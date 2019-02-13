@@ -138,7 +138,10 @@ if ! $nix/bin/nix-channel --list | grep -q "^nixpkgs "; then
     $nix/bin/nix-channel --add https://nixos.org/channels/nixpkgs-unstable
 fi
 if [ -z "$_NIX_INSTALLER_TEST" ]; then
-    $nix/bin/nix-channel --update nixpkgs
+    if ! $nix/bin/nix-channel --update nixpkgs; then
+        echo "Fetching the nixpkgs channel failed. (Are you offline?)"
+        echo "To try again later, run \"nix-channel --update nixpkgs\"."
+    fi
 fi
 
 added=

@@ -240,10 +240,16 @@ EOF
 }
 trap finish_fail EXIT
 
+channel_update_failed=0
 function finish_success {
     finish_cleanup
 
     ok "Alright! We're done!"
+    if [ "x$channel_update_failed" = x1 ]; then
+        echo ""
+        echo "But fetching the nixpkgs channel failed. (Are you offline?)"
+        echo "To try again later, run \"sudo -i nix-channel --update nixpkgs\"."
+    fi
     cat <<EOF
 
 Before Nix will work in your existing shells, you'll need to close
@@ -737,7 +743,9 @@ setup_default_profile() {
     # otherwise it will be lost in environments where sudo doesn't pass
     # all the environment variables by default.
     _sudo "to update the default channel in the default profile" \
-          HOME="$ROOT_HOME" NIX_SSL_CERT_FILE="$NIX_SSL_CERT_FILE" "$NIX_INSTALLED_NIX/bin/nix-channel" --update nixpkgs
+          HOME="$ROOT_HOME" NIX_SSL_CERT_FILE="$NIX_SSL_CERT_FILE" "$NIX_INSTALLED_NIX/bin/nix-channel" --update nixpkgs \
+          || channel_update_failed=1
+
 }
 
 
