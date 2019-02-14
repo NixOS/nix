@@ -1282,6 +1282,7 @@ ktorrent-2.2.1/NEWS
   <cmdsynopsis>
     <command>nix-store</command>
     <arg choice='plain'><option>--dump-db</option></arg>
+    <arg rep='repeat'><replaceable>paths</replaceable></arg>
   </cmdsynopsis>
 </refsection>
 
@@ -1291,6 +1292,13 @@ ktorrent-2.2.1/NEWS
 Nix database to standard output.  It can be loaded into an empty Nix
 store using <option>--load-db</option>.  This is useful for making
 backups and when migrating to different database schemas.</para>
+
+<para>By default, <option>--dump-db</option> will dump the entire Nix
+database.  When one or more store paths is passed, only the subset of
+the Nix database for those store paths is dumped.  As with
+<option>--export</option>, the user is responsible for passing all the
+store paths for a closure.  See <option>--export</option> for an
+example.</para>
 
 </refsection>
 

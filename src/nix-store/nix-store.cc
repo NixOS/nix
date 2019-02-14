@@ -485,11 +485,16 @@ static void opReadLog(Strings opFlags, Strings opArgs)
 static void opDumpDB(Strings opFlags, Strings opArgs)
 {
     if (!opFlags.empty()) throw UsageError("unknown flag");
-    if (!opArgs.empty())
-        throw UsageError("no arguments expected");
-    PathSet validPaths = store->queryAllValidPaths();
-    for (auto & i : validPaths)
-        cout << store->makeValidityRegistration({i}, true, true);
+    if (!opArgs.empty()) {
+        for (auto & i : opArgs)
+            i = store->followLinksToStorePath(i);
+        for (auto & i : opArgs)
+            cout << store->makeValidityRegistration({i}, true, true);
+    } else {
+        PathSet validPaths = store->queryAllValidPaths();
+        for (auto & i : validPaths)
+            cout << store->makeValidityRegistration({i}, true, true);
+    }
 }
 
 
