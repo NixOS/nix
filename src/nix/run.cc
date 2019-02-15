@@ -21,7 +21,7 @@ std::string chrootHelperName = "__run_in_chroot";
 
 struct CmdRun : InstallablesCommand
 {
-    std::vector<std::string> command = { "bash" };
+    std::vector<std::string> command;
     StringSet keep, unset;
     bool ignoreEnvironment = false;
 
@@ -30,7 +30,8 @@ struct CmdRun : InstallablesCommand
         mkFlag()
             .longName("command")
             .shortName('c')
-            .description("command and arguments to be executed; defaults to 'bash'")
+            .description("command and arguments to be executed; defaults to "
+                "\"$NIX_RUN_INTERACTIVE_SHELL\" if set, otherwise to 'bash'")
             .labels({"command", "args"})
             .arity(ArityAny)
             .handler([&](std::vector<std::string> ss) {
@@ -146,6 +147,11 @@ struct CmdRun : InstallablesCommand
         }
 
         setenv("PATH", concatStringsSep(":", unixPath).c_str(), 1);
+
+        if (command.empty()) {
+            auto interactiveShell = getenv("NIX_RUN_INTERACTIVE_SHELL");
+            command = { interactiveShell ? interactiveShell : "bash" };
+        }
 
         std::string cmd = *command.begin();
         Strings args;
