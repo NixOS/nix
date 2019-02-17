@@ -3537,6 +3537,29 @@ StorePathSet parseReferenceSpecifiers(Store & store, const BasicDerivation & drv
 }
 
 
+static void moveCheckToStore(const Path & src, const Path & dst)
+{
+    /* For the rename of directory to succeed, we must be running as root or
+       the directory must be made temporarily writable (to update the
+       directory's parent link ".."). */
+    struct stat st;
+    if (lstat(src.c_str(), &st) == -1) {
+        throw SysError(format("getting attributes of path '%1%'") % src);
+    }
+
+    bool changePerm = (geteuid() && S_ISDIR(st.st_mode) && !(st.st_mode & S_IWUSR));
+
+    if (changePerm)
+        chmod_(src, st.st_mode | S_IWUSR);
+
+    if (rename(src.c_str(), dst.c_str()))
+        throw SysError(format("renaming '%1%' to '%2%'") % src % dst);
+
+    if (changePerm)
+        chmod_(dst, st.st_mode);
+}
+
+
 void DerivationGoal::registerOutputs()
 {
     /* When using a build hook, the build hook can register the output
@@ -3715,8 +3738,7 @@ void DerivationGoal::registerOutputs()
                 if (settings.runDiffHook || settings.keepFailed) {
                     Path dst = worker.store.toRealPath(path + checkSuffix);
                     deletePath(dst);
-                    if (rename(actualPath.c_str(), dst.c_str()))
-                        throw SysError(format("renaming '%1%' to '%2%'") % actualPath % dst);
+                    moveCheckToStore(actualPath, dst);
 
                     handleDiffHook(
                         buildUser ? buildUser->getUID() : getuid(),
@@ -3724,10 +3746,10 @@ void DerivationGoal::registerOutputs()
                         path, dst, worker.store.printStorePath(drvPath), tmpDir);
 
                     throw NotDeterministic("derivation '%s' may not be deterministic: output '%s' differs from '%s'",
-                        worker.store.printStorePath(drvPath), path, dst);
+                        worker.store.printStorePath(drvPath), worker.store.toRealPath(path), dst);
                 } else
                     throw NotDeterministic("derivation '%s' may not be deterministic: output '%s' differs",
-                        worker.store.printStorePath(drvPath), path);
+                        worker.store.printStorePath(drvPath), worker.store.toRealPath(path));
             }
 
             /* Since we verified the build, it's now ultimately trusted. */
