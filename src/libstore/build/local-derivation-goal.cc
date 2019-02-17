@@ -2567,10 +2567,9 @@ void LocalDerivationGoal::registerOutputs()
     /* If this is the first round of several, then move the output out of the way. */
     if (nrRounds > 1 && curRound == 1 && curRound < nrRounds && keepPreviousRound) {
         for (auto & [_, outputStorePath] : finalOutputs) {
-            auto path = worker.store.printStorePath(outputStorePath);
-            Path prev = path + checkSuffix;
-            deletePath(prev);
+            auto path = worker.store.toRealPath(outputStorePath);
             Path dst = path + checkSuffix;
+            deletePath(dst);
             if (rename(path.c_str(), dst.c_str()))
                 throw SysError("renaming '%s' to '%s'", path, dst);
         }
@@ -2585,7 +2584,7 @@ void LocalDerivationGoal::registerOutputs()
        if the result was not determistic? */
     if (curRound == nrRounds) {
         for (auto & [_, outputStorePath] : finalOutputs) {
-            Path prev = worker.store.printStorePath(outputStorePath) + checkSuffix;
+            Path prev = worker.store.toRealPath(outputStorePath) + checkSuffix;
             deletePath(prev);
         }
     }
