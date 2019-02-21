@@ -141,19 +141,6 @@ static FlakeSourceInfo fetchFlake(EvalState & state, const FlakeRef & flakeRef)
     else abort();
 }
 
-struct Flake
-{
-    FlakeId id;
-    std::string description;
-    Path path;
-    std::vector<FlakeRef> requires;
-    std::unique_ptr<FlakeRegistry> lockFile;
-    Value * vProvides; // FIXME: gc
-    // commit hash
-    // date
-    // content hash
-};
-
 static Flake getFlake(EvalState & state, const FlakeRef & flakeRef)
 {
     auto sourceInfo = fetchFlake(state, flakeRef);

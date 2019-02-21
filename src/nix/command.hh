@@ -34,6 +34,17 @@ struct Buildable
 
 typedef std::vector<Buildable> Buildables;
 
+struct FlakeCommand : virtual Args, StoreCommand, MixEvalArgs
+{
+  std::string flakeUri;
+
+public:
+  FlakeCommand()
+  {
+    expectArg("flake-uri", &flakeUri);
+  }
+};
+
 struct Installable
 {
     virtual std::string what() = 0;

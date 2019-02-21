@@ -33,10 +33,31 @@ struct CmdFlakeList : StoreCommand, MixEvalArgs
     }
 };
 
+struct CmdFlakeInfo : FlakeCommand
+{
+    std::string name() override
+    {
+        return "info";
+    }
+
+    std::string description() override
+    {
+        return "list info about a given flake";
+    }
+
+    void run(nix::ref<nix::Store> store) override
+    {
+        auto evalState = std::make_shared<EvalState>(searchPath, store);
+        nix::Flake flake = nix::getFlake(*evalState, FlakeRef(flakeUri));
+        std::cout << "Location:    " << flake.path << "\n";
+        std::cout << "Description: " << flake.description << "\n";
+    }
+};
+
 struct CmdFlake : virtual MultiCommand, virtual Command
 {
     CmdFlake()
-        : MultiCommand({make_ref<CmdFlakeList>()})
+        : MultiCommand({make_ref<CmdFlakeList>(), make_ref<CmdFlakeInfo>()})
     {
     }
 
