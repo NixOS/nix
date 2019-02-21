@@ -11,7 +11,7 @@ struct CmdBuild : MixDryRun, InstallablesCommand
 {
     Path outLink = "result";
 
-    std::optional<std::string> flakeUri = std::nullopt;
+    std::optional<std::string> gitRepo = std::nullopt;
 
     CmdBuild()
     {
@@ -28,9 +28,9 @@ struct CmdBuild : MixDryRun, InstallablesCommand
             .set(&outLink, Path(""));
 
         mkFlag()
-            .longName("flake")
-            .description("update lock file of given flake")
-            .dest(&flakeUri);
+            .longName("update-lock-file")
+            .description("update the lock file")
+            .dest(&gitRepo);
     }
 
     std::string name() override
@@ -78,9 +78,8 @@ struct CmdBuild : MixDryRun, InstallablesCommand
                     }
         }
 
-        if (flakeUri) {
-            updateLockFile(*evalState, *flakeUri);
-        }
+        if(gitRepo)
+            updateLockFile(*evalState, *gitRepo);
     }
 };
 

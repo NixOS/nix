@@ -299,14 +299,14 @@ FlakeRegistry updateLockFile(EvalState & evalState, FlakeRef & flakeRef)
 void updateLockFile(EvalState & state, std::string path)
 {
     // 'path' is the path to the local flake repo.
-    FlakeRef flakeRef = FlakeRef(path);
+    FlakeRef flakeRef = FlakeRef("file://" + path);
     if (std::get_if<FlakeRef::IsGit>(&flakeRef.data)) {
         FlakeRegistry newLockFile = updateLockFile(state, flakeRef);
         writeRegistry(newLockFile, path + "/flake.lock");
     } else if (std::get_if<FlakeRef::IsGitHub>(&flakeRef.data)) {
-        throw UsageError("You can only update local flakes, not flakes on GitHub.");
+        throw UsageError("you can only update local flakes, not flakes on GitHub");
     } else {
-       throw UsageError("You can only update local flakes, not flakes through their FlakeId.");
+        throw UsageError("you can only update local flakes, not flakes through their FlakeId");
     }
 }
 

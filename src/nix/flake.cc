@@ -34,7 +34,7 @@ struct CmdFlakeList : StoreCommand, MixEvalArgs
     }
 };
 
-struct CmdFlakeUpdate : FlakeCommand
+struct CmdFlakeUpdate : StoreCommand, GitRepoCommand, MixEvalArgs
 {
     std::string name() override
     {
@@ -51,7 +51,12 @@ struct CmdFlakeUpdate : FlakeCommand
         auto evalState = std::make_shared<EvalState>(searchPath, store);
 
         if (flakeUri == "") flakeUri = absPath("./flake.nix");
-        updateLockFile(*evalState, flakeUri);
+        int result = updateLockFile(*evalState, flakeUri);
+        if (result == 1) {
+            std::cout << "You can only update local flakes, not flakes on GitHub.\n";
+        } else if (result == 2) {
+            std::cout << "You can only update local flakes, not flakes through their FlakeId.\n";
+        }
     }
 };
 
@@ -77,8 +82,8 @@ struct CmdFlakeInfo : FlakeCommand, MixJSON
             j["description"] = flake.description;
             std::cout << j.dump(4) << std::endl;
         } else {
-            std::cout << "Location:    " << flake.path << "\n";
             std::cout << "Description: " << flake.description << "\n";
+            std::cout << "Location:    " << flake.path << "\n";
         }
     }
 };
