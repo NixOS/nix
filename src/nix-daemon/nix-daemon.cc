@@ -566,7 +566,7 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
                 else if (setSubstituters(settings.extraSubstituters))
                     ;
                 else
-                    debug("ignoring untrusted setting '%s'", name);
+                    warn("ignoring untrusted setting '%s'", name);
             } catch (UsageError & e) {
                 warn(e.what());
             }
