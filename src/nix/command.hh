@@ -26,13 +26,6 @@ private:
     std::shared_ptr<Store> _store;
 };
 
-struct JsonFormattable : virtual Command
-{
-    bool jsonFormatting = false;;
-
-    JsonFormattable();
-};
-
 struct Buildable
 {
     Path drvPath; // may be empty

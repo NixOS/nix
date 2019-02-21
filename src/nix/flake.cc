@@ -34,7 +34,28 @@ struct CmdFlakeList : StoreCommand, MixEvalArgs
     }
 };
 
-struct CmdFlakeInfo : FlakeCommand, JsonFormattable
+struct CmdFlakeUpdate : FlakeCommand
+{
+    std::string name() override
+    {
+        return "update";
+    }
+
+    std::string description() override
+    {
+        return "update flake lock file";
+    }
+
+    void run(nix::ref<nix::Store> store) override
+    {
+        auto evalState = std::make_shared<EvalState>(searchPath, store);
+
+        if (flakeUri == "") flakeUri = absPath("./flake.nix");
+        updateLockFile(*evalState, flakeUri);
+    }
+};
+
+struct CmdFlakeInfo : FlakeCommand, MixJSON
 {
     std::string name() override
     {
@@ -50,7 +71,7 @@ struct CmdFlakeInfo : FlakeCommand, JsonFormattable
     {
         auto evalState = std::make_shared<EvalState>(searchPath, store);
         nix::Flake flake = nix::getFlake(*evalState, FlakeRef(flakeUri));
-        if (jsonFormatting) {
+        if (json) {
             nlohmann::json j;
             j["location"] = flake.path;
             j["description"] = flake.description;
@@ -65,7 +86,9 @@ struct CmdFlakeInfo : FlakeCommand, JsonFormattable
 struct CmdFlake : virtual MultiCommand, virtual Command
 {
     CmdFlake()
-        : MultiCommand({make_ref<CmdFlakeList>(), make_ref<CmdFlakeInfo>()})
+        : MultiCommand({make_ref<CmdFlakeList>()
+            , make_ref<CmdFlakeInfo>()
+            , make_ref<CmdFlakeUpdate>()})
     {
     }
 

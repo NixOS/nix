@@ -129,6 +129,9 @@ struct FlakeRef
     // Parse a flake URI.
     FlakeRef(const std::string & uri);
 
+    // Default constructor
+    FlakeRef(const FlakeRef & flakeRef) : data(flakeRef.data) {};
+
     /* Unify two flake references so that the resulting reference
        combines the information from both. For example,
        "nixpkgs/<hash>" and "github:NixOS/nixpkgs" unifies to

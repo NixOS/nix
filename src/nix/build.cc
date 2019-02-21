@@ -1,3 +1,5 @@
+#include "primops/flake.hh"
+#include "eval.hh"
 #include "command.hh"
 #include "common-args.hh"
 #include "shared.hh"
@@ -8,6 +10,8 @@ using namespace nix;
 struct CmdBuild : MixDryRun, InstallablesCommand
 {
     Path outLink = "result";
+
+    std::optional<std::string> flakeUri = std::nullopt;
 
     CmdBuild()
     {
@@ -22,6 +26,11 @@ struct CmdBuild : MixDryRun, InstallablesCommand
             .longName("no-link")
             .description("do not create a symlink to the build result")
             .set(&outLink, Path(""));
+
+        mkFlag()
+            .longName("flake")
+            .description("update lock file of given flake")
+            .dest(&flakeUri);
     }
 
     std::string name() override
@@ -52,6 +61,8 @@ struct CmdBuild : MixDryRun, InstallablesCommand
     {
         auto buildables = build(store, dryRun ? DryRun : Build, installables);
 
+        auto evalState = std::make_shared<EvalState>(searchPath, store);
+
         if (dryRun) return;
 
         for (size_t i = 0; i < buildables.size(); ++i) {
@@ -65,6 +76,10 @@ struct CmdBuild : MixDryRun, InstallablesCommand
                         if (output.first != "out") symlink += fmt("-%s", output.first);
                         store2->addPermRoot(output.second, absPath(symlink), true);
                     }
+        }
+
+        if (flakeUri) {
+            updateLockFile(*evalState, *flakeUri);
         }
     }
 };

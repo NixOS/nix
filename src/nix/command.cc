@@ -27,15 +27,6 @@ void StoreCommand::run()
     run(getStore());
 }
 
-JsonFormattable::JsonFormattable()
-{
-    mkFlag()
-        .longName("json-formattable")
-        .shortName('j')
-        .description("output will be printed as json")
-        .handler([&]() { jsonFormatting = true; });
-}
-
 StorePathsCommand::StorePathsCommand(bool recursive)
     : recursive(recursive)
 {
