@@ -639,7 +639,14 @@ struct CurlDownloader : public Downloader
             try {
 #ifdef ENABLE_S3
                 auto [bucketName, key, params] = parseS3Uri(request.uri);
-                S3Helper s3Helper("", Aws::Region::US_EAST_1, "", ""); // FIXME: make configurable
+
+                std::string profile = get(params, "profile", "");
+                std::string region = get(params, "region", Aws::Region::US_EAST_1);
+                std::string scheme = get(params, "scheme", "");
+                std::string endpoint = get(params, "endpoint", "");
+
+                S3Helper s3Helper(profile, region, scheme, endpoint);
+
                 // FIXME: implement ETag
                 auto s3Res = s3Helper.getObject(bucketName, key);
                 DownloadResult res;
