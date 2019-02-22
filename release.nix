@@ -278,7 +278,6 @@ let
       pkgs.runCommand "eval-nixos" { buildInputs = [ build.x86_64-linux ]; }
         ''
           export NIX_STATE_DIR=$TMPDIR
-          nix-store --init
 
           nix-instantiate ${nixpkgs}/nixos/release-combined.nix -A tested --dry-run \
             --arg nixpkgs '{ outPath = ${nixpkgs}; revCount = 123; shortRev = "abcdefgh"; }'

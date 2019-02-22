@@ -674,9 +674,6 @@ $NIX_INSTALLED_NIX.
 EOF
         fi
 
-        _sudo "to initialize the Nix Database" \
-              $NIX_INSTALLED_NIX/bin/nix-store --init
-
         cat ./.reginfo \
             | _sudo "to load data for the first time in to the Nix Database" \
                    "$NIX_INSTALLED_NIX/bin/nix-store" --load-db
