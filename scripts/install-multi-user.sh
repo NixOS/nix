@@ -747,7 +747,6 @@ build-users-group = $NIX_BUILD_GROUP_NAME
 
 max-jobs = $NIX_USER_COUNT
 cores = 1
-sandbox = false
 EOF
     _sudo "to place the default nix daemon configuration (part 2)" \
           install -m 0664 "$SCRATCH/nix.conf" /etc/nix/nix.conf
