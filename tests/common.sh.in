@@ -53,7 +53,6 @@ clearStore() {
     mkdir "$NIX_STORE_DIR"
     rm -rf "$NIX_STATE_DIR"
     mkdir "$NIX_STATE_DIR"
-    nix-store --init
     clearProfiles
 }
 
