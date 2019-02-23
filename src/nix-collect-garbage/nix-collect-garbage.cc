@@ -76,19 +76,30 @@ static int _main(int argc, char * * argv)
             return true;
         });
 
+        if (removeOld && dryRun)
+        {
+            // removeOldGenerations does not record any information
+            // about which generations would be deleted if dryRun is true, so
+            // we cannot get an accurate list of store paths to be deleted.
+            throw UsageError("Sorry, the --dry-run option is not yet "
+                "compatible with deleting generations.");
+        }
+
         initPlugins();
 
         auto profilesDir = settings.nixStateDir + "/profiles";
         if (removeOld) removeOldGenerations(profilesDir);
 
         // Run the actual garbage collector.
-        if (!dryRun) {
-            auto store = openStore();
-            options.action = GCOptions::gcDeleteDead;
-            GCResults results;
-            PrintFreed freed(true, results);
-            store->collectGarbage(options, results);
-        }
+        options.action = dryRun ? GCOptions::gcReturnDead : GCOptions::gcDeleteDead;
+        auto store = openStore();
+        GCResults results;
+        PrintFreed freed(!dryRun, results);
+        store->collectGarbage(options, results);
+
+        if (dryRun)
+            for (auto & i : results.paths)
+                std::cout << i << std::endl;
 
         return 0;
     }
