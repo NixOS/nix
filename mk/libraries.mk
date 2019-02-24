@@ -127,7 +127,7 @@ define build-library
     $$($(1)_PATH): $$($(1)_OBJS) | $$(_d)/
 	$(trace-ar) $(AR) crs $$@ $$?
 
-    $(1)_LDFLAGS_USE += $$($(1)_PATH) $$($(1)_LDFLAGS)
+    $(1)_LDFLAGS_USE += -Wl,--whole-archive $$($(1)_PATH) -Wl,--no-whole-archive $$($(1)_LDFLAGS)
 
     $(1)_INSTALL_PATH := $$(libdir)/$$($(1)_NAME).a
 
