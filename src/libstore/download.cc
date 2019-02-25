@@ -614,6 +614,22 @@ struct CurlDownloader : public Downloader
         writeFull(wakeupPipe.writeSide.get(), " ");
     }
 
+#ifdef ENABLE_S3
+    std::tuple<std::string, std::string, Store::Params> parseS3Uri(std::string uri)
+    {
+        auto [path, params] = splitUriAndParams(uri);
+
+        auto slash = path.find('/', 5); // 5 is the length of "s3://" prefix
+           if (slash == std::string::npos)
+               throw nix::Error("bad S3 URI '%s'", path);
+
+        std::string bucketName(path, 5, slash - 5);
+        std::string key(path, slash + 1);
+
+        return {bucketName, key, params};
+    }
+#endif
+
     void enqueueDownload(const DownloadRequest & request,
         Callback<DownloadResult> callback) override
     {
@@ -622,12 +638,8 @@ struct CurlDownloader : public Downloader
             // FIXME: do this on a worker thread
             try {
 #ifdef ENABLE_S3
+                auto [bucketName, key, params] = parseS3Uri(request.uri);
                 S3Helper s3Helper("", Aws::Region::US_EAST_1, "", ""); // FIXME: make configurable
-                auto slash = request.uri.find('/', 5);
-                if (slash == std::string::npos)
-                    throw nix::Error("bad S3 URI '%s'", request.uri);
-                std::string bucketName(request.uri, 5, slash - 5);
-                std::string key(request.uri, slash + 1);
                 // FIXME: implement ETag
                 auto s3Res = s3Helper.getObject(bucketName, key);
                 DownloadResult res;
