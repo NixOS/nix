@@ -657,7 +657,7 @@ std::pair<bool, std::string> EvalState::resolveSearchPathElem(const SearchPathEl
 
     if (isUri(elem.second)) {
         try {
-            res = { true, getDownloader()->downloadCached(store, elem.second, true) };
+            res = { true, getDownloader()->downloadCached(store, elem.second, true).path };
         } catch (DownloadError & e) {
             printError(format("warning: Nix search path entry '%1%' cannot be downloaded, ignoring") % elem.second);
             res = { false, "" };

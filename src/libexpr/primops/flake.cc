@@ -87,7 +87,13 @@ static FlakeRef lookupFlake(EvalState & state, const FlakeRef & flakeRef,
         return flakeRef;
 }
 
-static Path fetchFlake(EvalState & state, const FlakeRef & flakeRef)
+struct FlakeSourceInfo
+{
+    Path storePath;
+    std::optional<Hash> rev;
+};
+
+static FlakeSourceInfo fetchFlake(EvalState & state, const FlakeRef & flakeRef)
 {
     assert(flakeRef.isDirect());
 
@@ -99,25 +105,36 @@ static Path fetchFlake(EvalState & state, const FlakeRef & flakeRef)
 
         // FIXME: support passing auth tokens for private repos.
 
-        auto storePath = getDownloader()->downloadCached(state.store,
-            fmt("https://api.github.com/repos/%s/%s/tarball/%s",
-                refData->owner, refData->repo,
-                refData->rev
-                  ? refData->rev->to_string(Base16, false)
-                  : refData->ref
-                    ? *refData->ref
-                    : "master"),
-            true, "source");
+        auto url = fmt("https://api.github.com/repos/%s/%s/tarball/%s",
+            refData->owner, refData->repo,
+            refData->rev
+                ? refData->rev->to_string(Base16, false)
+                : refData->ref
+                  ? *refData->ref
+                  : "master");
 
-        // FIXME: extract revision hash from ETag.
+        auto result = getDownloader()->downloadCached(state.store, url, true, "source");
 
-        return storePath;
+        if (!result.etag)
+            throw Error("did not receive an ETag header from '%s'", url);
+
+        if (result.etag->size() != 42 || (*result.etag)[0] != '"' || (*result.etag)[41] != '"')
+            throw Error("ETag header '%s' from '%s' is not a Git revision", *result.etag, url);
+
+        FlakeSourceInfo info;
+        info.storePath = result.path;
+        info.rev = Hash(std::string(*result.etag, 1, result.etag->size() - 2), htSHA1);
+
+        return info;
     }
 
     else if (auto refData = std::get_if<FlakeRef::IsGit>(&flakeRef.data)) {
         auto gitInfo = exportGit(state.store, refData->uri, refData->ref,
             refData->rev ? refData->rev->to_string(Base16, false) : "", "source");
-        return gitInfo.storePath;
+        FlakeSourceInfo info;
+        info.storePath = gitInfo.storePath;
+        info.rev = Hash(gitInfo.rev, htSHA1);
+        return info;
     }
 
     else abort();
@@ -138,7 +155,11 @@ struct Flake
 
 static Flake getFlake(EvalState & state, const FlakeRef & flakeRef)
 {
-    auto flakePath = fetchFlake(state, flakeRef);
+    auto sourceInfo = fetchFlake(state, flakeRef);
+    debug("got flake source '%s' with revision %s",
+        sourceInfo.storePath, sourceInfo.rev.value_or(Hash(htSHA1)).to_string(Base16, false));
+
+    auto flakePath = sourceInfo.storePath;
     state.store->assertStorePath(flakePath);
 
     if (state.allowedPaths)

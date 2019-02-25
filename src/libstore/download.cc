@@ -771,7 +771,7 @@ void Downloader::download(DownloadRequest && request, Sink & sink)
     }
 }
 
-Path Downloader::downloadCached(ref<Store> store, const string & url_, bool unpack, string name, const Hash & expectedHash, string * effectiveUrl, int ttl)
+CachedDownloadResult Downloader::downloadCached(ref<Store> store, const string & url_, bool unpack, string name, const Hash & expectedHash, string * effectiveUrl, int ttl)
 {
     auto url = resolveUri(url_);
 
@@ -783,8 +783,11 @@ Path Downloader::downloadCached(ref<Store> store, const string & url_, bool unpa
     Path expectedStorePath;
     if (expectedHash) {
         expectedStorePath = store->makeFixedOutputPath(unpack, expectedHash, name);
-        if (store->isValidPath(expectedStorePath))
-            return store->toRealPath(expectedStorePath);
+        if (store->isValidPath(expectedStorePath)) {
+            CachedDownloadResult result;
+            result.path = store->toRealPath(expectedStorePath);
+            return result;
+        }
     }
 
     Path cacheDir = getCacheDir() + "/nix/tarballs";
@@ -803,6 +806,8 @@ Path Downloader::downloadCached(ref<Store> store, const string & url_, bool unpa
 
     bool skip = false;
 
+    CachedDownloadResult result;
+
     if (pathExists(fileLink) && pathExists(dataFile)) {
         storePath = readLink(fileLink);
         store->addTempRoot(storePath);
@@ -814,6 +819,7 @@ Path Downloader::downloadCached(ref<Store> store, const string & url_, bool unpa
                     skip = true;
                     if (effectiveUrl)
                         *effectiveUrl = url_;
+                    result.etag = ss[1];
                 } else if (!ss[1].empty()) {
                     debug(format("verifying previous ETag '%1%'") % ss[1]);
                     expectedETag = ss[1];
@@ -831,6 +837,7 @@ Path Downloader::downloadCached(ref<Store> store, const string & url_, bool unpa
             auto res = download(request);
             if (effectiveUrl)
                 *effectiveUrl = res.effectiveUrl;
+            result.etag = res.etag;
 
             if (!res.cached) {
                 ValidPathInfo info;
@@ -852,6 +859,7 @@ Path Downloader::downloadCached(ref<Store> store, const string & url_, bool unpa
         } catch (DownloadError & e) {
             if (storePath.empty()) throw;
             printError(format("warning: %1%; using cached result") % e.msg());
+            result.etag = expectedETag;
         }
     }
 
@@ -885,7 +893,8 @@ Path Downloader::downloadCached(ref<Store> store, const string & url_, bool unpa
             url, expectedHash.to_string(), gotHash.to_string());
     }
 
-    return store->toRealPath(storePath);
+    result.path = store->toRealPath(storePath);
+    return result;
 }
 
 
