@@ -113,7 +113,8 @@ static FlakeSourceInfo fetchFlake(EvalState & state, const FlakeRef & flakeRef)
                   ? *refData->ref
                   : "master");
 
-        auto result = getDownloader()->downloadCached(state.store, url, true, "source");
+        auto result = getDownloader()->downloadCached(state.store, url, true, "source",
+            Hash(), nullptr, refData->rev ? 1000000000 : settings.tarballTtl);
 
         if (!result.etag)
             throw Error("did not receive an ETag header from '%s'", url);
