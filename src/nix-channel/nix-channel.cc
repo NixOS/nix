@@ -88,7 +88,7 @@ static void update(const StringSet & channelNames)
         // definition from a consistent location if the redirect changes mid-download.
         std::string effectiveUrl;
         auto dl = getDownloader();
-        auto filename = dl->downloadCached(store, url, false, "", Hash(), &effectiveUrl, 0);
+        auto filename = dl->downloadCached(store, url, false, "", Hash(), &effectiveUrl, 0).path;
         url = chomp(std::move(effectiveUrl));
 
         // If the URL contains a version number, append it to the name
@@ -123,10 +123,10 @@ static void update(const StringSet & channelNames)
             // Download the channel tarball.
             auto fullURL = url + "/nixexprs.tar.xz";
             try {
-                filename = dl->downloadCached(store, fullURL, false);
+                filename = dl->downloadCached(store, fullURL, false).path;
             } catch (DownloadError & e) {
                 fullURL = url + "/nixexprs.tar.bz2";
-                filename = dl->downloadCached(store, fullURL, false);
+                filename = dl->downloadCached(store, fullURL, false).path;
             }
             chomp(filename);
         }
