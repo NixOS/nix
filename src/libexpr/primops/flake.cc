@@ -31,6 +31,18 @@ static std::unique_ptr<FlakeRegistry> readRegistry(const Path & path)
     return registry;
 }
 
+/* Write the registry or lock file to a file. */
+static void writeRegistry(FlakeRegistry registry, Path path = "./flake.lock")
+{
+    nlohmann::json json = {};
+    json["value"] = 0; // Not sure whether this should be 0.
+    json["flakes"] = {};
+    for (auto elem : registry.entries) {
+        json["flakes"][elem.first] = elem.second.ref.to_string();
+    }
+    writeFile(path, json.dump(4)); // The '4' is the number of spaces used in the indentation in the json file.
+}
+
 const FlakeRegistry & EvalState::getFlakeRegistry()
 {
     std::call_once(_flakeRegistryInit, [&]()

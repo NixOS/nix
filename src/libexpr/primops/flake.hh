@@ -35,4 +35,6 @@ struct Flake
 };
 
 Flake getFlake(EvalState & state, const FlakeRef & flakeRef);
+
+void writeRegistry(FlakeRegistry);
 }
