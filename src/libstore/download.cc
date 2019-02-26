@@ -620,8 +620,8 @@ struct CurlDownloader : public Downloader
         auto [path, params] = splitUriAndParams(uri);
 
         auto slash = path.find('/', 5); // 5 is the length of "s3://" prefix
-           if (slash == std::string::npos)
-               throw nix::Error("bad S3 URI '%s'", path);
+            if (slash == std::string::npos)
+                throw nix::Error("bad S3 URI '%s'", path);
 
         std::string bucketName(path, 5, slash - 5);
         std::string key(path, slash + 1);
