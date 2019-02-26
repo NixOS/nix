@@ -798,4 +798,8 @@ ValidPathInfo decodeValidPathInfo(std::istream & str,
    for paths created by makeFixedOutputPath() / addToStore(). */
 std::string makeFixedOutputCA(bool recursive, const Hash & hash);
 
+
+/* Split URI into protocol+hierarchy part and its parameter set. */
+std::pair<std::string, Store::Params> splitUriAndParams(const std::string & uri);
+
 }
