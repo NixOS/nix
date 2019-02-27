@@ -333,9 +333,7 @@ Roots LocalStore::findRootsNoTemp()
        NIX_ROOT_FINDER environment variable.  This is typically used
        to add running programs to the set of roots (to prevent them
        from being garbage collected). */
-    size_t n = 0;
-    for (auto & root : findRuntimeRoots())
-        roots[fmt("{memory:%d}", n++)] = root;
+    findRuntimeRoots(roots);
 
     return roots;
 }
@@ -357,8 +355,7 @@ Roots LocalStore::findRoots()
     return roots;
 }
 
-
-static void readProcLink(const string & file, StringSet & paths)
+static void readProcLink(const string & file, Roots & roots)
 {
     /* 64 is the starting buffer size gnu readlink uses... */
     auto bufsiz = ssize_t{64};
@@ -377,7 +374,7 @@ try_again:
         goto try_again;
     }
     if (res > 0 && buf[0] == '/')
-        paths.emplace(static_cast<char *>(buf), res);
+        roots.emplace(file, std::string(static_cast<char *>(buf), res));
     return;
 }
 
@@ -387,20 +384,20 @@ static string quoteRegexChars(const string & raw)
     return std::regex_replace(raw, specialRegex, R"(\$&)");
 }
 
-static void readFileRoots(const char * path, StringSet & paths)
+static void readFileRoots(const char * path, Roots & roots)
 {
     try {
-        paths.emplace(readFile(path));
+        roots.emplace(path, readFile(path));
     } catch (SysError & e) {
         if (e.errNo != ENOENT && e.errNo != EACCES)
             throw;
     }
 }
 
-PathSet LocalStore::findRuntimeRoots()
+void LocalStore::findRuntimeRoots(Roots & roots)
 {
-    PathSet roots;
-    StringSet paths;
+    Roots unchecked;
+
     auto procDir = AutoCloseDir{opendir("/proc")};
     if (procDir) {
         struct dirent * ent;
@@ -410,8 +407,8 @@ PathSet LocalStore::findRuntimeRoots()
         while (errno = 0, ent = readdir(procDir.get())) {
             checkInterrupt();
             if (std::regex_match(ent->d_name, digitsRegex)) {
-                readProcLink((format("/proc/%1%/exe") % ent->d_name).str(), paths);
-                readProcLink((format("/proc/%1%/cwd") % ent->d_name).str(), paths);
+                readProcLink((format("/proc/%1%/exe") % ent->d_name).str(), unchecked);
+                readProcLink((format("/proc/%1%/cwd") % ent->d_name).str(), unchecked);
 
                 auto fdStr = (format("/proc/%1%/fd") % ent->d_name).str();
                 auto fdDir = AutoCloseDir(opendir(fdStr.c_str()));
@@ -423,7 +420,7 @@ PathSet LocalStore::findRuntimeRoots()
                 struct dirent * fd_ent;
                 while (errno = 0, fd_ent = readdir(fdDir.get())) {
                     if (fd_ent->d_name[0] != '.') {
-                        readProcLink((format("%1%/%2%") % fdStr % fd_ent->d_name).str(), paths);
+                        readProcLink((format("%1%/%2%") % fdStr % fd_ent->d_name).str(), unchecked);
                     }
                 }
                 if (errno) {
@@ -434,18 +431,22 @@ PathSet LocalStore::findRuntimeRoots()
                 fdDir.reset();
 
                 try {
-                    auto mapLines =
-                        tokenizeString<std::vector<string>>(readFile((format("/proc/%1%/maps") % ent->d_name).str(), true), "\n");
+                    auto mapFile = (format("/proc/%1%/maps") % ent->d_name).str();
+                    auto mapLines = tokenizeString<std::vector<string>>(readFile(mapFile, true), "\n");
+                    int n = 0;
                     for (const auto& line : mapLines) {
+                        n++;
                         auto match = std::smatch{};
                         if (std::regex_match(line, match, mapRegex))
-                            paths.emplace(match[1]);
+                            unchecked.emplace((format("{%1%:%2%}") % mapFile % n).str(), match[1]);
                     }
 
-                    auto envString = readFile((format("/proc/%1%/environ") % ent->d_name).str(), true);
+                    auto envFile = (format("/proc/%1%/environ") % ent->d_name).str();
+                    auto envString = readFile(envFile, true);
                     auto env_end = std::sregex_iterator{};
+                    n = 0;
                     for (auto i = std::sregex_iterator{envString.begin(), envString.end(), storePathRegex}; i != env_end; ++i)
-                        paths.emplace(i->str());
+                        unchecked.emplace((format("{%1%:%2%}") % envFile % envString).str(), i->str());
                 } catch (SysError & e) {
                     if (errno == ENOENT || errno == EACCES || errno == ESRCH)
                         continue;
@@ -462,10 +463,11 @@ PathSet LocalStore::findRuntimeRoots()
         std::regex lsofRegex(R"(^n(/.*)$)");
         auto lsofLines =
             tokenizeString<std::vector<string>>(runProgram(LSOF, true, { "-n", "-w", "-F", "n" }), "\n");
+        int n = 0;
         for (const auto & line : lsofLines) {
             std::smatch match;
             if (std::regex_match(line, match, lsofRegex))
-                paths.emplace(match[1]);
+                unchecked.emplace((format("{%1%:%2%}" % LSOF % n++).str(), match[1]);
         }
     } catch (ExecError & e) {
         /* lsof not installed, lsof failed */
@@ -473,21 +475,20 @@ PathSet LocalStore::findRuntimeRoots()
 #endif
 
 #if defined(__linux__)
-    readFileRoots("/proc/sys/kernel/modprobe", paths);
-    readFileRoots("/proc/sys/kernel/fbsplash", paths);
-    readFileRoots("/proc/sys/kernel/poweroff_cmd", paths);
+    readFileRoots("/proc/sys/kernel/modprobe", unchecked);
+    readFileRoots("/proc/sys/kernel/fbsplash", unchecked);
+    readFileRoots("/proc/sys/kernel/poweroff_cmd", unchecked);
 #endif
 
-    for (auto & i : paths)
-        if (isInStore(i)) {
-            Path path = toStorePath(i);
-            if (roots.find(path) == roots.end() && isStorePath(path) && isValidPath(path)) {
+    for (auto & root : unchecked) {
+        if (isInStore(root.second)) {
+            Path path = toStorePath(root.second);
+            if (isStorePath(path) && isValidPath(path)) {
                 debug(format("got additional root '%1%'") % path);
-                roots.insert(path);
+                roots.emplace(root.first, path);
             }
         }
-
-    return roots;
+    }
 }
 
 

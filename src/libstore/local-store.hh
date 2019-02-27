@@ -269,7 +269,7 @@ private:
 
     Roots findRootsNoTemp();
 
-    PathSet findRuntimeRoots();
+    void findRuntimeRoots(Roots & roots);
 
     void removeUnusedLinks(const GCState & state);
 
