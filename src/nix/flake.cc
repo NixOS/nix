@@ -4,6 +4,7 @@
 #include "shared.hh"
 #include "progress-bar.hh"
 #include "eval.hh"
+#include <nlohmann/json.hpp>
 
 using namespace nix;
 
@@ -33,7 +34,7 @@ struct CmdFlakeList : StoreCommand, MixEvalArgs
     }
 };
 
-struct CmdFlakeInfo : FlakeCommand
+struct CmdFlakeInfo : FlakeCommand, JsonFormattable
 {
     std::string name() override
     {
@@ -49,8 +50,15 @@ struct CmdFlakeInfo : FlakeCommand
     {
         auto evalState = std::make_shared<EvalState>(searchPath, store);
         nix::Flake flake = nix::getFlake(*evalState, FlakeRef(flakeUri));
-        std::cout << "Location:    " << flake.path << "\n";
-        std::cout << "Description: " << flake.description << "\n";
+        if (jsonFormatting) {
+            nlohmann::json j;
+            j["location"] = flake.path;
+            j["description"] = flake.description;
+            std::cout << j.dump(4) << std::endl;
+        } else {
+            std::cout << "Location:    " << flake.path << "\n";
+            std::cout << "Description: " << flake.description << "\n";
+        }
     }
 };
 

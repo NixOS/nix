@@ -34,5 +34,5 @@ struct Flake
     // content hash
 };
 
-static Flake getFlake(EvalState & state, const FlakeRef & flakeRef);
+Flake getFlake(EvalState & state, const FlakeRef & flakeRef);
 }

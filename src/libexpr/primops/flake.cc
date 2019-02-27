@@ -141,7 +141,7 @@ static FlakeSourceInfo fetchFlake(EvalState & state, const FlakeRef & flakeRef)
     else abort();
 }
 
-static Flake getFlake(EvalState & state, const FlakeRef & flakeRef)
+Flake getFlake(EvalState & state, const FlakeRef & flakeRef)
 {
     auto sourceInfo = fetchFlake(state, flakeRef);
     debug("got flake source '%s' with revision %s",
