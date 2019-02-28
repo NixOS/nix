@@ -130,7 +130,7 @@ Path LocalFSStore::addPermRoot(const Path & _storePath,
        gcroots directory. */
     if (settings.checkRootReachability) {
         Roots roots = findRoots();
-        if (roots.find(gcRoot) == roots.end())
+        if (roots[storePath].count(gcRoot) == 0)
             printError(
                 format(
                     "warning: '%1%' is not in a directory where the garbage collector looks for roots; "
@@ -266,7 +266,7 @@ void LocalStore::findRoots(const Path & path, unsigned char type, Roots & roots)
     auto foundRoot = [&](const Path & path, const Path & target) {
         Path storePath = toStorePath(target);
         if (isStorePath(storePath) && isValidPath(storePath))
-            roots[path] = storePath;
+            roots[storePath].emplace(path);
         else
             printInfo(format("skipping invalid root from '%1%' to '%2%'") % path % storePath);
     };
@@ -306,7 +306,7 @@ void LocalStore::findRoots(const Path & path, unsigned char type, Roots & roots)
         else if (type == DT_REG) {
             Path storePath = storeDir + "/" + baseNameOf(path);
             if (isStorePath(storePath) && isValidPath(storePath))
-                roots[path] = storePath;
+                roots[storePath].emplace(path);
         }
 
     }
@@ -346,10 +346,10 @@ Roots LocalStore::findRoots()
     FDs fds;
     pid_t prev = -1;
     size_t n = 0;
-    for (auto & root : readTempRoots(fds)) {
-        if (prev != root.first) n = 0;
-        prev = root.first;
-        roots[fmt("{temp:%d:%d}", root.first, n++)] = root.second;
+    for (auto & [pid, root] : readTempRoots(fds)) {
+        if (prev != pid) n = 0;
+        prev = pid;
+        roots[root].emplace(fmt("{temp:%d:%d}", pid, n++));
     }
 
     return roots;
@@ -374,8 +374,8 @@ try_again:
         goto try_again;
     }
     if (res > 0 && buf[0] == '/')
-        roots.emplace((format("{memory:%1%") % file).str(),
-                std::string(static_cast<char *>(buf), res));
+        roots[std::string(static_cast<char *>(buf), res)]
+            .emplace((format("{memory:%1%") % file).str());
     return;
 }
 
@@ -388,7 +388,7 @@ static string quoteRegexChars(const string & raw)
 static void readFileRoots(const char * path, Roots & roots)
 {
     try {
-        roots.emplace(path, readFile(path));
+        roots[readFile(path)].emplace(path);
     } catch (SysError & e) {
         if (e.errNo != ENOENT && e.errNo != EACCES)
             throw;
@@ -434,19 +434,17 @@ void LocalStore::findRuntimeRoots(Roots & roots)
                 try {
                     auto mapFile = (format("/proc/%1%/maps") % ent->d_name).str();
                     auto mapLines = tokenizeString<std::vector<string>>(readFile(mapFile, true), "\n");
-                    int n = 0;
                     for (const auto& line : mapLines) {
                         auto match = std::smatch{};
                         if (std::regex_match(line, match, mapRegex))
-                            unchecked.emplace((format("{memory:%1%:%2%}") % mapFile % n++).str(), match[1]);
+                            unchecked[match[1]].emplace((format("{memory:%1%}") % mapFile).str());
                     }
 
                     auto envFile = (format("/proc/%1%/environ") % ent->d_name).str();
                     auto envString = readFile(envFile, true);
                     auto env_end = std::sregex_iterator{};
-                    n = 0;
                     for (auto i = std::sregex_iterator{envString.begin(), envString.end(), storePathRegex}; i != env_end; ++i)
-                        unchecked.emplace((format("{memory:%1%:%2%}") % envFile % n++).str(), i->str());
+                        unchecked[i->str()].emplace((format("{memory:%1%}") % envFile).str());
                 } catch (SysError & e) {
                     if (errno == ENOENT || errno == EACCES || errno == ESRCH)
                         continue;
@@ -463,11 +461,10 @@ void LocalStore::findRuntimeRoots(Roots & roots)
         std::regex lsofRegex(R"(^n(/.*)$)");
         auto lsofLines =
             tokenizeString<std::vector<string>>(runProgram(LSOF, true, { "-n", "-w", "-F", "n" }), "\n");
-        int n = 0;
         for (const auto & line : lsofLines) {
             std::smatch match;
             if (std::regex_match(line, match, lsofRegex))
-                unchecked.emplace((format("{memory:%1%:%2%}" % LSOF % n++).str(), match[1]);
+                unchecked[match[1]].emplace((format("{memory:%1%}" % LSOF).str());
         }
     } catch (ExecError & e) {
         /* lsof not installed, lsof failed */
@@ -480,12 +477,12 @@ void LocalStore::findRuntimeRoots(Roots & roots)
     readFileRoots("/proc/sys/kernel/poweroff_cmd", unchecked);
 #endif
 
-    for (auto & root : unchecked) {
-        if (isInStore(root.second)) {
-            Path path = toStorePath(root.second);
+    for (auto & [target, links] : unchecked) {
+        if (isInStore(target)) {
+            Path path = toStorePath(target);
             if (isStorePath(path) && isValidPath(path)) {
                 debug(format("got additional root '%1%'") % path);
-                roots.emplace(root.first, path);
+                roots[path].insert(links.begin(), links.end());
             }
         }
     }
@@ -757,7 +754,7 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
     printError(format("finding garbage collector roots..."));
     Roots rootMap = options.ignoreLiveness ? Roots() : findRootsNoTemp();
 
-    for (auto & i : rootMap) state.roots.insert(i.second);
+    for (auto & i : rootMap) state.roots.insert(i.first);
 
     /* Read the temporary roots.  This acquires read locks on all
        per-process temporary root files.  So after this point no paths

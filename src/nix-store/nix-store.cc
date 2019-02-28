@@ -428,9 +428,10 @@ static void opQuery(Strings opFlags, Strings opArgs)
                     referrers, true, settings.gcKeepOutputs, settings.gcKeepDerivations);
             }
             Roots roots = store->findRoots();
-            for (auto & i : roots)
-                if (referrers.find(i.second) != referrers.end())
-                    cout << format("%1%\n") % i.first;
+            for (auto & [path, roots] : roots)
+                if (referrers.find(path) != referrers.end())
+                    for (auto & root : roots)
+                        cout << format("%1% -> %2%\n") % root % path;
             break;
         }
 
@@ -591,8 +592,9 @@ static void opGC(Strings opFlags, Strings opArgs)
 
     if (printRoots) {
         Roots roots = store->findRoots();
-        for (auto & i : roots)
-            cout << i.first << " -> " << i.second << std::endl;
+        for (auto & [path, roots] : roots)
+            for (auto & root : roots)
+                cout << root << " -> " << path << std::endl;
     }
 
     else {

@@ -47,7 +47,7 @@ const size_t storePathHashLen = 32; // i.e. 160 bits
 const uint32_t exportMagic = 0x4558494e;
 
 
-typedef std::map<Path, Path> Roots;
+typedef std::map<Path, std::set<std::string>> Roots;
 
 
 struct GCOptions

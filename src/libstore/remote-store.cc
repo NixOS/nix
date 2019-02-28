@@ -606,7 +606,7 @@ Roots RemoteStore::findRoots()
     while (count--) {
         Path link = readString(conn->from);
         Path target = readStorePath(*this, conn->from);
-        result[link] = target;
+        result[target].emplace(link);
     }
     return result;
 }
