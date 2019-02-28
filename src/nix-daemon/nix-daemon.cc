@@ -478,8 +478,15 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
         Roots roots = store->findRoots();
         logger->stopWork();
         to << roots.size();
-        for (auto & i : roots)
-            to << i.first << i.second;
+        int n = 0;
+        for (auto & i : roots) {
+            // Obfuscate 'memory' roots as they exposes information about other users,
+            if (i.first.rfind("{memory:", 0) == 0) {
+               to << fmt("{memory:%d}", n++) << i.second;
+            } else {
+               to << i.first << i.second;
+            }
+        }
         break;
     }
 

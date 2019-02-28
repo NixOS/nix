@@ -374,7 +374,8 @@ try_again:
         goto try_again;
     }
     if (res > 0 && buf[0] == '/')
-        roots.emplace(file, std::string(static_cast<char *>(buf), res));
+        roots.emplace((format("{memory:%1%") % file).str(),
+                std::string(static_cast<char *>(buf), res));
     return;
 }
 
@@ -407,8 +408,8 @@ void LocalStore::findRuntimeRoots(Roots & roots)
         while (errno = 0, ent = readdir(procDir.get())) {
             checkInterrupt();
             if (std::regex_match(ent->d_name, digitsRegex)) {
-                readProcLink((format("/proc/%1%/exe") % ent->d_name).str(), unchecked);
-                readProcLink((format("/proc/%1%/cwd") % ent->d_name).str(), unchecked);
+                readProcLink((format("{memory:/proc/%1%/exe}") % ent->d_name).str(), unchecked);
+                readProcLink((format("{memory:/proc/%1%/cwd}") % ent->d_name).str(), unchecked);
 
                 auto fdStr = (format("/proc/%1%/fd") % ent->d_name).str();
                 auto fdDir = AutoCloseDir(opendir(fdStr.c_str()));
@@ -435,10 +436,9 @@ void LocalStore::findRuntimeRoots(Roots & roots)
                     auto mapLines = tokenizeString<std::vector<string>>(readFile(mapFile, true), "\n");
                     int n = 0;
                     for (const auto& line : mapLines) {
-                        n++;
                         auto match = std::smatch{};
                         if (std::regex_match(line, match, mapRegex))
-                            unchecked.emplace((format("{%1%:%2%}") % mapFile % n).str(), match[1]);
+                            unchecked.emplace((format("{memory:%1%:%2%}") % mapFile % n++).str(), match[1]);
                     }
 
                     auto envFile = (format("/proc/%1%/environ") % ent->d_name).str();
@@ -446,7 +446,7 @@ void LocalStore::findRuntimeRoots(Roots & roots)
                     auto env_end = std::sregex_iterator{};
                     n = 0;
                     for (auto i = std::sregex_iterator{envString.begin(), envString.end(), storePathRegex}; i != env_end; ++i)
-                        unchecked.emplace((format("{%1%:%2%}") % envFile % envString).str(), i->str());
+                        unchecked.emplace((format("{memory:%1%:%2%}") % envFile % n++).str(), i->str());
                 } catch (SysError & e) {
                     if (errno == ENOENT || errno == EACCES || errno == ESRCH)
                         continue;
@@ -467,7 +467,7 @@ void LocalStore::findRuntimeRoots(Roots & roots)
         for (const auto & line : lsofLines) {
             std::smatch match;
             if (std::regex_match(line, match, lsofRegex))
-                unchecked.emplace((format("{%1%:%2%}" % LSOF % n++).str(), match[1]);
+                unchecked.emplace((format("{memory:%1%:%2%}" % LSOF % n++).str(), match[1]);
         }
     } catch (ExecError & e) {
         /* lsof not installed, lsof failed */
