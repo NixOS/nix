@@ -478,15 +478,29 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
         Roots roots = store->findRoots();
         logger->stopWork();
         size_t total_length = 0;
-        for (auto & root : roots)
-            total_length += root.second.size();
+        bool hasMemoryLink;
+        for (auto & [target, links] : roots) {
+            hasMemoryLink = false;
+            for (auto & link : links) {
+                if (link.rfind("{memory:", 0) == 0) {
+                    if (hasMemoryLink) continue;
+                    ++total_length;
+                    hasMemoryLink = true;
+                } else {
+                    ++total_length;
+                }
+            }
+        }
         to << total_length;
         int n = 0;
         for (auto & [target, links] : roots) {
+            bool hasMemoryLink = false;
             for (auto & link : links) {
                 // Obfuscate 'memory' roots as they expose information about other users,
                 if (link.rfind("{memory:", 0) == 0) {
+                    if (hasMemoryLink) continue;
                     to << fmt("{memory:%d}", n++) << target;
+                    hasMemoryLink = true;
                 } else {
                     to << link << target;
                 }
