@@ -428,10 +428,10 @@ static void opQuery(Strings opFlags, Strings opArgs)
                     referrers, true, settings.gcKeepOutputs, settings.gcKeepDerivations);
             }
             Roots roots = store->findRoots();
-            for (auto & [path, roots] : roots)
+            for (auto & [path, links] : roots)
                 if (referrers.find(path) != referrers.end())
-                    for (auto & root : roots)
-                        cout << format("%1% -> %2%\n") % root % path;
+                    for (auto & link : links)
+                        cout << format("%1%\n") % link;
             break;
         }
 
