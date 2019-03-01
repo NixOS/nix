@@ -431,7 +431,7 @@ static void opQuery(Strings opFlags, Strings opArgs)
             for (auto & [path, links] : roots)
                 if (referrers.find(path) != referrers.end())
                     for (auto & link : links)
-                        cout << format("%1%\n") % link;
+                        cout << format("%1% -> %2%\n") % link % path;
             break;
         }
 
