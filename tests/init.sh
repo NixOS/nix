@@ -25,6 +25,9 @@ fsync-metadata = false
 !include nix.conf.extra.not-there
 EOF
 
+# Initialise the database.
+nix-store --init
+
 # Did anything happen?
 test -e "$NIX_STATE_DIR"/db/db.sqlite
 
