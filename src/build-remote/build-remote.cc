@@ -38,6 +38,12 @@ static AutoCloseFD openSlotLock(const Machine & m, unsigned long long slot)
     return openLockFile(fmt("%s/%s-%d", currentLoad, escapeUri(m.storeUri), slot), true);
 }
 
+static bool allSupportedLocally(const std::set<std::string>& requiredFeatures) {
+    for (auto & feature : requiredFeatures)
+        if (!settings.systemFeatures.get().count(feature)) return false;
+    return true;
+}
+
 static int _main(int argc, char * * argv)
 {
     {
@@ -97,9 +103,10 @@ static int _main(int argc, char * * argv)
             source >> drvPath;
             auto requiredFeatures = readStrings<std::set<std::string>>(source);
 
-            auto canBuildLocally = amWilling
-                &&  (  neededSystem == settings.thisSystem
-                    || settings.extraPlatforms.get().count(neededSystem) > 0);
+             auto canBuildLocally = amWilling
+                 &&  (  neededSystem == settings.thisSystem
+                     || settings.extraPlatforms.get().count(neededSystem) > 0)
+                 &&  allSupportedLocally(requiredFeatures);
 
             /* Error ignored here, will be caught later */
             mkdir(currentLoad.c_str(), 0777);
