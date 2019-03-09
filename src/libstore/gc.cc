@@ -197,10 +197,8 @@ void LocalStore::addTempRoot(const Path & path)
 }
 
 
-std::set<std::pair<pid_t, Path>> LocalStore::readTempRoots(FDs & fds)
+void LocalStore::findTempRoots(FDs & fds, Roots & tempRoots)
 {
-    std::set<std::pair<pid_t, Path>> tempRoots;
-
     /* Read the `temproots' directory for per-process temporary root
        files. */
     for (auto & i : readDirectory(tempRootsDir)) {
@@ -250,14 +248,12 @@ std::set<std::pair<pid_t, Path>> LocalStore::readTempRoots(FDs & fds)
             Path root(contents, pos, end - pos);
             debug("got temporary root '%s'", root);
             assertStorePath(root);
-            tempRoots.emplace(pid, root);
+            tempRoots[root].emplace(fmt("{temp:%d}", pid));
             pos = end + 1;
         }
 
         fds.push_back(fd); /* keep open */
     }
-
-    return tempRoots;
 }
 
 
@@ -321,10 +317,8 @@ void LocalStore::findRoots(const Path & path, unsigned char type, Roots & roots)
 }
 
 
-Roots LocalStore::findRootsNoTemp()
+void LocalStore::findRootsNoTemp(Roots & roots)
 {
-    Roots roots;
-
     /* Process direct roots in {gcroots,profiles}. */
     findRoots(stateDir + "/" + gcRootsDir, DT_UNKNOWN, roots);
     findRoots(stateDir + "/profiles", DT_UNKNOWN, roots);
@@ -334,23 +328,16 @@ Roots LocalStore::findRootsNoTemp()
        to add running programs to the set of roots (to prevent them
        from being garbage collected). */
     findRuntimeRoots(roots);
-
-    return roots;
 }
 
 
 Roots LocalStore::findRoots()
 {
-    Roots roots = findRootsNoTemp();
+    Roots roots;
+    findRootsNoTemp(roots);
 
     FDs fds;
-    pid_t prev = -1;
-    size_t n = 0;
-    for (auto & [pid, root] : readTempRoots(fds)) {
-        if (prev != pid) n = 0;
-        prev = pid;
-        roots[root].emplace(fmt("{temp:%d:%d}", pid, n++));
-    }
+    findTempRoots(fds, roots);
 
     return roots;
 }
@@ -752,7 +739,9 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
     /* Find the roots.  Since we've grabbed the GC lock, the set of
        permanent roots cannot increase now. */
     printError(format("finding garbage collector roots..."));
-    Roots rootMap = options.ignoreLiveness ? Roots() : findRootsNoTemp();
+    Roots rootMap;
+    if (!options.ignoreLiveness)
+       findRootsNoTemp(rootMap);
 
     for (auto & i : rootMap) state.roots.insert(i.first);
 
@@ -760,8 +749,10 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
        per-process temporary root files.  So after this point no paths
        can be added to the set of temporary roots. */
     FDs fds;
-    for (auto & root : readTempRoots(fds))
-        state.tempRoots.insert(root.second);
+    Roots tempRoots;
+    findTempRoots(fds, tempRoots);
+    for (auto & root : tempRoots)
+        state.tempRoots.insert(root.first);
     state.roots.insert(state.tempRoots.begin(), state.tempRoots.end());
 
     /* After this point the set of roots or temporary roots cannot

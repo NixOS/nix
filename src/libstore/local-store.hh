@@ -180,7 +180,7 @@ private:
     typedef std::shared_ptr<AutoCloseFD> FDPtr;
     typedef list<FDPtr> FDs;
 
-    std::set<std::pair<pid_t, Path>> readTempRoots(FDs & fds);
+    void findTempRoots(FDs & fds, Roots & roots);
 
 public:
 
@@ -267,7 +267,7 @@ private:
 
     void findRoots(const Path & path, unsigned char type, Roots & roots);
 
-    Roots findRootsNoTemp();
+    void findRootsNoTemp(Roots & roots);
 
     void findRuntimeRoots(Roots & roots);
 
