@@ -477,11 +477,13 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
         logger->startWork();
         Roots roots = store->findRoots();
         logger->stopWork();
+
+        // Pre-compute roots length using same algo as below.
         size_t total_length = 0;
         bool hasMemoryLink;
-        for (auto & [target, links] : roots) {
+        for (auto & root : roots) {
             hasMemoryLink = false;
-            for (auto & link : links) {
+            for (auto & link : root.second) {
                 if (link.rfind("{memory:", 0) == 0) {
                     if (hasMemoryLink) continue;
                     ++total_length;
@@ -491,6 +493,7 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
                 }
             }
         }
+
         to << total_length;
         int n = 0;
         for (auto & [target, links] : roots) {
