@@ -44,7 +44,7 @@ struct GitRepoCommand : virtual Args
     }
 };
 
-struct FlakeCommand : virtual Args, StoreCommand, MixEvalArgs
+struct FlakeCommand : virtual Args
 {
     std::string flakeUri;
 
