@@ -766,6 +766,12 @@ private:
     /* User selected for running the builder. */
     std::unique_ptr<UserLock> buildUser;
 
+    /* The uid we will use for the build, outside any sandboxing. */
+    uid_t hostUid;
+
+    /* The gid we will use for the build, outside any sandboxing. */
+    gid_t hostGid;
+
     /* The process ID of the builder. */
     Pid pid;
 
@@ -792,9 +798,6 @@ private:
 
     /* Pipe for the builder's standard output/error. */
     Pipe builderOut;
-
-    /* Pipe for synchronising updates to the builder user namespace. */
-    Pipe userNamespaceSync;
 
     /* The build hook. */
     std::unique_ptr<HookInstance> hook;
@@ -1846,6 +1849,8 @@ void DerivationGoal::startBuilder()
     if (settings.buildUsersGroup != "" && getuid() == 0) {
 #if defined(__linux__) || defined(__APPLE__)
         buildUser = std::make_unique<UserLock>();
+        hostUid = buildUser->getUID();
+        hostGid = buildUser->getGID();
 
         /* Make sure that no other processes are executing under this
            uid. */
@@ -1855,6 +1860,9 @@ void DerivationGoal::startBuilder()
            binaries on this platform. */
         throw Error("build users are not supported on this platform for security reasons");
 #endif
+    } else {
+        hostUid = getuid();
+        hostGid = getgid();
     }
 
     /* Create a temporary directory where the build will take
@@ -2190,8 +2198,6 @@ void DerivationGoal::startBuilder()
         if (!fixedOutput)
             privateNetwork = true;
 
-        userNamespaceSync.create();
-
         options.allowVfork = false;
 
         Pid helper = startProcess([&]() {
@@ -2230,31 +2236,9 @@ void DerivationGoal::startBuilder()
         if (helper.wait() != 0)
             throw Error("unable to start build process");
 
-        userNamespaceSync.readSide = -1;
-
         pid_t tmp;
         if (!string2Int<pid_t>(readLine(builderOut.readSide.get()), tmp)) abort();
         pid = tmp;
-
-        /* Set the UID/GID mapping of the builder's user namespace
-           such that the sandbox user maps to the build user, or to
-           the calling user (if build users are disabled). */
-        uid_t hostUid = buildUser ? buildUser->getUID() : getuid();
-        uid_t hostGid = buildUser ? buildUser->getGID() : getgid();
-
-        writeFile("/proc/" + std::to_string(pid) + "/uid_map",
-            (format("%d %d 1") % sandboxUid % hostUid).str());
-
-        writeFile("/proc/" + std::to_string(pid) + "/setgroups", "deny");
-
-        writeFile("/proc/" + std::to_string(pid) + "/gid_map",
-            (format("%d %d 1") % sandboxGid % hostGid).str());
-
-        /* Signal the builder that we've updated its user
-           namespace. */
-        writeFull(userNamespaceSync.writeSide.get(), "1");
-        userNamespaceSync.writeSide = -1;
-
     } else
 #endif
     {
@@ -2576,12 +2560,13 @@ void DerivationGoal::runChild()
 #if __linux__
         if (useChroot) {
 
-            userNamespaceSync.writeSide = -1;
+            writeFile("/proc/self/uid_map",
+                (format("%d %d 1") % sandboxUid % hostUid).str());
 
-            if (drainFD(userNamespaceSync.readSide.get()) != "1")
-                throw Error("user namespace initialisation failed");
+            writeFile("/proc/self/setgroups", "deny");
 
-            userNamespaceSync.readSide = -1;
+            writeFile("/proc/self/gid_map",
+                (format("%d %d 1") % sandboxGid % hostGid).str());
 
             if (privateNetwork) {
 
