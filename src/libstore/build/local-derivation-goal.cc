@@ -229,6 +229,13 @@ void LocalDerivationGoal::tryLocalBuild()
             worker.waitForAWhile(shared_from_this());
             return;
         }
+        hostUid = buildUser->getUID();
+        hostGid = buildUser->getGID();
+        nrIds = buildUser->getUIDCount();
+    } else {
+        hostUid = getuid();
+        hostGid = getgid();
+        nrIds = 1;
     }
 
     actLock.reset();
@@ -891,8 +898,6 @@ void LocalDerivationGoal::startBuilder()
         if (derivationType.isSandboxed())
             privateNetwork = true;
 
-        userNamespaceSync.create();
-
         usingUserNamespace = userNamespacesSupported();
 
         Pipe sendPid;
@@ -935,67 +940,9 @@ void LocalDerivationGoal::startBuilder()
         if (helper.wait() != 0)
             throw Error("unable to start build process");
 
-        userNamespaceSync.readSide = -1;
-
-        /* Close the write side to prevent runChild() from hanging
-           reading from this. */
-        Finally cleanup([&]() {
-            userNamespaceSync.writeSide = -1;
-        });
-
         auto ss = tokenizeString<std::vector<std::string>>(readLine(sendPid.readSide.get()));
         assert(ss.size() == 1);
         pid = string2Int<pid_t>(ss[0]).value();
-
-        if (usingUserNamespace) {
-            /* Set the UID/GID mapping of the builder's user namespace
-               such that the sandbox user maps to the build user, or to
-               the calling user (if build users are disabled). */
-            uid_t hostUid = buildUser ? buildUser->getUID() : getuid();
-            uid_t hostGid = buildUser ? buildUser->getGID() : getgid();
-            uid_t nrIds = buildUser ? buildUser->getUIDCount() : 1;
-
-            writeFile("/proc/" + std::to_string(pid) + "/uid_map",
-                fmt("%d %d %d", sandboxUid(), hostUid, nrIds));
-
-            if (!buildUser || buildUser->getUIDCount() == 1)
-                writeFile("/proc/" + std::to_string(pid) + "/setgroups", "deny");
-
-            writeFile("/proc/" + std::to_string(pid) + "/gid_map",
-                fmt("%d %d %d", sandboxGid(), hostGid, nrIds));
-        } else {
-            debug("note: not using a user namespace");
-            if (!buildUser)
-                throw Error("cannot perform a sandboxed build because user namespaces are not enabled; check /proc/sys/user/max_user_namespaces");
-        }
-
-        /* Now that we now the sandbox uid, we can write
-           /etc/passwd. */
-        writeFile(chrootRootDir + "/etc/passwd", fmt(
-                "root:x:0:0:Nix build user:%3%:/noshell\n"
-                "nixbld:x:%1%:%2%:Nix build user:%3%:/noshell\n"
-                "nobody:x:65534:65534:Nobody:/:/noshell\n",
-                sandboxUid(), sandboxGid(), settings.sandboxBuildDir));
-
-        /* Save the mount- and user namespace of the child. We have to do this
-           *before* the child does a chroot. */
-        sandboxMountNamespace = open(fmt("/proc/%d/ns/mnt", (pid_t) pid).c_str(), O_RDONLY);
-        if (sandboxMountNamespace.get() == -1)
-            throw SysError("getting sandbox mount namespace");
-
-        if (usingUserNamespace) {
-            sandboxUserNamespace = open(fmt("/proc/%d/ns/user", (pid_t) pid).c_str(), O_RDONLY);
-            if (sandboxUserNamespace.get() == -1)
-                throw SysError("getting sandbox user namespace");
-        }
-
-        /* Move the child into its own cgroup. */
-        if (cgroup)
-            writeFile(*cgroup + "/cgroup.procs", fmt("%d", (pid_t) pid));
-
-        /* Signal the builder that we've updated its user namespace. */
-        writeFull(userNamespaceSync.writeSide.get(), "1");
-
     } else
 #endif
     {
@@ -1696,12 +1643,44 @@ void LocalDerivationGoal::runChild()
 #if __linux__
         if (useChroot) {
 
-            userNamespaceSync.writeSide = -1;
+            if (usingUserNamespace) {
+                writeFile("/proc/self/uid_map",
+                    fmt("%d %d %d", sandboxUid(), hostUid, nrIds));
 
-            if (drainFD(userNamespaceSync.readSide.get()) != "1")
-                throw Error("user namespace initialisation failed");
+                if (nrIds == 1)
+                    writeFile("/proc/self/setgroups", "deny");
 
-            userNamespaceSync.readSide = -1;
+                writeFile("/proc/self/gid_map",
+                    fmt("%d %d %d", sandboxGid(), hostGid, nrIds));
+            } else {
+                debug("note: not using a user namespace");
+                if (!buildUser)
+                    throw Error("cannot perform a sandboxed build because user namespaces are not enabled; check /proc/sys/user/max_user_namespaces");
+            }
+
+            /* Now that we now the sandbox uid, we can write
+               /etc/passwd. */
+            writeFile(chrootRootDir + "/etc/passwd", fmt(
+                    "root:x:0:0:Nix build user:%3%:/noshell\n"
+                    "nixbld:x:%1%:%2%:Nix build user:%3%:/noshell\n"
+                    "nobody:x:65534:65534:Nobody:/:/noshell\n",
+                    sandboxUid(), sandboxGid(), settings.sandboxBuildDir));
+
+            /* Save the mount namespace of the child (us). We have to do
+               this *before* doing a chroot. */
+            sandboxMountNamespace = open("/proc/self/ns/mnt", O_RDONLY);
+            if (sandboxMountNamespace.get() == -1)
+                throw SysError("getting sandbox mount namespace");
+
+            if (usingUserNamespace) {
+                sandboxUserNamespace = open("/proc/self/ns/user", O_RDONLY);
+                if (sandboxUserNamespace.get() == -1)
+                    throw SysError("getting sandbox user namespace");
+            }
+
+            /* Move the child into its own cgroup. */
+            if (cgroup)
+                writeFile(*cgroup + "/cgroup.procs", fmt("%d", (pid_t) pid));
 
             if (privateNetwork) {
 

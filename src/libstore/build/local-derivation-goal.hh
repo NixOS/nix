@@ -16,6 +16,23 @@ struct LocalDerivationGoal : public DerivationGoal
     std::unique_ptr<UserLock> buildUser;
 
     /**
+     * The uid we will use for the build, outside any sandboxing.
+     */
+    uid_t hostUid;
+
+    /**
+     * The gid we will use for the build, outside any sandboxing.
+     */
+    gid_t hostGid;
+
+    /**
+     * The number of user IDS for the build.
+     *
+     * Used for user namespaces.
+     */
+    uid_t nrIds;
+
+    /**
      * The process ID of the builder.
      */
     Pid pid;
@@ -40,11 +57,6 @@ struct LocalDerivationGoal : public DerivationGoal
      * standard output/error.
      */
     AutoCloseFD builderOut;
-
-    /**
-     * Pipe for synchronising updates to the builder namespaces.
-     */
-    Pipe userNamespaceSync;
 
     /**
      * The mount namespace and user namespace of the builder, used to add additional
