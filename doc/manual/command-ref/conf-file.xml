@@ -700,6 +700,20 @@ password <replaceable>my-password</replaceable>
   </varlistentry>
 
 
+  <varlistentry xml:id="conf-sandbox-use-pivot_root">
+    <term><literal>sandbox-use-pivot_root</literal></term>
+
+    <listitem><para>Whether to use the <literal>pivot_root</literal>
+    system call, which is safer than plain <literal>chroot</literal> when
+    establishing the sandbox.</para>
+    <para>This option has the safe default <literal>true</literal>,
+    but needs to be set to <literal>false</literal> when running the
+    sandbox inside a container.</para>
+    </listitem>
+
+  </varlistentry>
+
+
   <varlistentry xml:id="conf-secret-key-files"><term><literal>secret-key-files</literal></term>
 
     <listitem><para>A whitespace-separated list of files containing

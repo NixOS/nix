@@ -2720,20 +2720,24 @@ void DerivationGoal::runChild()
             if (chdir(chrootRootDir.c_str()) == -1)
                 throw SysError(format("cannot change directory to '%1%'") % chrootRootDir);
 
-            if (mkdir("real-root", 0) == -1)
-                throw SysError("cannot create real-root directory");
+            if (settings.sandboxUsePivotRoot) {
+                if (mkdir("real-root", 0) == -1)
+                    throw SysError("cannot create real-root directory");
 
-            if (pivot_root(".", "real-root") == -1)
-                throw SysError(format("cannot pivot old root directory onto '%1%'") % (chrootRootDir + "/real-root"));
+                if (pivot_root(".", "real-root") == -1)
+                    throw SysError(format("cannot pivot old root directory onto '%1%'") % (chrootRootDir + "/real-root"));
+            }
 
             if (chroot(".") == -1)
                 throw SysError(format("cannot change root directory to '%1%'") % chrootRootDir);
 
-            if (umount2("real-root", MNT_DETACH) == -1)
-                throw SysError("cannot unmount real root filesystem");
+            if (settings.sandboxUsePivotRoot) {
+                if (umount2("real-root", MNT_DETACH) == -1)
+                    throw SysError("cannot unmount real root filesystem");
 
-            if (rmdir("real-root") == -1)
-                throw SysError("cannot remove real-root directory");
+                if (rmdir("real-root") == -1)
+                    throw SysError("cannot remove real-root directory");
+            }
 
             /* Switch to the sandbox uid/gid in the user namespace,
                which corresponds to the build user or calling user in

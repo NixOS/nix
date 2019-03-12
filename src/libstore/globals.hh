@@ -205,6 +205,9 @@ public:
         "Whether to enable sandboxed builds. Can be \"true\", \"false\" or \"relaxed\".",
         {"build-use-chroot", "build-use-sandbox"}};
 
+    Setting<bool> sandboxUsePivotRoot{this, true, "sandbox-use-pivot_root",
+        "Whether to use pivot_root when sandboxing is enabled. This is safer than plain chroot, but not supported when running the sandbox in a container."};
+
     Setting<PathSet> sandboxPaths{this, {}, "sandbox-paths",
         "The paths to make available inside the build sandbox.",
         {"build-chroot-dirs", "build-sandbox-paths"}};
