@@ -11,6 +11,7 @@
 #include <atomic>
 #include <limits>
 #include <map>
+#include <unordered_map>
 #include <unordered_set>
 #include <memory>
 #include <string>
