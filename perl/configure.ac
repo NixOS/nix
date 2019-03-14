@@ -1,4 +1,4 @@
-AC_INIT(nix-perl, m4_esyscmd([bash -c "echo -n $(cat ../version)$VERSION_SUFFIX"]))
+AC_INIT(nix-perl, m4_esyscmd([bash -c "echo -n $(cat ../.version)$VERSION_SUFFIX"]))
 AC_CONFIG_SRCDIR(MANIFEST)
 AC_CONFIG_AUX_DIR(../config)
 
