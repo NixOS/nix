@@ -475,7 +475,7 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
 
     case wopFindRoots: {
         logger->startWork();
-        Roots roots = store->findRoots(true);
+        Roots roots = store->findRoots(!trusted);
         logger->stopWork();
 
         size_t size = 0;
