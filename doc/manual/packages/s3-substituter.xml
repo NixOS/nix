@@ -89,7 +89,7 @@ the S3 URL:</para>
     "Version": "2012-10-17",
     "Statement": [
         {
-            "Sid": "AlowDirectReads",
+            "Sid": "AllowDirectReads",
             "Action": [
                 "s3:GetObject",
                 "s3:GetBucketLocation"
