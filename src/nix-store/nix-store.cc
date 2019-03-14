@@ -427,7 +427,7 @@ static void opQuery(Strings opFlags, Strings opArgs)
                     maybeUseOutputs(store->followLinksToStorePath(i), useOutput, forceRealise),
                     referrers, true, settings.gcKeepOutputs, settings.gcKeepDerivations);
             }
-            Roots roots = store->findRoots();
+            Roots roots = store->findRoots(false);
             for (auto & [target, links] : roots)
                 if (referrers.find(target) != referrers.end())
                     for (auto & link : links)
@@ -591,7 +591,7 @@ static void opGC(Strings opFlags, Strings opArgs)
     if (!opArgs.empty()) throw UsageError("no arguments expected");
 
     if (printRoots) {
-        Roots roots = store->findRoots();
+        Roots roots = store->findRoots(false);
         for (auto & [target, links] : roots)
             for (auto & link : links)
                 cout << link << " -> " << target << std::endl;

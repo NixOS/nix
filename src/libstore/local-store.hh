@@ -180,11 +180,11 @@ private:
     typedef std::shared_ptr<AutoCloseFD> FDPtr;
     typedef list<FDPtr> FDs;
 
-    void findTempRoots(FDs & fds, Roots & roots);
+    void findTempRoots(FDs & fds, Roots & roots, bool censor);
 
 public:
 
-    Roots findRoots() override;
+    Roots findRoots(bool censor) override;
 
     void collectGarbage(const GCOptions & options, GCResults & results) override;
 
@@ -267,9 +267,9 @@ private:
 
     void findRoots(const Path & path, unsigned char type, Roots & roots);
 
-    void findRootsNoTemp(Roots & roots);
+    void findRootsNoTemp(Roots & roots, bool censor);
 
-    void findRuntimeRoots(Roots & roots);
+    void findRuntimeRoots(Roots & roots, bool censor);
 
     void removeUnusedLinks(const GCState & state);
 

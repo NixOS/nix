@@ -596,7 +596,7 @@ void RemoteStore::syncWithGC()
 }
 
 
-Roots RemoteStore::findRoots()
+Roots RemoteStore::findRoots(bool censor)
 {
     auto conn(getConnection());
     conn->to << wopFindRoots;

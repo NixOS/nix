@@ -484,8 +484,10 @@ public:
 
     /* Find the roots of the garbage collector.  Each root is a pair
        (link, storepath) where `link' is the path of the symlink
-       outside of the Nix store that point to `storePath'.  */
-    virtual Roots findRoots()
+       outside of the Nix store that point to `storePath'. If
+       'censor' is true, privacy-sensitive information about roots
+       found in /proc is censored. */
+    virtual Roots findRoots(bool censor)
     { unsupported("findRoots"); }
 
     /* Perform a garbage collection. */

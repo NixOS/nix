@@ -129,7 +129,7 @@ Path LocalFSStore::addPermRoot(const Path & _storePath,
        check if the root is in a directory in or linked from the
        gcroots directory. */
     if (settings.checkRootReachability) {
-        Roots roots = findRoots();
+        Roots roots = findRoots(false);
         if (roots[storePath].count(gcRoot) == 0)
             printError(
                 format(
@@ -197,7 +197,10 @@ void LocalStore::addTempRoot(const Path & path)
 }
 
 
-void LocalStore::findTempRoots(FDs & fds, Roots & tempRoots)
+static std::string censored = "{censored}";
+
+
+void LocalStore::findTempRoots(FDs & fds, Roots & tempRoots, bool censor)
 {
     /* Read the `temproots' directory for per-process temporary root
        files. */
@@ -248,7 +251,7 @@ void LocalStore::findTempRoots(FDs & fds, Roots & tempRoots)
             Path root(contents, pos, end - pos);
             debug("got temporary root '%s'", root);
             assertStorePath(root);
-            tempRoots[root].emplace(fmt("{temp:%d}", pid));
+            tempRoots[root].emplace(censor ? censored : fmt("{temp:%d}", pid));
             pos = end + 1;
         }
 
@@ -317,7 +320,7 @@ void LocalStore::findRoots(const Path & path, unsigned char type, Roots & roots)
 }
 
 
-void LocalStore::findRootsNoTemp(Roots & roots)
+void LocalStore::findRootsNoTemp(Roots & roots, bool censor)
 {
     /* Process direct roots in {gcroots,profiles}. */
     findRoots(stateDir + "/" + gcRootsDir, DT_UNKNOWN, roots);
@@ -327,17 +330,17 @@ void LocalStore::findRootsNoTemp(Roots & roots)
        NIX_ROOT_FINDER environment variable.  This is typically used
        to add running programs to the set of roots (to prevent them
        from being garbage collected). */
-    findRuntimeRoots(roots);
+    findRuntimeRoots(roots, censor);
 }
 
 
-Roots LocalStore::findRoots()
+Roots LocalStore::findRoots(bool censor)
 {
     Roots roots;
-    findRootsNoTemp(roots);
+    findRootsNoTemp(roots, censor);
 
     FDs fds;
-    findTempRoots(fds, roots);
+    findTempRoots(fds, roots, censor);
 
     return roots;
 }
@@ -381,7 +384,7 @@ static void readFileRoots(const char * path, Roots & roots)
     }
 }
 
-void LocalStore::findRuntimeRoots(Roots & roots)
+void LocalStore::findRuntimeRoots(Roots & roots, bool censor)
 {
     Roots unchecked;
 
@@ -467,7 +470,10 @@ void LocalStore::findRuntimeRoots(Roots & roots)
             Path path = toStorePath(target);
             if (isStorePath(path) && isValidPath(path)) {
                 debug(format("got additional root '%1%'") % path);
-                roots[path].insert(links.begin(), links.end());
+                if (censor)
+                    roots[path].insert(censored);
+                else
+                    roots[path].insert(links.begin(), links.end());
             }
         }
     }
@@ -739,7 +745,7 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
     printError(format("finding garbage collector roots..."));
     Roots rootMap;
     if (!options.ignoreLiveness)
-       findRootsNoTemp(rootMap);
+        findRootsNoTemp(rootMap, true);
 
     for (auto & i : rootMap) state.roots.insert(i.first);
 
@@ -748,7 +754,7 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
        can be added to the set of temporary roots. */
     FDs fds;
     Roots tempRoots;
-    findTempRoots(fds, tempRoots);
+    findTempRoots(fds, tempRoots, true);
     for (auto & root : tempRoots)
         state.tempRoots.insert(root.first);
     state.roots.insert(state.tempRoots.begin(), state.tempRoots.end());

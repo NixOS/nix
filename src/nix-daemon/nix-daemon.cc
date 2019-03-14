@@ -475,40 +475,19 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
 
     case wopFindRoots: {
         logger->startWork();
-        Roots roots = store->findRoots();
+        Roots roots = store->findRoots(true);
         logger->stopWork();
 
-        // Pre-compute roots length using same algo as below.
-        size_t total_length = 0;
-        bool hasMemoryLink;
-        for (auto & root : roots) {
-            hasMemoryLink = false;
-            for (auto & link : root.second) {
-                if (link.rfind("{memory:", 0) == 0) {
-                    if (hasMemoryLink) continue;
-                    ++total_length;
-                    hasMemoryLink = true;
-                } else {
-                    ++total_length;
-                }
-            }
-        }
+        size_t size = 0;
+        for (auto & i : roots)
+            size += i.second.size();
 
-        to << total_length;
-        int n = 0;
-        for (auto & [target, links] : roots) {
-            bool hasMemoryLink = false;
-            for (auto & link : links) {
-                // Obfuscate 'memory' roots as they expose information about other users,
-                if (link.rfind("{memory:", 0) == 0) {
-                    if (hasMemoryLink) continue;
-                    to << fmt("{memory:%d}", n++) << target;
-                    hasMemoryLink = true;
-                } else {
-                    to << link << target;
-                }
-            }
-        }
+        to << size;
+
+        for (auto & [target, links] : roots)
+            for (auto & link : links)
+                to << link << target;
+
         break;
     }
 
