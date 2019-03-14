@@ -11,6 +11,7 @@
 #include <atomic>
 #include <limits>
 #include <map>
+#include <unordered_set>
 #include <memory>
 #include <string>
 
@@ -47,7 +48,7 @@ const size_t storePathHashLen = 32; // i.e. 160 bits
 const uint32_t exportMagic = 0x4558494e;
 
 
-typedef std::map<Path, std::set<std::string>> Roots;
+typedef std::unordered_map<Path, std::unordered_set<std::string>> Roots;
 
 
 struct GCOptions

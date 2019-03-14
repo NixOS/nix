@@ -362,8 +362,7 @@ try_again:
     }
     if (res > 0 && buf[0] == '/')
         roots[std::string(static_cast<char *>(buf), res)]
-            .emplace((format("{memory:%1%") % file).str());
-    return;
+            .emplace(file);
 }
 
 static string quoteRegexChars(const string & raw)
@@ -395,10 +394,10 @@ void LocalStore::findRuntimeRoots(Roots & roots)
         while (errno = 0, ent = readdir(procDir.get())) {
             checkInterrupt();
             if (std::regex_match(ent->d_name, digitsRegex)) {
-                readProcLink((format("{memory:/proc/%1%/exe}") % ent->d_name).str(), unchecked);
-                readProcLink((format("{memory:/proc/%1%/cwd}") % ent->d_name).str(), unchecked);
+                readProcLink(fmt("/proc/%s/exe" ,ent->d_name), unchecked);
+                readProcLink(fmt("/proc/%s/cwd", ent->d_name), unchecked);
 
-                auto fdStr = (format("/proc/%1%/fd") % ent->d_name).str();
+                auto fdStr = fmt("/proc/%s/fd", ent->d_name);
                 auto fdDir = AutoCloseDir(opendir(fdStr.c_str()));
                 if (!fdDir) {
                     if (errno == ENOENT || errno == EACCES)
@@ -407,9 +406,8 @@ void LocalStore::findRuntimeRoots(Roots & roots)
                 }
                 struct dirent * fd_ent;
                 while (errno = 0, fd_ent = readdir(fdDir.get())) {
-                    if (fd_ent->d_name[0] != '.') {
-                        readProcLink((format("%1%/%2%") % fdStr % fd_ent->d_name).str(), unchecked);
-                    }
+                    if (fd_ent->d_name[0] != '.')
+                        readProcLink(fmt("%s/%s", fdStr, fd_ent->d_name), unchecked);
                 }
                 if (errno) {
                     if (errno == ESRCH)
@@ -419,19 +417,19 @@ void LocalStore::findRuntimeRoots(Roots & roots)
                 fdDir.reset();
 
                 try {
-                    auto mapFile = (format("/proc/%1%/maps") % ent->d_name).str();
+                    auto mapFile = fmt("/proc/%s/maps", ent->d_name);
                     auto mapLines = tokenizeString<std::vector<string>>(readFile(mapFile, true), "\n");
-                    for (const auto& line : mapLines) {
+                    for (const auto & line : mapLines) {
                         auto match = std::smatch{};
                         if (std::regex_match(line, match, mapRegex))
-                            unchecked[match[1]].emplace((format("{memory:%1%}") % mapFile).str());
+                            unchecked[match[1]].emplace(mapFile);
                     }
 
-                    auto envFile = (format("/proc/%1%/environ") % ent->d_name).str();
+                    auto envFile = fmt("/proc/%s/environ", ent->d_name);
                     auto envString = readFile(envFile, true);
                     auto env_end = std::sregex_iterator{};
                     for (auto i = std::sregex_iterator{envString.begin(), envString.end(), storePathRegex}; i != env_end; ++i)
-                        unchecked[i->str()].emplace((format("{memory:%1%}") % envFile).str());
+                        unchecked[i->str()].emplace(envFile);
                 } catch (SysError & e) {
                     if (errno == ENOENT || errno == EACCES || errno == ESRCH)
                         continue;
@@ -451,7 +449,7 @@ void LocalStore::findRuntimeRoots(Roots & roots)
         for (const auto & line : lsofLines) {
             std::smatch match;
             if (std::regex_match(line, match, lsofRegex))
-                unchecked[match[1]].emplace((format("{memory:%1%}" % LSOF).str());
+                unchecked[match[1]].emplace("{lsof}");
         }
     } catch (ExecError & e) {
         /* lsof not installed, lsof failed */
