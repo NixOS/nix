@@ -2,7 +2,7 @@
 
 #include <map>
 #include <list>
-#include <experimental/optional>
+#include <optional>
 
 namespace nix {
 
@@ -64,7 +64,7 @@ public:
 
     /* Look up an item in the cache. If it exists, it becomes the most
        recently used item. */
-    std::experimental::optional<Value> get(const Key & key)
+    std::optional<Value> get(const Key & key)
     {
         auto i = data.find(key);
         if (i == data.end()) return {};

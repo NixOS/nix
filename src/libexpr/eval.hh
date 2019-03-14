@@ -81,7 +81,7 @@ public:
 
     /* The allowed filesystem paths in restricted or pure evaluation
        mode. */
-    std::experimental::optional<PathSet> allowedPaths;
+    std::optional<PathSet> allowedPaths;
 
     Value vEmptySet;
 

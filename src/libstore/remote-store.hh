@@ -149,7 +149,7 @@ public:
 private:
 
     ref<RemoteStore::Connection> openConnection() override;
-    std::experimental::optional<std::string> path;
+    std::optional<std::string> path;
 };
 
 

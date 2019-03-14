@@ -2413,7 +2413,7 @@ void DerivationGoal::writeStructuredAttrs()
        objects consisting entirely of those values. (So nested
        arrays or objects are not supported.) */
 
-    auto handleSimpleType = [](const nlohmann::json & value) -> std::experimental::optional<std::string> {
+    auto handleSimpleType = [](const nlohmann::json & value) -> std::optional<std::string> {
         if (value.is_string())
             return shellEscape(value);
 
@@ -3311,8 +3311,8 @@ void DerivationGoal::checkOutputs(const std::map<Path, ValidPathInfo> & outputs)
         struct Checks
         {
             bool ignoreSelfRefs = false;
-            std::experimental::optional<uint64_t> maxSize, maxClosureSize;
-            std::experimental::optional<Strings> allowedReferences, allowedRequisites, disallowedReferences, disallowedRequisites;
+            std::optional<uint64_t> maxSize, maxClosureSize;
+            std::optional<Strings> allowedReferences, allowedRequisites, disallowedReferences, disallowedRequisites;
         };
 
         /* Compute the closure and closure size of some output. This
@@ -3359,7 +3359,7 @@ void DerivationGoal::checkOutputs(const std::map<Path, ValidPathInfo> & outputs)
                         info.path, closureSize, *checks.maxClosureSize);
             }
 
-            auto checkRefs = [&](const std::experimental::optional<Strings> & value, bool allowed, bool recursive)
+            auto checkRefs = [&](const std::optional<Strings> & value, bool allowed, bool recursive)
             {
                 if (!value) return;
 
@@ -3413,7 +3413,7 @@ void DerivationGoal::checkOutputs(const std::map<Path, ValidPathInfo> & outputs)
                     if (maxClosureSize != output->end())
                         checks.maxClosureSize = maxClosureSize->get<uint64_t>();
 
-                    auto get = [&](const std::string & name) -> std::experimental::optional<Strings> {
+                    auto get = [&](const std::string & name) -> std::optional<Strings> {
                         auto i = output->find(name);
                         if (i != output->end()) {
                             Strings res;
