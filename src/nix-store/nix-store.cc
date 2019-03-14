@@ -592,9 +592,13 @@ static void opGC(Strings opFlags, Strings opArgs)
 
     if (printRoots) {
         Roots roots = store->findRoots(false);
+        std::set<std::pair<Path, Path>> roots2;
+        // Transpose and sort the roots.
         for (auto & [target, links] : roots)
             for (auto & link : links)
-                cout << link << " -> " << target << std::endl;
+                roots2.emplace(link, target);
+        for (auto & [link, target] : roots2)
+            std::cout << link << " -> " << target << "\n";
     }
 
     else {
