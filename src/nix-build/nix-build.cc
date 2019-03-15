@@ -370,7 +370,7 @@ static void _main(int argc, char * * argv)
         // Set the environment.
         auto env = getEnv();
 
-        auto tmp = getEnv("TMPDIR", getEnv("XDG_RUNTIME_DIR", "/tmp"));
+        auto tmp = getEnv("TMPDIR", "/tmp");
 
         if (pure) {
             decltype(env) newEnv;
