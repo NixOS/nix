@@ -2867,6 +2867,11 @@ void DerivationGoal::runChild()
                 if (fixedOutput)
                     sandboxProfile += "(import \"sandbox-network.sb\")\n";
 
+                auto extraFile = settings.darwinExtraSandboxProfile;
+                trim(extraFile);
+                if (extraFile != "")
+                    sandboxProfile += (format("(import \"%1%\")\n") % extraFile).str();
+
                 /* Our rwx outputs */
                 sandboxProfile += "(allow file-read* file-write* process-exec\n";
                 for (auto & i : missingPaths) {

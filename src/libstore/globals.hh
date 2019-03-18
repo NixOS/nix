@@ -231,6 +231,9 @@ public:
 #if __APPLE__
     Setting<bool> darwinLogSandboxViolations{this, false, "darwin-log-sandbox-violations",
         "Whether to log Darwin sandbox access violations to the system log."};
+
+    Setting<std::string> darwinExtraSandboxProfile{this, "", "darwin-extra-sandbox-profile",
+        "Additional sandbox profile to import after the defaults."};
 #endif
 
     Setting<bool> runDiffHook{this, false, "run-diff-hook",
