@@ -180,4 +180,8 @@ builders = @/etc/nix/machines
 causes the list of machines in <filename>/etc/nix/machines</filename>
 to be included. (This is the default.)</para>
 
+<para>If you want the builders to use caches, you likely want to set
+the option <link linkend='conf-builders-use-substitutes'><literal>builders-use-substitutes</literal></link>
+in your local <filename>nix.conf</filename>.</para>
+
 </chapter>
