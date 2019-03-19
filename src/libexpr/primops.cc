@@ -865,6 +865,8 @@ static void prim_readFile(EvalState & state, const Pos & pos, Value * * args, Va
 {
     PathSet context;
     Path path = state.coerceToPath(pos, *args[0], context);
+    if (path == "/dev/stdin")
+        throw EvalError(format("cannot read from stdin, at %1%") % pos);
     try {
         state.realiseContext(context);
     } catch (InvalidPathError & e) {
