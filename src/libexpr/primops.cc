@@ -865,8 +865,12 @@ static void prim_readFile(EvalState & state, const Pos & pos, Value * * args, Va
 {
     PathSet context;
     Path path = state.coerceToPath(pos, *args[0], context);
-    if (path == "/dev/stdin")
-        throw EvalError(format("cannot read from stdin, at %1%") % pos);
+
+    struct stat st;
+    stat(path.c_str(), &st);
+    if (S_ISCHR(st.st_mode) || S_ISBLK(st.st_mode) || S_ISFIFO(st.st_mode) || S_ISSOCK(st.st_mode))
+        throw EvalError(format("cannot read from character special files, at %1%") % pos);
+
     try {
         state.realiseContext(context);
     } catch (InvalidPathError & e) {
