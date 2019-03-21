@@ -128,6 +128,86 @@ void writeLockFile(LockFile lockFile, Path path)
 }
 
 Path getUserRegistryPath()
+>>>>>>> Fixed dependency resolution
+{
+    FlakeRef flakeRef(json["uri"]);
+    if (!flakeRef.isImmutable())
+        throw Error("requested to fetch FlakeRef '%s' purely, which is mutable", flakeRef.to_string());
+
+    LockFile::FlakeEntry entry(flakeRef);
+
+    auto nonFlakeRequires = json["nonFlakeRequires"];
+
+    for (auto i = nonFlakeRequires.begin(); i != nonFlakeRequires.end(); ++i) {
+        FlakeRef flakeRef(i->value("uri", ""));
+        if (!flakeRef.isImmutable())
+            throw Error("requested to fetch FlakeRef '%s' purely, which is mutable", flakeRef.to_string());
+        entry.nonFlakeEntries.insert_or_assign(i.key(), flakeRef);
+    }
+
+    auto requires = json["requires"];
+
+    for (auto i = requires.begin(); i != requires.end(); ++i)
+        entry.flakeEntries.insert_or_assign(i.key(), readFlakeEntry(*i));
+
+    return entry;
+}
+
+LockFile readLockFile(const Path & path)
+{
+    LockFile lockFile;
+
+    if (!pathExists(path))
+        return lockFile;
+
+    auto json = nlohmann::json::parse(readFile(path));
+
+    auto version = json.value("version", 0);
+    if (version != 1)
+        throw Error("lock file '%s' has unsupported version %d", path, version);
+
+    auto nonFlakeRequires = json["nonFlakeRequires"];
+
+    for (auto i = nonFlakeRequires.begin(); i != nonFlakeRequires.end(); ++i) {
+        FlakeRef flakeRef(i->value("uri", ""));
+        if (!flakeRef.isImmutable())
+            throw Error("requested to fetch FlakeRef '%s' purely, which is mutable", flakeRef.to_string());
+        lockFile.nonFlakeEntries.insert_or_assign(i.key(), flakeRef);
+    }
+
+    auto requires = json["requires"];
+
+    for (auto i = requires.begin(); i != requires.end(); ++i)
+        lockFile.flakeEntries.insert_or_assign(i.key(), readFlakeEntry(*i));
+
+    return lockFile;
+}
+
+nlohmann::json flakeEntryToJson(LockFile::FlakeEntry & entry)
+{
+    nlohmann::json json;
+    json["uri"] = entry.ref.to_string();
+    for (auto & x : entry.nonFlakeEntries)
+        json["nonFlakeRequires"][x.first]["uri"] = x.second.to_string();
+    for (auto & x : entry.flakeEntries)
+        json["requires"][x.first] = flakeEntryToJson(x.second);
+    return json;
+}
+
+void writeLockFile(LockFile lockFile, Path path)
+{
+    nlohmann::json json;
+    json["version"] = 1;
+    json["nonFlakeRequires"];
+    for (auto & x : lockFile.nonFlakeEntries)
+        json["nonFlakeRequires"][x.first]["uri"] = x.second.to_string();
+    for (auto & x : lockFile.flakeEntries)
+        json["requires"][x.first] = flakeEntryToJson(x.second);
+    createDirs(dirOf(path));
+    writeFile(path, json.dump(4)); // '4' = indentation in json file
+}
+
+Path getUserRegistryPath()
 {
     return getHome() + "/.config/nix/registry.json";
 }
@@ -194,9 +274,9 @@ Value * makeFlakeRegistryValue(EvalState & state)
 static FlakeRef lookupFlake(EvalState & state, const FlakeRef & flakeRef,
     std::vector<std::shared_ptr<FlakeRegistry>> registries)
 {
-    if (auto refData = std::get_if<FlakeRef::IsFlakeId>(&flakeRef.data)) {
+    if (auto refData = std::get_if<FlakeRef::IsAlias>(&flakeRef.data)) {
         for (auto registry : registries) {
-            auto i = registry->entries.find(refData->id);
+            auto i = registry->entries.find(refData->alias);
             if (i != registry->entries.end()) {
                 auto newRef = FlakeRef(i->second.ref);
                 if (!newRef.isDirect())
@@ -206,7 +286,7 @@ static FlakeRef lookupFlake(EvalState & state, const FlakeRef & flakeRef,
                 return newRef;
             }
         }
-        throw Error("cannot find flake '%s' in the flake registry or in the flake lock file", refData->id);
+        throw Error("cannot find flake with alias '%s' in the flake registry or in the flake lock file", refData->alias);
     } else
         return flakeRef;
 }
@@ -342,7 +422,7 @@ Flake getFlake(EvalState & state, const FlakeRef & flakeRef, bool impureIsAllowe
 }
 
 // Get the `NonFlake` corresponding to a `FlakeRef`.
-NonFlake getNonFlake(EvalState & state, const FlakeRef & flakeRef, FlakeId flakeId)
+NonFlake getNonFlake(EvalState & state, const FlakeRef & flakeRef, FlakeAlias alias)
 {
     FlakeSourceInfo sourceInfo = fetchFlake(state, flakeRef);
     debug("got non-flake source '%s' with revision %s",
@@ -363,7 +443,7 @@ NonFlake getNonFlake(EvalState & state, const FlakeRef & flakeRef, FlakeId flake
 
     nonFlake.path = flakePath;
 
-    nonFlake.id = flakeId;
+    nonFlake.alias = alias;
 
     return nonFlake;
 }
@@ -394,14 +474,14 @@ LockFile::FlakeEntry dependenciesToFlakeEntry(Dependencies & deps)
         entry.flakeEntries.insert_or_assign(deps.flake.id, dependenciesToFlakeEntry(deps));
 
     for (NonFlake & nonFlake : deps.nonFlakeDeps)
-        entry.nonFlakeEntries.insert_or_assign(nonFlake.id, nonFlake.ref);
+        entry.nonFlakeEntries.insert_or_assign(nonFlake.alias, nonFlake.ref);
 
     return entry;
 }
 
-LockFile getLockFile(EvalState & evalState, FlakeRef & flakeRef, bool impureTopRef)
+LockFile getLockFile(EvalState & evalState, FlakeRef & flakeRef)
 {
-    Dependencies deps = resolveFlake(evalState, flakeRef, impureTopRef);
+    Dependencies deps = resolveFlake(evalState, flakeRef, true);
     LockFile::FlakeEntry entry = dependenciesToFlakeEntry(deps);
     LockFile lockFile;
     lockFile.flakeEntries = entry.flakeEntries;
@@ -409,17 +489,17 @@ LockFile getLockFile(EvalState & evalState, FlakeRef & flakeRef, bool impureTopR
     return lockFile;
 }
 
-void updateLockFile(EvalState & state, Path path, bool impureTopRef)
+void updateLockFile(EvalState & state, Path path)
 {
     // 'path' is the path to the local flake repo.
     FlakeRef flakeRef = FlakeRef("file://" + path);
     if (std::get_if<FlakeRef::IsGit>(&flakeRef.data)) {
-        LockFile lockFile = getLockFile(state, flakeRef, impureTopRef);
+        LockFile lockFile = getLockFile(state, flakeRef);
         writeLockFile(lockFile, path + "/flake.lock");
     } else if (std::get_if<FlakeRef::IsGitHub>(&flakeRef.data)) {
         throw UsageError("you can only update local flakes, not flakes on GitHub");
     } else {
-        throw UsageError("you can only update local flakes, not flakes through their FlakeId");
+        throw UsageError("you can only update local flakes, not flakes through their FlakeAlias");
     }
 }
 
@@ -456,7 +536,7 @@ Value * makeFlakeValue(EvalState & state, FlakeUri flakeUri, Value & v)
             mkInt(*state.allocAttr(*vFlake, state.symbols.create("revCount")), *flake.revCount);
 
         auto vProvides = state.allocAttr(*vFlake, state.symbols.create("provides"));
-        mkApp(*vProvides, *flake.vProvides, *vResult); // Should this be vResult or vFlake??? Or both!
+        mkApp(*vProvides, *flake.vProvides, *vResult);
 
         vFlake->attrs->sort();
     }

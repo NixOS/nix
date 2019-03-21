@@ -82,7 +82,7 @@ struct CmdBuild : MixDryRun, InstallablesCommand
         // if(updateLock)
         //     for (uint i = 0; i < installables.size(); i++)
         //         // if (auto flakeUri = installableToFlakeUri)
-        //             updateLockFile(*evalState, flakeUri, true);
+        //             updateLockFile(*evalState, flakeUri);
     }
 };
 

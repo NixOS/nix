@@ -40,12 +40,12 @@ struct CmdFlakeList : StoreCommand, MixEvalArgs
 void printFlakeInfo(Flake & flake, bool json) {
     if (json) {
         nlohmann::json j;
-        j["name"] = flake.id;
+        j["id"] = flake.id;
         j["location"] = flake.path;
         j["description"] = flake.description;
         std::cout << j.dump(4) << std::endl;
     } else {
-        std::cout << "Name:        " << flake.id << "\n";
+        std::cout << "ID:          " << flake.id << "\n";
         std::cout << "Description: " << flake.description << "\n";
         std::cout << "Location:    " << flake.path << "\n";
     }
@@ -54,11 +54,11 @@ void printFlakeInfo(Flake & flake, bool json) {
 void printNonFlakeInfo(NonFlake & nonFlake, bool json) {
     if (json) {
         nlohmann::json j;
-        j["name"] = nonFlake.id;
+        j["name"] = nonFlake.alias;
         j["location"] = nonFlake.path;
         std::cout << j.dump(4) << std::endl;
     } else {
-        std::cout << "name:        " << nonFlake.id << "\n";
+        std::cout << "name:        " << nonFlake.alias << "\n";
         std::cout << "Location:    " << nonFlake.path << "\n";
     }
 }
@@ -116,7 +116,7 @@ struct CmdFlakeUpdate : StoreCommand, GitRepoCommand, MixEvalArgs
         auto evalState = std::make_shared<EvalState>(searchPath, store);
 
         if (gitPath == "") gitPath = absPath(".");
-        updateLockFile(*evalState, gitPath, true);
+        updateLockFile(*evalState, gitPath);
     }
 };
 
@@ -135,15 +135,15 @@ struct CmdFlakeInfo : FlakeCommand, MixJSON, MixEvalArgs, StoreCommand
     void run(nix::ref<nix::Store> store) override
     {
         auto evalState = std::make_shared<EvalState>(searchPath, store);
-        nix::Flake flake = nix::getFlake(*evalState, FlakeRef(flakeUri), true);
+        nix::Flake flake = nix::getFlake(*evalState, FlakeRef(flakeUri));
         printFlakeInfo(flake, json);
     }
 };
 
 struct CmdFlakeAdd : MixEvalArgs, Command
 {
-    std::string flakeId;
-    std::string flakeUri;
+    FlakeAlias flakeAlias;
+    FlakeUri flakeUri;
 
     std::string name() override
     {
@@ -157,7 +157,7 @@ struct CmdFlakeAdd : MixEvalArgs, Command
 
     CmdFlakeAdd()
     {
-        expectArg("flake-id", &flakeId);
+        expectArg("flake-id", &flakeAlias);
         expectArg("flake-uri", &flakeUri);
     }
 
@@ -167,15 +167,15 @@ struct CmdFlakeAdd : MixEvalArgs, Command
         Path userRegistryPath = getUserRegistryPath();
         auto userRegistry = readRegistry(userRegistryPath);
         FlakeRegistry::Entry entry(newFlakeRef);
-        userRegistry->entries.erase(flakeId);
-        userRegistry->entries.insert_or_assign(flakeId, newFlakeRef);
+        userRegistry->entries.erase(flakeAlias);
+        userRegistry->entries.insert_or_assign(flakeAlias, newFlakeRef);
         writeRegistry(*userRegistry, userRegistryPath);
     }
 };
 
 struct CmdFlakeRemove : virtual Args, MixEvalArgs, Command
 {
-    std::string flakeId;
+    FlakeAlias flakeAlias;
 
     std::string name() override
     {
@@ -189,21 +189,21 @@ struct CmdFlakeRemove : virtual Args, MixEvalArgs, Command
 
     CmdFlakeRemove()
     {
-        expectArg("flake-id", &flakeId);
+        expectArg("flake-id", &flakeAlias);
     }
 
     void run() override
     {
         Path userRegistryPath = getUserRegistryPath();
         auto userRegistry = readRegistry(userRegistryPath);
-        userRegistry->entries.erase(flakeId);
+        userRegistry->entries.erase(flakeAlias);
         writeRegistry(*userRegistry, userRegistryPath);
     }
 };
 
 struct CmdFlakePin : virtual Args, StoreCommand, MixEvalArgs
 {
-    std::string flakeId;
+    FlakeAlias flakeAlias;
 
     std::string name() override
     {
@@ -217,7 +217,7 @@ struct CmdFlakePin : virtual Args, StoreCommand, MixEvalArgs
 
     CmdFlakePin()
     {
-        expectArg("flake-id", &flakeId);
+        expectArg("flake-id", &flakeAlias);
     }
 
     void run(nix::ref<nix::Store> store) override
@@ -226,14 +226,14 @@ struct CmdFlakePin : virtual Args, StoreCommand, MixEvalArgs
 
         Path userRegistryPath = getUserRegistryPath();
         FlakeRegistry userRegistry = *readRegistry(userRegistryPath);
-        auto it = userRegistry.entries.find(flakeId);
+        auto it = userRegistry.entries.find(flakeAlias);
         if (it != userRegistry.entries.end()) {
             FlakeRef oldRef = it->second.ref;
             it->second.ref = getFlake(*evalState, oldRef, true).ref;
             // The 'ref' in 'flake' is immutable.
             writeRegistry(userRegistry, userRegistryPath);
         } else
-            throw Error("the flake identifier '%s' does not exist in the user registry", flakeId);
+            throw Error("the flake alias '%s' does not exist in the user registry", flakeAlias);
     }
 };
 

@@ -98,15 +98,17 @@ namespace nix {
 */
 
 typedef std::string FlakeId;
+typedef std::string FlakeAlias;
+typedef std::string FlakeUri;
 
 struct FlakeRef
 {
     std::optional<std::string> ref;
     std::optional<Hash> rev;
 
-    struct IsFlakeId
+    struct IsAlias
     {
-        FlakeId id;
+        FlakeAlias alias;
     };
 
     struct IsGitHub
@@ -150,7 +152,7 @@ struct FlakeRef
        a flake ID, which requires a lookup in the flake registry. */
     bool isDirect() const
     {
-        return !std::get_if<FlakeRef::IsFlakeId>(&data);
+        return !std::get_if<FlakeRef::IsAlias>(&data);
     }
 
     /* Check whether this is an "immutable" flake reference, that is,

@@ -16,7 +16,7 @@ struct FlakeRegistry
         Entry(const FlakeRef & flakeRef) : ref(flakeRef) {};
         Entry operator=(const Entry & entry) { return Entry(entry.ref); }
     };
-    std::map<FlakeId, Entry> entries;
+    std::map<FlakeAlias, Entry> entries;
 };
 
 struct LockFile
@@ -52,7 +52,7 @@ struct Flake
     std::optional<uint64_t> revCount;
     std::vector<FlakeRef> requires;
     LockFile lockFile;
-    std::map<FlakeId, FlakeRef> nonFlakeRequires;
+    std::map<FlakeAlias, FlakeRef> nonFlakeRequires;
     Value * vProvides; // FIXME: gc
     // date
     // content hash
@@ -61,7 +61,7 @@ struct Flake
 
 struct NonFlake
 {
-    FlakeId id;
+    FlakeAlias alias;
     FlakeRef ref;
     Path path;
     // date
@@ -81,5 +81,7 @@ struct Dependencies
 
 Dependencies resolveFlake(EvalState &, const FlakeRef &, bool impureTopRef, bool isTopFlake);
 
-void updateLockFile(EvalState &, Path path, bool impureTopRef);
+FlakeRegistry updateLockFile(EvalState &, Flake &);
+
+void updateLockFile(EvalState &, Path path);
 }
