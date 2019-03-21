@@ -2,6 +2,7 @@
 
 #include "args.hh"
 #include "common-eval-args.hh"
+#include <optional>
 
 namespace nix {
 
@@ -64,6 +65,11 @@ struct Installable
     }
 
     Buildable toBuildable();
+
+    virtual std::optional<std::string> installableToFlakeUri()
+    {
+        return std::nullopt;
+    }
 
     virtual Value * toValue(EvalState & state)
     {

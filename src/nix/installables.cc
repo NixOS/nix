@@ -176,6 +176,14 @@ struct InstallableFlake : InstallableValue
         state.forceValue(*v);
         return v;
     }
+
+    std::optional<std::string> installableToFlakeUri() override
+    {
+        if (std::get_if<FlakeRef::IsPath>(&flakeRef.data))
+            return flakeRef.to_string();
+        else
+            return std::nullopt;
+    }
 };
 
 // FIXME: extend
