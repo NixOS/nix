@@ -23,6 +23,7 @@ available as <function>builtins.derivation</function>.</para>
 
   <varlistentry xml:id='builtin-abort'>
     <term><function>abort</function> <replaceable>s</replaceable></term>
+    <term><function>builtins.abort</function> <replaceable>s</replaceable></term>
 
     <listitem><para>Abort Nix expression evaluation, print error
     message <replaceable>s</replaceable>.</para></listitem>
@@ -251,6 +252,8 @@ if builtins ? getEnv then builtins.getEnv "PATH" else ""</programlisting>
   <varlistentry xml:id='builtin-derivation'>
     <term><function>derivation</function>
     <replaceable>attrs</replaceable></term>
+    <term><function>builtins.derivation</function>
+    <replaceable>attrs</replaceable></term>
 
     <listitem><para><function>derivation</function> is described in
     <xref linkend='ssec-derivation' />.</para></listitem>
@@ -260,6 +263,7 @@ if builtins ? getEnv then builtins.getEnv "PATH" else ""</programlisting>
 
   <varlistentry xml:id='builtin-dirOf'>
     <term><function>dirOf</function> <replaceable>s</replaceable></term>
+    <term><function>builtins.dirOf</function> <replaceable>s</replaceable></term>
 
     <listitem><para>Return the directory part of the string
     <replaceable>s</replaceable>, that is, everything before the final
@@ -317,6 +321,8 @@ if builtins ? getEnv then builtins.getEnv "PATH" else ""</programlisting>
 
   <varlistentry xml:id='builtin-fetchTarball'>
     <term><function>fetchTarball</function>
+    <replaceable>url</replaceable></term>
+    <term><function>builtins.fetchTarball</function>
     <replaceable>url</replaceable></term>
 
     <listitem><para>Download the specified URL, unpack it and return
@@ -714,6 +720,8 @@ builtins.genList (x: x * x) 5
   <varlistentry xml:id='builtin-import'>
     <term><function>import</function>
     <replaceable>path</replaceable></term>
+    <term><function>builtins.import</function>
+    <replaceable>path</replaceable></term>
 
     <listitem><para>Load, parse and return the Nix expression in the
     file <replaceable>path</replaceable>.  If <replaceable>path
@@ -857,6 +865,8 @@ x: x + 456</programlisting>
   <varlistentry xml:id='builtin-isNull'>
     <term><function>isNull</function>
     <replaceable>e</replaceable></term>
+    <term><function>builtins.isNull</function>
+    <replaceable>e</replaceable></term>
 
     <listitem><para>Return <literal>true</literal> if
     <replaceable>e</replaceable> evaluates to <literal>null</literal>,
@@ -924,6 +934,8 @@ builtins.listToAttrs
 
   <varlistentry xml:id='builtin-map'>
     <term><function>map</function>
+    <replaceable>f</replaceable> <replaceable>list</replaceable></term>
+    <term><function>builtins.map</function>
     <replaceable>f</replaceable> <replaceable>list</replaceable></term>
 
     <listitem><para>Apply the function <replaceable>f</replaceable> to
@@ -1119,6 +1131,8 @@ Evaluates to <literal>[ "foo" ]</literal>.
   <varlistentry xml:id='builtin-removeAttrs'>
     <term><function>removeAttrs</function>
     <replaceable>set</replaceable> <replaceable>list</replaceable></term>
+    <term><function>builtins.removeAttrs</function>
+    <replaceable>set</replaceable> <replaceable>list</replaceable></term>
 
     <listitem><para>Remove the attributes listed in
     <replaceable>list</replaceable> from
@@ -1287,6 +1301,8 @@ builtins.substring 0 3 "nixos"
   <varlistentry xml:id='builtin-throw'>
     <term><function>throw</function>
     <replaceable>s</replaceable></term>
+    <term><function>builtins.throw</function>
+    <replaceable>s</replaceable></term>
 
     <listitem><para>Throw an error message
     <replaceable>s</replaceable>.  This usually aborts Nix expression
@@ -1405,6 +1421,7 @@ in foo</programlisting>
 
   <varlistentry xml:id='builtin-toString'>
     <term><function>toString</function> <replaceable>e</replaceable></term>
+    <term><function>builtins.toString</function> <replaceable>e</replaceable></term>
 
     <listitem><para>Convert the expression
     <replaceable>e</replaceable> to a string.
