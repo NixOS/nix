@@ -38,14 +38,33 @@ struct Flake
     std::optional<uint64_t> revCount;
     std::vector<FlakeRef> requires;
     std::shared_ptr<FlakeRegistry> lockFile;
+    std::map<FlakeId, FlakeRef> nonFlakeRequires;
     Value * vProvides; // FIXME: gc
-    // commit hash
     // date
     // content hash
-    Flake(FlakeRef & flakeRef) : ref(flakeRef) {};
+    Flake(const FlakeRef flakeRef) : ref(flakeRef) {};
+};
+
+struct NonFlake
+{
+    FlakeId id;
+    FlakeRef ref;
+    Path path;
+    // date
+    // content hash
+    NonFlake(const FlakeRef flakeRef) : ref(flakeRef) {};
 };
 
 Flake getFlake(EvalState &, const FlakeRef &);
+
+struct Dependencies
+{
+    FlakeId topFlakeId;
+    std::vector<Flake> flakes;
+    std::vector<NonFlake> nonFlakes;
+};
+
+Dependencies resolveFlake(EvalState &, const FlakeRef &, bool impureTopRef);
 
 FlakeRegistry updateLockFile(EvalState &, Flake &);
 

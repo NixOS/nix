@@ -36,6 +36,60 @@ struct CmdFlakeList : StoreCommand, MixEvalArgs
     }
 };
 
+void printFlakeInfo(Flake & flake, bool json) {
+    if (json) {
+        nlohmann::json j;
+        j["name"] = flake.id;
+        j["location"] = flake.path;
+        j["description"] = flake.description;
+        std::cout << j.dump(4) << std::endl;
+    } else {
+        std::cout << "Name:        " << flake.id << "\n";
+        std::cout << "Description: " << flake.description << "\n";
+        std::cout << "Location:    " << flake.path << "\n";
+    }
+}
+
+void printNonFlakeInfo(NonFlake & nonFlake, bool json) {
+    if (json) {
+        nlohmann::json j;
+        j["name"] = nonFlake.id;
+        j["location"] = nonFlake.path;
+        std::cout << j.dump(4) << std::endl;
+    } else {
+        std::cout << "name:        " << nonFlake.id << "\n";
+        std::cout << "Location:    " << nonFlake.path << "\n";
+    }
+}
+
+struct CmdFlakeDeps : FlakeCommand, MixJSON, StoreCommand, MixEvalArgs
+{
+    std::string name() override
+    {
+        return "deps";
+    }
+
+    std::string description() override
+    {
+        return "list informaton about dependencies";
+    }
+
+    void run(nix::ref<nix::Store> store) override
+    {
+        auto evalState = std::make_shared<EvalState>(searchPath, store);
+
+        FlakeRef flakeRef(flakeUri);
+
+        Dependencies deps = resolveFlake(*evalState, flakeRef, true);
+
+        for (auto & flake : deps.flakes)
+            printFlakeInfo(flake, json);
+
+        for (auto & nonFlake : deps.nonFlakes)
+            printNonFlakeInfo(nonFlake, json);
+    }
+};
+
 struct CmdFlakeUpdate : StoreCommand, GitRepoCommand, MixEvalArgs
 {
     std::string name() override
@@ -73,15 +127,7 @@ struct CmdFlakeInfo : FlakeCommand, MixJSON, MixEvalArgs, StoreCommand
     {
         auto evalState = std::make_shared<EvalState>(searchPath, store);
         nix::Flake flake = nix::getFlake(*evalState, FlakeRef(flakeUri));
-        if (json) {
-            nlohmann::json j;
-            j["location"] = flake.path;
-            j["description"] = flake.description;
-            std::cout << j.dump(4) << std::endl;
-        } else {
-            std::cout << "Description: " << flake.description << "\n";
-            std::cout << "Location:    " << flake.path << "\n";
-        }
+        printFlakeInfo(flake, json);
     }
 };
 
@@ -218,6 +264,7 @@ struct CmdFlake : virtual MultiCommand, virtual Command
         : MultiCommand({make_ref<CmdFlakeList>()
             , make_ref<CmdFlakeUpdate>()
             , make_ref<CmdFlakeInfo>()
+            , make_ref<CmdFlakeDeps>()
             , make_ref<CmdFlakeAdd>()
             , make_ref<CmdFlakeRemove>()
             , make_ref<CmdFlakePin>()
