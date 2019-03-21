@@ -130,6 +130,16 @@ std::ostream & operator << (std::ostream & str, const Value & v)
 }
 
 
+const Value *getPrimOp(const Value &v) {
+    const Value * primOp = &v;
+    while (primOp->type == tPrimOpApp) {
+        primOp = primOp->primOpApp.left;
+    }
+    assert(primOp->type == tPrimOp);
+    return primOp;
+}
+
+
 string showType(const Value & v)
 {
     switch (v.type) {
@@ -144,8 +154,10 @@ string showType(const Value & v)
         case tApp: return "a function application";
         case tLambda: return "a function";
         case tBlackhole: return "a black hole";
-        case tPrimOp: return "a built-in function";
-        case tPrimOpApp: return "a partially applied built-in function";
+        case tPrimOp:
+            return fmt("the built-in function '%s'", string(v.primOp->name));
+        case tPrimOpApp:
+            return fmt("the partially applied built-in function '%s'", string(getPrimOp(v)->primOp->name));
         case tExternal: return v.external->showType();
         case tFloat: return "a float";
     }
