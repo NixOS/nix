@@ -78,10 +78,11 @@ struct CmdBuild : MixDryRun, InstallablesCommand
                     }
         }
 
+        std::string flakeUri = "";
         if(updateLock)
-            for (int i = 0; i < installables.size(); i++)
-                if (auto flakeUri = installableToFlakeUri)
-                    updateLockFile(*evalState, FlakeRef(*flakeUri));
+            for (uint i = 0; i < installables.size(); i++)
+                // if (auto flakeUri = installableToFlakeUri)
+                    updateLockFile(*evalState, flakeUri);
     }
 };
 

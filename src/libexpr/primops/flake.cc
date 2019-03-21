@@ -123,6 +123,10 @@ static FlakeRef lookupFlake(EvalState & state, const FlakeRef & flakeRef,
                 auto newRef = FlakeRef(i->second.ref);
                 if (!newRef.isDirect())
                     throw Error("found indirect flake URI '%s' in the flake registry", i->second.ref.to_string());
+                if (refData->ref)
+                    newRef.setRef(*refData->ref);
+                if (refData->rev)
+                    newRef.setRev(*refData->rev);
                 return newRef;
             }
         }
@@ -224,7 +228,6 @@ Flake getFlake(EvalState & state, const FlakeRef & flakeRef)
 
     flake.path = flakePath;
     flake.revCount = sourceInfo.revCount;
-    flake.path = flakePath;
 
     Value vInfo;
     state.evalFile(flakePath + "/flake.nix", vInfo); // FIXME: symlink attack
@@ -317,9 +320,9 @@ Dependencies resolveFlake(EvalState & state, const FlakeRef & topRef, bool impur
         auto flakeRef = todo.front();
         todo.pop();
 
-        if (auto refData = std::get_if<FlakeRef::IsFlakeId>(&flakeRef.data)) {
-            if (done.count(refData->id)) continue; // optimization
+        if (std::get_if<FlakeRef::IsFlakeId>(&flakeRef.data))
             flakeRef = lookupFlake(state, flakeRef, registries);
+
         if (evalSettings.pureEval && !flakeRef.isImmutable() && (!isTopLevel || !impureTopRef))
             throw Error("mutable flake '%s' is not allowed in pure mode; use --impure to disable", flakeRef.to_string());
 
@@ -368,7 +371,7 @@ FlakeRegistry updateLockFile(EvalState & evalState, FlakeRef & flakeRef)
     return newLockFile;
 }
 
-void updateLockFile(EvalState & state, std::string path)
+void updateLockFile(EvalState & state, Path path)
 {
     // 'path' is the path to the local flake repo.
     FlakeRef flakeRef = FlakeRef("file://" + path);
@@ -384,7 +387,7 @@ void updateLockFile(EvalState & state, std::string path)
 
 // Return the `provides` of the top flake, while assigning to `v` the provides
 // of the dependencies as well.
-Value * makeFlakeValue(EvalState & state, FlakeUri flakeUri, bool impureTopRef, Value & v)
+Value * makeFlakeValue(EvalState & state, FlakeUri flakeUri, Value & v)
 {
     FlakeRef flakeRef = FlakeRef(flakeUri);
 
@@ -406,16 +409,16 @@ Value * makeFlakeValue(EvalState & state, FlakeUri flakeUri, bool impureTopRef, 
 
         state.mkAttrs(*vFlake, 4);
 
-        mkString(*state.allocAttr(*vFlake, state.sDescription), flake.second.description);
+        mkString(*state.allocAttr(*vFlake, state.sDescription), flake.description);
 
-        state.store->assertStorePath(flake.second.path);
-        mkString(*state.allocAttr(*vFlake, state.sOutPath), flake.second.path, {flake.second.path});
+        state.store->assertStorePath(flake.path);
+        mkString(*state.allocAttr(*vFlake, state.sOutPath), flake.path, {flake.path});
 
         if (flake.second.revCount)
-            mkInt(*state.allocAttr(*vFlake, state.symbols.create("revCount")), *flake.second.revCount);
+            mkInt(*state.allocAttr(*vFlake, state.symbols.create("revCount")), *flake.revCount);
 
         auto vProvides = state.allocAttr(*vFlake, state.symbols.create("provides"));
-        mkApp(*vProvides, *flake.second.vProvides, *vResult);
+        mkApp(*vProvides, *flake.vProvides, *vResult); // Should this be vResult or vFlake??? Or both!
 
         vFlake->attrs->sort();
     }

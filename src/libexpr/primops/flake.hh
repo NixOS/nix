@@ -68,5 +68,5 @@ Dependencies resolveFlake(EvalState &, const FlakeRef &, bool impureTopRef);
 
 FlakeRegistry updateLockFile(EvalState &, Flake &);
 
-void updateLockFile(EvalState &, std::string);
+void updateLockFile(EvalState &, Path);
 }
