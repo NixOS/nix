@@ -280,6 +280,34 @@ struct CmdFlakeInit : virtual Args, Command
     }
 };
 
+struct CmdFlakeClone : StoreCommand, FlakeCommand, MixEvalArgs
+{
+    Path endDirectory = "";
+
+    std::string name() override
+    {
+        return "clone";
+    }
+
+    std::string description() override
+    {
+        return "clone flake repository";
+    }
+
+    CmdFlakeClone()
+    {
+        expectArg("end-dir", &endDirectory, true);
+    }
+
+    void run(nix::ref<nix::Store> store) override
+    {
+        auto evalState = std::make_shared<EvalState>(searchPath, store);
+
+        Registries registries = evalState->getFlakeRegistries();
+        gitCloneFlake(flakeUri, *evalState, registries, endDirectory);
+    }
+};
+
 struct CmdFlake : virtual MultiCommand, virtual Command
 {
     CmdFlake()
@@ -291,6 +319,7 @@ struct CmdFlake : virtual MultiCommand, virtual Command
             , make_ref<CmdFlakeRemove>()
             , make_ref<CmdFlakePin>()
             , make_ref<CmdFlakeInit>()
+            , make_ref<CmdFlakeClone>()
           })
     {
     }

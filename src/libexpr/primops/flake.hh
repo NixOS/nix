@@ -27,6 +27,8 @@ struct LockFile
     std::map<FlakeId, FlakeRef> nonFlakeEntries;
 };
 
+typedef std::vector<std::shared_ptr<FlakeRegistry>> Registries;
+
 Path getUserRegistryPath();
 
 enum RegistryAccess { DisallowRegistry, AllowRegistry, AllowRegistryAtTop };
@@ -86,4 +88,5 @@ Dependencies resolveFlake(EvalState &, const FlakeRef &, RegistryAccess registry
 
 void updateLockFile(EvalState &, const Path & path);
 
+void gitCloneFlake (std::string flakeUri, EvalState &, Registries, Path);
 }
