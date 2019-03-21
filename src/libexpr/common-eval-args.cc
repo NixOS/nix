@@ -33,6 +33,15 @@ MixEvalArgs::MixEvalArgs()
         .handler([&](std::vector<std::string> ss) {
             evalSettings.pureEval = false;
         });
+
+    mkFlag()
+      .longName("override-flake")
+      .labels({"original-ref", "resolved-ref"})
+      .description("override a flake registry value")
+      .arity(2)
+      .handler([&](std::vector<std::string> ss) {
+          registryOverrides.push_back(std::make_pair(ss[0], ss[1]));
+      });
 }
 
 Bindings * MixEvalArgs::getAutoArgs(EvalState & state)

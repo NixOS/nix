@@ -63,6 +63,8 @@ typedef std::list<SearchPathElem> SearchPath;
 /* Initialise the Boehm GC, if applicable. */
 void initGC();
 
+typedef std::vector<std::pair<std::string, std::string>> RegistryOverrides;
+
 
 class EvalState
 {
@@ -88,6 +90,9 @@ public:
     Value vEmptySet;
 
     const ref<Store> store;
+
+    RegistryOverrides registryOverrides;
+
 
 private:
     SrcToStore srcToStore;
@@ -210,6 +215,8 @@ public:
        path.  The result is guaranteed to be a canonicalised, absolute
        path.  Nothing is copied to the store. */
     Path coerceToPath(const Pos & pos, Value & v, PathSet & context);
+
+    void addRegistryOverrides(RegistryOverrides overrides) { registryOverrides = overrides; }
 
 public:
 
