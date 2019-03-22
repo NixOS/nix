@@ -528,7 +528,8 @@ public:
 
 UserLock::UserLock()
 {
-    assert(settings.buildUsersGroup != "");
+    if(settings.buildUsersGroup == "")
+        throw Error("the 'build-users-group' option is required for security reasons");
 
     /* Get the members of the build-users-group. */
     struct group * gr = getgrnam(settings.buildUsersGroup.get().c_str());
@@ -1943,7 +1944,7 @@ void DerivationGoal::startBuilder()
 
     /* If `build-users-group' is not empty, then we have to build as
        one of the members of that group. */
-    if (settings.buildUsersGroup != "" && getuid() == 0) {
+    if (getuid() == 0) {
 #if defined(__linux__) || defined(__APPLE__)
         buildUser = std::make_unique<UserLock>();
 
