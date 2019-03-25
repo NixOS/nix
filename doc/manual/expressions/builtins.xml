@@ -861,6 +861,14 @@ x: x + 456</programlisting>
 
   </varlistentry>
 
+  <varlistentry><term><function>builtins.isPath</function>
+  <replaceable>e</replaceable></term>
+
+    <listitem><para>Return <literal>true</literal> if
+    <replaceable>e</replaceable> evaluates to a path, and
+    <literal>false</literal> otherwise.</para></listitem>
+
+  </varlistentry>
 
   <varlistentry xml:id='builtin-isNull'>
     <term><function>isNull</function>
