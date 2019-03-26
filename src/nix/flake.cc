@@ -4,6 +4,7 @@
 #include "shared.hh"
 #include "progress-bar.hh"
 #include "eval.hh"
+#include <nlohmann/json.hpp>
 
 using namespace nix;
 
@@ -33,10 +34,66 @@ struct CmdFlakeList : StoreCommand, MixEvalArgs
     }
 };
 
+struct CmdFlakeUpdate : StoreCommand, GitRepoCommand, MixEvalArgs
+{
+    std::string name() override
+    {
+        return "update";
+    }
+
+    std::string description() override
+    {
+        return "update flake lock file";
+    }
+
+    void run(nix::ref<nix::Store> store) override
+    {
+        auto evalState = std::make_shared<EvalState>(searchPath, store);
+
+        if (flakeUri == "") flakeUri = absPath("./flake.nix");
+        int result = updateLockFile(*evalState, flakeUri);
+        if (result == 1) {
+            std::cout << "You can only update local flakes, not flakes on GitHub.\n";
+        } else if (result == 2) {
+            std::cout << "You can only update local flakes, not flakes through their FlakeId.\n";
+        }
+    }
+};
+
+struct CmdFlakeInfo : FlakeCommand, MixJSON
+{
+    std::string name() override
+    {
+        return "info";
+    }
+
+    std::string description() override
+    {
+        return "list info about a given flake";
+    }
+
+    void run(nix::ref<nix::Store> store) override
+    {
+        auto evalState = std::make_shared<EvalState>(searchPath, store);
+        nix::Flake flake = nix::getFlake(*evalState, FlakeRef(flakeUri));
+        if (json) {
+            nlohmann::json j;
+            j["location"] = flake.path;
+            j["description"] = flake.description;
+            std::cout << j.dump(4) << std::endl;
+        } else {
+            std::cout << "Description: " << flake.description << "\n";
+            std::cout << "Location:    " << flake.path << "\n";
+        }
+    }
+};
+
 struct CmdFlake : virtual MultiCommand, virtual Command
 {
     CmdFlake()
-        : MultiCommand({make_ref<CmdFlakeList>()})
+        : MultiCommand({make_ref<CmdFlakeList>()
+            , make_ref<CmdFlakeInfo>()
+            , make_ref<CmdFlakeUpdate>()})
     {
     }
 

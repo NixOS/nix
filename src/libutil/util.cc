@@ -344,7 +344,6 @@ void writeFile(const Path & path, Source & source, mode_t mode)
     }
 }
 
-
 string readLine(int fd)
 {
     string s;

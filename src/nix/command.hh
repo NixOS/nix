@@ -34,6 +34,26 @@ struct Buildable
 
 typedef std::vector<Buildable> Buildables;
 
+struct GitRepoCommand : virtual Args
+{
+    std::string gitPath = absPath(".");
+
+    GitRepoCommand ()
+    {
+        expectArg("git-path", &gitPath, true);
+    }
+};
+
+struct FlakeCommand : virtual Args, StoreCommand, MixEvalArgs
+{
+    std::string flakeUri;
+
+    FlakeCommand()
+    {
+        expectArg("flake-uri", &flakeUri);
+    }
+};
+
 struct Installable
 {
     virtual std::string what() = 0;

@@ -234,6 +234,7 @@ Buildables build(ref<Store> store, RealiseMode mode,
     PathSet pathsToBuild;
 
     for (auto & i : installables) {
+        std::cout << i->what() << std::endl;
         for (auto & b : i->toBuildables()) {
             if (b.drvPath != "") {
                 StringSet outputNames;

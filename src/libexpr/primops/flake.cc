@@ -3,7 +3,9 @@
 #include "eval-inline.hh"
 #include "fetchGit.hh"
 #include "download.hh"
+#include "args.hh"
 
+#include <iostream>
 #include <queue>
 #include <regex>
 #include <nlohmann/json.hpp>
@@ -29,6 +31,18 @@ static std::unique_ptr<FlakeRegistry> readRegistry(const Path & path)
     }
 
     return registry;
+}
+
+/* Write the registry or lock file to a file. */
+void writeRegistry(FlakeRegistry registry, Path path)
+{
+    nlohmann::json json = {};
+    json["version"] = 1;
+    json["flakes"] = {};
+    for (auto elem : registry.entries) {
+        json["flakes"][elem.first] = elem.second.ref.to_string();
+    }
+    writeFile(path, json.dump(4)); // The '4' is the number of spaces used in the indentation in the json file.
 }
 
 const FlakeRegistry & EvalState::getFlakeRegistry()
@@ -95,9 +109,21 @@ struct FlakeSourceInfo
 
 static FlakeSourceInfo fetchFlake(EvalState & state, const FlakeRef & flakeRef)
 {
-    assert(flakeRef.isDirect());
+    FlakeRef directFlakeRef = FlakeRef(flakeRef);
+    if (!flakeRef.isDirect())
+    {
+        std::vector<const FlakeRegistry *> registries;
+        // 'pureEval' is a setting which cannot be changed in `nix flake`,
+        // but without flagging it off, we can't use any FlakeIds.
+        // if (!evalSettings.pureEval) {
+            registries.push_back(&state.getFlakeRegistry());
+        // }
+        directFlakeRef = lookupFlake(state, flakeRef, registries);
+    }
+    assert(directFlakeRef.isDirect());
+    // NOTE FROM NICK: I don't see why one wouldn't fetch FlakeId flakes..
 
-    if (auto refData = std::get_if<FlakeRef::IsGitHub>(&flakeRef.data)) {
+    if (auto refData = std::get_if<FlakeRef::IsGitHub>(&directFlakeRef.data)) {
         // FIXME: require hash in pure mode.
 
         // FIXME: use regular /archive URLs instead? api.github.com
@@ -129,7 +155,7 @@ static FlakeSourceInfo fetchFlake(EvalState & state, const FlakeRef & flakeRef)
         return info;
     }
 
-    else if (auto refData = std::get_if<FlakeRef::IsGit>(&flakeRef.data)) {
+    else if (auto refData = std::get_if<FlakeRef::IsGit>(&directFlakeRef.data)) {
         auto gitInfo = exportGit(state.store, refData->uri, refData->ref,
             refData->rev ? refData->rev->to_string(Base16, false) : "", "source");
         FlakeSourceInfo info;
@@ -141,20 +167,7 @@ static FlakeSourceInfo fetchFlake(EvalState & state, const FlakeRef & flakeRef)
     else abort();
 }
 
-struct Flake
-{
-    FlakeId id;
-    std::string description;
-    Path path;
-    std::vector<FlakeRef> requires;
-    std::unique_ptr<FlakeRegistry> lockFile;
-    Value * vProvides; // FIXME: gc
-    // commit hash
-    // date
-    // content hash
-};
-
-static Flake getFlake(EvalState & state, const FlakeRef & flakeRef)
+Flake getFlake(EvalState & state, const FlakeRef & flakeRef)
 {
     auto sourceInfo = fetchFlake(state, flakeRef);
     debug("got flake source '%s' with revision %s",
@@ -166,7 +179,16 @@ static Flake getFlake(EvalState & state, const FlakeRef & flakeRef)
     if (state.allowedPaths)
         state.allowedPaths->insert(flakePath);
 
-    Flake flake;
+    FlakeRef newFlakeRef(flakeRef);
+    if (std::get_if<FlakeRef::IsGitHub>(&newFlakeRef.data)) {
+        FlakeSourceInfo srcInfo = fetchFlake(state, newFlakeRef);
+        if (srcInfo.rev) {
+            std::string uri = flakeRef.to_string();
+            newFlakeRef = FlakeRef(uri + "/" + srcInfo.rev->to_string());
+        }
+    }
+
+    Flake flake(newFlakeRef);
 
     Value vInfo;
     state.evalFile(flakePath + "/flake.nix", vInfo); // FIXME: symlink attack
@@ -257,6 +279,35 @@ static std::tuple<FlakeId, std::map<FlakeId, Flake>> resolveFlake(EvalState & st
 
     assert(topFlakeId);
     return {*topFlakeId, std::move(done)};
+}
+
+FlakeRegistry updateLockFile(EvalState & evalState, FlakeRef & flakeRef)
+{
+    FlakeRegistry newLockFile;
+    std::map<FlakeId, Flake> myDependencyMap = get<1>(resolveFlake(evalState, flakeRef, false));
+    // Nick assumed that "topRefPure" means that the Flake for flakeRef can be
+    // fetched purely.
+    for (auto const& require : myDependencyMap) {
+        FlakeRegistry::Entry entry = FlakeRegistry::Entry(require.second.ref);
+        // The FlakeRefs are immutable because they come out of the Flake objects,
+        // not from the requires.
+        newLockFile.entries.insert(std::pair<FlakeId, FlakeRegistry::Entry>(require.first, entry));
+    }
+    return newLockFile;
+}
+
+void updateLockFile(EvalState & state, std::string path)
+{
+    // 'path' is the path to the local flake repo.
+    FlakeRef flakeRef = FlakeRef("file://" + path);
+    if (std::get_if<FlakeRef::IsGit>(&flakeRef.data)) {
+        FlakeRegistry newLockFile = updateLockFile(state, flakeRef);
+        writeRegistry(newLockFile, path + "/flake.lock");
+    } else if (std::get_if<FlakeRef::IsGitHub>(&flakeRef.data)) {
+        throw UsageError("you can only update local flakes, not flakes on GitHub");
+    } else {
+        throw UsageError("you can only update local flakes, not flakes through their FlakeId");
+    }
 }
 
 Value * makeFlakeValue(EvalState & state, std::string flakeUri, Value & v)
