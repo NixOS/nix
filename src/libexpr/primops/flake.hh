@@ -14,13 +14,18 @@ struct FlakeRegistry
     {
         FlakeRef ref;
         Entry(const FlakeRef & flakeRef) : ref(flakeRef) {};
+        Entry operator=(const Entry & entry) { return Entry(entry.ref); }
     };
     std::map<FlakeId, Entry> entries;
 };
 
+Path getUserRegistryPath();
+
 Value * makeFlakeRegistryValue(EvalState & state);
 
 Value * makeFlakeValue(EvalState & state, std::string flakeUri, Value & v);
+
+std::unique_ptr<FlakeRegistry> readRegistry(const Path &);
 
 void writeRegistry(FlakeRegistry, Path);
 

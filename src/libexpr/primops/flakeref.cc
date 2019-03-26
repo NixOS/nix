@@ -152,4 +152,19 @@ bool FlakeRef::isImmutable() const
     else abort();
 }
 
+FlakeRef FlakeRef::baseRef() const // Removes the ref and rev from a FlakeRef.
+{
+    FlakeRef result(*this);
+    if (auto refData = std::get_if<FlakeRef::IsGitHub>(&result.data)) {
+        refData->ref = std::nullopt;
+        refData->rev = std::nullopt;
+    } else if (auto refData = std::get_if<FlakeRef::IsGit>(&result.data)) {
+        refData->ref = std::nullopt;
+        refData->rev = std::nullopt;
+    } else if (auto refData = std::get_if<FlakeRef::IsGit>(&result.data)) {
+        refData->ref = std::nullopt;
+        refData->rev = std::nullopt;
+    }
+    return result;
+}
 }

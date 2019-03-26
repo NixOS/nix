@@ -50,17 +50,12 @@ struct CmdFlakeUpdate : StoreCommand, GitRepoCommand, MixEvalArgs
     {
         auto evalState = std::make_shared<EvalState>(searchPath, store);
 
-        if (flakeUri == "") flakeUri = absPath("./flake.nix");
-        int result = updateLockFile(*evalState, flakeUri);
-        if (result == 1) {
-            std::cout << "You can only update local flakes, not flakes on GitHub.\n";
-        } else if (result == 2) {
-            std::cout << "You can only update local flakes, not flakes through their FlakeId.\n";
-        }
+        if (gitPath == "") gitPath = absPath(".");
+        updateLockFile(*evalState, gitPath);
     }
 };
 
-struct CmdFlakeInfo : FlakeCommand, MixJSON
+struct CmdFlakeInfo : FlakeCommand, MixJSON, MixEvalArgs, StoreCommand
 {
     std::string name() override
     {
@@ -88,12 +83,112 @@ struct CmdFlakeInfo : FlakeCommand, MixJSON
     }
 };
 
+struct CmdFlakeAdd : MixEvalArgs, Command
+{
+    std::string flakeId;
+    std::string flakeUri;
+
+    std::string name() override
+    {
+        return "add";
+    }
+
+    std::string description() override
+    {
+        return "upsert flake in user flake registry";
+    }
+
+    CmdFlakeAdd()
+    {
+        expectArg("flake-id", &flakeId);
+        expectArg("flake-uri", &flakeUri);
+    }
+
+    void run() override
+    {
+        FlakeRef newFlakeRef(flakeUri);
+        Path userRegistryPath = getUserRegistryPath();
+        auto userRegistry = readRegistry(userRegistryPath);
+        FlakeRegistry::Entry entry(newFlakeRef);
+        userRegistry->entries.erase(flakeId);
+        userRegistry->entries.insert_or_assign(flakeId, newFlakeRef);
+        writeRegistry(*userRegistry, userRegistryPath);
+    }
+};
+
+struct CmdFlakeRemove : virtual Args, MixEvalArgs, Command
+{
+    std::string flakeId;
+
+    std::string name() override
+    {
+        return "remove";
+    }
+
+    std::string description() override
+    {
+        return "remove flake from user flake registry";
+    }
+
+    CmdFlakeRemove()
+    {
+        expectArg("flake-id", &flakeId);
+    }
+
+    void run() override
+    {
+        Path userRegistryPath = getUserRegistryPath();
+        auto userRegistry = readRegistry(userRegistryPath);
+        userRegistry->entries.erase(flakeId);
+        writeRegistry(*userRegistry, userRegistryPath);
+    }
+};
+
+struct CmdFlakePin : virtual Args, StoreCommand, MixEvalArgs
+{
+    std::string flakeId;
+
+    std::string name() override
+    {
+        return "pin";
+    }
+
+    std::string description() override
+    {
+        return "pin flake require in user flake registry";
+    }
+
+    CmdFlakePin()
+    {
+        expectArg("flake-id", &flakeId);
+    }
+
+    void run(nix::ref<nix::Store> store) override
+    {
+        auto evalState = std::make_shared<EvalState>(searchPath, store);
+
+        Path userRegistryPath = getUserRegistryPath();
+        FlakeRegistry userRegistry = *readRegistry(userRegistryPath);
+        auto it = userRegistry.entries.find(flakeId);
+        if (it != userRegistry.entries.end()) {
+            FlakeRef oldRef = it->second.ref;
+            it->second.ref = getFlake(*evalState, oldRef).ref;
+            // The 'ref' in 'flake' is immutable.
+            writeRegistry(userRegistry, userRegistryPath);
+        } else
+            throw Error("the flake identifier '%s' does not exist in the user registry", flakeId);
+    }
+};
+
 struct CmdFlake : virtual MultiCommand, virtual Command
 {
     CmdFlake()
         : MultiCommand({make_ref<CmdFlakeList>()
+            , make_ref<CmdFlakeUpdate>()
             , make_ref<CmdFlakeInfo>()
-            , make_ref<CmdFlakeUpdate>()})
+            , make_ref<CmdFlakeAdd>()
+            , make_ref<CmdFlakeRemove>()
+            , make_ref<CmdFlakePin>()})
     {
     }
 

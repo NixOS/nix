@@ -12,9 +12,14 @@
 
 namespace nix {
 
+Path getUserRegistryPath()
+{
+    return getHome() + "/.config/nix/registry.json";
+}
+
 /* Read the registry or a lock file. (Currently they have an identical
    format. */
-static std::unique_ptr<FlakeRegistry> readRegistry(const Path & path)
+std::unique_ptr<FlakeRegistry> readRegistry(const Path & path)
 {
     auto registry = std::make_unique<FlakeRegistry>();
 
@@ -40,7 +45,7 @@ void writeRegistry(FlakeRegistry registry, Path path)
     json["version"] = 1;
     json["flakes"] = {};
     for (auto elem : registry.entries) {
-        json["flakes"][elem.first] = elem.second.ref.to_string();
+        json["flakes"][elem.first] = { {"uri", elem.second.ref.to_string()} };
     }
     writeFile(path, json.dump(4)); // The '4' is the number of spaces used in the indentation in the json file.
 }
@@ -183,8 +188,8 @@ Flake getFlake(EvalState & state, const FlakeRef & flakeRef)
     if (std::get_if<FlakeRef::IsGitHub>(&newFlakeRef.data)) {
         FlakeSourceInfo srcInfo = fetchFlake(state, newFlakeRef);
         if (srcInfo.rev) {
-            std::string uri = flakeRef.to_string();
-            newFlakeRef = FlakeRef(uri + "/" + srcInfo.rev->to_string());
+            std::string uri = flakeRef.baseRef().to_string();
+            newFlakeRef = FlakeRef(uri + "/" + srcInfo.rev->to_string(Base16, false));
         }
     }
 
