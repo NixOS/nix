@@ -78,7 +78,7 @@ struct CmdBuild : MixDryRun, InstallablesCommand
                     }
         }
 
-        if(gitRepo)
+        if (gitRepo)
             updateLockFile(*evalState, *gitRepo);
     }
 };
