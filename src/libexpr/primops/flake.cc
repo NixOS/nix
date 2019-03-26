@@ -23,16 +23,20 @@ std::unique_ptr<FlakeRegistry> readRegistry(const Path & path)
 {
     auto registry = std::make_unique<FlakeRegistry>();
 
-    auto json = nlohmann::json::parse(readFile(path));
+    try {
+        auto json = nlohmann::json::parse(readFile(path));
 
-    auto version = json.value("version", 0);
-    if (version != 1)
-        throw Error("flake registry '%s' has unsupported version %d", path, version);
+        auto version = json.value("version", 0);
+        if (version != 1)
+            throw Error("flake registry '%s' has unsupported version %d", path, version);
 
-    auto flakes = json["flakes"];
-    for (auto i = flakes.begin(); i != flakes.end(); ++i) {
-        FlakeRegistry::Entry entry{FlakeRef(i->value("uri", ""))};
-        registry->entries.emplace(i.key(), entry);
+        auto flakes = json["flakes"];
+        for (auto i = flakes.begin(); i != flakes.end(); ++i) {
+            FlakeRegistry::Entry entry{FlakeRef(i->value("uri", ""))};
+            registry->entries.emplace(i.key(), entry);
+        }
+    } catch (SysError & e) {
+        if (e.errNo != ENOENT) throw;
     }
 
     return registry;
@@ -47,6 +51,7 @@ void writeRegistry(FlakeRegistry registry, Path path)
     for (auto elem : registry.entries) {
         json["flakes"][elem.first] = { {"uri", elem.second.ref.to_string()} };
     }
+    createDirs(dirOf(path));
     writeFile(path, json.dump(4)); // The '4' is the number of spaces used in the indentation in the json file.
 }
 
