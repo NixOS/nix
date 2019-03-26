@@ -475,11 +475,19 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
 
     case wopFindRoots: {
         logger->startWork();
-        Roots roots = store->findRoots();
+        Roots roots = store->findRoots(!trusted);
         logger->stopWork();
-        to << roots.size();
+
+        size_t size = 0;
         for (auto & i : roots)
-            to << i.first << i.second;
+            size += i.second.size();
+
+        to << size;
+
+        for (auto & [target, links] : roots)
+            for (auto & link : links)
+                to << link << target;
+
         break;
     }
 

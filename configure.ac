@@ -1,4 +1,4 @@
-AC_INIT(nix, m4_esyscmd([bash -c "echo -n $(cat ./version)$VERSION_SUFFIX"]))
+AC_INIT(nix, m4_esyscmd([bash -c "echo -n $(cat ./.version)$VERSION_SUFFIX"]))
 AC_CONFIG_SRCDIR(README.md)
 AC_CONFIG_AUX_DIR(config)
 
@@ -64,6 +64,7 @@ AC_PROG_CXX
 AC_PROG_CPP
 AX_CXX_COMPILE_STDCXX_17
 
+AC_CHECK_TOOL([AR], [ar])
 
 # Use 64-bit file system calls so that we can support files > 2 GiB.
 AC_SYS_LARGEFILE
@@ -266,6 +267,15 @@ AC_ARG_WITH(sandbox-shell, AC_HELP_STRING([--with-sandbox-shell=PATH],
   [path of a statically-linked shell to use as /bin/sh in sandboxes]),
   sandbox_shell=$withval)
 AC_SUBST(sandbox_shell)
+
+AC_ARG_ENABLE(shared, AC_HELP_STRING([--enable-shared],
+  [Build shared libraries for Nix [default=yes]]),
+  shared=$enableval, shared=yes)
+if test "$shared" = yes; then
+  AC_SUBST(BUILD_SHARED_LIBS, 1, [Whether to build shared libraries.])
+else
+  AC_SUBST(BUILD_SHARED_LIBS, 0, [Whether to build shared libraries.])
+fi
 
 
 # Expand all variables in config.status.

@@ -75,7 +75,7 @@ if [ -n "$HOME" ] && [ -n "$USER" ]; then
         export NIX_SSL_CERT_FILE="$NIX_LINK/etc/ca-bundle.crt"
     fi
 
-    if [ -n "${MANPATH}" ]; then
+    if [ -n "${MANPATH-}" ]; then
         export MANPATH="$NIX_LINK/share/man:$MANPATH"
     fi
 

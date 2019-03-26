@@ -125,7 +125,7 @@ define build-library
     $(1)_PATH := $$(_d)/$$($(1)_NAME).a
 
     $$($(1)_PATH): $$($(1)_OBJS) | $$(_d)/
-	$(trace-ar) ar crs $$@ $$?
+	$(trace-ar) $(AR) crs $$@ $$?
 
     $(1)_LDFLAGS_USE += $$($(1)_PATH) $$($(1)_LDFLAGS)
 

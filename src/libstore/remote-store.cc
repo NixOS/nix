@@ -596,7 +596,7 @@ void RemoteStore::syncWithGC()
 }
 
 
-Roots RemoteStore::findRoots()
+Roots RemoteStore::findRoots(bool censor)
 {
     auto conn(getConnection());
     conn->to << wopFindRoots;
@@ -606,7 +606,7 @@ Roots RemoteStore::findRoots()
     while (count--) {
         Path link = readString(conn->from);
         Path target = readStorePath(*this, conn->from);
-        result[link] = target;
+        result[target].emplace(link);
     }
     return result;
 }
