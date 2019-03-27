@@ -1,9 +1,4 @@
-#include "command.hh"
-#include "store-api.hh"
-#include "common-args.hh"
-#include "compression.hh"
-
-using namespace nix;
+#include "serialise.hh"
 
 namespace rust {
 
@@ -47,37 +42,3 @@ struct Source
 extern "C" {
     bool unpack_tarfile(rust::Source source, rust::StringSlice dest_dir);
 }
-
-struct CmdTest : StoreCommand
-{
-    CmdTest()
-    {
-    }
-
-    std::string name() override
-    {
-        return "test";
-    }
-
-    std::string description() override
-    {
-        return "bla bla";
-    }
-
-    void run(ref<Store> store) override
-    {
-        auto source = sinkToSource([&](Sink & sink) {
-            auto decompressor = makeDecompressionSink("bzip2", sink);
-            readFile("./nix-2.2.tar.bz2", *decompressor);
-            decompressor->finish();
-        });
-
-        std::string destDir = "./dest";
-
-        deletePath(destDir);
-
-        unpack_tarfile(*source, destDir);
-    }
-};
-
-static RegisterCommand r(make_ref<CmdTest>());

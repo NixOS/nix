@@ -33,7 +33,7 @@ pub extern "C" fn unpack_tarfile(source: Source, dest_dir: &str) -> bool {
     for file in tar.entries().unwrap() {
         let mut file = file.unwrap();
 
-        let dest_file = dest_dir.join(file.header().path().unwrap());
+        let dest_file = dest_dir.join(file.path().unwrap());
 
         fs::create_dir_all(dest_file.parent().unwrap()).unwrap();
 
@@ -54,6 +54,9 @@ pub extern "C" fn unpack_tarfile(source: Source, dest_dir: &str) -> bool {
                     .open(dest_file)
                     .unwrap();
                 io::copy(&mut file, &mut f).unwrap();
+            }
+            tar::EntryType::Symlink => {
+                std::os::unix::fs::symlink(file.header().link_name().unwrap().unwrap(), dest_file).unwrap();
             }
             t => panic!("Unsupported tar entry type '{:?}'.", t),
         }
