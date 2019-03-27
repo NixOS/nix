@@ -1,6 +1,7 @@
 #include "command.hh"
 #include "store-api.hh"
 #include "common-args.hh"
+#include "compression.hh"
 
 using namespace nix;
 
@@ -10,10 +11,10 @@ namespace rust {
 // evil...
 template<typename T> struct Slice
 {
-    const T * ptr;
+    T * ptr;
     size_t size;
 
-    Slice(const T * ptr, size_t size) : ptr(ptr), size(size)
+    Slice(T * ptr, size_t size) : ptr(ptr), size(size)
     {
         assert(ptr);
     }
@@ -21,13 +22,30 @@ template<typename T> struct Slice
 
 struct StringSlice : Slice<char>
 {
-    StringSlice(const std::string & s): Slice(s.data(), s.size()) { }
+    StringSlice(const std::string & s): Slice((char *) s.data(), s.size()) {}
+};
+
+struct Source
+{
+    size_t (*fun)(void * source_this, rust::Slice<uint8_t> data);
+    nix::Source * _this;
+
+    Source(nix::Source & _this)
+        : fun(sourceWrapper), _this(&_this)
+    {}
+
+    // FIXME: how to propagate exceptions?
+    static size_t sourceWrapper(void * _this, rust::Slice<uint8_t> data)
+    {
+        auto n = ((nix::Source *) _this)->read(data.ptr, data.size);
+        return n;
+    }
 };
 
 }
 
 extern "C" {
-    bool unpack_tarfile(rust::Slice<uint8_t> data, rust::StringSlice dest_dir);
+    bool unpack_tarfile(rust::Source source, rust::StringSlice dest_dir);
 }
 
 struct CmdTest : StoreCommand
@@ -48,13 +66,17 @@ struct CmdTest : StoreCommand
 
     void run(ref<Store> store) override
     {
-        auto data = readFile("./nix-2.2.tar");
+        auto source = sinkToSource([&](Sink & sink) {
+            auto decompressor = makeDecompressionSink("bzip2", sink);
+            readFile("./nix-2.2.tar.bz2", *decompressor);
+            decompressor->finish();
+        });
 
         std::string destDir = "./dest";
 
         deletePath(destDir);
 
-        unpack_tarfile({(uint8_t*) data.data(), data.size()}, destDir);
+        unpack_tarfile(*source, destDir);
     }
 };
 

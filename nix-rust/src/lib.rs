@@ -7,13 +7,28 @@ use std::os::unix::fs::OpenOptionsExt;
 use std::path::Path;
 use tar::Archive;
 
+/// A wrapper around Nix's Source class that provides the Read trait.
+#[repr(C)]
+pub struct Source {
+    fun: extern "C" fn(this: *mut libc::c_void, data: &mut [u8]) -> usize,
+    this: *mut libc::c_void,
+}
+
+impl std::io::Read for Source {
+    fn read(&mut self, buf: &mut [u8]) -> std::result::Result<usize, std::io::Error> {
+        let n = (self.fun)(self.this, buf);
+        assert!(n <= buf.len());
+        Ok(n)
+    }
+}
+
 #[no_mangle]
-pub extern "C" fn unpack_tarfile(data: &[u8], dest_dir: &str) -> bool {
+pub extern "C" fn unpack_tarfile(source: Source, dest_dir: &str) -> bool {
     // FIXME: handle errors.
 
     let dest_dir = Path::new(dest_dir);
 
-    let mut tar = Archive::new(data);
+    let mut tar = Archive::new(source);
 
     for file in tar.entries().unwrap() {
         let mut file = file.unwrap();
