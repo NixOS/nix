@@ -24,12 +24,14 @@ struct CmdFlakeList : StoreCommand, MixEvalArgs
     {
         auto evalState = std::make_shared<EvalState>(searchPath, store);
 
-        auto registry = evalState->getFlakeRegistry();
+        auto registries = evalState->getFlakeRegistries();
 
         stopProgressBar();
 
-        for (auto & entry : registry.entries) {
-            std::cout << entry.first << " " << entry.second.ref.to_string() << "\n";
+        for (auto & registry : registries) {
+            for (auto & entry : registry->entries) {
+                std::cout << entry.first << " " << entry.second.ref.to_string() << "\n";
+            }
         }
     }
 };

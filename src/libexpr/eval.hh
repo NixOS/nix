@@ -316,10 +316,10 @@ private:
 
 public:
 
-    const FlakeRegistry & getFlakeRegistry();
+    const std::vector<std::shared_ptr<FlakeRegistry>> getFlakeRegistries();
 
 private:
-    std::unique_ptr<FlakeRegistry> _flakeRegistry;
+    std::shared_ptr<FlakeRegistry> _flakeRegistry;
     std::once_flag _flakeRegistryInit;
 };
 

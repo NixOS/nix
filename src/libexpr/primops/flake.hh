@@ -25,7 +25,7 @@ Value * makeFlakeRegistryValue(EvalState & state);
 
 Value * makeFlakeValue(EvalState & state, std::string flakeUri, Value & v);
 
-std::unique_ptr<FlakeRegistry> readRegistry(const Path &);
+std::shared_ptr<FlakeRegistry> readRegistry(const Path &);
 
 void writeRegistry(FlakeRegistry, Path);
 
@@ -36,7 +36,7 @@ struct Flake
     std::string description;
     Path path;
     std::vector<FlakeRef> requires;
-    std::unique_ptr<FlakeRegistry> lockFile;
+    std::shared_ptr<FlakeRegistry> lockFile;
     Value * vProvides; // FIXME: gc
     // commit hash
     // date

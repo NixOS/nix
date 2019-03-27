@@ -12,16 +12,11 @@
 
 namespace nix {
 
-Path getUserRegistryPath()
-{
-    return getHome() + "/.config/nix/registry.json";
-}
-
 /* Read the registry or a lock file. (Currently they have an identical
    format. */
-std::unique_ptr<FlakeRegistry> readRegistry(const Path & path)
+std::shared_ptr<FlakeRegistry> readRegistry(const Path & path)
 {
-    auto registry = std::make_unique<FlakeRegistry>();
+    auto registry = std::make_shared<FlakeRegistry>();
 
     try {
         auto json = nlohmann::json::parse(readFile(path));
@@ -55,37 +50,71 @@ void writeRegistry(FlakeRegistry registry, Path path)
     writeFile(path, json.dump(4)); // The '4' is the number of spaces used in the indentation in the json file.
 }
 
-const FlakeRegistry & EvalState::getFlakeRegistry()
+Path getUserRegistryPath()
 {
-    std::call_once(_flakeRegistryInit, [&]()
-    {
-#if 0
-        auto registryUri = "file:///home/eelco/Dev/gists/nix-flakes/registry.json";
+    return getHome() + "/.config/nix/registry.json";
+}
 
-        auto registryFile = getDownloader()->download(DownloadRequest(registryUri));
-#endif
+std::shared_ptr<FlakeRegistry> getGlobalRegistry()
+{
+    // TODO: Make a global registry, and return it here.
+    return std::make_shared<FlakeRegistry>();
+}
 
-        auto registryFile = settings.nixDataDir + "/nix/flake-registry.json";
+std::shared_ptr<FlakeRegistry> getUserRegistry()
+{
+    return readRegistry(getUserRegistryPath());
+}
 
-        _flakeRegistry = readRegistry(registryFile);
-    });
+// Project-specific registry saved in flake-registry.json.
+std::shared_ptr<FlakeRegistry> getLocalRegistry()
+{
+    Path registryFile = settings.nixDataDir + "/nix/flake-registry.json";
+    return readRegistry(registryFile);
+}
 
-    return *_flakeRegistry;
+std::shared_ptr<FlakeRegistry> getFlagRegistry()
+{
+    return std::make_shared<FlakeRegistry>();
+    // TODO: Implement this once the right flags are implemented.
+}
+
+// This always returns a vector with globalReg, userReg, localReg, flakeReg.
+// If one of them doesn't exist, the registry is left empty but does exist.
+const std::vector<std::shared_ptr<FlakeRegistry>> EvalState::getFlakeRegistries()
+{
+    std::vector<std::shared_ptr<FlakeRegistry>> registries;
+    if (!evalSettings.pureEval) {
+        registries.push_back(std::make_shared<FlakeRegistry>()); // global
+        registries.push_back(std::make_shared<FlakeRegistry>()); // user
+        registries.push_back(std::make_shared<FlakeRegistry>()); // local
+    } else {
+        registries.push_back(getGlobalRegistry());
+        registries.push_back(getUserRegistry());
+        registries.push_back(getLocalRegistry());
+    }
+    registries.push_back(getFlagRegistry());
+    return registries;
 }
 
 Value * makeFlakeRegistryValue(EvalState & state)
 {
     auto v = state.allocValue();
 
-    auto registry = state.getFlakeRegistry();
+    auto registries = state.getFlakeRegistries();
 
-    state.mkAttrs(*v, registry.entries.size());
+    int size = 0;
+    for (auto registry : registries)
+        size += registry->entries.size();
+    state.mkAttrs(*v, size);
 
-    for (auto & entry : registry.entries) {
-        auto vEntry = state.allocAttr(*v, entry.first);
-        state.mkAttrs(*vEntry, 2);
-        mkString(*state.allocAttr(*vEntry, state.symbols.create("uri")), entry.second.ref.to_string());
-        vEntry->attrs->sort();
+    for (auto & registry : registries) {
+        for (auto & entry : registry->entries) {
+            auto vEntry = state.allocAttr(*v, entry.first);
+            state.mkAttrs(*vEntry, 2);
+            mkString(*state.allocAttr(*vEntry, state.symbols.create("uri")), entry.second.ref.to_string());
+            vEntry->attrs->sort();
+        }
     }
 
     v->attrs->sort();
@@ -94,7 +123,7 @@ Value * makeFlakeRegistryValue(EvalState & state)
 }
 
 static FlakeRef lookupFlake(EvalState & state, const FlakeRef & flakeRef,
-    std::vector<const FlakeRegistry *> registries)
+    std::vector<std::shared_ptr<FlakeRegistry>> registries)
 {
     if (auto refData = std::get_if<FlakeRef::IsFlakeId>(&flakeRef.data)) {
         for (auto registry : registries) {
@@ -122,13 +151,7 @@ static FlakeSourceInfo fetchFlake(EvalState & state, const FlakeRef & flakeRef)
     FlakeRef directFlakeRef = FlakeRef(flakeRef);
     if (!flakeRef.isDirect())
     {
-        std::vector<const FlakeRegistry *> registries;
-        // 'pureEval' is a setting which cannot be changed in `nix flake`,
-        // but without flagging it off, we can't use any FlakeIds.
-        // if (!evalSettings.pureEval) {
-            registries.push_back(&state.getFlakeRegistry());
-        // }
-        directFlakeRef = lookupFlake(state, flakeRef, registries);
+        directFlakeRef = lookupFlake(state, flakeRef, state.getFlakeRegistries());
     }
     assert(directFlakeRef.isDirect());
     // NOTE FROM NICK: I don't see why one wouldn't fetch FlakeId flakes..
@@ -251,11 +274,8 @@ static std::tuple<FlakeId, std::map<FlakeId, Flake>> resolveFlake(EvalState & st
     std::optional<FlakeId> topFlakeId; /// FIXME: ambiguous
     todo.push({topRef, true});
 
-    std::vector<const FlakeRegistry *> registries;
-    FlakeRegistry localRegistry;
-    registries.push_back(&localRegistry);
-    if (!evalSettings.pureEval)
-        registries.push_back(&state.getFlakeRegistry());
+    std::vector<std::shared_ptr<FlakeRegistry>> registries = state.getFlakeRegistries();
+    std::shared_ptr<FlakeRegistry> localRegistry = registries.at(2);
 
     while (!todo.empty()) {
         auto [flakeRef, toplevel] = todo.front();
@@ -264,6 +284,7 @@ static std::tuple<FlakeId, std::map<FlakeId, Flake>> resolveFlake(EvalState & st
         if (auto refData = std::get_if<FlakeRef::IsFlakeId>(&flakeRef.data)) {
             if (done.count(refData->id)) continue; // optimization
             flakeRef = lookupFlake(state, flakeRef, registries);
+            // This is why we need the `registries`.
         }
 
         if (evalSettings.pureEval && !flakeRef.isImmutable() && (!toplevel || !impureTopRef))
@@ -278,10 +299,13 @@ static std::tuple<FlakeId, std::map<FlakeId, Flake>> resolveFlake(EvalState & st
         for (auto & require : flake.requires)
             todo.push({require, false});
 
+        // The following piece of code basically adds the FlakeRefs from
+        // the lockfiles of dependencies to the localRegistry. This is used
+        // to resolve future `FlakeId`s, in `lookupFlake` a bit above this.
         if (flake.lockFile)
             for (auto & entry : flake.lockFile->entries) {
-                if (localRegistry.entries.count(entry.first)) continue;
-                localRegistry.entries.emplace(entry.first, entry.second);
+                if (localRegistry->entries.count(entry.first)) continue;
+                localRegistry->entries.emplace(entry.first, entry.second);
             }
 
         done.emplace(flake.id, std::move(flake));
