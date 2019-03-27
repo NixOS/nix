@@ -753,9 +753,13 @@ main() {
     if [ "$(uname -s)" = "Darwin" ]; then
         # shellcheck source=./install-darwin-multi-user.sh
         . "$EXTRACTED_NIX_PATH/install-darwin-multi-user.sh"
-    elif [ "$(uname -s)" = "Linux" ] && [ -e /run/systemd/system ]; then
-        # shellcheck source=./install-systemd-multi-user.sh
-        . "$EXTRACTED_NIX_PATH/install-systemd-multi-user.sh"
+    elif [ "$(uname -s)" = "Linux" ]; then
+        if [ -e /run/systemd/system ]; then
+            # shellcheck source=./install-systemd-multi-user.sh
+            . "$EXTRACTED_NIX_PATH/install-systemd-multi-user.sh"
+        else
+            failure "Sorry, the multi-user installation requires systemd on Linux (detected using /run/systemd/system)"
+        fi
     else
         failure "Sorry, I don't know what to do on $(uname)"
     fi
