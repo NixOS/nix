@@ -1,0 +1,12 @@
+[package]
+name = "nix-rust"
+version = "0.1.0"
+authors = ["Eelco Dolstra <edolstra@gmail.com>"]
+
+[lib]
+name = "nixrust"
+crate-type = ["staticlib"]
+
+[dependencies]
+tar = "0.4"
+libc = "0.2"

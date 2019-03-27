@@ -119,3 +119,5 @@ GPATH
 GRTAGS
 GSYMS
 GTAGS
+
+nix-rust/target
