@@ -742,7 +742,7 @@ place_nix_configuration() {
     cat <<EOF > "$SCRATCH/nix.conf"
 build-users-group = $NIX_BUILD_GROUP_NAME
 
-max-jobs = $NIX_USER_COUNT
+max-jobs = 1
 cores = 1
 EOF
     _sudo "to place the default nix daemon configuration (part 2)" \
