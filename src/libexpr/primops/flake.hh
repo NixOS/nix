@@ -19,6 +19,20 @@ struct FlakeRegistry
     std::map<FlakeId, Entry> entries;
 };
 
+struct LockFile
+{
+    struct FlakeEntry
+    {
+        FlakeRef ref;
+        std::map<FlakeId, FlakeEntry> flakeEntries;
+        std::map<FlakeId, FlakeRef> nonFlakeEntries;
+        FlakeEntry(const FlakeRef & flakeRef) : ref(flakeRef) {};
+    };
+
+    std::map<FlakeId, FlakeEntry> flakeEntries;
+    std::map<FlakeId, FlakeRef> nonFlakeEntries;
+};
+
 Path getUserRegistryPath();
 
 Value * makeFlakeRegistryValue(EvalState & state);
@@ -37,7 +51,7 @@ struct Flake
     Path path;
     std::optional<uint64_t> revCount;
     std::vector<FlakeRef> requires;
-    std::shared_ptr<FlakeRegistry> lockFile;
+    LockFile lockFile;
     std::map<FlakeId, FlakeRef> nonFlakeRequires;
     Value * vProvides; // FIXME: gc
     // date
@@ -55,18 +69,17 @@ struct NonFlake
     NonFlake(const FlakeRef flakeRef) : ref(flakeRef) {};
 };
 
-Flake getFlake(EvalState &, const FlakeRef &);
+Flake getFlake(EvalState &, const FlakeRef &, bool impureIsAllowed);
 
 struct Dependencies
 {
-    FlakeId topFlakeId;
-    std::vector<Flake> flakes;
-    std::vector<NonFlake> nonFlakes;
+    Flake flake;
+    std::vector<Dependencies> flakeDeps; // The flake dependencies
+    std::vector<NonFlake> nonFlakeDeps;
+    Dependencies(const Flake & flake) : flake(flake) {}
 };
 
-Dependencies resolveFlake(EvalState &, const FlakeRef &, bool impureTopRef);
+Dependencies resolveFlake(EvalState &, const FlakeRef &, bool impureTopRef, bool isTopFlake);
 
-FlakeRegistry updateLockFile(EvalState &, Flake &);
-
-void updateLockFile(EvalState &, Path);
+void updateLockFile(EvalState &, Path path, bool impureTopRef);
 }

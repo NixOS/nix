@@ -39,14 +39,92 @@ std::shared_ptr<FlakeRegistry> readRegistry(const Path & path)
 /* Write the registry or lock file to a file. */
 void writeRegistry(FlakeRegistry registry, Path path)
 {
-    nlohmann::json json = {};
+    nlohmann::json json;
     json["version"] = 1;
-    json["flakes"] = {};
     for (auto elem : registry.entries) {
         json["flakes"][elem.first] = { {"uri", elem.second.ref.to_string()} };
     }
     createDirs(dirOf(path));
     writeFile(path, json.dump(4)); // The '4' is the number of spaces used in the indentation in the json file.
+}
+
+LockFile::FlakeEntry readFlakeEntry(nlohmann::json json)
+{
+    FlakeRef flakeRef(json["uri"]);
+    if (!flakeRef.isImmutable())
+        throw Error("requested to fetch FlakeRef '%s' purely, which is mutable", flakeRef.to_string());
+
+    LockFile::FlakeEntry entry(flakeRef);
+
+    auto nonFlakeRequires = json["nonFlakeRequires"];
+
+    for (auto i = nonFlakeRequires.begin(); i != nonFlakeRequires.end(); ++i) {
+        FlakeRef flakeRef(i->value("uri", ""));
+        if (!flakeRef.isImmutable())
+            throw Error("requested to fetch FlakeRef '%s' purely, which is mutable", flakeRef.to_string());
+        entry.nonFlakeEntries.insert_or_assign(i.key(), flakeRef);
+    }
+
+    auto requires = json["requires"];
+
+    for (auto i = requires.begin(); i != requires.end(); ++i)
+        entry.flakeEntries.insert_or_assign(i.key(), readFlakeEntry(*i));
+
+    return entry;
+}
+
+LockFile readLockFile(const Path & path)
+{
+    LockFile lockFile;
+
+    if (!pathExists(path))
+        return lockFile;
+
+    auto json = nlohmann::json::parse(readFile(path));
+
+    auto version = json.value("version", 0);
+    if (version != 1)
+        throw Error("lock file '%s' has unsupported version %d", path, version);
+
+    auto nonFlakeRequires = json["nonFlakeRequires"];
+
+    for (auto i = nonFlakeRequires.begin(); i != nonFlakeRequires.end(); ++i) {
+        FlakeRef flakeRef(i->value("uri", ""));
+        if (!flakeRef.isImmutable())
+            throw Error("requested to fetch FlakeRef '%s' purely, which is mutable", flakeRef.to_string());
+        lockFile.nonFlakeEntries.insert_or_assign(i.key(), flakeRef);
+    }
+
+    auto requires = json["requires"];
+
+    for (auto i = requires.begin(); i != requires.end(); ++i)
+        lockFile.flakeEntries.insert_or_assign(i.key(), readFlakeEntry(*i));
+
+    return lockFile;
+}
+
+nlohmann::json flakeEntryToJson(LockFile::FlakeEntry & entry)
+{
+    nlohmann::json json;
+    json["uri"] = entry.ref.to_string();
+    for (auto & x : entry.nonFlakeEntries)
+        json["nonFlakeRequires"][x.first]["uri"] = x.second.to_string();
+    for (auto & x : entry.flakeEntries)
+        json["requires"][x.first] = flakeEntryToJson(x.second);
+    return json;
+}
+
+void writeLockFile(LockFile lockFile, Path path)
+{
+    nlohmann::json json;
+    json["version"] = 1;
+    json["nonFlakeRequires"];
+    for (auto & x : lockFile.nonFlakeEntries)
+        json["nonFlakeRequires"][x.first]["uri"] = x.second.to_string();
+    for (auto & x : lockFile.flakeEntries)
+        json["requires"][x.first] = flakeEntryToJson(x.second);
+    createDirs(dirOf(path));
+    writeFile(path, json.dump(4)); // '4' = indentation in json file
 }
 
 Path getUserRegistryPath()
@@ -142,17 +220,13 @@ struct FlakeSourceInfo
     std::optional<uint64_t> revCount;
 };
 
-static FlakeSourceInfo fetchFlake(EvalState & state, const FlakeRef & flakeRef)
+static FlakeSourceInfo fetchFlake(EvalState & state, const FlakeRef & flakeRef, bool impureIsAllowed = false)
 {
-    FlakeRef directFlakeRef = FlakeRef(flakeRef);
-    if (!flakeRef.isDirect()) {
-        directFlakeRef = lookupFlake(state, flakeRef, state.getFlakeRegistries());
-    }
-    assert(directFlakeRef.isDirect());
-    // NOTE FROM NICK: I don't see why one wouldn't fetch FlakeId flakes..
+    FlakeRef directFlakeRef = lookupFlake(state, flakeRef, state.getFlakeRegistries());
 
     if (auto refData = std::get_if<FlakeRef::IsGitHub>(&directFlakeRef.data)) {
-        // FIXME: require hash in pure mode.
+        if (evalSettings.pureEval && !impureIsAllowed && !directFlakeRef.isImmutable())
+            throw Error("requested to fetch FlakeRef '%s' purely, which is mutable", directFlakeRef.to_string());
 
         // FIXME: use regular /archive URLs instead? api.github.com
         // might have stricter rate limits.
@@ -207,7 +281,8 @@ static FlakeSourceInfo fetchFlake(EvalState & state, const FlakeRef & flakeRef)
     else abort();
 }
 
-Flake getFlake(EvalState & state, const FlakeRef & flakeRef)
+// This will return the flake which corresponds to a given FlakeRef. The lookupFlake is done within this function.
+Flake getFlake(EvalState & state, const FlakeRef & flakeRef, bool impureIsAllowed = false)
 {
     FlakeSourceInfo sourceInfo = fetchFlake(state, flakeRef);
     debug("got flake source '%s' with revision %s",
@@ -264,14 +339,9 @@ Flake getFlake(EvalState & state, const FlakeRef & flakeRef)
     } else
         throw Error("flake lacks attribute 'provides'");
 
-    auto lockFile = flakePath + "/flake.lock"; // FIXME: symlink attack
+    const Path lockFile = flakePath + "/flake.lock"; // FIXME: symlink attack
 
-    flake.lockFile = readRegistry(lockFile);
-    for (auto & entry : flake.lockFile->entries)
-        if (!entry.second.ref.isImmutable())
-            throw Error("flake lock file '%s' contains mutable entry '%s'",
-                lockFile, entry.second.ref.to_string());
-
+    flake.lockFile = readLockFile(lockFile);
 
     return flake;
 }
@@ -307,77 +377,50 @@ NonFlake getNonFlake(EvalState & state, const FlakeRef & flakeRef, FlakeId flake
    dependencies.
    FIXME: this should return a graph of flakes.
 */
-Dependencies resolveFlake(EvalState & state, const FlakeRef & topRef, bool impureTopRef)
+Dependencies resolveFlake(EvalState & state, const FlakeRef & topRef, bool impureTopRef, bool isTopFlake = true)
 {
-    Dependencies deps;
-    std::queue<FlakeRef> todo;
-    bool isTopLevel = true;
-    todo.push(topRef);
+    Flake flake = getFlake(state, topRef, isTopFlake && impureTopRef);
+    Dependencies deps(flake);
 
-    auto registries = state.getFlakeRegistries();
+    for (auto & nonFlakeInfo : flake.nonFlakeRequires)
+        deps.nonFlakeDeps.push_back(getNonFlake(state, nonFlakeInfo.second, nonFlakeInfo.first));
 
-    while (!todo.empty()) {
-        auto flakeRef = todo.front();
-        todo.pop();
-
-        if (std::get_if<FlakeRef::IsFlakeId>(&flakeRef.data))
-            flakeRef = lookupFlake(state, flakeRef, registries);
-
-        if (evalSettings.pureEval && !flakeRef.isImmutable() && (!isTopLevel || !impureTopRef))
-            throw Error("mutable flake '%s' is not allowed in pure mode; use --impure to disable", flakeRef.to_string());
-
-        auto flake = getFlake(state, flakeRef);
-
-        if (isTopLevel) {
-            deps.topFlakeId = flake.id;
-            isTopLevel = false;
-        }
-
-        for (auto & flakeRef : flake.requires)
-            todo.push(flakeRef);
-
-        for (auto & x : flake.nonFlakeRequires)
-            deps.nonFlakes.push_back(getNonFlake(state, x.second, x.first));
-            // TODO (Nick): If there are 2 non-flake dependencies with the same
-            // FlakeId, this will lead to trouble! One of the dependencies won't
-            // be used!
-
-        deps.flakes.push_back(flake);
-    }
+    for (auto & newFlakeRef : flake.requires)
+        deps.flakeDeps.push_back(resolveFlake(state, newFlakeRef, impureTopRef, false));
 
     return deps;
 }
 
-FlakeRegistry updateLockFile(EvalState & evalState, FlakeRef & flakeRef)
+LockFile::FlakeEntry dependenciesToFlakeEntry(Dependencies & deps)
 {
-    FlakeRegistry newLockFile;
-    Dependencies deps = resolveFlake(evalState, flakeRef, false);
-    // Nick assumed that "topRefPure" means that the Flake for flakeRef can be
-    // fetched purely.
-    for (auto const& require : deps.flakes) {
-        FlakeRegistry::Entry entry = FlakeRegistry::Entry(require.ref);
-        // The FlakeRefs are immutable because they come out of the Flake objects.
-        if (require.id != deps.topFlakeId)
-            newLockFile.entries.insert_or_assign(require.id, entry);
-        // TODO (Nick): If there are 2 flake dependencies with the same FlakeId,
-        // one of them gets ignored!
-    }
-    for (auto const& nonFlake : deps.nonFlakes) {
-        FlakeRegistry::Entry entry = FlakeRegistry::Entry(nonFlake.ref);
-        newLockFile.entries.insert_or_assign(nonFlake.id, entry);
-        // We are assuming the sets of FlakeIds for flakes and non-flakes
-        // are disjoint.
-    }
-    return newLockFile;
+    LockFile::FlakeEntry entry(deps.flake.ref);
+
+    for (Dependencies & deps : deps.flakeDeps)
+        entry.flakeEntries.insert_or_assign(deps.flake.id, dependenciesToFlakeEntry(deps));
+
+    for (NonFlake & nonFlake : deps.nonFlakeDeps)
+        entry.nonFlakeEntries.insert_or_assign(nonFlake.id, nonFlake.ref);
+
+    return entry;
 }
 
-void updateLockFile(EvalState & state, Path path)
+LockFile getLockFile(EvalState & evalState, FlakeRef & flakeRef, bool impureTopRef)
+{
+    Dependencies deps = resolveFlake(evalState, flakeRef, impureTopRef);
+    LockFile::FlakeEntry entry = dependenciesToFlakeEntry(deps);
+    LockFile lockFile;
+    lockFile.flakeEntries = entry.flakeEntries;
+    lockFile.nonFlakeEntries = entry.nonFlakeEntries;
+    return lockFile;
+}
+
+void updateLockFile(EvalState & state, Path path, bool impureTopRef)
 {
     // 'path' is the path to the local flake repo.
     FlakeRef flakeRef = FlakeRef("file://" + path);
     if (std::get_if<FlakeRef::IsGit>(&flakeRef.data)) {
-        FlakeRegistry newLockFile = updateLockFile(state, flakeRef);
-        writeRegistry(newLockFile, path + "/flake.lock");
+        LockFile lockFile = getLockFile(state, flakeRef, impureTopRef);
+        writeLockFile(lockFile, path + "/flake.lock");
     } else if (std::get_if<FlakeRef::IsGitHub>(&flakeRef.data)) {
         throw UsageError("you can only update local flakes, not flakes on GitHub");
     } else {
@@ -393,19 +436,19 @@ Value * makeFlakeValue(EvalState & state, FlakeUri flakeUri, Value & v)
 
     Dependencies deps = resolveFlake(state, flakeRef, impure);
 
-    // FIXME: we should call each flake with only its dependencies
-    // (rather than the closure of the top-level flake).
+    // // FIXME: we should call each flake with only its dependencies
+    // // (rather than the closure of the top-level flake).
 
     auto vResult = state.allocValue();
     // This will store the attribute set of the `nonFlakeRequires` and the `requires.provides`.
 
-    state.mkAttrs(*vResult, dependencies.flakes.size());
+    state.mkAttrs(*vResult, deps.flakeDeps.size());
 
     Value * vTop = 0;
 
-    for (auto & flake : deps.flakes) {
+    for (auto & flake : deps.flakeDeps) {
         auto vFlake = state.allocAttr(*vResult, flake.id);
-        if (topFlakeId == flake.second.id) vTop = vFlake;
+        if (deps.topFlakeId == flake.id) vTop = vFlake;
 
         state.mkAttrs(*vFlake, 4);
 
@@ -431,6 +474,7 @@ Value * makeFlakeValue(EvalState & state, FlakeUri flakeUri, Value & v)
     return vTop;
 }
 
+// This function is exposed to be used in nix files.
 static void prim_getFlake(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
     makeFlakeValue(state, state.forceStringNoCtx(*args[0], pos), false, v);

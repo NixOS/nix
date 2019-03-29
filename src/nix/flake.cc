@@ -5,6 +5,7 @@
 #include "progress-bar.hh"
 #include "eval.hh"
 #include <nlohmann/json.hpp>
+#include <queue>
 
 using namespace nix;
 
@@ -80,13 +81,21 @@ struct CmdFlakeDeps : FlakeCommand, MixJSON, StoreCommand, MixEvalArgs
 
         FlakeRef flakeRef(flakeUri);
 
-        Dependencies deps = resolveFlake(*evalState, flakeRef, true);
+        Dependencies deps = resolveFlake(*evalState, flakeRef, true, true);
 
-        for (auto & flake : deps.flakes)
-            printFlakeInfo(flake, json);
+        std::queue<Dependencies> todo;
+        todo.push(deps);
 
-        for (auto & nonFlake : deps.nonFlakes)
-            printNonFlakeInfo(nonFlake, json);
+        while (!todo.empty()) {
+            deps = todo.front();
+            todo.pop();
+
+            for (auto & nonFlake : deps.nonFlakeDeps)
+                printNonFlakeInfo(nonFlake, json);
+
+            for (auto & newDeps : deps.flakeDeps)
+                todo.push(newDeps);
+        }
     }
 };
 
@@ -107,7 +116,7 @@ struct CmdFlakeUpdate : StoreCommand, GitRepoCommand, MixEvalArgs
         auto evalState = std::make_shared<EvalState>(searchPath, store);
 
         if (gitPath == "") gitPath = absPath(".");
-        updateLockFile(*evalState, gitPath);
+        updateLockFile(*evalState, gitPath, true);
     }
 };
 
@@ -126,7 +135,7 @@ struct CmdFlakeInfo : FlakeCommand, MixJSON, MixEvalArgs, StoreCommand
     void run(nix::ref<nix::Store> store) override
     {
         auto evalState = std::make_shared<EvalState>(searchPath, store);
-        nix::Flake flake = nix::getFlake(*evalState, FlakeRef(flakeUri));
+        nix::Flake flake = nix::getFlake(*evalState, FlakeRef(flakeUri), true);
         printFlakeInfo(flake, json);
     }
 };
@@ -220,7 +229,7 @@ struct CmdFlakePin : virtual Args, StoreCommand, MixEvalArgs
         auto it = userRegistry.entries.find(flakeId);
         if (it != userRegistry.entries.end()) {
             FlakeRef oldRef = it->second.ref;
-            it->second.ref = getFlake(*evalState, oldRef).ref;
+            it->second.ref = getFlake(*evalState, oldRef, true).ref;
             // The 'ref' in 'flake' is immutable.
             writeRegistry(userRegistry, userRegistryPath);
         } else
