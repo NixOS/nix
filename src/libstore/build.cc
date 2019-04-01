@@ -12,6 +12,7 @@
 #include "json.hh"
 #include "nar-info.hh"
 #include "parsed-derivations.hh"
+#include "machines.hh"
 
 #include <algorithm>
 #include <iostream>
@@ -4411,6 +4412,11 @@ static void primeCache(Store & store, const PathSet & paths)
     PathSet willBuild, willSubstitute, unknown;
     unsigned long long downloadSize, narSize;
     store.queryMissing(paths, willBuild, willSubstitute, unknown, downloadSize, narSize);
+
+    if (!willBuild.empty() && 0 == settings.maxBuildJobs && getMachines().empty())
+        throw Error(
+            "%d derivations need to be built, but neither local builds ('--max-jobs') "
+            "nor remote builds ('--builders') are enabled", willBuild.size());
 }
 
 
