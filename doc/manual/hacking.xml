@@ -27,7 +27,7 @@ $ nix-shell
 To build Nix itself in this shell:
 <screen>
 [nix-shell]$ ./bootstrap.sh
-[nix-shell]$ configurePhase
+[nix-shell]$ ./configure
 [nix-shell]$ make
 </screen>
 To install it in <literal>$(pwd)/inst</literal> and test it:
