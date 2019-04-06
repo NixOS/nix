@@ -201,10 +201,8 @@ static FlakeRef lookupFlake(EvalState & state, const FlakeRef & flakeRef,
                 auto newRef = FlakeRef(i->second.ref);
                 if (!newRef.isDirect())
                     throw Error("found indirect flake URI '%s' in the flake registry", i->second.ref.to_string());
-                if (refData->ref)
-                    newRef.setRef(*refData->ref);
-                if (refData->rev)
-                    newRef.setRev(*refData->rev);
+                if (flakeRef.ref) newRef.setRef(*flakeRef.ref);
+                if (flakeRef.rev) newRef.setRev(*flakeRef.rev);
                 return newRef;
             }
         }
@@ -220,13 +218,13 @@ struct FlakeSourceInfo
     std::optional<uint64_t> revCount;
 };
 
-static FlakeSourceInfo fetchFlake(EvalState & state, const FlakeRef & flakeRef, bool impureIsAllowed = false)
+static FlakeSourceInfo fetchFlake(EvalState & state, const FlakeRef flakeRef, bool impureIsAllowed = false)
 {
-    FlakeRef directFlakeRef = lookupFlake(state, flakeRef, state.getFlakeRegistries());
+    FlakeRef fRef = lookupFlake(state, flakeRef, state.getFlakeRegistries());
 
-    if (auto refData = std::get_if<FlakeRef::IsGitHub>(&directFlakeRef.data)) {
-        if (evalSettings.pureEval && !impureIsAllowed && !directFlakeRef.isImmutable())
-            throw Error("requested to fetch FlakeRef '%s' purely, which is mutable", directFlakeRef.to_string());
+    if (auto refData = std::get_if<FlakeRef::IsGitHub>(&fRef.data)) {
+        if (evalSettings.pureEval && !impureIsAllowed && !fRef.isImmutable())
+            throw Error("requested to fetch FlakeRef '%s' purely, which is mutable", fRef.to_string());
 
         // FIXME: use regular /archive URLs instead? api.github.com
         // might have stricter rate limits.
@@ -235,14 +233,11 @@ static FlakeSourceInfo fetchFlake(EvalState & state, const FlakeRef & flakeRef, 
 
         auto url = fmt("https://api.github.com/repos/%s/%s/tarball/%s",
             refData->owner, refData->repo,
-            refData->rev
-                ? refData->rev->to_string(Base16, false)
-                : refData->ref
-                  ? *refData->ref
-                  : "master");
+            fRef.rev ? fRef.rev->to_string(Base16, false)
+                : fRef.ref ? *fRef.ref : "master");
 
         auto result = getDownloader()->downloadCached(state.store, url, true, "source",
-            Hash(), nullptr, refData->rev ? 1000000000 : settings.tarballTtl);
+            Hash(), nullptr, fRef.rev ? 1000000000 : settings.tarballTtl);
 
         if (!result.etag)
             throw Error("did not receive an ETag header from '%s'", url);
@@ -257,9 +252,9 @@ static FlakeSourceInfo fetchFlake(EvalState & state, const FlakeRef & flakeRef, 
         return info;
     }
 
-    else if (auto refData = std::get_if<FlakeRef::IsGit>(&directFlakeRef.data)) {
-        auto gitInfo = exportGit(state.store, refData->uri, refData->ref,
-            refData->rev ? refData->rev->to_string(Base16, false) : "", "source");
+    else if (auto refData = std::get_if<FlakeRef::IsGit>(&fRef.data)) {
+        auto gitInfo = exportGit(state.store, refData->uri, fRef.ref,
+            fRef.rev ? fRef.rev->to_string(Base16, false) : "", "source");
         FlakeSourceInfo info;
         info.storePath = gitInfo.storePath;
         info.rev = Hash(gitInfo.rev, htSHA1);

@@ -101,25 +101,23 @@ typedef std::string FlakeId;
 
 struct FlakeRef
 {
+    std::optional<std::string> ref;
+    std::optional<Hash> rev;
+
     struct IsFlakeId
     {
         FlakeId id;
-        std::optional<std::string> ref;
-        std::optional<Hash> rev;
     };
 
     struct IsGitHub
     {
         std::string owner, repo;
-        std::optional<std::string> ref;
-        std::optional<Hash> rev;
     };
 
+    // Git, Tarball
     struct IsGit
     {
         std::string uri;
-        std::optional<std::string> ref;
-        std::optional<Hash> rev;
     };
 
     struct IsPath
@@ -161,22 +159,8 @@ struct FlakeRef
 
     FlakeRef baseRef() const;
 
-    void setRef(std::optional<std::string> ref) {
-        if (auto refData = std::get_if<IsGit>(&data))
-            refData->ref = ref;
-        else if (auto refData = std::get_if<IsGitHub>(&data))
-            refData->ref = ref;
-        else if (auto refData = std::get_if<IsFlakeId>(&data))
-            refData->ref = ref;
-    }
+    void setRef(std::optional<std::string> ref) { ref = ref; }
 
-    void setRev(std::optional<Hash> rev) {
-        if (auto refData = std::get_if<IsGit>(&data))
-            refData->rev = rev;
-        else if (auto refData = std::get_if<IsGitHub>(&data))
-            refData->rev = rev;
-        else if (auto refData = std::get_if<IsFlakeId>(&data))
-            refData->rev = rev;
-    }
+    void setRev(std::optional<Hash> rev) { rev = rev; }
 };
 }
