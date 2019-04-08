@@ -207,23 +207,8 @@ struct CmdFlakeInit : virtual Args, Command
             throw Error("file '%s' already exists", flakePath);
 
         writeFile(flakePath,
-R"str(
-{
-  name = "hello";
-
-  description = "A flake for building Hello World";
-
-  epoch = 2019;
-
-  requires = [ "nixpkgs" ];
-
-  provides = deps: rec {
-
-    packages.hello = deps.nixpkgs.provides.packages.hello;
-
-  };
-}
-)str");
+#include "flake-template.nix.gen.hh"
+            );
     }
 };
 

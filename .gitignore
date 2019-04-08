@@ -46,7 +46,7 @@ perl/Makefile.config
 /src/libexpr/nix.tbl
 
 # /src/libstore/
-/src/libstore/*.gen.hh
+*.gen.*
 
 /src/nix/nix
 
