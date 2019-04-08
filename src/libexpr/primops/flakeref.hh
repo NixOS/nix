@@ -132,7 +132,7 @@ struct FlakeRef
     std::variant<IsFlakeId, IsGitHub, IsGit, IsPath> data;
 
     // Parse a flake URI.
-    FlakeRef(const std::string & uri);
+    FlakeRef(const std::string & uri, bool allowRelative = false);
 
     // Default constructor
     FlakeRef(const FlakeRef & flakeRef) : data(flakeRef.data) {};

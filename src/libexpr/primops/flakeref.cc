@@ -32,7 +32,7 @@ const static std::string segmentRegex = "[a-zA-Z0-9._~-]+";
 const static std::string pathRegex = "/?" + segmentRegex + "(?:/" + segmentRegex + ")*";
 const static std::string paramRegex = "[a-z]+=[a-zA-Z0-9._-]*";
 
-FlakeRef::FlakeRef(const std::string & uri)
+FlakeRef::FlakeRef(const std::string & uri, bool allowRelative)
 {
     // FIXME: could combine this into one regex.
 
@@ -106,9 +106,9 @@ FlakeRef::FlakeRef(const std::string & uri)
         data = d;
     }
 
-    else if (hasPrefix(uri, "/")) {
+    else if (hasPrefix(uri, "/") || (allowRelative && (hasPrefix(uri, "./") || uri == "."))) {
         IsPath d;
-        d.path = canonPath(uri);
+        d.path = allowRelative ? absPath(uri) : canonPath(uri);
         data = d;
     }
 

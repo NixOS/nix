@@ -219,12 +219,18 @@ std::vector<std::shared_ptr<Installable>> SourceExprCommand::parseInstallables(
             else if ((colon = s.rfind(':')) != std::string::npos) {
                 auto flakeRef = std::string(s, 0, colon);
                 auto attrPath = std::string(s, colon + 1);
-                result.push_back(std::make_shared<InstallableFlake>(*this, FlakeRef(flakeRef), attrPath));
+                result.push_back(std::make_shared<InstallableFlake>(*this, FlakeRef(flakeRef, true), attrPath));
             }
 
-            else if (s.find('/') != std::string::npos) {
-                auto path = store->toStorePath(store->followLinksToStore(s));
-                result.push_back(std::make_shared<InstallableStorePath>(path));
+            else if (s.find('/') != std::string::npos || s == ".") {
+                Path storePath;
+                try {
+                    storePath = store->toStorePath(store->followLinksToStore(s));
+                } catch (Error) { }
+                if (storePath != "")
+                    result.push_back(std::make_shared<InstallableStorePath>(storePath));
+                else
+                    result.push_back(std::make_shared<InstallableFlake>(*this, FlakeRef(s, true), "defaultPackage"));
             }
 
             else
