@@ -182,6 +182,51 @@ struct CmdFlakePin : virtual Args, StoreCommand, MixEvalArgs
     }
 };
 
+struct CmdFlakeInit : virtual Args, Command
+{
+    std::string name() override
+    {
+        return "init";
+    }
+
+    std::string description() override
+    {
+        return "create a skeleton 'flake.nix' file in the current directory";
+    }
+
+    void run() override
+    {
+        Path flakeDir = absPath(".");
+
+        if (!pathExists(flakeDir + "/.git"))
+            throw Error("the directory '%s' is not a Git repository", flakeDir);
+
+        Path flakePath = flakeDir + "/flake.nix";
+
+        if (pathExists(flakePath))
+            throw Error("file '%s' already exists", flakePath);
+
+        writeFile(flakePath,
+R"str(
+{
+  name = "hello";
+
+  description = "A flake for building Hello World";
+
+  epoch = 2019;
+
+  requires = [ "nixpkgs" ];
+
+  provides = deps: rec {
+
+    packages.hello = deps.nixpkgs.provides.packages.hello;
+
+  };
+}
+)str");
+    }
+};
+
 struct CmdFlake : virtual MultiCommand, virtual Command
 {
     CmdFlake()
@@ -190,7 +235,9 @@ struct CmdFlake : virtual MultiCommand, virtual Command
             , make_ref<CmdFlakeInfo>()
             , make_ref<CmdFlakeAdd>()
             , make_ref<CmdFlakeRemove>()
-            , make_ref<CmdFlakePin>()})
+            , make_ref<CmdFlakePin>()
+            , make_ref<CmdFlakeInit>()
+          })
     {
     }
 
