@@ -19,7 +19,7 @@ let
       releaseTools.sourceTarball {
         name = "nix-tarball";
         version = builtins.readFile ./.version;
-        versionSuffix = if officialRelease then "" else "pre${toString nix.revCount}_${nix.shortRev}";
+        versionSuffix = if officialRelease then "" else "pre${toString nix.revCount or 0}_${nix.shortRev or "0000000"}";
         src = nix;
         inherit officialRelease;
 
