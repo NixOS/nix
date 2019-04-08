@@ -129,6 +129,7 @@ struct FlakeSourceInfo
 {
     Path storePath;
     std::optional<Hash> rev;
+    std::optional<uint64_t> revCount;
 };
 
 static FlakeSourceInfo fetchFlake(EvalState & state, const FlakeRef & flakeRef)
@@ -178,6 +179,18 @@ static FlakeSourceInfo fetchFlake(EvalState & state, const FlakeRef & flakeRef)
         FlakeSourceInfo info;
         info.storePath = gitInfo.storePath;
         info.rev = Hash(gitInfo.rev, htSHA1);
+        info.revCount = gitInfo.revCount;
+        return info;
+    }
+
+    else if (auto refData = std::get_if<FlakeRef::IsPath>(&directFlakeRef.data)) {
+        if (!pathExists(refData->path + "/.git"))
+            throw Error("flake '%s' does not reference a Git repository", refData->path);
+        auto gitInfo = exportGit(state.store, refData->path, {}, "", "source");
+        FlakeSourceInfo info;
+        info.storePath = gitInfo.storePath;
+        info.rev = Hash(gitInfo.rev, htSHA1);
+        info.revCount = gitInfo.revCount;
         return info;
     }
 
@@ -206,6 +219,8 @@ Flake getFlake(EvalState & state, const FlakeRef & flakeRef)
     }
 
     Flake flake(newFlakeRef);
+    flake.path = flakePath;
+    flake.revCount = sourceInfo.revCount;
 
     Value vInfo;
     state.evalFile(flakePath + "/flake.nix", vInfo); // FIXME: symlink attack
@@ -349,10 +364,20 @@ Value * makeFlakeValue(EvalState & state, const FlakeRef & flakeRef, bool impure
     for (auto & flake : flakes) {
         auto vFlake = state.allocAttr(*vResult, flake.second.id);
         if (topFlakeId == flake.second.id) vTop = vFlake;
-        state.mkAttrs(*vFlake, 2);
+
+        state.mkAttrs(*vFlake, 4);
+
         mkString(*state.allocAttr(*vFlake, state.sDescription), flake.second.description);
+
+        state.store->assertStorePath(flake.second.path);
+        mkString(*state.allocAttr(*vFlake, state.sOutPath), flake.second.path, {flake.second.path});
+
+        if (flake.second.revCount)
+            mkInt(*state.allocAttr(*vFlake, state.symbols.create("revCount")), *flake.second.revCount);
+
         auto vProvides = state.allocAttr(*vFlake, state.symbols.create("provides"));
         mkApp(*vProvides, *flake.second.vProvides, *vResult);
+
         vFlake->attrs->sort();
     }
 

@@ -122,9 +122,14 @@ struct FlakeRef
         std::optional<Hash> rev;
     };
 
+    struct IsPath
+    {
+        Path path;
+    };
+
     // Git, Tarball
 
-    std::variant<IsFlakeId, IsGitHub, IsGit> data;
+    std::variant<IsFlakeId, IsGitHub, IsGit, IsPath> data;
 
     // Parse a flake URI.
     FlakeRef(const std::string & uri);

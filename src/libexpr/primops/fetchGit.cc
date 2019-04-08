@@ -170,7 +170,7 @@ GitInfo exportGit(ref<Store> store, const std::string & uri,
     json["uri"] = uri;
     json["name"] = name;
     json["rev"] = gitInfo.rev;
-    json["revCount"] = gitInfo.revCount;
+    json["revCount"] = *gitInfo.revCount;
 
     writeFile(storeLink, json.dump());
 
@@ -224,7 +224,7 @@ static void prim_fetchGit(EvalState & state, const Pos & pos, Value * * args, Va
     mkString(*state.allocAttr(v, state.sOutPath), gitInfo.storePath, PathSet({gitInfo.storePath}));
     mkString(*state.allocAttr(v, state.symbols.create("rev")), gitInfo.rev);
     mkString(*state.allocAttr(v, state.symbols.create("shortRev")), gitInfo.shortRev);
-    mkInt(*state.allocAttr(v, state.symbols.create("revCount")), gitInfo.revCount);
+    mkInt(*state.allocAttr(v, state.symbols.create("revCount")), gitInfo.revCount.value_or(0));
     v.attrs->sort();
 
     if (state.allowedPaths)

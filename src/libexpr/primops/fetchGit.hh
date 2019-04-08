@@ -11,7 +11,7 @@ struct GitInfo
     Path storePath;
     std::string rev;
     std::string shortRev;
-    uint64_t revCount = 0;
+    std::optional<uint64_t> revCount;
 };
 
 GitInfo exportGit(ref<Store> store, const std::string & uri,

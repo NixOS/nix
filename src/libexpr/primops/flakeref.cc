@@ -106,6 +106,12 @@ FlakeRef::FlakeRef(const std::string & uri)
         data = d;
     }
 
+    else if (hasPrefix(uri, "/")) {
+        IsPath d;
+        d.path = canonPath(uri);
+        data = d;
+    }
+
     else
         throw Error("'%s' is not a valid flake reference", uri);
 }
@@ -135,6 +141,10 @@ std::string FlakeRef::to_string() const
             (refData->rev ? "&rev=" + refData->rev->to_string(Base16, false) : "");
     }
 
+    else if (auto refData = std::get_if<FlakeRef::IsPath>(&data)) {
+        return refData->path;
+    }
+
     else abort();
 }
 
@@ -148,6 +158,9 @@ bool FlakeRef::isImmutable() const
 
     else if (auto refData = std::get_if<FlakeRef::IsGit>(&data))
         return (bool) refData->rev;
+
+    else if (std::get_if<FlakeRef::IsPath>(&data))
+        return false;
 
     else abort();
 }

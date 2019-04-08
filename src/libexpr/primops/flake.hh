@@ -35,6 +35,7 @@ struct Flake
     FlakeRef ref;
     std::string description;
     Path path;
+    std::optional<uint64_t> revCount;
     std::vector<FlakeRef> requires;
     std::shared_ptr<FlakeRegistry> lockFile;
     Value * vProvides; // FIXME: gc
