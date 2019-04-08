@@ -1,7 +1,7 @@
 %glr-parser
 %pure-parser
 %locations
-%error-verbose
+%define parse.error verbose
 %defines
 /* %no-lines */
 %parse-param { void * scanner }
