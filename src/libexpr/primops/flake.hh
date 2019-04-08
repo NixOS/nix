@@ -10,13 +10,7 @@ class EvalState;
 
 struct FlakeRegistry
 {
-    struct Entry
-    {
-        FlakeRef ref;
-        Entry(const FlakeRef & flakeRef) : ref(flakeRef) {};
-        Entry operator=(const Entry & entry) { return Entry(entry.ref); }
-    };
-    std::map<FlakeAlias, Entry> entries;
+    std::map<FlakeRef, FlakeRef> entries;
 };
 
 struct LockFile
@@ -79,7 +73,7 @@ struct Dependencies
     Dependencies(const Flake & flake) : flake(flake) {}
 };
 
-Dependencies resolveFlake(EvalState &, const FlakeRef &, bool impureTopRef, bool isTopFlake);
+Dependencies resolveFlake(EvalState &, const FlakeRef &, bool impureTopRef, bool isTopFlake = true);
 
 FlakeRegistry updateLockFile(EvalState &, Flake &);
 

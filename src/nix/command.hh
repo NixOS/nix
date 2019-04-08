@@ -1,6 +1,7 @@
 #pragma once
 
 #include "args.hh"
+#include "primops/flake.hh"
 #include "common-eval-args.hh"
 
 namespace nix {
@@ -46,7 +47,7 @@ struct GitRepoCommand : virtual Args
 
 struct FlakeCommand : virtual Args
 {
-    std::string flakeUri;
+    FlakeUri flakeUri;
 
     FlakeCommand()
     {

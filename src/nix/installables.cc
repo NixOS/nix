@@ -7,7 +7,6 @@
 #include "get-drvs.hh"
 #include "store-api.hh"
 #include "shared.hh"
-#include "primops/flake.hh"
 
 #include <regex>
 

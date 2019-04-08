@@ -1,4 +1,3 @@
-#include "primops/flake.hh"
 #include "command.hh"
 #include "common-args.hh"
 #include "shared.hh"
@@ -29,11 +28,9 @@ struct CmdFlakeList : StoreCommand, MixEvalArgs
 
         stopProgressBar();
 
-        for (auto & registry : registries) {
-            for (auto & entry : registry->entries) {
-                std::cout << entry.first << " " << entry.second.ref.to_string() << "\n";
-            }
-        }
+        for (auto & registry : registries)
+            for (auto & entry : registry->entries)
+                std::cout << entry.first.to_string() << " " << entry.second.to_string() << "\n";
     }
 };
 
@@ -81,7 +78,7 @@ struct CmdFlakeDeps : FlakeCommand, MixJSON, StoreCommand, MixEvalArgs
 
         FlakeRef flakeRef(flakeUri);
 
-        Dependencies deps = resolveFlake(*evalState, flakeRef, true, true);
+        Dependencies deps = resolveFlake(*evalState, flakeRef, true);
 
         std::queue<Dependencies> todo;
         todo.push(deps);
@@ -135,15 +132,15 @@ struct CmdFlakeInfo : FlakeCommand, MixJSON, MixEvalArgs, StoreCommand
     void run(nix::ref<nix::Store> store) override
     {
         auto evalState = std::make_shared<EvalState>(searchPath, store);
-        nix::Flake flake = nix::getFlake(*evalState, FlakeRef(flakeUri));
+        nix::Flake flake = nix::getFlake(*evalState, FlakeRef(flakeUri), true);
         printFlakeInfo(flake, json);
     }
 };
 
 struct CmdFlakeAdd : MixEvalArgs, Command
 {
-    FlakeAlias flakeAlias;
-    FlakeUri flakeUri;
+    FlakeUri alias;
+    FlakeUri uri;
 
     std::string name() override
     {
@@ -157,25 +154,24 @@ struct CmdFlakeAdd : MixEvalArgs, Command
 
     CmdFlakeAdd()
     {
-        expectArg("flake-id", &flakeAlias);
-        expectArg("flake-uri", &flakeUri);
+        expectArg("alias", &alias);
+        expectArg("flake-uri", &uri);
     }
 
     void run() override
     {
-        FlakeRef newFlakeRef(flakeUri);
+        FlakeRef aliasRef(alias);
         Path userRegistryPath = getUserRegistryPath();
         auto userRegistry = readRegistry(userRegistryPath);
-        FlakeRegistry::Entry entry(newFlakeRef);
-        userRegistry->entries.erase(flakeAlias);
-        userRegistry->entries.insert_or_assign(flakeAlias, newFlakeRef);
+        userRegistry->entries.erase(aliasRef);
+        userRegistry->entries.insert_or_assign(aliasRef, FlakeRef(uri));
         writeRegistry(*userRegistry, userRegistryPath);
     }
 };
 
 struct CmdFlakeRemove : virtual Args, MixEvalArgs, Command
 {
-    FlakeAlias flakeAlias;
+    FlakeUri alias;
 
     std::string name() override
     {
@@ -189,21 +185,21 @@ struct CmdFlakeRemove : virtual Args, MixEvalArgs, Command
 
     CmdFlakeRemove()
     {
-        expectArg("flake-id", &flakeAlias);
+        expectArg("alias", &alias);
     }
 
     void run() override
     {
         Path userRegistryPath = getUserRegistryPath();
         auto userRegistry = readRegistry(userRegistryPath);
-        userRegistry->entries.erase(flakeAlias);
+        userRegistry->entries.erase(FlakeRef(alias));
         writeRegistry(*userRegistry, userRegistryPath);
     }
 };
 
 struct CmdFlakePin : virtual Args, StoreCommand, MixEvalArgs
 {
-    FlakeAlias flakeAlias;
+    FlakeUri alias;
 
     std::string name() override
     {
@@ -217,7 +213,7 @@ struct CmdFlakePin : virtual Args, StoreCommand, MixEvalArgs
 
     CmdFlakePin()
     {
-        expectArg("flake-id", &flakeAlias);
+        expectArg("alias", &alias);
     }
 
     void run(nix::ref<nix::Store> store) override
@@ -226,14 +222,13 @@ struct CmdFlakePin : virtual Args, StoreCommand, MixEvalArgs
 
         Path userRegistryPath = getUserRegistryPath();
         FlakeRegistry userRegistry = *readRegistry(userRegistryPath);
-        auto it = userRegistry.entries.find(flakeAlias);
+        auto it = userRegistry.entries.find(FlakeRef(alias));
         if (it != userRegistry.entries.end()) {
-            FlakeRef oldRef = it->second.ref;
-            it->second.ref = getFlake(*evalState, oldRef, true).ref;
+            it->second = getFlake(*evalState, it->second, true).ref;
             // The 'ref' in 'flake' is immutable.
             writeRegistry(userRegistry, userRegistryPath);
         } else
-            throw Error("the flake alias '%s' does not exist in the user registry", flakeAlias);
+            throw Error("the flake alias '%s' does not exist in the user registry", alias);
     }
 };
 

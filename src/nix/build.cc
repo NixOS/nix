@@ -1,4 +1,3 @@
-#include "primops/flake.hh"
 #include "eval.hh"
 #include "command.hh"
 #include "common-args.hh"
@@ -78,7 +77,7 @@ struct CmdBuild : MixDryRun, InstallablesCommand
                     }
         }
 
-        // std::string flakeUri = "";
+        // FlakeUri flakeUri = "";
         // if(updateLock)
         //     for (uint i = 0; i < installables.size(); i++)
         //         // if (auto flakeUri = installableToFlakeUri)

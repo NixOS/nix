@@ -103,47 +103,59 @@ typedef std::string FlakeUri;
 
 struct FlakeRef
 {
-    std::optional<std::string> ref;
-    std::optional<Hash> rev;
-
     struct IsAlias
     {
         FlakeAlias alias;
+        bool operator<(const IsAlias & b) const { return alias < b.alias; };
+        bool operator==(const IsAlias & b) const { return alias == b.alias; };
     };
 
-    struct IsGitHub
-    {
+    struct IsGitHub {
         std::string owner, repo;
+        bool operator<(const IsGitHub & b) const {
+            return std::make_tuple(owner, repo) < std::make_tuple(b.owner, b.repo);
+        }
+        bool operator==(const IsGitHub & b) const {
+            return owner == b.owner && repo == b.repo;
+        }
     };
 
     // Git, Tarball
     struct IsGit
     {
         std::string uri;
+        bool operator<(const IsGit & b) const { return uri < b.uri; }
+        bool operator==(const IsGit & b) const { return uri == b.uri; }
     };
 
     struct IsPath
     {
         Path path;
+        bool operator<(const IsPath & b) const { return path < b.path; }
+        bool operator==(const IsPath & b) const { return path == b.path; }
     };
 
     // Git, Tarball
 
-    std::variant<IsFlakeId, IsGitHub, IsGit, IsPath> data;
+    std::variant<IsAlias, IsGitHub, IsGit, IsPath> data;
+
+    std::optional<std::string> ref;
+    std::optional<Hash> rev;
+
+    bool operator<(const FlakeRef & flakeRef) const
+    {
+        return std::make_tuple(this->data, ref, rev) <
+            std::make_tuple(flakeRef.data, flakeRef.ref, flakeRef.rev);
+    }
+
+    bool operator==(const FlakeRef & flakeRef) const
+    {
+        return std::make_tuple(this->data, ref, rev) ==
+            std::make_tuple(flakeRef.data, flakeRef.ref, flakeRef.rev);
+    }
 
     // Parse a flake URI.
     FlakeRef(const std::string & uri, bool allowRelative = false);
-
-    // Default constructor
-    FlakeRef(const FlakeRef & flakeRef) : data(flakeRef.data) {};
-
-    /* Unify two flake references so that the resulting reference
-       combines the information from both. For example,
-       "nixpkgs/<hash>" and "github:NixOS/nixpkgs" unifies to
-       "nixpkgs/master". May throw an exception if the references are
-       incompatible (e.g. "nixpkgs/<hash1>" and "nixpkgs/<hash2>",
-       where hash1 != hash2). */
-    FlakeRef(const FlakeRef & a, const FlakeRef & b);
 
     // FIXME: change to operator <<.
     std::string to_string() const;
@@ -160,9 +172,5 @@ struct FlakeRef
     bool isImmutable() const;
 
     FlakeRef baseRef() const;
-
-    void setRef(std::optional<std::string> ref) { ref = ref; }
-
-    void setRev(std::optional<Hash> rev) { rev = rev; }
 };
 }
