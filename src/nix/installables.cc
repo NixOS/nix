@@ -203,6 +203,12 @@ std::vector<std::shared_ptr<Installable>> SourceExprCommand::parseInstallables(
             if (s.compare(0, 1, "(") == 0)
                 result.push_back(std::make_shared<InstallableExpr>(*this, s));
 
+            else if (hasPrefix(s, "nixpkgs.")) {
+                bool static warned;
+                warnOnce(warned, "the syntax 'nixpkgs.<attr>' is deprecated; use 'nixpkgs:<attr>' instead");
+                result.push_back(std::make_shared<InstallableFlake>(*this, FlakeRef("nixpkgs"), std::string(s, 8)));
+            }
+
             else if ((colon = s.rfind(':')) != std::string::npos) {
                 auto flakeRef = std::string(s, 0, colon);
                 auto attrPath = std::string(s, colon + 1);
@@ -214,17 +220,8 @@ std::vector<std::shared_ptr<Installable>> SourceExprCommand::parseInstallables(
                 result.push_back(std::make_shared<InstallableStorePath>(path));
             }
 
-            else {
-                result.push_back(std::make_shared<InstallableFlake>(*this, FlakeRef("nixpkgs"), s));
-            }
-
-            /*
-            else if (s == "" || std::regex_match(s, attrPathRegex))
-                result.push_back(std::make_shared<InstallableAttrPath>(cmd, s));
-
             else
-                throw UsageError("don't know what to do with argument '%s'", s);
-            */
+                result.push_back(std::make_shared<InstallableFlake>(*this, FlakeRef("nixpkgs"), s));
         }
     }
 
