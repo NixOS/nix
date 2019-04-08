@@ -289,7 +289,7 @@ static std::tuple<FlakeId, std::map<FlakeId, Flake>> resolveFlake(EvalState & st
 
 #if 0
         if (evalSettings.pureEval && !flakeRef.isImmutable() && (!toplevel || !impureTopRef))
-            throw Error("mutable flake '%s' is not allowed in pure mode; use --no-pure-eval to disable", flakeRef.to_string());
+            throw Error("mutable flake '%s' is not allowed in pure mode; use --impure to disable", flakeRef.to_string());
 #endif
 
         auto flake = getFlake(state, flakeRef);
