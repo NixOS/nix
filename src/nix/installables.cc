@@ -21,13 +21,6 @@ SourceExprCommand::SourceExprCommand()
         .label("file")
         .description("evaluate FILE rather than use the default installation source")
         .dest(&file);
-
-    mkFlag()
-        .shortName('F')
-        .longName("flake")
-        .label("flake")
-        .description("evaluate FLAKE rather than use the default installation source")
-        .dest(&flakeUri);
 }
 
 Value * SourceExprCommand::getSourceExpr(EvalState & state)
@@ -36,17 +29,9 @@ Value * SourceExprCommand::getSourceExpr(EvalState & state)
 
     vSourceExpr = state.allocValue();
 
-    if (file && flakeUri)
-        throw Error("cannot use both --file and --flake");
-
     if (file)
         state.evalFile(lookupFileArg(state, *file), *vSourceExpr);
-    else if (flakeUri) {
-        // FIXME: handle flakeUri being a relative path
-        auto vTemp = state.allocValue();
-        auto vFlake = *makeFlakeValue(state, "impure:" + *flakeUri, *vTemp);
-        *vSourceExpr = *((*vFlake.attrs->get(state.symbols.create("provides")))->value);
-    } else {
+    else {
         // FIXME: remove "impure" hack, call some non-user-accessible
         // variant of getFlake instead.
         auto fun = state.parseExprFromString(
@@ -176,6 +161,43 @@ struct InstallableAttrPath : InstallableValue
     }
 };
 
+struct InstallableFlake : InstallableValue
+{
+    FlakeRef flakeRef;
+    std::string attrPath;
+
+    InstallableFlake(SourceExprCommand & cmd, FlakeRef && flakeRef, const std::string & attrPath)
+        : InstallableValue(cmd), flakeRef(flakeRef), attrPath(attrPath)
+    { }
+
+    std::string what() override { return flakeRef.to_string() + ":" + attrPath; }
+
+    Value * toValue(EvalState & state) override
+    {
+        auto vTemp = state.allocValue();
+        auto vFlake = *makeFlakeValue(state, flakeRef, true, *vTemp);
+
+        auto vProvides = (*vFlake.attrs->get(state.symbols.create("provides")))->value;
+
+        state.forceValue(*vProvides);
+
+        auto emptyArgs = state.allocBindings(0);
+
+        if (auto aPackages = *vProvides->attrs->get(state.symbols.create("packages"))) {
+            try {
+                auto * v = findAlongAttrPath(state, attrPath, *emptyArgs, *aPackages->value);
+                state.forceValue(*v);
+                return v;
+            } catch (AttrPathNotFound & e) {
+            }
+        }
+
+        auto * v = findAlongAttrPath(state, attrPath, *emptyArgs, *vProvides);
+        state.forceValue(*v);
+        return v;
+    }
+};
+
 // FIXME: extend
 std::string attrRegex = R"([A-Za-z_][A-Za-z0-9-_+]*)";
 static std::regex attrPathRegex(fmt(R"(%1%(\.%1%)*)", attrRegex));
@@ -196,19 +218,34 @@ static std::vector<std::shared_ptr<Installable>> parseInstallables(
         if (s.compare(0, 1, "(") == 0)
             result.push_back(std::make_shared<InstallableExpr>(cmd, s));
 
-        else if (s.find("/") != std::string::npos) {
+        /*
+        else if (s.find('/') != std::string::npos) {
 
             auto path = store->toStorePath(store->followLinksToStore(s));
 
             if (store->isStorePath(path))
                 result.push_back(std::make_shared<InstallableStorePath>(path));
         }
+        */
 
+        else {
+            auto colon = s.rfind(':');
+            if (colon != std::string::npos) {
+                auto flakeRef = std::string(s, 0, colon);
+                auto attrPath = std::string(s, colon + 1);
+                result.push_back(std::make_shared<InstallableFlake>(cmd, FlakeRef(flakeRef), attrPath));
+            } else {
+                result.push_back(std::make_shared<InstallableFlake>(cmd, FlakeRef("nixpkgs"), s));
+            }
+        }
+
+        /*
         else if (s == "" || std::regex_match(s, attrPathRegex))
             result.push_back(std::make_shared<InstallableAttrPath>(cmd, s));
 
         else
             throw UsageError("don't know what to do with argument '%s'", s);
+        */
     }
 
     return result;
