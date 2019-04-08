@@ -70,7 +70,7 @@ Value * findAlongAttrPath(EvalState & state, const string & attrPath,
 
             Bindings::iterator a = v->attrs->find(state.symbols.create(attr));
             if (a == v->attrs->end())
-                throw Error(format("attribute '%1%' in selection path '%2%' not found") % attr % attrPath);
+                throw AttrPathNotFound("attribute '%1%' in selection path '%2%' not found", attr, attrPath);
             v = &*a->value;
         }
 
@@ -82,7 +82,7 @@ Value * findAlongAttrPath(EvalState & state, const string & attrPath,
                     % attrPath % showType(*v));
 
             if (attrIndex >= v->listSize())
-                throw Error(format("list index %1% in selection path '%2%' is out of range") % attrIndex % attrPath);
+                throw AttrPathNotFound("list index %1% in selection path '%2%' is out of range", attrIndex, attrPath);
 
             v = v->listElems()[attrIndex];
         }
