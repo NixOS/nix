@@ -74,9 +74,9 @@ struct CmdWhyDepends : SourceExprCommand
 
     void run(ref<Store> store) override
     {
-        auto package = parseInstallable(*this, store, _package, false);
+        auto package = parseInstallable(store, _package);
         auto packagePath = toStorePath(store, Build, package);
-        auto dependency = parseInstallable(*this, store, _dependency, false);
+        auto dependency = parseInstallable(store, _dependency);
         auto dependencyPath = toStorePath(store, NoBuild, dependency);
         auto dependencyPathHash = storePathToHash(dependencyPath);
 

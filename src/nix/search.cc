@@ -257,7 +257,9 @@ struct CmdSearch : SourceExprCommand, MixJSON
 
                 auto cache = writeCache ? std::make_unique<JSONObject>(jsonCacheFile, false) : nullptr;
 
-                doExpr(getSourceExpr(*state), "", true, cache.get());
+                // FIXME
+                throw Error("NOT IMPLEMENTED");
+                //doExpr(getSourceExpr(*state), "", true, cache.get());
 
             } catch (std::exception &) {
                 /* Fun fact: catching std::ios::failure does not work

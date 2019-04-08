@@ -74,23 +74,20 @@ struct Installable
 struct SourceExprCommand : virtual Args, StoreCommand, MixEvalArgs
 {
     std::optional<Path> file;
-    std::optional<std::string> flakeUri;
 
     SourceExprCommand();
 
-    /* Return a value representing the Nix expression from which we
-       are installing. This is either the file specified by ‘--file’,
-       or an attribute set constructed from $NIX_PATH, e.g. ‘{ nixpkgs
-       = import ...; bla = import ...; }’. */
-    Value * getSourceExpr(EvalState & state);
-
     ref<EvalState> getEvalState();
+
+    std::vector<std::shared_ptr<Installable>> parseInstallables(
+        ref<Store> store, std::vector<std::string> ss);
+
+    std::shared_ptr<Installable> parseInstallable(
+        ref<Store> store, const std::string & installable);
 
 private:
 
     std::shared_ptr<EvalState> evalState;
-
-    Value * vSourceExpr = 0;
 };
 
 enum RealiseMode { Build, NoBuild, DryRun };
@@ -107,8 +104,6 @@ struct InstallablesCommand : virtual Args, SourceExprCommand
     }
 
     void prepare() override;
-
-    virtual bool useDefaultInstallables() { return true; }
 
 private:
 
@@ -148,8 +143,6 @@ public:
     virtual void run(ref<Store> store, Paths storePaths) = 0;
 
     void run(ref<Store> store) override;
-
-    bool useDefaultInstallables() override { return !all; }
 };
 
 /* A command that operates on exactly one store path. */
@@ -173,10 +166,6 @@ struct RegisterCommand
         commands->push_back(command);
     }
 };
-
-std::shared_ptr<Installable> parseInstallable(
-    SourceExprCommand & cmd, ref<Store> store, const std::string & installable,
-    bool useDefaultInstallables);
 
 Buildables build(ref<Store> store, RealiseMode mode,
     std::vector<std::shared_ptr<Installable>> installables);

@@ -19,31 +19,8 @@ SourceExprCommand::SourceExprCommand()
         .shortName('f')
         .longName("file")
         .label("file")
-        .description("evaluate FILE rather than use the default installation source")
+        .description("evaluate a set of attributes from FILE (deprecated)")
         .dest(&file);
-}
-
-Value * SourceExprCommand::getSourceExpr(EvalState & state)
-{
-    if (vSourceExpr) return vSourceExpr;
-
-    vSourceExpr = state.allocValue();
-
-    if (file)
-        state.evalFile(lookupFileArg(state, *file), *vSourceExpr);
-    else {
-        // FIXME: remove "impure" hack, call some non-user-accessible
-        // variant of getFlake instead.
-        auto fun = state.parseExprFromString(
-             "builtins.mapAttrs (flakeName: flakeInfo:"
-             "  (getFlake (\"impure:\" + flakeInfo.uri)).${flakeName}.provides.packages or {})", "/");
-        auto vFun = state.allocValue();
-        state.eval(fun, *vFun);
-        auto vRegistry = makeFlakeRegistryValue(state);
-        mkApp(*vSourceExpr, *vFun, *vRegistry);
-    }
-
-    return vSourceExpr;
 }
 
 ref<EvalState> SourceExprCommand::getEvalState()
@@ -140,24 +117,20 @@ struct InstallableExpr : InstallableValue
 
 struct InstallableAttrPath : InstallableValue
 {
+    Value * v;
     std::string attrPath;
 
-    InstallableAttrPath(SourceExprCommand & cmd, const std::string & attrPath)
-        : InstallableValue(cmd), attrPath(attrPath)
+    InstallableAttrPath(SourceExprCommand & cmd, Value * v, const std::string & attrPath)
+        : InstallableValue(cmd), v(v), attrPath(attrPath)
     { }
 
     std::string what() override { return attrPath; }
 
     Value * toValue(EvalState & state) override
     {
-        auto source = cmd.getSourceExpr(state);
-
-        Bindings & autoArgs = *cmd.getAutoArgs(state);
-
-        Value * v = findAlongAttrPath(state, attrPath, autoArgs, *source);
-        state.forceValue(*v);
-
-        return v;
+        auto vRes = findAlongAttrPath(state, attrPath, *cmd.getAutoArgs(state), *v);
+        state.forceValue(*vRes);
+        return vRes;
     }
 };
 
@@ -202,60 +175,66 @@ struct InstallableFlake : InstallableValue
 std::string attrRegex = R"([A-Za-z_][A-Za-z0-9-_+]*)";
 static std::regex attrPathRegex(fmt(R"(%1%(\.%1%)*)", attrRegex));
 
-static std::vector<std::shared_ptr<Installable>> parseInstallables(
-    SourceExprCommand & cmd, ref<Store> store, std::vector<std::string> ss, bool useDefaultInstallables)
+std::vector<std::shared_ptr<Installable>> SourceExprCommand::parseInstallables(
+    ref<Store> store, std::vector<std::string> ss)
 {
     std::vector<std::shared_ptr<Installable>> result;
 
-    if (ss.empty() && useDefaultInstallables) {
-        if (cmd.file == "")
-            cmd.file = ".";
-        ss = {""};
-    }
+    if (file) {
+        // FIXME: backward compatibility hack
+        evalSettings.pureEval = false;
 
-    for (auto & s : ss) {
+        auto state = getEvalState();
+        auto vFile = state->allocValue();
+        state->evalFile(lookupFileArg(*state, *file), *vFile);
 
-        if (s.compare(0, 1, "(") == 0)
-            result.push_back(std::make_shared<InstallableExpr>(cmd, s));
+        if (ss.empty())
+            ss = {""};
 
-        /*
-        else if (s.find('/') != std::string::npos) {
+        for (auto & s : ss)
+            result.push_back(std::make_shared<InstallableAttrPath>(*this, vFile, s));
 
-            auto path = store->toStorePath(store->followLinksToStore(s));
+    } else {
 
-            if (store->isStorePath(path))
-                result.push_back(std::make_shared<InstallableStorePath>(path));
-        }
-        */
+        for (auto & s : ss) {
 
-        else {
-            auto colon = s.rfind(':');
-            if (colon != std::string::npos) {
+            size_t colon;
+
+            if (s.compare(0, 1, "(") == 0)
+                result.push_back(std::make_shared<InstallableExpr>(*this, s));
+
+            else if ((colon = s.rfind(':')) != std::string::npos) {
                 auto flakeRef = std::string(s, 0, colon);
                 auto attrPath = std::string(s, colon + 1);
-                result.push_back(std::make_shared<InstallableFlake>(cmd, FlakeRef(flakeRef), attrPath));
-            } else {
-                result.push_back(std::make_shared<InstallableFlake>(cmd, FlakeRef("nixpkgs"), s));
+                result.push_back(std::make_shared<InstallableFlake>(*this, FlakeRef(flakeRef), attrPath));
             }
+
+            else if (s.find('/') != std::string::npos) {
+                auto path = store->toStorePath(store->followLinksToStore(s));
+                result.push_back(std::make_shared<InstallableStorePath>(path));
+            }
+
+            else {
+                result.push_back(std::make_shared<InstallableFlake>(*this, FlakeRef("nixpkgs"), s));
+            }
+
+            /*
+            else if (s == "" || std::regex_match(s, attrPathRegex))
+                result.push_back(std::make_shared<InstallableAttrPath>(cmd, s));
+
+            else
+                throw UsageError("don't know what to do with argument '%s'", s);
+            */
         }
-
-        /*
-        else if (s == "" || std::regex_match(s, attrPathRegex))
-            result.push_back(std::make_shared<InstallableAttrPath>(cmd, s));
-
-        else
-            throw UsageError("don't know what to do with argument '%s'", s);
-        */
     }
 
     return result;
 }
 
-std::shared_ptr<Installable> parseInstallable(
-    SourceExprCommand & cmd, ref<Store> store, const std::string & installable,
-    bool useDefaultInstallables)
+std::shared_ptr<Installable> SourceExprCommand::parseInstallable(
+    ref<Store> store, const std::string & installable)
 {
-    auto installables = parseInstallables(cmd, store, {installable}, false);
+    auto installables = parseInstallables(store, {installable});
     assert(installables.size() == 1);
     return installables.front();
 }
@@ -342,12 +321,12 @@ PathSet toDerivations(ref<Store> store,
 
 void InstallablesCommand::prepare()
 {
-    installables = parseInstallables(*this, getStore(), _installables, useDefaultInstallables());
+    installables = parseInstallables(getStore(), _installables);
 }
 
 void InstallableCommand::prepare()
 {
-    installable = parseInstallable(*this, getStore(), _installable, false);
+    installable = parseInstallable(getStore(), _installable);
 }
 
 }
