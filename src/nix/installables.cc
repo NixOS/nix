@@ -300,7 +300,7 @@ Path toStorePath(ref<Store> store, RealiseMode mode,
     auto paths = toStorePaths(store, mode, {installable});
 
     if (paths.size() != 1)
-            throw Error("argument '%s' should evaluate to one store path", installable->what());
+        throw Error("argument '%s' should evaluate to one store path", installable->what());
 
     return *paths.begin();
 }
