@@ -226,12 +226,14 @@ static FlakeSourceInfo fetchFlake(EvalState & state, const FlakeRef flakeRef, bo
         // FIXME: use regular /archive URLs instead? api.github.com
         // might have stricter rate limits.
 
-        // FIXME: support passing auth tokens for private repos.
-
         auto url = fmt("https://api.github.com/repos/%s/%s/tarball/%s",
             refData->owner, refData->repo,
             fRef.rev ? fRef.rev->to_string(Base16, false)
                 : fRef.ref ? *fRef.ref : "master");
+
+        std::string accessToken = settings.githubAccessToken.get();
+        if (accessToken != "")
+            url += "?access_token=" + accessToken;
 
         auto result = getDownloader()->downloadCached(state.store, url, true, "source",
             Hash(), nullptr, fRef.rev ? 1000000000 : settings.tarballTtl);
