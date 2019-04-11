@@ -1811,6 +1811,7 @@ void EvalState::printStats()
             gc.attr("totalBytes", totalBytes);
         }
 #endif
+
         if (countCalls) {
             {
                 auto obj = topObj.object("primops");
@@ -1845,6 +1846,11 @@ void EvalState::printStats()
                     obj.attr("count", i.second);
                 }
             }
+        }
+
+        if (getEnv("NIX_SHOW_SYMBOLS", "0") != "0") {
+            auto list = topObj.list("symbols");
+            symbols.dump([&](const std::string & s) { list.elem(s); });
         }
     }
 }
