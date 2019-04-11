@@ -9,6 +9,7 @@
 #include "json.hh"
 
 #include <algorithm>
+#include <chrono>
 #include <cstring>
 #include <unistd.h>
 #include <sys/time.h>
@@ -1504,9 +1505,17 @@ bool EvalState::isFunctor(Value & fun)
 
 void EvalState::forceFunction(Value & v, const Pos & pos)
 {
+    auto start = std::chrono::high_resolution_clock::now();
+
     forceValue(v);
     if (v.type != tLambda && v.type != tPrimOp && v.type != tPrimOpApp && !isFunctor(v))
         throwTypeError("value is %1% while a function was expected, at %2%", v, pos);
+
+    auto finish = std::chrono::high_resolution_clock::now();
+
+    auto duration = finish - start;
+    auto nanoseconds = std::chrono::duration_cast<std::chrono::nanoseconds>(duration);
+    debug(":clock: %1% %2%", pos, nanoseconds.count());
 }
 
 
