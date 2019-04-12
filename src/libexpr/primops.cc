@@ -341,6 +341,8 @@ struct CompareValues
                 return strcmp(v1->string.s, v2->string.s) < 0;
             case tPath:
                 return strcmp(v1->path, v2->path) < 0;
+            case tAttrs:
+                return v1 < v2; // FIXME
             default:
                 throw EvalError(format("cannot compare %1% with %2%") % showType(*v1) % showType(*v2));
         }
@@ -1576,7 +1578,6 @@ static void prim_sort(EvalState & state, const Pos & pos, Value * * args, Value 
         v.listElems()[n] = args[1]->listElems()[n];
     }
 
-
     auto comparator = [&](Value * a, Value * b) {
         /* Optimization: if the comparator is lessThan, bypass
            callFunction. */
@@ -1593,6 +1594,62 @@ static void prim_sort(EvalState & state, const Pos & pos, Value * * args, Value 
        weak ordering. What to do? std::stable_sort() seems more
        resilient, but no guarantees... */
     std::stable_sort(v.listElems(), v.listElems() + len, comparator);
+}
+
+
+static void prim_unique(EvalState & state, const Pos & pos, Value * * args, Value & v)
+{
+    state.forceFunction(*args[0], pos);
+    state.forceList(*args[1], pos);
+
+    auto len = args[1]->listSize();
+
+    Value * vs[len];
+    for (size_t n = 0; n < len; ++n) {
+        auto v2 = args[1]->listElems()[n];
+        state.forceValue(*v2);
+        vs[n] = v2;
+    }
+
+    auto comparator = [&](Value * a, Value * b) {
+        /* Optimization: if the comparator is lessThan, bypass
+           callFunction. */
+        if (args[0]->type == tPrimOp && args[0]->primOp->fun == prim_lessThan)
+            return CompareValues()(a, b);
+
+        Value vTmp1, vTmp2;
+        state.callFunction(*args[0], *a, vTmp1, pos);
+        state.callFunction(vTmp1, *b, vTmp2, pos);
+        return state.forceBool(vTmp2, pos);
+    };
+
+    std::sort(vs, vs + len, comparator);
+
+    auto outLen = std::min((size_t) 1, len);
+    for (size_t n = 1; n < len; n++) {
+        if (comparator(vs[outLen - 1], vs[n])) {
+            vs[outLen++] = vs[n];
+        }
+    }
+
+    std::sort(vs, vs + outLen);
+
+    state.mkList(v, outLen);
+
+    size_t outPos = 0;
+    for (size_t n = 0; n < len; n++) {
+        auto v2 = args[1]->listElems()[n];
+        auto i = std::lower_bound(vs, vs + outLen, v2);
+        if (*i == v2) {
+            // Remove v2 from the set by setting its least significant
+            // bit. (This doesn't change the sort order.)
+            *i = (Value *) (((ptrdiff_t) v2) | 1);
+            assert(outPos < outLen);
+            v.listElems()[outPos++] = v2;
+        }
+    }
+
+    assert(outPos == outLen);
 }
 
 
@@ -2240,6 +2297,7 @@ void EvalState::createBaseEnv()
     addPrimOp("__all", 2, prim_all);
     addPrimOp("__genList", 2, prim_genList);
     addPrimOp("__sort", 2, prim_sort);
+    addPrimOp("__unique", 2, prim_unique);
     addPrimOp("__partition", 2, prim_partition);
     addPrimOp("__concatMap", 2, prim_concatMap);
 
