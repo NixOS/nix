@@ -6,6 +6,7 @@
 #include "symbol-table.hh"
 #include "hash.hh"
 #include "config.hh"
+#include "function-trace.hh"
 
 #include <map>
 #include <unordered_map>
@@ -349,6 +350,9 @@ struct EvalSettings : Config
 
     Setting<Strings> allowedUris{this, {}, "allowed-uris",
         "Prefixes of URIs that builtin functions such as fetchurl and fetchGit are allowed to fetch."};
+
+    Setting<bool> traceFunctionCalls{this, false, "trace-function-calls",
+        "Emit log messages for each function entry and exit at the 'vomit' log level (-vvvv)"};
 };
 
 extern EvalSettings evalSettings;

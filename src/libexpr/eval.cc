@@ -9,6 +9,7 @@
 #include "json.hh"
 
 #include <algorithm>
+#include <chrono>
 #include <cstring>
 #include <unistd.h>
 #include <sys/time.h>
@@ -16,7 +17,6 @@
 #include <iostream>
 #include <fstream>
 
-#include <sys/time.h>
 #include <sys/resource.h>
 
 #if HAVE_BOEHMGC
@@ -1094,9 +1094,13 @@ void EvalState::callPrimOp(Value & fun, Value & arg, Value & v, const Pos & pos)
     }
 }
 
-
 void EvalState::callFunction(Value & fun, Value & arg, Value & v, const Pos & pos)
 {
+    std::optional<FunctionCallTrace> trace;
+    if (evalSettings.traceFunctionCalls) {
+        trace.emplace(pos);
+    }
+
     forceValue(fun, pos);
 
     if (fun.type == tPrimOp || fun.type == tPrimOpApp) {
