@@ -120,7 +120,7 @@ std::string FlakeRef::to_string() const
 {
     std::string string;
     if (auto refData = std::get_if<FlakeRef::IsAlias>(&data))
-        string = "flake:" + refData->alias;
+        string = refData->alias;
 
     else if (auto refData = std::get_if<FlakeRef::IsGitHub>(&data)) {
         assert(!ref || !rev);
