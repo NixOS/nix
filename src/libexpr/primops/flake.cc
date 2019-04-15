@@ -126,7 +126,8 @@ void writeLockFile(LockFile lockFile, Path path)
 
 std::shared_ptr<FlakeRegistry> getGlobalRegistry()
 {
-    return std::make_shared<FlakeRegistry>();
+    Path registryFile = settings.nixDataDir + "/nix/flake-registry.json";
+    return readRegistry(registryFile);
 }
 
 Path getUserRegistryPath()
@@ -139,12 +140,6 @@ std::shared_ptr<FlakeRegistry> getUserRegistry()
     return readRegistry(getUserRegistryPath());
 }
 
-std::shared_ptr<FlakeRegistry> getLocalRegistry()
-{
-    Path registryFile = settings.nixDataDir + "/nix/flake-registry.json";
-    return readRegistry(registryFile);
-}
-
 std::shared_ptr<FlakeRegistry> getFlagRegistry()
 {
     // TODO (Nick): Implement this.
@@ -154,15 +149,8 @@ std::shared_ptr<FlakeRegistry> getFlagRegistry()
 const std::vector<std::shared_ptr<FlakeRegistry>> EvalState::getFlakeRegistries()
 {
     std::vector<std::shared_ptr<FlakeRegistry>> registries;
-    if (evalSettings.pureEval) {
-        registries.push_back(std::make_shared<FlakeRegistry>()); // global
-        registries.push_back(std::make_shared<FlakeRegistry>()); // user
-        registries.push_back(std::make_shared<FlakeRegistry>()); // local
-    } else {
-        registries.push_back(getGlobalRegistry());
-        registries.push_back(getUserRegistry());
-        registries.push_back(getLocalRegistry());
-    }
+    registries.push_back(getGlobalRegistry());
+    registries.push_back(getUserRegistry());
     registries.push_back(getFlagRegistry());
     return registries;
 }
