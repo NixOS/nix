@@ -56,7 +56,7 @@ void printValueAsJSON(EvalState & state, bool strict,
             break;
         }
 
-        case tList1: case tList2: case tListN: {
+        case tList0: case tList1: case tList2: case tListN: {
             auto list(out.list());
             for (unsigned int n = 0; n < v.listSize(); ++n) {
                 auto placeholder(list.placeholder());
@@ -65,9 +65,11 @@ void printValueAsJSON(EvalState & state, bool strict,
             break;
         }
 
+#if 0
         case tExternal:
             v.external->printValueAsJSON(state, strict, out, context);
             break;
+#endif
 
         case tFloat:
             out.write(v.fpoint);
@@ -85,11 +87,13 @@ void printValueAsJSON(EvalState & state, bool strict,
     printValueAsJSON(state, strict, v, out, context);
 }
 
+#if 0
 void ExternalValueBase::printValueAsJSON(EvalState & state, bool strict,
     JSONPlaceholder & out, PathSet & context) const
 {
     throw TypeError(format("cannot convert %1% to JSON") % showType());
 }
+#endif
 
 
 }

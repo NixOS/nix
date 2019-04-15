@@ -2,6 +2,7 @@
 
 #include "nixexpr.hh"
 #include "symbol-table.hh"
+#include "gc.hh"
 
 #include <algorithm>
 
@@ -30,19 +31,22 @@ struct Attr
    by its size and its capacity, the capacity being the number of Attr
    elements allocated after this structure, while the size corresponds to
    the number of elements already inserted in this structure. */
-class Bindings
+class Bindings : public Object
 {
 public:
     typedef uint32_t size_t;
 
 private:
-    size_t size_, capacity_;
+    // FIXME: eliminate size_. We can just rely on capacity by sorting
+    // null entries towards the end of the vector.
+    size_t size_;
     Attr attrs[0];
 
-    Bindings(size_t capacity) : size_(0), capacity_(capacity) { }
+public:
+    // FIXME: make private
+    Bindings(size_t capacity) : Object(tBindings, capacity), size_(0) { }
     Bindings(const Bindings & bindings) = delete;
 
-public:
     size_t size() const { return size_; }
 
     bool empty() const { return !size_; }
@@ -51,7 +55,7 @@ public:
 
     void push_back(const Attr & attr)
     {
-        assert(size_ < capacity_);
+        assert(size_ < capacity());
         attrs[size_++] = attr;
     }
 
@@ -73,7 +77,7 @@ public:
 
     void sort();
 
-    size_t capacity() { return capacity_; }
+    size_t capacity() const { return getMisc(); }
 
     /* Returns the attributes in lexicographically sorted order. */
     std::vector<const Attr *> lexicographicOrder() const
@@ -88,7 +92,19 @@ public:
         return res;
     }
 
-    friend class EvalState;
+    Size words() const
+    {
+        return wordsFor(capacity());
+    }
+
+    static Size wordsFor(size_t capacity)
+    {
+        return 2 + 3 * capacity; // FIXME
+    }
+
+    static Ptr<Bindings> allocBindings(size_t capacity);
+
+    friend class GC;
 };
 
 

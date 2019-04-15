@@ -44,7 +44,7 @@ struct NixRepl
 
     const static int envSize = 32768;
     StaticEnv staticEnv;
-    Env * env;
+    Ptr<Env> env;
     int displ;
     StringSet varNames;
 
@@ -506,8 +506,8 @@ void NixRepl::loadFile(const Path & path)
 
 void NixRepl::initEnv()
 {
-    env = &state.allocEnv(envSize);
-    env->up = &state.baseEnv;
+    env = state.allocEnv(envSize);
+    env->up = state.baseEnv;
     displ = 0;
     staticEnv.vars.clear();
 
@@ -665,6 +665,7 @@ std::ostream & NixRepl::printValue(std::ostream & str, Value & v, unsigned int m
         break;
     }
 
+    case tList0:
     case tList1:
     case tList2:
     case tListN:

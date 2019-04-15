@@ -130,8 +130,8 @@ static void prim_scopedImport(EvalState & state, const Pos & pos, Value * * args
         if (args[0]->attrs->empty())
             state.evalFile(realPath, v);
         else {
-            Env * env = &state.allocEnv(args[0]->attrs->size());
-            env->up = &state.baseEnv;
+            auto env = state.allocEnv(args[0]->attrs->size());
+            env->up = state.baseEnv;
 
             StaticEnv staticEnv(false, &state.staticBaseEnv);
 
@@ -243,15 +243,17 @@ static void prim_typeOf(EvalState & state, const Pos & pos, Value * * args, Valu
         case tPath: t = "path"; break;
         case tNull: t = "null"; break;
         case tAttrs: t = "set"; break;
-        case tList1: case tList2: case tListN: t = "list"; break;
+        case tList0: case tList1: case tList2: case tListN: t = "list"; break;
         case tLambda:
         case tPrimOp:
         case tPrimOpApp:
             t = "lambda";
             break;
+#if 0
         case tExternal:
             t = args[0]->external->typeOf();
             break;
+#endif
         case tFloat: t = "float"; break;
         default: abort();
     }
@@ -348,15 +350,12 @@ struct CompareValues
 };
 
 
-#if HAVE_BOEHMGC
-typedef list<Value *, gc_allocator<Value *> > ValueList;
-#else
-typedef list<Value *> ValueList;
-#endif
+typedef list<Ptr<Value>> ValueList;
 
 
 static void prim_genericClosure(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
+#if 0
     state.forceAttrs(*args[0], pos);
 
     /* Get the start set. */
@@ -417,6 +416,8 @@ static void prim_genericClosure(EvalState & state, const Pos & pos, Value * * ar
     unsigned int n = 0;
     for (auto & i : res)
         v.listElems()[n++] = i;
+#endif
+    abort();
 }
 
 
@@ -1603,7 +1604,8 @@ static void prim_partition(EvalState & state, const Pos & pos, Value * * args, V
 
     auto len = args[1]->listSize();
 
-    ValueVector right, wrong;
+    // Note: these Values are reachable via args[0].
+    std::vector<Value *> right, wrong;
 
     for (unsigned int n = 0; n < len; ++n) {
         auto vElem = args[1]->listElems()[n];
@@ -2107,10 +2109,10 @@ RegisterPrimOp::RegisterPrimOp(std::string name, size_t arity, PrimOpFun fun)
 
 void EvalState::createBaseEnv()
 {
-    baseEnv.up = 0;
+    baseEnv->up = 0;
 
     /* Add global constants such as `true' to the base environment. */
-    Value v;
+    auto v = allocValue();
 
     /* `builtins' must be first! */
     mkAttrs(v, 128);
@@ -2287,7 +2289,7 @@ void EvalState::createBaseEnv()
     mkList(v, searchPath.size());
     int n = 0;
     for (auto & i : searchPath) {
-        v2 = v.listElems()[n++] = allocValue();
+        v2 = v->listElems()[n++] = allocValue();
         mkAttrs(*v2, 2);
         mkString(*allocAttr(*v2, symbols.create("path")), i.second);
         mkString(*allocAttr(*v2, symbols.create("prefix")), i.first);
@@ -2301,7 +2303,7 @@ void EvalState::createBaseEnv()
 
     /* Now that we've added all primops, sort the `builtins' set,
        because attribute lookups expect it to be sorted. */
-    baseEnv.values[0]->attrs->sort();
+    baseEnv->values[0]->attrs->sort();
 }
 
 

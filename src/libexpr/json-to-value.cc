@@ -52,9 +52,9 @@ static void parseJSON(EvalState & state, const char * & s, Value & v)
         skipWhitespace(s);
         while (1) {
             if (values.empty() && *s == ']') break;
-            Value * v2 = state.allocValue();
+            Ptr<Value> v2 = state.allocValue();
             parseJSON(state, s, *v2);
-            values.push_back(v2);
+            values.push_back(std::move(v2));
             skipWhitespace(s);
             if (*s == ']') break;
             if (*s != ',') throw JSONParseError("expected ',' or ']' after JSON array element");
@@ -76,9 +76,9 @@ static void parseJSON(EvalState & state, const char * & s, Value & v)
             skipWhitespace(s);
             if (*s != ':') throw JSONParseError("expected ':' in JSON object");
             s++;
-            Value * v2 = state.allocValue();
+            Ptr<Value> v2 = state.allocValue();
             parseJSON(state, s, *v2);
-            attrs[state.symbols.create(name)] = v2;
+            attrs.emplace(state.symbols.create(name), std::move(v2));
             skipWhitespace(s);
             if (*s == '}') break;
             if (*s != ',') throw JSONParseError("expected ',' or '}' after JSON member");
@@ -98,7 +98,7 @@ static void parseJSON(EvalState & state, const char * & s, Value & v)
     else if (isdigit(*s) || *s == '-' || *s == '.' ) {
         // Buffer into a string first, then use built-in C++ conversions
         std::string tmp_number;
-        ValueType number_type = tInt;
+        Tag number_type = tInt;
 
         while (isdigit(*s) || *s == '-' || *s == '.' || *s == 'e' || *s == 'E') {
             if (*s == '.' || *s == 'e' || *s == 'E')

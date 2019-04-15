@@ -248,7 +248,7 @@ void DrvInfo::setMeta(const string & name, Value * v)
 {
     getMeta();
     Bindings * old = meta;
-    meta = state->allocBindings(1 + (old ? old->size() : 0));
+    meta = Bindings::allocBindings(1 + (old ? old->size() : 0));
     Symbol sym = state->symbols.create(name);
     if (old)
         for (auto i : *old)

@@ -19,7 +19,7 @@ DrvInfos queryInstalled(EvalState & state, const Path & userEnv)
     if (pathExists(manifestFile)) {
         Value v;
         state.evalFile(manifestFile, v);
-        Bindings & bindings(*state.allocBindings(0));
+        auto bindings = Bindings::allocBindings(0);
         getDerivations(state, v, "", bindings, elems, false);
     }
     return elems;
@@ -42,7 +42,7 @@ bool createUserEnv(EvalState & state, DrvInfos & elems,
 
     /* Construct the whole top level derivation. */
     PathSet references;
-    Value manifest;
+    auto manifest = state.allocValue();
     state.mkList(manifest, elems.size());
     unsigned int n = 0;
     for (auto & i : elems) {
@@ -51,8 +51,8 @@ bool createUserEnv(EvalState & state, DrvInfos & elems,
            as the meta attributes. */
         Path drvPath = keepDerivations ? i.queryDrvPath() : "";
 
-        Value & v(*state.allocValue());
-        manifest.listElems()[n++] = &v;
+        auto v = state.allocValue();
+        manifest->listElems()[n++] = (Value *) v;
         state.mkAttrs(v, 16);
 
         mkString(*state.allocAttr(v, state.sType), "derivation");
@@ -70,7 +70,7 @@ bool createUserEnv(EvalState & state, DrvInfos & elems,
         state.mkList(vOutputs, outputs.size());
         unsigned int m = 0;
         for (auto & j : outputs) {
-            mkString(*(vOutputs.listElems()[m++] = state.allocValue()), j.first);
+            mkString(*(vOutputs.listElems()[m++] = (Value *) state.allocValue()), j.first);
             Value & vOutputs = *state.allocAttr(v, state.symbols.create(j.first));
             state.mkAttrs(vOutputs, 2);
             mkString(*state.allocAttr(vOutputs, state.sOutPath), j.second);
@@ -93,7 +93,7 @@ bool createUserEnv(EvalState & state, DrvInfos & elems,
             vMeta.attrs->push_back(Attr(state.symbols.create(j), v));
         }
         vMeta.attrs->sort();
-        v.attrs->sort();
+        v->attrs->sort();
 
         if (drvPath != "") references.insert(drvPath);
     }
@@ -102,7 +102,7 @@ bool createUserEnv(EvalState & state, DrvInfos & elems,
        the store; we need it for future modifications of the
        environment. */
     Path manifestFile = state.store->addTextToStore("env-manifest.nix",
-        (format("%1%") % manifest).str(), references);
+        fmt("%1%", (Value &) manifest), references);
 
     /* Get the environment builder expression. */
     Value envBuilder;
@@ -114,7 +114,7 @@ bool createUserEnv(EvalState & state, DrvInfos & elems,
     state.mkAttrs(args, 3);
     mkString(*state.allocAttr(args, state.symbols.create("manifest")),
         manifestFile, {manifestFile});
-    args.attrs->push_back(Attr(state.symbols.create("derivations"), &manifest));
+    args.attrs->push_back(Attr(state.symbols.create("derivations"), (Value *) manifest));
     args.attrs->sort();
     mkApp(topLevel, envBuilder, args);
 

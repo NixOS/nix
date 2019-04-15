@@ -119,7 +119,7 @@ static void printValueAsXML(EvalState & state, bool strict, bool location,
 
             break;
 
-        case tList1: case tList2: case tListN: {
+        case tList0: case tList1: case tList2: case tListN: {
             XMLOpenElement _(doc, "list");
             for (unsigned int n = 0; n < v.listSize(); ++n)
                 printValueAsXML(state, strict, location, *v.listElems()[n], doc, context, drvsSeen);
@@ -144,9 +144,11 @@ static void printValueAsXML(EvalState & state, bool strict, bool location,
             break;
         }
 
+#if 0
         case tExternal:
             v.external->printValueAsXML(state, strict, location, doc, context, drvsSeen);
             break;
+#endif
 
         case tFloat:
             doc.writeEmptyElement("float", singletonAttrs("value", (format("%1%") % v.fpoint).str()));
@@ -158,11 +160,13 @@ static void printValueAsXML(EvalState & state, bool strict, bool location,
 }
 
 
+#if 0
 void ExternalValueBase::printValueAsXML(EvalState & state, bool strict,
     bool location, XMLWriter & doc, PathSet & context, PathSet & drvsSeen) const
 {
     doc.writeEmptyElement("unevaluated");
 }
+#endif
 
 
 void printValueAsXML(EvalState & state, bool strict, bool location,

@@ -6,6 +6,7 @@
 #include "symbol-table.hh"
 #include "hash.hh"
 #include "config.hh"
+#include "gc.hh"
 
 #include <map>
 #include <unordered_map>
@@ -32,13 +33,26 @@ struct PrimOp
 };
 
 
-struct Env
+struct Env : Object
 {
     Env * up;
+    // FIXME: use misc field
     unsigned short size; // used by ‘valueSize’
     unsigned short prevWith:14; // nr of levels up to next `with' environment
-    enum { Plain = 0, HasWithExpr, HasWithAttrs } type:2;
+    enum { Plain = 0, HasWithExpr, HasWithAttrs } type:2; // FIXME: fold into type?
     Value * values[0];
+
+    Env(unsigned short size) : Object(tEnv, 0), size(size) {}
+
+    Size words() const
+    {
+        return wordsFor(size);
+    }
+
+    static Size wordsFor(unsigned short size)
+    {
+        return 3 + size; // FIXME
+    }
 };
 
 
@@ -83,7 +97,7 @@ public:
        mode. */
     std::optional<PathSet> allowedPaths;
 
-    Value vEmptySet;
+    Ptr<Bindings> emptyBindings;
 
     const ref<Store> store;
 
@@ -91,19 +105,11 @@ private:
     SrcToStore srcToStore;
 
     /* A cache from path names to parse trees. */
-#if HAVE_BOEHMGC
-    typedef std::map<Path, Expr *, std::less<Path>, traceable_allocator<std::pair<const Path, Expr *> > > FileParseCache;
-#else
     typedef std::map<Path, Expr *> FileParseCache;
-#endif
     FileParseCache fileParseCache;
 
     /* A cache from path names to values. */
-#if HAVE_BOEHMGC
-    typedef std::map<Path, Value, std::less<Path>, traceable_allocator<std::pair<const Path, Value> > > FileEvalCache;
-#else
-    typedef std::map<Path, Value> FileEvalCache;
-#endif
+    typedef std::map<Path, Ptr<Value>> FileEvalCache;
     FileEvalCache fileEvalCache;
 
     SearchPath searchPath;
@@ -213,7 +219,7 @@ public:
 
     /* The base environment, containing the builtin functions and
        values. */
-    Env & baseEnv;
+    Ptr<Env> baseEnv;
 
     /* The same, but used during parsing to resolve variables. */
     StaticEnv staticBaseEnv; // !!! should be private
@@ -260,12 +266,12 @@ public:
     void autoCallFunction(Bindings & args, Value & fun, Value & res);
 
     /* Allocation primitives. */
-    Value * allocValue();
-    Env & allocEnv(size_t size);
+    Ptr<Value> allocValue();
+    Ptr<Env> allocEnv(size_t size);
 
+    // Note: the resulting Value is only reachable as long as vAttrs
+    // is reachable.
     Value * allocAttr(Value & vAttrs, const Symbol & name);
-
-    Bindings * allocBindings(size_t capacity);
 
     void mkList(Value & v, size_t length);
     void mkAttrs(Value & v, size_t capacity);

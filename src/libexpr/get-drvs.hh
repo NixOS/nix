@@ -69,11 +69,7 @@ public:
 };
 
 
-#if HAVE_BOEHMGC
-typedef list<DrvInfo, traceable_allocator<DrvInfo> > DrvInfos;
-#else
-typedef list<DrvInfo> DrvInfos;
-#endif
+typedef std::list<DrvInfo> DrvInfos;
 
 
 /* If value `v' denotes a derivation, return a DrvInfo object

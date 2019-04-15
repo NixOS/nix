@@ -92,8 +92,11 @@ std::ostream & operator << (std::ostream & str, const Expr & e);
 struct ExprInt : Expr
 {
     NixInt n;
-    Value v;
-    ExprInt(NixInt n) : n(n) { mkInt(v, n); };
+    Ptr<Value> v;
+    ExprInt(NixInt n) : n(n) {
+        v = gc.alloc<Value>(Value::words());
+        mkInt(v, n);
+    };
     COMMON_METHODS
     Value * maybeThunk(EvalState & state, Env & env);
 };
@@ -101,8 +104,11 @@ struct ExprInt : Expr
 struct ExprFloat : Expr
 {
     NixFloat nf;
-    Value v;
-    ExprFloat(NixFloat nf) : nf(nf) { mkFloat(v, nf); };
+    Ptr<Value> v;
+    ExprFloat(NixFloat nf) : nf(nf) {
+        v = gc.alloc<Value>(Value::words());
+        mkFloat(v, nf);
+    };
     COMMON_METHODS
     Value * maybeThunk(EvalState & state, Env & env);
 };
@@ -110,8 +116,11 @@ struct ExprFloat : Expr
 struct ExprString : Expr
 {
     Symbol s;
-    Value v;
-    ExprString(const Symbol & s) : s(s) { mkString(v, s); };
+    Ptr<Value> v;
+    ExprString(const Symbol & s) : s(s) {
+        v = gc.alloc<Value>(Value::words());
+        mkString(v, s);
+    };
     COMMON_METHODS
     Value * maybeThunk(EvalState & state, Env & env);
 };
@@ -126,8 +135,11 @@ struct ExprIndStr : Expr
 struct ExprPath : Expr
 {
     string s;
-    Value v;
-    ExprPath(const string & s) : s(s) { mkPathNoCopy(v, this->s.c_str()); };
+    Ptr<Value> v;
+    ExprPath(const string & s) : s(s) {
+        v = gc.alloc<Value>(Value::words());
+        mkPathNoCopy(v, this->s.c_str());
+    };
     COMMON_METHODS
     Value * maybeThunk(EvalState & state, Env & env);
 };

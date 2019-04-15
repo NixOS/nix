@@ -244,9 +244,6 @@ void printVersion(const string & programName)
     std::cout << format("%1% (Nix) %2%") % programName % nixVersion << std::endl;
     if (verbosity > lvlInfo) {
         Strings cfg;
-#if HAVE_BOEHMGC
-        cfg.push_back("gc");
-#endif
 #if HAVE_SODIUM
         cfg.push_back("signed-caches");
 #endif

@@ -19,24 +19,14 @@
 #include <sys/time.h>
 #include <sys/resource.h>
 
-#if HAVE_BOEHMGC
-
-#include <gc/gc.h>
-#include <gc/gc_cpp.h>
-
-#endif
-
 namespace nix {
 
 
+// FIXME
 static char * dupString(const char * s)
 {
     char * t;
-#if HAVE_BOEHMGC
-    t = GC_STRDUP(s);
-#else
     t = strdup(s);
-#endif
     if (!t) throw std::bad_alloc();
     return t;
 }
@@ -85,6 +75,7 @@ static void printValue(std::ostream & str, std::set<const Value *> & active, con
         str << "}";
         break;
     }
+    case tList0:
     case tList1:
     case tList2:
     case tListN:
@@ -108,9 +99,11 @@ static void printValue(std::ostream & str, std::set<const Value *> & active, con
     case tPrimOpApp:
         str << "<PRIMOP-APP>";
         break;
+#if 0
     case tExternal:
         str << *v.external;
         break;
+#endif
     case tFloat:
         str << v.fpoint;
         break;
@@ -130,10 +123,10 @@ std::ostream & operator << (std::ostream & str, const Value & v)
 }
 
 
-const Value *getPrimOp(const Value &v) {
+const Value * getPrimOp(const Value & v) {
     const Value * primOp = &v;
     while (primOp->type == tPrimOpApp) {
-        primOp = primOp->primOpApp.left;
+        primOp = primOp->app.left;
     }
     assert(primOp->type == tPrimOp);
     return primOp;
@@ -149,7 +142,7 @@ string showType(const Value & v)
         case tPath: return "a path";
         case tNull: return "null";
         case tAttrs: return "a set";
-        case tList1: case tList2: case tListN: return "a list";
+        case tList0: case tList1: case tList2: case tListN: return "a list";
         case tThunk: return "a thunk";
         case tApp: return "a function application";
         case tLambda: return "a function";
@@ -158,21 +151,14 @@ string showType(const Value & v)
             return fmt("the built-in function '%s'", string(v.primOp->name));
         case tPrimOpApp:
             return fmt("the partially applied built-in function '%s'", string(getPrimOp(v)->primOp->name));
+#if 0
         case tExternal: return v.external->showType();
-        case tFloat: return "a float";
-    }
-    abort();
-}
-
-
-#if HAVE_BOEHMGC
-/* Called when the Boehm GC runs out of memory. */
-static void * oomHandler(size_t requested)
-{
-    /* Convert this to a proper C++ exception. */
-    throw std::bad_alloc();
-}
 #endif
+        case tFloat: return "a float";
+        default:
+            abort();
+    }
+}
 
 
 static Symbol getName(const AttrName & name, EvalState & state, Env & env)
@@ -193,46 +179,6 @@ static bool gcInitialised = false;
 void initGC()
 {
     if (gcInitialised) return;
-
-#if HAVE_BOEHMGC
-    /* Initialise the Boehm garbage collector. */
-
-    /* Don't look for interior pointers. This reduces the odds of
-       misdetection a bit. */
-    GC_set_all_interior_pointers(0);
-
-    /* We don't have any roots in data segments, so don't scan from
-       there. */
-    GC_set_no_dls(1);
-
-    GC_INIT();
-
-    GC_set_oom_fn(oomHandler);
-
-    /* Set the initial heap size to something fairly big (25% of
-       physical RAM, up to a maximum of 384 MiB) so that in most cases
-       we don't need to garbage collect at all.  (Collection has a
-       fairly significant overhead.)  The heap size can be overridden
-       through libgc's GC_INITIAL_HEAP_SIZE environment variable.  We
-       should probably also provide a nix.conf setting for this.  Note
-       that GC_expand_hp() causes a lot of virtual, but not physical
-       (resident) memory to be allocated.  This might be a problem on
-       systems that don't overcommit. */
-    if (!getenv("GC_INITIAL_HEAP_SIZE")) {
-        size_t size = 32 * 1024 * 1024;
-#if HAVE_SYSCONF && defined(_SC_PAGESIZE) && defined(_SC_PHYS_PAGES)
-        size_t maxSize = 384 * 1024 * 1024;
-        long pageSize = sysconf(_SC_PAGESIZE);
-        long pages = sysconf(_SC_PHYS_PAGES);
-        if (pageSize != -1)
-            size = (pageSize * pages) / 4; // 25% of RAM
-        if (size > maxSize) size = maxSize;
-#endif
-        debug(format("setting initial heap size to %1% bytes") % size);
-        GC_expand_hp(size);
-    }
-
-#endif
 
     gcInitialised = true;
 }
@@ -311,7 +257,9 @@ EvalState::EvalState(const Strings & _searchPath, ref<Store> store)
 
     assert(gcInitialised);
 
+#if 0
     static_assert(sizeof(Env) <= 16, "environment must be <= 16 bytes");
+#endif
 
     /* Initialise the Nix expression search path. */
     if (!evalSettings.pureEval) {
@@ -340,9 +288,7 @@ EvalState::EvalState(const Strings & _searchPath, ref<Store> store)
         }
     }
 
-    clearValue(vEmptySet);
-    vEmptySet.type = tAttrs;
-    vEmptySet.attrs = allocBindings(0);
+    emptyBindings = Bindings::allocBindings(0);
 
     createBaseEnv();
 }
@@ -441,9 +387,9 @@ Value * EvalState::addConstant(const string & name, Value & v)
     Value * v2 = allocValue();
     *v2 = v;
     staticBaseEnv.vars[symbols.create(name)] = baseEnvDispl;
-    baseEnv.values[baseEnvDispl++] = v2;
+    baseEnv->values[baseEnvDispl++] = v2;
     string name2 = string(name, 0, 2) == "__" ? string(name, 2) : name;
-    baseEnv.values[0]->attrs->push_back(Attr(symbols.create(name2), v2));
+    baseEnv->values[0]->attrs->push_back(Attr(symbols.create(name2), v2));
     return v2;
 }
 
@@ -462,15 +408,15 @@ Value * EvalState::addPrimOp(const string & name,
     v->type = tPrimOp;
     v->primOp = new PrimOp(primOp, arity, sym);
     staticBaseEnv.vars[symbols.create(name)] = baseEnvDispl;
-    baseEnv.values[baseEnvDispl++] = v;
-    baseEnv.values[0]->attrs->push_back(Attr(sym, v));
+    baseEnv->values[baseEnvDispl++] = v;
+    baseEnv->values[0]->attrs->push_back(Attr(sym, v));
     return v;
 }
 
 
 Value & EvalState::getBuiltin(const string & name)
 {
-    return *baseEnv.values[0]->attrs->find(symbols.create(name))->value;
+    return *baseEnv->values[0]->attrs->find(symbols.create(name))->value;
 }
 
 
@@ -556,8 +502,9 @@ Value & mkString(Value & v, const string & s, const PathSet & context)
     mkString(v, s.c_str());
     if (!context.empty()) {
         size_t n = 0;
+        // FIXME: store as Symbols?
         v.string.context = (const char * *)
-            allocBytes((context.size() + 1) * sizeof(char *));
+            malloc((context.size() + 1) * sizeof(char *));
         for (auto & i : context)
             v.string.context[n++] = dupString(i.c_str());
         v.string.context[n] = 0;
@@ -598,50 +545,41 @@ inline Value * EvalState::lookupVar(Env * env, const ExprVar & var, bool noEval)
 }
 
 
-std::atomic<uint64_t> nrValuesFreed{0};
-
-void finalizeValue(void * obj, void * data)
-{
-    nrValuesFreed++;
-}
-
-Value * EvalState::allocValue()
+Ptr<Value> EvalState::allocValue()
 {
     nrValues++;
-    auto v = (Value *) allocBytes(sizeof(Value));
-    //GC_register_finalizer_no_order(v, finalizeValue, nullptr, nullptr, nullptr);
-    return v;
+    return gc.alloc<Value>(Value::words());
 }
 
 
-Env & EvalState::allocEnv(size_t size)
+Ptr<Env> EvalState::allocEnv(size_t size)
 {
-    if (size > std::numeric_limits<decltype(Env::size)>::max())
+    if (size > std::numeric_limits<decltype(Env::size)>::max()) // FIXME
         throw Error("environment size %d is too big", size);
 
     nrEnvs++;
     nrValuesInEnvs += size;
-    Env * env = (Env *) allocBytes(sizeof(Env) + size * sizeof(Value *));
-    env->size = (decltype(Env::size)) size;
-    env->type = Env::Plain;
+    auto env = gc.alloc<Env>(Env::wordsFor(size), size);
 
+    // FIXME
     /* We assume that env->values has been cleared by the allocator; maybeThunk() and lookupVar fromWith expect this. */
 
-    return *env;
+    return env;
 }
 
 
 void EvalState::mkList(Value & v, size_t size)
 {
-    clearValue(v);
-    if (size == 1)
+    if (size == 0)
+        v.type = tList0;
+    else if (size == 1)
         v.type = tList1;
     else if (size == 2)
         v.type = tList2;
     else {
         v.type = tListN;
-        v.bigList.size = size;
-        v.bigList.elems = size ? (Value * *) allocBytes(size * sizeof(Value *)) : 0;
+        v.bigList = gc.alloc<PtrList<Value>>(
+            PtrList<Value>::wordsFor(size), tValueList, size);
     }
     nrListElems += size;
 }
@@ -704,25 +642,25 @@ Value * ExprVar::maybeThunk(EvalState & state, Env & env)
 Value * ExprString::maybeThunk(EvalState & state, Env & env)
 {
     nrAvoided++;
-    return &v;
+    return &*v;
 }
 
 Value * ExprInt::maybeThunk(EvalState & state, Env & env)
 {
     nrAvoided++;
-    return &v;
+    return &*v;
 }
 
 Value * ExprFloat::maybeThunk(EvalState & state, Env & env)
 {
     nrAvoided++;
-    return &v;
+    return &*v;
 }
 
 Value * ExprPath::maybeThunk(EvalState & state, Env & env)
 {
     nrAvoided++;
-    return &v;
+    return &*v;
 }
 
 
@@ -732,13 +670,13 @@ void EvalState::evalFile(const Path & path_, Value & v)
 
     FileEvalCache::iterator i;
     if ((i = fileEvalCache.find(path)) != fileEvalCache.end()) {
-        v = i->second;
+        v = *i->second;
         return;
     }
 
     Path path2 = resolveExprPath(path);
     if ((i = fileEvalCache.find(path2)) != fileEvalCache.end()) {
-        v = i->second;
+        v = *i->second;
         return;
     }
 
@@ -755,14 +693,18 @@ void EvalState::evalFile(const Path & path_, Value & v)
     fileParseCache[path2] = e;
 
     try {
-        eval(e, v);
+        auto v2 = allocValue();
+        eval(e, *v2);
+
+        v = *v2;
+
+        if (path != path2) fileEvalCache.emplace(path, v2);
+        fileEvalCache.emplace(path2, std::move(v2));
     } catch (Error & e) {
         addErrorPrefix(e, "while evaluating the file '%1%':\n", path2);
         throw;
     }
 
-    fileEvalCache[path2] = v;
-    if (path != path2) fileEvalCache[path] = v;
 }
 
 
@@ -815,24 +757,24 @@ void Expr::eval(EvalState & state, Env & env, Value & v)
 
 void ExprInt::eval(EvalState & state, Env & env, Value & v)
 {
-    v = this->v;
+    v = *this->v;
 }
 
 
 void ExprFloat::eval(EvalState & state, Env & env, Value & v)
 {
-    v = this->v;
+    v = *this->v;
 }
 
 void ExprString::eval(EvalState & state, Env & env, Value & v)
 {
-    v = this->v;
+    v = *this->v;
 }
 
 
 void ExprPath::eval(EvalState & state, Env & env, Value & v)
 {
-    v = this->v;
+    v = *this->v;
 }
 
 
@@ -877,7 +819,7 @@ void ExprAttrs::eval(EvalState & state, Env & env, Value & v)
         if (hasOverrides) {
             Value * vOverrides = (*v.attrs)[overrides->second.displ].value;
             state.forceAttrs(*vOverrides);
-            Bindings * newBnds = state.allocBindings(v.attrs->size() + vOverrides->attrs->size());
+            Bindings * newBnds = Bindings::allocBindings(v.attrs->size() + vOverrides->attrs->size());
             for (auto & i : *v.attrs)
                 newBnds->push_back(i);
             for (auto & i : *vOverrides->attrs) {
@@ -1065,7 +1007,7 @@ void EvalState::callPrimOp(Value & fun, Value & arg, Value & v, const Pos & pos)
     Value * primOp = &fun;
     while (primOp->type == tPrimOpApp) {
         argsDone++;
-        primOp = primOp->primOpApp.left;
+        primOp = primOp->app.left;
     }
     assert(primOp->type == tPrimOp);
     auto arity = primOp->primOp->arity;
@@ -1078,8 +1020,8 @@ void EvalState::callPrimOp(Value & fun, Value & arg, Value & v, const Pos & pos)
         Value * vArgs[arity];
         auto n = arity - 1;
         vArgs[n--] = &arg;
-        for (Value * arg = &fun; arg->type == tPrimOpApp; arg = arg->primOpApp.left)
-            vArgs[n--] = arg->primOpApp.right;
+        for (Value * arg = &fun; arg->type == tPrimOpApp; arg = arg->app.left)
+            vArgs[n--] = arg->app.right;
 
         /* And call the primop. */
         nrPrimOpCalls++;
@@ -1089,8 +1031,8 @@ void EvalState::callPrimOp(Value & fun, Value & arg, Value & v, const Pos & pos)
         Value * fun2 = allocValue();
         *fun2 = fun;
         v.type = tPrimOpApp;
-        v.primOpApp.left = fun2;
-        v.primOpApp.right = &arg;
+        v.app.left = fun2;
+        v.app.right = &arg;
     }
 }
 
@@ -1379,7 +1321,7 @@ void ExprConcatStrings::eval(EvalState & state, Env & env, Value & v)
     NixFloat nf = 0;
 
     bool first = !forceString;
-    ValueType firstType = tString;
+    Tag firstType = tString;
 
     for (auto & i : *es) {
         Value vTmp;
@@ -1594,8 +1536,10 @@ string EvalState::coerceToString(const Pos & pos, Value & v, PathSet & context,
         return coerceToString(pos, *i->value, context, coerceMore, copyToStore);
     }
 
+#if 0
     if (v.type == tExternal)
         return v.external->coerceToString(pos, context, coerceMore, copyToStore);
+#endif
 
     if (coerceMore) {
 
@@ -1692,6 +1636,7 @@ bool EvalState::eqValues(Value & v1, Value & v2)
         case tNull:
             return true;
 
+        case tList0:
         case tList1:
         case tList2:
         case tListN:
@@ -1727,8 +1672,10 @@ bool EvalState::eqValues(Value & v1, Value & v2)
         case tPrimOpApp:
             return false;
 
+#if 0
         case tExternal:
             return *v1.external == *v2.external;
+#endif
 
         case tFloat:
             return v1.fpoint == v2.fpoint;
@@ -1751,10 +1698,6 @@ void EvalState::printStats()
     uint64_t bValues = nrValues * sizeof(Value);
     uint64_t bAttrsets = nrAttrsets * sizeof(Bindings) + nrAttrsInAttrsets * sizeof(Attr);
 
-#if HAVE_BOEHMGC
-    GC_word heapSize, totalBytes;
-    GC_get_heap_usage_safe(&heapSize, 0, 0, 0, &totalBytes);
-#endif
     if (showStats) {
         auto outPath = getEnv("NIX_SHOW_STATS_PATH","-");
         std::fstream fs;
@@ -1804,13 +1747,6 @@ void EvalState::printStats()
         topObj.attr("nrLookups", nrLookups);
         topObj.attr("nrPrimOpCalls", nrPrimOpCalls);
         topObj.attr("nrFunctionCalls", nrFunctionCalls);
-#if HAVE_BOEHMGC
-        {
-            auto gc = topObj.object("gc");
-            gc.attr("heapSize", heapSize);
-            gc.attr("totalBytes", totalBytes);
-        }
-#endif
 
         if (countCalls) {
             {
@@ -1893,6 +1829,7 @@ size_t valueSize(Value & v)
                     sz += doValue(*i.value);
             }
             break;
+        case tList0:
         case tList1:
         case tList2:
         case tListN:
@@ -1914,14 +1851,16 @@ size_t valueSize(Value & v)
             sz += doEnv(*v.lambda.env);
             break;
         case tPrimOpApp:
-            sz += doValue(*v.primOpApp.left);
-            sz += doValue(*v.primOpApp.right);
+            sz += doValue(*v.app.left);
+            sz += doValue(*v.app.right);
             break;
+#if 0
         case tExternal:
             if (seen.find(v.external) != seen.end()) break;
             seen.insert(v.external);
             sz += v.external->valueSize(seen);
             break;
+#endif
         default:
             ;
         }
@@ -1949,6 +1888,7 @@ size_t valueSize(Value & v)
 }
 
 
+#if 0
 string ExternalValueBase::coerceToString(const Pos & pos, PathSet & context, bool copyMore, bool copyToStore) const
 {
     throw TypeError(format("cannot coerce %1% to a string, at %2%") %
@@ -1965,6 +1905,7 @@ bool ExternalValueBase::operator==(const ExternalValueBase & b) const
 std::ostream & operator << (std::ostream & str, const ExternalValueBase & v) {
     return v.print(str);
 }
+#endif
 
 
 EvalSettings evalSettings;

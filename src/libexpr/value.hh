@@ -1,34 +1,9 @@
 #pragma once
 
 #include "symbol-table.hh"
-
-#if HAVE_BOEHMGC
-#include <gc/gc_allocator.h>
-#endif
+#include "gc.hh"
 
 namespace nix {
-
-
-typedef enum {
-    tInt = 1,
-    tBool,
-    tString,
-    tPath,
-    tNull,
-    tAttrs,
-    tList1,
-    tList2,
-    tListN,
-    tThunk,
-    tApp,
-    tLambda,
-    tBlackhole,
-    tPrimOp,
-    tPrimOpApp,
-    tExternal,
-    tFloat
-} ValueType;
-
 
 class Bindings;
 struct Env;
@@ -46,6 +21,7 @@ class JSONPlaceholder;
 typedef int64_t NixInt;
 typedef double NixFloat;
 
+#if 0
 /* External values must descend from ExternalValueBase, so that
  * type-agnostic nix functions (e.g. showType) can be implemented
  */
@@ -90,11 +66,11 @@ class ExternalValueBase
 };
 
 std::ostream & operator << (std::ostream & str, const ExternalValueBase & v);
+#endif
 
 
-struct Value
+struct Value : Object
 {
-    ValueType type;
     union
     {
         NixInt integer;
@@ -127,10 +103,7 @@ struct Value
 
         const char * path;
         Bindings * attrs;
-        struct {
-            size_t size;
-            Value * * elems;
-        } bigList;
+        PtrList<Value> * bigList;
         Value * smallList[2];
         struct {
             Env * env;
@@ -144,46 +117,38 @@ struct Value
             ExprLambda * fun;
         } lambda;
         PrimOp * primOp;
-        struct {
-            Value * left, * right;
-        } primOpApp;
-        ExternalValueBase * external;
+        //ExternalValueBase * external;
         NixFloat fpoint;
     };
 
+    Value() : Object(tBlackhole, 0) { }
+
     bool isList() const
     {
-        return type == tList1 || type == tList2 || type == tListN;
+        return type >= tList0 && type <= tListN;
     }
 
     Value * * listElems()
     {
-        return type == tList1 || type == tList2 ? smallList : bigList.elems;
+        return type == tList0 || type == tList1 || type == tList2 ? smallList : bigList->elems;
     }
 
     const Value * const * listElems() const
     {
-        return type == tList1 || type == tList2 ? smallList : bigList.elems;
+        return type == tList0 || type == tList1 || type == tList2 ? smallList : bigList->elems;
     }
 
     size_t listSize() const
     {
-        return type == tList1 ? 1 : type == tList2 ? 2 : bigList.size;
+        return type == tList0 ? 0 : type == tList1 ? 1 : type == tList2 ? 2 : bigList->size();
     }
+
+    constexpr static Size words() { return 3; } // FIXME
 };
-
-
-/* After overwriting an app node, be sure to clear pointers in the
-   Value to ensure that the target isn't kept alive unnecessarily. */
-static inline void clearValue(Value & v)
-{
-    v.app.left = v.app.right = 0;
-}
 
 
 static inline void mkInt(Value & v, NixInt n)
 {
-    clearValue(v);
     v.type = tInt;
     v.integer = n;
 }
@@ -191,7 +156,6 @@ static inline void mkInt(Value & v, NixInt n)
 
 static inline void mkFloat(Value & v, NixFloat n)
 {
-    clearValue(v);
     v.type = tFloat;
     v.fpoint = n;
 }
@@ -199,7 +163,6 @@ static inline void mkFloat(Value & v, NixFloat n)
 
 static inline void mkBool(Value & v, bool b)
 {
-    clearValue(v);
     v.type = tBool;
     v.boolean = b;
 }
@@ -207,7 +170,6 @@ static inline void mkBool(Value & v, bool b)
 
 static inline void mkNull(Value & v)
 {
-    clearValue(v);
     v.type = tNull;
 }
 
@@ -247,7 +209,6 @@ void mkString(Value & v, const char * s);
 
 static inline void mkPathNoCopy(Value & v, const char * s)
 {
-    clearValue(v);
     v.type = tPath;
     v.path = s;
 }
@@ -262,13 +223,8 @@ void mkPath(Value & v, const char * s);
 size_t valueSize(Value & v);
 
 
-#if HAVE_BOEHMGC
-typedef std::vector<Value *, gc_allocator<Value *> > ValueVector;
-typedef std::map<Symbol, Value *, std::less<Symbol>, gc_allocator<std::pair<const Symbol, Value *> > > ValueMap;
-#else
-typedef std::vector<Value *> ValueVector;
-typedef std::map<Symbol, Value *> ValueMap;
-#endif
+typedef std::vector<Ptr<Value>> ValueVector; // FIXME: make more efficient
+typedef std::map<Symbol, Ptr<Value>> ValueMap; // FIXME: use Bindings?
 
 
 }

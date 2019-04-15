@@ -7,26 +7,25 @@
 namespace nix {
 
 
-/* Allocate a new array of attributes for an attribute set with a specific
-   capacity. The space is implicitly reserved after the Bindings
-   structure. */
-Bindings * EvalState::allocBindings(size_t capacity)
+/* Allocate a new array of attributes for an attribute set with a
+   specific capacity. The space is implicitly reserved after the
+   Bindings structure. */
+Ptr<Bindings> Bindings::allocBindings(size_t capacity)
 {
-    if (capacity > std::numeric_limits<Bindings::size_t>::max())
+    if (capacity >= 1UL << Object::miscBits)
         throw Error("attribute set of size %d is too big", capacity);
-    return new (allocBytes(sizeof(Bindings) + sizeof(Attr) * capacity)) Bindings((Bindings::size_t) capacity);
+    return gc.alloc<Bindings>(Bindings::wordsFor(capacity), capacity);
 }
 
 
 void EvalState::mkAttrs(Value & v, size_t capacity)
 {
+    v.type = tAttrs;
     if (capacity == 0) {
-        v = vEmptySet;
+        v.attrs = emptyBindings;
         return;
     }
-    clearValue(v);
-    v.type = tAttrs;
-    v.attrs = allocBindings(capacity);
+    v.attrs = Bindings::allocBindings(capacity);
     nrAttrsets++;
     nrAttrsInAttrsets += capacity;
 }
