@@ -1,4 +1,3 @@
-#include "primops/flake.hh"
 #include "eval.hh"
 #include "command.hh"
 #include "common-args.hh"
@@ -11,7 +10,7 @@ struct CmdBuild : MixDryRun, InstallablesCommand
 {
     Path outLink = "result";
 
-    std::optional<std::string> gitRepo = std::nullopt;
+    bool updateLock = true;
 
     CmdBuild()
     {
@@ -28,9 +27,9 @@ struct CmdBuild : MixDryRun, InstallablesCommand
             .set(&outLink, Path(""));
 
         mkFlag()
-            .longName("update-lock-file")
-            .description("update the lock file")
-            .dest(&gitRepo);
+            .longName("no-update")
+            .description("don't update the lock file")
+            .set(&updateLock, false);
     }
 
     std::string name() override
@@ -78,8 +77,11 @@ struct CmdBuild : MixDryRun, InstallablesCommand
                     }
         }
 
-        if (gitRepo)
-            updateLockFile(*evalState, *gitRepo);
+        // FlakeUri flakeUri = "";
+        // if(updateLock)
+        //     for (uint i = 0; i < installables.size(); i++)
+        //         // if (auto flakeUri = installableToFlakeUri)
+        //             updateLockFile(*evalState, flakeUri);
     }
 };
 

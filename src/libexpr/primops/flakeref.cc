@@ -19,7 +19,7 @@ const static std::string revOrRefRegex = "(?:(" + revRegexS + ")|(" + refRegex +
 // "master/e72daba8250068216d79d2aeef40d4d95aff6666").
 const static std::string refAndOrRevRegex = "(?:(" + revRegexS + ")|(?:(" + refRegex + ")(?:/(" + revRegexS + "))?))";
 
-const static std::string flakeId = "[a-zA-Z][a-zA-Z0-9_-]*";
+const static std::string flakeAlias = "[a-zA-Z][a-zA-Z0-9_-]*";
 
 // GitHub references.
 const static std::string ownerRegex = "[a-zA-Z][a-zA-Z0-9_-]*";
@@ -37,7 +37,7 @@ FlakeRef::FlakeRef(const std::string & uri, bool allowRelative)
     // FIXME: could combine this into one regex.
 
     static std::regex flakeRegex(
-        "(?:flake:)?(" + flakeId + ")(?:/(?:" + refAndOrRevRegex + "))?",
+        "(?:flake:)?(" + flakeAlias + ")(?:/(?:" + refAndOrRevRegex + "))?",
         std::regex::ECMAScript);
 
     static std::regex githubRegex(
@@ -55,14 +55,14 @@ FlakeRef::FlakeRef(const std::string & uri, bool allowRelative)
 
     std::cmatch match;
     if (std::regex_match(uri.c_str(), match, flakeRegex)) {
-        IsFlakeId d;
-        d.id = match[1];
+        IsAlias d;
+        d.alias = match[1];
         if (match[2].matched)
-            d.rev = Hash(match[2], htSHA1);
+            rev = Hash(match[2], htSHA1);
         else if (match[3].matched) {
-            d.ref = match[3];
+            ref = match[3];
             if (match[4].matched)
-                d.rev = Hash(match[4], htSHA1);
+                rev = Hash(match[4], htSHA1);
         }
         data = d;
     }
@@ -72,9 +72,9 @@ FlakeRef::FlakeRef(const std::string & uri, bool allowRelative)
         d.owner = match[1];
         d.repo = match[2];
         if (match[3].matched)
-            d.rev = Hash(match[3], htSHA1);
+            rev = Hash(match[3], htSHA1);
         else if (match[4].matched) {
-            d.ref = match[4];
+            ref = match[4];
         }
         data = d;
     }
@@ -92,16 +92,16 @@ FlakeRef::FlakeRef(const std::string & uri, bool allowRelative)
             if (name == "rev") {
                 if (!std::regex_match(value, revRegex))
                     throw Error("invalid Git revision '%s'", value);
-                d.rev = Hash(value, htSHA1);
+                rev = Hash(value, htSHA1);
             } else if (name == "ref") {
                 if (!std::regex_match(value, refRegex2))
                     throw Error("invalid Git ref '%s'", value);
-                d.ref = value;
+                ref = value;
             } else
                 // FIXME: should probably pass through unknown parameters
                 throw Error("invalid Git flake reference parameter '%s', in '%s'", name, uri);
         }
-        if (d.rev && !d.ref)
+        if (rev && !ref)
             throw Error("flake URI '%s' lacks a Git ref", uri);
         data = d;
     }
@@ -118,66 +118,40 @@ FlakeRef::FlakeRef(const std::string & uri, bool allowRelative)
 
 std::string FlakeRef::to_string() const
 {
-    if (auto refData = std::get_if<FlakeRef::IsFlakeId>(&data)) {
-        return
-            "flake:" + refData->id +
-            (refData->ref ? "/" + *refData->ref : "") +
-            (refData->rev ? "/" + refData->rev->to_string(Base16, false) : "");
-    }
+    std::string string;
+    if (auto refData = std::get_if<FlakeRef::IsAlias>(&data))
+        string = "flake:" + refData->alias;
 
     else if (auto refData = std::get_if<FlakeRef::IsGitHub>(&data)) {
-        assert(!refData->ref || !refData->rev);
-        return
-            "github:" + refData->owner + "/" + refData->repo +
-            (refData->ref ? "/" + *refData->ref : "") +
-            (refData->rev ? "/" + refData->rev->to_string(Base16, false) : "");
+        assert(!ref || !rev);
+        string = "github:" + refData->owner + "/" + refData->repo;
     }
 
     else if (auto refData = std::get_if<FlakeRef::IsGit>(&data)) {
-        assert(refData->ref || !refData->rev);
-        return
-            refData->uri +
-            (refData->ref ? "?ref=" + *refData->ref : "") +
-            (refData->rev ? "&rev=" + refData->rev->to_string(Base16, false) : "");
+        assert(ref || !rev);
+        string = refData->uri;
     }
 
-    else if (auto refData = std::get_if<FlakeRef::IsPath>(&data)) {
+    else if (auto refData = std::get_if<FlakeRef::IsPath>(&data))
         return refData->path;
-    }
 
     else abort();
+
+    string += (ref ? "/" + *ref : "") +
+              (rev ? "/" + rev->to_string(Base16, false) : "");
+    return string;
 }
 
 bool FlakeRef::isImmutable() const
 {
-    if (auto refData = std::get_if<FlakeRef::IsFlakeId>(&data))
-        return (bool) refData->rev;
-
-    else if (auto refData = std::get_if<FlakeRef::IsGitHub>(&data))
-        return (bool) refData->rev;
-
-    else if (auto refData = std::get_if<FlakeRef::IsGit>(&data))
-        return (bool) refData->rev;
-
-    else if (std::get_if<FlakeRef::IsPath>(&data))
-        return false;
-
-    else abort();
+    return (bool) rev;
 }
 
 FlakeRef FlakeRef::baseRef() const // Removes the ref and rev from a FlakeRef.
 {
     FlakeRef result(*this);
-    if (auto refData = std::get_if<FlakeRef::IsGitHub>(&result.data)) {
-        refData->ref = std::nullopt;
-        refData->rev = std::nullopt;
-    } else if (auto refData = std::get_if<FlakeRef::IsGit>(&result.data)) {
-        refData->ref = std::nullopt;
-        refData->rev = std::nullopt;
-    } else if (auto refData = std::get_if<FlakeRef::IsGit>(&result.data)) {
-        refData->ref = std::nullopt;
-        refData->rev = std::nullopt;
-    }
+    result.ref = std::nullopt;
+    result.rev = std::nullopt;
     return result;
 }
 }
