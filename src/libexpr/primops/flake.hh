@@ -35,7 +35,7 @@ Value * makeFlakeValue(EvalState & state, const FlakeRef & flakeRef, bool impure
 
 std::shared_ptr<FlakeRegistry> readRegistry(const Path &);
 
-void writeRegistry(FlakeRegistry, Path);
+void writeRegistry(const FlakeRegistry &, Path);
 
 struct Flake
 {

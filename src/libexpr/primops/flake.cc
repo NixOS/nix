@@ -12,8 +12,7 @@
 
 namespace nix {
 
-/* Read the registry or a lock file. (Currently they have an identical
-   format. */
+/* Read a registry. */
 std::shared_ptr<FlakeRegistry> readRegistry(const Path & path)
 {
     auto registry = std::make_shared<FlakeRegistry>();
@@ -34,8 +33,8 @@ std::shared_ptr<FlakeRegistry> readRegistry(const Path & path)
     return registry;
 }
 
-/* Write the registry or lock file to a file. */
-void writeRegistry(FlakeRegistry registry, Path path)
+/* Write a registry to a file. */
+void writeRegistry(const FlakeRegistry & registry, Path path)
 {
     nlohmann::json json;
     json["version"] = 1;
