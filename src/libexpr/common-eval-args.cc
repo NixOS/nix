@@ -26,6 +26,13 @@ MixEvalArgs::MixEvalArgs()
         .description("add a path to the list of locations used to look up <...> file names")
         .label("path")
         .handler([&](std::string s) { searchPath.push_back(s); });
+
+    mkFlag()
+        .longName("impure")
+        .description("allow access to mutable paths and repositories")
+        .handler([&](std::vector<std::string> ss) {
+            evalSettings.pureEval = false;
+        });
 }
 
 Bindings * MixEvalArgs::getAutoArgs(EvalState & state)

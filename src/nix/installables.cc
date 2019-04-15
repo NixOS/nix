@@ -20,13 +20,6 @@ SourceExprCommand::SourceExprCommand()
         .label("file")
         .description("evaluate a set of attributes from FILE (deprecated)")
         .dest(&file);
-
-    mkFlag()
-        .longName("impure")
-        .description("allow access to mutable paths and repositories")
-        .handler([&](std::vector<std::string> ss) {
-            evalSettings.pureEval = false;
-        });
 }
 
 ref<EvalState> SourceExprCommand::getEvalState()
