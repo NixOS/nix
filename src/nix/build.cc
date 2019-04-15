@@ -10,7 +10,7 @@ struct CmdBuild : MixDryRun, InstallablesCommand
 {
     Path outLink = "result";
 
-    bool updateLock = true;
+    bool update = true;
 
     CmdBuild()
     {
@@ -29,7 +29,7 @@ struct CmdBuild : MixDryRun, InstallablesCommand
         mkFlag()
             .longName("no-update")
             .description("don't update the lock file")
-            .set(&updateLock, false);
+            .set(&update, false);
     }
 
     std::string name() override
@@ -77,11 +77,12 @@ struct CmdBuild : MixDryRun, InstallablesCommand
                     }
         }
 
-        // FlakeUri flakeUri = "";
-        // if(updateLock)
-        //     for (uint i = 0; i < installables.size(); i++)
-        //         // if (auto flakeUri = installableToFlakeUri)
-        //             updateLockFile(*evalState, flakeUri);
+        if (update)
+            for (auto installable : installables) {
+                auto flakeUri = installable->installableToFlakeUri();
+                if (flakeUri)
+                    updateLockFile(*evalState, *flakeUri);
+            }
     }
 };
 
