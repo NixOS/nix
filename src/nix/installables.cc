@@ -146,10 +146,10 @@ struct InstallableFlake : InstallableValue
 
     Value * toValue(EvalState & state) override
     {
-        auto vTemp = state.allocValue();
-        auto vFlake = *makeFlakeValue(state, flakeRef, true, *vTemp);
+        auto vFlake = state.allocValue();
+        makeFlakeValue(state, flakeRef, true, *vFlake);
 
-        auto vProvides = (*vFlake.attrs->get(state.symbols.create("provides")))->value;
+        auto vProvides = (*vFlake->attrs->get(state.symbols.create("provides")))->value;
 
         state.forceValue(*vProvides);
 

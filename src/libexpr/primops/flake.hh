@@ -31,7 +31,7 @@ Path getUserRegistryPath();
 
 Value * makeFlakeRegistryValue(EvalState & state);
 
-Value * makeFlakeValue(EvalState & state, const FlakeRef & flakeRef, bool impureTopRef, Value & v);
+void makeFlakeValue(EvalState & state, const FlakeRef & flakeRef, bool impureTopRef, Value & v);
 
 std::shared_ptr<FlakeRegistry> readRegistry(const Path &);
 

@@ -304,6 +304,7 @@ Flake getFlake(EvalState & state, const FlakeRef & flakeRef, bool impureIsAllowe
 
     state.forceAttrs(vInfo);
 
+    // FIXME: change to "id"?
     if (auto name = vInfo.attrs->get(state.sName))
         flake.id = state.forceStringNoCtx(*(**name).value, *(**name).pos);
     else
@@ -423,48 +424,45 @@ void updateLockFile(EvalState & state, Path path)
     }
 }
 
-// Return the `provides` of the top flake, while assigning to `v` the provides
-// of the dependencies as well.
-Value * makeFlakeValue(EvalState & state, const FlakeRef & flakeRef, bool impureTopRef, Value & v)
+void callFlake(EvalState & state, const Dependencies & flake, Value & v)
 {
-    Dependencies deps = resolveFlake(state, flakeRef, impureTopRef);
+    // Construct the resulting attrset '{description, provides,
+    // ...}'. This attrset is passed lazily as an argument to 'provides'.
 
-    // FIXME: we should call each flake with only its dependencies
-    // (rather than the closure of the top-level flake).
+    state.mkAttrs(v, flake.flakeDeps.size() + flake.nonFlakeDeps.size() + 4);
 
-    auto vResult = state.allocValue();
-    // This will store the attribute set of the `nonFlakeRequires` and the `requires.provides`.
-
-    state.mkAttrs(*vResult, deps.flakeDeps.size());
-
-    Value * vTop = state.allocAttr(*vResult, deps.flake.id);
-
-    for (auto & dep : deps.flakeDeps) {
-        Flake flake = dep.flake;
-        auto vFlake = state.allocAttr(*vResult, flake.id);
-
-        state.mkAttrs(*vFlake, 4);
-
-        mkString(*state.allocAttr(*vFlake, state.sDescription), flake.description);
-
-        state.store->assertStorePath(flake.path);
-        mkString(*state.allocAttr(*vFlake, state.sOutPath), flake.path, {flake.path});
-
-        if (flake.revCount)
-            mkInt(*state.allocAttr(*vFlake, state.symbols.create("revCount")), *flake.revCount);
-
-        auto vProvides = state.allocAttr(*vFlake, state.symbols.create("provides"));
-        mkApp(*vProvides, *flake.vProvides, *vResult);
-
-        vFlake->attrs->sort();
+    for (auto & dep : flake.flakeDeps) {
+        auto vFlake = state.allocAttr(v, dep.flake.id);
+        callFlake(state, dep, *vFlake);
     }
 
-    vResult->attrs->sort();
+    for (auto & dep : flake.nonFlakeDeps) {
+        auto vNonFlake = state.allocAttr(v, dep.alias);
+        state.mkAttrs(*vNonFlake, 4);
 
-    v = *vResult;
+        state.store->isValidPath(dep.path);
+        mkString(*state.allocAttr(*vNonFlake, state.sOutPath), dep.path, {dep.path});
+    }
 
-    assert(vTop);
-    return vTop;
+    mkString(*state.allocAttr(v, state.sDescription), flake.flake.description);
+
+    state.store->isValidPath(flake.flake.path);
+    mkString(*state.allocAttr(v, state.sOutPath), flake.flake.path, {flake.flake.path});
+
+    if (flake.flake.revCount)
+        mkInt(*state.allocAttr(v, state.symbols.create("revCount")), *flake.flake.revCount);
+
+    auto vProvides = state.allocAttr(v, state.symbols.create("provides"));
+    mkApp(*vProvides, *flake.flake.vProvides, v);
+
+    v.attrs->sort();
+}
+
+// Return the `provides` of the top flake, while assigning to `v` the provides
+// of the dependencies as well.
+void makeFlakeValue(EvalState & state, const FlakeRef & flakeRef, bool impureTopRef, Value & v)
+{
+    callFlake(state, resolveFlake(state, flakeRef, impureTopRef), v);
 }
 
 // This function is exposed to be used in nix files.
