@@ -3,13 +3,15 @@
 
   description = "The purely functional package manager";
 
-  requires = [ flake:nixpkgs ];
+  epoch = 2019;
 
-  provides = flakes: rec {
+  requires = [ "nixpkgs" ];
+
+  provides = deps: rec {
 
     hydraJobs = import ./release.nix {
-      nix = flakes.nix; # => flakes.self?
-      nixpkgs = flakes.nixpkgs;
+      nix = deps.self;
+      nixpkgs = deps.nixpkgs;
     };
 
     packages.nix = hydraJobs.build.x86_64-linux;

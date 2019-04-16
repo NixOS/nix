@@ -441,6 +441,8 @@ void callFlake(EvalState & state, const Dependencies & flake, Value & v)
     auto vProvides = state.allocAttr(v, state.symbols.create("provides"));
     mkApp(*vProvides, *flake.flake.vProvides, v);
 
+    v.attrs->push_back(Attr(state.symbols.create("self"), &v));
+
     v.attrs->sort();
 }
 
