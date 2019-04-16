@@ -63,6 +63,8 @@ struct NonFlake
     NonFlake(const FlakeRef flakeRef) : ref(flakeRef) {};
 };
 
+std::shared_ptr<FlakeRegistry> getGlobalRegistry();
+
 Flake getFlake(EvalState &, const FlakeRef &, bool impureIsAllowed);
 
 struct Dependencies
