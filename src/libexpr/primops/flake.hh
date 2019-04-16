@@ -18,12 +18,12 @@ struct LockFile
     struct FlakeEntry
     {
         FlakeRef ref;
-        std::map<FlakeId, FlakeEntry> flakeEntries;
+        std::map<FlakeRef, FlakeEntry> flakeEntries;
         std::map<FlakeId, FlakeRef> nonFlakeEntries;
         FlakeEntry(const FlakeRef & flakeRef) : ref(flakeRef) {};
     };
 
-    std::map<FlakeId, FlakeEntry> flakeEntries;
+    std::map<FlakeRef, FlakeEntry> flakeEntries;
     std::map<FlakeId, FlakeRef> nonFlakeEntries;
 };
 
@@ -54,7 +54,6 @@ struct Flake
     std::string description;
     FlakeSourceInfo sourceInfo;
     std::vector<FlakeRef> requires;
-    LockFile lockFile;
     std::map<FlakeAlias, FlakeRef> nonFlakeRequires;
     Value * vProvides; // FIXME: gc
     Flake(const FlakeRef & flakeRef, FlakeSourceInfo && sourceInfo)

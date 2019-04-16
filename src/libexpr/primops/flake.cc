@@ -106,7 +106,7 @@ nlohmann::json flakeEntryToJson(const LockFile::FlakeEntry & entry)
     for (auto & x : entry.nonFlakeEntries)
         json["nonFlakeRequires"][x.first]["uri"] = x.second.to_string();
     for (auto & x : entry.flakeEntries)
-        json["requires"][x.first] = flakeEntryToJson(x.second);
+        json["requires"][x.first.to_string()] = flakeEntryToJson(x.second);
     return json;
 }
 
@@ -119,7 +119,7 @@ void writeLockFile(const LockFile & lockFile, const Path & path)
         json["nonFlakeRequires"][x.first]["uri"] = x.second.to_string();
     json["requires"] = nlohmann::json::object();
     for (auto & x : lockFile.flakeEntries)
-        json["requires"][x.first] = flakeEntryToJson(x.second);
+        json["requires"][x.first.to_string()] = flakeEntryToJson(x.second);
     createDirs(dirOf(path));
     writeFile(path, json.dump(4)); // '4' = indentation in json file
 }
@@ -312,10 +312,6 @@ Flake getFlake(EvalState & state, const FlakeRef & flakeRef, bool impureIsAllowe
     } else
         throw Error("flake lacks attribute 'provides'");
 
-    Path lockFile = sourceInfo.storePath + "/flake.lock"; // FIXME: symlink attack
-
-    flake.lockFile = readLockFile(lockFile);
-
     return flake;
 }
 
@@ -355,13 +351,23 @@ Dependencies resolveFlake(EvalState & state, const FlakeRef & topRef,
 {
     Flake flake = getFlake(state, topRef,
         registryAccess == AllowRegistry || (registryAccess == AllowRegistryAtTop && isTopFlake));
+
+    LockFile lockFile;
+
+    if (isTopFlake)
+        lockFile = readLockFile(flake.sourceInfo.storePath + "/flake.lock"); // FIXME: symlink attack
+
     Dependencies deps(flake);
 
     for (auto & nonFlakeInfo : flake.nonFlakeRequires)
         deps.nonFlakeDeps.push_back(getNonFlake(state, nonFlakeInfo.second, nonFlakeInfo.first));
 
-    for (auto & newFlakeRef : flake.requires)
+    for (auto newFlakeRef : flake.requires) {
+        auto i = lockFile.flakeEntries.find(newFlakeRef);
+        if (i != lockFile.flakeEntries.end()) newFlakeRef = i->second.ref;
+        // FIXME: propagate lockFile downwards
         deps.flakeDeps.push_back(resolveFlake(state, newFlakeRef, registryAccess, false));
+    }
 
     return deps;
 }
