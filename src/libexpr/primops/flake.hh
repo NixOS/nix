@@ -33,7 +33,7 @@ void makeFlakeValue(EvalState & state, const FlakeRef & flakeRef, bool impureTop
 
 std::shared_ptr<FlakeRegistry> readRegistry(const Path &);
 
-void writeRegistry(const FlakeRegistry &, Path);
+void writeRegistry(const FlakeRegistry &, const Path &);
 
 struct Flake
 {
@@ -75,7 +75,8 @@ struct Dependencies
 
 Dependencies resolveFlake(EvalState &, const FlakeRef &, bool impureTopRef, bool isTopFlake = true);
 
-FlakeRegistry updateLockFile(EvalState &, Flake &);
+FlakeRegistry updateLockFile(EvalState &, const Flake &);
 
-void updateLockFile(EvalState &, Path path);
+void updateLockFile(EvalState &, const Path & path);
+
 }

@@ -34,7 +34,7 @@ std::shared_ptr<FlakeRegistry> readRegistry(const Path & path)
 }
 
 /* Write a registry to a file. */
-void writeRegistry(const FlakeRegistry & registry, Path path)
+void writeRegistry(const FlakeRegistry & registry, const Path & path)
 {
     nlohmann::json json;
     json["version"] = 1;
@@ -99,7 +99,7 @@ LockFile readLockFile(const Path & path)
     return lockFile;
 }
 
-nlohmann::json flakeEntryToJson(LockFile::FlakeEntry & entry)
+nlohmann::json flakeEntryToJson(const LockFile::FlakeEntry & entry)
 {
     nlohmann::json json;
     json["uri"] = entry.ref.to_string();
@@ -110,7 +110,7 @@ nlohmann::json flakeEntryToJson(LockFile::FlakeEntry & entry)
     return json;
 }
 
-void writeLockFile(LockFile lockFile, Path path)
+void writeLockFile(const LockFile & lockFile, const Path & path)
 {
     nlohmann::json json;
     json["version"] = 1;
@@ -156,7 +156,8 @@ const std::vector<std::shared_ptr<FlakeRegistry>> EvalState::getFlakeRegistries(
 }
 
 static FlakeRef lookupFlake(EvalState & state, const FlakeRef & flakeRef,
-    std::vector<std::shared_ptr<FlakeRegistry>> registries, std::vector<FlakeRef> pastSearches = {})
+    const std::vector<std::shared_ptr<FlakeRegistry>> & registries,
+    std::vector<FlakeRef> pastSearches = {})
 {
     for (std::shared_ptr<FlakeRegistry> registry : registries) {
         auto i = registry->entries.find(flakeRef);
@@ -362,14 +363,14 @@ Dependencies resolveFlake(EvalState & state, const FlakeRef & topRef, bool impur
     return deps;
 }
 
-LockFile::FlakeEntry dependenciesToFlakeEntry(Dependencies & deps)
+LockFile::FlakeEntry dependenciesToFlakeEntry(const Dependencies & deps)
 {
     LockFile::FlakeEntry entry(deps.flake.ref);
 
-    for (Dependencies & deps : deps.flakeDeps)
+    for (auto & deps : deps.flakeDeps)
         entry.flakeEntries.insert_or_assign(deps.flake.id, dependenciesToFlakeEntry(deps));
 
-    for (NonFlake & nonFlake : deps.nonFlakeDeps)
+    for (auto & nonFlake : deps.nonFlakeDeps)
         entry.nonFlakeEntries.insert_or_assign(nonFlake.alias, nonFlake.ref);
 
     return entry;
@@ -385,7 +386,7 @@ LockFile getLockFile(EvalState & evalState, FlakeRef & flakeRef)
     return lockFile;
 }
 
-void updateLockFile(EvalState & state, Path path)
+void updateLockFile(EvalState & state, const Path & path)
 {
     // 'path' is the path to the local flake repo.
     FlakeRef flakeRef = FlakeRef("file://" + path);
