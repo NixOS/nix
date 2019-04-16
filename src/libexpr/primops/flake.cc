@@ -188,13 +188,6 @@ static FlakeRef lookupFlake(EvalState & state, const FlakeRef & flakeRef,
     return flakeRef;
 }
 
-struct FlakeSourceInfo
-{
-    Path storePath;
-    std::optional<Hash> rev;
-    std::optional<uint64_t> revCount;
-};
-
 static FlakeSourceInfo fetchFlake(EvalState & state, const FlakeRef flakeRef, bool impureIsAllowed = false)
 {
     FlakeRef fRef = lookupFlake(state, flakeRef,
@@ -226,9 +219,11 @@ static FlakeSourceInfo fetchFlake(EvalState & state, const FlakeRef flakeRef, bo
         if (result.etag->size() != 42 || (*result.etag)[0] != '"' || (*result.etag)[41] != '"')
             throw Error("ETag header '%s' from '%s' is not a Git revision", *result.etag, url);
 
-        FlakeSourceInfo info;
+        FlakeSourceInfo info(fRef);
         info.storePath = result.path;
         info.rev = Hash(std::string(*result.etag, 1, result.etag->size() - 2), htSHA1);
+        info.flakeRef.rev = info.rev;
+        info.flakeRef.ref = {};
 
         return info;
     }
@@ -237,10 +232,12 @@ static FlakeSourceInfo fetchFlake(EvalState & state, const FlakeRef flakeRef, bo
     else if (auto refData = std::get_if<FlakeRef::IsGit>(&fRef.data)) {
         auto gitInfo = exportGit(state.store, refData->uri, fRef.ref,
             fRef.rev ? fRef.rev->to_string(Base16, false) : "", "source");
-        FlakeSourceInfo info;
+        FlakeSourceInfo info(fRef);
         info.storePath = gitInfo.storePath;
         info.rev = Hash(gitInfo.rev, htSHA1);
         info.revCount = gitInfo.revCount;
+        info.flakeRef.rev = info.rev;
+        // FIXME: ensure info.flakeRef.ref is set.
         return info;
     }
 
@@ -248,10 +245,11 @@ static FlakeSourceInfo fetchFlake(EvalState & state, const FlakeRef flakeRef, bo
         if (!pathExists(refData->path + "/.git"))
             throw Error("flake '%s' does not reference a Git repository", refData->path);
         auto gitInfo = exportGit(state.store, refData->path, {}, "", "source");
-        FlakeSourceInfo info;
+        FlakeSourceInfo info(fRef);
         info.storePath = gitInfo.storePath;
         info.rev = Hash(gitInfo.rev, htSHA1);
         info.revCount = gitInfo.revCount;
+        info.flakeRef.rev = info.rev;
         return info;
     }
 
@@ -265,24 +263,21 @@ Flake getFlake(EvalState & state, const FlakeRef & flakeRef, bool impureIsAllowe
     debug("got flake source '%s' with revision %s",
         sourceInfo.storePath, sourceInfo.rev.value_or(Hash(htSHA1)).to_string(Base16, false));
 
-    auto flakePath = sourceInfo.storePath;
-    state.store->assertStorePath(flakePath);
+    state.store->assertStorePath(sourceInfo.storePath);
 
     if (state.allowedPaths)
-        state.allowedPaths->insert(flakePath);
+        state.allowedPaths->insert(sourceInfo.storePath);
 
-    Flake flake(flakeRef);
+    Flake flake(flakeRef, std::move(sourceInfo));
     if (std::get_if<FlakeRef::IsGitHub>(&flakeRef.data)) {
-        if (sourceInfo.rev)
+        // FIXME: ehm?
+        if (flake.sourceInfo.rev)
             flake.ref = FlakeRef(flakeRef.baseRef().to_string()
-                + "/" + sourceInfo.rev->to_string(Base16, false));
+                + "/" + flake.sourceInfo.rev->to_string(Base16, false));
     }
 
-    flake.path = flakePath;
-    flake.revCount = sourceInfo.revCount;
-
     Value vInfo;
-    state.evalFile(flakePath + "/flake.nix", vInfo); // FIXME: symlink attack
+    state.evalFile(sourceInfo.storePath + "/flake.nix", vInfo); // FIXME: symlink attack
 
     state.forceAttrs(vInfo);
 
@@ -317,7 +312,7 @@ Flake getFlake(EvalState & state, const FlakeRef & flakeRef, bool impureIsAllowe
     } else
         throw Error("flake lacks attribute 'provides'");
 
-    const Path lockFile = flakePath + "/flake.lock"; // FIXME: symlink attack
+    Path lockFile = sourceInfo.storePath + "/flake.lock"; // FIXME: symlink attack
 
     flake.lockFile = readLockFile(lockFile);
 
@@ -373,7 +368,7 @@ Dependencies resolveFlake(EvalState & state, const FlakeRef & topRef,
 
 LockFile::FlakeEntry dependenciesToFlakeEntry(const Dependencies & deps)
 {
-    LockFile::FlakeEntry entry(deps.flake.ref);
+    LockFile::FlakeEntry entry(deps.flake.sourceInfo.flakeRef);
 
     for (auto & deps : deps.flakeDeps)
         entry.flakeEntries.insert_or_assign(deps.flake.id, dependenciesToFlakeEntry(deps));
@@ -396,7 +391,10 @@ static LockFile makeLockFile(EvalState & evalState, FlakeRef & flakeRef)
 
 void updateLockFile(EvalState & state, const Path & path)
 {
-    FlakeRef flakeRef = FlakeRef("file://" + path); // FIXME: ugly
+    // FIXME: don't copy 'path' to the store (especially since we
+    // dirty it immediately afterwards).
+
+    FlakeRef flakeRef = FlakeRef(path); // FIXME: ugly
     auto lockFile = makeLockFile(state, flakeRef);
     writeLockFile(lockFile, path + "/flake.lock");
 
@@ -427,11 +425,12 @@ void callFlake(EvalState & state, const Dependencies & flake, Value & v)
 
     mkString(*state.allocAttr(v, state.sDescription), flake.flake.description);
 
-    state.store->isValidPath(flake.flake.path);
-    mkString(*state.allocAttr(v, state.sOutPath), flake.flake.path, {flake.flake.path});
+    auto & path = flake.flake.sourceInfo.storePath;
+    state.store->isValidPath(path);
+    mkString(*state.allocAttr(v, state.sOutPath), path, {path});
 
-    if (flake.flake.revCount)
-        mkInt(*state.allocAttr(v, state.symbols.create("revCount")), *flake.flake.revCount);
+    if (flake.flake.sourceInfo.revCount)
+        mkInt(*state.allocAttr(v, state.symbols.create("revCount")), *flake.flake.sourceInfo.revCount);
 
     auto vProvides = state.allocAttr(v, state.symbols.create("provides"));
     mkApp(*vProvides, *flake.flake.vProvides, v);

@@ -37,20 +37,28 @@ std::shared_ptr<FlakeRegistry> readRegistry(const Path &);
 
 void writeRegistry(const FlakeRegistry &, const Path &);
 
+struct FlakeSourceInfo
+{
+    FlakeRef flakeRef;
+    Path storePath;
+    std::optional<Hash> rev;
+    std::optional<uint64_t> revCount;
+    // date
+    FlakeSourceInfo(const FlakeRef & flakeRef) : flakeRef(flakeRef) { }
+};
+
 struct Flake
 {
     FlakeId id;
     FlakeRef ref;
     std::string description;
-    Path path;
-    std::optional<uint64_t> revCount;
+    FlakeSourceInfo sourceInfo;
     std::vector<FlakeRef> requires;
     LockFile lockFile;
     std::map<FlakeAlias, FlakeRef> nonFlakeRequires;
     Value * vProvides; // FIXME: gc
-    // date
-    // content hash
-    Flake(const FlakeRef flakeRef) : ref(flakeRef) {};
+    Flake(const FlakeRef & flakeRef, FlakeSourceInfo && sourceInfo)
+        : ref(flakeRef), sourceInfo(sourceInfo) {};
 };
 
 struct NonFlake

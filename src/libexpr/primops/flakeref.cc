@@ -123,7 +123,7 @@ std::string FlakeRef::to_string() const
         string = refData->alias;
 
     else if (auto refData = std::get_if<FlakeRef::IsGitHub>(&data)) {
-        assert(!ref || !rev);
+        assert(!(ref && rev));
         string = "github:" + refData->owner + "/" + refData->repo;
     }
 
