@@ -5,7 +5,7 @@
 namespace nix {
 
 // A Git ref (i.e. branch or tag name).
-const static std::string refRegex = "[a-zA-Z][a-zA-Z0-9_.-]*"; // FIXME: check
+const static std::string refRegex = "[a-zA-Z0-9][a-zA-Z0-9_.-]*"; // FIXME: check
 
 // A Git revision (a SHA-1 commit hash).
 const static std::string revRegexS = "[0-9a-fA-F]{40}";
