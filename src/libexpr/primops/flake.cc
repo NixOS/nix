@@ -399,6 +399,10 @@ void updateLockFile(EvalState & state, const Path & path)
     FlakeRef flakeRef = FlakeRef("file://" + path); // FIXME: ugly
     auto lockFile = makeLockFile(state, flakeRef);
     writeLockFile(lockFile, path + "/flake.lock");
+
+    // Hack: Make sure that flake.lock is visible to Git. Otherwise,
+    // exportGit will fail to copy it to the Nix store.
+    runProgram("git", true, { "-C", path, "add", "flake.lock" });
 }
 
 void callFlake(EvalState & state, const Dependencies & flake, Value & v)
