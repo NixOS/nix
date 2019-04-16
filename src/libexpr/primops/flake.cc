@@ -114,9 +114,10 @@ void writeLockFile(LockFile lockFile, Path path)
 {
     nlohmann::json json;
     json["version"] = 1;
-    json["nonFlakeRequires"];
+    json["nonFlakeRequires"] = nlohmann::json::object();
     for (auto & x : lockFile.nonFlakeEntries)
         json["nonFlakeRequires"][x.first]["uri"] = x.second.to_string();
+    json["requires"] = nlohmann::json::object();
     for (auto & x : lockFile.flakeEntries)
         json["requires"][x.first] = flakeEntryToJson(x.second);
     createDirs(dirOf(path));
