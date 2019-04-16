@@ -80,7 +80,7 @@ struct CmdFlakeDeps : FlakeCommand, MixJSON, StoreCommand, MixEvalArgs
 
         FlakeRef flakeRef(flakeUri);
 
-        Dependencies deps = resolveFlake(*evalState, flakeRef, true);
+        Dependencies deps = resolveFlake(*evalState, flakeRef, AllowRegistryAtTop);
 
         std::queue<Dependencies> todo;
         todo.push(deps);

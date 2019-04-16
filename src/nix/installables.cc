@@ -21,6 +21,11 @@ SourceExprCommand::SourceExprCommand()
         .label("file")
         .description("evaluate a set of attributes from FILE (deprecated)")
         .dest(&file);
+
+    mkFlag()
+        .longName("no-update")
+        .description("don't create/update flake lock files")
+        .set(&updateLockFile, false);
 }
 
 ref<EvalState> SourceExprCommand::getEvalState()
@@ -147,8 +152,13 @@ struct InstallableFlake : InstallableValue
 
     Value * toValue(EvalState & state) override
     {
+        auto path = std::get_if<FlakeRef::IsPath>(&flakeRef.data);
+        if (cmd.updateLockFile && path) {
+            updateLockFile(state, path->path);
+        }
+
         auto vFlake = state.allocValue();
-        makeFlakeValue(state, flakeRef, true, *vFlake);
+        makeFlakeValue(state, flakeRef, AllowRegistryAtTop, *vFlake);
 
         auto vProvides = (*vFlake->attrs->get(state.symbols.create("provides")))->value;
 
@@ -168,14 +178,6 @@ struct InstallableFlake : InstallableValue
         auto * v = findAlongAttrPath(state, attrPath, *emptyArgs, *vProvides);
         state.forceValue(*v);
         return v;
-    }
-
-    std::optional<std::string> installableToFlakeUri() override
-    {
-        if (std::get_if<FlakeRef::IsPath>(&flakeRef.data))
-            return flakeRef.to_string();
-        else
-            return std::nullopt;
     }
 };
 

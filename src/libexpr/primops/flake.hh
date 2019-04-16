@@ -29,7 +29,9 @@ struct LockFile
 
 Path getUserRegistryPath();
 
-void makeFlakeValue(EvalState & state, const FlakeRef & flakeRef, bool impureTopRef, Value & v);
+enum RegistryAccess { DisallowRegistry, AllowRegistry, AllowRegistryAtTop };
+
+void makeFlakeValue(EvalState & state, const FlakeRef & flakeRef, RegistryAccess registryAccess, Value & v);
 
 std::shared_ptr<FlakeRegistry> readRegistry(const Path &);
 
@@ -73,9 +75,7 @@ struct Dependencies
     Dependencies(const Flake & flake) : flake(flake) {}
 };
 
-Dependencies resolveFlake(EvalState &, const FlakeRef &, bool impureTopRef, bool isTopFlake = true);
-
-FlakeRegistry updateLockFile(EvalState &, const Flake &);
+Dependencies resolveFlake(EvalState &, const FlakeRef &, RegistryAccess registryAccess, bool isTopFlake = true);
 
 void updateLockFile(EvalState &, const Path & path);
 

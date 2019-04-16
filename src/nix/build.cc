@@ -11,8 +11,6 @@ struct CmdBuild : MixDryRun, InstallablesCommand
 {
     Path outLink = "result";
 
-    bool update = true;
-
     CmdBuild()
     {
         mkFlag()
@@ -26,11 +24,6 @@ struct CmdBuild : MixDryRun, InstallablesCommand
             .longName("no-link")
             .description("do not create a symlink to the build result")
             .set(&outLink, Path(""));
-
-        mkFlag()
-            .longName("no-update")
-            .description("don't update the lock file")
-            .set(&update, false);
     }
 
     std::string name() override
@@ -77,13 +70,6 @@ struct CmdBuild : MixDryRun, InstallablesCommand
                         store2->addPermRoot(output.second, absPath(symlink), true);
                     }
         }
-
-        if (update)
-            for (auto installable : installables) {
-                auto flakeUri = installable->installableToFlakeUri();
-                if (flakeUri)
-                    updateLockFile(*evalState, *flakeUri);
-            }
     }
 };
 

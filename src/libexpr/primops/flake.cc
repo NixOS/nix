@@ -159,6 +159,9 @@ static FlakeRef lookupFlake(EvalState & state, const FlakeRef & flakeRef,
     const std::vector<std::shared_ptr<FlakeRegistry>> & registries,
     std::vector<FlakeRef> pastSearches = {})
 {
+    if (registries.empty() && !flakeRef.isDirect())
+        throw Error("indirect flake reference '%s' is not allowed", flakeRef.to_string());
+
     for (std::shared_ptr<FlakeRegistry> registry : registries) {
         auto i = registry->entries.find(flakeRef);
         if (i != registry->entries.end()) {
@@ -178,8 +181,10 @@ static FlakeRef lookupFlake(EvalState & state, const FlakeRef & flakeRef,
             return lookupFlake(state, newRef, registries, pastSearches);
         }
     }
+
     if (!flakeRef.isDirect())
-        throw Error("indirect flake URI '%s' is the result of a lookup", flakeRef.to_string());
+        throw Error("could not resolve flake reference '%s'", flakeRef.to_string());
+
     return flakeRef;
 }
 
@@ -192,7 +197,8 @@ struct FlakeSourceInfo
 
 static FlakeSourceInfo fetchFlake(EvalState & state, const FlakeRef flakeRef, bool impureIsAllowed = false)
 {
-    FlakeRef fRef = lookupFlake(state, flakeRef, state.getFlakeRegistries());
+    FlakeRef fRef = lookupFlake(state, flakeRef,
+        impureIsAllowed ? state.getFlakeRegistries() : std::vector<std::shared_ptr<FlakeRegistry>>());
 
     // This only downloads only one revision of the repo, not the entire history.
     if (auto refData = std::get_if<FlakeRef::IsGitHub>(&fRef.data)) {
@@ -349,16 +355,18 @@ NonFlake getNonFlake(EvalState & state, const FlakeRef & flakeRef, FlakeAlias al
    dependencies.
    FIXME: this should return a graph of flakes.
 */
-Dependencies resolveFlake(EvalState & state, const FlakeRef & topRef, bool impureTopRef, bool isTopFlake)
+Dependencies resolveFlake(EvalState & state, const FlakeRef & topRef,
+    RegistryAccess registryAccess, bool isTopFlake)
 {
-    Flake flake = getFlake(state, topRef, isTopFlake && impureTopRef);
+    Flake flake = getFlake(state, topRef,
+        registryAccess == AllowRegistry || (registryAccess == AllowRegistryAtTop && isTopFlake));
     Dependencies deps(flake);
 
     for (auto & nonFlakeInfo : flake.nonFlakeRequires)
         deps.nonFlakeDeps.push_back(getNonFlake(state, nonFlakeInfo.second, nonFlakeInfo.first));
 
     for (auto & newFlakeRef : flake.requires)
-        deps.flakeDeps.push_back(resolveFlake(state, newFlakeRef, false));
+        deps.flakeDeps.push_back(resolveFlake(state, newFlakeRef, registryAccess, false));
 
     return deps;
 }
@@ -376,9 +384,9 @@ LockFile::FlakeEntry dependenciesToFlakeEntry(const Dependencies & deps)
     return entry;
 }
 
-LockFile getLockFile(EvalState & evalState, FlakeRef & flakeRef)
+static LockFile makeLockFile(EvalState & evalState, FlakeRef & flakeRef)
 {
-    Dependencies deps = resolveFlake(evalState, flakeRef, true);
+    Dependencies deps = resolveFlake(evalState, flakeRef, AllowRegistry);
     LockFile::FlakeEntry entry = dependenciesToFlakeEntry(deps);
     LockFile lockFile;
     lockFile.flakeEntries = entry.flakeEntries;
@@ -388,16 +396,9 @@ LockFile getLockFile(EvalState & evalState, FlakeRef & flakeRef)
 
 void updateLockFile(EvalState & state, const Path & path)
 {
-    // 'path' is the path to the local flake repo.
-    FlakeRef flakeRef = FlakeRef("file://" + path);
-    if (std::get_if<FlakeRef::IsGit>(&flakeRef.data)) {
-        LockFile lockFile = getLockFile(state, flakeRef);
-        writeLockFile(lockFile, path + "/flake.lock");
-    } else if (std::get_if<FlakeRef::IsGitHub>(&flakeRef.data)) {
-        throw UsageError("you can only update local flakes, not flakes on GitHub");
-    } else {
-        throw UsageError("you can only update local flakes, not flakes through their FlakeAlias");
-    }
+    FlakeRef flakeRef = FlakeRef("file://" + path); // FIXME: ugly
+    auto lockFile = makeLockFile(state, flakeRef);
+    writeLockFile(lockFile, path + "/flake.lock");
 }
 
 void callFlake(EvalState & state, const Dependencies & flake, Value & v)
@@ -436,15 +437,16 @@ void callFlake(EvalState & state, const Dependencies & flake, Value & v)
 
 // Return the `provides` of the top flake, while assigning to `v` the provides
 // of the dependencies as well.
-void makeFlakeValue(EvalState & state, const FlakeRef & flakeRef, bool impureTopRef, Value & v)
+void makeFlakeValue(EvalState & state, const FlakeRef & flakeRef, RegistryAccess registryAccess, Value & v)
 {
-    callFlake(state, resolveFlake(state, flakeRef, impureTopRef), v);
+    callFlake(state, resolveFlake(state, flakeRef, registryAccess), v);
 }
 
 // This function is exposed to be used in nix files.
 static void prim_getFlake(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
-    makeFlakeValue(state, state.forceStringNoCtx(*args[0], pos), false, v);
+    makeFlakeValue(state, state.forceStringNoCtx(*args[0], pos),
+        evalSettings.pureEval ? DisallowRegistry : AllowRegistryAtTop, v);
 }
 
 static RegisterPrimOp r2("getFlake", 1, prim_getFlake);

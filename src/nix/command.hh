@@ -66,11 +66,6 @@ struct Installable
 
     Buildable toBuildable();
 
-    virtual std::optional<std::string> installableToFlakeUri()
-    {
-        return std::nullopt;
-    }
-
     virtual Value * toValue(EvalState & state)
     {
         throw Error("argument '%s' cannot be evaluated", what());
@@ -80,6 +75,8 @@ struct Installable
 struct SourceExprCommand : virtual Args, StoreCommand, MixEvalArgs
 {
     std::optional<Path> file;
+
+    bool updateLockFile = true;
 
     SourceExprCommand();
 
