@@ -3,6 +3,8 @@
 #include "shared.hh"
 #include "progress-bar.hh"
 #include "eval.hh"
+#include "primops/flake.hh"
+
 #include <nlohmann/json.hpp>
 #include <queue>
 
