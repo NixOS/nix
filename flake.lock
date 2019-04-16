@@ -1,0 +1,9 @@
+{
+    "nonFlakeRequires": {},
+    "requires": {
+        "nixpkgs": {
+            "uri": "github:edolstra/nixpkgs/f10e8a02eb7fa2b4a070f30cf87f4efcc7f3186d"
+        }
+    },
+    "version": 1
+}
