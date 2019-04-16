@@ -253,7 +253,7 @@ static FlakeSourceInfo fetchFlake(EvalState & state, const FlakeRef flakeRef, bo
 // This will return the flake which corresponds to a given FlakeRef. The lookupFlake is done within this function.
 Flake getFlake(EvalState & state, const FlakeRef & flakeRef, bool impureIsAllowed = false)
 {
-    FlakeSourceInfo sourceInfo = fetchFlake(state, flakeRef);
+    FlakeSourceInfo sourceInfo = fetchFlake(state, flakeRef, impureIsAllowed);
     debug("got flake source '%s' with revision %s",
         sourceInfo.storePath, sourceInfo.rev.value_or(Hash(htSHA1)).to_string(Base16, false));
 
