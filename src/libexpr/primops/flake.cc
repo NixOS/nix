@@ -154,32 +154,6 @@ const std::vector<std::shared_ptr<FlakeRegistry>> EvalState::getFlakeRegistries(
     return registries;
 }
 
-// Creates a Nix attribute set value listing all dependencies, so they can be used in `provides`.
-Value * makeFlakeRegistryValue(EvalState & state)
-{
-    auto v = state.allocValue();
-
-    auto registries = state.getFlakeRegistries();
-
-    int size = 0;
-    for (auto registry : registries)
-        size += registry->entries.size();
-    state.mkAttrs(*v, size);
-
-    for (auto & registry : registries) {
-        for (auto & entry : registry->entries) {
-            auto vEntry = state.allocAttr(*v, entry.first.to_string());
-            state.mkAttrs(*vEntry, 2);
-            mkString(*state.allocAttr(*vEntry, state.symbols.create("uri")), entry.second.to_string());
-            vEntry->attrs->sort();
-        }
-    }
-
-    v->attrs->sort();
-
-    return v;
-}
-
 static FlakeRef lookupFlake(EvalState & state, const FlakeRef & flakeRef,
     std::vector<std::shared_ptr<FlakeRegistry>> registries, std::vector<FlakeRef> pastSearches = {})
 {

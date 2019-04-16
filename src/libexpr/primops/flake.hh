@@ -29,8 +29,6 @@ struct LockFile
 
 Path getUserRegistryPath();
 
-Value * makeFlakeRegistryValue(EvalState & state);
-
 void makeFlakeValue(EvalState & state, const FlakeRef & flakeRef, bool impureTopRef, Value & v);
 
 std::shared_ptr<FlakeRegistry> readRegistry(const Path &);
