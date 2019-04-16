@@ -3,6 +3,9 @@
         "dwarffs": {
             "uri": "github:edolstra/dwarffs/flake"
         },
+        "nix": {
+            "uri": "github:tweag/nix/flakes"
+        },
         "nixpkgs": {
             "uri": "github:edolstra/nixpkgs/flake"
         }
