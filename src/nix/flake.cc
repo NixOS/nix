@@ -40,13 +40,19 @@ void printFlakeInfo(Flake & flake, bool json) {
     if (json) {
         nlohmann::json j;
         j["id"] = flake.id;
-        j["location"] = flake.sourceInfo.storePath;
+        j["uri"] = flake.sourceInfo.flakeRef.to_string();
         j["description"] = flake.description;
+        if (flake.sourceInfo.rev)
+            j["revision"] = flake.sourceInfo.rev->to_string(Base16, false);
+        j["path"] = flake.sourceInfo.storePath;
         std::cout << j.dump(4) << std::endl;
     } else {
         std::cout << "ID:          " << flake.id << "\n";
+        std::cout << "URI:         " << flake.sourceInfo.flakeRef.to_string() << "\n";
         std::cout << "Description: " << flake.description << "\n";
-        std::cout << "Location:    " << flake.sourceInfo.storePath << "\n";
+        if (flake.sourceInfo.rev)
+            std::cout << "Revision:    " << flake.sourceInfo.rev->to_string(Base16, false) << "\n";
+        std::cout << "Path:        " << flake.sourceInfo.storePath << "\n";
     }
 }
 
