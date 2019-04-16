@@ -131,7 +131,7 @@ struct CmdFlakeInfo : FlakeCommand, MixJSON, MixEvalArgs, StoreCommand
         return "list info about a given flake";
     }
 
-    CmdFlakeInfo () { evalSettings.pureEval = false; /* FIXME */ }
+    CmdFlakeInfo () { }
 
     void run(nix::ref<nix::Store> store) override
     {
@@ -160,7 +160,6 @@ struct CmdFlakeAdd : MixEvalArgs, Command
     {
         expectArg("alias", &alias);
         expectArg("flake-uri", &uri);
-        evalSettings.pureEval = false; // FIXME
     }
 
     void run() override
@@ -191,7 +190,6 @@ struct CmdFlakeRemove : virtual Args, MixEvalArgs, Command
     CmdFlakeRemove()
     {
         expectArg("alias", &alias);
-        evalSettings.pureEval = false; // FIXME
     }
 
     void run() override
@@ -220,7 +218,6 @@ struct CmdFlakePin : virtual Args, StoreCommand, MixEvalArgs
     CmdFlakePin()
     {
         expectArg("alias", &alias);
-        evalSettings.pureEval = false; // FIXME
     }
 
     void run(nix::ref<nix::Store> store) override
