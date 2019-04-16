@@ -129,6 +129,8 @@ struct CmdFlakeInfo : FlakeCommand, MixJSON, MixEvalArgs, StoreCommand
         return "list info about a given flake";
     }
 
+    CmdFlakeInfo () { evalSettings.pureEval = false; }
+
     void run(nix::ref<nix::Store> store) override
     {
         auto evalState = std::make_shared<EvalState>(searchPath, store);
@@ -156,6 +158,7 @@ struct CmdFlakeAdd : MixEvalArgs, Command
     {
         expectArg("alias", &alias);
         expectArg("flake-uri", &uri);
+        evalSettings.pureEval = false;
     }
 
     void run() override
@@ -186,6 +189,7 @@ struct CmdFlakeRemove : virtual Args, MixEvalArgs, Command
     CmdFlakeRemove()
     {
         expectArg("alias", &alias);
+        evalSettings.pureEval = false;
     }
 
     void run() override
@@ -214,6 +218,7 @@ struct CmdFlakePin : virtual Args, StoreCommand, MixEvalArgs
     CmdFlakePin()
     {
         expectArg("alias", &alias);
+        evalSettings.pureEval = false;
     }
 
     void run(nix::ref<nix::Store> store) override
@@ -227,8 +232,16 @@ struct CmdFlakePin : virtual Args, StoreCommand, MixEvalArgs
             it->second = getFlake(*evalState, it->second, true).ref;
             // The 'ref' in 'flake' is immutable.
             writeRegistry(userRegistry, userRegistryPath);
-        } else
-            throw Error("the flake alias '%s' does not exist in the user registry", alias);
+        } else {
+            std::shared_ptr<FlakeRegistry> globalReg = getGlobalRegistry();
+            it = globalReg->entries.find(FlakeRef(alias));
+            if (it != globalReg->entries.end()) {
+                FlakeRef newRef = getFlake(*evalState, it->second, true).ref;
+                userRegistry.entries.insert_or_assign(alias, newRef);
+                writeRegistry(userRegistry, userRegistryPath);
+            } else
+                throw Error("the flake alias '%s' does not exist in the user or global registry", alias);
+        }
     }
 };
 
