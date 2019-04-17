@@ -193,10 +193,11 @@ static FlakeSourceInfo fetchFlake(EvalState & state, const FlakeRef flakeRef, bo
     FlakeRef fRef = lookupFlake(state, flakeRef,
         impureIsAllowed ? state.getFlakeRegistries() : std::vector<std::shared_ptr<FlakeRegistry>>());
 
+    if (evalSettings.pureEval && !impureIsAllowed && !fRef.isImmutable())
+        throw Error("requested to fetch mutable flake '%s' in pure mode", fRef.to_string());
+
     // This only downloads only one revision of the repo, not the entire history.
     if (auto refData = std::get_if<FlakeRef::IsGitHub>(&fRef.data)) {
-        if (evalSettings.pureEval && !impureIsAllowed && !fRef.isImmutable())
-            throw Error("requested to fetch FlakeRef '%s' purely, which is mutable", fRef.to_string());
 
         // FIXME: use regular /archive URLs instead? api.github.com
         // might have stricter rate limits.
