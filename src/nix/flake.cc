@@ -30,9 +30,14 @@ struct CmdFlakeList : StoreCommand, MixEvalArgs
 
         stopProgressBar();
 
-        for (auto & registry : registries)
-            for (auto & entry : registry->entries)
-                std::cout << entry.first << " " << entry.second << "\n";
+        for (auto & entry : registries[0]->entries)
+            std::cout << entry.first.to_string() << " flags " << entry.second.to_string() << "\n";
+
+        for (auto & entry : registries[1]->entries)
+            std::cout << entry.first.to_string() << " user " << entry.second.to_string() << "\n";
+
+        for (auto & entry : registries[2]->entries)
+            std::cout << entry.first.to_string() << " global " << entry.second.to_string() << "\n";
     }
 };
 
@@ -146,7 +151,7 @@ struct CmdFlakeInfo : FlakeCommand, MixJSON, MixEvalArgs, StoreCommand
     void run(nix::ref<nix::Store> store) override
     {
         auto evalState = std::make_shared<EvalState>(searchPath, store);
-        nix::Flake flake = nix::getFlake(*evalState, FlakeRef(flakeUri), true);
+        Flake flake = getFlake(*evalState, FlakeRef(flakeUri), true);
         printFlakeInfo(flake, json);
     }
 };
