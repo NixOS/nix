@@ -249,6 +249,11 @@ $ nix-shell -p pan -I nixpkgs=https://github.com/NixOS/nixpkgs-channels/archive/
 [nix-shell:~]$ pan --version
 Pan 0.139
 </screen>
+      
+You can use prefixes to install packages from different branches/revisions:
+<screen>
+$ nix-shell -I nixpkgs=channel:nixos-18.09 -I oldie=channel:nixos-16.09 -p gzip -p '(import <oldie> {}).xz'      
+</screen>
 
 </para>
 
