@@ -108,6 +108,8 @@ struct InstallablesCommand : virtual Args, SourceExprCommand
 
     void prepare() override;
 
+    virtual bool useDefaultInstallables() { return true; }
+
 private:
 
     std::vector<std::string> _installables;
@@ -119,14 +121,14 @@ struct InstallableCommand : virtual Args, SourceExprCommand
 
     InstallableCommand()
     {
-        expectArg("installable", &_installable);
+        expectArg("installable", &_installable, true);
     }
 
     void prepare() override;
 
 private:
 
-    std::string _installable;
+    std::string _installable{"."};
 };
 
 /* A command that operates on zero or more store paths. */
@@ -146,6 +148,8 @@ public:
     virtual void run(ref<Store> store, Paths storePaths) = 0;
 
     void run(ref<Store> store) override;
+
+    bool useDefaultInstallables() override { return !all; }
 };
 
 /* A command that operates on exactly one store path. */

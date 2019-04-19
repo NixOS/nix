@@ -3,7 +3,6 @@
 #include "common-args.hh"
 #include "shared.hh"
 #include "store-api.hh"
-#include "primops/flake.hh"
 
 using namespace nix;
 

@@ -334,6 +334,10 @@ PathSet toDerivations(ref<Store> store,
 
 void InstallablesCommand::prepare()
 {
+    if (_installables.empty() && !file && useDefaultInstallables())
+        // FIXME: commands like "nix install" should not have a
+        // default, probably.
+        _installables.push_back(".");
     installables = parseInstallables(getStore(), _installables);
 }
 
