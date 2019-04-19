@@ -90,20 +90,20 @@ struct CmdFlakeDeps : FlakeCommand, MixJSON, StoreCommand, MixEvalArgs
 
         FlakeRef flakeRef(flakeUri);
 
-        Dependencies deps = resolveFlake(*evalState, flakeRef, AllowRegistryAtTop);
+        ResolvedFlake resFlake = resolveFlake(*evalState, flakeRef, AllowRegistryAtTop);
 
-        std::queue<Dependencies> todo;
-        todo.push(deps);
+        std::queue<ResolvedFlake> todo;
+        todo.push(resFlake);
 
         while (!todo.empty()) {
-            deps = todo.front();
+            resFlake = todo.front();
             todo.pop();
 
-            for (auto & nonFlake : deps.nonFlakeDeps)
+            for (NonFlake & nonFlake : resFlake.nonFlakeDeps)
                 printNonFlakeInfo(nonFlake, json);
 
-            for (auto & newDeps : deps.flakeDeps)
-                todo.push(newDeps);
+            for (ResolvedFlake & newResFlake : resFlake.flakeDeps)
+                todo.push(newResFlake);
         }
     }
 };

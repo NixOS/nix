@@ -351,7 +351,7 @@ NonFlake getNonFlake(EvalState & state, const FlakeRef & flakeRef, FlakeAlias al
    dependencies.
    FIXME: this should return a graph of flakes.
 */
-Dependencies resolveFlake(EvalState & state, const FlakeRef & topRef,
+ResolvedFlake resolveFlake(EvalState & state, const FlakeRef & topRef,
     RegistryAccess registryAccess, bool isTopFlake)
 {
     Flake flake = getFlake(state, topRef,
@@ -362,7 +362,7 @@ Dependencies resolveFlake(EvalState & state, const FlakeRef & topRef,
     if (isTopFlake)
         lockFile = readLockFile(flake.sourceInfo.storePath + "/flake.lock"); // FIXME: symlink attack
 
-    Dependencies deps(flake);
+    ResolvedFlake deps(flake);
 
     for (auto & nonFlakeInfo : flake.nonFlakeRequires)
         deps.nonFlakeDeps.push_back(getNonFlake(state, nonFlakeInfo.second, nonFlakeInfo.first));
@@ -377,14 +377,14 @@ Dependencies resolveFlake(EvalState & state, const FlakeRef & topRef,
     return deps;
 }
 
-LockFile::FlakeEntry dependenciesToFlakeEntry(const Dependencies & deps)
+LockFile::FlakeEntry dependenciesToFlakeEntry(const ResolvedFlake & resolvedFlake)
 {
-    LockFile::FlakeEntry entry(deps.flake.sourceInfo.flakeRef);
+    LockFile::FlakeEntry entry(resolvedFlake.flake.sourceInfo.flakeRef);
 
-    for (auto & deps : deps.flakeDeps)
-        entry.flakeEntries.insert_or_assign(deps.flake.id, dependenciesToFlakeEntry(deps));
+    for (auto & newResFlake : resolvedFlake.flakeDeps)
+        entry.flakeEntries.insert_or_assign(newResFlake.flake.id, dependenciesToFlakeEntry(newResFlake));
 
-    for (auto & nonFlake : deps.nonFlakeDeps)
+    for (auto & nonFlake : resolvedFlake.nonFlakeDeps)
         entry.nonFlakeEntries.insert_or_assign(nonFlake.alias, nonFlake.ref);
 
     return entry;
@@ -392,8 +392,8 @@ LockFile::FlakeEntry dependenciesToFlakeEntry(const Dependencies & deps)
 
 static LockFile makeLockFile(EvalState & evalState, FlakeRef & flakeRef)
 {
-    Dependencies deps = resolveFlake(evalState, flakeRef, AllowRegistry);
-    LockFile::FlakeEntry entry = dependenciesToFlakeEntry(deps);
+    ResolvedFlake resFlake = resolveFlake(evalState, flakeRef, AllowRegistry);
+    LockFile::FlakeEntry entry = dependenciesToFlakeEntry(resFlake);
     LockFile lockFile;
     lockFile.flakeEntries = entry.flakeEntries;
     lockFile.nonFlakeEntries = entry.nonFlakeEntries;
@@ -414,37 +414,37 @@ void updateLockFile(EvalState & state, const Path & path)
     runProgram("git", true, { "-C", path, "add", "flake.lock" });
 }
 
-void callFlake(EvalState & state, const Dependencies & flake, Value & v)
+void callFlake(EvalState & state, const ResolvedFlake & resFlake, Value & v)
 {
     // Construct the resulting attrset '{description, provides,
     // ...}'. This attrset is passed lazily as an argument to 'provides'.
 
-    state.mkAttrs(v, flake.flakeDeps.size() + flake.nonFlakeDeps.size() + 8);
+    state.mkAttrs(v, resFlake.flakeDeps.size() + resFlake.nonFlakeDeps.size() + 8);
 
-    for (auto & dep : flake.flakeDeps) {
-        auto vFlake = state.allocAttr(v, dep.flake.id);
-        callFlake(state, dep, *vFlake);
+    for (const ResolvedFlake newResFlake : resFlake.flakeDeps) {
+        auto vFlake = state.allocAttr(v, newResFlake.flake.id);
+        callFlake(state, newResFlake, *vFlake);
     }
 
-    for (auto & dep : flake.nonFlakeDeps) {
-        auto vNonFlake = state.allocAttr(v, dep.alias);
+    for (const NonFlake nonFlake : resFlake.nonFlakeDeps) {
+        auto vNonFlake = state.allocAttr(v, nonFlake.alias);
         state.mkAttrs(*vNonFlake, 4);
 
-        state.store->isValidPath(dep.path);
-        mkString(*state.allocAttr(*vNonFlake, state.sOutPath), dep.path, {dep.path});
+        state.store->isValidPath(nonFlake.path);
+        mkString(*state.allocAttr(*vNonFlake, state.sOutPath), nonFlake.path, {nonFlake.path});
     }
 
-    mkString(*state.allocAttr(v, state.sDescription), flake.flake.description);
+    mkString(*state.allocAttr(v, state.sDescription), resFlake.flake.description);
 
-    auto & path = flake.flake.sourceInfo.storePath;
+    auto & path = resFlake.flake.sourceInfo.storePath;
     state.store->isValidPath(path);
     mkString(*state.allocAttr(v, state.sOutPath), path, {path});
 
-    if (flake.flake.sourceInfo.revCount)
-        mkInt(*state.allocAttr(v, state.symbols.create("revCount")), *flake.flake.sourceInfo.revCount);
+    if (resFlake.flake.sourceInfo.revCount)
+        mkInt(*state.allocAttr(v, state.symbols.create("revCount")), *resFlake.flake.sourceInfo.revCount);
 
     auto vProvides = state.allocAttr(v, state.symbols.create("provides"));
-    mkApp(*vProvides, *flake.flake.vProvides, v);
+    mkApp(*vProvides, *resFlake.flake.vProvides, v);
 
     v.attrs->push_back(Attr(state.symbols.create("self"), &v));
 
