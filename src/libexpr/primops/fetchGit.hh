@@ -11,7 +11,7 @@ struct GitInfo
     Path storePath;
     std::string ref;
     Hash rev{htSHA1};
-    std::optional<uint64_t> revCount;
+    uint64_t revCount;
 };
 
 GitInfo exportGit(ref<Store> store, std::string uri,

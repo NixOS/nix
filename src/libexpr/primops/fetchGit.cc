@@ -68,6 +68,7 @@ GitInfo exportGit(ref<Store> store, std::string uri,
             };
 
             gitInfo.storePath = store->addToStore("source", uri, true, htSHA256, filter);
+            gitInfo.revCount = std::stoull(runProgram("git", true, { "-C", uri, "rev-list", "--count", "HEAD" }));
 
             return gitInfo;
         }
@@ -200,7 +201,7 @@ GitInfo exportGit(ref<Store> store, std::string uri,
     json["uri"] = uri;
     json["name"] = name;
     json["rev"] = gitInfo.rev.gitRev();
-    json["revCount"] = *gitInfo.revCount;
+    json["revCount"] = gitInfo.revCount;
 
     writeFile(storeLink, json.dump());
 
@@ -254,7 +255,7 @@ static void prim_fetchGit(EvalState & state, const Pos & pos, Value * * args, Va
     mkString(*state.allocAttr(v, state.sOutPath), gitInfo.storePath, PathSet({gitInfo.storePath}));
     mkString(*state.allocAttr(v, state.symbols.create("rev")), gitInfo.rev.gitRev());
     mkString(*state.allocAttr(v, state.symbols.create("shortRev")), gitInfo.rev.gitShortRev());
-    mkInt(*state.allocAttr(v, state.symbols.create("revCount")), gitInfo.revCount.value_or(0));
+    mkInt(*state.allocAttr(v, state.symbols.create("revCount")), gitInfo.revCount);
     v.attrs->sort();
 
     if (state.allowedPaths)
