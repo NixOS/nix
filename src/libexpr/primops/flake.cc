@@ -231,11 +231,10 @@ static FlakeSourceInfo fetchFlake(EvalState & state, const FlakeRef flakeRef, bo
 
     // This downloads the entire git history
     else if (auto refData = std::get_if<FlakeRef::IsGit>(&fRef.data)) {
-        auto gitInfo = exportGit(state.store, refData->uri, fRef.ref,
-            fRef.rev ? fRef.rev->to_string(Base16, false) : "", "source");
+        auto gitInfo = exportGit(state.store, refData->uri, fRef.ref, fRef.rev, "source");
         FlakeSourceInfo info(fRef);
         info.storePath = gitInfo.storePath;
-        info.rev = Hash(gitInfo.rev, htSHA1);
+        info.rev = gitInfo.rev;
         info.revCount = gitInfo.revCount;
         info.flakeRef.ref = gitInfo.ref;
         info.flakeRef.rev = info.rev;
@@ -245,11 +244,12 @@ static FlakeSourceInfo fetchFlake(EvalState & state, const FlakeRef flakeRef, bo
     else if (auto refData = std::get_if<FlakeRef::IsPath>(&fRef.data)) {
         if (!pathExists(refData->path + "/.git"))
             throw Error("flake '%s' does not reference a Git repository", refData->path);
-        auto gitInfo = exportGit(state.store, refData->path, {}, "", "source");
+        auto gitInfo = exportGit(state.store, refData->path, {}, {}, "source");
         FlakeSourceInfo info(fRef);
         info.storePath = gitInfo.storePath;
-        info.rev = Hash(gitInfo.rev, htSHA1);
+        info.rev = gitInfo.rev;
         info.revCount = gitInfo.revCount;
+        info.flakeRef.ref = gitInfo.ref;
         info.flakeRef.rev = info.rev;
         return info;
     }

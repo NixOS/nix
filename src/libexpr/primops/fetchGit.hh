@@ -10,13 +10,13 @@ struct GitInfo
 {
     Path storePath;
     std::string ref;
-    std::string rev;
-    std::string shortRev;
+    Hash rev{htSHA1};
     std::optional<uint64_t> revCount;
 };
 
 GitInfo exportGit(ref<Store> store, const std::string & uri,
-    std::optional<std::string> ref, std::string rev,
+    std::optional<std::string> ref,
+    std::optional<Hash> rev,
     const std::string & name);
 
 }

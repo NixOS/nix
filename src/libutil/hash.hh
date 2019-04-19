@@ -80,6 +80,18 @@ struct Hash
        or base-64. By default, this is prefixed by the hash type
        (e.g. "sha256:"). */
     std::string to_string(Base base = Base32, bool includeType = true) const;
+
+    std::string gitRev() const
+    {
+        assert(type == htSHA1);
+        return to_string(Base16, false);
+    }
+
+    std::string gitShortRev() const
+    {
+        assert(type == htSHA1);
+        return std::string(to_string(Base16, false), 0, 7);
+    }
 };
 
 

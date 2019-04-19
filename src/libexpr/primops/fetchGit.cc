@@ -19,10 +19,13 @@ namespace nix {
 extern std::regex revRegex;
 
 GitInfo exportGit(ref<Store> store, const std::string & uri,
-    std::optional<std::string> ref, std::string rev,
+    std::optional<std::string> ref,
+    std::optional<Hash> rev,
     const std::string & name)
 {
-    if (!ref && rev == "" && hasPrefix(uri, "/") && pathExists(uri + "/.git")) {
+    assert(!rev || rev->type == htSHA1);
+
+    if (!ref && !rev && hasPrefix(uri, "/") && pathExists(uri + "/.git")) {
 
         bool clean = true;
 
@@ -40,8 +43,6 @@ GitInfo exportGit(ref<Store> store, const std::string & uri,
 
             GitInfo gitInfo;
             gitInfo.ref = "HEAD";
-            gitInfo.rev = "0000000000000000000000000000000000000000";
-            gitInfo.shortRev = std::string(gitInfo.rev, 0, 7);
 
             auto files = tokenizeString<std::set<std::string>>(
                 runProgram("git", true, { "-C", uri, "ls-files", "-z" }), "\0"s);
@@ -67,13 +68,10 @@ GitInfo exportGit(ref<Store> store, const std::string & uri,
         }
 
         // clean working tree, but no ref or rev specified.  Use 'HEAD'.
-        rev = chomp(runProgram("git", true, { "-C", uri, "rev-parse", "HEAD" }));
+        rev = Hash(chomp(runProgram("git", true, { "-C", uri, "rev-parse", "HEAD" })), htSHA1);
     }
 
     if (!ref) ref = "HEAD"s;
-
-    if (rev != "" && !std::regex_match(rev, revRegex))
-        throw Error("invalid Git revision '%s'", rev);
 
     deletePath(getCacheDir() + "/nix/git");
 
@@ -90,9 +88,9 @@ GitInfo exportGit(ref<Store> store, const std::string & uri,
     time_t now = time(0);
     /* If a rev was specified, we need to fetch if it's not in the
        repo. */
-    if (rev != "") {
+    if (rev) {
         try {
-            runProgram("git", true, { "-C", cacheDir, "cat-file", "-e", rev });
+            runProgram("git", true, { "-C", cacheDir, "cat-file", "-e", rev->gitRev() });
             doFetch = false;
         } catch (ExecError & e) {
             if (WIFEXITED(e.status)) {
@@ -128,19 +126,19 @@ GitInfo exportGit(ref<Store> store, const std::string & uri,
     // FIXME: check whether rev is an ancestor of ref.
     GitInfo gitInfo;
     gitInfo.ref = *ref;
-    gitInfo.rev = rev != "" ? rev : chomp(readFile(localRefFile));
-    gitInfo.shortRev = std::string(gitInfo.rev, 0, 7);
+    gitInfo.rev = rev ? *rev : Hash(chomp(readFile(localRefFile)), htSHA1);
 
     printTalkative("using revision %s of repo '%s'", gitInfo.rev, uri);
 
-    std::string storeLinkName = hashString(htSHA512, name + std::string("\0"s) + gitInfo.rev).to_string(Base32, false);
+    std::string storeLinkName = hashString(htSHA512,
+        name + std::string("\0"s) + gitInfo.rev.gitRev()).to_string(Base32, false);
     Path storeLink = cacheDir + "/" + storeLinkName + ".link";
     PathLocks storeLinkLock({storeLink}, fmt("waiting for lock on '%1%'...", storeLink)); // FIXME: broken
 
     try {
         auto json = nlohmann::json::parse(readFile(storeLink));
 
-        assert(json["name"] == name && json["rev"] == gitInfo.rev);
+        assert(json["name"] == name && Hash((std::string) json["rev"], htSHA1) == gitInfo.rev);
 
         gitInfo.storePath = json["storePath"];
 
@@ -155,7 +153,7 @@ GitInfo exportGit(ref<Store> store, const std::string & uri,
 
     // FIXME: should pipe this, or find some better way to extract a
     // revision.
-    auto tar = runProgram("git", true, { "-C", cacheDir, "archive", gitInfo.rev });
+    auto tar = runProgram("git", true, { "-C", cacheDir, "archive", gitInfo.rev.gitRev() });
 
     Path tmpDir = createTempDir();
     AutoDelete delTmpDir(tmpDir, true);
@@ -164,13 +162,13 @@ GitInfo exportGit(ref<Store> store, const std::string & uri,
 
     gitInfo.storePath = store->addToStore(name, tmpDir);
 
-    gitInfo.revCount = std::stoull(runProgram("git", true, { "-C", cacheDir, "rev-list", "--count", gitInfo.rev }));
+    gitInfo.revCount = std::stoull(runProgram("git", true, { "-C", cacheDir, "rev-list", "--count", gitInfo.rev.gitRev() }));
 
     nlohmann::json json;
     json["storePath"] = gitInfo.storePath;
     json["uri"] = uri;
     json["name"] = name;
-    json["rev"] = gitInfo.rev;
+    json["rev"] = gitInfo.rev.gitRev();
     json["revCount"] = *gitInfo.revCount;
 
     writeFile(storeLink, json.dump());
@@ -182,7 +180,7 @@ static void prim_fetchGit(EvalState & state, const Pos & pos, Value * * args, Va
 {
     std::string url;
     std::optional<std::string> ref;
-    std::string rev;
+    std::optional<Hash> rev;
     std::string name = "source";
     PathSet context;
 
@@ -199,7 +197,7 @@ static void prim_fetchGit(EvalState & state, const Pos & pos, Value * * args, Va
             else if (n == "ref")
                 ref = state.forceStringNoCtx(*attr.value, *attr.pos);
             else if (n == "rev")
-                rev = state.forceStringNoCtx(*attr.value, *attr.pos);
+                rev = Hash(state.forceStringNoCtx(*attr.value, *attr.pos), htSHA1);
             else if (n == "name")
                 name = state.forceStringNoCtx(*attr.value, *attr.pos);
             else
@@ -216,15 +214,15 @@ static void prim_fetchGit(EvalState & state, const Pos & pos, Value * * args, Va
     // whitelist. Ah well.
     state.checkURI(url);
 
-    if (evalSettings.pureEval && rev == "")
+    if (evalSettings.pureEval && !rev)
         throw Error("in pure evaluation mode, 'fetchGit' requires a Git revision");
 
     auto gitInfo = exportGit(state.store, url, ref, rev, name);
 
     state.mkAttrs(v, 8);
     mkString(*state.allocAttr(v, state.sOutPath), gitInfo.storePath, PathSet({gitInfo.storePath}));
-    mkString(*state.allocAttr(v, state.symbols.create("rev")), gitInfo.rev);
-    mkString(*state.allocAttr(v, state.symbols.create("shortRev")), gitInfo.shortRev);
+    mkString(*state.allocAttr(v, state.symbols.create("rev")), gitInfo.rev.gitRev());
+    mkString(*state.allocAttr(v, state.symbols.create("shortRev")), gitInfo.rev.gitShortRev());
     mkInt(*state.allocAttr(v, state.symbols.create("revCount")), gitInfo.revCount.value_or(0));
     v.attrs->sort();
 
