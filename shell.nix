@@ -1,6 +1,6 @@
 { useClang ? false }:
 
-with import (builtins.fetchGit { url = https://github.com/NixOS/nixpkgs-channels.git; ref = "nixos-19.03"; }) {};
+with import (builtins.fetchTarball https://github.com/NixOS/nixpkgs-channels/archive/nixos-19.03.tar.gz) {};
 
 with import ./release-common.nix { inherit pkgs; };
 
