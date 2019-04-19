@@ -74,15 +74,15 @@ std::shared_ptr<FlakeRegistry> getGlobalRegistry();
 
 Flake getFlake(EvalState &, const FlakeRef &, bool impureIsAllowed);
 
-struct Dependencies
+struct ResolvedFlake
 {
     Flake flake;
-    std::vector<Dependencies> flakeDeps; // The flake dependencies
+    std::vector<ResolvedFlake> flakeDeps; // The flake dependencies
     std::vector<NonFlake> nonFlakeDeps;
-    Dependencies(const Flake & flake) : flake(flake) {}
+    ResolvedFlake(const Flake & flake) : flake(flake) {}
 };
 
-Dependencies resolveFlake(EvalState &, const FlakeRef &, RegistryAccess registryAccess, bool isTopFlake = true);
+ResolvedFlake resolveFlake(EvalState &, const FlakeRef &, RegistryAccess registryAccess, bool isTopFlake = true);
 
 void updateLockFile(EvalState &, const Path & path);
 
