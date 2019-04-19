@@ -14,7 +14,7 @@ struct GitInfo
     std::optional<uint64_t> revCount;
 };
 
-GitInfo exportGit(ref<Store> store, const std::string & uri,
+GitInfo exportGit(ref<Store> store, std::string uri,
     std::optional<std::string> ref,
     std::optional<Hash> rev,
     const std::string & name);

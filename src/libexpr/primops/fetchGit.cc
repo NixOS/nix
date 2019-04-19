@@ -18,14 +18,19 @@ namespace nix {
 
 extern std::regex revRegex;
 
-GitInfo exportGit(ref<Store> store, const std::string & uri,
+GitInfo exportGit(ref<Store> store, std::string uri,
     std::optional<std::string> ref,
     std::optional<Hash> rev,
     const std::string & name)
 {
     assert(!rev || rev->type == htSHA1);
 
-    if (!ref && !rev && hasPrefix(uri, "/") && pathExists(uri + "/.git")) {
+    bool isLocal = hasPrefix(uri, "/") && pathExists(uri + "/.git");
+
+    // If this is a local directory (but not a file:// URI) and no ref
+    // or revision is given, then allow the use of an unclean working
+    // tree.
+    if (!ref && !rev && isLocal) {
 
         bool clean = true;
 
@@ -66,67 +71,92 @@ GitInfo exportGit(ref<Store> store, const std::string & uri,
 
             return gitInfo;
         }
-
-        // clean working tree, but no ref or rev specified.  Use 'HEAD'.
-        rev = Hash(chomp(runProgram("git", true, { "-C", uri, "rev-parse", "HEAD" })), htSHA1);
     }
 
-    if (!ref) ref = "HEAD"s;
+    if (!ref) ref = isLocal ? "HEAD" : "master";
+
+    // Don't clone file:// URIs (but otherwise treat them the same as
+    // remote URIs, i.e. don't use the working tree or HEAD).
+    static bool forceHttp = getEnv("_NIX_FORCE_HTTP") == "1"; // for testing
+    if (!forceHttp && hasPrefix(uri, "file://")) {
+        uri = std::string(uri, 7);
+        isLocal = true;
+    }
 
     deletePath(getCacheDir() + "/nix/git");
 
     Path cacheDir = getCacheDir() + "/nix/gitv2/" + hashString(htSHA256, uri).to_string(Base32, false);
+    Path repoDir;
 
-    if (!pathExists(cacheDir)) {
-        createDirs(dirOf(cacheDir));
-        runProgram("git", true, { "init", "--bare", cacheDir });
-    }
+    if (isLocal) {
 
-    Path localRefFile = cacheDir + "/refs/heads/" + *ref;
+        if (!rev)
+            rev = Hash(chomp(runProgram("git", true, { "-C", uri, "rev-parse", *ref })), htSHA1);
 
-    bool doFetch;
-    time_t now = time(0);
-    /* If a rev was specified, we need to fetch if it's not in the
-       repo. */
-    if (rev) {
-        try {
-            runProgram("git", true, { "-C", cacheDir, "cat-file", "-e", rev->gitRev() });
-            doFetch = false;
-        } catch (ExecError & e) {
-            if (WIFEXITED(e.status)) {
-                doFetch = true;
-            } else {
-                throw;
-            }
-        }
+        if (!pathExists(cacheDir))
+            createDirs(cacheDir);
+
+        repoDir = uri;
+
     } else {
-        /* If the local ref is older than ‘tarball-ttl’ seconds, do a
-           git fetch to update the local ref to the remote ref. */
-        struct stat st;
-        doFetch = stat(localRefFile.c_str(), &st) != 0 ||
-            st.st_mtime + settings.tarballTtl <= now;
-    }
-    if (doFetch)
-    {
-        Activity act(*logger, lvlTalkative, actUnknown, fmt("fetching Git repository '%s'", uri));
 
-        // FIXME: git stderr messes up our progress indicator, so
-        // we're using --quiet for now. Should process its stderr.
-        runProgram("git", true, { "-C", cacheDir, "fetch", "--quiet", "--force", "--", uri, fmt("%s:%s", *ref, *ref) });
+        repoDir = cacheDir;
 
-        struct timeval times[2];
-        times[0].tv_sec = now;
-        times[0].tv_usec = 0;
-        times[1].tv_sec = now;
-        times[1].tv_usec = 0;
+        if (!pathExists(cacheDir)) {
+            createDirs(dirOf(cacheDir));
+            runProgram("git", true, { "init", "--bare", repoDir });
+        }
 
-        utimes(localRefFile.c_str(), times);
+        Path localRefFile = repoDir + "/refs/heads/" + *ref;
+
+        bool doFetch;
+        time_t now = time(0);
+
+        /* If a rev was specified, we need to fetch if it's not in the
+           repo. */
+        if (rev) {
+            try {
+                runProgram("git", true, { "-C", repoDir, "cat-file", "-e", rev->gitRev() });
+                doFetch = false;
+            } catch (ExecError & e) {
+                if (WIFEXITED(e.status)) {
+                    doFetch = true;
+                } else {
+                    throw;
+                }
+            }
+        } else {
+            /* If the local ref is older than ‘tarball-ttl’ seconds, do a
+               git fetch to update the local ref to the remote ref. */
+            struct stat st;
+            doFetch = stat(localRefFile.c_str(), &st) != 0 ||
+                st.st_mtime + settings.tarballTtl <= now;
+        }
+
+        if (doFetch) {
+            Activity act(*logger, lvlTalkative, actUnknown, fmt("fetching Git repository '%s'", uri));
+
+            // FIXME: git stderr messes up our progress indicator, so
+            // we're using --quiet for now. Should process its stderr.
+            runProgram("git", true, { "-C", repoDir, "fetch", "--quiet", "--force", "--", uri, fmt("%s:%s", *ref, *ref) });
+
+            struct timeval times[2];
+            times[0].tv_sec = now;
+            times[0].tv_usec = 0;
+            times[1].tv_sec = now;
+            times[1].tv_usec = 0;
+
+            utimes(localRefFile.c_str(), times);
+        }
+
+        if (!rev)
+            rev = Hash(chomp(readFile(localRefFile)), htSHA1);
     }
 
     // FIXME: check whether rev is an ancestor of ref.
     GitInfo gitInfo;
     gitInfo.ref = *ref;
-    gitInfo.rev = rev ? *rev : Hash(chomp(readFile(localRefFile)), htSHA1);
+    gitInfo.rev = *rev;
 
     printTalkative("using revision %s of repo '%s'", gitInfo.rev, uri);
 
@@ -140,9 +170,10 @@ GitInfo exportGit(ref<Store> store, const std::string & uri,
 
         assert(json["name"] == name && Hash((std::string) json["rev"], htSHA1) == gitInfo.rev);
 
-        gitInfo.storePath = json["storePath"];
+        Path storePath = json["storePath"];
 
-        if (store->isValidPath(gitInfo.storePath)) {
+        if (store->isValidPath(storePath)) {
+            gitInfo.storePath = storePath;
             gitInfo.revCount = json["revCount"];
             return gitInfo;
         }
@@ -153,7 +184,7 @@ GitInfo exportGit(ref<Store> store, const std::string & uri,
 
     // FIXME: should pipe this, or find some better way to extract a
     // revision.
-    auto tar = runProgram("git", true, { "-C", cacheDir, "archive", gitInfo.rev.gitRev() });
+    auto tar = runProgram("git", true, { "-C", repoDir, "archive", gitInfo.rev.gitRev() });
 
     Path tmpDir = createTempDir();
     AutoDelete delTmpDir(tmpDir, true);
@@ -162,7 +193,7 @@ GitInfo exportGit(ref<Store> store, const std::string & uri,
 
     gitInfo.storePath = store->addToStore(name, tmpDir);
 
-    gitInfo.revCount = std::stoull(runProgram("git", true, { "-C", cacheDir, "rev-list", "--count", gitInfo.rev.gitRev() }));
+    gitInfo.revCount = std::stoull(runProgram("git", true, { "-C", repoDir, "rev-list", "--count", gitInfo.rev.gitRev() }));
 
     nlohmann::json json;
     json["storePath"] = gitInfo.storePath;

@@ -160,10 +160,11 @@ static RegisterStoreImplementation regStore([](
     const std::string & uri, const Store::Params & params)
     -> std::shared_ptr<Store>
 {
+    static bool forceHttp = getEnv("_NIX_FORCE_HTTP") == "1";
     if (std::string(uri, 0, 7) != "http://" &&
         std::string(uri, 0, 8) != "https://" &&
-        (getEnv("_NIX_FORCE_HTTP_BINARY_CACHE_STORE") != "1" || std::string(uri, 0, 7) != "file://")
-        ) return 0;
+        (!forceHttp || std::string(uri, 0, 7) != "file://"))
+        return 0;
     auto store = std::make_shared<HttpBinaryCacheStore>(params, uri);
     store->init();
     return store;
