@@ -44,6 +44,8 @@ void printFlakeInfo(Flake & flake, bool json) {
         j["description"] = flake.description;
         if (flake.sourceInfo.rev)
             j["revision"] = flake.sourceInfo.rev->to_string(Base16, false);
+        if (flake.sourceInfo.revCount)
+            j["revCount"] = *flake.sourceInfo.revCount;
         j["path"] = flake.sourceInfo.storePath;
         std::cout << j.dump(4) << std::endl;
     } else {
@@ -52,6 +54,8 @@ void printFlakeInfo(Flake & flake, bool json) {
         std::cout << "Description: " << flake.description << "\n";
         if (flake.sourceInfo.rev)
             std::cout << "Revision:    " << flake.sourceInfo.rev->to_string(Base16, false) << "\n";
+        if (flake.sourceInfo.revCount)
+            std::cout << "Revcount:    " << *flake.sourceInfo.revCount << "\n";
         std::cout << "Path:        " << flake.sourceInfo.storePath << "\n";
     }
 }
