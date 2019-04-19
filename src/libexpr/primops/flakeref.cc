@@ -142,6 +142,12 @@ std::string FlakeRef::to_string() const
     return string;
 }
 
+std::ostream & operator << (std::ostream & str, const FlakeRef & flakeRef)
+{
+    str << flakeRef.to_string();
+    return str;
+}
+
 bool FlakeRef::isImmutable() const
 {
     return (bool) rev;

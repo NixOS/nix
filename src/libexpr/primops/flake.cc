@@ -48,7 +48,7 @@ LockFile::FlakeEntry readFlakeEntry(nlohmann::json json)
 {
     FlakeRef flakeRef(json["uri"]);
     if (!flakeRef.isImmutable())
-        throw Error("requested to fetch FlakeRef '%s' purely, which is mutable", flakeRef.to_string());
+        throw Error("requested to fetch FlakeRef '%s' purely, which is mutable", flakeRef);
 
     LockFile::FlakeEntry entry(flakeRef);
 
@@ -57,7 +57,7 @@ LockFile::FlakeEntry readFlakeEntry(nlohmann::json json)
     for (auto i = nonFlakeRequires.begin(); i != nonFlakeRequires.end(); ++i) {
         FlakeRef flakeRef(i->value("uri", ""));
         if (!flakeRef.isImmutable())
-            throw Error("requested to fetch FlakeRef '%s' purely, which is mutable", flakeRef.to_string());
+            throw Error("requested to fetch FlakeRef '%s' purely, which is mutable", flakeRef);
         entry.nonFlakeEntries.insert_or_assign(i.key(), flakeRef);
     }
 
@@ -87,7 +87,7 @@ LockFile readLockFile(const Path & path)
     for (auto i = nonFlakeRequires.begin(); i != nonFlakeRequires.end(); ++i) {
         FlakeRef flakeRef(i->value("uri", ""));
         if (!flakeRef.isImmutable())
-            throw Error("requested to fetch FlakeRef '%s' purely, which is mutable", flakeRef.to_string());
+            throw Error("requested to fetch FlakeRef '%s' purely, which is mutable", flakeRef);
         lockFile.nonFlakeEntries.insert_or_assign(i.key(), flakeRef);
     }
 
@@ -160,7 +160,7 @@ static FlakeRef lookupFlake(EvalState & state, const FlakeRef & flakeRef,
     std::vector<FlakeRef> pastSearches = {})
 {
     if (registries.empty() && !flakeRef.isDirect())
-        throw Error("indirect flake reference '%s' is not allowed", flakeRef.to_string());
+        throw Error("indirect flake reference '%s' is not allowed", flakeRef);
 
     for (std::shared_ptr<FlakeRegistry> registry : registries) {
         auto i = registry->entries.find(flakeRef);
@@ -183,7 +183,7 @@ static FlakeRef lookupFlake(EvalState & state, const FlakeRef & flakeRef,
     }
 
     if (!flakeRef.isDirect())
-        throw Error("could not resolve flake reference '%s'", flakeRef.to_string());
+        throw Error("could not resolve flake reference '%s'", flakeRef);
 
     return flakeRef;
 }
@@ -194,7 +194,7 @@ static FlakeSourceInfo fetchFlake(EvalState & state, const FlakeRef flakeRef, bo
         impureIsAllowed ? state.getFlakeRegistries() : std::vector<std::shared_ptr<FlakeRegistry>>());
 
     if (evalSettings.pureEval && !impureIsAllowed && !fRef.isImmutable())
-        throw Error("requested to fetch mutable flake '%s' in pure mode", fRef.to_string());
+        throw Error("requested to fetch mutable flake '%s' in pure mode", fRef);
 
     // This only downloads only one revision of the repo, not the entire history.
     if (auto refData = std::get_if<FlakeRef::IsGitHub>(&fRef.data)) {
@@ -277,8 +277,12 @@ Flake getFlake(EvalState & state, const FlakeRef & flakeRef, bool impureIsAllowe
                 + "/" + flake.sourceInfo.rev->to_string(Base16, false));
     }
 
+    Path flakeFile = sourceInfo.storePath + "/flake.nix";
+    if (!pathExists(flakeFile))
+        throw Error("source tree referenced by '%s' does not contain a 'flake.nix' file", flakeRef);
+
     Value vInfo;
-    state.evalFile(sourceInfo.storePath + "/flake.nix", vInfo); // FIXME: symlink attack
+    state.evalFile(flakeFile, vInfo); // FIXME: symlink attack
 
     state.forceAttrs(vInfo);
 

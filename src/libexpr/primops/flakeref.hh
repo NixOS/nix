@@ -1,3 +1,5 @@
+#pragma once
+
 #include "types.hh"
 #include "hash.hh"
 
@@ -173,4 +175,7 @@ struct FlakeRef
 
     FlakeRef baseRef() const;
 };
+
+std::ostream & operator << (std::ostream & str, const FlakeRef & flakeRef);
+
 }

@@ -32,7 +32,7 @@ struct CmdFlakeList : StoreCommand, MixEvalArgs
 
         for (auto & registry : registries)
             for (auto & entry : registry->entries)
-                std::cout << entry.first.to_string() << " " << entry.second.to_string() << "\n";
+                std::cout << entry.first << " " << entry.second << "\n";
     }
 };
 
@@ -48,7 +48,7 @@ void printFlakeInfo(Flake & flake, bool json) {
         std::cout << j.dump(4) << std::endl;
     } else {
         std::cout << "ID:          " << flake.id << "\n";
-        std::cout << "URI:         " << flake.sourceInfo.flakeRef.to_string() << "\n";
+        std::cout << "URI:         " << flake.sourceInfo.flakeRef << "\n";
         std::cout << "Description: " << flake.description << "\n";
         if (flake.sourceInfo.rev)
             std::cout << "Revision:    " << flake.sourceInfo.rev->to_string(Base16, false) << "\n";
