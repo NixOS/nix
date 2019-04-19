@@ -415,7 +415,7 @@ void callFlake(EvalState & state, const Dependencies & flake, Value & v)
     // Construct the resulting attrset '{description, provides,
     // ...}'. This attrset is passed lazily as an argument to 'provides'.
 
-    state.mkAttrs(v, flake.flakeDeps.size() + flake.nonFlakeDeps.size() + 4);
+    state.mkAttrs(v, flake.flakeDeps.size() + flake.nonFlakeDeps.size() + 8);
 
     for (auto & dep : flake.flakeDeps) {
         auto vFlake = state.allocAttr(v, dep.flake.id);
