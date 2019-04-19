@@ -128,7 +128,7 @@ std::string FlakeRef::to_string() const
     }
 
     else if (auto refData = std::get_if<FlakeRef::IsGit>(&data)) {
-        assert(ref || !rev);
+        assert(!rev || ref);
         string = refData->uri;
     }
 

@@ -9,6 +9,7 @@ namespace nix {
 struct GitInfo
 {
     Path storePath;
+    std::string ref;
     std::string rev;
     std::string shortRev;
     std::optional<uint64_t> revCount;

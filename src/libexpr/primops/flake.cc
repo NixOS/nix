@@ -237,8 +237,8 @@ static FlakeSourceInfo fetchFlake(EvalState & state, const FlakeRef flakeRef, bo
         info.storePath = gitInfo.storePath;
         info.rev = Hash(gitInfo.rev, htSHA1);
         info.revCount = gitInfo.revCount;
+        info.flakeRef.ref = gitInfo.ref;
         info.flakeRef.rev = info.rev;
-        // FIXME: ensure info.flakeRef.ref is set.
         return info;
     }
 

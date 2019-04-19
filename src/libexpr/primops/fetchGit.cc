@@ -39,6 +39,7 @@ GitInfo exportGit(ref<Store> store, const std::string & uri,
                files. */
 
             GitInfo gitInfo;
+            gitInfo.ref = "HEAD";
             gitInfo.rev = "0000000000000000000000000000000000000000";
             gitInfo.shortRev = std::string(gitInfo.rev, 0, 7);
 
@@ -67,7 +68,6 @@ GitInfo exportGit(ref<Store> store, const std::string & uri,
 
         // clean working tree, but no ref or rev specified.  Use 'HEAD'.
         rev = chomp(runProgram("git", true, { "-C", uri, "rev-parse", "HEAD" }));
-        ref = "HEAD"s;
     }
 
     if (!ref) ref = "HEAD"s;
@@ -127,6 +127,7 @@ GitInfo exportGit(ref<Store> store, const std::string & uri,
 
     // FIXME: check whether rev is an ancestor of ref.
     GitInfo gitInfo;
+    gitInfo.ref = *ref;
     gitInfo.rev = rev != "" ? rev : chomp(readFile(localRefFile));
     gitInfo.shortRev = std::string(gitInfo.rev, 0, 7);
 
