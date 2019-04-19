@@ -7,7 +7,7 @@
             "uri": "github:tweag/nix/flakes"
         },
         "nixpkgs": {
-            "uri": "github:edolstra/nixpkgs/flake"
+            "uri": "github:edolstra/nixpkgs/release-19.03"
         }
     },
     "version": 1
