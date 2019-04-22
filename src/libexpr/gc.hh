@@ -225,7 +225,7 @@ private:
         ArenaList();
     };
 
-    std::array<ArenaList, 2> arenaLists;
+    std::array<ArenaList, 3> arenaLists;
 
 public:
 
@@ -235,7 +235,10 @@ public:
     template<typename T, typename... Args>
     Ptr<T> alloc(Size size, const Args & ... args)
     {
-        ArenaList & arenaList = size == 3 ? arenaLists[0] : arenaLists[1];
+        ArenaList & arenaList =
+            size == 3 ? arenaLists[0] :
+            size == 4 ? arenaLists[1] :
+            arenaLists[2];
 
         for (int i = 0; i < 3; i++) {
 

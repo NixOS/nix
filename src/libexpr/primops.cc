@@ -119,7 +119,7 @@ static void prim_scopedImport(EvalState & state, const Pos & pos, Value * * args
             mkString(*(outputsVal->listElems()[outputs_index++]), o.first);
         }
         w->attrs->sort();
-        Root<Value> fun;
+        auto fun = state.allocValue();
         state.evalFile(settings.nixDataDir + "/nix/corepkgs/imported-drv-to-derivation.nix", fun);
         state.forceFunction(fun, pos);
         mkApp(v, fun, w);
@@ -1497,7 +1497,7 @@ static void prim_foldlStrict(EvalState & state, const Pos & pos, Value * * args,
         Ptr<Value> vCur = args[1];
 
         for (unsigned int n = 0; n < args[2]->listSize(); ++n) {
-            Root<Value> vTmp;
+            Root<Value> vTmp; // FIXME: correct?
             state.callFunction(*args[0], *vCur, vTmp, pos);
             vCur = n == args[2]->listSize() - 1 ? Ptr(&v) : state.allocValue();
             state.callFunction(vTmp, *args[2]->listElems()[n], *vCur, pos);
@@ -1580,7 +1580,7 @@ static void prim_sort(EvalState & state, const Pos & pos, Value * * args, Value 
         if (args[0]->type == tPrimOp && args[0]->primOp->fun == prim_lessThan)
             return CompareValues()(a, b);
 
-        Root<Value> vTmp1, vTmp2;
+        Root<Value> vTmp1, vTmp2; // FIXME
         state.callFunction(*args[0], *a, vTmp1, pos);
         state.callFunction(vTmp1, *b, vTmp2, pos);
         return state.forceBool(vTmp2, pos);

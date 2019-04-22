@@ -1330,8 +1330,9 @@ void ExprConcatStrings::eval(EvalState & state, Env & env, Value & v)
     bool first = !forceString;
     Tag firstType = tString;
 
+    auto vTmp = state.allocValue();
+
     for (auto & i : *es) {
-        Root<Value> vTmp;
         i->eval(state, env, vTmp);
 
         /* If the first element is a path, then the result will also
@@ -1534,7 +1535,7 @@ string EvalState::coerceToString(const Pos & pos, Value & v, PathSet & context,
     if (v.type == tAttrs) {
         auto i = v.attrs->find(sToString);
         if (i != v.attrs->end()) {
-            Root<Value> v1;
+            auto v1 = allocValue();
             callFunction(*i->value, v, v1, pos);
             return coerceToString(pos, v1, context, coerceMore, copyToStore);
         }
