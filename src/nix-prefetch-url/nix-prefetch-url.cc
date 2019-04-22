@@ -30,12 +30,12 @@ string resolveMirrorUri(EvalState & state, string uri)
     if (p == string::npos) throw Error("invalid mirror URI");
     string mirrorName(s, 0, p);
 
-    Value vMirrors;
+    Root<Value> vMirrors;
     state.eval(state.parseExprFromString("import <nixpkgs/pkgs/build-support/fetchurl/mirrors.nix>", "."), vMirrors);
     state.forceAttrs(vMirrors);
 
-    auto mirrorList = vMirrors.attrs->find(state.symbols.create(mirrorName));
-    if (mirrorList == vMirrors.attrs->end())
+    auto mirrorList = vMirrors->attrs->find(state.symbols.create(mirrorName));
+    if (mirrorList == vMirrors->attrs->end())
         throw Error(format("unknown mirror name '%1%'") % mirrorName);
     state.forceList(*mirrorList->value);
 
@@ -106,7 +106,7 @@ static int _main(int argc, char * * argv)
         auto store = openStore();
         auto state = std::make_unique<EvalState>(myArgs.searchPath, store);
 
-        Bindings & autoArgs = *myArgs.getAutoArgs(*state);
+        auto autoArgs = myArgs.getAutoArgs(*state);
 
         /* If -A is given, get the URI from the specified Nix
            expression. */
@@ -117,14 +117,14 @@ static int _main(int argc, char * * argv)
             uri = args[0];
         } else {
             Path path = resolveExprPath(lookupFileArg(*state, args.empty() ? "." : args[0]));
-            Value vRoot;
+            Root<Value> vRoot;
             state->evalFile(path, vRoot);
-            Value & v(*findAlongAttrPath(*state, attrPath, autoArgs, vRoot));
+            auto v = findAlongAttrPath(*state, attrPath, *autoArgs, vRoot);
             state->forceAttrs(v);
 
             /* Extract the URI. */
-            auto attr = v.attrs->find(state->symbols.create("urls"));
-            if (attr == v.attrs->end())
+            auto attr = v->attrs->find(state->symbols.create("urls"));
+            if (attr == v->attrs->end())
                 throw Error("attribute set does not contain a 'urls' attribute");
             state->forceList(*attr->value);
             if (attr->value->listSize() < 1)
@@ -132,16 +132,16 @@ static int _main(int argc, char * * argv)
             uri = state->forceString(*attr->value->listElems()[0]);
 
             /* Extract the hash mode. */
-            attr = v.attrs->find(state->symbols.create("outputHashMode"));
-            if (attr == v.attrs->end())
+            attr = v->attrs->find(state->symbols.create("outputHashMode"));
+            if (attr == v->attrs->end())
                 printInfo("warning: this does not look like a fetchurl call");
             else
                 unpack = state->forceString(*attr->value) == "recursive";
 
             /* Extract the name. */
             if (name.empty()) {
-                attr = v.attrs->find(state->symbols.create("name"));
-                if (attr != v.attrs->end())
+                attr = v->attrs->find(state->symbols.create("name"));
+                if (attr != v->attrs->end())
                     name = state->forceString(*attr->value);
             }
         }

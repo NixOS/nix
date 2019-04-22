@@ -46,7 +46,7 @@ struct InstallSourceInfo
     Path nixExprPath; /* for srcNixExprDrvs, srcNixExprs */
     Path profile; /* for srcProfile */
     string systemFilter; /* for srcNixExprDrvs */
-    Bindings * autoArgs;
+    Ptr<Bindings> autoArgs;
 };
 
 
@@ -131,7 +131,7 @@ static void getAllExprs(EvalState & state,
             attrs.insert(attrName);
             /* Load the expression on demand. */
             Value & vFun = state.getBuiltin("import");
-            Value & vArg(*state.allocValue());
+            auto vArg = state.allocValue();
             mkString(vArg, path2);
             if (v.attrs->size() == v.attrs->capacity())
                 throw Error(format("too many Nix expressions in directory '%1%'") % path);
@@ -176,10 +176,10 @@ static void loadDerivations(EvalState & state, Path nixExprPath,
     string systemFilter, Bindings & autoArgs,
     const string & pathPrefix, DrvInfos & elems)
 {
-    Value vRoot;
+    auto vRoot = state.allocValue();
     loadSourceExpr(state, nixExprPath, vRoot);
 
-    Value & v(*findAlongAttrPath(state, pathPrefix, autoArgs, vRoot));
+    auto v = findAlongAttrPath(state, pathPrefix, autoArgs, vRoot);
 
     getDerivations(state, v, pathPrefix, autoArgs, elems, true);
 
@@ -360,13 +360,14 @@ static void queryInstSources(EvalState & state,
            (import ./foo.nix)' = `(import ./foo.nix).bar'. */
         case srcNixExprs: {
 
-            Value vArg;
+            auto vArg = state.allocValue();
             loadSourceExpr(state, instSource.nixExprPath, vArg);
 
             for (auto & i : args) {
                 Expr * eFun = state.parseExprFromString(i, absPath("."));
-                Value vFun, vTmp;
+                auto vFun = state.allocValue();
                 state.eval(eFun, vFun);
+                auto vTmp = state.allocValue();
                 mkApp(vTmp, vFun, vArg);
                 getDerivations(state, vTmp, "", *instSource.autoArgs, elems, true);
             }
@@ -416,10 +417,10 @@ static void queryInstSources(EvalState & state,
         }
 
         case srcAttrPath: {
-            Value vRoot;
+            Root<Value> vRoot;
             loadSourceExpr(state, instSource.nixExprPath, vRoot);
             for (auto & i : args) {
-                Value & v(*findAlongAttrPath(state, i, *instSource.autoArgs, vRoot));
+                auto v = findAlongAttrPath(state, i, *instSource.autoArgs, vRoot);
                 getDerivations(state, v, "", *instSource.autoArgs, elems, true);
             }
             break;
@@ -639,7 +640,7 @@ static void opUpgrade(Globals & globals, Strings opFlags, Strings opArgs)
 static void setMetaFlag(EvalState & state, DrvInfo & drv,
     const string & name, const string & value)
 {
-    Value * v = state.allocValue();
+    auto v = state.allocValue();
     mkString(*v, value.c_str());
     drv.setMeta(name, v);
 }

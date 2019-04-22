@@ -26,7 +26,8 @@ private:
 
     bool failed = false; // set if we get an AssertionError
 
-    Bindings * attrs = nullptr, * meta = nullptr;
+    Ptr<Bindings> attrs;
+    Ptr<Bindings> meta;
 
     Bindings * getMeta();
 

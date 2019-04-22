@@ -78,7 +78,7 @@ struct Expr
     virtual void show(std::ostream & str) const;
     virtual void bindVars(const StaticEnv & env);
     virtual void eval(EvalState & state, Env & env, Value & v);
-    virtual Value * maybeThunk(EvalState & state, Env & env);
+    virtual Ptr<Value> maybeThunk(EvalState & state, Env & env);
     virtual void setName(Symbol & name);
 };
 
@@ -98,7 +98,7 @@ struct ExprInt : Expr
         mkInt(v, n);
     };
     COMMON_METHODS
-    Value * maybeThunk(EvalState & state, Env & env);
+    Ptr<Value> maybeThunk(EvalState & state, Env & env) override;
 };
 
 struct ExprFloat : Expr
@@ -110,7 +110,7 @@ struct ExprFloat : Expr
         mkFloat(v, nf);
     };
     COMMON_METHODS
-    Value * maybeThunk(EvalState & state, Env & env);
+    Ptr<Value> maybeThunk(EvalState & state, Env & env) override;
 };
 
 struct ExprString : Expr
@@ -122,7 +122,7 @@ struct ExprString : Expr
         mkString(v, s);
     };
     COMMON_METHODS
-    Value * maybeThunk(EvalState & state, Env & env);
+    Ptr<Value> maybeThunk(EvalState & state, Env & env) override;
 };
 
 /* Temporary class used during parsing of indented strings. */
@@ -141,7 +141,7 @@ struct ExprPath : Expr
         mkPathNoCopy(v, this->s.c_str());
     };
     COMMON_METHODS
-    Value * maybeThunk(EvalState & state, Env & env);
+    Ptr<Value> maybeThunk(EvalState & state, Env & env) override;
 };
 
 struct ExprVar : Expr
@@ -165,7 +165,7 @@ struct ExprVar : Expr
     ExprVar(const Symbol & name) : name(name) { };
     ExprVar(const Pos & pos, const Symbol & name) : pos(pos), name(name) { };
     COMMON_METHODS
-    Value * maybeThunk(EvalState & state, Env & env);
+    Ptr<Value> maybeThunk(EvalState & state, Env & env) override;
 };
 
 struct ExprSelect : Expr

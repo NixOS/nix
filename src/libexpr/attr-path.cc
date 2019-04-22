@@ -32,7 +32,7 @@ static Strings parseAttrPath(const string & s)
 }
 
 
-Value * findAlongAttrPath(EvalState & state, const string & attrPath,
+Ptr<Value> findAlongAttrPath(EvalState & state, const string & attrPath,
     Bindings & autoArgs, Value & vIn)
 {
     Strings tokens = parseAttrPath(attrPath);
@@ -40,7 +40,7 @@ Value * findAlongAttrPath(EvalState & state, const string & attrPath,
     Error attrError =
         Error(format("attribute selection path '%1%' does not match expression") % attrPath);
 
-    Value * v = &vIn;
+    Ptr<Value> v(&vIn);
 
     for (auto & attr : tokens) {
 
@@ -50,7 +50,7 @@ Value * findAlongAttrPath(EvalState & state, const string & attrPath,
         if (string2Int(attr, attrIndex)) apType = apIndex;
 
         /* Evaluate the expression. */
-        Value * vNew = state.allocValue();
+        auto vNew = state.allocValue();
         state.autoCallFunction(autoArgs, *v, *vNew);
         v = vNew;
         state.forceValue(*v);
@@ -71,7 +71,7 @@ Value * findAlongAttrPath(EvalState & state, const string & attrPath,
             Bindings::iterator a = v->attrs->find(state.symbols.create(attr));
             if (a == v->attrs->end())
                 throw Error(format("attribute '%1%' in selection path '%2%' not found") % attr % attrPath);
-            v = &*a->value;
+            v = a->value;
         }
 
         else if (apType == apIndex) {

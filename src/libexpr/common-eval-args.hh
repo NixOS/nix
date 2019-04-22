@@ -8,11 +8,14 @@ class Store;
 class EvalState;
 class Bindings;
 
+template<class T>
+struct Ptr;
+
 struct MixEvalArgs : virtual Args
 {
     MixEvalArgs();
 
-    Bindings * getAutoArgs(EvalState & state);
+    Ptr<Bindings> getAutoArgs(EvalState & state);
 
     Strings searchPath;
 

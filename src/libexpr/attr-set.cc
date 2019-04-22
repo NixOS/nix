@@ -20,14 +20,15 @@ Ptr<Bindings> Bindings::allocBindings(size_t capacity)
 
 void EvalState::mkAttrs(Value & v, size_t capacity)
 {
-    v.type = tAttrs;
     if (capacity == 0) {
         v.attrs = emptyBindings;
-        return;
+        v.type = tAttrs;
+    } else {
+        v.attrs = Bindings::allocBindings(capacity);
+        v.type = tAttrs;
+        nrAttrsets++;
+        nrAttrsInAttrsets += capacity;
     }
-    v.attrs = Bindings::allocBindings(capacity);
-    nrAttrsets++;
-    nrAttrsInAttrsets += capacity;
 }
 
 
@@ -36,7 +37,7 @@ void EvalState::mkAttrs(Value & v, size_t capacity)
    this attribute. */
 Value * EvalState::allocAttr(Value & vAttrs, const Symbol & name)
 {
-    Value * v = allocValue();
+    auto v = allocValue();
     vAttrs.attrs->push_back(Attr(name, v));
     return v;
 }

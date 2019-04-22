@@ -17,7 +17,7 @@ DrvInfos queryInstalled(EvalState & state, const Path & userEnv)
     DrvInfos elems;
     Path manifestFile = userEnv + "/manifest.nix";
     if (pathExists(manifestFile)) {
-        Value v;
+        Root<Value> v;
         state.evalFile(manifestFile, v);
         auto bindings = Bindings::allocBindings(0);
         getDerivations(state, v, "", bindings, elems, false);
@@ -105,26 +105,27 @@ bool createUserEnv(EvalState & state, DrvInfos & elems,
         fmt("%1%", (Value &) manifest), references);
 
     /* Get the environment builder expression. */
-    Value envBuilder;
+    auto envBuilder = state.allocValue();
     state.evalFile(state.findFile("nix/buildenv.nix"), envBuilder);
 
     /* Construct a Nix expression that calls the user environment
        builder with the manifest as argument. */
-    Value args, topLevel;
+    auto args = state.allocValue();
+    Root<Value> topLevel;
     state.mkAttrs(args, 3);
     mkString(*state.allocAttr(args, state.symbols.create("manifest")),
         manifestFile, {manifestFile});
-    args.attrs->push_back(Attr(state.symbols.create("derivations"), (Value *) manifest));
-    args.attrs->sort();
+    args->attrs->push_back(Attr(state.symbols.create("derivations"), (Value *) manifest));
+    args->attrs->sort();
     mkApp(topLevel, envBuilder, args);
 
     /* Evaluate it. */
     debug("evaluating user environment builder");
     state.forceValue(topLevel);
     PathSet context;
-    Attr & aDrvPath(*topLevel.attrs->find(state.sDrvPath));
+    Attr & aDrvPath(*topLevel->attrs->find(state.sDrvPath));
     Path topLevelDrv = state.coerceToPath(aDrvPath.pos ? *(aDrvPath.pos) : noPos, *(aDrvPath.value), context);
-    Attr & aOutPath(*topLevel.attrs->find(state.sOutPath));
+    Attr & aOutPath(*topLevel->attrs->find(state.sOutPath));
     Path topLevelOut = state.coerceToPath(aOutPath.pos ? *(aOutPath.pos) : noPos, *(aOutPath.value), context);
 
     /* Realise the resulting store expression. */

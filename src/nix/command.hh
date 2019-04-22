@@ -1,6 +1,7 @@
 #pragma once
 
 #include "args.hh"
+#include "gc.hh"
 #include "common-eval-args.hh"
 
 namespace nix {
@@ -66,7 +67,7 @@ struct Installable
 
     Buildable toBuildable();
 
-    virtual Value * toValue(EvalState & state)
+    virtual Ptr<Value> toValue(EvalState & state)
     {
         throw Error("argument '%s' cannot be evaluated", what());
     }
@@ -82,7 +83,7 @@ struct SourceExprCommand : virtual Args, StoreCommand, MixEvalArgs
        are installing. This is either the file specified by ‘--file’,
        or an attribute set constructed from $NIX_PATH, e.g. ‘{ nixpkgs
        = import ...; bla = import ...; }’. */
-    Value * getSourceExpr(EvalState & state);
+    Ptr<Value> getSourceExpr(EvalState & state);
 
     ref<EvalState> getEvalState();
 
@@ -90,7 +91,7 @@ private:
 
     std::shared_ptr<EvalState> evalState;
 
-    Value * vSourceExpr = 0;
+    Ptr<Value> vSourceExpr;
 };
 
 enum RealiseMode { Build, NoBuild, DryRun };

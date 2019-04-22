@@ -36,7 +36,7 @@ struct CmdEdit : InstallableCommand
 
         auto v = installable->toValue(*state);
 
-        Value * v2;
+        Ptr<Value> v2;
         try {
             auto dummyArgs = Bindings::allocBindings(0);
             v2 = findAlongAttrPath(*state, "meta.position", dummyArgs, *v);

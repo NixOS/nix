@@ -35,18 +35,18 @@ void processExpr(EvalState & state, const Strings & attrPaths,
         return;
     }
 
-    Value vRoot;
+    Root<Value> vRoot;
     state.eval(e, vRoot);
 
     for (auto & i : attrPaths) {
-        Value & v(*findAlongAttrPath(state, i, autoArgs, vRoot));
+        auto v = findAlongAttrPath(state, i, autoArgs, vRoot);
         state.forceValue(v);
 
         PathSet context;
         if (evalOnly) {
-            Value vRes;
+            Root<Value> vRes;
             if (autoArgs.empty())
-                vRes = v;
+                vRes = *v;
             else
                 state.autoCallFunction(autoArgs, v, vRes);
             if (output == okXML)
@@ -55,7 +55,7 @@ void processExpr(EvalState & state, const Strings & attrPaths,
                 printValueAsJSON(state, strict, vRes, std::cout, context);
             else {
                 if (strict) state.forceValueDeep(vRes);
-                std::cout << vRes << std::endl;
+                std::cout << *vRes << std::endl;
             }
         } else {
             DrvInfos drvs;
@@ -159,7 +159,7 @@ static int _main(int argc, char * * argv)
         auto state = std::make_unique<EvalState>(myArgs.searchPath, store);
         state->repair = repair;
 
-        Bindings & autoArgs = *myArgs.getAutoArgs(*state);
+        auto autoArgs = myArgs.getAutoArgs(*state);
 
         if (attrPaths.empty()) attrPaths = {""};
 
@@ -174,7 +174,7 @@ static int _main(int argc, char * * argv)
 
         if (readStdin) {
             Expr * e = state->parseStdin();
-            processExpr(*state, attrPaths, parseOnly, strict, autoArgs,
+            processExpr(*state, attrPaths, parseOnly, strict, *autoArgs,
                 evalOnly, outputKind, xmlOutputSourceLocation, e);
         } else if (files.empty() && !fromArgs)
             files.push_back("./default.nix");
@@ -183,7 +183,7 @@ static int _main(int argc, char * * argv)
             Expr * e = fromArgs
                 ? state->parseExprFromString(i, absPath("."))
                 : state->parseExprFromFile(resolveExprPath(state->checkSourcePath(lookupFileArg(*state, i))));
-            processExpr(*state, attrPaths, parseOnly, strict, autoArgs,
+            processExpr(*state, attrPaths, parseOnly, strict, *autoArgs,
                 evalOnly, outputKind, xmlOutputSourceLocation, e);
         }
 

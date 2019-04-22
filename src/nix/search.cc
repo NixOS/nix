@@ -235,12 +235,12 @@ struct CmdSearch : SourceExprCommand, MixJSON
 
             warn("using cached results; pass '-u' to update the cache");
 
-            Value vRoot;
+            Root<Value> vRoot;
             parseJSON(*state, readFile(jsonCacheFileName), vRoot);
 
             fromCache = true;
 
-            doExpr(&vRoot, "", true, nullptr);
+            doExpr(&*vRoot, "", true, nullptr);
         }
 
         else {

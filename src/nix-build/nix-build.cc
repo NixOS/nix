@@ -245,7 +245,7 @@ static void _main(int argc, char * * argv)
     auto state = std::make_unique<EvalState>(myArgs.searchPath, store);
     state->repair = repair;
 
-    Bindings & autoArgs = *myArgs.getAutoArgs(*state);
+    auto autoArgs = myArgs.getAutoArgs(*state);
 
     if (packages) {
         std::ostringstream joined;
@@ -293,13 +293,13 @@ static void _main(int argc, char * * argv)
     if (attrPaths.empty()) attrPaths = {""};
 
     for (auto e : exprs) {
-        Value vRoot;
+        Root<Value> vRoot;
         state->eval(e, vRoot);
 
         for (auto & i : attrPaths) {
-            Value & v(*findAlongAttrPath(*state, i, autoArgs, vRoot));
+            auto v = findAlongAttrPath(*state, i, *autoArgs, vRoot);
             state->forceValue(v);
-            getDerivations(*state, v, "", autoArgs, drvs, false);
+            getDerivations(*state, v, "", *autoArgs, drvs, false);
         }
     }
 
@@ -339,7 +339,7 @@ static void _main(int argc, char * * argv)
             try {
                 auto expr = state->parseExprFromString("(import <nixpkgs> {}).bashInteractive", absPath("."));
 
-                Value v;
+                Root<Value> v;
                 state->eval(expr, v);
 
                 auto drv = getDerivation(*state, v, false);

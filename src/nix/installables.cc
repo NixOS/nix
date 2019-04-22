@@ -22,7 +22,7 @@ SourceExprCommand::SourceExprCommand()
         .dest(&file);
 }
 
-Value * SourceExprCommand::getSourceExpr(EvalState & state)
+Ptr<Value> SourceExprCommand::getSourceExpr(EvalState & state)
 {
     if (vSourceExpr) return vSourceExpr;
 
@@ -57,9 +57,9 @@ Value * SourceExprCommand::getSourceExpr(EvalState & state)
                 state.getBuiltin("import"),
                 mkString(*state.allocValue(), res.second));
 #endif
-            Value * v1 = state.allocValue();
+            auto v1 = state.allocValue();
             mkPrimOpApp(*v1, state.getBuiltin("findFile"), state.getBuiltin("nixPath"));
-            Value * v2 = state.allocValue();
+            auto v2 = state.allocValue();
             mkApp(*v2, *v1, mkString(*state.allocValue(), i.first));
             mkApp(*state.allocAttr(*vSourceExpr, state.symbols.create(i.first)),
                 state.getBuiltin("import"), *v2);
@@ -155,7 +155,7 @@ struct InstallableExpr : InstallableValue
 
     std::string what() override { return text; }
 
-    Value * toValue(EvalState & state) override
+    Ptr<Value> toValue(EvalState & state) override
     {
         auto v = state.allocValue();
         state.eval(state.parseExprFromString(text, absPath(".")), *v);
@@ -173,13 +173,13 @@ struct InstallableAttrPath : InstallableValue
 
     std::string what() override { return attrPath; }
 
-    Value * toValue(EvalState & state) override
+    Ptr<Value> toValue(EvalState & state) override
     {
         auto source = cmd.getSourceExpr(state);
 
-        Bindings & autoArgs = *cmd.getAutoArgs(state);
+        auto autoArgs = cmd.getAutoArgs(state);
 
-        Value * v = findAlongAttrPath(state, attrPath, autoArgs, *source);
+        auto v = findAlongAttrPath(state, attrPath, *autoArgs, *source);
         state.forceValue(*v);
 
         return v;

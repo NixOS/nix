@@ -42,10 +42,10 @@ private:
     size_t size_;
     Attr attrs[0];
 
-public:
-    // FIXME: make private
-    Bindings(size_t capacity) : Object(tBindings, capacity), size_(0) { }
+    Bindings(size_t capacity) : Object(tBindings, capacity), size_(0) {}
     Bindings(const Bindings & bindings) = delete;
+
+public:
 
     size_t size() const { return size_; }
 
@@ -56,6 +56,7 @@ public:
     void push_back(const Attr & attr)
     {
         assert(size_ < capacity());
+        gc.assertObject(attr.value);
         attrs[size_++] = attr;
     }
 

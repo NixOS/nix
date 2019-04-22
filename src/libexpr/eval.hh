@@ -42,7 +42,16 @@ struct Env : Object
     enum { Plain = 0, HasWithExpr, HasWithAttrs } type:2; // FIXME: fold into type?
     Value * values[0];
 
-    Env(unsigned short size) : Object(tEnv, 0), size(size) {}
+private:
+
+    Env(unsigned short size) : Object(tEnv, 0), size(size) {
+        for (auto i = 0; i < size; i++)
+            values[i] = nullptr;
+    }
+
+    friend class GC;
+
+public:
 
     Size words() const
     {

@@ -28,7 +28,8 @@ typedef double NixFloat;
 class ExternalValueBase
 {
     friend std::ostream & operator << (std::ostream & str, const ExternalValueBase & v);
-    protected:
+
+protected:
     /* Print out the value */
     virtual std::ostream & print(std::ostream & str) const = 0;
 
@@ -121,7 +122,14 @@ struct Value : Object
         NixFloat fpoint;
     };
 
-    Value() : Object(tBlackhole, 0) { }
+private:
+
+    Value() : Object(tNull, 0) {}
+
+    friend class GC;
+    template<typename T> friend class Root;
+
+public:
 
     bool isList() const
     {

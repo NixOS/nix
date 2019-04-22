@@ -102,14 +102,13 @@ static void prim_scopedImport(EvalState & state, const Pos & pos, Value * * args
 
     if (state.store->isStorePath(path) && state.store->isValidPath(path) && isDerivation(path)) {
         Derivation drv = readDerivation(realPath);
-        Value & w = *state.allocValue();
+        auto w = state.allocValue();
         state.mkAttrs(w, 3 + drv.outputs.size());
-        Value * v2 = state.allocAttr(w, state.sDrvPath);
+        auto v2 = state.allocAttr(w, state.sDrvPath);
         mkString(*v2, path, {"=" + path});
         v2 = state.allocAttr(w, state.sName);
         mkString(*v2, drv.env["name"]);
-        Value * outputsVal =
-            state.allocAttr(w, state.symbols.create("outputs"));
+        auto outputsVal = state.allocAttr(w, state.symbols.create("outputs"));
         state.mkList(*outputsVal, drv.outputs.size());
         unsigned int outputs_index = 0;
 
@@ -119,8 +118,8 @@ static void prim_scopedImport(EvalState & state, const Pos & pos, Value * * args
             outputsVal->listElems()[outputs_index] = state.allocValue();
             mkString(*(outputsVal->listElems()[outputs_index++]), o.first);
         }
-        w.attrs->sort();
-        Value fun;
+        w->attrs->sort();
+        Root<Value> fun;
         state.evalFile(settings.nixDataDir + "/nix/corepkgs/imported-drv-to-derivation.nix", fun);
         state.forceFunction(fun, pos);
         mkApp(v, fun, w);
@@ -355,7 +354,6 @@ typedef list<Ptr<Value>> ValueList;
 
 static void prim_genericClosure(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
-#if 0
     state.forceAttrs(*args[0], pos);
 
     /* Get the start set. */
@@ -381,10 +379,10 @@ static void prim_genericClosure(EvalState & state, const Pos & pos, Value * * ar
        no new elements are found. */
     ValueList res;
     // `doneKeys' doesn't need to be a GC root, because its values are
-    // reachable from res.
+    // reachable from res. FIXME: dubious.
     set<Value *, CompareValues> doneKeys;
     while (!workSet.empty()) {
-        Value * e = *(workSet.begin());
+        auto e = *(workSet.begin());
         workSet.pop_front();
 
         state.forceAttrs(*e, pos);
@@ -395,19 +393,19 @@ static void prim_genericClosure(EvalState & state, const Pos & pos, Value * * ar
             throw EvalError(format("attribute 'key' required, at %1%") % pos);
         state.forceValue(*key->value);
 
-        if (doneKeys.find(key->value) != doneKeys.end()) continue;
+        if (doneKeys.count(key->value)) continue;
         doneKeys.insert(key->value);
         res.push_back(e);
 
         /* Call the `operator' function with `e' as argument. */
-        Value call;
+        Root<Value> call;
         mkApp(call, *op->value, *e);
         state.forceList(call, pos);
 
         /* Add the values returned by the operator to the work set. */
-        for (unsigned int n = 0; n < call.listSize(); ++n) {
-            state.forceValue(*call.listElems()[n]);
-            workSet.push_back(call.listElems()[n]);
+        for (unsigned int n = 0; n < call->listSize(); ++n) {
+            state.forceValue(*call->listElems()[n]);
+            workSet.push_back(call->listElems()[n]);
         }
     }
 
@@ -416,8 +414,6 @@ static void prim_genericClosure(EvalState & state, const Pos & pos, Value * * ar
     unsigned int n = 0;
     for (auto & i : res)
         v.listElems()[n++] = i;
-#endif
-    abort();
 }
 
 
@@ -940,7 +936,7 @@ static void prim_readDir(EvalState & state, const Pos & pos, Value * * args, Val
     state.mkAttrs(v, entries.size());
 
     for (auto & ent : entries) {
-        Value * ent_val = state.allocAttr(v, state.symbols.create(ent.name));
+        auto ent_val = state.allocAttr(v, state.symbols.create(ent.name));
         if (ent.type == DT_UNKNOWN)
             ent.type = getFileType(path + "/" + ent.name);
         mkStringNoCopy(*ent_val,
@@ -1030,20 +1026,20 @@ static void addPath(EvalState & state, const Pos & pos, const string & name, con
 
         /* Call the filter function.  The first argument is the path,
            the second is a string indicating the type of the file. */
-        Value arg1;
+        auto arg1 = state.allocValue();
         mkString(arg1, path);
 
-        Value fun2;
+        Root<Value> fun2;
         state.callFunction(*filterFun, arg1, fun2, noPos);
 
-        Value arg2;
+        auto arg2 = state.allocValue();
         mkString(arg2,
             S_ISREG(st.st_mode) ? "regular" :
             S_ISDIR(st.st_mode) ? "directory" :
             S_ISLNK(st.st_mode) ? "symlink" :
             "unknown" /* not supported, will fail! */);
 
-        Value res;
+        Root<Value> res;
         state.callFunction(fun2, arg2, res, noPos);
 
         return state.forceBool(res, pos);
@@ -1355,8 +1351,8 @@ static void prim_mapAttrs(EvalState & state, const Pos & pos, Value * * args, Va
     state.mkAttrs(v, args[1]->attrs->size());
 
     for (auto & i : *args[1]->attrs) {
-        Value * vName = state.allocValue();
-        Value * vFun2 = state.allocValue();
+        auto vName = state.allocValue();
+        auto vFun2 = state.allocValue();
         mkString(*vName, i.name);
         mkApp(*vFun2, *args[0], *vName);
         mkApp(*state.allocAttr(v, i.name), *vFun2, *i.value);
@@ -1443,7 +1439,7 @@ static void prim_filter(EvalState & state, const Pos & pos, Value * * args, Valu
 
     bool same = true;
     for (unsigned int n = 0; n < args[1]->listSize(); ++n) {
-        Value res;
+        Root<Value> res;
         state.callFunction(*args[0], *args[1]->listElems()[n], res, noPos);
         if (state.forceBool(res, pos))
             vs[k++] = args[1]->listElems()[n];
@@ -1498,12 +1494,12 @@ static void prim_foldlStrict(EvalState & state, const Pos & pos, Value * * args,
     state.forceList(*args[2], pos);
 
     if (args[2]->listSize()) {
-        Value * vCur = args[1];
+        Ptr<Value> vCur = args[1];
 
         for (unsigned int n = 0; n < args[2]->listSize(); ++n) {
-            Value vTmp;
+            Root<Value> vTmp;
             state.callFunction(*args[0], *vCur, vTmp, pos);
-            vCur = n == args[2]->listSize() - 1 ? &v : state.allocValue();
+            vCur = n == args[2]->listSize() - 1 ? Ptr(&v) : state.allocValue();
             state.callFunction(vTmp, *args[2]->listElems()[n], *vCur, pos);
         }
         state.forceValue(v);
@@ -1519,7 +1515,7 @@ static void anyOrAll(bool any, EvalState & state, const Pos & pos, Value * * arg
     state.forceFunction(*args[0], pos);
     state.forceList(*args[1], pos);
 
-    Value vTmp;
+    Root<Value> vTmp;
     for (unsigned int n = 0; n < args[1]->listSize(); ++n) {
         state.callFunction(*args[0], *args[1]->listElems()[n], vTmp, pos);
         bool res = state.forceBool(vTmp, pos);
@@ -1555,7 +1551,7 @@ static void prim_genList(EvalState & state, const Pos & pos, Value * * args, Val
     state.mkList(v, len);
 
     for (unsigned int n = 0; n < (unsigned int) len; ++n) {
-        Value * arg = state.allocValue();
+        auto arg = state.allocValue();
         mkInt(*arg, n);
         mkApp(*(v.listElems()[n] = state.allocValue()), *args[0], *arg);
     }
@@ -1584,7 +1580,7 @@ static void prim_sort(EvalState & state, const Pos & pos, Value * * args, Value 
         if (args[0]->type == tPrimOp && args[0]->primOp->fun == prim_lessThan)
             return CompareValues()(a, b);
 
-        Value vTmp1, vTmp2;
+        Root<Value> vTmp1, vTmp2;
         state.callFunction(*args[0], *a, vTmp1, pos);
         state.callFunction(vTmp1, *b, vTmp2, pos);
         return state.forceBool(vTmp2, pos);
@@ -1610,7 +1606,7 @@ static void prim_partition(EvalState & state, const Pos & pos, Value * * args, V
     for (unsigned int n = 0; n < len; ++n) {
         auto vElem = args[1]->listElems()[n];
         state.forceValue(*vElem);
-        Value res;
+        Root<Value> res;
         state.callFunction(*args[0], *vElem, res, pos);
         if (state.forceBool(res, pos))
             right.push_back(vElem);
@@ -1620,13 +1616,13 @@ static void prim_partition(EvalState & state, const Pos & pos, Value * * args, V
 
     state.mkAttrs(v, 2);
 
-    Value * vRight = state.allocAttr(v, state.sRight);
+    auto vRight = state.allocAttr(v, state.sRight);
     auto rsize = right.size();
     state.mkList(*vRight, rsize);
     if (rsize)
         memcpy(vRight->listElems(), right.data(), sizeof(Value *) * rsize);
 
-    Value * vWrong = state.allocAttr(v, state.sWrong);
+    auto vWrong = state.allocAttr(v, state.sWrong);
     auto wsize = wrong.size();
     state.mkList(*vWrong, wsize);
     if (wsize)
@@ -1644,22 +1640,23 @@ static void prim_concatMap(EvalState & state, const Pos & pos, Value * * args, V
     state.forceList(*args[1], pos);
     auto nrLists = args[1]->listSize();
 
-    Value lists[nrLists];
+    // FIXME: Root<>[] is inefficient
+    Root<Value> lists[nrLists];
     size_t len = 0;
 
     for (unsigned int n = 0; n < nrLists; ++n) {
         Value * vElem = args[1]->listElems()[n];
         state.callFunction(*args[0], *vElem, lists[n], pos);
         state.forceList(lists[n], pos);
-        len += lists[n].listSize();
+        len += lists[n]->listSize();
     }
 
     state.mkList(v, len);
     auto out = v.listElems();
     for (unsigned int n = 0, pos = 0; n < nrLists; ++n) {
-        auto l = lists[n].listSize();
+        auto l = lists[n]->listSize();
         if (l)
-            memcpy(out + pos, lists[n].listElems(), l * sizeof(Value *));
+            memcpy(out + pos, lists[n]->listElems(), l * sizeof(Value *));
         pos += l;
     }
 }
@@ -2130,7 +2127,7 @@ void EvalState::createBaseEnv()
     auto vThrow = addPrimOp("throw", 1, prim_throw);
 
     auto addPurityError = [&](const std::string & name) {
-        Value * v2 = allocValue();
+        auto v2 = allocValue();
         mkString(*v2, fmt("'%s' is not allowed in pure evaluation mode", name));
         mkApp(v, *vThrow, *v2);
         addConstant(name, v);
@@ -2161,7 +2158,7 @@ void EvalState::createBaseEnv()
 
     // Miscellaneous
     auto vScopedImport = addPrimOp("scopedImport", 2, prim_scopedImport);
-    Value * v2 = allocValue();
+    auto v2 = allocValue();
     mkAttrs(*v2, 0);
     mkApp(v, *vScopedImport, *v2);
     forceValue(v);

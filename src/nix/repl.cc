@@ -38,7 +38,7 @@ struct NixRepl
 {
     string curDir;
     EvalState state;
-    Bindings * autoArgs;
+    Ptr<Bindings> autoArgs;
 
     Strings loadedFiles;
 
@@ -304,11 +304,11 @@ StringSet NixRepl::completePrefix(string prefix)
             string cur2 = string(cur, dot + 1);
 
             Expr * e = parseString(expr);
-            Value v;
+            Root<Value> v;
             e->eval(state, *env, v);
             state.forceAttrs(v);
 
-            for (auto & i : *v.attrs) {
+            for (auto & i : *v->attrs) {
                 string name = i.name;
                 if (string(name, 0, cur2.size()) != cur2) continue;
                 completions.insert(prev + expr + "." + name);
@@ -404,7 +404,7 @@ bool NixRepl::processLine(string line)
     }
 
     else if (command == ":a" || command == ":add") {
-        Value v;
+        Root<Value> v;
         evalString(arg, v);
         addAttrsToScope(v);
     }
@@ -420,12 +420,12 @@ bool NixRepl::processLine(string line)
     }
 
     else if (command == ":t") {
-        Value v;
+        Root<Value> v;
         evalString(arg, v);
         std::cout << showType(v) << std::endl;
 
     } else if (command == ":u") {
-        Value v, f, result;
+        Root<Value> v, f, result;
         evalString(arg, v);
         evalString("drv: (import <nixpkgs> {}).runCommand \"shell\" { buildInputs = [ drv ]; } \"\"", f);
         state.callFunction(f, v, result, Pos());
@@ -435,7 +435,7 @@ bool NixRepl::processLine(string line)
     }
 
     else if (command == ":b" || command == ":i" || command == ":s") {
-        Value v;
+        Root<Value> v;
         evalString(arg, v);
         Path drvPath = getDerivationPath(v);
 
@@ -457,7 +457,7 @@ bool NixRepl::processLine(string line)
     }
 
     else if (command == ":p" || command == ":print") {
-        Value v;
+        Root<Value> v;
         evalString(arg, v);
         printValue(std::cout, v, 1000000000) << std::endl;
     }
@@ -483,7 +483,7 @@ bool NixRepl::processLine(string line)
             v.thunk.expr = e;
             addVarToScope(state.symbols.create(name), v);
         } else {
-            Value v;
+            Root<Value> v;
             evalString(line, v);
             printValue(std::cout, v, 1) << std::endl;
         }
@@ -497,9 +497,9 @@ void NixRepl::loadFile(const Path & path)
 {
     loadedFiles.remove(path);
     loadedFiles.push_back(path);
-    Value v, v2;
+    Root<Value> v, v2;
     state.evalFile(lookupFileArg(state, path), v);
-    state.autoCallFunction(*autoArgs, v, v2);
+    state.autoCallFunction(autoArgs, v, v2);
     addAttrsToScope(v2);
 }
 

@@ -115,7 +115,7 @@ DrvInfo::Outputs DrvInfo::queryOutputs(bool onlyOutputsToInstall)
         return outputs;
 
     /* Check for `meta.outputsToInstall` and return `outputs` reduced to that. */
-    const Value * outTI = queryMeta("outputsToInstall");
+    const auto outTI = queryMeta("outputsToInstall");
     if (!outTI) return outputs;
     const auto errMsg = Error("this derivation has bad 'meta.outputsToInstall'");
         /* ^ this shows during `nix-env -i` right under the bad derivation */
@@ -194,7 +194,7 @@ Value * DrvInfo::queryMeta(const string & name)
 
 string DrvInfo::queryMetaString(const string & name)
 {
-    Value * v = queryMeta(name);
+    auto v = queryMeta(name);
     if (!v || v->type != tString) return "";
     return v->string.s;
 }
@@ -202,7 +202,7 @@ string DrvInfo::queryMetaString(const string & name)
 
 NixInt DrvInfo::queryMetaInt(const string & name, NixInt def)
 {
-    Value * v = queryMeta(name);
+    auto v = queryMeta(name);
     if (!v) return def;
     if (v->type == tInt) return v->integer;
     if (v->type == tString) {
@@ -216,7 +216,7 @@ NixInt DrvInfo::queryMetaInt(const string & name, NixInt def)
 
 NixFloat DrvInfo::queryMetaFloat(const string & name, NixFloat def)
 {
-    Value * v = queryMeta(name);
+    auto v = queryMeta(name);
     if (!v) return def;
     if (v->type == tFloat) return v->fpoint;
     if (v->type == tString) {
@@ -231,7 +231,7 @@ NixFloat DrvInfo::queryMetaFloat(const string & name, NixFloat def)
 
 bool DrvInfo::queryMetaBool(const string & name, bool def)
 {
-    Value * v = queryMeta(name);
+    auto v = queryMeta(name);
     if (!v) return def;
     if (v->type == tBool) return v->boolean;
     if (v->type == tString) {
@@ -247,7 +247,7 @@ bool DrvInfo::queryMetaBool(const string & name, bool def)
 void DrvInfo::setMeta(const string & name, Value * v)
 {
     getMeta();
-    Bindings * old = meta;
+    Ptr<Bindings> old = meta;
     meta = Bindings::allocBindings(1 + (old ? old->size() : 0));
     Symbol sym = state->symbols.create(name);
     if (old)
@@ -260,6 +260,7 @@ void DrvInfo::setMeta(const string & name, Value * v)
 
 
 /* Cache for already considered attrsets. */
+// FIXME: Use Ptr?
 typedef set<Bindings *> Done;
 
 
@@ -320,24 +321,24 @@ static void getDerivations(EvalState & state, Value & vIn,
     DrvInfos & drvs, Done & done,
     bool ignoreAssertionFailures)
 {
-    Value v;
+    Root<Value> v;
     state.autoCallFunction(autoArgs, vIn, v);
 
     /* Process the expression. */
     if (!getDerivation(state, v, pathPrefix, drvs, done, ignoreAssertionFailures)) ;
 
-    else if (v.type == tAttrs) {
+    else if (v->type == tAttrs) {
 
         /* !!! undocumented hackery to support combining channels in
            nix-env.cc. */
-        bool combineChannels = v.attrs->find(state.symbols.create("_combineChannels")) != v.attrs->end();
+        bool combineChannels = v->attrs->find(state.symbols.create("_combineChannels")) != v->attrs->end();
 
         /* Consider the attributes in sorted order to get more
            deterministic behaviour in nix-env operations (e.g. when
            there are names clashes between derivations, the derivation
            bound to the attribute with the "lower" name should take
            precedence). */
-        for (auto & i : v.attrs->lexicographicOrder()) {
+        for (auto & i : v->attrs->lexicographicOrder()) {
             debug("evaluating attribute '%1%'", i->name);
             if (!std::regex_match(std::string(i->name), attrRegex))
                 continue;
@@ -357,11 +358,11 @@ static void getDerivations(EvalState & state, Value & vIn,
         }
     }
 
-    else if (v.isList()) {
-        for (unsigned int n = 0; n < v.listSize(); ++n) {
+    else if (v->isList()) {
+        for (unsigned int n = 0; n < v->listSize(); ++n) {
             string pathPrefix2 = addToPath(pathPrefix, (format("%1%") % n).str());
-            if (getDerivation(state, *v.listElems()[n], pathPrefix2, drvs, done, ignoreAssertionFailures))
-                getDerivations(state, *v.listElems()[n], pathPrefix2, autoArgs, drvs, done, ignoreAssertionFailures);
+            if (getDerivation(state, *v->listElems()[n], pathPrefix2, drvs, done, ignoreAssertionFailures))
+                getDerivations(state, *v->listElems()[n], pathPrefix2, autoArgs, drvs, done, ignoreAssertionFailures);
         }
     }
 

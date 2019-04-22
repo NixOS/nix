@@ -104,94 +104,6 @@ struct PtrList : Object
     static Size wordsFor(Size size) { return 1 + size; }
 };
 
-template<class T>
-struct Ptr
-{
-    Ptr * prev = nullptr, * next = nullptr;
-    T * value = nullptr;
-
-    Ptr() { }
-
-    Ptr(Ptr * next, T * value) : next(next), value(value)
-    {
-        assert(value);
-        assert(next == next->prev->next);
-        prev = next->prev;
-        next->prev = this;
-        prev->next = this;
-    }
-
-    Ptr(const Ptr & p)
-    {
-        if (p.value) {
-            auto & p2 = const_cast<Ptr &>(p);
-            value = p2.value;
-            next = &p2;
-            prev = p2.prev;
-            prev->next = this;
-            p2.prev = this;
-        }
-    }
-
-    Ptr(Ptr && p)
-    {
-        *this = std::move(p);
-    }
-
-    Ptr & operator =(Ptr && p)
-    {
-        reset();
-        if (p.value) {
-            value = p.value;
-            next = p.next;
-            prev = p.prev;
-            p.value = nullptr;
-            prev->next = this;
-            next->prev = this;
-        }
-        return *this;
-    }
-
-    Ptr & operator =(const Ptr & p)
-    {
-        throw Error("NOT IMPLEMENTED = PTR &");
-    }
-
-    ~Ptr()
-    {
-        reset();
-    }
-
-    void reset()
-    {
-        if (value) {
-            assert(next);
-            assert(prev);
-            assert(next->prev == this);
-            next->prev = prev;
-            assert(prev->next == this);
-            prev->next = next;
-            value = nullptr;
-        }
-    }
-
-    T * operator ->()
-    {
-        return value;
-    }
-
-    operator T * ()
-    {
-        return value;
-    }
-
-    operator T & ()
-    {
-        assert(value);
-        return *value;
-    }
-};
-
 struct Free : Object
 {
     Free * next;
@@ -204,6 +116,12 @@ struct Free : Object
     void setSize(Size size) { assert(size >= 1); setMisc(size); }
 };
 
+template<class T>
+struct Ptr;
+
+template<class T>
+struct Root;
+
 struct GC
 {
 
@@ -211,6 +129,15 @@ private:
 
     Ptr<Object> * frontSentinel;
     Ptr<Object> * backSentinel;
+
+    Root<Object> * frontRootSentinel;
+    Root<Object> * backRootSentinel;
+
+    template<class T>
+    friend class Ptr;
+
+    template<class T>
+    friend class Root;
 
     struct Arena
     {
@@ -317,18 +244,17 @@ public:
                 auto raw = arena.alloc(size);
                 if (raw) {
                     auto obj = new (raw) T(args...);
-                    //printError("ALLOC %x", obj);
-                    return Ptr<T>((Ptr<T> *) frontSentinel->next, obj);
+                    return obj;
                 }
             }
 
             if (i == 0) {
-                printError("allocation of %d bytes failed, GCing...", size * WORD_SIZE);
+                debug("allocation of %d bytes failed, GCing...", size * WORD_SIZE);
                 gc();
             } else {
                 Size arenaSize = std::max(arenaList.nextSize, size);
-                arenaList.nextSize = arenaSize * 2; // FIXME: overflow
-                printError("allocating arena of %d bytes", arenaSize * WORD_SIZE);
+                arenaList.nextSize = arenaSize * 1.5; // FIXME: overflow
+                debug("allocating arena of %d bytes", arenaSize * WORD_SIZE);
                 arenaList.arenas.emplace_back(arenaSize);
             }
         }
@@ -339,8 +265,159 @@ public:
     void gc();
 
     bool isObject(void * p);
+
+    void assertObject(void * p);
 };
 
 extern GC gc;
+
+template<class T>
+struct Ptr
+{
+private:
+
+    friend class GC;
+
+    Ptr * prev = nullptr, * next = nullptr;
+    T * value = nullptr;
+
+    void link()
+    {
+        prev = (Ptr *) gc.frontSentinel;
+        next = prev->next;
+        next->prev = this;
+        prev->next = this;
+    }
+
+public:
+
+    Ptr() {
+        link();
+    }
+
+    Ptr(T * value) : value(value)
+    {
+        link();
+    }
+
+    Ptr(const Ptr & p)
+    {
+        auto & p2 = const_cast<Ptr &>(p);
+        value = p2.value;
+        next = &p2;
+        prev = p2.prev;
+        prev->next = this;
+        p2.prev = this;
+    }
+
+    Ptr(Ptr && p)
+    {
+        link();
+        value = p.value;
+        p.value = nullptr;
+    }
+
+    Ptr & operator =(const Ptr & p)
+    {
+        value = p.value;
+        return *this;
+    }
+
+    Ptr & operator =(Ptr && p)
+    {
+        value = p.value;
+        p.value = nullptr;
+        return *this;
+    }
+
+    Ptr & operator =(T * v)
+    {
+        value = v;
+        return *this;
+    }
+
+    ~Ptr()
+    {
+        assert(next);
+        assert(prev);
+        assert(next->prev == this);
+        next->prev = prev;
+        assert(prev->next == this);
+        prev->next = next;
+    }
+
+    T * operator ->()
+    {
+        return value;
+    }
+
+    T * operator ->() const // FIXME
+    {
+        return value;
+    }
+
+    operator T * ()
+    {
+        return value;
+    }
+
+    operator T & ()
+    {
+        assert(value);
+        return *value;
+    }
+
+    operator bool() const
+    {
+        return value != nullptr;
+    }
+};
+
+template<class T>
+struct Root
+{
+    Root * prev = nullptr, * next = nullptr;
+    T value;
+
+    template<typename... Args>
+    Root(const Args & ... args)
+        : value{args... }
+    {
+        prev = (Root *) gc.frontRootSentinel;
+        next = prev->next;
+        next->prev = this;
+        prev->next = this;
+    }
+
+    Root(const Root & p) = delete;
+    Root(Root && p) = delete;
+
+    Root & operator =(const T & v) { value = v; return *this; }
+
+    ~Root()
+    {
+        assert(next);
+        assert(prev);
+        assert(next->prev == this);
+        next->prev = prev;
+        assert(prev->next == this);
+        prev->next = next;
+    }
+
+    T * operator ->()
+    {
+        return &value;
+    }
+
+    operator T * ()
+    {
+        return &value;
+    }
+
+    operator T & ()
+    {
+        return value;
+    }
+};
 
 }

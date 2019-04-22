@@ -27,21 +27,27 @@ LocalNoInlineNoReturn(void throwTypeError(const char * s, const Value & v, const
 void EvalState::forceValue(Value & v, const Pos & pos)
 {
     if (v.type == tThunk) {
-        Env * env = v.thunk.env;
+        // FIXME: this is necessary because some values (like vList2)
+        // are created non-atomically.
+        Ptr<Env> env(v.thunk.env);
         Expr * expr = v.thunk.expr;
         try {
             v.type = tBlackhole;
             //checkInterrupt();
             expr->eval(*this, *env, v);
         } catch (...) {
-            v.type = tThunk;
             v.thunk.env = env;
             v.thunk.expr = expr;
+            v.type = tThunk;
             throw;
         }
     }
-    else if (v.type == tApp)
+    else if (v.type == tApp) {
+        // FIXME: idem.
+        Ptr<Value> left(v.app.left);
+        Ptr<Value> right(v.app.right);
         callFunction(*v.app.left, *v.app.right, v, noPos);
+    }
     else if (v.type == tBlackhole)
         throwEvalError("infinite recursion encountered, at %1%", pos);
 }
