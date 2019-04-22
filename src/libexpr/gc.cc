@@ -82,9 +82,21 @@ void GC::gc()
         case tEnv: {
             auto obj2 = (Env *) obj;
             push(obj2->up);
-            if (obj2->type != Env::HasWithExpr)
-                for (auto i = obj2->values; i < obj2->values + obj2->size; ++i)
-                    push(*i);
+            for (auto i = obj2->values; i < obj2->values + obj2->getSize(); ++i)
+                push(*i);
+            break;
+        }
+
+        case tWithExprEnv: {
+            auto obj2 = (Env *) obj;
+            push(obj2->up);
+            break;
+        }
+
+        case tWithAttrsEnv: {
+            auto obj2 = (Env *) obj;
+            push(obj2->up);
+            push(obj2->values[0]);
             break;
         }
 
@@ -229,6 +241,8 @@ std::pair<Size, Size> GC::Arena::freeUnmarked()
                 objSize = ((PtrList<Value> *) obj)->words();
                 break;
             case tEnv:
+            case tWithExprEnv:
+            case tWithAttrsEnv:
                 objSize = ((Env *) obj)->words();
                 break;
             default:

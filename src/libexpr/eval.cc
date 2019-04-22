@@ -523,8 +523,6 @@ inline Value * EvalState::lookupVar(Env * env, const ExprVar & var, bool noEval)
 {
     for (size_t l = var.level; l; --l, env = env->up) ;
 
-    assert(((Object *) env)->type == tEnv);
-
     if (!var.fromWith) {
         auto v = env->values[var.displ];
         if (v) gc.assertObject(v);
@@ -532,12 +530,12 @@ inline Value * EvalState::lookupVar(Env * env, const ExprVar & var, bool noEval)
     }
 
     while (1) {
-        if (env->type == Env::HasWithExpr) {
+        if (env->type == tWithExprEnv) {
             if (noEval) return 0;
             auto v = allocValue();
             evalAttrs(*env->up, (Expr *) env->values[0], *v);
             env->values[0] = v;
-            env->type = Env::HasWithAttrs;
+            env->type = tWithAttrsEnv;
         }
         Bindings::iterator j = env->values[0]->attrs->find(var.name);
         if (j != env->values[0]->attrs->end()) {
@@ -545,9 +543,9 @@ inline Value * EvalState::lookupVar(Env * env, const ExprVar & var, bool noEval)
             gc.assertObject(j->value);
             return j->value;
         }
-        if (!env->prevWith)
+        if (!env->getPrevWith())
             throwUndefinedVarError("undefined variable '%1%' at %2%", var.name, var.pos);
-        for (size_t l = env->prevWith; l; --l, env = env->up) ;
+        for (size_t l = env->getPrevWith(); l; --l, env = env->up) ;
     }
 }
 
@@ -559,15 +557,11 @@ Ptr<Value> EvalState::allocValue()
 }
 
 
-Ptr<Env> EvalState::allocEnv(size_t size)
+Ptr<Env> EvalState::allocEnv(size_t size, size_t prevWith, Tag type)
 {
-    if (size > std::numeric_limits<decltype(Env::size)>::max()) // FIXME
-        throw Error("environment size %d is too big", size);
-
     nrEnvs++;
     nrValuesInEnvs += size;
-
-    return gc.alloc<Env>(Env::wordsFor(size), size);
+    return gc.alloc<Env>(Env::wordsFor(size), type, size, prevWith);
 }
 
 
@@ -1181,12 +1175,9 @@ void EvalState::autoCallFunction(Bindings & args, Value & fun, Value & res)
 
 void ExprWith::eval(EvalState & state, Env & env, Value & v)
 {
-    auto env2 = state.allocEnv(1);
+    auto env2 = state.allocEnv(1, prevWith, tWithExprEnv);
     env2->up = &env;
-    env2->prevWith = prevWith;
-    env2->type = Env::HasWithExpr;
     env2->values[0] = (Value *) attrs;
-
     body->eval(state, env2, v);
 }
 
@@ -1880,10 +1871,10 @@ size_t valueSize(Value & v)
         if (seen.find(&env) != seen.end()) return 0;
         seen.insert(&env);
 
-        size_t sz = sizeof(Env) + sizeof(Value *) * env.size;
+        size_t sz = sizeof(Env) + sizeof(Value *) * env.getSize();
 
-        if (env.type != Env::HasWithExpr)
-            for (size_t i = 0; i < env.size; ++i)
+        if (env.type != tWithExprEnv)
+            for (size_t i = 0; i < env.getSize(); ++i)
                 if (env.values[i])
                     sz += doValue(*env.values[i]);
 

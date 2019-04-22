@@ -36,16 +36,23 @@ struct PrimOp
 struct Env : Object
 {
     Env * up;
-    // FIXME: use misc field
-    unsigned short size; // used by ‘valueSize’
-    unsigned short prevWith:14; // nr of levels up to next `with' environment
-    enum { Plain = 0, HasWithExpr, HasWithAttrs } type:2; // FIXME: fold into type?
     Value * values[0];
 
 private:
 
-    Env(unsigned short size) : Object(tEnv, 0), size(size) {
-        for (auto i = 0; i < size; i++)
+    constexpr static size_t maxSize = 1 << 16;
+    constexpr static size_t maxPrevWith = 1 << 10;
+
+    Env(Tag type, size_t size, size_t prevWith)
+        : Object(type, size | (prevWith << 16))
+    {
+        if (size >= maxSize)
+            throw Error("environment size %d is too big", size);
+
+        if (prevWith >= maxPrevWith)
+            throw Error("too many nesting levels");
+
+        for (size_t i = 0; i < size; i++)
             values[i] = nullptr;
     }
 
@@ -53,14 +60,24 @@ private:
 
 public:
 
+    unsigned short getPrevWith() const
+    {
+        return getMisc() >> 16;
+    }
+
+    unsigned short getSize() const
+    {
+        return getMisc() & 0xffff;
+    }
+
     Size words() const
     {
-        return wordsFor(size);
+        return wordsFor(getSize());
     }
 
     static Size wordsFor(unsigned short size)
     {
-        return 3 + size; // FIXME
+        return 2 + size;
     }
 };
 
@@ -276,7 +293,7 @@ public:
 
     /* Allocation primitives. */
     Ptr<Value> allocValue();
-    Ptr<Env> allocEnv(size_t size);
+    Ptr<Env> allocEnv(size_t size, size_t prevWith = 0, Tag type = tEnv);
 
     // Note: the resulting Value is only reachable as long as vAttrs
     // is reachable.

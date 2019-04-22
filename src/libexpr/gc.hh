@@ -18,6 +18,8 @@ enum Tag {
     tBindings,
     tValueList,
     tEnv,
+    tWithExprEnv,
+    tWithAttrsEnv,
 
     // Value tags
     tInt,
