@@ -6,6 +6,8 @@
 #include <limits>
 #include <cassert>
 
+//#define GC_DEBUG 1
+
 namespace nix {
 
 typedef unsigned long Word;
@@ -150,90 +152,100 @@ private:
     struct Arena
     {
         Size size; // in words
-        Size free; // words free
-        Free * firstFree;
         Word * start;
 
         Arena(Size size)
             : size(size)
-            , free(size)
             , start(new Word[size])
         {
             assert(size >= 2);
-            firstFree = new (start) Free(size);
         }
 
         Arena(const Arena & arena) = delete;
 
         Arena(Arena && arena)
         {
-            *this = std::move(arena);
-        }
-
-        Arena & operator =(Arena && arena)
-        {
             size = arena.size;
-            free = arena.free;
-            firstFree = arena.firstFree;
             start = arena.start;
             arena.start = nullptr;
-            return *this;
         }
 
         ~Arena()
         {
             delete[] start;
         }
+    };
 
-        Object * alloc(Size size)
-        {
-            assert(size >= 2);
+    size_t totalSize = 0;
+    size_t nextSize;
 
-            Free * * prev = &firstFree;
+    std::vector<Arena> arenas;
 
-            while (Free * freeObj = *prev) {
-                //printError("LOOK %x %d %x", freeObj, freeObj->words(), freeObj->next);
-                assert(freeObj->words() >= 2);
-                if (freeObj->words() == size) {
-                    *prev = freeObj->next;
-                    assert(free >= size);
-                    free -= size;
-                    return (Object *) freeObj;
-                } else if (freeObj->words() >= size + 2) {
-                    // Split this free object.
-                    auto newSize = freeObj->words() - size;
-                    freeObj->setSize(newSize);
-                    assert(free >= size);
-                    free -= size;
-                    return (Object *) (((Word *) freeObj) + newSize);
-                } else if (freeObj->words() == size + 1) {
-                    // Return this free object and add a padding word.
-                    *prev = freeObj->next;
-                    freeObj->setSize(1);
-                    assert(free >= size + 1);
-                    free -= size + 1;
-                    return (Object *) (((Word *) freeObj) + 1);
-                } else {
-                    assert(freeObj->words() < size);
-                    prev = &freeObj->next;
+    struct FreeList
+    {
+        Size minSize;
+        Free * front = nullptr;
+    };
+
+    std::array<FreeList, 8> freeLists;
+
+    Object * allocObject(Size size)
+    {
+        assert(size >= 2);
+
+        for (int attempt = 0; attempt < 3; attempt++) {
+
+            for (size_t i = 0; i < freeLists.size(); ++i) {
+                auto & freeList = freeLists[i];
+
+                if ((size <= freeList.minSize || i == freeLists.size() - 1) && freeList.front) {
+                    //printError("TRY %d %d %d", size, i, freeList.minSize);
+
+                    Free * * prev = &freeList.front;
+
+                    while (Free * freeObj = *prev) {
+                        //printError("LOOK %x %d %x", freeObj, freeObj->words(), freeObj->next);
+                        assert(freeObj->words() >= freeList.minSize);
+                        if (freeObj->words() == size) {
+                            // Convert the free object.
+                            *prev = freeObj->next;
+                            return (Object *) freeObj;
+                        } else if (freeObj->words() >= size + 2) {
+                            // Split the free object.
+                            auto newSize = freeObj->words() - size;
+                            freeObj->setSize(newSize);
+                            if (newSize < freeList.minSize) {
+                                /* The free object is now smaller than
+                                   the minimum size for this freelist,
+                                   so move it to another one. */
+                                //printError("MOVE %x %d -> %d", freeObj, newSize + size, newSize);
+                                *prev = freeObj->next;
+                                addToFreeList(freeObj);
+                            }
+                            return (Object *) (((Word *) freeObj) + newSize);
+                        } else if (freeObj->words() == size + 1) {
+                            // Return the free object and add a padding word.
+                            *prev = freeObj->next;
+                            freeObj->setSize(1);
+                            return (Object *) (((Word *) freeObj) + 1);
+                        } else {
+                            assert(freeObj->words() < size);
+                            prev = &freeObj->next;
+                        }
+                    }
                 }
             }
 
-            return nullptr;
+            if (attempt == 0) {
+                debug("allocation of %d bytes failed, GCing...", size * WORD_SIZE);
+                gc();
+            } else if (attempt == 1) {
+                addArena(std::max(nextSize, size));
+            }
         }
 
-        std::pair<Size, Size> freeUnmarked();
-    };
-
-    // Note: arenas are sorted by ascending amount of free space.
-    struct ArenaList
-    {
-        Size nextSize;
-        std::vector<Arena> arenas;
-        ArenaList();
-    };
-
-    std::array<ArenaList, 3> arenaLists;
+        throw Error("allocation of %d bytes failed", size);
+    }
 
 public:
 
@@ -243,34 +255,8 @@ public:
     template<typename T, typename... Args>
     Ptr<T> alloc(Size size, const Args & ... args)
     {
-        ArenaList & arenaList =
-            size == 3 ? arenaLists[0] :
-            size == 4 ? arenaLists[1] :
-            arenaLists[2];
-
-        for (int i = 0; i < 3; i++) {
-
-            for (auto j = arenaList.arenas.rbegin(); j != arenaList.arenas.rend(); ++j) {
-                auto & arena = *j;
-                auto raw = arena.alloc(size);
-                if (raw) {
-                    auto obj = new (raw) T(args...);
-                    return obj;
-                }
-            }
-
-            if (i == 0) {
-                debug("allocation of %d bytes failed, GCing...", size * WORD_SIZE);
-                gc();
-            } else {
-                Size arenaSize = std::max(arenaList.nextSize, size);
-                arenaList.nextSize = arenaSize * 1.5; // FIXME: overflow
-                debug("allocating arena of %d bytes", arenaSize * WORD_SIZE);
-                arenaList.arenas.emplace_back(arenaSize);
-            }
-        }
-
-        throw Error("allocation of %d bytes failed", size);
+        auto raw = allocObject(size);
+        return new (raw) T(args...);
     }
 
     void gc();
@@ -286,6 +272,14 @@ public:
         }
         #endif
     }
+
+private:
+
+    void addArena(size_t arenaSize);
+
+    void addToFreeList(Free * obj);
+
+    std::pair<Size, Size> freeUnmarked(Arena & arena);
 };
 
 extern GC gc;

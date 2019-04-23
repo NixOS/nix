@@ -9,6 +9,8 @@ GC gc;
 
 GC::GC()
 {
+    nextSize = std::max((size_t) 2, parseSize<size_t>(getEnv("GC_INITIAL_HEAP_SIZE", "131072")) / WORD_SIZE);
+
     // FIXME: placement new
     frontSentinel = (Ptr<Object> *) malloc(sizeof(Ptr<Object>));
     backSentinel = (Ptr<Object> *) malloc(sizeof(Ptr<Object>));
@@ -27,10 +29,23 @@ GC::GC()
 
     backRootSentinel->prev = frontRootSentinel;
     backRootSentinel->next = nullptr;
+
+    freeLists[0].minSize = 2;
+    freeLists[1].minSize = 3;
+    freeLists[2].minSize = 4;
+    freeLists[3].minSize = 8;
+    freeLists[4].minSize = 16;
+    freeLists[5].minSize = 32;
+    freeLists[6].minSize = 64;
+    freeLists[7].minSize = 128;
+
+    addArena(nextSize);
 }
 
 GC::~GC()
 {
+    debug("allocated %d bytes in total", totalSize * WORD_SIZE);
+
     size_t n = 0;
     for (Ptr<Object> * p = frontSentinel->next; p != backSentinel; p = p->next)
         n++;
@@ -47,6 +62,34 @@ GC::~GC()
     assert(!backSentinel->next);
     assert(!frontRootSentinel->prev);
     assert(!backRootSentinel->next);
+}
+
+void GC::addArena(size_t arenaSize)
+{
+    debug("allocating arena of %d bytes", arenaSize * WORD_SIZE);
+
+    auto arena = Arena(arenaSize);
+
+    // Add this arena to a freelist as a single block.
+    addToFreeList(new (arena.start) Free(arenaSize));
+
+    arenas.emplace_back(std::move(arena));
+
+    totalSize += arenaSize;
+
+    nextSize = arenaSize * 1.5; // FIXME: overflow, clamp
+}
+
+void GC::addToFreeList(Free * obj)
+{
+    auto size = obj->words();
+    for (auto i = freeLists.rbegin(); i != freeLists.rend(); ++i)
+        if (size >= i->minSize) {
+            obj->next = i->front;
+            i->front = obj;
+            return;
+        }
+    abort();
 }
 
 void GC::gc()
@@ -190,48 +233,44 @@ void GC::gc()
         processStack();
     }
 
+    // Reset all the freelists.
+    for (auto & freeList : freeLists)
+        freeList.front = nullptr;
+
+    // Go through all the arenas and add free objects to the
+    // appropriate freelists.
     Size totalObjectsFreed = 0;
     Size totalWordsFreed = 0;
 
-    for (auto & arenaList : arenaLists) {
-
-        for (auto & arena : arenaList.arenas) {
-            auto [objectsFreed, wordsFreed] = arena.freeUnmarked();
-            totalObjectsFreed += objectsFreed;
-            totalWordsFreed += wordsFreed;
-        }
-
-        std::sort(arenaList.arenas.begin(), arenaList.arenas.end(),
-            [](const Arena & a, const Arena & b) {
-                return b.free < a.free;
-            });
+    for (auto & arena : arenas) {
+        auto [objectsFreed, wordsFreed] = freeUnmarked(arena);
+        totalObjectsFreed += objectsFreed;
+        totalWordsFreed += wordsFreed;
     }
 
     debug("freed %d bytes in %d dead objects, keeping %d objects",
         totalWordsFreed * WORD_SIZE, totalObjectsFreed, marked);
 }
 
-std::pair<Size, Size> GC::Arena::freeUnmarked()
+std::pair<Size, Size> GC::freeUnmarked(Arena & arena)
 {
     Size objectsFreed = 0;
     Size wordsFreed = 0;
 
-    auto end = start + size;
-    auto pos = start;
+    auto end = arena.start + arena.size;
+    auto pos = arena.start;
 
     Free * curFree = nullptr;
-    Free * * freeLink = &firstFree;
 
-    free = 0;
+    auto linkCurFree = [&]() {
+        if (curFree && curFree->words() > 1)
+            addToFreeList(curFree);
+        curFree = nullptr;
+    };
 
     while (pos < end) {
         auto obj = (Object *) pos;
         auto tag = obj->type;
-
-        auto linkFree = [&]() {
-            *freeLink = curFree;
-            freeLink = &curFree->next;
-        };
 
         Size objSize;
         if (tag >= tInt && tag <= tFloat) {
@@ -265,33 +304,24 @@ std::pair<Size, Size> GC::Arena::freeUnmarked()
         auto mergeFree = [&]() {
             //printError("MERGE %x %x %d", curFree, obj, curFree->size() + objSize);
             assert(curFree->words() >= 1);
-            if (curFree->words() == 1) {
-                linkFree();
-                free += 1;
-            }
             curFree->setSize(curFree->words() + objSize);
-            free += objSize;
         };
 
         if (tag == tFree) {
-            //debug("FREE %x %d", obj, obj->getMisc());
+            //debug("KEEP FREE %x %d", obj, obj->getMisc());
             if (curFree) {
                 // Merge this object into the previous free
                 // object.
                 mergeFree();
             } else {
                 curFree = (Free *) obj;
-                if (curFree->words() > 1) {
-                    linkFree();
-                    free += curFree->words();
-                }
             }
         } else {
 
             if (obj->isMarked()) {
                 // Unmark to prepare for the next GC run.
                 //debug("KEEP OBJECT %x %d %d", obj, obj->type, objSize);
-                curFree = nullptr;
+                linkCurFree();
                 obj->unmark();
             } else {
                 //debug("FREE OBJECT %x %d %d", obj, obj->type, objSize);
@@ -308,8 +338,6 @@ std::pair<Size, Size> GC::Arena::freeUnmarked()
                     curFree = (Free *) obj;
                     curFree->type = tFree;
                     curFree->setSize(objSize);
-                    linkFree();
-                    free += objSize;
                 }
             }
         }
@@ -317,28 +345,19 @@ std::pair<Size, Size> GC::Arena::freeUnmarked()
         pos += objSize;
     }
 
-    assert(pos == end);
+    linkCurFree();
 
-    *freeLink = nullptr;
+    assert(pos == end);
 
     return {objectsFreed, wordsFreed};
 }
 
 bool GC::isObject(void * p)
 {
-    for (auto & arenaList : arenaLists) {
-        for (auto & arena : arenaList.arenas) {
-            if (p >= arena.start && p < arena.start + arena.size)
-                return true;
-        }
-    }
+    for (auto & arena : arenas)
+        if (p >= arena.start && p < arena.start + arena.size)
+            return true;
     return false;
-}
-
-GC::ArenaList::ArenaList()
-{
-    static Size initialHeapSize = std::stol(getEnv("GC_INITIAL_HEAP_SIZE", "1000000")) / WORD_SIZE;
-    nextSize = initialHeapSize;
 }
 
 }
