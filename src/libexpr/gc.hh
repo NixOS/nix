@@ -277,7 +277,15 @@ public:
 
     bool isObject(void * p);
 
-    void assertObject(void * p);
+    void assertObject(void * p)
+    {
+        #if GC_DEBUG
+        if (!isObject(p)) {
+            printError("object %p is not an object", p);
+            abort();
+        }
+        #endif
+    }
 };
 
 extern GC gc;

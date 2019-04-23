@@ -295,8 +295,10 @@ std::pair<Size, Size> GC::Arena::freeUnmarked()
                 obj->unmark();
             } else {
                 //debug("FREE OBJECT %x %d %d", obj, obj->type, objSize);
+                #if GC_DEBUG
                 for (Size i = 0; i < objSize; ++i)
                     ((Word *) obj)[i] = 0xdeadc0dedeadbeefULL;
+                #endif
                 objectsFreed += 1;
                 wordsFreed += objSize;
                 if (curFree) {
@@ -331,14 +333,6 @@ bool GC::isObject(void * p)
         }
     }
     return false;
-}
-
-void GC::assertObject(void * p)
-{
-    if (!isObject(p)) {
-        printError("object %p is not an object", p);
-        abort();
-    }
 }
 
 GC::ArenaList::ArenaList()
