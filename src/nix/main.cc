@@ -75,7 +75,6 @@ void mainWrapped(int argc, char * * argv)
     }
 
     initNix();
-    initGC();
 
     programPath = argv[0];
     string programName = baseNameOf(programPath);

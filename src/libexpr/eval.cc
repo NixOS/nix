@@ -177,16 +177,6 @@ static Symbol getName(const AttrName & name, EvalState & state, Env & env)
 }
 
 
-static bool gcInitialised = false;
-
-void initGC()
-{
-    if (gcInitialised) return;
-
-    gcInitialised = true;
-}
-
-
 /* Very hacky way to parse $NIX_PATH, which is colon-separated, but
    can contain URLs (e.g. "nixpkgs=https://bla...:foo=https://"). */
 static Strings parseNixPath(const string & s)
@@ -258,11 +248,7 @@ EvalState::EvalState(const Strings & _searchPath, ref<Store> store)
 {
     countCalls = getEnv("NIX_COUNT_CALLS", "0") != "0";
 
-    assert(gcInitialised);
-
-#if 0
     static_assert(sizeof(Env) <= 16, "environment must be <= 16 bytes");
-#endif
 
     /* Initialise the Nix expression search path. */
     if (!evalSettings.pureEval) {

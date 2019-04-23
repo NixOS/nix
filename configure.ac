@@ -219,17 +219,6 @@ if test -n "$enable_s3"; then
 fi
 
 
-# Whether to use the Boehm garbage collector.
-AC_ARG_ENABLE(gc, AC_HELP_STRING([--enable-gc],
-  [enable garbage collection in the Nix expression evaluator (requires Boehm GC) [default=no]]),
-  gc=$enableval, gc=no)
-if test "$gc" = yes; then
-  PKG_CHECK_MODULES([BDW_GC], [bdw-gc])
-  CXXFLAGS="$BDW_GC_CFLAGS $CXXFLAGS"
-  AC_DEFINE(HAVE_BOEHMGC, 1, [Whether to use the Boehm garbage collector.])
-fi
-
-
 # documentation generation switch
 AC_ARG_ENABLE(doc-gen, AC_HELP_STRING([--disable-doc-gen],
   [disable documentation generation]),

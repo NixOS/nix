@@ -50,14 +50,6 @@
   or higher.  If your distribution does not provide it, please install
   it from <link xlink:href="http://www.sqlite.org/" />.</para></listitem>
 
-  <listitem><para>The <link
-  xlink:href="http://www.hboehm.info/gc/">Boehm
-  garbage collector</link> to reduce the evaluator’s memory
-  consumption (optional).  To enable it, install
-  <literal>pkgconfig</literal> and the Boehm garbage collector, and
-  pass the flag <option>--enable-gc</option> to
-  <command>configure</command>.</para></listitem>
-
   <listitem><para>The <literal>boost</literal> library of version
   1.66.0 or higher. It can be obtained from the official web site
   <link xlink:href="https://www.boost.org/" />.</para></listitem>

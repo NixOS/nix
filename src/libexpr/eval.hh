@@ -97,10 +97,6 @@ typedef std::pair<std::string, std::string> SearchPathElem;
 typedef std::list<SearchPathElem> SearchPath;
 
 
-/* Initialise the Boehm GC, if applicable. */
-void initGC();
-
-
 class EvalState
 {
 public:
