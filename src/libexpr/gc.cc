@@ -12,14 +12,14 @@ GC::GC()
     nextSize = std::max((size_t) 2, parseSize<size_t>(getEnv("GC_INITIAL_HEAP_SIZE", "131072")) / WORD_SIZE);
 
     // FIXME: placement new
-    frontSentinel = (Ptr<Object> *) malloc(sizeof(Ptr<Object>));
-    backSentinel = (Ptr<Object> *) malloc(sizeof(Ptr<Object>));
+    frontPtrSentinel = (Ptr<Object> *) malloc(sizeof(Ptr<Object>));
+    backPtrSentinel = (Ptr<Object> *) malloc(sizeof(Ptr<Object>));
 
-    frontSentinel->prev = nullptr;
-    frontSentinel->next = backSentinel;
+    frontPtrSentinel->prev = nullptr;
+    frontPtrSentinel->next = backPtrSentinel;
 
-    backSentinel->prev = frontSentinel;
-    backSentinel->next = nullptr;
+    backPtrSentinel->prev = frontPtrSentinel;
+    backPtrSentinel->next = nullptr;
 
     frontRootSentinel = (Root<Object> *) malloc(sizeof(Root<Object>));
     backRootSentinel = (Root<Object> *) malloc(sizeof(Root<Object>));
@@ -47,7 +47,7 @@ GC::~GC()
     debug("allocated %d bytes in total", totalSize * WORD_SIZE);
 
     size_t n = 0;
-    for (Ptr<Object> * p = frontSentinel->next; p != backSentinel; p = p->next)
+    for (Ptr<Object> * p = frontPtrSentinel->next; p != backPtrSentinel; p = p->next)
         n++;
     if (n)
         warn("%d GC root pointers still exist on exit", n);
@@ -58,8 +58,8 @@ GC::~GC()
     if (n)
         warn("%d GC root objects still exist on exit", n);
 
-    assert(!frontSentinel->prev);
-    assert(!backSentinel->next);
+    assert(!frontPtrSentinel->prev);
+    assert(!backPtrSentinel->next);
     assert(!frontRootSentinel->prev);
     assert(!backRootSentinel->next);
 }
@@ -227,7 +227,7 @@ void GC::gc()
         processStack();
     }
 
-    for (Ptr<Object> * p = frontSentinel->next; p != backSentinel; p = p->next) {
+    for (Ptr<Object> * p = frontPtrSentinel->next; p != backPtrSentinel; p = p->next) {
         if (!p->value) continue;
         stack.push(p->value);
         processStack();

@@ -136,8 +136,8 @@ struct GC
 
 private:
 
-    Ptr<Object> * frontSentinel;
-    Ptr<Object> * backSentinel;
+    Ptr<Object> * frontPtrSentinel;
+    Ptr<Object> * backPtrSentinel;
 
     Root<Object> * frontRootSentinel;
     Root<Object> * backRootSentinel;
@@ -295,7 +295,7 @@ private:
 
     void link()
     {
-        prev = (Ptr *) gc.frontSentinel;
+        prev = (Ptr *) gc.frontPtrSentinel;
         next = prev->next;
         next->prev = this;
         prev->next = this;
