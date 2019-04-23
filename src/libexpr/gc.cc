@@ -239,8 +239,8 @@ void GC::gc()
 
     // Go through all the arenas and add free objects to the
     // appropriate freelists.
-    Size totalObjectsFreed = 0;
-    Size totalWordsFreed = 0;
+    size_t totalObjectsFreed = 0;
+    size_t totalWordsFreed = 0;
 
     for (auto & arena : arenas) {
         auto [objectsFreed, wordsFreed] = freeUnmarked(arena);
@@ -252,10 +252,10 @@ void GC::gc()
         totalWordsFreed * WORD_SIZE, totalObjectsFreed, marked);
 }
 
-std::pair<Size, Size> GC::freeUnmarked(Arena & arena)
+std::pair<size_t, size_t> GC::freeUnmarked(Arena & arena)
 {
-    Size objectsFreed = 0;
-    Size wordsFreed = 0;
+    size_t objectsFreed = 0;
+    size_t wordsFreed = 0;
 
     auto end = arena.start + arena.size;
     auto pos = arena.start;
@@ -272,7 +272,7 @@ std::pair<Size, Size> GC::freeUnmarked(Arena & arena)
         auto obj = (Object *) pos;
         auto tag = obj->type;
 
-        Size objSize;
+        size_t objSize;
         if (tag >= tInt && tag <= tFloat) {
             objSize = ((Value *) obj)->words();
         } else {
@@ -326,7 +326,7 @@ std::pair<Size, Size> GC::freeUnmarked(Arena & arena)
             } else {
                 //debug("FREE OBJECT %x %d %d", obj, obj->type, objSize);
                 #if GC_DEBUG
-                for (Size i = 0; i < objSize; ++i)
+                for (size_t i = 0; i < objSize; ++i)
                     ((Word *) obj)[i] = 0xdeadc0dedeadbeefULL;
                 #endif
                 objectsFreed += 1;

@@ -11,7 +11,6 @@
 namespace nix {
 
 typedef unsigned long Word;
-typedef size_t Size; // size in words
 
 enum Tag {
     tFree = 3,
@@ -103,27 +102,27 @@ struct PtrList : Object
 {
     T * elems[0];
 
-    PtrList(Tag type, Size size) : Object(type, size)
+    PtrList(Tag type, size_t size) : Object(type, size)
     {
-        for (Size i = 0; i < size; i++)
+        for (size_t i = 0; i < size; i++)
             elems[i] = nullptr;
     }
 
-    Size size() const { return getMisc(); }
-    Size words() const { return wordsFor(size()); }
-    static Size wordsFor(Size size) { return 1 + size; }
+    size_t size() const { return getMisc(); }
+    size_t words() const { return wordsFor(size()); }
+    static size_t wordsFor(size_t size) { return 1 + size; }
 };
 
 struct Free : Object
 {
     Free * next;
 
-    Free(Size size) : Object(tFree, size), next(nullptr) { }
+    Free(size_t size) : Object(tFree, size), next(nullptr) { }
 
     // return size in words
-    Size words() const { return getMisc(); }
+    size_t words() const { return getMisc(); }
 
-    void setSize(Size size) { assert(size >= 1); setMisc(size); }
+    void setSize(size_t size) { assert(size >= 1); setMisc(size); }
 };
 
 template<class T>
@@ -151,10 +150,10 @@ private:
 
     struct Arena
     {
-        Size size; // in words
+        size_t size; // in words
         Word * start;
 
-        Arena(Size size)
+        Arena(size_t size)
             : size(size)
             , start(new Word[size])
         {
@@ -183,13 +182,13 @@ private:
 
     struct FreeList
     {
-        Size minSize;
+        size_t minSize;
         Free * front = nullptr;
     };
 
     std::array<FreeList, 8> freeLists;
 
-    Object * allocObject(Size size)
+    Object * allocObject(size_t size)
     {
         assert(size >= 2);
 
@@ -253,7 +252,7 @@ public:
     ~GC();
 
     template<typename T, typename... Args>
-    Ptr<T> alloc(Size size, const Args & ... args)
+    Ptr<T> alloc(size_t size, const Args & ... args)
     {
         auto raw = allocObject(size);
         return new (raw) T(args...);
@@ -279,7 +278,7 @@ private:
 
     void addToFreeList(Free * obj);
 
-    std::pair<Size, Size> freeUnmarked(Arena & arena);
+    std::pair<size_t, size_t> freeUnmarked(Arena & arena);
 };
 
 extern GC gc;

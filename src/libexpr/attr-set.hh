@@ -93,12 +93,12 @@ public:
         return res;
     }
 
-    Size words() const
+    size_t words() const
     {
         return wordsFor(capacity());
     }
 
-    static Size wordsFor(size_t capacity)
+    static size_t wordsFor(size_t capacity)
     {
         return 2 + 3 * capacity; // FIXME
     }

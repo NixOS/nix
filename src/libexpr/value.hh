@@ -169,7 +169,7 @@ public:
         return type == tList0 ? 0 : type == tList1 ? 1 : type == tList2 ? 2 : bigList->size();
     }
 
-    constexpr static Size words() { return 3; } // FIXME
+    constexpr static size_t words() { return 3; } // FIXME
 
     void setContext(const PathSet & context)
     {

@@ -70,12 +70,12 @@ public:
         return getMisc() & 0xffff;
     }
 
-    Size words() const
+    size_t words() const
     {
         return wordsFor(getSize());
     }
 
-    static Size wordsFor(unsigned short size)
+    static size_t wordsFor(unsigned short size)
     {
         return 2 + size;
     }
