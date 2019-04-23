@@ -51,16 +51,15 @@ struct Object
     friend class GC;
 
 public:
-    constexpr static unsigned int miscBits = 58;
-
-private:
-    unsigned long misc:58;
+    constexpr static size_t miscBytes = 7;
 
 public: // FIXME
-    Tag type:5;
+    Tag type:7;
 
 private:
     bool marked:1;
+
+    unsigned long misc:56;
 
     void unmark()
     {
@@ -69,7 +68,7 @@ private:
 
 protected:
 
-    Object(Tag type, unsigned long misc) : misc(misc), type(type), marked(false) { }
+    Object(Tag type, unsigned long misc) : type(type), marked(false), misc(misc) { }
 
     bool isMarked()
     {
@@ -89,6 +88,11 @@ protected:
     unsigned int getMisc() const
     {
         return misc;
+    }
+
+    char * getMiscData() const
+    {
+        return ((char *) this) + 1;
     }
 };
 

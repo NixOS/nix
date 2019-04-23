@@ -497,10 +497,9 @@ LocalNoInline(void addErrorPrefix(Error & e, const char * s, const string & s2, 
 void mkString(Value & v, const char * s)
 {
     auto len = strlen(s); // FIXME: only need to know if > short
-    if (len < WORD_SIZE * 2) {
-        strcpy((char *) &v.string, s);
-        v.type = tShortString;
-    } else
+    if (len < WORD_SIZE * 2 + Object::miscBytes)
+        v.setShortString(s);
+    else
         mkStringNoCopy(v, dupString(s));
 }
 

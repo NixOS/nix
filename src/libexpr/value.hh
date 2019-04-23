@@ -3,6 +3,8 @@
 #include "symbol-table.hh"
 #include "gc.hh"
 
+#include <cstring>
+
 namespace nix {
 
 class Bindings;
@@ -203,10 +205,18 @@ public:
         return type == tShortString || type == tLongString;
     }
 
+    void setShortString(const char * s)
+    {
+        // FIXME: can't use strcpy here because gcc flags it as a
+        // buffer overflow on 'misc'.
+        memcpy(getMiscData(), s, strlen(s) + 1);
+        type = tShortString;
+    }
+
     const char * getString() const
     {
         if (type == tShortString)
-            return (const char *) &string;
+            return getMiscData();
         else
             return string._s;
     }

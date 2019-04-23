@@ -12,7 +12,7 @@ namespace nix {
    Bindings structure. */
 Ptr<Bindings> Bindings::allocBindings(size_t capacity)
 {
-    if (capacity >= 1UL << Object::miscBits)
+    if (capacity >= 1UL << Object::miscBytes * 8)
         throw Error("attribute set of size %d is too big", capacity);
     return gc.alloc<Bindings>(Bindings::wordsFor(capacity), capacity);
 }
