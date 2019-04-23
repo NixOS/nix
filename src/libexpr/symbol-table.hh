@@ -19,6 +19,7 @@ private:
     const string * s; // pointer into SymbolTable
     Symbol(const string * s) : s(s) { };
     friend class SymbolTable;
+    friend class Value;
 
 public:
     Symbol() : s(0) { };
@@ -83,5 +84,7 @@ public:
             callback(s);
     }
 };
+
+extern SymbolTable symbols;
 
 }

@@ -20,6 +20,7 @@ enum Tag {
     tEnv,
     tWithExprEnv,
     tWithAttrsEnv,
+    tContext,
 
     // Value tags
     tInt,

@@ -21,6 +21,8 @@
 
 namespace nix {
 
+SymbolTable symbols;
+
 
 // FIXME
 static char * dupString(const char * s)
@@ -500,15 +502,7 @@ void mkString(Value & v, const char * s)
 Value & mkString(Value & v, const string & s, const PathSet & context)
 {
     mkString(v, s.c_str());
-    if (!context.empty()) {
-        size_t n = 0;
-        // FIXME: store as Symbols?
-        v.string.context = (const char * *)
-            malloc((context.size() + 1) * sizeof(char *));
-        for (auto & i : context)
-            v.string.context[n++] = dupString(i.c_str());
-        v.string.context[n] = 0;
-    }
+    v.setContext(context);
     return v;
 }
 
@@ -1464,18 +1458,10 @@ string EvalState::forceString(Value & v, const Pos & pos)
 }
 
 
-void copyContext(const Value & v, PathSet & context)
-{
-    if (v.string.context)
-        for (const char * * p = v.string.context; *p; ++p)
-            context.insert(*p);
-}
-
-
 string EvalState::forceString(Value & v, PathSet & context, const Pos & pos)
 {
     string s = forceString(v, pos);
-    copyContext(v, context);
+    v.getContext(context);
     return s;
 }
 
@@ -1484,12 +1470,14 @@ string EvalState::forceStringNoCtx(Value & v, const Pos & pos)
 {
     string s = forceString(v, pos);
     if (v.string.context) {
+        PathSet context;
+        v.getContext(context);
         if (pos)
             throwEvalError("the string '%1%' is not allowed to refer to a store path (such as '%2%'), at %3%",
-                v.string.s, v.string.context[0], pos);
+                v.string.s, *context.begin(), pos);
         else
             throwEvalError("the string '%1%' is not allowed to refer to a store path (such as '%2%')",
-                v.string.s, v.string.context[0]);
+                v.string.s, *context.begin());
     }
     return s;
 }
@@ -1514,7 +1502,7 @@ string EvalState::coerceToString(const Pos & pos, Value & v, PathSet & context,
     string s;
 
     if (v.type == tString) {
-        copyContext(v, context);
+        v.getContext(context);
         return v.string.s;
     }
 
@@ -1813,9 +1801,6 @@ size_t valueSize(Value & v)
         switch (v.type) {
         case tString:
             sz += doString(v.string.s);
-            if (v.string.context)
-                for (const char * * p = v.string.context; *p; ++p)
-                    sz += doString(*p);
             break;
         case tPath:
             sz += doString(v.path);

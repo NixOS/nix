@@ -100,6 +100,7 @@ void GC::gc()
             break;
         }
 
+        case tContext:
         case tInt:
         case tBool:
         case tNull:
@@ -107,9 +108,14 @@ void GC::gc()
         case tFloat:
             break;
 
-        case tString:
-            // FIXME
+        case tString: {
+            auto obj2 = (Value *) obj;
+            // FIXME: GC string
+            // See setContext().
+            if (!(((ptrdiff_t) obj2->string.context) & 1))
+                push(obj2->string.context);
             break;
+        }
 
         case tPath:
             // FIXME
@@ -245,9 +251,12 @@ std::pair<Size, Size> GC::Arena::freeUnmarked()
             case tWithAttrsEnv:
                 objSize = ((Env *) obj)->words();
                 break;
+            case tContext:
+                objSize = ((Context *) obj)->getSize() + 1;
+                break;
             default:
+                printError("GC encountered invalid object with tag %d", tag);
                 abort();
-                //throw Error("GC encountered invalid object with tag %d", tag);
             }
         }
 

@@ -27,7 +27,7 @@ void printValueAsJSON(EvalState & state, bool strict,
             break;
 
         case tString:
-            copyContext(v, context);
+            v.getContext(context);
             out.write(v.string.s);
             break;
 

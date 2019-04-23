@@ -10,7 +10,7 @@ struct Env;
 struct Expr;
 struct ExprLambda;
 struct PrimOp;
-struct PrimOp;
+struct Context;
 class Symbol;
 struct Pos;
 class EvalState;
@@ -70,6 +70,24 @@ std::ostream & operator << (std::ostream & str, const ExternalValueBase & v);
 #endif
 
 
+class Context : Object
+{
+    friend class Value;
+    friend class GC;
+
+    Symbol members[0];
+
+    Context(const PathSet & context) : Object(tContext, context.size())
+    {
+        size_t n = 0;
+        for (auto & i : context)
+            members[n++] = symbols.create(i);
+    }
+
+    size_t getSize() { return getMisc(); }
+};
+
+
 struct Value : Object
 {
     union
@@ -94,12 +112,10 @@ struct Value : Object
            with context C is used as a derivation attribute, then the
            derivations in C will be added to the inputDrvs of the
            derivation, and the other store paths in C will be added to
-           the inputSrcs of the derivations.
-
-           For canonicity, the store paths should be in sorted order. */
+           the inputSrcs of the derivations. */
         struct {
             const char * s;
-            const char * * context; // must be in sorted order
+            Context * context;
         } string;
 
         const char * path;
@@ -152,6 +168,35 @@ public:
     }
 
     constexpr static Size words() { return 3; } // FIXME
+
+    void setContext(const PathSet & context)
+    {
+        if (context.size() == 0)
+            string.context = nullptr;
+        else if (context.size() == 1) {
+            // If we have a single context, then store it
+            // directly. This saves allocating a Context object (16
+            // bytes).
+            auto symbol = symbols.create(*context.begin());
+            string.context = (Context *) (((ptrdiff_t) symbol.s) | 1);
+        } else {
+            string.context = gc.alloc<Context>(1 + context.size(), context);
+        }
+    }
+
+    void getContext(PathSet & context)
+    {
+        if (string.context) {
+            if (((ptrdiff_t) string.context) & 1) {
+                auto s = (const std::string *) (((ptrdiff_t) string.context) & ~1UL);
+                context.insert(*s);
+            } else {
+                auto size = string.context->getSize();
+                for (size_t i = 0; i < size; ++i)
+                    context.insert(string.context->members[i]);
+            }
+        }
+    }
 };
 
 

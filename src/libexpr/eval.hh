@@ -84,8 +84,6 @@ public:
 
 Value & mkString(Value & v, const string & s, const PathSet & context = PathSet());
 
-void copyContext(const Value & v, PathSet & context);
-
 
 /* Cache for calls to addToStore(); maps source paths to the store
    paths. */
@@ -106,7 +104,7 @@ void initGC();
 class EvalState
 {
 public:
-    SymbolTable symbols;
+    SymbolTable & symbols{nix::symbols}; // FIXME: remove
 
     const Symbol sWith, sOutPath, sDrvPath, sType, sMeta, sName, sValue,
         sSystem, sOverrides, sOutputs, sOutputName, sIgnoreNulls,
