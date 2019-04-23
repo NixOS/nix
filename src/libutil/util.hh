@@ -359,13 +359,34 @@ bool statusOk(int status);
 
 
 /* Parse a string into an integer. */
-template<class N> bool string2Int(const string & s, N & n)
+template<typename N> bool string2Int(const string & s, N & n)
 {
     if (string(s, 0, 1) == "-" && !std::numeric_limits<N>::is_signed)
         return false;
     std::istringstream str(s);
     str >> n;
     return str && str.get() == EOF;
+}
+
+template<typename N>
+N parseSize(std::string s, bool allowUnit = true)
+{
+    N multiplier = 1;
+    if (allowUnit && !s.empty()) {
+        char u = std::toupper(*s.rbegin());
+        if (std::isalpha(u)) {
+            if (u == 'K') multiplier = 1ULL << 10;
+            else if (u == 'M') multiplier = 1ULL << 20;
+            else if (u == 'G') multiplier = 1ULL << 30;
+            else if (u == 'T') multiplier = 1ULL << 40;
+            else throw Error("invalid unit specifier '%1%'", u);
+            s.resize(s.size() - 1);
+        }
+    }
+    N n;
+    if (!string2Int(s, n))
+        throw Error("'%s' is not an integer", s);
+    return n * multiplier;
 }
 
 /* Parse a string into a float. */
