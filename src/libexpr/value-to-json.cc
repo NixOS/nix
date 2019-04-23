@@ -26,9 +26,10 @@ void printValueAsJSON(EvalState & state, bool strict,
             out.write(v.boolean);
             break;
 
-        case tString:
+        case tShortString:
+        case tLongString:
             v.getContext(context);
-            out.write(v.string.s);
+            out.write(v.getString());
             break;
 
         case tPath:

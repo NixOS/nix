@@ -1116,9 +1116,9 @@ static void opQuery(Globals & globals, Strings opFlags, Strings opArgs)
                             if (!v)
                                 printError("derivation '%s' has invalid meta attribute '%s'", i.queryName(), j);
                             else {
-                                if (v->type == tString) {
+                                if (v->isString()) {
                                     attrs2["type"] = "string";
-                                    attrs2["value"] = v->string.s;
+                                    attrs2["value"] = v->getString();
                                     xml.writeEmptyElement("meta", attrs2);
                                 } else if (v->type == tInt) {
                                     attrs2["type"] = "int";
@@ -1136,9 +1136,9 @@ static void opQuery(Globals & globals, Strings opFlags, Strings opArgs)
                                     attrs2["type"] = "strings";
                                     XMLOpenElement m(xml, "meta", attrs2);
                                     for (unsigned int j = 0; j < v->listSize(); ++j) {
-                                        if (v->listElems()[j]->type != tString) continue;
+                                        if (!v->listElems()[j]->isString()) continue;
                                         XMLAttrs attrs3;
-                                        attrs3["value"] = v->listElems()[j]->string.s;
+                                        attrs3["value"] = v->listElems()[j]->getString();
                                         xml.writeEmptyElement("string", attrs3);
                                     }
                               } else if (v->type == tAttrs) {
@@ -1147,10 +1147,10 @@ static void opQuery(Globals & globals, Strings opFlags, Strings opArgs)
                                   Bindings & attrs = *v->attrs;
                                   for (auto &i : attrs) {
                                       Attr & a(*attrs.find(i.name));
-                                      if(a.value->type != tString) continue;
+                                      if (!a.value->isString()) continue;
                                       XMLAttrs attrs3;
                                       attrs3["type"] = i.name;
-                                      attrs3["value"] = a.value->string.s;
+                                      attrs3["value"] = a.value->getString();
                                       xml.writeEmptyElement("string", attrs3);
                                 }
                               }

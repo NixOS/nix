@@ -114,7 +114,7 @@ struct Value : Object
            derivation, and the other store paths in C will be added to
            the inputSrcs of the derivations. */
         struct {
-            const char * s;
+            const char * _s;
             Context * context;
         } string;
 
@@ -186,7 +186,7 @@ public:
 
     void getContext(PathSet & context)
     {
-        if (string.context) {
+        if (type == tLongString && string.context) {
             if (((ptrdiff_t) string.context) & 1) {
                 auto s = (const std::string *) (((ptrdiff_t) string.context) & ~1UL);
                 context.insert(*s);
@@ -196,6 +196,19 @@ public:
                     context.insert(string.context->members[i]);
             }
         }
+    }
+
+    bool isString() const
+    {
+        return type == tShortString || type == tLongString;
+    }
+
+    const char * getString() const
+    {
+        if (type == tShortString)
+            return (const char *) &string;
+        else
+            return string._s;
     }
 };
 
@@ -245,19 +258,20 @@ static inline void mkPrimOpApp(Value & v, Value & left, Value & right)
 
 static inline void mkStringNoCopy(Value & v, const char * s)
 {
-    v.type = tString;
-    v.string.s = s;
+    // FIXME: copy short strings?
+    v.type = tLongString;
+    v.string._s = s;
     v.string.context = 0;
 }
 
 
+void mkString(Value & v, const char * s);
+
+
 static inline void mkString(Value & v, const Symbol & s)
 {
-    mkStringNoCopy(v, ((const string &) s).c_str());
+    mkString(v, ((const string &) s).c_str());
 }
-
-
-void mkString(Value & v, const char * s);
 
 
 static inline void mkPathNoCopy(Value & v, const char * s)

@@ -25,7 +25,8 @@ enum Tag {
     // Value tags
     tInt,
     tBool,
-    tString,
+    tShortString,
+    tLongString,
     tPath,
     tNull,
     tAttrs,

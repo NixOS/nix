@@ -51,9 +51,10 @@ static void printValue(std::ostream & str, std::set<const Value *> & active, con
     case tBool:
         str << (v.boolean ? "true" : "false");
         break;
-    case tString:
+    case tShortString:
+    case tLongString:
         str << "\"";
-        for (const char * i = v.string.s; *i; i++)
+        for (const char * i = v.getString(); *i; i++)
             if (*i == '\"' || *i == '\\') str << "\\" << *i;
             else if (*i == '\n') str << "\\n";
             else if (*i == '\r') str << "\\r";
@@ -140,7 +141,8 @@ string showType(const Value & v)
     switch (v.type) {
         case tInt: return "an integer";
         case tBool: return "a boolean";
-        case tString: return v.string.context ? "a string with context" : "a string";
+        case tShortString: return "a string";
+        case tLongString: return v.string.context ? "a string with context" : "a string";
         case tPath: return "a path";
         case tNull: return "null";
         case tAttrs: return "a set";
@@ -170,8 +172,7 @@ static Symbol getName(const AttrName & name, EvalState & state, Env & env)
     } else {
         Root<Value> nameValue;
         name.expr->eval(state, env, nameValue);
-        state.forceStringNoCtx(nameValue);
-        return state.symbols.create(nameValue->string.s);
+        return state.symbols.create(state.forceStringNoCtx(nameValue));
     }
 }
 
@@ -495,14 +496,23 @@ LocalNoInline(void addErrorPrefix(Error & e, const char * s, const string & s2, 
 
 void mkString(Value & v, const char * s)
 {
-    mkStringNoCopy(v, dupString(s));
+    auto len = strlen(s); // FIXME: only need to know if > short
+    if (len < WORD_SIZE * 2) {
+        strcpy((char *) &v.string, s);
+        v.type = tShortString;
+    } else
+        mkStringNoCopy(v, dupString(s));
 }
 
 
 Value & mkString(Value & v, const string & s, const PathSet & context)
 {
-    mkString(v, s.c_str());
-    v.setContext(context);
+    if (context.empty())
+        mkString(v, s.c_str());
+    else {
+        mkStringNoCopy(v, dupString(s.c_str()));
+        v.setContext(context);
+    }
     return v;
 }
 
@@ -840,8 +850,7 @@ void ExprAttrs::eval(EvalState & state, Env & env, Value & v)
         state.forceValue(nameVal, i.pos);
         if (nameVal->type == tNull)
             continue;
-        state.forceStringNoCtx(nameVal);
-        Symbol nameSym = state.symbols.create(nameVal->string.s);
+        Symbol nameSym = state.symbols.create(state.forceStringNoCtx(nameVal));
         Bindings::iterator j = v.attrs->find(nameSym);
         if (j != v.attrs->end())
             throwEvalError("dynamic attribute '%1%' at %2% already defined at %3%", nameSym, i.pos, *j->pos);
@@ -1313,7 +1322,7 @@ void ExprConcatStrings::eval(EvalState & state, Env & env, Value & v)
     NixFloat nf = 0;
 
     bool first = !forceString;
-    Tag firstType = tString;
+    Tag firstType = tLongString;
 
     auto vTmp = state.allocValue();
 
@@ -1325,7 +1334,7 @@ void ExprConcatStrings::eval(EvalState & state, Env & env, Value & v)
            since paths are copied when they are used in a derivation),
            and none of the strings are allowed to have contexts. */
         if (first) {
-            firstType = vTmp->type;
+            firstType = vTmp->isString() ? tLongString : vTmp->type;
             first = false;
         }
 
@@ -1347,7 +1356,7 @@ void ExprConcatStrings::eval(EvalState & state, Env & env, Value & v)
             } else
                 throwEvalError("cannot add %1% to a float, at %2%", showType(vTmp), pos);
         } else
-            s << state.coerceToString(pos, vTmp, context, false, firstType == tString);
+            s << state.coerceToString(pos, vTmp, context, false, firstType == tLongString);
     }
 
     if (firstType == tInt)
@@ -1448,13 +1457,13 @@ void EvalState::forceFunction(Value & v, const Pos & pos)
 string EvalState::forceString(Value & v, const Pos & pos)
 {
     forceValue(v, pos);
-    if (v.type != tString) {
+    if (!v.isString()) {
         if (pos)
             throwTypeError("value is %1% while a string was expected, at %2%", v, pos);
         else
             throwTypeError("value is %1% while a string was expected", v);
     }
-    return string(v.string.s);
+    return string(v.getString()); // FIXME: don't copy
 }
 
 
@@ -1469,15 +1478,15 @@ string EvalState::forceString(Value & v, PathSet & context, const Pos & pos)
 string EvalState::forceStringNoCtx(Value & v, const Pos & pos)
 {
     string s = forceString(v, pos);
-    if (v.string.context) {
+    if (v.type == tLongString && v.string.context) {
         PathSet context;
         v.getContext(context);
         if (pos)
             throwEvalError("the string '%1%' is not allowed to refer to a store path (such as '%2%'), at %3%",
-                v.string.s, *context.begin(), pos);
+                v.string._s, *context.begin(), pos);
         else
             throwEvalError("the string '%1%' is not allowed to refer to a store path (such as '%2%')",
-                v.string.s, *context.begin());
+                v.string._s, *context.begin());
     }
     return s;
 }
@@ -1489,8 +1498,8 @@ bool EvalState::isDerivation(Value & v)
     Bindings::iterator i = v.attrs->find(sType);
     if (i == v.attrs->end()) return false;
     forceValue(*i->value);
-    if (i->value->type != tString) return false;
-    return strcmp(i->value->string.s, "derivation") == 0;
+    if (!i->value->isString()) return false;
+    return strcmp(i->value->getString(), "derivation") == 0;
 }
 
 
@@ -1501,9 +1510,9 @@ string EvalState::coerceToString(const Pos & pos, Value & v, PathSet & context,
 
     string s;
 
-    if (v.type == tString) {
+    if (v.isString()) {
         v.getContext(context);
-        return v.string.s;
+        return v.getString();
     }
 
     if (v.type == tPath) {
@@ -1603,6 +1612,9 @@ bool EvalState::eqValues(Value & v1, Value & v2)
     if (v1.type == tFloat && v2.type == tInt)
         return v1.fpoint == v2.integer;
 
+    if (v1.isString())
+        return v2.isString() && strcmp(v1.getString(), v2.getString()) == 0;
+
     // All other types are not compatible with each other.
     if (v1.type != v2.type) return false;
 
@@ -1613,9 +1625,6 @@ bool EvalState::eqValues(Value & v1, Value & v2)
 
         case tBool:
             return v1.boolean == v2.boolean;
-
-        case tString:
-            return strcmp(v1.string.s, v2.string.s) == 0;
 
         case tPath:
             return strcmp(v1.path, v2.path) == 0;
@@ -1799,8 +1808,8 @@ size_t valueSize(Value & v)
         size_t sz = sizeof(Value);
 
         switch (v.type) {
-        case tString:
-            sz += doString(v.string.s);
+        case tLongString:
+            sz += doString(v.string._s);
             break;
         case tPath:
             sz += doString(v.path);

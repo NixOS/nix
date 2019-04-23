@@ -68,10 +68,11 @@ static void printValueAsXML(EvalState & state, bool strict, bool location,
             doc.writeEmptyElement("bool", singletonAttrs("value", v.boolean ? "true" : "false"));
             break;
 
-        case tString:
+        case tShortString:
+        case tLongString:
             /* !!! show the context? */
             v.getContext(context);
-            doc.writeEmptyElement("string", singletonAttrs("value", v.string.s));
+            doc.writeEmptyElement("string", singletonAttrs("value", v.getString()));
             break;
 
         case tPath:
@@ -92,15 +93,15 @@ static void printValueAsXML(EvalState & state, bool strict, bool location,
                 a = v.attrs->find(state.sDrvPath);
                 if (a != v.attrs->end()) {
                     if (strict) state.forceValue(*a->value);
-                    if (a->value->type == tString)
-                        xmlAttrs["drvPath"] = drvPath = a->value->string.s;
+                    if (a->value->isString())
+                        xmlAttrs["drvPath"] = drvPath = a->value->getString();
                 }
 
                 a = v.attrs->find(state.sOutPath);
                 if (a != v.attrs->end()) {
                     if (strict) state.forceValue(*a->value);
-                    if (a->value->type == tString)
-                        xmlAttrs["outPath"] = a->value->string.s;
+                    if (a->value->isString())
+                        xmlAttrs["outPath"] = a->value->getString();
                 }
 
                 XMLOpenElement _(doc, "derivation", xmlAttrs);

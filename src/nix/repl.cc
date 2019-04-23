@@ -606,9 +606,10 @@ std::ostream & NixRepl::printValue(std::ostream & str, Value & v, unsigned int m
         str << ESC_CYA << (v.boolean ? "true" : "false") << ESC_END;
         break;
 
-    case tString:
+    case tShortString:
+    case tLongString:
         str << ESC_YEL;
-        printStringValue(str, v.string.s);
+        printStringValue(str, v.getString());
         str << ESC_END;
         break;
 

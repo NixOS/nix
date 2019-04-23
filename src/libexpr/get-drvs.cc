@@ -122,8 +122,8 @@ DrvInfo::Outputs DrvInfo::queryOutputs(bool onlyOutputsToInstall)
     if (!outTI->isList()) throw errMsg;
     Outputs result;
     for (auto i = outTI->listElems(); i != outTI->listElems() + outTI->listSize(); ++i) {
-        if ((*i)->type != tString) throw errMsg;
-        auto out = outputs.find((*i)->string.s);
+        if (!(*i)->isString()) throw errMsg;
+        auto out = outputs.find((*i)->getString());
         if (out == outputs.end()) throw errMsg;
         result.insert(*out);
     }
@@ -178,8 +178,7 @@ bool DrvInfo::checkMeta(Value & v)
             if (!checkMeta(*i.value)) return false;
         return true;
     }
-    else return v.type == tInt || v.type == tBool || v.type == tString ||
-                v.type == tFloat;
+    else return v.type == tInt || v.type == tBool || v.isString() || v.type == tFloat;
 }
 
 
@@ -195,8 +194,8 @@ Value * DrvInfo::queryMeta(const string & name)
 string DrvInfo::queryMetaString(const string & name)
 {
     auto v = queryMeta(name);
-    if (!v || v->type != tString) return "";
-    return v->string.s;
+    if (!v || !v->isString()) return "";
+    return v->getString();
 }
 
 
@@ -205,11 +204,11 @@ NixInt DrvInfo::queryMetaInt(const string & name, NixInt def)
     auto v = queryMeta(name);
     if (!v) return def;
     if (v->type == tInt) return v->integer;
-    if (v->type == tString) {
+    if (v->isString()) {
         /* Backwards compatibility with before we had support for
            integer meta fields. */
         NixInt n;
-        if (string2Int(v->string.s, n)) return n;
+        if (string2Int(v->getString(), n)) return n;
     }
     return def;
 }
@@ -219,11 +218,11 @@ NixFloat DrvInfo::queryMetaFloat(const string & name, NixFloat def)
     auto v = queryMeta(name);
     if (!v) return def;
     if (v->type == tFloat) return v->fpoint;
-    if (v->type == tString) {
+    if (v->isString()) {
         /* Backwards compatibility with before we had support for
            float meta fields. */
         NixFloat n;
-        if (string2Float(v->string.s, n)) return n;
+        if (string2Float(v->getString(), n)) return n;
     }
     return def;
 }
@@ -234,11 +233,12 @@ bool DrvInfo::queryMetaBool(const string & name, bool def)
     auto v = queryMeta(name);
     if (!v) return def;
     if (v->type == tBool) return v->boolean;
-    if (v->type == tString) {
+    if (v->isString()) {
         /* Backwards compatibility with before we had support for
            Boolean meta fields. */
-        if (strcmp(v->string.s, "true") == 0) return true;
-        if (strcmp(v->string.s, "false") == 0) return false;
+        auto s = v->getString();
+        if (strcmp(s, "true") == 0) return true;
+        if (strcmp(s, "false") == 0) return false;
     }
     return def;
 }

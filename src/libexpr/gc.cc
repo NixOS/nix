@@ -106,9 +106,10 @@ void GC::gc()
         case tNull:
         case tList0:
         case tFloat:
+        case tShortString:
             break;
 
-        case tString: {
+        case tLongString: {
             auto obj2 = (Value *) obj;
             // FIXME: GC string
             // See setContext().

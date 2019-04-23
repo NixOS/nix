@@ -238,7 +238,9 @@ static void prim_typeOf(EvalState & state, const Pos & pos, Value * * args, Valu
     switch (args[0]->type) {
         case tInt: t = "int"; break;
         case tBool: t = "bool"; break;
-        case tString: t = "string"; break;
+        case tShortString:
+        case tLongString:
+            t = "string"; break;
         case tPath: t = "path"; break;
         case tNull: t = "null"; break;
         case tAttrs: t = "set"; break;
@@ -305,7 +307,7 @@ static void prim_isFloat(EvalState & state, const Pos & pos, Value * * args, Val
 static void prim_isString(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
     state.forceValue(*args[0]);
-    mkBool(v, args[0]->type == tString);
+    mkBool(v, args[0]->isString());
 }
 
 
@@ -331,6 +333,8 @@ struct CompareValues
             return v1->fpoint < v2->integer;
         if (v1->type == tInt && v2->type == tFloat)
             return v1->integer < v2->fpoint;
+        if (v1->isString() && v2->isString())
+            return strcmp(v1->getString(), v2->getString()) < 0;
         if (v1->type != v2->type)
             throw EvalError(format("cannot compare %1% with %2%") % showType(*v1) % showType(*v2));
         switch (v1->type) {
@@ -338,8 +342,6 @@ struct CompareValues
                 return v1->integer < v2->integer;
             case tFloat:
                 return v1->fpoint < v2->fpoint;
-            case tString:
-                return strcmp(v1->string.s, v2->string.s) < 0;
             case tPath:
                 return strcmp(v1->path, v2->path) < 0;
             default:
@@ -495,10 +497,10 @@ static void prim_deepSeq(EvalState & state, const Pos & pos, Value * * args, Val
 static void prim_trace(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
     state.forceValue(*args[0]);
-    if (args[0]->type == tString)
-        printError(format("trace: %1%") % args[0]->string.s);
+    if (args[0]->isString())
+        printError("trace: %s", args[0]->getString());
     else
-        printError(format("trace: %1%") % *args[0]);
+        printError("trace: %s", *args[0]);
     state.forceValue(*args[1]);
     v = *args[1];
 }
@@ -1134,7 +1136,7 @@ static void prim_attrNames(EvalState & state, const Pos & pos, Value * * args, V
         mkString(*(v.listElems()[n++] = state.allocValue()), i.name);
 
     std::sort(v.listElems(), v.listElems() + n,
-              [](Value * v1, Value * v2) { return strcmp(v1->string.s, v2->string.s) < 0; });
+        [](Value * v1, Value * v2) { return strcmp(v1->getString(), v2->getString()) < 0; });
 }
 
 
@@ -1211,10 +1213,9 @@ static void prim_removeAttrs(EvalState & state, const Pos & pos, Value * * args,
 
     /* Get the attribute names to be removed. */
     std::set<Symbol> names;
-    for (unsigned int i = 0; i < args[1]->listSize(); ++i) {
-        state.forceStringNoCtx(*args[1]->listElems()[i], pos);
-        names.insert(state.symbols.create(args[1]->listElems()[i]->string.s));
-    }
+    for (unsigned int i = 0; i < args[1]->listSize(); ++i)
+        names.insert(state.symbols.create(
+                state.forceStringNoCtx(*args[1]->listElems()[i], pos)));
 
     /* Copy all attributes not in that set.  Note that we don't need
        to sort v.attrs because it's a subset of an already sorted
