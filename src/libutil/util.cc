@@ -962,12 +962,14 @@ std::vector<char *> stringsToCharPtrs(const Strings & ss)
     return res;
 }
 
-
+// Output = "standard out" output stream
 string runProgram(Path program, bool searchPath, const Strings & args,
     const std::optional<std::string> & input)
 {
     RunOptions opts(program, args);
     opts.searchPath = searchPath;
+    // This allows you to refer to a program with a pathname relative to the
+    // PATH variable.
     opts.input = input;
 
     auto res = runProgram(opts);
@@ -978,6 +980,7 @@ string runProgram(Path program, bool searchPath, const Strings & args,
     return res.second;
 }
 
+// Output = error code + "standard out" output stream
 std::pair<int, std::string> runProgram(const RunOptions & options_)
 {
     RunOptions options(options_);
@@ -1028,6 +1031,8 @@ void runProgram2(const RunOptions & options)
 
         if (options.searchPath)
             execvp(options.program.c_str(), stringsToCharPtrs(args_).data());
+            // This allows you to refer to a program with a pathname relative
+            // to the PATH variable.
         else
             execv(options.program.c_str(), stringsToCharPtrs(args_).data());
 

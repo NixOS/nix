@@ -69,6 +69,7 @@ namespace nix {
        https://example.org/my/repo.git
        https://example.org/my/repo.git?ref=release-1.2.3
        https://example.org/my/repo.git?rev=e72daba8250068216d79d2aeef40d4d95aff6666
+       git://github.com/edolstra/dwarffs.git\?ref=flake\&rev=2efca4bc9da70fb001b26c3dc858c6397d3c4817
 
    * /path.git(\?attr(&attr)*)?
 

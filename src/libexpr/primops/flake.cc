@@ -146,17 +146,19 @@ std::shared_ptr<FlakeRegistry> getFlagRegistry()
     return std::make_shared<FlakeRegistry>();
 }
 
-const std::vector<std::shared_ptr<FlakeRegistry>> EvalState::getFlakeRegistries()
+// This always returns a vector with globalReg, userReg, localReg, flakeReg.
+// If one of them doesn't exist, the registry is left empty but does exist.
+const Registries EvalState::getFlakeRegistries()
 {
-    std::vector<std::shared_ptr<FlakeRegistry>> registries;
-    registries.push_back(getGlobalRegistry());
+    Registries registries;
+    registries.push_back(getGlobalRegistry()); // TODO (Nick): Doesn't this break immutability?
     registries.push_back(getUserRegistry());
+    registries.push_back(std::make_shared<FlakeRegistry>()); // local
     registries.push_back(getFlagRegistry());
     return registries;
 }
 
-static FlakeRef lookupFlake(EvalState & state, const FlakeRef & flakeRef,
-    const std::vector<std::shared_ptr<FlakeRegistry>> & registries,
+static FlakeRef lookupFlake(EvalState & state, const FlakeRef & flakeRef, const Registries & registries,
     std::vector<FlakeRef> pastSearches = {})
 {
     if (registries.empty() && !flakeRef.isDirect())
@@ -466,5 +468,36 @@ static void prim_getFlake(EvalState & state, const Pos & pos, Value * * args, Va
 }
 
 static RegisterPrimOp r2("getFlake", 1, prim_getFlake);
+
+void gitCloneFlake (std::string flakeUri, EvalState & state, Registries registries,
+    Path endDirectory)
+{
+    FlakeRef flakeRef(flakeUri);
+    flakeRef = lookupFlake(state, flakeRef, registries);
+
+    std::string uri;
+
+    Strings args = {"clone"};
+
+    if (auto refData = std::get_if<FlakeRef::IsGitHub>(&flakeRef.data)) {
+        uri = "git@github.com:" + refData->owner + "/" + refData->repo + ".git";
+        args.push_back(uri);
+        if (flakeRef.ref) {
+            args.push_back("--branch");
+            args.push_back(*flakeRef.ref);
+        }
+    } else if (auto refData = std::get_if<FlakeRef::IsGit>(&flakeRef.data)) {
+        args.push_back(refData->uri);
+        if (flakeRef.ref) {
+            args.push_back("--branch");
+            args.push_back(*flakeRef.ref);
+        }
+    }
+
+    if (endDirectory != "")
+        args.push_back(endDirectory);
+
+    runProgram("git", true, args);
+}
 
 }
