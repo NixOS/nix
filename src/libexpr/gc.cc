@@ -44,7 +44,10 @@ GC::GC()
 
 GC::~GC()
 {
-    debug("allocated %d bytes in total", totalSize * WORD_SIZE);
+    printInfo("%d bytes in arenas, %d bytes allocated, %d bytes reclaimed by GC",
+        totalSize * WORD_SIZE,
+        allTimeWordsAllocated * WORD_SIZE,
+        allTimeWordsFreed * WORD_SIZE);
 
     size_t n = 0;
     for (Ptr<Object> * p = frontPtrSentinel->next; p != backPtrSentinel; p = p->next)
@@ -250,6 +253,8 @@ void GC::gc()
 
     debug("freed %d bytes in %d dead objects, keeping %d objects",
         totalWordsFreed * WORD_SIZE, totalObjectsFreed, marked);
+
+    allTimeWordsFreed += totalWordsFreed;
 }
 
 std::pair<size_t, size_t> GC::freeUnmarked(Arena & arena)

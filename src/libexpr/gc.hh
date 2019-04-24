@@ -188,6 +188,9 @@ private:
 
     std::array<FreeList, 8> freeLists;
 
+    size_t allTimeWordsAllocated = 0;
+    size_t allTimeWordsFreed = 0;
+
     Object * allocObject(size_t size)
     {
         assert(size >= 2);
@@ -255,6 +258,7 @@ public:
     Ptr<T> alloc(size_t size, const Args & ... args)
     {
         auto raw = allocObject(size);
+        allTimeWordsAllocated += size;
         return new (raw) T(args...);
     }
 
