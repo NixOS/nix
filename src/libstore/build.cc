@@ -803,6 +803,9 @@ private:
     /* Whether we're currently doing a chroot build. */
     bool useChroot = false;
 
+    /* Whether we need to perform hash rewriting if there are valid output paths. */
+    bool needsHashRewrite;
+
     Path chrootRootDir;
 
     /* RAII object to delete the chroot directory. */
@@ -994,6 +997,13 @@ DerivationGoal::DerivationGoal(const Path & drvPath, const StringSet & wantedOut
     , wantedOutputs(wantedOutputs)
     , buildMode(buildMode)
 {
+#if __linux__
+    needsHashRewrite = !useChroot;
+#else
+    /* Darwin requires hash rewriting even when sandboxing is enabled. */
+    needsHashRewrite = true;
+#endif
+
     state = &DerivationGoal::getDerivation;
     name = (format("building of '%1%'") % drvPath).str();
     trace("created");
@@ -2073,7 +2083,7 @@ void DerivationGoal::startBuilder()
 #endif
     }
 
-    else {
+    if (needsHashRewrite) {
 
         if (pathExists(homeDir))
             throw Error(format("directory '%1%' exists; please remove it") % homeDir);
@@ -2873,6 +2883,10 @@ void DerivationGoal::runChild()
                 for (auto & i : missingPaths) {
                     sandboxProfile += (format("\t(subpath \"%1%\")\n") % i.c_str()).str();
                 }
+                /* Also add redirected outputs to the chroot */
+                for (auto & i : redirectedOutputs) {
+                    sandboxProfile += (format("\t(subpath \"%1%\")\n") % i.second.c_str()).str();
+                }
                 sandboxProfile += ")\n";
 
                 /* Our inputs (transitive dependencies and any impurities computed above)
@@ -3051,7 +3065,9 @@ void DerivationGoal::registerOutputs()
                         throw SysError(format("moving build output '%1%' from the sandbox to the Nix store") % path);
             }
             if (buildMode != bmCheck) actualPath = worker.store.toRealPath(path);
-        } else {
+        }
+
+        if (needsHashRewrite) {
             Path redirected = redirectedOutputs[path];
             if (buildMode == bmRepair
                 && redirectedBadOutputs.find(path) != redirectedBadOutputs.end()
