@@ -146,15 +146,14 @@ std::shared_ptr<FlakeRegistry> getFlagRegistry()
     return std::make_shared<FlakeRegistry>();
 }
 
-// This always returns a vector with globalReg, userReg, localReg, flakeReg.
+// This always returns a vector with flakeRef, userReg, globalReg.
 // If one of them doesn't exist, the registry is left empty but does exist.
 const Registries EvalState::getFlakeRegistries()
 {
     Registries registries;
-    registries.push_back(getGlobalRegistry()); // TODO (Nick): Doesn't this break immutability?
-    registries.push_back(getUserRegistry());
-    registries.push_back(std::make_shared<FlakeRegistry>()); // local
     registries.push_back(getFlagRegistry());
+    registries.push_back(getUserRegistry());
+    registries.push_back(getGlobalRegistry());
     return registries;
 }
 
@@ -169,8 +168,10 @@ static FlakeRef lookupFlake(EvalState & state, const FlakeRef & flakeRef, const 
         if (i != registry->entries.end()) {
             auto newRef = i->second;
             if (std::get_if<FlakeRef::IsAlias>(&flakeRef.data)) {
-                if (flakeRef.ref) newRef.ref = flakeRef.ref;
-                if (flakeRef.rev) newRef.rev = flakeRef.rev;
+                if (flakeRef.ref || flakeRef.rev) {
+                    newRef.ref = flakeRef.ref;
+                    newRef.rev = flakeRef.rev;
+                }
             }
             std::string errorMsg = "found cycle in flake registries: ";
             for (FlakeRef oldRef : pastSearches) {
