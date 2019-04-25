@@ -190,6 +190,10 @@ struct LegacySSHStore : public Store
     Path queryPathFromHashPart(const string & hashPart) override
     { unsupported("queryPathFromHashPart"); }
 
+    Path queryPathFromFileHash(const string & fileHash) override
+    { unsupported("queryPathFromFileHash"); }
+
+
     Path addToStore(const string & name, const Path & srcPath,
         bool recursive, HashType hashAlgo,
         PathFilter & filter, RepairFlag repair) override

@@ -19,6 +19,8 @@ public:
     virtual std::pair<Outcome, std::shared_ptr<NarInfo>> lookupNarInfo(
         const std::string & uri, const std::string & hashPart) = 0;
 
+    virtual Path queryPathFromFileHash(const std::string & fileHash) = 0;
+
     virtual void upsertNarInfo(
         const std::string & uri, const std::string & hashPart,
         std::shared_ptr<ValidPathInfo> info) = 0;

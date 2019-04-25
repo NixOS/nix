@@ -5,6 +5,7 @@
 #include "worker-protocol.hh"
 #include "derivations.hh"
 #include "nar-info.hh"
+#include "nar-info-disk-cache.hh"
 
 #include <iostream>
 #include <algorithm>
@@ -829,6 +830,11 @@ Path LocalStore::queryPathFromHashPart(const string & hashPart)
         const char * s = (const char *) sqlite3_column_text(state->stmtQueryPathFromHashPart, 0);
         return s && prefix.compare(0, prefix.size(), s, prefix.size()) == 0 ? s : "";
     });
+}
+
+Path LocalStore::queryPathFromFileHash(const string & fileHash)
+{
+    return getNarInfoDiskCache()->queryPathFromFileHash(fileHash);
 }
 
 

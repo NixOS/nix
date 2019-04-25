@@ -63,7 +63,7 @@ public:
     struct State
     {
         SQLite db;
-        SQLiteStmt insertCache, queryCache, insertNAR, insertMissingNAR, queryNAR, purgeCache;
+        SQLiteStmt insertCache, queryCache, insertNAR, insertMissingNAR, queryNAR, purgeCache, queryPathFromFileHash;
         std::map<std::string, Cache> caches;
     };
 
@@ -102,6 +102,9 @@ public:
 
         state->queryNAR.create(state->db,
             "select present, namePart, url, compression, fileHash, fileSize, narHash, narSize, refs, deriver, sigs, ca from NARs where cache = ? and hashPart = ? and ((present = 0 and timestamp > ?) or (present = 1 and timestamp > ?))");
+
+        state->queryPathFromFileHash.create(state->db,
+                "select n.present, n.hashPart, n.namePart, b.storeDir from NARs as n JOIN BinaryCaches b ON (n.cache = b.id) WHERE n.fileHash = ? LIMIT 1");
 
         /* Periodically purge expired entries from the database. */
         retrySQLite<void>([&]() {
@@ -256,6 +259,32 @@ public:
             }
         });
     }
+
+    Path queryPathFromFileHash(const std::string & fileHash) override
+    {
+        return retrySQLite<Path>([&](){
+            auto state(_state.lock());
+
+            auto query(state->queryPathFromFileHash.use()(fileHash));
+
+            if (!query.next())
+                return Path("");
+
+            if (!query.getInt(0))
+                return Path("");
+
+            if (query.isNull(2))
+                return Path("");
+
+            auto hashPart = query.getStr(1);
+            auto namePart = query.getStr(2);
+            auto storeDir = query.getStr(3);
+
+            Path path = storeDir + "/" + hashPart + (namePart.empty() ? "" : "-" + namePart);
+            return path;
+        });
+    }
+
 };
 
 ref<NarInfoDiskCache> getNarInfoDiskCache()
