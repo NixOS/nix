@@ -5,6 +5,7 @@
 #include "finally.hh"
 #include "serialise.hh"
 
+#include <algorithm>
 #include <cctype>
 #include <cerrno>
 #include <cstdio>
@@ -274,6 +275,11 @@ DirEntries readDirectory(const Path & path)
         );
     }
     if (errno) throw SysError(format("reading directory '%1%'") % path);
+
+    std::sort(entries.begin(), entries.end(),
+        [](const DirEntry & a, const DirEntry & b) {
+            return a.name < b.name;
+    });
 
     return entries;
 }
