@@ -17,6 +17,7 @@ namespace nix {
 
 class Store;
 class EvalState;
+struct Derivation;
 enum RepairFlag : bool;
 
 
@@ -341,6 +342,10 @@ private:
     friend struct ExprOpConcatLists;
     friend struct ExprSelect;
     friend void prim_getAttr(EvalState & state, const Pos & pos, Value * * args, Value & v);
+
+public:
+
+    std::function<void(const Path & drvPath, const Derivation & drv)> derivationHook;
 };
 
 
