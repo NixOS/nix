@@ -607,6 +607,7 @@ std::ostream & NixRepl::printValue(std::ostream & str, Value & v, unsigned int m
         break;
 
     case tShortString:
+    case tStaticString:
     case tLongString:
         str << ESC_YEL;
         printStringValue(str, v.getString());

@@ -146,6 +146,7 @@ void GC::gc()
             break;
         }
 
+        case tString:
         case tContext:
         case tInt:
         case tBool:
@@ -153,11 +154,12 @@ void GC::gc()
         case tList0:
         case tFloat:
         case tShortString:
+        case tStaticString:
             break;
 
         case tLongString: {
             auto obj2 = (Value *) obj;
-            // FIXME: GC string
+            push(obj2->string.s);
             // See setContext().
             if (!(((ptrdiff_t) obj2->string.context) & 1))
                 push(obj2->string.context);
@@ -284,6 +286,9 @@ std::pair<size_t, size_t> GC::freeUnmarked(Arena & arena)
             switch (tag) {
             case tFree:
                 objSize = ((Free *) obj)->words();
+                break;
+            case tString:
+                objSize = ((String *) obj)->words();
                 break;
             case tBindings:
                 objSize = ((Bindings *) obj)->words();

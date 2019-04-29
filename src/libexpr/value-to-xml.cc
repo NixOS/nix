@@ -69,6 +69,7 @@ static void printValueAsXML(EvalState & state, bool strict, bool location,
             break;
 
         case tShortString:
+        case tStaticString:
         case tLongString:
             /* !!! show the context? */
             v.getContext(context);

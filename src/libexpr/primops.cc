@@ -239,6 +239,7 @@ static void prim_typeOf(EvalState & state, const Pos & pos, Value * * args, Valu
         case tInt: t = "int"; break;
         case tBool: t = "bool"; break;
         case tShortString:
+        case tStaticString:
         case tLongString:
             t = "string"; break;
         case tPath: t = "path"; break;
@@ -937,15 +938,20 @@ static void prim_readDir(EvalState & state, const Pos & pos, Value * * args, Val
     DirEntries entries = readDirectory(state.checkSourcePath(path));
     state.mkAttrs(v, entries.size());
 
+    auto sRegular = state.symbols.create("regular");
+    auto sDirectory = state.symbols.create("directory");
+    auto sSymlink = state.symbols.create("symlink");
+    auto sUnknown = state.symbols.create("unknown");
+
     for (auto & ent : entries) {
         auto ent_val = state.allocAttr(v, state.symbols.create(ent.name));
         if (ent.type == DT_UNKNOWN)
             ent.type = getFileType(path + "/" + ent.name);
-        mkStringNoCopy(*ent_val,
-            ent.type == DT_REG ? "regular" :
-            ent.type == DT_DIR ? "directory" :
-            ent.type == DT_LNK ? "symlink" :
-            "unknown");
+        mkString(*ent_val,
+            ent.type == DT_REG ? sRegular :
+            ent.type == DT_DIR ? sDirectory :
+            ent.type == DT_LNK ? sSymlink :
+            sUnknown);
     }
 
     v.attrs->sort();

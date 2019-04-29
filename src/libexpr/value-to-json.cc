@@ -27,6 +27,7 @@ void printValueAsJSON(EvalState & state, bool strict,
             break;
 
         case tShortString:
+        case tStaticString:
         case tLongString:
             v.getContext(context);
             out.write(v.getString());

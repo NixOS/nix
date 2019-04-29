@@ -5,6 +5,7 @@
 #include <stack>
 #include <limits>
 #include <cassert>
+#include <cstring>
 
 //#define GC_DEBUG 1
 
@@ -16,6 +17,7 @@ enum Tag {
     tFree = 3,
 
     // Misc types
+    tString,
     tBindings,
     tValueList,
     tEnv,
@@ -27,6 +29,7 @@ enum Tag {
     tInt,
     tBool,
     tShortString,
+    tStaticString,
     tLongString,
     tPath,
     tNull,
@@ -433,6 +436,32 @@ struct Root
     operator T & ()
     {
         return value;
+    }
+};
+
+struct String : Object
+{
+    char s[0];
+
+    String(size_t len, const char * src)
+        : Object(tString, len)
+    {
+        std::memcpy(s, src, len + 1);
+    }
+
+    size_t words() const { return wordsFor(getMisc()); }
+
+    /* Return the number of words needed to store a string of 'len'
+       characters (where 'len' excludes the terminator). */
+    static size_t wordsFor(size_t len)
+    {
+        return len / WORD_SIZE + 2;
+    }
+
+    static String * alloc(const char * src)
+    {
+        auto len = strlen(src);
+        return gc.alloc<String>(wordsFor(len), len, src);
     }
 };
 

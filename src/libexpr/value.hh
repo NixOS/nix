@@ -116,10 +116,10 @@ struct Value : Object
            derivation, and the other store paths in C will be added to
            the inputSrcs of the derivations. */
         struct {
-            const char * _s;
+            String * s;
             Context * context;
         } string;
-
+        const char * staticString;
         const char * path;
         Bindings * attrs;
         PtrList<Value> * bigList;
@@ -202,7 +202,7 @@ public:
 
     bool isString() const
     {
-        return type == tShortString || type == tLongString;
+        return type == tShortString || type == tStaticString || type == tLongString;
     }
 
     void setShortString(const char * s)
@@ -217,8 +217,10 @@ public:
     {
         if (type == tShortString)
             return getMiscData();
+        else if (type == tStaticString)
+            return staticString;
         else
-            return string._s;
+            return string.s->s;
     }
 };
 
@@ -266,21 +268,23 @@ static inline void mkPrimOpApp(Value & v, Value & left, Value & right)
 }
 
 
-static inline void mkStringNoCopy(Value & v, const char * s)
+static inline void mkString(Value & v, const char * s)
 {
-    // FIXME: copy short strings?
-    v.type = tLongString;
-    v.string._s = s;
-    v.string.context = 0;
+    auto len = strlen(s); // FIXME: only need to know if > short
+    if (len < WORD_SIZE * 2 + Object::miscBytes)
+        v.setShortString(s);
+    else {
+        v.string.s = gc.alloc<String>(String::wordsFor(len), len, s);
+        v.string.context = 0;
+        v.type = tLongString;
+    }
 }
-
-
-void mkString(Value & v, const char * s);
 
 
 static inline void mkString(Value & v, const Symbol & s)
 {
-    mkString(v, ((const string &) s).c_str());
+    v.staticString = ((const string &) s).c_str();
+    v.type = tStaticString;
 }
 
 

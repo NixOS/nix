@@ -24,10 +24,13 @@ namespace nix {
 SymbolTable symbols;
 
 
+unsigned long stringBytes = 0;
+
 // FIXME
 static char * dupString(const char * s)
 {
     char * t;
+    stringBytes += strlen(s) + 1;
     t = strdup(s);
     if (!t) throw std::bad_alloc();
     return t;
@@ -52,6 +55,7 @@ static void printValue(std::ostream & str, std::set<const Value *> & active, con
         str << (v.boolean ? "true" : "false");
         break;
     case tShortString:
+    case tStaticString:
     case tLongString:
         str << "\"";
         for (const char * i = v.getString(); *i; i++)
@@ -141,7 +145,9 @@ string showType(const Value & v)
     switch (v.type) {
         case tInt: return "an integer";
         case tBool: return "a boolean";
-        case tShortString: return "a string";
+        case tShortString:
+        case tStaticString:
+            return "a string";
         case tLongString: return v.string.context ? "a string with context" : "a string";
         case tPath: return "a path";
         case tNull: return "null";
@@ -480,22 +486,14 @@ LocalNoInline(void addErrorPrefix(Error & e, const char * s, const string & s2, 
 }
 
 
-void mkString(Value & v, const char * s)
-{
-    auto len = strlen(s); // FIXME: only need to know if > short
-    if (len < WORD_SIZE * 2 + Object::miscBytes)
-        v.setShortString(s);
-    else
-        mkStringNoCopy(v, dupString(s));
-}
-
-
 Value & mkString(Value & v, const string & s, const PathSet & context)
 {
     if (context.empty())
         mkString(v, s.c_str());
     else {
-        mkStringNoCopy(v, dupString(s.c_str()));
+        v.string.s = String::alloc(s.c_str());
+        v.string.context = nullptr;
+        v.type = tLongString;
         v.setContext(context);
     }
     return v;
@@ -1461,10 +1459,10 @@ string EvalState::forceStringNoCtx(Value & v, const Pos & pos)
         v.getContext(context);
         if (pos)
             throwEvalError("the string '%1%' is not allowed to refer to a store path (such as '%2%'), at %3%",
-                v.string._s, *context.begin(), pos);
+                v.getString(), *context.begin(), pos);
         else
             throwEvalError("the string '%1%' is not allowed to refer to a store path (such as '%2%')",
-                v.string._s, *context.begin());
+                v.getString(), *context.begin());
     }
     return s;
 }
@@ -1721,6 +1719,7 @@ void EvalState::printStats()
         topObj.attr("nrLookups", nrLookups);
         topObj.attr("nrPrimOpCalls", nrPrimOpCalls);
         topObj.attr("nrFunctionCalls", nrFunctionCalls);
+        topObj.attr("stringBytes", stringBytes);
 
         if (countCalls) {
             {
@@ -1766,6 +1765,7 @@ void EvalState::printStats()
 }
 
 
+// FIXME: move to gc.cc and make generic.
 size_t valueSize(Value & v)
 {
     std::set<const void *> seen;
@@ -1787,7 +1787,7 @@ size_t valueSize(Value & v)
 
         switch (v.type) {
         case tLongString:
-            sz += doString(v.string._s);
+            sz += v.string.s->words() * WORD_SIZE;
             break;
         case tPath:
             sz += doString(v.path);

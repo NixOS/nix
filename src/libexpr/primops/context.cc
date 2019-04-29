@@ -160,7 +160,7 @@ static void prim_appendContext(EvalState & state, const Pos & pos, Value * * arg
         if (iter != i.value->attrs->end()) {
             if (state.forceBool(*iter->value, *iter->pos)) {
                 if (!isDerivation(i.name)) {
-                    throw EvalError("Tried to add all-outputs context of %s, which is not a derivation, to a string, at %s", i.name, i.pos);
+                    throw EvalError("tried to add all-outputs context of %s, which is not a derivation, to a string, at %s", i.name, *i.pos);
                 }
                 context.insert("=" + string(i.name));
             }
@@ -170,7 +170,7 @@ static void prim_appendContext(EvalState & state, const Pos & pos, Value * * arg
         if (iter != i.value->attrs->end()) {
             state.forceList(*iter->value, *iter->pos);
             if (iter->value->listSize() && !isDerivation(i.name)) {
-                throw EvalError("Tried to add derivation output context of %s, which is not a derivation, to a string, at %s", i.name, i.pos);
+                throw EvalError("tried to add derivation output context of %s, which is not a derivation, to a string, at %s", i.name, *i.pos);
             }
             for (unsigned int n = 0; n < iter->value->listSize(); ++n) {
                 auto name = state.forceStringNoCtx(*iter->value->listElems()[n], *iter->pos);
