@@ -286,7 +286,12 @@ public:
     void autoCallFunction(Bindings & args, Value & fun, Value & res);
 
     /* Allocation primitives. */
-    Ptr<Value> allocValue();
+    Ptr<Value> allocValue()
+    {
+        nrValues++;
+        return gc.alloc<Value>(Value::words());
+    }
+
     Ptr<Env> allocEnv(size_t size, size_t prevWith = 0, Tag type = tEnv);
 
     // Note: the resulting Value is only reachable as long as vAttrs

@@ -539,13 +539,6 @@ inline Value * EvalState::lookupVar(Env * env, const ExprVar & var, bool noEval)
 }
 
 
-Ptr<Value> EvalState::allocValue()
-{
-    nrValues++;
-    return gc.alloc<Value>(Value::words());
-}
-
-
 Ptr<Env> EvalState::allocEnv(size_t size, size_t prevWith, Tag type)
 {
     nrEnvs++;
