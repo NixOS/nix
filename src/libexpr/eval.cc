@@ -1657,7 +1657,7 @@ void EvalState::printStats()
         if (outPath != "-")
             fs.open(outPath, std::fstream::out);
         JSONObject topObj(outPath == "-" ? std::cerr : fs, true);
-        topObj.attr("cpuTime",cpuTime);
+        topObj.attr("cpuTime", cpuTime);
         {
             auto envs = topObj.object("envs");
             envs.attr("number", nrEnvs);
@@ -1700,6 +1700,13 @@ void EvalState::printStats()
         topObj.attr("nrLookups", nrLookups);
         topObj.attr("nrPrimOpCalls", nrPrimOpCalls);
         topObj.attr("nrFunctionCalls", nrFunctionCalls);
+        {
+            auto j = topObj.object("gc");
+            j.attr("heapSize", gc.getHeapSize());
+            j.attr("totalBytes", gc.allTimeWordsAllocated * WORD_SIZE);
+            j.attr("reclaimedBytes", gc.allTimeWordsFreed * WORD_SIZE);
+            j.attr("gcTime", gc.totalDurationMs / 1000.0);
+        }
 
         if (countCalls) {
             {
