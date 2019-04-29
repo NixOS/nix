@@ -548,8 +548,7 @@ void LocalStore::checkDerivationOutputs(const Path & drvPath, const Derivation &
         if (out == drv.outputs.end())
             throw Error(format("derivation '%1%' does not have an output named 'out'") % drvPath);
 
-        bool recursive; Hash h;
-        out->second.parseHashInfo(recursive, h);
+        auto [recursive, h] = out->second.parseHashInfo();
         Path outPath = makeFixedOutputPath(recursive, h, drvName);
 
         StringPairs::const_iterator j = drv.env.find("out");

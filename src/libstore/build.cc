@@ -3106,8 +3106,7 @@ void DerivationGoal::registerOutputs()
            hash). */
         if (fixedOutput) {
 
-            bool recursive; Hash h;
-            i.second.parseHashInfo(recursive, h);
+            auto [recursive, h] = i.second.parseHashInfo();
 
             if (!recursive) {
                 /* The output path should be a regular file without

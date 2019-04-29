@@ -9,21 +9,19 @@
 namespace nix {
 
 
-void DerivationOutput::parseHashInfo(bool & recursive, Hash & hash) const
+std::pair<bool, Hash> DerivationOutput::parseHashInfo() const
 {
-    recursive = false;
+    bool recursive = false;
     string algo = hashAlgo;
 
-    if (string(algo, 0, 2) == "r:") {
+    if (string(algo, 0, 2) == "r:")
         recursive = true;
-        algo = string(algo, 2);
-    }
 
-    HashType hashType = parseHashType(algo);
+    HashType hashType = parseHashType(recursive ? string(algo, 2) : algo);
     if (hashType == htUnknown)
         throw Error(format("unknown hash algorithm '%1%'") % algo);
 
-    hash = Hash(this->hash, hashType);
+    return {recursive, Hash(this->hash, hashType)};
 }
 
 
