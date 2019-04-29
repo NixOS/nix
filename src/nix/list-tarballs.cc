@@ -98,8 +98,11 @@ struct CmdListTarballs : MixJSON, InstallablesCommand
                         } catch (EvalError & e) {
                         }
                     } else {
-                        for (auto & attr : *v->attrs)
+                        std::unordered_set<Value *> vs;
+                        for (auto & attr : *v->attrs) {
+                            if (!vs.insert(attr.value).second) continue;
                             findDerivations(attr.value);
+                        }
                     }
                 }
             };
