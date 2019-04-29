@@ -120,7 +120,7 @@ struct Value : Object
             Context * context;
         } string;
         const char * staticString;
-        const char * path;
+        String * path;
         Bindings * attrs;
         PtrList<Value> * bigList;
         Value * smallList[2];
@@ -288,14 +288,11 @@ static inline void mkString(Value & v, const Symbol & s)
 }
 
 
-static inline void mkPathNoCopy(Value & v, const char * s)
+static inline void mkPath(Value & v, const std::string & s)
 {
+    v.path = String::alloc(s.c_str());
     v.type = tPath;
-    v.path = s;
 }
-
-
-void mkPath(Value & v, const char * s);
 
 
 /* Compute the size in bytes of the given value, including all values

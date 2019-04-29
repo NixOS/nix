@@ -344,7 +344,7 @@ struct CompareValues
             case tFloat:
                 return v1->fpoint < v2->fpoint;
             case tPath:
-                return strcmp(v1->path, v2->path) < 0;
+                return strcmp(v1->path->s, v2->path->s) < 0;
             default:
                 throw EvalError(format("cannot compare %1% with %2%") % showType(*v1) % showType(*v2));
         }

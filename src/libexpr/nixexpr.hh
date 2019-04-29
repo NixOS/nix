@@ -134,11 +134,10 @@ struct ExprIndStr : Expr
 
 struct ExprPath : Expr
 {
-    string s;
     Ptr<Value> v;
-    ExprPath(const string & s) : s(s) {
+    ExprPath(const string & s) {
         v = gc.alloc<Value>(Value::words());
-        mkPathNoCopy(v, this->s.c_str());
+        mkPath(v, s);
     };
     COMMON_METHODS
     Ptr<Value> maybeThunk(EvalState & state, Env & env) override;

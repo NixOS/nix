@@ -167,7 +167,7 @@ void GC::gc()
         }
 
         case tPath:
-            // FIXME
+            push(((Value *) obj)->path);
             break;
 
         case tAttrs:

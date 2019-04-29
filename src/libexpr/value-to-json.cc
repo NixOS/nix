@@ -34,7 +34,7 @@ void printValueAsJSON(EvalState & state, bool strict,
             break;
 
         case tPath:
-            out.write(state.copyPathToStore(context, v.path));
+            out.write(state.copyPathToStore(context, v.path->s));
             break;
 
         case tNull:

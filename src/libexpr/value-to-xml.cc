@@ -77,7 +77,7 @@ static void printValueAsXML(EvalState & state, bool strict, bool location,
             break;
 
         case tPath:
-            doc.writeEmptyElement("path", singletonAttrs("value", v.path));
+            doc.writeEmptyElement("path", singletonAttrs("value", v.path->s));
             break;
 
         case tNull:

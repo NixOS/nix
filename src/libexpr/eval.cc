@@ -24,19 +24,6 @@ namespace nix {
 SymbolTable symbols;
 
 
-unsigned long stringBytes = 0;
-
-// FIXME
-static char * dupString(const char * s)
-{
-    char * t;
-    stringBytes += strlen(s) + 1;
-    t = strdup(s);
-    if (!t) throw std::bad_alloc();
-    return t;
-}
-
-
 static void printValue(std::ostream & str, std::set<const Value *> & active, const Value & v)
 {
     checkInterrupt();
@@ -67,7 +54,7 @@ static void printValue(std::ostream & str, std::set<const Value *> & active, con
         str << "\"";
         break;
     case tPath:
-        str << v.path; // !!! escaping?
+        str << v.path->s; // !!! escaping?
         break;
     case tNull:
         str << "null";
@@ -497,12 +484,6 @@ Value & mkString(Value & v, const string & s, const PathSet & context)
         v.setContext(context);
     }
     return v;
-}
-
-
-void mkPath(Value & v, const char * s)
-{
-    mkPathNoCopy(v, dupString(s));
 }
 
 
@@ -1492,7 +1473,7 @@ string EvalState::coerceToString(const Pos & pos, Value & v, PathSet & context,
     }
 
     if (v.type == tPath) {
-        Path path(canonPath(v.path));
+        Path path(canonPath(v.path->s));
         return copyToStore ? copyPathToStore(context, path) : path;
     }
 
@@ -1603,7 +1584,7 @@ bool EvalState::eqValues(Value & v1, Value & v2)
             return v1.boolean == v2.boolean;
 
         case tPath:
-            return strcmp(v1.path, v2.path) == 0;
+            return strcmp(v1.path->s, v2.path->s) == 0;
 
         case tNull:
             return true;
@@ -1719,7 +1700,6 @@ void EvalState::printStats()
         topObj.attr("nrLookups", nrLookups);
         topObj.attr("nrPrimOpCalls", nrPrimOpCalls);
         topObj.attr("nrFunctionCalls", nrFunctionCalls);
-        topObj.attr("stringBytes", stringBytes);
 
         if (countCalls) {
             {
@@ -1770,12 +1750,6 @@ size_t valueSize(Value & v)
 {
     std::set<const void *> seen;
 
-    auto doString = [&](const char * s) -> size_t {
-        if (seen.find(s) != seen.end()) return 0;
-        seen.insert(s);
-        return strlen(s) + 1;
-    };
-
     std::function<size_t(Value & v)> doValue;
     std::function<size_t(Env & v)> doEnv;
 
@@ -1790,7 +1764,7 @@ size_t valueSize(Value & v)
             sz += v.string.s->words() * WORD_SIZE;
             break;
         case tPath:
-            sz += doString(v.path);
+            sz += v.path->words() * WORD_SIZE;
             break;
         case tAttrs:
             if (seen.find(v.attrs) == seen.end()) {

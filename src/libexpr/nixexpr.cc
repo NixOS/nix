@@ -80,7 +80,7 @@ void ExprString::show(std::ostream & str) const
 
 void ExprPath::show(std::ostream & str) const
 {
-    str << s;
+    str << v->path->s;
 }
 
 void ExprVar::show(std::ostream & str) const
