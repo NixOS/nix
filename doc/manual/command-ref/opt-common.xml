@@ -107,14 +107,22 @@
 <varlistentry xml:id="opt-max-jobs"><term><option>--max-jobs</option> / <option>-j</option>
 <replaceable>number</replaceable></term>
 
-  <listitem><para>Sets the maximum number of build jobs that Nix will
+  <listitem>
+
+  <para>Sets the maximum number of build jobs that Nix will
   perform in parallel to the specified number.  Specify
   <literal>auto</literal> to use the number of CPUs in the system.
   The default is specified by the <link
   linkend='conf-max-jobs'><literal>max-jobs</literal></link>
   configuration setting, which itself defaults to
   <literal>1</literal>.  A higher value is useful on SMP systems or to
-  exploit I/O latency.</para></listitem>
+  exploit I/O latency.</para>
+
+  <para> Setting it to <literal>0</literal> disallows building on the local
+  machine, which is useful when you want builds to happen only on remote
+  builders.</para>
+
+  </listitem>
 
 </varlistentry>
 
