@@ -75,6 +75,8 @@ struct Installable
 
 struct SourceExprCommand : virtual Args, StoreCommand, MixEvalArgs
 {
+    friend void mainWrapped(int argc, char * * argv);
+
     Path file;
 
     SourceExprCommand();

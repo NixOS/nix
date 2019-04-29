@@ -102,6 +102,11 @@ void mainWrapped(int argc, char * * argv)
 
     args.command->prepare();
     args.command->run();
+
+    auto c = dynamic_cast<SourceExprCommand *>(&*args.command);
+    if (c && c->evalState) {
+        c->evalState->printStats();
+    }
 }
 
 }
