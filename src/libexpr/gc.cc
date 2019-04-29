@@ -3,6 +3,8 @@
 #include "attr-set.hh"
 #include "eval.hh"
 
+#include <chrono>
+
 namespace nix {
 
 GC gc;
@@ -44,10 +46,11 @@ GC::GC()
 
 GC::~GC()
 {
-    printInfo("%d bytes in arenas, %d bytes allocated, %d bytes reclaimed by GC",
+    debug("%d bytes in arenas, %d bytes allocated, %d bytes reclaimed, in %d ms",
         totalSize * WORD_SIZE,
         allTimeWordsAllocated * WORD_SIZE,
-        allTimeWordsFreed * WORD_SIZE);
+        allTimeWordsFreed * WORD_SIZE,
+        totalDurationMs);
 
     size_t n = 0;
     for (Ptr<Object> * p = frontPtrSentinel->next; p != backPtrSentinel; p = p->next)
@@ -97,6 +100,10 @@ void GC::addToFreeList(Free * obj)
 
 void GC::gc()
 {
+    typedef std::chrono::time_point<std::chrono::steady_clock> steady_time_point;
+
+    auto before = steady_time_point::clock::now();
+
     size_t marked = 0;
 
     std::stack<Object *> stack;
@@ -253,10 +260,15 @@ void GC::gc()
         totalWordsFreed += wordsFreed;
     }
 
-    debug("freed %d bytes in %d dead objects, keeping %d objects",
-        totalWordsFreed * WORD_SIZE, totalObjectsFreed, marked);
+    auto after = steady_time_point::clock::now();
+
+    auto durationMs = std::chrono::duration_cast<std::chrono::milliseconds>(after - before).count();
+
+    debug("freed %d bytes in %d dead objects, keeping %d objects, in %d ms",
+        totalWordsFreed * WORD_SIZE, totalObjectsFreed, marked, durationMs);
 
     allTimeWordsFreed += totalWordsFreed;
+    totalDurationMs += durationMs;
 }
 
 std::pair<size_t, size_t> GC::freeUnmarked(Arena & arena)

@@ -193,6 +193,7 @@ private:
 
     size_t allTimeWordsAllocated = 0;
     size_t allTimeWordsFreed = 0;
+    uint64_t totalDurationMs = 0;
 
     Object * allocObject(size_t size)
     {
