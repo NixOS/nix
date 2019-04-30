@@ -146,7 +146,7 @@ std::shared_ptr<FlakeRegistry> getFlagRegistry()
     return std::make_shared<FlakeRegistry>();
 }
 
-// This always returns a vector with flakeRef, userReg, globalReg.
+// This always returns a vector with flakeReg, userReg, globalReg.
 // If one of them doesn't exist, the registry is left empty but does exist.
 const Registries EvalState::getFlakeRegistries()
 {

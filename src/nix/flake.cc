@@ -30,13 +30,13 @@ struct CmdFlakeList : StoreCommand, MixEvalArgs
 
         stopProgressBar();
 
-        for (auto & entry : registries[0]->entries)
+        for (auto & entry : registries[FLAG_REGISTRY]->entries)
             std::cout << entry.first.to_string() << " flags " << entry.second.to_string() << "\n";
 
-        for (auto & entry : registries[1]->entries)
+        for (auto & entry : registries[USER_REGISTRY]->entries)
             std::cout << entry.first.to_string() << " user " << entry.second.to_string() << "\n";
 
-        for (auto & entry : registries[2]->entries)
+        for (auto & entry : registries[GLOBAL_REGISTRY]->entries)
             std::cout << entry.first.to_string() << " global " << entry.second.to_string() << "\n";
     }
 };

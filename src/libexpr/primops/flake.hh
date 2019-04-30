@@ -5,6 +5,10 @@
 
 namespace nix {
 
+static const size_t FLAG_REGISTRY = 0;
+static const size_t USER_REGISTRY = 1;
+static const size_t GLOBAL_REGISTRY = 2;
+
 struct Value;
 class EvalState;
 
