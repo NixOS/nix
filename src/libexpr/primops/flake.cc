@@ -140,10 +140,13 @@ std::shared_ptr<FlakeRegistry> getUserRegistry()
     return readRegistry(getUserRegistryPath());
 }
 
-std::shared_ptr<FlakeRegistry> getFlagRegistry()
+std::shared_ptr<FlakeRegistry> getFlagRegistry(RegistryOverrides registryOverrides)
 {
-    // TODO (Nick): Implement this.
-    return std::make_shared<FlakeRegistry>();
+    auto flagRegistry = std::make_shared<FlakeRegistry>();
+    for (auto const & x : registryOverrides) {
+        flagRegistry->entries.insert_or_assign(FlakeRef(x.first), FlakeRef(x.second));
+    }
+    return flagRegistry;
 }
 
 // This always returns a vector with flakeReg, userReg, globalReg.
@@ -151,7 +154,7 @@ std::shared_ptr<FlakeRegistry> getFlagRegistry()
 const Registries EvalState::getFlakeRegistries()
 {
     Registries registries;
-    registries.push_back(getFlagRegistry());
+    registries.push_back(getFlagRegistry(registryOverrides));
     registries.push_back(getUserRegistry());
     registries.push_back(getGlobalRegistry());
     return registries;
@@ -357,9 +360,8 @@ NonFlake getNonFlake(EvalState & state, const FlakeRef & flakeRef, FlakeAlias al
 ResolvedFlake resolveFlake(EvalState & state, const FlakeRef & topRef,
     RegistryAccess registryAccess, bool isTopFlake)
 {
-    Flake flake = getFlake(state, topRef,
-        registryAccess == AllowRegistry || (registryAccess == AllowRegistryAtTop && isTopFlake));
-
+    bool allowRegistries = registryAccess == AllowRegistry || (registryAccess == AllowRegistryAtTop && isTopFlake);
+    Flake flake = getFlake(state, topRef, allowRegistries);
     LockFile lockFile;
 
     if (isTopFlake)
@@ -405,10 +407,8 @@ static LockFile makeLockFile(EvalState & evalState, FlakeRef & flakeRef)
 
 void updateLockFile(EvalState & state, const Path & path)
 {
-    // FIXME: don't copy 'path' to the store (especially since we
-    // dirty it immediately afterwards).
-
-    FlakeRef flakeRef = FlakeRef(path); // FIXME: ugly
+    // FIXME: We are writing the lockfile to the store here! Very bad practice!
+    FlakeRef flakeRef = FlakeRef(path);
     auto lockFile = makeLockFile(state, flakeRef);
     writeLockFile(lockFile, path + "/flake.lock");
 

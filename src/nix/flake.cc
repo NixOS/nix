@@ -92,6 +92,7 @@ struct CmdFlakeDeps : FlakeCommand, MixJSON, StoreCommand, MixEvalArgs
     void run(nix::ref<nix::Store> store) override
     {
         auto evalState = std::make_shared<EvalState>(searchPath, store);
+        evalState->addRegistryOverrides(registryOverrides);
 
         FlakeRef flakeRef(flakeUri);
 
