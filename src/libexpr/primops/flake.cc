@@ -161,7 +161,23 @@ const Registries EvalState::getFlakeRegistries()
 }
 
 static FlakeRef lookupFlake(EvalState & state, const FlakeRef & flakeRef, const Registries & registries,
-    std::vector<FlakeRef> pastSearches = {})
+    std::vector<FlakeRef> pastSearches = {});
+
+FlakeRef updateFlakeRef(EvalState & state, const FlakeRef & newRef, const Registries & registries, std::vector<FlakeRef> pastSearches)
+{
+    std::string errorMsg = "found cycle in flake registries: ";
+    for (FlakeRef oldRef : pastSearches) {
+        errorMsg += oldRef.to_string();
+        if (oldRef == newRef)
+            throw Error(errorMsg);
+        errorMsg += " - ";
+    }
+    pastSearches.push_back(newRef);
+    return lookupFlake(state, newRef, registries, pastSearches);
+}
+
+static FlakeRef lookupFlake(EvalState & state, const FlakeRef & flakeRef, const Registries & registries,
+    std::vector<FlakeRef> pastSearches)
 {
     if (registries.empty() && !flakeRef.isDirect())
         throw Error("indirect flake reference '%s' is not allowed", flakeRef);
@@ -170,21 +186,15 @@ static FlakeRef lookupFlake(EvalState & state, const FlakeRef & flakeRef, const 
         auto i = registry->entries.find(flakeRef);
         if (i != registry->entries.end()) {
             auto newRef = i->second;
-            if (std::get_if<FlakeRef::IsAlias>(&flakeRef.data)) {
-                if (flakeRef.ref || flakeRef.rev) {
-                    newRef.ref = flakeRef.ref;
-                    newRef.rev = flakeRef.rev;
-                }
-            }
-            std::string errorMsg = "found cycle in flake registries: ";
-            for (FlakeRef oldRef : pastSearches) {
-                errorMsg += oldRef.to_string();
-                if (oldRef == newRef)
-                    throw Error(errorMsg);
-                errorMsg += " - ";
-            }
-            pastSearches.push_back(newRef);
-            return lookupFlake(state, newRef, registries, pastSearches);
+            return updateFlakeRef(state, newRef, registries, pastSearches);
+        }
+
+        auto j = registry->entries.find(flakeRef.baseRef());
+        if (j != registry->entries.end()) {
+            auto newRef = j->second;
+            newRef.ref = flakeRef.ref;
+            newRef.rev = flakeRef.rev;
+            return updateFlakeRef(state, newRef, registries, pastSearches);
         }
     }
 
