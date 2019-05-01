@@ -139,6 +139,7 @@ std::string FlakeRef::to_string() const
 
     string += (ref ? "/" + *ref : "") +
               (rev ? "/" + rev->to_string(Base16, false) : "");
+    if (subdir != "") string += "?dir=" + subdir;
     return string;
 }
 

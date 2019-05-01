@@ -194,11 +194,8 @@ static FlakeRef lookupFlake(EvalState & state, const FlakeRef & flakeRef, const 
     return flakeRef;
 }
 
-static FlakeSourceInfo fetchFlake(EvalState & state, const FlakeRef flakeRef, bool impureIsAllowed = false)
+static FlakeSourceInfo fetchFlake(EvalState & state, const FlakeRef fRef, bool impureIsAllowed = false)
 {
-    FlakeRef fRef = lookupFlake(state, flakeRef,
-        impureIsAllowed ? state.getFlakeRegistries() : std::vector<std::shared_ptr<FlakeRegistry>>());
-
     if (evalSettings.pureEval && !impureIsAllowed && !fRef.isImmutable())
         throw Error("requested to fetch mutable flake '%s' in pure mode", fRef);
 
@@ -266,26 +263,31 @@ static FlakeSourceInfo fetchFlake(EvalState & state, const FlakeRef flakeRef, bo
 // This will return the flake which corresponds to a given FlakeRef. The lookupFlake is done within this function.
 Flake getFlake(EvalState & state, const FlakeRef & flakeRef, bool impureIsAllowed = false)
 {
-    FlakeSourceInfo sourceInfo = fetchFlake(state, flakeRef, impureIsAllowed);
+    FlakeRef resolvedRef = lookupFlake(state, flakeRef,
+        impureIsAllowed ? state.getFlakeRegistries() : std::vector<std::shared_ptr<FlakeRegistry>>());
+
+    FlakeSourceInfo sourceInfo = fetchFlake(state, resolvedRef, impureIsAllowed);
     debug("got flake source '%s' with revision %s",
         sourceInfo.storePath, sourceInfo.rev.value_or(Hash(htSHA1)).to_string(Base16, false));
+
+    resolvedRef = sourceInfo.flakeRef; // `resolvedRef` is now immutable
 
     state.store->assertStorePath(sourceInfo.storePath);
 
     if (state.allowedPaths)
         state.allowedPaths->insert(sourceInfo.storePath);
 
-    Flake flake(flakeRef, std::move(sourceInfo));
-    if (std::get_if<FlakeRef::IsGitHub>(&flakeRef.data)) {
+    Flake flake(resolvedRef, std::move(sourceInfo));
+    if (std::get_if<FlakeRef::IsGitHub>(&resolvedRef.data)) {
         // FIXME: ehm?
         if (flake.sourceInfo.rev)
-            flake.ref = FlakeRef(flakeRef.baseRef().to_string()
+            flake.ref = FlakeRef(resolvedRef.baseRef().to_string()
                 + "/" + flake.sourceInfo.rev->to_string(Base16, false));
     }
 
-    Path flakeFile = sourceInfo.storePath + "/flake.nix";
+    Path flakeFile = sourceInfo.storePath + resolvedRef.subdir + "/flake.nix";
     if (!pathExists(flakeFile))
-        throw Error("source tree referenced by '%s' does not contain a 'flake.nix' file", flakeRef);
+        throw Error("source tree referenced by '%s' does not contain a 'flake.nix' file", resolvedRef);
 
     Value vInfo;
     state.evalFile(flakeFile, vInfo); // FIXME: symlink attack
