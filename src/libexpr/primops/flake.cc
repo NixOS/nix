@@ -50,7 +50,8 @@ LockFile::FlakeEntry readFlakeEntry(nlohmann::json json)
     if (!flakeRef.isImmutable())
         throw Error("cannot use mutable flake '%s' in pure mode", flakeRef);
 
-    LockFile::FlakeEntry entry(flakeRef);
+    Hash hash = Hash((std::string) json["contentHash"]);
+    LockFile::FlakeEntry entry(flakeRef, hash);
 
     auto nonFlakeRequires = json["nonFlakeRequires"];
 
@@ -58,7 +59,9 @@ LockFile::FlakeEntry readFlakeEntry(nlohmann::json json)
         FlakeRef flakeRef(i->value("uri", ""));
         if (!flakeRef.isImmutable())
             throw Error("requested to fetch FlakeRef '%s' purely, which is mutable", flakeRef);
-        entry.nonFlakeEntries.insert_or_assign(i.key(), flakeRef);
+        Hash hash = Hash((std::string) i->value("contentHash", ""));
+        LockFile::NonFlakeEntry newEntry(flakeRef, hash);
+        entry.nonFlakeEntries.insert_or_assign(i.key(), newEntry);
     }
 
     auto requires = json["requires"];
@@ -86,9 +89,10 @@ LockFile readLockFile(const Path & path)
 
     for (auto i = nonFlakeRequires.begin(); i != nonFlakeRequires.end(); ++i) {
         FlakeRef flakeRef(i->value("uri", ""));
+        LockFile::NonFlakeEntry entry(flakeRef, Hash((std::string) json["contentHash"]));
         if (!flakeRef.isImmutable())
             throw Error("requested to fetch FlakeRef '%s' purely, which is mutable", flakeRef);
-        lockFile.nonFlakeEntries.insert_or_assign(i.key(), flakeRef);
+        lockFile.nonFlakeEntries.insert_or_assign(i.key(), entry);
     }
 
     auto requires = json["requires"];
@@ -103,8 +107,11 @@ nlohmann::json flakeEntryToJson(const LockFile::FlakeEntry & entry)
 {
     nlohmann::json json;
     json["uri"] = entry.ref.to_string();
-    for (auto & x : entry.nonFlakeEntries)
-        json["nonFlakeRequires"][x.first]["uri"] = x.second.to_string();
+    json["contentHash"] = entry.contentHash.to_string(SRI);
+    for (auto & x : entry.nonFlakeEntries) {
+        json["nonFlakeRequires"][x.first]["uri"] = x.second.ref.to_string();
+        json["nonFlakeRequires"][x.first]["contentHash"] = x.second.contentHash.to_string(SRI);
+    }
     for (auto & x : entry.flakeEntries)
         json["requires"][x.first.to_string()] = flakeEntryToJson(x.second);
     return json;
@@ -115,8 +122,10 @@ void writeLockFile(const LockFile & lockFile, const Path & path)
     nlohmann::json json;
     json["version"] = 1;
     json["nonFlakeRequires"] = nlohmann::json::object();
-    for (auto & x : lockFile.nonFlakeEntries)
-        json["nonFlakeRequires"][x.first]["uri"] = x.second.to_string();
+    for (auto & x : lockFile.nonFlakeEntries) {
+        json["nonFlakeRequires"][x.first]["uri"] = x.second.ref.to_string();
+        json["nonFlakeRequires"][x.first]["contentHash"] = x.second.contentHash.to_string(SRI);
+    }
     json["requires"] = nlohmann::json::object();
     for (auto & x : lockFile.flakeEntries)
         json["requires"][x.first.to_string()] = flakeEntryToJson(x.second);
@@ -293,6 +302,7 @@ Flake getFlake(EvalState & state, const FlakeRef & flakeRef, bool impureIsAllowe
         throw Error("flake file '%s' escapes from '%s'", resolvedRef, sourceInfo.storePath);
 
     Flake flake(flakeRef, sourceInfo);
+    flake.hash = state.store->queryPathInfo(sourceInfo.storePath)->narHash;
 
     if (!pathExists(flakeFile))
         throw Error("source tree referenced by '%s' does not contain a '%s/flake.nix' file", resolvedRef, resolvedRef.subdir);
@@ -346,11 +356,12 @@ NonFlake getNonFlake(EvalState & state, const FlakeRef & flakeRef, FlakeAlias al
 
     NonFlake nonFlake(flakeRef, sourceInfo);
 
-    nonFlake.storePath = sourceInfo.storePath;
     state.store->assertStorePath(nonFlake.storePath);
 
     if (state.allowedPaths)
         state.allowedPaths->insert(nonFlake.storePath);
+
+    nonFlake.hash = state.store->queryPathInfo(sourceInfo.storePath)->narHash;
 
     nonFlake.alias = alias;
 
@@ -388,13 +399,13 @@ ResolvedFlake resolveFlake(EvalState & state, const FlakeRef & topRef,
 
 LockFile::FlakeEntry dependenciesToFlakeEntry(const ResolvedFlake & resolvedFlake)
 {
-    LockFile::FlakeEntry entry(resolvedFlake.flake.resolvedRef);
+    LockFile::FlakeEntry entry(resolvedFlake.flake.resolvedRef, resolvedFlake.flake.hash);
 
     for (auto & newResFlake : resolvedFlake.flakeDeps)
         entry.flakeEntries.insert_or_assign(newResFlake.flake.originalRef, dependenciesToFlakeEntry(newResFlake));
 
     for (auto & nonFlake : resolvedFlake.nonFlakeDeps)
-        entry.nonFlakeEntries.insert_or_assign(nonFlake.alias, nonFlake.resolvedRef);
+        entry.nonFlakeEntries.insert_or_assign(nonFlake.alias, LockFile::NonFlakeEntry(nonFlake.resolvedRef, nonFlake.hash));
 
     return entry;
 }

@@ -19,16 +19,24 @@ struct FlakeRegistry
 
 struct LockFile
 {
+    struct NonFlakeEntry
+    {
+        FlakeRef ref;
+        Hash contentHash;
+        NonFlakeEntry(const FlakeRef & flakeRef, const Hash & hash) : ref(flakeRef), contentHash(hash) {};
+    };
+
     struct FlakeEntry
     {
         FlakeRef ref;
+        Hash contentHash;
         std::map<FlakeRef, FlakeEntry> flakeEntries;
-        std::map<FlakeAlias, FlakeRef> nonFlakeEntries;
-        FlakeEntry(const FlakeRef & flakeRef) : ref(flakeRef) {};
+        std::map<FlakeAlias, NonFlakeEntry> nonFlakeEntries;
+        FlakeEntry(const FlakeRef & flakeRef, const Hash & hash) : ref(flakeRef), contentHash(hash) {};
     };
 
     std::map<FlakeRef, FlakeEntry> flakeEntries;
-    std::map<FlakeId, FlakeRef> nonFlakeEntries;
+    std::map<FlakeId, NonFlakeEntry> nonFlakeEntries;
 };
 
 typedef std::vector<std::shared_ptr<FlakeRegistry>> Registries;
@@ -60,6 +68,7 @@ struct Flake
     std::string description;
     std::optional<uint64_t> revCount;
     Path storePath;
+    Hash hash; // content hash
     std::vector<FlakeRef> requires;
     std::map<FlakeAlias, FlakeRef> nonFlakeRequires;
     Value * vProvides; // FIXME: gc
@@ -76,8 +85,8 @@ struct NonFlake
     FlakeRef resolvedRef;
     std::optional<uint64_t> revCount;
     Path storePath;
+    Hash hash; // content hash
     // date
-    // content hash
     NonFlake(const FlakeRef & origRef, const SourceInfo & sourceInfo) : originalRef(origRef),
         resolvedRef(sourceInfo.resolvedRef), revCount(sourceInfo.revCount), storePath(sourceInfo.storePath) {};
 };
