@@ -30,7 +30,9 @@ const static std::string schemeRegex = "(?:http|https|ssh|git|file)";
 const static std::string authorityRegex = "[a-zA-Z0-9._~-]*";
 const static std::string segmentRegex = "[a-zA-Z0-9._~-]+";
 const static std::string pathRegex = "/?" + segmentRegex + "(?:/" + segmentRegex + ")*";
-const static std::string paramRegex = "[a-z]+=[a-zA-Z0-9._-]*";
+// FIXME: support escaping in query string.
+// Note: '/' is not a valid query parameter, but so what...
+const static std::string paramRegex = "[a-z]+=[/a-zA-Z0-9._-]*";
 
 FlakeRef::FlakeRef(const std::string & uri, bool allowRelative)
 {
@@ -97,6 +99,9 @@ FlakeRef::FlakeRef(const std::string & uri, bool allowRelative)
                 if (!std::regex_match(value, refRegex2))
                     throw Error("invalid Git ref '%s'", value);
                 ref = value;
+            } else if (name == "dir") {
+                // FIXME: validate value; should not contain relative paths
+                subdir = value;
             } else
                 // FIXME: should probably pass through unknown parameters
                 throw Error("invalid Git flake reference parameter '%s', in '%s'", name, uri);
