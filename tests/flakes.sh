@@ -59,7 +59,7 @@ EOF
 git -C $flake2Dir add flake.nix
 git -C $flake2Dir commit -m 'Initial'
 
-cat > $flake3/flake.nix <<EOF
+cat > $flake3Dir/flake.nix <<EOF
 {
   name = "flake3";
 
@@ -75,8 +75,8 @@ cat > $flake3/flake.nix <<EOF
 }
 EOF
 
-git -C $flake3 add flake.nix
-git -C $flake3 commit -m 'Initial'
+git -C $flake3Dir add flake.nix
+git -C $flake3Dir commit -m 'Initial'
 
 cat > $registry <<EOF
 {
@@ -139,4 +139,4 @@ nix build -o $TEST_ROOT/result --flake-registry $registry flake2:bar
 nix build -o $TEST_ROOT/result file://$flake2Dir:bar
 
 # Test whether indirect dependencies work.
-#nix build -o $TEST_ROOT/result --flake-registry $registry $flake3:xyzzy
+nix build -o $TEST_ROOT/result --flake-registry $registry $flake3Dir:xyzzy

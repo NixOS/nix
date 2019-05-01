@@ -43,9 +43,9 @@ typedef std::vector<std::shared_ptr<FlakeRegistry>> Registries;
 
 Path getUserRegistryPath();
 
-enum RegistryAccess { DisallowRegistry, AllowRegistry, AllowRegistryAtTop };
+enum ShouldUpdateLockFile { DontUpdate, UpdateLockFile, RecreateLockFile};
 
-void makeFlakeValue(EvalState & state, const FlakeRef & flakeRef, RegistryAccess registryAccess, Value & v, bool recreateLockFile);
+void makeFlakeValue(EvalState &, const FlakeRef &, ShouldUpdateLockFile, Value &);
 
 std::shared_ptr<FlakeRegistry> readRegistry(const Path &);
 
@@ -84,8 +84,8 @@ struct NonFlake
     FlakeRef originalRef;
     FlakeRef resolvedRef;
     std::optional<uint64_t> revCount;
+    Hash hash;
     Path storePath;
-    Hash hash; // content hash
     // date
     NonFlake(const FlakeRef & origRef, const SourceInfo & sourceInfo) : originalRef(origRef),
         resolvedRef(sourceInfo.resolvedRef), revCount(sourceInfo.revCount), storePath(sourceInfo.storePath) {};
@@ -103,7 +103,7 @@ struct ResolvedFlake
     ResolvedFlake(const Flake & flake) : flake(flake) {}
 };
 
-ResolvedFlake resolveFlake(EvalState &, const FlakeRef &, RegistryAccess, bool recreateLockFile);
+ResolvedFlake resolveFlake(EvalState &, const FlakeRef &, ShouldUpdateLockFile);
 
 void updateLockFile(EvalState &, const FlakeUri &, bool recreateLockFile);
 

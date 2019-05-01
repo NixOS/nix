@@ -161,7 +161,7 @@ struct InstallableFlake : InstallableValue
         if (std::get_if<FlakeRef::IsPath>(&flakeRef.data))
             updateLockFile(state, flakeRef.to_string(), cmd.recreateLockFile);
 
-        makeFlakeValue(state, flakeRef, AllowRegistryAtTop, *vFlake, cmd.recreateLockFile);
+        makeFlakeValue(state, flakeRef, cmd.recreateLockFile ? RecreateLockFile : UpdateLockFile, *vFlake);
 
         auto vProvides = (*vFlake->attrs->get(state.symbols.create("provides")))->value;
 

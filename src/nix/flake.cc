@@ -114,8 +114,7 @@ struct CmdFlakeDeps : FlakeCommand, MixJSON, StoreCommand, MixEvalArgs
 
         FlakeRef flakeRef(flakeUri);
 
-        bool recreateLockFile = false;
-        ResolvedFlake resFlake = resolveFlake(*evalState, flakeRef, AllowRegistryAtTop, recreateLockFile);
+        ResolvedFlake resFlake = resolveFlake(*evalState, flakeRef, UpdateLockFile);
 
         std::queue<ResolvedFlake> todo;
         todo.push(resFlake);

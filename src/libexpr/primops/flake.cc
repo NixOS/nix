@@ -50,8 +50,7 @@ LockFile::FlakeEntry readFlakeEntry(nlohmann::json json)
     if (!flakeRef.isImmutable())
         throw Error("cannot use mutable flake '%s' in pure mode", flakeRef);
 
-    Hash hash = Hash((std::string) json["contentHash"]);
-    LockFile::FlakeEntry entry(flakeRef, hash);
+    LockFile::FlakeEntry entry(flakeRef, Hash((std::string) json["contentHash"]));
 
     auto nonFlakeRequires = json["nonFlakeRequires"];
 
@@ -59,9 +58,8 @@ LockFile::FlakeEntry readFlakeEntry(nlohmann::json json)
         FlakeRef flakeRef(i->value("uri", ""));
         if (!flakeRef.isImmutable())
             throw Error("requested to fetch FlakeRef '%s' purely, which is mutable", flakeRef);
-        Hash hash = Hash((std::string) i->value("contentHash", ""));
-        LockFile::NonFlakeEntry newEntry(flakeRef, hash);
-        entry.nonFlakeEntries.insert_or_assign(i.key(), newEntry);
+        LockFile::NonFlakeEntry nonEntry(flakeRef, Hash(i->value("contentHash", "")));
+        entry.nonFlakeEntries.insert_or_assign(i.key(), nonEntry);
     }
 
     auto requires = json["requires"];
@@ -89,10 +87,10 @@ LockFile readLockFile(const Path & path)
 
     for (auto i = nonFlakeRequires.begin(); i != nonFlakeRequires.end(); ++i) {
         FlakeRef flakeRef(i->value("uri", ""));
-        LockFile::NonFlakeEntry entry(flakeRef, Hash((std::string) json["contentHash"]));
+        LockFile::NonFlakeEntry nonEntry(flakeRef, Hash(i->value("contentHash", "")));
         if (!flakeRef.isImmutable())
-            throw Error("requested to fetch FlakeRef '%s' purely, which is mutable", flakeRef);
-        lockFile.nonFlakeEntries.insert_or_assign(i.key(), entry);
+            throw Error("found mutable FlakeRef '%s' in lockfile at path %s", flakeRef, path);
+        lockFile.nonFlakeEntries.insert_or_assign(i.key(), nonEntry);
     }
 
     auto requires = json["requires"];
@@ -374,19 +372,25 @@ LockFile entryToLockFile(const LockFile::FlakeEntry & entry)
     return lockFile;
 }
 
-ResolvedFlake resolveFlakeFromLockFile(EvalState & state, const FlakeRef & flakeRef, RegistryAccess registryAccess,
-    LockFile lockFile, bool isTopFlake = false)
+ResolvedFlake resolveFlakeFromLockFile(EvalState & state, const FlakeRef & flakeRef,
+    ShouldUpdateLockFile update, LockFile lockFile = {})
 {
-    bool allowRegistries = registryAccess == AllowRegistry || (registryAccess == AllowRegistryAtTop && isTopFlake);
-    Flake flake = getFlake(state, flakeRef, allowRegistries);
+    Flake flake = getFlake(state, flakeRef, update != DontUpdate);
 
     ResolvedFlake deps(flake);
 
     for (auto & nonFlakeInfo : flake.nonFlakeRequires) {
         FlakeRef ref = nonFlakeInfo.second;
         auto i = lockFile.nonFlakeEntries.find(nonFlakeInfo.first);
-        if (i != lockFile.nonFlakeEntries.end()) ref = i->second.ref;
-        deps.nonFlakeDeps.push_back(getNonFlake(state, ref, nonFlakeInfo.first));
+        if (i != lockFile.nonFlakeEntries.end()) {
+            NonFlake nonFlake = getNonFlake(state, i->second.ref, nonFlakeInfo.first);
+            if (nonFlake.hash != i->second.contentHash)
+                throw Error("the content hash of flakeref %s doesn't match", i->second.ref.to_string());
+            deps.nonFlakeDeps.push_back(nonFlake);
+        } else {
+            if (update == DontUpdate) throw Error("the lockfile requires updating nonflake dependency %s in DontUpdate mode", nonFlakeInfo.first);
+            deps.nonFlakeDeps.push_back(getNonFlake(state, nonFlakeInfo.second, nonFlakeInfo.first));
+        }
     }
 
     for (auto newFlakeRef : flake.requires) {
@@ -394,10 +398,14 @@ ResolvedFlake resolveFlakeFromLockFile(EvalState & state, const FlakeRef & flake
         LockFile newLockFile;
         auto i = lockFile.flakeEntries.find(newFlakeRef);
         if (i != lockFile.flakeEntries.end()) { // Propagate lockFile downwards if possible
-            ref = i->second.ref;
-            newLockFile = entryToLockFile(i->second);
+            ResolvedFlake newResFlake = resolveFlakeFromLockFile(state, i->second.ref, update, entryToLockFile(i->second));
+            if (newResFlake.flake.hash != i->second.contentHash)
+                throw Error("the content hash of flakeref %s doesn't match", i->second.ref.to_string());
+            deps.flakeDeps.push_back(newResFlake);
+        } else {
+            if (update == DontUpdate) throw Error("the lockfile requires updating flake dependency %s in DontUpdate mode", newFlakeRef.to_string());
+            deps.flakeDeps.push_back(resolveFlakeFromLockFile(state, newFlakeRef, update));
         }
-        deps.flakeDeps.push_back(resolveFlakeFromLockFile(state, ref, registryAccess, newLockFile));
     }
 
     return deps;
@@ -406,17 +414,18 @@ ResolvedFlake resolveFlakeFromLockFile(EvalState & state, const FlakeRef & flake
 /* Given a flake reference, recursively fetch it and its dependencies.
    FIXME: this should return a graph of flakes.
 */
-ResolvedFlake resolveFlake(EvalState & state, const FlakeRef & topRef, RegistryAccess registryAccess,
-    bool recreateLockFile)
+ResolvedFlake resolveFlake(EvalState & state, const FlakeRef & topRef, ShouldUpdateLockFile update)
 {
-    bool allowRegistries = registryAccess == AllowRegistry || registryAccess == AllowRegistryAtTop;
-    Flake flake = getFlake(state, topRef, allowRegistries);
+    if (!std::get_if<FlakeRef::IsPath>(&topRef.data)) update = DontUpdate;
+    Flake flake = getFlake(state, topRef, update != DontUpdate);
     LockFile lockFile;
 
-    if (!recreateLockFile) // If recreateLockFile, start with an empty lockfile
+    if (update != RecreateLockFile) {
+        // If recreateLockFile, start with an empty lockfile
         lockFile = readLockFile(flake.storePath + "/flake.lock"); // FIXME: symlink attack
+    }
 
-    return resolveFlakeFromLockFile(state, topRef, registryAccess, lockFile, true);
+    return resolveFlakeFromLockFile(state, topRef, update, lockFile);
 }
 
 LockFile::FlakeEntry dependenciesToFlakeEntry(const ResolvedFlake & resolvedFlake)
@@ -426,15 +435,17 @@ LockFile::FlakeEntry dependenciesToFlakeEntry(const ResolvedFlake & resolvedFlak
     for (auto & newResFlake : resolvedFlake.flakeDeps)
         entry.flakeEntries.insert_or_assign(newResFlake.flake.originalRef, dependenciesToFlakeEntry(newResFlake));
 
-    for (auto & nonFlake : resolvedFlake.nonFlakeDeps)
-        entry.nonFlakeEntries.insert_or_assign(nonFlake.alias, LockFile::NonFlakeEntry(nonFlake.resolvedRef, nonFlake.hash));
+    for (auto & nonFlake : resolvedFlake.nonFlakeDeps) {
+        LockFile::NonFlakeEntry nonEntry(nonFlake.resolvedRef, nonFlake.hash);
+        entry.nonFlakeEntries.insert_or_assign(nonFlake.alias, nonEntry);
+    }
 
     return entry;
 }
 
 static LockFile makeLockFile(EvalState & evalState, FlakeRef & flakeRef, bool recreateLockFile)
 {
-    ResolvedFlake resFlake = resolveFlake(evalState, flakeRef, AllowRegistry, recreateLockFile);
+    ResolvedFlake resFlake = resolveFlake(evalState, flakeRef, recreateLockFile ? RecreateLockFile : UpdateLockFile);
     return entryToLockFile(dependenciesToFlakeEntry(resFlake));
 }
 
@@ -501,17 +512,16 @@ void callFlake(EvalState & state, const ResolvedFlake & resFlake, Value & v)
 
 // Return the `provides` of the top flake, while assigning to `v` the provides
 // of the dependencies as well.
-void makeFlakeValue(EvalState & state, const FlakeRef & flakeRef, RegistryAccess registryAccess, Value & v, bool recreateLockFile)
+void makeFlakeValue(EvalState & state, const FlakeRef & flakeRef, ShouldUpdateLockFile update, Value & v)
 {
-    callFlake(state, resolveFlake(state, flakeRef, registryAccess, recreateLockFile), v);
+    callFlake(state, resolveFlake(state, flakeRef, update), v);
 }
 
 // This function is exposed to be used in nix files.
 static void prim_getFlake(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
     makeFlakeValue(state, state.forceStringNoCtx(*args[0], pos),
-        evalSettings.pureEval ? DisallowRegistry : AllowRegistryAtTop, v, false);
-    // `recreateLockFile == false` because this is the evaluation stage, which should be pure, and hence not recreate lockfiles.
+        evalSettings.pureEval ? DontUpdate : UpdateLockFile, v);
 }
 
 static RegisterPrimOp r2("getFlake", 1, prim_getFlake);
