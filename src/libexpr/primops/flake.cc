@@ -287,7 +287,7 @@ Flake getFlake(EvalState & state, const FlakeRef & flakeRef, bool impureIsAllowe
 
     Path flakeFile = sourceInfo.storePath + "/" + resolvedRef.subdir + "/flake.nix";
     if (!pathExists(flakeFile))
-        throw Error("source tree referenced by '%s' does not contain a 'flake.nix' file", resolvedRef);
+        throw Error("source tree referenced by '%s' does not contain a '%s/flake.nix' file", resolvedRef, resolvedRef.subdir);
 
     Value vInfo;
     state.evalFile(flakeFile, vInfo); // FIXME: symlink attack
