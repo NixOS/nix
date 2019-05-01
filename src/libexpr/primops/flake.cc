@@ -285,7 +285,10 @@ Flake getFlake(EvalState & state, const FlakeRef & flakeRef, bool impureIsAllowe
                 + "/" + flake.sourceInfo.rev->to_string(Base16, false));
     }
 
-    Path flakeFile = sourceInfo.storePath + "/" + resolvedRef.subdir + "/flake.nix";
+    // Guard against symlink attacks.
+    auto flakeFile = canonPath(sourceInfo.storePath + "/" + resolvedRef.subdir + "/flake.nix");
+    if (!isInDir(flakeFile, sourceInfo.storePath))
+        throw Error("flake file '%s' escapes from '%s'", resolvedRef, sourceInfo.storePath);
     if (!pathExists(flakeFile))
         throw Error("source tree referenced by '%s' does not contain a '%s/flake.nix' file", resolvedRef, resolvedRef.subdir);
 

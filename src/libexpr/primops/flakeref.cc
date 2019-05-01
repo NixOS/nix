@@ -107,7 +107,7 @@ FlakeRef::FlakeRef(const std::string & uri, bool allowRelative)
                     throw Error("invalid Git ref '%s'", value);
                 ref = value;
             } else if (name == "dir") {
-                if (!std::regex_match(value, subDirRegex2))
+                if (value != "" && !std::regex_match(value, subDirRegex2))
                     throw Error("flake '%s' has invalid subdirectory '%s'", uri, value);
                 subdir = value;
             } else
