@@ -33,11 +33,13 @@ const static std::string pathRegex = "/?" + segmentRegex + "(?:/" + segmentRegex
 // FIXME: support escaping in query string.
 // Note: '/' is not a valid query parameter, but so what...
 const static std::string paramRegex = "[a-z]+=[/a-zA-Z0-9._-]*";
+const static std::string paramsRegex = "(?:[?](" + paramRegex + "(?:&" + paramRegex + ")*))";
 
 // 'dir' path elements cannot start with a '.'. We also reject
 // potentially dangerous characters like ';'.
 const static std::string subDirElemRegex = "(?:[a-zA-Z0-9_-]+[a-zA-Z0-9._-]*)";
 const static std::string subDirRegex = subDirElemRegex + "(?:/" + subDirElemRegex + ")*";
+
 
 FlakeRef::FlakeRef(const std::string & uri, bool allowRelative)
 {
@@ -48,14 +50,15 @@ FlakeRef::FlakeRef(const std::string & uri, bool allowRelative)
         std::regex::ECMAScript);
 
     static std::regex githubRegex(
-        "github:(" + ownerRegex + ")/(" + repoRegex + ")(?:/" + revOrRefRegex + ")?",
+        "github:(" + ownerRegex + ")/(" + repoRegex + ")(?:/" + revOrRefRegex + ")?"
+        + paramsRegex + "?",
         std::regex::ECMAScript);
 
     static std::regex uriRegex(
         "((" + schemeRegex + "):" +
         "(?://(" + authorityRegex + "))?" +
         "(" + pathRegex + "))" +
-        "(?:[?](" + paramRegex + "(?:&" + paramRegex + ")*))?",
+        paramsRegex + "?",
         std::regex::ECMAScript);
 
     static std::regex refRegex2(refRegex, std::regex::ECMAScript);
@@ -84,6 +87,18 @@ FlakeRef::FlakeRef(const std::string & uri, bool allowRelative)
             rev = Hash(match[3], htSHA1);
         else if (match[4].matched) {
             ref = match[4];
+        }
+        for (auto & param : tokenizeString<Strings>(match[5], "&")) {
+            auto n = param.find('=');
+            assert(n != param.npos);
+            std::string name(param, 0, n);
+            std::string value(param, n + 1);
+            if (name == "dir") {
+                if (value != "" && !std::regex_match(value, subDirRegex2))
+                    throw Error("flake '%s' has invalid subdirectory '%s'", uri, value);
+                subdir = value;
+            } else
+                throw Error("invalid Git flake reference parameter '%s', in '%s'", name, uri);
         }
         data = d;
     }
