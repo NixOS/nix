@@ -114,7 +114,8 @@ struct CmdFlakeDeps : FlakeCommand, MixJSON, StoreCommand, MixEvalArgs
 
         FlakeRef flakeRef(flakeUri);
 
-        ResolvedFlake resFlake = resolveFlake(*evalState, flakeRef, AllowRegistryAtTop);
+        bool recreateLockFile = false;
+        ResolvedFlake resFlake = resolveFlake(*evalState, flakeRef, AllowRegistryAtTop, recreateLockFile);
 
         std::queue<ResolvedFlake> todo;
         todo.push(resFlake);
@@ -132,7 +133,7 @@ struct CmdFlakeDeps : FlakeCommand, MixJSON, StoreCommand, MixEvalArgs
     }
 };
 
-struct CmdFlakeUpdate : StoreCommand, GitRepoCommand, MixEvalArgs
+struct CmdFlakeUpdate : StoreCommand, FlakeCommand, MixEvalArgs
 {
     std::string name() override
     {
@@ -148,8 +149,8 @@ struct CmdFlakeUpdate : StoreCommand, GitRepoCommand, MixEvalArgs
     {
         auto evalState = std::make_shared<EvalState>(searchPath, store);
 
-        if (gitPath == "") gitPath = absPath(".");
-        updateLockFile(*evalState, gitPath);
+        bool recreateLockFile = true;
+        updateLockFile(*evalState, flakeUri, recreateLockFile);
     }
 };
 

@@ -45,7 +45,7 @@ Path getUserRegistryPath();
 
 enum RegistryAccess { DisallowRegistry, AllowRegistry, AllowRegistryAtTop };
 
-void makeFlakeValue(EvalState & state, const FlakeRef & flakeRef, RegistryAccess registryAccess, Value & v);
+void makeFlakeValue(EvalState & state, const FlakeRef & flakeRef, RegistryAccess registryAccess, Value & v, bool recreateLockFile);
 
 std::shared_ptr<FlakeRegistry> readRegistry(const Path &);
 
@@ -103,9 +103,9 @@ struct ResolvedFlake
     ResolvedFlake(const Flake & flake) : flake(flake) {}
 };
 
-ResolvedFlake resolveFlake(EvalState &, const FlakeRef &, RegistryAccess registryAccess, bool isTopFlake = true);
+ResolvedFlake resolveFlake(EvalState &, const FlakeRef &, RegistryAccess, bool recreateLockFile);
 
-void updateLockFile(EvalState &, const FlakeUri &);
+void updateLockFile(EvalState &, const FlakeUri &, bool recreateLockFile);
 
 void gitCloneFlake (std::string flakeUri, EvalState &, Registries, Path);
 }

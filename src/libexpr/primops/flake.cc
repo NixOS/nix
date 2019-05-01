@@ -289,8 +289,6 @@ Flake getFlake(EvalState & state, const FlakeRef & flakeRef, bool impureIsAllowe
 
     FlakeRef resolvedRef = sourceInfo.resolvedRef;
 
-    resolvedRef = sourceInfo.resolvedRef; // `resolvedRef` is now immutable
-
     state.store->assertStorePath(sourceInfo.storePath);
 
     if (state.allowedPaths)
@@ -368,33 +366,57 @@ NonFlake getNonFlake(EvalState & state, const FlakeRef & flakeRef, FlakeAlias al
     return nonFlake;
 }
 
-/* Given a flake reference, recursively fetch it and its
-   dependencies.
-   FIXME: this should return a graph of flakes.
-*/
-ResolvedFlake resolveFlake(EvalState & state, const FlakeRef & topRef,
-    RegistryAccess registryAccess, bool isTopFlake)
+LockFile entryToLockFile(const LockFile::FlakeEntry & entry)
+{
+    LockFile lockFile;
+    lockFile.flakeEntries = entry.flakeEntries;
+    lockFile.nonFlakeEntries = entry.nonFlakeEntries;
+    return lockFile;
+}
+
+ResolvedFlake resolveFlakeFromLockFile(EvalState & state, const FlakeRef & flakeRef, RegistryAccess registryAccess,
+    LockFile lockFile, bool isTopFlake = false)
 {
     bool allowRegistries = registryAccess == AllowRegistry || (registryAccess == AllowRegistryAtTop && isTopFlake);
-    Flake flake = getFlake(state, topRef, allowRegistries);
-    LockFile lockFile;
-
-    if (isTopFlake)
-        lockFile = readLockFile(flake.storePath + flake.resolvedRef.subdir + "/flake.lock"); // FIXME: symlink attack
+    Flake flake = getFlake(state, flakeRef, allowRegistries);
 
     ResolvedFlake deps(flake);
 
-    for (auto & nonFlakeInfo : flake.nonFlakeRequires)
-        deps.nonFlakeDeps.push_back(getNonFlake(state, nonFlakeInfo.second, nonFlakeInfo.first));
+    for (auto & nonFlakeInfo : flake.nonFlakeRequires) {
+        FlakeRef ref = nonFlakeInfo.second;
+        auto i = lockFile.nonFlakeEntries.find(nonFlakeInfo.first);
+        if (i != lockFile.nonFlakeEntries.end()) ref = i->second.ref;
+        deps.nonFlakeDeps.push_back(getNonFlake(state, ref, nonFlakeInfo.first));
+    }
 
     for (auto newFlakeRef : flake.requires) {
+        FlakeRef ref = newFlakeRef;
+        LockFile newLockFile;
         auto i = lockFile.flakeEntries.find(newFlakeRef);
-        if (i != lockFile.flakeEntries.end()) newFlakeRef = i->second.ref;
-        // FIXME: propagate lockFile downwards
-        deps.flakeDeps.push_back(resolveFlake(state, newFlakeRef, registryAccess, false));
+        if (i != lockFile.flakeEntries.end()) { // Propagate lockFile downwards if possible
+            ref = i->second.ref;
+            newLockFile = entryToLockFile(i->second);
+        }
+        deps.flakeDeps.push_back(resolveFlakeFromLockFile(state, ref, registryAccess, newLockFile));
     }
 
     return deps;
+}
+
+/* Given a flake reference, recursively fetch it and its dependencies.
+   FIXME: this should return a graph of flakes.
+*/
+ResolvedFlake resolveFlake(EvalState & state, const FlakeRef & topRef, RegistryAccess registryAccess,
+    bool recreateLockFile)
+{
+    bool allowRegistries = registryAccess == AllowRegistry || registryAccess == AllowRegistryAtTop;
+    Flake flake = getFlake(state, topRef, allowRegistries);
+    LockFile lockFile;
+
+    if (!recreateLockFile) // If recreateLockFile, start with an empty lockfile
+        lockFile = readLockFile(flake.storePath + "/flake.lock"); // FIXME: symlink attack
+
+    return resolveFlakeFromLockFile(state, topRef, registryAccess, lockFile, true);
 }
 
 LockFile::FlakeEntry dependenciesToFlakeEntry(const ResolvedFlake & resolvedFlake)
@@ -410,31 +432,25 @@ LockFile::FlakeEntry dependenciesToFlakeEntry(const ResolvedFlake & resolvedFlak
     return entry;
 }
 
-static LockFile makeLockFile(EvalState & evalState, FlakeRef & flakeRef)
+static LockFile makeLockFile(EvalState & evalState, FlakeRef & flakeRef, bool recreateLockFile)
 {
-    ResolvedFlake resFlake = resolveFlake(evalState, flakeRef, AllowRegistry);
-    LockFile::FlakeEntry entry = dependenciesToFlakeEntry(resFlake);
-    LockFile lockFile;
-    lockFile.flakeEntries = entry.flakeEntries;
-    lockFile.nonFlakeEntries = entry.nonFlakeEntries;
-    return lockFile;
+    ResolvedFlake resFlake = resolveFlake(evalState, flakeRef, AllowRegistry, recreateLockFile);
+    return entryToLockFile(dependenciesToFlakeEntry(resFlake));
 }
 
-void updateLockFile(EvalState & state, const FlakeUri & flakeUri)
+void updateLockFile(EvalState & state, const FlakeUri & uri, bool recreateLockFile)
 {
-    // FIXME: We are writing the lockfile to the store here! Very bad practice!
-    FlakeRef flakeRef = FlakeRef(flakeUri);
+    FlakeRef flakeRef = FlakeRef(uri);
+    auto lockFile = makeLockFile(state, flakeRef, recreateLockFile);
     if (auto refData = std::get_if<FlakeRef::IsPath>(&flakeRef.data)) {
-        auto lockFile = makeLockFile(state, flakeRef);
-        writeLockFile(lockFile, refData->path + "/" + flakeRef.subdir + "/flake.lock");
+        writeLockFile(lockFile, refData->path + (flakeRef.subdir == "" ? "" : "/" + flakeRef.subdir) + "/flake.lock");
 
         // Hack: Make sure that flake.lock is visible to Git. Otherwise,
         // exportGit will fail to copy it to the Nix store.
-        runProgram("git", true,
-            { "-C", refData->path, "add", "--intent-to-add",
-              (flakeRef.subdir == "" ? "" : flakeRef.subdir + "/") + "flake.lock" });
+        runProgram("git", true, { "-C", refData->path, "add",
+                  (flakeRef.subdir == "" ? "" : flakeRef.subdir + "/") + "flake.lock" });
     } else
-        throw Error("flakeUri %s can't be updated because it is not a path", flakeUri);
+        throw Error("flakeUri %s can't be updated because it is not a path", uri);
 }
 
 void callFlake(EvalState & state, const ResolvedFlake & resFlake, Value & v)
@@ -485,16 +501,17 @@ void callFlake(EvalState & state, const ResolvedFlake & resFlake, Value & v)
 
 // Return the `provides` of the top flake, while assigning to `v` the provides
 // of the dependencies as well.
-void makeFlakeValue(EvalState & state, const FlakeRef & flakeRef, RegistryAccess registryAccess, Value & v)
+void makeFlakeValue(EvalState & state, const FlakeRef & flakeRef, RegistryAccess registryAccess, Value & v, bool recreateLockFile)
 {
-    callFlake(state, resolveFlake(state, flakeRef, registryAccess), v);
+    callFlake(state, resolveFlake(state, flakeRef, registryAccess, recreateLockFile), v);
 }
 
 // This function is exposed to be used in nix files.
 static void prim_getFlake(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
     makeFlakeValue(state, state.forceStringNoCtx(*args[0], pos),
-        evalSettings.pureEval ? DisallowRegistry : AllowRegistryAtTop, v);
+        evalSettings.pureEval ? DisallowRegistry : AllowRegistryAtTop, v, false);
+    // `recreateLockFile == false` because this is the evaluation stage, which should be pure, and hence not recreate lockfiles.
 }
 
 static RegisterPrimOp r2("getFlake", 1, prim_getFlake);
