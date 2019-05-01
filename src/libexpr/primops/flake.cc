@@ -285,7 +285,7 @@ Flake getFlake(EvalState & state, const FlakeRef & flakeRef, bool impureIsAllowe
                 + "/" + flake.sourceInfo.rev->to_string(Base16, false));
     }
 
-    Path flakeFile = sourceInfo.storePath + resolvedRef.subdir + "/flake.nix";
+    Path flakeFile = sourceInfo.storePath + "/" + resolvedRef.subdir + "/flake.nix";
     if (!pathExists(flakeFile))
         throw Error("source tree referenced by '%s' does not contain a 'flake.nix' file", resolvedRef);
 
@@ -367,7 +367,7 @@ ResolvedFlake resolveFlake(EvalState & state, const FlakeRef & topRef,
     LockFile lockFile;
 
     if (isTopFlake)
-        lockFile = readLockFile(flake.sourceInfo.storePath + "/flake.lock"); // FIXME: symlink attack
+        lockFile = readLockFile(flake.sourceInfo.storePath + "/" + flake.resolvedRef.subdir + "/flake.lock"); // FIXME: symlink attack
 
     ResolvedFlake deps(flake);
 
@@ -407,16 +407,19 @@ static LockFile makeLockFile(EvalState & evalState, FlakeRef & flakeRef)
     return lockFile;
 }
 
-void updateLockFile(EvalState & state, const Path & path)
+void updateLockFile(EvalState & state, const FlakeUri & flakeUri)
 {
     // FIXME: We are writing the lockfile to the store here! Very bad practice!
-    FlakeRef flakeRef = FlakeRef(path);
-    auto lockFile = makeLockFile(state, flakeRef);
-    writeLockFile(lockFile, path + "/flake.lock");
+    FlakeRef flakeRef = FlakeRef(flakeUri);
+    if (auto refData = std::get_if<IsPath>(flakeRef)) {
+        auto lockFile = makeLockFile(state, flakeRef);
+        writeLockFile(lockFile, refData->path + "/" + flakeRef.subdir + "/flake.lock");
 
-    // Hack: Make sure that flake.lock is visible to Git. Otherwise,
-    // exportGit will fail to copy it to the Nix store.
-    runProgram("git", true, { "-C", path, "add", "flake.lock" });
+        // Hack: Make sure that flake.lock is visible to Git. Otherwise,
+        // exportGit will fail to copy it to the Nix store.
+        runProgram("git", true, { "-C", refData->path, "add", flakeRef.subDir + "/flake.lock" });
+    } else
+        throw Error("flakeUri %s can't be updated because it is not a path", flakeUri);
 }
 
 void callFlake(EvalState & state, const ResolvedFlake & resFlake, Value & v)
