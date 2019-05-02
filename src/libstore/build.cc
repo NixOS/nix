@@ -1904,7 +1904,7 @@ void DerivationGoal::startBuilder()
             concatStringsSep(", ", parsedDrv->getRequiredSystemFeatures()),
             worker.store.printStorePath(drvPath),
             settings.thisSystem,
-            concatStringsSep(", ", settings.systemFeatures));
+            concatStringsSep<StringSet>(", ", settings.systemFeatures));
 
     if (drv->isBuiltin())
         preloadNSS();
