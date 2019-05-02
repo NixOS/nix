@@ -370,7 +370,7 @@ ResolvedFlake resolveFlake(EvalState & state, const FlakeRef & topRef,
     LockFile lockFile;
 
     if (isTopFlake)
-        lockFile = readLockFile(flake.sourceInfo.storePath + "/" + flake.resolvedRef.subdir + "/flake.lock"); // FIXME: symlink attack
+        lockFile = readLockFile(flake.sourceInfo.storePath + "/" + flake.ref.subdir + "/flake.lock"); // FIXME: symlink attack
 
     ResolvedFlake deps(flake);
 
@@ -414,13 +414,13 @@ void updateLockFile(EvalState & state, const FlakeUri & flakeUri)
 {
     // FIXME: We are writing the lockfile to the store here! Very bad practice!
     FlakeRef flakeRef = FlakeRef(flakeUri);
-    if (auto refData = std::get_if<IsPath>(flakeRef)) {
+    if (auto refData = std::get_if<FlakeRef::IsPath>(&flakeRef.data)) {
         auto lockFile = makeLockFile(state, flakeRef);
         writeLockFile(lockFile, refData->path + "/" + flakeRef.subdir + "/flake.lock");
 
         // Hack: Make sure that flake.lock is visible to Git. Otherwise,
         // exportGit will fail to copy it to the Nix store.
-        runProgram("git", true, { "-C", refData->path, "add", flakeRef.subDir + "/flake.lock" });
+        runProgram("git", true, { "-C", refData->path, "add", flakeRef.subdir + "/flake.lock" });
     } else
         throw Error("flakeUri %s can't be updated because it is not a path", flakeUri);
 }
