@@ -36,6 +36,7 @@ jardir ?= $(datadir)/java
 localstatedir ?= $(prefix)/var
 sysconfdir ?= $(prefix)/etc
 mandir ?= $(prefix)/share/man
+policydir ?= $(datadir)/selinux/packages
 
 
 # Initialise support for build directories.
@@ -89,6 +90,7 @@ include mk/jars.mk
 include mk/patterns.mk
 include mk/templates.mk
 include mk/tests.mk
+include mk/policies.mk
 
 
 # Include all sub-Makefiles.
@@ -110,6 +112,7 @@ $(foreach script, $(noinst-scripts), $(eval programs-list += $(script)))
 $(foreach template, $(template-files), $(eval $(call instantiate-template,$(template))))
 $(foreach test, $(install-tests), $(eval $(call run-install-test,$(test))))
 $(foreach file, $(man-pages), $(eval $(call install-data-in, $(file), $(mandir)/man$(patsubst .%,%,$(suffix $(file))))))
+$(foreach policy, $(policies), $(eval $(call build-policy,$(policy))))
 
 
 include mk/dist.mk
@@ -117,7 +120,7 @@ include mk/dist.mk
 
 .PHONY: default all man help
 
-all: $(programs-list) $(libs-list) $(jars-list) $(man-pages)
+all: $(programs-list) $(libs-list) $(jars-list) $(man-pages) $(policies-list)
 
 man: $(man-pages)
 

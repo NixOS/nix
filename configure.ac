@@ -219,6 +219,23 @@ if test -n "$enable_s3"; then
 fi
 
 
+# Look for SELinux.
+PKG_CHECK_MODULES([SELINUX], [libselinux],
+  [AC_DEFINE([HAVE_SELINUX], [1], [Whether to integrate SELinux support.])
+   CXXFLAGS="$SELINUX_CFLAGS $CXXFLAGS"
+   have_selinux=1], [have_selinux=])
+AC_SUBST(HAVE_SELINUX, [$have_selinux])
+
+AC_PATH_PROG(checkmodule, checkmodule)
+AC_PATH_PROG(sepackage, semodule_package)
+
+have_policytools=
+if test -n "$checkmodule" && test -n "$sepackage"; then
+have_policytools=1
+fi
+AC_SUBST(HAVE_POLICYTOOLS, [$have_policytools])
+
+
 # Whether to use the Boehm garbage collector.
 AC_ARG_ENABLE(gc, AC_HELP_STRING([--enable-gc],
   [enable garbage collection in the Nix expression evaluator (requires Boehm GC) [default=no]]),

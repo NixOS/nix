@@ -117,3 +117,5 @@ GPATH
 GRTAGS
 GSYMS
 GTAGS
+*.mod
+*.pp

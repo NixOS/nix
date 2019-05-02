@@ -74,6 +74,16 @@ uninstall_directions() {
         poly_service_uninstall_directions "$step"
     fi
 
+    if selinux_present_check; then
+        step=$((step + 1))
+            cat <<EOF
+$step. Remove the Nix SELinux policy
+
+  sudo semodule -r nix
+
+EOF
+    fi
+
     for profile_target in "${PROFILE_TARGETS[@]}"; do
         if [ -e "$profile_target" ] && [ -e "$profile_target$PROFILE_BACKUP_SUFFIX" ]; then
             step=$((step + 1))
@@ -757,6 +767,25 @@ EOF
           install -m 0664 "$SCRATCH/nix.conf" /etc/nix/nix.conf
 }
 
+selinux_present_check() {
+    test -e /sys/fs/selinux
+}
+
+setup_selinux() {
+    if ! selinux_present_check; then
+        return 0
+    fi
+
+    _sudo "to install the Nix SELinux policy" \
+          semodule -i "$NIX_INSTALLED_NIX/share/selinux/packages/nix.pp"
+
+    _sudo "to relabel the SELinux security context" \
+          restorecon -FR /nix
+
+    _sudo "to reexec systemd" \
+          systemctl daemon-reexec
+}
+
 main() {
     if [ "$(uname -s)" = "Darwin" ]; then
         # shellcheck source=./install-darwin-multi-user.sh
@@ -789,6 +818,7 @@ main() {
     create_directories
     place_channel_configuration
     install_from_extracted_nix
+    setup_selinux
 
     configure_shell_profile
 
