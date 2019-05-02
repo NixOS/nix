@@ -118,10 +118,6 @@ void deletePath(const Path & path);
 
 void deletePath(const Path & path, unsigned long long & bytesFreed);
 
-/* Create a temporary directory. */
-Path createTempDir(const Path & tmpRoot = "", const Path & prefix = "nix",
-    bool includePid = true, bool useGlobalCounter = true, mode_t mode = 0755);
-
 /* Return $HOME or the user's home directory from /etc/passwd. */
 Path getHome();
 
@@ -197,6 +193,14 @@ public:
     explicit operator bool() const;
     int release();
 };
+
+
+/* Create a temporary directory. */
+Path createTempDir(const Path & tmpRoot = "", const Path & prefix = "nix",
+    bool includePid = true, bool useGlobalCounter = true, mode_t mode = 0755);
+
+/* Create a temporary file, returning a file handle and its path. */
+std::pair<AutoCloseFD, Path> createTempFile(const Path & prefix = "nix");
 
 
 class Pipe

@@ -461,6 +461,17 @@ Path createTempDir(const Path & tmpRoot, const Path & prefix,
 }
 
 
+std::pair<AutoCloseFD, Path> createTempFile(const Path & prefix)
+{
+    Path tmpl(getEnv("TMPDIR", "/tmp") + "/" + prefix + ".XXXXXX");
+    // Strictly speaking, this is UB, but who cares...
+    AutoCloseFD fd(mkstemp((char *) tmpl.c_str()));
+    if (!fd)
+        throw SysError("creating temporary file '%s'", tmpl);
+    return {std::move(fd), tmpl};
+}
+
+
 static Lazy<Path> getHome2([]() {
     Path homeDir = getEnv("HOME");
     if (homeDir.empty()) {

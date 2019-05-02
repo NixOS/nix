@@ -166,16 +166,6 @@ struct Common : InstallableCommand
     }
 };
 
-std::pair<AutoCloseFD, Path> createTempFile(const Path & prefix = "nix")
-{
-    Path tmpl(getEnv("TMPDIR", "/tmp") + "/" + prefix + ".XXXXXX");
-    // Strictly speaking, this is UB, but who cares...
-    AutoCloseFD fd(mkstemp((char *) tmpl.c_str()));
-    if (!fd)
-        throw SysError("creating temporary file '%s'", tmpl);
-    return {std::move(fd), tmpl};
-}
-
 struct CmdDevShell : Common
 {
 
