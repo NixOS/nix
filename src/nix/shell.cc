@@ -125,6 +125,7 @@ struct Common : InstallableCommand
         "BASHOPTS",
         "EUID",
         "NIX_BUILD_TOP",
+        "NIX_ENFORCE_PURITY",
         "PPID",
         "PWD",
         "SHELLOPTS",
@@ -155,6 +156,11 @@ struct Common : InstallableCommand
         out << "export NIX_BUILD_TOP=\"$(mktemp -d --tmpdir nix-shell.XXXXXX)\"\n";
         for (auto & i : {"TMP", "TMPDIR", "TEMP", "TEMPDIR"})
             out << fmt("export %s=\"$NIX_BUILD_TOP\"\n", i);
+    }
+
+    Strings getDefaultFlakeAttrPaths() override
+    {
+        return {"devShell", "defaultPackage"};
     }
 };
 
