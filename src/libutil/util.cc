@@ -1167,28 +1167,6 @@ template StringSet tokenizeString(const string & s, const string & separators);
 template vector<string> tokenizeString(const string & s, const string & separators);
 
 
-string concatStringsSep(const string & sep, const Strings & ss)
-{
-    string s;
-    for (auto & i : ss) {
-        if (s.size() != 0) s += sep;
-        s += i;
-    }
-    return s;
-}
-
-
-string concatStringsSep(const string & sep, const StringSet & ss)
-{
-    string s;
-    for (auto & i : ss) {
-        if (s.size() != 0) s += sep;
-        s += i;
-    }
-    return s;
-}
-
-
 string chomp(const string & s)
 {
     size_t i = s.find_last_not_of(" \n\r\t");

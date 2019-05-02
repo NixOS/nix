@@ -334,8 +334,26 @@ template<class C> C tokenizeString(const string & s, const string & separators =
 
 /* Concatenate the given strings with a separator between the
    elements. */
-string concatStringsSep(const string & sep, const Strings & ss);
-string concatStringsSep(const string & sep, const StringSet & ss);
+template<class C>
+string concatStringsSep(const string & sep, const C & ss)
+{
+    string s;
+    for (auto & i : ss) {
+        if (s.size() != 0) s += sep;
+        s += i;
+    }
+    return s;
+}
+
+
+/* Add quotes around a collection of strings. */
+template<class C> Strings quoteStrings(const C & c)
+{
+    Strings res;
+    for (auto & s : c)
+        res.push_back("'" + s + "'");
+    return res;
+}
 
 
 /* Remove trailing whitespace from a string. */

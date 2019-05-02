@@ -726,12 +726,7 @@ ValidPathInfo decodeValidPathInfo(std::istream & str, bool hashGiven)
 
 string showPaths(const PathSet & paths)
 {
-    string s;
-    for (auto & i : paths) {
-        if (s.size() != 0) s += ", ";
-        s += "'" + i + "'";
-    }
-    return s;
+    return concatStringsSep(", ", quoteStrings(paths));
 }
 
 
