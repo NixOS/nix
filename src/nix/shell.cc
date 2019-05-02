@@ -124,6 +124,7 @@ struct Common : InstallableCommand
     std::set<string> ignoreVars{
         "BASHOPTS",
         "EUID",
+        "HOME", // FIXME: don't ignore in pure mode?
         "NIX_BUILD_TOP",
         "NIX_ENFORCE_PURITY",
         "PPID",
@@ -134,11 +135,15 @@ struct Common : InstallableCommand
         "TEMPDIR",
         "TMP",
         "TMPDIR",
+        "TZ",
         "UID",
     };
 
     void makeRcScript(const BuildEnvironment & buildEnvironment, std::ostream & out)
     {
+        out << "export IN_NIX_SHELL=1\n";
+        out << "nix_saved_PATH=\"$PATH\"\n";
+
         for (auto & i : buildEnvironment.env) {
             // FIXME: shellEscape
             // FIXME: figure out what to export
@@ -146,6 +151,8 @@ struct Common : InstallableCommand
             if (!ignoreVars.count(i.first) && !hasPrefix(i.first, "BASH_"))
                 out << fmt("export %s=%s\n", i.first, i.second);
         }
+
+        out << "PATH=\"$PATH:$nix_saved_PATH\"\n";
 
         for (auto & i : buildEnvironment.functions) {
             out << fmt("%s () {\n%s\n}\n", i.first, i.second);
