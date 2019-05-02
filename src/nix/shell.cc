@@ -156,6 +156,8 @@ struct Common : InstallableCommand
         out << "export NIX_BUILD_TOP=\"$(mktemp -d --tmpdir nix-shell.XXXXXX)\"\n";
         for (auto & i : {"TMP", "TMPDIR", "TEMP", "TEMPDIR"})
             out << fmt("export %s=\"$NIX_BUILD_TOP\"\n", i);
+
+        out << "eval \"$shellHook\"\n";
     }
 
     Strings getDefaultFlakeAttrPaths() override
