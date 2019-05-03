@@ -204,11 +204,8 @@ static FlakeRef lookupFlake(EvalState & state, const FlakeRef & flakeRef, const 
     return flakeRef;
 }
 
-static FlakeSourceInfo fetchFlake(EvalState & state, const FlakeRef flakeRef, bool impureIsAllowed = false)
+static FlakeSourceInfo fetchFlake(EvalState & state, const FlakeRef fRef, bool impureIsAllowed = false)
 {
-    FlakeRef fRef = lookupFlake(state, flakeRef,
-        impureIsAllowed ? state.getFlakeRegistries() : std::vector<std::shared_ptr<FlakeRegistry>>());
-
     if (evalSettings.pureEval && !impureIsAllowed && !fRef.isImmutable())
         throw Error("requested to fetch mutable flake '%s' in pure mode", fRef);
 
@@ -276,26 +273,34 @@ static FlakeSourceInfo fetchFlake(EvalState & state, const FlakeRef flakeRef, bo
 // This will return the flake which corresponds to a given FlakeRef. The lookupFlake is done within this function.
 Flake getFlake(EvalState & state, const FlakeRef & flakeRef, bool impureIsAllowed = false)
 {
-    FlakeSourceInfo sourceInfo = fetchFlake(state, flakeRef, impureIsAllowed);
+    FlakeRef resolvedRef = lookupFlake(state, flakeRef,
+        impureIsAllowed ? state.getFlakeRegistries() : std::vector<std::shared_ptr<FlakeRegistry>>());
+
+    FlakeSourceInfo sourceInfo = fetchFlake(state, resolvedRef, impureIsAllowed);
     debug("got flake source '%s' with revision %s",
         sourceInfo.storePath, sourceInfo.rev.value_or(Hash(htSHA1)).to_string(Base16, false));
+
+    resolvedRef = sourceInfo.flakeRef; // `resolvedRef` is now immutable
 
     state.store->assertStorePath(sourceInfo.storePath);
 
     if (state.allowedPaths)
         state.allowedPaths->insert(sourceInfo.storePath);
 
-    Flake flake(flakeRef, std::move(sourceInfo));
-    if (std::get_if<FlakeRef::IsGitHub>(&flakeRef.data)) {
+    Flake flake(resolvedRef, std::move(sourceInfo));
+    if (std::get_if<FlakeRef::IsGitHub>(&resolvedRef.data)) {
         // FIXME: ehm?
         if (flake.sourceInfo.rev)
-            flake.ref = FlakeRef(flakeRef.baseRef().to_string()
+            flake.ref = FlakeRef(resolvedRef.baseRef().to_string()
                 + "/" + flake.sourceInfo.rev->to_string(Base16, false));
     }
 
-    Path flakeFile = sourceInfo.storePath + "/flake.nix";
+    // Guard against symlink attacks.
+    auto flakeFile = canonPath(sourceInfo.storePath + "/" + resolvedRef.subdir + "/flake.nix");
+    if (!isInDir(flakeFile, sourceInfo.storePath))
+        throw Error("flake file '%s' escapes from '%s'", resolvedRef, sourceInfo.storePath);
     if (!pathExists(flakeFile))
-        throw Error("source tree referenced by '%s' does not contain a 'flake.nix' file", flakeRef);
+        throw Error("source tree referenced by '%s' does not contain a '%s/flake.nix' file", resolvedRef, resolvedRef.subdir);
 
     Value vInfo;
     state.evalFile(flakeFile, vInfo); // FIXME: symlink attack
@@ -375,7 +380,7 @@ ResolvedFlake resolveFlake(EvalState & state, const FlakeRef & topRef,
     LockFile lockFile;
 
     if (isTopFlake)
-        lockFile = readLockFile(flake.sourceInfo.storePath + "/flake.lock"); // FIXME: symlink attack
+        lockFile = readLockFile(flake.sourceInfo.storePath + "/" + flake.ref.subdir + "/flake.lock"); // FIXME: symlink attack
 
     ResolvedFlake deps(flake);
 
@@ -415,16 +420,19 @@ static LockFile makeLockFile(EvalState & evalState, FlakeRef & flakeRef)
     return lockFile;
 }
 
-void updateLockFile(EvalState & state, const Path & path)
+void updateLockFile(EvalState & state, const FlakeUri & flakeUri)
 {
     // FIXME: We are writing the lockfile to the store here! Very bad practice!
-    FlakeRef flakeRef = FlakeRef(path);
-    auto lockFile = makeLockFile(state, flakeRef);
-    writeLockFile(lockFile, path + "/flake.lock");
+    FlakeRef flakeRef = FlakeRef(flakeUri);
+    if (auto refData = std::get_if<FlakeRef::IsPath>(&flakeRef.data)) {
+        auto lockFile = makeLockFile(state, flakeRef);
+        writeLockFile(lockFile, refData->path + "/" + flakeRef.subdir + "/flake.lock");
 
-    // Hack: Make sure that flake.lock is visible to Git. Otherwise,
-    // exportGit will fail to copy it to the Nix store.
-    runProgram("git", true, { "-C", path, "add", "flake.lock" });
+        // Hack: Make sure that flake.lock is visible to Git. Otherwise,
+        // exportGit will fail to copy it to the Nix store.
+        runProgram("git", true, { "-C", refData->path, "add", flakeRef.subdir + "/flake.lock" });
+    } else
+        throw Error("flakeUri %s can't be updated because it is not a path", flakeUri);
 }
 
 void callFlake(EvalState & state, const ResolvedFlake & resFlake, Value & v)

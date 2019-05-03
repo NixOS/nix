@@ -30,7 +30,16 @@ const static std::string schemeRegex = "(?:http|https|ssh|git|file)";
 const static std::string authorityRegex = "[a-zA-Z0-9._~-]*";
 const static std::string segmentRegex = "[a-zA-Z0-9._~-]+";
 const static std::string pathRegex = "/?" + segmentRegex + "(?:/" + segmentRegex + ")*";
-const static std::string paramRegex = "[a-z]+=[a-zA-Z0-9._-]*";
+// FIXME: support escaping in query string.
+// Note: '/' is not a valid query parameter, but so what...
+const static std::string paramRegex = "[a-z]+=[/a-zA-Z0-9._-]*";
+const static std::string paramsRegex = "(?:[?](" + paramRegex + "(?:&" + paramRegex + ")*))";
+
+// 'dir' path elements cannot start with a '.'. We also reject
+// potentially dangerous characters like ';'.
+const static std::string subDirElemRegex = "(?:[a-zA-Z0-9_-]+[a-zA-Z0-9._-]*)";
+const static std::string subDirRegex = subDirElemRegex + "(?:/" + subDirElemRegex + ")*";
+
 
 FlakeRef::FlakeRef(const std::string & uri, bool allowRelative)
 {
@@ -41,17 +50,20 @@ FlakeRef::FlakeRef(const std::string & uri, bool allowRelative)
         std::regex::ECMAScript);
 
     static std::regex githubRegex(
-        "github:(" + ownerRegex + ")/(" + repoRegex + ")(?:/" + revOrRefRegex + ")?",
+        "github:(" + ownerRegex + ")/(" + repoRegex + ")(?:/" + revOrRefRegex + ")?"
+        + paramsRegex + "?",
         std::regex::ECMAScript);
 
     static std::regex uriRegex(
         "((" + schemeRegex + "):" +
         "(?://(" + authorityRegex + "))?" +
         "(" + pathRegex + "))" +
-        "(?:[?](" + paramRegex + "(?:&" + paramRegex + ")*))?",
+        paramsRegex + "?",
         std::regex::ECMAScript);
 
     static std::regex refRegex2(refRegex, std::regex::ECMAScript);
+
+    static std::regex subDirRegex2(subDirRegex, std::regex::ECMAScript);
 
     std::cmatch match;
     if (std::regex_match(uri.c_str(), match, flakeRegex)) {
@@ -76,6 +88,18 @@ FlakeRef::FlakeRef(const std::string & uri, bool allowRelative)
         else if (match[4].matched) {
             ref = match[4];
         }
+        for (auto & param : tokenizeString<Strings>(match[5], "&")) {
+            auto n = param.find('=');
+            assert(n != param.npos);
+            std::string name(param, 0, n);
+            std::string value(param, n + 1);
+            if (name == "dir") {
+                if (value != "" && !std::regex_match(value, subDirRegex2))
+                    throw Error("flake '%s' has invalid subdirectory '%s'", uri, value);
+                subdir = value;
+            } else
+                throw Error("invalid Git flake reference parameter '%s', in '%s'", name, uri);
+        }
         data = d;
     }
 
@@ -97,6 +121,10 @@ FlakeRef::FlakeRef(const std::string & uri, bool allowRelative)
                 if (!std::regex_match(value, refRegex2))
                     throw Error("invalid Git ref '%s'", value);
                 ref = value;
+            } else if (name == "dir") {
+                if (value != "" && !std::regex_match(value, subDirRegex2))
+                    throw Error("flake '%s' has invalid subdirectory '%s'", uri, value);
+                subdir = value;
             } else
                 // FIXME: should probably pass through unknown parameters
                 throw Error("invalid Git flake reference parameter '%s', in '%s'", name, uri);
@@ -119,6 +147,7 @@ FlakeRef::FlakeRef(const std::string & uri, bool allowRelative)
 std::string FlakeRef::to_string() const
 {
     std::string string;
+
     if (auto refData = std::get_if<FlakeRef::IsAlias>(&data))
         string = refData->alias;
 
@@ -137,8 +166,12 @@ std::string FlakeRef::to_string() const
 
     else abort();
 
+    // FIXME: need to use ?rev etc. for IsGit URIs.
     string += (ref ? "/" + *ref : "") +
               (rev ? "/" + rev->to_string(Base16, false) : "");
+
+    if (subdir != "") string += "?dir=" + subdir;
+
     return string;
 }
 

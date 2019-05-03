@@ -90,7 +90,7 @@ struct ResolvedFlake
 
 ResolvedFlake resolveFlake(EvalState &, const FlakeRef &, RegistryAccess registryAccess, bool isTopFlake = true);
 
-void updateLockFile(EvalState &, const Path & path);
+void updateLockFile(EvalState &, const FlakeUri &);
 
 void gitCloneFlake (std::string flakeUri, EvalState &, Registries, Path);
 }
