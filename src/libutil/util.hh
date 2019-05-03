@@ -30,6 +30,10 @@ struct Sink;
 struct Source;
 
 
+/* The system for which Nix is compiled. */
+extern const std::string nativeSystem;
+
+
 /* Return an environment variable. */
 string getEnv(const string & key, const string & def = "");
 

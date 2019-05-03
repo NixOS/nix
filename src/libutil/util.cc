@@ -38,6 +38,9 @@ extern char * * environ;
 namespace nix {
 
 
+const std::string nativeSystem = SYSTEM;
+
+
 BaseError & BaseError::addPrefix(const FormatOrString & fs)
 {
     prefix_ = fs.s + prefix_;

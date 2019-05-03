@@ -2510,17 +2510,17 @@ void setupSeccomp()
         seccomp_release(ctx);
     });
 
-    if (settings.thisSystem == "x86_64-linux" &&
+    if (nativeSystem == "x86_64-linux" &&
         seccomp_arch_add(ctx, SCMP_ARCH_X86) != 0)
         throw SysError("unable to add 32-bit seccomp architecture");
 
-    if (settings.thisSystem == "x86_64-linux" &&
+    if (nativeSystem == "x86_64-linux" &&
         seccomp_arch_add(ctx, SCMP_ARCH_X32) != 0)
         throw SysError("unable to add X32 seccomp architecture");
 
-    if (settings.thisSystem == "aarch64-linux" &&
+    if (nativeSystem == "aarch64-linux" &&
         seccomp_arch_add(ctx, SCMP_ARCH_ARM) != 0)
-        printError("unsable to add ARM seccomp architecture; this may result in spurious build failures if running 32-bit ARM processes.");
+        printError("unable to add ARM seccomp architecture; this may result in spurious build failures if running 32-bit ARM processes");
 
     /* Prevent builders from creating setuid/setgid binaries. */
     for (int perm : { S_ISUID, S_ISGID }) {
