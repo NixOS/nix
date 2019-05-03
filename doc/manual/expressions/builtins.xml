@@ -705,6 +705,19 @@ builtins.genList (x: x * x) 5
   </varlistentry>
 
 
+  <varlistentry xml:id='builtin-hashFile'>
+    <term><function>builtins.hashFile</function>
+    <replaceable>type</replaceable> <replaceable>p</replaceable></term>
+
+    <listitem><para>Return a base-16 representation of the
+    cryptographic hash of the file at path <replaceable>p</replaceable>.  The
+    hash algorithm specified by <replaceable>type</replaceable> must
+    be one of <literal>"md5"</literal>, <literal>"sha1"</literal>,
+    <literal>"sha256"</literal> or <literal>"sha512"</literal>.</para></listitem>
+
+  </varlistentry>
+
+
   <varlistentry xml:id='builtin-head'>
     <term><function>builtins.head</function>
     <replaceable>list</replaceable></term>
