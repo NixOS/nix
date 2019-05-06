@@ -169,7 +169,7 @@ typedef std::map<std::string, ref<Command>> Commands;
 class MultiCommand : virtual Args
 {
 public:
-    Commands commands;
+    const Commands & commands;
 
     std::shared_ptr<Command> command;
 
@@ -186,12 +186,7 @@ public:
 struct RegisterCommand
 {
     static Commands * commands;
-
-    RegisterCommand(ref<Command> command)
-    {
-        if (!commands) commands = new Commands;
-        commands->emplace(command->name(), command);
-    }
+    RegisterCommand(ref<Command> command);
 };
 
 std::shared_ptr<Installable> parseInstallable(
