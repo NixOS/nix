@@ -1,2 +1,11 @@
-os: osx
-script: ./tests/install-darwin.sh
+language: nix
+before_install:
+- git fetch --unshallow
+matrix:
+  include:
+  - script:
+    - nix-build ./release.nix -A build.x86_64-linux
+  - os: osx
+    script:
+    - nix-build ./release.nix -A build.x86_64-darwin
+    # - ./tests/install-darwin.sh
