@@ -367,6 +367,11 @@ struct EvalSettings : Config
 
     Setting<Strings> allowedUris{this, {}, "allowed-uris",
         "Prefixes of URIs that builtin functions such as fetchurl and fetchGit are allowed to fetch."};
+
+    Setting<std::string> flakeRegistry{this, "", "flake-registry",
+        "Path or URI of the global flake registry."};
+
+    EvalSettings();
 };
 
 extern EvalSettings evalSettings;

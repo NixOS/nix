@@ -126,8 +126,7 @@ void writeLockFile(const LockFile & lockFile, const Path & path)
 
 std::shared_ptr<FlakeRegistry> getGlobalRegistry()
 {
-    Path registryFile = settings.nixDataDir + "/nix/flake-registry.json";
-    return readRegistry(registryFile);
+    return readRegistry(evalSettings.flakeRegistry);
 }
 
 Path getUserRegistryPath()
