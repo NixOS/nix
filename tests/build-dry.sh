@@ -8,13 +8,13 @@ clearStore
 clearCache
 
 # Ensure this builds successfully first
-nix build -f dependencies.nix
+nix build --no-link -f dependencies.nix
 
 clearStore
 clearCache
 
 # Try --dry-run using old command first
-nix-build dependencies.nix --dry-run 2>&1 | grep "will be built"
+nix-build --no-out-link dependencies.nix --dry-run 2>&1 | grep "will be built"
 # Now new command:
 nix build -f dependencies.nix --dry-run 2>&1 | grep "will be built"
 
@@ -27,7 +27,7 @@ clearCache
 # Try --dry-run using new command first
 nix build -f dependencies.nix --dry-run 2>&1 | grep "will be built"
 # Now old command:
-nix-build dependencies.nix --dry-run 2>&1 | grep "will be built"
+nix-build --no-out-link dependencies.nix --dry-run 2>&1 | grep "will be built"
 fi
 
 ###################################################
