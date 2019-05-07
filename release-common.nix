@@ -56,6 +56,7 @@ rec {
       # Tests
       git
       mercurial
+      jq
     ]
     ++ lib.optionals stdenv.isLinux [libseccomp utillinuxMinimal]
     ++ lib.optional (stdenv.isLinux || stdenv.isDarwin) libsodium

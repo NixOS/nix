@@ -26,13 +26,15 @@ nix_tests = \
   check.sh \
   plugins.sh \
   search.sh \
-  nix-copy-ssh.sh
+  nix-copy-ssh.sh \
+  flakes.sh
   # parallel.sh
 
 install-tests += $(foreach x, $(nix_tests), tests/$(x))
 
 tests-environment = NIX_REMOTE= $(bash) -e
 
-clean-files += $(d)/common.sh
+clean-files += $(d)/common.sh $(d)/config.nix
 
-installcheck: $(d)/common.sh $(d)/plugins/libplugintest.$(SO_EXT)
+installcheck: $(d)/common.sh $(d)/plugins/libplugintest.$(SO_EXT) $(d)/config.nix
+

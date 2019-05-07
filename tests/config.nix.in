@@ -5,7 +5,7 @@ rec {
 
   path = coreutils;
 
-  system = builtins.currentSystem;
+  system = "@system@";
 
   shared = builtins.getEnv "_NIX_TEST_SHARED";
 
