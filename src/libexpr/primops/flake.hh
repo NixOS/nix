@@ -23,7 +23,7 @@ struct LockFile
     {
         FlakeRef ref;
         std::map<FlakeRef, FlakeEntry> flakeEntries;
-        std::map<FlakeId, FlakeRef> nonFlakeEntries;
+        std::map<FlakeAlias, FlakeRef> nonFlakeEntries;
         FlakeEntry(const FlakeRef & flakeRef) : ref(flakeRef) {};
     };
 
@@ -43,37 +43,43 @@ std::shared_ptr<FlakeRegistry> readRegistry(const Path &);
 
 void writeRegistry(const FlakeRegistry &, const Path &);
 
-struct FlakeSourceInfo
+struct SourceInfo
 {
-    FlakeRef flakeRef;
+    FlakeRef resolvedRef;
     Path storePath;
-    std::optional<Hash> rev;
     std::optional<uint64_t> revCount;
     // date
-    FlakeSourceInfo(const FlakeRef & flakeRef) : flakeRef(flakeRef) { }
+    SourceInfo(const FlakeRef & resolvRef) : resolvedRef(resolvRef) {};
 };
 
 struct Flake
 {
     FlakeId id;
-    FlakeRef ref;
+    FlakeRef originalRef;
+    FlakeRef resolvedRef;
     std::string description;
-    FlakeSourceInfo sourceInfo;
+    std::optional<uint64_t> revCount;
+    Path storePath;
     std::vector<FlakeRef> requires;
     std::map<FlakeAlias, FlakeRef> nonFlakeRequires;
     Value * vProvides; // FIXME: gc
-    Flake(const FlakeRef & flakeRef, FlakeSourceInfo && sourceInfo)
-        : ref(flakeRef), sourceInfo(sourceInfo) {};
+    // date
+    // content hash
+    Flake(const FlakeRef & origRef, const SourceInfo & sourceInfo) : originalRef(origRef),
+        resolvedRef(sourceInfo.resolvedRef), revCount(sourceInfo.revCount), storePath(sourceInfo.storePath) {};
 };
 
 struct NonFlake
 {
     FlakeAlias alias;
-    FlakeRef ref;
-    Path path;
+    FlakeRef originalRef;
+    FlakeRef resolvedRef;
+    std::optional<uint64_t> revCount;
+    Path storePath;
     // date
     // content hash
-    NonFlake(const FlakeRef flakeRef) : ref(flakeRef) {};
+    NonFlake(const FlakeRef & origRef, const SourceInfo & sourceInfo) : originalRef(origRef),
+        resolvedRef(sourceInfo.resolvedRef), revCount(sourceInfo.revCount), storePath(sourceInfo.storePath) {};
 };
 
 std::shared_ptr<FlakeRegistry> getGlobalRegistry();

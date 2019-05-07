@@ -204,28 +204,32 @@ static FlakeRef lookupFlake(EvalState & state, const FlakeRef & flakeRef, const 
     return flakeRef;
 }
 
-static FlakeSourceInfo fetchFlake(EvalState & state, const FlakeRef fRef, bool impureIsAllowed = false)
+// Lookups happen here too
+static SourceInfo fetchFlake(EvalState & state, const FlakeRef & flakeRef, bool impureIsAllowed = false)
 {
-    if (evalSettings.pureEval && !impureIsAllowed && !fRef.isImmutable())
-        throw Error("requested to fetch mutable flake '%s' in pure mode", fRef);
+    FlakeRef resolvedRef = lookupFlake(state, flakeRef,
+        impureIsAllowed ? state.getFlakeRegistries() : std::vector<std::shared_ptr<FlakeRegistry>>());
+
+    if (evalSettings.pureEval && !impureIsAllowed && !resolvedRef.isImmutable())
+        throw Error("requested to fetch mutable flake '%s' in pure mode", resolvedRef);
 
     // This only downloads only one revision of the repo, not the entire history.
-    if (auto refData = std::get_if<FlakeRef::IsGitHub>(&fRef.data)) {
+    if (auto refData = std::get_if<FlakeRef::IsGitHub>(&resolvedRef.data)) {
 
         // FIXME: use regular /archive URLs instead? api.github.com
         // might have stricter rate limits.
 
         auto url = fmt("https://api.github.com/repos/%s/%s/tarball/%s",
             refData->owner, refData->repo,
-            fRef.rev ? fRef.rev->to_string(Base16, false)
-                : fRef.ref ? *fRef.ref : "master");
+            resolvedRef.rev ? resolvedRef.rev->to_string(Base16, false)
+                : resolvedRef.ref ? *resolvedRef.ref : "master");
 
         std::string accessToken = settings.githubAccessToken.get();
         if (accessToken != "")
             url += "?access_token=" + accessToken;
 
         auto result = getDownloader()->downloadCached(state.store, url, true, "source",
-            Hash(), nullptr, fRef.rev ? 1000000000 : settings.tarballTtl);
+            Hash(), nullptr, resolvedRef.rev ? 1000000000 : settings.tarballTtl);
 
         if (!result.etag)
             throw Error("did not receive an ETag header from '%s'", url);
@@ -233,72 +237,60 @@ static FlakeSourceInfo fetchFlake(EvalState & state, const FlakeRef fRef, bool i
         if (result.etag->size() != 42 || (*result.etag)[0] != '"' || (*result.etag)[41] != '"')
             throw Error("ETag header '%s' from '%s' is not a Git revision", *result.etag, url);
 
-        FlakeSourceInfo info(fRef);
+        std::string rev = std::string(*result.etag, 1, result.etag->size() - 2);
+        const FlakeRef ref(resolvedRef.baseRef().to_string() + "/" + rev);
+        SourceInfo info(ref);
         info.storePath = result.path;
-        info.rev = Hash(std::string(*result.etag, 1, result.etag->size() - 2), htSHA1);
-        info.flakeRef.rev = info.rev;
-        info.flakeRef.ref = {};
 
         return info;
     }
 
     // This downloads the entire git history
-    else if (auto refData = std::get_if<FlakeRef::IsGit>(&fRef.data)) {
-        auto gitInfo = exportGit(state.store, refData->uri, fRef.ref, fRef.rev, "source");
-        FlakeSourceInfo info(fRef);
+    else if (auto refData = std::get_if<FlakeRef::IsGit>(&resolvedRef.data)) {
+        auto gitInfo = exportGit(state.store, refData->uri, resolvedRef.ref, resolvedRef.rev, "source");
+        const FlakeRef ref(resolvedRef.baseRef().to_string() + "/" + gitInfo.ref + "/" + gitInfo.rev.to_string(Base16, false));
+        SourceInfo info(ref);
         info.storePath = gitInfo.storePath;
-        info.rev = gitInfo.rev;
         info.revCount = gitInfo.revCount;
-        info.flakeRef.ref = gitInfo.ref;
-        info.flakeRef.rev = info.rev;
         return info;
     }
 
-    else if (auto refData = std::get_if<FlakeRef::IsPath>(&fRef.data)) {
+    else if (auto refData = std::get_if<FlakeRef::IsPath>(&resolvedRef.data)) {
         if (!pathExists(refData->path + "/.git"))
             throw Error("flake '%s' does not reference a Git repository", refData->path);
         auto gitInfo = exportGit(state.store, refData->path, {}, {}, "source");
-        FlakeSourceInfo info(fRef);
+        const FlakeRef ref(resolvedRef.baseRef().to_string() + "/" + gitInfo.ref + "/" + gitInfo.rev.to_string(Base16, false));
+        SourceInfo info(ref);
         info.storePath = gitInfo.storePath;
-        info.rev = gitInfo.rev;
         info.revCount = gitInfo.revCount;
-        info.flakeRef.ref = gitInfo.ref;
-        info.flakeRef.rev = info.rev;
         return info;
     }
 
     else abort();
 }
 
-// This will return the flake which corresponds to a given FlakeRef. The lookupFlake is done within this function.
+// This will return the flake which corresponds to a given FlakeRef. The lookupFlake is done within `fetchFlake`, which is used here.
 Flake getFlake(EvalState & state, const FlakeRef & flakeRef, bool impureIsAllowed = false)
 {
-    FlakeRef resolvedRef = lookupFlake(state, flakeRef,
-        impureIsAllowed ? state.getFlakeRegistries() : std::vector<std::shared_ptr<FlakeRegistry>>());
+    SourceInfo sourceInfo = fetchFlake(state, flakeRef, impureIsAllowed);
+    debug("got flake source '%s' with flakeref %s", sourceInfo.storePath, sourceInfo.resolvedRef.to_string());
 
-    FlakeSourceInfo sourceInfo = fetchFlake(state, resolvedRef, impureIsAllowed);
-    debug("got flake source '%s' with revision %s",
-        sourceInfo.storePath, sourceInfo.rev.value_or(Hash(htSHA1)).to_string(Base16, false));
+    FlakeRef resolvedRef = sourceInfo.resolvedRef;
 
-    resolvedRef = sourceInfo.flakeRef; // `resolvedRef` is now immutable
+    resolvedRef = sourceInfo.resolvedRef; // `resolvedRef` is now immutable
 
     state.store->assertStorePath(sourceInfo.storePath);
 
     if (state.allowedPaths)
         state.allowedPaths->insert(sourceInfo.storePath);
 
-    Flake flake(resolvedRef, std::move(sourceInfo));
-    if (std::get_if<FlakeRef::IsGitHub>(&resolvedRef.data)) {
-        // FIXME: ehm?
-        if (flake.sourceInfo.rev)
-            flake.ref = FlakeRef(resolvedRef.baseRef().to_string()
-                + "/" + flake.sourceInfo.rev->to_string(Base16, false));
-    }
-
     // Guard against symlink attacks.
-    auto flakeFile = canonPath(sourceInfo.storePath + "/" + resolvedRef.subdir + "/flake.nix");
+    Path flakeFile = canonPath(sourceInfo.storePath + "/" + resolvedRef.subdir + "/flake.nix");
     if (!isInDir(flakeFile, sourceInfo.storePath))
         throw Error("flake file '%s' escapes from '%s'", resolvedRef, sourceInfo.storePath);
+
+    Flake flake(flakeRef, sourceInfo);
+
     if (!pathExists(flakeFile))
         throw Error("source tree referenced by '%s' does not contain a '%s/flake.nix' file", resolvedRef, resolvedRef.subdir);
 
@@ -344,24 +336,18 @@ Flake getFlake(EvalState & state, const FlakeRef & flakeRef, bool impureIsAllowe
 // Get the `NonFlake` corresponding to a `FlakeRef`.
 NonFlake getNonFlake(EvalState & state, const FlakeRef & flakeRef, FlakeAlias alias)
 {
-    FlakeSourceInfo sourceInfo = fetchFlake(state, flakeRef);
-    debug("got non-flake source '%s' with revision %s",
-        sourceInfo.storePath, sourceInfo.rev.value_or(Hash(htSHA1)).to_string(Base16, false));
+    SourceInfo sourceInfo = fetchFlake(state, flakeRef);
+    debug("got non-flake source '%s' with flakeref %s", sourceInfo.storePath, sourceInfo.resolvedRef.to_string());
 
-    auto flakePath = sourceInfo.storePath;
-    state.store->assertStorePath(flakePath);
+    FlakeRef resolvedRef = sourceInfo.resolvedRef;
+
+    NonFlake nonFlake(flakeRef, sourceInfo);
+
+    nonFlake.storePath = sourceInfo.storePath;
+    state.store->assertStorePath(nonFlake.storePath);
 
     if (state.allowedPaths)
-        state.allowedPaths->insert(flakePath);
-
-    NonFlake nonFlake(flakeRef);
-    if (std::get_if<FlakeRef::IsGitHub>(&flakeRef.data)) {
-        if (sourceInfo.rev)
-            nonFlake.ref = FlakeRef(flakeRef.baseRef().to_string()
-                + "/" + sourceInfo.rev->to_string(Base16, false));
-    }
-
-    nonFlake.path = flakePath;
+        state.allowedPaths->insert(nonFlake.storePath);
 
     nonFlake.alias = alias;
 
@@ -380,7 +366,7 @@ ResolvedFlake resolveFlake(EvalState & state, const FlakeRef & topRef,
     LockFile lockFile;
 
     if (isTopFlake)
-        lockFile = readLockFile(flake.sourceInfo.storePath + "/" + flake.ref.subdir + "/flake.lock"); // FIXME: symlink attack
+        lockFile = readLockFile(flake.storePath + flake.resolvedRef.subdir + "/flake.lock"); // FIXME: symlink attack
 
     ResolvedFlake deps(flake);
 
@@ -399,13 +385,13 @@ ResolvedFlake resolveFlake(EvalState & state, const FlakeRef & topRef,
 
 LockFile::FlakeEntry dependenciesToFlakeEntry(const ResolvedFlake & resolvedFlake)
 {
-    LockFile::FlakeEntry entry(resolvedFlake.flake.sourceInfo.flakeRef);
+    LockFile::FlakeEntry entry(resolvedFlake.flake.resolvedRef);
 
     for (auto & newResFlake : resolvedFlake.flakeDeps)
-        entry.flakeEntries.insert_or_assign(newResFlake.flake.id, dependenciesToFlakeEntry(newResFlake));
+        entry.flakeEntries.insert_or_assign(newResFlake.flake.originalRef, dependenciesToFlakeEntry(newResFlake));
 
     for (auto & nonFlake : resolvedFlake.nonFlakeDeps)
-        entry.nonFlakeEntries.insert_or_assign(nonFlake.alias, nonFlake.ref);
+        entry.nonFlakeEntries.insert_or_assign(nonFlake.alias, nonFlake.resolvedRef);
 
     return entry;
 }
@@ -453,18 +439,18 @@ void callFlake(EvalState & state, const ResolvedFlake & resFlake, Value & v)
         auto vNonFlake = state.allocAttr(v, nonFlake.alias);
         state.mkAttrs(*vNonFlake, 4);
 
-        state.store->isValidPath(nonFlake.path);
-        mkString(*state.allocAttr(*vNonFlake, state.sOutPath), nonFlake.path, {nonFlake.path});
+        state.store->isValidPath(nonFlake.storePath);
+        mkString(*state.allocAttr(*vNonFlake, state.sOutPath), nonFlake.storePath, {nonFlake.storePath});
     }
 
     mkString(*state.allocAttr(v, state.sDescription), resFlake.flake.description);
 
-    auto & path = resFlake.flake.sourceInfo.storePath;
+    auto & path = resFlake.flake.storePath;
     state.store->isValidPath(path);
     mkString(*state.allocAttr(v, state.sOutPath), path, {path});
 
-    if (resFlake.flake.sourceInfo.revCount)
-        mkInt(*state.allocAttr(v, state.symbols.create("revCount")), *resFlake.flake.sourceInfo.revCount);
+    if (resFlake.flake.revCount)
+        mkInt(*state.allocAttr(v, state.symbols.create("revCount")), *resFlake.flake.revCount);
 
     auto vProvides = state.allocAttr(v, state.symbols.create("provides"));
     mkApp(*vProvides, *resFlake.flake.vProvides, v);
