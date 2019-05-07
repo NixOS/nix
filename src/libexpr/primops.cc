@@ -923,6 +923,20 @@ static void prim_findFile(EvalState & state, const Pos & pos, Value * * args, Va
     mkPath(v, state.checkSourcePath(state.findFile(searchPath, path, pos)).c_str());
 }
 
+/* Return the cryptographic hash of a file in base-16. */
+static void prim_hashFile(EvalState & state, const Pos & pos, Value * * args, Value & v)
+{
+    string type = state.forceStringNoCtx(*args[0], pos);
+    HashType ht = parseHashType(type);
+    if (ht == htUnknown)
+      throw Error(format("unknown hash type '%1%', at %2%") % type % pos);
+
+    PathSet context; // discarded
+    Path p = state.coerceToPath(pos, *args[1], context);
+
+    mkString(v, hashFile(ht, state.checkSourcePath(p)).to_string(Base16, false), context);
+}
+
 /* Read a directory (without . or ..) */
 static void prim_readDir(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
@@ -2202,6 +2216,7 @@ void EvalState::createBaseEnv()
     addPrimOp("__readFile", 1, prim_readFile);
     addPrimOp("__readDir", 1, prim_readDir);
     addPrimOp("__findFile", 2, prim_findFile);
+    addPrimOp("__hashFile", 2, prim_hashFile);
 
     // Creating files
     addPrimOp("__toXML", 1, prim_toXML);
