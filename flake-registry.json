@@ -11,6 +11,9 @@
         },
         "hydra": {
             "uri": "github:NixOS/hydra/flake"
+        },
+        "patchelf": {
+            "uri": "github:NixOS/patchelf"
         }
     },
     "version": 1
