@@ -192,6 +192,14 @@ static int listPossibleCallback(char *s, char ***avp) {
   return ac;
 }
 
+namespace {
+    // Used to communicate to NixRepl::getLine whether a signal occurred in ::readline.
+    volatile sig_atomic_t g_signal_received = 0;
+
+    void sigintHandler(int signo) {
+        g_signal_received = signo;
+    }
+}
 
 void NixRepl::mainLoop(const std::vector<std::string> & files)
 {
@@ -251,8 +259,40 @@ void NixRepl::mainLoop(const std::vector<std::string> & files)
 
 bool NixRepl::getLine(string & input, const std::string &prompt)
 {
+    struct sigaction act, old;
+    sigset_t savedSignalMask, set;
+
+    auto setupSignals = [&]() {
+        act.sa_handler = sigintHandler;
+        sigfillset(&act.sa_mask);
+        act.sa_flags = 0;
+        if (sigaction(SIGINT, &act, &old))
+            throw SysError("installing handler for SIGINT");
+
+        sigemptyset(&set);
+        sigaddset(&set, SIGINT);
+        if (sigprocmask(SIG_UNBLOCK, &set, &savedSignalMask))
+            throw SysError("unblocking SIGINT");
+    };
+    auto restoreSignals = [&]() {
+        if (sigprocmask(SIG_SETMASK, &savedSignalMask, nullptr))
+            throw SysError("restoring signals");
+
+        if (sigaction(SIGINT, &old, 0))
+            throw SysError("restoring handler for SIGINT");
+    };
+
+    setupSignals();
     char * s = readline(prompt.c_str());
     Finally doFree([&]() { free(s); });
+    restoreSignals();
+
+    if (g_signal_received) {
+        g_signal_received = 0;
+        input.clear();
+        return true;
+    }
+
     if (!s)
       return false;
     input += s;

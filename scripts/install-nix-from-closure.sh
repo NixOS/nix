@@ -22,10 +22,12 @@ if [ -z "$HOME" ]; then
     exit 1
 fi
 
-# macOS support for 10.10 or higher
+# macOS support for 10.12.6 or higher
 if [ "$(uname -s)" = "Darwin" ]; then
-    if [ $(($(sw_vers -productVersion | cut -d '.' -f 2))) -lt 10 ]; then
-        echo "$0: macOS $(sw_vers -productVersion) is not supported, upgrade to 10.10 or higher"
+    macos_major=$(sw_vers -productVersion | cut -d '.' -f 2)
+    macos_minor=$(sw_vers -productVersion | cut -d '.' -f 3)
+    if [ "$macos_major" -lt 12 ] || ([ "$macos_major" -eq 12 ] && [ "$macos_minor" -lt 6 ]); then
+        echo "$0: macOS $(sw_vers -productVersion) is not supported, upgrade to 10.12.6 or higher"
         exit 1
     fi
 fi
@@ -132,7 +134,10 @@ if ! $nix/bin/nix-channel --list | grep -q "^nixpkgs "; then
     $nix/bin/nix-channel --add https://nixos.org/channels/nixpkgs-unstable
 fi
 if [ -z "$_NIX_INSTALLER_TEST" ]; then
-    $nix/bin/nix-channel --update nixpkgs
+    if ! $nix/bin/nix-channel --update nixpkgs; then
+        echo "Fetching the nixpkgs channel failed. (Are you offline?)"
+        echo "To try again later, run \"nix-channel --update nixpkgs\"."
+    fi
 fi
 
 added=

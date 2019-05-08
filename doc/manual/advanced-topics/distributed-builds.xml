@@ -184,4 +184,7 @@ to be included. (This is the default.)</para>
 the option <link linkend='conf-builders-use-substitutes'><literal>builders-use-substitutes</literal></link>
 in your local <filename>nix.conf</filename>.</para>
 
+<para>To build only on remote builders and disable building on the local machine,
+you can use the option <option>--max-jobs 0</option>.</para>
+
 </chapter>
