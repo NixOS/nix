@@ -274,19 +274,21 @@ static void _main(int argc, char * * argv)
         exprs = {state->parseStdin()};
     else
         for (auto i : left) {
-            auto absolute = i;
-            try {
-                absolute = canonPath(absPath(i), true);
-            } catch (Error e) {};
             if (fromArgs)
                 exprs.push_back(state->parseExprFromString(i, absPath(".")));
-            else if (store->isStorePath(absolute) && std::regex_match(absolute, std::regex(".*\\.drv(!.*)?")))
+            else {
+                auto absolute = i;
+                try {
+                    absolute = canonPath(absPath(i), true);
+                } catch (Error e) {};
+                if (store->isStorePath(absolute) && std::regex_match(absolute, std::regex(".*\\.drv(!.*)?")))
                 drvs.push_back(DrvInfo(*state, store, absolute));
             else
                 /* If we're in a #! script, interpret filenames
                    relative to the script. */
                 exprs.push_back(state->parseExprFromFile(resolveExprPath(state->checkSourcePath(lookupFileArg(*state,
                     inShebang && !packages ? absPath(i, absPath(dirOf(script))) : i)))));
+            }
         }
 
     /* Evaluate them into derivations. */
