@@ -417,7 +417,7 @@ void updateLockFile(EvalState & state, const FlakeUri & flakeUri)
         // Hack: Make sure that flake.lock is visible to Git. Otherwise,
         // exportGit will fail to copy it to the Nix store.
         runProgram("git", true,
-            { "-C", refData->path, "add",
+            { "-C", refData->path, "add", "--intent-to-add",
               (flakeRef.subdir == "" ? "" : flakeRef.subdir + "/") + "flake.lock" });
     } else
         throw Error("flakeUri %s can't be updated because it is not a path", flakeUri);
