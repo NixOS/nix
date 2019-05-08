@@ -8,6 +8,9 @@
         },
         "nixpkgs": {
             "uri": "github:edolstra/nixpkgs/release-19.03"
+        },
+        "hydra": {
+            "uri": "github:NixOS/hydra/flake"
         }
     },
     "version": 1
