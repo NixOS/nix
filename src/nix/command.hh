@@ -88,6 +88,11 @@ struct SourceExprCommand : virtual Args, StoreCommand, MixEvalArgs
     std::shared_ptr<Installable> parseInstallable(
         ref<Store> store, const std::string & installable);
 
+    virtual Strings getDefaultFlakeAttrPaths()
+    {
+        return {"defaultPackage"};
+    }
+
 private:
 
     std::shared_ptr<EvalState> evalState;

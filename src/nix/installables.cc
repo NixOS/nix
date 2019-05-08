@@ -142,13 +142,18 @@ struct InstallableAttrPath : InstallableValue
 struct InstallableFlake : InstallableValue
 {
     FlakeRef flakeRef;
-    std::string attrPath;
+    Strings attrPaths;
+    bool searchPackages = false;
 
-    InstallableFlake(SourceExprCommand & cmd, FlakeRef && flakeRef, const std::string & attrPath)
-        : InstallableValue(cmd), flakeRef(flakeRef), attrPath(attrPath)
+    InstallableFlake(SourceExprCommand & cmd, FlakeRef && flakeRef, Strings attrPaths)
+        : InstallableValue(cmd), flakeRef(flakeRef), attrPaths(std::move(attrPaths))
     { }
 
-    std::string what() override { return flakeRef.to_string() + ":" + attrPath; }
+    InstallableFlake(SourceExprCommand & cmd, FlakeRef && flakeRef, std::string attrPath)
+        : InstallableValue(cmd), flakeRef(flakeRef), attrPaths{attrPath}, searchPackages(true)
+    { }
+
+    std::string what() override { return flakeRef.to_string() + ":" + *attrPaths.begin(); }
 
     Value * toValue(EvalState & state) override
     {
@@ -166,18 +171,31 @@ struct InstallableFlake : InstallableValue
 
         auto emptyArgs = state.allocBindings(0);
 
-        if (auto aPackages = *vProvides->attrs->get(state.symbols.create("packages"))) {
+        // As a convenience, look for the attribute in
+        // 'provides.packages'.
+        if (searchPackages) {
+            if (auto aPackages = *vProvides->attrs->get(state.symbols.create("packages"))) {
+                try {
+                    auto * v = findAlongAttrPath(state, *attrPaths.begin(), *emptyArgs, *aPackages->value);
+                    state.forceValue(*v);
+                    return v;
+                } catch (AttrPathNotFound & e) {
+                }
+            }
+        }
+
+        // Otherwise, look for it in 'provides'.
+        for (auto & attrPath : attrPaths) {
             try {
-                auto * v = findAlongAttrPath(state, attrPath, *emptyArgs, *aPackages->value);
+                auto * v = findAlongAttrPath(state, attrPath, *emptyArgs, *vProvides);
                 state.forceValue(*v);
                 return v;
             } catch (AttrPathNotFound & e) {
             }
         }
 
-        auto * v = findAlongAttrPath(state, attrPath, *emptyArgs, *vProvides);
-        state.forceValue(*v);
-        return v;
+        throw Error("flake '%s' does not provide attribute %s",
+            flakeRef, concatStringsSep(", ", quoteStrings(attrPaths)));
     }
 };
 
@@ -216,7 +234,8 @@ std::vector<std::shared_ptr<Installable>> SourceExprCommand::parseInstallables(
             else if (hasPrefix(s, "nixpkgs.")) {
                 bool static warned;
                 warnOnce(warned, "the syntax 'nixpkgs.<attr>' is deprecated; use 'nixpkgs:<attr>' instead");
-                result.push_back(std::make_shared<InstallableFlake>(*this, FlakeRef("nixpkgs"), std::string(s, 8)));
+                result.push_back(std::make_shared<InstallableFlake>(*this, FlakeRef("nixpkgs"),
+                        Strings{"packages." + std::string(s, 8)}));
             }
 
             else if ((colon = s.rfind(':')) != std::string::npos) {
@@ -233,7 +252,8 @@ std::vector<std::shared_ptr<Installable>> SourceExprCommand::parseInstallables(
                 if (storePath != "")
                     result.push_back(std::make_shared<InstallableStorePath>(storePath));
                 else
-                    result.push_back(std::make_shared<InstallableFlake>(*this, FlakeRef(s, true), "defaultPackage"));
+                    result.push_back(std::make_shared<InstallableFlake>(*this, FlakeRef(s, true),
+                            getDefaultFlakeAttrPaths()));
             }
 
             else

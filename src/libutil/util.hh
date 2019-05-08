@@ -118,10 +118,6 @@ void deletePath(const Path & path);
 
 void deletePath(const Path & path, unsigned long long & bytesFreed);
 
-/* Create a temporary directory. */
-Path createTempDir(const Path & tmpRoot = "", const Path & prefix = "nix",
-    bool includePid = true, bool useGlobalCounter = true, mode_t mode = 0755);
-
 /* Return $HOME or the user's home directory from /etc/passwd. */
 Path getHome();
 
@@ -197,6 +193,14 @@ public:
     explicit operator bool() const;
     int release();
 };
+
+
+/* Create a temporary directory. */
+Path createTempDir(const Path & tmpRoot = "", const Path & prefix = "nix",
+    bool includePid = true, bool useGlobalCounter = true, mode_t mode = 0755);
+
+/* Create a temporary file, returning a file handle and its path. */
+std::pair<AutoCloseFD, Path> createTempFile(const Path & prefix = "nix");
 
 
 class Pipe
@@ -334,8 +338,26 @@ template<class C> C tokenizeString(const string & s, const string & separators =
 
 /* Concatenate the given strings with a separator between the
    elements. */
-string concatStringsSep(const string & sep, const Strings & ss);
-string concatStringsSep(const string & sep, const StringSet & ss);
+template<class C>
+string concatStringsSep(const string & sep, const C & ss)
+{
+    string s;
+    for (auto & i : ss) {
+        if (s.size() != 0) s += sep;
+        s += i;
+    }
+    return s;
+}
+
+
+/* Add quotes around a collection of strings. */
+template<class C> Strings quoteStrings(const C & c)
+{
+    Strings res;
+    for (auto & s : c)
+        res.push_back("'" + s + "'");
+    return res;
+}
 
 
 /* Remove trailing whitespace from a string. */
