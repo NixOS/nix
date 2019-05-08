@@ -161,13 +161,13 @@ std::string FlakeRef::to_string() const
     if (auto refData = std::get_if<FlakeRef::IsAlias>(&data)) {
         string = refData->alias;
         if (ref) string += '/' + *ref;
-        if (rev) string += '/' + rev->to_string(Base16, false);
+        if (rev) string += '/' + rev->gitRev();
     }
 
     else if (auto refData = std::get_if<FlakeRef::IsPath>(&data)) {
         assert(subdir == "");
-        assert(!rev);
-        assert(!ref);
+        if (ref) addParam("ref", *ref);
+        if (rev) addParam("rev", rev->gitRev());
         return refData->path;
     }
 
@@ -175,7 +175,7 @@ std::string FlakeRef::to_string() const
         assert(!(ref && rev));
         string = "github:" + refData->owner + "/" + refData->repo;
         if (ref) { string += '/'; string += *ref; }
-        if (rev) { string += '/'; string += rev->to_string(Base16, false); }
+        if (rev) { string += '/'; string += rev->gitRev(); }
         if (subdir != "") addParam("dir", subdir);
     }
 
@@ -186,7 +186,7 @@ std::string FlakeRef::to_string() const
         if (ref) {
             addParam("ref", *ref);
             if (rev)
-                addParam("rev", rev->to_string(Base16, false));
+                addParam("rev", rev->gitRev());
         }
 
         if (subdir != "") addParam("dir", subdir);
