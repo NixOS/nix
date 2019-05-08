@@ -326,10 +326,9 @@ void LocalStore::findRootsNoTemp(Roots & roots, bool censor)
     findRoots(stateDir + "/" + gcRootsDir, DT_UNKNOWN, roots);
     findRoots(stateDir + "/profiles", DT_UNKNOWN, roots);
 
-    /* Add additional roots returned by the program specified by the
-       NIX_ROOT_FINDER environment variable.  This is typically used
-       to add running programs to the set of roots (to prevent them
-       from being garbage collected). */
+    /* Add additional roots returned by different platforms-specific
+       heuristics.  This is typically used to add running programs to
+       the set of roots (to prevent them from being garbage collected). */
     findRuntimeRoots(roots, censor);
 }
 
