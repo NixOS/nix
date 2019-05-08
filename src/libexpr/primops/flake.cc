@@ -48,7 +48,7 @@ LockFile::FlakeEntry readFlakeEntry(nlohmann::json json)
 {
     FlakeRef flakeRef(json["uri"]);
     if (!flakeRef.isImmutable())
-        throw Error("requested to fetch FlakeRef '%s' purely, which is mutable", flakeRef);
+        throw Error("cannot use mutable flake '%s' in pure mode", flakeRef);
 
     LockFile::FlakeEntry entry(flakeRef);
 
@@ -126,8 +126,7 @@ void writeLockFile(const LockFile & lockFile, const Path & path)
 
 std::shared_ptr<FlakeRegistry> getGlobalRegistry()
 {
-    Path registryFile = settings.nixDataDir + "/nix/flake-registry.json";
-    return readRegistry(registryFile);
+    return readRegistry(evalSettings.flakeRegistry);
 }
 
 Path getUserRegistryPath()
@@ -237,8 +236,8 @@ static SourceInfo fetchFlake(EvalState & state, const FlakeRef & flakeRef, bool 
         if (result.etag->size() != 42 || (*result.etag)[0] != '"' || (*result.etag)[41] != '"')
             throw Error("ETag header '%s' from '%s' is not a Git revision", *result.etag, url);
 
-        std::string rev = std::string(*result.etag, 1, result.etag->size() - 2);
-        const FlakeRef ref(resolvedRef.baseRef().to_string() + "/" + rev);
+        FlakeRef ref(resolvedRef.baseRef());
+        ref.rev = Hash(std::string(*result.etag, 1, result.etag->size() - 2), htSHA1);
         SourceInfo info(ref);
         info.storePath = result.path;
 
@@ -248,7 +247,9 @@ static SourceInfo fetchFlake(EvalState & state, const FlakeRef & flakeRef, bool 
     // This downloads the entire git history
     else if (auto refData = std::get_if<FlakeRef::IsGit>(&resolvedRef.data)) {
         auto gitInfo = exportGit(state.store, refData->uri, resolvedRef.ref, resolvedRef.rev, "source");
-        const FlakeRef ref(resolvedRef.baseRef().to_string() + "/" + gitInfo.ref + "/" + gitInfo.rev.to_string(Base16, false));
+        FlakeRef ref(resolvedRef.baseRef());
+        ref.ref = gitInfo.ref;
+        ref.rev = gitInfo.rev;
         SourceInfo info(ref);
         info.storePath = gitInfo.storePath;
         info.revCount = gitInfo.revCount;
@@ -259,7 +260,9 @@ static SourceInfo fetchFlake(EvalState & state, const FlakeRef & flakeRef, bool 
         if (!pathExists(refData->path + "/.git"))
             throw Error("flake '%s' does not reference a Git repository", refData->path);
         auto gitInfo = exportGit(state.store, refData->path, {}, {}, "source");
-        const FlakeRef ref(resolvedRef.baseRef().to_string() + "/" + gitInfo.ref + "/" + gitInfo.rev.to_string(Base16, false));
+        FlakeRef ref(resolvedRef.baseRef());
+        ref.ref = gitInfo.ref;
+        ref.rev = gitInfo.rev;
         SourceInfo info(ref);
         info.storePath = gitInfo.storePath;
         info.revCount = gitInfo.revCount;

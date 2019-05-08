@@ -147,30 +147,52 @@ FlakeRef::FlakeRef(const std::string & uri, bool allowRelative)
 std::string FlakeRef::to_string() const
 {
     std::string string;
+    bool first = true;
 
-    if (auto refData = std::get_if<FlakeRef::IsAlias>(&data))
+    auto addParam =
+        [&](const std::string & name, std::string value) {
+            string += first ? '?' : '&';
+            first = false;
+            string += name;
+            string += '=';
+            string += value; // FIXME: escaping
+        };
+
+    if (auto refData = std::get_if<FlakeRef::IsAlias>(&data)) {
         string = refData->alias;
+        if (ref) string += '/' + *ref;
+        if (rev) string += '/' + rev->to_string(Base16, false);
+    }
+
+    else if (auto refData = std::get_if<FlakeRef::IsPath>(&data)) {
+        assert(subdir == "");
+        assert(!rev);
+        assert(!ref);
+        return refData->path;
+    }
 
     else if (auto refData = std::get_if<FlakeRef::IsGitHub>(&data)) {
         assert(!(ref && rev));
         string = "github:" + refData->owner + "/" + refData->repo;
+        if (ref) { string += '/'; string += *ref; }
+        if (rev) { string += '/'; string += rev->to_string(Base16, false); }
+        if (subdir != "") addParam("dir", subdir);
     }
 
     else if (auto refData = std::get_if<FlakeRef::IsGit>(&data)) {
         assert(!rev || ref);
         string = refData->uri;
+
+        if (ref) {
+            addParam("ref", *ref);
+            if (rev)
+                addParam("rev", rev->to_string(Base16, false));
+        }
+
+        if (subdir != "") addParam("dir", subdir);
     }
 
-    else if (auto refData = std::get_if<FlakeRef::IsPath>(&data))
-        return refData->path;
-
     else abort();
-
-    // FIXME: need to use ?rev etc. for IsGit URIs.
-    string += (ref ? "/" + *ref : "") +
-              (rev ? "/" + rev->to_string(Base16, false) : "");
-
-    if (subdir != "") string += "?dir=" + subdir;
 
     return string;
 }

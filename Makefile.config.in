@@ -35,6 +35,7 @@ prefix = @prefix@
 sandbox_shell = @sandbox_shell@
 storedir = @storedir@
 sysconfdir = @sysconfdir@
+system = @system@
 doc_generate = @doc_generate@
 xmllint = @xmllint@
 xsltproc = @xsltproc@
