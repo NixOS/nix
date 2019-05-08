@@ -133,6 +133,7 @@ struct Common : InstallableCommand
         "SHLVL",
         "TEMP",
         "TEMPDIR",
+        "TERM",
         "TMP",
         "TMPDIR",
         "TZ",
