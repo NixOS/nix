@@ -121,7 +121,7 @@ void writeLockFile(const LockFile & lockFile, const Path & path)
     for (auto & x : lockFile.flakeEntries)
         json["requires"][x.first.to_string()] = flakeEntryToJson(x.second);
     createDirs(dirOf(path));
-    writeFile(path, json.dump(4)); // '4' = indentation in json file
+    writeFile(path, json.dump(4) + "\n"); // '4' = indentation in json file
 }
 
 std::shared_ptr<FlakeRegistry> getGlobalRegistry()
