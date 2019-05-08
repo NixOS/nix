@@ -441,6 +441,8 @@ void callFlake(EvalState & state, const ResolvedFlake & resFlake, Value & v)
 
         state.store->isValidPath(nonFlake.storePath);
         mkString(*state.allocAttr(*vNonFlake, state.sOutPath), nonFlake.storePath, {nonFlake.storePath});
+
+        // FIXME: add rev, shortRev, revCount, ...
     }
 
     mkString(*state.allocAttr(v, state.sDescription), resFlake.flake.description);
@@ -448,6 +450,13 @@ void callFlake(EvalState & state, const ResolvedFlake & resFlake, Value & v)
     auto & path = resFlake.flake.storePath;
     state.store->isValidPath(path);
     mkString(*state.allocAttr(v, state.sOutPath), path, {path});
+
+    if (resFlake.flake.resolvedRef.rev) {
+        mkString(*state.allocAttr(v, state.symbols.create("rev")),
+            resFlake.flake.resolvedRef.rev->gitRev());
+        mkString(*state.allocAttr(v, state.symbols.create("shortRev")),
+            resFlake.flake.resolvedRef.rev->gitShortRev());
+    }
 
     if (resFlake.flake.revCount)
         mkInt(*state.allocAttr(v, state.symbols.create("revCount")), *resFlake.flake.revCount);
