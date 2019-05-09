@@ -2,6 +2,7 @@
     "nonFlakeRequires": {},
     "requires": {
         "nixpkgs": {
+            "contentHash": "sha256-vy2UmXQM66aS/Kn2tCtjt9RwxfBvV+nQVb5tJQFwi8E=",
             "uri": "github:edolstra/nixpkgs/a4d896e89932e873c4117908d558db6210fa3b56"
         }
     },
