@@ -59,6 +59,25 @@ EOF
 git -C $flake2 add flake.nix
 git -C $flake2 commit -m 'Initial'
 
+cat > $flake3/flake.nix <<EOF
+{
+  name = "flake3";
+
+  epoch = 2019;
+
+  requires = [ "flake2" ];
+
+  description = "Fnord";
+
+  provides = deps: rec {
+    packages.xyzzy = deps.flake2.provides.packages.bar;
+  };
+}
+EOF
+
+git -C $flake3 add flake.nix
+git -C $flake3 commit -m 'Initial'
+
 cat > $registry <<EOF
 {
     "flakes": {
@@ -119,3 +138,6 @@ nix build -o $TEST_ROOT/result --flake-registry $registry flake2:bar
 
 # Or without a registry.
 nix build -o $TEST_ROOT/result file://$flake2:bar
+
+# Test whether indirect dependencies work.
+nix build -o $TEST_ROOT/result --flake-registry $registry $flake3:xyzzy
