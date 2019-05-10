@@ -1401,6 +1401,8 @@ static int _main(int argc, char * * argv)
 
         initPlugins();
 
+        unsetenv("IN_NIX_SHELL");
+
         if (!op) throw UsageError("no operation specified");
 
         auto store = openStore();

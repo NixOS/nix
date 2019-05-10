@@ -151,6 +151,8 @@ static int _main(int argc, char * * argv)
 
         initPlugins();
 
+        unsetenv("IN_NIX_SHELL");
+
         if (evalOnly && !wantsReadWrite)
             settings.readOnlyMode = true;
 

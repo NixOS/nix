@@ -94,6 +94,8 @@ void mainWrapped(int argc, char * * argv)
 
     initPlugins();
 
+    unsetenv("IN_NIX_SHELL");
+
     if (!args.command) args.showHelpAndExit();
 
     Finally f([]() { stopProgressBar(); });

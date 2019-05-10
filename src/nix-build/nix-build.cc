@@ -264,6 +264,8 @@ static void _main(int argc, char * * argv)
 
     if (runEnv)
         setenv("IN_NIX_SHELL", pure ? "pure" : "impure", 1);
+    else
+        unsetenv("IN_NIX_SHELL");
 
     DrvInfos drvs;
 
