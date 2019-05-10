@@ -268,7 +268,8 @@ let
 
     tests.evalNixpkgs =
       import (nixpkgs + "/pkgs/top-level/make-tarball.nix") {
-        inherit nixpkgs;
+        # FIXME: fix pkgs/top-level/make-tarball.nix in NixOS to not require a revCount.
+        nixpkgs = nixpkgs // { revCount = 0; };
         inherit pkgs;
         nix = build.x86_64-linux;
         officialRelease = false;
