@@ -27,11 +27,13 @@ output=$(nix-shell --pure --keep SELECTED_IMPURE_VAR shell.nix -A shellDrv --run
 # Test nix-shell on a .drv symlink
 
 # Legacy: absolute path and .drv extension required
-nix-instantiate shell.nix -A shellDrv --indirect --add-root shell.drv
+rm -f shell.drv
+nix-instantiate shell.nix -A shellDrv --indirect --add-root ./shell.drv
 [[ $(nix-shell --pure $PWD/shell.drv --run \
     'echo "$IMPURE_VAR - $VAR_FROM_STDENV_SETUP - $VAR_FROM_NIX"') = " - foo - bar" ]]
 
 # New behaviour: just needs to resolve to a derivation in the store
+rm -f shell
 nix-instantiate shell.nix -A shellDrv --indirect --add-root shell
 [[ $(nix-shell --pure shell --run \
     'echo "$IMPURE_VAR - $VAR_FROM_STDENV_SETUP - $VAR_FROM_NIX"') = " - foo - bar" ]]
@@ -55,3 +57,23 @@ chmod a+rx $TEST_ROOT/shell.shebang.rb
 
 output=$($TEST_ROOT/shell.shebang.rb abc ruby)
 [ "$output" = '-e load("'"$TEST_ROOT"'/shell.shebang.rb") -- abc ruby' ]
+
+# Test IN_NIX_SHELL.
+output=$(nix-shell --pure shell.nix -A shellDrv --run \
+    'echo $IN_NIX_SHELL')
+[ "$output" = "pure" ]
+
+output=$(nix-shell shell.nix -A shellDrv --run \
+    'echo $IN_NIX_SHELL')
+[ "$output" = "impure" ]
+
+# Nested nix commands inside a nix-shell.
+cmd=$(type -p nix-instantiate)
+output=$(nix-shell shell.nix -A shellDrv --run \
+    "$cmd --eval shell.nix -A inNixShell")
+[ "$output" = "false" ]
+
+cmd=$(type -p nix)
+output=$(nix-shell shell.nix -A shellDrv --run \
+    "$cmd eval -f shell.nix inNixShell")
+[ "$output" = "false" ]

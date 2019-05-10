@@ -3,6 +3,8 @@
 with import ./config.nix;
 
 let pkgs = rec {
+  inNixShell = builtins.getEnv "IN_NIX_SHELL" != "";
+
   setupSh = builtins.toFile "setup" ''
     export VAR_FROM_STDENV_SETUP=foo
     for pkg in $buildInputs; do
