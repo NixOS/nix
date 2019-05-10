@@ -461,6 +461,19 @@ static void commonChildInit(Pipe & logPipe)
     close(fdDevNull);
 }
 
+void handleDiffHook(Path tryA, Path tryB, Path drvPath)
+{
+    auto diffHook = settings.diffHook;
+    if (diffHook != "" && settings.runDiffHook) {
+        try {
+            auto diff = runProgram(diffHook, true, {tryA, tryB, drvPath});
+            if (diff != "")
+                printError(chomp(diff));
+        } catch (Error & error) {
+            printError("diff hook execution failed: %s", error.what());
+        }
+    }
+}
 
 //////////////////////////////////////////////////////////////////////
 
@@ -3039,8 +3052,7 @@ void DerivationGoal::registerOutputs()
     InodesSeen inodesSeen;
 
     Path checkSuffix = ".check";
-    bool runDiffHook = settings.runDiffHook;
-    bool keepPreviousRound = settings.keepFailed || runDiffHook;
+    bool keepPreviousRound = settings.keepFailed || settings.runDiffHook;
 
     std::exception_ptr delayedException;
 
@@ -3185,11 +3197,14 @@ void DerivationGoal::registerOutputs()
             if (!worker.store.isValidPath(path)) continue;
             auto info = *worker.store.queryPathInfo(path);
             if (hash.first != info.narHash) {
+                handleDiffHook(path, actualPath, drvPath);
+
                 if (settings.keepFailed) {
                     Path dst = worker.store.toRealPath(path + checkSuffix);
                     deletePath(dst);
                     if (rename(actualPath.c_str(), dst.c_str()))
                         throw SysError(format("renaming '%1%' to '%2%'") % actualPath % dst);
+
                     throw Error(format("derivation '%1%' may not be deterministic: output '%2%' differs from '%3%'")
                         % drvPath % path % dst);
                 } else
@@ -3254,16 +3269,7 @@ void DerivationGoal::registerOutputs()
                     ? fmt("output '%1%' of '%2%' differs from '%3%' from previous round", i->second.path, drvPath, prev)
                     : fmt("output '%1%' of '%2%' differs from previous round", i->second.path, drvPath);
 
-                auto diffHook = settings.diffHook;
-                if (prevExists && diffHook != "" && runDiffHook) {
-                    try {
-                        auto diff = runProgram(diffHook, true, {prev, i->second.path});
-                        if (diff != "")
-                            printError(chomp(diff));
-                    } catch (Error & error) {
-                        printError("diff hook execution failed: %s", error.what());
-                    }
-                }
+                handleDiffHook(prev, i->second.path, drvPath);
 
                 if (settings.enforceDeterminism)
                     throw NotDeterministic(msg);
