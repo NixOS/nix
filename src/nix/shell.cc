@@ -131,6 +131,7 @@ struct Common : InstallableCommand
         "PWD",
         "SHELLOPTS",
         "SHLVL",
+        "SSL_CERT_FILE", // FIXME: only want to ignore /no-cert-file.crt
         "TEMP",
         "TEMPDIR",
         "TERM",
