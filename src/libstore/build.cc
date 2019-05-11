@@ -4471,7 +4471,15 @@ void Worker::waitForInput()
 
 unsigned int Worker::exitStatus()
 {
-    return checkMismatch ? 104 : (hashMismatch ? 102 : (timedOut ? 101 : (permanentFailure ? 100 : 1)));
+    unsigned int mask = 0;
+    if (timedOut)
+        mask |= 1;
+    if (hashMismatch)
+        mask |= 2;
+    if (checkMismatch)
+        mask |= 4;
+
+    return mask ? 100 + mask : 1;
 }
 
 
