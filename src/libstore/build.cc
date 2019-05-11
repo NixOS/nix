@@ -466,8 +466,12 @@ void handleDiffHook(bool allowVfork, uid_t uid, uid_t gid, Path tryA, Path tryB,
     auto diffHook = settings.diffHook;
     if (diffHook != "" && settings.runDiffHook) {
         auto wrapper = [&]() {
+            if (chdir("/") == -1)
+                throw SysError("chdir / failed");
             if (setgid(gid) == -1)
                 throw SysError("setgid failed");
+            if (setgroups(0, 0) == -1)
+                throw SysError("setgroups failed");
             if (setuid(uid) == -1)
                 throw SysError("setuid failed");
 
