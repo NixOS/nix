@@ -46,16 +46,14 @@ file containing:
 #!/bin/sh
 exec &gt;&amp;2
 echo "For derivation $3:"
-/run/current-system/sw/bin/runuser -u nobody -- /run/current-system/sw/bin/diff -r "$1" "$2"
+/run/current-system/sw/bin/diff -r "$1" "$2"
 </programlisting>
 
-<warning>
-  <para>The diff hook can be run as root. Take care to run as little
-  as possible as root, for this example we use <command>runuser</command>
-  to drop privileges.
-  </para>
-</warning>
 </para>
+
+<para>The diff hook is executed by the same user and group who ran the
+build. However, the diff hook does not have write access to the store
+path just built.</para>
 
 <section>
   <title>

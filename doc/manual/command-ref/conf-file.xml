@@ -252,13 +252,11 @@ false</literal>.</para>
       same.
     </para>
 
-    <warning>
-      <para>
-        The root user executes the diff hook in a daemonised
-        installation. See <xref linkend="chap-diff-hook" /> for
-        information on using the diff hook safely.
-      </para>
-    </warning>
+    <para>
+      The diff hook is executed by the same user and group who ran the
+      build. However, the diff hook does not have write access to the
+      store path just built.
+    </para>
 
     <para>The diff hook program receives three parameters:</para>
 
@@ -278,6 +276,14 @@ false</literal>.</para>
       <listitem>
         <para>
           The path to the build's derivation
+        </para>
+      </listitem>
+
+      <listitem>
+        <para>
+          The path to the build's scratch directory. This directory
+          will exist only if the build was run with
+          <option>--keep-failed</option>.
         </para>
       </listitem>
     </orderedlist>

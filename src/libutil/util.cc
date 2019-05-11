@@ -914,8 +914,8 @@ void killUser(uid_t uid)
 
 /* Wrapper around vfork to prevent the child process from clobbering
    the caller's stack frame in the parent. */
-static pid_t doFork(bool allowVfork, std::function<void()> fun) __attribute__((noinline));
-static pid_t doFork(bool allowVfork, std::function<void()> fun)
+pid_t doFork(bool allowVfork, std::function<void()> fun) __attribute__((noinline));
+pid_t doFork(bool allowVfork, std::function<void()> fun)
 {
 #ifdef __linux__
     pid_t pid = allowVfork ? vfork() : fork();

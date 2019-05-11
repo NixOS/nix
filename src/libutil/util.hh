@@ -265,6 +265,8 @@ string runProgram(Path program, bool searchPath = false,
     const Strings & args = Strings(),
     const std::optional<std::string> & input = {});
 
+pid_t doFork(bool allowVfork, std::function<void()> fun);
+
 struct RunOptions
 {
     Path program;

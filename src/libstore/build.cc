@@ -461,17 +461,26 @@ static void commonChildInit(Pipe & logPipe)
     close(fdDevNull);
 }
 
-void handleDiffHook(Path tryA, Path tryB, Path drvPath)
+void handleDiffHook(bool allowVfork, uid_t uid, uid_t gid, Path tryA, Path tryB, Path drvPath, Path tmpDir)
 {
     auto diffHook = settings.diffHook;
     if (diffHook != "" && settings.runDiffHook) {
-        try {
-            auto diff = runProgram(diffHook, true, {tryA, tryB, drvPath});
-            if (diff != "")
-                printError(chomp(diff));
-        } catch (Error & error) {
-            printError("diff hook execution failed: %s", error.what());
-        }
+        auto wrapper = [&]() {
+            if (setgid(gid) == -1)
+                throw SysError("setgid failed");
+            if (setuid(uid) == -1)
+                throw SysError("setuid failed");
+
+            try {
+                auto diff = runProgram(diffHook, true, {tryA, tryB, drvPath, tmpDir});
+                if (diff != "")
+                    printError(chomp(diff));
+            } catch (Error & error) {
+                printError("diff hook execution failed: %s", error.what());
+            }
+        };
+
+        doFork(allowVfork, wrapper);
     }
 }
 
@@ -3197,13 +3206,17 @@ void DerivationGoal::registerOutputs()
             if (!worker.store.isValidPath(path)) continue;
             auto info = *worker.store.queryPathInfo(path);
             if (hash.first != info.narHash) {
-                handleDiffHook(path, actualPath, drvPath);
-
-                if (settings.keepFailed) {
+                if (settings.runDiffHook || settings.keepFailed) {
                     Path dst = worker.store.toRealPath(path + checkSuffix);
                     deletePath(dst);
                     if (rename(actualPath.c_str(), dst.c_str()))
                         throw SysError(format("renaming '%1%' to '%2%'") % actualPath % dst);
+
+                    handleDiffHook(
+                        !buildUser && !drv->isBuiltin(),
+                        buildUser ? buildUser->getUID() : getuid(),
+                        buildUser ? buildUser->getGID() : getgid(),
+                        path, dst, drvPath, tmpDir);
 
                     throw Error(format("derivation '%1%' may not be deterministic: output '%2%' differs from '%3%'")
                         % drvPath % path % dst);
@@ -3269,7 +3282,11 @@ void DerivationGoal::registerOutputs()
                     ? fmt("output '%1%' of '%2%' differs from '%3%' from previous round", i->second.path, drvPath, prev)
                     : fmt("output '%1%' of '%2%' differs from previous round", i->second.path, drvPath);
 
-                handleDiffHook(prev, i->second.path, drvPath);
+                handleDiffHook(
+                    !buildUser && !drv->isBuiltin(),
+                    buildUser ? buildUser->getUID() : getuid(),
+                    buildUser ? buildUser->getGID() : getgid(),
+                    prev, i->second.path, drvPath, tmpDir);
 
                 if (settings.enforceDeterminism)
                     throw NotDeterministic(msg);
