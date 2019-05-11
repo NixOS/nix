@@ -465,26 +465,22 @@ void handleDiffHook(bool allowVfork, uid_t uid, uid_t gid, Path tryA, Path tryB,
 {
     auto diffHook = settings.diffHook;
     if (diffHook != "" && settings.runDiffHook) {
-        auto wrapper = [&]() {
-            if (chdir("/") == -1)
-                throw SysError("chdir / failed");
-            if (setgid(gid) == -1)
-                throw SysError("setgid failed");
-            if (setgroups(0, 0) == -1)
-                throw SysError("setgroups failed");
-            if (setuid(uid) == -1)
-                throw SysError("setuid failed");
+        try {
+            RunOptions diffHookOptions(diffHook,{tryA, tryB, drvPath, tmpDir});
+            diffHookOptions.searchPath = true;
+            diffHookOptions.uid = uid;
+            diffHookOptions.gid = gid;
+            diffHookOptions.chdir = "/";
 
-            try {
-                auto diff = runProgram(diffHook, true, {tryA, tryB, drvPath, tmpDir});
-                if (diff != "")
-                    printError(chomp(diff));
-            } catch (Error & error) {
-                printError("diff hook execution failed: %s", error.what());
-            }
-        };
+            auto diffRes = runProgram(diffHookOptions);
+            if (!statusOk(diffRes.first))
+                throw ExecError(diffRes.first, fmt("diff-hook program '%1%' %2%", diffHook, statusToString(diffRes.first)));
 
-        doFork(allowVfork, wrapper);
+            if (diffRes.second != "")
+                printError(chomp(diffRes.second));
+        } catch (Error & error) {
+            printError("diff hook execution failed: %s", error.what());
+        }
     }
 }
 

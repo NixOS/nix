@@ -265,10 +265,11 @@ string runProgram(Path program, bool searchPath = false,
     const Strings & args = Strings(),
     const std::optional<std::string> & input = {});
 
-pid_t doFork(bool allowVfork, std::function<void()> fun);
-
 struct RunOptions
 {
+    std::optional<uid_t> uid;
+    std::optional<uid_t> gid;
+    std::optional<Path> chdir;
     Path program;
     bool searchPath = true;
     Strings args;

@@ -16,6 +16,7 @@
 #include <future>
 
 #include <fcntl.h>
+#include <grp.h>
 #include <limits.h>
 #include <pwd.h>
 #include <sys/ioctl.h>
@@ -914,8 +915,8 @@ void killUser(uid_t uid)
 
 /* Wrapper around vfork to prevent the child process from clobbering
    the caller's stack frame in the parent. */
-pid_t doFork(bool allowVfork, std::function<void()> fun) __attribute__((noinline));
-pid_t doFork(bool allowVfork, std::function<void()> fun)
+static pid_t doFork(bool allowVfork, std::function<void()> fun) __attribute__((noinline));
+static pid_t doFork(bool allowVfork, std::function<void()> fun)
 {
 #ifdef __linux__
     pid_t pid = allowVfork ? vfork() : fork();
@@ -1024,6 +1025,16 @@ void runProgram2(const RunOptions & options)
             throw SysError("dupping stdout");
         if (source && dup2(in.readSide.get(), STDIN_FILENO) == -1)
             throw SysError("dupping stdin");
+
+        //if (options.chdir && chdir((*options.chdir).c_str()) == -1)
+        //    throw SysError("chdir failed");
+        if (options.gid && setgid(*options.gid) == -1)
+            throw SysError("setgid failed");
+        /* Drop all other groups if we're setgid. */
+        if (options.gid && setgroups(0, 0) == -1)
+            throw SysError("setgroups failed");
+        if (options.uid && setuid(*options.uid) == -1)
+            throw SysError("setuid failed");
 
         Strings args_(options.args);
         args_.push_front(options.program);
