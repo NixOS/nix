@@ -267,6 +267,9 @@ string runProgram(Path program, bool searchPath = false,
 
 struct RunOptions
 {
+    std::optional<uid_t> uid;
+    std::optional<uid_t> gid;
+    std::optional<Path> chdir;
     Path program;
     bool searchPath = true;
     Strings args;

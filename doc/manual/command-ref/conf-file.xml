@@ -1,7 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
 <refentry xmlns="http://docbook.org/ns/docbook"
           xmlns:xlink="http://www.w3.org/1999/xlink"
           xmlns:xi="http://www.w3.org/2001/XInclude"
-          xml:id="sec-conf-file">
+          xml:id="sec-conf-file"
+          version="5">
 
 <refmeta>
   <refentrytitle>nix.conf</refentrytitle>
@@ -238,6 +240,71 @@ false</literal>.</para>
     means that the builder should use all available CPU cores in the
     system.</para></listitem>
 
+  </varlistentry>
+
+  <varlistentry xml:id="conf-diff-hook"><term><literal>diff-hook</literal></term>
+  <listitem>
+    <para>
+      Absolute path to an executable capable of diffing build results.
+      The hook executes if <xref linkend="conf-run-diff-hook" /> is
+      true, and the output of a build is known to not be the same.
+      This program is not executed to determine if two results are the
+      same.
+    </para>
+
+    <para>
+      The diff hook is executed by the same user and group who ran the
+      build. However, the diff hook does not have write access to the
+      store path just built.
+    </para>
+
+    <para>The diff hook program receives three parameters:</para>
+
+    <orderedlist>
+      <listitem>
+        <para>
+          A path to the previous build's results
+        </para>
+      </listitem>
+
+      <listitem>
+        <para>
+          A path to the current build's results
+        </para>
+      </listitem>
+
+      <listitem>
+        <para>
+          The path to the build's derivation
+        </para>
+      </listitem>
+
+      <listitem>
+        <para>
+          The path to the build's scratch directory. This directory
+          will exist only if the build was run with
+          <option>--keep-failed</option>.
+        </para>
+      </listitem>
+    </orderedlist>
+
+    <para>
+      The stderr and stdout output from the diff hook will not be
+      displayed to the user. Instead, it will print to the nix-daemon's
+      log.
+    </para>
+
+    <para>When using the Nix daemon, <literal>diff-hook</literal> must
+    be set in the <filename>nix.conf</filename> configuration file, and
+    cannot be passed at the command line.
+    </para>
+  </listitem>
+  </varlistentry>
+
+  <varlistentry xml:id="conf-enforce-determinism">
+    <term><literal>enforce-determinism</literal></term>
+
+    <listitem><para>See <xref linkend="conf-repeat" />.</para></listitem>
   </varlistentry>
 
   <varlistentry xml:id="conf-extra-sandbox-paths">
@@ -595,9 +662,9 @@ password <replaceable>my-password</replaceable>
     they are deterministic. The default value is 0. If the value is
     non-zero, every build is repeated the specified number of
     times. If the contents of any of the runs differs from the
-    previous ones, the build is rejected and the resulting store paths
-    are not registered as “valid” in Nix’s database.</para></listitem>
-
+    previous ones and <xref linkend="conf-enforce-determinism" /> is
+    true, the build is rejected and the resulting store paths are not
+    registered as “valid” in Nix’s database.</para></listitem>
   </varlistentry>
 
   <varlistentry xml:id="conf-require-sigs"><term><literal>require-sigs</literal></term>
@@ -628,6 +695,19 @@ password <replaceable>my-password</replaceable>
 
   </varlistentry>
 
+  <varlistentry xml:id="conf-run-diff-hook"><term><literal>run-diff-hook</literal></term>
+  <listitem>
+    <para>
+      If true, enable the execution of <xref linkend="conf-diff-hook" />.
+    </para>
+
+    <para>
+      When using the Nix daemon, <literal>run-diff-hook</literal> must
+      be set in the <filename>nix.conf</filename> configuration file,
+      and cannot be passed at the command line.
+    </para>
+  </listitem>
+  </varlistentry>
 
   <varlistentry xml:id="conf-sandbox"><term><literal>sandbox</literal></term>
 
