@@ -288,10 +288,11 @@ false</literal>.</para>
       </listitem>
     </orderedlist>
 
-    <para>The diff hook should not print data to stderr or stdout, as
-    output is not displayed to the user. However, if information is
-    printed, it will be printed in the <command>nix-daemon</command>
-    log.</para>
+    <para>
+      The stderr and stdout output from the diff hook will not be
+      displayed to the user. Instead, it will print to the nix-daemon's
+      log.
+    </para>
 
     <para>When using the Nix daemon, <literal>diff-hook</literal> must
     be set in the <filename>nix.conf</filename> configuration file, and
