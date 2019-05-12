@@ -997,13 +997,6 @@ DerivationGoal::DerivationGoal(const Path & drvPath, const StringSet & wantedOut
     , wantedOutputs(wantedOutputs)
     , buildMode(buildMode)
 {
-#if __linux__
-    needsHashRewrite = !useChroot;
-#else
-    /* Darwin requires hash rewriting even when sandboxing is enabled. */
-    needsHashRewrite = true;
-#endif
-
     state = &DerivationGoal::getDerivation;
     name = (format("building of '%1%'") % drvPath).str();
     trace("created");
@@ -1851,6 +1844,13 @@ void DerivationGoal::startBuilder()
             throw Error("building using a diverted store is not supported on this platform");
         #endif
     }
+
+#if __linux__
+    needsHashRewrite = !useChroot;
+#else
+    /* Darwin requires hash rewriting even when sandboxing is enabled. */
+    needsHashRewrite = true;
+#endif
 
     /* If `build-users-group' is not empty, then we have to build as
        one of the members of that group. */
