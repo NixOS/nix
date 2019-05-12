@@ -461,7 +461,7 @@ static void commonChildInit(Pipe & logPipe)
     close(fdDevNull);
 }
 
-void handleDiffHook(bool allowVfork, uid_t uid, uid_t gid, Path tryA, Path tryB, Path drvPath, Path tmpDir)
+void handleDiffHook(uid_t uid, uid_t gid, Path tryA, Path tryB, Path drvPath, Path tmpDir)
 {
     auto diffHook = settings.diffHook;
     if (diffHook != "" && settings.runDiffHook) {
@@ -3213,7 +3213,6 @@ void DerivationGoal::registerOutputs()
                         throw SysError(format("renaming '%1%' to '%2%'") % actualPath % dst);
 
                     handleDiffHook(
-                        !buildUser && !drv->isBuiltin(),
                         buildUser ? buildUser->getUID() : getuid(),
                         buildUser ? buildUser->getGID() : getgid(),
                         path, dst, drvPath, tmpDir);
@@ -3283,7 +3282,6 @@ void DerivationGoal::registerOutputs()
                     : fmt("output '%1%' of '%2%' differs from previous round", i->second.path, drvPath);
 
                 handleDiffHook(
-                    !buildUser && !drv->isBuiltin(),
                     buildUser ? buildUser->getUID() : getuid(),
                     buildUser ? buildUser->getGID() : getgid(),
                     prev, i->second.path, drvPath, tmpDir);
