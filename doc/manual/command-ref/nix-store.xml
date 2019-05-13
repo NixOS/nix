@@ -215,6 +215,41 @@ printed.)</para>
 
 </variablelist>
 
+<para>Special exit codes:</para>
+
+<variablelist>
+
+  <varlistentry><term><literal>100</literal></term>
+    <listitem><para>Generic build failure, the builder process
+    returned with a non-zero exit code.</para></listitem>
+  </varlistentry>
+
+  <varlistentry><term><literal>101</literal></term>
+    <listitem><para>Build timeout, the build was aborted because it
+    did not complete within the specified <link
+    linkend='conf-timeout'><literal>timeout</literal></link>.
+    </para></listitem>
+  </varlistentry>
+
+  <varlistentry><term><literal>102</literal></term>
+    <listitem><para>Hash mismatch, the build output was rejected
+    because it does not match the specified <link
+    linkend="fixed-output-drvs"><varname>outputHash</varname></link>.
+    </para></listitem>
+  </varlistentry>
+
+  <varlistentry><term><literal>104</literal></term>
+    <listitem><para>Not deterministic, the build succeeded in check
+    mode but the resulting output is not binary reproducable.</para>
+    </listitem>
+  </varlistentry>
+
+</variablelist>
+
+<para>With the <option>--keep-going</option> flag it's possible for
+multiple build failures to occur, in this case the 1xx status codes
+are or combined.</para>
+
 </refsection>
 
 
