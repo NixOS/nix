@@ -825,9 +825,6 @@ private:
     /* Whether we're currently doing a chroot build. */
     bool useChroot = false;
 
-    /* Whether we need to perform hash rewriting if there are valid output paths. */
-    bool needsHashRewrite;
-
     Path chrootRootDir;
 
     /* RAII object to delete the chroot directory. */
@@ -906,6 +903,9 @@ public:
     DerivationGoal(const Path & drvPath, const BasicDerivation & drv,
         Worker & worker, BuildMode buildMode = bmNormal);
     ~DerivationGoal();
+
+    /* Whether we need to perform hash rewriting if there are valid output paths. */
+    bool needsHashRewrite();
 
     void timedOut() override;
 
@@ -1019,13 +1019,6 @@ DerivationGoal::DerivationGoal(const Path & drvPath, const StringSet & wantedOut
     , wantedOutputs(wantedOutputs)
     , buildMode(buildMode)
 {
-#if __linux__
-    needsHashRewrite = !useChroot;
-#else
-    /* Darwin requires hash rewriting even when sandboxing is enabled. */
-    needsHashRewrite = true;
-#endif
-
     state = &DerivationGoal::getDerivation;
     name = (format("building of '%1%'") % drvPath).str();
     trace("created");
@@ -1063,6 +1056,17 @@ DerivationGoal::~DerivationGoal()
     try { killChild(); } catch (...) { ignoreException(); }
     try { deleteTmpDir(false); } catch (...) { ignoreException(); }
     try { closeLogFile(); } catch (...) { ignoreException(); }
+}
+
+
+inline bool DerivationGoal::needsHashRewrite()
+{
+#if __linux__
+    return !useChroot;
+#else
+    /* Darwin requires hash rewriting even when sandboxing is enabled. */
+    return true;
+#endif
 }
 
 
@@ -2105,7 +2109,7 @@ void DerivationGoal::startBuilder()
 #endif
     }
 
-    if (needsHashRewrite) {
+    if (needsHashRewrite()) {
 
         if (pathExists(homeDir))
             throw Error(format("directory '%1%' exists; please remove it") % homeDir);
@@ -3088,7 +3092,7 @@ void DerivationGoal::registerOutputs()
             if (buildMode != bmCheck) actualPath = worker.store.toRealPath(path);
         }
 
-        if (needsHashRewrite) {
+        if (needsHashRewrite()) {
             Path redirected = redirectedOutputs[path];
             if (buildMode == bmRepair
                 && redirectedBadOutputs.find(path) != redirectedBadOutputs.end()
