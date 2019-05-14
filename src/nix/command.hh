@@ -80,6 +80,10 @@ struct SourceExprCommand : virtual Args, StoreCommand, MixEvalArgs
 
     bool recreateLockFile = false;
 
+    bool saveLockFile = true;
+
+    bool noRegistries = false;
+
     ref<EvalState> getEvalState();
 
     std::vector<std::shared_ptr<Installable>> parseInstallables(

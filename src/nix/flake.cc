@@ -126,8 +126,8 @@ struct CmdFlakeDeps : FlakeCommand, MixJSON, StoreCommand, MixEvalArgs
             for (NonFlake & nonFlake : resFlake.nonFlakeDeps)
                 printNonFlakeInfo(nonFlake, json);
 
-            for (ResolvedFlake & newResFlake : resFlake.flakeDeps)
-                todo.push(newResFlake);
+            for (auto info : resFlake.flakeDeps)
+                todo.push(info.second);
         }
     }
 };

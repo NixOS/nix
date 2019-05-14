@@ -118,7 +118,7 @@ nix build -o $TEST_ROOT/result --flake-registry $registry flake1:
 [[ -e $TEST_ROOT/result/hello ]]
 
 # Building a flake with an unlocked dependency should fail in pure mode.
-(! nix build -o $TEST_ROOT/result --flake-registry $registry flake2:bar)
+(! nix eval "(builtins.getFlake "$flake2Dir")")
 
 # But should succeed in impure mode.
 nix build -o $TEST_ROOT/result --flake-registry $registry flake2:bar --impure
@@ -129,8 +129,8 @@ nix build -o $TEST_ROOT/result --flake-registry $registry $flake2Dir:bar
 git -C $flake2Dir commit flake.lock -m 'Add flake.lock'
 
 # Rerunning the build should not change the lockfile.
-#nix build -o $TEST_ROOT/result --flake-registry $registry $flake2:bar
-#[[ -z $(git -C $flake2 diff) ]]
+nix build -o $TEST_ROOT/result --flake-registry $registry $flake2Dir:bar
+[[ -z $(git -C $flake2Dir diff master) ]]
 
 # Now we should be able to build the flake in pure mode.
 nix build -o $TEST_ROOT/result --flake-registry $registry flake2:bar
@@ -140,3 +140,32 @@ nix build -o $TEST_ROOT/result file://$flake2Dir:bar
 
 # Test whether indirect dependencies work.
 nix build -o $TEST_ROOT/result --flake-registry $registry $flake3Dir:xyzzy
+
+# Add dependency to flake3
+rm $flake3Dir/flake.nix
+
+cat > $flake3Dir/flake.nix <<EOF
+{
+  name = "flake3";
+
+  epoch = 2019;
+
+  requires = [ "flake1" "flake2" ];
+
+  description = "Fnord";
+
+  provides = deps: rec {
+    packages.xyzzy = deps.flake2.provides.packages.bar;
+    packages.sth = deps.flake1.provides.packages.foo;
+  };
+}
+EOF
+
+git -C $flake3Dir add flake.nix
+git -C $flake3Dir commit -m 'Update flake.nix'
+
+# Check whether `nix build` works with an incomplete lockfile
+nix build -o $TEST_ROOT/result --flake-registry $registry $flake3Dir:sth
+
+# Check whether it saved the lockfile
+[[ ! (-z $(git -C $flake3Dir diff master)) ]]

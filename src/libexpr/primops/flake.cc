@@ -372,10 +372,58 @@ LockFile entryToLockFile(const LockFile::FlakeEntry & entry)
     return lockFile;
 }
 
-ResolvedFlake resolveFlakeFromLockFile(EvalState & state, const FlakeRef & flakeRef,
-    ShouldUpdateLockFile update, LockFile lockFile = {})
+LockFile::FlakeEntry dependenciesToFlakeEntry(const ResolvedFlake & resolvedFlake)
 {
-    Flake flake = getFlake(state, flakeRef, update != DontUpdate);
+    LockFile::FlakeEntry entry(resolvedFlake.flake.resolvedRef, resolvedFlake.flake.hash);
+
+    for (auto & info : resolvedFlake.flakeDeps)
+        entry.flakeEntries.insert_or_assign(info.first.to_string(), dependenciesToFlakeEntry(info.second));
+
+    for (auto & nonFlake : resolvedFlake.nonFlakeDeps) {
+        LockFile::NonFlakeEntry nonEntry(nonFlake.resolvedRef, nonFlake.hash);
+        entry.nonFlakeEntries.insert_or_assign(nonFlake.alias, nonEntry);
+    }
+
+    return entry;
+}
+
+bool allowedToWrite (HandleLockFile handle)
+{
+    if (handle == AllPure) return false;
+    else if (handle == TopRefUsesRegistries) return false;
+    else if (handle == UpdateLockFile) return true;
+    else if (handle == UseUpdatedLockFile) return false;
+    else if (handle == RecreateLockFile) return true;
+    else if (handle == UseNewLockFile) return false;
+    else assert(false);
+}
+
+bool recreateLockFile (HandleLockFile handle)
+{
+    if (handle == AllPure) return false;
+    else if (handle == TopRefUsesRegistries) return false;
+    else if (handle == UpdateLockFile) return false;
+    else if (handle == UseUpdatedLockFile) return false;
+    else if (handle == RecreateLockFile) return true;
+    else if (handle == UseNewLockFile) return true;
+    else assert(false);
+}
+
+bool allowedToUseRegistries (HandleLockFile handle, bool isTopRef)
+{
+    if (handle == AllPure) return false;
+    else if (handle == TopRefUsesRegistries) return isTopRef;
+    else if (handle == UpdateLockFile) return true;
+    else if (handle == UseUpdatedLockFile) return true;
+    else if (handle == RecreateLockFile) return true;
+    else if (handle == UseNewLockFile) return true;
+    else assert(false);
+}
+
+ResolvedFlake resolveFlakeFromLockFile(EvalState & state, const FlakeRef & flakeRef,
+    HandleLockFile handleLockFile, LockFile lockFile = {}, bool topRef = false)
+{
+    Flake flake = getFlake(state, flakeRef, allowedToUseRegistries(handleLockFile, topRef));
 
     ResolvedFlake deps(flake);
 
@@ -388,23 +436,23 @@ ResolvedFlake resolveFlakeFromLockFile(EvalState & state, const FlakeRef & flake
                 throw Error("the content hash of flakeref %s doesn't match", i->second.ref.to_string());
             deps.nonFlakeDeps.push_back(nonFlake);
         } else {
-            if (update == DontUpdate) throw Error("the lockfile requires updating nonflake dependency %s in DontUpdate mode", nonFlakeInfo.first);
+            if (handleLockFile == AllPure || handleLockFile == TopRefUsesRegistries)
+                throw Error("the lockfile requires updating nonflake dependency %s in AllPure mode", nonFlakeInfo.first);
             deps.nonFlakeDeps.push_back(getNonFlake(state, nonFlakeInfo.second, nonFlakeInfo.first));
         }
     }
 
     for (auto newFlakeRef : flake.requires) {
-        FlakeRef ref = newFlakeRef;
-        LockFile newLockFile;
         auto i = lockFile.flakeEntries.find(newFlakeRef);
         if (i != lockFile.flakeEntries.end()) { // Propagate lockFile downwards if possible
-            ResolvedFlake newResFlake = resolveFlakeFromLockFile(state, i->second.ref, update, entryToLockFile(i->second));
+            ResolvedFlake newResFlake = resolveFlakeFromLockFile(state, i->second.ref, handleLockFile, entryToLockFile(i->second));
             if (newResFlake.flake.hash != i->second.contentHash)
                 throw Error("the content hash of flakeref %s doesn't match", i->second.ref.to_string());
-            deps.flakeDeps.push_back(newResFlake);
+            deps.flakeDeps.insert_or_assign(newFlakeRef, newResFlake);
         } else {
-            if (update == DontUpdate) throw Error("the lockfile requires updating flake dependency %s in DontUpdate mode", newFlakeRef.to_string());
-            deps.flakeDeps.push_back(resolveFlakeFromLockFile(state, newFlakeRef, update));
+            if (handleLockFile == AllPure || handleLockFile == TopRefUsesRegistries)
+                throw Error("the lockfile requires updating flake dependency %s in AllPure mode", newFlakeRef.to_string());
+            deps.flakeDeps.insert_or_assign(newFlakeRef, resolveFlakeFromLockFile(state, newFlakeRef, handleLockFile));
         }
     }
 
@@ -414,54 +462,37 @@ ResolvedFlake resolveFlakeFromLockFile(EvalState & state, const FlakeRef & flake
 /* Given a flake reference, recursively fetch it and its dependencies.
    FIXME: this should return a graph of flakes.
 */
-ResolvedFlake resolveFlake(EvalState & state, const FlakeRef & topRef, ShouldUpdateLockFile update)
+ResolvedFlake resolveFlake(EvalState & state, const FlakeRef & topRef, HandleLockFile handleLockFile)
 {
-    if (!std::get_if<FlakeRef::IsPath>(&topRef.data)) update = DontUpdate;
-    Flake flake = getFlake(state, topRef, update != DontUpdate);
+    Flake flake = getFlake(state, topRef, allowedToUseRegistries(handleLockFile, true));
     LockFile lockFile;
 
-    if (update != RecreateLockFile) {
+    if (!recreateLockFile (handleLockFile)) {
         // If recreateLockFile, start with an empty lockfile
         lockFile = readLockFile(flake.storePath + "/flake.lock"); // FIXME: symlink attack
     }
 
-    return resolveFlakeFromLockFile(state, topRef, update, lockFile);
+    ResolvedFlake resFlake = resolveFlakeFromLockFile(state, topRef, handleLockFile, lockFile, true);
+    lockFile = entryToLockFile(dependenciesToFlakeEntry(resFlake));
+
+    if (allowedToWrite(handleLockFile)) {
+        if (auto refData = std::get_if<FlakeRef::IsPath>(&topRef.data)) {
+            writeLockFile(lockFile, refData->path + (topRef.subdir == "" ? "" : "/" + topRef.subdir) + "/flake.lock");
+
+            // Hack: Make sure that flake.lock is visible to Git, so it ends up in the Nix store.
+            runProgram("git", true, { "-C", refData->path, "add",
+                      (topRef.subdir == "" ? "" : topRef.subdir + "/") + "flake.lock" });
+        } else std::cout << "Cannot write lockfile because the FlakeRef isn't of the form IsPath." << std::endl;
+    } else if (handleLockFile != AllPure && handleLockFile != TopRefUsesRegistries)
+        std::cout << "Using updating lockfile without writing it to file" << std::endl;
+
+    return resFlake;
 }
 
-LockFile::FlakeEntry dependenciesToFlakeEntry(const ResolvedFlake & resolvedFlake)
+void updateLockFile (EvalState & state, const FlakeUri & flakeUri, bool recreateLockFile)
 {
-    LockFile::FlakeEntry entry(resolvedFlake.flake.resolvedRef, resolvedFlake.flake.hash);
-
-    for (auto & newResFlake : resolvedFlake.flakeDeps)
-        entry.flakeEntries.insert_or_assign(newResFlake.flake.originalRef, dependenciesToFlakeEntry(newResFlake));
-
-    for (auto & nonFlake : resolvedFlake.nonFlakeDeps) {
-        LockFile::NonFlakeEntry nonEntry(nonFlake.resolvedRef, nonFlake.hash);
-        entry.nonFlakeEntries.insert_or_assign(nonFlake.alias, nonEntry);
-    }
-
-    return entry;
-}
-
-static LockFile makeLockFile(EvalState & evalState, FlakeRef & flakeRef, bool recreateLockFile)
-{
-    ResolvedFlake resFlake = resolveFlake(evalState, flakeRef, recreateLockFile ? RecreateLockFile : UpdateLockFile);
-    return entryToLockFile(dependenciesToFlakeEntry(resFlake));
-}
-
-void updateLockFile(EvalState & state, const FlakeUri & uri, bool recreateLockFile)
-{
-    FlakeRef flakeRef = FlakeRef(uri);
-    auto lockFile = makeLockFile(state, flakeRef, recreateLockFile);
-    if (auto refData = std::get_if<FlakeRef::IsPath>(&flakeRef.data)) {
-        writeLockFile(lockFile, refData->path + (flakeRef.subdir == "" ? "" : "/" + flakeRef.subdir) + "/flake.lock");
-
-        // Hack: Make sure that flake.lock is visible to Git. Otherwise,
-        // exportGit will fail to copy it to the Nix store.
-        runProgram("git", true, { "-C", refData->path, "add",
-                  (flakeRef.subdir == "" ? "" : flakeRef.subdir + "/") + "flake.lock" });
-    } else
-        throw Error("flakeUri %s can't be updated because it is not a path", uri);
+    FlakeRef flakeRef(flakeUri);
+    resolveFlake(state, flakeRef, recreateLockFile ? RecreateLockFile : UpdateLockFile);
 }
 
 void callFlake(EvalState & state, const ResolvedFlake & resFlake, Value & v)
@@ -471,7 +502,8 @@ void callFlake(EvalState & state, const ResolvedFlake & resFlake, Value & v)
 
     state.mkAttrs(v, resFlake.flakeDeps.size() + resFlake.nonFlakeDeps.size() + 8);
 
-    for (const ResolvedFlake newResFlake : resFlake.flakeDeps) {
+    for (auto info : resFlake.flakeDeps) {
+        const ResolvedFlake newResFlake = info.second;
         auto vFlake = state.allocAttr(v, newResFlake.flake.id);
         callFlake(state, newResFlake, *vFlake);
     }
@@ -512,16 +544,16 @@ void callFlake(EvalState & state, const ResolvedFlake & resFlake, Value & v)
 
 // Return the `provides` of the top flake, while assigning to `v` the provides
 // of the dependencies as well.
-void makeFlakeValue(EvalState & state, const FlakeRef & flakeRef, ShouldUpdateLockFile update, Value & v)
+void makeFlakeValue(EvalState & state, const FlakeRef & flakeRef, HandleLockFile handle, Value & v)
 {
-    callFlake(state, resolveFlake(state, flakeRef, update), v);
+    callFlake(state, resolveFlake(state, flakeRef, handle), v);
 }
 
 // This function is exposed to be used in nix files.
 static void prim_getFlake(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
     makeFlakeValue(state, state.forceStringNoCtx(*args[0], pos),
-        evalSettings.pureEval ? DontUpdate : UpdateLockFile, v);
+        evalSettings.pureEval ? AllPure : UseUpdatedLockFile, v);
 }
 
 static RegisterPrimOp r2("getFlake", 1, prim_getFlake);

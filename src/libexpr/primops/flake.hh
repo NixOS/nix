@@ -36,16 +36,23 @@ struct LockFile
     };
 
     std::map<FlakeRef, FlakeEntry> flakeEntries;
-    std::map<FlakeId, NonFlakeEntry> nonFlakeEntries;
+    std::map<FlakeAlias, NonFlakeEntry> nonFlakeEntries;
 };
 
 typedef std::vector<std::shared_ptr<FlakeRegistry>> Registries;
 
 Path getUserRegistryPath();
 
-enum ShouldUpdateLockFile { DontUpdate, UpdateLockFile, RecreateLockFile};
+enum HandleLockFile
+    { AllPure // Everything is handled 100% purely
+    , TopRefUsesRegistries // The top FlakeRef uses the registries, apart from that, everything happens 100% purely
+    , UpdateLockFile // Update the existing lockfile and write it to file
+    , UseUpdatedLockFile // `UpdateLockFile` without writing to file
+    , RecreateLockFile // Recreate the lockfile from scratch and write it to file
+    , UseNewLockFile // `RecreateLockFile` without writing to file
+    };
 
-void makeFlakeValue(EvalState &, const FlakeRef &, ShouldUpdateLockFile, Value &);
+void makeFlakeValue(EvalState &, const FlakeRef &, HandleLockFile, Value &);
 
 std::shared_ptr<FlakeRegistry> readRegistry(const Path &);
 
@@ -98,12 +105,12 @@ Flake getFlake(EvalState &, const FlakeRef &, bool impureIsAllowed);
 struct ResolvedFlake
 {
     Flake flake;
-    std::vector<ResolvedFlake> flakeDeps; // The flake dependencies
+    std::map<FlakeRef, ResolvedFlake> flakeDeps; // The key in this map, is the originalRef as written in flake.nix
     std::vector<NonFlake> nonFlakeDeps;
     ResolvedFlake(const Flake & flake) : flake(flake) {}
 };
 
-ResolvedFlake resolveFlake(EvalState &, const FlakeRef &, ShouldUpdateLockFile);
+ResolvedFlake resolveFlake(EvalState &, const FlakeRef &, HandleLockFile);
 
 void updateLockFile(EvalState &, const FlakeUri &, bool recreateLockFile);
 
