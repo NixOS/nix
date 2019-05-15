@@ -26,7 +26,7 @@ fi
 if [ "$(uname -s)" = "Darwin" ]; then
     macos_major=$(sw_vers -productVersion | cut -d '.' -f 2)
     macos_minor=$(sw_vers -productVersion | cut -d '.' -f 3)
-    if [ "$macos_major" -lt 12 ] || ([ "$macos_major" -eq 12 ] && [ "$macos_minor" -lt 6 ]); then
+    if [ "$macos_major" -lt 12 ] || { [ "$macos_major" -eq 12 ] && [ "$macos_minor" -lt 6 ]; }; then
         echo "$0: macOS $(sw_vers -productVersion) is not supported, upgrade to 10.12.6 or higher"
         exit 1
     fi
