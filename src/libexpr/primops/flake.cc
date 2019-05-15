@@ -312,7 +312,6 @@ Flake getFlake(EvalState & state, const FlakeRef & flakeRef, bool impureIsAllowe
 
     state.forceAttrs(vInfo);
 
-    // FIXME: change to "id"?
     if (auto name = vInfo.attrs->get(state.sName))
         flake.id = state.forceStringNoCtx(*(**name).value, *(**name).pos);
     else
