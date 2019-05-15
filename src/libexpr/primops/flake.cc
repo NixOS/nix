@@ -248,7 +248,7 @@ static SourceInfo fetchFlake(EvalState & state, const FlakeRef & flakeRef, bool 
         FlakeRef ref(resolvedRef.baseRef());
         ref.rev = Hash(std::string(*result.etag, 1, result.etag->size() - 2), htSHA1);
         SourceInfo info(ref);
-        info.storePath = result.path;
+        info.storePath = result.storePath;
 
         return info;
     }
@@ -294,21 +294,22 @@ Flake getFlake(EvalState & state, const FlakeRef & flakeRef, bool impureIsAllowe
     state.store->assertStorePath(sourceInfo.storePath);
 
     if (state.allowedPaths)
-        state.allowedPaths->insert(sourceInfo.storePath);
+        state.allowedPaths->insert(state.store->toRealPath(sourceInfo.storePath));
 
     // Guard against symlink attacks.
     Path flakeFile = canonPath(sourceInfo.storePath + "/" + resolvedRef.subdir + "/flake.nix");
-    if (!isInDir(flakeFile, sourceInfo.storePath))
-        throw Error("flake file '%s' escapes from '%s'", resolvedRef, sourceInfo.storePath);
+    Path realFlakeFile = state.store->toRealPath(flakeFile);
+    if (!isInDir(realFlakeFile, state.store->toRealPath(sourceInfo.storePath)))
+        throw Error("'flake.nix' file of flake '%s' escapes from '%s'", resolvedRef, sourceInfo.storePath);
 
     Flake flake(flakeRef, sourceInfo);
     flake.hash = state.store->queryPathInfo(sourceInfo.storePath)->narHash;
 
-    if (!pathExists(flakeFile))
+    if (!pathExists(realFlakeFile))
         throw Error("source tree referenced by '%s' does not contain a '%s/flake.nix' file", resolvedRef, resolvedRef.subdir);
 
     Value vInfo;
-    state.evalFile(flakeFile, vInfo); // FIXME: symlink attack
+    state.evalFile(realFlakeFile, vInfo); // FIXME: symlink attack
 
     state.forceAttrs(vInfo);
 

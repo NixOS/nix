@@ -43,6 +43,9 @@ struct DownloadResult
 
 struct CachedDownloadResult
 {
+    // Note: 'storePath' may be different from 'path' when using a
+    // chroot store.
+    Path storePath;
     Path path;
     std::optional<std::string> etag;
 };
