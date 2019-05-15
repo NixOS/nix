@@ -20,6 +20,8 @@ std::string programPath;
 
 struct NixArgs : virtual MultiCommand, virtual MixCommonArgs
 {
+    bool printBuildLogs = false;
+
     NixArgs() : MultiCommand(*RegisterCommand::commands), MixCommonArgs("nix")
     {
         mkFlag()
@@ -40,6 +42,11 @@ struct NixArgs : virtual MultiCommand, virtual MixCommonArgs
                 printTable(std::cout, tbl);
                 throw Exit();
             });
+
+        mkFlag()
+            .longName("print-build-logs")
+            .description("print full build logs on stderr")
+            .set(&printBuildLogs, true);
 
         mkFlag()
             .longName("version")
@@ -98,8 +105,7 @@ void mainWrapped(int argc, char * * argv)
 
     Finally f([]() { stopProgressBar(); });
 
-    if (isatty(STDERR_FILENO))
-        startProgressBar();
+    startProgressBar(args.printBuildLogs);
 
     args.command->prepare();
     args.command->run();

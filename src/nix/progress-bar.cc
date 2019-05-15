@@ -2,6 +2,7 @@
 #include "util.hh"
 #include "sync.hh"
 #include "store-api.hh"
+#include "names.hh"
 
 #include <atomic>
 #include <map>
@@ -38,6 +39,7 @@ private:
         std::map<ActivityType, uint64_t> expectedByType;
         bool visible = true;
         ActivityId parent;
+        std::optional<std::string> name;
     };
 
     struct ActivitiesByType
@@ -68,10 +70,16 @@ private:
 
     std::condition_variable quitCV, updateCV;
 
+    bool printBuildLogs;
+    bool isTTY;
+
 public:
 
-    ProgressBar()
+    ProgressBar(bool printBuildLogs, bool isTTY)
+        : printBuildLogs(printBuildLogs)
+        , isTTY(isTTY)
     {
+        state_.lock()->active = isTTY;
         updateThread = std::thread([&]() {
             auto state(state_.lock());
             while (state->active) {
@@ -109,8 +117,14 @@ public:
 
     void log(State & state, Verbosity lvl, const std::string & s)
     {
-        writeToStderr("\r\e[K" + s + ANSI_NORMAL "\n");
-        draw(state);
+        if (state.active) {
+            writeToStderr("\r\e[K" + s + ANSI_NORMAL "\n");
+            draw(state);
+        } else {
+            auto s2 = s + ANSI_NORMAL "\n";
+            if (!isTTY) s2 = filterANSIEscapes(s2, true);
+            writeToStderr(s2);
+        }
     }
 
     void startActivity(ActivityId act, Verbosity lvl, ActivityType type,
@@ -141,6 +155,7 @@ public:
             auto nrRounds = getI(fields, 3);
             if (nrRounds != 1)
                 i->s += fmt(" (round %d/%d)", curRound, nrRounds);
+            i->name = DrvName(name).name;
         }
 
         if (type == actSubstitute) {
@@ -217,11 +232,15 @@ public:
                 auto i = state->its.find(act);
                 assert(i != state->its.end());
                 ActInfo info = *i->second;
-                state->activities.erase(i->second);
-                info.lastLine = lastLine;
-                state->activities.emplace_back(info);
-                i->second = std::prev(state->activities.end());
-                update();
+                if (printBuildLogs) {
+                    log(*state, lvlInfo, ANSI_FAINT + info.name.value_or("unnamed") + "> " + ANSI_NORMAL + lastLine);
+                } else {
+                    state->activities.erase(i->second);
+                    info.lastLine = lastLine;
+                    state->activities.emplace_back(info);
+                    i->second = std::prev(state->activities.end());
+                    update();
+                }
             }
         }
 
@@ -395,9 +414,9 @@ public:
     }
 };
 
-void startProgressBar()
+void startProgressBar(bool printBuildLogs)
 {
-    logger = new ProgressBar();
+    logger = new ProgressBar(printBuildLogs, isatty(STDERR_FILENO));
 }
 
 void stopProgressBar()
