@@ -25,3 +25,6 @@ nix path-info -r $outPath | grep input-2
 nix ls-store -R -l $outPath | grep foobar
 
 nix cat-store $outPath/foobar | grep FOOBAR
+
+# Test --check without hash rewriting.
+nix-build dependencies.nix --no-out-link --check --sandbox-paths /nix/store

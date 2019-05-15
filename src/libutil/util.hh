@@ -271,6 +271,9 @@ string runProgram(Path program, bool searchPath = false,
 
 struct RunOptions
 {
+    std::optional<uid_t> uid;
+    std::optional<uid_t> gid;
+    std::optional<Path> chdir;
     Path program;
     bool searchPath = true;
     Strings args;
@@ -427,6 +430,7 @@ void ignoreException();
 /* Some ANSI escape sequences. */
 #define ANSI_NORMAL "\e[0m"
 #define ANSI_BOLD "\e[1m"
+#define ANSI_FAINT "\e[2m"
 #define ANSI_RED "\e[31;1m"
 #define ANSI_GREEN "\e[32;1m"
 #define ANSI_BLUE "\e[34;1m"
