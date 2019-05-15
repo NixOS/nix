@@ -214,7 +214,7 @@ static void prim_fetchMercurial(EvalState & state, const Pos & pos, Value * * ar
     v.attrs->sort();
 
     if (state.allowedPaths)
-        state.allowedPaths->insert(hgInfo.storePath);
+        state.allowedPaths->insert(state.store->toRealPath(hgInfo.storePath));
 }
 
 static RegisterPrimOp r("fetchMercurial", 1, prim_fetchMercurial);

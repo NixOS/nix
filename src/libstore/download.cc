@@ -804,6 +804,7 @@ CachedDownloadResult Downloader::downloadCached(ref<Store> store, const string &
         expectedStorePath = store->makeFixedOutputPath(unpack, expectedHash, name);
         if (store->isValidPath(expectedStorePath)) {
             CachedDownloadResult result;
+            result.storePath = expectedStorePath;
             result.path = store->toRealPath(expectedStorePath);
             return result;
         }
@@ -912,6 +913,7 @@ CachedDownloadResult Downloader::downloadCached(ref<Store> store, const string &
             url, expectedHash.to_string(), gotHash.to_string());
     }
 
+    result.storePath = storePath;
     result.path = store->toRealPath(storePath);
     return result;
 }
