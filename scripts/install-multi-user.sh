@@ -484,6 +484,9 @@ EOF
 
     if [ "$(poly_user_home_get "$username")" = "/var/empty" ]; then
         row "    Home Directory" "/var/empty"
+    # macOS Mojave
+    elif [ "$(poly_user_home_get "$username")" = "/private/var/empty" ]; then
+        row "    Home Directory" "/private/var/empty"
     else
         poly_user_home_set "$username" "/var/empty"
         row "    Home Directory" "/var/empty"
