@@ -51,10 +51,9 @@ if [ -n "$HOME" ] && [ -n "$USER" ]; then
         unset __nix_defexpr
     fi
 
-    # Append ~/.nix-defexpr/channels/nixpkgs to $NIX_PATH so that
-    # <nixpkgs> paths work when the user has fetched the Nixpkgs
-    # channel.
-    export NIX_PATH="${NIX_PATH:+$NIX_PATH:}nixpkgs=$HOME/.nix-defexpr/channels/nixpkgs"
+    # Append ~/.nix-defexpr/channels to $NIX_PATH so that <nixpkgs>
+    # paths work when the user has fetched the Nixpkgs channel.
+    export NIX_PATH=${NIX_PATH:+$NIX_PATH:}$HOME/.nix-defexpr/channels
 
     # Set up environment.
     # This part should be kept in sync with nixpkgs:nixos/modules/programs/environment.nix
