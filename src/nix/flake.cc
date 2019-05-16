@@ -153,8 +153,10 @@ struct CmdFlakeUpdate : StoreCommand, GitRepoCommand, MixEvalArgs
     }
 };
 
-struct CmdFlakeInfo : FlakeCommand, MixJSON, MixEvalArgs, StoreCommand
+struct CmdFlakeInfo : MixJSON, MixEvalArgs, StoreCommand
 {
+    FlakeUri flakeUri = absPath(".");
+
     std::string name() override
     {
         return "info";
@@ -165,7 +167,9 @@ struct CmdFlakeInfo : FlakeCommand, MixJSON, MixEvalArgs, StoreCommand
         return "list info about a given flake";
     }
 
-    CmdFlakeInfo () { }
+    CmdFlakeInfo () {
+        expectArg("flake-uri", &flakeUri, true);
+    }
 
     void run(nix::ref<nix::Store> store) override
     {
