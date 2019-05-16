@@ -259,7 +259,7 @@ static void prim_fetchGit(EvalState & state, const Pos & pos, Value * * args, Va
     v.attrs->sort();
 
     if (state.allowedPaths)
-        state.allowedPaths->insert(gitInfo.storePath);
+        state.allowedPaths->insert(state.store->toRealPath(gitInfo.storePath));
 }
 
 static RegisterPrimOp r("fetchGit", 1, prim_fetchGit);
