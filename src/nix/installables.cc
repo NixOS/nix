@@ -38,7 +38,7 @@ SourceExprCommand::SourceExprCommand()
         .set(&noRegistries, true);
 }
 
-ref<EvalState> SourceExprCommand::getEvalState()
+ref<EvalState> EvalCommand::getEvalState()
 {
     if (!evalState)
         evalState = std::make_shared<EvalState>(searchPath, getStore());

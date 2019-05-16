@@ -133,7 +133,8 @@ struct ResolvedFlake
 
 ResolvedFlake resolveFlake(EvalState &, const FlakeRef &, HandleLockFile);
 
-void updateLockFile(EvalState &, const FlakeUri &, bool recreateLockFile);
+void updateLockFile(EvalState &, const FlakeRef & flakeRef, bool recreateLockFile);
 
-void gitCloneFlake (std::string flakeUri, EvalState &, Registries, Path);
+void gitCloneFlake(FlakeRef flakeRef, EvalState &, Registries, const Path & destDir);
+
 }

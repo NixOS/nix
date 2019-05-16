@@ -482,9 +482,8 @@ ResolvedFlake resolveFlake(EvalState & state, const FlakeRef & topRef, HandleLoc
     return resFlake;
 }
 
-void updateLockFile(EvalState & state, const FlakeUri & flakeUri, bool recreateLockFile)
+void updateLockFile(EvalState & state, const FlakeRef & flakeRef, bool recreateLockFile)
 {
-    FlakeRef flakeRef(flakeUri);
     resolveFlake(state, flakeRef, recreateLockFile ? RecreateLockFile : UpdateLockFile);
 }
 
@@ -551,10 +550,8 @@ static void prim_getFlake(EvalState & state, const Pos & pos, Value * * args, Va
 
 static RegisterPrimOp r2("getFlake", 1, prim_getFlake);
 
-void gitCloneFlake (std::string flakeUri, EvalState & state, Registries registries,
-    Path endDirectory)
+void gitCloneFlake(FlakeRef flakeRef, EvalState & state, Registries registries, const Path & destDir)
 {
-    FlakeRef flakeRef(flakeUri);
     flakeRef = lookupFlake(state, flakeRef, registries);
 
     std::string uri;
@@ -576,8 +573,8 @@ void gitCloneFlake (std::string flakeUri, EvalState & state, Registries registri
         }
     }
 
-    if (endDirectory != "")
-        args.push_back(endDirectory);
+    if (destDir != "")
+        args.push_back(destDir);
 
     runProgram("git", true, args);
 }

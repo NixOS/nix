@@ -10,7 +10,33 @@
 
 using namespace nix;
 
-struct CmdFlakeList : StoreCommand, MixEvalArgs
+class FlakeCommand : virtual Args, public EvalCommand
+{
+    std::string flakeUri = ".";
+
+public:
+
+    FlakeCommand()
+    {
+        expectArg("flake-uri", &flakeUri, true);
+    }
+
+    FlakeRef getFlakeRef()
+    {
+        if (flakeUri.find('/') != std::string::npos || flakeUri == ".")
+            return FlakeRef(flakeUri, true);
+        else
+            return FlakeRef(flakeUri);
+    }
+
+    Flake getFlake()
+    {
+        auto evalState = getEvalState();
+        return nix::getFlake(*evalState, getFlakeRef(), true);
+    }
+};
+
+struct CmdFlakeList : EvalCommand
 {
     std::string name() override
     {
@@ -24,9 +50,7 @@ struct CmdFlakeList : StoreCommand, MixEvalArgs
 
     void run(nix::ref<nix::Store> store) override
     {
-        auto evalState = std::make_shared<EvalState>(searchPath, store);
-
-        auto registries = evalState->getFlakeRegistries();
+        auto registries = getEvalState()->getFlakeRegistries();
 
         stopProgressBar();
 
@@ -60,7 +84,7 @@ void printFlakeInfo(Flake & flake, bool json) {
         std::cout << "URI:         " << flake.resolvedRef.to_string() << "\n";
         std::cout << "Description: " << flake.description << "\n";
         if (flake.resolvedRef.ref)
-            std::cout << "Branch:      " << *flake.resolvedRef.ref;
+            std::cout << "Branch:      " << *flake.resolvedRef.ref << "\n";
         if (flake.resolvedRef.rev)
             std::cout << "Revision:    " << flake.resolvedRef.rev->to_string(Base16, false) << "\n";
         if (flake.revCount)
@@ -95,7 +119,7 @@ void printNonFlakeInfo(NonFlake & nonFlake, bool json) {
     }
 }
 
-struct CmdFlakeDeps : FlakeCommand, MixJSON, StoreCommand, MixEvalArgs
+struct CmdFlakeDeps : FlakeCommand, MixJSON
 {
     std::string name() override
     {
@@ -109,12 +133,10 @@ struct CmdFlakeDeps : FlakeCommand, MixJSON, StoreCommand, MixEvalArgs
 
     void run(nix::ref<nix::Store> store) override
     {
-        auto evalState = std::make_shared<EvalState>(searchPath, store);
+        auto evalState = getEvalState();
         evalState->addRegistryOverrides(registryOverrides);
 
-        FlakeRef flakeRef(flakeUri);
-
-        ResolvedFlake resFlake = resolveFlake(*evalState, flakeRef, UpdateLockFile);
+        ResolvedFlake resFlake = resolveFlake(*evalState, getFlakeRef(), UpdateLockFile);
 
         std::queue<ResolvedFlake> todo;
         todo.push(resFlake);
@@ -132,7 +154,7 @@ struct CmdFlakeDeps : FlakeCommand, MixJSON, StoreCommand, MixEvalArgs
     }
 };
 
-struct CmdFlakeUpdate : StoreCommand, FlakeCommand, MixEvalArgs
+struct CmdFlakeUpdate : FlakeCommand
 {
     std::string name() override
     {
@@ -146,14 +168,18 @@ struct CmdFlakeUpdate : StoreCommand, FlakeCommand, MixEvalArgs
 
     void run(nix::ref<nix::Store> store) override
     {
-        auto evalState = std::make_shared<EvalState>(searchPath, store);
+        auto evalState = getEvalState();
 
-        bool recreateLockFile = true;
-        updateLockFile(*evalState, flakeUri, recreateLockFile);
+        auto flakeRef = getFlakeRef();
+
+        if (std::get_if<FlakeRef::IsPath>(&flakeRef.data))
+            updateLockFile(*evalState, flakeRef, true);
+        else
+            throw Error("cannot update lockfile of flake '%s'", flakeRef);
     }
 };
 
-struct CmdFlakeInfo : FlakeCommand, MixJSON, MixEvalArgs, StoreCommand
+struct CmdFlakeInfo : FlakeCommand, MixJSON
 {
     std::string name() override
     {
@@ -169,8 +195,7 @@ struct CmdFlakeInfo : FlakeCommand, MixJSON, MixEvalArgs, StoreCommand
 
     void run(nix::ref<nix::Store> store) override
     {
-        auto evalState = std::make_shared<EvalState>(searchPath, store);
-        Flake flake = getFlake(*evalState, FlakeRef(flakeUri), true);
+        auto flake = getFlake();
         printFlakeInfo(flake, json);
     }
 };
@@ -235,7 +260,7 @@ struct CmdFlakeRemove : virtual Args, MixEvalArgs, Command
     }
 };
 
-struct CmdFlakePin : virtual Args, StoreCommand, MixEvalArgs
+struct CmdFlakePin : virtual Args, EvalCommand
 {
     FlakeUri alias;
 
@@ -256,7 +281,7 @@ struct CmdFlakePin : virtual Args, StoreCommand, MixEvalArgs
 
     void run(nix::ref<nix::Store> store) override
     {
-        auto evalState = std::make_shared<EvalState>(searchPath, store);
+        auto evalState = getEvalState();
 
         Path userRegistryPath = getUserRegistryPath();
         FlakeRegistry userRegistry = *readRegistry(userRegistryPath);
@@ -307,7 +332,7 @@ struct CmdFlakeInit : virtual Args, Command
     }
 };
 
-struct CmdFlakeClone : StoreCommand, FlakeCommand, MixEvalArgs
+struct CmdFlakeClone : FlakeCommand
 {
     Path endDirectory = "";
 
@@ -328,10 +353,10 @@ struct CmdFlakeClone : StoreCommand, FlakeCommand, MixEvalArgs
 
     void run(nix::ref<nix::Store> store) override
     {
-        auto evalState = std::make_shared<EvalState>(searchPath, store);
+        auto evalState = getEvalState();
 
         Registries registries = evalState->getFlakeRegistries();
-        gitCloneFlake(flakeUri, *evalState, registries, endDirectory);
+        gitCloneFlake(getFlakeRef().to_string(), *evalState, registries, endDirectory);
     }
 };
 

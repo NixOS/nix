@@ -35,26 +35,6 @@ struct Buildable
 
 typedef std::vector<Buildable> Buildables;
 
-struct GitRepoCommand : virtual Args
-{
-    std::string gitPath = absPath(".");
-
-    GitRepoCommand ()
-    {
-        expectArg("git-path", &gitPath, true);
-    }
-};
-
-struct FlakeCommand : virtual Args
-{
-    std::string flakeUri;
-
-    FlakeCommand()
-    {
-        expectArg("flake-uri", &flakeUri);
-    }
-};
-
 struct Installable
 {
     virtual std::string what() = 0;
@@ -72,7 +52,16 @@ struct Installable
     }
 };
 
-struct SourceExprCommand : virtual Args, StoreCommand, MixEvalArgs
+struct EvalCommand : virtual StoreCommand, MixEvalArgs
+{
+    ref<EvalState> getEvalState();
+
+private:
+
+    std::shared_ptr<EvalState> evalState;
+};
+
+struct SourceExprCommand : virtual Args, EvalCommand
 {
     std::optional<Path> file;
 
@@ -84,8 +73,6 @@ struct SourceExprCommand : virtual Args, StoreCommand, MixEvalArgs
 
     bool noRegistries = false;
 
-    ref<EvalState> getEvalState();
-
     std::vector<std::shared_ptr<Installable>> parseInstallables(
         ref<Store> store, std::vector<std::string> ss);
 
@@ -96,10 +83,6 @@ struct SourceExprCommand : virtual Args, StoreCommand, MixEvalArgs
     {
         return {"defaultPackage"};
     }
-
-private:
-
-    std::shared_ptr<EvalState> evalState;
 };
 
 enum RealiseMode { Build, NoBuild, DryRun };
