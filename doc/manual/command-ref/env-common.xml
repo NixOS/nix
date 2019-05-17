@@ -14,7 +14,8 @@
 <varlistentry><term><envar>IN_NIX_SHELL</envar></term>
 
   <listitem><para>Indicator that tells if the current environment was set up by
-  <command>nix-shell</command>.</para></listitem>
+  <command>nix-shell</command>.  Since Nix 2.0 the values are
+  <literal>"pure"</literal> and <literal>"impure"</literal></para></listitem>
 
 </varlistentry>
 
