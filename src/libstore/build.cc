@@ -38,6 +38,7 @@
 #include <unistd.h>
 #include <errno.h>
 #include <cstring>
+#include <termios.h>
 
 #include <pwd.h>
 #include <grp.h>
@@ -1558,8 +1559,8 @@ void DerivationGoal::buildDone()
     if (hook) {
         hook->builderOut.readSide = -1;
         hook->fromHook.readSide = -1;
-    }
-    else builderOut.readSide = -1;
+    } else
+        builderOut.readSide = -1;
 
     /* Close the log file. */
     closeLogFile();
@@ -2181,7 +2182,43 @@ void DerivationGoal::startBuilder()
     Path logFile = openLogFile();
 
     /* Create a pipe to get the output of the builder. */
-    builderOut.create();
+    //builderOut.create();
+
+    builderOut.readSide = posix_openpt(O_RDWR | O_NOCTTY);
+    if (!builderOut.readSide)
+        throw SysError("opening pseudoterminal master");
+
+    std::string slaveName(ptsname(builderOut.readSide.get()));
+
+    if (chmod(slaveName.c_str(), 0600))
+        throw SysError("changing mode of pseudoterminal slave");
+
+    if (buildUser && chown(slaveName.c_str(), buildUser->getUID(), 0))
+        throw SysError("changing owner of pseudoterminal slave");
+
+    #if 0
+    // Mount the pt in the sandbox so that the "tty" command works.
+    // FIXME: this doesn't work with the new devpts in the sandbox.
+    if (useChroot)
+        dirsInChroot[slaveName] = {slaveName, false};
+    #endif
+
+    if (unlockpt(builderOut.readSide.get()))
+        throw SysError("unlocking pseudoterminal");
+
+    builderOut.writeSide = open(slaveName.c_str(), O_RDWR | O_NOCTTY);
+    if (!builderOut.writeSide)
+        throw SysError("opening pseudoterminal slave");
+
+    // Put the pt into raw mode to prevent \n -> \r\n translation.
+    struct termios term;
+    if (tcgetattr(builderOut.writeSide.get(), &term))
+        throw SysError("getting pseudoterminal attributes");
+
+    cfmakeraw(&term);
+
+    if (tcsetattr(builderOut.writeSide.get(), TCSANOW, &term))
+        throw SysError("putting pseudoterminal into raw mode");
 
     result.startTime = time(0);
 
@@ -4361,14 +4398,15 @@ void Worker::waitForInput()
         for (auto & k : fds2) {
             if (FD_ISSET(k, &fds)) {
                 ssize_t rd = read(k, buffer.data(), buffer.size());
-                if (rd == -1) {
-                    if (errno != EINTR)
-                        throw SysError(format("reading from %1%")
-                            % goal->getName());
-                } else if (rd == 0) {
+                // FIXME: is there a cleaner way to handle pt close
+                // than EIO? Is this even standard?
+                if (rd == 0 || (rd == -1 && errno == EIO)) {
                     debug(format("%1%: got EOF") % goal->getName());
                     goal->handleEOF(k);
                     j->fds.erase(k);
+                } else if (rd == -1) {
+                    if (errno != EINTR)
+                        throw SysError("%s: read failed", goal->getName());
                 } else {
                     printMsg(lvlVomit, format("%1%: read %2% bytes")
                         % goal->getName() % rd);
