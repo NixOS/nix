@@ -127,7 +127,28 @@ define build-library
     $$($(1)_PATH): $$($(1)_OBJS) | $$(_d)/
 	$(trace-ar) $(AR) crs $$@ $$?
 
-    $(1)_LDFLAGS_USE += -Wl,--whole-archive $$($(1)_PATH) -Wl,--no-whole-archive $$($(1)_LDFLAGS)
+    # Special care is needed to support C++ global initializers, used
+    # in RegisterStoreImplementation. The .init section needs to be in
+    # the linked executable for it find the registered stores. On
+    # Linux systems systems, wrap the linked object archive with whole
+    # archive flags. Note that --whole-archive is only supported with
+    # the bfd, gold, and lld linkers. The macOS ld64 linker has a
+    # -force_load that seems to work similarly, but takes one argument
+    # instead of a group of arguments.
+
+    ifeq ($(OS), Linux)
+      $(1)_LDFLAGS_USE += -Wl,--whole-archive
+    else ifeq ($(OS), Darwin)
+      $(1)_LDFLAGS_USE += -Wl,-force_load
+    endif
+
+    $(1)_LDFLAGS_USE += $$($(1)_PATH)
+
+    ifeq ($(OS), Linux)
+      $(1)_LDFLAGS_USE += -Wl,--no-whole-archive
+    endif
+
+    $(1)_LDFLAGS_USE += $$($(1)_LDFLAGS)
 
     $(1)_INSTALL_PATH := $$(libdir)/$$($(1)_NAME).a
 
