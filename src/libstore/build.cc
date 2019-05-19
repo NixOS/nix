@@ -2443,6 +2443,9 @@ void DerivationGoal::initEnv()
        may change that in the future. So tell the builder which file
        descriptor to use for that. */
     env["NIX_LOG_FD"] = "2";
+
+    /* Trigger colored output in various tools. */
+    env["TERM"] = "xterm-256color";
 }
 
 
