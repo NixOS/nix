@@ -465,31 +465,35 @@ ResolvedFlake resolveFlakeFromLockFile(EvalState & state, const FlakeRef & flake
 ResolvedFlake resolveFlake(EvalState & state, const FlakeRef & topRef, HandleLockFile handleLockFile)
 {
     Flake flake = getFlake(state, topRef, allowedToUseRegistries(handleLockFile, true));
-    LockFile lockFile;
+    LockFile oldLockFile;
 
     if (!recreateLockFile (handleLockFile)) {
         // If recreateLockFile, start with an empty lockfile
-        lockFile = readLockFile(flake.storePath + "/flake.lock"); // FIXME: symlink attack
+        oldLockFile = readLockFile(flake.storePath + "/flake.lock"); // FIXME: symlink attack
     }
+
+    LockFile lockFile(oldLockFile);
 
     ResolvedFlake resFlake = resolveFlakeFromLockFile(state, topRef, handleLockFile, lockFile, true);
     lockFile = entryToLockFile(dependenciesToFlakeEntry(resFlake));
 
-    if (allowedToWrite(handleLockFile)) {
-        if (auto refData = std::get_if<FlakeRef::IsPath>(&topRef.data)) {
-            writeLockFile(lockFile, refData->path + (topRef.subdir == "" ? "" : "/" + topRef.subdir) + "/flake.lock");
+    if (!(lockFile == oldLockFile)) {
+        if (allowedToWrite(handleLockFile)) {
+            if (auto refData = std::get_if<FlakeRef::IsPath>(&topRef.data)) {
+                writeLockFile(lockFile, refData->path + (topRef.subdir == "" ? "" : "/" + topRef.subdir) + "/flake.lock");
 
-            // Hack: Make sure that flake.lock is visible to Git, so it ends up in the Nix store.
-            runProgram("git", true, { "-C", refData->path, "add",
-                      (topRef.subdir == "" ? "" : topRef.subdir + "/") + "flake.lock" });
-        } else std::cout << "Cannot write lockfile because the FlakeRef isn't of the form IsPath." << std::endl;
-    } else if (handleLockFile != AllPure && handleLockFile != TopRefUsesRegistries)
-        std::cout << "Using updating lockfile without writing it to file" << std::endl;
+                // Hack: Make sure that flake.lock is visible to Git, so it ends up in the Nix store.
+                runProgram("git", true, { "-C", refData->path, "add",
+                                          (topRef.subdir == "" ? "" : topRef.subdir + "/") + "flake.lock" });
+            } else std::cout << "Cannot write lockfile because the FlakeRef isn't of the form IsPath." << std::endl;
+        } else if (handleLockFile != AllPure && handleLockFile != TopRefUsesRegistries)
+            std::cout << "Using updating lockfile without writing it to file" << std::endl;
+    }
 
     return resFlake;
 }
 
-void updateLockFile (EvalState & state, const FlakeUri & flakeUri, bool recreateLockFile)
+void updateLockFile(EvalState & state, const FlakeUri & flakeUri, bool recreateLockFile)
 {
     FlakeRef flakeRef(flakeUri);
     resolveFlake(state, flakeRef, recreateLockFile ? RecreateLockFile : UpdateLockFile);

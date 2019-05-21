@@ -24,6 +24,11 @@ struct LockFile
         FlakeRef ref;
         Hash contentHash;
         NonFlakeEntry(const FlakeRef & flakeRef, const Hash & hash) : ref(flakeRef), contentHash(hash) {};
+
+        bool operator ==(const NonFlakeEntry & other) const
+        {
+            return ref == other.ref && contentHash == other.contentHash;
+        }
     };
 
     struct FlakeEntry
@@ -33,10 +38,26 @@ struct LockFile
         std::map<FlakeRef, FlakeEntry> flakeEntries;
         std::map<FlakeAlias, NonFlakeEntry> nonFlakeEntries;
         FlakeEntry(const FlakeRef & flakeRef, const Hash & hash) : ref(flakeRef), contentHash(hash) {};
+
+        bool operator ==(const FlakeEntry & other) const
+        {
+            return
+                ref == other.ref
+                && contentHash == other.contentHash
+                && flakeEntries == other.flakeEntries
+                && nonFlakeEntries == other.nonFlakeEntries;
+        }
     };
 
     std::map<FlakeRef, FlakeEntry> flakeEntries;
     std::map<FlakeAlias, NonFlakeEntry> nonFlakeEntries;
+
+    bool operator ==(const LockFile & other) const
+    {
+        return
+            flakeEntries == other.flakeEntries
+            && nonFlakeEntries == other.nonFlakeEntries;
+    }
 };
 
 typedef std::vector<std::shared_ptr<FlakeRegistry>> Registries;
