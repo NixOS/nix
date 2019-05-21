@@ -76,9 +76,13 @@ struct SourceExprCommand : virtual Args, StoreCommand, MixEvalArgs
 {
     std::optional<Path> file;
 
-    bool updateLockFile = true;
-
     SourceExprCommand();
+
+    bool recreateLockFile = false;
+
+    bool saveLockFile = true;
+
+    bool noRegistries = false;
 
     ref<EvalState> getEvalState();
 

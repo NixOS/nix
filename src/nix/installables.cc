@@ -23,9 +23,19 @@ SourceExprCommand::SourceExprCommand()
         .dest(&file);
 
     mkFlag()
-        .longName("no-update")
-        .description("don't create/update flake lock files")
-        .set(&updateLockFile, false);
+        .longName("recreate-lock-file")
+        .description("recreate lock file from scratch")
+        .set(&recreateLockFile, true);
+
+    mkFlag()
+        .longName("dont-save-lock-file")
+        .description("save the newly generated lock file")
+        .set(&saveLockFile, false);
+
+    mkFlag()
+        .longName("no-registries")
+        .description("don't use flake registries")
+        .set(&noRegistries, true);
 }
 
 ref<EvalState> SourceExprCommand::getEvalState()
@@ -157,13 +167,13 @@ struct InstallableFlake : InstallableValue
 
     Value * toValue(EvalState & state) override
     {
-        auto path = std::get_if<FlakeRef::IsPath>(&flakeRef.data);
-        if (cmd.updateLockFile && path) {
-            updateLockFile(state, path->path);
-        }
-
         auto vFlake = state.allocValue();
-        makeFlakeValue(state, flakeRef, AllowRegistryAtTop, *vFlake);
+
+        HandleLockFile handle = cmd.noRegistries ? AllPure :
+            cmd.recreateLockFile ?
+            (cmd.saveLockFile ? RecreateLockFile : UseNewLockFile)
+            : (cmd.saveLockFile ? UpdateLockFile : UseUpdatedLockFile);
+        makeFlakeValue(state, flakeRef, handle, *vFlake);
 
         auto vProvides = (*vFlake->attrs->get(state.symbols.create("provides")))->value;
 

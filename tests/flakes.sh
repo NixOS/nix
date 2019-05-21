@@ -9,11 +9,11 @@ clearStore
 
 registry=$TEST_ROOT/registry.json
 
-flake1=$TEST_ROOT/flake1
-flake2=$TEST_ROOT/flake2
-flake3=$TEST_ROOT/flake3
+flake1Dir=$TEST_ROOT/flake1
+flake2Dir=$TEST_ROOT/flake2
+flake3Dir=$TEST_ROOT/flake3
 
-for repo in $flake1 $flake2 $flake3; do
+for repo in $flake1Dir $flake2Dir $flake3Dir; do
     rm -rf $repo
     mkdir $repo
     git -C $repo init
@@ -21,7 +21,7 @@ for repo in $flake1 $flake2 $flake3; do
     git -C $repo config user.name "Foobar"
 done
 
-cat > $flake1/flake.nix <<EOF
+cat > $flake1Dir/flake.nix <<EOF
 {
   name = "flake1";
 
@@ -36,11 +36,11 @@ cat > $flake1/flake.nix <<EOF
 }
 EOF
 
-cp ./simple.nix ./simple.builder.sh ./config.nix $flake1/
-git -C $flake1 add flake.nix simple.nix simple.builder.sh config.nix
-git -C $flake1 commit -m 'Initial'
+cp ./simple.nix ./simple.builder.sh ./config.nix $flake1Dir/
+git -C $flake1Dir add flake.nix simple.nix simple.builder.sh config.nix
+git -C $flake1Dir commit -m 'Initial'
 
-cat > $flake2/flake.nix <<EOF
+cat > $flake2Dir/flake.nix <<EOF
 {
   name = "flake2";
 
@@ -56,10 +56,10 @@ cat > $flake2/flake.nix <<EOF
 }
 EOF
 
-git -C $flake2 add flake.nix
-git -C $flake2 commit -m 'Initial'
+git -C $flake2Dir add flake.nix
+git -C $flake2Dir commit -m 'Initial'
 
-cat > $flake3/flake.nix <<EOF
+cat > $flake3Dir/flake.nix <<EOF
 {
   name = "flake3";
 
@@ -75,20 +75,20 @@ cat > $flake3/flake.nix <<EOF
 }
 EOF
 
-git -C $flake3 add flake.nix
-git -C $flake3 commit -m 'Initial'
+git -C $flake3Dir add flake.nix
+git -C $flake3Dir commit -m 'Initial'
 
 cat > $registry <<EOF
 {
     "flakes": {
         "flake1": {
-            "uri": "file://$flake1"
+            "uri": "file://$flake1Dir"
         },
         "flake2": {
-            "uri": "file://$flake2"
+            "uri": "file://$flake2Dir"
         },
         "flake3": {
-            "uri": "file://$flake3"
+            "uri": "file://$flake3Dir"
         },
         "nixpkgs": {
             "uri": "flake1"
@@ -118,26 +118,54 @@ nix build -o $TEST_ROOT/result --flake-registry $registry flake1:
 [[ -e $TEST_ROOT/result/hello ]]
 
 # Building a flake with an unlocked dependency should fail in pure mode.
-(! nix build -o $TEST_ROOT/result --flake-registry $registry flake2:bar)
+(! nix eval "(builtins.getFlake "$flake2Dir")")
 
 # But should succeed in impure mode.
-# FIXME: this currently fails.
-#nix build -o $TEST_ROOT/result --flake-registry $registry flake2:bar --impure
+nix build -o $TEST_ROOT/result --flake-registry $registry flake2:bar --impure
 
 # Test automatic lock file generation.
-nix build -o $TEST_ROOT/result --flake-registry $registry $flake2:bar
-[[ -e $flake2/flake.lock ]]
-git -C $flake2 commit flake.lock -m 'Add flake.lock'
+nix build -o $TEST_ROOT/result --flake-registry $registry $flake2Dir:bar
+[[ -e $flake2Dir/flake.lock ]]
+git -C $flake2Dir commit flake.lock -m 'Add flake.lock'
 
 # Rerunning the build should not change the lockfile.
-#nix build -o $TEST_ROOT/result --flake-registry $registry $flake2:bar
-#[[ -z $(git -C $flake2 diff) ]]
+nix build -o $TEST_ROOT/result --flake-registry $registry $flake2Dir:bar
+[[ -z $(git -C $flake2Dir diff master) ]]
 
 # Now we should be able to build the flake in pure mode.
 nix build -o $TEST_ROOT/result --flake-registry $registry flake2:bar
 
 # Or without a registry.
-nix build -o $TEST_ROOT/result file://$flake2:bar
+nix build -o $TEST_ROOT/result file://$flake2Dir:bar
 
 # Test whether indirect dependencies work.
-#nix build -o $TEST_ROOT/result --flake-registry $registry $flake3:xyzzy
+nix build -o $TEST_ROOT/result --flake-registry $registry $flake3Dir:xyzzy
+
+# Add dependency to flake3
+rm $flake3Dir/flake.nix
+
+cat > $flake3Dir/flake.nix <<EOF
+{
+  name = "flake3";
+
+  epoch = 2019;
+
+  requires = [ "flake1" "flake2" ];
+
+  description = "Fnord";
+
+  provides = deps: rec {
+    packages.xyzzy = deps.flake2.provides.packages.bar;
+    packages.sth = deps.flake1.provides.packages.foo;
+  };
+}
+EOF
+
+git -C $flake3Dir add flake.nix
+git -C $flake3Dir commit -m 'Update flake.nix'
+
+# Check whether `nix build` works with an incomplete lockfile
+nix build -o $TEST_ROOT/result --flake-registry $registry $flake3Dir:sth
+
+# Check whether it saved the lockfile
+[[ ! (-z $(git -C $flake3Dir diff master)) ]]
