@@ -70,7 +70,7 @@ struct CmdFlakeList : EvalCommand
     }
 };
 
-void printFlakeInfo(Flake & flake, bool json) {
+void printFlakeInfo(const Flake & flake, bool json) {
     if (json) {
         nlohmann::json j;
         j["id"] = flake.id;
@@ -98,7 +98,7 @@ void printFlakeInfo(Flake & flake, bool json) {
     }
 }
 
-void printNonFlakeInfo(NonFlake & nonFlake, bool json) {
+void printNonFlakeInfo(const NonFlake & nonFlake, bool json) {
     if (json) {
         nlohmann::json j;
         j["id"] = nonFlake.alias;
@@ -142,20 +142,20 @@ struct CmdFlakeDeps : FlakeCommand, MixJSON
         auto evalState = getEvalState();
         evalState->addRegistryOverrides(registryOverrides);
 
-        auto resFlake = resolveFlake();
-
         std::queue<ResolvedFlake> todo;
-        todo.push(resFlake);
+        todo.push(resolveFlake());
 
         while (!todo.empty()) {
-            resFlake = todo.front();
+            auto resFlake = std::move(todo.front());
             todo.pop();
 
-            for (NonFlake & nonFlake : resFlake.nonFlakeDeps)
+            for (auto & nonFlake : resFlake.nonFlakeDeps)
                 printNonFlakeInfo(nonFlake, json);
 
-            for (auto info : resFlake.flakeDeps)
+            for (auto & info : resFlake.flakeDeps) {
+                printFlakeInfo(info.second.flake, json);
                 todo.push(info.second);
+            }
         }
     }
 };
