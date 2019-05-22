@@ -120,8 +120,6 @@ struct NonFlake
         resolvedRef(sourceInfo.resolvedRef), revCount(sourceInfo.revCount), storePath(sourceInfo.storePath) {};
 };
 
-std::shared_ptr<FlakeRegistry> getGlobalRegistry();
-
 Flake getFlake(EvalState &, const FlakeRef &, bool impureIsAllowed);
 
 struct ResolvedFlake

@@ -131,9 +131,19 @@ void writeLockFile(const LockFile & lockFile, const Path & path)
     writeFile(path, json.dump(4) + "\n"); // '4' = indentation in json file
 }
 
-std::shared_ptr<FlakeRegistry> getGlobalRegistry()
+std::shared_ptr<FlakeRegistry> EvalState::getGlobalFlakeRegistry()
 {
-    return readRegistry(evalSettings.flakeRegistry);
+    std::call_once(_globalFlakeRegistryInit, [&]() {
+        auto path = evalSettings.flakeRegistry;
+
+        if (!hasPrefix(path, "/"))
+            path = getDownloader()->downloadCached(store,
+                evalSettings.flakeRegistry, false, "registry").path;
+
+        _globalFlakeRegistry = readRegistry(path);
+    });
+
+    return _globalFlakeRegistry;
 }
 
 Path getUserRegistryPath()
@@ -162,7 +172,7 @@ const Registries EvalState::getFlakeRegistries()
     Registries registries;
     registries.push_back(getFlagRegistry(registryOverrides));
     registries.push_back(getUserRegistry());
-    registries.push_back(getGlobalRegistry());
+    registries.push_back(getGlobalFlakeRegistry());
     return registries;
 }
 

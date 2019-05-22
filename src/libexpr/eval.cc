@@ -1978,14 +1978,6 @@ std::ostream & operator << (std::ostream & str, const ExternalValueBase & v) {
 
 EvalSettings evalSettings;
 
-EvalSettings::EvalSettings()
-{
-    if (flakeRegistry == "")
-        // FIXME: static initialization order fiasco. But this will go
-        // away when we switch to an online registry.
-        flakeRegistry = settings.nixDataDir + "/nix/flake-registry.json";
-}
-
 static GlobalConfig::Register r1(&evalSettings);
 
 
