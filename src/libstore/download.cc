@@ -913,6 +913,9 @@ CachedDownloadResult Downloader::downloadCached(
             url, request.expectedHash.to_string(), gotHash.to_string());
     }
 
+    if (request.gcRoot)
+        store->addIndirectRoot(fileLink);
+
     result.storePath = storePath;
     result.path = store->toRealPath(storePath);
     return result;

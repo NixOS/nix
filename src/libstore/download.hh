@@ -48,6 +48,7 @@ struct CachedDownloadRequest
     std::string name;
     Hash expectedHash;
     unsigned int ttl = settings.tarballTtl;
+    bool gcRoot = false;
 
     CachedDownloadRequest(const std::string & uri)
         : uri(uri) { }

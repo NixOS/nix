@@ -139,6 +139,7 @@ std::shared_ptr<FlakeRegistry> EvalState::getGlobalFlakeRegistry()
         if (!hasPrefix(path, "/")) {
             CachedDownloadRequest request(evalSettings.flakeRegistry);
             request.name = "flake-registry.json";
+            request.gcRoot = true;
             path = getDownloader()->downloadCached(store, request).path;
         }
 
