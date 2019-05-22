@@ -86,10 +86,12 @@ static void update(const StringSet & channelNames)
         // We want to download the url to a file to see if it's a tarball while also checking if we
         // got redirected in the process, so that we can grab the various parts of a nix channel
         // definition from a consistent location if the redirect changes mid-download.
-        std::string effectiveUrl;
+        CachedDownloadRequest request(url);
+        request.ttl = 0;
         auto dl = getDownloader();
-        auto filename = dl->downloadCached(store, url, false, "", Hash(), &effectiveUrl, 0).path;
-        url = chomp(std::move(effectiveUrl));
+        auto result = dl->downloadCached(store, request);
+        auto filename = result.path;
+        url = chomp(result.effectiveUri);
 
         // If the URL contains a version number, append it to the name
         // attribute (so that "nix-env -q" on the channels profile
@@ -121,12 +123,10 @@ static void update(const StringSet & channelNames)
             }
 
             // Download the channel tarball.
-            auto fullURL = url + "/nixexprs.tar.xz";
             try {
-                filename = dl->downloadCached(store, fullURL, false).path;
+                filename = dl->downloadCached(store, CachedDownloadRequest(url + "/nixexprs.tar.xz")).path;
             } catch (DownloadError & e) {
-                fullURL = url + "/nixexprs.tar.bz2";
-                filename = dl->downloadCached(store, fullURL, false).path;
+                filename = dl->downloadCached(store, CachedDownloadRequest(url + "/nixexprs.tar.bz2")).path;
             }
             chomp(filename);
         }

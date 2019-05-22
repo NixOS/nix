@@ -136,9 +136,11 @@ std::shared_ptr<FlakeRegistry> EvalState::getGlobalFlakeRegistry()
     std::call_once(_globalFlakeRegistryInit, [&]() {
         auto path = evalSettings.flakeRegistry;
 
-        if (!hasPrefix(path, "/"))
-            path = getDownloader()->downloadCached(store,
-                evalSettings.flakeRegistry, false, "registry").path;
+        if (!hasPrefix(path, "/")) {
+            CachedDownloadRequest request(evalSettings.flakeRegistry);
+            request.name = "flake-registry.json";
+            path = getDownloader()->downloadCached(store, request).path;
+        }
 
         _globalFlakeRegistry = readRegistry(path);
     });
@@ -244,8 +246,11 @@ static SourceInfo fetchFlake(EvalState & state, const FlakeRef & flakeRef, bool 
         if (accessToken != "")
             url += "?access_token=" + accessToken;
 
-        auto result = getDownloader()->downloadCached(state.store, url, true, "source",
-            Hash(), nullptr, resolvedRef.rev ? 1000000000 : settings.tarballTtl);
+        CachedDownloadRequest request(url);
+        request.unpack = true;
+        request.name = "source";
+        request.ttl = resolvedRef.rev ? 1000000000 : settings.tarballTtl;
+        auto result = getDownloader()->downloadCached(state.store, request);
 
         if (!result.etag)
             throw Error("did not receive an ETag header from '%s'", url);
