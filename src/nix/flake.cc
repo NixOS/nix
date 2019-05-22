@@ -10,7 +10,38 @@
 
 using namespace nix;
 
-struct CmdFlakeList : StoreCommand, MixEvalArgs
+class FlakeCommand : virtual Args, public EvalCommand, public MixFlakeOptions
+{
+    std::string flakeUri = ".";
+
+public:
+
+    FlakeCommand()
+    {
+        expectArg("flake-uri", &flakeUri, true);
+    }
+
+    FlakeRef getFlakeRef()
+    {
+        if (flakeUri.find('/') != std::string::npos || flakeUri == ".")
+            return FlakeRef(flakeUri, true);
+        else
+            return FlakeRef(flakeUri);
+    }
+
+    Flake getFlake()
+    {
+        auto evalState = getEvalState();
+        return nix::getFlake(*evalState, getFlakeRef(), useRegistries);
+    }
+
+    ResolvedFlake resolveFlake()
+    {
+        return nix::resolveFlake(*getEvalState(), getFlakeRef(), getLockFileMode());
+    }
+};
+
+struct CmdFlakeList : EvalCommand
 {
     std::string name() override
     {
@@ -24,9 +55,7 @@ struct CmdFlakeList : StoreCommand, MixEvalArgs
 
     void run(nix::ref<nix::Store> store) override
     {
-        auto evalState = std::make_shared<EvalState>(searchPath, store);
-
-        auto registries = evalState->getFlakeRegistries();
+        auto registries = getEvalState()->getFlakeRegistries();
 
         stopProgressBar();
 
@@ -41,7 +70,7 @@ struct CmdFlakeList : StoreCommand, MixEvalArgs
     }
 };
 
-void printFlakeInfo(Flake & flake, bool json) {
+void printFlakeInfo(const Flake & flake, bool json) {
     if (json) {
         nlohmann::json j;
         j["id"] = flake.id;
@@ -60,7 +89,7 @@ void printFlakeInfo(Flake & flake, bool json) {
         std::cout << "URI:         " << flake.resolvedRef.to_string() << "\n";
         std::cout << "Description: " << flake.description << "\n";
         if (flake.resolvedRef.ref)
-            std::cout << "Branch:      " << *flake.resolvedRef.ref;
+            std::cout << "Branch:      " << *flake.resolvedRef.ref << "\n";
         if (flake.resolvedRef.rev)
             std::cout << "Revision:    " << flake.resolvedRef.rev->to_string(Base16, false) << "\n";
         if (flake.revCount)
@@ -69,7 +98,7 @@ void printFlakeInfo(Flake & flake, bool json) {
     }
 }
 
-void printNonFlakeInfo(NonFlake & nonFlake, bool json) {
+void printNonFlakeInfo(const NonFlake & nonFlake, bool json) {
     if (json) {
         nlohmann::json j;
         j["id"] = nonFlake.alias;
@@ -95,7 +124,8 @@ void printNonFlakeInfo(NonFlake & nonFlake, bool json) {
     }
 }
 
-struct CmdFlakeDeps : FlakeCommand, MixJSON, StoreCommand, MixEvalArgs
+// FIXME: merge info CmdFlakeInfo?
+struct CmdFlakeDeps : FlakeCommand, MixJSON
 {
     std::string name() override
     {
@@ -109,30 +139,28 @@ struct CmdFlakeDeps : FlakeCommand, MixJSON, StoreCommand, MixEvalArgs
 
     void run(nix::ref<nix::Store> store) override
     {
-        auto evalState = std::make_shared<EvalState>(searchPath, store);
+        auto evalState = getEvalState();
         evalState->addRegistryOverrides(registryOverrides);
 
-        FlakeRef flakeRef(flakeUri);
-
-        ResolvedFlake resFlake = resolveFlake(*evalState, flakeRef, UpdateLockFile);
-
         std::queue<ResolvedFlake> todo;
-        todo.push(resFlake);
+        todo.push(resolveFlake());
 
         while (!todo.empty()) {
-            resFlake = todo.front();
+            auto resFlake = std::move(todo.front());
             todo.pop();
 
-            for (NonFlake & nonFlake : resFlake.nonFlakeDeps)
+            for (auto & nonFlake : resFlake.nonFlakeDeps)
                 printNonFlakeInfo(nonFlake, json);
 
-            for (auto info : resFlake.flakeDeps)
+            for (auto & info : resFlake.flakeDeps) {
+                printFlakeInfo(info.second.flake, json);
                 todo.push(info.second);
+            }
         }
     }
 };
 
-struct CmdFlakeUpdate : StoreCommand, FlakeCommand, MixEvalArgs
+struct CmdFlakeUpdate : FlakeCommand
 {
     std::string name() override
     {
@@ -146,14 +174,18 @@ struct CmdFlakeUpdate : StoreCommand, FlakeCommand, MixEvalArgs
 
     void run(nix::ref<nix::Store> store) override
     {
-        auto evalState = std::make_shared<EvalState>(searchPath, store);
+        auto evalState = getEvalState();
 
-        bool recreateLockFile = true;
-        updateLockFile(*evalState, flakeUri, recreateLockFile);
+        auto flakeRef = getFlakeRef();
+
+        if (std::get_if<FlakeRef::IsPath>(&flakeRef.data))
+            updateLockFile(*evalState, flakeRef, true);
+        else
+            throw Error("cannot update lockfile of flake '%s'", flakeRef);
     }
 };
 
-struct CmdFlakeInfo : FlakeCommand, MixJSON, MixEvalArgs, StoreCommand
+struct CmdFlakeInfo : FlakeCommand, MixJSON
 {
     std::string name() override
     {
@@ -169,8 +201,7 @@ struct CmdFlakeInfo : FlakeCommand, MixJSON, MixEvalArgs, StoreCommand
 
     void run(nix::ref<nix::Store> store) override
     {
-        auto evalState = std::make_shared<EvalState>(searchPath, store);
-        Flake flake = getFlake(*evalState, FlakeRef(flakeUri), true);
+        auto flake = getFlake();
         printFlakeInfo(flake, json);
     }
 };
@@ -235,7 +266,7 @@ struct CmdFlakeRemove : virtual Args, MixEvalArgs, Command
     }
 };
 
-struct CmdFlakePin : virtual Args, StoreCommand, MixEvalArgs
+struct CmdFlakePin : virtual Args, EvalCommand
 {
     FlakeUri alias;
 
@@ -256,7 +287,7 @@ struct CmdFlakePin : virtual Args, StoreCommand, MixEvalArgs
 
     void run(nix::ref<nix::Store> store) override
     {
-        auto evalState = std::make_shared<EvalState>(searchPath, store);
+        auto evalState = getEvalState();
 
         Path userRegistryPath = getUserRegistryPath();
         FlakeRegistry userRegistry = *readRegistry(userRegistryPath);
@@ -307,9 +338,9 @@ struct CmdFlakeInit : virtual Args, Command
     }
 };
 
-struct CmdFlakeClone : StoreCommand, FlakeCommand, MixEvalArgs
+struct CmdFlakeClone : FlakeCommand
 {
-    Path endDirectory = "";
+    Path destDir;
 
     std::string name() override
     {
@@ -323,15 +354,15 @@ struct CmdFlakeClone : StoreCommand, FlakeCommand, MixEvalArgs
 
     CmdFlakeClone()
     {
-        expectArg("end-dir", &endDirectory, true);
+        expectArg("dest-dir", &destDir, true);
     }
 
     void run(nix::ref<nix::Store> store) override
     {
-        auto evalState = std::make_shared<EvalState>(searchPath, store);
+        auto evalState = getEvalState();
 
         Registries registries = evalState->getFlakeRegistries();
-        gitCloneFlake(flakeUri, *evalState, registries, endDirectory);
+        gitCloneFlake(getFlakeRef().to_string(), *evalState, registries, destDir);
     }
 };
 

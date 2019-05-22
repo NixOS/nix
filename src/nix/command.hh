@@ -11,8 +11,8 @@ extern std::string programPath;
 struct Value;
 class Bindings;
 class EvalState;
-
 class Store;
+enum HandleLockFile : unsigned int;
 
 /* A command that require a Nix store. */
 struct StoreCommand : virtual Command
@@ -35,26 +35,6 @@ struct Buildable
 
 typedef std::vector<Buildable> Buildables;
 
-struct GitRepoCommand : virtual Args
-{
-    std::string gitPath = absPath(".");
-
-    GitRepoCommand ()
-    {
-        expectArg("git-path", &gitPath, true);
-    }
-};
-
-struct FlakeCommand : virtual Args
-{
-    std::string flakeUri;
-
-    FlakeCommand()
-    {
-        expectArg("flake-uri", &flakeUri);
-    }
-};
-
 struct Installable
 {
     virtual std::string what() = 0;
@@ -72,19 +52,33 @@ struct Installable
     }
 };
 
-struct SourceExprCommand : virtual Args, StoreCommand, MixEvalArgs
+struct EvalCommand : virtual StoreCommand, MixEvalArgs
 {
-    std::optional<Path> file;
+    ref<EvalState> getEvalState();
 
-    SourceExprCommand();
+private:
 
+    std::shared_ptr<EvalState> evalState;
+};
+
+struct MixFlakeOptions : virtual Args
+{
     bool recreateLockFile = false;
 
     bool saveLockFile = true;
 
-    bool noRegistries = false;
+    bool useRegistries = true;
 
-    ref<EvalState> getEvalState();
+    MixFlakeOptions();
+
+    HandleLockFile getLockFileMode();
+};
+
+struct SourceExprCommand : virtual Args, EvalCommand, MixFlakeOptions
+{
+    std::optional<Path> file;
+
+    SourceExprCommand();
 
     std::vector<std::shared_ptr<Installable>> parseInstallables(
         ref<Store> store, std::vector<std::string> ss);
@@ -96,10 +90,6 @@ struct SourceExprCommand : virtual Args, StoreCommand, MixEvalArgs
     {
         return {"defaultPackage"};
     }
-
-private:
-
-    std::shared_ptr<EvalState> evalState;
 };
 
 enum RealiseMode { Build, NoBuild, DryRun };

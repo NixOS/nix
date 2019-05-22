@@ -104,6 +104,11 @@ EOF
 # Test 'nix flake info'.
 nix flake info --flake-registry $registry flake1 | grep -q 'ID: *flake1'
 
+# Test 'nix flake info' on a local flake.
+(cd $flake1Dir && nix flake info) | grep -q 'ID: *flake1'
+(cd $flake1Dir && nix flake info .) | grep -q 'ID: *flake1'
+nix flake info $flake1Dir | grep -q 'ID: *flake1'
+
 # Test 'nix flake info --json'.
 json=$(nix flake info --flake-registry $registry flake1 --json | jq .)
 [[ $(echo "$json" | jq -r .description) = 'Bla bla' ]]

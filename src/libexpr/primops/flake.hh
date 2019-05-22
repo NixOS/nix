@@ -64,7 +64,7 @@ typedef std::vector<std::shared_ptr<FlakeRegistry>> Registries;
 
 Path getUserRegistryPath();
 
-enum HandleLockFile
+enum HandleLockFile : unsigned int
     { AllPure // Everything is handled 100% purely
     , TopRefUsesRegistries // The top FlakeRef uses the registries, apart from that, everything happens 100% purely
     , UpdateLockFile // Update the existing lockfile and write it to file
@@ -133,7 +133,8 @@ struct ResolvedFlake
 
 ResolvedFlake resolveFlake(EvalState &, const FlakeRef &, HandleLockFile);
 
-void updateLockFile(EvalState &, const FlakeUri &, bool recreateLockFile);
+void updateLockFile(EvalState &, const FlakeRef & flakeRef, bool recreateLockFile);
 
-void gitCloneFlake (std::string flakeUri, EvalState &, Registries, Path);
+void gitCloneFlake(FlakeRef flakeRef, EvalState &, Registries, const Path & destDir);
+
 }
