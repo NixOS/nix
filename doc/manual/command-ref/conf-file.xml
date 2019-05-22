@@ -864,6 +864,31 @@ requiredSystemFeatures = [ "kvm" ];
 
   </varlistentry>
 
+  <varlistentry xml:id="conf-tarball-ttl"><term><literal>tarball-ttl</literal></term>
+
+    <listitem>
+      <para>Default: <literal>3600</literal> seconds.</para>
+
+      <para>The number of seconds a downloaded tarball is considered
+      fresh. If the cached tarball is stale, Nix will check whether
+      it is still up to date using the ETag header. Nix will download
+      a new version if the ETag header is unsupported, or the
+      cached ETag doesn't match.
+      </para>
+
+      <para>Setting the TTL to <literal>0</literal> forces Nix to always
+      check if the tarball is up to date.</para>
+
+      <para>Nix caches tarballs in
+      <filename>$XDG_CACHE_HOME/nix/tarballs</filename>.</para>
+
+      <para>Files fetched via <envar>NIX_PATH</envar>,
+      <function>fetchGit</function>, <function>fetchMercurial</function>,
+      <function>fetchTarball</function>, and <function>fetchurl</function>
+      respect this TTL.
+      </para>
+    </listitem>
+  </varlistentry>
 
   <varlistentry xml:id="conf-timeout"><term><literal>timeout</literal></term>
 
