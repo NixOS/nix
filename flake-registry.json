@@ -4,7 +4,7 @@
             "uri": "github:edolstra/dwarffs/flake"
         },
         "nix": {
-            "uri": "github:tweag/nix/flakes"
+            "uri": "github:NixOS/nix/flakes"
         },
         "nixpkgs": {
             "uri": "github:edolstra/nixpkgs/release-19.03"
