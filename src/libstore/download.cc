@@ -293,10 +293,10 @@ struct CurlDownloader : public Downloader
             long httpStatus = 0;
             curl_easy_getinfo(req, CURLINFO_RESPONSE_CODE, &httpStatus);
 
-            char * effectiveUrlCStr;
-            curl_easy_getinfo(req, CURLINFO_EFFECTIVE_URL, &effectiveUrlCStr);
-            if (effectiveUrlCStr)
-                result.effectiveUrl = effectiveUrlCStr;
+            char * effectiveUriCStr;
+            curl_easy_getinfo(req, CURLINFO_EFFECTIVE_URL, &effectiveUriCStr);
+            if (effectiveUriCStr)
+                result.effectiveUri = effectiveUriCStr;
 
             debug("finished %s of '%s'; curl status = %d, HTTP status = %d, body = %d bytes",
                 request.verb(), request.uri, code, httpStatus, result.bodySize);
@@ -737,18 +737,20 @@ void Downloader::download(DownloadRequest && request, Sink & sink)
     }
 }
 
-CachedDownloadResult Downloader::downloadCached(ref<Store> store, const string & url_, bool unpack, string name, const Hash & expectedHash, string * effectiveUrl, int ttl)
+CachedDownloadResult Downloader::downloadCached(
+    ref<Store> store, const CachedDownloadRequest & request)
 {
-    auto url = resolveUri(url_);
+    auto url = resolveUri(request.uri);
 
+    auto name = request.name;
     if (name == "") {
         auto p = url.rfind('/');
         if (p != string::npos) name = string(url, p + 1);
     }
 
     Path expectedStorePath;
-    if (expectedHash) {
-        expectedStorePath = store->makeFixedOutputPath(unpack, expectedHash, name);
+    if (request.expectedHash) {
+        expectedStorePath = store->makeFixedOutputPath(request.unpack, request.expectedHash, name);
         if (store->isValidPath(expectedStorePath)) {
             CachedDownloadResult result;
             result.storePath = expectedStorePath;
@@ -782,10 +784,9 @@ CachedDownloadResult Downloader::downloadCached(ref<Store> store, const string &
             auto ss = tokenizeString<vector<string>>(readFile(dataFile), "\n");
             if (ss.size() >= 3 && ss[0] == url) {
                 time_t lastChecked;
-                if (string2Int(ss[2], lastChecked) && lastChecked + ttl >= time(0)) {
+                if (string2Int(ss[2], lastChecked) && lastChecked + request.ttl >= time(0)) {
                     skip = true;
-                    if (effectiveUrl)
-                        *effectiveUrl = url_;
+                    result.effectiveUri = request.uri;
                     result.etag = ss[1];
                 } else if (!ss[1].empty()) {
                     debug(format("verifying previous ETag '%1%'") % ss[1]);
@@ -799,18 +800,17 @@ CachedDownloadResult Downloader::downloadCached(ref<Store> store, const string &
     if (!skip) {
 
         try {
-            DownloadRequest request(url);
-            request.expectedETag = expectedETag;
-            auto res = download(request);
-            if (effectiveUrl)
-                *effectiveUrl = res.effectiveUrl;
+            DownloadRequest request2(url);
+            request2.expectedETag = expectedETag;
+            auto res = download(request2);
+            result.effectiveUri = res.effectiveUri;
             result.etag = res.etag;
 
             if (!res.cached) {
                 ValidPathInfo info;
                 StringSink sink;
                 dumpString(*res.data, sink);
-                Hash hash = hashString(expectedHash ? expectedHash.type : htSHA256, *res.data);
+                Hash hash = hashString(request.expectedHash ? request.expectedHash.type : htSHA256, *res.data);
                 info.path = store->makeFixedOutputPath(false, hash, name);
                 info.narHash = hashString(htSHA256, *sink.s);
                 info.narSize = sink.s->size();
@@ -830,7 +830,7 @@ CachedDownloadResult Downloader::downloadCached(ref<Store> store, const string &
         }
     }
 
-    if (unpack) {
+    if (request.unpack) {
         Path unpackedLink = cacheDir + "/" + baseNameOf(storePath) + "-unpacked";
         PathLocks lock2({unpackedLink}, fmt("waiting for lock on '%1%'...", unpackedLink));
         Path unpackedStorePath;
@@ -853,11 +853,11 @@ CachedDownloadResult Downloader::downloadCached(ref<Store> store, const string &
     }
 
     if (expectedStorePath != "" && storePath != expectedStorePath) {
-        Hash gotHash = unpack
-            ? hashPath(expectedHash.type, store->toRealPath(storePath)).first
-            : hashFile(expectedHash.type, store->toRealPath(storePath));
+        Hash gotHash = request.unpack
+            ? hashPath(request.expectedHash.type, store->toRealPath(storePath)).first
+            : hashFile(request.expectedHash.type, store->toRealPath(storePath));
         throw nix::Error("hash mismatch in file downloaded from '%s':\n  wanted: %s\n  got:    %s",
-            url, expectedHash.to_string(), gotHash.to_string());
+            url, request.expectedHash.to_string(), gotHash.to_string());
     }
 
     result.storePath = storePath;
