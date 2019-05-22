@@ -13,6 +13,34 @@
 
 namespace nix {
 
+MixFlakeOptions::MixFlakeOptions()
+{
+    mkFlag()
+        .longName("recreate-lock-file")
+        .description("recreate lock file from scratch")
+        .set(&recreateLockFile, true);
+
+    mkFlag()
+        .longName("no-save-lock-file")
+        .description("do not save the newly generated lock file")
+        .set(&saveLockFile, false);
+
+    mkFlag()
+        .longName("no-registries")
+        .description("don't use flake registries")
+        .set(&useRegistries, false);
+}
+
+HandleLockFile MixFlakeOptions::getLockFileMode()
+{
+    return
+        useRegistries
+        ? recreateLockFile
+          ? (saveLockFile ? RecreateLockFile : UseNewLockFile)
+          : (saveLockFile ? UpdateLockFile : UseUpdatedLockFile)
+        : AllPure;
+}
+
 SourceExprCommand::SourceExprCommand()
 {
     mkFlag()
@@ -21,21 +49,6 @@ SourceExprCommand::SourceExprCommand()
         .label("file")
         .description("evaluate a set of attributes from FILE (deprecated)")
         .dest(&file);
-
-    mkFlag()
-        .longName("recreate-lock-file")
-        .description("recreate lock file from scratch")
-        .set(&recreateLockFile, true);
-
-    mkFlag()
-        .longName("dont-save-lock-file")
-        .description("save the newly generated lock file")
-        .set(&saveLockFile, false);
-
-    mkFlag()
-        .longName("no-registries")
-        .description("don't use flake registries")
-        .set(&noRegistries, true);
 }
 
 ref<EvalState> EvalCommand::getEvalState()
@@ -169,11 +182,7 @@ struct InstallableFlake : InstallableValue
     {
         auto vFlake = state.allocValue();
 
-        HandleLockFile handle = cmd.noRegistries ? AllPure :
-            cmd.recreateLockFile ?
-            (cmd.saveLockFile ? RecreateLockFile : UseNewLockFile)
-            : (cmd.saveLockFile ? UpdateLockFile : UseUpdatedLockFile);
-        makeFlakeValue(state, flakeRef, handle, *vFlake);
+        makeFlakeValue(state, flakeRef, cmd.getLockFileMode(), *vFlake);
 
         auto vProvides = (*vFlake->attrs->get(state.symbols.create("provides")))->value;
 

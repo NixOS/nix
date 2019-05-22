@@ -64,7 +64,7 @@ typedef std::vector<std::shared_ptr<FlakeRegistry>> Registries;
 
 Path getUserRegistryPath();
 
-enum HandleLockFile
+enum HandleLockFile : unsigned int
     { AllPure // Everything is handled 100% purely
     , TopRefUsesRegistries // The top FlakeRef uses the registries, apart from that, everything happens 100% purely
     , UpdateLockFile // Update the existing lockfile and write it to file

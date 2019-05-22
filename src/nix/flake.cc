@@ -10,7 +10,7 @@
 
 using namespace nix;
 
-class FlakeCommand : virtual Args, public EvalCommand
+class FlakeCommand : virtual Args, public EvalCommand, public MixFlakeOptions
 {
     std::string flakeUri = ".";
 
@@ -32,7 +32,12 @@ public:
     Flake getFlake()
     {
         auto evalState = getEvalState();
-        return nix::getFlake(*evalState, getFlakeRef(), true);
+        return nix::getFlake(*evalState, getFlakeRef(), useRegistries);
+    }
+
+    ResolvedFlake resolveFlake()
+    {
+        return nix::resolveFlake(*getEvalState(), getFlakeRef(), getLockFileMode());
     }
 };
 
@@ -119,6 +124,7 @@ void printNonFlakeInfo(NonFlake & nonFlake, bool json) {
     }
 }
 
+// FIXME: merge info CmdFlakeInfo?
 struct CmdFlakeDeps : FlakeCommand, MixJSON
 {
     std::string name() override
@@ -136,7 +142,7 @@ struct CmdFlakeDeps : FlakeCommand, MixJSON
         auto evalState = getEvalState();
         evalState->addRegistryOverrides(registryOverrides);
 
-        ResolvedFlake resFlake = resolveFlake(*evalState, getFlakeRef(), UpdateLockFile);
+        auto resFlake = resolveFlake();
 
         std::queue<ResolvedFlake> todo;
         todo.push(resFlake);
@@ -334,7 +340,7 @@ struct CmdFlakeInit : virtual Args, Command
 
 struct CmdFlakeClone : FlakeCommand
 {
-    Path endDirectory = "";
+    Path destDir;
 
     std::string name() override
     {
@@ -348,7 +354,7 @@ struct CmdFlakeClone : FlakeCommand
 
     CmdFlakeClone()
     {
-        expectArg("end-dir", &endDirectory, true);
+        expectArg("dest-dir", &destDir, true);
     }
 
     void run(nix::ref<nix::Store> store) override
@@ -356,7 +362,7 @@ struct CmdFlakeClone : FlakeCommand
         auto evalState = getEvalState();
 
         Registries registries = evalState->getFlakeRegistries();
-        gitCloneFlake(getFlakeRef().to_string(), *evalState, registries, endDirectory);
+        gitCloneFlake(getFlakeRef().to_string(), *evalState, registries, destDir);
     }
 };
 

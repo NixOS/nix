@@ -11,8 +11,8 @@ extern std::string programPath;
 struct Value;
 class Bindings;
 class EvalState;
-
 class Store;
+enum HandleLockFile : unsigned int;
 
 /* A command that require a Nix store. */
 struct StoreCommand : virtual Command
@@ -61,17 +61,24 @@ private:
     std::shared_ptr<EvalState> evalState;
 };
 
-struct SourceExprCommand : virtual Args, EvalCommand
+struct MixFlakeOptions : virtual Args
 {
-    std::optional<Path> file;
-
-    SourceExprCommand();
-
     bool recreateLockFile = false;
 
     bool saveLockFile = true;
 
-    bool noRegistries = false;
+    bool useRegistries = true;
+
+    MixFlakeOptions();
+
+    HandleLockFile getLockFileMode();
+};
+
+struct SourceExprCommand : virtual Args, EvalCommand, MixFlakeOptions
+{
+    std::optional<Path> file;
+
+    SourceExprCommand();
 
     std::vector<std::shared_ptr<Installable>> parseInstallables(
         ref<Store> store, std::vector<std::string> ss);
