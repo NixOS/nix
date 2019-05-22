@@ -83,6 +83,7 @@ void printFlakeInfo(const Flake & flake, bool json) {
         if (flake.revCount)
             j["revCount"] = *flake.revCount;
         j["path"] = flake.storePath;
+        j["epoch"] = flake.epoch;
         std::cout << j.dump(4) << std::endl;
     } else {
         std::cout << "ID:          " << flake.id << "\n";
@@ -95,6 +96,7 @@ void printFlakeInfo(const Flake & flake, bool json) {
         if (flake.revCount)
             std::cout << "Revcount:    " << *flake.revCount << "\n";
         std::cout << "Path:        " << flake.storePath << "\n";
+        std::cout << "Epoch:       " << flake.epoch << "\n";
     }
 }
 

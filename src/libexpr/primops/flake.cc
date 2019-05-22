@@ -309,10 +309,17 @@ Flake getFlake(EvalState & state, const FlakeRef & flakeRef, bool impureIsAllowe
 
     state.forceAttrs(vInfo);
 
+    if (auto epoch = vInfo.attrs->get(state.symbols.create("epoch"))) {
+        flake.epoch = state.forceInt(*(**epoch).value, *(**epoch).pos);
+        if (flake.epoch > 2019)
+            throw Error("flake '%s' requires unsupported epoch %d; please upgrade Nix", flakeRef, flake.epoch);
+    } else
+        throw Error("flake '%s' lacks attribute 'epoch'", flakeRef);
+
     if (auto name = vInfo.attrs->get(state.sName))
         flake.id = state.forceStringNoCtx(*(**name).value, *(**name).pos);
     else
-        throw Error("flake lacks attribute 'name'");
+        throw Error("flake '%s' lacks attribute 'name'", flakeRef);
 
     if (auto description = vInfo.attrs->get(state.sDescription))
         flake.description = state.forceStringNoCtx(*(**description).value, *(**description).pos);
@@ -337,7 +344,7 @@ Flake getFlake(EvalState & state, const FlakeRef & flakeRef, bool impureIsAllowe
         state.forceFunction(*(**provides).value, *(**provides).pos);
         flake.vProvides = (**provides).value;
     } else
-        throw Error("flake lacks attribute 'provides'");
+        throw Error("flake '%s' lacks attribute 'provides'", flakeRef);
 
     return flake;
 }

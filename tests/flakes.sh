@@ -146,7 +146,7 @@ nix build -o $TEST_ROOT/result file://$flake2Dir:bar
 # Test whether indirect dependencies work.
 nix build -o $TEST_ROOT/result --flake-registry $registry $flake3Dir:xyzzy
 
-# Add dependency to flake3
+# Add dependency to flake3.
 rm $flake3Dir/flake.nix
 
 cat > $flake3Dir/flake.nix <<EOF
@@ -174,3 +174,7 @@ nix build -o $TEST_ROOT/result --flake-registry $registry $flake3Dir:sth
 
 # Check whether it saved the lockfile
 [[ ! (-z $(git -C $flake3Dir diff master)) ]]
+
+# Unsupported epochs should be an error.
+sed -i $flake3Dir/flake.nix -e s/2019/2030/
+nix build -o $TEST_ROOT/result --flake-registry $registry $flake3Dir:sth 2>&1 | grep 'unsupported epoch'

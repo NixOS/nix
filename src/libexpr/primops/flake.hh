@@ -101,7 +101,8 @@ struct Flake
     std::map<FlakeAlias, FlakeRef> nonFlakeRequires;
     Value * vProvides; // FIXME: gc
     // date
-    // content hash
+    unsigned int epoch;
+
     Flake(const FlakeRef & origRef, const SourceInfo & sourceInfo) : originalRef(origRef),
         resolvedRef(sourceInfo.resolvedRef), revCount(sourceInfo.revCount), storePath(sourceInfo.storePath) {};
 };
