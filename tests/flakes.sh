@@ -105,9 +105,9 @@ EOF
 nix flake info --flake-registry $registry flake1 | grep -q 'ID: *flake1'
 
 # Test 'nix flake info' on a local flake.
-(cd $flake1Dir && nix flake info) | grep -q 'ID: *flake1'
-(cd $flake1Dir && nix flake info .) | grep -q 'ID: *flake1'
-nix flake info $flake1Dir | grep -q 'ID: *flake1'
+(cd $flake1Dir && nix flake info --flake-registry $registry) | grep -q 'ID: *flake1'
+(cd $flake1Dir && nix flake info --flake-registry $registry .) | grep -q 'ID: *flake1'
+nix flake info --flake-registry $registry $flake1Dir | grep -q 'ID: *flake1'
 
 # Test 'nix flake info --json'.
 json=$(nix flake info --flake-registry $registry flake1 --json | jq .)
@@ -141,7 +141,8 @@ nix build -o $TEST_ROOT/result --flake-registry $registry $flake2Dir:bar
 nix build -o $TEST_ROOT/result --flake-registry $registry flake2:bar
 
 # Or without a registry.
-nix build -o $TEST_ROOT/result file://$flake2Dir:bar
+# FIXME: shouldn't need '--flake-registry /no-registry'?
+nix build -o $TEST_ROOT/result --flake-registry /no-registry file://$flake2Dir:bar
 
 # Test whether indirect dependencies work.
 nix build -o $TEST_ROOT/result --flake-registry $registry $flake3Dir:xyzzy
