@@ -288,8 +288,8 @@ int handleExceptions(const string & programName, std::function<void()> fun)
         return e.status;
     } catch (UsageError & e) {
         printError(
-            format(error + "%1%\nTry '%2% --help' for more information.")
-            % e.what() % programName);
+            format(error + "%1%\nAdd '--help' to the command for usage information.")
+            % e.what());
         return 1;
     } catch (BaseError & e) {
         printError(format(error + "%1%%2%") % (settings.showTrace ? e.prefix() : "") % e.msg());
