@@ -298,7 +298,7 @@ struct CmdFlakePin : virtual Args, EvalCommand
             it->second = getFlake(*evalState, it->second, true).resolvedRef;
             writeRegistry(userRegistry, userRegistryPath);
         } else {
-            std::shared_ptr<FlakeRegistry> globalReg = getGlobalRegistry();
+            std::shared_ptr<FlakeRegistry> globalReg = evalState->getGlobalFlakeRegistry();
             it = globalReg->entries.find(FlakeRef(alias));
             if (it != globalReg->entries.end()) {
                 FlakeRef newRef = getFlake(*evalState, it->second, true).resolvedRef;

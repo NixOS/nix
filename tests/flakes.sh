@@ -178,3 +178,8 @@ nix build -o $TEST_ROOT/result --flake-registry $registry $flake3Dir:sth
 # Unsupported epochs should be an error.
 sed -i $flake3Dir/flake.nix -e s/2019/2030/
 nix build -o $TEST_ROOT/result --flake-registry $registry $flake3Dir:sth 2>&1 | grep 'unsupported epoch'
+
+# Test whether registry caching works.
+nix flake list --flake-registry file://$registry | grep -q flake3
+mv $registry $registry.tmp
+nix flake list --flake-registry file://$registry --tarball-ttl 0 | grep -q flake3

@@ -36,9 +36,22 @@ struct DownloadResult
 {
     bool cached = false;
     std::string etag;
-    std::string effectiveUrl;
+    std::string effectiveUri;
     std::shared_ptr<std::string> data;
     uint64_t bodySize = 0;
+};
+
+struct CachedDownloadRequest
+{
+    std::string uri;
+    bool unpack = false;
+    std::string name;
+    Hash expectedHash;
+    unsigned int ttl = settings.tarballTtl;
+    bool gcRoot = false;
+
+    CachedDownloadRequest(const std::string & uri)
+        : uri(uri) { }
 };
 
 struct CachedDownloadResult
@@ -48,6 +61,7 @@ struct CachedDownloadResult
     Path storePath;
     Path path;
     std::optional<std::string> etag;
+    std::string effectiveUri;
 };
 
 class Store;
@@ -73,10 +87,7 @@ struct Downloader
        and is more recent than ‘tarball-ttl’ seconds. Otherwise,
        use the recorded ETag to verify if the server has a more
        recent version, and if so, download it to the Nix store. */
-    CachedDownloadResult downloadCached(
-        ref<Store> store, const string & uri, bool unpack, string name = "",
-        const Hash & expectedHash = Hash(), string * effectiveUri = nullptr,
-        int ttl = settings.tarballTtl);
+    CachedDownloadResult downloadCached(ref<Store> store, const CachedDownloadRequest & request);
 
     enum Error { NotFound, Forbidden, Misc, Transient, Interrupted };
 };

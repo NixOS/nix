@@ -131,9 +131,22 @@ void writeLockFile(const LockFile & lockFile, const Path & path)
     writeFile(path, json.dump(4) + "\n"); // '4' = indentation in json file
 }
 
-std::shared_ptr<FlakeRegistry> getGlobalRegistry()
+std::shared_ptr<FlakeRegistry> EvalState::getGlobalFlakeRegistry()
 {
-    return readRegistry(evalSettings.flakeRegistry);
+    std::call_once(_globalFlakeRegistryInit, [&]() {
+        auto path = evalSettings.flakeRegistry;
+
+        if (!hasPrefix(path, "/")) {
+            CachedDownloadRequest request(evalSettings.flakeRegistry);
+            request.name = "flake-registry.json";
+            request.gcRoot = true;
+            path = getDownloader()->downloadCached(store, request).path;
+        }
+
+        _globalFlakeRegistry = readRegistry(path);
+    });
+
+    return _globalFlakeRegistry;
 }
 
 Path getUserRegistryPath()
@@ -162,7 +175,7 @@ const Registries EvalState::getFlakeRegistries()
     Registries registries;
     registries.push_back(getFlagRegistry(registryOverrides));
     registries.push_back(getUserRegistry());
-    registries.push_back(getGlobalRegistry());
+    registries.push_back(getGlobalFlakeRegistry());
     return registries;
 }
 
@@ -234,8 +247,11 @@ static SourceInfo fetchFlake(EvalState & state, const FlakeRef & flakeRef, bool 
         if (accessToken != "")
             url += "?access_token=" + accessToken;
 
-        auto result = getDownloader()->downloadCached(state.store, url, true, "source",
-            Hash(), nullptr, resolvedRef.rev ? 1000000000 : settings.tarballTtl);
+        CachedDownloadRequest request(url);
+        request.unpack = true;
+        request.name = "source";
+        request.ttl = resolvedRef.rev ? 1000000000 : settings.tarballTtl;
+        auto result = getDownloader()->downloadCached(state.store, request);
 
         if (!result.etag)
             throw Error("did not receive an ETag header from '%s'", url);

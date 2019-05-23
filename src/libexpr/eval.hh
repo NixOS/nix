@@ -325,9 +325,11 @@ public:
 
     const std::vector<std::shared_ptr<FlakeRegistry>> getFlakeRegistries();
 
+    std::shared_ptr<FlakeRegistry> getGlobalFlakeRegistry();
+
 private:
-    std::shared_ptr<FlakeRegistry> _flakeRegistry;
-    std::once_flag _flakeRegistryInit;
+    std::shared_ptr<FlakeRegistry> _globalFlakeRegistry;
+    std::once_flag _globalFlakeRegistryInit;
 };
 
 
@@ -368,10 +370,8 @@ struct EvalSettings : Config
     Setting<Strings> allowedUris{this, {}, "allowed-uris",
         "Prefixes of URIs that builtin functions such as fetchurl and fetchGit are allowed to fetch."};
 
-    Setting<std::string> flakeRegistry{this, "", "flake-registry",
+    Setting<std::string> flakeRegistry{this, "https://raw.githubusercontent.com/NixOS/flake-registry/master/flake-registry.json", "flake-registry",
         "Path or URI of the global flake registry."};
-
-    EvalSettings();
 };
 
 extern EvalSettings evalSettings;

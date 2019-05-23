@@ -2050,9 +2050,9 @@ static void prim_splitVersion(EvalState & state, const Pos & pos, Value * * args
 void fetch(EvalState & state, const Pos & pos, Value * * args, Value & v,
     const string & who, bool unpack, const std::string & defaultName)
 {
-    string url;
-    Hash expectedHash;
-    string name = defaultName;
+    CachedDownloadRequest request("");
+    request.unpack = unpack;
+    request.name = defaultName;
 
     state.forceValue(*args[0]);
 
@@ -2063,27 +2063,27 @@ void fetch(EvalState & state, const Pos & pos, Value * * args, Value & v,
         for (auto & attr : *args[0]->attrs) {
             string n(attr.name);
             if (n == "url")
-                url = state.forceStringNoCtx(*attr.value, *attr.pos);
+                request.uri = state.forceStringNoCtx(*attr.value, *attr.pos);
             else if (n == "sha256")
-                expectedHash = Hash(state.forceStringNoCtx(*attr.value, *attr.pos), htSHA256);
+                request.expectedHash = Hash(state.forceStringNoCtx(*attr.value, *attr.pos), htSHA256);
             else if (n == "name")
-                name = state.forceStringNoCtx(*attr.value, *attr.pos);
+                request.name = state.forceStringNoCtx(*attr.value, *attr.pos);
             else
                 throw EvalError(format("unsupported argument '%1%' to '%2%', at %3%") % attr.name % who % attr.pos);
         }
 
-        if (url.empty())
+        if (request.uri.empty())
             throw EvalError(format("'url' argument required, at %1%") % pos);
 
     } else
-        url = state.forceStringNoCtx(*args[0], pos);
+        request.uri = state.forceStringNoCtx(*args[0], pos);
 
-    state.checkURI(url);
+    state.checkURI(request.uri);
 
-    if (evalSettings.pureEval && !expectedHash)
+    if (evalSettings.pureEval && !request.expectedHash)
         throw Error("in pure evaluation mode, '%s' requires a 'sha256' argument", who);
 
-    Path res = getDownloader()->downloadCached(state.store, url, unpack, name, expectedHash).path;
+    Path res = getDownloader()->downloadCached(state.store, request).path;
 
     if (state.allowedPaths)
         state.allowedPaths->insert(res);
