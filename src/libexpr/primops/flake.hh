@@ -132,6 +132,8 @@ struct ResolvedFlake
 
 ResolvedFlake resolveFlake(EvalState &, const FlakeRef &, HandleLockFile);
 
+void callFlake(EvalState & state, const ResolvedFlake & resFlake, Value & v);
+
 void updateLockFile(EvalState &, const FlakeRef & flakeRef, bool recreateLockFile);
 
 void gitCloneFlake(FlakeRef flakeRef, EvalState &, Registries, const Path & destDir);

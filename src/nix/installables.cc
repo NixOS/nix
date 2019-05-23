@@ -10,6 +10,7 @@
 #include "primops/flake.hh"
 
 #include <regex>
+#include <queue>
 
 namespace nix {
 
@@ -162,6 +163,44 @@ struct InstallableAttrPath : InstallableValue
     }
 };
 
+void makeFlakeClosureGCRoot(Store & store, const FlakeRef & origFlakeRef, const ResolvedFlake & resFlake)
+{
+    if (std::get_if<FlakeRef::IsPath>(&origFlakeRef.data)) return;
+
+    /* Get the store paths of all non-local flakes. */
+    PathSet closure;
+
+    std::queue<std::reference_wrapper<const ResolvedFlake>> queue;
+    queue.push(resFlake);
+
+    while (!queue.empty()) {
+        const ResolvedFlake & flake = queue.front();
+        queue.pop();
+        if (!std::get_if<FlakeRef::IsPath>(&flake.flake.resolvedRef.data))
+            closure.insert(flake.flake.storePath);
+        for (const auto & dep : flake.flakeDeps)
+            queue.push(dep.second);
+    }
+
+    if (closure.empty()) return;
+
+    /* Write the closure to a file in the store. */
+    auto closurePath = store.addTextToStore("flake-closure", concatStringsSep(" ", closure), closure);
+
+    Path cacheDir = getCacheDir() + "/nix/flake-closures";
+    createDirs(cacheDir);
+
+    auto s = origFlakeRef.to_string();
+    assert(s[0] != '.');
+    s = replaceStrings(s, "%", "%25");
+    s = replaceStrings(s, "/", "%2f");
+    s = replaceStrings(s, ":", "%3a");
+    Path symlink = cacheDir + "/" + s;
+    debug("writing GC root '%s' for flake closure of '%s'", symlink, origFlakeRef);
+    replaceSymlink(closurePath, symlink);
+    store.addIndirectRoot(symlink);
+}
+
 struct InstallableFlake : InstallableValue
 {
     FlakeRef flakeRef;
@@ -182,7 +221,11 @@ struct InstallableFlake : InstallableValue
     {
         auto vFlake = state.allocValue();
 
-        makeFlakeValue(state, flakeRef, cmd.getLockFileMode(), *vFlake);
+        auto resFlake = resolveFlake(state, flakeRef, cmd.getLockFileMode());
+
+        callFlake(state, resFlake, *vFlake);
+
+        makeFlakeClosureGCRoot(*state.store, flakeRef, resFlake);
 
         auto vProvides = (*vFlake->attrs->get(state.symbols.create("provides")))->value;
 

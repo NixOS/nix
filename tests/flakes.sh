@@ -5,7 +5,10 @@ if [[ -z $(type -p git) ]]; then
     exit 99
 fi
 
+export _NIX_FORCE_HTTP=1
+
 clearStore
+rm -rf $TEST_HOME/.cache
 
 registry=$TEST_ROOT/registry.json
 
@@ -14,7 +17,7 @@ flake2Dir=$TEST_ROOT/flake2
 flake3Dir=$TEST_ROOT/flake3
 
 for repo in $flake1Dir $flake2Dir $flake3Dir; do
-    rm -rf $repo
+    rm -rf $repo $repo.tmp
     mkdir $repo
     git -C $repo init
     git -C $repo config user.email "foobar@example.com"
@@ -142,7 +145,7 @@ nix build -o $TEST_ROOT/result --flake-registry $registry flake2:bar
 
 # Or without a registry.
 # FIXME: shouldn't need '--flake-registry /no-registry'?
-nix build -o $TEST_ROOT/result --flake-registry /no-registry file://$flake2Dir:bar
+nix build -o $TEST_ROOT/result --flake-registry /no-registry file://$flake2Dir:bar --tarball-ttl 0
 
 # Test whether indirect dependencies work.
 nix build -o $TEST_ROOT/result --flake-registry $registry $flake3Dir:xyzzy
@@ -184,3 +187,15 @@ nix build -o $TEST_ROOT/result --flake-registry $registry $flake3Dir:sth 2>&1 | 
 nix flake list --flake-registry file://$registry | grep -q flake3
 mv $registry $registry.tmp
 nix flake list --flake-registry file://$registry --tarball-ttl 0 | grep -q flake3
+mv $registry.tmp $registry
+
+# Test whether flakes are registered as GC roots for offline use.
+rm -rf $TEST_HOME/.cache
+nix build -o $TEST_ROOT/result --flake-registry file://$registry file://$flake2Dir:bar
+mv $flake1Dir $flake1Dir.tmp
+mv $flake2Dir $flake2Dir.tmp
+nix-store --gc
+nix build -o $TEST_ROOT/result --flake-registry file://$registry file://$flake2Dir:bar
+nix build -o $TEST_ROOT/result --flake-registry file://$registry file://$flake2Dir:bar --tarball-ttl 0
+mv $flake1Dir.tmp $flake1Dir
+mv $flake2Dir.tmp $flake2Dir
