@@ -194,6 +194,8 @@ std::string FlakeRef::to_string() const
 
     else abort();
 
+    assert(FlakeRef(string) == *this);
+
     return string;
 }
 
