@@ -139,7 +139,12 @@ GitInfo exportGit(ref<Store> store, std::string uri,
 
             // FIXME: git stderr messes up our progress indicator, so
             // we're using --quiet for now. Should process its stderr.
-            runProgram("git", true, { "-C", repoDir, "fetch", "--quiet", "--force", "--", uri, fmt("%s:%s", *ref, *ref) });
+            try {
+                runProgram("git", true, { "-C", repoDir, "fetch", "--quiet", "--force", "--", uri, fmt("%s:%s", *ref, *ref) });
+            } catch (Error & e) {
+                if (!pathExists(localRefFile)) throw;
+                warn("could not update local clone of Git repository '%s'; continuing with the most recent version", uri);
+            }
 
             struct timeval times[2];
             times[0].tv_sec = now;
