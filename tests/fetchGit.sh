@@ -50,9 +50,6 @@ path2=$(nix eval --impure --raw "(builtins.fetchGit file://$repo).outPath")
 [[ $(nix eval --impure "(builtins.fetchGit file://$repo).revCount") = 2 ]]
 [[ $(nix eval --impure --raw "(builtins.fetchGit file://$repo).rev") = $rev2 ]]
 
-# But with TTL 0, it should fail.
-(! nix eval --impure --tarball-ttl 0 "(builtins.fetchGit file://$repo)" -vvvvv)
-
 # Fetching with a explicit hash should succeed.
 path2=$(nix eval --tarball-ttl 0 --raw "(builtins.fetchGit { url = file://$repo; rev = \"$rev2\"; }).outPath")
 [[ $path = $path2 ]]
