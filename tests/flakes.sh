@@ -15,8 +15,9 @@ registry=$TEST_ROOT/registry.json
 flake1Dir=$TEST_ROOT/flake1
 flake2Dir=$TEST_ROOT/flake2
 flake3Dir=$TEST_ROOT/flake3
+nonFlakeDir=$TEST_ROOT/nonFlake
 
-for repo in $flake1Dir $flake2Dir $flake3Dir; do
+for repo in $flake1Dir $flake2Dir $flake3Dir $nonFlakeDir; do
     rm -rf $repo $repo.tmp
     mkdir $repo
     git -C $repo init
@@ -80,6 +81,13 @@ EOF
 
 git -C $flake3Dir add flake.nix
 git -C $flake3Dir commit -m 'Initial'
+
+cat > $nonFlakeDir/README.md <<EOF
+Not much
+EOF
+
+git -C $nonFlakeDir add README.md
+git -C $nonFlakeDir commit -m 'Initial'
 
 cat > $registry <<EOF
 {
@@ -199,3 +207,33 @@ nix build -o $TEST_ROOT/result --flake-registry file://$registry file://$flake2D
 nix build -o $TEST_ROOT/result --flake-registry file://$registry file://$flake2Dir:bar --tarball-ttl 0
 mv $flake1Dir.tmp $flake1Dir
 mv $flake2Dir.tmp $flake2Dir
+
+# Add nonFlakeRequires to flake3.
+rm $flake3Dir/flake.nix
+
+cat > $flake3Dir/flake.nix <<EOF
+{
+  name = "flake3";
+
+  epoch = 2019;
+
+  requires = [ "flake1" "flake2" ];
+
+  nonFlakeRequires = {
+    nonFlake = "$nonFlakeDir";
+  };
+
+  description = "Fnord";
+
+  provides = deps: rec {
+    packages.xyzzy = deps.flake2.provides.packages.bar;
+    packages.sth = deps.flake1.provides.packages.foo;
+  };
+}
+EOF
+
+git -C $flake3Dir add flake.nix
+git -C $flake3Dir commit -m 'Add nonFlakeRequires'
+
+# Check whether `nix build` works with a lockfile which is missing a nonFlakeRequires
+nix build -o $TEST_ROOT/result --flake-registry $registry $flake3Dir:sth
