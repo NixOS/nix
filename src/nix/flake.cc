@@ -72,14 +72,14 @@ struct CmdFlakeList : EvalCommand
 
 static void printSourceInfo(const SourceInfo & sourceInfo)
 {
-    std::cout << "URI:         " << sourceInfo.resolvedRef.to_string() << "\n";
+    std::cout << fmt("URI:         %s\n", sourceInfo.resolvedRef.to_string());
     if (sourceInfo.resolvedRef.ref)
-        std::cout << "Branch:      " << *sourceInfo.resolvedRef.ref;
+        std::cout << fmt("Branch:      %s\n",*sourceInfo.resolvedRef.ref);
     if (sourceInfo.resolvedRef.rev)
-        std::cout << "Revision:    " << sourceInfo.resolvedRef.rev->to_string(Base16, false) << "\n";
+        std::cout << fmt("Revision:    %s\n", sourceInfo.resolvedRef.rev->to_string(Base16, false));
     if (sourceInfo.revCount)
-        std::cout << "Revcount:    " << *sourceInfo.revCount << "\n";
-    std::cout << "Path:        " << sourceInfo.storePath << "\n";
+        std::cout << fmt("Revcount:    %s\n", *sourceInfo.revCount);
+    std::cout << fmt("Path:        %s\n", sourceInfo.storePath);
 }
 
 static void sourceInfoToJson(const SourceInfo & sourceInfo, nlohmann::json & j)
@@ -96,9 +96,9 @@ static void sourceInfoToJson(const SourceInfo & sourceInfo, nlohmann::json & j)
 
 static void printFlakeInfo(const Flake & flake)
 {
-    std::cout << "ID:          " << flake.id << "\n";
-    std::cout << "Description: " << flake.description << "\n";
-    std::cout << "Epoch:       " << flake.epoch << "\n";
+    std::cout << fmt("ID:          %s\n", flake.id);
+    std::cout << fmt("Description: %s\n", flake.description);
+    std::cout << fmt("Epoch:       %s\n", flake.epoch);
     printSourceInfo(flake.sourceInfo);
 }
 
@@ -114,7 +114,7 @@ static nlohmann::json flakeToJson(const Flake & flake)
 
 static void printNonFlakeInfo(const NonFlake & nonFlake)
 {
-    std::cout << "ID:          " << nonFlake.alias << "\n";
+    std::cout << fmt("ID:          %s\n", nonFlake.alias);
     printSourceInfo(nonFlake.sourceInfo);
 }
 
