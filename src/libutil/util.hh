@@ -142,10 +142,12 @@ Path getDataDir();
 Paths createDirs(const Path & path);
 
 /* Create a symlink. */
-void createSymlink(const Path & target, const Path & link);
+void createSymlink(const Path & target, const Path & link,
+    std::optional<time_t> mtime = {});
 
 /* Atomically create or replace a symlink. */
-void replaceSymlink(const Path & target, const Path & link);
+void replaceSymlink(const Path & target, const Path & link,
+    std::optional<time_t> mtime = {});
 
 
 /* Wrappers arount read()/write() that read/write exactly the

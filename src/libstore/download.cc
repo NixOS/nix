@@ -808,6 +808,7 @@ CachedDownloadResult Downloader::downloadCached(
             CachedDownloadResult result;
             result.storePath = expectedStorePath;
             result.path = store->toRealPath(expectedStorePath);
+            assert(!request.getLastModified); // FIXME
             return result;
         }
     }
@@ -892,16 +893,26 @@ CachedDownloadResult Downloader::downloadCached(
             store->addTempRoot(unpackedStorePath);
             if (!store->isValidPath(unpackedStorePath))
                 unpackedStorePath = "";
+            else
+                result.lastModified = lstat(unpackedLink).st_mtime;
         }
         if (unpackedStorePath.empty()) {
             printInfo(format("unpacking '%1%'...") % url);
             Path tmpDir = createTempDir();
             AutoDelete autoDelete(tmpDir, true);
             // FIXME: this requires GNU tar for decompression.
-            runProgram("tar", true, {"xf", store->toRealPath(storePath), "-C", tmpDir, "--strip-components", "1"});
-            unpackedStorePath = store->addToStore(name, tmpDir, true, htSHA256, defaultPathFilter, NoRepair);
+            runProgram("tar", true, {"xf", store->toRealPath(storePath), "-C", tmpDir});
+            auto members = readDirectory(tmpDir);
+            if (members.size() != 1)
+                throw nix::Error("tarball '%s' contains an unexpected number of top-level files", url);
+            auto topDir = tmpDir + "/" + members.begin()->name;
+            result.lastModified = lstat(topDir).st_mtime;
+            unpackedStorePath = store->addToStore(name, topDir, true, htSHA256, defaultPathFilter, NoRepair);
         }
-        replaceSymlink(unpackedStorePath, unpackedLink);
+        // Store the last-modified date of the tarball in the symlink
+        // mtime. This saves us from having to store it somewhere
+        // else.
+        replaceSymlink(unpackedStorePath, unpackedLink, result.lastModified);
         storePath = unpackedStorePath;
     }
 

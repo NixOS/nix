@@ -265,6 +265,7 @@ static SourceInfo fetchFlake(EvalState & state, const FlakeRef & flakeRef, bool 
         request.unpack = true;
         request.name = "source";
         request.ttl = resolvedRef.rev ? 1000000000 : settings.tarballTtl;
+        request.getLastModified = true;
         auto result = getDownloader()->downloadCached(state.store, request);
 
         if (!result.etag)
@@ -278,6 +279,7 @@ static SourceInfo fetchFlake(EvalState & state, const FlakeRef & flakeRef, bool 
         SourceInfo info(ref);
         info.storePath = result.storePath;
         info.narHash = state.store->queryPathInfo(info.storePath)->narHash;
+        info.lastModified = result.lastModified;
 
         return info;
     }
