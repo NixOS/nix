@@ -366,9 +366,9 @@ Flake getFlake(EvalState & state, const FlakeRef & flakeRef, bool impureIsAllowe
 }
 
 // Get the `NonFlake` corresponding to a `FlakeRef`.
-NonFlake getNonFlake(EvalState & state, const FlakeRef & flakeRef, FlakeAlias alias)
+NonFlake getNonFlake(EvalState & state, const FlakeRef & flakeRef, FlakeAlias alias, bool impureIsAllowed = false)
 {
-    SourceInfo sourceInfo = fetchFlake(state, flakeRef);
+    SourceInfo sourceInfo = fetchFlake(state, flakeRef, impureIsAllowed);
     debug("got non-flake source '%s' with flakeref %s", sourceInfo.storePath, sourceInfo.resolvedRef.to_string());
 
     FlakeRef resolvedRef = sourceInfo.resolvedRef;
@@ -449,7 +449,7 @@ ResolvedFlake resolveFlakeFromLockFile(EvalState & state, const FlakeRef & flake
         } else {
             if (handleLockFile == AllPure || handleLockFile == TopRefUsesRegistries)
                 throw Error("cannot update non-flake dependency '%s' in pure mode", nonFlakeInfo.first);
-            deps.nonFlakeDeps.push_back(getNonFlake(state, nonFlakeInfo.second, nonFlakeInfo.first));
+            deps.nonFlakeDeps.push_back(getNonFlake(state, nonFlakeInfo.second, nonFlakeInfo.first, allowedToUseRegistries(handleLockFile, false)));
         }
     }
 
