@@ -94,34 +94,36 @@ static void sourceInfoToJson(const SourceInfo & sourceInfo, nlohmann::json & j)
     j["path"] = sourceInfo.storePath;
 }
 
-static void printFlakeInfo(const Flake & flake, bool json)
+static void printFlakeInfo(const Flake & flake)
 {
-    if (json) {
-        nlohmann::json j;
-        j["id"] = flake.id;
-        j["description"] = flake.description;
-        j["epoch"] = flake.epoch;
-        sourceInfoToJson(flake.sourceInfo, j);
-        std::cout << j.dump(4) << std::endl;
-    } else {
-        std::cout << "ID:          " << flake.id << "\n";
-        std::cout << "Description: " << flake.description << "\n";
-        std::cout << "Epoch:       " << flake.epoch << "\n";
-        printSourceInfo(flake.sourceInfo);
-    }
+    std::cout << "ID:          " << flake.id << "\n";
+    std::cout << "Description: " << flake.description << "\n";
+    std::cout << "Epoch:       " << flake.epoch << "\n";
+    printSourceInfo(flake.sourceInfo);
 }
 
-static void printNonFlakeInfo(const NonFlake & nonFlake, bool json)
+static nlohmann::json flakeToJson(const Flake & flake)
 {
-    if (json) {
-        nlohmann::json j;
-        j["id"] = nonFlake.alias;
-        printSourceInfo(nonFlake.sourceInfo);
-        std::cout << j.dump(4) << std::endl;
-    } else {
-        std::cout << "ID:          " << nonFlake.alias << "\n";
-        printSourceInfo(nonFlake.sourceInfo);
-    }
+    nlohmann::json j;
+    j["id"] = flake.id;
+    j["description"] = flake.description;
+    j["epoch"] = flake.epoch;
+    sourceInfoToJson(flake.sourceInfo, j);
+    return j;
+}
+
+static void printNonFlakeInfo(const NonFlake & nonFlake)
+{
+    std::cout << "ID:          " << nonFlake.alias << "\n";
+    printSourceInfo(nonFlake.sourceInfo);
+}
+
+static nlohmann::json nonFlakeToJson(const NonFlake & nonFlake)
+{
+    nlohmann::json j;
+    j["id"] = nonFlake.alias;
+    sourceInfoToJson(nonFlake.sourceInfo, j);
+    return j;
 }
 
 // FIXME: merge info CmdFlakeInfo?
@@ -152,10 +154,10 @@ struct CmdFlakeDeps : FlakeCommand
             todo.pop();
 
             for (auto & nonFlake : resFlake.nonFlakeDeps)
-                printNonFlakeInfo(nonFlake, false);
+                printNonFlakeInfo(nonFlake);
 
             for (auto & info : resFlake.flakeDeps) {
-                printFlakeInfo(info.second.flake, false);
+                printFlakeInfo(info.second.flake);
                 todo.push(info.second);
             }
         }
@@ -205,7 +207,10 @@ struct CmdFlakeInfo : FlakeCommand, MixJSON
     {
         auto flake = getFlake();
         stopProgressBar();
-        printFlakeInfo(flake, json);
+        if (json)
+            std::cout << flakeToJson(flake).dump() << std::endl;
+        else
+            printFlakeInfo(flake);
     }
 };
 
