@@ -22,28 +22,28 @@ struct LockFile
     struct NonFlakeEntry
     {
         FlakeRef ref;
-        Hash contentHash;
-        NonFlakeEntry(const FlakeRef & flakeRef, const Hash & hash) : ref(flakeRef), contentHash(hash) {};
+        Hash narHash;
+        NonFlakeEntry(const FlakeRef & flakeRef, const Hash & hash) : ref(flakeRef), narHash(hash) {};
 
         bool operator ==(const NonFlakeEntry & other) const
         {
-            return ref == other.ref && contentHash == other.contentHash;
+            return ref == other.ref && narHash == other.narHash;
         }
     };
 
     struct FlakeEntry
     {
         FlakeRef ref;
-        Hash contentHash;
+        Hash narHash;
         std::map<FlakeRef, FlakeEntry> flakeEntries;
         std::map<FlakeAlias, NonFlakeEntry> nonFlakeEntries;
-        FlakeEntry(const FlakeRef & flakeRef, const Hash & hash) : ref(flakeRef), contentHash(hash) {};
+        FlakeEntry(const FlakeRef & flakeRef, const Hash & hash) : ref(flakeRef), narHash(hash) {};
 
         bool operator ==(const FlakeEntry & other) const
         {
             return
                 ref == other.ref
-                && contentHash == other.contentHash
+                && narHash == other.narHash
                 && flakeEntries == other.flakeEntries
                 && nonFlakeEntries == other.nonFlakeEntries;
         }

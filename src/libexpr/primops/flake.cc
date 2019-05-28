@@ -105,10 +105,10 @@ nlohmann::json flakeEntryToJson(const LockFile::FlakeEntry & entry)
 {
     nlohmann::json json;
     json["uri"] = entry.ref.to_string();
-    json["contentHash"] = entry.contentHash.to_string(SRI);
+    json["contentHash"] = entry.narHash.to_string(SRI);
     for (auto & x : entry.nonFlakeEntries) {
         json["nonFlakeRequires"][x.first]["uri"] = x.second.ref.to_string();
-        json["nonFlakeRequires"][x.first]["contentHash"] = x.second.contentHash.to_string(SRI);
+        json["nonFlakeRequires"][x.first]["contentHash"] = x.second.narHash.to_string(SRI);
     }
     for (auto & x : entry.flakeEntries)
         json["requires"][x.first.to_string()] = flakeEntryToJson(x.second);
@@ -122,7 +122,7 @@ void writeLockFile(const LockFile & lockFile, const Path & path)
     json["nonFlakeRequires"] = nlohmann::json::object();
     for (auto & x : lockFile.nonFlakeEntries) {
         json["nonFlakeRequires"][x.first]["uri"] = x.second.ref.to_string();
-        json["nonFlakeRequires"][x.first]["contentHash"] = x.second.contentHash.to_string(SRI);
+        json["nonFlakeRequires"][x.first]["contentHash"] = x.second.narHash.to_string(SRI);
     }
     json["requires"] = nlohmann::json::object();
     for (auto & x : lockFile.flakeEntries)
@@ -443,7 +443,7 @@ ResolvedFlake resolveFlakeFromLockFile(EvalState & state, const FlakeRef & flake
         auto i = lockFile.nonFlakeEntries.find(nonFlakeInfo.first);
         if (i != lockFile.nonFlakeEntries.end()) {
             NonFlake nonFlake = getNonFlake(state, i->second.ref, nonFlakeInfo.first);
-            if (nonFlake.sourceInfo.narHash != i->second.contentHash)
+            if (nonFlake.sourceInfo.narHash != i->second.narHash)
                 throw Error("the content hash of flakeref '%s' doesn't match", i->second.ref.to_string());
             deps.nonFlakeDeps.push_back(nonFlake);
         } else {
@@ -457,7 +457,7 @@ ResolvedFlake resolveFlakeFromLockFile(EvalState & state, const FlakeRef & flake
         auto i = lockFile.flakeEntries.find(newFlakeRef);
         if (i != lockFile.flakeEntries.end()) { // Propagate lockFile downwards if possible
             ResolvedFlake newResFlake = resolveFlakeFromLockFile(state, i->second.ref, handleLockFile, entryToLockFile(i->second));
-            if (newResFlake.flake.sourceInfo.narHash != i->second.contentHash)
+            if (newResFlake.flake.sourceInfo.narHash != i->second.narHash)
                 throw Error("the content hash of flakeref '%s' doesn't match", i->second.ref.to_string());
             deps.flakeDeps.insert_or_assign(newFlakeRef, newResFlake);
         } else {
