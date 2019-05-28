@@ -397,13 +397,17 @@ LockFile entryToLockFile(const LockFile::FlakeEntry & entry)
 
 LockFile::FlakeEntry dependenciesToFlakeEntry(const ResolvedFlake & resolvedFlake)
 {
-    LockFile::FlakeEntry entry(resolvedFlake.flake.resolvedRef, resolvedFlake.flake.sourceInfo.narHash);
+    LockFile::FlakeEntry entry(
+        resolvedFlake.flake.sourceInfo.resolvedRef,
+        resolvedFlake.flake.sourceInfo.narHash);
 
     for (auto & info : resolvedFlake.flakeDeps)
         entry.flakeEntries.insert_or_assign(info.first.to_string(), dependenciesToFlakeEntry(info.second));
 
     for (auto & nonFlake : resolvedFlake.nonFlakeDeps) {
-        LockFile::NonFlakeEntry nonEntry(nonFlake.resolvedRef, nonFlake.sourceInfo.narHash);
+        LockFile::NonFlakeEntry nonEntry(
+            nonFlake.sourceInfo.resolvedRef,
+            nonFlake.sourceInfo.narHash);
         entry.nonFlakeEntries.insert_or_assign(nonFlake.alias, nonEntry);
     }
 
@@ -540,11 +544,11 @@ void callFlake(EvalState & state, const ResolvedFlake & resFlake, Value & v)
     state.store->isValidPath(path);
     mkString(*state.allocAttr(v, state.sOutPath), path, {path});
 
-    if (resFlake.flake.resolvedRef.rev) {
+    if (resFlake.flake.sourceInfo.resolvedRef.rev) {
         mkString(*state.allocAttr(v, state.symbols.create("rev")),
-            resFlake.flake.resolvedRef.rev->gitRev());
+            resFlake.flake.sourceInfo.resolvedRef.rev->gitRev());
         mkString(*state.allocAttr(v, state.symbols.create("shortRev")),
-            resFlake.flake.resolvedRef.rev->gitShortRev());
+            resFlake.flake.sourceInfo.resolvedRef.rev->gitShortRev());
     }
 
     if (resFlake.flake.sourceInfo.revCount)

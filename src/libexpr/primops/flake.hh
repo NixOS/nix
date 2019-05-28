@@ -92,7 +92,6 @@ struct Flake
 {
     FlakeId id;
     FlakeRef originalRef;
-    FlakeRef resolvedRef;
     std::string description;
     SourceInfo sourceInfo;
     std::vector<FlakeRef> requires;
@@ -100,18 +99,17 @@ struct Flake
     Value * vProvides; // FIXME: gc
     unsigned int epoch;
 
-    Flake(const FlakeRef & origRef, const SourceInfo & sourceInfo) : originalRef(origRef),
-        resolvedRef(sourceInfo.resolvedRef), sourceInfo(sourceInfo) {};
+    Flake(const FlakeRef & origRef, const SourceInfo & sourceInfo)
+        : originalRef(origRef), sourceInfo(sourceInfo) {};
 };
 
 struct NonFlake
 {
     FlakeAlias alias;
     FlakeRef originalRef;
-    FlakeRef resolvedRef;
     SourceInfo sourceInfo;
-    NonFlake(const FlakeRef & origRef, const SourceInfo & sourceInfo) :
-        originalRef(origRef), resolvedRef(sourceInfo.resolvedRef), sourceInfo(sourceInfo) {};
+    NonFlake(const FlakeRef & origRef, const SourceInfo & sourceInfo)
+        : originalRef(origRef), sourceInfo(sourceInfo) {};
 };
 
 Flake getFlake(EvalState &, const FlakeRef &, bool impureIsAllowed);
