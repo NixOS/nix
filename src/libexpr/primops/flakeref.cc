@@ -134,7 +134,7 @@ FlakeRef::FlakeRef(const std::string & uri, bool allowRelative)
         data = d;
     }
 
-    else if (hasPrefix(uri, "/") || (allowRelative && (hasPrefix(uri, "./") || uri == "."))) {
+    else if (hasPrefix(uri, "/") || (allowRelative && (hasPrefix(uri, "./") || hasPrefix(uri, "../") || uri == "."))) {
         IsPath d;
         d.path = allowRelative ? absPath(uri) : canonPath(uri);
         data = d;
