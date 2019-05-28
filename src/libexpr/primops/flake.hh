@@ -84,7 +84,7 @@ struct SourceInfo
     FlakeRef resolvedRef;
     Path storePath;
     std::optional<uint64_t> revCount;
-    // date
+    Hash narHash; // store path hash
     SourceInfo(const FlakeRef & resolvRef) : resolvedRef(resolvRef) {};
 };
 
@@ -95,7 +95,6 @@ struct Flake
     FlakeRef resolvedRef;
     std::string description;
     SourceInfo sourceInfo;
-    Hash hash; // content hash
     std::vector<FlakeRef> requires;
     std::map<FlakeAlias, FlakeRef> nonFlakeRequires;
     Value * vProvides; // FIXME: gc
@@ -111,7 +110,6 @@ struct NonFlake
     FlakeRef originalRef;
     FlakeRef resolvedRef;
     SourceInfo sourceInfo;
-    Hash hash;
     NonFlake(const FlakeRef & origRef, const SourceInfo & sourceInfo) :
         originalRef(origRef), resolvedRef(sourceInfo.resolvedRef), sourceInfo(sourceInfo) {};
 };

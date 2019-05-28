@@ -263,6 +263,7 @@ static SourceInfo fetchFlake(EvalState & state, const FlakeRef & flakeRef, bool 
         ref.rev = Hash(std::string(*result.etag, 1, result.etag->size() - 2), htSHA1);
         SourceInfo info(ref);
         info.storePath = result.storePath;
+        info.narHash = state.store->queryPathInfo(info.storePath)->narHash;
 
         return info;
     }
@@ -276,6 +277,7 @@ static SourceInfo fetchFlake(EvalState & state, const FlakeRef & flakeRef, bool 
         SourceInfo info(ref);
         info.storePath = gitInfo.storePath;
         info.revCount = gitInfo.revCount;
+        info.narHash = state.store->queryPathInfo(info.storePath)->narHash;
         return info;
     }
 
@@ -289,6 +291,7 @@ static SourceInfo fetchFlake(EvalState & state, const FlakeRef & flakeRef, bool 
         SourceInfo info(ref);
         info.storePath = gitInfo.storePath;
         info.revCount = gitInfo.revCount;
+        info.narHash = state.store->queryPathInfo(info.storePath)->narHash;
         return info;
     }
 
@@ -315,7 +318,6 @@ Flake getFlake(EvalState & state, const FlakeRef & flakeRef, bool impureIsAllowe
         throw Error("'flake.nix' file of flake '%s' escapes from '%s'", resolvedRef, sourceInfo.storePath);
 
     Flake flake(flakeRef, sourceInfo);
-    flake.hash = state.store->queryPathInfo(sourceInfo.storePath)->narHash;
 
     if (!pathExists(realFlakeFile))
         throw Error("source tree referenced by '%s' does not contain a '%s/flake.nix' file", resolvedRef, resolvedRef.subdir);
@@ -380,8 +382,6 @@ NonFlake getNonFlake(EvalState & state, const FlakeRef & flakeRef, FlakeAlias al
     if (state.allowedPaths)
         state.allowedPaths->insert(nonFlake.sourceInfo.storePath);
 
-    nonFlake.hash = state.store->queryPathInfo(nonFlake.sourceInfo.storePath)->narHash;
-
     nonFlake.alias = alias;
 
     return nonFlake;
@@ -397,13 +397,13 @@ LockFile entryToLockFile(const LockFile::FlakeEntry & entry)
 
 LockFile::FlakeEntry dependenciesToFlakeEntry(const ResolvedFlake & resolvedFlake)
 {
-    LockFile::FlakeEntry entry(resolvedFlake.flake.resolvedRef, resolvedFlake.flake.hash);
+    LockFile::FlakeEntry entry(resolvedFlake.flake.resolvedRef, resolvedFlake.flake.sourceInfo.narHash);
 
     for (auto & info : resolvedFlake.flakeDeps)
         entry.flakeEntries.insert_or_assign(info.first.to_string(), dependenciesToFlakeEntry(info.second));
 
     for (auto & nonFlake : resolvedFlake.nonFlakeDeps) {
-        LockFile::NonFlakeEntry nonEntry(nonFlake.resolvedRef, nonFlake.hash);
+        LockFile::NonFlakeEntry nonEntry(nonFlake.resolvedRef, nonFlake.sourceInfo.narHash);
         entry.nonFlakeEntries.insert_or_assign(nonFlake.alias, nonEntry);
     }
 
@@ -443,7 +443,7 @@ ResolvedFlake resolveFlakeFromLockFile(EvalState & state, const FlakeRef & flake
         auto i = lockFile.nonFlakeEntries.find(nonFlakeInfo.first);
         if (i != lockFile.nonFlakeEntries.end()) {
             NonFlake nonFlake = getNonFlake(state, i->second.ref, nonFlakeInfo.first);
-            if (nonFlake.hash != i->second.contentHash)
+            if (nonFlake.sourceInfo.narHash != i->second.contentHash)
                 throw Error("the content hash of flakeref '%s' doesn't match", i->second.ref.to_string());
             deps.nonFlakeDeps.push_back(nonFlake);
         } else {
@@ -457,7 +457,7 @@ ResolvedFlake resolveFlakeFromLockFile(EvalState & state, const FlakeRef & flake
         auto i = lockFile.flakeEntries.find(newFlakeRef);
         if (i != lockFile.flakeEntries.end()) { // Propagate lockFile downwards if possible
             ResolvedFlake newResFlake = resolveFlakeFromLockFile(state, i->second.ref, handleLockFile, entryToLockFile(i->second));
-            if (newResFlake.flake.hash != i->second.contentHash)
+            if (newResFlake.flake.sourceInfo.narHash != i->second.contentHash)
                 throw Error("the content hash of flakeref '%s' doesn't match", i->second.ref.to_string());
             deps.flakeDeps.insert_or_assign(newFlakeRef, newResFlake);
         } else {
