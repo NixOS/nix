@@ -83,7 +83,7 @@ static void addAttr(ExprAttrs * attrs, AttrPath & attrPath,
     assert(!attrPath.empty());
     // Checking attrPath validity.
     // ===========================
-    for (i = attrPath.begin(); i + 1 < attrPath.end(); i++) { 
+    for (i = attrPath.begin(); i + 1 < attrPath.end(); i++) {
         if (i->symbol.set()) {
             ExprAttrs::AttrDefs::iterator j = attrs->attrs.find(i->symbol);
             if (j != attrs->attrs.end()) {
@@ -106,18 +106,18 @@ static void addAttr(ExprAttrs * attrs, AttrPath & attrPath,
     }
     // Expr insertion.
     // ==========================
-    if (i->symbol.set()) { 
+    if (i->symbol.set()) {
         ExprAttrs::AttrDefs::iterator j = attrs->attrs.find(i->symbol);
         if (j != attrs->attrs.end()) {
             // This attr path is already defined. However, if both
             // e and the expr pointed by the attr path are two attribute sets,
             // we want to merge them.
             // Otherwise, throw an error.
-            ExprAttrs* ae = dynamic_cast<ExprAttrs *>(e);
-            ExprAttrs* jAttrs = dynamic_cast<ExprAttrs *>(j->second.e);
+            auto ae = dynamic_cast<ExprAttrs *>(e);
+            auto jAttrs = dynamic_cast<ExprAttrs *>(j->second.e);
             if (jAttrs && ae) {
-                for (auto ad: ae->attrs) {
-                    ExprAttrs::AttrDefs::iterator j2 = jAttrs->attrs.find(ad.first);
+                for (auto & ad : ae->attrs) {
+                    auto j2 = jAttrs->attrs.find(ad.first);
                     if (j2 != jAttrs->attrs.end()) // Attr already defined in iAttrs, error.
                         dupAttr(ad.first, j2->second.pos, ad.second.pos);
                     jAttrs->attrs[ad.first] = ad.second;
