@@ -70,59 +70,57 @@ struct CmdFlakeList : EvalCommand
     }
 };
 
-void printFlakeInfo(const Flake & flake, bool json) {
+static void printSourceInfo(const SourceInfo & sourceInfo)
+{
+    std::cout << "URI:         " << sourceInfo.resolvedRef.to_string() << "\n";
+    if (sourceInfo.resolvedRef.ref)
+        std::cout << "Branch:      " << *sourceInfo.resolvedRef.ref;
+    if (sourceInfo.resolvedRef.rev)
+        std::cout << "Revision:    " << sourceInfo.resolvedRef.rev->to_string(Base16, false) << "\n";
+    if (sourceInfo.revCount)
+        std::cout << "Revcount:    " << *sourceInfo.revCount << "\n";
+    std::cout << "Path:        " << sourceInfo.storePath << "\n";
+}
+
+static void sourceInfoToJson(const SourceInfo & sourceInfo, nlohmann::json & j)
+{
+    j["uri"] = sourceInfo.resolvedRef.to_string();
+    if (sourceInfo.resolvedRef.ref)
+        j["branch"] = *sourceInfo.resolvedRef.ref;
+    if (sourceInfo.resolvedRef.rev)
+        j["revision"] = sourceInfo.resolvedRef.rev->to_string(Base16, false);
+    if (sourceInfo.revCount)
+        j["revCount"] = *sourceInfo.revCount;
+    j["path"] = sourceInfo.storePath;
+}
+
+static void printFlakeInfo(const Flake & flake, bool json)
+{
     if (json) {
         nlohmann::json j;
         j["id"] = flake.id;
-        j["uri"] = flake.sourceInfo.resolvedRef.to_string();
         j["description"] = flake.description;
-        if (flake.sourceInfo.resolvedRef.ref)
-            j["branch"] = *flake.sourceInfo.resolvedRef.ref;
-        if (flake.sourceInfo.resolvedRef.rev)
-            j["revision"] = flake.sourceInfo.resolvedRef.rev->to_string(Base16, false);
-        if (flake.sourceInfo.revCount)
-            j["revCount"] = *flake.sourceInfo.revCount;
-        j["path"] = flake.sourceInfo.storePath;
         j["epoch"] = flake.epoch;
+        sourceInfoToJson(flake.sourceInfo, j);
         std::cout << j.dump(4) << std::endl;
     } else {
         std::cout << "ID:          " << flake.id << "\n";
-        std::cout << "URI:         " << flake.sourceInfo.resolvedRef.to_string() << "\n";
         std::cout << "Description: " << flake.description << "\n";
-        if (flake.sourceInfo.resolvedRef.ref)
-            std::cout << "Branch:      " << *flake.sourceInfo.resolvedRef.ref << "\n";
-        if (flake.sourceInfo.resolvedRef.rev)
-            std::cout << "Revision:    " << flake.sourceInfo.resolvedRef.rev->to_string(Base16, false) << "\n";
-        if (flake.sourceInfo.revCount)
-            std::cout << "Revcount:    " << *flake.sourceInfo.revCount << "\n";
-        std::cout << "Path:        " << flake.sourceInfo.storePath << "\n";
         std::cout << "Epoch:       " << flake.epoch << "\n";
+        printSourceInfo(flake.sourceInfo);
     }
 }
 
-void printNonFlakeInfo(const NonFlake & nonFlake, bool json) {
+static void printNonFlakeInfo(const NonFlake & nonFlake, bool json)
+{
     if (json) {
         nlohmann::json j;
         j["id"] = nonFlake.alias;
-        j["uri"] = nonFlake.sourceInfo.resolvedRef.to_string();
-        if (nonFlake.sourceInfo.resolvedRef.ref)
-            j["branch"] = *nonFlake.sourceInfo.resolvedRef.ref;
-        if (nonFlake.sourceInfo.resolvedRef.rev)
-            j["revision"] = nonFlake.sourceInfo.resolvedRef.rev->to_string(Base16, false);
-        if (nonFlake.sourceInfo.revCount)
-            j["revCount"] = *nonFlake.sourceInfo.revCount;
-        j["path"] = nonFlake.sourceInfo.storePath;
+        printSourceInfo(nonFlake.sourceInfo);
         std::cout << j.dump(4) << std::endl;
     } else {
         std::cout << "ID:          " << nonFlake.alias << "\n";
-        std::cout << "URI:         " << nonFlake.sourceInfo.resolvedRef.to_string() << "\n";
-        if (nonFlake.sourceInfo.resolvedRef.ref)
-            std::cout << "Branch:      " << *nonFlake.sourceInfo.resolvedRef.ref;
-        if (nonFlake.sourceInfo.resolvedRef.rev)
-            std::cout << "Revision:    " << nonFlake.sourceInfo.resolvedRef.rev->to_string(Base16, false) << "\n";
-        if (nonFlake.sourceInfo.revCount)
-            std::cout << "Revcount:    " << *nonFlake.sourceInfo.revCount << "\n";
-        std::cout << "Path:        " << nonFlake.sourceInfo.storePath << "\n";
+        printSourceInfo(nonFlake.sourceInfo);
     }
 }
 
