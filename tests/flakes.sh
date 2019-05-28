@@ -124,6 +124,7 @@ nix flake info --flake-registry $registry $flake1Dir | grep -q 'ID: *flake1'
 json=$(nix flake info --flake-registry $registry flake1 --json | jq .)
 [[ $(echo "$json" | jq -r .description) = 'Bla bla' ]]
 [[ -d $(echo "$json" | jq -r .path) ]]
+[[ $(echo "$json" | jq -r .lastModified) = $(git -C $flake1Dir log -n1 --format=%ct) ]]
 
 # Test 'nix build' on a flake.
 nix build -o $TEST_ROOT/result --flake-registry $registry flake1:foo

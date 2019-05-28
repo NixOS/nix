@@ -69,6 +69,9 @@ GitInfo exportGit(ref<Store> store, std::string uri,
 
             gitInfo.storePath = store->addToStore("source", uri, true, htSHA256, filter);
             gitInfo.revCount = std::stoull(runProgram("git", true, { "-C", uri, "rev-list", "--count", "HEAD" }));
+            // FIXME: maybe we should use the timestamp of the last
+            // modified dirty file?
+            gitInfo.lastModified = std::stoull(runProgram("git", true, { "-C", uri, "show", "-s", "--format=%ct", "HEAD" }));
 
             return gitInfo;
         }
@@ -85,8 +88,9 @@ GitInfo exportGit(ref<Store> store, std::string uri,
     }
 
     deletePath(getCacheDir() + "/nix/git");
+    deletePath(getCacheDir() + "/nix/gitv2");
 
-    Path cacheDir = getCacheDir() + "/nix/gitv2/" + hashString(htSHA256, uri).to_string(Base32, false);
+    Path cacheDir = getCacheDir() + "/nix/gitv3/" + hashString(htSHA256, uri).to_string(Base32, false);
     Path repoDir;
 
     if (isLocal) {
@@ -181,6 +185,7 @@ GitInfo exportGit(ref<Store> store, std::string uri,
         if (store->isValidPath(storePath)) {
             gitInfo.storePath = storePath;
             gitInfo.revCount = json["revCount"];
+            gitInfo.lastModified = json["lastModified"];
             return gitInfo;
         }
 
@@ -200,6 +205,7 @@ GitInfo exportGit(ref<Store> store, std::string uri,
     gitInfo.storePath = store->addToStore(name, tmpDir);
 
     gitInfo.revCount = std::stoull(runProgram("git", true, { "-C", repoDir, "rev-list", "--count", gitInfo.rev.gitRev() }));
+    gitInfo.lastModified = std::stoull(runProgram("git", true, { "-C", repoDir, "show", "-s", "--format=%ct", gitInfo.rev.gitRev() }));
 
     nlohmann::json json;
     json["storePath"] = gitInfo.storePath;
@@ -207,6 +213,7 @@ GitInfo exportGit(ref<Store> store, std::string uri,
     json["name"] = name;
     json["rev"] = gitInfo.rev.gitRev();
     json["revCount"] = gitInfo.revCount;
+    json["lastModified"] = gitInfo.lastModified;
 
     writeFile(storeLink, json.dump());
 

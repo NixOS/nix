@@ -81,10 +81,22 @@ void writeRegistry(const FlakeRegistry &, const Path &);
 
 struct SourceInfo
 {
+    // Immutable flakeref that this source tree was obtained from.
     FlakeRef resolvedRef;
+
     Path storePath;
+
+    // Number of ancestors of the most recent commit.
     std::optional<uint64_t> revCount;
-    Hash narHash; // store path hash
+
+    // NAR hash of the store path.
+    Hash narHash;
+
+    // A stable timestamp of this source tree. For Git and GitHub
+    // flakes, the commit date (not author date!) of the most recent
+    // commit.
+    std::optional<time_t> lastModified;
+
     SourceInfo(const FlakeRef & resolvRef) : resolvedRef(resolvRef) {};
 };
 

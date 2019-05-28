@@ -7,6 +7,7 @@
 
 #include <nlohmann/json.hpp>
 #include <queue>
+#include <iomanip>
 
 using namespace nix;
 
@@ -72,14 +73,17 @@ struct CmdFlakeList : EvalCommand
 
 static void printSourceInfo(const SourceInfo & sourceInfo)
 {
-    std::cout << fmt("URI:         %s\n", sourceInfo.resolvedRef.to_string());
+    std::cout << fmt("URI:           %s\n", sourceInfo.resolvedRef.to_string());
     if (sourceInfo.resolvedRef.ref)
-        std::cout << fmt("Branch:      %s\n",*sourceInfo.resolvedRef.ref);
+        std::cout << fmt("Branch:        %s\n",*sourceInfo.resolvedRef.ref);
     if (sourceInfo.resolvedRef.rev)
-        std::cout << fmt("Revision:    %s\n", sourceInfo.resolvedRef.rev->to_string(Base16, false));
+        std::cout << fmt("Revision:      %s\n", sourceInfo.resolvedRef.rev->to_string(Base16, false));
     if (sourceInfo.revCount)
-        std::cout << fmt("Revcount:    %s\n", *sourceInfo.revCount);
-    std::cout << fmt("Path:        %s\n", sourceInfo.storePath);
+        std::cout << fmt("Revisions:     %s\n", *sourceInfo.revCount);
+    if (sourceInfo.lastModified)
+        std::cout << fmt("Last modified: %s\n",
+            std::put_time(std::localtime(&*sourceInfo.lastModified), "%F %T"));
+    std::cout << fmt("Path:          %s\n", sourceInfo.storePath);
 }
 
 static void sourceInfoToJson(const SourceInfo & sourceInfo, nlohmann::json & j)
@@ -91,14 +95,16 @@ static void sourceInfoToJson(const SourceInfo & sourceInfo, nlohmann::json & j)
         j["revision"] = sourceInfo.resolvedRef.rev->to_string(Base16, false);
     if (sourceInfo.revCount)
         j["revCount"] = *sourceInfo.revCount;
+    if (sourceInfo.lastModified)
+        j["lastModified"] = *sourceInfo.lastModified;
     j["path"] = sourceInfo.storePath;
 }
 
 static void printFlakeInfo(const Flake & flake)
 {
-    std::cout << fmt("ID:          %s\n", flake.id);
-    std::cout << fmt("Description: %s\n", flake.description);
-    std::cout << fmt("Epoch:       %s\n", flake.epoch);
+    std::cout << fmt("ID:            %s\n", flake.id);
+    std::cout << fmt("Description:   %s\n", flake.description);
+    std::cout << fmt("Epoch:         %s\n", flake.epoch);
     printSourceInfo(flake.sourceInfo);
 }
 
@@ -114,7 +120,7 @@ static nlohmann::json flakeToJson(const Flake & flake)
 
 static void printNonFlakeInfo(const NonFlake & nonFlake)
 {
-    std::cout << fmt("ID:          %s\n", nonFlake.alias);
+    std::cout << fmt("ID:            %s\n", nonFlake.alias);
     printSourceInfo(nonFlake.sourceInfo);
 }
 
