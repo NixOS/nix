@@ -147,6 +147,8 @@ struct CmdFlakeDeps : FlakeCommand, MixJSON
         std::queue<ResolvedFlake> todo;
         todo.push(resolveFlake());
 
+        stopProgressBar();
+
         while (!todo.empty()) {
             auto resFlake = std::move(todo.front());
             todo.pop();
@@ -204,6 +206,7 @@ struct CmdFlakeInfo : FlakeCommand, MixJSON
     void run(nix::ref<nix::Store> store) override
     {
         auto flake = getFlake();
+        stopProgressBar();
         printFlakeInfo(flake, json);
     }
 };
