@@ -125,7 +125,7 @@ static void printNonFlakeInfo(const NonFlake & nonFlake, bool json)
 }
 
 // FIXME: merge info CmdFlakeInfo?
-struct CmdFlakeDeps : FlakeCommand, MixJSON
+struct CmdFlakeDeps : FlakeCommand
 {
     std::string name() override
     {
@@ -152,10 +152,10 @@ struct CmdFlakeDeps : FlakeCommand, MixJSON
             todo.pop();
 
             for (auto & nonFlake : resFlake.nonFlakeDeps)
-                printNonFlakeInfo(nonFlake, json);
+                printNonFlakeInfo(nonFlake, false);
 
             for (auto & info : resFlake.flakeDeps) {
-                printFlakeInfo(info.second.flake, json);
+                printFlakeInfo(info.second.flake, false);
                 todo.push(info.second);
             }
         }
