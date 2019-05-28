@@ -177,7 +177,7 @@ void makeFlakeClosureGCRoot(Store & store, const FlakeRef & origFlakeRef, const 
         const ResolvedFlake & flake = queue.front();
         queue.pop();
         if (!std::get_if<FlakeRef::IsPath>(&flake.flake.resolvedRef.data))
-            closure.insert(flake.flake.storePath);
+            closure.insert(flake.flake.sourceInfo.storePath);
         for (const auto & dep : flake.flakeDeps)
             queue.push(dep.second);
     }

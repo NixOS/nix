@@ -94,17 +94,15 @@ struct Flake
     FlakeRef originalRef;
     FlakeRef resolvedRef;
     std::string description;
-    std::optional<uint64_t> revCount;
-    Path storePath;
+    SourceInfo sourceInfo;
     Hash hash; // content hash
     std::vector<FlakeRef> requires;
     std::map<FlakeAlias, FlakeRef> nonFlakeRequires;
     Value * vProvides; // FIXME: gc
-    // date
     unsigned int epoch;
 
     Flake(const FlakeRef & origRef, const SourceInfo & sourceInfo) : originalRef(origRef),
-        resolvedRef(sourceInfo.resolvedRef), revCount(sourceInfo.revCount), storePath(sourceInfo.storePath) {};
+        resolvedRef(sourceInfo.resolvedRef), sourceInfo(sourceInfo) {};
 };
 
 struct NonFlake
@@ -112,12 +110,10 @@ struct NonFlake
     FlakeAlias alias;
     FlakeRef originalRef;
     FlakeRef resolvedRef;
-    std::optional<uint64_t> revCount;
+    SourceInfo sourceInfo;
     Hash hash;
-    Path storePath;
-    // date
-    NonFlake(const FlakeRef & origRef, const SourceInfo & sourceInfo) : originalRef(origRef),
-        resolvedRef(sourceInfo.resolvedRef), revCount(sourceInfo.revCount), storePath(sourceInfo.storePath) {};
+    NonFlake(const FlakeRef & origRef, const SourceInfo & sourceInfo) :
+        originalRef(origRef), resolvedRef(sourceInfo.resolvedRef), sourceInfo(sourceInfo) {};
 };
 
 Flake getFlake(EvalState &, const FlakeRef &, bool impureIsAllowed);

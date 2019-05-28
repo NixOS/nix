@@ -368,19 +368,19 @@ Flake getFlake(EvalState & state, const FlakeRef & flakeRef, bool impureIsAllowe
 // Get the `NonFlake` corresponding to a `FlakeRef`.
 NonFlake getNonFlake(EvalState & state, const FlakeRef & flakeRef, FlakeAlias alias, bool impureIsAllowed = false)
 {
-    SourceInfo sourceInfo = fetchFlake(state, flakeRef, impureIsAllowed);
+    auto sourceInfo = fetchFlake(state, flakeRef, impureIsAllowed);
     debug("got non-flake source '%s' with flakeref %s", sourceInfo.storePath, sourceInfo.resolvedRef.to_string());
 
     FlakeRef resolvedRef = sourceInfo.resolvedRef;
 
     NonFlake nonFlake(flakeRef, sourceInfo);
 
-    state.store->assertStorePath(nonFlake.storePath);
+    state.store->assertStorePath(nonFlake.sourceInfo.storePath);
 
     if (state.allowedPaths)
-        state.allowedPaths->insert(nonFlake.storePath);
+        state.allowedPaths->insert(nonFlake.sourceInfo.storePath);
 
-    nonFlake.hash = state.store->queryPathInfo(sourceInfo.storePath)->narHash;
+    nonFlake.hash = state.store->queryPathInfo(nonFlake.sourceInfo.storePath)->narHash;
 
     nonFlake.alias = alias;
 
@@ -480,7 +480,7 @@ ResolvedFlake resolveFlake(EvalState & state, const FlakeRef & topRef, HandleLoc
 
     if (!recreateLockFile (handleLockFile)) {
         // If recreateLockFile, start with an empty lockfile
-        oldLockFile = readLockFile(flake.storePath + "/flake.lock"); // FIXME: symlink attack
+        oldLockFile = readLockFile(flake.sourceInfo.storePath + "/flake.lock"); // FIXME: symlink attack
     }
 
     LockFile lockFile(oldLockFile);
@@ -527,15 +527,16 @@ void callFlake(EvalState & state, const ResolvedFlake & resFlake, Value & v)
         auto vNonFlake = state.allocAttr(v, nonFlake.alias);
         state.mkAttrs(*vNonFlake, 4);
 
-        state.store->isValidPath(nonFlake.storePath);
-        mkString(*state.allocAttr(*vNonFlake, state.sOutPath), nonFlake.storePath, {nonFlake.storePath});
+        state.store->isValidPath(nonFlake.sourceInfo.storePath);
+        mkString(*state.allocAttr(*vNonFlake, state.sOutPath),
+            nonFlake.sourceInfo.storePath, {nonFlake.sourceInfo.storePath});
 
         // FIXME: add rev, shortRev, revCount, ...
     }
 
     mkString(*state.allocAttr(v, state.sDescription), resFlake.flake.description);
 
-    auto & path = resFlake.flake.storePath;
+    auto & path = resFlake.flake.sourceInfo.storePath;
     state.store->isValidPath(path);
     mkString(*state.allocAttr(v, state.sOutPath), path, {path});
 
@@ -546,8 +547,8 @@ void callFlake(EvalState & state, const ResolvedFlake & resFlake, Value & v)
             resFlake.flake.resolvedRef.rev->gitShortRev());
     }
 
-    if (resFlake.flake.revCount)
-        mkInt(*state.allocAttr(v, state.symbols.create("revCount")), *resFlake.flake.revCount);
+    if (resFlake.flake.sourceInfo.revCount)
+        mkInt(*state.allocAttr(v, state.symbols.create("revCount")), *resFlake.flake.sourceInfo.revCount);
 
     auto vProvides = state.allocAttr(v, state.symbols.create("provides"));
     mkApp(*vProvides, *resFlake.flake.vProvides, v);

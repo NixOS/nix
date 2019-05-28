@@ -80,9 +80,9 @@ void printFlakeInfo(const Flake & flake, bool json) {
             j["branch"] = *flake.resolvedRef.ref;
         if (flake.resolvedRef.rev)
             j["revision"] = flake.resolvedRef.rev->to_string(Base16, false);
-        if (flake.revCount)
-            j["revCount"] = *flake.revCount;
-        j["path"] = flake.storePath;
+        if (flake.sourceInfo.revCount)
+            j["revCount"] = *flake.sourceInfo.revCount;
+        j["path"] = flake.sourceInfo.storePath;
         j["epoch"] = flake.epoch;
         std::cout << j.dump(4) << std::endl;
     } else {
@@ -93,9 +93,9 @@ void printFlakeInfo(const Flake & flake, bool json) {
             std::cout << "Branch:      " << *flake.resolvedRef.ref << "\n";
         if (flake.resolvedRef.rev)
             std::cout << "Revision:    " << flake.resolvedRef.rev->to_string(Base16, false) << "\n";
-        if (flake.revCount)
-            std::cout << "Revcount:    " << *flake.revCount << "\n";
-        std::cout << "Path:        " << flake.storePath << "\n";
+        if (flake.sourceInfo.revCount)
+            std::cout << "Revcount:    " << *flake.sourceInfo.revCount << "\n";
+        std::cout << "Path:        " << flake.sourceInfo.storePath << "\n";
         std::cout << "Epoch:       " << flake.epoch << "\n";
     }
 }
@@ -109,9 +109,9 @@ void printNonFlakeInfo(const NonFlake & nonFlake, bool json) {
             j["branch"] = *nonFlake.resolvedRef.ref;
         if (nonFlake.resolvedRef.rev)
             j["revision"] = nonFlake.resolvedRef.rev->to_string(Base16, false);
-        if (nonFlake.revCount)
-            j["revCount"] = *nonFlake.revCount;
-        j["path"] = nonFlake.storePath;
+        if (nonFlake.sourceInfo.revCount)
+            j["revCount"] = *nonFlake.sourceInfo.revCount;
+        j["path"] = nonFlake.sourceInfo.storePath;
         std::cout << j.dump(4) << std::endl;
     } else {
         std::cout << "ID:          " << nonFlake.alias << "\n";
@@ -120,9 +120,9 @@ void printNonFlakeInfo(const NonFlake & nonFlake, bool json) {
             std::cout << "Branch:      " << *nonFlake.resolvedRef.ref;
         if (nonFlake.resolvedRef.rev)
             std::cout << "Revision:    " << nonFlake.resolvedRef.rev->to_string(Base16, false) << "\n";
-        if (nonFlake.revCount)
-            std::cout << "Revcount:    " << *nonFlake.revCount << "\n";
-        std::cout << "Path:        " << nonFlake.storePath << "\n";
+        if (nonFlake.sourceInfo.revCount)
+            std::cout << "Revcount:    " << *nonFlake.sourceInfo.revCount << "\n";
+        std::cout << "Path:        " << nonFlake.sourceInfo.storePath << "\n";
     }
 }
 
