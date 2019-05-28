@@ -514,6 +514,23 @@ void updateLockFile(EvalState & state, const FlakeRef & flakeRef, bool recreateL
     resolveFlake(state, flakeRef, recreateLockFile ? RecreateLockFile : UpdateLockFile);
 }
 
+static void emitSourceInfoAttrs(EvalState & state, const SourceInfo & sourceInfo, Value & vAttrs)
+{
+    auto & path = sourceInfo.storePath;
+    state.store->isValidPath(path);
+    mkString(*state.allocAttr(vAttrs, state.sOutPath), path, {path});
+
+    if (sourceInfo.resolvedRef.rev) {
+        mkString(*state.allocAttr(vAttrs, state.symbols.create("rev")),
+            sourceInfo.resolvedRef.rev->gitRev());
+        mkString(*state.allocAttr(vAttrs, state.symbols.create("shortRev")),
+            sourceInfo.resolvedRef.rev->gitShortRev());
+    }
+
+    if (sourceInfo.revCount)
+        mkInt(*state.allocAttr(vAttrs, state.symbols.create("revCount")), *sourceInfo.revCount);
+}
+
 void callFlake(EvalState & state, const ResolvedFlake & resFlake, Value & v)
 {
     // Construct the resulting attrset '{description, provides,
@@ -529,30 +546,18 @@ void callFlake(EvalState & state, const ResolvedFlake & resFlake, Value & v)
 
     for (const NonFlake nonFlake : resFlake.nonFlakeDeps) {
         auto vNonFlake = state.allocAttr(v, nonFlake.alias);
-        state.mkAttrs(*vNonFlake, 4);
+        state.mkAttrs(*vNonFlake, 8);
 
         state.store->isValidPath(nonFlake.sourceInfo.storePath);
         mkString(*state.allocAttr(*vNonFlake, state.sOutPath),
             nonFlake.sourceInfo.storePath, {nonFlake.sourceInfo.storePath});
 
-        // FIXME: add rev, shortRev, revCount, ...
+        emitSourceInfoAttrs(state, nonFlake.sourceInfo, *vNonFlake);
     }
 
     mkString(*state.allocAttr(v, state.sDescription), resFlake.flake.description);
 
-    auto & path = resFlake.flake.sourceInfo.storePath;
-    state.store->isValidPath(path);
-    mkString(*state.allocAttr(v, state.sOutPath), path, {path});
-
-    if (resFlake.flake.sourceInfo.resolvedRef.rev) {
-        mkString(*state.allocAttr(v, state.symbols.create("rev")),
-            resFlake.flake.sourceInfo.resolvedRef.rev->gitRev());
-        mkString(*state.allocAttr(v, state.symbols.create("shortRev")),
-            resFlake.flake.sourceInfo.resolvedRef.rev->gitShortRev());
-    }
-
-    if (resFlake.flake.sourceInfo.revCount)
-        mkInt(*state.allocAttr(v, state.symbols.create("revCount")), *resFlake.flake.sourceInfo.revCount);
+    emitSourceInfoAttrs(state, resFlake.flake.sourceInfo, v);
 
     auto vProvides = state.allocAttr(v, state.symbols.create("provides"));
     mkApp(*vProvides, *resFlake.flake.vProvides, v);
