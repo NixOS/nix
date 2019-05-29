@@ -105,10 +105,10 @@ nlohmann::json flakeEntryToJson(const LockFile::FlakeEntry & entry)
 {
     nlohmann::json json;
     json["uri"] = entry.ref.to_string();
-    json["contentHash"] = entry.contentHash.to_string(SRI);
+    json["contentHash"] = entry.narHash.to_string(SRI);
     for (auto & x : entry.nonFlakeEntries) {
         json["nonFlakeRequires"][x.first]["uri"] = x.second.ref.to_string();
-        json["nonFlakeRequires"][x.first]["contentHash"] = x.second.contentHash.to_string(SRI);
+        json["nonFlakeRequires"][x.first]["contentHash"] = x.second.narHash.to_string(SRI);
     }
     for (auto & x : entry.flakeEntries)
         json["requires"][x.first.to_string()] = flakeEntryToJson(x.second);
@@ -122,7 +122,7 @@ void writeLockFile(const LockFile & lockFile, const Path & path)
     json["nonFlakeRequires"] = nlohmann::json::object();
     for (auto & x : lockFile.nonFlakeEntries) {
         json["nonFlakeRequires"][x.first]["uri"] = x.second.ref.to_string();
-        json["nonFlakeRequires"][x.first]["contentHash"] = x.second.contentHash.to_string(SRI);
+        json["nonFlakeRequires"][x.first]["contentHash"] = x.second.narHash.to_string(SRI);
     }
     json["requires"] = nlohmann::json::object();
     for (auto & x : lockFile.flakeEntries)
@@ -263,6 +263,7 @@ static SourceInfo fetchFlake(EvalState & state, const FlakeRef & flakeRef, bool 
         ref.rev = Hash(std::string(*result.etag, 1, result.etag->size() - 2), htSHA1);
         SourceInfo info(ref);
         info.storePath = result.storePath;
+        info.narHash = state.store->queryPathInfo(info.storePath)->narHash;
 
         return info;
     }
@@ -276,6 +277,7 @@ static SourceInfo fetchFlake(EvalState & state, const FlakeRef & flakeRef, bool 
         SourceInfo info(ref);
         info.storePath = gitInfo.storePath;
         info.revCount = gitInfo.revCount;
+        info.narHash = state.store->queryPathInfo(info.storePath)->narHash;
         return info;
     }
 
@@ -289,6 +291,7 @@ static SourceInfo fetchFlake(EvalState & state, const FlakeRef & flakeRef, bool 
         SourceInfo info(ref);
         info.storePath = gitInfo.storePath;
         info.revCount = gitInfo.revCount;
+        info.narHash = state.store->queryPathInfo(info.storePath)->narHash;
         return info;
     }
 
@@ -315,7 +318,6 @@ Flake getFlake(EvalState & state, const FlakeRef & flakeRef, bool impureIsAllowe
         throw Error("'flake.nix' file of flake '%s' escapes from '%s'", resolvedRef, sourceInfo.storePath);
 
     Flake flake(flakeRef, sourceInfo);
-    flake.hash = state.store->queryPathInfo(sourceInfo.storePath)->narHash;
 
     if (!pathExists(realFlakeFile))
         throw Error("source tree referenced by '%s' does not contain a '%s/flake.nix' file", resolvedRef, resolvedRef.subdir);
@@ -368,19 +370,17 @@ Flake getFlake(EvalState & state, const FlakeRef & flakeRef, bool impureIsAllowe
 // Get the `NonFlake` corresponding to a `FlakeRef`.
 NonFlake getNonFlake(EvalState & state, const FlakeRef & flakeRef, FlakeAlias alias, bool impureIsAllowed = false)
 {
-    SourceInfo sourceInfo = fetchFlake(state, flakeRef, impureIsAllowed);
+    auto sourceInfo = fetchFlake(state, flakeRef, impureIsAllowed);
     debug("got non-flake source '%s' with flakeref %s", sourceInfo.storePath, sourceInfo.resolvedRef.to_string());
 
     FlakeRef resolvedRef = sourceInfo.resolvedRef;
 
     NonFlake nonFlake(flakeRef, sourceInfo);
 
-    state.store->assertStorePath(nonFlake.storePath);
+    state.store->assertStorePath(nonFlake.sourceInfo.storePath);
 
     if (state.allowedPaths)
-        state.allowedPaths->insert(nonFlake.storePath);
-
-    nonFlake.hash = state.store->queryPathInfo(sourceInfo.storePath)->narHash;
+        state.allowedPaths->insert(nonFlake.sourceInfo.storePath);
 
     nonFlake.alias = alias;
 
@@ -397,13 +397,17 @@ LockFile entryToLockFile(const LockFile::FlakeEntry & entry)
 
 LockFile::FlakeEntry dependenciesToFlakeEntry(const ResolvedFlake & resolvedFlake)
 {
-    LockFile::FlakeEntry entry(resolvedFlake.flake.resolvedRef, resolvedFlake.flake.hash);
+    LockFile::FlakeEntry entry(
+        resolvedFlake.flake.sourceInfo.resolvedRef,
+        resolvedFlake.flake.sourceInfo.narHash);
 
     for (auto & info : resolvedFlake.flakeDeps)
         entry.flakeEntries.insert_or_assign(info.first.to_string(), dependenciesToFlakeEntry(info.second));
 
     for (auto & nonFlake : resolvedFlake.nonFlakeDeps) {
-        LockFile::NonFlakeEntry nonEntry(nonFlake.resolvedRef, nonFlake.hash);
+        LockFile::NonFlakeEntry nonEntry(
+            nonFlake.sourceInfo.resolvedRef,
+            nonFlake.sourceInfo.narHash);
         entry.nonFlakeEntries.insert_or_assign(nonFlake.alias, nonEntry);
     }
 
@@ -443,7 +447,7 @@ ResolvedFlake resolveFlakeFromLockFile(EvalState & state, const FlakeRef & flake
         auto i = lockFile.nonFlakeEntries.find(nonFlakeInfo.first);
         if (i != lockFile.nonFlakeEntries.end()) {
             NonFlake nonFlake = getNonFlake(state, i->second.ref, nonFlakeInfo.first);
-            if (nonFlake.hash != i->second.contentHash)
+            if (nonFlake.sourceInfo.narHash != i->second.narHash)
                 throw Error("the content hash of flakeref '%s' doesn't match", i->second.ref.to_string());
             deps.nonFlakeDeps.push_back(nonFlake);
         } else {
@@ -457,7 +461,7 @@ ResolvedFlake resolveFlakeFromLockFile(EvalState & state, const FlakeRef & flake
         auto i = lockFile.flakeEntries.find(newFlakeRef);
         if (i != lockFile.flakeEntries.end()) { // Propagate lockFile downwards if possible
             ResolvedFlake newResFlake = resolveFlakeFromLockFile(state, i->second.ref, handleLockFile, entryToLockFile(i->second));
-            if (newResFlake.flake.hash != i->second.contentHash)
+            if (newResFlake.flake.sourceInfo.narHash != i->second.narHash)
                 throw Error("the content hash of flakeref '%s' doesn't match", i->second.ref.to_string());
             deps.flakeDeps.insert_or_assign(newFlakeRef, newResFlake);
         } else {
@@ -480,7 +484,7 @@ ResolvedFlake resolveFlake(EvalState & state, const FlakeRef & topRef, HandleLoc
 
     if (!recreateLockFile (handleLockFile)) {
         // If recreateLockFile, start with an empty lockfile
-        oldLockFile = readLockFile(flake.storePath + "/flake.lock"); // FIXME: symlink attack
+        oldLockFile = readLockFile(flake.sourceInfo.storePath + "/flake.lock"); // FIXME: symlink attack
     }
 
     LockFile lockFile(oldLockFile);
@@ -510,6 +514,23 @@ void updateLockFile(EvalState & state, const FlakeRef & flakeRef, bool recreateL
     resolveFlake(state, flakeRef, recreateLockFile ? RecreateLockFile : UpdateLockFile);
 }
 
+static void emitSourceInfoAttrs(EvalState & state, const SourceInfo & sourceInfo, Value & vAttrs)
+{
+    auto & path = sourceInfo.storePath;
+    state.store->isValidPath(path);
+    mkString(*state.allocAttr(vAttrs, state.sOutPath), path, {path});
+
+    if (sourceInfo.resolvedRef.rev) {
+        mkString(*state.allocAttr(vAttrs, state.symbols.create("rev")),
+            sourceInfo.resolvedRef.rev->gitRev());
+        mkString(*state.allocAttr(vAttrs, state.symbols.create("shortRev")),
+            sourceInfo.resolvedRef.rev->gitShortRev());
+    }
+
+    if (sourceInfo.revCount)
+        mkInt(*state.allocAttr(vAttrs, state.symbols.create("revCount")), *sourceInfo.revCount);
+}
+
 void callFlake(EvalState & state, const ResolvedFlake & resFlake, Value & v)
 {
     // Construct the resulting attrset '{description, provides,
@@ -525,29 +546,18 @@ void callFlake(EvalState & state, const ResolvedFlake & resFlake, Value & v)
 
     for (const NonFlake nonFlake : resFlake.nonFlakeDeps) {
         auto vNonFlake = state.allocAttr(v, nonFlake.alias);
-        state.mkAttrs(*vNonFlake, 4);
+        state.mkAttrs(*vNonFlake, 8);
 
-        state.store->isValidPath(nonFlake.storePath);
-        mkString(*state.allocAttr(*vNonFlake, state.sOutPath), nonFlake.storePath, {nonFlake.storePath});
+        state.store->isValidPath(nonFlake.sourceInfo.storePath);
+        mkString(*state.allocAttr(*vNonFlake, state.sOutPath),
+            nonFlake.sourceInfo.storePath, {nonFlake.sourceInfo.storePath});
 
-        // FIXME: add rev, shortRev, revCount, ...
+        emitSourceInfoAttrs(state, nonFlake.sourceInfo, *vNonFlake);
     }
 
     mkString(*state.allocAttr(v, state.sDescription), resFlake.flake.description);
 
-    auto & path = resFlake.flake.storePath;
-    state.store->isValidPath(path);
-    mkString(*state.allocAttr(v, state.sOutPath), path, {path});
-
-    if (resFlake.flake.resolvedRef.rev) {
-        mkString(*state.allocAttr(v, state.symbols.create("rev")),
-            resFlake.flake.resolvedRef.rev->gitRev());
-        mkString(*state.allocAttr(v, state.symbols.create("shortRev")),
-            resFlake.flake.resolvedRef.rev->gitShortRev());
-    }
-
-    if (resFlake.flake.revCount)
-        mkInt(*state.allocAttr(v, state.symbols.create("revCount")), *resFlake.flake.revCount);
+    emitSourceInfoAttrs(state, resFlake.flake.sourceInfo, v);
 
     auto vProvides = state.allocAttr(v, state.symbols.create("provides"));
     mkApp(*vProvides, *resFlake.flake.vProvides, v);

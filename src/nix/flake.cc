@@ -70,64 +70,64 @@ struct CmdFlakeList : EvalCommand
     }
 };
 
-void printFlakeInfo(const Flake & flake, bool json) {
-    if (json) {
-        nlohmann::json j;
-        j["id"] = flake.id;
-        j["uri"] = flake.resolvedRef.to_string();
-        j["description"] = flake.description;
-        if (flake.resolvedRef.ref)
-            j["branch"] = *flake.resolvedRef.ref;
-        if (flake.resolvedRef.rev)
-            j["revision"] = flake.resolvedRef.rev->to_string(Base16, false);
-        if (flake.revCount)
-            j["revCount"] = *flake.revCount;
-        j["path"] = flake.storePath;
-        j["epoch"] = flake.epoch;
-        std::cout << j.dump(4) << std::endl;
-    } else {
-        std::cout << "ID:          " << flake.id << "\n";
-        std::cout << "URI:         " << flake.resolvedRef.to_string() << "\n";
-        std::cout << "Description: " << flake.description << "\n";
-        if (flake.resolvedRef.ref)
-            std::cout << "Branch:      " << *flake.resolvedRef.ref << "\n";
-        if (flake.resolvedRef.rev)
-            std::cout << "Revision:    " << flake.resolvedRef.rev->to_string(Base16, false) << "\n";
-        if (flake.revCount)
-            std::cout << "Revcount:    " << *flake.revCount << "\n";
-        std::cout << "Path:        " << flake.storePath << "\n";
-        std::cout << "Epoch:       " << flake.epoch << "\n";
-    }
+static void printSourceInfo(const SourceInfo & sourceInfo)
+{
+    std::cout << fmt("URI:         %s\n", sourceInfo.resolvedRef.to_string());
+    if (sourceInfo.resolvedRef.ref)
+        std::cout << fmt("Branch:      %s\n",*sourceInfo.resolvedRef.ref);
+    if (sourceInfo.resolvedRef.rev)
+        std::cout << fmt("Revision:    %s\n", sourceInfo.resolvedRef.rev->to_string(Base16, false));
+    if (sourceInfo.revCount)
+        std::cout << fmt("Revcount:    %s\n", *sourceInfo.revCount);
+    std::cout << fmt("Path:        %s\n", sourceInfo.storePath);
 }
 
-void printNonFlakeInfo(const NonFlake & nonFlake, bool json) {
-    if (json) {
-        nlohmann::json j;
-        j["id"] = nonFlake.alias;
-        j["uri"] = nonFlake.resolvedRef.to_string();
-        if (nonFlake.resolvedRef.ref)
-            j["branch"] = *nonFlake.resolvedRef.ref;
-        if (nonFlake.resolvedRef.rev)
-            j["revision"] = nonFlake.resolvedRef.rev->to_string(Base16, false);
-        if (nonFlake.revCount)
-            j["revCount"] = *nonFlake.revCount;
-        j["path"] = nonFlake.storePath;
-        std::cout << j.dump(4) << std::endl;
-    } else {
-        std::cout << "ID:          " << nonFlake.alias << "\n";
-        std::cout << "URI:         " << nonFlake.resolvedRef.to_string() << "\n";
-        if (nonFlake.resolvedRef.ref)
-            std::cout << "Branch:      " << *nonFlake.resolvedRef.ref;
-        if (nonFlake.resolvedRef.rev)
-            std::cout << "Revision:    " << nonFlake.resolvedRef.rev->to_string(Base16, false) << "\n";
-        if (nonFlake.revCount)
-            std::cout << "Revcount:    " << *nonFlake.revCount << "\n";
-        std::cout << "Path:        " << nonFlake.storePath << "\n";
-    }
+static void sourceInfoToJson(const SourceInfo & sourceInfo, nlohmann::json & j)
+{
+    j["uri"] = sourceInfo.resolvedRef.to_string();
+    if (sourceInfo.resolvedRef.ref)
+        j["branch"] = *sourceInfo.resolvedRef.ref;
+    if (sourceInfo.resolvedRef.rev)
+        j["revision"] = sourceInfo.resolvedRef.rev->to_string(Base16, false);
+    if (sourceInfo.revCount)
+        j["revCount"] = *sourceInfo.revCount;
+    j["path"] = sourceInfo.storePath;
+}
+
+static void printFlakeInfo(const Flake & flake)
+{
+    std::cout << fmt("ID:          %s\n", flake.id);
+    std::cout << fmt("Description: %s\n", flake.description);
+    std::cout << fmt("Epoch:       %s\n", flake.epoch);
+    printSourceInfo(flake.sourceInfo);
+}
+
+static nlohmann::json flakeToJson(const Flake & flake)
+{
+    nlohmann::json j;
+    j["id"] = flake.id;
+    j["description"] = flake.description;
+    j["epoch"] = flake.epoch;
+    sourceInfoToJson(flake.sourceInfo, j);
+    return j;
+}
+
+static void printNonFlakeInfo(const NonFlake & nonFlake)
+{
+    std::cout << fmt("ID:          %s\n", nonFlake.alias);
+    printSourceInfo(nonFlake.sourceInfo);
+}
+
+static nlohmann::json nonFlakeToJson(const NonFlake & nonFlake)
+{
+    nlohmann::json j;
+    j["id"] = nonFlake.alias;
+    sourceInfoToJson(nonFlake.sourceInfo, j);
+    return j;
 }
 
 // FIXME: merge info CmdFlakeInfo?
-struct CmdFlakeDeps : FlakeCommand, MixJSON
+struct CmdFlakeDeps : FlakeCommand
 {
     std::string name() override
     {
@@ -147,15 +147,17 @@ struct CmdFlakeDeps : FlakeCommand, MixJSON
         std::queue<ResolvedFlake> todo;
         todo.push(resolveFlake());
 
+        stopProgressBar();
+
         while (!todo.empty()) {
             auto resFlake = std::move(todo.front());
             todo.pop();
 
             for (auto & nonFlake : resFlake.nonFlakeDeps)
-                printNonFlakeInfo(nonFlake, json);
+                printNonFlakeInfo(nonFlake);
 
             for (auto & info : resFlake.flakeDeps) {
-                printFlakeInfo(info.second.flake, json);
+                printFlakeInfo(info.second.flake);
                 todo.push(info.second);
             }
         }
@@ -204,7 +206,11 @@ struct CmdFlakeInfo : FlakeCommand, MixJSON
     void run(nix::ref<nix::Store> store) override
     {
         auto flake = getFlake();
-        printFlakeInfo(flake, json);
+        stopProgressBar();
+        if (json)
+            std::cout << flakeToJson(flake).dump() << std::endl;
+        else
+            printFlakeInfo(flake);
     }
 };
 
@@ -295,13 +301,13 @@ struct CmdFlakePin : virtual Args, EvalCommand
         FlakeRegistry userRegistry = *readRegistry(userRegistryPath);
         auto it = userRegistry.entries.find(FlakeRef(alias));
         if (it != userRegistry.entries.end()) {
-            it->second = getFlake(*evalState, it->second, true).resolvedRef;
+            it->second = getFlake(*evalState, it->second, true).sourceInfo.resolvedRef;
             writeRegistry(userRegistry, userRegistryPath);
         } else {
             std::shared_ptr<FlakeRegistry> globalReg = evalState->getGlobalFlakeRegistry();
             it = globalReg->entries.find(FlakeRef(alias));
             if (it != globalReg->entries.end()) {
-                FlakeRef newRef = getFlake(*evalState, it->second, true).resolvedRef;
+                auto newRef = getFlake(*evalState, it->second, true).sourceInfo.resolvedRef;
                 userRegistry.entries.insert_or_assign(alias, newRef);
                 writeRegistry(userRegistry, userRegistryPath);
             } else
