@@ -3,7 +3,10 @@
 #include "shared.hh"
 #include "progress-bar.hh"
 #include "eval.hh"
+#include "eval-inline.hh"
 #include "primops/flake.hh"
+#include "get-drvs.hh"
+#include "store-api.hh"
 
 #include <nlohmann/json.hpp>
 #include <queue>
@@ -208,8 +211,6 @@ struct CmdFlakeInfo : FlakeCommand, MixJSON
         return "list info about a given flake";
     }
 
-    CmdFlakeInfo () { }
-
     void run(nix::ref<nix::Store> store) override
     {
         auto flake = getFlake();
@@ -218,6 +219,93 @@ struct CmdFlakeInfo : FlakeCommand, MixJSON
             std::cout << flakeToJson(flake).dump() << std::endl;
         else
             printFlakeInfo(flake);
+    }
+};
+
+static void enumerateProvides(EvalState & state, Value & vFlake,
+    std::function<void(const std::string & name, Value & vProvide)> callback)
+{
+    state.forceAttrs(vFlake);
+
+    auto vProvides = (*vFlake.attrs->get(state.symbols.create("provides")))->value;
+
+    state.forceAttrs(*vProvides);
+
+    for (auto & attr : *vProvides->attrs)
+        callback(attr.name, *attr.value);
+}
+
+struct CmdFlakeCheck : FlakeCommand, MixJSON
+{
+    bool build = true;
+
+    CmdFlakeCheck()
+    {
+        mkFlag()
+            .longName("no-build")
+            .description("do not build checks")
+            .set(&build, false);
+    }
+
+    std::string name() override
+    {
+        return "check";
+    }
+
+    std::string description() override
+    {
+        return "check whether the flake evaluates and run its tests";
+    }
+
+    void run(nix::ref<nix::Store> store) override
+    {
+        auto state = getEvalState();
+        auto flake = resolveFlake();
+
+        PathSet drvPaths;
+
+        {
+            Activity act(*logger, lvlInfo, actUnknown, "evaluating flake");
+
+            auto vFlake = state->allocValue();
+            flake::callFlake(*state, flake, *vFlake);
+
+            enumerateProvides(*state,
+                *vFlake,
+                [&](const std::string & name, Value & vProvide) {
+                    Activity act(*logger, lvlChatty, actUnknown,
+                        fmt("checking flake output '%s'", name));
+
+                    try {
+                        state->forceValue(vProvide);
+
+                        if (name == "checks") {
+                            state->forceAttrs(vProvide);
+                            for (auto & aCheck : *vProvide.attrs) {
+                                try {
+                                    auto drvInfo = getDerivation(*state, *aCheck.value, false);
+                                    if (!drvInfo)
+                                        throw Error("flake output 'check.%s' is not a derivation", aCheck.name);
+                                    drvPaths.insert(drvInfo->queryDrvPath());
+                                    // FIXME: check meta attributes?
+                                } catch (Error & e) {
+                                    e.addPrefix(fmt("while checking flake check '" ANSI_BOLD "%s" ANSI_NORMAL "':\n", aCheck.name));
+                                    throw;
+                                }
+                            }
+                        }
+
+                    } catch (Error & e) {
+                        e.addPrefix(fmt("while checking flake output '" ANSI_BOLD "%s" ANSI_NORMAL "':\n", name));
+                        throw;
+                    }
+                });
+        }
+
+        if (build) {
+            Activity act(*logger, lvlInfo, actUnknown, "running flake checks");
+            store->buildPaths(drvPaths);
+        }
     }
 };
 
@@ -387,6 +475,7 @@ struct CmdFlake : virtual MultiCommand, virtual Command
         : MultiCommand({make_ref<CmdFlakeList>()
             , make_ref<CmdFlakeUpdate>()
             , make_ref<CmdFlakeInfo>()
+            , make_ref<CmdFlakeCheck>()
             , make_ref<CmdFlakeDeps>()
             , make_ref<CmdFlakeAdd>()
             , make_ref<CmdFlakeRemove>()
