@@ -46,15 +46,15 @@
     "character encoding" = "value"
     "ʎǝʞ" = "value"
     'key2' = "value"
-    #'quoted "value"' = "value"
+    'quoted "value"' = "value"
 
     name = "Orange"
 
-    # FIXME: cpptoml doesn't handle dotted keys properly yet.
-    #physical.color = "orange"
-    #physical.shape = "round"
-    #site."google.com" = true
+    physical.color = "orange"
+    physical.shape = "round"
+    site."google.com" = true
 
+    # This is legal according to the spec, but cpptoml doesn't handle it.
     #a.b.c = 1
     #a.d = 2
 
@@ -68,16 +68,14 @@
     int6 = 5_349_221
     int7 = 1_2_3_4_5
 
-    # FIXME: cpptoml doesn't support these yet:
+    hex1 = 0xDEADBEEF
+    hex2 = 0xdeadbeef
+    hex3 = 0xdead_beef
 
-    #hex1 = 0xDEADBEEF
-    #hex2 = 0xdeadbeef
-    #hex3 = 0xdead_beef
+    oct1 = 0o01234567
+    oct2 = 0o755
 
-    #oct1 = 0o01234567
-    #oct2 = 0o755
-
-    #bin1 = 0b11010110
+    bin1 = 0b11010110
 
     flt1 = +1.0
     flt2 = 3.1415
@@ -126,8 +124,8 @@
     key1 = "another string"
     key2 = 456
 
-    #[dog."tater.man"]
-    #type.name = "pug"
+    [dog."tater.man"]
+    type.name = "pug"
 
     [a.b.c]
     [ d.e.f ]
@@ -137,7 +135,7 @@
 
     name = { first = "Tom", last = "Preston-Werner" }
     point = { x = 1, y = 2 }
-    #animal = { type.name = "pug" }
+    animal = { type.name = "pug" }
 
     [[products]]
     name = "Hammer"
