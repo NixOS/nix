@@ -236,10 +236,21 @@ struct InstallableFlake : InstallableValue
 
         auto emptyArgs = state.allocBindings(0);
 
-        // As a convenience, look for the attribute in
-        // 'provides.packages'.
         if (searchPackages) {
+            // As a convenience, look for the attribute in
+            // 'provides.packages'.
             if (auto aPackages = *vProvides->attrs->get(state.symbols.create("packages"))) {
+                try {
+                    auto * v = findAlongAttrPath(state, *attrPaths.begin(), *emptyArgs, *aPackages->value);
+                    state.forceValue(*v);
+                    return v;
+                } catch (AttrPathNotFound & e) {
+                }
+            }
+
+            // As a temporary hack until Nixpkgs is properly converted
+            // to provide a clean 'packages' set, look in 'legacyPackages'.
+            if (auto aPackages = *vProvides->attrs->get(state.symbols.create("legacyPackages"))) {
                 try {
                     auto * v = findAlongAttrPath(state, *attrPaths.begin(), *emptyArgs, *aPackages->value);
                     state.forceValue(*v);
