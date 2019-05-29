@@ -5,12 +5,14 @@
 
 namespace nix {
 
+struct Value;
+class EvalState;
+
+namespace flake {
+
 static const size_t FLAG_REGISTRY = 0;
 static const size_t USER_REGISTRY = 1;
 static const size_t GLOBAL_REGISTRY = 2;
-
-struct Value;
-class EvalState;
 
 struct FlakeRegistry
 {
@@ -141,5 +143,7 @@ void callFlake(EvalState & state, const ResolvedFlake & resFlake, Value & v);
 void updateLockFile(EvalState &, const FlakeRef & flakeRef, bool recreateLockFile);
 
 void gitCloneFlake(FlakeRef flakeRef, EvalState &, Registries, const Path & destDir);
+
+}
 
 }

@@ -10,6 +10,7 @@
 #include <iomanip>
 
 using namespace nix;
+using namespace nix::flake;
 
 class FlakeCommand : virtual Args, public EvalCommand, public MixFlakeOptions
 {
@@ -33,12 +34,12 @@ public:
     Flake getFlake()
     {
         auto evalState = getEvalState();
-        return nix::getFlake(*evalState, getFlakeRef(), useRegistries);
+        return flake::getFlake(*evalState, getFlakeRef(), useRegistries);
     }
 
     ResolvedFlake resolveFlake()
     {
-        return nix::resolveFlake(*getEvalState(), getFlakeRef(), getLockFileMode());
+        return flake::resolveFlake(*getEvalState(), getFlakeRef(), getLockFileMode());
     }
 };
 

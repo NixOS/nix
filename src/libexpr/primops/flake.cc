@@ -14,6 +14,10 @@
 
 namespace nix {
 
+using namespace flake;
+
+namespace flake {
+
 /* Read a registry. */
 std::shared_ptr<FlakeRegistry> readRegistry(const Path & path)
 {
@@ -133,24 +137,6 @@ void writeLockFile(const LockFile & lockFile, const Path & path)
     writeFile(path, json.dump(4) + "\n"); // '4' = indentation in json file
 }
 
-std::shared_ptr<FlakeRegistry> EvalState::getGlobalFlakeRegistry()
-{
-    std::call_once(_globalFlakeRegistryInit, [&]() {
-        auto path = evalSettings.flakeRegistry;
-
-        if (!hasPrefix(path, "/")) {
-            CachedDownloadRequest request(evalSettings.flakeRegistry);
-            request.name = "flake-registry.json";
-            request.gcRoot = true;
-            path = getDownloader()->downloadCached(store, request).path;
-        }
-
-        _globalFlakeRegistry = readRegistry(path);
-    });
-
-    return _globalFlakeRegistry;
-}
-
 Path getUserRegistryPath()
 {
     return getHome() + "/.config/nix/registry.json";
@@ -168,17 +154,6 @@ std::shared_ptr<FlakeRegistry> getFlagRegistry(RegistryOverrides registryOverrid
         flagRegistry->entries.insert_or_assign(FlakeRef(x.first), FlakeRef(x.second));
     }
     return flagRegistry;
-}
-
-// This always returns a vector with flakeReg, userReg, globalReg.
-// If one of them doesn't exist, the registry is left empty but does exist.
-const Registries EvalState::getFlakeRegistries()
-{
-    Registries registries;
-    registries.push_back(getFlagRegistry(registryOverrides));
-    registries.push_back(getUserRegistry());
-    registries.push_back(getGlobalFlakeRegistry());
-    return registries;
 }
 
 static FlakeRef lookupFlake(EvalState & state, const FlakeRef & flakeRef, const Registries & registries,
@@ -634,6 +609,37 @@ void gitCloneFlake(FlakeRef flakeRef, EvalState & state, Registries registries, 
         args.push_back(destDir);
 
     runProgram("git", true, args);
+}
+
+}
+
+std::shared_ptr<flake::FlakeRegistry> EvalState::getGlobalFlakeRegistry()
+{
+    std::call_once(_globalFlakeRegistryInit, [&]() {
+        auto path = evalSettings.flakeRegistry;
+
+        if (!hasPrefix(path, "/")) {
+            CachedDownloadRequest request(evalSettings.flakeRegistry);
+            request.name = "flake-registry.json";
+            request.gcRoot = true;
+            path = getDownloader()->downloadCached(store, request).path;
+        }
+
+        _globalFlakeRegistry = readRegistry(path);
+    });
+
+    return _globalFlakeRegistry;
+}
+
+// This always returns a vector with flakeReg, userReg, globalReg.
+// If one of them doesn't exist, the registry is left empty but does exist.
+const Registries EvalState::getFlakeRegistries()
+{
+    Registries registries;
+    registries.push_back(getFlagRegistry(registryOverrides));
+    registries.push_back(getUserRegistry());
+    registries.push_back(getGlobalFlakeRegistry());
+    return registries;
 }
 
 }

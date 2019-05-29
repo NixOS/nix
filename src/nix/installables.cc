@@ -32,8 +32,9 @@ MixFlakeOptions::MixFlakeOptions()
         .set(&useRegistries, false);
 }
 
-HandleLockFile MixFlakeOptions::getLockFileMode()
+flake::HandleLockFile MixFlakeOptions::getLockFileMode()
 {
+    using namespace flake;
     return
         useRegistries
         ? recreateLockFile
@@ -163,18 +164,20 @@ struct InstallableAttrPath : InstallableValue
     }
 };
 
-void makeFlakeClosureGCRoot(Store & store, const FlakeRef & origFlakeRef, const ResolvedFlake & resFlake)
+void makeFlakeClosureGCRoot(Store & store,
+    const FlakeRef & origFlakeRef,
+    const flake::ResolvedFlake & resFlake)
 {
     if (std::get_if<FlakeRef::IsPath>(&origFlakeRef.data)) return;
 
     /* Get the store paths of all non-local flakes. */
     PathSet closure;
 
-    std::queue<std::reference_wrapper<const ResolvedFlake>> queue;
+    std::queue<std::reference_wrapper<const flake::ResolvedFlake>> queue;
     queue.push(resFlake);
 
     while (!queue.empty()) {
-        const ResolvedFlake & flake = queue.front();
+        const flake::ResolvedFlake & flake = queue.front();
         queue.pop();
         if (!std::get_if<FlakeRef::IsPath>(&flake.flake.sourceInfo.resolvedRef.data))
             closure.insert(flake.flake.sourceInfo.storePath);
