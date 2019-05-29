@@ -57,7 +57,7 @@ if [ -n "$HOME" ] && [ -n "$USER" ]; then
 
     # Set up environment.
     # This part should be kept in sync with nixpkgs:nixos/modules/programs/environment.nix
-    NIX_PROFILES="@localstatedir@/nix/profiles/default $NIX_USER_PROFILE_DIR"
+    export NIX_PROFILES="@localstatedir@/nix/profiles/default $HOME/.nix-profile"
 
     # Set $NIX_SSL_CERT_FILE so that Nixpkgs applications like curl work.
     if [ -e /etc/ssl/certs/ca-certificates.crt ]; then # NixOS, Ubuntu, Debian, Gentoo, Arch
@@ -79,5 +79,5 @@ if [ -n "$HOME" ] && [ -n "$USER" ]; then
     fi
 
     export PATH="$NIX_LINK/bin:$__savedpath"
-    unset __savedpath NIX_LINK NIX_USER_PROFILE_DIR NIX_PROFILES
+    unset __savedpath NIX_LINK NIX_USER_PROFILE_DIR
 fi

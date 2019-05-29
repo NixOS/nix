@@ -217,7 +217,25 @@ but can also be written as:
   ellipsis(<literal>...</literal>) as you can access attribute names as 
   <literal>a</literal>, using <literal>args.a</literal>, which was given as an
   additional attribute to the function.
-  </para></listitem>
+  </para>
+
+  <warning>
+   <para>
+    The <literal>args@</literal> expression is bound to the argument passed to the function which
+    means that attributes with defaults that aren't explicitly specified in the function call
+    won't cause an evaluation error, but won't exist in <literal>args</literal>.
+   </para>
+   <para>
+    For instance
+<programlisting>
+let
+  function = args@{ a ? 23, ... }: args;
+in
+ function {}
+</programlisting>
+    will evaluate to an empty attribute set.
+   </para>
+  </warning></listitem>
 
 </itemizedlist>
 

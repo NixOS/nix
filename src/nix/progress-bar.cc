@@ -352,11 +352,18 @@ public:
 
             if (running || done || expected || failed) {
                 if (running)
-                    s = fmt(ANSI_BLUE + numberFmt + ANSI_NORMAL "/" ANSI_GREEN + numberFmt + ANSI_NORMAL "/" + numberFmt,
-                        running / unit, done / unit, expected / unit);
+                    if (expected != 0)
+                        s = fmt(ANSI_BLUE + numberFmt + ANSI_NORMAL "/" ANSI_GREEN + numberFmt + ANSI_NORMAL "/" + numberFmt,
+                            running / unit, done / unit, expected / unit);
+                    else
+                        s = fmt(ANSI_BLUE + numberFmt + ANSI_NORMAL "/" ANSI_GREEN + numberFmt + ANSI_NORMAL,
+                            running / unit, done / unit);
                 else if (expected != done)
-                    s = fmt(ANSI_GREEN + numberFmt + ANSI_NORMAL "/" + numberFmt,
-                        done / unit, expected / unit);
+                    if (expected != 0)
+                        s = fmt(ANSI_GREEN + numberFmt + ANSI_NORMAL "/" + numberFmt,
+                            done / unit, expected / unit);
+                    else
+                        s = fmt(ANSI_GREEN + numberFmt + ANSI_NORMAL, done / unit);
                 else
                     s = fmt(done ? ANSI_GREEN + numberFmt + ANSI_NORMAL : numberFmt, done / unit);
                 s = fmt(itemFmt, s);

@@ -2,12 +2,6 @@
 if [ -n "${__ETC_PROFILE_NIX_SOURCED:-}" ]; then return; fi
 __ETC_PROFILE_NIX_SOURCED=1
 
-# Set up secure multi-user builds: non-root users build through the
-# Nix daemon.
-if [ "$USER" != root -o ! -w @localstatedir@/nix/db ]; then
-    export NIX_REMOTE=daemon
-fi
-
 export NIX_USER_PROFILE_DIR="@localstatedir@/nix/profiles/per-user/$USER"
 export NIX_PROFILES="@localstatedir@/nix/profiles/default $HOME/.nix-profile"
 
