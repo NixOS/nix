@@ -230,16 +230,16 @@ struct InstallableFlake : InstallableValue
 
         makeFlakeClosureGCRoot(*state.store, flakeRef, resFlake);
 
-        auto vProvides = (*vFlake->attrs->get(state.symbols.create("provides")))->value;
+        auto vOutputs = (*vFlake->attrs->get(state.symbols.create("outputs")))->value;
 
-        state.forceValue(*vProvides);
+        state.forceValue(*vOutputs);
 
         auto emptyArgs = state.allocBindings(0);
 
         if (searchPackages) {
             // As a convenience, look for the attribute in
-            // 'provides.packages'.
-            if (auto aPackages = *vProvides->attrs->get(state.symbols.create("packages"))) {
+            // 'outputs.packages'.
+            if (auto aPackages = *vOutputs->attrs->get(state.symbols.create("packages"))) {
                 try {
                     auto * v = findAlongAttrPath(state, *attrPaths.begin(), *emptyArgs, *aPackages->value);
                     state.forceValue(*v);
@@ -250,7 +250,7 @@ struct InstallableFlake : InstallableValue
 
             // As a temporary hack until Nixpkgs is properly converted
             // to provide a clean 'packages' set, look in 'legacyPackages'.
-            if (auto aPackages = *vProvides->attrs->get(state.symbols.create("legacyPackages"))) {
+            if (auto aPackages = *vOutputs->attrs->get(state.symbols.create("legacyPackages"))) {
                 try {
                     auto * v = findAlongAttrPath(state, *attrPaths.begin(), *emptyArgs, *aPackages->value);
                     state.forceValue(*v);
@@ -260,10 +260,10 @@ struct InstallableFlake : InstallableValue
             }
         }
 
-        // Otherwise, look for it in 'provides'.
+        // Otherwise, look for it in 'outputs'.
         for (auto & attrPath : attrPaths) {
             try {
-                auto * v = findAlongAttrPath(state, attrPath, *emptyArgs, *vProvides);
+                auto * v = findAlongAttrPath(state, attrPath, *emptyArgs, *vOutputs);
                 state.forceValue(*v);
                 return v;
             } catch (AttrPathNotFound & e) {

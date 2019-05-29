@@ -5,13 +5,13 @@
 
   epoch = 2019;
 
-  requires = [ "nixpkgs" ];
+  inputs = [ "nixpkgs" ];
 
-  provides = deps: rec {
+  outputs = inputs: rec {
 
     hydraJobs = import ./release.nix {
-      nix = deps.self;
-      nixpkgs = deps.nixpkgs;
+      nix = inputs.self;
+      nixpkgs = inputs.nixpkgs;
     };
 
     checks = {
@@ -29,7 +29,7 @@
     defaultPackage = packages.nix;
 
     devShell = import ./shell.nix {
-      nixpkgs = deps.nixpkgs;
+      nixpkgs = inputs.nixpkgs;
     };
   };
 }

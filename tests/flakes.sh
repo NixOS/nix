@@ -33,7 +33,7 @@ cat > $flake1Dir/flake.nix <<EOF
 
   description = "Bla bla";
 
-  provides = deps: rec {
+  outputs = inputs: rec {
     packages.foo = import ./simple.nix;
     defaultPackage = packages.foo;
   };
@@ -50,12 +50,12 @@ cat > $flake2Dir/flake.nix <<EOF
 
   epoch = 2019;
 
-  requires = [ "flake1" ];
+  inputs = [ "flake1" ];
 
   description = "Fnord";
 
-  provides = deps: rec {
-    packages.bar = deps.flake1.provides.packages.foo;
+  outputs = inputs: rec {
+    packages.bar = inputs.flake1.outputs.packages.foo;
   };
 }
 EOF
@@ -69,12 +69,12 @@ cat > $flake3Dir/flake.nix <<EOF
 
   epoch = 2019;
 
-  requires = [ "flake2" ];
+  inputs = [ "flake2" ];
 
   description = "Fnord";
 
-  provides = deps: rec {
-    packages.xyzzy = deps.flake2.provides.packages.bar;
+  outputs = inputs: rec {
+    packages.xyzzy = inputs.flake2.outputs.packages.bar;
   };
 }
 EOF
@@ -168,13 +168,13 @@ cat > $flake3Dir/flake.nix <<EOF
 
   epoch = 2019;
 
-  requires = [ "flake1" "flake2" ];
+  inputs = [ "flake1" "flake2" ];
 
   description = "Fnord";
 
-  provides = deps: rec {
-    packages.xyzzy = deps.flake2.provides.packages.bar;
-    packages.sth = deps.flake1.provides.packages.foo;
+  outputs = inputs: rec {
+    packages.xyzzy = inputs.flake2.outputs.packages.bar;
+    packages.sth = inputs.flake1.outputs.packages.foo;
   };
 }
 EOF
@@ -209,7 +209,7 @@ nix build -o $TEST_ROOT/result --flake-registry file://$registry file://$flake2D
 mv $flake1Dir.tmp $flake1Dir
 mv $flake2Dir.tmp $flake2Dir
 
-# Add nonFlakeRequires to flake3.
+# Add nonFlakeInputs to flake3.
 rm $flake3Dir/flake.nix
 
 cat > $flake3Dir/flake.nix <<EOF
@@ -218,23 +218,23 @@ cat > $flake3Dir/flake.nix <<EOF
 
   epoch = 2019;
 
-  requires = [ "flake1" "flake2" ];
+  inputs = [ "flake1" "flake2" ];
 
-  nonFlakeRequires = {
+  nonFlakeInputs = {
     nonFlake = "$nonFlakeDir";
   };
 
   description = "Fnord";
 
-  provides = deps: rec {
-    packages.xyzzy = deps.flake2.provides.packages.bar;
-    packages.sth = deps.flake1.provides.packages.foo;
+  outputs = inputs: rec {
+    packages.xyzzy = inputs.flake2.outputs.packages.bar;
+    packages.sth = inputs.flake1.outputs.packages.foo;
   };
 }
 EOF
 
 git -C $flake3Dir add flake.nix
-git -C $flake3Dir commit -m 'Add nonFlakeRequires'
+git -C $flake3Dir commit -m 'Add nonFlakeInputs'
 
-# Check whether `nix build` works with a lockfile which is missing a nonFlakeRequires
+# Check whether `nix build` works with a lockfile which is missing a nonFlakeInputs
 nix build -o $TEST_ROOT/result --flake-registry $registry $flake3Dir:sth

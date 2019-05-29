@@ -56,21 +56,21 @@ LockFile::FlakeEntry readFlakeEntry(nlohmann::json json)
     if (!flakeRef.isImmutable())
         throw Error("cannot use mutable flake '%s' in pure mode", flakeRef);
 
-    LockFile::FlakeEntry entry(flakeRef, Hash((std::string) json["contentHash"]));
+    LockFile::FlakeEntry entry(flakeRef, Hash((std::string) json["narHash"]));
 
-    auto nonFlakeRequires = json["nonFlakeRequires"];
+    auto nonFlakeInputs = json["nonFlakeInputs"];
 
-    for (auto i = nonFlakeRequires.begin(); i != nonFlakeRequires.end(); ++i) {
+    for (auto i = nonFlakeInputs.begin(); i != nonFlakeInputs.end(); ++i) {
         FlakeRef flakeRef(i->value("uri", ""));
         if (!flakeRef.isImmutable())
             throw Error("requested to fetch FlakeRef '%s' purely, which is mutable", flakeRef);
-        LockFile::NonFlakeEntry nonEntry(flakeRef, Hash(i->value("contentHash", "")));
+        LockFile::NonFlakeEntry nonEntry(flakeRef, Hash(i->value("narHash", "")));
         entry.nonFlakeEntries.insert_or_assign(i.key(), nonEntry);
     }
 
-    auto requires = json["requires"];
+    auto inputs = json["inputs"];
 
-    for (auto i = requires.begin(); i != requires.end(); ++i)
+    for (auto i = inputs.begin(); i != inputs.end(); ++i)
         entry.flakeEntries.insert_or_assign(i.key(), readFlakeEntry(*i));
 
     return entry;
@@ -89,19 +89,19 @@ LockFile readLockFile(const Path & path)
     if (version != 1)
         throw Error("lock file '%s' has unsupported version %d", path, version);
 
-    auto nonFlakeRequires = json["nonFlakeRequires"];
+    auto nonFlakeInputs = json["nonFlakeInputs"];
 
-    for (auto i = nonFlakeRequires.begin(); i != nonFlakeRequires.end(); ++i) {
+    for (auto i = nonFlakeInputs.begin(); i != nonFlakeInputs.end(); ++i) {
         FlakeRef flakeRef(i->value("uri", ""));
-        LockFile::NonFlakeEntry nonEntry(flakeRef, Hash(i->value("contentHash", "")));
+        LockFile::NonFlakeEntry nonEntry(flakeRef, Hash(i->value("narHash", "")));
         if (!flakeRef.isImmutable())
             throw Error("found mutable FlakeRef '%s' in lockfile at path %s", flakeRef, path);
         lockFile.nonFlakeEntries.insert_or_assign(i.key(), nonEntry);
     }
 
-    auto requires = json["requires"];
+    auto inputs = json["inputs"];
 
-    for (auto i = requires.begin(); i != requires.end(); ++i)
+    for (auto i = inputs.begin(); i != inputs.end(); ++i)
         lockFile.flakeEntries.insert_or_assign(i.key(), readFlakeEntry(*i));
 
     return lockFile;
@@ -111,13 +111,13 @@ nlohmann::json flakeEntryToJson(const LockFile::FlakeEntry & entry)
 {
     nlohmann::json json;
     json["uri"] = entry.ref.to_string();
-    json["contentHash"] = entry.narHash.to_string(SRI);
+    json["narHash"] = entry.narHash.to_string(SRI);
     for (auto & x : entry.nonFlakeEntries) {
-        json["nonFlakeRequires"][x.first]["uri"] = x.second.ref.to_string();
-        json["nonFlakeRequires"][x.first]["contentHash"] = x.second.narHash.to_string(SRI);
+        json["nonFlakeInputs"][x.first]["uri"] = x.second.ref.to_string();
+        json["nonFlakeInputs"][x.first]["narHash"] = x.second.narHash.to_string(SRI);
     }
     for (auto & x : entry.flakeEntries)
-        json["requires"][x.first.to_string()] = flakeEntryToJson(x.second);
+        json["inputs"][x.first.to_string()] = flakeEntryToJson(x.second);
     return json;
 }
 
@@ -125,14 +125,14 @@ void writeLockFile(const LockFile & lockFile, const Path & path)
 {
     nlohmann::json json;
     json["version"] = 1;
-    json["nonFlakeRequires"] = nlohmann::json::object();
+    json["nonFlakeInputs"] = nlohmann::json::object();
     for (auto & x : lockFile.nonFlakeEntries) {
-        json["nonFlakeRequires"][x.first]["uri"] = x.second.ref.to_string();
-        json["nonFlakeRequires"][x.first]["contentHash"] = x.second.narHash.to_string(SRI);
+        json["nonFlakeInputs"][x.first]["uri"] = x.second.ref.to_string();
+        json["nonFlakeInputs"][x.first]["narHash"] = x.second.narHash.to_string(SRI);
     }
-    json["requires"] = nlohmann::json::object();
+    json["inputs"] = nlohmann::json::object();
     for (auto & x : lockFile.flakeEntries)
-        json["requires"][x.first.to_string()] = flakeEntryToJson(x.second);
+        json["inputs"][x.first.to_string()] = flakeEntryToJson(x.second);
     createDirs(dirOf(path));
     writeFile(path, json.dump(4) + "\n"); // '4' = indentation in json file
 }
@@ -319,41 +319,41 @@ Flake getFlake(EvalState & state, const FlakeRef & flakeRef, bool impureIsAllowe
     if (auto description = vInfo.attrs->get(state.sDescription))
         flake.description = state.forceStringNoCtx(*(**description).value, *(**description).pos);
 
-    auto sRequires = state.symbols.create("requires");
+    auto sInputs = state.symbols.create("inputs");
 
-    if (auto requires = vInfo.attrs->get(sRequires)) {
-        state.forceList(*(**requires).value, *(**requires).pos);
-        for (unsigned int n = 0; n < (**requires).value->listSize(); ++n)
-            flake.requires.push_back(FlakeRef(state.forceStringNoCtx(
-                *(**requires).value->listElems()[n], *(**requires).pos)));
+    if (auto inputs = vInfo.attrs->get(sInputs)) {
+        state.forceList(*(**inputs).value, *(**inputs).pos);
+        for (unsigned int n = 0; n < (**inputs).value->listSize(); ++n)
+            flake.inputs.push_back(FlakeRef(state.forceStringNoCtx(
+                *(**inputs).value->listElems()[n], *(**inputs).pos)));
     }
 
-    auto sNonFlakeRequires = state.symbols.create("nonFlakeRequires");
+    auto sNonFlakeInputs = state.symbols.create("nonFlakeInputs");
 
-    if (std::optional<Attr *> nonFlakeRequires = vInfo.attrs->get(sNonFlakeRequires)) {
-        state.forceAttrs(*(**nonFlakeRequires).value, *(**nonFlakeRequires).pos);
-        for (Attr attr : *(*(**nonFlakeRequires).value).attrs) {
+    if (std::optional<Attr *> nonFlakeInputs = vInfo.attrs->get(sNonFlakeInputs)) {
+        state.forceAttrs(*(**nonFlakeInputs).value, *(**nonFlakeInputs).pos);
+        for (Attr attr : *(*(**nonFlakeInputs).value).attrs) {
             std::string myNonFlakeUri = state.forceStringNoCtx(*attr.value, *attr.pos);
             FlakeRef nonFlakeRef = FlakeRef(myNonFlakeUri);
-            flake.nonFlakeRequires.insert_or_assign(attr.name, nonFlakeRef);
+            flake.nonFlakeInputs.insert_or_assign(attr.name, nonFlakeRef);
         }
     }
 
-    auto sProvides = state.symbols.create("provides");
+    auto sOutputs = state.symbols.create("outputs");
 
-    if (auto provides = vInfo.attrs->get(sProvides)) {
-        state.forceFunction(*(**provides).value, *(**provides).pos);
-        flake.vProvides = (**provides).value;
+    if (auto outputs = vInfo.attrs->get(sOutputs)) {
+        state.forceFunction(*(**outputs).value, *(**outputs).pos);
+        flake.vOutputs = (**outputs).value;
     } else
-        throw Error("flake '%s' lacks attribute 'provides'", flakeRef);
+        throw Error("flake '%s' lacks attribute 'outputs'", flakeRef);
 
     for (auto & attr : *vInfo.attrs) {
         if (attr.name != sEpoch &&
             attr.name != state.sName &&
             attr.name != state.sDescription &&
-            attr.name != sRequires &&
-            attr.name != sNonFlakeRequires &&
-            attr.name != sProvides)
+            attr.name != sInputs &&
+            attr.name != sNonFlakeInputs &&
+            attr.name != sOutputs)
             throw Error("flake '%s' has an unsupported attribute '%s', at %s",
                 flakeRef, attr.name, *attr.pos);
     }
@@ -436,7 +436,7 @@ ResolvedFlake resolveFlakeFromLockFile(EvalState & state, const FlakeRef & flake
 
     ResolvedFlake deps(flake);
 
-    for (auto & nonFlakeInfo : flake.nonFlakeRequires) {
+    for (auto & nonFlakeInfo : flake.nonFlakeInputs) {
         FlakeRef ref = nonFlakeInfo.second;
         auto i = lockFile.nonFlakeEntries.find(nonFlakeInfo.first);
         if (i != lockFile.nonFlakeEntries.end()) {
@@ -451,7 +451,7 @@ ResolvedFlake resolveFlakeFromLockFile(EvalState & state, const FlakeRef & flake
         }
     }
 
-    for (auto newFlakeRef : flake.requires) {
+    for (auto newFlakeRef : flake.inputs) {
         auto i = lockFile.flakeEntries.find(newFlakeRef);
         if (i != lockFile.flakeEntries.end()) { // Propagate lockFile downwards if possible
             ResolvedFlake newResFlake = resolveFlakeFromLockFile(state, i->second.ref, handleLockFile, entryToLockFile(i->second));
@@ -532,8 +532,8 @@ static void emitSourceInfoAttrs(EvalState & state, const SourceInfo & sourceInfo
 
 void callFlake(EvalState & state, const ResolvedFlake & resFlake, Value & v)
 {
-    // Construct the resulting attrset '{description, provides,
-    // ...}'. This attrset is passed lazily as an argument to 'provides'.
+    // Construct the resulting attrset '{description, outputs,
+    // ...}'. This attrset is passed lazily as an argument to 'outputs'.
 
     state.mkAttrs(v, resFlake.flakeDeps.size() + resFlake.nonFlakeDeps.size() + 8);
 
@@ -558,8 +558,8 @@ void callFlake(EvalState & state, const ResolvedFlake & resFlake, Value & v)
 
     emitSourceInfoAttrs(state, resFlake.flake.sourceInfo, v);
 
-    auto vProvides = state.allocAttr(v, state.symbols.create("provides"));
-    mkApp(*vProvides, *resFlake.flake.vProvides, v);
+    auto vOutputs = state.allocAttr(v, state.symbols.create("outputs"));
+    mkApp(*vOutputs, *resFlake.flake.vOutputs, v);
 
     v.attrs->push_back(Attr(state.symbols.create("self"), &v));
 
