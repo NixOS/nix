@@ -199,6 +199,19 @@ struct CmdFlakeUpdate : FlakeCommand
     }
 };
 
+static void enumerateProvides(EvalState & state, Value & vFlake,
+    std::function<void(const std::string & name, Value & vProvide)> callback)
+{
+    state.forceAttrs(vFlake);
+
+    auto vProvides = (*vFlake.attrs->get(state.symbols.create("provides")))->value;
+
+    state.forceAttrs(*vProvides);
+
+    for (auto & attr : *vProvides->attrs)
+        callback(attr.name, *attr.value);
+}
+
 struct CmdFlakeInfo : FlakeCommand, MixJSON
 {
     std::string name() override
@@ -215,25 +228,38 @@ struct CmdFlakeInfo : FlakeCommand, MixJSON
     {
         auto flake = getFlake();
         stopProgressBar();
-        if (json)
-            std::cout << flakeToJson(flake).dump() << std::endl;
-        else
+
+        if (json) {
+            auto json = flakeToJson(flake);
+
+            auto state = getEvalState();
+
+            auto vFlake = state->allocValue();
+            flake::callFlake(*state, flake, *vFlake);
+
+            auto provides = nlohmann::json::object();
+
+            enumerateProvides(*state,
+                *vFlake,
+                [&](const std::string & name, Value & vProvide) {
+                    auto provide = nlohmann::json::object();
+
+                    if (name == "checks" || name == "packages") {
+                        state->forceAttrs(vProvide);
+                        for (auto & aCheck : *vProvide.attrs)
+                            provide[aCheck.name] = nlohmann::json::object();
+                    }
+
+                    provides[name] = provide;
+                });
+
+            json["provides"] = std::move(provides);
+
+            std::cout << json.dump() << std::endl;
+        } else
             printFlakeInfo(flake);
     }
 };
-
-static void enumerateProvides(EvalState & state, Value & vFlake,
-    std::function<void(const std::string & name, Value & vProvide)> callback)
-{
-    state.forceAttrs(vFlake);
-
-    auto vProvides = (*vFlake.attrs->get(state.symbols.create("provides")))->value;
-
-    state.forceAttrs(*vProvides);
-
-    for (auto & attr : *vProvides->attrs)
-        callback(attr.name, *attr.value);
-}
 
 struct CmdFlakeCheck : FlakeCommand, MixJSON
 {
