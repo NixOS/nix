@@ -262,6 +262,19 @@ struct CmdFlakeCheck : FlakeCommand, MixJSON
         auto state = getEvalState();
         auto flake = resolveFlake();
 
+        auto checkDerivation = [&](const std::string & attrPath, Value & v) {
+            try {
+                auto drvInfo = getDerivation(*state, v, false);
+                if (!drvInfo)
+                    throw Error("flake attribute '%s' is not a derivation", attrPath);
+                // FIXME: check meta attributes
+                return drvInfo->queryDrvPath();
+            } catch (Error & e) {
+                e.addPrefix(fmt("while checking flake attribute '" ANSI_BOLD "%s" ANSI_NORMAL "':\n", attrPath));
+                throw;
+            }
+        };
+
         PathSet drvPaths;
 
         {
@@ -281,19 +294,20 @@ struct CmdFlakeCheck : FlakeCommand, MixJSON
 
                         if (name == "checks") {
                             state->forceAttrs(vProvide);
-                            for (auto & aCheck : *vProvide.attrs) {
-                                try {
-                                    auto drvInfo = getDerivation(*state, *aCheck.value, false);
-                                    if (!drvInfo)
-                                        throw Error("flake output 'check.%s' is not a derivation", aCheck.name);
-                                    drvPaths.insert(drvInfo->queryDrvPath());
-                                    // FIXME: check meta attributes?
-                                } catch (Error & e) {
-                                    e.addPrefix(fmt("while checking flake check '" ANSI_BOLD "%s" ANSI_NORMAL "':\n", aCheck.name));
-                                    throw;
-                                }
-                            }
+                            for (auto & aCheck : *vProvide.attrs)
+                                drvPaths.insert(checkDerivation(
+                                        name + "." + (std::string) aCheck.name, *aCheck.value));
                         }
+
+                        else if (name == "packages") {
+                            state->forceAttrs(vProvide);
+                            for (auto & aCheck : *vProvide.attrs)
+                                checkDerivation(
+                                    name + "." + (std::string) aCheck.name, *aCheck.value);
+                        }
+
+                        else if (name == "defaultPackage" || name == "devShell")
+                            checkDerivation(name, vProvide);
 
                     } catch (Error & e) {
                         e.addPrefix(fmt("while checking flake output '" ANSI_BOLD "%s" ANSI_NORMAL "':\n", name));
