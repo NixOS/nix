@@ -12,6 +12,7 @@ struct GitInfo
     std::string ref;
     Hash rev{htSHA1};
     uint64_t revCount;
+    time_t lastModified;
 };
 
 GitInfo exportGit(ref<Store> store, std::string uri,

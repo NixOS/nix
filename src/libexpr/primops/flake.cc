@@ -8,6 +8,8 @@
 #include <iostream>
 #include <queue>
 #include <regex>
+#include <ctime>
+#include <iomanip>
 #include <nlohmann/json.hpp>
 
 namespace nix {
@@ -232,6 +234,18 @@ static SourceInfo fetchFlake(EvalState & state, const FlakeRef & flakeRef, bool 
     if (evalSettings.pureEval && !impureIsAllowed && !resolvedRef.isImmutable())
         throw Error("requested to fetch mutable flake '%s' in pure mode", resolvedRef);
 
+    auto doGit = [&](const GitInfo & gitInfo) {
+        FlakeRef ref(resolvedRef.baseRef());
+        ref.ref = gitInfo.ref;
+        ref.rev = gitInfo.rev;
+        SourceInfo info(ref);
+        info.storePath = gitInfo.storePath;
+        info.revCount = gitInfo.revCount;
+        info.narHash = state.store->queryPathInfo(info.storePath)->narHash;
+        info.lastModified = gitInfo.lastModified;
+        return info;
+    };
+
     // This only downloads only one revision of the repo, not the entire history.
     if (auto refData = std::get_if<FlakeRef::IsGitHub>(&resolvedRef.data)) {
 
@@ -251,6 +265,7 @@ static SourceInfo fetchFlake(EvalState & state, const FlakeRef & flakeRef, bool 
         request.unpack = true;
         request.name = "source";
         request.ttl = resolvedRef.rev ? 1000000000 : settings.tarballTtl;
+        request.getLastModified = true;
         auto result = getDownloader()->downloadCached(state.store, request);
 
         if (!result.etag)
@@ -264,35 +279,20 @@ static SourceInfo fetchFlake(EvalState & state, const FlakeRef & flakeRef, bool 
         SourceInfo info(ref);
         info.storePath = result.storePath;
         info.narHash = state.store->queryPathInfo(info.storePath)->narHash;
+        info.lastModified = result.lastModified;
 
         return info;
     }
 
     // This downloads the entire git history
     else if (auto refData = std::get_if<FlakeRef::IsGit>(&resolvedRef.data)) {
-        auto gitInfo = exportGit(state.store, refData->uri, resolvedRef.ref, resolvedRef.rev, "source");
-        FlakeRef ref(resolvedRef.baseRef());
-        ref.ref = gitInfo.ref;
-        ref.rev = gitInfo.rev;
-        SourceInfo info(ref);
-        info.storePath = gitInfo.storePath;
-        info.revCount = gitInfo.revCount;
-        info.narHash = state.store->queryPathInfo(info.storePath)->narHash;
-        return info;
+        return doGit(exportGit(state.store, refData->uri, resolvedRef.ref, resolvedRef.rev, "source"));
     }
 
     else if (auto refData = std::get_if<FlakeRef::IsPath>(&resolvedRef.data)) {
         if (!pathExists(refData->path + "/.git"))
             throw Error("flake '%s' does not reference a Git repository", refData->path);
-        auto gitInfo = exportGit(state.store, refData->path, {}, {}, "source");
-        FlakeRef ref(resolvedRef.baseRef());
-        ref.ref = gitInfo.ref;
-        ref.rev = gitInfo.rev;
-        SourceInfo info(ref);
-        info.storePath = gitInfo.storePath;
-        info.revCount = gitInfo.revCount;
-        info.narHash = state.store->queryPathInfo(info.storePath)->narHash;
-        return info;
+        return doGit(exportGit(state.store, refData->path, {}, {}, "source"));
     }
 
     else abort();
@@ -529,6 +529,11 @@ static void emitSourceInfoAttrs(EvalState & state, const SourceInfo & sourceInfo
 
     if (sourceInfo.revCount)
         mkInt(*state.allocAttr(vAttrs, state.symbols.create("revCount")), *sourceInfo.revCount);
+
+    if (sourceInfo.lastModified)
+        mkString(*state.allocAttr(vAttrs, state.symbols.create("lastModified")),
+            fmt("%s",
+                std::put_time(std::gmtime(&*sourceInfo.lastModified), "%Y%m%d%H%M%S")));
 }
 
 void callFlake(EvalState & state, const ResolvedFlake & resFlake, Value & v)

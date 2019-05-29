@@ -49,6 +49,7 @@ struct CachedDownloadRequest
     Hash expectedHash;
     unsigned int ttl = settings.tarballTtl;
     bool gcRoot = false;
+    bool getLastModified = false;
 
     CachedDownloadRequest(const std::string & uri)
         : uri(uri) { }
@@ -62,6 +63,7 @@ struct CachedDownloadResult
     Path path;
     std::optional<std::string> etag;
     std::string effectiveUri;
+    std::optional<time_t> lastModified;
 };
 
 class Store;
