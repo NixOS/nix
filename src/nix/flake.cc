@@ -259,6 +259,8 @@ struct CmdFlakeCheck : FlakeCommand, MixJSON
 
     void run(nix::ref<nix::Store> store) override
     {
+        settings.readOnlyMode = !build;
+
         auto state = getEvalState();
         auto flake = resolveFlake();
 
