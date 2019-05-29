@@ -566,18 +566,11 @@ void callFlake(EvalState & state, const ResolvedFlake & resFlake, Value & v)
     v.attrs->sort();
 }
 
-// Return the `provides` of the top flake, while assigning to `v` the provides
-// of the dependencies as well.
-void makeFlakeValue(EvalState & state, const FlakeRef & flakeRef, HandleLockFile handle, Value & v)
-{
-    callFlake(state, resolveFlake(state, flakeRef, handle), v);
-}
-
 // This function is exposed to be used in nix files.
 static void prim_getFlake(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
-    makeFlakeValue(state, state.forceStringNoCtx(*args[0], pos),
-        evalSettings.pureEval ? AllPure : UseUpdatedLockFile, v);
+    callFlake(state, resolveFlake(state, state.forceStringNoCtx(*args[0], pos),
+            evalSettings.pureEval ? AllPure : UseUpdatedLockFile), v);
 }
 
 static RegisterPrimOp r2("getFlake", 1, prim_getFlake);

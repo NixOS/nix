@@ -75,8 +75,6 @@ enum HandleLockFile : unsigned int
     , UseNewLockFile // `RecreateLockFile` without writing to file
     };
 
-void makeFlakeValue(EvalState &, const FlakeRef &, HandleLockFile, Value &);
-
 std::shared_ptr<FlakeRegistry> readRegistry(const Path &);
 
 void writeRegistry(const FlakeRegistry &, const Path &);
