@@ -327,7 +327,9 @@ Flake getFlake(EvalState & state, const FlakeRef & flakeRef, bool impureIsAllowe
 
     state.forceAttrs(vInfo);
 
-    if (auto epoch = vInfo.attrs->get(state.symbols.create("epoch"))) {
+    auto sEpoch = state.symbols.create("epoch");
+
+    if (auto epoch = vInfo.attrs->get(sEpoch)) {
         flake.epoch = state.forceInt(*(**epoch).value, *(**epoch).pos);
         if (flake.epoch > 2019)
             throw Error("flake '%s' requires unsupported epoch %d; please upgrade Nix", flakeRef, flake.epoch);
@@ -342,14 +344,18 @@ Flake getFlake(EvalState & state, const FlakeRef & flakeRef, bool impureIsAllowe
     if (auto description = vInfo.attrs->get(state.sDescription))
         flake.description = state.forceStringNoCtx(*(**description).value, *(**description).pos);
 
-    if (auto requires = vInfo.attrs->get(state.symbols.create("requires"))) {
+    auto sRequires = state.symbols.create("requires");
+
+    if (auto requires = vInfo.attrs->get(sRequires)) {
         state.forceList(*(**requires).value, *(**requires).pos);
         for (unsigned int n = 0; n < (**requires).value->listSize(); ++n)
             flake.requires.push_back(FlakeRef(state.forceStringNoCtx(
                 *(**requires).value->listElems()[n], *(**requires).pos)));
     }
 
-    if (std::optional<Attr *> nonFlakeRequires = vInfo.attrs->get(state.symbols.create("nonFlakeRequires"))) {
+    auto sNonFlakeRequires = state.symbols.create("nonFlakeRequires");
+
+    if (std::optional<Attr *> nonFlakeRequires = vInfo.attrs->get(sNonFlakeRequires)) {
         state.forceAttrs(*(**nonFlakeRequires).value, *(**nonFlakeRequires).pos);
         for (Attr attr : *(*(**nonFlakeRequires).value).attrs) {
             std::string myNonFlakeUri = state.forceStringNoCtx(*attr.value, *attr.pos);
@@ -358,11 +364,24 @@ Flake getFlake(EvalState & state, const FlakeRef & flakeRef, bool impureIsAllowe
         }
     }
 
-    if (auto provides = vInfo.attrs->get(state.symbols.create("provides"))) {
+    auto sProvides = state.symbols.create("provides");
+
+    if (auto provides = vInfo.attrs->get(sProvides)) {
         state.forceFunction(*(**provides).value, *(**provides).pos);
         flake.vProvides = (**provides).value;
     } else
         throw Error("flake '%s' lacks attribute 'provides'", flakeRef);
+
+    for (auto & attr : *vInfo.attrs) {
+        if (attr.name != sEpoch &&
+            attr.name != state.sName &&
+            attr.name != state.sDescription &&
+            attr.name != sRequires &&
+            attr.name != sNonFlakeRequires &&
+            attr.name != sProvides)
+            throw Error("flake '%s' has an unsupported attribute '%s', at %s",
+                flakeRef, attr.name, *attr.pos);
+    }
 
     return flake;
 }
