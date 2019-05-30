@@ -18,7 +18,7 @@ cleanup() {
 trap cleanup EXIT INT QUIT TERM
 
 require_util() {
-    type "$1" > /dev/null 2>&1 || command -v "$1" > /dev/null 2>&1 ||
+    command -v "$1" > /dev/null 2>&1 ||
         oops "you do not have '$1' installed, which I need to $2"
 }
 
@@ -41,11 +41,11 @@ require_util tar "unpack the binary tarball"
 echo "downloading Nix @nixVersion@ binary tarball for $system from '$url' to '$tmpDir'..."
 curl -L "$url" -o "$tarball" || oops "failed to download '$url'"
 
-if type sha256sum > /dev/null 2>&1; then
+if command -v sha256sum > /dev/null 2>&1; then
     hash2="$(sha256sum -b "$tarball" | cut -c1-64)"
-elif type shasum > /dev/null 2>&1; then
+elif command -v shasum > /dev/null 2>&1; then
     hash2="$(shasum -a 256 -b "$tarball" | cut -c1-64)"
-elif type openssl > /dev/null 2>&1; then
+elif command -v openssl > /dev/null 2>&1; then
     hash2="$(openssl dgst -r -sha256 "$tarball" | cut -c1-64)"
 else
     oops "cannot verify the SHA-256 hash of '$url'; you need one of 'shasum', 'sha256sum', or 'openssl'"
