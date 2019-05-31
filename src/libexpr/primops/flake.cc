@@ -482,9 +482,12 @@ ResolvedFlake resolveFlake(EvalState & state, const FlakeRef & topRef, HandleLoc
     Flake flake = getFlake(state, topRef, allowedToUseRegistries(handleLockFile, true));
     LockFile oldLockFile;
 
-    if (!recreateLockFile (handleLockFile)) {
+    if (!recreateLockFile(handleLockFile)) {
         // If recreateLockFile, start with an empty lockfile
-        oldLockFile = readLockFile(flake.sourceInfo.storePath + "/flake.lock"); // FIXME: symlink attack
+        // FIXME: symlink attack
+        oldLockFile = readLockFile(
+            state.store->toRealPath(flake.sourceInfo.storePath)
+            + "/" + flake.sourceInfo.resolvedRef.subdir + "/flake.lock");
     }
 
     LockFile lockFile(oldLockFile);
