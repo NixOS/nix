@@ -140,7 +140,17 @@ FlakeRef::FlakeRef(const std::string & uri_, bool allowRelative)
         && uri.find(':') == std::string::npos)
     {
         IsPath d;
-        d.path = allowRelative ? absPath(uri) : canonPath(uri);
+        if (allowRelative) {
+            d.path = absPath(uri);
+            while (true) {
+                if (pathExists(d.path + "/.git")) break;
+                subdir = baseNameOf(d.path) + (subdir.empty() ? "" : "/" + subdir);
+                d.path = dirOf(d.path);
+                if (d.path == "/")
+                    throw BadFlakeRef("path '%s' does not reference a Git repository", uri);
+            }
+        } else
+            d.path = canonPath(uri);
         data = d;
         for (auto & param : params) {
             if (handleGitParams(param.first, param.second))
