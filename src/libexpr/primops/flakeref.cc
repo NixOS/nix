@@ -65,7 +65,7 @@ FlakeRef::FlakeRef(const std::string & uri_, bool allowRelative)
     auto handleSubdir = [&](const std::string & name, const std::string & value) {
         if (name == "dir") {
             if (value != "" && !std::regex_match(value, subDirRegex2))
-                throw Error("flake '%s' has invalid subdirectory '%s'", uri, value);
+                throw BadFlakeRef("flake '%s' has invalid subdirectory '%s'", uri, value);
             subdir = value;
             return true;
         } else
@@ -75,11 +75,11 @@ FlakeRef::FlakeRef(const std::string & uri_, bool allowRelative)
     auto handleGitParams = [&](const std::string & name, const std::string & value) {
         if (name == "rev") {
             if (!std::regex_match(value, revRegex))
-                throw Error("invalid Git revision '%s'", value);
+                throw BadFlakeRef("invalid Git revision '%s'", value);
             rev = Hash(value, htSHA1);
         } else if (name == "ref") {
             if (!std::regex_match(value, refRegex2))
-                throw Error("invalid Git ref '%s'", value);
+                throw BadFlakeRef("invalid Git ref '%s'", value);
             ref = value;
         } else if (handleSubdir(name, value))
             ;
@@ -114,7 +114,7 @@ FlakeRef::FlakeRef(const std::string & uri_, bool allowRelative)
             if (handleSubdir(param.first, param.second))
                 ;
             else
-                throw Error("invalid Git flakeref parameter '%s', in '%s'", param.first, uri);
+                throw BadFlakeRef("invalid Git flakeref parameter '%s', in '%s'", param.first, uri);
         }
         data = d;
     }
@@ -129,14 +129,16 @@ FlakeRef::FlakeRef(const std::string & uri_, bool allowRelative)
                 ;
             else
                 // FIXME: should probably pass through unknown parameters
-                throw Error("invalid Git flakeref parameter '%s', in '%s'", param.first, uri);
+                throw BadFlakeRef("invalid Git flakeref parameter '%s', in '%s'", param.first, uri);
         }
         if (rev && !ref)
-            throw Error("flake URI '%s' lacks a Git ref", uri);
+            throw BadFlakeRef("flake URI '%s' lacks a Git ref", uri);
         data = d;
     }
 
-    else if (hasPrefix(uri, "/") || (allowRelative && (hasPrefix(uri, "./") || hasPrefix(uri, "../") || uri == "."))) {
+    else if ((hasPrefix(uri, "/") || (allowRelative && (hasPrefix(uri, "./") || hasPrefix(uri, "../") || uri == ".")))
+        && uri.find(':') == std::string::npos)
+    {
         IsPath d;
         d.path = allowRelative ? absPath(uri) : canonPath(uri);
         data = d;
@@ -144,12 +146,12 @@ FlakeRef::FlakeRef(const std::string & uri_, bool allowRelative)
             if (handleGitParams(param.first, param.second))
                 ;
             else
-                throw Error("invalid Git flakeref parameter '%s', in '%s'", param.first, uri);
+                throw BadFlakeRef("invalid Git flakeref parameter '%s', in '%s'", param.first, uri);
         }
     }
 
     else
-        throw Error("'%s' is not a valid flake reference", uri);
+        throw BadFlakeRef("'%s' is not a valid flake reference", uri);
 }
 
 std::string FlakeRef::to_string() const
@@ -225,4 +227,15 @@ FlakeRef FlakeRef::baseRef() const // Removes the ref and rev from a FlakeRef.
     result.rev = std::nullopt;
     return result;
 }
+
+std::optional<FlakeRef> parseFlakeRef(
+    const std::string & uri, bool allowRelative)
+{
+    try {
+        return FlakeRef(uri, allowRelative);
+    } catch (BadFlakeRef & e) {
+        return {};
+    }
+}
+
 }

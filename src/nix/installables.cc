@@ -332,6 +332,10 @@ std::vector<std::shared_ptr<Installable>> SourceExprCommand::parseInstallables(
                             getDefaultFlakeAttrPaths()));
             }
 
+            else if (auto flakeRef = parseFlakeRef(s, true))
+                result.push_back(std::make_shared<InstallableFlake>(*this, s,
+                        getDefaultFlakeAttrPaths()));
+
             else
                 result.push_back(std::make_shared<InstallableFlake>(*this, FlakeRef("nixpkgs"), s));
         }

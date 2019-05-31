@@ -180,4 +180,9 @@ struct FlakeRef
 
 std::ostream & operator << (std::ostream & str, const FlakeRef & flakeRef);
 
+MakeError(BadFlakeRef, Error);
+
+std::optional<FlakeRef> parseFlakeRef(
+    const std::string & uri, bool allowRelative = false);
+
 }
