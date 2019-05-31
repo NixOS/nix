@@ -103,12 +103,12 @@ module.
 
   # A list of flake references denoting the flakes that this flake
   # depends on. Nix will resolve and fetch these flakes and pass them
-  # as a function argument to `provides` below.
+  # as a function argument to `outputs` below.
   #
   # `flake:nixpkgs` denotes a flake named `nixpkgs` which is looked up
   # in the flake registry, or in `flake.lock` inside this flake, if it
   # exists.
-  requires = [ flake:nixpkgs ];
+  inputs = [ flake:nixpkgs ];
 
   # The stuff provided by this flake. Flakes can provide whatever they
   # want (convention over configuration), but some attributes have
@@ -117,9 +117,9 @@ module.
   # `nixosModules` is used by NixOS to automatically pull in the
   # modules provided by a flake.
   #
-  # `provides` takes a single argument named `deps` that contains
+  # `outputs` takes a single argument named `deps` that contains
   # the resolved set of flakes. (See below.)
-  provides = deps: {
+  outputs = deps: {
 
     # This is searched by `nix`, so something like `nix install
     # dwarffs.dwarffs` resolves to this `packages.dwarffs`.
@@ -168,7 +168,7 @@ Similarly, a minimal `flake.nix` for Nixpkgs:
 
   description = "A collection of packages for the Nix package manager";
 
-  provides = deps:
+  outputs = deps:
     let pkgs = import ./. {}; in
     {
       lib = import ./lib;
@@ -310,9 +310,9 @@ Example:
 ```
 
 
-## `provides`
+## `outputs`
 
-The flake attribute `provides` is a function that takes an argument
+The flake attribute `outputs` is a function that takes an argument
 named `deps` and returns a (mostly) arbitrary attrset of values. Some
 of the standard result attributes:
 
@@ -329,13 +329,13 @@ of the standard result attributes:
   we need to avoid a situation where `nixos-rebuild` needs to fetch
   its own `nixpkgs` just to do `evalModules`.)
 
-* `shell`: A specification of a development environment in some TBD
+* `devShell`: A specification of a development environment in some TBD
   format.
 
 The function argument `flakes` is an attrset that contains an
-attribute for each dependency specified in `requires`. (Should it
+attribute for each dependency specified in `inputs`. (Should it
 contain transitive dependencies? Probably not.) Each attribute is an
-attrset containing the `provides` of the dependency, in addition to
+attrset containing the `outputs` of the dependency, in addition to
 the following attributes:
 
 * `path`: The path to the flake's source code. Useful when you want to
@@ -366,13 +366,13 @@ It may be useful to pull in repositories that are not flakes
 (i.e. don't contain a `flake.nix`). This could be done in two ways:
 
 * Allow flakes not to have a `flake.nix` file, in which case it's a
-  flake with no requires and no provides. The downside of this
+  flake with no inputs and no outputs. The downside of this
   approach is that we can't detect accidental use of a non-flake
   repository. (Also, we need to conjure up an identifier somehow.)
 
 * Add a flake attribute to specifiy non-flake dependencies, e.g.
 
-  > nonFlakeRequires.foobar = github:foo/bar;
+  > nonFlakeInputs.foobar = github:foo/bar;
 
 
 ## Flake registry
@@ -454,7 +454,7 @@ The default installation source in `nix` is the `packages` from all
 flakes in the registry, that is:
 ```
 builtins.mapAttrs (flakeName: flakeInfo:
-  (getFlake flakeInfo.uri).${flakeName}.provides.packages or {})
+  (getFlake flakeInfo.uri).${flakeName}.outputs.packages or {})
   builtins.flakeRegistry
 ```
 (where `builtins.flakeRegistry` is the global registry with user
@@ -476,10 +476,11 @@ in the registry named `hello`.
 
 Maybe the command
 
-> nix shell
+> nix dev-shell
 
-should do something like use `provides.shell` to initialize the shell,
-but probably we should ditch `nix shell` / `nix-shell` for direnv.
+should do something like use `outputs.devShell` to initialize the
+shell, but probably we should ditch `nix shell` / `nix-shell` for
+direnv.
 
 
 ## Pure evaluation and caching
@@ -535,7 +536,7 @@ repositories.
 
 ```nix
 {
-  provides = flakes: {
+  outputs = flakes: {
     nixosSystems.default =
       flakes.nixpkgs.lib.evalModules {
         modules =
@@ -549,7 +550,7 @@ repositories.
       };
   };
 
-  requires =
+  inputs =
     [ "nixpkgs/nixos-18.09"
       "dwarffs"
       "hydra"

@@ -199,16 +199,16 @@ struct CmdFlakeUpdate : FlakeCommand
     }
 };
 
-static void enumerateProvides(EvalState & state, Value & vFlake,
+static void enumerateOutputs(EvalState & state, Value & vFlake,
     std::function<void(const std::string & name, Value & vProvide)> callback)
 {
     state.forceAttrs(vFlake);
 
-    auto vProvides = (*vFlake.attrs->get(state.symbols.create("provides")))->value;
+    auto vOutputs = (*vFlake.attrs->get(state.symbols.create("outputs")))->value;
 
-    state.forceAttrs(*vProvides);
+    state.forceAttrs(*vOutputs);
 
-    for (auto & attr : *vProvides->attrs)
+    for (auto & attr : *vOutputs->attrs)
         callback(attr.name, *attr.value);
 }
 
@@ -237,9 +237,9 @@ struct CmdFlakeInfo : FlakeCommand, MixJSON
             auto vFlake = state->allocValue();
             flake::callFlake(*state, flake, *vFlake);
 
-            auto provides = nlohmann::json::object();
+            auto outputs = nlohmann::json::object();
 
-            enumerateProvides(*state,
+            enumerateOutputs(*state,
                 *vFlake,
                 [&](const std::string & name, Value & vProvide) {
                     auto provide = nlohmann::json::object();
@@ -250,10 +250,10 @@ struct CmdFlakeInfo : FlakeCommand, MixJSON
                             provide[aCheck.name] = nlohmann::json::object();
                     }
 
-                    provides[name] = provide;
+                    outputs[name] = provide;
                 });
 
-            json["provides"] = std::move(provides);
+            json["outputs"] = std::move(outputs);
 
             std::cout << json.dump() << std::endl;
         } else
@@ -298,7 +298,7 @@ struct CmdFlakeCheck : FlakeCommand, MixJSON
                 // FIXME: check meta attributes
                 return drvInfo->queryDrvPath();
             } catch (Error & e) {
-                e.addPrefix(fmt("while checking flake attribute '" ANSI_BOLD "%s" ANSI_NORMAL "':\n", attrPath));
+                e.addPrefix(fmt("while checking flake output attribute '" ANSI_BOLD "%s" ANSI_NORMAL "':\n", attrPath));
                 throw;
             }
         };
@@ -311,7 +311,7 @@ struct CmdFlakeCheck : FlakeCommand, MixJSON
             auto vFlake = state->allocValue();
             flake::callFlake(*state, flake, *vFlake);
 
-            enumerateProvides(*state,
+            enumerateOutputs(*state,
                 *vFlake,
                 [&](const std::string & name, Value & vProvide) {
                     Activity act(*logger, lvlChatty, actUnknown,

@@ -106,9 +106,9 @@ struct Flake
     FlakeRef originalRef;
     std::string description;
     SourceInfo sourceInfo;
-    std::vector<FlakeRef> requires;
-    std::map<FlakeAlias, FlakeRef> nonFlakeRequires;
-    Value * vProvides; // FIXME: gc
+    std::vector<FlakeRef> inputs;
+    std::map<FlakeAlias, FlakeRef> nonFlakeInputs;
+    Value * vOutputs; // FIXME: gc
     unsigned int epoch;
 
     Flake(const FlakeRef & origRef, const SourceInfo & sourceInfo)
