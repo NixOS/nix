@@ -72,6 +72,14 @@ public:
         return {};
     }
 
+    Attr & need(const Symbol & name, const Pos & pos = noPos)
+    {
+        auto a = get(name);
+        if (!a)
+            throw Error("attribute '%s' missing, at %s", name, pos);
+        return **a;
+    }
+
     iterator begin() { return &attrs[0]; }
     iterator end() { return &attrs[size_]; }
 
