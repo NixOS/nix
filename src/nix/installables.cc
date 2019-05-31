@@ -315,7 +315,7 @@ std::vector<std::shared_ptr<Installable>> SourceExprCommand::parseInstallables(
             }
 
             else if (auto flakeRef = parseFlakeRef(s, true))
-                result.push_back(std::make_shared<InstallableFlake>(*this, s,
+                result.push_back(std::make_shared<InstallableFlake>(*this, std::move(*flakeRef),
                         getDefaultFlakeAttrPaths()));
 
             else if ((colon = s.rfind(':')) != std::string::npos) {
