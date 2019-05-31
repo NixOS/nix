@@ -17,7 +17,10 @@ namespace nix {
 class Store;
 class EvalState;
 enum RepairFlag : bool;
+
+namespace flake {
 struct FlakeRegistry;
+}
 
 
 typedef void (* PrimOpFun) (EvalState & state, const Pos & pos, Value * * args, Value & v);
@@ -323,12 +326,12 @@ private:
 
 public:
 
-    const std::vector<std::shared_ptr<FlakeRegistry>> getFlakeRegistries();
+    const std::vector<std::shared_ptr<flake::FlakeRegistry>> getFlakeRegistries();
 
-    std::shared_ptr<FlakeRegistry> getGlobalFlakeRegistry();
+    std::shared_ptr<flake::FlakeRegistry> getGlobalFlakeRegistry();
 
 private:
-    std::shared_ptr<FlakeRegistry> _globalFlakeRegistry;
+    std::shared_ptr<flake::FlakeRegistry> _globalFlakeRegistry;
     std::once_flag _globalFlakeRegistryInit;
 };
 

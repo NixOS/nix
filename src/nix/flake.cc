@@ -3,13 +3,17 @@
 #include "shared.hh"
 #include "progress-bar.hh"
 #include "eval.hh"
+#include "eval-inline.hh"
 #include "primops/flake.hh"
+#include "get-drvs.hh"
+#include "store-api.hh"
 
 #include <nlohmann/json.hpp>
 #include <queue>
 #include <iomanip>
 
 using namespace nix;
+using namespace nix::flake;
 
 class FlakeCommand : virtual Args, public EvalCommand, public MixFlakeOptions
 {
@@ -33,12 +37,12 @@ public:
     Flake getFlake()
     {
         auto evalState = getEvalState();
-        return nix::getFlake(*evalState, getFlakeRef(), useRegistries);
+        return flake::getFlake(*evalState, getFlakeRef(), useRegistries);
     }
 
     ResolvedFlake resolveFlake()
     {
-        return nix::resolveFlake(*getEvalState(), getFlakeRef(), getLockFileMode());
+        return flake::resolveFlake(*getEvalState(), getFlakeRef(), getLockFileMode());
     }
 };
 
@@ -195,6 +199,19 @@ struct CmdFlakeUpdate : FlakeCommand
     }
 };
 
+static void enumerateProvides(EvalState & state, Value & vFlake,
+    std::function<void(const std::string & name, Value & vProvide)> callback)
+{
+    state.forceAttrs(vFlake);
+
+    auto vProvides = (*vFlake.attrs->get(state.symbols.create("provides")))->value;
+
+    state.forceAttrs(*vProvides);
+
+    for (auto & attr : *vProvides->attrs)
+        callback(attr.name, *attr.value);
+}
+
 struct CmdFlakeInfo : FlakeCommand, MixJSON
 {
     std::string name() override
@@ -207,16 +224,130 @@ struct CmdFlakeInfo : FlakeCommand, MixJSON
         return "list info about a given flake";
     }
 
-    CmdFlakeInfo () { }
-
     void run(nix::ref<nix::Store> store) override
     {
         auto flake = getFlake();
         stopProgressBar();
-        if (json)
-            std::cout << flakeToJson(flake).dump() << std::endl;
-        else
+
+        if (json) {
+            auto json = flakeToJson(flake);
+
+            auto state = getEvalState();
+
+            auto vFlake = state->allocValue();
+            flake::callFlake(*state, flake, *vFlake);
+
+            auto provides = nlohmann::json::object();
+
+            enumerateProvides(*state,
+                *vFlake,
+                [&](const std::string & name, Value & vProvide) {
+                    auto provide = nlohmann::json::object();
+
+                    if (name == "checks" || name == "packages") {
+                        state->forceAttrs(vProvide);
+                        for (auto & aCheck : *vProvide.attrs)
+                            provide[aCheck.name] = nlohmann::json::object();
+                    }
+
+                    provides[name] = provide;
+                });
+
+            json["provides"] = std::move(provides);
+
+            std::cout << json.dump() << std::endl;
+        } else
             printFlakeInfo(flake);
+    }
+};
+
+struct CmdFlakeCheck : FlakeCommand, MixJSON
+{
+    bool build = true;
+
+    CmdFlakeCheck()
+    {
+        mkFlag()
+            .longName("no-build")
+            .description("do not build checks")
+            .set(&build, false);
+    }
+
+    std::string name() override
+    {
+        return "check";
+    }
+
+    std::string description() override
+    {
+        return "check whether the flake evaluates and run its tests";
+    }
+
+    void run(nix::ref<nix::Store> store) override
+    {
+        settings.readOnlyMode = !build;
+
+        auto state = getEvalState();
+        auto flake = resolveFlake();
+
+        auto checkDerivation = [&](const std::string & attrPath, Value & v) {
+            try {
+                auto drvInfo = getDerivation(*state, v, false);
+                if (!drvInfo)
+                    throw Error("flake attribute '%s' is not a derivation", attrPath);
+                // FIXME: check meta attributes
+                return drvInfo->queryDrvPath();
+            } catch (Error & e) {
+                e.addPrefix(fmt("while checking flake attribute '" ANSI_BOLD "%s" ANSI_NORMAL "':\n", attrPath));
+                throw;
+            }
+        };
+
+        PathSet drvPaths;
+
+        {
+            Activity act(*logger, lvlInfo, actUnknown, "evaluating flake");
+
+            auto vFlake = state->allocValue();
+            flake::callFlake(*state, flake, *vFlake);
+
+            enumerateProvides(*state,
+                *vFlake,
+                [&](const std::string & name, Value & vProvide) {
+                    Activity act(*logger, lvlChatty, actUnknown,
+                        fmt("checking flake output '%s'", name));
+
+                    try {
+                        state->forceValue(vProvide);
+
+                        if (name == "checks") {
+                            state->forceAttrs(vProvide);
+                            for (auto & aCheck : *vProvide.attrs)
+                                drvPaths.insert(checkDerivation(
+                                        name + "." + (std::string) aCheck.name, *aCheck.value));
+                        }
+
+                        else if (name == "packages") {
+                            state->forceAttrs(vProvide);
+                            for (auto & aCheck : *vProvide.attrs)
+                                checkDerivation(
+                                    name + "." + (std::string) aCheck.name, *aCheck.value);
+                        }
+
+                        else if (name == "defaultPackage" || name == "devShell")
+                            checkDerivation(name, vProvide);
+
+                    } catch (Error & e) {
+                        e.addPrefix(fmt("while checking flake output '" ANSI_BOLD "%s" ANSI_NORMAL "':\n", name));
+                        throw;
+                    }
+                });
+        }
+
+        if (build) {
+            Activity act(*logger, lvlInfo, actUnknown, "running flake checks");
+            store->buildPaths(drvPaths);
+        }
     }
 };
 
@@ -386,6 +517,7 @@ struct CmdFlake : virtual MultiCommand, virtual Command
         : MultiCommand({make_ref<CmdFlakeList>()
             , make_ref<CmdFlakeUpdate>()
             , make_ref<CmdFlakeInfo>()
+            , make_ref<CmdFlakeCheck>()
             , make_ref<CmdFlakeDeps>()
             , make_ref<CmdFlakeAdd>()
             , make_ref<CmdFlakeRemove>()

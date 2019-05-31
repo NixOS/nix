@@ -32,8 +32,9 @@ MixFlakeOptions::MixFlakeOptions()
         .set(&useRegistries, false);
 }
 
-HandleLockFile MixFlakeOptions::getLockFileMode()
+flake::HandleLockFile MixFlakeOptions::getLockFileMode()
 {
+    using namespace flake;
     return
         useRegistries
         ? recreateLockFile
@@ -163,18 +164,20 @@ struct InstallableAttrPath : InstallableValue
     }
 };
 
-void makeFlakeClosureGCRoot(Store & store, const FlakeRef & origFlakeRef, const ResolvedFlake & resFlake)
+void makeFlakeClosureGCRoot(Store & store,
+    const FlakeRef & origFlakeRef,
+    const flake::ResolvedFlake & resFlake)
 {
     if (std::get_if<FlakeRef::IsPath>(&origFlakeRef.data)) return;
 
     /* Get the store paths of all non-local flakes. */
     PathSet closure;
 
-    std::queue<std::reference_wrapper<const ResolvedFlake>> queue;
+    std::queue<std::reference_wrapper<const flake::ResolvedFlake>> queue;
     queue.push(resFlake);
 
     while (!queue.empty()) {
-        const ResolvedFlake & flake = queue.front();
+        const flake::ResolvedFlake & flake = queue.front();
         queue.pop();
         if (!std::get_if<FlakeRef::IsPath>(&flake.flake.sourceInfo.resolvedRef.data))
             closure.insert(flake.flake.sourceInfo.storePath);
@@ -233,10 +236,21 @@ struct InstallableFlake : InstallableValue
 
         auto emptyArgs = state.allocBindings(0);
 
-        // As a convenience, look for the attribute in
-        // 'provides.packages'.
         if (searchPackages) {
+            // As a convenience, look for the attribute in
+            // 'provides.packages'.
             if (auto aPackages = *vProvides->attrs->get(state.symbols.create("packages"))) {
+                try {
+                    auto * v = findAlongAttrPath(state, *attrPaths.begin(), *emptyArgs, *aPackages->value);
+                    state.forceValue(*v);
+                    return v;
+                } catch (AttrPathNotFound & e) {
+                }
+            }
+
+            // As a temporary hack until Nixpkgs is properly converted
+            // to provide a clean 'packages' set, look in 'legacyPackages'.
+            if (auto aPackages = *vProvides->attrs->get(state.symbols.create("legacyPackages"))) {
                 try {
                     auto * v = findAlongAttrPath(state, *attrPaths.begin(), *emptyArgs, *aPackages->value);
                     state.forceValue(*v);

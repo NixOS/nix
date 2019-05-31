@@ -14,6 +14,10 @@
 
 namespace nix {
 
+using namespace flake;
+
+namespace flake {
+
 /* Read a registry. */
 std::shared_ptr<FlakeRegistry> readRegistry(const Path & path)
 {
@@ -133,24 +137,6 @@ void writeLockFile(const LockFile & lockFile, const Path & path)
     writeFile(path, json.dump(4) + "\n"); // '4' = indentation in json file
 }
 
-std::shared_ptr<FlakeRegistry> EvalState::getGlobalFlakeRegistry()
-{
-    std::call_once(_globalFlakeRegistryInit, [&]() {
-        auto path = evalSettings.flakeRegistry;
-
-        if (!hasPrefix(path, "/")) {
-            CachedDownloadRequest request(evalSettings.flakeRegistry);
-            request.name = "flake-registry.json";
-            request.gcRoot = true;
-            path = getDownloader()->downloadCached(store, request).path;
-        }
-
-        _globalFlakeRegistry = readRegistry(path);
-    });
-
-    return _globalFlakeRegistry;
-}
-
 Path getUserRegistryPath()
 {
     return getHome() + "/.config/nix/registry.json";
@@ -168,17 +154,6 @@ std::shared_ptr<FlakeRegistry> getFlagRegistry(RegistryOverrides registryOverrid
         flagRegistry->entries.insert_or_assign(FlakeRef(x.first), FlakeRef(x.second));
     }
     return flagRegistry;
-}
-
-// This always returns a vector with flakeReg, userReg, globalReg.
-// If one of them doesn't exist, the registry is left empty but does exist.
-const Registries EvalState::getFlakeRegistries()
-{
-    Registries registries;
-    registries.push_back(getFlagRegistry(registryOverrides));
-    registries.push_back(getUserRegistry());
-    registries.push_back(getGlobalFlakeRegistry());
-    return registries;
 }
 
 static FlakeRef lookupFlake(EvalState & state, const FlakeRef & flakeRef, const Registries & registries,
@@ -327,7 +302,9 @@ Flake getFlake(EvalState & state, const FlakeRef & flakeRef, bool impureIsAllowe
 
     state.forceAttrs(vInfo);
 
-    if (auto epoch = vInfo.attrs->get(state.symbols.create("epoch"))) {
+    auto sEpoch = state.symbols.create("epoch");
+
+    if (auto epoch = vInfo.attrs->get(sEpoch)) {
         flake.epoch = state.forceInt(*(**epoch).value, *(**epoch).pos);
         if (flake.epoch > 2019)
             throw Error("flake '%s' requires unsupported epoch %d; please upgrade Nix", flakeRef, flake.epoch);
@@ -342,14 +319,18 @@ Flake getFlake(EvalState & state, const FlakeRef & flakeRef, bool impureIsAllowe
     if (auto description = vInfo.attrs->get(state.sDescription))
         flake.description = state.forceStringNoCtx(*(**description).value, *(**description).pos);
 
-    if (auto requires = vInfo.attrs->get(state.symbols.create("requires"))) {
+    auto sRequires = state.symbols.create("requires");
+
+    if (auto requires = vInfo.attrs->get(sRequires)) {
         state.forceList(*(**requires).value, *(**requires).pos);
         for (unsigned int n = 0; n < (**requires).value->listSize(); ++n)
             flake.requires.push_back(FlakeRef(state.forceStringNoCtx(
                 *(**requires).value->listElems()[n], *(**requires).pos)));
     }
 
-    if (std::optional<Attr *> nonFlakeRequires = vInfo.attrs->get(state.symbols.create("nonFlakeRequires"))) {
+    auto sNonFlakeRequires = state.symbols.create("nonFlakeRequires");
+
+    if (std::optional<Attr *> nonFlakeRequires = vInfo.attrs->get(sNonFlakeRequires)) {
         state.forceAttrs(*(**nonFlakeRequires).value, *(**nonFlakeRequires).pos);
         for (Attr attr : *(*(**nonFlakeRequires).value).attrs) {
             std::string myNonFlakeUri = state.forceStringNoCtx(*attr.value, *attr.pos);
@@ -358,11 +339,24 @@ Flake getFlake(EvalState & state, const FlakeRef & flakeRef, bool impureIsAllowe
         }
     }
 
-    if (auto provides = vInfo.attrs->get(state.symbols.create("provides"))) {
+    auto sProvides = state.symbols.create("provides");
+
+    if (auto provides = vInfo.attrs->get(sProvides)) {
         state.forceFunction(*(**provides).value, *(**provides).pos);
         flake.vProvides = (**provides).value;
     } else
         throw Error("flake '%s' lacks attribute 'provides'", flakeRef);
+
+    for (auto & attr : *vInfo.attrs) {
+        if (attr.name != sEpoch &&
+            attr.name != state.sName &&
+            attr.name != state.sDescription &&
+            attr.name != sRequires &&
+            attr.name != sNonFlakeRequires &&
+            attr.name != sProvides)
+            throw Error("flake '%s' has an unsupported attribute '%s', at %s",
+                flakeRef, attr.name, *attr.pos);
+    }
 
     return flake;
 }
@@ -572,18 +566,11 @@ void callFlake(EvalState & state, const ResolvedFlake & resFlake, Value & v)
     v.attrs->sort();
 }
 
-// Return the `provides` of the top flake, while assigning to `v` the provides
-// of the dependencies as well.
-void makeFlakeValue(EvalState & state, const FlakeRef & flakeRef, HandleLockFile handle, Value & v)
-{
-    callFlake(state, resolveFlake(state, flakeRef, handle), v);
-}
-
 // This function is exposed to be used in nix files.
 static void prim_getFlake(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
-    makeFlakeValue(state, state.forceStringNoCtx(*args[0], pos),
-        evalSettings.pureEval ? AllPure : UseUpdatedLockFile, v);
+    callFlake(state, resolveFlake(state, state.forceStringNoCtx(*args[0], pos),
+            evalSettings.pureEval ? AllPure : UseUpdatedLockFile), v);
 }
 
 static RegisterPrimOp r2("getFlake", 1, prim_getFlake);
@@ -615,6 +602,37 @@ void gitCloneFlake(FlakeRef flakeRef, EvalState & state, Registries registries, 
         args.push_back(destDir);
 
     runProgram("git", true, args);
+}
+
+}
+
+std::shared_ptr<flake::FlakeRegistry> EvalState::getGlobalFlakeRegistry()
+{
+    std::call_once(_globalFlakeRegistryInit, [&]() {
+        auto path = evalSettings.flakeRegistry;
+
+        if (!hasPrefix(path, "/")) {
+            CachedDownloadRequest request(evalSettings.flakeRegistry);
+            request.name = "flake-registry.json";
+            request.gcRoot = true;
+            path = getDownloader()->downloadCached(store, request).path;
+        }
+
+        _globalFlakeRegistry = readRegistry(path);
+    });
+
+    return _globalFlakeRegistry;
+}
+
+// This always returns a vector with flakeReg, userReg, globalReg.
+// If one of them doesn't exist, the registry is left empty but does exist.
+const Registries EvalState::getFlakeRegistries()
+{
+    Registries registries;
+    registries.push_back(getFlagRegistry(registryOverrides));
+    registries.push_back(getUserRegistry());
+    registries.push_back(getGlobalFlakeRegistry());
+    return registries;
 }
 
 }

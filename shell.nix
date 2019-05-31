@@ -2,7 +2,7 @@
 , nixpkgs ? builtins.fetchTarball https://github.com/NixOS/nixpkgs-channels/archive/nixos-19.03.tar.gz
 }:
 
-with import (builtins.fetchTarball https://github.com/NixOS/nixpkgs-channels/archive/nixos-19.03.tar.gz) { system = builtins.currentSystem or "x86_64-linux"; };
+with import nixpkgs { system = builtins.currentSystem or "x86_64-linux"; };
 
 with import ./release-common.nix { inherit pkgs; };
 

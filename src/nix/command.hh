@@ -12,7 +12,10 @@ struct Value;
 class Bindings;
 class EvalState;
 class Store;
+
+namespace flake {
 enum HandleLockFile : unsigned int;
+}
 
 /* A command that require a Nix store. */
 struct StoreCommand : virtual Command
@@ -71,7 +74,7 @@ struct MixFlakeOptions : virtual Args
 
     MixFlakeOptions();
 
-    HandleLockFile getLockFileMode();
+    flake::HandleLockFile getLockFileMode();
 };
 
 struct SourceExprCommand : virtual Args, EvalCommand, MixFlakeOptions
