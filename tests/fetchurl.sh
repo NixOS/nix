@@ -42,6 +42,10 @@ ln -s $(pwd)/fetchurl.sh $mirror/sha512/$hash32
 
 outPath=$(nix-build '<nix/fetchurl.nix>' --argstr url file:///no-such-dir/fetchurl.sh --argstr sha512 $hash --no-out-link --hashed-mirrors "file://$mirror")
 
+# Test hashed mirrors with an SRI hash.
+nix-build '<nix/fetchurl.nix>' --argstr url file:///no-such-dir/fetchurl.sh --argstr hash $(nix to-sri --type sha512 $hash) \
+          --argstr name bla --no-out-link --hashed-mirrors "file://$mirror"
+
 # Test unpacking a NAR.
 rm -rf $TEST_ROOT/archive
 mkdir -p $TEST_ROOT/archive
