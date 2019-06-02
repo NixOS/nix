@@ -41,8 +41,9 @@ let
   '';
 
   s6 = ''  
-    Tabs are not interpreted as whitespace (since we can't guess
-    what tab settings are intended), so don't use them.
+    Tabs are only interpreted as whitespace  when they are
+    the only indentation used (since we can't guess
+    what tab settings are intended), so don't mix them.
  	This line starts with a space and a tab, so only one
     space will be stripped from each line.
   '';
@@ -125,4 +126,16 @@ let
   # Accept dollars at end of strings 
   s17 = ''ending dollar $'' + ''$'' + "\n";
 
-in s1 + s2 + s3 + s4 + s5 + s6 + s7 + s8 + s9 + s10 + s11 + s12 + s13 + s14 + s15 + s16 + s17
+	s18 = ''
+			This is a test of tabs-only indentation.
+		  Two tabs should be stripped from each line.
+		    This line contains mixed tabs and spaces.
+		 This line contains two tabs and then a space.
+	'';
+
+  s19 = ''
+    This is another test of tabs-only indentation.
+	  This line begins with a tab, so nothing should be stripped.
+  '';
+
+in s1 + s2 + s3 + s4 + s5 + s6 + s7 + s8 + s9 + s10 + s11 + s12 + s13 + s14 + s15 + s16 + s17 + s18 + s19

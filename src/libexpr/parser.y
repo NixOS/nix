@@ -156,6 +156,7 @@ static Expr * stripIndentation(const Pos & pos, SymbolTable & symbols, vector<Ex
     bool atStartOfLine = true; /* = seen only whitespace in the current line */
     size_t minIndent = 1000000;
     size_t curIndent = 0;
+    char indChar = 0;
     for (auto & i : es) {
         ExprIndStr * e = dynamic_cast<ExprIndStr *>(i);
         if (!e) {
@@ -168,7 +169,10 @@ static Expr * stripIndentation(const Pos & pos, SymbolTable & symbols, vector<Ex
         }
         for (size_t j = 0; j < e->s.size(); ++j) {
             if (atStartOfLine) {
-                if (e->s[j] == ' ')
+                if (indChar == 0 && (e->s[j] == ' ' || e->s[j] == '\t')) {
+                    indChar = e->s[j];
+                    curIndent++;
+                } else if (e->s[j] == indChar)
                     curIndent++;
                 else if (e->s[j] == '\n') {
                     /* Empty line, doesn't influence minimum
@@ -202,7 +206,7 @@ static Expr * stripIndentation(const Pos & pos, SymbolTable & symbols, vector<Ex
         string s2;
         for (size_t j = 0; j < e->s.size(); ++j) {
             if (atStartOfLine) {
-                if (e->s[j] == ' ') {
+                if (e->s[j] == indChar) {
                     if (curDropped++ >= minIndent)
                         s2 += e->s[j];
                 }
@@ -224,7 +228,7 @@ static Expr * stripIndentation(const Pos & pos, SymbolTable & symbols, vector<Ex
            spaces. */
         if (n == 1) {
             string::size_type p = s2.find_last_of('\n');
-            if (p != string::npos && s2.find_first_not_of(' ', p + 1) == string::npos)
+            if (p != string::npos && s2.find_first_not_of(indChar, p + 1) == string::npos)
                 s2 = string(s2, 0, p + 1);
         }
 
