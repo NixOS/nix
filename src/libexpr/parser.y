@@ -169,10 +169,9 @@ static Expr * stripIndentation(const Pos & pos, SymbolTable & symbols, vector<Ex
         }
         for (size_t j = 0; j < e->s.size(); ++j) {
             if (atStartOfLine) {
-                if (indChar == 0 && (e->s[j] == ' ' || e->s[j] == '\t')) {
+                if (indChar == 0 && (e->s[j] == ' ' || e->s[j] == '\t'))
                     indChar = e->s[j];
-                    curIndent++;
-                } else if (e->s[j] == indChar)
+                if (e->s[j] == indChar)
                     curIndent++;
                 else if (e->s[j] == '\n') {
                     /* Empty line, doesn't influence minimum
