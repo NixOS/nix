@@ -314,6 +314,10 @@ std::vector<std::shared_ptr<Installable>> SourceExprCommand::parseInstallables(
                         Strings{"packages." + std::string(s, 8)}));
             }
 
+            else if (auto flakeRef = parseFlakeRef(s, true))
+                result.push_back(std::make_shared<InstallableFlake>(*this, std::move(*flakeRef),
+                        getDefaultFlakeAttrPaths()));
+
             else if ((colon = s.rfind(':')) != std::string::npos) {
                 auto flakeRef = std::string(s, 0, colon);
                 auto attrPath = std::string(s, colon + 1);

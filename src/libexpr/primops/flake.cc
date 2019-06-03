@@ -121,7 +121,7 @@ nlohmann::json flakeEntryToJson(const LockFile::FlakeEntry & entry)
     return json;
 }
 
-void writeLockFile(const LockFile & lockFile, const Path & path)
+std::ostream & operator <<(std::ostream & stream, const LockFile & lockFile)
 {
     nlohmann::json json;
     json["version"] = 1;
@@ -133,8 +133,14 @@ void writeLockFile(const LockFile & lockFile, const Path & path)
     json["inputs"] = nlohmann::json::object();
     for (auto & x : lockFile.flakeEntries)
         json["inputs"][x.first.to_string()] = flakeEntryToJson(x.second);
+    stream << json.dump(4); // '4' = indentation in json file
+    return stream;
+}
+
+void writeLockFile(const LockFile & lockFile, const Path & path)
+{
     createDirs(dirOf(path));
-    writeFile(path, json.dump(4) + "\n"); // '4' = indentation in json file
+    writeFile(path, fmt("%s\n", lockFile));
 }
 
 Path getUserRegistryPath()
@@ -476,9 +482,12 @@ ResolvedFlake resolveFlake(EvalState & state, const FlakeRef & topRef, HandleLoc
     Flake flake = getFlake(state, topRef, allowedToUseRegistries(handleLockFile, true));
     LockFile oldLockFile;
 
-    if (!recreateLockFile (handleLockFile)) {
+    if (!recreateLockFile(handleLockFile)) {
         // If recreateLockFile, start with an empty lockfile
-        oldLockFile = readLockFile(flake.sourceInfo.storePath + "/flake.lock"); // FIXME: symlink attack
+        // FIXME: symlink attack
+        oldLockFile = readLockFile(
+            state.store->toRealPath(flake.sourceInfo.storePath)
+            + "/" + flake.sourceInfo.resolvedRef.subdir + "/flake.lock");
     }
 
     LockFile lockFile(oldLockFile);

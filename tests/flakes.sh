@@ -131,8 +131,11 @@ nix build -o $TEST_ROOT/result --flake-registry $registry flake1:foo
 [[ -e $TEST_ROOT/result/hello ]]
 
 # Test defaultPackage.
-nix build -o $TEST_ROOT/result --flake-registry $registry flake1:
+nix build -o $TEST_ROOT/result --flake-registry $registry flake1
 [[ -e $TEST_ROOT/result/hello ]]
+
+nix build -o $TEST_ROOT/result --flake-registry $registry $flake1Dir
+nix build -o $TEST_ROOT/result --flake-registry $registry file://$flake1Dir
 
 # Building a flake with an unlocked dependency should fail in pure mode.
 (! nix eval "(builtins.getFlake "$flake2Dir")")
