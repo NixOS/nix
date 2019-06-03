@@ -3,7 +3,7 @@
 
   description = "A flake for building Hello World";
 
-  epoch = 2019;
+  epoch = 201906;
 
   requires = [ "nixpkgs" ];
 

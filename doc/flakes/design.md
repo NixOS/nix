@@ -96,7 +96,7 @@ module.
 
   # The epoch may be used in the future to determine how Nix
   # expressions inside this flake are to be parsed.
-  epoch = 2018;
+  epoch = 201906;
 
   # Some other metadata.
   description = "A filesystem that fetches DWARF debug info from the Internet on demand";
@@ -164,7 +164,7 @@ Similarly, a minimal `flake.nix` for Nixpkgs:
 {
   name = "nixpkgs";
 
-  epoch = 2018;
+  epoch = 201906;
 
   description = "A collection of packages for the Nix package manager";
 
