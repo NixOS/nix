@@ -60,7 +60,8 @@ FlakeRef::FlakeRef(const std::string & uri_, bool allowRelative)
 
     static std::regex subDirRegex2(subDirRegex, std::regex::ECMAScript);
 
-    auto [uri, params] = splitUriAndParams(uri_);
+    auto [uri2, params] = splitUriAndParams(uri_);
+    std::string uri(uri2);
 
     auto handleSubdir = [&](const std::string & name, const std::string & value) {
         if (name == "dir") {
