@@ -227,7 +227,7 @@ static Expr * stripIndentation(const Pos & pos, SymbolTable & symbols, vector<Ex
            spaces. */
         if (n == 1) {
             string::size_type p = s2.find_last_of('\n');
-            if (p != string::npos && s2.find_first_not_of(indChar, p + 1) == string::npos)
+            if (p != string::npos && s2.find_first_not_of(" \t", p + 1) == string::npos)
                 s2 = string(s2, 0, p + 1);
         }
 
