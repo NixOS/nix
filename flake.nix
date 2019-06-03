@@ -3,7 +3,7 @@
 
   description = "The purely functional package manager";
 
-  epoch = 2019;
+  epoch = 201906;
 
   inputs = [ "nixpkgs" ];
 

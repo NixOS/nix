@@ -29,7 +29,7 @@ cat > $flake1Dir/flake.nix <<EOF
 {
   name = "flake1";
 
-  epoch = 2019;
+  epoch = 201906;
 
   description = "Bla bla";
 
@@ -48,7 +48,7 @@ cat > $flake2Dir/flake.nix <<EOF
 {
   name = "flake2";
 
-  epoch = 2019;
+  epoch = 201906;
 
   inputs = [ "flake1" ];
 
@@ -67,7 +67,7 @@ cat > $flake3Dir/flake.nix <<EOF
 {
   name = "flake3";
 
-  epoch = 2019;
+  epoch = 201906;
 
   inputs = [ "flake2" ];
 
@@ -169,7 +169,7 @@ cat > $flake3Dir/flake.nix <<EOF
 {
   name = "flake3";
 
-  epoch = 2019;
+  epoch = 201906;
 
   inputs = [ "flake1" "flake2" ];
 
@@ -192,7 +192,7 @@ nix build -o $TEST_ROOT/result --flake-registry $registry $flake3Dir:sth
 [[ ! (-z $(git -C $flake3Dir diff master)) ]]
 
 # Unsupported epochs should be an error.
-sed -i $flake3Dir/flake.nix -e s/2019/2030/
+sed -i $flake3Dir/flake.nix -e s/201906/201909/
 nix build -o $TEST_ROOT/result --flake-registry $registry $flake3Dir:sth 2>&1 | grep 'unsupported epoch'
 
 # Test whether registry caching works.
@@ -219,7 +219,7 @@ cat > $flake3Dir/flake.nix <<EOF
 {
   name = "flake3";
 
-  epoch = 2019;
+  epoch = 201906;
 
   inputs = [ "flake1" "flake2" ];
 

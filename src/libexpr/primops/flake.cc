@@ -312,7 +312,7 @@ Flake getFlake(EvalState & state, const FlakeRef & flakeRef, bool impureIsAllowe
 
     if (auto epoch = vInfo.attrs->get(sEpoch)) {
         flake.epoch = state.forceInt(*(**epoch).value, *(**epoch).pos);
-        if (flake.epoch > 2019)
+        if (flake.epoch > 201906)
             throw Error("flake '%s' requires unsupported epoch %d; please upgrade Nix", flakeRef, flake.epoch);
     } else
         throw Error("flake '%s' lacks attribute 'epoch'", flakeRef);
