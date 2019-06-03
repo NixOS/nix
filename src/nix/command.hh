@@ -38,6 +38,13 @@ struct Buildable
 
 typedef std::vector<Buildable> Buildables;
 
+struct App
+{
+    PathSet context;
+    Path program;
+    // FIXME: add args, sandbox settings, metadata, ...
+};
+
 struct Installable
 {
     virtual std::string what() = 0;
@@ -48,6 +55,8 @@ struct Installable
     }
 
     Buildable toBuildable();
+
+    App toApp(EvalState & state);
 
     virtual Value * toValue(EvalState & state)
     {
