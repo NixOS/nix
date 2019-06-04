@@ -245,6 +245,8 @@ git -C $flake3Dir commit -m 'Add nonFlakeInputs'
 # Check whether `nix build` works with a lockfile which is missing a nonFlakeInputs
 nix build -o $TEST_ROOT/result --flake-registry $registry $flake3Dir:sth
 
+git -C $flake3Dir commit -m 'Update nonFlakeInputs'
+
 # Check whether flake input fetching is lazy: flake3:sth does not
 # depend on flake2, so this shouldn't fail.
 rm -rf $TEST_HOME/.cache
