@@ -1,4 +1,4 @@
-{ useClang ? false
+{ useClang ? true
 , nixpkgs ? builtins.fetchTarball https://github.com/NixOS/nixpkgs-channels/archive/nixos-19.03.tar.gz
 }:
 
