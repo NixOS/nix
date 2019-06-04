@@ -468,10 +468,12 @@ static void prim_callNonFlake(EvalState & state, const Pos & pos, Value * * args
 void callFlake(EvalState & state,
     const Flake & flake,
     const FlakeInputs & inputs,
-    Value & v)
+    Value & vRes)
 {
-    // Construct the resulting attrset '{description, outputs,
-    // ...}'. This attrset is passed lazily as an argument to 'outputs'.
+    // Construct the resulting attrset '{outputs, ...}'. This attrset
+    // is passed lazily as an argument to the 'outputs' function.
+
+    auto & v = *state.allocValue();
 
     state.mkAttrs(v,
         inputs.flakeInputs.size() +
@@ -513,6 +515,14 @@ void callFlake(EvalState & state,
     v.attrs->push_back(Attr(state.symbols.create("self"), &v));
 
     v.attrs->sort();
+
+    /* For convenience, put the outputs directly in the result, so you
+       can refer to an output of an input as 'inputs.foo.bar' rather
+       than 'inputs.foo.outputs.bar'. */
+    auto v2 = *state.allocValue();
+    state.eval(state.parseExprFromString("res: res.outputs // res", "/"), v2);
+
+    state.callFunction(v2, v, vRes, noPos);
 }
 
 void callFlake(EvalState & state,

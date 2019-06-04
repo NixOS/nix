@@ -55,7 +55,7 @@ cat > $flake2Dir/flake.nix <<EOF
   description = "Fnord";
 
   outputs = inputs: rec {
-    packages.bar = inputs.flake1.outputs.packages.foo;
+    packages.bar = inputs.flake1.packages.foo;
   };
 }
 EOF
@@ -74,7 +74,7 @@ cat > $flake3Dir/flake.nix <<EOF
   description = "Fnord";
 
   outputs = inputs: rec {
-    packages.xyzzy = inputs.flake2.outputs.packages.bar;
+    packages.xyzzy = inputs.flake2.packages.bar;
   };
 }
 EOF
@@ -176,8 +176,8 @@ cat > $flake3Dir/flake.nix <<EOF
   description = "Fnord";
 
   outputs = inputs: rec {
-    packages.xyzzy = inputs.flake2.outputs.packages.bar;
-    packages.sth = inputs.flake1.outputs.packages.foo;
+    packages.xyzzy = inputs.flake2.packages.bar;
+    packages.sth = inputs.flake1.packages.foo;
   };
 }
 EOF
@@ -233,8 +233,8 @@ cat > $flake3Dir/flake.nix <<EOF
   description = "Fnord";
 
   outputs = inputs: rec {
-    packages.xyzzy = inputs.flake2.outputs.packages.bar;
-    packages.sth = inputs.flake1.outputs.packages.foo;
+    packages.xyzzy = inputs.flake2.packages.bar;
+    packages.sth = inputs.flake1.packages.foo;
     packages.fnord =
       with import ./config.nix;
       mkDerivation {
