@@ -2,6 +2,7 @@
 #include "flakeref.hh"
 
 #include <variant>
+#include <nlohmann/json.hpp>
 
 namespace nix {
 
@@ -19,50 +20,11 @@ struct FlakeRegistry
     std::map<FlakeRef, FlakeRef> entries;
 };
 
-struct LockFile
-{
-    struct NonFlakeEntry
-    {
-        FlakeRef ref;
-        Hash narHash;
-        NonFlakeEntry(const FlakeRef & flakeRef, const Hash & hash) : ref(flakeRef), narHash(hash) {};
-
-        bool operator ==(const NonFlakeEntry & other) const
-        {
-            return ref == other.ref && narHash == other.narHash;
-        }
-    };
-
-    struct FlakeEntry
-    {
-        FlakeRef ref;
-        Hash narHash;
-        std::map<FlakeRef, FlakeEntry> flakeEntries;
-        std::map<FlakeAlias, NonFlakeEntry> nonFlakeEntries;
-        FlakeEntry(const FlakeRef & flakeRef, const Hash & hash) : ref(flakeRef), narHash(hash) {};
-
-        bool operator ==(const FlakeEntry & other) const
-        {
-            return
-                ref == other.ref
-                && narHash == other.narHash
-                && flakeEntries == other.flakeEntries
-                && nonFlakeEntries == other.nonFlakeEntries;
-        }
-    };
-
-    std::map<FlakeRef, FlakeEntry> flakeEntries;
-    std::map<FlakeAlias, NonFlakeEntry> nonFlakeEntries;
-
-    bool operator ==(const LockFile & other) const
-    {
-        return
-            flakeEntries == other.flakeEntries
-            && nonFlakeEntries == other.nonFlakeEntries;
-    }
-};
-
 typedef std::vector<std::shared_ptr<FlakeRegistry>> Registries;
+
+std::shared_ptr<FlakeRegistry> readRegistry(const Path &);
+
+void writeRegistry(const FlakeRegistry &, const Path &);
 
 Path getUserRegistryPath();
 
@@ -75,9 +37,80 @@ enum HandleLockFile : unsigned int
     , UseNewLockFile // `RecreateLockFile` without writing to file
     };
 
-std::shared_ptr<FlakeRegistry> readRegistry(const Path &);
+struct NonFlakeDep
+{
+    FlakeRef ref;
+    Hash narHash;
 
-void writeRegistry(const FlakeRegistry &, const Path &);
+    NonFlakeDep(const FlakeRef & flakeRef, const Hash & narHash)
+        : ref(flakeRef), narHash(narHash) {};
+
+    NonFlakeDep(const nlohmann::json & json);
+
+    bool operator ==(const NonFlakeDep & other) const
+    {
+        return ref == other.ref && narHash == other.narHash;
+    }
+
+    nlohmann::json toJson() const;
+};
+
+struct FlakeDep;
+
+struct FlakeInputs
+{
+    std::map<FlakeRef, FlakeDep> flakeDeps;
+    std::map<FlakeAlias, NonFlakeDep> nonFlakeDeps;
+
+    FlakeInputs() {};
+    FlakeInputs(const nlohmann::json & json);
+
+    nlohmann::json toJson() const;
+};
+
+struct FlakeDep : FlakeInputs
+{
+    FlakeId id;
+    FlakeRef ref;
+    Hash narHash;
+
+    FlakeDep(const FlakeId & id, const FlakeRef & flakeRef, const Hash & narHash)
+        : id(id), ref(flakeRef), narHash(narHash) {};
+
+    FlakeDep(const nlohmann::json & json);
+
+    bool operator ==(const FlakeDep & other) const
+    {
+        return
+            id == other.id
+            && ref == other.ref
+            && narHash == other.narHash
+            && flakeDeps == other.flakeDeps
+            && nonFlakeDeps == other.nonFlakeDeps;
+    }
+
+    nlohmann::json toJson() const;
+};
+
+struct LockFile : FlakeInputs
+{
+    bool operator ==(const LockFile & other) const
+    {
+        return
+            flakeDeps == other.flakeDeps
+            && nonFlakeDeps == other.nonFlakeDeps;
+    }
+
+    LockFile() {}
+    LockFile(const nlohmann::json & json) : FlakeInputs(json) {}
+    LockFile(FlakeDep && dep)
+    {
+        flakeDeps = std::move(dep.flakeDeps);
+        nonFlakeDeps = std::move(dep.nonFlakeDeps);
+    }
+
+    nlohmann::json toJson() const;
+};
 
 struct SourceInfo
 {
@@ -129,14 +162,21 @@ Flake getFlake(EvalState &, const FlakeRef &, bool impureIsAllowed);
 struct ResolvedFlake
 {
     Flake flake;
-    std::map<FlakeRef, ResolvedFlake> flakeDeps; // The key in this map, is the originalRef as written in flake.nix
-    std::vector<NonFlake> nonFlakeDeps;
-    ResolvedFlake(const Flake & flake) : flake(flake) {}
+    LockFile lockFile;
+    ResolvedFlake(Flake && flake, LockFile && lockFile)
+        : flake(flake), lockFile(lockFile) {}
 };
 
 ResolvedFlake resolveFlake(EvalState &, const FlakeRef &, HandleLockFile);
 
-void callFlake(EvalState & state, const ResolvedFlake & resFlake, Value & v);
+void callFlake(EvalState & state,
+    const Flake & flake,
+    const FlakeInputs & inputs,
+    Value & v);
+
+void callFlake(EvalState & state,
+    const ResolvedFlake & resFlake,
+    Value & v);
 
 void updateLockFile(EvalState &, const FlakeRef & flakeRef, bool recreateLockFile);
 

@@ -190,6 +190,7 @@ void makeFlakeClosureGCRoot(Store & store,
     const FlakeRef & origFlakeRef,
     const flake::ResolvedFlake & resFlake)
 {
+#if 0
     if (std::get_if<FlakeRef::IsPath>(&origFlakeRef.data)) return;
 
     /* Get the store paths of all non-local flakes. */
@@ -224,6 +225,7 @@ void makeFlakeClosureGCRoot(Store & store,
     debug("writing GC root '%s' for flake closure of '%s'", symlink, origFlakeRef);
     replaceSymlink(closurePath, symlink);
     store.addIndirectRoot(symlink);
+#endif
 }
 
 struct InstallableFlake : InstallableValue

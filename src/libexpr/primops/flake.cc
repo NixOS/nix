@@ -43,97 +43,101 @@ std::shared_ptr<FlakeRegistry> readRegistry(const Path & path)
 void writeRegistry(const FlakeRegistry & registry, const Path & path)
 {
     nlohmann::json json;
-    json["version"] = 1;
+    json["version"] = 2;
     for (auto elem : registry.entries)
         json["flakes"][elem.first.to_string()] = { {"uri", elem.second.to_string()} };
     createDirs(dirOf(path));
     writeFile(path, json.dump(4)); // The '4' is the number of spaces used in the indentation in the json file.
 }
 
-LockFile::FlakeEntry readFlakeEntry(nlohmann::json json)
+NonFlakeDep::NonFlakeDep(const nlohmann::json & json)
+    : ref(json["uri"])
+    , narHash(Hash((std::string) json["narHash"]))
 {
-    FlakeRef flakeRef(json["uri"]);
-    if (!flakeRef.isImmutable())
-        throw Error("cannot use mutable flake '%s' in pure mode", flakeRef);
+    if (!ref.isImmutable())
+        throw Error("lockfile contains mutable flakeref '%s'", ref);
+}
 
-    LockFile::FlakeEntry entry(flakeRef, Hash((std::string) json["narHash"]));
+nlohmann::json NonFlakeDep::toJson() const
+{
+    nlohmann::json json;
+    json["uri"] = ref.to_string();
+    json["narHash"] = narHash.to_string(SRI);
+    return json;
+}
 
+FlakeDep::FlakeDep(const nlohmann::json & json)
+    : FlakeInputs(json)
+    , id(json["id"])
+    , ref(json["uri"])
+    , narHash(Hash((std::string) json["narHash"]))
+{
+    if (!ref.isImmutable())
+        throw Error("lockfile contains mutable flakeref '%s'", ref);
+}
+
+nlohmann::json FlakeDep::toJson() const
+{
+    auto json = FlakeInputs::toJson();
+    json["id"] = id;
+    json["uri"] = ref.to_string();
+    json["narHash"] = narHash.to_string(SRI);
+    return json;
+}
+
+FlakeInputs::FlakeInputs(const nlohmann::json & json)
+{
     auto nonFlakeInputs = json["nonFlakeInputs"];
-
-    for (auto i = nonFlakeInputs.begin(); i != nonFlakeInputs.end(); ++i) {
-        FlakeRef flakeRef(i->value("uri", ""));
-        if (!flakeRef.isImmutable())
-            throw Error("requested to fetch FlakeRef '%s' purely, which is mutable", flakeRef);
-        LockFile::NonFlakeEntry nonEntry(flakeRef, Hash(i->value("narHash", "")));
-        entry.nonFlakeEntries.insert_or_assign(i.key(), nonEntry);
-    }
+    for (auto i = nonFlakeInputs.begin(); i != nonFlakeInputs.end(); ++i)
+        nonFlakeDeps.insert_or_assign(i.key(), NonFlakeDep(*i));
 
     auto inputs = json["inputs"];
-
     for (auto i = inputs.begin(); i != inputs.end(); ++i)
-        entry.flakeEntries.insert_or_assign(i.key(), readFlakeEntry(*i));
+        flakeDeps.insert_or_assign(i.key(), FlakeDep(*i));
+}
 
-    return entry;
+nlohmann::json FlakeInputs::toJson() const
+{
+    nlohmann::json json;
+    {
+        auto j = nlohmann::json::object();
+        for (auto & i : nonFlakeDeps)
+            j[i.first] = i.second.toJson();
+        json["nonFlakeInputs"] = std::move(j);
+    }
+    {
+        auto j = nlohmann::json::object();
+        for (auto & i : flakeDeps)
+            j[i.first.to_string()] = i.second.toJson();
+        json["inputs"] = std::move(j);
+    }
+    return json;
+}
+
+nlohmann::json LockFile::toJson() const
+{
+    auto json = FlakeInputs::toJson();
+    json["version"] = 2;
+    return json;
 }
 
 LockFile readLockFile(const Path & path)
 {
-    LockFile lockFile;
+    if (pathExists(path)) {
+        auto json = nlohmann::json::parse(readFile(path));
 
-    if (!pathExists(path))
-        return lockFile;
+        auto version = json.value("version", 0);
+        if (version != 2)
+            throw Error("lock file '%s' has unsupported version %d", path, version);
 
-    auto json = nlohmann::json::parse(readFile(path));
-
-    auto version = json.value("version", 0);
-    if (version != 1)
-        throw Error("lock file '%s' has unsupported version %d", path, version);
-
-    auto nonFlakeInputs = json["nonFlakeInputs"];
-
-    for (auto i = nonFlakeInputs.begin(); i != nonFlakeInputs.end(); ++i) {
-        FlakeRef flakeRef(i->value("uri", ""));
-        LockFile::NonFlakeEntry nonEntry(flakeRef, Hash(i->value("narHash", "")));
-        if (!flakeRef.isImmutable())
-            throw Error("found mutable FlakeRef '%s' in lockfile at path %s", flakeRef, path);
-        lockFile.nonFlakeEntries.insert_or_assign(i.key(), nonEntry);
-    }
-
-    auto inputs = json["inputs"];
-
-    for (auto i = inputs.begin(); i != inputs.end(); ++i)
-        lockFile.flakeEntries.insert_or_assign(i.key(), readFlakeEntry(*i));
-
-    return lockFile;
-}
-
-nlohmann::json flakeEntryToJson(const LockFile::FlakeEntry & entry)
-{
-    nlohmann::json json;
-    json["uri"] = entry.ref.to_string();
-    json["narHash"] = entry.narHash.to_string(SRI);
-    for (auto & x : entry.nonFlakeEntries) {
-        json["nonFlakeInputs"][x.first]["uri"] = x.second.ref.to_string();
-        json["nonFlakeInputs"][x.first]["narHash"] = x.second.narHash.to_string(SRI);
-    }
-    for (auto & x : entry.flakeEntries)
-        json["inputs"][x.first.to_string()] = flakeEntryToJson(x.second);
-    return json;
+        return LockFile(json);
+    } else
+        return LockFile();
 }
 
 std::ostream & operator <<(std::ostream & stream, const LockFile & lockFile)
 {
-    nlohmann::json json;
-    json["version"] = 1;
-    json["nonFlakeInputs"] = nlohmann::json::object();
-    for (auto & x : lockFile.nonFlakeEntries) {
-        json["nonFlakeInputs"][x.first]["uri"] = x.second.ref.to_string();
-        json["nonFlakeInputs"][x.first]["narHash"] = x.second.narHash.to_string(SRI);
-    }
-    json["inputs"] = nlohmann::json::object();
-    for (auto & x : lockFile.flakeEntries)
-        json["inputs"][x.first.to_string()] = flakeEntryToJson(x.second);
-    stream << json.dump(4); // '4' = indentation in json file
+    stream << lockFile.toJson().dump(4); // '4' = indentation in json file
     return stream;
 }
 
@@ -387,33 +391,6 @@ NonFlake getNonFlake(EvalState & state, const FlakeRef & flakeRef, FlakeAlias al
     return nonFlake;
 }
 
-LockFile entryToLockFile(const LockFile::FlakeEntry & entry)
-{
-    LockFile lockFile;
-    lockFile.flakeEntries = entry.flakeEntries;
-    lockFile.nonFlakeEntries = entry.nonFlakeEntries;
-    return lockFile;
-}
-
-LockFile::FlakeEntry dependenciesToFlakeEntry(const ResolvedFlake & resolvedFlake)
-{
-    LockFile::FlakeEntry entry(
-        resolvedFlake.flake.sourceInfo.resolvedRef,
-        resolvedFlake.flake.sourceInfo.narHash);
-
-    for (auto & info : resolvedFlake.flakeDeps)
-        entry.flakeEntries.insert_or_assign(info.first.to_string(), dependenciesToFlakeEntry(info.second));
-
-    for (auto & nonFlake : resolvedFlake.nonFlakeDeps) {
-        LockFile::NonFlakeEntry nonEntry(
-            nonFlake.sourceInfo.resolvedRef,
-            nonFlake.sourceInfo.narHash);
-        entry.nonFlakeEntries.insert_or_assign(nonFlake.alias, nonEntry);
-    }
-
-    return entry;
-}
-
 bool allowedToWrite(HandleLockFile handle)
 {
     return handle == UpdateLockFile || handle == RecreateLockFile;
@@ -435,43 +412,50 @@ bool allowedToUseRegistries(HandleLockFile handle, bool isTopRef)
     else assert(false);
 }
 
-ResolvedFlake resolveFlakeFromLockFile(EvalState & state, const FlakeRef & flakeRef,
-    HandleLockFile handleLockFile, LockFile lockFile = {}, bool topRef = false)
+static std::pair<Flake, FlakeDep> updateLocks(
+    EvalState & state,
+    const FlakeRef & flakeRef,
+    HandleLockFile handleLockFile,
+    const FlakeInputs & oldEntry,
+    bool topRef)
 {
-    Flake flake = getFlake(state, flakeRef, allowedToUseRegistries(handleLockFile, topRef));
+    auto flake = getFlake(state, flakeRef, allowedToUseRegistries(handleLockFile, topRef));
 
-    ResolvedFlake deps(flake);
+    FlakeDep newEntry(
+        flake.id,
+        flake.sourceInfo.resolvedRef,
+        flake.sourceInfo.narHash);
 
-    for (auto & nonFlakeInfo : flake.nonFlakeInputs) {
-        FlakeRef ref = nonFlakeInfo.second;
-        auto i = lockFile.nonFlakeEntries.find(nonFlakeInfo.first);
-        if (i != lockFile.nonFlakeEntries.end()) {
-            NonFlake nonFlake = getNonFlake(state, i->second.ref, nonFlakeInfo.first);
-            if (nonFlake.sourceInfo.narHash != i->second.narHash)
-                throw Error("the content hash of flakeref '%s' doesn't match", i->second.ref.to_string());
-            deps.nonFlakeDeps.push_back(nonFlake);
+    for (auto & input : flake.nonFlakeInputs) {
+        auto & id = input.first;
+        auto & ref = input.second;
+        auto i = oldEntry.nonFlakeDeps.find(id);
+        if (i != oldEntry.nonFlakeDeps.end()) {
+            newEntry.nonFlakeDeps.insert_or_assign(i->first, i->second);
         } else {
             if (handleLockFile == AllPure || handleLockFile == TopRefUsesRegistries)
-                throw Error("cannot update non-flake dependency '%s' in pure mode", nonFlakeInfo.first);
-            deps.nonFlakeDeps.push_back(getNonFlake(state, nonFlakeInfo.second, nonFlakeInfo.first, allowedToUseRegistries(handleLockFile, false)));
+                throw Error("cannot update non-flake dependency '%s' in pure mode", id);
+            auto nonFlake = getNonFlake(state, ref, id, allowedToUseRegistries(handleLockFile, false));
+            newEntry.nonFlakeDeps.insert_or_assign(id,
+                NonFlakeDep(
+                    nonFlake.sourceInfo.resolvedRef,
+                    nonFlake.sourceInfo.narHash));
         }
     }
 
-    for (auto newFlakeRef : flake.inputs) {
-        auto i = lockFile.flakeEntries.find(newFlakeRef);
-        if (i != lockFile.flakeEntries.end()) { // Propagate lockFile downwards if possible
-            ResolvedFlake newResFlake = resolveFlakeFromLockFile(state, i->second.ref, handleLockFile, entryToLockFile(i->second));
-            if (newResFlake.flake.sourceInfo.narHash != i->second.narHash)
-                throw Error("the content hash of flakeref '%s' doesn't match", i->second.ref.to_string());
-            deps.flakeDeps.insert_or_assign(newFlakeRef, newResFlake);
+    for (auto & inputRef : flake.inputs) {
+        auto i = oldEntry.flakeDeps.find(inputRef);
+        if (i != oldEntry.flakeDeps.end()) {
+            newEntry.flakeDeps.insert_or_assign(inputRef, i->second);
         } else {
             if (handleLockFile == AllPure || handleLockFile == TopRefUsesRegistries)
-                throw Error("cannot update flake dependency '%s' in pure mode", newFlakeRef.to_string());
-            deps.flakeDeps.insert_or_assign(newFlakeRef, resolveFlakeFromLockFile(state, newFlakeRef, handleLockFile));
+                throw Error("cannot update flake dependency '%s' in pure mode", inputRef);
+            newEntry.flakeDeps.insert_or_assign(inputRef,
+                updateLocks(state, inputRef, handleLockFile, {}, false).second);
         }
     }
 
-    return deps;
+    return {flake, newEntry};
 }
 
 /* Given a flake reference, recursively fetch it and its dependencies.
@@ -479,7 +463,8 @@ ResolvedFlake resolveFlakeFromLockFile(EvalState & state, const FlakeRef & flake
 */
 ResolvedFlake resolveFlake(EvalState & state, const FlakeRef & topRef, HandleLockFile handleLockFile)
 {
-    Flake flake = getFlake(state, topRef, allowedToUseRegistries(handleLockFile, true));
+    auto flake = getFlake(state, topRef, allowedToUseRegistries(handleLockFile, true));
+
     LockFile oldLockFile;
 
     if (!recreateLockFile(handleLockFile)) {
@@ -490,10 +475,9 @@ ResolvedFlake resolveFlake(EvalState & state, const FlakeRef & topRef, HandleLoc
             + "/" + flake.sourceInfo.resolvedRef.subdir + "/flake.lock");
     }
 
-    LockFile lockFile(oldLockFile);
-
-    ResolvedFlake resFlake = resolveFlakeFromLockFile(state, topRef, handleLockFile, lockFile, true);
-    lockFile = entryToLockFile(dependenciesToFlakeEntry(resFlake));
+    // FIXME: get rid of duplicate getFlake call
+    LockFile lockFile(updateLocks(
+            state, topRef, handleLockFile, oldLockFile, true).second);
 
     if (!(lockFile == oldLockFile)) {
         if (allowedToWrite(handleLockFile)) {
@@ -509,7 +493,7 @@ ResolvedFlake resolveFlake(EvalState & state, const FlakeRef & topRef, HandleLoc
             warn("using updated lockfile without writing it to file");
     }
 
-    return resFlake;
+    return ResolvedFlake(std::move(flake), std::move(lockFile));
 }
 
 void updateLockFile(EvalState & state, const FlakeRef & flakeRef, bool recreateLockFile)
@@ -520,7 +504,9 @@ void updateLockFile(EvalState & state, const FlakeRef & flakeRef, bool recreateL
 static void emitSourceInfoAttrs(EvalState & state, const SourceInfo & sourceInfo, Value & vAttrs)
 {
     auto & path = sourceInfo.storePath;
-    state.store->isValidPath(path);
+    assert(state.store->isValidPath(path));
+    // FIXME: turn into fetchGit etc.
+    // FIXME: check narHash.
     mkString(*state.allocAttr(vAttrs, state.sOutPath), path, {path});
 
     if (sourceInfo.resolvedRef.rev) {
@@ -539,40 +525,72 @@ static void emitSourceInfoAttrs(EvalState & state, const SourceInfo & sourceInfo
                 std::put_time(std::gmtime(&*sourceInfo.lastModified), "%Y%m%d%H%M%S")));
 }
 
-void callFlake(EvalState & state, const ResolvedFlake & resFlake, Value & v)
+/* Helper primop to make callFlake (below) fetch/call its inputs
+   lazily. Note that this primop cannot be called by user code since
+   it doesn't appear in 'builtins'. */
+static void prim_callFlake(EvalState & state, const Pos & pos, Value * * args, Value & v)
+{
+    auto lazyFlake = (FlakeDep *) args[0]->attrs;
+    auto flake = getFlake(state, lazyFlake->ref, false);
+    callFlake(state, flake, *lazyFlake, v);
+}
+
+void callFlake(EvalState & state,
+    const Flake & flake,
+    const FlakeInputs & inputs,
+    Value & v)
 {
     // Construct the resulting attrset '{description, outputs,
     // ...}'. This attrset is passed lazily as an argument to 'outputs'.
 
-    state.mkAttrs(v, resFlake.flakeDeps.size() + resFlake.nonFlakeDeps.size() + 8);
+    state.mkAttrs(v,
+        inputs.flakeDeps.size() +
+        inputs.nonFlakeDeps.size() + 8);
 
-    for (auto info : resFlake.flakeDeps) {
-        const ResolvedFlake newResFlake = info.second;
-        auto vFlake = state.allocAttr(v, newResFlake.flake.id);
-        callFlake(state, newResFlake, *vFlake);
+    for (auto & dep : inputs.flakeDeps) {
+        auto vFlake = state.allocAttr(v, dep.second.id);
+        auto vPrimOp = state.allocValue();
+        static auto primOp = new PrimOp(prim_callFlake, 1, state.symbols.create("callFlake"));
+        vPrimOp->type = tPrimOp;
+        vPrimOp->primOp = primOp;
+        auto vArg = state.allocValue();
+        vArg->type = tNull;
+        // FIXME: leak
+        vArg->attrs = (Bindings *) new FlakeDep(dep.second); // evil! also inefficient
+        mkApp(*vFlake, *vPrimOp, *vArg);
     }
 
-    for (const NonFlake nonFlake : resFlake.nonFlakeDeps) {
-        auto vNonFlake = state.allocAttr(v, nonFlake.alias);
+    for (auto & dep : inputs.nonFlakeDeps) {
+        auto vNonFlake = state.allocAttr(v, dep.first);
         state.mkAttrs(*vNonFlake, 8);
 
-        state.store->isValidPath(nonFlake.sourceInfo.storePath);
+        auto nonFlake = getNonFlake(state, dep.second.ref, dep.first);
+
+        assert(state.store->isValidPath(nonFlake.sourceInfo.storePath));
+
         mkString(*state.allocAttr(*vNonFlake, state.sOutPath),
             nonFlake.sourceInfo.storePath, {nonFlake.sourceInfo.storePath});
 
         emitSourceInfoAttrs(state, nonFlake.sourceInfo, *vNonFlake);
     }
 
-    mkString(*state.allocAttr(v, state.sDescription), resFlake.flake.description);
+    mkString(*state.allocAttr(v, state.sDescription), flake.description);
 
-    emitSourceInfoAttrs(state, resFlake.flake.sourceInfo, v);
+    emitSourceInfoAttrs(state, flake.sourceInfo, v);
 
     auto vOutputs = state.allocAttr(v, state.symbols.create("outputs"));
-    mkApp(*vOutputs, *resFlake.flake.vOutputs, v);
+    mkApp(*vOutputs, *flake.vOutputs, v);
 
     v.attrs->push_back(Attr(state.symbols.create("self"), &v));
 
     v.attrs->sort();
+}
+
+void callFlake(EvalState & state,
+    const ResolvedFlake & resFlake,
+    Value & v)
+{
+    callFlake(state, resFlake.flake, resFlake.lockFile, v);
 }
 
 // This function is exposed to be used in nix files.

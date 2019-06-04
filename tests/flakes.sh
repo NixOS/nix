@@ -191,6 +191,8 @@ nix build -o $TEST_ROOT/result --flake-registry $registry $flake3Dir:sth
 # Check whether it saved the lockfile
 [[ ! (-z $(git -C $flake3Dir diff master)) ]]
 
+git -C $flake3Dir commit -m 'Add lockfile'
+
 # Unsupported epochs should be an error.
 sed -i $flake3Dir/flake.nix -e s/201906/201909/
 nix build -o $TEST_ROOT/result --flake-registry $registry $flake3Dir:sth 2>&1 | grep 'unsupported epoch'
@@ -241,3 +243,12 @@ git -C $flake3Dir commit -m 'Add nonFlakeInputs'
 
 # Check whether `nix build` works with a lockfile which is missing a nonFlakeInputs
 nix build -o $TEST_ROOT/result --flake-registry $registry $flake3Dir:sth
+
+# Check whether flake input fetching is lazy: flake3:sth does not
+# depend on flake2, so this shouldn't fail.
+rm -rf $TEST_HOME/.cache
+clearStore
+mv $flake2Dir $flake2Dir.tmp
+nix build -o $TEST_ROOT/result --flake-registry $registry flake3:sth
+(! nix build -o $TEST_ROOT/result --flake-registry $registry flake3:xyzzy)
+mv $flake2Dir.tmp $flake2Dir

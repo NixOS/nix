@@ -136,6 +136,7 @@ static nlohmann::json nonFlakeToJson(const NonFlake & nonFlake)
     return j;
 }
 
+#if 0
 // FIXME: merge info CmdFlakeInfo?
 struct CmdFlakeDeps : FlakeCommand
 {
@@ -173,6 +174,7 @@ struct CmdFlakeDeps : FlakeCommand
         }
     }
 };
+#endif
 
 struct CmdFlakeUpdate : FlakeCommand
 {
@@ -232,6 +234,7 @@ struct CmdFlakeInfo : FlakeCommand, MixJSON
         if (json) {
             auto json = flakeToJson(flake);
 
+#if 0
             auto state = getEvalState();
 
             auto vFlake = state->allocValue();
@@ -254,6 +257,7 @@ struct CmdFlakeInfo : FlakeCommand, MixJSON
                 });
 
             json["outputs"] = std::move(outputs);
+#endif
 
             std::cout << json.dump() << std::endl;
         } else
@@ -518,7 +522,7 @@ struct CmdFlake : virtual MultiCommand, virtual Command
             , make_ref<CmdFlakeUpdate>()
             , make_ref<CmdFlakeInfo>()
             , make_ref<CmdFlakeCheck>()
-            , make_ref<CmdFlakeDeps>()
+            //, make_ref<CmdFlakeDeps>()
             , make_ref<CmdFlakeAdd>()
             , make_ref<CmdFlakeRemove>()
             , make_ref<CmdFlakePin>()
