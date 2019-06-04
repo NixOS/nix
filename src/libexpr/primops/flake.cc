@@ -50,7 +50,7 @@ void writeRegistry(const FlakeRegistry & registry, const Path & path)
     writeFile(path, json.dump(4)); // The '4' is the number of spaces used in the indentation in the json file.
 }
 
-NonFlakeDep::NonFlakeDep(const nlohmann::json & json)
+AbstractDep::AbstractDep(const nlohmann::json & json)
     : ref(json["uri"])
     , narHash(Hash((std::string) json["narHash"]))
 {
@@ -58,7 +58,7 @@ NonFlakeDep::NonFlakeDep(const nlohmann::json & json)
         throw Error("lockfile contains mutable flakeref '%s'", ref);
 }
 
-nlohmann::json NonFlakeDep::toJson() const
+nlohmann::json AbstractDep::toJson() const
 {
     nlohmann::json json;
     json["uri"] = ref.to_string();
@@ -66,22 +66,23 @@ nlohmann::json NonFlakeDep::toJson() const
     return json;
 }
 
+Path AbstractDep::computeStorePath(Store & store) const
+{
+    return store.makeFixedOutputPath(true, narHash, "source");
+}
+
 FlakeDep::FlakeDep(const nlohmann::json & json)
     : FlakeInputs(json)
+    , AbstractDep(json)
     , id(json["id"])
-    , ref(json["uri"])
-    , narHash(Hash((std::string) json["narHash"]))
 {
-    if (!ref.isImmutable())
-        throw Error("lockfile contains mutable flakeref '%s'", ref);
 }
 
 nlohmann::json FlakeDep::toJson() const
 {
     auto json = FlakeInputs::toJson();
+    json.update(AbstractDep::toJson());
     json["id"] = id;
-    json["uri"] = ref.to_string();
-    json["narHash"] = narHash.to_string(SRI);
     return json;
 }
 

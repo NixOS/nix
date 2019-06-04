@@ -204,6 +204,7 @@ nix flake list --flake-registry file://$registry --tarball-ttl 0 | grep -q flake
 mv $registry.tmp $registry
 
 # Test whether flakes are registered as GC roots for offline use.
+# FIXME: use tarballs rather than git.
 rm -rf $TEST_HOME/.cache
 nix build -o $TEST_ROOT/result --flake-registry file://$registry file://$flake2Dir:bar
 mv $flake1Dir $flake1Dir.tmp

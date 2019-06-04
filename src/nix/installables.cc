@@ -190,22 +190,28 @@ void makeFlakeClosureGCRoot(Store & store,
     const FlakeRef & origFlakeRef,
     const flake::ResolvedFlake & resFlake)
 {
-#if 0
     if (std::get_if<FlakeRef::IsPath>(&origFlakeRef.data)) return;
 
     /* Get the store paths of all non-local flakes. */
     PathSet closure;
 
-    std::queue<std::reference_wrapper<const flake::ResolvedFlake>> queue;
-    queue.push(resFlake);
+    assert(store.isValidPath(resFlake.flake.sourceInfo.storePath));
+    closure.insert(resFlake.flake.sourceInfo.storePath);
+
+    std::queue<std::reference_wrapper<const flake::FlakeInputs>> queue;
+    queue.push(resFlake.lockFile);
 
     while (!queue.empty()) {
-        const flake::ResolvedFlake & flake = queue.front();
+        const flake::FlakeInputs & flake = queue.front();
         queue.pop();
-        if (!std::get_if<FlakeRef::IsPath>(&flake.flake.sourceInfo.resolvedRef.data))
-            closure.insert(flake.flake.sourceInfo.storePath);
-        for (const auto & dep : flake.flakeDeps)
+        /* Note: due to lazy fetching, these paths might not exist
+           yet. */
+        for (auto & dep : flake.flakeDeps) {
+            closure.insert(dep.second.computeStorePath(store));
             queue.push(dep.second);
+        }
+        for (auto & dep : flake.nonFlakeDeps)
+            closure.insert(dep.second.computeStorePath(store));
     }
 
     if (closure.empty()) return;
@@ -225,7 +231,6 @@ void makeFlakeClosureGCRoot(Store & store,
     debug("writing GC root '%s' for flake closure of '%s'", symlink, origFlakeRef);
     replaceSymlink(closurePath, symlink);
     store.addIndirectRoot(symlink);
-#endif
 }
 
 struct InstallableFlake : InstallableValue

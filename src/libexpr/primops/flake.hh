@@ -1,3 +1,5 @@
+#pragma once
+
 #include "types.hh"
 #include "flakeref.hh"
 
@@ -8,6 +10,7 @@ namespace nix {
 
 struct Value;
 class EvalState;
+class Store;
 
 namespace flake {
 
@@ -37,22 +40,29 @@ enum HandleLockFile : unsigned int
     , UseNewLockFile // `RecreateLockFile` without writing to file
     };
 
-struct NonFlakeDep
+struct AbstractDep
 {
     FlakeRef ref;
     Hash narHash;
 
-    NonFlakeDep(const FlakeRef & flakeRef, const Hash & narHash)
+    AbstractDep(const FlakeRef & flakeRef, const Hash & narHash)
         : ref(flakeRef), narHash(narHash) {};
 
-    NonFlakeDep(const nlohmann::json & json);
+    AbstractDep(const nlohmann::json & json);
+
+    nlohmann::json toJson() const;
+
+    Path computeStorePath(Store & store) const;
+};
+
+struct NonFlakeDep : AbstractDep
+{
+    using AbstractDep::AbstractDep;
 
     bool operator ==(const NonFlakeDep & other) const
     {
         return ref == other.ref && narHash == other.narHash;
     }
-
-    nlohmann::json toJson() const;
 };
 
 struct FlakeDep;
@@ -68,14 +78,12 @@ struct FlakeInputs
     nlohmann::json toJson() const;
 };
 
-struct FlakeDep : FlakeInputs
+struct FlakeDep : FlakeInputs, AbstractDep
 {
     FlakeId id;
-    FlakeRef ref;
-    Hash narHash;
 
     FlakeDep(const FlakeId & id, const FlakeRef & flakeRef, const Hash & narHash)
-        : id(id), ref(flakeRef), narHash(narHash) {};
+        : AbstractDep(flakeRef, narHash), id(id) {};
 
     FlakeDep(const nlohmann::json & json);
 
