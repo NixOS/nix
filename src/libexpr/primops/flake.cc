@@ -409,8 +409,6 @@ static void emitSourceInfoAttrs(EvalState & state, const SourceInfo & sourceInfo
 {
     auto & path = sourceInfo.storePath;
     assert(state.store->isValidPath(path));
-    // FIXME: turn into fetchGit etc.
-    // FIXME: check narHash.
     mkString(*state.allocAttr(vAttrs, state.sOutPath), path, {path});
 
     if (sourceInfo.resolvedRef.rev) {
@@ -436,6 +434,10 @@ static void prim_callFlake(EvalState & state, const Pos & pos, Value * * args, V
 {
     auto lazyFlake = (FlakeInput *) args[0]->attrs;
     auto flake = getFlake(state, lazyFlake->ref, false);
+
+    if (flake.sourceInfo.narHash != lazyFlake->narHash)
+        throw Error("the content hash of flake '%s' doesn't match the hash recorded in the referring lockfile", flake.sourceInfo.resolvedRef);
+
     callFlake(state, flake, *lazyFlake, v);
 }
 

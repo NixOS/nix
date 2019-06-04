@@ -106,5 +106,7 @@ struct LockFile : FlakeInputs
     void write(const Path & path) const;
 };
 
+std::ostream & operator <<(std::ostream & stream, const LockFile & lockFile);
+
 }
 
