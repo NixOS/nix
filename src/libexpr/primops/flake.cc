@@ -325,13 +325,11 @@ bool allowedToUseRegistries(HandleLockFile handle, bool isTopRef)
    not in the lockfile yet. */
 static std::pair<Flake, FlakeInput> updateLocks(
     EvalState & state,
-    const FlakeRef & flakeRef,
+    const Flake & flake,
     HandleLockFile handleLockFile,
     const FlakeInputs & oldEntry,
     bool topRef)
 {
-    auto flake = getFlake(state, flakeRef, allowedToUseRegistries(handleLockFile, topRef));
-
     FlakeInput newEntry(
         flake.id,
         flake.sourceInfo.resolvedRef,
@@ -362,7 +360,9 @@ static std::pair<Flake, FlakeInput> updateLocks(
             if (handleLockFile == AllPure || handleLockFile == TopRefUsesRegistries)
                 throw Error("cannot update flake dependency '%s' in pure mode", inputRef);
             newEntry.flakeInputs.insert_or_assign(inputRef,
-                updateLocks(state, inputRef, handleLockFile, {}, false).second);
+                updateLocks(state,
+                    getFlake(state, inputRef, allowedToUseRegistries(handleLockFile, false)),
+                    handleLockFile, {}, false).second);
         }
     }
 
@@ -385,9 +385,8 @@ ResolvedFlake resolveFlake(EvalState & state, const FlakeRef & topRef, HandleLoc
             + "/" + flake.sourceInfo.resolvedRef.subdir + "/flake.lock");
     }
 
-    // FIXME: get rid of duplicate getFlake call
     LockFile lockFile(updateLocks(
-            state, topRef, handleLockFile, oldLockFile, true).second);
+            state, flake, handleLockFile, oldLockFile, true).second);
 
     if (!(lockFile == oldLockFile)) {
         if (allowedToWrite(handleLockFile)) {
