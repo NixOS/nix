@@ -12,18 +12,18 @@ namespace nix::flake {
 
 /* Common lock file information about a flake input, namely the
    immutable ref and the NAR hash. */
-struct AbstractDep
+struct AbstractInput
 {
     FlakeRef ref;
     Hash narHash;
 
-    AbstractDep(const FlakeRef & flakeRef, const Hash & narHash)
+    AbstractInput(const FlakeRef & flakeRef, const Hash & narHash)
         : ref(flakeRef), narHash(narHash)
     {
         assert(ref.isImmutable());
     };
 
-    AbstractDep(const nlohmann::json & json);
+    AbstractInput(const nlohmann::json & json);
 
     nlohmann::json toJson() const;
 
@@ -31,23 +31,23 @@ struct AbstractDep
 };
 
 /* Lock file information about a non-flake input. */
-struct NonFlakeDep : AbstractDep
+struct NonFlakeInput : AbstractInput
 {
-    using AbstractDep::AbstractDep;
+    using AbstractInput::AbstractInput;
 
-    bool operator ==(const NonFlakeDep & other) const
+    bool operator ==(const NonFlakeInput & other) const
     {
         return ref == other.ref && narHash == other.narHash;
     }
 };
 
-struct FlakeDep;
+struct FlakeInput;
 
 /* Lock file information about the dependencies of a flake. */
 struct FlakeInputs
 {
-    std::map<FlakeRef, FlakeDep> flakeDeps;
-    std::map<FlakeAlias, NonFlakeDep> nonFlakeDeps;
+    std::map<FlakeRef, FlakeInput> flakeInputs;
+    std::map<FlakeAlias, NonFlakeInput> nonFlakeInputs;
 
     FlakeInputs() {};
     FlakeInputs(const nlohmann::json & json);
@@ -56,29 +56,29 @@ struct FlakeInputs
 };
 
 /* Lock file information about a flake input. */
-struct FlakeDep : FlakeInputs, AbstractDep
+struct FlakeInput : FlakeInputs, AbstractInput
 {
     FlakeId id;
 
-    FlakeDep(const FlakeId & id, const FlakeRef & flakeRef, const Hash & narHash)
-        : AbstractDep(flakeRef, narHash), id(id) {};
+    FlakeInput(const FlakeId & id, const FlakeRef & flakeRef, const Hash & narHash)
+        : AbstractInput(flakeRef, narHash), id(id) {};
 
-    FlakeDep(const nlohmann::json & json);
+    FlakeInput(const nlohmann::json & json);
 
-    bool operator ==(const FlakeDep & other) const
+    bool operator ==(const FlakeInput & other) const
     {
         return
             id == other.id
             && ref == other.ref
             && narHash == other.narHash
-            && flakeDeps == other.flakeDeps
-            && nonFlakeDeps == other.nonFlakeDeps;
+            && flakeInputs == other.flakeInputs
+            && nonFlakeInputs == other.nonFlakeInputs;
     }
 
     nlohmann::json toJson() const;
 };
 
-/* An entire lock file. Note that this cannot be a FlakeDep for the
+/* An entire lock file. Note that this cannot be a FlakeInput for the
    top-level flake, because then the lock file would need to contain
    the hash of the top-level flake, but committing the lock file
    would invalidate that hash. */
@@ -87,16 +87,16 @@ struct LockFile : FlakeInputs
     bool operator ==(const LockFile & other) const
     {
         return
-            flakeDeps == other.flakeDeps
-            && nonFlakeDeps == other.nonFlakeDeps;
+            flakeInputs == other.flakeInputs
+            && nonFlakeInputs == other.nonFlakeInputs;
     }
 
     LockFile() {}
     LockFile(const nlohmann::json & json) : FlakeInputs(json) {}
-    LockFile(FlakeDep && dep)
+    LockFile(FlakeInput && dep)
     {
-        flakeDeps = std::move(dep.flakeDeps);
-        nonFlakeDeps = std::move(dep.nonFlakeDeps);
+        flakeInputs = std::move(dep.flakeInputs);
+        nonFlakeInputs = std::move(dep.nonFlakeInputs);
     }
 
     nlohmann::json toJson() const;

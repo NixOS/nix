@@ -3,7 +3,7 @@
 
 namespace nix::flake {
 
-AbstractDep::AbstractDep(const nlohmann::json & json)
+AbstractInput::AbstractInput(const nlohmann::json & json)
     : ref(json["uri"])
     , narHash(Hash((std::string) json["narHash"]))
 {
@@ -11,7 +11,7 @@ AbstractDep::AbstractDep(const nlohmann::json & json)
         throw Error("lockfile contains mutable flakeref '%s'", ref);
 }
 
-nlohmann::json AbstractDep::toJson() const
+nlohmann::json AbstractInput::toJson() const
 {
     nlohmann::json json;
     json["uri"] = ref.to_string();
@@ -19,35 +19,33 @@ nlohmann::json AbstractDep::toJson() const
     return json;
 }
 
-Path AbstractDep::computeStorePath(Store & store) const
+Path AbstractInput::computeStorePath(Store & store) const
 {
     return store.makeFixedOutputPath(true, narHash, "source");
 }
 
-FlakeDep::FlakeDep(const nlohmann::json & json)
+FlakeInput::FlakeInput(const nlohmann::json & json)
     : FlakeInputs(json)
-    , AbstractDep(json)
+    , AbstractInput(json)
     , id(json["id"])
 {
 }
 
-nlohmann::json FlakeDep::toJson() const
+nlohmann::json FlakeInput::toJson() const
 {
     auto json = FlakeInputs::toJson();
-    json.update(AbstractDep::toJson());
+    json.update(AbstractInput::toJson());
     json["id"] = id;
     return json;
 }
 
 FlakeInputs::FlakeInputs(const nlohmann::json & json)
 {
-    auto nonFlakeInputs = json["nonFlakeInputs"];
-    for (auto i = nonFlakeInputs.begin(); i != nonFlakeInputs.end(); ++i)
-        nonFlakeDeps.insert_or_assign(i.key(), NonFlakeDep(*i));
+    for (auto & i : json["nonFlakeInputs"].items())
+        nonFlakeInputs.insert_or_assign(i.key(), NonFlakeInput(i.value()));
 
-    auto inputs = json["inputs"];
-    for (auto i = inputs.begin(); i != inputs.end(); ++i)
-        flakeDeps.insert_or_assign(i.key(), FlakeDep(*i));
+    for (auto & i : json["inputs"].items())
+        flakeInputs.insert_or_assign(i.key(), FlakeInput(i.value()));
 }
 
 nlohmann::json FlakeInputs::toJson() const
@@ -55,13 +53,13 @@ nlohmann::json FlakeInputs::toJson() const
     nlohmann::json json;
     {
         auto j = nlohmann::json::object();
-        for (auto & i : nonFlakeDeps)
+        for (auto & i : nonFlakeInputs)
             j[i.first] = i.second.toJson();
         json["nonFlakeInputs"] = std::move(j);
     }
     {
         auto j = nlohmann::json::object();
-        for (auto & i : flakeDeps)
+        for (auto & i : flakeInputs)
             j[i.first.to_string()] = i.second.toJson();
         json["inputs"] = std::move(j);
     }

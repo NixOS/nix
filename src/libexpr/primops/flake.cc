@@ -316,7 +316,7 @@ bool allowedToUseRegistries(HandleLockFile handle, bool isTopRef)
     else assert(false);
 }
 
-static std::pair<Flake, FlakeDep> updateLocks(
+static std::pair<Flake, FlakeInput> updateLocks(
     EvalState & state,
     const FlakeRef & flakeRef,
     HandleLockFile handleLockFile,
@@ -325,7 +325,7 @@ static std::pair<Flake, FlakeDep> updateLocks(
 {
     auto flake = getFlake(state, flakeRef, allowedToUseRegistries(handleLockFile, topRef));
 
-    FlakeDep newEntry(
+    FlakeInput newEntry(
         flake.id,
         flake.sourceInfo.resolvedRef,
         flake.sourceInfo.narHash);
@@ -333,28 +333,28 @@ static std::pair<Flake, FlakeDep> updateLocks(
     for (auto & input : flake.nonFlakeInputs) {
         auto & id = input.first;
         auto & ref = input.second;
-        auto i = oldEntry.nonFlakeDeps.find(id);
-        if (i != oldEntry.nonFlakeDeps.end()) {
-            newEntry.nonFlakeDeps.insert_or_assign(i->first, i->second);
+        auto i = oldEntry.nonFlakeInputs.find(id);
+        if (i != oldEntry.nonFlakeInputs.end()) {
+            newEntry.nonFlakeInputs.insert_or_assign(i->first, i->second);
         } else {
             if (handleLockFile == AllPure || handleLockFile == TopRefUsesRegistries)
                 throw Error("cannot update non-flake dependency '%s' in pure mode", id);
             auto nonFlake = getNonFlake(state, ref, id, allowedToUseRegistries(handleLockFile, false));
-            newEntry.nonFlakeDeps.insert_or_assign(id,
-                NonFlakeDep(
+            newEntry.nonFlakeInputs.insert_or_assign(id,
+                NonFlakeInput(
                     nonFlake.sourceInfo.resolvedRef,
                     nonFlake.sourceInfo.narHash));
         }
     }
 
     for (auto & inputRef : flake.inputs) {
-        auto i = oldEntry.flakeDeps.find(inputRef);
-        if (i != oldEntry.flakeDeps.end()) {
-            newEntry.flakeDeps.insert_or_assign(inputRef, i->second);
+        auto i = oldEntry.flakeInputs.find(inputRef);
+        if (i != oldEntry.flakeInputs.end()) {
+            newEntry.flakeInputs.insert_or_assign(inputRef, i->second);
         } else {
             if (handleLockFile == AllPure || handleLockFile == TopRefUsesRegistries)
                 throw Error("cannot update flake dependency '%s' in pure mode", inputRef);
-            newEntry.flakeDeps.insert_or_assign(inputRef,
+            newEntry.flakeInputs.insert_or_assign(inputRef,
                 updateLocks(state, inputRef, handleLockFile, {}, false).second);
         }
     }
@@ -434,7 +434,7 @@ static void emitSourceInfoAttrs(EvalState & state, const SourceInfo & sourceInfo
    it doesn't appear in 'builtins'. */
 static void prim_callFlake(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
-    auto lazyFlake = (FlakeDep *) args[0]->attrs;
+    auto lazyFlake = (FlakeInput *) args[0]->attrs;
     auto flake = getFlake(state, lazyFlake->ref, false);
     callFlake(state, flake, *lazyFlake, v);
 }
@@ -448,10 +448,10 @@ void callFlake(EvalState & state,
     // ...}'. This attrset is passed lazily as an argument to 'outputs'.
 
     state.mkAttrs(v,
-        inputs.flakeDeps.size() +
-        inputs.nonFlakeDeps.size() + 8);
+        inputs.flakeInputs.size() +
+        inputs.nonFlakeInputs.size() + 8);
 
-    for (auto & dep : inputs.flakeDeps) {
+    for (auto & dep : inputs.flakeInputs) {
         auto vFlake = state.allocAttr(v, dep.second.id);
         auto vPrimOp = state.allocValue();
         static auto primOp = new PrimOp(prim_callFlake, 1, state.symbols.create("callFlake"));
@@ -460,11 +460,11 @@ void callFlake(EvalState & state,
         auto vArg = state.allocValue();
         vArg->type = tNull;
         // FIXME: leak
-        vArg->attrs = (Bindings *) new FlakeDep(dep.second); // evil! also inefficient
+        vArg->attrs = (Bindings *) new FlakeInput(dep.second); // evil! also inefficient
         mkApp(*vFlake, *vPrimOp, *vArg);
     }
 
-    for (auto & dep : inputs.nonFlakeDeps) {
+    for (auto & dep : inputs.nonFlakeInputs) {
         auto vNonFlake = state.allocAttr(v, dep.first);
         state.mkAttrs(*vNonFlake, 8);
 

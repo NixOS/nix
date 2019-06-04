@@ -206,11 +206,11 @@ void makeFlakeClosureGCRoot(Store & store,
         queue.pop();
         /* Note: due to lazy fetching, these paths might not exist
            yet. */
-        for (auto & dep : flake.flakeDeps) {
+        for (auto & dep : flake.flakeInputs) {
             closure.insert(dep.second.computeStorePath(store));
             queue.push(dep.second);
         }
-        for (auto & dep : flake.nonFlakeDeps)
+        for (auto & dep : flake.nonFlakeInputs)
             closure.insert(dep.second.computeStorePath(store));
     }
 
