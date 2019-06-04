@@ -276,7 +276,7 @@ Flake getFlake(EvalState & state, const FlakeRef & flakeRef, bool impureIsAllowe
 }
 
 // Get the `NonFlake` corresponding to a `FlakeRef`.
-NonFlake getNonFlake(EvalState & state, const FlakeRef & flakeRef, FlakeAlias alias, bool impureIsAllowed = false)
+NonFlake getNonFlake(EvalState & state, const FlakeRef & flakeRef, bool impureIsAllowed = false)
 {
     auto sourceInfo = fetchFlake(state, flakeRef, impureIsAllowed);
     debug("got non-flake source '%s' with flakeref %s", sourceInfo.storePath, sourceInfo.resolvedRef.to_string());
@@ -289,8 +289,6 @@ NonFlake getNonFlake(EvalState & state, const FlakeRef & flakeRef, FlakeAlias al
 
     if (state.allowedPaths)
         state.allowedPaths->insert(nonFlake.sourceInfo.storePath);
-
-    nonFlake.alias = alias;
 
     return nonFlake;
 }
@@ -339,7 +337,7 @@ static std::pair<Flake, FlakeInput> updateLocks(
         } else {
             if (handleLockFile == AllPure || handleLockFile == TopRefUsesRegistries)
                 throw Error("cannot update non-flake dependency '%s' in pure mode", id);
-            auto nonFlake = getNonFlake(state, ref, id, allowedToUseRegistries(handleLockFile, false));
+            auto nonFlake = getNonFlake(state, ref, allowedToUseRegistries(handleLockFile, false));
             newEntry.nonFlakeInputs.insert_or_assign(id,
                 NonFlakeInput(
                     nonFlake.sourceInfo.resolvedRef,
@@ -441,6 +439,25 @@ static void prim_callFlake(EvalState & state, const Pos & pos, Value * * args, V
     callFlake(state, flake, *lazyFlake, v);
 }
 
+static void prim_callNonFlake(EvalState & state, const Pos & pos, Value * * args, Value & v)
+{
+    auto lazyNonFlake = (NonFlakeInput *) args[0]->attrs;
+
+    auto nonFlake = getNonFlake(state, lazyNonFlake->ref);
+
+    if (nonFlake.sourceInfo.narHash != lazyNonFlake->narHash)
+        throw Error("the content hash of repository '%s' doesn't match the hash recorded in the referring lockfile", nonFlake.sourceInfo.resolvedRef);
+
+    state.mkAttrs(v, 8);
+
+    assert(state.store->isValidPath(nonFlake.sourceInfo.storePath));
+
+    mkString(*state.allocAttr(v, state.sOutPath),
+        nonFlake.sourceInfo.storePath, {nonFlake.sourceInfo.storePath});
+
+    emitSourceInfoAttrs(state, nonFlake.sourceInfo, v);
+}
+
 void callFlake(EvalState & state,
     const Flake & flake,
     const FlakeInputs & inputs,
@@ -468,16 +485,15 @@ void callFlake(EvalState & state,
 
     for (auto & dep : inputs.nonFlakeInputs) {
         auto vNonFlake = state.allocAttr(v, dep.first);
-        state.mkAttrs(*vNonFlake, 8);
-
-        auto nonFlake = getNonFlake(state, dep.second.ref, dep.first);
-
-        assert(state.store->isValidPath(nonFlake.sourceInfo.storePath));
-
-        mkString(*state.allocAttr(*vNonFlake, state.sOutPath),
-            nonFlake.sourceInfo.storePath, {nonFlake.sourceInfo.storePath});
-
-        emitSourceInfoAttrs(state, nonFlake.sourceInfo, *vNonFlake);
+        auto vPrimOp = state.allocValue();
+        static auto primOp = new PrimOp(prim_callNonFlake, 1, state.symbols.create("callNonFlake"));
+        vPrimOp->type = tPrimOp;
+        vPrimOp->primOp = primOp;
+        auto vArg = state.allocValue();
+        vArg->type = tNull;
+        // FIXME: leak
+        vArg->attrs = (Bindings *) new NonFlakeInput(dep.second); // evil! also inefficient
+        mkApp(*vNonFlake, *vPrimOp, *vArg);
     }
 
     mkString(*state.allocAttr(v, state.sDescription), flake.description);

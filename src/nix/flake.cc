@@ -122,6 +122,7 @@ static nlohmann::json flakeToJson(const Flake & flake)
     return j;
 }
 
+#if 0
 static void printNonFlakeInfo(const NonFlake & nonFlake)
 {
     std::cout << fmt("ID:            %s\n", nonFlake.alias);
@@ -136,7 +137,6 @@ static nlohmann::json nonFlakeToJson(const NonFlake & nonFlake)
     return j;
 }
 
-#if 0
 // FIXME: merge info CmdFlakeInfo?
 struct CmdFlakeDeps : FlakeCommand
 {

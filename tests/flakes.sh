@@ -83,7 +83,7 @@ git -C $flake3Dir add flake.nix
 git -C $flake3Dir commit -m 'Initial'
 
 cat > $nonFlakeDir/README.md <<EOF
-Not much
+FNORD
 EOF
 
 git -C $nonFlakeDir add README.md
@@ -235,23 +235,42 @@ cat > $flake3Dir/flake.nix <<EOF
   outputs = inputs: rec {
     packages.xyzzy = inputs.flake2.outputs.packages.bar;
     packages.sth = inputs.flake1.outputs.packages.foo;
+    packages.fnord =
+      with import ./config.nix;
+      mkDerivation {
+        inherit system;
+        name = "fnord";
+        buildCommand = ''
+          cat \${inputs.nonFlake}/README.md > \$out
+        '';
+      };
   };
 }
 EOF
 
-git -C $flake3Dir add flake.nix
+cp ./config.nix $flake3Dir
+
+git -C $flake3Dir add flake.nix config.nix
 git -C $flake3Dir commit -m 'Add nonFlakeInputs'
 
-# Check whether `nix build` works with a lockfile which is missing a nonFlakeInputs
+# Check whether `nix build` works with a lockfile which is missing a
+# nonFlakeInputs.
 nix build -o $TEST_ROOT/result --flake-registry $registry $flake3Dir:sth
 
 git -C $flake3Dir commit -m 'Update nonFlakeInputs'
+
+nix build -o $TEST_ROOT/result --flake-registry $registry flake3:fnord
+[[ $(cat $TEST_ROOT/result) = FNORD ]]
 
 # Check whether flake input fetching is lazy: flake3:sth does not
 # depend on flake2, so this shouldn't fail.
 rm -rf $TEST_HOME/.cache
 clearStore
 mv $flake2Dir $flake2Dir.tmp
+mv $nonFlakeDir $nonFlakeDir.tmp
 nix build -o $TEST_ROOT/result --flake-registry $registry flake3:sth
 (! nix build -o $TEST_ROOT/result --flake-registry $registry flake3:xyzzy)
+(! nix build -o $TEST_ROOT/result --flake-registry $registry flake3:fnord)
 mv $flake2Dir.tmp $flake2Dir
+mv $nonFlakeDir.tmp $nonFlakeDir
+nix build -o $TEST_ROOT/result --flake-registry $registry flake3:xyzzy flake3:fnord

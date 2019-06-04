@@ -75,7 +75,6 @@ struct Flake
 
 struct NonFlake
 {
-    FlakeAlias alias;
     FlakeRef originalRef;
     SourceInfo sourceInfo;
     NonFlake(const FlakeRef & origRef, const SourceInfo & sourceInfo)
