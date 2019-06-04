@@ -314,6 +314,15 @@ bool allowedToUseRegistries(HandleLockFile handle, bool isTopRef)
     else assert(false);
 }
 
+/* Given a flakeref and its subtree of the lockfile, return an updated
+   subtree of the lockfile. That is, if the 'flake.nix' of the
+   referenced flake has inputs that don't have a corresponding entry
+   in the lockfile, they're added to the lockfile; conversely, any
+   lockfile entries that don't have a corresponding entry in flake.nix
+   are removed.
+
+   Note that this is lazy: we only recursively fetch inputs that are
+   not in the lockfile yet. */
 static std::pair<Flake, FlakeInput> updateLocks(
     EvalState & state,
     const FlakeRef & flakeRef,
@@ -360,9 +369,8 @@ static std::pair<Flake, FlakeInput> updateLocks(
     return {flake, newEntry};
 }
 
-/* Given a flake reference, recursively fetch it and its dependencies.
-   FIXME: this should return a graph of flakes.
-*/
+/* Compute an in-memory lockfile for the specified top-level flake,
+   and optionally write it to file, it the flake is writable. */
 ResolvedFlake resolveFlake(EvalState & state, const FlakeRef & topRef, HandleLockFile handleLockFile)
 {
     auto flake = getFlake(state, topRef, allowedToUseRegistries(handleLockFile, true));
