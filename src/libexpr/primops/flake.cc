@@ -1,4 +1,5 @@
 #include "flake.hh"
+#include "lockfile.hh"
 #include "primops.hh"
 #include "eval-inline.hh"
 #include "fetchGit.hh"
@@ -48,104 +49,6 @@ void writeRegistry(const FlakeRegistry & registry, const Path & path)
         json["flakes"][elem.first.to_string()] = { {"uri", elem.second.to_string()} };
     createDirs(dirOf(path));
     writeFile(path, json.dump(4)); // The '4' is the number of spaces used in the indentation in the json file.
-}
-
-AbstractDep::AbstractDep(const nlohmann::json & json)
-    : ref(json["uri"])
-    , narHash(Hash((std::string) json["narHash"]))
-{
-    if (!ref.isImmutable())
-        throw Error("lockfile contains mutable flakeref '%s'", ref);
-}
-
-nlohmann::json AbstractDep::toJson() const
-{
-    nlohmann::json json;
-    json["uri"] = ref.to_string();
-    json["narHash"] = narHash.to_string(SRI);
-    return json;
-}
-
-Path AbstractDep::computeStorePath(Store & store) const
-{
-    return store.makeFixedOutputPath(true, narHash, "source");
-}
-
-FlakeDep::FlakeDep(const nlohmann::json & json)
-    : FlakeInputs(json)
-    , AbstractDep(json)
-    , id(json["id"])
-{
-}
-
-nlohmann::json FlakeDep::toJson() const
-{
-    auto json = FlakeInputs::toJson();
-    json.update(AbstractDep::toJson());
-    json["id"] = id;
-    return json;
-}
-
-FlakeInputs::FlakeInputs(const nlohmann::json & json)
-{
-    auto nonFlakeInputs = json["nonFlakeInputs"];
-    for (auto i = nonFlakeInputs.begin(); i != nonFlakeInputs.end(); ++i)
-        nonFlakeDeps.insert_or_assign(i.key(), NonFlakeDep(*i));
-
-    auto inputs = json["inputs"];
-    for (auto i = inputs.begin(); i != inputs.end(); ++i)
-        flakeDeps.insert_or_assign(i.key(), FlakeDep(*i));
-}
-
-nlohmann::json FlakeInputs::toJson() const
-{
-    nlohmann::json json;
-    {
-        auto j = nlohmann::json::object();
-        for (auto & i : nonFlakeDeps)
-            j[i.first] = i.second.toJson();
-        json["nonFlakeInputs"] = std::move(j);
-    }
-    {
-        auto j = nlohmann::json::object();
-        for (auto & i : flakeDeps)
-            j[i.first.to_string()] = i.second.toJson();
-        json["inputs"] = std::move(j);
-    }
-    return json;
-}
-
-nlohmann::json LockFile::toJson() const
-{
-    auto json = FlakeInputs::toJson();
-    json["version"] = 2;
-    return json;
-}
-
-LockFile readLockFile(const Path & path)
-{
-    if (pathExists(path)) {
-        auto json = nlohmann::json::parse(readFile(path));
-
-        auto version = json.value("version", 0);
-        if (version != 2)
-            throw Error("lock file '%s' has unsupported version %d", path, version);
-
-        return LockFile(json);
-    } else
-        return LockFile();
-}
-
-std::ostream & operator <<(std::ostream & stream, const LockFile & lockFile)
-{
-    stream << lockFile.toJson().dump(4); // '4' = indentation in json file
-    return stream;
-}
-
-void writeLockFile(const LockFile & lockFile, const Path & path)
-{
-    createDirs(dirOf(path));
-    writeFile(path, fmt("%s\n", lockFile));
 }
 
 Path getUserRegistryPath()
@@ -471,7 +374,7 @@ ResolvedFlake resolveFlake(EvalState & state, const FlakeRef & topRef, HandleLoc
     if (!recreateLockFile(handleLockFile)) {
         // If recreateLockFile, start with an empty lockfile
         // FIXME: symlink attack
-        oldLockFile = readLockFile(
+        oldLockFile = LockFile::read(
             state.store->toRealPath(flake.sourceInfo.storePath)
             + "/" + flake.sourceInfo.resolvedRef.subdir + "/flake.lock");
     }
@@ -483,7 +386,7 @@ ResolvedFlake resolveFlake(EvalState & state, const FlakeRef & topRef, HandleLoc
     if (!(lockFile == oldLockFile)) {
         if (allowedToWrite(handleLockFile)) {
             if (auto refData = std::get_if<FlakeRef::IsPath>(&topRef.data)) {
-                writeLockFile(lockFile, refData->path + (topRef.subdir == "" ? "" : "/" + topRef.subdir) + "/flake.lock");
+                lockFile.write(refData->path + (topRef.subdir == "" ? "" : "/" + topRef.subdir) + "/flake.lock");
 
                 // Hack: Make sure that flake.lock is visible to Git, so it ends up in the Nix store.
                 runProgram("git", true, { "-C", refData->path, "add",

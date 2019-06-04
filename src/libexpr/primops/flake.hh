@@ -2,15 +2,12 @@
 
 #include "types.hh"
 #include "flakeref.hh"
-
-#include <variant>
-#include <nlohmann/json.hpp>
+#include "lockfile.hh"
 
 namespace nix {
 
 struct Value;
 class EvalState;
-class Store;
 
 namespace flake {
 
@@ -39,86 +36,6 @@ enum HandleLockFile : unsigned int
     , RecreateLockFile // Recreate the lockfile from scratch and write it to file
     , UseNewLockFile // `RecreateLockFile` without writing to file
     };
-
-struct AbstractDep
-{
-    FlakeRef ref;
-    Hash narHash;
-
-    AbstractDep(const FlakeRef & flakeRef, const Hash & narHash)
-        : ref(flakeRef), narHash(narHash) {};
-
-    AbstractDep(const nlohmann::json & json);
-
-    nlohmann::json toJson() const;
-
-    Path computeStorePath(Store & store) const;
-};
-
-struct NonFlakeDep : AbstractDep
-{
-    using AbstractDep::AbstractDep;
-
-    bool operator ==(const NonFlakeDep & other) const
-    {
-        return ref == other.ref && narHash == other.narHash;
-    }
-};
-
-struct FlakeDep;
-
-struct FlakeInputs
-{
-    std::map<FlakeRef, FlakeDep> flakeDeps;
-    std::map<FlakeAlias, NonFlakeDep> nonFlakeDeps;
-
-    FlakeInputs() {};
-    FlakeInputs(const nlohmann::json & json);
-
-    nlohmann::json toJson() const;
-};
-
-struct FlakeDep : FlakeInputs, AbstractDep
-{
-    FlakeId id;
-
-    FlakeDep(const FlakeId & id, const FlakeRef & flakeRef, const Hash & narHash)
-        : AbstractDep(flakeRef, narHash), id(id) {};
-
-    FlakeDep(const nlohmann::json & json);
-
-    bool operator ==(const FlakeDep & other) const
-    {
-        return
-            id == other.id
-            && ref == other.ref
-            && narHash == other.narHash
-            && flakeDeps == other.flakeDeps
-            && nonFlakeDeps == other.nonFlakeDeps;
-    }
-
-    nlohmann::json toJson() const;
-};
-
-struct LockFile : FlakeInputs
-{
-    bool operator ==(const LockFile & other) const
-    {
-        return
-            flakeDeps == other.flakeDeps
-            && nonFlakeDeps == other.nonFlakeDeps;
-    }
-
-    LockFile() {}
-    LockFile(const nlohmann::json & json) : FlakeInputs(json) {}
-    LockFile(FlakeDep && dep)
-    {
-        flakeDeps = std::move(dep.flakeDeps);
-        nonFlakeDeps = std::move(dep.nonFlakeDeps);
-    }
-
-    nlohmann::json toJson() const;
-};
 
 struct SourceInfo
 {
