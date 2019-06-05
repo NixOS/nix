@@ -2,7 +2,7 @@
 #include "lockfile.hh"
 #include "primops.hh"
 #include "eval-inline.hh"
-#include "fetchGit.hh"
+#include "primops/fetchGit.hh"
 #include "download.hh"
 #include "args.hh"
 

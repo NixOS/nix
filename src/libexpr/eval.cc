@@ -7,7 +7,7 @@
 #include "eval-inline.hh"
 #include "download.hh"
 #include "json.hh"
-#include "primops/flake.hh"
+#include "flake/flake.hh"
 
 #include <algorithm>
 #include <cstring>
