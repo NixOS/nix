@@ -125,6 +125,9 @@ void initNix()
     act.sa_handler = sigHandler;
     if (sigaction(SIGUSR1, &act, 0)) throw SysError("handling SIGUSR1");
 
+    /* Make sure SIGWINCH is handled as well. */
+    if (sigaction(SIGWINCH, &act, 0)) throw SysError("handling SIGWINCH");
+
     /* Register a SIGSEGV handler to detect stack overflows. */
     detectStackOverflow();
 
