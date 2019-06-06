@@ -4,7 +4,7 @@
 #include "progress-bar.hh"
 #include "eval.hh"
 #include "eval-inline.hh"
-#include "primops/flake.hh"
+#include "flake/flake.hh"
 #include "get-drvs.hh"
 #include "store-api.hh"
 
@@ -122,6 +122,7 @@ static nlohmann::json flakeToJson(const Flake & flake)
     return j;
 }
 
+#if 0
 static void printNonFlakeInfo(const NonFlake & nonFlake)
 {
     std::cout << fmt("ID:            %s\n", nonFlake.alias);
@@ -173,6 +174,7 @@ struct CmdFlakeDeps : FlakeCommand
         }
     }
 };
+#endif
 
 struct CmdFlakeUpdate : FlakeCommand
 {
@@ -232,6 +234,7 @@ struct CmdFlakeInfo : FlakeCommand, MixJSON
         if (json) {
             auto json = flakeToJson(flake);
 
+#if 0
             auto state = getEvalState();
 
             auto vFlake = state->allocValue();
@@ -254,6 +257,7 @@ struct CmdFlakeInfo : FlakeCommand, MixJSON
                 });
 
             json["outputs"] = std::move(outputs);
+#endif
 
             std::cout << json.dump() << std::endl;
         } else
@@ -518,7 +522,7 @@ struct CmdFlake : virtual MultiCommand, virtual Command
             , make_ref<CmdFlakeUpdate>()
             , make_ref<CmdFlakeInfo>()
             , make_ref<CmdFlakeCheck>()
-            , make_ref<CmdFlakeDeps>()
+            //, make_ref<CmdFlakeDeps>()
             , make_ref<CmdFlakeAdd>()
             , make_ref<CmdFlakeRemove>()
             , make_ref<CmdFlakePin>()

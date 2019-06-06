@@ -55,7 +55,7 @@ cat > $flake2Dir/flake.nix <<EOF
   description = "Fnord";
 
   outputs = inputs: rec {
-    packages.bar = inputs.flake1.outputs.packages.foo;
+    packages.bar = inputs.flake1.packages.foo;
   };
 }
 EOF
@@ -74,7 +74,7 @@ cat > $flake3Dir/flake.nix <<EOF
   description = "Fnord";
 
   outputs = inputs: rec {
-    packages.xyzzy = inputs.flake2.outputs.packages.bar;
+    packages.xyzzy = inputs.flake2.packages.bar;
   };
 }
 EOF
@@ -83,7 +83,7 @@ git -C $flake3Dir add flake.nix
 git -C $flake3Dir commit -m 'Initial'
 
 cat > $nonFlakeDir/README.md <<EOF
-Not much
+FNORD
 EOF
 
 git -C $nonFlakeDir add README.md
@@ -176,8 +176,8 @@ cat > $flake3Dir/flake.nix <<EOF
   description = "Fnord";
 
   outputs = inputs: rec {
-    packages.xyzzy = inputs.flake2.outputs.packages.bar;
-    packages.sth = inputs.flake1.outputs.packages.foo;
+    packages.xyzzy = inputs.flake2.packages.bar;
+    packages.sth = inputs.flake1.packages.foo;
   };
 }
 EOF
@@ -191,6 +191,8 @@ nix build -o $TEST_ROOT/result --flake-registry $registry $flake3Dir:sth
 # Check whether it saved the lockfile
 [[ ! (-z $(git -C $flake3Dir diff master)) ]]
 
+git -C $flake3Dir commit -m 'Add lockfile'
+
 # Unsupported epochs should be an error.
 sed -i $flake3Dir/flake.nix -e s/201906/201909/
 nix build -o $TEST_ROOT/result --flake-registry $registry $flake3Dir:sth 2>&1 | grep 'unsupported epoch'
@@ -202,6 +204,7 @@ nix flake list --flake-registry file://$registry --tarball-ttl 0 | grep -q flake
 mv $registry.tmp $registry
 
 # Test whether flakes are registered as GC roots for offline use.
+# FIXME: use tarballs rather than git.
 rm -rf $TEST_HOME/.cache
 nix build -o $TEST_ROOT/result --flake-registry file://$registry file://$flake2Dir:bar
 mv $flake1Dir $flake1Dir.tmp
@@ -230,14 +233,44 @@ cat > $flake3Dir/flake.nix <<EOF
   description = "Fnord";
 
   outputs = inputs: rec {
-    packages.xyzzy = inputs.flake2.outputs.packages.bar;
-    packages.sth = inputs.flake1.outputs.packages.foo;
+    packages.xyzzy = inputs.flake2.packages.bar;
+    packages.sth = inputs.flake1.packages.foo;
+    packages.fnord =
+      with import ./config.nix;
+      mkDerivation {
+        inherit system;
+        name = "fnord";
+        buildCommand = ''
+          cat \${inputs.nonFlake}/README.md > \$out
+        '';
+      };
   };
 }
 EOF
 
-git -C $flake3Dir add flake.nix
+cp ./config.nix $flake3Dir
+
+git -C $flake3Dir add flake.nix config.nix
 git -C $flake3Dir commit -m 'Add nonFlakeInputs'
 
-# Check whether `nix build` works with a lockfile which is missing a nonFlakeInputs
+# Check whether `nix build` works with a lockfile which is missing a
+# nonFlakeInputs.
 nix build -o $TEST_ROOT/result --flake-registry $registry $flake3Dir:sth
+
+git -C $flake3Dir commit -m 'Update nonFlakeInputs'
+
+nix build -o $TEST_ROOT/result --flake-registry $registry flake3:fnord
+[[ $(cat $TEST_ROOT/result) = FNORD ]]
+
+# Check whether flake input fetching is lazy: flake3:sth does not
+# depend on flake2, so this shouldn't fail.
+rm -rf $TEST_HOME/.cache
+clearStore
+mv $flake2Dir $flake2Dir.tmp
+mv $nonFlakeDir $nonFlakeDir.tmp
+nix build -o $TEST_ROOT/result --flake-registry $registry flake3:sth
+(! nix build -o $TEST_ROOT/result --flake-registry $registry flake3:xyzzy)
+(! nix build -o $TEST_ROOT/result --flake-registry $registry flake3:fnord)
+mv $flake2Dir.tmp $flake2Dir
+mv $nonFlakeDir.tmp $nonFlakeDir
+nix build -o $TEST_ROOT/result --flake-registry $registry flake3:xyzzy flake3:fnord

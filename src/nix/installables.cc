@@ -7,7 +7,7 @@
 #include "get-drvs.hh"
 #include "store-api.hh"
 #include "shared.hh"
-#include "primops/flake.hh"
+#include "flake/flake.hh"
 
 #include <regex>
 #include <queue>
@@ -195,16 +195,28 @@ void makeFlakeClosureGCRoot(Store & store,
     /* Get the store paths of all non-local flakes. */
     PathSet closure;
 
-    std::queue<std::reference_wrapper<const flake::ResolvedFlake>> queue;
-    queue.push(resFlake);
+    assert(store.isValidPath(resFlake.flake.sourceInfo.storePath));
+    closure.insert(resFlake.flake.sourceInfo.storePath);
+
+    std::queue<std::reference_wrapper<const flake::FlakeInputs>> queue;
+    queue.push(resFlake.lockFile);
 
     while (!queue.empty()) {
-        const flake::ResolvedFlake & flake = queue.front();
+        const flake::FlakeInputs & flake = queue.front();
         queue.pop();
-        if (!std::get_if<FlakeRef::IsPath>(&flake.flake.sourceInfo.resolvedRef.data))
-            closure.insert(flake.flake.sourceInfo.storePath);
-        for (const auto & dep : flake.flakeDeps)
+        /* Note: due to lazy fetching, these paths might not exist
+           yet. */
+        for (auto & dep : flake.flakeInputs) {
+            auto path = dep.second.computeStorePath(store);
+            if (store.isValidPath(path))
+                closure.insert(path);
             queue.push(dep.second);
+        }
+        for (auto & dep : flake.nonFlakeInputs) {
+            auto path = dep.second.computeStorePath(store);
+            if (store.isValidPath(path))
+                closure.insert(path);
+        }
     }
 
     if (closure.empty()) return;
