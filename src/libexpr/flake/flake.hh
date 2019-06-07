@@ -83,12 +83,18 @@ struct NonFlake
 
 Flake getFlake(EvalState &, const FlakeRef &, bool impureIsAllowed);
 
+/* Fingerprint of a locked flake; used as a cache key. */
+typedef Hash Fingerprint;
+
 struct ResolvedFlake
 {
     Flake flake;
     LockFile lockFile;
+
     ResolvedFlake(Flake && flake, LockFile && lockFile)
         : flake(flake), lockFile(lockFile) {}
+
+    Fingerprint getFingerprint() const;
 };
 
 ResolvedFlake resolveFlake(EvalState &, const FlakeRef &, HandleLockFile);

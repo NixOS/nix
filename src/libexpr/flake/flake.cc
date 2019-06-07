@@ -601,4 +601,13 @@ const Registries EvalState::getFlakeRegistries()
     return registries;
 }
 
+Fingerprint ResolvedFlake::getFingerprint() const
+{
+    // FIXME: as an optimization, if the flake contains a lockfile and
+    // we haven't changed it, then it's sufficient to use
+    // flake.sourceInfo.storePath for the fingerprint.
+    return hashString(htSHA256,
+        fmt("%s;%s", flake.sourceInfo.storePath, lockFile));
+}
+
 }
