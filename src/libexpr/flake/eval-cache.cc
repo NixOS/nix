@@ -1,5 +1,6 @@
 #include "eval-cache.hh"
 #include "sqlite.hh"
+#include "eval.hh"
 
 #include <set>
 
@@ -62,6 +63,8 @@ void EvalCache::addDerivation(
     const std::string & attrPath,
     const Derivation & drv)
 {
+    if (!evalSettings.pureEval) return;
+
     auto state(_state->lock());
 
     if (state->fingerprints.insert(fingerprint).second)
@@ -81,6 +84,8 @@ std::optional<EvalCache::Derivation> EvalCache::getDerivation(
     const Fingerprint & fingerprint,
     const std::string & attrPath)
 {
+    if (!evalSettings.pureEval) return {};
+
     auto state(_state->lock());
 
     auto queryAttribute(state->queryAttribute.use()
