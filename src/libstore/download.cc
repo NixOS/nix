@@ -376,6 +376,26 @@ struct CurlDownloader : public Downloader
                 } else {
                     // Don't bother retrying on certain cURL errors either
                     switch (code) {
+                        case CURLE_COULDNT_RESOLVE_HOST:
+                        case CURLE_COULDNT_RESOLVE_PROXY:
+                            // If Nix can't resolve the binary cache,
+                            // the network is probably down and we have
+                            // no reason to retry.
+                            //
+                            // Consider the user on an airplane hacking
+                            // on their favorite project who doesn't need
+                            // to substitute any dependencies. Running
+                            // `nix-build` will try (and fail) to
+                            // substitute the project.
+                            //
+                            // In this case, we can go ahead and build
+                            // locally. The user probably won't be
+                            // rebuilding the world, and even if they do
+                            // they probably won't make much progress
+                            // since their internet is probably down.
+                            err = NotFound;
+                            break;
+
                         case CURLE_FAILED_INIT:
                         case CURLE_URL_MALFORMAT:
                         case CURLE_NOT_BUILT_IN:
