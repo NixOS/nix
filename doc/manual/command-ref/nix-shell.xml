@@ -69,6 +69,12 @@ unpacked to a temporary location. The tarball must include a single
 top-level directory containing at least a file named
 <filename>default.nix</filename>.</para>
 
+<para>If <replaceable>path</replaceable> is of the form
+<literal>&lt;<replaceable>foo</replaceable>&gt;</literal>, it is
+replaced with the definition of <replaceable>foo</replaceable> as set
+in the environment variable <envar>NIX_PATH</envar> or by the
+<option>-I</option> option.</para>
+
 <para>If the derivation defines the variable
 <varname>shellHook</varname>, it will be evaluated after
 <literal>$stdenv/setup</literal> has been sourced.  Since this hook is
