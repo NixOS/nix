@@ -53,7 +53,10 @@ if [ -n "$HOME" ] && [ -n "$USER" ]; then
 
     # Append ~/.nix-defexpr/channels to $NIX_PATH so that <nixpkgs>
     # paths work when the user has fetched the Nixpkgs channel.
-    export NIX_PATH=${NIX_PATH:+$NIX_PATH:}$HOME/.nix-defexpr/channels
+    case ":${NIX_PATH}:" in
+        *":$HOME/.nix-defexpr/channels:"*) ;;
+        *) export NIX_PATH=${NIX_PATH:+$NIX_PATH:}$HOME/.nix-defexpr/channels ;;
+    esac
 
     # Set up environment.
     # This part should be kept in sync with nixpkgs:nixos/modules/programs/environment.nix
@@ -75,9 +78,17 @@ if [ -n "$HOME" ] && [ -n "$USER" ]; then
     fi
 
     if [ -n "${MANPATH-}" ]; then
-        export MANPATH="$NIX_LINK/share/man:$MANPATH"
+        case ":${MANPATH}:" in
+            *":$NIX_LINK/share/man:"*) ;;
+            *) export MANPATH="$NIX_LINK/share/man:$MANPATH" ;;
+        esac
     fi
 
-    export PATH="$NIX_LINK/bin:$__savedpath"
+    export PATH="$__savedpath"
+    case ":${PATH}:" in
+        *":$NIX_LINK/bin:"*) ;;
+        *) export PATH="$NIX_LINK/bin:$PATH" ;;
+    esac
+
     unset __savedpath NIX_LINK NIX_USER_PROFILE_DIR
 fi
