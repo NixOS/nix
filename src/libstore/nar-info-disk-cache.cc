@@ -78,12 +78,7 @@ public:
 
         state->db = SQLite(dbPath);
 
-        if (sqlite3_busy_timeout(state->db, 60 * 60 * 1000) != SQLITE_OK)
-            throwSQLiteError(state->db, "setting timeout");
-
-        // We can always reproduce the cache.
-        state->db.exec("pragma synchronous = off");
-        state->db.exec("pragma main.journal_mode = truncate");
+        state->db.isCache();
 
         state->db.exec(schema);
 

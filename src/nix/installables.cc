@@ -8,6 +8,7 @@
 #include "store-api.hh"
 #include "shared.hh"
 #include "flake/flake.hh"
+#include "flake/eval-cache.hh"
 
 #include <regex>
 #include <queue>
@@ -110,7 +111,7 @@ struct InstallableValue : Installable
 
     InstallableValue(SourceExprCommand & cmd) : cmd(cmd) { }
 
-    Buildables toBuildables() override
+    virtual std::vector<flake::EvalCache::Derivation> toDerivations()
     {
         auto state = cmd.getEvalState();
 
@@ -118,22 +119,36 @@ struct InstallableValue : Installable
 
         Bindings & autoArgs = *cmd.getAutoArgs(*state);
 
-        DrvInfos drvs;
-        getDerivations(*state, *v, "", autoArgs, drvs, false);
+        DrvInfos drvInfos;
+        getDerivations(*state, *v, "", autoArgs, drvInfos, false);
 
+        std::vector<flake::EvalCache::Derivation> res;
+        for (auto & drvInfo : drvInfos) {
+            res.push_back({
+                drvInfo.queryDrvPath(),
+                drvInfo.queryOutPath(),
+                drvInfo.queryOutputName()
+            });
+        }
+
+        return res;
+    }
+
+    Buildables toBuildables() override
+    {
         Buildables res;
 
         PathSet drvPaths;
 
-        for (auto & drv : drvs) {
-            Buildable b{drv.queryDrvPath()};
+        for (auto & drv : toDerivations()) {
+            Buildable b{drv.drvPath};
             drvPaths.insert(b.drvPath);
 
-            auto outputName = drv.queryOutputName();
+            auto outputName = drv.outputName;
             if (outputName == "")
                 throw Error("derivation '%s' lacks an 'outputName' attribute", b.drvPath);
 
-            b.outputs.emplace(outputName, drv.queryOutPath());
+            b.outputs.emplace(outputName, drv.outPath);
 
             res.push_back(std::move(b));
         }
@@ -254,11 +269,29 @@ struct InstallableFlake : InstallableValue
 
     std::string what() override { return flakeRef.to_string() + ":" + *attrPaths.begin(); }
 
-    Value * toValue(EvalState & state) override
+    std::vector<std::string> getActualAttrPaths()
+    {
+        std::vector<std::string> res;
+
+        if (searchPackages) {
+            // As a convenience, look for the attribute in
+            // 'outputs.packages'.
+            res.push_back("packages." + *attrPaths.begin());
+
+            // As a temporary hack until Nixpkgs is properly converted
+            // to provide a clean 'packages' set, look in 'legacyPackages'.
+            res.push_back("legacyPackages." + *attrPaths.begin());
+        }
+
+        for (auto & s : attrPaths)
+            res.push_back(s);
+
+        return res;
+    }
+
+    Value * getFlakeOutputs(EvalState & state, const flake::ResolvedFlake & resFlake)
     {
         auto vFlake = state.allocValue();
-
-        auto resFlake = resolveFlake(state, flakeRef, cmd.getLockFileMode());
 
         callFlake(state, resFlake, *vFlake);
 
@@ -268,34 +301,67 @@ struct InstallableFlake : InstallableValue
 
         state.forceValue(*vOutputs);
 
-        auto emptyArgs = state.allocBindings(0);
+        return vOutputs;
+    }
 
-        if (searchPackages) {
-            // As a convenience, look for the attribute in
-            // 'outputs.packages'.
-            if (auto aPackages = *vOutputs->attrs->get(state.symbols.create("packages"))) {
-                try {
-                    auto * v = findAlongAttrPath(state, *attrPaths.begin(), *emptyArgs, *aPackages->value);
-                    state.forceValue(*v);
-                    return v;
-                } catch (AttrPathNotFound & e) {
-                }
+    std::vector<flake::EvalCache::Derivation> toDerivations() override
+    {
+        auto state = cmd.getEvalState();
+
+        auto resFlake = resolveFlake(*state, flakeRef, cmd.getLockFileMode());
+
+        Value * vOutputs = nullptr;
+
+        auto emptyArgs = state->allocBindings(0);
+
+        auto & evalCache = flake::EvalCache::singleton();
+
+        auto fingerprint = resFlake.getFingerprint();
+
+        for (auto & attrPath : getActualAttrPaths()) {
+            auto drv = evalCache.getDerivation(fingerprint, attrPath);
+            if (drv) {
+                if (state->store->isValidPath(drv->drvPath))
+                    return {*drv};
             }
 
-            // As a temporary hack until Nixpkgs is properly converted
-            // to provide a clean 'packages' set, look in 'legacyPackages'.
-            if (auto aPackages = *vOutputs->attrs->get(state.symbols.create("legacyPackages"))) {
-                try {
-                    auto * v = findAlongAttrPath(state, *attrPaths.begin(), *emptyArgs, *aPackages->value);
-                    state.forceValue(*v);
-                    return v;
-                } catch (AttrPathNotFound & e) {
-                }
+            if (!vOutputs)
+                vOutputs = getFlakeOutputs(*state, resFlake);
+
+            try {
+                auto * v = findAlongAttrPath(*state, attrPath, *emptyArgs, *vOutputs);
+                state->forceValue(*v);
+
+                auto drvInfo = getDerivation(*state, *v, false);
+                if (!drvInfo)
+                    throw Error("flake output attribute '%s' is not a derivation", attrPath);
+
+                auto drv = flake::EvalCache::Derivation{
+                    drvInfo->queryDrvPath(),
+                    drvInfo->queryOutPath(),
+                    drvInfo->queryOutputName()
+                };
+
+                evalCache.addDerivation(fingerprint, attrPath, drv);
+
+                return {drv};
+            } catch (AttrPathNotFound & e) {
             }
         }
 
-        // Otherwise, look for it in 'outputs'.
-        for (auto & attrPath : attrPaths) {
+        throw Error("flake '%s' does not provide attribute %s",
+            flakeRef, concatStringsSep(", ", quoteStrings(attrPaths)));
+    }
+
+    Value * toValue(EvalState & state) override
+    {
+        auto resFlake = resolveFlake(state, flakeRef, cmd.getLockFileMode());
+
+        auto vOutputs = getFlakeOutputs(state, resFlake);
+
+        auto emptyArgs = state.allocBindings(0);
+
+        for (auto & attrPath : getActualAttrPaths()) {
             try {
                 auto * v = findAlongAttrPath(state, attrPath, *emptyArgs, *vOutputs);
                 state.forceValue(*v);
