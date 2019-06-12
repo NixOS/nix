@@ -2089,12 +2089,12 @@ void fetch(EvalState & state, const Pos & pos, Value * * args, Value & v,
     if (evalSettings.pureEval && !request.expectedHash)
         throw Error("in pure evaluation mode, '%s' requires a 'sha256' argument", who);
 
-    Path res = getDownloader()->downloadCached(state.store, request).path;
+    auto res = getDownloader()->downloadCached(state.store, request);
 
     if (state.allowedPaths)
-        state.allowedPaths->insert(res);
+        state.allowedPaths->insert(res.path);
 
-    mkString(v, res, PathSet({res}));
+    mkString(v, res.storePath, PathSet({res.storePath}));
 }
 
 
