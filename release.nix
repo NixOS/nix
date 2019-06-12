@@ -228,6 +228,11 @@ let
       nix = build.x86_64-linux; system = "x86_64-linux";
     });
 
+    tests.githubFlakes = (import ./tests/github-flakes.nix rec {
+      inherit nixpkgs;
+      nix = build.x86_64-linux; system = "x86_64-linux";
+    });
+
     tests.setuid = pkgs.lib.genAttrs
       ["i686-linux" "x86_64-linux"]
       (system:

@@ -44,7 +44,7 @@ std::shared_ptr<FlakeRegistry> readRegistry(const Path & path)
 void writeRegistry(const FlakeRegistry & registry, const Path & path)
 {
     nlohmann::json json;
-    json["version"] = 2;
+    json["version"] = 1;
     for (auto elem : registry.entries)
         json["flakes"][elem.first.to_string()] = { {"uri", elem.second.to_string()} };
     createDirs(dirOf(path));
