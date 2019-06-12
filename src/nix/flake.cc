@@ -136,7 +136,6 @@ struct CmdFlakeDeps : FlakeCommand
     void run(nix::ref<nix::Store> store) override
     {
         auto evalState = getEvalState();
-        evalState->addRegistryOverrides(registryOverrides);
 
         std::queue<ResolvedFlake> todo;
         todo.push(resolveFlake());

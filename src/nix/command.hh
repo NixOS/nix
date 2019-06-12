@@ -70,6 +70,12 @@ struct EvalCommand : virtual StoreCommand, MixEvalArgs
 {
     ref<EvalState> getEvalState();
 
+    std::map<FlakeRef, FlakeRef> registryOverrides;
+
+    std::map<FlakeRef, FlakeRef> lockFileOverrides;
+
+    EvalCommand();
+
 private:
 
     std::shared_ptr<EvalState> evalState;

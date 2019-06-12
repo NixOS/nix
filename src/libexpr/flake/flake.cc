@@ -64,9 +64,7 @@ std::shared_ptr<FlakeRegistry> getUserRegistry()
 std::shared_ptr<FlakeRegistry> getFlagRegistry(RegistryOverrides registryOverrides)
 {
     auto flagRegistry = std::make_shared<FlakeRegistry>();
-    for (auto const & x : registryOverrides) {
-        flagRegistry->entries.insert_or_assign(FlakeRef(x.first), FlakeRef(x.second));
-    }
+    flagRegistry->entries = registryOverrides;
     return flagRegistry;
 }
 
@@ -339,8 +337,15 @@ static std::pair<Flake, FlakeInput> updateLocks(
     for (auto & input : flake.nonFlakeInputs) {
         auto & id = input.first;
         auto & ref = input.second;
+        auto j = state.lockFileOverrides.find(FlakeRef(id)); // The LockFile can be overrides by flags.
         auto i = oldEntry.nonFlakeInputs.find(id);
-        if (i != oldEntry.nonFlakeInputs.end()) {
+        if (j != state.lockFileOverrides.end()) {
+            auto nonFlake = getNonFlake(state, j->second, allowedToUseRegistries(handleLockFile, false));
+            newEntry.nonFlakeInputs.insert_or_assign(id,
+                NonFlakeInput(
+                    nonFlake.sourceInfo.resolvedRef,
+                    nonFlake.sourceInfo.narHash));
+        } else if (i != oldEntry.nonFlakeInputs.end()) {
             newEntry.nonFlakeInputs.insert_or_assign(i->first, i->second);
         } else {
             if (handleLockFile == AllPure || handleLockFile == TopRefUsesRegistries)
@@ -354,8 +359,15 @@ static std::pair<Flake, FlakeInput> updateLocks(
     }
 
     for (auto & inputRef : flake.inputs) {
+        auto j = state.lockFileOverrides.find(inputRef); // The LockFile can be overrides by flags.
         auto i = oldEntry.flakeInputs.find(inputRef);
-        if (i != oldEntry.flakeInputs.end()) {
+        if (j != state.lockFileOverrides.end()) {
+            auto flake = getFlake(state, j->first, allowedToUseRegistries(handleLockFile, false));
+            newEntry.flakeInputs.insert_or_assign(inputRef,
+                updateLocks(state,
+                    getFlake(state, j->second, allowedToUseRegistries(handleLockFile, false)),
+                    handleLockFile, {}, false).second);
+        } else if (i != oldEntry.flakeInputs.end()) {
             newEntry.flakeInputs.insert_or_assign(inputRef, i->second);
         } else {
             if (handleLockFile == AllPure || handleLockFile == TopRefUsesRegistries)

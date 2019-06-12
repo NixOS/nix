@@ -58,7 +58,30 @@ ref<EvalState> EvalCommand::getEvalState()
 {
     if (!evalState)
         evalState = std::make_shared<EvalState>(searchPath, getStore());
+    evalState->addRegistryOverrides(registryOverrides);
+    evalState->addLockFileOverrides(lockFileOverrides);
     return ref<EvalState>(evalState);
+}
+
+EvalCommand::EvalCommand()
+{
+    mkFlag()
+      .longName("override-flake")
+      .labels({"original-ref", "resolved-ref"})
+      .description("override a flake registry value")
+      .arity(2)
+      .handler([&](std::vector<std::string> ss) {
+          registryOverrides.insert_or_assign(FlakeRef(ss[0]), FlakeRef(ss[1]));
+      });
+
+    mkFlag()
+      .longName("override-lockfile")
+      .labels({"original-ref", "resolved-ref"})
+      .description("override a lockfile value")
+      .arity(2)
+      .handler([&](std::vector<std::string> ss) {
+          lockFileOverrides.insert_or_assign(FlakeRef(ss[0]), FlakeRef(ss[1]));
+      });
 }
 
 Buildable Installable::toBuildable()

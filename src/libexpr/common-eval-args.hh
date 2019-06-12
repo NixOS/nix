@@ -1,6 +1,7 @@
 #pragma once
 
 #include "args.hh"
+#include "flake/flakeref.hh"
 
 namespace nix {
 
@@ -15,8 +16,6 @@ struct MixEvalArgs : virtual Args
     Bindings * getAutoArgs(EvalState & state);
 
     Strings searchPath;
-
-    std::vector<std::pair<std::string, std::string>> registryOverrides;
 
 private:
 

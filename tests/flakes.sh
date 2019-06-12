@@ -328,3 +328,8 @@ git -C $flake3Dir checkout master
 # Test whether fuzzy-matching works for IsGit
 (! nix build -o $TEST_ROOT/result --flake-registry $registry flake4/removeXyzzy:xyzzy)
 nix build -o $TEST_ROOT/result --flake-registry $registry flake4/removeXyzzy:sth
+
+# Test overide-lockfile
+nix build -o $TEST_ROOT/result --flake-registry $registry flake4:xyzzy --override-lockfile flake3 flake3/removeXyzzy
+# Test that the flake registry is entirely used
+[[ -z $(nix build -o $TEST_ROOT/result --flake-registry $registry flake3:xyzzy --override-lockfile flake2 flake1) ]]

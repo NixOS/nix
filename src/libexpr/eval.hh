@@ -6,6 +6,7 @@
 #include "symbol-table.hh"
 #include "hash.hh"
 #include "config.hh"
+#include "flake/flakeref.hh"
 
 #include <map>
 #include <unordered_map>
@@ -66,7 +67,7 @@ typedef std::list<SearchPathElem> SearchPath;
 /* Initialise the Boehm GC, if applicable. */
 void initGC();
 
-typedef std::vector<std::pair<std::string, std::string>> RegistryOverrides;
+typedef std::map<FlakeRef, FlakeRef> RegistryOverrides;
 
 
 class EvalState
@@ -95,6 +96,8 @@ public:
     const ref<Store> store;
 
     RegistryOverrides registryOverrides;
+
+    RegistryOverrides lockFileOverrides;
 
 
 private:
@@ -220,6 +223,8 @@ public:
     Path coerceToPath(const Pos & pos, Value & v, PathSet & context);
 
     void addRegistryOverrides(RegistryOverrides overrides) { registryOverrides = overrides; }
+
+    void addLockFileOverrides(RegistryOverrides overrides) { lockFileOverrides = overrides; }
 
 public:
 
