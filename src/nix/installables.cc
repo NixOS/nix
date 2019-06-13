@@ -411,7 +411,7 @@ std::vector<std::shared_ptr<Installable>> SourceExprCommand::parseInstallables(
                 bool static warned;
                 warnOnce(warned, "the syntax 'nixpkgs.<attr>' is deprecated; use 'nixpkgs:<attr>' instead");
                 result.push_back(std::make_shared<InstallableFlake>(*this, FlakeRef("nixpkgs"),
-                        Strings{"packages." + std::string(s, 8)}));
+                        Strings{"legacyPackages." + std::string(s, 8)}));
             }
 
             else if (auto flakeRef = parseFlakeRef(s, true))
