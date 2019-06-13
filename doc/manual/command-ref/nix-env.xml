@@ -221,31 +221,53 @@ also <xref linkend="sec-common-options" />.</phrase></para>
 
   <varlistentry><term><filename>~/.nix-defexpr</filename></term>
 
-    <listitem><para>A directory that contains the default Nix
+    <listitem><para>The source for the default Nix
     expressions used by the <option>--install</option>,
     <option>--upgrade</option>, and <option>--query
-    --available</option> operations to obtain derivations.  The
+    --available</option> operations to obtain derivations. The
     <option>--file</option> option may be used to override this
     default.</para>
 
-    <para>The Nix expressions in this directory are combined into a
-    single set, with each file as an attribute that has the name of
-    the file.  Thus, if <filename>~/.nix-defexpr</filename> contains
-    two files, <filename>foo</filename> and <filename>bar</filename>,
+    <para>If <filename>~/.nix-defexpr</filename> is a file,
+    it is loaded as a Nix expression. If the expression
+    is a set, it is used as the default Nix expression.
+    If the expression is a function, an empty set is passed
+    as argument and the return value is used as
+    the default Nix expression.</para>
+
+    <para>If <filename>~/.nix-defexpr</filename> is a directory
+    containing a <filename>default.nix</filename> file, that file
+    is loaded as in the above paragraph.</para>
+
+    <para>If <filename>~/.nix-defexpr</filename> is a directory without
+    a <filename>default.nix</filename> file, then its contents
+    (both files and subdirectories) are loaded as Nix expressions.
+    The expressions are combined into a single set, each expression
+    under an attribute with the same name as the original file
+    or subdirectory.
+    </para>
+
+    <para>For example, if <filename>~/.nix-defexpr</filename> contains
+    two files, <filename>foo.nix</filename> and <filename>bar.nix</filename>,
     then the default Nix expression will essentially be
 
 <programlisting>
 {
-  foo = import ~/.nix-defexpr/foo;
-  bar = import ~/.nix-defexpr/bar;
+  foo = import ~/.nix-defexpr/foo.nix;
+  bar = import ~/.nix-defexpr/bar.nix;
 }</programlisting>
 
     </para>
 
+    <para>The file <filename>manifest.nix</filename> is always ignored.
+    Subdirectories without a <filename>default.nix</filename> file
+    are traversed recursively in search of more Nix expressions,
+    but the names of these intermediate directories are not
+    added to the attribute paths of the default Nix expression.</para>
+
     <para>The command <command>nix-channel</command> places symlinks
     to the downloaded Nix expressions from each subscribed channel in
     this directory.</para>
-
     </listitem>
 
   </varlistentry>
