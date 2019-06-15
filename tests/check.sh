@@ -7,8 +7,8 @@ nix-build dependencies.nix --no-out-link --check
 
 nix-build check.nix -A nondeterministic --no-out-link
 nix-build check.nix -A nondeterministic --no-out-link --check 2> $TEST_ROOT/log || status=$?
-[ "$status" = "104" ]
 grep 'may not be deterministic' $TEST_ROOT/log
+[ "$status" = "104" ]
 
 clearStore
 
@@ -44,4 +44,4 @@ nix-build check.nix -A hashmismatch --no-out-link --check --hashed-mirrors '' ||
 # Multiple failures with --keep-going
 nix-build check.nix -A nondeterministic --no-out-link
 nix-build check.nix -A nondeterministic -A hashmismatch --no-out-link --check --keep-going --hashed-mirrors '' || status=$?
-[ "$status" = "106" ]
+[ "$status" = "110" ]

@@ -247,8 +247,15 @@ printed.)</para>
 </variablelist>
 
 <para>With the <option>--keep-going</option> flag it's possible for
-multiple build failures to occur, in this case the 1xx status codes
-are or combined.</para>
+multiple failures to occur, in this case the 1xx status codes are or combined
+using binary or. <screen>
+1100100
+   ^^^^
+   |||`- timeout
+   ||`-- output hash mismatch
+   |`--- build failure
+   `---- not deterministic
+</screen></para>
 
 </refsection>
 

@@ -4471,15 +4471,29 @@ void Worker::waitForInput()
 
 unsigned int Worker::exitStatus()
 {
+    /*
+     * 1100100
+     *    ^^^^
+     *    |||`- timeout
+     *    ||`-- output hash mismatch
+     *    |`--- build failure
+     *    `---- not deterministic
+     */
     unsigned int mask = 0;
+    bool buildFailure = permanentFailure || timedOut || hashMismatch;
+    if (buildFailure)
+        mask |= 0x04;  // 100
     if (timedOut)
-        mask |= 1;
+        mask |= 0x01;  // 101
     if (hashMismatch)
-        mask |= 2;
-    if (checkMismatch)
-        mask |= 4;
+        mask |= 0x02;  // 102
+    if (checkMismatch) {
+        mask |= 0x08;  // 104
+    }
 
-    return mask ? 100 + mask : 1;
+    if (mask)
+        mask |= 0x60;
+    return mask ? mask : 1;
 }
 
 
