@@ -175,10 +175,6 @@ LegacyArgs::LegacyArgs(const std::string & programName,
         .description("build from source if substitution fails")
         .set(&(bool&) settings.tryFallback, true);
 
-    mkFlag1('j', "max-jobs", "jobs", "maximum number of parallel builds", [=](std::string s) {
-        settings.set("max-jobs", s);
-    });
-
     auto intSettingAlias = [&](char shortName, const std::string & longName,
         const std::string & description, const std::string & dest) {
         mkFlag<unsigned int>(shortName, longName, description, [=](unsigned int n) {
