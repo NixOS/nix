@@ -4,17 +4,15 @@
       version="5.0"
       xml:id="ch-env-variables">
 
-<title>Environment Variables</title>
+<title>Environment variables</title>
 
-<para>To use Nix, some environment variables should be set.  In
+<para>Nix requires some environment variables, which are set by the installation script.  In
 particular, <envar>PATH</envar> should contain the directories
-<filename><replaceable>prefix</replaceable>/bin</filename> and
-<filename>~/.nix-profile/bin</filename>.  The first directory contains
-the Nix tools themselves, while <filename>~/.nix-profile</filename> is
-a symbolic link to the current <emphasis>user environment</emphasis>
-(an automatically generated package consisting of symlinks to
-installed packages).  The simplest way to set the required environment
-variables is to include the file
+<filename><replaceable>prefix</replaceable>/bin</filename> (which contains
+the Nix tools themselves) and
+<filename>~/.nix-profile/bin</filename> (a symbolic link to the current <emphasis>user environment</emphasis>, an automatically-generated package consisting of symlinks to installed packages).</para>
+
+<para>The simplest way to set the required environment variables is to include the file
 <filename><replaceable>prefix</replaceable>/etc/profile.d/nix.sh</filename>
 in your <filename>~/.profile</filename> (or similar), like this:</para>
 
@@ -23,24 +21,27 @@ source <replaceable>prefix</replaceable>/etc/profile.d/nix.sh</screen>
 
 <section xml:id="sec-nix-ssl-cert-file">
 
-<title><envar>NIX_SSL_CERT_FILE</envar></title>
+<title>Specifying a custom certificate bundle</title>
 
 <para>If you need to specify a custom certificate bundle to account
 for an HTTPS-intercepting man in the middle proxy, you must specify
 the path to the certificate bundle in the environment variable
 <envar>NIX_SSL_CERT_FILE</envar>.</para>
 
-
 <para>If you don't specify a <envar>NIX_SSL_CERT_FILE</envar>
 manually, Nix will install and use its own certificate
 bundle.</para>
 
 <procedure>
-  <step><para>Set the environment variable and install Nix</para>
+  <step><para>Set the environment variable and install Nix:</para>
     <screen>
 $ export NIX_SSL_CERT_FILE=/etc/ssl/my-certificate-bundle.crt
 $ sh &lt;(curl https://nixos.org/nix/install)
-</screen></step>
+</screen>
+You <emphasis>must not</emphasis> add the export and then do the install, as
+the Nix installer will detect the presense of Nix configuration, and
+abort.
+</step>
 
   <step><para>In the shell profile and rc files (for example,
   <filename>/etc/bashrc</filename>, <filename>/etc/zshrc</filename>),
@@ -51,12 +52,8 @@ export NIX_SSL_CERT_FILE=/etc/ssl/my-certificate-bundle.crt
 </step>
 </procedure>
 
-<note><para>You must not add the export and then do the install, as
-the Nix installer will detect the presense of Nix configuration, and
-abort.</para></note>
-
 <section xml:id="sec-nix-ssl-cert-file-with-nix-daemon-and-macos">
-<title><envar>NIX_SSL_CERT_FILE</envar> with macOS and the Nix daemon</title>
+<title>Specifying a custom certificate bundle with macOS and the Nix daemon</title>
 
 <para>On macOS you must specify the environment variable for the Nix
 daemon service, then restart it:</para>
