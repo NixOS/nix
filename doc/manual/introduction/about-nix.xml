@@ -38,9 +38,7 @@ been built</para></listitem>
 <simplesect><title>Multi-user support</title>
 
 <para>Nix has multi-user support, letting non-privileged
-users can securely install software.</para>
-
-TODO link to relevant section.
+users can securely install software. For details, see <xref linkend="ssec-multi-user"/>.)</para>
 
 </simplesect>
 
@@ -58,7 +56,7 @@ TODO link to relevant section.
 
 </itemizedlist>
 
-<para>TODO link to rollback section.</para>
+<para>For details, see <xref linkend="sec-profiles"/>.</para>
 
 </simplesect>
 
@@ -67,7 +65,7 @@ TODO link to relevant section.
 
 <para>When you uninstall a package using <literal>nix-env --uninstall</literal>, the package isn’t deleted. When you're ready, you can delete all packages not in use (aka <emphasis>garbage collect</emphasis>) by running <literal>nix-collect-garbage</literal>.</para>
 
-<para>TODO link to gc section.</para>
+<para>For details, see <xref linkend="sec-garbage-collection"/>.</para>
 
 </simplesect>
 
