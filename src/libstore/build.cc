@@ -2190,11 +2190,13 @@ void DerivationGoal::startBuilder()
 
     std::string slaveName(ptsname(builderOut.readSide.get()));
 
-    if (chmod(slaveName.c_str(), 0600))
-        throw SysError("changing mode of pseudoterminal slave");
+    if (buildUser) {
+        if (chmod(slaveName.c_str(), 0600))
+            throw SysError("changing mode of pseudoterminal slave");
 
-    if (buildUser && chown(slaveName.c_str(), buildUser->getUID(), 0))
-        throw SysError("changing owner of pseudoterminal slave");
+        if (chown(slaveName.c_str(), buildUser->getUID(), 0))
+            throw SysError("changing owner of pseudoterminal slave");
+    }
 
     #if 0
     // Mount the pt in the sandbox so that the "tty" command works.
