@@ -79,7 +79,7 @@ hello: command not found
 
 </para></step>
 
-<step><para>Update Nix packages:
+<step><para>Update your packages:
 
 <screen>
 $ nix-channel --update nixpkgs
