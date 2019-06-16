@@ -574,7 +574,7 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
                 else if (setSubstituters(settings.extraSubstituters))
                     ;
                 else
-                    warn("ignoring the user-specified setting '%s', because it is a restricted setting and you are not a trusted user.", name);
+                    warn("ignoring the user-specified setting '%s', because it is a restricted setting and you are not a trusted user", name);
             } catch (UsageError & e) {
                 warn(e.what());
             }
