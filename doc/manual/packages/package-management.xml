@@ -7,11 +7,9 @@
 <title>Package Management</title>
 
 <partintro>
-<para>This chapter discusses how to do package management with Nix,
-i.e., how to obtain, install, upgrade, and erase packages.  This is
-the “user’s” perspective of the Nix system — people
-who want to <emphasis>create</emphasis> packages should consult
-<xref linkend='chap-writing-nix-expressions' />.</para>
+<para>This section discusses how to get, install, upgrade, and erase packages with Nix.</para>
+
+<para>If you want to <emphasis>create</emphasis> packages, look at <xref linkend='chap-writing-nix-expressions' /> instead.</para>
 </partintro>
 
 <xi:include href="basic-package-mgmt.xml" />

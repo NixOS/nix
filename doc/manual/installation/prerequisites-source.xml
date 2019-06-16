@@ -10,7 +10,7 @@
 
   <listitem><para>GNU Make.</para></listitem>
   
-  <listitem><para>Bash Shell (used by the <literal>./configure</literal> script)</listitem>
+  <listitem><para>Bash Shell (used by the <literal>./configure</literal> script)</para></listitem>
 
   <listitem><para>A version of GCC or Clang that supports C++14.</para></listitem>
 
@@ -26,12 +26,12 @@
   <literal>libbrotlidec</literal> (Brotli compression algorithm): <link
   xlink:href="https://github.com/google/brotli" />.</para></listitem>
 
-  <listitem><para><literal>bzip2<literal> (compressor program) and
+  <listitem><para><literal>bzip2</literal> (compressor program) and
   <literal>libbz2</literal>, including development headers and libraries: <link
   xlink:href="https://web.archive.org/web/20180624184756/http://www.bzip.org/"
   />.</para></listitem>
 
-  <listitem><para><literal>liblzma</literal> in XZ Utils:<link xlink:href="https://tukaani.org/xz/"/>.</para></listitem>
+  <listitem><para><literal>liblzma</literal> in XZ Utils: <link xlink:href="https://tukaani.org/xz/"/>.</para></listitem>
   
   <listitem><para>cURL and its library:<link
   xlink:href="https://curl.haxx.se/"/>.</para></listitem>

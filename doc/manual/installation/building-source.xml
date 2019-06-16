@@ -22,12 +22,16 @@ $ bash &lt;(curl https://nixos.org/nix/install)
 Nix requires GNU Make so you may need to invoke <command>gmake</command> instead.
 </para></step>
 
+</procedure>
+
 <title>Options</title>
 
 <para>You can change the installation path by passing <option>--prefix=<replaceable>prefix</replaceable></option> to <command>configure</command>. You can use any location you like, as long as you have write permission to the <replaceable>prefix</replaceable> path. The default is <filename>/usr/local</filename>. </para>
 
 <para>You can change where Nix keeps state (such as its database and log files) by passing <option>--localstatedir=<replaceable>path</replaceable></option>. The default is <filename>/nix/var</filename>.</para>
 
-<warning><para>It's not a good idea to change the Nix store location from its default, <filename>/nix/store</filename>, since doing so makes it impossible to use pre-built binaries from the standard Nixpkgs channels: you'll have to build all packages from source. If you do want to do this, use the option <option>--with-store-dir=<replaceable>path</replaceable></option>. </para></warning>
+<warning><para>
+	It's not a good idea to change the Nix store location from its default, <filename>/nix/store</filename>, since doing so makes it impossible to use pre-built binaries from the standard Nixpkgs channels: you'll have to build all packages from source. If you do want to do this, use the option <option>--with-store-dir=<replaceable>path</replaceable></option>.
+</para></warning>
 
 </section>

@@ -18,6 +18,7 @@
 <screen>
   $ sh &lt;(curl https://nixos.org/nix/install)
 </screen>
+</para>
 
 <para> To explicitly install a single-user installation, use <command>--no-daemon</command>:
 
@@ -38,6 +39,7 @@ The install script modifies the first writable file from <filename>.bash_profile
 variable before executing the install script.</para>
 
 </section>
+
 <section xml:id="sect-single-user-uninstall">
 <title>Uninstall a single-user installation</title>
 
@@ -145,7 +147,7 @@ alice$ cd nix-1.8-x86_64-darwin
 alice$ ./install
 </screen>
 </para></step>
-
+</procedure>
   
 </section>
 </chapter>
