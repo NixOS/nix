@@ -10,91 +10,59 @@
 
   <listitem><para>GNU Make.</para></listitem>
   
-  <listitem><para>Bash Shell. The <literal>./configure</literal> script
-  relies on bashisms, so Bash is required.</para></listitem>
+  <listitem><para>Bash Shell (used by the <literal>./configure</literal> script)</listitem>
 
   <listitem><para>A version of GCC or Clang that supports C++14.</para></listitem>
 
-  <listitem><para><command>pkg-config</command> to locate
-  dependencies.  If your distribution does not provide it, you can get
-  it from <link
+  <listitem><para><literal>pkg-config</literal> (locates
+  dependencies): <link
   xlink:href="http://www.freedesktop.org/wiki/Software/pkg-config"
-  />.</para></listitem>
+  /></para></listitem>
 
-  <listitem><para>The OpenSSL library to calculate cryptographic hashes.
-  If your distribution does not provide it, you can get it from <link
+  <listitem><para>OpenSSL (calculates cryptographic hashes): <link
   xlink:href="https://www.openssl.org"/>.</para></listitem>
 
-  <listitem><para>The <literal>libbrotlienc</literal> and
-  <literal>libbrotlidec</literal> libraries to provide implementation
-  of the Brotli compression algorithm. They are available for download
-  from the official repository <link
+  <listitem><para><literal>libbrotlienc</literal>
+  <literal>libbrotlidec</literal> (Brotli compression algorithm): <link
   xlink:href="https://github.com/google/brotli" />.</para></listitem>
 
-  <listitem><para>The bzip2 compressor program and the
-  <literal>libbz2</literal> library.  Thus you must have bzip2
-  installed, including development headers and libraries.  If your
-  distribution does not provide these, you can obtain bzip2 from <link
+  <listitem><para><literal>bzip2<literal> (compressor program) and
+  <literal>libbz2</literal>, including development headers and libraries: <link
   xlink:href="https://web.archive.org/web/20180624184756/http://www.bzip.org/"
   />.</para></listitem>
 
-  <listitem><para><literal>liblzma</literal>, which is provided by
-  XZ Utils. If your distribution does not provide this, you can
-  get it from <link xlink:href="https://tukaani.org/xz/"/>.</para></listitem>
+  <listitem><para><literal>liblzma</literal> in XZ Utils:<link xlink:href="https://tukaani.org/xz/"/>.</para></listitem>
   
-  <listitem><para>cURL and its library. If your distribution does not
-  provide it, you can get it from <link
+  <listitem><para>cURL and its library:<link
   xlink:href="https://curl.haxx.se/"/>.</para></listitem>
       
-  <listitem><para>The SQLite embedded database library, version 3.6.19
-  or higher.  If your distribution does not provide it, please install
-  it from <link xlink:href="http://www.sqlite.org/" />.</para></listitem>
+  <listitem><para>SQLite embedded database library, version 3.6.19
+  or higher:<link xlink:href="http://www.sqlite.org/" />.</para></listitem>
 
-  <listitem><para>The <link
+  <listitem><para>(optional)<link
   xlink:href="http://www.hboehm.info/gc/">Boehm
-  garbage collector</link> to reduce the evaluator’s memory
-  consumption (optional).  To enable it, install
-  <literal>pkgconfig</literal> and the Boehm garbage collector, and
-  pass the flag <option>--enable-gc</option> to
+  garbage collector</link> (reduces the evaluator’s memory
+  consumption). To enable it, install <literal>pkgconfig</literal> and the Boehm garbage collector, and pass the flag <option>--enable-gc</option> to
   <command>configure</command>.</para></listitem>
 
-  <listitem><para>The <literal>boost</literal> library of version
-  1.66.0 or higher. It can be obtained from the official web site
-  <link xlink:href="https://www.boost.org/" />.</para></listitem>
+  <listitem><para><literal>boost</literal> version
+  1.66.0 or higher: <link xlink:href="https://www.boost.org/" />.</para></listitem>
 
-  <listitem><para>The <command>xmllint</command> and
-  <command>xsltproc</command> programs to build this manual and the
-  man-pages.  These are part of the <literal>libxml2</literal> and
-  <literal>libxslt</literal> packages, respectively.  You also need
-  the <link
+  <listitem><para>If you modify the manual sources or when you are building from the Git repository, you need <literal>xmllint</literal> <literal>xsltproc</literal> (part of <literal>libxml2</literal> and <literal>libxslt</literal> respectively), the <link
   xlink:href="http://docbook.sourceforge.net/projects/xsl/">DocBook
-  XSL stylesheets</link> and optionally the <link
+  XSL stylesheets</link>, and optionally the <link
   xlink:href="http://www.docbook.org/schemas/5x"> DocBook 5.0 RELAX NG
-  schemas</link>.  Note that these are only required if you modify the
-  manual sources or when you are building from the Git
-  repository.</para></listitem>
+  schemas</link>.</para></listitem>
 
-  <listitem><para>Recent versions of Bison and Flex to build the
-  parser.  (This is because Nix needs GLR support in Bison and
-  reentrancy support in Flex.)  For Bison, you need version 2.6, which
-  can be obtained from the <link
+  <listitem><para>If you modify the parser or when you are building from the Git repository, you need Bison version 2.6: <link
   xlink:href="ftp://alpha.gnu.org/pub/gnu/bison">GNU FTP
-  server</link>.  For Flex, you need version 2.5.35, which is
-  available on <link
-  xlink:href="http://lex.sourceforge.net/">SourceForge</link>.
-  Slightly older versions may also work, but ancient versions like the
-  ubiquitous 2.5.4a won't.  Note that these are only required if you
-  modify the parser or when you are building from the Git
-  repository.</para></listitem>
+  server</link>.</para></listitem>
 
-  <listitem><para>The <literal>libseccomp</literal> is used to provide
-  syscall filtering on Linux. This is an optional dependency and can
-  be disabled passing a <option>--disable-seccomp-sandboxing</option>
-  option to the <command>configure</command> script (Not recommended
-  unless your system doesn't support
-  <literal>libseccomp</literal>). To get the library, visit <link
-  xlink:href="https://github.com/seccomp/libseccomp"
-  />.</para></listitem>
+  <listitem><para>If you modify the parser or when you are building from the Git repository, you need Flex version 2.5.35: <link
+  xlink:href="http://lex.sourceforge.net/">SourceForge</link>.</para></listitem>
+
+  <listitem><para>(optional) <literal>libseccomp</literal> (provides syscall filtering on Linux): <link xlink:href="https://github.com/seccomp/libseccomp" />. To disable this dependency, pass the <option>--disable-seccomp-sandboxing</option> option to the <command>configure</command> script (Not recommended unless your system doesn't support
+  <literal>libseccomp</literal>).</para></listitem>
 
 </itemizedlist>
 
