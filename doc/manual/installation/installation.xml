@@ -4,13 +4,20 @@
       version="5.0"
       xml:id="chap-installation">
 
-<title>Installation</title>
+<title>Installing and configuring Nix</title>
 
-<partintro>
-<para>This section covers how to install and configure Nix.</para>
-</partintro>
+<para>Nix is currently supported on the following platforms:
 
-<xi:include href="supported-platforms.xml" />
+<itemizedlist>
+
+  <listitem><para>Linux (i686, x86_64, aarch64).</para></listitem>
+
+  <listitem><para>macOS (x86_64).</para></listitem>
+
+</itemizedlist>
+
+</para>
+
 <xi:include href="installing-binary.xml" />
 <xi:include href="installing-source.xml" />
 <xi:include href="nix-security.xml" />
