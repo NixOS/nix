@@ -17,7 +17,7 @@ $ bash &lt;(curl https://nixos.org/nix/install)
 </screen>
 
 This installs Nix in <filename>/nix</filename>. The install script
-uses <command>sudo</command>, so make sure you have sufficient rights.</step>
+uses <command>sudo</command>, so make sure you have sufficient rights.</para></step>
 
 <step><para>See what packages are currently available:
 

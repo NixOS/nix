@@ -6,7 +6,7 @@
 
 <title>Installing and configuring Nix</title>
 
-<para>Nix is currently supported on the following platforms:
+<para>Nix is currently supported on the following platforms:</para>
 
 <itemizedlist>
 
@@ -16,7 +16,7 @@
 
 </itemizedlist>
 
-</para>
+You can either <xref linkend="installing-binary"/>, or <xref linkend="installing-source"/>.
 
 <xi:include href="installing-binary.xml" />
 <xi:include href="installing-source.xml" />
