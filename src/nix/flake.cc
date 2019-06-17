@@ -234,8 +234,8 @@ struct CmdFlakeInfo : FlakeCommand, MixJSON
         if (json) {
             auto json = flakeToJson(flake);
 
-#if 0
             auto state = getEvalState();
+            auto flake = resolveFlake();
 
             auto vFlake = state->allocValue();
             flake::callFlake(*state, flake, *vFlake);
@@ -257,7 +257,6 @@ struct CmdFlakeInfo : FlakeCommand, MixJSON
                 });
 
             json["outputs"] = std::move(outputs);
-#endif
 
             std::cout << json.dump() << std::endl;
         } else
