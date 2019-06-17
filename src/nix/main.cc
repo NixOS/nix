@@ -102,7 +102,7 @@ void mainWrapped(int argc, char * * argv)
         if (legacy) return legacy(argc, argv);
     }
 
-    verbosity = lvlError;
+    verbosity = lvlWarn;
     settings.verboseBuild = false;
     evalSettings.pureEval = true;
 
