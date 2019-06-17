@@ -257,14 +257,16 @@ struct InstallableFlake : InstallableValue
 {
     FlakeRef flakeRef;
     Strings attrPaths;
-    bool searchPackages = false;
+    Strings prefixes;
 
     InstallableFlake(SourceExprCommand & cmd, FlakeRef && flakeRef, Strings attrPaths)
         : InstallableValue(cmd), flakeRef(flakeRef), attrPaths(std::move(attrPaths))
     { }
 
-    InstallableFlake(SourceExprCommand & cmd, FlakeRef && flakeRef, std::string attrPath)
-        : InstallableValue(cmd), flakeRef(flakeRef), attrPaths{attrPath}, searchPackages(true)
+    InstallableFlake(SourceExprCommand & cmd, FlakeRef && flakeRef,
+        std::string attrPath, Strings && prefixes)
+        : InstallableValue(cmd), flakeRef(flakeRef), attrPaths{attrPath},
+          prefixes(prefixes)
     { }
 
     std::string what() override { return flakeRef.to_string() + ":" + *attrPaths.begin(); }
@@ -273,15 +275,8 @@ struct InstallableFlake : InstallableValue
     {
         std::vector<std::string> res;
 
-        if (searchPackages) {
-            // As a convenience, look for the attribute in
-            // 'outputs.packages'.
-            res.push_back("packages." + *attrPaths.begin());
-
-            // As a temporary hack until Nixpkgs is properly converted
-            // to provide a clean 'packages' set, look in 'legacyPackages'.
-            res.push_back("legacyPackages." + *attrPaths.begin());
-        }
+        for (auto & prefix : prefixes)
+            res.push_back(prefix + *attrPaths.begin());
 
         for (auto & s : attrPaths)
             res.push_back(s);
@@ -421,7 +416,11 @@ std::vector<std::shared_ptr<Installable>> SourceExprCommand::parseInstallables(
             else if ((colon = s.rfind(':')) != std::string::npos) {
                 auto flakeRef = std::string(s, 0, colon);
                 auto attrPath = std::string(s, colon + 1);
-                result.push_back(std::make_shared<InstallableFlake>(*this, FlakeRef(flakeRef, true), attrPath));
+                result.push_back(std::make_shared<InstallableFlake>(
+                        *this,
+                        FlakeRef(flakeRef, true),
+                        attrPath,
+                        getDefaultFlakeAttrPathPrefixes()));
             }
 
             else if (s.find('/') != std::string::npos || s == ".") {
@@ -437,7 +436,7 @@ std::vector<std::shared_ptr<Installable>> SourceExprCommand::parseInstallables(
             }
 
             else
-                result.push_back(std::make_shared<InstallableFlake>(*this, FlakeRef("nixpkgs"), s));
+                throw Error("unsupported argument '%s'", s);
         }
     }
 

@@ -225,6 +225,11 @@ struct CmdApp : InstallableCommand, RunCommon
         return {"defaultApp"};
     }
 
+    Strings getDefaultFlakeAttrPathPrefixes() override
+    {
+        return {"apps."};
+    }
+
     void run(ref<Store> store) override
     {
         auto state = getEvalState();
