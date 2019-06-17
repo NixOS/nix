@@ -69,26 +69,25 @@ Buildable Installable::toBuildable()
     return std::move(buildables[0]);
 }
 
-App Installable::toApp(EvalState & state)
+App::App(EvalState & state, Value & vApp)
 {
-    auto v = toValue(state);
+    state.forceAttrs(vApp);
 
-    state.forceAttrs(*v);
-
-    auto aType = v->attrs->need(state.sType);
+    auto aType = vApp.attrs->need(state.sType);
     if (state.forceStringNoCtx(*aType.value, *aType.pos) != "app")
         throw Error("value does not have type 'app', at %s", *aType.pos);
 
-    App app;
-
-    auto aProgram = v->attrs->need(state.symbols.create("program"));
-    app.program = state.forceString(*aProgram.value, app.context, *aProgram.pos);
+    auto aProgram = vApp.attrs->need(state.symbols.create("program"));
+    program = state.forceString(*aProgram.value, context, *aProgram.pos);
 
     // FIXME: check that 'program' is in the closure of 'context'.
-    if (!state.store->isInStore(app.program))
-        throw Error("app program '%s' is not in the Nix store", app.program);
+    if (!state.store->isInStore(program))
+        throw Error("app program '%s' is not in the Nix store", program);
+}
 
-    return app;
+App Installable::toApp(EvalState & state)
+{
+    return App(state, *toValue(state));
 }
 
 struct InstallableStorePath : Installable

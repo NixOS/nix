@@ -43,6 +43,8 @@ struct App
     PathSet context;
     Path program;
     // FIXME: add args, sandbox settings, metadata, ...
+
+    App(EvalState & state, Value & vApp);
 };
 
 struct Installable
