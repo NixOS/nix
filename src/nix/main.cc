@@ -45,6 +45,7 @@ struct NixArgs : virtual MultiCommand, virtual MixCommonArgs
 
         mkFlag()
             .longName("print-build-logs")
+            .shortName('L')
             .description("print full build logs on stderr")
             .set(&printBuildLogs, true);
 
