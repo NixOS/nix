@@ -365,6 +365,9 @@ struct CmdFlakeCheck : FlakeCommand, MixJSON
                         else if (name == "defaultApp")
                             checkApp(name, vProvide);
 
+                        else
+                            warn("unknown flake output '%s'", name);
+
                     } catch (Error & e) {
                         e.addPrefix(fmt("while checking flake output '" ANSI_BOLD "%s" ANSI_NORMAL "':\n", name));
                         throw;
