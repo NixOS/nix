@@ -85,7 +85,6 @@ protected:
         try {
             DownloadRequest request(cacheUri + "/" + path);
             request.head = true;
-            request.tries = 5;
             getDownloader()->download(request);
             return true;
         } catch (DownloadError & e) {

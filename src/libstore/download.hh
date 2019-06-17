@@ -9,13 +9,34 @@
 
 namespace nix {
 
+struct DownloadSettings : Config
+{
+    Setting<bool> enableHttp2{this, true, "http2",
+        "Whether to enable HTTP/2 support."};
+
+    Setting<std::string> userAgentSuffix{this, "", "user-agent-suffix",
+        "String appended to the user agent in HTTP requests."};
+
+    Setting<size_t> httpConnections{this, 25, "http-connections",
+        "Number of parallel HTTP connections.",
+        {"binary-caches-parallel-connections"}};
+
+    Setting<unsigned long> connectTimeout{this, 0, "connect-timeout",
+        "Timeout for connecting to servers during downloads. 0 means use curl's builtin default."};
+
+    Setting<unsigned int> tries{this, 5, "download-attempts",
+        "How often Nix will attempt to download a file before giving up."};
+};
+
+extern DownloadSettings downloadSettings;
+
 struct DownloadRequest
 {
     std::string uri;
     std::string expectedETag;
     bool verifyTLS = true;
     bool head = false;
-    size_t tries = 5;
+    size_t tries = downloadSettings.tries;
     unsigned int baseRetryTimeMs = 250;
     ActivityId parentAct;
     bool decompress = true;
