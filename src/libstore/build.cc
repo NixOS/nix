@@ -2196,6 +2196,9 @@ void DerivationGoal::startBuilder()
 
         if (chown(slaveName.c_str(), buildUser->getUID(), 0))
             throw SysError("changing owner of pseudoterminal slave");
+    } else {
+        if (grantpt(builderOut.readSide.get()))
+            throw SysError("granting access to pseudoterminal slave");
     }
 
     #if 0
