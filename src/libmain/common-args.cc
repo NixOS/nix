@@ -1,5 +1,6 @@
 #include "common-args.hh"
 #include "globals.hh"
+#include "download.hh"
 
 namespace nix {
 
@@ -33,6 +34,16 @@ MixCommonArgs::MixCommonArgs(const string & programName)
             } catch (UsageError & e) {
                 warn(e.what());
             }
+        });
+
+    mkFlag()
+        .longName("no-net")
+        .description("disable substituters and consider all previously downloaded files up-to-date")
+        .handler([]() {
+            settings.useSubstitutes = false;
+            settings.tarballTtl = std::numeric_limits<unsigned int>::max();
+            downloadSettings.tries = 0;
+            downloadSettings.connectTimeout = 1;
         });
 
     std::string cat = "config";
