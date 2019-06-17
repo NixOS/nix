@@ -749,9 +749,6 @@ setup_default_profile() {
 place_nix_configuration() {
     cat <<EOF > "$SCRATCH/nix.conf"
 build-users-group = $NIX_BUILD_GROUP_NAME
-
-max-jobs = $NIX_USER_COUNT
-cores = 1
 EOF
     _sudo "to place the default nix daemon configuration (part 2)" \
           install -m 0664 "$SCRATCH/nix.conf" /etc/nix/nix.conf
