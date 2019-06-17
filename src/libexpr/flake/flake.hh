@@ -30,11 +30,9 @@ Path getUserRegistryPath();
 
 enum HandleLockFile : unsigned int
     { AllPure // Everything is handled 100% purely
-    , TopRefUsesRegistries // The top FlakeRef uses the registries, apart from that, everything happens 100% purely
-    , UpdateLockFile // Update the existing lockfile and write it to file
-    , UseUpdatedLockFile // `UpdateLockFile` without writing to file
-    , RecreateLockFile // Recreate the lockfile from scratch and write it to file
-    , UseNewLockFile // `RecreateLockFile` without writing to file
+    , TopRefMutable // The top FlakeRef can be mutable, the rest is pure
+    , RecreateLockFile // Recreate lockfile from scratch
+    , UpdateLockFile // Update lockfile
     };
 
 struct SourceInfo

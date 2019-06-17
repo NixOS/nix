@@ -37,7 +37,7 @@ public:
     Flake getFlake()
     {
         auto evalState = getEvalState();
-        return flake::getFlake(*evalState, getFlakeRef(), useRegistries);
+        return flake::getFlake(*evalState, getFlakeRef(), !allPure);
     }
 
     ResolvedFlake resolveFlake()
@@ -186,10 +186,7 @@ struct CmdFlakeUpdate : FlakeCommand
 
         auto flakeRef = getFlakeRef();
 
-        if (std::get_if<FlakeRef::IsPath>(&flakeRef.data))
-            updateLockFile(*evalState, flakeRef, true);
-        else
-            throw Error("cannot update lockfile of flake '%s'", flakeRef);
+        flake::updateLockFile(*evalState, flakeRef, true);
     }
 };
 

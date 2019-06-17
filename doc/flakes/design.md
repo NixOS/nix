@@ -272,13 +272,10 @@ Example:
 ```
 
 Lockfiles are used to help resolve the dependencies of a flake.
-- `nix build github:<..>` uses the remote lockfile and update it
-- `nix build /home/user/dwarffs` uses the local lockfile, updates it and writes the result to file
-- `nix flake update <flakeref>` recreates the lockfile from scratch and writes it to file
-- `--no-registries` makes the command pure, also when fetching dependencies
-- `--no-save-lock-file`: Several commands will update the lockfile (e.g. `nix
-  build`). This flag prevents the updated lockfile to be written to file.
+- `nix build <flakeRef>` updates the lockfile
 - `--recreate-lock-file` makes prevents the current lockfile from being used
+- `--mutable-args` allows the `FlakeRef` arguments to be mutable
+- `--all-pure` doesn't allow the use of flake registries or mutable flakes
 
 ## `outputs`
 

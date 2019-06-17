@@ -23,25 +23,22 @@ MixFlakeOptions::MixFlakeOptions()
         .set(&recreateLockFile, true);
 
     mkFlag()
-        .longName("no-save-lock-file")
-        .description("do not save the newly generated lock file")
-        .set(&saveLockFile, false);
+        .longName("all-pure")
+        .description("don't use flake registries")
+        .set(&allPure, true);
 
     mkFlag()
-        .longName("no-registries")
-        .description("don't use flake registries")
-        .set(&useRegistries, false);
+        .longName("mutable-args")
+        .description("only the flakes in the arguments are allowed to be mutable")
+        .set(&onlyTopRefMutable, true);
 }
 
 flake::HandleLockFile MixFlakeOptions::getLockFileMode()
 {
     using namespace flake;
-    return
-        useRegistries
-        ? recreateLockFile
-          ? (saveLockFile ? RecreateLockFile : UseNewLockFile)
-          : (saveLockFile ? UpdateLockFile : UseUpdatedLockFile)
-        : AllPure;
+    return allPure ? AllPure
+        : onlyTopRefMutable ? TopRefMutable
+        : recreateLockFile ? RecreateLockFile : UpdateLockFile;
 }
 
 SourceExprCommand::SourceExprCommand()

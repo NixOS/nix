@@ -77,9 +77,9 @@ struct MixFlakeOptions : virtual Args
 {
     bool recreateLockFile = false;
 
-    bool saveLockFile = true;
+    bool allPure = false;
 
-    bool useRegistries = true;
+    bool onlyTopRefMutable = false;
 
     MixFlakeOptions();
 

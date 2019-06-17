@@ -93,13 +93,13 @@ cat > $registry <<EOF
 {
     "flakes": {
         "flake1": {
-            "uri": "file://$flake1Dir"
+            "uri": "$flake1Dir"
         },
         "flake2": {
-            "uri": "file://$flake2Dir"
+            "uri": "$flake2Dir"
         },
         "flake3": {
-            "uri": "file://$flake3Dir"
+            "uri": "$flake3Dir"
         },
         "nixpkgs": {
             "uri": "flake1"
@@ -138,14 +138,15 @@ nix build -o $TEST_ROOT/result --flake-registry $registry $flake1Dir
 nix build -o $TEST_ROOT/result --flake-registry $registry file://$flake1Dir
 
 # Building a flake with an unlocked dependency should fail in pure mode.
-(! nix eval "(builtins.getFlake "$flake2Dir")")
+(! nix build -o $TEST_ROOT/result --flake-registry $registry flake2:bar --mutable-args)
 
 # But should succeed in impure mode.
 nix build -o $TEST_ROOT/result --flake-registry $registry flake2:bar --impure
 
 # Test automatic lock file generation.
-nix build -o $TEST_ROOT/result --flake-registry $registry $flake2Dir:bar
+nix build -o $TEST_ROOT/result --flake-registry $registry $flake2Dir:bar --update-lock-file
 [[ -e $flake2Dir/flake.lock ]]
+git -C $flake2Dir add flake.lock
 git -C $flake2Dir commit flake.lock -m 'Add flake.lock'
 
 # Rerunning the build should not change the lockfile.
@@ -153,6 +154,7 @@ nix build -o $TEST_ROOT/result --flake-registry $registry $flake2Dir:bar
 [[ -z $(git -C $flake2Dir diff master) ]]
 
 # Now we should be able to build the flake in pure mode.
+nix build -o $TEST_ROOT/result --flake-registry $registry file://$flake2Dir:bar
 nix build -o $TEST_ROOT/result --flake-registry $registry flake2:bar
 
 # Or without a registry.
@@ -206,12 +208,12 @@ mv $registry.tmp $registry
 # Test whether flakes are registered as GC roots for offline use.
 # FIXME: use tarballs rather than git.
 rm -rf $TEST_HOME/.cache
-nix build -o $TEST_ROOT/result --flake-registry file://$registry file://$flake2Dir:bar
+nix build -o $TEST_ROOT/result --flake-registry $registry file://$flake2Dir:bar
 mv $flake1Dir $flake1Dir.tmp
 mv $flake2Dir $flake2Dir.tmp
 nix-store --gc
-nix build -o $TEST_ROOT/result --flake-registry file://$registry file://$flake2Dir:bar
-nix build -o $TEST_ROOT/result --flake-registry file://$registry file://$flake2Dir:bar --tarball-ttl 0
+nix build -o $TEST_ROOT/result --flake-registry $registry file://$flake2Dir:bar
+nix build -o $TEST_ROOT/result --flake-registry $registry file://$flake2Dir:bar --tarball-ttl 0
 mv $flake1Dir.tmp $flake1Dir
 mv $flake2Dir.tmp $flake2Dir
 

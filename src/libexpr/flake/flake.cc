@@ -300,18 +300,19 @@ bool allowedToWrite(HandleLockFile handle)
 
 bool recreateLockFile(HandleLockFile handle)
 {
-    return handle == RecreateLockFile || handle == UseNewLockFile;
+    return handle == RecreateLockFile;
 }
 
-bool allowedToUseRegistries(HandleLockFile handle, bool isTopRef)
+bool allowedToUpdate (HandleLockFile handle)
+{
+    return handle == AllPure || handle == TopRefMutable;
+}
+
+bool impureIsAllowed(HandleLockFile handle, bool isTopRef)
 {
     if (handle == AllPure) return false;
-    else if (handle == TopRefUsesRegistries) return isTopRef;
-    else if (handle == UpdateLockFile) return true;
-    else if (handle == UseUpdatedLockFile) return true;
-    else if (handle == RecreateLockFile) return true;
-    else if (handle == UseNewLockFile) return true;
-    else assert(false);
+    else if (handle == TopRefMutable) return isTopRef;
+    else return true;
 }
 
 /* Given a flakeref and its subtree of the lockfile, return an updated
@@ -327,8 +328,8 @@ static std::pair<Flake, FlakeInput> updateLocks(
     EvalState & state,
     const Flake & flake,
     HandleLockFile handleLockFile,
-    const FlakeInputs & oldEntry,
-    bool topRef)
+    const FlakeInputs & oldEntry = {},
+    bool topRef = false)
 {
     FlakeInput newEntry(
         flake.id,
@@ -342,9 +343,10 @@ static std::pair<Flake, FlakeInput> updateLocks(
         if (i != oldEntry.nonFlakeInputs.end()) {
             newEntry.nonFlakeInputs.insert_or_assign(i->first, i->second);
         } else {
-            if (handleLockFile == AllPure || handleLockFile == TopRefUsesRegistries)
+            if (allowedToUpdate(handleLockFile)) {
                 throw Error("cannot update non-flake dependency '%s' in pure mode", id);
-            auto nonFlake = getNonFlake(state, ref, allowedToUseRegistries(handleLockFile, false));
+            }
+            auto nonFlake = getNonFlake(state, ref, impureIsAllowed(handleLockFile, false));
             newEntry.nonFlakeInputs.insert_or_assign(id,
                 NonFlakeInput(
                     nonFlake.sourceInfo.resolvedRef,
@@ -357,12 +359,12 @@ static std::pair<Flake, FlakeInput> updateLocks(
         if (i != oldEntry.flakeInputs.end()) {
             newEntry.flakeInputs.insert_or_assign(inputRef, i->second);
         } else {
-            if (handleLockFile == AllPure || handleLockFile == TopRefUsesRegistries)
+            if (allowedToUpdate(handleLockFile)) {
                 throw Error("cannot update flake dependency '%s' in pure mode", inputRef);
-            newEntry.flakeInputs.insert_or_assign(inputRef,
-                updateLocks(state,
-                    getFlake(state, inputRef, allowedToUseRegistries(handleLockFile, false)),
-                    handleLockFile, {}, false).second);
+            }
+            Flake newFlake = getFlake(state, inputRef, impureIsAllowed(handleLockFile, false));
+            newEntry.flakeInputs.insert_or_assign(inputRef, updateLocks(state,
+                  newFlake, handleLockFile).second);
         }
     }
 
@@ -373,12 +375,12 @@ static std::pair<Flake, FlakeInput> updateLocks(
    and optionally write it to file, it the flake is writable. */
 ResolvedFlake resolveFlake(EvalState & state, const FlakeRef & topRef, HandleLockFile handleLockFile)
 {
-    auto flake = getFlake(state, topRef, allowedToUseRegistries(handleLockFile, true));
+    auto flake = getFlake(state, topRef, impureIsAllowed(handleLockFile, true));
 
     LockFile oldLockFile;
 
     if (!recreateLockFile(handleLockFile)) {
-        // If recreateLockFile, start with an empty lockfile
+        // If recreateLockFile, start with an empty lockfile.
         // FIXME: symlink attack
         oldLockFile = LockFile::read(
             state.store->toRealPath(flake.sourceInfo.storePath)
@@ -390,15 +392,20 @@ ResolvedFlake resolveFlake(EvalState & state, const FlakeRef & topRef, HandleLoc
 
     if (!(lockFile == oldLockFile)) {
         if (allowedToWrite(handleLockFile)) {
-            if (auto refData = std::get_if<FlakeRef::IsPath>(&topRef.data)) {
+            if (auto refData =
+                std::get_if<FlakeRef::IsPath>(&flake.sourceInfo.resolvedRef.data))
+            {
                 lockFile.write(refData->path + (topRef.subdir == "" ? "" : "/" + topRef.subdir) + "/flake.lock");
+                printMsg(lvlWarn, "notice: lockfile '%s' was updated", flake.sourceInfo.resolvedRef);
 
                 // Hack: Make sure that flake.lock is visible to Git, so it ends up in the Nix store.
                 runProgram("git", true, { "-C", refData->path, "add",
                                           (topRef.subdir == "" ? "" : topRef.subdir + "/") + "flake.lock" });
-            } else
-                warn("cannot write lockfile of remote flake '%s'", topRef);
-        } else if (handleLockFile != AllPure && handleLockFile != TopRefUsesRegistries)
+            } else if (handleLockFile == RecreateLockFile)
+                Error("tried recreating the lockfile but can't write it to file");
+            else
+                warn("using updated lockfile without writing it to file");
+        } else
             warn("using updated lockfile without writing it to file");
     }
 
@@ -536,7 +543,7 @@ void callFlake(EvalState & state,
 static void prim_getFlake(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
     callFlake(state, resolveFlake(state, state.forceStringNoCtx(*args[0], pos),
-            evalSettings.pureEval ? AllPure : UseUpdatedLockFile), v);
+            evalSettings.pureEval ? AllPure : UpdateLockFile), v);
 }
 
 static RegisterPrimOp r2("getFlake", 1, prim_getFlake);
