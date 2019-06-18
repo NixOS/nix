@@ -8,15 +8,6 @@ using namespace nix;
 
 struct CmdLog : InstallableCommand
 {
-    CmdLog()
-    {
-    }
-
-    std::string name() override
-    {
-        return "log";
-    }
-
     std::string description() override
     {
         return "show the build log of the specified packages or paths, if available";
@@ -68,4 +59,4 @@ struct CmdLog : InstallableCommand
     }
 };
 
-static RegisterCommand r1(make_ref<CmdLog>());
+static auto r1 = registerCommand<CmdLog>("log");

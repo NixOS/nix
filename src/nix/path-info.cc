@@ -24,11 +24,6 @@ struct CmdPathInfo : StorePathsCommand, MixJSON
         mkFlag(0, "sigs", "show signatures", &showSigs);
     }
 
-    std::string name() override
-    {
-        return "path-info";
-    }
-
     std::string description() override
     {
         return "query information about store paths";
@@ -130,4 +125,4 @@ struct CmdPathInfo : StorePathsCommand, MixJSON
     }
 };
 
-static RegisterCommand r1(make_ref<CmdPathInfo>());
+static auto r1 = registerCommand<CmdPathInfo>("path-info");

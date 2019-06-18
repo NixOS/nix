@@ -22,11 +22,6 @@ struct CmdAddToStore : MixDryRun, StoreCommand
             .dest(&namePart);
     }
 
-    std::string name() override
-    {
-        return "add-to-store";
-    }
-
     std::string description() override
     {
         return "add a path to the Nix store";
@@ -58,4 +53,4 @@ struct CmdAddToStore : MixDryRun, StoreCommand
     }
 };
 
-static RegisterCommand r1(make_ref<CmdAddToStore>());
+static auto r1 = registerCommand<CmdAddToStore>("add-to-store");

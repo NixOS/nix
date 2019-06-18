@@ -49,11 +49,6 @@ public:
 
 struct CmdFlakeList : EvalCommand
 {
-    std::string name() override
-    {
-        return "list";
-    }
-
     std::string description() override
     {
         return "list available Nix flakes";
@@ -133,11 +128,6 @@ static void printNonFlakeInfo(const NonFlake & nonFlake)
 // FIXME: merge info CmdFlakeInfo?
 struct CmdFlakeDeps : FlakeCommand
 {
-    std::string name() override
-    {
-        return "deps";
-    }
-
     std::string description() override
     {
         return "list informaton about dependencies";
@@ -171,11 +161,6 @@ struct CmdFlakeDeps : FlakeCommand
 
 struct CmdFlakeUpdate : FlakeCommand
 {
-    std::string name() override
-    {
-        return "update";
-    }
-
     std::string description() override
     {
         return "update flake lock file";
@@ -209,11 +194,6 @@ static void enumerateOutputs(EvalState & state, Value & vFlake,
 
 struct CmdFlakeInfo : FlakeCommand, MixJSON
 {
-    std::string name() override
-    {
-        return "info";
-    }
-
     std::string description() override
     {
         return "list info about a given flake";
@@ -267,11 +247,6 @@ struct CmdFlakeCheck : FlakeCommand, MixJSON
             .longName("no-build")
             .description("do not build checks")
             .set(&build, false);
-    }
-
-    std::string name() override
-    {
-        return "check";
     }
 
     std::string description() override
@@ -383,11 +358,6 @@ struct CmdFlakeAdd : MixEvalArgs, Command
     FlakeUri alias;
     FlakeUri uri;
 
-    std::string name() override
-    {
-        return "add";
-    }
-
     std::string description() override
     {
         return "upsert flake in user flake registry";
@@ -414,11 +384,6 @@ struct CmdFlakeRemove : virtual Args, MixEvalArgs, Command
 {
     FlakeUri alias;
 
-    std::string name() override
-    {
-        return "remove";
-    }
-
     std::string description() override
     {
         return "remove flake from user flake registry";
@@ -441,11 +406,6 @@ struct CmdFlakeRemove : virtual Args, MixEvalArgs, Command
 struct CmdFlakePin : virtual Args, EvalCommand
 {
     FlakeUri alias;
-
-    std::string name() override
-    {
-        return "pin";
-    }
 
     std::string description() override
     {
@@ -482,11 +442,6 @@ struct CmdFlakePin : virtual Args, EvalCommand
 
 struct CmdFlakeInit : virtual Args, Command
 {
-    std::string name() override
-    {
-        return "init";
-    }
-
     std::string description() override
     {
         return "create a skeleton 'flake.nix' file in the current directory";
@@ -514,11 +469,6 @@ struct CmdFlakeClone : FlakeCommand
 {
     Path destDir;
 
-    std::string name() override
-    {
-        return "clone";
-    }
-
     std::string description() override
     {
         return "clone flake repository";
@@ -541,23 +491,18 @@ struct CmdFlakeClone : FlakeCommand
 struct CmdFlake : virtual MultiCommand, virtual Command
 {
     CmdFlake()
-        : MultiCommand({make_ref<CmdFlakeList>()
-            , make_ref<CmdFlakeUpdate>()
-            , make_ref<CmdFlakeInfo>()
-            , make_ref<CmdFlakeCheck>()
-            //, make_ref<CmdFlakeDeps>()
-            , make_ref<CmdFlakeAdd>()
-            , make_ref<CmdFlakeRemove>()
-            , make_ref<CmdFlakePin>()
-            , make_ref<CmdFlakeInit>()
-            , make_ref<CmdFlakeClone>()
-          })
+        : MultiCommand({
+                {"list", []() { return make_ref<CmdFlakeList>(); }},
+                {"update", []() { return make_ref<CmdFlakeUpdate>(); }},
+                {"info", []() { return make_ref<CmdFlakeInfo>(); }},
+                {"check", []() { return make_ref<CmdFlakeCheck>(); }},
+                {"add", []() { return make_ref<CmdFlakeAdd>(); }},
+                {"remove", []() { return make_ref<CmdFlakeRemove>(); }},
+                {"pin", []() { return make_ref<CmdFlakePin>(); }},
+                {"init", []() { return make_ref<CmdFlakeInit>(); }},
+                {"clone", []() { return make_ref<CmdFlakeClone>(); }},
+            })
     {
-    }
-
-    std::string name() override
-    {
-        return "flake";
     }
 
     std::string description() override
@@ -578,4 +523,4 @@ struct CmdFlake : virtual MultiCommand, virtual Command
     }
 };
 
-static RegisterCommand r1(make_ref<CmdFlake>());
+static auto r1 = registerCommand<CmdFlake>("flake");

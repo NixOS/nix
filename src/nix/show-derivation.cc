@@ -22,11 +22,6 @@ struct CmdShowDerivation : InstallablesCommand
             .set(&recursive, true);
     }
 
-    std::string name() override
-    {
-        return "show-derivation";
-    }
-
     std::string description() override
     {
         return "show the contents of a store derivation";
@@ -116,4 +111,4 @@ struct CmdShowDerivation : InstallablesCommand
     }
 };
 
-static RegisterCommand r1(make_ref<CmdShowDerivation>());
+static auto r1 = registerCommand<CmdShowDerivation>("show-derivation");
