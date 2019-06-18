@@ -365,6 +365,10 @@ struct CmdFlakeCheck : FlakeCommand, MixJSON
                         else if (name == "defaultApp")
                             checkApp(name, vProvide);
 
+                        else if (name == "legacyPackages")
+                            // FIXME: do getDerivations?
+                            ;
+
                         else
                             warn("unknown flake output '%s'", name);
 
