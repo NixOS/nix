@@ -129,14 +129,6 @@ static void printNonFlakeInfo(const NonFlake & nonFlake)
     printSourceInfo(nonFlake.sourceInfo);
 }
 
-static nlohmann::json nonFlakeToJson(const NonFlake & nonFlake)
-{
-    nlohmann::json j;
-    j["id"] = nonFlake.alias;
-    sourceInfoToJson(nonFlake.sourceInfo, j);
-    return j;
-}
-
 // FIXME: merge info CmdFlakeInfo?
 struct CmdFlakeDeps : FlakeCommand
 {
