@@ -6,11 +6,6 @@ using namespace nix;
 
 struct CmdPingStore : StoreCommand
 {
-    std::string name() override
-    {
-        return "ping-store";
-    }
-
     std::string description() override
     {
         return "test whether a store can be opened";
@@ -32,4 +27,4 @@ struct CmdPingStore : StoreCommand
     }
 };
 
-static RegisterCommand r1(make_ref<CmdPingStore>());
+static auto r1 = registerCommand<CmdPingStore>("ping-store");

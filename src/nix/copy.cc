@@ -42,11 +42,6 @@ struct CmdCopy : StorePathsCommand
             .set(&substitute, Substitute);
     }
 
-    std::string name() override
-    {
-        return "copy";
-    }
-
     std::string description() override
     {
         return "copy paths between Nix stores";
@@ -97,4 +92,4 @@ struct CmdCopy : StorePathsCommand
     }
 };
 
-static RegisterCommand r1(make_ref<CmdCopy>());
+static auto r1 = registerCommand<CmdCopy>("copy");

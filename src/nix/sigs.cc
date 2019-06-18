@@ -22,11 +22,6 @@ struct CmdCopySigs : StorePathsCommand
             .handler([&](std::vector<std::string> ss) { substituterUris.push_back(ss[0]); });
     }
 
-    std::string name() override
-    {
-        return "copy-sigs";
-    }
-
     std::string description() override
     {
         return "copy path signatures from substituters (like binary caches)";
@@ -93,7 +88,7 @@ struct CmdCopySigs : StorePathsCommand
     }
 };
 
-static RegisterCommand r1(make_ref<CmdCopySigs>());
+static auto r1 = registerCommand<CmdCopySigs>("copy-sigs");
 
 struct CmdSignPaths : StorePathsCommand
 {
@@ -107,11 +102,6 @@ struct CmdSignPaths : StorePathsCommand
             .label("file")
             .description("file containing the secret signing key")
             .dest(&secretKeyFile);
-    }
-
-    std::string name() override
-    {
-        return "sign-paths";
     }
 
     std::string description() override
@@ -146,4 +136,4 @@ struct CmdSignPaths : StorePathsCommand
     }
 };
 
-static RegisterCommand r3(make_ref<CmdSignPaths>());
+static auto r2 = registerCommand<CmdSignPaths>("sign-paths");

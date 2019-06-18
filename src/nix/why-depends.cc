@@ -44,11 +44,6 @@ struct CmdWhyDepends : SourceExprCommand
             .set(&all, true);
     }
 
-    std::string name() override
-    {
-        return "why-depends";
-    }
-
     std::string description() override
     {
         return "show why a package has another package in its closure";
@@ -264,4 +259,4 @@ struct CmdWhyDepends : SourceExprCommand
     }
 };
 
-static RegisterCommand r1(make_ref<CmdWhyDepends>());
+static auto r1 = registerCommand<CmdWhyDepends>("why-depends");

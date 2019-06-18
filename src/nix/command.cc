@@ -4,7 +4,7 @@
 
 namespace nix {
 
-std::vector<ref<Command>> * RegisterCommand::commands = 0;
+Commands * RegisterCommand::commands = nullptr;
 
 StoreCommand::StoreCommand()
 {

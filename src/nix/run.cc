@@ -99,11 +99,6 @@ struct CmdRun : InstallablesCommand, RunCommon
             .handler([&](std::vector<std::string> ss) { unset.insert(ss.front()); });
     }
 
-    std::string name() override
-    {
-        return "run";
-    }
-
     std::string description() override
     {
         return "run a shell in which the specified packages are available";
@@ -192,7 +187,7 @@ struct CmdRun : InstallablesCommand, RunCommon
     }
 };
 
-static RegisterCommand r1(make_ref<CmdRun>());
+static auto r1 = registerCommand<CmdRun>("run");
 
 struct CmdApp : InstallableCommand, RunCommon
 {
@@ -201,11 +196,6 @@ struct CmdApp : InstallableCommand, RunCommon
     CmdApp()
     {
         expectArgs("args", &args);
-    }
-
-    std::string name() override
-    {
-        return "app";
     }
 
     std::string description() override
@@ -248,7 +238,7 @@ struct CmdApp : InstallableCommand, RunCommon
     }
 };
 
-static RegisterCommand r2(make_ref<CmdApp>());
+static auto r2 = registerCommand<CmdApp>("app");
 
 void chrootHelper(int argc, char * * argv)
 {

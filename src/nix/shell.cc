@@ -177,12 +177,6 @@ struct Common : InstallableCommand
 
 struct CmdDevShell : Common
 {
-
-    std::string name() override
-    {
-        return "dev-shell";
-    }
-
     std::string description() override
     {
         return "run a bash shell that provides the build environment of a derivation";
@@ -240,12 +234,6 @@ struct CmdDevShell : Common
 
 struct CmdPrintDevEnv : Common
 {
-
-    std::string name() override
-    {
-        return "print-dev-env";
-    }
-
     std::string description() override
     {
         return "print shell code that can be sourced by bash to reproduce the build environment of a derivation";
@@ -279,5 +267,5 @@ struct CmdPrintDevEnv : Common
     }
 };
 
-static RegisterCommand r1(make_ref<CmdPrintDevEnv>());
-static RegisterCommand r2(make_ref<CmdDevShell>());
+static auto r1 = registerCommand<CmdPrintDevEnv>("print-dev-env");
+static auto r2 = registerCommand<CmdDevShell>("dev-shell");

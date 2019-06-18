@@ -18,11 +18,6 @@ struct CmdEval : MixJSON, InstallableCommand
         mkFlag(0, "raw", "print strings unquoted", &raw);
     }
 
-    std::string name() override
-    {
-        return "eval";
-    }
-
     std::string description() override
     {
         return "evaluate a Nix expression";
@@ -74,4 +69,4 @@ struct CmdEval : MixJSON, InstallableCommand
     }
 };
 
-static RegisterCommand r1(make_ref<CmdEval>());
+static auto r1 = registerCommand<CmdEval>("eval");

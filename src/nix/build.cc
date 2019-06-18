@@ -25,11 +25,6 @@ struct CmdBuild : MixDryRun, InstallablesCommand
             .set(&outLink, Path(""));
     }
 
-    std::string name() override
-    {
-        return "build";
-    }
-
     std::string description() override
     {
         return "build a derivation or fetch a store path";
@@ -72,4 +67,4 @@ struct CmdBuild : MixDryRun, InstallablesCommand
     }
 };
 
-static RegisterCommand r1(make_ref<CmdBuild>());
+static auto r1 = registerCommand<CmdBuild>("build");

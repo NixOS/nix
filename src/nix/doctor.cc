@@ -20,11 +20,6 @@ struct CmdDoctor : StoreCommand
 {
     bool success = true;
 
-    std::string name() override
-    {
-        return "doctor";
-    }
-
     std::string description() override
     {
         return "check your system for potential problems";
@@ -121,4 +116,4 @@ struct CmdDoctor : StoreCommand
     }
 };
 
-static RegisterCommand r1(make_ref<CmdDoctor>());
+static auto r1 = registerCommand<CmdDoctor>("doctore");

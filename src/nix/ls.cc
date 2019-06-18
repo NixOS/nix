@@ -100,11 +100,6 @@ struct CmdLsStore : StoreCommand, MixLs
         };
     }
 
-    std::string name() override
-    {
-        return "ls-store";
-    }
-
     std::string description() override
     {
         return "show information about a store path";
@@ -136,11 +131,6 @@ struct CmdLsNar : Command, MixLs
         };
     }
 
-    std::string name() override
-    {
-        return "ls-nar";
-    }
-
     std::string description() override
     {
         return "show information about the contents of a NAR file";
@@ -152,5 +142,5 @@ struct CmdLsNar : Command, MixLs
     }
 };
 
-static RegisterCommand r1(make_ref<CmdLsStore>());
-static RegisterCommand r2(make_ref<CmdLsNar>());
+static auto r1 = registerCommand<CmdLsStore>("ls-store");
+static auto r2 = registerCommand<CmdLsNar>("ls-nar");
