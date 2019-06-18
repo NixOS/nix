@@ -7,6 +7,7 @@
 #include "flake/flake.hh"
 #include "get-drvs.hh"
 #include "store-api.hh"
+#include "derivations.hh"
 
 #include <nlohmann/json.hpp>
 #include <queue>
@@ -226,8 +227,8 @@ struct CmdFlakeInfo : FlakeCommand, MixJSON
         if (json) {
             auto json = flakeToJson(flake);
 
-#if 0
             auto state = getEvalState();
+            auto flake = resolveFlake();
 
             auto vFlake = state->allocValue();
             flake::callFlake(*state, flake, *vFlake);
@@ -249,7 +250,6 @@ struct CmdFlakeInfo : FlakeCommand, MixJSON
                 });
 
             json["outputs"] = std::move(outputs);
-#endif
 
             std::cout << json.dump() << std::endl;
         } else
@@ -294,12 +294,26 @@ struct CmdFlakeCheck : FlakeCommand, MixJSON
                 // FIXME: check meta attributes
                 return drvInfo->queryDrvPath();
             } catch (Error & e) {
-                e.addPrefix(fmt("while checking flake output attribute '" ANSI_BOLD "%s" ANSI_NORMAL "':\n", attrPath));
+                e.addPrefix(fmt("while checking the derivation '" ANSI_BOLD "%s" ANSI_NORMAL "':\n", attrPath));
                 throw;
             }
         };
 
         PathSet drvPaths;
+
+        auto checkApp = [&](const std::string & attrPath, Value & v) {
+            try {
+                auto app = App(*state, v);
+                for (auto & i : app.context) {
+                    auto [drvPath, outputName] = decodeContext(i);
+                    if (!outputName.empty() && nix::isDerivation(drvPath))
+                        drvPaths.insert(drvPath + "!" + outputName);
+                }
+            } catch (Error & e) {
+                e.addPrefix(fmt("while checking the app definition '" ANSI_BOLD "%s" ANSI_NORMAL "':\n", attrPath));
+                throw;
+            }
+        };
 
         {
             Activity act(*logger, lvlInfo, actUnknown, "evaluating flake");
@@ -330,8 +344,25 @@ struct CmdFlakeCheck : FlakeCommand, MixJSON
                                     name + "." + (std::string) aCheck.name, *aCheck.value);
                         }
 
+                        else if (name == "apps") {
+                            state->forceAttrs(vProvide);
+                            for (auto & aCheck : *vProvide.attrs)
+                                checkApp(
+                                    name + "." + (std::string) aCheck.name, *aCheck.value);
+                        }
+
                         else if (name == "defaultPackage" || name == "devShell")
                             checkDerivation(name, vProvide);
+
+                        else if (name == "defaultApp")
+                            checkApp(name, vProvide);
+
+                        else if (name == "legacyPackages")
+                            // FIXME: do getDerivations?
+                            ;
+
+                        else
+                            warn("unknown flake output '%s'", name);
 
                     } catch (Error & e) {
                         e.addPrefix(fmt("while checking flake output '" ANSI_BOLD "%s" ANSI_NORMAL "':\n", name));
@@ -340,7 +371,7 @@ struct CmdFlakeCheck : FlakeCommand, MixJSON
                 });
         }
 
-        if (build) {
+        if (build && !drvPaths.empty()) {
             Activity act(*logger, lvlInfo, actUnknown, "running flake checks");
             store->buildPaths(drvPaths);
         }

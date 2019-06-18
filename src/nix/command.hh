@@ -43,6 +43,8 @@ struct App
     PathSet context;
     Path program;
     // FIXME: add args, sandbox settings, metadata, ...
+
+    App(EvalState & state, Value & vApp);
 };
 
 struct Installable
@@ -101,6 +103,18 @@ struct SourceExprCommand : virtual Args, EvalCommand, MixFlakeOptions
     virtual Strings getDefaultFlakeAttrPaths()
     {
         return {"defaultPackage"};
+    }
+
+    virtual Strings getDefaultFlakeAttrPathPrefixes()
+    {
+        return {
+            // As a convenience, look for the attribute in
+            // 'outputs.packages'.
+            "packages.",
+            // As a temporary hack until Nixpkgs is properly converted
+            // to provide a clean 'packages' set, look in 'legacyPackages'.
+            "legacyPackages."
+        };
     }
 };
 

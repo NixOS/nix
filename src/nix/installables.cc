@@ -69,26 +69,25 @@ Buildable Installable::toBuildable()
     return std::move(buildables[0]);
 }
 
-App Installable::toApp(EvalState & state)
+App::App(EvalState & state, Value & vApp)
 {
-    auto v = toValue(state);
+    state.forceAttrs(vApp);
 
-    state.forceAttrs(*v);
-
-    auto aType = v->attrs->need(state.sType);
+    auto aType = vApp.attrs->need(state.sType);
     if (state.forceStringNoCtx(*aType.value, *aType.pos) != "app")
         throw Error("value does not have type 'app', at %s", *aType.pos);
 
-    App app;
-
-    auto aProgram = v->attrs->need(state.symbols.create("program"));
-    app.program = state.forceString(*aProgram.value, app.context, *aProgram.pos);
+    auto aProgram = vApp.attrs->need(state.symbols.create("program"));
+    program = state.forceString(*aProgram.value, context, *aProgram.pos);
 
     // FIXME: check that 'program' is in the closure of 'context'.
-    if (!state.store->isInStore(app.program))
-        throw Error("app program '%s' is not in the Nix store", app.program);
+    if (!state.store->isInStore(program))
+        throw Error("app program '%s' is not in the Nix store", program);
+}
 
-    return app;
+App Installable::toApp(EvalState & state)
+{
+    return App(state, *toValue(state));
 }
 
 struct InstallableStorePath : Installable
@@ -257,14 +256,16 @@ struct InstallableFlake : InstallableValue
 {
     FlakeRef flakeRef;
     Strings attrPaths;
-    bool searchPackages = false;
+    Strings prefixes;
 
     InstallableFlake(SourceExprCommand & cmd, FlakeRef && flakeRef, Strings attrPaths)
         : InstallableValue(cmd), flakeRef(flakeRef), attrPaths(std::move(attrPaths))
     { }
 
-    InstallableFlake(SourceExprCommand & cmd, FlakeRef && flakeRef, std::string attrPath)
-        : InstallableValue(cmd), flakeRef(flakeRef), attrPaths{attrPath}, searchPackages(true)
+    InstallableFlake(SourceExprCommand & cmd, FlakeRef && flakeRef,
+        std::string attrPath, Strings && prefixes)
+        : InstallableValue(cmd), flakeRef(flakeRef), attrPaths{attrPath},
+          prefixes(prefixes)
     { }
 
     std::string what() override { return flakeRef.to_string() + ":" + *attrPaths.begin(); }
@@ -273,15 +274,8 @@ struct InstallableFlake : InstallableValue
     {
         std::vector<std::string> res;
 
-        if (searchPackages) {
-            // As a convenience, look for the attribute in
-            // 'outputs.packages'.
-            res.push_back("packages." + *attrPaths.begin());
-
-            // As a temporary hack until Nixpkgs is properly converted
-            // to provide a clean 'packages' set, look in 'legacyPackages'.
-            res.push_back("legacyPackages." + *attrPaths.begin());
-        }
+        for (auto & prefix : prefixes)
+            res.push_back(prefix + *attrPaths.begin());
 
         for (auto & s : attrPaths)
             res.push_back(s);
@@ -421,7 +415,11 @@ std::vector<std::shared_ptr<Installable>> SourceExprCommand::parseInstallables(
             else if ((colon = s.rfind(':')) != std::string::npos) {
                 auto flakeRef = std::string(s, 0, colon);
                 auto attrPath = std::string(s, colon + 1);
-                result.push_back(std::make_shared<InstallableFlake>(*this, FlakeRef(flakeRef, true), attrPath));
+                result.push_back(std::make_shared<InstallableFlake>(
+                        *this,
+                        FlakeRef(flakeRef, true),
+                        attrPath,
+                        getDefaultFlakeAttrPathPrefixes()));
             }
 
             else if (s.find('/') != std::string::npos || s == ".") {
@@ -437,7 +435,7 @@ std::vector<std::shared_ptr<Installable>> SourceExprCommand::parseInstallables(
             }
 
             else
-                result.push_back(std::make_shared<InstallableFlake>(*this, FlakeRef("nixpkgs"), s));
+                throw Error("unsupported argument '%s'", s);
         }
     }
 

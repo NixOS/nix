@@ -196,8 +196,11 @@ static RegisterCommand r1(make_ref<CmdRun>());
 
 struct CmdApp : InstallableCommand, RunCommon
 {
+    std::vector<std::string> args;
+
     CmdApp()
     {
+        expectArgs("args", &args);
     }
 
     std::string name() override
@@ -225,6 +228,11 @@ struct CmdApp : InstallableCommand, RunCommon
         return {"defaultApp"};
     }
 
+    Strings getDefaultFlakeAttrPathPrefixes() override
+    {
+        return {"apps."};
+    }
+
     void run(ref<Store> store) override
     {
         auto state = getEvalState();
@@ -233,7 +241,10 @@ struct CmdApp : InstallableCommand, RunCommon
 
         state->realiseContext(app.context);
 
-        runProgram(store, app.program, {app.program});
+        Strings allArgs{app.program};
+        for (auto & i : args) allArgs.push_back(i);
+
+        runProgram(store, app.program, allArgs);
     }
 };
 
