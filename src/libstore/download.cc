@@ -30,23 +30,7 @@ using namespace std::string_literals;
 
 namespace nix {
 
-struct DownloadSettings : Config
-{
-    Setting<bool> enableHttp2{this, true, "http2",
-        "Whether to enable HTTP/2 support."};
-
-    Setting<std::string> userAgentSuffix{this, "", "user-agent-suffix",
-        "String appended to the user agent in HTTP requests."};
-
-    Setting<size_t> httpConnections{this, 25, "http-connections",
-        "Number of parallel HTTP connections.",
-        {"binary-caches-parallel-connections"}};
-
-    Setting<unsigned long> connectTimeout{this, 0, "connect-timeout",
-        "Timeout for connecting to servers during downloads. 0 means use curl's builtin default."};
-};
-
-static DownloadSettings downloadSettings;
+DownloadSettings downloadSettings;
 
 static GlobalConfig::Register r1(&downloadSettings);
 

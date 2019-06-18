@@ -255,7 +255,7 @@ public:
         "Secret keys with which to sign local builds."};
 
     Setting<unsigned int> tarballTtl{this, 60 * 60, "tarball-ttl",
-        "How soon to expire files fetched by builtins.fetchTarball and builtins.fetchurl."};
+        "How long downloaded files are considered up-to-date."};
 
     Setting<bool> requireSigs{this, true, "require-sigs",
         "Whether to check that any non-content-addressed path added to the "
