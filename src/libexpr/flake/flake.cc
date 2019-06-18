@@ -104,6 +104,7 @@ static FlakeRef lookupFlake(EvalState & state, const FlakeRef & flakeRef, const 
             auto newRef = j->second;
             newRef.ref = flakeRef.ref;
             newRef.rev = flakeRef.rev;
+            newRef.subdir = flakeRef.subdir;
             return updateFlakeRef(state, newRef, registries, pastSearches);
         }
     }

@@ -15,6 +15,7 @@ registry=$TEST_ROOT/registry.json
 flake1Dir=$TEST_ROOT/flake1
 flake2Dir=$TEST_ROOT/flake2
 flake3Dir=$TEST_ROOT/flake3
+flake4Dir=$TEST_ROOT/flake4
 nonFlakeDir=$TEST_ROOT/nonFlake
 
 for repo in $flake1Dir $flake2Dir $flake3Dir $nonFlakeDir; do
@@ -101,6 +102,12 @@ cat > $registry <<EOF
         "flake3": {
             "uri": "file://$flake3Dir"
         },
+        "file://$flake4Dir": {
+            "uri": "file://$flake3Dir"
+        },
+        "flake4": {
+            "uri": "flake3"
+        },
         "nixpkgs": {
             "uri": "flake1"
         }
@@ -110,7 +117,7 @@ cat > $registry <<EOF
 EOF
 
 # Test 'nix flake list'.
-(( $(nix flake list --flake-registry $registry | wc -l) == 4 ))
+(( $(nix flake list --flake-registry $registry | wc -l) == 6 ))
 
 # Test 'nix flake info'.
 nix flake info --flake-registry $registry flake1 | grep -q 'ID: *flake1'
@@ -274,3 +281,50 @@ nix build -o $TEST_ROOT/result --flake-registry $registry flake3:sth
 mv $flake2Dir.tmp $flake2Dir
 mv $nonFlakeDir.tmp $nonFlakeDir
 nix build -o $TEST_ROOT/result --flake-registry $registry flake3:xyzzy flake3:fnord
+
+# Test doing multiple `lookupFlake`s
+nix build -o $TEST_ROOT/result --flake-registry $registry flake4:xyzzy
+nix build -o $TEST_ROOT/result --flake-registry $registry file://$flake4Dir:xyzzy
+
+# Make branch "removeXyzzy" where flake3 doesn't have xyzzy anymore
+git -C $flake3Dir checkout -b removeXyzzy
+rm $flake3Dir/flake.nix
+
+cat > $flake3Dir/flake.nix <<EOF
+{
+  name = "flake3";
+
+  epoch = 201906;
+
+  inputs = [ "flake1" "flake2" ];
+
+  nonFlakeInputs = {
+    nonFlake = "$nonFlakeDir";
+  };
+
+  description = "Fnord";
+
+  outputs = inputs: rec {
+    packages.sth = inputs.flake1.packages.foo;
+    packages.fnord =
+      with import ./config.nix;
+      mkDerivation {
+        inherit system;
+        name = "fnord";
+        buildCommand = ''
+          cat \${inputs.nonFlake}/README.md > \$out
+        '';
+      };
+  };
+}
+EOF
+git -C $flake3Dir add flake.nix
+git -C $flake3Dir commit -m 'Remove packages.xyzzy'
+git -C $flake3Dir checkout master
+
+# Test whether fuzzy-matching works for IsAlias
+(! nix build -o $TEST_ROOT/result --flake-registry $registry flake4/removeXyzzy:xyzzy)
+
+# Test whether fuzzy-matching works for IsGit
+(! nix build -o $TEST_ROOT/result --flake-registry $registry flake4/removeXyzzy:xyzzy)
+nix build -o $TEST_ROOT/result --flake-registry $registry flake4/removeXyzzy:sth
