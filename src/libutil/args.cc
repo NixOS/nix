@@ -215,17 +215,15 @@ void Command::printHelp(const string & programName, std::ostream & out)
     }
 }
 
-MultiCommand::MultiCommand(const std::vector<ref<Command>> & _commands)
+MultiCommand::MultiCommand(const Commands & commands)
+    : commands(commands)
 {
-    for (auto & command : _commands)
-        commands.emplace(command->name(), command);
-
     expectedArgs.push_back(ExpectedArg{"command", 1, true, [=](std::vector<std::string> ss) {
         assert(!command);
         auto i = commands.find(ss[0]);
         if (i == commands.end())
             throw UsageError("'%s' is not a recognised command", ss[0]);
-        command = i->second;
+        command = i->second();
     }});
 }
 
@@ -246,10 +244,11 @@ void MultiCommand::printHelp(const string & programName, std::ostream & out)
     out << "Available commands:\n";
 
     Table2 table;
-    for (auto & command : commands) {
-        auto descr = command.second->description();
+    for (auto & i : commands) {
+        auto command = i.second();
+        auto descr = command->description();
         if (!descr.empty())
-            table.push_back(std::make_pair(command.second->name(), descr));
+            table.push_back(std::make_pair(command->name(), descr));
     }
     printTable(out, table);
 }

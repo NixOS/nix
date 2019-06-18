@@ -801,8 +801,6 @@ struct CmdRepl : StoreCommand, MixEvalArgs
         expectArgs("files", &files);
     }
 
-    std::string name() override { return "repl"; }
-
     std::string description() override
     {
         return "start an interactive environment for evaluating Nix expressions";
@@ -816,6 +814,6 @@ struct CmdRepl : StoreCommand, MixEvalArgs
     }
 };
 
-static RegisterCommand r1(make_ref<CmdRepl>());
+static auto r1 = registerCommand<CmdRepl>("repl");
 
 }

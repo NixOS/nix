@@ -10,11 +10,6 @@ using namespace nix;
 
 struct CmdEdit : InstallableCommand
 {
-    std::string name() override
-    {
-        return "edit";
-    }
-
     std::string description() override
     {
         return "open the Nix expression of a Nix package in $EDITOR";
@@ -50,4 +45,4 @@ struct CmdEdit : InstallableCommand
     }
 };
 
-static RegisterCommand r1(make_ref<CmdEdit>());
+static auto r1 = registerCommand<CmdEdit>("edit");

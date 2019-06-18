@@ -192,8 +192,15 @@ public:
    run() method. */
 struct Command : virtual Args
 {
+private:
+    std::string _name;
+
+public:
+
     virtual ~Command() { }
-    virtual std::string name() = 0;
+
+    std::string name() { return _name; }
+
     virtual void prepare() { };
     virtual void run() = 0;
 
@@ -210,7 +217,7 @@ struct Command : virtual Args
     void printHelp(const string & programName, std::ostream & out) override;
 };
 
-typedef std::map<std::string, ref<Command>> Commands;
+typedef std::map<std::string, std::function<ref<Command>()>> Commands;
 
 /* An argument parser that supports multiple subcommands,
    i.e. ‘<command> <subcommand>’. */
@@ -221,7 +228,7 @@ public:
 
     std::shared_ptr<Command> command;
 
-    MultiCommand(const std::vector<ref<Command>> & commands);
+    MultiCommand(const Commands & commands);
 
     void printHelp(const string & programName, std::ostream & out) override;
 

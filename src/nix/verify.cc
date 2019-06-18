@@ -30,11 +30,6 @@ struct CmdVerify : StorePathsCommand
         mkIntFlag('n', "sigs-needed", "require that each path has at least N valid signatures", &sigsNeeded);
     }
 
-    std::string name() override
-    {
-        return "verify";
-    }
-
     std::string description() override
     {
         return "verify the integrity of store paths";
@@ -180,4 +175,4 @@ struct CmdVerify : StorePathsCommand
     }
 };
 
-static RegisterCommand r1(make_ref<CmdVerify>());
+static auto r1 = registerCommand<CmdVerify>("verify");

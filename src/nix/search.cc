@@ -52,11 +52,6 @@ struct CmdSearch : SourceExprCommand, MixJSON
             .handler([&]() { writeCache = false; useCache = false; });
     }
 
-    std::string name() override
-    {
-        return "search";
-    }
-
     std::string description() override
     {
         return "query available packages";
@@ -277,4 +272,4 @@ struct CmdSearch : SourceExprCommand, MixJSON
     }
 };
 
-static RegisterCommand r1(make_ref<CmdSearch>());
+static auto r1 = registerCommand<CmdSearch>("search");

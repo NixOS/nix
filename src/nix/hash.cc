@@ -36,11 +36,6 @@ struct CmdHash : Command
         expectArgs("paths", &paths);
     }
 
-    std::string name() override
-    {
-        return mode == mFile ? "hash-file" : "hash-path";
-    }
-
     std::string description() override
     {
         return mode == mFile
@@ -71,8 +66,8 @@ struct CmdHash : Command
     }
 };
 
-static RegisterCommand r1(make_ref<CmdHash>(CmdHash::mFile));
-static RegisterCommand r2(make_ref<CmdHash>(CmdHash::mPath));
+static RegisterCommand r1("hash-file", [](){ return make_ref<CmdHash>(CmdHash::mFile); });
+static RegisterCommand r2("hash-path", [](){ return make_ref<CmdHash>(CmdHash::mPath); });
 
 struct CmdToBase : Command
 {
@@ -86,15 +81,6 @@ struct CmdToBase : Command
             .longName("type")
             .mkHashTypeFlag(&ht);
         expectArgs("strings", &args);
-    }
-
-    std::string name() override
-    {
-        return
-            base == Base16 ? "to-base16" :
-            base == Base32 ? "to-base32" :
-            base == Base64 ? "to-base64" :
-            "to-sri";
     }
 
     std::string description() override
@@ -113,10 +99,10 @@ struct CmdToBase : Command
     }
 };
 
-static RegisterCommand r3(make_ref<CmdToBase>(Base16));
-static RegisterCommand r4(make_ref<CmdToBase>(Base32));
-static RegisterCommand r5(make_ref<CmdToBase>(Base64));
-static RegisterCommand r6(make_ref<CmdToBase>(SRI));
+static RegisterCommand r3("to-base16", [](){ return make_ref<CmdToBase>(Base16); });
+static RegisterCommand r4("to-base32", [](){ return make_ref<CmdToBase>(Base32); });
+static RegisterCommand r5("to-base64", [](){ return make_ref<CmdToBase>(Base64); });
+static RegisterCommand r6("to-sri", [](){ return make_ref<CmdToBase>(SRI); });
 
 /* Legacy nix-hash command. */
 static int compatNixHash(int argc, char * * argv)

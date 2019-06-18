@@ -30,11 +30,6 @@ struct CmdUpgradeNix : MixDryRun, StoreCommand
             .dest(&storePathsUrl);
     }
 
-    std::string name() override
-    {
-        return "upgrade-nix";
-    }
-
     std::string description() override
     {
         return "upgrade Nix to the latest stable version";
@@ -157,4 +152,4 @@ struct CmdUpgradeNix : MixDryRun, StoreCommand
     }
 };
 
-static RegisterCommand r1(make_ref<CmdUpgradeNix>());
+static auto r1 = registerCommand<CmdUpgradeNix>("upgrade-nix");
