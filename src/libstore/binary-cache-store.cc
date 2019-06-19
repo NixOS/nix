@@ -123,7 +123,8 @@ void BinaryCacheStore::addToStore(const ValidPathInfo & info, const ref<std::str
             if (ref != info.path)
                 queryPathInfo(ref);
         } catch (InvalidPath &) {
-            throw Error(format("cannot add '%s' to the binary cache because the reference '%s' is not valid")
+            throw Error(format("cannot add '%s' to the binary cache because the reference '%s' is missing. "
+                               "Copying a partial closure isn't supported (the reference should be in the cache).")
                 % info.path % ref);
         }
 

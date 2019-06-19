@@ -1,5 +1,6 @@
 Makefile.config
 perl/Makefile.config
+.vscode
 
 # /
 /aclocal.m4
