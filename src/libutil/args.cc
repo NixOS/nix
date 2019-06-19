@@ -224,6 +224,7 @@ MultiCommand::MultiCommand(const Commands & commands)
         if (i == commands.end())
             throw UsageError("'%s' is not a recognised command", ss[0]);
         command = i->second();
+        command->_name = ss[0];
     }});
 }
 
@@ -246,6 +247,7 @@ void MultiCommand::printHelp(const string & programName, std::ostream & out)
     Table2 table;
     for (auto & i : commands) {
         auto command = i.second();
+        command->_name = i.first;
         auto descr = command->description();
         if (!descr.empty())
             table.push_back(std::make_pair(command->name(), descr));
