@@ -195,7 +195,10 @@ struct Command : virtual Args
 private:
     std::string _name;
 
+    friend class MultiCommand;
+
 public:
+
     std::string name() { return _name; }
 
     virtual void prepare() { };
