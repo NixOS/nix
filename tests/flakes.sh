@@ -16,9 +16,10 @@ flake1Dir=$TEST_ROOT/flake1
 flake2Dir=$TEST_ROOT/flake2
 flake3Dir=$TEST_ROOT/flake3
 flake4Dir=$TEST_ROOT/flake4
+flake7Dir=$TEST_ROOT/flake7
 nonFlakeDir=$TEST_ROOT/nonFlake
 
-for repo in $flake1Dir $flake2Dir $flake3Dir $nonFlakeDir; do
+for repo in $flake1Dir $flake2Dir $flake3Dir $flake7Dir $nonFlakeDir; do
     rm -rf $repo $repo.tmp
     mkdir $repo
     git -C $repo init
@@ -76,6 +77,10 @@ cat > $flake3Dir/flake.nix <<EOF
 
   outputs = inputs: rec {
     packages.xyzzy = inputs.flake2.packages.bar;
+
+    checks = {
+        xyzzy = packages.xyzzy;
+    };
   };
 }
 EOF
@@ -157,6 +162,10 @@ git -C $flake2Dir commit flake.lock -m 'Add flake.lock'
 
 # Rerunning the build should not change the lockfile.
 nix build -o $TEST_ROOT/result --flake-registry $registry $flake2Dir:bar
+[[ -z $(git -C $flake2Dir diff master) ]]
+
+# Updating the flake should not change the lockfile.
+nix flake update --flake-registry $registry $flake2Dir
 [[ -z $(git -C $flake2Dir diff master) ]]
 
 # Now we should be able to build the flake in pure mode.
@@ -328,3 +337,16 @@ git -C $flake3Dir checkout master
 # Test whether fuzzy-matching works for IsGit
 (! nix build -o $TEST_ROOT/result --flake-registry $registry flake4/removeXyzzy:xyzzy)
 nix build -o $TEST_ROOT/result --flake-registry $registry flake4/removeXyzzy:sth
+
+# Testing the nix CLI
+nix flake add --flake-registry $registry flake1 flake3
+(( $(nix flake list --flake-registry $registry | wc -l) == 7 ))
+nix flake pin --flake-registry $registry flake1
+(( $(nix flake list --flake-registry $registry | wc -l) == 7 ))
+nix flake remove --flake-registry $registry flake1
+(( $(nix flake list --flake-registry $registry | wc -l) == 6 ))
+
+(cd $flake7Dir && nix flake init)
+nix flake --flake-registry $registry check $flake3Dir
+
+nix flake clone --flake-registry $registry flake1 $TEST_ROOT/flake1-v2
