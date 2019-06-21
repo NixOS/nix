@@ -77,7 +77,7 @@ HgInfo exportMercurial(ref<Store> store, const std::string & uri,
     time_t now = time(0);
     struct stat st;
     if (stat(stampFile.c_str(), &st) != 0 ||
-        st.st_mtime + settings.tarballTtl <= now)
+        (uint64_t) st.st_mtime + settings.tarballTtl <= (uint64_t) now)
     {
         /* Except that if this is a commit hash that we already have,
            we don't have to pull again. */
@@ -93,17 +93,14 @@ HgInfo exportMercurial(ref<Store> store, const std::string & uri,
                 try {
                     runProgram("hg", true, { "pull", "-R", cacheDir, "--", uri });
                 }
-                catch (ExecError & e){
+                catch (ExecError & e) {
                     string transJournal = cacheDir + "/.hg/store/journal";
                     /* hg throws "abandoned transaction" error only if this file exists */
-                    if (pathExists(transJournal))
-                    {
+                    if (pathExists(transJournal)) {
                         runProgram("hg", true, { "recover", "-R", cacheDir });
                         runProgram("hg", true, { "pull", "-R", cacheDir, "--", uri });
-                    }
-                    else 
-                    {
-                        throw ExecError(e.status, fmt("program hg '%1%' ", statusToString(e.status)));
+                    } else {
+                        throw ExecError(e.status, fmt("'hg pull' %s", statusToString(e.status)));
                     }
                 }
             } else {
