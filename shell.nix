@@ -23,5 +23,6 @@ with import ./release-common.nix { inherit pkgs; };
       configureFlags+=" --prefix=$prefix"
       PKG_CONFIG_PATH=$prefix/lib/pkgconfig:$PKG_CONFIG_PATH
       PATH=$prefix/bin:$PATH
+      unset PYTHONPATH
     '';
 }
