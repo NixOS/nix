@@ -119,7 +119,9 @@ static FlakeRef lookupFlake(EvalState & state, const FlakeRef & flakeRef, const 
 static SourceInfo fetchFlake(EvalState & state, const FlakeRef & flakeRef, bool impureIsAllowed = false)
 {
     FlakeRef resolvedRef = lookupFlake(state, flakeRef,
-        impureIsAllowed ? state.getFlakeRegistries() : std::vector<std::shared_ptr<FlakeRegistry>>());
+        impureIsAllowed && !flakeRef.isDirect()
+        ? state.getFlakeRegistries()
+        : std::vector<std::shared_ptr<FlakeRegistry>>());
 
     if (evalSettings.pureEval && !impureIsAllowed && !resolvedRef.isImmutable())
         throw Error("requested to fetch mutable flake '%s' in pure mode", resolvedRef);

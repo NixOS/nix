@@ -168,6 +168,9 @@ git -C $flake2Dir commit flake.lock -m 'Add flake.lock'
 nix build -o $TEST_ROOT/result --flake-registry $registry $flake2Dir:bar
 [[ -z $(git -C $flake2Dir diff master) ]]
 
+# Building with a lockfile should not require a fetch of the registry.
+nix build -o $TEST_ROOT/result --flake-registry file:///no-registry.json $flake2Dir:bar --tarball-ttl 0
+
 # Updating the flake should not change the lockfile.
 nix flake update --flake-registry $registry $flake2Dir
 [[ -z $(git -C $flake2Dir diff master) ]]
@@ -297,7 +300,7 @@ nix build -o $TEST_ROOT/result --flake-registry $registry flake3:xyzzy flake3:fn
 
 # Test doing multiple `lookupFlake`s
 nix build -o $TEST_ROOT/result --flake-registry $registry flake4:xyzzy
-nix build -o $TEST_ROOT/result --flake-registry $registry file://$flake4Dir:xyzzy
+#nix build -o $TEST_ROOT/result --flake-registry $registry file://$flake4Dir:xyzzy
 
 # Make branch "removeXyzzy" where flake3 doesn't have xyzzy anymore
 git -C $flake3Dir checkout -b removeXyzzy
