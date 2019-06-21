@@ -143,6 +143,14 @@ FlakeRef::FlakeRef(const std::string & uri_, bool allowRelative)
         IsPath d;
         if (allowRelative) {
             d.path = absPath(uri);
+            try {
+                if (!S_ISDIR(lstat(d.path).st_mode))
+                    throw BadFlakeRef("path '%s' is not a flake (sub)directory");
+            } catch (SysError & e) {
+                if (e.errNo == ENOENT || e.errNo == EISDIR)
+                    throw BadFlakeRef("flake '%s' does not exist");
+                throw;
+            }
             while (true) {
                 if (pathExists(d.path + "/.git")) break;
                 subdir = baseNameOf(d.path) + (subdir.empty() ? "" : "/" + subdir);

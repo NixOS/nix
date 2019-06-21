@@ -55,7 +55,7 @@ Path Store::followLinksToStore(const Path & _path) const
         path = absPath(target, dirOf(path));
     }
     if (!isInStore(path))
-        throw Error(format("path '%1%' is not in the Nix store") % path);
+        throw NotInStore("path '%1%' is not in the Nix store", path);
     return path;
 }
 

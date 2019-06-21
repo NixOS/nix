@@ -394,9 +394,18 @@ std::vector<std::shared_ptr<Installable>> SourceExprCommand::parseInstallables(
 
     } else {
 
+        auto follow = [&](const std::string & s) -> std::optional<Path> {
+            try {
+                return store->followLinksToStorePath(s);
+            } catch (NotInStore &) {
+                return {};
+            }
+        };
+
         for (auto & s : ss) {
 
             size_t colon;
+            std::optional<Path> storePath;
 
             if (s.compare(0, 1, "(") == 0)
                 result.push_back(std::make_shared<InstallableExpr>(*this, s));
@@ -422,17 +431,8 @@ std::vector<std::shared_ptr<Installable>> SourceExprCommand::parseInstallables(
                         getDefaultFlakeAttrPathPrefixes()));
             }
 
-            else if (s.find('/') != std::string::npos || s == ".") {
-                Path storePath;
-                try {
-                    storePath = store->toStorePath(store->followLinksToStore(s));
-                } catch (Error) { }
-                if (storePath != "")
-                    result.push_back(std::make_shared<InstallableStorePath>(storePath));
-                else
-                    result.push_back(std::make_shared<InstallableFlake>(*this, FlakeRef(s, true),
-                            getDefaultFlakeAttrPaths()));
-            }
+            else if (s.find('/') != std::string::npos && (storePath = follow(s)))
+                result.push_back(std::make_shared<InstallableStorePath>(*storePath));
 
             else
                 throw Error("unsupported argument '%s'", s);

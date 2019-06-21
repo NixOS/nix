@@ -149,6 +149,10 @@ nix build -o $TEST_ROOT/result --flake-registry $registry flake1
 nix build -o $TEST_ROOT/result --flake-registry $registry $flake1Dir
 nix build -o $TEST_ROOT/result --flake-registry $registry file://$flake1Dir
 
+# CHeck that store symlinks inside a flake are not interpreted as flakes.
+nix build -o $flake1Dir/result --flake-registry $registry file://$flake1Dir
+nix path-info $flake1Dir/result
+
 # Building a flake with an unlocked dependency should fail in pure mode.
 (! nix eval "(builtins.getFlake "$flake2Dir")")
 
