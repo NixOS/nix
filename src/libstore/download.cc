@@ -784,7 +784,7 @@ CachedDownloadResult Downloader::downloadCached(
             auto ss = tokenizeString<vector<string>>(readFile(dataFile), "\n");
             if (ss.size() >= 3 && ss[0] == url) {
                 time_t lastChecked;
-                if (string2Int(ss[2], lastChecked) && lastChecked + request.ttl >= time(0)) {
+                if (string2Int(ss[2], lastChecked) && (uint64_t) lastChecked + request.ttl >= (uint64_t) time(0)) {
                     skip = true;
                     result.effectiveUri = request.uri;
                     result.etag = ss[1];
