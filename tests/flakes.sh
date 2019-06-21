@@ -107,9 +107,6 @@ cat > $registry <<EOF
         "flake3": {
             "uri": "file://$flake3Dir"
         },
-        "file://$flake4Dir": {
-            "uri": "file://$flake3Dir"
-        },
         "flake4": {
             "uri": "flake3"
         },
@@ -122,7 +119,7 @@ cat > $registry <<EOF
 EOF
 
 # Test 'nix flake list'.
-(( $(nix flake list --flake-registry $registry | wc -l) == 6 ))
+(( $(nix flake list --flake-registry $registry | wc -l) == 5 ))
 
 # Test 'nix flake info'.
 nix flake info --flake-registry $registry flake1 | grep -q 'ID: *flake1'
@@ -300,7 +297,6 @@ nix build -o $TEST_ROOT/result --flake-registry $registry flake3:xyzzy flake3:fn
 
 # Test doing multiple `lookupFlake`s
 nix build -o $TEST_ROOT/result --flake-registry $registry flake4:xyzzy
-#nix build -o $TEST_ROOT/result --flake-registry $registry file://$flake4Dir:xyzzy
 
 # Make branch "removeXyzzy" where flake3 doesn't have xyzzy anymore
 git -C $flake3Dir checkout -b removeXyzzy
@@ -347,11 +343,11 @@ nix build -o $TEST_ROOT/result --flake-registry $registry flake4/removeXyzzy:sth
 
 # Testing the nix CLI
 nix flake add --flake-registry $registry flake1 flake3
-(( $(nix flake list --flake-registry $registry | wc -l) == 7 ))
-nix flake pin --flake-registry $registry flake1
-(( $(nix flake list --flake-registry $registry | wc -l) == 7 ))
-nix flake remove --flake-registry $registry flake1
 (( $(nix flake list --flake-registry $registry | wc -l) == 6 ))
+nix flake pin --flake-registry $registry flake1
+(( $(nix flake list --flake-registry $registry | wc -l) == 6 ))
+nix flake remove --flake-registry $registry flake1
+(( $(nix flake list --flake-registry $registry | wc -l) == 5 ))
 
 (cd $flake7Dir && nix flake init)
 nix flake --flake-registry $registry check $flake3Dir

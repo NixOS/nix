@@ -38,7 +38,8 @@ public:
     Flake getFlake()
     {
         auto evalState = getEvalState();
-        return flake::getFlake(*evalState, getFlakeRef(), useRegistries);
+        return flake::getFlake(*evalState,
+            maybeLookupFlake(*evalState, getFlakeRef(), useRegistries));
     }
 
     ResolvedFlake resolveFlake()
@@ -425,13 +426,13 @@ struct CmdFlakePin : virtual Args, EvalCommand
         FlakeRegistry userRegistry = *readRegistry(userRegistryPath);
         auto it = userRegistry.entries.find(FlakeRef(alias));
         if (it != userRegistry.entries.end()) {
-            it->second = getFlake(*evalState, it->second, true).sourceInfo.resolvedRef;
+            it->second = getFlake(*evalState, maybeLookupFlake(*evalState, it->second, true)).sourceInfo.resolvedRef;
             writeRegistry(userRegistry, userRegistryPath);
         } else {
             std::shared_ptr<FlakeRegistry> globalReg = evalState->getGlobalFlakeRegistry();
             it = globalReg->entries.find(FlakeRef(alias));
             if (it != globalReg->entries.end()) {
-                auto newRef = getFlake(*evalState, it->second, true).sourceInfo.resolvedRef;
+                auto newRef = getFlake(*evalState, maybeLookupFlake(*evalState, it->second, true)).sourceInfo.resolvedRef;
                 userRegistry.entries.insert_or_assign(alias, newRef);
                 writeRegistry(userRegistry, userRegistryPath);
             } else

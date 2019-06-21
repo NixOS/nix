@@ -81,7 +81,14 @@ struct NonFlake
         : originalRef(origRef), sourceInfo(sourceInfo) {};
 };
 
-Flake getFlake(EvalState &, const FlakeRef &, bool impureIsAllowed);
+Flake getFlake(EvalState &, const FlakeRef &);
+
+/* If 'allowLookup' is true, then resolve 'flakeRef' using the
+   registries. */
+FlakeRef maybeLookupFlake(
+    EvalState & state,
+    const FlakeRef & flakeRef,
+    bool allowLookup);
 
 /* Fingerprint of a locked flake; used as a cache key. */
 typedef Hash Fingerprint;

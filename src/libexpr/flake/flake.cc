@@ -89,9 +89,6 @@ FlakeRef updateFlakeRef(EvalState & state, const FlakeRef & newRef, const Regist
 static FlakeRef lookupFlake(EvalState & state, const FlakeRef & flakeRef, const Registries & registries,
     std::vector<FlakeRef> pastSearches)
 {
-    if (registries.empty() && !flakeRef.isDirect())
-        throw Error("indirect flake reference '%s' is not allowed", flakeRef);
-
     for (std::shared_ptr<FlakeRegistry> registry : registries) {
         auto i = registry->entries.find(flakeRef);
         if (i != registry->entries.end()) {
@@ -115,16 +112,24 @@ static FlakeRef lookupFlake(EvalState & state, const FlakeRef & flakeRef, const 
     return flakeRef;
 }
 
-// Lookups happen here too
-static SourceInfo fetchFlake(EvalState & state, const FlakeRef & flakeRef, bool impureIsAllowed = false)
+FlakeRef maybeLookupFlake(
+    EvalState & state,
+    const FlakeRef & flakeRef,
+    bool allowLookup)
 {
-    FlakeRef resolvedRef = lookupFlake(state, flakeRef,
-        impureIsAllowed && !flakeRef.isDirect()
-        ? state.getFlakeRegistries()
-        : std::vector<std::shared_ptr<FlakeRegistry>>());
+    if (!flakeRef.isDirect()) {
+        if (allowLookup)
+            return lookupFlake(state, flakeRef, state.getFlakeRegistries());
+        else
+            throw Error("'%s' is an indirect flake reference, but registry lookups are not allowed", flakeRef);
+    } else
+        return flakeRef;
+}
 
-    if (evalSettings.pureEval && !impureIsAllowed && !resolvedRef.isImmutable())
-        throw Error("requested to fetch mutable flake '%s' in pure mode", resolvedRef);
+
+static SourceInfo fetchFlake(EvalState & state, const FlakeRef & resolvedRef)
+{
+    assert(resolvedRef.isDirect());
 
     auto doGit = [&](const GitInfo & gitInfo) {
         FlakeRef ref(resolvedRef.baseRef());
@@ -190,10 +195,9 @@ static SourceInfo fetchFlake(EvalState & state, const FlakeRef & flakeRef, bool 
     else abort();
 }
 
-// This will return the flake which corresponds to a given FlakeRef. The lookupFlake is done within `fetchFlake`, which is used here.
-Flake getFlake(EvalState & state, const FlakeRef & flakeRef, bool impureIsAllowed = false)
+Flake getFlake(EvalState & state, const FlakeRef & flakeRef)
 {
-    SourceInfo sourceInfo = fetchFlake(state, flakeRef, impureIsAllowed);
+    SourceInfo sourceInfo = fetchFlake(state, flakeRef);
     debug("got flake source '%s' with flakeref %s", sourceInfo.storePath, sourceInfo.resolvedRef.to_string());
 
     FlakeRef resolvedRef = sourceInfo.resolvedRef;
@@ -278,10 +282,9 @@ Flake getFlake(EvalState & state, const FlakeRef & flakeRef, bool impureIsAllowe
     return flake;
 }
 
-// Get the `NonFlake` corresponding to a `FlakeRef`.
-NonFlake getNonFlake(EvalState & state, const FlakeRef & flakeRef, bool impureIsAllowed = false)
+NonFlake getNonFlake(EvalState & state, const FlakeRef & flakeRef)
 {
-    auto sourceInfo = fetchFlake(state, flakeRef, impureIsAllowed);
+    auto sourceInfo = fetchFlake(state, flakeRef);
     debug("got non-flake source '%s' with flakeref %s", sourceInfo.storePath, sourceInfo.resolvedRef.to_string());
 
     FlakeRef resolvedRef = sourceInfo.resolvedRef;
@@ -347,7 +350,7 @@ static std::pair<Flake, FlakeInput> updateLocks(
         } else {
             if (handleLockFile == AllPure || handleLockFile == TopRefUsesRegistries)
                 throw Error("cannot update non-flake dependency '%s' in pure mode", id);
-            auto nonFlake = getNonFlake(state, ref, allowedToUseRegistries(handleLockFile, false));
+            auto nonFlake = getNonFlake(state, maybeLookupFlake(state, ref, allowedToUseRegistries(handleLockFile, false)));
             newEntry.nonFlakeInputs.insert_or_assign(id,
                 NonFlakeInput(
                     nonFlake.sourceInfo.resolvedRef,
@@ -364,7 +367,7 @@ static std::pair<Flake, FlakeInput> updateLocks(
                 throw Error("cannot update flake dependency '%s' in pure mode", inputRef);
             newEntry.flakeInputs.insert_or_assign(inputRef,
                 updateLocks(state,
-                    getFlake(state, inputRef, allowedToUseRegistries(handleLockFile, false)),
+                    getFlake(state, maybeLookupFlake(state, inputRef, allowedToUseRegistries(handleLockFile, false))),
                     handleLockFile, {}, false).second);
         }
     }
@@ -376,7 +379,7 @@ static std::pair<Flake, FlakeInput> updateLocks(
    and optionally write it to file, it the flake is writable. */
 ResolvedFlake resolveFlake(EvalState & state, const FlakeRef & topRef, HandleLockFile handleLockFile)
 {
-    auto flake = getFlake(state, topRef, allowedToUseRegistries(handleLockFile, true));
+    auto flake = getFlake(state, maybeLookupFlake(state, topRef, allowedToUseRegistries(handleLockFile, true)));
 
     LockFile oldLockFile;
 
@@ -441,7 +444,10 @@ static void emitSourceInfoAttrs(EvalState & state, const SourceInfo & sourceInfo
 static void prim_callFlake(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
     auto lazyFlake = (FlakeInput *) args[0]->attrs;
-    auto flake = getFlake(state, lazyFlake->ref, false);
+
+    assert(lazyFlake->ref.isImmutable());
+
+    auto flake = getFlake(state, lazyFlake->ref);
 
     if (flake.sourceInfo.narHash != lazyFlake->narHash)
         throw Error("the content hash of flake '%s' doesn't match the hash recorded in the referring lockfile", flake.sourceInfo.resolvedRef);
@@ -452,6 +458,8 @@ static void prim_callFlake(EvalState & state, const Pos & pos, Value * * args, V
 static void prim_callNonFlake(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
     auto lazyNonFlake = (NonFlakeInput *) args[0]->attrs;
+
+    assert(lazyNonFlake->ref.isImmutable());
 
     auto nonFlake = getNonFlake(state, lazyNonFlake->ref);
 
