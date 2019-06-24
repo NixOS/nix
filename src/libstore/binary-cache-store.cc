@@ -10,6 +10,8 @@
 #include "nar-info-disk-cache.hh"
 #include "nar-accessor.hh"
 #include "json.hh"
+#include "retry.hh"
+#include "download.hh"
 
 #include <chrono>
 
@@ -79,13 +81,15 @@ void BinaryCacheStore::getFile(const std::string & path, Sink & sink)
 
 std::shared_ptr<std::string> BinaryCacheStore::getFile(const std::string & path)
 {
-    StringSink sink;
-    try {
-        getFile(path, sink);
-    } catch (NoSuchBinaryCacheFile &) {
-        return nullptr;
-    }
-    return sink.s;
+    return retry<std::shared_ptr<std::string>>(downloadSettings.tries, [&]() -> std::shared_ptr<std::string> {
+        StringSink sink;
+        try {
+            getFile(path, sink);
+        } catch (NoSuchBinaryCacheFile &) {
+            return nullptr;
+        }
+        return sink.s;
+    });
 }
 
 Path BinaryCacheStore::narInfoFileFor(const Path & storePath)
