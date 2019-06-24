@@ -62,11 +62,13 @@ struct Downloader
 
     std::future<DownloadResult> enqueueDownload(const DownloadRequest & request);
 
-    /* Synchronously download a file. */
+    /* Synchronously download a file. The request will be retried in
+       case of transient failures. */
     DownloadResult download(const DownloadRequest & request);
 
     /* Download a file, writing its data to a sink. The sink will be
-       invoked on the thread of the caller. */
+       invoked on the thread of the caller. The request will not be
+       retried in case of transient failures. */
     void download(DownloadRequest && request, Sink & sink);
 
     /* Check if the specified file is already in ~/.cache/nix/tarballs
@@ -95,6 +97,11 @@ public:
     DownloadError(Downloader::Error error, const FormatOrString & fs)
         : Error(fs), error(error)
     { }
+
+    bool isTransient() override
+    {
+        return error == Downloader::Error::Transient;
+    }
 };
 
 bool isUri(const string & s);
