@@ -327,8 +327,13 @@ struct CurlDownloader : public Downloader
             debug("finished %s of '%s'; curl status = %d, HTTP status = %d, body = %d bytes",
                 request.verb(), request.uri, code, httpStatus, result.bodySize);
 
-            if (decompressionSink)
-                decompressionSink->finish();
+            if (decompressionSink) {
+                try {
+                    decompressionSink->finish();
+                } catch (...) {
+                    writeException = std::current_exception();
+                }
+            }
 
             if (code == CURLE_WRITE_ERROR && result.etag == request.expectedETag) {
                 code = CURLE_OK;
