@@ -113,7 +113,7 @@ the S3 URL:</para>
   exactly <uri>s3://example-nix-cache</uri>.</para>
 
   <para>Nix will use the <link
-  xlink:href="https://docs.aws.amazon.com/sdk-for-java/v1/developer-guide/credentials.html#credentials-default.">default
+  xlink:href="https://docs.aws.amazon.com/sdk-for-cpp/v1/developer-guide/credentials.html">default
   credential provider chain</link> for authenticating requests to
   Amazon S3.</para>
 
@@ -138,7 +138,7 @@ the S3 URL:</para>
   be <uri>s3://example-nix-cache</uri>.</para>
 
   <para>Nix will use the <link
-  xlink:href="https://docs.aws.amazon.com/sdk-for-java/v1/developer-guide/credentials.html#credentials-default.">default
+  xlink:href="https://docs.aws.amazon.com/sdk-for-cpp/v1/developer-guide/credentials.html">default
   credential provider chain</link> for authenticating requests to
   Amazon S3.</para>
 

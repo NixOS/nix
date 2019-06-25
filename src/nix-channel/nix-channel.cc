@@ -113,15 +113,6 @@ static void update(const StringSet & channelNames)
         }
 
         if (!unpacked) {
-            // The URL doesn't unpack directly, so let's try treating it like a full channel folder with files in it
-            // Check if the channel advertises a binary cache.
-            DownloadRequest request(url + "/binary-cache-url");
-            try {
-                auto dlRes = dl->download(request);
-                extraAttrs = "binaryCacheURL = \"" + *dlRes.data + "\";";
-            } catch (DownloadError & e) {
-            }
-
             // Download the channel tarball.
             try {
                 filename = dl->downloadCached(store, CachedDownloadRequest(url + "/nixexprs.tar.xz")).path;

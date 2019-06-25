@@ -31,12 +31,11 @@
 
 <refsection><title>Description</title>
 
-<para>A Nix channel is a mechanism that allows you to automatically stay
-up-to-date with a set of pre-built Nix expressions.  A Nix channel is
-just a URL that points to a place containing both a set of Nix
-expressions and a pointer to a binary cache.  <phrase
-condition="manual">See also <xref linkend="sec-channels"
-/>.</phrase></para>
+<para>A Nix channel is a mechanism that allows you to automatically
+stay up-to-date with a set of pre-built Nix expressions.  A Nix
+channel is just a URL that points to a place containing a set of Nix
+expressions.  <phrase condition="manual">See also <xref
+linkend="sec-channels" />.</phrase></para>
 
 <para>This command has the following operations:
 
@@ -169,18 +168,6 @@ following files:</para>
     top level, the tarball should contain a single directory. That
     directory must contain a file <filename>default.nix</filename>
     that serves as the channel’s “entry point”.</para></listitem>
-
-  </varlistentry>
-
-  <varlistentry><term><filename>binary-cache-url</filename></term>
-
-    <listitem><para>A file containing the URL to a binary cache (such
-    as <uri>https://cache.nixos.org</uri>). Nix will automatically
-    check this cache for pre-built binaries, if the user has
-    sufficient rights to add binary caches. For instance, in a
-    multi-user Nix setup, the binary caches provided by the channels
-    of the root user are used automatically, but caches corresponding
-    to the channels of non-root users are ignored.</para></listitem>
 
   </varlistentry>
 

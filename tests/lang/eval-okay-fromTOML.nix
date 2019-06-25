@@ -147,6 +147,25 @@
     name = "Nail"
     sku = 284758393
     color = "gray"
+
+    [[fruit]]
+      name = "apple"
+
+      [fruit.physical]
+        color = "red"
+        shape = "round"
+
+      [[fruit.variety]]
+        name = "red delicious"
+
+      [[fruit.variety]]
+        name = "granny smith"
+
+    [[fruit]]
+      name = "banana"
+
+      [[fruit.variety]]
+        name = "plantain"
   '')
 
   (builtins.fromTOML ''
@@ -179,4 +198,11 @@
     "checksum ansi_term 0.9.0 (registry+https://github.com/rust-lang/crates.io-index)" = "23ac7c30002a5accbf7e8987d0632fa6de155b7c3d39d0067317a391e00a2ef6"
     "checksum arrayvec 0.4.7 (registry+https://github.com/rust-lang/crates.io-index)" = "a1e964f9e24d588183fcb43503abda40d288c8657dfc27311516ce2f05675aef"
   '')
+
+  (builtins.fromTOML ''
+    a = [[{ b = true }]]
+    c = [ [ { d = true } ] ]
+    e = [[123]]
+  '')
+
 ]
