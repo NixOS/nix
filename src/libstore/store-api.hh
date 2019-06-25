@@ -766,8 +766,7 @@ StoreType getStoreType(const std::string & uri = settings.storeUri.get(),
     const std::string & stateDir = settings.nixStateDir);
 
 /* Return the default substituter stores, defined by the
-   ‘substituters’ option and various legacy options like
-   ‘binary-caches’. */
+   ‘substituters’ option and various legacy options. */
 std::list<ref<Store>> getDefaultSubstituters();
 
 

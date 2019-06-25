@@ -18,21 +18,17 @@ let
       if [ * != $channelName ]; then
         mv * $out/$channelName
       fi
-      if [ -n "$binaryCacheURL" ]; then
-        mkdir $out/binary-caches
-        echo -n "$binaryCacheURL" > $out/binary-caches/$channelName
-      fi
     '';
 
 in
 
-{ name, channelName, src, binaryCacheURL ? "" }:
+{ name, channelName, src }:
 
 derivation {
   system = builtins.currentSystem;
   builder = shell;
   args = [ "-e" builder ];
-  inherit name channelName src binaryCacheURL;
+  inherit name channelName src;
 
   PATH = "${nixBinDir}:${coreutils}";
 
