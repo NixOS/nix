@@ -330,6 +330,6 @@ git -C $flake3Dir checkout master
 nix build -o $TEST_ROOT/result --flake-registry $registry flake4/removeXyzzy:sth
 
 # Test overide-lockfile
-nix build -o $TEST_ROOT/result --flake-registry $registry flake4:xyzzy --override-lockfile flake3 flake3/removeXyzzy
+nix build -o $TEST_ROOT/result --flake-registry $registry flake4:xyzzy --override-lock flake3 flake3/removeXyzzy
 # Test that the flake registry is entirely used
-[[ -z $(nix build -o $TEST_ROOT/result --flake-registry $registry flake3:xyzzy --override-lockfile flake2 flake1) ]]
+[[ -z $(nix build -o $TEST_ROOT/result --flake-registry $registry flake3:xyzzy --override-lock flake2 flake1) ]]

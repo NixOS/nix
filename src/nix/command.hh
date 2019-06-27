@@ -3,6 +3,7 @@
 #include "args.hh"
 #include "common-eval-args.hh"
 #include <optional>
+#include "flake/flakeref.hh"
 
 namespace nix {
 

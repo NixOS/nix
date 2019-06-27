@@ -75,7 +75,7 @@ EvalCommand::EvalCommand()
       });
 
     mkFlag()
-      .longName("override-lockfile")
+      .longName("override-lock")
       .labels({"original-ref", "resolved-ref"})
       .description("override a lockfile value")
       .arity(2)
