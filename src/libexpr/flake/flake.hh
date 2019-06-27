@@ -17,7 +17,13 @@ static const size_t GLOBAL_REGISTRY = 2;
 
 struct FlakeRegistry
 {
-    std::map<FlakeRef, FlakeRef> entries;
+    struct Entry
+    {
+        FlakeRef ref;
+        bool used = false;
+        Entry (FlakeRef r) : ref(r) {}
+    };
+    std::map<FlakeRef, Entry> entries;
 };
 
 typedef std::vector<std::shared_ptr<FlakeRegistry>> Registries;

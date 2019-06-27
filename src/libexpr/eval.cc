@@ -349,11 +349,21 @@ EvalState::EvalState(const Strings & _searchPath, ref<Store> store)
     createBaseEnv();
 }
 
+void checkFlagRegistryUsage (EvalState & state)
+{
+    if (state.registries.size() == 3) {
+        for (auto info : state.registries[flake::FLAG_REGISTRY]->entries) {
+            if (!info.second.used)
+                warn("unused flag \"--override-flake %s %s\"",
+                    info.first.to_string(), info.second.ref.to_string());
+        }
+    }
+}
 
 EvalState::~EvalState()
 {
+    checkFlagRegistryUsage(*this);
 }
-
 
 Path EvalState::checkSourcePath(const Path & path_)
 {

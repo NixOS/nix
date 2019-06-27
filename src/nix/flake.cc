@@ -57,18 +57,18 @@ struct CmdFlakeList : EvalCommand
 
     void run(nix::ref<nix::Store> store) override
     {
-        auto registries = getEvalState()->getFlakeRegistries();
+        auto registries = getEvalState()->registries;
 
         stopProgressBar();
 
         for (auto & entry : registries[FLAG_REGISTRY]->entries)
-            std::cout << entry.first.to_string() << " flags " << entry.second.to_string() << "\n";
+            std::cout << entry.first.to_string() << " flags " << entry.second.ref.to_string() << "\n";
 
         for (auto & entry : registries[USER_REGISTRY]->entries)
-            std::cout << entry.first.to_string() << " user " << entry.second.to_string() << "\n";
+            std::cout << entry.first.to_string() << " user " << entry.second.ref.to_string() << "\n";
 
         for (auto & entry : registries[GLOBAL_REGISTRY]->entries)
-            std::cout << entry.first.to_string() << " global " << entry.second.to_string() << "\n";
+            std::cout << entry.first.to_string() << " global " << entry.second.ref.to_string() << "\n";
     }
 };
 
@@ -426,13 +426,13 @@ struct CmdFlakePin : virtual Args, EvalCommand
         FlakeRegistry userRegistry = *readRegistry(userRegistryPath);
         auto it = userRegistry.entries.find(FlakeRef(alias));
         if (it != userRegistry.entries.end()) {
-            it->second = getFlake(*evalState, maybeLookupFlake(*evalState, it->second, true)).sourceInfo.resolvedRef;
+            it->second.ref = getFlake(*evalState, maybeLookupFlake(*evalState, it->second.ref, true)).sourceInfo.resolvedRef;
             writeRegistry(userRegistry, userRegistryPath);
         } else {
             std::shared_ptr<FlakeRegistry> globalReg = evalState->getGlobalFlakeRegistry();
             it = globalReg->entries.find(FlakeRef(alias));
             if (it != globalReg->entries.end()) {
-                auto newRef = getFlake(*evalState, maybeLookupFlake(*evalState, it->second, true)).sourceInfo.resolvedRef;
+                auto newRef = getFlake(*evalState, maybeLookupFlake(*evalState, it->second.ref, true)).sourceInfo.resolvedRef;
                 userRegistry.entries.insert_or_assign(alias, newRef);
                 writeRegistry(userRegistry, userRegistryPath);
             } else
@@ -484,7 +484,7 @@ struct CmdFlakeClone : FlakeCommand
     {
         auto evalState = getEvalState();
 
-        Registries registries = evalState->getFlakeRegistries();
+        Registries registries = evalState->registries;
         gitCloneFlake(getFlakeRef().to_string(), *evalState, registries, destDir);
     }
 };

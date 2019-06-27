@@ -35,7 +35,7 @@ std::shared_ptr<FlakeRegistry> readRegistry(const Path & path)
 
     auto flakes = json["flakes"];
     for (auto i = flakes.begin(); i != flakes.end(); ++i)
-        registry->entries.emplace(i.key(), FlakeRef(i->value("uri", "")));
+        registry->entries.emplace(i.key(), FlakeRegistry::Entry(FlakeRef(i->value("uri", ""))));
 
     return registry;
 }
@@ -46,7 +46,7 @@ void writeRegistry(const FlakeRegistry & registry, const Path & path)
     nlohmann::json json;
     json["version"] = 1;
     for (auto elem : registry.entries)
-        json["flakes"][elem.first.to_string()] = { {"uri", elem.second.to_string()} };
+        json["flakes"][elem.first.to_string()] = { {"uri", elem.second.ref.to_string()} };
     createDirs(dirOf(path));
     writeFile(path, json.dump(4)); // The '4' is the number of spaces used in the indentation in the json file.
 }
@@ -65,7 +65,8 @@ std::shared_ptr<FlakeRegistry> getFlagRegistry(RegistryOverrides registryOverrid
 {
     auto flagRegistry = std::make_shared<FlakeRegistry>();
     for (auto const & x : registryOverrides) {
-        flagRegistry->entries.insert_or_assign(FlakeRef(x.first), FlakeRef(x.second));
+        flagRegistry->entries.insert_or_assign(FlakeRef(x.first),
+            FlakeRegistry::Entry(FlakeRef(x.second)));
     }
     return flagRegistry;
 }
@@ -92,13 +93,15 @@ static FlakeRef lookupFlake(EvalState & state, const FlakeRef & flakeRef, const 
     for (std::shared_ptr<FlakeRegistry> registry : registries) {
         auto i = registry->entries.find(flakeRef);
         if (i != registry->entries.end()) {
-            auto newRef = i->second;
+            auto newRef = i->second.ref;
+            i->second.used = true;
             return updateFlakeRef(state, newRef, registries, pastSearches);
         }
 
         auto j = registry->entries.find(flakeRef.baseRef());
         if (j != registry->entries.end()) {
-            auto newRef = j->second;
+            auto newRef = j->second.ref;
+            j->second.used = true;
             newRef.ref = flakeRef.ref;
             newRef.rev = flakeRef.rev;
             newRef.subdir = flakeRef.subdir;
@@ -119,7 +122,7 @@ FlakeRef maybeLookupFlake(
 {
     if (!flakeRef.isDirect()) {
         if (allowLookup)
-            return lookupFlake(state, flakeRef, state.getFlakeRegistries());
+            return lookupFlake(state, flakeRef, state.registries);
         else
             throw Error("'%s' is an indirect flake reference, but registry lookups are not allowed", flakeRef);
     } else
@@ -603,13 +606,11 @@ std::shared_ptr<flake::FlakeRegistry> EvalState::getGlobalFlakeRegistry()
 
 // This always returns a vector with flakeReg, userReg, globalReg.
 // If one of them doesn't exist, the registry is left empty but does exist.
-const Registries EvalState::getFlakeRegistries()
+void EvalState::initializeRegistries(RegistryOverrides registryOverrides)
 {
-    Registries registries;
     registries.push_back(getFlagRegistry(registryOverrides));
     registries.push_back(getUserRegistry());
     registries.push_back(getGlobalFlakeRegistry());
-    return registries;
 }
 
 Fingerprint ResolvedFlake::getFingerprint() const

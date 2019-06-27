@@ -6,6 +6,7 @@
 #include "symbol-table.hh"
 #include "hash.hh"
 #include "config.hh"
+#include "flake/flake.hh"
 
 #include <map>
 #include <unordered_map>
@@ -219,7 +220,7 @@ public:
        path.  Nothing is copied to the store. */
     Path coerceToPath(const Pos & pos, Value & v, PathSet & context);
 
-    void addRegistryOverrides(RegistryOverrides overrides) { registryOverrides = overrides; }
+    void initializeRegistries(RegistryOverrides overrides);
 
 public:
 
@@ -326,7 +327,7 @@ private:
 
 public:
 
-    const std::vector<std::shared_ptr<flake::FlakeRegistry>> getFlakeRegistries();
+    std::vector<std::shared_ptr<flake::FlakeRegistry>> registries;
 
     std::shared_ptr<flake::FlakeRegistry> getGlobalFlakeRegistry();
 
