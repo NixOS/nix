@@ -1,4 +1,5 @@
 AC_INIT(nix, m4_esyscmd([bash -c "echo -n $(cat ./.version)$VERSION_SUFFIX"]))
+AC_CONFIG_MACRO_DIRS([m4])
 AC_CONFIG_SRCDIR(README.md)
 AC_CONFIG_AUX_DIR(config)
 
@@ -62,7 +63,7 @@ CXXFLAGS=
 AC_PROG_CC
 AC_PROG_CXX
 AC_PROG_CPP
-AX_CXX_COMPILE_STDCXX_17
+AX_CXX_COMPILE_STDCXX_17([noext], [mandatory])
 
 AC_CHECK_TOOL([AR], [ar])
 
