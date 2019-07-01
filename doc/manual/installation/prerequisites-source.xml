@@ -62,6 +62,10 @@
   1.66.0 or higher. It can be obtained from the official web site
   <link xlink:href="https://www.boost.org/" />.</para></listitem>
 
+  <listitem><para>The <literal>editline</literal> library of version
+  1.14.0 or higher. It can be obtained from the its repository
+  <link xlink:href="https://github.com/troglobit/editline" />.</para></listitem>
+
   <listitem><para>The <command>xmllint</command> and
   <command>xsltproc</command> programs to build this manual and the
   man-pages.  These are part of the <literal>libxml2</literal> and
