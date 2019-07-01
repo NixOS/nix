@@ -343,11 +343,9 @@ stdenv.mkDerivation { … }
     </para>
 
     <para>The fetched tarball is cached for a certain amount of time
-    (1 hour by default) in <filename>~/.cache/nix/tarballs/</filename>.
-    You can change the cache timeout either on the command line with
-    <option>--option tarball-ttl <replaceable>number of seconds</replaceable></option> or
-    in the Nix configuration file with this option:
-    <literal>tarball-ttl <replaceable>number of seconds to cache</replaceable></literal>.
+    (see <xref linkend="conf-tarball-ttl" />).
+    You can change the cache timeout via that option or via the command line with
+    <option>--option tarball-ttl <replaceable>number of seconds</replaceable></option>.
     </para>
 
     <para>Note that when obtaining the hash with <varname>nix-prefetch-url

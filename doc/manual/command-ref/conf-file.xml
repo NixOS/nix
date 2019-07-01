@@ -865,6 +865,26 @@ requiredSystemFeatures = [ "kvm" ];
   </varlistentry>
 
 
+  <varlistentry xml:id="conf-tarball-ttl"><term><literal>tarball-ttl</literal></term>
+
+    <listitem>
+
+      <para>This option defines the number of seconds that a
+      downloaded tarball is cached in <filename>~/.cache/nix/tarballs/</filename>.
+      </para>
+
+      <para>This is most relevant for fetching tarballs that change remotely
+      via <envar>NIX_PATH</envar> or <function>fetchGit</function>.
+      Using <option>--option tarball-ttl 0</option> forces nix to re-fetch
+      these tarballs.</para>
+
+      <para>The default is <literal>3600</literal> seconds.</para>
+
+    </listitem>
+
+  </varlistentry>
+
+
   <varlistentry xml:id="conf-timeout"><term><literal>timeout</literal></term>
 
     <listitem>
