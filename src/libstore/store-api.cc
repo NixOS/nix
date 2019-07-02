@@ -86,18 +86,25 @@ string storePathToHash(const Path & path)
 void checkStoreName(const string & name)
 {
     string validChars = "+-._?=";
+
+    auto baseError = format("The path name '%2%' is invalid: %3%. "
+        "Path names are alphanumeric and can include the symbols %1% "
+        "and must not begin with a period. "
+        "Note: If '%2%' is a source file and you cannot rename it on "
+        "disk, builtins.path { name = ... } can be used to give it an "
+        "alternative name.") % validChars % name;
+
     /* Disallow names starting with a dot for possible security
        reasons (e.g., "." and ".."). */
     if (string(name, 0, 1) == ".")
-        throw Error(format("illegal name: '%1%'") % name);
+        throw Error(baseError % "it is illegal to start the name with a period");
     for (auto & i : name)
         if (!((i >= 'A' && i <= 'Z') ||
               (i >= 'a' && i <= 'z') ||
               (i >= '0' && i <= '9') ||
               validChars.find(i) != string::npos))
         {
-            throw Error(format("invalid character '%1%' in name '%2%'")
-                % i % name);
+            throw Error(baseError % (format("the '%1%' character is invalid") % i));
         }
 }
 
