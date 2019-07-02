@@ -42,7 +42,7 @@ esac
 
 AC_MSG_RESULT($system)
 AC_SUBST(system)
-AC_DEFINE_UNQUOTED(SYSTEM, ["$system"], [platform identifier (`cpu-os')])
+AC_DEFINE_UNQUOTED(SYSTEM, ["$system"], [platform identifier ('cpu-os')])
 
 
 # State should be stored in /nix/var, unless the user overrides it explicitly.
