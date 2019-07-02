@@ -4,10 +4,9 @@
       version="5.0"
       xml:id="ch-installing-source">
 
-<title>Installing Nix from Source</title>
+<title>Build Nix from source</title>
 
-<para>If no binary package is available, you can download and compile
-a source distribution.</para>
+<para>If no binary package is available, you can download and compile a source distribution.</para>
 
 <xi:include href="prerequisites-source.xml" />
 <xi:include href="obtaining-source.xml" />
