@@ -50,8 +50,10 @@ AC_DEFINE_UNQUOTED(SYSTEM, ["$system"], [platform identifier ('cpu-os')])
 test "$localstatedir" = '${prefix}/var' && localstatedir=/nix/var
 
 
-CFLAGS=
-CXXFLAGS=
+# Set default flags for nix (as per AC_PROG_CC/CXX docs),
+# while still allowing the user to override them from the command line.
+: ${CFLAGS="-O3"}
+: ${CXXFLAGS="-O3"}
 AC_PROG_CC
 AC_PROG_CXX
 AC_PROG_CPP
