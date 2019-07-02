@@ -1,0 +1,22 @@
+<section xmlns="http://docbook.org/ns/docbook"
+      xmlns:xlink="http://www.w3.org/1999/xlink"
+      xmlns:xi="http://www.w3.org/2001/XInclude"
+      version="5.0"
+      xml:id="ssec-relnotes-2.3">
+
+<title>Release 2.3 (????-??-??)</title>
+
+<para>This release contains the following changes:</para>
+
+<itemizedlist>
+
+  <listitem>
+    <para><function>builtins.fetchGit</function>'s <varname>ref</varname>
+    argument now allows specifying an absolute remote ref.
+    Nix will automatically prefix <varname>ref</varname> with
+    <literal>refs/heads</literal> only if <varname>ref</varname> doesn't
+    already begin with <literal>refs/</literal>.
+    </para>
+  </listitem>
+</itemizedlist>
+</section>

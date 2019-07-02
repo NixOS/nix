@@ -425,6 +425,13 @@ stdenv.mkDerivation { … }
               This is often a branch or tag name. Defaults to
               <literal>HEAD</literal>.
             </para>
+
+            <para>
+              By default, the <varname>ref</varname> value is prefixed
+              with <literal>refs/heads/</literal>. As of Nix 2.3.0
+              Nix will not prefix <literal>refs/heads/</literal> if
+              <varname>ref</varname> starts with <literal>refs/</literal>.
+            </para>
           </listitem>
         </varlistentry>
       </variablelist>
@@ -435,6 +442,14 @@ stdenv.mkDerivation { … }
   url = "git@github.com:my-secret/repository.git";
   ref = "master";
   rev = "adab8b916a45068c044658c4158d81878f9ed1c3";
+}</programlisting>
+      </example>
+
+      <example>
+        <title>Fetching an arbitrary ref</title>
+        <programlisting>builtins.fetchGit {
+  url = "https://gitub.com/NixOS/nix.git";
+  ref = "refs/heads/0.5-release";
 }</programlisting>
       </example>
 
