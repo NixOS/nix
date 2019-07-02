@@ -50,14 +50,6 @@ AC_DEFINE_UNQUOTED(SYSTEM, ["$system"], [platform identifier ('cpu-os')])
 test "$localstatedir" = '${prefix}/var' && localstatedir=/nix/var
 
 
-# Solaris-specific stuff.
-AC_STRUCT_DIRENT_D_TYPE
-if test "$sys_name" = sunos; then
-    # Solaris requires -lsocket -lnsl for network functions
-    LIBS="-lsocket -lnsl $LIBS"
-fi
-
-
 CFLAGS=
 CXXFLAGS=
 AC_PROG_CC
@@ -69,6 +61,14 @@ AC_CHECK_TOOL([AR], [ar])
 
 # Use 64-bit file system calls so that we can support files > 2 GiB.
 AC_SYS_LARGEFILE
+
+
+# Solaris-specific stuff.
+AC_STRUCT_DIRENT_D_TYPE
+if test "$sys_name" = sunos; then
+    # Solaris requires -lsocket -lnsl for network functions
+    LIBS="-lsocket -lnsl $LIBS"
+fi
 
 
 # Check for pubsetbuf.
