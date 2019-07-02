@@ -145,6 +145,13 @@ AC_ARG_WITH(store-dir, AC_HELP_STRING([--with-store-dir=PATH],
 AC_SUBST(storedir)
 
 
+# Look for boost, a required dependency.
+# Note that AX_BOOST_BASE only exports *CPP* BOOST_CPPFLAGS, no CXX flags,
+# and CPPFLAGS are not passed to the C++ compiler automatically.
+# Thus we append the returned CPPFLAGS to the CXXFLAGS here.
+AX_BOOST_BASE([1.66], [CXXFLAGS="$BOOST_CPPFLAGS $CXXFLAGS"], [AC_MSG_ERROR([Nix requires boost.])])
+
+
 # Look for OpenSSL, a required dependency.
 PKG_CHECK_MODULES([OPENSSL], [libcrypto], [CXXFLAGS="$OPENSSL_CFLAGS $CXXFLAGS"])
 
