@@ -258,6 +258,15 @@ AC_ARG_ENABLE(doc-gen, AC_HELP_STRING([--disable-doc-gen],
   doc_generate=$enableval, doc_generate=yes)
 AC_SUBST(doc_generate)
 
+# Check if docbook works without Internet (if not, likely packages providing the .xsl files are not installed)
+if test "$doc_generate" = yes; then
+  AC_MSG_CHECKING([if docbook can run without networking])
+  if "$xsltproc" --nonet --novalid http://docbook.sourceforge.net/release/xsl-ns/current/profiling/profile.xsl >&AS_MESSAGE_LOG_FD 2>&1; then
+    AC_MSG_RESULT(yes)
+  else
+    AC_MSG_FAILURE([Building the manual requires 'xsltproc --nonet' to work. It did not. Perhaps you lack the necessary xsl files (e.g. package docbook-xsl-ns on Debian)?])
+  fi
+fi
 
 # Setuid installations.
 AC_CHECK_FUNCS([setresuid setreuid lchown])
