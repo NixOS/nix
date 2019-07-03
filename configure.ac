@@ -153,6 +153,9 @@ AC_SUBST(storedir)
 # and CPPFLAGS are not passed to the C++ compiler automatically.
 # Thus we append the returned CPPFLAGS to the CXXFLAGS here.
 AX_BOOST_BASE([1.66], [CXXFLAGS="$BOOST_CPPFLAGS $CXXFLAGS"], [AC_MSG_ERROR([Nix requires boost.])])
+# For unknown reasons, setting this directly in the ACTION-IF-FOUND above
+# ends up with LDFLAGS being empty, so we set it afterwards.
+LDFLAGS="$BOOST_LDFLAGS $LDFLAGS"
 
 
 # Look for OpenSSL, a required dependency.
