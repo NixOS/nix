@@ -149,6 +149,10 @@ public:
        form. */
     void evalFile(const Path & path, Value & v);
 
+
+    /* Evaluate an expression from stdin. */
+    void evalStdin(Value & v);
+
     void resetFileCache();
 
     /* Look up a file in the search path. */

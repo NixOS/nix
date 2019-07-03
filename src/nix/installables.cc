@@ -30,10 +30,12 @@ Value * SourceExprCommand::getSourceExpr(EvalState & state)
 
     vSourceExpr = state.allocValue();
 
-    if (file != "")
-        state.evalFile(lookupFileArg(state, file), *vSourceExpr);
-
-    else {
+    if (file != "") {
+        if (file == "-")
+            state.evalStdin(*vSourceExpr);
+        else
+            state.evalFile(lookupFileArg(state, file), *vSourceExpr);
+    } else {
 
         /* Construct the installation source from $NIX_PATH. */
 

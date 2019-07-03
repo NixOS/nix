@@ -45,8 +45,6 @@ Bindings * MixEvalArgs::getAutoArgs(EvalState & state)
 
 Path lookupFileArg(EvalState & state, string s)
 {
-    if (s == "-")
-        return "-";
     if (isUri(s)) {
         CachedDownloadRequest request(s);
         request.unpack = true;
