@@ -1,8 +1,22 @@
 AC_INIT(nix, m4_esyscmd([bash -c "echo -n $(cat ./.version)$VERSION_SUFFIX"]))
+AC_CONFIG_MACRO_DIRS([m4])
 AC_CONFIG_SRCDIR(README.md)
 AC_CONFIG_AUX_DIR(config)
 
 AC_PROG_SED
+
+# Detect building from release tarballs (we need less dependencies then)
+# by checking for the `.dist-files` file present only in release tarballs
+# (created in release.nix).
+# For example, we don't need to build the manual or run bison/flex
+# parser generators for release tarballs, as those have them pre-generated.
+AC_MSG_CHECKING([whether we are building from a release tarball (.dist-files existence)])
+if test -f .dist-files; then
+  AC_MSG_RESULT(yes; will not require tools that are not needed for building from release tarballs)
+  building_from_release_tarball=yes;
+else
+  AC_MSG_RESULT(no)
+fi
 
 # Construct a Nix system name (like "i686-linux").
 AC_CANONICAL_HOST
@@ -42,11 +56,26 @@ esac
 
 AC_MSG_RESULT($system)
 AC_SUBST(system)
-AC_DEFINE_UNQUOTED(SYSTEM, ["$system"], [platform identifier (`cpu-os')])
+AC_DEFINE_UNQUOTED(SYSTEM, ["$system"], [platform identifier ('cpu-os')])
 
 
 # State should be stored in /nix/var, unless the user overrides it explicitly.
 test "$localstatedir" = '${prefix}/var' && localstatedir=/nix/var
+
+
+# Set default flags for nix (as per AC_PROG_CC/CXX docs),
+# while still allowing the user to override them from the command line.
+: ${CFLAGS="-O3"}
+: ${CXXFLAGS="-O3"}
+AC_PROG_CC
+AC_PROG_CXX
+AC_PROG_CPP
+AX_CXX_COMPILE_STDCXX_17([noext], [mandatory])
+
+AC_CHECK_TOOL([AR], [ar])
+
+# Use 64-bit file system calls so that we can support files > 2 GiB.
+AC_SYS_LARGEFILE
 
 
 # Solaris-specific stuff.
@@ -55,19 +84,6 @@ if test "$sys_name" = sunos; then
     # Solaris requires -lsocket -lnsl for network functions
     LIBS="-lsocket -lnsl $LIBS"
 fi
-
-
-CFLAGS=
-CXXFLAGS=
-AC_PROG_CC
-AC_PROG_CXX
-AC_PROG_CPP
-AX_CXX_COMPILE_STDCXX_17
-
-AC_CHECK_TOOL([AR], [ar])
-
-# Use 64-bit file system calls so that we can support files > 2 GiB.
-AC_SYS_LARGEFILE
 
 
 # Check for pubsetbuf.
@@ -118,10 +134,11 @@ fi
 
 NEED_PROG(bash, bash)
 NEED_PROG(patch, patch)
-AC_PATH_PROG(xmllint, xmllint, false)
-AC_PATH_PROG(xsltproc, xsltproc, false)
-AC_PATH_PROG(flex, flex, false)
-AC_PATH_PROG(bison, bison, false)
+if test "x$building_from_release_tarball" != x"yes"; then
+  # Parser generators are pre-built in release tarballs.
+  NEED_PROG(flex, flex)
+  NEED_PROG(bison, bison)
+fi
 NEED_PROG(sed, sed)
 NEED_PROG(tar, tar)
 NEED_PROG(bzip2, bzip2)
@@ -145,6 +162,16 @@ AC_ARG_WITH(store-dir, AC_HELP_STRING([--with-store-dir=PATH],
 AC_SUBST(storedir)
 
 
+# Look for boost, a required dependency.
+# Note that AX_BOOST_BASE only exports *CPP* BOOST_CPPFLAGS, no CXX flags,
+# and CPPFLAGS are not passed to the C++ compiler automatically.
+# Thus we append the returned CPPFLAGS to the CXXFLAGS here.
+AX_BOOST_BASE([1.66], [CXXFLAGS="$BOOST_CPPFLAGS $CXXFLAGS"], [AC_MSG_ERROR([Nix requires boost.])])
+# For unknown reasons, setting this directly in the ACTION-IF-FOUND above
+# ends up with LDFLAGS being empty, so we set it afterwards.
+LDFLAGS="$BOOST_LDFLAGS $LDFLAGS"
+
+
 # Look for OpenSSL, a required dependency.
 PKG_CHECK_MODULES([OPENSSL], [libcrypto], [CXXFLAGS="$OPENSSL_CFLAGS $CXXFLAGS"])
 
@@ -164,7 +191,16 @@ PKG_CHECK_MODULES([SQLITE3], [sqlite3 >= 3.6.19], [CXXFLAGS="$SQLITE3_CFLAGS $CX
 PKG_CHECK_MODULES([LIBCURL], [libcurl], [CXXFLAGS="$LIBCURL_CFLAGS $CXXFLAGS"])
 
 # Look for editline, a required dependency.
-PKG_CHECK_MODULES([EDITLINE], [libeditline], [CXXFLAGS="$EDITLINE_CFLAGS $CXXFLAGS"])
+# The the libeditline.pc file was added only in libeditline >= 1.15.2,
+# see https://github.com/troglobit/editline/commit/0a8f2ef4203c3a4a4726b9dd1336869cd0da8607,
+# but e.g. Ubuntu 16.04 has an older version, so we fall back to searching for
+# editline.h when the pkg-config approach fails.
+PKG_CHECK_MODULES([EDITLINE], [libeditline], [CXXFLAGS="$EDITLINE_CFLAGS $CXXFLAGS"], [
+  AC_CHECK_HEADERS([editline.h], [true],
+    [AC_MSG_ERROR([Nix requires libeditline; it was found neither via pkg-config nor its normal header.])])
+  AC_SEARCH_LIBS([readline read_history], [editline], [],
+    [AC_MSG_ERROR([Nix requires libeditline; it was not found via pkg-config, but via its header, but required functions do not work. Maybe it is too old? >= 1.14 is required.])])
+])
 
 # Look for libsodium, an optional dependency.
 PKG_CHECK_MODULES([SODIUM], [libsodium],
@@ -236,6 +272,20 @@ AC_ARG_ENABLE(doc-gen, AC_HELP_STRING([--disable-doc-gen],
   doc_generate=$enableval, doc_generate=yes)
 AC_SUBST(doc_generate)
 
+# The manual is pre-generated in release tarballs.
+if test "$doc_generate" = yes && test "x$building_from_release_tarball" != x"yes"; then
+  # Programs required to build the manual
+  NEED_PROG(xmllint, xmllint)
+  NEED_PROG(xsltproc, xsltproc)
+
+  # Check if docbook works without Internet (if not, likely packages providing the .xsl files are not installed)
+  AC_MSG_CHECKING([if docbook can run without networking])
+  if "$xsltproc" --nonet --novalid http://docbook.sourceforge.net/release/xsl-ns/current/profiling/profile.xsl >&AS_MESSAGE_LOG_FD 2>&1; then
+    AC_MSG_RESULT(yes)
+  else
+    AC_MSG_FAILURE([Building the manual requires 'xsltproc --nonet' to work. It did not. Perhaps you lack the necessary xsl files (e.g. package docbook-xsl-ns on Debian)?])
+  fi
+fi
 
 # Setuid installations.
 AC_CHECK_FUNCS([setresuid setreuid lchown])

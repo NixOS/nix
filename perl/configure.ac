@@ -2,8 +2,10 @@ AC_INIT(nix-perl, m4_esyscmd([bash -c "echo -n $(cat ../.version)$VERSION_SUFFIX
 AC_CONFIG_SRCDIR(MANIFEST)
 AC_CONFIG_AUX_DIR(../config)
 
-CFLAGS=
-CXXFLAGS=
+# Set default flags for nix (as per AC_PROG_CC/CXX docs),
+# while still allowing the user to override them from the command line.
+: ${CFLAGS="-O3"}
+: ${CXXFLAGS="-O3"}
 AC_PROG_CC
 AC_PROG_CXX
 AX_CXX_COMPILE_STDCXX_11
