@@ -119,10 +119,12 @@ if test -z "$$1"; then
 fi
 ])
 
+# Note: Usage of `AC_PATH_PROG(..., ..., false)` indicates that this program
+# is not required in all cases. (e.g. not when building from a release tarball).
+# The use of `false` isn't ideal, because when used somewhere in the build it
+# will silently fail without error message; this should be improved.
 NEED_PROG(bash, bash)
 NEED_PROG(patch, patch)
-AC_PATH_PROG(xmllint, xmllint, false)
-AC_PATH_PROG(xsltproc, xsltproc, false)
 AC_PATH_PROG(flex, flex, false)
 AC_PATH_PROG(bison, bison, false)
 NEED_PROG(sed, sed)
@@ -258,8 +260,12 @@ AC_ARG_ENABLE(doc-gen, AC_HELP_STRING([--disable-doc-gen],
   doc_generate=$enableval, doc_generate=yes)
 AC_SUBST(doc_generate)
 
-# Check if docbook works without Internet (if not, likely packages providing the .xsl files are not installed)
 if test "$doc_generate" = yes; then
+  # Programs required to build the manual
+  NEED_PROG(xmllint, xmllint)
+  NEED_PROG(xsltproc, xsltproc)
+
+  # Check if docbook works without Internet (if not, likely packages providing the .xsl files are not installed)
   AC_MSG_CHECKING([if docbook can run without networking])
   if "$xsltproc" --nonet --novalid http://docbook.sourceforge.net/release/xsl-ns/current/profiling/profile.xsl >&AS_MESSAGE_LOG_FD 2>&1; then
     AC_MSG_RESULT(yes)
