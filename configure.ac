@@ -5,19 +5,6 @@ AC_CONFIG_AUX_DIR(config)
 
 AC_PROG_SED
 
-# Detect building from release tarballs (we need less dependencies then)
-# by checking for the `.dist-files` file present only in release tarballs
-# (created in release.nix).
-# For example, we don't need to build the manual or run bison/flex
-# parser generators for release tarballs, as those have them pre-generated.
-AC_MSG_CHECKING([whether we are building from a release tarball (.dist-files existence)])
-if test -f .dist-files; then
-  AC_MSG_RESULT(yes; will not require tools that are not needed for building from release tarballs)
-  building_from_release_tarball=yes;
-else
-  AC_MSG_RESULT(no)
-fi
-
 # Construct a Nix system name (like "i686-linux").
 AC_CANONICAL_HOST
 AC_MSG_CHECKING([for the canonical Nix system name])
@@ -134,11 +121,10 @@ fi
 
 NEED_PROG(bash, bash)
 NEED_PROG(patch, patch)
-if test "x$building_from_release_tarball" != x"yes"; then
-  # Parser generators are pre-built in release tarballs.
-  NEED_PROG(flex, flex)
-  NEED_PROG(bison, bison)
-fi
+AC_PATH_PROG(xmllint, xmllint, false)
+AC_PATH_PROG(xsltproc, xsltproc, false)
+AC_PATH_PROG(flex, flex, false)
+AC_PATH_PROG(bison, bison, false)
 NEED_PROG(sed, sed)
 NEED_PROG(tar, tar)
 NEED_PROG(bzip2, bzip2)
@@ -272,20 +258,6 @@ AC_ARG_ENABLE(doc-gen, AC_HELP_STRING([--disable-doc-gen],
   doc_generate=$enableval, doc_generate=yes)
 AC_SUBST(doc_generate)
 
-# The manual is pre-generated in release tarballs.
-if test "$doc_generate" = yes && test "x$building_from_release_tarball" != x"yes"; then
-  # Programs required to build the manual
-  NEED_PROG(xmllint, xmllint)
-  NEED_PROG(xsltproc, xsltproc)
-
-  # Check if docbook works without Internet (if not, likely packages providing the .xsl files are not installed)
-  AC_MSG_CHECKING([if docbook can run without networking])
-  if "$xsltproc" --nonet --novalid http://docbook.sourceforge.net/release/xsl-ns/current/profiling/profile.xsl >&AS_MESSAGE_LOG_FD 2>&1; then
-    AC_MSG_RESULT(yes)
-  else
-    AC_MSG_FAILURE([Building the manual requires 'xsltproc --nonet' to work. It did not. Perhaps you lack the necessary xsl files (e.g. package docbook-xsl-ns on Debian)?])
-  fi
-fi
 
 # Setuid installations.
 AC_CHECK_FUNCS([setresuid setreuid lchown])
