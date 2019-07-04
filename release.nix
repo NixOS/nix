@@ -42,8 +42,15 @@ let
             # Add just enough metadata to keep Cargo happy.
             printf '{"files":{},"package":"${file.outputHash}"}' > "$dir/.cargo-checksum.json"
 
+            # Clean up some cruft from the winapi crates. FIXME: find
+            # a way to remove winapi* from our dependencies.
+            if [[ $dir =~ /winapi ]]; then
+              find $dir -name "*.a" -print0 | xargs -0 rm -f --
+            fi
+
             mv "$dir" $out/vendor/
-            rmdir $out/vendor/tmp
+
+            rm -rf $out/vendor/tmp
           '') files)}
         '';
 
