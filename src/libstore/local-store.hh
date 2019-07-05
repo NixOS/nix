@@ -158,6 +158,10 @@ public:
        false). */
     Path addToStoreFromDump(const string & dump, const string & name,
         bool recursive = true, HashType hashAlgo = htSHA256, RepairFlag repair = NoRepair);
+    /* addToStoreFromDump variant that works on a source and a hash, if
+       a hash is already available. */
+    Path addToStoreFromDump(const Hash & h, Source & source,
+        const string & name, bool recursive = true, RepairFlag repair = NoRepair);
 
     Path addTextToStore(const string & name, const string & s,
         const PathSet & references, RepairFlag repair) override;

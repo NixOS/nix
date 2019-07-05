@@ -117,6 +117,7 @@ size_t BufferedSource::read(unsigned char * data, size_t len)
     size_t n = len > bufPosIn - bufPosOut ? bufPosIn - bufPosOut : len;
     memcpy(data, buffer.get() + bufPosOut, n);
     bufPosOut += n;
+    totalRead += n;
     if (bufPosIn == bufPosOut) bufPosIn = bufPosOut = 0;
     return n;
 }
@@ -205,6 +206,9 @@ std::unique_ptr<Source> sinkToSource(
             pos += n;
 
             return n;
+        }
+        size_t total_read() const override {
+            return pos;
         }
     };
 

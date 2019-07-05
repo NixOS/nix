@@ -210,12 +210,14 @@ protected:
 
 /* If the NAR archive contains a single file at top-level, then save
    the contents of the file to `s'.  Otherwise barf. */
+template<class S>
 struct RetrieveRegularNARSink : ParseSink
 {
     bool regular;
-    string s;
+    S sink;
 
-    RetrieveRegularNARSink() : regular(true) { }
+    template<typename... Args>
+    RetrieveRegularNARSink(Args... args) : regular(true), sink(args...) { }
 
     void createDirectory(const Path & path)
     {
@@ -224,7 +226,7 @@ struct RetrieveRegularNARSink : ParseSink
 
     void receiveContents(unsigned char * data, unsigned int len)
     {
-        s.append((const char *) data, len);
+        sink(data, len);
     }
 
     void createSymlink(const Path & path, const string & target)
@@ -347,27 +349,41 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
             s = "sha256";
             recursive = true;
         }
+        // here: hash while we save
+        // if >thresh, convert to file first
         HashType hashAlgo = parseHashType(s);
+        Path path;
 
-        TeeSource savedNAR(from);
-        RetrieveRegularNARSink savedRegular;
+        AutoDelete tmpDir(createTempDir(), true);
+        Path tmpFile = (Path) tmpDir + "/daemon-adding.nar";
+        {
+            AutoCloseFD fd = open(tmpFile.c_str(), O_WRONLY | O_CREAT | O_EXCL, 0600);
 
-        if (recursive) {
-            /* Get the entire NAR dump from the client and save it to
-               a string so that we can pass it to
-               addToStoreFromDump(). */
-            ParseSink sink; /* null sink; just parse the NAR */
-            parseDump(sink, savedNAR);
-        } else
-            parseDump(savedRegular, from);
+            if (recursive) {
+                TeeSource<FdSink> savedNAR(from, fd.get());
+                /* Get the entire NAR dump from the client and save it to
+                   a string so that we can pass it to
+                   addToStoreFromDump(). */
+                ParseSink sink; /* null sink; just parse the NAR */
+                parseDump(sink, savedNAR);
+            } else {
+                RetrieveRegularNARSink<FdSink> savedRegular(fd.get());
+                parseDump(savedRegular, from);
+                if (!savedRegular.regular) throw Error("regular file expected");
+            }
+        }
 
         logger->startWork();
-        if (!savedRegular.regular) throw Error("regular file expected");
 
         auto store2 = store.dynamic_pointer_cast<LocalStore>();
         if (!store2) throw Error("operation is only supported by LocalStore");
+        {
+            Hash hash = hashFile(hashAlgo, tmpFile);
+            AutoCloseFD fd = open(tmpFile.c_str(), O_RDONLY | O_EXCL, 0600);
+            FdSource source(fd.get());
+            path = store2->addToStoreFromDump(hash, source, baseName, recursive);
+        }
 
-        Path path = store2->addToStoreFromDump(recursive ? *savedNAR.data : savedRegular.s, baseName, recursive, hashAlgo);
         logger->stopWork();
 
         to << path;
@@ -709,9 +725,9 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
         if (GET_PROTOCOL_MINOR(clientVersion) >= 21)
             source = std::make_unique<TunnelSource>(from);
         else {
-            TeeSink tee(from);
+            TeeSink<StringSink> tee(from);
             parseDump(tee, tee.source);
-            saved = std::move(*tee.source.data);
+            saved = std::move(*tee.source.sink.s);
             source = std::make_unique<StringSource>(saved);
         }
 

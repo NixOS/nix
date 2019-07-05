@@ -1041,11 +1041,9 @@ void LocalStore::addToStore(const ValidPathInfo & info, Source & source,
 }
 
 
-Path LocalStore::addToStoreFromDump(const string & dump, const string & name,
-    bool recursive, HashType hashAlgo, RepairFlag repair)
+Path LocalStore::addToStoreFromDump(const Hash & h, Source & source,
+    const string & name, bool recursive, RepairFlag repair)
 {
-    Hash h = hashString(hashAlgo, dump);
-
     Path dstPath = makeFixedOutputPath(recursive, h, name);
 
     addTempRoot(dstPath);
@@ -1066,10 +1064,9 @@ Path LocalStore::addToStoreFromDump(const string & dump, const string & name,
             autoGC();
 
             if (recursive) {
-                StringSource source(dump);
                 restorePath(realPath, source);
             } else
-                writeFile(realPath, dump);
+                writeFile(realPath, source);
 
             canonicalisePathMetaData(realPath, -1);
 
@@ -1078,9 +1075,9 @@ Path LocalStore::addToStoreFromDump(const string & dump, const string & name,
                above (if called with recursive == true and hashAlgo ==
                sha256); otherwise, compute it here. */
             HashResult hash;
-            if (recursive) {
-                hash.first = hashAlgo == htSHA256 ? h : hashString(htSHA256, dump);
-                hash.second = dump.size();
+            if (recursive && h.type == htSHA256) {
+                hash.first = h;
+                hash.second = source.total_read();
             } else
                 hash = hashPath(htSHA256, realPath);
 
@@ -1099,6 +1096,13 @@ Path LocalStore::addToStoreFromDump(const string & dump, const string & name,
 
     return dstPath;
 }
+Path LocalStore::addToStoreFromDump(const string & dump, const string & name,
+    bool recursive, HashType hashAlgo, RepairFlag repair)
+{
+    Hash h = hashString(hashAlgo, dump);
+    StringSource source(dump);
+    return addToStoreFromDump(h, source, name, recursive, repair);
+}
 
 
 Path LocalStore::addToStore(const string & name, const Path & _srcPath,
@@ -1109,6 +1113,7 @@ Path LocalStore::addToStore(const string & name, const Path & _srcPath,
     /* Read the whole path into memory. This is not a very scalable
        method for very large paths, but `copyPath' is mainly used for
        small files. */
+    // TODO: if too big, first copy to tmp, then hash, then addToStore
     StringSink sink;
     if (recursive)
         dumpPath(srcPath, sink, filter);

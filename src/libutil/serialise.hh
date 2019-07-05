@@ -61,6 +61,7 @@ struct Source
     virtual size_t read(unsigned char * data, size_t len) = 0;
 
     virtual bool good() { return true; }
+    virtual size_t total_read() const = 0;
 
     std::string drain();
 };
@@ -69,14 +70,16 @@ struct Source
 /* A buffered abstract source. */
 struct BufferedSource : Source
 {
-    size_t bufSize, bufPosIn, bufPosOut;
+    size_t bufSize, bufPosIn, bufPosOut, totalRead;
     std::unique_ptr<unsigned char[]> buffer;
 
     BufferedSource(size_t bufSize = 32 * 1024)
-        : bufSize(bufSize), bufPosIn(0), bufPosOut(0), buffer(nullptr) { }
+        : bufSize(bufSize), bufPosIn(0), bufPosOut(0), totalRead(0), buffer(nullptr) { }
 
     size_t read(unsigned char * data, size_t len) override;
-
+    size_t total_read() const override {
+        return totalRead;
+    }
 
     bool hasData();
 
@@ -137,6 +140,7 @@ struct FdSource : BufferedSource
     }
 
     bool good() override;
+    size_t total_read() const override { return read; }
 protected:
     size_t readUnbuffered(unsigned char * data, size_t len) override;
 private:
@@ -160,22 +164,29 @@ struct StringSource : Source
     const string & s;
     size_t pos;
     StringSource(const string & _s) : s(_s), pos(0) { }
-    size_t read(unsigned char * data, size_t len) override;
+    size_t read(unsigned char * data, size_t len);
+    size_t total_read() const override {
+        return pos;
+    }
 };
 
 
 /* Adapter class of a Source that saves all data read to `s'. */
+template<class S>
 struct TeeSource : Source
 {
     Source & orig;
-    ref<std::string> data;
-    TeeSource(Source & orig)
-        : orig(orig), data(make_ref<std::string>()) { }
+    S sink;
+    template<typename... Args> TeeSource(Source & orig, Args... args)
+        : orig(orig), sink(args...) { }
     size_t read(unsigned char * data, size_t len)
     {
         size_t n = orig.read(data, len);
-        this->data->append((const char *) data, n);
+        this->sink(data, n);
         return n;
+    }
+    size_t total_read() const override {
+        return orig.total_read();
     }
 };
 
@@ -199,6 +210,9 @@ struct LambdaSink : Sink
 /* Convert a function into a source. */
 struct LambdaSource : Source
 {
+private:
+    size_t totalRead = 0;
+public:
     typedef std::function<size_t(unsigned char *, size_t)> lambda_t;
 
     lambda_t lambda;
@@ -207,7 +221,12 @@ struct LambdaSource : Source
 
     size_t read(unsigned char * data, size_t len) override
     {
-        return lambda(data, len);
+        size_t ret = lambda(data, len);
+        totalRead += ret;
+        return ret;
+    }
+    size_t total_read() const override {
+        return totalRead;
     }
 };
 
