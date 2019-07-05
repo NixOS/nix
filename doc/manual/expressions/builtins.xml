@@ -347,7 +347,7 @@ stdenv.mkDerivation { … }
     You can change the cache timeout either on the command line with
     <option>--option tarball-ttl <replaceable>number of seconds</replaceable></option> or
     in the Nix configuration file with this option:
-    <literal>tarball-ttl <replaceable>number of seconds to cache</replaceable></literal>.
+    <literal><xref linkend="conf-tarball-ttl" /> <replaceable>number of seconds to cache</replaceable></literal>.
     </para>
 
     <para>Note that when obtaining the hash with <varname>nix-prefetch-url
@@ -513,7 +513,7 @@ stdenv.mkDerivation { … }
            fetch the latest version of a remote branch.
         </para>
         <note><para>Nix will refetch the branch in accordance to
-        <option>tarball-ttl</option>.</para></note>
+        <xref linkend="conf-tarball-ttl" />.</para></note>
         <note><para>This behavior is disabled in
         <emphasis>Pure evaluation mode</emphasis>.</para></note>
         <programlisting>builtins.fetchGit {
