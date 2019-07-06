@@ -39,8 +39,8 @@ static bool haveInternet()
                 return true;
             }
         } else if (i->ifa_addr->sa_family == AF_INET6) {
-            if (!IN6_IS_ADDR_LOOPBACK(((sockaddr_in6 *) i->ifa_addr)->sin6_addr.s6_addr) &&
-                !IN6_IS_ADDR_LINKLOCAL(((sockaddr_in6 *) i->ifa_addr)->sin6_addr.s6_addr))
+            if (!IN6_IS_ADDR_LOOPBACK(&((sockaddr_in6 *) i->ifa_addr)->sin6_addr) &&
+                !IN6_IS_ADDR_LINKLOCAL(&((sockaddr_in6 *) i->ifa_addr)->sin6_addr))
                 return true;
         }
     }

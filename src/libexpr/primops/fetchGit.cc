@@ -112,7 +112,10 @@ GitInfo exportGit(ref<Store> store, std::string uri,
             runProgram("git", true, { "init", "--bare", repoDir });
         }
 
-        Path localRefFile = repoDir + "/refs/heads/" + *ref;
+        Path localRefFile =
+            ref->compare(0, 5, "refs/") == 0
+            ? cacheDir + "/" + *ref
+            : cacheDir + "/refs/heads/" + *ref;
 
         bool doFetch;
         time_t now = time(0);

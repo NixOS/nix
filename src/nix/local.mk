@@ -17,7 +17,7 @@ nix_SOURCES := \
 
 nix_LIBS = libexpr libmain libstore libutil
 
-nix_LDFLAGS = -pthread $(SODIUM_LIBS) $(EDITLINE_LIBS)
+nix_LDFLAGS = -pthread $(SODIUM_LIBS) $(EDITLINE_LIBS) $(BOOST_LDFLAGS) -lboost_context -lboost_thread -lboost_system
 
 $(foreach name, \
   nix-build nix-channel nix-collect-garbage nix-copy-closure nix-daemon nix-env nix-hash nix-instantiate nix-prefetch-url nix-shell nix-store, \

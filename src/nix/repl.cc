@@ -9,7 +9,14 @@
 #include <readline/history.h>
 #include <readline/readline.h>
 #else
+// editline < 1.15.2 don't wrap their API for C++ usage
+// (added in https://github.com/troglobit/editline/commit/91398ceb3427b730995357e9d120539fb9bb7461).
+// This results in linker errors due to to name-mangling of editline C symbols.
+// For compatibility with these versions, we wrap the API here
+// (wrapping multiple times on newer versions is no problem).
+extern "C" {
 #include <editline.h>
+}
 #endif
 
 #include "shared.hh"
