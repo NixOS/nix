@@ -217,7 +217,7 @@ struct RetrieveRegularNARSink : ParseSink
     S sink;
 
     template<typename... Args>
-    RetrieveRegularNARSink(Args... args) : regular(true), sink(args...) { }
+    RetrieveRegularNARSink(Args&&... args) : regular(true), sink(std::forward<Args>(args)...) { }
 
     void createDirectory(const Path & path)
     {
@@ -349,40 +349,26 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
             s = "sha256";
             recursive = true;
         }
-        // here: hash while we save
-        // if >thresh, convert to file first
         HashType hashAlgo = parseHashType(s);
-        Path path;
-
-        AutoDelete tmpDir(createTempDir(), true);
-        Path tmpFile = (Path) tmpDir + "/daemon-adding.nar";
-        {
-            AutoCloseFD fd = open(tmpFile.c_str(), O_WRONLY | O_CREAT | O_EXCL, 0600);
-
-            if (recursive) {
-                TeeSource<FdSink> savedNAR(from, fd.get());
-                /* Get the entire NAR dump from the client and save it to
-                   a string so that we can pass it to
-                   addToStoreFromDump(). */
-                ParseSink sink; /* null sink; just parse the NAR */
-                parseDump(sink, savedNAR);
-            } else {
-                RetrieveRegularNARSink<FdSink> savedRegular(fd.get());
-                parseDump(savedRegular, from);
-                if (!savedRegular.regular) throw Error("regular file expected");
-            }
+        HashedBufferSink sourcesink(hashAlgo);
+        if (recursive) {
+            TeeSource<HashedBufferSink&> savedNAR(from, sourcesink);
+            /* Get the entire NAR dump from the client and save it to
+               a buffer so that we can pass it to
+               addToStoreFromDump(). */
+            ParseSink sink; /* null sink; just parse the NAR */
+            parseDump(sink, savedNAR);
+        } else {
+            RetrieveRegularNARSink<HashedBufferSink&> savedRegular(sourcesink);
+            parseDump(savedRegular, from);
+            if (!savedRegular.regular) throw Error("regular file expected");
         }
 
         logger->startWork();
 
         auto store2 = store.dynamic_pointer_cast<LocalStore>();
         if (!store2) throw Error("operation is only supported by LocalStore");
-        {
-            Hash hash = hashFile(hashAlgo, tmpFile);
-            AutoCloseFD fd = open(tmpFile.c_str(), O_RDONLY | O_EXCL, 0600);
-            FdSource source(fd.get());
-            path = store2->addToStoreFromDump(hash, source, baseName, recursive);
-        }
+        Path path = store2->addToStoreFromDump(sourcesink.toHash().first, sourcesink.toSource(), baseName, recursive);
 
         logger->stopWork();
 

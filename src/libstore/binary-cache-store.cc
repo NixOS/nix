@@ -280,21 +280,16 @@ Path BinaryCacheStore::addToStore(const string & name, const Path & srcPath,
     /* Read the whole path into memory. This is not a very scalable
        method for very large paths, but `copyPath' is mainly used for
        small files. */
-    StringSink sink;
+    HashedBufferSink sink(hashAlgo);
     Hash h;
-    if (recursive) {
-        dumpPath(srcPath, sink, filter);
-        h = hashString(hashAlgo, *sink.s);
-    } else {
-        auto s = readFile(srcPath);
-        dumpString(s, sink);
-        h = hashString(hashAlgo, s);
-    }
+    // todo: assert regular
+    dumpPath(srcPath, sink, filter);
 
     ValidPathInfo info;
-    info.path = makeFixedOutputPath(recursive, h, name);
+    info.path = makeFixedOutputPath(recursive, sink.toHash().first, name);
 
-    addToStore(info, sink.s, repair, CheckSigs, nullptr);
+    // todo: fix toString
+    addToStore(info, sink.toString(), repair, CheckSigs, nullptr);
 
     return info.path;
 }

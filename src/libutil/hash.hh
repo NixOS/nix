@@ -128,4 +128,25 @@ public:
 };
 
 
+struct HashedBufferSink : Sink
+{
+private:
+    std::unique_ptr<Sink> child;
+    std::unique_ptr<AutoDelete> tmpDir;
+    std::unique_ptr<AutoCloseFD> fd;
+    std::unique_ptr<Source> src;
+    Path tmpFile;
+    HashSink hashsink;
+    bool finished = false;
+    bool upgraded = false;
+public:
+    HashedBufferSink(HashType ht) : child(new StringSink()), hashsink(ht) {}
+    void operator () (const unsigned char * data, size_t len) override;
+    HashResult toHash();
+    Source& toSource();
+    void finish();
+    ref<std::string> toString();
+    void upgrade();
+};
+
 }

@@ -323,5 +323,4 @@ void StringSink::operator () (const unsigned char * data, size_t len)
     s->append((const char *) data, len);
 }
 
-
 }

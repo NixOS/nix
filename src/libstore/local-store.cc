@@ -1110,17 +1110,13 @@ Path LocalStore::addToStore(const string & name, const Path & _srcPath,
 {
     Path srcPath(absPath(_srcPath));
 
-    /* Read the whole path into memory. This is not a very scalable
-       method for very large paths, but `copyPath' is mainly used for
-       small files. */
-    // TODO: if too big, first copy to tmp, then hash, then addToStore
-    StringSink sink;
+    HashedBufferSink sink(hashAlgo);
     if (recursive)
         dumpPath(srcPath, sink, filter);
     else
-        sink.s = make_ref<std::string>(readFile(srcPath));
+        readFile(srcPath, sink);
 
-    return addToStoreFromDump(*sink.s, name, recursive, hashAlgo, repair);
+    return addToStoreFromDump(sink.toHash().first, sink.toSource(), name, recursive, repair);
 }
 
 

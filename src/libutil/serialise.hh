@@ -158,7 +158,7 @@ struct StringSink : Sink
 };
 
 
-/* A source that reads data from a string. */
+/* A source that reads data from a string/fd. */
 struct StringSource : Source
 {
     const string & s;
@@ -177,8 +177,8 @@ struct TeeSource : Source
 {
     Source & orig;
     S sink;
-    template<typename... Args> TeeSource(Source & orig, Args... args)
-        : orig(orig), sink(args...) { }
+    template<typename... Args> TeeSource(Source & orig, Args&&... args)
+        : orig(orig), sink(std::forward<Args>(args)...) { }
     size_t read(unsigned char * data, size_t len)
     {
         size_t n = orig.read(data, len);
