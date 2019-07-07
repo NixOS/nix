@@ -378,7 +378,7 @@ void HashedBufferSink::operator () ( const unsigned char * data, size_t len)
     std::visit([&](Sink& s) { s(data, len); }, child);
 }
 void HashedBufferSink::finish() {
-    if (!finished) return;
+    if (finished) return;
     if (std::holds_alternative<FdSink>(child)) {
         std::get<FdSink>(child).flush();
         fd.reset();
