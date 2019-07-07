@@ -8,11 +8,11 @@
 #include <string>
 #include <iostream>
 
-template <class CharT, class Traits = std::char_traits<CharT>, class Allocator = std::allocator<CharT>>
+template <class CharT, class Traits = std::char_traits<CharT>>
 class basic_istringbuf_nocopy : public std::basic_streambuf<CharT, Traits>
 {
 public:
-    typedef std::basic_string<CharT, Traits, Allocator> string_type;
+    typedef std::basic_string_view<CharT> string_type;
 
     typedef typename std::basic_streambuf<CharT, Traits>::off_type off_type;
 
@@ -23,12 +23,12 @@ public:
     typedef typename std::basic_streambuf<CharT, Traits>::traits_type traits_type;
 
 private:
-    const string_type & s;
+    const string_type s;
 
     off_type off;
 
 public:
-    basic_istringbuf_nocopy(const string_type & s) : s{s}, off{0}
+    basic_istringbuf_nocopy(const string_type s) : s{s}, off{0}
     {
     }
 
@@ -79,10 +79,10 @@ private:
 
 };
 
-template <class CharT, class Traits = std::char_traits<CharT>, class Allocator = std::allocator<CharT>>
+template <class CharT, class Traits = std::char_traits<CharT>>
 class basic_istringstream_nocopy : public std::basic_iostream<CharT, Traits>
 {
-    typedef basic_istringbuf_nocopy<CharT, Traits, Allocator> buf_type;
+    typedef basic_istringbuf_nocopy<CharT, Traits> buf_type;
     buf_type buf;
 public:
     basic_istringstream_nocopy(const typename buf_type::string_type & s) :

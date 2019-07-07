@@ -96,6 +96,9 @@ std::pair<ref<FSAccessor>, Path> RemoteFSAccessor::fetch(const Path & path_)
         } catch (SysError &) { }
     }
 
+    // FIXME: This loads the nar in-memory.
+    // Hard to fix because it leaks a reference to the entire file contents
+    // via the nar accessor
     store->narFromPath(storePath, sink);
     auto narAccessor = makeNarAccessor(sink.s);
     addToCache(storePath, *sink.s, narAccessor);

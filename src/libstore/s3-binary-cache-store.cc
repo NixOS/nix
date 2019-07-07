@@ -257,7 +257,7 @@ struct S3BinaryCacheStoreImpl : public S3BinaryCacheStore
     std::shared_ptr<TransferManager> transferManager;
     std::once_flag transferManagerCreated;
 
-    void uploadFile(const std::string & path, const std::string & data,
+    void uploadFile(const std::string & path, const std::string_view data,
         const std::string & mimeType,
         const std::string & contentEncoding)
     {
@@ -350,7 +350,7 @@ struct S3BinaryCacheStoreImpl : public S3BinaryCacheStore
         stats.put++;
     }
 
-    void upsertFile(const std::string & path, const std::string & data,
+    void upsertFile(const std::string & path, const std::string_view data,
         const std::string & mimeType) override
     {
         if (narinfoCompression != "" && hasSuffix(path, ".narinfo"))

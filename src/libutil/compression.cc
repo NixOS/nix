@@ -420,7 +420,7 @@ ref<CompressionSink> makeCompressionSink(const std::string & method, Sink & next
         throw UnknownCompressionMethod(format("unknown compression method '%s'") % method);
 }
 
-ref<std::string> compress(const std::string & method, const std::string & in, const bool parallel)
+ref<std::string> compress(const std::string & method, const std::string_view in, const bool parallel)
 {
     StringSink ssink;
     auto sink = makeCompressionSink(method, ssink, parallel);

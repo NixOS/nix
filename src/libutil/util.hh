@@ -105,7 +105,7 @@ string readFile(const Path & path, bool drain = false);
 void readFile(const Path & path, Sink & sink);
 
 /* Write a string to a file. */
-void writeFile(const Path & path, const string & s, mode_t mode = 0666);
+void writeFile(const Path & path, const std::string_view s, mode_t mode = 0666);
 
 void writeFile(const Path & path, Source & source, mode_t mode = 0666);
 
@@ -156,7 +156,7 @@ void replaceSymlink(const Path & target, const Path & link);
    requested number of bytes. */
 void readFull(int fd, unsigned char * buf, size_t count);
 void writeFull(int fd, const unsigned char * buf, size_t count, bool allowInterrupts = true);
-void writeFull(int fd, const string & s, bool allowInterrupts = true);
+void writeFull(int fd, const std::string_view s, bool allowInterrupts = true);
 
 MakeError(EndOfFile, Error)
 
