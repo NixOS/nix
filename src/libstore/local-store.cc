@@ -1096,13 +1096,6 @@ Path LocalStore::addToStoreFromDump(const Hash & h, Source & source,
 
     return dstPath;
 }
-Path LocalStore::addToStoreFromDump(const string & dump, const string & name,
-    bool recursive, HashType hashAlgo, RepairFlag repair)
-{
-    Hash h = hashString(hashAlgo, dump);
-    StringSource source(dump);
-    return addToStoreFromDump(h, source, name, recursive, repair);
-}
 
 
 Path LocalStore::addToStore(const string & name, const Path & _srcPath,
