@@ -351,33 +351,36 @@ string printHashType(HashType ht)
     else abort();
 }
 
+// convert string sink to fd sink
 void HashedBufferSink::upgrade() {
-    if (upgraded) return;
-    // convert to fd sink
+    auto oldchild = std::get_if<StringSink>(&child);
+    if (!oldchild) return;
     tmpDir = std::make_unique<AutoDelete>(createTempDir(getCacheDir()+"/nix"), true);
     tmpFile = (Path) *tmpDir + "/tmp-buffer";
-    fd = std::make_unique<AutoCloseFD>(open(tmpFile.c_str(), O_WRONLY | O_CREAT | O_EXCL, 0600));
+
+    fd = std::make_unique<AutoCloseFD>(
+        open(tmpFile.c_str(), O_WRONLY | O_CREAT | O_EXCL, 0600));
     if (!fd) throw SysError("creating temporary file '%s'", tmpFile);
-    auto newchild = std::make_unique<FdSink>(fd->get());
-    (*newchild)(*(dynamic_cast<StringSink*>(child.get())->s));
+
+    FdSink newchild(fd->get());
+    newchild(*(oldchild->s));
     child = std::move(newchild);
-    upgraded = true;
 }
 extern size_t threshold;
 void HashedBufferSink::operator () ( const unsigned char * data, size_t len)
 {
     assert(!finished);
-    if (!upgraded &&
-        dynamic_cast<StringSink*>(child.get())->s->size() + len > threshold) {
-        upgrade();
+    if (auto strs = std::get_if<StringSink>(&child)) {
+        if (strs->s->size() + len > threshold)
+            upgrade();
     }
     hashsink(data, len);
-    (*child)(data, len);
+    std::visit([&](Sink& s) { s(data, len); }, child);
 }
 void HashedBufferSink::finish() {
-    if (upgraded && !finished) {
-        // flush and close
-        child.reset();
+    if (!finished) return;
+    if (std::holds_alternative<FdSink>(child)) {
+        std::get<FdSink>(child).flush();
         fd.reset();
     }
     finished = true;
@@ -386,17 +389,21 @@ HashResult HashedBufferSink::toHash() {
     finish();
     return hashsink.finish();
 }
+template<class... Ts> struct overload : Ts... { using Ts::operator()...; };
+template<class... Ts> overload(Ts...) -> overload<Ts...>;
+
 Source& HashedBufferSink::toSource() {
     finish();
     if (src) return *src;
-    if (!upgraded) {
-        src = std::make_unique<StringSource>(*(dynamic_cast<StringSink*>(child.get())->s));
-    } else {
-        child.reset();
-        fd.reset(); // close first
-        fd = std::make_unique<AutoCloseFD>(open(tmpFile.c_str(), O_RDONLY, 0600));
-        src = std::make_unique<FdSource>(fd->get());
-    }
+    src = std::visit(overload{
+            [&](StringSink& ss) -> std::unique_ptr<Source> {
+                return std::make_unique<StringSource>(*(ss.s));
+            },
+            [&](FdSink& fs) -> std::unique_ptr<Source> {
+                fd = std::make_unique<AutoCloseFD>(open(tmpFile.c_str(), O_RDONLY, 0600));
+                return std::make_unique<FdSource>(fd->get());
+            },
+        }, child);
     return *src;
 }
 static void warnLargeDump()
@@ -405,9 +412,9 @@ static void warnLargeDump()
 }
 ref<std::string> HashedBufferSink::toString() {
     finish();
-    if (!upgraded) {
-        return dynamic_cast<StringSink*>(child.get())->s;
-    } else {
+    try {
+        return std::get<StringSink>(child).s;
+    } catch (const std::bad_variant_access&) {
         warnLargeDump();
         return make_ref<std::string>(readFile(tmpFile));
     }
