@@ -35,6 +35,7 @@ void RemoteFSAccessor::addToCache(const Path & storePath, Source & nar,
             writeFile(makeCacheFile(storePath, "ls"), str.str());
 
             /* FIXME: do this asynchronously. */
+            // fixme: link from FS if possible
             writeFile(makeCacheFile(storePath, "nar"), nar);
 
         } catch (...) {
@@ -101,7 +102,8 @@ std::pair<ref<FSAccessor>, Path> RemoteFSAccessor::fetch(const Path & path_)
     // via the nar accessor
     store->narFromPath(storePath, sink);
     auto narAccessor = makeNarAccessor(sink.s);
-    addToCache(storePath, *sink.s, narAccessor);
+    StringSource src(*sink.s);
+    addToCache(storePath, src, narAccessor);
     return {narAccessor, restPath};
 }
 
