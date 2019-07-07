@@ -48,7 +48,7 @@ FdSink::~FdSink()
 }
 
 
-size_t threshold = 256 * 1024 * 1024;
+size_t large_dump_threshold = 256 * 1024 * 1024;
 
 static void warnLargeDump()
 {
@@ -61,7 +61,7 @@ void FdSink::write(const unsigned char * data, size_t len)
     written += len;
     static bool warned = false;
     if (warn && !warned) {
-        if (written > threshold) {
+        if (written > large_dump_threshold) {
             warnLargeDump();
             warned = true;
         }
@@ -316,7 +316,7 @@ template PathSet readStrings(Source & source);
 void StringSink::operator () (const unsigned char * data, size_t len)
 {
     static bool warned = false;
-    if (!warned && s->size() > threshold) {
+    if (!warned && s->size() > large_dump_threshold) {
         warnLargeDump();
         warned = true;
     }

@@ -366,12 +366,13 @@ void HashedBufferSink::upgrade() {
     newchild(*(oldchild->s));
     child = std::move(newchild);
 }
-extern size_t threshold;
+
+extern size_t large_dump_threshold;
 void HashedBufferSink::operator () ( const unsigned char * data, size_t len)
 {
     assert(!finished);
     if (auto strs = std::get_if<StringSink>(&child)) {
-        if (strs->s->size() + len > threshold)
+        if (strs->s->size() + len > large_dump_threshold)
             upgrade();
     }
     hashsink(data, len);
