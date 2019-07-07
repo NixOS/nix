@@ -61,7 +61,7 @@ void Store::exportPath(const Path & path, Sink & sink)
     hashAndWriteSink << exportMagic << path << info->references << info->deriver << 0;
 }
 
-Paths Store::importPaths(Source & source, std::shared_ptr<FSAccessor> accessor, CheckSigsFlag checkSigs)
+Paths Store::importPaths(Source & source, CheckSigsFlag checkSigs)
 {
     Paths res;
     while (true) {
@@ -70,7 +70,7 @@ Paths Store::importPaths(Source & source, std::shared_ptr<FSAccessor> accessor, 
         if (n != 1) throw Error("input doesn't look like something created by 'nix-store --export'");
 
         /* Extract the NAR from the source. */
-        TeeSink<StringSink> tee(source);
+        TeeSink<HashedBufferSink> tee(source, htSHA256);
         parseDump(tee, tee.source);
 
         uint32_t magic = readInt(source);
@@ -88,15 +88,17 @@ Paths Store::importPaths(Source & source, std::shared_ptr<FSAccessor> accessor, 
         info.deriver = readString(source);
         if (info.deriver != "") assertStorePath(info.deriver);
 
-        info.narHash = hashString(htSHA256, *tee.source.sink.s);
-        info.narSize = tee.source.sink.s->size();
-
         // Ignore optional legacy signature.
         if (readInt(source) == 1)
             readString(source);
 
-        // todo: use addtostore that supports source
-        addToStore(info, tee.source.sink.s, NoRepair, checkSigs, accessor);
+        LambdaSink voidsink([](const unsigned char*, size_t){});
+        tee.source.drain(voidsink);
+        HashResult hash = tee.source.sink.toHash();
+        info.narHash = hash.first;
+        info.narSize = hash.second;
+
+        addToStore(info, tee.source.sink.toSource(), NoRepair, checkSigs);
 
         res.push_back(info.path);
     }

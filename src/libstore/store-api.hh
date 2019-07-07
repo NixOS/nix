@@ -571,10 +571,8 @@ public:
     void exportPath(const Path & path, Sink & sink);
 
     /* Import a sequence of NAR dumps created by exportPaths() into
-       the Nix store. Optionally, the contents of the NARs are
-       preloaded into the specified FS accessor to speed up subsequent
-       access. */
-    Paths importPaths(Source & source, std::shared_ptr<FSAccessor> accessor,
+       the Nix store. */
+    Paths importPaths(Source & source,
         CheckSigsFlag checkSigs = CheckSigs);
 
     struct Stats

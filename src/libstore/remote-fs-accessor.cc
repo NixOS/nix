@@ -22,7 +22,7 @@ Path RemoteFSAccessor::makeCacheFile(const Path & storePath, const std::string &
     return fmt("%s/%s.%s", cacheDir, storePathToHash(storePath), ext);
 }
 
-void RemoteFSAccessor::addToCache(const Path & storePath, const std::string & nar,
+void RemoteFSAccessor::addToCache(const Path & storePath, Source & nar,
     ref<FSAccessor> narAccessor)
 {
     nars.emplace(storePath, narAccessor);
