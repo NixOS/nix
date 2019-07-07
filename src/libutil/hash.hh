@@ -134,7 +134,9 @@ private:
     std::unique_ptr<AutoDelete> tmpDir;
     std::unique_ptr<AutoCloseFD> fd;
     std::unique_ptr<Source> src;
+    std::shared_ptr<void> mmapped;
     std::variant<StringSink, FdSink> child;
+    HashResult hash;
     Path tmpFile;
     HashSink hashsink;
     bool finished = false;
@@ -144,7 +146,7 @@ public:
     HashResult toHash();
     Source& toSource();
     void finish();
-    ref<std::string> toString();
+    std::string_view toStringView();
     void upgrade();
 };
 

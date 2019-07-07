@@ -12,6 +12,7 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
+#include <sys/mman.h>
 
 namespace nix {
 
@@ -384,11 +385,13 @@ void HashedBufferSink::finish() {
         std::get<FdSink>(child).flush();
         fd.reset();
     }
+    hash = hashsink.finish();
     finished = true;
 }
 HashResult HashedBufferSink::toHash() {
+    if (finished) return hash;
     finish();
-    return hashsink.finish();
+    return hash;
 }
 template<class... Ts> struct overload : Ts... { using Ts::operator()...; };
 template<class... Ts> overload(Ts...) -> overload<Ts...>;
@@ -407,18 +410,21 @@ Source& HashedBufferSink::toSource() {
         }, child);
     return *src;
 }
-static void warnLargeDump()
-{
-    printError("warning: dumping very large path (> 256 MiB); this may run out of memory");
-}
-ref<std::string> HashedBufferSink::toString() {
-    finish();
-    try {
-        return std::get<StringSink>(child).s;
-    } catch (const std::bad_variant_access&) {
-        warnLargeDump();
-        return make_ref<std::string>(readFile(tmpFile));
-    }
+std::string_view HashedBufferSink::toStringView() {
+    return std::visit(overload{
+            [](StringSink& ss) -> std::string_view {
+                return *ss.s;
+            },
+            [&](FdSink& fs) -> std::string_view {
+                toSource(); // open fd
+                size_t length = this->toHash().second;
+                auto deleter = [&](void* p) { munmap(p, length); };
+                mmapped = { mmap(nullptr, length, PROT_READ, MAP_PRIVATE | MAP_POPULATE, fd->get(), 0), deleter };
+                if (mmapped.get() == MAP_FAILED) {
+                    if (!fd) throw SysError("failed to mmap file");
+                }
+                return std::string_view((const char*)mmapped.get(), length);
+            }}, child);
 }
 
 }
