@@ -2092,10 +2092,7 @@ void DerivationGoal::startBuilder()
                        --optimise'. */
                     if (errno != EMLINK)
                         throw SysError(format("linking '%1%' to '%2%'") % p % i);
-                    StringSink sink;
-                    dumpPath(r, sink);
-                    StringSource source(*sink.s);
-                    restorePath(p, source);
+                    restorePath(p, *sinkToSource([&](Sink & s) { dumpPath(r, s); }));
                 }
             }
         }
