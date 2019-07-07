@@ -145,8 +145,7 @@ public:
         SubstitutablePathInfos & infos) override;
 
     void addToStore(const ValidPathInfo & info, Source & source,
-        RepairFlag repair, CheckSigsFlag checkSigs,
-        std::shared_ptr<FSAccessor> accessor) override;
+        RepairFlag repair, CheckSigsFlag checkSigs) override;
 
     Path addToStore(const string & name, const Path & srcPath,
         bool recursive, HashType hashAlgo,
@@ -161,7 +160,8 @@ public:
     /* addToStoreFromDump variant that works on a source and a hash, if
        a hash is already available. */
     Path addToStoreFromDump(const Hash & h, Source & source,
-        const string & name, bool recursive = true, RepairFlag repair = NoRepair);
+        const string & name, bool recursive = true,
+        RepairFlag repair = NoRepair);
 
     Path addTextToStore(const string & name, const string & s,
         const PathSet & references, RepairFlag repair) override;

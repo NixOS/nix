@@ -979,7 +979,7 @@ const PublicKeys & LocalStore::getPublicKeys()
 
 
 void LocalStore::addToStore(const ValidPathInfo & info, Source & source,
-    RepairFlag repair, CheckSigsFlag checkSigs, std::shared_ptr<FSAccessor> accessor)
+    RepairFlag repair, CheckSigsFlag checkSigs)
 {
     if (!info.narHash)
         throw Error("cannot add path '%s' because it lacks a hash", info.path);

@@ -827,18 +827,16 @@ std::string makeFixedOutputCA(bool recursive, const Hash & hash)
 
 
 void Store::addToStore(const ValidPathInfo & info, Source & narSource,
-    RepairFlag repair, CheckSigsFlag checkSigs,
-    std::shared_ptr<FSAccessor> accessor)
+    RepairFlag repair, CheckSigsFlag checkSigs)
 {
-    addToStore(info, make_ref<std::string>(narSource.drain()), repair, checkSigs, accessor);
+    addToStore(info, make_ref<std::string>(narSource.drain()), repair, checkSigs);
 }
 
 void Store::addToStore(const ValidPathInfo & info, const ref<std::string> & nar,
-    RepairFlag repair, CheckSigsFlag checkSigs,
-    std::shared_ptr<FSAccessor> accessor)
+    RepairFlag repair, CheckSigsFlag checkSigs)
 {
     StringSource source(*nar);
-    addToStore(info, source, repair, checkSigs, accessor);
+    addToStore(info, source, repair, checkSigs);
 }
 
 }

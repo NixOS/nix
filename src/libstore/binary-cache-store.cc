@@ -24,10 +24,6 @@ BinaryCacheStore::BinaryCacheStore(const Params & params)
 {
     if (secretKeyFile != "")
         secretKey = std::unique_ptr<SecretKey>(new SecretKey(readFile(secretKeyFile)));
-
-    StringSink sink;
-    sink << narVersionMagic1;
-    narMagic = *sink.s;
 }
 
 void BinaryCacheStore::init()
@@ -114,9 +110,34 @@ void BinaryCacheStore::writeNarInfo(ref<NarInfo> narInfo)
     if (diskCache)
         diskCache->upsertNarInfo(getUri(), hashPart, std::shared_ptr<NarInfo>(narInfo));
 }
-
 void BinaryCacheStore::addToStore(const ValidPathInfo & info, const ref<std::string> & nar,
-    RepairFlag repair, CheckSigsFlag checkSigs, std::shared_ptr<FSAccessor> accessor)
+    RepairFlag repair, CheckSigsFlag checkSigs)
+{
+    StringSource source(*nar);
+    addToStore(info, std::make_pair(hashString(htSHA256, *nar), nar->size()), source, repair, checkSigs);
+}
+
+static void doWriteNARListing(BinaryCacheStore& store, Source & source, const ValidPathInfo & info)
+{
+    std::ostringstream jsonOut;
+
+    {
+        JSONObject jsonRoot(jsonOut);
+        jsonRoot.attr("version", 1);
+
+        auto narAccessor = makeNarAccessor(source);
+
+        {
+            auto res = jsonRoot.placeholder("root");
+            listNar(res, narAccessor, "", true);
+        }
+    }
+
+    store.upsertFile(storePathToHash(info.path) + ".ls", jsonOut.str(), "application/json");
+}
+
+void BinaryCacheStore::addToStore(const ValidPathInfo & info, HashResult hash, Source & source,
+    RepairFlag repair, CheckSigsFlag checkSigs)
 {
     if (!repair && isValidPath(info.path)) return;
 
@@ -131,58 +152,40 @@ void BinaryCacheStore::addToStore(const ValidPathInfo & info, const ref<std::str
                 % info.path % ref);
         }
 
-    assert(nar->compare(0, narMagic.size(), narMagic) == 0);
-
     auto narInfo = make_ref<NarInfo>(info);
 
-    narInfo->narSize = nar->size();
-    narInfo->narHash = hashString(htSHA256, *nar);
-
+    narInfo->narSize = hash.second;
+    narInfo->narHash = hash.first;
+    narInfo->compression = compression;
     if (info.narHash && info.narHash != narInfo->narHash)
         throw Error(format("refusing to copy corrupted path '%1%' to binary cache") % info.path);
 
-    auto accessor_ = std::dynamic_pointer_cast<RemoteFSAccessor>(accessor);
+    /* Set up compression */
+    HashedBufferSink narCompressed(htSHA256);
+    auto csink = makeCompressionSink(compression, narCompressed, parallelCompression);
+    TeeSource<Sink&> compressorTee(source, *csink);
+    auto now1 = std::chrono::steady_clock::now();
 
     /* Optionally write a JSON file containing a listing of the
        contents of the NAR. */
     if (writeNARListing) {
-        std::ostringstream jsonOut;
-
-        {
-            JSONObject jsonRoot(jsonOut);
-            jsonRoot.attr("version", 1);
-
-            auto narAccessor = makeNarAccessor(nar);
-
-            if (accessor_)
-                accessor_->addToCache(info.path, *nar, narAccessor);
-
-            {
-                auto res = jsonRoot.placeholder("root");
-                listNar(res, narAccessor, "", true);
-            }
-        }
-
-        upsertFile(storePathToHash(info.path) + ".ls", jsonOut.str(), "application/json");
+        doWriteNARListing(*this, compressorTee, info);
+    } else {
+        assert(readString(compressorTee, narVersionMagic1.size()) == narVersionMagic1);
+        LambdaSink voidsink([](const unsigned char*, size_t){});
+        // ignore the rest of the data here, just send to compressor
+        compressorTee.drain(voidsink);
     }
-
-    else {
-        if (accessor_)
-            accessor_->addToCache(info.path, *nar, makeNarAccessor(nar));
-    }
-
-    /* Compress the NAR. */
-    narInfo->compression = compression;
-    auto now1 = std::chrono::steady_clock::now();
-    auto narCompressed = compress(compression, *nar, parallelCompression);
+    csink->finish();
     auto now2 = std::chrono::steady_clock::now();
-    narInfo->fileHash = hashString(htSHA256, *narCompressed);
-    narInfo->fileSize = narCompressed->size();
+
+    narInfo->fileHash = narCompressed.toHash().first;
+    narInfo->fileSize = narCompressed.toHash().second;
 
     auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(now2 - now1).count();
     printMsg(lvlTalkative, format("copying path '%1%' (%2% bytes, compressed %3$.1f%% in %4% ms) to binary cache")
         % narInfo->path % narInfo->narSize
-        % ((1.0 - (double) narCompressed->size() / nar->size()) * 100.0)
+        % ((1.0 - (double) narInfo->fileSize / narInfo->narSize) * 100.0)
         % duration);
 
     /* Atomically write the NAR file. */
@@ -193,12 +196,13 @@ void BinaryCacheStore::addToStore(const ValidPathInfo & info, const ref<std::str
            "");
     if (repair || !fileExists(narInfo->url)) {
         stats.narWrite++;
-        upsertFile(narInfo->url, *narCompressed, "application/x-nix-nar");
+        // FIXME: this is the only place using toStringView
+        upsertFile(narInfo->url, narCompressed.toStringView(), "application/x-nix-nar");
     } else
         stats.narWriteAverted++;
 
-    stats.narWriteBytes += nar->size();
-    stats.narWriteCompressedBytes += narCompressed->size();
+    stats.narWriteBytes += narInfo->narSize;
+    stats.narWriteCompressedBytes += narInfo->fileSize;
     stats.narWriteCompressionTimeMs += duration;
 
     /* Atomically write the NAR info file.*/
@@ -277,19 +281,16 @@ Path BinaryCacheStore::addToStore(const string & name, const Path & srcPath,
 {
     // FIXME: some cut&paste from LocalStore::addToStore().
 
-    /* Read the whole path into memory. This is not a very scalable
-       method for very large paths, but `copyPath' is mainly used for
-       small files. */
     HashedBufferSink sink(hashAlgo);
-    Hash h;
-    // todo: assert regular
+    // todo: assert !recursive -> path is regular
     dumpPath(srcPath, sink, filter);
-
+    HashResult hash = sink.toHash();
     ValidPathInfo info;
     info.path = makeFixedOutputPath(recursive, sink.toHash().first, name);
+    info.narSize = hash.second;
+    info.narHash = hash.first;
 
-    // todo: fix toString
-    addToStore(info, sink.toString(), repair, CheckSigs, nullptr);
+    addToStore(info, hash, sink.toSource(), repair, CheckSigs);
 
     return info.path;
 }
@@ -304,7 +305,7 @@ Path BinaryCacheStore::addTextToStore(const string & name, const string & s,
     if (repair || !isValidPath(info.path)) {
         StringSink sink;
         dumpString(s, sink);
-        addToStore(info, sink.s, repair, CheckSigs, nullptr);
+        addToStore(info, sink.s, repair, CheckSigs);
     }
 
     return info.path;

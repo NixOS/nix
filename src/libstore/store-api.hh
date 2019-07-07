@@ -405,13 +405,11 @@ public:
 
     /* Import a path into the store. */
     virtual void addToStore(const ValidPathInfo & info, Source & narSource,
-        RepairFlag repair = NoRepair, CheckSigsFlag checkSigs = CheckSigs,
-        std::shared_ptr<FSAccessor> accessor = 0);
+        RepairFlag repair = NoRepair, CheckSigsFlag checkSigs = CheckSigs);
 
     // FIXME: remove
     virtual void addToStore(const ValidPathInfo & info, const ref<std::string> & nar,
-        RepairFlag repair = NoRepair, CheckSigsFlag checkSigs = CheckSigs,
-        std::shared_ptr<FSAccessor> accessor = 0);
+        RepairFlag repair = NoRepair, CheckSigsFlag checkSigs = CheckSigs);
 
     /* Copy the contents of a path to the store and register the
        validity the resulting path.  The resulting path is returned.
