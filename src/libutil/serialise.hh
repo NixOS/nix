@@ -64,6 +64,7 @@ struct Source
     virtual size_t total_read() const = 0;
 
     std::string drain();
+    void drain(Sink& s);
 };
 
 

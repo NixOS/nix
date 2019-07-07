@@ -89,6 +89,19 @@ void Source::operator () (unsigned char * data, size_t len)
     }
 }
 
+void Source::drain(Sink& s)
+{
+    std::vector<unsigned char> buf(8192);
+    while (true) {
+        size_t n;
+        try {
+            n = read(buf.data(), buf.size());
+            s((const unsigned char *) buf.data(), n);
+        } catch (EndOfFile &) {
+            break;
+        }
+    }
+}
 
 std::string Source::drain()
 {
