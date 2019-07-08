@@ -92,8 +92,6 @@ Paths Store::importPaths(Source & source, CheckSigsFlag checkSigs)
         if (readInt(source) == 1)
             readString(source);
 
-        LambdaSink voidsink([](const unsigned char*, size_t){});
-        tee.source.drain(voidsink);
         HashResult hash = tee.source.sink.toHash();
         info.narHash = hash.first;
         info.narSize = hash.second;
