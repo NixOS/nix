@@ -227,6 +227,8 @@ Flake getFlake(EvalState & state, const FlakeRef & flakeRef)
 
     if (auto epoch = vInfo.attrs->get(sEpoch)) {
         flake.epoch = state.forceInt(*(**epoch).value, *(**epoch).pos);
+        if (flake.epoch < 201906)
+            throw Error("flake '%s' has illegal epoch %d", flakeRef, flake.epoch);
         if (flake.epoch > 201906)
             throw Error("flake '%s' requires unsupported epoch %d; please upgrade Nix", flakeRef, flake.epoch);
     } else
