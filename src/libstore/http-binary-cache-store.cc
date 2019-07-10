@@ -113,7 +113,6 @@ protected:
     DownloadRequest makeRequest(const std::string & path)
     {
         DownloadRequest request(cacheUri + "/" + path);
-        request.tries = 8;
         return request;
     }
 
