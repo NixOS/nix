@@ -71,6 +71,10 @@ struct CurlDownloader : public Downloader
 
         std::string encoding;
 
+        bool acceptRanges = false;
+
+        curl_off_t writtenToSink = 0;
+
         DownloadItem(CurlDownloader & downloader,
             const DownloadRequest & request,
             Callback<DownloadResult> callback)
@@ -81,9 +85,10 @@ struct CurlDownloader : public Downloader
                 {request.uri}, request.parentAct)
             , callback(callback)
             , finalSink([this](const unsigned char * data, size_t len) {
-                if (this->request.dataCallback)
+                if (this->request.dataCallback) {
+                    writtenToSink += len;
                     this->request.dataCallback((char *) data, len);
-                else
+                } else
                     this->result.data->append((char *) data, len);
               })
         {
@@ -161,6 +166,7 @@ struct CurlDownloader : public Downloader
                 status = ss.size() >= 2 ? ss[1] : "";
                 result.data = std::make_shared<std::string>();
                 result.bodySize = 0;
+                acceptRanges = false;
                 encoding = "";
             } else {
                 auto i = line.find(':');
@@ -178,7 +184,9 @@ struct CurlDownloader : public Downloader
                             return 0;
                         }
                     } else if (name == "content-encoding")
-                        encoding = trim(string(line, i + 1));;
+                        encoding = trim(string(line, i + 1));
+                    else if (name == "accept-ranges" && toLower(trim(std::string(line, i + 1))) == "bytes")
+                        acceptRanges = true;
                 }
             }
             return realSize;
@@ -296,6 +304,9 @@ struct CurlDownloader : public Downloader
             curl_easy_setopt(req, CURLOPT_NETRC_FILE, settings.netrcFile.get().c_str());
             curl_easy_setopt(req, CURLOPT_NETRC, CURL_NETRC_OPTIONAL);
 
+            if (writtenToSink)
+                curl_easy_setopt(req, CURLOPT_RESUME_FROM_LARGE, writtenToSink);
+
             result.data = std::make_shared<std::string>();
             result.bodySize = 0;
         }
@@ -330,7 +341,7 @@ struct CurlDownloader : public Downloader
                 failEx(writeException);
 
             else if (code == CURLE_OK &&
-                (httpStatus == 200 || httpStatus == 201 || httpStatus == 204 || httpStatus == 304 || httpStatus == 226 /* FTP */ || httpStatus == 0 /* other protocol */))
+                (httpStatus == 200 || httpStatus == 201 || httpStatus == 204 || httpStatus == 206 || httpStatus == 304 || httpStatus == 226 /* FTP */ || httpStatus == 0 /* other protocol */))
             {
                 result.cached = httpStatus == 304;
                 done = true;
@@ -403,10 +414,20 @@ struct CurlDownloader : public Downloader
                             request.verb(), request.uri, curl_easy_strerror(code), code));
 
                 /* If this is a transient error, then maybe retry the
-                   download after a while. */
-                if (err == Transient && attempt < request.tries) {
+                   download after a while. If we're writing to a
+                   sink, we can only retry if the server supports
+                   ranged requests. */
+                if (err == Transient
+                    && attempt < request.tries
+                    && (!this->request.dataCallback
+                        || writtenToSink == 0
+                        || (acceptRanges && encoding.empty())))
+                {
                     int ms = request.baseRetryTimeMs * std::pow(2.0f, attempt - 1 + std::uniform_real_distribution<>(0.0, 0.5)(downloader.mt19937));
-                    warn("%s; retrying in %d ms", exc.what(), ms);
+                    if (writtenToSink)
+                        warn("%s; retrying from offset %d in %d ms", exc.what(), writtenToSink, ms);
+                    else
+                        warn("%s; retrying in %d ms", exc.what(), ms);
                     embargo = std::chrono::steady_clock::now() + std::chrono::milliseconds(ms);
                     downloader.enqueueItem(shared_from_this());
                 }
