@@ -406,7 +406,7 @@ struct CurlDownloader : public Downloader
                    download after a while. */
                 if (err == Transient && attempt < request.tries) {
                     int ms = request.baseRetryTimeMs * std::pow(2.0f, attempt - 1 + std::uniform_real_distribution<>(0.0, 0.5)(downloader.mt19937));
-                    printError(format("warning: %s; retrying in %d ms") % exc.what() % ms);
+                    warn("%s; retrying in %d ms", exc.what(), ms);
                     embargo = std::chrono::steady_clock::now() + std::chrono::milliseconds(ms);
                     downloader.enqueueItem(shared_from_this());
                 }
@@ -579,7 +579,7 @@ struct CurlDownloader : public Downloader
             workerThreadMain();
         } catch (nix::Interrupted & e) {
         } catch (std::exception & e) {
-            printError(format("unexpected error in download thread: %s") % e.what());
+            printError("unexpected error in download thread: %s", e.what());
         }
 
         {
@@ -869,7 +869,7 @@ CachedDownloadResult Downloader::downloadCached(
             writeFile(dataFile, url + "\n" + res.etag + "\n" + std::to_string(time(0)) + "\n");
         } catch (DownloadError & e) {
             if (storePath.empty()) throw;
-            printError(format("warning: %1%; using cached result") % e.msg());
+            warn("warning: %s; using cached result", e.msg());
             result.etag = expectedETag;
         }
     }
