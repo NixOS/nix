@@ -6,10 +6,9 @@
 #include "thread-pool.hh"
 #include "json.hh"
 #include "derivations.hh"
-#include "retry.hh"
-#include "download.hh"
 
 #include <future>
+
 
 namespace nix {
 
@@ -580,57 +579,54 @@ void Store::buildPaths(const PathSet & paths, BuildMode buildMode)
 void copyStorePath(ref<Store> srcStore, ref<Store> dstStore,
     const Path & storePath, RepairFlag repair, CheckSigsFlag checkSigs)
 {
-    retry<void>(downloadSettings.tries, [&]() {
+    auto srcUri = srcStore->getUri();
+    auto dstUri = dstStore->getUri();
 
-        auto srcUri = srcStore->getUri();
-        auto dstUri = dstStore->getUri();
+    Activity act(*logger, lvlInfo, actCopyPath,
+        srcUri == "local" || srcUri == "daemon"
+          ? fmt("copying path '%s' to '%s'", storePath, dstUri)
+          : dstUri == "local" || dstUri == "daemon"
+            ? fmt("copying path '%s' from '%s'", storePath, srcUri)
+            : fmt("copying path '%s' from '%s' to '%s'", storePath, srcUri, dstUri),
+        {storePath, srcUri, dstUri});
+    PushActivity pact(act.id);
 
-        Activity act(*logger, lvlInfo, actCopyPath,
-            srcUri == "local" || srcUri == "daemon"
-              ? fmt("copying path '%s' to '%s'", storePath, dstUri)
-              : dstUri == "local" || dstUri == "daemon"
-                ? fmt("copying path '%s' from '%s'", storePath, srcUri)
-                : fmt("copying path '%s' from '%s' to '%s'", storePath, srcUri, dstUri),
-            {storePath, srcUri, dstUri});
-        PushActivity pact(act.id);
+    auto info = srcStore->queryPathInfo(storePath);
 
-        auto info = srcStore->queryPathInfo(storePath);
+    uint64_t total = 0;
 
-        uint64_t total = 0;
+    if (!info->narHash) {
+        StringSink sink;
+        srcStore->narFromPath({storePath}, sink);
+        auto info2 = make_ref<ValidPathInfo>(*info);
+        info2->narHash = hashString(htSHA256, *sink.s);
+        if (!info->narSize) info2->narSize = sink.s->size();
+        if (info->ultimate) info2->ultimate = false;
+        info = info2;
 
-        if (!info->narHash) {
-            StringSink sink;
-            srcStore->narFromPath({storePath}, sink);
-            auto info2 = make_ref<ValidPathInfo>(*info);
-            info2->narHash = hashString(htSHA256, *sink.s);
-            if (!info->narSize) info2->narSize = sink.s->size();
-            if (info->ultimate) info2->ultimate = false;
-            info = info2;
+        StringSource source(*sink.s);
+        dstStore->addToStore(*info, source, repair, checkSigs);
+        return;
+    }
 
-            StringSource source(*sink.s);
-            dstStore->addToStore(*info, source, repair, checkSigs);
-            return;
-        }
+    if (info->ultimate) {
+        auto info2 = make_ref<ValidPathInfo>(*info);
+        info2->ultimate = false;
+        info = info2;
+    }
 
-        if (info->ultimate) {
-            auto info2 = make_ref<ValidPathInfo>(*info);
-            info2->ultimate = false;
-            info = info2;
-        }
-
-        auto source = sinkToSource([&](Sink & sink) {
-            LambdaSink wrapperSink([&](const unsigned char * data, size_t len) {
-                sink(data, len);
-                total += len;
-                act.progress(total, info->narSize);
-            });
-            srcStore->narFromPath({storePath}, wrapperSink);
-        }, [&]() {
-            throw EndOfFile("NAR for '%s' fetched from '%s' is incomplete", storePath, srcStore->getUri());
+    auto source = sinkToSource([&](Sink & sink) {
+        LambdaSink wrapperSink([&](const unsigned char * data, size_t len) {
+            sink(data, len);
+            total += len;
+            act.progress(total, info->narSize);
         });
-
-        dstStore->addToStore(*info, *source, repair, checkSigs);
+        srcStore->narFromPath({storePath}, wrapperSink);
+    }, [&]() {
+        throw EndOfFile("NAR for '%s' fetched from '%s' is incomplete", storePath, srcStore->getUri());
     });
+
+    dstStore->addToStore(*info, *source, repair, checkSigs);
 }
 
 
