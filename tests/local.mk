@@ -26,7 +26,8 @@ nix_tests = \
   check.sh \
   plugins.sh \
   search.sh \
-  nix-copy-ssh.sh
+  nix-copy-ssh.sh \
+  post-hook.sh
   # parallel.sh
 
 install-tests += $(foreach x, $(nix_tests), tests/$(x))

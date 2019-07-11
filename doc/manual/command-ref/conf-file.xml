@@ -656,6 +656,61 @@ password <replaceable>my-password</replaceable>
 
   </varlistentry>
 
+  <varlistentry xml:id="conf-post-build-hook">
+    <term><literal>post-build-hook</literal></term>
+    <listitem>
+      <para>Optional. The path to a program to execute after each build.</para>
+
+      <para>This option is only settable in the global
+      <filename>nix.conf</filename>, or on the command line by trusted
+      users.</para>
+
+      <para>When using the nix-daemon, the daemon executes the hook as
+      <literal>root</literal>. If the nix-daemon is not involved, the
+      hook runs as the user executing the nix-build.</para>
+
+      <itemizedlist>
+        <listitem><para>The hook executes after an evaluation-time build.</para></listitem>
+        <listitem><para>The hook does not execute on substituted paths.</para></listitem>
+        <listitem><para>The hook's output always goes to the user's terminal.</para></listitem>
+        <listitem><para>If the hook fails, the build succeeds but no further builds execute.</para></listitem>
+      </itemizedlist>
+
+      <para>The program executes with no arguments. The program's environment
+      contains the following environment variables:</para>
+
+      <variablelist>
+        <varlistentry>
+          <term><envar>DRV_PATH</envar></term>
+          <listitem>
+            <para>The derivation for the built paths.</para>
+            <para>Example:
+            <literal>/nix/store/5nihn1a7pa8b25l9zafqaqibznlvvp3f-bash-4.4-p23.drv</literal>
+            </para>
+          </listitem>
+        </varlistentry>
+
+        <varlistentry>
+          <term><envar>OUT_PATHS</envar></term>
+          <listitem>
+            <para>Output paths of the built derivation, separated by a space (<literal> </literal>) character.</para>
+            <para>Example:
+            <literal>/nix/store/zf5lbh336mnzf1nlswdn11g4n2m8zh3g-bash-4.4-p23-dev
+            /nix/store/rjxwxwv1fpn9wa2x5ssk5phzwlcv4mna-bash-4.4-p23-doc
+            /nix/store/6bqvbzjkcp9695dq0dpl5y43nvy37pq1-bash-4.4-p23-info
+            /nix/store/r7fng3kk3vlpdlh2idnrbn37vh4imlj2-bash-4.4-p23-man
+            /nix/store/xfghy8ixrhz3kyy6p724iv3cxji088dx-bash-4.4-p23</literal>.
+            </para>
+          </listitem>
+        </varlistentry>
+      </variablelist>
+
+      <para>See <xref linkend="chap-post-build-hook" /> for an example
+      implementation.</para>
+
+    </listitem>
+  </varlistentry>
+
   <varlistentry xml:id="conf-repeat"><term><literal>repeat</literal></term>
 
     <listitem><para>How many times to repeat builds to check whether

@@ -270,12 +270,14 @@ struct RunOptions
     std::optional<uid_t> uid;
     std::optional<uid_t> gid;
     std::optional<Path> chdir;
+    std::optional<std::map<std::string, std::string>> environment;
     Path program;
     bool searchPath = true;
     Strings args;
     std::optional<std::string> input;
     Source * standardIn = nullptr;
     Sink * standardOut = nullptr;
+    bool mergeStderrToStdout = false;
     bool _killStderr = false;
 
     RunOptions(const Path & program, const Strings & args)

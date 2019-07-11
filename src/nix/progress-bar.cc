@@ -170,6 +170,14 @@ public:
                 name, sub);
         }
 
+        if (type == actPostBuildHook) {
+            auto name = storePathToName(getS(fields, 0));
+            if (hasSuffix(name, ".drv"))
+                name.resize(name.size() - 4);
+            i->s = fmt("post-build " ANSI_BOLD "%s" ANSI_NORMAL, name);
+            i->name = DrvName(name).name;
+        }
+
         if (type == actQueryPathInfo) {
             auto name = storePathToName(getS(fields, 0));
             i->s = fmt("querying " ANSI_BOLD "%s" ANSI_NORMAL " on %s", name, getS(fields, 1));
@@ -228,14 +236,18 @@ public:
             update(*state);
         }
 
-        else if (type == resBuildLogLine) {
+        else if (type == resBuildLogLine || type == resPostBuildLogLine) {
             auto lastLine = trim(getS(fields, 0));
             if (!lastLine.empty()) {
                 auto i = state->its.find(act);
                 assert(i != state->its.end());
                 ActInfo info = *i->second;
                 if (printBuildLogs) {
-                    log(*state, lvlInfo, ANSI_FAINT + info.name.value_or("unnamed") + "> " + ANSI_NORMAL + lastLine);
+                    auto suffix = "> ";
+                    if (type == resPostBuildLogLine) {
+                        suffix = " (post)> ";
+                    }
+                    log(*state, lvlInfo, ANSI_FAINT + info.name.value_or("unnamed") + suffix + ANSI_NORMAL + lastLine);
                 } else {
                     state->activities.erase(i->second);
                     info.lastLine = lastLine;

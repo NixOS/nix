@@ -315,6 +315,9 @@ public:
         "pre-build-hook",
         "A program to run just before a build to set derivation-specific build settings."};
 
+    Setting<std::string> postBuildHook{this, "", "post-build-hook",
+        "A program to run just after each succesful build."};
+
     Setting<std::string> netrcFile{this, fmt("%s/%s", nixConfDir, "netrc"), "netrc-file",
         "Path to the netrc file used to obtain usernames/passwords for downloads."};
 
