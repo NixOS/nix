@@ -67,7 +67,7 @@ struct Flake
     std::vector<FlakeRef> inputs;
     std::map<FlakeAlias, FlakeRef> nonFlakeInputs;
     Value * vOutputs; // FIXME: gc
-    unsigned int epoch;
+    unsigned int edition;
 
     Flake(const FlakeRef & origRef, const SourceInfo & sourceInfo)
         : originalRef(origRef), sourceInfo(sourceInfo) {};

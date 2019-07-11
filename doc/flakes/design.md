@@ -65,7 +65,7 @@ Upcoming but not yet implemented:
   NixOS configuration can be reproduced unambiguously from the top-level flake.
 
 * Nix code can query flake metadata such as `commitHash` (the Git revision) or
-  `epoch` (the date of the last commit). This is useful for NixOS to compute
+  `edition` (the date of the last commit). This is useful for NixOS to compute
   the NixOS version string (which will be the revision of the top-level
   configuration flake, uniquely identifying the configuration).
 
@@ -85,9 +85,9 @@ repository that provides a single package and a single NixOS module.
   # The flake identifier.
   name = "dwarffs";
 
-  # The epoch may be used in the future to determine how Nix
+  # The edition may be used in the future to determine how Nix
   # expressions inside this flake are to be parsed.
-  epoch = 201906;
+  edition = 201906;
 
   # Some other metadata.
   description = "A filesystem that fetches DWARF debug info from the Internet on demand";
@@ -162,7 +162,7 @@ Similarly, a minimal `flake.nix` for Nixpkgs:
 {
   name = "nixpkgs";
 
-  epoch = 201906;
+  edition = 201906;
 
   description = "A collection of packages for the Nix package manager";
 
@@ -449,7 +449,7 @@ flakes in (local) Git repositories.
 {
   name = "my-system";
 
-  epoch = 201906;
+  edition = 201906;
 
   inputs =
     [ "nixpkgs/nixos-18.09"

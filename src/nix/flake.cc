@@ -105,7 +105,7 @@ static void printFlakeInfo(const Flake & flake)
 {
     std::cout << fmt("ID:            %s\n", flake.id);
     std::cout << fmt("Description:   %s\n", flake.description);
-    std::cout << fmt("Epoch:         %s\n", flake.epoch);
+    std::cout << fmt("Edition:       %s\n", flake.edition);
     printSourceInfo(flake.sourceInfo);
 }
 
@@ -114,7 +114,7 @@ static nlohmann::json flakeToJson(const Flake & flake)
     nlohmann::json j;
     j["id"] = flake.id;
     j["description"] = flake.description;
-    j["epoch"] = flake.epoch;
+    j["edition"] = flake.edition;
     sourceInfoToJson(flake.sourceInfo, j);
     return j;
 }

@@ -223,16 +223,21 @@ Flake getFlake(EvalState & state, const FlakeRef & flakeRef)
 
     state.forceAttrs(vInfo);
 
-    auto sEpoch = state.symbols.create("epoch");
+    auto sEdition = state.symbols.create("edition");
+    auto sEpoch = state.symbols.create("epoch"); // FIXME: remove soon
 
-    if (auto epoch = vInfo.attrs->get(sEpoch)) {
-        flake.epoch = state.forceInt(*(**epoch).value, *(**epoch).pos);
-        if (flake.epoch < 201906)
-            throw Error("flake '%s' has illegal epoch %d", flakeRef, flake.epoch);
-        if (flake.epoch > 201906)
-            throw Error("flake '%s' requires unsupported epoch %d; please upgrade Nix", flakeRef, flake.epoch);
+    auto edition = vInfo.attrs->get(sEdition);
+    if (!edition)
+        edition = vInfo.attrs->get(sEpoch);
+
+    if (edition) {
+        flake.edition = state.forceInt(*(**edition).value, *(**edition).pos);
+        if (flake.edition < 201906)
+            throw Error("flake '%s' has illegal edition %d", flakeRef, flake.edition);
+        if (flake.edition > 201906)
+            throw Error("flake '%s' requires unsupported edition %d; please upgrade Nix", flakeRef, flake.edition);
     } else
-        throw Error("flake '%s' lacks attribute 'epoch'", flakeRef);
+        throw Error("flake '%s' lacks attribute 'edition'", flakeRef);
 
     if (auto name = vInfo.attrs->get(state.sName))
         flake.id = state.forceStringNoCtx(*(**name).value, *(**name).pos);
@@ -271,7 +276,8 @@ Flake getFlake(EvalState & state, const FlakeRef & flakeRef)
         throw Error("flake '%s' lacks attribute 'outputs'", flakeRef);
 
     for (auto & attr : *vInfo.attrs) {
-        if (attr.name != sEpoch &&
+        if (attr.name != sEdition &&
+            attr.name != sEpoch &&
             attr.name != state.sName &&
             attr.name != state.sDescription &&
             attr.name != sInputs &&
