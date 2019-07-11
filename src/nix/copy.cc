@@ -36,7 +36,7 @@ struct CmdCopy : StorePathsCommand
             .set(&checkSigs, NoCheckSigs);
 
         mkFlag()
-            .longName("substitute")
+            .longName("substitute-on-destination")
             .shortName('s')
             .description("whether to try substitutes on the destination store (only supported by SSH)")
             .set(&substitute, Substitute);

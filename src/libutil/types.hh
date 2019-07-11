@@ -109,8 +109,6 @@ public:
     const string & msg() const { return err; }
     const string & prefix() const { return prefix_; }
     BaseError & addPrefix(const FormatOrString & fs);
-
-    virtual bool isTransient() { return false; }
 };
 
 #define MakeError(newClass, superClass) \

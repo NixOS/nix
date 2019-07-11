@@ -2,7 +2,6 @@
 #include "download.hh"
 #include "globals.hh"
 #include "nar-info-disk-cache.hh"
-#include "retry.hh"
 
 namespace nix {
 
@@ -136,46 +135,21 @@ protected:
     {
         checkEnabled();
 
-        struct State
-        {
-            DownloadRequest request;
-            std::function<void()> tryDownload;
-            unsigned int attempt = 0;
-            State(DownloadRequest && request) : request(request) {}
-        };
+        auto request(makeRequest(path));
 
-        auto state = std::make_shared<State>(makeRequest(path));
-
-        state->tryDownload = [callback, state, this]() {
-            getDownloader()->enqueueDownload(state->request,
-                {[callback, state, this](std::future<DownloadResult> result) {
-                    try {
-                        callback(result.get().data);
-                    } catch (DownloadError & e) {
-                        if (e.error == Downloader::NotFound || e.error == Downloader::Forbidden)
-                            return callback(std::shared_ptr<std::string>());
-                        ++state->attempt;
-                        if (state->attempt < state->request.tries && e.isTransient()) {
-                            auto ms = retrySleepTime(state->attempt);
-                            warn("%s; retrying in %d ms", e.what(), ms);
-                            /* We can't sleep here because that would
-                               block the download thread. So use a
-                               separate thread for sleeping. */
-                            std::thread([state, ms]() {
-                                std::this_thread::sleep_for(std::chrono::milliseconds(ms));
-                                state->tryDownload();
-                            }).detach();
-                        } else {
-                            maybeDisable();
-                            callback.rethrow();
-                        }
-                    } catch (...) {
-                        callback.rethrow();
-                    }
-                }});
-        };
-
-        state->tryDownload();
+        getDownloader()->enqueueDownload(request,
+            {[callback, this](std::future<DownloadResult> result) {
+                try {
+                    callback(result.get().data);
+                } catch (DownloadError & e) {
+                    if (e.error == Downloader::NotFound || e.error == Downloader::Forbidden)
+                        return callback(std::shared_ptr<std::string>());
+                    maybeDisable();
+                    callback.rethrow();
+                } catch (...) {
+                    callback.rethrow();
+                }
+            }});
     }
 
 };
