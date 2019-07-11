@@ -409,6 +409,8 @@ ResolvedFlake resolveFlake(EvalState & state, const FlakeRef & topRef, HandleLoc
 
                 // Hack: Make sure that flake.lock is visible to Git, so it ends up in the Nix store.
                 runProgram("git", true, { "-C", refData->path, "add",
+                                          "--force",
+                                          "--intent-to-add",
                                           (topRef.subdir == "" ? "" : topRef.subdir + "/") + "flake.lock" });
             } else
                 warn("cannot write lockfile of remote flake '%s'", topRef);
