@@ -104,7 +104,7 @@ Path getDerivationEnvironment(ref<Store> store, Derivation drv)
     return shellOutPath;
 }
 
-struct Common : InstallableCommand
+struct Common : InstallableCommand, MixProfile
 {
     /*
     std::set<string> keepVars{
@@ -173,9 +173,26 @@ struct Common : InstallableCommand
     {
         return {"devShell", "defaultPackage"};
     }
+
+    BuildEnvironment getBuildEnvironment(ref<Store> store)
+    {
+        auto drvs = toDerivations(store, {installable});
+
+        if (drvs.size() != 1)
+            throw Error("'%s' needs to evaluate to a single derivation, but it evaluated to %d derivations",
+                installable->what(), drvs.size());
+
+        auto & drvPath = *drvs.begin();
+
+        auto shellOutPath = getDerivationEnvironment(store, store->derivationFromPath(drvPath));
+
+        updateProfile(shellOutPath);
+
+        return readEnvironment(shellOutPath);
+    }
 };
 
-struct CmdDevShell : Common, MixProfile
+struct CmdDevShell : Common
 {
     std::string description() override
     {
@@ -202,19 +219,7 @@ struct CmdDevShell : Common, MixProfile
 
     void run(ref<Store> store) override
     {
-        auto drvs = toDerivations(store, {installable});
-
-        if (drvs.size() != 1)
-            throw Error("'%s' needs to evaluate to a single derivation, but it evaluated to %d derivations",
-                installable->what(), drvs.size());
-
-        auto & drvPath = *drvs.begin();
-
-        auto shellOutPath = getDerivationEnvironment(store, store->derivationFromPath(drvPath));
-
-        updateProfile(shellOutPath);
-
-        auto buildEnvironment = readEnvironment(shellOutPath);
+        auto buildEnvironment = getBuildEnvironment(store);
 
         auto [rcFileFd, rcFilePath] = createTempFile("nix-shell");
 
@@ -259,17 +264,7 @@ struct CmdPrintDevEnv : Common
 
     void run(ref<Store> store) override
     {
-        auto drvs = toDerivations(store, {installable});
-
-        if (drvs.size() != 1)
-            throw Error("'%s' needs to evaluate to a single derivation, but it evaluated to %d derivations",
-                installable->what(), drvs.size());
-
-        auto & drvPath = *drvs.begin();
-
-        auto buildEnvironment = readEnvironment(
-            getDerivationEnvironment(store,
-                store->derivationFromPath(drvPath)));
+        auto buildEnvironment = getBuildEnvironment(store);
 
         stopProgressBar();
 
