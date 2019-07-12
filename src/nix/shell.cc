@@ -66,7 +66,7 @@ BuildEnvironment readEnvironment(const Path & path)
    modified derivation with the same dependencies and nearly the same
    initial environment variables, that just writes the resulting
    environment to a file and exits. */
-BuildEnvironment getDerivationEnvironment(ref<Store> store, Derivation drv)
+Path getDerivationEnvironment(ref<Store> store, Derivation drv)
 {
     auto builder = baseNameOf(drv.builder);
     if (builder != "bash")
@@ -101,7 +101,7 @@ BuildEnvironment getDerivationEnvironment(ref<Store> store, Derivation drv)
 
     assert(store->isValidPath(shellOutPath));
 
-    return readEnvironment(shellOutPath);
+    return shellOutPath;
 }
 
 struct Common : InstallableCommand
@@ -175,7 +175,7 @@ struct Common : InstallableCommand
     }
 };
 
-struct CmdDevShell : Common
+struct CmdDevShell : Common, MixProfile
 {
     std::string description() override
     {
@@ -193,6 +193,10 @@ struct CmdDevShell : Common
                 "To get the build environment of the default package of flake in the current directory:",
                 "nix dev-shell"
             },
+            Example{
+                "To store the build environment in a profile:",
+                "nix dev-shell --profile /tmp/my-shell"
+            },
         };
     }
 
@@ -206,7 +210,11 @@ struct CmdDevShell : Common
 
         auto & drvPath = *drvs.begin();
 
-        auto buildEnvironment = getDerivationEnvironment(store, store->derivationFromPath(drvPath));
+        auto shellOutPath = getDerivationEnvironment(store, store->derivationFromPath(drvPath));
+
+        updateProfile(shellOutPath);
+
+        auto buildEnvironment = readEnvironment(shellOutPath);
 
         auto [rcFileFd, rcFilePath] = createTempFile("nix-shell");
 
@@ -259,7 +267,9 @@ struct CmdPrintDevEnv : Common
 
         auto & drvPath = *drvs.begin();
 
-        auto buildEnvironment = getDerivationEnvironment(store, store->derivationFromPath(drvPath));
+        auto buildEnvironment = readEnvironment(
+            getDerivationEnvironment(store,
+                store->derivationFromPath(drvPath)));
 
         stopProgressBar();
 
