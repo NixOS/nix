@@ -64,6 +64,13 @@ struct Installable
     {
         throw Error("argument '%s' cannot be evaluated", what());
     }
+
+    /* Return a value only if this installable is a store path or a
+       symlink to it. */
+    virtual std::optional<Path> getStorePath()
+    {
+        return {};
+    }
 };
 
 struct EvalCommand : virtual StoreCommand, MixEvalArgs

@@ -102,6 +102,11 @@ struct InstallableStorePath : Installable
     {
         return {{isDerivation(storePath) ? storePath : "", {{"out", storePath}}}};
     }
+
+    std::optional<Path> getStorePath() override
+    {
+        return storePath;
+    }
 };
 
 struct InstallableValue : Installable

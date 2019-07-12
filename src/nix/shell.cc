@@ -174,17 +174,27 @@ struct Common : InstallableCommand, MixProfile
         return {"devShell", "defaultPackage"};
     }
 
+    Path getShellOutPath(ref<Store> store)
+    {
+        auto path = installable->getStorePath();
+        if (path && hasSuffix(*path, "-env"))
+            return *path;
+        else {
+            auto drvs = toDerivations(store, {installable});
+
+            if (drvs.size() != 1)
+                throw Error("'%s' needs to evaluate to a single derivation, but it evaluated to %d derivations",
+                    installable->what(), drvs.size());
+
+            auto & drvPath = *drvs.begin();
+
+            return getDerivationEnvironment(store, store->derivationFromPath(drvPath));
+        }
+    }
+
     BuildEnvironment getBuildEnvironment(ref<Store> store)
     {
-        auto drvs = toDerivations(store, {installable});
-
-        if (drvs.size() != 1)
-            throw Error("'%s' needs to evaluate to a single derivation, but it evaluated to %d derivations",
-                installable->what(), drvs.size());
-
-        auto & drvPath = *drvs.begin();
-
-        auto shellOutPath = getDerivationEnvironment(store, store->derivationFromPath(drvPath));
+        auto shellOutPath = getShellOutPath(store);
 
         updateProfile(shellOutPath);
 
@@ -212,7 +222,11 @@ struct CmdDevShell : Common
             },
             Example{
                 "To store the build environment in a profile:",
-                "nix dev-shell --profile /tmp/my-shell"
+                "nix dev-shell --profile /tmp/my-shell nixpkgs:hello"
+            },
+            Example{
+                "To use a build environment previously recorded in a profile:",
+                "nix dev-shell /tmp/my-shell"
             },
         };
     }
