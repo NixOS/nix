@@ -53,6 +53,10 @@ struct FlakeInputs
     FlakeInputs(const nlohmann::json & json);
 
     nlohmann::json toJson() const;
+
+    /* A lock file is dirty if it contains a dirty flakeref
+       (i.e. reference to a dirty working tree). */
+    bool isDirty() const;
 };
 
 /* Lock file information about a flake input. */

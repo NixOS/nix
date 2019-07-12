@@ -66,6 +66,17 @@ nlohmann::json FlakeInputs::toJson() const
     return json;
 }
 
+bool FlakeInputs::isDirty() const
+{
+    for (auto & i : flakeInputs)
+        if (i.second.ref.isDirty() || i.second.isDirty()) return true;
+
+    for (auto & i : nonFlakeInputs)
+        if (i.second.ref.isDirty()) return true;
+
+    return false;
+}
+
 nlohmann::json LockFile::toJson() const
 {
     auto json = FlakeInputs::toJson();

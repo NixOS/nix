@@ -176,6 +176,12 @@ struct FlakeRef
     bool isImmutable() const;
 
     FlakeRef baseRef() const;
+
+    bool isDirty() const
+    {
+        return std::get_if<FlakeRef::IsPath>(&data)
+            && rev == Hash(rev->type);
+    }
 };
 
 std::ostream & operator << (std::ostream & str, const FlakeRef & flakeRef);

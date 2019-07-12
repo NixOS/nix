@@ -405,17 +405,22 @@ ResolvedFlake resolveFlake(EvalState & state, const FlakeRef & topRef, HandleLoc
     if (!(lockFile == oldLockFile)) {
         if (allowedToWrite(handleLockFile)) {
             if (auto refData = std::get_if<FlakeRef::IsPath>(&topRef.data)) {
-                lockFile.write(refData->path + (topRef.subdir == "" ? "" : "/" + topRef.subdir) + "/flake.lock");
+                if (lockFile.isDirty())
+                    warn("will not write lock file of flake '%s' because it has a dirty input", topRef);
+                else {
+                    lockFile.write(refData->path + (topRef.subdir == "" ? "" : "/" + topRef.subdir) + "/flake.lock");
 
-                // Hack: Make sure that flake.lock is visible to Git, so it ends up in the Nix store.
-                runProgram("git", true, { "-C", refData->path, "add",
-                                          "--force",
-                                          "--intent-to-add",
-                                          (topRef.subdir == "" ? "" : topRef.subdir + "/") + "flake.lock" });
+                    // Hack: Make sure that flake.lock is visible to Git, so it ends up in the Nix store.
+                    runProgram("git", true,
+                        { "-C", refData->path, "add",
+                          "--force",
+                          "--intent-to-add",
+                          (topRef.subdir == "" ? "" : topRef.subdir + "/") + "flake.lock" });
+                }
             } else
-                warn("cannot write lockfile of remote flake '%s'", topRef);
+                warn("cannot write lock file of remote flake '%s'", topRef);
         } else if (handleLockFile != AllPure && handleLockFile != TopRefUsesRegistries)
-            warn("using updated lockfile without writing it to file");
+            warn("using updated lock file without writing it to file");
     }
 
     return ResolvedFlake(std::move(flake), std::move(lockFile));
@@ -624,8 +629,8 @@ const Registries EvalState::getFlakeRegistries()
 
 Fingerprint ResolvedFlake::getFingerprint() const
 {
-    // FIXME: as an optimization, if the flake contains a lockfile and
-    // we haven't changed it, then it's sufficient to use
+    // FIXME: as an optimization, if the flake contains a lock file
+    // and we haven't changed it, then it's sufficient to use
     // flake.sourceInfo.storePath for the fingerprint.
     return hashString(htSHA256,
         fmt("%s;%s", flake.sourceInfo.storePath, lockFile));
