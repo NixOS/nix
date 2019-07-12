@@ -1,6 +1,7 @@
 #include "command.hh"
 #include "store-api.hh"
 #include "derivations.hh"
+#include "profiles.hh"
 
 namespace nix {
 
@@ -79,6 +80,46 @@ void StorePathCommand::run(ref<Store> store)
         throw UsageError("this command requires exactly one store path");
 
     run(store, *storePaths.begin());
+}
+
+MixProfile::MixProfile()
+{
+    mkFlag()
+        .longName("profile")
+        .description("profile to update")
+        .labels({"path"})
+        .dest(&profile);
+}
+
+void MixProfile::updateProfile(const Path & storePath)
+{
+    if (!profile) return;
+    auto store = getStore().dynamic_pointer_cast<LocalFSStore>();
+    if (!store) throw Error("'--profile' is not supported for this Nix store");
+    switchLink(*profile,
+        createGeneration(
+            ref<LocalFSStore>(store),
+            *profile, storePath));
+}
+
+void MixProfile::updateProfile(const Buildables & buildables)
+{
+    if (!profile) return;
+
+    std::optional<Path> result;
+
+    for (auto & buildable : buildables) {
+        for (auto & output : buildable.outputs) {
+            if (result)
+                throw Error("'--profile' requires that the arguments produce a single store path, but there are multiple");
+            result = output.second;
+        }
+    }
+
+    if (!result)
+        throw Error("'--profile' requires that the arguments produce a single store path, but there are none");
+
+    updateProfile(*result);
 }
 
 }

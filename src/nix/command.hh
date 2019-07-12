@@ -219,4 +219,18 @@ PathSet toDerivations(ref<Store> store,
     std::vector<std::shared_ptr<Installable>> installables,
     bool useDeriver = false);
 
+struct MixProfile : virtual Args, virtual StoreCommand
+{
+    std::optional<Path> profile;
+
+    MixProfile();
+
+    /* If 'profile' is set, make it point at 'storePath'. */
+    void updateProfile(const Path & storePath);
+
+    /* If 'profile' is set, make it point at the store path produced
+       by 'buildables'. */
+    void updateProfile(const Buildables & buildables);
+};
+
 }

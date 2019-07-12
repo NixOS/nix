@@ -6,7 +6,7 @@
 
 using namespace nix;
 
-struct CmdBuild : MixDryRun, InstallablesCommand
+struct CmdBuild : MixDryRun, MixProfile, InstallablesCommand
 {
     Path outLink = "result";
 
@@ -41,6 +41,10 @@ struct CmdBuild : MixDryRun, InstallablesCommand
                 "To build the build.x86_64-linux attribute from release.nix:",
                 "nix build -f release.nix build.x86_64-linux"
             },
+            Example{
+                "To make a profile point at GNU Hello:",
+                "nix build --profile /tmp/profile nixpkgs:hello"
+            },
         };
     }
 
@@ -52,18 +56,19 @@ struct CmdBuild : MixDryRun, InstallablesCommand
         evalState->addRegistryOverrides(registryOverrides);
         if (dryRun) return;
 
-        for (size_t i = 0; i < buildables.size(); ++i) {
-            auto & b(buildables[i]);
-
-            if (outLink != "")
-                for (auto & output : b.outputs)
+        if (outLink != "") {
+            for (size_t i = 0; i < buildables.size(); ++i) {
+                for (auto & output : buildables[i].outputs)
                     if (auto store2 = store.dynamic_pointer_cast<LocalFSStore>()) {
                         std::string symlink = outLink;
                         if (i) symlink += fmt("-%d", i);
                         if (output.first != "out") symlink += fmt("-%s", output.first);
                         store2->addPermRoot(output.second, absPath(symlink), true);
                     }
+            }
         }
+
+        updateProfile(buildables);
     }
 };
 
