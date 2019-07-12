@@ -31,7 +31,7 @@ cat > $flake1Dir/flake.nix <<EOF
 {
   name = "flake1";
 
-  epoch = 201906;
+  edition = 201906;
 
   description = "Bla bla";
 
@@ -50,7 +50,7 @@ cat > $flake2Dir/flake.nix <<EOF
 {
   name = "flake2";
 
-  epoch = 201906;
+  edition = 201906;
 
   inputs = [ "flake1" ];
 
@@ -69,7 +69,7 @@ cat > $flake3Dir/flake.nix <<EOF
 {
   name = "flake3";
 
-  epoch = 201906;
+  edition = 201906;
 
   inputs = [ "flake2" ];
 
@@ -189,7 +189,7 @@ cat > $flake3Dir/flake.nix <<EOF
 {
   name = "flake3";
 
-  epoch = 201906;
+  edition = 201906;
 
   inputs = [ "flake1" "flake2" ];
 
@@ -211,11 +211,13 @@ nix build -o $TEST_ROOT/result --flake-registry $registry $flake3Dir:sth
 # Check whether it saved the lockfile
 [[ ! (-z $(git -C $flake3Dir diff master)) ]]
 
+git -C $flake3Dir add flake.lock
+
 git -C $flake3Dir commit -m 'Add lockfile'
 
-# Unsupported epochs should be an error.
+# Unsupported editions should be an error.
 sed -i $flake3Dir/flake.nix -e s/201906/201909/
-nix build -o $TEST_ROOT/result --flake-registry $registry $flake3Dir:sth 2>&1 | grep 'unsupported epoch'
+nix build -o $TEST_ROOT/result --flake-registry $registry $flake3Dir:sth 2>&1 | grep 'unsupported edition'
 
 # Test whether registry caching works.
 nix flake list --flake-registry file://$registry | grep -q flake3
@@ -242,7 +244,7 @@ cat > $flake3Dir/flake.nix <<EOF
 {
   name = "flake3";
 
-  epoch = 201906;
+  edition = 201906;
 
   inputs = [ "flake1" "flake2" ];
 
@@ -277,6 +279,8 @@ git -C $flake3Dir commit -m 'Add nonFlakeInputs'
 # nonFlakeInputs.
 nix build -o $TEST_ROOT/result --flake-registry $registry $flake3Dir:sth
 
+git -C $flake3Dir add flake.lock
+
 git -C $flake3Dir commit -m 'Update nonFlakeInputs'
 
 nix build -o $TEST_ROOT/result --flake-registry $registry flake3:fnord
@@ -306,7 +310,7 @@ cat > $flake3Dir/flake.nix <<EOF
 {
   name = "flake3";
 
-  epoch = 201906;
+  edition = 201906;
 
   inputs = [ "flake1" "flake2" ];
 
