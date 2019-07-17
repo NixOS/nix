@@ -172,6 +172,12 @@ void RemoteStore::initConnection(Connection & conn)
 }
 
 
+/* TODO Add a way to explicitly ask for some options to be
+        forwarded. One option: A way to query the daemon for its
+        settings, and then a series of params to SSHStore like
+        forward-cores or forward-overridden-cores that only
+        override the requested settings.
+*/
 void RemoteStore::setOptions(Connection & conn)
 {
     conn.to << wopSetOptions
