@@ -238,8 +238,9 @@ false</literal>.</para>
     linkend='opt-cores'>--cores</option> command line switch and
     defaults to <literal>1</literal>.  The value <literal>0</literal>
     means that the builder should use all available CPU cores in the
-    system.</para></listitem>
+    system.</para>
 
+    <para>See also <xref linkend="chap-tuning-cores-and-jobs" />.</para></listitem>
   </varlistentry>
 
   <varlistentry xml:id="conf-diff-hook"><term><literal>diff-hook</literal></term>
@@ -498,7 +499,10 @@ builtins.fetchurl {
     regardless).  It can be
     overridden using the <option
     linkend='opt-max-jobs'>--max-jobs</option> (<option>-j</option>)
-    command line switch.</para></listitem>
+    command line switch.</para>
+
+    <para>See also <xref linkend="chap-tuning-cores-and-jobs" />.</para>
+    </listitem>
   </varlistentry>
 
   <varlistentry xml:id="conf-max-silent-time"><term><literal>max-silent-time</literal></term>
