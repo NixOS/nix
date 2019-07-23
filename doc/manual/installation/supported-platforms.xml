@@ -31,6 +31,9 @@
 
 </itemizedlist>
 
+      
+      Nix cannot currently be used in Docker environments without some special tweaking,
+      please see <link xlink:href="https://github.com/NixOS/nix/issues/971">issue #971</link> for the details.
 </para>
 
 </chapter>
