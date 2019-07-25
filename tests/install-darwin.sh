@@ -34,7 +34,7 @@ cleanup() {
     sudo rm -rf /etc/nix \
          /nix \
          /var/root/.nix-profile /var/root/.nix-defexpr /var/root/.nix-channels \
-         "$USER/.nix-profile" "$USER/.nix-defexpr" "$USER/.nix-channels"
+         "$HOME/.nix-profile" "$HOME/.nix-defexpr" "$HOME/.nix-channels"
 }
 
 verify() {
