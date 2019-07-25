@@ -2302,10 +2302,20 @@ void DerivationGoal::startBuilder()
                 flags |= CLONE_NEWNET;
 
             pid_t child = clone(childEntry, stack + stackSize, flags, this);
-            if (child == -1 && errno == EINVAL)
+            if (child == -1 && errno == EINVAL) {
                 /* Fallback for Linux < 2.13 where CLONE_NEWPID and
                    CLONE_PARENT are not allowed together. */
-                child = clone(childEntry, stack + stackSize, flags & ~CLONE_NEWPID, this);
+                flags &= ~CLONE_NEWPID;
+                child = clone(childEntry, stack + stackSize, flags, this);
+            }
+            if (child == -1 && (errno == EPERM || errno == EINVAL)) {
+                /* Some distros patch Linux to not allow unpriveleged
+                 * user namespaces. If we get EPERM or EINVAL, try
+                 * without CLONE_NEWUSER and see if that works.
+                 */
+                flags &= ~CLONE_NEWUSER;
+                child = clone(childEntry, stack + stackSize, flags, this);
+            }
             if (child == -1) throw SysError("cloning builder process");
 
             writeFull(builderOut.writeSide.get(), std::to_string(child) + "\n");
