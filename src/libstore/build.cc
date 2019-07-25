@@ -2316,13 +2316,22 @@ void DerivationGoal::startBuilder()
                 flags &= ~CLONE_NEWUSER;
                 child = clone(childEntry, stack + stackSize, flags, this);
             }
+            /* Otherwise exit with EPERM so we can handle this in the
+               parent. This is only done when sandbox-fallback is set
+               to true (the default). */
+            if (child == -1 && (errno == EPERM || errno == EINVAL) && settings.sandboxFallback)
+                _exit(EPERM);
             if (child == -1) throw SysError("cloning builder process");
 
             writeFull(builderOut.writeSide.get(), std::to_string(child) + "\n");
             _exit(0);
         }, options);
 
-        if (helper.wait() != 0)
+        int res = helper.wait();
+        if (res == EPERM && settings.sandboxFallback) {
+            useChroot = false;
+            goto fallback;
+        } else if (res != 0)
             throw Error("unable to start build process");
 
         userNamespaceSync.readSide = -1;
@@ -2353,6 +2362,7 @@ void DerivationGoal::startBuilder()
     } else
 #endif
     {
+    fallback:
         options.allowVfork = !buildUser && !drv->isBuiltin();
         pid = startProcess([&]() {
             runChild();
