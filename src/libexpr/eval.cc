@@ -765,6 +765,17 @@ void EvalState::evalFile(const Path & path_, Value & v)
     if (path != path2) fileEvalCache[path] = v;
 }
 
+void EvalState::evalStdin(Value & v)
+{
+    Expr * e = parseStdin();
+    try {
+        eval(e, v);
+    } catch (Error & e) {
+        addErrorPrefix(e, "while evaluating %1%:\n", "<stdin>");
+        throw;
+    }
+}
+
 
 void EvalState::resetFileCache()
 {
