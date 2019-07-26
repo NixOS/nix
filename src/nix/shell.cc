@@ -72,7 +72,7 @@ Path getDerivationEnvironment(ref<Store> store, Derivation drv)
     if (builder != "bash")
         throw Error("'nix shell' only works on derivations that use 'bash' as their builder");
 
-    drv.args = {"-c", "set -e; if [[ -n $stdenv ]]; then source $stdenv/setup; fi; set > $out"};
+    drv.args = {"-c", "set -e; export IN_NIX_SHELL=impure; if [[ -n $stdenv ]]; then source $stdenv/setup; fi; set > $out"};
 
     /* Remove derivation checks. */
     drv.env.erase("allowedReferences");
@@ -143,7 +143,6 @@ struct Common : InstallableCommand, MixProfile
 
     void makeRcScript(const BuildEnvironment & buildEnvironment, std::ostream & out)
     {
-        out << "export IN_NIX_SHELL=1\n";
         out << "nix_saved_PATH=\"$PATH\"\n";
 
         for (auto & i : buildEnvironment.env) {
