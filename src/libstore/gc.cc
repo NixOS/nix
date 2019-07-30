@@ -444,17 +444,22 @@ void LocalStore::findRuntimeRoots(Roots & roots, bool censor)
     }
 
 #if !defined(__linux__)
-    try {
-        std::regex lsofRegex(R"(^n(/.*)$)");
-        auto lsofLines =
-            tokenizeString<std::vector<string>>(runProgram(LSOF, true, { "-n", "-w", "-F", "n" }), "\n");
-        for (const auto & line : lsofLines) {
-            std::smatch match;
-            if (std::regex_match(line, match, lsofRegex))
-                unchecked[match[1]].emplace("{lsof}");
+    // lsof is really slow on OS X. This actually causes the gc-concurrent.sh test to fail.
+    // See: https://github.com/NixOS/nix/issues/3011
+    // Because of this we disable lsof when running the tests.
+    if (getEnv("_NIX_TEST_NO_LSOF") == "") {
+        try {
+            std::regex lsofRegex(R"(^n(/.*)$)");
+            auto lsofLines =
+                tokenizeString<std::vector<string>>(runProgram(LSOF, true, { "-n", "-w", "-F", "n" }), "\n");
+            for (const auto & line : lsofLines) {
+                std::smatch match;
+                if (std::regex_match(line, match, lsofRegex))
+                    unchecked[match[1]].emplace("{lsof}");
+            }
+        } catch (ExecError & e) {
+            /* lsof not installed, lsof failed */
         }
-    } catch (ExecError & e) {
-        /* lsof not installed, lsof failed */
     }
 #endif
 
