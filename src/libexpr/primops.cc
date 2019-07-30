@@ -832,8 +832,14 @@ static void prim_pathExists(EvalState & state, const Pos & pos, Value * * args, 
 {
     PathSet context;
     Path path = state.coerceToPath(pos, *args[0], context);
-    if (!context.empty())
-        throw EvalError(format("string '%1%' cannot refer to other paths, at %2%") % path % pos);
+    try {
+        state.realiseContext(context);
+    } catch (InvalidPathError & e) {
+        throw EvalError(format(
+                "cannot check the existence of '%1%', since path '%2%' is not valid, at %3%")
+            % path % e.path % pos);
+    }
+
     try {
         mkBool(v, pathExists(state.checkSourcePath(path)));
     } catch (SysError & e) {
