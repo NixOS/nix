@@ -21,6 +21,10 @@ ifeq ($(ENABLE_S3), 1)
 	libstore_LDFLAGS += -laws-cpp-sdk-transfer -laws-cpp-sdk-s3 -laws-cpp-sdk-core
 endif
 
+ifeq ($(ENABLE_GCS), 1)
+	libstore_LDFLAGS += -lstorage_client -lgoogle_cloud_cpp_common
+endif
+
 ifeq ($(OS), SunOS)
 	libstore_LDFLAGS += -lsocket
 endif

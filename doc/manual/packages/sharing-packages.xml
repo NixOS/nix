@@ -16,5 +16,6 @@ packages between machines.</para>
 <xi:include href="copy-closure.xml" />
 <xi:include href="ssh-substituter.xml" />
 <xi:include href="s3-substituter.xml" />
+<xi:include href="gcs-substituter.xml" />
 
 </chapter>

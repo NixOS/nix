@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<section xmlns="http://docbook.org/ns/docbook"
+         xmlns:xlink="http://www.w3.org/1999/xlink"
+         xmlns:xi="http://www.w3.org/2001/XInclude"
+         version="5.0"
+         xml:id="ssec-gcs-substituter">
+
+  <title>Serving a Nix store via Google Cloud Storage</title>
+
+  <para>Nix has built-in support for storing and fetching store paths
+  	from Google Cloud Storage.</para>
+  <para>For a GCS bucket with the name <literal>example-nix-cache</literal> the URI is <uri>gs://example-nix-cache</uri>.</para>
+  <para>Nix will use the environment variable <literal>GOOGLE_APPLICATION_CREDENTIALS</literal> to discover the credentials JSON file.</para>
+
+  <example>
+    <title>Uploading to GCS</title>
+    <para><command>
+      GOOGLE_APPLICATION_CREDENTIALS=~/google.json nix copy --to gs://example-nix-cache nixpkgs.hello
+    </command></para>
+  </example>
+</section>
