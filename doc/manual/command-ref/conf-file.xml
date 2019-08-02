@@ -483,8 +483,10 @@ builtins.fetchurl {
 
   <varlistentry xml:id="conf-max-free"><term><literal>max-free</literal></term>
 
-    <listitem><para>This option defines after how many free bytes to stop collecting
-    garbage once the <literal>min-free</literal> condition gets triggered.</para></listitem>
+    <listitem><para>When a garbage collection is triggered by the
+    <literal>min-free</literal> option, it stops as soon as
+    <literal>max-free</literal> bytes are available. The default is
+    infinity (i.e. delete all garbage).</para></listitem>
 
   </varlistentry>
 
@@ -528,9 +530,11 @@ builtins.fetchurl {
   <varlistentry xml:id="conf-min-free"><term><literal>min-free</literal></term>
 
     <listitem>
-      <para>When the disk reaches <literal>min-free</literal> bytes of free disk space during a build, nix
-        will start to garbage-collection until <literal>max-free</literal> bytes are available on the disk.
-        A value of <literal>0</literal> (the default) means that this feature is disabled.</para>
+      <para>When free disk space in <filename>/nix/store</filename>
+      drops below <literal>min-free</literal> during a build, Nix
+      performs a garbage-collection until <literal>max-free</literal>
+      bytes are available or there is no more garbage.  A value of
+      <literal>0</literal> (the default) disables this feature.</para>
     </listitem>
 
   </varlistentry>
