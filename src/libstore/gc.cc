@@ -221,25 +221,21 @@ void LocalStore::findTempRoots(FDs & fds, Roots & tempRoots, bool censor)
         //FDPtr fd(new AutoCloseFD(openLockFile(path, false)));
         //if (*fd == -1) continue;
 
-        if (path != fnTempRoots) {
-
-            /* Try to acquire a write lock without blocking.  This can
-               only succeed if the owning process has died.  In that case
-               we don't care about its temporary roots. */
-            if (lockFile(fd->get(), ltWrite, false)) {
-                printError(format("removing stale temporary roots file '%1%'") % path);
-                unlink(path.c_str());
-                writeFull(fd->get(), "d");
-                continue;
-            }
-
-            /* Acquire a read lock.  This will prevent the owning process
-               from upgrading to a write lock, therefore it will block in
-               addTempRoot(). */
-            debug(format("waiting for read lock on '%1%'") % path);
-            lockFile(fd->get(), ltRead, true);
-
+        /* Try to acquire a write lock without blocking.  This can
+           only succeed if the owning process has died.  In that case
+           we don't care about its temporary roots. */
+        if (lockFile(fd->get(), ltWrite, false)) {
+            printError(format("removing stale temporary roots file '%1%'") % path);
+            unlink(path.c_str());
+            writeFull(fd->get(), "d");
+            continue;
         }
+
+        /* Acquire a read lock.  This will prevent the owning process
+           from upgrading to a write lock, therefore it will block in
+           addTempRoot(). */
+        debug(format("waiting for read lock on '%1%'") % path);
+        lockFile(fd->get(), ltRead, true);
 
         /* Read the entire file. */
         string contents = readFile(fd->get());
