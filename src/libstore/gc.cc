@@ -871,7 +871,12 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
 
 void LocalStore::autoGC(bool sync)
 {
-    auto getAvail = [this]() {
+    static auto fakeFreeSpaceFile = getEnv("_NIX_TEST_FREE_SPACE_FILE", "");
+
+    auto getAvail = [this]() -> uint64_t {
+        if (!fakeFreeSpaceFile.empty())
+            return std::stoll(readFile(fakeFreeSpaceFile));
+
         struct statvfs st;
         if (statvfs(realStoreDir.c_str(), &st))
             throw SysError("getting filesystem info about '%s'", realStoreDir);
@@ -892,7 +897,7 @@ void LocalStore::autoGC(bool sync)
 
         auto now = std::chrono::steady_clock::now();
 
-        if (now < state->lastGCCheck + std::chrono::seconds(5)) return;
+        if (now < state->lastGCCheck + std::chrono::seconds(settings.minFreeCheckInterval)) return;
 
         auto avail = getAvail();
 
