@@ -74,6 +74,8 @@ trusted-public-keys = cache.nixos.org-1:6NCHdD59X431o0gWypbMrAURkbJ16ZPMQFGspcDS
 #!/bin/sh
 
 set -eu
+set -f # disable globbing
+export IFS=' '
 
 echo "Signing paths" $OUT_PATHS
 nix sign-paths --key-file /etc/nix/key.private $OUT_PATHS
@@ -88,8 +90,9 @@ exec nix copy --to 's3://example-nix-cache' $OUT_PATHS
       list of Nix store paths. In this case, we expect and want the
       shell to perform word splitting to make each output path its
       own argument to <command>nix sign-paths</command>. Nix guarantees
-      the paths will only contain characters which are safe for word
-      splitting, and free of any globs.
+      the paths will not contain any spaces, however a store path
+      might contain glob characters. The <command>set -f</command>
+      disables globbing in the shell.
     </para>
   </note>
   <para>
