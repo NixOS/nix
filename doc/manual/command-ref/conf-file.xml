@@ -873,6 +873,14 @@ password <replaceable>my-password</replaceable>
 
   </varlistentry>
 
+  <varlistentry xml:id="conf-stalled-download-timeout"><term><literal>stalled-download-timeout</literal></term>
+    <listitem>
+      <para>The timeout (in seconds) for receiving data from servers
+      during download. Nix cancels idle downloads after this timeout's
+      duration.</para>
+    </listitem>
+  </varlistentry>
+
   <varlistentry xml:id="conf-substituters"><term><literal>substituters</literal></term>
 
     <listitem><para>A list of URLs of substituters, separated by
