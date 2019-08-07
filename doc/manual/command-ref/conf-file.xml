@@ -682,7 +682,7 @@ password <replaceable>my-password</replaceable>
         <listitem><para>The hook does not execute on substituted paths.</para></listitem>
         <listitem><para>The hook's output always goes to the user's terminal.</para></listitem>
         <listitem><para>If the hook fails, the build succeeds but no further builds execute.</para></listitem>
-        <listitem><para>The hook executes synchronously, and blocks other builds from progressing while it runs.</para>
+        <listitem><para>The hook executes synchronously, and blocks other builds from progressing while it runs.</para></listitem>
       </itemizedlist>
 
       <para>The program executes with no arguments. The program's environment
