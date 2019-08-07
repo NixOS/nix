@@ -17,6 +17,7 @@ let {
     builder = ./dependencies.builder0.sh + "/FOOBAR/../.";
     input1 = input1 + "/.";
     input2 = "${input2}/.";
+    input1_drv = input1;
     meta.description = "Random test package";
   };
 

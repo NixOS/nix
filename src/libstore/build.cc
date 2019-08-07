@@ -1629,6 +1629,61 @@ void DerivationGoal::buildDone()
            being valid. */
         registerOutputs();
 
+        if (settings.postBuildHook != "") {
+            Activity act(*logger, lvlInfo, actPostBuildHook,
+                fmt("running post-build-hook '%s'", settings.postBuildHook),
+                Logger::Fields{drvPath});
+            PushActivity pact(act.id);
+            auto outputPaths = drv->outputPaths();
+            std::map<std::string, std::string> hookEnvironment = getEnv();
+
+            hookEnvironment.emplace("DRV_PATH", drvPath);
+            hookEnvironment.emplace("OUT_PATHS", chomp(concatStringsSep(" ", outputPaths)));
+
+            RunOptions opts(settings.postBuildHook, {});
+            opts.environment = hookEnvironment;
+
+            struct LogSink : Sink {
+                Activity & act;
+                std::string currentLine;
+
+                LogSink(Activity & act) : act(act) { }
+
+                void operator() (const unsigned char * data, size_t len) override {
+                    for (size_t i = 0; i < len; i++) {
+                        auto c = data[i];
+
+                        if (c == '\n') {
+                            flushLine();
+                        } else {
+                            currentLine += c;
+                        }
+                    }
+                }
+
+                void flushLine() {
+                    if (settings.verboseBuild) {
+                        printError("post-build-hook: " + currentLine);
+                    } else {
+                        act.result(resPostBuildLogLine, currentLine);
+                    }
+                    currentLine.clear();
+                }
+
+                ~LogSink() {
+                    if (currentLine != "") {
+                        currentLine += '\n';
+                        flushLine();
+                    }
+                }
+            };
+            LogSink sink(act);
+
+            opts.standardOut = &sink;
+            opts.mergeStderrToStdout = true;
+            runProgram2(opts);
+        }
+
         if (buildMode == bmCheck) {
             done(BuildResult::Built);
             return;

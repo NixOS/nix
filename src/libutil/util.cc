@@ -84,6 +84,15 @@ void clearEnv()
         unsetenv(name.first.c_str());
 }
 
+void replaceEnv(std::map<std::string, std::string> newEnv)
+{
+    clearEnv();
+    for (auto newEnvVar : newEnv)
+    {
+        setenv(newEnvVar.first.c_str(), newEnvVar.second.c_str(), 1);
+    }
+}
+
 
 Path absPath(Path path, Path dir)
 {
@@ -1019,10 +1028,22 @@ void runProgram2(const RunOptions & options)
     if (options.standardOut) out.create();
     if (source) in.create();
 
+    ProcessOptions processOptions;
+    // vfork implies that the environment of the main process and the fork will
+    // be shared (technically this is undefined, but in practice that's the
+    // case), so we can't use it if we alter the environment
+    if (options.environment)
+        processOptions.allowVfork = false;
+
     /* Fork. */
     Pid pid = startProcess([&]() {
+        if (options.environment)
+            replaceEnv(*options.environment);
         if (options.standardOut && dup2(out.writeSide.get(), STDOUT_FILENO) == -1)
             throw SysError("dupping stdout");
+        if (options.mergeStderrToStdout)
+            if (dup2(STDOUT_FILENO, STDERR_FILENO) == -1)
+                throw SysError("cannot dup stdout into stderr");
         if (source && dup2(in.readSide.get(), STDIN_FILENO) == -1)
             throw SysError("dupping stdin");
 
@@ -1047,7 +1068,7 @@ void runProgram2(const RunOptions & options)
             execv(options.program.c_str(), stringsToCharPtrs(args_).data());
 
         throw SysError("executing '%1%'", options.program);
-    });
+    }, processOptions);
 
     out.writeSide = -1;
 
