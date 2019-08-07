@@ -5,6 +5,7 @@
 #include <cerrno>
 #include <cstdlib>
 
+#include <fcntl.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <sys/file.h>
