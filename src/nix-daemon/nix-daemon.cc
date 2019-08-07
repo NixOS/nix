@@ -567,7 +567,17 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
                 else if (trusted
                     || name == settings.buildTimeout.name
                     || name == "connect-timeout"
-                    || (name == "builders" && value == ""))
+                    || (name == "builders" && value == "") // "build locally, no remote builders"
+                    || (name == "max-jobs" && value == "0") // "build remotely, no local builders"
+                    || name == "show-trace" // eval-time tracing doesn't require trust
+                    || name == "log-lines" // log output size doesn't require trust
+                    || name == "print-missing" // behavioral, no trust required
+                    // TTL-related settings are useful, shouldn't require trust and are useful if you just updated cache
+                    || name == "tarball-ttl"
+                    || name == "narinfo-cache-negative-ttl"
+                    || name == "narinfo-cache-positive-ttl"
+                    // useful for big builds that might encounter a failure, useful for CI-esque cases
+                    || name == "keep-going")
                     settings.set(name, value);
                 else if (setSubstituters(settings.substituters))
                     ;
