@@ -315,6 +315,9 @@ public:
         "pre-build-hook",
         "A program to run just before a build to set derivation-specific build settings."};
 
+    Setting<std::string> postBuildHook{this, "", "post-build-hook",
+        "A program to run just after each succesful build."};
+
     Setting<std::string> netrcFile{this, fmt("%s/%s", nixConfDir, "netrc"), "netrc-file",
         "Path to the netrc file used to obtain usernames/passwords for downloads."};
 
@@ -341,6 +344,9 @@ public:
 
     Setting<uint64_t> maxFree{this, std::numeric_limits<uint64_t>::max(), "max-free",
         "Stop deleting garbage when free disk space is above the specified amount."};
+
+    Setting<uint64_t> minFreeCheckInterval{this, 5, "min-free-check-interval",
+        "Number of seconds between checking free disk space."};
 
     Setting<Paths> pluginFiles{this, {}, "plugin-files",
         "Plugins to dynamically load at nix initialization time."};

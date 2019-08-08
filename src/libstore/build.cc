@@ -1629,6 +1629,61 @@ void DerivationGoal::buildDone()
            being valid. */
         registerOutputs();
 
+        if (settings.postBuildHook != "") {
+            Activity act(*logger, lvlInfo, actPostBuildHook,
+                fmt("running post-build-hook '%s'", settings.postBuildHook),
+                Logger::Fields{drvPath});
+            PushActivity pact(act.id);
+            auto outputPaths = drv->outputPaths();
+            std::map<std::string, std::string> hookEnvironment = getEnv();
+
+            hookEnvironment.emplace("DRV_PATH", drvPath);
+            hookEnvironment.emplace("OUT_PATHS", chomp(concatStringsSep(" ", outputPaths)));
+
+            RunOptions opts(settings.postBuildHook, {});
+            opts.environment = hookEnvironment;
+
+            struct LogSink : Sink {
+                Activity & act;
+                std::string currentLine;
+
+                LogSink(Activity & act) : act(act) { }
+
+                void operator() (const unsigned char * data, size_t len) override {
+                    for (size_t i = 0; i < len; i++) {
+                        auto c = data[i];
+
+                        if (c == '\n') {
+                            flushLine();
+                        } else {
+                            currentLine += c;
+                        }
+                    }
+                }
+
+                void flushLine() {
+                    if (settings.verboseBuild) {
+                        printError("post-build-hook: " + currentLine);
+                    } else {
+                        act.result(resPostBuildLogLine, currentLine);
+                    }
+                    currentLine.clear();
+                }
+
+                ~LogSink() {
+                    if (currentLine != "") {
+                        currentLine += '\n';
+                        flushLine();
+                    }
+                }
+            };
+            LogSink sink(act);
+
+            opts.standardOut = &sink;
+            opts.mergeStderrToStdout = true;
+            runProgram2(opts);
+        }
+
         if (buildMode == bmCheck) {
             done(BuildResult::Built);
             return;
@@ -2734,7 +2789,13 @@ void DerivationGoal::runChild()
                on. */
             if (fixedOutput) {
                 ss.push_back("/etc/resolv.conf");
-                ss.push_back("/etc/nsswitch.conf");
+
+                // Only use nss functions to resolve hosts and
+                // services. Don’t use it for anything else that may
+                // be configured for this system. This limits the
+                // potential impurities introduced in fixed outputs.
+                writeFile(chrootRootDir + "/etc/nsswitch.conf", "hosts: files dns\nservices: files\n");
+
                 ss.push_back("/etc/services");
                 ss.push_back("/etc/hosts");
                 if (pathExists("/var/run/nscd/socket"))
@@ -3978,17 +4039,6 @@ void SubstitutionGoal::tryToRun()
         return;
     }
 
-    /* If the store path is already locked (probably by a
-       DerivationGoal), then put this goal to sleep. Note: we don't
-       acquire a lock here since that breaks addToStore(), so below we
-       handle an AlreadyLocked exception from addToStore(). The check
-       here is just an optimisation to prevent having to redo a
-       download due to a locked path. */
-    if (pathIsLockedByMe(worker.store.toRealPath(storePath))) {
-        worker.waitForAWhile(shared_from_this());
-        return;
-    }
-
     maintainRunningSubstitutions = std::make_unique<MaintainCount<uint64_t>>(worker.runningSubstitutions);
     worker.updateProgress();
 
@@ -4028,12 +4078,6 @@ void SubstitutionGoal::finished()
 
     try {
         promise.get_future().get();
-    } catch (AlreadyLocked & e) {
-        /* Probably a DerivationGoal is already building this store
-           path. Sleep for a while and try again. */
-        state = &SubstitutionGoal::init;
-        worker.waitForAWhile(shared_from_this());
-        return;
     } catch (std::exception & e) {
         printError(e.what());
 

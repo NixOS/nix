@@ -860,7 +860,10 @@ static void queryJSON(Globals & globals, vector<DrvInfo> & elems)
     for (auto & i : elems) {
         JSONObject pkgObj = topObj.object(i.attrPath);
 
-        pkgObj.attr("name", i.queryName());
+        auto drvName = DrvName(i.queryName());
+        pkgObj.attr("name", drvName.fullName);
+        pkgObj.attr("pname", drvName.name);
+        pkgObj.attr("version", drvName.version);
         pkgObj.attr("system", i.querySystem());
 
         JSONObject metaObj = pkgObj.object("meta");
@@ -1026,10 +1029,14 @@ static void opQuery(Globals & globals, Strings opFlags, Strings opArgs)
             else if (printAttrPath)
                 columns.push_back(i.attrPath);
 
-            if (xmlOutput)
-                attrs["name"] = i.queryName();
-            else if (printName)
+            if (xmlOutput) {
+                auto drvName = DrvName(i.queryName());
+                attrs["name"] = drvName.fullName;
+                attrs["pname"] = drvName.name;
+                attrs["version"] = drvName.version;
+            } else if (printName) {
                 columns.push_back(i.queryName());
+            }
 
             if (compareVersions) {
                 /* Compare this element against the versions of the

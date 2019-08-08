@@ -1,0 +1,121 @@
+<chapter xmlns="http://docbook.org/ns/docbook"
+      xmlns:xlink="http://www.w3.org/1999/xlink"
+      xmlns:xi="http://www.w3.org/2001/XInclude"
+      version="5.0"
+      xml:id="chap-tuning-cores-and-jobs">
+
+<title>Tuning Cores and Jobs</title>
+
+<para>Nix has two relevant settings with regards to how your CPU cores
+will be utilized: <xref linkend="conf-cores" /> and
+<xref linkend="conf-max-jobs" />. This chapter will talk about what
+they are, how they interact, and their configuration trade-offs.</para>
+
+<variablelist>
+  <varlistentry>
+    <term><xref linkend="conf-max-jobs" /></term>
+    <listitem><para>
+      Dictates how many separate derivations will be built at the same
+      time. If you set this to zero, the local machine will do no
+      builds. Nix will still substitute from binary caches, and build
+      remotely if remote builders are configured.
+    </para></listitem>
+  </varlistentry>
+  <varlistentry>
+    <term><xref linkend="conf-cores" /></term>
+    <listitem><para>
+      Suggests how many cores each derivation should use. Similar to
+      <command>make -j</command>.
+    </para></listitem>
+  </varlistentry>
+</variablelist>
+
+<para>The <xref linkend="conf-cores" /> setting determines the value of
+<envar>NIX_BUILD_CORES</envar>. <envar>NIX_BUILD_CORES</envar> is equal
+to <xref linkend="conf-cores" />, unless <xref linkend="conf-cores" />
+equals <literal>0</literal>, in which case <envar>NIX_BUILD_CORES</envar>
+will be the total number of cores in the system.</para>
+
+<para>The total number of consumed cores is a simple multiplication,
+<xref linkend="conf-cores" /> * <envar>NIX_BUILD_CORES</envar>.</para>
+
+<para>The balance on how to set these two independent variables depends
+upon each builder's workload and hardware. Here are a few example
+scenarios on a machine with 24 cores:</para>
+
+<table>
+  <caption>Balancing 24 Build Cores</caption>
+  <thead>
+    <tr>
+      <th><xref linkend="conf-max-jobs" /></th>
+      <th><xref linkend="conf-cores" /></th>
+      <th><envar>NIX_BUILD_CORES</envar></th>
+      <th>Maximum Processes</th>
+      <th>Result</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>1</td>
+      <td>24</td>
+      <td>24</td>
+      <td>24</td>
+      <td>
+        One derivation will be built at a time, each one can use 24
+        cores. Undersold if a job can’t use 24 cores.
+      </td>
+    </tr>
+
+    <tr>
+      <td>4</td>
+      <td>6</td>
+      <td>6</td>
+      <td>24</td>
+      <td>
+        Four derivations will be built at once, each given access to
+        six cores.
+      </td>
+    </tr>
+    <tr>
+      <td>12</td>
+      <td>6</td>
+      <td>6</td>
+      <td>72</td>
+      <td>
+        12 derivations will be built at once, each given access to six
+        cores. This configuration is over-sold. If all 12 derivations
+        being built simultaneously try to use all six cores, the
+        machine's performance will be degraded due to extensive context
+        switching between the 12 builds.
+      </td>
+    </tr>
+    <tr>
+      <td>24</td>
+      <td>1</td>
+      <td>1</td>
+      <td>24</td>
+      <td>
+        24 derivations can build at the same time, each using a single
+        core. Never oversold, but derivations which require many cores
+        will be very slow to compile.
+      </td>
+    </tr>
+    <tr>
+      <td>24</td>
+      <td>0</td>
+      <td>24</td>
+      <td>576</td>
+      <td>
+        24 derivations can build at the same time, each using all the
+        available cores of the machine. Very likely to be oversold,
+        and very likely to suffer context switches.
+      </td>
+    </tr>
+  </tbody>
+</table>
+
+<para>It is up to the derivations' build script to respect
+host's requested cores-per-build by following the value of the
+<envar>NIX_BUILD_CORES</envar> environment variable.</para>
+
+</chapter>

@@ -1,0 +1,160 @@
+<chapter xmlns="http://docbook.org/ns/docbook"
+      xmlns:xlink="http://www.w3.org/1999/xlink"
+      xmlns:xi="http://www.w3.org/2001/XInclude"
+      xml:id="chap-post-build-hook"
+      version="5.0"
+      >
+
+<title>Using the <xref linkend="conf-post-build-hook" /></title>
+<subtitle>Uploading to an S3-compatible binary cache after each build</subtitle>
+
+
+<section xml:id="chap-post-build-hook-caveats">
+  <title>Implementation Caveats</title>
+  <para>Here we use the post-build hook to upload to a binary cache.
+  This is a simple and working example, but it is not suitable for all
+  use cases.</para>
+
+  <para>The post build hook program runs after each executed build,
+  and blocks the build loop. The build loop exits if the hook program
+  fails.</para>
+
+  <para>Concretely, this implementation will make Nix slow or unusable
+  when the internet is slow or unreliable.</para>
+
+  <para>A more advanced implementation might pass the store paths to a
+  user-supplied daemon or queue for processing the store paths outside
+  of the build loop.</para>
+</section>
+
+<section>
+  <title>Prerequisites</title>
+
+  <para>
+    This tutorial assumes you have configured an S3-compatible binary cache
+    according to the instructions at
+    <xref linkend="ssec-s3-substituter-authenticated-writes" />, and
+    that the <literal>root</literal> user's default AWS profile can
+    upload to the bucket.
+  </para>
+</section>
+
+<section>
+  <title>Set up a Signing Key</title>
+  <para>Use <command>nix-store --generate-binary-cache-key</command> to
+  create our public and private signing keys. We will sign paths
+  with the private key, and distribute the public key for verifying
+  the authenticity of the paths.</para>
+
+  <screen>
+# nix-store --generate-binary-cache-key example-nix-cache-1 /etc/nix/key.private /etc/nix/key.public
+# cat /etc/nix/key.public
+example-nix-cache-1:1/cKDz3QCCOmwcztD2eV6Coggp6rqc9DGjWv7C0G+rM=
+</screen>
+
+<para>Then, add the public key and the cache URL to your
+<filename>nix.conf</filename>'s <xref linkend="conf-trusted-public-keys" />
+and <xref linkend="conf-substituters" /> like:</para>
+
+<programlisting>
+substituters = https://cache.nixos.org/ s3://example-nix-cache
+trusted-public-keys = cache.nixos.org-1:6NCHdD59X431o0gWypbMrAURkbJ16ZPMQFGspcDShjY= example-nix-cache-1:1/cKDz3QCCOmwcztD2eV6Coggp6rqc9DGjWv7C0G+rM=
+</programlisting>
+
+<para>we will restart the Nix daemon a later step.</para>
+</section>
+
+<section>
+  <title>Implementing the build hook</title>
+  <para>Write the following script to
+  <filename>/etc/nix/upload-to-cache.sh</filename>:
+  </para>
+
+  <programlisting>
+#!/bin/sh
+
+set -eu
+set -f # disable globbing
+export IFS=' '
+
+echo "Signing paths" $OUT_PATHS
+nix sign-paths --key-file /etc/nix/key.private $OUT_PATHS
+echo "Uploading paths" $OUT_PATHS
+exec nix copy --to 's3://example-nix-cache' $OUT_PATHS
+</programlisting>
+
+  <note>
+    <title>Should <literal>$OUT_PATHS</literal> be quoted?</title>
+    <para>
+      The <literal>$OUT_PATHS</literal> variable is a space-separated
+      list of Nix store paths. In this case, we expect and want the
+      shell to perform word splitting to make each output path its
+      own argument to <command>nix sign-paths</command>. Nix guarantees
+      the paths will not contain any spaces, however a store path
+      might contain glob characters. The <command>set -f</command>
+      disables globbing in the shell.
+    </para>
+  </note>
+  <para>
+    Then make sure the hook program is executable by the <literal>root</literal> user:
+    <screen>
+# chmod +x /etc/nix/upload-to-cache.sh
+</screen></para>
+</section>
+
+<section>
+  <title>Updating Nix Configuration</title>
+
+  <para>Edit <filename>/etc/nix/nix.conf</filename> to run our hook,
+  by adding the following configuration snippet at the end:</para>
+
+  <programlisting>
+post-build-hook = /etc/nix/upload-to-cache.sh
+</programlisting>
+
+<para>Then, restart the <command>nix-daemon</command>.</para>
+</section>
+
+<section>
+  <title>Testing</title>
+
+  <para>Build any derivation, for example:</para>
+
+  <screen>
+$ nix-build -E '(import &lt;nixpkgs&gt; {}).writeText "example" (builtins.toString builtins.currentTime)'
+these derivations will be built:
+  /nix/store/s4pnfbkalzy5qz57qs6yybna8wylkig6-example.drv
+building '/nix/store/s4pnfbkalzy5qz57qs6yybna8wylkig6-example.drv'...
+running post-build-hook '/home/grahamc/projects/github.com/NixOS/nix/post-hook.sh'...
+post-build-hook: Signing paths /nix/store/ibcyipq5gf91838ldx40mjsp0b8w9n18-example
+post-build-hook: Uploading paths /nix/store/ibcyipq5gf91838ldx40mjsp0b8w9n18-example
+/nix/store/ibcyipq5gf91838ldx40mjsp0b8w9n18-example
+</screen>
+
+  <para>Then delete the path from the store, and try substituting it from the binary cache:</para>
+  <screen>
+$ rm ./result
+$ nix-store --delete /nix/store/ibcyipq5gf91838ldx40mjsp0b8w9n18-example
+</screen>
+
+<para>Now, copy the path back from the cache:</para>
+<screen>
+$ nix store --realize /nix/store/ibcyipq5gf91838ldx40mjsp0b8w9n18-example
+copying path '/nix/store/m8bmqwrch6l3h8s0k3d673xpmipcdpsa-example from 's3://example-nix-cache'...
+warning: you did not specify '--add-root'; the result might be removed by the garbage collector
+/nix/store/m8bmqwrch6l3h8s0k3d673xpmipcdpsa-example
+</screen>
+</section>
+<section>
+  <title>Conclusion</title>
+  <para>
+    We now have a Nix installation configured to automatically sign and
+    upload every local build to a remote binary cache.
+  </para>
+
+  <para>
+    Before deploying this to production, be sure to consider the
+    implementation caveats in <xref linkend="chap-post-build-hook-caveats" />.
+  </para>
+</section>
+</chapter>
