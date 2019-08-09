@@ -64,7 +64,8 @@ Settings::Settings()
     }
 
 #if defined(__linux__) && defined(SANDBOX_SHELL)
-    sandboxPaths = tokenizeString<StringSet>("/bin/sh=" SANDBOX_SHELL);
+    if (SANDBOX_SHELL[0] != '\0')
+        sandboxPaths = tokenizeString<StringSet>("/bin/sh=" SANDBOX_SHELL);
 #endif
 
     allowedImpureHostPrefixes = tokenizeString<StringSet>(DEFAULT_ALLOWED_IMPURE_PREFIXES);
