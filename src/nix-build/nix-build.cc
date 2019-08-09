@@ -400,9 +400,12 @@ static void _main(int argc, char * * argv)
                 Path p = (Path) tmpDir + "/" + fn;
                 writeFile(p, var.second);
                 env[var.first + "Path"] = p;
-            } else if (var.first == "out")          // 'nix-shell' usualy has no permission to write to nix store, so 'installPhase' fails.
-                env[var.first] = absPath(outLink);  // this overrides derivation's $out with path passed in -o switch (or ./result by default).
-              else                                  // while in 'nix-build' ./result is a symlink to nix store path, in 'nix-shell' it is a real output path
+            } else if (drv.outputs.find(var.first) != drv.outputs.end()) {  // 'nix-shell' usualy has no permission to write to nix store, so 'installPhase' fails.
+                if (var.first == "out")                                     // this overrides derivation's $out with path passed in -o switch (or ./result by default).
+                    env[var.first] = absPath(outLink);                      // while in 'nix-build' ./result is a symlink to nix store path, in 'nix-shell' it is a real output path
+                else
+                    env[var.first] = absPath(outLink + "-" + var.first);
+             } else
                 env[var.first] = var.second;
 
         restoreAffinity();
