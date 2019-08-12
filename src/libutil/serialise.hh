@@ -179,6 +179,36 @@ struct TeeSource : Source
     }
 };
 
+/* A reader that consumes the original Source until 'size'. */
+struct SizedSource : Source
+{
+    Source & orig;
+    size_t remain;
+    SizedSource(Source & orig, size_t size)
+        : orig(orig), remain(size) { }
+    size_t read(unsigned char * data, size_t len)
+    {
+        if (this->remain <= 0) {
+            throw EndOfFile("sized: unexpected end-of-file");
+        }
+        len = std::min(len, this->remain);
+        size_t n = this->orig.read(data, len);
+        this->remain -= n;
+        return n;
+    }
+
+    /* Consume the original source until no remain data is left to consume. */
+    size_t drainAll()
+    {
+        std::vector<unsigned char> buf(8192);
+        size_t sum = 0;
+        while (this->remain > 0) {
+            size_t n = read(buf.data(), buf.size());
+            sum += n;
+        }
+        return sum;
+    }
+};
 
 /* Convert a function into a sink. */
 struct LambdaSink : Sink
