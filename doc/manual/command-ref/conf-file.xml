@@ -981,6 +981,34 @@ requiredSystemFeatures = [ "kvm" ];
 
   </varlistentry>
 
+  <varlistentry xml:id="conf-trace-function-calls"><term><literal>trace-function-calls</literal></term>
+
+    <listitem>
+
+      <para>Default: <literal>false</literal>.</para>
+
+      <para>If set to <literal>true</literal>, the Nix evaluator will
+      trace every function call. Nix will print a log message at the
+      "vomit" level for every function entrance and function exit.</para>
+
+      <informalexample><screen>
+function-trace entered undefined position at 1565795816999559622
+function-trace exited undefined position at 1565795816999581277
+function-trace entered /nix/store/.../example.nix:226:41 at 1565795253249935150
+function-trace exited /nix/store/.../example.nix:226:41 at 1565795253249941684
+</screen></informalexample>
+
+      <para>The <literal>undefined position</literal> means the function
+      call is a builtin.</para>
+
+      <para>Use the <literal>contrib/stack-collapse.py</literal> script
+      distributed with the Nix source code to convert the trace logs
+      in to a format suitable for <command>flamegraph.pl</command>.</para>
+
+    </listitem>
+
+  </varlistentry>
+
   <varlistentry xml:id="conf-trusted-public-keys"><term><literal>trusted-public-keys</literal></term>
 
     <listitem><para>A whitespace-separated list of public keys. When
