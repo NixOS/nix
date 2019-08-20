@@ -908,9 +908,7 @@ StoreType getStoreType(const std::string & uri, const std::string & stateDir)
     } else if (uri == "local" || hasPrefix(uri, "/")) {
         return tLocal;
     } else if (uri == "" || uri == "auto") {
-        if (access(stateDir.c_str(), R_OK | W_OK) == 0)
-            return tLocal;
-        else if (pathExists(settings.nixDaemonSocketFile))
+        if (pathExists(settings.nixDaemonSocketFile))
             return tDaemon;
         else
             return tLocal;
