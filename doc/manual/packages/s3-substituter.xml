@@ -173,11 +173,11 @@ the S3 URL:</para>
 
 
   <example><title>Uploading with a specific credential profile for Amazon S3</title>
-    <para><command>nix copy --to 's3://example-nix-cache?profile=cache-upload&amp;region=eu-west-2' nixpkgs.hello</command></para>
+    <para><programlisting>nix copy --to 's3://example-nix-cache?profile=cache-upload&amp;region=eu-west-2' nixpkgs.hello</programlisting></para>
   </example>
 
   <example><title>Uploading to an S3-Compatible Binary Cache</title>
-    <para><command>nix copy --to 's3://example-nix-cache?profile=cache-upload&amp;scheme=https&amp;endpoint=minio.example.com' nixpkgs.hello</command></para>
+    <para><programlisting>nix copy --to 's3://example-nix-cache?profile=cache-upload&amp;scheme=https&amp;endpoint=minio.example.com' nixpkgs.hello</programlisting></para>
   </example>
 </section>
 </section>
