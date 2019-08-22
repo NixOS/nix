@@ -95,7 +95,7 @@ Paths Store::importPaths(Source & source, std::shared_ptr<FSAccessor> accessor, 
         if (readInt(source) == 1)
             readString(source);
 
-        addToStore(info, tee.source.data, NoRepair, checkSigs, accessor);
+        addToStore(info, tee.source, NoRepair, checkSigs, accessor);
 
         res.push_back(info.path);
     }

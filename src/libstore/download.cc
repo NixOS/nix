@@ -878,7 +878,8 @@ CachedDownloadResult Downloader::downloadCached(
                 info.narHash = hashString(htSHA256, *sink.s);
                 info.narSize = sink.s->size();
                 info.ca = makeFixedOutputCA(false, hash);
-                store->addToStore(info, sink.s, NoRepair, NoCheckSigs);
+                StringSource source(*sink.s);
+                store->addToStore(info, source, NoRepair, NoCheckSigs);
                 storePath = info.path;
             }
 

@@ -111,10 +111,11 @@ void BinaryCacheStore::writeNarInfo(ref<NarInfo> narInfo)
         diskCache->upsertNarInfo(getUri(), hashPart, std::shared_ptr<NarInfo>(narInfo));
 }
 
-void BinaryCacheStore::addToStore(const ValidPathInfo & info, const ref<std::string> & nar,
+void BinaryCacheStore::addToStore(const ValidPathInfo & info, Source& narSource,
     RepairFlag repair, CheckSigsFlag checkSigs, std::shared_ptr<FSAccessor> accessor)
 {
     if (!repair && isValidPath(info.path)) return;
+    auto nar = narSource.drain();
 
     /* Verify that all references are valid. This may do some .narinfo
        reads, but typically they'll already be cached. */
@@ -127,12 +128,12 @@ void BinaryCacheStore::addToStore(const ValidPathInfo & info, const ref<std::str
                 % info.path % ref);
         }
 
-    assert(nar->compare(0, narMagic.size(), narMagic) == 0);
+    assert(nar.compare(0, narMagic.size(), narMagic) == 0);
 
     auto narInfo = make_ref<NarInfo>(info);
 
-    narInfo->narSize = nar->size();
-    narInfo->narHash = hashString(htSHA256, *nar);
+    narInfo->narSize = nar.size();
+    narInfo->narHash = hashString(htSHA256, nar);
 
     if (info.narHash && info.narHash != narInfo->narHash)
         throw Error(format("refusing to copy corrupted path '%1%' to binary cache") % info.path);
@@ -148,10 +149,10 @@ void BinaryCacheStore::addToStore(const ValidPathInfo & info, const ref<std::str
             JSONObject jsonRoot(jsonOut);
             jsonRoot.attr("version", 1);
 
-            auto narAccessor = makeNarAccessor(nar);
+            auto narAccessor = makeNarAccessor(make_ref<string>(nar));
 
             if (accessor_)
-                accessor_->addToCache(info.path, *nar, narAccessor);
+                accessor_->addToCache(info.path, nar, narAccessor);
 
             {
                 auto res = jsonRoot.placeholder("root");
@@ -164,13 +165,13 @@ void BinaryCacheStore::addToStore(const ValidPathInfo & info, const ref<std::str
 
     else {
         if (accessor_)
-            accessor_->addToCache(info.path, *nar, makeNarAccessor(nar));
+            accessor_->addToCache(info.path, nar, makeNarAccessor(make_ref<string>(nar)));
     }
 
     /* Compress the NAR. */
     narInfo->compression = compression;
     auto now1 = std::chrono::steady_clock::now();
-    auto narCompressed = compress(compression, *nar, parallelCompression);
+    auto narCompressed = compress(compression, nar, parallelCompression);
     auto now2 = std::chrono::steady_clock::now();
     narInfo->fileHash = hashString(htSHA256, *narCompressed);
     narInfo->fileSize = narCompressed->size();
@@ -178,7 +179,7 @@ void BinaryCacheStore::addToStore(const ValidPathInfo & info, const ref<std::str
     auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(now2 - now1).count();
     printMsg(lvlTalkative, format("copying path '%1%' (%2% bytes, compressed %3$.1f%% in %4% ms) to binary cache")
         % narInfo->path % narInfo->narSize
-        % ((1.0 - (double) narCompressed->size() / nar->size()) * 100.0)
+        % ((1.0 - (double) narCompressed->size() / nar.size()) * 100.0)
         % duration);
 
     /* Atomically write the NAR file. */
@@ -193,7 +194,7 @@ void BinaryCacheStore::addToStore(const ValidPathInfo & info, const ref<std::str
     } else
         stats.narWriteAverted++;
 
-    stats.narWriteBytes += nar->size();
+    stats.narWriteBytes += nar.size();
     stats.narWriteCompressedBytes += narCompressed->size();
     stats.narWriteCompressionTimeMs += duration;
 
@@ -290,7 +291,8 @@ Path BinaryCacheStore::addToStore(const string & name, const Path & srcPath,
     ValidPathInfo info;
     info.path = makeFixedOutputPath(recursive, h, name);
 
-    addToStore(info, sink.s, repair, CheckSigs, nullptr);
+    StringSource source(*sink.s);
+    addToStore(info, source, repair, CheckSigs, nullptr);
 
     return info.path;
 }
@@ -305,7 +307,8 @@ Path BinaryCacheStore::addTextToStore(const string & name, const string & s,
     if (repair || !isValidPath(info.path)) {
         StringSink sink;
         dumpString(s, sink);
-        addToStore(info, sink.s, repair, CheckSigs, nullptr);
+        StringSource source(*sink.s);
+        addToStore(info, source, repair, CheckSigs, nullptr);
     }
 
     return info.path;

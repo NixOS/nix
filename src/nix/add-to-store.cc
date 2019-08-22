@@ -51,8 +51,10 @@ struct CmdAddToStore : MixDryRun, StoreCommand
         info.path = store->makeFixedOutputPath(true, info.narHash, *namePart);
         info.ca = makeFixedOutputCA(true, info.narHash);
 
-        if (!dryRun)
-            store->addToStore(info, sink.s);
+        if (!dryRun) {
+          StringSource source(*sink.s);
+          store->addToStore(info, source);
+        }
 
         std::cout << fmt("%s\n", info.path);
     }
