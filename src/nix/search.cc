@@ -178,7 +178,7 @@ struct CmdSearch : SourceExprCommand, MixJSON
                             results[attrPath] = fmt(
                                 "* %s (%s)\n  %s\n",
                                 wrap("\e[0;1m", hilite(attrPath, attrPathMatch, "\e[0;1m")),
-                                wrap("\e[0;2m", hilite(name, nameMatch, "\e[0;2m")),
+                                wrap("\e[0;2m", name),
                                 hilite(description, descriptionMatch, ANSI_NORMAL));
                         }
                     }
