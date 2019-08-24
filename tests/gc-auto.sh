@@ -30,7 +30,7 @@ EOF
 )
 
 nix build -o $TEST_ROOT/result-A -L "($expr)" \
-    --min-free 1000 --max-free 2000 --min-free-check-interval 1 &
+    --no-net --min-free 1000 --max-free 2000 --min-free-check-interval 1 &
 pid=$!
 
 expr2=$(cat <<EOF
@@ -51,7 +51,7 @@ EOF
 )
 
 nix build -o $TEST_ROOT/result-B -L "($expr2)" \
-    --min-free 1000 --max-free 2000 --min-free-check-interval 1
+    --no-net --min-free 1000 --max-free 2000 --min-free-check-interval 1
 
 wait "$pid"
 
