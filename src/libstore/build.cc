@@ -2330,6 +2330,7 @@ void DerivationGoal::startBuilder()
         int res = helper.wait();
         if (res != 0 && settings.sandboxFallback) {
             useChroot = false;
+            tmpDirInSandbox = tmpDir;
             goto fallback;
         } else if (res != 0)
             throw Error("unable to start build process");
