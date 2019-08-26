@@ -11,16 +11,16 @@ if [ -n "$HOME" ] && [ -n "$USER" ]; then
 
     mkdir -m 0755 -p "$NIX_USER_PROFILE_DIR"
 
-    if [ "$(stat --printf '%u' "$NIX_USER_PROFILE_DIR")" != "$(id -u)" ]; then
-        echo "Nix: WARNING: bad ownership on "$NIX_USER_PROFILE_DIR", should be $(id -u)" >&2
+    if [ "$(stat --printf '%u' "$NIX_USER _PROFILE_DIR")" != "$(id -u)" ]; then
+        echo "Nix: WARNING: bad ownership on '$NIX_USER_PROFILE_DIR', should be $(id -u)" >&2
     fi
 
     if [ -w "$HOME" ]; then
         if ! [ -L "$NIX_LINK" ]; then
-            echo "Nix: creating $NIX_LINK" >&2
+            echo "Nix: creating '$NIX_LINK'" >&2
             if [ "$USER" != root ]; then
                 if ! ln -s "$NIX_USER_PROFILE_DIR"/profile "$NIX_LINK"; then
-                    echo "Nix: WARNING: could not create $NIX_LINK -> $NIX_USER_PROFILE_DIR/profile" >&2
+                    echo "Nix: WARNING: could not link '$NIX_LINK' to '$NIX_USER_PROFILE_DIR/profile'" >&2
                 fi
             else
                 # Root installs in the system-wide profile by default.
@@ -37,7 +37,7 @@ if [ -n "$HOME" ] && [ -n "$USER" ]; then
         __user_gcroots=@localstatedir@/nix/gcroots/per-user/"$USER"
         mkdir -m 0755 -p "$__user_gcroots"
         if [ "$(stat --printf '%u' "$__user_gcroots")" != "$(id -u)" ]; then
-            echo "Nix: WARNING: bad ownership on $__user_gcroots, should be $(id -u)" >&2
+            echo "Nix: WARNING: bad ownership on '$__user_gcroots', should be $(id -u)" >&2
         fi
         unset __user_gcroots
 
