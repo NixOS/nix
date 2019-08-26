@@ -44,7 +44,6 @@ if [ -n "$HOME" ] && [ -n "$USER" ]; then
         if [ "$(stat --printf '%u' "$__user_gcroots")" != "$(id -u)" ]; then
             echo "Nix: WARNING: bad ownership on '$__user_gcroots', should be $(id -u)," >&2
             echo "              please delete '$__user_gcroots'." >&2
-            __safe=1
         fi
         unset __user_gcroots
 
