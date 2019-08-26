@@ -1,6 +1,6 @@
 if [ -n "$HOME" ] && [ -n "$USER" ]; then
     # __safe: if it is safe to "activate" Nix. 0 is safe, 1 is unsafe
-    __safe=0
+    __safe=1
     __savedpath="$PATH"
     export PATH=@coreutils@
 
@@ -13,11 +13,12 @@ if [ -n "$HOME" ] && [ -n "$USER" ]; then
 
     mkdir -m 0755 -p "$NIX_USER_PROFILE_DIR"
 
-    if [ "$(stat --printf '%u' "$NIX_USER_PROFILE_DIR")" != "$(id -u)" ]; then
+    if [ "$(stat --printf '%u' "$NIX_USER_PROFILE_DIR")" -eq "$(id -u)" ]; then
+        __safe=0
+    else
         echo "Nix: WARNING: bad ownership on '$NIX_USER_PROFILE_DIR', should be $(id -u)," >&2
         echo "              please delete '$NIX_USER_PROFILE_DIR'. The current ownership" >&2
         echo "              allows other users to install software for you." >&2
-        __safe=1
     fi
 
     if [ -w "$HOME" ]; then
