@@ -13,7 +13,7 @@ if [ -n "$HOME" ] && [ -n "$USER" ]; then
 
     mkdir -m 0755 -p "$NIX_USER_PROFILE_DIR"
 
-    if [ "$(stat --printf '%u' "$NIX_USER _PROFILE_DIR")" != "$(id -u)" ]; then
+    if [ "$(stat --printf '%u' "$NIX_USER_PROFILE_DIR")" != "$(id -u)" ]; then
         echo "Nix: WARNING: bad ownership on '$NIX_USER_PROFILE_DIR', should be $(id -u)," >&2
         echo "              please delete '$NIX_USER_PROFILE_DIR'." >&2
         __safe=1
