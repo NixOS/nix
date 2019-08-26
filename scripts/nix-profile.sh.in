@@ -15,7 +15,8 @@ if [ -n "$HOME" ] && [ -n "$USER" ]; then
 
     if [ "$(stat --printf '%u' "$NIX_USER_PROFILE_DIR")" != "$(id -u)" ]; then
         echo "Nix: WARNING: bad ownership on '$NIX_USER_PROFILE_DIR', should be $(id -u)," >&2
-        echo "              please delete '$NIX_USER_PROFILE_DIR'." >&2
+        echo "              please delete '$NIX_USER_PROFILE_DIR'. The current ownership" >&2
+        echo "              allows other users to install software for you." >&2
         __safe=1
     fi
 
@@ -55,7 +56,7 @@ if [ -n "$HOME" ] && [ -n "$USER" ]; then
             if [ "$(stat --printf '%u' @localstatedir@/nix/profiles/per-user/root)" -eq 0 ]; then
                 if [ "$USER" != root ] && [ ! -L "$__nix_defexpr"/channels_root ]; then
                     if [ -d @localstatedir@/nix/profiles/per-user/root ]; then
-                        ln -s @localstatedir@/nix/profiles/per-user/root/channels "$__nix_defexpr"/channels_root # !!! is this safe?
+                        ln -s @localstatedir@/nix/profiles/per-user/root/channels "$__nix_defexpr"/channels_root
                     fi
                 fi
             else
