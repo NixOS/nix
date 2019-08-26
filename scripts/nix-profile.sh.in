@@ -52,18 +52,19 @@ if [ -n "$HOME" ] && [ -n "$USER" ]; then
         __nix_defexpr="$HOME"/.nix-defexpr
         [ -L "$__nix_defexpr" ] && rm -f "$__nix_defexpr"
         mkdir -m 0755 -p "$__nix_defexpr"
-        if [ "$USER" != root ] && [ ! -L "$__nix_defexpr"/channels_root ]; then
-            if [ -d @localstatedir@/nix/profiles/per-user/root ]; then
-                if [ "$(stat --printf '%u' @localstatedir@/nix/profiles/per-user/root)" -eq 0 ]; then
-                    # This runs if we are not root, the channels_root symlink doesn't already exist,
-                    # and the root per-user profile is actually owned by root.
-                    ln -s @localstatedir@/nix/profiles/per-user/root/channels "$__nix_defexpr"/channels_root # !!! is this safe?
-                else
-                    echo "Nix: WARNING: bad ownership on '@localstatedir@/nix/profiles/per-user/root',"
-                    echo "              the root user should own it."
+        if [ -d @localstatedir@/nix/profiles/per-user/root ]; then
+            if [ "$(stat --printf '%u' @localstatedir@/nix/profiles/per-user/root)" -eq 0 ]; then
+                if [ "$USER" != root ] && [ ! -L "$__nix_defexpr"/channels_root ]; then
+                    if [ -d @localstatedir@/nix/profiles/per-user/root ]; then
+                        ln -s @localstatedir@/nix/profiles/per-user/root/channels "$__nix_defexpr"/channels_root # !!! is this safe?
+                    fi
                 fi
+            else
+                echo "Nix: WARNING: bad ownership on '@localstatedir@/nix/profiles/per-user/root':"
+                echo "              the root user should own it."
             fi
         fi
+
         unset __nix_defexpr
     fi
 
