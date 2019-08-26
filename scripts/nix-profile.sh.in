@@ -1,4 +1,6 @@
 if [ -n "$HOME" ] && [ -n "$USER" ]; then
+    # __safe: if it is safe to "activate" Nix. 0 is safe, 1 is unsafe
+    __safe=0
     __savedpath="$PATH"
     export PATH=@coreutils@
 
@@ -14,6 +16,7 @@ if [ -n "$HOME" ] && [ -n "$USER" ]; then
     if [ "$(stat --printf '%u' "$NIX_USER _PROFILE_DIR")" != "$(id -u)" ]; then
         echo "Nix: WARNING: bad ownership on '$NIX_USER_PROFILE_DIR', should be $(id -u)," >&2
         echo "              please delete '$NIX_USER_PROFILE_DIR'." >&2
+        __safe=1
     fi
 
     if [ -w "$HOME" ]; then
@@ -25,6 +28,7 @@ if [ -n "$HOME" ] && [ -n "$USER" ]; then
                 fi
             else
                 # Root installs in the system-wide profile by default.
+                # nix/profiles is not writable by arbitrary users
                 ln -s @localstatedir@/nix/profiles/default "$NIX_LINK"
             fi
         fi
@@ -40,6 +44,7 @@ if [ -n "$HOME" ] && [ -n "$USER" ]; then
         if [ "$(stat --printf '%u' "$__user_gcroots")" != "$(id -u)" ]; then
             echo "Nix: WARNING: bad ownership on '$__user_gcroots', should be $(id -u)," >&2
             echo "              please delete '$__user_gcroots'." >&2
+            __safe=1
         fi
         unset __user_gcroots
 
@@ -48,38 +53,51 @@ if [ -n "$HOME" ] && [ -n "$USER" ]; then
         [ -L "$__nix_defexpr" ] && rm -f "$__nix_defexpr"
         mkdir -m 0755 -p "$__nix_defexpr"
         if [ "$USER" != root ] && [ ! -L "$__nix_defexpr"/channels_root ]; then
-            ln -s @localstatedir@/nix/profiles/per-user/root/channels "$__nix_defexpr"/channels_root
+            if [ -d @localstatedir@/nix/profiles/per-user/root ]; then
+                if [ "$(stat --printf '%u' @localstatedir@/nix/profiles/per-user/root)" -eq 0 ]; then
+                    # This runs if we are not root, the channels_root symlink doesn't already exist,
+                    # and the root per-user profile is actually owned by root.
+                    ln -s @localstatedir@/nix/profiles/per-user/root/channels "$__nix_defexpr"/channels_root # !!! is this safe?
+                else
+                    echo "Nix: WARNING: bad ownership on '@localstatedir@/nix/profiles/per-user/root',"
+                    echo "              the root user should own it."
+                fi
+            fi
         fi
         unset __nix_defexpr
     fi
 
-    # Append ~/.nix-defexpr/channels to $NIX_PATH so that <nixpkgs>
-    # paths work when the user has fetched the Nixpkgs channel.
-    export NIX_PATH=${NIX_PATH:+$NIX_PATH:}$HOME/.nix-defexpr/channels
+    if [ "$__safe" -eq 1 ]; then
+        echo "Nix: WARNING: Not activating due to the above warnings." >&2
+    else
+        # Append ~/.nix-defexpr/channels to $NIX_PATH so that <nixpkgs>
+        # paths work when the user has fetched the Nixpkgs channel.
+        export NIX_PATH=${NIX_PATH:+$NIX_PATH:}$HOME/.nix-defexpr/channels
 
-    # Set up environment.
-    # This part should be kept in sync with nixpkgs:nixos/modules/programs/environment.nix
-    export NIX_PROFILES="@localstatedir@/nix/profiles/default $HOME/.nix-profile"
+        # Set up environment.
+        # This part should be kept in sync with nixpkgs:nixos/modules/programs/environment.nix
+        export NIX_PROFILES="@localstatedir@/nix/profiles/default $HOME/.nix-profile"
 
-    # Set $NIX_SSL_CERT_FILE so that Nixpkgs applications like curl work.
-    if [ -e /etc/ssl/certs/ca-certificates.crt ]; then # NixOS, Ubuntu, Debian, Gentoo, Arch
-        export NIX_SSL_CERT_FILE=/etc/ssl/certs/ca-certificates.crt
-    elif [ -e /etc/ssl/ca-bundle.pem ]; then # openSUSE Tumbleweed
-        export NIX_SSL_CERT_FILE=/etc/ssl/ca-bundle.pem
-    elif [ -e /etc/ssl/certs/ca-bundle.crt ]; then # Old NixOS
-        export NIX_SSL_CERT_FILE=/etc/ssl/certs/ca-bundle.crt
-    elif [ -e /etc/pki/tls/certs/ca-bundle.crt ]; then # Fedora, CentOS
-        export NIX_SSL_CERT_FILE=/etc/pki/tls/certs/ca-bundle.crt
-    elif [ -e "$NIX_LINK/etc/ssl/certs/ca-bundle.crt" ]; then # fall back to cacert in Nix profile
-        export NIX_SSL_CERT_FILE="$NIX_LINK/etc/ssl/certs/ca-bundle.crt"
-    elif [ -e "$NIX_LINK/etc/ca-bundle.crt" ]; then # old cacert in Nix profile
-        export NIX_SSL_CERT_FILE="$NIX_LINK/etc/ca-bundle.crt"
+        # Set $NIX_SSL_CERT_FILE so that Nixpkgs applications like curl work.
+        if [ -e /etc/ssl/certs/ca-certificates.crt ]; then # NixOS, Ubuntu, Debian, Gentoo, Arch
+            export NIX_SSL_CERT_FILE=/etc/ssl/certs/ca-certificates.crt
+        elif [ -e /etc/ssl/ca-bundle.pem ]; then # openSUSE Tumbleweed
+            export NIX_SSL_CERT_FILE=/etc/ssl/ca-bundle.pem
+        elif [ -e /etc/ssl/certs/ca-bundle.crt ]; then # Old NixOS
+            export NIX_SSL_CERT_FILE=/etc/ssl/certs/ca-bundle.crt
+        elif [ -e /etc/pki/tls/certs/ca-bundle.crt ]; then # Fedora, CentOS
+            export NIX_SSL_CERT_FILE=/etc/pki/tls/certs/ca-bundle.crt
+        elif [ -e "$NIX_LINK/etc/ssl/certs/ca-bundle.crt" ]; then # fall back to cacert in Nix profile
+            export NIX_SSL_CERT_FILE="$NIX_LINK/etc/ssl/certs/ca-bundle.crt"
+        elif [ -e "$NIX_LINK/etc/ca-bundle.crt" ]; then # old cacert in Nix profile
+            export NIX_SSL_CERT_FILE="$NIX_LINK/etc/ca-bundle.crt"
+        fi
+
+        if [ -n "${MANPATH-}" ]; then
+            export MANPATH="$NIX_LINK/share/man:$MANPATH"
+        fi
+
+        export PATH="$NIX_LINK/bin:$__savedpath"
     fi
-
-    if [ -n "${MANPATH-}" ]; then
-        export MANPATH="$NIX_LINK/share/man:$MANPATH"
-    fi
-
-    export PATH="$NIX_LINK/bin:$__savedpath"
-    unset __savedpath NIX_LINK NIX_USER_PROFILE_DIR
+    unset __unsafe __savedpath NIX_LINK NIX_USER_PROFILE_DIR
 fi
