@@ -12,7 +12,8 @@ if [ -n "$HOME" ] && [ -n "$USER" ]; then
     mkdir -m 0755 -p "$NIX_USER_PROFILE_DIR"
 
     if [ "$(stat --printf '%u' "$NIX_USER _PROFILE_DIR")" != "$(id -u)" ]; then
-        echo "Nix: WARNING: bad ownership on '$NIX_USER_PROFILE_DIR', should be $(id -u)" >&2
+        echo "Nix: WARNING: bad ownership on '$NIX_USER_PROFILE_DIR', should be $(id -u)," >&2
+        echo "              please delete '$NIX_USER_PROFILE_DIR'." >&2
     fi
 
     if [ -w "$HOME" ]; then
@@ -37,7 +38,8 @@ if [ -n "$HOME" ] && [ -n "$USER" ]; then
         __user_gcroots=@localstatedir@/nix/gcroots/per-user/"$USER"
         mkdir -m 0755 -p "$__user_gcroots"
         if [ "$(stat --printf '%u' "$__user_gcroots")" != "$(id -u)" ]; then
-            echo "Nix: WARNING: bad ownership on '$__user_gcroots', should be $(id -u)" >&2
+            echo "Nix: WARNING: bad ownership on '$__user_gcroots', should be $(id -u)," >&2
+            echo "              please delete '$__user_gcroots'." >&2
         fi
         unset __user_gcroots
 
