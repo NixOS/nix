@@ -14,7 +14,12 @@
     <key>RunAtLoad</key>
     <true/>
     <key>Program</key>
-    <string>@bindir@/nix-daemon</string>
+    <string>/bin/sh</string>
+    <key>ProgramArguments</key>
+    <array>
+      <string>-c</string>
+      <string>/bin/wait4path @bindir@/nix-daemon &amp;&amp; @bindir@/nix-daemon</string>
+    </array>
     <key>StandardErrorPath</key>
     <string>/var/log/nix-daemon.log</string>
     <key>StandardOutPath</key>
