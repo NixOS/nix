@@ -30,12 +30,11 @@ case "$(uname -s).$(uname -m)" in
     *) oops "sorry, there is no binary distribution of Nix for your platform";;
 esac
 
-url="https://nixos.org/releases/nix/nix-@nixVersion@/nix-@nixVersion@-$system.tar.bz2"
+url="https://nixos.org/releases/nix/nix-@nixVersion@/nix-@nixVersion@-$system.tar.xz"
 
-tarball="$tmpDir/$(basename "$tmpDir/nix-@nixVersion@-$system.tar.bz2")"
+tarball="$tmpDir/$(basename "$tmpDir/nix-@nixVersion@-$system.tar.xz")"
 
 require_util curl "download the binary tarball"
-require_util bzcat "decompress the binary tarball"
 require_util tar "unpack the binary tarball"
 
 echo "downloading Nix @nixVersion@ binary tarball for $system from '$url' to '$tmpDir'..."
@@ -57,7 +56,7 @@ fi
 
 unpack=$tmpDir/unpack
 mkdir -p "$unpack"
-< "$tarball" bzcat | tar -xf - -C "$unpack" || oops "failed to unpack '$url'"
+tar -xf "$tarball" -C "$unpack" || oops "failed to unpack '$url'"
 
 script=$(echo "$unpack"/*/install)
 
