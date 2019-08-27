@@ -72,7 +72,12 @@ let
           # https://github.com/NixOS/nixpkgs/issues/45462
           ''
             mkdir -p $out/lib
-            cp ${boost}/lib/libboost_context* $out/lib
+            cp -pd ${boost}/lib/{libboost_context*,libboost_thread*,libboost_system*} $out/lib
+            rm -f $out/lib/*.a
+            chmod u+w $out/lib/*.so.*
+            ${lib.optionalString stdenv.isLinux ''
+              patchelf --set-rpath $out/lib:${stdenv.cc.cc.lib}/lib $out/lib/libboost_thread.so.*
+            ''}
           '';
 
         configureFlags = configureFlags ++
