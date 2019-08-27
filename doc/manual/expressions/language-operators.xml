@@ -190,7 +190,7 @@ weakest binding).</para>
         <entry>11</entry>
       </row>
       <row>
-        <entry>Logical And</entry>
+        <entry>Logical AND</entry>
         <entry><replaceable>e1</replaceable> <literal>&amp;&amp;</literal>
         <replaceable>e2</replaceable></entry>
         <entry>left</entry>
@@ -198,7 +198,7 @@ weakest binding).</para>
         <entry>12</entry>
       </row>
       <row>
-        <entry>Logical Or</entry>
+        <entry>Logical OR</entry>
         <entry><replaceable>e1</replaceable> <literal>||</literal>
         <replaceable>e2</replaceable></entry>
         <entry>left</entry>
