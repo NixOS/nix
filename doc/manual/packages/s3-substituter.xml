@@ -133,7 +133,7 @@ the S3 URL:</para>
 <section xml:id="ssec-s3-substituter-authenticated-writes">
   <title>Authenticated Writes to your S3-compatible binary cache</title>
 
-  <para>Nix support fully supports writing to Amazon S3 and S3
+  <para>Nix fully supports writing to Amazon S3 and S3
   compatible buckets. The binary cache URL for our example bucket will
   be <uri>s3://example-nix-cache</uri>.</para>
 
