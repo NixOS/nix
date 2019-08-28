@@ -13,6 +13,8 @@ ifneq ($(OS), FreeBSD)
  libstore_LDFLAGS += -ldl
 endif
 
+libstore_WHOLE_ARCHIVE = 1
+
 ifeq ($(OS), Darwin)
 libstore_FILES = sandbox-defaults.sb sandbox-minimal.sb sandbox-network.sb
 endif

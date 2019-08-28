@@ -50,6 +50,11 @@ endif
 #   target andwill not be listed in the make help output. This is
 #   useful for libraries built solely for testing, for example.
 #
+# - $(1)_WHOLE_ARCHIVE: if defined, the whole archive of the static
+#   library will be used. This is necessary when using global
+#   constructors such as setting up a RegisterStoreImplementation.
+#   Only applies when BUILD_SHARED_LIBS=0.
+#
 # - BUILD_SHARED_LIBS: if equal to ‘1’, a dynamic library will be
 #   built, otherwise a static library.
 define build-library
@@ -136,16 +141,20 @@ define build-library
     # -force_load that seems to work similarly, but takes one argument
     # instead of a group of arguments.
 
-    ifeq ($(OS), Linux)
-      $(1)_LDFLAGS_USE += -Wl,--whole-archive
-    else ifeq ($(OS), Darwin)
-      $(1)_LDFLAGS_USE += -Wl,-force_load
+    ifdef $(1)_WHOLE_ARCHIVE
+      ifeq ($(OS), Linux)
+        $(1)_LDFLAGS_USE += -Wl,--whole-archive
+      else ifeq ($(OS), Darwin)
+        $(1)_LDFLAGS_USE += -Wl,-force_load
+      endif
     endif
 
     $(1)_LDFLAGS_USE += $$($(1)_PATH)
 
-    ifeq ($(OS), Linux)
-      $(1)_LDFLAGS_USE += -Wl,--no-whole-archive
+    ifdef $(1)_WHOLE_ARCHIVE
+      ifeq ($(OS), Linux)
+        $(1)_LDFLAGS_USE += -Wl,--no-whole-archive
+      endif
     endif
 
     $(1)_LDFLAGS_USE += $$($(1)_LDFLAGS)
