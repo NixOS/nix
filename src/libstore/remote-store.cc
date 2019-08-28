@@ -191,6 +191,13 @@ void RemoteStore::setOptions(Connection & conn)
     if (GET_PROTOCOL_MINOR(conn.daemonVersion) >= 12) {
         std::map<std::string, Config::SettingInfo> overrides;
         globalConfig.getSettings(overrides, true);
+        overrides.erase(settings.keepFailed.name);
+        overrides.erase(settings.keepGoing.name);
+        overrides.erase(settings.tryFallback.name);
+        overrides.erase(settings.maxBuildJobs.name);
+        overrides.erase(settings.maxSilentTime.name);
+        overrides.erase(settings.buildCores.name);
+        overrides.erase(settings.useSubstitutes.name);
         conn.to << overrides.size();
         for (auto & i : overrides)
             conn.to << i.first << i.second.value;
