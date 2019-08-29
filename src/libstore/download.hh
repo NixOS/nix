@@ -24,6 +24,9 @@ struct DownloadSettings : Config
     Setting<unsigned long> connectTimeout{this, 0, "connect-timeout",
         "Timeout for connecting to servers during downloads. 0 means use curl's builtin default."};
 
+    Setting<unsigned long> stalledDownloadTimeout{this, 300, "stalled-download-timeout",
+        "Timeout (in seconds) for receiving data from servers during download. Nix cancels idle downloads after this timeout's duration."};
+
     Setting<unsigned int> tries{this, 5, "download-attempts",
         "How often Nix will attempt to download a file before giving up."};
 };

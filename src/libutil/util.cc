@@ -397,7 +397,7 @@ static void _deletePath(const Path & path, unsigned long long & bytesFreed)
     }
 
     if (!S_ISDIR(st.st_mode) && st.st_nlink == 1)
-        bytesFreed += st.st_blocks * 512;
+        bytesFreed += st.st_size;
 
     if (S_ISDIR(st.st_mode)) {
         /* Make the directory accessible. */

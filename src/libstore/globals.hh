@@ -209,6 +209,9 @@ public:
         "The paths to make available inside the build sandbox.",
         {"build-chroot-dirs", "build-sandbox-paths"}};
 
+    Setting<bool> sandboxFallback{this, true, "sandbox-fallback",
+        "Whether to disable sandboxing when the kernel doesn't allow it."};
+
     Setting<PathSet> extraSandboxPaths{this, {}, "extra-sandbox-paths",
         "Additional paths to make available inside the build sandbox.",
         {"build-extra-chroot-dirs", "build-extra-sandbox-paths"}};

@@ -30,6 +30,7 @@ nix_tests = \
   search.sh \
   nix-copy-ssh.sh \
   post-hook.sh \
+  function-trace.sh \
   flakes.sh
   # parallel.sh
 
