@@ -6,6 +6,9 @@ garbage1=$(nix add-to-store --name garbage1 ./tarball.sh)
 garbage2=$(nix add-to-store --name garbage2 ./tarball.sh)
 garbage3=$(nix add-to-store --name garbage3 ./tarball.sh)
 
+ls -l $garbage3
+du $garbage3
+
 fake_free=$TEST_ROOT/fake-free
 export _NIX_TEST_FREE_SPACE_FILE=$fake_free
 echo 1100 > $fake_free
