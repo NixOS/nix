@@ -1370,10 +1370,13 @@ profile.  The generations can be a list of generation numbers, the
 special value <literal>old</literal> to delete all non-current
 generations,  a value such as <literal>30d</literal> to delete all
 generations older than the specified number of days (except for the
-generation that was active at that point in time), or a value such as.
-<literal>+5</literal> to only keep the specified items older than the
-current generation. Periodically deleting old generations is important
-to make garbage collection effective.</para>
+generation that was active at that point in time), or a value such as
+<literal>+5</literal> to keep the last <literal>5</literal> generations
+ignoring any newer than current, e.g., if <literal>30</literal> is the current
+generation <literal>+5</literal> will delete generation <literal>25</literal>
+and all older generations.
+Periodically deleting old generations is important to make garbage collection
+effective.</para>
 
 </refsection>
 
