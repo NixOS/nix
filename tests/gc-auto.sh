@@ -2,12 +2,12 @@ source common.sh
 
 clearStore
 
-garbage1=$(nix add-to-store --name garbage1 ./tarball.sh)
-garbage2=$(nix add-to-store --name garbage2 ./tarball.sh)
-garbage3=$(nix add-to-store --name garbage3 ./tarball.sh)
+garbage1=$(nix add-to-store --name garbage1 ./nar-access.sh)
+garbage2=$(nix add-to-store --name garbage2 ./nar-access.sh)
+garbage3=$(nix add-to-store --name garbage3 ./nar-access.sh)
 
 ls -l $garbage3
-du $garbage3
+POSIXLY_CORRECT=1 du $garbage3
 
 fake_free=$TEST_ROOT/fake-free
 export _NIX_TEST_FREE_SPACE_FILE=$fake_free
