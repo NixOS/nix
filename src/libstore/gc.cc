@@ -920,10 +920,10 @@ void LocalStore::autoGC(bool sync)
                     promise.set_value();
                 });
 
-                printInfo("running auto-GC to free %d bytes", settings.maxFree - avail);
-
                 GCOptions options;
                 options.maxFreed = settings.maxFree - avail;
+
+                printInfo("running auto-GC to free %d bytes", options.maxFreed);
 
                 GCResults results;
 
