@@ -97,6 +97,10 @@ void checkStoreName(const string & name)
        reasons (e.g., "." and ".."). */
     if (string(name, 0, 1) == ".")
         throw Error(baseError % "it is illegal to start the name with a period");
+    /* Disallow names longer than 211 characters. ext4’s max is 256,
+       but we need extra space for the hash and .chroot extensions. */
+    if (name.length() > 211)
+        throw Error(baseError % "name must be less than 212 characters");
     for (auto & i : name)
         if (!((i >= 'A' && i <= 'Z') ||
               (i >= 'a' && i <= 'z') ||
