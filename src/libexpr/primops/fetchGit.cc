@@ -31,7 +31,6 @@ GitInfo exportGit(ref<Store> store, std::string uri,
     // or revision is given, then allow the use of an unclean working
     // tree.
     if (!ref && !rev && isLocal) {
-
         bool clean = true;
 
         try {

@@ -240,10 +240,13 @@ cat > $flake3Dir/flake.nix <<EOF
 
   edition = 201909;
 
-  inputs = [ "flake1" "flake2" ];
-
-  nonFlakeInputs = {
-    nonFlake = "$nonFlakeDir";
+  inputs = {
+    flake1 = {};
+    flake2 = {};
+    nonFlake = {
+      uri = "$nonFlakeDir";
+      flake = false;
+    };
   };
 
   description = "Fnord";
@@ -306,23 +309,24 @@ cat > $flake3Dir/flake.nix <<EOF
 
   edition = 201909;
 
-  inputs = [ "flake1" "flake2" ];
-
-  nonFlakeInputs = {
-    nonFlake = "$nonFlakeDir";
+  inputs = {
+    nonFlake = {
+      uri = "$nonFlakeDir";
+      flake = false;
+    };
   };
 
   description = "Fnord";
 
-  outputs = inputs: rec {
-    packages.sth = inputs.flake1.packages.foo;
+  outputs = { self, flake1, flake2, nonFlake }: rec {
+    packages.sth = flake1.packages.foo;
     packages.fnord =
       with import ./config.nix;
       mkDerivation {
         inherit system;
         name = "fnord";
         buildCommand = ''
-          cat \${inputs.nonFlake}/README.md > \$out
+          cat \${nonFlake}/README.md > \$out
         '';
       };
   };

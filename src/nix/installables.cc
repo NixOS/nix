@@ -217,24 +217,19 @@ void makeFlakeClosureGCRoot(Store & store,
     assert(store.isValidPath(resFlake.flake.sourceInfo.storePath));
     closure.insert(resFlake.flake.sourceInfo.storePath);
 
-    std::queue<std::reference_wrapper<const flake::FlakeInputs>> queue;
+    std::queue<std::reference_wrapper<const flake::LockedInputs>> queue;
     queue.push(resFlake.lockFile);
 
     while (!queue.empty()) {
-        const flake::FlakeInputs & flake = queue.front();
+        const flake::LockedInputs & flake = queue.front();
         queue.pop();
         /* Note: due to lazy fetching, these paths might not exist
            yet. */
-        for (auto & dep : flake.flakeInputs) {
+        for (auto & dep : flake.inputs) {
             auto path = dep.second.computeStorePath(store);
             if (store.isValidPath(path))
                 closure.insert(path);
             queue.push(dep.second);
-        }
-        for (auto & dep : flake.nonFlakeInputs) {
-            auto path = dep.second.computeStorePath(store);
-            if (store.isValidPath(path))
-                closure.insert(path);
         }
     }
 

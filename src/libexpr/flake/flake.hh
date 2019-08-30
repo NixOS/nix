@@ -58,26 +58,24 @@ struct SourceInfo
     SourceInfo(const FlakeRef & resolvRef) : resolvedRef(resolvRef) {};
 };
 
+struct FlakeInput
+{
+    FlakeRef ref;
+    bool isFlake = true;
+    FlakeInput(const FlakeRef & ref) : ref(ref) {};
+};
+
 struct Flake
 {
     FlakeId id;
     FlakeRef originalRef;
     std::string description;
     SourceInfo sourceInfo;
-    std::vector<FlakeRef> inputs;
-    std::map<FlakeAlias, FlakeRef> nonFlakeInputs;
+    std::map<FlakeId, FlakeInput> inputs;
     Value * vOutputs; // FIXME: gc
     unsigned int edition;
 
     Flake(const FlakeRef & origRef, const SourceInfo & sourceInfo)
-        : originalRef(origRef), sourceInfo(sourceInfo) {};
-};
-
-struct NonFlake
-{
-    FlakeRef originalRef;
-    SourceInfo sourceInfo;
-    NonFlake(const FlakeRef & origRef, const SourceInfo & sourceInfo)
         : originalRef(origRef), sourceInfo(sourceInfo) {};
 };
 
@@ -108,7 +106,7 @@ ResolvedFlake resolveFlake(EvalState &, const FlakeRef &, HandleLockFile);
 
 void callFlake(EvalState & state,
     const Flake & flake,
-    const FlakeInputs & inputs,
+    const LockedInputs & inputs,
     Value & v);
 
 void callFlake(EvalState & state,

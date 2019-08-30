@@ -248,22 +248,28 @@ Flake getFlake(EvalState & state, const FlakeRef & flakeRef)
         flake.description = state.forceStringNoCtx(*(**description).value, *(**description).pos);
 
     auto sInputs = state.symbols.create("inputs");
+    auto sUri = state.symbols.create("uri");
+    auto sFlake = state.symbols.create("flake");
 
-    if (auto inputs = vInfo.attrs->get(sInputs)) {
-        state.forceList(*(**inputs).value, *(**inputs).pos);
-        for (unsigned int n = 0; n < (**inputs).value->listSize(); ++n)
-            flake.inputs.push_back(FlakeRef(state.forceStringNoCtx(
-                *(**inputs).value->listElems()[n], *(**inputs).pos)));
-    }
+    if (std::optional<Attr *> inputs = vInfo.attrs->get(sInputs)) {
+        state.forceAttrs(*(**inputs).value, *(**inputs).pos);
 
-    auto sNonFlakeInputs = state.symbols.create("nonFlakeInputs");
+        for (Attr inputAttr : *(*(**inputs).value).attrs) {
+            state.forceAttrs(*inputAttr.value, *inputAttr.pos);
 
-    if (std::optional<Attr *> nonFlakeInputs = vInfo.attrs->get(sNonFlakeInputs)) {
-        state.forceAttrs(*(**nonFlakeInputs).value, *(**nonFlakeInputs).pos);
-        for (Attr attr : *(*(**nonFlakeInputs).value).attrs) {
-            std::string myNonFlakeUri = state.forceStringNoCtx(*attr.value, *attr.pos);
-            FlakeRef nonFlakeRef = FlakeRef(myNonFlakeUri);
-            flake.nonFlakeInputs.insert_or_assign(attr.name, nonFlakeRef);
+            FlakeInput input(FlakeRef(inputAttr.name));
+
+            for (Attr attr : *(inputAttr.value->attrs)) {
+                if (attr.name == sUri) {
+                    input.ref = state.forceStringNoCtx(*attr.value, *attr.pos);
+                } else if (attr.name == sFlake) {
+                    input.isFlake = state.forceBool(*attr.value, *attr.pos);
+                } else
+                    throw Error("flake input '%s' has an unsupported attribute '%s', at %s",
+                        inputAttr.name, attr.name, *attr.pos);
+            }
+
+            flake.inputs.emplace(inputAttr.name, input);
         }
     }
 
@@ -275,9 +281,8 @@ Flake getFlake(EvalState & state, const FlakeRef & flakeRef)
 
         if (flake.vOutputs->lambda.fun->matchAttrs) {
             for (auto & formal : flake.vOutputs->lambda.fun->formals->formals) {
-                if (formal.name != state.sSelf) {
-                    flake.inputs.push_back(FlakeRef(formal.name));
-                }
+                if (formal.name != state.sSelf)
+                    flake.inputs.emplace(formal.name, FlakeInput(FlakeRef(formal.name)));
             }
         }
 
@@ -290,7 +295,6 @@ Flake getFlake(EvalState & state, const FlakeRef & flakeRef)
             attr.name != state.sName &&
             attr.name != state.sDescription &&
             attr.name != sInputs &&
-            attr.name != sNonFlakeInputs &&
             attr.name != sOutputs)
             throw Error("flake '%s' has an unsupported attribute '%s', at %s",
                 flakeRef, attr.name, *attr.pos);
@@ -299,21 +303,19 @@ Flake getFlake(EvalState & state, const FlakeRef & flakeRef)
     return flake;
 }
 
-NonFlake getNonFlake(EvalState & state, const FlakeRef & flakeRef)
+static SourceInfo getNonFlake(EvalState & state, const FlakeRef & flakeRef)
 {
     auto sourceInfo = fetchFlake(state, flakeRef);
     debug("got non-flake source '%s' with flakeref %s", sourceInfo.storePath, sourceInfo.resolvedRef.to_string());
 
     FlakeRef resolvedRef = sourceInfo.resolvedRef;
 
-    NonFlake nonFlake(flakeRef, sourceInfo);
-
-    state.store->assertStorePath(nonFlake.sourceInfo.storePath);
+    state.store->assertStorePath(sourceInfo.storePath);
 
     if (state.allowedPaths)
-        state.allowedPaths->insert(nonFlake.sourceInfo.storePath);
+        state.allowedPaths->insert(sourceInfo.storePath);
 
-    return nonFlake;
+    return sourceInfo;
 }
 
 bool allowedToWrite(HandleLockFile handle)
@@ -346,46 +348,33 @@ bool allowedToUseRegistries(HandleLockFile handle, bool isTopRef)
 
    Note that this is lazy: we only recursively fetch inputs that are
    not in the lockfile yet. */
-static std::pair<Flake, FlakeInput> updateLocks(
+static std::pair<Flake, LockedInput> updateLocks(
     EvalState & state,
     const Flake & flake,
     HandleLockFile handleLockFile,
-    const FlakeInputs & oldEntry,
+    const LockedInputs & oldEntry,
     bool topRef)
 {
-    FlakeInput newEntry(
-        flake.id,
+    LockedInput newEntry(
         flake.sourceInfo.resolvedRef,
         flake.sourceInfo.narHash);
 
-    for (auto & input : flake.nonFlakeInputs) {
-        auto & id = input.first;
-        auto & ref = input.second;
-        auto i = oldEntry.nonFlakeInputs.find(id);
-        if (i != oldEntry.nonFlakeInputs.end()) {
-            newEntry.nonFlakeInputs.insert_or_assign(i->first, i->second);
+    for (auto & [id, input] : flake.inputs) {
+        auto i = oldEntry.inputs.find(id);
+        if (i != oldEntry.inputs.end()) {
+            newEntry.inputs.insert_or_assign(id, i->second);
         } else {
             if (handleLockFile == AllPure || handleLockFile == TopRefUsesRegistries)
-                throw Error("cannot update non-flake dependency '%s' in pure mode", id);
-            auto nonFlake = getNonFlake(state, maybeLookupFlake(state, ref, allowedToUseRegistries(handleLockFile, false)));
-            newEntry.nonFlakeInputs.insert_or_assign(id,
-                NonFlakeInput(
-                    nonFlake.sourceInfo.resolvedRef,
-                    nonFlake.sourceInfo.narHash));
-        }
-    }
-
-    for (auto & inputRef : flake.inputs) {
-        auto i = oldEntry.flakeInputs.find(inputRef);
-        if (i != oldEntry.flakeInputs.end()) {
-            newEntry.flakeInputs.insert_or_assign(inputRef, i->second);
-        } else {
-            if (handleLockFile == AllPure || handleLockFile == TopRefUsesRegistries)
-                throw Error("cannot update flake dependency '%s' in pure mode", inputRef);
-            newEntry.flakeInputs.insert_or_assign(inputRef,
-                updateLocks(state,
-                    getFlake(state, maybeLookupFlake(state, inputRef, allowedToUseRegistries(handleLockFile, false))),
-                    handleLockFile, {}, false).second);
+                throw Error("cannot update flake input '%s' in pure mode", id);
+            if (input.isFlake)
+                newEntry.inputs.insert_or_assign(id,
+                    updateLocks(state,
+                        getFlake(state, maybeLookupFlake(state, input.ref, allowedToUseRegistries(handleLockFile, false))),
+                        handleLockFile, {}, false).second);
+            else {
+                auto sourceInfo = getNonFlake(state, maybeLookupFlake(state, input.ref, allowedToUseRegistries(handleLockFile, false)));
+                newEntry.inputs.insert_or_assign(id, LockedInput(sourceInfo.resolvedRef, sourceInfo.narHash));
+            }
         }
     }
 
@@ -462,79 +451,67 @@ static void emitSourceInfoAttrs(EvalState & state, const SourceInfo & sourceInfo
                 std::put_time(std::gmtime(&*sourceInfo.lastModified), "%Y%m%d%H%M%S")));
 }
 
+struct LazyInput
+{
+    bool isFlake;
+    LockedInput lockedInput;
+};
+
 /* Helper primop to make callFlake (below) fetch/call its inputs
    lazily. Note that this primop cannot be called by user code since
    it doesn't appear in 'builtins'. */
 static void prim_callFlake(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
-    auto lazyFlake = (FlakeInput *) args[0]->attrs;
+    auto lazyInput = (LazyInput *) args[0]->attrs;
 
-    assert(lazyFlake->ref.isImmutable());
+    assert(lazyInput->lockedInput.ref.isImmutable());
 
-    auto flake = getFlake(state, lazyFlake->ref);
+    if (lazyInput->isFlake) {
+        auto flake = getFlake(state, lazyInput->lockedInput.ref);
 
-    if (flake.sourceInfo.narHash != lazyFlake->narHash)
-        throw Error("the content hash of flake '%s' doesn't match the hash recorded in the referring lockfile", flake.sourceInfo.resolvedRef);
+        if (flake.sourceInfo.narHash != lazyInput->lockedInput.narHash)
+            throw Error("the content hash of flake '%s' doesn't match the hash recorded in the referring lockfile", flake.sourceInfo.resolvedRef);
 
-    callFlake(state, flake, *lazyFlake, v);
-}
+        callFlake(state, flake, lazyInput->lockedInput, v);
+    } else {
+        auto sourceInfo = getNonFlake(state, lazyInput->lockedInput.ref);
 
-static void prim_callNonFlake(EvalState & state, const Pos & pos, Value * * args, Value & v)
-{
-    auto lazyNonFlake = (NonFlakeInput *) args[0]->attrs;
+        if (sourceInfo.narHash != lazyInput->lockedInput.narHash)
+            throw Error("the content hash of repository '%s' doesn't match the hash recorded in the referring lockfile", sourceInfo.resolvedRef);
 
-    assert(lazyNonFlake->ref.isImmutable());
+        state.mkAttrs(v, 8);
 
-    auto nonFlake = getNonFlake(state, lazyNonFlake->ref);
+        assert(state.store->isValidPath(sourceInfo.storePath));
 
-    if (nonFlake.sourceInfo.narHash != lazyNonFlake->narHash)
-        throw Error("the content hash of repository '%s' doesn't match the hash recorded in the referring lockfile", nonFlake.sourceInfo.resolvedRef);
+        mkString(*state.allocAttr(v, state.sOutPath),
+            sourceInfo.storePath, {sourceInfo.storePath});
 
-    state.mkAttrs(v, 8);
-
-    assert(state.store->isValidPath(nonFlake.sourceInfo.storePath));
-
-    mkString(*state.allocAttr(v, state.sOutPath),
-        nonFlake.sourceInfo.storePath, {nonFlake.sourceInfo.storePath});
-
-    emitSourceInfoAttrs(state, nonFlake.sourceInfo, v);
+        emitSourceInfoAttrs(state, sourceInfo, v);
+    }
 }
 
 void callFlake(EvalState & state,
     const Flake & flake,
-    const FlakeInputs & inputs,
+    const LockedInputs & lockedInputs,
     Value & vRes)
 {
     auto & vInputs = *state.allocValue();
 
-    state.mkAttrs(vInputs,
-        inputs.flakeInputs.size() +
-        inputs.nonFlakeInputs.size() + 1);
+    state.mkAttrs(vInputs, flake.inputs.size() + 1);
 
-    for (auto & dep : inputs.flakeInputs) {
-        auto vFlake = state.allocAttr(vInputs, dep.second.id);
+    for (auto & [inputId, input] : flake.inputs) {
+        auto vFlake = state.allocAttr(vInputs, inputId);
         auto vPrimOp = state.allocValue();
         static auto primOp = new PrimOp(prim_callFlake, 1, state.symbols.create("callFlake"));
         vPrimOp->type = tPrimOp;
         vPrimOp->primOp = primOp;
         auto vArg = state.allocValue();
         vArg->type = tNull;
+        auto lockedInput = lockedInputs.inputs.find(inputId);
+        assert(lockedInput != lockedInputs.inputs.end());
         // FIXME: leak
-        vArg->attrs = (Bindings *) new FlakeInput(dep.second); // evil! also inefficient
+        vArg->attrs = (Bindings *) new LazyInput{input.isFlake, lockedInput->second};
         mkApp(*vFlake, *vPrimOp, *vArg);
-    }
-
-    for (auto & dep : inputs.nonFlakeInputs) {
-        auto vNonFlake = state.allocAttr(vInputs, dep.first);
-        auto vPrimOp = state.allocValue();
-        static auto primOp = new PrimOp(prim_callNonFlake, 1, state.symbols.create("callNonFlake"));
-        vPrimOp->type = tPrimOp;
-        vPrimOp->primOp = primOp;
-        auto vArg = state.allocValue();
-        vArg->type = tNull;
-        // FIXME: leak
-        vArg->attrs = (Bindings *) new NonFlakeInput(dep.second); // evil! also inefficient
-        mkApp(*vNonFlake, *vPrimOp, *vArg);
     }
 
     auto & vSourceInfo = *state.allocValue();
