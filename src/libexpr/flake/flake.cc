@@ -232,10 +232,10 @@ Flake getFlake(EvalState & state, const FlakeRef & flakeRef)
 
     if (edition) {
         flake.edition = state.forceInt(*(**edition).value, *(**edition).pos);
-        if (flake.edition < 201906)
-            throw Error("flake '%s' has illegal edition %d", flakeRef, flake.edition);
-        if (flake.edition > 201906)
+        if (flake.edition > 201909)
             throw Error("flake '%s' requires unsupported edition %d; please upgrade Nix", flakeRef, flake.edition);
+        if (flake.edition < 201909)
+            throw Error("flake '%s' has illegal edition %d", flakeRef, flake.edition);
     } else
         throw Error("flake '%s' lacks attribute 'edition'", flakeRef);
 
@@ -272,6 +272,15 @@ Flake getFlake(EvalState & state, const FlakeRef & flakeRef)
     if (auto outputs = vInfo.attrs->get(sOutputs)) {
         state.forceFunction(*(**outputs).value, *(**outputs).pos);
         flake.vOutputs = (**outputs).value;
+
+        if (flake.vOutputs->lambda.fun->matchAttrs) {
+            for (auto & formal : flake.vOutputs->lambda.fun->formals->formals) {
+                if (formal.name != state.sSelf) {
+                    flake.inputs.push_back(FlakeRef(formal.name));
+                }
+            }
+        }
+
     } else
         throw Error("flake '%s' lacks attribute 'outputs'", flakeRef);
 
@@ -538,7 +547,7 @@ void callFlake(EvalState & state,
     auto vOutputs = state.allocAttr(v, state.symbols.create("outputs"));
     mkApp(*vOutputs, *flake.vOutputs, v);
 
-    v.attrs->push_back(Attr(state.symbols.create("self"), &v));
+    v.attrs->push_back(Attr(state.sSelf, &v));
 
     v.attrs->sort();
 
