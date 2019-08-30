@@ -103,7 +103,6 @@ static void sourceInfoToJson(const SourceInfo & sourceInfo, nlohmann::json & j)
 
 static void printFlakeInfo(const Flake & flake)
 {
-    std::cout << fmt("ID:            %s\n", flake.id);
     std::cout << fmt("Description:   %s\n", flake.description);
     std::cout << fmt("Edition:       %s\n", flake.edition);
     printSourceInfo(flake.sourceInfo);
@@ -112,7 +111,6 @@ static void printFlakeInfo(const Flake & flake)
 static nlohmann::json flakeToJson(const Flake & flake)
 {
     nlohmann::json j;
-    j["id"] = flake.id;
     j["description"] = flake.description;
     j["edition"] = flake.edition;
     sourceInfoToJson(flake.sourceInfo, j);
@@ -120,12 +118,6 @@ static nlohmann::json flakeToJson(const Flake & flake)
 }
 
 #if 0
-static void printNonFlakeInfo(const NonFlake & nonFlake)
-{
-    std::cout << fmt("ID:            %s\n", nonFlake.alias);
-    printSourceInfo(nonFlake.sourceInfo);
-}
-
 // FIXME: merge info CmdFlakeInfo?
 struct CmdFlakeDeps : FlakeCommand
 {
@@ -147,9 +139,6 @@ struct CmdFlakeDeps : FlakeCommand
         while (!todo.empty()) {
             auto resFlake = std::move(todo.front());
             todo.pop();
-
-            for (auto & nonFlake : resFlake.nonFlakeDeps)
-                printNonFlakeInfo(nonFlake);
 
             for (auto & info : resFlake.flakeDeps) {
                 printFlakeInfo(info.second.flake);

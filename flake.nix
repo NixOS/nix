@@ -1,6 +1,4 @@
 {
-  name = "nix";
-
   description = "The purely functional package manager";
 
   edition = 201909;

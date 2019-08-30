@@ -67,7 +67,6 @@ struct FlakeInput
 
 struct Flake
 {
-    FlakeId id;
     FlakeRef originalRef;
     std::string description;
     SourceInfo sourceInfo;

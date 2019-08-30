@@ -239,11 +239,6 @@ Flake getFlake(EvalState & state, const FlakeRef & flakeRef)
     } else
         throw Error("flake '%s' lacks attribute 'edition'", flakeRef);
 
-    if (auto name = vInfo.attrs->get(state.sName))
-        flake.id = state.forceStringNoCtx(*(**name).value, *(**name).pos);
-    else
-        throw Error("flake '%s' lacks attribute 'name'", flakeRef);
-
     if (auto description = vInfo.attrs->get(state.sDescription))
         flake.description = state.forceStringNoCtx(*(**description).value, *(**description).pos);
 
@@ -292,7 +287,6 @@ Flake getFlake(EvalState & state, const FlakeRef & flakeRef)
     for (auto & attr : *vInfo.attrs) {
         if (attr.name != sEdition &&
             attr.name != sEpoch &&
-            attr.name != state.sName &&
             attr.name != state.sDescription &&
             attr.name != sInputs &&
             attr.name != sOutputs)

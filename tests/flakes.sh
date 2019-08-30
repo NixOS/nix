@@ -29,8 +29,6 @@ done
 
 cat > $flake1Dir/flake.nix <<EOF
 {
-  name = "flake1";
-
   edition = 201909;
 
   description = "Bla bla";
@@ -48,8 +46,6 @@ git -C $flake1Dir commit -m 'Initial'
 
 cat > $flake2Dir/flake.nix <<EOF
 {
-  name = "flake2";
-
   edition = 201909;
 
   description = "Fnord";
@@ -65,8 +61,6 @@ git -C $flake2Dir commit -m 'Initial'
 
 cat > $flake3Dir/flake.nix <<EOF
 {
-  name = "flake3";
-
   edition = 201909;
 
   description = "Fnord";
@@ -118,12 +112,12 @@ EOF
 (( $(nix flake list --flake-registry $registry | wc -l) == 5 ))
 
 # Test 'nix flake info'.
-nix flake info --flake-registry $registry flake1 | grep -q 'ID: *flake1'
+nix flake info --flake-registry $registry flake1 | grep -q 'URI: .*flake1.*'
 
 # Test 'nix flake info' on a local flake.
-(cd $flake1Dir && nix flake info --flake-registry $registry) | grep -q 'ID: *flake1'
-(cd $flake1Dir && nix flake info --flake-registry $registry .) | grep -q 'ID: *flake1'
-nix flake info --flake-registry $registry $flake1Dir | grep -q 'ID: *flake1'
+(cd $flake1Dir && nix flake info --flake-registry $registry) | grep -q 'URI: .*flake1.*'
+(cd $flake1Dir && nix flake info --flake-registry $registry .) | grep -q 'URI: .*flake1.*'
+nix flake info --flake-registry $registry $flake1Dir | grep -q 'URI: .*flake1.*'
 
 # Test 'nix flake info --json'.
 json=$(nix flake info --flake-registry $registry flake1 --json | jq .)
@@ -183,8 +177,6 @@ rm $flake3Dir/flake.nix
 
 cat > $flake3Dir/flake.nix <<EOF
 {
-  name = "flake3";
-
   edition = 201909;
 
   description = "Fnord";
@@ -236,8 +228,6 @@ rm $flake3Dir/flake.nix
 
 cat > $flake3Dir/flake.nix <<EOF
 {
-  name = "flake3";
-
   edition = 201909;
 
   inputs = {
@@ -305,8 +295,6 @@ rm $flake3Dir/flake.nix
 
 cat > $flake3Dir/flake.nix <<EOF
 {
-  name = "flake3";
-
   edition = 201909;
 
   inputs = {
