@@ -3,9 +3,9 @@
         "nixpkgs": {
             "id": "nixpkgs",
             "inputs": {},
-            "narHash": "sha256-5/HXWs25BLukwG9VaxmdmUf/9o79e32aW/tmhcWEbKk=",
+            "narHash": "sha256-AndIaZrFFIT+VFhVtQHsS90I5SWfjTDTxzs9Hx9ZxZA=",
             "nonFlakeInputs": {},
-            "uri": "github:edolstra/nixpkgs/62ac6f7f504c8d3998558d9b269d22d26f13f1f0"
+            "uri": "github:edolstra/nixpkgs/9bd2e2c96ddeec64e9ad37540412263fdb78458d"
         }
     },
     "nonFlakeInputs": {},

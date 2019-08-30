@@ -3,15 +3,13 @@
 
   description = "The purely functional package manager";
 
-  edition = 201906;
+  edition = 201909;
 
-  inputs = [ "nixpkgs" ];
-
-  outputs = inputs: rec {
+  outputs = { self, nixpkgs }: rec {
 
     hydraJobs = import ./release.nix {
-      nix = inputs.self;
-      nixpkgs = inputs.nixpkgs;
+      nix = self;
+      nixpkgs = nixpkgs;
     };
 
     checks = {
@@ -29,7 +27,7 @@
     defaultPackage = packages.nix;
 
     devShell = import ./shell.nix {
-      nixpkgs = inputs.nixpkgs;
+      inherit nixpkgs;
     };
   };
 }
