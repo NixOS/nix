@@ -511,6 +511,7 @@ void callFlake(EvalState & state,
     auto & vSourceInfo = *state.allocValue();
     state.mkAttrs(vSourceInfo, 8);
     emitSourceInfoAttrs(state, flake.sourceInfo, vSourceInfo);
+    vSourceInfo.attrs->sort();
 
     vInputs.attrs->push_back(Attr(state.sSelf, &vRes));
 
