@@ -505,17 +505,14 @@ void callFlake(EvalState & state,
     const FlakeInputs & inputs,
     Value & vRes)
 {
-    // Construct the resulting attrset '{outputs, ...}'. This attrset
-    // is passed lazily as an argument to the 'outputs' function.
+    auto & vInputs = *state.allocValue();
 
-    auto & v = *state.allocValue();
-
-    state.mkAttrs(v,
+    state.mkAttrs(vInputs,
         inputs.flakeInputs.size() +
-        inputs.nonFlakeInputs.size() + 8);
+        inputs.nonFlakeInputs.size() + 1);
 
     for (auto & dep : inputs.flakeInputs) {
-        auto vFlake = state.allocAttr(v, dep.second.id);
+        auto vFlake = state.allocAttr(vInputs, dep.second.id);
         auto vPrimOp = state.allocValue();
         static auto primOp = new PrimOp(prim_callFlake, 1, state.symbols.create("callFlake"));
         vPrimOp->type = tPrimOp;
@@ -528,7 +525,7 @@ void callFlake(EvalState & state,
     }
 
     for (auto & dep : inputs.nonFlakeInputs) {
-        auto vNonFlake = state.allocAttr(v, dep.first);
+        auto vNonFlake = state.allocAttr(vInputs, dep.first);
         auto vPrimOp = state.allocValue();
         static auto primOp = new PrimOp(prim_callNonFlake, 1, state.symbols.create("callNonFlake"));
         vPrimOp->type = tPrimOp;
@@ -540,24 +537,27 @@ void callFlake(EvalState & state,
         mkApp(*vNonFlake, *vPrimOp, *vArg);
     }
 
-    mkString(*state.allocAttr(v, state.sDescription), flake.description);
+    auto & vSourceInfo = *state.allocValue();
+    state.mkAttrs(vSourceInfo, 8);
+    emitSourceInfoAttrs(state, flake.sourceInfo, vSourceInfo);
 
-    emitSourceInfoAttrs(state, flake.sourceInfo, v);
+    vInputs.attrs->push_back(Attr(state.sSelf, &vRes));
 
-    auto vOutputs = state.allocAttr(v, state.symbols.create("outputs"));
-    mkApp(*vOutputs, *flake.vOutputs, v);
-
-    v.attrs->push_back(Attr(state.sSelf, &v));
-
-    v.attrs->sort();
+    vInputs.attrs->sort();
 
     /* For convenience, put the outputs directly in the result, so you
        can refer to an output of an input as 'inputs.foo.bar' rather
        than 'inputs.foo.outputs.bar'. */
-    auto v2 = *state.allocValue();
-    state.eval(state.parseExprFromString("res: res.outputs // res", "/"), v2);
+    auto vCall = *state.allocValue();
+    state.eval(state.parseExprFromString(
+            "outputsFun: inputs: sourceInfo: let outputs = outputsFun inputs; in "
+            "outputs // sourceInfo // { inherit inputs; inherit outputs; inherit sourceInfo; }", "/"), vCall);
 
-    state.callFunction(v2, v, vRes, noPos);
+    auto vCall2 = *state.allocValue();
+    auto vCall3 = *state.allocValue();
+    state.callFunction(vCall, *flake.vOutputs, vCall2, noPos);
+    state.callFunction(vCall2, vInputs, vCall3, noPos);
+    state.callFunction(vCall3, vSourceInfo, vRes, noPos);
 }
 
 void callFlake(EvalState & state,
