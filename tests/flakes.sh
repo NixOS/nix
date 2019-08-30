@@ -31,7 +31,7 @@ cat > $flake1Dir/flake.nix <<EOF
 {
   name = "flake1";
 
-  edition = 201906;
+  edition = 201909;
 
   description = "Bla bla";
 
@@ -50,14 +50,12 @@ cat > $flake2Dir/flake.nix <<EOF
 {
   name = "flake2";
 
-  edition = 201906;
-
-  inputs = [ "flake1" ];
+  edition = 201909;
 
   description = "Fnord";
 
-  outputs = inputs: rec {
-    packages.bar = inputs.flake1.packages.foo;
+  outputs = { self, flake1 }: rec {
+    packages.bar = flake1.packages.foo;
   };
 }
 EOF
@@ -69,14 +67,12 @@ cat > $flake3Dir/flake.nix <<EOF
 {
   name = "flake3";
 
-  edition = 201906;
-
-  inputs = [ "flake2" ];
+  edition = 201909;
 
   description = "Fnord";
 
-  outputs = inputs: rec {
-    packages.xyzzy = inputs.flake2.packages.bar;
+  outputs = { self, flake2 }: rec {
+    packages.xyzzy = flake2.packages.bar;
 
     checks = {
         xyzzy = packages.xyzzy;
@@ -189,15 +185,13 @@ cat > $flake3Dir/flake.nix <<EOF
 {
   name = "flake3";
 
-  edition = 201906;
-
-  inputs = [ "flake1" "flake2" ];
+  edition = 201909;
 
   description = "Fnord";
 
-  outputs = inputs: rec {
-    packages.xyzzy = inputs.flake2.packages.bar;
-    packages.sth = inputs.flake1.packages.foo;
+  outputs = { self, flake1, flake2 }: rec {
+    packages.xyzzy = flake2.packages.bar;
+    packages.sth = flake1.packages.foo;
   };
 }
 EOF
@@ -216,7 +210,7 @@ git -C $flake3Dir add flake.lock
 git -C $flake3Dir commit -m 'Add lockfile'
 
 # Unsupported editions should be an error.
-sed -i $flake3Dir/flake.nix -e s/201906/201909/
+sed -i $flake3Dir/flake.nix -e s/201909/201912/
 nix build -o $TEST_ROOT/result --flake-registry $registry $flake3Dir:sth 2>&1 | grep 'unsupported edition'
 
 # Test whether registry caching works.
@@ -244,7 +238,7 @@ cat > $flake3Dir/flake.nix <<EOF
 {
   name = "flake3";
 
-  edition = 201906;
+  edition = 201909;
 
   inputs = [ "flake1" "flake2" ];
 
@@ -310,7 +304,7 @@ cat > $flake3Dir/flake.nix <<EOF
 {
   name = "flake3";
 
-  edition = 201906;
+  edition = 201909;
 
   inputs = [ "flake1" "flake2" ];
 
@@ -356,4 +350,5 @@ nix flake remove --flake-registry $registry flake1
 (cd $flake7Dir && nix flake init)
 nix flake --flake-registry $registry check $flake3Dir
 
+rm -rf $TEST_ROOT/flake1-v2
 nix flake clone --flake-registry $registry flake1 $TEST_ROOT/flake1-v2
