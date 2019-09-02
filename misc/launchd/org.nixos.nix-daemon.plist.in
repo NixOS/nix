@@ -13,10 +13,9 @@
     <true/>
     <key>RunAtLoad</key>
     <true/>
-    <key>Program</key>
-    <string>/bin/sh</string>
     <key>ProgramArguments</key>
     <array>
+      <string>/bin/sh</string>
       <string>-c</string>
       <string>/bin/wait4path @bindir@/nix-daemon &amp;&amp; @bindir@/nix-daemon</string>
     </array>
