@@ -96,10 +96,11 @@ void MixProfile::updateProfile(const Path & storePath)
     if (!profile) return;
     auto store = getStore().dynamic_pointer_cast<LocalFSStore>();
     if (!store) throw Error("'--profile' is not supported for this Nix store");
-    switchLink(*profile,
+    auto profile2 = absPath(*profile);
+    switchLink(profile2,
         createGeneration(
             ref<LocalFSStore>(store),
-            *profile, storePath));
+            profile2, storePath));
 }
 
 void MixProfile::updateProfile(const Buildables & buildables)
