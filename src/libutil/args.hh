@@ -199,6 +199,8 @@ private:
 
 public:
 
+    virtual ~Command() { }
+
     std::string name() { return _name; }
 
     virtual void prepare() { };

@@ -49,6 +49,8 @@ struct App
 
 struct Installable
 {
+    virtual ~Installable() { }
+
     virtual std::string what() = 0;
 
     virtual Buildables toBuildables()
