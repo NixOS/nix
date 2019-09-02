@@ -417,25 +417,43 @@ std::vector<std::shared_ptr<Installable>> SourceExprCommand::parseInstallables(
                         Strings{"legacyPackages." + std::string(s, 8)}));
             }
 
-            else if (auto flakeRef = parseFlakeRef(s, true))
-                result.push_back(std::make_shared<InstallableFlake>(*this, std::move(*flakeRef),
-                        getDefaultFlakeAttrPaths()));
+            else {
 
-            else if ((colon = s.rfind(':')) != std::string::npos) {
-                auto flakeRef = std::string(s, 0, colon);
-                auto attrPath = std::string(s, colon + 1);
-                result.push_back(std::make_shared<InstallableFlake>(
-                        *this,
-                        FlakeRef(flakeRef, true),
-                        attrPath,
-                        getDefaultFlakeAttrPathPrefixes()));
+                std::exception_ptr flakeEx;
+
+                try {
+                    auto flakeRef = FlakeRef(s, true);
+                    result.push_back(std::make_shared<InstallableFlake>(
+                            *this, std::move(flakeRef), getDefaultFlakeAttrPaths()));
+                    continue;
+                } catch (MissingFlake &) {
+                    /* 's' could be parsed as a flakeref, but it
+                       references a local path that is not a flake. So
+                       take note of that. */
+                    flakeEx = std::current_exception();
+                } catch (BadFlakeRef &) {
+                }
+
+                if ((colon = s.rfind(':')) != std::string::npos) {
+                    auto flakeRef = std::string(s, 0, colon);
+                    auto attrPath = std::string(s, colon + 1);
+                    result.push_back(std::make_shared<InstallableFlake>(
+                            *this,
+                            FlakeRef(flakeRef, true),
+                            attrPath,
+                            getDefaultFlakeAttrPathPrefixes()));
+                }
+
+                else if (s.find('/') != std::string::npos && (storePath = follow(s)))
+                    result.push_back(std::make_shared<InstallableStorePath>(*storePath));
+
+                else {
+                    if (flakeEx)
+                        std::rethrow_exception(flakeEx);
+                    else
+                        throw Error("unsupported argument '%s'", s);
+                }
             }
-
-            else if (s.find('/') != std::string::npos && (storePath = follow(s)))
-                result.push_back(std::make_shared<InstallableStorePath>(*storePath));
-
-            else
-                throw Error("unsupported argument '%s'", s);
         }
     }
 

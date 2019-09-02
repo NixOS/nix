@@ -145,10 +145,10 @@ FlakeRef::FlakeRef(const std::string & uri_, bool allowRelative)
             d.path = absPath(uri);
             try {
                 if (!S_ISDIR(lstat(d.path).st_mode))
-                    throw BadFlakeRef("path '%s' is not a flake (sub)directory");
+                    throw MissingFlake("path '%s' is not a flake (sub)directory", d.path);
             } catch (SysError & e) {
                 if (e.errNo == ENOENT || e.errNo == EISDIR)
-                    throw BadFlakeRef("flake '%s' does not exist");
+                    throw MissingFlake("flake '%s' does not exist", d.path);
                 throw;
             }
             while (true) {
@@ -156,7 +156,7 @@ FlakeRef::FlakeRef(const std::string & uri_, bool allowRelative)
                 subdir = baseNameOf(d.path) + (subdir.empty() ? "" : "/" + subdir);
                 d.path = dirOf(d.path);
                 if (d.path == "/")
-                    throw BadFlakeRef("path '%s' does not reference a Git repository", uri);
+                    throw MissingFlake("path '%s' is not a flake (because it does not reference a Git repository)", uri);
             }
         } else
             d.path = canonPath(uri);
