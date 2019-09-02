@@ -15,8 +15,6 @@
 #include <unistd.h>
 #include <signal.h>
 
-#include <openssl/crypto.h>
-
 
 namespace nix {
 
@@ -80,20 +78,6 @@ string getArg(const string & opt,
 }
 
 
-/* OpenSSL is not thread-safe by default - it will randomly crash
-   unless the user supplies a mutex locking function. So let's do
-   that. */
-static std::vector<std::mutex> opensslLocks;
-
-static void opensslLockCallback(int mode, int type, const char * file, int line)
-{
-    if (mode & CRYPTO_LOCK)
-        opensslLocks[type].lock();
-    else
-        opensslLocks[type].unlock();
-}
-
-
 static void sigHandler(int signo) { }
 
 
@@ -104,10 +88,6 @@ void initNix()
     static char buf[1024];
     std::cerr.rdbuf()->pubsetbuf(buf, sizeof(buf));
 #endif
-
-    /* Initialise OpenSSL locking. */
-    opensslLocks = std::vector<std::mutex>(CRYPTO_num_locks());
-    CRYPTO_set_locking_callback(opensslLockCallback);
 
     loadConfFile();
 
