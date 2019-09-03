@@ -131,7 +131,7 @@ protected:
     }
 
     void getFile(const std::string & path,
-        Callback<std::shared_ptr<std::string>> callback) override
+        Callback<std::shared_ptr<std::string>> callback) noexcept override
     {
         checkEnabled();
 

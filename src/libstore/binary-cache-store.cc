@@ -55,7 +55,7 @@ void BinaryCacheStore::init()
 }
 
 void BinaryCacheStore::getFile(const std::string & path,
-    Callback<std::shared_ptr<std::string>> callback)
+    Callback<std::shared_ptr<std::string>> callback) noexcept
 {
     try {
         callback(getFile(path));
@@ -240,7 +240,7 @@ void BinaryCacheStore::narFromPath(const Path & storePath, Sink & sink)
 }
 
 void BinaryCacheStore::queryPathInfoUncached(const Path & storePath,
-    Callback<std::shared_ptr<ValidPathInfo>> callback)
+    Callback<std::shared_ptr<ValidPathInfo>> callback) noexcept
 {
     auto uri = getUri();
     auto act = std::make_shared<Activity>(*logger, lvlTalkative, actQueryPathInfo,

@@ -360,12 +360,12 @@ public:
 
     /* Asynchronous version of queryPathInfo(). */
     void queryPathInfo(const Path & path,
-        Callback<ref<ValidPathInfo>> callback);
+        Callback<ref<ValidPathInfo>> callback) noexcept;
 
 protected:
 
     virtual void queryPathInfoUncached(const Path & path,
-        Callback<std::shared_ptr<ValidPathInfo>> callback) = 0;
+        Callback<std::shared_ptr<ValidPathInfo>> callback) noexcept = 0;
 
 public:
 

@@ -329,13 +329,14 @@ ref<const ValidPathInfo> Store::queryPathInfo(const Path & storePath)
 
 
 void Store::queryPathInfo(const Path & storePath,
-    Callback<ref<ValidPathInfo>> callback)
+    Callback<ref<ValidPathInfo>> callback) noexcept
 {
-    assertStorePath(storePath);
-
-    auto hashPart = storePathToHash(storePath);
+    std::string hashPart;
 
     try {
+        assertStorePath(storePath);
+
+        hashPart = storePathToHash(storePath);
 
         {
             auto res = state.lock()->pathInfoCache.get(hashPart);

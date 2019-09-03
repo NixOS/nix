@@ -629,7 +629,7 @@ uint64_t LocalStore::addValidPath(State & state,
 
 
 void LocalStore::queryPathInfoUncached(const Path & path,
-    Callback<std::shared_ptr<ValidPathInfo>> callback)
+    Callback<std::shared_ptr<ValidPathInfo>> callback) noexcept
 {
     try {
         auto info = std::make_shared<ValidPathInfo>();
