@@ -77,13 +77,13 @@ struct CurlDownloader : public Downloader
 
         DownloadItem(CurlDownloader & downloader,
             const DownloadRequest & request,
-            Callback<DownloadResult> callback)
+            Callback<DownloadResult> && callback)
             : downloader(downloader)
             , request(request)
             , act(*logger, lvlTalkative, actDownload,
                 fmt(request.data ? "uploading '%s'" : "downloading '%s'", request.uri),
                 {request.uri}, request.parentAct)
-            , callback(callback)
+            , callback(std::move(callback))
             , finalSink([this](const unsigned char * data, size_t len) {
                 if (this->request.dataCallback) {
                     writtenToSink += len;
@@ -665,7 +665,7 @@ struct CurlDownloader : public Downloader
             return;
         }
 
-        enqueueItem(std::make_shared<DownloadItem>(*this, request, callback));
+        enqueueItem(std::make_shared<DownloadItem>(*this, request, std::move(callback)));
     }
 };
 

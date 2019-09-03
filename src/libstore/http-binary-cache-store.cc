@@ -137,17 +137,19 @@ protected:
 
         auto request(makeRequest(path));
 
+        auto callbackPtr = std::make_shared<decltype(callback)>(std::move(callback));
+
         getDownloader()->enqueueDownload(request,
-            {[callback, this](std::future<DownloadResult> result) {
+            {[callbackPtr, this](std::future<DownloadResult> result) {
                 try {
-                    callback(result.get().data);
+                    (*callbackPtr)(result.get().data);
                 } catch (DownloadError & e) {
                     if (e.error == Downloader::NotFound || e.error == Downloader::Forbidden)
-                        return callback(std::shared_ptr<std::string>());
+                        return (*callbackPtr)(std::shared_ptr<std::string>());
                     maybeDisable();
-                    callback.rethrow();
+                    callbackPtr->rethrow();
                 } catch (...) {
-                    callback.rethrow();
+                    callbackPtr->rethrow();
                 }
             }});
     }

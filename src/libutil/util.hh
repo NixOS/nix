@@ -445,21 +445,34 @@ string get(const T & map, const string & key, const string & def = "")
    type T or an exception. (We abuse std::future<T> to pass the value or
    exception.) */
 template<typename T>
-struct Callback
+class Callback
 {
     std::function<void(std::future<T>)> fun;
+    std::atomic_flag done = ATOMIC_FLAG_INIT;
+
+public:
 
     Callback(std::function<void(std::future<T>)> fun) : fun(fun) { }
 
-    void operator()(T && t) const
+    Callback(Callback && callback) : fun(std::move(callback.fun))
     {
+        auto prev = callback.done.test_and_set();
+        if (prev) done.test_and_set();
+    }
+
+    void operator()(T && t)
+    {
+        auto prev = done.test_and_set();
+        assert(!prev);
         std::promise<T> promise;
         promise.set_value(std::move(t));
         fun(promise.get_future());
     }
 
-    void rethrow(const std::exception_ptr & exc = std::current_exception()) const
+    void rethrow(const std::exception_ptr & exc = std::current_exception())
     {
+        auto prev = done.test_and_set();
+        assert(!prev);
         std::promise<T> promise;
         promise.set_exception(exc);
         fun(promise.get_future());
