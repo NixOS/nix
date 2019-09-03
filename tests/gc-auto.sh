@@ -17,6 +17,7 @@ expr=$(cat <<EOF
 with import ./config.nix; mkDerivation {
   name = "gc-A";
   buildCommand = ''
+    set -x
     [[ \$(ls \$NIX_STORE/*-garbage? | wc -l) = 3 ]]
     mkdir \$out
     echo foo > \$out/bar
@@ -32,14 +33,11 @@ with import ./config.nix; mkDerivation {
 EOF
 )
 
-nix build -v -o $TEST_ROOT/result-A -L "($expr)" \
-    --min-free 1000 --max-free 2000 --min-free-check-interval 1 &
-pid=$!
-
 expr2=$(cat <<EOF
 with import ./config.nix; mkDerivation {
   name = "gc-B";
   buildCommand = ''
+    set -x
     mkdir \$out
     echo foo > \$out/bar
     echo 1...
@@ -52,6 +50,10 @@ with import ./config.nix; mkDerivation {
 }
 EOF
 )
+
+nix build -v -o $TEST_ROOT/result-A -L "($expr)" \
+    --min-free 1000 --max-free 2000 --min-free-check-interval 1 &
+pid=$!
 
 nix build -v -o $TEST_ROOT/result-B -L "($expr2)" \
     --min-free 1000 --max-free 2000 --min-free-check-interval 1
