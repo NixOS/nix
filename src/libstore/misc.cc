@@ -1,4 +1,5 @@
 #include "derivations.hh"
+#include "parsed-derivations.hh"
 #include "globals.hh"
 #include "local-store.hh"
 #include "store-api.hh"
@@ -189,6 +190,7 @@ void Store::queryMissing(const PathSet & targets,
             }
 
             Derivation drv = derivationFromPath(i2.first);
+            ParsedDerivation parsedDrv(i2.first, drv);
 
             PathSet invalid;
             for (auto & j : drv.outputs)
@@ -197,7 +199,7 @@ void Store::queryMissing(const PathSet & targets,
                     invalid.insert(j.second.path);
             if (invalid.empty()) return;
 
-            if (settings.useSubstitutes && drv.substitutesAllowed()) {
+            if (settings.useSubstitutes && parsedDrv.substitutesAllowed()) {
                 auto drvState = make_ref<Sync<DrvState>>(DrvState(invalid.size()));
                 for (auto & output : invalid)
                     pool.enqueue(std::bind(checkOutput, i2.first, make_ref<Derivation>(drv), output, drvState));

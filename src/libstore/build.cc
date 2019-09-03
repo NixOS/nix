@@ -1197,7 +1197,7 @@ void DerivationGoal::haveDerivation()
     /* We are first going to try to create the invalid output paths
        through substitutes.  If that doesn't work, we'll build
        them. */
-    if (settings.useSubstitutes && drv->substitutesAllowed())
+    if (settings.useSubstitutes && parsedDrv->substitutesAllowed())
         for (auto & i : invalidOutputs)
             addWaitee(worker.makeSubstitutionGoal(i, buildMode == bmRepair ? Repair : NoRepair));
 
