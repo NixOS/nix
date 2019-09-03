@@ -1605,12 +1605,18 @@ stdenv.mkDerivation (rec {
     <term><function>builtins.tryEval</function>
     <replaceable>e</replaceable></term>
 
-    <listitem><para>Try to evaluate <replaceable>e</replaceable>.
+    <listitem><para>Try to shallowly evaluate <replaceable>e</replaceable>.
     Return a set containing the attributes <literal>success</literal>
     (<literal>true</literal> if <replaceable>e</replaceable> evaluated
     successfully, <literal>false</literal> if an error was thrown) and
     <literal>value</literal>, equalling <replaceable>e</replaceable>
-    if successful and <literal>false</literal> otherwise.
+    if successful and <literal>false</literal> otherwise. Note that this
+    doesn't evaluate <replaceable>e</replaceable> deeply, so
+    <literal>let e = { x = throw ""; }; in (builtins.tryEval e).success
+    </literal> will be <literal>true</literal>. Using <literal>builtins.deepSeq
+    </literal> one can get the expected result: <literal>let e = { x = throw "";
+    }; in (builtins.tryEval (builtins.deepSeq e e)).success</literal> will be
+    <literal>false</literal>.
     </para></listitem>
 
   </varlistentry>
