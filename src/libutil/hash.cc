@@ -13,10 +13,6 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 
-#if OPENSSL_VERSION_NUMBER < 0x10101000L
-#error "Unsupported version of OpenSSL, you need at least 1.1.1"
-#endif
-
 namespace nix {
 
 
