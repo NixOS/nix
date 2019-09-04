@@ -44,7 +44,7 @@ print STDERR "Nix revision is $nixRev, version is $version\n";
 
 File::Path::make_path($releasesDir);
 if (system("mountpoint -q $releasesDir") != 0) {
-    system("sshfs hydra-mirror:/releases $releasesDir") == 0 or die;
+    system("sshfs hydra-mirror\@nixos.org:/releases $releasesDir") == 0 or die;
 }
 
 my $releaseDir = "$releasesDir/nix/$releaseName";
