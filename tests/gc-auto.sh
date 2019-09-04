@@ -17,16 +17,41 @@ expr=$(cat <<EOF
 with import ./config.nix; mkDerivation {
   name = "gc-A";
   buildCommand = ''
+    set -x
     [[ \$(ls \$NIX_STORE/*-garbage? | wc -l) = 3 ]]
     mkdir \$out
     echo foo > \$out/bar
     echo 1...
     sleep 2
-    echo 200 > $fake_free
+    echo 200 > ${fake_free}.tmp1
+    mv ${fake_free}.tmp1 $fake_free
     echo 2...
     sleep 2
     echo 3...
+    sleep 2
+    echo 4...
     [[ \$(ls \$NIX_STORE/*-garbage? | wc -l) = 1 ]]
+  '';
+}
+EOF
+)
+
+expr2=$(cat <<EOF
+with import ./config.nix; mkDerivation {
+  name = "gc-B";
+  buildCommand = ''
+    set -x
+    mkdir \$out
+    echo foo > \$out/bar
+    echo 1...
+    sleep 2
+    echo 200 > ${fake_free}.tmp2
+    mv ${fake_free}.tmp2 $fake_free
+    echo 2...
+    sleep 2
+    echo 3...
+    sleep 2
+    echo 4...
   '';
 }
 EOF
@@ -35,23 +60,6 @@ EOF
 nix build --impure -v -o $TEST_ROOT/result-A -L "($expr)" \
     --min-free 1000 --max-free 2000 --min-free-check-interval 1 &
 pid=$!
-
-expr2=$(cat <<EOF
-with import ./config.nix; mkDerivation {
-  name = "gc-B";
-  buildCommand = ''
-    mkdir \$out
-    echo foo > \$out/bar
-    echo 1...
-    sleep 2
-    echo 200 > $fake_free
-    echo 2...
-    sleep 2
-    echo 3...
-  '';
-}
-EOF
-)
 
 nix build --impure -v -o $TEST_ROOT/result-B -L "($expr2)" \
     --min-free 1000 --max-free 2000 --min-free-check-interval 1

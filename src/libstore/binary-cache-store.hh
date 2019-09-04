@@ -47,7 +47,7 @@ public:
     /* Fetch the specified file and call the specified callback with
        the result. A subclass may implement this asynchronously. */
     virtual void getFile(const std::string & path,
-        Callback<std::shared_ptr<std::string>> callback);
+        Callback<std::shared_ptr<std::string>> callback) noexcept;
 
     std::shared_ptr<std::string> getFile(const std::string & path);
 
@@ -73,7 +73,7 @@ public:
     bool isValidPathUncached(const Path & path) override;
 
     void queryPathInfoUncached(const Path & path,
-        Callback<std::shared_ptr<ValidPathInfo>> callback) override;
+        Callback<std::shared_ptr<ValidPathInfo>> callback) noexcept override;
 
     Path queryPathFromHashPart(const string & hashPart) override
     { unsupported("queryPathFromHashPart"); }

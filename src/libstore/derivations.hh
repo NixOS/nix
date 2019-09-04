@@ -56,8 +56,6 @@ struct BasicDerivation
        the given derivation. */
     Path findOutput(const string & id) const;
 
-    bool substitutesAllowed() const;
-
     bool isBuiltin() const;
 
     /* Return true iff this is a fixed-output derivation. */

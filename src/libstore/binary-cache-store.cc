@@ -55,7 +55,7 @@ void BinaryCacheStore::init()
 }
 
 void BinaryCacheStore::getFile(const std::string & path,
-    Callback<std::shared_ptr<std::string>> callback)
+    Callback<std::shared_ptr<std::string>> callback) noexcept
 {
     try {
         callback(getFile(path));
@@ -240,7 +240,7 @@ void BinaryCacheStore::narFromPath(const Path & storePath, Sink & sink)
 }
 
 void BinaryCacheStore::queryPathInfoUncached(const Path & storePath,
-    Callback<std::shared_ptr<ValidPathInfo>> callback)
+    Callback<std::shared_ptr<ValidPathInfo>> callback) noexcept
 {
     auto uri = getUri();
     auto act = std::make_shared<Activity>(*logger, lvlTalkative, actQueryPathInfo,
@@ -249,21 +249,23 @@ void BinaryCacheStore::queryPathInfoUncached(const Path & storePath,
 
     auto narInfoFile = narInfoFileFor(storePath);
 
+    auto callbackPtr = std::make_shared<decltype(callback)>(std::move(callback));
+
     getFile(narInfoFile,
         {[=](std::future<std::shared_ptr<std::string>> fut) {
             try {
                 auto data = fut.get();
 
-                if (!data) return callback(nullptr);
+                if (!data) return (*callbackPtr)(nullptr);
 
                 stats.narInfoRead++;
 
-                callback((std::shared_ptr<ValidPathInfo>)
+                (*callbackPtr)((std::shared_ptr<ValidPathInfo>)
                     std::make_shared<NarInfo>(*this, *data, narInfoFile));
 
                 (void) act; // force Activity into this lambda to ensure it stays alive
             } catch (...) {
-                callback.rethrow();
+                callbackPtr->rethrow();
             }
         }});
 }

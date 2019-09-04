@@ -329,13 +329,14 @@ ref<const ValidPathInfo> Store::queryPathInfo(const Path & storePath)
 
 
 void Store::queryPathInfo(const Path & storePath,
-    Callback<ref<ValidPathInfo>> callback)
+    Callback<ref<ValidPathInfo>> callback) noexcept
 {
-    assertStorePath(storePath);
-
-    auto hashPart = storePathToHash(storePath);
+    std::string hashPart;
 
     try {
+        assertStorePath(storePath);
+
+        hashPart = storePathToHash(storePath);
 
         {
             auto res = state.lock()->pathInfoCache.get(hashPart);
@@ -365,8 +366,10 @@ void Store::queryPathInfo(const Path & storePath,
 
     } catch (...) { return callback.rethrow(); }
 
+    auto callbackPtr = std::make_shared<decltype(callback)>(std::move(callback));
+
     queryPathInfoUncached(storePath,
-        {[this, storePath, hashPart, callback](std::future<std::shared_ptr<ValidPathInfo>> fut) {
+        {[this, storePath, hashPart, callbackPtr](std::future<std::shared_ptr<ValidPathInfo>> fut) {
 
             try {
                 auto info = fut.get();
@@ -386,8 +389,8 @@ void Store::queryPathInfo(const Path & storePath,
                     throw InvalidPath("path '%s' is not valid", storePath);
                 }
 
-                callback(ref<ValidPathInfo>(info));
-            } catch (...) { callback.rethrow(); }
+                (*callbackPtr)(ref<ValidPathInfo>(info));
+            } catch (...) { callbackPtr->rethrow(); }
         }});
 }
 
