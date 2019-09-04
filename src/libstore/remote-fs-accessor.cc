@@ -22,7 +22,7 @@ Path RemoteFSAccessor::makeCacheFile(const Path & storePath, const std::string &
     return fmt("%s/%s.%s", cacheDir, storePathToHash(storePath), ext);
 }
 
-void RemoteFSAccessor::addToCache(const Path & storePath, const std::string & nar,
+void RemoteFSAccessor::addToCache(const Path & storePath, Source & nar,
     ref<FSAccessor> narAccessor)
 {
     nars.emplace(storePath, narAccessor);
@@ -35,6 +35,7 @@ void RemoteFSAccessor::addToCache(const Path & storePath, const std::string & na
             writeFile(makeCacheFile(storePath, "ls"), str.str());
 
             /* FIXME: do this asynchronously. */
+            // fixme: link from FS if possible
             writeFile(makeCacheFile(storePath, "nar"), nar);
 
         } catch (...) {
@@ -96,9 +97,13 @@ std::pair<ref<FSAccessor>, Path> RemoteFSAccessor::fetch(const Path & path_)
         } catch (SysError &) { }
     }
 
+    // FIXME: This loads the nar in-memory.
+    // Hard to fix because it leaks a reference to the entire file contents
+    // via the nar accessor
     store->narFromPath(storePath, sink);
     auto narAccessor = makeNarAccessor(sink.s);
-    addToCache(storePath, *sink.s, narAccessor);
+    StringSource src(*sink.s);
+    addToCache(storePath, src, narAccessor);
     return {narAccessor, restPath};
 }
 

@@ -42,19 +42,16 @@ struct CmdAddToStore : MixDryRun, StoreCommand
     {
         if (!namePart) namePart = baseNameOf(path);
 
-        StringSink sink;
-        dumpPath(path, sink);
+        if (!dryRun) {
+            const string result = store->addToStore(*namePart, path);
+            std::cout << fmt("%s\n", result);
+        }
+        else {
+            const Hash narHash = hashPath(htSHA256, path).first;
+            const string result = store->makeFixedOutputPath(true, narHash, *namePart);
 
-        ValidPathInfo info;
-        info.narHash = hashString(htSHA256, *sink.s);
-        info.narSize = sink.s->size();
-        info.path = store->makeFixedOutputPath(true, info.narHash, *namePart);
-        info.ca = makeFixedOutputCA(true, info.narHash);
-
-        if (!dryRun)
-            store->addToStore(info, sink.s);
-
-        std::cout << fmt("%s\n", info.path);
+            std::cout << fmt("%s\n", result);
+        }
     }
 };
 

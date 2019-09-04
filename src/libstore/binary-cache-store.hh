@@ -35,7 +35,7 @@ public:
     virtual bool fileExists(const std::string & path) = 0;
 
     virtual void upsertFile(const std::string & path,
-        const std::string & data,
+        const std::string_view data,
         const std::string & mimeType) = 0;
 
     /* Note: subclasses must implement at least one of the two
@@ -62,8 +62,6 @@ public:
 
 private:
 
-    std::string narMagic;
-
     std::string narInfoFileFor(const Path & storePath);
 
     void writeNarInfo(ref<NarInfo> narInfo);
@@ -80,9 +78,11 @@ public:
 
     bool wantMassQuery() override { return wantMassQuery_; }
 
+    void addToStore(const ValidPathInfo & info, HashResult hash, Source & source,
+        RepairFlag repair, CheckSigsFlag checkSigs);
+
     void addToStore(const ValidPathInfo & info, const ref<std::string> & nar,
-        RepairFlag repair, CheckSigsFlag checkSigs,
-        std::shared_ptr<FSAccessor> accessor) override;
+        RepairFlag repair, CheckSigsFlag checkSigs) override;
 
     Path addToStore(const string & name, const Path & srcPath,
         bool recursive, HashType hashAlgo,

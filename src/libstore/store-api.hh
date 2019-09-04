@@ -405,13 +405,11 @@ public:
 
     /* Import a path into the store. */
     virtual void addToStore(const ValidPathInfo & info, Source & narSource,
-        RepairFlag repair = NoRepair, CheckSigsFlag checkSigs = CheckSigs,
-        std::shared_ptr<FSAccessor> accessor = 0);
+        RepairFlag repair = NoRepair, CheckSigsFlag checkSigs = CheckSigs);
 
     // FIXME: remove
     virtual void addToStore(const ValidPathInfo & info, const ref<std::string> & nar,
-        RepairFlag repair = NoRepair, CheckSigsFlag checkSigs = CheckSigs,
-        std::shared_ptr<FSAccessor> accessor = 0);
+        RepairFlag repair = NoRepair, CheckSigsFlag checkSigs = CheckSigs);
 
     /* Copy the contents of a path to the store and register the
        validity the resulting path.  The resulting path is returned.
@@ -571,10 +569,8 @@ public:
     void exportPath(const Path & path, Sink & sink);
 
     /* Import a sequence of NAR dumps created by exportPaths() into
-       the Nix store. Optionally, the contents of the NARs are
-       preloaded into the specified FS accessor to speed up subsequent
-       access. */
-    Paths importPaths(Source & source, std::shared_ptr<FSAccessor> accessor,
+       the Nix store. */
+    Paths importPaths(Source & source,
         CheckSigsFlag checkSigs = CheckSigs);
 
     struct Stats

@@ -31,7 +31,7 @@ protected:
     bool fileExists(const std::string & path) override;
 
     void upsertFile(const std::string & path,
-        const std::string & data,
+        const std::string_view data,
         const std::string & mimeType) override;
 
     void getFile(const std::string & path, Sink & sink) override
@@ -66,7 +66,7 @@ void LocalBinaryCacheStore::init()
     BinaryCacheStore::init();
 }
 
-static void atomicWrite(const Path & path, const std::string & s)
+static void atomicWrite(const Path & path, const std::string_view s)
 {
     Path tmp = path + ".tmp." + std::to_string(getpid());
     AutoDelete del(tmp, false);
@@ -82,7 +82,7 @@ bool LocalBinaryCacheStore::fileExists(const std::string & path)
 }
 
 void LocalBinaryCacheStore::upsertFile(const std::string & path,
-    const std::string & data,
+    const std::string_view data,
     const std::string & mimeType)
 {
     atomicWrite(binaryCacheDir + "/" + path, data);

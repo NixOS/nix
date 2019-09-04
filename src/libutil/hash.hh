@@ -2,7 +2,7 @@
 
 #include "types.hh"
 #include "serialise.hh"
-
+#include <variant>
 
 namespace nix {
 
@@ -127,5 +127,27 @@ public:
     HashResult currentHash();
 };
 
+
+struct HashedBufferSink : Sink
+{
+private:
+    std::unique_ptr<AutoDelete> tmpDir;
+    std::unique_ptr<AutoCloseFD> fd;
+    std::unique_ptr<Source> src;
+    std::shared_ptr<void> mmapped;
+    std::variant<StringSink, FdSink> child;
+    HashResult hash;
+    Path tmpFile;
+    HashSink hashsink;
+    bool finished = false;
+public:
+    HashedBufferSink(HashType ht) : hashsink(ht) {}
+    void operator () (const unsigned char * data, size_t len) override;
+    HashResult toHash();
+    Source& toSource();
+    void finish();
+    std::string_view toStringView();
+    void upgrade();
+};
 
 }

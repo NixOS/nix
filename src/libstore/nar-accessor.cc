@@ -34,18 +34,20 @@ struct NarAccessor : public FSAccessor
 
     NarMember root;
 
-    struct NarIndexer : ParseSink, StringSource
+    struct NarIndexer : ParseSink
     {
         NarAccessor & acc;
+        Source & src;
 
         std::stack<NarMember *> parents;
 
-        std::string currentStart;
         bool isExec = false;
 
-        NarIndexer(NarAccessor & acc, const std::string & nar)
-            : StringSource(nar), acc(acc)
-        { }
+        NarIndexer(NarAccessor & acc, Source & src)
+            : acc(acc), src(src)
+        {
+            parseDump(*this, src);
+        }
 
         void createMember(const Path & path, NarMember member) {
             size_t level = std::count(path.begin(), path.end(), '/');
@@ -79,20 +81,13 @@ struct NarAccessor : public FSAccessor
 
         void preallocateContents(unsigned long long size) override
         {
-            currentStart = string(s, pos, 16);
             assert(size <= std::numeric_limits<size_t>::max());
             parents.top()->size = (size_t)size;
-            parents.top()->start = pos;
+            parents.top()->start = src.total_read();
         }
 
         void receiveContents(unsigned char * data, unsigned int len) override
-        {
-            // Sanity check
-            if (!currentStart.empty()) {
-                assert(len < 16 || currentStart == string((char *) data, 16));
-                currentStart.clear();
-            }
-        }
+        {}
 
         void createSymlink(const Path & path, const string & target) override
         {
@@ -103,8 +98,13 @@ struct NarAccessor : public FSAccessor
 
     NarAccessor(ref<const std::string> nar) : nar(nar)
     {
-        NarIndexer indexer(*this, *nar);
-        parseDump(indexer, indexer);
+        StringSource str(*nar);
+        NarIndexer indexer(*this, str);
+    }
+
+    NarAccessor(Source & source)
+    {
+        NarIndexer indexer(*this, source);
     }
 
     NarAccessor(const std::string & listing, GetNarBytes getNarBytes)
@@ -215,6 +215,11 @@ struct NarAccessor : public FSAccessor
 };
 
 ref<FSAccessor> makeNarAccessor(ref<const std::string> nar)
+{
+    return make_ref<NarAccessor>(nar);
+}
+
+ref<FSAccessor> makeNarAccessor(Source & nar)
 {
     return make_ref<NarAccessor>(nar);
 }

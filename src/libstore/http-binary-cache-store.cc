@@ -97,7 +97,7 @@ protected:
     }
 
     void upsertFile(const std::string & path,
-        const std::string & data,
+        const std::string_view data,
         const std::string & mimeType) override
     {
         auto req = DownloadRequest(cacheUri + "/" + path);

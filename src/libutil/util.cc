@@ -332,7 +332,7 @@ void readFile(const Path & path, Sink & sink)
 }
 
 
-void writeFile(const Path & path, const string & s, mode_t mode)
+void writeFile(const Path & path, const std::string_view s, mode_t mode)
 {
     AutoCloseFD fd = open(path.c_str(), O_WRONLY | O_TRUNC | O_CREAT | O_CLOEXEC, mode);
     if (!fd)
@@ -609,7 +609,7 @@ void writeFull(int fd, const unsigned char * buf, size_t count, bool allowInterr
 }
 
 
-void writeFull(int fd, const string & s, bool allowInterrupts)
+void writeFull(int fd, const std::string_view s, bool allowInterrupts)
 {
     writeFull(fd, (const unsigned char *) s.data(), s.size(), allowInterrupts);
 }

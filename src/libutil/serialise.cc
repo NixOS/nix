@@ -48,7 +48,7 @@ FdSink::~FdSink()
 }
 
 
-size_t threshold = 256 * 1024 * 1024;
+size_t large_dump_threshold = 256 * 1024 * 1024;
 
 static void warnLargeDump()
 {
@@ -61,7 +61,7 @@ void FdSink::write(const unsigned char * data, size_t len)
     written += len;
     static bool warned = false;
     if (warn && !warned) {
-        if (written > threshold) {
+        if (written > large_dump_threshold) {
             warnLargeDump();
             warned = true;
         }
@@ -89,6 +89,19 @@ void Source::operator () (unsigned char * data, size_t len)
     }
 }
 
+void Source::drain(Sink& s)
+{
+    std::vector<unsigned char> buf(8192);
+    while (true) {
+        size_t n;
+        try {
+            n = read(buf.data(), buf.size());
+            s((const unsigned char *) buf.data(), n);
+        } catch (EndOfFile &) {
+            break;
+        }
+    }
+}
 
 std::string Source::drain()
 {
@@ -117,6 +130,7 @@ size_t BufferedSource::read(unsigned char * data, size_t len)
     size_t n = len > bufPosIn - bufPosOut ? bufPosIn - bufPosOut : len;
     memcpy(data, buffer.get() + bufPosOut, n);
     bufPosOut += n;
+    totalRead += n;
     if (bufPosIn == bufPosOut) bufPosIn = bufPosOut = 0;
     return n;
 }
@@ -205,6 +219,9 @@ std::unique_ptr<Source> sinkToSource(
             pos += n;
 
             return n;
+        }
+        size_t total_read() const override {
+            return pos;
         }
     };
 
@@ -312,12 +329,11 @@ template PathSet readStrings(Source & source);
 void StringSink::operator () (const unsigned char * data, size_t len)
 {
     static bool warned = false;
-    if (!warned && s->size() > threshold) {
+    if (!warned && s->size() > large_dump_threshold) {
         warnLargeDump();
         warned = true;
     }
     s->append((const char *) data, len);
 }
-
 
 }

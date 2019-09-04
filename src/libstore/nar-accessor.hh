@@ -3,12 +3,14 @@
 #include <functional>
 
 #include "fs-accessor.hh"
+#include "serialise.hh"
 
 namespace nix {
 
 /* Return an object that provides access to the contents of a NAR
    file. */
 ref<FSAccessor> makeNarAccessor(ref<const std::string> nar);
+ref<FSAccessor> makeNarAccessor(Source & nar);
 
 /* Create a NAR accessor from a NAR listing (in the format produced by
    listNar()). The callback getNarBytes(offset, length) is used by the

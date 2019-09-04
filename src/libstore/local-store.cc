@@ -979,7 +979,7 @@ const PublicKeys & LocalStore::getPublicKeys()
 
 
 void LocalStore::addToStore(const ValidPathInfo & info, Source & source,
-    RepairFlag repair, CheckSigsFlag checkSigs, std::shared_ptr<FSAccessor> accessor)
+    RepairFlag repair, CheckSigsFlag checkSigs)
 {
     if (!info.narHash)
         throw Error("cannot add path '%s' because it lacks a hash", info.path);
@@ -1041,11 +1041,9 @@ void LocalStore::addToStore(const ValidPathInfo & info, Source & source,
 }
 
 
-Path LocalStore::addToStoreFromDump(const string & dump, const string & name,
-    bool recursive, HashType hashAlgo, RepairFlag repair)
+Path LocalStore::addToStoreFromDump(const Hash & h, Source & source,
+    const string & name, bool recursive, RepairFlag repair)
 {
-    Hash h = hashString(hashAlgo, dump);
-
     Path dstPath = makeFixedOutputPath(recursive, h, name);
 
     addTempRoot(dstPath);
@@ -1066,10 +1064,9 @@ Path LocalStore::addToStoreFromDump(const string & dump, const string & name,
             autoGC();
 
             if (recursive) {
-                StringSource source(dump);
                 restorePath(realPath, source);
             } else
-                writeFile(realPath, dump);
+                writeFile(realPath, source);
 
             canonicalisePathMetaData(realPath, -1);
 
@@ -1078,9 +1075,9 @@ Path LocalStore::addToStoreFromDump(const string & dump, const string & name,
                above (if called with recursive == true and hashAlgo ==
                sha256); otherwise, compute it here. */
             HashResult hash;
-            if (recursive) {
-                hash.first = hashAlgo == htSHA256 ? h : hashString(htSHA256, dump);
-                hash.second = dump.size();
+            if (recursive && h.type == htSHA256) {
+                hash.first = h;
+                hash.second = source.total_read();
             } else
                 hash = hashPath(htSHA256, realPath);
 
@@ -1106,16 +1103,13 @@ Path LocalStore::addToStore(const string & name, const Path & _srcPath,
 {
     Path srcPath(absPath(_srcPath));
 
-    /* Read the whole path into memory. This is not a very scalable
-       method for very large paths, but `copyPath' is mainly used for
-       small files. */
-    StringSink sink;
+    HashedBufferSink sink(hashAlgo);
     if (recursive)
         dumpPath(srcPath, sink, filter);
     else
-        sink.s = make_ref<std::string>(readFile(srcPath));
+        readFile(srcPath, sink);
 
-    return addToStoreFromDump(*sink.s, name, recursive, hashAlgo, repair);
+    return addToStoreFromDump(sink.toHash().first, sink.toSource(), name, recursive, repair);
 }
 
 

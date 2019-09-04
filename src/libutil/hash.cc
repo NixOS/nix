@@ -12,6 +12,7 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
+#include <sys/mman.h>
 
 namespace nix {
 
@@ -351,5 +352,79 @@ string printHashType(HashType ht)
     else abort();
 }
 
+// convert string sink to fd sink
+void HashedBufferSink::upgrade() {
+    auto oldchild = std::get_if<StringSink>(&child);
+    if (!oldchild) return;
+    tmpDir = std::make_unique<AutoDelete>(createTempDir(getCacheDir()+"/nix"), true);
+    tmpFile = (Path) *tmpDir + "/tmp-buffer";
+
+    fd = std::make_unique<AutoCloseFD>(
+        open(tmpFile.c_str(), O_WRONLY | O_CREAT | O_EXCL, 0600));
+    if (!fd) throw SysError("creating temporary file '%s'", tmpFile);
+
+    FdSink newchild(fd->get());
+    newchild(*(oldchild->s));
+    child = std::move(newchild);
+}
+
+extern size_t large_dump_threshold;
+void HashedBufferSink::operator () ( const unsigned char * data, size_t len)
+{
+    assert(!finished);
+    if (auto strs = std::get_if<StringSink>(&child)) {
+        if (strs->s->size() + len > large_dump_threshold)
+            upgrade();
+    }
+    hashsink(data, len);
+    std::visit([&](Sink& s) { s(data, len); }, child);
+}
+void HashedBufferSink::finish() {
+    if (finished) return;
+    if (std::holds_alternative<FdSink>(child)) {
+        std::get<FdSink>(child).flush();
+        fd.reset();
+    }
+    hash = hashsink.finish();
+    finished = true;
+}
+HashResult HashedBufferSink::toHash() {
+    if (finished) return hash;
+    finish();
+    return hash;
+}
+template<class... Ts> struct overload : Ts... { using Ts::operator()...; };
+template<class... Ts> overload(Ts...) -> overload<Ts...>;
+
+Source& HashedBufferSink::toSource() {
+    finish();
+    if (src) return *src;
+    src = std::visit(overload{
+            [&](StringSink& ss) -> std::unique_ptr<Source> {
+                return std::make_unique<StringSource>(*(ss.s));
+            },
+            [&](FdSink& fs) -> std::unique_ptr<Source> {
+                fd = std::make_unique<AutoCloseFD>(open(tmpFile.c_str(), O_RDONLY, 0600));
+                return std::make_unique<FdSource>(fd->get());
+            },
+        }, child);
+    return *src;
+}
+std::string_view HashedBufferSink::toStringView() {
+    return std::visit(overload{
+            [](StringSink& ss) -> std::string_view {
+                return *ss.s;
+            },
+            [&](FdSink& fs) -> std::string_view {
+                toSource(); // open fd
+                size_t length = this->toHash().second;
+                auto deleter = [&](void* p) { munmap(p, length); };
+                mmapped = { mmap(nullptr, length, PROT_READ, MAP_PRIVATE | MAP_POPULATE, fd->get(), 0), deleter };
+                if (mmapped.get() == MAP_FAILED) {
+                    if (!fd) throw SysError("failed to mmap file");
+                }
+                return std::string_view((const char*)mmapped.get(), length);
+            }}, child);
+}
 
 }

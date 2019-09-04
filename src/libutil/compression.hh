@@ -17,7 +17,7 @@ ref<std::string> decompress(const std::string & method, const std::string & in);
 
 ref<CompressionSink> makeDecompressionSink(const std::string & method, Sink & nextSink);
 
-ref<std::string> compress(const std::string & method, const std::string & in, const bool parallel = false);
+ref<std::string> compress(const std::string & method, const std::string_view in, const bool parallel = false);
 
 ref<CompressionSink> makeCompressionSink(const std::string & method, Sink & nextSink, const bool parallel = false);
 
