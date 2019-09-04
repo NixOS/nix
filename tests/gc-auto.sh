@@ -26,9 +26,9 @@ with import ./config.nix; mkDerivation {
     echo 200 > ${fake_free}.tmp1
     mv ${fake_free}.tmp1 $fake_free
     echo 2...
-    sleep 1
+    sleep 2
     echo 3...
-    sleep 1
+    sleep 2
     echo 4...
     [[ \$(ls \$NIX_STORE/*-garbage? | wc -l) = 1 ]]
   '';
@@ -48,9 +48,9 @@ with import ./config.nix; mkDerivation {
     echo 200 > ${fake_free}.tmp2
     mv ${fake_free}.tmp2 $fake_free
     echo 2...
-    sleep 1
+    sleep 2
     echo 3...
-    sleep 1
+    sleep 2
     echo 4...
   '';
 }
