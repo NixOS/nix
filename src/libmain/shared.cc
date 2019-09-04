@@ -80,6 +80,7 @@ string getArg(const string & opt,
 }
 
 
+#if OPENSSL_VERSION_NUMBER < 0x10101000L
 /* OpenSSL is not thread-safe by default - it will randomly crash
    unless the user supplies a mutex locking function. So let's do
    that. */
@@ -92,6 +93,7 @@ static void opensslLockCallback(int mode, int type, const char * file, int line)
     else
         opensslLocks[type].unlock();
 }
+#endif
 
 
 static void sigHandler(int signo) { }
@@ -105,9 +107,11 @@ void initNix()
     std::cerr.rdbuf()->pubsetbuf(buf, sizeof(buf));
 #endif
 
+#if OPENSSL_VERSION_NUMBER < 0x10101000L
     /* Initialise OpenSSL locking. */
     opensslLocks = std::vector<std::mutex>(CRYPTO_num_locks());
     CRYPTO_set_locking_callback(opensslLockCallback);
+#endif
 
     loadConfFile();
 
