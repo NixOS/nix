@@ -25,6 +25,8 @@ GitInfo exportGit(ref<Store> store, std::string uri,
 {
     assert(!rev || rev->type == htSHA1);
 
+    if (hasPrefix(uri, "git+")) uri = std::string(uri, 4);
+
     bool isLocal = hasPrefix(uri, "/") && pathExists(uri + "/.git");
 
     // If this is a local directory (but not a file:// URI) and no ref

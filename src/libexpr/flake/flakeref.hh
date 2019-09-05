@@ -52,28 +52,28 @@ namespace nix {
        github:edolstra/dwarffs/unstable
        github:edolstra/dwarffs/41c0c1bf292ea3ac3858ff393b49ca1123dbd553
 
-   * https://<server>/<path>.git(\?attr(&attr)*)?
-     ssh://<server>/<path>.git(\?attr(&attr)*)?
-     git://<server>/<path>.git(\?attr(&attr)*)?
+   * git+https://<server>/<path>(\?attr(&attr)*)?
+     git+ssh://<server>/<path>(\?attr(&attr)*)?
+     git://<server>/<path>(\?attr(&attr)*)?
      file:///<path>(\?attr(&attr)*)?
 
      where 'attr' is one of:
        rev=<rev>
        ref=<ref>
 
-     A Git repository fetched through https. Note that the path must
-     end in ".git". The default for "ref" is "master".
+     A Git repository fetched through https. The default for "ref" is
+     "master".
 
      Examples:
 
-       https://example.org/my/repo.git
-       https://example.org/my/repo.git?ref=release-1.2.3
-       https://example.org/my/repo.git?rev=e72daba8250068216d79d2aeef40d4d95aff6666
+       git+https://example.org/my/repo.git
+       git+https://example.org/my/repo.git?ref=release-1.2.3
+       git+https://example.org/my/repo.git?rev=e72daba8250068216d79d2aeef40d4d95aff6666
        git://github.com/edolstra/dwarffs.git?ref=flake&rev=2efca4bc9da70fb001b26c3dc858c6397d3c4817
 
-   * /path.git(\?attr(&attr)*)?
+   * /path(\?attr(&attr)*)?
 
-     Like file://path.git, but if no "ref" or "rev" is specified, the
+     Like file://path, but if no "ref" or "rev" is specified, the
      (possibly dirty) working tree will be used. Using a working tree
      is not allowed in pure evaluation mode.
 

@@ -27,7 +27,7 @@ const static std::string ownerRegex = "[a-zA-Z][a-zA-Z0-9_-]*";
 const static std::string repoRegex = "[a-zA-Z][a-zA-Z0-9_-]*";
 
 // URI stuff.
-const static std::string schemeRegex = "(?:http|https|ssh|git|file)";
+const static std::string schemeRegex = "[a-z+]+";
 const static std::string authorityRegex = "[a-zA-Z0-9._~-]*";
 const static std::string segmentRegex = "[a-zA-Z0-9._~-]+";
 const static std::string pathRegex = "/?" + segmentRegex + "(?:/" + segmentRegex + ")*";
@@ -120,21 +120,29 @@ FlakeRef::FlakeRef(const std::string & uri_, bool allowRelative)
         data = d;
     }
 
-    else if (std::regex_match(uri.c_str(), match, uriRegex)
-        && (match[2] == "file" || hasSuffix(match[4], ".git")))
-    {
-        IsGit d;
-        d.uri = match[1];
-        for (auto & param : params) {
-            if (handleGitParams(param.first, param.second))
-                ;
-            else
-                // FIXME: should probably pass through unknown parameters
-                throw BadFlakeRef("invalid Git flakeref parameter '%s', in '%s'", param.first, uri);
-        }
-        if (rev && !ref)
-            throw BadFlakeRef("flake URI '%s' lacks a Git ref", uri);
-        data = d;
+    else if (std::regex_match(uri.c_str(), match, uriRegex)) {
+        auto & scheme = match[2];
+        if (scheme == "git" ||
+            scheme == "git+http" ||
+            scheme == "git+https" ||
+            scheme == "git+ssh" ||
+            scheme == "git+file" ||
+            scheme == "file")
+        {
+            IsGit d;
+            d.uri = match[1];
+            for (auto & param : params) {
+                if (handleGitParams(param.first, param.second))
+                    ;
+                else
+                    // FIXME: should probably pass through unknown parameters
+                    throw BadFlakeRef("invalid Git flakeref parameter '%s', in '%s'", param.first, uri);
+            }
+            if (rev && !ref)
+                throw BadFlakeRef("flake URI '%s' lacks a Git ref", uri);
+            data = d;
+        } else
+            throw BadFlakeRef("unsupported URI scheme '%s' in flake reference '%s'", scheme, uri);
     }
 
     else if ((hasPrefix(uri, "/") || (allowRelative && (hasPrefix(uri, "./") || hasPrefix(uri, "../") || uri == ".")))
