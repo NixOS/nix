@@ -1742,6 +1742,11 @@ bool EvalState::eqValues(Value & v1, Value & v2)
     }
 }
 
+PathSet const & EvalState::realisedDerivations() const
+{
+    return realisedPaths;
+}
+
 void EvalState::printStats()
 {
     bool showStats = getEnv("NIX_SHOW_STATS", "0") != "0";

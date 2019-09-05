@@ -28,7 +28,7 @@ enum OutputKind { okPlain, okXML, okJSON };
 
 void processExpr(EvalState & state, const Strings & attrPaths,
     bool parseOnly, bool strict, Bindings & autoArgs,
-    bool evalOnly, OutputKind output, bool location, Expr * e)
+    bool evalOnly, const Path realisedRoot, OutputKind output, bool location, Expr * e)
 {
     if (parseOnly) {
         std::cout << format("%1%\n") % *e;
@@ -80,6 +80,19 @@ void processExpr(EvalState & state, const Strings & attrPaths,
                 std::cout << format("%1%%2%\n") % drvPath % (outputName != "out" ? "!" + outputName : "");
             }
         }
+
+        if (!realisedRoot.empty() && !state.realisedDerivations().empty()) {
+            auto store2 = state.store.dynamic_pointer_cast<LocalFSStore>();
+            if (store2) {
+                Path rootName = indirectRoot ? absPath(realisedRoot) : realisedRoot;
+                Path collection = createTempDir();
+                for (const auto & path : state.realisedDerivations())
+                    createSymlink(path, collection + "/" + baseNameOf(path));
+                Path collectionInStore = store2->addToStore(baseNameOf(collection), collection, true, htSHA256, defaultPathFilter, NoRepair);
+                store2->addPermRoot(collectionInStore, rootName, indirectRoot);
+            } else
+                throw Error("Cannot add root for realised derivations, couldn't convert store to LocalFSStore");
+        }
     }
 }
 
@@ -99,6 +112,7 @@ static int _main(int argc, char * * argv)
         Strings attrPaths;
         bool wantsReadWrite = false;
         RepairFlag repair = NoRepair;
+        Path realisedRoot;
 
         struct MyArgs : LegacyArgs, MixEvalArgs
         {
@@ -140,6 +154,8 @@ static int _main(int argc, char * * argv)
                 repair = Repair;
             else if (*arg == "--dry-run")
                 settings.readOnlyMode = true;
+            else if (*arg == "--root-realisations")
+                realisedRoot = getArg(*arg, arg, end);
             else if (*arg != "" && arg->at(0) == '-')
                 return false;
             else
@@ -175,7 +191,7 @@ static int _main(int argc, char * * argv)
         if (readStdin) {
             Expr * e = state->parseStdin();
             processExpr(*state, attrPaths, parseOnly, strict, autoArgs,
-                evalOnly, outputKind, xmlOutputSourceLocation, e);
+                evalOnly, realisedRoot, outputKind, xmlOutputSourceLocation, e);
         } else if (files.empty() && !fromArgs)
             files.push_back("./default.nix");
 
@@ -184,7 +200,7 @@ static int _main(int argc, char * * argv)
                 ? state->parseExprFromString(i, absPath("."))
                 : state->parseExprFromFile(resolveExprPath(state->checkSourcePath(lookupFileArg(*state, i))));
             processExpr(*state, attrPaths, parseOnly, strict, autoArgs,
-                evalOnly, outputKind, xmlOutputSourceLocation, e);
+                evalOnly, realisedRoot, outputKind, xmlOutputSourceLocation, e);
         }
 
         state->printStats();

@@ -280,7 +280,11 @@ public:
 
     void realiseContext(const PathSet & context);
 
+    PathSet const & realisedDerivations() const;
+
 private:
+
+    PathSet realisedPaths;
 
     unsigned long nrEnvs = 0;
     unsigned long nrValuesInEnvs = 0;
