@@ -195,6 +195,18 @@ static SourceInfo fetchFlake(EvalState & state, const FlakeRef & resolvedRef)
     else abort();
 }
 
+static void expectType(EvalState & state, ValueType type,
+    Value & value, const Pos & pos)
+{
+    if (value.type == tThunk &&
+        ((type == tAttrs && dynamic_cast<ExprAttrs *>(value.thunk.expr)) ||
+         (type == tLambda && dynamic_cast<ExprLambda *>(value.thunk.expr))))
+        state.forceValue(value, pos);
+    if (value.type != type)
+        throw Error("expected %s but got %s at %s",
+            showType(type), showType(value.type), pos);
+}
+
 Flake getFlake(EvalState & state, const FlakeRef & flakeRef)
 {
     SourceInfo sourceInfo = fetchFlake(state, flakeRef);
@@ -219,9 +231,10 @@ Flake getFlake(EvalState & state, const FlakeRef & flakeRef)
         throw Error("source tree referenced by '%s' does not contain a '%s/flake.nix' file", resolvedRef, resolvedRef.subdir);
 
     Value vInfo;
+    // FIXME: don't evaluate vInfo.
     state.evalFile(realFlakeFile, vInfo); // FIXME: symlink attack
 
-    state.forceAttrs(vInfo);
+    expectType(state, tAttrs, vInfo, Pos(state.symbols.create(realFlakeFile), 0, 0));
 
     auto sEdition = state.symbols.create("edition");
     auto sEpoch = state.symbols.create("epoch"); // FIXME: remove soon
@@ -231,7 +244,8 @@ Flake getFlake(EvalState & state, const FlakeRef & flakeRef)
         edition = vInfo.attrs->get(sEpoch);
 
     if (edition) {
-        flake.edition = state.forceInt(*(**edition).value, *(**edition).pos);
+        expectType(state, tInt, *(**edition).value, *(**edition).pos);
+        flake.edition = (**edition).value->integer;
         if (flake.edition > 201909)
             throw Error("flake '%s' requires unsupported edition %d; please upgrade Nix", flakeRef, flake.edition);
         if (flake.edition < 201909)
@@ -239,26 +253,30 @@ Flake getFlake(EvalState & state, const FlakeRef & flakeRef)
     } else
         throw Error("flake '%s' lacks attribute 'edition'", flakeRef);
 
-    if (auto description = vInfo.attrs->get(state.sDescription))
-        flake.description = state.forceStringNoCtx(*(**description).value, *(**description).pos);
+    if (auto description = vInfo.attrs->get(state.sDescription)) {
+        expectType(state, tString, *(**description).value, *(**description).pos);
+        flake.description = (**description).value->string.s;
+    }
 
     auto sInputs = state.symbols.create("inputs");
     auto sUri = state.symbols.create("uri");
     auto sFlake = state.symbols.create("flake");
 
     if (std::optional<Attr *> inputs = vInfo.attrs->get(sInputs)) {
-        state.forceAttrs(*(**inputs).value, *(**inputs).pos);
+        expectType(state, tAttrs, *(**inputs).value, *(**inputs).pos);
 
         for (Attr inputAttr : *(*(**inputs).value).attrs) {
-            state.forceAttrs(*inputAttr.value, *inputAttr.pos);
+            expectType(state, tAttrs, *inputAttr.value, *inputAttr.pos);
 
             FlakeInput input(FlakeRef(inputAttr.name));
 
             for (Attr attr : *(inputAttr.value->attrs)) {
                 if (attr.name == sUri) {
-                    input.ref = state.forceStringNoCtx(*attr.value, *attr.pos);
+                    expectType(state, tString, *attr.value, *attr.pos);
+                    input.ref = std::string(attr.value->string.s);
                 } else if (attr.name == sFlake) {
-                    input.isFlake = state.forceBool(*attr.value, *attr.pos);
+                    expectType(state, tBool, *attr.value, *attr.pos);
+                    input.isFlake = attr.value->boolean;
                 } else
                     throw Error("flake input '%s' has an unsupported attribute '%s', at %s",
                         inputAttr.name, attr.name, *attr.pos);
@@ -271,7 +289,7 @@ Flake getFlake(EvalState & state, const FlakeRef & flakeRef)
     auto sOutputs = state.symbols.create("outputs");
 
     if (auto outputs = vInfo.attrs->get(sOutputs)) {
-        state.forceFunction(*(**outputs).value, *(**outputs).pos);
+        expectType(state, tLambda, *(**outputs).value, *(**outputs).pos);
         flake.vOutputs = (**outputs).value;
 
         if (flake.vOutputs->lambda.fun->matchAttrs) {

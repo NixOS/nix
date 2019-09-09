@@ -141,12 +141,12 @@ const Value *getPrimOp(const Value &v) {
 }
 
 
-string showType(const Value & v)
+string showType(ValueType type)
 {
-    switch (v.type) {
+    switch (type) {
         case tInt: return "an integer";
         case tBool: return "a boolean";
-        case tString: return v.string.context ? "a string with context" : "a string";
+        case tString: return "a string";
         case tPath: return "a path";
         case tNull: return "null";
         case tAttrs: return "a set";
@@ -155,14 +155,27 @@ string showType(const Value & v)
         case tApp: return "a function application";
         case tLambda: return "a function";
         case tBlackhole: return "a black hole";
+        case tPrimOp: return "a built-in function";
+        case tPrimOpApp: return "a partially applied built-in function";
+        case tExternal: return "an external value";
+        case tFloat: return "a float";
+    }
+    abort();
+}
+
+
+string showType(const Value & v)
+{
+    switch (v.type) {
+        case tString: return v.string.context ? "a string with context" : "a string";
         case tPrimOp:
             return fmt("the built-in function '%s'", string(v.primOp->name));
         case tPrimOpApp:
             return fmt("the partially applied built-in function '%s'", string(getPrimOp(v)->primOp->name));
         case tExternal: return v.external->showType();
-        case tFloat: return "a float";
+    default:
+        return showType(v.type);
     }
-    abort();
 }
 
 

@@ -338,6 +338,7 @@ private:
 
 
 /* Return a string representing the type of the value `v'. */
+string showType(ValueType type);
 string showType(const Value & v);
 
 /* Decode a context string ‘!<name>!<path>’ into a pair <path,
