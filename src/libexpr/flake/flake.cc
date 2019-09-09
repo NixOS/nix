@@ -198,9 +198,7 @@ static SourceInfo fetchFlake(EvalState & state, const FlakeRef & resolvedRef)
 static void expectType(EvalState & state, ValueType type,
     Value & value, const Pos & pos)
 {
-    if (value.type == tThunk &&
-        ((type == tAttrs && dynamic_cast<ExprAttrs *>(value.thunk.expr)) ||
-         (type == tLambda && dynamic_cast<ExprLambda *>(value.thunk.expr))))
+    if (value.type == tThunk && value.isTrivial())
         state.forceValue(value, pos);
     if (value.type != type)
         throw Error("expected %s but got %s at %s",
@@ -231,8 +229,7 @@ Flake getFlake(EvalState & state, const FlakeRef & flakeRef)
         throw Error("source tree referenced by '%s' does not contain a '%s/flake.nix' file", resolvedRef, resolvedRef.subdir);
 
     Value vInfo;
-    // FIXME: don't evaluate vInfo.
-    state.evalFile(realFlakeFile, vInfo); // FIXME: symlink attack
+    state.evalFile(realFlakeFile, vInfo, true); // FIXME: symlink attack
 
     expectType(state, tAttrs, vInfo, Pos(state.symbols.create(realFlakeFile), 0, 0));
 

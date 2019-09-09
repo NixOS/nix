@@ -179,6 +179,18 @@ string showType(const Value & v)
 }
 
 
+bool Value::isTrivial() const
+{
+    return
+        type != tApp
+        && type != tPrimOpApp
+        && (type != tThunk
+            || (dynamic_cast<ExprAttrs *>(thunk.expr)
+                && ((ExprAttrs *) thunk.expr)->dynamicAttrs.empty())
+            || dynamic_cast<ExprLambda *>(thunk.expr));
+}
+
+
 #if HAVE_BOEHMGC
 /* Called when the Boehm GC runs out of memory. */
 static void * oomHandler(size_t requested)
@@ -749,7 +761,7 @@ Value * ExprPath::maybeThunk(EvalState & state, Env & env)
 }
 
 
-void EvalState::evalFile(const Path & path_, Value & v)
+void EvalState::evalFile(const Path & path_, Value & v, bool mustBeTrivial)
 {
     auto path = checkSourcePath(path_);
 
@@ -778,6 +790,11 @@ void EvalState::evalFile(const Path & path_, Value & v)
     fileParseCache[path2] = e;
 
     try {
+        // Enforce that 'flake.nix' is a direct attrset, not a
+        // computation.
+        if (mustBeTrivial &&
+            !(dynamic_cast<ExprAttrs *>(e)))
+            throw Error("file '%s' must be an attribute set", path);
         eval(e, v);
     } catch (Error & e) {
         addErrorPrefix(e, "while evaluating the file '%1%':\n", path2);
