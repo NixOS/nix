@@ -344,3 +344,88 @@ nix flake --flake-registry $registry check $flake3Dir
 
 rm -rf $TEST_ROOT/flake1-v2
 nix flake clone --flake-registry $registry flake1 $TEST_ROOT/flake1-v2
+
+# More 'nix flake check' tests.
+cat > $flake3Dir/flake.nix <<EOF
+{
+  edition = 201909;
+
+  outputs = { flake1, self }: {
+    overlay = final: prev: {
+    };
+  };
+}
+EOF
+
+nix flake check --flake-registry $registry $flake3Dir
+
+cat > $flake3Dir/flake.nix <<EOF
+{
+  edition = 201909;
+
+  outputs = { flake1, self }: {
+    overlay = finalll: prev: {
+    };
+  };
+}
+EOF
+
+(! nix flake check --flake-registry $registry $flake3Dir)
+
+cat > $flake3Dir/flake.nix <<EOF
+{
+  edition = 201909;
+
+  outputs = { flake1, self }: {
+    nixosModules.foo = {
+      a.b.c = 123;
+      foo = true;
+    };
+  };
+}
+EOF
+
+nix flake check --flake-registry $registry $flake3Dir
+
+cat > $flake3Dir/flake.nix <<EOF
+{
+  edition = 201909;
+
+  outputs = { flake1, self }: {
+    nixosModules.foo = {
+      a.b.c = 123;
+      foo = assert false; true;
+    };
+  };
+}
+EOF
+
+(! nix flake check --flake-registry $registry $flake3Dir)
+
+cat > $flake3Dir/flake.nix <<EOF
+{
+  edition = 201909;
+
+  outputs = { flake1, self }: {
+    nixosModule = { config, pkgs, ... }: {
+      a.b.c = 123;
+    };
+  };
+}
+EOF
+
+nix flake check --flake-registry $registry $flake3Dir
+
+cat > $flake3Dir/flake.nix <<EOF
+{
+  edition = 201909;
+
+  outputs = { flake1, self }: {
+    nixosModule = { config, pkgs }: {
+      a.b.c = 123;
+    };
+  };
+}
+EOF
+
+(! nix flake check --flake-registry $registry $flake3Dir)
