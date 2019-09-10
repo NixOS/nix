@@ -2,6 +2,7 @@
 name = "nix-rust"
 version = "0.1.0"
 authors = ["Eelco Dolstra <edolstra@gmail.com>"]
+edition = "2018"
 
 [lib]
 name = "nixrust"

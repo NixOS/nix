@@ -40,5 +40,5 @@ struct Source
 }
 
 extern "C" {
-    bool unpack_tarfile(rust::Source source, rust::StringSlice dest_dir);
+    void unpack_tarfile(rust::Source source, rust::StringSlice dest_dir);
 }
