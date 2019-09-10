@@ -183,7 +183,7 @@ cat > $flake3Dir/flake.nix <<EOF
 
   outputs = { self, flake1, flake2 }: rec {
     packages.xyzzy = flake2.packages.bar;
-    packages.sth = flake1.packages.foo;
+    packages."sth sth" = flake1.packages.foo;
   };
 }
 EOF
@@ -192,7 +192,7 @@ git -C $flake3Dir add flake.nix
 git -C $flake3Dir commit -m 'Update flake.nix'
 
 # Check whether `nix build` works with an incomplete lockfile
-nix build -o $TEST_ROOT/result --flake-registry $registry $flake3Dir:sth
+nix build -o $TEST_ROOT/result --flake-registry $registry $flake3Dir:"sth sth"
 
 # Check whether it saved the lockfile
 [[ ! (-z $(git -C $flake3Dir diff master)) ]]
