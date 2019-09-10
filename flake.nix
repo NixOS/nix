@@ -13,8 +13,6 @@
     checks = {
       binaryTarball = hydraJobs.binaryTarball.x86_64-linux;
       perlBindings = hydraJobs.perlBindings.x86_64-linux;
-      inherit (hydraJobs.tests) remoteBuilds nix-copy-closure;
-      setuid = hydraJobs.tests.setuid.x86_64-linux;
     };
 
     packages = {
