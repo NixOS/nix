@@ -27,7 +27,7 @@ void builtinUnpackChannel(const BasicDerivation & drv)
         decompressor->finish();
     });
 
-    unpack_tarfile(*source, out);
+    unpack_tarfile(*source, out).use()->unwrap();
 
     auto entries = readDirectory(out);
     if (entries.size() != 1)

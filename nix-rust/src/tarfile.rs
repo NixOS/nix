@@ -10,19 +10,19 @@ pub fn unpack_tarfile(source: Source, dest_dir: &str) -> Result<(), Error> {
 
     let mut tar = Archive::new(source);
 
-    for file in tar.entries().unwrap() {
-        let mut file = file.unwrap();
+    for file in tar.entries()? {
+        let mut file = file?;
 
-        let dest_file = dest_dir.join(file.path().unwrap());
+        let dest_file = dest_dir.join(file.path()?);
 
-        fs::create_dir_all(dest_file.parent().unwrap()).unwrap();
+        fs::create_dir_all(dest_file.parent().unwrap())?;
 
         match file.header().entry_type() {
             tar::EntryType::Directory => {
-                fs::create_dir(dest_file).unwrap();
+                fs::create_dir(dest_file)?;
             }
             tar::EntryType::Regular => {
-                let mode = if file.header().mode().unwrap() & libc::S_IXUSR == 0 {
+                let mode = if file.header().mode()? & libc::S_IXUSR == 0 {
                     0o666
                 } else {
                     0o777
@@ -31,13 +31,11 @@ pub fn unpack_tarfile(source: Source, dest_dir: &str) -> Result<(), Error> {
                     .create(true)
                     .write(true)
                     .mode(mode)
-                    .open(dest_file)
-                    .unwrap();
-                io::copy(&mut file, &mut f).unwrap();
+                    .open(dest_file)?;
+                io::copy(&mut file, &mut f)?;
             }
             tar::EntryType::Symlink => {
-                std::os::unix::fs::symlink(file.header().link_name().unwrap().unwrap(), dest_file)
-                    .unwrap();
+                std::os::unix::fs::symlink(file.header().link_name()?.unwrap(), dest_file)?;
             }
             t => return Err(Error::Misc(format!("unsupported tar entry type '{:?}'", t))),
         }
