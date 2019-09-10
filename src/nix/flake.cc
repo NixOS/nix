@@ -211,7 +211,7 @@ struct CmdFlakeInfo : FlakeCommand, MixJSON
                     auto provide = nlohmann::json::object();
 
                     if (name == "checks" || name == "packages") {
-                        state->forceAttrs(vProvide);
+                        state->forceAttrs(vProvide, pos);
                         for (auto & aCheck : *vProvide.attrs)
                             provide[aCheck.name] = nlohmann::json::object();
                     }
@@ -282,7 +282,7 @@ struct CmdFlakeCheck : FlakeCommand, MixJSON
 
         auto checkOverlay = [&](const std::string & attrPath, Value & v, const Pos & pos) {
             try {
-                state->forceValue(v);
+                state->forceValue(v, pos);
                 if (v.type != tLambda || v.lambda.fun->matchAttrs || std::string(v.lambda.fun->arg) != "final")
                     throw Error("overlay does not take an argument named 'final'");
                 auto body = dynamic_cast<ExprLambda *>(v.lambda.fun->body);
@@ -298,14 +298,14 @@ struct CmdFlakeCheck : FlakeCommand, MixJSON
 
         auto checkModule = [&](const std::string & attrPath, Value & v, const Pos & pos) {
             try {
-                state->forceValue(v);
+                state->forceValue(v, pos);
                 if (v.type == tLambda) {
                     if (!v.lambda.fun->matchAttrs || !v.lambda.fun->formals->ellipsis)
                         throw Error("module must match an open attribute set ('{ config, ... }')");
                 } else if (v.type == tAttrs) {
                     for (auto & attr : *v.attrs)
                         try {
-                            state->forceValue(*attr.value);
+                            state->forceValue(*attr.value, *attr.pos);
                         } catch (Error & e) {
                             e.addPrefix(fmt("while evaluating the option '" ANSI_BOLD "%s" ANSI_NORMAL "' at %s:\n", attr.name, *attr.pos));
                             throw;
@@ -316,6 +316,28 @@ struct CmdFlakeCheck : FlakeCommand, MixJSON
                 // check the module.
             } catch (Error & e) {
                 e.addPrefix(fmt("while checking the NixOS module '" ANSI_BOLD "%s" ANSI_NORMAL "' at %s:\n", attrPath, pos));
+                throw;
+            }
+        };
+
+        std::function<void(const std::string & attrPath, Value & v, const Pos & pos)> checkHydraJobs;
+
+        checkHydraJobs = [&](const std::string & attrPath, Value & v, const Pos & pos) {
+            try {
+                state->forceAttrs(v, pos);
+
+                if (state->isDerivation(v))
+                    throw Error("jobset should not be a derivation at top-level");
+
+                for (auto & attr : *v.attrs) {
+                    state->forceAttrs(*attr.value, *attr.pos);
+                    if (!state->isDerivation(*attr.value))
+                        checkHydraJobs(attrPath + "." + (std::string) attr.name,
+                            *attr.value, *attr.pos);
+                }
+
+            } catch (Error & e) {
+                e.addPrefix(fmt("while checking the Hydra jobset '" ANSI_BOLD "%s" ANSI_NORMAL "' at %s:\n", attrPath, pos));
                 throw;
             }
         };
@@ -333,24 +355,24 @@ struct CmdFlakeCheck : FlakeCommand, MixJSON
                         fmt("checking flake output '%s'", name));
 
                     try {
-                        state->forceValue(vOutput);
+                        state->forceValue(vOutput, pos);
 
                         if (name == "checks") {
-                            state->forceAttrs(vOutput);
+                            state->forceAttrs(vOutput, pos);
                             for (auto & attr : *vOutput.attrs)
                                 drvPaths.insert(checkDerivation(
                                         name + "." + (std::string) attr.name, *attr.value, *attr.pos));
                         }
 
                         else if (name == "packages") {
-                            state->forceAttrs(vOutput);
+                            state->forceAttrs(vOutput, pos);
                             for (auto & attr : *vOutput.attrs)
                                 checkDerivation(
                                     name + "." + (std::string) attr.name, *attr.value, *attr.pos);
                         }
 
                         else if (name == "apps") {
-                            state->forceAttrs(vOutput);
+                            state->forceAttrs(vOutput, pos);
                             for (auto & attr : *vOutput.attrs)
                                 checkApp(
                                     name + "." + (std::string) attr.name, *attr.value, *attr.pos);
@@ -370,7 +392,7 @@ struct CmdFlakeCheck : FlakeCommand, MixJSON
                             checkOverlay(name, vOutput, pos);
 
                         else if (name == "overlays") {
-                            state->forceAttrs(vOutput);
+                            state->forceAttrs(vOutput, pos);
                             for (auto & attr : *vOutput.attrs)
                                 checkOverlay(name + "." + (std::string) attr.name,
                                     *attr.value, *attr.pos);
@@ -380,11 +402,14 @@ struct CmdFlakeCheck : FlakeCommand, MixJSON
                             checkModule(name, vOutput, pos);
 
                         else if (name == "nixosModules") {
-                            state->forceAttrs(vOutput);
+                            state->forceAttrs(vOutput, pos);
                             for (auto & attr : *vOutput.attrs)
                                 checkModule(name + "." + (std::string) attr.name,
                                     *attr.value, *attr.pos);
                         }
+
+                        else if (name == "hydraJobs")
+                            checkHydraJobs(name, vOutput, pos);
 
                         else
                             warn("unknown flake output '%s'", name);
