@@ -280,6 +280,22 @@ struct CmdFlakeCheck : FlakeCommand, MixJSON
             }
         };
 
+        auto checkOverlay = [&](const std::string & attrPath, Value & v) {
+            try {
+                state->forceValue(v);
+                if (v.type != tLambda || v.lambda.fun->matchAttrs || std::string(v.lambda.fun->arg) != "final")
+                    throw Error("overlay does not take an argument named 'final'");
+                auto body = dynamic_cast<ExprLambda *>(v.lambda.fun->body);
+                if (!body || body->matchAttrs || std::string(body->arg) != "prev")
+                    throw Error("overlay does not take an argument named 'prev'");
+                // FIXME: if we have a 'nixpkgs' input, use it to
+                // evaluate the overlay.
+            } catch (Error & e) {
+                e.addPrefix(fmt("while checking the overlay '" ANSI_BOLD "%s" ANSI_NORMAL "':\n", attrPath));
+                throw;
+            }
+        };
+
         {
             Activity act(*logger, lvlInfo, actUnknown, "evaluating flake");
 
@@ -325,6 +341,9 @@ struct CmdFlakeCheck : FlakeCommand, MixJSON
                         else if (name == "legacyPackages")
                             // FIXME: do getDerivations?
                             ;
+
+                        else if (name == "overlay")
+                            checkOverlay(name, vProvide);
 
                         else
                             warn("unknown flake output '%s'", name);
