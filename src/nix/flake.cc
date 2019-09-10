@@ -170,7 +170,7 @@ struct CmdFlakeUpdate : FlakeCommand
 };
 
 static void enumerateOutputs(EvalState & state, Value & vFlake,
-    std::function<void(const std::string & name, Value & vProvide)> callback)
+    std::function<void(const std::string & name, Value & vProvide, const Pos & pos)> callback)
 {
     state.forceAttrs(vFlake);
 
@@ -179,7 +179,7 @@ static void enumerateOutputs(EvalState & state, Value & vFlake,
     state.forceAttrs(*vOutputs);
 
     for (auto & attr : *vOutputs->attrs)
-        callback(attr.name, *attr.value);
+        callback(attr.name, *attr.value, *attr.pos);
 }
 
 struct CmdFlakeInfo : FlakeCommand, MixJSON
@@ -207,7 +207,7 @@ struct CmdFlakeInfo : FlakeCommand, MixJSON
 
             enumerateOutputs(*state,
                 *vFlake,
-                [&](const std::string & name, Value & vProvide) {
+                [&](const std::string & name, Value & vProvide, const Pos & pos) {
                     auto provide = nlohmann::json::object();
 
                     if (name == "checks" || name == "packages") {
@@ -251,7 +251,7 @@ struct CmdFlakeCheck : FlakeCommand, MixJSON
         auto state = getEvalState();
         auto flake = resolveFlake();
 
-        auto checkDerivation = [&](const std::string & attrPath, Value & v) {
+        auto checkDerivation = [&](const std::string & attrPath, Value & v, const Pos & pos) {
             try {
                 auto drvInfo = getDerivation(*state, v, false);
                 if (!drvInfo)
@@ -259,14 +259,14 @@ struct CmdFlakeCheck : FlakeCommand, MixJSON
                 // FIXME: check meta attributes
                 return drvInfo->queryDrvPath();
             } catch (Error & e) {
-                e.addPrefix(fmt("while checking the derivation '" ANSI_BOLD "%s" ANSI_NORMAL "':\n", attrPath));
+                e.addPrefix(fmt("while checking the derivation '" ANSI_BOLD "%s" ANSI_NORMAL "' at %s:\n", attrPath, pos));
                 throw;
             }
         };
 
         PathSet drvPaths;
 
-        auto checkApp = [&](const std::string & attrPath, Value & v) {
+        auto checkApp = [&](const std::string & attrPath, Value & v, const Pos & pos) {
             try {
                 auto app = App(*state, v);
                 for (auto & i : app.context) {
@@ -275,12 +275,12 @@ struct CmdFlakeCheck : FlakeCommand, MixJSON
                         drvPaths.insert(drvPath + "!" + outputName);
                 }
             } catch (Error & e) {
-                e.addPrefix(fmt("while checking the app definition '" ANSI_BOLD "%s" ANSI_NORMAL "':\n", attrPath));
+                e.addPrefix(fmt("while checking the app definition '" ANSI_BOLD "%s" ANSI_NORMAL "' at %s:\n", attrPath, pos));
                 throw;
             }
         };
 
-        auto checkOverlay = [&](const std::string & attrPath, Value & v) {
+        auto checkOverlay = [&](const std::string & attrPath, Value & v, const Pos & pos) {
             try {
                 state->forceValue(v);
                 if (v.type != tLambda || v.lambda.fun->matchAttrs || std::string(v.lambda.fun->arg) != "final")
@@ -291,7 +291,31 @@ struct CmdFlakeCheck : FlakeCommand, MixJSON
                 // FIXME: if we have a 'nixpkgs' input, use it to
                 // evaluate the overlay.
             } catch (Error & e) {
-                e.addPrefix(fmt("while checking the overlay '" ANSI_BOLD "%s" ANSI_NORMAL "':\n", attrPath));
+                e.addPrefix(fmt("while checking the overlay '" ANSI_BOLD "%s" ANSI_NORMAL "' at %s:\n", attrPath, pos));
+                throw;
+            }
+        };
+
+        auto checkModule = [&](const std::string & attrPath, Value & v, const Pos & pos) {
+            try {
+                state->forceValue(v);
+                if (v.type == tLambda) {
+                    if (!v.lambda.fun->matchAttrs || !v.lambda.fun->formals->ellipsis)
+                        throw Error("module must match an open attribute set ('{ config, ... }')");
+                } else if (v.type == tAttrs) {
+                    for (auto & attr : *v.attrs)
+                        try {
+                            state->forceValue(*attr.value);
+                        } catch (Error & e) {
+                            e.addPrefix(fmt("while evaluating the option '" ANSI_BOLD "%s" ANSI_NORMAL "' at %s:\n", attr.name, *attr.pos));
+                            throw;
+                        }
+                } else
+                    throw Error("module must be a function or an attribute set");
+                // FIXME: if we have a 'nixpkgs' input, use it to
+                // check the module.
+            } catch (Error & e) {
+                e.addPrefix(fmt("while checking the NixOS module '" ANSI_BOLD "%s" ANSI_NORMAL "' at %s:\n", attrPath, pos));
                 throw;
             }
         };
@@ -304,46 +328,63 @@ struct CmdFlakeCheck : FlakeCommand, MixJSON
 
             enumerateOutputs(*state,
                 *vFlake,
-                [&](const std::string & name, Value & vProvide) {
+                [&](const std::string & name, Value & vOutput, const Pos & pos) {
                     Activity act(*logger, lvlChatty, actUnknown,
                         fmt("checking flake output '%s'", name));
 
                     try {
-                        state->forceValue(vProvide);
+                        state->forceValue(vOutput);
 
                         if (name == "checks") {
-                            state->forceAttrs(vProvide);
-                            for (auto & aCheck : *vProvide.attrs)
+                            state->forceAttrs(vOutput);
+                            for (auto & attr : *vOutput.attrs)
                                 drvPaths.insert(checkDerivation(
-                                        name + "." + (std::string) aCheck.name, *aCheck.value));
+                                        name + "." + (std::string) attr.name, *attr.value, *attr.pos));
                         }
 
                         else if (name == "packages") {
-                            state->forceAttrs(vProvide);
-                            for (auto & aCheck : *vProvide.attrs)
+                            state->forceAttrs(vOutput);
+                            for (auto & attr : *vOutput.attrs)
                                 checkDerivation(
-                                    name + "." + (std::string) aCheck.name, *aCheck.value);
+                                    name + "." + (std::string) attr.name, *attr.value, *attr.pos);
                         }
 
                         else if (name == "apps") {
-                            state->forceAttrs(vProvide);
-                            for (auto & aCheck : *vProvide.attrs)
+                            state->forceAttrs(vOutput);
+                            for (auto & attr : *vOutput.attrs)
                                 checkApp(
-                                    name + "." + (std::string) aCheck.name, *aCheck.value);
+                                    name + "." + (std::string) attr.name, *attr.value, *attr.pos);
                         }
 
                         else if (name == "defaultPackage" || name == "devShell")
-                            checkDerivation(name, vProvide);
+                            checkDerivation(name, vOutput, pos);
 
                         else if (name == "defaultApp")
-                            checkApp(name, vProvide);
+                            checkApp(name, vOutput, pos);
 
                         else if (name == "legacyPackages")
                             // FIXME: do getDerivations?
                             ;
 
                         else if (name == "overlay")
-                            checkOverlay(name, vProvide);
+                            checkOverlay(name, vOutput, pos);
+
+                        else if (name == "overlays") {
+                            state->forceAttrs(vOutput);
+                            for (auto & attr : *vOutput.attrs)
+                                checkOverlay(name + "." + (std::string) attr.name,
+                                    *attr.value, *attr.pos);
+                        }
+
+                        else if (name == "nixosModule")
+                            checkModule(name, vOutput, pos);
+
+                        else if (name == "nixosModules") {
+                            state->forceAttrs(vOutput);
+                            for (auto & attr : *vOutput.attrs)
+                                checkModule(name + "." + (std::string) attr.name,
+                                    *attr.value, *attr.pos);
+                        }
 
                         else
                             warn("unknown flake output '%s'", name);
