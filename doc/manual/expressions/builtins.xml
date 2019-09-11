@@ -448,7 +448,7 @@ stdenv.mkDerivation { … }
       <example>
         <title>Fetching an arbitrary ref</title>
         <programlisting>builtins.fetchGit {
-  url = "https://gitub.com/NixOS/nix.git";
+  url = "https://github.com/NixOS/nix.git";
   ref = "refs/heads/0.5-release";
 }</programlisting>
       </example>
@@ -499,11 +499,8 @@ stdenv.mkDerivation { … }
         <title>Fetching a tag</title>
         <programlisting>builtins.fetchGit {
   url = "https://github.com/nixos/nix.git";
-  ref = "tags/1.9";
+  ref = "refs/tags/1.9";
 }</programlisting>
-        <note><para>Due to a bug (<link
-        xlink:href="https://github.com/NixOS/nix/issues/2385">#2385</link>),
-        only non-annotated tags can be fetched.</para></note>
       </example>
 
       <example>
