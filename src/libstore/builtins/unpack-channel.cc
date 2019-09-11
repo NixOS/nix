@@ -1,6 +1,6 @@
-#include "rust.hh"
 #include "builtins.hh"
 #include "compression.hh"
+#include "tarfile.hh"
 
 namespace nix {
 
@@ -27,7 +27,7 @@ void builtinUnpackChannel(const BasicDerivation & drv)
         decompressor->finish();
     });
 
-    unpack_tarfile(*source, out).use()->unwrap();
+    unpackTarfile(*source, out);
 
     auto entries = readDirectory(out);
     if (entries.size() != 1)

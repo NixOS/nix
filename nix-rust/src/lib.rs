@@ -14,7 +14,6 @@ impl<T> CBox<T> {
         unsafe {
             let size = std::mem::size_of::<T>();
             let ptr = libc::malloc(size);
-            eprintln!("PTR = {:?}, SIZE = {}", ptr, size);
             *(ptr as *mut T) = t; // FIXME: probably UB
             Self {
                 ptr,

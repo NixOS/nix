@@ -1,5 +1,5 @@
 #include "logging.hh"
-#include "rust.hh"
+#include "rust-ffi.hh"
 
 namespace nix {
 
