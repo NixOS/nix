@@ -5,7 +5,7 @@ mod tarfile;
 pub use error::Error;
 
 pub struct CBox<T> {
-    ptr: *mut libc::c_void,
+    pub ptr: *mut libc::c_void,
     phantom: std::marker::PhantomData<T>,
 }
 

@@ -26,5 +26,6 @@ impl From<Error> for CppException {
 pub struct CppException(*const libc::c_void); // == std::exception_ptr*
 
 extern "C" {
+    #[allow(improper_ctypes)] // YOLO
     fn make_error(s: &str) -> CppException;
 }
