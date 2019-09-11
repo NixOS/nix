@@ -37,6 +37,7 @@ pub fn unpack_tarfile(source: Source, dest_dir: &str) -> Result<(), Error> {
             tar::EntryType::Symlink => {
                 std::os::unix::fs::symlink(file.header().link_name()?.unwrap(), dest_file)?;
             }
+            tar::EntryType::XGlobalHeader | tar::EntryType::XHeader => {}
             t => return Err(Error::Misc(format!("unsupported tar entry type '{:?}'", t))),
         }
     }
