@@ -1,5 +1,4 @@
 #include "builtins.hh"
-#include "compression.hh"
 #include "tarfile.hh"
 
 namespace nix {
@@ -18,16 +17,7 @@ void builtinUnpackChannel(const BasicDerivation & drv)
 
     createDirs(out);
 
-    auto source = sinkToSource([&](Sink & sink) {
-        auto decompressor =
-            hasSuffix(src, ".bz2") ? makeDecompressionSink("bzip2", sink) :
-            hasSuffix(src, ".xz") ? makeDecompressionSink("xz", sink) :
-            makeDecompressionSink("none", sink);
-        readFile(src, *decompressor);
-        decompressor->finish();
-    });
-
-    unpackTarfile(*source, out);
+    unpackTarfile(src, out);
 
     auto entries = readDirectory(out);
     if (entries.size() != 1)

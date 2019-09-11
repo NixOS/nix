@@ -77,7 +77,6 @@ struct BufferedSource : Source
 
     size_t read(unsigned char * data, size_t len) override;
 
-
     bool hasData();
 
 protected:

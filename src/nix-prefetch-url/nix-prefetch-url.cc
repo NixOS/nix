@@ -9,6 +9,7 @@
 #include "legacy.hh"
 #include "finally.hh"
 #include "progress-bar.hh"
+#include "tarfile.hh"
 
 #include <iostream>
 
@@ -192,8 +193,7 @@ static int _main(int argc, char * * argv)
                 if (hasSuffix(baseNameOf(uri), ".zip"))
                     runProgram("unzip", true, {"-qq", tmpFile, "-d", unpacked});
                 else
-                    // FIXME: this requires GNU tar for decompression.
-                    runProgram("tar", true, {"xf", tmpFile, "-C", unpacked});
+                    unpackTarfile(tmpFile, unpacked, baseNameOf(uri));
 
                 /* If the archive unpacks to a single file/directory, then use
                    that as the top-level. */
