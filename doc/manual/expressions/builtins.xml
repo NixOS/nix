@@ -448,7 +448,7 @@ stdenv.mkDerivation { … }
       <example>
         <title>Fetching an arbitrary ref</title>
         <programlisting>builtins.fetchGit {
-  url = "https://gitub.com/NixOS/nix.git";
+  url = "https://github.com/NixOS/nix.git";
   ref = "refs/heads/0.5-release";
 }</programlisting>
       </example>
