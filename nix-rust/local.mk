@@ -8,8 +8,8 @@ endif
 
 libnixrust_PATH := $(d)/target/$(RUST_DIR)/libnixrust.$(SO_EXT)
 libnixrust_INSTALL_PATH := $(libdir)/libnixrust.$(SO_EXT)
-libnixrust_LDFLAGS_USE := -L$(d)/target/$(RUST_DIR) -lnixrust -ldl -lssl
-libnixrust_LDFLAGS_USE_INSTALLED := -L$(libdir) -lnixrust -ldl -lssl
+libnixrust_LDFLAGS_USE := -L$(d)/target/$(RUST_DIR) -lnixrust -ldl
+libnixrust_LDFLAGS_USE_INSTALLED := -L$(libdir) -lnixrust -ldl
 
 ifeq ($(OS), Darwin)
 libnixrust_BUILD_FLAGS = NIX_LDFLAGS="-undefined dynamic_lookup"
