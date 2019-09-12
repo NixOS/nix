@@ -15,4 +15,4 @@ futures-preview = { version = "=0.3.0-alpha.18", features = ["compat"] }
 #hyper = "0.12"
 reqwest = { version = "0.9", default-features = false, features = ["rustls-tls"] }
 http = "0.1"
-tokio = "0.1"
+tokio = { version = "0.1", default-features = false }
