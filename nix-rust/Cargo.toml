@@ -11,3 +11,8 @@ crate-type = ["cdylib"]
 [dependencies]
 tar = "0.4"
 libc = "0.2"
+futures-preview = { version = "=0.3.0-alpha.18", features = ["compat"] }
+#hyper = "0.12"
+reqwest = "0.9"
+http = "0.1"
+tokio = "0.1"

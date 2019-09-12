@@ -8,8 +8,8 @@ endif
 
 libnixrust_PATH := $(d)/target/$(RUST_DIR)/libnixrust.$(SO_EXT)
 libnixrust_INSTALL_PATH := $(libdir)/libnixrust.$(SO_EXT)
-libnixrust_LDFLAGS_USE := -L$(d)/target/$(RUST_DIR) -lnixrust -ldl
-libnixrust_LDFLAGS_USE_INSTALLED := -L$(libdir) -lnixrust -ldl
+libnixrust_LDFLAGS_USE := -L$(d)/target/$(RUST_DIR) -lnixrust -ldl -lssl
+libnixrust_LDFLAGS_USE_INSTALLED := -L$(libdir) -lnixrust -ldl -lssl
 
 ifeq ($(OS), Darwin)
 libnixrust_BUILD_FLAGS = NIX_LDFLAGS="-undefined dynamic_lookup"
@@ -21,7 +21,7 @@ endif
 $(libnixrust_PATH): $(wildcard $(d)/src/*.rs) $(d)/Cargo.toml
 	$(trace-gen) cd nix-rust && CARGO_HOME=$$(if [[ -d vendor ]]; then echo vendor; fi) \
 	$(libnixrust_BUILD_FLAGS) \
-	  cargo build $(RUST_MODE) $$(if [[ -d vendor ]]; then echo --offline; fi) \
+	  RUSTC_BOOTSTRAP=1 cargo build $(RUST_MODE) $$(if [[ -d vendor ]]; then echo --offline; fi) \
 	&& touch target/$(RUST_DIR)/libnixrust.$(SO_EXT)
 
 $(libnixrust_INSTALL_PATH): $(libnixrust_PATH)
