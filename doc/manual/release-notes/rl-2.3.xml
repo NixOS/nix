@@ -13,9 +13,8 @@ incompatible changes:</para>
 
   <listitem>
     <para>Nix now uses BSD file locks instead of POSIX file
-    locks. Since previous releases used POSIX file locks, you should
-    not use Nix 2.2 and previous releases at the same time on a Nix
-    store.</para>
+    locks. Because of this, you should not use Nix 2.3 and previous
+    releases at the same time on a Nix store.</para>
   </listitem>
 
 </itemizedlist>
@@ -47,9 +46,9 @@ incompatible changes:</para>
   </listitem>
 
   <listitem>
-    <para><command>nix</command>: Add
+    <para>The <command>nix</command> command has a new
     <option>--print-build-logs</option> (<option>-L</option>) flag to
-    print build log output to stderr rather than showing the last log
+    print build log output to stderr, rather than showing the last log
     line in the progress bar. To distinguish between concurrent
     builds, log lines are prefixed by the name of the package.
     </para>
@@ -57,7 +56,7 @@ incompatible changes:</para>
 
   <listitem>
     <para>Builds are now executed in a pseudo-terminal, and the
-    <envar>TERM</envar> evnironment variable is set to
+    <envar>TERM</envar> environment variable is set to
     <literal>xterm-256color</literal>. This allows many programs
     (e.g. <command>gcc</command>, <command>clang</command>,
     <command>cmake</command>) to print colorized log output.</para>
