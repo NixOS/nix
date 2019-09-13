@@ -170,7 +170,7 @@ public:
 
     ~JSONPlaceholder()
     {
-        assert(!first || std::uncaught_exception());
+        assert(!first || std::uncaught_exceptions());
     }
 
     template<typename T>
