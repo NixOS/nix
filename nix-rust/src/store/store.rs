@@ -1,4 +1,4 @@
-use crate::path_info::PathInfo;
+use super::PathInfo;
 use crate::Error;
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;

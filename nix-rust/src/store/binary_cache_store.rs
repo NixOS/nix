@@ -1,5 +1,4 @@
-use crate::store::{Store, StorePath};
-use crate::path_info::PathInfo;
+use super::{Store, StorePath, PathInfo};
 use crate::Error;
 use futures::compat::Future01CompatExt;
 
