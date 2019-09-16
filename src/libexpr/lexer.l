@@ -63,7 +63,10 @@ static Expr * unescapeStr(SymbolTable & symbols, const char * s, size_t length)
             if (c == 'n') t += '\n';
             else if (c == 'r') t += '\r';
             else if (c == 't') t += '\t';
-            else t += c;
+            else {
+                assert(c == '"' || c == '\\' || c == '$');
+                t += c;
+            }
         }
         else if (c == '\r') {
             /* Normalise CR and CR/LF into LF. */
@@ -151,8 +154,8 @@ or          { return OR_KW; }
 \{          { PUSH_STATE(DEFAULT); return '{'; }
 
 \"          { PUSH_STATE(STRING); return '"'; }
-<STRING>([^\$\"\\]|\$[^\{\"\\]|\\{ANY}|\$\\{ANY})*\$/\" |
-<STRING>([^\$\"\\]|\$[^\{\"\\]|\\{ANY}|\$\\{ANY})+ {
+<STRING>([^\$\"\\]|\$[^\{\"\\]|\\["ntr\\$]|\$\\["ntr\\$])*\$/\" |
+<STRING>([^\$\"\\]|\$[^\{\"\\]|\\["ntr\\$]|\$\\["ntr\\$])+ {
                 /* It is impossible to match strings ending with '$' with one
                    regex because trailing contexts are only valid at the end
                    of a rule. (A sane but undocumented limitation.) */
