@@ -12,7 +12,7 @@ pub struct StorePath {
 pub const STORE_PATH_HASH_CHARS: usize = 32;
 
 impl StorePath {
-    pub fn new(path: &Path, store_dir: &str) -> Result<Self, Error> {
+    pub fn new(path: &Path, _store_dir: &str) -> Result<Self, Error> {
         // FIXME: check store_dir
         Self::new_short(
             path.file_name()

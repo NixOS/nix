@@ -3,6 +3,7 @@ pub enum Error {
     InvalidPath(crate::store::StorePath),
     BadStorePath(std::path::PathBuf),
     BadNarInfo,
+    BadBase32,
     IOError(std::io::Error),
     HttpError(reqwest::Error),
     Misc(String),
@@ -29,6 +30,7 @@ impl From<Error> for CppException {
             Error::BadStorePath(path) => unsafe {
                 make_error(&format!("path '{}' is not a store path", path.display()))
             }, // FIXME
+            Error::BadBase32 => unsafe { make_error("invalid base32 string") }, // FIXME
             Error::IOError(err) => unsafe { make_error(&err.to_string()) },
             Error::HttpError(err) => unsafe { make_error(&err.to_string()) },
             Error::Foreign(ex) => ex,

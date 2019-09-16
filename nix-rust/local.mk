@@ -36,3 +36,8 @@ clean: clean-rust
 
 clean-rust:
 	$(suppress) rm -rfv nix-rust/target
+
+check: rust-tests
+
+rust-tests:
+	cd nix-rust && CARGO_HOME=$$(if [[ -d vendor ]]; then echo vendor; fi) RUSTC_BOOTSTRAP=1 cargo test --release $$(if [[ -d vendor ]]; then echo -Z offline; fi)

@@ -1,6 +1,3 @@
-check:
-	@echo "Warning: Nix has no 'make check'. Please install Nix and run 'make installcheck' instead."
-
 nix_tests = \
   init.sh hash.sh lang.sh add.sh simple.sh dependencies.sh \
   gc.sh \
