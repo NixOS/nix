@@ -13,6 +13,7 @@
 
 %{
 #include <boost/lexical_cast.hpp>
+#include <iostream>
 
 #include "nixexpr.hh"
 #include "parser-tab.hh"
@@ -51,7 +52,7 @@ static void adjustLoc(YYLTYPE * loc, const char * s, size_t len)
 }
 
 
-static Expr * unescapeStr(SymbolTable & symbols, const char * s, size_t length)
+static Expr * unescapeStr(YYLTYPE * loc, SymbolTable & symbols, const char * s, size_t length)
 {
     string t;
     t.reserve(length);
@@ -64,8 +65,9 @@ static Expr * unescapeStr(SymbolTable & symbols, const char * s, size_t length)
             else if (c == 'r') t += '\r';
             else if (c == 't') t += '\t';
             else {
-                assert(c == '"' || c == '\\' || c == '$' || c == '\n');
-                t += c;
+              if (!(c == '"' || c == '\\' || c == '$' || c == '\n'))
+                std::cerr << "meaningful escape sequence \"\\" << c << "\" at " << loc->last_line << ":" << loc->last_column << std::endl;
+              t += c;
             }
         }
         else if (c == '\r') {
@@ -154,12 +156,12 @@ or          { return OR_KW; }
 \{          { PUSH_STATE(DEFAULT); return '{'; }
 
 \"          { PUSH_STATE(STRING); return '"'; }
-<STRING>([^\$\"\\]|\$[^\{\"\\]|\\["ntr\\$\n]|\$\\["ntr\\$\n])*\$/\" |
-<STRING>([^\$\"\\]|\$[^\{\"\\]|\\["ntr\\$\n]|\$\\["ntr\\$\n])+ {
+<STRING>([^\$\"\\]|\$[^\{\"\\]|\\{ANY}|\$\\{ANY})*\$/\" |
+<STRING>([^\$\"\\]|\$[^\{\"\\]|\\{ANY}|\$\\{ANY})+ {
                 /* It is impossible to match strings ending with '$' with one
                    regex because trailing contexts are only valid at the end
                    of a rule. (A sane but undocumented limitation.) */
-                yylval->e = unescapeStr(data->symbols, yytext, yyleng);
+                yylval->e = unescapeStr(yylloc, data->symbols, yytext, yyleng);
                 return STR;
               }
 <STRING>\$\{  { PUSH_STATE(DEFAULT); return DOLLAR_CURLY; }
@@ -187,7 +189,7 @@ or          { return OR_KW; }
                    return IND_STR;
                  }
 <IND_STRING>\'\'\\{ANY} {
-                   yylval->e = unescapeStr(data->symbols, yytext + 2, yyleng - 2);
+                   yylval->e = unescapeStr(yylloc, data->symbols, yytext + 2, yyleng - 2);
                    return IND_STR;
                  }
 <IND_STRING>\$\{ { PUSH_STATE(DEFAULT); return DOLLAR_CURLY; }
