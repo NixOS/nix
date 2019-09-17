@@ -61,16 +61,14 @@ static Expr * unescapeStr(YYLTYPE * loc, SymbolTable & symbols, const char * s, 
         if (c == '\\') {
             assert(*s);
             c = *s++;
-            if (c == 'n') t += '\n';
-            else if (c == 'r') t += '\r';
-            else if (c == 't') t += '\t';
-            else {
-              if (!(c == '"' || c == '\\' || c == '$' || c == '\n'))
+            if (c == 'n') { t += '\n'; continue; }
+            if (c == 'r') { t += '\r'; continue; }
+            if (c == 't') { t += '\t'; continue; }
+            if (!(c == '"' || c == '\\' || c == '$' || c == '\n'))
                 std::cerr << "meaningless escape sequence \"\\" << c << "\" at " << loc->last_line << ":" << loc->last_column << std::endl;
-              t += c;
-            }
+           /* fall through */
         }
-        else if (c == '\r') {
+        if (c == '\r') {
             /* Normalise CR and CR/LF into LF. */
             t += '\n';
             if (*s == '\n') s++; /* cr/lf */
