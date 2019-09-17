@@ -66,7 +66,7 @@ static Expr * unescapeStr(YYLTYPE * loc, SymbolTable & symbols, const char * s, 
             else if (c == 't') t += '\t';
             else {
               if (!(c == '"' || c == '\\' || c == '$' || c == '\n'))
-                std::cerr << "meaningful escape sequence \"\\" << c << "\" at " << loc->last_line << ":" << loc->last_column << std::endl;
+                std::cerr << "meaningless escape sequence \"\\" << c << "\" at " << loc->last_line << ":" << loc->last_column << std::endl;
               t += c;
             }
         }
