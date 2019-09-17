@@ -14,6 +14,7 @@ extern crate proptest;
 mod c;
 mod error;
 mod foreign;
+mod nar;
 mod store;
 mod util;
 

@@ -1,4 +1,8 @@
-use super::{foreign::{self, CBox}, error, util, store};
+use super::{
+    error,
+    foreign::{self, CBox},
+    util,
+};
 
 #[no_mangle]
 pub extern "C" fn unpack_tarfile(
@@ -10,7 +14,8 @@ pub extern "C" fn unpack_tarfile(
 
 #[no_mangle]
 pub extern "C" fn rust_test() {
-    use crate::store::Store;
+    /*
+    use crate::store::{self, Store};
     use futures::future::{FutureExt, TryFutureExt};
     use std::path::Path;
 
@@ -39,4 +44,9 @@ pub extern "C" fn rust_test() {
     };
 
     tokio::run(fut.boxed().compat());
+     */
+
+    let file = std::fs::File::open("test.nar").unwrap();
+
+    crate::nar::parse(&mut std::io::BufReader::new(file)).unwrap();
 }
