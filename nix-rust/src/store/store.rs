@@ -1,55 +1,7 @@
-use super::PathInfo;
+use super::{PathInfo, StorePath};
 use crate::Error;
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
-
-#[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Debug)]
-pub struct StorePath {
-    pub hash: String,
-    pub name: String,
-}
-
-pub const STORE_PATH_HASH_CHARS: usize = 32;
-
-impl StorePath {
-    pub fn new(path: &Path, _store_dir: &str) -> Result<Self, Error> {
-        // FIXME: check store_dir
-        Self::new_short(
-            path.file_name()
-                .ok_or(Error::BadStorePath(path.into()))?
-                .to_str()
-                .ok_or(Error::BadStorePath(path.into()))?,
-        )
-    }
-
-    pub fn new_short(base_name: &str) -> Result<Self, Error> {
-        if base_name.len() < STORE_PATH_HASH_CHARS + 2
-            || base_name.as_bytes()[STORE_PATH_HASH_CHARS] != '-' as u8
-        {
-            return Err(Error::BadStorePath(base_name.into()));
-        }
-
-        // FIXME: validate name
-
-        Ok(StorePath {
-            hash: base_name[0..STORE_PATH_HASH_CHARS].to_string(),
-            name: base_name[STORE_PATH_HASH_CHARS + 1..].to_string(),
-        })
-    }
-}
-
-#[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Debug)]
-pub struct StorePathHash {
-    bytes: [u8; 20],
-}
-
-/*
-impl StorePathHash {
-    pub fn to_base32(&self) -> String {
-        "7h7qgvs4kgzsn8a6rb273saxyqh4jxlz".to_string()
-    }
-}
-*/
 
 pub trait Store: Send + Sync {
     fn store_dir(&self) -> &str {

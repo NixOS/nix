@@ -43,11 +43,11 @@ impl PathInfo {
             } else if name == "References" {
                 if !value.is_empty() {
                     for r in value.split(' ') {
-                        references.insert(StorePath::new_short(r)?);
+                        references.insert(StorePath::new_from_base_name(r)?);
                     }
                 }
             } else if name == "Deriver" {
-                deriver = Some(StorePath::new_short(value)?);
+                deriver = Some(StorePath::new_from_base_name(value)?);
             } else if name == "URL" {
                 url = Some(value.into());
             } else if name == "Compression" {

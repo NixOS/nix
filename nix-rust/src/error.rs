@@ -1,9 +1,13 @@
+use std::fmt;
+
 #[derive(Debug)]
 pub enum Error {
     InvalidPath(crate::store::StorePath),
     BadStorePath(std::path::PathBuf),
     BadNarInfo,
     BadBase32,
+    StorePathNameTooLong,
+    BadStorePathName,
     IOError(std::io::Error),
     HttpError(reqwest::Error),
     Misc(String),
@@ -22,19 +26,30 @@ impl From<reqwest::Error> for Error {
     }
 }
 
+impl fmt::Display for Error {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Error::InvalidPath(_) => write!(f, "invalid path"),
+            Error::BadNarInfo => write!(f, ".narinfo file is corrupt"),
+            Error::BadStorePath(path) => write!(f, "path '{}' is not a store path", path.display()),
+            Error::BadBase32 => write!(f, "invalid base32 string"),
+            Error::StorePathNameTooLong => {
+                write!(f, "store path name is longer than 211 characters")
+            }
+            Error::BadStorePathName => write!(f, "store path name contains forbidden character"),
+            Error::IOError(err) => write!(f, "I/O error: {}", err),
+            Error::HttpError(err) => write!(f, "HTTP error: {}", err),
+            Error::Foreign(_) => write!(f, "<C++ exception>"), // FIXME
+            Error::Misc(s) => write!(f, "{}", s),
+        }
+    }
+}
+
 impl From<Error> for CppException {
     fn from(err: Error) -> Self {
         match err {
-            Error::InvalidPath(_) => unsafe { make_error("invalid path") }, // FIXME
-            Error::BadNarInfo => unsafe { make_error(".narinfo file is corrupt") }, // FIXME
-            Error::BadStorePath(path) => unsafe {
-                make_error(&format!("path '{}' is not a store path", path.display()))
-            }, // FIXME
-            Error::BadBase32 => unsafe { make_error("invalid base32 string") }, // FIXME
-            Error::IOError(err) => unsafe { make_error(&err.to_string()) },
-            Error::HttpError(err) => unsafe { make_error(&err.to_string()) },
             Error::Foreign(ex) => ex,
-            Error::Misc(s) => unsafe { make_error(&s) },
+            _ => unsafe { make_error(&err.to_string()) },
         }
     }
 }
