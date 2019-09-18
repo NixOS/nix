@@ -80,13 +80,6 @@ struct Flake
 
 Flake getFlake(EvalState & state, const FlakeRef & flakeRef, bool allowLookup);
 
-/* If 'allowLookup' is true, then resolve 'flakeRef' using the
-   registries. */
-FlakeRef maybeLookupFlake(
-    EvalState & state,
-    const FlakeRef & flakeRef,
-    bool allowLookup);
-
 /* Fingerprint of a locked flake; used as a cache key. */
 typedef Hash Fingerprint;
 

@@ -182,6 +182,12 @@ struct FlakeRef
         return std::get_if<FlakeRef::IsPath>(&data)
             && rev == Hash(rev->type);
     }
+
+    /* Return true if 'other' is not less specific than 'this'. For
+       example, 'nixpkgs' contains 'nixpkgs/release-19.03', and both
+       'nixpkgs' and 'nixpkgs/release-19.03' contain
+       'nixpkgs/release-19.03/<hash>'. */
+    bool contains(const FlakeRef & other) const;
 };
 
 std::ostream & operator << (std::ostream & str, const FlakeRef & flakeRef);

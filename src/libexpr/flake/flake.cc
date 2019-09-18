@@ -112,7 +112,9 @@ static FlakeRef lookupFlake(EvalState & state, const FlakeRef & flakeRef, const 
     return flakeRef;
 }
 
-FlakeRef maybeLookupFlake(
+/* If 'allowLookup' is true, then resolve 'flakeRef' using the
+   registries. */
+static FlakeRef maybeLookupFlake(
     EvalState & state,
     const FlakeRef & flakeRef,
     bool allowLookup)
@@ -126,6 +128,23 @@ FlakeRef maybeLookupFlake(
         return flakeRef;
 }
 
+typedef std::vector<std::pair<FlakeRef, FlakeRef>> RefMap;
+
+static FlakeRef lookupInRefMap(
+    const RefMap & refMap,
+    const FlakeRef & flakeRef)
+{
+    // FIXME: inefficient.
+    for (auto & i : refMap) {
+        if (flakeRef.contains(i.first)) {
+            debug("mapping '%s' to previously seen input '%s' -> '%s",
+                flakeRef, i.first, i.second);
+            return i.second;
+        }
+    }
+
+    return flakeRef;
+}
 
 static SourceInfo fetchFlake(EvalState & state, const FlakeRef & resolvedRef)
 {
@@ -205,14 +224,20 @@ static void expectType(EvalState & state, ValueType type,
             showType(type), showType(value.type), pos);
 }
 
-Flake getFlake(EvalState & state, const FlakeRef & originalRef, bool allowLookup)
+static Flake getFlake(EvalState & state, const FlakeRef & originalRef,
+    bool allowLookup, RefMap & refMap)
 {
-    auto flakeRef = maybeLookupFlake(state, originalRef, allowLookup);
+    auto flakeRef = lookupInRefMap(refMap,
+        maybeLookupFlake(state,
+            lookupInRefMap(refMap, originalRef), allowLookup));
 
     SourceInfo sourceInfo = fetchFlake(state, flakeRef);
     debug("got flake source '%s' with flakeref %s", sourceInfo.storePath, sourceInfo.resolvedRef.to_string());
 
     FlakeRef resolvedRef = sourceInfo.resolvedRef;
+
+    refMap.push_back({originalRef, resolvedRef});
+    refMap.push_back({flakeRef, resolvedRef});
 
     state.store->assertStorePath(sourceInfo.storePath);
 
@@ -314,12 +339,26 @@ Flake getFlake(EvalState & state, const FlakeRef & originalRef, bool allowLookup
     return flake;
 }
 
-static SourceInfo getNonFlake(EvalState & state, const FlakeRef & flakeRef)
+Flake getFlake(EvalState & state, const FlakeRef & originalRef, bool allowLookup)
 {
+    RefMap refMap;
+    return getFlake(state, originalRef, allowLookup, refMap);
+}
+
+static SourceInfo getNonFlake(EvalState & state, const FlakeRef & originalRef,
+    bool allowLookup, RefMap & refMap)
+{
+    auto flakeRef = lookupInRefMap(refMap,
+        maybeLookupFlake(state,
+            lookupInRefMap(refMap, originalRef), allowLookup));
+
     auto sourceInfo = fetchFlake(state, flakeRef);
     debug("got non-flake source '%s' with flakeref %s", sourceInfo.storePath, sourceInfo.resolvedRef.to_string());
 
     FlakeRef resolvedRef = sourceInfo.resolvedRef;
+
+    refMap.push_back({originalRef, resolvedRef});
+    refMap.push_back({flakeRef, resolvedRef});
 
     state.store->assertStorePath(sourceInfo.storePath);
 
@@ -360,6 +399,7 @@ bool allowedToUseRegistries(HandleLockFile handle, bool isTopRef)
    Note that this is lazy: we only recursively fetch inputs that are
    not in the lockfile yet. */
 static std::pair<Flake, LockedInput> updateLocks(
+    RefMap & refMap,
     const std::string & inputPath,
     EvalState & state,
     const Flake & flake,
@@ -372,6 +412,8 @@ static std::pair<Flake, LockedInput> updateLocks(
         flake.originalRef,
         flake.sourceInfo.narHash);
 
+    std::vector<std::function<void()>> postponed;
+
     for (auto & [id, input] : flake.inputs) {
         auto inputPath2 = (inputPath.empty() ? "" : inputPath + "/") + id;
         auto i = oldEntry.inputs.find(id);
@@ -380,28 +422,35 @@ static std::pair<Flake, LockedInput> updateLocks(
         } else {
             if (handleLockFile == AllPure || handleLockFile == TopRefUsesRegistries)
                 throw Error("cannot update flake input '%s' in pure mode", id);
-            if (input.isFlake) {
-                auto actualInput = getFlake(state, input.ref,
-                        allowedToUseRegistries(handleLockFile, false));
+
+            auto warn = [&](const SourceInfo & sourceInfo) {
                 if (i == oldEntry.inputs.end())
-                    printMsg(lvlWarn, "mapped flake input '%s' to '%s'",
-                        inputPath2, actualInput.sourceInfo.resolvedRef);
+                    printInfo("mapped flake input '%s' to '%s'",
+                        inputPath2, sourceInfo.resolvedRef);
                 else
                     printMsg(lvlWarn, "updated flake input '%s' from '%s' to '%s'",
-                        inputPath2, i->second.originalRef, actualInput.sourceInfo.resolvedRef);
-                newEntry.inputs.insert_or_assign(id,
-                    updateLocks(inputPath2, state, actualInput, handleLockFile, {}, false).second);
+                        inputPath2, i->second.originalRef, sourceInfo.resolvedRef);
+            };
+
+            if (input.isFlake) {
+                auto actualInput = getFlake(state, input.ref,
+                    allowedToUseRegistries(handleLockFile, false), refMap);
+                warn(actualInput.sourceInfo);
+                postponed.push_back([&, id{id}, inputPath2, actualInput]() {
+                    newEntry.inputs.insert_or_assign(id,
+                        updateLocks(refMap, inputPath2, state, actualInput, handleLockFile, {}, false).second);
+                });
             } else {
-                auto sourceInfo = getNonFlake(state,
-                    maybeLookupFlake(state, input.ref,
-                        allowedToUseRegistries(handleLockFile, false)));
-                printMsg(lvlWarn, "mapped flake input '%s' to '%s'",
-                    inputPath2, sourceInfo.resolvedRef);
+                auto sourceInfo = getNonFlake(state, input.ref,
+                    allowedToUseRegistries(handleLockFile, false), refMap);
+                warn(sourceInfo);
                 newEntry.inputs.insert_or_assign(id,
                     LockedInput(sourceInfo.resolvedRef, input.ref, sourceInfo.narHash));
             }
         }
     }
+
+    for (auto & f : postponed) f();
 
     return {flake, newEntry};
 }
@@ -423,8 +472,10 @@ ResolvedFlake resolveFlake(EvalState & state, const FlakeRef & topRef, HandleLoc
             + "/" + flake.sourceInfo.resolvedRef.subdir + "/flake.lock");
     }
 
+    RefMap refMap;
+
     LockFile lockFile(updateLocks(
-            "", state, flake, handleLockFile, oldLockFile, true).second);
+            refMap, "", state, flake, handleLockFile, oldLockFile, true).second);
 
     if (!(lockFile == oldLockFile)) {
         if (allowedToWrite(handleLockFile)) {
@@ -500,7 +551,8 @@ static void prim_callFlake(EvalState & state, const Pos & pos, Value * * args, V
 
         callFlake(state, flake, lazyInput->lockedInput, v);
     } else {
-        auto sourceInfo = getNonFlake(state, lazyInput->lockedInput.ref);
+        RefMap refMap;
+        auto sourceInfo = getNonFlake(state, lazyInput->lockedInput.ref, false, refMap);
 
         if (sourceInfo.narHash != lazyInput->lockedInput.narHash)
             throw Error("the content hash of repository '%s' doesn't match the hash recorded in the referring lockfile", sourceInfo.resolvedRef);

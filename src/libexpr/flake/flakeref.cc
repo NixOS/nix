@@ -255,6 +255,23 @@ FlakeRef FlakeRef::baseRef() const // Removes the ref and rev from a FlakeRef.
     return result;
 }
 
+bool FlakeRef::contains(const FlakeRef & other) const
+{
+    if (!(data == other.data))
+        return false;
+
+    if (ref && ref != other.ref)
+        return false;
+
+    if (rev && rev != other.rev)
+        return false;
+
+    if (subdir != other.subdir)
+        return false;
+
+    return true;
+}
+
 std::optional<FlakeRef> parseFlakeRef(
     const std::string & uri, bool allowRelative)
 {
