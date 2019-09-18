@@ -205,8 +205,10 @@ static void expectType(EvalState & state, ValueType type,
             showType(type), showType(value.type), pos);
 }
 
-Flake getFlake(EvalState & state, const FlakeRef & flakeRef)
+Flake getFlake(EvalState & state, const FlakeRef & originalRef, bool allowLookup)
 {
+    auto flakeRef = maybeLookupFlake(state, originalRef, allowLookup);
+
     SourceInfo sourceInfo = fetchFlake(state, flakeRef);
     debug("got flake source '%s' with flakeref %s", sourceInfo.storePath, sourceInfo.resolvedRef.to_string());
 
@@ -223,7 +225,7 @@ Flake getFlake(EvalState & state, const FlakeRef & flakeRef)
     if (!isInDir(realFlakeFile, state.store->toRealPath(sourceInfo.storePath)))
         throw Error("'flake.nix' file of flake '%s' escapes from '%s'", resolvedRef, sourceInfo.storePath);
 
-    Flake flake(flakeRef, sourceInfo);
+    Flake flake(originalRef, sourceInfo);
 
     if (!pathExists(realFlakeFile))
         throw Error("source tree referenced by '%s' does not contain a '%s/flake.nix' file", resolvedRef, resolvedRef.subdir);
@@ -358,6 +360,7 @@ bool allowedToUseRegistries(HandleLockFile handle, bool isTopRef)
    Note that this is lazy: we only recursively fetch inputs that are
    not in the lockfile yet. */
 static std::pair<Flake, LockedInput> updateLocks(
+    const std::string & inputPath,
     EvalState & state,
     const Flake & flake,
     HandleLockFile handleLockFile,
@@ -366,23 +369,36 @@ static std::pair<Flake, LockedInput> updateLocks(
 {
     LockedInput newEntry(
         flake.sourceInfo.resolvedRef,
+        flake.originalRef,
         flake.sourceInfo.narHash);
 
     for (auto & [id, input] : flake.inputs) {
+        auto inputPath2 = (inputPath.empty() ? "" : inputPath + "/") + id;
         auto i = oldEntry.inputs.find(id);
-        if (i != oldEntry.inputs.end()) {
+        if (i != oldEntry.inputs.end() && i->second.originalRef == input.ref) {
             newEntry.inputs.insert_or_assign(id, i->second);
         } else {
             if (handleLockFile == AllPure || handleLockFile == TopRefUsesRegistries)
                 throw Error("cannot update flake input '%s' in pure mode", id);
-            if (input.isFlake)
+            if (input.isFlake) {
+                auto actualInput = getFlake(state, input.ref,
+                        allowedToUseRegistries(handleLockFile, false));
+                if (i == oldEntry.inputs.end())
+                    printMsg(lvlWarn, "mapped flake input '%s' to '%s'",
+                        inputPath2, actualInput.sourceInfo.resolvedRef);
+                else
+                    printMsg(lvlWarn, "updated flake input '%s' from '%s' to '%s'",
+                        inputPath2, i->second.originalRef, actualInput.sourceInfo.resolvedRef);
                 newEntry.inputs.insert_or_assign(id,
-                    updateLocks(state,
-                        getFlake(state, maybeLookupFlake(state, input.ref, allowedToUseRegistries(handleLockFile, false))),
-                        handleLockFile, {}, false).second);
-            else {
-                auto sourceInfo = getNonFlake(state, maybeLookupFlake(state, input.ref, allowedToUseRegistries(handleLockFile, false)));
-                newEntry.inputs.insert_or_assign(id, LockedInput(sourceInfo.resolvedRef, sourceInfo.narHash));
+                    updateLocks(inputPath2, state, actualInput, handleLockFile, {}, false).second);
+            } else {
+                auto sourceInfo = getNonFlake(state,
+                    maybeLookupFlake(state, input.ref,
+                        allowedToUseRegistries(handleLockFile, false)));
+                printMsg(lvlWarn, "mapped flake input '%s' to '%s'",
+                    inputPath2, sourceInfo.resolvedRef);
+                newEntry.inputs.insert_or_assign(id,
+                    LockedInput(sourceInfo.resolvedRef, input.ref, sourceInfo.narHash));
             }
         }
     }
@@ -394,7 +410,8 @@ static std::pair<Flake, LockedInput> updateLocks(
    and optionally write it to file, it the flake is writable. */
 ResolvedFlake resolveFlake(EvalState & state, const FlakeRef & topRef, HandleLockFile handleLockFile)
 {
-    auto flake = getFlake(state, maybeLookupFlake(state, topRef, allowedToUseRegistries(handleLockFile, true)));
+    auto flake = getFlake(state, topRef,
+        allowedToUseRegistries(handleLockFile, true));
 
     LockFile oldLockFile;
 
@@ -407,7 +424,7 @@ ResolvedFlake resolveFlake(EvalState & state, const FlakeRef & topRef, HandleLoc
     }
 
     LockFile lockFile(updateLocks(
-            state, flake, handleLockFile, oldLockFile, true).second);
+            "", state, flake, handleLockFile, oldLockFile, true).second);
 
     if (!(lockFile == oldLockFile)) {
         if (allowedToWrite(handleLockFile)) {
@@ -476,7 +493,7 @@ static void prim_callFlake(EvalState & state, const Pos & pos, Value * * args, V
     assert(lazyInput->lockedInput.ref.isImmutable());
 
     if (lazyInput->isFlake) {
-        auto flake = getFlake(state, lazyInput->lockedInput.ref);
+        auto flake = getFlake(state, lazyInput->lockedInput.ref, false);
 
         if (flake.sourceInfo.narHash != lazyInput->lockedInput.narHash)
             throw Error("the content hash of flake '%s' doesn't match the hash recorded in the referring lockfile", flake.sourceInfo.resolvedRef);

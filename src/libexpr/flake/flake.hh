@@ -78,7 +78,7 @@ struct Flake
         : originalRef(origRef), sourceInfo(sourceInfo) {};
 };
 
-Flake getFlake(EvalState &, const FlakeRef &);
+Flake getFlake(EvalState & state, const FlakeRef & flakeRef, bool allowLookup);
 
 /* If 'allowLookup' is true, then resolve 'flakeRef' using the
    registries. */

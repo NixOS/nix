@@ -30,11 +30,11 @@ struct LockedInputs
 /* Lock file information about a flake input. */
 struct LockedInput : LockedInputs
 {
-    FlakeRef ref;
+    FlakeRef ref, originalRef;
     Hash narHash;
 
-    LockedInput(const FlakeRef & ref, const Hash & narHash)
-        : ref(ref), narHash(narHash)
+    LockedInput(const FlakeRef & ref, const FlakeRef & originalRef, const Hash & narHash)
+        : ref(ref), originalRef(originalRef), narHash(narHash)
     {
         assert(ref.isImmutable());
     };

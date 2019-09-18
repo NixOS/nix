@@ -6,6 +6,7 @@ namespace nix::flake {
 LockedInput::LockedInput(const nlohmann::json & json)
     : LockedInputs(json)
     , ref(json["uri"])
+    , originalRef(json["originalUri"])
     , narHash(Hash((std::string) json["narHash"]))
 {
     if (!ref.isImmutable())
@@ -16,6 +17,7 @@ nlohmann::json LockedInput::toJson() const
 {
     auto json = LockedInputs::toJson();
     json["uri"] = ref.to_string();
+    json["originalUri"] = originalRef.to_string();
     json["narHash"] = narHash.to_string(SRI);
     return json;
 }
@@ -54,7 +56,7 @@ bool LockedInputs::isDirty() const
 nlohmann::json LockFile::toJson() const
 {
     auto json = LockedInputs::toJson();
-    json["version"] = 2;
+    json["version"] = 3;
     return json;
 }
 
@@ -64,7 +66,7 @@ LockFile LockFile::read(const Path & path)
         auto json = nlohmann::json::parse(readFile(path));
 
         auto version = json.value("version", 0);
-        if (version != 2)
+        if (version != 3)
             throw Error("lock file '%s' has unsupported version %d", path, version);
 
         return LockFile(json);
