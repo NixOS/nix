@@ -8,7 +8,6 @@ expect_trace() {
     actual=$(
         nix-instantiate \
             --trace-function-calls \
-            -vvvv \
             --expr "$expr" 2>&1 \
             | grep "function-trace" \
             | sed -e 's/ [0-9]*$//'
