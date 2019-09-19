@@ -8,6 +8,7 @@
 #include "get-drvs.hh"
 #include "store-api.hh"
 #include "derivations.hh"
+#include "attr-path.hh"
 
 #include <nlohmann/json.hpp>
 #include <queue>
@@ -341,6 +342,21 @@ struct CmdFlakeCheck : FlakeCommand, MixJSON
             }
         };
 
+        auto checkNixOSConfiguration = [&](const std::string & attrPath, Value & v, const Pos & pos) {
+            try {
+                Activity act(*logger, lvlChatty, actUnknown,
+                    fmt("checking NixOS configuration '%s'", attrPath));
+                Bindings & bindings(*state->allocBindings(0));
+                auto vToplevel = findAlongAttrPath(*state, "config.system.build.toplevel", bindings, v);
+                state->forceAttrs(*vToplevel, pos);
+                if (!state->isDerivation(*vToplevel))
+                    throw Error("attribute 'config.system.build.toplevel' is not a derivation");
+            } catch (Error & e) {
+                e.addPrefix(fmt("while checking the NixOS configuration '" ANSI_BOLD "%s" ANSI_NORMAL "' at %s:\n", attrPath, pos));
+                throw;
+            }
+        };
+
         {
             Activity act(*logger, lvlInfo, actUnknown, "evaluating flake");
 
@@ -404,6 +420,13 @@ struct CmdFlakeCheck : FlakeCommand, MixJSON
                             state->forceAttrs(vOutput, pos);
                             for (auto & attr : *vOutput.attrs)
                                 checkModule(name + "." + (std::string) attr.name,
+                                    *attr.value, *attr.pos);
+                        }
+
+                        else if (name == "nixosConfigurations") {
+                            state->forceAttrs(vOutput, pos);
+                            for (auto & attr : *vOutput.attrs)
+                                checkNixOSConfiguration(name + "." + (std::string) attr.name,
                                     *attr.value, *attr.pos);
                         }
 
