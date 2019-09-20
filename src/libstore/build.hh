@@ -21,9 +21,6 @@ namespace nix {
 using std::map;
 
 
-static string pathNullDevice = "/dev/null";
-
-
 /* Forward definition. */
 class Worker;
 struct HookInstance;
@@ -672,7 +669,4 @@ struct HookInstance
 
 
 void addToWeakGoals(WeakGoals & goals, GoalPtr p);
-
-/** Common initialisation performed in child processes. */
-void commonChildInit(Pipe & logPipe);
 }
