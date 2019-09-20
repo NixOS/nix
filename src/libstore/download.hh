@@ -91,6 +91,8 @@ class Store;
 
 struct Downloader
 {
+    virtual ~Downloader() { }
+
     /* Enqueue a download request, returning a future to the result of
        the download. The future may throw a DownloadError
        exception. */
