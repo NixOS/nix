@@ -36,7 +36,11 @@ HgInfo exportMercurial(ref<Store> store, const std::string & uri,
             /* This is an unclean working tree. So copy all tracked
                files. */
 
-            printTalkative("copying unclean Mercurial working tree '%s'", uri);
+            if (!evalSettings.allowDirty)
+                throw Error("Mercurial tree '%s' is unclean", uri);
+
+            if (evalSettings.warnDirty)
+                warn("Mercurial tree '%s' is unclean", uri);
 
             HgInfo hgInfo;
             hgInfo.rev = "0000000000000000000000000000000000000000";

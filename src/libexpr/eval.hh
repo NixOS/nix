@@ -377,10 +377,16 @@ struct EvalSettings : Config
         "Prefixes of URIs that builtin functions such as fetchurl and fetchGit are allowed to fetch."};
 
     Setting<bool> traceFunctionCalls{this, false, "trace-function-calls",
-        "Emit log messages for each function entry and exit at the 'vomit' log level (-vvvv)"};
+        "Emit log messages for each function entry and exit at the 'vomit' log level (-vvvv)."};
 
     Setting<std::string> flakeRegistry{this, "https://raw.githubusercontent.com/NixOS/flake-registry/master/flake-registry.json", "flake-registry",
         "Path or URI of the global flake registry."};
+
+    Setting<bool> allowDirty{this, true, "allow-dirty",
+        "Whether to allow dirty Git/Mercurial trees."};
+
+    Setting<bool> warnDirty{this, true, "warn-dirty",
+        "Whether to warn about dirty Git/Mercurial trees."};
 };
 
 extern EvalSettings evalSettings;

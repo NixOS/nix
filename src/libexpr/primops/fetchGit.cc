@@ -47,7 +47,11 @@ GitInfo exportGit(ref<Store> store, std::string uri,
             /* This is an unclean working tree. So copy all tracked
                files. */
 
-            warn("Git tree '%s' is dirty", uri);
+            if (!evalSettings.allowDirty)
+                throw Error("Git tree '%s' is dirty", uri);
+
+            if (evalSettings.warnDirty)
+                warn("Git tree '%s' is dirty", uri);
 
             GitInfo gitInfo;
             gitInfo.ref = "HEAD";

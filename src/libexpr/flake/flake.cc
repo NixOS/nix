@@ -480,9 +480,10 @@ ResolvedFlake resolveFlake(EvalState & state, const FlakeRef & topRef, HandleLoc
     if (!(lockFile == oldLockFile)) {
         if (allowedToWrite(handleLockFile)) {
             if (auto refData = std::get_if<FlakeRef::IsPath>(&topRef.data)) {
-                if (lockFile.isDirty())
-                    warn("will not write lock file of flake '%s' because it has a dirty input", topRef);
-                else {
+                if (lockFile.isDirty()) {
+                    if (evalSettings.warnDirty)
+                        warn("will not write lock file of flake '%s' because it has a dirty input", topRef);
+                } else {
                     lockFile.write(refData->path + (topRef.subdir == "" ? "" : "/" + topRef.subdir) + "/flake.lock");
 
                     // Hack: Make sure that flake.lock is visible to Git, so it ends up in the Nix store.
