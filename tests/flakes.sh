@@ -126,7 +126,7 @@ json=$(nix flake info --flake-registry $registry flake1 --json | jq .)
 [[ $(echo "$json" | jq -r .lastModified) = $(git -C $flake1Dir log -n1 --format=%ct) ]]
 
 # Test 'nix build' on a flake.
-nix build -o $TEST_ROOT/result --flake-registry $registry flake1:foo
+nix build -o $TEST_ROOT/result --flake-registry $registry flake1#foo
 [[ -e $TEST_ROOT/result/hello ]]
 
 # Test defaultPackage.
@@ -144,33 +144,33 @@ nix path-info $flake1Dir/result
 (! nix eval "(builtins.getFlake "$flake2Dir")")
 
 # But should succeed in impure mode.
-nix build -o $TEST_ROOT/result --flake-registry $registry flake2:bar --impure
+nix build -o $TEST_ROOT/result --flake-registry $registry flake2#bar --impure
 
 # Test automatic lock file generation.
-nix build -o $TEST_ROOT/result --flake-registry $registry $flake2Dir:bar
+nix build -o $TEST_ROOT/result --flake-registry $registry $flake2Dir#bar
 [[ -e $flake2Dir/flake.lock ]]
 git -C $flake2Dir commit flake.lock -m 'Add flake.lock'
 
 # Rerunning the build should not change the lockfile.
-nix build -o $TEST_ROOT/result --flake-registry $registry $flake2Dir:bar
+nix build -o $TEST_ROOT/result --flake-registry $registry $flake2Dir#bar
 [[ -z $(git -C $flake2Dir diff master) ]]
 
 # Building with a lockfile should not require a fetch of the registry.
-nix build -o $TEST_ROOT/result --flake-registry file:///no-registry.json $flake2Dir:bar --tarball-ttl 0
+nix build -o $TEST_ROOT/result --flake-registry file:///no-registry.json $flake2Dir#bar --tarball-ttl 0
 
 # Updating the flake should not change the lockfile.
 nix flake update --flake-registry $registry $flake2Dir
 [[ -z $(git -C $flake2Dir diff master) ]]
 
 # Now we should be able to build the flake in pure mode.
-nix build -o $TEST_ROOT/result --flake-registry $registry flake2:bar
+nix build -o $TEST_ROOT/result --flake-registry $registry flake2#bar
 
 # Or without a registry.
 # FIXME: shouldn't need '--flake-registry /no-registry'?
-nix build -o $TEST_ROOT/result --flake-registry /no-registry file://$flake2Dir:bar --tarball-ttl 0
+nix build -o $TEST_ROOT/result --flake-registry /no-registry file://$flake2Dir#bar --tarball-ttl 0
 
 # Test whether indirect dependencies work.
-nix build -o $TEST_ROOT/result --flake-registry $registry $flake3Dir:xyzzy
+nix build -o $TEST_ROOT/result --flake-registry $registry $flake3Dir#xyzzy
 
 # Add dependency to flake3.
 rm $flake3Dir/flake.nix
@@ -192,7 +192,7 @@ git -C $flake3Dir add flake.nix
 git -C $flake3Dir commit -m 'Update flake.nix'
 
 # Check whether `nix build` works with an incomplete lockfile
-nix build -o $TEST_ROOT/result --flake-registry $registry $flake3Dir:"sth sth"
+nix build -o $TEST_ROOT/result --flake-registry $registry $flake3Dir#"sth sth"
 
 # Check whether it saved the lockfile
 [[ ! (-z $(git -C $flake3Dir diff master)) ]]
@@ -203,7 +203,7 @@ git -C $flake3Dir commit -m 'Add lockfile'
 
 # Unsupported editions should be an error.
 sed -i $flake3Dir/flake.nix -e s/201909/201912/
-nix build -o $TEST_ROOT/result --flake-registry $registry $flake3Dir:sth 2>&1 | grep 'unsupported edition'
+nix build -o $TEST_ROOT/result --flake-registry $registry $flake3Dir#sth 2>&1 | grep 'unsupported edition'
 
 # Test whether registry caching works.
 nix flake list --flake-registry file://$registry | grep -q flake3
@@ -214,12 +214,12 @@ mv $registry.tmp $registry
 # Test whether flakes are registered as GC roots for offline use.
 # FIXME: use tarballs rather than git.
 rm -rf $TEST_HOME/.cache
-nix build -o $TEST_ROOT/result --flake-registry file://$registry file://$flake2Dir:bar
+nix build -o $TEST_ROOT/result --flake-registry file://$registry file://$flake2Dir#bar
 mv $flake1Dir $flake1Dir.tmp
 mv $flake2Dir $flake2Dir.tmp
 nix-store --gc
-nix build -o $TEST_ROOT/result --flake-registry file://$registry file://$flake2Dir:bar
-nix build -o $TEST_ROOT/result --flake-registry file://$registry file://$flake2Dir:bar --tarball-ttl 0
+nix build -o $TEST_ROOT/result --flake-registry file://$registry file://$flake2Dir#bar
+nix build -o $TEST_ROOT/result --flake-registry file://$registry file://$flake2Dir#bar --tarball-ttl 0
 mv $flake1Dir.tmp $flake1Dir
 mv $flake2Dir.tmp $flake2Dir
 
@@ -264,30 +264,30 @@ git -C $flake3Dir commit -m 'Add nonFlakeInputs'
 
 # Check whether `nix build` works with a lockfile which is missing a
 # nonFlakeInputs.
-nix build -o $TEST_ROOT/result --flake-registry $registry $flake3Dir:sth
+nix build -o $TEST_ROOT/result --flake-registry $registry $flake3Dir#sth
 
 git -C $flake3Dir add flake.lock
 
 git -C $flake3Dir commit -m 'Update nonFlakeInputs'
 
-nix build -o $TEST_ROOT/result --flake-registry $registry flake3:fnord
+nix build -o $TEST_ROOT/result --flake-registry $registry flake3#fnord
 [[ $(cat $TEST_ROOT/result) = FNORD ]]
 
-# Check whether flake input fetching is lazy: flake3:sth does not
+# Check whether flake input fetching is lazy: flake3#sth does not
 # depend on flake2, so this shouldn't fail.
 rm -rf $TEST_HOME/.cache
 clearStore
 mv $flake2Dir $flake2Dir.tmp
 mv $nonFlakeDir $nonFlakeDir.tmp
-nix build -o $TEST_ROOT/result --flake-registry $registry flake3:sth
-(! nix build -o $TEST_ROOT/result --flake-registry $registry flake3:xyzzy)
-(! nix build -o $TEST_ROOT/result --flake-registry $registry flake3:fnord)
+nix build -o $TEST_ROOT/result --flake-registry $registry flake3#sth
+(! nix build -o $TEST_ROOT/result --flake-registry $registry flake3#xyzzy)
+(! nix build -o $TEST_ROOT/result --flake-registry $registry flake3#fnord)
 mv $flake2Dir.tmp $flake2Dir
 mv $nonFlakeDir.tmp $nonFlakeDir
-nix build -o $TEST_ROOT/result --flake-registry $registry flake3:xyzzy flake3:fnord
+nix build -o $TEST_ROOT/result --flake-registry $registry flake3#xyzzy flake3#fnord
 
 # Test doing multiple `lookupFlake`s
-nix build -o $TEST_ROOT/result --flake-registry $registry flake4:xyzzy
+nix build -o $TEST_ROOT/result --flake-registry $registry flake4#xyzzy
 
 # Make branch "removeXyzzy" where flake3 doesn't have xyzzy anymore
 git -C $flake3Dir checkout -b removeXyzzy
@@ -325,11 +325,11 @@ git -C $flake3Dir commit -m 'Remove packages.xyzzy'
 git -C $flake3Dir checkout master
 
 # Test whether fuzzy-matching works for IsAlias
-(! nix build -o $TEST_ROOT/result --flake-registry $registry flake4/removeXyzzy:xyzzy)
+(! nix build -o $TEST_ROOT/result --flake-registry $registry flake4/removeXyzzy#xyzzy)
 
 # Test whether fuzzy-matching works for IsGit
-(! nix build -o $TEST_ROOT/result --flake-registry $registry flake4/removeXyzzy:xyzzy)
-nix build -o $TEST_ROOT/result --flake-registry $registry flake4/removeXyzzy:sth
+(! nix build -o $TEST_ROOT/result --flake-registry $registry flake4/removeXyzzy#xyzzy)
+nix build -o $TEST_ROOT/result --flake-registry $registry flake4/removeXyzzy#sth
 
 # Testing the nix CLI
 nix flake add --flake-registry $registry flake1 flake3

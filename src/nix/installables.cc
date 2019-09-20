@@ -404,7 +404,7 @@ std::vector<std::shared_ptr<Installable>> SourceExprCommand::parseInstallables(
 
         for (auto & s : ss) {
 
-            size_t colon;
+            size_t hash;
             std::optional<Path> storePath;
 
             if (s.compare(0, 1, "(") == 0)
@@ -417,8 +417,14 @@ std::vector<std::shared_ptr<Installable>> SourceExprCommand::parseInstallables(
                         Strings{"legacyPackages." + std::string(s, 8)}));
             }
 
-            else {
+            else if ((hash = s.rfind('#')) != std::string::npos)
+                result.push_back(std::make_shared<InstallableFlake>(
+                        *this,
+                        FlakeRef(std::string(s, 0, hash), true),
+                        std::string(s, hash + 1),
+                        getDefaultFlakeAttrPathPrefixes()));
 
+            else {
                 std::exception_ptr flakeEx;
 
                 try {
@@ -434,17 +440,7 @@ std::vector<std::shared_ptr<Installable>> SourceExprCommand::parseInstallables(
                 } catch (BadFlakeRef &) {
                 }
 
-                if ((colon = s.rfind(':')) != std::string::npos) {
-                    auto flakeRef = std::string(s, 0, colon);
-                    auto attrPath = std::string(s, colon + 1);
-                    result.push_back(std::make_shared<InstallableFlake>(
-                            *this,
-                            FlakeRef(flakeRef, true),
-                            attrPath,
-                            getDefaultFlakeAttrPathPrefixes()));
-                }
-
-                else if (s.find('/') != std::string::npos && (storePath = follow(s)))
+                if (s.find('/') != std::string::npos && (storePath = follow(s)))
                     result.push_back(std::make_shared<InstallableStorePath>(*storePath));
 
                 else {
