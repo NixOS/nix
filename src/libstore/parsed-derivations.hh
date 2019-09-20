@@ -1,3 +1,5 @@
+#pragma once
+
 #include "derivations.hh"
 
 #include <nlohmann/json.hpp>
