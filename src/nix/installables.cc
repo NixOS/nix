@@ -425,29 +425,15 @@ std::vector<std::shared_ptr<Installable>> SourceExprCommand::parseInstallables(
                         getDefaultFlakeAttrPathPrefixes()));
 
             else {
-                std::exception_ptr flakeEx;
-
                 try {
                     auto flakeRef = FlakeRef(s, true);
                     result.push_back(std::make_shared<InstallableFlake>(
                             *this, std::move(flakeRef), getDefaultFlakeAttrPaths()));
-                    continue;
-                } catch (MissingFlake &) {
-                    /* 's' could be parsed as a flakeref, but it
-                       references a local path that is not a flake. So
-                       take note of that. */
-                    flakeEx = std::current_exception();
-                } catch (BadFlakeRef &) {
-                }
-
-                if (s.find('/') != std::string::npos && (storePath = follow(s)))
-                    result.push_back(std::make_shared<InstallableStorePath>(*storePath));
-
-                else {
-                    if (flakeEx)
-                        std::rethrow_exception(flakeEx);
+                } catch (...) {
+                    if (s.find('/') != std::string::npos && (storePath = follow(s)))
+                        result.push_back(std::make_shared<InstallableStorePath>(*storePath));
                     else
-                        throw Error("unsupported argument '%s'", s);
+                        throw;
                 }
             }
         }
