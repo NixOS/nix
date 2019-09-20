@@ -20,7 +20,7 @@ const static std::string revOrRefRegex = "(?:(" + revRegexS + ")|(" + refRegex +
 // "master/e72daba8250068216d79d2aeef40d4d95aff6666").
 const static std::string refAndOrRevRegex = "(?:(" + revRegexS + ")|(?:(" + refRegex + ")(?:/(" + revRegexS + "))?))";
 
-const static std::string flakeAlias = "[a-zA-Z][a-zA-Z0-9_-]*";
+const static std::string flakeId = "[a-zA-Z][a-zA-Z0-9_-]*";
 
 // GitHub references.
 const static std::string ownerRegex = "[a-zA-Z][a-zA-Z0-9_-]*";
@@ -43,7 +43,7 @@ FlakeRef::FlakeRef(const std::string & uri_, bool allowRelative)
     // FIXME: could combine this into one regex.
 
     static std::regex flakeRegex(
-        "(?:flake:)?(" + flakeAlias + ")(?:/(?:" + refAndOrRevRegex + "))?",
+        "(?:flake:)?(" + flakeId + ")(?:/(?:" + refAndOrRevRegex + "))?",
         std::regex::ECMAScript);
 
     static std::regex githubRegex(
@@ -90,8 +90,8 @@ FlakeRef::FlakeRef(const std::string & uri_, bool allowRelative)
 
     std::cmatch match;
     if (std::regex_match(uri.c_str(), match, flakeRegex)) {
-        IsAlias d;
-        d.alias = match[1];
+        IsId d;
+        d.id = match[1];
         if (match[2].matched)
             rev = Hash(match[2], htSHA1);
         else if (match[3].matched) {
@@ -195,8 +195,8 @@ std::string FlakeRef::to_string() const
             string += value; // FIXME: escaping
         };
 
-    if (auto refData = std::get_if<FlakeRef::IsAlias>(&data)) {
-        string = refData->alias;
+    if (auto refData = std::get_if<FlakeRef::IsId>(&data)) {
+        string = refData->id;
         if (ref) string += '/' + *ref;
         if (rev) string += '/' + rev->gitRev();
     }

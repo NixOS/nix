@@ -101,16 +101,15 @@ namespace nix {
 */
 
 typedef std::string FlakeId;
-typedef std::string FlakeAlias;
 typedef std::string FlakeUri;
 
 struct FlakeRef
 {
-    struct IsAlias
+    struct IsId
     {
-        FlakeAlias alias;
-        bool operator<(const IsAlias & b) const { return alias < b.alias; };
-        bool operator==(const IsAlias & b) const { return alias == b.alias; };
+        FlakeId id;
+        bool operator<(const IsId & b) const { return id < b.id; };
+        bool operator==(const IsId & b) const { return id == b.id; };
     };
 
     struct IsGitHub {
@@ -140,7 +139,7 @@ struct FlakeRef
 
     // Git, Tarball
 
-    std::variant<IsAlias, IsGitHub, IsGit, IsPath> data;
+    std::variant<IsId, IsGitHub, IsGit, IsPath> data;
 
     std::optional<std::string> ref;
     std::optional<Hash> rev;
@@ -168,7 +167,7 @@ struct FlakeRef
        a flake ID, which requires a lookup in the flake registry. */
     bool isDirect() const
     {
-        return !std::get_if<FlakeRef::IsAlias>(&data);
+        return !std::get_if<FlakeRef::IsId>(&data);
     }
 
     /* Check whether this is an "immutable" flake reference, that is,
