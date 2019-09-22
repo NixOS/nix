@@ -111,9 +111,9 @@ static void parseJSON(EvalState & state, const char * & s, Value & v)
                 mkFloat(v, stod(tmp_number));
             else
                 mkInt(v, stol(tmp_number));
-        } catch (std::invalid_argument e) {
+        } catch (std::invalid_argument & e) {
             throw JSONParseError("invalid JSON number");
-        } catch (std::out_of_range e) {
+        } catch (std::out_of_range & e) {
             throw JSONParseError("out-of-range JSON number");
         }
     }
