@@ -174,11 +174,12 @@ static void enumerateOutputs(EvalState & state, Value & vFlake,
 {
     state.forceAttrs(vFlake);
 
-    auto vOutputs = (*vFlake.attrs->get(state.symbols.create("outputs")))->value;
+    auto aOutputs = vFlake.attrs->get(state.symbols.create("outputs"));
+    assert(aOutputs);
 
-    state.forceAttrs(*vOutputs);
+    state.forceAttrs(*(*aOutputs)->value);
 
-    for (auto & attr : *vOutputs->attrs)
+    for (auto & attr : *((*aOutputs)->value->attrs))
         callback(attr.name, *attr.value, *attr.pos);
 }
 
@@ -191,14 +192,11 @@ struct CmdFlakeInfo : FlakeCommand, MixJSON
 
     void run(nix::ref<nix::Store> store) override
     {
-        auto flake = getFlake();
-        stopProgressBar();
-
         if (json) {
-            auto json = flakeToJson(flake);
-
             auto state = getEvalState();
             auto flake = resolveFlake();
+
+            auto json = flakeToJson(flake.flake);
 
             auto vFlake = state->allocValue();
             flake::callFlake(*state, flake, *vFlake);
@@ -222,8 +220,11 @@ struct CmdFlakeInfo : FlakeCommand, MixJSON
             json["outputs"] = std::move(outputs);
 
             std::cout << json.dump() << std::endl;
-        } else
+        } else {
+            auto flake = getFlake();
+            stopProgressBar();
             printFlakeInfo(flake);
+        }
     }
 };
 

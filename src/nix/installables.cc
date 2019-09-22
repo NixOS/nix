@@ -291,11 +291,12 @@ struct InstallableFlake : InstallableValue
 
         makeFlakeClosureGCRoot(*state.store, flakeRef, resFlake);
 
-        auto vOutputs = (*vFlake->attrs->get(state.symbols.create("outputs")))->value;
+        auto aOutputs = vFlake->attrs->get(state.symbols.create("outputs"));
+        assert(aOutputs);
 
-        state.forceValue(*vOutputs);
+        state.forceValue(*(*aOutputs)->value);
 
-        return vOutputs;
+        return (*aOutputs)->value;
     }
 
     std::vector<flake::EvalCache::Derivation> toDerivations() override
