@@ -280,7 +280,7 @@ static void _main(int argc, char * * argv)
                 auto absolute = i;
                 try {
                     absolute = canonPath(absPath(i), true);
-                } catch (Error e) {};
+                } catch (Error & e) {};
                 if (store->isStorePath(absolute) && std::regex_match(absolute, std::regex(".*\\.drv(!.*)?")))
                 drvs.push_back(DrvInfo(*state, store, absolute));
             else
