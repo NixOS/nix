@@ -157,6 +157,12 @@ struct ValidPathInfo
     */
     std::string ca;
 
+    /* If non-empty, indicates that the path is an alias of another path,
+     * so it has no content by itself, but should be replaced by the path
+     * targeted by this field.
+     */
+    std::string aliasOf;
+
     bool operator == (const ValidPathInfo & i) const
     {
         return

@@ -215,13 +215,13 @@ LocalStore::LocalStore(const Params & params)
 
     /* Prepare SQL statements. */
     state->stmtRegisterValidPath.create(state->db,
-        "insert into ValidPaths (path, hash, registrationTime, deriver, narSize, ultimate, sigs, ca) values (?, ?, ?, ?, ?, ?, ?, ?);");
+        "insert into ValidPaths (path, hash, registrationTime, deriver, narSize, ultimate, sigs, ca, aliasOf) values (?, ?, ?, ?, ?, ?, ?, ?, ?);");
     state->stmtUpdatePathInfo.create(state->db,
         "update ValidPaths set narSize = ?, hash = ?, ultimate = ?, sigs = ?, ca = ? where path = ?;");
     state->stmtAddReference.create(state->db,
         "insert or replace into Refs (referrer, reference) values (?, ?);");
     state->stmtQueryPathInfo.create(state->db,
-        "select id, hash, registrationTime, deriver, narSize, ultimate, sigs, ca from ValidPaths where path = ?;");
+        "select id, hash, registrationTime, deriver, narSize, ultimate, sigs, ca, aliasOf from ValidPaths where path = ?;");
     state->stmtQueryReferences.create(state->db,
         "select path from Refs join ValidPaths on reference = id where referrer = ?;");
     state->stmtQueryReferrers.create(state->db,
@@ -594,6 +594,7 @@ uint64_t LocalStore::addValidPath(State & state,
         (info.ultimate ? 1 : 0, info.ultimate)
         (concatStringsSep(" ", info.sigs), !info.sigs.empty())
         (info.ca, !info.ca.empty())
+        (info.aliasOf, !info.aliasOf.empty())
         .exec();
     uint64_t id = sqlite3_last_insert_rowid(state.db);
 
@@ -670,6 +671,9 @@ void LocalStore::queryPathInfoUncached(const Path & path,
 
             s = (const char *) sqlite3_column_text(state->stmtQueryPathInfo, 7);
             if (s) info->ca = s;
+
+            s = (const char *) sqlite3_column_text(state->stmtQueryPathInfo, 8);
+            if (s) info->aliasOf = s;
 
             /* Get the references. */
             auto useQueryReferences(state->stmtQueryReferences.use()(info->id));
@@ -1448,6 +1452,7 @@ ref<ValidPathInfo> LocalStore::createAlias(const ValidPathInfo & destInfo, const
     aliasInfo.narHash = aliasHash.first;
     aliasInfo.narSize = aliasHash.second;
     aliasInfo.path = aliasPath;
+    aliasInfo.aliasOf = destInfo.path;
 
     signPathInfo(aliasInfo);
 
