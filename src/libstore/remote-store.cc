@@ -198,6 +198,7 @@ void RemoteStore::setOptions(Connection & conn)
         overrides.erase(settings.maxSilentTime.name);
         overrides.erase(settings.buildCores.name);
         overrides.erase(settings.useSubstitutes.name);
+        overrides.erase(settings.showTrace.name);
         conn.to << overrides.size();
         for (auto & i : overrides)
             conn.to << i.first << i.second.value;
