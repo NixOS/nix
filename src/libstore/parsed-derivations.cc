@@ -113,4 +113,9 @@ bool ParsedDerivation::substitutesAllowed() const
     return getBoolAttr("allowSubstitutes", true);
 }
 
+bool ParsedDerivation::contentAddressed() const
+{
+    return getBoolAttr("contentAddressed", false);
+}
+
 }

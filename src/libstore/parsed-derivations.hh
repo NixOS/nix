@@ -32,6 +32,8 @@ public:
     bool willBuildLocally() const;
 
     bool substitutesAllowed() const;
+
+    bool contentAddressed() const;
 };
 
 }

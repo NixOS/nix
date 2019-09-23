@@ -291,6 +291,10 @@ private:
        specified by the ‘secret-key-files’ option. */
     void signPathInfo(ValidPathInfo & info);
 
+    ref<ValidPathInfo> createAlias(const ValidPathInfo & destInfo, const Path & aliasPath);
+
+    ref<ValidPathInfo> makeContentAddressed(ValidPathInfo & info);
+
     Path getRealStoreDir() override { return realStoreDir; }
 
     friend class DerivationGoal;

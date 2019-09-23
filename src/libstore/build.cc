@@ -840,6 +840,9 @@ private:
     /* Whether this is a fixed-output derivation. */
     bool fixedOutput;
 
+    /* Whether this is a content adressed derivation */
+    bool contentAddressed = false;
+
     /* Whether to run the build in a private network namespace. */
     bool privateNetwork = false;
 
@@ -1193,6 +1196,8 @@ void DerivationGoal::haveDerivation()
     }
 
     parsedDrv = std::make_unique<ParsedDerivation>(drvPath, *drv);
+
+    contentAddressed = parsedDrv->contentAddressed();
 
     /* We are first going to try to create the invalid output paths
        through substitutes.  If that doesn't work, we'll build
@@ -3395,11 +3400,21 @@ void DerivationGoal::registerOutputs()
         info.references = references;
         info.deriver = drvPath;
         info.ultimate = true;
-        worker.store.signPathInfo(info);
 
         if (!info.references.empty()) info.ca.clear();
 
+        /* If the derivation is content addressed, move its outputs to the right
+         * place and update the path info
+         */
+        if (contentAddressed) {
+            auto aliasInfo = *(worker.store.makeContentAddressed(info));
+            infos["cas-of-" + i.first] = aliasInfo;
+        }
+
+        worker.store.signPathInfo(info);
+
         infos[i.first] = info;
+
     }
 
     if (buildMode == bmCheck) return;

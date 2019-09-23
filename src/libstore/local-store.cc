@@ -5,6 +5,7 @@
 #include "worker-protocol.hh"
 #include "derivations.hh"
 #include "nar-info.hh"
+#include "references.hh"
 
 #include <iostream>
 #include <algorithm>
@@ -1432,5 +1433,51 @@ void LocalStore::signPathInfo(ValidPathInfo & info)
     }
 }
 
+ref<ValidPathInfo> LocalStore::createAlias(const ValidPathInfo & destInfo, const Path & aliasPath) {
+    ValidPathInfo aliasInfo = destInfo;
+
+    // XXX: We currently need the alias path to exist for things like `--check`
+    // to work nicely with it
+    writeFile(aliasPath, destInfo.path);
+
+    HashResult aliasHash;
+
+    // XXX: Do we actualy need `scanForReferences` as we just want to compute
+    // the hash?
+    scanForReferences(aliasPath, {}, aliasHash);
+    aliasInfo.narHash = aliasHash.first;
+    aliasInfo.narSize = aliasHash.second;
+    aliasInfo.path = aliasPath;
+
+    signPathInfo(aliasInfo);
+
+    return make_ref<ValidPathInfo>(aliasInfo);
+}
+
+ref<ValidPathInfo> LocalStore::makeContentAddressed(ValidPathInfo & info) {
+    debug("Moving to its actual location");
+
+    auto aliasPath = info.path;
+    auto recursive = true;
+    auto hashAlgo = htSHA256;
+    auto pathName = storePathToName(aliasPath);
+    Hash contentHash = hashPath(hashAlgo, aliasPath).first;
+
+    Path casPath = makeFixedOutputPath(recursive, contentHash, pathName);
+
+    // Move the path to its ca location
+    // XXX: We could probably actually move it instead of copy it
+    if (!pathExists(casPath)) {
+        StringSink sink;
+        dumpPath(aliasPath, sink);
+        StringSource source(*sink.s);
+        restorePath(casPath, source);
+    };
+    deletePath(aliasPath);
+
+    info.path = casPath;
+
+    return createAlias(info, aliasPath);
+}
 
 }
