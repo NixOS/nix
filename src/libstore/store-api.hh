@@ -559,6 +559,8 @@ public:
         PathSet & out, bool flipDirection = false,
         bool includeOutputs = false, bool includeDerivers = false);
 
+    Path resolveAliases(const Path & path);
+
     /* Given a set of paths that are to be built, return the set of
        derivations that will be built, and the set of output paths
        that will be substituted. */

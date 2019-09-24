@@ -104,6 +104,17 @@ void Store::computeFSClosure(const Path & startPath,
     computeFSClosure(PathSet{startPath}, paths_, flipDirection, includeOutputs, includeDerivers);
 }
 
+Path Store::resolveAliases(const Path & path)
+{
+    Path destPath = path;
+    queryPathInfo(path, {[&, path](std::future<ref<ValidPathInfo>> fut) {
+        auto info = fut.get();
+        if (!info->aliasOf.empty()) {
+            destPath = resolveAliases(info->aliasOf);
+        }
+    }});
+    return destPath;
+}
 
 void Store::queryMissing(const PathSet & targets,
     PathSet & willBuild_, PathSet & willSubstitute_, PathSet & unknown_,

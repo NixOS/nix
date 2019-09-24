@@ -13,6 +13,7 @@
 #include "nar-info.hh"
 #include "parsed-derivations.hh"
 #include "machines.hh"
+#include "rewrite-derivation.hh"
 
 #include <algorithm>
 #include <iostream>
@@ -724,27 +725,6 @@ HookInstance::~HookInstance()
     }
 }
 
-
-//////////////////////////////////////////////////////////////////////
-
-
-typedef map<std::string, std::string> StringRewrites;
-
-
-std::string rewriteStrings(std::string s, const StringRewrites & rewrites)
-{
-    for (auto & i : rewrites) {
-        size_t j = 0;
-        while ((j = s.find(i.first, j)) != string::npos)
-            s.replace(j, i.first.size(), i.second);
-    }
-    return s;
-}
-
-
-//////////////////////////////////////////////////////////////////////
-
-
 typedef enum {rpAccept, rpDecline, rpPostpone} HookReply;
 
 class SubstitutionGoal;
@@ -768,6 +748,10 @@ private:
     /* Whether to retry substituting the outputs after building the
        inputs. */
     bool retrySubstitution;
+
+    /* Whether we should try to rewrite the inputs to resolve aliases before
+     * building the derivation */
+    bool rewriteInputs = true;
 
     /* The derivation stored at drvPath. */
     std::unique_ptr<BasicDerivation> drv;
@@ -1365,6 +1349,10 @@ void DerivationGoal::inputsRealised()
 
     /* Determine the full set of input paths. */
 
+    // A map from the set of all the input paths of the derivation (inputSrcs
+    // or outputs of a dependency drv) to their actual path.
+    PathMap directInputPaths;
+
     /* First, the input derivations. */
     if (useDerivation)
         for (auto & i : dynamic_cast<Derivation *>(drv.get())->inputDrvs) {
@@ -1375,7 +1363,10 @@ void DerivationGoal::inputsRealised()
             Derivation inDrv = worker.store.derivationFromPath(i.first);
             for (auto & j : i.second)
                 if (inDrv.outputs.find(j) != inDrv.outputs.end())
-                    worker.store.computeFSClosure(inDrv.outputs[j].path, inputPaths);
+                    directInputPaths.emplace(
+                        inDrv.outputs[j].path,
+                        worker.store.resolveAliases(inDrv.outputs[j].path)
+                    );
                 else
                     throw Error(
                         format("derivation '%1%' requires non-existent output '%2%' from input derivation '%3%'")
@@ -1383,7 +1374,31 @@ void DerivationGoal::inputsRealised()
         }
 
     /* Second, the input sources. */
-    worker.store.computeFSClosure(drv->inputSrcs, inputPaths);
+    for (auto & inputSrc: drv->inputSrcs) {
+        directInputPaths.emplace(
+            inputSrc,
+            worker.store.resolveAliases(inputSrc)
+        );
+    }
+
+    if (rewriteInputs && useDerivation) {
+        rewriteDerivation(
+            worker.store,
+            *(dynamic_cast<Derivation *>(drv.get())),
+            directInputPaths
+        );
+        rewriteInputs = false;
+        haveDerivation();
+        return;
+    }
+
+
+    for (auto & inputSrcAlias: directInputPaths) {
+        worker.store.computeFSClosure(
+            inputSrcAlias.second,
+            inputPaths
+        );
+    }
 
     debug(format("added input paths %1%") % showPaths(inputPaths));
 

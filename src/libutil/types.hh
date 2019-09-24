@@ -145,6 +145,7 @@ typedef std::map<std::string, std::string> StringMap;
 typedef string Path;
 typedef list<Path> Paths;
 typedef set<Path> PathSet;
+typedef std::map<Path, Path> PathMap;
 
 
 }
