@@ -67,6 +67,16 @@ void rewriteDerivation(Store & store, Derivation & drv, const PathMap & pathRewr
     }
     drv.env = newEnv;
 
+    // Remove all the input derivations because we've already resolved their
+    // output path and we don't want them to have an influence on the output
+    // paths.
+    // XXX: We only do that if we effectively rewrote some inputs, because this
+    // changes the output path of the derivation and we want to maintain
+    // backwards compatibility
+    if (!rewrites.empty()) {
+        drv.inputDrvs = {};
+    }
+
     if (!drv.isFixedOutput()) {
         recomputeOutputs(store, drv);
     }
