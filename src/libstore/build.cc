@@ -777,6 +777,9 @@ private:
     /* Outputs that are corrupt or not valid. */
     PathSet missingPaths;
 
+    /* Extra outputs that will be stored as aliases to the actual outputs. */
+    DerivationOutputs aliasOutputs;
+
     /* User selected for running the builder. */
     std::unique_ptr<UserLock> buildUser;
 
@@ -958,6 +961,9 @@ private:
     /* Check that the derivation outputs all exist and register them
        as valid. */
     void registerOutputs();
+
+    /* Register the static aliases to the actual output paths if needed */
+    void registerAliases();
 
     /* Check that an output meets the requirements specified by the
        'outputChecks' attribute (or the legacy
@@ -1382,6 +1388,7 @@ void DerivationGoal::inputsRealised()
     }
 
     if (rewriteInputs && useDerivation) {
+        aliasOutputs = drv->outputs;
         rewriteDerivation(
             worker.store,
             *(dynamic_cast<Derivation *>(drv.get())),
@@ -3197,6 +3204,30 @@ PathSet parseReferenceSpecifiers(Store & store, const BasicDerivation & drv, con
     return result;
 }
 
+void DerivationGoal::registerAliases()
+{
+    std::map<string, ValidPathInfo> knownPathInfos;
+    for (auto & output: drv->outputs) {
+        auto pathInfo =
+          *worker.store.queryPathInfo(output.second.path);
+        knownPathInfos[output.first] = pathInfo;
+    }
+
+    ValidPathInfos aliasesInfos;
+
+    for (auto & staticOutput : aliasOutputs) {
+        auto aliasTarget = knownPathInfos[staticOutput.first];
+        auto srcPath = staticOutput.second.path;
+        if (srcPath != aliasTarget.path) {
+            debug(format("Registering alias %1% of %2%")
+                % aliasTarget.path
+                % srcPath);
+            auto aliasInfo = *(worker.store.createAlias(aliasTarget, srcPath));
+            aliasesInfos.emplace_back(aliasInfo);
+        }
+    }
+    worker.store.registerValidPaths(aliasesInfos);
+}
 
 void DerivationGoal::registerOutputs()
 {
@@ -3825,6 +3856,7 @@ void DerivationGoal::done(BuildResult::Status status, const string & msg)
     mcRunningBuilds.reset();
 
     if (result.success()) {
+        registerAliases();
         if (status == BuildResult::Built)
             worker.doneBuilds++;
     } else {
