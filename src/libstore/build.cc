@@ -1357,35 +1357,7 @@ void DerivationGoal::inputsRealised()
 
     // A map from the set of all the input paths of the derivation (inputSrcs
     // or outputs of a dependency drv) to their actual path.
-    PathMap directInputPaths;
-
-    /* First, the input derivations. */
-    if (useDerivation)
-        for (auto & i : dynamic_cast<Derivation *>(drv.get())->inputDrvs) {
-            /* Add the relevant output closures of the input derivation
-               `i' as input paths.  Only add the closures of output paths
-               that are specified as inputs. */
-            assert(worker.store.isValidPath(i.first));
-            Derivation inDrv = worker.store.derivationFromPath(i.first);
-            for (auto & j : i.second)
-                if (inDrv.outputs.find(j) != inDrv.outputs.end())
-                    directInputPaths.emplace(
-                        inDrv.outputs[j].path,
-                        worker.store.resolveAliases(inDrv.outputs[j].path)
-                    );
-                else
-                    throw Error(
-                        format("derivation '%1%' requires non-existent output '%2%' from input derivation '%3%'")
-                        % drvPath % j % i.first);
-        }
-
-    /* Second, the input sources. */
-    for (auto & inputSrc: drv->inputSrcs) {
-        directInputPaths.emplace(
-            inputSrc,
-            worker.store.resolveAliases(inputSrc)
-        );
-    }
+    PathMap directInputPaths = gatherInputPaths(worker.store, *(drv.get()), useDerivation);
 
     if (rewriteInputs && useDerivation) {
         if (wantedOutputs.empty()) {

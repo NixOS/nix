@@ -86,4 +86,42 @@ void rewriteDerivation(Store & store, Derivation & drv, const PathMap & pathRewr
     }
 }
 
+PathMap gatherInputPaths(Store & store, BasicDerivation & drv, bool isDerivation)
+{
+    PathMap directInputsPathMap;
+
+    // XXX: Make this non dummy
+    auto drvPath = "";
+
+    /* First, the input derivations. */
+    if (isDerivation)
+        for (auto & i : dynamic_cast<Derivation*>(&drv)->inputDrvs) {
+            /* Add the relevant output closures of the input derivation
+               `i' as input paths.  Only add the closures of output paths
+               that are specified as inputs. */
+            assert(store.isValidPath(i.first));
+            Derivation inDrv = store.derivationFromPath(i.first);
+            for (auto & j : i.second)
+                if (inDrv.outputs.find(j) != inDrv.outputs.end())
+                    directInputsPathMap.emplace(
+                        inDrv.outputs[j].path,
+                        store.resolveAliases(inDrv.outputs[j].path)
+                    );
+                else
+                    throw Error(
+                        format("derivation '%1%' requires non-existent output '%2%' from input derivation '%3%'")
+                        % drvPath % j % i.first);
+        }
+
+    /* Second, the input sources. */
+    for (auto & inputSrc: drv.inputSrcs) {
+        directInputsPathMap.emplace(
+            inputSrc,
+            store.resolveAliases(inputSrc)
+        );
+    }
+    return directInputsPathMap;
+
+}
+
 }

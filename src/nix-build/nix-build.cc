@@ -17,6 +17,7 @@
 #include "common-eval-args.hh"
 #include "attr-path.hh"
 #include "legacy.hh"
+#include "rewrite-derivation.hh"
 
 using namespace nix;
 using namespace std::string_literals;
@@ -335,6 +336,7 @@ static void _main(int argc, char * * argv)
            is not set, then build bashInteractive from
            <nixpkgs>. */
         auto shell = getEnv("NIX_BUILD_SHELL", "");
+        std::optional<DrvInfo> shellDrv;
 
         if (shell == "") {
 
@@ -344,13 +346,11 @@ static void _main(int argc, char * * argv)
                 Value v;
                 state->eval(expr, v);
 
-                auto drv = getDerivation(*state, v, false);
-                if (!drv)
+                shellDrv = getDerivation(*state, v, false);
+                if (!shellDrv)
                     throw Error("the 'bashInteractive' attribute in <nixpkgs> did not evaluate to a derivation");
 
-                pathsToBuild.insert(drv->queryDrvPath());
-
-                shell = drv->queryOutPath() + "/bin/bash";
+                pathsToBuild.insert(shellDrv->queryDrvPath());
 
             } catch (Error & e) {
                 printError("warning: %s; will use bash from your environment", e.what());
@@ -366,6 +366,16 @@ static void _main(int argc, char * * argv)
             pathsToBuild.insert(src);
 
         buildPaths(pathsToBuild);
+
+        if (shellDrv) {
+            shell = store->resolveAliases(shellDrv->queryOutPath()) + "/bin/bash";
+        }
+
+        rewriteDerivation(
+            *store,
+            drv,
+            gatherInputPaths(*store, drv, true)
+        );
 
         if (dryRun) return;
 
