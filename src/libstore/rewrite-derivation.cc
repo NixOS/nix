@@ -75,6 +75,10 @@ void rewriteDerivation(Store & store, Derivation & drv, const PathMap & pathRewr
     // backwards compatibility
     if (!rewrites.empty()) {
         drv.inputDrvs = {};
+        drv.inputSrcs = {};
+        for (auto & inputPathPair : pathRewrites) {
+            drv.inputSrcs.emplace(inputPathPair.second);
+        }
     }
 
     if (!drv.isFixedOutput()) {
