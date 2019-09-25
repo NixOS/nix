@@ -1388,7 +1388,14 @@ void DerivationGoal::inputsRealised()
     }
 
     if (rewriteInputs && useDerivation) {
-        aliasOutputs = drv->outputs;
+        if (wantedOutputs.empty()) {
+            aliasOutputs = drv->outputs;
+        }
+        else {
+            for (auto & outputName : wantedOutputs) {
+                aliasOutputs[outputName] = drv->outputs[outputName];
+            }
+        }
         rewriteDerivation(
             worker.store,
             *(dynamic_cast<Derivation *>(drv.get())),
@@ -3206,17 +3213,11 @@ PathSet parseReferenceSpecifiers(Store & store, const BasicDerivation & drv, con
 
 void DerivationGoal::registerAliases()
 {
-    std::map<string, ValidPathInfo> knownPathInfos;
-    for (auto & output: drv->outputs) {
-        auto pathInfo =
-          *worker.store.queryPathInfo(output.second.path);
-        knownPathInfos[output.first] = pathInfo;
-    }
-
     ValidPathInfos aliasesInfos;
 
     for (auto & staticOutput : aliasOutputs) {
-        auto aliasTarget = knownPathInfos[staticOutput.first];
+        auto aliasTarget =
+          *worker.store.queryPathInfo(drv->outputs[staticOutput.first].path);
         auto srcPath = staticOutput.second.path;
         if (srcPath != aliasTarget.path) {
             debug(format("Registering alias %1% of %2%")
