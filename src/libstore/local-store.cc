@@ -1442,13 +1442,13 @@ ref<ValidPathInfo> LocalStore::createAlias(const ValidPathInfo & destInfo, const
 
     // XXX: We currently need the alias path to exist for things like `--check`
     // to work nicely with it
-    writeFile(aliasPath, destInfo.path);
+    writeFile(toRealPath(aliasPath), destInfo.path);
 
     HashResult aliasHash;
 
     // XXX: Do we actualy need `scanForReferences` as we just want to compute
     // the hash?
-    scanForReferences(aliasPath, {}, aliasHash);
+    scanForReferences(toRealPath(aliasPath), {}, aliasHash);
     aliasInfo.narHash = aliasHash.first;
     aliasInfo.narSize = aliasHash.second;
     aliasInfo.path = aliasPath;
@@ -1463,22 +1463,23 @@ ref<ValidPathInfo> LocalStore::makeContentAddressed(ValidPathInfo & info) {
     debug("Moving to its actual location");
 
     auto aliasPath = info.path;
+    auto aliasRealPath = toRealPath(info.path);
     auto recursive = true;
     auto hashAlgo = htSHA256;
     auto pathName = storePathToName(aliasPath);
-    Hash contentHash = hashPath(hashAlgo, aliasPath).first;
+    Hash contentHash = hashPath(hashAlgo, aliasRealPath).first;
 
     Path casPath = makeFixedOutputPath(recursive, contentHash, pathName);
 
     // Move the path to its ca location
     // XXX: We could probably actually move it instead of copy it
-    if (!pathExists(casPath)) {
+    if (!pathExists(toRealPath(casPath))) {
         StringSink sink;
-        dumpPath(aliasPath, sink);
+        dumpPath(aliasRealPath, sink);
         StringSource source(*sink.s);
-        restorePath(casPath, source);
+        restorePath(toRealPath(casPath), source);
     };
-    deletePath(aliasPath);
+    deletePath(aliasRealPath);
 
     info.path = casPath;
 
