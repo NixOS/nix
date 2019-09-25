@@ -497,10 +497,10 @@ static void _main(int argc, char * * argv)
 
         for (auto & symlink : resultSymlinks)
             if (auto store2 = store.dynamic_pointer_cast<LocalFSStore>())
-                store2->addPermRoot(symlink.second, absPath(symlink.first), true);
+                store2->addPermRoot(store2->resolveAliases(symlink.second), absPath(symlink.first), true);
 
         for (auto & path : outPaths)
-            std::cout << path << '\n';
+            std::cout << store->resolveAliases(path) << '\n';
     }
 }
 
