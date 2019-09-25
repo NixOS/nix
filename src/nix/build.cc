@@ -60,10 +60,11 @@ struct CmdBuild : MixDryRun, InstallablesCommand
             if (outLink != "")
                 for (auto & output : b.outputs)
                     if (auto store2 = store.dynamic_pointer_cast<LocalFSStore>()) {
+                        auto realOutputPath = store2->resolveAliases(output.second);
                         std::string symlink = outLink;
                         if (i) symlink += fmt("-%d", i);
                         if (output.first != "out") symlink += fmt("-%s", output.first);
-                        store2->addPermRoot(output.second, absPath(symlink), true);
+                        store2->addPermRoot(realOutputPath, absPath(symlink), true);
                     }
         }
     }
