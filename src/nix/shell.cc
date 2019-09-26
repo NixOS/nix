@@ -245,7 +245,7 @@ struct CmdDevShell : Common
 
         stopProgressBar();
 
-        auto shell = getEnv("SHELL", "bash");
+        auto shell = string("bash");
 
         auto args = Strings{baseNameOf(shell), "--rcfile", rcFilePath};
 
