@@ -146,7 +146,7 @@ static FlakeRef lookupInRefMap(
     return flakeRef;
 }
 
-static SourceInfo fetchFlake(EvalState & state, const FlakeRef & resolvedRef)
+static SourceInfo fetchInput(EvalState & state, const FlakeRef & resolvedRef)
 {
     assert(resolvedRef.isDirect());
 
@@ -231,7 +231,7 @@ static Flake getFlake(EvalState & state, const FlakeRef & originalRef,
         maybeLookupFlake(state,
             lookupInRefMap(refMap, originalRef), allowLookup));
 
-    SourceInfo sourceInfo = fetchFlake(state, flakeRef);
+    SourceInfo sourceInfo = fetchInput(state, flakeRef);
     debug("got flake source '%s' with flakeref %s", sourceInfo.storePath, sourceInfo.resolvedRef.to_string());
 
     FlakeRef resolvedRef = sourceInfo.resolvedRef;
@@ -352,7 +352,7 @@ static SourceInfo getNonFlake(EvalState & state, const FlakeRef & originalRef,
         maybeLookupFlake(state,
             lookupInRefMap(refMap, originalRef), allowLookup));
 
-    auto sourceInfo = fetchFlake(state, flakeRef);
+    auto sourceInfo = fetchInput(state, flakeRef);
     debug("got non-flake source '%s' with flakeref %s", sourceInfo.storePath, sourceInfo.resolvedRef.to_string());
 
     FlakeRef resolvedRef = sourceInfo.resolvedRef;
@@ -566,6 +566,8 @@ static void prim_callFlake(EvalState & state, const Pos & pos, Value * * args, V
             sourceInfo.storePath, {sourceInfo.storePath});
 
         emitSourceInfoAttrs(state, sourceInfo, v);
+
+        v.attrs->sort();
     }
 }
 
