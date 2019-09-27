@@ -88,8 +88,8 @@ FlakeRef::FlakeRef(const std::string & uri_, bool allowRelative)
         return true;
     };
 
-    std::cmatch match;
-    if (std::regex_match(uri.c_str(), match, flakeRegex)) {
+    std::smatch match;
+    if (std::regex_match(uri, match, flakeRegex)) {
         IsId d;
         d.id = match[1];
         if (match[2].matched)
@@ -102,7 +102,7 @@ FlakeRef::FlakeRef(const std::string & uri_, bool allowRelative)
         data = d;
     }
 
-    else if (std::regex_match(uri.c_str(), match, githubRegex)) {
+    else if (std::regex_match(uri, match, githubRegex)) {
         IsGitHub d;
         d.owner = match[1];
         d.repo = match[2];
@@ -120,7 +120,7 @@ FlakeRef::FlakeRef(const std::string & uri_, bool allowRelative)
         data = d;
     }
 
-    else if (std::regex_match(uri.c_str(), match, uriRegex)) {
+    else if (std::regex_match(uri, match, uriRegex)) {
         auto & scheme = match[2];
         if (scheme == "git" ||
             scheme == "git+http" ||
