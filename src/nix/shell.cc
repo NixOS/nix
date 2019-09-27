@@ -7,55 +7,76 @@
 #include "affinity.hh"
 #include "progress-bar.hh"
 
+#include <regex>
+
 using namespace nix;
+
+struct Var
+{
+    bool exported;
+    std::string value; // quoted string or array
+};
 
 struct BuildEnvironment
 {
-    // FIXME: figure out which vars should be exported.
-    std::map<std::string, std::string> env;
-    std::map<std::string, std::string> functions;
+    std::map<std::string, Var> env;
+    std::string bashFunctions;
 };
 
 BuildEnvironment readEnvironment(const Path & path)
 {
     BuildEnvironment res;
 
-    auto lines = tokenizeString<Strings>(readFile(path), "\n");
+    std::set<std::string> exported;
 
-    auto getLine =
-        [&]() {
-            if (lines.empty())
-                throw Error("shell environment '%s' ends unexpectedly", path);
-            auto line = lines.front();
-            lines.pop_front();
-            return line;
-        };
+    auto file = readFile(path);
+    //auto file = readFile("/tmp/x");
 
-    while (!lines.empty()) {
-        auto line = getLine();
+    auto pos = file.cbegin();
 
-        auto eq = line.find('=');
-        if (eq != std::string::npos) {
-            std::string name(line, 0, eq);
-            std::string value(line, eq + 1);
-            // FIXME: parse arrays
-            res.env.insert({name, value});
+    static std::string varNameRegex =
+        R"re((?:[a-zA-Z_][a-zA-Z0-9_]*))re";
+
+    static std::regex declareRegex(
+        "^declare -x (" + varNameRegex + ")" +
+        R"re((?:="((?:[^"\\]|\\.)*)")?\n)re");
+
+    static std::string simpleStringRegex =
+        R"re((?:[a-zA-Z0-9_/:\.\-1\+]*))re";
+
+    static std::string quotedStringRegex =
+        R"re((?:\$?'[^']*'))re";
+
+    static std::string arrayRegex =
+        R"re((?:\(( *\[[^\]]+\]="(?:[^"\\]|\\.)*")*\)))re";
+
+    static std::regex varRegex(
+        "^(" + varNameRegex + ")=(" + simpleStringRegex + "|" + quotedStringRegex + "|" + arrayRegex + ")\n");
+
+    static std::regex functionRegex(
+        "^" + varNameRegex + " \\(\\) *\n");
+
+    while (pos != file.end()) {
+
+        std::smatch match;
+
+        if (std::regex_search(pos, file.cend(), match, declareRegex)) {
+            pos = match[0].second;
+            exported.insert(match[1]);
         }
 
-        else if (hasSuffix(line, " () ")) {
-            std::string name(line, 0, line.size() - 4);
-            // FIXME: validate name
-            auto l = getLine();
-            if (l != "{ ") throw Error("shell environment '%s' has unexpected line '%s'", path, l);
-            std::string body;
-            while ((l = getLine()) != "}") {
-                body += l;
-                body += '\n';
-            }
-            res.functions.insert({name, body});
+        else if (std::regex_search(pos, file.cend(), match, varRegex)) {
+            pos = match[0].second;
+            res.env.insert({match[1], Var { (bool) exported.count(match[1]), match[2] }});
         }
 
-        else throw Error("shell environment '%s' has unexpected line '%s'", path, line);
+        else if (std::regex_search(pos, file.cend(), match, functionRegex)) {
+            res.bashFunctions = std::string(pos, file.cend());
+            break;
+        }
+
+        else throw Error("shell environment '%s' has unexpected line '%s'",
+            path, file.substr(pos - file.cbegin(), 60));
     }
 
     return res;
@@ -72,7 +93,16 @@ Path getDerivationEnvironment(ref<Store> store, Derivation drv)
     if (builder != "bash")
         throw Error("'nix shell' only works on derivations that use 'bash' as their builder");
 
-    drv.args = {"-c", "set -e; export IN_NIX_SHELL=impure; export dontAddDisableDepTrack=1; if [[ -n $stdenv ]]; then source $stdenv/setup; fi; set > $out"};
+    drv.args = {
+        "-c",
+        "set -e; "
+        "export IN_NIX_SHELL=impure; "
+        "export dontAddDisableDepTrack=1; "
+        "if [[ -n $stdenv ]]; then "
+        "  source $stdenv/setup; "
+        "fi; "
+        "export > $out; "
+        "set >> $out "};
 
     /* Remove derivation checks. */
     drv.env.erase("allowedReferences");
@@ -146,18 +176,16 @@ struct Common : InstallableCommand, MixProfile
         out << "nix_saved_PATH=\"$PATH\"\n";
 
         for (auto & i : buildEnvironment.env) {
-            // FIXME: shellEscape
-            // FIXME: figure out what to export
-            // FIXME: handle arrays
-            if (!ignoreVars.count(i.first) && !hasPrefix(i.first, "BASH_"))
-                out << fmt("export %s=%s\n", i.first, i.second);
+            if (!ignoreVars.count(i.first) && !hasPrefix(i.first, "BASH_")) {
+                out << fmt("%s=%s\n", i.first, i.second.value);
+                if (i.second.exported)
+                    out << fmt("export %s\n", i.first);
+            }
         }
 
         out << "PATH=\"$PATH:$nix_saved_PATH\"\n";
 
-        for (auto & i : buildEnvironment.functions) {
-            out << fmt("%s () {\n%s\n}\n", i.first, i.second);
-        }
+        out << buildEnvironment.bashFunctions << "\n";
 
         // FIXME: set outputs
 
