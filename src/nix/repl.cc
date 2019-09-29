@@ -199,6 +199,33 @@ static int listPossibleCallback(char *s, char ***avp) {
   return ac;
 }
 
+#ifdef READLINE
+static char * completionEntry(const char * text, int state) {
+  rl_completion_suppress_append = 1;
+
+  static char** completions = nullptr;
+  static int index, count;
+
+  if (!state) {
+    if (completions) {
+      free(completions);
+      completions = nullptr;
+    }
+    count = listPossibleCallback((char*)text, &completions);
+    index = 0;
+    return completionEntry(text, 1);
+  } else {
+    return index < count ? completions[index++] : NULL;
+  }
+}
+
+static char ** completionAttempted(const char * text, int start, int end) {
+  rl_attempted_completion_over = 1;
+
+  return rl_completion_matches(text, completionEntry);
+}
+#endif
+
 namespace {
     // Used to communicate to NixRepl::getLine whether a signal occurred in ::readline.
     volatile sig_atomic_t g_signal_received = 0;
@@ -230,6 +257,10 @@ void NixRepl::mainLoop(const std::vector<std::string> & files)
 #ifndef READLINE
     rl_set_complete_func(completionCallback);
     rl_set_list_possib_func(listPossibleCallback);
+#else
+    rl_completion_entry_function = completionEntry;
+    rl_attempted_completion_function = completionAttempted;
+    rl_completion_query_items = -1;
 #endif
 
     std::string input;
