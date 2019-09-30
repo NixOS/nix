@@ -783,7 +783,11 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
             assertStorePath(i);
             tryToDelete(state, i);
             if (state.dead.find(i) == state.dead.end())
-                throw Error(format("cannot delete path '%1%' since it is still alive") % i);
+                throw Error(format(
+                    "cannot delete path '%1%' since it is still alive. "
+                    "To find out why use: "
+                    "nix-store --query --roots"
+                    ) % i);
         }
 
     } else if (options.maxFreed > 0) {
