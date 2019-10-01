@@ -4061,6 +4061,8 @@ void SubstitutionGoal::tryNext()
     for (auto & i : info->references)
         if (i != storePath) /* ignore self-references */
             addWaitee(worker.makeSubstitutionGoal(i));
+    if (!info->aliasOf.empty())
+        addWaitee(worker.makeSubstitutionGoal(info->aliasOf));
 
     if (waitees.empty()) /* to prevent hang (no wake-up event) */
         referencesValid();
