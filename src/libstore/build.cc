@@ -1634,6 +1634,9 @@ void DerivationGoal::buildDone()
         /* Compute the FS closure of the outputs and register them as
            being valid. */
         registerOutputs();
+        if (curRound == nrRounds) {
+            registerAliases();
+        }
 
         if (settings.postBuildHook != "") {
             Activity act(*logger, lvlInfo, actPostBuildHook,
@@ -1641,6 +1644,9 @@ void DerivationGoal::buildDone()
                 Logger::Fields{drvPath});
             PushActivity pact(act.id);
             auto outputPaths = drv->outputPaths();
+            for (auto & aliasPath : aliasOutputs) {
+              outputPaths.emplace(aliasPath.second.path);
+            }
             std::map<std::string, std::string> hookEnvironment = getEnv();
 
             hookEnvironment.emplace("DRV_PATH", drvPath);
