@@ -157,6 +157,11 @@ AX_BOOST_BASE([1.66], [CXXFLAGS="$BOOST_CPPFLAGS $CXXFLAGS"], [AC_MSG_ERROR([Nix
 # ends up with LDFLAGS being empty, so we set it afterwards.
 LDFLAGS="$BOOST_LDFLAGS $LDFLAGS"
 
+# Boost atomic needs GCC libatomic on 32-bit ARM
+case "$host_cpu" in
+  armv5*|armv6*|armv7*) LIBS="-latomic $LIBS"
+esac
+
 
 # Look for OpenSSL, a required dependency.
 PKG_CHECK_MODULES([OPENSSL], [libcrypto], [CXXFLAGS="$OPENSSL_CFLAGS $CXXFLAGS"])
