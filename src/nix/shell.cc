@@ -157,6 +157,7 @@ struct Common : InstallableCommand, MixProfile
         "HOME", // FIXME: don't ignore in pure mode?
         "NIX_BUILD_TOP",
         "NIX_ENFORCE_PURITY",
+        "NIX_LOG_FD",
         "PPID",
         "PWD",
         "SHELLOPTS",
