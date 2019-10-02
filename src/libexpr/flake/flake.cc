@@ -574,8 +574,9 @@ static void prim_callFlake(EvalState & state, const Pos & pos, Value * * args, V
 void callFlake(EvalState & state,
     const Flake & flake,
     const LockedInputs & lockedInputs,
-    Value & vRes)
+    Value & vResFinal)
 {
+    auto & vRes = *state.allocValue();
     auto & vInputs = *state.allocValue();
 
     state.mkAttrs(vInputs, flake.inputs.size() + 1);
@@ -617,6 +618,8 @@ void callFlake(EvalState & state,
     state.callFunction(vCall, *flake.vOutputs, vCall2, noPos);
     state.callFunction(vCall2, vInputs, vCall3, noPos);
     state.callFunction(vCall3, vSourceInfo, vRes, noPos);
+
+    vResFinal = vRes;
 }
 
 void callFlake(EvalState & state,
