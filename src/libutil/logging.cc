@@ -54,7 +54,7 @@ public:
             prefix = std::string("<") + c + ">";
         }
 
-        writeToStderr(prefix + filterANSIEscapes(fs.s, !tty) + "\n");
+        writeToStderr(prefix + filterANSIEscapes(fs.s, !tty && (getEnv("NIX_FORCE_COLOR") != "1")) + "\n");
     }
 
     void startActivity(ActivityId act, Verbosity lvl, ActivityType type,

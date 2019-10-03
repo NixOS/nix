@@ -196,6 +196,15 @@ $ mount -o bind /mnt/otherdisk/nix /nix</screen>
 </varlistentry>
 
 
+<varlistentry><term><envar>NIX_FORCE_COLOR</envar></term>
+
+ <listitem><para>Forces the Nix process to not strip any ANSI sequences
+ from the output to <literal>stderr</literal>. Especially helpful for a
+ <command>nix-daemon</command> on a remote builder.</para></listitem>
+
+</varlistentry>
+
+
 </variablelist>
 
 
