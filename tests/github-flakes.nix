@@ -1,6 +1,9 @@
-{ nixpkgs, system, nix }:
+{ nixpkgs, system, overlay }:
 
-with import (nixpkgs + "/nixos/lib/testing.nix") { inherit system; };
+with import (nixpkgs + "/nixos/lib/testing.nix") {
+  inherit system;
+  extraConfigurations = [ { nixpkgs.overlays = [ overlay ]; } ];
+};
 
 let
 
@@ -101,7 +104,6 @@ makeTest (
         { config, pkgs, nodes, ... }:
         { virtualisation.writableStore = true;
           virtualisation.pathsInNixDB = [ pkgs.hello pkgs.fuse ];
-          nix.package = nix;
           nix.binaryCaches = [ ];
           environment.systemPackages = [ pkgs.jq ];
           networking.hosts.${(builtins.head nodes.github.config.networking.interfaces.eth1.ipv4.addresses).address} =
@@ -135,11 +137,11 @@ makeTest (
       my $date = $client->succeed("nix flake info nixpkgs --json | jq -M .lastModified");
       strftime("%Y%m%d%H%M%S", gmtime($date)) eq "${nixpkgs.lastModified}" or die "time mismatch";
 
-      $client->succeed("nix build nixpkgs:hello");
+      $client->succeed("nix build nixpkgs#hello");
 
       # The build shouldn't fail even with --tarball-ttl 0 (the server
       # being down should not be a fatal error).
-      $client->succeed("nix build nixpkgs:fuse --tarball-ttl 0");
+      $client->succeed("nix build nixpkgs#fuse --tarball-ttl 0");
     '';
 
 })
