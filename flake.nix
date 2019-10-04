@@ -93,11 +93,11 @@
 
     in {
 
-      # A Nixpkgs overlay that overrides the 'nix' and 'nix-perl'
-      # packages.
+      # A Nixpkgs overlay that overrides the 'nix' and
+      # 'nix.perl-bindings' packages.
       overlay = final: prev: {
 
-        nix = with final; with commonDeps pkgs; releaseTools.nixBuild {
+        nix = with final; with commonDeps pkgs; (releaseTools.nixBuild {
           name = "nix";
           src = self.hydraJobs.tarball;
 
@@ -127,24 +127,26 @@
 
           doInstallCheck = true;
           installCheckFlags = "sysconfdir=$(out)/etc";
-        };
+        }) // {
 
-        nix-perl = with final; releaseTools.nixBuild {
-          name = "nix-perl";
-          src = self.hydraJobs.tarball;
+          perl-bindings = with final; releaseTools.nixBuild {
+            name = "nix-perl";
+            src = self.hydraJobs.tarball;
 
-          buildInputs =
-            [ nix curl bzip2 xz pkgconfig pkgs.perl boost ]
-            ++ lib.optional (stdenv.isLinux || stdenv.isDarwin) libsodium;
+            buildInputs =
+              [ nix curl bzip2 xz pkgconfig pkgs.perl boost ]
+              ++ lib.optional (stdenv.isLinux || stdenv.isDarwin) libsodium;
 
-          configureFlags = ''
-            --with-dbi=${perlPackages.DBI}/${pkgs.perl.libPrefix}
-            --with-dbd-sqlite=${perlPackages.DBDSQLite}/${pkgs.perl.libPrefix}
-          '';
+            configureFlags = ''
+              --with-dbi=${perlPackages.DBI}/${pkgs.perl.libPrefix}
+              --with-dbd-sqlite=${perlPackages.DBDSQLite}/${pkgs.perl.libPrefix}
+            '';
 
-          enableParallelBuilding = true;
+            enableParallelBuilding = true;
 
-          postUnpack = "sourceRoot=$sourceRoot/perl";
+            postUnpack = "sourceRoot=$sourceRoot/perl";
+          };
+
         };
 
       };
@@ -197,7 +199,7 @@
         build = nixpkgs.lib.genAttrs systems (system: nixpkgsFor.${system}.nix);
 
         # Perl bindings for various platforms.
-        perlBindings = nixpkgs.lib.genAttrs systems (system: nixpkgsFor.${system}.nix-perl);
+        perlBindings = nixpkgs.lib.genAttrs systems (system: nixpkgsFor.${system}.nix.perl-bindings);
 
         # Binary tarball for various platforms, containing a Nix store
         # with the closure of 'nix' package, and the second half of
@@ -429,7 +431,7 @@
       };
 
       packages = {
-        inherit (nixpkgsFor.x86_64-linux) nix nix-perl;
+        inherit (nixpkgsFor.x86_64-linux) nix;
       };
 
       defaultPackage = self.packages.nix;
