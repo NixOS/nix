@@ -229,7 +229,7 @@ struct ConnectionHandle
 
     ~ConnectionHandle()
     {
-        if (!daemonException && std::uncaught_exceptions()) {
+        if (!daemonException && std::uncaught_exception()) {
             handle.markBad();
             debug("closing daemon connection because of an exception");
         }
