@@ -101,6 +101,8 @@
           name = "nix";
           src = self.hydraJobs.tarball;
 
+          outputs = [ "out" "dev" ];
+
           buildInputs = buildDeps;
 
           preConfigure =
