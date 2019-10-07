@@ -33,13 +33,19 @@ GitInfo exportGit(ref<Store> store, std::string uri,
     // or revision is given, then allow the use of an unclean working
     // tree.
     if (!ref && !rev && isLocal) {
-        bool clean = true;
+        bool clean = false;
+
+        /* Check whether this repo has any commits. There are
+           probably better ways to do this. */
+        bool haveCommits = !readDirectory(uri + "/.git/refs/heads").empty();
 
         try {
-            runProgram("git", true, { "-C", uri, "diff-index", "--quiet", "HEAD", "--" });
+            if (haveCommits) {
+                runProgram("git", true, { "-C", uri, "diff-index", "--quiet", "HEAD", "--" });
+                clean = true;
+            }
         } catch (ExecError & e) {
             if (!WIFEXITED(e.status) || WEXITSTATUS(e.status) != 1) throw;
-            clean = false;
         }
 
         if (!clean) {
@@ -75,10 +81,10 @@ GitInfo exportGit(ref<Store> store, std::string uri,
             };
 
             gitInfo.storePath = store->addToStore("source", uri, true, htSHA256, filter);
-            gitInfo.revCount = std::stoull(runProgram("git", true, { "-C", uri, "rev-list", "--count", "HEAD" }));
+            gitInfo.revCount = haveCommits ? std::stoull(runProgram("git", true, { "-C", uri, "rev-list", "--count", "HEAD" })) : 0;
             // FIXME: maybe we should use the timestamp of the last
             // modified dirty file?
-            gitInfo.lastModified = std::stoull(runProgram("git", true, { "-C", uri, "show", "-s", "--format=%ct", "HEAD" }));
+            gitInfo.lastModified = haveCommits ? std::stoull(runProgram("git", true, { "-C", uri, "show", "-s", "--format=%ct", "HEAD" })) : 0;
 
             return gitInfo;
         }
