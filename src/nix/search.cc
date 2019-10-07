@@ -80,10 +80,6 @@ struct CmdSearch : SourceExprCommand, MixJSON
             Example{
                 "To search for git and frontend or gui:",
                 "nix search git 'frontend|gui'"
-            },
-            Example{
-                "To display the description of the found packages:",
-                "nix search git --verbose"
             }
         };
     }
