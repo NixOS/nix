@@ -30,7 +30,6 @@ BuildEnvironment readEnvironment(const Path & path)
     std::set<std::string> exported;
 
     auto file = readFile(path);
-    //auto file = readFile("/tmp/x");
 
     auto pos = file.cbegin();
 
