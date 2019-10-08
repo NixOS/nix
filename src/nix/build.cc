@@ -52,8 +52,6 @@ struct CmdBuild : MixDryRun, MixProfile, InstallablesCommand
     {
         auto buildables = build(store, dryRun ? DryRun : Build, installables);
 
-        auto evalState = std::make_shared<EvalState>(searchPath, store);
-        evalState->addRegistryOverrides(registryOverrides);
         if (dryRun) return;
 
         if (outLink != "") {

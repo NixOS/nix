@@ -56,8 +56,10 @@ SourceExprCommand::SourceExprCommand()
 
 ref<EvalState> EvalCommand::getEvalState()
 {
-    if (!evalState)
+    if (!evalState) {
         evalState = std::make_shared<EvalState>(searchPath, getStore());
+        evalState->addRegistryOverrides(registryOverrides);
+    }
     return ref<EvalState>(evalState);
 }
 
