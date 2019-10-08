@@ -659,7 +659,7 @@ upgrading `mozilla-1.2' to `mozilla-1.4'</screen>
 <literal>gcc-3.3.1</literal> are split into two parts: the package
 name (<literal>gcc</literal>), and the version
 (<literal>3.3.1</literal>).  The version part starts after the first
-dash not following by a letter.  <varname>x</varname> is considered an
+dash not followed by a letter.  <varname>x</varname> is considered an
 upgrade of <varname>y</varname> if their package names match, and the
 version of <varname>y</varname> is higher that that of
 <varname>x</varname>.</para>
