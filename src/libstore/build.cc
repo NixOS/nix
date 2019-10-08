@@ -3232,6 +3232,21 @@ void DerivationGoal::registerOutputs()
 
     std::exception_ptr delayedException;
 
+    std::map<string, string> normalizedHashes;
+    std::set<string> hashesToErase;
+    for (auto & output : drv->outputs) {
+        hashesToErase.emplace(output.second.path);
+    }
+    for (auto & output : drv->outputs) {
+        normalizedHashes[output.second.path] =
+            worker.store.makeOutputPath(
+                    output.first,
+                    hashModuloReferences(output.second.path, hashesToErase),
+                    storePathToName(output.second.path)
+            );
+
+    }
+
     /* Check whether the output paths were created, and grep each
        output path to determine what other paths it references.  Also make all
        output paths read-only. */
@@ -3294,13 +3309,7 @@ void DerivationGoal::registerOutputs()
                something like that. */
             canonicalisePathMetaData(actualPath, buildUser ? buildUser->getUID() : -1, inodesSeen);
 
-            /* FIXME: this is in-memory. */
-            StringSink sink;
-            dumpPath(actualPath, sink);
-            deletePath(actualPath);
-            sink.s = make_ref<std::string>(rewriteStrings(*sink.s, outputRewrites));
-            StringSource source(*sink.s);
-            restorePath(actualPath, source);
+            rewriteInPath(actualPath, actualPath, outputRewrites);
 
             rewritten = true;
         }
@@ -3432,7 +3441,7 @@ void DerivationGoal::registerOutputs()
          * place and update the path info
          */
         if (contentAddressed) {
-            auto aliasInfo = *(worker.store.makeContentAddressed(info));
+            auto aliasInfo = *(worker.store.makeContentAddressed(info, normalizedHashes));
             infos["cas-of-" + i.first] = aliasInfo;
         }
 

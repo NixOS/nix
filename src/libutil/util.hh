@@ -537,4 +537,8 @@ typedef std::function<bool(const Path & path)> PathFilter;
 extern PathFilter defaultPathFilter;
 
 
+typedef std::map<std::string, std::string> StringRewrites;
+
+std::string rewriteStrings(std::string s, const StringRewrites & rewrites);
+
 }

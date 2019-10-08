@@ -118,5 +118,29 @@ PathSet scanForReferences(const string & path,
     return found;
 }
 
+void rewriteReferences(StringSink & input, const StringRewrites & rewrites) {
+    input.s = make_ref<std::string>(rewriteStrings(*input.s, rewrites));
+}
+
+void rewriteInPath(Path input, Path output, const StringRewrites & rewrites) {
+    /* FIXME: this is in-memory. */
+    StringSink sink;
+    dumpPath(input, sink);
+    deletePath(input);
+    rewriteReferences(sink, rewrites);
+    StringSource source(*sink.s);
+    restorePath(output, source);
+}
+
+Hash hashModuloReferences(Path input, const std::set<std::string> & hashesToErase) {
+    StringRewrites rewrites;
+    for (auto & i : hashesToErase) {
+        rewrites[i] = "";
+    }
+    StringSink sink;
+    dumpPath(input, sink);
+    rewriteReferences(sink, rewrites);
+    return hashString(htSHA256, *sink.s);
+}
 
 }

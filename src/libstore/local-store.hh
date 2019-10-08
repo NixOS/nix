@@ -293,7 +293,7 @@ private:
 
     ref<ValidPathInfo> createAlias(const ValidPathInfo & destInfo, const Path & aliasPath);
 
-    ref<ValidPathInfo> makeContentAddressed(ValidPathInfo & info);
+    ref<ValidPathInfo> makeContentAddressed(ValidPathInfo & info, StringRewrites & normalizedHashes);
 
     Path getRealStoreDir() override { return realStoreDir; }
 

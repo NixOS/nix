@@ -11,6 +11,7 @@ let
     PATH = "";
     goodPath = "${path}:${toString seed}";
     contentAddressed = true;
+    MSG = "Hello from ${placeholder "out"}";
   };
   dependent = mkDerivation {
     name = "dependent";

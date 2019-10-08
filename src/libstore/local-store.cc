@@ -1459,29 +1459,37 @@ ref<ValidPathInfo> LocalStore::createAlias(const ValidPathInfo & destInfo, const
     return make_ref<ValidPathInfo>(aliasInfo);
 }
 
-ref<ValidPathInfo> LocalStore::makeContentAddressed(ValidPathInfo & info) {
+ref<ValidPathInfo> LocalStore::makeContentAddressed(ValidPathInfo & info, StringRewrites & normalizedHashes) {
     debug("Moving to its actual location");
 
     auto aliasPath = info.path;
     auto aliasRealPath = toRealPath(info.path);
-    auto recursive = true;
-    auto hashAlgo = htSHA256;
     auto pathName = storePathToName(aliasPath);
-    Hash contentHash = hashPath(hashAlgo, aliasRealPath).first;
 
-    Path casPath = makeFixedOutputPath(recursive, contentHash, pathName);
+    Path casPath = normalizedHashes[aliasPath];
 
-    // Move the path to its ca location
-    // XXX: We could probably actually move it instead of copy it
+    // Move the path to its ca location, rewriting hashes if needed
     if (!pathExists(toRealPath(casPath))) {
-        StringSink sink;
-        dumpPath(aliasRealPath, sink);
-        StringSource source(*sink.s);
-        restorePath(toRealPath(casPath), source);
+        rewriteInPath(aliasRealPath, toRealPath(casPath), normalizedHashes);
     };
     deletePath(aliasRealPath);
 
     info.path = casPath;
+
+    auto myHash = hashPath(htSHA256, casPath);
+    info.narHash = myHash.first;
+    info.narSize = myHash.second;
+
+    PathSet references2;
+    for (auto & ref : info.references) {
+        auto rewrite = normalizedHashes.find(ref);
+        if (rewrite != normalizedHashes.end()) {
+            references2.insert(rewrite->second);
+        } else {
+            references2.emplace(ref);
+        }
+    }
+    info.references = references2;
 
     return createAlias(info, aliasPath);
 }
