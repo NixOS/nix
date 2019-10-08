@@ -19,21 +19,21 @@ using namespace nix::flake;
 
 class FlakeCommand : virtual Args, public EvalCommand, public MixFlakeOptions
 {
-    std::string flakeUri = ".";
+    std::string flakeUrl = ".";
 
 public:
 
     FlakeCommand()
     {
-        expectArg("flake-uri", &flakeUri, true);
+        expectArg("flake-url", &flakeUrl, true);
     }
 
     FlakeRef getFlakeRef()
     {
-        if (flakeUri.find('/') != std::string::npos || flakeUri == ".")
-            return FlakeRef(flakeUri, true);
+        if (flakeUrl.find('/') != std::string::npos || flakeUrl == ".")
+            return FlakeRef(flakeUrl, true);
         else
-            return FlakeRef(flakeUri);
+            return FlakeRef(flakeUrl);
     }
 
     Flake getFlake()
@@ -74,7 +74,7 @@ struct CmdFlakeList : EvalCommand
 
 static void printSourceInfo(const SourceInfo & sourceInfo)
 {
-    std::cout << fmt("URI:           %s\n", sourceInfo.resolvedRef.to_string());
+    std::cout << fmt("URL:           %s\n", sourceInfo.resolvedRef.to_string());
     if (sourceInfo.resolvedRef.ref)
         std::cout << fmt("Branch:        %s\n",*sourceInfo.resolvedRef.ref);
     if (sourceInfo.resolvedRef.rev)
@@ -89,7 +89,7 @@ static void printSourceInfo(const SourceInfo & sourceInfo)
 
 static void sourceInfoToJson(const SourceInfo & sourceInfo, nlohmann::json & j)
 {
-    j["uri"] = sourceInfo.resolvedRef.to_string();
+    j["url"] = sourceInfo.resolvedRef.to_string();
     if (sourceInfo.resolvedRef.ref)
         j["branch"] = *sourceInfo.resolvedRef.ref;
     if (sourceInfo.resolvedRef.rev)
@@ -454,7 +454,7 @@ struct CmdFlakeCheck : FlakeCommand, MixJSON
 struct CmdFlakeAdd : MixEvalArgs, Command
 {
     FlakeUri alias;
-    FlakeUri uri;
+    FlakeUri url;
 
     std::string description() override
     {
@@ -464,7 +464,7 @@ struct CmdFlakeAdd : MixEvalArgs, Command
     CmdFlakeAdd()
     {
         expectArg("alias", &alias);
-        expectArg("flake-uri", &uri);
+        expectArg("flake-url", &url);
     }
 
     void run() override
@@ -473,7 +473,7 @@ struct CmdFlakeAdd : MixEvalArgs, Command
         Path userRegistryPath = getUserRegistryPath();
         auto userRegistry = readRegistry(userRegistryPath);
         userRegistry->entries.erase(aliasRef);
-        userRegistry->entries.insert_or_assign(aliasRef, FlakeRef(uri));
+        userRegistry->entries.insert_or_assign(aliasRef, FlakeRef(url));
         writeRegistry(*userRegistry, userRegistryPath);
     }
 };

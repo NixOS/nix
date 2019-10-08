@@ -89,19 +89,19 @@ cat > $registry <<EOF
 {
     "flakes": {
         "flake1": {
-            "uri": "file://$flake1Dir"
+            "url": "file://$flake1Dir"
         },
         "flake2": {
-            "uri": "file://$flake2Dir"
+            "url": "file://$flake2Dir"
         },
         "flake3": {
-            "uri": "file://$flake3Dir"
+            "url": "file://$flake3Dir"
         },
         "flake4": {
-            "uri": "flake3"
+            "url": "flake3"
         },
         "nixpkgs": {
-            "uri": "flake1"
+            "url": "flake1"
         }
     },
     "version": 1
@@ -112,12 +112,12 @@ EOF
 (( $(nix flake list --flake-registry $registry | wc -l) == 5 ))
 
 # Test 'nix flake info'.
-nix flake info --flake-registry $registry flake1 | grep -q 'URI: .*flake1.*'
+nix flake info --flake-registry $registry flake1 | grep -q 'URL: .*flake1.*'
 
 # Test 'nix flake info' on a local flake.
-(cd $flake1Dir && nix flake info --flake-registry $registry) | grep -q 'URI: .*flake1.*'
-(cd $flake1Dir && nix flake info --flake-registry $registry .) | grep -q 'URI: .*flake1.*'
-nix flake info --flake-registry $registry $flake1Dir | grep -q 'URI: .*flake1.*'
+(cd $flake1Dir && nix flake info --flake-registry $registry) | grep -q 'URL: .*flake1.*'
+(cd $flake1Dir && nix flake info --flake-registry $registry .) | grep -q 'URL: .*flake1.*'
+nix flake info --flake-registry $registry $flake1Dir | grep -q 'URL: .*flake1.*'
 
 # Test 'nix flake info --json'.
 json=$(nix flake info --flake-registry $registry flake1 --json | jq .)
@@ -234,7 +234,7 @@ cat > $flake3Dir/flake.nix <<EOF
     flake1 = {};
     flake2 = {};
     nonFlake = {
-      uri = "$nonFlakeDir";
+      url = "$nonFlakeDir";
       flake = false;
     };
   };
@@ -299,7 +299,7 @@ cat > $flake3Dir/flake.nix <<EOF
 
   inputs = {
     nonFlake = {
-      uri = "$nonFlakeDir";
+      url = "$nonFlakeDir";
       flake = false;
     };
   };

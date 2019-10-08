@@ -3,8 +3,8 @@
         "nixpkgs": {
             "inputs": {},
             "narHash": "sha256-ltGlDPfwicH/u4orj1n4JXgRsA+jvKQsGnekObi0TV4=",
-            "originalUri": "nixpkgs/release-19.03",
-            "uri": "github:edolstra/nixpkgs/9a593b575e4044f9aff939b512e7cb1cf1e76a65"
+            "originalUrl": "nixpkgs/release-19.03",
+            "url": "github:edolstra/nixpkgs/9a593b575e4044f9aff939b512e7cb1cf1e76a65"
         }
     },
     "version": 3

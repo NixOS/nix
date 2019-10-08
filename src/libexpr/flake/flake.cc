@@ -34,8 +34,14 @@ std::shared_ptr<FlakeRegistry> readRegistry(const Path & path)
         throw Error("flake registry '%s' has unsupported version %d", path, version);
 
     auto flakes = json["flakes"];
-    for (auto i = flakes.begin(); i != flakes.end(); ++i)
-        registry->entries.emplace(i.key(), FlakeRef(i->value("uri", "")));
+    for (auto i = flakes.begin(); i != flakes.end(); ++i) {
+        // FIXME: remove 'uri' soon.
+        auto url = i->value("url", i->value("uri", ""));
+        if (url.empty())
+            throw Error("flake registry '%s' lacks a 'url' attribute for entry '%s'",
+                path, i.key());
+        registry->entries.emplace(i.key(), url);
+    }
 
     return registry;
 }
@@ -46,7 +52,7 @@ void writeRegistry(const FlakeRegistry & registry, const Path & path)
     nlohmann::json json;
     json["version"] = 1;
     for (auto elem : registry.entries)
-        json["flakes"][elem.first.to_string()] = { {"uri", elem.second.to_string()} };
+        json["flakes"][elem.first.to_string()] = { {"url", elem.second.to_string()} };
     createDirs(dirOf(path));
     writeFile(path, json.dump(4)); // The '4' is the number of spaces used in the indentation in the json file.
 }
@@ -283,7 +289,8 @@ static Flake getFlake(EvalState & state, const FlakeRef & originalRef,
     }
 
     auto sInputs = state.symbols.create("inputs");
-    auto sUri = state.symbols.create("uri");
+    auto sUrl = state.symbols.create("url");
+    auto sUri = state.symbols.create("uri"); // FIXME: remove soon
     auto sFlake = state.symbols.create("flake");
 
     if (std::optional<Attr *> inputs = vInfo.attrs->get(sInputs)) {
@@ -295,7 +302,7 @@ static Flake getFlake(EvalState & state, const FlakeRef & originalRef,
             FlakeInput input(FlakeRef(inputAttr.name));
 
             for (Attr attr : *(inputAttr.value->attrs)) {
-                if (attr.name == sUri) {
+                if (attr.name == sUrl || attr.name == sUri) {
                     expectType(state, tString, *attr.value, *attr.pos);
                     input.ref = std::string(attr.value->string.s);
                 } else if (attr.name == sFlake) {

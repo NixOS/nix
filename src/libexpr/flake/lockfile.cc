@@ -5,8 +5,8 @@ namespace nix::flake {
 
 LockedInput::LockedInput(const nlohmann::json & json)
     : LockedInputs(json)
-    , ref(json["uri"])
-    , originalRef(json["originalUri"])
+    , ref(json.value("url", json.value("uri", "")))
+    , originalRef(json.value("originalUrl", json.value("originalUri", "")))
     , narHash(Hash((std::string) json["narHash"]))
 {
     if (!ref.isImmutable())
@@ -16,8 +16,8 @@ LockedInput::LockedInput(const nlohmann::json & json)
 nlohmann::json LockedInput::toJson() const
 {
     auto json = LockedInputs::toJson();
-    json["uri"] = ref.to_string();
-    json["originalUri"] = originalRef.to_string();
+    json["url"] = ref.to_string();
+    json["originalUrl"] = originalRef.to_string();
     json["narHash"] = narHash.to_string(SRI);
     return json;
 }
