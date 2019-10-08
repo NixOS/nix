@@ -289,7 +289,7 @@ if builtins ? getEnv then builtins.getEnv "PATH" else ""</programlisting>
 
     <listitem><para>Return element <replaceable>n</replaceable> from
     the list <replaceable>xs</replaceable>.  Elements are counted
-    starting from 0.  A fatal error occurs in the index is out of
+    starting from 0.  A fatal error occurs if the index is out of
     bounds.</para></listitem>
 
   </varlistentry>
@@ -1466,7 +1466,7 @@ in foo</programlisting>
       <listitem><para>A set containing <literal>{ __toString = self: ...; }</literal>.</para></listitem>
       <listitem><para>An integer.</para></listitem>
       <listitem><para>A list, in which case the string representations of its elements are joined with spaces.</para></listitem>
-      <listitem><para>A Boolean (<literal>false</literal> yields <literal>""</literal>, <literal>true</literal> yields <literal>"1"</literal>.</para></listitem>
+      <listitem><para>A Boolean (<literal>false</literal> yields <literal>""</literal>, <literal>true</literal> yields <literal>"1"</literal>).</para></listitem>
       <listitem><para><literal>null</literal>, which yields the empty string.</para></listitem>
     </itemizedlist>
     </listitem>
