@@ -1,5 +1,5 @@
 %glr-parser
-%pure-parser
+%define api.pure
 %locations
 %define parse.error verbose
 %defines
