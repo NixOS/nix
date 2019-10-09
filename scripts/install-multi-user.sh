@@ -540,12 +540,6 @@ create_directories() {
     _sudo "to make the basic directory structure of Nix (part 3)" \
           chgrp "$NIX_BUILD_GROUP_NAME" /nix/store
 
-    _sudo "to set up the root user's profile (part 1)" \
-          mkdir -pv -m 0755 /nix/var/nix/profiles/per-user/root
-
-    _sudo "to set up the root user's profile (part 2)" \
-          mkdir -pv -m 0700 "$ROOT_HOME/.nix-defexpr"
-
     _sudo "to place the default nix daemon configuration (part 1)" \
           mkdir -pv -m 0555 /etc/nix
 }
