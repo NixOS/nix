@@ -7,17 +7,6 @@ if [ -n "$HOME" ] && [ -n "$USER" ]; then
 
     NIX_USER_PROFILE_DIR=@localstatedir@/nix/profiles/per-user/$USER
 
-    if [ -w "$HOME" ]; then
-        # Set up a default Nix expression from which to install stuff.
-        __nix_defexpr="$HOME"/.nix-defexpr
-        [ -L "$__nix_defexpr" ] && rm -f "$__nix_defexpr"
-        mkdir -m 0755 -p "$__nix_defexpr"
-        if [ "$USER" != root ] && [ ! -L "$__nix_defexpr"/channels_root ]; then
-            ln -s @localstatedir@/nix/profiles/per-user/root/channels "$__nix_defexpr"/channels_root
-        fi
-        unset __nix_defexpr
-    fi
-
     # Append ~/.nix-defexpr/channels to $NIX_PATH so that <nixpkgs>
     # paths work when the user has fetched the Nixpkgs channel.
     export NIX_PATH=${NIX_PATH:+$NIX_PATH:}$HOME/.nix-defexpr/channels
