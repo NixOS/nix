@@ -6,15 +6,6 @@ export NIX_USER_PROFILE_DIR="@localstatedir@/nix/profiles/per-user/$USER"
 export NIX_PROFILES="@localstatedir@/nix/profiles/default $HOME/.nix-profile"
 
 if test -w $HOME; then
-  if ! test -L $HOME/.nix-profile; then
-      if test "$USER" != root; then
-          ln -s $NIX_USER_PROFILE_DIR/profile $HOME/.nix-profile
-      else
-          # Root installs in the system-wide profile by default.
-          ln -s @localstatedir@/nix/profiles/default $HOME/.nix-profile
-      fi
-  fi
-
   # Set up a default Nix expression from which to install stuff.
   if [ ! -e $HOME/.nix-defexpr -o -L $HOME/.nix-defexpr ]; then
       rm -f $HOME/.nix-defexpr
