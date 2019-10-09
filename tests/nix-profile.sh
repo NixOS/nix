@@ -10,5 +10,3 @@ USER=$user $SHELL -e -c ". $TEST_ROOT/nix-profile.sh" # test idempotency
 
 [ -L $TEST_HOME/.nix-profile ]
 [ -e $TEST_HOME/.nix-channels ]
-[ -e $TEST_ROOT/profile-var/nix/gcroots/per-user/$user ]
-[ -e $TEST_ROOT/profile-var/nix/profiles/per-user/$user ]

@@ -628,6 +628,9 @@ public:
         return storePath;
     }
 
+    virtual void createUser(const std::string & userName, uid_t userId)
+    { }
+
 protected:
 
     Stats stats;

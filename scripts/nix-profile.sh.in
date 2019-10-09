@@ -9,12 +9,6 @@ if [ -n "$HOME" ] && [ -n "$USER" ]; then
 
     NIX_USER_PROFILE_DIR=@localstatedir@/nix/profiles/per-user/$USER
 
-    mkdir -m 0755 -p "$NIX_USER_PROFILE_DIR"
-
-    if [ "$(stat --printf '%u' "$NIX_USER_PROFILE_DIR")" != "$(id -u)" ]; then
-        echo "Nix: WARNING: bad ownership on "$NIX_USER_PROFILE_DIR", should be $(id -u)" >&2
-    fi
-
     if [ -w "$HOME" ]; then
         if ! [ -L "$NIX_LINK" ]; then
             echo "Nix: creating $NIX_LINK" >&2
@@ -32,14 +26,6 @@ if [ -n "$HOME" ] && [ -n "$USER" ]; then
         if [ ! -e "$HOME/.nix-channels" ]; then
             echo "https://nixos.org/channels/nixpkgs-unstable nixpkgs" > "$HOME/.nix-channels"
         fi
-
-        # Create the per-user garbage collector roots directory.
-        __user_gcroots=@localstatedir@/nix/gcroots/per-user/"$USER"
-        mkdir -m 0755 -p "$__user_gcroots"
-        if [ "$(stat --printf '%u' "$__user_gcroots")" != "$(id -u)" ]; then
-            echo "Nix: WARNING: bad ownership on $__user_gcroots, should be $(id -u)" >&2
-        fi
-        unset __user_gcroots
 
         # Set up a default Nix expression from which to install stuff.
         __nix_defexpr="$HOME"/.nix-defexpr
