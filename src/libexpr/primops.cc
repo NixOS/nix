@@ -396,8 +396,7 @@ static void prim_genericClosure(EvalState & state, const Pos & pos, Value * * ar
             throw EvalError(format("attribute 'key' required, at %1%") % pos);
         state.forceValue(*key->value);
 
-        if (doneKeys.find(key->value) != doneKeys.end()) continue;
-        doneKeys.insert(key->value);
+        if (!doneKeys.insert(key->value).second) continue;
         res.push_back(e);
 
         /* Call the `operator' function with `e' as argument. */
@@ -1273,13 +1272,12 @@ static void prim_listToAttrs(EvalState & state, const Pos & pos, Value * * args,
         string name = state.forceStringNoCtx(*j->value, pos);
 
         Symbol sym = state.symbols.create(name);
-        if (seen.find(sym) == seen.end()) {
+        if (seen.insert(sym).second) {
             Bindings::iterator j2 = v2.attrs->find(state.symbols.create(state.sValue));
             if (j2 == v2.attrs->end())
                 throw TypeError(format("'value' attribute missing in a call to 'listToAttrs', at %1%") % pos);
 
             v.attrs->push_back(Attr(sym, j2->value, j2->pos));
-            seen.insert(sym);
         }
     }
 

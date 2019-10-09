@@ -568,10 +568,9 @@ UserLock::UserLock()
 
         {
             auto lockedPaths(lockedPaths_.lock());
-            if (lockedPaths->count(fnUserLock))
+            if (!lockedPaths->insert(fnUserLock).second)
                 /* We already have a lock on this one. */
                 continue;
-            lockedPaths->insert(fnUserLock);
         }
 
         try {
@@ -620,8 +619,8 @@ UserLock::UserLock()
 UserLock::~UserLock()
 {
     auto lockedPaths(lockedPaths_.lock());
-    assert(lockedPaths->count(fnUserLock));
-    lockedPaths->erase(fnUserLock);
+    auto erased = lockedPaths->erase(fnUserLock);
+    assert(erased);
 }
 
 
@@ -1125,10 +1124,8 @@ void DerivationGoal::addWantedOutputs(const StringSet & outputs)
         needRestart = true;
     } else
         for (auto & i : outputs)
-            if (wantedOutputs.find(i) == wantedOutputs.end()) {
-                wantedOutputs.insert(i);
+            if (wantedOutputs.insert(i).second)
                 needRestart = true;
-            }
 }
 
 

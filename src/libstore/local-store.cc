@@ -1292,8 +1292,7 @@ void LocalStore::verifyPath(const Path & path, const PathSet & store,
 {
     checkInterrupt();
 
-    if (done.find(path) != done.end()) return;
-    done.insert(path);
+    if (!done.insert(path).second) return;
 
     if (!isStorePath(path)) {
         printError(format("path '%1%' is not in the Nix store") % path);

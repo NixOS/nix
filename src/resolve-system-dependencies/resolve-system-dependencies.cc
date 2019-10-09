@@ -117,9 +117,7 @@ Path resolveSymlink(const Path & path)
 std::set<string> resolveTree(const Path & path, PathSet & deps)
 {
     std::set<string> results;
-    if (deps.count(path))
-        return {};
-    deps.insert(path);
+    if (!deps.insert(path).second) return {};
     for (auto & lib : runResolver(path)) {
         results.insert(lib);
         for (auto & p : resolveTree(lib, deps)) {

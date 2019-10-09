@@ -277,8 +277,7 @@ static bool getDerivation(EvalState & state, Value & v,
 
         /* Remove spurious duplicates (e.g., a set like `rec { x =
            derivation {...}; y = x;}'. */
-        if (done.find(v.attrs) != done.end()) return false;
-        done.insert(v.attrs);
+        if (!done.insert(v.attrs).second) return false;
 
         DrvInfo drv(state, attrPath, v.attrs);
 

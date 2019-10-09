@@ -123,8 +123,7 @@ static Path out;
 
 static void addPkg(const Path & pkgDir, int priority)
 {
-    if (done.count(pkgDir)) return;
-    done.insert(pkgDir);
+    if (!done.insert(pkgDir).second) return;
     createLinks(pkgDir, out, priority);
 
     try {

@@ -124,11 +124,10 @@ static void getAllExprs(EvalState & state,
             string attrName = i;
             if (hasSuffix(attrName, ".nix"))
                 attrName = string(attrName, 0, attrName.size() - 4);
-            if (attrs.find(attrName) != attrs.end()) {
+            if (!attrs.insert(attrName).second) {
                 printError(format("warning: name collision in input Nix expressions, skipping '%1%'") % path2);
                 continue;
             }
-            attrs.insert(attrName);
             /* Load the expression on demand. */
             Value & vFun = state.getBuiltin("import");
             Value & vArg(*state.allocValue());
@@ -307,10 +306,8 @@ static DrvInfos filterBySelector(EvalState & state, const DrvInfos & allElems,
         /* Insert only those elements in the final list that we
            haven't inserted before. */
         for (auto & j : matches)
-            if (done.find(j.second) == done.end()) {
-                done.insert(j.second);
+            if (done.insert(j.second).second)
                 elems.push_back(j.first);
-            }
     }
 
     checkSelectorUse(selectors);
