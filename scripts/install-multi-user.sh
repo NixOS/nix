@@ -582,7 +582,7 @@ EOF
 We will:
 
  - make sure your computer doesn't already have Nix files
-   (if it does, I  will tell you how to clean them up.)
+   (if it does, I will tell you how to clean them up.)
  - create local users (see the list above for the users we'll make)
  - create a local group ($NIX_BUILD_GROUP_NAME)
  - install Nix in to $NIX_ROOT
