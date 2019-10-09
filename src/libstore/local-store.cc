@@ -1441,7 +1441,7 @@ void LocalStore::createUser(const std::string & userName, uid_t userId)
         fmt("%s/gcroots/per-user/%s", stateDir, userName)
     }) {
         createDirs(dir);
-        if (chmod(dir.c_str(), 0700) == -1)
+        if (chmod(dir.c_str(), 0755) == -1)
             throw SysError("changing permissions of directory '%s'", dir);
         if (chown(dir.c_str(), userId, -1) == -1)
             throw SysError("changing owner of directory '%s'", dir);
