@@ -1,7 +1,4 @@
 if [ -n "$HOME" ] && [ -n "$USER" ]; then
-    __savedpath="$PATH"
-    export PATH=@coreutils@
-
     # Set up the per-user profile.
     # This part should be kept in sync with nixpkgs:nixos/modules/programs/shell.nix
 
@@ -10,10 +7,6 @@ if [ -n "$HOME" ] && [ -n "$USER" ]; then
     NIX_USER_PROFILE_DIR=@localstatedir@/nix/profiles/per-user/$USER
 
     mkdir -m 0755 -p "$NIX_USER_PROFILE_DIR"
-
-    if [ "$(stat --printf '%u' "$NIX_USER_PROFILE_DIR")" != "$(id -u)" ]; then
-        echo "Nix: WARNING: bad ownership on "$NIX_USER_PROFILE_DIR", should be $(id -u)" >&2
-    fi
 
     if [ -w "$HOME" ]; then
         if ! [ -L "$NIX_LINK" ]; then
@@ -36,9 +29,6 @@ if [ -n "$HOME" ] && [ -n "$USER" ]; then
         # Create the per-user garbage collector roots directory.
         __user_gcroots=@localstatedir@/nix/gcroots/per-user/"$USER"
         mkdir -m 0755 -p "$__user_gcroots"
-        if [ "$(stat --printf '%u' "$__user_gcroots")" != "$(id -u)" ]; then
-            echo "Nix: WARNING: bad ownership on $__user_gcroots, should be $(id -u)" >&2
-        fi
         unset __user_gcroots
 
         # Set up a default Nix expression from which to install stuff.
@@ -78,6 +68,6 @@ if [ -n "$HOME" ] && [ -n "$USER" ]; then
         export MANPATH="$NIX_LINK/share/man:$MANPATH"
     fi
 
-    export PATH="$NIX_LINK/bin:$__savedpath"
-    unset __savedpath NIX_LINK NIX_USER_PROFILE_DIR
+    export PATH="$NIX_LINK/bin:$PATH"
+    unset NIX_LINK NIX_USER_PROFILE_DIR
 fi
