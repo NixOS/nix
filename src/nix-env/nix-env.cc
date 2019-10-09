@@ -1422,9 +1422,14 @@ static int _main(int argc, char * * argv)
 
         if (globals.profile == "") {
             Path profileLink = getHome() + "/.nix-profile";
-            globals.profile = pathExists(profileLink)
-                ? absPath(readLink(profileLink), dirOf(profileLink))
-                : canonPath(settings.nixStateDir + "/profiles/default");
+            if (!pathExists(profileLink)) {
+                replaceSymlink(
+                    getuid() == 0
+                    ? settings.nixStateDir + "/profiles/default"
+                    : fmt("%s/profiles/per-user/%s/profile", settings.nixStateDir, getUserName()),
+                    profileLink);
+            }
+            globals.profile = absPath(readLink(profileLink), dirOf(profileLink));
         }
 
         op(globals, opFlags, opArgs);

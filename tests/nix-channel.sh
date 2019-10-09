@@ -36,7 +36,7 @@ grep -q 'item.*attrPath="foo".*name="dependencies"' $TEST_ROOT/meta.xml
 
 # Do an install.
 nix-env -i dependencies
-[ -e $TEST_ROOT/var/nix/profiles/default/foobar ]
+[ -e $TEST_HOME/.nix-profile/foobar ]
 
 clearProfiles
 rm -f $TEST_HOME/.nix-channels
@@ -55,5 +55,5 @@ grep -q 'item.*attrPath="foo".*name="dependencies"' $TEST_ROOT/meta.xml
 
 # Do an install.
 nix-env -i dependencies
-[ -e $TEST_ROOT/var/nix/profiles/default/foobar ]
+[ -e $TEST_HOME/.nix-profile/foobar ]
 

@@ -7,5 +7,3 @@ rm -rf $TEST_HOME $TEST_ROOT/profile-var
 mkdir -p $TEST_HOME
 USER=$user $SHELL -e -c ". $TEST_ROOT/nix-profile.sh; set"
 USER=$user $SHELL -e -c ". $TEST_ROOT/nix-profile.sh" # test idempotency
-
-[ -L $TEST_HOME/.nix-profile ]

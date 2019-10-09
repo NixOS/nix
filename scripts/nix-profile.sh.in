@@ -10,18 +10,6 @@ if [ -n "$HOME" ] && [ -n "$USER" ]; then
     NIX_USER_PROFILE_DIR=@localstatedir@/nix/profiles/per-user/$USER
 
     if [ -w "$HOME" ]; then
-        if ! [ -L "$NIX_LINK" ]; then
-            echo "Nix: creating $NIX_LINK" >&2
-            if [ "$USER" != root ]; then
-                if ! ln -s "$NIX_USER_PROFILE_DIR"/profile "$NIX_LINK"; then
-                    echo "Nix: WARNING: could not create $NIX_LINK -> $NIX_USER_PROFILE_DIR/profile" >&2
-                fi
-            else
-                # Root installs in the system-wide profile by default.
-                ln -s @localstatedir@/nix/profiles/default "$NIX_LINK"
-            fi
-        fi
-
         # Set up a default Nix expression from which to install stuff.
         __nix_defexpr="$HOME"/.nix-defexpr
         [ -L "$__nix_defexpr" ] && rm -f "$__nix_defexpr"

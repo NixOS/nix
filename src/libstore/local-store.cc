@@ -70,16 +70,17 @@ LocalStore::LocalStore(const Params & params)
         createSymlink(profilesDir, gcRootsDir + "/profiles");
     }
 
+    for (auto & perUserDir : {profilesDir + "/per-user", gcRootsDir + "/per-user"}) {
+        createDirs(perUserDir);
+        if (chmod(perUserDir.c_str(), 0755) == -1)
+            throw SysError("could not set permissions on '%s' to 755", perUserDir);
+    }
+
+    createUser(getUserName(), getuid());
+
     /* Optionally, create directories and set permissions for a
        multi-user install. */
     if (getuid() == 0 && settings.buildUsersGroup != "") {
-
-        for (auto & perUserDir : {profilesDir + "/per-user", gcRootsDir + "/per-user"}) {
-            createDirs(perUserDir);
-            if (chmod(perUserDir.c_str(), 0755) == -1)
-                throw SysError("could not set permissions on '%s' to 755", perUserDir);
-        }
-
         mode_t perm = 01775;
 
         struct group * gr = getgrnam(settings.buildUsersGroup.get().c_str());
