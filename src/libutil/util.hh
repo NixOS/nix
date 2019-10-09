@@ -126,6 +126,8 @@ void deletePath(const Path & path, unsigned long long & bytesFreed);
 Path createTempDir(const Path & tmpRoot = "", const Path & prefix = "nix",
     bool includePid = true, bool useGlobalCounter = true, mode_t mode = 0755);
 
+std::string getUserName();
+
 /* Return $HOME or the user's home directory from /etc/passwd. */
 Path getHome();
 

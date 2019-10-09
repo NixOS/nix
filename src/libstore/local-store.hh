@@ -293,6 +293,8 @@ private:
 
     Path getRealStoreDir() override { return realStoreDir; }
 
+    void createUser(const std::string & userName, uid_t userId) override;
+
     friend class DerivationGoal;
     friend class SubstitutionGoal;
 };

@@ -437,23 +437,16 @@ create_build_users() {
 }
 
 create_directories() {
+    # FIXME: remove all of this because it duplicates LocalStore::LocalStore().
+
     _sudo "to make the basic directory structure of Nix (part 1)" \
-          mkdir -pv -m 0755 /nix /nix/var /nix/var/log /nix/var/log/nix /nix/var/log/nix/drvs /nix/var/nix{,/db,/gcroots,/profiles,/temproots,/userpool}
+          mkdir -pv -m 0755 /nix /nix/var /nix/var/log /nix/var/log/nix /nix/var/log/nix/drvs /nix/var/nix{,/db,/gcroots,/profiles,/temproots,/userpool} /nix/var/nix/{gcroots,profiles}/per-user
 
     _sudo "to make the basic directory structure of Nix (part 2)" \
-          mkdir -pv -m 1777 /nix/var/nix/{gcroots,profiles}/per-user
-
-    _sudo "to make the basic directory structure of Nix (part 3)" \
           mkdir -pv -m 1775 /nix/store
 
-    _sudo "to make the basic directory structure of Nix (part 4)" \
+    _sudo "to make the basic directory structure of Nix (part 3)" \
           chgrp "$NIX_BUILD_GROUP_NAME" /nix/store
-
-    _sudo "to set up the root user's profile (part 1)" \
-          mkdir -pv -m 0755 /nix/var/nix/profiles/per-user/root
-
-    _sudo "to set up the root user's profile (part 2)" \
-          mkdir -pv -m 0700 "$ROOT_HOME/.nix-defexpr"
 
     _sudo "to place the default nix daemon configuration (part 1)" \
           mkdir -pv -m 0555 /etc/nix
@@ -497,7 +490,7 @@ EOF
 We will:
 
  - make sure your computer doesn't already have Nix files
-   (if it does, I  will tell you how to clean them up.)
+   (if it does, I will tell you how to clean them up.)
  - create local users (see the list above for the users we'll make)
  - create a local group ($NIX_BUILD_GROUP_NAME)
  - install Nix in to $NIX_ROOT

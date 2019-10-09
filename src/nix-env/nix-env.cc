@@ -192,12 +192,6 @@ static void loadDerivations(EvalState & state, Path nixExprPath,
 }
 
 
-static Path getDefNixExprPath()
-{
-    return getHome() + "/.nix-defexpr";
-}
-
-
 static long getPriority(EvalState & state, DrvInfo & drv)
 {
     return drv.queryMetaInt("priority", 0);
@@ -1327,8 +1321,19 @@ static int _main(int argc, char * * argv)
         Globals globals;
 
         globals.instSource.type = srcUnknown;
-        globals.instSource.nixExprPath = getDefNixExprPath();
+        globals.instSource.nixExprPath = getHome() + "/.nix-defexpr";
         globals.instSource.systemFilter = "*";
+
+        if (!pathExists(globals.instSource.nixExprPath)) {
+            createDirs(globals.instSource.nixExprPath);
+            replaceSymlink(
+                fmt("%s/profiles/per-user/%s/channels", settings.nixStateDir, getUserName()),
+                globals.instSource.nixExprPath + "/channels");
+            if (getuid() != 0)
+                replaceSymlink(
+                    fmt("%s/profiles/per-user/root/channels", settings.nixStateDir),
+                    globals.instSource.nixExprPath + "/channels_root");
+        }
 
         globals.dryRun = false;
         globals.preserveInstalled = false;
@@ -1422,9 +1427,14 @@ static int _main(int argc, char * * argv)
 
         if (globals.profile == "") {
             Path profileLink = getHome() + "/.nix-profile";
-            globals.profile = pathExists(profileLink)
-                ? absPath(readLink(profileLink), dirOf(profileLink))
-                : canonPath(settings.nixStateDir + "/profiles/default");
+            if (!pathExists(profileLink)) {
+                replaceSymlink(
+                    getuid() == 0
+                    ? settings.nixStateDir + "/profiles/default"
+                    : fmt("%s/profiles/per-user/%s/profile", settings.nixStateDir, getUserName()),
+                    profileLink);
+            }
+            globals.profile = absPath(readLink(profileLink), dirOf(profileLink));
         }
 
         op(globals, opFlags, opArgs);

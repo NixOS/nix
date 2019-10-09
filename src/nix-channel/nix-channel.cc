@@ -159,13 +159,7 @@ static int _main(int argc, char ** argv)
         nixDefExpr = home + "/.nix-defexpr";
 
         // Figure out the name of the channels profile.
-        ;
-        auto pw = getpwuid(geteuid());
-        std::string name = pw ? pw->pw_name : getEnv("USER", "");
-        if (name.empty())
-            throw Error("cannot figure out user name");
-        profile = settings.nixStateDir + "/profiles/per-user/" + name + "/channels";
-        createDirs(dirOf(profile));
+        profile = fmt("%s/profiles/per-user/%s/channels", settings.nixStateDir, getUserName());
 
         enum {
             cNone,
