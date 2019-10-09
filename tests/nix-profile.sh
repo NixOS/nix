@@ -9,4 +9,3 @@ USER=$user $SHELL -e -c ". $TEST_ROOT/nix-profile.sh; set"
 USER=$user $SHELL -e -c ". $TEST_ROOT/nix-profile.sh" # test idempotency
 
 [ -L $TEST_HOME/.nix-profile ]
-[ -e $TEST_HOME/.nix-channels ]

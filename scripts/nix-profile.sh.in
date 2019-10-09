@@ -22,11 +22,6 @@ if [ -n "$HOME" ] && [ -n "$USER" ]; then
             fi
         fi
 
-        # Subscribe the user to the unstable Nixpkgs channel by default.
-        if [ ! -e "$HOME/.nix-channels" ]; then
-            echo "https://nixos.org/channels/nixpkgs-unstable nixpkgs" > "$HOME/.nix-channels"
-        fi
-
         # Set up a default Nix expression from which to install stuff.
         __nix_defexpr="$HOME"/.nix-defexpr
         [ -L "$__nix_defexpr" ] && rm -f "$__nix_defexpr"
