@@ -45,25 +45,26 @@ Value * SourceExprCommand::getSourceExpr(EvalState & state)
 
         std::unordered_set<std::string> seen;
 
-        for (auto & i : searchPath) {
-            if (i.first == "") continue;
-            if (seen.count(i.first)) continue;
-            seen.insert(i.first);
-#if 0
-            auto res = state.resolveSearchPathElem(i);
-            if (!res.first) continue;
-            if (!pathExists(res.second)) continue;
-            mkApp(*state.allocAttr(*vSourceExpr, state.symbols.create(i.first)),
-                state.getBuiltin("import"),
-                mkString(*state.allocValue(), res.second));
-#endif
+        auto addEntry = [&](const std::string & name) {
+            if (name == "") return;
+            if (!seen.insert(name).second) return;
             Value * v1 = state.allocValue();
             mkPrimOpApp(*v1, state.getBuiltin("findFile"), state.getBuiltin("nixPath"));
             Value * v2 = state.allocValue();
-            mkApp(*v2, *v1, mkString(*state.allocValue(), i.first));
-            mkApp(*state.allocAttr(*vSourceExpr, state.symbols.create(i.first)),
+            mkApp(*v2, *v1, mkString(*state.allocValue(), name));
+            mkApp(*state.allocAttr(*vSourceExpr, state.symbols.create(name)),
                 state.getBuiltin("import"), *v2);
-        }
+        };
+
+        for (auto & i : searchPath)
+            /* Hack to handle channels. */
+            if (i.first.empty() && pathExists(i.second + "/manifest.nix")) {
+                for (auto & j : readDirectory(i.second))
+                    if (j.name != "manifest.nix"
+                        && pathExists(fmt("%s/%s/default.nix", i.second, j.name)))
+                        addEntry(j.name);
+            } else
+                addEntry(i.first);
 
         vSourceExpr->attrs->sort();
     }
