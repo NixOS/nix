@@ -171,4 +171,9 @@ JSONObject JSONPlaceholder::object()
     return JSONObject(state);
 }
 
+JSONPlaceholder::~JSONPlaceholder()
+{
+    assert(!first || std::uncaught_exception());
+}
+
 }
