@@ -5,12 +5,6 @@ __ETC_PROFILE_NIX_SOURCED=1
 export NIX_USER_PROFILE_DIR="@localstatedir@/nix/profiles/per-user/$USER"
 export NIX_PROFILES="@localstatedir@/nix/profiles/default $HOME/.nix-profile"
 
-# Set up the per-user profile.
-mkdir -m 0755 -p $NIX_USER_PROFILE_DIR
-if ! test -O "$NIX_USER_PROFILE_DIR"; then
-    echo "WARNING: bad ownership on $NIX_USER_PROFILE_DIR" >&2
-fi
-
 if test -w $HOME; then
   if ! test -L $HOME/.nix-profile; then
       if test "$USER" != root; then
@@ -24,13 +18,6 @@ if test -w $HOME; then
   # Subscribe the root user to the NixOS channel by default.
   if [ "$USER" = root -a ! -e $HOME/.nix-channels ]; then
       echo "https://nixos.org/channels/nixpkgs-unstable nixpkgs" > $HOME/.nix-channels
-  fi
-
-  # Create the per-user garbage collector roots directory.
-  NIX_USER_GCROOTS_DIR=@localstatedir@/nix/gcroots/per-user/$USER
-  mkdir -m 0755 -p $NIX_USER_GCROOTS_DIR
-  if ! test -O "$NIX_USER_GCROOTS_DIR"; then
-      echo "WARNING: bad ownership on $NIX_USER_GCROOTS_DIR" >&2
   fi
 
   # Set up a default Nix expression from which to install stuff.
