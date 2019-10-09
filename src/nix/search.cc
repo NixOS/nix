@@ -261,6 +261,7 @@ struct CmdSearch : SourceExprCommand, MixJSON
                    https://gcc.gnu.org/bugzilla/show_bug.cgi?id=66145 */
                 if (!jsonCacheFile)
                     throw Error("error writing to %s", tmpFile);
+                throw;
             }
 
             if (writeCache && rename(tmpFile.c_str(), jsonCacheFileName.c_str()) == -1)
