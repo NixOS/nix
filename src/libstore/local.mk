@@ -39,8 +39,11 @@ libstore_CXXFLAGS = \
  -DNIX_LIBEXEC_DIR=\"$(libexecdir)\" \
  -DNIX_BIN_DIR=\"$(bindir)\" \
  -DNIX_MAN_DIR=\"$(mandir)\" \
- -DSANDBOX_SHELL="\"$(sandbox_shell)\"" \
  -DLSOF=\"$(lsof)\"
+
+ifneq ($(sandbox_shell),)
+libstore_CXXFLAGS += -DSANDBOX_SHELL="\"$(sandbox_shell)\""
+endif
 
 $(d)/local-store.cc: $(d)/schema.sql.gen.hh
 
