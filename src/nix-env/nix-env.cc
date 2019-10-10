@@ -1325,14 +1325,16 @@ static int _main(int argc, char * * argv)
         globals.instSource.systemFilter = "*";
 
         if (!pathExists(globals.instSource.nixExprPath)) {
-            createDirs(globals.instSource.nixExprPath);
-            replaceSymlink(
-                fmt("%s/profiles/per-user/%s/channels", settings.nixStateDir, getUserName()),
-                globals.instSource.nixExprPath + "/channels");
-            if (getuid() != 0)
+            try {
+                createDirs(globals.instSource.nixExprPath);
                 replaceSymlink(
-                    fmt("%s/profiles/per-user/root/channels", settings.nixStateDir),
-                    globals.instSource.nixExprPath + "/channels_root");
+                    fmt("%s/profiles/per-user/%s/channels", settings.nixStateDir, getUserName()),
+                    globals.instSource.nixExprPath + "/channels");
+                if (getuid() != 0)
+                    replaceSymlink(
+                        fmt("%s/profiles/per-user/root/channels", settings.nixStateDir),
+                        globals.instSource.nixExprPath + "/channels_root");
+            } catch (Error &) { }
         }
 
         globals.dryRun = false;
@@ -1427,14 +1429,18 @@ static int _main(int argc, char * * argv)
 
         if (globals.profile == "") {
             Path profileLink = getHome() + "/.nix-profile";
-            if (!pathExists(profileLink)) {
-                replaceSymlink(
-                    getuid() == 0
-                    ? settings.nixStateDir + "/profiles/default"
-                    : fmt("%s/profiles/per-user/%s/profile", settings.nixStateDir, getUserName()),
-                    profileLink);
+            try {
+                if (!pathExists(profileLink)) {
+                    replaceSymlink(
+                        getuid() == 0
+                        ? settings.nixStateDir + "/profiles/default"
+                        : fmt("%s/profiles/per-user/%s/profile", settings.nixStateDir, getUserName()),
+                        profileLink);
+                }
+                globals.profile = absPath(readLink(profileLink), dirOf(profileLink));
+            } catch (Error &) {
+                globals.profile = profileLink;
             }
-            globals.profile = absPath(readLink(profileLink), dirOf(profileLink));
         }
 
         op(globals, opFlags, opArgs);
