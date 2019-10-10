@@ -113,8 +113,7 @@ struct CmdVerify : StorePathsCommand
 
                         auto doSigs = [&](StringSet sigs) {
                             for (auto sig : sigs) {
-                                if (sigsSeen.count(sig)) continue;
-                                sigsSeen.insert(sig);
+                                if (!sigsSeen.insert(sig).second) continue;
                                 if (validSigs < ValidPathInfo::maxSigs && info->checkSignature(publicKeys, sig))
                                     validSigs++;
                             }

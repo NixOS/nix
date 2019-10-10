@@ -486,6 +486,16 @@ std::pair<AutoCloseFD, Path> createTempFile(const Path & prefix)
 }
 
 
+std::string getUserName()
+{
+    auto pw = getpwuid(geteuid());
+    std::string name = pw ? pw->pw_name : getEnv("USER", "");
+    if (name.empty())
+        throw Error("cannot figure out user name");
+    return name;
+}
+
+
 static Lazy<Path> getHome2([]() {
     Path homeDir = getEnv("HOME");
     if (homeDir.empty()) {

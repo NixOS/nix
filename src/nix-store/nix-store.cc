@@ -242,11 +242,10 @@ const string treeNull = "    ";
 static void printTree(const Path & path,
     const string & firstPad, const string & tailPad, PathSet & done)
 {
-    if (done.find(path) != done.end()) {
+    if (!done.insert(path).second) {
         cout << format("%1%%2% [...]\n") % firstPad % path;
         return;
     }
-    done.insert(path);
 
     cout << format("%1%%2%\n") % firstPad % path;
 

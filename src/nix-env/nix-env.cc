@@ -124,11 +124,10 @@ static void getAllExprs(EvalState & state,
             string attrName = i;
             if (hasSuffix(attrName, ".nix"))
                 attrName = string(attrName, 0, attrName.size() - 4);
-            if (attrs.find(attrName) != attrs.end()) {
+            if (!attrs.insert(attrName).second) {
                 printError(format("warning: name collision in input Nix expressions, skipping '%1%'") % path2);
                 continue;
             }
-            attrs.insert(attrName);
             /* Load the expression on demand. */
             Value & vFun = state.getBuiltin("import");
             Value & vArg(*state.allocValue());
@@ -190,12 +189,6 @@ static void loadDerivations(EvalState & state, Path nixExprPath,
         if (systemFilter != "*" && i->querySystem() != systemFilter)
             elems.erase(i);
     }
-}
-
-
-static Path getDefNixExprPath()
-{
-    return getHome() + "/.nix-defexpr";
 }
 
 
@@ -307,10 +300,8 @@ static DrvInfos filterBySelector(EvalState & state, const DrvInfos & allElems,
         /* Insert only those elements in the final list that we
            haven't inserted before. */
         for (auto & j : matches)
-            if (done.find(j.second) == done.end()) {
-                done.insert(j.second);
+            if (done.insert(j.second).second)
                 elems.push_back(j.first);
-            }
     }
 
     checkSelectorUse(selectors);
@@ -1330,8 +1321,21 @@ static int _main(int argc, char * * argv)
         Globals globals;
 
         globals.instSource.type = srcUnknown;
-        globals.instSource.nixExprPath = getDefNixExprPath();
+        globals.instSource.nixExprPath = getHome() + "/.nix-defexpr";
         globals.instSource.systemFilter = "*";
+
+        if (!pathExists(globals.instSource.nixExprPath)) {
+            try {
+                createDirs(globals.instSource.nixExprPath);
+                replaceSymlink(
+                    fmt("%s/profiles/per-user/%s/channels", settings.nixStateDir, getUserName()),
+                    globals.instSource.nixExprPath + "/channels");
+                if (getuid() != 0)
+                    replaceSymlink(
+                        fmt("%s/profiles/per-user/root/channels", settings.nixStateDir),
+                        globals.instSource.nixExprPath + "/channels_root");
+            } catch (Error &) { }
+        }
 
         globals.dryRun = false;
         globals.preserveInstalled = false;
@@ -1425,9 +1429,18 @@ static int _main(int argc, char * * argv)
 
         if (globals.profile == "") {
             Path profileLink = getHome() + "/.nix-profile";
-            globals.profile = pathExists(profileLink)
-                ? absPath(readLink(profileLink), dirOf(profileLink))
-                : canonPath(settings.nixStateDir + "/profiles/default");
+            try {
+                if (!pathExists(profileLink)) {
+                    replaceSymlink(
+                        getuid() == 0
+                        ? settings.nixStateDir + "/profiles/default"
+                        : fmt("%s/profiles/per-user/%s/profile", settings.nixStateDir, getUserName()),
+                        profileLink);
+                }
+                globals.profile = absPath(readLink(profileLink), dirOf(profileLink));
+            } catch (Error &) {
+                globals.profile = profileLink;
+            }
         }
 
         op(globals, opFlags, opArgs);

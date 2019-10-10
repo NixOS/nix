@@ -29,8 +29,7 @@ void Store::computeFSClosure(const PathSet & startPaths,
         {
             auto state(state_.lock());
             if (state->exc) return;
-            if (state->paths.count(path)) return;
-            state->paths.insert(path);
+            if (!state->paths.insert(path).second) return;
             state->pending++;
         }
 
@@ -175,8 +174,7 @@ void Store::queryMissing(const PathSet & targets,
 
         {
             auto state(state_.lock());
-            if (state->done.count(path)) return;
-            state->done.insert(path);
+            if (!state->done.insert(path).second) return;
         }
 
         DrvPathWithOutputs i2 = parseDrvPathWithOutputs(path);
@@ -252,8 +250,7 @@ Paths Store::topoSortPaths(const PathSet & paths)
         if (parents.find(path) != parents.end())
             throw BuildError(format("cycle detected in the references of '%1%' from '%2%'") % path % *parent);
 
-        if (visited.find(path) != visited.end()) return;
-        visited.insert(path);
+        if (!visited.insert(path).second) return;
         parents.insert(path);
 
         PathSet references;

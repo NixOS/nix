@@ -47,11 +47,10 @@ static void printValue(std::ostream & str, std::set<const Value *> & active, con
 {
     checkInterrupt();
 
-    if (active.find(&v) != active.end()) {
+    if (!active.insert(&v).second) {
         str << "<CYCLE>";
         return;
     }
-    active.insert(&v);
 
     switch (v.type) {
     case tInt:
@@ -1486,8 +1485,7 @@ void EvalState::forceValueDeep(Value & v)
     std::function<void(Value & v)> recurse;
 
     recurse = [&](Value & v) {
-        if (seen.find(&v) != seen.end()) return;
-        seen.insert(&v);
+        if (!seen.insert(&v).second) return;
 
         forceValue(v);
 
@@ -1905,8 +1903,7 @@ size_t valueSize(Value & v)
     std::set<const void *> seen;
 
     auto doString = [&](const char * s) -> size_t {
-        if (seen.find(s) != seen.end()) return 0;
-        seen.insert(s);
+        if (!seen.insert(s).second) return 0;
         return strlen(s) + 1;
     };
 
@@ -1914,8 +1911,7 @@ size_t valueSize(Value & v)
     std::function<size_t(Env & v)> doEnv;
 
     doValue = [&](Value & v) -> size_t {
-        if (seen.find(&v) != seen.end()) return 0;
-        seen.insert(&v);
+        if (!seen.insert(&v).second) return 0;
 
         size_t sz = sizeof(Value);
 
@@ -1930,8 +1926,7 @@ size_t valueSize(Value & v)
             sz += doString(v.path);
             break;
         case tAttrs:
-            if (seen.find(v.attrs) == seen.end()) {
-                seen.insert(v.attrs);
+            if (seen.insert(v.attrs).second) {
                 sz += sizeof(Bindings) + sizeof(Attr) * v.attrs->capacity();
                 for (auto & i : *v.attrs)
                     sz += doValue(*i.value);
@@ -1940,8 +1935,7 @@ size_t valueSize(Value & v)
         case tList1:
         case tList2:
         case tListN:
-            if (seen.find(v.listElems()) == seen.end()) {
-                seen.insert(v.listElems());
+            if (seen.insert(v.listElems()).second) {
                 sz += v.listSize() * sizeof(Value *);
                 for (size_t n = 0; n < v.listSize(); ++n)
                     sz += doValue(*v.listElems()[n]);
@@ -1962,8 +1956,7 @@ size_t valueSize(Value & v)
             sz += doValue(*v.primOpApp.right);
             break;
         case tExternal:
-            if (seen.find(v.external) != seen.end()) break;
-            seen.insert(v.external);
+            if (!seen.insert(v.external).second) break;
             sz += v.external->valueSize(seen);
             break;
         default:
@@ -1974,8 +1967,7 @@ size_t valueSize(Value & v)
     };
 
     doEnv = [&](Env & env) -> size_t {
-        if (seen.find(&env) != seen.end()) return 0;
-        seen.insert(&env);
+        if (!seen.insert(&env).second) return 0;
 
         size_t sz = sizeof(Env) + sizeof(Value *) * env.size;
 

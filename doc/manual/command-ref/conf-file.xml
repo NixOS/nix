@@ -433,7 +433,7 @@ builtins.fetchurl {
   <varlistentry xml:id="conf-keep-env-derivations"><term><literal>keep-env-derivations</literal></term>
 
     <listitem><para>If <literal>false</literal> (default), derivations
-    are not stored in Nix user environments.  That is, the derivation
+    are not stored in Nix user environments.  That is, the derivations of
     any build-time-only dependencies may be garbage-collected.</para>
 
     <para>If <literal>true</literal>, when you add a Nix derivation to

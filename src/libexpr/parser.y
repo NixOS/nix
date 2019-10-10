@@ -1,5 +1,5 @@
 %glr-parser
-%pure-parser
+%define api.pure
 %locations
 %define parse.error verbose
 %defines
@@ -138,11 +138,10 @@ static void addAttr(ExprAttrs * attrs, AttrPath & attrPath,
 
 static void addFormal(const Pos & pos, Formals * formals, const Formal & formal)
 {
-    if (formals->argNames.find(formal.name) != formals->argNames.end())
+    if (!formals->argNames.insert(formal.name).second)
         throw ParseError(format("duplicate formal function argument '%1%' at %2%")
             % formal.name % pos);
     formals->formals.push_front(formal);
-    formals->argNames.insert(formal.name);
 }
 
 

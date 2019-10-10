@@ -36,11 +36,10 @@ static void search(const unsigned char * s, size_t len,
             }
         if (!match) continue;
         string ref((const char *) s + i, refLength);
-        if (hashes.find(ref) != hashes.end()) {
+        if (hashes.erase(ref)) {
             debug(format("found reference to '%1%' at offset '%2%'")
                   % ref % i);
             seen.insert(ref);
-            hashes.erase(ref);
         }
         ++i;
     }

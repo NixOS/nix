@@ -120,7 +120,7 @@ public:
     void log(State & state, Verbosity lvl, const std::string & s)
     {
         if (state.active) {
-            writeToStderr("\r\e[K" + s + ANSI_NORMAL "\n");
+            writeToStderr("\r\e[K" + filterANSIEscapes(s, !isTTY) + ANSI_NORMAL "\n");
             draw(state);
         } else {
             auto s2 = s + ANSI_NORMAL "\n";

@@ -949,8 +949,7 @@ std::list<ref<Store>> getDefaultSubstituters()
         StringSet done;
 
         auto addStore = [&](const std::string & uri) {
-            if (done.count(uri)) return;
-            done.insert(uri);
+            if (!done.insert(uri).second) return;
             try {
                 stores.push_back(openStore(uri));
             } catch (Error & e) {
