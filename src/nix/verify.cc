@@ -13,7 +13,7 @@ struct CmdVerify : StorePathsCommand
     bool noContents = false;
     bool noTrust = false;
     Strings substituterUris;
-    size_t sigsNeeded;
+    size_t sigsNeeded = 0;
 
     CmdVerify()
     {
@@ -108,7 +108,7 @@ struct CmdVerify : StorePathsCommand
                     else {
 
                         StringSet sigsSeen;
-                        size_t actualSigsNeeded = sigsNeeded ? sigsNeeded : 1;
+                        size_t actualSigsNeeded = std::max(sigsNeeded, (size_t) 1);
                         size_t validSigs = 0;
 
                         auto doSigs = [&](StringSet sigs) {
