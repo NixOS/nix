@@ -157,6 +157,18 @@ AX_BOOST_BASE([1.66], [CXXFLAGS="$BOOST_CPPFLAGS $CXXFLAGS"], [AC_MSG_ERROR([Nix
 # ends up with LDFLAGS being empty, so we set it afterwards.
 LDFLAGS="$BOOST_LDFLAGS $LDFLAGS"
 
+# On some platforms, new-style atomics need a helper library
+AC_MSG_CHECKING(whether -latomic is needed)
+AC_LINK_IFELSE([AC_LANG_SOURCE([[
+#include <stdint.h>
+uint64_t v;
+int main() {
+    return (int)__atomic_load_n(&v, __ATOMIC_ACQUIRE);
+}]])], GCC_ATOMIC_BUILTINS_NEED_LIBATOMIC=no, GCC_ATOMIC_BUILTINS_NEED_LIBATOMIC=yes)
+AC_MSG_RESULT($GCC_ATOMIC_BUILTINS_NEED_LIBATOMIC)
+if test "x$GCC_ATOMIC_BUILTINS_NEED_LIBATOMIC" = xyes; then
+    LIBS="-latomic $LIBS"
+fi
 
 # Look for OpenSSL, a required dependency.
 PKG_CHECK_MODULES([OPENSSL], [libcrypto], [CXXFLAGS="$OPENSSL_CFLAGS $CXXFLAGS"])
