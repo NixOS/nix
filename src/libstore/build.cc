@@ -2395,13 +2395,21 @@ void DerivationGoal::startBuilder()
         uid_t hostUid = buildUser ? buildUser->getUID() : getuid();
         uid_t hostGid = buildUser ? buildUser->getGID() : getgid();
 
-        writeFile("/proc/" + std::to_string(pid) + "/uid_map",
-            (format("%d %d 1") % sandboxUid % hostUid).str());
+        try {
+            writeFile("/proc/" + std::to_string(pid) + "/uid_map",
+                (format("%d %d 1") % sandboxUid % hostUid).str());
 
-        writeFile("/proc/" + std::to_string(pid) + "/setgroups", "deny");
+            writeFile("/proc/" + std::to_string(pid) + "/setgroups", "deny");
 
-        writeFile("/proc/" + std::to_string(pid) + "/gid_map",
-            (format("%d %d 1") % sandboxGid % hostGid).str());
+            writeFile("/proc/" + std::to_string(pid) + "/gid_map",
+                (format("%d %d 1") % sandboxGid % hostGid).str());
+        } catch (SysError & e) {
+            if (settings.sandboxFallback) {
+                useChroot = false;
+                initTmpDir();
+                goto fallback;
+            } else throw e;
+        }
 
         /* Signal the builder that we've updated its user namespace. */
         writeFull(userNamespaceSync.writeSide.get(), "1");
