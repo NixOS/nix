@@ -1,3 +1,4 @@
+#include "installables.hh"
 #include "command.hh"
 #include "attr-path.hh"
 #include "common-eval-args.hh"
@@ -111,65 +112,58 @@ struct InstallableStorePath : Installable
     }
 };
 
-struct InstallableValue : Installable
+std::vector<flake::EvalCache::Derivation> InstallableValue::toDerivations()
 {
-    SourceExprCommand & cmd;
+    auto state = cmd.getEvalState();
 
-    InstallableValue(SourceExprCommand & cmd) : cmd(cmd) { }
+    auto v = toValue(*state);
 
-    virtual std::vector<flake::EvalCache::Derivation> toDerivations()
-    {
-        auto state = cmd.getEvalState();
+    Bindings & autoArgs = *cmd.getAutoArgs(*state);
 
-        auto v = toValue(*state);
+    DrvInfos drvInfos;
+    getDerivations(*state, *v, "", autoArgs, drvInfos, false);
 
-        Bindings & autoArgs = *cmd.getAutoArgs(*state);
+    std::vector<flake::EvalCache::Derivation> res;
+    for (auto & drvInfo : drvInfos) {
+        res.push_back({
+            drvInfo.queryDrvPath(),
+            drvInfo.queryOutPath(),
+            drvInfo.queryOutputName()
+        });
+    }
 
-        DrvInfos drvInfos;
-        getDerivations(*state, *v, "", autoArgs, drvInfos, false);
+    return res;
+}
 
-        std::vector<flake::EvalCache::Derivation> res;
-        for (auto & drvInfo : drvInfos) {
-            res.push_back({
-                drvInfo.queryDrvPath(),
-                drvInfo.queryOutPath(),
-                drvInfo.queryOutputName()
-            });
-        }
+Buildables InstallableValue::toBuildables()
+{
+    Buildables res;
 
+    PathSet drvPaths;
+
+    for (auto & drv : toDerivations()) {
+        Buildable b{drv.drvPath};
+        drvPaths.insert(b.drvPath);
+
+        auto outputName = drv.outputName;
+        if (outputName == "")
+            throw Error("derivation '%s' lacks an 'outputName' attribute", b.drvPath);
+
+        b.outputs.emplace(outputName, drv.outPath);
+
+        res.push_back(std::move(b));
+    }
+
+    // Hack to recognize .all: if all drvs have the same drvPath,
+    // merge the buildables.
+    if (drvPaths.size() == 1) {
+        Buildable b{*drvPaths.begin()};
+        for (auto & b2 : res)
+            b.outputs.insert(b2.outputs.begin(), b2.outputs.end());
+        return {b};
+    } else
         return res;
-    }
-
-    Buildables toBuildables() override
-    {
-        Buildables res;
-
-        PathSet drvPaths;
-
-        for (auto & drv : toDerivations()) {
-            Buildable b{drv.drvPath};
-            drvPaths.insert(b.drvPath);
-
-            auto outputName = drv.outputName;
-            if (outputName == "")
-                throw Error("derivation '%s' lacks an 'outputName' attribute", b.drvPath);
-
-            b.outputs.emplace(outputName, drv.outPath);
-
-            res.push_back(std::move(b));
-        }
-
-        // Hack to recognize .all: if all drvs have the same drvPath,
-        // merge the buildables.
-        if (drvPaths.size() == 1) {
-            Buildable b{*drvPaths.begin()};
-            for (auto & b2 : res)
-                b.outputs.insert(b2.outputs.begin(), b2.outputs.end());
-            return {b};
-        } else
-            return res;
-    }
-};
+}
 
 struct InstallableExpr : InstallableValue
 {
@@ -254,123 +248,104 @@ void makeFlakeClosureGCRoot(Store & store,
     store.addIndirectRoot(symlink);
 }
 
-struct InstallableFlake : InstallableValue
+std::vector<std::string> InstallableFlake::getActualAttrPaths()
 {
-    FlakeRef flakeRef;
-    Strings attrPaths;
-    Strings prefixes;
+    std::vector<std::string> res;
 
-    InstallableFlake(SourceExprCommand & cmd, FlakeRef && flakeRef, Strings attrPaths)
-        : InstallableValue(cmd), flakeRef(flakeRef), attrPaths(std::move(attrPaths))
-    { }
+    for (auto & prefix : prefixes)
+        res.push_back(prefix + *attrPaths.begin());
 
-    InstallableFlake(SourceExprCommand & cmd, FlakeRef && flakeRef,
-        std::string attrPath, Strings && prefixes)
-        : InstallableValue(cmd), flakeRef(flakeRef), attrPaths{attrPath},
-          prefixes(prefixes)
-    { }
+    for (auto & s : attrPaths)
+        res.push_back(s);
 
-    std::string what() override { return flakeRef.to_string() + ":" + *attrPaths.begin(); }
+    return res;
+}
 
-    std::vector<std::string> getActualAttrPaths()
-    {
-        std::vector<std::string> res;
+Value * InstallableFlake::getFlakeOutputs(EvalState & state, const flake::ResolvedFlake & resFlake)
+{
+    auto vFlake = state.allocValue();
 
-        for (auto & prefix : prefixes)
-            res.push_back(prefix + *attrPaths.begin());
+    callFlake(state, resFlake, *vFlake);
 
-        for (auto & s : attrPaths)
-            res.push_back(s);
+    makeFlakeClosureGCRoot(*state.store, flakeRef, resFlake);
 
-        return res;
-    }
+    auto aOutputs = vFlake->attrs->get(state.symbols.create("outputs"));
+    assert(aOutputs);
 
-    Value * getFlakeOutputs(EvalState & state, const flake::ResolvedFlake & resFlake)
-    {
-        auto vFlake = state.allocValue();
+    state.forceValue(*(*aOutputs)->value);
 
-        callFlake(state, resFlake, *vFlake);
+    return (*aOutputs)->value;
+}
 
-        makeFlakeClosureGCRoot(*state.store, flakeRef, resFlake);
+std::vector<flake::EvalCache::Derivation> InstallableFlake::toDerivations()
+{
+    auto state = cmd.getEvalState();
 
-        auto aOutputs = vFlake->attrs->get(state.symbols.create("outputs"));
-        assert(aOutputs);
+    auto resFlake = resolveFlake(*state, flakeRef, cmd.getLockFileMode());
 
-        state.forceValue(*(*aOutputs)->value);
+    Value * vOutputs = nullptr;
 
-        return (*aOutputs)->value;
-    }
+    auto emptyArgs = state->allocBindings(0);
 
-    std::vector<flake::EvalCache::Derivation> toDerivations() override
-    {
-        auto state = cmd.getEvalState();
+    auto & evalCache = flake::EvalCache::singleton();
 
-        auto resFlake = resolveFlake(*state, flakeRef, cmd.getLockFileMode());
+    auto fingerprint = resFlake.getFingerprint();
 
-        Value * vOutputs = nullptr;
-
-        auto emptyArgs = state->allocBindings(0);
-
-        auto & evalCache = flake::EvalCache::singleton();
-
-        auto fingerprint = resFlake.getFingerprint();
-
-        for (auto & attrPath : getActualAttrPaths()) {
-            auto drv = evalCache.getDerivation(fingerprint, attrPath);
-            if (drv) {
-                if (state->store->isValidPath(drv->drvPath))
-                    return {*drv};
-            }
-
-            if (!vOutputs)
-                vOutputs = getFlakeOutputs(*state, resFlake);
-
-            try {
-                auto * v = findAlongAttrPath(*state, attrPath, *emptyArgs, *vOutputs);
-                state->forceValue(*v);
-
-                auto drvInfo = getDerivation(*state, *v, false);
-                if (!drvInfo)
-                    throw Error("flake output attribute '%s' is not a derivation", attrPath);
-
-                auto drv = flake::EvalCache::Derivation{
-                    drvInfo->queryDrvPath(),
-                    drvInfo->queryOutPath(),
-                    drvInfo->queryOutputName()
-                };
-
-                evalCache.addDerivation(fingerprint, attrPath, drv);
-
-                return {drv};
-            } catch (AttrPathNotFound & e) {
-            }
+    for (auto & attrPath : getActualAttrPaths()) {
+        auto drv = evalCache.getDerivation(fingerprint, attrPath);
+        if (drv) {
+            if (state->store->isValidPath(drv->drvPath))
+                return {*drv};
         }
 
-        throw Error("flake '%s' does not provide attribute %s",
-            flakeRef, concatStringsSep(", ", quoteStrings(attrPaths)));
-    }
+        if (!vOutputs)
+            vOutputs = getFlakeOutputs(*state, resFlake);
 
-    Value * toValue(EvalState & state) override
-    {
-        auto resFlake = resolveFlake(state, flakeRef, cmd.getLockFileMode());
+        try {
+            auto * v = findAlongAttrPath(*state, attrPath, *emptyArgs, *vOutputs);
+            state->forceValue(*v);
 
-        auto vOutputs = getFlakeOutputs(state, resFlake);
+            auto drvInfo = getDerivation(*state, *v, false);
+            if (!drvInfo)
+                throw Error("flake output attribute '%s' is not a derivation", attrPath);
 
-        auto emptyArgs = state.allocBindings(0);
+            auto drv = flake::EvalCache::Derivation{
+                drvInfo->queryDrvPath(),
+                drvInfo->queryOutPath(),
+                drvInfo->queryOutputName()
+            };
 
-        for (auto & attrPath : getActualAttrPaths()) {
-            try {
-                auto * v = findAlongAttrPath(state, attrPath, *emptyArgs, *vOutputs);
-                state.forceValue(*v);
-                return v;
-            } catch (AttrPathNotFound & e) {
-            }
+            evalCache.addDerivation(fingerprint, attrPath, drv);
+
+            return {drv};
+        } catch (AttrPathNotFound & e) {
         }
-
-        throw Error("flake '%s' does not provide attribute %s",
-            flakeRef, concatStringsSep(", ", quoteStrings(attrPaths)));
     }
-};
+
+    throw Error("flake '%s' does not provide attribute %s",
+        flakeRef, concatStringsSep(", ", quoteStrings(attrPaths)));
+}
+
+Value * InstallableFlake::toValue(EvalState & state)
+{
+    auto resFlake = resolveFlake(state, flakeRef, cmd.getLockFileMode());
+
+    auto vOutputs = getFlakeOutputs(state, resFlake);
+
+    auto emptyArgs = state.allocBindings(0);
+
+    for (auto & attrPath : getActualAttrPaths()) {
+        try {
+            auto * v = findAlongAttrPath(state, attrPath, *emptyArgs, *vOutputs);
+            state.forceValue(*v);
+            return v;
+        } catch (AttrPathNotFound & e) {
+        }
+    }
+
+    throw Error("flake '%s' does not provide attribute %s",
+        flakeRef, concatStringsSep(", ", quoteStrings(attrPaths)));
+}
 
 // FIXME: extend
 std::string attrRegex = R"([A-Za-z_][A-Za-z0-9-_+]*)";

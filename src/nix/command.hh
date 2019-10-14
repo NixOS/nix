@@ -1,15 +1,15 @@
 #pragma once
 
+#include "installables.hh"
 #include "args.hh"
 #include "common-eval-args.hh"
+
 #include <optional>
 
 namespace nix {
 
 extern std::string programPath;
 
-struct Value;
-class Bindings;
 class EvalState;
 class Store;
 
@@ -28,51 +28,6 @@ struct StoreCommand : virtual Command
 
 private:
     std::shared_ptr<Store> _store;
-};
-
-struct Buildable
-{
-    Path drvPath; // may be empty
-    std::map<std::string, Path> outputs;
-};
-
-typedef std::vector<Buildable> Buildables;
-
-struct App
-{
-    PathSet context;
-    Path program;
-    // FIXME: add args, sandbox settings, metadata, ...
-
-    App(EvalState & state, Value & vApp);
-};
-
-struct Installable
-{
-    virtual ~Installable() { }
-
-    virtual std::string what() = 0;
-
-    virtual Buildables toBuildables()
-    {
-        throw Error("argument '%s' cannot be built", what());
-    }
-
-    Buildable toBuildable();
-
-    App toApp(EvalState & state);
-
-    virtual Value * toValue(EvalState & state)
-    {
-        throw Error("argument '%s' cannot be evaluated", what());
-    }
-
-    /* Return a value only if this installable is a store path or a
-       symlink to it. */
-    virtual std::optional<Path> getStorePath()
-    {
-        return {};
-    }
 };
 
 struct EvalCommand : virtual StoreCommand, MixEvalArgs
