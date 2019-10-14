@@ -2377,6 +2377,8 @@ void DerivationGoal::startBuilder()
 
         int res = helper.wait();
         if (res != 0 && settings.sandboxFallback) {
+            debug(format("builder process exited with '%1%' when setting up sandbox, "
+                         "falling back to sandbox = false") % res);
             useChroot = false;
             initTmpDir();
             goto fallback;
@@ -2405,6 +2407,8 @@ void DerivationGoal::startBuilder()
                 (format("%d %d 1") % sandboxGid % hostGid).str());
         } catch (SysError & e) {
             if (settings.sandboxFallback) {
+                debug(format("caught '%1%' while invoking sandbox, "
+                             "falling back to sandbox = false") % w.what());
                 useChroot = false;
                 initTmpDir();
                 goto fallback;
