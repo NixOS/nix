@@ -170,43 +170,10 @@ static SourceInfo fetchInput(EvalState & state, const FlakeRef & resolvedRef)
 
     // This only downloads only one revision of the repo, not the entire history.
     if (auto refData = std::get_if<FlakeRef::IsGitHub>(&resolvedRef.data)) {
-
-        // FIXME: use regular /archive URLs instead? api.github.com
-        // might have stricter rate limits.
-
-        auto url = fmt("https://api.github.com/repos/%s/%s/tarball/%s",
-            refData->owner, refData->repo,
-            resolvedRef.rev ? resolvedRef.rev->to_string(Base16, false)
-                : resolvedRef.ref ? *resolvedRef.ref : "master");
-
-        std::string accessToken = settings.githubAccessToken.get();
-        if (accessToken != "")
-            url += "?access_token=" + accessToken;
-
-        CachedDownloadRequest request(url);
-        request.unpack = true;
-        request.name = "source";
-        request.ttl = resolvedRef.rev ? 1000000000 : settings.tarballTtl;
-        request.getLastModified = true;
-        auto result = getDownloader()->downloadCached(state.store, request);
-
-        if (!result.etag)
-            throw Error("did not receive an ETag header from '%s'", url);
-
-        if (result.etag->size() != 42 || (*result.etag)[0] != '"' || (*result.etag)[41] != '"')
-            throw Error("ETag header '%s' from '%s' is not a Git revision", *result.etag, url);
-
-        FlakeRef ref(resolvedRef.baseRef());
-        ref.rev = Hash(std::string(*result.etag, 1, result.etag->size() - 2), htSHA1);
-        SourceInfo info(ref);
-        info.storePath = result.storePath;
-        info.narHash = state.store->queryPathInfo(info.storePath)->narHash;
-        info.lastModified = result.lastModified;
-
-        return info;
+        return doGit(exportGitHub(state.store, refData->owner, refData->repo, resolvedRef.ref, resolvedRef.rev));
     }
 
-    // This downloads the entire git history
+    // This downloads the entire git history.
     else if (auto refData = std::get_if<FlakeRef::IsGit>(&resolvedRef.data)) {
         return doGit(exportGit(state.store, refData->uri, resolvedRef.ref, resolvedRef.rev, "source"));
     }

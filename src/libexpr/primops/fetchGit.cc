@@ -18,12 +18,77 @@ namespace nix {
 
 extern std::regex revRegex;
 
+static Path getCacheInfoPathFor(const std::string & name, const Hash & rev)
+{
+    Path cacheDir = getCacheDir() + "/nix/git-revs";
+    std::string linkName =
+        name == "source"
+        ? rev.gitRev()
+        : hashString(htSHA512, name + std::string("\0"s) + rev.gitRev()).to_string(Base32, false);
+    return cacheDir + "/" + linkName + ".link";
+}
+
+static void cacheGitInfo(const std::string & name, const GitInfo & gitInfo)
+{
+    nlohmann::json json;
+    json["storePath"] = gitInfo.storePath;
+    json["name"] = name;
+    json["rev"] = gitInfo.rev.gitRev();
+    if (gitInfo.revCount)
+        json["revCount"] = *gitInfo.revCount;
+    json["lastModified"] = gitInfo.lastModified;
+
+    auto cacheInfoPath = getCacheInfoPathFor(name, gitInfo.rev);
+    createDirs(dirOf(cacheInfoPath));
+    writeFile(cacheInfoPath, json.dump());
+}
+
+static std::optional<GitInfo> lookupGitInfo(
+    ref<Store> store,
+    const std::string & name,
+    const Hash & rev)
+{
+    try {
+        auto json = nlohmann::json::parse(readFile(getCacheInfoPathFor(name, rev)));
+
+        assert(json["name"] == name && Hash((std::string) json["rev"], htSHA1) == rev);
+
+        Path storePath = json["storePath"];
+
+        if (store->isValidPath(storePath)) {
+            GitInfo gitInfo;
+            gitInfo.storePath = storePath;
+            gitInfo.rev = rev;
+            if (json.find("revCount") != json.end())
+                gitInfo.revCount = json["revCount"];
+            gitInfo.lastModified = json["lastModified"];
+            return gitInfo;
+        }
+
+    } catch (SysError & e) {
+        if (e.errNo != ENOENT) throw;
+    }
+
+    return {};
+}
+
 GitInfo exportGit(ref<Store> store, std::string uri,
     std::optional<std::string> ref,
     std::optional<Hash> rev,
     const std::string & name)
 {
     assert(!rev || rev->type == htSHA1);
+
+    if (rev) {
+        if (auto gitInfo = lookupGitInfo(store, name, *rev)) {
+            // If this gitInfo was produced by exportGitHub, then it won't
+            // have a revCount. So we have to do a full clone.
+            if (gitInfo->revCount) {
+                gitInfo->ref = ref;
+                return *gitInfo;
+            }
+        }
+    }
 
     if (hasPrefix(uri, "git+")) uri = std::string(uri, 4);
 
@@ -99,9 +164,6 @@ GitInfo exportGit(ref<Store> store, std::string uri,
         uri = std::string(uri, 7);
         isLocal = true;
     }
-
-    deletePath(getCacheDir() + "/nix/git");
-    deletePath(getCacheDir() + "/nix/gitv2");
 
     Path cacheDir = getCacheDir() + "/nix/gitv3/" + hashString(htSHA256, uri).to_string(Base32, false);
     Path repoDir;
@@ -179,35 +241,19 @@ GitInfo exportGit(ref<Store> store, std::string uri,
             rev = Hash(chomp(readFile(localRefFile)), htSHA1);
     }
 
+    if (auto gitInfo = lookupGitInfo(store, name, *rev)) {
+        if (gitInfo->revCount) {
+            gitInfo->ref = ref;
+            return *gitInfo;
+        }
+    }
+
     // FIXME: check whether rev is an ancestor of ref.
     GitInfo gitInfo;
     gitInfo.ref = *ref;
     gitInfo.rev = *rev;
 
     printTalkative("using revision %s of repo '%s'", gitInfo.rev, uri);
-
-    std::string storeLinkName = hashString(htSHA512,
-        name + std::string("\0"s) + gitInfo.rev.gitRev()).to_string(Base32, false);
-    Path storeLink = cacheDir + "/" + storeLinkName + ".link";
-    PathLocks storeLinkLock({storeLink}, fmt("waiting for lock on '%1%'...", storeLink)); // FIXME: broken
-
-    try {
-        auto json = nlohmann::json::parse(readFile(storeLink));
-
-        assert(json["name"] == name && Hash((std::string) json["rev"], htSHA1) == gitInfo.rev);
-
-        Path storePath = json["storePath"];
-
-        if (store->isValidPath(storePath)) {
-            gitInfo.storePath = storePath;
-            gitInfo.revCount = json["revCount"];
-            gitInfo.lastModified = json["lastModified"];
-            return gitInfo;
-        }
-
-    } catch (SysError & e) {
-        if (e.errNo != ENOENT) throw;
-    }
 
     // FIXME: should pipe this, or find some better way to extract a
     // revision.
@@ -223,15 +269,55 @@ GitInfo exportGit(ref<Store> store, std::string uri,
     gitInfo.revCount = std::stoull(runProgram("git", true, { "-C", repoDir, "rev-list", "--count", gitInfo.rev.gitRev() }));
     gitInfo.lastModified = std::stoull(runProgram("git", true, { "-C", repoDir, "show", "-s", "--format=%ct", gitInfo.rev.gitRev() }));
 
-    nlohmann::json json;
-    json["storePath"] = gitInfo.storePath;
-    json["uri"] = uri;
-    json["name"] = name;
-    json["rev"] = gitInfo.rev.gitRev();
-    json["revCount"] = gitInfo.revCount;
-    json["lastModified"] = gitInfo.lastModified;
+    cacheGitInfo(name, gitInfo);
 
-    writeFile(storeLink, json.dump());
+    return gitInfo;
+}
+
+GitInfo exportGitHub(
+    ref<Store> store,
+    const std::string & owner,
+    const std::string & repo,
+    std::optional<std::string> ref,
+    std::optional<Hash> rev)
+{
+    if (rev) {
+        if (auto gitInfo = lookupGitInfo(store, "source", *rev))
+            return *gitInfo;
+    }
+
+    // FIXME: use regular /archive URLs instead? api.github.com
+    // might have stricter rate limits.
+
+    auto url = fmt("https://api.github.com/repos/%s/%s/tarball/%s",
+        owner, repo, rev ? rev->to_string(Base16, false) : ref ? *ref : "master");
+
+    std::string accessToken = settings.githubAccessToken.get();
+    if (accessToken != "")
+        url += "?access_token=" + accessToken;
+
+    CachedDownloadRequest request(url);
+    request.unpack = true;
+    request.name = "source";
+    request.ttl = rev ? 1000000000 : settings.tarballTtl;
+    request.getLastModified = true;
+    auto result = getDownloader()->downloadCached(store, request);
+
+    if (!result.etag)
+        throw Error("did not receive an ETag header from '%s'", url);
+
+    if (result.etag->size() != 42 || (*result.etag)[0] != '"' || (*result.etag)[41] != '"')
+        throw Error("ETag header '%s' from '%s' is not a Git revision", *result.etag, url);
+
+    assert(result.lastModified);
+
+    GitInfo gitInfo;
+    gitInfo.storePath = result.storePath;
+    gitInfo.rev = Hash(std::string(*result.etag, 1, result.etag->size() - 2), htSHA1);
+    gitInfo.lastModified = *result.lastModified;
+
+    // FIXME: this can overwrite a cache file that contains a revCount.
+    cacheGitInfo("source", gitInfo);
 
     return gitInfo;
 }
@@ -283,7 +369,8 @@ static void prim_fetchGit(EvalState & state, const Pos & pos, Value * * args, Va
     mkString(*state.allocAttr(v, state.sOutPath), gitInfo.storePath, PathSet({gitInfo.storePath}));
     mkString(*state.allocAttr(v, state.symbols.create("rev")), gitInfo.rev.gitRev());
     mkString(*state.allocAttr(v, state.symbols.create("shortRev")), gitInfo.rev.gitShortRev());
-    mkInt(*state.allocAttr(v, state.symbols.create("revCount")), gitInfo.revCount);
+    assert(gitInfo.revCount);
+    mkInt(*state.allocAttr(v, state.symbols.create("revCount")), *gitInfo.revCount);
     v.attrs->sort();
 
     if (state.allowedPaths)
