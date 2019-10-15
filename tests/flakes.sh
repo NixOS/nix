@@ -36,6 +36,9 @@ cat > $flake1Dir/flake.nix <<EOF
   outputs = inputs: rec {
     packages.$system.foo = import ./simple.nix;
     defaultPackage.$system = packages.$system.foo;
+
+    # To test "nix flake init".
+    packages.x86_64-linux.hello = import ./simple.nix;
   };
 }
 EOF
@@ -339,8 +342,10 @@ nix flake pin --flake-registry $registry flake1
 nix flake remove --flake-registry $registry flake1
 (( $(nix flake list --flake-registry $registry | wc -l) == 5 ))
 
+# Test 'nix flake init'.
 (cd $flake7Dir && nix flake init)
-nix flake --flake-registry $registry check $flake3Dir
+git -C $flake7Dir add flake.nix
+nix flake --flake-registry $registry check $flake7Dir
 
 rm -rf $TEST_ROOT/flake1-v2
 nix flake clone --flake-registry $registry flake1 $TEST_ROOT/flake1-v2
