@@ -251,6 +251,12 @@ struct CmdFlakeCheck : FlakeCommand, MixJSON
         auto state = getEvalState();
         auto flake = resolveFlake();
 
+        auto checkSystemName = [&](const std::string & system, const Pos & pos) {
+            // FIXME: what's the format of "system"?
+            if (system.find('-') == std::string::npos)
+                throw Error("'%s' is not a valid system type, at %s", system, pos);
+        };
+
         auto checkDerivation = [&](const std::string & attrPath, Value & v, const Pos & pos) {
             try {
                 auto drvInfo = getDerivation(*state, v, false);
@@ -374,34 +380,70 @@ struct CmdFlakeCheck : FlakeCommand, MixJSON
 
                         if (name == "checks") {
                             state->forceAttrs(vOutput, pos);
-                            for (auto & attr : *vOutput.attrs)
-                                drvPaths.insert(checkDerivation(
-                                        name + "." + (std::string) attr.name, *attr.value, *attr.pos));
+                            for (auto & attr : *vOutput.attrs) {
+                                checkSystemName(attr.name, *attr.pos);
+                                state->forceAttrs(*attr.value, *attr.pos);
+                                for (auto & attr2 : *attr.value->attrs) {
+                                    auto drvPath = checkDerivation(
+                                        fmt("%s.%s.%s", name, attr.name, attr2.name),
+                                        *attr2.value, *attr2.pos);
+                                    if ((std::string) attr.name == settings.thisSystem.get())
+                                        drvPaths.insert(drvPath);
+                                }
+                            }
                         }
 
                         else if (name == "packages") {
                             state->forceAttrs(vOutput, pos);
-                            for (auto & attr : *vOutput.attrs)
-                                checkDerivation(
-                                    name + "." + (std::string) attr.name, *attr.value, *attr.pos);
+                            for (auto & attr : *vOutput.attrs) {
+                                checkSystemName(attr.name, *attr.pos);
+                                state->forceAttrs(*attr.value, *attr.pos);
+                                for (auto & attr2 : *attr.value->attrs)
+                                    checkDerivation(
+                                        fmt("%s.%s.%s", name, attr.name, attr2.name),
+                                        *attr2.value, *attr2.pos);
+                            }
                         }
 
                         else if (name == "apps") {
                             state->forceAttrs(vOutput, pos);
-                            for (auto & attr : *vOutput.attrs)
-                                checkApp(
-                                    name + "." + (std::string) attr.name, *attr.value, *attr.pos);
+                            for (auto & attr : *vOutput.attrs) {
+                                checkSystemName(attr.name, *attr.pos);
+                                state->forceAttrs(*attr.value, *attr.pos);
+                                for (auto & attr2 : *attr.value->attrs)
+                                    checkApp(
+                                        fmt("%s.%s.%s", name, attr.name, attr2.name),
+                                        *attr2.value, *attr2.pos);
+                            }
                         }
 
-                        else if (name == "defaultPackage" || name == "devShell")
-                            checkDerivation(name, vOutput, pos);
+                        else if (name == "defaultPackage" || name == "devShell") {
+                            state->forceAttrs(vOutput, pos);
+                            for (auto & attr : *vOutput.attrs) {
+                                checkSystemName(attr.name, *attr.pos);
+                                checkDerivation(
+                                    fmt("%s.%s", name, attr.name),
+                                    *attr.value, *attr.pos);
+                            }
+                        }
 
-                        else if (name == "defaultApp")
-                            checkApp(name, vOutput, pos);
+                        else if (name == "defaultApp") {
+                            state->forceAttrs(vOutput, pos);
+                            for (auto & attr : *vOutput.attrs) {
+                                checkSystemName(attr.name, *attr.pos);
+                                checkApp(
+                                    fmt("%s.%s", name, attr.name),
+                                    *attr.value, *attr.pos);
+                            }
+                        }
 
-                        else if (name == "legacyPackages")
-                            // FIXME: do getDerivations?
-                            ;
+                        else if (name == "legacyPackages") {
+                            state->forceAttrs(vOutput, pos);
+                            for (auto & attr : *vOutput.attrs) {
+                                checkSystemName(attr.name, *attr.pos);
+                                // FIXME: do getDerivations?
+                            }
+                        }
 
                         else if (name == "overlay")
                             checkOverlay(name, vOutput, pos);
@@ -409,7 +451,7 @@ struct CmdFlakeCheck : FlakeCommand, MixJSON
                         else if (name == "overlays") {
                             state->forceAttrs(vOutput, pos);
                             for (auto & attr : *vOutput.attrs)
-                                checkOverlay(name + "." + (std::string) attr.name,
+                                checkOverlay(fmt("%s.%s", name, attr.name),
                                     *attr.value, *attr.pos);
                         }
 
@@ -419,14 +461,14 @@ struct CmdFlakeCheck : FlakeCommand, MixJSON
                         else if (name == "nixosModules") {
                             state->forceAttrs(vOutput, pos);
                             for (auto & attr : *vOutput.attrs)
-                                checkModule(name + "." + (std::string) attr.name,
+                                checkModule(fmt("%s.%s", name, attr.name),
                                     *attr.value, *attr.pos);
                         }
 
                         else if (name == "nixosConfigurations") {
                             state->forceAttrs(vOutput, pos);
                             for (auto & attr : *vOutput.attrs)
-                                checkNixOSConfiguration(name + "." + (std::string) attr.name,
+                                checkNixOSConfiguration(fmt("%s.%s", name, attr.name),
                                     *attr.value, *attr.pos);
                         }
 

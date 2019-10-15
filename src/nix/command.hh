@@ -64,22 +64,9 @@ struct SourceExprCommand : virtual Args, EvalCommand, MixFlakeOptions
     std::shared_ptr<Installable> parseInstallable(
         ref<Store> store, const std::string & installable);
 
-    virtual Strings getDefaultFlakeAttrPaths()
-    {
-        return {"defaultPackage"};
-    }
+    virtual Strings getDefaultFlakeAttrPaths();
 
-    virtual Strings getDefaultFlakeAttrPathPrefixes()
-    {
-        return {
-            // As a convenience, look for the attribute in
-            // 'outputs.packages'.
-            "packages.",
-            // As a temporary hack until Nixpkgs is properly converted
-            // to provide a clean 'packages' set, look in 'legacyPackages'.
-            "legacyPackages."
-        };
-    }
+    virtual Strings getDefaultFlakeAttrPathPrefixes();
 };
 
 enum RealiseMode { Build, NoBuild, DryRun };

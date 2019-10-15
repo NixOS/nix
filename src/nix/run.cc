@@ -215,12 +215,12 @@ struct CmdApp : InstallableCommand, RunCommon
 
     Strings getDefaultFlakeAttrPaths() override
     {
-        return {"defaultApp"};
+        return {"defaultApp." + settings.thisSystem.get()};
     }
 
     Strings getDefaultFlakeAttrPathPrefixes() override
     {
-        return {"apps."};
+        return {"apps." + settings.thisSystem.get() + "."};
     }
 
     void run(ref<Store> store) override

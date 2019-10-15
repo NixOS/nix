@@ -13,8 +13,10 @@
 
       systems = [ "x86_64-linux" "i686-linux" "x86_64-darwin" "aarch64-linux" ];
 
+      forAllSystems = f: nixpkgs.lib.genAttrs systems (system: f system);
+
       # Memoize nixpkgs for different platforms for efficiency.
-      nixpkgsFor = nixpkgs.lib.genAttrs systems (system:
+      nixpkgsFor = forAllSystems (system:
         import nixpkgs {
           inherit system;
           overlays = [ self.overlay ];
@@ -427,19 +429,19 @@
 
       };
 
-      checks = {
-        binaryTarball = self.hydraJobs.binaryTarball.x86_64-linux;
-        perlBindings = self.hydraJobs.perlBindings.x86_64-linux;
-      };
+      checks = forAllSystems (system: {
+        binaryTarball = self.hydraJobs.binaryTarball.${system};
+        perlBindings = self.hydraJobs.perlBindings.${system};
+      });
 
-      packages = {
-        inherit (nixpkgsFor.x86_64-linux) nix;
-      };
+      packages = forAllSystems (system: {
+        inherit (nixpkgsFor.${system}) nix;
+      });
 
-      defaultPackage = self.packages.nix;
+      defaultPackage = forAllSystems (system: self.packages.${system}.nix);
 
-      devShell =
-        with nixpkgsFor.x86_64-linux;
+      devShell = forAllSystems (system:
+        with nixpkgsFor.${system};
         with commonDeps pkgs;
 
         stdenv.mkDerivation {
@@ -461,7 +463,7 @@
               PATH=$prefix/bin:$PATH
               unset PYTHONPATH
             '';
-        };
+        });
 
   };
 }

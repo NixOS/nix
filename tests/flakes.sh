@@ -34,8 +34,8 @@ cat > $flake1Dir/flake.nix <<EOF
   description = "Bla bla";
 
   outputs = inputs: rec {
-    packages.foo = import ./simple.nix;
-    defaultPackage = packages.foo;
+    packages.$system.foo = import ./simple.nix;
+    defaultPackage.$system = packages.$system.foo;
   };
 }
 EOF
@@ -51,7 +51,7 @@ cat > $flake2Dir/flake.nix <<EOF
   description = "Fnord";
 
   outputs = { self, flake1 }: rec {
-    packages.bar = flake1.packages.foo;
+    packages.$system.bar = flake1.packages.$system.foo;
   };
 }
 EOF
@@ -66,10 +66,10 @@ cat > $flake3Dir/flake.nix <<EOF
   description = "Fnord";
 
   outputs = { self, flake2 }: rec {
-    packages.xyzzy = flake2.packages.bar;
+    packages.$system.xyzzy = flake2.packages.$system.bar;
 
     checks = {
-        xyzzy = packages.xyzzy;
+      xyzzy = packages.$system.xyzzy;
     };
   };
 }
@@ -182,8 +182,8 @@ cat > $flake3Dir/flake.nix <<EOF
   description = "Fnord";
 
   outputs = { self, flake1, flake2 }: rec {
-    packages.xyzzy = flake2.packages.bar;
-    packages."sth sth" = flake1.packages.foo;
+    packages.$system.xyzzy = flake2.packages.$system.bar;
+    packages.$system."sth sth" = flake1.packages.$system.foo;
   };
 }
 EOF
@@ -242,9 +242,9 @@ cat > $flake3Dir/flake.nix <<EOF
   description = "Fnord";
 
   outputs = inputs: rec {
-    packages.xyzzy = inputs.flake2.packages.bar;
-    packages.sth = inputs.flake1.packages.foo;
-    packages.fnord =
+    packages.$system.xyzzy = inputs.flake2.packages.$system.bar;
+    packages.$system.sth = inputs.flake1.packages.$system.foo;
+    packages.$system.fnord =
       with import ./config.nix;
       mkDerivation {
         inherit system;
@@ -307,8 +307,8 @@ cat > $flake3Dir/flake.nix <<EOF
   description = "Fnord";
 
   outputs = { self, flake1, flake2, nonFlake }: rec {
-    packages.sth = flake1.packages.foo;
-    packages.fnord =
+    packages.$system.sth = flake1.packages.$system.foo;
+    packages.$system.fnord =
       with import ./config.nix;
       mkDerivation {
         inherit system;

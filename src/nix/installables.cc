@@ -55,6 +55,23 @@ SourceExprCommand::SourceExprCommand()
         .dest(&file);
 }
 
+Strings SourceExprCommand::getDefaultFlakeAttrPaths()
+{
+    return {"defaultPackage." + settings.thisSystem.get()};
+}
+
+Strings SourceExprCommand::getDefaultFlakeAttrPathPrefixes()
+{
+    return {
+        // As a convenience, look for the attribute in
+        // 'outputs.packages'.
+        "packages." + settings.thisSystem.get() + ".",
+        // As a temporary hack until Nixpkgs is properly converted
+        // to provide a clean 'packages' set, look in 'legacyPackages'.
+        "legacyPackages." + settings.thisSystem.get() + "."
+    };
+}
+
 ref<EvalState> EvalCommand::getEvalState()
 {
     if (!evalState) {

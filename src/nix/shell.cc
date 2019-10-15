@@ -198,7 +198,7 @@ struct Common : InstallableCommand, MixProfile
 
     Strings getDefaultFlakeAttrPaths() override
     {
-        return {"devShell", "defaultPackage"};
+        return {"devShell." + settings.thisSystem.get(), "defaultPackage." + settings.thisSystem.get()};
     }
 
     Path getShellOutPath(ref<Store> store)
