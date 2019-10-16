@@ -105,6 +105,13 @@ StringSet Settings::getDefaultSystemFeatures()
     return features;
 }
 
+void Settings::requireExperimentalFeature(const std::string & name)
+{
+    auto & f = experimentalFeatures.get();
+    if (std::find(f.begin(), f.end(), name) == f.end())
+        throw Error("experimental Nix feature '%s' is disabled", name);
+}
+
 const string nixVersion = PACKAGE_VERSION;
 
 template<> void BaseSetting<SandboxMode>::set(const std::string & str)
