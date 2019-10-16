@@ -433,6 +433,8 @@ static std::pair<Flake, LockedInput> updateLocks(
    and optionally write it to file, it the flake is writable. */
 ResolvedFlake resolveFlake(EvalState & state, const FlakeRef & topRef, HandleLockFile handleLockFile)
 {
+    settings.requireExperimentalFeature("flakes");
+
     auto flake = getFlake(state, topRef,
         allowedToUseRegistries(handleLockFile, true));
 

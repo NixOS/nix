@@ -149,6 +149,8 @@ void mainWrapped(int argc, char * * argv)
 
     args.parseCmdline(argvToStrings(argc, argv));
 
+    settings.requireExperimentalFeature("nix-command");
+
     initPlugins();
 
     if (!args.command) args.showHelpAndExit();
