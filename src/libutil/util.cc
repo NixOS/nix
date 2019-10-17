@@ -1181,7 +1181,7 @@ void _interrupted()
     /* Block user interrupts while an exception is being handled.
        Throwing an exception while another exception is being handled
        kills the program! */
-    if (!interruptThrown && !std::uncaught_exception()) {
+    if (!interruptThrown && std::uncaught_exceptions() == 0) {
         interruptThrown = true;
         throw Interrupted("interrupted by the user");
     }

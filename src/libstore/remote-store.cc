@@ -218,6 +218,7 @@ struct ConnectionHandle
 {
     Pool<RemoteStore::Connection>::Handle handle;
     bool daemonException = false;
+    int uncaught_exceptions = std::uncaught_exceptions();
 
     ConnectionHandle(Pool<RemoteStore::Connection>::Handle && handle)
         : handle(std::move(handle))
@@ -229,7 +230,7 @@ struct ConnectionHandle
 
     ~ConnectionHandle()
     {
-        if (!daemonException && std::uncaught_exception()) {
+        if (!daemonException && std::uncaught_exceptions() != uncaught_exceptions) {
             handle.markBad();
             debug("closing daemon connection because of an exception");
         }
