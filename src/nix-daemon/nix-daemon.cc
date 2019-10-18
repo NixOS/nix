@@ -736,6 +736,15 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
         break;
     }
 
+    case wopQueryPathFromFileHash: {
+        string fileHash = readString(from);
+        logger->startWork();
+        Path path = store->queryPathFromFileHash(fileHash);
+        logger->stopWork();
+        to << path;
+        break;
+    }
+
     default:
         throw Error(format("invalid operation %1%") % op);
     }

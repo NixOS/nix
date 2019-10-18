@@ -694,6 +694,16 @@ void RemoteStore::queryMissing(const PathSet & targets,
         unknown, downloadSize, narSize);
 }
 
+Path RemoteStore::queryPathFromFileHash(const string & fileHash)
+{
+    auto conn(getConnection());
+    conn->to << wopQueryPathFromFileHash << fileHash;
+    conn.processStderr();
+    Path path = readString(conn->from);
+    if (!path.empty()) assertStorePath(path);
+    return path;
+}
+
 
 void RemoteStore::connect()
 {

@@ -49,6 +49,7 @@ typedef enum {
     wopNarFromPath = 38,
     wopAddToStoreNar = 39,
     wopQueryMissing = 40,
+    wopQueryPathFromFileHash = 41,
 } WorkerOp;
 
 

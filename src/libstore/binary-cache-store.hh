@@ -79,6 +79,9 @@ public:
     Path queryPathFromHashPart(const string & hashPart) override
     { unsupported("queryPathFromHashPart"); }
 
+    Path queryPathFromFileHash(const string & fileHash) override
+    { unsupported("queryPathFromFileHash"); }
+
     bool wantMassQuery() override { return wantMassQuery_; }
 
     void addToStore(const ValidPathInfo & info, const ref<std::string> & nar,
