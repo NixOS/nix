@@ -515,6 +515,7 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
     }
 
     case wopSetOptions: {
+        settings.keepSuccessful = readInt(from);
         settings.keepFailed = readInt(from);
         settings.keepGoing = readInt(from);
         settings.tryFallback = readInt(from);

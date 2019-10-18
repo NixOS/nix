@@ -44,6 +44,12 @@
 </arg>
 <arg>
   <group choice='plain'>
+    <arg choice='plain'><option>--keep-successful</option></arg>
+    <arg choice='plain'><option>-S</option></arg>
+  </group>
+</arg>
+<arg>
+  <group choice='plain'>
     <arg choice='plain'><option>--keep-failed</option></arg>
     <arg choice='plain'><option>-K</option></arg>
   </group>
