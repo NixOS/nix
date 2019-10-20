@@ -83,7 +83,7 @@ struct InstallableFlake : InstallableValue
           prefixes(prefixes)
     { }
 
-    std::string what() override { return flakeRef.to_string() + ":" + *attrPaths.begin(); }
+    std::string what() override { return flakeRef.to_string() + "#" + *attrPaths.begin(); }
 
     std::vector<std::string> getActualAttrPaths();
 
