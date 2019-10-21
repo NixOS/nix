@@ -1427,21 +1427,8 @@ static int _main(int argc, char * * argv)
         if (globals.profile == "")
             globals.profile = getEnv("NIX_PROFILE", "");
 
-        if (globals.profile == "") {
-            Path profileLink = getHome() + "/.nix-profile";
-            try {
-                if (!pathExists(profileLink)) {
-                    replaceSymlink(
-                        getuid() == 0
-                        ? settings.nixStateDir + "/profiles/default"
-                        : fmt("%s/profiles/per-user/%s/profile", settings.nixStateDir, getUserName()),
-                        profileLink);
-                }
-                globals.profile = absPath(readLink(profileLink), dirOf(profileLink));
-            } catch (Error &) {
-                globals.profile = profileLink;
-            }
-        }
+        if (globals.profile == "")
+            globals.profile = getDefaultProfile();
 
         op(globals, opFlags, opArgs);
 
