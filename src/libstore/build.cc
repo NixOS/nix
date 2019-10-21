@@ -6,6 +6,7 @@
 #include "archive.hh"
 #include "affinity.hh"
 #include "builtins.hh"
+#include "builtins/buildenv.hh"
 #include "download.hh"
 #include "finally.hh"
 #include "compression.hh"
