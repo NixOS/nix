@@ -733,21 +733,13 @@ builtins.genList (x: x * x) 5
   <varlistentry xml:id='builtin-import'>
     <term><function>import</function>
     <replaceable>path</replaceable></term>
-    <term><function>import</function>
-    <replaceable>&lt;path&gt;</replaceable></term>
     <term><function>builtins.import</function>
     <replaceable>path</replaceable></term>
-    <term><function>builtins.import</function>
-    <replaceable>&lt;path&gt;</replaceable></term>
 
     <listitem><para>Load, parse and return the Nix expression in the
     file <replaceable>path</replaceable>.  If <replaceable>path
     </replaceable> is a directory, the file <filename>default.nix
-    </filename> in that directory is loaded.  If the <replaceable>
-    &lt;path&gt;</replaceable> syntax is used, the path will be resolved
-    relative to those listed in the <envar>NIX_PATH</envar> environment
-    variable (see the section on <envar linkend="env-NIX_PATH">NIX_PATH</envar>
-    for details on how the resolution works). Evaluation aborts if the
+    </filename> in that directory is loaded.  Evaluation aborts if the
     file doesn’t exist or contains an incorrect Nix expression.
     <function>import</function> implements Nix’s module system: you
     can put any Nix expression (such as a set or a function) in a
