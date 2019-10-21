@@ -18,9 +18,22 @@ struct CmdMakeContentAddressable : StorePathsCommand
 
     std::string description() override
     {
-        return "test";
+        return "rewrite a path or closure to content-addressable form";
     }
 
+    Examples examples() override
+    {
+        return {
+            Example{
+                "To create a content-addressable representation of GNU Hello (but not its dependencies):",
+                "nix make-content-addressable nixpkgs.hello"
+            },
+            Example{
+                "To compute a content-addressable representation of the current NixOS system closure:",
+                "nix make-content-addressable -r /run/current-system"
+            },
+        };
+    }
     void run(ref<Store> store, Paths storePaths) override
     {
         auto paths = store->topoSortPaths(PathSet(storePaths.begin(), storePaths.end()));
