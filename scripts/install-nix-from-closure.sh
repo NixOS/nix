@@ -141,11 +141,9 @@ if [ -z "$_NIX_INSTALLER_TEST" ]; then
 fi
 
 added=
+p=$HOME/.nix-profile/etc/profile.d/nix.sh
 if [ -z "$NIX_INSTALLER_NO_MODIFY_PROFILE" ]; then
-
     # Make the shell source nix.sh during login.
-    p=$HOME/.nix-profile/etc/profile.d/nix.sh
-
     for i in .bash_profile .bash_login .profile; do
         fn="$HOME/$i"
         if [ -w "$fn" ]; then
@@ -157,7 +155,6 @@ if [ -z "$NIX_INSTALLER_NO_MODIFY_PROFILE" ]; then
             break
         fi
     done
-
 fi
 
 if [ -z "$added" ]; then

@@ -35,6 +35,9 @@ public:
         return uriScheme + host;
     }
 
+    bool sameMachine()
+    { return false; }
+
     void narFromPath(const Path & path, Sink & sink) override;
 
     ref<FSAccessor> getFSAccessor() override;

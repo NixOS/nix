@@ -111,13 +111,13 @@ $ nix-env -iA nixpkgs.hello</screen>
 <para>You can revert channel updates using <option>--rollback</option>:</para>
 
 <screen>
-$ nix-instantiate --eval -E '(import &lt;nixpkgs> {}).lib.nixpkgsVersion'
+$ nix-instantiate --eval -E '(import &lt;nixpkgs> {}).lib.version'
 "14.04.527.0e935f1"
 
 $ nix-channel --rollback
 switching from generation 483 to 482
 
-$ nix-instantiate --eval -E '(import &lt;nixpkgs> {}).lib.nixpkgsVersion'
+$ nix-instantiate --eval -E '(import &lt;nixpkgs> {}).lib.version'
 "14.04.526.dbadfad"
 </screen>
 
