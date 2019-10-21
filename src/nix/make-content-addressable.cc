@@ -11,11 +11,6 @@ struct CmdMakeContentAddressable : StorePathsCommand
         realiseMode = Build;
     }
 
-    std::string name() override
-    {
-        return "make-content-addressable";
-    }
-
     std::string description() override
     {
         return "rewrite a path or closure to content-addressable form";
@@ -92,4 +87,4 @@ struct CmdMakeContentAddressable : StorePathsCommand
     }
 };
 
-static RegisterCommand r1(make_ref<CmdMakeContentAddressable>());
+static auto r1 = registerCommand<CmdMakeContentAddressable>("make-content-addressable");
