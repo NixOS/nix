@@ -286,11 +286,21 @@ GitInfo exportGitHub(
             return *gitInfo;
     }
 
+    if (!rev) {
+        auto url = fmt("https://api.github.com/repos/%s/%s/commits/%s",
+            owner, repo, ref ? *ref : "master");
+        CachedDownloadRequest request(url);
+        request.ttl = rev ? 1000000000 : settings.tarballTtl;
+        auto result = getDownloader()->downloadCached(store, request);
+        auto json = nlohmann::json::parse(readFile(result.path));
+        rev = Hash(json["sha"], htSHA1);
+    }
+
     // FIXME: use regular /archive URLs instead? api.github.com
     // might have stricter rate limits.
 
     auto url = fmt("https://api.github.com/repos/%s/%s/tarball/%s",
-        owner, repo, rev ? rev->to_string(Base16, false) : ref ? *ref : "master");
+        owner, repo, rev->to_string(Base16, false));
 
     std::string accessToken = settings.githubAccessToken.get();
     if (accessToken != "")
@@ -299,21 +309,15 @@ GitInfo exportGitHub(
     CachedDownloadRequest request(url);
     request.unpack = true;
     request.name = "source";
-    request.ttl = rev ? 1000000000 : settings.tarballTtl;
+    request.ttl = 1000000000;
     request.getLastModified = true;
     auto result = getDownloader()->downloadCached(store, request);
-
-    if (!result.etag)
-        throw Error("did not receive an ETag header from '%s'", url);
-
-    if (result.etag->size() != 42 || (*result.etag)[0] != '"' || (*result.etag)[41] != '"')
-        throw Error("ETag header '%s' from '%s' is not a Git revision", *result.etag, url);
 
     assert(result.lastModified);
 
     GitInfo gitInfo;
     gitInfo.storePath = result.storePath;
-    gitInfo.rev = Hash(std::string(*result.etag, 1, result.etag->size() - 2), htSHA1);
+    gitInfo.rev = *rev;
     gitInfo.lastModified = *result.lastModified;
 
     // FIXME: this can overwrite a cache file that contains a revCount.
