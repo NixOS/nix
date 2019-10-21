@@ -123,4 +123,9 @@ void MixProfile::updateProfile(const Buildables & buildables)
     updateProfile(*result);
 }
 
+MixDefaultProfile::MixDefaultProfile()
+{
+    profile = getDefaultProfile();
+}
+
 }

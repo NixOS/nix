@@ -8,6 +8,7 @@
 namespace nix {
 
 struct Value;
+struct DrvInfo;
 class EvalState;
 class SourceExprCommand;
 
@@ -88,6 +89,8 @@ struct InstallableFlake : InstallableValue
     std::vector<std::string> getActualAttrPaths();
 
     Value * getFlakeOutputs(EvalState & state, const flake::ResolvedFlake & resFlake);
+
+    std::tuple<std::string, FlakeRef, flake::EvalCache::Derivation> toDerivation();
 
     std::vector<flake::EvalCache::Derivation> toDerivations() override;
 

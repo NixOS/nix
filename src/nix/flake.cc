@@ -653,6 +653,7 @@ struct CmdFlake : virtual MultiCommand, virtual Command
     {
         if (!command)
             throw UsageError("'nix flake' requires a sub-command.");
+        command->prepare();
         command->run();
     }
 

@@ -294,7 +294,7 @@ Value * InstallableFlake::getFlakeOutputs(EvalState & state, const flake::Resolv
     return (*aOutputs)->value;
 }
 
-std::vector<flake::EvalCache::Derivation> InstallableFlake::toDerivations()
+std::tuple<std::string, FlakeRef, flake::EvalCache::Derivation> InstallableFlake::toDerivation()
 {
     auto state = cmd.getEvalState();
 
@@ -312,7 +312,7 @@ std::vector<flake::EvalCache::Derivation> InstallableFlake::toDerivations()
         auto drv = evalCache.getDerivation(fingerprint, attrPath);
         if (drv) {
             if (state->store->isValidPath(drv->drvPath))
-                return {*drv};
+                return {attrPath, resFlake.flake.sourceInfo.resolvedRef, *drv};
         }
 
         if (!vOutputs)
@@ -334,13 +334,18 @@ std::vector<flake::EvalCache::Derivation> InstallableFlake::toDerivations()
 
             evalCache.addDerivation(fingerprint, attrPath, drv);
 
-            return {drv};
+            return {attrPath, resFlake.flake.sourceInfo.resolvedRef, drv};
         } catch (AttrPathNotFound & e) {
         }
     }
 
     throw Error("flake '%s' does not provide attribute %s",
         flakeRef, concatStringsSep(", ", quoteStrings(attrPaths)));
+}
+
+std::vector<flake::EvalCache::Derivation> InstallableFlake::toDerivations()
+{
+    return {std::get<2>(toDerivation())};
 }
 
 Value * InstallableFlake::toValue(EvalState & state)

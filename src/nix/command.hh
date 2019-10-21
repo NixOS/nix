@@ -188,4 +188,9 @@ struct MixProfile : virtual Args, virtual StoreCommand
     void updateProfile(const Buildables & buildables);
 };
 
+struct MixDefaultProfile : MixProfile
+{
+    MixDefaultProfile();
+};
+
 }
