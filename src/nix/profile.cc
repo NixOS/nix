@@ -14,6 +14,7 @@ using namespace nix;
 struct ProfileElementSource
 {
     FlakeRef originalRef;
+    // FIXME: record original attrpath.
     FlakeRef resolvedRef;
     std::string attrPath;
     // FIXME: output names
@@ -193,8 +194,9 @@ struct CmdProfileInfo : virtual StoreCommand, MixDefaultProfile
     {
         ProfileManifest manifest(*profile);
 
-        for (auto & element : manifest.elements) {
-            std::cout << fmt("%s %s\n",
+        for (size_t i = 0; i < manifest.elements.size(); ++i) {
+            auto & element(manifest.elements[i]);
+            std::cout << fmt("%d %s %s\n", i,
                 element.source ? element.source->originalRef.to_string() + "#" + element.source->attrPath : "-",
                 element.source ? element.source->resolvedRef.to_string() + "#" + element.source->attrPath : "-",
                 concatStringsSep(" ", element.storePaths));
