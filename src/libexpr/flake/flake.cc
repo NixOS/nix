@@ -181,7 +181,7 @@ static SourceInfo fetchInput(EvalState & state, const FlakeRef & resolvedRef)
     else if (auto refData = std::get_if<FlakeRef::IsPath>(&resolvedRef.data)) {
         if (!pathExists(refData->path + "/.git"))
             throw Error("flake '%s' does not reference a Git repository", refData->path);
-        return doGit(exportGit(state.store, refData->path, {}, {}, "source"));
+        return doGit(exportGit(state.store, refData->path, resolvedRef.ref, resolvedRef.rev, "source"));
     }
 
     else abort();
@@ -448,10 +448,14 @@ ResolvedFlake resolveFlake(EvalState & state, const FlakeRef & topRef, HandleLoc
             + "/" + flake.sourceInfo.resolvedRef.subdir + "/flake.lock");
     }
 
+    debug("old lock file: %s", oldLockFile);
+
     RefMap refMap;
 
     LockFile lockFile(updateLocks(
             refMap, "", state, flake, handleLockFile, oldLockFile, true).second);
+
+    debug("new lock file: %s", lockFile);
 
     if (!(lockFile == oldLockFile)) {
         if (allowedToWrite(handleLockFile)) {
@@ -524,7 +528,8 @@ static void prim_callFlake(EvalState & state, const Pos & pos, Value * * args, V
         auto flake = getFlake(state, lazyInput->lockedInput.ref, false);
 
         if (flake.sourceInfo.narHash != lazyInput->lockedInput.narHash)
-            throw Error("the content hash of flake '%s' doesn't match the hash recorded in the referring lockfile", flake.sourceInfo.resolvedRef);
+            throw Error("the content hash of flake '%s' doesn't match the hash recorded in the referring lockfile",
+                lazyInput->lockedInput.ref);
 
         callFlake(state, flake, lazyInput->lockedInput, v);
     } else {
@@ -532,7 +537,8 @@ static void prim_callFlake(EvalState & state, const Pos & pos, Value * * args, V
         auto sourceInfo = getNonFlake(state, lazyInput->lockedInput.ref, false, refMap);
 
         if (sourceInfo.narHash != lazyInput->lockedInput.narHash)
-            throw Error("the content hash of repository '%s' doesn't match the hash recorded in the referring lockfile", sourceInfo.resolvedRef);
+            throw Error("the content hash of repository '%s' doesn't match the hash recorded in the referring lockfile",
+                lazyInput->lockedInput.ref);
 
         state.mkAttrs(v, 8);
 
