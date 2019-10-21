@@ -1013,8 +1013,11 @@ void LocalStore::addToStore(const ValidPathInfo & info, Source & source,
             std::unique_ptr<AbstractHashSink> hashSink;
             if (info.ca == "")
                 hashSink = std::make_unique<HashSink>(htSHA256);
-            else
+            else {
+                if (!info.references.empty())
+                    settings.requireExperimentalFeature("ca-references");
                 hashSink = std::make_unique<HashModuloSink>(htSHA256, storePathToHash(info.path));
+            }
 
             LambdaSource wrapperSource([&](unsigned char * data, size_t len) -> size_t {
                 size_t n = source.read(data, len);
