@@ -24,7 +24,7 @@ struct Sink
 
 
 /* A buffered abstract sink. */
-struct BufferedSink : Sink
+struct BufferedSink : virtual Sink
 {
     size_t bufSize, bufPos;
     std::unique_ptr<unsigned char[]> buffer;

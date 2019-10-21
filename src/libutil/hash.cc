@@ -256,23 +256,9 @@ Hash hashString(HashType ht, const string & s)
 
 Hash hashFile(HashType ht, const Path & path)
 {
-    Ctx ctx;
-    Hash hash(ht);
-    start(ht, ctx);
-
-    AutoCloseFD fd = open(path.c_str(), O_RDONLY | O_CLOEXEC);
-    if (!fd) throw SysError(format("opening file '%1%'") % path);
-
-    std::vector<unsigned char> buf(8192);
-    ssize_t n;
-    while ((n = read(fd.get(), buf.data(), buf.size()))) {
-        checkInterrupt();
-        if (n == -1) throw SysError(format("reading file '%1%'") % path);
-        update(ht, ctx, buf.data(), n);
-    }
-
-    finish(ht, ctx, hash.hash);
-    return hash;
+    HashSink sink(ht);
+    readFile(path, sink);
+    return sink.finish().first;
 }
 
 

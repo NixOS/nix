@@ -728,23 +728,6 @@ HookInstance::~HookInstance()
 //////////////////////////////////////////////////////////////////////
 
 
-typedef map<std::string, std::string> StringRewrites;
-
-
-std::string rewriteStrings(std::string s, const StringRewrites & rewrites)
-{
-    for (auto & i : rewrites) {
-        size_t j = 0;
-        while ((j = s.find(i.first, j)) != string::npos)
-            s.replace(j, i.first.size(), i.second);
-    }
-    return s;
-}
-
-
-//////////////////////////////////////////////////////////////////////
-
-
 typedef enum {rpAccept, rpDecline, rpPostpone} HookReply;
 
 class SubstitutionGoal;
@@ -866,7 +849,7 @@ private:
 #endif
 
     /* Hash rewriting. */
-    StringRewrites inputRewrites, outputRewrites;
+    StringMap inputRewrites, outputRewrites;
     typedef map<Path, Path> RedirectedOutputs;
     RedirectedOutputs redirectedOutputs;
 

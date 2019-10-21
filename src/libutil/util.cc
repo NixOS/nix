@@ -1265,6 +1265,19 @@ string replaceStrings(const std::string & s,
 }
 
 
+std::string rewriteStrings(const std::string & _s, const StringMap & rewrites)
+{
+    auto s = _s;
+    for (auto & i : rewrites) {
+        if (i.first == i.second) continue;
+        size_t j = 0;
+        while ((j = s.find(i.first, j)) != string::npos)
+            s.replace(j, i.first.size(), i.second);
+    }
+    return s;
+}
+
+
 string statusToString(int status)
 {
     if (!WIFEXITED(status) || WEXITSTATUS(status) != 0) {

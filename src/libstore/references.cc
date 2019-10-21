@@ -118,4 +118,66 @@ PathSet scanForReferences(const string & path,
 }
 
 
+RewritingSink::RewritingSink(const std::string & from, const std::string & to, Sink & nextSink)
+    : from(from), to(to), nextSink(nextSink)
+{
+    assert(from.size() == to.size());
+}
+
+void RewritingSink::operator () (const unsigned char * data, size_t len)
+{
+    std::string s(prev);
+    s.append((const char *) data, len);
+
+    size_t j = 0;
+    while ((j = s.find(from, j)) != string::npos) {
+        matches.push_back(pos + j);
+        s.replace(j, from.size(), to);
+    }
+
+    prev = s.size() < from.size() ? s : std::string(s, s.size() - from.size() + 1, from.size() - 1);
+
+    auto consumed = s.size() - prev.size();
+
+    pos += consumed;
+
+    if (consumed) nextSink((unsigned char *) s.data(), consumed);
+}
+
+void RewritingSink::flush()
+{
+    if (prev.empty()) return;
+    pos += prev.size();
+    nextSink((unsigned char *) prev.data(), prev.size());
+    prev.clear();
+}
+
+HashModuloSink::HashModuloSink(HashType ht, const std::string & modulus)
+    : hashSink(ht)
+    , rewritingSink(modulus, std::string(modulus.size(), 0), hashSink)
+{
+}
+
+void HashModuloSink::operator () (const unsigned char * data, size_t len)
+{
+    rewritingSink(data, len);
+}
+
+HashResult HashModuloSink::finish()
+{
+    rewritingSink.flush();
+
+    /* Hash the positions of the self-references. This ensures that a
+       NAR with self-references and a NAR with some of the
+       self-references already zeroed out do not produce a hash
+       collision. FIXME: proof. */
+    for (auto & pos : rewritingSink.matches) {
+        auto s = fmt("|%d", pos);
+        hashSink((unsigned char *) s.data(), s.size());
+    }
+
+    auto h = hashSink.finish();
+    return {h.first, rewritingSink.pos};
+}
+
 }

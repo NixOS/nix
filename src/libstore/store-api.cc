@@ -205,15 +205,27 @@ Path Store::makeOutputPath(const string & id,
 }
 
 
-Path Store::makeFixedOutputPath(bool recursive,
-    const Hash & hash, const string & name) const
+static std::string makeType(string && type, const PathSet & references)
 {
-    return hash.type == htSHA256 && recursive
-        ? makeStorePath("source", hash, name)
-        : makeStorePath("output:out", hashString(htSHA256,
+    for (auto & i : references) {
+        type += ":";
+        type += i;
+    }
+    return type;
+}
+
+
+Path Store::makeFixedOutputPath(bool recursive,
+    const Hash & hash, const string & name, const PathSet & references) const
+{
+    if (hash.type == htSHA256 && recursive) {
+        return makeStorePath(makeType("source", references), hash, name);
+    } else {
+        assert(references.empty());
+        return makeStorePath("output:out", hashString(htSHA256,
                 "fixed:out:" + (recursive ? (string) "r:" : "") +
-                hash.to_string(Base16) + ":"),
-            name);
+                hash.to_string(Base16) + ":"), name);
+    }
 }
 
 
@@ -224,12 +236,7 @@ Path Store::makeTextPath(const string & name, const Hash & hash,
     /* Stuff the references (if any) into the type.  This is a bit
        hacky, but we can't put them in `s' since that would be
        ambiguous. */
-    string type = "text";
-    for (auto & i : references) {
-        type += ":";
-        type += i;
-    }
-    return makeStorePath(type, hash, name);
+    return makeStorePath(makeType("text", references), hash, name);
 }
 
 
@@ -780,8 +787,9 @@ bool ValidPathInfo::isContentAddressed(const Store & store) const
     else if (hasPrefix(ca, "fixed:")) {
         bool recursive = ca.compare(6, 2, "r:") == 0;
         Hash hash(std::string(ca, recursive ? 8 : 6));
-        if (references.empty() &&
-            store.makeFixedOutputPath(recursive, hash, storePathToName(path)) == path)
+        auto refs = references;
+        replaceInSet(refs, path, std::string("self"));
+        if (store.makeFixedOutputPath(recursive, hash, storePathToName(path), refs) == path)
             return true;
         else
             warn();
