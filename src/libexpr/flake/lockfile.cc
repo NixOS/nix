@@ -1,6 +1,8 @@
 #include "lockfile.hh"
 #include "store-api.hh"
 
+#include <nlohmann/json.hpp>
+
 namespace nix::flake {
 
 LockedInput::LockedInput(const nlohmann::json & json)

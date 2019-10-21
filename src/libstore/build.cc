@@ -2521,7 +2521,7 @@ static std::regex shVarName("[A-Za-z_][A-Za-z0-9_]*");
 
 void DerivationGoal::writeStructuredAttrs()
 {
-    auto & structuredAttrs = parsedDrv->getStructuredAttrs();
+    auto structuredAttrs = parsedDrv->getStructuredAttrs();
     if (!structuredAttrs) return;
 
     auto json = *structuredAttrs;

@@ -2,7 +2,7 @@
 
 #include "flakeref.hh"
 
-#include <nlohmann/json.hpp>
+#include <nlohmann/json_fwd.hpp>
 
 namespace nix {
 class Store;
