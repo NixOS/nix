@@ -15,7 +15,7 @@ struct CmdHash : Command
     bool truncate = false;
     HashType ht = htSHA256;
     std::vector<std::string> paths;
-    std::experimental::optional<std::string> modulus;
+    std::optional<std::string> modulus;
 
     CmdHash(Mode mode) : mode(mode)
     {
