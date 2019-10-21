@@ -747,7 +747,8 @@ builtins.genList (x: x * x) 5
     files.</para>
 
     <note><para>Unlike some languages, <function>import</function> is a regular
-    function in Nix. Paths using the angle bracket syntax (e.g., <function>import</function> <replaceable>&lt;foo&gt;</replaceable>) are normal
+    function in Nix. Paths using the angle bracket syntax (e.g., <function>
+    import</function> <replaceable>&lt;foo&gt;</replaceable>) are normal path
     values (see <xref linkend='ssec-values' />).</para></note>
 
     <para>A Nix expression loaded by <function>import</function> must
