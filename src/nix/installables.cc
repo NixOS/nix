@@ -39,7 +39,7 @@ Value * SourceExprCommand::getSourceExpr(EvalState & state)
 
         auto searchPath = state.getSearchPath();
 
-        state.mkAttrs(*vSourceExpr, searchPath.size() + 1);
+        state.mkAttrs(*vSourceExpr, 1024);
 
         mkBool(*state.allocAttr(*vSourceExpr, sToplevel), true);
 
