@@ -8,6 +8,7 @@
 #include "flake/flakeref.hh"
 
 #include <nlohmann/json.hpp>
+#include <regex>
 
 using namespace nix;
 
@@ -31,6 +32,8 @@ struct ProfileElement
 struct ProfileManifest
 {
     std::vector<ProfileElement> elements;
+
+    ProfileManifest() { }
 
     ProfileManifest(const Path & profile)
     {
@@ -173,11 +176,112 @@ struct CmdProfileInstall : InstallablesCommand, MixDefaultProfile
     }
 };
 
+class MixProfileElementMatchers : virtual Args
+{
+    std::vector<std::string> _matchers;
+
+public:
+
+    MixProfileElementMatchers()
+    {
+        expectArgs("elements", &_matchers);
+    }
+
+    typedef std::variant<size_t, Path, std::regex> Matcher;
+
+    std::vector<Matcher> getMatchers(ref<Store> store)
+    {
+        std::vector<Matcher> res;
+
+        for (auto & s : _matchers) {
+            size_t n;
+            if (string2Int(s, n))
+                res.push_back(n);
+            else if (store->isStorePath(s))
+                res.push_back(s);
+            else
+                res.push_back(std::regex(s, std::regex::extended | std::regex::icase));
+        }
+
+        return res;
+    }
+
+    bool matches(const ProfileElement & element, size_t pos, std::vector<Matcher> matchers)
+    {
+        for (auto & matcher : matchers) {
+            if (auto n = std::get_if<size_t>(&matcher)) {
+                if (*n == pos) return true;
+            } else if (auto path = std::get_if<Path>(&matcher)) {
+                if (element.storePaths.count(*path)) return true;
+            } else if (auto regex = std::get_if<std::regex>(&matcher)) {
+                if (element.source
+                    && std::regex_match(element.source->attrPath, *regex))
+                    return true;
+            }
+        }
+
+        return false;
+    }
+};
+
+struct CmdProfileRemove : virtual StoreCommand, MixDefaultProfile, MixProfileElementMatchers
+{
+    std::string description() override
+    {
+        return "remove packages from a profile";
+    }
+
+    Examples examples() override
+    {
+        return {
+            Example{
+                "To remove a package by attribute path:",
+                "nix profile remove packages.x86_64-linux.hello"
+            },
+            Example{
+                "To remove all package:",
+                "nix profile remove '.*'"
+            },
+            Example{
+                "To remove a package by store path:",
+                "nix profile remove /nix/store/rr3y0c6zyk7kjjl8y19s4lsrhn4aiq1z-hello-2.10"
+            },
+            Example{
+                "To remove a package by position:",
+                "nix profile remove 3"
+            },
+        };
+    }
+
+    void run(ref<Store> store) override
+    {
+        ProfileManifest oldManifest(*profile);
+
+        auto matchers = getMatchers(store);
+
+        ProfileManifest newManifest;
+
+        for (size_t i = 0; i < oldManifest.elements.size(); ++i) {
+            auto & element(oldManifest.elements[i]);
+            if (!matches(element, i, matchers))
+                newManifest.elements.push_back(element);
+        }
+
+        // FIXME: warn about unused matchers?
+
+        printInfo("removed %d packages, kept %d packages",
+            oldManifest.elements.size() - newManifest.elements.size(),
+            newManifest.elements.size());
+
+        updateProfile(newManifest.build(store));
+    }
+};
+
 struct CmdProfileInfo : virtual StoreCommand, MixDefaultProfile
 {
     std::string description() override
     {
-        return "info";
+        return "list installed packages";
     }
 
     Examples examples() override
@@ -196,7 +300,7 @@ struct CmdProfileInfo : virtual StoreCommand, MixDefaultProfile
 
         for (size_t i = 0; i < manifest.elements.size(); ++i) {
             auto & element(manifest.elements[i]);
-            std::cout << fmt("%d %s %s\n", i,
+            std::cout << fmt("%d %s %s %s\n", i,
                 element.source ? element.source->originalRef.to_string() + "#" + element.source->attrPath : "-",
                 element.source ? element.source->resolvedRef.to_string() + "#" + element.source->attrPath : "-",
                 concatStringsSep(" ", element.storePaths));
@@ -209,6 +313,7 @@ struct CmdProfile : virtual MultiCommand, virtual Command
     CmdProfile()
         : MultiCommand({
               {"install", []() { return make_ref<CmdProfileInstall>(); }},
+              {"remove", []() { return make_ref<CmdProfileRemove>(); }},
               {"info", []() { return make_ref<CmdProfileInfo>(); }},
           })
     { }

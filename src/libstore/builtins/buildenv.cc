@@ -156,7 +156,7 @@ void buildProfile(const Path & out, Packages && pkgs)
             addPkg(pkgDir, priorityCounter++);
     }
 
-    printError("created %d symlinks in user environment", state.symlinks);
+    debug("created %d symlinks in user environment", state.symlinks);
 }
 
 void builtinBuildenv(const BasicDerivation & drv)
