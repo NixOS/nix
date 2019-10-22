@@ -3,7 +3,7 @@
 
   edition = 201909;
 
-  inputs.nixpkgs.uri = "nixpkgs/release-19.03";
+  inputs.nixpkgs.uri = "nixpkgs/release-19.09";
 
   outputs = { self, nixpkgs }:
 
@@ -73,6 +73,7 @@
             bzip2 xz brotli editline
             openssl pkgconfig sqlite boehmgc
             boost
+            nlohmann_json
 
             # Tests
             git
@@ -313,7 +314,7 @@
 
             doInstallCheck = true;
 
-            lcovFilter = [ "*/boost/*" "*-tab.*" "*/nlohmann/*" "*/linenoise/*" ];
+            lcovFilter = [ "*/boost/*" "*-tab.*" "*/linenoise/*" ];
 
             # We call `dot', and even though we just use it to
             # syntax-check generated dot files, it still requires some
