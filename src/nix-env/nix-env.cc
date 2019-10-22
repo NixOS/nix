@@ -13,6 +13,7 @@
 #include "json.hh"
 #include "value-to-json.hh"
 #include "xml-writer.hh"
+#include "legacy.hh"
 
 #include <cerrno>
 #include <ctime>
@@ -1311,12 +1312,9 @@ static void opVersion(Globals & globals, Strings opFlags, Strings opArgs)
 }
 
 
-int main(int argc, char * * argv)
+static int _main(int argc, char * * argv)
 {
-    return handleExceptions(argv[0], [&]() {
-        initNix();
-        initGC();
-
+    {
         Strings opFlags, opArgs;
         Operation op = 0;
         RepairFlag repair = NoRepair;
@@ -1428,5 +1426,9 @@ int main(int argc, char * * argv)
         op(globals, opFlags, opArgs);
 
         globals.state->printStats();
-    });
+
+        return 0;
+    }
 }
+
+static RegisterLegacyCommand s1("nix-env", _main);

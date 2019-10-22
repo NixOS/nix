@@ -167,7 +167,7 @@ Path dirOf(const Path & path)
 {
     Path::size_type pos = path.rfind('/');
     if (pos == string::npos)
-        throw Error(format("invalid file name '%1%'") % path);
+        return ".";
     return pos == 0 ? "/" : Path(path, 0, pos);
 }
 
@@ -202,7 +202,7 @@ bool isInDir(const Path & path, const Path & dir)
 
 bool isDirOrInDir(const Path & path, const Path & dir)
 {
-    return path == dir or isInDir(path, dir);
+    return path == dir || isInDir(path, dir);
 }
 
 
@@ -468,7 +468,7 @@ static Lazy<Path> getHome2([]() {
         std::vector<char> buf(16384);
         struct passwd pwbuf;
         struct passwd * pw;
-        if (getpwuid_r(getuid(), &pwbuf, buf.data(), buf.size(), &pw) != 0
+        if (getpwuid_r(geteuid(), &pwbuf, buf.data(), buf.size(), &pw) != 0
             || !pw || !pw->pw_dir || !pw->pw_dir[0])
             throw Error("cannot determine user's home directory");
         homeDir = pw->pw_dir;
@@ -494,6 +494,15 @@ Path getConfigDir()
     if (configDir.empty())
         configDir = getHome() + "/.config";
     return configDir;
+}
+
+std::vector<Path> getConfigDirs()
+{
+    Path configHome = getConfigDir();
+    string configDirs = getEnv("XDG_CONFIG_DIRS");
+    std::vector<Path> result = tokenizeString<std::vector<string>>(configDirs, ":");
+    result.insert(result.begin(), configHome);
+    return result;
 }
 
 
@@ -956,7 +965,7 @@ std::vector<char *> stringsToCharPtrs(const Strings & ss)
 
 
 string runProgram(Path program, bool searchPath, const Strings & args,
-    const std::experimental::optional<std::string> & input)
+    const std::optional<std::string> & input)
 {
     RunOptions opts(program, args);
     opts.searchPath = searchPath;

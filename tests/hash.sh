@@ -2,7 +2,7 @@ source common.sh
 
 try () {
     printf "%s" "$2" > $TEST_ROOT/vector
-    hash=$(nix-hash $EXTRA --flat --type "$1" $TEST_ROOT/vector)
+    hash=$(nix hash-file --base16 $EXTRA --type "$1" $TEST_ROOT/vector)
     if test "$hash" != "$3"; then
         echo "hash $1, expected $3, got $hash"
         exit 1
@@ -32,6 +32,12 @@ try sha512 "abcdbcdecdefdefgefghfghighijhijkijkljklmklmnlmnomnopnopq" "204a8fc6d
 EXTRA=--base32
 try sha256 "abc" "1b8m03r63zqhnjf7l5wnldhh7c134ap5vpj0850ymkq1iyzicy5s"
 EXTRA=
+
+EXTRA=--sri
+try sha512 "" "sha512-z4PhNX7vuL3xVChQ1m2AB9Yg5AULVxXcg/SpIdNs6c5H0NE8XYXysP+DGNKHfuwvY7kxvUdBeoGlODJ6+SfaPg=="
+try sha512 "abc" "sha512-3a81oZNherrMQXNJriBBMRLm+k6JqX6iCp7u5ktV05ohkpkqJ0/BqDa6PCOj/uu9RU1EI2Q86A4qmslPpUyknw=="
+try sha512 "abcdbcdecdefdefgefghfghighijhijkijkljklmklmnlmnomnopnopq" "sha512-IEqPxt2oLwoM7XvrjgikFlfBbvRosiioJ5vjMacDwzWW/RXBOxsH+aodO+pXeJygMa2Fx6cd1wNU7GMSOMo0RQ=="
+try sha256 "abcdbcdecdefdefgefghfghighijhijkijkljklmklmnlmnomnopnopq" "sha256-JI1qYdIGOLjlwCaTDD5gOaM85Flk/yFn9uzt1BnbBsE="
 
 try2 () {
     hash=$(nix-hash --type "$1" $TEST_ROOT/hash-path)
@@ -65,11 +71,15 @@ try2 md5 "f78b733a68f5edbdf9413899339eaa4a"
 try3() {
     h64=$(nix to-base64 --type "$1" "$2")
     [ "$h64" = "$4" ]
+    sri=$(nix to-sri --type "$1" "$2")
+    [ "$sri" = "$1-$4" ]
     h32=$(nix-hash --type "$1" --to-base32 "$2")
     [ "$h32" = "$3" ]
     h16=$(nix-hash --type "$1" --to-base16 "$h32")
     [ "$h16" = "$2" ]
     h16=$(nix to-base16 --type "$1" "$h64")
+    [ "$h16" = "$2" ]
+    h16=$(nix to-base16 "$sri")
     [ "$h16" = "$2" ]
 }
 try3 sha1 "800d59cfcd3c05e900cb4e214be48f6b886a08df" "vw46m23bizj4n8afrc0fj19wrp7mj3c0" "gA1Zz808BekAy04hS+SPa4hqCN8="

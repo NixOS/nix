@@ -262,12 +262,6 @@ xlink:href="http://nixos.org/">NixOS homepage</link>.</para>
 xlink:href="http://www.gnu.org/licenses/old-licenses/lgpl-2.1.html">GNU
 LGPLv2.1 or (at your option) any later version</link>.</para>
 
-<para>Nix uses the <link
-xlink:href="https://github.com/arangodb/linenoise-ng">linenoise-ng
-library</link>, which has the following license:</para>
-
-<programlisting><xi:include href="../../../src/linenoise/LICENSE" parse="text" /></programlisting>
-
 </simplesect>
 
 

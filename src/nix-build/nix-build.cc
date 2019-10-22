@@ -16,6 +16,7 @@
 #include "get-drvs.hh"
 #include "common-eval-args.hh"
 #include "attr-path.hh"
+#include "legacy.hh"
 
 using namespace nix;
 using namespace std::string_literals;
@@ -66,11 +67,8 @@ std::vector<string> shellwords(const string & s)
     return res;
 }
 
-void mainWrapped(int argc, char * * argv)
+static void _main(int argc, char * * argv)
 {
-    initNix();
-    initGC();
-
     auto dryRun = false;
     auto runEnv = std::regex_search(argv[0], std::regex("nix-shell$"));
     auto pure = false;
@@ -417,16 +415,20 @@ void mainWrapped(int argc, char * * argv)
                 "dontAddDisableDepTrack=1; "
                 "[ -e $stdenv/setup ] && source $stdenv/setup; "
                 "%3%"
+                "PATH=\"%4%:$PATH\"; "
+                "SHELL=%5%; "
                 "set +e; "
                 R"s([ -n "$PS1" ] && PS1='\n\[\033[1;32m\][nix-shell:\w]\$\[\033[0m\] '; )s"
                 "if [ \"$(type -t runHook)\" = function ]; then runHook shellHook; fi; "
                 "unset NIX_ENFORCE_PURITY; "
                 "shopt -u nullglob; "
-                "unset TZ; %4%"
-                "%5%",
+                "unset TZ; %6%"
+                "%7%",
                 (Path) tmpDir,
                 (pure ? "" : "p=$PATH; "),
                 (pure ? "" : "PATH=$PATH:$p; unset p; "),
+                dirOf(shell),
+                shell,
                 (getenv("TZ") ? (string("export TZ='") + getenv("TZ") + "'; ") : ""),
                 envCommand));
 
@@ -500,9 +502,5 @@ void mainWrapped(int argc, char * * argv)
     }
 }
 
-int main(int argc, char * * argv)
-{
-    return handleExceptions(argv[0], [&]() {
-        return mainWrapped(argc, argv);
-    });
-}
+static RegisterLegacyCommand s1("nix-build", _main);
+static RegisterLegacyCommand s2("nix-shell", _main);

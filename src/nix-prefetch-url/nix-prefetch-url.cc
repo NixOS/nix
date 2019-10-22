@@ -6,6 +6,9 @@
 #include "eval-inline.hh"
 #include "common-eval-args.hh"
 #include "attr-path.hh"
+#include "legacy.hh"
+#include "finally.hh"
+#include "progress-bar.hh"
 
 #include <iostream>
 
@@ -44,12 +47,9 @@ string resolveMirrorUri(EvalState & state, string uri)
 }
 
 
-int main(int argc, char * * argv)
+static int _main(int argc, char * * argv)
 {
-    return handleExceptions(argv[0], [&]() {
-        initNix();
-        initGC();
-
+    {
         HashType ht = htSHA256;
         std::vector<string> args;
         bool printPath = getEnv("PRINT_PATH") != "";
@@ -97,6 +97,11 @@ int main(int argc, char * * argv)
 
         if (args.size() > 2)
             throw UsageError("too many arguments");
+
+        Finally f([]() { stopProgressBar(); });
+
+        if (isatty(STDERR_FILENO))
+          startProgressBar();
 
         auto store = openStore();
         auto state = std::make_unique<EvalState>(myArgs.searchPath, store);
@@ -215,11 +220,17 @@ int main(int argc, char * * argv)
             assert(storePath == store->makeFixedOutputPath(unpack, hash, name));
         }
 
+        stopProgressBar();
+
         if (!printPath)
             printInfo(format("path is '%1%'") % storePath);
 
         std::cout << printHash16or32(hash) << std::endl;
         if (printPath)
             std::cout << storePath << std::endl;
-    });
+
+        return 0;
+    }
 }
+
+static RegisterLegacyCommand s1("nix-prefetch-url", _main);

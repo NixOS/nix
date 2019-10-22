@@ -32,6 +32,8 @@ class Settings : public Config {
 
     unsigned int getDefaultCores();
 
+    StringSet getDefaultSystemFeatures();
+
 public:
 
     Settings();
@@ -80,9 +82,9 @@ public:
     /* Whether to show build log output in real time. */
     bool verboseBuild = true;
 
-    /* If verboseBuild is false, the number of lines of the tail of
-       the log to show if a build fails. */
-    size_t logLines = 10;
+    Setting<size_t> logLines{this, 10, "log-lines",
+        "If verbose-build is false, the number of lines of the tail of "
+        "the log to show if a build fails."};
 
     MaxBuildJobsSetting maxBuildJobs{this, 1, "max-jobs",
         "Maximum number of parallel build jobs. \"auto\" means use number of cores.",
@@ -193,7 +195,13 @@ public:
     Setting<bool> showTrace{this, false, "show-trace",
         "Whether to show a stack trace on evaluation errors."};
 
-    Setting<SandboxMode> sandboxMode{this, smDisabled, "sandbox",
+    Setting<SandboxMode> sandboxMode{this,
+        #if __linux__
+          smEnabled
+        #else
+          smDisabled
+        #endif
+        , "sandbox",
         "Whether to enable sandboxed builds. Can be \"true\", \"false\" or \"relaxed\".",
         {"build-use-chroot", "build-use-sandbox"}};
 
@@ -260,6 +268,10 @@ public:
         "Additional platforms that can be built on the local system. "
         "These may be supported natively (e.g. armv7 on some aarch64 CPUs "
         "or using hacks like qemu-user."};
+
+    Setting<StringSet> systemFeatures{this, getDefaultSystemFeatures(),
+        "system-features",
+        "Optional features that this system implements (like \"kvm\")."};
 
     Setting<Strings> substituters{this,
         nixStore == "/nix/store" ? Strings{"https://cache.nixos.org/"} : Strings(),

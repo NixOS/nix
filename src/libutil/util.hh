@@ -14,7 +14,7 @@
 #include <cstdio>
 #include <map>
 #include <sstream>
-#include <experimental/optional>
+#include <optional>
 #include <future>
 
 #ifndef HAVE_STRUCT_DIRENT_D_TYPE
@@ -130,6 +130,9 @@ Path getCacheDir();
 
 /* Return $XDG_CONFIG_HOME or $HOME/.config. */
 Path getConfigDir();
+
+/* Return the directories to search for user configuration files */
+std::vector<Path> getConfigDirs();
 
 /* Return $XDG_DATA_HOME or $HOME/.local/share. */
 Path getDataDir();
@@ -256,14 +259,14 @@ pid_t startProcess(std::function<void()> fun, const ProcessOptions & options = P
    shell backtick operator). */
 string runProgram(Path program, bool searchPath = false,
     const Strings & args = Strings(),
-    const std::experimental::optional<std::string> & input = {});
+    const std::optional<std::string> & input = {});
 
 struct RunOptions
 {
     Path program;
     bool searchPath = true;
     Strings args;
-    std::experimental::optional<std::string> input;
+    std::optional<std::string> input;
     Source * standardIn = nullptr;
     Sink * standardOut = nullptr;
     bool _killStderr = false;

@@ -1,7 +1,16 @@
 #include <iostream>
 #include <cstdlib>
+#include <cstring>
+#include <climits>
 
 #include <setjmp.h>
+
+#ifdef READLINE
+#include <readline/history.h>
+#include <readline/readline.h>
+#else
+#include <editline.h>
+#endif
 
 #include "shared.hh"
 #include "eval.hh"
@@ -14,8 +23,6 @@
 #include "globals.hh"
 #include "command.hh"
 #include "finally.hh"
-
-#include "src/linenoise/linenoise.h"
 
 namespace nix {
 
@@ -31,6 +38,7 @@ struct NixRepl
 {
     string curDir;
     EvalState state;
+    Bindings * autoArgs;
 
     Strings loadedFiles;
 
@@ -117,17 +125,71 @@ NixRepl::NixRepl(const Strings & searchPath, nix::ref<Store> store)
 
 NixRepl::~NixRepl()
 {
-    linenoiseHistorySave(historyFile.c_str());
+    write_history(historyFile.c_str());
 }
-
 
 static NixRepl * curRepl; // ugly
 
-static void completionCallback(const char * s, linenoiseCompletions *lc)
-{
-    /* Otherwise, return all symbols that start with the prefix. */
-    for (auto & c : curRepl->completePrefix(s))
-        linenoiseAddCompletion(lc, c.c_str());
+static char * completionCallback(char * s, int *match) {
+  auto possible = curRepl->completePrefix(s);
+  if (possible.size() == 1) {
+    *match = 1;
+    auto *res = strdup(possible.begin()->c_str() + strlen(s));
+    if (!res) throw Error("allocation failure");
+    return res;
+  } else if (possible.size() > 1) {
+    auto checkAllHaveSameAt = [&](size_t pos) {
+      auto &first = *possible.begin();
+      for (auto &p : possible) {
+        if (p.size() <= pos || p[pos] != first[pos])
+          return false;
+      }
+      return true;
+    };
+    size_t start = strlen(s);
+    size_t len = 0;
+    while (checkAllHaveSameAt(start + len)) ++len;
+    if (len > 0) {
+      *match = 1;
+      auto *res = strdup(std::string(*possible.begin(), start, len).c_str());
+      if (!res) throw Error("allocation failure");
+      return res;
+    }
+  }
+
+  *match = 0;
+  return nullptr;
+}
+
+static int listPossibleCallback(char *s, char ***avp) {
+  auto possible = curRepl->completePrefix(s);
+
+  if (possible.size() > (INT_MAX / sizeof(char*)))
+    throw Error("too many completions");
+
+  int ac = 0;
+  char **vp = nullptr;
+
+  auto check = [&](auto *p) {
+    if (!p) {
+      if (vp) {
+        while (--ac >= 0)
+          free(vp[ac]);
+        free(vp);
+      }
+      throw Error("allocation failure");
+    }
+    return p;
+  };
+
+  vp = check((char **)malloc(possible.size() * sizeof(char*)));
+
+  for (auto & p : possible)
+    vp[ac++] = check(strdup(p.c_str()));
+
+  *avp = vp;
+
+  return ac;
 }
 
 
@@ -142,12 +204,18 @@ void NixRepl::mainLoop(const std::vector<std::string> & files)
     reloadFiles();
     if (!loadedFiles.empty()) std::cout << std::endl;
 
+    // Allow nix-repl specific settings in .inputrc
+    rl_readline_name = "nix-repl";
     createDirs(dirOf(historyFile));
-    linenoiseHistorySetMaxLen(1000);
-    linenoiseHistoryLoad(historyFile.c_str());
-
+#ifndef READLINE
+    el_hist_size = 1000;
+#endif
+    read_history(historyFile.c_str());
     curRepl = this;
-    linenoiseSetCompletionCallback(completionCallback);
+#ifndef READLINE
+    rl_set_complete_func(completionCallback);
+    rl_set_list_possib_func(listPossibleCallback);
+#endif
 
     std::string input;
 
@@ -173,12 +241,6 @@ void NixRepl::mainLoop(const std::vector<std::string> & files)
             printMsg(lvlError, format(error + "%1%%2%") % (settings.showTrace ? e.prefix() : "") % e.msg());
         }
 
-        if (input.size() > 0) {
-            // Remove trailing newline before adding to history
-            input.erase(input.size() - 1);
-            linenoiseHistoryAdd(input.c_str());
-        }
-
         // We handled the current input fully, so we should clear it
         // and read brand new input.
         input.clear();
@@ -189,19 +251,10 @@ void NixRepl::mainLoop(const std::vector<std::string> & files)
 
 bool NixRepl::getLine(string & input, const std::string &prompt)
 {
-    char * s = linenoise(prompt.c_str());
+    char * s = readline(prompt.c_str());
     Finally doFree([&]() { free(s); });
-    if (!s) {
-      switch (auto type = linenoiseKeyType()) {
-        case 1: // ctrl-C
-          input = "";
-          return true;
-        case 2: // ctrl-D
-          return false;
-        default:
-          throw Error(format("Unexpected linenoise keytype: %1%") % type);
-      }
-    }
+    if (!s)
+      return false;
     input += s;
     input += '\n';
     return true;
@@ -390,7 +443,7 @@ bool NixRepl::processLine(string line)
             /* We could do the build in this process using buildPaths(),
                but doing it in a child makes it easier to recover from
                problems / SIGINT. */
-            if (runProgram(settings.nixBinDir + "/nix", Strings{"build", drvPath}) == 0) {
+            if (runProgram(settings.nixBinDir + "/nix", Strings{"build", "--no-link", drvPath}) == 0) {
                 Derivation drv = readDerivation(drvPath);
                 std::cout << std::endl << "this derivation produced the following outputs:" << std::endl;
                 for (auto & i : drv.outputs)
@@ -446,8 +499,7 @@ void NixRepl::loadFile(const Path & path)
     loadedFiles.push_back(path);
     Value v, v2;
     state.evalFile(lookupFileArg(state, path), v);
-    Bindings & bindings(*state.allocBindings(0));
-    state.autoCallFunction(bindings, v, v2);
+    state.autoCallFunction(*autoArgs, v, v2);
     addAttrsToScope(v2);
 }
 
@@ -589,30 +641,13 @@ std::ostream & NixRepl::printValue(std::ostream & str, Value & v, unsigned int m
             for (auto & i : *v.attrs)
                 sorted[i.name] = i.value;
 
-            /* If this is a derivation, then don't show the
-               self-references ("all", "out", etc.). */
-            StringSet hidden;
-            if (isDrv) {
-                hidden.insert("all");
-                Bindings::iterator i = v.attrs->find(state.sOutputs);
-                if (i == v.attrs->end())
-                    hidden.insert("out");
-                else {
-                    state.forceList(*i->value);
-                    for (unsigned int j = 0; j < i->value->listSize(); ++j)
-                        hidden.insert(state.forceStringNoCtx(*i->value->listElems()[j]));
-                }
-            }
-
             for (auto & i : sorted) {
                 if (isVarName(i.first))
                     str << i.first;
                 else
                     printStringValue(str, i.first.c_str());
                 str << " = ";
-                if (hidden.find(i.first) != hidden.end())
-                    str << "«...»";
-                else if (seen.find(i.second) != seen.end())
+                if (seen.find(i.second) != seen.end())
                     str << "«repeated»";
                 else
                     try {
@@ -699,6 +734,7 @@ struct CmdRepl : StoreCommand, MixEvalArgs
     void run(ref<Store> store) override
     {
         auto repl = std::make_unique<NixRepl>(searchPath, openStore());
+        repl->autoArgs = getAutoArgs(repl->state);
         repl->mainLoop(files);
     }
 };

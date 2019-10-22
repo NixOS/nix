@@ -320,6 +320,8 @@ ref<const ValidPathInfo> Store::queryPathInfo(const Path & storePath)
 void Store::queryPathInfo(const Path & storePath,
     Callback<ref<ValidPathInfo>> callback)
 {
+    assertStorePath(storePath);
+
     auto hashPart = storePathToHash(storePath);
 
     try {
@@ -560,10 +562,10 @@ void Store::buildPaths(const PathSet & paths, BuildMode buildMode)
 {
     for (auto & path : paths)
         if (isDerivation(path))
-            unsupported();
+            unsupported("buildPaths");
 
     if (queryValidPaths(paths).size() != paths.size())
-        unsupported();
+        unsupported("buildPaths");
 }
 
 
@@ -586,15 +588,19 @@ void copyStorePath(ref<Store> srcStore, ref<Store> dstStore,
 
     uint64_t total = 0;
 
-    // FIXME
-#if 0
     if (!info->narHash) {
+        StringSink sink;
+        srcStore->narFromPath({storePath}, sink);
         auto info2 = make_ref<ValidPathInfo>(*info);
         info2->narHash = hashString(htSHA256, *sink.s);
         if (!info->narSize) info2->narSize = sink.s->size();
+        if (info->ultimate) info2->ultimate = false;
         info = info2;
+
+        StringSource source(*sink.s);
+        dstStore->addToStore(*info, source, repair, checkSigs);
+        return;
     }
-#endif
 
     if (info->ultimate) {
         auto info2 = make_ref<ValidPathInfo>(*info);
@@ -610,7 +616,7 @@ void copyStorePath(ref<Store> srcStore, ref<Store> dstStore,
         });
         srcStore->narFromPath({storePath}, wrapperSink);
     }, [&]() {
-	throw EndOfFile("NAR for '%s' fetched from '%s' is incomplete", storePath, srcStore->getUri());
+        throw EndOfFile("NAR for '%s' fetched from '%s' is incomplete", storePath, srcStore->getUri());
     });
 
     dstStore->addToStore(*info, *source, repair, checkSigs);
@@ -836,12 +842,11 @@ namespace nix {
 
 RegisterStoreImplementation::Implementations * RegisterStoreImplementation::implementations = 0;
 
-
-ref<Store> openStore(const std::string & uri_,
-    const Store::Params & extraParams)
+/* Split URI into protocol+hierarchy part and its parameter set. */
+std::pair<std::string, Store::Params> splitUriAndParams(const std::string & uri_)
 {
     auto uri(uri_);
-    Store::Params params(extraParams);
+    Store::Params params;
     auto q = uri.find('?');
     if (q != std::string::npos) {
         for (auto s : tokenizeString<Strings>(uri.substr(q + 1), "&")) {
@@ -867,6 +872,15 @@ ref<Store> openStore(const std::string & uri_,
         }
         uri = uri_.substr(0, q);
     }
+    return {uri, params};
+}
+
+ref<Store> openStore(const std::string & uri_,
+    const Store::Params & extraParams)
+{
+    auto [uri, uriParams] = splitUriAndParams(uri_);
+    auto params = extraParams;
+    params.insert(uriParams.begin(), uriParams.end());
 
     for (auto fun : *RegisterStoreImplementation::implementations) {
         auto store = fun(uri, params);

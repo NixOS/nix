@@ -109,12 +109,6 @@ for i in $(cd "$self/store" >/dev/null && echo ./*); do
 done
 echo "" >&2
 
-echo "initialising Nix database..." >&2
-if ! $nix/bin/nix-store --init; then
-    echo "$0: failed to initialize the Nix database" >&2
-    exit 1
-fi
-
 if ! "$nix/bin/nix-store" --load-db < "$self/.reginfo"; then
     echo "$0: unable to register valid paths" >&2
     exit 1

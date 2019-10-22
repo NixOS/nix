@@ -3,6 +3,7 @@
 #include "download.hh"
 #include "store-api.hh"
 #include "pathlocks.hh"
+#include "hash.hh"
 
 #include <sys/time.h>
 
@@ -25,7 +26,7 @@ struct GitInfo
 std::regex revRegex("^[0-9a-fA-F]{40}$");
 
 GitInfo exportGit(ref<Store> store, const std::string & uri,
-    std::experimental::optional<std::string> ref, std::string rev,
+    std::optional<std::string> ref, std::string rev,
     const std::string & name)
 {
     if (evalSettings.pureEval && rev == "")
@@ -84,15 +85,16 @@ GitInfo exportGit(ref<Store> store, const std::string & uri,
     if (rev != "" && !std::regex_match(rev, revRegex))
         throw Error("invalid Git revision '%s'", rev);
 
-    Path cacheDir = getCacheDir() + "/nix/git";
+    deletePath(getCacheDir() + "/nix/git");
+
+    Path cacheDir = getCacheDir() + "/nix/gitv2/" + hashString(htSHA256, uri).to_string(Base32, false);
 
     if (!pathExists(cacheDir)) {
+        createDirs(dirOf(cacheDir));
         runProgram("git", true, { "init", "--bare", cacheDir });
     }
 
-    std::string localRef = hashString(htSHA256, fmt("%s-%s", uri, *ref)).to_string(Base32, false);
-
-    Path localRefFile = cacheDir + "/refs/heads/" + localRef;
+    Path localRefFile = cacheDir + "/refs/heads/" + *ref;
 
     bool doFetch;
     time_t now = time(0);
@@ -122,7 +124,7 @@ GitInfo exportGit(ref<Store> store, const std::string & uri,
 
         // FIXME: git stderr messes up our progress indicator, so
         // we're using --quiet for now. Should process its stderr.
-        runProgram("git", true, { "-C", cacheDir, "fetch", "--quiet", "--force", "--", uri, *ref + ":" + localRef });
+        runProgram("git", true, { "-C", cacheDir, "fetch", "--quiet", "--force", "--", uri, fmt("%s:%s", *ref, *ref) });
 
         struct timeval times[2];
         times[0].tv_sec = now;
@@ -188,7 +190,7 @@ GitInfo exportGit(ref<Store> store, const std::string & uri,
 static void prim_fetchGit(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
     std::string url;
-    std::experimental::optional<std::string> ref;
+    std::optional<std::string> ref;
     std::string rev;
     std::string name = "source";
     PathSet context;

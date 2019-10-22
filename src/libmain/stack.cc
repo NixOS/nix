@@ -63,7 +63,7 @@ void detectStackOverflow()
     act.sa_sigaction = sigsegvHandler;
     act.sa_flags = SA_SIGINFO | SA_ONSTACK;
     if (sigaction(SIGSEGV, &act, 0))
-        throw SysError("resetting SIGCHLD");
+        throw SysError("resetting SIGSEGV");
 #endif
 }
 

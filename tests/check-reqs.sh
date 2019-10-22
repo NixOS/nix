@@ -1,5 +1,7 @@
 source common.sh
 
+clearStore
+
 RESULT=$TEST_ROOT/result
 
 nix-build -o $RESULT check-reqs.nix -A test1

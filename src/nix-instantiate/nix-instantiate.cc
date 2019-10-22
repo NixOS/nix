@@ -9,6 +9,7 @@
 #include "util.hh"
 #include "store-api.hh"
 #include "common-eval-args.hh"
+#include "legacy.hh"
 
 #include <map>
 #include <iostream>
@@ -83,12 +84,9 @@ void processExpr(EvalState & state, const Strings & attrPaths,
 }
 
 
-int main(int argc, char * * argv)
+static int _main(int argc, char * * argv)
 {
-    return handleExceptions(argv[0], [&]() {
-        initNix();
-        initGC();
-
+    {
         Strings files;
         bool readStdin = false;
         bool fromArgs = false;
@@ -171,7 +169,7 @@ int main(int argc, char * * argv)
                 if (p == "") throw Error(format("unable to find '%1%'") % i);
                 std::cout << p << std::endl;
             }
-            return;
+            return 0;
         }
 
         if (readStdin) {
@@ -190,5 +188,9 @@ int main(int argc, char * * argv)
         }
 
         state->printStats();
-    });
+
+        return 0;
+    }
 }
+
+static RegisterLegacyCommand s1("nix-instantiate", _main);
