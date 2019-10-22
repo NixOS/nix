@@ -50,6 +50,7 @@ rec {
       bzip2 xz brotli editline
       openssl pkgconfig sqlite boehmgc
       boost
+      nlohmann_json
 
       # Tests
       git
