@@ -13,7 +13,7 @@ if [[ "$(uname)" =~ ^MINGW|^MSYS ]]; then
 fi
 
 
-rm -rf $repo ${repo}-tmp $TEST_HOME/.cache/nix/git
+rm -rf $repo ${repo}-tmp $TEST_HOME/.cache/nix/gitv2
 
 git init $repo
 git -C $repo config user.email "foobar@example.com"
@@ -137,7 +137,7 @@ path5=$(nix eval --raw "(builtins.fetchGit { url = $repo; ref = \"dev\"; }).outP
 
 
 # Nuke the cache
-rm -rf $TEST_HOME/.cache/nix/git
+rm -rf $TEST_HOME/.cache/nix/gitv2
 
 # Try again, but without 'git' on PATH
 NIX=$(command -v nix)

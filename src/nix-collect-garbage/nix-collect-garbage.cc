@@ -2,6 +2,7 @@
 #include "profiles.hh"
 #include "shared.hh"
 #include "globals.hh"
+#include "legacy.hh"
 
 #include <iostream>
 #include <cerrno>
@@ -54,12 +55,10 @@ void removeOldGenerations(std::string dir)
 #endif
 }
 
-int main(int argc, char * * argv)
+static int _main(int argc, char * * argv)
 {
-    bool removeOld = false;
-
-    return handleExceptions(argv[0], [&]() {
-        initNix();
+    {
+        bool removeOld = false;
 
         GCOptions options;
 
@@ -96,5 +95,9 @@ int main(int argc, char * * argv)
             PrintFreed freed(true, results);
             store->collectGarbage(options, results);
         }
-    });
+
+        return 0;
+    }
 }
+
+static RegisterLegacyCommand s1("nix-collect-garbage", _main);

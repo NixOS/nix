@@ -1,13 +1,12 @@
 #include "shared.hh"
 #include "store-api.hh"
+#include "legacy.hh"
 
 using namespace nix;
 
-int main(int argc, char ** argv)
+static int _main(int argc, char ** argv)
 {
-    return handleExceptions(argv[0], [&]() {
-        initNix();
-
+    {
         auto gzip = false;
         auto toMode = true;
         auto includeOutputs = false;
@@ -61,5 +60,9 @@ int main(int argc, char ** argv)
         from->computeFSClosure(storePaths2, closure, false, includeOutputs);
 
         copyPaths(from, to, closure, NoRepair, NoCheckSigs, useSubstitutes);
-    });
+
+        return 0;
+    }
 }
+
+static RegisterLegacyCommand s1("nix-copy-closure", _main);

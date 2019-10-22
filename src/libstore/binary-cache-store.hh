@@ -72,24 +72,11 @@ public:
 
     bool isValidPathUncached(const Path & path) override;
 
-    PathSet queryAllValidPaths() override
-    { unsupported(); }
-
     void queryPathInfoUncached(const Path & path,
         Callback<std::shared_ptr<ValidPathInfo>> callback) override;
 
-    void queryReferrers(const Path & path,
-        PathSet & referrers) override
-    { unsupported(); }
-
-    PathSet queryDerivationOutputs(const Path & path) override
-    { unsupported(); }
-
-    StringSet queryDerivationOutputNames(const Path & path) override
-    { unsupported(); }
-
     Path queryPathFromHashPart(const string & hashPart) override
-    { unsupported(); }
+    { unsupported("queryPathFromHashPart"); }
 
     bool wantMassQuery() override { return wantMassQuery_; }
 
@@ -108,22 +95,10 @@ public:
 
     BuildResult buildDerivation(const Path & drvPath, const BasicDerivation & drv,
         BuildMode buildMode) override
-    { unsupported(); }
+    { unsupported("buildDerivation"); }
 
     void ensurePath(const Path & path) override
-    { unsupported(); }
-
-    void addTempRoot(const Path & path) override
-    { unsupported(); }
-
-    void addIndirectRoot(const Path & path) override
-    { unsupported(); }
-
-    Roots findRoots() override
-    { unsupported(); }
-
-    void collectGarbage(const GCOptions & options, GCResults & results) override
-    { unsupported(); }
+    { unsupported("ensurePath"); }
 
     ref<FSAccessor> getFSAccessor() override;
 

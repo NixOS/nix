@@ -16,13 +16,7 @@
 #include <cstdio>
 #include <map>
 #include <sstream>
-#ifdef _MSC_VER
 #include <optional>
-using std::optional;
-#else
-#include <experimental/optional>
-using std::experimental::optional;
-#endif
 #include <future>
 
 #ifdef _WIN32
@@ -190,6 +184,9 @@ Path getCacheDir();
 
 /* Return $XDG_CONFIG_HOME or $HOME/.config. */
 Path getConfigDir();
+
+/* Return the directories to search for user configuration files */
+std::vector<Path> getConfigDirs();
 
 /* Return $XDG_DATA_HOME or $HOME/.local/share. */
 Path getDataDir();
@@ -397,14 +394,14 @@ pid_t startProcess(std::function<void()> fun, const ProcessOptions & options = P
    shell backtick operator). */
 string runProgramGetStdout(Path program, bool searchPath = false,
     const Strings & args = Strings(),
-    const optional<std::string> & input = {});
+    const std::optional<std::string> & input = {});
 
 struct RunOptions
 {
     Path program;
     bool searchPath = true;
     Strings args; // TODO: unicode on Windows?
-    optional<std::string> input;
+    std::optional<std::string> input;
     Source * standardIn = nullptr;
     Sink * standardOut = nullptr;
     bool _killStderr = false;

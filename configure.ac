@@ -62,8 +62,9 @@ CXXFLAGS=
 AC_PROG_CC
 AC_PROG_CXX
 AC_PROG_CPP
-AX_CXX_COMPILE_STDCXX_14
+AX_CXX_COMPILE_STDCXX_17
 
+AC_CHECK_TOOL([AR], [ar])
 
 # Use 64-bit file system calls so that we can support files > 2 GiB.
 AC_SYS_LARGEFILE
@@ -127,8 +128,6 @@ NEED_PROG(bzip2, bzip2)
 NEED_PROG(gzip, gzip)
 NEED_PROG(xz, xz)
 AC_PATH_PROG(dot, dot)
-AC_PATH_PROG(pv, pv, pv)
-AC_PATH_PROGS(brotli, brotli bro, bro)
 AC_PATH_PROG(lsof, lsof, lsof)
 
 
@@ -164,6 +163,8 @@ PKG_CHECK_MODULES([SQLITE3], [sqlite3 >= 3.6.19], [CXXFLAGS="$SQLITE3_CFLAGS $CX
 # Look for libcurl, a required dependency.
 PKG_CHECK_MODULES([LIBCURL], [libcurl], [CXXFLAGS="$LIBCURL_CFLAGS $CXXFLAGS"])
 
+# Look for editline, a required dependency.
+PKG_CHECK_MODULES([EDITLINE], [libeditline], [CXXFLAGS="$EDITLINE_CFLAGS $CXXFLAGS"])
 
 # Look for libsodium, an optional dependency.
 PKG_CHECK_MODULES([SODIUM], [libsodium],
@@ -253,11 +254,6 @@ if test "$(uname)" = "Darwin"; then
 fi
 
 
-# Figure out the extension of dynamic libraries.
-eval dynlib_suffix=$shrext_cmds
-AC_SUBST(dynlib_suffix)
-
-
 # Do we have GNU tar?
 AC_MSG_CHECKING([if you have a recent GNU tar])
 if $tar --version 2> /dev/null | grep -q GNU && tar cvf /dev/null --warning=no-timestamp ./config.log > /dev/null; then
@@ -273,6 +269,15 @@ AC_ARG_WITH(sandbox-shell, AC_HELP_STRING([--with-sandbox-shell=PATH],
   [path of a statically-linked shell to use as /bin/sh in sandboxes]),
   sandbox_shell=$withval)
 AC_SUBST(sandbox_shell)
+
+AC_ARG_ENABLE(shared, AC_HELP_STRING([--enable-shared],
+  [Build shared libraries for Nix [default=yes]]),
+  shared=$enableval, shared=yes)
+if test "$shared" = yes; then
+  AC_SUBST(BUILD_SHARED_LIBS, 1, [Whether to build shared libraries.])
+else
+  AC_SUBST(BUILD_SHARED_LIBS, 0, [Whether to build shared libraries.])
+fi
 
 
 # Expand all variables in config.status.

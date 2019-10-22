@@ -120,7 +120,7 @@ struct CmdVerify : StorePathsCommand
                             for (auto sig : sigs) {
                                 if (sigsSeen.count(sig)) continue;
                                 sigsSeen.insert(sig);
-                                if (info->checkSignature(publicKeys, sig))
+                                if (validSigs < ValidPathInfo::maxSigs && info->checkSignature(publicKeys, sig))
                                     validSigs++;
                             }
                         };

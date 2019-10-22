@@ -17,6 +17,9 @@ else
   [ "$(nix-store -q --roots $outPath)" = "$NIX_STATE_DIR"/gcroots/foo ]
 fi
 
+# TODO is not MinGW
+false && \
+  [ "$(nix-store -q --roots $outPath)" = "$NIX_STATE_DIR/gcroots/foo -> $outPath" ]
 
 nix-store --gc --print-roots | grep $outPath
 nix-store --gc --print-live | grep $outPath

@@ -14,6 +14,7 @@ class Pid;
 struct FdSink;
 struct FdSource;
 template<typename T> class Pool;
+struct ConnectionHandle;
 
 
 /* FIXME: RemoteStore is a misnomer - should be something like
@@ -81,7 +82,7 @@ public:
 
     void syncWithGC() override;
 
-    Roots findRoots() override;
+    Roots findRoots(bool censor) override;
 
     void collectGarbage(const GCOptions & options, GCResults & results) override;
 
@@ -97,12 +98,15 @@ public:
 
     void connect() override;
 
+    unsigned int getProtocol() override;
+
     void flushBadConnections();
 
 protected:
 
     struct Connection
     {
+        AutoCloseFD fd;
         FdSink to;
         FdSource from;
         unsigned int daemonVersion;
@@ -110,7 +114,7 @@ protected:
 
         virtual ~Connection();
 
-        void processStderr(Sink * sink = 0, Source * source = 0);
+        std::exception_ptr processStderr(Sink * sink = 0, Source * source = 0);
     };
 
     ref<Connection> openConnectionWrapper();
@@ -122,6 +126,10 @@ protected:
     ref<Pool<Connection>> connections;
 
     virtual void setOptions(Connection & conn);
+
+    ConnectionHandle getConnection();
+
+    friend struct ConnectionHandle;
 
 private:
 
@@ -140,17 +148,8 @@ public:
 
 private:
 
-    struct Connection : RemoteStore::Connection
-    {
-#ifndef _WIN32
-        AutoCloseFD fd;
-#else
-        AutoCloseWindowsHandle handle;
-#endif
-    };
-
     ref<RemoteStore::Connection> openConnection() override;
-    optional<std::string> path;
+    std::optional<std::string> path;
 };
 
 

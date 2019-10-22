@@ -6,9 +6,13 @@
 #include "globals.hh"
 #include "eval-inline.hh"
 #include "download.hh"
+#include "json.hh"
 
 #include <algorithm>
 #include <cstring>
+#include <iostream>
+#include <fstream>
+
 #ifndef _MSC_VER
 #include <unistd.h>
 #include <sys/time.h>
@@ -23,7 +27,6 @@
 #include <gc/gc_cpp.h>
 
 #endif
-
 
 namespace nix {
 
@@ -767,6 +770,7 @@ void EvalState::evalFile(const Path & path_, Value & v)
 void EvalState::resetFileCache()
 {
     fileEvalCache.clear();
+    fileParseCache.clear();
 }
 
 
@@ -1749,13 +1753,10 @@ bool EvalState::eqValues(Value & v1, Value & v2)
     }
 }
 
-
 void EvalState::printStats()
 {
     bool showStats = getEnv("NIX_SHOW_STATS", "0") != "0";
-    Verbosity v = showStats ? lvlInfo : lvlDebug;
-    printMsg(v, "evaluation statistics:");
-#ifndef _WIN32
+
     struct rusage buf;
     getrusage(RUSAGE_SELF, &buf);
     float cpuTime = buf.ru_utime.tv_sec + ((float) buf.ru_utime.tv_usec / 1000000);
@@ -1765,64 +1766,101 @@ void EvalState::printStats()
     uint64_t bValues = nrValues * sizeof(Value);
     uint64_t bAttrsets = nrAttrsets * sizeof(Bindings) + nrAttrsInAttrsets * sizeof(Attr);
 
-#ifndef _WIN32
-    printMsg(v, format("  time elapsed: %1%") % cpuTime);
-#endif
-    printMsg(v, format("  size of a value: %1%") % sizeof(Value));
-    printMsg(v, format("  size of an attr: %1%") % sizeof(Attr));
-    printMsg(v, format("  environments allocated count: %1%") % nrEnvs);
-    printMsg(v, format("  environments allocated bytes: %1%") % bEnvs);
-    printMsg(v, format("  list elements count: %1%") % nrListElems);
-    printMsg(v, format("  list elements bytes: %1%") % bLists);
-    printMsg(v, format("  list concatenations: %1%") % nrListConcats);
-    printMsg(v, format("  values allocated count: %1%") % nrValues);
-    printMsg(v, format("  values allocated bytes: %1%") % bValues);
-    printMsg(v, format("  sets allocated: %1% (%2% bytes)") % nrAttrsets % bAttrsets);
-    printMsg(v, format("  right-biased unions: %1%") % nrOpUpdates);
-    printMsg(v, format("  values copied in right-biased unions: %1%") % nrOpUpdateValuesCopied);
-    printMsg(v, format("  symbols in symbol table: %1%") % symbols.size());
-    printMsg(v, format("  size of symbol table: %1%") % symbols.totalSize());
-    printMsg(v, format("  number of thunks: %1%") % nrThunks);
-    printMsg(v, format("  number of thunks avoided: %1%") % nrAvoided);
-    printMsg(v, format("  number of attr lookups: %1%") % nrLookups);
-    printMsg(v, format("  number of primop calls: %1%") % nrPrimOpCalls);
-    printMsg(v, format("  number of function calls: %1%") % nrFunctionCalls);
-    printMsg(v, format("  total allocations: %1% bytes") % (bEnvs + bLists + bValues + bAttrsets));
-
 #if HAVE_BOEHMGC
     GC_word heapSize, totalBytes;
     GC_get_heap_usage_safe(&heapSize, 0, 0, 0, &totalBytes);
-    printMsg(v, format("  current Boehm heap size: %1% bytes") % heapSize);
-    printMsg(v, format("  total Boehm heap allocations: %1% bytes") % totalBytes);
 #endif
-
-    if (countCalls) {
-        v = lvlInfo;
-
-        printMsg(v, format("calls to %1% primops:") % primOpCalls.size());
-        typedef std::multimap<size_t, Symbol> PrimOpCalls_;
-        PrimOpCalls_ primOpCalls_;
-        for (auto & i : primOpCalls)
-            primOpCalls_.insert(std::pair<size_t, Symbol>(i.second, i.first));
-        for (auto i = primOpCalls_.rbegin(); i != primOpCalls_.rend(); ++i)
-            printMsg(v, format("%1$10d %2%") % i->first % i->second);
-
-        printMsg(v, format("calls to %1% functions:") % functionCalls.size());
-        typedef std::multimap<size_t, ExprLambda *> FunctionCalls_;
-        FunctionCalls_ functionCalls_;
-        for (auto & i : functionCalls)
-            functionCalls_.insert(std::pair<size_t, ExprLambda *>(i.second, i.first));
-        for (auto i = functionCalls_.rbegin(); i != functionCalls_.rend(); ++i)
-            printMsg(v, format("%1$10d %2%") % i->first % i->second->showNamePos());
-
-        printMsg(v, format("evaluations of %1% attributes:") % attrSelects.size());
-        typedef std::multimap<size_t, Pos> AttrSelects_;
-        AttrSelects_ attrSelects_;
-        for (auto & i : attrSelects)
-            attrSelects_.insert(std::pair<size_t, Pos>(i.second, i.first));
-        for (auto i = attrSelects_.rbegin(); i != attrSelects_.rend(); ++i)
-            printMsg(v, format("%1$10d %2%") % i->first % i->second);
-
+    if (showStats) {
+        auto outPath = getEnv("NIX_SHOW_STATS_PATH","-");
+        std::fstream fs;
+        if (outPath != "-")
+            fs.open(outPath, std::fstream::out);
+        JSONObject topObj(outPath == "-" ? std::cerr : fs, true);
+        topObj.attr("cpuTime",cpuTime);
+        {
+            auto envs = topObj.object("envs");
+            envs.attr("number", nrEnvs);
+            envs.attr("elements", nrValuesInEnvs);
+            envs.attr("bytes", bEnvs);
+        }
+        {
+            auto lists = topObj.object("list");
+            lists.attr("elements", nrListElems);
+            lists.attr("bytes", bLists);
+            lists.attr("concats", nrListConcats);
+        }
+        {
+            auto values = topObj.object("values");
+            values.attr("number", nrValues);
+            values.attr("bytes", bValues);
+        }
+        {
+            auto syms = topObj.object("symbols");
+            syms.attr("number", symbols.size());
+            syms.attr("bytes", symbols.totalSize());
+        }
+        {
+            auto sets = topObj.object("sets");
+            sets.attr("number", nrAttrsets);
+            sets.attr("bytes", bAttrsets);
+            sets.attr("elements", nrAttrsInAttrsets);
+        }
+        {
+            auto sizes = topObj.object("sizes");
+            sizes.attr("Env", sizeof(Env));
+            sizes.attr("Value", sizeof(Value));
+            sizes.attr("Bindings", sizeof(Bindings));
+            sizes.attr("Attr", sizeof(Attr));
+        }
+        topObj.attr("nrOpUpdates", nrOpUpdates);
+        topObj.attr("nrOpUpdateValuesCopied", nrOpUpdateValuesCopied);
+        topObj.attr("nrThunks", nrThunks);
+        topObj.attr("nrAvoided", nrAvoided);
+        topObj.attr("nrLookups", nrLookups);
+        topObj.attr("nrPrimOpCalls", nrPrimOpCalls);
+        topObj.attr("nrFunctionCalls", nrFunctionCalls);
+#if HAVE_BOEHMGC
+        {
+            auto gc = topObj.object("gc");
+            gc.attr("heapSize", heapSize);
+            gc.attr("totalBytes", totalBytes);
+        }
+#endif
+        if (countCalls) {
+            {
+                auto obj = topObj.object("primops");
+                for (auto & i : primOpCalls)
+                    obj.attr(i.first, i.second);
+            }
+            {
+                auto list = topObj.list("functions");
+                for (auto & i : functionCalls) {
+                    auto obj = list.object();
+                    if (i.first->name.set())
+                        obj.attr("name", (const string &) i.first->name);
+                    else
+                        obj.attr("name", nullptr);
+                    if (i.first->pos) {
+                        obj.attr("file", (const string &) i.first->pos.file);
+                        obj.attr("line", i.first->pos.line);
+                        obj.attr("column", i.first->pos.column);
+                    }
+                    obj.attr("count", i.second);
+                }
+            }
+            {
+                auto list = topObj.list("attributes");
+                for (auto & i : attrSelects) {
+                    auto obj = list.object();
+                    if (i.first) {
+                        obj.attr("file", (const string &) i.first.file);
+                        obj.attr("line", i.first.line);
+                        obj.attr("column", i.first.column);
+                    }
+                    obj.attr("count", i.second);
+                }
+            }
+        }
     }
 }
 

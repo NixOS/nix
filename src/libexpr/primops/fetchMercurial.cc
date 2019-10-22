@@ -125,8 +125,22 @@ HgInfo exportMercurial(ref<Store> store, const std::string & uri,
             Activity act(*logger, lvlTalkative, actUnknown, fmt("fetching Mercurial repository '%s'", uri));
 
             if (pathExists(cacheDir)) {
-                string res = runProgramGetStdout("hg", true, { "pull", "-R", cacheDirMSYS, "--", uriMSYS });
-                std::cerr << "res1='" << res << "'" << std::endl;
+                try {
+                    runProgram("hg", true, { "pull", "-R", cacheDir, "--", uri });
+                }
+                catch (ExecError & e){
+                    string transJournal = cacheDir + "/.hg/store/journal";
+                    /* hg throws "abandoned transaction" error only if this file exists */
+                    if (pathExists(transJournal))
+                    {
+                        runProgram("hg", true, { "recover", "-R", cacheDir });
+                        runProgram("hg", true, { "pull", "-R", cacheDir, "--", uri });
+                    }
+                    else 
+                    {
+                        throw ExecError(e.status, fmt("program hg '%1%' ", statusToString(e.status)));
+                    }
+                }
             } else {
                 createDirs(dirOf(cacheDir));
 

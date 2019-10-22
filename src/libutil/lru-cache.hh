@@ -2,13 +2,7 @@
 
 #include <map>
 #include <list>
-#ifdef _MSC_VER
 #include <optional>
-using std::optional;
-#else
-#include <experimental/optional>
-using std::experimental::optional;
-#endif
 
 namespace nix {
 
@@ -70,7 +64,7 @@ public:
 
     /* Look up an item in the cache. If it exists, it becomes the most
        recently used item. */
-    optional<Value> get(const Key & key)
+    std::optional<Value> get(const Key & key)
     {
         auto i = data.find(key);
         if (i == data.end()) return {};
