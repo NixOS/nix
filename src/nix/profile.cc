@@ -6,6 +6,7 @@
 #include "archive.hh"
 #include "builtins/buildenv.hh"
 #include "flake/flakeref.hh"
+#include "nix-env/user-env.hh"
 
 #include <nlohmann/json.hpp>
 #include <regex>
@@ -35,7 +36,7 @@ struct ProfileManifest
 
     ProfileManifest() { }
 
-    ProfileManifest(const Path & profile)
+    ProfileManifest(EvalState & state, const Path & profile)
     {
         auto manifestPath = profile + "/manifest.json";
 
@@ -58,6 +59,22 @@ struct ProfileManifest
                         e["attrPath"]
                     };
                 }
+                elements.emplace_back(std::move(element));
+            }
+        }
+
+        else if (pathExists(profile + "/manifest.nix")) {
+            // FIXME: needed because of pure mode; ugly.
+            if (state.allowedPaths) {
+                state.allowedPaths->insert(state.store->followLinksToStore(profile));
+                state.allowedPaths->insert(state.store->followLinksToStore(profile + "/manifest.nix"));
+            }
+
+            auto drvInfos = queryInstalled(state, state.store->followLinksToStore(profile));
+
+            for (auto & drvInfo : drvInfos) {
+                ProfileElement element;
+                element.storePaths = {drvInfo.queryOutPath()};
                 elements.emplace_back(std::move(element));
             }
         }
@@ -147,7 +164,7 @@ struct CmdProfileInstall : InstallablesCommand, MixDefaultProfile
 
     void run(ref<Store> store) override
     {
-        ProfileManifest manifest(*profile);
+        ProfileManifest manifest(*getEvalState(), *profile);
 
         PathSet pathsToBuild;
 
@@ -224,7 +241,7 @@ public:
     }
 };
 
-struct CmdProfileRemove : virtual StoreCommand, MixDefaultProfile, MixProfileElementMatchers
+struct CmdProfileRemove : virtual EvalCommand, MixDefaultProfile, MixProfileElementMatchers
 {
     std::string description() override
     {
@@ -255,7 +272,7 @@ struct CmdProfileRemove : virtual StoreCommand, MixDefaultProfile, MixProfileEle
 
     void run(ref<Store> store) override
     {
-        ProfileManifest oldManifest(*profile);
+        ProfileManifest oldManifest(*getEvalState(), *profile);
 
         auto matchers = getMatchers(store);
 
@@ -300,7 +317,7 @@ struct CmdProfileUpgrade : virtual SourceExprCommand, MixDefaultProfile, MixProf
 
     void run(ref<Store> store) override
     {
-        ProfileManifest manifest(*profile);
+        ProfileManifest manifest(*getEvalState(), *profile);
 
         auto matchers = getMatchers(store);
 
@@ -342,7 +359,7 @@ struct CmdProfileUpgrade : virtual SourceExprCommand, MixDefaultProfile, MixProf
     }
 };
 
-struct CmdProfileInfo : virtual StoreCommand, MixDefaultProfile
+struct CmdProfileInfo : virtual EvalCommand, virtual StoreCommand, MixDefaultProfile
 {
     std::string description() override
     {
@@ -361,7 +378,7 @@ struct CmdProfileInfo : virtual StoreCommand, MixDefaultProfile
 
     void run(ref<Store> store) override
     {
-        ProfileManifest manifest(*profile);
+        ProfileManifest manifest(*getEvalState(), *profile);
 
         for (size_t i = 0; i < manifest.elements.size(); ++i) {
             auto & element(manifest.elements[i]);
