@@ -44,7 +44,7 @@ print STDERR "Nix revision is $nixRev, version is $version\n";
 
 File::Path::make_path($releasesDir);
 if (system("mountpoint -q $releasesDir") != 0) {
-    system("sshfs hydra-mirror:/releases $releasesDir") == 0 or die;
+    system("sshfs hydra-mirror\@nixos.org:/releases $releasesDir") == 0 or die;
 }
 
 my $releaseDir = "$releasesDir/nix/$releaseName";
@@ -67,10 +67,10 @@ sub downloadFile {
     }
 
     my $sha256_expected = $buildInfo->{buildproducts}->{$productNr}->{sha256hash} or die;
-    my $sha256_actual = `nix hash-file --type sha256 '$dstFile'`;
+    my $sha256_actual = `nix hash-file --base16 --type sha256 '$dstFile'`;
     chomp $sha256_actual;
     if ($sha256_expected ne $sha256_actual) {
-        print STDERR "file $dstFile is corrupt\n";
+        print STDERR "file $dstFile is corrupt, got $sha256_actual, expected $sha256_expected\n";
         exit 1;
     }
 

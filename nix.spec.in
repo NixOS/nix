@@ -106,7 +106,7 @@ chmod 1775 $RPM_BUILD_ROOT/nix/store
 for d in profiles gcroots;
 do
   mkdir -p $RPM_BUILD_ROOT/nix/var/nix/$d/per-user
-  chmod 1777 $RPM_BUILD_ROOT/nix/var/nix/$d/per-user
+  chmod 755 $RPM_BUILD_ROOT/nix/var/nix/$d/per-user
 done
 
 # fix permission of nix profile

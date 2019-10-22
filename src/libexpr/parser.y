@@ -1,7 +1,7 @@
 %glr-parser
-%pure-parser
+%define api.pure
 %locations
-%error-verbose
+%define parse.error verbose
 %defines
 /* %no-lines */
 %parse-param { void * scanner }
@@ -81,6 +81,8 @@ static void addAttr(ExprAttrs * attrs, AttrPath & attrPath,
     AttrPath::iterator i;
     // All attrpaths have at least one attr
     assert(!attrPath.empty());
+    // Checking attrPath validity.
+    // ===========================
     for (i = attrPath.begin(); i + 1 < attrPath.end(); i++) {
         if (i->symbol.set()) {
             ExprAttrs::AttrDefs::iterator j = attrs->attrs.find(i->symbol);
@@ -102,11 +104,29 @@ static void addAttr(ExprAttrs * attrs, AttrPath & attrPath,
             attrs = nested;
         }
     }
+    // Expr insertion.
+    // ==========================
     if (i->symbol.set()) {
         ExprAttrs::AttrDefs::iterator j = attrs->attrs.find(i->symbol);
         if (j != attrs->attrs.end()) {
-            dupAttr(attrPath, pos, j->second.pos);
+            // This attr path is already defined. However, if both
+            // e and the expr pointed by the attr path are two attribute sets,
+            // we want to merge them.
+            // Otherwise, throw an error.
+            auto ae = dynamic_cast<ExprAttrs *>(e);
+            auto jAttrs = dynamic_cast<ExprAttrs *>(j->second.e);
+            if (jAttrs && ae) {
+                for (auto & ad : ae->attrs) {
+                    auto j2 = jAttrs->attrs.find(ad.first);
+                    if (j2 != jAttrs->attrs.end()) // Attr already defined in iAttrs, error.
+                        dupAttr(ad.first, j2->second.pos, ad.second.pos);
+                    jAttrs->attrs[ad.first] = ad.second;
+                }
+            } else {
+                dupAttr(attrPath, pos, j->second.pos);
+            }
         } else {
+            // This attr path is not defined. Let's create it.
             attrs->attrs[i->symbol] = ExprAttrs::AttrDef(e, pos);
             e->setName(i->symbol);
         }
@@ -118,11 +138,10 @@ static void addAttr(ExprAttrs * attrs, AttrPath & attrPath,
 
 static void addFormal(const Pos & pos, Formals * formals, const Formal & formal)
 {
-    if (formals->argNames.find(formal.name) != formals->argNames.end())
+    if (!formals->argNames.insert(formal.name).second)
         throw ParseError(format("duplicate formal function argument '%1%' at %2%")
             % formal.name % pos);
     formals->formals.push_front(formal);
-    formals->argNames.insert(formal.name);
 }
 
 
@@ -657,7 +676,9 @@ std::pair<bool, std::string> EvalState::resolveSearchPathElem(const SearchPathEl
 
     if (isUri(elem.second)) {
         try {
-            res = { true, getDownloader()->downloadCached(store, elem.second, true) };
+            CachedDownloadRequest request(elem.second);
+            request.unpack = true;
+            res = { true, getDownloader()->downloadCached(store, request).path };
         } catch (DownloadError & e) {
             printError(format("warning: Nix search path entry '%1%' cannot be downloaded, ignoring") % elem.second);
             res = { false, "" };

@@ -139,6 +139,10 @@ private:
     bool recursive = false;
     bool all = false;
 
+protected:
+
+    RealiseMode realiseMode = NoBuild;
+
 public:
 
     StorePathsCommand(bool recursive = false);

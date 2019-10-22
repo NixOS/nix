@@ -2,6 +2,7 @@
 #include "util.hh"
 #include "sync.hh"
 #include "store-api.hh"
+#include "names.hh"
 
 #include <atomic>
 #include <map>
@@ -38,6 +39,7 @@ private:
         std::map<ActivityType, uint64_t> expectedByType;
         bool visible = true;
         ActivityId parent;
+        std::optional<std::string> name;
     };
 
     struct ActivitiesByType
@@ -60,6 +62,7 @@ private:
         uint64_t corruptedPaths = 0, untrustedPaths = 0;
 
         bool active = true;
+        bool haveUpdate = true;
     };
 
     Sync<State> state_;
@@ -68,14 +71,21 @@ private:
 
     std::condition_variable quitCV, updateCV;
 
+    bool printBuildLogs;
+    bool isTTY;
+
 public:
 
-    ProgressBar()
+    ProgressBar(bool printBuildLogs, bool isTTY)
+        : printBuildLogs(printBuildLogs)
+        , isTTY(isTTY)
     {
+        state_.lock()->active = isTTY;
         updateThread = std::thread([&]() {
             auto state(state_.lock());
             while (state->active) {
-                state.wait(updateCV);
+                if (!state->haveUpdate)
+                    state.wait(updateCV);
                 draw(*state);
                 state.wait_for(quitCV, std::chrono::milliseconds(50));
             }
@@ -109,8 +119,14 @@ public:
 
     void log(State & state, Verbosity lvl, const std::string & s)
     {
-        writeToStderr("\r\e[K" + s + ANSI_NORMAL "\n");
-        draw(state);
+        if (state.active) {
+            writeToStderr("\r\e[K" + filterANSIEscapes(s, !isTTY) + ANSI_NORMAL "\n");
+            draw(state);
+        } else {
+            auto s2 = s + ANSI_NORMAL "\n";
+            if (!isTTY) s2 = filterANSIEscapes(s2, true);
+            writeToStderr(s2);
+        }
     }
 
     void startActivity(ActivityId act, Verbosity lvl, ActivityType type,
@@ -141,6 +157,7 @@ public:
             auto nrRounds = getI(fields, 3);
             if (nrRounds != 1)
                 i->s += fmt(" (round %d/%d)", curRound, nrRounds);
+            i->name = DrvName(name).name;
         }
 
         if (type == actSubstitute) {
@@ -153,6 +170,14 @@ public:
                 name, sub);
         }
 
+        if (type == actPostBuildHook) {
+            auto name = storePathToName(getS(fields, 0));
+            if (hasSuffix(name, ".drv"))
+                name.resize(name.size() - 4);
+            i->s = fmt("post-build " ANSI_BOLD "%s" ANSI_NORMAL, name);
+            i->name = DrvName(name).name;
+        }
+
         if (type == actQueryPathInfo) {
             auto name = storePathToName(getS(fields, 0));
             i->s = fmt("querying " ANSI_BOLD "%s" ANSI_NORMAL " on %s", name, getS(fields, 1));
@@ -163,7 +188,7 @@ public:
             || (type == actCopyPath && hasAncestor(*state, actSubstitute, parent)))
             i->visible = false;
 
-        update();
+        update(*state);
     }
 
     /* Check whether an activity has an ancestore with the specified
@@ -198,7 +223,7 @@ public:
             state->its.erase(i);
         }
 
-        update();
+        update(*state);
     }
 
     void result(ActivityId act, ResultType type, const std::vector<Field> & fields) override
@@ -208,38 +233,46 @@ public:
         if (type == resFileLinked) {
             state->filesLinked++;
             state->bytesLinked += getI(fields, 0);
-            update();
+            update(*state);
         }
 
-        else if (type == resBuildLogLine) {
+        else if (type == resBuildLogLine || type == resPostBuildLogLine) {
             auto lastLine = trim(getS(fields, 0));
             if (!lastLine.empty()) {
                 auto i = state->its.find(act);
                 assert(i != state->its.end());
                 ActInfo info = *i->second;
-                state->activities.erase(i->second);
-                info.lastLine = lastLine;
-                state->activities.emplace_back(info);
-                i->second = std::prev(state->activities.end());
-                update();
+                if (printBuildLogs) {
+                    auto suffix = "> ";
+                    if (type == resPostBuildLogLine) {
+                        suffix = " (post)> ";
+                    }
+                    log(*state, lvlInfo, ANSI_FAINT + info.name.value_or("unnamed") + suffix + ANSI_NORMAL + lastLine);
+                } else {
+                    state->activities.erase(i->second);
+                    info.lastLine = lastLine;
+                    state->activities.emplace_back(info);
+                    i->second = std::prev(state->activities.end());
+                    update(*state);
+                }
             }
         }
 
         else if (type == resUntrustedPath) {
             state->untrustedPaths++;
-            update();
+            update(*state);
         }
 
         else if (type == resCorruptedPath) {
             state->corruptedPaths++;
-            update();
+            update(*state);
         }
 
         else if (type == resSetPhase) {
             auto i = state->its.find(act);
             assert(i != state->its.end());
             i->second->phase = getS(fields, 0);
-            update();
+            update(*state);
         }
 
         else if (type == resProgress) {
@@ -250,7 +283,7 @@ public:
             actInfo.expected = getI(fields, 1);
             actInfo.running = getI(fields, 2);
             actInfo.failed = getI(fields, 3);
-            update();
+            update(*state);
         }
 
         else if (type == resSetExpected) {
@@ -262,17 +295,19 @@ public:
             state->activitiesByType[type].expected -= j;
             j = getI(fields, 1);
             state->activitiesByType[type].expected += j;
-            update();
+            update(*state);
         }
     }
 
-    void update()
+    void update(State & state)
     {
+        state.haveUpdate = true;
         updateCV.notify_one();
     }
 
     void draw(State & state)
     {
+        state.haveUpdate = false;
         if (!state.active) return;
 
         std::string line;
@@ -333,11 +368,18 @@ public:
 
             if (running || done || expected || failed) {
                 if (running)
-                    s = fmt(ANSI_BLUE + numberFmt + ANSI_NORMAL "/" ANSI_GREEN + numberFmt + ANSI_NORMAL "/" + numberFmt,
-                        running / unit, done / unit, expected / unit);
+                    if (expected != 0)
+                        s = fmt(ANSI_BLUE + numberFmt + ANSI_NORMAL "/" ANSI_GREEN + numberFmt + ANSI_NORMAL "/" + numberFmt,
+                            running / unit, done / unit, expected / unit);
+                    else
+                        s = fmt(ANSI_BLUE + numberFmt + ANSI_NORMAL "/" ANSI_GREEN + numberFmt + ANSI_NORMAL,
+                            running / unit, done / unit);
                 else if (expected != done)
-                    s = fmt(ANSI_GREEN + numberFmt + ANSI_NORMAL "/" + numberFmt,
-                        done / unit, expected / unit);
+                    if (expected != 0)
+                        s = fmt(ANSI_GREEN + numberFmt + ANSI_NORMAL "/" + numberFmt,
+                            done / unit, expected / unit);
+                    else
+                        s = fmt(ANSI_GREEN + numberFmt + ANSI_NORMAL, done / unit);
                 else
                     s = fmt(done ? ANSI_GREEN + numberFmt + ANSI_NORMAL : numberFmt, done / unit);
                 s = fmt(itemFmt, s);
@@ -395,9 +437,9 @@ public:
     }
 };
 
-void startProgressBar()
+void startProgressBar(bool printBuildLogs)
 {
-    logger = new ProgressBar();
+    logger = new ProgressBar(printBuildLogs, isatty(STDERR_FILENO));
 }
 
 void stopProgressBar()

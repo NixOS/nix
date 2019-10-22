@@ -574,7 +574,7 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
                 else if (setSubstituters(settings.extraSubstituters))
                     ;
                 else
-                    debug("ignoring untrusted setting '%s'", name);
+                    warn("ignoring the user-specified setting '%s', because it is a restricted setting and you are not a trusted user", name);
             } catch (UsageError & e) {
                 warn(e.what());
             }
@@ -742,7 +742,8 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
 }
 
 
-static void processConnection(bool trusted)
+static void processConnection(bool trusted,
+    const std::string & userName, uid_t userId)
 {
     MonitorFdHup monitor(from.fd);
 
@@ -792,6 +793,8 @@ static void processConnection(bool trusted)
         // Disable caching since the client already does that.
         params["path-info-cache-size"] = "0";
         auto store = openStore(settings.storeUri, params);
+
+        store->createUser(userName, userId);
 
         tunnelLogger->stopWork();
         to.flush();
@@ -1053,7 +1056,7 @@ static void daemonLoop(char * * argv)
                 /* Handle the connection. */
                 from.fd = remote.get();
                 to.fd = remote.get();
-                processConnection(trusted);
+                processConnection(trusted, user, peer.uid);
 
                 exit(0);
             }, options);
@@ -1133,7 +1136,7 @@ static int _main(int argc, char * * argv)
                     }
                 }
             } else {
-                processConnection(true);
+                processConnection(true, "root", 0);
             }
         } else {
             daemonLoop(argv);

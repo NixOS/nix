@@ -27,13 +27,13 @@ output=$(nix-shell --pure --keep SELECTED_IMPURE_VAR shell.nix -A shellDrv --run
 # Test nix-shell on a .drv symlink
 
 # Legacy: absolute path and .drv extension required
-nix-instantiate shell.nix -A shellDrv --indirect --add-root shell.drv
-[[ $(nix-shell --pure $PWD/shell.drv --run \
+nix-instantiate shell.nix -A shellDrv --indirect --add-root $TEST_ROOT/shell.drv
+[[ $(nix-shell --pure $TEST_ROOT/shell.drv --run \
     'echo "$IMPURE_VAR - $VAR_FROM_STDENV_SETUP - $VAR_FROM_NIX"') = " - foo - bar" ]]
 
 # New behaviour: just needs to resolve to a derivation in the store
-nix-instantiate shell.nix -A shellDrv --indirect --add-root shell
-[[ $(nix-shell --pure shell --run \
+nix-instantiate shell.nix -A shellDrv --indirect --add-root $TEST_ROOT/shell
+[[ $(nix-shell --pure $TEST_ROOT/shell --run \
     'echo "$IMPURE_VAR - $VAR_FROM_STDENV_SETUP - $VAR_FROM_NIX"') = " - foo - bar" ]]
 
 # Test nix-shell -p

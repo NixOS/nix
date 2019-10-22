@@ -13,7 +13,7 @@
   <listitem><para>Bash Shell. The <literal>./configure</literal> script
   relies on bashisms, so Bash is required.</para></listitem>
 
-  <listitem><para>A version of GCC or Clang that supports C++14.</para></listitem>
+  <listitem><para>A version of GCC or Clang that supports C++17.</para></listitem>
 
   <listitem><para><command>pkg-config</command> to locate
   dependencies.  If your distribution does not provide it, you can get
@@ -61,6 +61,10 @@
   <listitem><para>The <literal>boost</literal> library of version
   1.66.0 or higher. It can be obtained from the official web site
   <link xlink:href="https://www.boost.org/" />.</para></listitem>
+
+  <listitem><para>The <literal>editline</literal> library of version
+  1.14.0 or higher. It can be obtained from the its repository
+  <link xlink:href="https://github.com/troglobit/editline" />.</para></listitem>
 
   <listitem><para>The <command>xmllint</command> and
   <command>xsltproc</command> programs to build this manual and the

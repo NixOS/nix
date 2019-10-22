@@ -127,7 +127,7 @@ public:
     PathSet queryAllValidPaths() override;
 
     void queryPathInfoUncached(const Path & path,
-        Callback<std::shared_ptr<ValidPathInfo>> callback) override;
+        Callback<std::shared_ptr<ValidPathInfo>> callback) noexcept override;
 
     void queryReferrers(const Path & path, PathSet & referrers) override;
 
@@ -263,7 +263,7 @@ private:
     bool isActiveTempFile(const GCState & state,
         const Path & path, const string & suffix);
 
-    int openGCLock(LockType lockType);
+    AutoCloseFD openGCLock(LockType lockType);
 
     void findRoots(const Path & path, unsigned char type, Roots & roots);
 
@@ -292,6 +292,8 @@ private:
     void signPathInfo(ValidPathInfo & info);
 
     Path getRealStoreDir() override { return realStoreDir; }
+
+    void createUser(const std::string & userName, uid_t userId) override;
 
     friend class DerivationGoal;
     friend class SubstitutionGoal;

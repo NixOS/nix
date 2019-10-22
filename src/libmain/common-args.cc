@@ -35,6 +35,15 @@ MixCommonArgs::MixCommonArgs(const string & programName)
             }
         });
 
+    mkFlag()
+        .longName("max-jobs")
+        .shortName('j')
+        .label("jobs")
+        .description("maximum number of parallel builds")
+        .handler([=](std::string s) {
+            settings.set("max-jobs", s);
+        });
+
     std::string cat = "config";
     globalConfig.convertToArgs(*this, cat);
 

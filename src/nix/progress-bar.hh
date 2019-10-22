@@ -4,7 +4,7 @@
 
 namespace nix {
 
-void startProgressBar();
+void startProgressBar(bool printBuildLogs = false);
 
 void stopProgressBar();
 

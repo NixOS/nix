@@ -209,6 +209,9 @@ public:
         "The paths to make available inside the build sandbox.",
         {"build-chroot-dirs", "build-sandbox-paths"}};
 
+    Setting<bool> sandboxFallback{this, true, "sandbox-fallback",
+        "Whether to disable sandboxing when the kernel doesn't allow it."};
+
     Setting<PathSet> extraSandboxPaths{this, {}, "extra-sandbox-paths",
         "Additional paths to make available inside the build sandbox.",
         {"build-extra-chroot-dirs", "build-extra-sandbox-paths"}};
@@ -255,7 +258,7 @@ public:
         "Secret keys with which to sign local builds."};
 
     Setting<unsigned int> tarballTtl{this, 60 * 60, "tarball-ttl",
-        "How soon to expire files fetched by builtins.fetchTarball and builtins.fetchurl."};
+        "How long downloaded files are considered up-to-date."};
 
     Setting<bool> requireSigs{this, true, "require-sigs",
         "Whether to check that any non-content-addressed path added to the "
@@ -315,6 +318,9 @@ public:
         "pre-build-hook",
         "A program to run just before a build to set derivation-specific build settings."};
 
+    Setting<std::string> postBuildHook{this, "", "post-build-hook",
+        "A program to run just after each succesful build."};
+
     Setting<std::string> netrcFile{this, fmt("%s/%s", nixConfDir, "netrc"), "netrc-file",
         "Path to the netrc file used to obtain usernames/passwords for downloads."};
 
@@ -342,8 +348,16 @@ public:
     Setting<uint64_t> maxFree{this, std::numeric_limits<uint64_t>::max(), "max-free",
         "Stop deleting garbage when free disk space is above the specified amount."};
 
+    Setting<uint64_t> minFreeCheckInterval{this, 5, "min-free-check-interval",
+        "Number of seconds between checking free disk space."};
+
     Setting<Paths> pluginFiles{this, {}, "plugin-files",
         "Plugins to dynamically load at nix initialization time."};
+
+    Setting<Strings> experimentalFeatures{this, {}, "experimental-features",
+        "Experimental Nix features to enable."};
+
+    void requireExperimentalFeature(const std::string & name);
 };
 
 

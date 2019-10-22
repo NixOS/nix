@@ -1,3 +1,5 @@
+[![Open Collective supporters](https://opencollective.com/nixos/tiers/supporter/badge.svg?label=Supporters&color=brightgreen)](https://opencollective.com/nixos)
+
 Nix, the purely functional package manager
 ------------------------------------------
 

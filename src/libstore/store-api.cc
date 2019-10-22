@@ -85,18 +85,29 @@ string storePathToHash(const Path & path)
 void checkStoreName(const string & name)
 {
     string validChars = "+-._?=";
+
+    auto baseError = format("The path name '%2%' is invalid: %3%. "
+        "Path names are alphanumeric and can include the symbols %1% "
+        "and must not begin with a period. "
+        "Note: If '%2%' is a source file and you cannot rename it on "
+        "disk, builtins.path { name = ... } can be used to give it an "
+        "alternative name.") % validChars % name;
+
     /* Disallow names starting with a dot for possible security
        reasons (e.g., "." and ".."). */
     if (string(name, 0, 1) == ".")
-        throw Error(format("illegal name: '%1%'") % name);
+        throw Error(baseError % "it is illegal to start the name with a period");
+    /* Disallow names longer than 211 characters. ext4’s max is 256,
+       but we need extra space for the hash and .chroot extensions. */
+    if (name.length() > 211)
+        throw Error(baseError % "name must be less than 212 characters");
     for (auto & i : name)
         if (!((i >= 'A' && i <= 'Z') ||
               (i >= 'a' && i <= 'z') ||
               (i >= '0' && i <= '9') ||
               validChars.find(i) != string::npos))
         {
-            throw Error(format("invalid character '%1%' in name '%2%'")
-                % i % name);
+            throw Error(baseError % (format("the '%1%' character is invalid") % i));
         }
 }
 
@@ -194,15 +205,27 @@ Path Store::makeOutputPath(const string & id,
 }
 
 
-Path Store::makeFixedOutputPath(bool recursive,
-    const Hash & hash, const string & name) const
+static std::string makeType(string && type, const PathSet & references)
 {
-    return hash.type == htSHA256 && recursive
-        ? makeStorePath("source", hash, name)
-        : makeStorePath("output:out", hashString(htSHA256,
+    for (auto & i : references) {
+        type += ":";
+        type += i;
+    }
+    return type;
+}
+
+
+Path Store::makeFixedOutputPath(bool recursive,
+    const Hash & hash, const string & name, const PathSet & references) const
+{
+    if (hash.type == htSHA256 && recursive) {
+        return makeStorePath(makeType("source", references), hash, name);
+    } else {
+        assert(references.empty());
+        return makeStorePath("output:out", hashString(htSHA256,
                 "fixed:out:" + (recursive ? (string) "r:" : "") +
-                hash.to_string(Base16) + ":"),
-            name);
+                hash.to_string(Base16) + ":"), name);
+    }
 }
 
 
@@ -213,12 +236,7 @@ Path Store::makeTextPath(const string & name, const Hash & hash,
     /* Stuff the references (if any) into the type.  This is a bit
        hacky, but we can't put them in `s' since that would be
        ambiguous. */
-    string type = "text";
-    for (auto & i : references) {
-        type += ":";
-        type += i;
-    }
-    return makeStorePath(type, hash, name);
+    return makeStorePath(makeType("text", references), hash, name);
 }
 
 
@@ -318,13 +336,14 @@ ref<const ValidPathInfo> Store::queryPathInfo(const Path & storePath)
 
 
 void Store::queryPathInfo(const Path & storePath,
-    Callback<ref<ValidPathInfo>> callback)
+    Callback<ref<ValidPathInfo>> callback) noexcept
 {
-    assertStorePath(storePath);
-
-    auto hashPart = storePathToHash(storePath);
+    std::string hashPart;
 
     try {
+        assertStorePath(storePath);
+
+        hashPart = storePathToHash(storePath);
 
         {
             auto res = state.lock()->pathInfoCache.get(hashPart);
@@ -354,8 +373,10 @@ void Store::queryPathInfo(const Path & storePath,
 
     } catch (...) { return callback.rethrow(); }
 
+    auto callbackPtr = std::make_shared<decltype(callback)>(std::move(callback));
+
     queryPathInfoUncached(storePath,
-        {[this, storePath, hashPart, callback](std::future<std::shared_ptr<ValidPathInfo>> fut) {
+        {[this, storePath, hashPart, callbackPtr](std::future<std::shared_ptr<ValidPathInfo>> fut) {
 
             try {
                 auto info = fut.get();
@@ -375,8 +396,8 @@ void Store::queryPathInfo(const Path & storePath,
                     throw InvalidPath("path '%s' is not valid", storePath);
                 }
 
-                callback(ref<ValidPathInfo>(info));
-            } catch (...) { callback.rethrow(); }
+                (*callbackPtr)(ref<ValidPathInfo>(info));
+            } catch (...) { callbackPtr->rethrow(); }
         }});
 }
 
@@ -771,8 +792,9 @@ bool ValidPathInfo::isContentAddressed(const Store & store) const
     else if (hasPrefix(ca, "fixed:")) {
         bool recursive = ca.compare(6, 2, "r:") == 0;
         Hash hash(std::string(ca, recursive ? 8 : 6));
-        if (references.empty() &&
-            store.makeFixedOutputPath(recursive, hash, storePathToName(path)) == path)
+        auto refs = references;
+        replaceInSet(refs, path, std::string("self"));
+        if (store.makeFixedOutputPath(recursive, hash, storePathToName(path), refs) == path)
             return true;
         else
             warn();
@@ -940,8 +962,7 @@ std::list<ref<Store>> getDefaultSubstituters()
         StringSet done;
 
         auto addStore = [&](const std::string & uri) {
-            if (done.count(uri)) return;
-            done.insert(uri);
+            if (!done.insert(uri).second) return;
             try {
                 stores.push_back(openStore(uri));
             } catch (Error & e) {

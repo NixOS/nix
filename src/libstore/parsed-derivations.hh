@@ -30,6 +30,8 @@ public:
     bool canBuildLocally() const;
 
     bool willBuildLocally() const;
+
+    bool substitutesAllowed() const;
 };
 
 }
