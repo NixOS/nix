@@ -28,8 +28,6 @@ bool lockFile(int fd, LockType lockType, bool wait);
 bool lockFile(HANDLE handle, LockType lockType, bool wait);
 #endif
 
-MakeError(AlreadyLocked, Error);
-
 class PathLocks
 {
 private:
@@ -52,7 +50,5 @@ public:
     void unlock();
     void setDeletion(bool deletePaths);
 };
-
-bool pathIsLockedByMe(const Path & path);
 
 }

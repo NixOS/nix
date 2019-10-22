@@ -75,6 +75,13 @@ public:
     }
 
     size_t totalSize() const;
+
+    template<typename T>
+    void dump(T callback)
+    {
+        for (auto & s : symbols)
+            callback(s);
+    }
 };
 
 }

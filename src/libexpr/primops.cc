@@ -331,6 +331,12 @@ static void prim_isBool(EvalState & state, const Pos & pos, Value * * args, Valu
     mkBool(v, args[0]->type == tBool);
 }
 
+/* Determine whether the argument is a path. */
+static void prim_isPath(EvalState & state, const Pos & pos, Value * * args, Value & v)
+{
+    state.forceValue(*args[0]);
+    mkBool(v, args[0]->type == tPath);
+}
 
 struct CompareValues
 {
@@ -406,8 +412,7 @@ static void prim_genericClosure(EvalState & state, const Pos & pos, Value * * ar
             throw EvalError(format("attribute 'key' required, at %1%") % pos);
         state.forceValue(*key->value);
 
-        if (doneKeys.find(key->value) != doneKeys.end()) continue;
-        doneKeys.insert(key->value);
+        if (!doneKeys.insert(key->value).second) continue;
         res.push_back(e);
 
         /* Call the `operator' function with `e' as argument. */
@@ -842,8 +847,14 @@ static void prim_pathExists(EvalState & state, const Pos & pos, Value * * args, 
 {
     PathSet context;
     Path path = state.coerceToPath(pos, *args[0], context);
-    if (!context.empty())
-        throw EvalError(format("string '%1%' cannot refer to other paths, at %2%") % path % pos);
+    try {
+        state.realiseContext(context);
+    } catch (InvalidPathError & e) {
+        throw EvalError(format(
+                "cannot check the existence of '%1%', since path '%2%' is not valid, at %3%")
+            % path % e.path % pos);
+    }
+
     try {
         mkBool(v, pathExists(state.checkSourcePath(path)));
     } catch (SysError & e) {
@@ -931,6 +942,20 @@ static void prim_findFile(EvalState & state, const Pos & pos, Value * * args, Va
     string path = state.forceStringNoCtx(*args[1], pos);
 
     mkPath(v, state.checkSourcePath(state.findFile(searchPath, path, pos)).c_str());
+}
+
+/* Return the cryptographic hash of a file in base-16. */
+static void prim_hashFile(EvalState & state, const Pos & pos, Value * * args, Value & v)
+{
+    string type = state.forceStringNoCtx(*args[0], pos);
+    HashType ht = parseHashType(type);
+    if (ht == htUnknown)
+      throw Error(format("unknown hash type '%1%', at %2%") % type % pos);
+
+    PathSet context; // discarded
+    Path p = state.coerceToPath(pos, *args[1], context);
+
+    mkString(v, hashFile(ht, state.checkSourcePath(p)).to_string(Base16, false), context);
 }
 
 /* Read a directory (without . or ..) */
@@ -1265,13 +1290,12 @@ static void prim_listToAttrs(EvalState & state, const Pos & pos, Value * * args,
         string name = state.forceStringNoCtx(*j->value, pos);
 
         Symbol sym = state.symbols.create(name);
-        if (seen.find(sym) == seen.end()) {
+        if (seen.insert(sym).second) {
             Bindings::iterator j2 = v2.attrs->find(state.symbols.create(state.sValue));
             if (j2 == v2.attrs->end())
                 throw TypeError(format("'value' attribute missing in a call to 'listToAttrs', at %1%") % pos);
 
             v.attrs->push_back(Attr(sym, j2->value, j2->pos));
-            seen.insert(sym);
         }
     }
 
@@ -2059,9 +2083,9 @@ static void prim_splitVersion(EvalState & state, const Pos & pos, Value * * args
 void fetch(EvalState & state, const Pos & pos, Value * * args, Value & v,
     const string & who, bool unpack, const std::string & defaultName)
 {
-    string url;
-    Hash expectedHash;
-    string name = defaultName;
+    CachedDownloadRequest request("");
+    request.unpack = unpack;
+    request.name = defaultName;
 
     state.forceValue(*args[0]);
 
@@ -2072,32 +2096,32 @@ void fetch(EvalState & state, const Pos & pos, Value * * args, Value & v,
         for (auto & attr : *args[0]->attrs) {
             string n(attr.name);
             if (n == "url")
-                url = state.forceStringNoCtx(*attr.value, *attr.pos);
+                request.uri = state.forceStringNoCtx(*attr.value, *attr.pos);
             else if (n == "sha256")
-                expectedHash = Hash(state.forceStringNoCtx(*attr.value, *attr.pos), htSHA256);
+                request.expectedHash = Hash(state.forceStringNoCtx(*attr.value, *attr.pos), htSHA256);
             else if (n == "name")
-                name = state.forceStringNoCtx(*attr.value, *attr.pos);
+                request.name = state.forceStringNoCtx(*attr.value, *attr.pos);
             else
                 throw EvalError(format("unsupported argument '%1%' to '%2%', at %3%") % attr.name % who % attr.pos);
         }
 
-        if (url.empty())
+        if (request.uri.empty())
             throw EvalError(format("'url' argument required, at %1%") % pos);
 
     } else
-        url = state.forceStringNoCtx(*args[0], pos);
+        request.uri = state.forceStringNoCtx(*args[0], pos);
 
-    state.checkURI(url);
+    state.checkURI(request.uri);
 
-    if (evalSettings.pureEval && !expectedHash)
+    if (evalSettings.pureEval && !request.expectedHash)
         throw Error("in pure evaluation mode, '%s' requires a 'sha256' argument", who);
 
-    Path res = getDownloader()->downloadCached(state.store, url, unpack, name, expectedHash);
+    auto res = getDownloader()->downloadCached(state.store, request);
 
     if (state.allowedPaths)
-        state.allowedPaths->insert(res);
+        state.allowedPaths->insert(res.path);
 
-    mkString(v, res, PathSet({res}));
+    mkString(v, res.storePath, PathSet({res.storePath}));
 }
 
 
@@ -2200,6 +2224,7 @@ void EvalState::createBaseEnv()
     addPrimOp("__isInt", 1, prim_isInt);
     addPrimOp("__isFloat", 1, prim_isFloat);
     addPrimOp("__isBool", 1, prim_isBool);
+    addPrimOp("__isPath", 1, prim_isPath);
     addPrimOp("__genericClosure", 1, prim_genericClosure);
     addPrimOp("abort", 1, prim_abort);
     addPrimOp("__addErrorContext", 2, prim_addErrorContext);
@@ -2226,6 +2251,7 @@ void EvalState::createBaseEnv()
     addPrimOp("__readFile", 1, prim_readFile);
     addPrimOp("__readDir", 1, prim_readDir);
     addPrimOp("__findFile", 2, prim_findFile);
+    addPrimOp("__hashFile", 2, prim_hashFile);
 
     // Creating files
     addPrimOp("__toXML", 1, prim_toXML);

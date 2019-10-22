@@ -16,6 +16,7 @@
 #include <future>
 
 #include <fcntl.h>
+#include <grp.h>
 #include <limits.h>
 #include <sys/types.h>
 #ifndef _MSC_VER
@@ -117,6 +118,9 @@ static inline Path::size_type rfindSlash(const Path & path, Path::size_type from
     return path.rfind('/', from);
 #endif
 }
+
+const std::string nativeSystem = SYSTEM;
+
 
 BaseError & BaseError::addPrefix(const FormatOrString & fs)
 {
@@ -258,6 +262,15 @@ void clearEnv()
         unsetenv(name.first.c_str());
 }
 #endif
+
+void replaceEnv(std::map<std::string, std::string> newEnv)
+{
+    clearEnv();
+    for (auto newEnvVar : newEnv)
+    {
+        setenv(newEnvVar.first.c_str(), newEnvVar.second.c_str(), 1);
+    }
+}
 
 
 
@@ -916,7 +929,7 @@ static void _deletePath(const Path & path, unsigned long long & bytesFreed)
     }
 
     if (!S_ISDIR(st.st_mode) && st.st_nlink == 1)
-        bytesFreed += st.st_blocks * 512;
+        bytesFreed += st.st_size;
 
     if (S_ISDIR(st.st_mode)) {
         /* Make the directory accessible. */
@@ -1104,6 +1117,16 @@ Path createTempDir(const Path & tmpRoot, const Path & prefix, bool includePid, b
     }
 }
 #endif
+
+
+std::string getUserName()
+{
+    auto pw = getpwuid(geteuid());
+    std::string name = pw ? pw->pw_name : getEnv("USER", "");
+    if (name.empty())
+        throw Error("cannot figure out user name");
+    return name;
+}
 
 
 static Lazy<Path> getHome2([]() {
@@ -2044,12 +2067,34 @@ void runProgram2(const RunOptions & options)
     if (options.standardOut) out.createPipe();
     if (source) in.createPipe();
 
+    ProcessOptions processOptions;
+    // vfork implies that the environment of the main process and the fork will
+    // be shared (technically this is undefined, but in practice that's the
+    // case), so we can't use it if we alter the environment
+    if (options.environment)
+        processOptions.allowVfork = false;
+
     /* Fork. */
     Pid pid = startProcess([&]() {
+        if (options.environment)
+            replaceEnv(*options.environment);
         if (options.standardOut && dup2(out.writeSide.get(), STDOUT_FILENO) == -1)
             throw PosixError("dupping stdout");
+        if (options.mergeStderrToStdout)
+            if (dup2(STDOUT_FILENO, STDERR_FILENO) == -1)
+                throw PosixError("cannot dup stdout into stderr");
         if (source && dup2(in.readSide.get(), STDIN_FILENO) == -1)
             throw PosixError("dupping stdin");
+
+        if (options.chdir && chdir((*options.chdir).c_str()) == -1)
+            throw SysError("chdir failed");
+        if (options.gid && setgid(*options.gid) == -1)
+            throw SysError("setgid failed");
+        /* Drop all other groups if we're setgid. */
+        if (options.gid && setgroups(0, 0) == -1)
+            throw SysError("setgroups failed");
+        if (options.uid && setuid(*options.uid) == -1)
+            throw SysError("setuid failed");
 
         Strings args_(options.args);
         args_.push_front(options.program);
@@ -2062,7 +2107,8 @@ void runProgram2(const RunOptions & options)
             execv(options.program.c_str(), stringsToCharPtrs(args_).data());
 
         throw PosixError("executing '%1%'", options.program);
-    });
+    }, processOptions);
+
     out.writeSide = -1;
 #else
 
@@ -2463,6 +2509,19 @@ string replaceStrings(const std::string & s,
         pos += to.size();
     }
     return res;
+}
+
+
+std::string rewriteStrings(const std::string & _s, const StringMap & rewrites)
+{
+    auto s = _s;
+    for (auto & i : rewrites) {
+        if (i.first == i.second) continue;
+        size_t j = 0;
+        while ((j = s.find(i.first, j)) != string::npos)
+            s.replace(j, i.first.size(), i.second);
+    }
+    return s;
 }
 
 

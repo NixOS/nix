@@ -24,11 +24,11 @@ symlinks to the files of the active applications.  </para>
 <para>Components are installed from a set of <emphasis>Nix
 expressions</emphasis> that tell Nix how to build those packages,
 including, if necessary, their dependencies.  There is a collection of
-Nix expressions called the Nix Package collection that contains
+Nix expressions called the Nixpkgs package collection that contains
 packages ranging from basic development stuff such as GCC and Glibc,
 to end-user applications like Mozilla Firefox.  (Nix is however not
-tied to the Nix Package collection; you could write your own Nix
-expressions based on it, or completely new ones.)</para>
+tied to the Nixpkgs package collection; you could write your own Nix
+expressions based on Nixpkgs, or completely new ones.)</para>
 
 <para>You can manually download the latest version of Nixpkgs from
 <link xlink:href='http://nixos.org/nixpkgs/download.html'/>. However,

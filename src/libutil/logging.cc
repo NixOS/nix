@@ -21,7 +21,7 @@ Logger * logger = makeDefaultLogger();
 
 void Logger::warn(const std::string & msg)
 {
-    log(lvlInfo, ANSI_RED "warning:" ANSI_NORMAL " " + msg);
+    log(lvlWarn, ANSI_RED "warning:" ANSI_NORMAL " " + msg);
 }
 
 class SimpleLogger : public Logger
@@ -46,6 +46,7 @@ public:
             char c;
             switch (lvl) {
             case lvlError: c = '3'; break;
+            case lvlWarn: c = '4'; break;
             case lvlInfo: c = '5'; break;
             case lvlTalkative: case lvlChatty: c = '6'; break;
             default: c = '7';

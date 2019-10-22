@@ -260,40 +260,9 @@ Hash hashString(HashType ht, const string & s)
 
 Hash hashFile(HashType ht, const Path & path)
 {
-    Ctx ctx;
-    Hash hash(ht);
-    start(ht, ctx);
-    std::vector<unsigned char> buf(8192);
-
-#ifndef _WIN32
-    AutoCloseFD fd = open(path.c_str(), O_RDONLY | O_CLOEXEC);
-    if (!fd) throw PosixError(format("opening file '%1%'") % path);
-
-    ssize_t n;
-    while ((n = read(fd.get(), buf.data(), buf.size()))) {
-        checkInterrupt();
-        if (n == -1) throw PosixError(format("reading file '%1%'") % path);
-        update(ht, ctx, buf.data(), n);
-    }
-#else
-//std::cerr << "hashFile(" << path << ")" << std::endl;
-    AutoCloseWindowsHandle fd = CreateFileW(pathW(path).c_str(), GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
-    if (fd.get() == INVALID_HANDLE_VALUE)
-        throw WinError("CreateFileW when hashFile '%1%'", path);
-
-    DWORD n;
-    while (true) {
-        if (!ReadFile(fd.get(), buf.data(), buf.size(), &n, NULL))
-            throw WinError("ReadFile when hashFile '%1%'", path);
-        if (n == 0)
-            break;
-        checkInterrupt();
-        update(ht, ctx, buf.data(), n);
-    }
-#endif
-
-    finish(ht, ctx, hash.hash);
-    return hash;
+    HashSink sink(ht);
+    readFile(path, sink);
+    return sink.finish().first;
 }
 
 

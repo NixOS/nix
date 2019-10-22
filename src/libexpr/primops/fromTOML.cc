@@ -49,6 +49,19 @@ static void prim_fromTOML(EvalState & state, const Pos & pos, Value * * args, Va
                 visit(*(v.listElems()[i] = state.allocValue()), t2->get()[i]);
         }
 
+        // Handle cases like 'a = [[{ a = true }]]', which IMHO should be
+        // parsed as a array containing an array containing a table,
+        // but instead are parsed as an array containing a table array
+        // containing a table.
+        else if (auto t2 = t->as_table_array()) {
+            size_t size = t2->get().size();
+
+            state.mkList(v, size);
+
+            for (size_t j = 0; j < size; ++j)
+                visit(*(v.listElems()[j] = state.allocValue()), t2->get()[j]);
+        }
+
         else if (t->is_value()) {
             if (auto val = t->as<int64_t>())
                 mkInt(v, val->get());

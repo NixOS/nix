@@ -9,6 +9,38 @@ readonly SERVICE_DEST=/etc/systemd/system/nix-daemon.service
 readonly SOCKET_SRC=/lib/systemd/system/nix-daemon.socket
 readonly SOCKET_DEST=/etc/systemd/system/nix-daemon.socket
 
+
+# Path for the systemd override unit file to contain the proxy settings
+readonly SERVICE_OVERRIDE=${SERVICE_DEST}.d/override.conf
+
+create_systemd_override() {
+     header "Configuring proxy for the nix-daemon service"
+    _sudo "create directory for systemd unit override" mkdir -p "$(dirname $SERVICE_OVERRIDE)"
+    cat <<EOF | _sudo "create systemd unit override" tee "$SERVICE_OVERRIDE"
+[Service]
+$1
+EOF
+}
+
+# Gather all non-empty proxy environment variables into a string
+create_systemd_proxy_env() {
+    vars="http_proxy https_proxy ftp_proxy no_proxy HTTP_PROXY HTTPS_PROXY FTP_PROXY NO_PROXY"
+    for v in $vars; do
+        if [ "x${!v:-}" != "x" ]; then
+            echo "Environment=${v}=${!v}"
+        fi
+    done
+}
+
+handle_network_proxy() {
+    # Create a systemd unit override with proxy environment variables
+    # if any proxy environment variables are not empty.
+    PROXY_ENV_STRING=$(create_systemd_proxy_env)
+    if [ -n "${PROXY_ENV_STRING}" ]; then
+        create_systemd_override "${PROXY_ENV_STRING}"
+    fi
+}
+
 poly_validate_assumptions() {
     if [ "$(uname -s)" != "Linux" ]; then
         failure "This script is for use with Linux!"
@@ -46,6 +78,8 @@ poly_configure_nix_daemon_service() {
 
     _sudo "to set up the nix-daemon socket service" \
           systemctl enable "/nix/var/nix/profiles/default$SOCKET_SRC"
+
+    handle_network_proxy
 
     _sudo "to load the systemd unit for nix-daemon" \
           systemctl daemon-reload

@@ -7,5 +7,8 @@
 <title>Advanced Topics</title>
 
 <xi:include href="distributed-builds.xml" />
+<xi:include href="cores-vs-jobs.xml" />
+<xi:include href="diff-hook.xml" />
+<xi:include href="post-build-hook.xml" />
 
 </part>

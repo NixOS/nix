@@ -1,5 +1,5 @@
 { nix ? builtins.fetchGit ./.
-, nixpkgs ? builtins.fetchGit { url = https://github.com/NixOS/nixpkgs-channels.git; ref = "nixos-18.09"; }
+, nixpkgs ? builtins.fetchTarball https://github.com/NixOS/nixpkgs-channels/archive/nixos-19.03.tar.gz
 , officialRelease ? false
 , systems ? [ "x86_64-linux" "i686-linux" "x86_64-darwin" "aarch64-linux" ]
 }:
@@ -18,7 +18,7 @@ let
 
       releaseTools.sourceTarball {
         name = "nix-tarball";
-        version = builtins.readFile ./version;
+        version = builtins.readFile ./.version;
         versionSuffix = if officialRelease then "" else "pre${toString nix.revCount}_${nix.shortRev}";
         src = nix;
         inherit officialRelease;
@@ -72,7 +72,12 @@ let
           # https://github.com/NixOS/nixpkgs/issues/45462
           ''
             mkdir -p $out/lib
-            cp ${boost}/lib/libboost_context* $out/lib
+            cp -pd ${boost}/lib/{libboost_context*,libboost_thread*,libboost_system*} $out/lib
+            rm -f $out/lib/*.a
+            ${lib.optionalString stdenv.isLinux ''
+              chmod u+w $out/lib/*.so.*
+              patchelf --set-rpath $out/lib:${stdenv.cc.cc.lib}/lib $out/lib/libboost_thread.so.*
+            ''}
           '';
 
         configureFlags = configureFlags ++
@@ -165,10 +170,10 @@ let
           chmod +x $TMPDIR/install-systemd-multi-user.sh
           chmod +x $TMPDIR/install-multi-user
           dir=nix-${version}-${system}
-          fn=$out/$dir.tar.bz2
+          fn=$out/$dir.tar.xz
           mkdir -p $out/nix-support
           echo "file binary-dist $fn" >> $out/nix-support/hydra-build-products
-          tar cvfj $fn \
+          tar cvfJ $fn \
             --owner=0 --group=0 --mode=u+rw,uga+r \
             --absolute-names \
             --hard-dereference \
@@ -295,7 +300,7 @@ let
 
           substitute ${./scripts/install.in} $out/install \
             ${pkgs.lib.concatMapStrings
-              (system: "--replace '@binaryTarball_${system}@' $(nix hash-file --base16 --type sha256 ${binaryTarball.${system}}/*.tar.bz2) ")
+              (system: "--replace '@binaryTarball_${system}@' $(nix hash-file --base16 --type sha256 ${binaryTarball.${system}}/*.tar.xz) ")
               [ "x86_64-linux" "i686-linux" "x86_64-darwin" "aarch64-linux" ]
             } \
             --replace '@nixVersion@' ${build.x86_64-linux.src.version}

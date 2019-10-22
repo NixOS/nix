@@ -89,10 +89,11 @@ void parseMachines(const std::string & s, Machines & machines)
 
 Machines getMachines()
 {
-    Machines machines;
-
-    parseMachines(settings.builders, machines);
-
+    static auto machines = [&]() {
+        Machines machines;
+        parseMachines(settings.builders, machines);
+        return machines;
+    }();
     return machines;
 }
 

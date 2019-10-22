@@ -3,6 +3,7 @@
 #include "store-api.hh"
 #include "sync.hh"
 #include "thread-pool.hh"
+#include "references.hh"
 
 #include <atomic>
 
@@ -13,7 +14,7 @@ struct CmdVerify : StorePathsCommand
     bool noContents = false;
     bool noTrust = false;
     Strings substituterUris;
-    size_t sigsNeeded;
+    size_t sigsNeeded = 0;
 
     CmdVerify()
     {
@@ -88,10 +89,15 @@ struct CmdVerify : StorePathsCommand
 
                 if (!noContents) {
 
-                    HashSink sink(info->narHash.type);
-                    store->narFromPath(info->path, sink);
+                    std::unique_ptr<AbstractHashSink> hashSink;
+                    if (info->ca == "")
+                        hashSink = std::make_unique<HashSink>(info->narHash.type);
+                    else
+                        hashSink = std::make_unique<HashModuloSink>(info->narHash.type, storePathToHash(info->path));
 
-                    auto hash = sink.finish();
+                    store->narFromPath(info->path, *hashSink);
+
+                    auto hash = hashSink->finish();
 
                     if (hash.first != info->narHash) {
                         corrupted++;
@@ -113,13 +119,12 @@ struct CmdVerify : StorePathsCommand
                     else {
 
                         StringSet sigsSeen;
-                        size_t actualSigsNeeded = sigsNeeded ? sigsNeeded : 1;
+                        size_t actualSigsNeeded = std::max(sigsNeeded, (size_t) 1);
                         size_t validSigs = 0;
 
                         auto doSigs = [&](StringSet sigs) {
                             for (auto sig : sigs) {
-                                if (sigsSeen.count(sig)) continue;
-                                sigsSeen.insert(sig);
+                                if (!sigsSeen.insert(sig).second) continue;
                                 if (validSigs < ValidPathInfo::maxSigs && info->checkSignature(publicKeys, sig))
                                     validSigs++;
                             }

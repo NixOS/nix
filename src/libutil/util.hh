@@ -36,6 +36,10 @@ struct Sink;
 struct Source;
 
 
+/* The system for which Nix is compiled. */
+extern const std::string nativeSystem;
+
+
 /* Return an environment variable. */
 string getEnv(const string & key, const string & def = "");
 
@@ -175,6 +179,8 @@ Path createTempDir(const Path & tmpRoot = "", const Path & prefix = "nix",
     , mode_t mode = 0755
 #endif
     );
+
+std::string getUserName();
 
 /* Return $HOME or the user's home directory from /etc/passwd. */
 Path getHome();
@@ -398,12 +404,17 @@ string runProgramGetStdout(Path program, bool searchPath = false,
 
 struct RunOptions
 {
+    std::optional<uid_t> uid;
+    std::optional<uid_t> gid;
+    std::optional<Path> chdir;
+    std::optional<std::map<std::string, std::string>> environment;
     Path program;
     bool searchPath = true;
     Strings args; // TODO: unicode on Windows?
     std::optional<std::string> input;
     Source * standardIn = nullptr;
     Sink * standardOut = nullptr;
+    bool mergeStderrToStdout = false;
     bool _killStderr = false;
 
     RunOptions(const Path & program, const Strings & args)
@@ -485,6 +496,20 @@ string replaceStrings(const std::string & s,
     const std::string & from, const std::string & to);
 
 
+std::string rewriteStrings(const std::string & s, const StringMap & rewrites);
+
+
+/* If a set contains 'from', remove it and insert 'to'. */
+template<typename T>
+void replaceInSet(std::set<T> & set, const T & from, const T & to)
+{
+    auto i = set.find(from);
+    if (i == set.end()) return;
+    set.erase(i);
+    set.insert(to);
+}
+
+
 /* Convert the exit status of a child as returned by wait() into an
    error string. */
 string statusToString(int status);
@@ -541,12 +566,14 @@ void ignoreException();
 #ifndef _WIN32
 #define ANSI_NORMAL "\x1B[0m"
 #define ANSI_BOLD "\x1B[1m"
+#define ANSI_FAINT "\x1B[2m"
 #define ANSI_RED "\x1B[31;1m"
 #define ANSI_GREEN "\x1B[32;1m"
 #define ANSI_BLUE "\x1B[34;1m"
 #else
 #define ANSI_NORMAL ""
 #define ANSI_BOLD ""
+#define ANSI_FAINT ""
 #define ANSI_RED ""
 #define ANSI_GREEN ""
 #define ANSI_BLUE ""
@@ -581,21 +608,34 @@ string get(const T & map, const string & key, const string & def = "")
    type T or an exception. (We abuse std::future<T> to pass the value or
    exception.) */
 template<typename T>
-struct Callback
+class Callback
 {
     std::function<void(std::future<T>)> fun;
+    std::atomic_flag done = ATOMIC_FLAG_INIT;
+
+public:
 
     Callback(std::function<void(std::future<T>)> fun) : fun(fun) { }
 
-    void operator()(T && t) const
+    Callback(Callback && callback) : fun(std::move(callback.fun))
     {
+        auto prev = callback.done.test_and_set();
+        if (prev) done.test_and_set();
+    }
+
+    void operator()(T && t) noexcept
+    {
+        auto prev = done.test_and_set();
+        assert(!prev);
         std::promise<T> promise;
         promise.set_value(std::move(t));
         fun(promise.get_future());
     }
 
-    void rethrow(const std::exception_ptr & exc = std::current_exception()) const
+    void rethrow(const std::exception_ptr & exc = std::current_exception()) noexcept
     {
+        auto prev = done.test_and_set();
+        assert(!prev);
         std::promise<T> promise;
         promise.set_exception(exc);
         fun(promise.get_future());

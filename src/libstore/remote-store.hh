@@ -29,6 +29,8 @@ public:
     const Setting<unsigned int> maxConnectionAge{(Store*) this, std::numeric_limits<unsigned int>::max(),
             "max-connection-age", "number of seconds to reuse a connection"};
 
+    virtual bool sameMachine() = 0;
+
     RemoteStore(const Params & params);
 
     /* Implementations of abstract store API methods. */
@@ -41,7 +43,7 @@ public:
     PathSet queryAllValidPaths() override;
 
     void queryPathInfoUncached(const Path & path,
-        Callback<std::shared_ptr<ValidPathInfo>> callback) override;
+        Callback<std::shared_ptr<ValidPathInfo>> callback) noexcept override;
 
     void queryReferrers(const Path & path, PathSet & referrers) override;
 
@@ -145,6 +147,9 @@ public:
     UDSRemoteStore(std::string path, const Params & params);
 
     std::string getUri() override;
+
+    bool sameMachine()
+    { return true; }
 
 private:
 

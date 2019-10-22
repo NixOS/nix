@@ -1,7 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
 <refentry xmlns="http://docbook.org/ns/docbook"
           xmlns:xlink="http://www.w3.org/1999/xlink"
           xmlns:xi="http://www.w3.org/2001/XInclude"
-          xml:id="sec-conf-file">
+          xml:id="sec-conf-file"
+          version="5">
 
 <refmeta>
   <refentrytitle>nix.conf</refentrytitle>
@@ -236,8 +238,74 @@ false</literal>.</para>
     linkend='opt-cores'>--cores</option> command line switch and
     defaults to <literal>1</literal>.  The value <literal>0</literal>
     means that the builder should use all available CPU cores in the
-    system.</para></listitem>
+    system.</para>
 
+    <para>See also <xref linkend="chap-tuning-cores-and-jobs" />.</para></listitem>
+  </varlistentry>
+
+  <varlistentry xml:id="conf-diff-hook"><term><literal>diff-hook</literal></term>
+  <listitem>
+    <para>
+      Absolute path to an executable capable of diffing build results.
+      The hook executes if <xref linkend="conf-run-diff-hook" /> is
+      true, and the output of a build is known to not be the same.
+      This program is not executed to determine if two results are the
+      same.
+    </para>
+
+    <para>
+      The diff hook is executed by the same user and group who ran the
+      build. However, the diff hook does not have write access to the
+      store path just built.
+    </para>
+
+    <para>The diff hook program receives three parameters:</para>
+
+    <orderedlist>
+      <listitem>
+        <para>
+          A path to the previous build's results
+        </para>
+      </listitem>
+
+      <listitem>
+        <para>
+          A path to the current build's results
+        </para>
+      </listitem>
+
+      <listitem>
+        <para>
+          The path to the build's derivation
+        </para>
+      </listitem>
+
+      <listitem>
+        <para>
+          The path to the build's scratch directory. This directory
+          will exist only if the build was run with
+          <option>--keep-failed</option>.
+        </para>
+      </listitem>
+    </orderedlist>
+
+    <para>
+      The stderr and stdout output from the diff hook will not be
+      displayed to the user. Instead, it will print to the nix-daemon's
+      log.
+    </para>
+
+    <para>When using the Nix daemon, <literal>diff-hook</literal> must
+    be set in the <filename>nix.conf</filename> configuration file, and
+    cannot be passed at the command line.
+    </para>
+  </listitem>
+  </varlistentry>
+
+  <varlistentry xml:id="conf-enforce-determinism">
+    <term><literal>enforce-determinism</literal></term>
+
+    <listitem><para>See <xref linkend="conf-repeat" />.</para></listitem>
   </varlistentry>
 
   <varlistentry xml:id="conf-extra-sandbox-paths">
@@ -365,7 +433,7 @@ builtins.fetchurl {
   <varlistentry xml:id="conf-keep-env-derivations"><term><literal>keep-env-derivations</literal></term>
 
     <listitem><para>If <literal>false</literal> (default), derivations
-    are not stored in Nix user environments.  That is, the derivation
+    are not stored in Nix user environments.  That is, the derivations of
     any build-time-only dependencies may be garbage-collected.</para>
 
     <para>If <literal>true</literal>, when you add a Nix derivation to
@@ -415,8 +483,10 @@ builtins.fetchurl {
 
   <varlistentry xml:id="conf-max-free"><term><literal>max-free</literal></term>
 
-    <listitem><para>This option defines after how many free bytes to stop collecting
-    garbage once the <literal>min-free</literal> condition gets triggered.</para></listitem>
+    <listitem><para>When a garbage collection is triggered by the
+    <literal>min-free</literal> option, it stops as soon as
+    <literal>max-free</literal> bytes are available. The default is
+    infinity (i.e. delete all garbage).</para></listitem>
 
   </varlistentry>
 
@@ -431,7 +501,10 @@ builtins.fetchurl {
     regardless).  It can be
     overridden using the <option
     linkend='opt-max-jobs'>--max-jobs</option> (<option>-j</option>)
-    command line switch.</para></listitem>
+    command line switch.</para>
+
+    <para>See also <xref linkend="chap-tuning-cores-and-jobs" />.</para>
+    </listitem>
   </varlistentry>
 
   <varlistentry xml:id="conf-max-silent-time"><term><literal>max-silent-time</literal></term>
@@ -457,9 +530,11 @@ builtins.fetchurl {
   <varlistentry xml:id="conf-min-free"><term><literal>min-free</literal></term>
 
     <listitem>
-      <para>When the disk reaches <literal>min-free</literal> bytes of free disk space during a build, nix
-        will start to garbage-collection until <literal>max-free</literal> bytes are available on the disk.
-        A value of <literal>0</literal> (the default) means that this feature is disabled.</para>
+      <para>When free disk space in <filename>/nix/store</filename>
+      drops below <literal>min-free</literal> during a build, Nix
+      performs a garbage-collection until <literal>max-free</literal>
+      bytes are available or there is no more garbage.  A value of
+      <literal>0</literal> (the default) disables this feature.</para>
     </listitem>
 
   </varlistentry>
@@ -589,15 +664,71 @@ password <replaceable>my-password</replaceable>
 
   </varlistentry>
 
+  <varlistentry xml:id="conf-post-build-hook">
+    <term><literal>post-build-hook</literal></term>
+    <listitem>
+      <para>Optional. The path to a program to execute after each build.</para>
+
+      <para>This option is only settable in the global
+      <filename>nix.conf</filename>, or on the command line by trusted
+      users.</para>
+
+      <para>When using the nix-daemon, the daemon executes the hook as
+      <literal>root</literal>. If the nix-daemon is not involved, the
+      hook runs as the user executing the nix-build.</para>
+
+      <itemizedlist>
+        <listitem><para>The hook executes after an evaluation-time build.</para></listitem>
+        <listitem><para>The hook does not execute on substituted paths.</para></listitem>
+        <listitem><para>The hook's output always goes to the user's terminal.</para></listitem>
+        <listitem><para>If the hook fails, the build succeeds but no further builds execute.</para></listitem>
+        <listitem><para>The hook executes synchronously, and blocks other builds from progressing while it runs.</para></listitem>
+      </itemizedlist>
+
+      <para>The program executes with no arguments. The program's environment
+      contains the following environment variables:</para>
+
+      <variablelist>
+        <varlistentry>
+          <term><envar>DRV_PATH</envar></term>
+          <listitem>
+            <para>The derivation for the built paths.</para>
+            <para>Example:
+            <literal>/nix/store/5nihn1a7pa8b25l9zafqaqibznlvvp3f-bash-4.4-p23.drv</literal>
+            </para>
+          </listitem>
+        </varlistentry>
+
+        <varlistentry>
+          <term><envar>OUT_PATHS</envar></term>
+          <listitem>
+            <para>Output paths of the built derivation, separated by a space character.</para>
+            <para>Example:
+            <literal>/nix/store/zf5lbh336mnzf1nlswdn11g4n2m8zh3g-bash-4.4-p23-dev
+            /nix/store/rjxwxwv1fpn9wa2x5ssk5phzwlcv4mna-bash-4.4-p23-doc
+            /nix/store/6bqvbzjkcp9695dq0dpl5y43nvy37pq1-bash-4.4-p23-info
+            /nix/store/r7fng3kk3vlpdlh2idnrbn37vh4imlj2-bash-4.4-p23-man
+            /nix/store/xfghy8ixrhz3kyy6p724iv3cxji088dx-bash-4.4-p23</literal>.
+            </para>
+          </listitem>
+        </varlistentry>
+      </variablelist>
+
+      <para>See <xref linkend="chap-post-build-hook" /> for an example
+      implementation.</para>
+
+    </listitem>
+  </varlistentry>
+
   <varlistentry xml:id="conf-repeat"><term><literal>repeat</literal></term>
 
     <listitem><para>How many times to repeat builds to check whether
     they are deterministic. The default value is 0. If the value is
     non-zero, every build is repeated the specified number of
     times. If the contents of any of the runs differs from the
-    previous ones, the build is rejected and the resulting store paths
-    are not registered as “valid” in Nix’s database.</para></listitem>
-
+    previous ones and <xref linkend="conf-enforce-determinism" /> is
+    true, the build is rejected and the resulting store paths are not
+    registered as “valid” in Nix’s database.</para></listitem>
   </varlistentry>
 
   <varlistentry xml:id="conf-require-sigs"><term><literal>require-sigs</literal></term>
@@ -628,6 +759,19 @@ password <replaceable>my-password</replaceable>
 
   </varlistentry>
 
+  <varlistentry xml:id="conf-run-diff-hook"><term><literal>run-diff-hook</literal></term>
+  <listitem>
+    <para>
+      If true, enable the execution of <xref linkend="conf-diff-hook" />.
+    </para>
+
+    <para>
+      When using the Nix daemon, <literal>run-diff-hook</literal> must
+      be set in the <filename>nix.conf</filename> configuration file,
+      and cannot be passed at the command line.
+    </para>
+  </listitem>
+  </varlistentry>
 
   <varlistentry xml:id="conf-sandbox"><term><literal>sandbox</literal></term>
 
@@ -729,6 +873,14 @@ password <replaceable>my-password</replaceable>
 
   </varlistentry>
 
+  <varlistentry xml:id="conf-stalled-download-timeout"><term><literal>stalled-download-timeout</literal></term>
+    <listitem>
+      <para>The timeout (in seconds) for receiving data from servers
+      during download. Nix cancels idle downloads after this timeout's
+      duration.</para>
+    </listitem>
+  </varlistentry>
+
   <varlistentry xml:id="conf-substituters"><term><literal>substituters</literal></term>
 
     <listitem><para>A list of URLs of substituters, separated by
@@ -784,6 +936,31 @@ requiredSystemFeatures = [ "kvm" ];
 
   </varlistentry>
 
+  <varlistentry xml:id="conf-tarball-ttl"><term><literal>tarball-ttl</literal></term>
+
+    <listitem>
+      <para>Default: <literal>3600</literal> seconds.</para>
+
+      <para>The number of seconds a downloaded tarball is considered
+      fresh. If the cached tarball is stale, Nix will check whether
+      it is still up to date using the ETag header. Nix will download
+      a new version if the ETag header is unsupported, or the
+      cached ETag doesn't match.
+      </para>
+
+      <para>Setting the TTL to <literal>0</literal> forces Nix to always
+      check if the tarball is up to date.</para>
+
+      <para>Nix caches tarballs in
+      <filename>$XDG_CACHE_HOME/nix/tarballs</filename>.</para>
+
+      <para>Files fetched via <envar>NIX_PATH</envar>,
+      <function>fetchGit</function>, <function>fetchMercurial</function>,
+      <function>fetchTarball</function>, and <function>fetchurl</function>
+      respect this TTL.
+      </para>
+    </listitem>
+  </varlistentry>
 
   <varlistentry xml:id="conf-timeout"><term><literal>timeout</literal></term>
 
@@ -799,6 +976,34 @@ requiredSystemFeatures = [ "kvm" ];
 
       <para>The value <literal>0</literal> means that there is no
       timeout.  This is also the default.</para>
+
+    </listitem>
+
+  </varlistentry>
+
+  <varlistentry xml:id="conf-trace-function-calls"><term><literal>trace-function-calls</literal></term>
+
+    <listitem>
+
+      <para>Default: <literal>false</literal>.</para>
+
+      <para>If set to <literal>true</literal>, the Nix evaluator will
+      trace every function call. Nix will print a log message at the
+      "vomit" level for every function entrance and function exit.</para>
+
+      <informalexample><screen>
+function-trace entered undefined position at 1565795816999559622
+function-trace exited undefined position at 1565795816999581277
+function-trace entered /nix/store/.../example.nix:226:41 at 1565795253249935150
+function-trace exited /nix/store/.../example.nix:226:41 at 1565795253249941684
+</screen></informalexample>
+
+      <para>The <literal>undefined position</literal> means the function
+      call is a builtin.</para>
+
+      <para>Use the <literal>contrib/stack-collapse.py</literal> script
+      distributed with the Nix source code to convert the trace logs
+      in to a format suitable for <command>flamegraph.pl</command>.</para>
 
     </listitem>
 

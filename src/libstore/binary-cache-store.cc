@@ -10,10 +10,13 @@
 #include "nar-info-disk-cache.hh"
 #include "nar-accessor.hh"
 #include "json.hh"
+#include "thread-pool.hh"
 
 #include <chrono>
-
 #include <future>
+#include <regex>
+
+#include <nlohmann/json.hpp>
 
 namespace nix {
 
@@ -55,7 +58,7 @@ void BinaryCacheStore::init()
 }
 
 void BinaryCacheStore::getFile(const std::string & path,
-    Callback<std::shared_ptr<std::string>> callback)
+    Callback<std::shared_ptr<std::string>> callback) noexcept
 {
     try {
         callback(getFile(path));
@@ -139,6 +142,11 @@ void BinaryCacheStore::addToStore(const ValidPathInfo & info, const ref<std::str
 
     auto accessor_ = std::dynamic_pointer_cast<RemoteFSAccessor>(accessor);
 
+    auto narAccessor = makeNarAccessor(nar);
+
+    if (accessor_)
+        accessor_->addToCache(info.path, *nar, narAccessor);
+
     /* Optionally write a JSON file containing a listing of the
        contents of the NAR. */
     if (writeNARListing) {
@@ -148,11 +156,6 @@ void BinaryCacheStore::addToStore(const ValidPathInfo & info, const ref<std::str
             JSONObject jsonRoot(jsonOut);
             jsonRoot.attr("version", 1);
 
-            auto narAccessor = makeNarAccessor(nar);
-
-            if (accessor_)
-                accessor_->addToCache(info.path, *nar, narAccessor);
-
             {
                 auto res = jsonRoot.placeholder("root");
                 listNar(res, narAccessor, "", true);
@@ -160,11 +163,6 @@ void BinaryCacheStore::addToStore(const ValidPathInfo & info, const ref<std::str
         }
 
         upsertFile(storePathToHash(info.path) + ".ls", jsonOut.str(), "application/json");
-    }
-
-    else {
-        if (accessor_)
-            accessor_->addToCache(info.path, *nar, makeNarAccessor(nar));
     }
 
     /* Compress the NAR. */
@@ -181,12 +179,70 @@ void BinaryCacheStore::addToStore(const ValidPathInfo & info, const ref<std::str
         % ((1.0 - (double) narCompressed->size() / nar->size()) * 100.0)
         % duration);
 
-    /* Atomically write the NAR file. */
     narInfo->url = "nar/" + narInfo->fileHash.to_string(Base32, false) + ".nar"
         + (compression == "xz" ? ".xz" :
            compression == "bzip2" ? ".bz2" :
            compression == "br" ? ".br" :
            "");
+
+    /* Optionally maintain an index of DWARF debug info files
+       consisting of JSON files named 'debuginfo/<build-id>' that
+       specify the NAR file and member containing the debug info. */
+    if (writeDebugInfo) {
+
+        std::string buildIdDir = "/lib/debug/.build-id";
+
+        if (narAccessor->stat(buildIdDir).type == FSAccessor::tDirectory) {
+
+            ThreadPool threadPool(25);
+
+            auto doFile = [&](std::string member, std::string key, std::string target) {
+                checkInterrupt();
+
+                nlohmann::json json;
+                json["archive"] = target;
+                json["member"] = member;
+
+                // FIXME: or should we overwrite? The previous link may point
+                // to a GC'ed file, so overwriting might be useful...
+                if (fileExists(key)) return;
+
+                printMsg(lvlTalkative, "creating debuginfo link from '%s' to '%s'", key, target);
+
+                upsertFile(key, json.dump(), "application/json");
+            };
+
+            std::regex regex1("^[0-9a-f]{2}$");
+            std::regex regex2("^[0-9a-f]{38}\\.debug$");
+
+            for (auto & s1 : narAccessor->readDirectory(buildIdDir)) {
+                auto dir = buildIdDir + "/" + s1;
+
+                if (narAccessor->stat(dir).type != FSAccessor::tDirectory
+                    || !std::regex_match(s1, regex1))
+                    continue;
+
+                for (auto & s2 : narAccessor->readDirectory(dir)) {
+                    auto debugPath = dir + "/" + s2;
+
+                    if (narAccessor->stat(debugPath).type != FSAccessor::tRegular
+                        || !std::regex_match(s2, regex2))
+                        continue;
+
+                    auto buildId = s1 + s2;
+
+                    std::string key = "debuginfo/" + buildId;
+                    std::string target = "../" + narInfo->url;
+
+                    threadPool.enqueue(std::bind(doFile, std::string(debugPath, 1), key, target));
+                }
+            }
+
+            threadPool.process();
+        }
+    }
+
+    /* Atomically write the NAR file. */
     if (repair || !fileExists(narInfo->url)) {
         stats.narWrite++;
         upsertFile(narInfo->url, *narCompressed, "application/x-nix-nar");
@@ -240,7 +296,7 @@ void BinaryCacheStore::narFromPath(const Path & storePath, Sink & sink)
 }
 
 void BinaryCacheStore::queryPathInfoUncached(const Path & storePath,
-    Callback<std::shared_ptr<ValidPathInfo>> callback)
+    Callback<std::shared_ptr<ValidPathInfo>> callback) noexcept
 {
     auto uri = getUri();
     auto act = std::make_shared<Activity>(*logger, lvlTalkative, actQueryPathInfo,
@@ -249,21 +305,23 @@ void BinaryCacheStore::queryPathInfoUncached(const Path & storePath,
 
     auto narInfoFile = narInfoFileFor(storePath);
 
+    auto callbackPtr = std::make_shared<decltype(callback)>(std::move(callback));
+
     getFile(narInfoFile,
         {[=](std::future<std::shared_ptr<std::string>> fut) {
             try {
                 auto data = fut.get();
 
-                if (!data) return callback(nullptr);
+                if (!data) return (*callbackPtr)(nullptr);
 
                 stats.narInfoRead++;
 
-                callback((std::shared_ptr<ValidPathInfo>)
+                (*callbackPtr)((std::shared_ptr<ValidPathInfo>)
                     std::make_shared<NarInfo>(*this, *data, narInfoFile));
 
                 (void) act; // force Activity into this lambda to ensure it stays alive
             } catch (...) {
-                callback.rethrow();
+                callbackPtr->rethrow();
             }
         }});
 }
