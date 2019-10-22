@@ -239,7 +239,7 @@ struct CmdProfileRemove : virtual StoreCommand, MixDefaultProfile, MixProfileEle
                 "nix profile remove packages.x86_64-linux.hello"
             },
             Example{
-                "To remove all package:",
+                "To remove all packages:",
                 "nix profile remove '.*'"
             },
             Example{
@@ -274,6 +274,71 @@ struct CmdProfileRemove : virtual StoreCommand, MixDefaultProfile, MixProfileEle
             newManifest.elements.size());
 
         updateProfile(newManifest.build(store));
+    }
+};
+
+struct CmdProfileUpgrade : virtual SourceExprCommand, MixDefaultProfile, MixProfileElementMatchers
+{
+    std::string description() override
+    {
+        return "upgrade packages using their most recent flake";
+    }
+
+    Examples examples() override
+    {
+        return {
+            Example{
+                "To upgrade all packages that were installed using a mutable flake reference:",
+                "nix profile upgrade '.*'"
+            },
+            Example{
+                "To upgrade a specific package:",
+                "nix profile upgrade packages.x86_64-linux.hello"
+            },
+        };
+    }
+
+    void run(ref<Store> store) override
+    {
+        ProfileManifest manifest(*profile);
+
+        auto matchers = getMatchers(store);
+
+        // FIXME: code duplication
+        PathSet pathsToBuild;
+
+        for (size_t i = 0; i < manifest.elements.size(); ++i) {
+            auto & element(manifest.elements[i]);
+            if (element.source
+                && !element.source->originalRef.isImmutable()
+                && matches(element, i, matchers))
+            {
+                Activity act(*logger, lvlChatty, actUnknown,
+                    fmt("checking '%s' for updates", element.source->attrPath));
+
+                InstallableFlake installable(*this, FlakeRef(element.source->originalRef), {element.source->attrPath});
+
+                auto [attrPath, resolvedRef, drv] = installable.toDerivation();
+
+                if (element.source->resolvedRef == resolvedRef) continue;
+
+                printInfo("upgrading '%s' from flake '%s' to '%s'",
+                    element.source->attrPath, element.source->resolvedRef, resolvedRef);
+
+                element.storePaths = {drv.outPath}; // FIXME
+                element.source = ProfileElementSource{
+                    installable.flakeRef,
+                    resolvedRef,
+                    attrPath,
+                };
+
+                pathsToBuild.insert(makeDrvPathWithOutputs(drv.drvPath, {"out"})); // FIXME
+            }
+        }
+
+        store->buildPaths(pathsToBuild);
+
+        updateProfile(manifest.build(store));
     }
 };
 
@@ -314,6 +379,7 @@ struct CmdProfile : virtual MultiCommand, virtual Command
         : MultiCommand({
               {"install", []() { return make_ref<CmdProfileInstall>(); }},
               {"remove", []() { return make_ref<CmdProfileRemove>(); }},
+              {"upgrade", []() { return make_ref<CmdProfileUpgrade>(); }},
               {"info", []() { return make_ref<CmdProfileInfo>(); }},
           })
     { }
