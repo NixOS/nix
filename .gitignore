@@ -9,6 +9,7 @@ perl/Makefile.config
 /nix.spec
 /stamp-h1
 /svn-revision
+/build-gcc
 /libtool
 
 /corepkgs/config.nix
