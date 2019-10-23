@@ -611,7 +611,7 @@ Expr * EvalState::parseExprFromString(const string & s, const Path & basePath)
 Expr * EvalState::parseStdin()
 {
 #ifndef _WIN32
-    Activity act(*logger, lvlTalkative, format("parsing standard input"));
+    //Activity act(*logger, lvlTalkative, format("parsing standard input"));
     return parseExprFromString(drainFD(STDIN_FILENO), absPath("."));
 #else
     return parseExprFromString(drainFD(GetStdHandle(STD_INPUT_HANDLE)), absPath("."));
