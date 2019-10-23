@@ -19,9 +19,6 @@ readonly BLUE_UL='\033[38;4;34m'
 readonly GREEN='\033[38;32m'
 readonly GREEN_UL='\033[38;4;32m'
 readonly RED='\033[38;31m'
-readonly RED_UL='\033[38;4;31m'
-readonly YELLOW='\033[38;33m'
-readonly YELLOW_UL='\033[38;4;33m'
 
 readonly NIX_USER_COUNT="32"
 readonly NIX_BUILD_GROUP_ID="30000"
