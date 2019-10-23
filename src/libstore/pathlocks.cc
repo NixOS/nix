@@ -202,7 +202,9 @@ bool PathLocks::lockPaths(const PathSet & _paths,
         strpaths += v;
     }
     strpaths += "]";
+#ifdef _WIN32
     std::cerr << "lockPaths _paths="<<strpaths<<" waitMsg="<<waitMsg<<" wait="<<wait << std::endl;
+#endif
     assert(fds.empty());
 
     /* Note that `fds' is built incrementally so that the destructor

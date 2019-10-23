@@ -899,9 +899,8 @@ StoreType getStoreType(const std::string & uri, const std::string & stateDir)
         else if (pathExists(settings.nixDaemonSocketFile))
             return tDaemon;
         else
-#else
-            return tLocal;
 #endif
+            return tLocal;
     } else {
         return tOther;
     }

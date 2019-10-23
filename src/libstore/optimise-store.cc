@@ -422,6 +422,7 @@ void LocalStore::optimisePath_(Activity * act, OptimiseStats & stats,
         }
         throw PosixError(format("cannot rename '%1%' to '%2%'") % tempLink % path);
     }
+    const bool optimized = true;
 #else
     if ((wfad.dwFileAttributes & FILE_ATTRIBUTE_READONLY) != 0)
         if (!SetFileAttributesW(wpath.c_str(), wfad.dwFileAttributes & ~FILE_ATTRIBUTE_READONLY))

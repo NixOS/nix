@@ -890,7 +890,9 @@ void LocalStore::removeUnusedLinks(const GCState & state)
 
 void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
 {
-std::cerr << "LocalStore::collectGarbage" <<std::endl;
+#ifdef _WIN32
+    std::cerr << "LocalStore::collectGarbage" <<std::endl;
+#endif
     GCState state(results);
     state.options = options;
     state.gcKeepOutputs = settings.gcKeepOutputs;

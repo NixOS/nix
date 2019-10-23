@@ -203,7 +203,11 @@ static void dump(const Path & path, const std::wstring & wpath, /* the same path
 void dumpPath(const Path & path, Sink & sink, PathFilter & filter)
 {
     sink << narVersionMagic1;
+#ifndef _WIN32
+    dump(path, sink, filter);
+#else
     dump(path, pathW(path), NULL, NULL, sink, filter);
+#endif
 }
 
 
