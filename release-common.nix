@@ -36,7 +36,7 @@ rec {
       "--with-sandbox-shell=${sh}/bin/busybox"
     ];
 
-  tarballDeps =
+  tarballDeps = with pkgs.buildPackages;
     [ bison
       flex
       libxml2
@@ -47,10 +47,20 @@ rec {
       autoreconfHook
     ];
 
+  nativeBuildDeps = [
+    pkgconfig
+  ];
+
   buildDeps =
-    [ curl
-      bzip2 xz brotli
-      openssl pkgconfig sqlite boehmgc
+    lib.optionals (!stdenv.hostPlatform.isWindows) [
+      curl
+    ] ++ [
+      bzip2
+      xz
+      brotli
+      openssl
+      sqlite
+      boehmgc
       boost
 
       # Tests

@@ -1,13 +1,20 @@
-{ useClang ? false }:
+{ useClang ? false, crossSystem ? null }:
 
-with import (builtins.fetchGit { url = https://github.com/NixOS/nixpkgs-channels.git; ref = "nixos-18.03"; }) {};
+let
+  pkgsSrc = builtins.fetchGit { url = https://github.com/NixOS/nixpkgs-channels.git; ref = "nixos-18.03"; };
+in
+
+with import pkgsSrc { inherit crossSystem; };
 
 with import ./release-common.nix { inherit pkgs; };
 
 (if useClang then clangStdenv else stdenv).mkDerivation {
   name = "nix";
 
-  buildInputs = buildDeps ++ tarballDeps ++ perlDeps;
+  nativeBuildInputs = nativeBuildDeps ++ tarballDeps;
+
+  buildInputs = buildDeps
+   ++ lib.optionals (!stdenv.hostPlatform.isWindows) perlDeps;
 
   inherit configureFlags;
 
