@@ -102,7 +102,7 @@ static void getAllExprs(EvalState & state,
     const Path & path, StringSet & attrs, Value & v)
 {
     StringSet namesSorted;
-    for (auto & i : readDirectory(path)) namesSorted.insert(i.name);
+    for (auto & i : readDirectory(path)) namesSorted.insert(i.name());
 
     for (auto & i : namesSorted) {
         /* Ignore the manifest.nix used by profiles.  This is

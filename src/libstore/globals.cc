@@ -170,7 +170,7 @@ void initPlugins()
         try {
             auto ents = readDirectory(pluginFile);
             for (const auto & ent : ents)
-                pluginFiles.emplace_back(pluginFile + "/" + ent.name);
+                pluginFiles.emplace_back(pluginFile + "/" + ent.name());
         } catch (PosixError & e) {
             if (e.errNo != ENOTDIR)
                 throw;

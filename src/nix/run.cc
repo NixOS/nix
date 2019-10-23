@@ -384,10 +384,10 @@ void chrootHelper(int argc, char * * argv)
             throw PosixError("mounting '%s' on '%s'", realStoreDir, storeDir);
 
         for (auto entry : readDirectory("/")) {
-            auto src = "/" + entry.name;
+            auto src = "/" + entry.name();
             auto st = lstatPath(src);
             if (!S_ISDIR(st.st_mode)) continue;
-            Path dst = tmpDir + "/" + entry.name;
+            Path dst = tmpDir + "/" + entry.name();
             if (pathExists(dst)) continue;
             if (mkdir(dst.c_str(), 0700) == -1)
                 throw PosixError("creating directory '%s'", dst);

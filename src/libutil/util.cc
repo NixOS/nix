@@ -926,7 +926,7 @@ static void _deletePath(const Path & path, unsigned long long & bytesFreed)
                 throw PosixError(format("chmod '%1%'") % path);
         }
         for (auto & i : readDirectory(path))
-            _deletePath(path + "/" + i.name, bytesFreed);
+            _deletePath(path + "/" + i.name(), bytesFreed);
     }
 
     if (remove(path.c_str()) == -1) {
@@ -2330,7 +2330,7 @@ void closeMostFDs(const set<int> & exceptions)
 #if __linux__
     try {
         for (auto & s : readDirectory("/proc/self/fd")) {
-            auto fd = std::stoi(s.name);
+            auto fd = std::stoi(s.name());
             if (!exceptions.count(fd)) {
                 debug("closing leaked FD %d", fd);
                 close(fd);

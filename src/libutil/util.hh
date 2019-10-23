@@ -110,7 +110,7 @@ struct DirEntry
     const string & name() const { return name_; }
     unsigned char  type() const { return type_; }
     DirEntry(const string & name, ino_t ino, unsigned char type)
-        : name(name), ino(ino), type(type) { }
+        : name_(name), ino(ino), type_(type) { }
 };
 #else
 struct DirEntry

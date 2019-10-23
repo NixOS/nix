@@ -542,7 +542,7 @@ static void canonicalisePathMetaData_(const Path & path, uid_t fromUid, InodesSe
     if (S_ISDIR(st.st_mode)) {
         DirEntries entries = readDirectory(path);
         for (auto & i : entries)
-            canonicalisePathMetaData_(path + "/" + i.name, fromUid, inodesSeen);
+            canonicalisePathMetaData_(path + "/" + i.name(), fromUid, inodesSeen);
     }
 }
 

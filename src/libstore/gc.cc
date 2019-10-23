@@ -269,9 +269,9 @@ std::set<std::pair<pid_t, Path>> LocalStore::readTempRoots(FDs & fds)
     /* Read the `temproots' directory for per-process temporary root
        files. */
     for (auto & i : readDirectory(tempRootsDir)) {
-        Path path = tempRootsDir + "/" + i.name;
+        Path path = tempRootsDir + "/" + i.name();
 
-        pid_t pid = std::stoi(i.name);
+        pid_t pid = std::stoi(i.name());
 
         debug(format("reading temporary root file '%1%'") % path);
         FDPtr fd(new AutoCloseFD(open(path.c_str(), O_CLOEXEC | O_RDWR, 0666)));
