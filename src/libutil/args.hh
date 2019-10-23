@@ -190,6 +190,9 @@ public:
 
 Strings argvToStrings(int argc, char * * argv);
 
+/* Helper function to generate args that invoke $EDITOR on filename:lineno */
+Strings editorFor(std::string filename, int lineno);
+
 /* Helper function for rendering argument labels. */
 std::string renderLabels(const Strings & labels);
 

@@ -506,15 +506,8 @@ bool NixRepl::processLine(string line)
         }
 
         // Open in EDITOR
-        auto editor = getEnv("EDITOR", "cat");
-        auto args = tokenizeString<Strings>(editor);
-        if (lineno > 0 && (
-            editor.find("emacs") != std::string::npos ||
-            editor.find("nano") != std::string::npos ||
-            editor.find("vim") != std::string::npos))
-            args.push_back(fmt("+%d", lineno));
-        args.push_back(filename);
-        editor = args.front();
+        auto args = editorFor(filename, lineno);
+        auto editor = args.front();
         args.pop_front();
         runProgram(editor, args);
 

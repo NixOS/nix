@@ -59,22 +59,15 @@ struct CmdEdit : InstallableCommand
             throw Error("cannot parse line number '%s'", pos);
         }
 
-        auto editor = getEnv("EDITOR", "cat");
-
-        auto args = tokenizeString<Strings>(editor);
-
-        if (editor.find("emacs") != std::string::npos ||
-            editor.find("nano") != std::string::npos ||
-            editor.find("vim") != std::string::npos)
-            args.push_back(fmt("+%d", lineno));
-
-        args.push_back(filename);
-
         stopProgressBar();
+
+        auto args = editorFor(filename, lineno);
 
         execvp(args.front().c_str(), stringsToCharPtrs(args).data());
 
-        throw SysError("cannot run editor '%s'", editor);
+        std::string command;
+        for (const auto &arg : args) command += " '" + arg + "'";
+        throw SysError("cannot run command%s", command);
     }
 };
 

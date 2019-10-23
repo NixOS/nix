@@ -178,6 +178,19 @@ Strings argvToStrings(int argc, char * * argv)
     return args;
 }
 
+Strings editorFor(std::string filename, int lineno)
+{
+    auto editor = getEnv("EDITOR", "cat");
+    auto args = tokenizeString<Strings>(editor);
+    if (lineno > 0 && (
+        editor.find("emacs") != std::string::npos ||
+        editor.find("nano") != std::string::npos ||
+        editor.find("vim") != std::string::npos))
+        args.push_back(fmt("+%d", lineno));
+    args.push_back(filename);
+    return args;
+}
+
 std::string renderLabels(const Strings & labels)
 {
     std::string res;
