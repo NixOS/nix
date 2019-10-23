@@ -118,7 +118,7 @@ HgInfo exportMercurial(ref<Store> store, const std::string & uri,
            we don't have to pull again. */
         if (!(std::regex_match(rev, commitHashRegex)
                 && pathExists(cacheDir)
-                && runProgramWithOptions(
+                && runProgramWithStatus(
                     RunOptions("hg", { "log", "-R", cacheDirMSYS, "-r", rev, "--template", "1" })
                     .killStderr(true)).second == "1"))
         {

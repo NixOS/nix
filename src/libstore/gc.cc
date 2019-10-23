@@ -674,7 +674,7 @@ void LocalStore::deletePathRecursive(GCState & state, const Path & path)
     } else
         deleteGarbage(state, realPath);
 #else
-    runProgramWithOptions(RunOptions("icacls", { realPath, "/reset" /*, "/C", "/T", "/L"*/ }));
+    runProgramWithStatus(RunOptions("icacls", { realPath, "/reset" /*, "/C", "/T", "/L"*/ }));
 
     if (state.moveToTrash && (wfad.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) != 0) {
         try {

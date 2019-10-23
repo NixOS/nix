@@ -1980,25 +1980,34 @@ std::vector<char *> stringsToCharPtrs(const Strings & ss)
     return res;
 }
 
-
-string runProgramGetStdout(Path program, bool searchPath, const Strings & args,
+RunOptions basic_options(Path program, bool searchPath, const Strings & args,
     const optional<std::string> & input)
 {
     RunOptions opts(program, args);
     opts.searchPath = searchPath;
     opts.input = input;
-
-    std::pair<int, std::string> res = runProgramWithOptions(opts);
-
-    if (!statusOk(res.first))
-        throw ExecError(res.first, fmt("program '%1%' %2%", program, statusToString(res.first)));
-
-    return res.second;
+    return opts;
 }
 
-void runProgram2(const RunOptions & options);
+string runProgramGetStdout(Path program, bool searchPath, const Strings & args,
+    const optional<std::string> & input)
+{
+	RunOptions opts = basic_options(program, searchPath, args, input);
+	return runProgramGetStdout(opts);
+}
 
-std::pair<int, std::string> runProgramWithOptions(const RunOptions & options_)
+string runProgramGetStdout(const RunOptions & options_)
+{
+    RunOptions options(options_);
+    StringSink sink;
+    options.standardOut = &sink;
+
+    runProgram(options);
+
+    return std::move(*sink.s);
+}
+
+std::pair<int, std::string> runProgramWithStatus(const RunOptions & options_)
 {
     RunOptions options(options_);
     StringSink sink;
@@ -2007,7 +2016,7 @@ std::pair<int, std::string> runProgramWithOptions(const RunOptions & options_)
     int status = 0;
 
     try {
-        runProgram2(options);
+        runProgram(options);
     } catch (ExecError & e) {
         status = e.status;
     }
@@ -2015,7 +2024,14 @@ std::pair<int, std::string> runProgramWithOptions(const RunOptions & options_)
     return {status, std::move(*sink.s)};
 }
 
-void runProgram2(const RunOptions & options)
+void runProgram(Path program, bool searchPath, const Strings & args,
+    const optional<std::string> & input)
+{
+	RunOptions opts = basic_options(program, searchPath, args, input);
+	return runProgram(opts);
+}
+
+void runProgram(const RunOptions & options)
 {
     checkInterrupt();
 

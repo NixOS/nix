@@ -390,12 +390,6 @@ struct ProcessOptions
 pid_t startProcess(std::function<void()> fun, const ProcessOptions & options = ProcessOptions());
 #endif
 
-/* Run a program and return its stdout in a string (i.e., like the
-   shell backtick operator). */
-string runProgramGetStdout(Path program, bool searchPath = false,
-    const Strings & args = Strings(),
-    const optional<std::string> & input = {});
-
 struct RunOptions
 {
     Path program;
@@ -412,9 +406,23 @@ struct RunOptions
     RunOptions & killStderr(bool v) { _killStderr = true; return *this; }
 };
 
-std::pair<int, std::string> runProgramWithOptions(const RunOptions & options);
+/* Run a program and return its stdout in a string (i.e., like the
+   shell backtick operator). */
+string runProgramGetStdout(const RunOptions & options);
 
+string runProgramGetStdout(Path program, bool searchPath = false,
+    const Strings & args = Strings(),
+    const optional<std::string> & input = {});
 
+std::pair<int, std::string> runProgramWithStatus(const RunOptions & options);
+
+/* Run a program without capturing stdout */
+void runProgram(Path program, bool searchPath = false,
+    const Strings & args = Strings(),
+    const optional<std::string> & input = {});
+
+/* Run a program, with all setup left to the caller */
+void runProgram(const RunOptions & options);
 
 class ExecError : public Error
 {

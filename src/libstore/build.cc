@@ -1966,7 +1966,7 @@ fprintf(stderr, "DerivationGoal::startBuilder()\n");
             if (isBusy) continue;
             // make the tmpDit as short as possible but not the root directory of the drive (boost rejects to be built in root dir)
             tmpDir = (format("%c:/x") % letter).str();
-            //    runProgramWithOptions(RunOptions("subst", { tmpDir.substr(0, 2), tmpDirOrig }));
+            //    runProgramWithStatus(RunOptions("subst", { tmpDir.substr(0, 2), tmpDirOrig }));
             if (DefineDosDeviceW(DDD_NO_BROADCAST_SYSTEM, from_bytes(tmpDir.substr(0, 2)).c_str(), pathW(tmpDirOrig).c_str())) {
                 break;
             }
@@ -3768,7 +3768,7 @@ void DerivationGoal::deleteTmpDir(bool force)
     if (tmpDir != "") {
 #ifdef _WIN32
         if (tmpDir != tmpDirOrig) {
-//          runProgramWithOptions(RunOptions("subst", { tmpDir.substr(0, 2), "/D" }));
+//          runProgramWithStatus(RunOptions("subst", { tmpDir.substr(0, 2), "/D" }));
             if (!DefineDosDeviceW(DDD_NO_BROADCAST_SYSTEM|DDD_REMOVE_DEFINITION|DDD_EXACT_MATCH_ON_REMOVE, from_bytes(tmpDir.substr(0, 2)).c_str(), pathW(tmpDirOrig).c_str())) {
                 throw WinError("DefineDosDeviceW(%1%, %2%)", tmpDir.substr(0, 2), tmpDirOrig);
             }
