@@ -481,28 +481,7 @@ bool NixRepl::processLine(string line)
             lineno = 0;
         } else {
             // assume it's a derivation
-            Value * v2;
-            try {
-                auto dummyArgs = state.allocBindings(0);
-                v2 = findAlongAttrPath(state, "meta.position", *dummyArgs, v);
-            } catch (Error &) {
-                throw Error("package '%s' has no source location information", arg);
-            }
-
-            auto pos = state.forceString(*v2);
-            debug("position is %s", pos);
-
-            auto colon = pos.rfind(':');
-            if (colon == std::string::npos)
-                throw Error("cannot parse meta.position attribute '%s'", pos);
-
-            filename = std::string(pos, 0, colon);
-            try {
-                lineno = std::stoi(std::string(pos, colon + 1));
-            } catch (std::invalid_argument & e) {
-                throw Error("cannot parse line number '%s'", pos);
-            }
-
+            std::tie(filename, lineno) = findDerivationFilename(state, v, arg);
         }
 
         // Open in EDITOR

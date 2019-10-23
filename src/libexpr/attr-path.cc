@@ -93,4 +93,32 @@ Value * findAlongAttrPath(EvalState & state, const string & attrPath,
 }
 
 
+std::tuple<std::string, int> findDerivationFilename(EvalState & state, Value & v, std::string what)
+{
+    Value * v2;
+    try {
+        auto dummyArgs = state.allocBindings(0);
+        v2 = findAlongAttrPath(state, "meta.position", *dummyArgs, v);
+    } catch (Error &) {
+        throw Error("package '%s' has no source location information", what);
+    }
+
+    auto pos = state.forceString(*v2);
+
+    auto colon = pos.rfind(':');
+    if (colon == std::string::npos)
+        throw Error("cannot parse meta.position attribute '%s'", pos);
+
+    std::string filename(pos, 0, colon);
+    int lineno;
+    try {
+        lineno = std::stoi(std::string(pos, colon + 1));
+    } catch (std::invalid_argument & e) {
+        throw Error("cannot parse line number '%s'", pos);
+    }
+
+    return std::make_tuple(filename, lineno);
+}
+
+
 }
