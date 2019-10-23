@@ -34,8 +34,10 @@ void removeOldGenerations(std::string dir)
                 link = readLink(path);
             } catch (PosixError & e) {
                 if (e.errNo == ENOENT) continue;
+#ifdef _WIN32
             } catch (WinError & e) {
                 throw e; // TODO
+#endif
             }
             if (link.find("link") != string::npos) {
                 printInfo(format("removing old generations of profile %1%") % path);

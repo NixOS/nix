@@ -395,8 +395,10 @@ void LocalStore::findRoots(const Path & path, unsigned char type, Roots & roots)
             printInfo(format("cannot read potential root '%1%'") % path);
         else
             throw;
+#ifdef _WIN32
     } catch (WinError & e) {
         throw e; // TODO
+#endif
     }
 }
 
@@ -946,8 +948,10 @@ std::cerr << "LocalStore::collectGarbage" <<std::endl;
                 printInfo(format("note: can't create trash directory: %1%") % e.msg());
                 state.moveToTrash = false;
             }
+#ifdef _WIN32
         } catch (WinError & e) {
             throw e; // TODO
+#endif
         }
     }
 

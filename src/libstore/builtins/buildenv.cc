@@ -29,8 +29,10 @@ static void createLinks(const Path & srcDir, const Path & dstDir, int priority)
             return;
         }
         throw;
+#ifdef _WIN32
     } catch (WinError & e) {
         throw e; // TODO
+#endif
     }
 
     for (const auto & ent : srcFiles) {
@@ -165,8 +167,10 @@ static void addPkg(const Path & pkgDir, int priority)
                 postponed.insert(p);
     } catch (PosixError & e) {
         if (e.errNo != ENOENT && e.errNo != ENOTDIR) throw;
+#ifdef _WIN32
     } catch (WinError & e) {
         throw e; // TODO
+#endif
     }
 }
 

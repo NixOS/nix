@@ -200,8 +200,10 @@ GitInfo exportGit(ref<Store> store, const std::string & uri,
 
     } catch (PosixError & e) {
         if (e.errNo != ENOENT) throw;
+#ifdef _WIN32
     } catch (WinError & e) {
         if (e.lastError != ERROR_FILE_NOT_FOUND) throw;
+#endif
     }
 
     // FIXME: should pipe this, or find some better way to extract a

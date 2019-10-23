@@ -41,9 +41,11 @@ protected:
         } catch (PosixError & e) {
             if (e.errNo == ENOENT)
                 throw NoSuchBinaryCacheFile("file '%s' does not exist in binary cache", path);
+#ifdef _WIN32
         } catch (WinError & e) {
             if (e.lastError == ERROR_FILE_NOT_FOUND)
                 throw NoSuchBinaryCacheFile("file '%s' does not exist in binary cache", path);
+#endif
         }
     }
 
