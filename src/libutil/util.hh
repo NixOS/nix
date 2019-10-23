@@ -292,21 +292,18 @@ public:
 #endif
 
 
+class Pipe
+{
+public:
 #ifndef _WIN32
-class Pipe
-{
-public:
     AutoCloseFD readSide, writeSide;
-    void createPipe();
-};
 #else
-class Pipe
-{
-public:
     AutoCloseWindowsHandle hRead, hWrite;
-    void createPipe();
+#endif
+    void create();
 };
 
+#ifdef _WIN32
 class AsyncPipe
 {
 public:
@@ -314,7 +311,7 @@ public:
     OVERLAPPED                  overlapped;
     DWORD                       got;
     std::vector<unsigned char>  buffer;
-    void createAsyncPipe(HANDLE iocp);
+    void create(HANDLE iocp);
 };
 #endif
 

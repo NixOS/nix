@@ -467,7 +467,7 @@ struct CurlDownloader : public Downloader
             downloadSettings.httpConnections.get());
         #endif
 #ifndef _WIN32
-        wakeupPipe.createPipe();
+        wakeupPipe.create();
 #endif
         workerThread = std::thread([&]() { workerThreadEntry(); });
     }

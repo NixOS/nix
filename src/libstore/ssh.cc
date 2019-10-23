@@ -29,8 +29,8 @@ std::unique_ptr<SSHMaster::Connection> SSHMaster::startCommand(const std::string
     Path socketPath = startMaster();
 #ifndef _WIN32
     Pipe in, out;
-    in.createPipe();
-    out.createPipe();
+    in.create();
+    out.create();
 
     auto conn = std::make_unique<Connection>();
     conn->sshPid = startProcess([&]() {
@@ -95,7 +95,7 @@ Path SSHMaster::startMaster()
     state->socketPath = (Path) *state->tmpDir + "/ssh.sock";
 #ifndef _WIN32
     Pipe out;
-    out.createPipe();
+    out.create();
 
     state->sshMaster = startProcess([&]() {
 

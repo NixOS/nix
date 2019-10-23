@@ -1643,8 +1643,8 @@ HANDLE AutoCloseWindowsHandle::release()
 #endif
 
 #ifdef _WIN32
-void AsyncPipe::createAsyncPipe(HANDLE iocp) {
-//std::cerr << (format("-----AsyncPipe::createAsyncPipe(%x)") % iocp) << std::endl;
+void AsyncPipe::create(HANDLE iocp) {
+//std::cerr << (format("-----AsyncPipe::create(%x)") % iocp) << std::endl;
 
     buffer.resize(0x1000);
     memset(&overlapped, 0, sizeof(overlapped));
@@ -1690,7 +1690,7 @@ void Pipe::create()
 }
 #else
 
-void Pipe::createPipe()
+void Pipe::create()
 {
     SECURITY_ATTRIBUTES saAttr = {0};
     saAttr.nLength = sizeof(SECURITY_ATTRIBUTES);
@@ -2032,8 +2032,8 @@ void runProgram2(const RunOptions & options)
 #ifndef _WIN32
     /* Create a pipe. */
     Pipe out, in;
-    if (options.standardOut) out.createPipe();
-    if (source) in.createPipe();
+    if (options.standardOut) out.create();
+    if (source) in.create();
 
     /* Fork. */
     Pid pid = startProcess([&]() {
@@ -2107,7 +2107,7 @@ if (options.input)
     }
 
     if (source) {
-        in.createPipe();
+        in.create();
         if (!SetHandleInformation(in.hWrite.get(), HANDLE_FLAG_INHERIT, 0)) // do not inherit the write end
             throw WinError("SetHandleInformation");
         si.hStdInput = in.hRead.get();
@@ -2115,7 +2115,7 @@ if (options.input)
         si.hStdInput = nul.get();
     }
     if (options.standardOut) {
-        out.createPipe();
+        out.create();
         if (!SetHandleInformation(out.hRead.get(), HANDLE_FLAG_INHERIT, 0)) // do not inherit the read end
             throw WinError("SetHandleInformation");
         si.hStdOutput = out.hWrite.get();

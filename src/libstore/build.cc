@@ -2275,10 +2275,10 @@ fprintf(stderr, "DerivationGoal::startBuilder()\n");
 
     /* Create a pipe to get the output of the builder. */
 #ifndef _WIN32
-    builderOut.createPipe();
+    builderOut.create();
 #else
-//std::cerr << (format("c----createAsyncPipe(%p, %p)") % &worker % worker.ioport.get()) << std::endl;
-    asyncBuilderOut.createAsyncPipe(worker.ioport.get());
+//std::cerr << (format("c----create(%p, %p)") % &worker % worker.ioport.get()) << std::endl;
+    asyncBuilderOut.create(worker.ioport.get());
 
     // Must be inheritable so subprocesses can dup to children.
     SECURITY_ATTRIBUTES sa = {0};
@@ -4237,7 +4237,11 @@ void SubstitutionGoal::tryToRun()
     maintainRunningSubstitutions = std::make_unique<MaintainCount<uint64_t>>(worker.runningSubstitutions);
     worker.updateProgress();
 
-    outPipe.createAsyncPipe(worker.ioport.get());
+#ifndef _WIN32
+    outPipe.create();
+#else
+    outPipe.create(worker.ioport.get());
+#endif
 
     promise = std::promise<void>();
 
