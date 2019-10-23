@@ -22,6 +22,7 @@ extern "C" {
 #include "shared.hh"
 #include "eval.hh"
 #include "eval-inline.hh"
+#include "attr-path.hh"
 #include "store-api.hh"
 #include "common-eval-args.hh"
 #include "get-drvs.hh"
@@ -440,6 +441,7 @@ bool NixRepl::processLine(string line)
              << "  <x> = <expr>  Bind expression to variable\n"
              << "  :a <expr>     Add attributes from resulting set to scope\n"
              << "  :b <expr>     Build derivation\n"
+             << "  :e <expr>     Open the derivation in $EDITOR\n"
              << "  :i <expr>     Build derivation, then install result into current profile\n"
              << "  :l <path>     Load Nix expression and add it to scope\n"
              << "  :p <expr>     Evaluate and print expression recursively\n"
@@ -462,6 +464,61 @@ bool NixRepl::processLine(string line)
     }
 
     else if (command == ":r" || command == ":reload") {
+        state.resetFileCache();
+        reloadFiles();
+    }
+
+    else if (command == ":e" || command == ":edit") {
+        Value v;
+        evalString(arg, v);
+
+        std::string filename;
+        int lineno = 0;
+
+        if (v.type == tPath || v.type == tString) {
+            PathSet context;
+            filename = state.coerceToString(noPos, v, context);
+            lineno = 0;
+        } else {
+            // assume it's a derivation
+            Value * v2;
+            try {
+                auto dummyArgs = state.allocBindings(0);
+                v2 = findAlongAttrPath(state, "meta.position", *dummyArgs, v);
+            } catch (Error &) {
+                throw Error("package '%s' has no source location information", arg);
+            }
+
+            auto pos = state.forceString(*v2);
+            debug("position is %s", pos);
+
+            auto colon = pos.rfind(':');
+            if (colon == std::string::npos)
+                throw Error("cannot parse meta.position attribute '%s'", pos);
+
+            filename = std::string(pos, 0, colon);
+            try {
+                lineno = std::stoi(std::string(pos, colon + 1));
+            } catch (std::invalid_argument & e) {
+                throw Error("cannot parse line number '%s'", pos);
+            }
+
+        }
+
+        // Open in EDITOR
+        auto editor = getEnv("EDITOR", "cat");
+        auto args = tokenizeString<Strings>(editor);
+        if (lineno > 0 && (
+            editor.find("emacs") != std::string::npos ||
+            editor.find("nano") != std::string::npos ||
+            editor.find("vim") != std::string::npos))
+            args.push_back(fmt("+%d", lineno));
+        args.push_back(filename);
+        editor = args.front();
+        args.pop_front();
+        runProgram(editor, args);
+
+        // Reload right after exiting the editor
         state.resetFileCache();
         reloadFiles();
     }
