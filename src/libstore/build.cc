@@ -1779,7 +1779,7 @@ HookReply DerivationGoal::tryBuildHook()
         else if (reply != "accept")
             throw Error(format("bad hook reply '%1%'") % reply);
 
-    } catch (SysError & e) {
+    } catch (PosixError & e) {
         if (e.errNo == EPIPE) {
             printError("build hook died unexpectedly: %s",
                 chomp(drainFD(worker.hook->fromHook.readSide.get())));
