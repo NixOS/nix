@@ -132,27 +132,6 @@ config_h.set(
     description : 'platform identifier (`cpu-os`)')
 
 
-# Check whether the store optimiser can optimise symlinks.
-#-------------------------------------------------
-gen_header = '''
-ln -s bla tmp_link
-if ln tmp_link tmp_link2 2> /dev/null; then
-    echo 1
-else
-    echo 0
-fi
-'''
-
-
-run_command('sh', '-c', 'rm tmp_link*') 
-can_link_symlink = run_command('sh', '-c', gen_header).stdout().strip()
-if can_link_symlink.to_int() == 1
-    run_command('sh', '-c', 'rm tmp_link*') 
-endif 
-
-config_h.set('CAN_LINK_SYMLINK', can_link_symlink,
-description : 'Whether link() works on symlinks')
-
 
 
 # checking headers
@@ -335,6 +314,9 @@ endif
 # look for required programs
 #--------------------------------------------------
 cat = find_program('cat', required : true)
+ln = find_program('ln', required : true)
+cp = find_program('cp', required : true)
+rm = find_program('rm', required : true)
 bash = find_program('bash', required : true)
 echo = find_program('echo', required : true)
 patch = find_program('patch', required : true)
@@ -350,6 +332,27 @@ dot = find_program('dot', required : true)
 lsof = find_program('lsof', required : true)
 tr = find_program('tr', required : true)
 coreutils = run_command('dirname', cat.path()).stdout().strip()
+
+
+# Check whether the store optimiser can optimise symlinks.
+#-------------------------------------------------
+gen_header = '''
+ln -s bla tmp_link
+if ln tmp_link tmp_link2 2> /dev/null; then
+    echo 1
+else
+    echo 0
+fi
+'''
+
+run_command('sh', '-c', 'rm tmp_link*') 
+can_link_symlink = run_command('sh', '-c', gen_header).stdout().strip()
+if can_link_symlink.to_int() == 1
+    run_command('sh', '-c', 'rm tmp_link*')
+endif 
+
+config_h.set('CAN_LINK_SYMLINK', can_link_symlink,
+description : 'Whether link() works on symlinks')
 
 
 # Look for boost, a required dependency.
@@ -468,13 +471,14 @@ endif
 if (get_option('with_gc'))
     gc_dep = declare_dependency(
         dependencies : dependency('bdw-gc'),
-        link_args :  get_option('sodium_link_args'))
+        link_args :  get_option('gc_link_args'))
     config_h.set(
         'HAVE_BOEHMGC', 1,
         description : 'Whether to use the Boehm garbage collector.')
 else
     gc_dep = declare_dependency()
 endif
+
 
 # Look for aws-cpp-sdk-s3.
 #--------------------------------------------------
@@ -533,9 +537,16 @@ install_headers(
 
 src_inc = [include_directories('.', 'src')]
 
-subdir('src')
-subdir('scripts')
-subdir('corepkgs')
-subdir('misc')
-subdir('doc')
-subdir('tests')
+project_dirs = [
+    'src',
+    'scripts',
+    'corepkgs',
+    'misc',
+    'doc',
+    'tests'
+]
+
+
+foreach dir : project_dirs
+    subdir(dir)
+endforeach

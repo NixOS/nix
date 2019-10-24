@@ -4,12 +4,14 @@
 # dirs
 #============================================================================
 
-
 option(
     'nixstoredir',
     type : 'string',
     value : '/nix/store',
     description : 'path of the Nix store (defaults to /nix/store)')
+
+
+
 
 # compiler args
 #============================================================================
@@ -134,6 +136,13 @@ option(
         '-lsqlite3'],
     description : 'link args for sqlite3')
 
+option(
+    'gc_link_args',
+    type : 'array',
+    value : [
+        '-L/usr/local/lib',
+        '-lgc'],
+    description : 'link args for boehm garbage collector')
 
 
 
