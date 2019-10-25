@@ -176,7 +176,7 @@ JSONObject JSONPlaceholder::object()
 
 JSONPlaceholder::~JSONPlaceholder()
 {
-    assert(!first || std::uncaught_exception());
+    assert(!first || std::uncaught_exceptions());
 }
 
 }

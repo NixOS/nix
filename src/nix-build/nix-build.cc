@@ -25,7 +25,7 @@ using namespace nix;
 using namespace std::string_literals;
 
 #ifndef _WIN32
-extern char * * environ;
+extern char * * environ __attribute__((weak));
 #endif
 
 /* Recreate the effect of the perl shellwords function, breaking up a

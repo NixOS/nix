@@ -1,0 +1,192 @@
+# Nix project build options
+#============================================================================
+
+# dirs
+#============================================================================
+
+
+option(
+    'nixstoredir',
+    type : 'string',
+    value : '/nix/store',
+    description : 'path of the Nix store (defaults to /nix/store)')
+
+# compiler args
+#============================================================================
+
+option(
+    'ldflags',
+    type : 'array',
+    value : [
+        '-L/usr/local/lib',
+        '-L/usr/lib',
+        '-L/lib'],
+    description : 'Link flags')
+
+option(
+    'cflags',
+    type : 'array',
+    value : [
+        '-O3'],
+    description : 'C build flags')
+
+option(
+    'cxxflags',
+    type : 'array',
+    value : [
+        '-O3'],
+    description : 'CXX build flags')
+
+
+
+
+# link args
+#============================================================================
+
+option(
+    'boost_link_args', 
+    type : 'array', 
+    value : [
+        '-L/usr/lib64',
+        '-lboost_system',
+        '-lboost_context',
+        '-lboost_thread'], 
+    description : 'link args for boost')
+
+option(
+    'brotli_link_args',
+    type : 'array',
+    value : [
+        '-L/usr/local/lib',
+        '-lbrotlienc',
+        '-lbrotlidec'],
+    description : 'link args for libbrotli')
+
+option(
+    'bz2_link_args',
+    type : 'array',
+    value : [
+        '-L/usr/local/lib',
+        '-lbz2'],
+    description : 'link args for libbz2')
+
+option(
+    'curl_link_args',
+    type : 'array',
+    value : [
+        '-L/usr/local/lib',
+        '-lcurl'],
+    description : 'link args for libcurl')
+
+option(
+    'dl_link_args',
+    type : 'array',
+    value : [
+        '-L/usr/local/lib',
+        '-ldl'],
+    description : 'link args for libdl')
+
+option(
+    'editline_link_args',
+    type : 'array',
+    value : [
+        '-L/usr/local/lib',
+        '-leditline'],
+    description : 'link args for editline_link_args')
+
+option(
+    'lzma_link_args',
+    type : 'array',
+    value : [
+        '-L/usr/local/lib',
+        '-llzma'],
+    description : 'link args for liblzma')
+
+option(
+    'openssl_link_args',
+    type : 'array',
+    value : [
+        '-L/usr/local/lib',
+        '-lcrypto'],
+    description : 'link args for openssl')
+
+option(
+    'pthread_link_args',
+    type : 'array',
+    value : [
+        '-L/usr/local/lib',
+        '-pthread'],
+    description : 'link args for pthread')
+
+option(
+    'sodium_link_args',
+    type : 'array',
+    value : [
+        '-L/usr/local/lib',
+        '-lsodium'],
+    description : 'link args for libsodium')
+
+option(
+    'sqlite3_link_args',
+    type : 'array',
+    value : [
+        '-L/usr/local/lib',
+        '-lsqlite3'],
+    description : 'link args for sqlite3')
+
+
+
+
+# optional dependancies
+#============================================================================
+
+option(
+    'with_gc',
+    type : 'boolean',
+    value : 'false',
+    description : 'build nix with Boehm garbage collector')
+
+option(
+    'with_libsodium',
+    type : 'boolean',
+    value : 'true',
+    description : 'build nix with shared libs')
+
+option(
+    'with_s3',
+    type : 'boolean',
+    value : 'false',
+    description : 'build nix with s3')
+
+option(
+    'with_coreutils_bin',
+    type : 'string',
+    description : 'path of cat, mkdir, etc.')
+
+
+
+# misc
+#============================================================================
+option(
+    'disable_doc_gen',
+    type : 'boolean',
+    value : 'false',
+    description : 'disable documentation generation')
+
+option(
+    'build_shared_libs',
+    type : 'boolean',
+    value : 'false',
+    description : 'build nix with shared libs')
+
+option(
+    'sandbox_shell',
+    type : 'string',
+    value : '/usr/bin/busybox',
+    description : 'path of a statically-linked shell to use as /bin/sh in sandboxes')
+
+option(
+    'normal_var',
+    type : 'boolean',
+    value : 'true',
+    description : 'Whether to use `/nix/var` or the user-overridable `localstatedir`.')

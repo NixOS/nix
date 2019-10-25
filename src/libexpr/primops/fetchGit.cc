@@ -5,6 +5,7 @@
 #include "pathlocks.hh"
 #ifndef _MSC_VER
 #include <sys/time.h>
+#include <sys/wait.h>
 #endif
 #include "hash.hh"
 
