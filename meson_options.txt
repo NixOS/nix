@@ -25,19 +25,15 @@ option(
         '-L/lib'],
     description : 'Link flags')
 
-option(
-    'cflags',
-    type : 'array',
-    value : [
-        '-O3'],
-    description : 'C build flags')
 
 option(
     'cxxflags',
     type : 'array',
     value : [
-        '-O3'],
-    description : 'CXX build flags')
+        '-Wdeprecated', 
+        '-Wno-non-virtual-dtor',
+        '-Wno-unused-parameter'],
+    description : 'C build flags')
 
 
 
