@@ -1,11 +1,13 @@
 { pkgs }:
 
-with pkgs;
+let
+  inherit (pkgs) stdenv lib curl;
+in
 
 rec {
   # Use "busybox-sandbox-shell" if present,
   # if not (legacy) fallback and hope it's sufficient.
-  sh = pkgs.busybox-sandbox-shell or (busybox.override {
+  sh = pkgs.busybox-sandbox-shell or (pkgs.busybox.override {
     useMusl = true;
     enableStatic = true;
     enableMinimal = true;
@@ -47,13 +49,13 @@ rec {
       autoreconfHook
     ];
 
-  nativeBuildDeps = [
+  nativeBuildDeps = with pkgs.buildPackages; [
     pkgconfig
     meson
     ninja
   ];
 
-  buildDeps =
+  buildDeps = with pkgs;
     [
       curl
       bzip2
@@ -84,7 +86,7 @@ rec {
         */
       }));
 
-  perlDeps =
+  perlDeps = with pkgs;
     [ perl
       perlPackages.DBDSQLite
     ];
