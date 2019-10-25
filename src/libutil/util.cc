@@ -57,7 +57,7 @@ std::wstring from_bytes(const std::string & s) {
     return converter.from_bytes(s);
 }
 
-optional<std::wstring> maybePathW(const Path & path) {
+std::optional<std::wstring> maybePathW(const Path & path) {
     if (path.length() >= 3 && (('A' <= path[0] && path[0] <= 'Z') || ('a' <= path[0] && path[0] <= 'z')) && path[1] == ':' && isslash(path[2])) {
         std::wstring sw = from_bytes("\\\\?\\" + path);
         std::replace(sw.begin(), sw.end(), '/', '\\');
@@ -69,11 +69,11 @@ optional<std::wstring> maybePathW(const Path & path) {
         std::replace(sw.begin(), sw.end(), '/', '\\');
         return sw;
     }
-    return optional<std::wstring>();
+    return std::optional<std::wstring>();
 }
 
 std::wstring pathW(const Path & path) {
-    optional<std::wstring> sw = maybePathW(path);
+    std::optional<std::wstring> sw = maybePathW(path);
     if (!sw) {
         std::cerr << "invalid path for WinAPI call ["<<path<<"]"<<std::endl;
         _exit(111);
@@ -308,7 +308,7 @@ Path absPath(Path path, Path dir)
 #endif
 
 
-optional<Path> maybeCanonPath(const Path & path, bool resolveSymlinks)
+std::optional<Path> maybeCanonPath(const Path & path, bool resolveSymlinks)
 {
 //std::cerr << "maybeCanonPath("<<path<<", resolveSymlinks="<<resolveSymlinks<<")"<<std::endl;
 
@@ -328,10 +328,10 @@ optional<Path> maybeCanonPath(const Path & path, bool resolveSymlinks)
         i += 6;
         s = path.substr(4, 2);
     } else
-        return optional<Path>();
+        return std::optional<Path>();
 #else
     if (path[0] != '/')
-        return optional<Path>();
+        return std::optional<Path>();
 #endif
 
     string temp;
@@ -390,7 +390,7 @@ optional<Path> maybeCanonPath(const Path & path, bool resolveSymlinks)
 }
 
 Path canonPath(const Path & path, bool resolveSymlinks) {
-    optional<Path> mb = maybeCanonPath(path, resolveSymlinks);
+    std::optional<Path> mb = maybeCanonPath(path, resolveSymlinks);
     if (!mb)
         throw Error(format("not an absolute path: '%1%'") % path);
     return *mb;
@@ -436,7 +436,7 @@ Path dirOf(const Path & path)
     Path::size_type pos = rfindSlash(path);
 //    Path::size_type pos = path.rfind('/');
     if (pos == string::npos)
-        throw Error(format("invalid file name4 '%1%'") % path);
+        return ".";
 // fprintf(stderr, "dirOf(%s)\n", path.c_str());
 #ifdef _WIN32
     if (path.length() >= 7 && path[0] == '\\' && path[1] == '\\' && (path[2] == '.' || path[2] == '?') && path[3] == '\\' &&
@@ -498,10 +498,10 @@ bool isInDir(const Path & path, const Path & dir)
         && path.size() >= dir.size() + 2
         && path[dir.size()] == '/';
 #else
-    optional<Path> cpath = maybeCanonPath(path, false);
+    std::optional<Path> cpath = maybeCanonPath(path, false);
     if (!cpath)
         return false;
-    optional<Path> cdir  = maybeCanonPath(dir, false);
+    std::optional<Path> cdir  = maybeCanonPath(dir, false);
     if (!cdir)
         return false;
     return (*cpath).compare(0, (*cdir).size(), *cdir) == 0
@@ -1113,7 +1113,7 @@ static Lazy<Path> getHome2([]() {
         std::vector<char> buf(16384);
         struct passwd pwbuf;
         struct passwd * pw;
-        if (getpwuid_r(getuid(), &pwbuf, buf.data(), buf.size(), &pw) != 0
+        if (getpwuid_r(geteuid(), &pwbuf, buf.data(), buf.size(), &pw) != 0
             || !pw || !pw->pw_dir || !pw->pw_dir[0])
             throw Error("cannot determine user's home directory");
         homeDir = pw->pw_dir;
@@ -1144,6 +1144,15 @@ Path getConfigDir()
     if (configDir.empty())
         configDir = getHome() + "/.config";
     return configDir;
+}
+
+std::vector<Path> getConfigDirs()
+{
+    Path configHome = getConfigDir();
+    string configDirs = getEnv("XDG_CONFIG_DIRS");
+    std::vector<Path> result = tokenizeString<std::vector<string>>(configDirs, ":");
+    result.insert(result.begin(), configHome);
+    return result;
 }
 
 
@@ -1232,7 +1241,7 @@ SymlinkType createSymlink(const Path & target, const Path & link)
     assert(target[0] != '/' && link[0] != '/');
     BOOLEAN rc;
     std::wstring wlink = pathW(link);
-    optional<std::wstring> wtarget = maybePathW(target);
+    std::optional<std::wstring> wtarget = maybePathW(target);
     SymlinkType st;
     if (!wtarget) {
         std::cerr << "path not absolute (" << target  << "), so make a dangling symlink" << std::endl;
@@ -1981,7 +1990,7 @@ std::vector<char *> stringsToCharPtrs(const Strings & ss)
 }
 
 RunOptions basic_options(Path program, bool searchPath, const Strings & args,
-    const optional<std::string> & input)
+    const std::optional<std::string> & input)
 {
     RunOptions opts(program, args);
     opts.searchPath = searchPath;
@@ -1990,7 +1999,7 @@ RunOptions basic_options(Path program, bool searchPath, const Strings & args,
 }
 
 string runProgramGetStdout(Path program, bool searchPath, const Strings & args,
-    const optional<std::string> & input)
+    const std::optional<std::string> & input)
 {
 	RunOptions opts = basic_options(program, searchPath, args, input);
 	return runProgramGetStdout(opts);
@@ -2025,7 +2034,7 @@ std::pair<int, std::string> runProgramWithStatus(const RunOptions & options_)
 }
 
 void runProgram(Path program, bool searchPath, const Strings & args,
-    const optional<std::string> & input)
+    const std::optional<std::string> & input)
 {
 	RunOptions opts = basic_options(program, searchPath, args, input);
 	return runProgram(opts);

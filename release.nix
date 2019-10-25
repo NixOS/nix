@@ -1,5 +1,5 @@
 { nix ? builtins.fetchGit ./.
-, nixpkgs ? builtins.fetchGit { url = https://github.com/NixOS/nixpkgs-channels.git; ref = "nixos-18.03"; }
+, nixpkgs ? builtins.fetchGit { url = https://github.com/NixOS/nixpkgs-channels.git; ref = "nixos-18.09"; }
 , officialRelease ? false
 , systems ? [ "x86_64-linux" "i686-linux" "x86_64-darwin" "aarch64-linux" ]
 }:
@@ -278,7 +278,6 @@ let
       pkgs.runCommand "eval-nixos" { buildInputs = [ build.x86_64-linux ]; }
         ''
           export NIX_STATE_DIR=$TMPDIR
-          nix-store --init
 
           nix-instantiate ${nixpkgs}/nixos/release-combined.nix -A tested --dry-run \
             --arg nixpkgs '{ outPath = ${nixpkgs}; revCount = 123; shortRev = "abcdefgh"; }'
@@ -296,7 +295,7 @@ let
 
           substitute ${./scripts/install.in} $out/install \
             ${pkgs.lib.concatMapStrings
-              (system: "--replace '@binaryTarball_${system}@' $(nix hash-file --type sha256 ${binaryTarball.${system}}/*.tar.bz2) ")
+              (system: "--replace '@binaryTarball_${system}@' $(nix hash-file --base16 --type sha256 ${binaryTarball.${system}}/*.tar.bz2) ")
               [ "x86_64-linux" "i686-linux" "x86_64-darwin" "aarch64-linux" ]
             } \
             --replace '@nixVersion@' ${build.x86_64-linux.src.version}

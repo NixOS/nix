@@ -8,7 +8,7 @@ using namespace nix;
 struct CmdAddToStore : MixDryRun, StoreCommand
 {
     Path path;
-    optional<std::string> namePart;
+    std::optional<std::string> namePart;
 
     CmdAddToStore()
     {

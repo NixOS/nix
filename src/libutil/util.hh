@@ -16,13 +16,7 @@
 #include <cstdio>
 #include <map>
 #include <sstream>
-#ifdef _MSC_VER
 #include <optional>
-using std::optional;
-#else
-#include <experimental/optional>
-using std::experimental::optional;
-#endif
 #include <future>
 
 #ifdef _WIN32
@@ -190,6 +184,9 @@ Path getCacheDir();
 
 /* Return $XDG_CONFIG_HOME or $HOME/.config. */
 Path getConfigDir();
+
+/* Return the directories to search for user configuration files */
+std::vector<Path> getConfigDirs();
 
 /* Return $XDG_DATA_HOME or $HOME/.local/share. */
 Path getDataDir();
@@ -395,7 +392,7 @@ struct RunOptions
     Path program;
     bool searchPath = true;
     Strings args; // TODO: unicode on Windows?
-    optional<std::string> input;
+    std::optional<std::string> input;
     Source * standardIn = nullptr;
     Sink * standardOut = nullptr;
     bool _killStderr = false;
@@ -412,14 +409,14 @@ string runProgramGetStdout(const RunOptions & options);
 
 string runProgramGetStdout(Path program, bool searchPath = false,
     const Strings & args = Strings(),
-    const optional<std::string> & input = {});
+    const std::optional<std::string> & input = {});
 
 std::pair<int, std::string> runProgramWithStatus(const RunOptions & options);
 
 /* Run a program without capturing stdout */
 void runProgram(Path program, bool searchPath = false,
     const Strings & args = Strings(),
-    const optional<std::string> & input = {});
+    const std::optional<std::string> & input = {});
 
 /* Run a program, with all setup left to the caller */
 void runProgram(const RunOptions & options);

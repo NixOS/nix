@@ -13,7 +13,3 @@ libutil_LDFLAGS += -lbacktrace -lboost_context-mt
 else
 libutil_LDFLAGS += -lboost_context
 endif
-
-libutil_LIBS = libformat
-
-libutil_CXXFLAGS = -DBROTLI=\"$(brotli)\"

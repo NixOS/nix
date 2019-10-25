@@ -91,6 +91,8 @@ downloadFile("binaryTarball.aarch64-linux", "1");
 downloadFile("binaryTarball.x86_64-darwin", "1");
 downloadFile("installerScript", "1");
 
+exit if $version =~ /pre/;
+
 # Update Nixpkgs in a very hacky way.
 system("cd $nixpkgsDir && git pull") == 0 or die;
 my $oldName = `nix-instantiate --eval $nixpkgsDir -A nix.name`; chomp $oldName;

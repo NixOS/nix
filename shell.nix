@@ -1,7 +1,7 @@
 { useClang ? false, crossSystem ? null }:
 
 let
-  pkgsSrc = builtins.fetchGit { url = https://github.com/NixOS/nixpkgs-channels.git; ref = "nixos-18.03"; };
+  pkgsSrc = builtins.fetchGit { url = https://github.com/NixOS/nixpkgs-channels.git; ref = "nixos-18.09"; };
 in
 
 with import pkgsSrc { inherit crossSystem; };

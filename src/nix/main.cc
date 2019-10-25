@@ -70,9 +70,6 @@ struct NixArgs : virtual MultiCommand, virtual MixCommonArgs
 
 void mainWrapped(int argc, char * * argv)
 {
-    verbosity = lvlError;
-    settings.verboseBuild = false;
-
     /* The chroot helper needs to be run before any threads have been
        started. */
     if (argc > 0 && argv[0] == chrootHelperName) {
@@ -94,6 +91,9 @@ void mainWrapped(int argc, char * * argv)
         auto legacy = (*RegisterLegacyCommand::commands)[programName];
         if (legacy) return legacy(argc, argv);
     }
+
+    verbosity = lvlError;
+    settings.verboseBuild = false;
 
     NixArgs args;
 

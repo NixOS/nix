@@ -2,13 +2,22 @@
 #include "shared.hh"
 #include "globals.hh"
 #include "download.hh"
+#include "store-api.hh"
+#endif
+
+#include "legacy.hh"
+
+#ifndef _WIN32
 #include <fcntl.h>
 #include <regex>
-#include "store-api.hh"
 #include <pwd.h>
+#else
+#include <iostream>
+#endif
 
 using namespace nix;
 
+#ifndef _WIN32
 typedef std::map<string,string> Channels;
 
 static Channels channels;
@@ -157,12 +166,12 @@ static void update(const StringSet & channelNames)
     auto channelLink = nixDefExpr + "/channels";
     replaceSymlink(profile, channelLink);
 }
+#endif
 
-int main(int argc, char ** argv)
+static int _main(int argc, char ** argv)
 {
-    return handleExceptions(argv[0], [&]() {
-        initNix();
-
+#ifndef _WIN32
+    {
         // Figure out the name of the `.nix-channels' file to use
         auto home = getHome();
         channelsList = home + "/.nix-channels";
@@ -170,7 +179,7 @@ int main(int argc, char ** argv)
 
         // Figure out the name of the channels profile.
         ;
-        auto pw = getpwuid(getuid());
+        auto pw = getpwuid(geteuid());
         std::string name = pw ? pw->pw_name : getEnv("USER", "");
         if (name.empty())
             throw Error("cannot figure out user name");
@@ -256,13 +265,16 @@ int main(int argc, char ** argv)
                 runProgram(settings.nixBinDir + "/nix-env", false, envArgs);
                 break;
         }
-    });
-}
+
+        return 0;
+    }
+
 #else
-#include <iostream>
-int main(int argc, char * * argv)
-{
-    std::cerr << "TODO: nix-channel" << std::endl;
-    return 1;
-}
+
+   std::cerr << "TODO: nix-channel" << std::endl;
+   return 1;
+
 #endif
+}
+
+static RegisterLegacyCommand s1("nix-channel", _main);

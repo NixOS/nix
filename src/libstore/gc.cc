@@ -182,8 +182,8 @@ Path LocalFSStore::addPermRoot(const Path & _storePath,
        check if the root is in a directory in or linked from the
        gcroots directory. */
     if (settings.checkRootReachability) {
-        Roots roots = findRoots();
-        if (roots.find(gcRoot) == roots.end())
+        Roots roots = findRoots(false);
+        if (roots[storePath].count(gcRoot) == 0)
             printError(
                 format(
                     "warning: '%1%' is not in a directory where the garbage collector looks for roots; "
@@ -261,11 +261,11 @@ void LocalStore::addTempRoot(const Path & path)
     lockFile(state->fdTempRoots.get(), ltRead, true);
 }
 
-#ifndef _WIN32
-std::set<std::pair<pid_t, Path>> LocalStore::readTempRoots(FDs & fds)
-{
-    std::set<std::pair<pid_t, Path>> tempRoots;
+static std::string censored = "{censored}";
 
+#ifndef _WIN32
+void LocalStore::findTempRoots(FDs & fds, Roots & tempRoots, bool censor)
+{
     /* Read the `temproots' directory for per-process temporary root
        files. */
     for (auto & i : readDirectory(tempRootsDir)) {
@@ -315,14 +315,12 @@ std::set<std::pair<pid_t, Path>> LocalStore::readTempRoots(FDs & fds)
             Path root(contents, pos, end - pos);
             debug("got temporary root '%s'", root);
             assertStorePath(root);
-            tempRoots.emplace(pid, root);
+            tempRoots[root].emplace(censor ? censored : fmt("{temp:%d}", pid));
             pos = end + 1;
         }
 
         fds.push_back(fd); /* keep open */
     }
-
-    return tempRoots;
 }
 #endif
 
@@ -332,7 +330,7 @@ void LocalStore::findRoots(const Path & path, unsigned char type, Roots & roots)
     auto foundRoot = [&](const Path & path, const Path & target) {
         Path storePath = toStorePath(target);
         if (isStorePath(storePath) && isValidPath(storePath))
-            roots[path] = storePath;
+            roots[storePath].emplace(path);
         else
             printInfo(format("skipping invalid root from '%1%' to '%2%'") % path % storePath);
     };
@@ -384,7 +382,7 @@ void LocalStore::findRoots(const Path & path, unsigned char type, Roots & roots)
         else if (type == DT_REG) {
             Path storePath = storeDir + "/" + baseNameOf(path);
             if (isStorePath(storePath) && isValidPath(storePath))
-                roots[path] = storePath;
+                roots[storePath].emplace(path);
         }
 
     }
@@ -403,10 +401,8 @@ void LocalStore::findRoots(const Path & path, unsigned char type, Roots & roots)
 }
 
 
-Roots LocalStore::findRootsNoTemp()
+void LocalStore::findRootsNoTemp(Roots & roots, bool censor)
 {
-    Roots roots;
-
     /* Process direct roots in {gcroots,profiles}. */
     findRoots(stateDir + "/" + gcRootsDir, DT_UNKNOWN, roots);
     findRoots(stateDir + "/profiles", DT_UNKNOWN, roots);
@@ -415,32 +411,25 @@ Roots LocalStore::findRootsNoTemp()
        NIX_ROOT_FINDER environment variable.  This is typically used
        to add running programs to the set of roots (to prevent them
        from being garbage collected). */
-    size_t n = 0;
-    for (auto & root : findRuntimeRoots())
-        roots[fmt("{memory:%d}", n++)] = root;
-
-    return roots;
+    findRuntimeRoots(roots, censor);
 }
 
 
-Roots LocalStore::findRoots()
+Roots LocalStore::findRoots(bool censor)
 {
-    Roots roots = findRootsNoTemp();
+    Roots roots;
+    findRootsNoTemp(roots, censor);
+
 #ifndef _WIN32
     FDs fds;
-    pid_t prev = -1;
-    size_t n = 0;
-    for (auto & root : readTempRoots(fds)) {
-        if (prev != root.first) n = 0;
-        prev = root.first;
-        roots[fmt("{temp:%d:%d}", root.first, n++)] = root.second;
-    }
+    findTempRoots(fds, roots, censor);
 #endif
+
     return roots;
 }
 
 #ifndef _WIN32
-static void readProcLink(const string & file, StringSet & paths)
+static void readProcLink(const string & file, Roots & roots)
 {
     /* 64 is the starting buffer size gnu readlink uses... */
     auto bufsiz = ssize_t{64};
@@ -459,8 +448,8 @@ try_again:
         goto try_again;
     }
     if (res > 0 && buf[0] == '/')
-        paths.emplace(static_cast<char *>(buf), res);
-    return;
+        roots[std::string(static_cast<char *>(buf), res)]
+            .emplace(file);
 }
 #endif
 
@@ -471,10 +460,10 @@ static string quoteRegexChars(const string & raw)
 }
 
 #ifndef _WIN32
-static void readFileRoots(const char * path, StringSet & paths)
+static void readFileRoots(const char * path, Roots & roots)
 {
     try {
-        paths.emplace(readFile(path));
+        roots[readFile(path)].emplace(path);
     } catch (PosixError & e) {
         if (e.errNo != ENOENT && e.errNo != EACCES)
             throw;
@@ -482,11 +471,11 @@ static void readFileRoots(const char * path, StringSet & paths)
 }
 #endif
 
-PathSet LocalStore::findRuntimeRoots()
+void LocalStore::findRuntimeRoots(Roots & roots, bool censor)
 {
-    PathSet roots;
 #ifndef _WIN32
-    StringSet paths;
+    Roots unchecked;
+
     auto procDir = AutoCloseDir{opendir("/proc")};
     if (procDir) {
         struct dirent * ent;
@@ -496,10 +485,10 @@ PathSet LocalStore::findRuntimeRoots()
         while (errno = 0, ent = readdir(procDir.get())) {
             checkInterrupt();
             if (std::regex_match(ent->d_name, digitsRegex)) {
-                readProcLink((format("/proc/%1%/exe") % ent->d_name).str(), paths);
-                readProcLink((format("/proc/%1%/cwd") % ent->d_name).str(), paths);
+                readProcLink(fmt("/proc/%s/exe" ,ent->d_name), unchecked);
+                readProcLink(fmt("/proc/%s/cwd", ent->d_name), unchecked);
 
-                auto fdStr = (format("/proc/%1%/fd") % ent->d_name).str();
+                auto fdStr = fmt("/proc/%s/fd", ent->d_name);
                 auto fdDir = AutoCloseDir(opendir(fdStr.c_str()));
                 if (!fdDir) {
                     if (errno == ENOENT || errno == EACCES)
@@ -508,9 +497,8 @@ PathSet LocalStore::findRuntimeRoots()
                 }
                 struct dirent * fd_ent;
                 while (errno = 0, fd_ent = readdir(fdDir.get())) {
-                    if (fd_ent->d_name[0] != '.') {
-                        readProcLink((format("%1%/%2%") % fdStr % fd_ent->d_name).str(), paths);
-                    }
+                    if (fd_ent->d_name[0] != '.')
+                        readProcLink(fmt("%s/%s", fdStr, fd_ent->d_name), unchecked);
                 }
                 if (errno) {
                     if (errno == ESRCH)
@@ -520,18 +508,19 @@ PathSet LocalStore::findRuntimeRoots()
                 fdDir.reset();
 
                 try {
-                    auto mapLines =
-                        tokenizeString<std::vector<string>>(readFile((format("/proc/%1%/maps") % ent->d_name).str(), true), "\n");
-                    for (const auto& line : mapLines) {
+                    auto mapFile = fmt("/proc/%s/maps", ent->d_name);
+                    auto mapLines = tokenizeString<std::vector<string>>(readFile(mapFile, true), "\n");
+                    for (const auto & line : mapLines) {
                         auto match = std::smatch{};
                         if (std::regex_match(line, match, mapRegex))
-                            paths.emplace(match[1]);
+                            unchecked[match[1]].emplace(mapFile);
                     }
 
-                    auto envString = readFile((format("/proc/%1%/environ") % ent->d_name).str(), true);
+                    auto envFile = fmt("/proc/%s/environ", ent->d_name);
+                    auto envString = readFile(envFile, true);
                     auto env_end = std::sregex_iterator{};
                     for (auto i = std::sregex_iterator{envString.begin(), envString.end(), storePathRegex}; i != env_end; ++i)
-                        paths.emplace(i->str());
+                        unchecked[i->str()].emplace(envFile);
                 } catch (SysError & e) {
                     if (errno == ENOENT || errno == EACCES || errno == ESRCH)
                         continue;
@@ -551,7 +540,7 @@ PathSet LocalStore::findRuntimeRoots()
         for (const auto & line : lsofLines) {
             std::smatch match;
             if (std::regex_match(line, match, lsofRegex))
-                paths.emplace(match[1]);
+                unchecked[match[1]].emplace("{lsof}");
         }
     } catch (ExecError & e) {
         /* lsof not installed, lsof failed */
@@ -559,21 +548,24 @@ PathSet LocalStore::findRuntimeRoots()
 #endif
 
 #if defined(__linux__)
-    readFileRoots("/proc/sys/kernel/modprobe", paths);
-    readFileRoots("/proc/sys/kernel/fbsplash", paths);
-    readFileRoots("/proc/sys/kernel/poweroff_cmd", paths);
+    readFileRoots("/proc/sys/kernel/modprobe", unchecked);
+    readFileRoots("/proc/sys/kernel/fbsplash", unchecked);
+    readFileRoots("/proc/sys/kernel/poweroff_cmd", unchecked);
 #endif
 
-    for (auto & i : paths)
-        if (isInStore(i)) {
-            Path path = toStorePath(i);
-            if (roots.find(path) == roots.end() && isStorePath(path) && isValidPath(path)) {
+    for (auto & [target, links] : unchecked) {
+        if (isInStore(target)) {
+            Path path = toStorePath(target);
+            if (isStorePath(path) && isValidPath(path)) {
                 debug(format("got additional root '%1%'") % path);
-                roots.insert(path);
+                if (censor)
+                    roots[path].insert(censored);
+                else
+                    roots[path].insert(links.begin(), links.end());
             }
         }
+    }
 #endif
-    return roots;
 }
 
 
@@ -924,18 +916,23 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
     /* Find the roots.  Since we've grabbed the GC lock, the set of
        permanent roots cannot increase now. */
     printError(format("finding garbage collector roots..."));
-    Roots rootMap = options.ignoreLiveness ? Roots() : findRootsNoTemp();
+    Roots rootMap;
+    if (!options.ignoreLiveness)
+        findRootsNoTemp(rootMap, true);
 
-    for (auto & i : rootMap) state.roots.insert(i.second);
+    for (auto & i : rootMap) state.roots.insert(i.first);
+
 #ifndef _WIN32
     /* Read the temporary roots.  This acquires read locks on all
        per-process temporary root files.  So after this point no paths
        can be added to the set of temporary roots. */
     FDs fds;
-    for (auto & root : readTempRoots(fds))
-        state.tempRoots.insert(root.second);
-#endif
+    Roots tempRoots;
+    findTempRoots(fds, tempRoots, true);
+    for (auto & root : tempRoots)
+        state.tempRoots.insert(root.first);
     state.roots.insert(state.tempRoots.begin(), state.tempRoots.end());
+#endif
 
     /* After this point the set of roots or temporary roots cannot
        increase, since we hold locks on everything.  So everything

@@ -11,6 +11,7 @@
 #include "compression.hh"
 #include "json.hh"
 #include "nar-info.hh"
+#include "parsed-derivations.hh"
 
 #include <algorithm>
 #include <iostream>
@@ -20,6 +21,7 @@
 #include <future>
 #include <chrono>
 #include <regex>
+#include <queue>
 
 #include <limits.h>
 #ifndef _MSC_VER
@@ -773,6 +775,8 @@ private:
     /* The derivation stored at drvPath. */
     std::unique_ptr<BasicDerivation> drv;
 
+    std::unique_ptr<ParsedDerivation> parsedDrv;
+
     /* The remainder is state held during the build. */
 
     /* Locks on the output paths. */
@@ -898,7 +902,8 @@ private:
        building multiple times. Since this contains the hash, it
        allows us to compare whether two rounds produced the same
        result. */
-    ValidPathInfos prevInfos;
+    std::map<Path, ValidPathInfo> prevInfos;
+
 #ifndef _WIN32
     const uid_t sandboxUid = 1000;
     const gid_t sandboxGid = 100;
@@ -979,6 +984,11 @@ private:
     /* Check that the derivation outputs all exist and register them
        as valid. */
     void registerOutputs();
+
+    /* Check that an output meets the requirements specified by the
+       'outputChecks' attribute (or the legacy
+       '{allowed,disallowed}{References,Requisites}' attributes). */
+    void checkOutputs(const std::map<std::string, ValidPathInfo> & outputs);
 
     /* Open a log file and a pipe to it. */
     Path openLogFile();
@@ -1201,6 +1211,8 @@ void DerivationGoal::haveDerivation()
         done(BuildResult::AlreadyValid);
         return;
     }
+
+    parsedDrv = std::make_unique<ParsedDerivation>(drvPath, *drv);
 
     /* We are first going to try to create the invalid output paths
        through substitutes.  If that doesn't work, we'll build
@@ -1458,7 +1470,7 @@ void DerivationGoal::tryToBuild()
     /* Don't do a remote build if the derivation has the attribute
        `preferLocalBuild' set.  Also, check and repair modes are only
        supported for local builds. */
-    bool buildLocally = buildMode != bmNormal || drv->willBuildLocally();
+    bool buildLocally = buildMode != bmNormal || parsedDrv->willBuildLocally();
 
     auto started = [&]() {
         auto msg = fmt(
@@ -1733,19 +1745,13 @@ HookReply DerivationGoal::tryBuildHook()
 
     try {
 
-        /* Tell the hook about system features (beyond the system type)
-           required from the build machine.  (The hook could parse the
-           drv file itself, but this is easier.) */
-        Strings features = tokenizeString<Strings>(get(drv->env, "requiredSystemFeatures"));
-        for (auto & i : features) checkStoreName(i); /* !!! abuse */
-
         /* Send the request to the hook. */
         worker.hook->sink
             << "try"
             << (worker.getNrLocalBuilds() < settings.maxBuildJobs ? 1 : 0)
             << drv->platform
             << drvPath
-            << features;
+            << parsedDrv->getRequiredSystemFeatures();
         worker.hook->sink.flush();
 
         /* Read the first line of input, which should be a word indicating
@@ -1889,24 +1895,28 @@ void DerivationGoal::startBuilder()
 {
 fprintf(stderr, "DerivationGoal::startBuilder()\n");
     /* Right platform? */
-    if (!drv->canBuildLocally()) {
-        throw Error(
-            format("a '%1%' is required to build '%3%', but I am a '%2%'")
-            % drv->platform % settings.thisSystem % drvPath);
-    }
+    if (!parsedDrv->canBuildLocally())
+        throw Error("a '%s' with features {%s} is required to build '%s', but I am a '%s' with features {%s}",
+            drv->platform,
+            concatStringsSep(", ", parsedDrv->getRequiredSystemFeatures()),
+            drvPath,
+            settings.thisSystem,
+            concatStringsSep(", ", settings.systemFeatures));
+
 #ifndef _WIN32
     if (drv->isBuiltin())
         preloadNSS();
 #endif
 #if __APPLE__
-    additionalSandboxProfile = get(drv->env, "__sandboxProfile");
+    additionalSandboxProfile = parsedDrv->getStringAttr("__sandboxProfile").value_or("");
 #endif
 
 #ifndef _WIN32
     /* Are we doing a chroot build? */
     {
+        auto noChroot = parsedDrv->getBoolAttr("__noChroot");
         if (settings.sandboxMode == smEnabled) {
-            if (get(drv->env, "__noChroot") == "1")
+            if (noChroot)
                 throw Error(format("derivation '%1%' has '__noChroot' set, "
                     "but that's not allowed when 'sandbox' is 'true'") % drvPath);
 #if __APPLE__
@@ -1919,7 +1929,7 @@ fprintf(stderr, "DerivationGoal::startBuilder()\n");
         else if (settings.sandboxMode == smDisabled)
             useChroot = false;
         else if (settings.sandboxMode == smRelaxed)
-            useChroot = !fixedOutput && get(drv->env, "__noChroot") != "1";
+            useChroot = !fixedOutput && !noChroot;
     }
 #endif // _WIN32
 
@@ -2005,7 +2015,7 @@ fprintf(stderr, "DerivationGoal::startBuilder()\n");
     writeStructuredAttrs();
 
     /* Handle exportReferencesGraph(), if set. */
-    if (!drv->env.count("__json")) {
+    if (!parsedDrv->getStructuredAttrs()) {
         /* The `exportReferencesGraph' feature allows the references graph
            to be passed to a builder.  This attribute should be a list of
            pairs [name1 path1 name2 path2 ...].  The references graph of
@@ -2072,7 +2082,7 @@ fprintf(stderr, "DerivationGoal::startBuilder()\n");
         PathSet allowedPaths = settings.allowedImpureHostPrefixes;
 
         /* This works like the above, except on a per-derivation level */
-        Strings impurePaths = tokenizeString<Strings>(get(drv->env, "__impureHostDeps"));
+        auto impurePaths = parsedDrv->getStringsAttr("__impureHostDeps").value_or(Strings());
 
         for (auto & i : impurePaths) {
             bool found = false;
@@ -2141,7 +2151,7 @@ fprintf(stderr, "DerivationGoal::startBuilder()\n");
 
         /* Create /etc/hosts with localhost entry. */
         if (!fixedOutput)
-            writeFile(chrootRootDir + "/etc/hosts", "127.0.0.1 localhost\n");
+            writeFile(chrootRootDir + "/etc/hosts", "127.0.0.1 localhost\n::1 localhost\n");
 
         /* Make the closure of the inputs available in the chroot,
            rather than the whole Nix store.  This prevents any access
@@ -2663,7 +2673,7 @@ void DerivationGoal::initEnv()
        passAsFile is ignored in structure mode because it's not
        needed (attributes are not passed through the environment, so
        there is no size constraint). */
-    if (!drv->env.count("__json")) {
+    if (!parsedDrv->getStructuredAttrs()) {
 
         StringSet passAsFile = tokenizeString<StringSet>(get(drv->env, "passAsFile"));
         int fileNr = 0;
@@ -2712,8 +2722,8 @@ void DerivationGoal::initEnv()
        fixed-output derivations is by definition pure (since we
        already know the cryptographic hash of the output). */
     if (fixedOutput) {
-        Strings varNames = tokenizeString<Strings>(get(drv->env, "impureEnvVars"));
-        for (auto & i : varNames) env[i] = getEnv(i);
+        for (auto & i : parsedDrv->getStringsAttr("impureEnvVars").value_or(Strings()))
+            env[i] = getEnv(i);
     }
 
     /* Currently structured log messages piggyback on stderr, but we
@@ -2728,111 +2738,103 @@ static std::regex shVarName("[A-Za-z_][A-Za-z0-9_]*");
 
 void DerivationGoal::writeStructuredAttrs()
 {
-    auto jsonAttr = drv->env.find("__json");
-    if (jsonAttr == drv->env.end()) return;
+    auto & structuredAttrs = parsedDrv->getStructuredAttrs();
+    if (!structuredAttrs) return;
 
-    try {
+    auto json = *structuredAttrs;
 
-        auto jsonStr = rewriteStrings(jsonAttr->second, inputRewrites);
+    /* Add an "outputs" object containing the output paths. */
+    nlohmann::json outputs;
+    for (auto & i : drv->outputs)
+        outputs[i.first] = rewriteStrings(i.second.path, inputRewrites);
+    json["outputs"] = outputs;
 
-        auto json = nlohmann::json::parse(jsonStr);
-
-        /* Add an "outputs" object containing the output paths. */
-        nlohmann::json outputs;
-        for (auto & i : drv->outputs)
-            outputs[i.first] = rewriteStrings(i.second.path, inputRewrites);
-        json["outputs"] = outputs;
-
-        /* Handle exportReferencesGraph. */
-        auto e = json.find("exportReferencesGraph");
-        if (e != json.end() && e->is_object()) {
-            for (auto i = e->begin(); i != e->end(); ++i) {
-                std::ostringstream str;
-                {
-                    JSONPlaceholder jsonRoot(str, true);
-                    PathSet storePaths;
-                    for (auto & p : *i)
-                        storePaths.insert(p.get<std::string>());
-                    worker.store.pathInfoToJSON(jsonRoot,
-                        exportReferences(storePaths), false, true);
-                }
-                json[i.key()] = nlohmann::json::parse(str.str()); // urgh
+    /* Handle exportReferencesGraph. */
+    auto e = json.find("exportReferencesGraph");
+    if (e != json.end() && e->is_object()) {
+        for (auto i = e->begin(); i != e->end(); ++i) {
+            std::ostringstream str;
+            {
+                JSONPlaceholder jsonRoot(str, true);
+                PathSet storePaths;
+                for (auto & p : *i)
+                    storePaths.insert(p.get<std::string>());
+                worker.store.pathInfoToJSON(jsonRoot,
+                    exportReferences(storePaths), false, true);
             }
+            json[i.key()] = nlohmann::json::parse(str.str()); // urgh
         }
-
-        writeFile(tmpDir + "/.attrs.json", json.dump());
-
-        /* As a convenience to bash scripts, write a shell file that
-           maps all attributes that are representable in bash -
-           namely, strings, integers, nulls, Booleans, and arrays and
-           objects consisting entirely of those values. (So nested
-           arrays or objects are not supported.) */
-
-        auto handleSimpleType = [](const nlohmann::json & value) -> optional<std::string> {
-            if (value.is_string())
-                return shellEscape(value);
-
-            if (value.is_number()) {
-                auto f = value.get<float>();
-                if (std::ceil(f) == f)
-                    return std::to_string(value.get<int>());
-            }
-
-            if (value.is_null())
-                return std::string("''");
-
-            if (value.is_boolean())
-                return value.get<bool>() ? std::string("1") : std::string("");
-
-            return {};
-        };
-
-        std::string jsonSh;
-
-        for (auto i = json.begin(); i != json.end(); ++i) {
-
-            if (!std::regex_match(i.key(), shVarName)) continue;
-
-            auto & value = i.value();
-
-            auto s = handleSimpleType(value);
-            if (s)
-                jsonSh += fmt("declare %s=%s\n", i.key(), *s);
-
-            else if (value.is_array()) {
-                std::string s2;
-                bool good = true;
-
-                for (auto i = value.begin(); i != value.end(); ++i) {
-                    auto s3 = handleSimpleType(i.value());
-                    if (!s3) { good = false; break; }
-                    s2 += *s3; s2 += ' ';
-                }
-
-                if (good)
-                    jsonSh += fmt("declare -a %s=(%s)\n", i.key(), s2);
-            }
-
-            else if (value.is_object()) {
-                std::string s2;
-                bool good = true;
-
-                for (auto i = value.begin(); i != value.end(); ++i) {
-                    auto s3 = handleSimpleType(i.value());
-                    if (!s3) { good = false; break; }
-                    s2 += fmt("[%s]=%s ", shellEscape(i.key()), *s3);
-                }
-
-                if (good)
-                    jsonSh += fmt("declare -A %s=(%s)\n", i.key(), s2);
-            }
-        }
-
-        writeFile(tmpDir + "/.attrs.sh", jsonSh);
-
-    } catch (std::exception & e) {
-        throw Error("cannot process __json attribute of '%s': %s", drvPath, e.what());
     }
+
+    writeFile(tmpDir + "/.attrs.json", rewriteStrings(json.dump(), inputRewrites));
+
+    /* As a convenience to bash scripts, write a shell file that
+       maps all attributes that are representable in bash -
+       namely, strings, integers, nulls, Booleans, and arrays and
+       objects consisting entirely of those values. (So nested
+       arrays or objects are not supported.) */
+
+    auto handleSimpleType = [](const nlohmann::json & value) -> std::optional<std::string> {
+        if (value.is_string())
+            return shellEscape(value);
+
+        if (value.is_number()) {
+            auto f = value.get<float>();
+            if (std::ceil(f) == f)
+                return std::to_string(value.get<int>());
+        }
+
+        if (value.is_null())
+            return std::string("''");
+
+        if (value.is_boolean())
+            return value.get<bool>() ? std::string("1") : std::string("");
+
+        return {};
+    };
+
+    std::string jsonSh;
+
+    for (auto i = json.begin(); i != json.end(); ++i) {
+
+        if (!std::regex_match(i.key(), shVarName)) continue;
+
+        auto & value = i.value();
+
+        auto s = handleSimpleType(value);
+        if (s)
+            jsonSh += fmt("declare %s=%s\n", i.key(), *s);
+
+        else if (value.is_array()) {
+            std::string s2;
+            bool good = true;
+
+            for (auto i = value.begin(); i != value.end(); ++i) {
+                auto s3 = handleSimpleType(i.value());
+                if (!s3) { good = false; break; }
+                s2 += *s3; s2 += ' ';
+            }
+
+            if (good)
+                jsonSh += fmt("declare -a %s=(%s)\n", i.key(), s2);
+        }
+
+        else if (value.is_object()) {
+            std::string s2;
+            bool good = true;
+
+            for (auto i = value.begin(); i != value.end(); ++i) {
+                auto s3 = handleSimpleType(i.value());
+                if (!s3) { good = false; break; }
+                s2 += fmt("[%s]=%s ", shellEscape(i.key()), *s3);
+            }
+
+            if (good)
+                jsonSh += fmt("declare -A %s=(%s)\n", i.key(), s2);
+        }
+    }
+
+    writeFile(tmpDir + "/.attrs.sh", rewriteStrings(jsonSh, inputRewrites));
 }
 
 
@@ -2988,7 +2990,7 @@ void DerivationGoal::runChild()
                 createDirs(chrootRootDir + "/dev/shm");
                 createDirs(chrootRootDir + "/dev/pts");
                 ss.push_back("/dev/full");
-                if (pathExists("/dev/kvm"))
+                if (settings.systemFeatures.get().count("kvm") && pathExists("/dev/kvm"))
                     ss.push_back("/dev/kvm");
                 ss.push_back("/dev/null");
                 ss.push_back("/dev/random");
@@ -3277,7 +3279,7 @@ void DerivationGoal::runChild()
 
             writeFile(sandboxFile, sandboxProfile);
 
-            bool allowLocalNetworking = get(drv->env, "__darwinAllowLocalNetworking") == "1";
+            bool allowLocalNetworking = parsedDrv->getBoolAttr("__darwinAllowLocalNetworking");
 
             /* The tmpDir in scope points at the temporary build directory for our derivation. Some packages try different mechanisms
                to find temporary directories, so we want to open up a broader place for them to dump their files, if needed. */
@@ -3349,10 +3351,9 @@ void DerivationGoal::runChild()
 /* Parse a list of reference specifiers.  Each element must either be
    a store path, or the symbolic name of the output of the derivation
    (such as `out'). */
-PathSet parseReferenceSpecifiers(Store & store, const BasicDerivation & drv, string attr)
+PathSet parseReferenceSpecifiers(Store & store, const BasicDerivation & drv, const Strings & paths)
 {
     PathSet result;
-    Paths paths = tokenizeString<Paths>(attr);
     for (auto & i : paths) {
         if (store.isStorePath(i))
             result.insert(i);
@@ -3378,7 +3379,8 @@ void DerivationGoal::registerOutputs()
         if (allValid) return;
     }
 #endif
-    ValidPathInfos infos;
+
+    std::map<std::string, ValidPathInfo> infos;
 
     /* Set of inodes seen during calls to canonicalisePathMetaData()
        for this build's outputs.  This needs to be shared between
@@ -3496,15 +3498,15 @@ void DerivationGoal::registerOutputs()
                the derivation to its content-addressed location. */
             Hash h2 = recursive ? hashPath(h.type, actualPath).first : hashFile(h.type, actualPath);
 
-            Path dest = worker.store.makeFixedOutputPath(recursive, h2, drv->env["name"]);
+            Path dest = worker.store.makeFixedOutputPath(recursive, h2, storePathToName(path));
 
             if (h != h2) {
 
                 /* Throw an error after registering the path as
                    valid. */
                 delayedException = std::make_exception_ptr(
-                    BuildError("fixed-output derivation produced path '%s' with %s hash '%s' instead of the expected hash '%s'",
-                        dest, printHashType(h.type), printHash16or32(h2), printHash16or32(h)));
+                    BuildError("hash mismatch in fixed-output derivation '%s':\n  wanted: %s\n  got:    %s",
+                        dest, h.to_string(), h2.to_string()));
 
                 Path actualDest = worker.store.toRealPath(dest);
 
@@ -3580,48 +3582,6 @@ void DerivationGoal::registerOutputs()
                 debug(format("referenced input: '%1%'") % i);
         }
 
-        /* Enforce `allowedReferences' and friends. */
-        auto checkRefs = [&](const string & attrName, bool allowed, bool recursive) {
-            if (drv->env.find(attrName) == drv->env.end()) return;
-
-            PathSet spec = parseReferenceSpecifiers(worker.store, *drv, get(drv->env, attrName));
-
-            PathSet used;
-            if (recursive) {
-                /* Our requisites are the union of the closures of our references. */
-                for (auto & i : references)
-                    /* Don't call computeFSClosure on ourselves. */
-                    if (path != i)
-                        worker.store.computeFSClosure(i, used);
-            } else
-                used = references;
-
-            PathSet badPaths;
-
-            for (auto & i : used)
-                if (allowed) {
-                    if (spec.find(i) == spec.end())
-                        badPaths.insert(i);
-                } else {
-                    if (spec.find(i) != spec.end())
-                        badPaths.insert(i);
-                }
-
-            if (!badPaths.empty()) {
-                string badPathsStr;
-                for (auto & i : badPaths) {
-                    badPathsStr += "\n\t";
-                    badPathsStr += i;
-                }
-                throw BuildError(format("output '%1%' is not allowed to refer to the following paths:%2%") % actualPath % badPathsStr);
-            }
-        };
-
-        checkRefs("allowedReferences", true, false);
-        checkRefs("allowedRequisites", true, true);
-        checkRefs("disallowedReferences", false, false);
-        checkRefs("disallowedRequisites", false, true);
-
         if (curRound == nrRounds) {
             worker.store.optimisePath(actualPath); // FIXME: combine with scanForReferences()
             worker.markContentsGood(path);
@@ -3637,10 +3597,13 @@ void DerivationGoal::registerOutputs()
 
         if (!info.references.empty()) info.ca.clear();
 
-        infos.push_back(info);
+        infos[i.first] = info;
     }
 
     if (buildMode == bmCheck) return;
+
+    /* Apply output checks. */
+    checkOutputs(infos);
 
     /* Compare the result with the previous round, and report which
        path is different, if any.*/
@@ -3649,16 +3612,16 @@ void DerivationGoal::registerOutputs()
         for (auto i = prevInfos.begin(), j = infos.begin(); i != prevInfos.end(); ++i, ++j)
             if (!(*i == *j)) {
                 result.isNonDeterministic = true;
-                Path prev = i->path + checkSuffix;
+                Path prev = i->second.path + checkSuffix;
                 bool prevExists = keepPreviousRound && pathExists(prev);
                 auto msg = prevExists
-                    ? fmt("output '%1%' of '%2%' differs from '%3%' from previous round", i->path, drvPath, prev)
-                    : fmt("output '%1%' of '%2%' differs from previous round", i->path, drvPath);
+                    ? fmt("output '%1%' of '%2%' differs from '%3%' from previous round", i->second.path, drvPath, prev)
+                    : fmt("output '%1%' of '%2%' differs from previous round", i->second.path, drvPath);
 
                 auto diffHook = settings.diffHook;
                 if (prevExists && diffHook != "" && runDiffHook) {
                     try {
-                        auto diff = runProgramGetStdout(diffHook, true, {prev, i->path});
+                        auto diff = runProgramGetStdout(diffHook, true, {prev, i->second.path});
                         if (diff != "")
                             printError(chomp(diff));
                     } catch (Error & error) {
@@ -3703,12 +3666,168 @@ void DerivationGoal::registerOutputs()
     /* Register each output path as valid, and register the sets of
        paths referenced by each of them.  If there are cycles in the
        outputs, this will fail. */
-    worker.store.registerValidPaths(infos);
+    {
+        ValidPathInfos infos2;
+        for (auto & i : infos) infos2.push_back(i.second);
+        worker.store.registerValidPaths(infos2);
+    }
 
     /* In case of a fixed-output derivation hash mismatch, throw an
        exception now that we have registered the output as valid. */
     if (delayedException)
         std::rethrow_exception(delayedException);
+}
+
+
+void DerivationGoal::checkOutputs(const std::map<Path, ValidPathInfo> & outputs)
+{
+    std::map<Path, const ValidPathInfo &> outputsByPath;
+    for (auto & output : outputs)
+        outputsByPath.emplace(output.second.path, output.second);
+
+    for (auto & output : outputs) {
+        auto & outputName = output.first;
+        auto & info = output.second;
+
+        struct Checks
+        {
+            bool ignoreSelfRefs = false;
+            std::optional<uint64_t> maxSize, maxClosureSize;
+            std::optional<Strings> allowedReferences, allowedRequisites, disallowedReferences, disallowedRequisites;
+        };
+
+        /* Compute the closure and closure size of some output. This
+           is slightly tricky because some of its references (namely
+           other outputs) may not be valid yet. */
+        auto getClosure = [&](const Path & path)
+        {
+            uint64_t closureSize = 0;
+            PathSet pathsDone;
+            std::queue<Path> pathsLeft;
+            pathsLeft.push(path);
+
+            while (!pathsLeft.empty()) {
+                auto path = pathsLeft.front();
+                pathsLeft.pop();
+                if (!pathsDone.insert(path).second) continue;
+
+                auto i = outputsByPath.find(path);
+                if (i != outputsByPath.end()) {
+                    closureSize += i->second.narSize;
+                    for (auto & ref : i->second.references)
+                        pathsLeft.push(ref);
+                } else {
+                    auto info = worker.store.queryPathInfo(path);
+                    closureSize += info->narSize;
+                    for (auto & ref : info->references)
+                        pathsLeft.push(ref);
+                }
+            }
+
+            return std::make_pair(pathsDone, closureSize);
+        };
+
+        auto applyChecks = [&](const Checks & checks)
+        {
+            if (checks.maxSize && info.narSize > *checks.maxSize)
+                throw BuildError("path '%s' is too large at %d bytes; limit is %d bytes",
+                    info.path, info.narSize, *checks.maxSize);
+
+            if (checks.maxClosureSize) {
+                uint64_t closureSize = getClosure(info.path).second;
+                if (closureSize > *checks.maxClosureSize)
+                    throw BuildError("closure of path '%s' is too large at %d bytes; limit is %d bytes",
+                        info.path, closureSize, *checks.maxClosureSize);
+            }
+
+            auto checkRefs = [&](const std::optional<Strings> & value, bool allowed, bool recursive)
+            {
+                if (!value) return;
+
+                PathSet spec = parseReferenceSpecifiers(worker.store, *drv, *value);
+
+                PathSet used = recursive ? getClosure(info.path).first : info.references;
+
+                if (recursive && checks.ignoreSelfRefs)
+                    used.erase(info.path);
+
+                PathSet badPaths;
+
+                for (auto & i : used)
+                    if (allowed) {
+                        if (!spec.count(i))
+                            badPaths.insert(i);
+                    } else {
+                        if (spec.count(i))
+                            badPaths.insert(i);
+                    }
+
+                if (!badPaths.empty()) {
+                    string badPathsStr;
+                    for (auto & i : badPaths) {
+                        badPathsStr += "\n  ";
+                        badPathsStr += i;
+                    }
+                    throw BuildError("output '%s' is not allowed to refer to the following paths:%s", info.path, badPathsStr);
+                }
+            };
+
+            checkRefs(checks.allowedReferences, true, false);
+            checkRefs(checks.allowedRequisites, true, true);
+            checkRefs(checks.disallowedReferences, false, false);
+            checkRefs(checks.disallowedRequisites, false, true);
+        };
+
+        if (auto structuredAttrs = parsedDrv->getStructuredAttrs()) {
+            auto outputChecks = structuredAttrs->find("outputChecks");
+            if (outputChecks != structuredAttrs->end()) {
+                auto output = outputChecks->find(outputName);
+
+                if (output != outputChecks->end()) {
+                    Checks checks;
+
+                    auto maxSize = output->find("maxSize");
+                    if (maxSize != output->end())
+                        checks.maxSize = maxSize->get<uint64_t>();
+
+                    auto maxClosureSize = output->find("maxClosureSize");
+                    if (maxClosureSize != output->end())
+                        checks.maxClosureSize = maxClosureSize->get<uint64_t>();
+
+                    auto get = [&](const std::string & name) -> std::optional<Strings> {
+                        auto i = output->find(name);
+                        if (i != output->end()) {
+                            Strings res;
+                            for (auto j = i->begin(); j != i->end(); ++j) {
+                                if (!j->is_string())
+                                    throw Error("attribute '%s' of derivation '%s' must be a list of strings", name, drvPath);
+                                res.push_back(j->get<std::string>());
+                            }
+                            checks.disallowedRequisites = res;
+                            return res;
+                        }
+                        return {};
+                    };
+
+                    checks.allowedReferences = get("allowedReferences");
+                    checks.allowedRequisites = get("allowedRequisites");
+                    checks.disallowedReferences = get("disallowedReferences");
+                    checks.disallowedRequisites = get("disallowedRequisites");
+
+                    applyChecks(checks);
+                }
+            }
+        } else {
+            // legacy non-structured-attributes case
+            Checks checks;
+            checks.ignoreSelfRefs = true;
+            checks.allowedReferences = parsedDrv->getStringsAttr("allowedReferences");
+            checks.allowedRequisites = parsedDrv->getStringsAttr("allowedRequisites");
+            checks.disallowedReferences = parsedDrv->getStringsAttr("disallowedReferences");
+            checks.disallowedRequisites = parsedDrv->getStringsAttr("disallowedRequisites");
+            applyChecks(checks);
+        }
+    }
 }
 
 

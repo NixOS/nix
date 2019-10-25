@@ -10,6 +10,11 @@
 #include "monitor-fd.hh"
 #include "derivations.hh"
 #include "finally.hh"
+#endif
+
+#include "legacy.hh"
+
+#ifndef _WIN32
 
 #include <algorithm>
 
@@ -31,8 +36,15 @@
 #include <sys/ucred.h>
 #endif
 
+#else
+
+#include <iostream>
+
+#endif
+
 using namespace nix;
 
+#ifndef _WIN32
 #ifndef __linux__
 #define SPLICE_F_MOVE 0
 static ssize_t splice(int fd_in, void *off_in, int fd_out, void *off_out, size_t len, unsigned int flags)
@@ -475,11 +487,19 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
 
     case wopFindRoots: {
         logger->startWork();
-        Roots roots = store->findRoots();
+        Roots roots = store->findRoots(!trusted);
         logger->stopWork();
-        to << roots.size();
+
+        size_t size = 0;
         for (auto & i : roots)
-            to << i.first << i.second;
+            size += i.second.size();
+
+        to << size;
+
+        for (auto & [target, links] : roots)
+            for (auto & link : links)
+                to << link << target;
+
         break;
     }
 
@@ -558,7 +578,8 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
                     ;
                 else if (trusted
                     || name == settings.buildTimeout.name
-                    || name == "connect-timeout")
+                    || name == "connect-timeout"
+                    || (name == "builders" && value == ""))
                     settings.set(name, value);
                 else if (setSubstituters(settings.substituters))
                     ;
@@ -709,7 +730,7 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
         logger->startWork();
 
         // FIXME: race if addToStore doesn't read source?
-        store.cast<Store>()->addToStore(info, *source, (RepairFlag) repair,
+        store->addToStore(info, *source, (RepairFlag) repair,
             dontCheckSigs ? NoCheckSigs : CheckSigs, nullptr);
 
         logger->stopWork();
@@ -1056,13 +1077,13 @@ static void daemonLoop(char * * argv)
         }
     }
 }
+#endif
 
 
-int main(int argc, char * * argv)
+static int _main(int argc, char * * argv)
 {
-    return handleExceptions(argv[0], [&]() {
-        initNix();
-
+#ifndef _WIN32
+    {
         auto stdio = false;
 
         parseCmdLine(argc, argv, [&](Strings::iterator & arg, const Strings::iterator & end) {
@@ -1122,7 +1143,7 @@ int main(int argc, char * * argv)
                         if (res == -1)
                             throw PosixError("splicing data from stdin to daemon socket");
                         else if (res == 0)
-                            return;
+                            return 0;
                     }
                 }
             } else {
@@ -1131,13 +1152,13 @@ int main(int argc, char * * argv)
         } else {
             daemonLoop(argv);
         }
-    });
-}
+
+        return 0;
+    }
 #else
-#include <iostream>
-int main(int argc, char * * argv)
-{
     std::cerr << "TODO: nix-daemon" << std::endl;
     return 1;
-}
 #endif
+}
+
+static RegisterLegacyCommand s1("nix-daemon", _main);

@@ -69,12 +69,12 @@ struct CmdCopy : StorePathsCommand
             },
 #ifdef ENABLE_S3
             Example{
-                "To populate the current folder build output to a S3 binary cache:",
-                "nix copy --to s3://my-bucket?region=eu-west-1"
+                "To copy Hello to an S3 binary cache:",
+                "nix copy --to s3://my-bucket?region=eu-west-1 nixpkgs.hello"
             },
             Example{
-                "To populate the current folder build output to an S3-compatible binary cache:",
-                "nix copy --to s3://my-bucket?region=eu-west-1&endpoint=example.com"
+                "To copy Hello to an S3-compatible binary cache:",
+                "nix copy --to s3://my-bucket?region=eu-west-1&endpoint=example.com nixpkgs.hello"
             },
 #endif
         };

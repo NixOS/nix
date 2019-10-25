@@ -66,6 +66,10 @@ outPathCA=$(IMPURE_VAR1=foo IMPURE_VAR2=bar nix-build ./fixed.nix -A good.0 --no
 nix verify $outPathCA
 nix verify $outPathCA --sigs-needed 1000
 
+# Check that signing a content-addressed path doesn't overflow validSigs
+nix sign-paths --key-file $TEST_ROOT/sk1 $outPathCA
+nix verify -r $outPathCA --sigs-needed 1000 --trusted-public-keys $pk1
+
 # Copy to a binary cache.
 if [[ "$(uname)" =~ ^MINGW|^MSYS ]]; then
     nix copy --to file://$(cygpath -m $cacheDir) $outPath2

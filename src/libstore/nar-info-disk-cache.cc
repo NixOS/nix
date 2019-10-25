@@ -31,6 +31,7 @@ create table if not exists NARs (
     refs             text,
     deriver          text,
     sigs             text,
+    ca               text,
     timestamp        integer not null,
     present          integer not null,
     primary key (cache, hashPart),
@@ -72,7 +73,7 @@ public:
     {
         auto state(_state.lock());
 
-        Path dbPath = getCacheDir() + "/nix/binary-cache-v5.sqlite";
+        Path dbPath = getCacheDir() + "/nix/binary-cache-v6.sqlite";
         createDirs(dirOf(dbPath));
 
         state->db = SQLite(dbPath);
@@ -94,13 +95,13 @@ public:
 
         state->insertNAR.create(state->db,
             "insert or replace into NARs(cache, hashPart, namePart, url, compression, fileHash, fileSize, narHash, "
-            "narSize, refs, deriver, sigs, timestamp, present) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)");
+            "narSize, refs, deriver, sigs, ca, timestamp, present) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)");
 
         state->insertMissingNAR.create(state->db,
             "insert or replace into NARs(cache, hashPart, timestamp, present) values (?, ?, ?, 0)");
 
         state->queryNAR.create(state->db,
-            "select * from NARs where cache = ? and hashPart = ? and ((present = 0 and timestamp > ?) or (present = 1 and timestamp > ?))");
+            "select present, namePart, url, compression, fileHash, fileSize, narHash, narSize, refs, deriver, sigs, ca from NARs where cache = ? and hashPart = ? and ((present = 0 and timestamp > ?) or (present = 1 and timestamp > ?))");
 
         /* Periodically purge expired entries from the database. */
         retrySQLite<void>([&]() {
@@ -189,27 +190,28 @@ public:
             if (!queryNAR.next())
                 return {oUnknown, 0};
 
-            if (!queryNAR.getInt(13))
+            if (!queryNAR.getInt(0))
                 return {oInvalid, 0};
 
             auto narInfo = make_ref<NarInfo>();
 
-            auto namePart = queryNAR.getStr(2);
+            auto namePart = queryNAR.getStr(1);
             narInfo->path = cache.storeDir + "/" +
                 hashPart + (namePart.empty() ? "" : "-" + namePart);
-            narInfo->url = queryNAR.getStr(3);
-            narInfo->compression = queryNAR.getStr(4);
-            if (!queryNAR.isNull(5))
-                narInfo->fileHash = Hash(queryNAR.getStr(5));
-            narInfo->fileSize = queryNAR.getInt(6);
-            narInfo->narHash = Hash(queryNAR.getStr(7));
-            narInfo->narSize = queryNAR.getInt(8);
-            for (auto & r : tokenizeString<Strings>(queryNAR.getStr(9), " "))
+            narInfo->url = queryNAR.getStr(2);
+            narInfo->compression = queryNAR.getStr(3);
+            if (!queryNAR.isNull(4))
+                narInfo->fileHash = Hash(queryNAR.getStr(4));
+            narInfo->fileSize = queryNAR.getInt(5);
+            narInfo->narHash = Hash(queryNAR.getStr(6));
+            narInfo->narSize = queryNAR.getInt(7);
+            for (auto & r : tokenizeString<Strings>(queryNAR.getStr(8), " "))
                 narInfo->references.insert(cache.storeDir + "/" + r);
-            if (!queryNAR.isNull(10))
-                narInfo->deriver = cache.storeDir + "/" + queryNAR.getStr(10);
-            for (auto & sig : tokenizeString<Strings>(queryNAR.getStr(11), " "))
+            if (!queryNAR.isNull(9))
+                narInfo->deriver = cache.storeDir + "/" + queryNAR.getStr(9);
+            for (auto & sig : tokenizeString<Strings>(queryNAR.getStr(10), " "))
                 narInfo->sigs.insert(sig);
+            narInfo->ca = queryNAR.getStr(11);
 
             return {oValid, narInfo};
         });
@@ -243,6 +245,7 @@ public:
                     (concatStringsSep(" ", info->shortRefs()))
                     (info->deriver != "" ? baseNameOf(info->deriver) : "", info->deriver != "")
                     (concatStringsSep(" ", info->sigs))
+                    (info->ca)
                     (time(0)).exec();
 
             } else {

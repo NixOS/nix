@@ -173,10 +173,12 @@ struct CmdSearch : SourceExprCommand, MixJSON
                             jsonElem.attr("description", description);
 
                         } else {
+                            auto name = hilite(parsed.name, nameMatch, "\e[0;2m")
+                                + std::string(parsed.fullName, parsed.name.length());
                             results[attrPath] = fmt(
                                 "* %s (%s)\n  %s\n",
                                 wrap("\x1B[0;1m", hilite(attrPath, attrPathMatch, "\x1B[0;1m")),
-                                wrap("\x1B[0;2m", hilite(parsed.fullName, nameMatch, "\x1B[0;2m")),
+                                wrap("\x1B[0;2m", hilite(name, nameMatch, "\x1B[0;2m")),
                                 hilite(description, descriptionMatch, ANSI_NORMAL));
                         }
                     }

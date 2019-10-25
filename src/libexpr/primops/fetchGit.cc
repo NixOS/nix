@@ -6,6 +6,8 @@
 #ifndef _MSC_VER
 #include <sys/time.h>
 #endif
+#include "hash.hh"
+
 #include <regex>
 
 #include <nlohmann/json.hpp>
@@ -25,7 +27,7 @@ struct GitInfo
 std::regex revRegex("^[0-9a-fA-F]{40}$");
 
 GitInfo exportGit(ref<Store> store, const std::string & uri,
-    optional<std::string> ref, std::string rev,
+    std::optional<std::string> ref, std::string rev,
     const std::string & name)
 {
     if (evalSettings.pureEval && rev == "")
@@ -42,7 +44,7 @@ GitInfo exportGit(ref<Store> store, const std::string & uri,
         bool clean = true;
 
         try {
-            runProgramGetStdout("git", true, { "-C", uri, "diff-index", "--quiet", "HEAD", "--" });
+            runProgram("git", true, { "-C", uri, "diff-index", "--quiet", "HEAD", "--" });
         } catch (ExecError e) {
 #ifndef _WIN32
             if (!WIFEXITED(e.status) || WEXITSTATUS(e.status) != 1) throw;
@@ -92,15 +94,16 @@ GitInfo exportGit(ref<Store> store, const std::string & uri,
     if (rev != "" && !std::regex_match(rev, revRegex))
         throw Error("invalid Git revision '%s'", rev);
 
-    Path cacheDir = getCacheDir() + "/nix/git";
+    deletePath(getCacheDir() + "/nix/git");
+
+    Path cacheDir = getCacheDir() + "/nix/gitv2/" + hashString(htSHA256, uri).to_string(Base32, false);
 
     if (!pathExists(cacheDir)) {
-        runProgramGetStdout("git", true, { "init", "--bare", cacheDir });
+        createDirs(dirOf(cacheDir));
+        runProgram("git", true, { "init", "--bare", cacheDir });
     }
 
-    std::string localRef = hashString(htSHA256, fmt("%s-%s", uri, *ref)).to_string(Base32, false);
-
-    Path localRefFile = cacheDir + "/refs/heads/" + localRef;
+    Path localRefFile = cacheDir + "/refs/heads/" + *ref;
 
     bool doFetch;
 #ifndef _WIN32
@@ -113,7 +116,7 @@ GitInfo exportGit(ref<Store> store, const std::string & uri,
        repo. */
     if (rev != "") {
         try {
-            runProgramGetStdout("git", true, { "-C", cacheDir, "cat-file", "-e", rev });
+            runProgram("git", true, { "-C", cacheDir, "cat-file", "-e", rev });
             doFetch = false;
         } catch (ExecError & e) {
 #ifndef _WIN32
@@ -156,7 +159,7 @@ GitInfo exportGit(ref<Store> store, const std::string & uri,
 
         // FIXME: git stderr messes up our progress indicator, so
         // we're using --quiet for now. Should process its stderr.
-        runProgramGetStdout("git", true, { "-C", cacheDir, "fetch", "--quiet", "--force", "--", uri2, *ref + ":" + localRef });
+        runProgram("git", true, { "-C", cacheDir, "fetch", "--quiet", "--force", "--", uri, fmt("%s:%s", *ref, *ref) });
 
 #ifndef _WIN32
         struct timeval times[2];
@@ -234,7 +237,7 @@ GitInfo exportGit(ref<Store> store, const std::string & uri,
 static void prim_fetchGit(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
     std::string url;
-    optional<std::string> ref;
+    std::optional<std::string> ref;
     std::string rev;
     std::string name = "source";
     PathSet context;

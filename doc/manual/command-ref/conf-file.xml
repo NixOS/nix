@@ -425,7 +425,10 @@ builtins.fetchurl {
     <listitem><para>This option defines the maximum number of jobs
     that Nix will try to build in parallel.  The default is
     <literal>1</literal>. The special value <literal>auto</literal>
-    causes Nix to use the number of CPUs in your system.  It can be
+    causes Nix to use the number of CPUs in your system.  <literal>0</literal>
+    is useful when using remote builders to prevent any local builds (except for
+    <literal>preferLocalBuild</literal> derivation attribute which executes locally
+    regardless).  It can be
     overridden using the <option
     linkend='opt-max-jobs'>--max-jobs</option> (<option>-j</option>)
     command line switch.</para></listitem>
@@ -654,7 +657,8 @@ password <replaceable>my-password</replaceable>
     <varname>__noChroot</varname> attribute set to
     <literal>true</literal> do not run in sandboxes.</para>
 
-    <para>The default is <literal>false</literal>.</para>
+    <para>The default is <literal>true</literal> on Linux and
+    <literal>false</literal> on all other platforms.</para>
 
     </listitem>
 
@@ -750,6 +754,33 @@ password <replaceable>my-password</replaceable>
 
     <para>It defaults to the canonical Nix system name detected by
     <filename>configure</filename> at build time.</para></listitem>
+
+  </varlistentry>
+
+
+  <varlistentry xml:id="conf-system-features"><term><literal>system-features</literal></term>
+
+    <listitem><para>A set of system “features” supported by this
+    machine, e.g. <literal>kvm</literal>. Derivations can express a
+    dependency on such features through the derivation attribute
+    <varname>requiredSystemFeatures</varname>. For example, the
+    attribute
+
+<programlisting>
+requiredSystemFeatures = [ "kvm" ];
+</programlisting>
+
+    ensures that the derivation can only be built on a machine with
+    the <literal>kvm</literal> feature.</para>
+
+    <para>This setting by default includes <literal>kvm</literal> if
+    <filename>/dev/kvm</filename> is accessible, and the
+    pseudo-features <literal>nixos-test</literal>,
+    <literal>benchmark</literal> and <literal>big-parallel</literal>
+    that are used in Nixpkgs to route builds to specific
+    machines.</para>
+
+    </listitem>
 
   </varlistentry>
 

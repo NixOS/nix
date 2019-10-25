@@ -1,4 +1,6 @@
+AR = @AR@
 BDW_GC_LIBS = @BDW_GC_LIBS@
+BUILD_SHARED_LIBS = @BUILD_SHARED_LIBS@
 CC = @CC@
 CFLAGS = @CFLAGS@
 CXX = @CXX@
@@ -15,9 +17,9 @@ SODIUM_LIBS = @SODIUM_LIBS@
 LIBLZMA_LIBS = @LIBLZMA_LIBS@
 SQLITE3_LIBS = @SQLITE3_LIBS@
 LIBBROTLI_LIBS = @LIBBROTLI_LIBS@
+EDITLINE_LIBS = @EDITLINE_LIBS@
 bash = @bash@
 bindir = @bindir@
-brotli = @brotli@
 lsof = @lsof@
 datadir = @datadir@
 datarootdir = @datarootdir@

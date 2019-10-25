@@ -17,6 +17,7 @@
 #include "store-api.hh"
 #include "derivations.hh"
 #include "local-store.hh"
+#include "legacy.hh"
 
 using namespace nix;
 using std::cin;
@@ -41,11 +42,15 @@ static AutoCloseWindowsHandle openSlotLock(const Machine & m, unsigned long long
     return openLockFile(fmt("%s/%s-%d", currentLoad, escapeUri(m.storeUri), slot), true);
 }
 
-int main (int argc, char * * argv)
-{
-    return handleExceptions(argv[0], [&]() {
-        initNix();
+static bool allSupportedLocally(const std::set<std::string>& requiredFeatures) {
+    for (auto & feature : requiredFeatures)
+        if (!settings.systemFeatures.get().count(feature)) return false;
+    return true;
+}
 
+static int _main(int argc, char * * argv)
+{
+    {
         logger = makeJSONLogger(*logger);
 
 #ifndef _WIN32
@@ -91,7 +96,7 @@ int main (int argc, char * * argv)
 
         if (machines.empty()) {
             std::cerr << "# decline-permanently\n";
-            return;
+            return 0;
         }
 
         string drvPath;
@@ -101,17 +106,18 @@ int main (int argc, char * * argv)
 
             try {
                 auto s = readString(source);
-                if (s != "try") return;
-            } catch (EndOfFile &) { return; }
+                if (s != "try") return 0;
+            } catch (EndOfFile &) { return 0; }
 
             auto amWilling = readInt(source);
             auto neededSystem = readString(source);
             source >> drvPath;
             auto requiredFeatures = readStrings<std::set<std::string>>(source);
 
-            auto canBuildLocally = amWilling
-                &&  (  neededSystem == settings.thisSystem
-                    || settings.extraPlatforms.get().count(neededSystem) > 0);
+             auto canBuildLocally = amWilling
+                 &&  (  neededSystem == settings.thisSystem
+                     || settings.extraPlatforms.get().count(neededSystem) > 0)
+                 &&  allSupportedLocally(requiredFeatures);
 
             /* Error ignored here, will be caught later */
             mkdir(currentLoad.c_str()
@@ -297,6 +303,8 @@ connected:
             copyPaths(ref<Store>(sshStore), store, missing, NoRepair, NoCheckSigs, NoSubstitute);
         }
 
-        return;
-    });
+        return 0;
+    }
 }
+
+static RegisterLegacyCommand s1("build-remote", _main);
