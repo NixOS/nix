@@ -16,7 +16,9 @@ project(
     
     default_options : [
         'cpp_std=c++17',
-        'warning_level=3'
+        'warning_level=3',
+        'optimization=3',
+        'debug=true'
     ],
     version : run_command('cat', './.version').stdout().strip(),
     license : 'MIT'
@@ -26,7 +28,7 @@ project(
 #-------------------------------------------------
 cpp = meson.get_compiler('cpp')
 
-add_project_arguments('-g', '-Wdeprecated', '-Wno-non-virtual-dtor', '-include', 'config.h', language : 'cpp')
+add_project_arguments(get_option('cxxflags'), language : 'cpp')
 add_project_link_arguments(get_option('ldflags'), language: 'cpp')
 
 
@@ -535,6 +537,7 @@ install_headers(
     conf,
     install_dir : join_paths(includedir, 'nix'))
 
+add_project_arguments('-include', 'config.h', language : 'cpp')
 src_inc = [include_directories('.', 'src')]
 
 project_dirs = [
