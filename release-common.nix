@@ -49,6 +49,7 @@ rec {
 
   nativeBuildDeps = [
     pkgconfig
+    meson
   ];
 
   buildDeps =
