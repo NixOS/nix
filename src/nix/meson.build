@@ -9,7 +9,7 @@
 
 src_inc += include_directories('.')
 
-nix_src = files(
+nix_src_files = [
     join_paths(meson.source_root(), 'src/nix/add-to-store.cc'),
     join_paths(meson.source_root(), 'src/nix/build.cc'),
     join_paths(meson.source_root(), 'src/nix/cat.cc'),
@@ -29,7 +29,6 @@ nix_src = files(
     join_paths(meson.source_root(), 'src/nix/path-info.cc'),
     join_paths(meson.source_root(), 'src/nix/ping-store.cc'),
     join_paths(meson.source_root(), 'src/nix/progress-bar.cc'),
-    join_paths(meson.source_root(), 'src/nix/repl.cc'),
     join_paths(meson.source_root(), 'src/nix/run.cc'),
     join_paths(meson.source_root(), 'src/nix/search.cc'),
     join_paths(meson.source_root(), 'src/nix/show-config.cc'),
@@ -51,7 +50,14 @@ nix_src = files(
     join_paths(meson.source_root(), 'src/nix-prefetch-url/nix-prefetch-url.cc'),
     join_paths(meson.source_root(), 'src/nix-store/dotgraph.cc'),
     join_paths(meson.source_root(), 'src/nix-store/graphml.cc'),
-    join_paths(meson.source_root(), 'src/nix-store/nix-store.cc'))
+    join_paths(meson.source_root(), 'src/nix-store/nix-store.cc'),
+]
+
+if editline_dep.found()
+  nix_src_files += [join_paths(meson.source_root(), 'src/nix/repl.cc')]
+endif
+
+nix_src = files(nix_src_files)
 
 nix_ln_src = [
     [ bindir, 'nix-build' ],
