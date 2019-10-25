@@ -16,7 +16,9 @@ project(
     
     default_options : [
         'cpp_std=c++17',
-        'warning_level=3'
+        'warning_level=3',
+        'optimization=3',
+        'debug=true'
     ],
     version : run_command('cat', './.version').stdout().strip(),
     license : 'MIT'
@@ -26,7 +28,7 @@ project(
 #-------------------------------------------------
 cpp = meson.get_compiler('cpp')
 
-add_project_arguments('-g', '-Wdeprecated', '-Wno-non-virtual-dtor', '-include', 'config.h', language : 'cpp')
+add_project_arguments(get_option('cxxflags'), language : 'cpp')
 add_project_link_arguments(get_option('ldflags'), language: 'cpp')
 
 
@@ -161,7 +163,8 @@ if (cpp.has_header('sys/ndir.h'))
         description : 'Define to 1 if you have the <sys/ndir.h> header file, and it defines `DIR`')
 endif
 
-if (cpp.has_header('dirent.h'))
+has_dirent_h = cpp.has_header('dirent.h')
+if (has_dirent_h)
     config_h.set(
         'HAVE_DIRENT_H', 1,
         description : 'Define to 1 if you have the <dirent.h> header file, and it defines `DIR`')
@@ -307,6 +310,23 @@ if meson.get_compiler('cpp').compiles(
         description : 'Define to 1 if you have the `pubsetbuf` function.')
 endif
 
+
+
+# checking data types
+#============================================================================
+
+
+dirent_h_prefix = '''
+  #include <sys/types.h>
+  #include <dirent.h>
+'''
+
+# Code taken from glib, thanks!
+if has_dirent_h and meson.get_compiler('cpp').has_member('struct dirent', 'd_type', prefix: dirent_h_prefix)
+  define = 'HAVE_STRUCT_@0@_@1@'.format('dirent'.to_upper(), 'd_type'.underscorify().to_upper())
+  config_h.set(define, 1)
+endif
+
 # required dependancies
 #============================================================================
 
@@ -328,8 +348,8 @@ tar = find_program('tar', required : true)
 bzip2 = find_program('bzip2', required : true)
 gzip = find_program('gzip', required : true)
 xz = find_program('xz', required : true)
-dot = find_program('dot', required : true)
-lsof = find_program('lsof', required : true)
+dot = find_program('dot', required : false)
+lsof = find_program('lsof', required : false)
 tr = find_program('tr', required : true)
 coreutils = run_command('dirname', cat.path()).stdout().strip()
 
@@ -359,9 +379,9 @@ description : 'Whether link() works on symlinks')
 #--------------------------------------------------
 boost_dep = declare_dependency(
     dependencies : [
-        cpp.find_library('libboost_system', dirs : libdir),
-        cpp.find_library('libboost_context', dirs : libdir),
-        cpp.find_library('libboost_thread', dirs : libdir)],
+        cpp.find_library('boost_system'),
+        cpp.find_library('boost_context'),
+        cpp.find_library('boost_thread')],
     link_args :  get_option('boost_link_args'))
 
 if (boost_dep.found())
@@ -388,7 +408,7 @@ libbrotli_dep = declare_dependency(
 # Look for OpenSSL, a required dependency.
 #--------------------------------------------------
 openssl_dep = declare_dependency(
-    dependencies: cpp.find_library('libssl', dirs : libdir),
+    dependencies: cpp.find_library('ssl'),
     link_args :  get_option('openssl_link_args'))
 
 
@@ -416,14 +436,14 @@ pthread_dep = declare_dependency(
 # Look for libdl, a required dependency.
 #--------------------------------------------------
 libdl_dep = declare_dependency(
-    dependencies : cpp.find_library('dl', dirs : libdir),
+    dependencies : cpp.find_library('dl'),
     link_args :  get_option('dl_link_args'))
 
 
 # Look for libbz2, a required dependency.
 #--------------------------------------------------
 libbz2_dep = declare_dependency(
-    dependencies : cpp.find_library('bz2', dirs : libdir),
+    dependencies : cpp.find_library('bz2'),
     link_args :  get_option('bz2_link_args'))
 
 
@@ -435,7 +455,7 @@ libbz2_dep = declare_dependency(
 # editline.h when the pkg-config approach fails.
 
 editline_dep = declare_dependency(
-    dependencies : cpp.find_library('libeditline'),
+    dependencies : cpp.find_library('editline'),
     link_args :  get_option('editline_link_args'))
 
 if not (
@@ -458,7 +478,7 @@ endif
 #--------------------------------------------------
 if (get_option('with_libsodium'))
     libsodium_dep = declare_dependency(
-        dependencies : cpp.find_library('libsodium', dirs : libdir),
+        dependencies : cpp.find_library('sodium'),
         link_args :  get_option('sodium_link_args'))
     config_h.set('HAVE_SODIUM', 1, description : 'Whether to use libsodium for cryptography.')
 else
@@ -535,6 +555,7 @@ install_headers(
     conf,
     install_dir : join_paths(includedir, 'nix'))
 
+add_project_arguments('-include', 'config.h', language : 'cpp')
 src_inc = [include_directories('.', 'src')]
 
 project_dirs = [

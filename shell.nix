@@ -1,7 +1,7 @@
 { useClang ? false, crossSystem ? null }:
 
 let
-  pkgsSrc = builtins.fetchTarball https://github.com/NixOS/nixpkgs-channels/archive/nixos-19.03.tar.gz;
+  pkgsSrc = builtins.fetchTarball https://github.com/NixOS/nixpkgs-channels/archive/nixos-19.09.tar.gz;
 in
 
 with import pkgsSrc { inherit crossSystem; };
