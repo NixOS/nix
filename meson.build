@@ -346,8 +346,8 @@ tar = find_program('tar', required : true)
 bzip2 = find_program('bzip2', required : true)
 gzip = find_program('gzip', required : true)
 xz = find_program('xz', required : true)
-dot = find_program('dot', required : true)
-lsof = find_program('lsof', required : true)
+dot = find_program('dot', required : false)
+lsof = find_program('lsof', required : false)
 tr = find_program('tr', required : true)
 coreutils = run_command('dirname', cat.path()).stdout().strip()
 
@@ -377,9 +377,9 @@ description : 'Whether link() works on symlinks')
 #--------------------------------------------------
 boost_dep = declare_dependency(
     dependencies : [
-        cpp.find_library('libboost_system', dirs : libdir),
-        cpp.find_library('libboost_context', dirs : libdir),
-        cpp.find_library('libboost_thread', dirs : libdir)],
+        cpp.find_library('boost_system'),
+        cpp.find_library('boost_context'),
+        cpp.find_library('boost_thread')],
     link_args :  get_option('boost_link_args'))
 
 if (boost_dep.found())
@@ -406,7 +406,7 @@ libbrotli_dep = declare_dependency(
 # Look for OpenSSL, a required dependency.
 #--------------------------------------------------
 openssl_dep = declare_dependency(
-    dependencies: cpp.find_library('libssl', dirs : libdir),
+    dependencies: cpp.find_library('ssl'),
     link_args :  get_option('openssl_link_args'))
 
 
@@ -434,14 +434,14 @@ pthread_dep = declare_dependency(
 # Look for libdl, a required dependency.
 #--------------------------------------------------
 libdl_dep = declare_dependency(
-    dependencies : cpp.find_library('dl', dirs : libdir),
+    dependencies : cpp.find_library('dl'),
     link_args :  get_option('dl_link_args'))
 
 
 # Look for libbz2, a required dependency.
 #--------------------------------------------------
 libbz2_dep = declare_dependency(
-    dependencies : cpp.find_library('bz2', dirs : libdir),
+    dependencies : cpp.find_library('bz2'),
     link_args :  get_option('bz2_link_args'))
 
 
@@ -453,7 +453,7 @@ libbz2_dep = declare_dependency(
 # editline.h when the pkg-config approach fails.
 
 editline_dep = declare_dependency(
-    dependencies : cpp.find_library('libeditline'),
+    dependencies : cpp.find_library('editline'),
     link_args :  get_option('editline_link_args'))
 
 if not (
@@ -476,7 +476,7 @@ endif
 #--------------------------------------------------
 if (get_option('with_libsodium'))
     libsodium_dep = declare_dependency(
-        dependencies : cpp.find_library('libsodium', dirs : libdir),
+        dependencies : cpp.find_library('sodium'),
         link_args :  get_option('sodium_link_args'))
     config_h.set('HAVE_SODIUM', 1, description : 'Whether to use libsodium for cryptography.')
 else
