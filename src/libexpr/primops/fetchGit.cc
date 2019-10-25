@@ -22,13 +22,14 @@ struct GitInfo
     std::string rev;
     std::string shortRev;
     uint64_t revCount = 0;
+    bool submodules = false;
 };
 
 std::regex revRegex("^[0-9a-fA-F]{40}$");
 
 GitInfo exportGit(ref<Store> store, const std::string & uri,
     std::optional<std::string> ref, std::string rev,
-    const std::string & name)
+    const std::string & name, bool fetchSubmodules)
 {
     if (evalSettings.pureEval && rev == "")
         throw Error("in pure evaluation mode, 'fetchGit' requires a Git revision");
@@ -145,7 +146,8 @@ GitInfo exportGit(ref<Store> store, const std::string & uri,
 
     printTalkative("using revision %s of repo '%s'", gitInfo.rev, uri);
 
-    std::string storeLinkName = hashString(htSHA512, name + std::string("\0"s) + gitInfo.rev).to_string(Base32, false);
+    std::string storeLinkName = hashString(htSHA512, name + std::string("\0"s) + gitInfo.rev
+        + (fetchSubmodules ? "submodules" : "")).to_string(Base32, false);
     Path storeLink = cacheDir + "/" + storeLinkName + ".link";
     PathLocks storeLinkLock({storeLink}, fmt("waiting for lock on '%1%'...", storeLink)); // FIXME: broken
 
@@ -165,16 +167,35 @@ GitInfo exportGit(ref<Store> store, const std::string & uri,
         if (e.errNo != ENOENT) throw;
     }
 
-    auto source = sinkToSource([&](Sink & sink) {
-        RunOptions gitOptions("git", { "-C", cacheDir, "archive", gitInfo.rev });
-        gitOptions.standardOut = &sink;
-        runProgram2(gitOptions);
-    });
-
     Path tmpDir = createTempDir();
     AutoDelete delTmpDir(tmpDir, true);
 
-    unpackTarfile(*source, tmpDir);
+    // Submodule support can be improved by adding caching to the submodules themselves. At the moment, only the root
+    // repo is cached.
+    if (fetchSubmodules) {
+        Path tmpGitDir = createTempDir();
+        AutoDelete delTmpGitDir(tmpGitDir, true);
+
+        runProgram("git", true, { "init", tmpDir, "--separate-git-dir", tmpGitDir });
+        runProgram("git", true, { "-C", tmpDir, "fetch", "--quiet", "--force",
+                                  "--", cacheDir, fmt("%s:%s", *ref, *ref) });
+
+        runProgram("git", true, { "-C", tmpDir, "checkout", "--quiet", "FETCH_HEAD" });
+        runProgram("git", true, { "-C", tmpDir, "remote", "add", "origin", uri });
+        runProgram("git", true, { "-C", tmpDir, "submodule", "--quiet", "update", "--init" });
+
+        deletePath(tmpDir + "/.git");
+
+        gitInfo.submodules = true;
+    } else {
+        auto source = sinkToSource([&](Sink & sink) {
+            RunOptions gitOptions("git", { "-C", cacheDir, "archive", gitInfo.rev });
+            gitOptions.standardOut = &sink;
+            runProgram2(gitOptions);
+        });
+
+        unpackTarfile(*source, tmpDir);
+    }
 
     gitInfo.storePath = store->printStorePath(store->addToStore(name, tmpDir));
 
@@ -198,6 +219,7 @@ static void prim_fetchGit(EvalState & state, const Pos & pos, Value * * args, Va
     std::optional<std::string> ref;
     std::string rev;
     std::string name = "source";
+    bool fetchSubmodules = false;
     PathSet context;
 
     state.forceValue(*args[0]);
@@ -216,6 +238,8 @@ static void prim_fetchGit(EvalState & state, const Pos & pos, Value * * args, Va
                 rev = state.forceStringNoCtx(*attr.value, *attr.pos);
             else if (n == "name")
                 name = state.forceStringNoCtx(*attr.value, *attr.pos);
+            else if (n == "fetchSubmodules")
+                fetchSubmodules = state.forceBool(*attr.value, *attr.pos);
             else
                 throw EvalError("unsupported argument '%s' to 'fetchGit', at %s", attr.name, *attr.pos);
         }
@@ -230,13 +254,14 @@ static void prim_fetchGit(EvalState & state, const Pos & pos, Value * * args, Va
     // whitelist. Ah well.
     state.checkURI(url);
 
-    auto gitInfo = exportGit(state.store, url, ref, rev, name);
+    auto gitInfo = exportGit(state.store, url, ref, rev, name, fetchSubmodules);
 
     state.mkAttrs(v, 8);
     mkString(*state.allocAttr(v, state.sOutPath), gitInfo.storePath, PathSet({gitInfo.storePath}));
     mkString(*state.allocAttr(v, state.symbols.create("rev")), gitInfo.rev);
     mkString(*state.allocAttr(v, state.symbols.create("shortRev")), gitInfo.shortRev);
     mkInt(*state.allocAttr(v, state.symbols.create("revCount")), gitInfo.revCount);
+    mkBool(*state.allocAttr(v, state.symbols.create("submodules")), gitInfo.submodules);
     v.attrs->sort();
 
     if (state.allowedPaths)
