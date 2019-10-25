@@ -161,7 +161,8 @@ if (cpp.has_header('sys/ndir.h'))
         description : 'Define to 1 if you have the <sys/ndir.h> header file, and it defines `DIR`')
 endif
 
-if (cpp.has_header('dirent.h'))
+has_dirent_h = cpp.has_header('dirent.h')
+if (has_dirent_h)
     config_h.set(
         'HAVE_DIRENT_H', 1,
         description : 'Define to 1 if you have the <dirent.h> header file, and it defines `DIR`')
@@ -305,6 +306,23 @@ if meson.get_compiler('cpp').compiles(
     config_h.set(
         'HAVE_PUBSETBUF', 1,
         description : 'Define to 1 if you have the `pubsetbuf` function.')
+endif
+
+
+
+# checking data types
+#============================================================================
+
+
+dirent_h_prefix = '''
+  #include <sys/types.h>
+  #include <dirent.h>
+'''
+
+# Code taken from glib, thanks!
+if has_dirent_h and meson.get_compiler('cpp').has_member('struct dirent', 'd_type', prefix: dirent_h_prefix)
+  define = 'HAVE_STRUCT_@0@_@1@'.format('dirent'.to_upper(), 'd_type'.underscorify().to_upper())
+  config_h.set(define, 1)
 endif
 
 # required dependancies
