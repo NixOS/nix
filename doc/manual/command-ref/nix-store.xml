@@ -215,6 +215,48 @@ printed.)</para>
 
 </variablelist>
 
+<para>Special exit codes:</para>
+
+<variablelist>
+
+  <varlistentry><term><literal>100</literal></term>
+    <listitem><para>Generic build failure, the builder process
+    returned with a non-zero exit code.</para></listitem>
+  </varlistentry>
+
+  <varlistentry><term><literal>101</literal></term>
+    <listitem><para>Build timeout, the build was aborted because it
+    did not complete within the specified <link
+    linkend='conf-timeout'><literal>timeout</literal></link>.
+    </para></listitem>
+  </varlistentry>
+
+  <varlistentry><term><literal>102</literal></term>
+    <listitem><para>Hash mismatch, the build output was rejected
+    because it does not match the specified <link
+    linkend="fixed-output-drvs"><varname>outputHash</varname></link>.
+    </para></listitem>
+  </varlistentry>
+
+  <varlistentry><term><literal>104</literal></term>
+    <listitem><para>Not deterministic, the build succeeded in check
+    mode but the resulting output is not binary reproducable.</para>
+    </listitem>
+  </varlistentry>
+
+</variablelist>
+
+<para>With the <option>--keep-going</option> flag it's possible for
+multiple failures to occur, in this case the 1xx status codes are or combined
+using binary or. <screen>
+1100100
+   ^^^^
+   |||`- timeout
+   ||`-- output hash mismatch
+   |`--- build failure
+   `---- not deterministic
+</screen></para>
+
 </refsection>
 
 
@@ -878,6 +920,60 @@ standard output.</para>
 <screen>
 $ nix-store --add ./foo.c
 /nix/store/m7lrha58ph6rcnv109yzx1nk1cj7k7zf-foo.c</screen>
+
+</refsection>
+
+</refsection>
+
+<!--######################################################################-->
+
+<refsection><title>Operation <option>--add-fixed</option></title>
+
+<refsection><title>Synopsis</title>
+
+<cmdsynopsis>
+  <command>nix-store</command>
+  <arg><option>--recursive</option></arg>
+  <arg choice='plain'><option>--add-fixed</option></arg>
+  <arg choice='plain'><replaceable>algorithm</replaceable></arg>
+  <arg choice='plain' rep='repeat'><replaceable>paths</replaceable></arg>
+</cmdsynopsis>
+
+</refsection>
+
+<refsection><title>Description</title>
+
+<para>The operation <option>--add-fixed</option> adds the specified paths to
+the Nix store.  Unlike <option>--add</option> paths are registered using the
+specified hashing algorithm, resulting in the same output path as a fixed output
+derivation.  This can be used for sources that are not available from a public
+url or broke since the download expression was written.
+</para>
+
+<para>This operation has the following options:
+
+<variablelist>
+
+  <varlistentry><term><option>--recursive</option></term>
+
+    <listitem><para>
+      Use recursive instead of flat hashing mode, used when adding directories
+      to the store.
+    </para></listitem>
+
+  </varlistentry>
+
+</variablelist>
+
+</para>
+
+</refsection>
+
+<refsection><title>Example</title>
+
+<screen>
+$ nix-store --add-fixed sha256 ./hello-2.10.tar.gz
+/nix/store/3x7dwzq014bblazs7kq20p9hyzz0qh8g-hello-2.10.tar.gz</screen>
 
 </refsection>
 

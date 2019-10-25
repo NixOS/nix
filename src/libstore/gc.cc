@@ -37,11 +37,7 @@ static string gcRootsDir = "gcroots";
    read.  To be precise: when they try to create a new temporary root
    file, they will block until the garbage collector has finished /
    yielded the GC lock. */
-#ifndef _WIN32
-int LocalStore::openGCLock(LockType lockType)
-#else
-HANDLE LocalStore::openGCLock(LockType lockType)
-#endif
+AutoCloseFD LocalStore::openGCLock(LockType lockType)
 {
     Path fnGCLock = (format("%1%/%2%")
         % stateDir % gcLockName).str();
@@ -67,7 +63,7 @@ HANDLE LocalStore::openGCLock(LockType lockType)
        process that can open the file for reading can DoS the
        collector. */
 
-    return fdGCLock.release();
+    return fdGCLock;
 }
 
 
@@ -285,25 +281,21 @@ void LocalStore::findTempRoots(FDs & fds, Roots & tempRoots, bool censor)
         //FDPtr fd(new AutoCloseFD(openLockFile(path, false)));
         //if (*fd == -1) continue;
 
-        if (path != fnTempRoots) {
-
-            /* Try to acquire a write lock without blocking.  This can
-               only succeed if the owning process has died.  In that case
-               we don't care about its temporary roots. */
-            if (lockFile(fd->get(), ltWrite, false)) {
-                printError(format("removing stale temporary roots file '%1%'") % path);
-                unlink(path.c_str());
-                writeFull(fd->get(), "d");
-                continue;
-            }
-
-            /* Acquire a read lock.  This will prevent the owning process
-               from upgrading to a write lock, therefore it will block in
-               addTempRoot(). */
-            debug(format("waiting for read lock on '%1%'") % path);
-            lockFile(fd->get(), ltRead, true);
-
+        /* Try to acquire a write lock without blocking.  This can
+           only succeed if the owning process has died.  In that case
+           we don't care about its temporary roots. */
+        if (lockFile(fd->get(), ltWrite, false)) {
+            printError(format("removing stale temporary roots file '%1%'") % path);
+            unlink(path.c_str());
+            writeFull(fd->get(), "d");
+            continue;
         }
+
+        /* Acquire a read lock.  This will prevent the owning process
+           from upgrading to a write lock, therefore it will block in
+           addTempRoot(). */
+        debug(format("waiting for read lock on '%1%'") % path);
+        lockFile(fd->get(), ltRead, true);
 
         /* Read the entire file. */
         string contents = readFile(fd->get());
@@ -407,10 +399,9 @@ void LocalStore::findRootsNoTemp(Roots & roots, bool censor)
     findRoots(stateDir + "/" + gcRootsDir, DT_UNKNOWN, roots);
     findRoots(stateDir + "/profiles", DT_UNKNOWN, roots);
 
-    /* Add additional roots returned by the program specified by the
-       NIX_ROOT_FINDER environment variable.  This is typically used
-       to add running programs to the set of roots (to prevent them
-       from being garbage collected). */
+    /* Add additional roots returned by different platforms-specific
+       heuristics.  This is typically used to add running programs to
+       the set of roots (to prevent them from being garbage collected). */
     findRuntimeRoots(roots, censor);
 }
 
@@ -533,17 +524,22 @@ void LocalStore::findRuntimeRoots(Roots & roots, bool censor)
     }
 
 #if !defined(__linux__)
-    try {
-        std::regex lsofRegex(R"(^n(/.*)$)");
-        auto lsofLines =
-            tokenizeString<std::vector<string>>(runProgramGetStdout(LSOF, true, { "-n", "-w", "-F", "n" }), "\n");
-        for (const auto & line : lsofLines) {
-            std::smatch match;
-            if (std::regex_match(line, match, lsofRegex))
-                unchecked[match[1]].emplace("{lsof}");
+    // lsof is really slow on OS X. This actually causes the gc-concurrent.sh test to fail.
+    // See: https://github.com/NixOS/nix/issues/3011
+    // Because of this we disable lsof when running the tests.
+    if (getEnv("_NIX_TEST_NO_LSOF") == "") {
+        try {
+            std::regex lsofRegex(R"(^n(/.*)$)");
+            auto lsofLines =
+                tokenizeString<std::vector<string>>(runProgramGetStdout(LSOF, true, { "-n", "-w", "-F", "n" }), "\n");
+            for (const auto & line : lsofLines) {
+                std::smatch match;
+                if (std::regex_match(line, match, lsofRegex))
+                    unchecked[match[1]].emplace("{lsof}");
+            }
+        } catch (ExecError & e) {
+            /* lsof not installed, lsof failed */
         }
-    } catch (ExecError & e) {
-        /* lsof not installed, lsof failed */
     }
 #endif
 
@@ -804,9 +800,8 @@ void LocalStore::removeUnusedLinks(const GCState & state)
             throw PosixError(format("statting '%1%'") % path);
 
         if (st.st_nlink != 1) {
-            unsigned long long size = st.st_blocks * 512ULL;
-            actualSize += size;
-            unsharedSize += (st.st_nlink - 1) * size;
+            actualSize += st.st_size;
+            unsharedSize += (st.st_nlink - 1) * st.st_size;
             continue;
         }
 
@@ -814,7 +809,8 @@ void LocalStore::removeUnusedLinks(const GCState & state)
 
         if (unlink(path.c_str()) == -1)
             throw PosixError(format("deleting '%1%'") % path);
-        state.results.bytesFreed += st.st_blocks * 512ULL;
+
+        state.results.bytesFreed += st.st_size;
     }
 
     struct stat st;
@@ -963,7 +959,11 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
             assertStorePath(i);
             tryToDelete(state, i);
             if (state.dead.find(i) == state.dead.end())
-                throw Error(format("cannot delete path '%1%' since it is still alive") % i);
+                throw Error(format(
+                    "cannot delete path '%1%' since it is still alive. "
+                    "To find out why use: "
+                    "nix-store --query --roots"
+                    ) % i);
         }
 
     } else if (options.maxFreed > 0) {
@@ -1084,7 +1084,12 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
 void LocalStore::autoGC(bool sync)
 {
 #ifdef HAVE_STATVFS
-    auto getAvail = [this]() {
+    static auto fakeFreeSpaceFile = getEnv("_NIX_TEST_FREE_SPACE_FILE", "");
+
+    auto getAvail = [this]() -> uint64_t {
+        if (!fakeFreeSpaceFile.empty())
+            return std::stoll(readFile(fakeFreeSpaceFile));
+
         struct statvfs st;
         if (statvfs(realStoreDir.c_str(), &st))
             throw PosixError("getting filesystem info about '%s'", realStoreDir);
@@ -1105,7 +1110,7 @@ void LocalStore::autoGC(bool sync)
 
         auto now = std::chrono::steady_clock::now();
 
-        if (now < state->lastGCCheck + std::chrono::seconds(5)) return;
+        if (now < state->lastGCCheck + std::chrono::seconds(settings.minFreeCheckInterval)) return;
 
         auto avail = getAvail();
 
@@ -1132,10 +1137,10 @@ void LocalStore::autoGC(bool sync)
                     promise.set_value();
                 });
 
-                printInfo("running auto-GC to free %d bytes", settings.maxFree - avail);
-
                 GCOptions options;
                 options.maxFreed = settings.maxFree - avail;
+
+                printInfo("running auto-GC to free %d bytes", options.maxFreed);
 
                 GCResults results;
 

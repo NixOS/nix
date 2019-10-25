@@ -1,0 +1,205 @@
+<chapter xmlns="http://docbook.org/ns/docbook"
+      xmlns:xlink="http://www.w3.org/1999/xlink"
+      xmlns:xi="http://www.w3.org/2001/XInclude"
+      xml:id="chap-diff-hook"
+      version="5.0"
+      >
+
+<title>Verifying Build Reproducibility with <option linkend="conf-diff-hook">diff-hook</option></title>
+
+<subtitle>Check build reproducibility by running builds multiple times
+and comparing their results.</subtitle>
+
+<para>Specify a program with Nix's <xref linkend="conf-diff-hook" /> to
+compare build results when two builds produce different results. Note:
+this hook is only executed if the results are not the same, this hook
+is not used for determining if the results are the same.</para>
+
+<para>For purposes of demonstration, we'll use the following Nix file,
+<filename>deterministic.nix</filename> for testing:</para>
+
+<programlisting>
+let
+  inherit (import &lt;nixpkgs&gt; {}) runCommand;
+in {
+  stable = runCommand "stable" {} ''
+    touch $out
+  '';
+
+  unstable = runCommand "unstable" {} ''
+    echo $RANDOM > $out
+  '';
+}
+</programlisting>
+
+<para>Additionally, <filename>nix.conf</filename> contains:
+
+<programlisting>
+diff-hook = /etc/nix/my-diff-hook
+run-diff-hook = true
+</programlisting>
+
+where <filename>/etc/nix/my-diff-hook</filename> is an executable
+file containing:
+
+<programlisting>
+#!/bin/sh
+exec &gt;&amp;2
+echo "For derivation $3:"
+/run/current-system/sw/bin/diff -r "$1" "$2"
+</programlisting>
+
+</para>
+
+<para>The diff hook is executed by the same user and group who ran the
+build. However, the diff hook does not have write access to the store
+path just built.</para>
+
+<section>
+  <title>
+    Spot-Checking Build Determinism
+  </title>
+
+  <para>
+    Verify a path which already exists in the Nix store by passing
+    <option>--check</option> to the build command.
+  </para>
+
+  <para>If the build passes and is deterministic, Nix will exit with a
+  status code of 0:</para>
+
+  <screen>
+$ nix-build ./deterministic.nix -A stable
+these derivations will be built:
+  /nix/store/z98fasz2jqy9gs0xbvdj939p27jwda38-stable.drv
+building '/nix/store/z98fasz2jqy9gs0xbvdj939p27jwda38-stable.drv'...
+/nix/store/yyxlzw3vqaas7wfp04g0b1xg51f2czgq-stable
+
+$ nix-build ./deterministic.nix -A stable --check
+checking outputs of '/nix/store/z98fasz2jqy9gs0xbvdj939p27jwda38-stable.drv'...
+/nix/store/yyxlzw3vqaas7wfp04g0b1xg51f2czgq-stable
+</screen>
+
+  <para>If the build is not deterministic, Nix will exit with a status
+  code of 1:</para>
+
+  <screen>
+$ nix-build ./deterministic.nix -A unstable
+these derivations will be built:
+  /nix/store/cgl13lbj1w368r5z8gywipl1ifli7dhk-unstable.drv
+building '/nix/store/cgl13lbj1w368r5z8gywipl1ifli7dhk-unstable.drv'...
+/nix/store/krpqk0l9ib0ibi1d2w52z293zw455cap-unstable
+
+$ nix-build ./deterministic.nix -A unstable --check
+checking outputs of '/nix/store/cgl13lbj1w368r5z8gywipl1ifli7dhk-unstable.drv'...
+error: derivation '/nix/store/cgl13lbj1w368r5z8gywipl1ifli7dhk-unstable.drv' may not be deterministic: output '/nix/store/krpqk0l9ib0ibi1d2w52z293zw455cap-unstable' differs
+</screen>
+
+<para>In the Nix daemon's log, we will now see:
+<screen>
+For derivation /nix/store/cgl13lbj1w368r5z8gywipl1ifli7dhk-unstable.drv:
+1c1
+&lt; 8108
+---
+&gt; 30204
+</screen>
+</para>
+
+  <para>Using <option>--check</option> with <option>--keep-failed</option>
+  will cause Nix to keep the second build's output in a special,
+  <literal>.check</literal> path:</para>
+
+  <screen>
+$ nix-build ./deterministic.nix -A unstable --check --keep-failed
+checking outputs of '/nix/store/cgl13lbj1w368r5z8gywipl1ifli7dhk-unstable.drv'...
+note: keeping build directory '/tmp/nix-build-unstable.drv-0'
+error: derivation '/nix/store/cgl13lbj1w368r5z8gywipl1ifli7dhk-unstable.drv' may not be deterministic: output '/nix/store/krpqk0l9ib0ibi1d2w52z293zw455cap-unstable' differs from '/nix/store/krpqk0l9ib0ibi1d2w52z293zw455cap-unstable.check'
+</screen>
+
+  <para>In particular, notice the
+  <literal>/nix/store/krpqk0l9ib0ibi1d2w52z293zw455cap-unstable.check</literal>
+  output. Nix has copied the build results to that directory where you
+  can examine it.</para>
+
+  <note xml:id="check-dirs-are-unregistered">
+    <title><literal>.check</literal> paths are not registered store paths</title>
+
+    <para>Check paths are not protected against garbage collection,
+    and this path will be deleted on the next garbage collection.</para>
+
+    <para>The path is guaranteed to be alive for the duration of
+    <xref linkend="conf-diff-hook" />'s execution, but may be deleted
+    any time after.</para>
+
+    <para>If the comparison is performed as part of automated tooling,
+    please use the diff-hook or author your tooling to handle the case
+    where the build was not deterministic and also a check path does
+    not exist.</para>
+  </note>
+
+  <para>
+    <option>--check</option> is only usable if the derivation has
+    been built on the system already. If the derivation has not been
+    built Nix will fail with the error:
+    <screen>
+error: some outputs of '/nix/store/hzi1h60z2qf0nb85iwnpvrai3j2w7rr6-unstable.drv' are not valid, so checking is not possible
+</screen>
+
+    Run the build without <option>--check</option>, and then try with
+    <option>--check</option> again.
+  </para>
+</section>
+
+<section>
+  <title>
+    Automatic and Optionally Enforced Determinism Verification
+  </title>
+
+  <para>
+    Automatically verify every build at build time by executing the
+    build multiple times.
+  </para>
+
+  <para>
+    Setting <xref linkend="conf-repeat" /> and
+    <xref linkend="conf-enforce-determinism" /> in your
+    <filename>nix.conf</filename> permits the automated verification
+    of every build Nix performs.
+  </para>
+
+  <para>
+    The following configuration will run each build three times, and
+    will require the build to be deterministic:
+
+    <programlisting>
+enforce-determinism = true
+repeat = 2
+</programlisting>
+  </para>
+
+  <para>
+    Setting <xref linkend="conf-enforce-determinism" /> to false as in
+    the following configuration will run the build multiple times,
+    execute the build hook, but will allow the build to succeed even
+    if it does not build reproducibly:
+
+    <programlisting>
+enforce-determinism = false
+repeat = 1
+</programlisting>
+  </para>
+
+  <para>
+    An example output of this configuration:
+    <screen>
+$ nix-build ./test.nix -A unstable
+these derivations will be built:
+  /nix/store/ch6llwpr2h8c3jmnf3f2ghkhx59aa97f-unstable.drv
+building '/nix/store/ch6llwpr2h8c3jmnf3f2ghkhx59aa97f-unstable.drv' (round 1/2)...
+building '/nix/store/ch6llwpr2h8c3jmnf3f2ghkhx59aa97f-unstable.drv' (round 2/2)...
+output '/nix/store/6xg356v9gl03hpbbg8gws77n19qanh02-unstable' of '/nix/store/ch6llwpr2h8c3jmnf3f2ghkhx59aa97f-unstable.drv' differs from '/nix/store/6xg356v9gl03hpbbg8gws77n19qanh02-unstable.check' from previous round
+/nix/store/6xg356v9gl03hpbbg8gws77n19qanh02-unstable
+</screen>
+  </para>
+</section>
+</chapter>

@@ -12,6 +12,7 @@
 #include "json.hh"
 #include "nar-info.hh"
 #include "parsed-derivations.hh"
+#include "machines.hh"
 
 #include <algorithm>
 #include <iostream>
@@ -35,6 +36,7 @@
 #endif
 #include <errno.h>
 #include <cstring>
+#include <termios.h>
 
 #ifdef _WIN32
 #define random() rand()
@@ -288,6 +290,12 @@ public:
     /* Set if at least one derivation had a timeout. */
     bool timedOut;
 
+    /* Set if at least one derivation fails with a hash mismatch. */
+    bool hashMismatch;
+
+    /* Set if at least one derivation is not deterministic in check mode. */
+    bool checkMismatch;
+
 #ifdef _WIN32
     AutoCloseWindowsHandle ioport;
 #endif
@@ -492,6 +500,28 @@ static void commonChildInit(Pipe & logPipe)
     close(fdDevNull);
 }
 
+void handleDiffHook(uid_t uid, uid_t gid, Path tryA, Path tryB, Path drvPath, Path tmpDir)
+{
+    auto diffHook = settings.diffHook;
+    if (diffHook != "" && settings.runDiffHook) {
+        try {
+            RunOptions diffHookOptions(diffHook,{tryA, tryB, drvPath, tmpDir});
+            diffHookOptions.searchPath = true;
+            diffHookOptions.uid = uid;
+            diffHookOptions.gid = gid;
+            diffHookOptions.chdir = "/";
+
+            auto diffRes = runProgramWithStatus(diffHookOptions);
+            if (!statusOk(diffRes.first))
+                throw ExecError(diffRes.first, fmt("diff-hook program '%1%' %2%", diffHook, statusToString(diffRes.first)));
+
+            if (diffRes.second != "")
+                printError(chomp(diffRes.second));
+        } catch (Error & error) {
+            printError("diff hook execution failed: %s", error.what());
+        }
+    }
+}
 
 //////////////////////////////////////////////////////////////////////
 
@@ -570,10 +600,9 @@ UserLock::UserLock()
 
         {
             auto lockedPaths(lockedPaths_.lock());
-            if (lockedPaths->count(fnUserLock))
+            if (!lockedPaths->insert(fnUserLock).second)
                 /* We already have a lock on this one. */
                 continue;
-            lockedPaths->insert(fnUserLock);
         }
 
         try {
@@ -622,8 +651,8 @@ UserLock::UserLock()
 UserLock::~UserLock()
 {
     auto lockedPaths(lockedPaths_.lock());
-    assert(lockedPaths->count(fnUserLock));
-    lockedPaths->erase(fnUserLock);
+    auto erased = lockedPaths->erase(fnUserLock);
+    assert(erased);
 }
 
 
@@ -727,23 +756,6 @@ HookInstance::~HookInstance()
     }
 }
 #endif
-
-//////////////////////////////////////////////////////////////////////
-
-
-typedef map<std::string, std::string> StringRewrites;
-
-
-std::string rewriteStrings(std::string s, const StringRewrites & rewrites)
-{
-    for (auto & i : rewrites) {
-        size_t j = 0;
-        while ((j = s.find(i.first, j)) != string::npos)
-            s.replace(j, i.first.size(), i.second);
-    }
-    return s;
-}
-
 
 //////////////////////////////////////////////////////////////////////
 
@@ -880,7 +892,7 @@ private:
 #endif
 
     /* Hash rewriting. */
-    StringRewrites inputRewrites, outputRewrites;
+    StringMap inputRewrites, outputRewrites;
     typedef map<Path, Path> RedirectedOutputs;
     RedirectedOutputs redirectedOutputs;
 
@@ -924,6 +936,9 @@ public:
     DerivationGoal(const Path & drvPath, const BasicDerivation & drv,
         Worker & worker, BuildMode buildMode = bmNormal);
     ~DerivationGoal();
+
+    /* Whether we need to perform hash rewriting if there are valid output paths. */
+    bool needsHashRewrite();
 
     void timedOut() override;
 
@@ -1088,6 +1103,17 @@ DerivationGoal::~DerivationGoal()
 }
 
 
+inline bool DerivationGoal::needsHashRewrite()
+{
+#if __linux__
+    return !useChroot;
+#else
+    /* Darwin requires hash rewriting even when sandboxing is enabled. */
+    return true;
+#endif
+}
+
+
 void DerivationGoal::killChild()
 {
 #ifndef _WIN32
@@ -1145,10 +1171,8 @@ void DerivationGoal::addWantedOutputs(const StringSet & outputs)
         needRestart = true;
     } else
         for (auto & i : outputs)
-            if (wantedOutputs.find(i) == wantedOutputs.end()) {
-                wantedOutputs.insert(i);
+            if (wantedOutputs.insert(i).second)
                 needRestart = true;
-            }
 }
 
 
@@ -1217,7 +1241,7 @@ void DerivationGoal::haveDerivation()
     /* We are first going to try to create the invalid output paths
        through substitutes.  If that doesn't work, we'll build
        them. */
-    if (settings.useSubstitutes && drv->substitutesAllowed())
+    if (settings.useSubstitutes && parsedDrv->substitutesAllowed())
         for (auto & i : invalidOutputs)
             addWaitee(worker.makeSubstitutionGoal(i, buildMode == bmRepair ? Repair : NoRepair));
 
@@ -1604,8 +1628,8 @@ std::cerr << "DerivationGoal::buildDone()" << std::endl;
     if (hook) {
         hook->builderOut.readSide = -1;
         hook->fromHook.readSide = -1;
-    }
-    else builderOut.readSide = -1;
+    } else
+        builderOut.readSide = -1;
 #else
     asyncBuilderOut.hRead = INVALID_HANDLE_VALUE;
     nul = INVALID_HANDLE_VALUE;
@@ -1671,6 +1695,61 @@ std::cerr << "DerivationGoal::buildDone()" << std::endl;
         /* Compute the FS closure of the outputs and register them as
            being valid. */
         registerOutputs();
+
+        if (settings.postBuildHook != "") {
+            Activity act(*logger, lvlInfo, actPostBuildHook,
+                fmt("running post-build-hook '%s'", settings.postBuildHook),
+                Logger::Fields{drvPath});
+            PushActivity pact(act.id);
+            auto outputPaths = drv->outputPaths();
+            std::map<std::string, std::string> hookEnvironment = getEnv();
+
+            hookEnvironment.emplace("DRV_PATH", drvPath);
+            hookEnvironment.emplace("OUT_PATHS", chomp(concatStringsSep(" ", outputPaths)));
+
+            RunOptions opts(settings.postBuildHook, {});
+            opts.environment = hookEnvironment;
+
+            struct LogSink : Sink {
+                Activity & act;
+                std::string currentLine;
+
+                LogSink(Activity & act) : act(act) { }
+
+                void operator() (const unsigned char * data, size_t len) override {
+                    for (size_t i = 0; i < len; i++) {
+                        auto c = data[i];
+
+                        if (c == '\n') {
+                            flushLine();
+                        } else {
+                            currentLine += c;
+                        }
+                    }
+                }
+
+                void flushLine() {
+                    if (settings.verboseBuild) {
+                        printError("post-build-hook: " + currentLine);
+                    } else {
+                        act.result(resPostBuildLogLine, currentLine);
+                    }
+                    currentLine.clear();
+                }
+
+                ~LogSink() {
+                    if (currentLine != "") {
+                        currentLine += '\n';
+                        flushLine();
+                    }
+                }
+            };
+            LogSink sink(act);
+
+            opts.standardOut = &sink;
+            opts.mergeStderrToStdout = true;
+            runProgram(opts);
+        }
 
         if (buildMode == bmCheck) {
             done(BuildResult::Built);
@@ -2040,9 +2119,8 @@ fprintf(stderr, "DerivationGoal::startBuilder()\n");
     }
 
 
-#ifndef _WIN32
     if (useChroot) {
-
+#ifndef _WIN32
         /* Allow a user-configurable set of directories from the
            host file system. */
         PathSet dirs = settings.sandboxPaths;
@@ -2103,6 +2181,7 @@ fprintf(stderr, "DerivationGoal::startBuilder()\n");
 
             dirsInChroot[i] = i;
         }
+#endif // !defined _WIN32
 
 #if __linux__
         /* Create a temporary directory in which we set up the chroot
@@ -2207,9 +2286,8 @@ fprintf(stderr, "DerivationGoal::startBuilder()\n");
         throw Error("sandboxing builds is not supported on this platform");
 #endif
     }
-    else
-#endif // _WIN32
-    {
+
+    if (needsHashRewrite()) {
 
 #ifndef _WIN32
         if (pathExists(homeDir))
@@ -2284,20 +2362,61 @@ fprintf(stderr, "DerivationGoal::startBuilder()\n");
     Path logFile = openLogFile();
 
     /* Create a pipe to get the output of the builder. */
-#ifndef _WIN32
-    builderOut.create();
-#else
-//std::cerr << (format("c----create(%p, %p)") % &worker % worker.ioport.get()) << std::endl;
-    asyncBuilderOut.create(worker.ioport.get());
+//#ifndef _WIN32
+//    builderOut.create();
+//#else
+////std::cerr << (format("c----create(%p, %p)") % &worker % worker.ioport.get()) << std::endl;
+//    asyncBuilderOut.create(worker.ioport.get());
+//
+//    // Must be inheritable so subprocesses can dup to children.
+//    SECURITY_ATTRIBUTES sa = {0};
+//    sa.nLength = sizeof(SECURITY_ATTRIBUTES);
+//    sa.bInheritHandle = TRUE;
+//    nul = CreateFileA("NUL", GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, &sa, OPEN_EXISTING, 0, NULL);
+//    if (!nul.get())
+//        throw WinError("CreateFileA(NUL)");
+//#endif
 
-    // Must be inheritable so subprocesses can dup to children.
-    SECURITY_ATTRIBUTES sa = {0};
-    sa.nLength = sizeof(SECURITY_ATTRIBUTES);
-    sa.bInheritHandle = TRUE;
-    nul = CreateFileA("NUL", GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, &sa, OPEN_EXISTING, 0, NULL);
-    if (!nul.get())
-        throw WinError("CreateFileA(NUL)");
-#endif
+    builderOut.readSide = posix_openpt(O_RDWR | O_NOCTTY);
+    if (!builderOut.readSide)
+        throw PosixError("opening pseudoterminal master");
+
+    std::string slaveName(ptsname(builderOut.readSide.get()));
+
+    if (buildUser) {
+        if (chmod(slaveName.c_str(), 0600))
+            throw PosixError("changing mode of pseudoterminal slave");
+
+        if (chown(slaveName.c_str(), buildUser->getUID(), 0))
+            throw PosixError("changing owner of pseudoterminal slave");
+    } else {
+        if (grantpt(builderOut.readSide.get()))
+            throw PosixError("granting access to pseudoterminal slave");
+    }
+
+    #if 0
+    // Mount the pt in the sandbox so that the "tty" command works.
+    // FIXME: this doesn't work with the new devpts in the sandbox.
+    if (useChroot)
+        dirsInChroot[slaveName] = {slaveName, false};
+    #endif
+
+    if (unlockpt(builderOut.readSide.get()))
+        throw PosixError("unlocking pseudoterminal");
+
+    builderOut.writeSide = open(slaveName.c_str(), O_RDWR | O_NOCTTY);
+    if (!builderOut.writeSide)
+        throw PosixError("opening pseudoterminal slave");
+
+    // Put the pt into raw mode to prevent \n -> \r\n translation.
+    struct termios term;
+    if (tcgetattr(builderOut.writeSide.get(), &term))
+        throw PosixError("getting pseudoterminal attributes");
+
+    cfmakeraw(&term);
+
+    if (tcsetattr(builderOut.writeSide.get(), TCSANOW, &term))
+        throw PosixError("putting pseudoterminal into raw mode");
 
     result.startTime = time(0);
 
@@ -2371,17 +2490,37 @@ fprintf(stderr, "DerivationGoal::startBuilder()\n");
                 flags |= CLONE_NEWNET;
 
             pid_t child = clone(childEntry, stack + stackSize, flags, this);
-            if (child == -1 && errno == EINVAL)
+            if (child == -1 && errno == EINVAL) {
                 /* Fallback for Linux < 2.13 where CLONE_NEWPID and
                    CLONE_PARENT are not allowed together. */
-                child = clone(childEntry, stack + stackSize, flags & ~CLONE_NEWPID, this);
+                flags &= ~CLONE_NEWPID;
+                child = clone(childEntry, stack + stackSize, flags, this);
+            }
+            if (child == -1 && (errno == EPERM || errno == EINVAL)) {
+                /* Some distros patch Linux to not allow unprivileged
+                 * user namespaces. If we get EPERM or EINVAL, try
+                 * without CLONE_NEWUSER and see if that works.
+                 */
+                flags &= ~CLONE_NEWUSER;
+                child = clone(childEntry, stack + stackSize, flags, this);
+            }
+            /* Otherwise exit with EPERM so we can handle this in the
+               parent. This is only done when sandbox-fallback is set
+               to true (the default). */
+            if (child == -1 && (errno == EPERM || errno == EINVAL) && settings.sandboxFallback)
+                _exit(1);
             if (child == -1) throw PosixError("cloning builder process");
 
             writeFull(builderOut.writeSide.get(), std::to_string(child) + "\n");
             _exit(0);
         }, options);
 
-        if (helper.wait() != 0)
+        int res = helper.wait();
+        if (res != 0 && settings.sandboxFallback) {
+            useChroot = false;
+            tmpDirInSandbox = tmpDir;
+            goto fallback;
+        } else if (res != 0)
             throw Error("unable to start build process");
 
         userNamespaceSync.readSide = -1;
@@ -2404,14 +2543,14 @@ fprintf(stderr, "DerivationGoal::startBuilder()\n");
         writeFile("/proc/" + std::to_string(pid) + "/gid_map",
             (format("%d %d 1") % sandboxGid % hostGid).str());
 
-        /* Signal the builder that we've updated its user
-           namespace. */
+        /* Signal the builder that we've updated its user namespace. */
         writeFull(userNamespaceSync.writeSide.get(), "1");
         userNamespaceSync.writeSide = -1;
 
     } else
 #endif // __linux__
     {
+    fallback:
         options.allowVfork = !buildUser && !drv->isBuiltin();
         pid = startProcess([&]() {
             runChild();
@@ -2730,6 +2869,9 @@ void DerivationGoal::initEnv()
        may change that in the future. So tell the builder which file
        descriptor to use for that. */
     env["NIX_LOG_FD"] = "2";
+
+    /* Trigger colored output in various tools. */
+    env["TERM"] = "xterm-256color";
 }
 
 
@@ -2861,17 +3003,17 @@ void setupSeccomp()
         seccomp_release(ctx);
     });
 
-    if (settings.thisSystem == "x86_64-linux" &&
+    if (nativeSystem == "x86_64-linux" &&
         seccomp_arch_add(ctx, SCMP_ARCH_X86) != 0)
         throw PosixError("unable to add 32-bit seccomp architecture");
 
-    if (settings.thisSystem == "x86_64-linux" &&
+    if (nativeSystem == "x86_64-linux" &&
         seccomp_arch_add(ctx, SCMP_ARCH_X32) != 0)
         throw PosixError("unable to add X32 seccomp architecture");
 
-    if (settings.thisSystem == "aarch64-linux" &&
+    if (nativeSystem == "aarch64-linux" &&
         seccomp_arch_add(ctx, SCMP_ARCH_ARM) != 0)
-        printError("unsable to add ARM seccomp architecture; this may result in spurious build failures if running 32-bit ARM processes.");
+        printError("unable to add ARM seccomp architecture; this may result in spurious build failures if running 32-bit ARM processes");
 
     /* Prevent builders from creating setuid/setgid binaries. */
     for (int perm : { S_ISUID, S_ISGID }) {
@@ -3008,7 +3150,13 @@ void DerivationGoal::runChild()
                on. */
             if (fixedOutput) {
                 ss.push_back("/etc/resolv.conf");
-                ss.push_back("/etc/nsswitch.conf");
+
+                // Only use nss functions to resolve hosts and
+                // services. Don’t use it for anything else that may
+                // be configured for this system. This limits the
+                // potential impurities introduced in fixed outputs.
+                writeFile(chrootRootDir + "/etc/nsswitch.conf", "hosts: files dns\nservices: files\n");
+
                 ss.push_back("/etc/services");
                 ss.push_back("/etc/hosts");
                 if (pathExists("/var/run/nscd/socket"))
@@ -3234,6 +3382,10 @@ void DerivationGoal::runChild()
                 for (auto & i : missingPaths) {
                     sandboxProfile += (format("\t(subpath \"%1%\")\n") % i.c_str()).str();
                 }
+                /* Also add redirected outputs to the chroot */
+                for (auto & i : redirectedOutputs) {
+                    sandboxProfile += (format("\t(subpath \"%1%\")\n") % i.second.c_str()).str();
+                }
                 sandboxProfile += ")\n";
 
                 /* Our inputs (transitive dependencies and any impurities computed above)
@@ -3388,8 +3540,7 @@ void DerivationGoal::registerOutputs()
     InodesSeen inodesSeen;
 
     Path checkSuffix = ".check";
-    bool runDiffHook = settings.runDiffHook;
-    bool keepPreviousRound = settings.keepFailed || runDiffHook;
+    bool keepPreviousRound = settings.keepFailed || settings.runDiffHook;
 
     std::exception_ptr delayedException;
 
@@ -3403,8 +3554,8 @@ void DerivationGoal::registerOutputs()
         ValidPathInfo info;
 
         Path actualPath = path;
-#ifndef _WIN32
         if (useChroot) {
+#ifndef _WIN32
             actualPath = chrootRootDir + path;
             if (pathExists(actualPath)) {
                 /* Move output paths from the chroot to the Nix store. */
@@ -3415,9 +3566,12 @@ void DerivationGoal::registerOutputs()
                         throw PosixError(format("moving build output '%1%' from the sandbox to the Nix store") % path);
             }
             if (buildMode != bmCheck) actualPath = worker.store.toRealPath(path);
-        } else
+#else
+	        // TODO windows no chroot supported error
 #endif
-        {
+        }
+
+        if (needsHashRewrite()) {
             Path redirected = redirectedOutputs[path];
             if (buildMode == bmRepair
                 && redirectedBadOutputs.find(path) != redirectedBadOutputs.end()
@@ -3504,6 +3658,7 @@ void DerivationGoal::registerOutputs()
 
                 /* Throw an error after registering the path as
                    valid. */
+                worker.hashMismatch = true;
                 delayedException = std::make_exception_ptr(
                     BuildError("hash mismatch in fixed-output derivation '%s':\n  wanted: %s\n  got:    %s",
                         dest, h.to_string(), h2.to_string()));
@@ -3549,15 +3704,22 @@ void DerivationGoal::registerOutputs()
             if (!worker.store.isValidPath(path)) continue;
             auto info = *worker.store.queryPathInfo(path);
             if (hash.first != info.narHash) {
-                if (settings.keepFailed) {
+                worker.checkMismatch = true;
+                if (settings.runDiffHook || settings.keepFailed) {
                     Path dst = worker.store.toRealPath(path + checkSuffix);
                     deletePath(dst);
                     if (rename(actualPath.c_str(), dst.c_str()))
-                        throw PosixError(format("renaming-1 '%1%' to '%2%'") % actualPath % dst);
-                    throw Error(format("derivation '%1%' may not be deterministic: output '%2%' differs from '%3%'")
+                        throw PosixError(format("renaming '%1%' to '%2%'") % actualPath % dst);
+
+                    handleDiffHook(
+                        buildUser ? buildUser->getUID() : getuid(),
+                        buildUser ? buildUser->getGID() : getgid(),
+                        path, dst, drvPath, tmpDir);
+
+                    throw NotDeterministic(format("derivation '%1%' may not be deterministic: output '%2%' differs from '%3%'")
                         % drvPath % path % dst);
                 } else
-                    throw Error(format("derivation '%1%' may not be deterministic: output '%2%' differs")
+                    throw NotDeterministic(format("derivation '%1%' may not be deterministic: output '%2%' differs")
                         % drvPath % path);
             }
 
@@ -3618,16 +3780,10 @@ void DerivationGoal::registerOutputs()
                     ? fmt("output '%1%' of '%2%' differs from '%3%' from previous round", i->second.path, drvPath, prev)
                     : fmt("output '%1%' of '%2%' differs from previous round", i->second.path, drvPath);
 
-                auto diffHook = settings.diffHook;
-                if (prevExists && diffHook != "" && runDiffHook) {
-                    try {
-                        auto diff = runProgramGetStdout(diffHook, true, {prev, i->second.path});
-                        if (diff != "")
-                            printError(chomp(diff));
-                    } catch (Error & error) {
-                        printError("diff hook execution failed: %s", error.what());
-                    }
-                }
+                handleDiffHook(
+                    buildUser ? buildUser->getUID() : getuid(),
+                    buildUser ? buildUser->getGID() : getgid(),
+                    prev, i->second.path, drvPath, tmpDir);
 
                 if (settings.enforceDeterminism)
                     throw NotDeterministic(msg);
@@ -4342,17 +4498,6 @@ void SubstitutionGoal::tryToRun()
         return;
     }
 
-    /* If the store path is already locked (probably by a
-       DerivationGoal), then put this goal to sleep. Note: we don't
-       acquire a lock here since that breaks addToStore(), so below we
-       handle an AlreadyLocked exception from addToStore(). The check
-       here is just an optimisation to prevent having to redo a
-       download due to a locked path. */
-    if (pathIsLockedByMe(worker.store.toRealPath(storePath))) {
-        worker.waitForAWhile(shared_from_this());
-        return;
-    }
-
     maintainRunningSubstitutions = std::make_unique<MaintainCount<uint64_t>>(worker.runningSubstitutions);
     worker.updateProgress();
 
@@ -4405,12 +4550,6 @@ void SubstitutionGoal::finished()
 
     try {
         promise.get_future().get();
-    } catch (AlreadyLocked & e) {
-        /* Probably a DerivationGoal is already building this store
-           path. Sleep for a while and try again. */
-        state = &SubstitutionGoal::init;
-        worker.waitForAWhile(shared_from_this());
-        return;
     } catch (std::exception & e) {
         printError(e.what());
 
@@ -4497,6 +4636,8 @@ Worker::Worker(LocalStore & store)
     lastWokenUp = steady_time_point::min();
     permanentFailure = false;
     timedOut = false;
+    hashMismatch = false;
+    checkMismatch = false;
 #ifdef _WIN32
     ioport = CreateIoCompletionPort(INVALID_HANDLE_VALUE, NULL, 0, 0);
     if (ioport.get() == NULL)
@@ -4858,14 +4999,15 @@ std::cerr << "bytesRead     " << bytesRead                 << std::endl;
         for (auto & k : fds2) {
             if (FD_ISSET(k, &fds)) {
                 ssize_t rd = read(k, buffer.data(), buffer.size());
-                if (rd == -1) {
-                    if (errno != EINTR)
-                        throw PosixError(format("reading from %1%")
-                            % goal->getName());
-                } else if (rd == 0) {
+                // FIXME: is there a cleaner way to handle pt close
+                // than EIO? Is this even standard?
+                if (rd == 0 || (rd == -1 && errno == EIO)) {
                     debug(format("%1%: got EOF") % goal->getName());
                     goal->handleEOF(k);
                     j->fds.erase(k);
+                } else if (rd == -1) {
+                    if (errno != EINTR)
+                        throw PosixError("%s: read failed", goal->getName());
                 } else {
                     printMsg(lvlVomit, format("%1%: read %2% bytes")
                         % goal->getName() % rd);
@@ -4943,7 +5085,29 @@ std::cerr << "bytesRead     " << bytesRead                 << std::endl;
 
 unsigned int Worker::exitStatus()
 {
-    return timedOut ? 101 : (permanentFailure ? 100 : 1);
+    /*
+     * 1100100
+     *    ^^^^
+     *    |||`- timeout
+     *    ||`-- output hash mismatch
+     *    |`--- build failure
+     *    `---- not deterministic
+     */
+    unsigned int mask = 0;
+    bool buildFailure = permanentFailure || timedOut || hashMismatch;
+    if (buildFailure)
+        mask |= 0x04;  // 100
+    if (timedOut)
+        mask |= 0x01;  // 101
+    if (hashMismatch)
+        mask |= 0x02;  // 102
+    if (checkMismatch) {
+        mask |= 0x08;  // 104
+    }
+
+    if (mask)
+        mask |= 0x60;
+    return mask ? mask : 1;
 }
 
 
@@ -4981,6 +5145,11 @@ static void primeCache(Store & store, const PathSet & paths)
     PathSet willBuild, willSubstitute, unknown;
     unsigned long long downloadSize, narSize;
     store.queryMissing(paths, willBuild, willSubstitute, unknown, downloadSize, narSize);
+
+    if (!willBuild.empty() && 0 == settings.maxBuildJobs && getMachines().empty())
+        throw Error(
+            "%d derivations need to be built, but neither local builds ('--max-jobs') "
+            "nor remote builds ('--builders') are enabled", willBuild.size());
 }
 
 

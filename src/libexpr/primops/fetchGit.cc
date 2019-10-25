@@ -45,7 +45,7 @@ GitInfo exportGit(ref<Store> store, const std::string & uri,
 
         try {
             runProgram("git", true, { "-C", uri, "diff-index", "--quiet", "HEAD", "--" });
-        } catch (ExecError e) {
+        } catch (ExecError & e) {
 #ifndef _WIN32
             if (!WIFEXITED(e.status) || WEXITSTATUS(e.status) != 1) throw;
 #else
@@ -103,7 +103,11 @@ GitInfo exportGit(ref<Store> store, const std::string & uri,
         runProgram("git", true, { "init", "--bare", cacheDir });
     }
 
-    Path localRefFile = cacheDir + "/refs/heads/" + *ref;
+    Path localRefFile;
+    if (ref->compare(0, 5, "refs/") == 0)
+        localRefFile = cacheDir + "/" + *ref;
+    else
+        localRefFile = cacheDir + "/refs/heads/" + *ref;
 
     bool doFetch;
 #ifndef _WIN32
@@ -136,7 +140,7 @@ GitInfo exportGit(ref<Store> store, const std::string & uri,
 #ifndef _WIN32
         struct stat st;
         doFetch = stat(localRefFile.c_str(), &st) != 0 ||
-            st.st_mtime + settings.tarballTtl <= now;
+            (uint64_t) st.st_mtime + settings.tarballTtl <= (uint64_t) now;
 #else
         WIN32_FILE_ATTRIBUTE_DATA wfad;
         doFetch = !GetFileAttributesExW(pathW(localRefFile).c_str(), GetFileExInfoStandard, &wfad) ||
@@ -282,7 +286,7 @@ static void prim_fetchGit(EvalState & state, const Pos & pos, Value * * args, Va
     v.attrs->sort();
 
     if (state.allowedPaths)
-        state.allowedPaths->insert(gitInfo.storePath);
+        state.allowedPaths->insert(state.store->toRealPath(gitInfo.storePath));
 }
 
 static RegisterPrimOp r("fetchGit", 1, prim_fetchGit);

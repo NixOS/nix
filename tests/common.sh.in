@@ -16,6 +16,7 @@ if [[ -n $NIX_STORE ]]; then
     export _NIX_TEST_NO_SANDBOX=1
 fi
 export _NIX_IN_TEST=$TEST_ROOT/shared
+export _NIX_TEST_NO_LSOF=1
 export NIX_REMOTE=$NIX_REMOTE_
 unset NIX_PATH
 export TEST_HOME=$TEST_ROOT/test-home

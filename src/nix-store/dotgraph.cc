@@ -71,9 +71,7 @@ void printClosure(const Path & nePath, const StoreExpr & fs)
         Path path = *(workList.begin());
         workList.erase(path);
 
-        if (doneSet.find(path) == doneSet.end()) {
-            doneSet.insert(path);
-
+        if (doneSet.insert(path).second) {
             ClosureElems::const_iterator elem = fs.closure.elems.find(path);
             if (elem == fs.closure.elems.end())
                 throw Error(format("bad closure, missing path '%1%'") % path);
@@ -104,8 +102,7 @@ void printDotGraph(ref<Store> store, const PathSet & roots)
         Path path = *(workList.begin());
         workList.erase(path);
 
-        if (doneSet.find(path) != doneSet.end()) continue;
-        doneSet.insert(path);
+        if (!doneSet.insert(path).second) continue;
 
         cout << makeNode(path, symbolicName(path), "#ff0000");
 

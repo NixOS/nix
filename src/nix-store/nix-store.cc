@@ -242,11 +242,10 @@ const string treeNull = "    ";
 static void printTree(const Path & path,
     const string & firstPad, const string & tailPad, PathSet & done)
 {
-    if (done.find(path) != done.end()) {
+    if (!done.insert(path).second) {
         cout << format("%1%%2% [...]\n") % firstPad % path;
         return;
     }
-    done.insert(path);
 
     cout << format("%1%%2%\n") % firstPad % path;
 
@@ -975,8 +974,16 @@ static void opServe(Strings opFlags, Strings opArgs)
                 info.sigs = readStrings<StringSet>(in);
                 in >> info.ca;
 
-                // FIXME: race if addToStore doesn't read source?
-                store->addToStore(info, in, NoRepair, NoCheckSigs);
+                if (info.narSize == 0) {
+                    throw Error("narInfo is too old and missing the narSize field");
+                }
+
+                SizedSource sizedSource(in, info.narSize);
+
+                store->addToStore(info, sizedSource, NoRepair, NoCheckSigs);
+
+                // consume all the data that has been sent before continuing.
+                sizedSource.drainAll();
 
                 out << 1; // indicate success
 

@@ -36,12 +36,6 @@ Path BasicDerivation::findOutput(const string & id) const
 }
 
 
-bool BasicDerivation::substitutesAllowed() const
-{
-    return get(env, "allowSubstitutes", "1") == "1";
-}
-
-
 bool BasicDerivation::isBuiltin() const
 {
     return string(builder, 0, 8) == "builtin:";

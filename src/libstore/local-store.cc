@@ -5,6 +5,7 @@
 #include "worker-protocol.hh"
 #include "derivations.hh"
 #include "nar-info.hh"
+#include "references.hh"
 
 #include <iostream>
 #include <algorithm>
@@ -88,16 +89,20 @@ LocalStore::LocalStore(const Params & params)
         createDirs(gcRootsDir);
         createSymlink(profilesDir, gcRootsDir + "/profiles");
     }
+
 #ifndef _WIN32
+
+    for (auto & perUserDir : {profilesDir + "/per-user", gcRootsDir + "/per-user"}) {
+        createDirs(perUserDir);
+        if (chmod(perUserDir.c_str(), 0755) == -1)
+            throw PosixError("could not set permissions on '%s' to 755", perUserDir);
+    }
+
+    createUser(getUserName(), getuid());
+
     /* Optionally, create directories and set permissions for a
        multi-user install. */
     if (getuid() == 0 && settings.buildUsersGroup != "") {
-
-        Path perUserDir = profilesDir + "/per-user";
-        createDirs(perUserDir);
-        if (chmod(perUserDir.c_str(), 01777) == -1)
-            throw PosixError(format("could not set permissions on '%1%' to 1777") % perUserDir);
-
         mode_t perm = 01775;
 
         struct group * gr = getgrnam(settings.buildUsersGroup.get().c_str());
@@ -800,7 +805,7 @@ uint64_t LocalStore::addValidPath(State & state,
 
 
 void LocalStore::queryPathInfoUncached(const Path & path,
-    Callback<std::shared_ptr<ValidPathInfo>> callback)
+    Callback<std::shared_ptr<ValidPathInfo>> callback) noexcept
 {
     try {
         auto info = std::make_shared<ValidPathInfo>();
@@ -1050,8 +1055,8 @@ void LocalStore::querySubstitutablePathInfos(const PathSet & paths,
                     info->references,
                     narInfo ? narInfo->fileSize : 0,
                     info->narSize};
-            } catch (InvalidPath) {
-            } catch (SubstituterDisabled) {
+            } catch (InvalidPath &) {
+            } catch (SubstituterDisabled &) {
             } catch (Error & e) {
                 if (settings.tryFallback)
                     printError(e.what());
@@ -1179,17 +1184,24 @@ void LocalStore::addToStore(const ValidPathInfo & info, Source & source,
 
             /* While restoring the path from the NAR, compute the hash
                of the NAR. */
-            HashSink hashSink(htSHA256);
+            std::unique_ptr<AbstractHashSink> hashSink;
+            if (info.ca == "")
+                hashSink = std::make_unique<HashSink>(htSHA256);
+            else {
+                if (!info.references.empty())
+                    settings.requireExperimentalFeature("ca-references");
+                hashSink = std::make_unique<HashModuloSink>(htSHA256, storePathToHash(info.path));
+            }
 
             LambdaSource wrapperSource([&](unsigned char * data, size_t len) -> size_t {
                 size_t n = source.read(data, len);
-                hashSink(data, n);
+                (*hashSink)(data, n);
                 return n;
             });
 
             restorePath(realPath, wrapperSource);
 
-            auto hashResult = hashSink.finish();
+            auto hashResult = hashSink->finish();
 
             if (hashResult.first != info.narHash)
                 throw Error("hash mismatch importing path '%s';\n  wanted: %s\n  got:    %s",
@@ -1394,7 +1406,8 @@ bool LocalStore::verifyStore(bool checkContents, RepairFlag repair)
 
     bool errors = false;
 
-    /* Acquire the global GC lock to prevent a garbage collection. */
+    /* Acquire the global GC lock to get a consistent snapshot of
+       existing and valid paths. */
 #ifndef _WIN32
     AutoCloseFD fdGCLock = openGCLock(ltWrite);
 #else
@@ -1409,16 +1422,10 @@ bool LocalStore::verifyStore(bool checkContents, RepairFlag repair)
 
     PathSet validPaths2 = queryAllValidPaths(), validPaths, done;
 
+    fdGCLock = -1;
+
     for (auto & i : validPaths2)
         verifyPath(i, store, done, validPaths, repair, errors);
-
-    /* Release the GC lock so that checking content hashes (which can
-       take ages) doesn't block the GC or builds. */
-#ifndef _WIN32
-    fdGCLock = -1;
-#else
-    fdGCLock = INVALID_HANDLE_VALUE;
-#endif
 
     /* Optionally, check the content hashes (slow). */
     if (checkContents) {
@@ -1432,7 +1439,15 @@ bool LocalStore::verifyStore(bool checkContents, RepairFlag repair)
 
                 /* Check the content hash (optionally - slow). */
                 printMsg(lvlTalkative, format("checking contents of '%1%'") % i);
-                HashResult current = hashPath(info->narHash.type, toRealPath(i));
+
+                std::unique_ptr<AbstractHashSink> hashSink;
+                if (info->ca == "")
+                    hashSink = std::make_unique<HashSink>(info->narHash.type);
+                else
+                    hashSink = std::make_unique<HashModuloSink>(info->narHash.type, storePathToHash(info->path));
+
+                dumpPath(toRealPath(i), *hashSink);
+                auto current = hashSink->finish();
 
                 if (info->narHash != nullHash && info->narHash != current.first) {
                     printError(format("path '%1%' was modified! "
@@ -1485,8 +1500,7 @@ void LocalStore::verifyPath(const Path & path, const PathSet & store,
 {
     checkInterrupt();
 
-    if (done.find(path) != done.end()) return;
-    done.insert(path);
+    if (!done.insert(path).second) return;
 
     if (!isStorePath(path)) {
         printError(format("path '%1%' is not in the Nix store") % path);
@@ -1622,6 +1636,21 @@ void LocalStore::signPathInfo(ValidPathInfo & info)
     for (auto & secretKeyFile : secretKeyFiles.get()) {
         SecretKey secretKey(readFile(secretKeyFile));
         info.sign(secretKey);
+    }
+}
+
+
+void LocalStore::createUser(const std::string & userName, uid_t userId)
+{
+    for (auto & dir : {
+        fmt("%s/profiles/per-user/%s", stateDir, userName),
+        fmt("%s/gcroots/per-user/%s", stateDir, userName)
+    }) {
+        createDirs(dir);
+        if (chmod(dir.c_str(), 0755) == -1)
+            throw PosixError("changing permissions of directory '%s'", dir);
+        if (chown(dir.c_str(), userId, getgid()) == -1)
+            throw PosixError("changing owner of directory '%s'", dir);
     }
 }
 

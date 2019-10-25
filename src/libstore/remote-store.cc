@@ -160,7 +160,7 @@ void RemoteStore::initConnection(Connection & conn)
         conn.to << PROTOCOL_VERSION;
 
         if (GET_PROTOCOL_MINOR(conn.daemonVersion) >= 14) {
-            int cpu = settings.lockCPU ? lockToCurrentCPU() : -1;
+            int cpu = sameMachine() && settings.lockCPU ? lockToCurrentCPU() : -1;
             if (cpu != -1)
                 conn.to << 1 << cpu;
             else
@@ -200,6 +200,14 @@ void RemoteStore::setOptions(Connection & conn)
     if (GET_PROTOCOL_MINOR(conn.daemonVersion) >= 12) {
         std::map<std::string, Config::SettingInfo> overrides;
         globalConfig.getSettings(overrides, true);
+        overrides.erase(settings.keepFailed.name);
+        overrides.erase(settings.keepGoing.name);
+        overrides.erase(settings.tryFallback.name);
+        overrides.erase(settings.maxBuildJobs.name);
+        overrides.erase(settings.maxSilentTime.name);
+        overrides.erase(settings.buildCores.name);
+        overrides.erase(settings.useSubstitutes.name);
+        overrides.erase(settings.showTrace.name);
         conn.to << overrides.size();
         for (auto & i : overrides)
             conn.to << i.first << i.second.value;
@@ -351,7 +359,7 @@ void RemoteStore::querySubstitutablePathInfos(const PathSet & paths,
 
 
 void RemoteStore::queryPathInfoUncached(const Path & path,
-    Callback<std::shared_ptr<ValidPathInfo>> callback)
+    Callback<std::shared_ptr<ValidPathInfo>> callback) noexcept
 {
     try {
         std::shared_ptr<ValidPathInfo> info;

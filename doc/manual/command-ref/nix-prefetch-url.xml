@@ -53,7 +53,7 @@ avoided.</para>
 <para>If <replaceable>hash</replaceable> is specified, then a download
 is not performed if the Nix store already contains a file with the
 same hash and base name.  Otherwise, the file is downloaded, and an
-error if signaled if the actual hash of the file does not match the
+error is signaled if the actual hash of the file does not match the
 specified hash.</para>
 
 <para>This command prints the hash on standard output.  Additionally,

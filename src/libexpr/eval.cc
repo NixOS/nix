@@ -9,13 +9,13 @@
 #include "json.hh"
 
 #include <algorithm>
+#include <chrono>
 #include <cstring>
 #include <iostream>
 #include <fstream>
 
 #ifndef _MSC_VER
 #include <unistd.h>
-#include <sys/time.h>
 #endif
 #ifndef _WIN32
 #include <sys/resource.h>
@@ -48,11 +48,10 @@ static void printValue(std::ostream & str, std::set<const Value *> & active, con
 {
     checkInterrupt();
 
-    if (active.find(&v) != active.end()) {
+    if (!active.insert(&v).second) {
         str << "<CYCLE>";
         return;
     }
-    active.insert(&v);
 
     switch (v.type) {
     case tInt:
@@ -132,6 +131,16 @@ std::ostream & operator << (std::ostream & str, const Value & v)
 }
 
 
+const Value *getPrimOp(const Value &v) {
+    const Value * primOp = &v;
+    while (primOp->type == tPrimOpApp) {
+        primOp = primOp->primOpApp.left;
+    }
+    assert(primOp->type == tPrimOp);
+    return primOp;
+}
+
+
 string showType(const Value & v)
 {
     switch (v.type) {
@@ -146,8 +155,10 @@ string showType(const Value & v)
         case tApp: return "a function application";
         case tLambda: return "a function";
         case tBlackhole: return "a black hole";
-        case tPrimOp: return "a built-in function";
-        case tPrimOpApp: return "a partially applied built-in function";
+        case tPrimOp:
+            return fmt("the built-in function '%s'", string(v.primOp->name));
+        case tPrimOpApp:
+            return fmt("the partially applied built-in function '%s'", string(getPrimOp(v)->primOp->name));
         case tExternal: return v.external->showType();
         case tFloat: return "a float";
     }
@@ -1099,9 +1110,13 @@ void EvalState::callPrimOp(Value & fun, Value & arg, Value & v, const Pos & pos)
     }
 }
 
-
 void EvalState::callFunction(Value & fun, Value & arg, Value & v, const Pos & pos)
 {
+    std::optional<FunctionCallTrace> trace;
+    if (evalSettings.traceFunctionCalls) {
+        trace.emplace(pos);
+    }
+
     forceValue(fun, pos);
 
     if (fun.type == tPrimOp || fun.type == tPrimOpApp) {
@@ -1447,8 +1462,7 @@ void EvalState::forceValueDeep(Value & v)
     std::function<void(Value & v)> recurse;
 
     recurse = [&](Value & v) {
-        if (seen.find(&v) != seen.end()) return;
-        seen.insert(&v);
+        if (!seen.insert(&v).second) return;
 
         forceValue(v);
 
@@ -1827,6 +1841,7 @@ void EvalState::printStats()
             gc.attr("totalBytes", totalBytes);
         }
 #endif
+
         if (countCalls) {
             {
                 auto obj = topObj.object("primops");
@@ -1862,6 +1877,11 @@ void EvalState::printStats()
                 }
             }
         }
+
+        if (getEnv("NIX_SHOW_SYMBOLS", "0") != "0") {
+            auto list = topObj.list("symbols");
+            symbols.dump([&](const std::string & s) { list.elem(s); });
+        }
     }
 }
 
@@ -1871,8 +1891,7 @@ size_t valueSize(Value & v)
     std::set<const void *> seen;
 
     auto doString = [&](const char * s) -> size_t {
-        if (seen.find(s) != seen.end()) return 0;
-        seen.insert(s);
+        if (!seen.insert(s).second) return 0;
         return strlen(s) + 1;
     };
 
@@ -1880,8 +1899,7 @@ size_t valueSize(Value & v)
     std::function<size_t(Env & v)> doEnv;
 
     doValue = [&](Value & v) -> size_t {
-        if (seen.find(&v) != seen.end()) return 0;
-        seen.insert(&v);
+        if (!seen.insert(&v).second) return 0;
 
         size_t sz = sizeof(Value);
 
@@ -1896,8 +1914,7 @@ size_t valueSize(Value & v)
             sz += doString(v.path);
             break;
         case tAttrs:
-            if (seen.find(v.attrs) == seen.end()) {
-                seen.insert(v.attrs);
+            if (seen.insert(v.attrs).second) {
                 sz += sizeof(Bindings) + sizeof(Attr) * v.attrs->capacity();
                 for (auto & i : *v.attrs)
                     sz += doValue(*i.value);
@@ -1906,8 +1923,7 @@ size_t valueSize(Value & v)
         case tList1:
         case tList2:
         case tListN:
-            if (seen.find(v.listElems()) == seen.end()) {
-                seen.insert(v.listElems());
+            if (seen.insert(v.listElems()).second) {
                 sz += v.listSize() * sizeof(Value *);
                 for (size_t n = 0; n < v.listSize(); ++n)
                     sz += doValue(*v.listElems()[n]);
@@ -1928,8 +1944,7 @@ size_t valueSize(Value & v)
             sz += doValue(*v.primOpApp.right);
             break;
         case tExternal:
-            if (seen.find(v.external) != seen.end()) break;
-            seen.insert(v.external);
+            if (!seen.insert(v.external).second) break;
             sz += v.external->valueSize(seen);
             break;
         default:
@@ -1940,8 +1955,7 @@ size_t valueSize(Value & v)
     };
 
     doEnv = [&](Env & env) -> size_t {
-        if (seen.find(&env) != seen.end()) return 0;
-        seen.insert(&env);
+        if (!seen.insert(&env).second) return 0;
 
         size_t sz = sizeof(Env) + sizeof(Value *) * env.size;
 

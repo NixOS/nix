@@ -24,7 +24,9 @@ endif
 
 nix_tests = \
   init.sh hash.sh lang.sh add.sh simple.sh dependencies.sh \
-  gc.sh gc-concurrent.sh \
+  gc.sh \
+  gc-concurrent.sh \
+  gc-auto.sh \
   referrers.sh user-envs.sh logging.sh nix-build.sh misc.sh fixed.sh \
   gc-runtime.sh check-refs.sh filter-source.sh \
   remote-store.sh export.sh export-graph.sh \
@@ -47,7 +49,9 @@ nix_tests = \
   check.sh \
   plugins.sh \
   search.sh \
-  nix-copy-ssh.sh
+  nix-copy-ssh.sh \
+  post-hook.sh \
+  function-trace.sh
   # parallel.sh
 
 install-tests += $(foreach x, $(nix_tests), tests/$(x))

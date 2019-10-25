@@ -23,6 +23,7 @@ available as <function>builtins.derivation</function>.</para>
 
   <varlistentry xml:id='builtin-abort'>
     <term><function>abort</function> <replaceable>s</replaceable></term>
+    <term><function>builtins.abort</function> <replaceable>s</replaceable></term>
 
     <listitem><para>Abort Nix expression evaluation, print error
     message <replaceable>s</replaceable>.</para></listitem>
@@ -169,18 +170,6 @@ if builtins ? getEnv then builtins.getEnv "PATH" else ""</programlisting>
   </varlistentry>
 
 
-  <varlistentry xml:id='builtin-splitVersion'>
-    <term><function>builtins.splitVersion</function>
-    <replaceable>s</replaceable></term>
-
-    <listitem><para>Split a string representing a version into its
-    components, by the same version splitting logic underlying the
-    version comparison in <link linkend="ssec-version-comparisons">
-    <command>nix-env -u</command></link>.</para></listitem>
-
-  </varlistentry>
-
-
   <varlistentry xml:id='builtin-concatLists'>
     <term><function>builtins.concatLists</function>
     <replaceable>lists</replaceable></term>
@@ -251,6 +240,8 @@ if builtins ? getEnv then builtins.getEnv "PATH" else ""</programlisting>
   <varlistentry xml:id='builtin-derivation'>
     <term><function>derivation</function>
     <replaceable>attrs</replaceable></term>
+    <term><function>builtins.derivation</function>
+    <replaceable>attrs</replaceable></term>
 
     <listitem><para><function>derivation</function> is described in
     <xref linkend='ssec-derivation' />.</para></listitem>
@@ -260,6 +251,7 @@ if builtins ? getEnv then builtins.getEnv "PATH" else ""</programlisting>
 
   <varlistentry xml:id='builtin-dirOf'>
     <term><function>dirOf</function> <replaceable>s</replaceable></term>
+    <term><function>builtins.dirOf</function> <replaceable>s</replaceable></term>
 
     <listitem><para>Return the directory part of the string
     <replaceable>s</replaceable>, that is, everything before the final
@@ -297,7 +289,7 @@ if builtins ? getEnv then builtins.getEnv "PATH" else ""</programlisting>
 
     <listitem><para>Return element <replaceable>n</replaceable> from
     the list <replaceable>xs</replaceable>.  Elements are counted
-    starting from 0.  A fatal error occurs in the index is out of
+    starting from 0.  A fatal error occurs if the index is out of
     bounds.</para></listitem>
 
   </varlistentry>
@@ -317,6 +309,8 @@ if builtins ? getEnv then builtins.getEnv "PATH" else ""</programlisting>
 
   <varlistentry xml:id='builtin-fetchTarball'>
     <term><function>fetchTarball</function>
+    <replaceable>url</replaceable></term>
+    <term><function>builtins.fetchTarball</function>
     <replaceable>url</replaceable></term>
 
     <listitem><para>Download the specified URL, unpack it and return
@@ -341,7 +335,7 @@ stdenv.mkDerivation { … }
     You can change the cache timeout either on the command line with
     <option>--option tarball-ttl <replaceable>number of seconds</replaceable></option> or
     in the Nix configuration file with this option:
-    <literal>tarball-ttl <replaceable>number of seconds to cache</replaceable></literal>.
+    <literal><xref linkend="conf-tarball-ttl" /> <replaceable>number of seconds to cache</replaceable></literal>.
     </para>
 
     <para>Note that when obtaining the hash with <varname>nix-prefetch-url
@@ -419,6 +413,13 @@ stdenv.mkDerivation { … }
               This is often a branch or tag name. Defaults to
               <literal>HEAD</literal>.
             </para>
+
+            <para>
+              By default, the <varname>ref</varname> value is prefixed
+              with <literal>refs/heads/</literal>. As of Nix 2.3.0
+              Nix will not prefix <literal>refs/heads/</literal> if
+              <varname>ref</varname> starts with <literal>refs/</literal>.
+            </para>
           </listitem>
         </varlistentry>
       </variablelist>
@@ -429,6 +430,14 @@ stdenv.mkDerivation { … }
   url = "git@github.com:my-secret/repository.git";
   ref = "master";
   rev = "adab8b916a45068c044658c4158d81878f9ed1c3";
+}</programlisting>
+      </example>
+
+      <example>
+        <title>Fetching an arbitrary ref</title>
+        <programlisting>builtins.fetchGit {
+  url = "https://github.com/NixOS/nix.git";
+  ref = "refs/heads/0.5-release";
 }</programlisting>
       </example>
 
@@ -478,11 +487,8 @@ stdenv.mkDerivation { … }
         <title>Fetching a tag</title>
         <programlisting>builtins.fetchGit {
   url = "https://github.com/nixos/nix.git";
-  ref = "tags/1.9";
+  ref = "refs/tags/1.9";
 }</programlisting>
-        <note><para>Due to a bug (<link
-        xlink:href="https://github.com/NixOS/nix/issues/2385">#2385</link>),
-        only non-annotated tags can be fetched.</para></note>
       </example>
 
       <example>
@@ -492,7 +498,7 @@ stdenv.mkDerivation { … }
            fetch the latest version of a remote branch.
         </para>
         <note><para>Nix will refetch the branch in accordance to
-        <option>tarball-ttl</option>.</para></note>
+        <xref linkend="conf-tarball-ttl" />.</para></note>
         <note><para>This behavior is disabled in
         <emphasis>Pure evaluation mode</emphasis>.</para></note>
         <programlisting>builtins.fetchGit {
@@ -699,6 +705,19 @@ builtins.genList (x: x * x) 5
   </varlistentry>
 
 
+  <varlistentry xml:id='builtin-hashFile'>
+    <term><function>builtins.hashFile</function>
+    <replaceable>type</replaceable> <replaceable>p</replaceable></term>
+
+    <listitem><para>Return a base-16 representation of the
+    cryptographic hash of the file at path <replaceable>p</replaceable>.  The
+    hash algorithm specified by <replaceable>type</replaceable> must
+    be one of <literal>"md5"</literal>, <literal>"sha1"</literal>,
+    <literal>"sha256"</literal> or <literal>"sha512"</literal>.</para></listitem>
+
+  </varlistentry>
+
+
   <varlistentry xml:id='builtin-head'>
     <term><function>builtins.head</function>
     <replaceable>list</replaceable></term>
@@ -713,6 +732,8 @@ builtins.genList (x: x * x) 5
 
   <varlistentry xml:id='builtin-import'>
     <term><function>import</function>
+    <replaceable>path</replaceable></term>
+    <term><function>builtins.import</function>
     <replaceable>path</replaceable></term>
 
     <listitem><para>Load, parse and return the Nix expression in the
@@ -853,9 +874,19 @@ x: x + 456</programlisting>
 
   </varlistentry>
 
+  <varlistentry><term><function>builtins.isPath</function>
+  <replaceable>e</replaceable></term>
+
+    <listitem><para>Return <literal>true</literal> if
+    <replaceable>e</replaceable> evaluates to a path, and
+    <literal>false</literal> otherwise.</para></listitem>
+
+  </varlistentry>
 
   <varlistentry xml:id='builtin-isNull'>
     <term><function>isNull</function>
+    <replaceable>e</replaceable></term>
+    <term><function>builtins.isNull</function>
     <replaceable>e</replaceable></term>
 
     <listitem><para>Return <literal>true</literal> if
@@ -924,6 +955,8 @@ builtins.listToAttrs
 
   <varlistentry xml:id='builtin-map'>
     <term><function>map</function>
+    <replaceable>f</replaceable> <replaceable>list</replaceable></term>
+    <term><function>builtins.map</function>
     <replaceable>f</replaceable> <replaceable>list</replaceable></term>
 
     <listitem><para>Apply the function <replaceable>f</replaceable> to
@@ -1119,6 +1152,8 @@ Evaluates to <literal>[ "foo" ]</literal>.
   <varlistentry xml:id='builtin-removeAttrs'>
     <term><function>removeAttrs</function>
     <replaceable>set</replaceable> <replaceable>list</replaceable></term>
+    <term><function>builtins.removeAttrs</function>
+    <replaceable>set</replaceable> <replaceable>list</replaceable></term>
 
     <listitem><para>Remove the attributes listed in
     <replaceable>list</replaceable> from
@@ -1225,6 +1260,19 @@ Evaluates to <literal>[ "  " [ "FOO" ] "   " ]</literal>.
     </para></listitem>
   </varlistentry>
 
+
+  <varlistentry xml:id='builtin-splitVersion'>
+    <term><function>builtins.splitVersion</function>
+    <replaceable>s</replaceable></term>
+
+    <listitem><para>Split a string representing a version into its
+    components, by the same version splitting logic underlying the
+    version comparison in <link linkend="ssec-version-comparisons">
+    <command>nix-env -u</command></link>.</para></listitem>
+
+  </varlistentry>
+
+
   <varlistentry xml:id='builtin-stringLength'>
     <term><function>builtins.stringLength</function>
     <replaceable>e</replaceable></term>
@@ -1286,6 +1334,8 @@ builtins.substring 0 3 "nixos"
 
   <varlistentry xml:id='builtin-throw'>
     <term><function>throw</function>
+    <replaceable>s</replaceable></term>
+    <term><function>builtins.throw</function>
     <replaceable>s</replaceable></term>
 
     <listitem><para>Throw an error message
@@ -1405,6 +1455,7 @@ in foo</programlisting>
 
   <varlistentry xml:id='builtin-toString'>
     <term><function>toString</function> <replaceable>e</replaceable></term>
+    <term><function>builtins.toString</function> <replaceable>e</replaceable></term>
 
     <listitem><para>Convert the expression
     <replaceable>e</replaceable> to a string.
@@ -1415,7 +1466,7 @@ in foo</programlisting>
       <listitem><para>A set containing <literal>{ __toString = self: ...; }</literal>.</para></listitem>
       <listitem><para>An integer.</para></listitem>
       <listitem><para>A list, in which case the string representations of its elements are joined with spaces.</para></listitem>
-      <listitem><para>A Boolean (<literal>false</literal> yields <literal>""</literal>, <literal>true</literal> yields <literal>"1"</literal>.</para></listitem>
+      <listitem><para>A Boolean (<literal>false</literal> yields <literal>""</literal>, <literal>true</literal> yields <literal>"1"</literal>).</para></listitem>
       <listitem><para><literal>null</literal>, which yields the empty string.</para></listitem>
     </itemizedlist>
     </listitem>
@@ -1554,12 +1605,18 @@ stdenv.mkDerivation (rec {
     <term><function>builtins.tryEval</function>
     <replaceable>e</replaceable></term>
 
-    <listitem><para>Try to evaluate <replaceable>e</replaceable>.
+    <listitem><para>Try to shallowly evaluate <replaceable>e</replaceable>.
     Return a set containing the attributes <literal>success</literal>
     (<literal>true</literal> if <replaceable>e</replaceable> evaluated
     successfully, <literal>false</literal> if an error was thrown) and
     <literal>value</literal>, equalling <replaceable>e</replaceable>
-    if successful and <literal>false</literal> otherwise.
+    if successful and <literal>false</literal> otherwise. Note that this
+    doesn't evaluate <replaceable>e</replaceable> deeply, so
+    <literal>let e = { x = throw ""; }; in (builtins.tryEval e).success
+    </literal> will be <literal>true</literal>. Using <literal>builtins.deepSeq
+    </literal> one can get the expected result: <literal>let e = { x = throw "";
+    }; in (builtins.tryEval (builtins.deepSeq e e)).success</literal> will be
+    <literal>false</literal>.
     </para></listitem>
 
   </varlistentry>

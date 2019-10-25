@@ -69,6 +69,8 @@ protected:
 void LocalBinaryCacheStore::init()
 {
     createDirs(binaryCacheDir + "/nar");
+    if (writeDebugInfo)
+        createDirs(binaryCacheDir + "/debuginfo");
     BinaryCacheStore::init();
 }
 

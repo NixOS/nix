@@ -88,6 +88,7 @@ string getArg(const string & opt,
 }
 
 
+#if OPENSSL_VERSION_NUMBER < 0x10101000L
 /* OpenSSL is not thread-safe by default - it will randomly crash
    unless the user supplies a mutex locking function. So let's do
    that. */
@@ -100,6 +101,7 @@ static void opensslLockCallback(int mode, int type, const char * file, int line)
     else
         opensslLocks[type].unlock();
 }
+#endif
 
 #ifndef _WIN32
 static void sigHandler(int signo) { }
@@ -120,9 +122,11 @@ void initNix()
     _setmode( _fileno(stderr), _O_BINARY );
 #endif
 
+#if OPENSSL_VERSION_NUMBER < 0x10101000L
     /* Initialise OpenSSL locking. */
     opensslLocks = std::vector<std::mutex>(CRYPTO_num_locks());
     CRYPTO_set_locking_callback(opensslLockCallback);
+#endif
 
     loadConfFile();
 #ifndef _WIN32
@@ -140,6 +144,16 @@ void initNix()
     act.sa_handler = sigHandler;
     if (sigaction(SIGUSR1, &act, 0)) throw PosixError("handling SIGUSR1");
 #endif
+
+#if __APPLE__
+    /* HACK: on darwin, we need can’t use sigprocmask with SIGWINCH.
+     * Instead, add a dummy sigaction handler, and signalHandlerThread
+     * can handle the rest. */
+    struct sigaction sa;
+    sa.sa_handler = sigHandler;
+    if (sigaction(SIGWINCH, &sa, 0)) throw PosixError("handling SIGWINCH");
+#endif
+
     /* Register a SIGSEGV handler to detect stack overflows. */
     detectStackOverflow();
 #ifndef _WIN32
@@ -192,10 +206,6 @@ LegacyArgs::LegacyArgs(const std::string & programName,
         .longName("fallback")
         .description("build from source if substitution fails")
         .set(&(bool&) settings.tryFallback, true);
-
-    mkFlag1('j', "max-jobs", "jobs", "maximum number of parallel builds", [=](std::string s) {
-        settings.set("max-jobs", s);
-    });
 
     auto intSettingAlias = [&](char shortName, const std::string & longName,
         const std::string & description, const std::string & dest) {

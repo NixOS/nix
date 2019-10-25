@@ -1,4 +1,5 @@
 #include "derivations.hh"
+#include "parsed-derivations.hh"
 #include "globals.hh"
 #include "local-store.hh"
 #include "store-api.hh"
@@ -28,8 +29,7 @@ void Store::computeFSClosure(const PathSet & startPaths,
         {
             auto state(state_.lock());
             if (state->exc) return;
-            if (state->paths.count(path)) return;
-            state->paths.insert(path);
+            if (!state->paths.insert(path).second) return;
             state->pending++;
         }
 
@@ -174,8 +174,7 @@ void Store::queryMissing(const PathSet & targets,
 
         {
             auto state(state_.lock());
-            if (state->done.count(path)) return;
-            state->done.insert(path);
+            if (!state->done.insert(path).second) return;
         }
 
         DrvPathWithOutputs i2 = parseDrvPathWithOutputs(path);
@@ -189,6 +188,7 @@ void Store::queryMissing(const PathSet & targets,
             }
 
             Derivation drv = derivationFromPath(i2.first);
+            ParsedDerivation parsedDrv(i2.first, drv);
 
             PathSet invalid;
             for (auto & j : drv.outputs)
@@ -197,7 +197,7 @@ void Store::queryMissing(const PathSet & targets,
                     invalid.insert(j.second.path);
             if (invalid.empty()) return;
 
-            if (settings.useSubstitutes && drv.substitutesAllowed()) {
+            if (settings.useSubstitutes && parsedDrv.substitutesAllowed()) {
                 auto drvState = make_ref<Sync<DrvState>>(DrvState(invalid.size()));
                 for (auto & output : invalid)
                     pool.enqueue(std::bind(checkOutput, i2.first, make_ref<Derivation>(drv), output, drvState));
@@ -250,8 +250,7 @@ Paths Store::topoSortPaths(const PathSet & paths)
         if (parents.find(path) != parents.end())
             throw BuildError(format("cycle detected in the references of '%1%' from '%2%'") % path % *parent);
 
-        if (visited.find(path) != visited.end()) return;
-        visited.insert(path);
+        if (!visited.insert(path).second) return;
         parents.insert(path);
 
         PathSet references;

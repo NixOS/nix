@@ -17,6 +17,7 @@ public:
 
     const Setting<std::string> compression{this, "xz", "compression", "NAR compression method ('xz', 'bzip2', or 'none')"};
     const Setting<bool> writeNARListing{this, false, "write-nar-listing", "whether to write a JSON file listing the files in each NAR"};
+    const Setting<bool> writeDebugInfo{this, false, "index-debug-info", "whether to index DWARF debug info files by build ID"};
     const Setting<Path> secretKeyFile{this, "", "secret-key", "path to secret key used to sign the binary cache"};
     const Setting<Path> localNarCache{this, "", "local-nar-cache", "path to a local cache of NARs"};
     const Setting<bool> parallelCompression{this, false, "parallel-compression",
@@ -47,7 +48,7 @@ public:
     /* Fetch the specified file and call the specified callback with
        the result. A subclass may implement this asynchronously. */
     virtual void getFile(const std::string & path,
-        Callback<std::shared_ptr<std::string>> callback);
+        Callback<std::shared_ptr<std::string>> callback) noexcept;
 
     std::shared_ptr<std::string> getFile(const std::string & path);
 
@@ -73,7 +74,7 @@ public:
     bool isValidPathUncached(const Path & path) override;
 
     void queryPathInfoUncached(const Path & path,
-        Callback<std::shared_ptr<ValidPathInfo>> callback) override;
+        Callback<std::shared_ptr<ValidPathInfo>> callback) noexcept override;
 
     Path queryPathFromHashPart(const string & hashPart) override
     { unsupported("queryPathFromHashPart"); }

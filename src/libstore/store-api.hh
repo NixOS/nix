@@ -11,6 +11,7 @@
 #include <atomic>
 #include <limits>
 #include <map>
+#include <unordered_map>
 #include <unordered_set>
 #include <memory>
 #include <string>
@@ -302,7 +303,8 @@ public:
         const Hash & hash, const string & name) const;
 
     Path makeFixedOutputPath(bool recursive,
-        const Hash & hash, const string & name) const;
+        const Hash & hash, const string & name,
+        const PathSet & references = {}) const;
 
     Path makeTextPath(const string & name, const Hash & hash,
         const PathSet & references) const;
@@ -359,12 +361,12 @@ public:
 
     /* Asynchronous version of queryPathInfo(). */
     void queryPathInfo(const Path & path,
-        Callback<ref<ValidPathInfo>> callback);
+        Callback<ref<ValidPathInfo>> callback) noexcept;
 
 protected:
 
     virtual void queryPathInfoUncached(const Path & path,
-        Callback<std::shared_ptr<ValidPathInfo>> callback) = 0;
+        Callback<std::shared_ptr<ValidPathInfo>> callback) noexcept = 0;
 
 public:
 
@@ -627,6 +629,9 @@ public:
         return storePath;
     }
 
+    virtual void createUser(const std::string & userName, uid_t userId)
+    { }
+
 protected:
 
     Stats stats;
@@ -765,8 +770,7 @@ StoreType getStoreType(const std::string & uri = settings.storeUri.get(),
     const std::string & stateDir = settings.nixStateDir);
 
 /* Return the default substituter stores, defined by the
-   ‘substituters’ option and various legacy options like
-   ‘binary-caches’. */
+   ‘substituters’ option and various legacy options. */
 std::list<ref<Store>> getDefaultSubstituters();
 
 

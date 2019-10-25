@@ -1,4 +1,5 @@
-AC_INIT(nix, m4_esyscmd([bash -c "echo -n $(cat ./version)$VERSION_SUFFIX"]))
+AC_INIT(nix, m4_esyscmd([bash -c "echo -n $(cat ./.version)$VERSION_SUFFIX"]))
+AC_CONFIG_MACRO_DIRS([m4])
 AC_CONFIG_SRCDIR(README.md)
 AC_CONFIG_AUX_DIR(config)
 
@@ -42,11 +43,26 @@ esac
 
 AC_MSG_RESULT($system)
 AC_SUBST(system)
-AC_DEFINE_UNQUOTED(SYSTEM, ["$system"], [platform identifier (`cpu-os')])
+AC_DEFINE_UNQUOTED(SYSTEM, ["$system"], [platform identifier ('cpu-os')])
 
 
 # State should be stored in /nix/var, unless the user overrides it explicitly.
 test "$localstatedir" = '${prefix}/var' && localstatedir=/nix/var
+
+
+# Set default flags for nix (as per AC_PROG_CC/CXX docs),
+# while still allowing the user to override them from the command line.
+: ${CFLAGS="-O3"}
+: ${CXXFLAGS="-O3"}
+AC_PROG_CC
+AC_PROG_CXX
+AC_PROG_CPP
+AX_CXX_COMPILE_STDCXX_17([noext], [mandatory])
+
+AC_CHECK_TOOL([AR], [ar])
+
+# Use 64-bit file system calls so that we can support files > 2 GiB.
+AC_SYS_LARGEFILE
 
 
 # Solaris-specific stuff.
@@ -55,19 +71,6 @@ if test "$sys_name" = sunos; then
     # Solaris requires -lsocket -lnsl for network functions
     LIBS="-lsocket -lnsl $LIBS"
 fi
-
-
-CFLAGS=
-CXXFLAGS=
-AC_PROG_CC
-AC_PROG_CXX
-AC_PROG_CPP
-AX_CXX_COMPILE_STDCXX_17
-
-AC_CHECK_TOOL([AR], [ar])
-
-# Use 64-bit file system calls so that we can support files > 2 GiB.
-AC_SYS_LARGEFILE
 
 
 # Check for pubsetbuf.
@@ -145,6 +148,28 @@ AC_ARG_WITH(store-dir, AC_HELP_STRING([--with-store-dir=PATH],
 AC_SUBST(storedir)
 
 
+# Look for boost, a required dependency.
+# Note that AX_BOOST_BASE only exports *CPP* BOOST_CPPFLAGS, no CXX flags,
+# and CPPFLAGS are not passed to the C++ compiler automatically.
+# Thus we append the returned CPPFLAGS to the CXXFLAGS here.
+AX_BOOST_BASE([1.66], [CXXFLAGS="$BOOST_CPPFLAGS $CXXFLAGS"], [AC_MSG_ERROR([Nix requires boost.])])
+# For unknown reasons, setting this directly in the ACTION-IF-FOUND above
+# ends up with LDFLAGS being empty, so we set it afterwards.
+LDFLAGS="$BOOST_LDFLAGS $LDFLAGS"
+
+# On some platforms, new-style atomics need a helper library
+AC_MSG_CHECKING(whether -latomic is needed)
+AC_LINK_IFELSE([AC_LANG_SOURCE([[
+#include <stdint.h>
+uint64_t v;
+int main() {
+    return (int)__atomic_load_n(&v, __ATOMIC_ACQUIRE);
+}]])], GCC_ATOMIC_BUILTINS_NEED_LIBATOMIC=no, GCC_ATOMIC_BUILTINS_NEED_LIBATOMIC=yes)
+AC_MSG_RESULT($GCC_ATOMIC_BUILTINS_NEED_LIBATOMIC)
+if test "x$GCC_ATOMIC_BUILTINS_NEED_LIBATOMIC" = xyes; then
+    LIBS="-latomic $LIBS"
+fi
+
 # Look for OpenSSL, a required dependency.
 PKG_CHECK_MODULES([OPENSSL], [libcrypto], [CXXFLAGS="$OPENSSL_CFLAGS $CXXFLAGS"])
 
@@ -164,7 +189,16 @@ PKG_CHECK_MODULES([SQLITE3], [sqlite3 >= 3.6.19], [CXXFLAGS="$SQLITE3_CFLAGS $CX
 PKG_CHECK_MODULES([LIBCURL], [libcurl], [CXXFLAGS="$LIBCURL_CFLAGS $CXXFLAGS"])
 
 # Look for editline, a required dependency.
-PKG_CHECK_MODULES([EDITLINE], [libeditline], [CXXFLAGS="$EDITLINE_CFLAGS $CXXFLAGS"])
+# The the libeditline.pc file was added only in libeditline >= 1.15.2,
+# see https://github.com/troglobit/editline/commit/0a8f2ef4203c3a4a4726b9dd1336869cd0da8607,
+# but e.g. Ubuntu 16.04 has an older version, so we fall back to searching for
+# editline.h when the pkg-config approach fails.
+PKG_CHECK_MODULES([EDITLINE], [libeditline], [CXXFLAGS="$EDITLINE_CFLAGS $CXXFLAGS"], [
+  AC_CHECK_HEADERS([editline.h], [true],
+    [AC_MSG_ERROR([Nix requires libeditline; it was found neither via pkg-config nor its normal header.])])
+  AC_SEARCH_LIBS([readline read_history], [editline], [],
+    [AC_MSG_ERROR([Nix requires libeditline; it was not found via pkg-config, but via its header, but required functions do not work. Maybe it is too old? >= 1.14 is required.])])
+])
 
 # Look for libsodium, an optional dependency.
 PKG_CHECK_MODULES([SODIUM], [libsodium],
