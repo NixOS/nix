@@ -55,24 +55,22 @@ rec {
     ninja
   ];
 
-  buildDeps = with pkgs;
-    lib.optionals (!stdenv.hostPlatform.isWindows) [
-      curl
-    ] ++ [
-      bzip2
-      xz
-      brotli
-      editline
-      openssl
-      sqlite
-      boehmgc
-      boost
+  buildDeps = with pkgs; [
+    bzip2
+    xz
+    brotli
+    (if stdenv.hostPlatform.isWindows then openssl_1_0_2 else openssl)
+    sqlite
+    boehmgc
+    boost
 
-      # Tests
-      git
-      mercurial
-    ]
-    ++ lib.optionals stdenv.isLinux [libseccomp utillinuxMinimal]
+    # Tests
+    git
+    mercurial
+  ] ++ lib.optionals (!stdenv.hostPlatform.isWindows) [
+    editline
+    curl
+  ] ++ lib.optionals stdenv.isLinux [libseccomp utillinuxMinimal]
     ++ lib.optional (stdenv.isLinux || stdenv.isDarwin) libsodium
     ++ lib.optional (stdenv.isLinux || stdenv.isDarwin)
       ((aws-sdk-cpp.override {
