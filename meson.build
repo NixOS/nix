@@ -417,11 +417,15 @@ sqlite3_dep = declare_dependency(
     link_args : get_option('sqlite3_link_args'))
 
 
-# Look for libcurl, a required dependency.
+# Look for libcurl, a required dependency on Unix.
 #--------------------------------------------------
+
+libcurl_needed = not sys_name.contains('windows')
+
 libcurl_dep = declare_dependency(
-    dependencies : dependency('libcurl'),
-    link_args :  get_option('curl_link_args'))
+    dependencies : dependency('libcurl', required : libcurl_needed),
+    link_args :  get_option('curl_link_args'),
+    required : libcurl_needed)
 
 
 # Look for pthread, a required dependency.
@@ -431,11 +435,15 @@ pthread_dep = declare_dependency(
     link_args :  get_option('pthread_link_args'))
 
 
-# Look for libdl, a required dependency.
+# Look for libdl, a required dependency on Unix.
 #--------------------------------------------------
+
+libdl_needed = not sys_name.contains('windows')
+
 libdl_dep = declare_dependency(
-    dependencies : cpp.find_library('dl'),
-    link_args :  get_option('dl_link_args'))
+    dependencies : cpp.find_library('dl', required : libdl_needed),
+    link_args :  get_option('dl_link_args'),
+    required : libdl_needed)
 
 
 # Look for libbz2, a required dependency.
