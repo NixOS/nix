@@ -476,10 +476,8 @@ endif
 
 # Look for libsodium, an optional dependency.
 #--------------------------------------------------
-if (not get_option('with_libsodium').disabled())
-    libsodium_dep_raw = cpp.find_library('sodium', required: get_option('with_libsodium').enabled())
-endif
-if (not get_option('with_libsodium').disabled() and libsodium_dep_raw.found())
+libsodium_dep_raw = cpp.find_library('sodium', required: get_option('with_libsodium'))
+if (libsodium_dep_raw.found())
     libsodium_dep = declare_dependency(
         dependencies : libsodium_dep_raw,
         link_args :  get_option('sodium_link_args'))
