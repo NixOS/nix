@@ -514,7 +514,7 @@ if (editline_dep_raw.found())
         dependencies : editline_dep_raw,
         link_args :  get_option('editline_link_args'))
 else
-    editline_dep = declare_dependency()
+    editline_dep = dependency('', required : false)
 endif
 
 if (editline_dep.found() and not cpp.has_function(
