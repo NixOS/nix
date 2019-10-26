@@ -476,9 +476,12 @@ endif
 
 # Look for libsodium, an optional dependency.
 #--------------------------------------------------
-if (get_option('with_libsodium'))
+if (not get_option('with_libsodium').disabled())
+    libsodium_dep_raw = cpp.find_library('sodium', required: get_option('with_libsodium').enabled())
+endif
+if (not get_option('with_libsodium').disabled() and libsodium_dep_raw.found())
     libsodium_dep = declare_dependency(
-        dependencies : cpp.find_library('sodium'),
+        dependencies : libsodium_dep_raw,
         link_args :  get_option('sodium_link_args'))
     config_h.set('HAVE_SODIUM', 1, description : 'Whether to use libsodium for cryptography.')
 else

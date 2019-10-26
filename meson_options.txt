@@ -153,8 +153,8 @@ option(
 
 option(
     'with_libsodium',
-    type : 'boolean',
-    value : 'true',
+    type : 'feature',
+    value : 'auto',
     description : 'build nix with shared libs')
 
 option(
