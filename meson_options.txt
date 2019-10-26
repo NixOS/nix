@@ -158,6 +158,12 @@ option(
     description : 'build nix with shared libs')
 
 option(
+    'with_editline',
+    type : 'feature',
+    value : 'auto',
+    description : 'build nix with editline for repl')
+
+option(
     'with_s3',
     type : 'boolean',
     value : 'false',

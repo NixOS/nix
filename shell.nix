@@ -16,7 +16,7 @@ with import ./release-common.nix { inherit pkgs; };
   buildInputs = buildDeps
    ++ lib.optionals (!stdenv.hostPlatform.isWindows) perlDeps;
 
-  inherit configureFlags;
+  inherit mesonFlags configureFlags;
 
   enableParallelBuilding = true;
 

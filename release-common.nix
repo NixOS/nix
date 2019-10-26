@@ -2,6 +2,7 @@
 
 let
   inherit (pkgs) stdenv lib curl;
+  mesonFeature = feature: cond: "-D${feature}=${if cond then "enabled" else "disabled"}";
 in
 
 rec {
@@ -30,6 +31,12 @@ rec {
       CONFIG_ASH_TEST y
     '';
   });
+
+  mesonFlags = [
+    "-Denable-gc=true"
+    (mesonFeature "with_libsodium" (!stdenv.hostPlatform.isWindows))
+    (mesonFeature "with_editline" (!stdenv.hostPlatform.isWindows))
+  ];
 
   configureFlags =
     [

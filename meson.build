@@ -508,9 +508,14 @@ endif
 # https://github.com/troglobit/editline/commit/0a8f2ef4203c3a4a4726b9dd1336869cd0da8607,
 # but e.g. Ubuntu 16.04 has an older version, so we fall back to searching for
 # editline.h when the pkg-config approach fails.
-editline_dep = declare_dependency(
-    dependencies : cpp.find_library('editline'),
-    link_args :  get_option('editline_link_args'))
+editline_dep_raw = cpp.find_library('editline', required: get_option('with_editline'))
+if (editline_dep_raw.found())
+    editline_dep = declare_dependency(
+        dependencies : editline_dep_raw,
+        link_args :  get_option('editline_link_args'))
+else
+    editline_dep = declare_dependency()
+endif
 
 if (editline_dep.found() and not cpp.has_function(
         'read_history',
