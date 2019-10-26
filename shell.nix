@@ -15,7 +15,7 @@ with import ./release-common.nix { inherit pkgs; };
 
   buildInputs = buildDeps ++ perlDeps;
 
-  inherit configureFlags;
+  inherit mesonFlags configureFlags;
 
   enableParallelBuilding = true;
 

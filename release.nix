@@ -82,6 +82,8 @@ let
             ''}
           '';
 
+        inherit mesonFlags;
+
         configureFlags = configureFlags ++
           [ "--sysconfdir=/etc" ];
 

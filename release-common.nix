@@ -2,6 +2,10 @@
 
 let
   inherit (pkgs) stdenv lib curl;
+  # TODO upstream
+  mesonFlag = key: value: "-D${key}=${value}";
+  mesonBool = feature: cond: mesonFlag feature (if cond then "true" else "false");
+  mesonFeature = feature: cond: mesonFlag feature (if cond then "enabled" else "disabled");
 in
 
 rec {
@@ -30,6 +34,11 @@ rec {
       CONFIG_ASH_TEST y
     '';
   });
+
+  mesonFlags = [
+    (mesonBool "with_gc" true)
+    (mesonFeature "with_libsodium" stdenv.hostPlatform.isLinux)
+  ];
 
   configureFlags =
     [
