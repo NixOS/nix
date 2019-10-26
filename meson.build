@@ -481,7 +481,7 @@ if (libsodium_lib.found())
         link_args :  get_option('sodium_link_args'))
     config_h.set('HAVE_SODIUM', 1, description : 'Whether to use libsodium for cryptography.')
 else
-    libsodium_dep = declare_dependency()
+    libsodium_dep = dependency('', required: false)
 endif
 
 
@@ -495,7 +495,7 @@ if (get_option('with_gc'))
         'HAVE_BOEHMGC', 1,
         description : 'Whether to use the Boehm garbage collector.')
 else
-    gc_dep = declare_dependency()
+    gc_dep = dependency('', required: false)
 endif
 
 
