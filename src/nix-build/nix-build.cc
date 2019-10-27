@@ -245,7 +245,21 @@ static void _main(int argc, char * * argv)
     auto state = std::make_unique<EvalState>(myArgs.searchPath, store);
     state->repair = repair;
 
-    Bindings & autoArgs = *myArgs.getAutoArgs(*state);
+    Bindings & autoArgs = *[&](){ 
+            Bindings *userAutoArgs = myArgs.getAutoArgs(*state);
+            if (runEnv) {
+                Bindings * res = state->allocBindings(userAutoArgs->size() + 1);
+                Value * tru = state->allocValue();
+                mkBool(*tru, true);
+                res->push_back(Attr(state->symbols.create("inNixShell"), tru));
+                for (auto & i : *userAutoArgs) {
+                    res->push_back(i);
+                }
+                res->sort();
+                return res;
+            }
+            else return userAutoArgs;
+        }();
 
     if (packages) {
         std::ostringstream joined;

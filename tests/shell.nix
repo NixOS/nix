@@ -1,4 +1,4 @@
-{ }:
+{ inNixShell ? false }:
 
 with import ./config.nix;
 
@@ -22,6 +22,7 @@ let pkgs = rec {
     name = "shellDrv";
     builder = "/does/not/exist";
     VAR_FROM_NIX = "bar";
+    TEST_inNixShell = if inNixShell then "true" else "false";
     inherit stdenv;
   };
 
