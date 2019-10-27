@@ -9,4 +9,5 @@ builtins.toJSON
     h = [ "a" [ "b" { "foo\nbar" = {}; } ] ];
     i = 1 + 2;
     j = 1.44;
+    k = { __toString = self: self.a; a = "foo"; };
   }
