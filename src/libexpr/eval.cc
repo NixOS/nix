@@ -1567,6 +1567,19 @@ bool EvalState::isDerivation(Value & v)
 }
 
 
+std::optional<string> EvalState::tryAttrsToString(const Pos & pos, Value & v,
+    PathSet & context, bool coerceMore, bool copyToStore)
+{
+    auto i = v.attrs->find(sToString);
+    if (i != v.attrs->end()) {
+        Value v1;
+        callFunction(*i->value, v, v1, pos);
+        return coerceToString(pos, v1, context, coerceMore, copyToStore);
+    }
+
+    return {};
+}
+
 string EvalState::coerceToString(const Pos & pos, Value & v, PathSet & context,
     bool coerceMore, bool copyToStore)
 {
@@ -1585,13 +1598,11 @@ string EvalState::coerceToString(const Pos & pos, Value & v, PathSet & context,
     }
 
     if (v.type == tAttrs) {
-        auto i = v.attrs->find(sToString);
-        if (i != v.attrs->end()) {
-            Value v1;
-            callFunction(*i->value, v, v1, pos);
-            return coerceToString(pos, v1, context, coerceMore, copyToStore);
+        auto maybeString = tryAttrsToString(pos, v, context, coerceMore, copyToStore);
+        if (maybeString) {
+            return *maybeString;
         }
-        i = v.attrs->find(sOutPath);
+        auto i = v.attrs->find(sOutPath);
         if (i == v.attrs->end()) throwTypeError("cannot coerce a set to a string, at %1%", pos);
         return coerceToString(pos, *i->value, context, coerceMore, copyToStore);
     }

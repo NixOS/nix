@@ -9,6 +9,7 @@
 #include "function-trace.hh"
 
 #include <map>
+#include <optional>
 #include <unordered_map>
 
 
@@ -195,6 +196,9 @@ public:
     /* Return true iff the value `v' denotes a derivation (i.e. a
        set with attribute `type = "derivation"'). */
     bool isDerivation(Value & v);
+
+    std::optional<string> tryAttrsToString(const Pos & pos, Value & v,
+        PathSet & context, bool coerceMore = false, bool copyToStore = true);
 
     /* String coercion.  Converts strings, paths and derivations to a
        string.  If `coerceMore' is set, also converts nulls, integers,
