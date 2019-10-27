@@ -45,6 +45,10 @@ struct CmdBuild : MixDryRun, InstallablesCommand
                 "To build the build.x86_64-linux attribute from release.nix:",
                 "nix build -f release.nix build.x86_64-linux"
             },
+            Example{
+                "To build a top-level derivation:"
+                "nix build -f default.nix ."
+            },
         };
     }
 

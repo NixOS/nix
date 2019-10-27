@@ -189,7 +189,7 @@ struct InstallableAttrPath : InstallableValue
 
 // FIXME: extend
 std::string attrRegex = R"([A-Za-z_][A-Za-z0-9-_+]*)";
-static std::regex attrPathRegex(fmt(R"(%1%(\.%1%)*)", attrRegex));
+static std::regex attrPathRegex(fmt(R"(\.|%1%(\.%1%)*)", attrRegex));
 
 static std::vector<std::shared_ptr<Installable>> parseInstallables(
     SourceExprCommand & cmd, ref<Store> store, std::vector<std::string> ss, bool useDefaultInstallables)
@@ -203,6 +203,7 @@ static std::vector<std::shared_ptr<Installable>> parseInstallables(
     }
 
     for (auto & s : ss) {
+        if (s == ".") s = "";
 
         if (s.compare(0, 1, "(") == 0)
             result.push_back(std::make_shared<InstallableExpr>(cmd, s));

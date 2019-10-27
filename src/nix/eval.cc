@@ -47,6 +47,10 @@ struct CmdEval : MixJSON, InstallableCommand
                 "To print the store path of the Hello package:",
                 "nix eval --raw nixpkgs.hello"
             },
+            Example{
+                "To print the top-level attribute:",
+                "nix eval -f default.nix ."
+            },
         };
     }
 
