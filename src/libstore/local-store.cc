@@ -937,8 +937,7 @@ void LocalStore::registerValidPaths(const ValidPathInfos & infos)
            not be valid yet. */
         for (auto & i : infos)
             if (isDerivation(i.path)) {
-                // FIXME: inefficient; we already loaded the
-                // derivation in addValidPath().
+                // FIXME: inefficient; we already loaded the derivation in addValidPath().
                 Derivation drv = readDerivation(realStoreDir + "/" + baseNameOf(i.path));
                 checkDerivationOutputs(i.path, drv);
             }

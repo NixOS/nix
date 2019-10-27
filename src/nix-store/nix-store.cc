@@ -632,8 +632,7 @@ static void opDelete(Strings opFlags, Strings opArgs)
 }
 
 
-/* Dump a path as a Nix archive.  The archive is written to standard
-   output. */
+/* Dump a path as a Nix archive.  The archive is written to stdout */
 static void opDump(Strings opFlags, Strings opArgs)
 {
     if (!opFlags.empty()) throw UsageError("unknown flag");
@@ -646,8 +645,7 @@ static void opDump(Strings opFlags, Strings opArgs)
 }
 
 
-/* Restore a value from a Nix archive.  The archive is read from
-   standard input. */
+/* Restore a value from a Nix archive.  The archive is read from stdin. */
 static void opRestore(Strings opFlags, Strings opArgs)
 {
     if (!opFlags.empty()) throw UsageError("unknown flag");
