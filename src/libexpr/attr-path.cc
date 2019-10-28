@@ -103,6 +103,8 @@ Pos findDerivationFilename(EvalState & state, Value & v, std::string what)
         throw Error("package '%s' has no source location information", what);
     }
 
+    // FIXME: is it possible to extract the Pos object instead of doing this
+    //        toString + parsing?
     auto pos = state.forceString(*v2);
 
     auto colon = pos.rfind(':');
