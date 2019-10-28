@@ -36,9 +36,9 @@ struct CmdEdit : InstallableCommand
 
         auto v = installable->toValue(*state);
 
-        std::string filename;
-        int lineno;
-        std::tie(filename, lineno) = findDerivationFilename(*state, *v, installable->what());
+        Pos pos = findDerivationFilename(*state, *v, installable->what());
+        std::string filename(pos.file);
+        int lineno(pos.line);
 
         stopProgressBar();
 

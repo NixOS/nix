@@ -481,7 +481,9 @@ bool NixRepl::processLine(string line)
             lineno = 0;
         } else {
             // assume it's a derivation
-            std::tie(filename, lineno) = findDerivationFilename(state, v, arg);
+            Pos pos = findDerivationFilename(state, v, arg);
+            filename = pos.file;
+            lineno = pos.line;
         }
 
         // Open in EDITOR
