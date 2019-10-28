@@ -135,7 +135,6 @@ Path getDerivationEnvironment(ref<Store> store, Derivation drv)
 
 struct Common : InstallableCommand, MixProfile
 {
-    /*
     std::set<string> keepVars{
         "DISPLAY",
         "HOME",
@@ -148,7 +147,6 @@ struct Common : InstallableCommand, MixProfile
         "TZ",
         "USER",
     };
-    */
 
     std::set<string> ignoreVars{
         "BASHOPTS",
@@ -231,6 +229,16 @@ struct Common : InstallableCommand, MixProfile
 
 struct CmdDevShell : Common
 {
+    bool pure = false;
+
+    CmdDevShell()
+    {
+        mkFlag()
+            .longName("pure")
+            .description("clear almost all environment variables")
+            .set(&pure, true);
+    }
+
     std::string description() override
     {
         return "run a bash shell that provides the build environment of a derivation";
@@ -280,7 +288,18 @@ struct CmdDevShell : Common
         restoreAffinity();
         restoreSignals();
 
-        execvp(shell.c_str(), stringsToCharPtrs(args).data());
+        if (pure) {
+            Strings envVars;
+            for (auto var : keepVars) {
+                auto val = getEnv(var, "");
+                if (!val.empty()) {
+                    envVars.emplace_back(fmt("%s=%s", var, val));
+                }
+            }
+            execvpe(shell.c_str(), stringsToCharPtrs(args).data(), stringsToCharPtrs(envVars).data());
+        } else {
+            execvp(shell.c_str(), stringsToCharPtrs(args).data());
+        }
 
         throw SysError("executing shell '%s'", shell);
     }
