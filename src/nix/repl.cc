@@ -478,6 +478,8 @@ bool NixRepl::processLine(string line)
             PathSet context;
             auto filename = state.coerceToString(noPos, v, context);
             pos.file = state.symbols.create(filename);
+        } else if (v.type == tLambda) {
+            pos = v.lambda.fun->pos;
         } else {
             // assume it's a derivation
             pos = findDerivationFilename(state, v, arg);
