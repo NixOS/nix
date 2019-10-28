@@ -5,6 +5,7 @@
 #include <memory>
 
 #include "util.hh"
+#include "nixexpr.hh"
 
 namespace nix {
 
@@ -191,7 +192,7 @@ public:
 Strings argvToStrings(int argc, char * * argv);
 
 /* Helper function to generate args that invoke $EDITOR on filename:lineno */
-Strings editorFor(std::string filename, int lineno);
+Strings editorFor(Pos pos);
 
 /* Helper function for rendering argument labels. */
 std::string renderLabels(const Strings & labels);

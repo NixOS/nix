@@ -37,12 +37,10 @@ struct CmdEdit : InstallableCommand
         auto v = installable->toValue(*state);
 
         Pos pos = findDerivationFilename(*state, *v, installable->what());
-        std::string filename(pos.file);
-        int lineno(pos.line);
 
         stopProgressBar();
 
-        auto args = editorFor(filename, lineno);
+        auto args = editorFor(pos);
 
         execvp(args.front().c_str(), stringsToCharPtrs(args).data());
 
