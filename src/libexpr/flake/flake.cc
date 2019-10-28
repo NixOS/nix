@@ -168,7 +168,7 @@ static SourceInfo fetchInput(EvalState & state, const FlakeRef & resolvedRef)
         return info;
     };
 
-    // This only downloads only one revision of the repo, not the entire history.
+    // This only downloads one revision of the repo, not the entire history.
     if (auto refData = std::get_if<FlakeRef::IsGitHub>(&resolvedRef.data)) {
         return doGit(exportGitHub(state.store, refData->owner, refData->repo, resolvedRef.ref, resolvedRef.rev));
     }
