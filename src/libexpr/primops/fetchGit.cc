@@ -25,9 +25,32 @@ struct GitInfo
 
 std::regex revRegex("^[0-9a-fA-F]{40}$");
 
-GitInfo exportGit(ref<Store> store, const std::string & uri,
+bool callFilter(EvalState & state, const Pos & pos, const std::string & uri,
+                Value * filterFun, const Path & path, struct stat & st) {
+   /* Call the filter function.  The first argument is the path relative to uri,
+      the second is a string indicating the type of the file. */
+   Value arg1;
+   mkString(arg1, string(path, uri.size() + 1));
+
+   Value fun2;
+   state.callFunction(*filterFun, arg1, fun2, noPos);
+
+   Value arg2;
+   mkString(arg2,
+       S_ISREG(st.st_mode) ? "regular" :
+       S_ISDIR(st.st_mode) ? "directory" :
+       S_ISLNK(st.st_mode) ? "symlink" :
+       "unknown" /* not supported, will fail! */);
+
+   Value res;
+   state.callFunction(fun2, arg2, res, noPos);
+
+   return state.forceBool(res, pos);
+}
+
+GitInfo exportGit(EvalState & state, const Pos & pos, const std::string & uri,
     std::optional<std::string> ref, std::string rev,
-    const std::string & name)
+    const std::string & name, Value * filterFun)
 {
     if (evalSettings.pureEval && rev == "")
         throw Error("in pure evaluation mode, 'fetchGit' requires a Git revision");
@@ -61,16 +84,26 @@ GitInfo exportGit(ref<Store> store, const std::string & uri,
 
                 auto st = lstat(p);
 
+                // Note that the `filter` function is also applied to
+                // directories. If it returns `false` on a directory all files
+                // below that directory will be skipped. Since the `files` set
+                // (the output from `git ls-files`) doesn't include directories
+                // we need to make sure to include the directory if `files`
+                // contains files that are below that directory.
+                bool includeDir = false;
                 if (S_ISDIR(st.st_mode)) {
                     auto prefix = file + "/";
                     auto i = files.lower_bound(prefix);
-                    return i != files.end() && hasPrefix(*i, prefix);
+                    includeDir = i != files.end() && hasPrefix(*i, prefix);
                 }
 
-                return files.count(file);
+                // Include the file if it occurs in `git ls-files` and if it
+                // satisfies the filter predicate.
+                return (includeDir || files.count(file)) &&
+                       (!filterFun || callFilter(state, pos, uri, filterFun, p, st));
             };
 
-            gitInfo.storePath = store->addToStore("source", uri, true, htSHA256, filter);
+            gitInfo.storePath = state.store->addToStore("source", uri, true, htSHA256, filter);
 
             return gitInfo;
         }
@@ -146,26 +179,36 @@ GitInfo exportGit(ref<Store> store, const std::string & uri,
 
     printTalkative("using revision %s of repo '%s'", gitInfo.rev, uri);
 
-    std::string storeLinkName = hashString(htSHA512, name + std::string("\0"s) + gitInfo.rev).to_string(Base32, false);
-    Path storeLink = cacheDir + "/" + storeLinkName + ".link";
-    PathLocks storeLinkLock({storeLink}, fmt("waiting for lock on '%1%'...", storeLink)); // FIXME: broken
+    Path storeLink;
+    // builtins.fetchGit stores a mapping from (uri, name, rev) to the store
+    // path of the fetched git repository such that subsequent invocations can
+    // first check if the store path already exists in which case they don't
+    // need to perform the `tar -x $(git archive)` which is more efficient.
+    //
+    // When a `filter` is specified this mapping is not stored nor used since in
+    // that case we would have to index on the filter function which is not
+    // easily possible.
+    if (!filterFun) {
+        std::string storeLinkName = hashString(htSHA512, name + std::string("\0"s) + gitInfo.rev).to_string(Base32, false);
+        storeLink = cacheDir + "/" + storeLinkName + ".link";
+        PathLocks storeLinkLock({storeLink}, fmt("waiting for lock on '%1%'...", storeLink)); // FIXME: broken
+        try {
+            auto json = nlohmann::json::parse(readFile(storeLink));
 
-    try {
-        auto json = nlohmann::json::parse(readFile(storeLink));
+            assert(json["name"] == name && json["rev"] == gitInfo.rev);
 
-        assert(json["name"] == name && json["rev"] == gitInfo.rev);
+            gitInfo.storePath = json["storePath"];
 
-        gitInfo.storePath = json["storePath"];
+            if (state.store->isValidPath(gitInfo.storePath)) {
+                gitInfo.revCount = json["revCount"];
+                Activity act(*logger, lvlTalkative, actUnknown, fmt("Exiting early. revCount = '%s'", gitInfo.revCount));
+                return gitInfo;
+            }
 
-        if (store->isValidPath(gitInfo.storePath)) {
-            gitInfo.revCount = json["revCount"];
-            return gitInfo;
+        } catch (SysError & e) {
+            if (e.errNo != ENOENT) throw;
         }
-
-    } catch (SysError & e) {
-        if (e.errNo != ENOENT) throw;
     }
-
     // FIXME: should pipe this, or find some better way to extract a
     // revision.
     auto tar = runProgram("git", true, { "-C", cacheDir, "archive", gitInfo.rev });
@@ -175,19 +218,26 @@ GitInfo exportGit(ref<Store> store, const std::string & uri,
 
     runProgram("tar", true, { "x", "-C", tmpDir }, tar);
 
-    gitInfo.storePath = store->addToStore(name, tmpDir);
+    PathFilter filter = filterFun ? ([&](const Path & path) {
+        auto st = lstat(path);
+        bool b = callFilter(state, pos, tmpDir, filterFun, path, st);
+        return b;
+    }) : defaultPathFilter;
+
+    gitInfo.storePath = state.store->addToStore(name, tmpDir,  true, htSHA256, filter);
 
     gitInfo.revCount = std::stoull(runProgram("git", true, { "-C", cacheDir, "rev-list", "--count", gitInfo.rev }));
 
-    nlohmann::json json;
-    json["storePath"] = gitInfo.storePath;
-    json["uri"] = uri;
-    json["name"] = name;
-    json["rev"] = gitInfo.rev;
-    json["revCount"] = gitInfo.revCount;
+    if (!filterFun) {
+        nlohmann::json json;
+        json["storePath"] = gitInfo.storePath;
+        json["uri"] = uri;
+        json["name"] = name;
+        json["rev"] = gitInfo.rev;
+        json["revCount"] = gitInfo.revCount;
 
-    writeFile(storeLink, json.dump());
-
+        writeFile(storeLink, json.dump());
+    }
     return gitInfo;
 }
 
@@ -197,6 +247,7 @@ static void prim_fetchGit(EvalState & state, const Pos & pos, Value * * args, Va
     std::optional<std::string> ref;
     std::string rev;
     std::string name = "source";
+    Value * filterFun = nullptr;
     PathSet context;
 
     state.forceValue(*args[0]);
@@ -215,6 +266,10 @@ static void prim_fetchGit(EvalState & state, const Pos & pos, Value * * args, Va
                 rev = state.forceStringNoCtx(*attr.value, *attr.pos);
             else if (n == "name")
                 name = state.forceStringNoCtx(*attr.value, *attr.pos);
+            else if (n == "filter") {
+                state.forceValue(*attr.value);
+                filterFun = attr.value;
+            }
             else
                 throw EvalError("unsupported argument '%s' to 'fetchGit', at %s", attr.name, *attr.pos);
         }
@@ -229,7 +284,7 @@ static void prim_fetchGit(EvalState & state, const Pos & pos, Value * * args, Va
     // whitelist. Ah well.
     state.checkURI(url);
 
-    auto gitInfo = exportGit(state.store, url, ref, rev, name);
+    auto gitInfo = exportGit(state, pos, url, ref, rev, name, filterFun);
 
     state.mkAttrs(v, 8);
     mkString(*state.allocAttr(v, state.sOutPath), gitInfo.storePath, PathSet({gitInfo.storePath}));
