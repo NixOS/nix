@@ -229,14 +229,15 @@ struct Common : InstallableCommand, MixProfile
 
 struct CmdDevShell : Common
 {
-    bool pure = false;
+    bool ignoreEnvironment = false;
 
     CmdDevShell()
     {
         mkFlag()
-            .longName("pure")
+            .longName("ignore-environment")
+            .shortName('i')
             .description("clear almost all environment variables")
-            .set(&pure, true);
+            .set(&ignoreEnvironment, true);
     }
 
     std::string description() override
@@ -288,7 +289,7 @@ struct CmdDevShell : Common
         restoreAffinity();
         restoreSignals();
 
-        if (pure) {
+        if (ignoreEnvironment) {
             Strings envVars;
             for (auto var : keepVars) {
                 auto val = getEnv(var, "");
