@@ -291,7 +291,7 @@ struct CmdDevShell : Common
 
         if (ignoreEnvironment) {
             Strings envVars;
-            for (auto var : keepVars) {
+            for (const auto & var : keepVars) {
                 auto val = getEnv(var, "");
                 if (!val.empty()) {
                     envVars.emplace_back(fmt("%s=%s", var, val));
