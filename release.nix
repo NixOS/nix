@@ -25,8 +25,6 @@ let
 
         buildInputs = tarballDeps ++ buildDeps;
 
-        configureFlags = "--enable-gc";
-
         postUnpack = ''
           (cd $sourceRoot && find . -type f) | cut -c3- > $sourceRoot/.dist-files
           cat $sourceRoot/.dist-files

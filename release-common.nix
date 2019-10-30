@@ -30,9 +30,7 @@ rec {
   });
 
   configureFlags =
-    [
-      "--enable-gc"
-    ] ++ lib.optionals stdenv.isLinux [
+    lib.optionals stdenv.isLinux [
       "--with-sandbox-shell=${sh}/bin/busybox"
     ];
 
