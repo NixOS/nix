@@ -63,7 +63,7 @@ typedef enum {
 
 
 class Store;
-class Source;
+struct Source;
 
 Path readStorePath(Store & store, Source & from);
 template<class T> T readStorePaths(Store & store, Source & from);
