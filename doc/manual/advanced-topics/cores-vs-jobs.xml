@@ -36,8 +36,8 @@ to <xref linkend="conf-cores" />, unless <xref linkend="conf-cores" />
 equals <literal>0</literal>, in which case <envar>NIX_BUILD_CORES</envar>
 will be the total number of cores in the system.</para>
 
-<para>The total number of consumed cores is a simple multiplication,
-<xref linkend="conf-cores" /> * <envar>NIX_BUILD_CORES</envar>.</para>
+<para>The maximum number of consumed cores is a simple multiplication,
+<xref linkend="conf-max-jobs" /> * <envar>NIX_BUILD_CORES</envar>.</para>
 
 <para>The balance on how to set these two independent variables depends
 upon each builder's workload and hardware. Here are a few example
