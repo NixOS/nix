@@ -395,10 +395,12 @@ pid_t startProcess(std::function<void()> fun, const ProcessOptions & options = P
 
 struct RunOptions
 {
+#ifndef _WIN32
     std::optional<uid_t> uid;
     std::optional<uid_t> gid;
     std::optional<Path> chdir;
     std::optional<std::map<std::string, std::string>> environment;
+#endif
     Path program;
     bool searchPath = true;
     Strings args; // TODO: unicode on Windows?

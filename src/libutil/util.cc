@@ -16,11 +16,14 @@
 #include <future>
 
 #include <fcntl.h>
-#include <grp.h>
 #include <limits.h>
 #include <sys/types.h>
 #ifndef _MSC_VER
 #include <unistd.h>
+#endif
+
+#ifndef _WIN32
+#include <grp.h>
 #endif
 
 #ifdef __APPLE__
