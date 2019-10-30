@@ -149,7 +149,7 @@ GitInfo exportGit(ref<Store> store, std::string uri,
             gitInfo.revCount = haveCommits ? std::stoull(runProgram("git", true, { "-C", uri, "rev-list", "--count", "HEAD" })) : 0;
             // FIXME: maybe we should use the timestamp of the last
             // modified dirty file?
-            gitInfo.lastModified = haveCommits ? std::stoull(runProgram("git", true, { "-C", uri, "show", "-s", "--format=%ct", "HEAD" })) : 0;
+            gitInfo.lastModified = haveCommits ? std::stoull(runProgram("git", true, { "-C", uri, "log", "-1", "--format=%ct", "HEAD" })) : 0;
 
             return gitInfo;
         }
@@ -267,7 +267,7 @@ GitInfo exportGit(ref<Store> store, std::string uri,
     gitInfo.storePath = store->addToStore(name, tmpDir);
 
     gitInfo.revCount = std::stoull(runProgram("git", true, { "-C", repoDir, "rev-list", "--count", gitInfo.rev.gitRev() }));
-    gitInfo.lastModified = std::stoull(runProgram("git", true, { "-C", repoDir, "show", "-s", "--format=%ct", gitInfo.rev.gitRev() }));
+    gitInfo.lastModified = std::stoull(runProgram("git", true, { "-C", repoDir, "log", "-1", "--format=%ct", gitInfo.rev.gitRev() }));
 
     cacheGitInfo(name, gitInfo);
 
