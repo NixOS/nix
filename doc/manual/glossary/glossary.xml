@@ -186,8 +186,8 @@
   <emphasis>AR</emphasis>chive.  This is a serialisation of a path in
   the Nix store.  It can contain regular files, directories and
   symbolic links.  NARs are generated and unpacked using
-  <command>nix-store --dump</command> and <command>nix-store
-  --restore</command>.</para></glossdef>
+  <command>nix-store --export</command> and <command>nix-store
+  --import</command>.</para></glossdef>
 
 </glossentry>
 
