@@ -45,9 +45,7 @@ GitInfo exportGit(ref<Store> store, const std::string & uri,
 
         if (!clean) {
 
-            /* This is an unclean working tree. So copy all tracked
-               files. */
-
+            /* This is an unclean working tree. So copy all tracked files. */
             GitInfo gitInfo;
             gitInfo.rev = "0000000000000000000000000000000000000000";
             gitInfo.shortRev = std::string(gitInfo.rev, 0, 7);
