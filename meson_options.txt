@@ -149,19 +149,19 @@ option(
     'with_gc',
     type : 'boolean',
     value : 'false',
-    description : 'build nix with Boehm garbage collector')
+    description : 'Build nix with Boehm garbage collector')
 
 option(
     'with_libsodium',
     type : 'feature',
     value : 'auto',
-    description : 'build nix with shared libs')
+    description : 'Build nix with libsodium')
 
 option(
     'with_s3',
     type : 'boolean',
     value : 'false',
-    description : 'build nix with s3')
+    description : 'Build nix with s3')
 
 option(
     'with_coreutils_bin',
@@ -182,7 +182,7 @@ option(
     'build_shared_libs',
     type : 'boolean',
     value : 'false',
-    description : 'build nix with shared libs')
+    description : 'Build nix with shared libs')
 
 option(
     'sandbox_shell',
