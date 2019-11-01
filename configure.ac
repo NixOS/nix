@@ -158,6 +158,18 @@ AX_BOOST_BASE([1.66], [CXXFLAGS="$BOOST_CPPFLAGS $CXXFLAGS"], [AC_MSG_ERROR([Nix
 LDFLAGS="$BOOST_LDFLAGS $LDFLAGS"
 
 
+PKG_PROG_PKG_CONFIG
+
+AC_ARG_ENABLE(shared, AC_HELP_STRING([--enable-shared],
+  [Build shared libraries for Nix [default=yes]]),
+  shared=$enableval, shared=yes)
+if test "$shared" = yes; then
+  AC_SUBST(BUILD_SHARED_LIBS, 1, [Whether to build shared libraries.])
+else
+  AC_SUBST(BUILD_SHARED_LIBS, 0, [Whether to build shared libraries.])
+  PKG_CONFIG="$PKG_CONFIG --static"
+fi
+
 # Look for OpenSSL, a required dependency.
 PKG_CHECK_MODULES([OPENSSL], [libcrypto], [CXXFLAGS="$OPENSSL_CFLAGS $CXXFLAGS"])
 
@@ -290,16 +302,6 @@ AC_ARG_WITH(sandbox-shell, AC_HELP_STRING([--with-sandbox-shell=PATH],
   [path of a statically-linked shell to use as /bin/sh in sandboxes]),
   sandbox_shell=$withval)
 AC_SUBST(sandbox_shell)
-
-AC_ARG_ENABLE(shared, AC_HELP_STRING([--enable-shared],
-  [Build shared libraries for Nix [default=yes]]),
-  shared=$enableval, shared=yes)
-if test "$shared" = yes; then
-  AC_SUBST(BUILD_SHARED_LIBS, 1, [Whether to build shared libraries.])
-else
-  AC_SUBST(BUILD_SHARED_LIBS, 0, [Whether to build shared libraries.])
-fi
-
 
 # Expand all variables in config.status.
 test "$prefix" = NONE && prefix=$ac_default_prefix
