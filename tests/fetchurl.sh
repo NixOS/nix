@@ -35,7 +35,7 @@ clearStore
 hash=$(nix hash-file --type sha512 --base64 ./fetchurl.sh)
 hash32=$(nix hash-file --type sha512 --base16 ./fetchurl.sh)
 
-mirror=$TMPDIR/hashed-mirror
+mirror=$TEST_ROOT/hashed-mirror
 rm -rf $mirror
 mkdir -p $mirror/sha512
 ln -s $(pwd)/fetchurl.sh $mirror/sha512/$hash32
