@@ -24,7 +24,7 @@ struct RunCommon : virtual Command
 {
     void runProgram(ref<Store> store,
         const std::string & program,
-        const Strings & args)
+        const Strings & args, char** env = environ)
     {
         stopProgressBar();
 
@@ -46,12 +46,12 @@ struct RunCommon : virtual Command
             Strings helperArgs = { chrootHelperName, store->storeDir, store2->realStoreDir, program };
             for (auto & arg : args) helperArgs.push_back(arg);
 
-            execv(readLink("/proc/self/exe").c_str(), stringsToCharPtrs(helperArgs).data());
+            execve(readLink("/proc/self/exe").c_str(), stringsToCharPtrs(helperArgs).data(), env);
 
             throw SysError("could not execute chroot helper");
         }
 
-        execvp(program.c_str(), stringsToCharPtrs(args).data());
+        execvpe(program.c_str(), stringsToCharPtrs(args).data(), env);
 
         throw SysError("unable to execute '%s'", program);
     }
@@ -61,6 +61,7 @@ struct CmdRun : InstallablesCommand, RunCommon
 {
     std::vector<std::string> command = { "bash" };
     StringSet keep, unset;
+    Strings stringEnv;
     bool ignoreEnvironment = false;
 
     CmdRun()
@@ -126,42 +127,44 @@ struct CmdRun : InstallablesCommand, RunCommon
         };
     }
 
+    char** newEnviron() {
+        if (ignoreEnvironment) {
+
+            if (!unset.empty())
+                throw UsageError("--unset does not make sense with --ignore-environment");
+
+            for (const auto & var : keep) {
+                auto val = getenv(var.c_str());
+                if (val) stringEnv.emplace_back(fmt("%s=%s", var.c_str(), val));
+            }
+
+            return stringsToCharPtrs(stringEnv).data();
+
+        } else {
+            if (!keep.empty())
+                throw UsageError("--keep does not make sense without --ignore-environment");
+
+            for (const auto & var : unset)
+                unsetenv(var.c_str());
+
+            return environ;
+        }
+    }
+
     void run(ref<Store> store) override
     {
         auto outPaths = toStorePaths(store, Build, installables);
 
         auto accessor = store->getFSAccessor();
 
-        if (ignoreEnvironment) {
-
-            if (!unset.empty())
-                throw UsageError("--unset does not make sense with --ignore-environment");
-
-            std::map<std::string, std::string> kept;
-            for (auto & var : keep) {
-                auto s = getenv(var.c_str());
-                if (s) kept[var] = s;
-            }
-
-            clearEnv();
-
-            for (auto & var : kept)
-                setenv(var.first.c_str(), var.second.c_str(), 1);
-
-        } else {
-
-            if (!keep.empty())
-                throw UsageError("--keep does not make sense without --ignore-environment");
-
-            for (auto & var : unset)
-                unsetenv(var.c_str());
-        }
 
         std::unordered_set<Path> done;
         std::queue<Path> todo;
         for (auto & path : outPaths) todo.push(path);
 
-        auto unixPath = tokenizeString<Strings>(getEnv("PATH"), ":");
+        Strings unixPath;
+        if (!ignoreEnvironment || keep.find("PATH") != keep.end())
+            unixPath = tokenizeString<Strings>(getEnv("PATH"), ":");
 
         while (!todo.empty()) {
             Path path = todo.front();
@@ -179,11 +182,16 @@ struct CmdRun : InstallablesCommand, RunCommon
         }
 
         setenv("PATH", concatStringsSep(":", unixPath).c_str(), 1);
+        if (ignoreEnvironment) {
+            keep.emplace("PATH");
+        } else {
+            unset.erase("PATH");
+        }
 
         Strings args;
         for (auto & arg : command) args.push_back(arg);
 
-        runProgram(store, *command.begin(), args);
+        runProgram(store, *command.begin(), args, newEnviron());
     }
 };
 
