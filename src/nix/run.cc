@@ -113,15 +113,15 @@ struct CmdRun : InstallablesCommand, RunCommon
             },
             Example{
                 "To start a shell providing youtube-dl from your 'nixpkgs' channel:",
-                "nix run nixpkgs.youtube-dl"
+                "nix run nixpkgs#youtube-dl"
             },
             Example{
                 "To run GNU Hello:",
-                "nix run nixpkgs.hello -c hello --greeting 'Hi everybody!'"
+                "nix run nixpkgs#hello -c hello --greeting 'Hi everybody!'"
             },
             Example{
                 "To run GNU Hello in a chroot store:",
-                "nix run --store ~/my-nix nixpkgs.hello -c hello"
+                "nix run --store ~/my-nix nixpkgs#hello -c hello"
             },
         };
     }
