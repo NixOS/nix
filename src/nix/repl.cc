@@ -329,6 +329,11 @@ bool NixRepl::getLine(string & input, const std::string &prompt)
 
     if (!s)
       return false;
+#ifdef READLINE
+    if (*s) {
+        add_history(s);
+    }
+#endif
     input += s;
     input += '\n';
     return true;
