@@ -44,7 +44,7 @@ config_h = configuration_data()
 
 config_h.set(
     'HAVE_CXX17', 1,
-    description : 'define if the compiler supports basic C++17 syntax')
+    description : 'Define if the compiler supports basic C++17 syntax')
 
 package_name = meson.project_name()
 config_h.set_quoted(
@@ -383,7 +383,7 @@ boost_dep = declare_dependency(
     link_args :  get_option('boost_link_args'))
 
 if (boost_dep.found())
-    config_h.set('HAVE_BOOST', 1, description : 'define if the Boost library is available.')
+    config_h.set('HAVE_BOOST', 1, description : 'Define if the Boost library is available.')
 endif
 
 
