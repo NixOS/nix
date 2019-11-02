@@ -727,4 +727,8 @@ inline bool isslash(int c) { return c == '/'; }
 #endif
 
 
+/* Create a Unix domain socket in listen mode. */
+AutoCloseFD createUnixDomainSocket(const Path & path, mode_t mode);
+
+
 }

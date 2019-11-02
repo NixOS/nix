@@ -74,7 +74,7 @@ public:
     bool isValidPathUncached(const Path & path) override;
 
     void queryPathInfoUncached(const Path & path,
-        Callback<std::shared_ptr<ValidPathInfo>> callback) noexcept override;
+        Callback<std::shared_ptr<const ValidPathInfo>> callback) noexcept override;
 
     Path queryPathFromHashPart(const string & hashPart) override
     { unsupported("queryPathFromHashPart"); }

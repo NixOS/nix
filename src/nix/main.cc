@@ -21,6 +21,7 @@
 
 #include <ifaddrs.h>
 #include <netdb.h>
+#include <netinet/in.h>
 
 extern std::string chrootHelperName;
 

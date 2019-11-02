@@ -805,7 +805,7 @@ uint64_t LocalStore::addValidPath(State & state,
 
 
 void LocalStore::queryPathInfoUncached(const Path & path,
-    Callback<std::shared_ptr<ValidPathInfo>> callback) noexcept
+    Callback<std::shared_ptr<const ValidPathInfo>> callback) noexcept
 {
     try {
         auto info = std::make_shared<ValidPathInfo>();
@@ -1111,8 +1111,7 @@ void LocalStore::registerValidPaths(const ValidPathInfos & infos)
            not be valid yet. */
         for (auto & i : infos)
             if (isDerivation(i.path)) {
-                // FIXME: inefficient; we already loaded the
-                // derivation in addValidPath().
+                // FIXME: inefficient; we already loaded the derivation in addValidPath().
                 Derivation drv = readDerivation(realStoreDir + "/" + baseNameOf(i.path));
                 checkDerivationOutputs(i.path, drv);
             }

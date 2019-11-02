@@ -487,4 +487,13 @@ void copyNAR(Source & source, Sink & sink)
 }
 
 
+void copyPath(const Path & from, const Path & to)
+{
+    auto source = sinkToSource([&](Sink & sink) {
+        dumpPath(from, sink);
+    });
+    restorePath(to, *source);
+}
+
+
 }

@@ -219,7 +219,7 @@ public:
 
     void upsertNarInfo(
         const std::string & uri, const std::string & hashPart,
-        std::shared_ptr<ValidPathInfo> info) override
+        std::shared_ptr<const ValidPathInfo> info) override
     {
         retrySQLite<void>([&]() {
             auto state(_state.lock());
@@ -228,7 +228,7 @@ public:
 
             if (info) {
 
-                auto narInfo = std::dynamic_pointer_cast<NarInfo>(info);
+                auto narInfo = std::dynamic_pointer_cast<const NarInfo>(info);
 
                 assert(hashPart == storePathToHash(info->path));
 

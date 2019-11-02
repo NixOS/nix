@@ -258,7 +258,7 @@ protected:
 
     struct State
     {
-        LRUCache<std::string, std::shared_ptr<ValidPathInfo>> pathInfoCache;
+        LRUCache<std::string, std::shared_ptr<const ValidPathInfo>> pathInfoCache;
     };
 
     Sync<State> state;
@@ -361,12 +361,12 @@ public:
 
     /* Asynchronous version of queryPathInfo(). */
     void queryPathInfo(const Path & path,
-        Callback<ref<ValidPathInfo>> callback) noexcept;
+        Callback<ref<const ValidPathInfo>> callback) noexcept;
 
 protected:
 
     virtual void queryPathInfoUncached(const Path & path,
-        Callback<std::shared_ptr<ValidPathInfo>> callback) noexcept = 0;
+        Callback<std::shared_ptr<const ValidPathInfo>> callback) noexcept = 0;
 
 public:
 
@@ -421,6 +421,13 @@ public:
     virtual Path addToStore(const string & name, const Path & srcPath,
         bool recursive = true, HashType hashAlgo = htSHA256,
         PathFilter & filter = defaultPathFilter, RepairFlag repair = NoRepair) = 0;
+
+    // FIXME: remove?
+    virtual Path addToStoreFromDump(const string & dump, const string & name,
+        bool recursive = true, HashType hashAlgo = htSHA256, RepairFlag repair = NoRepair)
+    {
+        throw Error("addToStoreFromDump() is not supported by this store");
+    }
 
     /* Like addToStore, but the contents written to the output path is
        a regular file containing the given string. */

@@ -43,7 +43,9 @@
 #else
 #include <pwd.h>
 #include <sys/ioctl.h>
+#include <sys/socket.h>
 #include <sys/wait.h>
+#include <sys/un.h>
 
 extern char * * environ __attribute__((weak));
 #endif
@@ -2914,5 +2916,34 @@ std::unique_ptr<InterruptCallback> createInterruptCallback(std::function<void()>
 
     return std::unique_ptr<InterruptCallback>(res.release());
 }
+
+AutoCloseFD createUnixDomainSocket(const Path & path, mode_t mode)
+{
+    AutoCloseFD fdSocket = socket(PF_UNIX, SOCK_STREAM | SOCK_CLOEXEC, 0);
+    if (!fdSocket)
+        throw PosixError("cannot create Unix domain socket");
+
+    closeOnExec(fdSocket.get());
+
+    struct sockaddr_un addr;
+    addr.sun_family = AF_UNIX;
+    if (path.size() >= sizeof(addr.sun_path))
+        throw Error("socket path '%1%' is too long", path);
+    strcpy(addr.sun_path, path.c_str());
+
+    unlink(path.c_str());
+
+    if (bind(fdSocket.get(), (struct sockaddr *) &addr, sizeof(addr)) == -1)
+        throw PosixError("cannot bind to socket '%1%'", path);
+
+    if (chmod(path.c_str(), mode) == -1)
+        throw PosixError("changing permissions on '%1%'", path);
+
+    if (listen(fdSocket.get(), 5) == -1)
+        throw PosixError("cannot listen on socket '%1%'", path);
+
+    return fdSocket;
+}
 #endif
+
 }
