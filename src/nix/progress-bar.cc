@@ -341,7 +341,7 @@ public:
         }
 
         auto width = getWindowSize().second;
-        if (width <= 0) std::numeric_limits<decltype(width)>::max();
+        if (width <= 0) width = std::numeric_limits<decltype(width)>::max();
 
         writeToStderr("\r" + filterANSIEscapes(line, false, width) + "\e[K");
     }
