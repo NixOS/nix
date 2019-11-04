@@ -44,7 +44,7 @@ config_h = configuration_data()
 
 config_h.set(
     'HAVE_CXX17', 1,
-    description : 'define if the compiler supports basic C++17 syntax')
+    description : 'Define if the compiler supports basic C++17 syntax')
 
 package_name = meson.project_name()
 config_h.set_quoted(
@@ -163,7 +163,8 @@ if (cpp.has_header('sys/ndir.h'))
         description : 'Define to 1 if you have the <sys/ndir.h> header file, and it defines `DIR`')
 endif
 
-if (cpp.has_header('dirent.h'))
+has_dirent_h = cpp.has_header('dirent.h')
+if (has_dirent_h)
     config_h.set(
         'HAVE_DIRENT_H', 1,
         description : 'Define to 1 if you have the <dirent.h> header file, and it defines `DIR`')
@@ -309,6 +310,21 @@ if meson.get_compiler('cpp').compiles(
         description : 'Define to 1 if you have the `pubsetbuf` function.')
 endif
 
+
+
+# checking data types
+#============================================================================
+
+
+dirent_h_prefix = '''
+  #include <sys/types.h>
+  #include <dirent.h>
+'''
+
+if has_dirent_h and meson.get_compiler('cpp').has_member('struct dirent', 'd_type', prefix: dirent_h_prefix)
+  config_h.set('HAVE_STRUCT_DIRENT_D_TYPE', 1)
+endif
+
 # required dependancies
 #============================================================================
 
@@ -330,8 +346,8 @@ tar = find_program('tar', required : true)
 bzip2 = find_program('bzip2', required : true)
 gzip = find_program('gzip', required : true)
 xz = find_program('xz', required : true)
-dot = find_program('dot', required : true)
-lsof = find_program('lsof', required : true)
+dot = find_program('dot', required : false)
+lsof = find_program('lsof', required : false)
 tr = find_program('tr', required : true)
 coreutils = run_command('dirname', cat.path()).stdout().strip()
 
@@ -361,13 +377,13 @@ description : 'Whether link() works on symlinks')
 #--------------------------------------------------
 boost_dep = declare_dependency(
     dependencies : [
-        cpp.find_library('libboost_system', dirs : libdir),
-        cpp.find_library('libboost_context', dirs : libdir),
-        cpp.find_library('libboost_thread', dirs : libdir)],
+        cpp.find_library('boost_system'),
+        cpp.find_library('boost_context'),
+        cpp.find_library('boost_thread')],
     link_args :  get_option('boost_link_args'))
 
 if (boost_dep.found())
-    config_h.set('HAVE_BOOST', 1, description : 'define if the Boost library is available.')
+    config_h.set('HAVE_BOOST', 1, description : 'Define if the Boost library is available.')
 endif
 
 
@@ -390,7 +406,7 @@ libbrotli_dep = declare_dependency(
 # Look for OpenSSL, a required dependency.
 #--------------------------------------------------
 openssl_dep = declare_dependency(
-    dependencies: cpp.find_library('libssl', dirs : libdir),
+    dependencies: cpp.find_library('ssl'),
     link_args :  get_option('openssl_link_args'))
 
 
@@ -418,14 +434,14 @@ pthread_dep = declare_dependency(
 # Look for libdl, a required dependency.
 #--------------------------------------------------
 libdl_dep = declare_dependency(
-    dependencies : cpp.find_library('dl', dirs : libdir),
+    dependencies : cpp.find_library('dl'),
     link_args :  get_option('dl_link_args'))
 
 
 # Look for libbz2, a required dependency.
 #--------------------------------------------------
 libbz2_dep = declare_dependency(
-    dependencies : cpp.find_library('bz2', dirs : libdir),
+    dependencies : cpp.find_library('bz2'),
     link_args :  get_option('bz2_link_args'))
 
 
@@ -437,7 +453,7 @@ libbz2_dep = declare_dependency(
 # editline.h when the pkg-config approach fails.
 
 editline_dep = declare_dependency(
-    dependencies : cpp.find_library('libeditline'),
+    dependencies : cpp.find_library('editline'),
     link_args :  get_option('editline_link_args'))
 
 if not (
@@ -458,13 +474,14 @@ endif
 
 # Look for libsodium, an optional dependency.
 #--------------------------------------------------
-if (get_option('with_libsodium'))
+libsodium_lib = cpp.find_library('sodium', required: get_option('with_libsodium'))
+if (libsodium_lib.found())
     libsodium_dep = declare_dependency(
-        dependencies : cpp.find_library('libsodium', dirs : libdir),
+        dependencies : libsodium_lib,
         link_args :  get_option('sodium_link_args'))
     config_h.set('HAVE_SODIUM', 1, description : 'Whether to use libsodium for cryptography.')
 else
-    libsodium_dep = declare_dependency()
+    libsodium_dep = dependency('', required: false)
 endif
 
 
@@ -478,7 +495,7 @@ if (get_option('with_gc'))
         'HAVE_BOEHMGC', 1,
         description : 'Whether to use the Boehm garbage collector.')
 else
-    gc_dep = declare_dependency()
+    gc_dep = dependency('', required: false)
 endif
 
 
@@ -503,15 +520,16 @@ endif
 # OS Specific checks 
 #============================================================================
 # Look for libsecppomp, required for Linux sandboxing.
-libseccomp_dep = ''
 if sys_name.contains('linux')
-    libseccomp_dep = dependency('libseccomp', version : '>= 2.3.1', required: false)
-    if not (libseccomp_dep.found())
-        error('Nix requires libseccomp on a linux host system')
-    endif
+    libseccomp_dep = dependency(
+        'libseccomp',
+        version : '>= 2.3.1',
+        not_found_message : 'Nix requires libseccomp on a linux host system')
     config_h.set(
         'HAVE_SECCOMP', 1,
-        description : 'Whether seccomp is available and should be used for sandboxing.')    
+        description : 'Whether seccomp is available and should be used for sandboxing.')
+else
+    libseccomp_dep = dependency('', required: false)
 endif
 
 if (sys_name.contains('freebsd'))

@@ -1,15 +1,21 @@
-{ useClang ? false }:
+{ useClang ? false, crossSystem ? null }:
 
-with import (builtins.fetchTarball https://github.com/NixOS/nixpkgs-channels/archive/nixos-19.03.tar.gz) {};
+let
+  pkgsSrc = builtins.fetchTarball https://github.com/NixOS/nixpkgs-channels/archive/nixos-19.09.tar.gz;
+in
+
+with import pkgsSrc { inherit crossSystem; };
 
 with import ./release-common.nix { inherit pkgs; };
 
 (if useClang then clangStdenv else stdenv).mkDerivation {
   name = "nix";
 
-  buildInputs = buildDeps ++ tarballDeps ++ perlDeps;
+  nativeBuildInputs = nativeBuildDeps ++ tarballDeps;
 
-  inherit configureFlags;
+  buildInputs = buildDeps ++ perlDeps;
+
+  inherit mesonFlags configureFlags;
 
   enableParallelBuilding = true;
 

@@ -1,11 +1,17 @@
 { pkgs }:
 
-with pkgs;
+let
+  inherit (pkgs) stdenv lib curl;
+  # TODO upstream
+  mesonFlag = key: value: "-D${key}=${value}";
+  mesonBool = feature: cond: mesonFlag feature (if cond then "true" else "false");
+  mesonFeature = feature: cond: mesonFlag feature (if cond then "enabled" else "disabled");
+in
 
 rec {
   # Use "busybox-sandbox-shell" if present,
   # if not (legacy) fallback and hope it's sufficient.
-  sh = pkgs.busybox-sandbox-shell or (busybox.override {
+  sh = pkgs.busybox-sandbox-shell or (pkgs.busybox.override {
     useMusl = true;
     enableStatic = true;
     enableMinimal = true;
@@ -29,6 +35,11 @@ rec {
     '';
   });
 
+  mesonFlags = [
+    (mesonBool "with_gc" true)
+    (mesonFeature "with_libsodium" stdenv.hostPlatform.isLinux)
+  ];
+
   configureFlags =
     [
       "--enable-gc"
@@ -36,7 +47,7 @@ rec {
       "--with-sandbox-shell=${sh}/bin/busybox"
     ];
 
-  tarballDeps =
+  tarballDeps = with pkgs.buildPackages;
     [ bison
       flex
       libxml2
@@ -47,10 +58,22 @@ rec {
       autoreconfHook
     ];
 
-  buildDeps =
-    [ curl
-      bzip2 xz brotli editline
-      openssl pkgconfig sqlite boehmgc
+  nativeBuildDeps = with pkgs.buildPackages; [
+    pkgconfig
+    meson
+    ninja
+  ];
+
+  buildDeps = with pkgs;
+    [
+      curl
+      bzip2
+      xz
+      brotli
+      editline
+      openssl
+      sqlite
+      boehmgc
       boost
 
       # Tests
@@ -72,7 +95,7 @@ rec {
         */
       }));
 
-  perlDeps =
+  perlDeps = with pkgs;
     [ perl
       perlPackages.DBDSQLite
     ];

@@ -159,7 +159,6 @@ the S3 URL:</para>
         "s3:ListBucket",
         "s3:ListBucketMultipartUploads",
         "s3:ListMultipartUploadParts",
-        "s3:ListObjects",
         "s3:PutObject"
       ],
       "Resource": [
