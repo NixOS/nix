@@ -4,7 +4,7 @@ clearStore
 
 export unreachable=$(nix add-to-store ./recursive.sh)
 
-nix build -o $TEST_ROOT/result -L '(
+nix --experimental-features 'nix-command recursive-nix' build -o $TEST_ROOT/result -L '(
   with import ./config.nix;
   with import <nix/config.nix>;
   mkDerivation {
@@ -14,6 +14,8 @@ nix build -o $TEST_ROOT/result -L '(
 
     # Note: this is a string without context.
     unreachable = builtins.getEnv "unreachable";
+
+    requiredSystemFeatures = [ "recursive-nix" ];
 
     buildCommand = '\'\''
       mkdir $out

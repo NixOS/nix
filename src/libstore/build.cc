@@ -2248,7 +2248,8 @@ void DerivationGoal::startBuilder()
 
     /* Fire up a Nix daemon to process recursive Nix calls from the
        builder. */
-    startDaemon();
+    if (parsedDrv->getRequiredSystemFeatures().count("recursive-nix"))
+        startDaemon();
 
     /* Run the builder. */
     printMsg(lvlChatty, format("executing builder '%1%'") % drv->builder);
@@ -2832,6 +2833,8 @@ struct RestrictedStore : public LocalFSStore
 
 void DerivationGoal::startDaemon()
 {
+    settings.requireExperimentalFeature("recursive-nix");
+
     Store::Params params;
     params["path-info-cache-size"] = "0";
     params["store"] = worker.store.storeDir;
