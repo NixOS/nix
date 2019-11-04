@@ -122,7 +122,7 @@ $ mount -o bind /mnt/otherdisk/nix /nix</screen>
 <varlistentry><term><envar>NIX_LOG_DIR</envar></term>
 
   <listitem><para>Overrides the location of the Nix log directory
-  (default <filename><replaceable>prefix</replaceable>/log/nix</filename>).</para></listitem>
+  (default <filename><replaceable>prefix</replaceable>/var/log/nix</filename>).</para></listitem>
 
 </varlistentry>
 
