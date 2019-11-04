@@ -245,7 +245,17 @@ static void _main(int argc, char * * argv)
     auto state = std::make_unique<EvalState>(myArgs.searchPath, store);
     state->repair = repair;
 
-    Bindings & autoArgs = *myArgs.getAutoArgs(*state);
+    auto autoArgs = myArgs.getAutoArgs(*state);
+
+    if (runEnv) {
+        auto newArgs = state->allocBindings(autoArgs->size() + 1);
+        auto tru = state->allocValue();
+        mkBool(*tru, true);
+        newArgs->push_back(Attr(state->symbols.create("inNixShell"), tru));
+        for (auto & i : *autoArgs) newArgs->push_back(i);
+        newArgs->sort();
+        autoArgs = newArgs;
+    }
 
     if (packages) {
         std::ostringstream joined;
@@ -299,9 +309,9 @@ static void _main(int argc, char * * argv)
         state->eval(e, vRoot);
 
         for (auto & i : attrPaths) {
-            Value & v(*findAlongAttrPath(*state, i, autoArgs, vRoot));
+            Value & v(*findAlongAttrPath(*state, i, *autoArgs, vRoot));
             state->forceValue(v);
-            getDerivations(*state, v, "", autoArgs, drvs, false);
+            getDerivations(*state, v, "", *autoArgs, drvs, false);
         }
     }
 

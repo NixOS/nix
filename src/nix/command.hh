@@ -17,7 +17,7 @@ namespace flake {
 enum HandleLockFile : unsigned int;
 }
 
-/* A command that require a Nix store. */
+/* A command that requires a Nix store. */
 struct StoreCommand : virtual Command
 {
     StoreCommand();
@@ -91,6 +91,7 @@ private:
     std::vector<std::string> _installables;
 };
 
+/* A command that operates on exactly one "installable" */
 struct InstallableCommand : virtual Args, SourceExprCommand
 {
     std::shared_ptr<Installable> installable;

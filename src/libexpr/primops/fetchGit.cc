@@ -115,8 +115,7 @@ GitInfo exportGit(ref<Store> store, std::string uri,
 
         if (!clean) {
 
-            /* This is an unclean working tree. So copy all tracked
-               files. */
+            /* This is an unclean working tree. So copy all tracked files. */
 
             if (!evalSettings.allowDirty)
                 throw Error("Git tree '%s' is dirty", uri);

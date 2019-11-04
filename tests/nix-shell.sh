@@ -7,9 +7,9 @@ export IMPURE_VAR=foo
 export SELECTED_IMPURE_VAR=baz
 export NIX_BUILD_SHELL=$SHELL
 output=$(nix-shell --pure shell.nix -A shellDrv --run \
-    'echo "$IMPURE_VAR - $VAR_FROM_STDENV_SETUP - $VAR_FROM_NIX"')
+    'echo "$IMPURE_VAR - $VAR_FROM_STDENV_SETUP - $VAR_FROM_NIX - $TEST_inNixShell"')
 
-[ "$output" = " - foo - bar" ]
+[ "$output" = " - foo - bar - true" ]
 
 # Test --keep
 output=$(nix-shell --pure --keep SELECTED_IMPURE_VAR shell.nix -A shellDrv --run \
@@ -19,10 +19,10 @@ output=$(nix-shell --pure --keep SELECTED_IMPURE_VAR shell.nix -A shellDrv --run
 
 # Test nix-shell on a .drv
 [[ $(nix-shell --pure $(nix-instantiate shell.nix -A shellDrv) --run \
-    'echo "$IMPURE_VAR - $VAR_FROM_STDENV_SETUP - $VAR_FROM_NIX"') = " - foo - bar" ]]
+    'echo "$IMPURE_VAR - $VAR_FROM_STDENV_SETUP - $VAR_FROM_NIX - $TEST_inNixShell"') = " - foo - bar - false" ]]
 
 [[ $(nix-shell --pure $(nix-instantiate shell.nix -A shellDrv) --run \
-    'echo "$IMPURE_VAR - $VAR_FROM_STDENV_SETUP - $VAR_FROM_NIX"') = " - foo - bar" ]]
+    'echo "$IMPURE_VAR - $VAR_FROM_STDENV_SETUP - $VAR_FROM_NIX - $TEST_inNixShell"') = " - foo - bar - false" ]]
 
 # Test nix-shell on a .drv symlink
 

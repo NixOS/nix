@@ -1875,6 +1875,21 @@ static void preloadNSS() {
     });
 }
 
+
+void linkOrCopy(const Path & from, const Path & to)
+{
+    if (link(from.c_str(), to.c_str()) == -1) {
+        /* Hard-linking fails if we exceed the maximum link count on a
+           file (e.g. 32000 of ext3), which is quite possible after a
+           'nix-store --optimise'. FIXME: actually, why don't we just
+           bind-mount in this case? */
+        if (errno != EMLINK)
+            throw SysError("linking '%s' to '%s'", to, from);
+        copyPath(from, to);
+    }
+}
+
+
 void DerivationGoal::startBuilder()
 {
     /* Right platform? */
@@ -2118,22 +2133,8 @@ void DerivationGoal::startBuilder()
                 throw SysError(format("getting attributes of path '%1%'") % i);
             if (S_ISDIR(st.st_mode))
                 dirsInChroot[i] = r;
-            else {
-                Path p = chrootRootDir + i;
-                debug("linking '%1%' to '%2%'", p, r);
-                if (link(r.c_str(), p.c_str()) == -1) {
-                    /* Hard-linking fails if we exceed the maximum
-                       link count on a file (e.g. 32000 of ext3),
-                       which is quite possible after a `nix-store
-                       --optimise'. */
-                    if (errno != EMLINK)
-                        throw SysError(format("linking '%1%' to '%2%'") % p % i);
-                    StringSink sink;
-                    dumpPath(r, sink);
-                    StringSource source(*sink.s);
-                    restorePath(p, source);
-                }
-            }
+            else
+                linkOrCopy(r, chrootRootDir + i);
         }
 
         /* If we're repairing, checking or rebuilding part of a
@@ -3264,8 +3265,7 @@ void DerivationGoal::registerOutputs()
             i.second.parseHashInfo(recursive, h);
 
             if (!recursive) {
-                /* The output path should be a regular file without
-                   execute permission. */
+                /* The output path should be a regular file without execute permission. */
                 if (!S_ISREG(st.st_mode) || (st.st_mode & S_IXUSR) != 0)
                     throw BuildError(
                         format("output path '%1%' should be a non-executable regular file") % path);
@@ -3343,8 +3343,7 @@ void DerivationGoal::registerOutputs()
                         % drvPath % path);
             }
 
-            /* Since we verified the build, it's now ultimately
-               trusted. */
+            /* Since we verified the build, it's now ultimately trusted. */
             if (!info.ultimate) {
                 info.ultimate = true;
                 worker.store.signPathInfo(info);
@@ -3354,8 +3353,7 @@ void DerivationGoal::registerOutputs()
             continue;
         }
 
-        /* For debugging, print out the referenced and unreferenced
-           paths. */
+        /* For debugging, print out the referenced and unreferenced paths. */
         for (auto & i : inputPaths) {
             PathSet::iterator j = references.find(i);
             if (j == references.end())
@@ -3413,8 +3411,7 @@ void DerivationGoal::registerOutputs()
             }
     }
 
-    /* If this is the first round of several, then move the output out
-       of the way. */
+    /* If this is the first round of several, then move the output out of the way. */
     if (nrRounds > 1 && curRound == 1 && curRound < nrRounds && keepPreviousRound) {
         for (auto & i : drv->outputs) {
             Path prev = i.second.path + checkSuffix;
@@ -4138,9 +4135,6 @@ void SubstitutionGoal::handleEOF(int fd)
 //////////////////////////////////////////////////////////////////////
 
 
-static bool working = false;
-
-
 Worker::Worker(LocalStore & store)
     : act(*logger, actRealise)
     , actDerivations(*logger, actBuilds)
@@ -4148,8 +4142,6 @@ Worker::Worker(LocalStore & store)
     , store(store)
 {
     /* Debugging: prevent recursive workers. */
-    if (working) abort();
-    working = true;
     nrLocalBuilds = 0;
     lastWokenUp = steady_time_point::min();
     permanentFailure = false;
@@ -4161,8 +4153,6 @@ Worker::Worker(LocalStore & store)
 
 Worker::~Worker()
 {
-    working = false;
-
     /* Explicitly get rid of all strong pointers now.  After this all
        goals that refer to this worker should be gone.  (Otherwise we
        are in trouble, since goals may call childTerminated() etc. in

@@ -77,6 +77,8 @@ void restorePath(const Path & path, Source & source);
 /* Read a NAR from 'source' and write it to 'sink'. */
 void copyNAR(Source & source, Sink & sink);
 
+void copyPath(const Path & from, const Path & to);
+
 
 extern const std::string narVersionMagic1;
 

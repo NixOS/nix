@@ -33,7 +33,7 @@ void Store::computeFSClosure(const PathSet & startPaths,
             state->pending++;
         }
 
-        queryPathInfo(path, {[&, path](std::future<ref<ValidPathInfo>> fut) {
+        queryPathInfo(path, {[&, path](std::future<ref<const ValidPathInfo>> fut) {
             // FIXME: calls to isValidPath() should be async
 
             try {

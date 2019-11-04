@@ -21,8 +21,10 @@
 #include <pwd.h>
 #include <sys/ioctl.h>
 #include <sys/types.h>
+#include <sys/socket.h>
 #include <sys/wait.h>
 #include <sys/time.h>
+#include <sys/un.h>
 #include <unistd.h>
 
 #ifdef __APPLE__
@@ -1470,7 +1472,7 @@ static Sync<std::pair<unsigned short, unsigned short>> windowSize{{0, 0}};
 static void updateWindowSize()
 {
     struct winsize ws;
-    if (ioctl(1, TIOCGWINSZ, &ws) == 0) {
+    if (ioctl(2, TIOCGWINSZ, &ws) == 0) {
         auto windowSize_(windowSize.lock());
         windowSize_->first = ws.ws_row;
         windowSize_->second = ws.ws_col;
@@ -1565,6 +1567,35 @@ std::unique_ptr<InterruptCallback> createInterruptCallback(std::function<void()>
     res->it--;
 
     return std::unique_ptr<InterruptCallback>(res.release());
+}
+
+
+AutoCloseFD createUnixDomainSocket(const Path & path, mode_t mode)
+{
+    AutoCloseFD fdSocket = socket(PF_UNIX, SOCK_STREAM | SOCK_CLOEXEC, 0);
+    if (!fdSocket)
+        throw SysError("cannot create Unix domain socket");
+
+    closeOnExec(fdSocket.get());
+
+    struct sockaddr_un addr;
+    addr.sun_family = AF_UNIX;
+    if (path.size() >= sizeof(addr.sun_path))
+        throw Error("socket path '%1%' is too long", path);
+    strcpy(addr.sun_path, path.c_str());
+
+    unlink(path.c_str());
+
+    if (bind(fdSocket.get(), (struct sockaddr *) &addr, sizeof(addr)) == -1)
+        throw SysError("cannot bind to socket '%1%'", path);
+
+    if (chmod(path.c_str(), mode) == -1)
+        throw SysError("changing permissions on '%1%'", path);
+
+    if (listen(fdSocket.get(), 5) == -1)
+        throw SysError("cannot listen on socket '%1%'", path);
+
+    return fdSocket;
 }
 
 }
