@@ -520,15 +520,16 @@ endif
 # OS Specific checks 
 #============================================================================
 # Look for libsecppomp, required for Linux sandboxing.
-libseccomp_dep = ''
 if sys_name.contains('linux')
-    libseccomp_dep = dependency('libseccomp', version : '>= 2.3.1', required: false)
-    if not (libseccomp_dep.found())
-        error('Nix requires libseccomp on a linux host system')
-    endif
+    libseccomp_dep = dependency(
+        'libseccomp',
+        version : '>= 2.3.1',
+        not_found_message : 'Nix requires libseccomp on a linux host system')
     config_h.set(
         'HAVE_SECCOMP', 1,
-        description : 'Whether seccomp is available and should be used for sandboxing.')    
+        description : 'Whether seccomp is available and should be used for sandboxing.')
+else
+    libseccomp_dep = dependency('', required: false)
 endif
 
 if (sys_name.contains('freebsd'))
