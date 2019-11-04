@@ -895,6 +895,9 @@ private:
     /* The daemon main thread. */
     std::thread daemonThread;
 
+    /* The daemon worker threads. */
+    std::vector<std::thread> daemonWorkerThreads;
+
     /* Paths that were added via recursive Nix calls. */
     PathSet addedPaths;
 
@@ -2875,17 +2878,19 @@ void DerivationGoal::startDaemon()
 
             debug("received daemon connection");
 
-            // FIXME: process on a separate thread.
-            FdSource from(remote.get());
-            FdSink to(remote.get());
-            try {
-                daemon::processConnection(store, from, to,
-                    daemon::NotTrusted, daemon::Recursive, "nobody", 65535);
-            } catch (SysError &) {
-                ignoreException();
-            }
+            auto workerThread = std::thread([this, store, remote{std::move(remote)}]() {
+                FdSource from(remote.get());
+                FdSink to(remote.get());
+                try {
+                    daemon::processConnection(store, from, to,
+                        daemon::NotTrusted, daemon::Recursive, "nobody", 65535);
+                    debug("terminated daemon connection");
+                } catch (SysError &) {
+                    ignoreException();
+                }
+            });
 
-            debug("terminated daemon connection");
+            daemonWorkerThreads.push_back(std::move(workerThread));
         }
 
         debug("daemon shutting down");
@@ -2900,6 +2905,12 @@ void DerivationGoal::stopDaemon()
 
     if (daemonThread.joinable())
         daemonThread.join();
+
+    // FIXME: should prune worker threads more quickly.
+    // FIXME: shutdown the client socket to speed up worker termination.
+    for (auto & thread : daemonWorkerThreads)
+        thread.join();
+    daemonWorkerThreads.clear();
 
     daemonSocket = -1;
 }
