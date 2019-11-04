@@ -41,7 +41,7 @@ struct CmdEval : MixJSON, InstallableCommand
             },
             Example{
                 "To get the current version of Nixpkgs:",
-                "nix eval --raw nixpkgs.lib.nixpkgsVersion"
+                "nix eval --raw nixpkgs.lib.version"
             },
             Example{
                 "To print the store path of the Hello package:",
