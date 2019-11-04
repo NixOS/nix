@@ -2721,7 +2721,14 @@ struct RestrictedStore : public LocalFSStore
     Path addToStore(const string & name, const Path & srcPath,
         bool recursive = true, HashType hashAlgo = htSHA256,
         PathFilter & filter = defaultPathFilter, RepairFlag repair = NoRepair) override
-    { throw Error("addToStore");
+    { throw Error("addToStore"); }
+
+    void addToStore(const ValidPathInfo & info, Source & narSource,
+        RepairFlag repair = NoRepair, CheckSigsFlag checkSigs = CheckSigs,
+        std::shared_ptr<FSAccessor> accessor = 0) override
+    {
+        next->addToStore(info, narSource, repair, checkSigs, accessor);
+        goal.addDependency(info.path);
     }
 
     Path addToStoreFromDump(const string & dump, const string & name,
