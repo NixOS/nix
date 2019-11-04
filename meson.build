@@ -321,10 +321,8 @@ dirent_h_prefix = '''
   #include <dirent.h>
 '''
 
-# Code taken from glib, thanks!
 if has_dirent_h and meson.get_compiler('cpp').has_member('struct dirent', 'd_type', prefix: dirent_h_prefix)
-  define = 'HAVE_STRUCT_@0@_@1@'.format('dirent'.to_upper(), 'd_type'.underscorify().to_upper())
-  config_h.set(define, 1)
+  config_h.set('HAVE_STRUCT_DIRENT_D_TYPE', 1)
 endif
 
 # required dependancies
