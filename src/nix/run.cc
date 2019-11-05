@@ -24,7 +24,7 @@ struct RunCommon : virtual Command
 {
     void runProgram(ref<Store> store,
         const std::string & program,
-        const Strings & args, char** env = environ)
+        const Strings & args)
     {
         stopProgressBar();
 
@@ -46,12 +46,12 @@ struct RunCommon : virtual Command
             Strings helperArgs = { chrootHelperName, store->storeDir, store2->realStoreDir, program };
             for (auto & arg : args) helperArgs.push_back(arg);
 
-            execve(readLink("/proc/self/exe").c_str(), stringsToCharPtrs(helperArgs).data(), env);
+            execv(readLink("/proc/self/exe").c_str(), stringsToCharPtrs(helperArgs).data());
 
             throw SysError("could not execute chroot helper");
         }
 
-        execvpe(program.c_str(), stringsToCharPtrs(args).data(), env);
+        execvp(program.c_str(), stringsToCharPtrs(args).data());
 
         throw SysError("unable to execute '%s'", program);
     }
@@ -127,7 +127,7 @@ struct CmdRun : InstallablesCommand, RunCommon
         };
     }
 
-    char** newEnviron() {
+    void setNewEnviron() {
         if (ignoreEnvironment) {
 
             if (!unset.empty())
@@ -138,7 +138,7 @@ struct CmdRun : InstallablesCommand, RunCommon
                 if (val) stringEnv.emplace_back(fmt("%s=%s", var.c_str(), val));
             }
 
-            return stringsToCharPtrs(stringEnv).data();
+            environ = stringsToCharPtrs(stringEnv).data();
 
         } else {
             if (!keep.empty())
@@ -146,8 +146,6 @@ struct CmdRun : InstallablesCommand, RunCommon
 
             for (const auto & var : unset)
                 unsetenv(var.c_str());
-
-            return environ;
         }
     }
 
@@ -162,9 +160,9 @@ struct CmdRun : InstallablesCommand, RunCommon
         std::queue<Path> todo;
         for (auto & path : outPaths) todo.push(path);
 
-        Strings unixPath;
-        if (!ignoreEnvironment || keep.find("PATH") != keep.end())
-            unixPath = tokenizeString<Strings>(getEnv("PATH"), ":");
+        setNewEnviron();
+
+        auto unixPath = tokenizeString<Strings>(getEnv("PATH"), ":");
 
         while (!todo.empty()) {
             Path path = todo.front();
@@ -182,16 +180,11 @@ struct CmdRun : InstallablesCommand, RunCommon
         }
 
         setenv("PATH", concatStringsSep(":", unixPath).c_str(), 1);
-        if (ignoreEnvironment) {
-            keep.emplace("PATH");
-        } else {
-            unset.erase("PATH");
-        }
 
         Strings args;
         for (auto & arg : command) args.push_back(arg);
 
-        runProgram(store, *command.begin(), args, newEnviron());
+        runProgram(store, *command.begin(), args);
     }
 };
 
