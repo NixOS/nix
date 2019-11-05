@@ -22,6 +22,7 @@ extern "C" {
 #include "shared.hh"
 #include "eval.hh"
 #include "eval-inline.hh"
+#include "attr-path.hh"
 #include "store-api.hh"
 #include "common-eval-args.hh"
 #include "get-drvs.hh"
@@ -440,6 +441,7 @@ bool NixRepl::processLine(string line)
              << "  <x> = <expr>  Bind expression to variable\n"
              << "  :a <expr>     Add attributes from resulting set to scope\n"
              << "  :b <expr>     Build derivation\n"
+             << "  :e <expr>     Open the derivation in $EDITOR\n"
              << "  :i <expr>     Build derivation, then install result into current profile\n"
              << "  :l <path>     Load Nix expression and add it to scope\n"
              << "  :p <expr>     Evaluate and print expression recursively\n"
@@ -462,6 +464,34 @@ bool NixRepl::processLine(string line)
     }
 
     else if (command == ":r" || command == ":reload") {
+        state.resetFileCache();
+        reloadFiles();
+    }
+
+    else if (command == ":e" || command == ":edit") {
+        Value v;
+        evalString(arg, v);
+
+        Pos pos;
+
+        if (v.type == tPath || v.type == tString) {
+            PathSet context;
+            auto filename = state.coerceToString(noPos, v, context);
+            pos.file = state.symbols.create(filename);
+        } else if (v.type == tLambda) {
+            pos = v.lambda.fun->pos;
+        } else {
+            // assume it's a derivation
+            pos = findDerivationFilename(state, v, arg);
+        }
+
+        // Open in EDITOR
+        auto args = editorFor(pos);
+        auto editor = args.front();
+        args.pop_front();
+        runProgram(editor, args);
+
+        // Reload right after exiting the editor
         state.resetFileCache();
         reloadFiles();
     }
