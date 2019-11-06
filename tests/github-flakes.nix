@@ -37,15 +37,18 @@ let
     destination = "/flake-registry.json";
   };
 
-  tarball = pkgs.runCommand "nixpkgs-flake" {}
+  api = pkgs.runCommand "nixpkgs-flake" {}
     ''
-      mkdir $out
+      mkdir -p $out/tarball
+
       dir=NixOS-nixpkgs-${nixpkgs.shortRev}
       cp -prd ${nixpkgs} $dir
       # Set the correct timestamp in the tarball.
       find $dir -print0 | xargs -0 touch -t ${builtins.substring 0 12 nixpkgs.lastModified}.${builtins.substring 12 2 nixpkgs.lastModified} --
-      tar cfz $out/${nixpkgs.rev} $dir
-      ln -s ${nixpkgs.rev} $out/master
+      tar cfz $out/tarball/${nixpkgs.rev} $dir
+
+      mkdir -p $out/commits
+      echo '{"sha": "${nixpkgs.rev}"}' > $out/commits/master
     '';
 
 in
@@ -70,6 +73,11 @@ makeTest (
                 enableSSL = true;
                 sslServerKey = "${cert}/server.key";
                 sslServerCert = "${cert}/server.crt";
+                servedDirs =
+                  [ { urlPath = "/NixOS/flake-registry/raw/master";
+                      dir = registry;
+                    }
+                  ];
               }
 
               { hostName = "api.github.com";
@@ -77,23 +85,8 @@ makeTest (
                 sslServerKey = "${cert}/server.key";
                 sslServerCert = "${cert}/server.crt";
                 servedDirs =
-                  [ { urlPath = "/repos/NixOS/nixpkgs/tarball";
-                      dir = tarball;
-                    }
-                  ];
-                extraConfig =
-                  ''
-                    Header set ETag "\"${nixpkgs.rev}\""
-                  '';
-              }
-
-              { hostName = "raw.githubusercontent.com";
-                enableSSL = true;
-                sslServerKey = "${cert}/server.key";
-                sslServerCert = "${cert}/server.crt";
-                servedDirs =
-                  [ { urlPath = "/NixOS/flake-registry/master";
-                      dir = registry;
+                  [ { urlPath = "/repos/NixOS/nixpkgs";
+                      dir = api;
                     }
                   ];
               }
@@ -101,10 +94,11 @@ makeTest (
         };
 
       client =
-        { config, pkgs, nodes, ... }:
+        { config, lib, pkgs, nodes, ... }:
         { virtualisation.writableStore = true;
           virtualisation.pathsInNixDB = [ pkgs.hello pkgs.fuse ];
-          nix.binaryCaches = [ ];
+          nix.binaryCaches = lib.mkForce [ ];
+          nix.extraOptions = "experimental-features = nix-command flakes";
           environment.systemPackages = [ pkgs.jq ];
           networking.hosts.${(builtins.head nodes.github.config.networking.interfaces.eth1.ipv4.addresses).address} =
             [ "github.com" "api.github.com" "raw.githubusercontent.com" ];
