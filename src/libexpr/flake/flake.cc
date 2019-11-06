@@ -686,7 +686,11 @@ Fingerprint ResolvedFlake::getFingerprint() const
     // and we haven't changed it, then it's sufficient to use
     // flake.sourceInfo.storePath for the fingerprint.
     return hashString(htSHA256,
-        fmt("%s;%s", flake.sourceInfo.storePath, lockFile));
+        fmt("%s;%d;%d;%s",
+            flake.sourceInfo.storePath,
+            flake.sourceInfo.revCount.value_or(0),
+            flake.sourceInfo.lastModified.value_or(0),
+            lockFile));
 }
 
 }
