@@ -57,7 +57,6 @@ test "$localstatedir" = '${prefix}/var' && localstatedir=/nix/var
 AC_PROG_CC
 AC_PROG_CXX
 AC_PROG_CPP
-AX_CXX_COMPILE_STDCXX_17([noext], [mandatory])
 
 AC_CHECK_TOOL([AR], [ar])
 
