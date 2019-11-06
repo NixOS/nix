@@ -1572,7 +1572,11 @@ std::unique_ptr<InterruptCallback> createInterruptCallback(std::function<void()>
 
 AutoCloseFD createUnixDomainSocket(const Path & path, mode_t mode)
 {
-    AutoCloseFD fdSocket = socket(PF_UNIX, SOCK_STREAM | SOCK_CLOEXEC, 0);
+    AutoCloseFD fdSocket = socket(PF_UNIX, SOCK_STREAM
+        #ifdef SOCK_CLOEXEC
+        | SOCK_CLOEXEC
+        #endif
+        , 0);
     if (!fdSocket)
         throw SysError("cannot create Unix domain socket");
 

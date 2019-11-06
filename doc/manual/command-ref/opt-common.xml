@@ -243,9 +243,10 @@
 <varlistentry><term><option>--arg</option> <replaceable>name</replaceable> <replaceable>value</replaceable></term>
 
   <listitem><para>This option is accepted by
-  <command>nix-env</command>, <command>nix-instantiate</command> and
-  <command>nix-build</command>.  When evaluating Nix expressions, the
-  expression evaluator will automatically try to call functions that
+  <command>nix-env</command>, <command>nix-instantiate</command>,
+  <command>nix-shell</command> and <command>nix-build</command>.
+  When evaluating Nix expressions, the expression evaluator will
+  automatically try to call functions that
   it encounters.  It can automatically call functions for which every
   argument has a <link linkend='ss-functions'>default value</link>
   (e.g., <literal>{ <replaceable>argName</replaceable> ?

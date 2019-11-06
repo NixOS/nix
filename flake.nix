@@ -51,9 +51,7 @@
         });
 
         configureFlags =
-          [
-            "--enable-gc"
-          ] ++ lib.optionals stdenv.isLinux [
+          lib.optionals stdenv.isLinux [
             "--with-sandbox-shell=${sh}/bin/busybox"
           ];
 
@@ -173,8 +171,6 @@
 
             buildInputs = tarballDeps ++ buildDeps;
 
-            configureFlags = "--enable-gc";
-
             postUnpack = ''
               (cd $sourceRoot && find . -type f) | cut -c3- > $sourceRoot/.dist-files
               cat $sourceRoot/.dist-files
@@ -219,7 +215,7 @@
           in
 
           runCommand "nix-binary-tarball-${version}"
-            { nativeBuildInputs = lib.optional (system != "aarch64-linux") shellcheck;
+            { #nativeBuildInputs = lib.optional (system != "aarch64-linux") shellcheck;
               meta.description = "Distribution-independent Nix bootstrap binaries for ${system}";
             }
             ''
@@ -372,7 +368,7 @@
                 x86_64-linux = "${self.hydraJobs.build.x86_64-linux}";
               }
               EOF
-              su - alice -c 'nix upgrade-nix -vvv --nix-store-paths-url file:///tmp/paths.nix'
+              su - alice -c 'nix --experimental-features nix-command upgrade-nix -vvv --nix-store-paths-url file:///tmp/paths.nix'
               (! [ -L /home/alice/.profile-1-link ])
               su - alice -c 'PAGER= nix-store -qR ${self.hydraJobs.build.x86_64-linux}'
 
@@ -381,6 +377,7 @@
               umount /nix
             '');
 
+        /*
         # Check whether we can still evaluate all of Nixpkgs.
         tests.evalNixpkgs =
           import (nixpkgs + "/pkgs/top-level/make-tarball.nix") {
@@ -389,6 +386,7 @@
             pkgs = nixpkgsFor.x86_64-linux;
             officialRelease = false;
           };
+        */
 
         # Check whether we can still evaluate NixOS.
         tests.evalNixOS =
@@ -422,7 +420,7 @@
                 tests.remoteBuilds
                 tests.nix-copy-closure
                 tests.binaryTarball
-                tests.evalNixpkgs
+                #tests.evalNixpkgs
                 tests.evalNixOS
                 installerScript
               ];
