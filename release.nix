@@ -271,6 +271,7 @@ let
           umount /nix
         ''); # */
 
+    /*
     tests.evalNixpkgs =
       import (nixpkgs + "/pkgs/top-level/make-tarball.nix") {
         inherit nixpkgs;
@@ -278,6 +279,7 @@ let
         nix = build.x86_64-linux;
         officialRelease = false;
       };
+    */
 
     tests.evalNixOS =
       pkgs.runCommand "eval-nixos" { buildInputs = [ build.x86_64-linux ]; }
@@ -326,7 +328,7 @@ let
           tests.remoteBuilds
           tests.nix-copy-closure
           tests.binaryTarball
-          tests.evalNixpkgs
+          #tests.evalNixpkgs
           tests.evalNixOS
           installerScript
         ];
