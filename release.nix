@@ -260,7 +260,7 @@ let
             x86_64-linux = "${build.x86_64-linux}";
           }
           EOF
-          su - alice -c 'nix upgrade-nix -vvv --nix-store-paths-url file:///tmp/paths.nix'
+          su - alice -c 'nix --experimental-features nix-command upgrade-nix -vvv --nix-store-paths-url file:///tmp/paths.nix'
           (! [ -L /home/alice/.profile-1-link ])
           su - alice -c 'PAGER= nix-store -qR ${build.x86_64-linux}'
 
