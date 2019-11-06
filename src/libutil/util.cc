@@ -10,6 +10,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <climits>
 #include <iostream>
 #include <sstream>
 #include <thread>
@@ -17,7 +18,6 @@
 
 #include <fcntl.h>
 #include <grp.h>
-#include <limits.h>
 #include <pwd.h>
 #include <sys/ioctl.h>
 #include <sys/types.h>
