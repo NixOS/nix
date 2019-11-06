@@ -2,7 +2,7 @@
 
 #include "types.hh"
 #include "hash.hh"
-#include "globals.hh"
+#include "config.hh"
 
 #include <string>
 #include <future>
@@ -71,10 +71,10 @@ struct CachedDownloadRequest
     bool unpack = false;
     std::string name;
     Hash expectedHash;
-    unsigned int ttl = settings.tarballTtl;
+    unsigned int ttl;
 
-    CachedDownloadRequest(const std::string & uri)
-        : uri(uri) { }
+    CachedDownloadRequest(const std::string & uri);
+    CachedDownloadRequest() = delete;
 };
 
 struct CachedDownloadResult
