@@ -71,7 +71,7 @@
             bzip2 xz brotli editline
             openssl pkgconfig sqlite boehmgc
             boost
-            nlohmann_json
+            (nlohmann_json.override { multipleHeaders = true; })
 
             # Tests
             git
