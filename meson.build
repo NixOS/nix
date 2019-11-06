@@ -319,10 +319,8 @@ dirent_h_prefix = '''
   #include <dirent.h>
 '''
 
-# Code taken from glib, thanks!
 if has_dirent_h and meson.get_compiler('cpp').has_member('struct dirent', 'd_type', prefix: dirent_h_prefix)
-  define = 'HAVE_STRUCT_@0@_@1@'.format('dirent'.to_upper(), 'd_type'.underscorify().to_upper())
-  config_h.set(define, 1)
+  config_h.set('HAVE_STRUCT_DIRENT_D_TYPE', 1)
 endif
 
 # required dependancies
@@ -461,10 +459,10 @@ libbz2_dep = declare_dependency(
 
 # Look for libsodium, an optional dependency.
 #--------------------------------------------------
-libsodium_dep_raw = cpp.find_library('sodium', required: get_option('with_libsodium'))
-if (libsodium_dep_raw.found())
+libsodium_lib = cpp.find_library('sodium', required: get_option('with_libsodium'))
+if (libsodium_lib.found())
     libsodium_dep = declare_dependency(
-        dependencies : libsodium_dep_raw,
+        dependencies : libsodium_lib,
         link_args :  get_option('sodium_link_args'))
     config_h.set('HAVE_SODIUM', 1, description : 'Whether to use libsodium for cryptography.')
 else
@@ -531,15 +529,16 @@ endif
 # OS Specific checks 
 #============================================================================
 # Look for libsecppomp, required for Linux sandboxing.
-libseccomp_dep = ''
 if sys_name.contains('linux')
-    libseccomp_dep = dependency('libseccomp', version : '>= 2.3.1', required: false)
-    if not (libseccomp_dep.found())
-        error('Nix requires libseccomp on a linux host system')
-    endif
+    libseccomp_dep = dependency(
+        'libseccomp',
+        version : '>= 2.3.1',
+        not_found_message : 'Nix requires libseccomp on a linux host system')
     config_h.set(
         'HAVE_SECCOMP', 1,
-        description : 'Whether seccomp is available and should be used for sandboxing.')    
+        description : 'Whether seccomp is available and should be used for sandboxing.')
+else
+    libseccomp_dep = dependency('', required: false)
 endif
 
 if (sys_name.contains('freebsd'))

@@ -23,7 +23,8 @@ let
         src = nix;
         inherit officialRelease;
 
-        buildInputs = tarballDeps ++ buildDeps;
+        nativeBuildInputs = tarballDeps ++ nativeBuildDeps;
+        buildInputs = buildDeps;
 
         configureFlags = "--enable-gc";
 
@@ -65,6 +66,7 @@ let
         name = "nix";
         src = tarball;
 
+        nativeBuildInputs = nativeBuildDeps;
         buildInputs = buildDeps;
 
         preConfigure =
@@ -79,6 +81,8 @@ let
               patchelf --set-rpath $out/lib:${stdenv.cc.cc.lib}/lib $out/lib/libboost_thread.so.*
             ''}
           '';
+
+        inherit mesonFlags;
 
         configureFlags = configureFlags ++
           [ "--sysconfdir=/etc" ];
@@ -196,6 +200,7 @@ let
         name = "nix-build";
         src = tarball;
 
+        nativeBuildInputs = nativeBuildDeps;
         buildInputs = buildDeps;
 
         dontInstall = false;
