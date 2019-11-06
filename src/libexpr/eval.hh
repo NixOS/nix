@@ -383,7 +383,7 @@ struct EvalSettings : Config
     Setting<bool> traceFunctionCalls{this, false, "trace-function-calls",
         "Emit log messages for each function entry and exit at the 'vomit' log level (-vvvv)."};
 
-    Setting<std::string> flakeRegistry{this, "https://raw.githubusercontent.com/NixOS/flake-registry/master/flake-registry.json", "flake-registry",
+    Setting<std::string> flakeRegistry{this, "https://github.com/NixOS/flake-registry/raw/master/flake-registry.json", "flake-registry",
         "Path or URI of the global flake registry."};
 
     Setting<bool> allowDirty{this, true, "allow-dirty",
