@@ -1,4 +1,5 @@
 makefiles = \
+  mk/precompiled-headers.mk \
   local.mk \
   src/libutil/local.mk \
   src/libstore/local.mk \
