@@ -89,7 +89,6 @@ include mk/jars.mk
 include mk/patterns.mk
 include mk/templates.mk
 include mk/tests.mk
-include mk/precompiled-headers.mk
 
 
 # Include all sub-Makefiles.
