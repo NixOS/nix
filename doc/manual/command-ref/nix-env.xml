@@ -509,6 +509,36 @@ selecting the <literal>subversionWithJava</literal> attribute from the
 set returned by calling the function defined in
 <filename>./foo.nix</filename>.</para>
 
+<para>To install an expression from a channel:
+
+<screen>
+$ nix-env -i -E 'channels: (channels.nixpkgs {}).git'</screen>
+
+Here, <literal>-f</literal> is not given, so the expression is passed
+as an argument the "default expressions" that
+are setup by <command>nix-channel</command> by default in
+<filename>~/.nix-defexpr</filename>.
+That means we can access the channel from it (using the one called
+<literal>nixpkgs</literal> in the example, as it is named in
+<command>nix-channel --list</command>).</para>
+
+<para>This also allows you to override packages:
+
+<screen>
+$ nix-env -i -E 'channels: (channels.nixpkgs {}).git.override { pythonSupport = false; }'</screen>
+
+However, this is not recommended, because the overrides will not be remembered,
+so the next update via <command>nix-env --upgrade</command> will undo them.
+It is better to define such overrides in <filename>~/.config/nixpkgs/config.nix</filename>.</para>
+
+<para>It is possible to install multiple derivations with an expression
+by making it evaluate to an attribute set instead of a single derivation:
+
+<screen>
+$ nix-env -i -E 'channels: with channels.nixpkgs {}; { inherit git vim; }'</screen>
+
+</para>
+
 <para>A dry-run tells you which paths will be downloaded or built from
 source:
 
