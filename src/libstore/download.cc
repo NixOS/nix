@@ -34,6 +34,10 @@ DownloadSettings downloadSettings;
 
 static GlobalConfig::Register r1(&downloadSettings);
 
+CachedDownloadRequest::CachedDownloadRequest(const std::string & uri)
+    : uri(uri), ttl(settings.tarballTtl)
+{ }
+
 std::string resolveUri(const std::string & uri)
 {
     if (uri.compare(0, 8, "channel:") == 0)

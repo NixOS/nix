@@ -1,10 +1,10 @@
-#include <assert.h>
+#include <cassert>
 
 #include "xml-writer.hh"
 
 
 namespace nix {
-    
+
 
 XMLWriter::XMLWriter(bool indent, std::ostream & output)
     : output(output), indent(indent)

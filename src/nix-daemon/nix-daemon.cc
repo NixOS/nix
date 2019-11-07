@@ -10,8 +10,9 @@
 #include "daemon.hh"
 
 #include <algorithm>
-
+#include <climits>
 #include <cstring>
+
 #include <unistd.h>
 #include <signal.h>
 #include <sys/types.h>
@@ -23,7 +24,6 @@
 #include <pwd.h>
 #include <grp.h>
 #include <fcntl.h>
-#include <limits.h>
 
 #if __APPLE__ || __FreeBSD__
 #include <sys/ucred.h>

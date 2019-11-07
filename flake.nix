@@ -386,7 +386,6 @@
             pkgs = nixpkgsFor.x86_64-linux;
             officialRelease = false;
           };
-        */
 
         # Check whether we can still evaluate NixOS.
         tests.evalNixOS =
@@ -400,6 +399,7 @@
 
               touch $out
             '';
+        */
 
         # Aggregate job containing the release-critical jobs.
         release =
@@ -421,7 +421,7 @@
                 tests.nix-copy-closure
                 tests.binaryTarball
                 #tests.evalNixpkgs
-                tests.evalNixOS
+                #tests.evalNixOS
                 installerScript
               ];
           };
