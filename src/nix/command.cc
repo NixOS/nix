@@ -128,4 +128,48 @@ MixDefaultProfile::MixDefaultProfile()
     profile = getDefaultProfile();
 }
 
+MixEnvironment::MixEnvironment() : ignoreEnvironment(false) {
+    mkFlag()
+        .longName("ignore-environment")
+        .shortName('i')
+        .description("clear the entire environment (except those specified with --keep)")
+        .set(&ignoreEnvironment, true);
+
+    mkFlag()
+        .longName("keep")
+        .shortName('k')
+        .description("keep specified environment variable")
+        .arity(1)
+        .labels({"name"})
+        .handler([&](std::vector<std::string> ss) { keep.insert(ss.front()); });
+
+    mkFlag()
+        .longName("unset")
+        .shortName('u')
+        .description("unset specified environment variable")
+        .arity(1)
+        .labels({"name"})
+        .handler([&](std::vector<std::string> ss) { unset.insert(ss.front()); });
+}
+
+void MixEnvironment::setEnviron() {
+    if (ignoreEnvironment) {
+        if (!unset.empty())
+            throw UsageError("--unset does not make sense with --ignore-environment");
+
+        for (const auto & var : keep) {
+            auto val = getenv(var.c_str());
+            if (val) stringEnv.emplace_back(fmt("%s=%s", var.c_str(), val));
+        }
+        vectorEnv = stringsToCharPtrs(stringsEnv);
+        environ = vectorEnv.data();
+    } else {
+        if (!keep.empty())
+            throw UsageError("--keep does not make sense without --ignore-environment");
+
+        for (const auto & var : unset)
+            unsetenv(var.c_str());
+    }
+}
+
 }
