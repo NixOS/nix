@@ -277,7 +277,6 @@ let
         nix = build.x86_64-linux;
         officialRelease = false;
       };
-    */
 
     tests.evalNixOS =
       pkgs.runCommand "eval-nixos" { buildInputs = [ build.x86_64-linux ]; }
@@ -289,6 +288,7 @@ let
 
           touch $out
         '';
+    */
 
 
     installerScript =
@@ -327,7 +327,7 @@ let
           tests.nix-copy-closure
           tests.binaryTarball
           #tests.evalNixpkgs
-          tests.evalNixOS
+          #tests.evalNixOS
           installerScript
         ];
     };
