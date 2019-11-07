@@ -57,12 +57,9 @@ struct RunCommon : virtual Command
     }
 };
 
-struct CmdRun : InstallablesCommand, RunCommon
+struct CmdRun : InstallablesCommand, RunCommon, MixEnvironment
 {
     std::vector<std::string> command = { "bash" };
-    StringSet keep, unset;
-    Strings stringEnv;
-    bool ignoreEnvironment = false;
 
     CmdRun()
     {
@@ -76,28 +73,6 @@ struct CmdRun : InstallablesCommand, RunCommon
                 if (ss.empty()) throw UsageError("--command requires at least one argument");
                 command = ss;
             });
-
-        mkFlag()
-            .longName("ignore-environment")
-            .shortName('i')
-            .description("clear the entire environment (except those specified with --keep)")
-            .set(&ignoreEnvironment, true);
-
-        mkFlag()
-            .longName("keep")
-            .shortName('k')
-            .description("keep specified environment variable")
-            .arity(1)
-            .labels({"name"})
-            .handler([&](std::vector<std::string> ss) { keep.insert(ss.front()); });
-
-        mkFlag()
-            .longName("unset")
-            .shortName('u')
-            .description("unset specified environment variable")
-            .arity(1)
-            .labels({"name"})
-            .handler([&](std::vector<std::string> ss) { unset.insert(ss.front()); });
     }
 
     std::string description() override
@@ -127,28 +102,6 @@ struct CmdRun : InstallablesCommand, RunCommon
         };
     }
 
-    void setNewEnviron() {
-        if (ignoreEnvironment) {
-
-            if (!unset.empty())
-                throw UsageError("--unset does not make sense with --ignore-environment");
-
-            for (const auto & var : keep) {
-                auto val = getenv(var.c_str());
-                if (val) stringEnv.emplace_back(fmt("%s=%s", var.c_str(), val));
-            }
-
-            environ = stringsToCharPtrs(stringEnv).data();
-
-        } else {
-            if (!keep.empty())
-                throw UsageError("--keep does not make sense without --ignore-environment");
-
-            for (const auto & var : unset)
-                unsetenv(var.c_str());
-        }
-    }
-
     void run(ref<Store> store) override
     {
         auto outPaths = toStorePaths(store, Build, installables);
@@ -160,7 +113,7 @@ struct CmdRun : InstallablesCommand, RunCommon
         std::queue<Path> todo;
         for (auto & path : outPaths) todo.push(path);
 
-        setNewEnviron();
+        setEnviron();
 
         auto unixPath = tokenizeString<Strings>(getEnv("PATH"), ":");
 

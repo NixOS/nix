@@ -229,7 +229,7 @@ struct Common : InstallableCommand, MixProfile
     }
 };
 
-struct CmdDevShell : Common
+struct CmdDevShell : Common, MixEnvironment
 {
     std::string description() override
     {
@@ -274,6 +274,8 @@ struct CmdDevShell : Common
         stopProgressBar();
 
         auto shell = getEnv("SHELL", "bash");
+
+        setEnviron();
 
         auto args = Strings{baseNameOf(shell), "--rcfile", rcFilePath};
 
