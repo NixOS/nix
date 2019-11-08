@@ -10,6 +10,7 @@ extern std::string programPath;
 struct Value;
 class Bindings;
 class EvalState;
+struct Pos;
 
 /* A command is an argument parser that can be executed by calling its
    run() method. */
@@ -215,5 +216,9 @@ Path toStorePath(ref<Store> store, RealiseMode mode,
 PathSet toDerivations(ref<Store> store,
     std::vector<std::shared_ptr<Installable>> installables,
     bool useDeriver = false);
+
+/* Helper function to generate args that invoke $EDITOR on
+   filename:lineno. */
+Strings editorFor(const Pos & pos);
 
 }
