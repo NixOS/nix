@@ -1,6 +1,7 @@
 #include "command.hh"
 #include "store-api.hh"
 #include "derivations.hh"
+#include "nixexpr.hh"
 #include "profiles.hh"
 
 namespace nix {
@@ -80,6 +81,19 @@ void StorePathCommand::run(ref<Store> store)
         throw UsageError("this command requires exactly one store path");
 
     run(store, *storePaths.begin());
+}
+
+Strings editorFor(const Pos & pos)
+{
+    auto editor = getEnv("EDITOR", "cat");
+    auto args = tokenizeString<Strings>(editor);
+    if (pos.line > 0 && (
+        editor.find("emacs") != std::string::npos ||
+        editor.find("nano") != std::string::npos ||
+        editor.find("vim") != std::string::npos))
+        args.push_back(fmt("+%d", pos.line));
+    args.push_back(pos.file);
+    return args;
 }
 
 MixProfile::MixProfile()
