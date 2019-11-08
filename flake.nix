@@ -287,7 +287,7 @@
 
               substitute ${./scripts/install.in} $out/install \
                 ${pkgs.lib.concatMapStrings
-                  (system: "--replace '@binaryTarball_${system}@' $(nix hash-file --base16 --type sha256 ${self.hydraJobs.binaryTarball.${system}}/*.tar.xz) ")
+                  (system: "--replace '@binaryTarball_${system}@' $(nix --experimental-features nix-command hash-file --base16 --type sha256 ${self.hydraJobs.binaryTarball.${system}}/*.tar.xz) ")
                   [ "x86_64-linux" "i686-linux" "x86_64-darwin" "aarch64-linux" ]
                 } \
                 --replace '@nixVersion@' ${nix.src.version}
@@ -310,7 +310,7 @@
 
             doInstallCheck = true;
 
-            lcovFilter = [ "*/boost/*" "*-tab.*" "*/linenoise/*" ];
+            lcovFilter = [ "*/boost/*" "*-tab.*" ];
 
             # We call `dot', and even though we just use it to
             # syntax-check generated dot files, it still requires some
