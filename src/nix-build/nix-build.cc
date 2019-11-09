@@ -460,6 +460,7 @@ static void _main(int argc, char * * argv)
 
         restoreSignals();
 
+        setenv("NIX_SHELL_NAME", drvInfo.queryName().c_str(), 1);
         execvp(shell.c_str(), argPtrs.data());
 
         throw SysError("executing shell '%s'", shell);
