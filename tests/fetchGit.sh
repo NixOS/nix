@@ -88,6 +88,12 @@ path3=$(nix eval --raw "(builtins.fetchGit { url = $repo; ref = \"master\"; }).o
 path3=$(nix eval --raw "(builtins.fetchGit { url = $repo; rev = \"$rev2\"; }).outPath")
 [[ $path = $path3 ]]
 
+path4=$(nix eval --raw "(builtins.fetchGit { url = $repo; rev = \"$rev2\"; hash = \"sha256-Hr8g6AqANb3xqX28eu1XnjK/3ab8Gv6TJSnkb1LezG8=\"; }).outPath")
+[[ $path = $path4 ]]
+
+nix eval --raw "(builtins.fetchGit { url = $repo; rev = \"$rev2\"; hash = \"sha256-B5yIPHhEm0eysJKEsO7nqxprh9vcblFxpJG11gXJus1=\"; }).outPath" || status=$?
+[[ "$status" = "102" ]]
+
 # Committing should not affect the store path.
 git -C $repo commit -m 'Bla3' -a
 

@@ -28,10 +28,27 @@ std::regex revRegex("^[0-9a-fA-F]{40}$");
 
 GitInfo exportGit(ref<Store> store, const std::string & uri,
     std::optional<std::string> ref, std::string rev,
-    const std::string & name)
+    const std::string & name, std::optional<Hash> hash)
 {
     if (evalSettings.pureEval && rev == "")
         throw Error("in pure evaluation mode, 'fetchGit' requires a Git revision");
+
+    std::optional<StorePath> expectedStorePath;
+    GitInfo gitInfo;
+    if (hash) {
+        // Disallow `hash` usage if no rev/ref is given.
+        if (rev == "" && !ref) {
+            throw Error("Cannot create a fixed-output derivation for a git repo without a git revision or ref");
+        }
+
+        expectedStorePath = store->makeFixedOutputPath(true, *hash, name);
+        if (store->isValidPath(*expectedStorePath)) {
+            gitInfo.storePath = store->printStorePath(*expectedStorePath);
+            gitInfo.rev = rev;
+            gitInfo.shortRev = std::string(gitInfo.rev, 0, 7);
+            return gitInfo;
+        }
+    }
 
     if (!ref && rev == "" && hasPrefix(uri, "/") && pathExists(uri + "/.git")) {
 
@@ -139,7 +156,6 @@ GitInfo exportGit(ref<Store> store, const std::string & uri,
     }
 
     // FIXME: check whether rev is an ancestor of ref.
-    GitInfo gitInfo;
     gitInfo.rev = rev != "" ? rev : chomp(readFile(localRefFile));
     gitInfo.shortRev = std::string(gitInfo.rev, 0, 7);
 
@@ -149,20 +165,25 @@ GitInfo exportGit(ref<Store> store, const std::string & uri,
     Path storeLink = cacheDir + "/" + storeLinkName + ".link";
     PathLocks storeLinkLock({storeLink}, fmt("waiting for lock on '%1%'...", storeLink)); // FIXME: broken
 
-    try {
-        auto json = nlohmann::json::parse(readFile(storeLink));
+    // Only return cached git repo if no hash is set. If a hash exists,
+    // the proper store path would've been returned earlier, otherwise the hash
+    // needs to be validated.
+    if (!hash) {
+        try {
+            auto json = nlohmann::json::parse(readFile(storeLink));
 
-        assert(json["name"] == name && json["rev"] == gitInfo.rev);
+            assert(json["name"] == name && json["rev"] == gitInfo.rev);
 
-        gitInfo.storePath = json["storePath"];
+            gitInfo.storePath = json["storePath"];
 
-        if (store->isValidPath(store->parseStorePath(gitInfo.storePath))) {
-            gitInfo.revCount = json["revCount"];
-            return gitInfo;
+            if (store->isValidPath(store->parseStorePath(gitInfo.storePath))) {
+                gitInfo.revCount = json["revCount"];
+                return gitInfo;
+            }
+
+        } catch (SysError & e) {
+            if (e.errNo != ENOENT) throw;
         }
-
-    } catch (SysError & e) {
-        if (e.errNo != ENOENT) throw;
     }
 
     auto source = sinkToSource([&](Sink & sink) {
@@ -176,7 +197,21 @@ GitInfo exportGit(ref<Store> store, const std::string & uri,
 
     unpackTarfile(*source, tmpDir);
 
-    gitInfo.storePath = store->printStorePath(store->addToStore(name, tmpDir));
+    auto storePath = store->addToStore(name, tmpDir);
+    if (expectedStorePath && storePath != expectedStorePath) {
+        unsigned int status = resUntrustedPath;
+        Hash got = hashPath(hash->type, store->toRealPath(store->printStorePath(storePath))).first;
+        throw Error(
+            status,
+            "hash mismatch in git repo (%s, rev %s):\n wanted: %s\n got:    %s",
+            uri,
+            gitInfo.rev,
+            hash->to_string(SRI, true),
+            got.to_string(SRI, true)
+        );
+    }
+
+    gitInfo.storePath = store->printStorePath(storePath);
 
     gitInfo.revCount = std::stoull(runProgram("git", true, { "-C", cacheDir, "rev-list", "--count", gitInfo.rev }));
 
@@ -197,6 +232,7 @@ static void prim_fetchGit(EvalState & state, const Pos & pos, Value * * args, Va
     std::string url;
     std::optional<std::string> ref;
     std::string rev;
+    std::optional<Hash> hash;
     std::string name = "source";
     PathSet context;
 
@@ -216,6 +252,8 @@ static void prim_fetchGit(EvalState & state, const Pos & pos, Value * * args, Va
                 rev = state.forceStringNoCtx(*attr.value, *attr.pos);
             else if (n == "name")
                 name = state.forceStringNoCtx(*attr.value, *attr.pos);
+            else if (n == "hash")
+                hash = Hash(state.forceStringNoCtx(*attr.value, *attr.pos), htUnknown);
             else
                 throw EvalError("unsupported argument '%s' to 'fetchGit', at %s", attr.name, *attr.pos);
         }
@@ -230,7 +268,7 @@ static void prim_fetchGit(EvalState & state, const Pos & pos, Value * * args, Va
     // whitelist. Ah well.
     state.checkURI(url);
 
-    auto gitInfo = exportGit(state.store, url, ref, rev, name);
+    auto gitInfo = exportGit(state.store, url, ref, rev, name, hash);
 
     state.mkAttrs(v, 8);
     mkString(*state.allocAttr(v, state.sOutPath), gitInfo.storePath, PathSet({gitInfo.storePath}));
