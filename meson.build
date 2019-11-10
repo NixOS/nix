@@ -18,7 +18,7 @@ project(
         'cpp_std=c++17',
         'warning_level=3',
         'optimization=3',
-        'debug=true'
+        'debug=true',
     ],
     version : run_command('cat', './.version').stdout().strip(),
     license : 'MIT'
@@ -30,6 +30,9 @@ cpp = meson.get_compiler('cpp')
 
 add_project_arguments(get_option('cxxflags'), language : 'cpp')
 add_project_link_arguments(get_option('ldflags'), language: 'cpp')
+
+# We do a lot of args... we'd otherwise have to convert to __ va_args__
+add_project_arguments('-Wno-variadic-macros', language : 'cpp')
 
 
 cmake = import('cmake')

@@ -133,9 +133,9 @@ public:
     {                                                   \
     public:                                             \
         using superClass::superClass;                   \
-    };
+    }
 
-MakeError(Error, BaseError)
+MakeError(Error, BaseError);
 
 // to use in catch-blocks
 class SysError : public Error {

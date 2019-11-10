@@ -445,7 +445,7 @@ Path EvalState::toRealPath(const Path & path, const PathSet & context)
         !context.empty() && store->isInStore(path)
         ? store->toRealPath(path)
         : path;
-};
+}
 
 
 Value * EvalState::addConstant(const string & name, Value & v)

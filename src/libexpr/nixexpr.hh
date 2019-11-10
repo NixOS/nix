@@ -9,14 +9,14 @@
 namespace nix {
 
 
-MakeError(EvalError, Error)
-MakeError(ParseError, Error)
-MakeError(AssertionError, EvalError)
-MakeError(ThrownError, AssertionError)
-MakeError(Abort, EvalError)
-MakeError(TypeError, EvalError)
-MakeError(UndefinedVarError, Error)
-MakeError(RestrictedPathError, Error)
+MakeError(EvalError, Error);
+MakeError(ParseError, Error);
+MakeError(AssertionError, EvalError);
+MakeError(ThrownError, AssertionError);
+MakeError(Abort, EvalError);
+MakeError(TypeError, EvalError);
+MakeError(UndefinedVarError, Error);
+MakeError(RestrictedPathError, Error);
 
 
 /* Position objects. */

@@ -225,7 +225,7 @@ void writeFull(HANDLE handle, const unsigned char * buf, size_t count, bool allo
 void writeFull(HANDLE handle, const string & s, bool allowInterrupts = true);
 #endif
 
-MakeError(EndOfFile, Error)
+MakeError(EndOfFile, Error);
 
 
 /* Read a file descriptor until EOF occurs. */
@@ -474,10 +474,10 @@ void inline checkInterrupt()
         _interrupted();
 }
 
-MakeError(Interrupted, BaseError)
+MakeError(Interrupted, BaseError);
 
 
-MakeError(FormatError, Error)
+MakeError(FormatError, Error);
 
 
 /* String tokenizer. */

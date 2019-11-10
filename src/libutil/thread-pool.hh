@@ -11,7 +11,7 @@
 
 namespace nix {
 
-MakeError(ThreadPoolShutDown, Error)
+MakeError(ThreadPoolShutDown, Error);
 
 /* A simple thread pool that executes a queue of work items
    (lambdas). */
