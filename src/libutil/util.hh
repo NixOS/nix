@@ -160,7 +160,7 @@ void readFull(int fd, unsigned char * buf, size_t count);
 void writeFull(int fd, const unsigned char * buf, size_t count, bool allowInterrupts = true);
 void writeFull(int fd, const string & s, bool allowInterrupts = true);
 
-MakeError(EndOfFile, Error)
+MakeError(EndOfFile, Error);
 
 
 /* Read a file descriptor until EOF occurs. */
@@ -333,10 +333,10 @@ void inline checkInterrupt()
         _interrupted();
 }
 
-MakeError(Interrupted, BaseError)
+MakeError(Interrupted, BaseError);
 
 
-MakeError(FormatError, Error)
+MakeError(FormatError, Error);
 
 
 /* String tokenizer. */

@@ -274,7 +274,7 @@ Sink & operator << (Sink & sink, const Strings & s);
 Sink & operator << (Sink & sink, const StringSet & s);
 
 
-MakeError(SerialisationError, Error)
+MakeError(SerialisationError, Error);
 
 
 template<typename T>
