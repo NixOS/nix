@@ -35,7 +35,6 @@ struct Env;
 struct Expr;
 struct ExprLambda;
 struct PrimOp;
-struct PrimOp;
 class Symbol;
 struct Pos;
 class EvalState;
