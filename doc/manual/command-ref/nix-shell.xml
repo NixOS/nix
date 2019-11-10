@@ -39,7 +39,12 @@
           <arg choice='plain'><option>--packages</option></arg>
           <arg choice='plain'><option>-p</option></arg>
         </group>
-        <arg choice='plain' rep='repeat'><replaceable>packages</replaceable></arg>
+        <arg choice='plain' rep='repeat'>
+          <group choice='req'>
+            <arg choice="plain"><replaceable>packages</replaceable></arg>
+            <arg choice="plain"><replaceable>expressions</replaceable></arg>
+          </group>
+        </arg>
       </arg>
       <arg><replaceable>path</replaceable></arg>
     </group>
@@ -189,8 +194,8 @@ also <xref linkend="sec-common-options" />.</phrase></para>
 <variablelist>
 
   <varlistentry><term><envar>NIX_BUILD_SHELL</envar></term>
-    
-    <listitem><para>Shell used to start the interactive environment. 
+
+    <listitem><para>Shell used to start the interactive environment.
     Defaults to the <command>bash</command> found in <envar>PATH</envar>.</para></listitem>
 
   </varlistentry>
@@ -222,8 +227,9 @@ $ nix-shell '&lt;nixpkgs>' -A pan --pure \
     --command 'export NIX_DEBUG=1; export NIX_CORES=8; return'
 </screen>
 
-Nix expressions can also be given on the command line.  For instance,
-the following starts a shell containing the packages
+Nix expressions can also be given on the command line using the
+<command>-E</command> and <command>-p</command> flags.
+For instance, the following starts a shell containing the packages
 <literal>sqlite</literal> and <literal>libX11</literal>:
 
 <screen>
@@ -236,6 +242,14 @@ A shorter way to do the same is:
 $ nix-shell -p sqlite xorg.libX11
 [nix-shell]$ echo $NIX_LDFLAGS
 … -L/nix/store/j1zg5v…-sqlite-3.8.0.2/lib -L/nix/store/0gmcz9…-libX11-1.6.1/lib …
+</screen>
+
+Note that <command>-p</command> accepts multiple full nix expressions that
+are valid in the <literal>buildInputs = [ ... ]</literal> shown above,
+not only package names. So the following is also legal:
+
+<screen>
+$ nix-shell -p sqlite 'git.override { withManual = false; }'
 </screen>
 
 The <command>-p</command> flag looks up Nixpkgs in the Nix search
