@@ -1515,7 +1515,7 @@ void replaceValidPath(const Path & storePath, const Path tmpPath)
 }
 
 
-MakeError(NotDeterministic, BuildError)
+MakeError(NotDeterministic, BuildError);
 
 
 void DerivationGoal::buildDone()
