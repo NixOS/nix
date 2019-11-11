@@ -362,6 +362,16 @@ if (sys_name.contains('sunos'))
     # Solaris requires -lsocket -lnsl for network functions 
 endif
 
+if sys_name.contains('windows')
+    windows_version_desc = '''
+      Windows SDK version we will use.
+      Newer version will have their headers trimmed of new functionality.
+    '''
+    windows_version = '0x0A00' # Windows 10
+    config_h.set('WINVER', windows_version, description : windows_version_desc)
+    config_h.set('_WIN32_WINNT', windows_version, description : windows_version_desc)
+endif
+
 
 
 
