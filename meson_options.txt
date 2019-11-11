@@ -85,14 +85,6 @@ option(
     description : 'link args for libdl')
 
 option(
-    'editline_link_args',
-    type : 'array',
-    value : [
-        '-L/usr/local/lib',
-        '-leditline'],
-    description : 'link args for editline_link_args')
-
-option(
     'lzma_link_args',
     type : 'array',
     value : [
