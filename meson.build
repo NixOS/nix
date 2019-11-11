@@ -255,10 +255,16 @@ endif
 
 libdl_needed = not sys_name.contains('windows')
 
-libdl_dep = declare_dependency(
-    dependencies : cpp.find_library('dl', required : libdl_needed),
-    link_args :  get_option('dl_link_args'),
-    required : libdl_needed)
+libdl_lib = cpp.find_library('dl', required : libdl_needed)
+
+if libdl_lib.found()
+    libdl_dep = declare_dependency(
+        dependencies : cpp.find_library('dl', required : libdl_needed),
+        link_args :  get_option('dl_link_args'),
+        required : libdl_needed)
+else
+    libdl_dep = dependency('', required: false)
+endif
 
 
 # Look for libbz2, a required dependency.
