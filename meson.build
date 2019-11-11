@@ -240,9 +240,14 @@ libcurl_dep = declare_dependency(
 
 # Look for pthread, a required dependency.
 #--------------------------------------------------
-pthread_dep = declare_dependency(
-    dependencies : dependency('threads'),
-    link_args :  get_option('pthread_link_args'))
+
+# Work around Meson not recognizing obscure alternative MCF threading.
+# https://github.com/mesonbuild/meson/issues/553#issuecomment-552602641
+if sys_name.contains('windows')
+  pthread_dep = dependency('', required : false)
+else
+  pthread_dep = dependency('threads')
+endif
 
 
 # Look for libdl, a required dependency on Unix.
