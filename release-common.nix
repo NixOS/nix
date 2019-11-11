@@ -73,13 +73,13 @@ rec {
     sqlite
     boehmgc
     boost
+    curl
 
     # Tests
     git
     mercurial
   ] ++ lib.optionals (!stdenv.hostPlatform.isWindows) [
     editline
-    curl
   ] ++ lib.optionals stdenv.isLinux [libseccomp utillinuxMinimal]
     ++ lib.optional (stdenv.isLinux || stdenv.isDarwin) libsodium
     ++ lib.optional (stdenv.isLinux || stdenv.isDarwin)

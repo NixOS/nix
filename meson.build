@@ -231,15 +231,11 @@ sqlite3_dep = declare_dependency(
     link_args : get_option('sqlite3_link_args'))
 
 
-# Look for libcurl, a required dependency on Unix.
+# Look for libcurl, a required dependency.
 #--------------------------------------------------
-
-libcurl_needed = not sys_name.contains('windows')
-
 libcurl_dep = declare_dependency(
-    dependencies : dependency('libcurl', required : libcurl_needed),
-    link_args :  get_option('curl_link_args'),
-    required : libcurl_needed)
+    dependencies : dependency('libcurl'),
+    link_args :  get_option('curl_link_args'))
 
 
 # Look for pthread, a required dependency.
