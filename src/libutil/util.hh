@@ -178,9 +178,7 @@ Path createTempDir(const Path & tmpRoot = "", const Path & prefix = "nix",
 #endif
     );
 
-#ifndef _WIN32
 std::string getUserName();
-#endif
 
 /* Return $HOME or the user's home directory from /etc/passwd. */
 Path getHome();
@@ -399,8 +397,8 @@ struct RunOptions
     std::optional<uid_t> uid;
     std::optional<uid_t> gid;
     std::optional<Path> chdir;
-    std::optional<std::map<std::string, std::string>> environment;
 #endif
+    std::optional<std::map<std::string, std::string>> environment;
     Path program;
     bool searchPath = true;
     Strings args; // TODO: unicode on Windows?

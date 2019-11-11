@@ -37,7 +37,12 @@ static string gcRootsDir = "gcroots";
    read.  To be precise: when they try to create a new temporary root
    file, they will block until the garbage collector has finished /
    yielded the GC lock. */
-AutoCloseFD LocalStore::openGCLock(LockType lockType)
+#ifndef _WIN32
+AutoCloseFD
+#else
+AutoCloseWindowsHandle
+#endif
+LocalStore::openGCLock(LockType lockType)
 {
     Path fnGCLock = (format("%1%/%2%")
         % stateDir % gcLockName).str();

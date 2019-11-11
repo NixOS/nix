@@ -636,8 +636,10 @@ public:
         return storePath;
     }
 
+#ifndef _WIN32
     virtual void createUser(const std::string & userName, uid_t userId)
     { }
+#endif
 
 protected:
 

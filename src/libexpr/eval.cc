@@ -1802,7 +1802,9 @@ void EvalState::printStats()
         if (outPath != "-")
             fs.open(outPath, std::fstream::out);
         JSONObject topObj(outPath == "-" ? std::cerr : fs, true);
+#ifndef _WIN32
         topObj.attr("cpuTime",cpuTime);
+#endif
         {
             auto envs = topObj.object("envs");
             envs.attr("number", nrEnvs);

@@ -1128,16 +1128,18 @@ Path createTempDir(const Path & tmpRoot, const Path & prefix, bool includePid, b
 #endif
 
 
-#ifndef _WIN32
 std::string getUserName()
 {
+#ifndef _WIN32
     auto pw = getpwuid(geteuid());
     std::string name = pw ? pw->pw_name : getEnv("USER", "");
+#else
+    std::string name = getEnv("USER", "");
+#endif
     if (name.empty())
         throw Error("cannot figure out user name");
     return name;
 }
-#endif
 
 
 static Lazy<Path> getHome2([]() {

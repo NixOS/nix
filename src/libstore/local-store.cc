@@ -462,7 +462,12 @@ void canonicaliseTimestampAndPermissions(const Path & path)
 }
 
 
-static void canonicalisePathMetaData_(const Path & path, uid_t fromUid, InodesSeen & inodesSeen)
+static void canonicalisePathMetaData_(
+        const Path & path,
+#ifndef _WIN32
+        uid_t fromUid,
+#endif
+        InodesSeen & inodesSeen)
 {
     checkInterrupt();
 
@@ -1421,7 +1426,12 @@ bool LocalStore::verifyStore(bool checkContents, RepairFlag repair)
 
     PathSet validPaths2 = queryAllValidPaths(), validPaths, done;
 
+    /* Release the GC lock */
+#ifndef _WIN32
     fdGCLock = -1;
+#else
+    fdGCLock = INVALID_HANDLE_VALUE;
+#endif
 
     for (auto & i : validPaths2)
         verifyPath(i, store, done, validPaths, repair, errors);
@@ -1639,6 +1649,7 @@ void LocalStore::signPathInfo(ValidPathInfo & info)
 }
 
 
+#ifndef _WIN32
 void LocalStore::createUser(const std::string & userName, uid_t userId)
 {
     for (auto & dir : {
@@ -1652,6 +1663,7 @@ void LocalStore::createUser(const std::string & userName, uid_t userId)
             throw PosixError("changing owner of directory '%s'", dir);
     }
 }
+#endif
 
 
 }

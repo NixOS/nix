@@ -1,6 +1,6 @@
 #include <algorithm>
 #ifdef _WIN32
-#include <boost/algorithm/string/predicate.hpp>
+#  include <boost/algorithm/string/predicate.hpp>
 #endif
 
 #include "command.hh"
@@ -14,14 +14,14 @@
 #include "download.hh"
 #include "finally.hh"
 
-#include <sys/types.h>
-#include <sys/socket.h>
+#ifndef _WIN32
+#  include <sys/types.h>
+#  include <sys/socket.h>
 
-#include <netinet/in.h>
-
-#include <ifaddrs.h>
-#include <netdb.h>
-#include <netinet/in.h>
+#  include <ifaddrs.h>
+#  include <netdb.h>
+#  include <netinet/in.h>
+#endif
 
 extern std::string chrootHelperName;
 
@@ -32,6 +32,7 @@ namespace nix {
 /* Check if we have a non-loopback/link-local network interface. */
 static bool haveInternet()
 {
+#ifndef _WIN32
     struct ifaddrs * addrs;
 
     if (getifaddrs(&addrs))
@@ -51,6 +52,7 @@ static bool haveInternet()
                 return true;
         }
     }
+#endif
 
     return false;
 }

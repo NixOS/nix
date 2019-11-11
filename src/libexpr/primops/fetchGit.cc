@@ -4,8 +4,10 @@
 #include "store-api.hh"
 #include "pathlocks.hh"
 #ifndef _MSC_VER
-#include <sys/time.h>
-#include <sys/wait.h>
+#  include <sys/time.h>
+#endif
+#ifndef _WIN32
+#  include <sys/wait.h>
 #endif
 #include "hash.hh"
 

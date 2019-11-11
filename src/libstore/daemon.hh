@@ -8,7 +8,10 @@ void processConnection(
     FdSource & from,
     FdSink & to,
     bool trusted,
-    const std::string & userName,
-    uid_t userId);
+    const std::string & userName
+#ifndef _WIN32
+    , uid_t userId
+#endif
+    );
 
 }

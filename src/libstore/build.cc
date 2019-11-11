@@ -36,7 +36,9 @@
 #endif
 #include <errno.h>
 #include <cstring>
+#ifndef _WIN32
 #include <termios.h>
+#endif
 
 #ifdef _WIN32
 #define random() rand()
@@ -841,6 +843,10 @@ private:
     size_t currentLogLinePos = 0; // to handle carriage return
 
     std::string currentHookLine;
+
+    /* Whether we're currently doing a chroot build. */
+    bool useChroot = false;
+
 #ifdef _WIN32
     /* Pipe for the builder's standard output/error. */
     AsyncPipe asyncBuilderOut;
@@ -855,14 +861,12 @@ private:
     /* The build hook. */
     std::unique_ptr<HookInstance> hook;
 
-    /* Whether we're currently doing a chroot build. */
-    bool useChroot = false;
-
     Path chrootRootDir;
 
     /* RAII object to delete the chroot directory. */
     std::shared_ptr<AutoDelete> autoDelChroot;
 #endif
+
     /* Whether this is a fixed-output derivation. */
     bool fixedOutput;
 
@@ -1971,6 +1975,7 @@ static void preloadNSS() {
 #endif
 
 
+#ifndef _WIN32
 void linkOrCopy(const Path & from, const Path & to)
 {
     if (link(from.c_str(), to.c_str()) == -1) {
@@ -1983,6 +1988,7 @@ void linkOrCopy(const Path & from, const Path & to)
         copyPath(from, to);
     }
 }
+#endif
 
 
 void DerivationGoal::startBuilder()
@@ -2378,6 +2384,7 @@ fprintf(stderr, "DerivationGoal::startBuilder()\n");
 //        throw WinError("CreateFileA(NUL)");
 //#endif
 
+#ifndef _WIN32
     builderOut.readSide = posix_openpt(O_RDWR | O_NOCTTY);
     if (!builderOut.readSide)
         throw PosixError("opening pseudoterminal master");
@@ -2424,7 +2431,6 @@ fprintf(stderr, "DerivationGoal::startBuilder()\n");
     /* Fork a child to build the package. */
     ProcessOptions options;
 
-#ifndef _WIN32
 #if __linux__
     if (useChroot) {
         /* Set up private namespaces for the build:
@@ -3711,10 +3717,12 @@ void DerivationGoal::registerOutputs()
                     if (rename(actualPath.c_str(), dst.c_str()))
                         throw PosixError(format("renaming '%1%' to '%2%'") % actualPath % dst);
 
+#ifndef _WIN32
                     handleDiffHook(
                         buildUser ? buildUser->getUID() : getuid(),
                         buildUser ? buildUser->getGID() : getgid(),
                         path, dst, drvPath, tmpDir);
+#endif
 
                     throw NotDeterministic(format("derivation '%1%' may not be deterministic: output '%2%' differs from '%3%'")
                         % drvPath % path % dst);
@@ -3778,10 +3786,12 @@ void DerivationGoal::registerOutputs()
                     ? fmt("output '%1%' of '%2%' differs from '%3%' from previous round", i->second.path, drvPath, prev)
                     : fmt("output '%1%' of '%2%' differs from previous round", i->second.path, drvPath);
 
+#ifndef _WIN32
                 handleDiffHook(
                     buildUser ? buildUser->getUID() : getuid(),
                     buildUser ? buildUser->getGID() : getgid(),
                     prev, i->second.path, drvPath, tmpDir);
+#endif
 
                 if (settings.enforceDeterminism)
                     throw NotDeterministic(msg);

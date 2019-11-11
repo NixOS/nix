@@ -274,7 +274,11 @@ private:
     bool isActiveTempFile(const GCState & state,
         const Path & path, const string & suffix);
 
+#ifndef _WIN32
     AutoCloseFD openGCLock(LockType lockType);
+#else
+    AutoCloseWindowsHandle openGCLock(LockType lockType);
+#endif
 
     void findRoots(const Path & path, unsigned char type, Roots & roots);
 
@@ -307,7 +311,9 @@ private:
 
     Path getRealStoreDir() override { return realStoreDir; }
 
+#ifndef _WIN32
     void createUser(const std::string & userName, uid_t userId) override;
+#endif
 
     friend class DerivationGoal;
     friend class SubstitutionGoal;
@@ -329,13 +335,19 @@ typedef set<Inode> InodesSeen;
      without execute permission; setuid bits etc. are cleared)
    - the owner and group are set to the Nix user and group, if we're
      running as root. */
+void canonicalisePathMetaData(
+    const Path & path,
 #ifndef _WIN32
-void canonicalisePathMetaData(const Path & path, uid_t fromUid, InodesSeen & inodesSeen);
-void canonicalisePathMetaData(const Path & path, uid_t fromUid);
-#else
-void canonicalisePathMetaData(const Path & path, InodesSeen & inodesSeen);
-void canonicalisePathMetaData(const Path & path);
+    uid_t fromUid,
 #endif
+    InodesSeen & inodesSeen);
+
+void canonicalisePathMetaData(
+    const Path & path
+#ifndef _WIN32
+    , uid_t fromUid
+#endif
+    );
 
 void canonicaliseTimestampAndPermissions(const Path & path);
 

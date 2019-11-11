@@ -695,10 +695,15 @@ void processConnection(
     FdSource & from,
     FdSink & to,
     bool trusted,
-    const std::string & userName,
-    uid_t userId)
+    const std::string & userName
+#ifndef _WIN32
+    , uid_t userId
+#endif
+    )
 {
+#ifndef _WIN32
     MonitorFdHup monitor(from.fd);
+#endif
 
     /* Exchange the greeting. */
     unsigned int magic = readInt(from);
@@ -741,7 +746,9 @@ void processConnection(
             throw Error("if you run 'nix-daemon' as root, then you MUST set 'build-users-group'!");
 #endif
 
+#ifndef _WIN32
         store->createUser(userName, userId);
+#endif
 
         tunnelLogger->stopWork();
         to.flush();

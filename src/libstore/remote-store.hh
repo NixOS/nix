@@ -108,7 +108,9 @@ protected:
 
     struct Connection
     {
+#ifndef _WIN32
         AutoCloseFD fd;
+#endif
         FdSink to;
         FdSource from;
         unsigned int daemonVersion;

@@ -1268,7 +1268,16 @@ static void opListGenerations(Globals & globals, Strings opFlags, Strings opArgs
 #endif
     for (auto & i : gens) {
         tm t;
-        if (!localtime_r(&i.creationTime, &t)) throw Error("cannot convert time");
+#ifndef _WIN32 // TODO HAVE_LOCALTIME_R or something instead
+        bool success = !localtime_r(&i.creationTime, &t);
+#else
+        auto t_ptr = localtime(&i.creationTime);
+        bool success = t_ptr != 0;
+        if (success)
+            t = *t_ptr;
+#endif
+        if (success)
+            throw Error("cannot convert time");
         cout << format("%|4|   %|4|-%|02|-%|02| %|02|:%|02|:%|02|   %||\n")
             % i.number
             % (t.tm_year + 1900) % (t.tm_mon + 1) % t.tm_mday
@@ -1334,7 +1343,11 @@ static int _main(int argc, char * * argv)
                 replaceSymlink(
                     fmt("%s/profiles/per-user/%s/channels", settings.nixStateDir, getUserName()),
                     globals.instSource.nixExprPath + "/channels");
+#ifndef _WIN32
                 if (getuid() != 0)
+#else
+                if (false)
+#endif
                     replaceSymlink(
                         fmt("%s/profiles/per-user/root/channels", settings.nixStateDir),
                         globals.instSource.nixExprPath + "/channels_root");
@@ -1436,7 +1449,11 @@ static int _main(int argc, char * * argv)
             try {
                 if (!pathExists(profileLink)) {
                     replaceSymlink(
+#ifndef _WIN32
                         getuid() == 0
+#else
+                        false
+#endif
                         ? settings.nixStateDir + "/profiles/default"
                         : fmt("%s/profiles/per-user/%s/profile", settings.nixStateDir, getUserName()),
                         profileLink);

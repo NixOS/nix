@@ -547,7 +547,7 @@ struct CurlDownloader : public Downloader
             vomit("download thread waiting for %d ms", sleepTimeMs);
 #ifdef _WIN32
             // as there is no way to wake up yet, limit the timeout to a reasonable small value
-            sleepTimeMs = std::min(500, sleepTimeMs);
+            sleepTimeMs = std::min((long int)500, sleepTimeMs);
 
             if (items.empty()) {
                 Sleep(sleepTimeMs);

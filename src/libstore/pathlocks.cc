@@ -253,6 +253,7 @@ bool PathLocks::lockPaths(const PathSet & paths,
 
             debug(format("lock acquired on '%1%'") % lockPath);
 
+#ifndef _WIN32
             /* Check that the lock file hasn't become stale (i.e.,
                hasn't been unlinked). */
             struct stat st;
@@ -265,6 +266,7 @@ bool PathLocks::lockPaths(const PathSet & paths,
                    `lockPath', and proceed.  So we must retry. */
                 debug(format("open lock file '%1%' has become stale") % lockPath);
             else
+#endif
                 break;
         }
 
@@ -297,7 +299,6 @@ void PathLocks::unlock()
             printError(
                 format("error (ignored): cannot close lock file on '%1%'") % i.second);
 #else
-        lockedPaths_.lock()->erase(i.second);
         if (!CloseHandle(i.first))
             printError(
                 format("%3%:%4% error (ignored): cannot close lock file on '%1%' lastError=%d") % i.second % GetLastError() % __FILE__ % __LINE__);
