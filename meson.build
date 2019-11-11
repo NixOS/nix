@@ -423,7 +423,9 @@ if (cpp.has_header('string.h'))
         description: 'Define to 1 if you have the <strings.h> header file.')
 endif
 
-if (cpp.has_header('bzlib.h'))
+if (cpp.has_header('bzlib.h')) # dependencies : [ libbz2_dep ]
+    # Unfortunately cannot results of `declare_dependency` above, and package
+    # is missing pkg-config file.
     config_h.set(
         'HAVE_BZLIB_H', 1,
         description : 'Define to 1 if you have the <bzlib.h> header file.')
@@ -441,7 +443,7 @@ if (cpp.has_header('memory.h'))
         description : 'Define to 1 if you have the <memory.h> header file.')
 endif
 
-if (cpp.has_header('editline.h'))
+if (cpp.has_header('editline.h', dependencies : [ editline_dep ]))
     config_h.set(
         'HAVE_EDITLINE_H', 1,
         description : 'Define to 1 if you have the <editline.h> header file.')
