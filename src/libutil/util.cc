@@ -35,17 +35,21 @@
 #endif
 
 #ifdef _WIN32
-#define BOOST_STACKTRACE_USE_BACKTRACE
-#include <boost/stacktrace.hpp>
-#include <boost/algorithm/string/predicate.hpp>
-#include <codecvt>
-#define random() rand()
+#  include <sdkddkver.h>
+#  include <fileapi.h>
+#  ifdef _MSC_VER
+#    define BOOST_STACKTRACE_USE_BACKTRACE
+#  endif
+#  include <boost/stacktrace.hpp>
+#  include <boost/algorithm/string/predicate.hpp>
+#  include <codecvt>
+#  define random() rand()
 #else
-#include <pwd.h>
-#include <sys/ioctl.h>
-#include <sys/socket.h>
-#include <sys/wait.h>
-#include <sys/un.h>
+#  include <pwd.h>
+#  include <sys/ioctl.h>
+#  include <sys/socket.h>
+#  include <sys/wait.h>
+#  include <sys/un.h>
 
 extern char * * environ __attribute__((weak));
 #endif
@@ -266,7 +270,6 @@ void clearEnv()
     for (auto & name : getEnv())
         unsetenv(name.first.c_str());
 }
-#endif
 
 void replaceEnv(std::map<std::string, std::string> newEnv)
 {
@@ -276,6 +279,7 @@ void replaceEnv(std::map<std::string, std::string> newEnv)
         setenv(newEnvVar.first.c_str(), newEnvVar.second.c_str(), 1);
     }
 }
+#endif
 
 
 
@@ -1124,6 +1128,7 @@ Path createTempDir(const Path & tmpRoot, const Path & prefix, bool includePid, b
 #endif
 
 
+#ifndef _WIN32
 std::string getUserName()
 {
     auto pw = getpwuid(geteuid());
@@ -1132,6 +1137,7 @@ std::string getUserName()
         throw Error("cannot figure out user name");
     return name;
 }
+#endif
 
 
 static Lazy<Path> getHome2([]() {

@@ -43,13 +43,11 @@ extern const std::string nativeSystem;
 /* Return an environment variable. */
 string getEnv(const string & key, const string & def = "");
 
-#ifndef _WIN32
 /* Get the entire environment. */
 std::map<std::string, std::string> getEnv();
 
 /* Clear the environment. */
 void clearEnv();
-#endif
 
 /* Return an absolutized path, resolving paths relative to the
    specified directory, or the current directory otherwise.  The path
@@ -180,7 +178,9 @@ Path createTempDir(const Path & tmpRoot = "", const Path & prefix = "nix",
 #endif
     );
 
+#ifndef _WIN32
 std::string getUserName();
+#endif
 
 /* Return $HOME or the user's home directory from /etc/passwd. */
 Path getHome();
@@ -727,8 +727,10 @@ inline bool isslash(int c) { return c == '/'; }
 #endif
 
 
+#ifndef _WIN32
 /* Create a Unix domain socket in listen mode. */
 AutoCloseFD createUnixDomainSocket(const Path & path, mode_t mode);
+#endif
 
 
 }
