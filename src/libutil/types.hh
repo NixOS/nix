@@ -116,9 +116,9 @@ public:
     {                                                   \
     public:                                             \
         using superClass::superClass;                   \
-    };
+    }
 
-MakeError(Error, BaseError)
+MakeError(Error, BaseError);
 
 class SysError : public Error
 {

@@ -20,12 +20,12 @@
 namespace nix {
 
 
-MakeError(SubstError, Error)
-MakeError(BuildError, Error) /* denotes a permanent build failure */
-MakeError(InvalidPath, Error)
-MakeError(Unsupported, Error)
-MakeError(SubstituteGone, Error)
-MakeError(SubstituterDisabled, Error)
+MakeError(SubstError, Error);
+MakeError(BuildError, Error); // denotes a permanent build failure
+MakeError(InvalidPath, Error);
+MakeError(Unsupported, Error);
+MakeError(SubstituteGone, Error);
+MakeError(SubstituterDisabled, Error);
 
 
 struct BasicDerivation;
