@@ -260,9 +260,10 @@ libbz2_dep = declare_dependency(
 # but e.g. Ubuntu 16.04 has an older version, so we fall back to searching for
 # editline.h when the pkg-config approach fails.
 
-editline_dep = declare_dependency(
-    dependencies : cpp.find_library('editline'),
-    link_args :  get_option('editline_link_args'))
+editline_dep = dependency(
+  'libeditline',
+  include_type : 'system' # force -isystem so we don't forget to use <..>
+)
 
 if not (
     cpp.has_function(
