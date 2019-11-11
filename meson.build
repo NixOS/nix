@@ -139,193 +139,6 @@ config_h.set(
 
 
 
-# checking headers
-#============================================================================
-
-if (cpp.has_header('sys/stat.h'))
-    config_h.set(
-        'HAVE_SYS_STAT_H', 1,
-        description : 'Define to 1 if you have the <sys/stat.h> header file.')
-endif
-
-if (cpp.has_header('sys/types.h'))
-    config_h.set(
-        'HAVE_SYS_TYPES_H', 1,
-        description : 'Define to 1 if you have the <sys/types.h> header file.')
-endif
-
-if (cpp.has_header('sys/dir.h'))
-    config_h.set(
-        'HAVE_DIR_H', 1,
-        description : 'Define to 1 if you have the <sys/dir.h> header file, and it defines `DIR`')
-endif
-
-if (cpp.has_header('sys/ndir.h'))
-    config_h.set(
-        'HAVE_NDIR_H', 1,
-        description : 'Define to 1 if you have the <sys/ndir.h> header file, and it defines `DIR`')
-endif
-
-has_dirent_h = cpp.has_header('dirent.h')
-if (has_dirent_h)
-    config_h.set(
-        'HAVE_DIRENT_H', 1,
-        description : 'Define to 1 if you have the <dirent.h> header file, and it defines `DIR`')
-endif
-
-if (cpp.has_header('locale.h'))
-    config_h.set(
-        'HAVE_LOCALE', 1,
-        description : 'Define to 1 if you have the <locale.h> header file.')
-endif
-
-if (cpp.has_header('unistd.h'))
-    config_h.set(
-        'HAVE_UNISTD_H', 1,
-        description: 'Define to 1 if you have the <unistd.h> header file.')
-endif
-
-if (cpp.has_header('stdint.h'))
-    config_h.set(
-        'HAVE_STDINT_H', 1,
-        description: 'Define to 1 if you have the <stdint.h> header file.')
-endif
-
-if (cpp.has_header('stdlib.h'))
-    config_h.set(
-        'HAVE_STDLIB_H', 1,
-        description: 'Define to 1 if you have the <stdlib.h> header file.')
-endif
-
-if (cpp.has_header('strings.h'))
-    config_h.set(
-        'HAVE_STRINGS_H', 1,
-        description: 'Define to 1 if you have the <strings.h> header file.')
-endif
-
-if (cpp.has_header('string.h'))
-    config_h.set(
-        'HAVE_STRING_H', 1,
-        description: 'Define to 1 if you have the <strings.h> header file.')
-endif
-
-if (cpp.has_header('bzlib.h'))
-    config_h.set(
-        'HAVE_BZLIB_H', 1,
-        description : 'Define to 1 if you have the <bzlib.h> header file.')
-endif
-
-if (cpp.has_header('inttypes.h'))
-    config_h.set(
-        'HAVE_INTTYPES_H', 1,
-        description : 'Define to 1 if you have the <inttypes.h> header file.')
-endif
-
-if (cpp.has_header('memory.h'))
-    config_h.set(
-        'HAVE_MEMORY_H', 1,
-        description : 'Define to 1 if you have the <memory.h> header file.')
-endif
-
-if (cpp.has_header('editline.h'))
-    config_h.set(
-        'HAVE_EDITLINE_H', 1,
-        description : 'Define to 1 if you have the <editline.h> header file.')
-endif
-
-
-
-
-# checking functions
-#============================================================================
-
-
-if (cpp.has_function('lutimes'))
-    config_h.set(
-        'HAVE_LUTIMES', 1,
-        description : 'Define to 1 if you have the `lutimes` function.')
-endif
-
-if (cpp.has_function('lchown'))
-    config_h.set(
-        'HAVE_LCHOWN', 1,
-        description : 'Define to 1 if you have the `lchown` function.')
-endif
-
-if (cpp.has_function('pipe2'))
-    config_h.set(
-        'HAVE_PIPE2', 1,
-        description : 'Define to 1 if you have the `pipe2` function.')
-endif
-
-if (cpp.has_function('posix_fallocate'))
-    config_h.set(
-        'HAVE_POSIX_FALLOCATE', 1,
-        description : 'Define to 1 if you have the `posix_fallocate` function.')
-endif
-
-if (cpp.has_function('setresuid'))
-    config_h.set(
-        'HAVE_SETRESUID', 1,
-        description : 'Define to 1 if you have the `setresuid` function.')
-endif
-
-if (cpp.has_function('setreuid'))
-    config_h.set(
-        'HAVE_SETREUID', 1,
-        description : 'Define to 1 if you have the `setreuid` function.')
-endif
-
-if (cpp.has_function('statvfs'))
-    config_h.set(
-        'HAVE_STATVFS', 1,
-        description : 'Define to 1 if you have the `statvfs` function.')
-endif
-
-if (cpp.has_function('strsignal'))
-    config_h.set(
-        'HAVE_STRSIGNAL', 1,
-        description : 'Define to 1 if you have the `strsignal` function.')
-endif
-
-if (cpp.has_function('sysconf'))
-    config_h.set(
-        'HAVE_SYSCONF', 1,
-        description : 'Define to 1 if you have the `sysconf` function.')
-endif
-
-pubsetbuff_c = '''
-    #include <iostream>
-    using namespace std;
-    static char buf[1024];
-    void func() {
-    cerr.rdbuf()->pubsetbuf(buf, sizeof(buf));
-    }'''
-
-if meson.get_compiler('cpp').compiles(
-    pubsetbuff_c,
-    name : 'pubsetbuf'
-  )
-    config_h.set(
-        'HAVE_PUBSETBUF', 1,
-        description : 'Define to 1 if you have the `pubsetbuf` function.')
-endif
-
-
-
-# checking data types
-#============================================================================
-
-
-dirent_h_prefix = '''
-  #include <sys/types.h>
-  #include <dirent.h>
-'''
-
-if has_dirent_h and meson.get_compiler('cpp').has_member('struct dirent', 'd_type', prefix: dirent_h_prefix)
-  config_h.set('HAVE_STRUCT_DIRENT_D_TYPE', 1)
-endif
-
 # required dependancies
 #============================================================================
 
@@ -454,8 +267,6 @@ libbz2_dep = declare_dependency(
     link_args :  get_option('bz2_link_args'))
 
 
-
-
 # Optional dependancies
 #============================================================================
 
@@ -503,20 +314,18 @@ if (get_option('with_s3'))
 endif
 
 
-# Look for editline, a required dependency.
+# Look for editline, a dependency required just by nix-repl.
 #--------------------------------------------------
 # NOTE: The the libeditline.pc file was added only in libeditline >= 1.15.2, see 
 # https://github.com/troglobit/editline/commit/0a8f2ef4203c3a4a4726b9dd1336869cd0da8607,
 # but e.g. Ubuntu 16.04 has an older version, so we fall back to searching for
 # editline.h when the pkg-config approach fails.
-editline_dep_raw = cpp.find_library('editline', required: get_option('with_editline'))
-if (editline_dep_raw.found())
-    editline_dep = declare_dependency(
-        dependencies : editline_dep_raw,
-        link_args :  get_option('editline_link_args'))
-else
-    editline_dep = dependency('', required : false)
-endif
+
+editline_dep = dependency(
+  'libeditline',
+  include_type : 'system', # force -isystem so we don't forget to use <..>
+  required : get_option('with_editline'),
+)
 
 if (editline_dep.found() and not cpp.has_function(
         'read_history',
@@ -551,6 +360,199 @@ endif
 
 if (sys_name.contains('sunos'))
     # Solaris requires -lsocket -lnsl for network functions 
+endif
+
+
+
+
+# checking headers
+#============================================================================
+
+if (cpp.has_header('sys/stat.h'))
+    config_h.set(
+        'HAVE_SYS_STAT_H', 1,
+        description : 'Define to 1 if you have the <sys/stat.h> header file.')
+endif
+
+if (cpp.has_header('sys/types.h'))
+    config_h.set(
+        'HAVE_SYS_TYPES_H', 1,
+        description : 'Define to 1 if you have the <sys/types.h> header file.')
+endif
+
+if (cpp.has_header('sys/dir.h'))
+    config_h.set(
+        'HAVE_DIR_H', 1,
+        description : 'Define to 1 if you have the <sys/dir.h> header file, and it defines `DIR`')
+endif
+
+if (cpp.has_header('sys/ndir.h'))
+    config_h.set(
+        'HAVE_NDIR_H', 1,
+        description : 'Define to 1 if you have the <sys/ndir.h> header file, and it defines `DIR`')
+endif
+
+has_dirent_h = cpp.has_header('dirent.h')
+if (has_dirent_h)
+    config_h.set(
+        'HAVE_DIRENT_H', 1,
+        description : 'Define to 1 if you have the <dirent.h> header file, and it defines `DIR`')
+endif
+
+if (cpp.has_header('locale.h'))
+    config_h.set(
+        'HAVE_LOCALE', 1,
+        description : 'Define to 1 if you have the <locale.h> header file.')
+endif
+
+if (cpp.has_header('unistd.h'))
+    config_h.set(
+        'HAVE_UNISTD_H', 1,
+        description: 'Define to 1 if you have the <unistd.h> header file.')
+endif
+
+if (cpp.has_header('stdint.h'))
+    config_h.set(
+        'HAVE_STDINT_H', 1,
+        description: 'Define to 1 if you have the <stdint.h> header file.')
+endif
+
+if (cpp.has_header('stdlib.h'))
+    config_h.set(
+        'HAVE_STDLIB_H', 1,
+        description: 'Define to 1 if you have the <stdlib.h> header file.')
+endif
+
+if (cpp.has_header('strings.h'))
+    config_h.set(
+        'HAVE_STRINGS_H', 1,
+        description: 'Define to 1 if you have the <strings.h> header file.')
+endif
+
+if (cpp.has_header('string.h'))
+    config_h.set(
+        'HAVE_STRING_H', 1,
+        description: 'Define to 1 if you have the <strings.h> header file.')
+endif
+
+if (cpp.has_header('bzlib.h')) # dependencies : [ libbz2_dep ]
+    # Unfortunately cannot results of `declare_dependency` above, and package
+    # is missing pkg-config file.
+    config_h.set(
+        'HAVE_BZLIB_H', 1,
+        description : 'Define to 1 if you have the <bzlib.h> header file.')
+endif
+
+if (cpp.has_header('inttypes.h'))
+    config_h.set(
+        'HAVE_INTTYPES_H', 1,
+        description : 'Define to 1 if you have the <inttypes.h> header file.')
+endif
+
+if (cpp.has_header('memory.h'))
+    config_h.set(
+        'HAVE_MEMORY_H', 1,
+        description : 'Define to 1 if you have the <memory.h> header file.')
+endif
+
+if (cpp.has_header('editline.h', dependencies : [ editline_dep ]))
+    config_h.set(
+        'HAVE_EDITLINE_H', 1,
+        description : 'Define to 1 if you have the <editline.h> header file.')
+endif
+
+
+
+
+# checking functions
+#============================================================================
+
+
+if (cpp.has_function('lutimes'))
+    config_h.set(
+        'HAVE_LUTIMES', 1,
+        description : 'Define to 1 if you have the `lutimes` function.')
+endif
+
+if (cpp.has_function('lchown'))
+    config_h.set(
+        'HAVE_LCHOWN', 1,
+        description : 'Define to 1 if you have the `lchown` function.')
+endif
+
+if (cpp.has_function('pipe2'))
+    config_h.set(
+        'HAVE_PIPE2', 1,
+        description : 'Define to 1 if you have the `pipe2` function.')
+endif
+
+if (cpp.has_function('posix_fallocate'))
+    config_h.set(
+        'HAVE_POSIX_FALLOCATE', 1,
+        description : 'Define to 1 if you have the `posix_fallocate` function.')
+endif
+
+if (cpp.has_function('setresuid'))
+    config_h.set(
+        'HAVE_SETRESUID', 1,
+        description : 'Define to 1 if you have the `setresuid` function.')
+endif
+
+if (cpp.has_function('setreuid'))
+    config_h.set(
+        'HAVE_SETREUID', 1,
+        description : 'Define to 1 if you have the `setreuid` function.')
+endif
+
+if (cpp.has_function('statvfs'))
+    config_h.set(
+        'HAVE_STATVFS', 1,
+        description : 'Define to 1 if you have the `statvfs` function.')
+endif
+
+if (cpp.has_function('strsignal'))
+    config_h.set(
+        'HAVE_STRSIGNAL', 1,
+        description : 'Define to 1 if you have the `strsignal` function.')
+endif
+
+if (cpp.has_function('sysconf'))
+    config_h.set(
+        'HAVE_SYSCONF', 1,
+        description : 'Define to 1 if you have the `sysconf` function.')
+endif
+
+pubsetbuff_c = '''
+    #include <iostream>
+    using namespace std;
+    static char buf[1024];
+    void func() {
+    cerr.rdbuf()->pubsetbuf(buf, sizeof(buf));
+    }'''
+
+if meson.get_compiler('cpp').compiles(
+    pubsetbuff_c,
+    name : 'pubsetbuf'
+  )
+    config_h.set(
+        'HAVE_PUBSETBUF', 1,
+        description : 'Define to 1 if you have the `pubsetbuf` function.')
+endif
+
+
+
+
+# checking data types
+#============================================================================
+
+
+dirent_h_prefix = '''
+  #include <sys/types.h>
+  #include <dirent.h>
+'''
+
+if has_dirent_h and meson.get_compiler('cpp').has_member('struct dirent', 'd_type', prefix: dirent_h_prefix)
+  config_h.set('HAVE_STRUCT_DIRENT_D_TYPE', 1)
 endif
 
 
