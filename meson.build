@@ -307,11 +307,10 @@ gc_c_lib = dependency(
 gc_cpp_lib = cpp.find_library(
     'gccpp',
     required : get_option('with_gc'),
-    dependencies: [ gc_c_lib ],
 )
 if (gc_cpp_lib.found())
     gc_dep = declare_dependency(
-        dependencies : [gc_c_lib, gc_cpp_lib],
+        dependencies : [gc_cpp_lib, gc_c_lib],
         link_args : get_option('gc_link_args'),
     )
     config_h.set(

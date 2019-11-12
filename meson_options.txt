@@ -121,7 +121,9 @@ option(
     type : 'array',
     value : [
         '-L/usr/local/lib',
-        '-lgc'],
+        '-lgccpp',
+        '-lgc',
+    ],
     description : 'link args for boehm garbage collector')
 
 

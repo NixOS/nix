@@ -89,7 +89,11 @@ nix_dep_list = [
     libdl_dep,
     boost_dep,
     editline_dep,
-    libsodium_dep]
+    libsodium_dep,
+    # There is a boemgc use in a static/inline method in libexpr. Sadly, meson
+    # don't have any propogated public dep mechanism.
+    gc_dep,
+]
 
 
 
