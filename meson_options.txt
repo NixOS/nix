@@ -131,8 +131,8 @@ option(
 
 option(
     'with_gc',
-    type : 'boolean',
-    value : 'false',
+    type : 'feature',
+    value : 'auto',
     description : 'Build nix with Boehm garbage collector')
 
 option(

@@ -51,8 +51,10 @@ libexpr_headers = files(
 #============================================================================
 
 libexpr_dep_list = [
+    gc_dep,
     libdl_dep,
-    libsodium_dep]
+    libsodium_dep,
+]
 
 if sys_name == 'freebsd'
     libexpr_dep_list += libdl_dep
