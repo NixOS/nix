@@ -264,7 +264,7 @@ libdl_lib = cpp.find_library('dl', required : libdl_needed)
 
 if libdl_lib.found()
     libdl_dep = declare_dependency(
-        dependencies : cpp.find_library('dl', required : libdl_needed),
+        dependencies : libdl_lib,
         link_args :  get_option('dl_link_args'),
         required : libdl_needed)
 else
