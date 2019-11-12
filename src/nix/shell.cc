@@ -29,6 +29,8 @@ BuildEnvironment readEnvironment(const Path & path)
 
     std::set<std::string> exported;
 
+    debug("reading environment file '%s'", path);
+
     auto file = readFile(path);
 
     auto pos = file.cbegin();
@@ -41,10 +43,10 @@ BuildEnvironment readEnvironment(const Path & path)
         R"re((?:="((?:[^"\\]|\\.)*)")?\n)re");
 
     static std::string simpleStringRegex =
-        R"re((?:[a-zA-Z0-9_/:\.\-1\+]*))re";
+        R"re((?:[a-zA-Z0-9_/:\.\-\+=]*))re";
 
     static std::string quotedStringRegex =
-        R"re((?:\$?'[^']*'))re";
+        R"re((?:\$?'(?:[^'\\]|\\[abeEfnrtv\\'"?])*'))re";
 
     static std::string arrayRegex =
         R"re((?:\(( *\[[^\]]+\]="(?:[^"\\]|\\.)*")*\)))re";
