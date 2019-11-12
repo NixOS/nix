@@ -244,6 +244,18 @@ std::map<std::wstring, std::wstring, no_case_compare> getEntireEnvW()
     return env;
 }
 
+std::map<std::string, std::string> getEnv()
+{
+    std::map<std::string, std::string> env;
+    auto uenv = getEntireEnvW();
+    std::transform(uenv.begin(), uenv.end(), std::inserter(env, env.begin()),
+        [](const std::pair<const std::wstring, const std::wstring>& p)
+        -> std::pair<const std::string, const std::string> {
+            return {to_bytes(p.first), to_bytes(p.second)};
+        });
+    return env;
+}
+
 #else
 string getEnv(const string & key, const string & def)
 {
