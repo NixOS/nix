@@ -1,7 +1,8 @@
 #pragma once
 
 #include "eval.hh"
-#include <sys/time.h>
+
+#include <chrono>
 
 namespace nix {
 
