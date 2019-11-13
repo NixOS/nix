@@ -7,6 +7,7 @@
 #include "eval-inline.hh"
 #include "download.hh"
 #include "json.hh"
+#include "function-trace.hh"
 
 #include <algorithm>
 #include <chrono>

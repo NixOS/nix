@@ -6,7 +6,6 @@
 #include "symbol-table.hh"
 #include "hash.hh"
 #include "config.hh"
-#include "function-trace.hh"
 
 #include <map>
 #include <optional>
