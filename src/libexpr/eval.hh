@@ -4,12 +4,12 @@
 #include "value.hh"
 #include "nixexpr.hh"
 #include "symbol-table.hh"
-#include "hash.hh"
 #include "config.hh"
 
 #include <map>
 #include <optional>
 #include <unordered_map>
+#include <mutex>
 
 
 namespace nix {
