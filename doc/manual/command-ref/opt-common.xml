@@ -323,7 +323,14 @@
   Nix expressions to be parsed and evaluated, rather than as a list
   of file names of Nix expressions.
   (<command>nix-instantiate</command>, <command>nix-build</command>
-  and <command>nix-shell</command> only.)</para></listitem>
+  and <command>nix-shell</command> only.)</para>
+
+  <para>For <command>nix-shell</command>, this option is commonly used
+  to give you a shell in which you can build the packages returned
+  by the expression. If you want to get a shell which contain the
+  <emphasis>built</emphasis> packages ready for use, give your
+  expression to the <command>nix-shell -p</command> convenience flag
+  instead.</para></listitem>
 
 </varlistentry>
 
