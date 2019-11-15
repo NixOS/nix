@@ -217,7 +217,16 @@ struct GitInput : Input
 
             /* Check whether this repo has any commits. There are
                probably better ways to do this. */
-            bool haveCommits = !readDirectory(actualUrl + "/.git/refs/heads").empty();
+            auto gitDir = actualUrl + "/.git";
+            auto commonGitDir = chomp(runProgram(
+                "git",
+                true,
+                { "-C", actualUrl, "rev-parse", "--git-common-dir" }
+            ));
+            if (commonGitDir != ".git")
+                    gitDir = commonGitDir;
+
+            bool haveCommits = !readDirectory(gitDir + "/refs/heads").empty();
 
             try {
                 if (haveCommits) {
