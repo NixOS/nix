@@ -38,7 +38,7 @@ cat > $flake1Dir/flake.nix <<EOF
     defaultPackage.$system = packages.$system.foo;
 
     # To test "nix flake init".
-    packages.x86_64-linux.hello = import ./simple.nix;
+    legacyPackages.x86_64-linux.hello = import ./simple.nix;
   };
 }
 EOF
