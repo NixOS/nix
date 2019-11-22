@@ -469,7 +469,7 @@ static void prim_tryEval(EvalState & state, const Pos & pos, Value * * args, Val
 static void prim_getEnv(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
     string name = state.forceStringNoCtx(*args[0], pos);
-    mkString(v, evalSettings.restrictEval || evalSettings.pureEval ? "" : getEnv(name));
+    mkString(v, evalSettings.restrictEval || evalSettings.pureEval ? "" : getEnv(name).value_or(""));
 }
 
 

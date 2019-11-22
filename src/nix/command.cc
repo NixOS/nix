@@ -156,7 +156,7 @@ void StorePathCommand::run(ref<Store> store)
 
 Strings editorFor(const Pos & pos)
 {
-    auto editor = getEnv("EDITOR", "cat");
+    auto editor = getEnv("EDITOR").value_or("cat");
     auto args = tokenizeString<Strings>(editor);
     if (pos.line > 0 && (
         editor.find("emacs") != std::string::npos ||

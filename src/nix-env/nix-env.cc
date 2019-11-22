@@ -1425,7 +1425,7 @@ static int _main(int argc, char * * argv)
         globals.instSource.autoArgs = myArgs.getAutoArgs(*globals.state);
 
         if (globals.profile == "")
-            globals.profile = getEnv("NIX_PROFILE", "");
+            globals.profile = getEnv("NIX_PROFILE").value_or("");
 
         if (globals.profile == "") {
             Path profileLink = getHome() + "/.nix-profile";

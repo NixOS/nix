@@ -2503,7 +2503,7 @@ void DerivationGoal::initEnv()
        already know the cryptographic hash of the output). */
     if (fixedOutput) {
         for (auto & i : parsedDrv->getStringsAttr("impureEnvVars").value_or(Strings()))
-            env[i] = getEnv(i);
+            env[i] = getEnv(i).value_or("");
     }
 
     /* Currently structured log messages piggyback on stderr, but we
@@ -3075,7 +3075,7 @@ void DerivationGoal::runChild()
 
             /* The tmpDir in scope points at the temporary build directory for our derivation. Some packages try different mechanisms
                to find temporary directories, so we want to open up a broader place for them to dump their files, if needed. */
-            Path globalTmpDir = canonPath(getEnv("TMPDIR", "/tmp"), true);
+            Path globalTmpDir = canonPath(getEnv("TMPDIR").value_or("/tmp"), true);
 
             /* They don't like trailing slashes on subpath directives */
             if (globalTmpDir.back() == '/') globalTmpDir.pop_back();

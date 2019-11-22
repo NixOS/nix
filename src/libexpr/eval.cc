@@ -217,7 +217,7 @@ void initGC()
        that GC_expand_hp() causes a lot of virtual, but not physical
        (resident) memory to be allocated.  This might be a problem on
        systems that don't overcommit. */
-    if (!getenv("GC_INITIAL_HEAP_SIZE")) {
+    if (!getEnv("GC_INITIAL_HEAP_SIZE")) {
         size_t size = 32 * 1024 * 1024;
 #if HAVE_SYSCONF && defined(_SC_PAGESIZE) && defined(_SC_PHYS_PAGES)
         size_t maxSize = 384 * 1024 * 1024;
@@ -306,7 +306,7 @@ EvalState::EvalState(const Strings & _searchPath, ref<Store> store)
     , baseEnv(allocEnv(128))
     , staticBaseEnv(false, 0)
 {
-    countCalls = getEnv("NIX_COUNT_CALLS", "0") != "0";
+    countCalls = getEnv("NIX_COUNT_CALLS").value_or("0") != "0";
 
     assert(gcInitialised);
 
@@ -314,7 +314,7 @@ EvalState::EvalState(const Strings & _searchPath, ref<Store> store)
 
     /* Initialise the Nix expression search path. */
     if (!evalSettings.pureEval) {
-        Strings paths = parseNixPath(getEnv("NIX_PATH", ""));
+        Strings paths = parseNixPath(getEnv("NIX_PATH").value_or(""));
         for (auto & i : _searchPath) addToSearchPath(i);
         for (auto & i : paths) addToSearchPath(i);
     }
@@ -1753,7 +1753,7 @@ bool EvalState::eqValues(Value & v1, Value & v2)
 
 void EvalState::printStats()
 {
-    bool showStats = getEnv("NIX_SHOW_STATS", "0") != "0";
+    bool showStats = getEnv("NIX_SHOW_STATS").value_or("0") != "0";
 
     struct rusage buf;
     getrusage(RUSAGE_SELF, &buf);
@@ -1769,7 +1769,7 @@ void EvalState::printStats()
     GC_get_heap_usage_safe(&heapSize, 0, 0, 0, &totalBytes);
 #endif
     if (showStats) {
-        auto outPath = getEnv("NIX_SHOW_STATS_PATH","-");
+        auto outPath = getEnv("NIX_SHOW_STATS_PATH").value_or("-");
         std::fstream fs;
         if (outPath != "-")
             fs.open(outPath, std::fstream::out);
@@ -1861,7 +1861,7 @@ void EvalState::printStats()
             }
         }
 
-        if (getEnv("NIX_SHOW_SYMBOLS", "0") != "0") {
+        if (getEnv("NIX_SHOW_SYMBOLS").value_or("0") != "0") {
             auto list = topObj.list("symbols");
             symbols.dump([&](const std::string & s) { list.elem(s); });
         }

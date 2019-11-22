@@ -58,10 +58,11 @@ std::string SysError::addErrno(const std::string & s)
 }
 
 
-string getEnv(const string & key, const string & def)
+std::optional<std::string> getEnv(const std::string & key)
 {
     char * value = getenv(key.c_str());
-    return value ? string(value) : def;
+    if (!value) return {};
+    return std::string(value);
 }
 
 
@@ -438,7 +439,7 @@ void deletePath(const Path & path, unsigned long long & bytesFreed)
 static Path tempName(Path tmpRoot, const Path & prefix, bool includePid,
     int & counter)
 {
-    tmpRoot = canonPath(tmpRoot.empty() ? getEnv("TMPDIR", "/tmp") : tmpRoot, true);
+    tmpRoot = canonPath(tmpRoot.empty() ? getEnv("TMPDIR").value_or("/tmp") : tmpRoot, true);
     if (includePid)
         return (format("%1%/%2%-%3%-%4%") % tmpRoot % prefix % getpid() % counter++).str();
     else
@@ -480,7 +481,7 @@ Path createTempDir(const Path & tmpRoot, const Path & prefix,
 std::string getUserName()
 {
     auto pw = getpwuid(geteuid());
-    std::string name = pw ? pw->pw_name : getEnv("USER", "");
+    std::string name = pw ? pw->pw_name : getEnv("USER").value_or("");
     if (name.empty())
         throw Error("cannot figure out user name");
     return name;
@@ -488,8 +489,8 @@ std::string getUserName()
 
 
 static Lazy<Path> getHome2([]() {
-    Path homeDir = getEnv("HOME");
-    if (homeDir.empty()) {
+    auto homeDir = getEnv("HOME");
+    if (!homeDir) {
         std::vector<char> buf(16384);
         struct passwd pwbuf;
         struct passwd * pw;
@@ -498,7 +499,7 @@ static Lazy<Path> getHome2([]() {
             throw Error("cannot determine user's home directory");
         homeDir = pw->pw_dir;
     }
-    return homeDir;
+    return *homeDir;
 });
 
 Path getHome() { return getHome2(); }
@@ -506,25 +507,21 @@ Path getHome() { return getHome2(); }
 
 Path getCacheDir()
 {
-    Path cacheDir = getEnv("XDG_CACHE_HOME");
-    if (cacheDir.empty())
-        cacheDir = getHome() + "/.cache";
-    return cacheDir;
+    auto cacheDir = getEnv("XDG_CACHE_HOME");
+    return cacheDir ? *cacheDir : getHome() + "/.cache";
 }
 
 
 Path getConfigDir()
 {
-    Path configDir = getEnv("XDG_CONFIG_HOME");
-    if (configDir.empty())
-        configDir = getHome() + "/.config";
-    return configDir;
+    auto configDir = getEnv("XDG_CONFIG_HOME");
+    return configDir ? *configDir : getHome() + "/.config";
 }
 
 std::vector<Path> getConfigDirs()
 {
     Path configHome = getConfigDir();
-    string configDirs = getEnv("XDG_CONFIG_DIRS");
+    string configDirs = getEnv("XDG_CONFIG_DIRS").value_or("");
     std::vector<Path> result = tokenizeString<std::vector<string>>(configDirs, ":");
     result.insert(result.begin(), configHome);
     return result;
@@ -533,10 +530,8 @@ std::vector<Path> getConfigDirs()
 
 Path getDataDir()
 {
-    Path dataDir = getEnv("XDG_DATA_HOME");
-    if (dataDir.empty())
-        dataDir = getHome() + "/.local/share";
-    return dataDir;
+    auto dataDir = getEnv("XDG_DATA_HOME");
+    return dataDir ? *dataDir : getHome() + "/.local/share";
 }
 
 

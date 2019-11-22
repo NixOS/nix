@@ -66,7 +66,7 @@ public:
     /* File name of the socket the daemon listens to.  */
     Path nixDaemonSocketFile;
 
-    Setting<std::string> storeUri{this, getEnv("NIX_REMOTE", "auto"), "store",
+    Setting<std::string> storeUri{this, getEnv("NIX_REMOTE").value_or("auto"), "store",
         "The default Nix store to use."};
 
     Setting<bool> keepFailed{this, false, "keep-failed",

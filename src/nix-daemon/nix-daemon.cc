@@ -161,8 +161,9 @@ static void daemonLoop(char * * argv)
     AutoCloseFD fdSocket;
 
     /* Handle socket-based activation by systemd. */
-    if (getEnv("LISTEN_FDS") != "") {
-        if (getEnv("LISTEN_PID") != std::to_string(getpid()) || getEnv("LISTEN_FDS") != "1")
+    auto listenFds = getEnv("LISTEN_FDS");
+    if (listenFds) {
+        if (getEnv("LISTEN_PID") != std::to_string(getpid()) || listenFds != "1")
             throw Error("unexpected systemd environment variables");
         fdSocket = SD_LISTEN_FDS_START;
         closeOnExec(fdSocket.get());

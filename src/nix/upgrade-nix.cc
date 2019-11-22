@@ -106,7 +106,7 @@ struct CmdUpgradeNix : MixDryRun, StoreCommand
     {
         Path where;
 
-        for (auto & dir : tokenizeString<Strings>(getEnv("PATH"), ":"))
+        for (auto & dir : tokenizeString<Strings>(getEnv("PATH").value_or(""), ":"))
             if (pathExists(dir + "/nix-env")) {
                 where = dir;
                 break;

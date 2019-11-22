@@ -128,7 +128,7 @@ struct CmdRun : InstallablesCommand
         std::queue<Path> todo;
         for (auto & path : outPaths) todo.push(path);
 
-        auto unixPath = tokenizeString<Strings>(getEnv("PATH"), ":");
+        auto unixPath = tokenizeString<Strings>(getEnv("PATH").value_or(""), ":");
 
         while (!todo.empty()) {
             Path path = todo.front();

@@ -16,7 +16,7 @@ SSHMaster::SSHMaster(const std::string & host, const std::string & keyFile, bool
 
 void SSHMaster::addCommonSSHOpts(Strings & args)
 {
-    for (auto & i : tokenizeString<Strings>(getEnv("NIX_SSHOPTS")))
+    for (auto & i : tokenizeString<Strings>(getEnv("NIX_SSHOPTS").value_or("")))
         args.push_back(i);
     if (!keyFile.empty())
         args.insert(args.end(), {"-i", keyFile});
