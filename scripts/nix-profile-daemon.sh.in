@@ -2,7 +2,6 @@
 if [ -n "${__ETC_PROFILE_NIX_SOURCED:-}" ]; then return; fi
 __ETC_PROFILE_NIX_SOURCED=1
 
-export NIX_USER_PROFILE_DIR="@localstatedir@/nix/profiles/per-user/$USER"
 export NIX_PROFILES="@localstatedir@/nix/profiles/default $HOME/.nix-profile"
 
 # Set $NIX_SSL_CERT_FILE so that Nixpkgs applications like curl work.
