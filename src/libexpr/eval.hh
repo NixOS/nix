@@ -339,8 +339,15 @@ struct InvalidPathError : EvalError
 
 struct EvalSettings : Config
 {
+    EvalSettings();
+
+    static Strings getDefaultNixPath();
+
     Setting<bool> enableNativeCode{this, false, "allow-unsafe-native-code-during-evaluation",
         "Whether builtin functions that allow executing native code should be enabled."};
+
+    Setting<Strings> nixPath{this, getDefaultNixPath(), "nix-path",
+        "List of directories to be searched for <...> file references."};
 
     Setting<bool> restrictEval{this, false, "restrict-eval",
         "Whether to restrict file system access to paths in $NIX_PATH, "
