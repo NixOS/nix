@@ -275,6 +275,17 @@ static Strings parseNixPath(const string & s)
 }
 
 
+static Strings getDefaultNixPath()
+{
+    Strings res;
+    auto add = [&](const Path & p) { if (pathExists(p)) { res.push_back(p); } };
+    add(getHome() + "/.nix-defexpr/channels");
+    add("nixpkgs=" + settings.nixStateDir + "/nix/profiles/per-user/root/channels/nixpkgs");
+    add(settings.nixStateDir + "/nix/profiles/per-user/root/channels");
+    return res;
+}
+
+
 EvalState::EvalState(const Strings & _searchPath, ref<Store> store)
     : sWith(symbols.create("<with>"))
     , sOutPath(symbols.create("outPath"))
@@ -314,7 +325,8 @@ EvalState::EvalState(const Strings & _searchPath, ref<Store> store)
 
     /* Initialise the Nix expression search path. */
     if (!evalSettings.pureEval) {
-        Strings paths = parseNixPath(getEnv("NIX_PATH").value_or(""));
+        auto nixPath = getEnv("NIX_PATH");
+        auto paths = nixPath ? parseNixPath(*nixPath) : getDefaultNixPath();
         for (auto & i : _searchPath) addToSearchPath(i);
         for (auto & i : paths) addToSearchPath(i);
     }

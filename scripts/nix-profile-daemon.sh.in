@@ -24,5 +24,4 @@ else
   done
 fi
 
-export NIX_PATH="nixpkgs=@localstatedir@/nix/profiles/per-user/root/channels/nixpkgs:@localstatedir@/nix/profiles/per-user/root/channels"
 export PATH="$HOME/.nix-profile/bin:@localstatedir@/nix/profiles/default/bin:$PATH"
