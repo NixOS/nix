@@ -877,7 +877,7 @@ void ExprAttrs::eval(EvalState & state, Env & env, Value & v)
         if (hasOverrides) {
             Value * vOverrides = (*v.attrs)[overrides->second.displ].value;
             state.forceAttrs(*vOverrides);
-            Bindings * newBnds = state.allocBindings(v.attrs->size() + vOverrides->attrs->size());
+            Bindings * newBnds = state.allocBindings(v.attrs->capacity() + vOverrides->attrs->size());
             for (auto & i : *v.attrs)
                 newBnds->push_back(i);
             for (auto & i : *vOverrides->attrs) {
