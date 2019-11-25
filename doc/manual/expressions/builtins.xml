@@ -1120,6 +1120,16 @@ Evaluates to <literal>[ "foo" ]</literal>.
 
   </varlistentry>
 
+  <varlistentry xml:id='builtin-placeholder'>
+    <term><function>builtins.placeholder</function>
+    <replaceable>output</replaceable></term>
+
+    <listitem><para>Return a placeholder string for the specified
+    <replaceable>output</replaceable> that will be substituted by the
+    corresponding output path at build time. Typical outputs would be
+    <literal>"out"</literal>, <literal>"bin"</literal> or
+    <literal>"dev"</literal>.</para></listitem>
+  </varlistentry>
 
   <varlistentry xml:id='builtin-readDir'>
     <term><function>builtins.readDir</function>
