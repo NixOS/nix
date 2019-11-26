@@ -56,6 +56,7 @@ struct MixFlakeOptions : virtual Args
 struct SourceExprCommand : virtual Args, EvalCommand, MixFlakeOptions
 {
     std::optional<Path> file;
+    std::optional<std::string> expr;
 
     SourceExprCommand();
 
@@ -106,7 +107,7 @@ struct InstallableCommand : virtual Args, SourceExprCommand
 
 private:
 
-    std::string _installable{"."};
+    std::string _installable{""};
 };
 
 /* A command that operates on zero or more store paths. */

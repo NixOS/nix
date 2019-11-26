@@ -51,8 +51,14 @@ SourceExprCommand::SourceExprCommand()
         .shortName('f')
         .longName("file")
         .label("file")
-        .description("evaluate a set of attributes from FILE (deprecated)")
+        .description("evaluate attributes from FILE")
         .dest(&file);
+
+    mkFlag()
+        .longName("expr")
+        .label("expr")
+        .description("evaluate attributes from EXPR")
+        .dest(&expr);
 }
 
 Strings SourceExprCommand::getDefaultFlakeAttrPaths()
@@ -378,19 +384,25 @@ std::vector<std::shared_ptr<Installable>> SourceExprCommand::parseInstallables(
 {
     std::vector<std::shared_ptr<Installable>> result;
 
-    if (file) {
+    if (file || expr) {
+        if (file && expr)
+            throw UsageError("'--file' and '--expr' are exclusive");
+
         // FIXME: backward compatibility hack
-        evalSettings.pureEval = false;
+        if (file) evalSettings.pureEval = false;
 
         auto state = getEvalState();
         auto vFile = state->allocValue();
-        state->evalFile(lookupFileArg(*state, *file), *vFile);
 
-        if (ss.empty())
-            ss = {""};
+        if (file)
+            state->evalFile(lookupFileArg(*state, *file), *vFile);
+        else {
+            auto e = state->parseExprFromString(*expr, absPath("."));
+            state->eval(e, *vFile);
+        }
 
         for (auto & s : ss)
-            result.push_back(std::make_shared<InstallableAttrPath>(*this, vFile, s));
+            result.push_back(std::make_shared<InstallableAttrPath>(*this, vFile, s == "." ? "" : s));
 
     } else {
 
@@ -407,10 +419,7 @@ std::vector<std::shared_ptr<Installable>> SourceExprCommand::parseInstallables(
             size_t hash;
             std::optional<Path> storePath;
 
-            if (s.compare(0, 1, "(") == 0)
-                result.push_back(std::make_shared<InstallableExpr>(*this, s));
-
-            else if (hasPrefix(s, "nixpkgs.")) {
+            if (hasPrefix(s, "nixpkgs.")) {
                 bool static warned;
                 warnOnce(warned, "the syntax 'nixpkgs.<attr>' is deprecated; use 'nixpkgs:<attr>' instead");
                 result.push_back(std::make_shared<InstallableFlake>(*this, FlakeRef("nixpkgs"),
@@ -532,7 +541,7 @@ PathSet toDerivations(ref<Store> store,
 
 void InstallablesCommand::prepare()
 {
-    if (_installables.empty() && !file && useDefaultInstallables())
+    if (_installables.empty() && useDefaultInstallables())
         // FIXME: commands like "nix install" should not have a
         // default, probably.
         _installables.push_back(".");

@@ -28,7 +28,7 @@ struct CmdEval : MixJSON, InstallableCommand
         return {
             Example{
                 "To evaluate a Nix expression given on the command line:",
-                "nix eval '(1 + 2)'"
+                "nix eval --expr '1 + 2'"
             },
             Example{
                 "To evaluate a Nix expression from a file or URI:",
