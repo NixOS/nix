@@ -81,6 +81,11 @@ path2=$(nix eval --raw "(builtins.fetchGit $repo).outPath")
 
 [[ $(nix eval --raw "(builtins.fetchGit $repo).rev") = 0000000000000000000000000000000000000000 ]]
 
+# Check whether filtering an unclean tree works
+dir1=$(nix eval --raw "(import ./fetchGit-subdir.nix $repo \"dir1\").outPath")
+[   -e $dir1/dir1/foo ]
+[ ! -e $dir1/dir2 ]
+
 # ... unless we're using an explicit ref or rev.
 path3=$(nix eval --raw "(builtins.fetchGit { url = $repo; ref = \"master\"; }).outPath")
 [[ $path = $path3 ]]
@@ -93,6 +98,11 @@ git -C $repo commit -m 'Bla3' -a
 
 path4=$(nix eval --tarball-ttl 0 --raw "(builtins.fetchGit file://$repo).outPath")
 [[ $path2 = $path4 ]]
+
+# Check whether filtering a clean tree procudes the same result as an unclean tree
+dir1=$(nix eval --raw "(import ./fetchGit-subdir.nix $repo \"dir1\").outPath")
+[   -e $dir1/dir1/foo ]
+[ ! -e $dir1/dir2 ]
 
 # tarball-ttl should be ignored if we specify a rev
 echo delft > $repo/hello

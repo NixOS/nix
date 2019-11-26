@@ -385,6 +385,16 @@ stdenv.mkDerivation { … }
             <para>
               The URL of the repo.
             </para>
+            <para>
+              Note that the <literal>url</literal> attribute can also be a path to a
+              local git repository in which case the files in the git index
+              (files which are either committed or staged) will be copied to the
+              store.
+            </para>
+            <para>
+              Note that only files which satisfy the optional
+              <literal>filter</literal> function are copied to the store.
+            </para>
           </listitem>
         </varlistentry>
         <varlistentry>
@@ -419,6 +429,18 @@ stdenv.mkDerivation { … }
               with <literal>refs/heads/</literal>. As of Nix 2.3.0
               Nix will not prefix <literal>refs/heads/</literal> if
               <varname>ref</varname> starts with <literal>refs/</literal>.
+            </para>
+          </listitem>
+        </varlistentry>
+        <varlistentry>
+          <term>filter</term>
+          <listitem>
+            <para>
+              A function to filter the resulting git checkout. Its type is the
+              same type as expected by <link
+              linkend="builtin-filterSource">builtins.filterSource</link>, with
+              the same semantics except that the path is always relative to the
+              git checkout.
             </para>
           </listitem>
         </varlistentry>
@@ -506,6 +528,28 @@ stdenv.mkDerivation { … }
   ref = "master";
 }</programlisting>
       </example>
+
+      <example>
+        <title>Fetching a local git repository and using a filter to only
+        include sub directories</title>
+        <para>
+          The following function is useful when working with a monorepo
+          containing multiple projects in sub directories. In such a setup each
+          sub directory typically has its own derivation. The
+          <literal>src</literal> attribute of each derivation can then be set to
+          the output of this function. This ensures that local nix builds are
+          reproducible on CI.
+        </para>
+        <programlisting><![CDATA[let fetchGitSubDir = url: subdir: builtins.fetchGit {
+  inherit url;
+  filter = path: type:
+    (lib.hasPrefix (subdir + "/") path) ||
+                   (type == "directory" && path == subdir);
+};
+in fetchGitSubDir ./my-repo "my-sub-project"
+]]></programlisting>
+      </example>
+
     </listitem>
   </varlistentry>
 
