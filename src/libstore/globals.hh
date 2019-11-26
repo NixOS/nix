@@ -357,6 +357,8 @@ public:
     Setting<Strings> experimentalFeatures{this, {}, "experimental-features",
         "Experimental Nix features to enable."};
 
+    bool isExperimentalFeatureEnabled(const std::string & name);
+
     void requireExperimentalFeature(const std::string & name);
 };
 

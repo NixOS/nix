@@ -105,10 +105,15 @@ StringSet Settings::getDefaultSystemFeatures()
     return features;
 }
 
-void Settings::requireExperimentalFeature(const std::string & name)
+bool Settings::isExperimentalFeatureEnabled(const std::string & name)
 {
     auto & f = experimentalFeatures.get();
-    if (std::find(f.begin(), f.end(), name) == f.end())
+    return std::find(f.begin(), f.end(), name) != f.end();
+}
+
+void Settings::requireExperimentalFeature(const std::string & name)
+{
+    if (!isExperimentalFeatureEnabled(name))
         throw Error("experimental Nix feature '%s' is disabled", name);
 }
 
