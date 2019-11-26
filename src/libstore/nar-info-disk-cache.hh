@@ -10,6 +10,8 @@ class NarInfoDiskCache
 public:
     typedef enum { oValid, oInvalid, oUnknown } Outcome;
 
+    virtual ~NarInfoDiskCache() { };
+
     virtual void createCache(const std::string & uri, const Path & storeDir,
         bool wantMassQuery, int priority) = 0;
 

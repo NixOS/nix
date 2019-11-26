@@ -16,6 +16,7 @@ struct Pos;
    run() method. */
 struct Command : virtual Args
 {
+    virtual ~Command() { }
     virtual std::string name() = 0;
     virtual void prepare() { };
     virtual void run() = 0;
@@ -58,6 +59,8 @@ typedef std::vector<Buildable> Buildables;
 
 struct Installable
 {
+    virtual ~Installable() { }
+
     virtual std::string what() = 0;
 
     virtual Buildables toBuildables()

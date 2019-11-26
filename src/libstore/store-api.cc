@@ -216,7 +216,7 @@ static std::string makeType(string && type, const PathSet & references)
         type += ":";
         type += i;
     }
-    return type;
+    return std::move(type);
 }
 
 
