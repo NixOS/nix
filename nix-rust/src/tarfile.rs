@@ -22,7 +22,7 @@ pub fn unpack_tarfile(source: Source, dest_dir: &str) -> Result<(), Error> {
                 fs::create_dir(dest_file)?;
             }
             tar::EntryType::Regular => {
-                let mode = if file.header().mode()? & libc::S_IXUSR == 0 {
+                let mode = if file.header().mode()? & (libc::S_IXUSR as u32) == 0 {
                     0o666
                 } else {
                     0o777
