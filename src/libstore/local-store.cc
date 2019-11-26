@@ -585,6 +585,8 @@ void LocalStore::checkDerivationOutputs(const Path & drvPath, const Derivation &
 uint64_t LocalStore::addValidPath(State & state,
     const ValidPathInfo & info, bool checkOutputs)
 {
+    checkStoreName(storePathToName(info.path));
+
     if (info.ca != "" && !info.isContentAddressed(*this))
         throw Error("cannot add path '%s' to the Nix store because it claims to be content-addressed but isn't", info.path);
 
