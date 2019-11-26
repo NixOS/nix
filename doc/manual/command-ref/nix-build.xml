@@ -100,7 +100,7 @@ also <xref linkend="sec-common-options" />.</phrase></para>
   </varlistentry>
 
   <varlistentry><term><option>--dry-run</option></term>
-   <listitem><para>Show what store paths would be built or downloaded</para></listitem>
+   <listitem><para>Show what store paths would be built or downloaded.</para></listitem>
   </varlistentry>
 
   <varlistentry xml:id='opt-out-link'><term><option>--out-link</option> /
