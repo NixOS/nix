@@ -1241,7 +1241,35 @@ bool LocalStore::verifyStore(bool checkContents, RepairFlag repair)
 
     /* Optionally, check the content hashes (slow). */
     if (checkContents) {
-        printInfo("checking hashes...");
+
+        printInfo("checking link hashes...");
+
+        AutoCloseDir dir(opendir(linksDir.c_str()));
+        if (!dir) throw SysError(format("opening directory '%1%'") % linksDir);
+
+        struct dirent * dirent;
+        while (errno = 0, dirent = readdir(dir.get())) { /* sic */
+            checkInterrupt();
+            if (strcmp(dirent->d_name, ".") == 0 || strcmp(dirent->d_name, "..") == 0) continue;
+            Path linkPath = linksDir + "/" + dirent->d_name;
+            string hash = hashPath(htSHA256, linkPath).first.to_string(Base32, false);
+            if (hash != dirent->d_name) {
+                printError(format("link '%1%' was modified! "
+                                  "expected hash '%2%', got '%3%'")
+                                  % linkPath % dirent->d_name % hash);
+                if (repair) {
+                    if (unlink(linkPath.c_str()) == 0)
+                        printError(format("Removed link '%1%'") % linkPath);
+                    else
+                        throw SysError(format("removing corrupt link '%1%'") % linkPath);
+                } else {
+                    errors = true;
+                }
+            }
+        }
+        if (errno) throw SysError(format("reading directory '%1%'") % linksDir);
+
+        printInfo("checking store hashes...");
 
         Hash nullHash(htSHA256);
 
