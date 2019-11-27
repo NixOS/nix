@@ -17,3 +17,8 @@ $(d)/target/$(RUST_DIR)/libnixrust.a: $(wildcard $(d)/src/*.rs) $(d)/Cargo.toml
 	&& touch target/$(RUST_DIR)/libnixrust.a
 
 dist-files += $(d)/vendor
+
+clean: clean-rust
+
+clean-rust:
+	$(suppress) rm -rfv nix-rust/target
