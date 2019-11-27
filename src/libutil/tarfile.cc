@@ -2,14 +2,16 @@
 #include "compression.hh"
 
 extern "C" {
-    rust::CBox2<rust::Result<std::tuple<>>> unpack_tarfile(rust::Source source, rust::StringSlice dest_dir);
+    rust::Result<std::tuple<>> *
+    unpack_tarfile(rust::Source source, rust::StringSlice dest_dir);
 }
 
 namespace nix {
 
 void unpackTarfile(Source & source, const Path & destDir)
 {
-    unpack_tarfile(source, destDir).use()->unwrap();
+    rust::Source source2(source);
+    rust::CBox(unpack_tarfile(source2, destDir))->unwrap();
 }
 
 void unpackTarfile(const Path & tarFile, const Path & destDir,

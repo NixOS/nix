@@ -81,17 +81,4 @@ struct CBox
     }
 };
 
-// Grrr, this is only needed because 'extern "C"' functions don't
-// support non-POD return types (and CBox has a destructor so it's not
-// POD).
-template<typename T>
-struct CBox2
-{
-    T * ptr;
-    CBox<T> use()
-    {
-        return CBox(ptr);
-    }
-};
-
 }
