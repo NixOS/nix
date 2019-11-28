@@ -506,13 +506,6 @@ static void prim_trace(EvalState & state, const Pos & pos, Value * * args, Value
 }
 
 
-void prim_valueSize(EvalState & state, const Pos & pos, Value * * args, Value & v)
-{
-    /* We're not forcing the argument on purpose. */
-    mkInt(v, valueSize(*args[0]));
-}
-
-
 /*************************************************************
  * Derivations
  *************************************************************/
@@ -2206,7 +2199,6 @@ void EvalState::createBaseEnv()
 
     // Debugging
     addPrimOp("__trace", 2, prim_trace);
-    addPrimOp("__valueSize", 1, prim_valueSize);
 
     // Paths
     addPrimOp("__toPath", 1, prim_toPath);

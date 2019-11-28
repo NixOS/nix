@@ -614,13 +614,9 @@ Value * EvalState::allocValue()
 
 Env & EvalState::allocEnv(size_t size)
 {
-    if (size > std::numeric_limits<decltype(Env::size)>::max())
-        throw Error("environment size %d is too big", size);
-
     nrEnvs++;
     nrValuesInEnvs += size;
     Env * env = (Env *) allocBytes(sizeof(Env) + size * sizeof(Value *));
-    env->size = (decltype(Env::size)) size;
     env->type = Env::Plain;
 
     /* We assume that env->values has been cleared by the allocator; maybeThunk() and lookupVar fromWith expect this. */
@@ -1865,93 +1861,6 @@ void EvalState::printStats()
             symbols.dump([&](const std::string & s) { list.elem(s); });
         }
     }
-}
-
-
-size_t valueSize(Value & v)
-{
-    std::set<const void *> seen;
-
-    auto doString = [&](const char * s) -> size_t {
-        if (!seen.insert(s).second) return 0;
-        return strlen(s) + 1;
-    };
-
-    std::function<size_t(Value & v)> doValue;
-    std::function<size_t(Env & v)> doEnv;
-
-    doValue = [&](Value & v) -> size_t {
-        if (!seen.insert(&v).second) return 0;
-
-        size_t sz = sizeof(Value);
-
-        switch (v.type) {
-        case tString:
-            sz += doString(v.string.s);
-            if (v.string.context)
-                for (const char * * p = v.string.context; *p; ++p)
-                    sz += doString(*p);
-            break;
-        case tPath:
-            sz += doString(v.path);
-            break;
-        case tAttrs:
-            if (seen.insert(v.attrs).second) {
-                sz += sizeof(Bindings) + sizeof(Attr) * v.attrs->capacity();
-                for (auto & i : *v.attrs)
-                    sz += doValue(*i.value);
-            }
-            break;
-        case tList1:
-        case tList2:
-        case tListN:
-            if (seen.insert(v.listElems()).second) {
-                sz += v.listSize() * sizeof(Value *);
-                for (size_t n = 0; n < v.listSize(); ++n)
-                    sz += doValue(*v.listElems()[n]);
-            }
-            break;
-        case tThunk:
-            sz += doEnv(*v.thunk.env);
-            break;
-        case tApp:
-            sz += doValue(*v.app.left);
-            sz += doValue(*v.app.right);
-            break;
-        case tLambda:
-            sz += doEnv(*v.lambda.env);
-            break;
-        case tPrimOpApp:
-            sz += doValue(*v.primOpApp.left);
-            sz += doValue(*v.primOpApp.right);
-            break;
-        case tExternal:
-            if (!seen.insert(v.external).second) break;
-            sz += v.external->valueSize(seen);
-            break;
-        default:
-            ;
-        }
-
-        return sz;
-    };
-
-    doEnv = [&](Env & env) -> size_t {
-        if (!seen.insert(&env).second) return 0;
-
-        size_t sz = sizeof(Env) + sizeof(Value *) * env.size;
-
-        if (env.type != Env::HasWithExpr)
-            for (size_t i = 0; i < env.size; ++i)
-                if (env.values[i])
-                    sz += doValue(*env.values[i]);
-
-        if (env.up) sz += doEnv(*env.up);
-
-        return sz;
-    };
-
-    return doValue(v);
 }
 
 

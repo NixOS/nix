@@ -37,7 +37,6 @@ struct PrimOp
 struct Env
 {
     Env * up;
-    unsigned short size; // used by ‘valueSize’
     unsigned short prevWith:14; // nr of levels up to next `with' environment
     enum { Plain = 0, HasWithExpr, HasWithAttrs } type:2;
     Value * values[0];
