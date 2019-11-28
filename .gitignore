@@ -8,7 +8,6 @@ perl/Makefile.config
 /precompiled-headers.h.pch
 /config.*
 /configure
-/nix.spec
 /stamp-h1
 /svn-revision
 /libtool
