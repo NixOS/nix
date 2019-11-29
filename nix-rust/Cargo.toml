@@ -6,7 +6,7 @@ edition = "2018"
 
 [lib]
 name = "nixrust"
-crate-type = ["staticlib"]
+crate-type = ["cdylib"]
 
 [dependencies]
 tar = "0.4"
