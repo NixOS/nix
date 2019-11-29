@@ -1,0 +1,13 @@
+[package]
+name = "nix-rust"
+version = "0.1.0"
+authors = ["Eelco Dolstra <edolstra@gmail.com>"]
+edition = "2018"
+
+[lib]
+name = "nixrust"
+crate-type = ["cdylib"]
+
+[dependencies]
+tar = "0.4"
+libc = "0.2"

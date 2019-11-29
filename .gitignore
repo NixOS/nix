@@ -85,6 +85,7 @@ perl/Makefile.config
 /tests/restricted-innocent
 /tests/shell
 /tests/shell.drv
+/tests/config.nix
 
 # /tests/lang/
 /tests/lang/*.out
@@ -118,3 +119,5 @@ GPATH
 GRTAGS
 GSYMS
 GTAGS
+
+nix-rust/target

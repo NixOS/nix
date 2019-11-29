@@ -8,6 +8,7 @@
 #include "compression.hh"
 #include "pathlocks.hh"
 #include "finally.hh"
+#include "tarfile.hh"
 
 #ifdef ENABLE_S3
 #include <aws/core/client/ClientConfiguration.h>
@@ -903,12 +904,15 @@ CachedDownloadResult Downloader::downloadCached(
                 unpackedStorePath = "";
         }
         if (unpackedStorePath.empty()) {
-            printInfo(format("unpacking '%1%'...") % url);
+            printInfo("unpacking '%s'...", url);
             Path tmpDir = createTempDir();
             AutoDelete autoDelete(tmpDir, true);
-            // FIXME: this requires GNU tar for decompression.
-            runProgram("tar", true, {"xf", store->toRealPath(storePath), "-C", tmpDir, "--strip-components", "1"});
-            unpackedStorePath = store->addToStore(name, tmpDir, true, htSHA256, defaultPathFilter, NoRepair);
+            unpackTarfile(store->toRealPath(storePath), tmpDir, baseNameOf(url));
+            auto members = readDirectory(tmpDir);
+            if (members.size() != 1)
+                throw nix::Error("tarball '%s' contains an unexpected number of top-level files", url);
+            auto topDir = tmpDir + "/" + members.begin()->name;
+            unpackedStorePath = store->addToStore(name, topDir, true, htSHA256, defaultPathFilter, NoRepair);
         }
         replaceSymlink(unpackedStorePath, unpackedLink);
         storePath = unpackedStorePath;
