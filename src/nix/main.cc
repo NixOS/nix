@@ -92,6 +92,11 @@ struct NixArgs : virtual MultiCommand, virtual MixCommonArgs
             .longName("no-net")
             .description("disable substituters and consider all previously downloaded files up-to-date")
             .handler([&]() { useNet = false; });
+
+        mkFlag()
+            .longName("refresh")
+            .description("consider all previously downloaded files out-of-date")
+            .handler([&]() { settings.tarballTtl = 0; });
     }
 
     void printFlags(std::ostream & out) override
