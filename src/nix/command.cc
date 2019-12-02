@@ -159,7 +159,7 @@ void MixEnvironment::setEnviron() {
 
         for (const auto & var : keep) {
             auto val = getenv(var.c_str());
-            if (val) stringEnv.emplace_back(fmt("%s=%s", var.c_str(), val));
+            if (val) stringsEnv.emplace_back(fmt("%s=%s", var.c_str(), val));
         }
         vectorEnv = stringsToCharPtrs(stringsEnv);
         environ = vectorEnv.data();
