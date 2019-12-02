@@ -200,4 +200,17 @@ struct MixDefaultProfile : MixProfile
     MixDefaultProfile();
 };
 
+struct MixEnvironment : virtual Args {
+
+    StringSet keep, unset;
+    Strings stringsEnv;
+    std::vector<char*> vectorEnv;
+    bool ignoreEnvironment;
+
+    MixEnvironment();
+
+    /* Modify global environ based on ignoreEnvironment, keep, and unset. It's expected that exec will be called before this class goes out of scope, otherwise environ will become invalid. */
+    void setEnviron();
+};
+
 }

@@ -57,11 +57,9 @@ struct RunCommon : virtual Command
     }
 };
 
-struct CmdRun : InstallablesCommand, RunCommon
+struct CmdRun : InstallablesCommand, RunCommon, MixEnvironment
 {
     std::vector<std::string> command = { "bash" };
-    StringSet keep, unset;
-    bool ignoreEnvironment = false;
 
     CmdRun()
     {
@@ -75,28 +73,6 @@ struct CmdRun : InstallablesCommand, RunCommon
                 if (ss.empty()) throw UsageError("--command requires at least one argument");
                 command = ss;
             });
-
-        mkFlag()
-            .longName("ignore-environment")
-            .shortName('i')
-            .description("clear the entire environment (except those specified with --keep)")
-            .set(&ignoreEnvironment, true);
-
-        mkFlag()
-            .longName("keep")
-            .shortName('k')
-            .description("keep specified environment variable")
-            .arity(1)
-            .labels({"name"})
-            .handler([&](std::vector<std::string> ss) { keep.insert(ss.front()); });
-
-        mkFlag()
-            .longName("unset")
-            .shortName('u')
-            .description("unset specified environment variable")
-            .arity(1)
-            .labels({"name"})
-            .handler([&](std::vector<std::string> ss) { unset.insert(ss.front()); });
     }
 
     std::string description() override
@@ -132,34 +108,12 @@ struct CmdRun : InstallablesCommand, RunCommon
 
         auto accessor = store->getFSAccessor();
 
-        if (ignoreEnvironment) {
-
-            if (!unset.empty())
-                throw UsageError("--unset does not make sense with --ignore-environment");
-
-            std::map<std::string, std::string> kept;
-            for (auto & var : keep) {
-                auto s = getenv(var.c_str());
-                if (s) kept[var] = s;
-            }
-
-            clearEnv();
-
-            for (auto & var : kept)
-                setenv(var.first.c_str(), var.second.c_str(), 1);
-
-        } else {
-
-            if (!keep.empty())
-                throw UsageError("--keep does not make sense without --ignore-environment");
-
-            for (auto & var : unset)
-                unsetenv(var.c_str());
-        }
 
         std::unordered_set<Path> done;
         std::queue<Path> todo;
         for (auto & path : outPaths) todo.push(path);
+
+        setEnviron();
 
         auto unixPath = tokenizeString<Strings>(getEnv("PATH"), ":");
 
