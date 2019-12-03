@@ -54,6 +54,7 @@ LocalStore::LocalStore(const Params & params)
     , trashDir(realStoreDir + "/trash")
     , tempRootsDir(stateDir + "/temproots")
     , fnTempRoots(fmt("%s/%d", tempRootsDir, getpid()))
+    , locksHeld(tokenizeString<PathSet>(getEnv("NIX_HELD_LOCKS").value_or("")))
 {
     auto state(_state.lock());
 
@@ -577,6 +578,8 @@ void LocalStore::checkDerivationOutputs(const Path & drvPath, const Derivation &
 uint64_t LocalStore::addValidPath(State & state,
     const ValidPathInfo & info, bool checkOutputs)
 {
+    checkStoreName(storePathToName(info.path));
+
     if (info.ca != "" && !info.isContentAddressed(*this))
         throw Error("cannot add path '%s' to the Nix store because it claims to be content-addressed but isn't", info.path);
 
@@ -1231,7 +1234,29 @@ bool LocalStore::verifyStore(bool checkContents, RepairFlag repair)
 
     /* Optionally, check the content hashes (slow). */
     if (checkContents) {
-        printInfo("checking hashes...");
+
+        printInfo("checking link hashes...");
+
+        for (auto & link : readDirectory(linksDir)) {
+            printMsg(lvlTalkative, "checking contents of '%s'", link.name);
+            Path linkPath = linksDir + "/" + link.name;
+            string hash = hashPath(htSHA256, linkPath).first.to_string(Base32, false);
+            if (hash != link.name) {
+                printError(
+                    "link '%s' was modified! expected hash '%s', got '%s'",
+                    linkPath, link.name, hash);
+                if (repair) {
+                    if (unlink(linkPath.c_str()) == 0)
+                        printError("removed link '%s'", linkPath);
+                    else
+                        throw SysError("removing corrupt link '%s'", linkPath);
+                } else {
+                    errors = true;
+                }
+            }
+        }
+
+        printInfo("checking store hashes...");
 
         Hash nullHash(htSHA256);
 

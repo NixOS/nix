@@ -2,7 +2,7 @@ ifeq ($(MAKECMDGOALS), dist)
   dist-files += $(shell cat .dist-files)
 endif
 
-dist-files += configure config.h.in nix.spec perl/configure
+dist-files += configure config.h.in perl/configure
 
 clean-files += Makefile.config
 

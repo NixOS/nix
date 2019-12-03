@@ -5,6 +5,7 @@
 #include "store-api.hh"
 #include "pathlocks.hh"
 #include "hash.hh"
+#include "tarfile.hh"
 
 #include <sys/time.h>
 
@@ -164,7 +165,6 @@ GitInfo exportGit(ref<Store> store, std::string uri,
         isLocal = true;
     }
 
-    Path cacheDir = getCacheDir() + "/nix/gitv3/" + hashString(htSHA256, uri).to_string(Base32, false);
     Path repoDir;
 
     if (isLocal) {
@@ -172,13 +172,11 @@ GitInfo exportGit(ref<Store> store, std::string uri,
         if (!rev)
             rev = Hash(chomp(runProgram("git", true, { "-C", uri, "rev-parse", *ref })), htSHA1);
 
-        if (!pathExists(cacheDir))
-            createDirs(cacheDir);
-
         repoDir = uri;
 
     } else {
 
+        Path cacheDir = getCacheDir() + "/nix/gitv3/" + hashString(htSHA256, uri).to_string(Base32, false);
         repoDir = cacheDir;
 
         if (!pathExists(cacheDir)) {
@@ -256,12 +254,16 @@ GitInfo exportGit(ref<Store> store, std::string uri,
 
     // FIXME: should pipe this, or find some better way to extract a
     // revision.
-    auto tar = runProgram("git", true, { "-C", repoDir, "archive", gitInfo.rev.gitRev() });
+    auto source = sinkToSource([&](Sink & sink) {
+        RunOptions gitOptions("git", { "-C", repoDir, "archive", gitInfo.rev.gitRev() });
+        gitOptions.standardOut = &sink;
+        runProgram2(gitOptions);
+    });
 
     Path tmpDir = createTempDir();
     AutoDelete delTmpDir(tmpDir, true);
 
-    runProgram("tar", true, { "x", "-C", tmpDir }, tar);
+    unpackTarfile(*source, tmpDir);
 
     gitInfo.storePath = store->addToStore(name, tmpDir);
 

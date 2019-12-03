@@ -275,7 +275,7 @@ struct CmdDevShell : Common, MixEnvironment
 
         stopProgressBar();
 
-        auto shell = getEnv("SHELL", "bash");
+        auto shell = getEnv("SHELL").value_or("bash");
 
         setEnviron();
 

@@ -117,27 +117,16 @@ fi
 ])
 
 NEED_PROG(bash, bash)
-NEED_PROG(patch, patch)
 AC_PATH_PROG(xmllint, xmllint, false)
 AC_PATH_PROG(xsltproc, xsltproc, false)
 AC_PATH_PROG(flex, flex, false)
 AC_PATH_PROG(bison, bison, false)
-NEED_PROG(sed, sed)
-NEED_PROG(tar, tar)
-NEED_PROG(bzip2, bzip2)
-NEED_PROG(gzip, gzip)
-NEED_PROG(xz, xz)
 AC_PATH_PROG(dot, dot)
 AC_PATH_PROG(lsof, lsof, lsof)
 NEED_PROG(jq, jq)
 
 
-NEED_PROG(cat, cat)
-NEED_PROG(tr, tr)
-AC_ARG_WITH(coreutils-bin, AC_HELP_STRING([--with-coreutils-bin=PATH],
-  [path of cat, mkdir, etc.]),
-  coreutils=$withval, coreutils=$(dirname $cat))
-AC_SUBST(coreutils)
+AC_SUBST(coreutils, [$(dirname $(type -p cat))])
 
 
 AC_ARG_WITH(store-dir, AC_HELP_STRING([--with-store-dir=PATH],
@@ -168,7 +157,20 @@ if test "x$GCC_ATOMIC_BUILTINS_NEED_LIBATOMIC" = xyes; then
     LIBS="-latomic $LIBS"
 fi
 
-# Look for OpenSSL, a required dependency.
+PKG_PROG_PKG_CONFIG
+
+AC_ARG_ENABLE(shared, AC_HELP_STRING([--enable-shared],
+  [Build shared libraries for Nix [default=yes]]),
+  shared=$enableval, shared=yes)
+if test "$shared" = yes; then
+  AC_SUBST(BUILD_SHARED_LIBS, 1, [Whether to build shared libraries.])
+else
+  AC_SUBST(BUILD_SHARED_LIBS, 0, [Whether to build shared libraries.])
+  PKG_CONFIG="$PKG_CONFIG --static"
+fi
+
+# Look for OpenSSL, a required dependency. FIXME: this is only (maybe)
+# used by S3BinaryCacheStore.
 PKG_CHECK_MODULES([OPENSSL], [libcrypto], [CXXFLAGS="$OPENSSL_CFLAGS $CXXFLAGS"])
 
 
@@ -178,10 +180,8 @@ AC_CHECK_LIB([bz2], [BZ2_bzWriteOpen], [true],
 AC_CHECK_HEADERS([bzlib.h], [true],
   [AC_MSG_ERROR([Nix requires libbz2, which is part of bzip2.  See https://web.archive.org/web/20180624184756/http://www.bzip.org/.])])
 
-
 # Look for SQLite, a required dependency.
 PKG_CHECK_MODULES([SQLITE3], [sqlite3 >= 3.6.19], [CXXFLAGS="$SQLITE3_CFLAGS $CXXFLAGS"])
-
 
 # Look for libcurl, a required dependency.
 PKG_CHECK_MODULES([LIBCURL], [libcurl], [CXXFLAGS="$LIBCURL_CFLAGS $CXXFLAGS"])
@@ -205,12 +205,10 @@ PKG_CHECK_MODULES([SODIUM], [libsodium],
    have_sodium=1], [have_sodium=])
 AC_SUBST(HAVE_SODIUM, [$have_sodium])
 
-
 # Look for liblzma, a required dependency.
 PKG_CHECK_MODULES([LIBLZMA], [liblzma], [CXXFLAGS="$LIBLZMA_CFLAGS $CXXFLAGS"])
 AC_CHECK_LIB([lzma], [lzma_stream_encoder_mt],
   [AC_DEFINE([HAVE_LZMA_MT], [1], [xz multithreaded compression support])])
-
 
 # Look for libbrotli{enc,dec}.
 PKG_CHECK_MODULES([LIBBROTLI], [libbrotlienc libbrotlidec], [CXXFLAGS="$LIBBROTLI_CFLAGS $CXXFLAGS"])
@@ -299,16 +297,6 @@ AC_ARG_WITH(sandbox-shell, AC_HELP_STRING([--with-sandbox-shell=PATH],
   [path of a statically-linked shell to use as /bin/sh in sandboxes]),
   sandbox_shell=$withval)
 AC_SUBST(sandbox_shell)
-
-AC_ARG_ENABLE(shared, AC_HELP_STRING([--enable-shared],
-  [Build shared libraries for Nix [default=yes]]),
-  shared=$enableval, shared=yes)
-if test "$shared" = yes; then
-  AC_SUBST(BUILD_SHARED_LIBS, 1, [Whether to build shared libraries.])
-else
-  AC_SUBST(BUILD_SHARED_LIBS, 0, [Whether to build shared libraries.])
-fi
-
 
 # Expand all variables in config.status.
 test "$prefix" = NONE && prefix=$ac_default_prefix

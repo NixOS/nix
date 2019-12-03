@@ -4,9 +4,10 @@ perl/Makefile.config
 # /
 /aclocal.m4
 /autom4te.cache
+/precompiled-headers.h.gch
+/precompiled-headers.h.pch
 /config.*
 /configure
-/nix.spec
 /stamp-h1
 /svn-revision
 /libtool
@@ -84,6 +85,7 @@ perl/Makefile.config
 /tests/restricted-innocent
 /tests/shell
 /tests/shell.drv
+/tests/config.nix
 
 # /tests/lang/
 /tests/lang/*.out
@@ -117,3 +119,5 @@ GPATH
 GRTAGS
 GSYMS
 GTAGS
+
+nix-rust/target

@@ -40,7 +40,6 @@ struct PrimOp
 struct Env
 {
     Env * up;
-    unsigned short size; // used by ‘valueSize’
     unsigned short prevWith:14; // nr of levels up to next `with' environment
     enum { Plain = 0, HasWithExpr, HasWithAttrs } type:2;
     Value * values[0];
@@ -363,8 +362,15 @@ struct InvalidPathError : EvalError
 
 struct EvalSettings : Config
 {
+    EvalSettings();
+
+    static Strings getDefaultNixPath();
+
     Setting<bool> enableNativeCode{this, false, "allow-unsafe-native-code-during-evaluation",
         "Whether builtin functions that allow executing native code should be enabled."};
+
+    Setting<Strings> nixPath{this, getDefaultNixPath(), "nix-path",
+        "List of directories to be searched for <...> file references."};
 
     Setting<bool> restrictEval{this, false, "restrict-eval",
         "Whether to restrict file system access to paths in $NIX_PATH, "

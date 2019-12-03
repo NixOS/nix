@@ -35,7 +35,7 @@ public:
         return uriScheme + host;
     }
 
-    bool sameMachine()
+    bool sameMachine() override
     { return false; }
 
     void narFromPath(const Path & path, Sink & sink) override;

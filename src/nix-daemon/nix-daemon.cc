@@ -161,8 +161,9 @@ static void daemonLoop(char * * argv)
     AutoCloseFD fdSocket;
 
     /* Handle socket-based activation by systemd. */
-    if (getEnv("LISTEN_FDS") != "") {
-        if (getEnv("LISTEN_PID") != std::to_string(getpid()) || getEnv("LISTEN_FDS") != "1")
+    auto listenFds = getEnv("LISTEN_FDS");
+    if (listenFds) {
+        if (getEnv("LISTEN_PID") != std::to_string(getpid()) || listenFds != "1")
             throw Error("unexpected systemd environment variables");
         fdSocket = SD_LISTEN_FDS_START;
         closeOnExec(fdSocket.get());
@@ -192,7 +193,7 @@ static void daemonLoop(char * * argv)
 
             closeOnExec(remote.get());
 
-            bool trusted = false;
+            TrustedFlag trusted = NotTrusted;
             PeerInfo peer = getPeerInfo(remote.get());
 
             struct passwd * pw = peer.uidKnown ? getpwuid(peer.uid) : 0;
@@ -205,7 +206,7 @@ static void daemonLoop(char * * argv)
             Strings allowedUsers = settings.allowedUsers;
 
             if (matchUser(user, group, trustedUsers))
-                trusted = true;
+                trusted = Trusted;
 
             if ((!trusted && !matchUser(user, group, allowedUsers)) || group == settings.buildUsersGroup)
                 throw Error(format("user '%1%' is not allowed to connect to the Nix daemon") % user);
@@ -239,7 +240,7 @@ static void daemonLoop(char * * argv)
                 /* Handle the connection. */
                 FdSource from(remote.get());
                 FdSink to(remote.get());
-                processConnection(openUncachedStore(), from, to, trusted, user, peer.uid);
+                processConnection(openUncachedStore(), from, to, trusted, NotRecursive, user, peer.uid);
 
                 exit(0);
             }, options);
@@ -321,7 +322,7 @@ static int _main(int argc, char * * argv)
             } else {
                 FdSource from(STDIN_FILENO);
                 FdSink to(STDOUT_FILENO);
-                processConnection(openUncachedStore(), from, to, true, "root", 0);
+                processConnection(openUncachedStore(), from, to, Trusted, NotRecursive, "root", 0);
             }
         } else {
             daemonLoop(argv);

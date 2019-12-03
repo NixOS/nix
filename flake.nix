@@ -72,6 +72,7 @@
             openssl pkgconfig sqlite boehmgc
             boost
             (nlohmann_json.override { multipleHeaders = true; })
+            rustc cargo
 
             # Tests
             git
@@ -156,6 +157,52 @@
 
       hydraJobs = {
 
+        # Create a "vendor" directory that contains the crates listed in
+        # Cargo.lock, and include it in the Nix tarball. This allows Nix
+        # to be built without network access.
+        vendoredCrates =
+          with nixpkgsFor.x86_64-linux;
+
+          let
+            lockFile = builtins.fromTOML (builtins.readFile nix-rust/Cargo.lock);
+
+            files = map (pkg: import <nix/fetchurl.nix> {
+              url = "https://crates.io/api/v1/crates/${pkg.name}/${pkg.version}/download";
+              sha256 = lockFile.metadata."checksum ${pkg.name} ${pkg.version} (registry+https://github.com/rust-lang/crates.io-index)";
+            }) (builtins.filter (pkg: pkg.source or "" == "registry+https://github.com/rust-lang/crates.io-index") lockFile.package);
+
+          in pkgs.runCommand "cargo-vendor-dir" {}
+            ''
+              mkdir -p $out/vendor
+
+              cat > $out/vendor/config <<EOF
+              [source.crates-io]
+              replace-with = "vendored-sources"
+
+              [source.vendored-sources]
+              directory = "vendor"
+              EOF
+
+              ${toString (builtins.map (file: ''
+                mkdir $out/vendor/tmp
+                tar xvf ${file} -C $out/vendor/tmp
+                dir=$(echo $out/vendor/tmp/*)
+
+                # Add just enough metadata to keep Cargo happy.
+                printf '{"files":{},"package":"${file.outputHash}"}' > "$dir/.cargo-checksum.json"
+
+                # Clean up some cruft from the winapi crates. FIXME: find
+                # a way to remove winapi* from our dependencies.
+                if [[ $dir =~ /winapi ]]; then
+                  find $dir -name "*.a" -print0 | xargs -0 rm -f --
+                fi
+
+                mv "$dir" $out/vendor/
+
+                rm -rf $out/vendor/tmp
+              '') files)}
+            '';
+
         # Source tarball.
         tarball =
           with nixpkgsFor.x86_64-linux;
@@ -184,6 +231,8 @@
 
             distPhase =
               ''
+                cp -prd ${vendoredCrates}/vendor/ nix-rust/vendor/
+
                 runHook preDist
                 make dist
                 mkdir -p $out/tarballs
@@ -446,7 +495,7 @@
         stdenv.mkDerivation {
           name = "nix";
 
-          buildInputs = buildDeps ++ tarballDeps ++ perlDeps;
+          buildInputs = buildDeps ++ tarballDeps ++ perlDeps ++ [ pkgs.rustfmt ];
 
           inherit configureFlags;
 

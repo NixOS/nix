@@ -115,7 +115,7 @@ struct CmdRun : InstallablesCommand, RunCommon, MixEnvironment
 
         setEnviron();
 
-        auto unixPath = tokenizeString<Strings>(getEnv("PATH"), ":");
+        auto unixPath = tokenizeString<Strings>(getEnv("PATH").value_or(""), ":");
 
         while (!todo.empty()) {
             Path path = todo.front();

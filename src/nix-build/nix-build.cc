@@ -344,9 +344,9 @@ static void _main(int argc, char * * argv)
         /* Figure out what bash shell to use. If $NIX_BUILD_SHELL
            is not set, then build bashInteractive from
            <nixpkgs>. */
-        auto shell = getEnv("NIX_BUILD_SHELL", "");
+        auto shell = getEnv("NIX_BUILD_SHELL");
 
-        if (shell == "") {
+        if (!shell) {
 
             try {
                 auto expr = state->parseExprFromString("(import <nixpkgs> {}).bashInteractive", absPath("."));
@@ -382,7 +382,8 @@ static void _main(int argc, char * * argv)
         // Set the environment.
         auto env = getEnv();
 
-        auto tmp = getEnv("TMPDIR", getEnv("XDG_RUNTIME_DIR", "/tmp"));
+        auto tmp = getEnv("TMPDIR");
+        if (!tmp) tmp = getEnv("XDG_RUNTIME_DIR").value_or("/tmp");
 
         if (pure) {
             decltype(env) newEnv;
@@ -394,7 +395,7 @@ static void _main(int argc, char * * argv)
             env["__ETC_PROFILE_SOURCED"] = "1";
         }
 
-        env["NIX_BUILD_TOP"] = env["TMPDIR"] = env["TEMPDIR"] = env["TMP"] = env["TEMP"] = tmp;
+        env["NIX_BUILD_TOP"] = env["TMPDIR"] = env["TEMPDIR"] = env["TMP"] = env["TEMP"] = *tmp;
         env["NIX_STORE"] = store->storeDir;
         env["NIX_BUILD_CORES"] = std::to_string(settings.buildCores);
 
@@ -439,8 +440,8 @@ static void _main(int argc, char * * argv)
                 (Path) tmpDir,
                 (pure ? "" : "p=$PATH; "),
                 (pure ? "" : "PATH=$PATH:$p; unset p; "),
-                dirOf(shell),
-                shell,
+                dirOf(*shell),
+                *shell,
                 (getenv("TZ") ? (string("export TZ='") + getenv("TZ") + "'; ") : ""),
                 envCommand));
 
@@ -460,9 +461,9 @@ static void _main(int argc, char * * argv)
 
         restoreSignals();
 
-        execvp(shell.c_str(), argPtrs.data());
+        execvp(shell->c_str(), argPtrs.data());
 
-        throw SysError("executing shell '%s'", shell);
+        throw SysError("executing shell '%s'", *shell);
     }
 
     else {

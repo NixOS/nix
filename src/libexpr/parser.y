@@ -20,6 +20,7 @@
 
 #include "nixexpr.hh"
 #include "eval.hh"
+#include "globals.hh"
 
 namespace nix {
 
@@ -401,7 +402,12 @@ expr_simple
               new ExprVar(data->symbols.create("__nixPath"))),
           new ExprString(data->symbols.create(path)));
   }
-  | URI { $$ = new ExprString(data->symbols.create($1)); }
+  | URI {
+      static bool noURLLiterals = settings.isExperimentalFeatureEnabled("no-url-literals");
+      if (noURLLiterals)
+          throw ParseError("URL literals are disabled, at %s", CUR_POS);
+      $$ = new ExprString(data->symbols.create($1));
+  }
   | '(' expr ')' { $$ = $2; }
   /* Let expressions `let {..., body = ...}' are just desugared
      into `(rec {..., body = ...}).body'. */

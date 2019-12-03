@@ -70,23 +70,23 @@ public:
         Args & args;
         Flag::ptr flag;
         friend class Args;
-        FlagMaker(Args & args) : args(args), flag(std::make_shared<Flag>()) { };
+        FlagMaker(Args & args) : args(args), flag(std::make_shared<Flag>()) { }
     public:
         ~FlagMaker();
-        FlagMaker & longName(const std::string & s) { flag->longName = s; return *this; };
-        FlagMaker & shortName(char s) { flag->shortName = s; return *this; };
-        FlagMaker & description(const std::string & s) { flag->description = s; return *this; };
-        FlagMaker & label(const std::string & l) { flag->arity = 1; flag->labels = {l}; return *this; };
-        FlagMaker & labels(const Strings & ls) { flag->arity = ls.size(); flag->labels = ls; return *this; };
-        FlagMaker & arity(size_t arity) { flag->arity = arity; return *this; };
-        FlagMaker & handler(std::function<void(std::vector<std::string>)> handler) { flag->handler = handler; return *this; };
-        FlagMaker & handler(std::function<void()> handler) { flag->handler = [handler](std::vector<std::string>) { handler(); }; return *this; };
+        FlagMaker & longName(const std::string & s) { flag->longName = s; return *this; }
+        FlagMaker & shortName(char s) { flag->shortName = s; return *this; }
+        FlagMaker & description(const std::string & s) { flag->description = s; return *this; }
+        FlagMaker & label(const std::string & l) { flag->arity = 1; flag->labels = {l}; return *this; }
+        FlagMaker & labels(const Strings & ls) { flag->arity = ls.size(); flag->labels = ls; return *this; }
+        FlagMaker & arity(size_t arity) { flag->arity = arity; return *this; }
+        FlagMaker & handler(std::function<void(std::vector<std::string>)> handler) { flag->handler = handler; return *this; }
+        FlagMaker & handler(std::function<void()> handler) { flag->handler = [handler](std::vector<std::string>) { handler(); }; return *this; }
         FlagMaker & handler(std::function<void(std::string)> handler) {
             flag->arity = 1;
             flag->handler = [handler](std::vector<std::string> ss) { handler(std::move(ss[0])); };
             return *this;
-        };
-        FlagMaker & category(const std::string & s) { flag->category = s; return *this; };
+        }
+        FlagMaker & category(const std::string & s) { flag->category = s; return *this; }
 
         template<class T>
         FlagMaker & dest(T * dest)
@@ -94,7 +94,7 @@ public:
             flag->arity = 1;
             flag->handler = [=](std::vector<std::string> ss) { *dest = ss[0]; };
             return *this;
-        };
+        }
 
         template<class T>
         FlagMaker & set(T * dest, const T & val)
@@ -102,7 +102,7 @@ public:
             flag->arity = 0;
             flag->handler = [=](std::vector<std::string> ss) { *dest = val; };
             return *this;
-        };
+        }
 
         FlagMaker & mkHashTypeFlag(HashType * ht);
     };

@@ -90,17 +90,22 @@ void checkStoreName(const string & name)
         "Path names are alphanumeric and can include the symbols %1% "
         "and must not begin with a period. "
         "Note: If '%2%' is a source file and you cannot rename it on "
-        "disk, builtins.path { name = ... } can be used to give it an "
+        "disk, 'builtins.path { name = ... }' can be used to give it an "
         "alternative name.") % validChars % name;
+
+    if (name.empty())
+        throw Error(baseError % "it is an empty string");
 
     /* Disallow names starting with a dot for possible security
        reasons (e.g., "." and ".."). */
-    if (string(name, 0, 1) == ".")
+    if (name[0] == '.')
         throw Error(baseError % "it is illegal to start the name with a period");
+
     /* Disallow names longer than 211 characters. ext4’s max is 256,
        but we need extra space for the hash and .chroot extensions. */
     if (name.length() > 211)
         throw Error(baseError % "name must be less than 212 characters");
+
     for (auto & i : name)
         if (!((i >= 'A' && i <= 'Z') ||
               (i >= 'a' && i <= 'z') ||
@@ -211,7 +216,7 @@ static std::string makeType(string && type, const PathSet & references)
         type += ":";
         type += i;
     }
-    return type;
+    return std::move(type);
 }
 
 

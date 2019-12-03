@@ -35,7 +35,6 @@ struct Env;
 struct Expr;
 struct ExprLambda;
 struct PrimOp;
-struct PrimOp;
 class Symbol;
 struct Pos;
 class EvalState;
@@ -62,9 +61,6 @@ class ExternalValueBase
 
     /* Return a string to be used in builtins.typeOf */
     virtual string typeOf() const = 0;
-
-    /* How much space does this value take up */
-    virtual size_t valueSize(std::set<const void *> & seen) const = 0;
 
     /* Coerce the value to a string. Defaults to uncoercable, i.e. throws an
      * error
@@ -259,12 +255,6 @@ static inline void mkPathNoCopy(Value & v, const char * s)
 
 
 void mkPath(Value & v, const char * s);
-
-
-/* Compute the size in bytes of the given value, including all values
-   and environments reachable from it. Static expressions (Exprs) are
-   not included. */
-size_t valueSize(Value & v);
 
 
 #if HAVE_BOEHMGC

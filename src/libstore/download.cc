@@ -8,6 +8,7 @@
 #include "compression.hh"
 #include "pathlocks.hh"
 #include "finally.hh"
+#include "tarfile.hh"
 
 #ifdef ENABLE_S3
 #include <aws/core/client/ClientConfiguration.h>
@@ -289,6 +290,7 @@ struct CurlDownloader : public Downloader
             }
 
             if (request.verifyTLS) {
+                debug("verify TLS: Nix CA file = '%s'", settings.caFile);
                 if (settings.caFile != "")
                     curl_easy_setopt(req, CURLOPT_CAINFO, settings.caFile.c_str());
             } else {
@@ -905,11 +907,10 @@ CachedDownloadResult Downloader::downloadCached(
                 result.lastModified = lstat(unpackedLink).st_mtime;
         }
         if (unpackedStorePath.empty()) {
-            printInfo(format("unpacking '%1%'...") % url);
+            printInfo("unpacking '%s'...", url);
             Path tmpDir = createTempDir();
             AutoDelete autoDelete(tmpDir, true);
-            // FIXME: this requires GNU tar for decompression.
-            runProgram("tar", true, {"xf", store->toRealPath(storePath), "-C", tmpDir});
+            unpackTarfile(store->toRealPath(storePath), tmpDir, baseNameOf(url));
             auto members = readDirectory(tmpDir);
             if (members.size() != 1)
                 throw nix::Error("tarball '%s' contains an unexpected number of top-level files", url);

@@ -244,7 +244,7 @@ void initGC()
        that GC_expand_hp() causes a lot of virtual, but not physical
        (resident) memory to be allocated.  This might be a problem on
        systems that don't overcommit. */
-    if (!getenv("GC_INITIAL_HEAP_SIZE")) {
+    if (!getEnv("GC_INITIAL_HEAP_SIZE")) {
         size_t size = 32 * 1024 * 1024;
 #if HAVE_SYSCONF && defined(_SC_PAGESIZE) && defined(_SC_PHYS_PAGES)
         size_t maxSize = 384 * 1024 * 1024;
@@ -335,7 +335,7 @@ EvalState::EvalState(const Strings & _searchPath, ref<Store> store)
     , baseEnv(allocEnv(128))
     , staticBaseEnv(false, 0)
 {
-    countCalls = getEnv("NIX_COUNT_CALLS", "0") != "0";
+    countCalls = getEnv("NIX_COUNT_CALLS").value_or("0") != "0";
 
     assert(gcInitialised);
 
@@ -343,9 +343,8 @@ EvalState::EvalState(const Strings & _searchPath, ref<Store> store)
 
     /* Initialise the Nix expression search path. */
     if (!evalSettings.pureEval) {
-        Strings paths = parseNixPath(getEnv("NIX_PATH", ""));
         for (auto & i : _searchPath) addToSearchPath(i);
-        for (auto & i : paths) addToSearchPath(i);
+        for (auto & i : evalSettings.nixPath.get()) addToSearchPath(i);
     }
     addToSearchPath("nix=" + canonPath(settings.nixDataDir + "/nix/corepkgs", true));
 
@@ -461,7 +460,7 @@ Path EvalState::toRealPath(const Path & path, const PathSet & context)
         !context.empty() && store->isInStore(path)
         ? store->toRealPath(path)
         : path;
-};
+}
 
 
 Value * EvalState::addConstant(const string & name, Value & v)
@@ -651,13 +650,9 @@ Value * EvalState::allocValue()
 
 Env & EvalState::allocEnv(size_t size)
 {
-    if (size > std::numeric_limits<decltype(Env::size)>::max())
-        throw Error("environment size %d is too big", size);
-
     nrEnvs++;
     nrValuesInEnvs += size;
     Env * env = (Env *) allocBytes(sizeof(Env) + size * sizeof(Value *));
-    env->size = (decltype(Env::size)) size;
     env->type = Env::Plain;
 
     /* We assume that env->values has been cleared by the allocator; maybeThunk() and lookupVar fromWith expect this. */
@@ -917,7 +912,7 @@ void ExprAttrs::eval(EvalState & state, Env & env, Value & v)
         if (hasOverrides) {
             Value * vOverrides = (*v.attrs)[overrides->second.displ].value;
             state.forceAttrs(*vOverrides);
-            Bindings * newBnds = state.allocBindings(v.attrs->size() + vOverrides->attrs->size());
+            Bindings * newBnds = state.allocBindings(v.attrs->capacity() + vOverrides->attrs->size());
             for (auto & i : *v.attrs)
                 newBnds->push_back(i);
             for (auto & i : *vOverrides->attrs) {
@@ -1794,7 +1789,7 @@ bool EvalState::eqValues(Value & v1, Value & v2)
 
 void EvalState::printStats()
 {
-    bool showStats = getEnv("NIX_SHOW_STATS", "0") != "0";
+    bool showStats = getEnv("NIX_SHOW_STATS").value_or("0") != "0";
 
     struct rusage buf;
     getrusage(RUSAGE_SELF, &buf);
@@ -1810,7 +1805,7 @@ void EvalState::printStats()
     GC_get_heap_usage_safe(&heapSize, 0, 0, 0, &totalBytes);
 #endif
     if (showStats) {
-        auto outPath = getEnv("NIX_SHOW_STATS_PATH","-");
+        auto outPath = getEnv("NIX_SHOW_STATS_PATH").value_or("-");
         std::fstream fs;
         if (outPath != "-")
             fs.open(outPath, std::fstream::out);
@@ -1902,98 +1897,11 @@ void EvalState::printStats()
             }
         }
 
-        if (getEnv("NIX_SHOW_SYMBOLS", "0") != "0") {
+        if (getEnv("NIX_SHOW_SYMBOLS").value_or("0") != "0") {
             auto list = topObj.list("symbols");
             symbols.dump([&](const std::string & s) { list.elem(s); });
         }
     }
-}
-
-
-size_t valueSize(Value & v)
-{
-    std::set<const void *> seen;
-
-    auto doString = [&](const char * s) -> size_t {
-        if (!seen.insert(s).second) return 0;
-        return strlen(s) + 1;
-    };
-
-    std::function<size_t(Value & v)> doValue;
-    std::function<size_t(Env & v)> doEnv;
-
-    doValue = [&](Value & v) -> size_t {
-        if (!seen.insert(&v).second) return 0;
-
-        size_t sz = sizeof(Value);
-
-        switch (v.type) {
-        case tString:
-            sz += doString(v.string.s);
-            if (v.string.context)
-                for (const char * * p = v.string.context; *p; ++p)
-                    sz += doString(*p);
-            break;
-        case tPath:
-            sz += doString(v.path);
-            break;
-        case tAttrs:
-            if (seen.insert(v.attrs).second) {
-                sz += sizeof(Bindings) + sizeof(Attr) * v.attrs->capacity();
-                for (auto & i : *v.attrs)
-                    sz += doValue(*i.value);
-            }
-            break;
-        case tList1:
-        case tList2:
-        case tListN:
-            if (seen.insert(v.listElems()).second) {
-                sz += v.listSize() * sizeof(Value *);
-                for (size_t n = 0; n < v.listSize(); ++n)
-                    sz += doValue(*v.listElems()[n]);
-            }
-            break;
-        case tThunk:
-            sz += doEnv(*v.thunk.env);
-            break;
-        case tApp:
-            sz += doValue(*v.app.left);
-            sz += doValue(*v.app.right);
-            break;
-        case tLambda:
-            sz += doEnv(*v.lambda.env);
-            break;
-        case tPrimOpApp:
-            sz += doValue(*v.primOpApp.left);
-            sz += doValue(*v.primOpApp.right);
-            break;
-        case tExternal:
-            if (!seen.insert(v.external).second) break;
-            sz += v.external->valueSize(seen);
-            break;
-        default:
-            ;
-        }
-
-        return sz;
-    };
-
-    doEnv = [&](Env & env) -> size_t {
-        if (!seen.insert(&env).second) return 0;
-
-        size_t sz = sizeof(Env) + sizeof(Value *) * env.size;
-
-        if (env.type != Env::HasWithExpr)
-            for (size_t i = 0; i < env.size; ++i)
-                if (env.values[i])
-                    sz += doValue(*env.values[i]);
-
-        if (env.up) sz += doEnv(*env.up);
-
-        return sz;
-    };
-
-    return doValue(v);
 }
 
 
@@ -2014,6 +1922,22 @@ std::ostream & operator << (std::ostream & str, const ExternalValueBase & v) {
     return v.print(str);
 }
 
+
+EvalSettings::EvalSettings()
+{
+    auto var = getEnv("NIX_PATH");
+    if (var) nixPath = parseNixPath(*var);
+}
+
+Strings EvalSettings::getDefaultNixPath()
+{
+    Strings res;
+    auto add = [&](const Path & p) { if (pathExists(p)) { res.push_back(p); } };
+    add(getHome() + "/.nix-defexpr/channels");
+    add("nixpkgs=" + settings.nixStateDir + "/nix/profiles/per-user/root/channels/nixpkgs");
+    add(settings.nixStateDir + "/nix/profiles/per-user/root/channels");
+    return res;
+}
 
 EvalSettings evalSettings;
 

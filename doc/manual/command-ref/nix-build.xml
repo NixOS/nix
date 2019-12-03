@@ -30,6 +30,7 @@
       <replaceable>attrPath</replaceable>
     </arg>
     <arg><option>--no-out-link</option></arg>
+    <arg><option>--dry-run</option></arg>
     <arg>
       <group choice='req'>
         <arg choice='plain'><option>--out-link</option></arg>
@@ -96,6 +97,10 @@ also <xref linkend="sec-common-options" />.</phrase></para>
     collector, and so might be deleted by <command>nix-store
     --gc</command>.</para></listitem>
 
+  </varlistentry>
+
+  <varlistentry><term><option>--dry-run</option></term>
+   <listitem><para>Show what store paths would be built or downloaded.</para></listitem>
   </varlistentry>
 
   <varlistentry xml:id='opt-out-link'><term><option>--out-link</option> /

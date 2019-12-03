@@ -469,7 +469,7 @@ static void prim_tryEval(EvalState & state, const Pos & pos, Value * * args, Val
 static void prim_getEnv(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
     string name = state.forceStringNoCtx(*args[0], pos);
-    mkString(v, evalSettings.restrictEval || evalSettings.pureEval ? "" : getEnv(name));
+    mkString(v, evalSettings.restrictEval || evalSettings.pureEval ? "" : getEnv(name).value_or(""));
 }
 
 
@@ -503,13 +503,6 @@ static void prim_trace(EvalState & state, const Pos & pos, Value * * args, Value
         printError(format("trace: %1%") % *args[0]);
     state.forceValue(*args[1]);
     v = *args[1];
-}
-
-
-void prim_valueSize(EvalState & state, const Pos & pos, Value * * args, Value & v)
-{
-    /* We're not forcing the argument on purpose. */
-    mkInt(v, valueSize(*args[0]));
 }
 
 
@@ -2206,7 +2199,6 @@ void EvalState::createBaseEnv()
 
     // Debugging
     addPrimOp("__trace", 2, prim_trace);
-    addPrimOp("__valueSize", 1, prim_valueSize);
 
     // Paths
     addPrimOp("__toPath", 1, prim_toPath);

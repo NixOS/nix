@@ -148,7 +148,7 @@ public:
 
     std::string getUri() override;
 
-    bool sameMachine()
+    bool sameMachine() override
     { return true; }
 
 private:

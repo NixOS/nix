@@ -35,7 +35,7 @@ extern const std::string nativeSystem;
 
 
 /* Return an environment variable. */
-string getEnv(const string & key, const string & def = "");
+std::optional<std::string> getEnv(const std::string & key);
 
 /* Get the entire environment. */
 std::map<std::string, std::string> getEnv();
@@ -158,7 +158,7 @@ void readFull(int fd, unsigned char * buf, size_t count);
 void writeFull(int fd, const unsigned char * buf, size_t count, bool allowInterrupts = true);
 void writeFull(int fd, const string & s, bool allowInterrupts = true);
 
-MakeError(EndOfFile, Error)
+MakeError(EndOfFile, Error);
 
 
 /* Read a file descriptor until EOF occurs. */
@@ -339,10 +339,10 @@ void inline checkInterrupt()
         _interrupted();
 }
 
-MakeError(Interrupted, BaseError)
+MakeError(Interrupted, BaseError);
 
 
-MakeError(FormatError, Error)
+MakeError(FormatError, Error);
 
 
 /* String tokenizer. */

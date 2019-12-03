@@ -20,13 +20,13 @@
 namespace nix {
 
 
-MakeError(SubstError, Error)
-MakeError(BuildError, Error) /* denotes a permanent build failure */
-MakeError(InvalidPath, Error)
-MakeError(Unsupported, Error)
-MakeError(SubstituteGone, Error)
-MakeError(SubstituterDisabled, Error)
-MakeError(NotInStore, Error)
+MakeError(SubstError, Error);
+MakeError(BuildError, Error); // denotes a permanent build failure
+MakeError(InvalidPath, Error);
+MakeError(Unsupported, Error);
+MakeError(SubstituteGone, Error);
+MakeError(SubstituterDisabled, Error);
+MakeError(NotInStore, Error);
 
 
 struct BasicDerivation;
@@ -570,7 +570,7 @@ public:
         unsigned long long & downloadSize, unsigned long long & narSize);
 
     /* Sort a set of paths topologically under the references
-       relation.  If p refers to q, then p preceeds q in this list. */
+       relation.  If p refers to q, then p precedes q in this list. */
     Paths topoSortPaths(const PathSet & paths);
 
     /* Export multiple paths in the format expected by ‘nix-store

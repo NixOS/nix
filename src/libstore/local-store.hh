@@ -107,7 +107,7 @@ private:
 public:
 
     // Hack for build-remote.cc.
-    PathSet locksHeld = tokenizeString<PathSet>(getEnv("NIX_HELD_LOCKS"));
+    PathSet locksHeld;
 
     /* Initialise the local store, upgrading the schema if
        necessary. */

@@ -63,7 +63,7 @@ struct CmdDoctor : StoreCommand
     {
         PathSet dirs;
 
-        for (auto & dir : tokenizeString<Strings>(getEnv("PATH"), ":"))
+        for (auto & dir : tokenizeString<Strings>(getEnv("PATH").value_or(""), ":"))
             if (pathExists(dir + "/nix-env"))
                 dirs.insert(dirOf(canonPath(dir + "/nix-env", true)));
 
@@ -82,7 +82,7 @@ struct CmdDoctor : StoreCommand
     {
         PathSet dirs;
 
-        for (auto & dir : tokenizeString<Strings>(getEnv("PATH"), ":")) {
+        for (auto & dir : tokenizeString<Strings>(getEnv("PATH").value_or(""), ":")) {
             Path profileDir = dirOf(dir);
             try {
                 Path userEnv = canonPath(profileDir, true);
