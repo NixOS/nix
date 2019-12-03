@@ -1,5 +1,8 @@
 source common.sh
 
+# FIXME
+if [[ $(uname) != Linux ]]; then exit; fi
+
 clearStore
 
 export unreachable=$(nix add-to-store ./recursive.sh)
