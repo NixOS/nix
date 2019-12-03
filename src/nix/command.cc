@@ -4,6 +4,8 @@
 #include "nixexpr.hh"
 #include "profiles.hh"
 
+extern char * * environ;
+
 namespace nix {
 
 Commands * RegisterCommand::commands = nullptr;
@@ -175,6 +177,7 @@ void MixEnvironment::setEnviron() {
             auto val = getenv(var.c_str());
             if (val) stringsEnv.emplace_back(fmt("%s=%s", var.c_str(), val));
         }
+
         vectorEnv = stringsToCharPtrs(stringsEnv);
         environ = vectorEnv.data();
     } else {

@@ -10,7 +10,7 @@ namespace nix {
 struct Value;
 struct DrvInfo;
 class EvalState;
-class SourceExprCommand;
+struct SourceExprCommand;
 
 struct Buildable
 {
