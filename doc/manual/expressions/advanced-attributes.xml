@@ -325,12 +325,23 @@ big = "a very long string";
 
   <varlistentry><term><varname>allowSubstitutes</varname></term>
 
-    <listitem><para>If this attribute is set to
+    <listitem>
+    <para>If this attribute is set to
     <literal>false</literal>, then Nix will always build this
     derivation; it will not try to substitute its outputs. This is
     useful for very trivial derivations (such as
     <function>writeText</function> in Nixpkgs) that are cheaper to
-    build than to substitute from a binary cache.</para></listitem>
+    build than to substitute from a binary cache.</para>
+
+    <note><para>You need to have a builder configured which satisfies
+    the derivation’s <literal>system</literal> attribute, since the
+    derivation cannot be substituted. Thus it is usually a good idea
+    to align <literal>system</literal> with
+    <literal>builtins.currentSystem</literal> when setting
+    <literal>allowSubstitutes</literal> to <literal>false</literal>.
+    For most trivial derivations this should be the case.
+    </para></note>
+    </listitem>
 
   </varlistentry>
 
