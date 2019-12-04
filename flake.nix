@@ -231,7 +231,7 @@
 
             distPhase =
               ''
-                cp -prd ${vendoredCrates}/vendor/ nix-rust/vendor/
+                cp -prd ${self.hydraJobs.vendoredCrates}/vendor/ nix-rust/vendor/
 
                 runHook preDist
                 make dist
