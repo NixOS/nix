@@ -20,7 +20,7 @@ pub extern "C" fn rust_test() {
 
     let fut = async move {
         let store: Box<dyn Store> = Box::new(store::BinaryCacheStore::new(
-            "https://cache.nixos.org".to_string(),
+            "http://cache.nixos.org".to_string(),
         ));
 
         let path = store

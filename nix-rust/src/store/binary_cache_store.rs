@@ -1,16 +1,18 @@
 use super::{PathInfo, Store, StorePath};
 use crate::Error;
+use hyper::client::Client;
+use futures::stream::Concat;
 
 pub struct BinaryCacheStore {
     base_uri: String,
-    client: reqwest::r#async::Client,
+    client: Client<hyper::client::HttpConnector, hyper::Body>,
 }
 
 impl BinaryCacheStore {
     pub fn new(base_uri: String) -> Self {
         Self {
             base_uri,
-            client: reqwest::r#async::Client::new(),
+            client: Client::new(),
         }
     }
 }
@@ -26,19 +28,22 @@ impl Store for BinaryCacheStore {
         let store_dir = self.store_dir().to_string();
 
         Box::pin(async move {
-            let response = client.get(&uri).send().await?;
+            let response = client.get(uri.parse::<hyper::Uri>().unwrap()).await?;
 
-            if response.status() == reqwest::StatusCode::NOT_FOUND
-                || response.status() == reqwest::StatusCode::FORBIDDEN
+            if response.status() == hyper::StatusCode::NOT_FOUND
+                || response.status() == hyper::StatusCode::FORBIDDEN
             {
                 return Err(Error::InvalidPath(path));
             }
 
-            let response = response.error_for_status()?;
+            let mut body = response.into_body();
 
-            let body = response.text().await?;
+            let mut bytes = Vec::new();
+            while let Some(next) = body.next().await {
+                bytes.extend(next?);
+            }
 
-            PathInfo::parse_nar_info(&body, &store_dir)
+            PathInfo::parse_nar_info(std::str::from_utf8(&bytes).unwrap(), &store_dir)
         })
     }
 }

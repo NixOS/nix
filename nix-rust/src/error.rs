@@ -18,7 +18,7 @@ pub enum Error {
     BadNarField(String),
     BadExecutableField,
     IOError(std::io::Error),
-    HttpError(reqwest::Error),
+    HttpError(hyper::error::Error),
     Misc(String),
     Foreign(CppException),
 }
@@ -29,8 +29,8 @@ impl From<std::io::Error> for Error {
     }
 }
 
-impl From<reqwest::Error> for Error {
-    fn from(err: reqwest::Error) -> Self {
+impl From<hyper::error::Error> for Error {
+    fn from(err: hyper::error::Error) -> Self {
         Error::HttpError(err)
     }
 }
