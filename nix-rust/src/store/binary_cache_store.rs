@@ -1,6 +1,5 @@
-use super::{Store, StorePath, PathInfo};
+use super::{PathInfo, Store, StorePath};
 use crate::Error;
-use futures::compat::Future01CompatExt;
 
 pub struct BinaryCacheStore {
     base_uri: String,
@@ -27,22 +26,17 @@ impl Store for BinaryCacheStore {
         let store_dir = self.store_dir().to_string();
 
         Box::pin(async move {
-            let response = client
-                .get(&uri)
-                .send()
-                .compat()
-                .await?;
+            let response = client.get(&uri).send().await?;
 
-            if response.status() == reqwest::StatusCode::NOT_FOUND || response.status() == reqwest::StatusCode::FORBIDDEN {
+            if response.status() == reqwest::StatusCode::NOT_FOUND
+                || response.status() == reqwest::StatusCode::FORBIDDEN
+            {
                 return Err(Error::InvalidPath(path));
             }
 
-            let mut response = response.error_for_status()?;
+            let response = response.error_for_status()?;
 
-            let body = response
-                .text()
-                .compat()
-                .await?;
+            let body = response.text().await?;
 
             PathInfo::parse_nar_info(&body, &store_dir)
         })

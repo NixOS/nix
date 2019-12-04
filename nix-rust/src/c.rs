@@ -14,10 +14,9 @@ pub extern "C" fn unpack_tarfile(
 
 #[no_mangle]
 pub extern "C" fn rust_test() {
-    /*
     use crate::store::{self, Store};
-    use futures::future::{FutureExt, TryFutureExt};
     use std::path::Path;
+    use tokio::runtime::Runtime;
 
     let fut = async move {
         let store: Box<dyn Store> = Box::new(store::BinaryCacheStore::new(
@@ -36,17 +35,21 @@ pub extern "C" fn rust_test() {
         eprintln!("INFO = {:?}", info);
          */
 
-        let closure = store.compute_path_closure(vec![path].into_iter().collect()).await.unwrap();
+        let closure = store
+            .compute_path_closure(vec![path].into_iter().collect())
+            .await
+            .unwrap();
 
         eprintln!("CLOSURE = {:?}", closure.len());
-
-        Ok(())
     };
 
-    tokio::run(fut.boxed().compat());
-     */
+    let rt = Runtime::new().unwrap();
 
+    rt.block_on(fut);
+
+    /*
     let file = std::fs::File::open("test.nar").unwrap();
 
     crate::nar::parse(&mut std::io::BufReader::new(file)).unwrap();
+    */
 }

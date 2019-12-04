@@ -11,11 +11,11 @@ crate-type = ["cdylib"]
 [dependencies]
 tar = "0.4"
 libc = "0.2"
-futures-preview = { version = "=0.3.0-alpha.18", features = ["compat"] }
+futures-preview = { version = "=0.3.0-alpha.19", features = ["compat"] }
 #hyper = "0.12"
-reqwest = { version = "0.9", default-features = false, features = ["rustls-tls"] }
+reqwest = { version = "=0.10.0-alpha.2", default-features = false }
 http = "0.1"
-tokio = { version = "0.1", default-features = false }
+tokio = { version = "0.2.0-alpha.6", default-features = false, features = ["rt-full"] }
 lazy_static = "1.4"
 byteorder = "1.3"
 

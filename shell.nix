@@ -1,6 +1,6 @@
 { useClang ? false }:
 
-with import (builtins.fetchTarball https://github.com/NixOS/nixpkgs-channels/archive/nixos-19.09.tar.gz) {};
+with import (builtins.fetchTarball https://github.com/NixOS/nixpkgs/archive/bb1013511e1e5edcf314df8321acf2f3c536df0d.tar.gz) {};
 
 with import ./release-common.nix { inherit pkgs; };
 
