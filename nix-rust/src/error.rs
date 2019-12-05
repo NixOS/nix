@@ -6,6 +6,7 @@ pub enum Error {
     BadStorePath(std::path::PathBuf),
     BadNarInfo,
     BadBase32,
+    StorePathNameEmpty,
     StorePathNameTooLong,
     BadStorePathName,
     NarSizeFieldTooBig,
@@ -42,6 +43,7 @@ impl fmt::Display for Error {
             Error::BadNarInfo => write!(f, ".narinfo file is corrupt"),
             Error::BadStorePath(path) => write!(f, "path '{}' is not a store path", path.display()),
             Error::BadBase32 => write!(f, "invalid base32 string"),
+            Error::StorePathNameEmpty => write!(f, "store path name is empty"),
             Error::StorePathNameTooLong => {
                 write!(f, "store path name is longer than 211 characters")
             }
