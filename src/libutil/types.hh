@@ -51,6 +51,16 @@ struct FormatOrString
    ... a_n’. However, ‘fmt(s)’ is equivalent to ‘s’ (so no %-expansion
    takes place). */
 
+inline void formatHelper(boost::format & f)
+{
+}
+
+template<typename T, typename... Args>
+inline void formatHelper(boost::format & f, const T & x, const Args & ... args)
+{
+    formatHelper(f % x, args...);
+}
+
 inline std::string fmt(const std::string & s)
 {
     return s;
@@ -67,11 +77,11 @@ inline std::string fmt(const FormatOrString & fs)
 }
 
 template<typename... Args>
-inline std::string fmt(const std::string & fs, Args... args)
+inline std::string fmt(const std::string & fs, const Args & ... args)
 {
     boost::format f(fs);
     f.exceptions(boost::io::all_error_bits ^ boost::io::too_many_args_bit);
-    nop{boost::io::detail::feed(f, args)...};
+    formatHelper(f, args...);
     return f.str();
 }
 
@@ -87,14 +97,14 @@ public:
     unsigned int status = 1; // exit status
 
     template<typename... Args>
-    BaseError(unsigned int status, Args... args)
+    BaseError(unsigned int status, const Args & ... args)
         : err(fmt(args...))
         , status(status)
     {
     }
 
     template<typename... Args>
-    BaseError(Args... args)
+    BaseError(const Args & ... args)
         : err(fmt(args...))
     {
     }
@@ -126,7 +136,7 @@ public:
     int errNo;
 
     template<typename... Args>
-    SysError(Args... args)
+    SysError(const Args & ... args)
         : Error(addErrno(fmt(args...)))
     { }
 

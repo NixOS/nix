@@ -305,7 +305,7 @@ public:
     int status;
 
     template<typename... Args>
-    ExecError(int status, Args... args)
+    ExecError(int status, const Args & ... args)
         : Error(args...), status(status)
     { }
 };

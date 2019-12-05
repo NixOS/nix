@@ -158,10 +158,10 @@ extern Verbosity verbosity; /* suppress msgs > this */
 #define vomit(args...) printMsg(lvlVomit, args)
 
 template<typename... Args>
-inline void warn(const std::string & fs, Args... args)
+inline void warn(const std::string & fs, const Args & ... args)
 {
     boost::format f(fs);
-    nop{boost::io::detail::feed(f, args)...};
+    formatHelper(f, args...);
     logger->warn(f.str());
 }
 
