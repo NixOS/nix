@@ -97,14 +97,14 @@ public:
     unsigned int status = 1; // exit status
 
     template<typename... Args>
-    BaseError(unsigned int status, Args... args)
+    BaseError(unsigned int status, const Args & ... args)
         : err(fmt(args...))
         , status(status)
     {
     }
 
     template<typename... Args>
-    BaseError(Args... args)
+    BaseError(const Args & ... args)
         : err(fmt(args...))
     {
     }
@@ -136,7 +136,7 @@ public:
     int errNo;
 
     template<typename... Args>
-    SysError(Args... args)
+    SysError(const Args & ... args)
         : Error(addErrno(fmt(args...)))
     { }
 
