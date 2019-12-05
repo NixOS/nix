@@ -24,6 +24,13 @@ static uint64_t getI(const std::vector<Logger::Field> & fields, size_t n)
     return fields[n].i;
 }
 
+static std::string_view storePathToName(std::string_view path)
+{
+    auto base = baseNameOf(path);
+    auto i = base.find('-');
+    return i == std::string::npos ? base.substr(0, 0) : base.substr(i + 1);
+}
+
 class ProgressBar : public Logger
 {
 private:
@@ -148,7 +155,7 @@ public:
         if (type == actBuild) {
             auto name = storePathToName(getS(fields, 0));
             if (hasSuffix(name, ".drv"))
-                name.resize(name.size() - 4);
+                name = name.substr(name.size() - 4);
             i->s = fmt("building " ANSI_BOLD "%s" ANSI_NORMAL, name);
             auto machineName = getS(fields, 1);
             if (machineName != "")
@@ -173,7 +180,7 @@ public:
         if (type == actPostBuildHook) {
             auto name = storePathToName(getS(fields, 0));
             if (hasSuffix(name, ".drv"))
-                name.resize(name.size() - 4);
+                name = name.substr(name.size() - 4);
             i->s = fmt("post-build " ANSI_BOLD "%s" ANSI_NORMAL, name);
             i->name = DrvName(name).name;
         }

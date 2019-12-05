@@ -40,7 +40,7 @@ Generations findGenerations(Path profile, int & curGen)
     Generations gens;
 
     Path profileDir = dirOf(profile);
-    string profileName = baseNameOf(profile);
+    auto profileName = std::string(baseNameOf(profile));
 
     for (auto & i : readDirectory(profileDir)) {
         int n;
@@ -108,7 +108,7 @@ Path createGeneration(ref<LocalFSStore> store, Path profile, Path outPath)
        user environment etc. we've just built. */
     Path generation;
     makeName(profile, num + 1, generation);
-    store->addPermRoot(outPath, generation, false, true);
+    store->addPermRoot(store->parseStorePath(outPath), generation, false, true);
 
     return generation;
 }

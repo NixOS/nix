@@ -2,8 +2,8 @@
 
 namespace nix {
 
-ParsedDerivation::ParsedDerivation(const Path & drvPath, BasicDerivation & drv)
-    : drvPath(drvPath), drv(drv)
+ParsedDerivation::ParsedDerivation(StorePath && drvPath, BasicDerivation & drv)
+    : drvPath(std::move(drvPath)), drv(drv)
 {
     /* Parse the __json attribute, if any. */
     auto jsonAttr = drv.env.find("__json");
@@ -11,7 +11,7 @@ ParsedDerivation::ParsedDerivation(const Path & drvPath, BasicDerivation & drv)
         try {
             structuredAttrs = nlohmann::json::parse(jsonAttr->second);
         } catch (std::exception & e) {
-            throw Error("cannot process __json attribute of '%s': %s", drvPath, e.what());
+            throw Error("cannot process __json attribute of '%s': %s", drvPath.to_string(), e.what());
         }
     }
 }
@@ -24,7 +24,7 @@ std::optional<std::string> ParsedDerivation::getStringAttr(const std::string & n
             return {};
         else {
             if (!i->is_string())
-                throw Error("attribute '%s' of derivation '%s' must be a string", name, drvPath);
+                throw Error("attribute '%s' of derivation '%s' must be a string", name, drvPath.to_string());
             return i->get<std::string>();
         }
     } else {
@@ -44,7 +44,7 @@ bool ParsedDerivation::getBoolAttr(const std::string & name, bool def) const
             return def;
         else {
             if (!i->is_boolean())
-                throw Error("attribute '%s' of derivation '%s' must be a Boolean", name, drvPath);
+                throw Error("attribute '%s' of derivation '%s' must be a Boolean", name, drvPath.to_string());
             return i->get<bool>();
         }
     } else {
@@ -64,11 +64,11 @@ std::optional<Strings> ParsedDerivation::getStringsAttr(const std::string & name
             return {};
         else {
             if (!i->is_array())
-                throw Error("attribute '%s' of derivation '%s' must be a list of strings", name, drvPath);
+                throw Error("attribute '%s' of derivation '%s' must be a list of strings", name, drvPath.to_string());
             Strings res;
             for (auto j = i->begin(); j != i->end(); ++j) {
                 if (!j->is_string())
-                    throw Error("attribute '%s' of derivation '%s' must be a list of strings", name, drvPath);
+                    throw Error("attribute '%s' of derivation '%s' must be a list of strings", name, drvPath.to_string());
                 res.push_back(j->get<std::string>());
             }
             return res;

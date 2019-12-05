@@ -10,9 +10,9 @@ using std::cout;
 namespace nix {
 
 
-static string dotQuote(const string & s)
+static string dotQuote(std::string_view s)
 {
-    return "\"" + s + "\"";
+    return "\"" + std::string(s) + "\"";
 }
 
 
@@ -34,20 +34,13 @@ static string makeEdge(const string & src, const string & dst)
 }
 
 
-static string makeNode(const string & id, const string & label,
+static string makeNode(const string & id, std::string_view label,
     const string & colour)
 {
     format f = format("%1% [label = %2%, shape = box, "
         "style = filled, fillcolor = %3%];\n")
         % dotQuote(id) % dotQuote(label) % dotQuote(colour);
     return f.str();
-}
-
-
-static string symbolicName(const string & path)
-{
-    string p = baseNameOf(path);
-    return string(p, p.find('-') + 1);
 }
 
 
@@ -91,25 +84,24 @@ void printClosure(const Path & nePath, const StoreExpr & fs)
 #endif
 
 
-void printDotGraph(ref<Store> store, const PathSet & roots)
+void printDotGraph(ref<Store> store, StorePathSet && roots)
 {
-    PathSet workList(roots);
-    PathSet doneSet;
+    StorePathSet workList(std::move(roots));
+    StorePathSet doneSet;
 
     cout << "digraph G {\n";
 
     while (!workList.empty()) {
-        Path path = *(workList.begin());
-        workList.erase(path);
+        auto path = std::move(workList.extract(workList.begin()).value());
 
-        if (!doneSet.insert(path).second) continue;
+        if (!doneSet.insert(path.clone()).second) continue;
 
-        cout << makeNode(path, symbolicName(path), "#ff0000");
+        cout << makeNode(std::string(path.to_string()), path.name(), "#ff0000");
 
         for (auto & p : store->queryPathInfo(path)->references) {
             if (p != path) {
-                workList.insert(p);
-                cout << makeEdge(p, path);
+                workList.insert(p.clone());
+                cout << makeEdge(std::string(p.to_string()), std::string(p.to_string()));
             }
         }
 

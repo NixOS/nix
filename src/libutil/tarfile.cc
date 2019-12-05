@@ -17,7 +17,7 @@ void unpackTarfile(Source & source, const Path & destDir)
 void unpackTarfile(const Path & tarFile, const Path & destDir,
     std::optional<std::string> baseName)
 {
-    if (!baseName) baseName = baseNameOf(tarFile);
+    if (!baseName) baseName = std::string(baseNameOf(tarFile));
 
     auto source = sinkToSource([&](Sink & sink) {
         // FIXME: look at first few bytes to determine compression type.

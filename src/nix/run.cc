@@ -119,24 +119,24 @@ struct CmdRun : InstallablesCommand
                 unsetenv(var.c_str());
         }
 
-        std::unordered_set<Path> done;
-        std::queue<Path> todo;
-        for (auto & path : outPaths) todo.push(path);
+        std::unordered_set<StorePath> done;
+        std::queue<StorePath> todo;
+        for (auto & path : outPaths) todo.push(path.clone());
 
         auto unixPath = tokenizeString<Strings>(getEnv("PATH").value_or(""), ":");
 
         while (!todo.empty()) {
-            Path path = todo.front();
+            auto path = todo.front().clone();
             todo.pop();
-            if (!done.insert(path).second) continue;
+            if (!done.insert(path.clone()).second) continue;
 
             if (true)
-                unixPath.push_front(path + "/bin");
+                unixPath.push_front(store->printStorePath(path) + "/bin");
 
-            auto propPath = path + "/nix-support/propagated-user-env-packages";
+            auto propPath = store->printStorePath(path) + "/nix-support/propagated-user-env-packages";
             if (accessor->stat(propPath).type == FSAccessor::tRegular) {
                 for (auto & p : tokenizeString<Paths>(readFile(propPath)))
-                    todo.push(p);
+                    todo.push(store->parseStorePath(p));
             }
         }
 

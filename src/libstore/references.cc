@@ -89,7 +89,7 @@ PathSet scanForReferences(const string & path,
        hash part of the file name.  (This assumes that all references
        have the form `HASH-bla'). */
     for (auto & i : refs) {
-        string baseName = baseNameOf(i);
+        auto baseName = std::string(baseNameOf(i));
         string::size_type pos = baseName.find('-');
         if (pos == string::npos)
             throw Error(format("bad reference '%1%'") % i);

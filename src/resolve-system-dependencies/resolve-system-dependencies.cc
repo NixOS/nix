@@ -179,8 +179,8 @@ int main(int argc, char ** argv)
         if (std::string(argv[1]) == "--test")
             impurePaths.insert(argv[2]);
         else {
-            auto drv = store->derivationFromPath(Path(argv[1]));
-            impurePaths = tokenizeString<StringSet>(get(drv.env, "__impureHostDeps"));
+            auto drv = store->derivationFromPath(store->parseStorePath(argv[1]));
+            impurePaths = tokenizeString<StringSet>(get(drv.env, "__impureHostDeps").value_or(""));
             impurePaths.insert("/usr/lib/libSystem.dylib");
         }
 

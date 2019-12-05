@@ -19,6 +19,7 @@ pub enum Error {
     BadNarField(String),
     BadExecutableField,
     IOError(std::io::Error),
+    #[cfg(unused)]
     HttpError(hyper::error::Error),
     Misc(String),
     Foreign(CppException),
@@ -30,6 +31,7 @@ impl From<std::io::Error> for Error {
     }
 }
 
+#[cfg(unused)]
 impl From<hyper::error::Error> for Error {
     fn from(err: hyper::error::Error) -> Self {
         Error::HttpError(err)
@@ -58,6 +60,7 @@ impl fmt::Display for Error {
             Error::BadNarField(s) => write!(f, "unrecognized NAR field '{}'", s),
             Error::BadExecutableField => write!(f, "bad 'executable' field in NAR"),
             Error::IOError(err) => write!(f, "I/O error: {}", err),
+            #[cfg(unused)]
             Error::HttpError(err) => write!(f, "HTTP error: {}", err),
             Error::Foreign(_) => write!(f, "<C++ exception>"), // FIXME
             Error::Misc(s) => write!(f, "{}", s),

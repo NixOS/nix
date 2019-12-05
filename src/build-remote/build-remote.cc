@@ -88,7 +88,7 @@ static int _main(int argc, char * * argv)
             return 0;
         }
 
-        string drvPath;
+        std::optional<StorePath> drvPath;
         string storeUri;
 
         while (true) {
@@ -100,7 +100,7 @@ static int _main(int argc, char * * argv)
 
             auto amWilling = readInt(source);
             auto neededSystem = readString(source);
-            source >> drvPath;
+            drvPath = store->parseStorePath(readString(source));
             auto requiredFeatures = readStrings<std::set<std::string>>(source);
 
              auto canBuildLocally = amWilling
@@ -236,26 +236,27 @@ connected:
 
         {
             Activity act(*logger, lvlTalkative, actUnknown, fmt("copying dependencies to '%s'", storeUri));
-            copyPaths(store, ref<Store>(sshStore), inputs, NoRepair, NoCheckSigs, substitute);
+            copyPaths(store, ref<Store>(sshStore), store->parseStorePathSet(inputs), NoRepair, NoCheckSigs, substitute);
         }
 
         uploadLock = -1;
 
-        BasicDerivation drv(readDerivation(store->realStoreDir + "/" + baseNameOf(drvPath)));
-        drv.inputSrcs = inputs;
+        BasicDerivation drv(readDerivation(*store, store->realStoreDir + "/" + std::string(drvPath->to_string())));
+        drv.inputSrcs = store->parseStorePathSet(inputs);
 
-        auto result = sshStore->buildDerivation(drvPath, drv);
+        auto result = sshStore->buildDerivation(*drvPath, drv);
 
         if (!result.success())
-            throw Error("build of '%s' on '%s' failed: %s", drvPath, storeUri, result.errorMsg);
+            throw Error("build of '%s' on '%s' failed: %s", store->printStorePath(*drvPath), storeUri, result.errorMsg);
 
-        PathSet missing;
+        StorePathSet missing;
         for (auto & path : outputs)
-            if (!store->isValidPath(path)) missing.insert(path);
+            if (!store->isValidPath(store->parseStorePath(path))) missing.insert(store->parseStorePath(path));
 
         if (!missing.empty()) {
             Activity act(*logger, lvlTalkative, actUnknown, fmt("copying outputs from '%s'", storeUri));
-            store->locksHeld.insert(missing.begin(), missing.end()); /* FIXME: ugly */
+            for (auto & i : missing)
+                store->locksHeld.insert(store->printStorePath(i)); /* FIXME: ugly */
             copyPaths(ref<Store>(sshStore), store, missing, NoRepair, NoCheckSigs, NoSubstitute);
         }
 

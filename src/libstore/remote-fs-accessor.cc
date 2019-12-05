@@ -50,7 +50,7 @@ std::pair<ref<FSAccessor>, Path> RemoteFSAccessor::fetch(const Path & path_)
     auto storePath = store->toStorePath(path);
     std::string restPath = std::string(path, storePath.size());
 
-    if (!store->isValidPath(storePath))
+    if (!store->isValidPath(store->parseStorePath(storePath)))
         throw InvalidPath(format("path '%1%' is not a valid store path") % storePath);
 
     auto i = nars.find(storePath);
@@ -96,7 +96,7 @@ std::pair<ref<FSAccessor>, Path> RemoteFSAccessor::fetch(const Path & path_)
         } catch (SysError &) { }
     }
 
-    store->narFromPath(storePath, sink);
+    store->narFromPath(store->parseStorePath(storePath), sink);
     auto narAccessor = makeNarAccessor(sink.s);
     addToCache(storePath, *sink.s, narAccessor);
     return {narAccessor, restPath};

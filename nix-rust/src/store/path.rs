@@ -23,6 +23,13 @@ impl StorePath {
         )
     }
 
+    pub fn from_parts(hash: [u8; STORE_PATH_HASH_BYTES], name: &str) -> Result<Self, Error> {
+        Ok(StorePath {
+            hash: StorePathHash(hash),
+            name: StorePathName::new(name)?,
+        })
+    }
+
     pub fn new_from_base_name(base_name: &str) -> Result<Self, Error> {
         if base_name.len() < STORE_PATH_HASH_CHARS + 1
             || base_name.as_bytes()[STORE_PATH_HASH_CHARS] != '-' as u8
@@ -43,7 +50,7 @@ impl fmt::Display for StorePath {
     }
 }
 
-#[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Debug)]
+#[derive(Clone, PartialEq, Eq, Debug)]
 pub struct StorePathHash([u8; STORE_PATH_HASH_BYTES]);
 
 impl StorePathHash {
@@ -55,11 +62,30 @@ impl StorePathHash {
         bytes.copy_from_slice(&v[0..STORE_PATH_HASH_BYTES]);
         Ok(Self(bytes))
     }
+
+    pub fn hash<'a>(&'a self) -> &'a [u8; STORE_PATH_HASH_BYTES] {
+        &self.0
+    }
 }
 
 impl fmt::Display for StorePathHash {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_str(&base32::encode(&self.0))
+    }
+}
+
+impl Ord for StorePathHash {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        // Historically we've sorted store paths by their base32
+        // serialization, but our base32 encodes bytes in reverse
+        // order. So compare them in reverse order as well.
+        self.0.iter().rev().cmp(other.0.iter().rev())
+    }
+}
+
+impl PartialOrd for StorePathHash {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(other))
     }
 }
 
@@ -92,6 +118,10 @@ impl StorePathName {
         }
 
         Ok(Self(s.to_string()))
+    }
+
+    pub fn name<'a>(&'a self) -> &'a str {
+        &self.0
     }
 }
 

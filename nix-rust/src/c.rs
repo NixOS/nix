@@ -1,6 +1,7 @@
 use super::{
     error,
     foreign::{self, CBox},
+    store::StorePath,
     util,
 };
 
@@ -13,43 +14,72 @@ pub extern "C" fn unpack_tarfile(
 }
 
 #[no_mangle]
-pub extern "C" fn rust_test() {
-    use crate::store::{self, Store};
-    use std::path::Path;
-    use tokio::runtime::Runtime;
+pub unsafe extern "C" fn ffi_String_new(s: &str, out: *mut String) {
+    // FIXME: check whether 's' is valid UTF-8?
+    out.write(s.to_string())
+}
 
-    let fut = async move {
-        let store: Box<dyn Store> = Box::new(store::BinaryCacheStore::new(
-            "http://cache.nixos.org".to_string(),
-        ));
+#[no_mangle]
+pub unsafe extern "C" fn ffi_String_drop(self_: *mut String) {
+    std::ptr::drop_in_place(self_);
+}
 
-        let path = store
-            .parse_store_path(&Path::new(
-                "/nix/store/7h7qgvs4kgzsn8a6rb273saxyqh4jxlz-konsole-18.12.3",
-            ))
-            .unwrap();
+#[no_mangle]
+pub extern "C" fn ffi_StorePath_new(
+    path: &str,
+    store_dir: &str,
+) -> Result<StorePath, error::CppException> {
+    StorePath::new(std::path::Path::new(path), store_dir).map_err(|err| err.into())
+}
 
-        /*
-        let info = store.query_path_info(&path).await.unwrap();
+#[no_mangle]
+pub extern "C" fn ffi_StorePath_new2(
+    hash: &[u8; crate::store::path::STORE_PATH_HASH_BYTES],
+    name: &str,
+) -> Result<StorePath, error::CppException> {
+    StorePath::from_parts(*hash, name).map_err(|err| err.into())
+}
 
-        eprintln!("INFO = {:?}", info);
-         */
+#[no_mangle]
+pub extern "C" fn ffi_StorePath_fromBaseName(
+    base_name: &str,
+) -> Result<StorePath, error::CppException> {
+    StorePath::new_from_base_name(base_name).map_err(|err| err.into())
+}
 
-        let closure = store
-            .compute_path_closure(vec![path].into_iter().collect())
-            .await
-            .unwrap();
+#[no_mangle]
+pub unsafe extern "C" fn ffi_StorePath_drop(self_: *mut StorePath) {
+    std::ptr::drop_in_place(self_);
+}
 
-        eprintln!("CLOSURE = {:?}", closure.len());
-    };
+#[no_mangle]
+pub extern "C" fn ffi_StorePath_to_string(self_: &StorePath) -> String {
+    format!("{}", self_)
+}
 
-    let rt = Runtime::new().unwrap();
+#[no_mangle]
+pub extern "C" fn ffi_StorePath_less_than(a: &StorePath, b: &StorePath) -> bool {
+    a < b
+}
 
-    rt.block_on(fut);
+#[no_mangle]
+pub extern "C" fn ffi_StorePath_eq(a: &StorePath, b: &StorePath) -> bool {
+    a == b
+}
 
-    /*
-    let file = std::fs::File::open("test.nar").unwrap();
+#[no_mangle]
+pub extern "C" fn ffi_StorePath_clone(self_: &StorePath) -> StorePath {
+    self_.clone()
+}
 
-    crate::nar::parse(&mut std::io::BufReader::new(file)).unwrap();
-    */
+#[no_mangle]
+pub extern "C" fn ffi_StorePath_name(self_: &StorePath) -> &str {
+    self_.name.name()
+}
+
+#[no_mangle]
+pub extern "C" fn ffi_StorePath_hash_data(
+    self_: &StorePath,
+) -> &[u8; crate::store::path::STORE_PATH_HASH_BYTES] {
+    self_.hash.hash()
 }

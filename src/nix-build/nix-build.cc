@@ -317,11 +317,11 @@ static void _main(int argc, char * * argv)
 
     state->printStats();
 
-    auto buildPaths = [&](const PathSet & paths) {
+    auto buildPaths = [&](const std::vector<StorePathWithOutputs> & paths) {
         /* Note: we do this even when !printMissing to efficiently
            fetch binary cache data. */
         unsigned long long downloadSize, narSize;
-        PathSet willBuild, willSubstitute, unknown;
+        StorePathSet willBuild, willSubstitute, unknown;
         store->queryMissing(paths,
             willBuild, willSubstitute, unknown, downloadSize, narSize);
 
@@ -337,9 +337,9 @@ static void _main(int argc, char * * argv)
             throw UsageError("nix-shell requires a single derivation");
 
         auto & drvInfo = drvs.front();
-        auto drv = store->derivationFromPath(drvInfo.queryDrvPath());
+        auto drv = store->derivationFromPath(store->parseStorePath(drvInfo.queryDrvPath()));
 
-        PathSet pathsToBuild;
+        std::vector<StorePathWithOutputs> pathsToBuild;
 
         /* Figure out what bash shell to use. If $NIX_BUILD_SHELL
            is not set, then build bashInteractive from
@@ -358,7 +358,7 @@ static void _main(int argc, char * * argv)
                 if (!drv)
                     throw Error("the 'bashInteractive' attribute in <nixpkgs> did not evaluate to a derivation");
 
-                pathsToBuild.insert(drv->queryDrvPath());
+                pathsToBuild.emplace_back(store->parseStorePath(drv->queryDrvPath()));
 
                 shell = drv->queryOutPath() + "/bin/bash";
 
@@ -370,10 +370,11 @@ static void _main(int argc, char * * argv)
 
         // Build or fetch all dependencies of the derivation.
         for (const auto & input : drv.inputDrvs)
-            if (std::all_of(envExclude.cbegin(), envExclude.cend(), [&](const string & exclude) { return !std::regex_search(input.first, std::regex(exclude)); }))
-                pathsToBuild.insert(makeDrvPathWithOutputs(input.first, input.second));
+            if (std::all_of(envExclude.cbegin(), envExclude.cend(),
+                    [&](const string & exclude) { return !std::regex_search(store->printStorePath(input.first), std::regex(exclude)); }))
+                pathsToBuild.emplace_back(input.first, input.second);
         for (const auto & src : drv.inputSrcs)
-            pathsToBuild.insert(src);
+            pathsToBuild.emplace_back(src);
 
         buildPaths(pathsToBuild);
 
@@ -399,7 +400,7 @@ static void _main(int argc, char * * argv)
         env["NIX_STORE"] = store->storeDir;
         env["NIX_BUILD_CORES"] = std::to_string(settings.buildCores);
 
-        auto passAsFile = tokenizeString<StringSet>(get(drv.env, "passAsFile", ""));
+        auto passAsFile = tokenizeString<StringSet>(get(drv.env, "passAsFile").value_or(""));
 
         bool keepTmp = false;
         int fileNr = 0;
@@ -468,7 +469,7 @@ static void _main(int argc, char * * argv)
 
     else {
 
-        PathSet pathsToBuild;
+        std::vector<StorePathWithOutputs> pathsToBuild;
 
         std::map<Path, Path> drvPrefixes;
         std::map<Path, Path> resultSymlinks;
@@ -482,7 +483,7 @@ static void _main(int argc, char * * argv)
             if (outputName == "")
                 throw Error("derivation '%s' lacks an 'outputName' attribute", drvPath);
 
-            pathsToBuild.insert(drvPath + "!" + outputName);
+            pathsToBuild.emplace_back(store->parseStorePath(drvPath), StringSet{outputName});
 
             std::string drvPrefix;
             auto i = drvPrefixes.find(drvPath);
@@ -508,7 +509,7 @@ static void _main(int argc, char * * argv)
 
         for (auto & symlink : resultSymlinks)
             if (auto store2 = store.dynamic_pointer_cast<LocalFSStore>())
-                store2->addPermRoot(symlink.second, absPath(symlink.first), true);
+                store2->addPermRoot(store->parseStorePath(symlink.second), absPath(symlink.first), true);
 
         for (auto & path : outPaths)
             std::cout << path << '\n';

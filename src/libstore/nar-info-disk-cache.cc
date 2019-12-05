@@ -193,11 +193,8 @@ public:
             if (!queryNAR.getInt(0))
                 return {oInvalid, 0};
 
-            auto narInfo = make_ref<NarInfo>();
-
             auto namePart = queryNAR.getStr(1);
-            narInfo->path = cache.storeDir + "/" +
-                hashPart + (namePart.empty() ? "" : "-" + namePart);
+            auto narInfo = make_ref<NarInfo>(StorePath::fromBaseName(hashPart + "-" + namePart));
             narInfo->url = queryNAR.getStr(2);
             narInfo->compression = queryNAR.getStr(3);
             if (!queryNAR.isNull(4))
@@ -206,9 +203,9 @@ public:
             narInfo->narHash = Hash(queryNAR.getStr(6));
             narInfo->narSize = queryNAR.getInt(7);
             for (auto & r : tokenizeString<Strings>(queryNAR.getStr(8), " "))
-                narInfo->references.insert(cache.storeDir + "/" + r);
+                narInfo->references.insert(StorePath::fromBaseName(r));
             if (!queryNAR.isNull(9))
-                narInfo->deriver = cache.storeDir + "/" + queryNAR.getStr(9);
+                narInfo->deriver = StorePath::fromBaseName(queryNAR.getStr(9));
             for (auto & sig : tokenizeString<Strings>(queryNAR.getStr(10), " "))
                 narInfo->sigs.insert(sig);
             narInfo->ca = queryNAR.getStr(11);
@@ -230,12 +227,12 @@ public:
 
                 auto narInfo = std::dynamic_pointer_cast<const NarInfo>(info);
 
-                assert(hashPart == storePathToHash(info->path));
+                //assert(hashPart == storePathToHash(info->path));
 
                 state->insertNAR.use()
                     (cache.id)
                     (hashPart)
-                    (storePathToName(info->path))
+                    (std::string(info->path.name()))
                     (narInfo ? narInfo->url : "", narInfo != 0)
                     (narInfo ? narInfo->compression : "", narInfo != 0)
                     (narInfo && narInfo->fileHash ? narInfo->fileHash.to_string() : "", narInfo && narInfo->fileHash)
@@ -243,7 +240,7 @@ public:
                     (info->narHash.to_string())
                     (info->narSize)
                     (concatStringsSep(" ", info->shortRefs()))
-                    (info->deriver != "" ? baseNameOf(info->deriver) : "", info->deriver != "")
+                    (info->deriver ? std::string(info->deriver->to_string()) : "", (bool) info->deriver)
                     (concatStringsSep(" ", info->sigs))
                     (info->ca)
                     (time(0)).exec();

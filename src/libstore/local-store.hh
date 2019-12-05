@@ -119,36 +119,36 @@ public:
 
     std::string getUri() override;
 
-    bool isValidPathUncached(const Path & path) override;
+    bool isValidPathUncached(const StorePath & path) override;
 
-    PathSet queryValidPaths(const PathSet & paths,
+    StorePathSet queryValidPaths(const StorePathSet & paths,
         SubstituteFlag maybeSubstitute = NoSubstitute) override;
 
-    PathSet queryAllValidPaths() override;
+    StorePathSet queryAllValidPaths() override;
 
-    void queryPathInfoUncached(const Path & path,
+    void queryPathInfoUncached(const StorePath & path,
         Callback<std::shared_ptr<const ValidPathInfo>> callback) noexcept override;
 
-    void queryReferrers(const Path & path, PathSet & referrers) override;
+    void queryReferrers(const StorePath & path, StorePathSet & referrers) override;
 
-    PathSet queryValidDerivers(const Path & path) override;
+    StorePathSet queryValidDerivers(const StorePath & path) override;
 
-    PathSet queryDerivationOutputs(const Path & path) override;
+    StorePathSet queryDerivationOutputs(const StorePath & path) override;
 
-    StringSet queryDerivationOutputNames(const Path & path) override;
+    StringSet queryDerivationOutputNames(const StorePath & path) override;
 
-    Path queryPathFromHashPart(const string & hashPart) override;
+    std::optional<StorePath> queryPathFromHashPart(const std::string & hashPart) override;
 
-    PathSet querySubstitutablePaths(const PathSet & paths) override;
+    StorePathSet querySubstitutablePaths(const StorePathSet & paths) override;
 
-    void querySubstitutablePathInfos(const PathSet & paths,
+    void querySubstitutablePathInfos(const StorePathSet & paths,
         SubstitutablePathInfos & infos) override;
 
     void addToStore(const ValidPathInfo & info, Source & source,
         RepairFlag repair, CheckSigsFlag checkSigs,
         std::shared_ptr<FSAccessor> accessor) override;
 
-    Path addToStore(const string & name, const Path & srcPath,
+    StorePath addToStore(const string & name, const Path & srcPath,
         bool recursive, HashType hashAlgo,
         PathFilter & filter, RepairFlag repair) override;
 
@@ -156,20 +156,22 @@ public:
        in `dump', which is either a NAR serialisation (if recursive ==
        true) or simply the contents of a regular file (if recursive ==
        false). */
-    Path addToStoreFromDump(const string & dump, const string & name,
+    StorePath addToStoreFromDump(const string & dump, const string & name,
         bool recursive = true, HashType hashAlgo = htSHA256, RepairFlag repair = NoRepair) override;
 
-    Path addTextToStore(const string & name, const string & s,
-        const PathSet & references, RepairFlag repair) override;
+    StorePath addTextToStore(const string & name, const string & s,
+        const StorePathSet & references, RepairFlag repair) override;
 
-    void buildPaths(const PathSet & paths, BuildMode buildMode) override;
-
-    BuildResult buildDerivation(const Path & drvPath, const BasicDerivation & drv,
+    void buildPaths(
+        const std::vector<StorePathWithOutputs> & paths,
         BuildMode buildMode) override;
 
-    void ensurePath(const Path & path) override;
+    BuildResult buildDerivation(const StorePath & drvPath, const BasicDerivation & drv,
+        BuildMode buildMode) override;
 
-    void addTempRoot(const Path & path) override;
+    void ensurePath(const StorePath & path) override;
+
+    void addTempRoot(const StorePath & path) override;
 
     void addIndirectRoot(const Path & path) override;
 
@@ -215,9 +217,9 @@ public:
 
     /* Repair the contents of the given path by redownloading it using
        a substituter (if available). */
-    void repairPath(const Path & path);
+    void repairPath(const StorePath & path);
 
-    void addSignatures(const Path & storePath, const StringSet & sigs) override;
+    void addSignatures(const StorePath & storePath, const StringSet & sigs) override;
 
     /* If free disk space in /nix/store if below minFree, delete
        garbage until it exceeds maxFree. */
@@ -231,17 +233,17 @@ private:
 
     void makeStoreWritable();
 
-    uint64_t queryValidPathId(State & state, const Path & path);
+    uint64_t queryValidPathId(State & state, const StorePath & path);
 
     uint64_t addValidPath(State & state, const ValidPathInfo & info, bool checkOutputs = true);
 
-    void invalidatePath(State & state, const Path & path);
+    void invalidatePath(State & state, const StorePath & path);
 
     /* Delete a path from the Nix store. */
-    void invalidatePathChecked(const Path & path);
+    void invalidatePathChecked(const StorePath & path);
 
-    void verifyPath(const Path & path, const PathSet & store,
-        PathSet & done, PathSet & validPaths, RepairFlag repair, bool & errors);
+    void verifyPath(const Path & path, const StringSet & store,
+        PathSet & done, StorePathSet & validPaths, RepairFlag repair, bool & errors);
 
     void updatePathInfo(State & state, const ValidPathInfo & info);
 
@@ -256,7 +258,7 @@ private:
 
     void tryToDelete(GCState & state, const Path & path);
 
-    bool canReachRoot(GCState & state, PathSet & visited, const Path & path);
+    bool canReachRoot(GCState & state, StorePathSet & visited, const StorePath & path);
 
     void deletePathRecursive(GCState & state, const Path & path);
 
@@ -275,7 +277,7 @@ private:
 
     Path createTempDirInStore();
 
-    void checkDerivationOutputs(const Path & drvPath, const Derivation & drv);
+    void checkDerivationOutputs(const StorePath & drvPath, const Derivation & drv);
 
     typedef std::unordered_set<ino_t> InodeHash;
 
@@ -284,8 +286,8 @@ private:
     void optimisePath_(Activity * act, OptimiseStats & stats, const Path & path, InodeHash & inodeHash);
 
     // Internal versions that are not wrapped in retry_sqlite.
-    bool isValidPath_(State & state, const Path & path);
-    void queryReferrers(State & state, const Path & path, PathSet & referrers);
+    bool isValidPath_(State & state, const StorePath & path);
+    void queryReferrers(State & state, const StorePath & path, StorePathSet & referrers);
 
     /* Add signatures to a ValidPathInfo using the secret keys
        specified by the ‘secret-key-files’ option. */

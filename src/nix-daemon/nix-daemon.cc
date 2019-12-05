@@ -286,7 +286,7 @@ static int _main(int argc, char * * argv)
                 if (chdir(socketDir.c_str()) == -1)
                     throw SysError(format("changing to socket directory '%1%'") % socketDir);
 
-                auto socketName = baseNameOf(socketPath);
+                auto socketName = std::string(baseNameOf(socketPath));
                 auto addr = sockaddr_un{};
                 addr.sun_family = AF_UNIX;
                 if (socketName.size() + 1 >= sizeof(addr.sun_path))

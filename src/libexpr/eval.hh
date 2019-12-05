@@ -17,6 +17,7 @@ namespace nix {
 
 class Store;
 class EvalState;
+struct StorePath;
 enum RepairFlag : bool;
 
 
@@ -42,14 +43,14 @@ struct Env
 };
 
 
-Value & mkString(Value & v, const string & s, const PathSet & context = PathSet());
+Value & mkString(Value & v, std::string_view s, const PathSet & context = PathSet());
 
 void copyContext(const Value & v, PathSet & context);
 
 
 /* Cache for calls to addToStore(); maps source paths to the store
    paths. */
-typedef std::map<Path, Path> SrcToStore;
+typedef std::map<Path, StorePath> SrcToStore;
 
 
 std::ostream & operator << (std::ostream & str, const Value & v);

@@ -2,6 +2,7 @@
 
 #include "args.hh"
 #include "common-eval-args.hh"
+#include "path.hh"
 
 namespace nix {
 
@@ -28,8 +29,8 @@ private:
 
 struct Buildable
 {
-    Path drvPath; // may be empty
-    std::map<std::string, Path> outputs;
+    std::optional<StorePath> drvPath;
+    std::map<std::string, StorePath> outputs;
 };
 
 typedef std::vector<Buildable> Buildables;
@@ -131,7 +132,7 @@ public:
 
     using StoreCommand::run;
 
-    virtual void run(ref<Store> store, Paths storePaths) = 0;
+    virtual void run(ref<Store> store, std::vector<StorePath> storePaths) = 0;
 
     void run(ref<Store> store) override;
 
@@ -143,7 +144,7 @@ struct StorePathCommand : public InstallablesCommand
 {
     using StoreCommand::run;
 
-    virtual void run(ref<Store> store, const Path & storePath) = 0;
+    virtual void run(ref<Store> store, const StorePath & storePath) = 0;
 
     void run(ref<Store> store) override;
 };
@@ -174,13 +175,13 @@ std::shared_ptr<Installable> parseInstallable(
 Buildables build(ref<Store> store, RealiseMode mode,
     std::vector<std::shared_ptr<Installable>> installables);
 
-PathSet toStorePaths(ref<Store> store, RealiseMode mode,
+std::set<StorePath> toStorePaths(ref<Store> store, RealiseMode mode,
     std::vector<std::shared_ptr<Installable>> installables);
 
-Path toStorePath(ref<Store> store, RealiseMode mode,
+StorePath toStorePath(ref<Store> store, RealiseMode mode,
     std::shared_ptr<Installable> installable);
 
-PathSet toDerivations(ref<Store> store,
+std::set<StorePath> toDerivations(ref<Store> store,
     std::vector<std::shared_ptr<Installable>> installables,
     bool useDeriver = false);
 

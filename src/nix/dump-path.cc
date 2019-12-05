@@ -20,7 +20,7 @@ struct CmdDumpPath : StorePathCommand
         };
     }
 
-    void run(ref<Store> store, const Path & storePath) override
+    void run(ref<Store> store, const StorePath & storePath) override
     {
         FdSink sink(STDOUT_FILENO);
         store->narFromPath(storePath, sink);

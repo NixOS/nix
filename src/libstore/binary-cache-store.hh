@@ -65,18 +65,18 @@ private:
 
     std::string narMagic;
 
-    std::string narInfoFileFor(const Path & storePath);
+    std::string narInfoFileFor(const StorePath & storePath);
 
     void writeNarInfo(ref<NarInfo> narInfo);
 
 public:
 
-    bool isValidPathUncached(const Path & path) override;
+    bool isValidPathUncached(const StorePath & path) override;
 
-    void queryPathInfoUncached(const Path & path,
+    void queryPathInfoUncached(const StorePath & path,
         Callback<std::shared_ptr<const ValidPathInfo>> callback) noexcept override;
 
-    Path queryPathFromHashPart(const string & hashPart) override
+    std::optional<StorePath> queryPathFromHashPart(const std::string & hashPart) override
     { unsupported("queryPathFromHashPart"); }
 
     bool wantMassQuery() override { return wantMassQuery_; }
@@ -85,27 +85,27 @@ public:
         RepairFlag repair, CheckSigsFlag checkSigs,
         std::shared_ptr<FSAccessor> accessor) override;
 
-    Path addToStore(const string & name, const Path & srcPath,
+    StorePath addToStore(const string & name, const Path & srcPath,
         bool recursive, HashType hashAlgo,
         PathFilter & filter, RepairFlag repair) override;
 
-    Path addTextToStore(const string & name, const string & s,
-        const PathSet & references, RepairFlag repair) override;
+    StorePath addTextToStore(const string & name, const string & s,
+        const StorePathSet & references, RepairFlag repair) override;
 
-    void narFromPath(const Path & path, Sink & sink) override;
+    void narFromPath(const StorePath & path, Sink & sink) override;
 
-    BuildResult buildDerivation(const Path & drvPath, const BasicDerivation & drv,
+    BuildResult buildDerivation(const StorePath & drvPath, const BasicDerivation & drv,
         BuildMode buildMode) override
     { unsupported("buildDerivation"); }
 
-    void ensurePath(const Path & path) override
+    void ensurePath(const StorePath & path) override
     { unsupported("ensurePath"); }
 
     ref<FSAccessor> getFSAccessor() override;
 
-    void addSignatures(const Path & storePath, const StringSet & sigs) override;
+    void addSignatures(const StorePath & storePath, const StringSet & sigs) override;
 
-    std::shared_ptr<std::string> getBuildLog(const Path & path) override;
+    std::shared_ptr<std::string> getBuildLog(const StorePath & path) override;
 
     int getPriority() override { return priority; }
 

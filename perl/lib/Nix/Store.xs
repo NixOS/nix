@@ -59,7 +59,7 @@ void setVerbosity(int level)
 int isValidPath(char * path)
     CODE:
         try {
-            RETVAL = store()->isValidPath(path);
+            RETVAL = store()->isValidPath(store()->parseStorePath(path));
         } catch (Error & e) {
             croak("%s", e.what());
         }
@@ -70,9 +70,8 @@ int isValidPath(char * path)
 SV * queryReferences(char * path)
     PPCODE:
         try {
-            PathSet paths = store()->queryPathInfo(path)->references;
-            for (PathSet::iterator i = paths.begin(); i != paths.end(); ++i)
-                XPUSHs(sv_2mortal(newSVpv(i->c_str(), 0)));
+            for (auto & i : store()->queryPathInfo(store()->parseStorePath(path))->references)
+                XPUSHs(sv_2mortal(newSVpv(store()->printStorePath(i).c_str(), 0)));
         } catch (Error & e) {
             croak("%s", e.what());
         }
@@ -81,7 +80,7 @@ SV * queryReferences(char * path)
 SV * queryPathHash(char * path)
     PPCODE:
         try {
-            auto s = store()->queryPathInfo(path)->narHash.to_string();
+            auto s = store()->queryPathInfo(store()->parseStorePath(path))->narHash.to_string();
             XPUSHs(sv_2mortal(newSVpv(s.c_str(), 0)));
         } catch (Error & e) {
             croak("%s", e.what());
@@ -91,9 +90,9 @@ SV * queryPathHash(char * path)
 SV * queryDeriver(char * path)
     PPCODE:
         try {
-            auto deriver = store()->queryPathInfo(path)->deriver;
-            if (deriver == "") XSRETURN_UNDEF;
-            XPUSHs(sv_2mortal(newSVpv(deriver.c_str(), 0)));
+            auto info = store()->queryPathInfo(store()->parseStorePath(path));
+            if (!info->deriver) XSRETURN_UNDEF;
+            XPUSHs(sv_2mortal(newSVpv(store()->printStorePath(*info->deriver).c_str(), 0)));
         } catch (Error & e) {
             croak("%s", e.what());
         }
@@ -102,18 +101,18 @@ SV * queryDeriver(char * path)
 SV * queryPathInfo(char * path, int base32)
     PPCODE:
         try {
-            auto info = store()->queryPathInfo(path);
-            if (info->deriver == "")
+            auto info = store()->queryPathInfo(store()->parseStorePath(path));
+            if (info->deriver)
                 XPUSHs(&PL_sv_undef);
             else
-                XPUSHs(sv_2mortal(newSVpv(info->deriver.c_str(), 0)));
+                XPUSHs(sv_2mortal(newSVpv(store()->printStorePath(*info->deriver).c_str(), 0)));
             auto s = info->narHash.to_string(base32 ? Base32 : Base16);
             XPUSHs(sv_2mortal(newSVpv(s.c_str(), 0)));
             mXPUSHi(info->registrationTime);
             mXPUSHi(info->narSize);
             AV * arr = newAV();
-            for (PathSet::iterator i = info->references.begin(); i != info->references.end(); ++i)
-                av_push(arr, newSVpv(i->c_str(), 0));
+            for (auto & i : info->references)
+                av_push(arr, newSVpv(store()->printStorePath(i).c_str(), 0));
             XPUSHs(sv_2mortal(newRV((SV *) arr)));
         } catch (Error & e) {
             croak("%s", e.what());
@@ -123,8 +122,8 @@ SV * queryPathInfo(char * path, int base32)
 SV * queryPathFromHashPart(char * hashPart)
     PPCODE:
         try {
-            Path path = store()->queryPathFromHashPart(hashPart);
-            XPUSHs(sv_2mortal(newSVpv(path.c_str(), 0)));
+            auto path = store()->queryPathFromHashPart(hashPart);
+            XPUSHs(sv_2mortal(newSVpv(path ? store()->printStorePath(*path).c_str() : "", 0)));
         } catch (Error & e) {
             croak("%s", e.what());
         }
@@ -133,11 +132,11 @@ SV * queryPathFromHashPart(char * hashPart)
 SV * computeFSClosure(int flipDirection, int includeOutputs, ...)
     PPCODE:
         try {
-            PathSet paths;
+            StorePathSet paths;
             for (int n = 2; n < items; ++n)
-                store()->computeFSClosure(SvPV_nolen(ST(n)), paths, flipDirection, includeOutputs);
-            for (PathSet::iterator i = paths.begin(); i != paths.end(); ++i)
-                XPUSHs(sv_2mortal(newSVpv(i->c_str(), 0)));
+                store()->computeFSClosure(store()->parseStorePath(SvPV_nolen(ST(n))), paths, flipDirection, includeOutputs);
+            for (auto & i : paths)
+                XPUSHs(sv_2mortal(newSVpv(store()->printStorePath(i).c_str(), 0)));
         } catch (Error & e) {
             croak("%s", e.what());
         }
@@ -146,11 +145,11 @@ SV * computeFSClosure(int flipDirection, int includeOutputs, ...)
 SV * topoSortPaths(...)
     PPCODE:
         try {
-            PathSet paths;
-            for (int n = 0; n < items; ++n) paths.insert(SvPV_nolen(ST(n)));
-            Paths sorted = store()->topoSortPaths(paths);
-            for (Paths::iterator i = sorted.begin(); i != sorted.end(); ++i)
-                XPUSHs(sv_2mortal(newSVpv(i->c_str(), 0)));
+            StorePathSet paths;
+            for (int n = 0; n < items; ++n) paths.insert(store()->parseStorePath(SvPV_nolen(ST(n))));
+            auto sorted = store()->topoSortPaths(paths);
+            for (auto & i : sorted)
+                XPUSHs(sv_2mortal(newSVpv(store()->printStorePath(i).c_str(), 0)));
         } catch (Error & e) {
             croak("%s", e.what());
         }
@@ -159,7 +158,7 @@ SV * topoSortPaths(...)
 SV * followLinksToStorePath(char * path)
     CODE:
         try {
-            RETVAL = newSVpv(store()->followLinksToStorePath(path).c_str(), 0);
+            RETVAL = newSVpv(store()->printStorePath(store()->followLinksToStorePath(path)).c_str(), 0);
         } catch (Error & e) {
             croak("%s", e.what());
         }
@@ -170,8 +169,8 @@ SV * followLinksToStorePath(char * path)
 void exportPaths(int fd, ...)
     PPCODE:
         try {
-            Paths paths;
-            for (int n = 1; n < items; ++n) paths.push_back(SvPV_nolen(ST(n)));
+            StorePathSet paths;
+            for (int n = 1; n < items; ++n) paths.insert(store()->parseStorePath(SvPV_nolen(ST(n))));
             FdSink sink(fd);
             store()->exportPaths(paths, sink);
         } catch (Error & e) {
@@ -275,8 +274,8 @@ int checkSignature(SV * publicKey_, SV * sig_, char * msg)
 SV * addToStore(char * srcPath, int recursive, char * algo)
     PPCODE:
         try {
-            Path path = store()->addToStore(baseNameOf(srcPath), srcPath, recursive, parseHashType(algo));
-            XPUSHs(sv_2mortal(newSVpv(path.c_str(), 0)));
+            auto path = store()->addToStore(std::string(baseNameOf(srcPath)), srcPath, recursive, parseHashType(algo));
+            XPUSHs(sv_2mortal(newSVpv(store()->printStorePath(path).c_str(), 0)));
         } catch (Error & e) {
             croak("%s", e.what());
         }
@@ -286,8 +285,8 @@ SV * makeFixedOutputPath(int recursive, char * algo, char * hash, char * name)
     PPCODE:
         try {
             Hash h(hash, parseHashType(algo));
-            Path path = store()->makeFixedOutputPath(recursive, h, name);
-            XPUSHs(sv_2mortal(newSVpv(path.c_str(), 0)));
+            auto path = store()->makeFixedOutputPath(recursive, h, name);
+            XPUSHs(sv_2mortal(newSVpv(store()->printStorePath(path).c_str(), 0)));
         } catch (Error & e) {
             croak("%s", e.what());
         }
@@ -298,35 +297,35 @@ SV * derivationFromPath(char * drvPath)
         HV *hash;
     CODE:
         try {
-            Derivation drv = store()->derivationFromPath(drvPath);
+            Derivation drv = store()->derivationFromPath(store()->parseStorePath(drvPath));
             hash = newHV();
 
             HV * outputs = newHV();
-            for (DerivationOutputs::iterator i = drv.outputs.begin(); i != drv.outputs.end(); ++i)
-                hv_store(outputs, i->first.c_str(), i->first.size(), newSVpv(i->second.path.c_str(), 0), 0);
+            for (auto & i : drv.outputs)
+                hv_store(outputs, i.first.c_str(), i.first.size(), newSVpv(store()->printStorePath(i.second.path).c_str(), 0), 0);
             hv_stores(hash, "outputs", newRV((SV *) outputs));
 
             AV * inputDrvs = newAV();
-            for (DerivationInputs::iterator i = drv.inputDrvs.begin(); i != drv.inputDrvs.end(); ++i)
-                av_push(inputDrvs, newSVpv(i->first.c_str(), 0)); // !!! ignores i->second
+            for (auto & i : drv.inputDrvs)
+                av_push(inputDrvs, newSVpv(store()->printStorePath(i.first).c_str(), 0)); // !!! ignores i->second
             hv_stores(hash, "inputDrvs", newRV((SV *) inputDrvs));
 
             AV * inputSrcs = newAV();
-            for (PathSet::iterator i = drv.inputSrcs.begin(); i != drv.inputSrcs.end(); ++i)
-                av_push(inputSrcs, newSVpv(i->c_str(), 0));
+            for (auto & i : drv.inputSrcs)
+                av_push(inputSrcs, newSVpv(store()->printStorePath(i).c_str(), 0));
             hv_stores(hash, "inputSrcs", newRV((SV *) inputSrcs));
 
             hv_stores(hash, "platform", newSVpv(drv.platform.c_str(), 0));
             hv_stores(hash, "builder", newSVpv(drv.builder.c_str(), 0));
 
             AV * args = newAV();
-            for (Strings::iterator i = drv.args.begin(); i != drv.args.end(); ++i)
-                av_push(args, newSVpv(i->c_str(), 0));
+            for (auto & i : drv.args)
+                av_push(args, newSVpv(i.c_str(), 0));
             hv_stores(hash, "args", newRV((SV *) args));
 
             HV * env = newHV();
-            for (StringPairs::iterator i = drv.env.begin(); i != drv.env.end(); ++i)
-                hv_store(env, i->first.c_str(), i->first.size(), newSVpv(i->second.c_str(), 0), 0);
+            for (auto & i : drv.env)
+                hv_store(env, i.first.c_str(), i.first.size(), newSVpv(i.second.c_str(), 0), 0);
             hv_stores(hash, "env", newRV((SV *) env));
 
             RETVAL = newRV_noinc((SV *)hash);
@@ -340,7 +339,7 @@ SV * derivationFromPath(char * drvPath)
 void addTempRoot(char * storePath)
     PPCODE:
         try {
-            store()->addTempRoot(storePath);
+            store()->addTempRoot(store()->parseStorePath(storePath));
         } catch (Error & e) {
             croak("%s", e.what());
         }

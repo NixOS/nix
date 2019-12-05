@@ -9,13 +9,13 @@
 namespace nix {
 
 
-void Store::computeFSClosure(const PathSet & startPaths,
-    PathSet & paths_, bool flipDirection, bool includeOutputs, bool includeDerivers)
+void Store::computeFSClosure(const StorePathSet & startPaths,
+    StorePathSet & paths_, bool flipDirection, bool includeOutputs, bool includeDerivers)
 {
     struct State
     {
         size_t pending;
-        PathSet & paths;
+        StorePathSet & paths;
         std::exception_ptr exc;
     };
 
@@ -29,45 +29,47 @@ void Store::computeFSClosure(const PathSet & startPaths,
         {
             auto state(state_.lock());
             if (state->exc) return;
-            if (!state->paths.insert(path).second) return;
+            if (!state->paths.insert(parseStorePath(path)).second) return;
             state->pending++;
         }
 
-        queryPathInfo(path, {[&, path](std::future<ref<const ValidPathInfo>> fut) {
+        queryPathInfo(parseStorePath(path), {[&, pathS(path)](std::future<ref<const ValidPathInfo>> fut) {
             // FIXME: calls to isValidPath() should be async
 
             try {
                 auto info = fut.get();
 
+                auto path = parseStorePath(pathS);
+
                 if (flipDirection) {
 
-                    PathSet referrers;
+                    StorePathSet referrers;
                     queryReferrers(path, referrers);
                     for (auto & ref : referrers)
                         if (ref != path)
-                            enqueue(ref);
+                            enqueue(printStorePath(ref));
 
                     if (includeOutputs)
                         for (auto & i : queryValidDerivers(path))
-                            enqueue(i);
+                            enqueue(printStorePath(i));
 
-                    if (includeDerivers && isDerivation(path))
+                    if (includeDerivers && path.isDerivation())
                         for (auto & i : queryDerivationOutputs(path))
                             if (isValidPath(i) && queryPathInfo(i)->deriver == path)
-                                enqueue(i);
+                                enqueue(printStorePath(i));
 
                 } else {
 
                     for (auto & ref : info->references)
                         if (ref != path)
-                            enqueue(ref);
+                            enqueue(printStorePath(ref));
 
-                    if (includeOutputs && isDerivation(path))
+                    if (includeOutputs && path.isDerivation())
                         for (auto & i : queryDerivationOutputs(path))
-                            if (isValidPath(i)) enqueue(i);
+                            if (isValidPath(i)) enqueue(printStorePath(i));
 
-                    if (includeDerivers && isValidPath(info->deriver))
-                        enqueue(info->deriver);
+                    if (includeDerivers && info->deriver && isValidPath(*info->deriver))
+                        enqueue(printStorePath(*info->deriver));
 
                 }
 
@@ -87,7 +89,7 @@ void Store::computeFSClosure(const PathSet & startPaths,
     };
 
     for (auto & startPath : startPaths)
-        enqueue(startPath);
+        enqueue(printStorePath(startPath));
 
     {
         auto state(state_.lock());
@@ -97,15 +99,17 @@ void Store::computeFSClosure(const PathSet & startPaths,
 }
 
 
-void Store::computeFSClosure(const Path & startPath,
-    PathSet & paths_, bool flipDirection, bool includeOutputs, bool includeDerivers)
+void Store::computeFSClosure(const StorePath & startPath,
+    StorePathSet & paths_, bool flipDirection, bool includeOutputs, bool includeDerivers)
 {
-    computeFSClosure(PathSet{startPath}, paths_, flipDirection, includeOutputs, includeDerivers);
+    StorePathSet paths;
+    paths.insert(startPath.clone());
+    computeFSClosure(paths, paths_, flipDirection, includeOutputs, includeDerivers);
 }
 
 
-void Store::queryMissing(const PathSet & targets,
-    PathSet & willBuild_, PathSet & willSubstitute_, PathSet & unknown_,
+void Store::queryMissing(const std::vector<StorePathWithOutputs> & targets,
+    StorePathSet & willBuild_, StorePathSet & willSubstitute_, StorePathSet & unknown_,
     unsigned long long & downloadSize_, unsigned long long & narSize_)
 {
     Activity act(*logger, lvlDebug, actUnknown, "querying info about missing paths");
@@ -116,8 +120,8 @@ void Store::queryMissing(const PathSet & targets,
 
     struct State
     {
-        PathSet done;
-        PathSet & unknown, & willSubstitute, & willBuild;
+        std::unordered_set<std::string> done;
+        StorePathSet & unknown, & willSubstitute, & willBuild;
         unsigned long long & downloadSize;
         unsigned long long & narSize;
     };
@@ -126,31 +130,36 @@ void Store::queryMissing(const PathSet & targets,
     {
         size_t left;
         bool done = false;
-        PathSet outPaths;
+        StorePathSet outPaths;
         DrvState(size_t left) : left(left) { }
     };
 
-    Sync<State> state_(State{PathSet(), unknown_, willSubstitute_, willBuild_, downloadSize_, narSize_});
+    Sync<State> state_(State{{}, unknown_, willSubstitute_, willBuild_, downloadSize_, narSize_});
 
-    std::function<void(Path)> doPath;
+    std::function<void(StorePathWithOutputs)> doPath;
 
-    auto mustBuildDrv = [&](const Path & drvPath, const Derivation & drv) {
+    auto mustBuildDrv = [&](const StorePath & drvPath, const Derivation & drv) {
         {
             auto state(state_.lock());
-            state->willBuild.insert(drvPath);
+            state->willBuild.insert(drvPath.clone());
         }
 
         for (auto & i : drv.inputDrvs)
-            pool.enqueue(std::bind(doPath, makeDrvPathWithOutputs(i.first, i.second)));
+            pool.enqueue(std::bind(doPath, StorePathWithOutputs(i.first, i.second)));
     };
 
     auto checkOutput = [&](
-        const Path & drvPath, ref<Derivation> drv, const Path & outPath, ref<Sync<DrvState>> drvState_)
+        const Path & drvPathS, ref<Derivation> drv, const Path & outPathS, ref<Sync<DrvState>> drvState_)
     {
         if (drvState_->lock()->done) return;
 
+        auto drvPath = parseStorePath(drvPathS);
+        auto outPath = parseStorePath(outPathS);
+
         SubstitutablePathInfos infos;
-        querySubstitutablePathInfos({outPath}, infos);
+        StorePathSet paths; // FIXME
+        paths.insert(outPath.clone());
+        querySubstitutablePathInfos(paths, infos);
 
         if (infos.empty()) {
             drvState_->lock()->done = true;
@@ -161,74 +170,74 @@ void Store::queryMissing(const PathSet & targets,
                 if (drvState->done) return;
                 assert(drvState->left);
                 drvState->left--;
-                drvState->outPaths.insert(outPath);
+                drvState->outPaths.insert(outPath.clone());
                 if (!drvState->left) {
                     for (auto & path : drvState->outPaths)
-                        pool.enqueue(std::bind(doPath, path));
+                        pool.enqueue(std::bind(doPath, StorePathWithOutputs(path.clone())));
                 }
             }
         }
     };
 
-    doPath = [&](const Path & path) {
+    doPath = [&](const StorePathWithOutputs & path) {
 
         {
             auto state(state_.lock());
-            if (!state->done.insert(path).second) return;
+            if (!state->done.insert(path.to_string(*this)).second) return;
         }
 
-        DrvPathWithOutputs i2 = parseDrvPathWithOutputs(path);
-
-        if (isDerivation(i2.first)) {
-            if (!isValidPath(i2.first)) {
+        if (path.path.isDerivation()) {
+            if (!isValidPath(path.path)) {
                 // FIXME: we could try to substitute the derivation.
                 auto state(state_.lock());
-                state->unknown.insert(path);
+                state->unknown.insert(path.path.clone());
                 return;
             }
 
-            Derivation drv = derivationFromPath(i2.first);
-            ParsedDerivation parsedDrv(i2.first, drv);
+            auto drv = make_ref<Derivation>(derivationFromPath(path.path));
+            ParsedDerivation parsedDrv(path.path.clone(), *drv);
 
             PathSet invalid;
-            for (auto & j : drv.outputs)
-                if (wantOutput(j.first, i2.second)
+            for (auto & j : drv->outputs)
+                if (wantOutput(j.first, path.outputs)
                     && !isValidPath(j.second.path))
-                    invalid.insert(j.second.path);
+                    invalid.insert(printStorePath(j.second.path));
             if (invalid.empty()) return;
 
             if (settings.useSubstitutes && parsedDrv.substitutesAllowed()) {
                 auto drvState = make_ref<Sync<DrvState>>(DrvState(invalid.size()));
                 for (auto & output : invalid)
-                    pool.enqueue(std::bind(checkOutput, i2.first, make_ref<Derivation>(drv), output, drvState));
+                    pool.enqueue(std::bind(checkOutput, printStorePath(path.path), drv, output, drvState));
             } else
-                mustBuildDrv(i2.first, drv);
+                mustBuildDrv(path.path, *drv);
 
         } else {
 
-            if (isValidPath(path)) return;
+            if (isValidPath(path.path)) return;
 
             SubstitutablePathInfos infos;
-            querySubstitutablePathInfos({path}, infos);
+            StorePathSet paths; // FIXME
+            paths.insert(path.path.clone());
+            querySubstitutablePathInfos(paths, infos);
 
             if (infos.empty()) {
                 auto state(state_.lock());
-                state->unknown.insert(path);
+                state->unknown.insert(path.path.clone());
                 return;
             }
 
-            auto info = infos.find(path);
+            auto info = infos.find(path.path);
             assert(info != infos.end());
 
             {
                 auto state(state_.lock());
-                state->willSubstitute.insert(path);
+                state->willSubstitute.insert(path.path.clone());
                 state->downloadSize += info->second.downloadSize;
                 state->narSize += info->second.narSize;
             }
 
             for (auto & ref : info->second.references)
-                pool.enqueue(std::bind(doPath, ref));
+                pool.enqueue(std::bind(doPath, StorePathWithOutputs(ref)));
         }
     };
 
@@ -239,38 +248,41 @@ void Store::queryMissing(const PathSet & targets,
 }
 
 
-Paths Store::topoSortPaths(const PathSet & paths)
+StorePaths Store::topoSortPaths(const StorePathSet & paths)
 {
-    Paths sorted;
-    PathSet visited, parents;
+    StorePaths sorted;
+    StorePathSet visited, parents;
 
-    std::function<void(const Path & path, const Path * parent)> dfsVisit;
+    std::function<void(const StorePath & path, const StorePath * parent)> dfsVisit;
 
-    dfsVisit = [&](const Path & path, const Path * parent) {
-        if (parents.find(path) != parents.end())
-            throw BuildError(format("cycle detected in the references of '%1%' from '%2%'") % path % *parent);
+    dfsVisit = [&](const StorePath & path, const StorePath * parent) {
+        if (parents.count(path))
+            throw BuildError("cycle detected in the references of '%s' from '%s'",
+                printStorePath(path), printStorePath(*parent));
 
-        if (!visited.insert(path).second) return;
-        parents.insert(path);
+        if (!visited.insert(path.clone()).second) return;
+        parents.insert(path.clone());
 
-        PathSet references;
+        StorePathSet references;
         try {
-            references = queryPathInfo(path)->references;
+            references = cloneStorePathSet(queryPathInfo(path)->references);
         } catch (InvalidPath &) {
         }
 
         for (auto & i : references)
             /* Don't traverse into paths that don't exist.  That can
                happen due to substitutes for non-existent paths. */
-            if (i != path && paths.find(i) != paths.end())
+            if (i != path && paths.count(i))
                 dfsVisit(i, &path);
 
-        sorted.push_front(path);
+        sorted.push_back(path.clone());
         parents.erase(path);
     };
 
     for (auto & i : paths)
         dfsVisit(i, nullptr);
+
+    std::reverse(sorted.begin(), sorted.end());
 
     return sorted;
 }

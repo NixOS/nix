@@ -27,7 +27,7 @@ static void readChannels()
             continue;
         auto split = tokenizeString<std::vector<string>>(line, " ");
         auto url = std::regex_replace(split[0], std::regex("/*$"), "");
-        auto name = split.size() > 1 ? split[1] : baseNameOf(url);
+        auto name = split.size() > 1 ? split[1] : std::string(baseNameOf(url));
         channels[name] = url;
     }
 }
@@ -98,10 +98,9 @@ static void update(const StringSet & channelNames)
         // shows something useful).
         auto cname = name;
         std::smatch match;
-        auto urlBase = baseNameOf(url);
-        if (std::regex_search(urlBase, match, std::regex("(-\\d.*)$"))) {
+        auto urlBase = std::string(baseNameOf(url));
+        if (std::regex_search(urlBase, match, std::regex("(-\\d.*)$")))
             cname = cname + (string) match[1];
-        }
 
         std::string extraAttrs;
 

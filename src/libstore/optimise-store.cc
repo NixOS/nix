@@ -254,7 +254,7 @@ void LocalStore::optimiseStore(OptimiseStats & stats)
 {
     Activity act(*logger, actOptimiseStore);
 
-    PathSet paths = queryAllValidPaths();
+    auto paths = queryAllValidPaths();
     InodeHash inodeHash = loadInodeHash();
 
     act.progress(0, paths.size());
@@ -265,8 +265,8 @@ void LocalStore::optimiseStore(OptimiseStats & stats)
         addTempRoot(i);
         if (!isValidPath(i)) continue; /* path was GC'ed, probably */
         {
-            Activity act(*logger, lvlTalkative, actUnknown, fmt("optimising path '%s'", i));
-            optimisePath_(&act, stats, realStoreDir + "/" + baseNameOf(i), inodeHash);
+            Activity act(*logger, lvlTalkative, actUnknown, fmt("optimising path '%s'", printStorePath(i)));
+            optimisePath_(&act, stats, realStoreDir + "/" + std::string(i.to_string()), inodeHash);
         }
         done++;
         act.progress(done, paths.size());

@@ -413,7 +413,7 @@ Path NixRepl::getDerivationPath(Value & v) {
     if (!drvInfo)
         throw Error("expression does not evaluate to a derivation, so I can't build it");
     Path drvPath = drvInfo->queryDrvPath();
-    if (drvPath == "" || !state.store->isValidPath(drvPath))
+    if (drvPath == "" || !state.store->isValidPath(state.store->parseStorePath(drvPath)))
         throw Error("expression did not evaluate to a valid derivation");
     return drvPath;
 }
@@ -521,10 +521,10 @@ bool NixRepl::processLine(string line)
                but doing it in a child makes it easier to recover from
                problems / SIGINT. */
             if (runProgram(settings.nixBinDir + "/nix", Strings{"build", "--no-link", drvPath}) == 0) {
-                Derivation drv = readDerivation(drvPath);
+                auto drv = readDerivation(*state.store, drvPath);
                 std::cout << std::endl << "this derivation produced the following outputs:" << std::endl;
                 for (auto & i : drv.outputs)
-                    std::cout << format("  %1% -> %2%") % i.first % i.second.path << std::endl;
+                    std::cout << fmt("  %s -> %s\n", i.first, state.store->printStorePath(i.second.path));
             }
         } else if (command == ":i") {
             runProgram(settings.nixBinDir + "/nix-env", Strings{"-i", drvPath});

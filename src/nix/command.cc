@@ -48,28 +48,29 @@ StorePathsCommand::StorePathsCommand(bool recursive)
 
 void StorePathsCommand::run(ref<Store> store)
 {
-    Paths storePaths;
+    StorePaths storePaths;
 
     if (all) {
         if (installables.size())
             throw UsageError("'--all' does not expect arguments");
         for (auto & p : store->queryAllValidPaths())
-            storePaths.push_back(p);
+            storePaths.push_back(p.clone());
     }
 
     else {
         for (auto & p : toStorePaths(store, realiseMode, installables))
-            storePaths.push_back(p);
+            storePaths.push_back(p.clone());
 
         if (recursive) {
-            PathSet closure;
-            store->computeFSClosure(PathSet(storePaths.begin(), storePaths.end()),
-                closure, false, false);
-            storePaths = Paths(closure.begin(), closure.end());
+            StorePathSet closure;
+            store->computeFSClosure(storePathsToSet(storePaths), closure, false, false);
+            storePaths.clear();
+            for (auto & p : closure)
+                storePaths.push_back(p.clone());
         }
     }
 
-    run(store, storePaths);
+    run(store, std::move(storePaths));
 }
 
 void StorePathCommand::run(ref<Store> store)
