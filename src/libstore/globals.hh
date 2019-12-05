@@ -354,7 +354,7 @@ public:
     Setting<Paths> pluginFiles{this, {}, "plugin-files",
         "Plugins to dynamically load at nix initialization time."};
 
-    Setting<std::string> githubAccessToken{this, "", "github-acces-token",
+    Setting<std::string> githubAccessToken{this, "", "github-access-token",
         "GitHub access token to get access to GitHub data through the GitHub API for github:<..> flakes."};
 
     Setting<Strings> experimentalFeatures{this, {}, "experimental-features",
