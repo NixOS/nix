@@ -1,7 +1,6 @@
 use super::{PathInfo, Store, StorePath};
 use crate::Error;
 use hyper::client::Client;
-use futures::stream::Concat;
 
 pub struct BinaryCacheStore {
     base_uri: String,

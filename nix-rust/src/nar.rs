@@ -24,10 +24,10 @@ fn parse_file<R: Read>(input: &mut R) -> Result<(), Error> {
 
     match String::read(input)?.as_ref() {
         "regular" => {
-            let mut executable = false;
+            let mut _executable = false;
             let mut tag = String::read(input)?;
             if tag == "executable" {
-                executable = true;
+                _executable = true;
                 if String::read(input)? != "" {
                     return Err(Error::BadExecutableField);
                 }
@@ -36,7 +36,7 @@ fn parse_file<R: Read>(input: &mut R) -> Result<(), Error> {
             if tag != "contents" {
                 return Err(Error::MissingNarField);
             }
-            let contents = Vec::<u8>::read(input)?;
+            let _contents = Vec::<u8>::read(input)?;
             if String::read(input)? != ")" {
                 return Err(Error::MissingNarCloseTag);
             }
@@ -50,7 +50,7 @@ fn parse_file<R: Read>(input: &mut R) -> Result<(), Error> {
                     if String::read(input)? != "name" {
                         return Err(Error::MissingNarField);
                     }
-                    let name = String::read(input)?;
+                    let _name = String::read(input)?;
                     if String::read(input)? != "node" {
                         return Err(Error::MissingNarField);
                     }
@@ -68,7 +68,7 @@ fn parse_file<R: Read>(input: &mut R) -> Result<(), Error> {
             if String::read(input)? != "target" {
                 return Err(Error::MissingNarField);
             }
-            let target = String::read(input)?;
+            let _target = String::read(input)?;
             if String::read(input)? != ")" {
                 return Err(Error::MissingNarCloseTag);
             }
