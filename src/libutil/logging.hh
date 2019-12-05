@@ -161,7 +161,7 @@ template<typename... Args>
 inline void warn(const std::string & fs, const Args & ... args)
 {
     boost::format f(fs);
-    nop{boost::io::detail::feed(f, args)...};
+    formatHelper(f, args...);
     logger->warn(f.str());
 }
 

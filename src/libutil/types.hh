@@ -51,6 +51,16 @@ struct FormatOrString
    ... a_n’. However, ‘fmt(s)’ is equivalent to ‘s’ (so no %-expansion
    takes place). */
 
+inline void formatHelper(boost::format & f)
+{
+}
+
+template<typename T, typename... Args>
+inline void formatHelper(boost::format & f, const T & x, const Args & ... args)
+{
+    formatHelper(f % x, args...);
+}
+
 inline std::string fmt(const std::string & s)
 {
     return s;
@@ -71,7 +81,7 @@ inline std::string fmt(const std::string & fs, const Args & ... args)
 {
     boost::format f(fs);
     f.exceptions(boost::io::all_error_bits ^ boost::io::too_many_args_bit);
-    nop{boost::io::detail::feed(f, args)...};
+    formatHelper(f, args...);
     return f.str();
 }
 
