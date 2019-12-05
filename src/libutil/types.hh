@@ -67,7 +67,7 @@ inline std::string fmt(const FormatOrString & fs)
 }
 
 template<typename... Args>
-inline std::string fmt(const std::string & fs, Args... args)
+inline std::string fmt(const std::string & fs, const Args & ... args)
 {
     boost::format f(fs);
     f.exceptions(boost::io::all_error_bits ^ boost::io::too_many_args_bit);
