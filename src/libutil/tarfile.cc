@@ -4,11 +4,6 @@
 #include <archive_entry.h>
 #include "finally.hh"
 
-extern "C" {
-    rust::Result<std::tuple<>> *
-    unpack_tarfile(rust::Source source, rust::StringSlice dest_dir);
-}
-
 namespace nix {
 
 std::shared_ptr<struct archive> archive_read_ptr() {
