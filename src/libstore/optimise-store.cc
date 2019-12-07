@@ -63,6 +63,34 @@ LocalStore::InodeHash LocalStore::loadInodeHash()
 }
 
 
+void LocalStore::getHardLinkSavings(HardLinkStats & linkStats)
+{
+     AutoCloseDir dir(opendir(linksDir.c_str()));
+     if (!dir) throw SysError(format("opening directory '%1%'") % linksDir);
+
+    struct dirent * dirent;
+    while (errno = 0, dirent = readdir(dir.get())) {
+        checkInterrupt();
+        string name = dirent->d_name;
+        if (name == "." || name == "..") continue;
+        Path path = linksDir + "/" + name;
+
+        struct stat st;
+        if (lstat(path.c_str(), &st) == -1)
+            throw SysError(format("statting '%1%'") % path);
+
+        if (st.st_nlink != 1) {
+            linkStats.actualSize += st.st_size;
+            linkStats.unsharedSize += (st.st_nlink - 1) * st.st_size;
+        }
+    }
+
+    struct stat st;
+    if (stat(linksDir.c_str(), &st) == -1)
+        throw SysError(format("statting '%1%'") % linksDir);
+    linkStats.overhead = st.st_size;
+}
+
 Strings LocalStore::readDirectoryIgnoringInodes(const Path & path, const InodeHash & inodeHash)
 {
     Strings names;
@@ -281,13 +309,19 @@ static string showBytes(unsigned long long bytes)
 void LocalStore::optimiseStore()
 {
     OptimiseStats stats;
+    HardLinkStats linkStats;
 
     optimiseStore(stats);
+    getHardLinkSavings(linkStats);
 
     printInfo(
-        format("%1% freed by hard-linking %2% files")
+        format("This run freed %1% by hard-linking %2% files\n")
         % showBytes(stats.bytesFreed)
         % stats.filesLinked);
+    printInfo(
+        format("Current hard-linking saves %1%.")
+        % showBytes(linkStats.unsharedSize - linkStats.actualSize - linkStats.overhead));    
+
 }
 
 void LocalStore::optimisePath(const Path & path)
