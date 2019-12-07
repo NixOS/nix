@@ -4,7 +4,6 @@ namespace nix {
 
 void unpackTarfile(Source & source, const Path & destDir);
 
-void unpackTarfile(const Path & tarFile, const Path & destDir,
-    std::optional<std::string> baseName = {});
+void unpackTarfile(const Path & tarFile, const Path & destDir);
 
 }

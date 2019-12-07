@@ -49,6 +49,7 @@ rec {
     [ curl
       bzip2 xz brotli editline
       openssl pkgconfig sqlite boehmgc
+      libarchive
       boost
       nlohmann_json
       rustc cargo
