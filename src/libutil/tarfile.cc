@@ -61,11 +61,11 @@ static void copy_data(std::shared_ptr<struct archive> ar, std::shared_ptr<struct
   for (;;) {
       r = archive_read_data_block(ar.get(), &buff, &size, &offset);
       if (r == ARCHIVE_EOF) return;
-      if (r < ARCHIVE_OK) {
+      if (r != ARCHIVE_OK) {
           throw Error("archive is corrupt (%s)", archive_error_string(ar.get()));
       }
       r = archive_write_data_block(aw.get(), buff, size, offset);
-      if (r < ARCHIVE_OK) {
+      if (r != ARCHIVE_OK) {
           throw Error("could not write archive output (%s)", archive_error_string(aw.get()));
       }
   }
@@ -74,14 +74,10 @@ static void copy_data(std::shared_ptr<struct archive> ar, std::shared_ptr<struct
 static void extract_archive(std::shared_ptr<struct archive> a, const Path & destDir) {
     char * cwd = getcwd(0, 0);
     if (!cwd) throw SysError("getting current directory");
-    Finally freeCwd([&]() { free(cwd); });
+    Finally freeCwd([&]() { chdir(cwd); free(cwd); });
     int r = chdir(destDir.c_str());
     if (r != 0) throw SysError("setting directory to tar output path");
     struct archive_entry *entry;
-    r = archive_read_next_header(a.get(), &entry);
-    if (r != ARCHIVE_OK) {
-        throw Error("archive is corrupt (%s)", archive_error_string(a.get()));
-    }
     int flags = 0;
     auto ext = archive_write_ptr();
     flags |= ARCHIVE_EXTRACT_PERM;
@@ -100,13 +96,10 @@ static void extract_archive(std::shared_ptr<struct archive> a, const Path & dest
         if (r != ARCHIVE_OK) {
             throw Error("could not write archive output (%s)", archive_error_string(ext.get()));
         }
-        if (archive_entry_size(entry) > 0) {
-            copy_data(a, ext);
-        }
+        copy_data(a, ext);
         archive_write_finish_entry(ext.get());
     }
-    r = chdir(cwd);
-    if (r != 0) throw SysError("resetting directory after archive extraction");
+    //if (r != 0) throw SysError("resetting directory after archive extraction");
 }
 void unpackTarfile(Source & source, const Path & destDir)
 {
