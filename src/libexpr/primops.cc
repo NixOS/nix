@@ -59,15 +59,17 @@ void EvalState::realiseContext(const PathSet & context)
         if (!decoded.second.empty() && nix::isDerivation(ctx)) {
             drvs.insert(decoded.first + "!" + decoded.second);
 
+            auto drv = store->derivationFromPath(decoded.first);
+            DerivationOutputs::iterator i = drv.outputs.find(decoded.second);
+            if (i == drv.outputs.end())
+                throw Error("derivation '%s' does not have an output named '%s'", decoded.first, decoded.second);
+            Path output = i->second.path;
+            realisedPaths.insert(output);
+
             /* Add the output of this derivation to the allowed
                paths. */
-            if (allowedPaths) {
-                auto drv = store->derivationFromPath(decoded.first);
-                DerivationOutputs::iterator i = drv.outputs.find(decoded.second);
-                if (i == drv.outputs.end())
-                    throw Error("derivation '%s' does not have an output named '%s'", decoded.first, decoded.second);
-                allowedPaths->insert(i->second.path);
-            }
+            if (allowedPaths)
+                allowedPaths->insert(output);
         }
     }
 
