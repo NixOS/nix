@@ -15,6 +15,22 @@
 
 namespace nix {
 
+static const int COMPRESSION_LEVEL_DEFAULT = -1;
+
+static unsigned checkLevel(unsigned min, unsigned max, unsigned methodDefault, std::string method, int level) {
+    if (level == COMPRESSION_LEVEL_DEFAULT)
+        return methodDefault;
+    if (level < 0)
+        throw CompressionError("compression level must be a non-negative integer");
+
+    unsigned l = static_cast<unsigned>(level);
+    if (min <= l && l <= max)
+        return l;
+
+    throw CompressionError("requested compression level '%u' not valid for method '%s': must be [%u,%u] (default=%u)",
+            l, method, min, max, methodDefault);
+}
+
 // Don't feed brotli too much at once.
 struct ChunkedCompressionSink : CompressionSink
 {
@@ -37,10 +53,14 @@ struct ChunkedCompressionSink : CompressionSink
 struct NoneSink : CompressionSink
 {
     Sink & nextSink;
-    NoneSink(Sink & nextSink) : nextSink(nextSink) { }
+    NoneSink(Sink & nextSink, int level = COMPRESSION_LEVEL_DEFAULT) : nextSink(nextSink) {
+        if (level != COMPRESSION_LEVEL_DEFAULT)
+            printError("Warning: requested compression level '%d' not supported by compression method 'none'", level);
+    }
     void finish() override { flush(); }
     void write(const unsigned char * data, size_t len) override { nextSink(data, len); }
 };
+
 
 struct XzDecompressionSink : CompressionSink
 {
@@ -228,17 +248,18 @@ struct XzCompressionSink : CompressionSink
     lzma_stream strm = LZMA_STREAM_INIT;
     bool finished = false;
 
-    XzCompressionSink(Sink & nextSink, bool parallel) : nextSink(nextSink)
+    XzCompressionSink(Sink & nextSink, bool parallel, int _level = COMPRESSION_LEVEL_DEFAULT) : nextSink(nextSink)
     {
         lzma_ret ret;
         bool done = false;
+        auto level = checkLevel(0, 9, LZMA_PRESET_DEFAULT, "xz", _level);
 
         if (parallel) {
 #ifdef HAVE_LZMA_MT
             lzma_mt mt_options = {};
             mt_options.flags = 0;
             mt_options.timeout = 300; // Using the same setting as the xz cmd line
-            mt_options.preset = LZMA_PRESET_DEFAULT;
+            mt_options.preset = level;
             mt_options.filters = NULL;
             mt_options.check = LZMA_CHECK_CRC64;
             mt_options.threads = lzma_cputhreads();
@@ -255,7 +276,7 @@ struct XzCompressionSink : CompressionSink
         }
 
         if (!done)
-            ret = lzma_easy_encoder(&strm, 6, LZMA_CHECK_CRC64);
+            ret = lzma_easy_encoder(&strm, level, LZMA_CHECK_CRC64);
 
         if (ret != LZMA_OK)
             throw CompressionError("unable to initialise lzma encoder");
@@ -306,10 +327,11 @@ struct BzipCompressionSink : ChunkedCompressionSink
     bz_stream strm;
     bool finished = false;
 
-    BzipCompressionSink(Sink & nextSink) : nextSink(nextSink)
+    BzipCompressionSink(Sink & nextSink, int level = COMPRESSION_LEVEL_DEFAULT) : nextSink(nextSink)
     {
         memset(&strm, 0, sizeof(strm));
-        int ret = BZ2_bzCompressInit(&strm, 9, 0, 30);
+        auto l = checkLevel(1, 9, 9, "bzip2", level);
+        int ret = BZ2_bzCompressInit(&strm, l, 0, 30);
         if (ret != BZ_OK)
             throw CompressionError("unable to initialise bzip2 encoder");
 
@@ -360,11 +382,16 @@ struct BrotliCompressionSink : ChunkedCompressionSink
     BrotliEncoderState *state;
     bool finished = false;
 
-    BrotliCompressionSink(Sink & nextSink) : nextSink(nextSink)
+    BrotliCompressionSink(Sink & nextSink, int level = COMPRESSION_LEVEL_DEFAULT) : nextSink(nextSink)
     {
         state = BrotliEncoderCreateInstance(nullptr, nullptr, nullptr);
         if (!state)
             throw CompressionError("unable to initialise brotli encoder");
+
+        if (!BrotliEncoderSetParameter(state, BROTLI_PARAM_QUALITY,
+                checkLevel(BROTLI_MIN_QUALITY, BROTLI_MAX_QUALITY,
+                    BROTLI_DEFAULT_QUALITY, "brotli", level)))
+            throw CompressionError("failure setting requested compression level for brotli encoder");
     }
 
     ~BrotliCompressionSink()
@@ -406,24 +433,24 @@ struct BrotliCompressionSink : ChunkedCompressionSink
     }
 };
 
-ref<CompressionSink> makeCompressionSink(const std::string & method, Sink & nextSink, const bool parallel)
+ref<CompressionSink> makeCompressionSink(const std::string & method, Sink & nextSink, const bool parallel, int level)
 {
     if (method == "none")
-        return make_ref<NoneSink>(nextSink);
+        return make_ref<NoneSink>(nextSink, level);
     else if (method == "xz")
-        return make_ref<XzCompressionSink>(nextSink, parallel);
+        return make_ref<XzCompressionSink>(nextSink, parallel, level);
     else if (method == "bzip2")
-        return make_ref<BzipCompressionSink>(nextSink);
+        return make_ref<BzipCompressionSink>(nextSink, level);
     else if (method == "br")
-        return make_ref<BrotliCompressionSink>(nextSink);
+        return make_ref<BrotliCompressionSink>(nextSink, level);
     else
         throw UnknownCompressionMethod(format("unknown compression method '%s'") % method);
 }
 
-ref<std::string> compress(const std::string & method, const std::string & in, const bool parallel)
+ref<std::string> compress(const std::string & method, const std::string & in, const bool parallel, int level)
 {
     StringSink ssink;
-    auto sink = makeCompressionSink(method, ssink, parallel);
+    auto sink = makeCompressionSink(method, ssink, parallel, level);
     (*sink)(in);
     sink->finish();
     return ssink.s;
