@@ -20,7 +20,7 @@ std::shared_ptr<struct archive> archive_read_ptr() {
 }
 static void ac(std::shared_ptr<struct archive> a, int r, const char* str = "archive is corrupt (%s)") {
     if (r == ARCHIVE_EOF) {
-        throw EndOfFile("tar ended");
+        throw EndOfFile("reached end of archive");
     }
     if (r != ARCHIVE_OK) {
         throw Error(str, archive_error_string(a.get()));
@@ -72,16 +72,25 @@ static void copy_data(std::shared_ptr<struct archive> ar, std::shared_ptr<struct
       ac(aw, archive_write_data_block(aw.get(), buff, size, offset), "could not write archive output (%s)");
   }
 }
+struct PushD {
+    char * oldDir;
+    PushD(std::string newDir)  {
+        oldDir = getcwd(0, 0);
+        if (!oldDir) throw SysError("getcwd");
+        int r = chdir(newDir.c_str());
+        if (r != 0) throw SysError("changing directory to tar output path");
+    }
+    ~PushD() {
+        int r = chdir(oldDir);
+        free(oldDir);
+        if (r != 0)
+            std::cerr << "warning: popd failed to chdir";
+        /* can't throw out of a destructor */
+    }
+};
 static void extract_archive(std::shared_ptr<struct archive> a, const Path & destDir) {
-    char * cwd = getcwd(0, 0);
-    if (!cwd) throw SysError("getting current directory");
-    Finally backCwd([&]() {
-                        int r = chdir(cwd);
-                        free(cwd);
-                        if (r != 0) throw SysError("resetting directory after archive extraction");
-                    });
-    int r = chdir(destDir.c_str());
-    if (r != 0) throw SysError("setting directory to tar output path");
+    // need to chdir back *after* archive closing
+    PushD newDir(destDir);
     struct archive_entry *entry;
     int flags = 0;
     auto ext = archive_write_ptr();
@@ -90,7 +99,7 @@ static void extract_archive(std::shared_ptr<struct archive> a, const Path & dest
     archive_write_disk_set_options(ext.get(), flags);
     archive_write_disk_set_standard_lookup(ext.get());
     for(;;) {
-        r = archive_read_next_header(a.get(), &entry);
+        int r = archive_read_next_header(a.get(), &entry);
         if (r == ARCHIVE_EOF) break;
         if (r == ARCHIVE_WARN) {
             std::cerr << "warning: " << archive_error_string(a.get());
@@ -101,22 +110,27 @@ static void extract_archive(std::shared_ptr<struct archive> a, const Path & dest
         copy_data(a, ext);
         archive_write_finish_entry(ext.get());
     }
+    // done in dtor, but this error can be 'failed to set permissions'
+    // so it's important
+    ac(ext, archive_write_close(ext.get()), "finishing archive extraction");
 }
 void unpackTarfile(Source & source, const Path & destDir)
 {
-    auto a = archive_read_ptr();
+    auto a = nix::archive_read_ptr();
     archive_read_support_filter_all(a.get());
     archive_read_support_format_all(a.get());
-    archive_read_open_source(a, source);
+    nix::archive_read_open_source(a, source);
+
     createDirs(destDir);
     extract_archive(a, destDir);
 }
 void unpackTarfile(const Path & tarFile, const Path & destDir)
 {
-    auto a = archive_read_ptr();
+    auto a = nix::archive_read_ptr();
     archive_read_support_filter_all(a.get());
     archive_read_support_format_all(a.get());
     ac(a, archive_read_open_filename(a.get(), tarFile.c_str(), 16384));
+
     createDirs(destDir);
     extract_archive(a, destDir);
 }
