@@ -424,7 +424,7 @@ let
       postInstall = "make installcheck";
       configureFlags = "--sysconfdir=/etc";
       debRequires =
-        [ "curl" "libsqlite3-0" "libbz2-1.0" "bzip2" "xz-utils" "libssl1.0.0" "liblzma5" "libseccomp2" ]
+        [ "curl" "libsqlite3-0" "libbz2-1.0" "bzip2" "xz-utils" "libarchive" "libssl1.0.0" "liblzma5" "libseccomp2" ]
         ++ extraDebPackages;
       debMaintainer = "Eelco Dolstra <eelco.dolstra@logicblox.com>";
       doInstallCheck = true;
