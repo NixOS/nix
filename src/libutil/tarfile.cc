@@ -1,15 +1,14 @@
-#include "rust-ffi.hh"
-#include "compression.hh"
 #include <archive.h>
 #include <archive_entry.h>
-#include "finally.hh"
+
+#include "serialise.hh"
 
 namespace nix {
 
 struct TarArchive {
     struct archive *archive;
     Source *source;
-    unsigned char buffer[4096];
+    std::vector<unsigned char> buffer;
 
     void check(int err, const char *reason = "Failed to extract archive (%s)") {
         if (err == ARCHIVE_EOF)
@@ -18,7 +17,7 @@ struct TarArchive {
             throw Error(reason, archive_error_string(this->archive));
     }
 
-    TarArchive(Source& source) {
+    TarArchive(Source& source) : buffer(4096) {
         this->archive = archive_read_new();
         this->source = &source;
 
@@ -35,6 +34,9 @@ struct TarArchive {
         check(archive_read_open_filename(archive, path.c_str(), 16384), "Failed to open archive (%s)");
     }
 
+    // disable copy constructor
+    TarArchive(const TarArchive&) = delete;
+
     void close() {
         check(archive_read_close(archive), "Failed to close archive (%s)");
     }
@@ -47,13 +49,13 @@ private:
     static int callback_open(struct archive *, void *self) {
         return ARCHIVE_OK;
     }
-    
+
     static ssize_t callback_read(struct archive *archive, void *_self, const void **buffer) {
-        TarArchive *self = (TarArchive *)_self; 
-        *buffer = self->buffer;
+        TarArchive *self = (TarArchive *)_self;
+        *buffer = self->buffer.data();
 
         try {
-            return self->source->read(self->buffer, 4096);
+            return self->source->read(self->buffer.data(), 4096);
         } catch (EndOfFile &) {
             return 0;
         } catch (std::exception &err) {
@@ -82,7 +84,7 @@ struct PushD {
         int r = chdir(oldDir);
         free(oldDir);
         if (r != 0)
-            std::cerr << "warning: popd failed to chdir";
+            std::cerr << "warning: failed to change directory back after tar extraction";
         /* can't throw out of a destructor */
     }
 };
@@ -91,7 +93,11 @@ static void extract_archive(TarArchive &archive, const Path & destDir) {
     // need to chdir back *after* archive closing
     PushD newDir(destDir);
     struct archive_entry *entry;
-    int flags = ARCHIVE_EXTRACT_FFLAGS | ARCHIVE_EXTRACT_PERM;
+    int flags = ARCHIVE_EXTRACT_FFLAGS
+        | ARCHIVE_EXTRACT_PERM
+        | ARCHIVE_EXTRACT_SECURE_SYMLINKS
+        | ARCHIVE_EXTRACT_SECURE_NODOTDOT
+        | ARCHIVE_EXTRACT_SECURE_NOABSOLUTEPATHS;
 
     for(;;) {
         int r = archive_read_next_header(archive.archive, &entry);
