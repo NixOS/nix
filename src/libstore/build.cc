@@ -499,12 +499,6 @@ void handleDiffHook(uid_t uid, uid_t gid, Path tryA, Path tryB, Path drvPath, Pa
 class UserLock
 {
 private:
-    /* POSIX locks suck.  If we have a lock on a file, and we open and
-       close that file again (without closing the original file
-       descriptor), we lose the lock.  So we have to be *very* careful
-       not to open a lock file on which we are holding a lock. */
-    static Sync<PathSet> lockedPaths_;
-
     Path fnUserLock;
     AutoCloseFD fdUserLock;
 
@@ -515,7 +509,6 @@ private:
 
 public:
     UserLock();
-    ~UserLock();
 
     void kill();
 
@@ -527,9 +520,6 @@ public:
     bool enabled() { return uid != 0; }
 
 };
-
-
-Sync<PathSet> UserLock::lockedPaths_;
 
 
 UserLock::UserLock()
@@ -568,61 +558,40 @@ UserLock::UserLock()
 
         fnUserLock = (format("%1%/userpool/%2%") % settings.nixStateDir % pw->pw_uid).str();
 
-        {
-            auto lockedPaths(lockedPaths_.lock());
-            if (!lockedPaths->insert(fnUserLock).second)
-                /* We already have a lock on this one. */
-                continue;
-        }
+        AutoCloseFD fd = open(fnUserLock.c_str(), O_RDWR | O_CREAT | O_CLOEXEC, 0600);
+        if (!fd)
+            throw SysError(format("opening user lock '%1%'") % fnUserLock);
 
-        try {
+        if (lockFile(fd.get(), ltWrite, false)) {
+            fdUserLock = std::move(fd);
+            user = i;
+            uid = pw->pw_uid;
 
-            AutoCloseFD fd = open(fnUserLock.c_str(), O_RDWR | O_CREAT | O_CLOEXEC, 0600);
-            if (!fd)
-                throw SysError(format("opening user lock '%1%'") % fnUserLock);
-
-            if (lockFile(fd.get(), ltWrite, false)) {
-                fdUserLock = std::move(fd);
-                user = i;
-                uid = pw->pw_uid;
-
-                /* Sanity check... */
-                if (uid == getuid() || uid == geteuid())
-                    throw Error(format("the Nix user should not be a member of '%1%'")
-                        % settings.buildUsersGroup);
+            /* Sanity check... */
+            if (uid == getuid() || uid == geteuid())
+                throw Error(format("the Nix user should not be a member of '%1%'")
+                    % settings.buildUsersGroup);
 
 #if __linux__
-                /* Get the list of supplementary groups of this build user.  This
-                   is usually either empty or contains a group such as "kvm".  */
-                supplementaryGIDs.resize(10);
-                int ngroups = supplementaryGIDs.size();
-                int err = getgrouplist(pw->pw_name, pw->pw_gid,
-                    supplementaryGIDs.data(), &ngroups);
-                if (err == -1)
-                    throw Error(format("failed to get list of supplementary groups for '%1%'") % pw->pw_name);
+            /* Get the list of supplementary groups of this build user.  This
+               is usually either empty or contains a group such as "kvm".  */
+            supplementaryGIDs.resize(10);
+            int ngroups = supplementaryGIDs.size();
+            int err = getgrouplist(pw->pw_name, pw->pw_gid,
+                supplementaryGIDs.data(), &ngroups);
+            if (err == -1)
+                throw Error(format("failed to get list of supplementary groups for '%1%'") % pw->pw_name);
 
-                supplementaryGIDs.resize(ngroups);
+            supplementaryGIDs.resize(ngroups);
 #endif
 
-                return;
-            }
-
-        } catch (...) {
-            lockedPaths_.lock()->erase(fnUserLock);
+            return;
         }
     }
 
     throw Error(format("all build users are currently in use; "
         "consider creating additional users and adding them to the '%1%' group")
         % settings.buildUsersGroup);
-}
-
-
-UserLock::~UserLock()
-{
-    auto lockedPaths(lockedPaths_.lock());
-    auto erased = lockedPaths->erase(fnUserLock);
-    assert(erased);
 }
 
 
