@@ -1,6 +1,5 @@
 mod error;
 mod foreign;
-mod tarfile;
 
 pub use error::Error;
 
@@ -23,10 +22,3 @@ impl<T> CBox<T> {
     }
 }
 
-#[no_mangle]
-pub extern "C" fn unpack_tarfile(
-    source: foreign::Source,
-    dest_dir: &str,
-) -> CBox<Result<(), error::CppException>> {
-    CBox::new(tarfile::unpack_tarfile(source, dest_dir).map_err(|err| err.into()))
-}
