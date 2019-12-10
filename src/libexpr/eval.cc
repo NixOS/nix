@@ -1096,10 +1096,9 @@ void EvalState::callPrimOp(Value & fun, Value & arg, Value & v, const Pos & pos)
 
 void EvalState::callFunction(Value & fun, Value & arg, Value & v, const Pos & pos)
 {
-    std::optional<FunctionCallTrace> trace;
-    if (evalSettings.traceFunctionCalls) {
-        trace.emplace(pos);
-    }
+    std::unique_ptr<FunctionCallTrace> trace;
+    if (evalSettings.traceFunctionCalls)
+        trace = std::make_unique<FunctionCallTrace>(pos);
 
     forceValue(fun, pos);
 
