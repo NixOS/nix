@@ -70,7 +70,9 @@ impl StorePathHash {
 
 impl fmt::Display for StorePathHash {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str(&base32::encode(&self.0))
+        let mut buf = vec![0; STORE_PATH_HASH_CHARS];
+        base32::encode_into(&self.0, &mut buf);
+        f.write_str(std::str::from_utf8(&buf).unwrap())
     }
 }
 

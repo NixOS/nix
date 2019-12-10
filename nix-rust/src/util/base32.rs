@@ -25,27 +25,36 @@ lazy_static! {
 }
 
 pub fn encode(input: &[u8]) -> String {
-    let mut res = String::new();
-    res.reserve(encoded_len(input.len()));
+    let mut buf = vec![0; encoded_len(input.len())];
+    encode_into(input, &mut buf);
+    std::str::from_utf8(&buf).unwrap().to_string()
+}
+
+pub fn encode_into(input: &[u8], output: &mut [u8]) {
+    let len = encoded_len(input.len());
+    assert_eq!(len, output.len());
 
     let mut nr_bits_left: usize = 0;
     let mut bits_left: u16 = 0;
+    let mut pos = len;
 
     for b in input {
         bits_left |= (*b as u16) << nr_bits_left;
         nr_bits_left += 8;
         while nr_bits_left > 5 {
-            res.push(BASE32_CHARS[(bits_left & 0x1f) as usize] as char);
+            output[pos - 1] = BASE32_CHARS[(bits_left & 0x1f) as usize];
+            pos -= 1;
             bits_left >>= 5;
             nr_bits_left -= 5;
         }
     }
 
     if nr_bits_left > 0 {
-        res.push(BASE32_CHARS[(bits_left & 0x1f) as usize] as char);
+        output[pos - 1] = BASE32_CHARS[(bits_left & 0x1f) as usize];
+        pos -= 1;
     }
 
-    res.chars().rev().collect()
+    assert_eq!(pos, 0);
 }
 
 pub fn decode(input: &str) -> Result<Vec<u8>, crate::Error> {

@@ -1,6 +1,7 @@
 use super::{
     error,
     foreign::{self, CBox},
+    store::path,
     store::StorePath,
     util,
 };
@@ -53,8 +54,12 @@ pub unsafe extern "C" fn ffi_StorePath_drop(self_: *mut StorePath) {
 }
 
 #[no_mangle]
-pub extern "C" fn ffi_StorePath_to_string(self_: &StorePath) -> String {
-    format!("{}", self_)
+pub extern "C" fn ffi_StorePath_to_string(self_: &StorePath) -> Vec<u8> {
+    let mut buf = vec![0; path::STORE_PATH_HASH_CHARS + 1 + self_.name.name().len()];
+    util::base32::encode_into(self_.hash.hash(), &mut buf[0..path::STORE_PATH_HASH_CHARS]);
+    buf[path::STORE_PATH_HASH_CHARS] = b'-';
+    buf[path::STORE_PATH_HASH_CHARS + 1..].clone_from_slice(self_.name.name().as_bytes());
+    buf
 }
 
 #[no_mangle]
