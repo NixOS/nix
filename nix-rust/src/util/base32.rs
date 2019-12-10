@@ -1,5 +1,4 @@
 use crate::error::Error;
-use std::collections::HashMap;
 
 pub fn encoded_len(input_len: usize) -> usize {
     if input_len == 0 {
@@ -9,14 +8,20 @@ pub fn encoded_len(input_len: usize) -> usize {
     }
 }
 
+pub fn decoded_len(input_len: usize) -> usize {
+    input_len * 5 / 8
+}
+
 static BASE32_CHARS: &'static [u8; 32] = &b"0123456789abcdfghijklmnpqrsvwxyz";
 
 lazy_static! {
-    static ref BASE32_CHARS_REVERSE: HashMap<char, u8> = BASE32_CHARS
-        .iter()
-        .enumerate()
-        .map(|(n, c)| (*c as char, n as u8))
-        .collect();
+    static ref BASE32_CHARS_REVERSE: Box<[u8; 256]> = {
+        let mut xs = [0xffu8; 256];
+        for (n, c) in BASE32_CHARS.iter().enumerate() {
+            xs[*c as usize] = n as u8;
+        }
+        Box::new(xs)
+    };
 }
 
 pub fn encode(input: &[u8]) -> String {
@@ -44,14 +49,17 @@ pub fn encode(input: &[u8]) -> String {
 }
 
 pub fn decode(input: &str) -> Result<Vec<u8>, crate::Error> {
-    let mut res = Vec::new();
+    let mut res = Vec::with_capacity(decoded_len(input.len()));
 
     let mut nr_bits_left: usize = 0;
     let mut bits_left: u16 = 0;
 
     for c in input.chars().rev() {
-        let x = BASE32_CHARS_REVERSE.get(&c).ok_or(Error::BadBase32)?;
-        bits_left |= (*x as u16) << nr_bits_left;
+        let b = BASE32_CHARS_REVERSE[c as usize];
+        if b == 0xff {
+            return Err(Error::BadBase32);
+        }
+        bits_left |= (b as u16) << nr_bits_left;
         nr_bits_left += 5;
         if nr_bits_left >= 8 {
             res.push((bits_left & 0xff) as u8);
