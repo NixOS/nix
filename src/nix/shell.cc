@@ -88,7 +88,7 @@ BuildEnvironment readEnvironment(const Path & path)
    modified derivation with the same dependencies and nearly the same
    initial environment variables, that just writes the resulting
    environment to a file and exits. */
-Path getDerivationEnvironment(ref<Store> store, Derivation drv)
+StorePath getDerivationEnvironment(ref<Store> store, Derivation drv)
 {
     auto builder = baseNameOf(drv.builder);
     if (builder != "bash")
@@ -120,12 +120,11 @@ Path getDerivationEnvironment(ref<Store> store, Derivation drv)
         drv.env.erase(output.first);
     drv.env["out"] = "";
     drv.env["outputs"] = "out";
-    drv.outputs["out"] = DerivationOutput("", "", "");
-    Hash h = hashDerivationModulo(*store, drv);
-    Path shellOutPath = store->makeOutputPath("out", h, drvName);
-    drv.outputs["out"].path = shellOutPath;
-    drv.env["out"] = shellOutPath;
-    Path shellDrvPath2 = writeDerivation(store, drv, drvName);
+    Hash h = hashDerivationModulo(*store, drv, true);
+    auto shellOutPath = store->makeOutputPath("out", h, drvName);
+    drv.outputs.insert_or_assign("out", DerivationOutput(shellOutPath.clone(), "", ""));
+    drv.env["out"] = store->printStorePath(shellOutPath);
+    auto shellDrvPath2 = writeDerivation(store, drv, drvName);
 
     /* Build the derivation. */
     store->buildPaths({shellDrvPath2});
@@ -203,11 +202,11 @@ struct Common : InstallableCommand, MixProfile
         return {"devShell." + settings.thisSystem.get(), "defaultPackage." + settings.thisSystem.get()};
     }
 
-    Path getShellOutPath(ref<Store> store)
+    StorePath getShellOutPath(ref<Store> store)
     {
         auto path = installable->getStorePath();
-        if (path && hasSuffix(*path, "-env"))
-            return *path;
+        if (path && hasSuffix(path->to_string(), "-env"))
+            return path->clone();
         else {
             auto drvs = toDerivations(store, {installable});
 
@@ -227,7 +226,7 @@ struct Common : InstallableCommand, MixProfile
 
         updateProfile(shellOutPath);
 
-        return readEnvironment(shellOutPath);
+        return readEnvironment(store->printStorePath(shellOutPath));
     }
 };
 
@@ -279,7 +278,7 @@ struct CmdDevShell : Common, MixEnvironment
 
         setEnviron();
 
-        auto args = Strings{baseNameOf(shell), "--rcfile", rcFilePath};
+        auto args = Strings{std::string(baseNameOf(shell)), "--rcfile", rcFilePath};
 
         restoreAffinity();
         restoreSignals();

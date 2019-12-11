@@ -35,50 +35,50 @@ public:
 
     /* Implementations of abstract store API methods. */
 
-    bool isValidPathUncached(const Path & path) override;
+    bool isValidPathUncached(const StorePath & path) override;
 
-    PathSet queryValidPaths(const PathSet & paths,
+    StorePathSet queryValidPaths(const StorePathSet & paths,
         SubstituteFlag maybeSubstitute = NoSubstitute) override;
 
-    PathSet queryAllValidPaths() override;
+    StorePathSet queryAllValidPaths() override;
 
-    void queryPathInfoUncached(const Path & path,
+    void queryPathInfoUncached(const StorePath & path,
         Callback<std::shared_ptr<const ValidPathInfo>> callback) noexcept override;
 
-    void queryReferrers(const Path & path, PathSet & referrers) override;
+    void queryReferrers(const StorePath & path, StorePathSet & referrers) override;
 
-    PathSet queryValidDerivers(const Path & path) override;
+    StorePathSet queryValidDerivers(const StorePath & path) override;
 
-    PathSet queryDerivationOutputs(const Path & path) override;
+    StorePathSet queryDerivationOutputs(const StorePath & path) override;
 
-    StringSet queryDerivationOutputNames(const Path & path) override;
+    StringSet queryDerivationOutputNames(const StorePath & path) override;
 
-    Path queryPathFromHashPart(const string & hashPart) override;
+    std::optional<StorePath> queryPathFromHashPart(const std::string & hashPart) override;
 
-    PathSet querySubstitutablePaths(const PathSet & paths) override;
+    StorePathSet querySubstitutablePaths(const StorePathSet & paths) override;
 
-    void querySubstitutablePathInfos(const PathSet & paths,
+    void querySubstitutablePathInfos(const StorePathSet & paths,
         SubstitutablePathInfos & infos) override;
 
     void addToStore(const ValidPathInfo & info, Source & nar,
         RepairFlag repair, CheckSigsFlag checkSigs,
         std::shared_ptr<FSAccessor> accessor) override;
 
-    Path addToStore(const string & name, const Path & srcPath,
+    StorePath addToStore(const string & name, const Path & srcPath,
         bool recursive = true, HashType hashAlgo = htSHA256,
         PathFilter & filter = defaultPathFilter, RepairFlag repair = NoRepair) override;
 
-    Path addTextToStore(const string & name, const string & s,
-        const PathSet & references, RepairFlag repair) override;
+    StorePath addTextToStore(const string & name, const string & s,
+        const StorePathSet & references, RepairFlag repair) override;
 
-    void buildPaths(const PathSet & paths, BuildMode buildMode) override;
+    void buildPaths(const std::vector<StorePathWithOutputs> & paths, BuildMode buildMode) override;
 
-    BuildResult buildDerivation(const Path & drvPath, const BasicDerivation & drv,
+    BuildResult buildDerivation(const StorePath & drvPath, const BasicDerivation & drv,
         BuildMode buildMode) override;
 
-    void ensurePath(const Path & path) override;
+    void ensurePath(const StorePath & path) override;
 
-    void addTempRoot(const Path & path) override;
+    void addTempRoot(const StorePath & path) override;
 
     void addIndirectRoot(const Path & path) override;
 
@@ -92,10 +92,10 @@ public:
 
     bool verifyStore(bool checkContents, RepairFlag repair) override;
 
-    void addSignatures(const Path & storePath, const StringSet & sigs) override;
+    void addSignatures(const StorePath & storePath, const StringSet & sigs) override;
 
-    void queryMissing(const PathSet & targets,
-        PathSet & willBuild, PathSet & willSubstitute, PathSet & unknown,
+    void queryMissing(const std::vector<StorePathWithOutputs> & targets,
+        StorePathSet & willBuild, StorePathSet & willSubstitute, StorePathSet & unknown,
         unsigned long long & downloadSize, unsigned long long & narSize) override;
 
     void connect() override;

@@ -3,6 +3,7 @@
 #include "installables.hh"
 #include "args.hh"
 #include "common-eval-args.hh"
+#include "path.hh"
 
 #include <optional>
 
@@ -34,8 +35,6 @@ private:
 struct EvalCommand : virtual StoreCommand, MixEvalArgs
 {
     ref<EvalState> getEvalState();
-
-private:
 
     std::shared_ptr<EvalState> evalState;
 };
@@ -128,7 +127,7 @@ public:
 
     using StoreCommand::run;
 
-    virtual void run(ref<Store> store, Paths storePaths) = 0;
+    virtual void run(ref<Store> store, std::vector<StorePath> storePaths) = 0;
 
     void run(ref<Store> store) override;
 
@@ -140,7 +139,7 @@ struct StorePathCommand : public InstallablesCommand
 {
     using StoreCommand::run;
 
-    virtual void run(ref<Store> store, const Path & storePath) = 0;
+    virtual void run(ref<Store> store, const StorePath & storePath) = 0;
 
     void run(ref<Store> store) override;
 };
@@ -167,13 +166,13 @@ static RegisterCommand registerCommand(const std::string & name)
 Buildables build(ref<Store> store, RealiseMode mode,
     std::vector<std::shared_ptr<Installable>> installables);
 
-PathSet toStorePaths(ref<Store> store, RealiseMode mode,
+std::set<StorePath> toStorePaths(ref<Store> store, RealiseMode mode,
     std::vector<std::shared_ptr<Installable>> installables);
 
-Path toStorePath(ref<Store> store, RealiseMode mode,
+StorePath toStorePath(ref<Store> store, RealiseMode mode,
     std::shared_ptr<Installable> installable);
 
-PathSet toDerivations(ref<Store> store,
+std::set<StorePath> toDerivations(ref<Store> store,
     std::vector<std::shared_ptr<Installable>> installables,
     bool useDeriver = false);
 
@@ -188,7 +187,7 @@ struct MixProfile : virtual Args, virtual StoreCommand
     MixProfile();
 
     /* If 'profile' is set, make it point at 'storePath'. */
-    void updateProfile(const Path & storePath);
+    void updateProfile(const StorePath & storePath);
 
     /* If 'profile' is set, make it point at the store path produced
        by 'buildables'. */

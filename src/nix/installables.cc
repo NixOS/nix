@@ -118,20 +118,30 @@ App Installable::toApp(EvalState & state)
 
 struct InstallableStorePath : Installable
 {
-    Path storePath;
+    ref<Store> store;
+    StorePath storePath;
 
-    InstallableStorePath(const Path & storePath) : storePath(storePath) { }
+    InstallableStorePath(ref<Store> store, const Path & storePath)
+        : store(store), storePath(store->parseStorePath(storePath)) { }
 
-    std::string what() override { return storePath; }
+    std::string what() override { return store->printStorePath(storePath); }
 
     Buildables toBuildables() override
     {
-        return {{isDerivation(storePath) ? storePath : "", {{"out", storePath}}}};
+        std::map<std::string, StorePath> outputs;
+        outputs.insert_or_assign("out", storePath.clone());
+        Buildable b{
+            .drvPath = storePath.isDerivation() ? storePath.clone() : std::optional<StorePath>(),
+            .outputs = std::move(outputs)
+        };
+        Buildables bs;
+        bs.push_back(std::move(b));
+        return bs;
     }
 
-    std::optional<Path> getStorePath() override
+    std::optional<StorePath> getStorePath() override
     {
-        return storePath;
+        return storePath.clone();
     }
 };
 
@@ -149,8 +159,8 @@ std::vector<flake::EvalCache::Derivation> InstallableValue::toDerivations()
     std::vector<flake::EvalCache::Derivation> res;
     for (auto & drvInfo : drvInfos) {
         res.push_back({
-            drvInfo.queryDrvPath(),
-            drvInfo.queryOutPath(),
+            state->store->parseStorePath(drvInfo.queryDrvPath()),
+            state->store->parseStorePath(drvInfo.queryOutPath()),
             drvInfo.queryOutputName()
         });
     }
@@ -160,19 +170,21 @@ std::vector<flake::EvalCache::Derivation> InstallableValue::toDerivations()
 
 Buildables InstallableValue::toBuildables()
 {
+    auto state = cmd.getEvalState();
+
     Buildables res;
 
-    PathSet drvPaths;
+    StorePathSet drvPaths;
 
     for (auto & drv : toDerivations()) {
-        Buildable b{drv.drvPath};
-        drvPaths.insert(b.drvPath);
+        Buildable b{.drvPath = drv.drvPath.clone()};
+        drvPaths.insert(drv.drvPath.clone());
 
         auto outputName = drv.outputName;
         if (outputName == "")
-            throw Error("derivation '%s' lacks an 'outputName' attribute", b.drvPath);
+            throw Error("derivation '%s' lacks an 'outputName' attribute", state->store->printStorePath(*b.drvPath));
 
-        b.outputs.emplace(outputName, drv.outPath);
+        b.outputs.emplace(outputName, drv.outPath.clone());
 
         res.push_back(std::move(b));
     }
@@ -180,10 +192,13 @@ Buildables InstallableValue::toBuildables()
     // Hack to recognize .all: if all drvs have the same drvPath,
     // merge the buildables.
     if (drvPaths.size() == 1) {
-        Buildable b{*drvPaths.begin()};
+        Buildable b{.drvPath = drvPaths.begin()->clone()};
         for (auto & b2 : res)
-            b.outputs.insert(b2.outputs.begin(), b2.outputs.end());
-        return {b};
+            for (auto & output : b2.outputs)
+                b.outputs.insert_or_assign(output.first, output.second.clone());
+        Buildables bs;
+        bs.push_back(std::move(b));
+        return bs;
     } else
         return res;
 }
@@ -231,10 +246,10 @@ void makeFlakeClosureGCRoot(Store & store,
     if (std::get_if<FlakeRef::IsPath>(&origFlakeRef.data)) return;
 
     /* Get the store paths of all non-local flakes. */
-    PathSet closure;
+    StorePathSet closure;
 
-    assert(store.isValidPath(resFlake.flake.sourceInfo.storePath));
-    closure.insert(resFlake.flake.sourceInfo.storePath);
+    assert(store.isValidPath(store.parseStorePath(resFlake.flake.sourceInfo.storePath)));
+    closure.insert(store.parseStorePath(resFlake.flake.sourceInfo.storePath));
 
     std::queue<std::reference_wrapper<const flake::LockedInputs>> queue;
     queue.push(resFlake.lockFile);
@@ -246,8 +261,8 @@ void makeFlakeClosureGCRoot(Store & store,
            yet. */
         for (auto & dep : flake.inputs) {
             auto path = dep.second.computeStorePath(store);
-            if (store.isValidPath(path))
-                closure.insert(path);
+            if (store.isValidPath(store.parseStorePath(path)))
+                closure.insert(store.parseStorePath(path));
             queue.push(dep.second);
         }
     }
@@ -255,7 +270,8 @@ void makeFlakeClosureGCRoot(Store & store,
     if (closure.empty()) return;
 
     /* Write the closure to a file in the store. */
-    auto closurePath = store.addTextToStore("flake-closure", concatStringsSep(" ", closure), closure);
+    auto closurePath = store.addTextToStore("flake-closure",
+        concatStringsSep(" ", store.printStorePathSet(closure)), closure);
 
     Path cacheDir = getCacheDir() + "/nix/flake-closures";
     createDirs(cacheDir);
@@ -267,7 +283,7 @@ void makeFlakeClosureGCRoot(Store & store,
     s = replaceStrings(s, ":", "%3a");
     Path symlink = cacheDir + "/" + s;
     debug("writing GC root '%s' for flake closure of '%s'", symlink, origFlakeRef);
-    replaceSymlink(closurePath, symlink);
+    replaceSymlink(store.printStorePath(closurePath), symlink);
     store.addIndirectRoot(symlink);
 }
 
@@ -318,7 +334,7 @@ std::tuple<std::string, FlakeRef, flake::EvalCache::Derivation> InstallableFlake
         auto drv = evalCache.getDerivation(fingerprint, attrPath);
         if (drv) {
             if (state->store->isValidPath(drv->drvPath))
-                return {attrPath, resFlake.flake.sourceInfo.resolvedRef, *drv};
+                return {attrPath, resFlake.flake.sourceInfo.resolvedRef, std::move(*drv)};
         }
 
         if (!vOutputs)
@@ -333,14 +349,14 @@ std::tuple<std::string, FlakeRef, flake::EvalCache::Derivation> InstallableFlake
                 throw Error("flake output attribute '%s' is not a derivation", attrPath);
 
             auto drv = flake::EvalCache::Derivation{
-                drvInfo->queryDrvPath(),
-                drvInfo->queryOutPath(),
+                state->store->parseStorePath(drvInfo->queryDrvPath()),
+                state->store->parseStorePath(drvInfo->queryOutPath()),
                 drvInfo->queryOutputName()
             };
 
             evalCache.addDerivation(fingerprint, attrPath, drv);
 
-            return {attrPath, resFlake.flake.sourceInfo.resolvedRef, drv};
+            return {attrPath, resFlake.flake.sourceInfo.resolvedRef, std::move(drv)};
         } catch (AttrPathNotFound & e) {
         }
     }
@@ -351,7 +367,9 @@ std::tuple<std::string, FlakeRef, flake::EvalCache::Derivation> InstallableFlake
 
 std::vector<flake::EvalCache::Derivation> InstallableFlake::toDerivations()
 {
-    return {std::get<2>(toDerivation())};
+    std::vector<flake::EvalCache::Derivation> res;
+    res.push_back(std::get<2>(toDerivation()));
+    return res;
 }
 
 Value * InstallableFlake::toValue(EvalState & state)
@@ -406,7 +424,7 @@ std::vector<std::shared_ptr<Installable>> SourceExprCommand::parseInstallables(
 
     } else {
 
-        auto follow = [&](const std::string & s) -> std::optional<Path> {
+        auto follow = [&](const std::string & s) -> std::optional<StorePath> {
             try {
                 return store->followLinksToStorePath(s);
             } catch (NotInStore &) {
@@ -417,7 +435,7 @@ std::vector<std::shared_ptr<Installable>> SourceExprCommand::parseInstallables(
         for (auto & s : ss) {
 
             size_t hash;
-            std::optional<Path> storePath;
+            std::optional<StorePath> storePath;
 
             if (hasPrefix(s, "nixpkgs.")) {
                 bool static warned;
@@ -440,7 +458,7 @@ std::vector<std::shared_ptr<Installable>> SourceExprCommand::parseInstallables(
                             *this, std::move(flakeRef), getDefaultFlakeAttrPaths()));
                 } catch (...) {
                     if (s.find('/') != std::string::npos && (storePath = follow(s)))
-                        result.push_back(std::make_shared<InstallableStorePath>(*storePath));
+                        result.push_back(std::make_shared<InstallableStorePath>(store, store->printStorePath(*storePath)));
                     else
                         throw;
                 }
@@ -467,19 +485,18 @@ Buildables build(ref<Store> store, RealiseMode mode,
 
     Buildables buildables;
 
-    PathSet pathsToBuild;
+    std::vector<StorePathWithOutputs> pathsToBuild;
 
     for (auto & i : installables) {
         for (auto & b : i->toBuildables()) {
-            if (b.drvPath != "") {
+            if (b.drvPath) {
                 StringSet outputNames;
                 for (auto & output : b.outputs)
                     outputNames.insert(output.first);
-                pathsToBuild.insert(
-                    b.drvPath + "!" + concatStringsSep(",", outputNames));
+                pathsToBuild.push_back({*b.drvPath, outputNames});
             } else
                 for (auto & output : b.outputs)
-                    pathsToBuild.insert(output.second);
+                    pathsToBuild.push_back({output.second.clone()});
             buildables.push_back(std::move(b));
         }
     }
@@ -492,19 +509,19 @@ Buildables build(ref<Store> store, RealiseMode mode,
     return buildables;
 }
 
-PathSet toStorePaths(ref<Store> store, RealiseMode mode,
+StorePathSet toStorePaths(ref<Store> store, RealiseMode mode,
     std::vector<std::shared_ptr<Installable>> installables)
 {
-    PathSet outPaths;
+    StorePathSet outPaths;
 
     for (auto & b : build(store, mode, installables))
         for (auto & output : b.outputs)
-            outPaths.insert(output.second);
+            outPaths.insert(output.second.clone());
 
     return outPaths;
 }
 
-Path toStorePath(ref<Store> store, RealiseMode mode,
+StorePath toStorePath(ref<Store> store, RealiseMode mode,
     std::shared_ptr<Installable> installable)
 {
     auto paths = toStorePaths(store, mode, {installable});
@@ -512,17 +529,17 @@ Path toStorePath(ref<Store> store, RealiseMode mode,
     if (paths.size() != 1)
         throw Error("argument '%s' should evaluate to one store path", installable->what());
 
-    return *paths.begin();
+    return paths.begin()->clone();
 }
 
-PathSet toDerivations(ref<Store> store,
+StorePathSet toDerivations(ref<Store> store,
     std::vector<std::shared_ptr<Installable>> installables, bool useDeriver)
 {
-    PathSet drvPaths;
+    StorePathSet drvPaths;
 
     for (auto & i : installables)
         for (auto & b : i->toBuildables()) {
-            if (b.drvPath.empty()) {
+            if (!b.drvPath) {
                 if (!useDeriver)
                     throw Error("argument '%s' did not evaluate to a derivation", i->what());
                 for (auto & output : b.outputs) {
@@ -530,10 +547,10 @@ PathSet toDerivations(ref<Store> store,
                     if (derivers.empty())
                         throw Error("'%s' does not have a known deriver", i->what());
                     // FIXME: use all derivers?
-                    drvPaths.insert(*derivers.begin());
+                    drvPaths.insert(derivers.begin()->clone());
                 }
             } else
-                drvPaths.insert(b.drvPath);
+                drvPaths.insert(b.drvPath->clone());
         }
 
     return drvPaths;

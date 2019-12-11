@@ -1,32 +1,20 @@
+#[macro_use]
+extern crate lazy_static;
+
+#[cfg(test)]
+#[macro_use]
+extern crate assert_matches;
+
+#[cfg(test)]
+#[macro_use]
+extern crate proptest;
+
+mod c;
 mod error;
 mod foreign;
-mod tarfile;
+#[cfg(unused)]
+mod nar;
+mod store;
+mod util;
 
 pub use error::Error;
-
-pub struct CBox<T> {
-    pub ptr: *mut libc::c_void,
-    phantom: std::marker::PhantomData<T>,
-}
-
-impl<T> CBox<T> {
-    fn new(t: T) -> Self {
-        unsafe {
-            let size = std::mem::size_of::<T>();
-            let ptr = libc::malloc(size);
-            *(ptr as *mut T) = t; // FIXME: probably UB
-            Self {
-                ptr,
-                phantom: std::marker::PhantomData,
-            }
-        }
-    }
-}
-
-#[no_mangle]
-pub extern "C" fn unpack_tarfile(
-    source: foreign::Source,
-    dest_dir: &str,
-) -> CBox<Result<(), error::CppException>> {
-    CBox::new(tarfile::unpack_tarfile(source, dest_dir).map_err(|err| err.into()))
-}

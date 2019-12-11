@@ -163,7 +163,7 @@ static SourceInfo fetchInput(EvalState & state, const FlakeRef & resolvedRef)
         SourceInfo info(ref);
         info.storePath = gitInfo.storePath;
         info.revCount = gitInfo.revCount;
-        info.narHash = state.store->queryPathInfo(info.storePath)->narHash;
+        info.narHash = state.store->queryPathInfo(state.store->parseStorePath(info.storePath))->narHash;
         info.lastModified = gitInfo.lastModified;
         return info;
     };
@@ -212,7 +212,7 @@ static Flake getFlake(EvalState & state, const FlakeRef & originalRef,
     refMap.push_back({originalRef, resolvedRef});
     refMap.push_back({flakeRef, resolvedRef});
 
-    state.store->assertStorePath(sourceInfo.storePath);
+    state.store->parseStorePath(sourceInfo.storePath);
 
     if (state.allowedPaths)
         state.allowedPaths->insert(state.store->toRealPath(sourceInfo.storePath));
@@ -334,7 +334,7 @@ static SourceInfo getNonFlake(EvalState & state, const FlakeRef & originalRef,
     refMap.push_back({originalRef, resolvedRef});
     refMap.push_back({flakeRef, resolvedRef});
 
-    state.store->assertStorePath(sourceInfo.storePath);
+    state.store->parseStorePath(sourceInfo.storePath);
 
     if (state.allowedPaths)
         state.allowedPaths->insert(sourceInfo.storePath);
@@ -490,7 +490,7 @@ void updateLockFile(EvalState & state, const FlakeRef & flakeRef, bool recreateL
 static void emitSourceInfoAttrs(EvalState & state, const SourceInfo & sourceInfo, Value & vAttrs)
 {
     auto & path = sourceInfo.storePath;
-    assert(state.store->isValidPath(path));
+    assert(state.store->isValidPath(state.store->parseStorePath(path)));
     mkString(*state.allocAttr(vAttrs, state.sOutPath), path, {path});
 
     if (sourceInfo.resolvedRef.rev) {
@@ -542,7 +542,7 @@ static void prim_callFlake(EvalState & state, const Pos & pos, Value * * args, V
 
         state.mkAttrs(v, 8);
 
-        assert(state.store->isValidPath(sourceInfo.storePath));
+        assert(state.store->isValidPath(state.store->parseStorePath(sourceInfo.storePath)));
 
         mkString(*state.allocAttr(v, state.sOutPath),
             sourceInfo.storePath, {sourceInfo.storePath});

@@ -43,7 +43,7 @@ struct CmdLog : InstallableCommand
 
         RunPager pager;
         for (auto & sub : subs) {
-            auto log = b.drvPath != "" ? sub->getBuildLog(b.drvPath) : nullptr;
+            auto log = b.drvPath ? sub->getBuildLog(*b.drvPath) : nullptr;
             for (auto & output : b.outputs) {
                 if (log) break;
                 log = sub->getBuildLog(output.second);

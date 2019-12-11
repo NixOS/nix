@@ -18,7 +18,7 @@ libnixrust_LDFLAGS_USE += -Wl,-rpath,$(abspath $(d)/target/$(RUST_DIR))
 libnixrust_LDFLAGS_USE_INSTALLED += -Wl,-rpath,$(libdir)
 endif
 
-$(libnixrust_PATH): $(wildcard $(d)/src/*.rs) $(d)/Cargo.toml
+$(libnixrust_PATH): $(call rwildcard, $(d)/src, *.rs) $(d)/Cargo.toml
 	$(trace-gen) cd nix-rust && CARGO_HOME=$$(if [[ -d vendor ]]; then echo vendor; fi) \
 	$(libnixrust_BUILD_FLAGS) \
 	  cargo build $(RUST_MODE) $$(if [[ -d vendor ]]; then echo --offline; fi) \
@@ -36,3 +36,10 @@ clean: clean-rust
 
 clean-rust:
 	$(suppress) rm -rfv nix-rust/target
+
+ifneq ($(OS), Darwin)
+check: rust-tests
+
+rust-tests:
+	cd nix-rust && CARGO_HOME=$$(if [[ -d vendor ]]; then echo vendor; fi) cargo test --release $$(if [[ -d vendor ]]; then echo --offline; fi)
+endif

@@ -38,7 +38,7 @@ public:
     bool sameMachine() override
     { return false; }
 
-    void narFromPath(const Path & path, Sink & sink) override;
+    void narFromPath(const StorePath & path, Sink & sink) override;
 
     ref<FSAccessor> getFSAccessor() override;
 
@@ -66,10 +66,10 @@ private:
     };
 };
 
-void SSHStore::narFromPath(const Path & path, Sink & sink)
+void SSHStore::narFromPath(const StorePath & path, Sink & sink)
 {
     auto conn(connections->get());
-    conn->to << wopNarFromPath << path;
+    conn->to << wopNarFromPath << printStorePath(path);
     conn->processStderr();
     copyNAR(conn->from, sink);
 }

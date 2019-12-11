@@ -1,6 +1,7 @@
 #pragma once
 
 #include "util.hh"
+#include "path.hh"
 #include "flake/eval-cache.hh"
 
 #include <optional>
@@ -14,8 +15,8 @@ struct SourceExprCommand;
 
 struct Buildable
 {
-    Path drvPath; // may be empty
-    std::map<std::string, Path> outputs;
+    std::optional<StorePath> drvPath;
+    std::map<std::string, StorePath> outputs;
 };
 
 typedef std::vector<Buildable> Buildables;
@@ -51,7 +52,7 @@ struct Installable
 
     /* Return a value only if this installable is a store path or a
        symlink to it. */
-    virtual std::optional<Path> getStorePath()
+    virtual std::optional<StorePath> getStorePath()
     {
         return {};
     }

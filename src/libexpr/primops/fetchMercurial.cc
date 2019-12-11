@@ -64,7 +64,7 @@ HgInfo exportMercurial(ref<Store> store, const std::string & uri,
                 return files.count(file);
             };
 
-            hgInfo.storePath = store->addToStore("source", uri, true, htSHA256, filter);
+            hgInfo.storePath = store->printStorePath(store->addToStore("source", uri, true, htSHA256, filter));
 
             return hgInfo;
         }
@@ -135,7 +135,7 @@ HgInfo exportMercurial(ref<Store> store, const std::string & uri,
 
         hgInfo.storePath = json["storePath"];
 
-        if (store->isValidPath(hgInfo.storePath)) {
+        if (store->isValidPath(store->parseStorePath(hgInfo.storePath))) {
             printTalkative("using cached Mercurial store path '%s'", hgInfo.storePath);
             return hgInfo;
         }
@@ -151,7 +151,7 @@ HgInfo exportMercurial(ref<Store> store, const std::string & uri,
 
     deletePath(tmpDir + "/.hg_archival.txt");
 
-    hgInfo.storePath = store->addToStore(name, tmpDir);
+    hgInfo.storePath = store->printStorePath(store->addToStore(name, tmpDir));
 
     nlohmann::json json;
     json["storePath"] = hgInfo.storePath;

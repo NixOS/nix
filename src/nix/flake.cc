@@ -263,22 +263,23 @@ struct CmdFlakeCheck : FlakeCommand, MixJSON
                 if (!drvInfo)
                     throw Error("flake attribute '%s' is not a derivation", attrPath);
                 // FIXME: check meta attributes
-                return drvInfo->queryDrvPath();
+                return store->parseStorePath(drvInfo->queryDrvPath());
             } catch (Error & e) {
                 e.addPrefix(fmt("while checking the derivation '" ANSI_BOLD "%s" ANSI_NORMAL "' at %s:\n", attrPath, pos));
                 throw;
             }
         };
 
-        PathSet drvPaths;
+        std::vector<StorePathWithOutputs> drvPaths;
 
         auto checkApp = [&](const std::string & attrPath, Value & v, const Pos & pos) {
             try {
                 auto app = App(*state, v);
                 for (auto & i : app.context) {
-                    auto [drvPath, outputName] = decodeContext(i);
-                    if (!outputName.empty() && nix::isDerivation(drvPath))
-                        drvPaths.insert(drvPath + "!" + outputName);
+                    auto [drvPathS, outputName] = decodeContext(i);
+                    auto drvPath = store->parseStorePath(drvPathS);
+                    if (!outputName.empty() && drvPath.isDerivation())
+                        drvPaths.emplace_back(drvPath);
                 }
             } catch (Error & e) {
                 e.addPrefix(fmt("while checking the app definition '" ANSI_BOLD "%s" ANSI_NORMAL "' at %s:\n", attrPath, pos));
@@ -388,7 +389,7 @@ struct CmdFlakeCheck : FlakeCommand, MixJSON
                                         fmt("%s.%s.%s", name, attr.name, attr2.name),
                                         *attr2.value, *attr2.pos);
                                     if ((std::string) attr.name == settings.thisSystem.get())
-                                        drvPaths.insert(drvPath);
+                                        drvPaths.emplace_back(drvPath);
                                 }
                             }
                         }

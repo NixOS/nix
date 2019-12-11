@@ -208,10 +208,11 @@ static long comparePriorities(EvalState & state, DrvInfo & drv1, DrvInfo & drv2)
 // at a time.
 static bool isPrebuilt(EvalState & state, DrvInfo & elem)
 {
-    Path path = elem.queryOutPath();
+    auto path = state.store->parseStorePath(elem.queryOutPath());
     if (state.store->isValidPath(path)) return true;
-    PathSet ps = state.store->querySubstitutablePaths({path});
-    return ps.find(path) != ps.end();
+    StorePathSet paths;
+    paths.insert(path.clone()); // FIXME: why doesn't StorePathSet{path.clone()} work?
+    return state.store->querySubstitutablePaths(paths).count(path);
 }
 
 
@@ -371,24 +372,21 @@ static void queryInstSources(EvalState & state,
         case srcStorePaths: {
 
             for (auto & i : args) {
-                Path path = state.store->followLinksToStorePath(i);
+                auto path = state.store->followLinksToStorePath(i);
 
-                string name = baseNameOf(path);
-                string::size_type dash = name.find('-');
-                if (dash != string::npos)
-                    name = string(name, dash + 1);
+                std::string name(path.name());
 
                 DrvInfo elem(state, "", nullptr);
                 elem.setName(name);
 
-                if (isDerivation(path)) {
-                    elem.setDrvPath(path);
-                    elem.setOutPath(state.store->derivationFromPath(path).findOutput("out"));
+                if (path.isDerivation()) {
+                    elem.setDrvPath(state.store->printStorePath(path));
+                    elem.setOutPath(state.store->printStorePath(state.store->derivationFromPath(path).findOutput("out")));
                     if (name.size() >= drvExtension.size() &&
                         string(name, name.size() - drvExtension.size()) == drvExtension)
                         name = string(name, 0, name.size() - drvExtension.size());
                 }
-                else elem.setOutPath(path);
+                else elem.setOutPath(state.store->printStorePath(path));
 
                 elems.push_back(elem);
             }
@@ -421,13 +419,13 @@ static void queryInstSources(EvalState & state,
 
 static void printMissing(EvalState & state, DrvInfos & elems)
 {
-    PathSet targets;
+    std::vector<StorePathWithOutputs> targets;
     for (auto & i : elems) {
         Path drvPath = i.queryDrvPath();
         if (drvPath != "")
-            targets.insert(drvPath);
+            targets.emplace_back(state.store->parseStorePath(drvPath));
         else
-            targets.insert(i.queryOutPath());
+            targets.emplace_back(state.store->parseStorePath(i.queryOutPath()));
     }
 
     printMissing(state.store, targets);
@@ -697,15 +695,15 @@ static void opSet(Globals & globals, Strings opFlags, Strings opArgs)
         drv.setName(globals.forceName);
 
     if (drv.queryDrvPath() != "") {
-        PathSet paths = {drv.queryDrvPath()};
+        std::vector<StorePathWithOutputs> paths{globals.state->store->parseStorePath(drv.queryDrvPath())};
         printMissing(globals.state->store, paths);
         if (globals.dryRun) return;
         globals.state->store->buildPaths(paths, globals.state->repair ? bmRepair : bmNormal);
-    }
-    else {
-        printMissing(globals.state->store, {drv.queryOutPath()});
+    } else {
+        printMissing(globals.state->store,
+            {globals.state->store->parseStorePath(drv.queryOutPath())});
         if (globals.dryRun) return;
-        globals.state->store->ensurePath(drv.queryOutPath());
+        globals.state->store->ensurePath(globals.state->store->parseStorePath(drv.queryOutPath()));
     }
 
     debug(format("switching to new user environment"));
@@ -729,7 +727,7 @@ static void uninstallDerivations(Globals & globals, Strings & selectors,
             for (auto & j : selectors)
                 /* !!! the repeated calls to followLinksToStorePath()
                    are expensive, should pre-compute them. */
-                if ((isPath(j) && i.queryOutPath() == globals.state->store->followLinksToStorePath(j))
+                if ((isPath(j) && globals.state->store->parseStorePath(i.queryOutPath()) == globals.state->store->followLinksToStorePath(j))
                     || DrvName(j).matches(drvName))
                 {
                     printInfo("uninstalling '%s'", i.queryName());
@@ -953,12 +951,13 @@ static void opQuery(Globals & globals, Strings opFlags, Strings opArgs)
 
 
     /* Query which paths have substitutes. */
-    PathSet validPaths, substitutablePaths;
+    StorePathSet validPaths;
+    StorePathSet substitutablePaths;
     if (printStatus || globals.prebuiltOnly) {
-        PathSet paths;
+        StorePathSet paths;
         for (auto & i : elems)
             try {
-                paths.insert(i.queryOutPath());
+                paths.insert(globals.state->store->parseStorePath(i.queryOutPath()));
             } catch (AssertionError & e) {
                 printMsg(lvlTalkative, "skipping derivation named '%s' which gives an assertion failure", i.queryName());
                 i.setFailed();
@@ -989,8 +988,8 @@ static void opQuery(Globals & globals, Strings opFlags, Strings opArgs)
             //Activity act(*logger, lvlDebug, format("outputting query result '%1%'") % i.attrPath);
 
             if (globals.prebuiltOnly &&
-                validPaths.find(i.queryOutPath()) == validPaths.end() &&
-                substitutablePaths.find(i.queryOutPath()) == substitutablePaths.end())
+                !validPaths.count(globals.state->store->parseStorePath(i.queryOutPath())) &&
+                !substitutablePaths.count(globals.state->store->parseStorePath(i.queryOutPath())))
                 continue;
 
             /* For table output. */
@@ -1001,9 +1000,9 @@ static void opQuery(Globals & globals, Strings opFlags, Strings opArgs)
 
             if (printStatus) {
                 Path outPath = i.queryOutPath();
-                bool hasSubs = substitutablePaths.find(outPath) != substitutablePaths.end();
+                bool hasSubs = substitutablePaths.count(globals.state->store->parseStorePath(outPath));
                 bool isInstalled = installed.find(outPath) != installed.end();
-                bool isValid = validPaths.find(outPath) != validPaths.end();
+                bool isValid = validPaths.count(globals.state->store->parseStorePath(outPath));
                 if (xmlOutput) {
                     attrs["installed"] = isInstalled ? "1" : "0";
                     attrs["valid"] = isValid ? "1" : "0";
@@ -1347,7 +1346,7 @@ static int _main(int argc, char * * argv)
             using LegacyArgs::LegacyArgs;
         };
 
-        MyArgs myArgs(baseNameOf(argv[0]), [&](Strings::iterator & arg, const Strings::iterator & end) {
+        MyArgs myArgs(std::string(baseNameOf(argv[0])), [&](Strings::iterator & arg, const Strings::iterator & end) {
             Operation oldOp = op;
 
             if (*arg == "--help")

@@ -67,7 +67,7 @@ struct MixLs : virtual Args, MixJSON
         if (st.type == FSAccessor::Type::tMissing)
             throw Error(format("path '%1%' does not exist") % path);
         doPath(st, path,
-            st.type == FSAccessor::Type::tDirectory ? "." : baseNameOf(path),
+            st.type == FSAccessor::Type::tDirectory ? "." : std::string(baseNameOf(path)),
             showDirectory);
     }
 

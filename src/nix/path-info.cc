@@ -78,36 +78,36 @@ struct CmdPathInfo : StorePathsCommand, MixJSON
         std::cout << fmt("\t%6.1f%c", res, idents.at(power));
     }
 
-    void run(ref<Store> store, Paths storePaths) override
+    void run(ref<Store> store, StorePaths storePaths) override
     {
         size_t pathLen = 0;
         for (auto & storePath : storePaths)
-            pathLen = std::max(pathLen, storePath.size());
+            pathLen = std::max(pathLen, store->printStorePath(storePath).size());
 
         if (json) {
             JSONPlaceholder jsonRoot(std::cout);
             store->pathInfoToJSON(jsonRoot,
                 // FIXME: preserve order?
-                PathSet(storePaths.begin(), storePaths.end()),
+                storePathsToSet(storePaths),
                 true, showClosureSize, AllowInvalid);
         }
 
         else {
 
-            for (auto storePath : storePaths) {
+            for (auto & storePath : storePaths) {
                 auto info = store->queryPathInfo(storePath);
-                storePath = info->path; // FIXME: screws up padding
+                auto storePathS = store->printStorePath(storePath);
 
-                std::cout << storePath;
+                std::cout << storePathS;
 
                 if (showSize || showClosureSize || showSigs)
-                    std::cout << std::string(std::max(0, (int) pathLen - (int) storePath.size()), ' ');
+                    std::cout << std::string(std::max(0, (int) pathLen - (int) storePathS.size()), ' ');
 
                 if (showSize)
                     printSize(info->narSize);
 
                 if (showClosureSize)
-                    printSize(store->getClosureSize(storePath).first);
+                    printSize(store->getClosureSize(info->path).first);
 
                 if (showSigs) {
                     std::cout << '\t';

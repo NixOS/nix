@@ -161,7 +161,7 @@ FlakeRef::FlakeRef(const std::string & uri_, bool allowRelative)
             }
             while (true) {
                 if (pathExists(d.path + "/.git")) break;
-                subdir = baseNameOf(d.path) + (subdir.empty() ? "" : "/" + subdir);
+                subdir = std::string(baseNameOf(d.path)) + (subdir.empty() ? "" : "/" + subdir);
                 d.path = dirOf(d.path);
                 if (d.path == "/")
                     throw MissingFlake("path '%s' is not a flake (because it does not reference a Git repository)", uri);

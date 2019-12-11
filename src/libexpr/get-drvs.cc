@@ -19,27 +19,27 @@ DrvInfo::DrvInfo(EvalState & state, const string & attrPath, Bindings * attrs)
 DrvInfo::DrvInfo(EvalState & state, ref<Store> store, const std::string & drvPathWithOutputs)
     : state(&state), attrs(nullptr), attrPath("")
 {
-    auto spec = parseDrvPathWithOutputs(drvPathWithOutputs);
+    auto [drvPath, selectedOutputs] = store->parseDrvPathWithOutputs(drvPathWithOutputs);
 
-    drvPath = spec.first;
+    this->drvPath = store->printStorePath(drvPath);
 
     auto drv = store->derivationFromPath(drvPath);
 
-    name = storePathToName(drvPath);
+    name = drvPath.name();
 
-    if (spec.second.size() > 1)
+    if (selectedOutputs.size() > 1)
         throw Error("building more than one derivation output is not supported, in '%s'", drvPathWithOutputs);
 
     outputName =
-        spec.second.empty()
-        ? get(drv.env, "outputName", "out")
-        : *spec.second.begin();
+        selectedOutputs.empty()
+        ? get(drv.env, "outputName").value_or("out")
+        : *selectedOutputs.begin();
 
     auto i = drv.outputs.find(outputName);
     if (i == drv.outputs.end())
-        throw Error("derivation '%s' does not have output '%s'", drvPath, outputName);
+        throw Error("derivation '%s' does not have output '%s'", store->printStorePath(drvPath), outputName);
 
-    outPath = i->second.path;
+    outPath = store->printStorePath(i->second.path);
 }
 
 

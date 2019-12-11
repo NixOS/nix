@@ -56,7 +56,7 @@ static std::optional<GitInfo> lookupGitInfo(
 
         Path storePath = json["storePath"];
 
-        if (store->isValidPath(storePath)) {
+        if (store->isValidPath(store->parseStorePath(storePath))) {
             GitInfo gitInfo;
             gitInfo.storePath = storePath;
             gitInfo.rev = rev;
@@ -145,7 +145,7 @@ GitInfo exportGit(ref<Store> store, std::string uri,
                 return files.count(file);
             };
 
-            gitInfo.storePath = store->addToStore("source", uri, true, htSHA256, filter);
+            gitInfo.storePath = store->printStorePath(store->addToStore("source", uri, true, htSHA256, filter));
             gitInfo.revCount = haveCommits ? std::stoull(runProgram("git", true, { "-C", uri, "rev-list", "--count", "HEAD" })) : 0;
             // FIXME: maybe we should use the timestamp of the last
             // modified dirty file?
@@ -265,7 +265,7 @@ GitInfo exportGit(ref<Store> store, std::string uri,
 
     unpackTarfile(*source, tmpDir);
 
-    gitInfo.storePath = store->addToStore(name, tmpDir);
+    gitInfo.storePath = store->printStorePath(store->addToStore(name, tmpDir));
 
     gitInfo.revCount = std::stoull(runProgram("git", true, { "-C", repoDir, "rev-list", "--count", gitInfo.rev.gitRev() }));
     gitInfo.lastModified = std::stoull(runProgram("git", true, { "-C", repoDir, "log", "-1", "--format=%ct", gitInfo.rev.gitRev() }));

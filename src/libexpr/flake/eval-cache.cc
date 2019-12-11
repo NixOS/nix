@@ -77,7 +77,7 @@ void EvalCache::addDerivation(
         (fingerprint.hash, fingerprint.hashSize)
         (attrPath)
         (ValueType::Derivation)
-        (drv.drvPath + " " + drv.outPath + " " + drv.outputName).exec();
+        (std::string(drv.drvPath.to_string()) + " " + std::string(drv.outPath.to_string()) + " " + drv.outputName).exec();
 }
 
 std::optional<EvalCache::Derivation> EvalCache::getDerivation(
@@ -104,7 +104,7 @@ std::optional<EvalCache::Derivation> EvalCache::getDerivation(
 
     debug("evaluation cache hit for '%s'", attrPath);
 
-    return Derivation { ss[0], ss[1], ss[2] };
+    return Derivation { StorePath::fromBaseName(ss[0]), StorePath::fromBaseName(ss[1]), ss[2] };
 }
 
 EvalCache & EvalCache::singleton()

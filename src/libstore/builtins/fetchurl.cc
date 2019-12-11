@@ -24,7 +24,7 @@ void builtinFetchurl(const BasicDerivation & drv, const std::string & netrcData)
 
     Path storePath = getAttr("out");
     auto mainUrl = getAttr("url");
-    bool unpack = get(drv.env, "unpack", "") == "1";
+    bool unpack = get(drv.env, "unpack").value_or("") == "1";
 
     /* Note: have to use a fresh downloader here because we're in
        a forked process. */

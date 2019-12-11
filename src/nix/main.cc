@@ -140,7 +140,7 @@ void mainWrapped(int argc, char * * argv)
     initGC();
 
     programPath = argv[0];
-    string programName = baseNameOf(programPath);
+    auto programName = std::string(baseNameOf(programPath));
 
     {
         auto legacy = (*RegisterLegacyCommand::commands)[programName];

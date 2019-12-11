@@ -33,25 +33,25 @@ void printGCWarning()
 }
 
 
-void printMissing(ref<Store> store, const PathSet & paths, Verbosity lvl)
+void printMissing(ref<Store> store, const std::vector<StorePathWithOutputs> & paths, Verbosity lvl)
 {
     unsigned long long downloadSize, narSize;
-    PathSet willBuild, willSubstitute, unknown;
+    StorePathSet willBuild, willSubstitute, unknown;
     store->queryMissing(paths, willBuild, willSubstitute, unknown, downloadSize, narSize);
     printMissing(store, willBuild, willSubstitute, unknown, downloadSize, narSize, lvl);
 }
 
 
-void printMissing(ref<Store> store, const PathSet & willBuild,
-    const PathSet & willSubstitute, const PathSet & unknown,
+void printMissing(ref<Store> store, const StorePathSet & willBuild,
+    const StorePathSet & willSubstitute, const StorePathSet & unknown,
     unsigned long long downloadSize, unsigned long long narSize, Verbosity lvl)
 {
     if (!willBuild.empty()) {
         printMsg(lvl, "these derivations will be built:");
-        Paths sorted = store->topoSortPaths(willBuild);
+        auto sorted = store->topoSortPaths(willBuild);
         reverse(sorted.begin(), sorted.end());
         for (auto & i : sorted)
-            printMsg(lvl, fmt("  %s", i));
+            printMsg(lvl, fmt("  %s", store->printStorePath(i)));
     }
 
     if (!willSubstitute.empty()) {
@@ -59,14 +59,14 @@ void printMissing(ref<Store> store, const PathSet & willBuild,
                 downloadSize / (1024.0 * 1024.0),
                 narSize / (1024.0 * 1024.0)));
         for (auto & i : willSubstitute)
-            printMsg(lvl, fmt("  %s", i));
+            printMsg(lvl, fmt("  %s", store->printStorePath(i)));
     }
 
     if (!unknown.empty()) {
         printMsg(lvl, fmt("don't know how to build these paths%s:",
                 (settings.readOnlyMode ? " (may be caused by read-only store access)" : "")));
         for (auto & i : unknown)
-            printMsg(lvl, fmt("  %s", i));
+            printMsg(lvl, fmt("  %s", store->printStorePath(i)));
     }
 }
 
@@ -237,7 +237,7 @@ bool LegacyArgs::processArgs(const Strings & args, bool finish)
 void parseCmdLine(int argc, char * * argv,
     std::function<bool(Strings::iterator & arg, const Strings::iterator & end)> parseArg)
 {
-    parseCmdLine(baseNameOf(argv[0]), argvToStrings(argc, argv), parseArg);
+    parseCmdLine(std::string(baseNameOf(argv[0])), argvToStrings(argc, argv), parseArg);
 }
 
 

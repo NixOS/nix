@@ -49,7 +49,7 @@ struct CmdVerify : StorePathsCommand
         };
     }
 
-    void run(ref<Store> store, Paths storePaths) override
+    void run(ref<Store> store, StorePaths storePaths) override
     {
         std::vector<ref<Store>> substituters;
         for (auto & s : substituterUris)
@@ -80,7 +80,7 @@ struct CmdVerify : StorePathsCommand
                 MaintainCount<std::atomic<size_t>> mcActive(active);
                 update();
 
-                auto info = store->queryPathInfo(storePath);
+                auto info = store->queryPathInfo(store->parseStorePath(storePath));
 
                 if (!noContents) {
 
@@ -88,7 +88,7 @@ struct CmdVerify : StorePathsCommand
                     if (info->ca == "")
                         hashSink = std::make_unique<HashSink>(info->narHash.type);
                     else
-                        hashSink = std::make_unique<HashModuloSink>(info->narHash.type, storePathToHash(info->path));
+                        hashSink = std::make_unique<HashModuloSink>(info->narHash.type, storePathToHash(store->printStorePath(info->path)));
 
                     store->narFromPath(info->path, *hashSink);
 
@@ -96,10 +96,10 @@ struct CmdVerify : StorePathsCommand
 
                     if (hash.first != info->narHash) {
                         corrupted++;
-                        act2.result(resCorruptedPath, info->path);
+                        act2.result(resCorruptedPath, store->printStorePath(info->path));
                         printError(
-                            format("path '%s' was modified! expected hash '%s', got '%s'")
-                            % info->path % info->narHash.to_string() % hash.first.to_string());
+                            "path '%s' was modified! expected hash '%s', got '%s'",
+                            store->printStorePath(info->path), info->narHash.to_string(), hash.first.to_string());
                     }
 
                 }
@@ -120,7 +120,7 @@ struct CmdVerify : StorePathsCommand
                         auto doSigs = [&](StringSet sigs) {
                             for (auto sig : sigs) {
                                 if (!sigsSeen.insert(sig).second) continue;
-                                if (validSigs < ValidPathInfo::maxSigs && info->checkSignature(publicKeys, sig))
+                                if (validSigs < ValidPathInfo::maxSigs && info->checkSignature(*store, publicKeys, sig))
                                     validSigs++;
                             }
                         };
@@ -147,8 +147,8 @@ struct CmdVerify : StorePathsCommand
 
                     if (!good) {
                         untrusted++;
-                        act2.result(resUntrustedPath, info->path);
-                        printError(format("path '%s' is untrusted") % info->path);
+                        act2.result(resUntrustedPath, store->printStorePath(info->path));
+                        printError("path '%s' is untrusted", store->printStorePath(info->path));
                     }
 
                 }
@@ -164,7 +164,7 @@ struct CmdVerify : StorePathsCommand
         };
 
         for (auto & storePath : storePaths)
-            pool.enqueue(std::bind(doPath, storePath));
+            pool.enqueue(std::bind(doPath, store->printStorePath(storePath)));
 
         pool.process();
 

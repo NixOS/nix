@@ -2,6 +2,7 @@
 
 #include "sync.hh"
 #include "flake.hh"
+#include "path.hh"
 
 namespace nix { struct SQLite; struct SQLiteStmt; }
 
@@ -19,8 +20,8 @@ public:
 
     struct Derivation
     {
-        Path drvPath;
-        Path outPath;
+        StorePath drvPath;
+        StorePath outPath;
         std::string outputName;
     };
 

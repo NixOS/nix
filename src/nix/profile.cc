@@ -24,7 +24,7 @@ struct ProfileElementSource
 
 struct ProfileElement
 {
-    PathSet storePaths;
+    StorePathSet storePaths;
     std::optional<ProfileElementSource> source;
     bool active = true;
     // FIXME: priority
@@ -50,7 +50,7 @@ struct ProfileManifest
             for (auto & e : json["elements"]) {
                 ProfileElement element;
                 for (auto & p : e["storePaths"])
-                    element.storePaths.insert((std::string) p);
+                    element.storePaths.insert(state.store->parseStorePath((std::string) p));
                 element.active = e["active"];
                 if (e.value("uri", "") != "") {
                     element.source = ProfileElementSource{
@@ -74,19 +74,19 @@ struct ProfileManifest
 
             for (auto & drvInfo : drvInfos) {
                 ProfileElement element;
-                element.storePaths = {drvInfo.queryOutPath()};
+                element.storePaths = singleton(state.store->parseStorePath(drvInfo.queryOutPath()));
                 elements.emplace_back(std::move(element));
             }
         }
     }
 
-    std::string toJSON() const
+    std::string toJSON(Store & store) const
     {
         auto array = nlohmann::json::array();
         for (auto & element : elements) {
             auto paths = nlohmann::json::array();
             for (auto & path : element.storePaths)
-                paths.push_back(path);
+                paths.push_back(store.printStorePath(path));
             nlohmann::json obj;
             obj["storePaths"] = paths;
             obj["active"] = element.active;
@@ -103,37 +103,38 @@ struct ProfileManifest
         return json.dump();
     }
 
-    Path build(ref<Store> store)
+    StorePath build(ref<Store> store)
     {
         auto tempDir = createTempDir();
 
-        ValidPathInfo info;
+        StorePathSet references;
 
         Packages pkgs;
         for (auto & element : elements) {
             for (auto & path : element.storePaths) {
                 if (element.active)
-                    pkgs.emplace_back(path, true, 5);
-                info.references.insert(path);
+                    pkgs.emplace_back(store->printStorePath(path), true, 5);
+                references.insert(path.clone());
             }
         }
 
         buildProfile(tempDir, std::move(pkgs));
 
-        writeFile(tempDir + "/manifest.json", toJSON());
+        writeFile(tempDir + "/manifest.json", toJSON(*store));
 
         /* Add the symlink tree to the store. */
         StringSink sink;
         dumpPath(tempDir, sink);
 
+        ValidPathInfo info(store->makeFixedOutputPath(true, info.narHash, "profile", references));
+        info.references = std::move(references);
         info.narHash = hashString(htSHA256, *sink.s);
         info.narSize = sink.s->size();
-        info.path = store->makeFixedOutputPath(true, info.narHash, "profile", info.references);
         info.ca = makeFixedOutputCA(true, info.narHash);
 
         store->addToStore(info, sink.s);
 
-        return info.path;
+        return std::move(info.path);
     }
 };
 
@@ -166,21 +167,21 @@ struct CmdProfileInstall : InstallablesCommand, MixDefaultProfile
     {
         ProfileManifest manifest(*getEvalState(), *profile);
 
-        PathSet pathsToBuild;
+        std::vector<StorePathWithOutputs> pathsToBuild;
 
         for (auto & installable : installables) {
             if (auto installable2 = std::dynamic_pointer_cast<InstallableFlake>(installable)) {
                 auto [attrPath, resolvedRef, drv] = installable2->toDerivation();
 
                 ProfileElement element;
-                element.storePaths = {drv.outPath}; // FIXME
+                element.storePaths = singleton(drv.outPath.clone()); // FIXME
                 element.source = ProfileElementSource{
                     installable2->flakeRef,
                     resolvedRef,
                     attrPath,
                 };
 
-                pathsToBuild.insert(makeDrvPathWithOutputs(drv.drvPath, {"out"})); // FIXME
+                pathsToBuild.emplace_back(drv.drvPath.clone(), StringSet{"out"}); // FIXME
 
                 manifest.elements.emplace_back(std::move(element));
             } else
@@ -223,13 +224,13 @@ public:
         return res;
     }
 
-    bool matches(const ProfileElement & element, size_t pos, std::vector<Matcher> matchers)
+    bool matches(const Store & store, const ProfileElement & element, size_t pos, const std::vector<Matcher> & matchers)
     {
         for (auto & matcher : matchers) {
             if (auto n = std::get_if<size_t>(&matcher)) {
                 if (*n == pos) return true;
             } else if (auto path = std::get_if<Path>(&matcher)) {
-                if (element.storePaths.count(*path)) return true;
+                if (element.storePaths.count(store.parseStorePath(*path))) return true;
             } else if (auto regex = std::get_if<std::regex>(&matcher)) {
                 if (element.source
                     && std::regex_match(element.source->attrPath, *regex))
@@ -280,8 +281,8 @@ struct CmdProfileRemove : virtual EvalCommand, MixDefaultProfile, MixProfileElem
 
         for (size_t i = 0; i < oldManifest.elements.size(); ++i) {
             auto & element(oldManifest.elements[i]);
-            if (!matches(element, i, matchers))
-                newManifest.elements.push_back(element);
+            if (!matches(*store, element, i, matchers))
+                newManifest.elements.push_back(std::move(element));
         }
 
         // FIXME: warn about unused matchers?
@@ -322,13 +323,13 @@ struct CmdProfileUpgrade : virtual SourceExprCommand, MixDefaultProfile, MixProf
         auto matchers = getMatchers(store);
 
         // FIXME: code duplication
-        PathSet pathsToBuild;
+        std::vector<StorePathWithOutputs> pathsToBuild;
 
         for (size_t i = 0; i < manifest.elements.size(); ++i) {
             auto & element(manifest.elements[i]);
             if (element.source
                 && !element.source->originalRef.isImmutable()
-                && matches(element, i, matchers))
+                && matches(*store, element, i, matchers))
             {
                 Activity act(*logger, lvlChatty, actUnknown,
                     fmt("checking '%s' for updates", element.source->attrPath));
@@ -342,14 +343,14 @@ struct CmdProfileUpgrade : virtual SourceExprCommand, MixDefaultProfile, MixProf
                 printInfo("upgrading '%s' from flake '%s' to '%s'",
                     element.source->attrPath, element.source->resolvedRef, resolvedRef);
 
-                element.storePaths = {drv.outPath}; // FIXME
+                element.storePaths = singleton(drv.outPath.clone()); // FIXME
                 element.source = ProfileElementSource{
                     installable.flakeRef,
                     resolvedRef,
                     attrPath,
                 };
 
-                pathsToBuild.insert(makeDrvPathWithOutputs(drv.drvPath, {"out"})); // FIXME
+                pathsToBuild.emplace_back(drv.drvPath, StringSet{"out"}); // FIXME
             }
         }
 
@@ -385,7 +386,7 @@ struct CmdProfileInfo : virtual EvalCommand, virtual StoreCommand, MixDefaultPro
             std::cout << fmt("%d %s %s %s\n", i,
                 element.source ? element.source->originalRef.to_string() + "#" + element.source->attrPath : "-",
                 element.source ? element.source->resolvedRef.to_string() + "#" + element.source->attrPath : "-",
-                concatStringsSep(" ", element.storePaths));
+                concatStringsSep(" ", store->printStorePathSet(element.storePaths)));
         }
     }
 };

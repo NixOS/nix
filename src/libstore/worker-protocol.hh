@@ -65,8 +65,9 @@ typedef enum {
 class Store;
 struct Source;
 
-Path readStorePath(Store & store, Source & from);
-template<class T> T readStorePaths(Store & store, Source & from);
+template<class T> T readStorePaths(const Store & store, Source & from);
+
+void writeStorePaths(const Store & store, Sink & out, const StorePathSet & paths);
 
 
 }
