@@ -76,7 +76,7 @@ impl From<Error> for CppException {
     fn from(err: Error) -> Self {
         match err {
             Error::Foreign(ex) => ex,
-            _ => unsafe { make_error(&err.to_string()) },
+            _ => CppException::new(&err.to_string()),
         }
     }
 }
@@ -85,7 +85,23 @@ impl From<Error> for CppException {
 #[derive(Debug)]
 pub struct CppException(*const libc::c_void); // == std::exception_ptr*
 
+impl CppException {
+    fn new(s: &str) -> Self {
+        Self(unsafe { make_error(s) })
+    }
+}
+
+impl Drop for CppException {
+    fn drop(&mut self) {
+        unsafe {
+            destroy_error(self.0);
+        }
+    }
+}
+
 extern "C" {
     #[allow(improper_ctypes)] // YOLO
-    fn make_error(s: &str) -> CppException;
+    fn make_error(s: &str) -> *const libc::c_void;
+
+    fn destroy_error(exc: *const libc::c_void);
 }

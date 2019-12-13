@@ -152,28 +152,47 @@ struct Source
 template<typename T>
 struct Result
 {
-    unsigned int tag;
+    enum { Ok = 0, Err = 1, Uninit = 2 } tag;
 
     union {
         T data;
         std::exception_ptr * exc;
     };
 
+    Result() : tag(Uninit) { }; // FIXME: remove
+
+    Result(const Result &) = delete;
+
+    Result(Result && other)
+        : tag(other.tag)
+    {
+        other.tag = Uninit;
+        if (tag == Ok)
+            data = std::move(other.data);
+        else if (tag == Err)
+            exc = other.exc;
+    }
+
     ~Result()
     {
-        if (tag == 0)
+        if (tag == Ok)
             data.~T();
-        else if (tag == 1)
-            // FIXME: don't leak exc
+        else if (tag == Err)
+            free(exc);
+        else if (tag == Uninit)
             ;
+        else
+            abort();
     }
 
     /* Rethrow the wrapped exception or return the wrapped value. */
     T unwrap()
     {
-        if (tag == 0)
+        if (tag == Ok) {
+            tag = Uninit;
             return std::move(data);
-        else if (tag == 1)
+        }
+        else if (tag == Err)
             std::rethrow_exception(*exc);
         else
             abort();
