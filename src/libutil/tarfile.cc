@@ -24,6 +24,7 @@ void unpackTarfile(const Path & tarFile, const Path & destDir,
         auto decompressor =
             // FIXME: add .gz support
             hasSuffix(*baseName, ".bz2") ? makeDecompressionSink("bzip2", sink) :
+            hasSuffix(*baseName, ".gz") ? makeDecompressionSink("gzip", sink) :
             hasSuffix(*baseName, ".xz") ? makeDecompressionSink("xz", sink) :
             makeDecompressionSink("none", sink);
         readFile(tarFile, *decompressor);

@@ -26,3 +26,20 @@ nix-instantiate --eval -E 'with <fnord/xyzzy>; 1 + 2' -I fnord=file://no-such-ta
 (! nix-instantiate --eval -E '<fnord/xyzzy> 1' -I fnord=file://no-such-tarball.tar.xz)
 
 nix-instantiate --eval -E '<fnord/config.nix>' -I fnord=file://no-such-tarball.tar.xz -I fnord=.
+
+tarball=$TEST_ROOT/tarball.tar.gz
+(cd $TEST_ROOT && tar c tarball) | gzip > $tarball
+
+nix-env -f file://$tarball -qa --out-path | grep -q dependencies
+
+nix-build -o $TEST_ROOT/result file://$tarball
+
+nix-build -o $TEST_ROOT/result '<foo>' -I foo=file://$tarball
+
+nix-build -o $TEST_ROOT/result -E "import (fetchTarball file://$tarball)"
+
+nix-instantiate --eval -E '1 + 2' -I fnord=file://no-such-tarball.tar.gz
+nix-instantiate --eval -E 'with <fnord/xyzzy>; 1 + 2' -I fnord=file://no-such-tarball.tar.gz
+(! nix-instantiate --eval -E '<fnord/xyzzy> 1' -I fnord=file://no-such-tarball.tar.gz)
+
+nix-instantiate --eval -E '<fnord/config.nix>' -I fnord=file://no-such-tarball.tar.gz -I fnord=.
