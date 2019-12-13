@@ -47,13 +47,10 @@ std::unique_ptr<SSHMaster::Connection> SSHMaster::startCommand(const std::string
             throw SysError("duping over stderr");
 
         Strings args;
-        const char * execInto;
 
         if (fakeSSH) {
-            execInto = "bash";
             args = { "bash", "-c" };
         } else {
-            execInto = "ssh";
             args = { "ssh", host.c_str(), "-x", "-a" };
             addCommonSSHOpts(args);
             if (socketPath != "")
@@ -66,7 +63,7 @@ std::unique_ptr<SSHMaster::Connection> SSHMaster::startCommand(const std::string
         execvp(args.begin()->c_str(), stringsToCharPtrs(args).data());
 
         // could not exec ssh/bash
-        throw SysError("Failed to exec into %s. Is it in PATH?", execInto);
+        throw SysError("unable to execute '%s'", args.front());
     });
 
 
@@ -112,7 +109,7 @@ Path SSHMaster::startMaster()
         addCommonSSHOpts(args);
         execvp(args.begin()->c_str(), stringsToCharPtrs(args).data());
 
-        throw SysError("Failed to exec into ssh. Is it in PATH?");
+        throw SysError("unable to execute '%s'", args.front());
     });
 
     out.writeSide = -1;
