@@ -23,6 +23,7 @@ pub enum Error {
     HttpError(hyper::error::Error),
     Misc(String),
     Foreign(CppException),
+    BadTarFileMemberName(String),
 }
 
 impl From<std::io::Error> for Error {
@@ -64,6 +65,9 @@ impl fmt::Display for Error {
             Error::HttpError(err) => write!(f, "HTTP error: {}", err),
             Error::Foreign(_) => write!(f, "<C++ exception>"), // FIXME
             Error::Misc(s) => write!(f, "{}", s),
+            Error::BadTarFileMemberName(s) => {
+                write!(f, "tar archive contains illegal file name '{}'", s)
+            }
         }
     }
 }
