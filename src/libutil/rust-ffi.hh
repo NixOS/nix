@@ -140,12 +140,7 @@ struct Source
         : fun(sourceWrapper), _this(&_this)
     {}
 
-    // FIXME: how to propagate exceptions?
-    static size_t sourceWrapper(void * _this, rust::Slice<uint8_t> data)
-    {
-        auto n = ((nix::Source *) _this)->read((unsigned char *) data.ptr, data.size);
-        return n;
-    }
+    static size_t sourceWrapper(void * _this, rust::Slice<uint8_t> data);
 };
 
 /* C++ representation of Rust's Result<T, CppException>. */
