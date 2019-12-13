@@ -3,7 +3,7 @@
 
 extern "C" {
     rust::Result<std::tuple<>> *
-    unpack_tarfile(rust::Source source, rust::StringSlice dest_dir);
+    unpack_tarfile(rust::Source source, rust::StringSlice dest_dir, rust::Result<std::tuple<>> & out);
 }
 
 namespace nix {
@@ -11,7 +11,9 @@ namespace nix {
 void unpackTarfile(Source & source, const Path & destDir)
 {
     rust::Source source2(source);
-    rust::CBox(unpack_tarfile(source2, destDir))->unwrap();
+    rust::Result<std::tuple<>> res;
+    unpack_tarfile(source2, destDir, res);
+    res.unwrap();
 }
 
 void unpackTarfile(const Path & tarFile, const Path & destDir,

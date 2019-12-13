@@ -1,20 +1,21 @@
 use super::{
     error,
-    foreign::{self, CBox},
+    foreign::{self},
     store::path,
     store::StorePath,
     util,
 };
 
 #[no_mangle]
-pub extern "C" fn unpack_tarfile(
+pub unsafe extern "C" fn unpack_tarfile(
     source: foreign::Source,
     dest_dir: &str,
-) -> CBox<Result<(), error::CppException>> {
-    CBox::new(
+    out: *mut Result<(), error::CppException>,
+) {
+    out.write(
         util::tarfile::unpack_tarfile(source, std::path::Path::new(dest_dir))
             .map_err(|err| err.into()),
-    )
+    );
 }
 
 #[no_mangle]

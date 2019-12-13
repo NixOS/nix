@@ -180,24 +180,4 @@ struct Result
     }
 };
 
-template<typename T>
-struct CBox
-{
-    T * ptr;
-
-    T * operator ->()
-    {
-        return ptr;
-    }
-
-    CBox(T * ptr) : ptr(ptr) { }
-    CBox(const CBox &) = delete;
-    CBox(CBox &&) = delete;
-
-    ~CBox()
-    {
-        free(ptr);
-    }
-};
-
 }
