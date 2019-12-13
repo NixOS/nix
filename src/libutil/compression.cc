@@ -90,8 +90,8 @@ struct GzipDecompressionSink : CompressionSink
 
             int ret = inflate(&strm,Z_SYNC_FLUSH);
             if (ret != Z_OK && ret != Z_STREAM_END)
-                throw CompressionError("error while decompressing gzip file: %d: %d: %d",ret, len, strm.avail_in);
-
+                throw CompressionError("error while decompressing gzip file: %d (%d, %d)",
+                    zError(ret), len, strm.avail_in);
 
             finished = ret == Z_STREAM_END;
 
