@@ -576,10 +576,15 @@ Path resolveExprPath(Path path)
 {
     assert(path[0] == '/');
 
+    unsigned int followCount = 0, maxFollow = 1024;
+
     /* If `path' is a symlink, follow it.  This is so that relative
        path references work. */
     struct stat st;
     while (true) {
+        // Basic cycle/depth limit to avoid infinite loops.
+        if (++followCount >= maxFollow)
+          throw Error(format("can't resolve expression. infinite symlink recursion in path '%1%'") % path);
         if (lstat(path.c_str(), &st))
             throw SysError(format("getting status of '%1%'") % path);
         if (!S_ISLNK(st.st_mode)) break;
