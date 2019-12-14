@@ -106,7 +106,7 @@ static void _main(int argc, char * * argv)
     // Heuristic to see if we're invoked as a shebang script, namely,
     // if we have at least one argument, it's the name of an
     // executable file, and it starts with "#!".
-    if (runEnv && argc > 1 && !std::regex_search(argv[1], std::regex("nix-shell"))) {
+    if (runEnv && argc > 1) {
         script = argv[1];
         try {
             auto lines = tokenizeString<Strings>(readFile(script), "\n");
