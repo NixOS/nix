@@ -155,7 +155,7 @@ public:
         if (type == actBuild) {
             auto name = storePathToName(getS(fields, 0));
             if (hasSuffix(name, ".drv"))
-                name = name.substr(name.size() - 4);
+                name = name.substr(0, name.size() - 4);
             i->s = fmt("building " ANSI_BOLD "%s" ANSI_NORMAL, name);
             auto machineName = getS(fields, 1);
             if (machineName != "")
@@ -180,7 +180,7 @@ public:
         if (type == actPostBuildHook) {
             auto name = storePathToName(getS(fields, 0));
             if (hasSuffix(name, ".drv"))
-                name = name.substr(name.size() - 4);
+                name = name.substr(0, name.size() - 4);
             i->s = fmt("post-build " ANSI_BOLD "%s" ANSI_NORMAL, name);
             i->name = DrvName(name).name;
         }
