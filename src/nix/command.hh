@@ -106,7 +106,7 @@ struct InstallableCommand : virtual Args, SourceExprCommand
 
 private:
 
-    std::string _installable{""};
+    std::string _installable{"."};
 };
 
 /* A command that operates on zero or more store paths. */
