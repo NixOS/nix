@@ -126,9 +126,11 @@ struct ProfileManifest
         StringSink sink;
         dumpPath(tempDir, sink);
 
-        ValidPathInfo info(store->makeFixedOutputPath(true, info.narHash, "profile", references));
+        auto narHash = hashString(htSHA256, *sink.s);
+
+        ValidPathInfo info(store->makeFixedOutputPath(true, narHash, "profile", references));
         info.references = std::move(references);
-        info.narHash = hashString(htSHA256, *sink.s);
+        info.narHash = narHash;
         info.narSize = sink.s->size();
         info.ca = makeFixedOutputCA(true, info.narHash);
 
