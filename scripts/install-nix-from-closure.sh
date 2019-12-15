@@ -40,43 +40,61 @@ elif [ "$(uname -s)" = "Linux" ] && [ -e /run/systemd/system ]; then
 fi
 
 INSTALL_MODE=no-daemon
-
+CREATE_DARWIN_VOLUME=0
 # handle the command line flags
-while [ "x${1:-}" != "x" ]; do
-    if [ "x${1:-}" = "x--no-daemon" ]; then
-        INSTALL_MODE=no-daemon
-    elif [ "x${1:-}" = "x--daemon" ]; then
-        INSTALL_MODE=daemon
-    elif [ "x${1:-}" = "x--no-channel-add" ]; then
-        NIX_INSTALLER_NO_CHANNEL_ADD=1
-    elif [ "x${1:-}" = "x--no-modify-profile" ]; then
-        NIX_INSTALLER_NO_MODIFY_PROFILE=1
-    elif [ "x${1:-}" != "x" ]; then
-        (
-            echo "Nix Installer [--daemon|--no-daemon] [--no-channel-add] [--no-modify-profile]"
+while [ $# -gt 0 ]; do
+    case $1 in
+        --daemon)
+            INSTALL_MODE=daemon;;
+        --no-daemon)
+            INSTALL_MODE=no-daemon;;
+        --no-channel-add)
+            NIX_INSTALLER_NO_CHANNEL_ADD=1;;
+        --no-modify-profile)
+            NIX_INSTALLER_NO_MODIFY_PROFILE=1;;
+        --create-volume)
+            CREATE_DARWIN_VOLUME=1;;
+        *)
+            (
+                echo "Nix Installer [--daemon|--no-daemon] [--no-channel-add] [--no-modify-profile]"
 
-            echo "Choose installation method."
-            echo ""
-            echo " --daemon:            Installs and configures a background daemon that manages the store,"
-            echo "                      providing multi-user support and better isolation for local builds."
-            echo "                      Both for security and reproducibility, this method is recommended if"
-            echo "                      supported on your platform."
-            echo "                      See https://nixos.org/nix/manual/#sect-multi-user-installation"
-            echo ""
-            echo " --no-daemon:         Simple, single-user installation that does not require root and is"
-            echo "                      trivial to uninstall."
-            echo "                      (default)"
-            echo ""
-            echo " --no-channel-add:    Don't add any channels. nixpkgs-unstable is installed by default."
-            echo ""
-            echo " --no-modify-profile: Skip channel installation. When not provided nixpkgs-unstable"
-            echo "                      is installed by default."
-            echo ""
-        ) >&2
-        exit
-    fi
+                echo "Choose installation method."
+                echo ""
+                echo " --daemon:    Installs and configures a background daemon that manages the store,"
+                echo "              providing multi-user support and better isolation for local builds."
+                echo "              Both for security and reproducibility, this method is recommended if"
+                echo "              supported on your platform."
+                echo "              See https://nixos.org/nix/manual/#sect-multi-user-installation"
+                echo ""
+                echo " --no-daemon: Simple, single-user installation that does not require root and is"
+                echo "              trivial to uninstall."
+                echo "              (default)"
+                echo ""
+                echo " --no-channel-add:    Don't add any channels. nixpkgs-unstable is installed by default."
+                echo ""
+                echo " --no-modify-profile: Skip channel installation. When not provided nixpkgs-unstable"
+                echo "                      is installed by default."
+                echo ""
+            ) >&2
+
+            if [ "$(uname -s)" = "Darwin" ]; then
+                (
+                    echo " --create-volume: Create an APFS volume for the store and create the /nix"
+                    echo "                  mountpoint for it using synthetic.conf."
+                    echo "                  (required on macOS >=10.15)"
+                    echo "                  See https://nixos.org/nix/manual/#sect-darwin-apfs-volume"
+                    echo ""
+                ) >&2
+            fi
+            exit;;
+    esac
     shift
 done
+
+if [ "$(uname -s)" = "Darwin" ] && [ "$CREATE_DARWIN_VOLUME" = 1 ]; then
+    printf '\e[1;31mCreating volume and mountpoint /nix.\e[0m\n'
+    "$self/create-darwin-volume.sh"
+fi
 
 if [ "$INSTALL_MODE" = "daemon" ]; then
     printf '\e[1;31mSwitching to the Daemon-based Installer\e[0m\n'
@@ -95,6 +113,15 @@ if ! [ -e $dest ]; then
     echo "directory $dest does not exist; creating it by running '$cmd' using sudo" >&2
     if ! sudo sh -c "$cmd"; then
         echo "$0: please manually run '$cmd' as root to create $dest" >&2
+        if [ "$(uname -s)" = "Darwin" ]; then
+            (
+                echo ""
+                echo "Installing on macOS >=10.15 requires relocating the store to an apfs volume."
+                echo "Use --create-volume or run the preparation steps manually."
+                echo "See https://nixos.org/nix/manual/#sect-darwin-apfs-volume."
+                echo ""
+            ) >&2
+        fi
         exit 1
     fi
 fi
