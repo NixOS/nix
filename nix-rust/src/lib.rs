@@ -9,6 +9,7 @@ extern crate assert_matches;
 #[macro_use]
 extern crate proptest;
 
+#[cfg(not(test))]
 mod c;
 mod error;
 mod foreign;
