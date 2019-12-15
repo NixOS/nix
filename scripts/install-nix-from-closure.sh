@@ -197,6 +197,17 @@ if [ -z "$NIX_INSTALLER_NO_MODIFY_PROFILE" ]; then
             break
         fi
     done
+    for i in .zshenv .zshrc; do
+        fn="$HOME/$i"
+        if [ -w "$fn" ]; then
+            if ! grep -q "$p" "$fn"; then
+                echo "modifying $fn..." >&2
+                echo "if [ -e $p ]; then . $p; fi # added by Nix installer" >> "$fn"
+            fi
+            added=1
+            break
+        fi
+    done
 fi
 
 if [ -z "$added" ]; then
