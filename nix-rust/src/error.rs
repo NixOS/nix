@@ -4,6 +4,7 @@ use std::fmt;
 pub enum Error {
     InvalidPath(crate::store::StorePath),
     BadStorePath(std::path::PathBuf),
+    NotInStore(std::path::PathBuf),
     BadNarInfo,
     BadBase32,
     StorePathNameEmpty,
@@ -46,6 +47,9 @@ impl fmt::Display for Error {
             Error::InvalidPath(_) => write!(f, "invalid path"),
             Error::BadNarInfo => write!(f, ".narinfo file is corrupt"),
             Error::BadStorePath(path) => write!(f, "path '{}' is not a store path", path.display()),
+            Error::NotInStore(path) => {
+                write!(f, "path '{}' is not in the Nix store", path.display())
+            }
             Error::BadBase32 => write!(f, "invalid base32 string"),
             Error::StorePathNameEmpty => write!(f, "store path name is empty"),
             Error::StorePathNameTooLong => {

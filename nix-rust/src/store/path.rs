@@ -13,8 +13,10 @@ pub const STORE_PATH_HASH_BYTES: usize = 20;
 pub const STORE_PATH_HASH_CHARS: usize = 32;
 
 impl StorePath {
-    pub fn new(path: &Path, _store_dir: &str) -> Result<Self, Error> {
-        // FIXME: check store_dir
+    pub fn new(path: &Path, store_dir: &Path) -> Result<Self, Error> {
+        if path.parent() != Some(store_dir) {
+            return Err(Error::NotInStore(path.into()));
+        }
         Self::new_from_base_name(
             path.file_name()
                 .ok_or(Error::BadStorePath(path.into()))?

@@ -34,7 +34,8 @@ pub extern "C" fn ffi_StorePath_new(
     path: &str,
     store_dir: &str,
 ) -> Result<StorePath, error::CppException> {
-    StorePath::new(std::path::Path::new(path), store_dir).map_err(|err| err.into())
+    StorePath::new(std::path::Path::new(path), std::path::Path::new(store_dir))
+        .map_err(|err| err.into())
 }
 
 #[no_mangle]
