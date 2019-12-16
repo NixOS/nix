@@ -62,7 +62,8 @@ std::unique_ptr<SSHMaster::Connection> SSHMaster::startCommand(const std::string
         args.push_back(command);
         execvp(args.begin()->c_str(), stringsToCharPtrs(args).data());
 
-        throw SysError("executing '%s' on '%s'", command, host);
+        // could not exec ssh/bash
+        throw SysError("unable to execute '%s'", args.front());
     });
 
 
@@ -108,7 +109,7 @@ Path SSHMaster::startMaster()
         addCommonSSHOpts(args);
         execvp(args.begin()->c_str(), stringsToCharPtrs(args).data());
 
-        throw SysError("starting SSH master");
+        throw SysError("unable to execute '%s'", args.front());
     });
 
     out.writeSide = -1;

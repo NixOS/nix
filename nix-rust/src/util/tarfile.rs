@@ -2,18 +2,28 @@ use crate::{foreign::Source, Error};
 use std::fs;
 use std::io;
 use std::os::unix::fs::OpenOptionsExt;
-use std::path::Path;
+use std::path::{Component, Path};
 use tar::Archive;
 
-pub fn unpack_tarfile(source: Source, dest_dir: &str) -> Result<(), Error> {
-    let dest_dir = Path::new(dest_dir);
+pub fn unpack_tarfile(source: Source, dest_dir: &Path) -> Result<(), Error> {
+    fs::create_dir_all(dest_dir)?;
 
     let mut tar = Archive::new(source);
 
     for file in tar.entries()? {
         let mut file = file?;
 
-        let dest_file = dest_dir.join(file.path()?);
+        let path = file.path()?;
+
+        for i in path.components() {
+            if let Component::Prefix(_) | Component::RootDir | Component::ParentDir = i {
+                return Err(Error::BadTarFileMemberName(
+                    file.path()?.to_str().unwrap().to_string(),
+                ));
+            }
+        }
+
+        let dest_file = dest_dir.join(path);
 
         fs::create_dir_all(dest_file.parent().unwrap())?;
 

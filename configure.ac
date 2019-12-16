@@ -210,6 +210,11 @@ PKG_CHECK_MODULES([LIBLZMA], [liblzma], [CXXFLAGS="$LIBLZMA_CFLAGS $CXXFLAGS"])
 AC_CHECK_LIB([lzma], [lzma_stream_encoder_mt],
   [AC_DEFINE([HAVE_LZMA_MT], [1], [xz multithreaded compression support])])
 
+# Look for zlib, a required dependency.
+PKG_CHECK_MODULES([ZLIB], [zlib], [CXXFLAGS="$ZLIB_CFLAGS $CXXFLAGS"])
+AC_CHECK_HEADER([zlib.h],[:],[AC_MSG_ERROR([could not find the zlib.h header])])
+LDFLAGS="-lz $LDFLAGS"
+
 # Look for libbrotli{enc,dec}.
 PKG_CHECK_MODULES([LIBBROTLI], [libbrotlienc libbrotlidec], [CXXFLAGS="$LIBBROTLI_CFLAGS $CXXFLAGS"])
 

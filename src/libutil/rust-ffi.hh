@@ -140,63 +140,57 @@ struct Source
         : fun(sourceWrapper), _this(&_this)
     {}
 
-    // FIXME: how to propagate exceptions?
-    static size_t sourceWrapper(void * _this, rust::Slice<uint8_t> data)
-    {
-        auto n = ((nix::Source *) _this)->read((unsigned char *) data.ptr, data.size);
-        return n;
-    }
+    static size_t sourceWrapper(void * _this, rust::Slice<uint8_t> data);
 };
 
 /* C++ representation of Rust's Result<T, CppException>. */
 template<typename T>
 struct Result
 {
-    unsigned int tag;
+    enum { Ok = 0, Err = 1, Uninit = 2 } tag;
 
     union {
         T data;
         std::exception_ptr * exc;
     };
 
+    Result() : tag(Uninit) { }; // FIXME: remove
+
+    Result(const Result &) = delete;
+
+    Result(Result && other)
+        : tag(other.tag)
+    {
+        other.tag = Uninit;
+        if (tag == Ok)
+            data = std::move(other.data);
+        else if (tag == Err)
+            exc = other.exc;
+    }
+
     ~Result()
     {
-        if (tag == 0)
+        if (tag == Ok)
             data.~T();
-        else if (tag == 1)
-            // FIXME: don't leak exc
+        else if (tag == Err)
+            free(exc);
+        else if (tag == Uninit)
             ;
+        else
+            abort();
     }
 
     /* Rethrow the wrapped exception or return the wrapped value. */
     T unwrap()
     {
-        if (tag == 0)
+        if (tag == Ok) {
+            tag = Uninit;
             return std::move(data);
-        else if (tag == 1)
+        }
+        else if (tag == Err)
             std::rethrow_exception(*exc);
         else
             abort();
-    }
-};
-
-template<typename T>
-struct CBox
-{
-    T * ptr;
-
-    T * operator ->()
-    {
-        return ptr;
-    }
-
-    CBox(T * ptr) : ptr(ptr) { }
-    CBox(const CBox &) = delete;
-    CBox(CBox &&) = delete;
-
-    ~CBox()
-    {
-        free(ptr);
     }
 };
 

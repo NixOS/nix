@@ -22,7 +22,9 @@ pub enum Error {
     #[cfg(unused)]
     HttpError(hyper::error::Error),
     Misc(String),
+    #[cfg(not(test))]
     Foreign(CppException),
+    BadTarFileMemberName(String),
 }
 
 impl From<std::io::Error> for Error {
@@ -62,26 +64,51 @@ impl fmt::Display for Error {
             Error::IOError(err) => write!(f, "I/O error: {}", err),
             #[cfg(unused)]
             Error::HttpError(err) => write!(f, "HTTP error: {}", err),
+            #[cfg(not(test))]
             Error::Foreign(_) => write!(f, "<C++ exception>"), // FIXME
             Error::Misc(s) => write!(f, "{}", s),
+            Error::BadTarFileMemberName(s) => {
+                write!(f, "tar archive contains illegal file name '{}'", s)
+            }
         }
     }
 }
 
+#[cfg(not(test))]
 impl From<Error> for CppException {
     fn from(err: Error) -> Self {
         match err {
             Error::Foreign(ex) => ex,
-            _ => unsafe { make_error(&err.to_string()) },
+            _ => CppException::new(&err.to_string()),
         }
     }
 }
 
+#[cfg(not(test))]
 #[repr(C)]
 #[derive(Debug)]
 pub struct CppException(*const libc::c_void); // == std::exception_ptr*
 
+#[cfg(not(test))]
+impl CppException {
+    fn new(s: &str) -> Self {
+        Self(unsafe { make_error(s) })
+    }
+}
+
+#[cfg(not(test))]
+impl Drop for CppException {
+    fn drop(&mut self) {
+        unsafe {
+            destroy_error(self.0);
+        }
+    }
+}
+
+#[cfg(not(test))]
 extern "C" {
     #[allow(improper_ctypes)] // YOLO
-    fn make_error(s: &str) -> CppException;
+    fn make_error(s: &str) -> *const libc::c_void;
+
+    fn destroy_error(exc: *const libc::c_void);
 }

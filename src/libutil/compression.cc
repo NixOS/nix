@@ -11,6 +11,8 @@
 #include <brotli/decode.h>
 #include <brotli/encode.h>
 
+#include <zlib.h>
+
 #include <iostream>
 
 namespace nix {
@@ -40,6 +42,66 @@ struct NoneSink : CompressionSink
     NoneSink(Sink & nextSink) : nextSink(nextSink) { }
     void finish() override { flush(); }
     void write(const unsigned char * data, size_t len) override { nextSink(data, len); }
+};
+
+struct GzipDecompressionSink : CompressionSink
+{
+    Sink & nextSink;
+    z_stream strm;
+    bool finished = false;
+    uint8_t outbuf[BUFSIZ];
+
+    GzipDecompressionSink(Sink & nextSink) : nextSink(nextSink)
+    {
+        strm.zalloc = Z_NULL;
+        strm.zfree = Z_NULL;
+        strm.opaque = Z_NULL;
+        strm.avail_in = 0;
+        strm.next_in = Z_NULL;
+        strm.next_out = outbuf;
+        strm.avail_out = sizeof(outbuf);
+
+        // Enable gzip and zlib decoding (+32) with 15 windowBits
+        int ret = inflateInit2(&strm,15+32);
+        if (ret != Z_OK)
+            throw CompressionError("unable to initialise gzip encoder");
+    }
+
+    ~GzipDecompressionSink()
+    {
+        inflateEnd(&strm);
+    }
+
+    void finish() override
+    {
+        CompressionSink::flush();
+        write(nullptr, 0);
+    }
+
+    void write(const unsigned char * data, size_t len) override
+    {
+        assert(len <= std::numeric_limits<decltype(strm.avail_in)>::max());
+
+        strm.next_in = (Bytef *) data;
+        strm.avail_in = len;
+
+        while (!finished && (!data || strm.avail_in)) {
+            checkInterrupt();
+
+            int ret = inflate(&strm,Z_SYNC_FLUSH);
+            if (ret != Z_OK && ret != Z_STREAM_END)
+                throw CompressionError("error while decompressing gzip file: %d (%d, %d)",
+                    zError(ret), len, strm.avail_in);
+
+            finished = ret == Z_STREAM_END;
+
+            if (strm.avail_out < sizeof(outbuf) || strm.avail_in == 0) {
+                nextSink(outbuf, sizeof(outbuf) - strm.avail_out);
+                strm.next_out = (Bytef *) outbuf;
+                strm.avail_out = sizeof(outbuf);
+            }
+        }
+    }
 };
 
 struct XzDecompressionSink : CompressionSink
@@ -215,6 +277,8 @@ ref<CompressionSink> makeDecompressionSink(const std::string & method, Sink & ne
         return make_ref<XzDecompressionSink>(nextSink);
     else if (method == "bzip2")
         return make_ref<BzipDecompressionSink>(nextSink);
+    else if (method == "gzip")
+        return make_ref<GzipDecompressionSink>(nextSink);
     else if (method == "br")
         return make_ref<BrotliDecompressionSink>(nextSink);
     else

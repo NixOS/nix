@@ -68,7 +68,7 @@
 
         buildDeps =
           [ curl
-            bzip2 xz brotli editline
+            bzip2 xz brotli zlib editline
             openssl pkgconfig sqlite boehmgc
             boost
             (nlohmann_json.override { multipleHeaders = true; })
