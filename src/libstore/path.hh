@@ -7,6 +7,8 @@ namespace nix {
 /* See path.rs. */
 struct StorePath;
 
+struct Store;
+
 extern "C" {
     void ffi_StorePath_drop(void *);
     bool ffi_StorePath_less_than(const StorePath & a, const StorePath & b);
@@ -66,6 +68,28 @@ const size_t storePathHashLen = 32; // i.e. 160 bits
 
 /* Extension of derivations in the Nix store. */
 const std::string drvExtension = ".drv";
+
+struct StorePathWithOutputs
+{
+    StorePath path;
+    std::set<std::string> outputs;
+
+    StorePathWithOutputs(const StorePath & path, const std::set<std::string> & outputs = {})
+        : path(path.clone()), outputs(outputs)
+    { }
+
+    StorePathWithOutputs(StorePath && path, std::set<std::string> && outputs)
+        : path(std::move(path)), outputs(std::move(outputs))
+    { }
+
+    StorePathWithOutputs(const StorePathWithOutputs & other)
+        : path(other.path.clone()), outputs(other.outputs)
+    { }
+
+    std::string to_string(const Store & store) const;
+};
+
+std::pair<std::string_view, StringSet> parsePathWithOutputs(std::string_view s);
 
 }
 

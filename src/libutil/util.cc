@@ -1186,7 +1186,7 @@ void _interrupted()
 //////////////////////////////////////////////////////////////////////
 
 
-template<class C> C tokenizeString(const string & s, const string & separators)
+template<class C> C tokenizeString(std::string_view s, const string & separators)
 {
     C result;
     string::size_type pos = s.find_first_not_of(separators, 0);
@@ -1200,9 +1200,9 @@ template<class C> C tokenizeString(const string & s, const string & separators)
     return result;
 }
 
-template Strings tokenizeString(const string & s, const string & separators);
-template StringSet tokenizeString(const string & s, const string & separators);
-template vector<string> tokenizeString(const string & s, const string & separators);
+template Strings tokenizeString(std::string_view s, const string & separators);
+template StringSet tokenizeString(std::string_view s, const string & separators);
+template vector<string> tokenizeString(std::string_view s, const string & separators);
 
 
 string concatStringsSep(const string & sep, const Strings & ss)

@@ -340,7 +340,7 @@ MakeError(FormatError, Error);
 
 
 /* String tokenizer. */
-template<class C> C tokenizeString(const string & s, const string & separators = " \t\n\r");
+template<class C> C tokenizeString(std::string_view s, const string & separators = " \t\n\r");
 
 
 /* Concatenate the given strings with a separator between the

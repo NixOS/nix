@@ -39,9 +39,9 @@ Path Store::toStorePath(const Path & path) const
 }
 
 
-Path Store::followLinksToStore(const Path & _path) const
+Path Store::followLinksToStore(std::string_view _path) const
 {
-    Path path = absPath(_path);
+    Path path = absPath(std::string(_path));
     while (!isInStore(path)) {
         if (!isLink(path)) break;
         string target = readLink(path);
@@ -53,9 +53,16 @@ Path Store::followLinksToStore(const Path & _path) const
 }
 
 
-StorePath Store::followLinksToStorePath(const Path & path) const
+StorePath Store::followLinksToStorePath(std::string_view path) const
 {
     return parseStorePath(toStorePath(followLinksToStore(path)));
+}
+
+
+StorePathWithOutputs Store::followLinksToStorePathWithOutputs(std::string_view path) const
+{
+    auto [path2, outputs] = nix::parsePathWithOutputs(path);
+    return StorePathWithOutputs(followLinksToStorePath(path2), std::move(outputs));
 }
 
 

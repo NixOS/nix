@@ -375,16 +375,6 @@ Hash hashDerivationModulo(Store & store, const Derivation & drv, bool maskOutput
 }
 
 
-StorePathWithOutputs Store::parseDrvPathWithOutputs(const std::string & s)
-{
-    size_t n = s.find("!");
-    return n == s.npos
-        ? StorePathWithOutputs{parseStorePath(s), std::set<string>()}
-        : StorePathWithOutputs{parseStorePath(std::string_view(s.data(), n)),
-            tokenizeString<std::set<string>>(string(s, n + 1), ",")};
-}
-
-
 std::string StorePathWithOutputs::to_string(const Store & store) const
 {
     return outputs.empty()
