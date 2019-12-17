@@ -99,8 +99,8 @@ void handleSQLiteBusy(const SQLiteBusy & e);
 
 /* Convenience function for retrying a SQLite transaction when the
    database is busy. */
-template<typename T>
-T retrySQLite(std::function<T()> fun)
+template<typename T, typename F>
+T retrySQLite(F && fun)
 {
     while (true) {
         try {

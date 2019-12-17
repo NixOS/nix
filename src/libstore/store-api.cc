@@ -975,7 +975,7 @@ std::list<ref<Store>> getDefaultSubstituters()
             addStore(uri);
 
         stores.sort([](ref<Store> & a, ref<Store> & b) {
-            return a->getPriority() < b->getPriority();
+            return a->priority < b->priority;
         });
 
         return stores;

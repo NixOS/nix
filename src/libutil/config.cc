@@ -154,6 +154,11 @@ AbstractSetting::AbstractSetting(
 {
 }
 
+void AbstractSetting::setDefault(const std::string & str)
+{
+    if (!overriden) set(str);
+}
+
 void AbstractSetting::toJSON(JSONPlaceholder & out)
 {
     out.write(to_string());
@@ -185,7 +190,7 @@ template<> void BaseSetting<std::string>::set(const std::string & str)
     value = str;
 }
 
-template<> std::string BaseSetting<std::string>::to_string()
+template<> std::string BaseSetting<std::string>::to_string() const
 {
     return value;
 }
@@ -199,7 +204,7 @@ void BaseSetting<T>::set(const std::string & str)
 }
 
 template<typename T>
-std::string BaseSetting<T>::to_string()
+std::string BaseSetting<T>::to_string() const
 {
     static_assert(std::is_integral<T>::value, "Integer required.");
     return std::to_string(value);
@@ -215,7 +220,7 @@ template<> void BaseSetting<bool>::set(const std::string & str)
         throw UsageError("Boolean setting '%s' has invalid value '%s'", name, str);
 }
 
-template<> std::string BaseSetting<bool>::to_string()
+template<> std::string BaseSetting<bool>::to_string() const
 {
     return value ? "true" : "false";
 }
@@ -239,7 +244,7 @@ template<> void BaseSetting<Strings>::set(const std::string & str)
     value = tokenizeString<Strings>(str);
 }
 
-template<> std::string BaseSetting<Strings>::to_string()
+template<> std::string BaseSetting<Strings>::to_string() const
 {
     return concatStringsSep(" ", value);
 }
@@ -256,7 +261,7 @@ template<> void BaseSetting<StringSet>::set(const std::string & str)
     value = tokenizeString<StringSet>(str);
 }
 
-template<> std::string BaseSetting<StringSet>::to_string()
+template<> std::string BaseSetting<StringSet>::to_string() const
 {
     return concatStringsSep(" ", value);
 }

@@ -205,11 +205,12 @@ struct S3BinaryCacheStoreImpl : public S3BinaryCacheStore
 
     void init() override
     {
-        if (!diskCache->cacheExists(getUri(), wantMassQuery_, priority)) {
-
+        if (auto cacheInfo = diskCache->cacheExists(getUri())) {
+            wantMassQuery.setDefault(cacheInfo->wantMassQuery ? "true" : "false");
+            priority.setDefault(fmt("%d", cacheInfo->priority));
+        } else {
             BinaryCacheStore::init();
-
-            diskCache->createCache(getUri(), storeDir, wantMassQuery_, priority);
+            diskCache->createCache(getUri(), storeDir, wantMassQuery, priority);
         }
     }
 

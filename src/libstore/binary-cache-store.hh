@@ -52,11 +52,6 @@ public:
 
     std::shared_ptr<std::string> getFile(const std::string & path);
 
-protected:
-
-    bool wantMassQuery_ = false;
-    int priority = 50;
-
 public:
 
     virtual void init();
@@ -78,8 +73,6 @@ public:
 
     std::optional<StorePath> queryPathFromHashPart(const std::string & hashPart) override
     { unsupported("queryPathFromHashPart"); }
-
-    bool wantMassQuery() override { return wantMassQuery_; }
 
     void addToStore(const ValidPathInfo & info, const ref<std::string> & nar,
         RepairFlag repair, CheckSigsFlag checkSigs,
@@ -106,8 +99,6 @@ public:
     void addSignatures(const StorePath & storePath, const StringSet & sigs) override;
 
     std::shared_ptr<std::string> getBuildLog(const StorePath & path) override;
-
-    int getPriority() override { return priority; }
 
 };
 

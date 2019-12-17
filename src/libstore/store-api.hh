@@ -255,6 +255,10 @@ public:
 
     const Setting<bool> isTrusted{this, false, "trusted", "whether paths from this store can be used as substitutes even when they lack trusted signatures"};
 
+    Setting<int> priority{this, 0, "priority", "priority of this substituter (lower value means higher priority)"};
+
+    Setting<bool> wantMassQuery{this, false, "want-mass-query", "whether this substituter can be queried efficiently for path validity"};
+
 protected:
 
     struct State
@@ -421,8 +425,6 @@ public:
        info, it's omitted from the resulting ‘infos’ map. */
     virtual void querySubstitutablePathInfos(const StorePathSet & paths,
         SubstitutablePathInfos & infos) { return; };
-
-    virtual bool wantMassQuery() { return false; }
 
     /* Import a path into the store. */
     virtual void addToStore(const ValidPathInfo & info, Source & narSource,
@@ -647,11 +649,6 @@ public:
     {
         return 0;
     };
-
-    /* Get the priority of the store, used to order substituters. In
-       particular, binary caches can specify a priority field in their
-       "nix-cache-info" file. Lower value means higher priority. */
-    virtual int getPriority() { return 0; }
 
     virtual Path toRealPath(const Path & storePath)
     {

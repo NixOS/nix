@@ -147,26 +147,26 @@ public:
         });
     }
 
-    bool cacheExists(const std::string & uri,
-        bool & wantMassQuery, int & priority) override
+    std::optional<CacheInfo> cacheExists(const std::string & uri) override
     {
-        return retrySQLite<bool>([&]() {
+        return retrySQLite<std::optional<CacheInfo>>([&]() -> std::optional<CacheInfo> {
             auto state(_state.lock());
 
             auto i = state->caches.find(uri);
             if (i == state->caches.end()) {
                 auto queryCache(state->queryCache.use()(uri));
-                if (!queryCache.next()) return false;
+                if (!queryCache.next())
+                    return std::nullopt;
                 state->caches.emplace(uri,
                     Cache{(int) queryCache.getInt(0), queryCache.getStr(1), queryCache.getInt(2) != 0, (int) queryCache.getInt(3)});
             }
 
             auto & cache(getCache(*state, uri));
 
-            wantMassQuery = cache.wantMassQuery;
-            priority = cache.priority;
-
-            return true;
+            return CacheInfo {
+                .wantMassQuery = cache.wantMassQuery,
+                .priority = cache.priority
+            };
         });
     }
 
