@@ -19,7 +19,7 @@ DrvInfo::DrvInfo(EvalState & state, const string & attrPath, Bindings * attrs)
 DrvInfo::DrvInfo(EvalState & state, ref<Store> store, const std::string & drvPathWithOutputs)
     : state(&state), attrs(nullptr), attrPath("")
 {
-    auto [drvPath, selectedOutputs] = store->parseDrvPathWithOutputs(drvPathWithOutputs);
+    auto [drvPath, selectedOutputs] = store->parsePathWithOutputs(drvPathWithOutputs);
 
     this->drvPath = store->printStorePath(drvPath);
 

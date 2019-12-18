@@ -15,8 +15,13 @@ public:
     virtual void createCache(const std::string & uri, const Path & storeDir,
         bool wantMassQuery, int priority) = 0;
 
-    virtual bool cacheExists(const std::string & uri,
-        bool & wantMassQuery, int & priority) = 0;
+    struct CacheInfo
+    {
+        bool wantMassQuery;
+        int priority;
+    };
+
+    virtual std::optional<CacheInfo> cacheExists(const std::string & uri) = 0;
 
     virtual std::pair<Outcome, std::shared_ptr<NarInfo>> lookupNarInfo(
         const std::string & uri, const std::string & hashPart) = 0;

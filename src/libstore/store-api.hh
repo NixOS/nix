@@ -242,23 +242,6 @@ struct BuildResult
 };
 
 
-struct StorePathWithOutputs
-{
-    StorePath path;
-    std::set<std::string> outputs;
-
-    StorePathWithOutputs(const StorePath & path, const std::set<std::string> & outputs = {})
-        : path(path.clone()), outputs(outputs)
-    { }
-
-    StorePathWithOutputs(const StorePathWithOutputs & other)
-        : path(other.path.clone()), outputs(other.outputs)
-    { }
-
-    std::string to_string(const Store & store) const;
-};
-
-
 class Store : public std::enable_shared_from_this<Store>, public Config
 {
 public:
@@ -272,6 +255,10 @@ public:
     const Setting<int> pathInfoCacheSize{this, 65536, "path-info-cache-size", "size of the in-memory store path information cache"};
 
     const Setting<bool> isTrusted{this, false, "trusted", "whether paths from this store can be used as substitutes even when they lack trusted signatures"};
+
+    Setting<int> priority{this, 0, "priority", "priority of this substituter (lower value means higher priority)"};
+
+    Setting<bool> wantMassQuery{this, false, "want-mass-query", "whether this substituter can be queried efficiently for path validity"};
 
 protected:
 
@@ -305,7 +292,7 @@ public:
     /* Split a string specifying a derivation and a set of outputs
        (/nix/store/hash-foo!out1,out2,...) into the derivation path
        and the outputs. */
-    StorePathWithOutputs parseDrvPathWithOutputs(const string & s);
+    StorePathWithOutputs parsePathWithOutputs(const string & s);
 
     /* Display a set of paths in human-readable form (i.e., between quotes
        and separated by commas). */
@@ -324,11 +311,13 @@ public:
     Path toStorePath(const Path & path) const;
 
     /* Follow symlinks until we end up with a path in the Nix store. */
-    Path followLinksToStore(const Path & path) const;
+    Path followLinksToStore(std::string_view path) const;
 
     /* Same as followLinksToStore(), but apply toStorePath() to the
        result. */
-    StorePath followLinksToStorePath(const Path & path) const;
+    StorePath followLinksToStorePath(std::string_view path) const;
+
+    StorePathWithOutputs followLinksToStorePathWithOutputs(std::string_view path) const;
 
     /* Constructs a unique store path name. */
     StorePath makeStorePath(const string & type,
@@ -437,8 +426,6 @@ public:
        info, it's omitted from the resulting ‘infos’ map. */
     virtual void querySubstitutablePathInfos(const StorePathSet & paths,
         SubstitutablePathInfos & infos) { return; };
-
-    virtual bool wantMassQuery() { return false; }
 
     /* Import a path into the store. */
     virtual void addToStore(const ValidPathInfo & info, Source & narSource,
@@ -663,11 +650,6 @@ public:
     {
         return 0;
     };
-
-    /* Get the priority of the store, used to order substituters. In
-       particular, binary caches can specify a priority field in their
-       "nix-cache-info" file. Lower value means higher priority. */
-    virtual int getPriority() { return 0; }
 
     virtual Path toRealPath(const Path & storePath)
     {

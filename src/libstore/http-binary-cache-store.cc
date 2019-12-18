@@ -42,13 +42,16 @@ public:
     void init() override
     {
         // FIXME: do this lazily?
-        if (!diskCache->cacheExists(cacheUri, wantMassQuery_, priority)) {
+        if (auto cacheInfo = diskCache->cacheExists(cacheUri)) {
+            wantMassQuery.setDefault(cacheInfo->wantMassQuery ? "true" : "false");
+            priority.setDefault(fmt("%d", cacheInfo->priority));
+        } else {
             try {
                 BinaryCacheStore::init();
             } catch (UploadToHTTP &) {
                 throw Error("'%s' does not appear to be a binary cache", cacheUri);
             }
-            diskCache->createCache(cacheUri, storeDir, wantMassQuery_, priority);
+            diskCache->createCache(cacheUri, storeDir, wantMassQuery, priority);
         }
     }
 

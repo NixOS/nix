@@ -127,7 +127,7 @@ template<> void BaseSetting<SandboxMode>::set(const std::string & str)
     else throw UsageError("option '%s' has invalid value '%s'", name, str);
 }
 
-template<> std::string BaseSetting<SandboxMode>::to_string()
+template<> std::string BaseSetting<SandboxMode>::to_string() const
 {
     if (value == smEnabled) return "true";
     else if (value == smRelaxed) return "relaxed";
