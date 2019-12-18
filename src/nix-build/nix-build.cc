@@ -432,7 +432,7 @@ static void _main(int argc, char * * argv)
                 "PATH=\"%4%:$PATH\"; "
                 "SHELL=%5%; "
                 "set +e; "
-                R"s([ -n "$PS1" ] && PS1='\n\[\033[1;32m\][nix-shell:\w]\$\[\033[0m\] '; )s"
+                R"s([ -n "$PS1" ] && PS1=${NIX_SHELL_PS1:-'\n\[\033[1;32m\][nix-shell:\w]\$\[\033[0m\] '}; )s"
                 "if [ \"$(type -t runHook)\" = function ]; then runHook shellHook; fi; "
                 "unset NIX_ENFORCE_PURITY; "
                 "shopt -u nullglob; "
