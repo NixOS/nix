@@ -912,18 +912,16 @@ CachedDownloadResult Downloader::downloadCached(
             AutoDelete autoDelete(tmpDir, true);
 #if 0
             unpackTarfile(store->toRealPath(store->printStorePath(*storePath)), tmpDir, std::string(baseNameOf(url)));
+#else
+            // FIXME: this requires GNU tar for decompression.
+            runProgram("tar", true, {"xf", store->toRealPath(store->printStorePath(*storePath)), "-C", tmpDir});
+#endif
             auto members = readDirectory(tmpDir);
             if (members.size() != 1)
                 throw nix::Error("tarball '%s' contains an unexpected number of top-level files", url);
             auto topDir = tmpDir + "/" + members.begin()->name;
             result.lastModified = lstat(topDir).st_mtime;
             unpackedStorePath = store->addToStore(name, topDir, true, htSHA256, defaultPathFilter, NoRepair);
-#else
-            // FIXME: this requires GNU tar for decompression.
-            runProgram("tar", true, {"xf", store->toRealPath(store->printStorePath(*storePath)), "-C", tmpDir, "--strip-components", "1"});
-            result.lastModified = lstat(tmpDir).st_mtime;
-            unpackedStorePath = store->addToStore(name, tmpDir, true, htSHA256, defaultPathFilter, NoRepair);
-#endif
         }
         // Store the last-modified date of the tarball in the symlink
         // mtime. This saves us from having to store it somewhere
