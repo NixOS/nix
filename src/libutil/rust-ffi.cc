@@ -19,15 +19,4 @@ std::ostream & operator << (std::ostream & str, const String & s)
     return str;
 }
 
-size_t Source::sourceWrapper(void * _this, rust::Slice<uint8_t> data)
-{
-    try {
-        // FIXME: how to propagate exceptions?
-        auto n = ((nix::Source *) _this)->read((unsigned char *) data.ptr, data.size);
-        return n;
-    } catch (...) {
-        abort();
-    }
-}
-
 }

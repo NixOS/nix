@@ -1,22 +1,4 @@
-use super::{
-    error,
-    foreign::{self},
-    store::path,
-    store::StorePath,
-    util,
-};
-
-#[no_mangle]
-pub unsafe extern "C" fn unpack_tarfile(
-    source: foreign::Source,
-    dest_dir: &str,
-    out: *mut Result<(), error::CppException>,
-) {
-    out.write(
-        util::tarfile::unpack_tarfile(source, std::path::Path::new(dest_dir))
-            .map_err(|err| err.into()),
-    );
-}
+use super::{error, store::path, store::StorePath, util};
 
 #[no_mangle]
 pub unsafe extern "C" fn ffi_String_new(s: &str, out: *mut String) {

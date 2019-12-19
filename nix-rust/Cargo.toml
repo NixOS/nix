@@ -9,7 +9,6 @@ name = "nixrust"
 crate-type = ["cdylib"]
 
 [dependencies]
-tar = "0.4"
 libc = "0.2"
 #futures-preview = { version = "=0.3.0-alpha.19" }
 #hyper = "0.13.0-alpha.4"

@@ -190,10 +190,7 @@ static int _main(int argc, char * * argv)
                 printInfo("unpacking...");
                 Path unpacked = (Path) tmpDir + "/unpacked";
                 createDirs(unpacked);
-                if (hasSuffix(baseNameOf(uri), ".zip"))
-                    runProgram("unzip", true, {"-qq", tmpFile, "-d", unpacked});
-                else
-                    unpackTarfile(tmpFile, unpacked, std::string(baseNameOf(uri)));
+                unpackTarfile(tmpFile, unpacked);
 
                 /* If the archive unpacks to a single file/directory, then use
                    that as the top-level. */
