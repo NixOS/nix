@@ -84,6 +84,7 @@ static void extract_archive(TarArchive & archive, const Path & destDir)
 {
     int flags = ARCHIVE_EXTRACT_FFLAGS
         | ARCHIVE_EXTRACT_PERM
+        | ARCHIVE_EXTRACT_TIME
         | ARCHIVE_EXTRACT_SECURE_SYMLINKS
         | ARCHIVE_EXTRACT_SECURE_NODOTDOT;
 
