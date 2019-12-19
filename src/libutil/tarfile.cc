@@ -80,34 +80,12 @@ private:
     }
 };
 
-struct PushD {
-    char * oldDir;
-
-    PushD(const std::string &newDir)  {
-        oldDir = getcwd(0, 0);
-        if (!oldDir) throw SysError("getcwd");
-        int r = chdir(newDir.c_str());
-        if (r != 0) throw SysError("changing directory to tar output path");
-    }
-
-    ~PushD() {
-        int r = chdir(oldDir);
-        free(oldDir);
-        if (r != 0)
-            warn("failed to change directory back after tar extraction");
-        /* can't throw out of a destructor */
-    }
-};
-
 static void extract_archive(TarArchive & archive, const Path & destDir)
 {
-    // need to chdir back *after* archive closing
-    PushD newDir(destDir);
     int flags = ARCHIVE_EXTRACT_FFLAGS
         | ARCHIVE_EXTRACT_PERM
         | ARCHIVE_EXTRACT_SECURE_SYMLINKS
-        | ARCHIVE_EXTRACT_SECURE_NODOTDOT
-        | ARCHIVE_EXTRACT_SECURE_NOABSOLUTEPATHS;
+        | ARCHIVE_EXTRACT_SECURE_NODOTDOT;
 
     for (;;) {
         struct archive_entry * entry;
@@ -117,6 +95,9 @@ static void extract_archive(TarArchive & archive, const Path & destDir)
             warn(archive_error_string(archive.archive));
         else
             archive.check(r);
+
+        archive_entry_set_pathname(entry,
+            (destDir + "/" + archive_entry_pathname(entry)).c_str());
 
         archive.check(archive_read_extract(archive.archive, entry, flags));
     }
