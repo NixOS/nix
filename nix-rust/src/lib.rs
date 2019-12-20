@@ -12,7 +12,6 @@ extern crate proptest;
 #[cfg(not(test))]
 mod c;
 mod error;
-mod foreign;
 #[cfg(unused)]
 mod nar;
 mod store;

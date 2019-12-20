@@ -131,18 +131,6 @@ struct String : Vec<char, ffi_String_drop>
 
 std::ostream & operator << (std::ostream & str, const String & s);
 
-struct Source
-{
-    size_t (*fun)(void * source_this, rust::Slice<uint8_t> data);
-    nix::Source * _this;
-
-    Source(nix::Source & _this)
-        : fun(sourceWrapper), _this(&_this)
-    {}
-
-    static size_t sourceWrapper(void * _this, rust::Slice<uint8_t> data);
-};
-
 /* C++ representation of Rust's Result<T, CppException>. */
 template<typename T>
 struct Result

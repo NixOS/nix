@@ -910,12 +910,7 @@ CachedDownloadResult Downloader::downloadCached(
             printInfo("unpacking '%s'...", url);
             Path tmpDir = createTempDir();
             AutoDelete autoDelete(tmpDir, true);
-#if 0
-            unpackTarfile(store->toRealPath(store->printStorePath(*storePath)), tmpDir, std::string(baseNameOf(url)));
-#else
-            // FIXME: this requires GNU tar for decompression.
-            runProgram("tar", true, {"xf", store->toRealPath(store->printStorePath(*storePath)), "-C", tmpDir});
-#endif
+            unpackTarfile(store->toRealPath(store->printStorePath(*storePath)), tmpDir);
             auto members = readDirectory(tmpDir);
             if (members.size() != 1)
                 throw nix::Error("tarball '%s' contains an unexpected number of top-level files", url);
