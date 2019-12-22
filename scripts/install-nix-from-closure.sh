@@ -102,7 +102,7 @@ for i in $(cd "$self/store" >/dev/null && echo ./*); do
         rm -rf "$i_tmp"
     fi
     if ! [ -e "$dest/store/$i" ]; then
-        cp -Rp "$self/store/$i" "$i_tmp"
+        cp -RPp "$self/store/$i" "$i_tmp"
         chmod -R a-w "$i_tmp"
         chmod +w "$i_tmp"
         mv "$i_tmp" "$dest/store/$i"
