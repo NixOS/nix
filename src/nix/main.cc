@@ -143,11 +143,11 @@ void mainWrapped(int argc, char * * argv)
     }
 
     verbosity = lvlWarn;
-    settings.verboseBuild = false;
 
     NixArgs args;
 
     args.parseCmdline(argvToStrings(argc, argv));
+    settings.verboseBuild = args.printBuildLogs;
 
     settings.requireExperimentalFeature("nix-command");
 
