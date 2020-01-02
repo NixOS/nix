@@ -1985,7 +1985,7 @@ void DerivationGoal::startBuilder()
             throw BuildError(format("odd number of tokens in 'exportReferencesGraph': '%1%'") % s);
         for (Strings::iterator i = ss.begin(); i != ss.end(); ) {
             string fileName = *i++;
-            static std::regex regex("[A-Za-z_][A-Za-z0-9_.]*");
+            static std::regex regex("[A-Za-z_][A-Za-z0-9_.-]*");
             if (!std::regex_match(fileName, regex))
                 throw Error("invalid file name '%s' in 'exportReferencesGraph'", fileName);
 
