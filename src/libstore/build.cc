@@ -2455,12 +2455,12 @@ void DerivationGoal::initTmpDir() {
     if (!parsedDrv->getStructuredAttrs()) {
 
         StringSet passAsFile = tokenizeString<StringSet>(get(drv->env, "passAsFile").value_or(""));
-        int fileNr = 0;
         for (auto & i : drv->env) {
             if (passAsFile.find(i.first) == passAsFile.end()) {
                 env[i.first] = i.second;
             } else {
-                string fn = ".attr-" + std::to_string(fileNr++);
+                auto hash = hashString(htSHA256, i.first);
+                string fn = ".attr-" + hash.to_string();
                 Path p = tmpDir + "/" + fn;
                 writeFile(p, i.second);
                 chownToBuilder(p);
