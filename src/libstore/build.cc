@@ -1513,8 +1513,10 @@ void replaceValidPath(const Path & storePath, const Path tmpPath)
     Path oldPath = (format("%1%.old-%2%-%3%") % storePath % getpid() % random()).str();
     if (pathExists(storePath))
         rename(storePath.c_str(), oldPath.c_str());
-    if (rename(tmpPath.c_str(), storePath.c_str()) == -1)
+    if (rename(tmpPath.c_str(), storePath.c_str()) == -1) {
+        rename(oldPath.c_str(), storePath.c_str()); // attempt to recover
         throw SysError("moving '%s' to '%s'", tmpPath, storePath);
+    }
     deletePath(oldPath);
 }
 
