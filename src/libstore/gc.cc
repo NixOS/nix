@@ -443,7 +443,7 @@ void LocalStore::findRuntimeRoots(Roots & roots, bool censor)
     // lsof is really slow on OS X. This actually causes the gc-concurrent.sh test to fail.
     // See: https://github.com/NixOS/nix/issues/3011
     // Because of this we disable lsof when running the tests.
-    if (getEnv("_NIX_TEST_NO_LSOF") == "") {
+    if (getEnv("_NIX_TEST_NO_LSOF") != "1") {
         try {
             std::regex lsofRegex(R"(^n(/.*)$)");
             auto lsofLines =

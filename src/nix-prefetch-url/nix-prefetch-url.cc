@@ -53,7 +53,7 @@ static int _main(int argc, char * * argv)
     {
         HashType ht = htSHA256;
         std::vector<string> args;
-        bool printPath = getEnv("PRINT_PATH") != "";
+        bool printPath = getEnv("PRINT_PATH") == "1";
         bool fromExpr = false;
         string attrPath;
         bool unpack = false;
