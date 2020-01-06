@@ -1016,7 +1016,7 @@ DerivationGoal::DerivationGoal(StorePath && drvPath, const StringSet & wantedOut
     , buildMode(buildMode)
 {
     state = &DerivationGoal::getDerivation;
-    name = fmt("building of '%s'", worker.store.printStorePath(drvPath));
+    name = fmt("building of '%s'", worker.store.printStorePath(this->drvPath));
     trace("created");
 
     mcExpectedBuilds = std::make_unique<MaintainCount<uint64_t>>(worker.expectedBuilds);
@@ -1041,7 +1041,7 @@ DerivationGoal::DerivationGoal(StorePath && drvPath, const BasicDerivation & drv
 
     /* Prevent the .chroot directory from being
        garbage-collected. (See isActiveTempFile() in gc.cc.) */
-    worker.store.addTempRoot(drvPath);
+    worker.store.addTempRoot(this->drvPath);
 }
 
 
@@ -4259,7 +4259,7 @@ SubstitutionGoal::SubstitutionGoal(StorePath && storePath, Worker & worker, Repa
     , repair(repair)
 {
     state = &SubstitutionGoal::init;
-    name = fmt("substitution of '%s'", worker.store.printStorePath(storePath));
+    name = fmt("substitution of '%s'", worker.store.printStorePath(this->storePath));
     trace("created");
     maintainExpectedSubstitutions = std::make_unique<MaintainCount<uint64_t>>(worker.expectedSubstitutions);
 }
