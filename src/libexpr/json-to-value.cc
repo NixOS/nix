@@ -22,7 +22,6 @@ static string parseJSONString(const char * & s)
             if (*s == '"') res += '"';
             else if (*s == '\\') res += '\\';
             else if (*s == '/') res += '/';
-            else if (*s == '/') res += '/';
             else if (*s == 'b') res += '\b';
             else if (*s == 'f') res += '\f';
             else if (*s == 'n') res += '\n';
