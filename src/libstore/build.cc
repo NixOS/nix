@@ -1514,8 +1514,10 @@ void replaceValidPath(const Path & storePath, const Path tmpPath)
     Path oldPath = (format("%1%.old-%2%-%3%") % storePath % getpid() % random()).str();
     if (pathExists(storePath))
         rename(storePath.c_str(), oldPath.c_str());
-    if (rename(tmpPath.c_str(), storePath.c_str()) == -1)
+    if (rename(tmpPath.c_str(), storePath.c_str()) == -1) {
+        rename(oldPath.c_str(), storePath.c_str()); // attempt to recover
         throw SysError("moving '%s' to '%s'", tmpPath, storePath);
+    }
     deletePath(oldPath);
 }
 
@@ -1986,7 +1988,7 @@ void DerivationGoal::startBuilder()
             throw BuildError(format("odd number of tokens in 'exportReferencesGraph': '%1%'") % s);
         for (Strings::iterator i = ss.begin(); i != ss.end(); ) {
             string fileName = *i++;
-            static std::regex regex("[A-Za-z_][A-Za-z0-9_.]*");
+            static std::regex regex("[A-Za-z_][A-Za-z0-9_.-]*");
             if (!std::regex_match(fileName, regex))
                 throw Error("invalid file name '%s' in 'exportReferencesGraph'", fileName);
 
@@ -2456,12 +2458,12 @@ void DerivationGoal::initTmpDir() {
     if (!parsedDrv->getStructuredAttrs()) {
 
         StringSet passAsFile = tokenizeString<StringSet>(get(drv->env, "passAsFile").value_or(""));
-        int fileNr = 0;
         for (auto & i : drv->env) {
             if (passAsFile.find(i.first) == passAsFile.end()) {
                 env[i.first] = i.second;
             } else {
-                string fn = ".attr-" + std::to_string(fileNr++);
+                auto hash = hashString(htSHA256, i.first);
+                string fn = ".attr-" + hash.to_string(Base32, false);
                 Path p = tmpDir + "/" + fn;
                 writeFile(p, i.second);
                 chownToBuilder(p);
@@ -3566,19 +3568,6 @@ void DerivationGoal::registerOutputs()
         if (!missingPaths.count(i.second.path)) continue;
 
         Path actualPath = path;
-        if (useChroot) {
-            actualPath = chrootRootDir + path;
-            if (pathExists(actualPath)) {
-                /* Move output paths from the chroot to the Nix store. */
-                if (buildMode == bmRepair)
-                    replaceValidPath(path, actualPath);
-                else
-                    if (buildMode != bmCheck && rename(actualPath.c_str(), worker.store.toRealPath(path).c_str()) == -1)
-                        throw SysError(format("moving build output '%1%' from the sandbox to the Nix store") % path);
-            }
-            if (buildMode != bmCheck) actualPath = worker.store.toRealPath(path);
-        }
-
         if (needsHashRewrite()) {
             auto r = redirectedOutputs.find(i.second.path);
             if (r != redirectedOutputs.end()) {
@@ -3590,6 +3579,17 @@ void DerivationGoal::registerOutputs()
                 if (buildMode == bmCheck)
                     actualPath = redirected;
             }
+        } else if (useChroot) {
+            actualPath = chrootRootDir + path;
+            if (pathExists(actualPath)) {
+                /* Move output paths from the chroot to the Nix store. */
+                if (buildMode == bmRepair)
+                    replaceValidPath(path, actualPath);
+                else
+                    if (buildMode != bmCheck && rename(actualPath.c_str(), worker.store.toRealPath(path).c_str()) == -1)
+                        throw SysError(format("moving build output '%1%' from the sandbox to the Nix store") % path);
+            }
+            if (buildMode != bmCheck) actualPath = worker.store.toRealPath(path);
         }
 
         struct stat st;

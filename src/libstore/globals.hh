@@ -34,6 +34,8 @@ class Settings : public Config {
 
     StringSet getDefaultSystemFeatures();
 
+    bool isWSL1();
+
 public:
 
     Settings();
@@ -130,7 +132,7 @@ public:
     Setting<bool> fsyncMetadata{this, true, "fsync-metadata",
         "Whether SQLite should use fsync()."};
 
-    Setting<bool> useSQLiteWAL{this, true, "use-sqlite-wal",
+    Setting<bool> useSQLiteWAL{this, !isWSL1(), "use-sqlite-wal",
         "Whether SQLite should use WAL mode."};
 
     Setting<bool> syncBeforeRegistering{this, false, "sync-before-registering",
