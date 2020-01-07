@@ -11,6 +11,87 @@ static void skipWhitespace(const char * & s)
 }
 
 
+/*
+  Parse an unicode escape sequence (4 hex characters following \u) in JSON string
+*/
+static string parseUnicodeEscapeSequence(const char * & s)
+{
+    int codepoint = 0;
+
+    const auto factors = { 12u, 8u, 4u, 0u };
+    for (const auto factor : factors)
+    {
+        if (!*s) throw JSONParseError("got end-of-string in JSON string while parsing \\u sequence");
+
+        if (*s >= '0' and *s <= '9') {
+            codepoint += static_cast<int>((static_cast<unsigned int>(*s) - 0x30u) << factor);
+        } else if (*s >= 'A' and *s <= 'F') {
+            codepoint += static_cast<int>((static_cast<unsigned int>(*s) - 0x37u) << factor);
+        } else if (*s >= 'a' and *s <= 'f') {
+            codepoint += static_cast<int>((static_cast<unsigned int>(*s) - 0x57u) << factor);
+        } else {
+            throw JSONParseError(format("illegal character '%1%' in \\u escape sequence.") % *s);
+        }
+        s++;
+    }
+
+    if ((codepoint > 0xd7ff && codepoint < 0xe000) || codepoint > 0x10ffff) {
+        throw JSONParseError("Unicode escape sequence is not a Unicode scalar value");
+    }
+
+    // taken from cpptoml.h
+    std::string result;
+    // See Table 3-6 of the Unicode standard
+    if (codepoint <= 0x7f)
+    {
+        // 1-byte codepoints: 00000000 0xxxxxxx
+        // repr: 0xxxxxxx
+        result += static_cast<char>(codepoint & 0x7f);
+    }
+    else if (codepoint <= 0x7ff)
+    {
+        // 2-byte codepoints: 00000yyy yyxxxxxx
+        // repr: 110yyyyy 10xxxxxx
+        //
+        // 0x1f = 00011111
+        // 0xc0 = 11000000
+        //
+        result += static_cast<char>(0xc0 | ((codepoint >> 6) & 0x1f));
+        //
+        // 0x80 = 10000000
+        // 0x3f = 00111111
+        //
+        result += static_cast<char>(0x80 | (codepoint & 0x3f));
+    }
+    else if (codepoint <= 0xffff)
+    {
+        // 3-byte codepoints: zzzzyyyy yyxxxxxx
+        // repr: 1110zzzz 10yyyyyy 10xxxxxx
+        //
+        // 0xe0 = 11100000
+        // 0x0f = 00001111
+        //
+        result += static_cast<char>(0xe0 | ((codepoint >> 12) & 0x0f));
+        result += static_cast<char>(0x80 | ((codepoint >> 6) & 0x1f));
+        result += static_cast<char>(0x80 | (codepoint & 0x3f));
+    }
+    else
+    {
+        // 4-byte codepoints: 000uuuuu zzzzyyyy yyxxxxxx
+        // repr: 11110uuu 10uuzzzz 10yyyyyy 10xxxxxx
+        //
+        // 0xf0 = 11110000
+        // 0x07 = 00000111
+        //
+        result += static_cast<char>(0xf0 | ((codepoint >> 18) & 0x07));
+        result += static_cast<char>(0x80 | ((codepoint >> 12) & 0x3f));
+        result += static_cast<char>(0x80 | ((codepoint >> 6) & 0x3f));
+        result += static_cast<char>(0x80 | (codepoint & 0x3f));
+    }
+    return result;
+}
+
+
 static string parseJSONString(const char * & s)
 {
     string res;
@@ -22,14 +103,16 @@ static string parseJSONString(const char * & s)
             if (*s == '"') res += '"';
             else if (*s == '\\') res += '\\';
             else if (*s == '/') res += '/';
-            else if (*s == '/') res += '/';
             else if (*s == 'b') res += '\b';
             else if (*s == 'f') res += '\f';
             else if (*s == 'n') res += '\n';
             else if (*s == 'r') res += '\r';
             else if (*s == 't') res += '\t';
-            else if (*s == 'u') throw JSONParseError("\\u characters in JSON strings are currently not supported");
-            else throw JSONParseError("invalid escaped character in JSON string");
+            else if (*s == 'u') {
+                res += parseUnicodeEscapeSequence(++s);
+                // to neuter the outside s++
+                s--;
+            } else throw JSONParseError("invalid escaped character in JSON string");
             s++;
         } else
             res += *s++;
