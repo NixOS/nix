@@ -36,6 +36,9 @@ stay up-to-date with a set of pre-built Nix expressions.  A Nix
 channel is just a URL that points to a place containing a set of Nix
 expressions.  <phrase condition="manual">See also <xref
 linkend="sec-channels" />.</phrase></para>
+      
+<para>To see the list of official NixOS channels, visit <link
+xlink:href="https://nixos.org/channels" />.</para>
 
 <para>This command has the following operations:
 
