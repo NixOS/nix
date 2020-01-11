@@ -531,9 +531,9 @@ LocalNoInlineNoReturn(void throwTypeError(const char * s, const ExprLambda & fun
     throw TypeError(format(s) % fun.showNamePos() % s2 % pos);
 }
 
-LocalNoInlineNoReturn(void throwAssertionError(const char * s, const Pos & pos))
+LocalNoInlineNoReturn(void throwAssertionError(const char * s, const string & s1, const Pos & pos))
 {
-    throw AssertionError(format(s) % pos);
+    throw AssertionError(format(s) % s1 % pos);
 }
 
 LocalNoInlineNoReturn(void throwUndefinedVarError(const char * s, const string & s1, const Pos & pos))
@@ -1262,8 +1262,11 @@ void ExprIf::eval(EvalState & state, Env & env, Value & v)
 
 void ExprAssert::eval(EvalState & state, Env & env, Value & v)
 {
-    if (!state.evalBool(env, cond, pos))
-        throwAssertionError("assertion failed at %1%", pos);
+    if (!state.evalBool(env, cond, pos)) {
+        std::ostringstream out;
+        cond->show(out);
+        throwAssertionError("assertion %1% failed at %2%", out.str(), pos);
+    }
     body->eval(state, env, v);
 }
 
