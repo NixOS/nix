@@ -7,6 +7,7 @@
 #include <map>
 #include <thread>
 #include <dlfcn.h>
+#include <sys/utsname.h>
 
 
 namespace nix {
