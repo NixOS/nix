@@ -97,7 +97,8 @@ let
       };
 
 
-    build = pkgs.lib.genAttrs systems (system:
+    build = pkgs.lib.genAttrs [ "regular-headers" "precompiled-headers" ] (pchVariant:
+      pkgs.lib.genAttrs systems (system:
 
       let pkgs = import nixpkgs { inherit system; }; in
 
@@ -129,13 +130,16 @@ let
 
         enableParallelBuilding = true;
 
-        makeFlags = "profiledir=$(out)/etc/profile.d";
+        makeFlagsArray = [
+          "PRECOMPILE_HEADERS=${if pchVariant == "precompiled-headers" then "1" else "0"}"
+          "profiledir=$(out)/etc/profile.d"
+        ];
 
         installFlags = "sysconfdir=$(out)/etc";
 
         doInstallCheck = true;
         installCheckFlags = "sysconfdir=$(out)/etc";
-      });
+      }));
 
 
     perlBindings = pkgs.lib.genAttrs systems (system:
@@ -147,7 +151,7 @@ let
         src = tarball;
 
         buildInputs =
-          [ jobs.build.${system} curl bzip2 xz pkgconfig pkgs.perl boost ]
+          [ jobs.build.precompiled-headers.${system} curl bzip2 xz pkgconfig pkgs.perl boost ]
           ++ lib.optional (stdenv.isLinux || stdenv.isDarwin) libsodium;
 
         configureFlags = ''
@@ -166,7 +170,7 @@ let
       with import nixpkgs { inherit system; };
 
       let
-        toplevel = builtins.getAttr system jobs.build;
+        toplevel = builtins.getAttr system jobs.build.precompiled-headers;
         version = toplevel.src.version;
         installerClosureInfo = closureInfo { rootPaths = [ toplevel cacert ]; };
       in
@@ -254,21 +258,18 @@ let
         # syntax-check generated dot files, it still requires some
         # fonts.  So provide those.
         FONTCONFIG_FILE = texFunctions.fontsConf;
-
-        # To test building without precompiled headers.
-        makeFlagsArray = [ "PRECOMPILE_HEADERS=0" ];
       };
 
 
     # System tests.
     tests.remoteBuilds = (import ./tests/remote-builds.nix rec {
       inherit nixpkgs;
-      nix = build.x86_64-linux; system = "x86_64-linux";
+      nix = build.precompiled-headers.x86_64-linux; system = "x86_64-linux";
     });
 
     tests.nix-copy-closure = (import ./tests/nix-copy-closure.nix rec {
       inherit nixpkgs;
-      nix = build.x86_64-linux; system = "x86_64-linux";
+      nix = build.precompiled-headers.x86_64-linux; system = "x86_64-linux";
     });
 
     tests.setuid = pkgs.lib.genAttrs
@@ -276,7 +277,7 @@ let
       (system:
         import ./tests/setuid.nix rec {
           inherit nixpkgs;
-          nix = build.${system}; inherit system;
+          nix = build.precompiled-headers.${system}; inherit system;
         });
 
     tests.binaryTarball =
@@ -293,17 +294,17 @@ let
           chown alice /nix
           su - alice -c '_NIX_INSTALLER_TEST=1 ./nix-*/install'
           su - alice -c 'nix-store --verify'
-          su - alice -c 'PAGER= nix-store -qR ${build.x86_64-linux}'
+          su - alice -c 'PAGER= nix-store -qR ${build.precompiled-headers.x86_64-linux}'
 
           # Check whether 'nix upgrade-nix' works.
           cat > /tmp/paths.nix <<EOF
           {
-            x86_64-linux = "${build.x86_64-linux}";
+            x86_64-linux = "${build.precompiled-headers.x86_64-linux}";
           }
           EOF
           su - alice -c 'nix --experimental-features nix-command upgrade-nix -vvv --nix-store-paths-url file:///tmp/paths.nix'
           (! [ -L /home/alice/.profile-1-link ])
-          su - alice -c 'PAGER= nix-store -qR ${build.x86_64-linux}'
+          su - alice -c 'PAGER= nix-store -qR ${build.precompiled-headers.x86_64-linux}'
 
           mkdir -p $out/nix-support
           touch $out/nix-support/hydra-build-products
@@ -315,12 +316,12 @@ let
       import (nixpkgs + "/pkgs/top-level/make-tarball.nix") {
         inherit nixpkgs;
         inherit pkgs;
-        nix = build.x86_64-linux;
+        nix = build.precompiled-headers.x86_64-linux;
         officialRelease = false;
       };
 
     tests.evalNixOS =
-      pkgs.runCommand "eval-nixos" { buildInputs = [ build.x86_64-linux ]; }
+      pkgs.runCommand "eval-nixos" { buildInputs = [ build.precompiled-headers.x86_64-linux ]; }
         ''
           export NIX_STATE_DIR=$TMPDIR
 
@@ -334,7 +335,7 @@ let
 
     installerScript =
       pkgs.runCommand "installer-script"
-        { buildInputs = [ build.x86_64-linux ];
+        { buildInputs = [ build.precompiled-headers.x86_64-linux ];
         }
         ''
           mkdir -p $out/nix-support
@@ -344,7 +345,7 @@ let
               (system: "--replace '@binaryTarball_${system}@' $(nix --experimental-features nix-command hash-file --base16 --type sha256 ${binaryTarball.${system}}/*.tar.xz) ")
               [ "x86_64-linux" "i686-linux" "x86_64-darwin" "aarch64-linux" ]
             } \
-            --replace '@nixVersion@' ${build.x86_64-linux.src.version}
+            --replace '@nixVersion@' ${build.precompiled-headers.x86_64-linux.src.version}
 
           echo "file installer $out/install" >> $out/nix-support/hydra-build-products
         '';
@@ -356,14 +357,16 @@ let
       meta.description = "Release-critical builds";
       constituents =
         [ tarball
-          build.i686-linux
-          build.x86_64-darwin
-          build.x86_64-linux
-          build.aarch64-linux
+          build.precompiled-headers.x86_64-darwin
+          build.precompiled-headers.i686-linux
+          build.precompiled-headers.x86_64-linux
+          build.precompiled-headers.aarch64-linux
+          build.regular-headers.x86_64-darwin
+          build.regular-headers.i686-linux
+          build.regular-headers.x86_64-linux
+          build.regular-headers.aarch64-linux
           binaryTarball.i686-linux
-          binaryTarball.x86_64-darwin
           binaryTarball.x86_64-linux
-          binaryTarball.aarch64-linux
           tests.remoteBuilds
           tests.nix-copy-closure
           tests.binaryTarball
