@@ -2,7 +2,6 @@
 
 #include <variant>
 #include <nlohmann/json.hpp>
-#include <nlohmann/detail/exceptions.hpp>
 
 using json = nlohmann::json;
 using std::unique_ptr;
