@@ -1265,7 +1265,7 @@ void ExprAssert::eval(EvalState & state, Env & env, Value & v)
     if (!state.evalBool(env, cond, pos)) {
         std::ostringstream out;
         cond->show(out);
-        throwAssertionError("assertion %1% failed at %2%", out.str(), pos);
+        throwAssertionError("assertion '%1%' failed at %2%", out.str(), pos);
     }
     body->eval(state, env, v);
 }
