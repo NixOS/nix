@@ -142,6 +142,12 @@ struct CmdRun : InstallablesCommand
 
         setenv("PATH", concatStringsSep(":", unixPath).c_str(), 1);
 
+        auto allInstallables = tokenizeString<Strings>(getEnv("NIX_RUN_INSTALLABLES"), " ");
+        for (auto inst : installables) {
+            allInstallables.push_front(inst->what());
+        }
+        setenv("NIX_RUN_INSTALLABLES", concatStringsSep(" ", allInstallables).c_str(), 1);
+
         std::string cmd = *command.begin();
         Strings args;
         for (auto & arg : command) args.push_back(arg);
