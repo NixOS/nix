@@ -33,9 +33,13 @@ incompatible changes:</para>
   </listitem>
 
   <listitem>
-    <para>The installer now enables sandboxing by default on
-    Linux. The <literal>max-jobs</literal> setting now defaults to
-    1.</para>
+    <para>The installer now enables sandboxing by default on Linux when the
+    system has the necessary kernel support.
+    </para>
+  </listitem>
+
+  <listitem>
+    <para>The <literal>max-jobs</literal> setting now defaults to 1.</para>
   </listitem>
 
   <listitem>
@@ -80,11 +84,6 @@ incompatible changes:</para>
   <listitem>
     <para>Add a <literal>trace-function-calls</literal> setting to log
     the duration of Nix function calls to stderr.</para>
-  </listitem>
-
-  <listitem>
-    <para>On Linux, sandboxing is now disabled by default on systems
-    that don’t have the necessary kernel support.</para>
   </listitem>
 
 </itemizedlist>
