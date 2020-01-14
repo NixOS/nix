@@ -3464,7 +3464,6 @@ void DerivationGoal::runChild()
                 }
                 args.push_back(drv->builder);
             } else {
-                printError("warning: running in sandboxing test mode, sandbox disabled");
                 builder = drv->builder.c_str();
                 args.push_back(std::string(baseNameOf(drv->builder)));
             }
