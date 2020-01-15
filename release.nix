@@ -231,8 +231,9 @@ let
         '');
 
 
-    coverage =
-      with pkgs;
+    coverage = pkgs.lib.genAttrs systems (system:
+
+      let pkgs = import nixpkgs { inherit system; }; in with pkgs;
 
       with import ./release-common.nix { inherit pkgs; };
 
@@ -257,7 +258,7 @@ let
 
         # To test building without precompiled headers.
         makeFlagsArray = [ "PRECOMPILE_HEADERS=0" ];
-      };
+      });
 
 
     # System tests.
