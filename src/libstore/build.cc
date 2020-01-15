@@ -3591,8 +3591,15 @@ void DerivationGoal::registerOutputs()
                 if (buildMode == bmRepair)
                     replaceValidPath(path, actualPath);
                 else
-                    if (buildMode != bmCheck && rename(actualPath.c_str(), worker.store.toRealPath(path).c_str()) == -1)
-                        throw SysError(format("moving build output '%1%' from the sandbox to the Nix store") % path);
+                    if (buildMode != bmCheck && rename(actualPath.c_str(), worker.store.toRealPath(path).c_str())) {
+                        if(errno == EACCES) {
+                            // No need to free since we are in a chroot, and that gets deleted later.
+                            // Hope it's a source problem
+                            copyPath(actualPath, worker.store.toRealPath(path));
+                        } else {
+                            throw SysError(format("moving build output '%1%' from the sandbox to the Nix store") % path);
+                        }
+                    }
             }
             if (buildMode != bmCheck) actualPath = worker.store.toRealPath(path);
         }
