@@ -423,13 +423,18 @@ static void _main(int argc, char * * argv)
            lose the current $PATH directories. */
         auto rcfile = (Path) tmpDir + "/rc";
         writeFile(rcfile, fmt(
-                (keepTmp ? "" : "rm -rf '%1%'; "s) +
+                R"(_nix_shell_clean_tmpdir() { rm -rf %1%; }; )"s +
+                (keepTmp ?
+                    "trap _nix_shell_clean_tmpdir EXIT; "
+                    "exitHooks+=(_nix_shell_clean_tmpdir); "
+                    "failureHooks+=(_nix_shell_clean_tmpdir); ":
+                    "_nix_shell_clean_tmpdir; ") +
                 (pure ? "" : "[ -n \"$PS1\" ] && [ -e ~/.bashrc ] && source ~/.bashrc;") +
                 "%2%"
                 "dontAddDisableDepTrack=1; "
                 "[ -e $stdenv/setup ] && source $stdenv/setup; "
                 "%3%"
-                "PATH=\"%4%:$PATH\"; "
+                "PATH=%4%:\"$PATH\"; "
                 "SHELL=%5%; "
                 "set +e; "
                 R"s([ -n "$PS1" ] && PS1='\n\[\033[1;32m\][nix-shell:\w]\$\[\033[0m\] '; )s"
@@ -438,12 +443,12 @@ static void _main(int argc, char * * argv)
                 "shopt -u nullglob; "
                 "unset TZ; %6%"
                 "%7%",
-                (Path) tmpDir,
+                shellEscape(tmpDir),
                 (pure ? "" : "p=$PATH; "),
                 (pure ? "" : "PATH=$PATH:$p; unset p; "),
-                dirOf(*shell),
-                *shell,
-                (getenv("TZ") ? (string("export TZ='") + getenv("TZ") + "'; ") : ""),
+                shellEscape(dirOf(*shell)),
+                shellEscape(*shell),
+                (getenv("TZ") ? (string("export TZ=") + shellEscape(getenv("TZ")) + "; ") : ""),
                 envCommand));
 
         Strings envStrs;
