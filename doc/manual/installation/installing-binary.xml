@@ -136,6 +136,109 @@ sudo rm /Library/LaunchDaemons/org.nixos.nix-daemon.plist
 
 </section>
 
+<section xml:id="sect-apfs-volume-installation">
+  <title>APFS Volume Installation</title>
+
+  <para>
+    The root filesystem is read-only as of macOS 10.15 Catalina, all writable
+    paths to a separate data volume.  This means creating or writing to <filename>/nix</filename>
+    is not allowed.  While changing the default prefix would be possible, it's
+    a very intrusive change that has side effects we want to avoid for now.
+  </para>
+
+  <para>
+    For common writable locations <literal>firmlinks</literal> where introduced,
+    described by Apple as a "bi-directional wormhole" between two filesystems.
+    Essentially a bind mount for APFS volumes.  However this is (currently) not
+    user configurable and only available for paths like <filename>/Users</filename>.
+  </para>
+
+  <para>
+    For special cases like NFS mount points or package manager roots <link xlink:href="https://developer.apple.com/library/archive/documentation/System/Conceptual/ManPages_iPhoneOS/man5/synthetic.conf.5.html">synthetic.conf(5)</link>
+    provides a mechanism for some limited, user-controlled file-creation at <filename>/</filename>.
+    This only applies on a reboot, but <command>apfs.util</command> can be used
+    to trigger the creation (not deletion) of new entries.
+  </para>
+
+<screen>
+alice$ /System/Library/Filesystems/apfs.fs/Contents/Resources/apfs.util -B
+</screen>
+
+  <itemizedlist>
+    <listitem>
+      <para>
+        The simplest solution is creating a symlink with <filename>/etc/synthetic.conf</filename>
+        to the data volume. (not recommended)
+      </para>
+
+<screen>
+nix    /System/Volumes/Data/nix
+</screen>
+
+<screen>
+alice$ ls -l /
+lrwxr-xr-x   1 root  wheel    25 Jan  1  2019 nix -> /System/Volumes/Data/nix
+</screen>
+
+      <para>
+        However builds that detect or resolve this symlink will leak the canonical
+        location or even fail in certain cases, making this approach undesirable.
+      </para>
+    </listitem>
+
+    <listitem>
+      <para>
+        An empty directory can also be created using <filename>/etc/synthetic.conf</filename>,
+        this won't be writable but can be used as a mount point.  And with
+        <literal>APFS</literal> it's relatively easy to create an separate
+        volume for nix instead.
+      </para>
+
+<screen>
+nix
+</screen>
+
+<screen>
+alice$ sudo diskutil apfs addVolume diskX APFS 'Nix Store' -mountpoint /nix
+alice$ mount
+/dev/disk1s6 on /nix (apfs, local, journaled)
+</screen>
+
+      <para>
+        This does make the installation more complicated, requiring both
+        <filename>/etc/synthetic.conf</filename> as well as <filename>/etc/fstab</filename>
+      </para>
+
+<screen>
+#
+# Warning - this file should only be modified with vifs(8)
+#
+# Failure to do so is unsupported and may be destructive.
+#
+LABEL=Nix\040Store /nix apfs rw
+</screen>
+
+      <para>
+        On macOS volumes are also mounted quite late, launchd services or other
+        things that start during login will start before our volume is mounted.
+        For these cases eg. <command>wait4path</command> must be used for
+        things that depend on <filename>/nix</filename>.
+      </para>
+
+      <para>
+        This new volume also won't be encrypted by default, and enabling is
+        only possible interactively?
+      </para>
+
+<screen>
+diskutil apfs enableFileVault /nix -user disk
+</screen>
+
+    </listitem>
+  </itemizedlist>
+
+</section>
+
 <section xml:id="sect-nix-install-pinned-version-url">
   <title>Installing a pinned Nix version from a URL</title>
 
