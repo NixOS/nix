@@ -82,8 +82,8 @@ path2=$(nix eval --impure --raw --expr "(builtins.fetchMercurial $repo).outPath"
 
 [[ $(nix eval --impure --raw --expr "(builtins.fetchMercurial $repo).rev") = 0000000000000000000000000000000000000000 ]]
 
-# ... unless we're using an explicit rev.
-path3=$(nix eval --raw --expr "(builtins.fetchMercurial { url = $repo; rev = \"default\"; }).outPath")
+# ... unless we're using an explicit ref.
+path3=$(nix eval --impure --raw --expr "(builtins.fetchMercurial { url = $repo; rev = \"default\"; }).outPath")
 [[ $path = $path3 ]]
 
 # Committing should not affect the store path.
