@@ -1017,7 +1017,7 @@ DerivationGoal::DerivationGoal(StorePath && drvPath, const StringSet & wantedOut
     , buildMode(buildMode)
 {
     state = &DerivationGoal::getDerivation;
-    name = fmt("building of '%s'", worker.store.printStorePath(drvPath));
+    name = fmt("building of '%s'", worker.store.printStorePath(this->drvPath));
     trace("created");
 
     mcExpectedBuilds = std::make_unique<MaintainCount<uint64_t>>(worker.expectedBuilds);
@@ -1042,7 +1042,7 @@ DerivationGoal::DerivationGoal(StorePath && drvPath, const BasicDerivation & drv
 
     /* Prevent the .chroot directory from being
        garbage-collected. (See isActiveTempFile() in gc.cc.) */
-    worker.store.addTempRoot(drvPath);
+    worker.store.addTempRoot(this->drvPath);
 }
 
 
@@ -3341,7 +3341,7 @@ void DerivationGoal::runChild()
             ;
         }
 #if __APPLE__
-        else if (getEnv("_NIX_TEST_NO_SANDBOX") == "") {
+        else {
             /* This has to appear before import statements. */
             std::string sandboxProfile = "(version 1)\n";
 
@@ -3450,25 +3450,31 @@ void DerivationGoal::runChild()
             /* They don't like trailing slashes on subpath directives */
             if (globalTmpDir.back() == '/') globalTmpDir.pop_back();
 
-            builder = "/usr/bin/sandbox-exec";
-            args.push_back("sandbox-exec");
-            args.push_back("-f");
-            args.push_back(sandboxFile);
-            args.push_back("-D");
-            args.push_back("_GLOBAL_TMP_DIR=" + globalTmpDir);
-            args.push_back("-D");
-            args.push_back("IMPORT_DIR=" + settings.nixDataDir + "/nix/sandbox/");
-            if (allowLocalNetworking) {
+            if (getEnv("_NIX_TEST_NO_SANDBOX") != "1") {
+                builder = "/usr/bin/sandbox-exec";
+                args.push_back("sandbox-exec");
+                args.push_back("-f");
+                args.push_back(sandboxFile);
                 args.push_back("-D");
-                args.push_back(string("_ALLOW_LOCAL_NETWORKING=1"));
+                args.push_back("_GLOBAL_TMP_DIR=" + globalTmpDir);
+                args.push_back("-D");
+                args.push_back("IMPORT_DIR=" + settings.nixDataDir + "/nix/sandbox/");
+                if (allowLocalNetworking) {
+                    args.push_back("-D");
+                    args.push_back(string("_ALLOW_LOCAL_NETWORKING=1"));
+                }
+                args.push_back(drv->builder);
+            } else {
+                builder = drv->builder.c_str();
+                args.push_back(std::string(baseNameOf(drv->builder)));
             }
-            args.push_back(drv->builder);
         }
-#endif
+#else
         else {
             builder = drv->builder.c_str();
             args.push_back(std::string(baseNameOf(drv->builder)));
         }
+#endif
 
         for (auto & i : drv->args)
             args.push_back(rewriteStrings(i, inputRewrites));
@@ -4253,7 +4259,7 @@ SubstitutionGoal::SubstitutionGoal(StorePath && storePath, Worker & worker, Repa
     , repair(repair)
 {
     state = &SubstitutionGoal::init;
-    name = fmt("substitution of '%s'", worker.store.printStorePath(storePath));
+    name = fmt("substitution of '%s'", worker.store.printStorePath(this->storePath));
     trace("created");
     maintainExpectedSubstitutions = std::make_unique<MaintainCount<uint64_t>>(worker.expectedSubstitutions);
 }

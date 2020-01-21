@@ -46,11 +46,14 @@ std::string_view StorePath::name() const
     return ffi_StorePath_name(*this);
 }
 
+StorePath StorePath::dummy(
+    StorePath::make(
+        (unsigned char *) "xxxxxxxxxxxxxxxxxxxx", "x"));
+
 StorePath Store::parseStorePath(std::string_view path) const
 {
     return StorePath::make(path, storeDir);
 }
-
 
 StorePathSet Store::parseStorePathSet(const PathSet & paths) const
 {
