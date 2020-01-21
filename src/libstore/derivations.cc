@@ -246,30 +246,18 @@ string Derivation::unparse(const Store & store, bool maskOutputs,
     s.reserve(65536);
     s += "Derive([";
 
-    StringSet maskedOutputs;
-
-    if (maskOutputs) {
-        bool first = true;
-        maskedOutputs = tokenizeString<StringSet>(get(env, "outputs").value_or("out"), " ");
-        for (auto & i : maskedOutputs) {
-            if (first) first = false; else s += ',';
-            s += '('; printString(s, i);
-            s += ",\"\",\"\",\"\")";
-        }
-    } else {
-        bool first = true;
-        for (auto & i : outputs) {
-            if (first) first = false; else s += ',';
-            s += '('; printString(s, i.first);
-            s += ','; printString(s, store.printStorePath(i.second.path));
-            s += ','; printString(s, i.second.hashAlgo);
-            s += ','; printString(s, i.second.hash);
-            s += ')';
-        }
+    bool first = true;
+    for (auto & i : outputs) {
+        if (first) first = false; else s += ',';
+        s += '('; printString(s, i.first);
+        s += ','; printString(s, maskOutputs ? "" : store.printStorePath(i.second.path));
+        s += ','; printString(s, i.second.hashAlgo);
+        s += ','; printString(s, i.second.hash);
+        s += ')';
     }
 
     s += "],[";
-    bool first = true;
+    first = true;
     if (actualInputs) {
         for (auto & i : *actualInputs) {
             if (first) first = false; else s += ',';
@@ -299,7 +287,7 @@ string Derivation::unparse(const Store & store, bool maskOutputs,
     for (auto & i : env) {
         if (first) first = false; else s += ',';
         s += '('; printString(s, i.first);
-        s += ','; printString(s, maskOutputs && maskedOutputs.count(i.first) ? "" : i.second);
+        s += ','; printString(s, maskOutputs && outputs.count(i.first) ? "" : i.second);
         s += ')';
     }
 

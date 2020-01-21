@@ -53,6 +53,8 @@ struct StorePath : rust::Value<3 * sizeof(void *) + 24, ffi_StorePath_drop>
     {
         return ffi_StorePath_hash_data(*this);
     }
+
+    static StorePath dummy;
 };
 
 typedef std::set<StorePath> StorePathSet;

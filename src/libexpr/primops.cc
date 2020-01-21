@@ -731,6 +731,8 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
            the hash. */
         for (auto & i : outputs) {
             if (!jsonObject) drv.env[i] = "";
+            drv.outputs.insert_or_assign(i,
+                DerivationOutput(StorePath::dummy.clone(), "", ""));
         }
 
         Hash h = hashDerivationModulo(*state.store, Derivation(drv), true);
