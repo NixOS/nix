@@ -27,7 +27,7 @@ let
     text = ''
       {
         "flakes": {
-          "nixpkgs": {
+          "flake:nixpkgs": {
             "uri": "github:NixOS/nixpkgs"
           }
         },
@@ -45,7 +45,7 @@ let
       cp -prd ${nixpkgs} $dir
       # Set the correct timestamp in the tarball.
       find $dir -print0 | xargs -0 touch -t ${builtins.substring 0 12 nixpkgs.lastModified}.${builtins.substring 12 2 nixpkgs.lastModified} --
-      tar cfz $out/tarball/${nixpkgs.rev} $dir
+      tar cfz $out/tarball/${nixpkgs.rev} $dir --hard-dereference
 
       mkdir -p $out/commits
       echo '{"sha": "${nixpkgs.rev}"}' > $out/commits/master
