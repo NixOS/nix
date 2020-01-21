@@ -6,6 +6,7 @@
 #include "thread-pool.hh"
 #include "json.hh"
 #include "derivations.hh"
+#include "fetchers/parse.hh"
 
 #include <future>
 
@@ -864,27 +865,7 @@ std::pair<std::string, Store::Params> splitUriAndParams(const std::string & uri_
     Store::Params params;
     auto q = uri.find('?');
     if (q != std::string::npos) {
-        for (auto s : tokenizeString<Strings>(uri.substr(q + 1), "&")) {
-            auto e = s.find('=');
-            if (e != std::string::npos) {
-                auto value = s.substr(e + 1);
-                std::string decoded;
-                for (size_t i = 0; i < value.size(); ) {
-                    if (value[i] == '%') {
-                        if (i + 2 >= value.size())
-                            throw Error("invalid URI parameter '%s'", value);
-                        try {
-                            decoded += std::stoul(std::string(value, i + 1, 2), 0, 16);
-                            i += 3;
-                        } catch (...) {
-                            throw Error("invalid URI parameter '%s'", value);
-                        }
-                    } else
-                        decoded += value[i++];
-                }
-                params[s.substr(0, e)] = decoded;
-            }
-        }
+        params = fetchers::decodeQuery(uri.substr(q + 1));
         uri = uri_.substr(0, q);
     }
     return {uri, params};

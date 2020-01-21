@@ -22,9 +22,7 @@ struct LockedInputs
 
     nlohmann::json toJson() const;
 
-    /* A lock file is dirty if it contains a dirty flakeref
-       (i.e. reference to a dirty working tree). */
-    bool isDirty() const;
+    bool isImmutable() const;
 };
 
 /* Lock file information about a flake input. */
@@ -35,9 +33,7 @@ struct LockedInput : LockedInputs
 
     LockedInput(const FlakeRef & ref, const FlakeRef & originalRef, const Hash & narHash)
         : ref(ref), originalRef(originalRef), narHash(narHash)
-    {
-        assert(ref.isImmutable());
-    };
+    { }
 
     LockedInput(const nlohmann::json & json);
 

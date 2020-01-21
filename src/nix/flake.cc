@@ -9,6 +9,8 @@
 #include "store-api.hh"
 #include "derivations.hh"
 #include "attr-path.hh"
+#include "fetchers/fetchers.hh"
+#include "fetchers/registry.hh"
 
 #include <nlohmann/json.hpp>
 #include <queue>
@@ -30,10 +32,7 @@ public:
 
     FlakeRef getFlakeRef()
     {
-        if (flakeUrl.find('/') != std::string::npos || flakeUrl == ".")
-            return FlakeRef(flakeUrl, true);
-        else
-            return FlakeRef(flakeUrl);
+        return parseFlakeRef(flakeUrl, absPath(".")); //FIXME
     }
 
     Flake getFlake()
@@ -57,63 +56,54 @@ struct CmdFlakeList : EvalCommand
 
     void run(nix::ref<nix::Store> store) override
     {
-        auto registries = getEvalState()->getFlakeRegistries();
+        using namespace fetchers;
+
+        auto registries = getRegistries(store);
 
         stopProgressBar();
 
-        for (auto & entry : registries[FLAG_REGISTRY]->entries)
-            std::cout << entry.first.to_string() << " flags " << entry.second.to_string() << "\n";
-
-        for (auto & entry : registries[USER_REGISTRY]->entries)
-            std::cout << entry.first.to_string() << " user " << entry.second.to_string() << "\n";
-
-        for (auto & entry : registries[GLOBAL_REGISTRY]->entries)
-            std::cout << entry.first.to_string() << " global " << entry.second.to_string() << "\n";
+        for (auto & registry : registries) {
+            for (auto & entry : registry->entries) {
+                // FIXME: format nicely
+                std::cout << fmt("%s %s %s\n",
+                    registry->type == Registry::Flag ? "flags " :
+                    registry->type == Registry::User ? "user  " :
+                    "global",
+                    entry.first->to_string(),
+                    entry.second->to_string());
+            }
+        }
     }
 };
 
-static void printSourceInfo(const SourceInfo & sourceInfo)
+static void printFlakeInfo(const Store & store, const Flake & flake)
 {
-    std::cout << fmt("URL:           %s\n", sourceInfo.resolvedRef.to_string());
-    if (sourceInfo.resolvedRef.ref)
-        std::cout << fmt("Branch:        %s\n",*sourceInfo.resolvedRef.ref);
-    if (sourceInfo.resolvedRef.rev)
-        std::cout << fmt("Revision:      %s\n", sourceInfo.resolvedRef.rev->to_string(Base16, false));
-    if (sourceInfo.revCount)
-        std::cout << fmt("Revisions:     %s\n", *sourceInfo.revCount);
-    if (sourceInfo.lastModified)
-        std::cout << fmt("Last modified: %s\n",
-            std::put_time(std::localtime(&*sourceInfo.lastModified), "%F %T"));
-    std::cout << fmt("Path:          %s\n", sourceInfo.storePath);
-}
-
-static void sourceInfoToJson(const SourceInfo & sourceInfo, nlohmann::json & j)
-{
-    j["url"] = sourceInfo.resolvedRef.to_string();
-    if (sourceInfo.resolvedRef.ref)
-        j["branch"] = *sourceInfo.resolvedRef.ref;
-    if (sourceInfo.resolvedRef.rev)
-        j["revision"] = sourceInfo.resolvedRef.rev->to_string(Base16, false);
-    if (sourceInfo.revCount)
-        j["revCount"] = *sourceInfo.revCount;
-    if (sourceInfo.lastModified)
-        j["lastModified"] = *sourceInfo.lastModified;
-    j["path"] = sourceInfo.storePath;
-}
-
-static void printFlakeInfo(const Flake & flake)
-{
-    std::cout << fmt("Description:   %s\n", flake.description);
+    std::cout << fmt("URL:           %s\n", flake.resolvedRef.input->to_string());
     std::cout << fmt("Edition:       %s\n", flake.edition);
-    printSourceInfo(flake.sourceInfo);
+    std::cout << fmt("Description:   %s\n", flake.description);
+    std::cout << fmt("Path:          %s\n", store.printStorePath(flake.sourceInfo->storePath));
+    if (flake.sourceInfo->rev)
+        std::cout << fmt("Revision:      %s\n", flake.sourceInfo->rev->to_string(Base16, false));
+    if (flake.sourceInfo->revCount)
+        std::cout << fmt("Revisions:     %s\n", *flake.sourceInfo->revCount);
+    if (flake.sourceInfo->lastModified)
+        std::cout << fmt("Last modified: %s\n",
+            std::put_time(std::localtime(&*flake.sourceInfo->lastModified), "%F %T"));
 }
 
-static nlohmann::json flakeToJson(const Flake & flake)
+static nlohmann::json flakeToJson(const Store & store, const Flake & flake)
 {
     nlohmann::json j;
     j["description"] = flake.description;
     j["edition"] = flake.edition;
-    sourceInfoToJson(flake.sourceInfo, j);
+    j["url"] = flake.resolvedRef.input->to_string();
+    if (flake.sourceInfo->rev)
+        j["revision"] = flake.sourceInfo->rev->to_string(Base16, false);
+    if (flake.sourceInfo->revCount)
+        j["revCount"] = *flake.sourceInfo->revCount;
+    if (flake.sourceInfo->lastModified)
+        j["lastModified"] = *flake.sourceInfo->lastModified;
+    j["path"] = store.printStorePath(flake.sourceInfo->storePath);
     return j;
 }
 
@@ -140,7 +130,7 @@ struct CmdFlakeDeps : FlakeCommand
             todo.pop();
 
             for (auto & info : resFlake.flakeDeps) {
-                printFlakeInfo(info.second.flake);
+                printFlakeInfo(*store, info.second.flake);
                 todo.push(info.second);
             }
         }
@@ -161,10 +151,12 @@ struct CmdFlakeUpdate : FlakeCommand
 
         auto flakeRef = getFlakeRef();
 
+#if 0
         if (std::get_if<FlakeRef::IsPath>(&flakeRef.data))
             updateLockFile(*evalState, flakeRef, true);
         else
             throw Error("cannot update lockfile of flake '%s'", flakeRef);
+#endif
     }
 };
 
@@ -195,7 +187,7 @@ struct CmdFlakeInfo : FlakeCommand, MixJSON
             auto state = getEvalState();
             auto flake = resolveFlake();
 
-            auto json = flakeToJson(flake.flake);
+            auto json = flakeToJson(*store, flake.flake);
 
             auto vFlake = state->allocValue();
             flake::callFlake(*state, flake, *vFlake);
@@ -222,7 +214,7 @@ struct CmdFlakeInfo : FlakeCommand, MixJSON
         } else {
             auto flake = getFlake();
             stopProgressBar();
-            printFlakeInfo(flake);
+            printFlakeInfo(*store, flake);
         }
     }
 };
@@ -495,8 +487,7 @@ struct CmdFlakeCheck : FlakeCommand, MixJSON
 
 struct CmdFlakeAdd : MixEvalArgs, Command
 {
-    FlakeUri alias;
-    FlakeUri url;
+    std::string fromUrl, toUrl;
 
     std::string description() override
     {
@@ -505,24 +496,24 @@ struct CmdFlakeAdd : MixEvalArgs, Command
 
     CmdFlakeAdd()
     {
-        expectArg("alias", &alias);
-        expectArg("flake-url", &url);
+        expectArg("from-url", &fromUrl);
+        expectArg("to-url", &toUrl);
     }
 
     void run() override
     {
-        FlakeRef aliasRef(alias);
-        Path userRegistryPath = getUserRegistryPath();
-        auto userRegistry = readRegistry(userRegistryPath);
-        userRegistry->entries.erase(aliasRef);
-        userRegistry->entries.insert_or_assign(aliasRef, FlakeRef(url));
-        writeRegistry(*userRegistry, userRegistryPath);
+        auto fromRef = parseFlakeRef(fromUrl);
+        auto toRef = parseFlakeRef(toUrl);
+        auto userRegistry = fetchers::getUserRegistry();
+        userRegistry->remove(fromRef.input);
+        userRegistry->add(fromRef.input, toRef.input);
+        userRegistry->write(fetchers::getUserRegistryPath());
     }
 };
 
 struct CmdFlakeRemove : virtual Args, MixEvalArgs, Command
 {
-    FlakeUri alias;
+    std::string url;
 
     std::string description() override
     {
@@ -531,52 +522,38 @@ struct CmdFlakeRemove : virtual Args, MixEvalArgs, Command
 
     CmdFlakeRemove()
     {
-        expectArg("alias", &alias);
+        expectArg("url", &url);
     }
 
     void run() override
     {
-        Path userRegistryPath = getUserRegistryPath();
-        auto userRegistry = readRegistry(userRegistryPath);
-        userRegistry->entries.erase(FlakeRef(alias));
-        writeRegistry(*userRegistry, userRegistryPath);
+        auto userRegistry = fetchers::getUserRegistry();
+        userRegistry->remove(parseFlakeRef(url).input);
+        userRegistry->write(fetchers::getUserRegistryPath());
     }
 };
 
 struct CmdFlakePin : virtual Args, EvalCommand
 {
-    FlakeUri alias;
+    std::string url;
 
     std::string description() override
     {
-        return "pin flake require in user flake registry";
+        return "pin a flake to its current version in user flake registry";
     }
 
     CmdFlakePin()
     {
-        expectArg("alias", &alias);
+        expectArg("url", &url);
     }
 
     void run(nix::ref<nix::Store> store) override
     {
-        auto evalState = getEvalState();
-
-        Path userRegistryPath = getUserRegistryPath();
-        FlakeRegistry userRegistry = *readRegistry(userRegistryPath);
-        auto it = userRegistry.entries.find(FlakeRef(alias));
-        if (it != userRegistry.entries.end()) {
-            it->second = getFlake(*evalState, it->second, true).sourceInfo.resolvedRef;
-            writeRegistry(userRegistry, userRegistryPath);
-        } else {
-            std::shared_ptr<FlakeRegistry> globalReg = evalState->getGlobalFlakeRegistry();
-            it = globalReg->entries.find(FlakeRef(alias));
-            if (it != globalReg->entries.end()) {
-                auto newRef = getFlake(*evalState, it->second, true).sourceInfo.resolvedRef;
-                userRegistry.entries.insert_or_assign(alias, newRef);
-                writeRegistry(userRegistry, userRegistryPath);
-            } else
-                throw Error("the flake alias '%s' does not exist in the user or global registry", alias);
-        }
+        auto ref = parseFlakeRef(url);
+        auto userRegistry = fetchers::getUserRegistry();
+        userRegistry->remove(ref.input);
+        auto [tree, resolved] = ref.resolve(store).input->fetchTree(store);
+        userRegistry->add(ref.input, resolved);
     }
 };
 
@@ -616,15 +593,20 @@ struct CmdFlakeClone : FlakeCommand
 
     CmdFlakeClone()
     {
-        expectArg("dest-dir", &destDir, true);
+        mkFlag()
+            .shortName('f')
+            .longName("dest")
+            .label("path")
+            .description("destination path")
+            .dest(&destDir);
     }
 
     void run(nix::ref<nix::Store> store) override
     {
-        auto evalState = getEvalState();
+        if (destDir.empty())
+            throw Error("missing flag '--dest'");
 
-        Registries registries = evalState->getFlakeRegistries();
-        gitCloneFlake(getFlakeRef().to_string(), *evalState, registries, destDir);
+        getFlakeRef().resolve(store).input->clone(destDir);
     }
 };
 

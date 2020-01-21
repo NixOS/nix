@@ -9,24 +9,9 @@ namespace nix {
 struct Value;
 class EvalState;
 
+namespace fetchers { struct Tree; }
+
 namespace flake {
-
-static const size_t FLAG_REGISTRY = 0;
-static const size_t USER_REGISTRY = 1;
-static const size_t GLOBAL_REGISTRY = 2;
-
-struct FlakeRegistry
-{
-    std::map<FlakeRef, FlakeRef> entries;
-};
-
-typedef std::vector<std::shared_ptr<FlakeRegistry>> Registries;
-
-std::shared_ptr<FlakeRegistry> readRegistry(const Path &);
-
-void writeRegistry(const FlakeRegistry &, const Path &);
-
-Path getUserRegistryPath();
 
 enum HandleLockFile : unsigned int
     { AllPure // Everything is handled 100% purely
@@ -36,27 +21,6 @@ enum HandleLockFile : unsigned int
     , RecreateLockFile // Recreate the lockfile from scratch and write it to file
     , UseNewLockFile // `RecreateLockFile` without writing to file
     };
-
-struct SourceInfo
-{
-    // Immutable flakeref that this source tree was obtained from.
-    FlakeRef resolvedRef;
-
-    Path storePath;
-
-    // Number of ancestors of the most recent commit.
-    std::optional<uint64_t> revCount;
-
-    // NAR hash of the store path.
-    Hash narHash;
-
-    // A stable timestamp of this source tree. For Git and GitHub
-    // flakes, the commit date (not author date!) of the most recent
-    // commit.
-    std::optional<time_t> lastModified;
-
-    SourceInfo(const FlakeRef & resolvRef) : resolvedRef(resolvRef) {};
-};
 
 struct FlakeInput
 {
@@ -68,14 +32,13 @@ struct FlakeInput
 struct Flake
 {
     FlakeRef originalRef;
+    FlakeRef resolvedRef;
     std::string description;
-    SourceInfo sourceInfo;
+    std::shared_ptr<const fetchers::Tree> sourceInfo;
     std::map<FlakeId, FlakeInput> inputs;
     Value * vOutputs; // FIXME: gc
     unsigned int edition;
-
-    Flake(const FlakeRef & origRef, const SourceInfo & sourceInfo)
-        : originalRef(origRef), sourceInfo(sourceInfo) {};
+    ~Flake();
 };
 
 Flake getFlake(EvalState & state, const FlakeRef & flakeRef, bool allowLookup);
@@ -87,9 +50,6 @@ struct ResolvedFlake
 {
     Flake flake;
     LockFile lockFile;
-
-    ResolvedFlake(Flake && flake, LockFile && lockFile)
-        : flake(flake), lockFile(lockFile) {}
 
     Fingerprint getFingerprint() const;
 };
@@ -106,8 +66,6 @@ void callFlake(EvalState & state,
     Value & v);
 
 void updateLockFile(EvalState &, const FlakeRef & flakeRef, bool recreateLockFile);
-
-void gitCloneFlake(FlakeRef flakeRef, EvalState &, Registries, const Path & destDir);
 
 }
 

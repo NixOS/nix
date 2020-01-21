@@ -365,6 +365,15 @@ public:
     bool isExperimentalFeatureEnabled(const std::string & name);
 
     void requireExperimentalFeature(const std::string & name);
+
+    Setting<std::string> flakeRegistry{this, "https://github.com/NixOS/flake-registry/raw/master/flake-registry.json", "flake-registry",
+        "Path or URI of the global flake registry."};
+
+    Setting<bool> allowDirty{this, true, "allow-dirty",
+        "Whether to allow dirty Git/Mercurial trees."};
+
+    Setting<bool> warnDirty{this, true, "warn-dirty",
+        "Whether to warn about dirty Git/Mercurial trees."};
 };
 
 

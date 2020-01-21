@@ -98,7 +98,7 @@ void replaceEnv(std::map<std::string, std::string> newEnv)
 }
 
 
-Path absPath(Path path, std::optional<Path> dir)
+Path absPath(Path path, std::optional<Path> dir, bool resolveSymlinks)
 {
     if (path[0] != '/') {
         if (!dir) {
@@ -119,7 +119,7 @@ Path absPath(Path path, std::optional<Path> dir)
         }
         path = *dir + "/" + path;
     }
-    return canonPath(path);
+    return canonPath(path, resolveSymlinks);
 }
 
 

@@ -75,13 +75,9 @@ struct InstallableFlake : InstallableValue
     Strings attrPaths;
     Strings prefixes;
 
-    InstallableFlake(SourceExprCommand & cmd, FlakeRef && flakeRef, Strings attrPaths)
-        : InstallableValue(cmd), flakeRef(flakeRef), attrPaths(std::move(attrPaths))
-    { }
-
     InstallableFlake(SourceExprCommand & cmd, FlakeRef && flakeRef,
-        std::string attrPath, Strings && prefixes)
-        : InstallableValue(cmd), flakeRef(flakeRef), attrPaths{attrPath},
+        Strings && attrPaths, Strings && prefixes)
+        : InstallableValue(cmd), flakeRef(flakeRef), attrPaths(attrPaths),
           prefixes(prefixes)
     { }
 

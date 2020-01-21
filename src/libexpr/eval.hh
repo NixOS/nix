@@ -20,10 +20,6 @@ class EvalState;
 struct StorePath;
 enum RepairFlag : bool;
 
-namespace flake {
-struct FlakeRegistry;
-}
-
 
 typedef void (* PrimOpFun) (EvalState & state, const Pos & pos, Value * * args, Value & v);
 
@@ -67,8 +63,6 @@ typedef std::list<SearchPathElem> SearchPath;
 /* Initialise the Boehm GC, if applicable. */
 void initGC();
 
-typedef std::vector<std::pair<std::string, std::string>> RegistryOverrides;
-
 
 class EvalState
 {
@@ -94,8 +88,6 @@ public:
     Value vEmptySet;
 
     const ref<Store> store;
-
-    RegistryOverrides registryOverrides;
 
 
 private:
@@ -224,8 +216,6 @@ public:
        path.  Nothing is copied to the store. */
     Path coerceToPath(const Pos & pos, Value & v, PathSet & context);
 
-    void addRegistryOverrides(RegistryOverrides overrides) { registryOverrides = overrides; }
-
 public:
 
     /* The base environment, containing the builtin functions and
@@ -328,16 +318,6 @@ private:
     friend struct ExprOpConcatLists;
     friend struct ExprSelect;
     friend void prim_getAttr(EvalState & state, const Pos & pos, Value * * args, Value & v);
-
-public:
-
-    const std::vector<std::shared_ptr<flake::FlakeRegistry>> getFlakeRegistries();
-
-    std::shared_ptr<flake::FlakeRegistry> getGlobalFlakeRegistry();
-
-private:
-    std::shared_ptr<flake::FlakeRegistry> _globalFlakeRegistry;
-    std::once_flag _globalFlakeRegistryInit;
 };
 
 
@@ -388,15 +368,6 @@ struct EvalSettings : Config
 
     Setting<bool> traceFunctionCalls{this, false, "trace-function-calls",
         "Emit log messages for each function entry and exit at the 'vomit' log level (-vvvv)."};
-
-    Setting<std::string> flakeRegistry{this, "https://github.com/NixOS/flake-registry/raw/master/flake-registry.json", "flake-registry",
-        "Path or URI of the global flake registry."};
-
-    Setting<bool> allowDirty{this, true, "allow-dirty",
-        "Whether to allow dirty Git/Mercurial trees."};
-
-    Setting<bool> warnDirty{this, true, "warn-dirty",
-        "Whether to warn about dirty Git/Mercurial trees."};
 };
 
 extern EvalSettings evalSettings;

@@ -71,6 +71,7 @@ echo bar > $repo/dir2/bar
 git -C $repo add dir1/foo
 git -C $repo rm hello
 
+unset _NIX_FORCE_HTTP
 path2=$(nix eval --impure --raw --expr "(builtins.fetchGit $repo).outPath")
 [ ! -e $path2/hello ]
 [ ! -e $path2/bar ]
@@ -107,9 +108,9 @@ path=$(nix eval --impure --raw --expr "(builtins.fetchGit file://$repo).outPath"
 git -C $repo checkout $rev2 -b dev
 echo dev > $repo/hello
 
-# File URI uses 'master' unless specified otherwise
+# File URI uses dirty tree unless specified otherwise
 path2=$(nix eval --impure --raw --expr "(builtins.fetchGit file://$repo).outPath")
-[[ $path = $path2 ]]
+[ $(cat $path2/hello) = dev ]
 
 # Using local path with branch other than 'master' should work when clean or dirty
 path3=$(nix eval --impure --raw --expr "(builtins.fetchGit $repo).outPath")

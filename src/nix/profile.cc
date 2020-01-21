@@ -54,8 +54,8 @@ struct ProfileManifest
                 element.active = e["active"];
                 if (e.value("uri", "") != "") {
                     element.source = ProfileElementSource{
-                        FlakeRef(e["originalUri"]),
-                        FlakeRef(e["uri"]),
+                        parseFlakeRef(e["originalUri"]),
+                        parseFlakeRef(e["uri"]),
                         e["attrPath"]
                     };
                 }
@@ -336,7 +336,7 @@ struct CmdProfileUpgrade : virtual SourceExprCommand, MixDefaultProfile, MixProf
                 Activity act(*logger, lvlChatty, actUnknown,
                     fmt("checking '%s' for updates", element.source->attrPath));
 
-                InstallableFlake installable(*this, FlakeRef(element.source->originalRef), {element.source->attrPath});
+                InstallableFlake installable(*this, FlakeRef(element.source->originalRef), {element.source->attrPath}, {});
 
                 auto [attrPath, resolvedRef, drv] = installable.toDerivation();
 

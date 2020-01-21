@@ -5,10 +5,8 @@ if [[ -z $(type -p git) ]]; then
     exit 99
 fi
 
-export _NIX_FORCE_HTTP=1
-
 clearStore
-rm -rf $TEST_HOME/.cache
+rm -rf $TEST_HOME/.cache $TEST_HOME/.config
 
 registry=$TEST_ROOT/registry.json
 
@@ -91,20 +89,20 @@ git -C $nonFlakeDir commit -m 'Initial'
 cat > $registry <<EOF
 {
     "flakes": {
-        "flake1": {
-            "url": "file://$flake1Dir"
+        "flake:flake1": {
+            "url": "git+file://$flake1Dir"
         },
-        "flake2": {
-            "url": "file://$flake2Dir"
+        "flake:flake2": {
+            "url": "git+file://$flake2Dir"
         },
-        "flake3": {
-            "url": "file://$flake3Dir"
+        "flake:flake3": {
+            "url": "git+file://$flake3Dir"
         },
-        "flake4": {
-            "url": "flake3"
+        "flake:flake4": {
+            "url": "flake:flake3"
         },
-        "nixpkgs": {
-            "url": "flake1"
+        "flake:nixpkgs": {
+            "url": "flake:flake1"
         }
     },
     "version": 1
@@ -137,10 +135,10 @@ nix build -o $TEST_ROOT/result --flake-registry $registry flake1
 [[ -e $TEST_ROOT/result/hello ]]
 
 nix build -o $TEST_ROOT/result --flake-registry $registry $flake1Dir
-nix build -o $TEST_ROOT/result --flake-registry $registry file://$flake1Dir
+nix build -o $TEST_ROOT/result --flake-registry $registry git+file://$flake1Dir
 
-# CHeck that store symlinks inside a flake are not interpreted as flakes.
-nix build -o $flake1Dir/result --flake-registry $registry file://$flake1Dir
+# Check that store symlinks inside a flake are not interpreted as flakes.
+nix build -o $flake1Dir/result --flake-registry $registry git+file://$flake1Dir
 nix path-info $flake1Dir/result
 
 # Building a flake with an unlocked dependency should fail in pure mode.
@@ -152,6 +150,7 @@ nix build -o $TEST_ROOT/result --flake-registry $registry flake2#bar --impure
 # Test automatic lock file generation.
 nix build -o $TEST_ROOT/result --flake-registry $registry $flake2Dir#bar
 [[ -e $flake2Dir/flake.lock ]]
+git -C $flake2Dir add flake.lock
 git -C $flake2Dir commit flake.lock -m 'Add flake.lock'
 
 # Rerunning the build should not change the lockfile.
@@ -170,10 +169,11 @@ nix build -o $TEST_ROOT/result --flake-registry $registry flake2#bar
 
 # Or without a registry.
 # FIXME: shouldn't need '--flake-registry /no-registry'?
-nix build -o $TEST_ROOT/result --flake-registry /no-registry file://$flake2Dir#bar --tarball-ttl 0
+nix build -o $TEST_ROOT/result --flake-registry /no-registry git+file://$flake2Dir#bar --tarball-ttl 0
 
 # Test whether indirect dependencies work.
 nix build -o $TEST_ROOT/result --flake-registry $registry $flake3Dir#xyzzy
+git -C $flake3Dir add flake.lock
 
 # Add dependency to flake3.
 rm $flake3Dir/flake.nix
@@ -196,9 +196,10 @@ git -C $flake3Dir commit -m 'Update flake.nix'
 
 # Check whether `nix build` works with an incomplete lockfile
 nix build -o $TEST_ROOT/result --flake-registry $registry $flake3Dir#"sth sth"
+nix build -o $TEST_ROOT/result --flake-registry $registry $flake3Dir#"sth%20sth"
 
 # Check whether it saved the lockfile
-[[ ! (-z $(git -C $flake3Dir diff master)) ]]
+(! [[ -z $(git -C $flake3Dir diff master) ]])
 
 git -C $flake3Dir add flake.lock
 
@@ -217,12 +218,12 @@ mv $registry.tmp $registry
 # Test whether flakes are registered as GC roots for offline use.
 # FIXME: use tarballs rather than git.
 rm -rf $TEST_HOME/.cache
-nix build -o $TEST_ROOT/result --flake-registry file://$registry file://$flake2Dir#bar
+_NIX_FORCE_HTTP=1 nix build -o $TEST_ROOT/result --flake-registry file://$registry git+file://$flake2Dir#bar
 mv $flake1Dir $flake1Dir.tmp
 mv $flake2Dir $flake2Dir.tmp
 nix-store --gc
-nix build -o $TEST_ROOT/result --flake-registry file://$registry file://$flake2Dir#bar
-nix build -o $TEST_ROOT/result --flake-registry file://$registry file://$flake2Dir#bar --tarball-ttl 0
+_NIX_FORCE_HTTP=1 nix build -o $TEST_ROOT/result --flake-registry file://$registry git+file://$flake2Dir#bar
+_NIX_FORCE_HTTP=1 nix build -o $TEST_ROOT/result --flake-registry file://$registry git+file://$flake2Dir#bar --tarball-ttl 0
 mv $flake1Dir.tmp $flake1Dir
 mv $flake2Dir.tmp $flake2Dir
 
@@ -237,7 +238,7 @@ cat > $flake3Dir/flake.nix <<EOF
     flake1 = {};
     flake2 = {};
     nonFlake = {
-      url = "$nonFlakeDir";
+      url = git+file://$nonFlakeDir;
       flake = false;
     };
   };
@@ -348,7 +349,8 @@ git -C $flake7Dir add flake.nix
 nix flake --flake-registry $registry check $flake7Dir
 
 rm -rf $TEST_ROOT/flake1-v2
-nix flake clone --flake-registry $registry flake1 $TEST_ROOT/flake1-v2
+nix flake clone --flake-registry $registry flake1 --dest $TEST_ROOT/flake1-v2
+[ -e $TEST_ROOT/flake1-v2/flake.nix ]
 
 # More 'nix flake check' tests.
 cat > $flake3Dir/flake.nix <<EOF

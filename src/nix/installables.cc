@@ -10,6 +10,7 @@
 #include "shared.hh"
 #include "flake/flake.hh"
 #include "flake/eval-cache.hh"
+#include "fetchers/parse.hh"
 
 #include <regex>
 #include <queue>
@@ -80,10 +81,8 @@ Strings SourceExprCommand::getDefaultFlakeAttrPathPrefixes()
 
 ref<EvalState> EvalCommand::getEvalState()
 {
-    if (!evalState) {
+    if (!evalState)
         evalState = std::make_shared<EvalState>(searchPath, getStore());
-        evalState->addRegistryOverrides(registryOverrides);
-    }
     return ref<EvalState>(evalState);
 }
 
@@ -243,6 +242,7 @@ void makeFlakeClosureGCRoot(Store & store,
     const FlakeRef & origFlakeRef,
     const flake::ResolvedFlake & resFlake)
 {
+#if 0
     if (std::get_if<FlakeRef::IsPath>(&origFlakeRef.data)) return;
 
     /* Get the store paths of all non-local flakes. */
@@ -285,6 +285,7 @@ void makeFlakeClosureGCRoot(Store & store,
     debug("writing GC root '%s' for flake closure of '%s'", symlink, origFlakeRef);
     replaceSymlink(store.printStorePath(closurePath), symlink);
     store.addIndirectRoot(symlink);
+#endif
 }
 
 std::vector<std::string> InstallableFlake::getActualAttrPaths()
@@ -334,7 +335,7 @@ std::tuple<std::string, FlakeRef, flake::EvalCache::Derivation> InstallableFlake
         auto drv = evalCache.getDerivation(fingerprint, attrPath);
         if (drv) {
             if (state->store->isValidPath(drv->drvPath))
-                return {attrPath, resFlake.flake.sourceInfo.resolvedRef, std::move(*drv)};
+                return {attrPath, resFlake.flake.resolvedRef, std::move(*drv)};
         }
 
         if (!vOutputs)
@@ -356,7 +357,7 @@ std::tuple<std::string, FlakeRef, flake::EvalCache::Derivation> InstallableFlake
 
             evalCache.addDerivation(fingerprint, attrPath, drv);
 
-            return {attrPath, resFlake.flake.sourceInfo.resolvedRef, std::move(drv)};
+            return {attrPath, resFlake.flake.resolvedRef, std::move(drv)};
         } catch (AttrPathNotFound & e) {
         }
     }
@@ -440,27 +441,23 @@ std::vector<std::shared_ptr<Installable>> SourceExprCommand::parseInstallables(
             if (hasPrefix(s, "nixpkgs.")) {
                 bool static warned;
                 warnOnce(warned, "the syntax 'nixpkgs.<attr>' is deprecated; use 'nixpkgs:<attr>' instead");
-                result.push_back(std::make_shared<InstallableFlake>(*this, FlakeRef("nixpkgs"),
-                        Strings{"legacyPackages." + settings.thisSystem.get() + "." + std::string(s, 8)}));
+                result.push_back(std::make_shared<InstallableFlake>(*this, parseFlakeRef("flake:nixpkgs"),
+                        Strings{"legacyPackages." + settings.thisSystem.get() + "." + std::string(s, 8)}, Strings{}));
             }
 
-            else if ((hash = s.rfind('#')) != std::string::npos)
-                result.push_back(std::make_shared<InstallableFlake>(
-                        *this,
-                        FlakeRef(std::string(s, 0, hash), true),
-                        std::string(s, hash + 1),
-                        getDefaultFlakeAttrPathPrefixes()));
-
             else {
-                try {
-                    auto flakeRef = FlakeRef(s, true);
+                auto res = maybeParseFlakeRefWithFragment(s, absPath("."));
+                if (res) {
+                    auto &[flakeRef, fragment] = *res;
                     result.push_back(std::make_shared<InstallableFlake>(
-                            *this, std::move(flakeRef), getDefaultFlakeAttrPaths()));
-                } catch (...) {
+                            *this, std::move(flakeRef),
+                            fragment == "" ? getDefaultFlakeAttrPaths() : Strings{fragment},
+                            getDefaultFlakeAttrPathPrefixes()));
+                } else {
                     if (s.find('/') != std::string::npos && (storePath = follow(s)))
                         result.push_back(std::make_shared<InstallableStorePath>(store, store->printStorePath(*storePath)));
                     else
-                        throw;
+                        throw Error("unrecognized argument '%s'", s);
                 }
             }
         }
