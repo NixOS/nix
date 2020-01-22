@@ -80,7 +80,8 @@ static void printFlakeInfo(const Store & store, const Flake & flake)
 {
     std::cout << fmt("URL:           %s\n", flake.resolvedRef.input->to_string());
     std::cout << fmt("Edition:       %s\n", flake.edition);
-    std::cout << fmt("Description:   %s\n", flake.description);
+    if (flake.description)
+        std::cout << fmt("Description:   %s\n", *flake.description);
     std::cout << fmt("Path:          %s\n", store.printStorePath(flake.sourceInfo->storePath));
     if (flake.sourceInfo->rev)
         std::cout << fmt("Revision:      %s\n", flake.sourceInfo->rev->to_string(Base16, false));
@@ -94,7 +95,8 @@ static void printFlakeInfo(const Store & store, const Flake & flake)
 static nlohmann::json flakeToJson(const Store & store, const Flake & flake)
 {
     nlohmann::json j;
-    j["description"] = flake.description;
+    if (flake.description)
+        j["description"] = *flake.description;
     j["edition"] = flake.edition;
     j["url"] = flake.resolvedRef.input->to_string();
     if (flake.sourceInfo->rev)
