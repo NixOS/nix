@@ -27,6 +27,8 @@ struct Input : std::enable_shared_from_this<Input>
     std::string type;
     std::optional<Hash> narHash;
 
+    virtual ~Input() { }
+
     virtual bool operator ==(const Input & other) const { return false; }
 
     virtual bool isDirect() const { return true; }
@@ -63,6 +65,8 @@ struct ParsedURL;
 
 struct InputScheme
 {
+    virtual ~InputScheme() { }
+
     virtual std::unique_ptr<Input> inputFromURL(const ParsedURL & url) = 0;
 };
 

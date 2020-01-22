@@ -142,7 +142,7 @@ struct GitInput : Input
         return res;
     }
 
-    std::optional<Path> getSourcePath() const
+    std::optional<Path> getSourcePath() const override
     {
         if (url.scheme == "git+file" && !ref && !rev)
             return url.path;
@@ -172,7 +172,8 @@ struct GitInput : Input
                 return {std::move(*tree), input};
         }
 
-        auto [isLocal, actualUrl] = getActualUrl();
+        auto [isLocal, actualUrl_] = getActualUrl();
+        auto actualUrl = actualUrl_; // work around clang bug
 
         // If this is a local directory and no ref or revision is
         // given, then allow the use of an unclean working tree.

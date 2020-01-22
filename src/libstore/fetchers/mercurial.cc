@@ -84,7 +84,8 @@ struct MercurialInput : Input
 
         auto input = std::make_shared<MercurialInput>(*this);
 
-        auto [isLocal, actualUrl] = getActualUrl();
+        auto [isLocal, actualUrl_] = getActualUrl();
+        auto actualUrl = actualUrl_; // work around clang bug
 
         // FIXME: return lastModified.
 
