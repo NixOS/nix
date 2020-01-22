@@ -4,7 +4,7 @@
             "inputs": {},
             "narHash": "sha256-HkMF+s/yqNOOxqZGp+rscaC8LPtOGc50nEAjLFsnJpg=",
             "originalUrl": "flake:nixpkgs/release-19.09",
-            "url": "git+file:///home/eelco/Dev/nixpkgs-flake?ref=release-19.09&rev=e7223c602152ee4544b05157fc9d88a3feed22c2"
+            "url": "github:edolstra/nixpkgs/e7223c602152ee4544b05157fc9d88a3feed22c2"
         }
     },
     "version": 3
