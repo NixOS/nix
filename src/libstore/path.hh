@@ -7,7 +7,7 @@ namespace nix {
 /* See path.rs. */
 struct StorePath;
 
-struct Store;
+class Store;
 
 extern "C" {
     void ffi_StorePath_drop(void *);
