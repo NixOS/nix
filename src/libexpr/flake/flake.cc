@@ -302,7 +302,10 @@ static std::pair<Flake, LockedInput> updateLocks(
 
 /* Compute an in-memory lockfile for the specified top-level flake,
    and optionally write it to file, it the flake is writable. */
-ResolvedFlake resolveFlake(EvalState & state, const FlakeRef & topRef, HandleLockFile handleLockFile)
+LockedFlake lockFlake(
+    EvalState & state,
+    const FlakeRef & topRef,
+    HandleLockFile handleLockFile)
 {
     settings.requireExperimentalFeature("flakes");
 
@@ -356,12 +359,7 @@ ResolvedFlake resolveFlake(EvalState & state, const FlakeRef & topRef, HandleLoc
             warn("using updated lock file without writing it to file");
     }
 
-    return ResolvedFlake { .flake = std::move(flake), .lockFile = std::move(lockFile) };
-}
-
-void updateLockFile(EvalState & state, const FlakeRef & flakeRef, bool recreateLockFile)
-{
-    resolveFlake(state, flakeRef, recreateLockFile ? RecreateLockFile : UpdateLockFile);
+    return LockedFlake { .flake = std::move(flake), .lockFile = std::move(lockFile) };
 }
 
 static void emitSourceInfoAttrs(EvalState & state, const fetchers::Tree & sourceInfo, Value & vAttrs)
@@ -480,16 +478,16 @@ void callFlake(EvalState & state,
 }
 
 void callFlake(EvalState & state,
-    const ResolvedFlake & resFlake,
+    const LockedFlake & lockedFlake,
     Value & v)
 {
-    callFlake(state, resFlake.flake, resFlake.lockFile, v);
+    callFlake(state, lockedFlake.flake, lockedFlake.lockFile, v);
 }
 
 // This function is exposed to be used in nix files.
 static void prim_getFlake(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
-    callFlake(state, resolveFlake(state, parseFlakeRef(state.forceStringNoCtx(*args[0], pos)),
+    callFlake(state, lockFlake(state, parseFlakeRef(state.forceStringNoCtx(*args[0], pos)),
             evalSettings.pureEval ? AllPure : UseUpdatedLockFile), v);
 }
 
@@ -497,7 +495,7 @@ static RegisterPrimOp r2("getFlake", 1, prim_getFlake);
 
 }
 
-Fingerprint ResolvedFlake::getFingerprint() const
+Fingerprint LockedFlake::getFingerprint() const
 {
     // FIXME: as an optimization, if the flake contains a lock file
     // and we haven't changed it, then it's sufficient to use

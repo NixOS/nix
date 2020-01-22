@@ -240,7 +240,7 @@ struct InstallableAttrPath : InstallableValue
 
 void makeFlakeClosureGCRoot(Store & store,
     const FlakeRef & origFlakeRef,
-    const flake::ResolvedFlake & resFlake)
+    const flake::LockedFlake & lockedFlake)
 {
 #if 0
     if (std::get_if<FlakeRef::IsPath>(&origFlakeRef.data)) return;
@@ -248,11 +248,11 @@ void makeFlakeClosureGCRoot(Store & store,
     /* Get the store paths of all non-local flakes. */
     StorePathSet closure;
 
-    assert(store.isValidPath(store.parseStorePath(resFlake.flake.sourceInfo.storePath)));
-    closure.insert(store.parseStorePath(resFlake.flake.sourceInfo.storePath));
+    assert(store.isValidPath(store.parseStorePath(lockedFlake.flake.sourceInfo.storePath)));
+    closure.insert(store.parseStorePath(lockedFlake.flake.sourceInfo.storePath));
 
     std::queue<std::reference_wrapper<const flake::LockedInputs>> queue;
-    queue.push(resFlake.lockFile);
+    queue.push(lockedFlake.lockFile);
 
     while (!queue.empty()) {
         const flake::LockedInputs & flake = queue.front();
@@ -301,13 +301,13 @@ std::vector<std::string> InstallableFlake::getActualAttrPaths()
     return res;
 }
 
-Value * InstallableFlake::getFlakeOutputs(EvalState & state, const flake::ResolvedFlake & resFlake)
+Value * InstallableFlake::getFlakeOutputs(EvalState & state, const flake::LockedFlake & lockedFlake)
 {
     auto vFlake = state.allocValue();
 
-    callFlake(state, resFlake, *vFlake);
+    callFlake(state, lockedFlake, *vFlake);
 
-    makeFlakeClosureGCRoot(*state.store, flakeRef, resFlake);
+    makeFlakeClosureGCRoot(*state.store, flakeRef, lockedFlake);
 
     auto aOutputs = vFlake->attrs->get(state.symbols.create("outputs"));
     assert(aOutputs);
@@ -321,7 +321,7 @@ std::tuple<std::string, FlakeRef, flake::EvalCache::Derivation> InstallableFlake
 {
     auto state = cmd.getEvalState();
 
-    auto resFlake = resolveFlake(*state, flakeRef, cmd.getLockFileMode());
+    auto lockedFlake = lockFlake(*state, flakeRef, cmd.getLockFileMode());
 
     Value * vOutputs = nullptr;
 
@@ -329,17 +329,17 @@ std::tuple<std::string, FlakeRef, flake::EvalCache::Derivation> InstallableFlake
 
     auto & evalCache = flake::EvalCache::singleton();
 
-    auto fingerprint = resFlake.getFingerprint();
+    auto fingerprint = lockedFlake.getFingerprint();
 
     for (auto & attrPath : getActualAttrPaths()) {
         auto drv = evalCache.getDerivation(fingerprint, attrPath);
         if (drv) {
             if (state->store->isValidPath(drv->drvPath))
-                return {attrPath, resFlake.flake.resolvedRef, std::move(*drv)};
+                return {attrPath, lockedFlake.flake.resolvedRef, std::move(*drv)};
         }
 
         if (!vOutputs)
-            vOutputs = getFlakeOutputs(*state, resFlake);
+            vOutputs = getFlakeOutputs(*state, lockedFlake);
 
         try {
             auto * v = findAlongAttrPath(*state, attrPath, *emptyArgs, *vOutputs);
@@ -357,7 +357,7 @@ std::tuple<std::string, FlakeRef, flake::EvalCache::Derivation> InstallableFlake
 
             evalCache.addDerivation(fingerprint, attrPath, drv);
 
-            return {attrPath, resFlake.flake.resolvedRef, std::move(drv)};
+            return {attrPath, lockedFlake.flake.resolvedRef, std::move(drv)};
         } catch (AttrPathNotFound & e) {
         }
     }
@@ -375,9 +375,9 @@ std::vector<flake::EvalCache::Derivation> InstallableFlake::toDerivations()
 
 Value * InstallableFlake::toValue(EvalState & state)
 {
-    auto resFlake = resolveFlake(state, flakeRef, cmd.getLockFileMode());
+    auto lockedFlake = lockFlake(state, flakeRef, cmd.getLockFileMode());
 
-    auto vOutputs = getFlakeOutputs(state, resFlake);
+    auto vOutputs = getFlakeOutputs(state, lockedFlake);
 
     auto emptyArgs = state.allocBindings(0);
 

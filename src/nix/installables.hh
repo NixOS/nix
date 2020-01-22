@@ -85,7 +85,7 @@ struct InstallableFlake : InstallableValue
 
     std::vector<std::string> getActualAttrPaths();
 
-    Value * getFlakeOutputs(EvalState & state, const flake::ResolvedFlake & resFlake);
+    Value * getFlakeOutputs(EvalState & state, const flake::LockedFlake & lockedFlake);
 
     std::tuple<std::string, FlakeRef, flake::EvalCache::Derivation> toDerivation();
 

@@ -41,9 +41,9 @@ public:
         return flake::getFlake(*evalState, getFlakeRef(), useRegistries);
     }
 
-    ResolvedFlake resolveFlake()
+    LockedFlake lockFlake()
     {
-        return flake::resolveFlake(*getEvalState(), getFlakeRef(), getLockFileMode());
+        return flake::lockFlake(*getEvalState(), getFlakeRef(), getLockFileMode());
     }
 };
 
@@ -122,16 +122,16 @@ struct CmdFlakeDeps : FlakeCommand
     {
         auto evalState = getEvalState();
 
-        std::queue<ResolvedFlake> todo;
-        todo.push(resolveFlake());
+        std::queue<LockedFlake> todo;
+        todo.push(lockFlake());
 
         stopProgressBar();
 
         while (!todo.empty()) {
-            auto resFlake = std::move(todo.front());
+            auto lockedFlake = std::move(todo.front());
             todo.pop();
 
-            for (auto & info : resFlake.flakeDeps) {
+            for (auto & info : lockedFlake.flakeDeps) {
                 printFlakeInfo(*store, info.second.flake);
                 todo.push(info.second);
             }
@@ -150,7 +150,7 @@ struct CmdFlakeUpdate : FlakeCommand
     void run(nix::ref<nix::Store> store) override
     {
         auto evalState = getEvalState();
-        resolveFlake();
+        lockFlake();
     }
 };
 
@@ -179,7 +179,7 @@ struct CmdFlakeInfo : FlakeCommand, MixJSON
     {
         if (json) {
             auto state = getEvalState();
-            auto flake = resolveFlake();
+            auto flake = lockFlake();
 
             auto json = flakeToJson(*store, flake.flake);
 
@@ -235,7 +235,7 @@ struct CmdFlakeCheck : FlakeCommand, MixJSON
         settings.readOnlyMode = !build;
 
         auto state = getEvalState();
-        auto flake = resolveFlake();
+        auto flake = lockFlake();
 
         auto checkSystemName = [&](const std::string & system, const Pos & pos) {
             // FIXME: what's the format of "system"?

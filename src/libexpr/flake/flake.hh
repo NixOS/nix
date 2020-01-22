@@ -46,7 +46,7 @@ Flake getFlake(EvalState & state, const FlakeRef & flakeRef, bool allowLookup);
 /* Fingerprint of a locked flake; used as a cache key. */
 typedef Hash Fingerprint;
 
-struct ResolvedFlake
+struct LockedFlake
 {
     Flake flake;
     LockFile lockFile;
@@ -54,7 +54,7 @@ struct ResolvedFlake
     Fingerprint getFingerprint() const;
 };
 
-ResolvedFlake resolveFlake(EvalState &, const FlakeRef &, HandleLockFile);
+LockedFlake lockFlake(EvalState &, const FlakeRef &, HandleLockFile);
 
 void callFlake(EvalState & state,
     const Flake & flake,
@@ -62,10 +62,8 @@ void callFlake(EvalState & state,
     Value & v);
 
 void callFlake(EvalState & state,
-    const ResolvedFlake & resFlake,
+    const LockedFlake & resFlake,
     Value & v);
-
-void updateLockFile(EvalState &, const FlakeRef & flakeRef, bool recreateLockFile);
 
 }
 
