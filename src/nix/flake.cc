@@ -150,15 +150,7 @@ struct CmdFlakeUpdate : FlakeCommand
     void run(nix::ref<nix::Store> store) override
     {
         auto evalState = getEvalState();
-
-        auto flakeRef = getFlakeRef();
-
-#if 0
-        if (std::get_if<FlakeRef::IsPath>(&flakeRef.data))
-            updateLockFile(*evalState, flakeRef, true);
-        else
-            throw Error("cannot update lockfile of flake '%s'", flakeRef);
-#endif
+        resolveFlake();
     }
 };
 
