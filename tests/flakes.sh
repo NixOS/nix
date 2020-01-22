@@ -293,6 +293,13 @@ nix build -o $TEST_ROOT/result --flake-registry $registry flake3#xyzzy flake3#fn
 # Test doing multiple `lookupFlake`s
 nix build -o $TEST_ROOT/result --flake-registry $registry flake4#xyzzy
 
+# Test 'nix flake update' and --override-flake.
+nix flake update --flake-registry $registry $flake3Dir
+[[ -z $(git -C $flake3Dir diff master) ]]
+
+nix flake update --flake-registry $registry $flake3Dir --recreate-lock-file --override-flake flake2 nixpkgs
+[[ ! -z $(git -C $flake3Dir diff master) ]]
+
 # Make branch "removeXyzzy" where flake3 doesn't have xyzzy anymore
 git -C $flake3Dir checkout -b removeXyzzy
 rm $flake3Dir/flake.nix

@@ -16,8 +16,6 @@ struct MixEvalArgs : virtual Args
 
     Strings searchPath;
 
-    std::vector<std::pair<std::string, std::string>> registryOverrides;
-
 private:
 
     std::map<std::string, std::string> autoArgs;

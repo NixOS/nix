@@ -3,6 +3,8 @@
 #include "download.hh"
 #include "util.hh"
 #include "eval.hh"
+#include "fetchers/registry.hh"
+#include "flake/flakeref.hh"
 
 namespace nix {
 
@@ -40,7 +42,9 @@ MixEvalArgs::MixEvalArgs()
       .description("override a flake registry value")
       .arity(2)
       .handler([&](std::vector<std::string> ss) {
-          registryOverrides.push_back(std::make_pair(ss[0], ss[1]));
+          fetchers::overrideRegistry(
+              parseFlakeRef(ss[0], absPath(".")).input,
+              parseFlakeRef(ss[1], absPath(".")).input);
       });
 }
 

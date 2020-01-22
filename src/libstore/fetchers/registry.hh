@@ -20,6 +20,10 @@ struct Registry
 
     std::vector<std::pair<std::shared_ptr<const Input>, std::shared_ptr<const Input>>> entries;
 
+    Registry(RegistryType type)
+        : type(type)
+    { }
+
     static std::shared_ptr<Registry> read(
         const Path & path, RegistryType type);
 
@@ -39,6 +43,10 @@ std::shared_ptr<Registry> getUserRegistry();
 Path getUserRegistryPath();
 
 Registries getRegistries(ref<Store> store);
+
+void overrideRegistry(
+    const std::shared_ptr<const Input> & from,
+    const std::shared_ptr<const Input> & to);
 
 std::shared_ptr<const Input> lookupInRegistries(
     ref<Store> store,

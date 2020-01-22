@@ -11,11 +11,10 @@ namespace nix::fetchers {
 std::shared_ptr<Registry> Registry::read(
     const Path & path, RegistryType type)
 {
-    auto registry = std::make_shared<Registry>();
-    registry->type = type;
+    auto registry = std::make_shared<Registry>(type);
 
     if (!pathExists(path))
-        return std::make_shared<Registry>();
+        return std::make_shared<Registry>(type);
 
     auto json = nlohmann::json::parse(readFile(path));
 
@@ -74,17 +73,20 @@ std::shared_ptr<Registry> getUserRegistry()
     return Registry::read(getUserRegistryPath(), Registry::User);
 }
 
-#if 0
-std::shared_ptr<Registry> getFlagRegistry(RegistryOverrides registryOverrides)
+static std::shared_ptr<Registry> flagRegistry =
+    std::make_shared<Registry>(Registry::Flag);
+
+std::shared_ptr<Registry> getFlagRegistry()
 {
-    auto flagRegistry = std::make_shared<Registry>();
-    for (auto const & x : registryOverrides)
-        flagRegistry->entries.insert_or_assign(
-            parseFlakeRef2(x.first),
-            parseFlakeRef2(x.second));
     return flagRegistry;
 }
-#endif
+
+void overrideRegistry(
+    const std::shared_ptr<const Input> & from,
+    const std::shared_ptr<const Input> & to)
+{
+    flagRegistry->add(from, to);
+}
 
 static std::shared_ptr<Registry> getGlobalRegistry(ref<Store> store)
 {
@@ -107,7 +109,7 @@ static std::shared_ptr<Registry> getGlobalRegistry(ref<Store> store)
 Registries getRegistries(ref<Store> store)
 {
     Registries registries;
-    //registries.push_back(getFlagRegistry(registryOverrides));
+    registries.push_back(getFlagRegistry());
     registries.push_back(getUserRegistry());
     registries.push_back(getGlobalRegistry(store));
     return registries;
