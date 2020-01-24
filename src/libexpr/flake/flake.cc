@@ -4,6 +4,7 @@
 #include "eval-inline.hh"
 #include "store-api.hh"
 #include "fetchers/fetchers.hh"
+#include "fetchers/regex.hh"
 
 #include <iostream>
 #include <ctime>
@@ -61,6 +62,78 @@ static void expectType(EvalState & state, ValueType type,
             showType(type), showType(value.type), pos);
 }
 
+static InputPath parseInputPath(std::string_view s, const Pos & pos)
+{
+    InputPath path;
+
+    for (auto & elem : tokenizeString<std::vector<std::string>>(s, "/")) {
+        if (!std::regex_match(elem, fetchers::flakeIdRegex))
+            throw Error("invalid flake input path element '%s' at %s", elem, pos);
+        path.push_back(elem);
+    }
+
+    if (path.empty())
+        throw Error("flake input path is empty at %s", pos);
+
+    return path;
+}
+
+static std::map<FlakeId, FlakeInput> parseFlakeInputs(
+    EvalState & state, Value * value, const Pos & pos);
+
+static FlakeInput parseFlakeInput(EvalState & state,
+    const std::string & inputName, Value * value, const Pos & pos)
+{
+    expectType(state, tAttrs, *value, pos);
+
+    FlakeInput input {
+        .ref = parseFlakeRef(inputName)
+    };
+
+    auto sInputs = state.symbols.create("inputs");
+    auto sUrl = state.symbols.create("url");
+    auto sUri = state.symbols.create("uri"); // FIXME: remove soon
+    auto sFlake = state.symbols.create("flake");
+    auto sFollows = state.symbols.create("follows");
+
+    for (Attr attr : *(value->attrs)) {
+        if (attr.name == sUrl || attr.name == sUri) {
+            expectType(state, tString, *attr.value, *attr.pos);
+            input.ref = parseFlakeRef(attr.value->string.s);
+        } else if (attr.name == sFlake) {
+            expectType(state, tBool, *attr.value, *attr.pos);
+            input.isFlake = attr.value->boolean;
+        } else if (attr.name == sInputs) {
+            input.overrides = parseFlakeInputs(state, attr.value, *attr.pos);
+        } else if (attr.name == sFollows) {
+            expectType(state, tString, *attr.value, *attr.pos);
+            input.follows = parseInputPath(attr.value->string.s, *attr.pos);
+        } else
+            throw Error("flake input '%s' has an unsupported attribute '%s', at %s",
+                inputName, attr.name, *attr.pos);
+    }
+
+    return input;
+}
+
+static std::map<FlakeId, FlakeInput> parseFlakeInputs(
+    EvalState & state, Value * value, const Pos & pos)
+{
+    std::map<FlakeId, FlakeInput> inputs;
+
+    expectType(state, tAttrs, *value, pos);
+
+    for (Attr & inputAttr : *(*value).attrs) {
+        inputs.emplace(inputAttr.name,
+            parseFlakeInput(state,
+                inputAttr.name,
+                inputAttr.value,
+                *inputAttr.pos));
+    }
+
+    return inputs;
+}
+
 static Flake getFlake(EvalState & state, const FlakeRef & originalRef,
     bool allowLookup, RefMap & refMap)
 {
@@ -72,7 +145,7 @@ static Flake getFlake(EvalState & state, const FlakeRef & originalRef,
 
     FlakeRef resolvedRef(resolvedInput, flakeRef.subdir);
 
-    debug("got flake source '%s' from flake URL '%s'",
+    debug("got flake source '%s' from '%s'",
         state.store->printStorePath(sourceInfo.storePath), resolvedRef);
 
     refMap.push_back({originalRef, resolvedRef});
@@ -124,33 +197,9 @@ static Flake getFlake(EvalState & state, const FlakeRef & originalRef,
     }
 
     auto sInputs = state.symbols.create("inputs");
-    auto sUrl = state.symbols.create("url");
-    auto sUri = state.symbols.create("uri"); // FIXME: remove soon
-    auto sFlake = state.symbols.create("flake");
 
-    if (std::optional<Attr *> inputs = vInfo.attrs->get(sInputs)) {
-        expectType(state, tAttrs, *(**inputs).value, *(**inputs).pos);
-
-        for (Attr inputAttr : *(*(**inputs).value).attrs) {
-            expectType(state, tAttrs, *inputAttr.value, *inputAttr.pos);
-
-            FlakeInput input(parseFlakeRef(inputAttr.name));
-
-            for (Attr attr : *(inputAttr.value->attrs)) {
-                if (attr.name == sUrl || attr.name == sUri) {
-                    expectType(state, tString, *attr.value, *attr.pos);
-                    input.ref = parseFlakeRef(attr.value->string.s);
-                } else if (attr.name == sFlake) {
-                    expectType(state, tBool, *attr.value, *attr.pos);
-                    input.isFlake = attr.value->boolean;
-                } else
-                    throw Error("flake input '%s' has an unsupported attribute '%s', at %s",
-                        inputAttr.name, attr.name, *attr.pos);
-            }
-
-            flake.inputs.emplace(inputAttr.name, input);
-        }
-    }
+    if (std::optional<Attr *> inputs = vInfo.attrs->get(sInputs))
+        flake.inputs = parseFlakeInputs(state, (**inputs).value, *(**inputs).pos);
 
     auto sOutputs = state.symbols.create("outputs");
 
@@ -161,7 +210,9 @@ static Flake getFlake(EvalState & state, const FlakeRef & originalRef,
         if (flake.vOutputs->lambda.fun->matchAttrs) {
             for (auto & formal : flake.vOutputs->lambda.fun->formals->formals) {
                 if (formal.name != state.sSelf)
-                    flake.inputs.emplace(formal.name, FlakeInput(parseFlakeRef(formal.name)));
+                    flake.inputs.emplace(formal.name, FlakeInput {
+                        .ref = parseFlakeRef(formal.name)
+                    });
             }
         }
 
@@ -201,7 +252,7 @@ static std::pair<fetchers::Tree, FlakeRef> getNonFlake(
 
     FlakeRef resolvedRef(resolvedInput, flakeRef.subdir);
 
-    debug("got non-flake source '%s' with flakeref %s",
+    debug("got non-flake source '%s' from '%s'",
         state.store->printStorePath(sourceInfo.storePath), resolvedRef);
 
     refMap.push_back({originalRef, resolvedRef});
@@ -224,73 +275,51 @@ bool allowedToUseRegistries(LockFileMode handle, bool isTopRef)
     else assert(false);
 }
 
-/* Given a flakeref and its subtree of the lockfile, return an updated
-   subtree of the lockfile. That is, if the 'flake.nix' of the
-   referenced flake has inputs that don't have a corresponding entry
-   in the lockfile, they're added to the lockfile; conversely, any
-   lockfile entries that don't have a corresponding entry in flake.nix
-   are removed.
-
-   Note that this is lazy: we only recursively fetch inputs that are
-   not in the lockfile yet. */
-static std::pair<Flake, LockedInput> updateLocks(
-    RefMap & refMap,
-    const std::string & inputPath,
-    EvalState & state,
-    const Flake & flake,
-    LockFileMode lockFileMode,
-    const LockedInputs & oldEntry,
-    bool topRef)
+static void flattenLockFile(
+    const LockedInputs & inputs,
+    const InputPath & prefix,
+    std::map<InputPath, const LockedInput *> & res)
 {
-    LockedInput newEntry(
-        flake.resolvedRef,
-        flake.originalRef,
-        flake.sourceInfo->narHash);
+    for (auto &[id, input] : inputs.inputs) {
+        auto inputPath(prefix);
+        inputPath.push_back(id);
+        res.emplace(inputPath, &input);
+        flattenLockFile(input, inputPath, res);
+    }
+}
 
-    std::vector<std::function<void()>> postponed;
+static std::string diffLockFiles(const LockedInputs & oldLocks, const LockedInputs & newLocks)
+{
+    std::map<InputPath, const LockedInput *> oldFlat, newFlat;
+    flattenLockFile(oldLocks, {}, oldFlat);
+    flattenLockFile(newLocks, {}, newFlat);
 
-    for (auto & [id, input] : flake.inputs) {
-        auto inputPath2 = (inputPath.empty() ? "" : inputPath + "/") + id;
-        auto i = oldEntry.inputs.find(id);
-        if (i != oldEntry.inputs.end() && i->second.originalRef == input.ref) {
-            newEntry.inputs.insert_or_assign(id, i->second);
+    auto i = oldFlat.begin();
+    auto j = newFlat.begin();
+    std::string res;
+
+    while (i != oldFlat.end() || j != newFlat.end()) {
+        if (j != newFlat.end() && (i == oldFlat.end() || i->first > j->first)) {
+            res += fmt("  added '%s': '%s'\n", concatStringsSep("/", j->first), j->second->ref);
+            ++j;
+        } else if (i != oldFlat.end() && (j == newFlat.end() || i->first < j->first)) {
+            res += fmt("  removed '%s'\n", concatStringsSep("/", i->first));
+            ++i;
         } else {
-            if (lockFileMode == AllPure || lockFileMode == TopRefUsesRegistries)
-                throw Error("cannot update flake input '%s' in pure mode", id);
-
-            auto warn = [&](const FlakeRef & resolvedRef, const fetchers::Tree & sourceInfo) {
-                if (i == oldEntry.inputs.end())
-                    printInfo("mapped flake input '%s' to '%s'",
-                        inputPath2, resolvedRef);
-                else
-                    printMsg(lvlWarn, "updated flake input '%s' from '%s' to '%s'",
-                        inputPath2, i->second.originalRef, resolvedRef);
-            };
-
-            if (input.isFlake) {
-                auto actualInput = getFlake(state, input.ref,
-                    allowedToUseRegistries(lockFileMode, false), refMap);
-                warn(actualInput.resolvedRef, *actualInput.sourceInfo);
-                postponed.push_back([&, id{id}, inputPath2, actualInput]() {
-                    newEntry.inputs.insert_or_assign(id,
-                        updateLocks(refMap, inputPath2, state, actualInput, lockFileMode, {}, false).second);
-                });
-            } else {
-                auto [sourceInfo, resolvedRef] = getNonFlake(state, input.ref,
-                    allowedToUseRegistries(lockFileMode, false), refMap);
-                warn(resolvedRef, sourceInfo);
-                newEntry.inputs.insert_or_assign(id,
-                    LockedInput(resolvedRef, input.ref, sourceInfo.narHash));
-            }
+            if (!(i->second->ref == j->second->ref))
+                res += fmt("  updated '%s': '%s' -> '%s'\n",
+                    concatStringsSep("/", i->first),
+                    i->second->ref,
+                    j->second->ref);
+            ++i;
+            ++j;
         }
     }
 
-    for (auto & f : postponed) f();
-
-    return {flake, newEntry};
+    return res;
 }
 
-/* Compute an in-memory lockfile for the specified top-level flake,
+/* Compute an in-memory lock file for the specified top-level flake,
    and optionally write it to file, it the flake is writable. */
 LockedFlake lockFlake(
     EvalState & state,
@@ -299,8 +328,10 @@ LockedFlake lockFlake(
 {
     settings.requireExperimentalFeature("flakes");
 
+    RefMap refMap;
+
     auto flake = getFlake(state, topRef,
-        allowedToUseRegistries(lockFileMode, true));
+        allowedToUseRegistries(lockFileMode, true), refMap);
 
     LockFile oldLockFile;
 
@@ -313,22 +344,171 @@ LockedFlake lockFlake(
 
     debug("old lock file: %s", oldLockFile);
 
-    RefMap refMap;
+    LockFile newLockFile, prevLockFile;
+    std::vector<InputPath> prevUnresolved;
 
-    LockFile newLockFile(updateLocks(
-            refMap, "", state, flake, lockFileMode, oldLockFile, true).second);
+    // FIXME: check whether all overrides are used.
+    std::map<InputPath, FlakeInput> overrides;
+
+    /* Compute the new lock file. This is dones as a fixpoint
+       iteration: we repeat until the new lock file no longer changes
+       and there are no unresolved "follows" inputs. */
+    while (true) {
+        std::vector<InputPath> unresolved;
+
+        /* Recurse into the flake inputs. */
+        std::function<void(
+            const FlakeInputs & flakeInputs,
+            const LockedInputs & oldLocks,
+            LockedInputs & newLocks,
+            const InputPath & inputPathPrefix)>
+            updateLocks;
+
+        updateLocks = [&](
+            const FlakeInputs & flakeInputs,
+            const LockedInputs & oldLocks,
+            LockedInputs & newLocks,
+            const InputPath & inputPathPrefix)
+        {
+            /* Get the overrides (i.e. attributes of the form
+               'inputs.nixops.inputs.nixpkgs.url = ...'). */
+            for (auto & [id, input] : flake.inputs) {
+                for (auto & [idOverride, inputOverride] : input.overrides) {
+                    auto inputPath(inputPathPrefix);
+                    inputPath.push_back(id);
+                    inputPath.push_back(idOverride);
+                    overrides.insert_or_assign(inputPath, inputOverride);
+                }
+            }
+
+            /* Go over the flake inputs, resolve/fetch them if
+               necessary (i.e. if they're new or the flakeref changed
+               from what's in the lock file). */
+            for (auto & [id, input2] : flakeInputs) {
+                auto inputPath(inputPathPrefix);
+                inputPath.push_back(id);
+                auto inputPathS = concatStringsSep("/", inputPath);
+
+                /* Do we have an override for this input from one of
+                   the ancestors? */
+                auto i = overrides.find(inputPath);
+                bool hasOverride = i != overrides.end();
+                auto & input = hasOverride ? i->second : input2;
+
+                if (input.follows) {
+                    /* This is a "follows" input
+                       (i.e. 'inputs.nixpkgs.follows =
+                       "dwarffs/nixpkgs"). Resolve the source and copy
+                       its inputs. Note that the source is normally
+                       relative to the current node of the lock file
+                       (e.g. "dwarffs/nixpkgs" refers to the nixpkgs
+                       input of the dwarffs input of the root flake),
+                       but if it's from an override, it's relative to
+                       the *root* of the lock file. */
+                    auto follows = (hasOverride ? newLockFile : newLocks).findInput(*input.follows);
+                    if (follows)
+                        newLocks.inputs.insert_or_assign(id, **follows);
+                    else
+                        /* We haven't processed the source of the
+                           "follows" yet (e.g. "dwarffs/nixpkgs"). So
+                           we'll need another round of the fixpoint
+                           iteration. */
+                        unresolved.push_back(inputPath);
+                    continue;
+                }
+
+                auto oldLock = oldLocks.inputs.find(id);
+
+                if (oldLock != oldLocks.inputs.end() && oldLock->second.originalRef == input.ref && !hasOverride) {
+                    /* Copy the input from the old lock file if its
+                       flakeref didn't change and there is no override
+                       from a higher level flake. */
+                    newLocks.inputs.insert_or_assign(id, oldLock->second);
+
+                    /* However there may be new overrides on the
+                       inputs of this flake, so we need to check those
+                       (without fetching this flake - we need to be
+                       lazy). */
+                    FlakeInputs fakeInputs;
+
+                    for (auto & i : oldLock->second.inputs) {
+                        fakeInputs.emplace(i.first, FlakeInput {
+                            .ref = i.second.originalRef
+                        });
+                    }
+
+                    updateLocks(fakeInputs,
+                        oldLock->second,
+                        newLocks.inputs.find(id)->second,
+                        inputPath);
+
+                } else {
+                    /* We need to update/create a new lock file
+                       entry. So fetch the flake/non-flake. */
+                    if (lockFileMode == AllPure || lockFileMode == TopRefUsesRegistries)
+                        throw Error("cannot update flake input '%s' in pure mode", inputPathS);
+
+                    if (input.isFlake) {
+                        auto inputFlake = getFlake(state, input.ref,
+                            allowedToUseRegistries(lockFileMode, false), refMap);
+
+                        newLocks.inputs.insert_or_assign(id,
+                            LockedInput(inputFlake.resolvedRef, inputFlake.originalRef, inputFlake.sourceInfo->narHash));
+
+                        /* Recursively process the inputs of this
+                           flake. Also, unless we already have this
+                           flake in the top-level lock file, use this
+                           flake's own lock file. */
+                        updateLocks(inputFlake.inputs,
+                            oldLock != oldLocks.inputs.end()
+                            ? (const LockedInputs &) oldLock->second
+                            : LockFile::read(
+                                inputFlake.sourceInfo->actualPath + "/" + inputFlake.resolvedRef.subdir + "/flake.lock"),
+                            newLocks.inputs.find(id)->second,
+                            inputPath);
+                    }
+
+                    else {
+                        auto [sourceInfo, resolvedRef] = getNonFlake(state, input.ref,
+                            allowedToUseRegistries(lockFileMode, false), refMap);
+                        newLocks.inputs.insert_or_assign(id,
+                            LockedInput(resolvedRef, input.ref, sourceInfo.narHash));
+                    }
+                }
+            }
+        };
+
+        updateLocks(flake.inputs, oldLockFile, newLockFile, {});
+
+        /* Check if there is a cycle in the "follows" inputs. */
+        if (!unresolved.empty() && unresolved == prevUnresolved) {
+            std::vector<std::string> ss;
+            for (auto & i : unresolved)
+                ss.push_back(concatStringsSep("/", i));
+            throw Error("cycle or missing input detected in flake inputs: %s", concatStringsSep(", ", ss));
+        }
+
+        std::swap(unresolved, prevUnresolved);
+
+        /* Done with the fixpoint iteration? */
+        if (newLockFile == prevLockFile) break;
+        prevLockFile = newLockFile;
+    };
 
     debug("new lock file: %s", newLockFile);
 
+    /* Check whether we need to / can write the new lock file. */
     if (!(newLockFile == oldLockFile)) {
+
+        if (!(oldLockFile == LockFile()))
+            printInfo("inputs of flake '%s' changed:\n%s", topRef, chomp(diffLockFiles(oldLockFile, newLockFile)));
+
         if (lockFileMode == UpdateLockFile || lockFileMode == RecreateLockFile) {
             if (auto sourcePath = topRef.input->getSourcePath()) {
                 if (!newLockFile.isImmutable()) {
                     if (settings.warnDirty)
                         warn("will not write lock file of flake '%s' because it has a mutable input", topRef);
                 } else {
-                    warn("updated lock file of flake '%s'", topRef);
-
                     newLockFile.write(*sourcePath + (topRef.subdir == "" ? "" : "/" + topRef.subdir) + "/flake.lock");
 
                     // FIXME: rewriting the lockfile changed the

@@ -6,6 +6,7 @@ namespace nix::fetchers {
 
 std::regex refRegex(refRegexS, std::regex::ECMAScript);
 std::regex revRegex(revRegexS, std::regex::ECMAScript);
+std::regex flakeIdRegex(flakeIdRegexS, std::regex::ECMAScript);
 
 ParsedURL parseURL(const std::string & url)
 {

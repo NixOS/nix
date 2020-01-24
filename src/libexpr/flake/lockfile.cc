@@ -55,6 +55,22 @@ bool LockedInputs::isImmutable() const
     return true;
 }
 
+std::optional<LockedInput *> LockedInputs::findInput(const InputPath & path)
+{
+    assert(!path.empty());
+
+    LockedInputs * pos = this;
+
+    for (auto & elem : path) {
+        auto i = pos->inputs.find(elem);
+        if (i == pos->inputs.end())
+            return {};
+        pos = &i->second;
+    }
+
+    return (LockedInput *) pos;
+}
+
 nlohmann::json LockFile::toJson() const
 {
     auto json = LockedInputs::toJson();

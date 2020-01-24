@@ -22,11 +22,16 @@ enum LockFileMode : unsigned int
     , UseNewLockFile // `RecreateLockFile` without writing to file
     };
 
+struct FlakeInput;
+
+typedef std::map<FlakeId, FlakeInput> FlakeInputs;
+
 struct FlakeInput
 {
     FlakeRef ref;
     bool isFlake = true;
-    FlakeInput(const FlakeRef & ref) : ref(ref) {};
+    std::optional<InputPath> follows;
+    FlakeInputs overrides;
 };
 
 struct Flake
@@ -35,7 +40,7 @@ struct Flake
     FlakeRef resolvedRef;
     std::optional<std::string> description;
     std::shared_ptr<const fetchers::Tree> sourceInfo;
-    std::map<FlakeId, FlakeInput> inputs;
+    FlakeInputs inputs;
     Value * vOutputs; // FIXME: gc
     unsigned int edition;
     ~Flake();

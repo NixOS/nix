@@ -77,7 +77,7 @@ std::pair<FlakeRef, std::string> parseFlakeRefWithFragment(
         std::regex::ECMAScript);
 
     static std::regex flakeRegex(
-        "((" + flakeId + ")(?:/(?:" + refAndOrRevRegex + "))?)"
+        "((" + flakeIdRegexS + ")(?:/(?:" + refAndOrRevRegex + "))?)"
         + "(?:#(" + queryRegex + "))?",
         std::regex::ECMAScript);
 

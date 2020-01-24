@@ -10,6 +10,8 @@ class Store;
 
 namespace nix::flake {
 
+typedef std::vector<FlakeId> InputPath;
+
 struct LockedInput;
 
 /* Lock file information about the dependencies of a flake. */
@@ -23,6 +25,8 @@ struct LockedInputs
     nlohmann::json toJson() const;
 
     bool isImmutable() const;
+
+    std::optional<LockedInput *> findInput(const InputPath & path);
 };
 
 /* Lock file information about a flake input. */

@@ -354,7 +354,9 @@ nix flake remove --flake-registry $registry flake1
 (cd $flake7Dir && nix flake init)
 git -C $flake7Dir add flake.nix
 nix flake --flake-registry $registry check $flake7Dir
+git -C $flake7Dir commit -m 'Initial'
 
+# Test 'nix flake clone'.
 rm -rf $TEST_ROOT/flake1-v2
 nix flake clone --flake-registry $registry flake1 --dest $TEST_ROOT/flake1-v2
 [ -e $TEST_ROOT/flake1-v2/flake.nix ]
@@ -443,3 +445,77 @@ cat > $flake3Dir/flake.nix <<EOF
 EOF
 
 (! nix flake check --flake-registry $registry $flake3Dir)
+
+# Test 'follows' inputs.
+cat > $flake3Dir/flake.nix <<EOF
+{
+  edition = 201909;
+
+  inputs.foo.url = flake:flake1;
+  inputs.bar.follows = "foo";
+
+  outputs = { self, foo, bar }: {
+  };
+}
+EOF
+
+nix flake update --flake-registry $registry $flake3Dir
+[[ $(jq .inputs.foo.url $flake3Dir/flake.lock) = $(jq .inputs.bar.url $flake3Dir/flake.lock) ]]
+
+cat > $flake3Dir/flake.nix <<EOF
+{
+  edition = 201909;
+
+  inputs.bar.follows = "flake2/flake1";
+
+  outputs = { self, flake2, bar }: {
+  };
+}
+EOF
+
+nix flake update --flake-registry $registry $flake3Dir
+[[ $(jq .inputs.bar.url $flake3Dir/flake.lock) =~ flake1 ]]
+
+cat > $flake3Dir/flake.nix <<EOF
+{
+  edition = 201909;
+
+  inputs.bar.follows = "flake2";
+
+  outputs = { self, flake2, bar }: {
+  };
+}
+EOF
+
+nix flake update --flake-registry $registry $flake3Dir
+[[ $(jq .inputs.bar.url $flake3Dir/flake.lock) =~ flake2 ]]
+
+# Test overriding inputs of inputs.
+cat > $flake3Dir/flake.nix <<EOF
+{
+  edition = 201909;
+
+  inputs.flake2.inputs.flake1.url = git+file://$flake7Dir;
+
+  outputs = { self, flake2 }: {
+  };
+}
+EOF
+
+nix flake update --flake-registry $registry $flake3Dir
+[[ $(jq .inputs.flake2.inputs.flake1.url $flake3Dir/flake.lock) =~ flake7 ]]
+
+cat > $flake3Dir/flake.nix <<EOF
+{
+  edition = 201909;
+
+  inputs.flake2.inputs.flake1.follows = "foo";
+  inputs.foo.url = git+file://$flake7Dir;
+
+  outputs = { self, flake2 }: {
+  };
+}
+EOF
+
+nix flake update --flake-registry $registry $flake3Dir --recreate-lock-file
+[[ $(jq .inputs.flake2.inputs.flake1.url $flake3Dir/flake.lock) =~ flake7 ]]
