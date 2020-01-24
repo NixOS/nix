@@ -16,7 +16,7 @@ struct Pos;
 class Store;
 
 namespace flake {
-enum HandleLockFile : unsigned int;
+enum LockFileMode : unsigned int;
 }
 
 /* A command that requires a Nix store. */
@@ -49,7 +49,7 @@ struct MixFlakeOptions : virtual Args
 
     MixFlakeOptions();
 
-    flake::HandleLockFile getLockFileMode();
+    flake::LockFileMode getLockFileMode();
 };
 
 struct SourceExprCommand : virtual Args, EvalCommand, MixFlakeOptions

@@ -35,7 +35,7 @@ MixFlakeOptions::MixFlakeOptions()
         .set(&useRegistries, false);
 }
 
-flake::HandleLockFile MixFlakeOptions::getLockFileMode()
+flake::LockFileMode MixFlakeOptions::getLockFileMode()
 {
     using namespace flake;
     return

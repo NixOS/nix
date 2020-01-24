@@ -213,17 +213,7 @@ static std::pair<fetchers::Tree, FlakeRef> getNonFlake(
     return std::make_pair(std::move(sourceInfo), resolvedRef);
 }
 
-bool allowedToWrite(HandleLockFile handle)
-{
-    return handle == UpdateLockFile || handle == RecreateLockFile;
-}
-
-bool recreateLockFile(HandleLockFile handle)
-{
-    return handle == RecreateLockFile || handle == UseNewLockFile;
-}
-
-bool allowedToUseRegistries(HandleLockFile handle, bool isTopRef)
+bool allowedToUseRegistries(LockFileMode handle, bool isTopRef)
 {
     if (handle == AllPure) return false;
     else if (handle == TopRefUsesRegistries) return isTopRef;
@@ -248,7 +238,7 @@ static std::pair<Flake, LockedInput> updateLocks(
     const std::string & inputPath,
     EvalState & state,
     const Flake & flake,
-    HandleLockFile handleLockFile,
+    LockFileMode lockFileMode,
     const LockedInputs & oldEntry,
     bool topRef)
 {
@@ -265,7 +255,7 @@ static std::pair<Flake, LockedInput> updateLocks(
         if (i != oldEntry.inputs.end() && i->second.originalRef == input.ref) {
             newEntry.inputs.insert_or_assign(id, i->second);
         } else {
-            if (handleLockFile == AllPure || handleLockFile == TopRefUsesRegistries)
+            if (lockFileMode == AllPure || lockFileMode == TopRefUsesRegistries)
                 throw Error("cannot update flake input '%s' in pure mode", id);
 
             auto warn = [&](const FlakeRef & resolvedRef, const fetchers::Tree & sourceInfo) {
@@ -279,15 +269,15 @@ static std::pair<Flake, LockedInput> updateLocks(
 
             if (input.isFlake) {
                 auto actualInput = getFlake(state, input.ref,
-                    allowedToUseRegistries(handleLockFile, false), refMap);
+                    allowedToUseRegistries(lockFileMode, false), refMap);
                 warn(actualInput.resolvedRef, *actualInput.sourceInfo);
                 postponed.push_back([&, id{id}, inputPath2, actualInput]() {
                     newEntry.inputs.insert_or_assign(id,
-                        updateLocks(refMap, inputPath2, state, actualInput, handleLockFile, {}, false).second);
+                        updateLocks(refMap, inputPath2, state, actualInput, lockFileMode, {}, false).second);
                 });
             } else {
                 auto [sourceInfo, resolvedRef] = getNonFlake(state, input.ref,
-                    allowedToUseRegistries(handleLockFile, false), refMap);
+                    allowedToUseRegistries(lockFileMode, false), refMap);
                 warn(resolvedRef, sourceInfo);
                 newEntry.inputs.insert_or_assign(id,
                     LockedInput(resolvedRef, input.ref, sourceInfo.narHash));
@@ -305,16 +295,16 @@ static std::pair<Flake, LockedInput> updateLocks(
 LockedFlake lockFlake(
     EvalState & state,
     const FlakeRef & topRef,
-    HandleLockFile handleLockFile)
+    LockFileMode lockFileMode)
 {
     settings.requireExperimentalFeature("flakes");
 
     auto flake = getFlake(state, topRef,
-        allowedToUseRegistries(handleLockFile, true));
+        allowedToUseRegistries(lockFileMode, true));
 
     LockFile oldLockFile;
 
-    if (!recreateLockFile(handleLockFile)) {
+    if (lockFileMode != RecreateLockFile && lockFileMode != UseNewLockFile) {
         // If recreateLockFile, start with an empty lockfile
         // FIXME: symlink attack
         oldLockFile = LockFile::read(
@@ -325,21 +315,21 @@ LockedFlake lockFlake(
 
     RefMap refMap;
 
-    LockFile lockFile(updateLocks(
-            refMap, "", state, flake, handleLockFile, oldLockFile, true).second);
+    LockFile newLockFile(updateLocks(
+            refMap, "", state, flake, lockFileMode, oldLockFile, true).second);
 
-    debug("new lock file: %s", lockFile);
+    debug("new lock file: %s", newLockFile);
 
-    if (!(lockFile == oldLockFile)) {
-        if (allowedToWrite(handleLockFile)) {
+    if (!(newLockFile == oldLockFile)) {
+        if (lockFileMode == UpdateLockFile || lockFileMode == RecreateLockFile) {
             if (auto sourcePath = topRef.input->getSourcePath()) {
-                if (!lockFile.isImmutable()) {
+                if (!newLockFile.isImmutable()) {
                     if (settings.warnDirty)
                         warn("will not write lock file of flake '%s' because it has a mutable input", topRef);
                 } else {
                     warn("updated lock file of flake '%s'", topRef);
 
-                    lockFile.write(*sourcePath + (topRef.subdir == "" ? "" : "/" + topRef.subdir) + "/flake.lock");
+                    newLockFile.write(*sourcePath + (topRef.subdir == "" ? "" : "/" + topRef.subdir) + "/flake.lock");
 
                     // FIXME: rewriting the lockfile changed the
                     // top-level repo, so we should re-read it.
@@ -355,11 +345,11 @@ LockedFlake lockFlake(
                 }
             } else
                 warn("cannot write lock file of remote flake '%s'", topRef);
-        } else if (handleLockFile != AllPure && handleLockFile != TopRefUsesRegistries)
+        } else if (lockFileMode != AllPure && lockFileMode != TopRefUsesRegistries)
             warn("using updated lock file without writing it to file");
     }
 
-    return LockedFlake { .flake = std::move(flake), .lockFile = std::move(lockFile) };
+    return LockedFlake { .flake = std::move(flake), .lockFile = std::move(newLockFile) };
 }
 
 static void emitSourceInfoAttrs(EvalState & state, const fetchers::Tree & sourceInfo, Value & vAttrs)

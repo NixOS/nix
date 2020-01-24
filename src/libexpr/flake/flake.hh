@@ -13,7 +13,7 @@ namespace fetchers { struct Tree; }
 
 namespace flake {
 
-enum HandleLockFile : unsigned int
+enum LockFileMode : unsigned int
     { AllPure // Everything is handled 100% purely
     , TopRefUsesRegistries // The top FlakeRef uses the registries, apart from that, everything happens 100% purely
     , UpdateLockFile // Update the existing lockfile and write it to file
@@ -54,7 +54,7 @@ struct LockedFlake
     Fingerprint getFingerprint() const;
 };
 
-LockedFlake lockFlake(EvalState &, const FlakeRef &, HandleLockFile);
+LockedFlake lockFlake(EvalState &, const FlakeRef &, LockFileMode);
 
 void callFlake(EvalState & state,
     const Flake & flake,
