@@ -111,6 +111,9 @@ std::pair<FlakeRef, std::string> parseFlakeRefWithFragment(
             throw BadURL("flake reference '%s' is not an absolute path", url);
         path = absPath(path, baseDir, true);
 
+        if (!S_ISDIR(lstat(path).st_mode))
+            throw BadURL("path '%s' is not a flake (because it's not a directory)", path);
+
         auto flakeRoot = path;
         std::string subdir;
 
