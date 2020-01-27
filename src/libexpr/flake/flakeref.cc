@@ -162,7 +162,6 @@ std::optional<std::pair<FlakeRef, std::string>> maybeParseFlakeRefWithFragment(
     try {
         return parseFlakeRefWithFragment(url, baseDir);
     } catch (Error & e) {
-        printError("FOO: %s", e.what());
         return {};
     }
 }
