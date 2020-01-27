@@ -14,6 +14,7 @@ flake1Dir=$TEST_ROOT/flake1
 flake2Dir=$TEST_ROOT/flake2
 flake3Dir=$TEST_ROOT/flake3
 flake4Dir=$TEST_ROOT/flake4
+flake5Dir=$TEST_ROOT/flake5
 flake7Dir=$TEST_ROOT/flake7
 nonFlakeDir=$TEST_ROOT/nonFlake
 
@@ -101,6 +102,9 @@ cat > $registry <<EOF
         "flake:flake4": {
             "url": "flake:flake3"
         },
+        "flake:flake5": {
+            "url": "hg+file://$flake5Dir"
+        },
         "flake:nixpkgs": {
             "url": "flake:flake1"
         }
@@ -110,7 +114,7 @@ cat > $registry <<EOF
 EOF
 
 # Test 'nix flake list'.
-(( $(nix flake list --flake-registry $registry | wc -l) == 5 ))
+(( $(nix flake list --flake-registry $registry | wc -l) == 6 ))
 
 # Test 'nix flake info'.
 nix flake info --flake-registry $registry flake1 | grep -q 'URL: .*flake1.*'
@@ -142,7 +146,8 @@ nix build -o $flake1Dir/result --flake-registry $registry git+file://$flake1Dir
 nix path-info $flake1Dir/result
 
 # Building a flake with an unlocked dependency should fail in pure mode.
-(! nix eval "(builtins.getFlake "$flake2Dir")")
+(! nix build -o $TEST_ROOT/result --flake-registry $registry flake2#bar --no-registries)
+(! nix eval --expr "builtins.getFlake \"$flake2Dir\"")
 
 # But should succeed in impure mode.
 nix build -o $TEST_ROOT/result --flake-registry $registry flake2#bar --impure
@@ -159,6 +164,7 @@ nix build -o $TEST_ROOT/result --flake-registry $registry $flake2Dir#bar
 
 # Building with a lockfile should not require a fetch of the registry.
 nix build -o $TEST_ROOT/result --flake-registry file:///no-registry.json $flake2Dir#bar --tarball-ttl 0
+nix build -o $TEST_ROOT/result --no-registries $flake2Dir#bar --tarball-ttl 0
 
 # Updating the flake should not change the lockfile.
 nix flake update --flake-registry $registry $flake2Dir
@@ -344,11 +350,11 @@ nix build -o $TEST_ROOT/result --flake-registry $registry flake4/removeXyzzy#sth
 
 # Testing the nix CLI
 nix flake add --flake-registry $registry flake1 flake3
-(( $(nix flake list --flake-registry $registry | wc -l) == 6 ))
+(( $(nix flake list --flake-registry $registry | wc -l) == 7 ))
 nix flake pin --flake-registry $registry flake1
-(( $(nix flake list --flake-registry $registry | wc -l) == 6 ))
+(( $(nix flake list --flake-registry $registry | wc -l) == 7 ))
 nix flake remove --flake-registry $registry flake1
-(( $(nix flake list --flake-registry $registry | wc -l) == 5 ))
+(( $(nix flake list --flake-registry $registry | wc -l) == 6 ))
 
 # Test 'nix flake init'.
 (cd $flake7Dir && nix flake init)
@@ -519,3 +525,51 @@ EOF
 
 nix flake update --flake-registry $registry $flake3Dir --recreate-lock-file
 [[ $(jq .inputs.flake2.inputs.flake1.url $flake3Dir/flake.lock) =~ flake7 ]]
+
+# Test Mercurial flakes.
+if [[ -z $(type -p hg) ]]; then
+    echo "Git not installed; skipping Mercurial flake tests"
+    exit 99
+fi
+
+rm -rf $flake5Dir
+hg init $flake5Dir
+
+cat > $flake5Dir/flake.nix <<EOF
+{
+  edition = 201909;
+
+  outputs = { self, flake1 }: {
+    defaultPackage.$system = flake1.defaultPackage.$system;
+
+    expr = assert builtins.pathExists ./flake.lock; 123;
+  };
+}
+EOF
+
+hg add $flake5Dir/flake.nix
+hg commit --config ui.username=foobar@example.org $flake5Dir -m 'Initial commit'
+
+nix build -o $TEST_ROOT/result --flake-registry $registry hg+file://$flake5Dir
+[[ -e $TEST_ROOT/result/hello ]]
+
+nix flake info --flake-registry $registry --json hg+file://$flake5Dir | jq -e -r .revision
+
+# This will fail because flake.lock is not tracked by Mercurial.
+(! nix eval --flake-registry $registry hg+file://$flake5Dir#expr)
+
+hg add $flake5Dir/flake.lock
+
+nix eval --flake-registry $registry hg+file://$flake5Dir#expr
+
+(! nix eval --flake-registry $registry hg+file://$flake5Dir#expr --no-allow-dirty)
+
+(! nix flake info --flake-registry $registry --json hg+file://$flake5Dir | jq -e -r .revision)
+
+hg commit --config ui.username=foobar@example.org $flake5Dir -m 'Add lock file'
+
+nix flake info --flake-registry $registry --json hg+file://$flake5Dir --refresh | jq -e -r .revision
+nix flake info --flake-registry $registry --json hg+file://$flake5Dir
+[[ $(nix flake info --flake-registry $registry --json hg+file://$flake5Dir | jq -e -r .revCount) = 1 ]]
+
+nix build -o $TEST_ROOT/result hg+file://$flake5Dir --no-registries --no-allow-dirty

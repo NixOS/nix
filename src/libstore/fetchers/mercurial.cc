@@ -89,6 +89,8 @@ struct MercurialInput : Input
 
         // FIXME: return lastModified.
 
+        // FIXME: don't clone local repositories.
+
         if (!input->ref && !input->rev && isLocal && pathExists(actualUrl + "/.hg")) {
 
             bool clean = runProgram("hg", true, { "status", "-R", actualUrl, "--modified", "--added", "--removed" }) == "";

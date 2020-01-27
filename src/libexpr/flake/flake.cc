@@ -509,7 +509,14 @@ LockedFlake lockFlake(
                     if (settings.warnDirty)
                         warn("will not write lock file of flake '%s' because it has a mutable input", topRef);
                 } else {
-                    newLockFile.write(*sourcePath + (topRef.subdir == "" ? "" : "/" + topRef.subdir) + "/flake.lock");
+                    auto path = *sourcePath + (topRef.subdir == "" ? "" : "/" + topRef.subdir) + "/flake.lock";
+
+                    if (pathExists(path))
+                        warn("updating lock file '%s'", path);
+                    else
+                        warn("creating lock file '%s'", path);
+
+                    newLockFile.write(path);
 
                     // FIXME: rewriting the lockfile changed the
                     // top-level repo, so we should re-read it.
