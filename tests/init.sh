@@ -18,6 +18,7 @@ build-users-group =
 keep-derivations = false
 sandbox = false
 experimental-features = nix-command flakes
+flake-registry = $TEST_ROOT/registry.json
 include nix.conf.extra
 EOF
 
