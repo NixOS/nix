@@ -25,7 +25,7 @@ struct Tree
 struct Input : std::enable_shared_from_this<Input>
 {
     std::string type;
-    std::optional<Hash> narHash;
+    std::optional<Hash> narHash; // FIXME: implement
 
     virtual ~Input() { }
 

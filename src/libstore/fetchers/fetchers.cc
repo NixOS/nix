@@ -39,6 +39,10 @@ std::pair<Tree, std::shared_ptr<const Input>> Input::fetchTree(ref<Store> store)
     if (input->narHash)
         assert(input->narHash == tree.narHash);
 
+    if (narHash && narHash != input->narHash)
+        throw Error("NAR hash mismatch in input '%s', expected '%s', got '%s'",
+            to_string(), narHash->to_string(SRI), input->narHash->to_string(SRI));
+
     return {std::move(tree), input};
 }
 

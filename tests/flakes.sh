@@ -573,3 +573,17 @@ nix flake info --flake-registry $registry --json hg+file://$flake5Dir
 [[ $(nix flake info --flake-registry $registry --json hg+file://$flake5Dir | jq -e -r .revCount) = 1 ]]
 
 nix build -o $TEST_ROOT/result hg+file://$flake5Dir --no-registries --no-allow-dirty
+
+# Test tarball flakes
+tar cfz $TEST_ROOT/flake.tar.gz -C $TEST_ROOT flake5
+
+nix build -o $TEST_ROOT/result file://$TEST_ROOT/flake.tar.gz
+
+# Building with a tarball URL containing a SRI hash should also work.
+url=$(nix flake info --json file://$TEST_ROOT/flake.tar.gz | jq -r .url)
+[[ $url =~ sha256- ]]
+
+nix build -o $TEST_ROOT/result $url
+
+# Building with an incorrect SRI hash should fail.
+nix build -o $TEST_ROOT/result "file://$TEST_ROOT/flake.tar.gz?narHash=sha256-qQ2Zz4DNHViCUrp6gTS7EE4+RMqFQtUfWF2UNUtJKS0=" 2>&1 | grep 'NAR hash mismatch'
