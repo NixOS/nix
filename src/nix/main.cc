@@ -55,6 +55,7 @@ struct NixArgs : virtual MultiCommand, virtual MixCommonArgs
 {
     bool printBuildLogs = false;
     bool useNet = true;
+    bool refresh = false;
 
     NixArgs() : MultiCommand(*RegisterCommand::commands), MixCommonArgs("nix")
     {
@@ -96,7 +97,7 @@ struct NixArgs : virtual MultiCommand, virtual MixCommonArgs
         mkFlag()
             .longName("refresh")
             .description("consider all previously downloaded files out-of-date")
-            .handler([&]() { settings.tarballTtl = 0; });
+            .handler([&]() { refresh = true; });
     }
 
     void printFlags(std::ostream & out) override
@@ -181,6 +182,9 @@ void mainWrapped(int argc, char * * argv)
         if (!downloadSettings.connectTimeout.overriden)
             downloadSettings.connectTimeout = 1;
     }
+
+    if (args.refresh)
+        settings.tarballTtl = 0;
 
     args.command->prepare();
     args.command->run();
