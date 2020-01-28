@@ -574,6 +574,7 @@ nix flake info --json hg+file://$flake5Dir
 nix build -o $TEST_ROOT/result hg+file://$flake5Dir --no-registries --no-allow-dirty
 
 # Test tarball flakes
+rm -rf $flake5Dir/.hg
 tar cfz $TEST_ROOT/flake.tar.gz -C $TEST_ROOT flake5
 
 nix build -o $TEST_ROOT/result file://$TEST_ROOT/flake.tar.gz
