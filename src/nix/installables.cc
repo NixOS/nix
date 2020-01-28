@@ -434,10 +434,6 @@ std::vector<std::shared_ptr<Installable>> SourceExprCommand::parseInstallables(
         };
 
         for (auto & s : ss) {
-
-            size_t hash;
-            std::optional<StorePath> storePath;
-
             if (hasPrefix(s, "nixpkgs.")) {
                 bool static warned;
                 warnOnce(warned, "the syntax 'nixpkgs.<attr>' is deprecated; use 'nixpkgs:<attr>' instead");
@@ -454,6 +450,7 @@ std::vector<std::shared_ptr<Installable>> SourceExprCommand::parseInstallables(
                             fragment == "" ? getDefaultFlakeAttrPaths() : Strings{fragment},
                             getDefaultFlakeAttrPathPrefixes()));
                 } else {
+                    std::optional<StorePath> storePath;
                     if (s.find('/') != std::string::npos && (storePath = follow(s)))
                         result.push_back(std::make_shared<InstallableStorePath>(store, store->printStorePath(*storePath)));
                     else
