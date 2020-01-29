@@ -251,17 +251,6 @@ static std::pair<fetchers::Tree, FlakeRef> getNonFlake(
     return std::make_pair(std::move(sourceInfo), resolvedRef);
 }
 
-bool allowedToUseRegistries(LockFileMode handle, bool isTopRef)
-{
-    if (handle == AllPure) return false;
-    else if (handle == TopRefUsesRegistries) return isTopRef;
-    else if (handle == UpdateLockFile) return true;
-    else if (handle == UseUpdatedLockFile) return true;
-    else if (handle == RecreateLockFile) return true;
-    else if (handle == UseNewLockFile) return true;
-    else assert(false);
-}
-
 static void flattenLockFile(
     const LockedInputs & inputs,
     const InputPath & prefix,
@@ -311,20 +300,17 @@ static std::string diffLockFiles(const LockedInputs & oldLocks, const LockedInpu
 LockedFlake lockFlake(
     EvalState & state,
     const FlakeRef & topRef,
-    LockFileMode lockFileMode,
     const LockFlags & lockFlags)
 {
     settings.requireExperimentalFeature("flakes");
 
     RefMap refMap;
 
-    auto flake = getFlake(state, topRef,
-        allowedToUseRegistries(lockFileMode, true), refMap);
+    auto flake = getFlake(state, topRef, lockFlags.useRegistries, refMap);
 
     LockFile oldLockFile;
 
-    if (lockFileMode != RecreateLockFile && lockFileMode != UseNewLockFile) {
-        // If recreateLockFile, start with an empty lockfile
+    if (!lockFlags.recreateLockFile) {
         // FIXME: symlink attack
         oldLockFile = LockFile::read(
             flake.sourceInfo->actualPath + "/" + flake.resolvedRef.subdir + "/flake.lock");
@@ -436,12 +422,13 @@ LockedFlake lockFlake(
                 } else {
                     /* We need to update/create a new lock file
                        entry. So fetch the flake/non-flake. */
-                    if (lockFileMode == AllPure || lockFileMode == TopRefUsesRegistries)
+
+                    if (!lockFlags.allowMutable && !input.ref.isImmutable())
                         throw Error("cannot update flake input '%s' in pure mode", inputPathS);
 
                     if (input.isFlake) {
                         auto inputFlake = getFlake(state, input.ref,
-                            allowedToUseRegistries(lockFileMode, false), refMap);
+                            lockFlags.useRegistries, refMap);
 
                         newLocks.inputs.insert_or_assign(id,
                             LockedInput(inputFlake.resolvedRef, inputFlake.originalRef, inputFlake.sourceInfo->narHash));
@@ -461,7 +448,7 @@ LockedFlake lockFlake(
 
                     else {
                         auto [sourceInfo, resolvedRef] = getNonFlake(state, input.ref,
-                            allowedToUseRegistries(lockFileMode, false), refMap);
+                            lockFlags.useRegistries, refMap);
                         newLocks.inputs.insert_or_assign(id,
                             LockedInput(resolvedRef, input.ref, sourceInfo.narHash));
                     }
@@ -494,12 +481,15 @@ LockedFlake lockFlake(
         if (!(oldLockFile == LockFile()))
             printInfo("inputs of flake '%s' changed:\n%s", topRef, chomp(diffLockFiles(oldLockFile, newLockFile)));
 
-        if (lockFileMode == UpdateLockFile || lockFileMode == RecreateLockFile) {
+        if (lockFlags.writeLockFile) {
             if (auto sourcePath = topRef.input->getSourcePath()) {
                 if (!newLockFile.isImmutable()) {
                     if (settings.warnDirty)
                         warn("will not write lock file of flake '%s' because it has a mutable input", topRef);
                 } else {
+                    if (!lockFlags.updateLockFile)
+                        throw Error("flake '%s' requires lock file changes but they're not allowed due to '--no-update-lock-file'", topRef);
+
                     auto path = *sourcePath + (topRef.subdir == "" ? "" : "/" + topRef.subdir) + "/flake.lock";
 
                     if (pathExists(path))
@@ -522,9 +512,9 @@ LockedFlake lockFlake(
                     #endif
                 }
             } else
-                warn("cannot write lock file of remote flake '%s'", topRef);
-        } else if (lockFileMode != AllPure && lockFileMode != TopRefUsesRegistries)
-            warn("using updated lock file without writing it to file");
+                throw Error("cannot write modified lock file of flake '%s' (use '--no-write-lock-file' to ignore)", topRef);
+        } else
+            warn("not writing modified lock file of flake '%s'", topRef);
     }
 
     return LockedFlake { .flake = std::move(flake), .lockFile = std::move(newLockFile) };
@@ -655,9 +645,14 @@ void callFlake(EvalState & state,
 // This function is exposed to be used in nix files.
 static void prim_getFlake(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
-    LockFlags lockFlags;
-    callFlake(state, lockFlake(state, parseFlakeRef(state.forceStringNoCtx(*args[0], pos)),
-            evalSettings.pureEval ? AllPure : UseUpdatedLockFile, lockFlags), v);
+    callFlake(state,
+        lockFlake(state, parseFlakeRef(state.forceStringNoCtx(*args[0], pos)),
+            LockFlags {
+                .updateLockFile = false,
+                .useRegistries = !evalSettings.pureEval,
+                .allowMutable  = !evalSettings.pureEval,
+            }),
+        v);
 }
 
 static RegisterPrimOp r2("getFlake", 1, prim_getFlake);

@@ -2,9 +2,9 @@
     "inputs": {
         "nixpkgs": {
             "inputs": {},
-            "narHash": "sha256-HkMF+s/yqNOOxqZGp+rscaC8LPtOGc50nEAjLFsnJpg=",
+            "narHash": "sha256-V4jz8Hbt+mZkXhH+3KmUQcRGETOFd8mVPhgQlS4Lu5E=",
             "originalUrl": "flake:nixpkgs/release-19.09",
-            "url": "github:edolstra/nixpkgs/e7223c602152ee4544b05157fc9d88a3feed22c2"
+            "url": "github:edolstra/nixpkgs/dd45a16733f4469a0dded6ad0bf9a662ea39bdea"
         }
     },
     "version": 3

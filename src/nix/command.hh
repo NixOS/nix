@@ -16,10 +16,6 @@ class EvalState;
 struct Pos;
 class Store;
 
-namespace flake {
-enum LockFileMode : unsigned int;
-}
-
 /* A command that requires a Nix store. */
 struct StoreCommand : virtual Command
 {
@@ -42,15 +38,9 @@ struct EvalCommand : virtual StoreCommand, MixEvalArgs
 
 struct MixFlakeOptions : virtual Args
 {
-    bool recreateLockFile = false;
-    bool saveLockFile = true;
-    bool useRegistries = true;
-
     flake::LockFlags lockFlags;
 
     MixFlakeOptions();
-
-    flake::LockFileMode getLockFileMode();
 };
 
 struct SourceExprCommand : virtual Args, EvalCommand, MixFlakeOptions

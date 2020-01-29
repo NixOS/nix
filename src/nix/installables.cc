@@ -22,17 +22,22 @@ MixFlakeOptions::MixFlakeOptions()
     mkFlag()
         .longName("recreate-lock-file")
         .description("recreate lock file from scratch")
-        .set(&recreateLockFile, true);
+        .set(&lockFlags.recreateLockFile, true);
 
     mkFlag()
-        .longName("no-save-lock-file")
-        .description("do not save the newly generated lock file")
-        .set(&saveLockFile, false);
+        .longName("no-update-lock-file")
+        .description("do not allow any updates to the lock file")
+        .set(&lockFlags.updateLockFile, false);
+
+    mkFlag()
+        .longName("no-write-lock-file")
+        .description("do not write the newly generated lock file")
+        .set(&lockFlags.writeLockFile, false);
 
     mkFlag()
         .longName("no-registries")
         .description("don't use flake registries")
-        .set(&useRegistries, false);
+        .set(&lockFlags.useRegistries, false);
 
     mkFlag()
         .longName("override-input")
@@ -44,17 +49,6 @@ MixFlakeOptions::MixFlakeOptions()
                 flake::parseInputPath(ss[0]),
                 parseFlakeRef(ss[1], absPath(".")));
         });
-}
-
-flake::LockFileMode MixFlakeOptions::getLockFileMode()
-{
-    using namespace flake;
-    return
-        useRegistries
-        ? recreateLockFile
-          ? (saveLockFile ? RecreateLockFile : UseNewLockFile)
-          : (saveLockFile ? UpdateLockFile : UseUpdatedLockFile)
-        : AllPure;
 }
 
 SourceExprCommand::SourceExprCommand()
@@ -332,7 +326,7 @@ std::tuple<std::string, FlakeRef, flake::EvalCache::Derivation> InstallableFlake
 {
     auto state = cmd.getEvalState();
 
-    auto lockedFlake = lockFlake(*state, flakeRef, cmd.getLockFileMode(), cmd.lockFlags);
+    auto lockedFlake = lockFlake(*state, flakeRef, cmd.lockFlags);
 
     Value * vOutputs = nullptr;
 
@@ -386,7 +380,7 @@ std::vector<flake::EvalCache::Derivation> InstallableFlake::toDerivations()
 
 Value * InstallableFlake::toValue(EvalState & state)
 {
-    auto lockedFlake = lockFlake(state, flakeRef, cmd.getLockFileMode(), cmd.lockFlags);
+    auto lockedFlake = lockFlake(state, flakeRef, cmd.lockFlags);
 
     auto vOutputs = getFlakeOutputs(state, lockedFlake);
 

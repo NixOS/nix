@@ -13,15 +13,6 @@ namespace fetchers { struct Tree; }
 
 namespace flake {
 
-enum LockFileMode : unsigned int
-    { AllPure // Everything is handled 100% purely
-    , TopRefUsesRegistries // The top FlakeRef uses the registries, apart from that, everything happens 100% purely
-    , UpdateLockFile // Update the existing lockfile and write it to file
-    , UseUpdatedLockFile // `UpdateLockFile` without writing to file
-    , RecreateLockFile // Recreate the lockfile from scratch and write it to file
-    , UseNewLockFile // `RecreateLockFile` without writing to file
-    };
-
 struct FlakeInput;
 
 typedef std::map<FlakeId, FlakeInput> FlakeInputs;
@@ -61,21 +52,48 @@ struct LockedFlake
 
 struct LockFlags
 {
+    /* Whether to ignore the existing lock file, creating a new one
+       from scratch. */
+    bool recreateLockFile = false;
+
+    /* Whether to update the lock file at all. If set to false, if any
+       change to the lock file is needed (e.g. when an input has been
+       added to flake.nix), you get a fatal error. */
+    bool updateLockFile = true;
+
+    /* Whether to write the lock file to disk. If set to true, if the
+       any changes to the lock file are needed and the flake is not
+       writable (i.e. is not a local Git working tree or similar), you
+       get a fatal error. If set to false, Nix will use the modified
+       lock file in memory only, without writing it to disk. */
+    bool writeLockFile = true;
+
+    /* Whether to use the registries to lookup indirect flake
+       references like 'nixpkgs'. */
+    bool useRegistries = true;
+
+    /* Whether mutable flake references (i.e. those without a Git
+       revision or similar) without a corresponding lock are
+       allowed. Mutable flake references with a lock are always
+       allowed. */
+    bool allowMutable = true;
+
     std::map<InputPath, FlakeRef> inputOverrides;
 };
 
 LockedFlake lockFlake(
-    EvalState &,
-    const FlakeRef &,
-    LockFileMode,
-    const LockFlags &);
+    EvalState & state,
+    const FlakeRef & flakeRef,
+    const LockFlags & lockFlags);
 
-void callFlake(EvalState & state,
+void callFlake(
+    EvalState & state,
     const Flake & flake,
     const LockedInputs & inputs,
     Value & v);
 
-void callFlake(EvalState & state,
+void callFlake(
+    EvalState & state,
     const LockedFlake & resFlake,
     Value & v);
 

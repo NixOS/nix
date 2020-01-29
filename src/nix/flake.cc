@@ -38,12 +38,12 @@ public:
     Flake getFlake()
     {
         auto evalState = getEvalState();
-        return flake::getFlake(*evalState, getFlakeRef(), useRegistries);
+        return flake::getFlake(*evalState, getFlakeRef(), lockFlags.useRegistries);
     }
 
     LockedFlake lockFlake()
     {
-        return flake::lockFlake(*getEvalState(), getFlakeRef(), getLockFileMode(), lockFlags);
+        return flake::lockFlake(*getEvalState(), getFlakeRef(), lockFlags);
     }
 };
 

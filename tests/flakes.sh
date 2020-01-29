@@ -156,9 +156,15 @@ nix path-info $flake1Dir/result
 (! nix eval --expr "builtins.getFlake \"$flake2Dir\"")
 
 # But should succeed in impure mode.
-nix build -o $TEST_ROOT/result flake2#bar --impure
+(! nix build -o $TEST_ROOT/result flake2#bar --impure)
+nix build -o $TEST_ROOT/result flake2#bar --impure --no-write-lock-file
 
-# Test automatic lock file generation.
+# Building a local flake with an unlocked dependency should fail with --no-update-lock-file.
+nix build -o $TEST_ROOT/result $flake2Dir#bar --no-update-lock-file 2>&1 | grep 'requires lock file changes'
+
+# But it should succeed without that flag.
+nix build -o $TEST_ROOT/result $flake2Dir#bar --no-write-lock-file
+nix build -o $TEST_ROOT/result $flake2Dir#bar --no-update-lock-file 2>&1 | grep 'requires lock file changes'
 nix build -o $TEST_ROOT/result $flake2Dir#bar
 [[ -e $flake2Dir/flake.lock ]]
 git -C $flake2Dir add flake.lock
