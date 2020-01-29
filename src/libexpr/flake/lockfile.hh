@@ -6,6 +6,7 @@
 
 namespace nix {
 class Store;
+struct StorePath;
 }
 
 namespace nix::flake {
@@ -53,7 +54,7 @@ struct LockedInput : LockedInputs
 
     nlohmann::json toJson() const;
 
-    Path computeStorePath(Store & store) const;
+    StorePath computeStorePath(Store & store) const;
 };
 
 /* An entire lock file. Note that this cannot be a FlakeInput for the

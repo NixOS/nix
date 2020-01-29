@@ -584,6 +584,8 @@ static void prim_callFlake(EvalState & state, const Pos & pos, Value * * args, V
             throw Error("the content hash of flake '%s' doesn't match the hash recorded in the referring lockfile",
                 lazyInput->lockedInput.ref);
 
+        assert(flake.sourceInfo->storePath == lazyInput->lockedInput.computeStorePath(*state.store));
+
         callFlake(state, flake, lazyInput->lockedInput, v);
     } else {
         FlakeCache flakeCache;
@@ -592,6 +594,8 @@ static void prim_callFlake(EvalState & state, const Pos & pos, Value * * args, V
         if (sourceInfo.narHash != lazyInput->lockedInput.narHash)
             throw Error("the content hash of repository '%s' doesn't match the hash recorded in the referring lockfile",
                 lazyInput->lockedInput.ref);
+
+        assert(sourceInfo.storePath == lazyInput->lockedInput.computeStorePath(*state.store));
 
         state.mkAttrs(v, 8);
 
