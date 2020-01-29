@@ -72,6 +72,22 @@ std::optional<LockedInput *> LockedInputs::findInput(const InputPath & path)
     return (LockedInput *) pos;
 }
 
+void LockedInputs::removeInput(const InputPath & path)
+{
+    assert(!path.empty());
+
+    LockedInputs * pos = this;
+
+    for (size_t n = 0; n < path.size(); n++) {
+        auto i = pos->inputs.find(path[n]);
+        if (i == pos->inputs.end()) return;
+        if (n + 1 == path.size())
+            pos->inputs.erase(i);
+        else
+            pos = &i->second;
+    }
+}
+
 nlohmann::json LockFile::toJson() const
 {
     auto json = LockedInputs::toJson();

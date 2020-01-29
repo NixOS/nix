@@ -40,6 +40,14 @@ MixFlakeOptions::MixFlakeOptions()
         .set(&lockFlags.useRegistries, false);
 
     mkFlag()
+        .longName("update-input")
+        .description("update a specific flake input")
+        .label("input-path")
+        .handler([&](std::vector<std::string> ss) {
+            lockFlags.inputUpdates.insert(flake::parseInputPath(ss[0]));
+        });
+
+    mkFlag()
         .longName("override-input")
         .description("override a specific flake input (e.g. 'dwarffs/nixpkgs')")
         .arity(2)

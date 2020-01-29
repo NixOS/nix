@@ -394,7 +394,13 @@ LockedFlake lockFlake(
                     continue;
                 }
 
-                auto oldLock = oldLocks.inputs.find(id);
+                /* Do we have an entry in the existing lock file? And
+                   we don't have a --update-input flag for this
+                   input? */
+                auto oldLock =
+                    lockFlags.inputUpdates.count(inputPath)
+                    ? oldLocks.inputs.end()
+                    : oldLocks.inputs.find(id);
 
                 if (oldLock != oldLocks.inputs.end() && oldLock->second.originalRef == input.ref && !hasOverride) {
                     /* Copy the input from the old lock file if its
@@ -402,22 +408,39 @@ LockedFlake lockFlake(
                        from a higher level flake. */
                     newLocks.inputs.insert_or_assign(id, oldLock->second);
 
-                    /* However there may be new overrides on the
-                       inputs of this flake, so we need to check those
-                       (without fetching this flake - we need to be
-                       lazy). */
-                    FlakeInputs fakeInputs;
+                    /* If we have an --update-input flag for an input
+                       of this input, then we must fetch the flake to
+                       to update it. */
+                    auto lb = lockFlags.inputUpdates.lower_bound(inputPath);
 
-                    for (auto & i : oldLock->second.inputs) {
-                        fakeInputs.emplace(i.first, FlakeInput {
-                            .ref = i.second.originalRef
-                        });
+                    auto hasChildUpdate =
+                        lb != lockFlags.inputUpdates.end()
+                        && lb->size() > inputPath.size()
+                        && std::equal(inputPath.begin(), inputPath.end(), lb->begin());
+
+                    if (hasChildUpdate) {
+                        auto inputFlake = getFlake(state, oldLock->second.ref, false, flakeCache);
+
+                        updateLocks(inputFlake.inputs,
+                            (const LockedInputs &) oldLock->second,
+                            newLocks.inputs.find(id)->second,
+                            inputPath);
+
+                    } else {
+                        /* No need to fetch this flake, we can be
+                           lazy. However there may be new overrides on
+                           the inputs of this flake, so we need to
+                           check those. */
+                        FlakeInputs fakeInputs;
+
+                        for (auto & i : oldLock->second.inputs)
+                            fakeInputs.emplace(i.first, FlakeInput { .ref = i.second.originalRef });
+
+                        updateLocks(fakeInputs,
+                            oldLock->second,
+                            newLocks.inputs.find(id)->second,
+                            inputPath);
                     }
-
-                    updateLocks(fakeInputs,
-                        oldLock->second,
-                        newLocks.inputs.find(id)->second,
-                        inputPath);
 
                 } else {
                     /* We need to update/create a new lock file

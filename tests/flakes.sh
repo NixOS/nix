@@ -610,3 +610,10 @@ nix flake update $flake3Dir --override-input flake2/flake1 flake1
 
 nix flake update $flake3Dir --override-input flake2/flake1 flake1/master/$hash1
 [[ $(jq .inputs.flake2.inputs.flake1.url $flake3Dir/flake.lock) =~ flake1.*rev=$hash1 ]]
+
+# Test --update-input.
+nix flake update $flake3Dir
+[[ $(jq .inputs.flake2.inputs.flake1.url $flake3Dir/flake.lock) =~ flake1.*rev=$hash1 ]]
+
+nix flake update $flake3Dir --update-input flake2/flake1
+[[ $(jq .inputs.flake2.inputs.flake1.url $flake3Dir/flake.lock) =~ flake1.*rev=$hash2 ]]

@@ -78,7 +78,12 @@ struct LockFlags
        allowed. */
     bool allowMutable = true;
 
+    /* Flake inputs to be overriden. */
     std::map<InputPath, FlakeRef> inputOverrides;
+
+    /* Flake inputs to be updated. This means that any existing lock
+       for those inputs will be ignored. */
+    std::set<InputPath> inputUpdates;
 };
 
 LockedFlake lockFlake(

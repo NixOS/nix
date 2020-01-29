@@ -27,6 +27,8 @@ struct LockedInputs
     bool isImmutable() const;
 
     std::optional<LockedInput *> findInput(const InputPath & path);
+
+    void removeInput(const InputPath & path);
 };
 
 /* Lock file information about a flake input. */
