@@ -83,7 +83,7 @@ struct GitInput : Input
         auto other2 = dynamic_cast<const GitInput *>(&other);
         return
             other2
-            && url.url == other2->url.url
+            && url == other2->url
             && rev == other2->rev
             && ref == other2->ref;
     }
@@ -361,6 +361,8 @@ struct GitInputScheme : InputScheme
 
         auto input = std::make_unique<GitInput>(url);
 
+        input->url.query.clear();
+
         for (auto &[name, value] : url.query) {
             if (name == "rev") {
                 if (!std::regex_match(value, revRegex))
@@ -372,6 +374,7 @@ struct GitInputScheme : InputScheme
                     throw BadURL("Git URL '%s' contains an invalid branch/tag name", url.url);
                 input->ref = value;
             }
+            else input->url.query.insert_or_assign(name, value);
         }
 
         return input;

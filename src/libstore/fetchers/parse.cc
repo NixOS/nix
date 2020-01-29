@@ -127,4 +127,14 @@ std::string ParsedURL::to_string() const
         + (fragment.empty() ? "" : "#" + percentEncode(fragment));
 }
 
+bool ParsedURL::operator ==(const ParsedURL & other) const
+{
+    return
+        scheme == other.scheme
+        && authority == other.authority
+        && path == other.path
+        && query == other.query
+        && fragment == other.fragment;
+}
+
 }

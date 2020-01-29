@@ -29,7 +29,7 @@ struct MercurialInput : Input
         auto other2 = dynamic_cast<const MercurialInput *>(&other);
         return
             other2
-            && url.url == other2->url.url
+            && url == other2->url
             && rev == other2->rev
             && ref == other2->ref;
     }
@@ -255,6 +255,8 @@ struct MercurialInputScheme : InputScheme
 
         auto input = std::make_unique<MercurialInput>(url);
 
+        input->url.query.clear();
+
         for (auto &[name, value] : url.query) {
             if (name == "rev") {
                 if (!std::regex_match(value, revRegex))
@@ -266,6 +268,7 @@ struct MercurialInputScheme : InputScheme
                     throw BadURL("Mercurial URL '%s' contains an invalid branch/tag name", url.url);
                 input->ref = value;
             }
+            else input->url.query.insert_or_assign(name, value);
         }
 
         return input;

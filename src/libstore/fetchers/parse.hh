@@ -15,6 +15,8 @@ struct ParsedURL
     std::string fragment;
 
     std::string to_string() const;
+
+    bool operator ==(const ParsedURL & other) const;
 };
 
 MakeError(BadURL, Error);

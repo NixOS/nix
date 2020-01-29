@@ -280,11 +280,13 @@ static std::string diffLockFiles(const LockedInputs & oldLocks, const LockedInpu
             res += fmt("  removed '%s'\n", concatStringsSep("/", i->first));
             ++i;
         } else {
-            if (!(i->second->ref == j->second->ref))
+            if (!(i->second->ref == j->second->ref)) {
+                assert(i->second->ref.to_string() != j->second->ref.to_string());
                 res += fmt("  updated '%s': '%s' -> '%s'\n",
                     concatStringsSep("/", i->first),
                     i->second->ref,
                     j->second->ref);
+            }
             ++i;
             ++j;
         }
