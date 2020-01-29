@@ -11,6 +11,7 @@
 #include "attr-path.hh"
 #include "fetchers/fetchers.hh"
 #include "fetchers/registry.hh"
+#include "json.hh"
 
 #include <nlohmann/json.hpp>
 #include <queue>
@@ -213,7 +214,7 @@ struct CmdFlakeInfo : FlakeCommand, MixJSON
     }
 };
 
-struct CmdFlakeCheck : FlakeCommand, MixJSON
+struct CmdFlakeCheck : FlakeCommand
 {
     bool build = true;
 
@@ -604,6 +605,79 @@ struct CmdFlakeClone : FlakeCommand
     }
 };
 
+struct CmdFlakeArchive : FlakeCommand, MixJSON, MixDryRun
+{
+    std::string dstUri;
+
+    CmdFlakeArchive()
+    {
+        mkFlag()
+            .longName("to")
+            .labels({"store-uri"})
+            .description("URI of the destination Nix store")
+            .dest(&dstUri);
+    }
+
+    std::string description() override
+    {
+        return "copy a flake and all its inputs to a store";
+    }
+
+    Examples examples() override
+    {
+        return {
+            Example{
+                "To copy the dwarffs flake and its dependencies to a binary cache:",
+                "nix flake archive --to file:///tmp/my-cache dwarffs"
+            },
+            Example{
+                "To fetch the dwarffs flake and its dependencies to the local Nix store:",
+                "nix flake archive dwarffs"
+            },
+            Example{
+                "To print the store paths of the flake sources of NixOps without fetching them:",
+                "nix flake archive --json --dry-run nixops"
+            },
+        };
+    }
+
+    void run(nix::ref<nix::Store> store) override
+    {
+        auto flake = lockFlake();
+
+        auto jsonRoot = json ? std::optional<JSONObject>(std::cout) : std::optional<JSONObject>();
+
+        StorePathSet sources;
+
+        sources.insert(flake.flake.sourceInfo->storePath.clone());
+        if (jsonRoot)
+            jsonRoot->attr("path", store->printStorePath(flake.flake.sourceInfo->storePath));
+
+        std::function<void(const LockedInputs & inputs, std::optional<JSONObject> & jsonObj)> traverse;
+        traverse = [&](const LockedInputs & inputs, std::optional<JSONObject> & jsonObj)
+        {
+            auto jsonObj2 = jsonObj ? jsonObj->object("inputs") : std::optional<JSONObject>();
+            for (auto & input : inputs.inputs) {
+                auto jsonObj3 = jsonObj2 ? jsonObj2->object(input.first) : std::optional<JSONObject>();
+                if (!dryRun)
+                    input.second.ref.input->fetchTree(store);
+                auto storePath = input.second.computeStorePath(*store);
+                if (jsonObj3)
+                    jsonObj3->attr("path", store->printStorePath(storePath));
+                sources.insert(std::move(storePath));
+                traverse(input.second, jsonObj3);
+            }
+        };
+
+        traverse(flake.lockFile, jsonRoot);
+
+        if (!dryRun && !dstUri.empty()) {
+            ref<Store> dstStore = dstUri.empty() ? openStore() : openStore(dstUri);
+            copyPaths(store, dstStore, sources);
+        }
+    }
+};
+
 struct CmdFlake : virtual MultiCommand, virtual Command
 {
     CmdFlake()
@@ -617,6 +691,7 @@ struct CmdFlake : virtual MultiCommand, virtual Command
                 {"pin", []() { return make_ref<CmdFlakePin>(); }},
                 {"init", []() { return make_ref<CmdFlakeInit>(); }},
                 {"clone", []() { return make_ref<CmdFlakeClone>(); }},
+                {"archive", []() { return make_ref<CmdFlakeArchive>(); }},
             })
     {
     }
