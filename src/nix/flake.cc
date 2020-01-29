@@ -43,7 +43,7 @@ public:
 
     LockedFlake lockFlake()
     {
-        return flake::lockFlake(*getEvalState(), getFlakeRef(), getLockFileMode());
+        return flake::lockFlake(*getEvalState(), getFlakeRef(), getLockFileMode(), lockFlags);
     }
 };
 

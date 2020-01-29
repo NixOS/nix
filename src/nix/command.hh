@@ -4,6 +4,7 @@
 #include "args.hh"
 #include "common-eval-args.hh"
 #include "path.hh"
+#include "flake/lockfile.hh"
 
 #include <optional>
 
@@ -42,10 +43,10 @@ struct EvalCommand : virtual StoreCommand, MixEvalArgs
 struct MixFlakeOptions : virtual Args
 {
     bool recreateLockFile = false;
-
     bool saveLockFile = true;
-
     bool useRegistries = true;
+
+    flake::LockFlags lockFlags;
 
     MixFlakeOptions();
 

@@ -129,6 +129,12 @@ json=$(nix flake info flake1 --json | jq .)
 [[ $(echo "$json" | jq -r .description) = 'Bla bla' ]]
 [[ -d $(echo "$json" | jq -r .path) ]]
 [[ $(echo "$json" | jq -r .lastModified) = $(git -C $flake1Dir log -n1 --format=%ct) ]]
+hash1=$(echo "$json" | jq -r .revision)
+
+echo -n '# foo' >> $flake1Dir/flake.nix
+git -C $flake1Dir commit -a -m 'Foo'
+hash2=$(nix flake info flake1 --json --refresh | jq -r .revision)
+[[ $hash1 != $hash2 ]]
 
 # Test 'nix build' on a flake.
 nix build -o $TEST_ROOT/result flake1#foo
@@ -587,3 +593,14 @@ nix build -o $TEST_ROOT/result $url
 
 # Building with an incorrect SRI hash should fail.
 nix build -o $TEST_ROOT/result "file://$TEST_ROOT/flake.tar.gz?narHash=sha256-qQ2Zz4DNHViCUrp6gTS7EE4+RMqFQtUfWF2UNUtJKS0=" 2>&1 | grep 'NAR hash mismatch'
+
+# Test --override-input.
+git -C $flake3Dir reset --hard
+nix flake update $flake3Dir --override-input flake2/flake1 flake5
+[[ $(jq .inputs.flake2.inputs.flake1.url $flake3Dir/flake.lock) =~ flake5 ]]
+
+nix flake update $flake3Dir --override-input flake2/flake1 flake1
+[[ $(jq .inputs.flake2.inputs.flake1.url $flake3Dir/flake.lock) =~ flake1.*rev=$hash2 ]]
+
+nix flake update $flake3Dir --override-input flake2/flake1 flake1/master/$hash1
+[[ $(jq .inputs.flake2.inputs.flake1.url $flake3Dir/flake.lock) =~ flake1.*rev=$hash1 ]]

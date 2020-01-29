@@ -4,7 +4,6 @@
 #include "eval-inline.hh"
 #include "store-api.hh"
 #include "fetchers/fetchers.hh"
-#include "fetchers/regex.hh"
 
 #include <iostream>
 #include <ctime>
@@ -62,22 +61,6 @@ static void expectType(EvalState & state, ValueType type,
             showType(type), showType(value.type), pos);
 }
 
-static InputPath parseInputPath(std::string_view s, const Pos & pos)
-{
-    InputPath path;
-
-    for (auto & elem : tokenizeString<std::vector<std::string>>(s, "/")) {
-        if (!std::regex_match(elem, fetchers::flakeIdRegex))
-            throw Error("invalid flake input path element '%s' at %s", elem, pos);
-        path.push_back(elem);
-    }
-
-    if (path.empty())
-        throw Error("flake input path is empty at %s", pos);
-
-    return path;
-}
-
 static std::map<FlakeId, FlakeInput> parseFlakeInputs(
     EvalState & state, Value * value, const Pos & pos);
 
@@ -107,7 +90,11 @@ static FlakeInput parseFlakeInput(EvalState & state,
             input.overrides = parseFlakeInputs(state, attr.value, *attr.pos);
         } else if (attr.name == sFollows) {
             expectType(state, tString, *attr.value, *attr.pos);
-            input.follows = parseInputPath(attr.value->string.s, *attr.pos);
+            try {
+                input.follows = parseInputPath(attr.value->string.s);
+            } catch (Error & e) {
+                e.addPrefix("in flake attribute at '%s':\n");
+            }
         } else
             throw Error("flake input '%s' has an unsupported attribute '%s', at %s",
                 inputName, attr.name, *attr.pos);
@@ -324,7 +311,8 @@ static std::string diffLockFiles(const LockedInputs & oldLocks, const LockedInpu
 LockedFlake lockFlake(
     EvalState & state,
     const FlakeRef & topRef,
-    LockFileMode lockFileMode)
+    LockFileMode lockFileMode,
+    const LockFlags & lockFlags)
 {
     settings.requireExperimentalFeature("flakes");
 
@@ -349,6 +337,9 @@ LockedFlake lockFlake(
 
     // FIXME: check whether all overrides are used.
     std::map<InputPath, FlakeInput> overrides;
+
+    for (auto & i : lockFlags.inputOverrides)
+        overrides.insert_or_assign(i.first, FlakeInput { .ref = i.second });
 
     /* Compute the new lock file. This is dones as a fixpoint
        iteration: we repeat until the new lock file no longer changes
@@ -664,8 +655,9 @@ void callFlake(EvalState & state,
 // This function is exposed to be used in nix files.
 static void prim_getFlake(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
+    LockFlags lockFlags;
     callFlake(state, lockFlake(state, parseFlakeRef(state.forceStringNoCtx(*args[0], pos)),
-            evalSettings.pureEval ? AllPure : UseUpdatedLockFile), v);
+            evalSettings.pureEval ? AllPure : UseUpdatedLockFile, lockFlags), v);
 }
 
 static RegisterPrimOp r2("getFlake", 1, prim_getFlake);

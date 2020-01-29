@@ -59,7 +59,16 @@ struct LockedFlake
     Fingerprint getFingerprint() const;
 };
 
-LockedFlake lockFlake(EvalState &, const FlakeRef &, LockFileMode);
+struct LockFlags
+{
+    std::map<InputPath, FlakeRef> inputOverrides;
+};
+
+LockedFlake lockFlake(
+    EvalState &,
+    const FlakeRef &,
+    LockFileMode,
+    const LockFlags &);
 
 void callFlake(EvalState & state,
     const Flake & flake,

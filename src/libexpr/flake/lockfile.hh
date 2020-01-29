@@ -81,5 +81,7 @@ struct LockFile : LockedInputs
 
 std::ostream & operator <<(std::ostream & stream, const LockFile & lockFile);
 
+InputPath parseInputPath(std::string_view s);
+
 }
 

@@ -33,6 +33,17 @@ MixFlakeOptions::MixFlakeOptions()
         .longName("no-registries")
         .description("don't use flake registries")
         .set(&useRegistries, false);
+
+    mkFlag()
+        .longName("override-input")
+        .description("override a specific flake input (e.g. 'dwarffs/nixpkgs')")
+        .arity(2)
+        .labels({"input-path", "flake-url"})
+        .handler([&](std::vector<std::string> ss) {
+            lockFlags.inputOverrides.insert_or_assign(
+                flake::parseInputPath(ss[0]),
+                parseFlakeRef(ss[1], absPath(".")));
+        });
 }
 
 flake::LockFileMode MixFlakeOptions::getLockFileMode()
@@ -321,7 +332,7 @@ std::tuple<std::string, FlakeRef, flake::EvalCache::Derivation> InstallableFlake
 {
     auto state = cmd.getEvalState();
 
-    auto lockedFlake = lockFlake(*state, flakeRef, cmd.getLockFileMode());
+    auto lockedFlake = lockFlake(*state, flakeRef, cmd.getLockFileMode(), cmd.lockFlags);
 
     Value * vOutputs = nullptr;
 
@@ -375,7 +386,7 @@ std::vector<flake::EvalCache::Derivation> InstallableFlake::toDerivations()
 
 Value * InstallableFlake::toValue(EvalState & state)
 {
-    auto lockedFlake = lockFlake(state, flakeRef, cmd.getLockFileMode());
+    auto lockedFlake = lockFlake(state, flakeRef, cmd.getLockFileMode(), cmd.lockFlags);
 
     auto vOutputs = getFlakeOutputs(state, lockedFlake);
 

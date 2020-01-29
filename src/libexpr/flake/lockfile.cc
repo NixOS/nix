@@ -1,5 +1,6 @@
 #include "lockfile.hh"
 #include "store-api.hh"
+#include "fetchers/regex.hh"
 
 #include <nlohmann/json.hpp>
 
@@ -102,6 +103,22 @@ void LockFile::write(const Path & path) const
 {
     createDirs(dirOf(path));
     writeFile(path, fmt("%s\n", *this));
+}
+
+InputPath parseInputPath(std::string_view s)
+{
+    InputPath path;
+
+    for (auto & elem : tokenizeString<std::vector<std::string>>(s, "/")) {
+        if (!std::regex_match(elem, fetchers::flakeIdRegex))
+            throw Error("invalid flake input path element '%s'", elem);
+        path.push_back(elem);
+    }
+
+    if (path.empty())
+        throw Error("flake input path is empty");
+
+    return path;
 }
 
 }
