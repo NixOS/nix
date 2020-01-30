@@ -645,7 +645,7 @@ struct CmdFlakeArchive : FlakeCommand, MixJSON, MixDryRun
     {
         auto flake = lockFlake();
 
-        auto jsonRoot = json ? std::optional<JSONObject>(std::cout) : std::optional<JSONObject>();
+        auto jsonRoot = json ? std::optional<JSONObject>(std::cout) : std::nullopt;
 
         StorePathSet sources;
 
