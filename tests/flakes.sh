@@ -114,7 +114,7 @@ cat > $registry <<EOF
 EOF
 
 # Test 'nix flake list'.
-(( $(nix flake list | wc -l) == 6 ))
+[[ $(nix flake list | wc -l) == 6 ]]
 
 # Test 'nix flake info'.
 nix flake info flake1 | grep -q 'URL: .*flake1.*'
@@ -361,11 +361,11 @@ nix build -o $TEST_ROOT/result flake4/removeXyzzy#sth
 
 # Testing the nix CLI
 nix flake add flake1 flake3
-(( $(nix flake list | wc -l) == 7 ))
+[[ $(nix flake list | wc -l) == 7 ]]
 nix flake pin flake1
-(( $(nix flake list | wc -l) == 7 ))
+[[ $(nix flake list | wc -l) == 7 ]]
 nix flake remove flake1
-(( $(nix flake list | wc -l) == 6 ))
+[[ $(nix flake list | wc -l) == 6 ]]
 
 # Test 'nix flake init'.
 (cd $flake7Dir && nix flake init)
@@ -617,3 +617,7 @@ nix flake update $flake3Dir
 
 nix flake update $flake3Dir --update-input flake2/flake1
 [[ $(jq .inputs.flake2.inputs.flake1.url $flake3Dir/flake.lock) =~ flake1.*rev=$hash2 ]]
+
+# Test 'nix flake list-inputs'.
+[[ $(nix flake list-inputs $flake3Dir | wc -l) == 5 ]]
+nix flake list-inputs $flake3Dir --json | jq .

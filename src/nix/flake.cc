@@ -110,37 +110,6 @@ static nlohmann::json flakeToJson(const Store & store, const Flake & flake)
     return j;
 }
 
-#if 0
-// FIXME: merge info CmdFlakeInfo?
-struct CmdFlakeDeps : FlakeCommand
-{
-    std::string description() override
-    {
-        return "list informaton about dependencies";
-    }
-
-    void run(nix::ref<nix::Store> store) override
-    {
-        auto evalState = getEvalState();
-
-        std::queue<LockedFlake> todo;
-        todo.push(lockFlake());
-
-        stopProgressBar();
-
-        while (!todo.empty()) {
-            auto lockedFlake = std::move(todo.front());
-            todo.pop();
-
-            for (auto & info : lockedFlake.flakeDeps) {
-                printFlakeInfo(*store, info.second.flake);
-                todo.push(info.second);
-            }
-        }
-    }
-};
-#endif
-
 struct CmdFlakeUpdate : FlakeCommand
 {
     std::string description() override
@@ -150,7 +119,6 @@ struct CmdFlakeUpdate : FlakeCommand
 
     void run(nix::ref<nix::Store> store) override
     {
-        auto evalState = getEvalState();
         lockFlake();
     }
 };
@@ -210,6 +178,37 @@ struct CmdFlakeInfo : FlakeCommand, MixJSON
             auto flake = getFlake();
             stopProgressBar();
             printFlakeInfo(*store, flake);
+        }
+    }
+};
+
+struct CmdFlakeListInputs : FlakeCommand, MixJSON
+{
+    std::string description() override
+    {
+        return "list flake inputs";
+    }
+
+    void run(nix::ref<nix::Store> store) override
+    {
+        auto flake = lockFlake();
+
+        if (json)
+            std::cout << ((LockedInputs &) flake.lockFile).toJson() << "\n";
+        else {
+            std::cout << fmt("%s\n", flake.flake.resolvedRef);
+
+            std::function<void(const LockedInputs & inputs, size_t depth)> recurse;
+
+            recurse = [&](const LockedInputs & inputs, size_t depth)
+            {
+                for (auto & input : inputs.inputs) {
+                    std::cout << fmt("%s%s: %s\n", std::string(depth * 2, ' '), input.first, input.second.ref);
+                    recurse(input.second, depth + 1);
+                }
+            };
+
+            recurse(flake.lockFile, 1);
         }
     }
 };
@@ -685,6 +684,7 @@ struct CmdFlake : virtual MultiCommand, virtual Command
                 {"list", []() { return make_ref<CmdFlakeList>(); }},
                 {"update", []() { return make_ref<CmdFlakeUpdate>(); }},
                 {"info", []() { return make_ref<CmdFlakeInfo>(); }},
+                {"list-inputs", []() { return make_ref<CmdFlakeListInputs>(); }},
                 {"check", []() { return make_ref<CmdFlakeCheck>(); }},
                 {"add", []() { return make_ref<CmdFlakeAdd>(); }},
                 {"remove", []() { return make_ref<CmdFlakeRemove>(); }},
