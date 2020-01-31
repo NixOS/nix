@@ -143,11 +143,6 @@ struct CmdWhyDepends : SourceExprCommand
            and `dependency`. */
         std::function<void(Node &, const string &, const string &)> printNode;
 
-        const string treeConn = "╠═══";
-        const string treeLast = "╚═══";
-        const string treeLine = "║   ";
-        const string treeNull = "    ";
-
         struct BailOut { };
 
         printNode = [&](Node & node, const string & firstPad, const string & tailPad) {

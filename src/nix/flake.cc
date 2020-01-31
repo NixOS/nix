@@ -193,22 +193,27 @@ struct CmdFlakeListInputs : FlakeCommand, MixJSON
     {
         auto flake = lockFlake();
 
+        stopProgressBar();
+
         if (json)
             std::cout << ((LockedInputs &) flake.lockFile).toJson() << "\n";
         else {
             std::cout << fmt("%s\n", flake.flake.resolvedRef);
 
-            std::function<void(const LockedInputs & inputs, size_t depth)> recurse;
+            std::function<void(const LockedInputs & inputs, const std::string & prefix)> recurse;
 
-            recurse = [&](const LockedInputs & inputs, size_t depth)
+            recurse = [&](const LockedInputs & inputs, const std::string & prefix)
             {
-                for (auto & input : inputs.inputs) {
-                    std::cout << fmt("%s%s: %s\n", std::string(depth * 2, ' '), input.first, input.second.ref);
-                    recurse(input.second, depth + 1);
+                for (const auto & [i, input] : enumerate(inputs.inputs)) {
+                    //auto tree2 = tree.child(i + 1 == inputs.inputs.size());
+                    bool last = i + 1 == inputs.inputs.size();
+                    std::cout << fmt("%s" ANSI_BOLD "%s" ANSI_NORMAL ": %s\n",
+                        prefix + (last ? treeLast : treeConn), input.first, input.second.ref);
+                    recurse(input.second, prefix + (last ? treeNull : treeLine));
                 }
             };
 
-            recurse(flake.lockFile, 1);
+            recurse(flake.lockFile, "");
         }
     }
 };

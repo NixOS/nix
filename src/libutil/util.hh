@@ -458,6 +458,13 @@ void ignoreException();
 #define ANSI_BLUE "\e[34;1m"
 
 
+/* Tree formatting. */
+constexpr char treeConn[] = "╠═══";
+constexpr char treeLast[] = "╚═══";
+constexpr char treeLine[] = "║   ";
+constexpr char treeNull[] = "    ";
+
+
 /* Truncate a string to 'width' printable characters. If 'filterAll'
    is true, all ANSI escape sequences are filtered out. Otherwise,
    some escape sequences (such as colour setting) are copied but not
@@ -581,6 +588,33 @@ extern PathFilter defaultPathFilter;
 
 /* Create a Unix domain socket in listen mode. */
 AutoCloseFD createUnixDomainSocket(const Path & path, mode_t mode);
+
+
+// A Rust/Python-like enumerate() iterator adapter.
+// Borrowed from http://reedbeta.com/blog/python-like-enumerate-in-cpp17.
+template <typename T,
+          typename TIter = decltype(std::begin(std::declval<T>())),
+          typename = decltype(std::end(std::declval<T>()))>
+constexpr auto enumerate(T && iterable)
+{
+    struct iterator
+    {
+        size_t i;
+        TIter iter;
+        bool operator != (const iterator & other) const { return iter != other.iter; }
+        void operator ++ () { ++i; ++iter; }
+        auto operator * () const { return std::tie(i, *iter); }
+    };
+
+    struct iterable_wrapper
+    {
+        T iterable;
+        auto begin() { return iterator{ 0, std::begin(iterable) }; }
+        auto end() { return iterator{ 0, std::end(iterable) }; }
+    };
+
+    return iterable_wrapper{ std::forward<T>(iterable) };
+}
 
 
 }
