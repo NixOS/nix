@@ -166,8 +166,6 @@ struct GitHubInputScheme : InputScheme
 
         for (auto &[name, value] : url.query) {
             if (name == "rev") {
-                if (!std::regex_match(value, revRegex))
-                    throw BadURL("GitHub URL '%s' contains an invalid commit hash", url.url);
                 if (input->rev)
                     throw BadURL("GitHub URL '%s' contains multiple commit hashes", url.url);
                 input->rev = Hash(value, htSHA1);
@@ -193,6 +191,11 @@ struct GitHubInputScheme : InputScheme
     std::unique_ptr<Input> inputFromAttrs(const Input::Attrs & attrs) override
     {
         if (maybeGetStrAttr(attrs, "type") != "github") return {};
+
+        for (auto & [name, value] : attrs)
+            if (name != "type" && name != "owner" && name != "repo" && name != "ref" && name != "rev")
+                throw Error("unsupported GitHub input attribute '%s'", name);
+
         auto input = std::make_unique<GitHubInput>();
         input->owner = getStrAttr(attrs, "owner");
         input->repo = getStrAttr(attrs, "repo");

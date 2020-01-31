@@ -110,6 +110,11 @@ struct TarballInputScheme : InputScheme
     std::unique_ptr<Input> inputFromAttrs(const Input::Attrs & attrs) override
     {
         if (maybeGetStrAttr(attrs, "type") != "tarball") return {};
+
+        for (auto & [name, value] : attrs)
+            if (name != "type" && name != "url" && name != "hash" && name != "narHash")
+                throw Error("unsupported tarball input attribute '%s'", name);
+
         auto input = std::make_unique<TarballInput>(parseURL(getStrAttr(attrs, "url")));
         if (auto hash = maybeGetStrAttr(attrs, "hash"))
             // FIXME: require SRI hash.

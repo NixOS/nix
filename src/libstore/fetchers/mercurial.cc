@@ -264,32 +264,39 @@ struct MercurialInputScheme : InputScheme
             url.scheme != "hg+ssh" &&
             url.scheme != "hg+file") return nullptr;
 
-        auto input = std::make_unique<MercurialInput>(url);
+        auto url2(url);
+        // FIXME: strip hg+
+        url2.query.clear();
 
-        input->url.query.clear();
+        Input::Attrs attrs;
+        attrs.emplace("type", "hg");
 
         for (auto &[name, value] : url.query) {
-            if (name == "rev") {
-                if (!std::regex_match(value, revRegex))
-                    throw BadURL("Mercurial URL '%s' contains an invalid commit hash", url.url);
-                input->rev = Hash(value, htSHA1);
-            }
-            else if (name == "ref") {
-                if (!std::regex_match(value, refRegex))
-                    throw BadURL("Mercurial URL '%s' contains an invalid branch/tag name", url.url);
-                input->ref = value;
-            }
-            else input->url.query.insert_or_assign(name, value);
+            if (name == "rev" || name == "ref")
+                attrs.emplace(name, value);
+            else
+                url2.query.emplace(name, value);
         }
 
-        return input;
+        attrs.emplace("url", url2.to_string());
+
+        return inputFromAttrs(attrs);
     }
 
     std::unique_ptr<Input> inputFromAttrs(const Input::Attrs & attrs) override
     {
         if (maybeGetStrAttr(attrs, "type") != "hg") return {};
+
+        for (auto & [name, value] : attrs)
+            if (name != "type" && name != "url" && name != "ref" && name != "rev")
+                throw Error("unsupported Mercurial input attribute '%s'", name);
+
         auto input = std::make_unique<MercurialInput>(parseURL(getStrAttr(attrs, "url")));
-        input->ref = maybeGetStrAttr(attrs, "ref");
+        if (auto ref = maybeGetStrAttr(attrs, "ref")) {
+            if (!std::regex_match(*ref, refRegex))
+                throw BadURL("invalid Mercurial branch/tag name '%s'", *ref);
+            input->ref = *ref;
+        }
         if (auto rev = maybeGetStrAttr(attrs, "rev"))
             input->rev = Hash(*rev, htSHA1);
         return input;

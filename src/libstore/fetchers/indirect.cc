@@ -123,6 +123,11 @@ struct IndirectInputScheme : InputScheme
     std::unique_ptr<Input> inputFromAttrs(const Input::Attrs & attrs) override
     {
         if (maybeGetStrAttr(attrs, "type") != "indirect") return {};
+
+        for (auto & [name, value] : attrs)
+            if (name != "type" && name != "id" && name != "ref" && name != "rev")
+                throw Error("unsupported indirect input attribute '%s'", name);
+
         auto input = std::make_unique<IndirectInput>();
         input->id = getStrAttr(attrs, "id");
         input->ref = maybeGetStrAttr(attrs, "ref");

@@ -68,7 +68,7 @@ static FlakeInput parseFlakeInput(EvalState & state,
     expectType(state, tAttrs, *value, pos);
 
     FlakeInput input {
-        .ref = parseFlakeRef(inputName)
+        .ref = FlakeRef::fromAttrs({{"type", "indirect"}, {"id", inputName}})
     };
 
     auto sInputs = state.symbols.create("inputs");
