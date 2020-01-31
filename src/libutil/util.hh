@@ -483,10 +483,11 @@ string base64Decode(const string & s);
 /* Get a value for the specified key from an associate container, or a
    default value if the key doesn't exist. */
 template <class T>
-std::optional<std::string> get(const T & map, const std::string & key)
+std::optional<typename T::mapped_type> get(const T & map, const typename T::key_type & key)
 {
     auto i = map.find(key);
-    return i == map.end() ? std::optional<std::string>() : i->second;
+    if (i == map.end()) return {};
+    return std::optional<typename T::mapped_type>(i->second);
 }
 
 

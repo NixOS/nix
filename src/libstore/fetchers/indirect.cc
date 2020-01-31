@@ -12,6 +12,8 @@ struct IndirectInput : Input
     std::optional<Hash> rev;
     std::optional<std::string> ref;
 
+    std::string type() const override { return "indirect"; }
+
     bool operator ==(const Input & other) const override
     {
         auto other2 = dynamic_cast<const IndirectInput *>(&other);
@@ -51,6 +53,17 @@ struct IndirectInput : Input
         return url.to_string();
     }
 
+    Attrs toAttrsInternal() const override
+    {
+        Attrs attrs;
+        attrs.emplace("id", id);
+        if (ref)
+            attrs.emplace("ref", *ref);
+        if (rev)
+            attrs.emplace("rev", rev->gitRev());
+        return attrs;
+    }
+
     std::shared_ptr<const Input> applyOverrides(
         std::optional<std::string> ref,
         std::optional<Hash> rev) const override
@@ -79,7 +92,6 @@ struct IndirectInputScheme : InputScheme
 
         auto path = tokenizeString<std::vector<std::string>>(url.path, "/");
         auto input = std::make_unique<IndirectInput>();
-        input->type = "indirect";
 
         if (path.size() == 1) {
         } else if (path.size() == 2) {
@@ -105,6 +117,17 @@ struct IndirectInputScheme : InputScheme
         if (!std::regex_match(input->id, flakeRegex))
             throw BadURL("'%s' is not a valid flake ID", input->id);
 
+        return input;
+    }
+
+    std::unique_ptr<Input> inputFromAttrs(const Input::Attrs & attrs) override
+    {
+        if (maybeGetStrAttr(attrs, "type") != "indirect") return {};
+        auto input = std::make_unique<IndirectInput>();
+        input->id = getStrAttr(attrs, "id");
+        input->ref = maybeGetStrAttr(attrs, "ref");
+        if (auto rev = maybeGetStrAttr(attrs, "rev"))
+            input->rev = Hash(*rev, htSHA1);
         return input;
     }
 };

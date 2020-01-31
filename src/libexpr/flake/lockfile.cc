@@ -6,10 +6,48 @@
 
 namespace nix::flake {
 
+FlakeRef flakeRefFromJson(const nlohmann::json & json)
+{
+    fetchers::Input::Attrs attrs;
+
+    for (auto & i : json.items()) {
+        if (i.value().is_number())
+            attrs.emplace(i.key(), i.value().get<int64_t>());
+        else if (i.value().is_string())
+            attrs.emplace(i.key(), i.value().get<std::string>());
+        else
+            throw Error("unsupported input attribute type in lock file");
+    }
+
+    return FlakeRef::fromAttrs(attrs);
+}
+
+FlakeRef getFlakeRef(
+    const nlohmann::json & json,
+    const char * version3Attr1,
+    const char * version3Attr2,
+    const char * version4Attr)
+{
+    auto i = json.find(version4Attr);
+    if (i != json.end())
+        return flakeRefFromJson(*i);
+
+    // FIXME: remove these.
+    i = json.find(version3Attr1);
+    if (i != json.end())
+        return parseFlakeRef(*i);
+
+    i = json.find(version3Attr2);
+    if (i != json.end())
+        return parseFlakeRef(*i);
+
+    throw Error("attribute '%s' missing in lock file", version4Attr);
+}
+
 LockedInput::LockedInput(const nlohmann::json & json)
     : LockedInputs(json)
-    , ref(parseFlakeRef(json.value("url", json.value("uri", ""))))
-    , originalRef(parseFlakeRef(json.value("originalUrl", json.value("originalUri", ""))))
+    , ref(getFlakeRef(json, "url", "uri", "resolvedRef"))
+    , originalRef(getFlakeRef(json, "originalUrl", "originalUri", "originalRef"))
     , narHash(Hash((std::string) json["narHash"]))
 {
     if (!ref.isImmutable())
@@ -19,9 +57,9 @@ LockedInput::LockedInput(const nlohmann::json & json)
 nlohmann::json LockedInput::toJson() const
 {
     auto json = LockedInputs::toJson();
-    json["url"] = ref.to_string();
-    json["originalUrl"] = originalRef.to_string();
-    json["narHash"] = narHash.to_string(SRI);
+    json["originalRef"] = fetchers::attrsToJson(originalRef.toAttrs());
+    json["resolvedRef"] = fetchers::attrsToJson(ref.toAttrs());
+    json["narHash"] = narHash.to_string(SRI); // FIXME
     return json;
 }
 
@@ -91,7 +129,7 @@ void LockedInputs::removeInput(const InputPath & path)
 nlohmann::json LockFile::toJson() const
 {
     auto json = LockedInputs::toJson();
-    json["version"] = 3;
+    json["version"] = 4;
     return json;
 }
 
@@ -101,7 +139,7 @@ LockFile LockFile::read(const Path & path)
         auto json = nlohmann::json::parse(readFile(path));
 
         auto version = json.value("version", 0);
-        if (version != 3)
+        if (version != 3 && version != 4)
             throw Error("lock file '%s' has unsupported version %d", path, version);
 
         return LockFile(json);
@@ -111,7 +149,7 @@ LockFile LockFile::read(const Path & path)
 
 std::ostream & operator <<(std::ostream & stream, const LockFile & lockFile)
 {
-    stream << lockFile.toJson().dump(4); // '4' = indentation in json file
+    stream << lockFile.toJson().dump(2);
     return stream;
 }
 

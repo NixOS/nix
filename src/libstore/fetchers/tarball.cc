@@ -11,6 +11,11 @@ struct TarballInput : Input
     ParsedURL url;
     std::optional<Hash> hash;
 
+    TarballInput(const ParsedURL & url) : url(url)
+    { }
+
+    std::string type() const override { return "tarball"; }
+
     bool operator ==(const Input & other) const override
     {
         auto other2 = dynamic_cast<const TarballInput *>(&other);
@@ -22,15 +27,30 @@ struct TarballInput : Input
 
     bool isImmutable() const override
     {
-        return (bool) hash;
+        return hash || narHash;
     }
 
     std::string to_string() const override
     {
         auto url2(url);
+        // NAR hashes are preferred over file hashes since tar/zip files
+        // don't have a canonical representation.
         if (narHash)
             url2.query.insert_or_assign("narHash", narHash->to_string(SRI));
+        else if (hash)
+            url2.query.insert_or_assign("hash", hash->to_string(SRI));
         return url2.to_string();
+    }
+
+    Attrs toAttrsInternal() const override
+    {
+        Attrs attrs;
+        attrs.emplace("url", url.to_string());
+        if (narHash)
+            attrs.emplace("narHash", hash->to_string(SRI));
+        else if (hash)
+            attrs.emplace("hash", hash->to_string(SRI));
+        return attrs;
     }
 
     std::pair<Tree, std::shared_ptr<const Input>> fetchTreeInternal(nix::ref<Store> store) const override
@@ -72,16 +92,31 @@ struct TarballInputScheme : InputScheme
             && !hasSuffix(url.path, ".tar.bz2"))
             return nullptr;
 
-        auto input = std::make_unique<TarballInput>();
-        input->type = "tarball";
-        input->url = url;
+        auto input = std::make_unique<TarballInput>(url);
+
+        auto hash = url.query.find("hash");
+        if (hash != url.query.end())
+            // FIXME: require SRI hash.
+            input->hash = Hash(hash->second);
 
         auto narHash = url.query.find("narHash");
-        if (narHash != url.query.end()) {
+        if (narHash != url.query.end())
             // FIXME: require SRI hash.
             input->narHash = Hash(narHash->second);
-        }
 
+        return input;
+    }
+
+    std::unique_ptr<Input> inputFromAttrs(const Input::Attrs & attrs) override
+    {
+        if (maybeGetStrAttr(attrs, "type") != "tarball") return {};
+        auto input = std::make_unique<TarballInput>(parseURL(getStrAttr(attrs, "url")));
+        if (auto hash = maybeGetStrAttr(attrs, "hash"))
+            // FIXME: require SRI hash.
+            input->hash = Hash(*hash);
+        if (auto narHash = maybeGetStrAttr(attrs, "narHash"))
+            // FIXME: require SRI hash.
+            input->narHash = Hash(*narHash);
         return input;
     }
 };

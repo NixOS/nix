@@ -2,14 +2,13 @@
 
 #include "types.hh"
 #include "hash.hh"
+#include "fetchers/fetchers.hh"
 
 #include <variant>
 
 namespace nix {
 
 class Store;
-
-namespace fetchers { struct Input; }
 
 typedef std::string FlakeId;
 
@@ -30,6 +29,8 @@ struct FlakeRef
     // FIXME: change to operator <<.
     std::string to_string() const;
 
+    fetchers::Input::Attrs toAttrs() const;
+
     /* Check whether this is a "direct" flake reference, that is, not
        a flake ID, which requires a lookup in the flake registry. */
     bool isDirect() const;
@@ -39,6 +40,8 @@ struct FlakeRef
     bool isImmutable() const;
 
     FlakeRef resolve(ref<Store> store) const;
+
+    static FlakeRef fromAttrs(const fetchers::Input::Attrs & attrs);
 };
 
 std::ostream & operator << (std::ostream & str, const FlakeRef & flakeRef);

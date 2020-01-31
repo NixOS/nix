@@ -19,6 +19,8 @@ struct GitHubInput : Input
     std::optional<std::string> ref;
     std::optional<Hash> rev;
 
+    std::string type() const override { return "github"; }
+
     bool operator ==(const Input & other) const override
     {
         auto other2 = dynamic_cast<const GitHubInput *>(&other);
@@ -46,6 +48,18 @@ struct GitHubInput : Input
         if (ref) s += "/" + *ref;
         if (rev) s += "/" + rev->to_string(Base16, false);
         return s;
+    }
+
+    Attrs toAttrsInternal() const override
+    {
+        Attrs attrs;
+        attrs.emplace("owner", owner);
+        attrs.emplace("repo", repo);
+        if (ref)
+            attrs.emplace("ref", *ref);
+        if (rev)
+            attrs.emplace("rev", rev->gitRev());
+        return attrs;
     }
 
     void clone(const Path & destDir) const override
@@ -138,7 +152,6 @@ struct GitHubInputScheme : InputScheme
 
         auto path = tokenizeString<std::vector<std::string>>(url.path, "/");
         auto input = std::make_unique<GitHubInput>();
-        input->type = "github";
 
         if (path.size() == 2) {
         } else if (path.size() == 3) {
@@ -174,6 +187,18 @@ struct GitHubInputScheme : InputScheme
         input->owner = path[0];
         input->repo = path[1];
 
+        return input;
+    }
+
+    std::unique_ptr<Input> inputFromAttrs(const Input::Attrs & attrs) override
+    {
+        if (maybeGetStrAttr(attrs, "type") != "github") return {};
+        auto input = std::make_unique<GitHubInput>();
+        input->owner = getStrAttr(attrs, "owner");
+        input->repo = getStrAttr(attrs, "repo");
+        input->ref = maybeGetStrAttr(attrs, "ref");
+        if (auto rev = maybeGetStrAttr(attrs, "rev"))
+            input->rev = Hash(*rev, htSHA1);
         return input;
     }
 };

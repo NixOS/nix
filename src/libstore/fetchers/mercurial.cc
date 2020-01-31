@@ -20,9 +20,9 @@ struct MercurialInput : Input
     std::optional<Hash> rev;
 
     MercurialInput(const ParsedURL & url) : url(url)
-    {
-        type = "hg";
-    }
+    { }
+
+    std::string type() const override { return "hg"; }
 
     bool operator ==(const Input & other) const override
     {
@@ -49,6 +49,17 @@ struct MercurialInput : Input
         if (rev) url2.query.insert_or_assign("rev", rev->gitRev());
         if (ref) url2.query.insert_or_assign("ref", *ref);
         return url2.to_string();
+    }
+
+    Attrs toAttrsInternal() const override
+    {
+        Attrs attrs;
+        attrs.emplace("url", url.to_string());
+        if (ref)
+            attrs.emplace("ref", *ref);
+        if (rev)
+            attrs.emplace("rev", rev->gitRev());
+        return attrs;
     }
 
     std::shared_ptr<const Input> applyOverrides(
@@ -271,6 +282,16 @@ struct MercurialInputScheme : InputScheme
             else input->url.query.insert_or_assign(name, value);
         }
 
+        return input;
+    }
+
+    std::unique_ptr<Input> inputFromAttrs(const Input::Attrs & attrs) override
+    {
+        if (maybeGetStrAttr(attrs, "type") != "hg") return {};
+        auto input = std::make_unique<MercurialInput>(parseURL(getStrAttr(attrs, "url")));
+        input->ref = maybeGetStrAttr(attrs, "ref");
+        if (auto rev = maybeGetStrAttr(attrs, "rev"))
+            input->rev = Hash(*rev, htSHA1);
         return input;
     }
 };

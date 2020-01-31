@@ -74,9 +74,9 @@ struct GitInput : Input
     std::optional<Hash> rev;
 
     GitInput(const ParsedURL & url) : url(url)
-    {
-        type = "git";
-    }
+    { }
+
+    std::string type() const override { return "git"; }
 
     bool operator ==(const Input & other) const override
     {
@@ -103,6 +103,17 @@ struct GitInput : Input
         if (rev) url2.query.insert_or_assign("rev", rev->gitRev());
         if (ref) url2.query.insert_or_assign("ref", *ref);
         return url2.to_string();
+    }
+
+    Attrs toAttrsInternal() const override
+    {
+        Attrs attrs;
+        attrs.emplace("url", url.to_string());
+        if (ref)
+            attrs.emplace("ref", *ref);
+        if (rev)
+            attrs.emplace("rev", rev->gitRev());
+        return attrs;
     }
 
     void clone(const Path & destDir) const override
@@ -377,6 +388,16 @@ struct GitInputScheme : InputScheme
             else input->url.query.insert_or_assign(name, value);
         }
 
+        return input;
+    }
+
+    std::unique_ptr<Input> inputFromAttrs(const Input::Attrs & attrs) override
+    {
+        if (maybeGetStrAttr(attrs, "type") != "git") return {};
+        auto input = std::make_unique<GitInput>(parseURL(getStrAttr(attrs, "url")));
+        input->ref = maybeGetStrAttr(attrs, "ref");
+        if (auto rev = maybeGetStrAttr(attrs, "rev"))
+            input->rev = Hash(*rev, htSHA1);
         return input;
     }
 };

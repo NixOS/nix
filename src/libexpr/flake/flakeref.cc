@@ -14,10 +14,17 @@ const static std::string subDirElemRegex = "(?:[a-zA-Z0-9_-]+[a-zA-Z0-9._-]*)";
 const static std::string subDirRegex = subDirElemRegex + "(?:/" + subDirElemRegex + ")*";
 #endif
 
-
 std::string FlakeRef::to_string() const
 {
     return input->to_string();
+}
+
+fetchers::Input::Attrs FlakeRef::toAttrs() const
+{
+    auto attrs = input->toAttrs();
+    if (subdir != "")
+        attrs.emplace("subdir", subdir);
+    return attrs;
 }
 
 bool FlakeRef::isDirect() const
@@ -36,7 +43,7 @@ std::ostream & operator << (std::ostream & str, const FlakeRef & flakeRef)
     return str;
 }
 
-bool FlakeRef::operator==(const FlakeRef & other) const
+bool FlakeRef::operator ==(const FlakeRef & other) const
 {
     return *input == *other.input && subdir == other.subdir;
 }
@@ -164,6 +171,15 @@ std::optional<std::pair<FlakeRef, std::string>> maybeParseFlakeRefWithFragment(
     } catch (Error & e) {
         return {};
     }
+}
+
+FlakeRef FlakeRef::fromAttrs(const fetchers::Input::Attrs & attrs)
+{
+    auto attrs2(attrs);
+    attrs2.erase("subdir");
+    return FlakeRef(
+        fetchers::inputFromAttrs(attrs2),
+        fetchers::maybeGetStrAttr(attrs, "subdir").value_or(""));
 }
 
 }

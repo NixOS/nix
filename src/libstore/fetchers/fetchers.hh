@@ -5,6 +5,9 @@
 #include "path.hh"
 
 #include <memory>
+#include <variant>
+
+#include <nlohmann/json_fwd.hpp>
 
 namespace nix { class Store; }
 
@@ -24,8 +27,9 @@ struct Tree
 
 struct Input : std::enable_shared_from_this<Input>
 {
-    std::string type;
     std::optional<Hash> narHash; // FIXME: implement
+
+    virtual std::string type() const = 0;
 
     virtual ~Input() { }
 
@@ -43,6 +47,11 @@ struct Input : std::enable_shared_from_this<Input>
 
     virtual std::string to_string() const = 0;
 
+    typedef std::variant<std::string, int64_t> Attr;
+    typedef std::map<std::string, Attr> Attrs;
+
+    Attrs toAttrs() const;
+
     std::pair<Tree, std::shared_ptr<const Input>> fetchTree(ref<Store> store) const;
 
     virtual std::shared_ptr<const Input> applyOverrides(
@@ -59,6 +68,8 @@ struct Input : std::enable_shared_from_this<Input>
 private:
 
     virtual std::pair<Tree, std::shared_ptr<const Input>> fetchTreeInternal(ref<Store> store) const = 0;
+
+    virtual Attrs toAttrsInternal() const = 0;
 };
 
 struct ParsedURL;
@@ -68,12 +79,22 @@ struct InputScheme
     virtual ~InputScheme() { }
 
     virtual std::unique_ptr<Input> inputFromURL(const ParsedURL & url) = 0;
+
+    virtual std::unique_ptr<Input> inputFromAttrs(const Input::Attrs & attrs) = 0;
 };
 
 std::unique_ptr<Input> inputFromURL(const ParsedURL & url);
 
 std::unique_ptr<Input> inputFromURL(const std::string & url);
 
+std::unique_ptr<Input> inputFromAttrs(const Input::Attrs & attrs);
+
 void registerInputScheme(std::unique_ptr<InputScheme> && fetcher);
+
+nlohmann::json attrsToJson(const Input::Attrs & attrs);
+
+std::optional<std::string> maybeGetStrAttr(const Input::Attrs & attrs, const std::string & name);
+
+std::string getStrAttr(const Input::Attrs & attrs, const std::string & name);
 
 }
