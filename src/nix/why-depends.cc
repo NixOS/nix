@@ -152,7 +152,7 @@ struct CmdWhyDepends : SourceExprCommand
             std::cout << fmt("%s%s%s%s" ANSI_NORMAL "\n",
                 firstPad,
                 node.visited ? "\e[38;5;244m" : "",
-                firstPad != "" ? "=> " : "",
+                firstPad != "" ? "→ " : "",
                 pathS);
 
             if (node.path == dependencyPath && !all

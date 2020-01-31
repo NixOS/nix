@@ -459,9 +459,9 @@ void ignoreException();
 
 
 /* Tree formatting. */
-constexpr char treeConn[] = "╠═══";
-constexpr char treeLast[] = "╚═══";
-constexpr char treeLine[] = "║   ";
+constexpr char treeConn[] = "├───";
+constexpr char treeLast[] = "└───";
+constexpr char treeLine[] = "│   ";
 constexpr char treeNull[] = "    ";
 
 
