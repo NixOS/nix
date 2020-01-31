@@ -468,7 +468,10 @@ cat > $flake3Dir/flake.nix <<EOF
 {
   edition = 201909;
 
-  inputs.foo.url = flake:flake1;
+  inputs.foo = {
+    type = "indirect";
+    id = "flake1";
+  };
   inputs.bar.follows = "foo";
 
   outputs = { self, foo, bar }: {

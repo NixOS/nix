@@ -77,25 +77,49 @@ static FlakeInput parseFlakeInput(EvalState & state,
     auto sFlake = state.symbols.create("flake");
     auto sFollows = state.symbols.create("follows");
 
+    fetchers::Input::Attrs attrs;
+    std::optional<std::string> url;
+
     for (Attr attr : *(value->attrs)) {
-        if (attr.name == sUrl || attr.name == sUri) {
-            expectType(state, tString, *attr.value, *attr.pos);
-            input.ref = parseFlakeRef(attr.value->string.s);
-        } else if (attr.name == sFlake) {
-            expectType(state, tBool, *attr.value, *attr.pos);
-            input.isFlake = attr.value->boolean;
-        } else if (attr.name == sInputs) {
-            input.overrides = parseFlakeInputs(state, attr.value, *attr.pos);
-        } else if (attr.name == sFollows) {
-            expectType(state, tString, *attr.value, *attr.pos);
-            try {
+        try {
+            if (attr.name == sUrl || attr.name == sUri) {
+                expectType(state, tString, *attr.value, *attr.pos);
+                url = attr.value->string.s;
+                attrs.emplace("url", *url);
+            } else if (attr.name == sFlake) {
+                expectType(state, tBool, *attr.value, *attr.pos);
+                input.isFlake = attr.value->boolean;
+            } else if (attr.name == sInputs) {
+                input.overrides = parseFlakeInputs(state, attr.value, *attr.pos);
+            } else if (attr.name == sFollows) {
+                expectType(state, tString, *attr.value, *attr.pos);
                 input.follows = parseInputPath(attr.value->string.s);
-            } catch (Error & e) {
-                e.addPrefix("in flake attribute at '%s':\n");
+            } else {
+                state.forceValue(*attr.value);
+                if (attr.value->type == tString)
+                    attrs.emplace(attr.name, attr.value->string.s);
+                else
+                    throw Error("unsupported attribute type");
             }
-        } else
-            throw Error("flake input '%s' has an unsupported attribute '%s', at %s",
-                inputName, attr.name, *attr.pos);
+        } catch (Error & e) {
+            e.addPrefix(fmt("in flake attribute '%s' at '%s':\n", attr.name, *attr.pos));
+            throw;
+        }
+    }
+
+    if (attrs.count("type"))
+        try {
+            input.ref = FlakeRef::fromAttrs(attrs);
+        } catch (Error & e) {
+            e.addPrefix(fmt("in flake input at '%s':\n", pos));
+            throw;
+        }
+    else {
+        attrs.erase("url");
+        if (!attrs.empty())
+            throw Error("unexpected flake input attribute '%s', at %s", attrs.begin()->first, pos);
+        if (url)
+            input.ref = parseFlakeRef(*url);
     }
 
     return input;
