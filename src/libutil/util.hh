@@ -429,6 +429,7 @@ void ignoreException();
 #define ANSI_FAINT "\e[2m"
 #define ANSI_RED "\e[31;1m"
 #define ANSI_GREEN "\e[32;1m"
+#define ANSI_YELLOW "\e[33;1m"
 #define ANSI_BLUE "\e[34;1m"
 
 

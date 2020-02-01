@@ -21,7 +21,7 @@ Logger * logger = makeDefaultLogger();
 
 void Logger::warn(const std::string & msg)
 {
-    log(lvlWarn, ANSI_RED "warning:" ANSI_NORMAL " " + msg);
+    log(lvlWarn, ANSI_YELLOW "warning:" ANSI_NORMAL " " + msg);
 }
 
 class SimpleLogger : public Logger
