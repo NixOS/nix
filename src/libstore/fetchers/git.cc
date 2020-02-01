@@ -23,21 +23,25 @@ static Path getCacheInfoPathFor(const std::string & name, const Hash & rev)
     return cacheDir + "/" + linkName + ".link";
 }
 
-static void cacheGitInfo(Store & store, const std::string & name, const Tree & tree)
+static void cacheGitInfo(
+    Store & store,
+    const std::string & name,
+    const Tree & tree,
+    const Hash & rev)
 {
     nlohmann::json json;
     json["storePath"] = store.printStorePath(tree.storePath);
     json["name"] = name;
-    json["rev"] = tree.info.rev->gitRev();
+    json["rev"] = rev.gitRev();
     json["revCount"] = *tree.info.revCount;
     json["lastModified"] = *tree.info.lastModified;
 
-    auto cacheInfoPath = getCacheInfoPathFor(name, *tree.info.rev);
+    auto cacheInfoPath = getCacheInfoPathFor(name, rev);
     createDirs(dirOf(cacheInfoPath));
     writeFile(cacheInfoPath, json.dump());
 }
 
-static std::optional<Tree> lookupGitInfo(
+static std::optional<std::pair<Hash, Tree>> lookupGitInfo(
     ref<Store> store,
     const std::string & name,
     const Hash & rev)
@@ -50,16 +54,14 @@ static std::optional<Tree> lookupGitInfo(
         auto storePath = store->parseStorePath((std::string) json["storePath"]);
 
         if (store->isValidPath(storePath)) {
-            Tree tree{
+            return {{rev, Tree{
                 .actualPath = store->toRealPath(store->printStorePath(storePath)),
                 .storePath = std::move(storePath),
                 .info = TreeInfo {
-                    .rev = rev,
                     .revCount = json["revCount"],
                     .lastModified = json["lastModified"],
                 }
-            };
-            return tree;
+            }}};
         }
 
     } catch (SysError & e) {
@@ -181,8 +183,10 @@ struct GitInput : Input
         assert(!rev || rev->type == htSHA1);
 
         if (rev) {
-            if (auto tree = lookupGitInfo(store, name, *rev))
-                return {std::move(*tree), input};
+            if (auto tree = lookupGitInfo(store, name, *rev)) {
+                input->rev = tree->first;
+                return {std::move(tree->second), input};
+            }
         }
 
         auto [isLocal, actualUrl_] = getActualUrl();
@@ -326,8 +330,10 @@ struct GitInput : Input
                 input->rev = Hash(chomp(readFile(localRefFile)), htSHA1);
         }
 
-        if (auto tree = lookupGitInfo(store, name, *input->rev))
-            return {std::move(*tree), input};
+        if (auto tree = lookupGitInfo(store, name, *input->rev)) {
+            assert(*input->rev == tree->first);
+            return {std::move(tree->second), input};
+        }
 
         // FIXME: check whether rev is an ancestor of ref.
 
@@ -354,13 +360,12 @@ struct GitInput : Input
             .actualPath = store->toRealPath(store->printStorePath(storePath)),
             .storePath = std::move(storePath),
             .info = TreeInfo {
-                .rev = input->rev,
                 .revCount = revCount,
                 .lastModified = lastModified
             }
         };
 
-        cacheGitInfo(*store, name, tree);
+        cacheGitInfo(*store, name, tree, *input->rev);
 
         return {std::move(tree), input};
     }

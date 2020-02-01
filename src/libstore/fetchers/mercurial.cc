@@ -220,7 +220,6 @@ struct MercurialInput : Input
                         .actualPath = store->printStorePath(storePath),
                         .storePath = std::move(storePath),
                         .info = TreeInfo {
-                            .rev = input->rev,
                             .revCount = revCount,
                         },
                     },
@@ -256,7 +255,6 @@ struct MercurialInput : Input
                 .actualPath = store->printStorePath(storePath),
                 .storePath = std::move(storePath),
                 .info = TreeInfo {
-                    .rev = input->rev,
                     .revCount = revCount
                 }
             },

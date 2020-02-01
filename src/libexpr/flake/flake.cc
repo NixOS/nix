@@ -567,17 +567,21 @@ LockedFlake lockFlake(
     return LockedFlake { .flake = std::move(flake), .lockFile = std::move(newLockFile) };
 }
 
-static void emitSourceInfoAttrs(EvalState & state, const fetchers::Tree & sourceInfo, Value & vAttrs)
+static void emitSourceInfoAttrs(
+    EvalState & state,
+    const FlakeRef & flakeRef,
+    const fetchers::Tree & sourceInfo,
+    Value & vAttrs)
 {
     assert(state.store->isValidPath(sourceInfo.storePath));
     auto pathS = state.store->printStorePath(sourceInfo.storePath);
     mkString(*state.allocAttr(vAttrs, state.sOutPath), pathS, {pathS});
 
-    if (sourceInfo.info.rev) {
+    if (auto rev = flakeRef.input->getRev()) {
         mkString(*state.allocAttr(vAttrs, state.symbols.create("rev")),
-            sourceInfo.info.rev->gitRev());
+            rev->gitRev());
         mkString(*state.allocAttr(vAttrs, state.symbols.create("shortRev")),
-            sourceInfo.info.rev->gitShortRev());
+            rev->gitShortRev());
     }
 
     if (sourceInfo.info.revCount)
@@ -639,7 +643,7 @@ static void prim_callFlake(EvalState & state, const Pos & pos, Value * * args, V
 
         mkString(*state.allocAttr(v, state.sOutPath), pathS, {pathS});
 
-        emitSourceInfoAttrs(state, sourceInfo, v);
+        emitSourceInfoAttrs(state, resolvedRef, sourceInfo, v);
 
         v.attrs->sort();
     }
@@ -672,7 +676,7 @@ void callFlake(EvalState & state,
 
     auto & vSourceInfo = *state.allocValue();
     state.mkAttrs(vSourceInfo, 8);
-    emitSourceInfoAttrs(state, *flake.sourceInfo, vSourceInfo);
+    emitSourceInfoAttrs(state, flake.resolvedRef, *flake.sourceInfo, vSourceInfo);
     vSourceInfo.attrs->sort();
 
     vInputs.attrs->push_back(Attr(state.sSelf, &vRes));

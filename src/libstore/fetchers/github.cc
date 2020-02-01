@@ -114,7 +114,6 @@ struct GitHubInput : Input
             .actualPath = dresult.path,
             .storePath = store->parseStorePath(dresult.storePath),
             .info = TreeInfo {
-                .rev = *rev,
                 .lastModified = *dresult.lastModified,
             },
         };

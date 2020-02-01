@@ -84,8 +84,8 @@ static void printFlakeInfo(const Store & store, const Flake & flake)
     if (flake.description)
         std::cout << fmt("Description:   %s\n", *flake.description);
     std::cout << fmt("Path:          %s\n", store.printStorePath(flake.sourceInfo->storePath));
-    if (flake.sourceInfo->info.rev)
-        std::cout << fmt("Revision:      %s\n", flake.sourceInfo->info.rev->to_string(Base16, false));
+    if (auto rev = flake.resolvedRef.input->getRev())
+        std::cout << fmt("Revision:      %s\n", rev->to_string(Base16, false));
     if (flake.sourceInfo->info.revCount)
         std::cout << fmt("Revisions:     %s\n", *flake.sourceInfo->info.revCount);
     if (flake.sourceInfo->info.lastModified)
@@ -100,8 +100,8 @@ static nlohmann::json flakeToJson(const Store & store, const Flake & flake)
         j["description"] = *flake.description;
     j["edition"] = flake.edition;
     j["url"] = flake.resolvedRef.input->to_string();
-    if (flake.sourceInfo->info.rev)
-        j["revision"] = flake.sourceInfo->info.rev->to_string(Base16, false);
+    if (auto rev = flake.resolvedRef.input->getRev())
+        j["revision"] = rev->to_string(Base16, false);
     if (flake.sourceInfo->info.revCount)
         j["revCount"] = *flake.sourceInfo->info.revCount;
     if (flake.sourceInfo->info.lastModified)

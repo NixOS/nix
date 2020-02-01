@@ -58,10 +58,6 @@ static TreeInfo parseTreeInfo(const nlohmann::json & json)
         else
             throw Error("attribute 'narHash' missing in lock file");
 
-        j = i2.find("rev");
-        if (j != i2.end())
-            info.rev = Hash((std::string) *j, htSHA1);
-
         j = i2.find("revCount");
         if (j != i2.end())
             info.revCount = *j;
@@ -97,8 +93,6 @@ static nlohmann::json treeInfoToJson(const TreeInfo & info)
     nlohmann::json json;
     assert(info.narHash);
     json["narHash"] = info.narHash.to_string(SRI);
-    if (info.rev)
-        json["rev"] = info.rev->gitRev();
     if (info.revCount)
         json["revCount"] = *info.revCount;
     if (info.lastModified)

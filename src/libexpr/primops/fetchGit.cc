@@ -57,14 +57,14 @@ static void prim_fetchGit(EvalState & state, const Pos & pos, Value * * args, Va
     // FIXME: use name
     auto input = inputFromURL(parsedUrl);
 
-    auto tree = input->fetchTree(state.store).first;
+    auto [tree, input2] = input->fetchTree(state.store);
 
     state.mkAttrs(v, 8);
     auto storePath = state.store->printStorePath(tree.storePath);
     mkString(*state.allocAttr(v, state.sOutPath), storePath, PathSet({storePath}));
     // Backward compatibility: set 'rev' to
     // 0000000000000000000000000000000000000000 for a dirty tree.
-    auto rev2 = tree.info.rev.value_or(Hash(htSHA1));
+    auto rev2 = input2->getRev().value_or(Hash(htSHA1));
     mkString(*state.allocAttr(v, state.symbols.create("rev")), rev2.gitRev());
     mkString(*state.allocAttr(v, state.symbols.create("shortRev")), rev2.gitShortRev());
     assert(tree.info.revCount);
