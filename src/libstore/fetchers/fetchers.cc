@@ -83,11 +83,11 @@ std::pair<Tree, std::shared_ptr<const Input>> Input::fetchTree(ref<Store> store)
     if (tree.actualPath == "")
         tree.actualPath = store->toRealPath(store->printStorePath(tree.storePath));
 
-    if (!tree.narHash)
-        tree.narHash = store->queryPathInfo(tree.storePath)->narHash;
+    if (!tree.info.narHash)
+        tree.info.narHash = store->queryPathInfo(tree.storePath)->narHash;
 
     if (input->narHash)
-        assert(input->narHash == tree.narHash);
+        assert(input->narHash == tree.info.narHash);
 
     if (narHash && narHash != input->narHash)
         throw Error("NAR hash mismatch in input '%s', expected '%s', got '%s'",

@@ -28,11 +28,11 @@ static void cacheGitInfo(Store & store, const std::string & name, const Tree & t
     nlohmann::json json;
     json["storePath"] = store.printStorePath(tree.storePath);
     json["name"] = name;
-    json["rev"] = tree.rev->gitRev();
-    json["revCount"] = *tree.revCount;
-    json["lastModified"] = *tree.lastModified;
+    json["rev"] = tree.info.rev->gitRev();
+    json["revCount"] = *tree.info.revCount;
+    json["lastModified"] = *tree.info.lastModified;
 
-    auto cacheInfoPath = getCacheInfoPathFor(name, *tree.rev);
+    auto cacheInfoPath = getCacheInfoPathFor(name, *tree.info.rev);
     createDirs(dirOf(cacheInfoPath));
     writeFile(cacheInfoPath, json.dump());
 }
@@ -53,9 +53,11 @@ static std::optional<Tree> lookupGitInfo(
             Tree tree{
                 .actualPath = store->toRealPath(store->printStorePath(storePath)),
                 .storePath = std::move(storePath),
-                .rev = rev,
-                .revCount = json["revCount"],
-                .lastModified = json["lastModified"],
+                .info = TreeInfo {
+                    .rev = rev,
+                    .revCount = json["revCount"],
+                    .lastModified = json["lastModified"],
+                }
             };
             return tree;
         }
@@ -237,10 +239,12 @@ struct GitInput : Input
                 auto tree = Tree {
                     .actualPath = store->printStorePath(storePath),
                     .storePath = std::move(storePath),
-                    .revCount = haveCommits ? std::stoull(runProgram("git", true, { "-C", actualUrl, "rev-list", "--count", "HEAD" })) : 0,
-                    // FIXME: maybe we should use the timestamp of the last
-                    // modified dirty file?
-                    .lastModified = haveCommits ? std::stoull(runProgram("git", true, { "-C", actualUrl, "log", "-1", "--format=%ct", "HEAD" })) : 0,
+                    .info = TreeInfo {
+                        .revCount = haveCommits ? std::stoull(runProgram("git", true, { "-C", actualUrl, "rev-list", "--count", "HEAD" })) : 0,
+                        // FIXME: maybe we should use the timestamp of the last
+                        // modified dirty file?
+                        .lastModified = haveCommits ? std::stoull(runProgram("git", true, { "-C", actualUrl, "log", "-1", "--format=%ct", "HEAD" })) : 0,
+                    }
                 };
 
                 return {std::move(tree), input};
@@ -349,9 +353,11 @@ struct GitInput : Input
         auto tree = Tree {
             .actualPath = store->toRealPath(store->printStorePath(storePath)),
             .storePath = std::move(storePath),
-            .rev = input->rev,
-            .revCount = revCount,
-            .lastModified = lastModified,
+            .info = TreeInfo {
+                .rev = input->rev,
+                .revCount = revCount,
+                .lastModified = lastModified
+            }
         };
 
         cacheGitInfo(*store, name, tree);

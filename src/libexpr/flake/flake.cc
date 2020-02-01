@@ -478,7 +478,7 @@ LockedFlake lockFlake(
                             lockFlags.useRegistries, flakeCache);
 
                         newLocks.inputs.insert_or_assign(id,
-                            LockedInput(inputFlake.resolvedRef, inputFlake.originalRef, inputFlake.sourceInfo->narHash));
+                            LockedInput(inputFlake.resolvedRef, inputFlake.originalRef, inputFlake.sourceInfo->info.narHash));
 
                         /* Recursively process the inputs of this
                            flake. Also, unless we already have this
@@ -497,7 +497,7 @@ LockedFlake lockFlake(
                         auto [sourceInfo, resolvedRef] = getNonFlake(state, input.ref,
                             lockFlags.useRegistries, flakeCache);
                         newLocks.inputs.insert_or_assign(id,
-                            LockedInput(resolvedRef, input.ref, sourceInfo.narHash));
+                            LockedInput(resolvedRef, input.ref, sourceInfo.info.narHash));
                     }
                 }
             }
@@ -573,19 +573,19 @@ static void emitSourceInfoAttrs(EvalState & state, const fetchers::Tree & source
     auto pathS = state.store->printStorePath(sourceInfo.storePath);
     mkString(*state.allocAttr(vAttrs, state.sOutPath), pathS, {pathS});
 
-    if (sourceInfo.rev) {
+    if (sourceInfo.info.rev) {
         mkString(*state.allocAttr(vAttrs, state.symbols.create("rev")),
-            sourceInfo.rev->gitRev());
+            sourceInfo.info.rev->gitRev());
         mkString(*state.allocAttr(vAttrs, state.symbols.create("shortRev")),
-            sourceInfo.rev->gitShortRev());
+            sourceInfo.info.rev->gitShortRev());
     }
 
-    if (sourceInfo.revCount)
-        mkInt(*state.allocAttr(vAttrs, state.symbols.create("revCount")), *sourceInfo.revCount);
+    if (sourceInfo.info.revCount)
+        mkInt(*state.allocAttr(vAttrs, state.symbols.create("revCount")), *sourceInfo.info.revCount);
 
-    if (sourceInfo.lastModified)
+    if (sourceInfo.info.lastModified)
         mkString(*state.allocAttr(vAttrs, state.symbols.create("lastModified")),
-            fmt("%s", std::put_time(std::gmtime(&*sourceInfo.lastModified), "%Y%m%d%H%M%S")));
+            fmt("%s", std::put_time(std::gmtime(&*sourceInfo.info.lastModified), "%Y%m%d%H%M%S")));
 }
 
 struct LazyInput
@@ -604,7 +604,7 @@ static void prim_callFlake(EvalState & state, const Pos & pos, Value * * args, V
     if (lazyInput->isFlake) {
         auto flake = getFlake(state, lazyInput->lockedInput.ref, false);
 
-        if (flake.sourceInfo->narHash != lazyInput->lockedInput.narHash)
+        if (flake.sourceInfo->info.narHash != lazyInput->lockedInput.narHash)
             throw Error("the content hash of flake '%s' doesn't match the hash recorded in the referring lockfile",
                 lazyInput->lockedInput.ref);
 
@@ -615,7 +615,7 @@ static void prim_callFlake(EvalState & state, const Pos & pos, Value * * args, V
         FlakeCache flakeCache;
         auto [sourceInfo, resolvedRef] = getNonFlake(state, lazyInput->lockedInput.ref, false, flakeCache);
 
-        if (sourceInfo.narHash != lazyInput->lockedInput.narHash)
+        if (sourceInfo.info.narHash != lazyInput->lockedInput.narHash)
             throw Error("the content hash of repository '%s' doesn't match the hash recorded in the referring lockfile",
                 lazyInput->lockedInput.ref);
 
@@ -718,8 +718,8 @@ Fingerprint LockedFlake::getFingerprint() const
     return hashString(htSHA256,
         fmt("%s;%d;%d;%s",
             flake.sourceInfo->storePath.to_string(),
-            flake.sourceInfo->revCount.value_or(0),
-            flake.sourceInfo->lastModified.value_or(0),
+            flake.sourceInfo->info.revCount.value_or(0),
+            flake.sourceInfo->info.lastModified.value_or(0),
             lockFile));
 }
 

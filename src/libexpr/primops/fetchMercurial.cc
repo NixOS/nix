@@ -73,11 +73,11 @@ static void prim_fetchMercurial(EvalState & state, const Pos & pos, Value * * ar
         mkString(*state.allocAttr(v, state.symbols.create("branch")), *input2->getRef());
     // Backward compatibility: set 'rev' to
     // 0000000000000000000000000000000000000000 for a dirty tree.
-    auto rev2 = tree.rev.value_or(Hash(htSHA1));
+    auto rev2 = tree.info.rev.value_or(Hash(htSHA1));
     mkString(*state.allocAttr(v, state.symbols.create("rev")), rev2.gitRev());
     mkString(*state.allocAttr(v, state.symbols.create("shortRev")), std::string(rev2.gitRev(), 0, 12));
-    if (tree.revCount)
-        mkInt(*state.allocAttr(v, state.symbols.create("revCount")), *tree.revCount);
+    if (tree.info.revCount)
+        mkInt(*state.allocAttr(v, state.symbols.create("revCount")), *tree.info.revCount);
     v.attrs->sort();
 
     if (state.allowedPaths)

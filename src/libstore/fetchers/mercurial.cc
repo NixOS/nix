@@ -215,12 +215,17 @@ struct MercurialInput : Input
 
             if (store->isValidPath(storePath)) {
                 printTalkative("using cached Mercurial store path '%s'", store->printStorePath(storePath));
-                return {Tree {
-                    .actualPath = store->printStorePath(storePath),
-                    .storePath = std::move(storePath),
-                    .rev = input->rev,
-                    .revCount = revCount,
-                }, input};
+                return {
+                    Tree {
+                        .actualPath = store->printStorePath(storePath),
+                        .storePath = std::move(storePath),
+                        .info = TreeInfo {
+                            .rev = input->rev,
+                            .revCount = revCount,
+                        },
+                    },
+                    input
+                };
             }
 
         } catch (SysError & e) {
@@ -246,12 +251,17 @@ struct MercurialInput : Input
 
         writeFile(storeLink, json.dump());
 
-        return {Tree {
-            .actualPath = store->printStorePath(storePath),
-            .storePath = std::move(storePath),
-            .rev = input->rev,
-            .revCount = revCount,
-        }, input};
+        return {
+            Tree {
+                .actualPath = store->printStorePath(storePath),
+                .storePath = std::move(storePath),
+                .info = TreeInfo {
+                    .rev = input->rev,
+                    .revCount = revCount
+                }
+            },
+            input
+        };
     }
 };
 

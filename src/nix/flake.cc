@@ -84,13 +84,13 @@ static void printFlakeInfo(const Store & store, const Flake & flake)
     if (flake.description)
         std::cout << fmt("Description:   %s\n", *flake.description);
     std::cout << fmt("Path:          %s\n", store.printStorePath(flake.sourceInfo->storePath));
-    if (flake.sourceInfo->rev)
-        std::cout << fmt("Revision:      %s\n", flake.sourceInfo->rev->to_string(Base16, false));
-    if (flake.sourceInfo->revCount)
-        std::cout << fmt("Revisions:     %s\n", *flake.sourceInfo->revCount);
-    if (flake.sourceInfo->lastModified)
+    if (flake.sourceInfo->info.rev)
+        std::cout << fmt("Revision:      %s\n", flake.sourceInfo->info.rev->to_string(Base16, false));
+    if (flake.sourceInfo->info.revCount)
+        std::cout << fmt("Revisions:     %s\n", *flake.sourceInfo->info.revCount);
+    if (flake.sourceInfo->info.lastModified)
         std::cout << fmt("Last modified: %s\n",
-            std::put_time(std::localtime(&*flake.sourceInfo->lastModified), "%F %T"));
+            std::put_time(std::localtime(&*flake.sourceInfo->info.lastModified), "%F %T"));
 }
 
 static nlohmann::json flakeToJson(const Store & store, const Flake & flake)
@@ -100,12 +100,12 @@ static nlohmann::json flakeToJson(const Store & store, const Flake & flake)
         j["description"] = *flake.description;
     j["edition"] = flake.edition;
     j["url"] = flake.resolvedRef.input->to_string();
-    if (flake.sourceInfo->rev)
-        j["revision"] = flake.sourceInfo->rev->to_string(Base16, false);
-    if (flake.sourceInfo->revCount)
-        j["revCount"] = *flake.sourceInfo->revCount;
-    if (flake.sourceInfo->lastModified)
-        j["lastModified"] = *flake.sourceInfo->lastModified;
+    if (flake.sourceInfo->info.rev)
+        j["revision"] = flake.sourceInfo->info.rev->to_string(Base16, false);
+    if (flake.sourceInfo->info.revCount)
+        j["revCount"] = *flake.sourceInfo->info.revCount;
+    if (flake.sourceInfo->info.lastModified)
+        j["lastModified"] = *flake.sourceInfo->info.lastModified;
     j["path"] = store.printStorePath(flake.sourceInfo->storePath);
     return j;
 }

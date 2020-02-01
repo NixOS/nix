@@ -3,6 +3,7 @@
 #include "types.hh"
 #include "hash.hh"
 #include "path.hh"
+#include "tree-info.hh"
 
 #include <memory>
 #include <variant>
@@ -19,10 +20,7 @@ struct Tree
 {
     Path actualPath;
     StorePath storePath;
-    Hash narHash;
-    std::optional<Hash> rev;
-    std::optional<uint64_t> revCount;
-    std::optional<time_t> lastModified;
+    TreeInfo info;
 };
 
 struct Input : std::enable_shared_from_this<Input>

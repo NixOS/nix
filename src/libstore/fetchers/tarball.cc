@@ -72,7 +72,9 @@ struct TarballInput : Input
             Tree {
                 .actualPath = res.path,
                 .storePath = std::move(storePath),
-                .lastModified = *res.lastModified
+                .info = TreeInfo {
+                    .lastModified = *res.lastModified,
+                },
             },
             input
         };
