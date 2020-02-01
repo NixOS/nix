@@ -119,6 +119,9 @@ struct CmdFlakeUpdate : FlakeCommand
 
     void run(nix::ref<nix::Store> store) override
     {
+        /* Use --refresh by default for 'nix flake update'. */
+        settings.tarballTtl = 0;
+
         lockFlake();
     }
 };
