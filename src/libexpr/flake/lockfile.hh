@@ -36,10 +36,10 @@ struct LockedInputs
 struct LockedInput : LockedInputs
 {
     FlakeRef ref, originalRef;
-    Hash narHash;
+    TreeInfo info;
 
-    LockedInput(const FlakeRef & ref, const FlakeRef & originalRef, const Hash & narHash)
-        : ref(ref), originalRef(originalRef), narHash(narHash)
+    LockedInput(const FlakeRef & ref, const FlakeRef & originalRef, const TreeInfo & info)
+        : ref(ref), originalRef(originalRef), info(info)
     { }
 
     LockedInput(const nlohmann::json & json);
@@ -48,7 +48,8 @@ struct LockedInput : LockedInputs
     {
         return
             ref == other.ref
-            && narHash == other.narHash
+            && originalRef == other.originalRef
+            && info == other.info
             && inputs == other.inputs;
     }
 

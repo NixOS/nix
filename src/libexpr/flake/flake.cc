@@ -478,7 +478,7 @@ LockedFlake lockFlake(
                             lockFlags.useRegistries, flakeCache);
 
                         newLocks.inputs.insert_or_assign(id,
-                            LockedInput(inputFlake.resolvedRef, inputFlake.originalRef, inputFlake.sourceInfo->info.narHash));
+                            LockedInput(inputFlake.resolvedRef, inputFlake.originalRef, inputFlake.sourceInfo->info));
 
                         /* Recursively process the inputs of this
                            flake. Also, unless we already have this
@@ -497,7 +497,7 @@ LockedFlake lockFlake(
                         auto [sourceInfo, resolvedRef] = getNonFlake(state, input.ref,
                             lockFlags.useRegistries, flakeCache);
                         newLocks.inputs.insert_or_assign(id,
-                            LockedInput(resolvedRef, input.ref, sourceInfo.info.narHash));
+                            LockedInput(resolvedRef, input.ref, sourceInfo.info));
                     }
                 }
             }
@@ -604,9 +604,14 @@ static void prim_callFlake(EvalState & state, const Pos & pos, Value * * args, V
     if (lazyInput->isFlake) {
         auto flake = getFlake(state, lazyInput->lockedInput.ref, false);
 
-        if (flake.sourceInfo->info.narHash != lazyInput->lockedInput.narHash)
-            throw Error("the content hash of flake '%s' doesn't match the hash recorded in the referring lockfile",
-                lazyInput->lockedInput.ref);
+        if (flake.sourceInfo->info.narHash != lazyInput->lockedInput.info.narHash)
+            throw Error("the content hash of flake '%s' (%s) doesn't match the hash recorded in the referring lock file (%s)",
+                lazyInput->lockedInput.ref,
+                flake.sourceInfo->info.narHash.to_string(SRI),
+                lazyInput->lockedInput.info.narHash.to_string(SRI));
+
+        // FIXME: check all the other attributes in lockedInput.info
+        // once we've dropped support for lock file version 4.
 
         assert(flake.sourceInfo->storePath == lazyInput->lockedInput.computeStorePath(*state.store));
 
@@ -615,9 +620,14 @@ static void prim_callFlake(EvalState & state, const Pos & pos, Value * * args, V
         FlakeCache flakeCache;
         auto [sourceInfo, resolvedRef] = getNonFlake(state, lazyInput->lockedInput.ref, false, flakeCache);
 
-        if (sourceInfo.info.narHash != lazyInput->lockedInput.narHash)
-            throw Error("the content hash of repository '%s' doesn't match the hash recorded in the referring lockfile",
-                lazyInput->lockedInput.ref);
+        if (sourceInfo.info.narHash != lazyInput->lockedInput.info.narHash)
+            throw Error("the content hash of repository '%s' (%s) doesn't match the hash recorded in the referring lock file (%s)",
+                lazyInput->lockedInput.ref,
+                sourceInfo.info.narHash.to_string(SRI),
+                lazyInput->lockedInput.info.narHash.to_string(SRI));
+
+        // FIXME: check all the other attributes in lockedInput.info
+        // once we've dropped support for lock file version 4.
 
         assert(sourceInfo.storePath == lazyInput->lockedInput.computeStorePath(*state.store));
 

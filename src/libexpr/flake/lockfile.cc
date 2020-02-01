@@ -44,14 +44,66 @@ FlakeRef getFlakeRef(
     throw Error("attribute '%s' missing in lock file", version4Attr);
 }
 
+static TreeInfo parseTreeInfo(const nlohmann::json & json)
+{
+    TreeInfo info;
+
+    auto i = json.find("info");
+    if (i != json.end()) {
+        const nlohmann::json & i2(*i);
+
+        auto j = i2.find("narHash");
+        if (j != i2.end())
+            info.narHash = Hash((std::string) *j);
+        else
+            throw Error("attribute 'narHash' missing in lock file");
+
+        j = i2.find("rev");
+        if (j != i2.end())
+            info.rev = Hash((std::string) *j, htSHA1);
+
+        j = i2.find("revCount");
+        if (j != i2.end())
+            info.revCount = *j;
+
+        j = i2.find("lastModified");
+        if (j != i2.end())
+            info.lastModified = *j;
+
+        return info;
+    }
+
+    i = json.find("narHash");
+    if (i != json.end()) {
+        info.narHash = Hash((std::string) *i);
+        return info;
+    }
+
+    throw Error("attribute 'info' missing in lock file");
+}
+
 LockedInput::LockedInput(const nlohmann::json & json)
     : LockedInputs(json)
     , ref(getFlakeRef(json, "url", "uri", "resolvedRef"))
     , originalRef(getFlakeRef(json, "originalUrl", "originalUri", "originalRef"))
-    , narHash(Hash((std::string) json["narHash"]))
+    , info(parseTreeInfo(json))
 {
     if (!ref.isImmutable())
         throw Error("lockfile contains mutable flakeref '%s'", ref);
+}
+
+static nlohmann::json treeInfoToJson(const TreeInfo & info)
+{
+    nlohmann::json json;
+    assert(info.narHash);
+    json["narHash"] = info.narHash.to_string(SRI);
+    if (info.rev)
+        json["rev"] = info.rev->gitRev();
+    if (info.revCount)
+        json["revCount"] = *info.revCount;
+    if (info.lastModified)
+        json["lastModified"] = *info.lastModified;
+    return json;
 }
 
 nlohmann::json LockedInput::toJson() const
@@ -59,13 +111,14 @@ nlohmann::json LockedInput::toJson() const
     auto json = LockedInputs::toJson();
     json["originalRef"] = fetchers::attrsToJson(originalRef.toAttrs());
     json["resolvedRef"] = fetchers::attrsToJson(ref.toAttrs());
-    json["narHash"] = narHash.to_string(SRI); // FIXME
+    json["info"] = treeInfoToJson(info);
     return json;
 }
 
 StorePath LockedInput::computeStorePath(Store & store) const
 {
-    return store.makeFixedOutputPath(true, narHash, "source");
+    assert(info.narHash);
+    return store.makeFixedOutputPath(true, info.narHash, "source");
 }
 
 LockedInputs::LockedInputs(const nlohmann::json & json)
