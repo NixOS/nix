@@ -152,31 +152,31 @@ static Flake getFlake(EvalState & state, const FlakeRef & originalRef,
 
     auto [sourceInfo, resolvedInput] = flakeRef.input->fetchTree(state.store);
 
-    FlakeRef resolvedRef(resolvedInput, flakeRef.subdir);
+    FlakeRef lockedRef(resolvedInput, flakeRef.subdir);
 
     debug("got flake source '%s' from '%s'",
-        state.store->printStorePath(sourceInfo.storePath), resolvedRef);
+        state.store->printStorePath(sourceInfo.storePath), lockedRef);
 
-    flakeCache.push_back({originalRef, resolvedRef});
-    flakeCache.push_back({flakeRef, resolvedRef});
+    flakeCache.push_back({originalRef, lockedRef});
+    flakeCache.push_back({flakeRef, lockedRef});
 
     if (state.allowedPaths)
         state.allowedPaths->insert(sourceInfo.actualPath);
 
     // Guard against symlink attacks.
-    auto flakeFile = canonPath(sourceInfo.actualPath + "/" + resolvedRef.subdir + "/flake.nix");
+    auto flakeFile = canonPath(sourceInfo.actualPath + "/" + lockedRef.subdir + "/flake.nix");
     if (!isInDir(flakeFile, sourceInfo.actualPath))
         throw Error("'flake.nix' file of flake '%s' escapes from '%s'",
-            resolvedRef, state.store->printStorePath(sourceInfo.storePath));
+            lockedRef, state.store->printStorePath(sourceInfo.storePath));
 
     Flake flake {
         .originalRef = originalRef,
-        .resolvedRef = resolvedRef,
+        .lockedRef = lockedRef,
         .sourceInfo = std::make_shared<fetchers::Tree>(std::move(sourceInfo))
     };
 
     if (!pathExists(flakeFile))
-        throw Error("source tree referenced by '%s' does not contain a '%s/flake.nix' file", resolvedRef, resolvedRef.subdir);
+        throw Error("source tree referenced by '%s' does not contain a '%s/flake.nix' file", lockedRef, lockedRef.subdir);
 
     Value vInfo;
     state.evalFile(flakeFile, vInfo, true); // FIXME: symlink attack
@@ -259,18 +259,18 @@ static std::pair<fetchers::Tree, FlakeRef> getNonFlake(
 
     auto [sourceInfo, resolvedInput] = flakeRef.input->fetchTree(state.store);
 
-    FlakeRef resolvedRef(resolvedInput, flakeRef.subdir);
+    FlakeRef lockedRef(resolvedInput, flakeRef.subdir);
 
     debug("got non-flake source '%s' from '%s'",
-        state.store->printStorePath(sourceInfo.storePath), resolvedRef);
+        state.store->printStorePath(sourceInfo.storePath), lockedRef);
 
-    flakeCache.push_back({originalRef, resolvedRef});
-    flakeCache.push_back({flakeRef, resolvedRef});
+    flakeCache.push_back({originalRef, lockedRef});
+    flakeCache.push_back({flakeRef, lockedRef});
 
     if (state.allowedPaths)
         state.allowedPaths->insert(sourceInfo.actualPath);
 
-    return std::make_pair(std::move(sourceInfo), resolvedRef);
+    return std::make_pair(std::move(sourceInfo), lockedRef);
 }
 
 static void flattenLockFile(
@@ -298,18 +298,18 @@ static std::string diffLockFiles(const LockedInputs & oldLocks, const LockedInpu
 
     while (i != oldFlat.end() || j != newFlat.end()) {
         if (j != newFlat.end() && (i == oldFlat.end() || i->first > j->first)) {
-            res += fmt("  added '%s': '%s'\n", concatStringsSep("/", j->first), j->second->ref);
+            res += fmt("  added '%s': '%s'\n", concatStringsSep("/", j->first), j->second->lockedRef);
             ++j;
         } else if (i != oldFlat.end() && (j == newFlat.end() || i->first < j->first)) {
             res += fmt("  removed '%s'\n", concatStringsSep("/", i->first));
             ++i;
         } else {
-            if (!(i->second->ref == j->second->ref)) {
-                assert(i->second->ref.to_string() != j->second->ref.to_string());
+            if (!(i->second->lockedRef == j->second->lockedRef)) {
+                assert(i->second->lockedRef.to_string() != j->second->lockedRef.to_string());
                 res += fmt("  updated '%s': '%s' -> '%s'\n",
                     concatStringsSep("/", i->first),
-                    i->second->ref,
-                    j->second->ref);
+                    i->second->lockedRef,
+                    j->second->lockedRef);
             }
             ++i;
             ++j;
@@ -337,7 +337,7 @@ LockedFlake lockFlake(
     if (!lockFlags.recreateLockFile) {
         // FIXME: symlink attack
         oldLockFile = LockFile::read(
-            flake.sourceInfo->actualPath + "/" + flake.resolvedRef.subdir + "/flake.lock");
+            flake.sourceInfo->actualPath + "/" + flake.lockedRef.subdir + "/flake.lock");
     }
 
     debug("old lock file: %s", oldLockFile);
@@ -443,7 +443,7 @@ LockedFlake lockFlake(
                         && std::equal(inputPath.begin(), inputPath.end(), lb->begin());
 
                     if (hasChildUpdate) {
-                        auto inputFlake = getFlake(state, oldLock->second.ref, false, flakeCache);
+                        auto inputFlake = getFlake(state, oldLock->second.lockedRef, false, flakeCache);
 
                         updateLocks(inputFlake.inputs,
                             (const LockedInputs &) oldLock->second,
@@ -478,7 +478,7 @@ LockedFlake lockFlake(
                             lockFlags.useRegistries, flakeCache);
 
                         newLocks.inputs.insert_or_assign(id,
-                            LockedInput(inputFlake.resolvedRef, inputFlake.originalRef, inputFlake.sourceInfo->info));
+                            LockedInput(inputFlake.lockedRef, inputFlake.originalRef, inputFlake.sourceInfo->info));
 
                         /* Recursively process the inputs of this
                            flake. Also, unless we already have this
@@ -488,16 +488,16 @@ LockedFlake lockFlake(
                             oldLock != oldLocks.inputs.end()
                             ? (const LockedInputs &) oldLock->second
                             : LockFile::read(
-                                inputFlake.sourceInfo->actualPath + "/" + inputFlake.resolvedRef.subdir + "/flake.lock"),
+                                inputFlake.sourceInfo->actualPath + "/" + inputFlake.lockedRef.subdir + "/flake.lock"),
                             newLocks.inputs.find(id)->second,
                             inputPath);
                     }
 
                     else {
-                        auto [sourceInfo, resolvedRef] = getNonFlake(state, input.ref,
+                        auto [sourceInfo, lockedRef] = getNonFlake(state, input.ref,
                             lockFlags.useRegistries, flakeCache);
                         newLocks.inputs.insert_or_assign(id,
-                            LockedInput(resolvedRef, input.ref, sourceInfo.info));
+                            LockedInput(lockedRef, input.ref, sourceInfo.info));
                     }
                 }
             }
@@ -606,11 +606,11 @@ static void prim_callFlake(EvalState & state, const Pos & pos, Value * * args, V
     auto lazyInput = (LazyInput *) args[0]->attrs;
 
     if (lazyInput->isFlake) {
-        auto flake = getFlake(state, lazyInput->lockedInput.ref, false);
+        auto flake = getFlake(state, lazyInput->lockedInput.lockedRef, false);
 
         if (flake.sourceInfo->info.narHash != lazyInput->lockedInput.info.narHash)
             throw Error("the content hash of flake '%s' (%s) doesn't match the hash recorded in the referring lock file (%s)",
-                lazyInput->lockedInput.ref,
+                lazyInput->lockedInput.lockedRef,
                 flake.sourceInfo->info.narHash.to_string(SRI),
                 lazyInput->lockedInput.info.narHash.to_string(SRI));
 
@@ -622,11 +622,11 @@ static void prim_callFlake(EvalState & state, const Pos & pos, Value * * args, V
         callFlake(state, flake, lazyInput->lockedInput, v);
     } else {
         FlakeCache flakeCache;
-        auto [sourceInfo, resolvedRef] = getNonFlake(state, lazyInput->lockedInput.ref, false, flakeCache);
+        auto [sourceInfo, lockedRef] = getNonFlake(state, lazyInput->lockedInput.lockedRef, false, flakeCache);
 
         if (sourceInfo.info.narHash != lazyInput->lockedInput.info.narHash)
             throw Error("the content hash of repository '%s' (%s) doesn't match the hash recorded in the referring lock file (%s)",
-                lazyInput->lockedInput.ref,
+                lazyInput->lockedInput.lockedRef,
                 sourceInfo.info.narHash.to_string(SRI),
                 lazyInput->lockedInput.info.narHash.to_string(SRI));
 
@@ -643,7 +643,7 @@ static void prim_callFlake(EvalState & state, const Pos & pos, Value * * args, V
 
         mkString(*state.allocAttr(v, state.sOutPath), pathS, {pathS});
 
-        emitSourceInfoAttrs(state, resolvedRef, sourceInfo, v);
+        emitSourceInfoAttrs(state, lockedRef, sourceInfo, v);
 
         v.attrs->sort();
     }
@@ -676,7 +676,7 @@ void callFlake(EvalState & state,
 
     auto & vSourceInfo = *state.allocValue();
     state.mkAttrs(vSourceInfo, 8);
-    emitSourceInfoAttrs(state, flake.resolvedRef, *flake.sourceInfo, vSourceInfo);
+    emitSourceInfoAttrs(state, flake.lockedRef, *flake.sourceInfo, vSourceInfo);
     vSourceInfo.attrs->sort();
 
     vInputs.attrs->push_back(Attr(state.sSelf, &vRes));

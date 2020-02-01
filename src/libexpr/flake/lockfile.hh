@@ -35,11 +35,11 @@ struct LockedInputs
 /* Lock file information about a flake input. */
 struct LockedInput : LockedInputs
 {
-    FlakeRef ref, originalRef;
+    FlakeRef lockedRef, originalRef;
     TreeInfo info;
 
-    LockedInput(const FlakeRef & ref, const FlakeRef & originalRef, const TreeInfo & info)
-        : ref(ref), originalRef(originalRef), info(info)
+    LockedInput(const FlakeRef & lockedRef, const FlakeRef & originalRef, const TreeInfo & info)
+        : lockedRef(lockedRef), originalRef(originalRef), info(info)
     { }
 
     LockedInput(const nlohmann::json & json);
@@ -47,7 +47,7 @@ struct LockedInput : LockedInputs
     bool operator ==(const LockedInput & other) const
     {
         return
-            ref == other.ref
+            lockedRef == other.lockedRef
             && originalRef == other.originalRef
             && info == other.info
             && inputs == other.inputs;

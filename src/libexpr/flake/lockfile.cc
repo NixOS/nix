@@ -80,12 +80,12 @@ static TreeInfo parseTreeInfo(const nlohmann::json & json)
 
 LockedInput::LockedInput(const nlohmann::json & json)
     : LockedInputs(json)
-    , ref(getFlakeRef(json, "url", "uri", "resolvedRef"))
-    , originalRef(getFlakeRef(json, "originalUrl", "originalUri", "originalRef"))
+    , lockedRef(getFlakeRef(json, "url", "uri", "locked"))
+    , originalRef(getFlakeRef(json, "originalUrl", "originalUri", "original"))
     , info(parseTreeInfo(json))
 {
-    if (!ref.isImmutable())
-        throw Error("lockfile contains mutable flakeref '%s'", ref);
+    if (!lockedRef.isImmutable())
+        throw Error("lockfile contains mutable flakeref '%s'", lockedRef);
 }
 
 static nlohmann::json treeInfoToJson(const TreeInfo & info)
@@ -103,8 +103,8 @@ static nlohmann::json treeInfoToJson(const TreeInfo & info)
 nlohmann::json LockedInput::toJson() const
 {
     auto json = LockedInputs::toJson();
-    json["originalRef"] = fetchers::attrsToJson(originalRef.toAttrs());
-    json["resolvedRef"] = fetchers::attrsToJson(ref.toAttrs());
+    json["original"] = fetchers::attrsToJson(originalRef.toAttrs());
+    json["locked"] = fetchers::attrsToJson(lockedRef.toAttrs());
     json["info"] = treeInfoToJson(info);
     return json;
 }
@@ -136,7 +136,7 @@ nlohmann::json LockedInputs::toJson() const
 bool LockedInputs::isImmutable() const
 {
     for (auto & i : inputs)
-        if (!i.second.ref.isImmutable() || !i.second.isImmutable()) return false;
+        if (!i.second.lockedRef.isImmutable() || !i.second.isImmutable()) return false;
 
     return true;
 }

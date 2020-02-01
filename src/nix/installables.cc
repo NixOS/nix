@@ -348,7 +348,7 @@ std::tuple<std::string, FlakeRef, flake::EvalCache::Derivation> InstallableFlake
         auto drv = evalCache.getDerivation(fingerprint, attrPath);
         if (drv) {
             if (state->store->isValidPath(drv->drvPath))
-                return {attrPath, lockedFlake.flake.resolvedRef, std::move(*drv)};
+                return {attrPath, lockedFlake.flake.lockedRef, std::move(*drv)};
         }
 
         if (!vOutputs)
@@ -370,7 +370,7 @@ std::tuple<std::string, FlakeRef, flake::EvalCache::Derivation> InstallableFlake
 
             evalCache.addDerivation(fingerprint, attrPath, drv);
 
-            return {attrPath, lockedFlake.flake.resolvedRef, std::move(drv)};
+            return {attrPath, lockedFlake.flake.lockedRef, std::move(drv)};
         } catch (AttrPathNotFound & e) {
         }
     }

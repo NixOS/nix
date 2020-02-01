@@ -79,12 +79,12 @@ struct CmdFlakeList : EvalCommand
 
 static void printFlakeInfo(const Store & store, const Flake & flake)
 {
-    std::cout << fmt("URL:           %s\n", flake.resolvedRef.input->to_string());
+    std::cout << fmt("URL:           %s\n", flake.lockedRef.input->to_string());
     std::cout << fmt("Edition:       %s\n", flake.edition);
     if (flake.description)
         std::cout << fmt("Description:   %s\n", *flake.description);
     std::cout << fmt("Path:          %s\n", store.printStorePath(flake.sourceInfo->storePath));
-    if (auto rev = flake.resolvedRef.input->getRev())
+    if (auto rev = flake.lockedRef.input->getRev())
         std::cout << fmt("Revision:      %s\n", rev->to_string(Base16, false));
     if (flake.sourceInfo->info.revCount)
         std::cout << fmt("Revisions:     %s\n", *flake.sourceInfo->info.revCount);
@@ -99,8 +99,8 @@ static nlohmann::json flakeToJson(const Store & store, const Flake & flake)
     if (flake.description)
         j["description"] = *flake.description;
     j["edition"] = flake.edition;
-    j["url"] = flake.resolvedRef.input->to_string();
-    if (auto rev = flake.resolvedRef.input->getRev())
+    j["url"] = flake.lockedRef.input->to_string();
+    if (auto rev = flake.lockedRef.input->getRev())
         j["revision"] = rev->to_string(Base16, false);
     if (flake.sourceInfo->info.revCount)
         j["revCount"] = *flake.sourceInfo->info.revCount;
@@ -201,7 +201,7 @@ struct CmdFlakeListInputs : FlakeCommand, MixJSON
         if (json)
             std::cout << ((LockedInputs &) flake.lockFile).toJson() << "\n";
         else {
-            std::cout << fmt("%s\n", flake.flake.resolvedRef);
+            std::cout << fmt("%s\n", flake.flake.lockedRef);
 
             std::function<void(const LockedInputs & inputs, const std::string & prefix)> recurse;
 
@@ -211,7 +211,7 @@ struct CmdFlakeListInputs : FlakeCommand, MixJSON
                     //auto tree2 = tree.child(i + 1 == inputs.inputs.size());
                     bool last = i + 1 == inputs.inputs.size();
                     std::cout << fmt("%s" ANSI_BOLD "%s" ANSI_NORMAL ": %s\n",
-                        prefix + (last ? treeLast : treeConn), input.first, input.second.ref);
+                        prefix + (last ? treeLast : treeConn), input.first, input.second.lockedRef);
                     recurse(input.second, prefix + (last ? treeNull : treeLine));
                 }
             };
@@ -667,7 +667,7 @@ struct CmdFlakeArchive : FlakeCommand, MixJSON, MixDryRun
             for (auto & input : inputs.inputs) {
                 auto jsonObj3 = jsonObj2 ? jsonObj2->object(input.first) : std::optional<JSONObject>();
                 if (!dryRun)
-                    input.second.ref.input->fetchTree(store);
+                    input.second.lockedRef.input->fetchTree(store);
                 auto storePath = input.second.computeStorePath(*store);
                 if (jsonObj3)
                     jsonObj3->attr("path", store->printStorePath(storePath));

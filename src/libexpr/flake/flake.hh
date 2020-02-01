@@ -28,7 +28,7 @@ struct FlakeInput
 struct Flake
 {
     FlakeRef originalRef;
-    FlakeRef resolvedRef;
+    FlakeRef lockedRef;
     std::optional<std::string> description;
     std::shared_ptr<const fetchers::Tree> sourceInfo;
     FlakeInputs inputs;
