@@ -579,8 +579,13 @@ LockedFlake lockFlake(
 
                     newLockFile.write(path);
 
-                    // FIXME: rewriting the lockfile changed the
-                    // top-level repo, so we should re-read it.
+                    // Rewriting the lockfile changed the top-level
+                    // repo, so we should re-read it.
+                    FlakeCache dummyCache;
+                    flake = getFlake(state, topRef, {}, lockFlags.useRegistries, dummyCache);
+
+                    if (flake.lockedRef.input->isImmutable())
+                        throw Error("'%s' did not change after I updated its 'flake.lock' file; is 'flake.lock' under version control?", flake.originalRef);
 
                     #if 0
                     // Hack: Make sure that flake.lock is visible to Git, so it ends up in the Nix store.
