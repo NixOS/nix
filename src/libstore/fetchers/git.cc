@@ -104,6 +104,7 @@ struct GitInput : Input
     std::string to_string() const override
     {
         ParsedURL url2(url);
+        if (url2.scheme != "git") url2.scheme = "git+" + url2.scheme;
         if (rev) url2.query.insert_or_assign("rev", rev->gitRev());
         if (ref) url2.query.insert_or_assign("ref", *ref);
         return url2.to_string();
@@ -159,19 +160,19 @@ struct GitInput : Input
 
     std::optional<Path> getSourcePath() const override
     {
-        if (url.scheme == "git+file" && !ref && !rev)
+        if (url.scheme == "file" && !ref && !rev)
             return url.path;
         return {};
     }
 
     std::pair<bool, std::string> getActualUrl() const
     {
-        // Don't clone git+file:// URIs (but otherwise treat them the
+        // Don't clone file:// URIs (but otherwise treat them the
         // same as remote URIs, i.e. don't use the working tree or
         // HEAD).
         static bool forceHttp = getEnv("_NIX_FORCE_HTTP") == "1"; // for testing
-        bool isLocal = url.scheme == "git+file" && !forceHttp;
-        return {isLocal, isLocal ? url.path : std::string(url.base, 4)};
+        bool isLocal = url.scheme == "file" && !forceHttp;
+        return {isLocal, isLocal ? url.path : url.base};
     }
 
     std::pair<Tree, std::shared_ptr<const Input>> fetchTreeInternal(nix::ref<Store> store) const override
@@ -382,7 +383,7 @@ struct GitInputScheme : InputScheme
             url.scheme != "git+file") return nullptr;
 
         auto url2(url);
-        // FIXME: strip git+
+        if (hasPrefix(url2.scheme, "git+")) url2.scheme = std::string(url2.scheme, 4);
         url2.query.clear();
 
         Input::Attrs attrs;

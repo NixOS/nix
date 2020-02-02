@@ -516,7 +516,10 @@ cat > $flake3Dir/flake.nix <<EOF
 {
   edition = 201909;
 
-  inputs.flake2.inputs.flake1.url = git+file://$flake7Dir;
+  inputs.flake2.inputs.flake1 = {
+    type = "git";
+    url = file://$flake7Dir;
+  };
 
   outputs = { self, flake2 }: {
   };

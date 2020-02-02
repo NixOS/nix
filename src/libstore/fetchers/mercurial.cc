@@ -46,6 +46,7 @@ struct MercurialInput : Input
     std::string to_string() const override
     {
         ParsedURL url2(url);
+        url2.scheme = "hg+" + url2.scheme;
         if (rev) url2.query.insert_or_assign("rev", rev->gitRev());
         if (ref) url2.query.insert_or_assign("ref", *ref);
         return url2.to_string();
@@ -78,15 +79,15 @@ struct MercurialInput : Input
 
     std::optional<Path> getSourcePath() const
     {
-        if (url.scheme == "hg+file" && !ref && !rev)
+        if (url.scheme == "file" && !ref && !rev)
             return url.path;
         return {};
     }
 
     std::pair<bool, std::string> getActualUrl() const
     {
-        bool isLocal = url.scheme == "hg+file";
-        return {isLocal, isLocal ? url.path : std::string(url.base, 3)};
+        bool isLocal = url.scheme == "file";
+        return {isLocal, isLocal ? url.path : url.base};
     }
 
     std::pair<Tree, std::shared_ptr<const Input>> fetchTreeInternal(nix::ref<Store> store) const override
@@ -273,7 +274,7 @@ struct MercurialInputScheme : InputScheme
             url.scheme != "hg+file") return nullptr;
 
         auto url2(url);
-        // FIXME: strip hg+
+        url2.scheme = std::string(url2.scheme, 3);
         url2.query.clear();
 
         Input::Attrs attrs;
