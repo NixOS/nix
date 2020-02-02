@@ -111,8 +111,7 @@ nlohmann::json LockedInput::toJson() const
 
 StorePath LockedInput::computeStorePath(Store & store) const
 {
-    assert(info.narHash);
-    return store.makeFixedOutputPath(true, info.narHash, "source");
+    return info.computeStorePath(store);
 }
 
 LockedInputs::LockedInputs(const nlohmann::json & json)

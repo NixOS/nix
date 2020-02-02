@@ -107,4 +107,10 @@ std::shared_ptr<const Input> Input::applyOverrides(
     return shared_from_this();
 }
 
+StorePath TreeInfo::computeStorePath(Store & store) const
+{
+    assert(narHash);
+    return store.makeFixedOutputPath(true, narHash, "source");
+}
+
 }

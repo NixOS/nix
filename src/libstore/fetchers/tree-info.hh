@@ -1,6 +1,10 @@
 #pragma once
 
-namespace nix {
+#include "path.hh"
+
+namespace nix { class Store; }
+
+namespace nix::fetchers {
 
 struct TreeInfo
 {
@@ -15,6 +19,8 @@ struct TreeInfo
             && revCount == other.revCount
             && lastModified == other.lastModified;
     }
+
+    StorePath computeStorePath(Store & store) const;
 };
 
 }
