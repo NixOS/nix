@@ -330,7 +330,7 @@ struct CmdProfileUpgrade : virtual SourceExprCommand, MixDefaultProfile, MixProf
         for (size_t i = 0; i < manifest.elements.size(); ++i) {
             auto & element(manifest.elements[i]);
             if (element.source
-                && !element.source->originalRef.isImmutable()
+                && !element.source->originalRef.input->isImmutable()
                 && matches(*store, element, i, matchers))
             {
                 Activity act(*logger, lvlChatty, actUnknown,

@@ -27,16 +27,6 @@ fetchers::Input::Attrs FlakeRef::toAttrs() const
     return attrs;
 }
 
-bool FlakeRef::isDirect() const
-{
-    return input->isDirect();
-}
-
-bool FlakeRef::isImmutable() const
-{
-    return input->isImmutable();
-}
-
 std::ostream & operator << (std::ostream & str, const FlakeRef & flakeRef)
 {
     str << flakeRef.to_string();
@@ -180,6 +170,12 @@ FlakeRef FlakeRef::fromAttrs(const fetchers::Input::Attrs & attrs)
     return FlakeRef(
         fetchers::inputFromAttrs(attrs2),
         fetchers::maybeGetStrAttr(attrs, "subdir").value_or(""));
+}
+
+std::pair<fetchers::Tree, FlakeRef> FlakeRef::fetchTree(ref<Store> store) const
+{
+    auto [tree, lockedInput] = input->fetchTree(store);
+    return {std::move(tree), FlakeRef(lockedInput, subdir)};
 }
 
 }

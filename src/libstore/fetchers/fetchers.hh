@@ -33,8 +33,12 @@ struct Input : std::enable_shared_from_this<Input>
 
     virtual bool operator ==(const Input & other) const { return false; }
 
+    /* Check whether this is a "direct" input, that is, not
+       one that goes through a registry. */
     virtual bool isDirect() const { return true; }
 
+    /* Check whether this is an "immutable" input, that is,
+       one that contains a commit hash or content hash. */
     virtual bool isImmutable() const { return (bool) narHash; }
 
     virtual bool contains(const Input & other) const { return false; }

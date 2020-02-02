@@ -84,7 +84,7 @@ LockedInput::LockedInput(const nlohmann::json & json)
     , originalRef(getFlakeRef(json, "originalUrl", "originalUri", "original"))
     , info(parseTreeInfo(json))
 {
-    if (!lockedRef.isImmutable())
+    if (!lockedRef.input->isImmutable())
         throw Error("lockfile contains mutable flakeref '%s'", lockedRef);
 }
 
@@ -136,7 +136,7 @@ nlohmann::json LockedInputs::toJson() const
 bool LockedInputs::isImmutable() const
 {
     for (auto & i : inputs)
-        if (!i.second.lockedRef.isImmutable() || !i.second.isImmutable()) return false;
+        if (!i.second.lockedRef.input->isImmutable() || !i.second.isImmutable()) return false;
 
     return true;
 }

@@ -31,17 +31,11 @@ struct FlakeRef
 
     fetchers::Input::Attrs toAttrs() const;
 
-    /* Check whether this is a "direct" flake reference, that is, not
-       a flake ID, which requires a lookup in the flake registry. */
-    bool isDirect() const;
-
-    /* Check whether this is an "immutable" flake reference, that is,
-       one that contains a commit hash or content hash. */
-    bool isImmutable() const;
-
     FlakeRef resolve(ref<Store> store) const;
 
     static FlakeRef fromAttrs(const fetchers::Input::Attrs & attrs);
+
+    std::pair<fetchers::Tree, FlakeRef> fetchTree(ref<Store> store) const;
 };
 
 std::ostream & operator << (std::ostream & str, const FlakeRef & flakeRef);

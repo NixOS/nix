@@ -22,7 +22,7 @@ static FlakeRef maybeLookupFlake(
     const FlakeRef & flakeRef,
     bool allowLookup)
 {
-    if (!flakeRef.isDirect()) {
+    if (!flakeRef.input->isDirect()) {
         if (allowLookup)
             return flakeRef.resolve(state.store);
         else
@@ -150,9 +150,7 @@ static Flake getFlake(EvalState & state, const FlakeRef & originalRef,
         maybeLookupFlake(state,
             lookupInFlakeCache(flakeCache, originalRef), allowLookup));
 
-    auto [sourceInfo, resolvedInput] = flakeRef.input->fetchTree(state.store);
-
-    FlakeRef lockedRef(resolvedInput, flakeRef.subdir);
+    auto [sourceInfo, lockedRef] = flakeRef.fetchTree(state.store);
 
     debug("got flake source '%s' from '%s'",
         state.store->printStorePath(sourceInfo.storePath), lockedRef);
@@ -257,9 +255,7 @@ static std::pair<fetchers::Tree, FlakeRef> getNonFlake(
         maybeLookupFlake(state,
             lookupInFlakeCache(flakeCache, originalRef), allowLookup));
 
-    auto [sourceInfo, resolvedInput] = flakeRef.input->fetchTree(state.store);
-
-    FlakeRef lockedRef(resolvedInput, flakeRef.subdir);
+    auto [sourceInfo, lockedRef] = flakeRef.fetchTree(state.store);
 
     debug("got non-flake source '%s' from '%s'",
         state.store->printStorePath(sourceInfo.storePath), lockedRef);
@@ -470,7 +466,7 @@ LockedFlake lockFlake(
                     /* We need to update/create a new lock file
                        entry. So fetch the flake/non-flake. */
 
-                    if (!lockFlags.allowMutable && !input.ref.isImmutable())
+                    if (!lockFlags.allowMutable && !input.ref.input->isImmutable())
                         throw Error("cannot update flake input '%s' in pure mode", inputPathS);
 
                     if (input.isFlake) {
