@@ -656,6 +656,11 @@ public:
         return storePath;
     }
 
+    Path toRealPath(const StorePath & storePath)
+    {
+        return toRealPath(printStorePath(storePath));
+    }
+
     virtual void createUser(const std::string & userName, uid_t userId)
     { }
 

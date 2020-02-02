@@ -1263,7 +1263,7 @@ bool LocalStore::verifyStore(bool checkContents, RepairFlag repair)
                 else
                     hashSink = std::make_unique<HashModuloSink>(info->narHash.type, storePathToHash(printStorePath(info->path)));
 
-                dumpPath(toRealPath(printStorePath(i)), *hashSink);
+                dumpPath(Store::toRealPath(i), *hashSink);
                 auto current = hashSink->finish();
 
                 if (info->narHash != nullHash && info->narHash != current.first) {

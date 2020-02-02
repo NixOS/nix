@@ -1398,7 +1398,7 @@ void DerivationGoal::tryToBuild()
        few seconds and then retry this goal. */
     PathSet lockFiles;
     for (auto & outPath : drv->outputPaths())
-        lockFiles.insert(worker.store.toRealPath(worker.store.printStorePath(outPath)));
+        lockFiles.insert(worker.store.Store::toRealPath(outPath));
 
     if (!outputLocks.lockPaths(lockFiles, "", false)) {
         worker.waitForAWhile(shared_from_this());
@@ -1429,7 +1429,7 @@ void DerivationGoal::tryToBuild()
     for (auto & i : drv->outputs) {
         if (worker.store.isValidPath(i.second.path)) continue;
         debug("removing invalid path '%s'", worker.store.printStorePath(i.second.path));
-        deletePath(worker.store.toRealPath(worker.store.printStorePath(i.second.path)));
+        deletePath(worker.store.Store::toRealPath(i.second.path));
     }
 
     /* Don't do a remote build if the derivation has the attribute
@@ -1686,7 +1686,7 @@ void DerivationGoal::buildDone()
 
         /* Delete unused redirected outputs (when doing hash rewriting). */
         for (auto & i : redirectedOutputs)
-            deletePath(worker.store.toRealPath(worker.store.printStorePath(i.second)));
+            deletePath(worker.store.Store::toRealPath(i.second));
 
         /* Delete the chroot (if we were using one). */
         autoDelChroot.reset(); /* this runs the destructor */
@@ -2072,7 +2072,7 @@ void DerivationGoal::startBuilder()
            environment using bind-mounts.  We put it in the Nix store
            to ensure that we can create hard-links to non-directory
            inputs in the fake Nix store in the chroot (see below). */
-        chrootRootDir = worker.store.toRealPath(worker.store.printStorePath(drvPath)) + ".chroot";
+        chrootRootDir = worker.store.Store::toRealPath(drvPath) + ".chroot";
         deletePath(chrootRootDir);
 
         /* Clean up the chroot directory automatically. */
@@ -2917,7 +2917,7 @@ void DerivationGoal::addDependency(const StorePath & path)
 
         #if __linux__
 
-            Path source = worker.store.toRealPath(worker.store.printStorePath(path));
+            Path source = worker.store.Store::toRealPath(path);
             Path target = chrootRootDir + worker.store.printStorePath(path);
             debug("bind-mounting %s -> %s", target, source);
 
@@ -3579,7 +3579,7 @@ void DerivationGoal::registerOutputs()
         if (needsHashRewrite()) {
             auto r = redirectedOutputs.find(i.second.path);
             if (r != redirectedOutputs.end()) {
-                auto redirected = worker.store.toRealPath(worker.store.printStorePath(r->second));
+                auto redirected = worker.store.Store::toRealPath(r->second);
                 if (buildMode == bmRepair
                     && redirectedBadOutputs.count(i.second.path)
                     && pathExists(redirected))
@@ -3672,7 +3672,7 @@ void DerivationGoal::registerOutputs()
                     BuildError("hash mismatch in fixed-output derivation '%s':\n  wanted: %s\n  got:    %s",
                         worker.store.printStorePath(dest), h.to_string(SRI), h2.to_string(SRI)));
 
-                Path actualDest = worker.store.toRealPath(worker.store.printStorePath(dest));
+                Path actualDest = worker.store.Store::toRealPath(dest);
 
                 if (worker.store.isValidPath(dest))
                     std::rethrow_exception(delayedException);

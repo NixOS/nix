@@ -55,7 +55,7 @@ static std::optional<std::pair<Hash, Tree>> lookupGitInfo(
 
         if (store->isValidPath(storePath)) {
             return {{rev, Tree{
-                .actualPath = store->toRealPath(store->printStorePath(storePath)),
+                .actualPath = store->toRealPath(storePath),
                 .storePath = std::move(storePath),
                 .info = TreeInfo {
                     .revCount = json["revCount"],
@@ -357,7 +357,7 @@ struct GitInput : Input
         auto lastModified = std::stoull(runProgram("git", true, { "-C", repoDir, "log", "-1", "--format=%ct", input->rev->gitRev() }));
 
         auto tree = Tree {
-            .actualPath = store->toRealPath(store->printStorePath(storePath)),
+            .actualPath = store->toRealPath(storePath),
             .storePath = std::move(storePath),
             .info = TreeInfo {
                 .revCount = revCount,

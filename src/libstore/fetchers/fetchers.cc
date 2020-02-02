@@ -81,7 +81,7 @@ std::pair<Tree, std::shared_ptr<const Input>> Input::fetchTree(ref<Store> store)
     auto [tree, input] = fetchTreeInternal(store);
 
     if (tree.actualPath == "")
-        tree.actualPath = store->toRealPath(store->printStorePath(tree.storePath));
+        tree.actualPath = store->toRealPath(tree.storePath);
 
     if (!tree.info.narHash)
         tree.info.narHash = store->queryPathInfo(tree.storePath)->narHash;

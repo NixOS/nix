@@ -910,7 +910,7 @@ CachedDownloadResult Downloader::downloadCached(
             printInfo("unpacking '%s'...", url);
             Path tmpDir = createTempDir();
             AutoDelete autoDelete(tmpDir, true);
-            unpackTarfile(store->toRealPath(store->printStorePath(*storePath)), tmpDir);
+            unpackTarfile(store->toRealPath(*storePath), tmpDir);
             auto members = readDirectory(tmpDir);
             if (members.size() != 1)
                 throw nix::Error("tarball '%s' contains an unexpected number of top-level files", url);
@@ -928,8 +928,8 @@ CachedDownloadResult Downloader::downloadCached(
     if (expectedStorePath && *storePath != *expectedStorePath) {
         unsigned int statusCode = 102;
         Hash gotHash = request.unpack
-            ? hashPath(request.expectedHash.type, store->toRealPath(store->printStorePath(*storePath))).first
-            : hashFile(request.expectedHash.type, store->toRealPath(store->printStorePath(*storePath)));
+            ? hashPath(request.expectedHash.type, store->toRealPath(*storePath)).first
+            : hashFile(request.expectedHash.type, store->toRealPath(*storePath));
         throw nix::Error(statusCode, "hash mismatch in file downloaded from '%s':\n  wanted: %s\n  got:    %s",
             url, request.expectedHash.to_string(), gotHash.to_string());
     }
