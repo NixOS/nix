@@ -90,12 +90,11 @@ std::pair<FlakeRef, std::string> parseFlakeRefWithFragment(
             .scheme = "flake",
             .authority = "",
             .path = match[1],
-            .fragment = percentDecode(std::string(match[6]))
         };
 
         return std::make_pair(
             FlakeRef(inputFromURL(parsedURL), ""),
-            parsedURL.fragment);
+            percentDecode(std::string(match[6])));
     }
 
     /* Check if 'url' is a path (either absolute or relative to
@@ -131,8 +130,9 @@ std::pair<FlakeRef, std::string> parseFlakeRefWithFragment(
             .authority = "",
             .path = flakeRoot,
             .query = decodeQuery(match[2]),
-            .fragment = percentDecode(std::string(match[3]))
         };
+
+        auto fragment = percentDecode(std::string(match[3]));
 
         if (subdir != "") {
             if (parsedURL.query.count("subdir"))
@@ -142,14 +142,16 @@ std::pair<FlakeRef, std::string> parseFlakeRefWithFragment(
 
         return std::make_pair(
             FlakeRef(inputFromURL(parsedURL), get(parsedURL.query, "subdir").value_or("")),
-            parsedURL.fragment);
+            fragment);
     }
 
     else {
         auto parsedURL = parseURL(url);
+        std::string fragment;
+        std::swap(fragment, parsedURL.fragment);
         return std::make_pair(
             FlakeRef(inputFromURL(parsedURL), get(parsedURL.query, "subdir").value_or("")),
-            parsedURL.fragment);
+            fragment);
     }
 }
 
