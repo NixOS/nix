@@ -4,6 +4,7 @@
 #include "eval-inline.hh"
 #include "store-api.hh"
 #include "fetchers/fetchers.hh"
+#include "finally.hh"
 
 #include <iostream>
 #include <ctime>
@@ -387,6 +388,8 @@ LockedFlake lockFlake(
             const InputPath & inputPathPrefix)>
             updateLocks;
 
+        std::vector<FlakeRef> parents;
+
         updateLocks = [&](
             const FlakeInputs & flakeInputs,
             const LockedInputs & oldLocks,
@@ -506,6 +509,14 @@ LockedFlake lockFlake(
                            flake. Also, unless we already have this
                            flake in the top-level lock file, use this
                            flake's own lock file. */
+
+                        /* Guard against circular flake imports. */
+                        for (auto & parent : parents)
+                            if (parent == input.ref)
+                                throw Error("found circular import of flake '%s'", parent);
+                        parents.push_back(input.ref);
+                        Finally cleanup([&]() { parents.pop_back(); });
+
                         updateLocks(inputFlake.inputs,
                             oldLock != oldLocks.inputs.end()
                             ? (const LockedInputs &) oldLock->second
