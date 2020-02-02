@@ -175,8 +175,8 @@ nix build -o $TEST_ROOT/result $flake2Dir#bar
 [[ -z $(git -C $flake2Dir diff master) ]]
 
 # Building with a lockfile should not require a fetch of the registry.
-nix build -o $TEST_ROOT/result --flake-registry file:///no-registry.json $flake2Dir#bar --tarball-ttl 0
-nix build -o $TEST_ROOT/result --no-registries $flake2Dir#bar --tarball-ttl 0
+nix build -o $TEST_ROOT/result --flake-registry file:///no-registry.json $flake2Dir#bar --refresh
+nix build -o $TEST_ROOT/result --no-registries $flake2Dir#bar --refresh
 
 # Updating the flake should not change the lockfile.
 nix flake update $flake2Dir
@@ -186,7 +186,7 @@ nix flake update $flake2Dir
 nix build -o $TEST_ROOT/result flake2#bar
 
 # Or without a registry.
-nix build -o $TEST_ROOT/result --no-registries git+file://$flake2Dir#bar --tarball-ttl 0
+nix build -o $TEST_ROOT/result --no-registries git+file://$flake2Dir#bar --refresh
 
 # Test whether indirect dependencies work.
 nix build -o $TEST_ROOT/result $flake3Dir#xyzzy
@@ -229,7 +229,7 @@ nix build -o $TEST_ROOT/result $flake3Dir#sth 2>&1 | grep 'unsupported edition'
 # Test whether registry caching works.
 nix flake list --flake-registry file://$registry | grep -q flake3
 mv $registry $registry.tmp
-nix flake list --flake-registry file://$registry --tarball-ttl 0 | grep -q flake3
+nix flake list --flake-registry file://$registry --refresh | grep -q flake3
 mv $registry.tmp $registry
 
 # Test whether flakes are registered as GC roots for offline use.
@@ -241,7 +241,7 @@ mv $flake1Dir $flake1Dir.tmp
 mv $flake2Dir $flake2Dir.tmp
 nix-store --gc
 _NIX_FORCE_HTTP=1 nix build -o $TEST_ROOT/result git+file://$flake2Dir#bar
-_NIX_FORCE_HTTP=1 nix build -o $TEST_ROOT/result git+file://$flake2Dir#bar --tarball-ttl 0
+_NIX_FORCE_HTTP=1 nix build -o $TEST_ROOT/result git+file://$flake2Dir#bar --refresh
 mv $flake1Dir.tmp $flake1Dir
 mv $flake2Dir.tmp $flake2Dir
 
