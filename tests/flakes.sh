@@ -235,6 +235,7 @@ mv $registry.tmp $registry
 # Test whether flakes are registered as GC roots for offline use.
 # FIXME: use tarballs rather than git.
 rm -rf $TEST_HOME/.cache
+nix-store --gc # get rid of copies in the store to ensure they get fetched to our git cache
 _NIX_FORCE_HTTP=1 nix build -o $TEST_ROOT/result git+file://$flake2Dir#bar
 mv $flake1Dir $flake1Dir.tmp
 mv $flake2Dir $flake2Dir.tmp

@@ -18,13 +18,13 @@ namespace flake {
 /* If 'allowLookup' is true, then resolve 'flakeRef' using the
    registries. */
 static FlakeRef maybeLookupFlake(
-    EvalState & state,
+    ref<Store> store,
     const FlakeRef & flakeRef,
     bool allowLookup)
 {
     if (!flakeRef.input->isDirect()) {
         if (allowLookup)
-            return flakeRef.resolve(state.store);
+            return flakeRef.resolve(store);
         else
             throw Error("'%s' is an indirect flake reference, but registry lookups are not allowed", flakeRef);
     } else
@@ -47,6 +47,64 @@ static FlakeRef lookupInFlakeCache(
     }
 
     return flakeRef;
+}
+
+static std::pair<fetchers::Tree, FlakeRef> fetchOrSubstituteTree(
+    EvalState & state,
+    const FlakeRef & originalRef,
+    std::optional<TreeInfo> treeInfo,
+    bool allowLookup,
+    FlakeCache & flakeCache)
+{
+    /* The tree may already be in the Nix store, or it could be
+       substituted (which is often faster than fetching from the
+       original source). So check that. */
+    if (treeInfo && originalRef.input->isDirect() && originalRef.input->isImmutable()) {
+        try {
+            auto storePath = treeInfo->computeStorePath(*state.store);
+
+            state.store->ensurePath(storePath);
+
+            debug("using substituted/cached input '%s' in '%s'",
+                originalRef, state.store->printStorePath(storePath));
+
+            auto actualPath = state.store->toRealPath(storePath);
+
+            if (state.allowedPaths)
+                state.allowedPaths->insert(actualPath);
+
+            return {
+                Tree {
+                    .actualPath = actualPath,
+                    .storePath = std::move(storePath),
+                    .info = *treeInfo,
+                },
+                originalRef
+            };
+        } catch (Error & e) {
+            debug("substitution of input '%s' failed: %s", originalRef, e.what());
+        }
+    }
+
+    auto resolvedRef = lookupInFlakeCache(flakeCache,
+        maybeLookupFlake(state.store,
+            lookupInFlakeCache(flakeCache, originalRef), allowLookup));
+
+    auto [tree, lockedRef] = resolvedRef.fetchTree(state.store);
+
+    debug("got tree '%s' from '%s'",
+        state.store->printStorePath(tree.storePath), lockedRef);
+
+    flakeCache.push_back({originalRef, lockedRef});
+    flakeCache.push_back({resolvedRef, lockedRef});
+
+    if (state.allowedPaths)
+        state.allowedPaths->insert(tree.actualPath);
+
+    if (treeInfo)
+        assert(tree.storePath == treeInfo->computeStorePath(*state.store));
+
+    return {std::move(tree), lockedRef};
 }
 
 static void expectType(EvalState & state, ValueType type,
@@ -143,23 +201,15 @@ static std::map<FlakeId, FlakeInput> parseFlakeInputs(
     return inputs;
 }
 
-static Flake getFlake(EvalState & state, const FlakeRef & originalRef,
-    bool allowLookup, FlakeCache & flakeCache)
+static Flake getFlake(
+    EvalState & state,
+    const FlakeRef & originalRef,
+    std::optional<TreeInfo> treeInfo,
+    bool allowLookup,
+    FlakeCache & flakeCache)
 {
-    auto flakeRef = lookupInFlakeCache(flakeCache,
-        maybeLookupFlake(state,
-            lookupInFlakeCache(flakeCache, originalRef), allowLookup));
-
-    auto [sourceInfo, lockedRef] = flakeRef.fetchTree(state.store);
-
-    debug("got flake source '%s' from '%s'",
-        state.store->printStorePath(sourceInfo.storePath), lockedRef);
-
-    flakeCache.push_back({originalRef, lockedRef});
-    flakeCache.push_back({flakeRef, lockedRef});
-
-    if (state.allowedPaths)
-        state.allowedPaths->insert(sourceInfo.actualPath);
+    auto [sourceInfo, lockedRef] = fetchOrSubstituteTree(
+        state, originalRef, treeInfo, allowLookup, flakeCache);
 
     // Guard against symlink attacks.
     auto flakeFile = canonPath(sourceInfo.actualPath + "/" + lockedRef.subdir + "/flake.nix");
@@ -192,11 +242,11 @@ static Flake getFlake(EvalState & state, const FlakeRef & originalRef,
         expectType(state, tInt, *(**edition).value, *(**edition).pos);
         flake.edition = (**edition).value->integer;
         if (flake.edition > 201909)
-            throw Error("flake '%s' requires unsupported edition %d; please upgrade Nix", flakeRef, flake.edition);
+            throw Error("flake '%s' requires unsupported edition %d; please upgrade Nix", lockedRef, flake.edition);
         if (flake.edition < 201909)
-            throw Error("flake '%s' has illegal edition %d", flakeRef, flake.edition);
+            throw Error("flake '%s' has illegal edition %d", lockedRef, flake.edition);
     } else
-        throw Error("flake '%s' lacks attribute 'edition'", flakeRef);
+        throw Error("flake '%s' lacks attribute 'edition'", lockedRef);
 
     if (auto description = vInfo.attrs->get(state.sDescription)) {
         expectType(state, tString, *(**description).value, *(**description).pos);
@@ -224,7 +274,7 @@ static Flake getFlake(EvalState & state, const FlakeRef & originalRef,
         }
 
     } else
-        throw Error("flake '%s' lacks attribute 'outputs'", flakeRef);
+        throw Error("flake '%s' lacks attribute 'outputs'", lockedRef);
 
     for (auto & attr : *vInfo.attrs) {
         if (attr.name != sEdition &&
@@ -233,7 +283,7 @@ static Flake getFlake(EvalState & state, const FlakeRef & originalRef,
             attr.name != sInputs &&
             attr.name != sOutputs)
             throw Error("flake '%s' has an unsupported attribute '%s', at %s",
-                flakeRef, attr.name, *attr.pos);
+                lockedRef, attr.name, *attr.pos);
     }
 
     return flake;
@@ -242,31 +292,7 @@ static Flake getFlake(EvalState & state, const FlakeRef & originalRef,
 Flake getFlake(EvalState & state, const FlakeRef & originalRef, bool allowLookup)
 {
     FlakeCache flakeCache;
-    return getFlake(state, originalRef, allowLookup, flakeCache);
-}
-
-static std::pair<fetchers::Tree, FlakeRef> getNonFlake(
-    EvalState & state,
-    const FlakeRef & originalRef,
-    bool allowLookup,
-    FlakeCache & flakeCache)
-{
-    auto flakeRef = lookupInFlakeCache(flakeCache,
-        maybeLookupFlake(state,
-            lookupInFlakeCache(flakeCache, originalRef), allowLookup));
-
-    auto [sourceInfo, lockedRef] = flakeRef.fetchTree(state.store);
-
-    debug("got non-flake source '%s' from '%s'",
-        state.store->printStorePath(sourceInfo.storePath), lockedRef);
-
-    flakeCache.push_back({originalRef, lockedRef});
-    flakeCache.push_back({flakeRef, lockedRef});
-
-    if (state.allowedPaths)
-        state.allowedPaths->insert(sourceInfo.actualPath);
-
-    return std::make_pair(std::move(sourceInfo), lockedRef);
+    return getFlake(state, originalRef, {}, allowLookup, flakeCache);
 }
 
 static void flattenLockFile(
@@ -326,7 +352,7 @@ LockedFlake lockFlake(
 
     FlakeCache flakeCache;
 
-    auto flake = getFlake(state, topRef, lockFlags.useRegistries, flakeCache);
+    auto flake = getFlake(state, topRef, {}, lockFlags.useRegistries, flakeCache);
 
     LockFile oldLockFile;
 
@@ -439,7 +465,8 @@ LockedFlake lockFlake(
                         && std::equal(inputPath.begin(), inputPath.end(), lb->begin());
 
                     if (hasChildUpdate) {
-                        auto inputFlake = getFlake(state, oldLock->second.lockedRef, false, flakeCache);
+                        auto inputFlake = getFlake(
+                            state, oldLock->second.lockedRef, oldLock->second.info, false, flakeCache);
 
                         updateLocks(inputFlake.inputs,
                             (const LockedInputs &) oldLock->second,
@@ -470,8 +497,7 @@ LockedFlake lockFlake(
                         throw Error("cannot update flake input '%s' in pure mode", inputPathS);
 
                     if (input.isFlake) {
-                        auto inputFlake = getFlake(state, input.ref,
-                            lockFlags.useRegistries, flakeCache);
+                        auto inputFlake = getFlake(state, input.ref, {}, lockFlags.useRegistries, flakeCache);
 
                         newLocks.inputs.insert_or_assign(id,
                             LockedInput(inputFlake.lockedRef, inputFlake.originalRef, inputFlake.sourceInfo->info));
@@ -490,8 +516,8 @@ LockedFlake lockFlake(
                     }
 
                     else {
-                        auto [sourceInfo, lockedRef] = getNonFlake(state, input.ref,
-                            lockFlags.useRegistries, flakeCache);
+                        auto [sourceInfo, lockedRef] = fetchOrSubstituteTree(
+                            state, input.ref, {}, lockFlags.useRegistries, flakeCache);
                         newLocks.inputs.insert_or_assign(id,
                             LockedInput(lockedRef, input.ref, sourceInfo.info));
                     }
@@ -602,7 +628,8 @@ static void prim_callFlake(EvalState & state, const Pos & pos, Value * * args, V
     auto lazyInput = (LazyInput *) args[0]->attrs;
 
     if (lazyInput->isFlake) {
-        auto flake = getFlake(state, lazyInput->lockedInput.lockedRef, false);
+        FlakeCache flakeCache;
+        auto flake = getFlake(state, lazyInput->lockedInput.lockedRef, lazyInput->lockedInput.info, false, flakeCache);
 
         if (flake.sourceInfo->info.narHash != lazyInput->lockedInput.info.narHash)
             throw Error("the content hash of flake '%s' (%s) doesn't match the hash recorded in the referring lock file (%s)",
@@ -618,7 +645,8 @@ static void prim_callFlake(EvalState & state, const Pos & pos, Value * * args, V
         callFlake(state, flake, lazyInput->lockedInput, v);
     } else {
         FlakeCache flakeCache;
-        auto [sourceInfo, lockedRef] = getNonFlake(state, lazyInput->lockedInput.lockedRef, false, flakeCache);
+        auto [sourceInfo, lockedRef] = fetchOrSubstituteTree(
+            state, lazyInput->lockedInput.lockedRef, {}, false, flakeCache);
 
         if (sourceInfo.info.narHash != lazyInput->lockedInput.info.narHash)
             throw Error("the content hash of repository '%s' (%s) doesn't match the hash recorded in the referring lock file (%s)",
