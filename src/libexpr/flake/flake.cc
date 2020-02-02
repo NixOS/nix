@@ -579,22 +579,23 @@ LockedFlake lockFlake(
 
                     newLockFile.write(path);
 
-                    // Rewriting the lockfile changed the top-level
-                    // repo, so we should re-read it.
+                    topRef.input->markChangedFile(
+                        (topRef.subdir == "" ? "" : topRef.subdir + "/") + "flake.lock");
+
+                    /* Rewriting the lockfile changed the top-level
+                       repo, so we should re-read it. FIXME: we could
+                       also just clear the 'rev' field... */
+                    auto prevLockedRef = flake.lockedRef;
                     FlakeCache dummyCache;
                     flake = getFlake(state, topRef, {}, lockFlags.useRegistries, dummyCache);
 
-                    if (flake.lockedRef.input->isImmutable())
+                    /* Make sure that we picked up the change,
+                       i.e. the tree should usually be dirty
+                       now. Corner case: we could have reverted from a
+                       dirty to a clean tree! */
+                    if (flake.lockedRef.input == prevLockedRef.input
+                        && !flake.lockedRef.input->isImmutable())
                         throw Error("'%s' did not change after I updated its 'flake.lock' file; is 'flake.lock' under version control?", flake.originalRef);
-
-                    #if 0
-                    // Hack: Make sure that flake.lock is visible to Git, so it ends up in the Nix store.
-                    runProgram("git", true,
-                        { "-C", *sourcePath, "add",
-                          "--force",
-                          "--intent-to-add",
-                          (topRef.subdir == "" ? "" : topRef.subdir + "/") + "flake.lock" });
-                    #endif
                 }
             } else
                 throw Error("cannot write modified lock file of flake '%s' (use '--no-write-lock-file' to ignore)", topRef);

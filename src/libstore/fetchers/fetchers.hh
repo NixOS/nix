@@ -62,6 +62,9 @@ struct Input : std::enable_shared_from_this<Input>
 
     virtual std::optional<Path> getSourcePath() const { return {}; }
 
+    // FIXME: should merge with getSourcePath().
+    virtual void markChangedFile(std::string_view file) const { assert(false); }
+
     virtual void clone(const Path & destDir) const
     {
         throw Error("do not know how to clone input '%s'", to_string());

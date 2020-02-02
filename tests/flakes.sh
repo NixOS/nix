@@ -5,6 +5,11 @@ if [[ -z $(type -p git) ]]; then
     exit 99
 fi
 
+if [[ -z $(type -p hg) ]]; then
+    echo "Mercurial not installed; skipping flake tests"
+    exit 99
+fi
+
 clearStore
 rm -rf $TEST_HOME/.cache $TEST_HOME/.config
 
@@ -372,7 +377,7 @@ nix flake remove flake1
 (cd $flake7Dir && nix flake init)
 git -C $flake7Dir add flake.nix
 nix flake check $flake7Dir
-git -C $flake7Dir commit -m 'Initial'
+git -C $flake7Dir commit -a -m 'Initial'
 
 # Test 'nix flake clone'.
 rm -rf $TEST_ROOT/flake1-v2
@@ -545,11 +550,6 @@ nix flake update $flake3Dir --recreate-lock-file
 [[ $(jq .inputs.flake2.inputs.flake1.locked.url $flake3Dir/flake.lock) =~ flake7 ]]
 
 # Test Mercurial flakes.
-if [[ -z $(type -p hg) ]]; then
-    echo "Git not installed; skipping Mercurial flake tests"
-    exit 99
-fi
-
 rm -rf $flake5Dir
 hg init $flake5Dir
 
@@ -571,12 +571,9 @@ hg commit --config ui.username=foobar@example.org $flake5Dir -m 'Initial commit'
 nix build -o $TEST_ROOT/result hg+file://$flake5Dir
 [[ -e $TEST_ROOT/result/hello ]]
 
-nix flake info --json hg+file://$flake5Dir | jq -e -r .revision
+(! nix flake info --json hg+file://$flake5Dir | jq -e -r .revision)
 
-# This will fail because flake.lock is not tracked by Mercurial.
-(! nix eval hg+file://$flake5Dir#expr)
-
-hg add $flake5Dir/flake.lock
+nix eval hg+file://$flake5Dir#expr
 
 nix eval hg+file://$flake5Dir#expr
 

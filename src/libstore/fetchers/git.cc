@@ -165,6 +165,18 @@ struct GitInput : Input
         return {};
     }
 
+    void markChangedFile(std::string_view file) const override
+    {
+        auto sourcePath = getSourcePath();
+        assert(sourcePath);
+        runProgram("git", true,
+            { "-C", *sourcePath, "add",
+              "--force",
+              "--intent-to-add",
+              std::string(file)
+            });
+    }
+
     std::pair<bool, std::string> getActualUrl() const
     {
         // Don't clone file:// URIs (but otherwise treat them the

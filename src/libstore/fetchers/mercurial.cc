@@ -84,6 +84,17 @@ struct MercurialInput : Input
         return {};
     }
 
+    void markChangedFile(std::string_view file) const override
+    {
+        auto sourcePath = getSourcePath();
+        assert(sourcePath);
+        // FIXME: shut up if file is already tracked.
+        runProgram("hg", true,
+            { "add",
+              *sourcePath + "/" + std::string(file)
+            });
+    }
+
     std::pair<bool, std::string> getActualUrl() const
     {
         bool isLocal = url.scheme == "file";
