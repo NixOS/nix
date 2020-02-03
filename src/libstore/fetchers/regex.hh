@@ -13,7 +13,7 @@ const static std::string authorityRegex =
 const static std::string segmentRegex = "[a-zA-Z0-9._~-]+";
 const static std::string pathRegex = "(?:/?" + segmentRegex + "(?:/" + segmentRegex + ")*|/?)";
 const static std::string pcharRegex =
-    "(?:[a-zA-Z0-9-._~!$&'()*+,;=:@ ]|" + pctEncoded + ")";
+    "(?:[a-zA-Z0-9-._~!$&'\"()*+,;=:@ ]|" + pctEncoded + ")";
 const static std::string queryRegex = "(?:" + pcharRegex + "|[/?])*";
 
 // A Git ref (i.e. branch or tag name).
