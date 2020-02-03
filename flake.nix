@@ -213,8 +213,7 @@
             name = "nix-tarball";
             version = builtins.readFile ./.version;
             versionSuffix = if officialRelease then "" else
-              "pre${builtins.substring 0 8 self.lastModified}" +
-              (if self ? shortRev then "_${self.shortRev}" else "");
+              "pre${builtins.substring 0 8 self.lastModified}_${self.shortRev or "dirty"}";
             src = self;
             inherit officialRelease;
 
