@@ -616,6 +616,10 @@ static void emitSourceInfoAttrs(
     auto pathS = state.store->printStorePath(sourceInfo.storePath);
     mkString(*state.allocAttr(vAttrs, state.sOutPath), pathS, {pathS});
 
+    assert(sourceInfo.info.narHash);
+    mkString(*state.allocAttr(vAttrs, state.symbols.create("narHash")),
+        sourceInfo.info.narHash.to_string(SRI));
+
     if (auto rev = flakeRef.input->getRev()) {
         mkString(*state.allocAttr(vAttrs, state.symbols.create("rev")),
             rev->gitRev());
