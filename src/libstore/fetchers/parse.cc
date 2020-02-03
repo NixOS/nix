@@ -11,24 +11,22 @@ std::regex flakeIdRegex(flakeIdRegexS, std::regex::ECMAScript);
 ParsedURL parseURL(const std::string & url)
 {
     static std::regex uriRegex(
-        "(((" + schemeRegex + "):"
-        + "(//(" + authorityRegex + "))?"
-        + "(" + pathRegex + "))"
+        "((" + schemeRegex + "):"
+        + "(?:(?://(" + authorityRegex + ")(" + absPathRegex + "))|(/?" + pathRegex + ")))"
         + "(?:\\?(" + queryRegex + "))?"
-        + "(?:#(" + queryRegex + "))?"
-        + ")",
+        + "(?:#(" + queryRegex + "))?",
         std::regex::ECMAScript);
 
     std::smatch match;
 
     if (std::regex_match(url, match, uriRegex)) {
-        auto & base = match[2];
-        std::string scheme = match[3];
+        auto & base = match[1];
+        std::string scheme = match[2];
         auto authority = match[4].matched
             ? std::optional<std::string>(match[5]) : std::nullopt;
-        std::string path = match[6];
-        auto & query = match[7];
-        auto & fragment = match[8];
+        std::string path = match[4].matched ? match[4] : match[5];
+        auto & query = match[6];
+        auto & fragment = match[7];
 
         auto isFile = scheme.find("file") != std::string::npos;
 

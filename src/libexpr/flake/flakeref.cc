@@ -67,8 +67,10 @@ std::pair<FlakeRef, std::string> parseFlakeRefWithFragment(
 {
     using namespace fetchers;
 
+    static std::string fnRegex = "[0-9a-zA-Z-._~!$&'\"()*+,;=]+";
+
     static std::regex pathUrlRegex(
-        "(" + pathRegex + "/?)"
+        "(/?" + fnRegex + "(?:/" + fnRegex + ")*/?)"
         + "(?:\\?(" + queryRegex + "))?"
         + "(?:#(" + queryRegex + "))?",
         std::regex::ECMAScript);
