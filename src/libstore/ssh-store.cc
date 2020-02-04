@@ -16,6 +16,8 @@ public:
 
     const Setting<Path> sshKey{(Store*) this, "", "ssh-key", "path to an SSH private key"};
     const Setting<bool> compress{(Store*) this, false, "compress", "whether to compress the connection"};
+    const Setting<Path> remoteProgram{this, "nix-daemon", "remote-program", "path to the nix-daemon executable on the remote system"};
+    const Setting<std::string> remoteStore{this, "", "remote-store", "URI of the store on the remote system"};
 
     SSHStore(const std::string & host, const Params & params)
         : Store(params)
@@ -82,7 +84,9 @@ ref<FSAccessor> SSHStore::getFSAccessor()
 ref<RemoteStore::Connection> SSHStore::openConnection()
 {
     auto conn = make_ref<Connection>();
-    conn->sshConn = master.startCommand("nix-daemon --stdio");
+    conn->sshConn = master.startCommand(
+        fmt("%s --stdio", remoteProgram)
+        + (remoteStore.get() == "" ? "" : " --store " + shellEscape(remoteStore.get())));
     conn->to = FdSink(conn->sshConn->in.get());
     conn->from = FdSource(conn->sshConn->out.get());
     initConnection(*conn);
