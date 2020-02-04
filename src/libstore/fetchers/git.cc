@@ -23,6 +23,11 @@ static Path getCacheInfoPathFor(const std::string & name, const Hash & rev)
     return cacheDir + "/" + linkName + ".link";
 }
 
+static std::string readHead(const Path & path)
+{
+    return chomp(runProgram("git", true, { "-C", path, "rev-parse", "--abbrev-ref", "HEAD" }));
+}
+
 static void cacheGitInfo(
     Store & store,
     const std::string & name,
@@ -268,7 +273,7 @@ struct GitInput : Input
             }
         }
 
-        if (!input->ref) input->ref = isLocal ? "HEAD" : "master";
+        if (!input->ref) input->ref = isLocal ? readHead(actualUrl) : "master";
 
         Path repoDir;
 
