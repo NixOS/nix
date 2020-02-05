@@ -40,6 +40,11 @@ MixFlakeOptions::MixFlakeOptions()
         .set(&lockFlags.useRegistries, false);
 
     mkFlag()
+        .longName("commit-lock-file")
+        .description("commit changes to the lock file")
+        .set(&lockFlags.commitLockFile, true);
+
+    mkFlag()
         .longName("update-input")
         .description("update a specific flake input")
         .label("input-path")

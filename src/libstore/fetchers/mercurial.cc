@@ -84,15 +84,18 @@ struct MercurialInput : Input
         return {};
     }
 
-    void markChangedFile(std::string_view file) const override
+    void markChangedFile(std::string_view file, std::optional<std::string> commitMsg) const override
     {
         auto sourcePath = getSourcePath();
         assert(sourcePath);
+
         // FIXME: shut up if file is already tracked.
         runProgram("hg", true,
-            { "add",
-              *sourcePath + "/" + std::string(file)
-            });
+            { "add", *sourcePath + "/" + std::string(file) });
+
+        if (commitMsg)
+            runProgram("hg", true,
+                { "commit", *sourcePath + "/" + std::string(file), "-m", *commitMsg });
     }
 
     std::pair<bool, std::string> getActualUrl() const

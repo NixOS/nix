@@ -170,10 +170,9 @@ nix build -o $TEST_ROOT/result $flake2Dir#bar --no-update-lock-file 2>&1 | grep 
 # But it should succeed without that flag.
 nix build -o $TEST_ROOT/result $flake2Dir#bar --no-write-lock-file
 nix build -o $TEST_ROOT/result $flake2Dir#bar --no-update-lock-file 2>&1 | grep 'requires lock file changes'
-nix build -o $TEST_ROOT/result $flake2Dir#bar
+nix build -o $TEST_ROOT/result $flake2Dir#bar --commit-lock-file
 [[ -e $flake2Dir/flake.lock ]]
-git -C $flake2Dir add flake.lock
-git -C $flake2Dir commit flake.lock -m 'Add flake.lock'
+[[ -z $(git -C $flake2Dir diff master) ]]
 
 # Rerunning the build should not change the lockfile.
 nix build -o $TEST_ROOT/result $flake2Dir#bar
@@ -291,11 +290,7 @@ git -C $flake3Dir commit -m 'Add nonFlakeInputs'
 
 # Check whether `nix build` works with a lockfile which is missing a
 # nonFlakeInputs.
-nix build -o $TEST_ROOT/result $flake3Dir#sth
-
-git -C $flake3Dir add flake.lock
-
-git -C $flake3Dir commit -m 'Update nonFlakeInputs'
+nix build -o $TEST_ROOT/result $flake3Dir#sth --commit-lock-file
 
 nix build -o $TEST_ROOT/result flake3#fnord
 [[ $(cat $TEST_ROOT/result) = FNORD ]]

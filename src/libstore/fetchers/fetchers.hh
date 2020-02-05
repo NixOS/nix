@@ -62,8 +62,10 @@ struct Input : std::enable_shared_from_this<Input>
 
     virtual std::optional<Path> getSourcePath() const { return {}; }
 
-    // FIXME: should merge with getSourcePath().
-    virtual void markChangedFile(std::string_view file) const { assert(false); }
+    virtual void markChangedFile(
+        std::string_view file,
+        std::optional<std::string> commitMsg) const
+    { assert(false); }
 
     virtual void clone(const Path & destDir) const
     {

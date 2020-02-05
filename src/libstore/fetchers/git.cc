@@ -169,17 +169,17 @@ struct GitInput : Input
             return url.path;
         return {};
     }
-
-    void markChangedFile(std::string_view file) const override
+    void markChangedFile(std::string_view file, std::optional<std::string> commitMsg) const override
     {
         auto sourcePath = getSourcePath();
         assert(sourcePath);
+
         runProgram("git", true,
-            { "-C", *sourcePath, "add",
-              "--force",
-              "--intent-to-add",
-              std::string(file)
-            });
+            { "-C", *sourcePath, "add", "--force", "--intent-to-add", std::string(file) });
+
+        if (commitMsg)
+            runProgram("git", true,
+                { "-C", *sourcePath, "commit", std::string(file), "-m", *commitMsg });
     }
 
     std::pair<bool, std::string> getActualUrl() const

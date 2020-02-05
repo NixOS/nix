@@ -321,15 +321,15 @@ static std::string diffLockFiles(const LockedInputs & oldLocks, const LockedInpu
 
     while (i != oldFlat.end() || j != newFlat.end()) {
         if (j != newFlat.end() && (i == oldFlat.end() || i->first > j->first)) {
-            res += fmt("  added '%s': '%s'\n", concatStringsSep("/", j->first), j->second->lockedRef);
+            res += fmt("* Added '%s': '%s'\n", concatStringsSep("/", j->first), j->second->lockedRef);
             ++j;
         } else if (i != oldFlat.end() && (j == newFlat.end() || i->first < j->first)) {
-            res += fmt("  removed '%s'\n", concatStringsSep("/", i->first));
+            res += fmt("* Removed '%s'\n", concatStringsSep("/", i->first));
             ++i;
         } else {
             if (!(i->second->lockedRef == j->second->lockedRef)) {
                 assert(i->second->lockedRef.to_string() != j->second->lockedRef.to_string());
-                res += fmt("  updated '%s': '%s' -> '%s'\n",
+                res += fmt("* Updated '%s': '%s' -> '%s'\n",
                     concatStringsSep("/", i->first),
                     i->second->lockedRef,
                     j->second->lockedRef);
@@ -558,8 +558,10 @@ LockedFlake lockFlake(
     /* Check whether we need to / can write the new lock file. */
     if (!(newLockFile == oldLockFile)) {
 
+        auto diff = diffLockFiles(oldLockFile, newLockFile);
+
         if (!(oldLockFile == LockFile()))
-            printInfo("inputs of flake '%s' changed:\n%s", topRef, chomp(diffLockFiles(oldLockFile, newLockFile)));
+            printInfo("inputs of flake '%s' changed:\n%s", topRef, chomp(diff));
 
         if (lockFlags.writeLockFile) {
             if (auto sourcePath = topRef.input->getSourcePath()) {
@@ -572,7 +574,9 @@ LockedFlake lockFlake(
 
                     auto path = *sourcePath + (topRef.subdir == "" ? "" : "/" + topRef.subdir) + "/flake.lock";
 
-                    if (pathExists(path))
+                    bool lockFileExists = pathExists(path);
+
+                    if (lockFileExists)
                         warn("updating lock file '%s'", path);
                     else
                         warn("creating lock file '%s'", path);
@@ -580,7 +584,10 @@ LockedFlake lockFlake(
                     newLockFile.write(path);
 
                     topRef.input->markChangedFile(
-                        (topRef.subdir == "" ? "" : topRef.subdir + "/") + "flake.lock");
+                        (topRef.subdir == "" ? "" : topRef.subdir + "/") + "flake.lock",
+                        lockFlags.commitLockFile
+                        ? std::optional<std::string>(fmt("flake.lock: %s\n\nFlake input changes:\n\n%s", lockFileExists ? "Update" : "Add", diff))
+                        : std::nullopt);
 
                     /* Rewriting the lockfile changed the top-level
                        repo, so we should re-read it. FIXME: we could

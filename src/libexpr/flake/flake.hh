@@ -78,6 +78,9 @@ struct LockFlags
        allowed. */
     bool allowMutable = true;
 
+    /* Whether to commit changes to flake.lock. */
+    bool commitLockFile = false;
+
     /* Flake inputs to be overriden. */
     std::map<InputPath, FlakeRef> inputOverrides;
 
