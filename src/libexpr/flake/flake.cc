@@ -572,7 +572,9 @@ LockedFlake lockFlake(
                     if (!lockFlags.updateLockFile)
                         throw Error("flake '%s' requires lock file changes but they're not allowed due to '--no-update-lock-file'", topRef);
 
-                    auto path = *sourcePath + (topRef.subdir == "" ? "" : "/" + topRef.subdir) + "/flake.lock";
+                    auto relPath = (topRef.subdir == "" ? "" : topRef.subdir + "/") + "flake.lock";
+
+                    auto path = *sourcePath + "/" + relPath;
 
                     bool lockFileExists = pathExists(path);
 
@@ -586,7 +588,8 @@ LockedFlake lockFlake(
                     topRef.input->markChangedFile(
                         (topRef.subdir == "" ? "" : topRef.subdir + "/") + "flake.lock",
                         lockFlags.commitLockFile
-                        ? std::optional<std::string>(fmt("flake.lock: %s\n\nFlake input changes:\n\n%s", lockFileExists ? "Update" : "Add", diff))
+                        ? std::optional<std::string>(fmt("%s: %s\n\nFlake input changes:\n\n%s",
+                                relPath, lockFileExists ? "Update" : "Add", diff))
                         : std::nullopt);
 
                     /* Rewriting the lockfile changed the top-level
