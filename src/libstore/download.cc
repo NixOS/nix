@@ -363,9 +363,10 @@ struct CurlDownloader : public Downloader
                 } else if (httpStatus == 401 || httpStatus == 403 || httpStatus == 407) {
                     // Don't retry on authentication/authorization failures
                     err = Forbidden;
-                } else if (httpStatus >= 400 && httpStatus < 500 && httpStatus != 408) {
+                } else if (httpStatus >= 400 && httpStatus < 500 && httpStatus != 408 && httpStatus != 429) {
                     // Most 4xx errors are client errors and are probably not worth retrying:
                     //   * 408 means the server timed out waiting for us, so we try again
+                    //   * 429 means too many requests, so we retry (with a delay)
                     err = Misc;
                 } else if (httpStatus == 501 || httpStatus == 505 || httpStatus == 511) {
                     // Let's treat most 5xx (server) errors as transient, except for a handful:
