@@ -599,6 +599,11 @@ LockedFlake lockFlake(
                     FlakeCache dummyCache;
                     flake = getFlake(state, topRef, {}, lockFlags.useRegistries, dummyCache);
 
+                    if (lockFlags.commitLockFile &&
+                        flake.lockedRef.input->getRev() &&
+                        prevLockedRef.input->getRev() != flake.lockedRef.input->getRev())
+                        warn("committed new revision '%s'", flake.lockedRef.input->getRev()->gitRev());
+
                     /* Make sure that we picked up the change,
                        i.e. the tree should usually be dirty
                        now. Corner case: we could have reverted from a
