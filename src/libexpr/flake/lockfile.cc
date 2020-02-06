@@ -8,18 +8,7 @@ namespace nix::flake {
 
 FlakeRef flakeRefFromJson(const nlohmann::json & json)
 {
-    fetchers::Input::Attrs attrs;
-
-    for (auto & i : json.items()) {
-        if (i.value().is_number())
-            attrs.emplace(i.key(), i.value().get<int64_t>());
-        else if (i.value().is_string())
-            attrs.emplace(i.key(), i.value().get<std::string>());
-        else
-            throw Error("unsupported input attribute type in lock file");
-    }
-
-    return FlakeRef::fromAttrs(attrs);
+    return FlakeRef::fromAttrs(jsonToAttrs(json));
 }
 
 FlakeRef getFlakeRef(

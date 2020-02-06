@@ -94,27 +94,63 @@ git -C $nonFlakeDir commit -m 'Initial'
 
 cat > $registry <<EOF
 {
-    "flakes": {
-        "flake:flake1": {
-            "url": "git+file://$flake1Dir"
-        },
-        "flake:flake2": {
-            "url": "git+file://$flake2Dir"
-        },
-        "flake:flake3": {
-            "url": "git+file://$flake3Dir"
-        },
-        "flake:flake4": {
-            "url": "flake:flake3"
-        },
-        "flake:flake5": {
-            "url": "hg+file://$flake5Dir"
-        },
-        "flake:nixpkgs": {
-            "url": "flake:flake1"
-        }
+  "version": 2,
+  "flakes": [
+    { "from": {
+        "type": "indirect",
+        "id": "flake1"
+      },
+      "to": {
+        "type": "git",
+        "url": "file://$flake1Dir"
+      }
     },
-    "version": 1
+    { "from": {
+        "type": "indirect",
+        "id": "flake2"
+      },
+      "to": {
+        "type": "git",
+        "url": "file://$flake2Dir"
+      }
+    },
+    { "from": {
+        "type": "indirect",
+        "id": "flake3"
+      },
+      "to": {
+        "type": "git",
+        "url": "file://$flake3Dir"
+      }
+    },
+    { "from": {
+        "type": "indirect",
+        "id": "flake4"
+      },
+      "to": {
+        "type": "indirect",
+        "id": "flake3"
+      }
+    },
+    { "from": {
+        "type": "indirect",
+        "id": "flake5"
+      },
+      "to": {
+        "type": "hg",
+        "url": "file://$flake5Dir"
+      }
+    },
+    { "from": {
+        "type": "indirect",
+        "id": "nixpkgs"
+      },
+      "to": {
+        "type": "indirect",
+        "id": "flake1"
+      }
+    }
+  ]
 }
 EOF
 

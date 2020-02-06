@@ -37,6 +37,22 @@ std::unique_ptr<Input> inputFromAttrs(const Input::Attrs & attrs)
     throw Error("input '%s' is unsupported", attrsToJson(attrs));
 }
 
+Input::Attrs jsonToAttrs(const nlohmann::json & json)
+{
+    fetchers::Input::Attrs attrs;
+
+    for (auto & i : json.items()) {
+        if (i.value().is_number())
+            attrs.emplace(i.key(), i.value().get<int64_t>());
+        else if (i.value().is_string())
+            attrs.emplace(i.key(), i.value().get<std::string>());
+        else
+            throw Error("unsupported input attribute type in lock file");
+    }
+
+    return attrs;
+}
+
 nlohmann::json attrsToJson(const fetchers::Input::Attrs & attrs)
 {
     nlohmann::json json;

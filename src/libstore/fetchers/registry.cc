@@ -19,31 +19,51 @@ std::shared_ptr<Registry> Registry::read(
     auto json = nlohmann::json::parse(readFile(path));
 
     auto version = json.value("version", 0);
-    if (version != 1)
+
+    // FIXME: remove soon
+    if (version == 1) {
+        auto flakes = json["flakes"];
+        for (auto i = flakes.begin(); i != flakes.end(); ++i) {
+            auto url = i->value("url", i->value("uri", ""));
+            if (url.empty())
+                throw Error("flake registry '%s' lacks a 'url' attribute for entry '%s'",
+                    path, i.key());
+            registry->entries.push_back(
+                {inputFromURL(i.key()), inputFromURL(url)});
+        }
+    }
+
+    else if (version == 2) {
+        for (auto & i : json["flakes"])
+            registry->entries.push_back(
+                { inputFromAttrs(jsonToAttrs(i["from"]))
+                , inputFromAttrs(jsonToAttrs(i["to"]))
+                });
+    }
+
+    else
         throw Error("flake registry '%s' has unsupported version %d", path, version);
 
-    auto flakes = json["flakes"];
-    for (auto i = flakes.begin(); i != flakes.end(); ++i) {
-        // FIXME: remove 'uri' soon.
-        auto url = i->value("url", i->value("uri", ""));
-        if (url.empty())
-            throw Error("flake registry '%s' lacks a 'url' attribute for entry '%s'",
-                path, i.key());
-        registry->entries.push_back(
-            {inputFromURL(i.key()), inputFromURL(url)});
-    }
 
     return registry;
 }
 
 void Registry::write(const Path & path)
 {
+    nlohmann::json arr;
+    for (auto & elem : entries) {
+        nlohmann::json obj;
+        obj["from"] = attrsToJson(elem.first->toAttrs());
+        obj["to"] = attrsToJson(elem.second->toAttrs());
+        arr.emplace_back(std::move(obj));
+    }
+
     nlohmann::json json;
-    json["version"] = 1;
-    for (auto & elem : entries)
-        json["flakes"][elem.first->to_string()] = { {"url", elem.second->to_string()} };
+    json["version"] = 2;
+    json["flakes"] = std::move(arr);
+
     createDirs(dirOf(path));
-    writeFile(path, json.dump(4));
+    writeFile(path, json.dump(2));
 }
 
 void Registry::add(

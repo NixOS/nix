@@ -98,6 +98,8 @@ std::unique_ptr<Input> inputFromAttrs(const Input::Attrs & attrs);
 
 void registerInputScheme(std::unique_ptr<InputScheme> && fetcher);
 
+Input::Attrs jsonToAttrs(const nlohmann::json & json);
+
 nlohmann::json attrsToJson(const Input::Attrs & attrs);
 
 std::optional<std::string> maybeGetStrAttr(const Input::Attrs & attrs, const std::string & name);
