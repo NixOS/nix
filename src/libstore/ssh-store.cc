@@ -17,8 +17,8 @@ public:
     const Setting<Path> sshKey{(Store*) this, "", "ssh-key", "path to an SSH private key"};
     const Setting<std::string> sshPublicHostKey{(Store*) this, "", "base64-ssh-public-host-key", "The public half of the host's SSH key"};
     const Setting<bool> compress{(Store*) this, false, "compress", "whether to compress the connection"};
-    const Setting<Path> remoteProgram{this, "nix-daemon", "remote-program", "path to the nix-daemon executable on the remote system"};
-    const Setting<std::string> remoteStore{this, "", "remote-store", "URI of the store on the remote system"};
+    const Setting<Path> remoteProgram{(Store*) this, "nix-daemon", "remote-program", "path to the nix-daemon executable on the remote system"};
+    const Setting<std::string> remoteStore{(Store*) this, "", "remote-store", "URI of the store on the remote system"};
 
     SSHStore(const std::string & host, const Params & params)
         : Store(params)
