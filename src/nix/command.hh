@@ -3,16 +3,11 @@
 #include "args.hh"
 #include "common-eval-args.hh"
 #include "path.hh"
+#include "eval.hh"
 
 namespace nix {
 
 extern std::string programPath;
-
-struct Value;
-class Bindings;
-class EvalState;
-struct Pos;
-class Store;
 
 /* A command that requires a Nix store. */
 struct StoreCommand : virtual Command
@@ -48,7 +43,7 @@ struct Installable
 
     Buildable toBuildable();
 
-    virtual Value * toValue(EvalState & state)
+    virtual std::pair<Value *, Pos> toValue(EvalState & state)
     {
         throw Error("argument '%s' cannot be evaluated", what());
     }
