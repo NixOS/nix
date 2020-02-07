@@ -29,9 +29,15 @@ struct CmdEdit : InstallableCommand
     {
         auto state = getEvalState();
 
-        auto v = installable->toValue(*state);
+        auto [v, pos] = installable->toValue(*state);
 
-        Pos pos = findDerivationFilename(*state, *v, installable->what());
+        try {
+            pos = findDerivationFilename(*state, *v, installable->what());
+        } catch (NoPositionInfo &) {
+        }
+
+        if (pos == noPos)
+            throw Error("cannot find position information for '%s", installable->what());
 
         stopProgressBar();
 

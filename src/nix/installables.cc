@@ -130,7 +130,7 @@ App::App(EvalState & state, Value & vApp)
 
 App Installable::toApp(EvalState & state)
 {
-    return App(state, *toValue(state));
+    return App(state, *toValue(state).first);
 }
 
 struct InstallableStorePath : Installable
@@ -166,7 +166,7 @@ std::vector<flake::EvalCache::Derivation> InstallableValue::toDerivations()
 {
     auto state = cmd.getEvalState();
 
-    auto v = toValue(*state);
+    auto v = toValue(*state).first;
 
     Bindings & autoArgs = *cmd.getAutoArgs(*state);
 
@@ -229,11 +229,11 @@ struct InstallableExpr : InstallableValue
 
     std::string what() override { return text; }
 
-    Value * toValue(EvalState & state) override
+    std::pair<Value *, Pos> toValue(EvalState & state) override
     {
         auto v = state.allocValue();
         state.eval(state.parseExprFromString(text, absPath(".")), *v);
-        return v;
+        return {v, noPos};
     }
 };
 
@@ -248,11 +248,11 @@ struct InstallableAttrPath : InstallableValue
 
     std::string what() override { return attrPath; }
 
-    Value * toValue(EvalState & state) override
+    std::pair<Value *, Pos> toValue(EvalState & state) override
     {
-        auto vRes = findAlongAttrPath(state, attrPath, *cmd.getAutoArgs(state), *v).first;
+        auto [vRes, pos] = findAlongAttrPath(state, attrPath, *cmd.getAutoArgs(state), *v);
         state.forceValue(*vRes);
-        return vRes;
+        return {vRes, pos};
     }
 };
 
@@ -391,7 +391,7 @@ std::vector<flake::EvalCache::Derivation> InstallableFlake::toDerivations()
     return res;
 }
 
-Value * InstallableFlake::toValue(EvalState & state)
+std::pair<Value *, Pos> InstallableFlake::toValue(EvalState & state)
 {
     auto lockedFlake = lockFlake(state, flakeRef, cmd.lockFlags);
 
@@ -401,9 +401,9 @@ Value * InstallableFlake::toValue(EvalState & state)
 
     for (auto & attrPath : getActualAttrPaths()) {
         try {
-            auto * v = findAlongAttrPath(state, attrPath, *emptyArgs, *vOutputs).first;
+            auto [v, pos] = findAlongAttrPath(state, attrPath, *emptyArgs, *vOutputs);
             state.forceValue(*v);
-            return v;
+            return {v, pos};
         } catch (AttrPathNotFound & e) {
         }
     }

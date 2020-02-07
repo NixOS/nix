@@ -103,7 +103,7 @@ Pos findDerivationFilename(EvalState & state, Value & v, std::string what)
         auto dummyArgs = state.allocBindings(0);
         v2 = findAlongAttrPath(state, "meta.position", *dummyArgs, v).first;
     } catch (Error &) {
-        throw Error("package '%s' has no source location information", what);
+        throw NoPositionInfo("package '%s' has no source location information", what);
     }
 
     // FIXME: is it possible to extract the Pos object instead of doing this

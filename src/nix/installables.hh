@@ -3,14 +3,13 @@
 #include "util.hh"
 #include "path.hh"
 #include "flake/eval-cache.hh"
+#include "eval.hh"
 
 #include <optional>
 
 namespace nix {
 
-struct Value;
 struct DrvInfo;
-class EvalState;
 struct SourceExprCommand;
 
 struct Buildable
@@ -45,7 +44,7 @@ struct Installable
 
     App toApp(EvalState & state);
 
-    virtual Value * toValue(EvalState & state)
+    virtual std::pair<Value *, Pos> toValue(EvalState & state)
     {
         throw Error("argument '%s' cannot be evaluated", what());
     }
@@ -91,7 +90,7 @@ struct InstallableFlake : InstallableValue
 
     std::vector<flake::EvalCache::Derivation> toDerivations() override;
 
-    Value * toValue(EvalState & state) override;
+    std::pair<Value *, Pos> toValue(EvalState & state) override;
 };
 
 }
