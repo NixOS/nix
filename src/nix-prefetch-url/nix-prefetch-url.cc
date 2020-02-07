@@ -120,7 +120,7 @@ static int _main(int argc, char * * argv)
             Path path = resolveExprPath(lookupFileArg(*state, args.empty() ? "." : args[0]));
             Value vRoot;
             state->evalFile(path, vRoot);
-            Value & v(*findAlongAttrPath(*state, attrPath, autoArgs, vRoot));
+            Value & v(*findAlongAttrPath(*state, attrPath, autoArgs, vRoot).first);
             state->forceAttrs(v);
 
             /* Extract the URI. */

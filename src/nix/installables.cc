@@ -193,7 +193,7 @@ struct InstallableAttrPath : InstallableValue
 
         Bindings & autoArgs = *cmd.getAutoArgs(state);
 
-        Value * v = findAlongAttrPath(state, attrPath, autoArgs, *source);
+        auto v = findAlongAttrPath(state, attrPath, autoArgs, *source).first;
         state.forceValue(*v);
 
         return v;
