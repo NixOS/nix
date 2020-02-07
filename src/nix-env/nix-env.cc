@@ -178,7 +178,7 @@ static void loadDerivations(EvalState & state, Path nixExprPath,
     Value vRoot;
     loadSourceExpr(state, nixExprPath, vRoot);
 
-    Value & v(*findAlongAttrPath(state, pathPrefix, autoArgs, vRoot));
+    Value & v(*findAlongAttrPath(state, pathPrefix, autoArgs, vRoot).first);
 
     getDerivations(state, v, pathPrefix, autoArgs, elems, true);
 
@@ -408,7 +408,7 @@ static void queryInstSources(EvalState & state,
             Value vRoot;
             loadSourceExpr(state, instSource.nixExprPath, vRoot);
             for (auto & i : args) {
-                Value & v(*findAlongAttrPath(state, i, *instSource.autoArgs, vRoot));
+                Value & v(*findAlongAttrPath(state, i, *instSource.autoArgs, vRoot).first);
                 getDerivations(state, v, "", *instSource.autoArgs, elems, true);
             }
             break;

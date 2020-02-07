@@ -309,7 +309,7 @@ static void _main(int argc, char * * argv)
         state->eval(e, vRoot);
 
         for (auto & i : attrPaths) {
-            Value & v(*findAlongAttrPath(*state, i, *autoArgs, vRoot));
+            Value & v(*findAlongAttrPath(*state, i, *autoArgs, vRoot).first);
             state->forceValue(v);
             getDerivations(*state, v, "", *autoArgs, drvs, false);
         }

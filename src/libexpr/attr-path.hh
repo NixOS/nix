@@ -9,7 +9,7 @@ namespace nix {
 
 MakeError(AttrPathNotFound, Error);
 
-Value * findAlongAttrPath(EvalState & state, const string & attrPath,
+std::pair<Value *, Pos> findAlongAttrPath(EvalState & state, const string & attrPath,
     Bindings & autoArgs, Value & vIn);
 
 /* Heuristic to find the filename and lineno or a nix value. */

@@ -250,7 +250,7 @@ struct InstallableAttrPath : InstallableValue
 
     Value * toValue(EvalState & state) override
     {
-        auto vRes = findAlongAttrPath(state, attrPath, *cmd.getAutoArgs(state), *v);
+        auto vRes = findAlongAttrPath(state, attrPath, *cmd.getAutoArgs(state), *v).first;
         state.forceValue(*vRes);
         return vRes;
     }
@@ -360,7 +360,7 @@ std::tuple<std::string, FlakeRef, flake::EvalCache::Derivation> InstallableFlake
             vOutputs = getFlakeOutputs(*state, lockedFlake);
 
         try {
-            auto * v = findAlongAttrPath(*state, attrPath, *emptyArgs, *vOutputs);
+            auto * v = findAlongAttrPath(*state, attrPath, *emptyArgs, *vOutputs).first;
             state->forceValue(*v);
 
             auto drvInfo = getDerivation(*state, *v, false);
@@ -401,7 +401,7 @@ Value * InstallableFlake::toValue(EvalState & state)
 
     for (auto & attrPath : getActualAttrPaths()) {
         try {
-            auto * v = findAlongAttrPath(state, attrPath, *emptyArgs, *vOutputs);
+            auto * v = findAlongAttrPath(state, attrPath, *emptyArgs, *vOutputs).first;
             state.forceValue(*v);
             return v;
         } catch (AttrPathNotFound & e) {
