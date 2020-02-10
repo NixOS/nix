@@ -1,4 +1,5 @@
 use crate::error::Error;
+use lazy_static::lazy_static;
 
 pub fn encoded_len(input_len: usize) -> usize {
     if input_len == 0 {
@@ -87,7 +88,9 @@ pub fn decode(input: &str) -> Result<Vec<u8>, crate::Error> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use assert_matches::assert_matches;
     use hex;
+    use proptest::proptest;
 
     #[test]
     fn test_encode() {
