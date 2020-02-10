@@ -1,30 +1,55 @@
+//! Error types
+
 use std::fmt;
 
+/// An error that can occur in this crate.
 #[derive(Debug)]
 pub enum Error {
+    /// The store path could not be resolved.
     InvalidPath(crate::store::StorePath),
+    /// The store path is in the wrong format.
     BadStorePath(std::path::PathBuf),
+    /// The store path does not exist in the store.
     NotInStore(std::path::PathBuf),
+    /// The NAR info is in the wrong format.
     BadNarInfo,
+    /// Base32 string is invalid.
     BadBase32,
+    /// The store path name is empty.
     StorePathNameEmpty,
+    /// The store path name is longer than 211 characters.
     StorePathNameTooLong,
+    /// The store path name contains unexpected characters.
     BadStorePathName,
+    /// The NAR size field is too big.
     NarSizeFieldTooBig,
+    /// The NAR string is not valid UTF-8.
     BadNarString,
+    /// The NAR padding contains bytes other than '0'.
     BadNarPadding,
+    /// The NAR version magic string has an unexpected value.
     BadNarVersionMagic,
+    /// An opening parenthesis was expected in the NAR file, but not found.
     MissingNarOpenTag,
+    /// A closing parenthesis was expected in the NAR file, but not found.
     MissingNarCloseTag,
+    /// A field was expected in the NAR file, but it is missing.
     MissingNarField,
+    /// An unexpected NAR field was encountered.
     BadNarField(String),
+    /// The 'executable' field is non-empty.
     BadExecutableField,
+    /// An I/O error occurred.
     IOError(std::io::Error),
+    /// An HTTP error occurred.
     #[cfg(unused)]
     HttpError(hyper::error::Error),
+    /// An uncategorized error occurred.
     Misc(String),
+    /// A C++ exception occurred.
     #[cfg(not(test))]
     Foreign(CppException),
+    /// The tar file member name is invalid.
     BadTarFileMemberName(String),
 }
 
@@ -74,6 +99,37 @@ impl fmt::Display for Error {
             Error::BadTarFileMemberName(s) => {
                 write!(f, "tar archive contains illegal file name '{}'", s)
             }
+        }
+    }
+}
+
+impl std::error::Error for Error {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match self {
+            Error::IOError(err) => Some(err),
+            #[cfg(unused)]
+            Error::HttpError(err) => Some(err),
+            #[cfg(not(test))]
+            Error::Foreign(_) => None, // Should the underlying error be considered a "source" in the Rust error sense?
+            Error::InvalidPath(_)
+            | Error::BadNarInfo
+            | Error::BadStorePath(_)
+            | Error::NotInStore(_)
+            | Error::BadBase32
+            | Error::StorePathNameEmpty
+            | Error::StorePathNameTooLong
+            | Error::BadStorePathName
+            | Error::NarSizeFieldTooBig
+            | Error::BadNarString
+            | Error::BadNarPadding
+            | Error::BadNarVersionMagic
+            | Error::MissingNarOpenTag
+            | Error::MissingNarCloseTag
+            | Error::MissingNarField
+            | Error::BadNarField(_)
+            | Error::BadExecutableField
+            | Error::Misc(_)
+            | Error::BadTarFileMemberName(_) => None,
         }
     }
 }
