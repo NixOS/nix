@@ -138,6 +138,7 @@ impl fmt::Display for StorePathName {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use assert_matches::assert_matches;
 
     #[test]
     fn test_parse() {
