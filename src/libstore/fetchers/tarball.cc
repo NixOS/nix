@@ -121,9 +121,7 @@ struct TarballInputScheme : InputScheme
         if (auto hash = maybeGetStrAttr(attrs, "hash"))
             // FIXME: require SRI hash.
             input->hash = Hash(*hash);
-        if (auto narHash = maybeGetStrAttr(attrs, "narHash"))
-            // FIXME: require SRI hash.
-            input->narHash = Hash(*narHash);
+
         return input;
     }
 };

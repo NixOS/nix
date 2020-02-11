@@ -32,7 +32,12 @@ std::unique_ptr<Input> inputFromAttrs(const Input::Attrs & attrs)
 {
     for (auto & inputScheme : *inputSchemes) {
         auto res = inputScheme->inputFromAttrs(attrs);
-        if (res) return res;
+        if (res) {
+            if (auto narHash = maybeGetStrAttr(attrs, "narHash"))
+                // FIXME: require SRI hash.
+                res->narHash = Hash(*narHash);
+            return res;
+        }
     }
     throw Error("input '%s' is unsupported", attrsToJson(attrs));
 }
@@ -106,8 +111,8 @@ std::pair<Tree, std::shared_ptr<const Input>> Input::fetchTree(ref<Store> store)
         assert(input->narHash == tree.info.narHash);
 
     if (narHash && narHash != input->narHash)
-        throw Error("NAR hash mismatch in input '%s', expected '%s', got '%s'",
-            to_string(), narHash->to_string(SRI), input->narHash->to_string(SRI));
+        throw Error("NAR hash mismatch in input '%s' (%s), expected '%s', got '%s'",
+            to_string(), tree.actualPath, narHash->to_string(SRI), input->narHash->to_string(SRI));
 
     return {std::move(tree), input};
 }
