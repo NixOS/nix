@@ -80,7 +80,7 @@ public:
 
     static size_t wordsFor(unsigned short size)
     {
-        return 1 + size;
+        return 2 + size;
     }
 };
 
