@@ -44,15 +44,15 @@ protected:
         }
     }
 
-    PathSet queryAllValidPaths() override
+    StorePathSet queryAllValidPaths() override
     {
-        PathSet paths;
+        StorePathSet paths;
 
         for (auto & entry : readDirectory(binaryCacheDir)) {
             if (entry.name.size() != 40 ||
                 !hasSuffix(entry.name, ".narinfo"))
                 continue;
-            paths.insert(storeDir + "/" + entry.name.substr(0, entry.name.size() - 8));
+            paths.insert(parseStorePath(storeDir + "/" + entry.name.substr(0, entry.name.size() - 8)));
         }
 
         return paths;
@@ -63,6 +63,8 @@ protected:
 void LocalBinaryCacheStore::init()
 {
     createDirs(binaryCacheDir + "/nar");
+    if (writeDebugInfo)
+        createDirs(binaryCacheDir + "/debuginfo");
     BinaryCacheStore::init();
 }
 

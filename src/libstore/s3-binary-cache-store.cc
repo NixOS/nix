@@ -205,11 +205,12 @@ struct S3BinaryCacheStoreImpl : public S3BinaryCacheStore
 
     void init() override
     {
-        if (!diskCache->cacheExists(getUri(), wantMassQuery_, priority)) {
-
+        if (auto cacheInfo = diskCache->cacheExists(getUri())) {
+            wantMassQuery.setDefault(cacheInfo->wantMassQuery ? "true" : "false");
+            priority.setDefault(fmt("%d", cacheInfo->priority));
+        } else {
             BinaryCacheStore::init();
-
-            diskCache->createCache(getUri(), storeDir, wantMassQuery_, priority);
+            diskCache->createCache(getUri(), storeDir, wantMassQuery, priority);
         }
     }
 
@@ -222,7 +223,7 @@ struct S3BinaryCacheStoreImpl : public S3BinaryCacheStore
        fetches the .narinfo file, rather than first checking for its
        existence via a HEAD request. Since .narinfos are small, doing
        a GET is unlikely to be slower than HEAD. */
-    bool isValidPathUncached(const Path & storePath) override
+    bool isValidPathUncached(const StorePath & storePath) override
     {
         try {
             queryPathInfo(storePath);
@@ -382,9 +383,9 @@ struct S3BinaryCacheStoreImpl : public S3BinaryCacheStore
             throw NoSuchBinaryCacheFile("file '%s' does not exist in binary cache '%s'", path, getUri());
     }
 
-    PathSet queryAllValidPaths() override
+    StorePathSet queryAllValidPaths() override
     {
-        PathSet paths;
+        StorePathSet paths;
         std::string marker;
 
         do {
@@ -405,7 +406,7 @@ struct S3BinaryCacheStoreImpl : public S3BinaryCacheStore
             for (auto object : contents) {
                 auto & key = object.GetKey();
                 if (key.size() != 40 || !hasSuffix(key, ".narinfo")) continue;
-                paths.insert(storeDir + "/" + key.substr(0, key.size() - 8));
+                paths.insert(parseStorePath(storeDir + "/" + key.substr(0, key.size() - 8) + "-unknown"));
             }
 
             marker = res.GetNextMarker();

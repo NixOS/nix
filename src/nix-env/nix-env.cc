@@ -124,11 +124,10 @@ static void getAllExprs(EvalState & state,
             string attrName = i;
             if (hasSuffix(attrName, ".nix"))
                 attrName = string(attrName, 0, attrName.size() - 4);
-            if (attrs.find(attrName) != attrs.end()) {
+            if (!attrs.insert(attrName).second) {
                 printError(format("warning: name collision in input Nix expressions, skipping '%1%'") % path2);
                 continue;
             }
-            attrs.insert(attrName);
             /* Load the expression on demand. */
             Value & vFun = state.getBuiltin("import");
             auto vArg = state.allocValue();
@@ -193,12 +192,6 @@ static void loadDerivations(EvalState & state, Path nixExprPath,
 }
 
 
-static Path getDefNixExprPath()
-{
-    return getHome() + "/.nix-defexpr";
-}
-
-
 static long getPriority(EvalState & state, DrvInfo & drv)
 {
     return drv.queryMetaInt("priority", 0);
@@ -215,10 +208,11 @@ static long comparePriorities(EvalState & state, DrvInfo & drv1, DrvInfo & drv2)
 // at a time.
 static bool isPrebuilt(EvalState & state, DrvInfo & elem)
 {
-    Path path = elem.queryOutPath();
+    auto path = state.store->parseStorePath(elem.queryOutPath());
     if (state.store->isValidPath(path)) return true;
-    PathSet ps = state.store->querySubstitutablePaths({path});
-    return ps.find(path) != ps.end();
+    StorePathSet paths;
+    paths.insert(path.clone()); // FIXME: why doesn't StorePathSet{path.clone()} work?
+    return state.store->querySubstitutablePaths(paths).count(path);
 }
 
 
@@ -307,10 +301,8 @@ static DrvInfos filterBySelector(EvalState & state, const DrvInfos & allElems,
         /* Insert only those elements in the final list that we
            haven't inserted before. */
         for (auto & j : matches)
-            if (done.find(j.second) == done.end()) {
-                done.insert(j.second);
+            if (done.insert(j.second).second)
                 elems.push_back(j.first);
-            }
     }
 
     checkSelectorUse(selectors);
@@ -381,24 +373,21 @@ static void queryInstSources(EvalState & state,
         case srcStorePaths: {
 
             for (auto & i : args) {
-                Path path = state.store->followLinksToStorePath(i);
+                auto path = state.store->followLinksToStorePath(i);
 
-                string name = baseNameOf(path);
-                string::size_type dash = name.find('-');
-                if (dash != string::npos)
-                    name = string(name, dash + 1);
+                std::string name(path.name());
 
                 DrvInfo elem(state, "", nullptr);
                 elem.setName(name);
 
-                if (isDerivation(path)) {
-                    elem.setDrvPath(path);
-                    elem.setOutPath(state.store->derivationFromPath(path).findOutput("out"));
+                if (path.isDerivation()) {
+                    elem.setDrvPath(state.store->printStorePath(path));
+                    elem.setOutPath(state.store->printStorePath(state.store->derivationFromPath(path).findOutput("out")));
                     if (name.size() >= drvExtension.size() &&
                         string(name, name.size() - drvExtension.size()) == drvExtension)
                         name = string(name, 0, name.size() - drvExtension.size());
                 }
-                else elem.setOutPath(path);
+                else elem.setOutPath(state.store->printStorePath(path));
 
                 elems.push_back(elem);
             }
@@ -431,13 +420,13 @@ static void queryInstSources(EvalState & state,
 
 static void printMissing(EvalState & state, DrvInfos & elems)
 {
-    PathSet targets;
+    std::vector<StorePathWithOutputs> targets;
     for (auto & i : elems) {
         Path drvPath = i.queryDrvPath();
         if (drvPath != "")
-            targets.insert(drvPath);
+            targets.emplace_back(state.store->parseStorePath(drvPath));
         else
-            targets.insert(i.queryOutPath());
+            targets.emplace_back(state.store->parseStorePath(i.queryOutPath()));
     }
 
     printMissing(state.store, targets);
@@ -707,15 +696,15 @@ static void opSet(Globals & globals, Strings opFlags, Strings opArgs)
         drv.setName(globals.forceName);
 
     if (drv.queryDrvPath() != "") {
-        PathSet paths = {drv.queryDrvPath()};
+        std::vector<StorePathWithOutputs> paths{globals.state->store->parseStorePath(drv.queryDrvPath())};
         printMissing(globals.state->store, paths);
         if (globals.dryRun) return;
         globals.state->store->buildPaths(paths, globals.state->repair ? bmRepair : bmNormal);
-    }
-    else {
-        printMissing(globals.state->store, {drv.queryOutPath()});
+    } else {
+        printMissing(globals.state->store,
+            {globals.state->store->parseStorePath(drv.queryOutPath())});
         if (globals.dryRun) return;
-        globals.state->store->ensurePath(drv.queryOutPath());
+        globals.state->store->ensurePath(globals.state->store->parseStorePath(drv.queryOutPath()));
     }
 
     debug(format("switching to new user environment"));
@@ -739,7 +728,7 @@ static void uninstallDerivations(Globals & globals, Strings & selectors,
             for (auto & j : selectors)
                 /* !!! the repeated calls to followLinksToStorePath()
                    are expensive, should pre-compute them. */
-                if ((isPath(j) && i.queryOutPath() == globals.state->store->followLinksToStorePath(j))
+                if ((isPath(j) && globals.state->store->parseStorePath(i.queryOutPath()) == globals.state->store->followLinksToStorePath(j))
                     || DrvName(j).matches(drvName))
                 {
                     printInfo("uninstalling '%s'", i.queryName());
@@ -861,7 +850,10 @@ static void queryJSON(Globals & globals, vector<DrvInfo> & elems)
     for (auto & i : elems) {
         JSONObject pkgObj = topObj.object(i.attrPath);
 
-        pkgObj.attr("name", i.queryName());
+        auto drvName = DrvName(i.queryName());
+        pkgObj.attr("name", drvName.fullName);
+        pkgObj.attr("pname", drvName.name);
+        pkgObj.attr("version", drvName.version);
         pkgObj.attr("system", i.querySystem());
 
         JSONObject metaObj = pkgObj.object("meta");
@@ -960,12 +952,13 @@ static void opQuery(Globals & globals, Strings opFlags, Strings opArgs)
 
 
     /* Query which paths have substitutes. */
-    PathSet validPaths, substitutablePaths;
+    StorePathSet validPaths;
+    StorePathSet substitutablePaths;
     if (printStatus || globals.prebuiltOnly) {
-        PathSet paths;
+        StorePathSet paths;
         for (auto & i : elems)
             try {
-                paths.insert(i.queryOutPath());
+                paths.insert(globals.state->store->parseStorePath(i.queryOutPath()));
             } catch (AssertionError & e) {
                 printMsg(lvlTalkative, "skipping derivation named '%s' which gives an assertion failure", i.queryName());
                 i.setFailed();
@@ -996,8 +989,8 @@ static void opQuery(Globals & globals, Strings opFlags, Strings opArgs)
             //Activity act(*logger, lvlDebug, format("outputting query result '%1%'") % i.attrPath);
 
             if (globals.prebuiltOnly &&
-                validPaths.find(i.queryOutPath()) == validPaths.end() &&
-                substitutablePaths.find(i.queryOutPath()) == substitutablePaths.end())
+                !validPaths.count(globals.state->store->parseStorePath(i.queryOutPath())) &&
+                !substitutablePaths.count(globals.state->store->parseStorePath(i.queryOutPath())))
                 continue;
 
             /* For table output. */
@@ -1008,9 +1001,9 @@ static void opQuery(Globals & globals, Strings opFlags, Strings opArgs)
 
             if (printStatus) {
                 Path outPath = i.queryOutPath();
-                bool hasSubs = substitutablePaths.find(outPath) != substitutablePaths.end();
+                bool hasSubs = substitutablePaths.count(globals.state->store->parseStorePath(outPath));
                 bool isInstalled = installed.find(outPath) != installed.end();
-                bool isValid = validPaths.find(outPath) != validPaths.end();
+                bool isValid = validPaths.count(globals.state->store->parseStorePath(outPath));
                 if (xmlOutput) {
                     attrs["installed"] = isInstalled ? "1" : "0";
                     attrs["valid"] = isValid ? "1" : "0";
@@ -1027,10 +1020,14 @@ static void opQuery(Globals & globals, Strings opFlags, Strings opArgs)
             else if (printAttrPath)
                 columns.push_back(i.attrPath);
 
-            if (xmlOutput)
-                attrs["name"] = i.queryName();
-            else if (printName)
+            if (xmlOutput) {
+                auto drvName = DrvName(i.queryName());
+                attrs["name"] = drvName.fullName;
+                attrs["pname"] = drvName.name;
+                attrs["version"] = drvName.version;
+            } else if (printName) {
                 columns.push_back(i.queryName());
+            }
 
             if (compareVersions) {
                 /* Compare this element against the versions of the
@@ -1324,8 +1321,21 @@ static int _main(int argc, char * * argv)
         Globals globals;
 
         globals.instSource.type = srcUnknown;
-        globals.instSource.nixExprPath = getDefNixExprPath();
+        globals.instSource.nixExprPath = getHome() + "/.nix-defexpr";
         globals.instSource.systemFilter = "*";
+
+        if (!pathExists(globals.instSource.nixExprPath)) {
+            try {
+                createDirs(globals.instSource.nixExprPath);
+                replaceSymlink(
+                    fmt("%s/profiles/per-user/%s/channels", settings.nixStateDir, getUserName()),
+                    globals.instSource.nixExprPath + "/channels");
+                if (getuid() != 0)
+                    replaceSymlink(
+                        fmt("%s/profiles/per-user/root/channels", settings.nixStateDir),
+                        globals.instSource.nixExprPath + "/channels_root");
+            } catch (Error &) { }
+        }
 
         globals.dryRun = false;
         globals.preserveInstalled = false;
@@ -1337,7 +1347,7 @@ static int _main(int argc, char * * argv)
             using LegacyArgs::LegacyArgs;
         };
 
-        MyArgs myArgs(baseNameOf(argv[0]), [&](Strings::iterator & arg, const Strings::iterator & end) {
+        MyArgs myArgs(std::string(baseNameOf(argv[0])), [&](Strings::iterator & arg, const Strings::iterator & end) {
             Operation oldOp = op;
 
             if (*arg == "--help")
@@ -1415,13 +1425,22 @@ static int _main(int argc, char * * argv)
         globals.instSource.autoArgs = myArgs.getAutoArgs(*globals.state);
 
         if (globals.profile == "")
-            globals.profile = getEnv("NIX_PROFILE", "");
+            globals.profile = getEnv("NIX_PROFILE").value_or("");
 
         if (globals.profile == "") {
             Path profileLink = getHome() + "/.nix-profile";
-            globals.profile = pathExists(profileLink)
-                ? absPath(readLink(profileLink), dirOf(profileLink))
-                : canonPath(settings.nixStateDir + "/profiles/default");
+            try {
+                if (!pathExists(profileLink)) {
+                    replaceSymlink(
+                        getuid() == 0
+                        ? settings.nixStateDir + "/profiles/default"
+                        : fmt("%s/profiles/per-user/%s/profile", settings.nixStateDir, getUserName()),
+                        profileLink);
+                }
+                globals.profile = absPath(readLink(profileLink), dirOf(profileLink));
+            } catch (Error &) {
+                globals.profile = profileLink;
+            }
         }
 
         op(globals, opFlags, opArgs);

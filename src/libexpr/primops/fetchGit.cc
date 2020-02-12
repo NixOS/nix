@@ -4,6 +4,7 @@
 #include "store-api.hh"
 #include "pathlocks.hh"
 #include "hash.hh"
+#include "tarfile.hh"
 
 #include <sys/time.h>
 
@@ -38,16 +39,14 @@ GitInfo exportGit(ref<Store> store, const std::string & uri,
 
         try {
             runProgram("git", true, { "-C", uri, "diff-index", "--quiet", "HEAD", "--" });
-        } catch (ExecError e) {
+        } catch (ExecError & e) {
             if (!WIFEXITED(e.status) || WEXITSTATUS(e.status) != 1) throw;
             clean = false;
         }
 
         if (!clean) {
 
-            /* This is an unclean working tree. So copy all tracked
-               files. */
-
+            /* This is an unclean working tree. So copy all tracked files. */
             GitInfo gitInfo;
             gitInfo.rev = "0000000000000000000000000000000000000000";
             gitInfo.shortRev = std::string(gitInfo.rev, 0, 7);
@@ -70,7 +69,7 @@ GitInfo exportGit(ref<Store> store, const std::string & uri,
                 return files.count(file);
             };
 
-            gitInfo.storePath = store->addToStore("source", uri, true, htSHA256, filter);
+            gitInfo.storePath = store->printStorePath(store->addToStore("source", uri, true, htSHA256, filter));
 
             return gitInfo;
         }
@@ -94,7 +93,11 @@ GitInfo exportGit(ref<Store> store, const std::string & uri,
         runProgram("git", true, { "init", "--bare", cacheDir });
     }
 
-    Path localRefFile = cacheDir + "/refs/heads/" + *ref;
+    Path localRefFile;
+    if (ref->compare(0, 5, "refs/") == 0)
+        localRefFile = cacheDir + "/" + *ref;
+    else
+        localRefFile = cacheDir + "/refs/heads/" + *ref;
 
     bool doFetch;
     time_t now = time(0);
@@ -116,7 +119,7 @@ GitInfo exportGit(ref<Store> store, const std::string & uri,
            git fetch to update the local ref to the remote ref. */
         struct stat st;
         doFetch = stat(localRefFile.c_str(), &st) != 0 ||
-            st.st_mtime + settings.tarballTtl <= now;
+            (uint64_t) st.st_mtime + settings.tarballTtl <= (uint64_t) now;
     }
     if (doFetch)
     {
@@ -153,7 +156,7 @@ GitInfo exportGit(ref<Store> store, const std::string & uri,
 
         gitInfo.storePath = json["storePath"];
 
-        if (store->isValidPath(gitInfo.storePath)) {
+        if (store->isValidPath(store->parseStorePath(gitInfo.storePath))) {
             gitInfo.revCount = json["revCount"];
             return gitInfo;
         }
@@ -162,16 +165,18 @@ GitInfo exportGit(ref<Store> store, const std::string & uri,
         if (e.errNo != ENOENT) throw;
     }
 
-    // FIXME: should pipe this, or find some better way to extract a
-    // revision.
-    auto tar = runProgram("git", true, { "-C", cacheDir, "archive", gitInfo.rev });
+    auto source = sinkToSource([&](Sink & sink) {
+        RunOptions gitOptions("git", { "-C", cacheDir, "archive", gitInfo.rev });
+        gitOptions.standardOut = &sink;
+        runProgram2(gitOptions);
+    });
 
     Path tmpDir = createTempDir();
     AutoDelete delTmpDir(tmpDir, true);
 
-    runProgram("tar", true, { "x", "-C", tmpDir }, tar);
+    unpackTarfile(*source, tmpDir);
 
-    gitInfo.storePath = store->addToStore(name, tmpDir);
+    gitInfo.storePath = store->printStorePath(store->addToStore(name, tmpDir));
 
     gitInfo.revCount = std::stoull(runProgram("git", true, { "-C", cacheDir, "rev-list", "--count", gitInfo.rev }));
 
@@ -235,7 +240,7 @@ static void prim_fetchGit(EvalState & state, const Pos & pos, Value * * args, Va
     v.attrs->sort();
 
     if (state.allowedPaths)
-        state.allowedPaths->insert(gitInfo.storePath);
+        state.allowedPaths->insert(state.store->toRealPath(gitInfo.storePath));
 }
 
 static RegisterPrimOp r("fetchGit", 1, prim_fetchGit);

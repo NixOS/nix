@@ -8,6 +8,7 @@
 #include "compression.hh"
 #include "pathlocks.hh"
 #include "finally.hh"
+#include "tarfile.hh"
 
 #ifdef ENABLE_S3
 #include <aws/core/client/ClientConfiguration.h>
@@ -30,25 +31,13 @@ using namespace std::string_literals;
 
 namespace nix {
 
-struct DownloadSettings : Config
-{
-    Setting<bool> enableHttp2{this, true, "http2",
-        "Whether to enable HTTP/2 support."};
-
-    Setting<std::string> userAgentSuffix{this, "", "user-agent-suffix",
-        "String appended to the user agent in HTTP requests."};
-
-    Setting<size_t> httpConnections{this, 25, "http-connections",
-        "Number of parallel HTTP connections.",
-        {"binary-caches-parallel-connections"}};
-
-    Setting<unsigned long> connectTimeout{this, 0, "connect-timeout",
-        "Timeout for connecting to servers during downloads. 0 means use curl's builtin default."};
-};
-
-static DownloadSettings downloadSettings;
+DownloadSettings downloadSettings;
 
 static GlobalConfig::Register r1(&downloadSettings);
+
+CachedDownloadRequest::CachedDownloadRequest(const std::string & uri)
+    : uri(uri), ttl(settings.tarballTtl)
+{ }
 
 std::string resolveUri(const std::string & uri)
 {
@@ -87,19 +76,24 @@ struct CurlDownloader : public Downloader
 
         std::string encoding;
 
+        bool acceptRanges = false;
+
+        curl_off_t writtenToSink = 0;
+
         DownloadItem(CurlDownloader & downloader,
             const DownloadRequest & request,
-            Callback<DownloadResult> callback)
+            Callback<DownloadResult> && callback)
             : downloader(downloader)
             , request(request)
             , act(*logger, lvlTalkative, actDownload,
                 fmt(request.data ? "uploading '%s'" : "downloading '%s'", request.uri),
                 {request.uri}, request.parentAct)
-            , callback(callback)
+            , callback(std::move(callback))
             , finalSink([this](const unsigned char * data, size_t len) {
-                if (this->request.dataCallback)
+                if (this->request.dataCallback) {
+                    writtenToSink += len;
                     this->request.dataCallback((char *) data, len);
-                else
+                } else
                     this->result.data->append((char *) data, len);
               })
         {
@@ -177,6 +171,7 @@ struct CurlDownloader : public Downloader
                 status = ss.size() >= 2 ? ss[1] : "";
                 result.data = std::make_shared<std::string>();
                 result.bodySize = 0;
+                acceptRanges = false;
                 encoding = "";
             } else {
                 auto i = line.find(':');
@@ -194,7 +189,9 @@ struct CurlDownloader : public Downloader
                             return 0;
                         }
                     } else if (name == "content-encoding")
-                        encoding = trim(string(line, i + 1));;
+                        encoding = trim(string(line, i + 1));
+                    else if (name == "accept-ranges" && toLower(trim(std::string(line, i + 1))) == "bytes")
+                        acceptRanges = true;
                 }
             }
             return realSize;
@@ -244,8 +241,6 @@ struct CurlDownloader : public Downloader
             return ((DownloadItem *) userp)->readCallback(buffer, size, nitems);
         }
 
-        long lowSpeedTimeout = 300;
-
         void init()
         {
             if (!req) req = curl_easy_init();
@@ -270,6 +265,8 @@ struct CurlDownloader : public Downloader
             #if LIBCURL_VERSION_NUM >= 0x072f00
             if (downloadSettings.enableHttp2)
                 curl_easy_setopt(req, CURLOPT_HTTP_VERSION, CURL_HTTP_VERSION_2TLS);
+            else
+                curl_easy_setopt(req, CURLOPT_HTTP_VERSION, CURL_HTTP_VERSION_1_1);
             #endif
             curl_easy_setopt(req, CURLOPT_WRITEFUNCTION, DownloadItem::writeCallbackWrapper);
             curl_easy_setopt(req, CURLOPT_WRITEDATA, this);
@@ -293,6 +290,7 @@ struct CurlDownloader : public Downloader
             }
 
             if (request.verifyTLS) {
+                debug("verify TLS: Nix CA file = '%s'", settings.caFile);
                 if (settings.caFile != "")
                     curl_easy_setopt(req, CURLOPT_CAINFO, settings.caFile.c_str());
             } else {
@@ -303,12 +301,15 @@ struct CurlDownloader : public Downloader
             curl_easy_setopt(req, CURLOPT_CONNECTTIMEOUT, downloadSettings.connectTimeout.get());
 
             curl_easy_setopt(req, CURLOPT_LOW_SPEED_LIMIT, 1L);
-            curl_easy_setopt(req, CURLOPT_LOW_SPEED_TIME, lowSpeedTimeout);
+            curl_easy_setopt(req, CURLOPT_LOW_SPEED_TIME, downloadSettings.stalledDownloadTimeout.get());
 
             /* If no file exist in the specified path, curl continues to work
                anyway as if netrc support was disabled. */
             curl_easy_setopt(req, CURLOPT_NETRC_FILE, settings.netrcFile.get().c_str());
             curl_easy_setopt(req, CURLOPT_NETRC, CURL_NETRC_OPTIONAL);
+
+            if (writtenToSink)
+                curl_easy_setopt(req, CURLOPT_RESUME_FROM_LARGE, writtenToSink);
 
             result.data = std::make_shared<std::string>();
             result.bodySize = 0;
@@ -319,16 +320,21 @@ struct CurlDownloader : public Downloader
             long httpStatus = 0;
             curl_easy_getinfo(req, CURLINFO_RESPONSE_CODE, &httpStatus);
 
-            char * effectiveUrlCStr;
-            curl_easy_getinfo(req, CURLINFO_EFFECTIVE_URL, &effectiveUrlCStr);
-            if (effectiveUrlCStr)
-                result.effectiveUrl = effectiveUrlCStr;
+            char * effectiveUriCStr;
+            curl_easy_getinfo(req, CURLINFO_EFFECTIVE_URL, &effectiveUriCStr);
+            if (effectiveUriCStr)
+                result.effectiveUri = effectiveUriCStr;
 
             debug("finished %s of '%s'; curl status = %d, HTTP status = %d, body = %d bytes",
                 request.verb(), request.uri, code, httpStatus, result.bodySize);
 
-            if (decompressionSink)
-                decompressionSink->finish();
+            if (decompressionSink) {
+                try {
+                    decompressionSink->finish();
+                } catch (...) {
+                    writeException = std::current_exception();
+                }
+            }
 
             if (code == CURLE_WRITE_ERROR && result.etag == request.expectedETag) {
                 code = CURLE_OK;
@@ -339,18 +345,12 @@ struct CurlDownloader : public Downloader
                 failEx(writeException);
 
             else if (code == CURLE_OK &&
-                (httpStatus == 200 || httpStatus == 201 || httpStatus == 204 || httpStatus == 304 || httpStatus == 226 /* FTP */ || httpStatus == 0 /* other protocol */))
+                (httpStatus == 200 || httpStatus == 201 || httpStatus == 204 || httpStatus == 206 || httpStatus == 304 || httpStatus == 226 /* FTP */ || httpStatus == 0 /* other protocol */))
             {
                 result.cached = httpStatus == 304;
+                act.progress(result.bodySize, result.bodySize);
                 done = true;
-
-                try {
-                    act.progress(result.bodySize, result.bodySize);
-                    callback(std::move(result));
-                } catch (...) {
-                    done = true;
-                    callback.rethrow();
-                }
+                callback(std::move(result));
             }
 
             else {
@@ -363,9 +363,10 @@ struct CurlDownloader : public Downloader
                 } else if (httpStatus == 401 || httpStatus == 403 || httpStatus == 407) {
                     // Don't retry on authentication/authorization failures
                     err = Forbidden;
-                } else if (httpStatus >= 400 && httpStatus < 500 && httpStatus != 408) {
+                } else if (httpStatus >= 400 && httpStatus < 500 && httpStatus != 408 && httpStatus != 429) {
                     // Most 4xx errors are client errors and are probably not worth retrying:
                     //   * 408 means the server timed out waiting for us, so we try again
+                    //   * 429 means too many requests, so we retry (with a delay)
                     err = Misc;
                 } else if (httpStatus == 501 || httpStatus == 505 || httpStatus == 511) {
                     // Let's treat most 5xx (server) errors as transient, except for a handful:
@@ -412,10 +413,20 @@ struct CurlDownloader : public Downloader
                             request.verb(), request.uri, curl_easy_strerror(code), code));
 
                 /* If this is a transient error, then maybe retry the
-                   download after a while. */
-                if (err == Transient && attempt < request.tries) {
+                   download after a while. If we're writing to a
+                   sink, we can only retry if the server supports
+                   ranged requests. */
+                if (err == Transient
+                    && attempt < request.tries
+                    && (!this->request.dataCallback
+                        || writtenToSink == 0
+                        || (acceptRanges && encoding.empty())))
+                {
                     int ms = request.baseRetryTimeMs * std::pow(2.0f, attempt - 1 + std::uniform_real_distribution<>(0.0, 0.5)(downloader.mt19937));
-                    printError(format("warning: %s; retrying in %d ms") % exc.what() % ms);
+                    if (writtenToSink)
+                        warn("%s; retrying from offset %d in %d ms", exc.what(), writtenToSink, ms);
+                    else
+                        warn("%s; retrying in %d ms", exc.what(), ms);
                     embargo = std::chrono::steady_clock::now() + std::chrono::milliseconds(ms);
                     downloader.enqueueItem(shared_from_this());
                 }
@@ -588,7 +599,7 @@ struct CurlDownloader : public Downloader
             workerThreadMain();
         } catch (nix::Interrupted & e) {
         } catch (std::exception & e) {
-            printError(format("unexpected error in download thread: %s") % e.what());
+            printError("unexpected error in download thread: %s", e.what());
         }
 
         {
@@ -640,10 +651,10 @@ struct CurlDownloader : public Downloader
 #ifdef ENABLE_S3
                 auto [bucketName, key, params] = parseS3Uri(request.uri);
 
-                std::string profile = get(params, "profile", "");
-                std::string region = get(params, "region", Aws::Region::US_EAST_1);
-                std::string scheme = get(params, "scheme", "");
-                std::string endpoint = get(params, "endpoint", "");
+                std::string profile = get(params, "profile").value_or("");
+                std::string region = get(params, "region").value_or(Aws::Region::US_EAST_1);
+                std::string scheme = get(params, "scheme").value_or("");
+                std::string endpoint = get(params, "endpoint").value_or("");
 
                 S3Helper s3Helper(profile, region, scheme, endpoint);
 
@@ -661,7 +672,7 @@ struct CurlDownloader : public Downloader
             return;
         }
 
-        enqueueItem(std::make_shared<DownloadItem>(*this, request, callback));
+        enqueueItem(std::make_shared<DownloadItem>(*this, request, std::move(callback)));
     }
 };
 
@@ -790,20 +801,26 @@ void Downloader::download(DownloadRequest && request, Sink & sink)
     }
 }
 
-Path Downloader::downloadCached(ref<Store> store, const string & url_, bool unpack, string name, const Hash & expectedHash, string * effectiveUrl, int ttl)
+CachedDownloadResult Downloader::downloadCached(
+    ref<Store> store, const CachedDownloadRequest & request)
 {
-    auto url = resolveUri(url_);
+    auto url = resolveUri(request.uri);
 
+    auto name = request.name;
     if (name == "") {
         auto p = url.rfind('/');
         if (p != string::npos) name = string(url, p + 1);
     }
 
-    Path expectedStorePath;
-    if (expectedHash) {
-        expectedStorePath = store->makeFixedOutputPath(unpack, expectedHash, name);
-        if (store->isValidPath(expectedStorePath))
-            return store->toRealPath(expectedStorePath);
+    std::optional<StorePath> expectedStorePath;
+    if (request.expectedHash) {
+        expectedStorePath = store->makeFixedOutputPath(request.unpack, request.expectedHash, name);
+        if (store->isValidPath(*expectedStorePath)) {
+            CachedDownloadResult result;
+            result.storePath = store->printStorePath(*expectedStorePath);
+            result.path = store->toRealPath(result.storePath);
+            return result;
+        }
     }
 
     Path cacheDir = getCacheDir() + "/nix/tarballs";
@@ -816,95 +833,105 @@ Path Downloader::downloadCached(ref<Store> store, const string & url_, bool unpa
 
     PathLocks lock({fileLink}, fmt("waiting for lock on '%1%'...", fileLink));
 
-    Path storePath;
+    std::optional<StorePath> storePath;
 
     string expectedETag;
 
     bool skip = false;
 
+    CachedDownloadResult result;
+
     if (pathExists(fileLink) && pathExists(dataFile)) {
-        storePath = readLink(fileLink);
-        store->addTempRoot(storePath);
-        if (store->isValidPath(storePath)) {
+        storePath = store->parseStorePath(readLink(fileLink));
+        // FIXME
+        store->addTempRoot(*storePath);
+        if (store->isValidPath(*storePath)) {
             auto ss = tokenizeString<vector<string>>(readFile(dataFile), "\n");
             if (ss.size() >= 3 && ss[0] == url) {
                 time_t lastChecked;
-                if (string2Int(ss[2], lastChecked) && lastChecked + ttl >= time(0)) {
+                if (string2Int(ss[2], lastChecked) && (uint64_t) lastChecked + request.ttl >= (uint64_t) time(0)) {
                     skip = true;
-                    if (effectiveUrl)
-                        *effectiveUrl = url_;
+                    result.effectiveUri = request.uri;
+                    result.etag = ss[1];
                 } else if (!ss[1].empty()) {
                     debug(format("verifying previous ETag '%1%'") % ss[1]);
                     expectedETag = ss[1];
                 }
             }
         } else
-            storePath = "";
+            storePath.reset();
     }
 
     if (!skip) {
 
         try {
-            DownloadRequest request(url);
-            request.expectedETag = expectedETag;
-            auto res = download(request);
-            if (effectiveUrl)
-                *effectiveUrl = res.effectiveUrl;
+            DownloadRequest request2(url);
+            request2.expectedETag = expectedETag;
+            auto res = download(request2);
+            result.effectiveUri = res.effectiveUri;
+            result.etag = res.etag;
 
             if (!res.cached) {
-                ValidPathInfo info;
                 StringSink sink;
                 dumpString(*res.data, sink);
-                Hash hash = hashString(expectedHash ? expectedHash.type : htSHA256, *res.data);
-                info.path = store->makeFixedOutputPath(false, hash, name);
+                Hash hash = hashString(request.expectedHash ? request.expectedHash.type : htSHA256, *res.data);
+                ValidPathInfo info(store->makeFixedOutputPath(false, hash, name));
                 info.narHash = hashString(htSHA256, *sink.s);
                 info.narSize = sink.s->size();
                 info.ca = makeFixedOutputCA(false, hash);
                 store->addToStore(info, sink.s, NoRepair, NoCheckSigs);
-                storePath = info.path;
+                storePath = info.path.clone();
             }
 
-            assert(!storePath.empty());
-            replaceSymlink(storePath, fileLink);
+            assert(storePath);
+            replaceSymlink(store->printStorePath(*storePath), fileLink);
 
             writeFile(dataFile, url + "\n" + res.etag + "\n" + std::to_string(time(0)) + "\n");
         } catch (DownloadError & e) {
-            if (storePath.empty()) throw;
-            printError(format("warning: %1%; using cached result") % e.msg());
+            if (!storePath) throw;
+            warn("warning: %s; using cached result", e.msg());
+            result.etag = expectedETag;
         }
     }
 
-    if (unpack) {
-        Path unpackedLink = cacheDir + "/" + baseNameOf(storePath) + "-unpacked";
+    if (request.unpack) {
+        Path unpackedLink = cacheDir + "/" + ((std::string) storePath->to_string()) + "-unpacked";
         PathLocks lock2({unpackedLink}, fmt("waiting for lock on '%1%'...", unpackedLink));
-        Path unpackedStorePath;
+        std::optional<StorePath> unpackedStorePath;
         if (pathExists(unpackedLink)) {
-            unpackedStorePath = readLink(unpackedLink);
-            store->addTempRoot(unpackedStorePath);
-            if (!store->isValidPath(unpackedStorePath))
-                unpackedStorePath = "";
+            unpackedStorePath = store->parseStorePath(readLink(unpackedLink));
+            // FIXME
+            store->addTempRoot(*unpackedStorePath);
+            if (!store->isValidPath(*unpackedStorePath))
+                unpackedStorePath.reset();
         }
-        if (unpackedStorePath.empty()) {
-            printInfo(format("unpacking '%1%'...") % url);
+        if (!unpackedStorePath) {
+            printInfo("unpacking '%s'...", url);
             Path tmpDir = createTempDir();
             AutoDelete autoDelete(tmpDir, true);
-            // FIXME: this requires GNU tar for decompression.
-            runProgram("tar", true, {"xf", store->toRealPath(storePath), "-C", tmpDir, "--strip-components", "1"});
-            unpackedStorePath = store->addToStore(name, tmpDir, true, htSHA256, defaultPathFilter, NoRepair);
+            unpackTarfile(store->toRealPath(store->printStorePath(*storePath)), tmpDir);
+            auto members = readDirectory(tmpDir);
+            if (members.size() != 1)
+                throw nix::Error("tarball '%s' contains an unexpected number of top-level files", url);
+            auto topDir = tmpDir + "/" + members.begin()->name;
+            unpackedStorePath = store->addToStore(name, topDir, true, htSHA256, defaultPathFilter, NoRepair);
         }
-        replaceSymlink(unpackedStorePath, unpackedLink);
-        storePath = unpackedStorePath;
+        replaceSymlink(store->printStorePath(*unpackedStorePath), unpackedLink);
+        storePath = std::move(*unpackedStorePath);
     }
 
-    if (expectedStorePath != "" && storePath != expectedStorePath) {
-        Hash gotHash = unpack
-            ? hashPath(expectedHash.type, store->toRealPath(storePath)).first
-            : hashFile(expectedHash.type, store->toRealPath(storePath));
-        throw nix::Error("hash mismatch in file downloaded from '%s':\n  wanted: %s\n  got:    %s",
-            url, expectedHash.to_string(), gotHash.to_string());
+    if (expectedStorePath && *storePath != *expectedStorePath) {
+        unsigned int statusCode = 102;
+        Hash gotHash = request.unpack
+            ? hashPath(request.expectedHash.type, store->toRealPath(store->printStorePath(*storePath))).first
+            : hashFile(request.expectedHash.type, store->toRealPath(store->printStorePath(*storePath)));
+        throw nix::Error(statusCode, "hash mismatch in file downloaded from '%s':\n  wanted: %s\n  got:    %s",
+            url, request.expectedHash.to_string(), gotHash.to_string());
     }
 
-    return store->toRealPath(storePath);
+    result.storePath = store->printStorePath(*storePath);
+    result.path = store->toRealPath(result.storePath);
+    return result;
 }
 
 

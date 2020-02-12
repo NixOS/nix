@@ -200,4 +200,74 @@ void printTable(std::ostream & out, const Table2 & table)
     }
 }
 
+void Command::printHelp(const string & programName, std::ostream & out)
+{
+    Args::printHelp(programName, out);
+
+    auto exs = examples();
+    if (!exs.empty()) {
+        out << "\n";
+        out << "Examples:\n";
+        for (auto & ex : exs)
+            out << "\n"
+                << "  " << ex.description << "\n" // FIXME: wrap
+                << "  $ " << ex.command << "\n";
+    }
+}
+
+MultiCommand::MultiCommand(const Commands & commands)
+    : commands(commands)
+{
+    expectedArgs.push_back(ExpectedArg{"command", 1, true, [=](std::vector<std::string> ss) {
+        assert(!command);
+        auto i = commands.find(ss[0]);
+        if (i == commands.end())
+            throw UsageError("'%s' is not a recognised command", ss[0]);
+        command = i->second();
+        command->_name = ss[0];
+    }});
+}
+
+void MultiCommand::printHelp(const string & programName, std::ostream & out)
+{
+    if (command) {
+        command->printHelp(programName + " " + command->name(), out);
+        return;
+    }
+
+    out << "Usage: " << programName << " <COMMAND> <FLAGS>... <ARGS>...\n";
+
+    out << "\n";
+    out << "Common flags:\n";
+    printFlags(out);
+
+    out << "\n";
+    out << "Available commands:\n";
+
+    Table2 table;
+    for (auto & i : commands) {
+        auto command = i.second();
+        command->_name = i.first;
+        auto descr = command->description();
+        if (!descr.empty())
+            table.push_back(std::make_pair(command->name(), descr));
+    }
+    printTable(out, table);
+}
+
+bool MultiCommand::processFlag(Strings::iterator & pos, Strings::iterator end)
+{
+    if (Args::processFlag(pos, end)) return true;
+    if (command && command->processFlag(pos, end)) return true;
+    return false;
+}
+
+bool MultiCommand::processArgs(const Strings & args, bool finish)
+{
+    if (command)
+        return command->processArgs(args, finish);
+    else
+        return Args::processArgs(args, finish);
+}
+
 }

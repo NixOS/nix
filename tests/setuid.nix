@@ -10,7 +10,7 @@ makeTest {
     { config, lib, pkgs, ... }:
     { virtualisation.writableStore = true;
       nix.package = nix;
-      nix.binaryCaches = [ ];
+      nix.binaryCaches = lib.mkForce [ ];
       nix.nixPath = [ "nixpkgs=${lib.cleanSource pkgs.path}" ];
       virtualisation.pathsInNixDB = [ pkgs.stdenv pkgs.pkgsi686Linux.stdenv ];
     };

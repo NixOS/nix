@@ -33,25 +33,25 @@ void printGCWarning()
 }
 
 
-void printMissing(ref<Store> store, const PathSet & paths, Verbosity lvl)
+void printMissing(ref<Store> store, const std::vector<StorePathWithOutputs> & paths, Verbosity lvl)
 {
     unsigned long long downloadSize, narSize;
-    PathSet willBuild, willSubstitute, unknown;
+    StorePathSet willBuild, willSubstitute, unknown;
     store->queryMissing(paths, willBuild, willSubstitute, unknown, downloadSize, narSize);
     printMissing(store, willBuild, willSubstitute, unknown, downloadSize, narSize, lvl);
 }
 
 
-void printMissing(ref<Store> store, const PathSet & willBuild,
-    const PathSet & willSubstitute, const PathSet & unknown,
+void printMissing(ref<Store> store, const StorePathSet & willBuild,
+    const StorePathSet & willSubstitute, const StorePathSet & unknown,
     unsigned long long downloadSize, unsigned long long narSize, Verbosity lvl)
 {
     if (!willBuild.empty()) {
         printMsg(lvl, "these derivations will be built:");
-        Paths sorted = store->topoSortPaths(willBuild);
+        auto sorted = store->topoSortPaths(willBuild);
         reverse(sorted.begin(), sorted.end());
         for (auto & i : sorted)
-            printMsg(lvl, fmt("  %s", i));
+            printMsg(lvl, fmt("  %s", store->printStorePath(i)));
     }
 
     if (!willSubstitute.empty()) {
@@ -59,14 +59,14 @@ void printMissing(ref<Store> store, const PathSet & willBuild,
                 downloadSize / (1024.0 * 1024.0),
                 narSize / (1024.0 * 1024.0)));
         for (auto & i : willSubstitute)
-            printMsg(lvl, fmt("  %s", i));
+            printMsg(lvl, fmt("  %s", store->printStorePath(i)));
     }
 
     if (!unknown.empty()) {
         printMsg(lvl, fmt("don't know how to build these paths%s:",
                 (settings.readOnlyMode ? " (may be caused by read-only store access)" : "")));
         for (auto & i : unknown)
-            printMsg(lvl, fmt("  %s", i));
+            printMsg(lvl, fmt("  %s", store->printStorePath(i)));
     }
 }
 
@@ -80,6 +80,7 @@ string getArg(const string & opt,
 }
 
 
+#if OPENSSL_VERSION_NUMBER < 0x10101000L
 /* OpenSSL is not thread-safe by default - it will randomly crash
    unless the user supplies a mutex locking function. So let's do
    that. */
@@ -92,6 +93,7 @@ static void opensslLockCallback(int mode, int type, const char * file, int line)
     else
         opensslLocks[type].unlock();
 }
+#endif
 
 
 static void sigHandler(int signo) { }
@@ -105,9 +107,11 @@ void initNix()
     std::cerr.rdbuf()->pubsetbuf(buf, sizeof(buf));
 #endif
 
+#if OPENSSL_VERSION_NUMBER < 0x10101000L
     /* Initialise OpenSSL locking. */
     opensslLocks = std::vector<std::mutex>(CRYPTO_num_locks());
     CRYPTO_set_locking_callback(opensslLockCallback);
+#endif
 
     loadConfFile();
 
@@ -124,6 +128,15 @@ void initNix()
     /* Install a dummy SIGUSR1 handler for use with pthread_kill(). */
     act.sa_handler = sigHandler;
     if (sigaction(SIGUSR1, &act, 0)) throw SysError("handling SIGUSR1");
+
+#if __APPLE__
+    /* HACK: on darwin, we need can’t use sigprocmask with SIGWINCH.
+     * Instead, add a dummy sigaction handler, and signalHandlerThread
+     * can handle the rest. */
+    struct sigaction sa;
+    sa.sa_handler = sigHandler;
+    if (sigaction(SIGWINCH, &sa, 0)) throw SysError("handling SIGWINCH");
+#endif
 
     /* Register a SIGSEGV handler to detect stack overflows. */
     detectStackOverflow();
@@ -142,7 +155,7 @@ void initNix()
        sshd). This breaks build users because they don't have access
        to the TMPDIR, in particular in ‘nix-store --serve’. */
 #if __APPLE__
-    if (getuid() == 0 && hasPrefix(getEnv("TMPDIR"), "/var/folders/"))
+    if (getuid() == 0 && hasPrefix(getEnv("TMPDIR").value_or("/tmp"), "/var/folders/"))
         unsetenv("TMPDIR");
 #endif
 }
@@ -174,10 +187,6 @@ LegacyArgs::LegacyArgs(const std::string & programName,
         .longName("fallback")
         .description("build from source if substitution fails")
         .set(&(bool&) settings.tryFallback, true);
-
-    mkFlag1('j', "max-jobs", "jobs", "maximum number of parallel builds", [=](std::string s) {
-        settings.set("max-jobs", s);
-    });
 
     auto intSettingAlias = [&](char shortName, const std::string & longName,
         const std::string & description, const std::string & dest) {
@@ -228,7 +237,7 @@ bool LegacyArgs::processArgs(const Strings & args, bool finish)
 void parseCmdLine(int argc, char * * argv,
     std::function<bool(Strings::iterator & arg, const Strings::iterator & end)> parseArg)
 {
-    parseCmdLine(baseNameOf(argv[0]), argvToStrings(argc, argv), parseArg);
+    parseCmdLine(std::string(baseNameOf(argv[0])), argvToStrings(argc, argv), parseArg);
 }
 
 

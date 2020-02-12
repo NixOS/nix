@@ -15,7 +15,7 @@ struct DrvName
     unsigned int hits;
 
     DrvName();
-    DrvName(const string & s);
+    DrvName(std::string_view s);
     bool matches(DrvName & n);
 
 private:

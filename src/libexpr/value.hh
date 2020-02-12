@@ -12,7 +12,6 @@ struct Env;
 struct Expr;
 struct ExprLambda;
 struct PrimOp;
-struct Context;
 class Symbol;
 struct Pos;
 class EvalState;
@@ -41,9 +40,6 @@ protected:
 
     /* Return a string to be used in builtins.typeOf */
     virtual string typeOf() const = 0;
-
-    /* How much space does this value take up */
-    virtual size_t valueSize(std::set<const void *> & seen) const = 0;
 
     /* Coerce the value to a string. Defaults to uncoercable, i.e. throws an
      * error
@@ -205,11 +201,13 @@ public:
         return type == tShortString || type == tStaticString || type == tLongString;
     }
 
-    void setShortString(const char * s)
+    void setShortString(std::string_view s)
     {
         // FIXME: can't use strcpy here because gcc flags it as a
         // buffer overflow on 'misc'.
-        memcpy(getMiscData(), s, strlen(s) + 1);
+        auto p = getMiscData();
+        memcpy(p, s.data(), s.size());
+        p[s.size()] = 0;
         type = tShortString;
     }
 
@@ -268,16 +266,16 @@ static inline void mkPrimOpApp(Value & v, Value & left, Value & right)
 }
 
 
-static inline void mkString(Value & v, const char * s)
+static inline Value & mkString(Value & v, std::string_view s)
 {
-    auto len = strlen(s); // FIXME: only need to know if > short
-    if (len < WORD_SIZE * 2 + Object::miscBytes)
+    if (s.size() < WORD_SIZE * 2 + Object::miscBytes)
         v.setShortString(s);
     else {
-        v.string.s = gc.alloc<String>(String::wordsFor(len), len, s);
+        v.string.s = gc.alloc<String>(String::wordsFor(s.size()), s.size(), s.data());
         v.string.context = 0;
         v.type = tLongString;
     }
+    return v;
 }
 
 
@@ -293,12 +291,6 @@ static inline void mkPath(Value & v, const std::string & s)
     v.path = String::alloc(s.c_str());
     v.type = tPath;
 }
-
-
-/* Compute the size in bytes of the given value, including all values
-   and environments reachable from it. Static expressions (Exprs) are
-   not included. */
-size_t valueSize(Value & v);
 
 
 typedef std::vector<Ptr<Value>> ValueVector; // FIXME: make more efficient

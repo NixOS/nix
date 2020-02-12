@@ -2,6 +2,8 @@
 #include "hash.hh"
 #include "legacy.hh"
 #include "shared.hh"
+#include "references.hh"
+#include "archive.hh"
 
 using namespace nix;
 
@@ -13,6 +15,7 @@ struct CmdHash : Command
     bool truncate = false;
     HashType ht = htSHA256;
     std::vector<std::string> paths;
+    std::optional<std::string> modulus;
 
     CmdHash(Mode mode) : mode(mode)
     {
@@ -23,12 +26,14 @@ struct CmdHash : Command
         mkFlag()
             .longName("type")
             .mkHashTypeFlag(&ht);
+        #if 0
+        mkFlag()
+            .longName("modulo")
+            .description("compute hash modulo specified string")
+            .labels({"modulus"})
+            .dest(&modulus);
+        #endif
         expectArgs("paths", &paths);
-    }
-
-    std::string name() override
-    {
-        return mode == mFile ? "hash-file" : "hash-path";
     }
 
     std::string description() override
@@ -41,7 +46,19 @@ struct CmdHash : Command
     void run() override
     {
         for (auto path : paths) {
-            Hash h = mode == mFile ? hashFile(ht, path) : hashPath(ht, path).first;
+
+            std::unique_ptr<AbstractHashSink> hashSink;
+            if (modulus)
+                hashSink = std::make_unique<HashModuloSink>(ht, *modulus);
+            else
+                hashSink = std::make_unique<HashSink>(ht);
+
+            if (mode == mFile)
+                readFile(path, *hashSink);
+            else
+                dumpPath(path, *hashSink);
+
+            Hash h = hashSink->finish().first;
             if (truncate && h.hashSize > 20) h = compressHash(h, 20);
             std::cout << format("%1%\n") %
                 h.to_string(base, base == SRI);
@@ -49,8 +66,8 @@ struct CmdHash : Command
     }
 };
 
-static RegisterCommand r1(make_ref<CmdHash>(CmdHash::mFile));
-static RegisterCommand r2(make_ref<CmdHash>(CmdHash::mPath));
+static RegisterCommand r1("hash-file", [](){ return make_ref<CmdHash>(CmdHash::mFile); });
+static RegisterCommand r2("hash-path", [](){ return make_ref<CmdHash>(CmdHash::mPath); });
 
 struct CmdToBase : Command
 {
@@ -64,15 +81,6 @@ struct CmdToBase : Command
             .longName("type")
             .mkHashTypeFlag(&ht);
         expectArgs("strings", &args);
-    }
-
-    std::string name() override
-    {
-        return
-            base == Base16 ? "to-base16" :
-            base == Base32 ? "to-base32" :
-            base == Base64 ? "to-base64" :
-            "to-sri";
     }
 
     std::string description() override
@@ -91,10 +99,10 @@ struct CmdToBase : Command
     }
 };
 
-static RegisterCommand r3(make_ref<CmdToBase>(Base16));
-static RegisterCommand r4(make_ref<CmdToBase>(Base32));
-static RegisterCommand r5(make_ref<CmdToBase>(Base64));
-static RegisterCommand r6(make_ref<CmdToBase>(SRI));
+static RegisterCommand r3("to-base16", [](){ return make_ref<CmdToBase>(Base16); });
+static RegisterCommand r4("to-base32", [](){ return make_ref<CmdToBase>(Base32); });
+static RegisterCommand r5("to-base64", [](){ return make_ref<CmdToBase>(Base64); });
+static RegisterCommand r6("to-sri", [](){ return make_ref<CmdToBase>(SRI); });
 
 /* Legacy nix-hash command. */
 static int compatNixHash(int argc, char * * argv)

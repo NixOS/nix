@@ -1,4 +1,5 @@
 AC_INIT(nix, m4_esyscmd([bash -c "echo -n $(cat ./.version)$VERSION_SUFFIX"]))
+AC_CONFIG_MACRO_DIRS([m4])
 AC_CONFIG_SRCDIR(README.md)
 AC_CONFIG_AUX_DIR(config)
 
@@ -42,11 +43,23 @@ esac
 
 AC_MSG_RESULT($system)
 AC_SUBST(system)
-AC_DEFINE_UNQUOTED(SYSTEM, ["$system"], [platform identifier (`cpu-os')])
+AC_DEFINE_UNQUOTED(SYSTEM, ["$system"], [platform identifier ('cpu-os')])
 
 
 # State should be stored in /nix/var, unless the user overrides it explicitly.
 test "$localstatedir" = '${prefix}/var' && localstatedir=/nix/var
+
+
+CFLAGS=
+CXXFLAGS=
+AC_PROG_CC
+AC_PROG_CXX
+AC_PROG_CPP
+
+AC_CHECK_TOOL([AR], [ar])
+
+# Use 64-bit file system calls so that we can support files > 2 GiB.
+AC_SYS_LARGEFILE
 
 
 # Solaris-specific stuff.
@@ -55,19 +68,6 @@ if test "$sys_name" = sunos; then
     # Solaris requires -lsocket -lnsl for network functions
     LIBS="-lsocket -lnsl $LIBS"
 fi
-
-
-CFLAGS=
-CXXFLAGS=
-AC_PROG_CC
-AC_PROG_CXX
-AC_PROG_CPP
-AX_CXX_COMPILE_STDCXX_17
-
-AC_CHECK_TOOL([AR], [ar])
-
-# Use 64-bit file system calls so that we can support files > 2 GiB.
-AC_SYS_LARGEFILE
 
 
 # Check for pubsetbuf.
@@ -117,26 +117,15 @@ fi
 ])
 
 NEED_PROG(bash, bash)
-NEED_PROG(patch, patch)
 AC_PATH_PROG(xmllint, xmllint, false)
 AC_PATH_PROG(xsltproc, xsltproc, false)
 AC_PATH_PROG(flex, flex, false)
 AC_PATH_PROG(bison, bison, false)
-NEED_PROG(sed, sed)
-NEED_PROG(tar, tar)
-NEED_PROG(bzip2, bzip2)
-NEED_PROG(gzip, gzip)
-NEED_PROG(xz, xz)
 AC_PATH_PROG(dot, dot)
 AC_PATH_PROG(lsof, lsof, lsof)
 
 
-NEED_PROG(cat, cat)
-NEED_PROG(tr, tr)
-AC_ARG_WITH(coreutils-bin, AC_HELP_STRING([--with-coreutils-bin=PATH],
-  [path of cat, mkdir, etc.]),
-  coreutils=$withval, coreutils=$(dirname $cat))
-AC_SUBST(coreutils)
+AC_SUBST(coreutils, [$(dirname $(type -p cat))])
 
 
 AC_ARG_WITH(store-dir, AC_HELP_STRING([--with-store-dir=PATH],
@@ -145,7 +134,42 @@ AC_ARG_WITH(store-dir, AC_HELP_STRING([--with-store-dir=PATH],
 AC_SUBST(storedir)
 
 
-# Look for OpenSSL, a required dependency.
+# Look for boost, a required dependency.
+# Note that AX_BOOST_BASE only exports *CPP* BOOST_CPPFLAGS, no CXX flags,
+# and CPPFLAGS are not passed to the C++ compiler automatically.
+# Thus we append the returned CPPFLAGS to the CXXFLAGS here.
+AX_BOOST_BASE([1.66], [CXXFLAGS="$BOOST_CPPFLAGS $CXXFLAGS"], [AC_MSG_ERROR([Nix requires boost.])])
+# For unknown reasons, setting this directly in the ACTION-IF-FOUND above
+# ends up with LDFLAGS being empty, so we set it afterwards.
+LDFLAGS="$BOOST_LDFLAGS $LDFLAGS"
+
+# On some platforms, new-style atomics need a helper library
+AC_MSG_CHECKING(whether -latomic is needed)
+AC_LINK_IFELSE([AC_LANG_SOURCE([[
+#include <stdint.h>
+uint64_t v;
+int main() {
+    return (int)__atomic_load_n(&v, __ATOMIC_ACQUIRE);
+}]])], GCC_ATOMIC_BUILTINS_NEED_LIBATOMIC=no, GCC_ATOMIC_BUILTINS_NEED_LIBATOMIC=yes)
+AC_MSG_RESULT($GCC_ATOMIC_BUILTINS_NEED_LIBATOMIC)
+if test "x$GCC_ATOMIC_BUILTINS_NEED_LIBATOMIC" = xyes; then
+    LIBS="-latomic $LIBS"
+fi
+
+PKG_PROG_PKG_CONFIG
+
+AC_ARG_ENABLE(shared, AC_HELP_STRING([--enable-shared],
+  [Build shared libraries for Nix [default=yes]]),
+  shared=$enableval, shared=yes)
+if test "$shared" = yes; then
+  AC_SUBST(BUILD_SHARED_LIBS, 1, [Whether to build shared libraries.])
+else
+  AC_SUBST(BUILD_SHARED_LIBS, 0, [Whether to build shared libraries.])
+  PKG_CONFIG="$PKG_CONFIG --static"
+fi
+
+# Look for OpenSSL, a required dependency. FIXME: this is only (maybe)
+# used by S3BinaryCacheStore.
 PKG_CHECK_MODULES([OPENSSL], [libcrypto], [CXXFLAGS="$OPENSSL_CFLAGS $CXXFLAGS"])
 
 
@@ -154,17 +178,26 @@ AC_CHECK_LIB([bz2], [BZ2_bzWriteOpen], [true],
   [AC_MSG_ERROR([Nix requires libbz2, which is part of bzip2.  See https://web.archive.org/web/20180624184756/http://www.bzip.org/.])])
 AC_CHECK_HEADERS([bzlib.h], [true],
   [AC_MSG_ERROR([Nix requires libbz2, which is part of bzip2.  See https://web.archive.org/web/20180624184756/http://www.bzip.org/.])])
-
+# Checks for libarchive
+PKG_CHECK_MODULES([LIBARCHIVE], [libarchive >= 3.1.2], [CXXFLAGS="$LIBARCHIVE_CFLAGS $CXXFLAGS"])
 
 # Look for SQLite, a required dependency.
 PKG_CHECK_MODULES([SQLITE3], [sqlite3 >= 3.6.19], [CXXFLAGS="$SQLITE3_CFLAGS $CXXFLAGS"])
-
 
 # Look for libcurl, a required dependency.
 PKG_CHECK_MODULES([LIBCURL], [libcurl], [CXXFLAGS="$LIBCURL_CFLAGS $CXXFLAGS"])
 
 # Look for editline, a required dependency.
-PKG_CHECK_MODULES([EDITLINE], [libeditline], [CXXFLAGS="$EDITLINE_CFLAGS $CXXFLAGS"])
+# The the libeditline.pc file was added only in libeditline >= 1.15.2,
+# see https://github.com/troglobit/editline/commit/0a8f2ef4203c3a4a4726b9dd1336869cd0da8607,
+# but e.g. Ubuntu 16.04 has an older version, so we fall back to searching for
+# editline.h when the pkg-config approach fails.
+PKG_CHECK_MODULES([EDITLINE], [libeditline], [CXXFLAGS="$EDITLINE_CFLAGS $CXXFLAGS"], [
+  AC_CHECK_HEADERS([editline.h], [true],
+    [AC_MSG_ERROR([Nix requires libeditline; it was found neither via pkg-config nor its normal header.])])
+  AC_SEARCH_LIBS([readline read_history], [editline], [],
+    [AC_MSG_ERROR([Nix requires libeditline; it was not found via pkg-config, but via its header, but required functions do not work. Maybe it is too old? >= 1.14 is required.])])
+])
 
 # Look for libsodium, an optional dependency.
 PKG_CHECK_MODULES([SODIUM], [libsodium],
@@ -173,12 +206,15 @@ PKG_CHECK_MODULES([SODIUM], [libsodium],
    have_sodium=1], [have_sodium=])
 AC_SUBST(HAVE_SODIUM, [$have_sodium])
 
-
 # Look for liblzma, a required dependency.
 PKG_CHECK_MODULES([LIBLZMA], [liblzma], [CXXFLAGS="$LIBLZMA_CFLAGS $CXXFLAGS"])
 AC_CHECK_LIB([lzma], [lzma_stream_encoder_mt],
   [AC_DEFINE([HAVE_LZMA_MT], [1], [xz multithreaded compression support])])
 
+# Look for zlib, a required dependency.
+PKG_CHECK_MODULES([ZLIB], [zlib], [CXXFLAGS="$ZLIB_CFLAGS $CXXFLAGS"])
+AC_CHECK_HEADER([zlib.h],[:],[AC_MSG_ERROR([could not find the zlib.h header])])
+LDFLAGS="-lz $LDFLAGS"
 
 # Look for libbrotli{enc,dec}.
 PKG_CHECK_MODULES([LIBBROTLI], [libbrotlienc libbrotlidec], [CXXFLAGS="$LIBBROTLI_CFLAGS $CXXFLAGS"])
@@ -256,16 +292,6 @@ AC_ARG_WITH(sandbox-shell, AC_HELP_STRING([--with-sandbox-shell=PATH],
   [path of a statically-linked shell to use as /bin/sh in sandboxes]),
   sandbox_shell=$withval)
 AC_SUBST(sandbox_shell)
-
-AC_ARG_ENABLE(shared, AC_HELP_STRING([--enable-shared],
-  [Build shared libraries for Nix [default=yes]]),
-  shared=$enableval, shared=yes)
-if test "$shared" = yes; then
-  AC_SUBST(BUILD_SHARED_LIBS, 1, [Whether to build shared libraries.])
-else
-  AC_SUBST(BUILD_SHARED_LIBS, 0, [Whether to build shared libraries.])
-fi
-
 
 # Expand all variables in config.status.
 test "$prefix" = NONE && prefix=$ac_default_prefix

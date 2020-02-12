@@ -67,7 +67,7 @@ struct MixLs : virtual Args, MixJSON
         if (st.type == FSAccessor::Type::tMissing)
             throw Error(format("path '%1%' does not exist") % path);
         doPath(st, path,
-            st.type == FSAccessor::Type::tDirectory ? "." : baseNameOf(path),
+            st.type == FSAccessor::Type::tDirectory ? "." : std::string(baseNameOf(path)),
             showDirectory);
     }
 
@@ -98,11 +98,6 @@ struct CmdLsStore : StoreCommand, MixLs
                 "nix ls-store --store https://cache.nixos.org/ -lR /nix/store/0i2jd68mp5g6h2sa5k9c85rb80sn8hi9-hello-2.10"
             },
         };
-    }
-
-    std::string name() override
-    {
-        return "ls-store";
     }
 
     std::string description() override
@@ -136,11 +131,6 @@ struct CmdLsNar : Command, MixLs
         };
     }
 
-    std::string name() override
-    {
-        return "ls-nar";
-    }
-
     std::string description() override
     {
         return "show information about the contents of a NAR file";
@@ -152,5 +142,5 @@ struct CmdLsNar : Command, MixLs
     }
 };
 
-static RegisterCommand r1(make_ref<CmdLsStore>());
-static RegisterCommand r2(make_ref<CmdLsNar>());
+static auto r1 = registerCommand<CmdLsStore>("ls-store");
+static auto r2 = registerCommand<CmdLsNar>("ls-nar");

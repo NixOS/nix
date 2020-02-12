@@ -8,15 +8,6 @@ using namespace nix;
 
 struct CmdShowConfig : Command, MixJSON
 {
-    CmdShowConfig()
-    {
-    }
-
-    std::string name() override
-    {
-        return "show-config";
-    }
-
     std::string description() override
     {
         return "show the Nix configuration";
@@ -37,4 +28,4 @@ struct CmdShowConfig : Command, MixJSON
     }
 };
 
-static RegisterCommand r1(make_ref<CmdShowConfig>());
+static auto r1 = registerCommand<CmdShowConfig>("show-config");

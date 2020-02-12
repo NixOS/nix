@@ -22,17 +22,12 @@ struct CmdCopySigs : StorePathsCommand
             .handler([&](std::vector<std::string> ss) { substituterUris.push_back(ss[0]); });
     }
 
-    std::string name() override
-    {
-        return "copy-sigs";
-    }
-
     std::string description() override
     {
         return "copy path signatures from substituters (like binary caches)";
     }
 
-    void run(ref<Store> store, Paths storePaths) override
+    void run(ref<Store> store, StorePaths storePaths) override
     {
         if (substituterUris.empty())
             throw UsageError("you must specify at least one substituter using '-s'");
@@ -49,10 +44,12 @@ struct CmdCopySigs : StorePathsCommand
 
         //logger->setExpected(doneLabel, storePaths.size());
 
-        auto doPath = [&](const Path & storePath) {
+        auto doPath = [&](const Path & storePathS) {
             //Activity act(*logger, lvlInfo, format("getting signatures for '%s'") % storePath);
 
             checkInterrupt();
+
+            auto storePath = store->parseStorePath(storePathS);
 
             auto info = store->queryPathInfo(storePath);
 
@@ -60,7 +57,7 @@ struct CmdCopySigs : StorePathsCommand
 
             for (auto & store2 : substituters) {
                 try {
-                    auto info2 = store2->queryPathInfo(storePath);
+                    auto info2 = store2->queryPathInfo(info->path);
 
                     /* Don't import signatures that don't match this
                        binary. */
@@ -85,15 +82,15 @@ struct CmdCopySigs : StorePathsCommand
         };
 
         for (auto & storePath : storePaths)
-            pool.enqueue(std::bind(doPath, storePath));
+            pool.enqueue(std::bind(doPath, store->printStorePath(storePath)));
 
         pool.process();
 
-        printInfo(format("imported %d signatures") % added);
+        printInfo("imported %d signatures", added);
     }
 };
 
-static RegisterCommand r1(make_ref<CmdCopySigs>());
+static auto r1 = registerCommand<CmdCopySigs>("copy-sigs");
 
 struct CmdSignPaths : StorePathsCommand
 {
@@ -109,17 +106,12 @@ struct CmdSignPaths : StorePathsCommand
             .dest(&secretKeyFile);
     }
 
-    std::string name() override
-    {
-        return "sign-paths";
-    }
-
     std::string description() override
     {
         return "sign the specified paths";
     }
 
-    void run(ref<Store> store, Paths storePaths) override
+    void run(ref<Store> store, StorePaths storePaths) override
     {
         if (secretKeyFile.empty())
             throw UsageError("you must specify a secret key file using '-k'");
@@ -133,7 +125,7 @@ struct CmdSignPaths : StorePathsCommand
 
             auto info2(*info);
             info2.sigs.clear();
-            info2.sign(secretKey);
+            info2.sign(*store, secretKey);
             assert(!info2.sigs.empty());
 
             if (!info->sigs.count(*info2.sigs.begin())) {
@@ -142,8 +134,8 @@ struct CmdSignPaths : StorePathsCommand
             }
         }
 
-        printInfo(format("added %d signatures") % added);
+        printInfo("added %d signatures", added);
     }
 };
 
-static RegisterCommand r3(make_ref<CmdSignPaths>());
+static auto r2 = registerCommand<CmdSignPaths>("sign-paths");

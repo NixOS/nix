@@ -52,11 +52,6 @@ struct CmdSearch : SourceExprCommand, MixJSON
             .handler([&]() { writeCache = false; useCache = false; });
     }
 
-    std::string name() override
-    {
-        return "search";
-    }
-
     std::string description() override
     {
         return "query available packages";
@@ -80,10 +75,6 @@ struct CmdSearch : SourceExprCommand, MixJSON
             Example{
                 "To search for git and frontend or gui:",
                 "nix search git 'frontend|gui'"
-            },
-            Example{
-                "To display the description of the found packages:",
-                "nix search git --verbose"
             }
         };
     }
@@ -265,6 +256,7 @@ struct CmdSearch : SourceExprCommand, MixJSON
                    https://gcc.gnu.org/bugzilla/show_bug.cgi?id=66145 */
                 if (!jsonCacheFile)
                     throw Error("error writing to %s", tmpFile);
+                throw;
             }
 
             if (writeCache && rename(tmpFile.c_str(), jsonCacheFileName.c_str()) == -1)
@@ -280,4 +272,4 @@ struct CmdSearch : SourceExprCommand, MixJSON
     }
 };
 
-static RegisterCommand r1(make_ref<CmdSearch>());
+static auto r1 = registerCommand<CmdSearch>("search");

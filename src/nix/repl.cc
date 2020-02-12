@@ -9,12 +9,20 @@
 #include <readline/history.h>
 #include <readline/readline.h>
 #else
+// editline < 1.15.2 don't wrap their API for C++ usage
+// (added in https://github.com/troglobit/editline/commit/91398ceb3427b730995357e9d120539fb9bb7461).
+// This results in linker errors due to to name-mangling of editline C symbols.
+// For compatibility with these versions, we wrap the API here
+// (wrapping multiple times on newer versions is no problem).
+extern "C" {
 #include <editline.h>
+}
 #endif
 
 #include "shared.hh"
 #include "eval.hh"
 #include "eval-inline.hh"
+#include "attr-path.hh"
 #include "store-api.hh"
 #include "common-eval-args.hh"
 #include "get-drvs.hh"
@@ -192,6 +200,14 @@ static int listPossibleCallback(char *s, char ***avp) {
   return ac;
 }
 
+namespace {
+    // Used to communicate to NixRepl::getLine whether a signal occurred in ::readline.
+    volatile sig_atomic_t g_signal_received = 0;
+
+    void sigintHandler(int signo) {
+        g_signal_received = signo;
+    }
+}
 
 void NixRepl::mainLoop(const std::vector<std::string> & files)
 {
@@ -251,8 +267,40 @@ void NixRepl::mainLoop(const std::vector<std::string> & files)
 
 bool NixRepl::getLine(string & input, const std::string &prompt)
 {
+    struct sigaction act, old;
+    sigset_t savedSignalMask, set;
+
+    auto setupSignals = [&]() {
+        act.sa_handler = sigintHandler;
+        sigfillset(&act.sa_mask);
+        act.sa_flags = 0;
+        if (sigaction(SIGINT, &act, &old))
+            throw SysError("installing handler for SIGINT");
+
+        sigemptyset(&set);
+        sigaddset(&set, SIGINT);
+        if (sigprocmask(SIG_UNBLOCK, &set, &savedSignalMask))
+            throw SysError("unblocking SIGINT");
+    };
+    auto restoreSignals = [&]() {
+        if (sigprocmask(SIG_SETMASK, &savedSignalMask, nullptr))
+            throw SysError("restoring signals");
+
+        if (sigaction(SIGINT, &old, 0))
+            throw SysError("restoring handler for SIGINT");
+    };
+
+    setupSignals();
     char * s = readline(prompt.c_str());
     Finally doFree([&]() { free(s); });
+    restoreSignals();
+
+    if (g_signal_received) {
+        g_signal_received = 0;
+        input.clear();
+        return true;
+    }
+
     if (!s)
       return false;
     input += s;
@@ -365,7 +413,7 @@ Path NixRepl::getDerivationPath(Value & v) {
     if (!drvInfo)
         throw Error("expression does not evaluate to a derivation, so I can't build it");
     Path drvPath = drvInfo->queryDrvPath();
-    if (drvPath == "" || !state.store->isValidPath(drvPath))
+    if (drvPath == "" || !state.store->isValidPath(state.store->parseStorePath(drvPath)))
         throw Error("expression did not evaluate to a valid derivation");
     return drvPath;
 }
@@ -393,6 +441,7 @@ bool NixRepl::processLine(string line)
              << "  <x> = <expr>  Bind expression to variable\n"
              << "  :a <expr>     Add attributes from resulting set to scope\n"
              << "  :b <expr>     Build derivation\n"
+             << "  :e <expr>     Open the derivation in $EDITOR\n"
              << "  :i <expr>     Build derivation, then install result into current profile\n"
              << "  :l <path>     Load Nix expression and add it to scope\n"
              << "  :p <expr>     Evaluate and print expression recursively\n"
@@ -415,6 +464,34 @@ bool NixRepl::processLine(string line)
     }
 
     else if (command == ":r" || command == ":reload") {
+        state.resetFileCache();
+        reloadFiles();
+    }
+
+    else if (command == ":e" || command == ":edit") {
+        Root<Value> v;
+        evalString(arg, v);
+
+        Pos pos;
+
+        if (v->type == tPath || v->isString()) {
+            PathSet context;
+            auto filename = state.coerceToString(noPos, v, context);
+            pos.file = state.symbols.create(filename);
+        } else if (v->type == tLambda) {
+            pos = v->lambda.fun->pos;
+        } else {
+            // assume it's a derivation
+            pos = findDerivationFilename(state, v, arg);
+        }
+
+        // Open in EDITOR
+        auto args = editorFor(pos);
+        auto editor = args.front();
+        args.pop_front();
+        runProgram(editor, args);
+
+        // Reload right after exiting the editor
         state.resetFileCache();
         reloadFiles();
     }
@@ -444,10 +521,10 @@ bool NixRepl::processLine(string line)
                but doing it in a child makes it easier to recover from
                problems / SIGINT. */
             if (runProgram(settings.nixBinDir + "/nix", Strings{"build", "--no-link", drvPath}) == 0) {
-                Derivation drv = readDerivation(drvPath);
+                auto drv = readDerivation(*state.store, drvPath);
                 std::cout << std::endl << "this derivation produced the following outputs:" << std::endl;
                 for (auto & i : drv.outputs)
-                    std::cout << format("  %1% -> %2%") % i.first % i.second.path << std::endl;
+                    std::cout << fmt("  %s -> %s\n", i.first, state.store->printStorePath(i.second.path));
             }
         } else if (command == ":i") {
             runProgram(settings.nixBinDir + "/nix-env", Strings{"-i", drvPath});
@@ -727,8 +804,6 @@ struct CmdRepl : StoreCommand, MixEvalArgs
         expectArgs("files", &files);
     }
 
-    std::string name() override { return "repl"; }
-
     std::string description() override
     {
         return "start an interactive environment for evaluating Nix expressions";
@@ -742,6 +817,6 @@ struct CmdRepl : StoreCommand, MixEvalArgs
     }
 };
 
-static RegisterCommand r1(make_ref<CmdRepl>());
+static auto r1 = registerCommand<CmdRepl>("repl");
 
 }

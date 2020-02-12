@@ -8,11 +8,11 @@ makeTest (let pkgA = pkgs.cowsay; pkgB = pkgs.wget; pkgC = pkgs.hello; in {
 
   nodes =
     { client =
-        { config, pkgs, ... }:
+        { config, lib, pkgs, ... }:
         { virtualisation.writableStore = true;
           virtualisation.pathsInNixDB = [ pkgA ];
           nix.package = nix;
-          nix.binaryCaches = [ ];
+          nix.binaryCaches = lib.mkForce [ ];
         };
 
       server =

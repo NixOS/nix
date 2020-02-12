@@ -30,8 +30,12 @@ struct Sink;
 struct Source;
 
 
+/* The system for which Nix is compiled. */
+extern const std::string nativeSystem;
+
+
 /* Return an environment variable. */
-string getEnv(const string & key, const string & def = "");
+std::optional<std::string> getEnv(const std::string & key);
 
 /* Get the entire environment. */
 std::map<std::string, std::string> getEnv();
@@ -58,7 +62,7 @@ Path dirOf(const Path & path);
 
 /* Return the base name of the given canonical path, i.e., everything
    following the final `/'. */
-string baseNameOf(const Path & path);
+std::string_view baseNameOf(std::string_view path);
 
 /* Check whether 'path' is a descendant of 'dir'. */
 bool isInDir(const Path & path, const Path & dir);
@@ -122,6 +126,8 @@ void deletePath(const Path & path, unsigned long long & bytesFreed);
 Path createTempDir(const Path & tmpRoot = "", const Path & prefix = "nix",
     bool includePid = true, bool useGlobalCounter = true, mode_t mode = 0755);
 
+std::string getUserName();
+
 /* Return $HOME or the user's home directory from /etc/passwd. */
 Path getHome();
 
@@ -154,7 +160,7 @@ void readFull(int fd, unsigned char * buf, size_t count);
 void writeFull(int fd, const unsigned char * buf, size_t count, bool allowInterrupts = true);
 void writeFull(int fd, const string & s, bool allowInterrupts = true);
 
-MakeError(EndOfFile, Error)
+MakeError(EndOfFile, Error);
 
 
 /* Read a file descriptor until EOF occurs. */
@@ -263,12 +269,17 @@ string runProgram(Path program, bool searchPath = false,
 
 struct RunOptions
 {
+    std::optional<uid_t> uid;
+    std::optional<uid_t> gid;
+    std::optional<Path> chdir;
+    std::optional<std::map<std::string, std::string>> environment;
     Path program;
     bool searchPath = true;
     Strings args;
     std::optional<std::string> input;
     Source * standardIn = nullptr;
     Sink * standardOut = nullptr;
+    bool mergeStderrToStdout = false;
     bool _killStderr = false;
 
     RunOptions(const Path & program, const Strings & args)
@@ -288,7 +299,7 @@ public:
     int status;
 
     template<typename... Args>
-    ExecError(int status, Args... args)
+    ExecError(int status, const Args & ... args)
         : Error(args...), status(status)
     { }
 };
@@ -322,14 +333,14 @@ void inline checkInterrupt()
         _interrupted();
 }
 
-MakeError(Interrupted, BaseError)
+MakeError(Interrupted, BaseError);
 
 
-MakeError(FormatError, Error)
+MakeError(FormatError, Error);
 
 
 /* String tokenizer. */
-template<class C> C tokenizeString(const string & s, const string & separators = " \t\n\r");
+template<class C> C tokenizeString(std::string_view s, const string & separators = " \t\n\r");
 
 
 /* Concatenate the given strings with a separator between the
@@ -349,6 +360,20 @@ string trim(const string & s, const string & whitespace = " \n\r\t");
 /* Replace all occurrences of a string inside another string. */
 string replaceStrings(const std::string & s,
     const std::string & from, const std::string & to);
+
+
+std::string rewriteStrings(const std::string & s, const StringMap & rewrites);
+
+
+/* If a set contains 'from', remove it and insert 'to'. */
+template<typename T>
+void replaceInSet(std::set<T> & set, const T & from, const T & to)
+{
+    auto i = set.find(from);
+    if (i == set.end()) return;
+    set.erase(i);
+    set.insert(to);
+}
 
 
 /* Convert the exit status of a child as returned by wait() into an
@@ -403,7 +428,7 @@ bool hasPrefix(const string & s, const string & prefix);
 
 
 /* Return true iff `s' ends in `suffix'. */
-bool hasSuffix(const string & s, const string & suffix);
+bool hasSuffix(std::string_view s, std::string_view suffix);
 
 
 /* Convert a string to lower case. */
@@ -422,8 +447,10 @@ void ignoreException();
 /* Some ANSI escape sequences. */
 #define ANSI_NORMAL "\e[0m"
 #define ANSI_BOLD "\e[1m"
+#define ANSI_FAINT "\e[2m"
 #define ANSI_RED "\e[31;1m"
 #define ANSI_GREEN "\e[32;1m"
+#define ANSI_YELLOW "\e[33;1m"
 #define ANSI_BLUE "\e[34;1m"
 
 
@@ -445,10 +472,10 @@ string base64Decode(const string & s);
 /* Get a value for the specified key from an associate container, or a
    default value if the key doesn't exist. */
 template <class T>
-string get(const T & map, const string & key, const string & def = "")
+std::optional<std::string> get(const T & map, const std::string & key)
 {
     auto i = map.find(key);
-    return i == map.end() ? def : i->second;
+    return i == map.end() ? std::optional<std::string>() : i->second;
 }
 
 
@@ -456,21 +483,34 @@ string get(const T & map, const string & key, const string & def = "")
    type T or an exception. (We abuse std::future<T> to pass the value or
    exception.) */
 template<typename T>
-struct Callback
+class Callback
 {
     std::function<void(std::future<T>)> fun;
+    std::atomic_flag done = ATOMIC_FLAG_INIT;
+
+public:
 
     Callback(std::function<void(std::future<T>)> fun) : fun(fun) { }
 
-    void operator()(T && t) const
+    Callback(Callback && callback) : fun(std::move(callback.fun))
     {
+        auto prev = callback.done.test_and_set();
+        if (prev) done.test_and_set();
+    }
+
+    void operator()(T && t) noexcept
+    {
+        auto prev = done.test_and_set();
+        assert(!prev);
         std::promise<T> promise;
         promise.set_value(std::move(t));
         fun(promise.get_future());
     }
 
-    void rethrow(const std::exception_ptr & exc = std::current_exception()) const
+    void rethrow(const std::exception_ptr & exc = std::current_exception()) noexcept
     {
+        auto prev = done.test_and_set();
+        assert(!prev);
         std::promise<T> promise;
         promise.set_exception(exc);
         fun(promise.get_future());
@@ -533,6 +573,10 @@ std::pair<unsigned short, unsigned short> getWindowSize();
 typedef std::function<bool(const Path & path)> PathFilter;
 
 extern PathFilter defaultPathFilter;
+
+
+/* Create a Unix domain socket in listen mode. */
+AutoCloseFD createUnixDomainSocket(const Path & path, mode_t mode);
 
 
 }

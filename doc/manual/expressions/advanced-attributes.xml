@@ -11,7 +11,7 @@ attributes.</para>
 
 <variablelist>
 
-  <varlistentry><term><varname>allowedReferences</varname></term>
+  <varlistentry xml:id="adv-attr-allowedReferences"><term><varname>allowedReferences</varname></term>
 
     <listitem><para>The optional attribute
     <varname>allowedReferences</varname> specifies a list of legal
@@ -32,7 +32,7 @@ allowedReferences = [];
   </varlistentry>
 
 
-  <varlistentry><term><varname>allowedRequisites</varname></term>
+  <varlistentry xml:id="adv-attr-allowedRequisites"><term><varname>allowedRequisites</varname></term>
 
     <listitem><para>This attribute is similar to
     <varname>allowedReferences</varname>, but it specifies the legal
@@ -50,7 +50,7 @@ allowedRequisites = [ foobar ];
 
   </varlistentry>
 
-  <varlistentry><term><varname>disallowedReferences</varname></term>
+  <varlistentry xml:id="adv-attr-disallowedReferences"><term><varname>disallowedReferences</varname></term>
 
     <listitem><para>The optional attribute
     <varname>disallowedReferences</varname> specifies a list of illegal
@@ -67,7 +67,7 @@ disallowedReferences = [ foo ];
   </varlistentry>
 
 
-  <varlistentry><term><varname>disallowedRequisites</varname></term>
+  <varlistentry xml:id="adv-attr-disallowedRequisites"><term><varname>disallowedRequisites</varname></term>
 
     <listitem><para>This attribute is similar to
     <varname>disallowedReferences</varname>, but it specifies illegal
@@ -85,7 +85,7 @@ disallowedRequisites = [ foobar ];
   </varlistentry>
 
 
-  <varlistentry><term><varname>exportReferencesGraph</varname></term>
+  <varlistentry xml:id="adv-attr-exportReferencesGraph"><term><varname>exportReferencesGraph</varname></term>
 
     <listitem><para>This attribute allows builders access to the
     references graph of their inputs.  The attribute is a list of
@@ -124,7 +124,7 @@ derivation {
   </varlistentry>
 
 
-  <varlistentry><term><varname>impureEnvVars</varname></term>
+  <varlistentry xml:id="adv-attr-impureEnvVars"><term><varname>impureEnvVars</varname></term>
 
     <listitem><para>This attribute allows you to specify a list of
     environment variables that should be passed from the environment
@@ -158,9 +158,9 @@ impureEnvVars = [ "http_proxy" "https_proxy" <replaceable>...</replaceable> ];
 
 
   <varlistentry xml:id="fixed-output-drvs">
-    <term><varname>outputHash</varname></term>
-    <term><varname>outputHashAlgo</varname></term>
-    <term><varname>outputHashMode</varname></term>
+    <term xml:id="adv-attr-outputHash"><varname>outputHash</varname></term>
+    <term xml:id="adv-attr-outputHashAlgo"><varname>outputHashAlgo</varname></term>
+    <term xml:id="adv-attr-outputHashMode"><varname>outputHashMode</varname></term>
 
     <listitem><para>These attributes declare that the derivation is a
     so-called <emphasis>fixed-output derivation</emphasis>, which
@@ -282,7 +282,7 @@ stdenv.mkDerivation {
   </varlistentry>
 
 
-  <varlistentry><term><varname>passAsFile</varname></term>
+  <varlistentry xml:id="adv-attr-passAsFile"><term><varname>passAsFile</varname></term>
 
     <listitem><para>A list of names of attributes that should be
     passed via files rather than environment variables.  For example,
@@ -309,7 +309,7 @@ big = "a very long string";
   </varlistentry>
 
 
-  <varlistentry><term><varname>preferLocalBuild</varname></term>
+  <varlistentry xml:id="adv-attr-preferLocalBuild"><term><varname>preferLocalBuild</varname></term>
 
     <listitem><para>If this attribute is set to
     <literal>true</literal> and <link
@@ -323,14 +323,25 @@ big = "a very long string";
   </varlistentry>
 
 
-  <varlistentry><term><varname>allowSubstitutes</varname></term>
+  <varlistentry xml:id="adv-attr-allowSubstitutes"><term><varname>allowSubstitutes</varname></term>
 
-    <listitem><para>If this attribute is set to
+    <listitem>
+    <para>If this attribute is set to
     <literal>false</literal>, then Nix will always build this
     derivation; it will not try to substitute its outputs. This is
     useful for very trivial derivations (such as
     <function>writeText</function> in Nixpkgs) that are cheaper to
-    build than to substitute from a binary cache.</para></listitem>
+    build than to substitute from a binary cache.</para>
+
+    <note><para>You need to have a builder configured which satisfies
+    the derivation’s <literal>system</literal> attribute, since the
+    derivation cannot be substituted. Thus it is usually a good idea
+    to align <literal>system</literal> with
+    <literal>builtins.currentSystem</literal> when setting
+    <literal>allowSubstitutes</literal> to <literal>false</literal>.
+    For most trivial derivations this should be the case.
+    </para></note>
+    </listitem>
 
   </varlistentry>
 

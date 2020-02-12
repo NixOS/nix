@@ -1,3 +1,4 @@
+#if 0
 #include "command.hh"
 #include "eval.hh"
 #include "eval-inline.hh"
@@ -138,3 +139,4 @@ struct CmdListTarballs : MixJSON, InstallablesCommand
 };
 
 static RegisterCommand r1(make_ref<CmdListTarballs>());
+#endif

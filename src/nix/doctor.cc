@@ -1,10 +1,16 @@
+#include <sstream>
+
 #include "command.hh"
+#include "logging.hh"
 #include "serve-protocol.hh"
 #include "shared.hh"
 #include "store-api.hh"
+#include "util.hh"
 #include "worker-protocol.hh"
 
 using namespace nix;
+
+namespace {
 
 std::string formatProtocol(unsigned int proto)
 {
@@ -16,24 +22,30 @@ std::string formatProtocol(unsigned int proto)
     return "unknown";
 }
 
+bool checkPass(const std::string & msg) {
+    logger->log(ANSI_GREEN "[PASS] " ANSI_NORMAL + msg);
+    return true;
+}
+
+bool checkFail(const std::string & msg) {
+    logger->log(ANSI_RED "[FAIL] " ANSI_NORMAL + msg);
+    return false;
+}
+
+}
+
 struct CmdDoctor : StoreCommand
 {
     bool success = true;
 
-    std::string name() override
-    {
-        return "doctor";
-    }
-
     std::string description() override
     {
-        return "check your system for potential problems";
+        return "check your system for potential problems and print a PASS or FAIL for each check.";
     }
 
     void run(ref<Store> store) override
     {
-        std::cout << "Store uri: " << store->getUri() << std::endl;
-        std::cout << std::endl;
+        logger->log("Running checks against store uri: " + store->getUri());
 
         auto type = getStoreType();
 
@@ -51,27 +63,26 @@ struct CmdDoctor : StoreCommand
     {
         PathSet dirs;
 
-        for (auto & dir : tokenizeString<Strings>(getEnv("PATH"), ":"))
+        for (auto & dir : tokenizeString<Strings>(getEnv("PATH").value_or(""), ":"))
             if (pathExists(dir + "/nix-env"))
                 dirs.insert(dirOf(canonPath(dir + "/nix-env", true)));
 
         if (dirs.size() != 1) {
-            std::cout << "Warning: multiple versions of nix found in PATH." << std::endl;
-            std::cout << std::endl;
+            std::stringstream ss;
+            ss << "Multiple versions of nix found in PATH:\n";
             for (auto & dir : dirs)
-                std::cout << "  " << dir << std::endl;
-            std::cout << std::endl;
-            return false;
+                ss << "  " << dir << "\n";
+            return checkFail(ss.str());
         }
 
-        return true;
+        return checkPass("PATH contains only one nix version.");
     }
 
     bool checkProfileRoots(ref<Store> store)
     {
         PathSet dirs;
 
-        for (auto & dir : tokenizeString<Strings>(getEnv("PATH"), ":")) {
+        for (auto & dir : tokenizeString<Strings>(getEnv("PATH").value_or(""), ":")) {
             Path profileDir = dirOf(dir);
             try {
                 Path userEnv = canonPath(profileDir, true);
@@ -87,17 +98,17 @@ struct CmdDoctor : StoreCommand
         }
 
         if (!dirs.empty()) {
-            std::cout << "Warning: found profiles outside of " << settings.nixStateDir << "/profiles." << std::endl;
-            std::cout << "The generation this profile points to might not have a gcroot and could be" << std::endl;
-            std::cout << "garbage collected, resulting in broken symlinks." << std::endl;
-            std::cout << std::endl;
+            std::stringstream ss;
+            ss << "Found profiles outside of " << settings.nixStateDir << "/profiles.\n"
+               << "The generation this profile points to might not have a gcroot and could be\n"
+               << "garbage collected, resulting in broken symlinks.\n\n";
             for (auto & dir : dirs)
-                std::cout << "  " << dir << std::endl;
-            std::cout << std::endl;
-            return false;
+                ss << "  " << dir << "\n";
+            ss << "\n";
+            return checkFail(ss.str());
         }
 
-        return true;
+        return checkPass("All profiles are gcroots.");
     }
 
     bool checkStoreProtocol(unsigned int storeProto)
@@ -107,18 +118,17 @@ struct CmdDoctor : StoreCommand
             : PROTOCOL_VERSION;
 
         if (clientProto != storeProto) {
-            std::cout << "Warning: protocol version of this client does not match the store." << std::endl;
-            std::cout << "While this is not necessarily a problem it's recommended to keep the client in" << std::endl;
-            std::cout << "sync with the daemon." << std::endl;
-            std::cout << std::endl;
-            std::cout << "Client protocol: " << formatProtocol(clientProto) << std::endl;
-            std::cout << "Store protocol: " << formatProtocol(storeProto) << std::endl;
-            std::cout << std::endl;
-            return false;
+            std::stringstream ss;
+            ss << "Warning: protocol version of this client does not match the store.\n"
+               << "While this is not necessarily a problem it's recommended to keep the client in\n"
+               << "sync with the daemon.\n\n"
+               << "Client protocol: " << formatProtocol(clientProto) << "\n"
+               << "Store protocol: " << formatProtocol(storeProto) << "\n\n";
+            return checkFail(ss.str());
         }
 
-        return true;
+        return checkPass("Client protocol matches store protocol.");
     }
 };
 
-static RegisterCommand r1(make_ref<CmdDoctor>());
+static auto r1 = registerCommand<CmdDoctor>("doctor");

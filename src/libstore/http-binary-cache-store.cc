@@ -42,13 +42,16 @@ public:
     void init() override
     {
         // FIXME: do this lazily?
-        if (!diskCache->cacheExists(cacheUri, wantMassQuery_, priority)) {
+        if (auto cacheInfo = diskCache->cacheExists(cacheUri)) {
+            wantMassQuery.setDefault(cacheInfo->wantMassQuery ? "true" : "false");
+            priority.setDefault(fmt("%d", cacheInfo->priority));
+        } else {
             try {
                 BinaryCacheStore::init();
             } catch (UploadToHTTP &) {
                 throw Error("'%s' does not appear to be a binary cache", cacheUri);
             }
-            diskCache->createCache(cacheUri, storeDir, wantMassQuery_, priority);
+            diskCache->createCache(cacheUri, storeDir, wantMassQuery, priority);
         }
     }
 
@@ -84,7 +87,6 @@ protected:
         try {
             DownloadRequest request(cacheUri + "/" + path);
             request.head = true;
-            request.tries = 5;
             getDownloader()->download(request);
             return true;
         } catch (DownloadError & e) {
@@ -114,7 +116,6 @@ protected:
     DownloadRequest makeRequest(const std::string & path)
     {
         DownloadRequest request(cacheUri + "/" + path);
-        request.tries = 8;
         return request;
     }
 
@@ -133,23 +134,25 @@ protected:
     }
 
     void getFile(const std::string & path,
-        Callback<std::shared_ptr<std::string>> callback) override
+        Callback<std::shared_ptr<std::string>> callback) noexcept override
     {
         checkEnabled();
 
         auto request(makeRequest(path));
 
+        auto callbackPtr = std::make_shared<decltype(callback)>(std::move(callback));
+
         getDownloader()->enqueueDownload(request,
-            {[callback, this](std::future<DownloadResult> result) {
+            {[callbackPtr, this](std::future<DownloadResult> result) {
                 try {
-                    callback(result.get().data);
+                    (*callbackPtr)(result.get().data);
                 } catch (DownloadError & e) {
                     if (e.error == Downloader::NotFound || e.error == Downloader::Forbidden)
-                        return callback(std::shared_ptr<std::string>());
+                        return (*callbackPtr)(std::shared_ptr<std::string>());
                     maybeDisable();
-                    callback.rethrow();
+                    callbackPtr->rethrow();
                 } catch (...) {
-                    callback.rethrow();
+                    callbackPtr->rethrow();
                 }
             }});
     }

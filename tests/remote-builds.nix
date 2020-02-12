@@ -40,7 +40,7 @@ in
       builder2 = builder;
 
       client =
-        { config, pkgs, ... }:
+        { config, lib, pkgs, ... }:
         { nix.maxJobs = 0; # force remote building
           nix.distributedBuilds = true;
           nix.buildMachines =
@@ -60,7 +60,7 @@ in
           virtualisation.writableStore = true;
           virtualisation.pathsInNixDB = [ config.system.build.extraUtils ];
           nix.package = nix;
-          nix.binaryCaches = [ ];
+          nix.binaryCaches = lib.mkForce [ ];
           programs.ssh.extraConfig = "ConnectTimeout 30";
         };
     };

@@ -9,6 +9,7 @@
 #include "legacy.hh"
 #include "finally.hh"
 #include "progress-bar.hh"
+#include "tarfile.hh"
 
 #include <iostream>
 
@@ -52,7 +53,7 @@ static int _main(int argc, char * * argv)
     {
         HashType ht = htSHA256;
         std::vector<string> args;
-        bool printPath = getEnv("PRINT_PATH") != "";
+        bool printPath = getEnv("PRINT_PATH") == "1";
         bool fromExpr = false;
         string attrPath;
         bool unpack = false;
@@ -63,7 +64,7 @@ static int _main(int argc, char * * argv)
             using LegacyArgs::LegacyArgs;
         };
 
-        MyArgs myArgs(baseNameOf(argv[0]), [&](Strings::iterator & arg, const Strings::iterator & end) {
+        MyArgs myArgs(std::string(baseNameOf(argv[0])), [&](Strings::iterator & arg, const Strings::iterator & end) {
             if (*arg == "--help")
                 showManPage("nix-prefetch-url");
             else if (*arg == "--version")
@@ -155,17 +156,17 @@ static int _main(int argc, char * * argv)
         /* If an expected hash is given, the file may already exist in
            the store. */
         Hash hash, expectedHash(ht);
-        Path storePath;
+        std::optional<StorePath> storePath;
         if (args.size() == 2) {
             expectedHash = Hash(args[1], ht);
             storePath = store->makeFixedOutputPath(unpack, expectedHash, name);
-            if (store->isValidPath(storePath))
+            if (store->isValidPath(*storePath))
                 hash = expectedHash;
             else
-                storePath.clear();
+                storePath.reset();
         }
 
-        if (storePath.empty()) {
+        if (!storePath) {
 
             auto actualUri = resolveMirrorUri(*state, uri);
 
@@ -189,11 +190,7 @@ static int _main(int argc, char * * argv)
                 printInfo("unpacking...");
                 Path unpacked = (Path) tmpDir + "/unpacked";
                 createDirs(unpacked);
-                if (hasSuffix(baseNameOf(uri), ".zip"))
-                    runProgram("unzip", true, {"-qq", tmpFile, "-d", unpacked});
-                else
-                    // FIXME: this requires GNU tar for decompression.
-                    runProgram("tar", true, {"xf", tmpFile, "-C", unpacked});
+                unpackTarfile(tmpFile, unpacked);
 
                 /* If the archive unpacks to a single file/directory, then use
                    that as the top-level. */
@@ -217,17 +214,17 @@ static int _main(int argc, char * * argv)
                into the Nix store. */
             storePath = store->addToStore(name, tmpFile, unpack, ht);
 
-            assert(storePath == store->makeFixedOutputPath(unpack, hash, name));
+            assert(*storePath == store->makeFixedOutputPath(unpack, hash, name));
         }
 
         stopProgressBar();
 
         if (!printPath)
-            printInfo(format("path is '%1%'") % storePath);
+            printInfo("path is '%s'", store->printStorePath(*storePath));
 
         std::cout << printHash16or32(hash) << std::endl;
         if (printPath)
-            std::cout << storePath << std::endl;
+            std::cout << store->printStorePath(*storePath) << std::endl;
 
         return 0;
     }

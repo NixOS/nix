@@ -115,6 +115,8 @@ public:
 
     bool overriden = false;
 
+    void setDefault(const std::string & str);
+
 protected:
 
     AbstractSetting(
@@ -131,13 +133,13 @@ protected:
 
     virtual void set(const std::string & value) = 0;
 
-    virtual std::string to_string() = 0;
+    virtual std::string to_string() const = 0;
 
     virtual void toJSON(JSONPlaceholder & out);
 
     virtual void convertToArg(Args & args, const std::string & category);
 
-    bool isOverriden() { return overriden; }
+    bool isOverriden() const { return overriden; }
 };
 
 /* A setting of type T. */
@@ -174,7 +176,7 @@ public:
         value = v;
     }
 
-    std::string to_string() override;
+    std::string to_string() const override;
 
     void convertToArg(Args & args, const std::string & category) override;
 

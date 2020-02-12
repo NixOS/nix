@@ -67,5 +67,23 @@ $ sudo launchctl kickstart -k system/org.nixos.nix-daemon
 </screen>
 </section>
 
+<section xml:id="sec-installer-proxy-settings">
+
+<title>Proxy Environment Variables</title>
+
+<para>The Nix installer has special handling for these proxy-related
+environment variables:
+<varname>http_proxy</varname>, <varname>https_proxy</varname>,
+<varname>ftp_proxy</varname>, <varname>no_proxy</varname>,
+<varname>HTTP_PROXY</varname>, <varname>HTTPS_PROXY</varname>,
+<varname>FTP_PROXY</varname>, <varname>NO_PROXY</varname>.
+</para>
+<para>If any of these variables are set when running the Nix installer,
+then the installer will create an override file at
+<filename>/etc/systemd/system/nix-daemon.service.d/override.conf</filename>
+so <command>nix-daemon</command> will use them.
+</para>
+</section>
+
 </section>
 </chapter>

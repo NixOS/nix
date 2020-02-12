@@ -44,11 +44,6 @@ struct CmdWhyDepends : SourceExprCommand
             .set(&all, true);
     }
 
-    std::string name() override
-    {
-        return "why-depends";
-    }
-
     std::string description() override
     {
         return "show why a package has another package in its closure";
@@ -78,9 +73,9 @@ struct CmdWhyDepends : SourceExprCommand
         auto packagePath = toStorePath(store, Build, package);
         auto dependency = parseInstallable(*this, store, _dependency, false);
         auto dependencyPath = toStorePath(store, NoBuild, dependency);
-        auto dependencyPathHash = storePathToHash(dependencyPath);
+        auto dependencyPathHash = storePathToHash(store->printStorePath(dependencyPath));
 
-        PathSet closure;
+        StorePathSet closure;
         store->computeFSClosure({packagePath}, closure, false, false);
 
         if (!closure.count(dependencyPath)) {
@@ -96,28 +91,28 @@ struct CmdWhyDepends : SourceExprCommand
 
         struct Node
         {
-            Path path;
-            PathSet refs;
-            PathSet rrefs;
+            StorePath path;
+            StorePathSet refs;
+            StorePathSet rrefs;
             size_t dist = inf;
             Node * prev = nullptr;
             bool queued = false;
             bool visited = false;
         };
 
-        std::map<Path, Node> graph;
+        std::map<StorePath, Node> graph;
 
         for (auto & path : closure)
-            graph.emplace(path, Node{path, store->queryPathInfo(path)->references});
+            graph.emplace(path.clone(), Node{path.clone(), cloneStorePathSet(store->queryPathInfo(path)->references)});
 
         // Transpose the graph.
         for (auto & node : graph)
             for (auto & ref : node.second.refs)
-                graph[ref].rrefs.insert(node.first);
+                graph.find(ref)->second.rrefs.insert(node.first.clone());
 
         /* Run Dijkstra's shortest path algorithm to get the distance
            of every path in the closure to 'dependency'. */
-        graph[dependencyPath].dist = 0;
+        graph[dependencyPath.clone()].dist = 0;
 
         std::priority_queue<Node *> queue;
 
@@ -156,12 +151,14 @@ struct CmdWhyDepends : SourceExprCommand
         struct BailOut { };
 
         printNode = [&](Node & node, const string & firstPad, const string & tailPad) {
+            auto pathS = store->printStorePath(node.path);
+
             assert(node.dist != inf);
             std::cout << fmt("%s%s%s%s" ANSI_NORMAL "\n",
                 firstPad,
                 node.visited ? "\e[38;5;244m" : "",
                 firstPad != "" ? "=> " : "",
-                node.path);
+                pathS);
 
             if (node.path == dependencyPath && !all
                 && packagePath != dependencyPath)
@@ -180,7 +177,7 @@ struct CmdWhyDepends : SourceExprCommand
                 auto & node2 = graph.at(ref);
                 if (node2.dist == inf) continue;
                 refs.emplace(node2.dist, &node2);
-                hashes.insert(storePathToHash(node2.path));
+                hashes.insert(storePathToHash(store->printStorePath(node2.path)));
             }
 
             /* For each reference, find the files and symlinks that
@@ -192,7 +189,7 @@ struct CmdWhyDepends : SourceExprCommand
             visitPath = [&](const Path & p) {
                 auto st = accessor->stat(p);
 
-                auto p2 = p == node.path ? "/" : std::string(p, node.path.size() + 1);
+                auto p2 = p == pathS ? "/" : std::string(p, pathS.size() + 1);
 
                 auto getColour = [&](const std::string & hash) {
                     return hash == dependencyPathHash ? ANSI_GREEN : ANSI_BLUE;
@@ -236,11 +233,11 @@ struct CmdWhyDepends : SourceExprCommand
 
             // FIXME: should use scanForReferences().
 
-            visitPath(node.path);
+            visitPath(pathS);
 
             RunPager pager;
             for (auto & ref : refs) {
-                auto hash = storePathToHash(ref.second->path);
+                auto hash = storePathToHash(store->printStorePath(ref.second->path));
 
                 bool last = all ? ref == *refs.rbegin() : true;
 
@@ -264,4 +261,4 @@ struct CmdWhyDepends : SourceExprCommand
     }
 };
 
-static RegisterCommand r1(make_ref<CmdWhyDepends>());
+static auto r1 = registerCommand<CmdWhyDepends>("why-depends");

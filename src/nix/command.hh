@@ -3,6 +3,7 @@
 #include "args.hh"
 #include "gc.hh"
 #include "common-eval-args.hh"
+#include "path.hh"
 
 namespace nix {
 
@@ -11,31 +12,10 @@ extern std::string programPath;
 struct Value;
 class Bindings;
 class EvalState;
-
-/* A command is an argument parser that can be executed by calling its
-   run() method. */
-struct Command : virtual Args
-{
-    virtual std::string name() = 0;
-    virtual void prepare() { };
-    virtual void run() = 0;
-
-    struct Example
-    {
-        std::string description;
-        std::string command;
-    };
-
-    typedef std::list<Example> Examples;
-
-    virtual Examples examples() { return Examples(); }
-
-    void printHelp(const string & programName, std::ostream & out) override;
-};
-
+struct Pos;
 class Store;
 
-/* A command that require a Nix store. */
+/* A command that requires a Nix store. */
 struct StoreCommand : virtual Command
 {
     StoreCommand();
@@ -50,14 +30,16 @@ private:
 
 struct Buildable
 {
-    Path drvPath; // may be empty
-    std::map<std::string, Path> outputs;
+    std::optional<StorePath> drvPath;
+    std::map<std::string, StorePath> outputs;
 };
 
 typedef std::vector<Buildable> Buildables;
 
 struct Installable
 {
+    virtual ~Installable() { }
+
     virtual std::string what() = 0;
 
     virtual Buildables toBuildables()
@@ -118,6 +100,7 @@ private:
     std::vector<std::string> _installables;
 };
 
+/* A command that operates on exactly one "installable" */
 struct InstallableCommand : virtual Args, SourceExprCommand
 {
     std::shared_ptr<Installable> installable;
@@ -142,13 +125,17 @@ private:
     bool recursive = false;
     bool all = false;
 
+protected:
+
+    RealiseMode realiseMode = NoBuild;
+
 public:
 
     StorePathsCommand(bool recursive = false);
 
     using StoreCommand::run;
 
-    virtual void run(ref<Store> store, Paths storePaths) = 0;
+    virtual void run(ref<Store> store, std::vector<StorePath> storePaths) = 0;
 
     void run(ref<Store> store) override;
 
@@ -160,29 +147,9 @@ struct StorePathCommand : public InstallablesCommand
 {
     using StoreCommand::run;
 
-    virtual void run(ref<Store> store, const Path & storePath) = 0;
+    virtual void run(ref<Store> store, const StorePath & storePath) = 0;
 
     void run(ref<Store> store) override;
-};
-
-typedef std::map<std::string, ref<Command>> Commands;
-
-/* An argument parser that supports multiple subcommands,
-   i.e. ‘<command> <subcommand>’. */
-class MultiCommand : virtual Args
-{
-public:
-    Commands commands;
-
-    std::shared_ptr<Command> command;
-
-    MultiCommand(const Commands & commands);
-
-    void printHelp(const string & programName, std::ostream & out) override;
-
-    bool processFlag(Strings::iterator & pos, Strings::iterator end) override;
-
-    bool processArgs(const Strings & args, bool finish) override;
 };
 
 /* A helper class for registering commands globally. */
@@ -190,12 +157,19 @@ struct RegisterCommand
 {
     static Commands * commands;
 
-    RegisterCommand(ref<Command> command)
+    RegisterCommand(const std::string & name,
+        std::function<ref<Command>()> command)
     {
         if (!commands) commands = new Commands;
-        commands->emplace(command->name(), command);
+        commands->emplace(name, command);
     }
 };
+
+template<class T>
+static RegisterCommand registerCommand(const std::string & name)
+{
+    return RegisterCommand(name, [](){ return make_ref<T>(); });
+}
 
 std::shared_ptr<Installable> parseInstallable(
     SourceExprCommand & cmd, ref<Store> store, const std::string & installable,
@@ -204,14 +178,18 @@ std::shared_ptr<Installable> parseInstallable(
 Buildables build(ref<Store> store, RealiseMode mode,
     std::vector<std::shared_ptr<Installable>> installables);
 
-PathSet toStorePaths(ref<Store> store, RealiseMode mode,
+std::set<StorePath> toStorePaths(ref<Store> store, RealiseMode mode,
     std::vector<std::shared_ptr<Installable>> installables);
 
-Path toStorePath(ref<Store> store, RealiseMode mode,
+StorePath toStorePath(ref<Store> store, RealiseMode mode,
     std::shared_ptr<Installable> installable);
 
-PathSet toDerivations(ref<Store> store,
+std::set<StorePath> toDerivations(ref<Store> store,
     std::vector<std::shared_ptr<Installable>> installables,
     bool useDeriver = false);
+
+/* Helper function to generate args that invoke $EDITOR on
+   filename:lineno. */
+Strings editorFor(const Pos & pos);
 
 }

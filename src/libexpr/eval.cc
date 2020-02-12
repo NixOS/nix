@@ -7,8 +7,10 @@
 #include "eval-inline.hh"
 #include "download.hh"
 #include "json.hh"
+#include "function-trace.hh"
 
 #include <algorithm>
+#include <chrono>
 #include <cstring>
 #include <unistd.h>
 #include <sys/time.h>
@@ -16,7 +18,6 @@
 #include <iostream>
 #include <fstream>
 
-#include <sys/time.h>
 #include <sys/resource.h>
 
 namespace nix {
@@ -28,11 +29,10 @@ static void printValue(std::ostream & str, std::set<const Value *> & active, con
 {
     checkInterrupt();
 
-    if (active.find(&v) != active.end()) {
+    if (!active.insert(&v).second) {
         str << "<CYCLE>";
         return;
     }
-    active.insert(&v);
 
     switch (v.type) {
     case tInt:
@@ -239,15 +239,14 @@ EvalState::EvalState(const Strings & _searchPath, ref<Store> store)
     , baseEnv(allocEnv(128))
     , staticBaseEnv(false, 0)
 {
-    countCalls = getEnv("NIX_COUNT_CALLS", "0") != "0";
+    countCalls = getEnv("NIX_COUNT_CALLS").value_or("0") != "0";
 
     static_assert(sizeof(Env) <= 16, "environment must be <= 16 bytes");
 
     /* Initialise the Nix expression search path. */
     if (!evalSettings.pureEval) {
-        Strings paths = parseNixPath(getEnv("NIX_PATH", ""));
         for (auto & i : _searchPath) addToSearchPath(i);
-        for (auto & i : paths) addToSearchPath(i);
+        for (auto & i : evalSettings.nixPath.get()) addToSearchPath(i);
     }
     addToSearchPath("nix=" + canonPath(settings.nixDataDir + "/nix/corepkgs", true));
 
@@ -261,10 +260,10 @@ EvalState::EvalState(const Strings & _searchPath, ref<Store> store)
             auto path = r.second;
 
             if (store->isInStore(r.second)) {
-                PathSet closure;
-                store->computeFSClosure(store->toStorePath(r.second), closure);
+                StorePathSet closure;
+                store->computeFSClosure(store->parseStorePath(store->toStorePath(r.second)), closure);
                 for (auto & path : closure)
-                    allowedPaths->insert(path);
+                    allowedPaths->insert(store->printStorePath(path));
             } else
                 allowedPaths->insert(r.second);
         }
@@ -361,7 +360,7 @@ Path EvalState::toRealPath(const Path & path, const PathSet & context)
         !context.empty() && store->isInStore(path)
         ? store->toRealPath(path)
         : path;
-};
+}
 
 
 Value * EvalState::addConstant(const string & name, Value & v)
@@ -447,9 +446,9 @@ LocalNoInlineNoReturn(void throwTypeError(const char * s, const ExprLambda & fun
     throw TypeError(format(s) % fun.showNamePos() % s2 % pos);
 }
 
-LocalNoInlineNoReturn(void throwAssertionError(const char * s, const Pos & pos))
+LocalNoInlineNoReturn(void throwAssertionError(const char * s, const string & s1, const Pos & pos))
 {
-    throw AssertionError(format(s) % pos);
+    throw AssertionError(format(s) % s1 % pos);
 }
 
 LocalNoInlineNoReturn(void throwUndefinedVarError(const char * s, const string & s1, const Pos & pos))
@@ -473,13 +472,13 @@ LocalNoInline(void addErrorPrefix(Error & e, const char * s, const string & s2, 
 }
 
 
-Value & mkString(Value & v, const string & s, const PathSet & context)
+Value & mkString(Value & v, std::string_view s, const PathSet & context)
 {
     if (context.empty())
-        mkString(v, s.c_str());
+        mkString(v, s);
     else {
-        v.string.s = String::alloc(s.c_str());
-        v.string.context = nullptr;
+        v.string.s = gc.alloc<String>(String::wordsFor(s.size()), s.size(), s.data());
+        v.string.context = 0;
         v.type = tLongString;
         v.setContext(context);
     }
@@ -780,7 +779,7 @@ void ExprAttrs::eval(EvalState & state, Env & env, Value & v)
         if (hasOverrides) {
             Value * vOverrides = (*v.attrs)[overrides->second.displ].value;
             state.forceAttrs(*vOverrides);
-            Bindings * newBnds = Bindings::allocBindings(v.attrs->size() + vOverrides->attrs->size());
+            auto newBnds = Bindings::allocBindings(v.attrs->capacity() + vOverrides->attrs->size());
             for (auto & i : *v.attrs)
                 newBnds->push_back(i);
             for (auto & i : *vOverrides->attrs) {
@@ -996,9 +995,10 @@ void EvalState::callPrimOp(Value & fun, Value & arg, Value & v, const Pos & pos)
     }
 }
 
-
 void EvalState::callFunction(Value & fun, Value & arg, Value & v, const Pos & pos)
 {
+    auto trace = evalSettings.traceFunctionCalls ? std::make_unique<FunctionCallTrace>(pos) : nullptr;
+
     forceValue(fun, pos);
 
     if (fun.type == tPrimOp || fun.type == tPrimOpApp) {
@@ -1150,8 +1150,11 @@ void ExprIf::eval(EvalState & state, Env & env, Value & v)
 
 void ExprAssert::eval(EvalState & state, Env & env, Value & v)
 {
-    if (!state.evalBool(env, cond, pos))
-        throwAssertionError("assertion failed at %1%", pos);
+    if (!state.evalBool(env, cond, pos)) {
+        std::ostringstream out;
+        cond->show(out);
+        throwAssertionError("assertion '%1%' failed at %2%", out.str(), pos);
+    }
     body->eval(state, env, v);
 }
 
@@ -1343,8 +1346,7 @@ void EvalState::forceValueDeep(Value & v)
     std::function<void(Value & v)> recurse;
 
     recurse = [&](Value & v) {
-        if (seen.find(&v) != seen.end()) return;
-        seen.insert(&v);
+        if (!seen.insert(&v).second) return;
 
         forceValue(v);
 
@@ -1460,6 +1462,19 @@ bool EvalState::isDerivation(Value & v)
 }
 
 
+std::optional<string> EvalState::tryAttrsToString(const Pos & pos, Value & v,
+    PathSet & context, bool coerceMore, bool copyToStore)
+{
+    auto i = v.attrs->find(sToString);
+    if (i != v.attrs->end()) {
+        auto v1 = allocValue();
+        callFunction(*i->value, v, v1, pos);
+        return coerceToString(pos, v1, context, coerceMore, copyToStore);
+    }
+
+    return {};
+}
+
 string EvalState::coerceToString(const Pos & pos, Value & v, PathSet & context,
     bool coerceMore, bool copyToStore)
 {
@@ -1478,13 +1493,11 @@ string EvalState::coerceToString(const Pos & pos, Value & v, PathSet & context,
     }
 
     if (v.type == tAttrs) {
-        auto i = v.attrs->find(sToString);
-        if (i != v.attrs->end()) {
-            auto v1 = allocValue();
-            callFunction(*i->value, v, v1, pos);
-            return coerceToString(pos, v1, context, coerceMore, copyToStore);
+        auto maybeString = tryAttrsToString(pos, v, context, coerceMore, copyToStore);
+        if (maybeString) {
+            return *maybeString;
         }
-        i = v.attrs->find(sOutPath);
+        auto i = v.attrs->find(sOutPath);
         if (i == v.attrs->end()) throwTypeError("cannot coerce a set to a string, at %1%", pos);
         return coerceToString(pos, *i->value, context, coerceMore, copyToStore);
     }
@@ -1528,15 +1541,16 @@ string EvalState::copyPathToStore(PathSet & context, const Path & path)
         throwEvalError("file names are not allowed to end in '%1%'", drvExtension);
 
     Path dstPath;
-    if (srcToStore[path] != "")
-        dstPath = srcToStore[path];
+    auto i = srcToStore.find(path);
+    if (i != srcToStore.end())
+        dstPath = store->printStorePath(i->second);
     else {
-        dstPath = settings.readOnlyMode
-            ? store->computeStorePathForPath(baseNameOf(path), checkSourcePath(path)).first
-            : store->addToStore(baseNameOf(path), checkSourcePath(path), true, htSHA256, defaultPathFilter, repair);
-        srcToStore[path] = dstPath;
-        printMsg(lvlChatty, format("copied source '%1%' -> '%2%'")
-            % path % dstPath);
+        auto p = settings.readOnlyMode
+            ? store->computeStorePathForPath(std::string(baseNameOf(path)), checkSourcePath(path)).first
+            : store->addToStore(std::string(baseNameOf(path)), checkSourcePath(path), true, htSHA256, defaultPathFilter, repair);
+        dstPath = store->printStorePath(p);
+        srcToStore.insert_or_assign(path, std::move(p));
+        printMsg(lvlChatty, "copied source '%1%' -> '%2%'", path, dstPath);
     }
 
     context.insert(dstPath);
@@ -1640,7 +1654,7 @@ bool EvalState::eqValues(Value & v1, Value & v2)
 
 void EvalState::printStats()
 {
-    bool showStats = getEnv("NIX_SHOW_STATS", "0") != "0";
+    bool showStats = getEnv("NIX_SHOW_STATS").value_or("0") != "0";
 
     struct rusage buf;
     getrusage(RUSAGE_SELF, &buf);
@@ -1652,7 +1666,7 @@ void EvalState::printStats()
     uint64_t bAttrsets = nrAttrsets * sizeof(Bindings) + nrAttrsInAttrsets * sizeof(Attr);
 
     if (showStats) {
-        auto outPath = getEnv("NIX_SHOW_STATS_PATH","-");
+        auto outPath = getEnv("NIX_SHOW_STATS_PATH").value_or("-");
         std::fstream fs;
         if (outPath != "-")
             fs.open(outPath, std::fstream::out);
@@ -1744,99 +1758,11 @@ void EvalState::printStats()
             }
         }
 
-        if (getEnv("NIX_SHOW_SYMBOLS", "0") != "0") {
+        if (getEnv("NIX_SHOW_SYMBOLS").value_or("0") != "0") {
             auto list = topObj.list("symbols");
             symbols.dump([&](const std::string & s) { list.elem(s); });
         }
     }
-}
-
-
-// FIXME: move to gc.cc and make generic.
-size_t valueSize(Value & v)
-{
-    std::set<const void *> seen;
-
-    std::function<size_t(Value & v)> doValue;
-    std::function<size_t(Env & v)> doEnv;
-
-    doValue = [&](Value & v) -> size_t {
-        if (seen.find(&v) != seen.end()) return 0;
-        seen.insert(&v);
-
-        size_t sz = sizeof(Value);
-
-        switch (v.type) {
-        case tLongString:
-            sz += v.string.s->words() * WORD_SIZE;
-            break;
-        case tPath:
-            sz += v.path->words() * WORD_SIZE;
-            break;
-        case tAttrs:
-            if (seen.find(v.attrs) == seen.end()) {
-                seen.insert(v.attrs);
-                sz += sizeof(Bindings) + sizeof(Attr) * v.attrs->capacity();
-                for (auto & i : *v.attrs)
-                    sz += doValue(*i.value);
-            }
-            break;
-        case tList0:
-        case tList1:
-        case tList2:
-        case tListN:
-            if (seen.find(v.listElems()) == seen.end()) {
-                seen.insert(v.listElems());
-                sz += v.listSize() * sizeof(Value *);
-                for (size_t n = 0; n < v.listSize(); ++n)
-                    sz += doValue(*v.listElems()[n]);
-            }
-            break;
-        case tThunk:
-            sz += doEnv(*v.thunk.env);
-            break;
-        case tApp:
-            sz += doValue(*v.app.left);
-            sz += doValue(*v.app.right);
-            break;
-        case tLambda:
-            sz += doEnv(*v.lambda.env);
-            break;
-        case tPrimOpApp:
-            sz += doValue(*v.app.left);
-            sz += doValue(*v.app.right);
-            break;
-#if 0
-        case tExternal:
-            if (seen.find(v.external) != seen.end()) break;
-            seen.insert(v.external);
-            sz += v.external->valueSize(seen);
-            break;
-#endif
-        default:
-            ;
-        }
-
-        return sz;
-    };
-
-    doEnv = [&](Env & env) -> size_t {
-        if (seen.find(&env) != seen.end()) return 0;
-        seen.insert(&env);
-
-        size_t sz = sizeof(Env) + sizeof(Value *) * env.getSize();
-
-        if (env.type != tWithExprEnv)
-            for (size_t i = 0; i < env.getSize(); ++i)
-                if (env.values[i])
-                    sz += doValue(*env.values[i]);
-
-        if (env.up) sz += doEnv(*env.up);
-
-        return sz;
-    };
-
-    return doValue(v);
 }
 
 
@@ -1859,6 +1785,22 @@ std::ostream & operator << (std::ostream & str, const ExternalValueBase & v) {
 }
 #endif
 
+
+EvalSettings::EvalSettings()
+{
+    auto var = getEnv("NIX_PATH");
+    if (var) nixPath = parseNixPath(*var);
+}
+
+Strings EvalSettings::getDefaultNixPath()
+{
+    Strings res;
+    auto add = [&](const Path & p) { if (pathExists(p)) { res.push_back(p); } };
+    add(getHome() + "/.nix-defexpr/channels");
+    add("nixpkgs=" + settings.nixStateDir + "/nix/profiles/per-user/root/channels/nixpkgs");
+    add(settings.nixStateDir + "/nix/profiles/per-user/root/channels");
+    return res;
+}
 
 EvalSettings evalSettings;
 

@@ -61,11 +61,6 @@ struct CmdRun : InstallablesCommand
             .handler([&](std::vector<std::string> ss) { unset.insert(ss.front()); });
     }
 
-    std::string name() override
-    {
-        return "run";
-    }
-
     std::string description() override
     {
         return "run a shell in which the specified packages are available";
@@ -124,24 +119,24 @@ struct CmdRun : InstallablesCommand
                 unsetenv(var.c_str());
         }
 
-        std::unordered_set<Path> done;
-        std::queue<Path> todo;
-        for (auto & path : outPaths) todo.push(path);
+        std::unordered_set<StorePath> done;
+        std::queue<StorePath> todo;
+        for (auto & path : outPaths) todo.push(path.clone());
 
-        auto unixPath = tokenizeString<Strings>(getEnv("PATH"), ":");
+        auto unixPath = tokenizeString<Strings>(getEnv("PATH").value_or(""), ":");
 
         while (!todo.empty()) {
-            Path path = todo.front();
+            auto path = todo.front().clone();
             todo.pop();
-            if (!done.insert(path).second) continue;
+            if (!done.insert(path.clone()).second) continue;
 
             if (true)
-                unixPath.push_front(path + "/bin");
+                unixPath.push_front(store->printStorePath(path) + "/bin");
 
-            auto propPath = path + "/nix-support/propagated-user-env-packages";
+            auto propPath = store->printStorePath(path) + "/nix-support/propagated-user-env-packages";
             if (accessor->stat(propPath).type == FSAccessor::tRegular) {
                 for (auto & p : tokenizeString<Paths>(readFile(propPath)))
-                    todo.push(p);
+                    todo.push(store->parseStorePath(p));
             }
         }
 
@@ -182,7 +177,7 @@ struct CmdRun : InstallablesCommand
     }
 };
 
-static RegisterCommand r1(make_ref<CmdRun>());
+static auto r1 = registerCommand<CmdRun>("run");
 
 void chrootHelper(int argc, char * * argv)
 {
@@ -199,7 +194,10 @@ void chrootHelper(int argc, char * * argv)
     uid_t gid = getgid();
 
     if (unshare(CLONE_NEWUSER | CLONE_NEWNS) == -1)
-        throw SysError("setting up a private mount namespace");
+        /* Try with just CLONE_NEWNS in case user namespaces are
+           specifically disabled. */
+        if (unshare(CLONE_NEWNS) == -1)
+            throw SysError("setting up a private mount namespace");
 
     /* Bind-mount realStoreDir on /nix/store. If the latter mount
        point doesn't already exists, we have to create a chroot

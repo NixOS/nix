@@ -8,15 +8,6 @@ using namespace nix;
 
 struct CmdLog : InstallableCommand
 {
-    CmdLog()
-    {
-    }
-
-    std::string name() override
-    {
-        return "log";
-    }
-
     std::string description() override
     {
         return "show the build log of the specified packages or paths, if available";
@@ -52,7 +43,7 @@ struct CmdLog : InstallableCommand
 
         RunPager pager;
         for (auto & sub : subs) {
-            auto log = b.drvPath != "" ? sub->getBuildLog(b.drvPath) : nullptr;
+            auto log = b.drvPath ? sub->getBuildLog(*b.drvPath) : nullptr;
             for (auto & output : b.outputs) {
                 if (log) break;
                 log = sub->getBuildLog(output.second);
@@ -68,4 +59,4 @@ struct CmdLog : InstallableCommand
     }
 };
 
-static RegisterCommand r1(make_ref<CmdLog>());
+static auto r1 = registerCommand<CmdLog>("log");

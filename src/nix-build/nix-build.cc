@@ -106,7 +106,7 @@ static void _main(int argc, char * * argv)
     // Heuristic to see if we're invoked as a shebang script, namely,
     // if we have at least one argument, it's the name of an
     // executable file, and it starts with "#!".
-    if (runEnv && argc > 1 && !std::regex_search(argv[1], std::regex("nix-shell"))) {
+    if (runEnv && argc > 1) {
         script = argv[1];
         try {
             auto lines = tokenizeString<Strings>(readFile(script), "\n");
@@ -247,6 +247,16 @@ static void _main(int argc, char * * argv)
 
     auto autoArgs = myArgs.getAutoArgs(*state);
 
+    if (runEnv) {
+        auto newArgs = Bindings::allocBindings(autoArgs->size() + 1);
+        auto tru = state->allocValue();
+        mkBool(*tru, true);
+        newArgs->push_back(Attr(state->symbols.create("inNixShell"), tru));
+        for (auto & i : *autoArgs) newArgs->push_back(i);
+        newArgs->sort();
+        autoArgs = newArgs;
+    }
+
     if (packages) {
         std::ostringstream joined;
         joined << "with import <nixpkgs> { }; (pkgs.runCommandCC or pkgs.runCommand) \"shell\" { buildInputs = [ ";
@@ -274,19 +284,21 @@ static void _main(int argc, char * * argv)
         exprs = {state->parseStdin()};
     else
         for (auto i : left) {
-            auto absolute = i;
-            try {
-                absolute = canonPath(absPath(i), true);
-            } catch (Error e) {};
             if (fromArgs)
                 exprs.push_back(state->parseExprFromString(i, absPath(".")));
-            else if (store->isStorePath(absolute) && std::regex_match(absolute, std::regex(".*\\.drv(!.*)?")))
-                drvs.push_back(DrvInfo(*state, store, absolute));
-            else
-                /* If we're in a #! script, interpret filenames
-                   relative to the script. */
-                exprs.push_back(state->parseExprFromFile(resolveExprPath(state->checkSourcePath(lookupFileArg(*state,
-                    inShebang && !packages ? absPath(i, absPath(dirOf(script))) : i)))));
+            else {
+                auto absolute = i;
+                try {
+                    absolute = canonPath(absPath(i), true);
+                } catch (Error & e) {};
+                if (store->isStorePath(absolute) && std::regex_match(absolute, std::regex(".*\\.drv(!.*)?")))
+                    drvs.push_back(DrvInfo(*state, store, absolute));
+                else
+                    /* If we're in a #! script, interpret filenames
+                       relative to the script. */
+                    exprs.push_back(state->parseExprFromFile(resolveExprPath(state->checkSourcePath(lookupFileArg(*state,
+                                        inShebang && !packages ? absPath(i, absPath(dirOf(script))) : i)))));
+            }
         }
 
     /* Evaluate them into derivations. */
@@ -305,11 +317,11 @@ static void _main(int argc, char * * argv)
 
     state->printStats();
 
-    auto buildPaths = [&](const PathSet & paths) {
+    auto buildPaths = [&](const std::vector<StorePathWithOutputs> & paths) {
         /* Note: we do this even when !printMissing to efficiently
            fetch binary cache data. */
         unsigned long long downloadSize, narSize;
-        PathSet willBuild, willSubstitute, unknown;
+        StorePathSet willBuild, willSubstitute, unknown;
         store->queryMissing(paths,
             willBuild, willSubstitute, unknown, downloadSize, narSize);
 
@@ -325,16 +337,16 @@ static void _main(int argc, char * * argv)
             throw UsageError("nix-shell requires a single derivation");
 
         auto & drvInfo = drvs.front();
-        auto drv = store->derivationFromPath(drvInfo.queryDrvPath());
+        auto drv = store->derivationFromPath(store->parseStorePath(drvInfo.queryDrvPath()));
 
-        PathSet pathsToBuild;
+        std::vector<StorePathWithOutputs> pathsToBuild;
 
         /* Figure out what bash shell to use. If $NIX_BUILD_SHELL
            is not set, then build bashInteractive from
            <nixpkgs>. */
-        auto shell = getEnv("NIX_BUILD_SHELL", "");
+        auto shell = getEnv("NIX_BUILD_SHELL");
 
-        if (shell == "") {
+        if (!shell) {
 
             try {
                 auto expr = state->parseExprFromString("(import <nixpkgs> {}).bashInteractive", absPath("."));
@@ -346,7 +358,7 @@ static void _main(int argc, char * * argv)
                 if (!drv)
                     throw Error("the 'bashInteractive' attribute in <nixpkgs> did not evaluate to a derivation");
 
-                pathsToBuild.insert(drv->queryDrvPath());
+                pathsToBuild.emplace_back(store->parseStorePath(drv->queryDrvPath()));
 
                 shell = drv->queryOutPath() + "/bin/bash";
 
@@ -358,10 +370,11 @@ static void _main(int argc, char * * argv)
 
         // Build or fetch all dependencies of the derivation.
         for (const auto & input : drv.inputDrvs)
-            if (std::all_of(envExclude.cbegin(), envExclude.cend(), [&](const string & exclude) { return !std::regex_search(input.first, std::regex(exclude)); }))
-                pathsToBuild.insert(makeDrvPathWithOutputs(input.first, input.second));
+            if (std::all_of(envExclude.cbegin(), envExclude.cend(),
+                    [&](const string & exclude) { return !std::regex_search(store->printStorePath(input.first), std::regex(exclude)); }))
+                pathsToBuild.emplace_back(input.first, input.second);
         for (const auto & src : drv.inputSrcs)
-            pathsToBuild.insert(src);
+            pathsToBuild.emplace_back(src);
 
         buildPaths(pathsToBuild);
 
@@ -370,7 +383,8 @@ static void _main(int argc, char * * argv)
         // Set the environment.
         auto env = getEnv();
 
-        auto tmp = getEnv("TMPDIR", getEnv("XDG_RUNTIME_DIR", "/tmp"));
+        auto tmp = getEnv("TMPDIR");
+        if (!tmp) tmp = getEnv("XDG_RUNTIME_DIR").value_or("/tmp");
 
         if (pure) {
             decltype(env) newEnv;
@@ -382,11 +396,11 @@ static void _main(int argc, char * * argv)
             env["__ETC_PROFILE_SOURCED"] = "1";
         }
 
-        env["NIX_BUILD_TOP"] = env["TMPDIR"] = env["TEMPDIR"] = env["TMP"] = env["TEMP"] = tmp;
+        env["NIX_BUILD_TOP"] = env["TMPDIR"] = env["TEMPDIR"] = env["TMP"] = env["TEMP"] = *tmp;
         env["NIX_STORE"] = store->storeDir;
         env["NIX_BUILD_CORES"] = std::to_string(settings.buildCores);
 
-        auto passAsFile = tokenizeString<StringSet>(get(drv.env, "passAsFile", ""));
+        auto passAsFile = tokenizeString<StringSet>(get(drv.env, "passAsFile").value_or(""));
 
         bool keepTmp = false;
         int fileNr = 0;
@@ -410,7 +424,7 @@ static void _main(int argc, char * * argv)
         auto rcfile = (Path) tmpDir + "/rc";
         writeFile(rcfile, fmt(
                 (keepTmp ? "" : "rm -rf '%1%'; "s) +
-                "[ -n \"$PS1\" ] && [ -e ~/.bashrc ] && source ~/.bashrc; "
+                (pure ? "" : "[ -n \"$PS1\" ] && [ -e ~/.bashrc ] && source ~/.bashrc;") +
                 "%2%"
                 "dontAddDisableDepTrack=1; "
                 "[ -e $stdenv/setup ] && source $stdenv/setup; "
@@ -427,8 +441,8 @@ static void _main(int argc, char * * argv)
                 (Path) tmpDir,
                 (pure ? "" : "p=$PATH; "),
                 (pure ? "" : "PATH=$PATH:$p; unset p; "),
-                dirOf(shell),
-                shell,
+                dirOf(*shell),
+                *shell,
                 (getenv("TZ") ? (string("export TZ='") + getenv("TZ") + "'; ") : ""),
                 envCommand));
 
@@ -448,14 +462,14 @@ static void _main(int argc, char * * argv)
 
         restoreSignals();
 
-        execvp(shell.c_str(), argPtrs.data());
+        execvp(shell->c_str(), argPtrs.data());
 
-        throw SysError("executing shell '%s'", shell);
+        throw SysError("executing shell '%s'", *shell);
     }
 
     else {
 
-        PathSet pathsToBuild;
+        std::vector<StorePathWithOutputs> pathsToBuild;
 
         std::map<Path, Path> drvPrefixes;
         std::map<Path, Path> resultSymlinks;
@@ -469,7 +483,7 @@ static void _main(int argc, char * * argv)
             if (outputName == "")
                 throw Error("derivation '%s' lacks an 'outputName' attribute", drvPath);
 
-            pathsToBuild.insert(drvPath + "!" + outputName);
+            pathsToBuild.emplace_back(store->parseStorePath(drvPath), StringSet{outputName});
 
             std::string drvPrefix;
             auto i = drvPrefixes.find(drvPath);
@@ -495,7 +509,7 @@ static void _main(int argc, char * * argv)
 
         for (auto & symlink : resultSymlinks)
             if (auto store2 = store.dynamic_pointer_cast<LocalFSStore>())
-                store2->addPermRoot(symlink.second, absPath(symlink.first), true);
+                store2->addPermRoot(store->parseStorePath(symlink.second), absPath(symlink.first), true);
 
         for (auto & path : outPaths)
             std::cout << path << '\n';

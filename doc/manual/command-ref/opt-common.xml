@@ -107,14 +107,22 @@
 <varlistentry xml:id="opt-max-jobs"><term><option>--max-jobs</option> / <option>-j</option>
 <replaceable>number</replaceable></term>
 
-  <listitem><para>Sets the maximum number of build jobs that Nix will
+  <listitem>
+
+  <para>Sets the maximum number of build jobs that Nix will
   perform in parallel to the specified number.  Specify
   <literal>auto</literal> to use the number of CPUs in the system.
   The default is specified by the <link
   linkend='conf-max-jobs'><literal>max-jobs</literal></link>
   configuration setting, which itself defaults to
   <literal>1</literal>.  A higher value is useful on SMP systems or to
-  exploit I/O latency.</para></listitem>
+  exploit I/O latency.</para>
+
+  <para> Setting it to <literal>0</literal> disallows building on the local
+  machine, which is useful when you want builds to happen only on remote
+  builders.</para>
+
+  </listitem>
 
 </varlistentry>
 
@@ -235,9 +243,10 @@
 <varlistentry><term><option>--arg</option> <replaceable>name</replaceable> <replaceable>value</replaceable></term>
 
   <listitem><para>This option is accepted by
-  <command>nix-env</command>, <command>nix-instantiate</command> and
-  <command>nix-build</command>.  When evaluating Nix expressions, the
-  expression evaluator will automatically try to call functions that
+  <command>nix-env</command>, <command>nix-instantiate</command>,
+  <command>nix-shell</command> and <command>nix-build</command>.
+  When evaluating Nix expressions, the expression evaluator will
+  automatically try to call functions that
   it encounters.  It can automatically call functions for which every
   argument has a <link linkend='ss-functions'>default value</link>
   (e.g., <literal>{ <replaceable>argName</replaceable> ?
@@ -314,7 +323,14 @@
   Nix expressions to be parsed and evaluated, rather than as a list
   of file names of Nix expressions.
   (<command>nix-instantiate</command>, <command>nix-build</command>
-  and <command>nix-shell</command> only.)</para></listitem>
+  and <command>nix-shell</command> only.)</para>
+
+  <para>For <command>nix-shell</command>, this option is commonly used
+  to give you a shell in which you can build the packages returned
+  by the expression. If you want to get a shell which contain the
+  <emphasis>built</emphasis> packages ready for use, give your
+  expression to the <command>nix-shell -p</command> convenience flag
+  instead.</para></listitem>
 
 </varlistentry>
 

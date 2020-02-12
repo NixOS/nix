@@ -11,7 +11,7 @@ GC gc;
 
 GC::GC()
 {
-    nextSize = std::max((size_t) 2, parseSize<size_t>(getEnv("GC_INITIAL_HEAP_SIZE", "131072")) / WORD_SIZE);
+    nextSize = std::max((size_t) 2, parseSize<size_t>(getEnv("GC_INITIAL_HEAP_SIZE").value_or("131072")) / WORD_SIZE);
 
     // FIXME: placement new
     frontPtrSentinel = (Ptr<Object> *) malloc(sizeof(Ptr<Object>));

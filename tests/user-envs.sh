@@ -20,7 +20,7 @@ drvPath10=$(nix-env -f ./user-envs.nix -qa --drv-path --no-name '*' | grep foo-1
 
 # Query descriptions.
 nix-env -f ./user-envs.nix -qa '*' --description | grep -q silly
-rm -f $HOME/.nix-defexpr
+rm -rf $HOME/.nix-defexpr
 ln -s $(pwd)/user-envs.nix $HOME/.nix-defexpr
 nix-env -qa '*' --description | grep -q silly
 

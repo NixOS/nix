@@ -30,9 +30,7 @@ rec {
   });
 
   configureFlags =
-    [
-      "--enable-gc"
-    ] ++ lib.optionals stdenv.isLinux [
+    lib.optionals stdenv.isLinux [
       "--with-sandbox-shell=${sh}/bin/busybox"
     ];
 
@@ -42,16 +40,19 @@ rec {
       libxml2
       libxslt
       docbook5
-      docbook5_xsl
+      docbook_xsl_ns
       autoconf-archive
       autoreconfHook
     ];
 
   buildDeps =
     [ curl
-      bzip2 xz brotli editline
+      bzip2 xz brotli zlib editline
       openssl pkgconfig sqlite
+      libarchive
       boost
+      nlohmann_json
+      rustc cargo
 
       # Tests
       git

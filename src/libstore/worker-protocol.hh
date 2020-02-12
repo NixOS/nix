@@ -62,8 +62,12 @@ typedef enum {
 #define STDERR_RESULT         0x52534c54
 
 
-Path readStorePath(Store & store, Source & from);
-template<class T> T readStorePaths(Store & store, Source & from);
+class Store;
+struct Source;
+
+template<class T> T readStorePaths(const Store & store, Source & from);
+
+void writeStorePaths(const Store & store, Sink & out, const StorePathSet & paths);
 
 
 }

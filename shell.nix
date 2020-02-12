@@ -1,13 +1,13 @@
 { useClang ? false }:
 
-with import (builtins.fetchGit { url = https://github.com/NixOS/nixpkgs-channels.git; ref = "nixos-19.03"; }) {};
+with import (builtins.fetchTarball https://github.com/NixOS/nixpkgs/archive/nixos-19.09.tar.gz) {};
 
 with import ./release-common.nix { inherit pkgs; };
 
 (if useClang then clangStdenv else stdenv).mkDerivation {
   name = "nix";
 
-  buildInputs = buildDeps ++ tarballDeps ++ perlDeps;
+  buildInputs = buildDeps ++ tarballDeps ++ perlDeps ++ [ pkgs.rustfmt ];
 
   inherit configureFlags;
 

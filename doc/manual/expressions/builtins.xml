@@ -170,18 +170,6 @@ if builtins ? getEnv then builtins.getEnv "PATH" else ""</programlisting>
   </varlistentry>
 
 
-  <varlistentry xml:id='builtin-splitVersion'>
-    <term><function>builtins.splitVersion</function>
-    <replaceable>s</replaceable></term>
-
-    <listitem><para>Split a string representing a version into its
-    components, by the same version splitting logic underlying the
-    version comparison in <link linkend="ssec-version-comparisons">
-    <command>nix-env -u</command></link>.</para></listitem>
-
-  </varlistentry>
-
-
   <varlistentry xml:id='builtin-concatLists'>
     <term><function>builtins.concatLists</function>
     <replaceable>lists</replaceable></term>
@@ -301,7 +289,7 @@ if builtins ? getEnv then builtins.getEnv "PATH" else ""</programlisting>
 
     <listitem><para>Return element <replaceable>n</replaceable> from
     the list <replaceable>xs</replaceable>.  Elements are counted
-    starting from 0.  A fatal error occurs in the index is out of
+    starting from 0.  A fatal error occurs if the index is out of
     bounds.</para></listitem>
 
   </varlistentry>
@@ -347,7 +335,7 @@ stdenv.mkDerivation { … }
     You can change the cache timeout either on the command line with
     <option>--option tarball-ttl <replaceable>number of seconds</replaceable></option> or
     in the Nix configuration file with this option:
-    <literal>tarball-ttl <replaceable>number of seconds to cache</replaceable></literal>.
+    <literal><xref linkend="conf-tarball-ttl" /> <replaceable>number of seconds to cache</replaceable></literal>.
     </para>
 
     <para>Note that when obtaining the hash with <varname>nix-prefetch-url
@@ -425,6 +413,13 @@ stdenv.mkDerivation { … }
               This is often a branch or tag name. Defaults to
               <literal>HEAD</literal>.
             </para>
+
+            <para>
+              By default, the <varname>ref</varname> value is prefixed
+              with <literal>refs/heads/</literal>. As of Nix 2.3.0
+              Nix will not prefix <literal>refs/heads/</literal> if
+              <varname>ref</varname> starts with <literal>refs/</literal>.
+            </para>
           </listitem>
         </varlistentry>
       </variablelist>
@@ -435,6 +430,14 @@ stdenv.mkDerivation { … }
   url = "git@github.com:my-secret/repository.git";
   ref = "master";
   rev = "adab8b916a45068c044658c4158d81878f9ed1c3";
+}</programlisting>
+      </example>
+
+      <example>
+        <title>Fetching an arbitrary ref</title>
+        <programlisting>builtins.fetchGit {
+  url = "https://github.com/NixOS/nix.git";
+  ref = "refs/heads/0.5-release";
 }</programlisting>
       </example>
 
@@ -484,11 +487,8 @@ stdenv.mkDerivation { … }
         <title>Fetching a tag</title>
         <programlisting>builtins.fetchGit {
   url = "https://github.com/nixos/nix.git";
-  ref = "tags/1.9";
+  ref = "refs/tags/1.9";
 }</programlisting>
-        <note><para>Due to a bug (<link
-        xlink:href="https://github.com/NixOS/nix/issues/2385">#2385</link>),
-        only non-annotated tags can be fetched.</para></note>
       </example>
 
       <example>
@@ -498,7 +498,7 @@ stdenv.mkDerivation { … }
            fetch the latest version of a remote branch.
         </para>
         <note><para>Nix will refetch the branch in accordance to
-        <option>tarball-ttl</option>.</para></note>
+        <xref linkend="conf-tarball-ttl" />.</para></note>
         <note><para>This behavior is disabled in
         <emphasis>Pure evaluation mode</emphasis>.</para></note>
         <programlisting>builtins.fetchGit {
@@ -705,6 +705,19 @@ builtins.genList (x: x * x) 5
   </varlistentry>
 
 
+  <varlistentry xml:id='builtin-hashFile'>
+    <term><function>builtins.hashFile</function>
+    <replaceable>type</replaceable> <replaceable>p</replaceable></term>
+
+    <listitem><para>Return a base-16 representation of the
+    cryptographic hash of the file at path <replaceable>p</replaceable>.  The
+    hash algorithm specified by <replaceable>type</replaceable> must
+    be one of <literal>"md5"</literal>, <literal>"sha1"</literal>,
+    <literal>"sha256"</literal> or <literal>"sha512"</literal>.</para></listitem>
+
+  </varlistentry>
+
+
   <varlistentry xml:id='builtin-head'>
     <term><function>builtins.head</function>
     <replaceable>list</replaceable></term>
@@ -732,6 +745,11 @@ builtins.genList (x: x * x) 5
     can put any Nix expression (such as a set or a function) in a
     separate file, and use it from Nix expressions in other
     files.</para>
+
+    <note><para>Unlike some languages, <function>import</function> is a regular
+    function in Nix. Paths using the angle bracket syntax (e.g., <function>
+    import</function> <replaceable>&lt;foo&gt;</replaceable>) are normal path
+    values (see <xref linkend='ssec-values' />).</para></note>
 
     <para>A Nix expression loaded by <function>import</function> must
     not contain any <emphasis>free variables</emphasis> (identifiers
@@ -1102,6 +1120,16 @@ Evaluates to <literal>[ "foo" ]</literal>.
 
   </varlistentry>
 
+  <varlistentry xml:id='builtin-placeholder'>
+    <term><function>builtins.placeholder</function>
+    <replaceable>output</replaceable></term>
+
+    <listitem><para>Return a placeholder string for the specified
+    <replaceable>output</replaceable> that will be substituted by the
+    corresponding output path at build time. Typical outputs would be
+    <literal>"out"</literal>, <literal>"bin"</literal> or
+    <literal>"dev"</literal>.</para></listitem>
+  </varlistentry>
 
   <varlistentry xml:id='builtin-readDir'>
     <term><function>builtins.readDir</function>
@@ -1246,6 +1274,19 @@ Evaluates to <literal>[ "  " [ "FOO" ] "   " ]</literal>.
 
     </para></listitem>
   </varlistentry>
+
+
+  <varlistentry xml:id='builtin-splitVersion'>
+    <term><function>builtins.splitVersion</function>
+    <replaceable>s</replaceable></term>
+
+    <listitem><para>Split a string representing a version into its
+    components, by the same version splitting logic underlying the
+    version comparison in <link linkend="ssec-version-comparisons">
+    <command>nix-env -u</command></link>.</para></listitem>
+
+  </varlistentry>
+
 
   <varlistentry xml:id='builtin-stringLength'>
     <term><function>builtins.stringLength</function>
@@ -1440,7 +1481,7 @@ in foo</programlisting>
       <listitem><para>A set containing <literal>{ __toString = self: ...; }</literal>.</para></listitem>
       <listitem><para>An integer.</para></listitem>
       <listitem><para>A list, in which case the string representations of its elements are joined with spaces.</para></listitem>
-      <listitem><para>A Boolean (<literal>false</literal> yields <literal>""</literal>, <literal>true</literal> yields <literal>"1"</literal>.</para></listitem>
+      <listitem><para>A Boolean (<literal>false</literal> yields <literal>""</literal>, <literal>true</literal> yields <literal>"1"</literal>).</para></listitem>
       <listitem><para><literal>null</literal>, which yields the empty string.</para></listitem>
     </itemizedlist>
     </listitem>
@@ -1579,12 +1620,18 @@ stdenv.mkDerivation (rec {
     <term><function>builtins.tryEval</function>
     <replaceable>e</replaceable></term>
 
-    <listitem><para>Try to evaluate <replaceable>e</replaceable>.
+    <listitem><para>Try to shallowly evaluate <replaceable>e</replaceable>.
     Return a set containing the attributes <literal>success</literal>
     (<literal>true</literal> if <replaceable>e</replaceable> evaluated
     successfully, <literal>false</literal> if an error was thrown) and
     <literal>value</literal>, equalling <replaceable>e</replaceable>
-    if successful and <literal>false</literal> otherwise.
+    if successful and <literal>false</literal> otherwise. Note that this
+    doesn't evaluate <replaceable>e</replaceable> deeply, so
+    <literal>let e = { x = throw ""; }; in (builtins.tryEval e).success
+    </literal> will be <literal>true</literal>. Using <literal>builtins.deepSeq
+    </literal> one can get the expected result: <literal>let e = { x = throw "";
+    }; in (builtins.tryEval (builtins.deepSeq e e)).success</literal> will be
+    <literal>false</literal>.
     </para></listitem>
 
   </varlistentry>

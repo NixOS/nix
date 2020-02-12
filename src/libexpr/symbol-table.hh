@@ -39,7 +39,12 @@ public:
         return s < s2.s;
     }
 
-    operator const string & () const
+    operator const std::string & () const
+    {
+        return *s;
+    }
+
+    operator const std::string_view () const
     {
         return *s;
     }

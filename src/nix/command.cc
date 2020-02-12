@@ -1,82 +1,11 @@
 #include "command.hh"
 #include "store-api.hh"
 #include "derivations.hh"
+#include "nixexpr.hh"
 
 namespace nix {
 
-Commands * RegisterCommand::commands = 0;
-
-void Command::printHelp(const string & programName, std::ostream & out)
-{
-    Args::printHelp(programName, out);
-
-    auto exs = examples();
-    if (!exs.empty()) {
-        out << "\n";
-        out << "Examples:\n";
-        for (auto & ex : exs)
-            out << "\n"
-                << "  " << ex.description << "\n" // FIXME: wrap
-                << "  $ " << ex.command << "\n";
-    }
-}
-
-MultiCommand::MultiCommand(const Commands & _commands)
-    : commands(_commands)
-{
-    expectedArgs.push_back(ExpectedArg{"command", 1, true, [=](std::vector<std::string> ss) {
-        assert(!command);
-        auto i = commands.find(ss[0]);
-        if (i == commands.end())
-            throw UsageError("'%s' is not a recognised command", ss[0]);
-        command = i->second;
-    }});
-}
-
-void MultiCommand::printHelp(const string & programName, std::ostream & out)
-{
-    if (command) {
-        command->printHelp(programName + " " + command->name(), out);
-        return;
-    }
-
-    out << "Usage: " << programName << " <COMMAND> <FLAGS>... <ARGS>...\n";
-
-    out << "\n";
-    out << "Common flags:\n";
-    printFlags(out);
-
-    out << "\n";
-    out << "Available commands:\n";
-
-    Table2 table;
-    for (auto & command : commands) {
-        auto descr = command.second->description();
-        if (!descr.empty())
-            table.push_back(std::make_pair(command.second->name(), descr));
-    }
-    printTable(out, table);
-
-#if 0
-    out << "\n";
-    out << "For full documentation, run 'man " << programName << "' or 'man " << programName << "-<COMMAND>'.\n";
-#endif
-}
-
-bool MultiCommand::processFlag(Strings::iterator & pos, Strings::iterator end)
-{
-    if (Args::processFlag(pos, end)) return true;
-    if (command && command->processFlag(pos, end)) return true;
-    return false;
-}
-
-bool MultiCommand::processArgs(const Strings & args, bool finish)
-{
-    if (command)
-        return command->processArgs(args, finish);
-    else
-        return Args::processArgs(args, finish);
-}
+Commands * RegisterCommand::commands = nullptr;
 
 StoreCommand::StoreCommand()
 {
@@ -119,28 +48,29 @@ StorePathsCommand::StorePathsCommand(bool recursive)
 
 void StorePathsCommand::run(ref<Store> store)
 {
-    Paths storePaths;
+    StorePaths storePaths;
 
     if (all) {
         if (installables.size())
             throw UsageError("'--all' does not expect arguments");
         for (auto & p : store->queryAllValidPaths())
-            storePaths.push_back(p);
+            storePaths.push_back(p.clone());
     }
 
     else {
-        for (auto & p : toStorePaths(store, NoBuild, installables))
-            storePaths.push_back(p);
+        for (auto & p : toStorePaths(store, realiseMode, installables))
+            storePaths.push_back(p.clone());
 
         if (recursive) {
-            PathSet closure;
-            store->computeFSClosure(PathSet(storePaths.begin(), storePaths.end()),
-                closure, false, false);
-            storePaths = Paths(closure.begin(), closure.end());
+            StorePathSet closure;
+            store->computeFSClosure(storePathsToSet(storePaths), closure, false, false);
+            storePaths.clear();
+            for (auto & p : closure)
+                storePaths.push_back(p.clone());
         }
     }
 
-    run(store, storePaths);
+    run(store, std::move(storePaths));
 }
 
 void StorePathCommand::run(ref<Store> store)
@@ -151,6 +81,19 @@ void StorePathCommand::run(ref<Store> store)
         throw UsageError("this command requires exactly one store path");
 
     run(store, *storePaths.begin());
+}
+
+Strings editorFor(const Pos & pos)
+{
+    auto editor = getEnv("EDITOR").value_or("cat");
+    auto args = tokenizeString<Strings>(editor);
+    if (pos.line > 0 && (
+        editor.find("emacs") != std::string::npos ||
+        editor.find("nano") != std::string::npos ||
+        editor.find("vim") != std::string::npos))
+        args.push_back(fmt("+%d", pos.line));
+    args.push_back(pos.file);
+    return args;
 }
 
 }

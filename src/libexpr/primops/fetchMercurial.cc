@@ -63,7 +63,7 @@ HgInfo exportMercurial(ref<Store> store, const std::string & uri,
                 return files.count(file);
             };
 
-            hgInfo.storePath = store->addToStore("source", uri, true, htSHA256, filter);
+            hgInfo.storePath = store->printStorePath(store->addToStore("source", uri, true, htSHA256, filter));
 
             return hgInfo;
         }
@@ -80,7 +80,7 @@ HgInfo exportMercurial(ref<Store> store, const std::string & uri,
     time_t now = time(0);
     struct stat st;
     if (stat(stampFile.c_str(), &st) != 0 ||
-        st.st_mtime + settings.tarballTtl <= now)
+        (uint64_t) st.st_mtime + settings.tarballTtl <= (uint64_t) now)
     {
         /* Except that if this is a commit hash that we already have,
            we don't have to pull again. */
@@ -96,17 +96,14 @@ HgInfo exportMercurial(ref<Store> store, const std::string & uri,
                 try {
                     runProgram("hg", true, { "pull", "-R", cacheDir, "--", uri });
                 }
-                catch (ExecError & e){
+                catch (ExecError & e) {
                     string transJournal = cacheDir + "/.hg/store/journal";
                     /* hg throws "abandoned transaction" error only if this file exists */
-                    if (pathExists(transJournal))
-                    {
+                    if (pathExists(transJournal)) {
                         runProgram("hg", true, { "recover", "-R", cacheDir });
                         runProgram("hg", true, { "pull", "-R", cacheDir, "--", uri });
-                    }
-                    else 
-                    {
-                        throw ExecError(e.status, fmt("program hg '%1%' ", statusToString(e.status)));
+                    } else {
+                        throw ExecError(e.status, fmt("'hg pull' %s", statusToString(e.status)));
                     }
                 }
             } else {
@@ -137,7 +134,7 @@ HgInfo exportMercurial(ref<Store> store, const std::string & uri,
 
         hgInfo.storePath = json["storePath"];
 
-        if (store->isValidPath(hgInfo.storePath)) {
+        if (store->isValidPath(store->parseStorePath(hgInfo.storePath))) {
             printTalkative("using cached Mercurial store path '%s'", hgInfo.storePath);
             return hgInfo;
         }
@@ -153,7 +150,7 @@ HgInfo exportMercurial(ref<Store> store, const std::string & uri,
 
     deletePath(tmpDir + "/.hg_archival.txt");
 
-    hgInfo.storePath = store->addToStore(name, tmpDir);
+    hgInfo.storePath = store->printStorePath(store->addToStore(name, tmpDir));
 
     nlohmann::json json;
     json["storePath"] = hgInfo.storePath;
@@ -214,7 +211,7 @@ static void prim_fetchMercurial(EvalState & state, const Pos & pos, Value * * ar
     v.attrs->sort();
 
     if (state.allowedPaths)
-        state.allowedPaths->insert(hgInfo.storePath);
+        state.allowedPaths->insert(state.store->toRealPath(hgInfo.storePath));
 }
 
 static RegisterPrimOp r("fetchMercurial", 1, prim_fetchMercurial);

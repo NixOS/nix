@@ -16,6 +16,8 @@ mkDerivation {
 
   __structuredAttrs = true;
 
+  outputs = [ "out" "dev" ];
+
   buildCommand = ''
     set -x
 
@@ -30,8 +32,9 @@ mkDerivation {
     [[ -v nothing ]]
     [[ -z $nothing ]]
 
-    mkdir ''${outputs[out]}
+    mkdir ''${outputs[out]} ''${outputs[dev]}
     echo bar > $dest
+    echo foo > $dest2
 
     json=$(cat .attrs.json)
     [[ $json =~ '"narHash":"sha256:1r7yc43zqnzl5b0als5vnyp649gk17i37s7mj00xr8kc47rjcybk"' ]]
@@ -57,6 +60,7 @@ mkDerivation {
   nothing = null;
 
   dest = "${placeholder "out"}/foo";
+  dest2 = "${placeholder "dev"}/foo";
 
   "foo bar" = "BAD";
   "1foobar" = "BAD";

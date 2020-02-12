@@ -11,10 +11,6 @@ $logDir = $ENV{"NIX_LOG_DIR"} || "@nixlocalstatedir@/log/nix";
 $confDir = $ENV{"NIX_CONF_DIR"} || "@nixsysconfdir@/nix";
 $storeDir = $ENV{"NIX_STORE_DIR"} || "@nixstoredir@";
 
-$bzip2 = "@bzip2@";
-$xz = "@xz@";
-$curl = "@curl@";
-
 $useBindings = 1;
 
 %config = ();

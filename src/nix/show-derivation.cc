@@ -22,11 +22,6 @@ struct CmdShowDerivation : InstallablesCommand
             .set(&recursive, true);
     }
 
-    std::string name() override
-    {
-        return "show-derivation";
-    }
-
     std::string description() override
     {
         return "show the contents of a store derivation";
@@ -51,9 +46,9 @@ struct CmdShowDerivation : InstallablesCommand
         auto drvPaths = toDerivations(store, installables, true);
 
         if (recursive) {
-            PathSet closure;
+            StorePathSet closure;
             store->computeFSClosure(drvPaths, closure);
-            drvPaths = closure;
+            drvPaths = std::move(closure);
         }
 
         {
@@ -61,17 +56,19 @@ struct CmdShowDerivation : InstallablesCommand
         JSONObject jsonRoot(std::cout, true);
 
         for (auto & drvPath : drvPaths) {
-            if (!isDerivation(drvPath)) continue;
+            if (!drvPath.isDerivation()) continue;
 
-            auto drvObj(jsonRoot.object(drvPath));
+            auto drvPathS = store->printStorePath(drvPath);
 
-            auto drv = readDerivation(drvPath);
+            auto drvObj(jsonRoot.object(drvPathS));
+
+            auto drv = readDerivation(*store, drvPathS);
 
             {
                 auto outputsObj(drvObj.object("outputs"));
                 for (auto & output : drv.outputs) {
                     auto outputObj(outputsObj.object(output.first));
-                    outputObj.attr("path", output.second.path);
+                    outputObj.attr("path", store->printStorePath(output.second.path));
                     if (output.second.hash != "") {
                         outputObj.attr("hashAlgo", output.second.hashAlgo);
                         outputObj.attr("hash", output.second.hash);
@@ -82,13 +79,13 @@ struct CmdShowDerivation : InstallablesCommand
             {
                 auto inputsList(drvObj.list("inputSrcs"));
                 for (auto & input : drv.inputSrcs)
-                    inputsList.elem(input);
+                    inputsList.elem(store->printStorePath(input));
             }
 
             {
                 auto inputDrvsObj(drvObj.object("inputDrvs"));
                 for (auto & input : drv.inputDrvs) {
-                    auto inputList(inputDrvsObj.list(input.first));
+                    auto inputList(inputDrvsObj.list(store->printStorePath(input.first)));
                     for (auto & outputId : input.second)
                         inputList.elem(outputId);
                 }
@@ -116,4 +113,4 @@ struct CmdShowDerivation : InstallablesCommand
     }
 };
 
-static RegisterCommand r1(make_ref<CmdShowDerivation>());
+static auto r1 = registerCommand<CmdShowDerivation>("show-derivation");

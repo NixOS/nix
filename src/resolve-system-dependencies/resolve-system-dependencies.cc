@@ -117,9 +117,7 @@ Path resolveSymlink(const Path & path)
 std::set<string> resolveTree(const Path & path, PathSet & deps)
 {
     std::set<string> results;
-    if (deps.count(path))
-        return {};
-    deps.insert(path);
+    if (!deps.insert(path).second) return {};
     for (auto & lib : runResolver(path)) {
         results.insert(lib);
         for (auto & p : resolveTree(lib, deps)) {
@@ -181,8 +179,8 @@ int main(int argc, char ** argv)
         if (std::string(argv[1]) == "--test")
             impurePaths.insert(argv[2]);
         else {
-            auto drv = store->derivationFromPath(Path(argv[1]));
-            impurePaths = tokenizeString<StringSet>(get(drv.env, "__impureHostDeps"));
+            auto drv = store->derivationFromPath(store->parseStorePath(argv[1]));
+            impurePaths = tokenizeString<StringSet>(get(drv.env, "__impureHostDeps").value_or(""));
             impurePaths.insert("/usr/lib/libSystem.dylib");
         }
 

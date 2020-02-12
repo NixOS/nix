@@ -6,14 +6,16 @@ libstore_DIR := $(d)
 
 libstore_SOURCES := $(wildcard $(d)/*.cc $(d)/builtins/*.cc)
 
-libstore_LIBS = libutil
+libstore_LIBS = libutil libnixrust
 
 libstore_LDFLAGS = $(SQLITE3_LIBS) -lbz2 $(LIBCURL_LIBS) $(SODIUM_LIBS) -pthread
 ifneq ($(OS), FreeBSD)
  libstore_LDFLAGS += -ldl
 endif
 
+ifeq ($(OS), Darwin)
 libstore_FILES = sandbox-defaults.sb sandbox-minimal.sb sandbox-network.sb
+endif
 
 $(foreach file,$(libstore_FILES),$(eval $(call install-data-in,$(d)/$(file),$(datadir)/nix/sandbox)))
 
@@ -39,8 +41,11 @@ libstore_CXXFLAGS = \
  -DNIX_LIBEXEC_DIR=\"$(libexecdir)\" \
  -DNIX_BIN_DIR=\"$(bindir)\" \
  -DNIX_MAN_DIR=\"$(mandir)\" \
- -DSANDBOX_SHELL="\"$(sandbox_shell)\"" \
  -DLSOF=\"$(lsof)\"
+
+ifneq ($(sandbox_shell),)
+libstore_CXXFLAGS += -DSANDBOX_SHELL="\"$(sandbox_shell)\""
+endif
 
 $(d)/local-store.cc: $(d)/schema.sql.gen.hh
 

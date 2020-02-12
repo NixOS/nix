@@ -75,9 +75,9 @@ void processExpr(EvalState & state, const Strings & attrPaths,
                     if (++rootNr > 1) rootName += "-" + std::to_string(rootNr);
                     auto store2 = state.store.dynamic_pointer_cast<LocalFSStore>();
                     if (store2)
-                        drvPath = store2->addPermRoot(drvPath, rootName, indirectRoot);
+                        drvPath = store2->addPermRoot(store2->parseStorePath(drvPath), rootName, indirectRoot);
                 }
-                std::cout << format("%1%%2%\n") % drvPath % (outputName != "out" ? "!" + outputName : "");
+                std::cout << fmt("%s%s\n", drvPath, (outputName != "out" ? "!" + outputName : ""));
             }
         }
     }
@@ -105,7 +105,7 @@ static int _main(int argc, char * * argv)
             using LegacyArgs::LegacyArgs;
         };
 
-        MyArgs myArgs(baseNameOf(argv[0]), [&](Strings::iterator & arg, const Strings::iterator & end) {
+        MyArgs myArgs(std::string(baseNameOf(argv[0])), [&](Strings::iterator & arg, const Strings::iterator & end) {
             if (*arg == "--help")
                 showManPage("nix-instantiate");
             else if (*arg == "--version")

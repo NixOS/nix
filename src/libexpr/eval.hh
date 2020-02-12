@@ -9,6 +9,7 @@
 #include "gc.hh"
 
 #include <map>
+#include <optional>
 #include <unordered_map>
 
 
@@ -17,7 +18,8 @@ namespace nix {
 
 class Store;
 class EvalState;
-struct Derivation;
+struct Derivation; // FIXME: remove
+struct StorePath;
 enum RepairFlag : bool;
 
 
@@ -78,17 +80,17 @@ public:
 
     static size_t wordsFor(unsigned short size)
     {
-        return 2 + size;
+        return 1 + size;
     }
 };
 
 
-Value & mkString(Value & v, const string & s, const PathSet & context = PathSet());
+Value & mkString(Value & v, std::string_view s, const PathSet & context);
 
 
 /* Cache for calls to addToStore(); maps source paths to the store
    paths. */
-typedef std::map<Path, Path> SrcToStore;
+typedef std::map<Path, StorePath> SrcToStore;
 
 
 std::ostream & operator << (std::ostream & str, const Value & v);
@@ -221,6 +223,9 @@ public:
     /* Return true iff the value `v' denotes a derivation (i.e. a
        set with attribute `type = "derivation"'). */
     bool isDerivation(Value & v);
+
+    std::optional<string> tryAttrsToString(const Pos & pos, Value & v,
+        PathSet & context, bool coerceMore = false, bool copyToStore = true);
 
     /* String coercion.  Converts strings, paths and derivations to a
        string.  If `coerceMore' is set, also converts nulls, integers,
@@ -370,8 +375,15 @@ struct InvalidPathError : EvalError
 
 struct EvalSettings : Config
 {
+    EvalSettings();
+
+    static Strings getDefaultNixPath();
+
     Setting<bool> enableNativeCode{this, false, "allow-unsafe-native-code-during-evaluation",
         "Whether builtin functions that allow executing native code should be enabled."};
+
+    Setting<Strings> nixPath{this, getDefaultNixPath(), "nix-path",
+        "List of directories to be searched for <...> file references."};
 
     Setting<bool> restrictEval{this, false, "restrict-eval",
         "Whether to restrict file system access to paths in $NIX_PATH, "
@@ -385,6 +397,9 @@ struct EvalSettings : Config
 
     Setting<Strings> allowedUris{this, {}, "allowed-uris",
         "Prefixes of URIs that builtin functions such as fetchurl and fetchGit are allowed to fetch."};
+
+    Setting<bool> traceFunctionCalls{this, false, "trace-function-calls",
+        "Emit log messages for each function entry and exit at the 'vomit' log level (-vvvv)"};
 };
 
 extern EvalSettings evalSettings;
