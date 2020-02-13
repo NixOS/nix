@@ -90,7 +90,7 @@ struct CmdListTarballs : MixJSON, InstallablesCommand
                         auto aDrvPath = v->attrs->get(state->sDrvPath);
                         if (!aDrvPath) return;
                         try {
-                            state->forceValue(*(*aDrvPath)->value, *(*aDrvPath)->pos);
+                            state->forceValue(*aDrvPath->value, *aDrvPath->pos);
                         } catch (EvalError & e) {
                         }
                     } else {
