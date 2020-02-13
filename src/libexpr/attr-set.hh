@@ -69,12 +69,12 @@ public:
         return end();
     }
 
-    std::optional<Attr *> get(const Symbol & name)
+    Attr * get(const Symbol & name)
     {
         Attr key(name, 0);
         iterator i = std::lower_bound(begin(), end(), key);
         if (i != end() && i->name == name) return &*i;
-        return {};
+        return nullptr;
     }
 
     Attr & need(const Symbol & name, const Pos & pos = noPos)
@@ -82,7 +82,7 @@ public:
         auto a = get(name);
         if (!a)
             throw Error("attribute '%s' missing, at %s", name, pos);
-        return **a;
+        return *a;
     }
 
     iterator begin() { return &attrs[0]; }
