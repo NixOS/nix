@@ -18,6 +18,8 @@ extern "C" {
 
 struct StorePath : rust::Value<3 * sizeof(void *) + 24, ffi_StorePath_drop>
 {
+    StorePath() = delete;
+
     static StorePath make(std::string_view path, std::string_view storeDir);
 
     static StorePath make(unsigned char hash[20], std::string_view name);
