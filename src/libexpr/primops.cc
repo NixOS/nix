@@ -749,7 +749,7 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
     auto drvPath = writeDerivation(state.store, drv, drvName, state.repair);
     auto drvPathS = state.store->printStorePath(drvPath);
 
-    if (state.derivationHook) state.derivationHook(drvPathS, drv);
+    if (state.derivationHook) state.derivationHook(drvPath, drv);
 
     printMsg(lvlChatty, "instantiated '%1%' -> '%2%'", drvName, drvPathS);
 

@@ -350,7 +350,7 @@ private:
 
 public:
 
-    std::function<void(const Path & drvPath, const Derivation & drv)> derivationHook;
+    std::function<void(const StorePath & drvPath, const Derivation & drv)> derivationHook;
 };
 
 

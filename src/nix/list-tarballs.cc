@@ -1,4 +1,3 @@
-#if 0
 #include "command.hh"
 #include "eval.hh"
 #include "eval-inline.hh"
@@ -10,11 +9,6 @@ using namespace nix;
 
 struct CmdListTarballs : MixJSON, InstallablesCommand
 {
-    std::string name() override
-    {
-        return "list-tarballs";
-    }
-
     std::string description() override
     {
         return "list the 'fetchurl' calls made by the dependency graph of a package";
@@ -36,7 +30,7 @@ struct CmdListTarballs : MixJSON, InstallablesCommand
         bool recursive;
         Hash hash;
         std::string url;
-        Path storePath;
+        StorePath storePath;
     };
 
     void doIt(ref<Store> store, std::function<void(const File &)> callback)
@@ -46,17 +40,17 @@ struct CmdListTarballs : MixJSON, InstallablesCommand
         auto state = getEvalState();
         auto autoArgs = getAutoArgs(*state);
 
-        PathSet done;
+        StorePathSet done;
 
         state->derivationHook =
-            [&](const Path & drvPath, const Derivation & drv) {
+            [&](const StorePath & drvPath, const Derivation & drv) {
                 if (drv.outputs.size() != 1) return;
 
                 auto & output = *drv.outputs.begin();
 
                 if (output.second.hashAlgo.empty() || output.second.hash.empty()) return;
 
-                if (!done.insert(output.second.path).second) return;
+                if (!done.insert(output.second.path.clone()).second) return;
 
                 auto [recursive, hash] = output.second.parseHashInfo();
 
@@ -75,12 +69,13 @@ struct CmdListTarballs : MixJSON, InstallablesCommand
                     url = urls[0];
                 }
 
-                File file;
-                file.type = drv.builder == "builtin:fetchurl" ? "fetchurl" : "unknown";
-                file.recursive = recursive;
-                file.hash = hash;
-                file.url = *url;
-                file.storePath = output.second.path;
+                File file {
+                    .type = drv.builder == "builtin:fetchurl" ? "fetchurl" : "unknown",
+                    .recursive = recursive,
+                    .hash = hash,
+                    .url = *url,
+                    .storePath = output.second.path.clone()
+                };
 
                 callback(file);
             };
@@ -127,7 +122,7 @@ struct CmdListTarballs : MixJSON, InstallablesCommand
                         obj.attr("recursive", true);
                     obj.attr("hash", file.hash.to_string(SRI));
                     obj.attr("url", file.url);
-                    obj.attr("storePath", file.storePath);
+                    obj.attr("storePath", store->printStorePath(file.storePath));
                 });
         } else {
             doIt(store,
@@ -138,5 +133,4 @@ struct CmdListTarballs : MixJSON, InstallablesCommand
     }
 };
 
-static RegisterCommand r1(make_ref<CmdListTarballs>());
-#endif
+static auto r1 = registerCommand<CmdListTarballs>("list-tarballs");
