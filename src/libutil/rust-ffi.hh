@@ -113,6 +113,8 @@ extern "C" {
 
 struct String : Vec<char, ffi_String_drop>
 {
+    String() = delete;
+
     String(std::string_view s)
     {
         ffi_String_new(StringSlice(s), this);
