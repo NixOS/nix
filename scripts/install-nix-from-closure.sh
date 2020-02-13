@@ -91,9 +91,22 @@ while [ $# -gt 0 ]; do
     shift
 done
 
-if [ "$(uname -s)" = "Darwin" ] && [ "$CREATE_DARWIN_VOLUME" = 1 ]; then
-    printf '\e[1;31mCreating volume and mountpoint /nix.\e[0m\n'
-    "$self/create-darwin-volume.sh"
+if [ "$(uname -s)" = "Darwin" ]; then
+    if [ "$CREATE_DARWIN_VOLUME" = 1 ]; then
+        printf '\e[1;31mCreating volume and mountpoint /nix.\e[0m\n'
+        "$self/create-darwin-volume.sh"
+    fi
+
+    info=$(diskutil info -plist / | xpath "/plist/dict/key[text()='Writable']/following-sibling::true[1]" 2> /dev/null)
+    if ! [ -e $dest ] && [ -n "$info" ]; then
+        (
+            echo ""
+            echo "Installing on macOS >=10.15 requires relocating the store to an apfs volume."
+            echo "Use --create-volume or run the preparation steps manually."
+            echo "See https://nixos.org/nix/manual/#sect-darwin-apfs-volume."
+            echo ""
+        ) >&2
+    fi
 fi
 
 if [ "$INSTALL_MODE" = "daemon" ]; then
@@ -113,15 +126,6 @@ if ! [ -e $dest ]; then
     echo "directory $dest does not exist; creating it by running '$cmd' using sudo" >&2
     if ! sudo sh -c "$cmd"; then
         echo "$0: please manually run '$cmd' as root to create $dest" >&2
-        if [ "$(uname -s)" = "Darwin" ]; then
-            (
-                echo ""
-                echo "Installing on macOS >=10.15 requires relocating the store to an apfs volume."
-                echo "Use --create-volume or run the preparation steps manually."
-                echo "See https://nixos.org/nix/manual/#sect-darwin-apfs-volume."
-                echo ""
-            ) >&2
-        fi
         exit 1
     fi
 fi
