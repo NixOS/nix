@@ -245,6 +245,8 @@ void GC::gc()
         processStack();
     }
 
+    auto afterMark = steady_time_point::clock::now();
+
     // Reset all the freelists.
     for (auto & freeList : freeLists)
         freeList.front = nullptr;
@@ -253,28 +255,71 @@ void GC::gc()
     // appropriate freelists.
     size_t totalObjectsFreed = 0;
     size_t totalWordsFreed = 0;
+    size_t totalObjectsKept = 0;
+    size_t totalWordsKept = 0;
 
     for (auto & arena : arenas) {
-        auto [objectsFreed, wordsFreed] = freeUnmarked(arena);
+        auto [objectsFreed, wordsFreed, objectsKept, wordsKept] = freeUnmarked(arena);
         totalObjectsFreed += objectsFreed;
         totalWordsFreed += wordsFreed;
+        totalObjectsKept += objectsKept;
+        totalWordsKept += wordsKept;
     }
 
     auto after = steady_time_point::clock::now();
 
-    auto durationMs = std::chrono::duration_cast<std::chrono::milliseconds>(after - before).count();
+    auto markDurationMs = std::chrono::duration_cast<std::chrono::milliseconds>(afterMark - before).count();
+    auto sweepDurationMs = std::chrono::duration_cast<std::chrono::milliseconds>(after - afterMark).count();
 
-    debug("freed %d bytes in %d dead objects, keeping %d objects, in %d ms",
-        totalWordsFreed * WORD_SIZE, totalObjectsFreed, marked, durationMs);
+    printError("freed %d dead objects (%d bytes), keeping %d/%d objects (%d bytes), marked in %d ms, swept in %d ms",
+        totalObjectsFreed, totalWordsFreed * WORD_SIZE,
+        marked, totalObjectsKept, totalWordsKept * WORD_SIZE,
+        markDurationMs, sweepDurationMs);
 
     allTimeWordsFreed += totalWordsFreed;
-    totalDurationMs += durationMs;
+    totalDurationMs += markDurationMs + sweepDurationMs;
 }
 
-std::pair<size_t, size_t> GC::freeUnmarked(Arena & arena)
+size_t GC::getObjectSize(Object * obj)
+{
+    auto tag = obj->type;
+    if (tag >= tInt && tag <= tFloat) {
+        return ((Value *) obj)->words();
+    } else {
+        switch (tag) {
+        case tFree:
+            return ((Free *) obj)->words();
+            break;
+        case tString:
+            return ((String *) obj)->words();
+            break;
+        case tBindings:
+            return ((Bindings *) obj)->words();
+            break;
+        case tValueList:
+            return ((PtrList<Value> *) obj)->words();
+            break;
+        case tEnv:
+        case tWithExprEnv:
+        case tWithAttrsEnv:
+            return ((Env *) obj)->words();
+            break;
+        case tContext:
+            return ((Context *) obj)->getSize() + 1;
+            break;
+        default:
+            printError("GC encountered invalid object with tag %d", tag);
+            abort();
+        }
+    }
+}
+
+std::tuple<size_t, size_t, size_t, size_t> GC::freeUnmarked(Arena & arena)
 {
     size_t objectsFreed = 0;
     size_t wordsFreed = 0;
+    size_t objectsKept = 0;
+    size_t wordsKept = 0;
 
     auto end = arena.start + arena.size;
     auto pos = arena.start;
@@ -289,38 +334,8 @@ std::pair<size_t, size_t> GC::freeUnmarked(Arena & arena)
 
     while (pos < end) {
         auto obj = (Object *) pos;
-        auto tag = obj->type;
 
-        size_t objSize;
-        if (tag >= tInt && tag <= tFloat) {
-            objSize = ((Value *) obj)->words();
-        } else {
-            switch (tag) {
-            case tFree:
-                objSize = ((Free *) obj)->words();
-                break;
-            case tString:
-                objSize = ((String *) obj)->words();
-                break;
-            case tBindings:
-                objSize = ((Bindings *) obj)->words();
-                break;
-            case tValueList:
-                objSize = ((PtrList<Value> *) obj)->words();
-                break;
-            case tEnv:
-            case tWithExprEnv:
-            case tWithAttrsEnv:
-                objSize = ((Env *) obj)->words();
-                break;
-            case tContext:
-                objSize = ((Context *) obj)->getSize() + 1;
-                break;
-            default:
-                printError("GC encountered invalid object with tag %d", tag);
-                abort();
-            }
-        }
+        auto objSize = getObjectSize(obj);
 
         // Merge current object into the previous free object.
         auto mergeFree = [&]() {
@@ -329,7 +344,7 @@ std::pair<size_t, size_t> GC::freeUnmarked(Arena & arena)
             curFree->setSize(curFree->words() + objSize);
         };
 
-        if (tag == tFree) {
+        if (obj->type == tFree) {
             //debug("KEEP FREE %x %d", obj, obj->getMisc());
             if (curFree) {
                 // Merge this object into the previous free
@@ -345,6 +360,8 @@ std::pair<size_t, size_t> GC::freeUnmarked(Arena & arena)
                 //debug("KEEP OBJECT %x %d %d", obj, obj->type, objSize);
                 linkCurFree();
                 obj->unmark();
+                objectsKept += 1;
+                wordsKept += objSize;
             } else {
                 //debug("FREE OBJECT %x %d %d", obj, obj->type, objSize);
                 #if GC_DEBUG
@@ -371,7 +388,7 @@ std::pair<size_t, size_t> GC::freeUnmarked(Arena & arena)
 
     assert(pos == end);
 
-    return {objectsFreed, wordsFreed};
+    return {objectsFreed, wordsFreed, objectsKept, wordsKept};
 }
 
 bool GC::isObject(void * p)
@@ -380,6 +397,141 @@ bool GC::isObject(void * p)
         if (p >= arena.start && p < arena.start + arena.size)
             return true;
     return false;
+}
+
+std::tuple<size_t, size_t> GC::getObjectClosureSize(Object * p)
+{
+    std::unordered_set<Object *> seen;
+
+    // FIXME: cut&paste.
+
+    std::stack<Object *> stack;
+
+    // FIXME: ensure this gets inlined.
+    auto push = [&](Object * p) { if (p) { assertObject(p); stack.push(p); } };
+
+    auto pushPointers = [&](Object * obj) {
+        switch (obj->type) {
+
+        case tFree:
+            printError("reached a freed object at %x", obj);
+            abort();
+
+        case tBindings: {
+            auto obj2 = (Bindings *) obj;
+            for (auto i = obj2->attrs; i < obj2->attrs + obj2->size_; ++i)
+                push(i->value);
+            break;
+        }
+
+        case tValueList: {
+            auto obj2 = (PtrList<Object> *) obj;
+            for (auto i = obj2->elems; i < obj2->elems + obj2->size(); ++i)
+                push(*i);
+            break;
+        }
+
+        case tEnv: {
+            auto obj2 = (Env *) obj;
+            push(obj2->up);
+            for (auto i = obj2->values; i < obj2->values + obj2->getSize(); ++i)
+                push(*i);
+            break;
+        }
+
+        case tWithExprEnv: {
+            auto obj2 = (Env *) obj;
+            push(obj2->up);
+            break;
+        }
+
+        case tWithAttrsEnv: {
+            auto obj2 = (Env *) obj;
+            push(obj2->up);
+            push(obj2->values[0]);
+            break;
+        }
+
+        case tString:
+        case tContext:
+        case tInt:
+        case tBool:
+        case tNull:
+        case tList0:
+        case tFloat:
+        case tShortString:
+        case tStaticString:
+            break;
+
+        case tLongString: {
+            auto obj2 = (Value *) obj;
+            push(obj2->string.s);
+            // See setContext().
+            if (!(((ptrdiff_t) obj2->string.context) & 1))
+                push(obj2->string.context);
+            break;
+        }
+
+        case tPath:
+            push(((Value *) obj)->path);
+            break;
+
+        case tAttrs:
+            push(((Value *) obj)->attrs);
+            break;
+
+        case tList1:
+            push(((Value *) obj)->smallList[0]);
+            break;
+
+        case tList2:
+            push(((Value *) obj)->smallList[0]);
+            push(((Value *) obj)->smallList[1]);
+            break;
+
+        case tListN:
+            push(((Value *) obj)->bigList);
+            break;
+
+        case tThunk:
+        case tBlackhole:
+            push(((Value *) obj)->thunk.env);
+            break;
+
+        case tApp:
+        case tPrimOpApp:
+            push(((Value *) obj)->app.left);
+            push(((Value *) obj)->app.right);
+            break;
+
+        case tLambda:
+            push(((Value *) obj)->lambda.env);
+            break;
+
+        case tPrimOp:
+            // FIXME: GC primops?
+            break;
+
+        default:
+            printError("don't know how to traverse object at %x (tag %d)", obj, obj->type);
+            abort();
+        }
+    };
+
+    stack.push(p);
+
+    size_t totalSize = 0;
+
+    while (!stack.empty()) {
+        auto obj = stack.top();
+        stack.pop();
+        if (seen.insert(obj).second) {
+            pushPointers(obj);
+            totalSize += getObjectSize(obj);
+        }
+    }
+
+    return {seen.size(), totalSize};
 }
 
 }

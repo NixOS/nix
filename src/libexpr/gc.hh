@@ -286,13 +286,20 @@ public:
         #endif
     }
 
+    /* Return the size in words of object 'obj'. */
+    static size_t getObjectSize(Object * obj);
+
+    /* Return the number and size in words of the objects reachable
+       from object 'obj'. */
+    std::tuple<size_t, size_t> getObjectClosureSize(Object * obj);
+
 private:
 
     void addArena(size_t arenaSize);
 
     void addToFreeList(Free * obj);
 
-    std::pair<size_t, size_t> freeUnmarked(Arena & arena);
+    std::tuple<size_t, size_t, size_t, size_t> freeUnmarked(Arena & arena);
 };
 
 extern GC gc;
