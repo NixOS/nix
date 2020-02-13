@@ -1,8 +1,8 @@
 #!/bin/sh
 set -e
 
-root_disks() {
-    diskutil list -plist /
+root_disk() {
+    diskutil info -plist /
 }
 
 apfs_volumes_for() {
@@ -11,7 +11,7 @@ apfs_volumes_for() {
 }
 
 disk_identifier() {
-    xpath "/plist/dict/key[text()='WholeDisks']/following-sibling::array[1]/string/text()" 2>/dev/null
+    xpath "/plist/dict/key[text()='ParentWholeDisk']/following-sibling::string[1]/text()" 2>/dev/null
 }
 
 volume_get() {
@@ -81,7 +81,7 @@ main() {
         sudo mkdir /nix
     fi
 
-    disk=$(root_disks | disk_identifier)
+    disk=$(root_disk | disk_identifier)
     volume=$(find_nix_volume "$disk")
     if [ -z "$volume" ]; then
         echo "Creating a Nix Store volume..." >&2
