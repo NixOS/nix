@@ -1,12 +1,11 @@
 #pragma once
 
 #include "args.hh"
+#include "eval.hh"
 
 namespace nix {
 
 class Store;
-class EvalState;
-class Bindings;
 
 template<class T>
 struct Ptr;
@@ -22,6 +21,8 @@ struct MixEvalArgs : virtual Args
 private:
 
     std::map<std::string, std::string> autoArgs;
+
+    Ptr<Bindings> bindings;
 };
 
 Path lookupFileArg(EvalState & state, string s);

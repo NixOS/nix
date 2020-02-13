@@ -30,17 +30,19 @@ MixEvalArgs::MixEvalArgs()
 
 Ptr<Bindings> MixEvalArgs::getAutoArgs(EvalState & state)
 {
-    auto res = Bindings::allocBindings(autoArgs.size());
-    for (auto & i : autoArgs) {
-        Value * v = state.allocValue();
-        if (i.second[0] == 'E')
-            state.mkThunk_(*v, state.parseExprFromString(string(i.second, 1), absPath(".")));
-        else
-            mkString(*v, string(i.second, 1));
-        res->push_back(Attr(state.symbols.create(i.first), v));
+    if (!bindings) {
+        bindings = Bindings::allocBindings(autoArgs.size());
+        for (auto & i : autoArgs) {
+            Value * v = state.allocValue();
+            if (i.second[0] == 'E')
+                state.mkThunk_(*v, state.parseExprFromString(string(i.second, 1), absPath(".")));
+            else
+                mkString(*v, string(i.second, 1));
+            bindings->push_back(Attr(state.symbols.create(i.first), v));
+        }
+        bindings->sort();
     }
-    res->sort();
-    return res;
+    return bindings;
 }
 
 Path lookupFileArg(EvalState & state, string s)
