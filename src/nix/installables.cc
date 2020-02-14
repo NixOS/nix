@@ -330,9 +330,9 @@ Value * InstallableFlake::getFlakeOutputs(EvalState & state, const flake::Locked
     auto aOutputs = vFlake->attrs->get(state.symbols.create("outputs"));
     assert(aOutputs);
 
-    state.forceValue(*(*aOutputs)->value);
+    state.forceValue(*aOutputs->value);
 
-    return (*aOutputs)->value;
+    return aOutputs->value;
 }
 
 std::tuple<std::string, FlakeRef, flake::EvalCache::Derivation> InstallableFlake::toDerivation()

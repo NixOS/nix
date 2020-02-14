@@ -240,8 +240,8 @@ static Flake getFlake(
         edition = vInfo.attrs->get(sEpoch);
 
     if (edition) {
-        expectType(state, tInt, *(**edition).value, *(**edition).pos);
-        flake.edition = (**edition).value->integer;
+        expectType(state, tInt, *edition->value, *edition->pos);
+        flake.edition = edition->value->integer;
         if (flake.edition > 201909)
             throw Error("flake '%s' requires unsupported edition %d; please upgrade Nix", lockedRef, flake.edition);
         if (flake.edition < 201909)
@@ -250,20 +250,20 @@ static Flake getFlake(
         throw Error("flake '%s' lacks attribute 'edition'", lockedRef);
 
     if (auto description = vInfo.attrs->get(state.sDescription)) {
-        expectType(state, tString, *(**description).value, *(**description).pos);
-        flake.description = (**description).value->string.s;
+        expectType(state, tString, *description->value, *description->pos);
+        flake.description = description->value->string.s;
     }
 
     auto sInputs = state.symbols.create("inputs");
 
-    if (std::optional<Attr *> inputs = vInfo.attrs->get(sInputs))
-        flake.inputs = parseFlakeInputs(state, (**inputs).value, *(**inputs).pos);
+    if (auto inputs = vInfo.attrs->get(sInputs))
+        flake.inputs = parseFlakeInputs(state, inputs->value, *inputs->pos);
 
     auto sOutputs = state.symbols.create("outputs");
 
     if (auto outputs = vInfo.attrs->get(sOutputs)) {
-        expectType(state, tLambda, *(**outputs).value, *(**outputs).pos);
-        flake.vOutputs = (**outputs).value;
+        expectType(state, tLambda, *outputs->value, *outputs->pos);
+        flake.vOutputs = outputs->value;
 
         if (flake.vOutputs->lambda.fun->matchAttrs) {
             for (auto & formal : flake.vOutputs->lambda.fun->formals->formals) {

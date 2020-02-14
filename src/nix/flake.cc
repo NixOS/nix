@@ -134,9 +134,9 @@ static void enumerateOutputs(EvalState & state, Value & vFlake,
     auto aOutputs = vFlake.attrs->get(state.symbols.create("outputs"));
     assert(aOutputs);
 
-    state.forceAttrs(*(*aOutputs)->value);
+    state.forceAttrs(*aOutputs->value);
 
-    for (auto & attr : *((*aOutputs)->value->attrs))
+    for (auto & attr : *aOutputs->value->attrs)
         callback(attr.name, *attr.value, *attr.pos);
 }
 
