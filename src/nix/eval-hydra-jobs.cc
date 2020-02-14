@@ -71,6 +71,11 @@ struct CmdEvalHydraJobs : MixJSON, MixDryRun, InstallableCommand
         };
     }
 
+    Strings getDefaultFlakeAttrPaths() override
+    {
+        return {"hydraJobs", "checks"};
+    }
+
     void worker(AutoCloseFD & to, AutoCloseFD & from)
     {
         auto state = getEvalState();
