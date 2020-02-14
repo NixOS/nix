@@ -271,7 +271,7 @@ void GC::gc()
     auto markDurationMs = std::chrono::duration_cast<std::chrono::milliseconds>(afterMark - before).count();
     auto sweepDurationMs = std::chrono::duration_cast<std::chrono::milliseconds>(after - afterMark).count();
 
-    printError("freed %d dead objects (%d bytes), keeping %d/%d objects (%d bytes), marked in %d ms, swept in %d ms",
+    debug("freed %d dead objects (%d bytes), keeping %d/%d objects (%d bytes), marked in %d ms, swept in %d ms",
         totalObjectsFreed, totalWordsFreed * WORD_SIZE,
         marked, totalObjectsKept, totalWordsKept * WORD_SIZE,
         markDurationMs, sweepDurationMs);
