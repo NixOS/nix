@@ -69,7 +69,7 @@
         buildDeps =
           [ curl
             bzip2 xz brotli zlib editline
-            openssl pkgconfig sqlite boehmgc
+            openssl pkgconfig sqlite
             libarchive
             boost
             (nlohmann_json.override { multipleHeaders = true; })
@@ -87,6 +87,10 @@
               apis = ["s3" "transfer"];
               customMemoryManagement = false;
             });
+
+        propagatedDeps =
+          [ (boehmgc.override { enableLargeConfig = true; })
+          ];
 
         perlDeps =
           [ perl
@@ -107,6 +111,8 @@
           outputs = [ "out" "dev" ];
 
           buildInputs = buildDeps;
+
+          propagatedBuildInputs = propagatedDeps;
 
           preConfigure =
             # Copy libboost_context so we don't get all of Boost in our closure.
@@ -219,7 +225,7 @@
             src = self;
             inherit officialRelease;
 
-            buildInputs = tarballDeps ++ buildDeps;
+            buildInputs = tarballDeps ++ buildDeps ++ propagatedDeps;
 
             postUnpack = ''
               (cd $sourceRoot && find . -type f) | cut -c3- > $sourceRoot/.dist-files
@@ -358,7 +364,7 @@
 
             enableParallelBuilding = true;
 
-            buildInputs = buildDeps;
+            buildInputs = buildDeps ++ propagatedDeps;
 
             dontInstall = false;
 
@@ -503,7 +509,7 @@
         stdenv.mkDerivation {
           name = "nix";
 
-          buildInputs = buildDeps ++ tarballDeps ++ perlDeps ++ [ pkgs.rustfmt ];
+          buildInputs = buildDeps ++ propagatedDeps ++ tarballDeps ++ perlDeps ++ [ pkgs.rustfmt ];
 
           inherit configureFlags;
 
