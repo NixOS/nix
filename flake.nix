@@ -132,6 +132,8 @@
 
           doInstallCheck = true;
           installCheckFlags = "sysconfdir=$(out)/etc";
+
+          separateDebugInfo = true;
         }) // {
 
           perl-bindings = with final; releaseTools.nixBuild {
