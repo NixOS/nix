@@ -23,7 +23,7 @@ let
         src = nix;
         inherit officialRelease;
 
-        buildInputs = tarballDeps ++ buildDeps;
+        buildInputs = tarballDeps ++ buildDeps ++ propagatedDeps;
 
         configureFlags = "--enable-gc";
 
@@ -66,6 +66,8 @@ let
         src = tarball;
 
         buildInputs = buildDeps;
+
+        propagatedBuildInputs = propagatedDeps;
 
         preConfigure =
           # Copy libboost_context so we don't get all of Boost in our closure.
@@ -198,7 +200,9 @@ let
         name = "nix-build";
         src = tarball;
 
-        buildInputs = buildDeps;
+        enableParallelBuilding = true;
+
+        buildInputs = buildDeps ++ propagatedDeps;
 
         dontInstall = false;
 
