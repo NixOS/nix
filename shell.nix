@@ -7,7 +7,7 @@ with import ./release-common.nix { inherit pkgs; };
 (if useClang then clangStdenv else stdenv).mkDerivation {
   name = "nix";
 
-  buildInputs = buildDeps ++ tarballDeps ++ perlDeps ++ [ pkgs.rustfmt ];
+  buildInputs = buildDeps ++ propagatedDeps ++ tarballDeps ++ perlDeps ++ [ pkgs.rustfmt ];
 
   inherit configureFlags;
 
