@@ -135,6 +135,8 @@ let
 
         doInstallCheck = true;
         installCheckFlags = "sysconfdir=$(out)/etc";
+
+        separateDebugInfo = true;
       });
 
 
