@@ -547,6 +547,18 @@ void LocalStore::checkDerivationOutputs(const StorePath & drvPath, const Derivat
     std::string drvName(drvPath.name());
     drvName = string(drvName, 0, drvName.size() - drvExtension.size());
 
+    auto check = [&](const StorePath & expected, const StorePath & actual, const std::string & varName)
+    {
+        if (actual != expected)
+            throw Error("derivation '%s' has incorrect output '%s', should be '%s'",
+                printStorePath(drvPath), printStorePath(actual), printStorePath(expected));
+        auto j = drv.env.find(varName);
+        if (j == drv.env.end() || parseStorePath(j->second) != actual)
+            throw Error("derivation '%s' has incorrect environment variable '%s', should be '%s'",
+                printStorePath(drvPath), varName, printStorePath(actual));
+    };
+
+
     if (drv.isFixedOutput()) {
         DerivationOutputs::const_iterator out = drv.outputs.find("out");
         if (out == drv.outputs.end())
@@ -554,24 +566,14 @@ void LocalStore::checkDerivationOutputs(const StorePath & drvPath, const Derivat
 
         bool recursive; Hash h;
         out->second.parseHashInfo(recursive, h);
-        auto outPath = makeFixedOutputPath(recursive, h, drvName);
 
-        StringPairs::const_iterator j = drv.env.find("out");
-        if (out->second.path != outPath || j == drv.env.end() || parseStorePath(j->second) != outPath)
-            throw Error("derivation '%s' has incorrect output '%s', should be '%s'",
-                printStorePath(drvPath), printStorePath(out->second.path), printStorePath(outPath));
+        check(makeFixedOutputPath(recursive, h, drvName), out->second.path, "out");
     }
 
     else {
         Hash h = hashDerivationModulo(*this, drv, true);
-
-        for (auto & i : drv.outputs) {
-            auto outPath = makeOutputPath(i.first, h, drvName);
-            StringPairs::const_iterator j = drv.env.find(i.first);
-            if (i.second.path != outPath || j == drv.env.end() || parseStorePath(j->second) != outPath)
-                throw Error("derivation '%s' has incorrect output '%s', should be '%s'",
-                    printStorePath(drvPath), printStorePath(i.second.path), printStorePath(outPath));
-        }
+        for (auto & i : drv.outputs)
+            check(makeOutputPath(i.first, h, drvName), i.second.path, i.first);
     }
 }
 
