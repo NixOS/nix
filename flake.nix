@@ -471,21 +471,21 @@
             name = "nix-${tarball.version}";
             meta.description = "Release-critical builds";
             constituents =
-              [ tarball
-                build.i686-linux
-                build.x86_64-darwin
-                build.x86_64-linux
-                build.aarch64-linux
-                binaryTarball.i686-linux
-                binaryTarball.x86_64-darwin
-                binaryTarball.x86_64-linux
-                binaryTarball.aarch64-linux
-                tests.remoteBuilds
-                tests.nix-copy-closure
-                tests.binaryTarball
-                #tests.evalNixpkgs
-                #tests.evalNixOS
-                installerScript
+              [ "tarball"
+                "build.i686-linux"
+                "build.x86_64-darwin"
+                "build.x86_64-linux"
+                "build.aarch64-linux"
+                "binaryTarball.i686-linux"
+                "binaryTarball.x86_64-darwin"
+                "binaryTarball.x86_64-linux"
+                "binaryTarball.aarch64-linux"
+                "tests.remoteBuilds"
+                "tests.nix-copy-closure"
+                "tests.binaryTarball"
+                #"tests.evalNixpkgs"
+                #"tests.evalNixOS"
+                "installerScript"
               ];
           };
 

@@ -143,15 +143,23 @@ struct CmdEvalHydraJobs : MixJSON, MixDryRun, InstallableCommand
                         auto a = v->attrs->get(state->symbols.create("constituents"));
                         if (!a)
                             throw EvalError("derivation must have a ‘constituents’ attribute");
+
+
                         PathSet context;
                         state->coerceToString(*a->pos, *a->value, context, true, false);
-                        PathSet drvs;
                         for (auto & i : context)
                             if (i.at(0) == '!') {
                                 size_t index = i.find("!", 1);
-                                drvs.insert(string(i, index + 1));
+                                job["constituents"].push_back(string(i, index + 1));
                             }
-                        job["constituents"] = concatStringsSep(" ", drvs);
+
+                        state->forceList(*a->value, *a->pos);
+                        for (unsigned int n = 0; n < a->value->listSize(); ++n) {
+                            auto v = a->value->listElems()[n];
+                            state->forceValue(*v);
+                            if (v->type == tString)
+                                job["namedConstituents"].push_back(state->forceStringNoCtx(*v));
+                        }
                     }
 
                     /* Register the derivation as a GC root.  !!! This
@@ -210,7 +218,7 @@ struct CmdEvalHydraJobs : MixJSON, MixDryRun, InstallableCommand
         {
             std::set<std::string> todo{""};
             std::set<std::string> active;
-            nlohmann::json result;
+            nlohmann::json jobs;
             std::exception_ptr exc;
         };
 
@@ -295,7 +303,7 @@ struct CmdEvalHydraJobs : MixJSON, MixDryRun, InstallableCommand
                     if (response.find("job") != response.end()) {
                         auto state(state_.lock());
                         if (json)
-                            state->result[attrPath] = response["job"];
+                            state->jobs[attrPath] = response["job"];
                         else
                             std::cout << fmt("%d: %d\n", attrPath, (std::string) response["job"]["drvPath"]);
                     }
@@ -310,7 +318,7 @@ struct CmdEvalHydraJobs : MixJSON, MixDryRun, InstallableCommand
                     if (response.find("error") != response.end()) {
                         auto state(state_.lock());
                         if (json)
-                            state->result[attrPath]["error"] = response["error"];
+                            state->jobs[attrPath]["error"] = response["error"];
                         else
                             printError("error in job '%s': %s",
                                 attrPath, (std::string) response["error"]);
@@ -344,7 +352,45 @@ struct CmdEvalHydraJobs : MixJSON, MixDryRun, InstallableCommand
         if (state->exc)
             std::rethrow_exception(state->exc);
 
-        if (json) std::cout << state->result.dump(2) << "\n";
+        /* For aggregate jobs that have named consistuents
+           (i.e. constituents that are a job name rather than a
+           derivation), look up the referenced job and add it to the
+           dependencies of the aggregate derivation. */
+        for (auto i = state->jobs.begin(); i != state->jobs.end(); ++i) {
+            auto jobName = i.key();
+            auto & job = i.value();
+
+            auto named = job.find("namedConstituents");
+            if (named == job.end() || dryRun) continue;
+
+            std::string drvPath = job["drvPath"];
+            auto drv = readDerivation(*store, drvPath);
+
+            for (std::string jobName2 : *named) {
+                auto job2 = state->jobs.find(jobName2);
+                if (job2 == state->jobs.end())
+                    throw Error("aggregate job '%s' references non-existent job '%s'", jobName, jobName2);
+                std::string drvPath2 = (*job2)["drvPath"];
+                auto drv2 = readDerivation(*store, drvPath2);
+                job["constituents"].push_back(drvPath2);
+                drv.inputDrvs[store->parseStorePath(drvPath2)] = {drv2.outputs.begin()->first};
+            }
+
+            std::string drvName(store->parseStorePath(drvPath).name());
+            auto h = hashDerivationModulo(*store, drv, true);
+            auto outPath = store->makeOutputPath("out", h, drvName);
+            drv.env["out"] = store->printStorePath(outPath);
+            drv.outputs.insert_or_assign("out", DerivationOutput(outPath.clone(), "", ""));
+            auto newDrvPath = store->printStorePath(writeDerivation(store, drv, drvName));
+
+            debug("rewrote aggregate derivation %s -> %s", drvPath, newDrvPath);
+
+            job["drvPath"] = newDrvPath;
+            job["outputs"]["out"] = store->printStorePath(outPath);
+            job.erase("namedConstituents");
+        }
+
+        if (json) std::cout << state->jobs.dump(2) << "\n";
     }
 };
 

@@ -65,7 +65,7 @@ bool BasicDerivation::isBuiltin() const
 
 
 StorePath writeDerivation(ref<Store> store,
-    const Derivation & drv, const string & name, RepairFlag repair)
+    const Derivation & drv, std::string_view name, RepairFlag repair)
 {
     auto references = cloneStorePathSet(drv.inputSrcs);
     for (auto & i : drv.inputDrvs)
@@ -73,8 +73,8 @@ StorePath writeDerivation(ref<Store> store,
     /* Note that the outputs of a derivation are *not* references
        (that can be missing (of course) and should not necessarily be
        held during a garbage collection). */
-    string suffix = name + drvExtension;
-    string contents = drv.unparse(*store, false);
+    auto suffix = std::string(name) + drvExtension;
+    auto contents = drv.unparse(*store, false);
     return settings.readOnlyMode
         ? store->computeStorePathForText(suffix, contents, references)
         : store->addTextToStore(suffix, contents, references, repair);

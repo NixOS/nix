@@ -79,7 +79,7 @@ class Store;
 
 /* Write a derivation to the Nix store, and return its path. */
 StorePath writeDerivation(ref<Store> store,
-    const Derivation & drv, const string & name, RepairFlag repair = NoRepair);
+    const Derivation & drv, std::string_view name, RepairFlag repair = NoRepair);
 
 /* Read a derivation from a file. */
 Derivation readDerivation(const Store & store, const Path & drvPath);
