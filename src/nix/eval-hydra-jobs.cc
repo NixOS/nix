@@ -281,6 +281,8 @@ struct CmdEvalHydraJobs : MixJSON, MixDryRun, InstallableCommand
                             state.wait(wakeup);
                     }
 
+                    Activity act(*logger, lvlInfo, actUnknown, fmt("evaluating '%s'", attrPath));
+
                     /* Tell the worker to evaluate it. */
                     writeLine(to.get(), "do " + attrPath);
 
