@@ -211,6 +211,7 @@ struct CmdEvalHydraJobs : MixJSON, MixDryRun, InstallableCommand
             std::set<std::string> todo{""};
             std::set<std::string> active;
             nlohmann::json result;
+            std::exception_ptr exc;
         };
 
         std::condition_variable wakeup;
@@ -239,9 +240,10 @@ struct CmdEvalHydraJobs : MixJSON, MixDryRun, InstallableCommand
                             {
                                 try {
                                     worker(*to, *from);
-                                } catch (Error & e) {
-                                    printError("unexpected worker error: %s", e.msg());
-                                    _exit(1);
+                                } catch (std::exception & e) {
+                                    nlohmann::json err;
+                                    err["error"] = e.what();
+                                    writeLine(to->get(), err.dump());
                                 }
                             },
                             ProcessOptions { .allowVfork = false });
@@ -255,8 +257,10 @@ struct CmdEvalHydraJobs : MixJSON, MixDryRun, InstallableCommand
                     if (s == "restart") {
                         pid = -1;
                         continue;
-                    } else if (s != "next")
-                        throw Error("unexpected worker request: %s", s);
+                    } else if (s != "next") {
+                        auto json = nlohmann::json::parse(s);
+                        throw Error("worker error: %s", (std::string) json["error"]);
+                    }
 
                     /* Wait for a job name to become available. */
                     std::string attrPath;
@@ -264,7 +268,7 @@ struct CmdEvalHydraJobs : MixJSON, MixDryRun, InstallableCommand
                     while (true) {
                         checkInterrupt();
                         auto state(state_.lock());
-                        if (state->todo.empty() && state->active.empty()) {
+                        if ((state->todo.empty() && state->active.empty()) || state->exc) {
                             writeLine(to.get(), "exit");
                             return;
                         }
@@ -319,9 +323,10 @@ struct CmdEvalHydraJobs : MixJSON, MixDryRun, InstallableCommand
                         wakeup.notify_all();
                     }
                 }
-            } catch (Error & e) {
-                printError("unexpected handler thread error: %s", e.msg());
-                abort();
+            } catch (...) {
+                auto state(state_.lock());
+                state->exc = std::current_exception();
+                wakeup.notify_all();
             }
         };
 
@@ -332,7 +337,12 @@ struct CmdEvalHydraJobs : MixJSON, MixDryRun, InstallableCommand
         for (auto & thread : threads)
             thread.join();
 
-        if (json) std::cout << state_.lock()->result.dump(2) << "\n";
+        auto state(state_.lock());
+
+        if (state->exc)
+            std::rethrow_exception(state->exc);
+
+        if (json) std::cout << state->result.dump(2) << "\n";
     }
 };
 
