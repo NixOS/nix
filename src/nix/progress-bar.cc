@@ -441,7 +441,7 @@ void startProgressBar(bool printBuildLogs)
 {
     logger = new ProgressBar(
         printBuildLogs,
-        isatty(STDERR_FILENO) && getEnv("TERM").value_or("dumb") != "dumb");
+        isatty(STDERR_FILENO) && getEnv("TERM", "dumb") != "dumb");
 }
 
 void stopProgressBar()
