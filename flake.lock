@@ -2,19 +2,19 @@
   "inputs": {
     "nixpkgs": {
       "info": {
-        "lastModified": 1582018495,
-        "narHash": "sha256-xcpSl9tQKAsMQFmZfHXCqv6E9y1k6pk6T3i3jX1hsuk="
+        "lastModified": 1580555706,
+        "narHash": "sha256-ly5Gxl9yZgW2w1F3aDU5bvg34Ct+juUaOg8vue+Mkbo="
       },
       "inputs": {},
       "locked": {
-        "owner": "NixOS",
+        "owner": "edolstra",
         "repo": "nixpkgs",
-        "rev": "01d84d1ecfd50d809796176670448e0ec1cc4f5d",
+        "rev": "43e283790fbe330b723ac44b584824cf6d85c1ee",
         "type": "github"
       },
       "original": {
         "id": "nixpkgs",
-        "ref": "release-20.03",
+        "ref": "release-19.09",
         "type": "indirect"
       }
     }
