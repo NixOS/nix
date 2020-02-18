@@ -386,6 +386,8 @@ struct CmdEvalHydraJobs : MixJSON, MixDryRun, InstallableCommand
                 }
 
                 std::string drvName(store->parseStorePath(drvPath).name());
+                assert(hasSuffix(drvName, drvExtension));
+                drvName.resize(drvName.size() - drvExtension.size());
                 auto h = hashDerivationModulo(*store, drv, true);
                 auto outPath = store->makeOutputPath("out", h, drvName);
                 drv.env["out"] = store->printStorePath(outPath);
