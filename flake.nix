@@ -228,7 +228,14 @@
             buildInputs = tarballDeps ++ buildDeps ++ propagatedDeps;
 
             postUnpack = ''
-              (cd $sourceRoot && find . -type f) | cut -c3- > $sourceRoot/.dist-files
+              (cd $sourceRoot && find . -type f) | grep -v '\$' | cut -c3- > $sourceRoot/.dist-files
+              #                                    ------------   --------
+              #                                        \              \
+              #                                         \       Strips the ./ prefix
+              #                                          \
+              #               Ensures we don't get files that would get wrongly expanded by make
+              #                   this is the case if there is e.g. the mojave-$HOME branch.
+
               cat $sourceRoot/.dist-files
             '';
 
