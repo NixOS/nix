@@ -504,7 +504,7 @@
 
   <listitem>
     <para><emphasis>Pure evaluation mode</emphasis>. With the
-    <literal>--pure-eval</literal> flag, nix enables a variant of the existing
+    <literal>--pure-eval</literal> flag, Nix enables a variant of the existing
     restricted evaluation mode that forbids access to anything that could cause
     different evaluations of the same command line arguments to produce a
     different result. This includes builtin functions such as
