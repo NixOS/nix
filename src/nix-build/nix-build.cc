@@ -97,7 +97,11 @@ static void _main(int argc, char * * argv)
     std::string outLink = "./result";
 
     // List of environment variables kept for --pure
-    std::set<string> keepVars{"HOME", "USER", "LOGNAME", "DISPLAY", "PATH", "TERM", "IN_NIX_SHELL", "TZ", "PAGER", "NIX_BUILD_SHELL", "SHLVL"};
+    std::set<string> keepVars{
+        "HOME", "USER", "LOGNAME", "DISPLAY", "PATH", "TERM",
+        "IN_NIX_SHELL", "TZ", "PAGER", "NIX_BUILD_SHELL", "SHLVL",
+        "http_proxy", "https_proxy", "ftp_proxy", "all_proxy", "no_proxy"
+    };
 
     Strings args;
     for (int i = 1; i < argc; ++i)
