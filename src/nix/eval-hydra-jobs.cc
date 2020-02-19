@@ -212,6 +212,8 @@ struct CmdEvalHydraJobs : MixJSON, MixDryRun, InstallableCommand
 
     void run(ref<Store> store) override
     {
+        settings.requireExperimentalFeature("eval-hydra-jobs");
+
         if (!gcRootsDir) warn("'--gc-roots-dir' not specified");
 
         struct State
