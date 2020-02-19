@@ -33,6 +33,9 @@ std::unique_ptr<SSHMaster::Connection> SSHMaster::startCommand(const std::string
     out.create();
 
     auto conn = std::make_unique<Connection>();
+    ProcessOptions options;
+    options.dieWithParent = false;
+
     conn->sshPid = startProcess([&]() {
         restoreSignals();
 
@@ -64,7 +67,7 @@ std::unique_ptr<SSHMaster::Connection> SSHMaster::startCommand(const std::string
 
         // could not exec ssh/bash
         throw SysError("unable to execute '%s'", args.front());
-    });
+    }, options);
 
 
     in.readSide = -1;
@@ -91,6 +94,9 @@ Path SSHMaster::startMaster()
     Pipe out;
     out.create();
 
+    ProcessOptions options;
+    options.dieWithParent = false;
+
     state->sshMaster = startProcess([&]() {
         restoreSignals();
 
@@ -110,7 +116,7 @@ Path SSHMaster::startMaster()
         execvp(args.begin()->c_str(), stringsToCharPtrs(args).data());
 
         throw SysError("unable to execute '%s'", args.front());
-    });
+    }, options);
 
     out.writeSide = -1;
 
