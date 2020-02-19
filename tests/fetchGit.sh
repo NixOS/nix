@@ -25,7 +25,15 @@ rev1=$(git -C $repo rev-parse HEAD)
 
 echo world > $repo/hello
 git -C $repo commit -m 'Bla2' -a
+git -C $repo worktree add $TEST_ROOT/worktree
+echo hello >> $TEST_ROOT/worktree/hello
 rev2=$(git -C $repo rev-parse HEAD)
+
+# Fetch a worktree
+unset _NIX_FORCE_HTTP
+path0=$(nix eval --impure --raw --expr "(builtins.fetchGit file://$TEST_ROOT/worktree).outPath")
+export _NIX_FORCE_HTTP=1
+[[ $(tail -n 1 $path0/hello) = "hello" ]]
 
 # Fetch the default branch.
 path=$(nix eval --impure --raw --expr "(builtins.fetchGit file://$repo).outPath")
