@@ -503,14 +503,14 @@
   </listitem>
 
   <listitem>
-    <para><emphasis>Pure evaluation mode</emphasis>. This is a variant
-    of the existing restricted evaluation mode. In pure mode, the Nix
-    evaluator forbids access to anything that could cause different
-    evaluations of the same command line arguments to produce a
+    <para><emphasis>Pure evaluation mode</emphasis>. With the
+    <literal>--pure-eval</literal> flag, nix enables a variant of the existing
+    restricted evaluation mode that forbids access to anything that could cause
+    different evaluations of the same command line arguments to produce a
     different result. This includes builtin functions such as
     <function>builtins.getEnv</function>, but more importantly,
-    <emphasis>all</emphasis> filesystem or network access unless a
-    content hash or commit hash is specified. For example, calls to
+    <emphasis>all</emphasis> filesystem or network access unless a content hash
+    or commit hash is specified. For example, calls to
     <function>builtins.fetchGit</function> are only allowed if a
     <varname>rev</varname> attribute is specified.</para>
 
