@@ -64,7 +64,8 @@ void Registry::write(const Path & path)
         nlohmann::json obj;
         obj["from"] = attrsToJson(std::get<0>(elem)->toAttrs());
         obj["to"] = attrsToJson(std::get<1>(elem)->toAttrs());
-        obj["to"].update(attrsToJson(std::get<2>(elem)));
+        if (!std::get<2>(elem).empty())
+            obj["to"].update(attrsToJson(std::get<2>(elem)));
         arr.emplace_back(std::move(obj));
     }
 
