@@ -13,4 +13,5 @@
   (eval . (c-set-offset 'arglist-cont-nonempty '+))
   (eval . (c-set-offset 'substatement-open 0))
   (eval . (c-set-offset 'access-label '-))
+  (eval . (c-set-offset 'inlambda 0))
   )))
