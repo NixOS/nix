@@ -37,7 +37,7 @@ std::shared_ptr<Registry> Registry::read(
         for (auto & i : json["flakes"]) {
             auto toAttrs = jsonToAttrs(i["to"]);
             Input::Attrs extraAttrs;
-            auto j = toAttrs.find("subdir");
+            auto j = toAttrs.find("dir");
             if (j != toAttrs.end()) {
                 extraAttrs.insert(*j);
                 toAttrs.erase(j);

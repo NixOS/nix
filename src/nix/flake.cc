@@ -507,7 +507,7 @@ struct CmdFlakeAdd : MixEvalArgs, Command
         auto fromRef = parseFlakeRef(fromUrl);
         auto toRef = parseFlakeRef(toUrl);
         fetchers::Input::Attrs extraAttrs;
-        if (toRef.subdir != "") extraAttrs["subdir"] = toRef.subdir;
+        if (toRef.subdir != "") extraAttrs["dir"] = toRef.subdir;
         auto userRegistry = fetchers::getUserRegistry();
         userRegistry->remove(fromRef.input);
         userRegistry->add(fromRef.input, toRef.input, extraAttrs);
@@ -558,7 +558,7 @@ struct CmdFlakePin : virtual Args, EvalCommand
         userRegistry->remove(ref.input);
         auto [tree, resolved] = ref.resolve(store).input->fetchTree(store);
         fetchers::Input::Attrs extraAttrs;
-        if (ref.subdir != "") extraAttrs["subdir"] = ref.subdir;
+        if (ref.subdir != "") extraAttrs["dir"] = ref.subdir;
         userRegistry->add(ref.input, resolved, extraAttrs);
     }
 };

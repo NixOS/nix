@@ -45,7 +45,7 @@ MixEvalArgs::MixEvalArgs()
           auto from = parseFlakeRef(ss[0], absPath("."));
           auto to = parseFlakeRef(ss[1], absPath("."));
           fetchers::Input::Attrs extraAttrs;
-          if (to.subdir != "") extraAttrs["subdir"] = to.subdir;
+          if (to.subdir != "") extraAttrs["dir"] = to.subdir;
           fetchers::overrideRegistry(from.input, to.input, extraAttrs);
       });
 }

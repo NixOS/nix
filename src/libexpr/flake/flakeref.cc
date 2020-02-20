@@ -23,7 +23,7 @@ fetchers::Input::Attrs FlakeRef::toAttrs() const
 {
     auto attrs = input->toAttrs();
     if (subdir != "")
-        attrs.emplace("subdir", subdir);
+        attrs.emplace("dir", subdir);
     return attrs;
 }
 
@@ -41,7 +41,7 @@ bool FlakeRef::operator ==(const FlakeRef & other) const
 FlakeRef FlakeRef::resolve(ref<Store> store) const
 {
     auto [input2, extraAttrs] = lookupInRegistries(store, input);
-    return FlakeRef(input2, fetchers::maybeGetStrAttr(extraAttrs, "subdir").value_or(subdir));
+    return FlakeRef(input2, fetchers::maybeGetStrAttr(extraAttrs, "dir").value_or(subdir));
 }
 
 FlakeRef parseFlakeRef(
@@ -138,13 +138,13 @@ std::pair<FlakeRef, std::string> parseFlakeRefWithFragment(
         auto fragment = percentDecode(std::string(match[3]));
 
         if (subdir != "") {
-            if (parsedURL.query.count("subdir"))
-                throw Error("flake URL '%s' has an inconsistent 'subdir' parameter", url);
-            parsedURL.query.insert_or_assign("subdir", subdir);
+            if (parsedURL.query.count("dir"))
+                throw Error("flake URL '%s' has an inconsistent 'dir' parameter", url);
+            parsedURL.query.insert_or_assign("dir", subdir);
         }
 
         return std::make_pair(
-            FlakeRef(inputFromURL(parsedURL), get(parsedURL.query, "subdir").value_or("")),
+            FlakeRef(inputFromURL(parsedURL), get(parsedURL.query, "dir").value_or("")),
             fragment);
     }
 
@@ -153,7 +153,7 @@ std::pair<FlakeRef, std::string> parseFlakeRefWithFragment(
         std::string fragment;
         std::swap(fragment, parsedURL.fragment);
         return std::make_pair(
-            FlakeRef(inputFromURL(parsedURL), get(parsedURL.query, "subdir").value_or("")),
+            FlakeRef(inputFromURL(parsedURL), get(parsedURL.query, "dir").value_or("")),
             fragment);
     }
 }
@@ -171,10 +171,10 @@ std::optional<std::pair<FlakeRef, std::string>> maybeParseFlakeRefWithFragment(
 FlakeRef FlakeRef::fromAttrs(const fetchers::Input::Attrs & attrs)
 {
     auto attrs2(attrs);
-    attrs2.erase("subdir");
+    attrs2.erase("dir");
     return FlakeRef(
         fetchers::inputFromAttrs(attrs2),
-        fetchers::maybeGetStrAttr(attrs, "subdir").value_or(""));
+        fetchers::maybeGetStrAttr(attrs, "dir").value_or(""));
 }
 
 std::pair<fetchers::Tree, FlakeRef> FlakeRef::fetchTree(ref<Store> store) const
