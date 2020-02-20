@@ -40,7 +40,8 @@ bool FlakeRef::operator ==(const FlakeRef & other) const
 
 FlakeRef FlakeRef::resolve(ref<Store> store) const
 {
-    return FlakeRef(lookupInRegistries(store, input), subdir);
+    auto [input2, extraAttrs] = lookupInRegistries(store, input);
+    return FlakeRef(input2, fetchers::maybeGetStrAttr(extraAttrs, "subdir").value_or(subdir));
 }
 
 FlakeRef parseFlakeRef(

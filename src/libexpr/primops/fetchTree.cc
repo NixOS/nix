@@ -36,7 +36,7 @@ static void prim_fetchTree(EvalState & state, const Pos & pos, Value * * args, V
         input = fetchers::inputFromURL(state.coerceToString(pos, *args[0], context, false, false));
 
     if (!evalSettings.pureEval && !input->isDirect())
-        input = lookupInRegistries(state.store, input);
+        input = lookupInRegistries(state.store, input).first;
 
     if (evalSettings.pureEval && !input->isImmutable())
         throw Error("in pure evaluation mode, 'fetchTree' requires an immutable input");

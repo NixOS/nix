@@ -70,8 +70,8 @@ struct CmdFlakeList : EvalCommand
                     registry->type == Registry::Flag ? "flags " :
                     registry->type == Registry::User ? "user  " :
                     "global",
-                    entry.first->to_string(),
-                    entry.second->to_string());
+                    std::get<0>(entry)->to_string(),
+                    std::get<1>(entry)->to_string());
             }
         }
     }
@@ -506,9 +506,11 @@ struct CmdFlakeAdd : MixEvalArgs, Command
     {
         auto fromRef = parseFlakeRef(fromUrl);
         auto toRef = parseFlakeRef(toUrl);
+        fetchers::Input::Attrs extraAttrs;
+        if (toRef.subdir != "") extraAttrs["subdir"] = toRef.subdir;
         auto userRegistry = fetchers::getUserRegistry();
         userRegistry->remove(fromRef.input);
-        userRegistry->add(fromRef.input, toRef.input);
+        userRegistry->add(fromRef.input, toRef.input, extraAttrs);
         userRegistry->write(fetchers::getUserRegistryPath());
     }
 };
@@ -555,7 +557,9 @@ struct CmdFlakePin : virtual Args, EvalCommand
         auto userRegistry = fetchers::getUserRegistry();
         userRegistry->remove(ref.input);
         auto [tree, resolved] = ref.resolve(store).input->fetchTree(store);
-        userRegistry->add(ref.input, resolved);
+        fetchers::Input::Attrs extraAttrs;
+        if (ref.subdir != "") extraAttrs["subdir"] = ref.subdir;
+        userRegistry->add(ref.input, resolved, extraAttrs);
     }
 };
 

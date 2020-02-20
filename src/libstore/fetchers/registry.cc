@@ -29,16 +29,25 @@ std::shared_ptr<Registry> Registry::read(
                 throw Error("flake registry '%s' lacks a 'url' attribute for entry '%s'",
                     path, i.key());
             registry->entries.push_back(
-                {inputFromURL(i.key()), inputFromURL(url)});
+                {inputFromURL(i.key()), inputFromURL(url), {}});
         }
     }
 
     else if (version == 2) {
-        for (auto & i : json["flakes"])
+        for (auto & i : json["flakes"]) {
+            auto toAttrs = jsonToAttrs(i["to"]);
+            Input::Attrs extraAttrs;
+            auto j = toAttrs.find("subdir");
+            if (j != toAttrs.end()) {
+                extraAttrs.insert(*j);
+                toAttrs.erase(j);
+            }
             registry->entries.push_back(
                 { inputFromAttrs(jsonToAttrs(i["from"]))
-                , inputFromAttrs(jsonToAttrs(i["to"]))
+                , inputFromAttrs(toAttrs)
+                , extraAttrs
                 });
+        }
     }
 
     else
@@ -53,8 +62,9 @@ void Registry::write(const Path & path)
     nlohmann::json arr;
     for (auto & elem : entries) {
         nlohmann::json obj;
-        obj["from"] = attrsToJson(elem.first->toAttrs());
-        obj["to"] = attrsToJson(elem.second->toAttrs());
+        obj["from"] = attrsToJson(std::get<0>(elem)->toAttrs());
+        obj["to"] = attrsToJson(std::get<1>(elem)->toAttrs());
+        obj["to"].update(attrsToJson(std::get<2>(elem)));
         arr.emplace_back(std::move(obj));
     }
 
@@ -68,16 +78,17 @@ void Registry::write(const Path & path)
 
 void Registry::add(
     const std::shared_ptr<const Input> & from,
-    const std::shared_ptr<const Input> & to)
+    const std::shared_ptr<const Input> & to,
+    const Input::Attrs & extraAttrs)
 {
-    entries.emplace_back(from, to);
+    entries.emplace_back(from, to, extraAttrs);
 }
 
 void Registry::remove(const std::shared_ptr<const Input> & input)
 {
     // FIXME: use C++20 std::erase.
     for (auto i = entries.begin(); i != entries.end(); )
-        if (*i->first == *input)
+        if (*std::get<0>(*i) == *input)
             i = entries.erase(i);
         else
             ++i;
@@ -103,9 +114,10 @@ std::shared_ptr<Registry> getFlagRegistry()
 
 void overrideRegistry(
     const std::shared_ptr<const Input> & from,
-    const std::shared_ptr<const Input> & to)
+    const std::shared_ptr<const Input> & to,
+    const Input::Attrs & extraAttrs)
 {
-    flagRegistry->add(from, to);
+    flagRegistry->add(from, to, extraAttrs);
 }
 
 static std::shared_ptr<Registry> getGlobalRegistry(ref<Store> store)
@@ -135,10 +147,11 @@ Registries getRegistries(ref<Store> store)
     return registries;
 }
 
-std::shared_ptr<const Input> lookupInRegistries(
+std::pair<std::shared_ptr<const Input>, Input::Attrs> lookupInRegistries(
     ref<Store> store,
     std::shared_ptr<const Input> input)
 {
+    Input::Attrs extraAttrs;
     int n = 0;
 
  restart:
@@ -149,10 +162,12 @@ std::shared_ptr<const Input> lookupInRegistries(
     for (auto & registry : getRegistries(store)) {
         // FIXME: O(n)
         for (auto & entry : registry->entries) {
-            if (entry.first->contains(*input)) {
-                input = entry.second->applyOverrides(
-                    !entry.first->getRef() && input->getRef() ? input->getRef() : std::optional<std::string>(),
-                    !entry.first->getRev() && input->getRev() ? input->getRev() : std::optional<Hash>());
+            auto from = std::get<0>(entry);
+            if (from->contains(*input)) {
+                input = std::get<1>(entry)->applyOverrides(
+                    !from->getRef() && input->getRef() ? input->getRef() : std::optional<std::string>(),
+                    !from->getRev() && input->getRev() ? input->getRev() : std::optional<Hash>());
+                extraAttrs = std::get<2>(entry);
                 goto restart;
             }
         }
@@ -161,7 +176,7 @@ std::shared_ptr<const Input> lookupInRegistries(
     if (!input->isDirect())
         throw Error("cannot find flake '%s' in the flake registries", input->to_string());
 
-    return input;
+    return {input, extraAttrs};
 }
 
 }

@@ -42,9 +42,11 @@ MixEvalArgs::MixEvalArgs()
       .description("override a flake registry value")
       .arity(2)
       .handler([&](std::vector<std::string> ss) {
-          fetchers::overrideRegistry(
-              parseFlakeRef(ss[0], absPath(".")).input,
-              parseFlakeRef(ss[1], absPath(".")).input);
+          auto from = parseFlakeRef(ss[0], absPath("."));
+          auto to = parseFlakeRef(ss[1], absPath("."));
+          fetchers::Input::Attrs extraAttrs;
+          if (to.subdir != "") extraAttrs["subdir"] = to.subdir;
+          fetchers::overrideRegistry(from.input, to.input, extraAttrs);
       });
 }
 
