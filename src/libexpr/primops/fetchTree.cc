@@ -8,6 +8,8 @@ namespace nix {
 
 static void prim_fetchTree(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
+    settings.requireExperimentalFeature("fetch-tree");
+
     std::shared_ptr<const fetchers::Input> input;
     PathSet context;
 
