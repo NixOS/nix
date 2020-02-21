@@ -4,8 +4,6 @@
 #include "symbol-table.hh"
 #include "error.hh"
 
-#include <map>
-
 
 namespace nix {
 
@@ -342,9 +340,28 @@ struct StaticEnv
 {
     bool isWith;
     const StaticEnv * up;
-    typedef std::map<Symbol, unsigned int> Vars;
+
+    // Note: these must be in sorted order.
+    typedef std::vector<std::pair<Symbol, unsigned int>> Vars;
     Vars vars;
-    StaticEnv(bool isWith, const StaticEnv * up) : isWith(isWith), up(up) { };
+
+    StaticEnv(bool isWith, const StaticEnv * up, size_t expectedSize = 0) : isWith(isWith), up(up) {
+        vars.reserve(expectedSize);
+    };
+
+    void sort()
+    {
+        std::sort(vars.begin(), vars.end(),
+            [](const Vars::value_type & a, const Vars::value_type & b) { return a.first < b.first; });
+    }
+
+    Vars::const_iterator find(const Symbol & name) const
+    {
+        Vars::value_type key(name, 0);
+        auto i = std::lower_bound(vars.begin(), vars.end(), key);
+        if (i != vars.end() && i->first == name) return i;
+        return vars.end();
+    }
 };
 
 

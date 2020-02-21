@@ -126,14 +126,14 @@ static void addAttr(ExprAttrs * attrs, AttrPath & attrPath,
                     auto j2 = jAttrs->attrs.find(ad.first);
                     if (j2 != jAttrs->attrs.end()) // Attr already defined in iAttrs, error.
                         dupAttr(ad.first, j2->second.pos, ad.second.pos);
-                    jAttrs->attrs[ad.first] = ad.second;
+                    jAttrs->attrs.emplace(ad.first, ad.second);
                 }
             } else {
                 dupAttr(attrPath, pos, j->second.pos);
             }
         } else {
             // This attr path is not defined. Let's create it.
-            attrs->attrs[i->symbol] = ExprAttrs::AttrDef(e, pos);
+            attrs->attrs.emplace(i->symbol, ExprAttrs::AttrDef(e, pos));
             e->setName(i->symbol);
         }
     } else {
@@ -483,7 +483,7 @@ binds
           if ($$->attrs.find(i.symbol) != $$->attrs.end())
               dupAttr(i.symbol, makeCurPos(@3, data), $$->attrs[i.symbol].pos);
           Pos pos = makeCurPos(@3, data);
-          $$->attrs[i.symbol] = ExprAttrs::AttrDef(new ExprVar(CUR_POS, i.symbol), pos, true);
+          $$->attrs.emplace(i.symbol, ExprAttrs::AttrDef(new ExprVar(CUR_POS, i.symbol), pos, true));
       }
     }
   | binds INHERIT '(' expr ')' attrs ';'
@@ -492,7 +492,7 @@ binds
       for (auto & i : *$6) {
           if ($$->attrs.find(i.symbol) != $$->attrs.end())
               dupAttr(i.symbol, makeCurPos(@6, data), $$->attrs[i.symbol].pos);
-          $$->attrs[i.symbol] = ExprAttrs::AttrDef(new ExprSelect(CUR_POS, $4, i.symbol), makeCurPos(@6, data));
+          $$->attrs.emplace(i.symbol, ExprAttrs::AttrDef(new ExprSelect(CUR_POS, $4, i.symbol), makeCurPos(@6, data)));
       }
     }
   | { $$ = new ExprAttrs(makeCurPos(@0, data)); }

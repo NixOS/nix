@@ -269,7 +269,7 @@ void ExprVar::bindVars(const StaticEnv & env)
         if (curEnv->isWith) {
             if (withLevel == -1) withLevel = level;
         } else {
-            StaticEnv::Vars::const_iterator i = curEnv->vars.find(name);
+            auto i = curEnv->find(name);
             if (i != curEnv->vars.end()) {
                 fromWith = false;
                 this->level = level;
@@ -311,14 +311,16 @@ void ExprOpHasAttr::bindVars(const StaticEnv & env)
 void ExprAttrs::bindVars(const StaticEnv & env)
 {
     const StaticEnv * dynamicEnv = &env;
-    StaticEnv newEnv(false, &env);
+    StaticEnv newEnv(false, &env, recursive ? attrs.size() : 0);
 
     if (recursive) {
         dynamicEnv = &newEnv;
 
         unsigned int displ = 0;
         for (auto & i : attrs)
-            newEnv.vars[i.first] = i.second.displ = displ++;
+            newEnv.vars.emplace_back(i.first, i.second.displ = displ++);
+
+        // No need to sort newEnv since attrs is in sorted order.
 
         for (auto & i : attrs)
             i.second.e->bindVars(i.second.inherited ? env : newEnv);
@@ -342,15 +344,20 @@ void ExprList::bindVars(const StaticEnv & env)
 
 void ExprLambda::bindVars(const StaticEnv & env)
 {
-    StaticEnv newEnv(false, &env);
+    StaticEnv newEnv(
+        false, &env,
+        (hasFormals() ? formals->formals.size() : 0) +
+        (arg.empty() ? 0 : 1));
 
     unsigned int displ = 0;
 
-    if (!arg.empty()) newEnv.vars[arg] = displ++;
+    if (!arg.empty()) newEnv.vars.emplace_back(arg, displ++);
 
     if (hasFormals()) {
         for (auto & i : formals->formals)
-            newEnv.vars[i.name] = displ++;
+            newEnv.vars.emplace_back(i.name, displ++);
+
+        newEnv.sort();
 
         for (auto & i : formals->formals)
             if (i.def) i.def->bindVars(newEnv);
@@ -361,11 +368,13 @@ void ExprLambda::bindVars(const StaticEnv & env)
 
 void ExprLet::bindVars(const StaticEnv & env)
 {
-    StaticEnv newEnv(false, &env);
+    StaticEnv newEnv(false, &env, attrs->attrs.size());
 
     unsigned int displ = 0;
     for (auto & i : attrs->attrs)
-        newEnv.vars[i.first] = i.second.displ = displ++;
+        newEnv.vars.emplace_back(i.first, i.second.displ = displ++);
+
+    // No need to sort newEnv since attrs->attrs is in sorted order.
 
     for (auto & i : attrs->attrs)
         i.second.e->bindVars(i.second.inherited ? env : newEnv);

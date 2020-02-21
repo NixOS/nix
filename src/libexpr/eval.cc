@@ -583,7 +583,7 @@ Value * EvalState::addConstant(const string & name, Value & v)
 {
     Value * v2 = allocValue();
     *v2 = v;
-    staticBaseEnv.vars[symbols.create(name)] = baseEnvDispl;
+    staticBaseEnv.vars.emplace_back(symbols.create(name), baseEnvDispl);
     baseEnv.values[baseEnvDispl++] = v2;
     string name2 = string(name, 0, 2) == "__" ? string(name, 2) : name;
     baseEnv.values[0]->attrs->push_back(Attr(symbols.create(name2), v2));
@@ -609,7 +609,7 @@ Value * EvalState::addPrimOp(const string & name,
 
     Value * v = allocValue();
     v->mkPrimOp(new PrimOp { .fun = primOp, .arity = arity, .name = sym });
-    staticBaseEnv.vars[symbols.create(name)] = baseEnvDispl;
+    staticBaseEnv.vars.emplace_back(symbols.create(name), baseEnvDispl);
     baseEnv.values[baseEnvDispl++] = v;
     baseEnv.values[0]->attrs->push_back(Attr(sym, v));
     return v;
@@ -635,7 +635,7 @@ Value * EvalState::addPrimOp(PrimOp && primOp)
 
     Value * v = allocValue();
     v->mkPrimOp(new PrimOp(std::move(primOp)));
-    staticBaseEnv.vars[envName] = baseEnvDispl;
+    staticBaseEnv.vars.emplace_back(envName, baseEnvDispl);
     baseEnv.values[baseEnvDispl++] = v;
     baseEnv.values[0]->attrs->push_back(Attr(primOp.name, v));
     return v;
