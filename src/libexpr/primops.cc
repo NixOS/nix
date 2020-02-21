@@ -1811,19 +1811,21 @@ static void prim_hashString(EvalState & state, const Pos & pos, Value * * args, 
 
 /* Match a regular expression against a string and return either
    ‘null’ or a list containing substring matches. */
-static void prim_match(EvalState & state, const Pos & pos, Value * * args, Value & v)
+void prim_match(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
     auto re = state.forceStringNoCtx(*args[0], pos);
 
     try {
 
-        std::regex regex(re, std::regex::extended);
+        auto regex = state.regexCache.find(re);
+        if (regex == state.regexCache.end())
+            regex = state.regexCache.emplace(re, std::regex(re, std::regex::extended)).first;
 
         PathSet context;
         const std::string str = state.forceString(*args[1], context, pos);
 
         std::smatch match;
-        if (!std::regex_match(str, match, regex)) {
+        if (!std::regex_match(str, match, regex->second)) {
             mkNull(v);
             return;
         }

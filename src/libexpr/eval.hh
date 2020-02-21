@@ -114,6 +114,9 @@ private:
     /* Cache used by checkSourcePath(). */
     std::unordered_map<Path, Path> resolvedPaths;
 
+    /* Cache used by prim_match(). */
+    std::unordered_map<std::string, std::regex> regexCache;
+
 public:
 
     EvalState(const Strings & _searchPath, ref<Store> store);
@@ -314,6 +317,7 @@ private:
     friend struct ExprOpConcatLists;
     friend struct ExprSelect;
     friend void prim_getAttr(EvalState & state, const Pos & pos, Value * * args, Value & v);
+    friend void prim_match(EvalState & state, const Pos & pos, Value * * args, Value & v);
 };
 
 
