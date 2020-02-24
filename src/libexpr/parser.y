@@ -41,6 +41,12 @@ namespace nix {
             { };
     };
 
+    // Helper to prevent an expensive dynamic_cast call in expr_app.
+    struct App
+    {
+        Expr * e;
+        bool isCall;
+    };
 }
 
 #define YY_DECL int yylex \
@@ -280,10 +286,12 @@ void yyerror(YYLTYPE * loc, yyscan_t scanner, ParseData * data, const char * err
   char * uri;
   std::vector<nix::AttrName> * attrNames;
   std::vector<nix::Expr *> * string_parts;
+  nix::App app; // bool == whether this is an ExprCall
 }
 
 %type <e> start expr expr_function expr_if expr_op
-%type <e> expr_app expr_select expr_simple
+%type <e> expr_select expr_simple
+%type <app> expr_app
 %type <list> expr_list
 %type <attrs> binds
 %type <formals> formals
@@ -353,13 +361,13 @@ expr_if
 
 expr_op
   : '!' expr_op %prec NOT { $$ = new ExprOpNot($2); }
-  | '-' expr_op %prec NEGATE { $$ = new ExprApp(CUR_POS, new ExprApp(new ExprVar(data->symbols.create("__sub")), new ExprInt(0)), $2); }
+  | '-' expr_op %prec NEGATE { $$ = new ExprCall(CUR_POS, new ExprVar(data->symbols.create("__sub")), {new ExprInt(0), $2}); }
   | expr_op EQ expr_op { $$ = new ExprOpEq($1, $3); }
   | expr_op NEQ expr_op { $$ = new ExprOpNEq($1, $3); }
-  | expr_op '<' expr_op { $$ = new ExprApp(CUR_POS, new ExprApp(new ExprVar(data->symbols.create("__lessThan")), $1), $3); }
-  | expr_op LEQ expr_op { $$ = new ExprOpNot(new ExprApp(CUR_POS, new ExprApp(new ExprVar(data->symbols.create("__lessThan")), $3), $1)); }
-  | expr_op '>' expr_op { $$ = new ExprApp(CUR_POS, new ExprApp(new ExprVar(data->symbols.create("__lessThan")), $3), $1); }
-  | expr_op GEQ expr_op { $$ = new ExprOpNot(new ExprApp(CUR_POS, new ExprApp(new ExprVar(data->symbols.create("__lessThan")), $1), $3)); }
+  | expr_op '<' expr_op { $$ = new ExprCall(CUR_POS, new ExprVar(data->symbols.create("__lessThan")), {$1, $3}); }
+  | expr_op LEQ expr_op { $$ = new ExprOpNot(new ExprCall(CUR_POS, new ExprVar(data->symbols.create("__lessThan")), {$3, $1})); }
+  | expr_op '>' expr_op { $$ = new ExprCall(CUR_POS, new ExprVar(data->symbols.create("__lessThan")), {$3, $1}); }
+  | expr_op GEQ expr_op { $$ = new ExprOpNot(new ExprCall(CUR_POS, new ExprVar(data->symbols.create("__lessThan")), {$1, $3})); }
   | expr_op AND expr_op { $$ = new ExprOpAnd(CUR_POS, $1, $3); }
   | expr_op OR expr_op { $$ = new ExprOpOr(CUR_POS, $1, $3); }
   | expr_op IMPL expr_op { $$ = new ExprOpImpl(CUR_POS, $1, $3); }
@@ -367,17 +375,24 @@ expr_op
   | expr_op '?' attrpath { $$ = new ExprOpHasAttr($1, *$3); }
   | expr_op '+' expr_op
     { $$ = new ExprConcatStrings(CUR_POS, false, new vector<Expr *>({$1, $3})); }
-  | expr_op '-' expr_op { $$ = new ExprApp(CUR_POS, new ExprApp(new ExprVar(data->symbols.create("__sub")), $1), $3); }
-  | expr_op '*' expr_op { $$ = new ExprApp(CUR_POS, new ExprApp(new ExprVar(data->symbols.create("__mul")), $1), $3); }
-  | expr_op '/' expr_op { $$ = new ExprApp(CUR_POS, new ExprApp(new ExprVar(data->symbols.create("__div")), $1), $3); }
+  | expr_op '-' expr_op { $$ = new ExprCall(CUR_POS, new ExprVar(data->symbols.create("__sub")), {$1, $3}); }
+  | expr_op '*' expr_op { $$ = new ExprCall(CUR_POS, new ExprVar(data->symbols.create("__mul")), {$1, $3}); }
+  | expr_op '/' expr_op { $$ = new ExprCall(CUR_POS, new ExprVar(data->symbols.create("__div")), {$1, $3}); }
   | expr_op CONCAT expr_op { $$ = new ExprOpConcatLists(CUR_POS, $1, $3); }
-  | expr_app
+  | expr_app { $$ = $1.e; }
   ;
 
 expr_app
-  : expr_app expr_select
-    { $$ = new ExprApp(CUR_POS, $1, $2); }
-  | expr_select { $$ = $1; }
+  : expr_app expr_select {
+      if ($1.isCall) {
+          ((ExprCall *) $1.e)->args.push_back($2);
+          $$ = $1;
+      } else {
+          $$.e = new ExprCall(CUR_POS, $1.e, {$2});
+          $$.isCall = true;
+      }
+  }
+  | expr_select { $$.e = $1; $$.isCall = false; }
   ;
 
 expr_select
@@ -388,7 +403,7 @@ expr_select
   | /* Backwards compatibility: because Nixpkgs has a rarely used
        function named ‘or’, allow stuff like ‘map or [...]’. */
     expr_simple OR_KW
-    { $$ = new ExprApp(CUR_POS, $1, new ExprVar(CUR_POS, data->symbols.create("or"))); }
+    { $$ = new ExprCall(CUR_POS, $1, {new ExprVar(CUR_POS, data->symbols.create("or"))}); }
   | expr_simple { $$ = $1; }
   ;
 
@@ -412,10 +427,10 @@ expr_simple
   }
   | SPATH {
       string path($1 + 1, strlen($1) - 2);
-      $$ = new ExprApp(CUR_POS,
-          new ExprApp(new ExprVar(data->symbols.create("__findFile")),
-              new ExprVar(data->symbols.create("__nixPath"))),
-          new ExprString(data->symbols.create(path)));
+      $$ = new ExprCall(CUR_POS,
+          new ExprVar(data->symbols.create("__findFile")),
+          {new ExprVar(data->symbols.create("__nixPath")),
+           new ExprString(data->symbols.create(path))});
   }
   | URI {
       static bool noURLLiterals = settings.isExperimentalFeatureEnabled(Xp::NoUrlLiterals);

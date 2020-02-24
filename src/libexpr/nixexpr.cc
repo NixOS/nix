@@ -143,6 +143,16 @@ void ExprLambda::show(std::ostream & str) const
     str << ": " << *body << ")";
 }
 
+void ExprCall::show(std::ostream & str) const
+{
+    str << '(' << *fun;
+    for (auto e : args) {
+        str <<  ' ';
+        str << *e;
+    }
+    str << ')';
+}
+
 void ExprLet::show(std::ostream & str) const
 {
     str << "(let ";
@@ -366,6 +376,13 @@ void ExprLambda::bindVars(const StaticEnv & env)
     body->bindVars(newEnv);
 }
 
+void ExprCall::bindVars(const StaticEnv & env)
+{
+    fun->bindVars(env);
+    for (auto e : args)
+        e->bindVars(env);
+}
+
 void ExprLet::bindVars(const StaticEnv & env)
 {
     StaticEnv newEnv(false, &env, attrs->attrs.size());
@@ -460,6 +477,5 @@ size_t SymbolTable::totalSize() const
         n += i.size();
     return n;
 }
-
 
 }
