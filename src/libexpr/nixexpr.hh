@@ -133,6 +133,9 @@ struct ExprPath : Expr
     Value * maybeThunk(EvalState & state, Env & env);
 };
 
+typedef uint32_t Level;
+typedef uint32_t Displacement;
+
 struct ExprVar : Expr
 {
     Pos pos;
@@ -148,8 +151,8 @@ struct ExprVar : Expr
        value is obtained by getting the attribute named `name' from
        the set stored in the environment that is `level' levels up
        from the current one.*/
-    unsigned int level;
-    unsigned int displ;
+    Level level;
+    Displacement displ;
 
     ExprVar(const Symbol & name) : name(name) { };
     ExprVar(const Pos & pos, const Symbol & name) : pos(pos), name(name) { };
@@ -183,7 +186,7 @@ struct ExprAttrs : Expr
         bool inherited;
         Expr * e;
         Pos pos;
-        unsigned int displ; // displacement
+        Displacement displ; // displacement
         AttrDef(Expr * e, const Pos & pos, bool inherited=false)
             : inherited(inherited), e(e), pos(pos) { };
         AttrDef() { };
@@ -352,7 +355,7 @@ struct StaticEnv
     const StaticEnv * up;
 
     // Note: these must be in sorted order.
-    typedef std::vector<std::pair<Symbol, unsigned int>> Vars;
+    typedef std::vector<std::pair<Symbol, Displacement>> Vars;
     Vars vars;
 
     StaticEnv(bool isWith, const StaticEnv * up, size_t expectedSize = 0) : isWith(isWith), up(up) {
