@@ -3666,10 +3666,11 @@ void DerivationGoal::registerOutputs()
 
                 /* Throw an error after registering the path as
                    valid. */
+                Base base = settings.hashBase;
                 worker.hashMismatch = true;
                 delayedException = std::make_exception_ptr(
                     BuildError("hash mismatch in fixed-output derivation '%s':\n  wanted: %s\n  got:    %s",
-                        worker.store.printStorePath(dest), h.to_string(SRI), h2.to_string(SRI)));
+                        worker.store.printStorePath(dest), h.to_string(base), h2.to_string(base)));
 
                 Path actualDest = worker.store.toRealPath(worker.store.printStorePath(dest));
 

@@ -129,6 +129,33 @@ bool Settings::isWSL1()
 
 const string nixVersion = PACKAGE_VERSION;
 
+template<> void BaseSetting<Base>::set(const std::string & str)
+{
+    if (str == "base64") value = Base64;
+    else if (str == "base32") value = Base32;
+    else if (str == "base16") value = Base16;
+    else if (str == "sri") value = SRI;
+    else throw UsageError("option '%s' has invalid value '%s'", name, str);
+}
+
+template<> std::string BaseSetting<Base>::to_string() const
+{
+    if (value == Base64) return "base64";
+    else if (value == Base32) return "base32";
+    else if (value == Base16) return "base16";
+    else if (value == SRI) return "sri";
+    else abort();
+}
+
+template<> void BaseSetting<Base>::toJSON(JSONPlaceholder & out)
+{
+    AbstractSetting::toJSON(out);
+}
+
+template<> void BaseSetting<Base>::convertToArg(Args & args, const std::string & category)
+{
+}
+
 template<> void BaseSetting<SandboxMode>::set(const std::string & str)
 {
     if (str == "true") value = smEnabled;

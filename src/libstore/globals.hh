@@ -2,6 +2,7 @@
 
 #include "types.hh"
 #include "config.hh"
+#include "hash.hh"
 #include "util.hh"
 
 #include <map>
@@ -189,6 +190,9 @@ public:
         "Whether to add derivations as a dependency of user environments "
         "(to prevent them from being GCed).",
         {"env-keep-derivations"}};
+
+    Setting<Base> hashBase{this, Base32, "hash-format",
+        "What format to use when displaying hashes (eg. fixed-output hash mismatches)."};
 
     /* Whether to lock the Nix client and worker to the same CPU. */
     bool lockCPU;
