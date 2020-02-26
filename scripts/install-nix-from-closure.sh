@@ -50,6 +50,9 @@ while [ $# -gt 0 ]; do
             INSTALL_MODE=no-daemon;;
         --no-channel-add)
             NIX_INSTALLER_NO_CHANNEL_ADD=1;;
+        --daemon-user-count)
+            NIX_USER_COUNT=$2
+            shift;;
         --no-modify-profile)
             NIX_INSTALLER_NO_MODIFY_PROFILE=1;;
         --darwin-use-unencrypted-nix-store-volume)
