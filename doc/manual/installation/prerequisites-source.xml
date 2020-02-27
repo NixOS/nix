@@ -8,6 +8,14 @@
 
 <itemizedlist>
 
+  <listitem><para>GNU Autoconf
+  (<link xlink:href="https://www.gnu.org/software/autoconf/"/>)
+  and the autoconf-archive macro collection
+  (<link xlink:href="https://www.gnu.org/software/autoconf-archive/"/>).
+  These are only needed to run the bootstrap script, and are not necessary
+  if your source distribution came with a pre-built
+  <literal>./configure</literal> script.</para></listitem>
+
   <listitem><para>GNU Make.</para></listitem>
   
   <listitem><para>Bash Shell. The <literal>./configure</literal> script
