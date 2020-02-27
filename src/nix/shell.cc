@@ -232,6 +232,22 @@ struct Common : InstallableCommand, MixProfile
 
 struct CmdDevShell : Common, MixEnvironment
 {
+    std::vector<std::string> command;
+
+    CmdDevShell()
+    {
+        mkFlag()
+            .longName("command")
+            .shortName('c')
+            .description("command and arguments to be executed insted of an interactive shell")
+            .labels({"command", "args"})
+            .arity(ArityAny)
+            .handler([&](std::vector<std::string> ss) {
+                if (ss.empty()) throw UsageError("--command requires at least one argument");
+                command = ss;
+            });
+    }
+
     std::string description() override
     {
         return "run a bash shell that provides the build environment of a derivation";
@@ -269,6 +285,13 @@ struct CmdDevShell : Common, MixEnvironment
         makeRcScript(buildEnvironment, ss);
 
         ss << fmt("rm -f '%s'\n", rcFilePath);
+
+        if (!command.empty()) {
+            std::vector<std::string> args;
+            for (auto s : command)
+                args.push_back(shellEscape(s));
+            ss << fmt("exec %s\n", concatStringsSep(" ", args));
+        }
 
         writeFull(rcFileFd.get(), ss.str());
 
