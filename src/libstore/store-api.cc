@@ -19,14 +19,6 @@ bool Store::isInStore(const Path & path) const
 }
 
 
-bool Store::isStorePath(const Path & path) const
-{
-    return isInStore(path)
-        && path.size() >= storeDir.size() + 1 + storePathHashLen
-        && path.find('/', storeDir.size() + 1) == Path::npos;
-}
-
-
 Path Store::toStorePath(const Path & path) const
 {
     if (!isInStore(path))

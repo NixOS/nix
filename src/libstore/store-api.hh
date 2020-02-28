@@ -281,6 +281,8 @@ public:
 
     StorePath parseStorePath(std::string_view path) const;
 
+    std::optional<StorePath> maybeParseStorePath(std::string_view path) const;
+
     std::string printStorePath(const StorePath & path) const;
 
     // FIXME: remove

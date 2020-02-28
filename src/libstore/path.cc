@@ -55,6 +55,20 @@ StorePath Store::parseStorePath(std::string_view path) const
     return StorePath::make(path, storeDir);
 }
 
+std::optional<StorePath> Store::maybeParseStorePath(std::string_view path) const
+{
+    try {
+        return parseStorePath(path);
+    } catch (Error &) {
+        return {};
+    }
+}
+
+bool Store::isStorePath(const Path & path) const
+{
+    return (bool) maybeParseStorePath(path);
+}
+
 StorePathSet Store::parseStorePathSet(const PathSet & paths) const
 {
     StorePathSet res;
