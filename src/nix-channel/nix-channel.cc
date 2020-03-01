@@ -14,12 +14,12 @@ typedef std::map<string,string> Channels;
 
 static Channels channels;
 static Path channelsList;
+static Path rootChannelsList;
 
-// Reads the list of channels.
-static void readChannels()
+static void doReadChannels(Path path)
 {
-    if (!pathExists(channelsList)) return;
-    auto channelsFile = readFile(channelsList);
+    if (!pathExists(path)) return;
+    auto channelsFile = readFile(path);
 
     for (const auto & line : tokenizeString<std::vector<string>>(channelsFile, "\n")) {
         chomp(line);
@@ -32,14 +32,31 @@ static void readChannels()
     }
 }
 
+// Reads the list of channels.
+static void readChannels()
+{
+    std::vector<Path> paths = {rootChannelsList, channelsList};
+    for (const auto & path : paths) {
+        doReadChannels(path);
+    }
+}
+
+static void doWriteChannels(Path path)
+{
+    auto channelsFD = AutoCloseFD{open(path.c_str(), O_WRONLY | O_CLOEXEC | O_CREAT | O_TRUNC, 0644)};
+    if (!channelsFD)
+        throw SysError(format("opening '%1%' for writing") % path);
+    for (const auto & channel : channels)
+        writeFull(channelsFD.get(), channel.second + " " + channel.first + "\n");
+}
+
 // Writes the list of channels.
 static void writeChannels()
 {
-    auto channelsFD = AutoCloseFD{open(channelsList.c_str(), O_WRONLY | O_CLOEXEC | O_CREAT | O_TRUNC, 0644)};
-    if (!channelsFD)
-        throw SysError(format("opening '%1%' for writing") % channelsList);
-    for (const auto & channel : channels)
-        writeFull(channelsFD.get(), channel.second + " " + channel.first + "\n");
+    doWriteChannels(channelsList);
+    if (getuid() == 0) {
+        doWriteChannels(rootChannelsList);
+    }
 }
 
 // Adds a channel.
@@ -156,6 +173,7 @@ static int _main(int argc, char ** argv)
         auto home = getHome();
         channelsList = home + "/.nix-channels";
         nixDefExpr = home + "/.nix-defexpr";
+        rootChannelsList = fmt("%s/profiles/per-user/root/nix-channels", settings.nixStateDir);
 
         // Figure out the name of the channels profile.
         profile = fmt("%s/profiles/per-user/%s/channels", settings.nixStateDir, getUserName());
