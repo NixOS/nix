@@ -914,6 +914,8 @@ static void opQuery(Globals & globals, Strings opFlags, Strings opArgs)
             throw UsageError(format("unknown flag '%1%'") % arg);
     }
 
+    if (printAttrPath && source != sAvailable)
+        throw UsageError("--attr-path(-P) only works with --available");
 
     /* Obtain derivation information from the specified source. */
     DrvInfos availElems, installedElems;
