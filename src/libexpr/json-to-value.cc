@@ -1,26 +1,43 @@
 #include "json-to-value.hh"
-
-#include <variant>
 #include <nlohmann/json.hpp>
 
 using json = nlohmann::json;
-using std::unique_ptr;
+#if HAVE_BOEHMGC
+#define GC_NEW_ABORTS_ON_OOM
+#include <gc/gc_cpp.h>
+#include <gc/gc.h>
+template<class T> struct GCDeleter {
+    GCDeleter<T>() {};
+    void operator()(T* p) const {
+        std::destroy_at<T>(p);
+        GC_FREE(p);
+    };
+};
+#define NOGC_NEW new(NoGC)
+#else
+#define NOGC_NEW new
+#endif
 
 namespace nix {
-
 // for more information, refer to
 // https://github.com/nlohmann/json/blob/master/include/nlohmann/detail/input/json_sax.hpp
 class JSONSax : nlohmann::json_sax<json> {
     class JSONState {
+    public:
+#if HAVE_BOEHMGC
+        typedef std::unique_ptr<JSONState, GCDeleter<JSONState>> u_ptr;
+#else
+        typedef std::unique_ptr<JSONState> u_ptr;
+#endif
     protected:
-        unique_ptr<JSONState> parent;
+        u_ptr parent;
         Value * v;
     public:
-        virtual unique_ptr<JSONState> resolve(EvalState &)
+        virtual u_ptr resolve(EvalState &)
         {
             throw std::logic_error("tried to close toplevel json parser state");
         };
-        explicit JSONState(unique_ptr<JSONState>&& p) : parent(std::move(p)), v(nullptr) {};
+        explicit JSONState(u_ptr&& p) : parent(std::move(p)), v(nullptr) {};
         explicit JSONState(Value* v) : v(v) {};
         JSONState(JSONState& p) = delete;
         Value& value(EvalState & state)
@@ -36,7 +53,7 @@ class JSONSax : nlohmann::json_sax<json> {
     class JSONObjectState : public JSONState {
         using JSONState::JSONState;
         ValueMap attrs = ValueMap();
-        virtual unique_ptr<JSONState> resolve(EvalState & state) override
+        virtual u_ptr resolve(EvalState & state) override
         {
             Value& v = parent->value(state);
             state.mkAttrs(v, attrs.size());
@@ -54,7 +71,7 @@ class JSONSax : nlohmann::json_sax<json> {
 
     class JSONListState : public JSONState {
         ValueVector values = ValueVector();
-        virtual unique_ptr<JSONState> resolve(EvalState & state) override
+        virtual u_ptr resolve(EvalState & state) override
         {
             Value& v = parent->value(state);
             state.mkList(v, values.size());
@@ -68,14 +85,14 @@ class JSONSax : nlohmann::json_sax<json> {
             v = nullptr;
         };
     public:
-        JSONListState(unique_ptr<JSONState>&& p, std::size_t reserve) : JSONState(std::move(p))
+        JSONListState(u_ptr&& p, std::size_t reserve) : JSONState(std::move(p))
         {
             values.reserve(reserve);
         }
     };
 
     EvalState & state;
-    unique_ptr<JSONState> rs;
+    JSONState::u_ptr rs;
 
     template<typename T, typename... Args> inline bool handle_value(T f, Args... args)
     {
@@ -85,7 +102,7 @@ class JSONSax : nlohmann::json_sax<json> {
     }
 
 public:
-    JSONSax(EvalState & state, Value & v) : state(state), rs(new JSONState(&v)) {};
+    JSONSax(EvalState & state, Value & v) : state(state), rs(NOGC_NEW JSONState(&v)) {};
 
     bool null()
     {
@@ -119,7 +136,7 @@ public:
 
     bool start_object(std::size_t len)
     {
-        rs = std::make_unique<JSONObjectState>(std::move(rs));
+        rs = JSONState::u_ptr(NOGC_NEW JSONObjectState(std::move(rs)));
         return true;
     }
 
@@ -140,8 +157,8 @@ public:
     }
 
     bool start_array(size_t len) {
-        rs = std::make_unique<JSONListState>(std::move(rs),
-            len != std::numeric_limits<size_t>::max() ? len : 128);
+        rs = JSONState::u_ptr(NOGC_NEW JSONListState(std::move(rs),
+                len != std::numeric_limits<size_t>::max() ? len : 128));
         return true;
     }
 
