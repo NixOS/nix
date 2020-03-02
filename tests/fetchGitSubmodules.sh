@@ -47,4 +47,5 @@ pathWithSubmodules=$(nix eval --raw "(builtins.fetchGit { url = file://$rootRepo
 [[ ! -e $pathWithoutSubmodules/sub/content ]]
 [[ -e $pathWithSubmodules/sub/content ]]
 
-
+# No .git directory or submodule reference files must be left
+test "$(find "$pathWithSubmodules" -name .git)" = ""

@@ -6,6 +6,7 @@
 #include "hash.hh"
 #include "tarfile.hh"
 
+#include <filesystem>
 #include <sys/time.h>
 
 #include <regex>
@@ -182,9 +183,13 @@ GitInfo exportGit(ref<Store> store, const std::string & uri,
 
         runProgram("git", true, { "-C", tmpDir, "checkout", "--quiet", "FETCH_HEAD" });
         runProgram("git", true, { "-C", tmpDir, "remote", "add", "origin", uri });
-        runProgram("git", true, { "-C", tmpDir, "submodule", "--quiet", "update", "--init" });
+        runProgram("git", true, { "-C", tmpDir, "submodule", "--quiet", "update", "--init", "--recursive" });
 
-        deletePath(tmpDir + "/.git");
+        for (const auto& p : std::filesystem::recursive_directory_iterator(tmpDir)) {
+            if (p.path().filename() == ".git") {
+                std::filesystem::remove_all(p.path());
+            }
+        }
 
         gitInfo.submodules = true;
     } else {
