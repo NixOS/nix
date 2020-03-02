@@ -583,11 +583,17 @@ Value * EvalState::addConstant(const string & name, Value & v)
 {
     Value * v2 = allocValue();
     *v2 = v;
-    staticBaseEnv.vars.emplace_back(symbols.create(name), baseEnvDispl);
-    baseEnv.values[baseEnvDispl++] = v2;
-    string name2 = string(name, 0, 2) == "__" ? string(name, 2) : name;
-    baseEnv.values[0]->attrs->push_back(Attr(symbols.create(name2), v2));
+    addConstant(name, v2);
     return v2;
+}
+
+
+void EvalState::addConstant(const string & name, Value * v)
+{
+    staticBaseEnv.vars.emplace_back(symbols.create(name), baseEnvDispl);
+    baseEnv.values[baseEnvDispl++] = v;
+    string name2 = string(name, 0, 2) == "__" ? string(name, 2) : name;
+    baseEnv.values[0]->attrs->push_back(Attr(symbols.create(name2), v));
 }
 
 

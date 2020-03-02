@@ -3725,18 +3725,21 @@ void EvalState::createBaseEnv()
 
     /* Add a wrapper around the derivation primop that computes the
        `drvPath' and `outPath' attributes lazily. */
-    staticBaseEnv.sort();
     sDerivationNix = symbols.create("//builtin/derivation.nix");
-    eval(parse(
-        #include "primops/derivation.nix.gen.hh"
-        , foFile, sDerivationNix, "/", staticBaseEnv), v);
-    addConstant("derivation", v);
+    auto vDerivation = allocValue();
+    addConstant("derivation", vDerivation);
 
     /* Now that we've added all primops, sort the `builtins' set,
        because attribute lookups expect it to be sorted. */
     baseEnv.values[0]->attrs->sort();
 
     staticBaseEnv.sort();
+
+    /* Note: we have to initialize the 'derivation' constant *after*
+       building baseEnv/staticBaseEnv because it uses 'builtins'. */
+    eval(parse(
+        #include "primops/derivation.nix.gen.hh"
+        , foFile, sDerivationNix, "/", staticBaseEnv), *vDerivation);
 }
 
 
