@@ -40,12 +40,23 @@ rev=$(git -C $rootRepo rev-parse HEAD)
 
 pathWithoutSubmodules=$(nix eval --raw "(builtins.fetchGit { url = file://$rootRepo; rev = \"$rev\"; }).outPath")
 pathWithSubmodules=$(nix eval --raw "(builtins.fetchGit { url = file://$rootRepo; rev = \"$rev\"; fetchSubmodules = true; }).outPath")
+pathWithSubmodulesAgain=$(nix eval --raw "(builtins.fetchGit { url = file://$rootRepo; rev = \"$rev\"; fetchSubmodules = true; }).outPath")
 
 # The resulting store path cannot be the same.
 [[ $pathWithoutSubmodules != $pathWithSubmodules ]]
 
+# Checking out the same repo with submodules returns in the same store path.
+[[ $pathWithSubmodules == $pathWithSubmodulesAgain ]]
+
+# The submodules flag is actually honored.
 [[ ! -e $pathWithoutSubmodules/sub/content ]]
 [[ -e $pathWithSubmodules/sub/content ]]
 
 # No .git directory or submodule reference files must be left
 test "$(find "$pathWithSubmodules" -name .git)" = ""
+
+# Git repos without submodules can be fetched with submodules = true.
+noSubmoduleRepoBaseline=$(nix eval --raw "(builtins.fetchGit { url = file://$subRepo; rev = \"$rev\"; }).outPath")
+noSubmoduleRepo=$(nix eval --raw "(builtins.fetchGit { url = file://$subRepo; rev = \"$rev\"; fetchSubmodules = true; }).outPath")
+
+[[ $noSubmoduleRepoBaseline == $noSubmoduleRepo ]]
