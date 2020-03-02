@@ -60,8 +60,6 @@ function-trace exited (string):1:1 at
 expect_trace '(x: x) 1 2' "
 function-trace entered (string):1:1 at
 function-trace exited (string):1:1 at
-function-trace entered (string):1:1 at
-function-trace exited (string):1:1 at
 "
 
 # Not a function
