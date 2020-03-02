@@ -600,8 +600,6 @@ void EvalState::addConstant(const string & name, Value * v)
 Value * EvalState::addPrimOp(const string & name,
     size_t arity, PrimOpFun primOp)
 {
-    assert(arity <= maxPrimOpArity);
-
     auto name2 = string(name, 0, 2) == "__" ? string(name, 2) : name;
     Symbol sym = symbols.create(name2);
 

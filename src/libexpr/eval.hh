@@ -279,8 +279,6 @@ private:
 
     void addConstant(const string & name, Value * v);
 
-    constexpr static size_t maxPrimOpArity = 3;
-
     Value * addPrimOp(const string & name,
         size_t arity, PrimOpFun primOp);
 
