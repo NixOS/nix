@@ -39,8 +39,8 @@ git -C $rootRepo commit -m "Add submodule"
 rev=$(git -C $rootRepo rev-parse HEAD)
 
 pathWithoutSubmodules=$(nix eval --raw "(builtins.fetchGit { url = file://$rootRepo; rev = \"$rev\"; }).outPath")
-pathWithSubmodules=$(nix eval --raw "(builtins.fetchGit { url = file://$rootRepo; rev = \"$rev\"; fetchSubmodules = true; }).outPath")
-pathWithSubmodulesAgain=$(nix eval --raw "(builtins.fetchGit { url = file://$rootRepo; rev = \"$rev\"; fetchSubmodules = true; }).outPath")
+pathWithSubmodules=$(nix eval --raw "(builtins.fetchGit { url = file://$rootRepo; rev = \"$rev\"; submodules = true; }).outPath")
+pathWithSubmodulesAgain=$(nix eval --raw "(builtins.fetchGit { url = file://$rootRepo; rev = \"$rev\"; submodules = true; }).outPath")
 
 # The resulting store path cannot be the same.
 [[ $pathWithoutSubmodules != $pathWithSubmodules ]]
@@ -57,6 +57,6 @@ test "$(find "$pathWithSubmodules" -name .git)" = ""
 
 # Git repos without submodules can be fetched with submodules = true.
 noSubmoduleRepoBaseline=$(nix eval --raw "(builtins.fetchGit { url = file://$subRepo; rev = \"$rev\"; }).outPath")
-noSubmoduleRepo=$(nix eval --raw "(builtins.fetchGit { url = file://$subRepo; rev = \"$rev\"; fetchSubmodules = true; }).outPath")
+noSubmoduleRepo=$(nix eval --raw "(builtins.fetchGit { url = file://$subRepo; rev = \"$rev\"; submodules = true; }).outPath")
 
 [[ $noSubmoduleRepoBaseline == $noSubmoduleRepo ]]

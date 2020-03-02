@@ -243,7 +243,7 @@ static void prim_fetchGit(EvalState & state, const Pos & pos, Value * * args, Va
                 rev = state.forceStringNoCtx(*attr.value, *attr.pos);
             else if (n == "name")
                 name = state.forceStringNoCtx(*attr.value, *attr.pos);
-            else if (n == "fetchSubmodules")
+            else if (n == "submodules")
                 fetchSubmodules = state.forceBool(*attr.value, *attr.pos);
             else
                 throw EvalError("unsupported argument '%s' to 'fetchGit', at %s", attr.name, *attr.pos);
