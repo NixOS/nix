@@ -41,12 +41,6 @@ namespace nix {
             { };
     };
 
-    // Helper to prevent an expensive dynamic_cast call in expr_app.
-    struct App
-    {
-        Expr * e;
-        bool isCall;
-    };
 }
 
 #define YY_DECL int yylex \
@@ -304,12 +298,10 @@ void yyerror(YYLTYPE * loc, yyscan_t scanner, ParseData * data, const char * err
   char * uri;
   std::vector<nix::AttrName> * attrNames;
   std::vector<nix::Expr *> * string_parts;
-  nix::App app; // bool == whether this is an ExprCall
 }
 
 %type <e> start expr expr_function expr_if expr_op
-%type <e> expr_select expr_simple
-%type <app> expr_app
+%type <e> expr_select expr_simple expr_app
 %type <list> expr_list
 %type <attrs> binds
 %type <formals> formals
@@ -397,20 +389,18 @@ expr_op
   | expr_op '*' expr_op { $$ = new ExprCall(CUR_POS, new ExprVar(data->symbols.create("__mul")), {$1, $3}); }
   | expr_op '/' expr_op { $$ = new ExprCall(CUR_POS, new ExprVar(data->symbols.create("__div")), {$1, $3}); }
   | expr_op CONCAT expr_op { $$ = new ExprOpConcatLists(CUR_POS, $1, $3); }
-  | expr_app { $$ = $1.e; }
+  | expr_app
   ;
 
 expr_app
   : expr_app expr_select {
-      if ($1.isCall) {
-          ((ExprCall *) $1.e)->args.push_back($2);
+      if (auto e2 = dynamic_cast<ExprCall *>($1)) {
+          e2->args.push_back($2);
           $$ = $1;
-      } else {
-          $$.e = new ExprCall(CUR_POS, $1.e, {$2});
-          $$.isCall = true;
-      }
+      } else
+          $$ = new ExprCall(CUR_POS, $1, {$2});
   }
-  | expr_select { $$.e = $1; $$.isCall = false; }
+  | expr_select
   ;
 
 expr_select
