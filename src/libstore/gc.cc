@@ -255,12 +255,11 @@ void LocalStore::findTempRoots(FDs & fds, Roots & tempRoots, bool censor)
 void LocalStore::findRoots(const Path & path, unsigned char type, Roots & roots)
 {
     auto foundRoot = [&](const Path & path, const Path & target) {
-        Path storePath = toStorePath(target);
-        // FIXME
-        if (isStorePath(storePath) && isValidPath(parseStorePath(storePath)))
-            roots[parseStorePath(storePath)].emplace(path);
+        auto storePath = maybeParseStorePath(toStorePath(target));
+        if (storePath && isValidPath(*storePath))
+            roots[std::move(*storePath)].emplace(path);
         else
-            printInfo("skipping invalid root from '%1%' to '%2%'", path, storePath);
+            printInfo("skipping invalid root from '%1%' to '%2%'", path, target);
     };
 
     try {
@@ -296,10 +295,9 @@ void LocalStore::findRoots(const Path & path, unsigned char type, Roots & roots)
         }
 
         else if (type == DT_REG) {
-            Path storePath = storeDir + "/" + std::string(baseNameOf(path));
-            // FIXME
-            if (isStorePath(storePath) && isValidPath(parseStorePath(storePath)))
-                roots[parseStorePath(storePath)].emplace(path);
+            auto storePath = maybeParseStorePath(storeDir + "/" + std::string(baseNameOf(path)));
+            if (storePath && isValidPath(*storePath))
+                roots[std::move(*storePath)].emplace(path);
         }
 
     }
@@ -523,14 +521,14 @@ void LocalStore::deletePathRecursive(GCState & state, const Path & path)
 
     unsigned long long size = 0;
 
-    // FIXME
-    if (isStorePath(path) && isValidPath(parseStorePath(path))) {
+    auto storePath = maybeParseStorePath(path);
+    if (storePath && isValidPath(*storePath)) {
         StorePathSet referrers;
-        queryReferrers(parseStorePath(path), referrers);
+        queryReferrers(*storePath, referrers);
         for (auto & i : referrers)
             if (printStorePath(i) != path) deletePathRecursive(state, printStorePath(i));
-        size = queryPathInfo(parseStorePath(path))->narSize;
-        invalidatePathChecked(parseStorePath(path));
+        size = queryPathInfo(*storePath)->narSize;
+        invalidatePathChecked(*storePath);
     }
 
     Path realPath = realStoreDir + "/" + std::string(baseNameOf(path));
@@ -593,8 +591,7 @@ bool LocalStore::canReachRoot(GCState & state, StorePathSet & visited, const Sto
 
     visited.insert(path.clone());
 
-    //FIXME
-    if (!isStorePath(printStorePath(path)) || !isValidPath(path)) return false;
+    if (!isValidPath(path)) return false;
 
     StorePathSet incoming;
 
@@ -637,8 +634,9 @@ void LocalStore::tryToDelete(GCState & state, const Path & path)
 
     //Activity act(*logger, lvlDebug, format("considering whether to delete '%1%'") % path);
 
-    // FIXME
-    if (!isStorePath(path) || !isValidPath(parseStorePath(path))) {
+    auto storePath = maybeParseStorePath(path);
+
+    if (!storePath || !isValidPath(*storePath)) {
         /* A lock file belonging to a path that we're building right
            now isn't garbage. */
         if (isActiveTempFile(state, path, ".lock")) return;
@@ -655,7 +653,7 @@ void LocalStore::tryToDelete(GCState & state, const Path & path)
 
     StorePathSet visited;
 
-    if (canReachRoot(state, visited, parseStorePath(path))) {
+    if (storePath && canReachRoot(state, visited, *storePath)) {
         debug("cannot delete '%s' because it's still reachable", path);
     } else {
         /* No path we visited was a root, so everything is garbage.
@@ -818,8 +816,8 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
                 string name = dirent->d_name;
                 if (name == "." || name == "..") continue;
                 Path path = storeDir + "/" + name;
-                // FIXME
-                if (isStorePath(path) && isValidPath(parseStorePath(path)))
+                auto storePath = maybeParseStorePath(path);
+                if (storePath && isValidPath(*storePath))
                     entries.push_back(path);
                 else
                     tryToDelete(state, path);

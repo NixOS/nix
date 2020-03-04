@@ -282,6 +282,8 @@ public:
 
     StorePath parseStorePath(std::string_view path) const;
 
+    std::optional<StorePath> maybeParseStorePath(std::string_view path) const;
+
     std::string printStorePath(const StorePath & path) const;
 
     // FIXME: remove
@@ -304,7 +306,7 @@ public:
 
     /* Return true if ‘path’ is a store path, i.e. a direct child of
        the Nix store. */
-    bool isStorePath(const Path & path) const;
+    bool isStorePath(std::string_view path) const;
 
     /* Chop off the parts after the top-level store name, e.g.,
        /nix/store/abcd-foo/bar => /nix/store/abcd-foo. */

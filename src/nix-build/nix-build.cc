@@ -295,7 +295,8 @@ static void _main(int argc, char * * argv)
                 try {
                     absolute = canonPath(absPath(i), true);
                 } catch (Error & e) {};
-                if (store->isStorePath(absolute) && std::regex_match(absolute, std::regex(".*\\.drv(!.*)?")))
+                auto [path, outputNames] = parsePathWithOutputs(absolute);
+                if (store->isStorePath(path) && hasSuffix(path, ".drv"))
                     drvs.push_back(DrvInfo(*state, store, absolute));
                 else
                     /* If we're in a #! script, interpret filenames
