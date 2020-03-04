@@ -64,7 +64,7 @@ std::optional<StorePath> Store::maybeParseStorePath(std::string_view path) const
     }
 }
 
-bool Store::isStorePath(const Path & path) const
+bool Store::isStorePath(std::string_view path) const
 {
     return (bool) maybeParseStorePath(path);
 }
