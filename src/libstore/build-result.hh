@@ -105,9 +105,14 @@ struct BuildResult
         return status == Built || status == Substituted || status == AlreadyValid || status == ResolvesToAlreadyValid;
     }
 
-    void rethrow()
+    [[noreturn]] void rethrow()
     {
-        throw Error("%s", errorMsg);
+        throw error();
+    }
+
+    Error error()
+    {
+        return Error("%s", errorMsg);
     }
 };
 

@@ -1655,7 +1655,7 @@ void EvalState::callFunction(Value & fun, size_t nrArgs, Value * * args, Value &
                     // 1. Unify this and above code. Heavily redundant.
                     // 2. Create a fake env (arg1, arg2, etc.) and a fake expr (arg1: arg2: etc: builtins.name arg1 arg2 etc)
                     //    so the debugger allows to inspect the wrong parameters passed to the builtin.
-                    primOp->primOp->fun(*this, noPos, vArgs, vCur);
+                    primOp->primOp->fun(*this, pos, vArgs, vCur);
                 } catch (Error & e) {
                     addErrorTrace(e, pos, "while calling the '%1%' builtin", name);
                     throw;
