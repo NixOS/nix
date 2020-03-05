@@ -94,7 +94,7 @@ main() {
     if ! test_fstab; then
         echo "Configuring /etc/fstab..." >&2
         label=$(echo "$volume" | sed 's/ /\\040/g')
-        printf "\$a\nLABEL=%s /nix apfs rw\n.\nwq\n" "$label" | EDITOR=ed sudo vifs
+        printf "\$a\nLABEL=%s /nix apfs rw,nobrowse\n.\nwq\n" "$label" | EDITOR=ed sudo vifs
     fi
 
     echo "The following options can be enabled to disable spotlight indexing" >&2
