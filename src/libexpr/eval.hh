@@ -366,7 +366,7 @@ public:
     /* Realise the given context, and return a mapping from the placeholders
      * used to construct the associated value to their final store path
      */
-    [[nodiscard]] StringMap realiseContext(const PathSet & context);
+    [[nodiscard]] StringMap realiseContext(const PathSet & context, const Pos &pos, const string & reason);
 
 private:
 
@@ -496,6 +496,9 @@ struct EvalSettings : Config
 
     Setting<bool> useEvalCache{this, true, "eval-cache",
         "Whether to use the flake evaluation cache."};
+
+    Setting<bool> logAllIFD{this, false, "log-all-ifd",
+        "Emit log messages for all imports from derivation at the 'info' log level"};
 };
 
 extern EvalSettings evalSettings;
