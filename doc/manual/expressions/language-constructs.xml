@@ -271,7 +271,7 @@ evaluate to a Boolean value (<literal>true</literal> or
 on or between features and dependencies hold.  They look like this:
 
 <programlisting>
-assert <replaceable>e1</replaceable>; <replaceable>e2</replaceable></programlisting>
+assert <replaceable>e1</replaceable> -> <replaceable>e2</replaceable></programlisting>
 
 where <replaceable>e1</replaceable> is an expression that should
 evaluate to a Boolean value.  If it evaluates to
