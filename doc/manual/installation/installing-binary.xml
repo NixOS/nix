@@ -199,6 +199,7 @@ nix
 </screen>
 
 <screen>
+alice$ /System/Library/Filesystems/apfs.fs/Contents/Resources/apfs.util -B
 alice$ sudo diskutil apfs addVolume diskX APFS 'Nix Store' -mountpoint /nix
 alice$ mount
 /dev/disk1s6 on /nix (apfs, local, journaled)
@@ -231,7 +232,7 @@ LABEL=Nix\040Store /nix apfs rw
       </para>
 
 <screen>
-diskutil apfs enableFileVault /nix -user disk
+alice$ diskutil apfs enableFileVault /nix -user disk
 </screen>
 
     </listitem>
