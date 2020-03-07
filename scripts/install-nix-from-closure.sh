@@ -82,7 +82,7 @@ while [ $# -gt 0 ]; do
                     echo " --create-volume: Create an APFS volume for the store and create the /nix"
                     echo "                  mountpoint for it using synthetic.conf."
                     echo "                  (required on macOS >=10.15)"
-                    echo "                  See https://nixos.org/nix/manual/#sect-darwin-apfs-volume"
+                    echo "                  See https://nixos.org/nix/manual/#sect-apfs-volume-installation"
                     echo ""
                 ) >&2
             fi
@@ -102,10 +102,11 @@ if [ "$(uname -s)" = "Darwin" ]; then
         (
             echo ""
             echo "Installing on macOS >=10.15 requires relocating the store to an apfs volume."
-            echo "Use --create-volume or run the preparation steps manually."
-            echo "See https://nixos.org/nix/manual/#sect-darwin-apfs-volume."
+            echo "Use sh <(curl https://nixos.org/nix/install) --create-volume or run the preparation steps manually."
+            echo "See https://nixos.org/nix/manual/#sect-apfs-volume-installation"
             echo ""
         ) >&2
+        exit 1
     fi
 fi
 

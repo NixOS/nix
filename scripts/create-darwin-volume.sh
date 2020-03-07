@@ -73,12 +73,22 @@ main() {
     if ! test_synthetic_conf; then
         echo "Configuring /etc/synthetic.conf..." >&2
         echo nix | sudo tee /etc/synthetic.conf
-        /System/Library/Filesystems/apfs.fs/Contents/Resources/apfs.util -B
+        if ! test_synthetic_conf; then
+            echo "error: failed to configure synthetic.conf" >&2
+            exit 1
+        fi
     fi
 
     if ! test_nix; then
         echo "Creating mountpoint for /nix..." >&2
-        sudo mkdir /nix
+        /System/Library/Filesystems/apfs.fs/Contents/Resources/apfs.util -B || true
+        if ! test_nix; then
+            sudo mkdir -p /nix 2>/dev/null || true
+        fi
+        if ! test_nix; then
+            echo "error: failed to bootstrap /nix, a reboot might be required" >&2
+            exit 1
+        fi
     fi
 
     disk=$(root_disk | disk_identifier)
@@ -97,10 +107,11 @@ main() {
         printf "\$a\nLABEL=%s /nix apfs rw,nobrowse\n.\nwq\n" "$label" | EDITOR=ed sudo vifs
     fi
 
+    echo "" >&2
     echo "The following options can be enabled to disable spotlight indexing" >&2
     echo "of the volume, which might be desirable." >&2
     echo "" >&2
-    echo "   $ mdutil -i off /nix" >&2
+    echo "   $ sudo mdutil -i off /nix" >&2
     echo "" >&2
 }
 
