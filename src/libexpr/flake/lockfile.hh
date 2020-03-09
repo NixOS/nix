@@ -27,6 +27,8 @@ struct LockedInputs
 
     nlohmann::json toJson() const;
 
+    std::string to_string() const;
+
     bool isImmutable() const;
 
     std::optional<LockedInput *> findInput(const InputPath & path);

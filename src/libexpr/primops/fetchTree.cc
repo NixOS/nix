@@ -4,11 +4,45 @@
 #include "fetchers/fetchers.hh"
 #include "fetchers/registry.hh"
 
+#include <ctime>
+#include <iomanip>
+
 namespace nix {
+
+void emitTreeAttrs(
+    EvalState & state,
+    const fetchers::Tree & tree,
+    std::shared_ptr<const fetchers::Input> input,
+    Value & v)
+{
+    state.mkAttrs(v, 8);
+
+    auto storePath = state.store->printStorePath(tree.storePath);
+
+    mkString(*state.allocAttr(v, state.sOutPath), storePath, PathSet({storePath}));
+
+    assert(tree.info.narHash);
+    mkString(*state.allocAttr(v, state.symbols.create("narHash")),
+        tree.info.narHash.to_string(SRI));
+
+    if (input->getRev()) {
+        mkString(*state.allocAttr(v, state.symbols.create("rev")), input->getRev()->gitRev());
+        mkString(*state.allocAttr(v, state.symbols.create("shortRev")), input->getRev()->gitShortRev());
+    }
+
+    if (tree.info.revCount)
+        mkInt(*state.allocAttr(v, state.symbols.create("revCount")), *tree.info.revCount);
+
+    if (tree.info.lastModified)
+        mkString(*state.allocAttr(v, state.symbols.create("lastModified")),
+            fmt("%s", std::put_time(std::gmtime(&*tree.info.lastModified), "%Y%m%d%H%M%S")));
+
+    v.attrs->sort();
+}
 
 static void prim_fetchTree(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
-    settings.requireExperimentalFeature("fetch-tree");
+    settings.requireExperimentalFeature("flakes");
 
     std::shared_ptr<const fetchers::Input> input;
     PathSet context;
@@ -25,7 +59,8 @@ static void prim_fetchTree(EvalState & state, const Pos & pos, Value * * args, V
             if (attr.value->type == tString)
                 attrs.emplace(attr.name, attr.value->string.s);
             else
-                throw Error("unsupported attribute type");
+                throw TypeError("fetchTree argument '%s' is %s while a string is expected",
+                    attr.name, showType(*attr.value));
         }
 
         if (!attrs.count("type"))
@@ -43,19 +78,10 @@ static void prim_fetchTree(EvalState & state, const Pos & pos, Value * * args, V
 
     auto [tree, input2] = input->fetchTree(state.store);
 
-    state.mkAttrs(v, 8);
-    auto storePath = state.store->printStorePath(tree.storePath);
-    mkString(*state.allocAttr(v, state.sOutPath), storePath, PathSet({storePath}));
-    if (input2->getRev()) {
-        mkString(*state.allocAttr(v, state.symbols.create("rev")), input2->getRev()->gitRev());
-        mkString(*state.allocAttr(v, state.symbols.create("shortRev")), input2->getRev()->gitShortRev());
-    }
-    if (tree.info.revCount)
-        mkInt(*state.allocAttr(v, state.symbols.create("revCount")), *tree.info.revCount);
-    v.attrs->sort();
-
     if (state.allowedPaths)
         state.allowedPaths->insert(tree.actualPath);
+
+    emitTreeAttrs(state, tree, input2, v);
 }
 
 static RegisterPrimOp r("fetchTree", 1, prim_fetchTree);

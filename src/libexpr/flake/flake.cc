@@ -6,10 +6,6 @@
 #include "fetchers/fetchers.hh"
 #include "finally.hh"
 
-#include <iostream>
-#include <ctime>
-#include <iomanip>
-
 namespace nix {
 
 using namespace flake;
@@ -158,7 +154,8 @@ static FlakeInput parseFlakeInput(EvalState & state,
                 if (attr.value->type == tString)
                     attrs.emplace(attr.name, attr.value->string.s);
                 else
-                    throw Error("unsupported attribute type");
+                    throw TypeError("flake input attribute '%s' is %s while a string is expected",
+                        attr.name, showType(*attr.value));
             }
         } catch (Error & e) {
             e.addPrefix(fmt("in flake attribute '%s' at '%s':\n", attr.name, *attr.pos));
@@ -621,143 +618,23 @@ LockedFlake lockFlake(
     return LockedFlake { .flake = std::move(flake), .lockFile = std::move(newLockFile) };
 }
 
-static void emitSourceInfoAttrs(
-    EvalState & state,
-    const FlakeRef & flakeRef,
-    const fetchers::Tree & sourceInfo,
-    Value & vAttrs)
-{
-    assert(state.store->isValidPath(sourceInfo.storePath));
-    auto pathS = state.store->printStorePath(sourceInfo.storePath);
-    mkString(*state.allocAttr(vAttrs, state.sOutPath), pathS, {pathS});
-
-    assert(sourceInfo.info.narHash);
-    mkString(*state.allocAttr(vAttrs, state.symbols.create("narHash")),
-        sourceInfo.info.narHash.to_string(SRI));
-
-    if (auto rev = flakeRef.input->getRev()) {
-        mkString(*state.allocAttr(vAttrs, state.symbols.create("rev")),
-            rev->gitRev());
-        mkString(*state.allocAttr(vAttrs, state.symbols.create("shortRev")),
-            rev->gitShortRev());
-    }
-
-    if (sourceInfo.info.revCount)
-        mkInt(*state.allocAttr(vAttrs, state.symbols.create("revCount")), *sourceInfo.info.revCount);
-
-    if (sourceInfo.info.lastModified)
-        mkString(*state.allocAttr(vAttrs, state.symbols.create("lastModified")),
-            fmt("%s", std::put_time(std::gmtime(&*sourceInfo.info.lastModified), "%Y%m%d%H%M%S")));
-}
-
-struct LazyInput
-{
-    bool isFlake;
-    LockedInput lockedInput;
-};
-
-/* Helper primop to make callFlake (below) fetch/call its inputs
-   lazily. Note that this primop cannot be called by user code since
-   it doesn't appear in 'builtins'. */
-static void prim_callFlake(EvalState & state, const Pos & pos, Value * * args, Value & v)
-{
-    auto lazyInput = (LazyInput *) args[0]->attrs;
-
-    if (lazyInput->isFlake) {
-        FlakeCache flakeCache;
-        auto flake = getFlake(state, lazyInput->lockedInput.lockedRef, lazyInput->lockedInput.info, false, flakeCache);
-
-        if (flake.sourceInfo->info.narHash != lazyInput->lockedInput.info.narHash)
-            throw Error("the content hash of flake '%s' (%s) doesn't match the hash recorded in the referring lock file (%s)",
-                lazyInput->lockedInput.lockedRef,
-                flake.sourceInfo->info.narHash.to_string(SRI),
-                lazyInput->lockedInput.info.narHash.to_string(SRI));
-
-        // FIXME: check all the other attributes in lockedInput.info
-        // once we've dropped support for lock file version 4.
-
-        assert(flake.sourceInfo->storePath == lazyInput->lockedInput.computeStorePath(*state.store));
-
-        callFlake(state, flake, lazyInput->lockedInput, v);
-    } else {
-        FlakeCache flakeCache;
-        auto [sourceInfo, lockedRef] = fetchOrSubstituteTree(
-            state, lazyInput->lockedInput.lockedRef, {}, false, flakeCache);
-
-        if (sourceInfo.info.narHash != lazyInput->lockedInput.info.narHash)
-            throw Error("the content hash of repository '%s' (%s) doesn't match the hash recorded in the referring lock file (%s)",
-                lazyInput->lockedInput.lockedRef,
-                sourceInfo.info.narHash.to_string(SRI),
-                lazyInput->lockedInput.info.narHash.to_string(SRI));
-
-        // FIXME: check all the other attributes in lockedInput.info
-        // once we've dropped support for lock file version 4.
-
-        assert(sourceInfo.storePath == lazyInput->lockedInput.computeStorePath(*state.store));
-
-        state.mkAttrs(v, 8);
-
-        assert(state.store->isValidPath(sourceInfo.storePath));
-
-        auto pathS = state.store->printStorePath(sourceInfo.storePath);
-
-        mkString(*state.allocAttr(v, state.sOutPath), pathS, {pathS});
-
-        emitSourceInfoAttrs(state, lockedRef, sourceInfo, v);
-
-        v.attrs->sort();
-    }
-}
-
 void callFlake(EvalState & state,
     const Flake & flake,
     const LockedInputs & lockedInputs,
-    Value & vResFinal)
+    Value & vRes)
 {
-    auto & vRes = *state.allocValue();
-    auto & vInputs = *state.allocValue();
+    auto vCallFlake = state.allocValue();
+    auto vLocks = state.allocValue();
+    auto vRootSrc = state.allocValue();
+    auto vTmp = state.allocValue();
 
-    state.mkAttrs(vInputs, flake.inputs.size() + 1);
+    mkString(*vLocks, lockedInputs.to_string());
 
-    for (auto & [inputId, input] : flake.inputs) {
-        auto vFlake = state.allocAttr(vInputs, inputId);
-        auto vPrimOp = state.allocValue();
-        static auto primOp = new PrimOp(prim_callFlake, 1, state.symbols.create("callFlake"));
-        vPrimOp->type = tPrimOp;
-        vPrimOp->primOp = primOp;
-        auto vArg = state.allocValue();
-        vArg->type = tNull;
-        auto lockedInput = lockedInputs.inputs.find(inputId);
-        assert(lockedInput != lockedInputs.inputs.end());
-        // FIXME: leak
-        vArg->attrs = (Bindings *) new LazyInput{input.isFlake, lockedInput->second};
-        mkApp(*vFlake, *vPrimOp, *vArg);
-    }
+    emitTreeAttrs(state, *flake.sourceInfo, flake.lockedRef.input, *vRootSrc);
 
-    auto & vSourceInfo = *state.allocValue();
-    state.mkAttrs(vSourceInfo, 8);
-    emitSourceInfoAttrs(state, flake.lockedRef, *flake.sourceInfo, vSourceInfo);
-    vSourceInfo.attrs->sort();
-
-    vInputs.attrs->push_back(Attr(state.sSelf, &vRes));
-
-    vInputs.attrs->sort();
-
-    /* For convenience, put the outputs directly in the result, so you
-       can refer to an output of an input as 'inputs.foo.bar' rather
-       than 'inputs.foo.outputs.bar'. */
-    auto vCall = *state.allocValue();
-    state.eval(state.parseExprFromString(
-            "outputsFun: inputs: sourceInfo: let outputs = outputsFun inputs; in "
-            "outputs // sourceInfo // { inherit inputs; inherit outputs; inherit sourceInfo; }", "/"), vCall);
-
-    auto vCall2 = *state.allocValue();
-    auto vCall3 = *state.allocValue();
-    state.callFunction(vCall, *flake.vOutputs, vCall2, noPos);
-    state.callFunction(vCall2, vInputs, vCall3, noPos);
-    state.callFunction(vCall3, vSourceInfo, vRes, noPos);
-
-    vResFinal = vRes;
+    state.evalFile(canonPath(settings.nixDataDir + "/nix/corepkgs/call-flake.nix", true), *vCallFlake);
+    state.callFunction(*vCallFlake, *vLocks, *vTmp, noPos);
+    state.callFunction(*vTmp, *vRootSrc, vRes, noPos);
 }
 
 void callFlake(EvalState & state,
@@ -767,7 +644,6 @@ void callFlake(EvalState & state,
     callFlake(state, lockedFlake.flake, lockedFlake.lockFile, v);
 }
 
-// This function is exposed to be used in nix files.
 static void prim_getFlake(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
     callFlake(state,

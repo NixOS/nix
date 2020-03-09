@@ -3,7 +3,8 @@ corepkgs_FILES = \
   unpack-channel.nix \
   derivation.nix \
   fetchurl.nix \
-  imported-drv-to-derivation.nix
+  imported-drv-to-derivation.nix \
+  call-flake.nix
 
 $(foreach file,config.nix $(corepkgs_FILES),$(eval $(call install-data-in,$(d)/$(file),$(datadir)/nix/corepkgs)))
 

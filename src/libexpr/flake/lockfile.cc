@@ -123,6 +123,11 @@ nlohmann::json LockedInputs::toJson() const
     return json;
 }
 
+std::string LockedInputs::to_string() const
+{
+    return toJson().dump(2);
+}
+
 bool LockedInputs::isImmutable() const
 {
     for (auto & i : inputs)
