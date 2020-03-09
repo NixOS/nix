@@ -39,9 +39,14 @@ struct LockedInput : LockedInputs
 {
     FlakeRef lockedRef, originalRef;
     TreeInfo info;
+    bool isFlake = true;
 
-    LockedInput(const FlakeRef & lockedRef, const FlakeRef & originalRef, const TreeInfo & info)
-        : lockedRef(lockedRef), originalRef(originalRef), info(info)
+    LockedInput(
+        const FlakeRef & lockedRef,
+        const FlakeRef & originalRef,
+        const TreeInfo & info,
+        bool isFlake = true)
+        : lockedRef(lockedRef), originalRef(originalRef), info(info), isFlake(isFlake)
     { }
 
     LockedInput(const nlohmann::json & json);
@@ -52,7 +57,8 @@ struct LockedInput : LockedInputs
             lockedRef == other.lockedRef
             && originalRef == other.originalRef
             && info == other.info
-            && inputs == other.inputs;
+            && inputs == other.inputs
+            && isFlake == other.isFlake;
     }
 
     nlohmann::json toJson() const;

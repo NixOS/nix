@@ -530,7 +530,7 @@ LockedFlake lockFlake(
                         auto [sourceInfo, lockedRef] = fetchOrSubstituteTree(
                             state, input.ref, {}, lockFlags.useRegistries, flakeCache);
                         newLocks.inputs.insert_or_assign(id,
-                            LockedInput(lockedRef, input.ref, sourceInfo.info));
+                            LockedInput(lockedRef, input.ref, sourceInfo.info, false));
                     }
                 }
             }
