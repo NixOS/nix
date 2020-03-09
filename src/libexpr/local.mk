@@ -8,7 +8,11 @@ libexpr_SOURCES := $(wildcard $(d)/*.cc) $(wildcard $(d)/primops/*.cc) $(d)/lexe
 
 libexpr_LIBS = libutil libstore libnixrust
 
+ifeq ($(CXX), g++)
+libexpr_LDFLAGS = -lstdc++fs
+else
 libexpr_LDFLAGS =
+endif
 
 ifneq ($(OS), FreeBSD)
  libexpr_LDFLAGS += -ldl
