@@ -102,7 +102,7 @@ SV * queryPathInfo(char * path, int base32)
     PPCODE:
         try {
             auto info = store()->queryPathInfo(store()->parseStorePath(path));
-            if (info->deriver)
+            if (!info->deriver)
                 XPUSHs(&PL_sv_undef);
             else
                 XPUSHs(sv_2mortal(newSVpv(store()->printStorePath(*info->deriver).c_str(), 0)));
