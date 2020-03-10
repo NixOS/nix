@@ -626,15 +626,20 @@ void callFlake(EvalState & state,
     auto vCallFlake = state.allocValue();
     auto vLocks = state.allocValue();
     auto vRootSrc = state.allocValue();
-    auto vTmp = state.allocValue();
+    auto vRootSubdir = state.allocValue();
+    auto vTmp1 = state.allocValue();
+    auto vTmp2 = state.allocValue();
 
     mkString(*vLocks, lockedInputs.to_string());
 
     emitTreeAttrs(state, *flake.sourceInfo, flake.lockedRef.input, *vRootSrc);
 
+    mkString(*vRootSubdir, flake.lockedRef.subdir);
+
     state.evalFile(canonPath(settings.nixDataDir + "/nix/corepkgs/call-flake.nix", true), *vCallFlake);
-    state.callFunction(*vCallFlake, *vLocks, *vTmp, noPos);
-    state.callFunction(*vTmp, *vRootSrc, vRes, noPos);
+    state.callFunction(*vCallFlake, *vLocks, *vTmp1, noPos);
+    state.callFunction(*vTmp1, *vRootSrc, *vTmp2, noPos);
+    state.callFunction(*vTmp2, *vRootSubdir, vRes, noPos);
 }
 
 void callFlake(EvalState & state,

@@ -1,14 +1,14 @@
-locks: rootSrc:
+locks: rootSrc: rootSubdir:
 
 let
 
-  callFlake = sourceInfo: locks:
+  callFlake = sourceInfo: subdir: locks:
     let
-      flake = import (sourceInfo + "/flake.nix");
+      flake = import (sourceInfo + "/" + subdir + "/flake.nix");
 
       inputs = builtins.mapAttrs (n: v:
         if v.flake or true
-        then callFlake (fetchTree v.locked) v.inputs
+        then callFlake (fetchTree (removeAttrs v.locked ["dir"])) (v.locked.dir or "") v.inputs
         else fetchTree v.locked) locks;
 
       outputs = flake.outputs (inputs // { self = result; });
@@ -19,4 +19,4 @@ let
 
       result;
 
-in callFlake rootSrc (builtins.fromJSON locks).inputs
+in callFlake rootSrc rootSubdir (builtins.fromJSON locks).inputs
