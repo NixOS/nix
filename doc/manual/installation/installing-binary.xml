@@ -142,7 +142,7 @@ sudo rm /Library/LaunchDaemons/org.nixos.nix-daemon.plist
   <para>
     NixOS.org hosts version-specific installation URLs for all Nix
     versions since 1.11.16, at
-    <literal>https://nixos.org/releases/nix/nix-VERSION/install</literal>.
+    <literal>https://releases.nixos.org/nix/nix-<replaceable>version</replaceable>/install</literal>.
   </para>
 
   <para>
