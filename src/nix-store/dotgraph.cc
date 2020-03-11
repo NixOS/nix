@@ -44,46 +44,6 @@ static string makeNode(const string & id, std::string_view label,
 }
 
 
-#if 0
-string pathLabel(const Path & nePath, const string & elemPath)
-{
-    return (string) nePath + "-" + elemPath;
-}
-
-
-void printClosure(const Path & nePath, const StoreExpr & fs)
-{
-    PathSet workList(fs.closure.roots);
-    PathSet doneSet;
-
-    for (PathSet::iterator i = workList.begin(); i != workList.end(); ++i) {
-        cout << makeEdge(pathLabel(nePath, *i), nePath);
-    }
-
-    while (!workList.empty()) {
-        Path path = *(workList.begin());
-        workList.erase(path);
-
-        if (doneSet.insert(path).second) {
-            ClosureElems::const_iterator elem = fs.closure.elems.find(path);
-            if (elem == fs.closure.elems.end())
-                throw Error(format("bad closure, missing path '%1%'") % path);
-
-            for (StringSet::const_iterator i = elem->second.refs.begin();
-                 i != elem->second.refs.end(); ++i)
-            {
-                workList.insert(*i);
-                cout << makeEdge(pathLabel(nePath, *i), pathLabel(nePath, path));
-            }
-
-            cout << makeNode(pathLabel(nePath, path),
-                symbolicName(path), "#ff0000");
-        }
-    }
-}
-#endif
-
-
 void printDotGraph(ref<Store> store, StorePathSet && roots)
 {
     StorePathSet workList(std::move(roots));
@@ -101,40 +61,9 @@ void printDotGraph(ref<Store> store, StorePathSet && roots)
         for (auto & p : store->queryPathInfo(path)->references) {
             if (p != path) {
                 workList.insert(p.clone());
-                cout << makeEdge(std::string(p.to_string()), std::string(p.to_string()));
+                cout << makeEdge(std::string(p.to_string()), std::string(path.to_string()));
             }
         }
-
-#if 0
-        StoreExpr ne = storeExprFromPath(path);
-
-        string label, colour;
-
-        if (ne.type == StoreExpr::neDerivation) {
-            for (PathSet::iterator i = ne.derivation.inputs.begin();
-                 i != ne.derivation.inputs.end(); ++i)
-            {
-                workList.insert(*i);
-                cout << makeEdge(*i, path);
-            }
-
-            label = "derivation";
-            colour = "#00ff00";
-            for (StringPairs::iterator i = ne.derivation.env.begin();
-                 i != ne.derivation.env.end(); ++i)
-                if (i->first == "name") label = i->second;
-        }
-
-        else if (ne.type == StoreExpr::neClosure) {
-            label = "<closure>";
-            colour = "#00ffff";
-            printClosure(path, ne);
-        }
-
-        else abort();
-
-        cout << makeNode(path, label, colour);
-#endif
     }
 
     cout << "}\n";
