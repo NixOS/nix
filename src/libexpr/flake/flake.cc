@@ -623,7 +623,6 @@ void callFlake(EvalState & state,
     const LockedInputs & lockedInputs,
     Value & vRes)
 {
-    auto vCallFlake = state.allocValue();
     auto vLocks = state.allocValue();
     auto vRootSrc = state.allocValue();
     auto vRootSubdir = state.allocValue();
@@ -636,7 +635,15 @@ void callFlake(EvalState & state,
 
     mkString(*vRootSubdir, flake.lockedRef.subdir);
 
-    state.evalFile(canonPath(settings.nixDataDir + "/nix/corepkgs/call-flake.nix", true), *vCallFlake);
+    static Value * vCallFlake = nullptr;
+
+    if (!vCallFlake) {
+        vCallFlake = state.allocValue();
+        state.eval(state.parseExprFromString(
+            #include "call-flake.nix.gen.hh"
+            , "/"), *vCallFlake);
+    }
+
     state.callFunction(*vCallFlake, *vLocks, *vTmp1, noPos);
     state.callFunction(*vTmp1, *vRootSrc, *vTmp2, noPos);
     state.callFunction(*vTmp2, *vRootSubdir, vRes, noPos);
