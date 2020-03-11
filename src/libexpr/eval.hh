@@ -146,8 +146,8 @@ public:
     Expr * parseExprFromFile(const Path & path, StaticEnv & staticEnv);
 
     /* Parse a Nix expression from the specified string. */
-    Expr * parseExprFromString(const string & s, const Path & basePath, StaticEnv & staticEnv);
-    Expr * parseExprFromString(const string & s, const Path & basePath);
+    Expr * parseExprFromString(std::string_view s, const Path & basePath, StaticEnv & staticEnv);
+    Expr * parseExprFromString(std::string_view s, const Path & basePath);
 
     Expr * parseStdin();
 

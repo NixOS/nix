@@ -122,10 +122,17 @@ static void prim_scopedImport(EvalState & state, const Pos & pos, Value * * args
             mkString(*(outputsVal->listElems()[outputs_index++]), o.first);
         }
         w.attrs->sort();
-        Value fun;
-        state.evalFile(settings.nixDataDir + "/nix/corepkgs/imported-drv-to-derivation.nix", fun);
-        state.forceFunction(fun, pos);
-        mkApp(v, fun, w);
+
+        static Value * fun = nullptr;
+        if (!fun) {
+            fun = state.allocValue();
+            state.eval(state.parseExprFromString(
+                #include "imported-drv-to-derivation.nix.gen.hh"
+                , "/"), *fun);
+        }
+
+        state.forceFunction(*fun, pos);
+        mkApp(v, *fun, w);
         state.forceAttrs(v, pos);
     } else {
         state.forceAttrs(*args[0]);

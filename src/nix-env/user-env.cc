@@ -106,7 +106,9 @@ bool createUserEnv(EvalState & state, DrvInfos & elems,
 
     /* Get the environment builder expression. */
     Value envBuilder;
-    state.evalFile(state.findFile("nix/buildenv.nix"), envBuilder);
+    state.eval(state.parseExprFromString(
+        #include "buildenv.nix.gen.hh"
+            , "/"), envBuilder);
 
     /* Construct a Nix expression that calls the user environment
        builder with the manifest as argument. */
