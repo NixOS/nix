@@ -25,6 +25,23 @@ echo world > $repo/hello
 git -C $repo commit -m 'Bla2' -a
 rev2=$(git -C $repo rev-parse HEAD)
 
+git -C $repo checkout -b my-branch
+echo universe > $repo/hello
+git -C $repo commit -m 'Bla3' -a
+rev3=$(git -C $repo rev-parse HEAD)
+
+git -C $repo checkout master
+
+# Fetch rev3 which is not an ancestor of HEAD without specifying a ref or setting `fetchRevInsteadOfRef = true` should fail.
+(! nix eval --raw "(builtins.fetchGit { url = file://$repo; rev = \"$rev3\"; }).outPath")
+
+# Fetch rev3 which is not an ancestor of HEAD without specifying a ref but setting `fetchRevInsteadOfRef = true`.
+path=$(nix eval --raw "(builtins.fetchGit { url = file://$repo; rev = \"$rev3\"; fetchRevInsteadOfRef = true; }).outPath")
+[[ $(cat $path/hello) = universe ]]
+
+# Fetching rev3 which is not an ancestor of HEAD should fail when specifying HEAD as ref.
+(! nix eval --raw "(builtins.fetchGit { url = file://$repo; rev = \"$rev3\"; ref = \"HEAD\"; })")
+
 # Fetch the default branch.
 path=$(nix eval --raw "(builtins.fetchGit file://$repo).outPath")
 [[ $(cat $path/hello) = world ]]

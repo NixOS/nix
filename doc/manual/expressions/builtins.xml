@@ -422,6 +422,28 @@ stdenv.mkDerivation { … }
             </para>
           </listitem>
         </varlistentry>
+        <varlistentry>
+          <term>fetchRevInsteadOfRef</term>
+          <listitem>
+            <para>
+              Defaults to <literal>false</literal>.
+            </para>
+
+            <para>
+              When set to <literal>true</literal> the specified
+              <varname>rev</varname> is fetched <emphasis>directly</emphasis>
+              instead of fetching the <varname>ref</varname> (which defaults to
+              <literal>HEAD</literal> when not specified). This is useful in
+              case a <varname>ref</varname> is not available.
+            </para>
+
+            <para>
+              Do note that git servers by default <link
+              xlink:href="https://www.git-scm.com/docs/git-config/2.25.1#Documentation/git-config.txt-uploadpackallowAnySHA1InWant">don't allow fetching revisions directly</link>
+              (GitHub does allow it).
+            </para>
+          </listitem>
+        </varlistentry>
       </variablelist>
 
       <example>

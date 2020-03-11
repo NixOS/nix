@@ -26,9 +26,80 @@ struct GitInfo
 
 std::regex revRegex("^[0-9a-fA-F]{40}$");
 
+void fetchRev(const Path cacheDir, const std::string & uri, std::string rev) {
+    Activity act(*logger, lvlTalkative, actUnknown, fmt("fetching '%s' of Git repository '%s'", rev, uri));
+
+    // FIXME: git stderr messes up our progress indicator, so
+    // we're using --quiet for now. Should process its stderr.
+    runProgram("git", true, { "-C", cacheDir, "fetch", "--quiet", "--", uri, rev });
+}
+
+void fetchRef(const Path cacheDir, const std::string & uri, std::string ref, time_t now, Path localRefFile) {
+    Activity act(*logger, lvlTalkative, actUnknown, fmt("fetching '%s' of Git repository '%s'", ref, uri));
+
+    // FIXME: git stderr messes up our progress indicator, so
+    // we're using --quiet for now. Should process its stderr.
+    runProgram("git", true, { "-C", cacheDir, "fetch", "--quiet", "--force", "--", uri, fmt("%s:%s", ref, ref) });
+
+    struct timeval times[2];
+    times[0].tv_sec = now;
+    times[0].tv_usec = 0;
+    times[1].tv_sec = now;
+    times[1].tv_usec = 0;
+
+    utimes(localRefFile.c_str(), times);
+}
+
+bool isAncestor(const Path cacheDir, std::string rev1, std::string rev2) {
+    try {
+        runProgram("git", true, { "-C", cacheDir, "merge-base", "--is-ancestor", rev1, rev2});
+        return true;
+    } catch (ExecError & e) {
+        if (WIFEXITED(e.status)) {
+            return false;
+        }
+        else {
+            throw;
+        }
+    }
+}
+
+void checkAncestor(const Path cacheDir, const std::string & uri, std::string rev, std::string ref) {
+    time_t now = time(0);
+
+    Path localRefFile;
+    if (ref.compare(0, 5, "refs/") == 0)
+        localRefFile = cacheDir + "/" + ref;
+    else
+        localRefFile = cacheDir + "/refs/heads/" + ref;
+
+    struct stat st;
+    if (stat(localRefFile.c_str(), &st) == 0 &&
+        isAncestor(cacheDir, rev, chomp(readFile(localRefFile)))) return;
+
+    fetchRef(cacheDir, uri, ref, now, localRefFile);
+    std::string refRev = chomp(readFile(localRefFile));
+    if (!isAncestor(cacheDir, rev, refRev)) {
+        throw Error("The specified rev '%s' is not an ancestor of the specified ref '%s' with revision '%s'", rev, ref, refRev);
+    }
+}
+
+bool revInCache(const Path cacheDir, std::string rev) {
+    try {
+        runProgram("git", true, { "-C", cacheDir, "cat-file", "-e", rev });
+        return true;
+    } catch (ExecError & e) {
+        if (WIFEXITED(e.status)) {
+            return false;
+        } else {
+            throw;
+        }
+    }
+}
+
 GitInfo exportGit(ref<Store> store, const std::string & uri,
     std::optional<std::string> ref, std::string rev,
-    const std::string & name)
+    const std::string & name, bool fetchRevInsteadOfRef)
 {
     if (evalSettings.pureEval && rev == "")
         throw Error("in pure evaluation mode, 'fetchGit' requires a Git revision");
@@ -79,8 +150,6 @@ GitInfo exportGit(ref<Store> store, const std::string & uri,
         ref = "HEAD"s;
     }
 
-    if (!ref) ref = "HEAD"s;
-
     if (rev != "" && !std::regex_match(rev, revRegex))
         throw Error("invalid Git revision '%s'", rev);
 
@@ -93,54 +162,66 @@ GitInfo exportGit(ref<Store> store, const std::string & uri,
         runProgram("git", true, { "init", "--bare", cacheDir });
     }
 
-    Path localRefFile;
-    if (ref->compare(0, 5, "refs/") == 0)
-        localRefFile = cacheDir + "/" + *ref;
-    else
-        localRefFile = cacheDir + "/refs/heads/" + *ref;
+    if (rev.empty()) {
+        std::string fetchedRef = ref ? *ref : "HEAD";
 
-    bool doFetch;
-    time_t now = time(0);
-    /* If a rev was specified, we need to fetch if it's not in the
-       repo. */
-    if (rev != "") {
-        try {
-            runProgram("git", true, { "-C", cacheDir, "cat-file", "-e", rev });
-            doFetch = false;
-        } catch (ExecError & e) {
-            if (WIFEXITED(e.status)) {
-                doFetch = true;
+        time_t now = time(0);
+
+        Path localRefFile;
+        if (fetchedRef.compare(0, 5, "refs/") == 0)
+            localRefFile = cacheDir + "/" + fetchedRef;
+        else
+            localRefFile = cacheDir + "/refs/heads/" + fetchedRef;
+
+        struct stat st;
+        if (stat(localRefFile.c_str(), &st) != 0 ||
+            (uint64_t) st.st_mtime + settings.tarballTtl <= (uint64_t) now) {
+            fetchRef(cacheDir, uri, fetchedRef, now, localRefFile);
+        }
+        rev = chomp(readFile(localRefFile));
+    } else {
+        if (revInCache(cacheDir, rev)) {
+            if (ref) { checkAncestor(cacheDir, uri, rev, *ref); }
+        } else {
+            if (fetchRevInsteadOfRef) {
+                fetchRev(cacheDir, uri, rev);
+                if (ref) { checkAncestor(cacheDir, uri, rev, *ref); }
             } else {
-                throw;
+                std::string fetchedRef = ref ? *ref : "HEAD";
+
+                time_t now = time(0);
+
+                Path localRefFile;
+                if (fetchedRef.compare(0, 5, "refs/") == 0)
+                    localRefFile = cacheDir + "/" + fetchedRef;
+                else
+                    localRefFile = cacheDir + "/refs/heads/" + fetchedRef;
+
+                fetchRef(cacheDir, uri, fetchedRef, now, localRefFile);
+                std::string refRev = chomp(readFile(localRefFile));
+
+                if (!isAncestor(cacheDir, rev, refRev)) {
+                    throw Error(
+                        "The specified rev '%s' "
+                        "is not an ancestor of ref '%s' "
+                        "with revision '%s'. %s",
+                        rev, fetchedRef, refRev,
+                        ref ? "" :
+                          "Note that 'ref' defaults to 'HEAD' when not specified. "
+                          "So either set a correct 'ref' "
+                          "or set 'fetchRevInsteadOfRef = true;' "
+                          "to directly fetch the specified 'rev' "
+                          "(which might be denied by git servers "
+                          "which have the config option "
+                          "'uploadpack.allowAnySHA1InWant' set to 'false')."
+                        );
+                }
             }
         }
-    } else {
-        /* If the local ref is older than ‘tarball-ttl’ seconds, do a
-           git fetch to update the local ref to the remote ref. */
-        struct stat st;
-        doFetch = stat(localRefFile.c_str(), &st) != 0 ||
-            (uint64_t) st.st_mtime + settings.tarballTtl <= (uint64_t) now;
-    }
-    if (doFetch)
-    {
-        Activity act(*logger, lvlTalkative, actUnknown, fmt("fetching Git repository '%s'", uri));
-
-        // FIXME: git stderr messes up our progress indicator, so
-        // we're using --quiet for now. Should process its stderr.
-        runProgram("git", true, { "-C", cacheDir, "fetch", "--quiet", "--force", "--", uri, fmt("%s:%s", *ref, *ref) });
-
-        struct timeval times[2];
-        times[0].tv_sec = now;
-        times[0].tv_usec = 0;
-        times[1].tv_sec = now;
-        times[1].tv_usec = 0;
-
-        utimes(localRefFile.c_str(), times);
     }
 
-    // FIXME: check whether rev is an ancestor of ref.
     GitInfo gitInfo;
-    gitInfo.rev = rev != "" ? rev : chomp(readFile(localRefFile));
+    gitInfo.rev = rev;
     gitInfo.shortRev = std::string(gitInfo.rev, 0, 7);
 
     printTalkative("using revision %s of repo '%s'", gitInfo.rev, uri);
@@ -198,6 +279,7 @@ static void prim_fetchGit(EvalState & state, const Pos & pos, Value * * args, Va
     std::optional<std::string> ref;
     std::string rev;
     std::string name = "source";
+    bool fetchRevInsteadOfRef = false;
     PathSet context;
 
     state.forceValue(*args[0]);
@@ -216,6 +298,8 @@ static void prim_fetchGit(EvalState & state, const Pos & pos, Value * * args, Va
                 rev = state.forceStringNoCtx(*attr.value, *attr.pos);
             else if (n == "name")
                 name = state.forceStringNoCtx(*attr.value, *attr.pos);
+            else if (n == "fetchRevInsteadOfRef")
+                fetchRevInsteadOfRef = state.forceBool(*attr.value, *attr.pos);
             else
                 throw EvalError("unsupported argument '%s' to 'fetchGit', at %s", attr.name, *attr.pos);
         }
@@ -230,7 +314,7 @@ static void prim_fetchGit(EvalState & state, const Pos & pos, Value * * args, Va
     // whitelist. Ah well.
     state.checkURI(url);
 
-    auto gitInfo = exportGit(state.store, url, ref, rev, name);
+    auto gitInfo = exportGit(state.store, url, ref, rev, name, fetchRevInsteadOfRef);
 
     state.mkAttrs(v, 8);
     mkString(*state.allocAttr(v, state.sOutPath), gitInfo.storePath, PathSet({gitInfo.storePath}));
