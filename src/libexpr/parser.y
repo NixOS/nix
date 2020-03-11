@@ -611,13 +611,13 @@ Expr * EvalState::parseExprFromFile(const Path & path, StaticEnv & staticEnv)
 }
 
 
-Expr * EvalState::parseExprFromString(const string & s, const Path & basePath, StaticEnv & staticEnv)
+Expr * EvalState::parseExprFromString(std::string_view s, const Path & basePath, StaticEnv & staticEnv)
 {
-    return parse(s.c_str(), "(string)", basePath, staticEnv);
+    return parse(s.data(), "(string)", basePath, staticEnv);
 }
 
 
-Expr * EvalState::parseExprFromString(const string & s, const Path & basePath)
+Expr * EvalState::parseExprFromString(std::string_view s, const Path & basePath)
 {
     return parseExprFromString(s, basePath, staticBaseEnv);
 }
