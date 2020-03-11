@@ -30,7 +30,7 @@ case "$(uname -s).$(uname -m)" in
     *) oops "sorry, there is no binary distribution of Nix for your platform";;
 esac
 
-url="https://nixos.org/releases/nix/nix-@nixVersion@/nix-@nixVersion@-$system.tar.xz"
+url="https://releases.nixos.org/nix/nix-@nixVersion@/nix-@nixVersion@-$system.tar.xz"
 
 tarball="$tmpDir/$(basename "$tmpDir/nix-@nixVersion@-$system.tar.xz")"
 
