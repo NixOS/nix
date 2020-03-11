@@ -23,3 +23,5 @@ $(foreach name, \
   nix-build nix-channel nix-collect-garbage nix-copy-closure nix-daemon nix-env nix-hash nix-instantiate nix-prefetch-url nix-shell nix-store, \
   $(eval $(call install-symlink, nix, $(bindir)/$(name))))
 $(eval $(call install-symlink, $(bindir)/nix, $(libexecdir)/nix/build-remote))
+
+src/nix-env/nix-env.cc: src/nix-env/buildenv.nix.gen.hh

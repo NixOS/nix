@@ -1,4 +1,7 @@
-corepkgs_FILES = buildenv.nix unpack-channel.nix derivation.nix fetchurl.nix imported-drv-to-derivation.nix
+corepkgs_FILES = \
+  unpack-channel.nix \
+  derivation.nix \
+  fetchurl.nix
 
 $(foreach file,config.nix $(corepkgs_FILES),$(eval $(call install-data-in,$(d)/$(file),$(datadir)/nix/corepkgs)))
 
