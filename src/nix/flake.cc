@@ -199,24 +199,25 @@ struct CmdFlakeListInputs : FlakeCommand, MixJSON
         stopProgressBar();
 
         if (json)
-            std::cout << ((LockedInputs &) flake.lockFile).toJson() << "\n";
+            std::cout << flake.lockFile.toJson() << "\n";
         else {
             std::cout << fmt("%s\n", flake.flake.lockedRef);
 
-            std::function<void(const LockedInputs & inputs, const std::string & prefix)> recurse;
+            std::function<void(const Node & node, const std::string & prefix)> recurse;
 
-            recurse = [&](const LockedInputs & inputs, const std::string & prefix)
+            recurse = [&](const Node & node, const std::string & prefix)
             {
-                for (const auto & [i, input] : enumerate(inputs.inputs)) {
+                for (const auto & [i, input] : enumerate(node.inputs)) {
                     //auto tree2 = tree.child(i + 1 == inputs.inputs.size());
-                    bool last = i + 1 == inputs.inputs.size();
+                    bool last = i + 1 == node.inputs.size();
                     std::cout << fmt("%s" ANSI_BOLD "%s" ANSI_NORMAL ": %s\n",
-                        prefix + (last ? treeLast : treeConn), input.first, input.second.lockedRef);
-                    recurse(input.second, prefix + (last ? treeNull : treeLine));
+                        prefix + (last ? treeLast : treeConn), input.first,
+                        std::dynamic_pointer_cast<const LockedNode>(input.second)->lockedRef);
+                    recurse(*input.second, prefix + (last ? treeNull : treeLine));
                 }
             };
 
-            recurse(flake.lockFile, "");
+            recurse(*flake.lockFile.root, "");
         }
     }
 };
@@ -664,23 +665,26 @@ struct CmdFlakeArchive : FlakeCommand, MixJSON, MixDryRun
         if (jsonRoot)
             jsonRoot->attr("path", store->printStorePath(flake.flake.sourceInfo->storePath));
 
-        std::function<void(const LockedInputs & inputs, std::optional<JSONObject> & jsonObj)> traverse;
-        traverse = [&](const LockedInputs & inputs, std::optional<JSONObject> & jsonObj)
+        // FIXME: use graph output, handle cycles.
+        std::function<void(const Node & node, std::optional<JSONObject> & jsonObj)> traverse;
+        traverse = [&](const Node & node, std::optional<JSONObject> & jsonObj)
         {
             auto jsonObj2 = jsonObj ? jsonObj->object("inputs") : std::optional<JSONObject>();
-            for (auto & input : inputs.inputs) {
+            for (auto & input : node.inputs) {
+                auto lockedInput = std::dynamic_pointer_cast<const LockedNode>(input.second);
+                assert(lockedInput);
                 auto jsonObj3 = jsonObj2 ? jsonObj2->object(input.first) : std::optional<JSONObject>();
                 if (!dryRun)
-                    input.second.lockedRef.input->fetchTree(store);
-                auto storePath = input.second.computeStorePath(*store);
+                    lockedInput->lockedRef.input->fetchTree(store);
+                auto storePath = lockedInput->computeStorePath(*store);
                 if (jsonObj3)
                     jsonObj3->attr("path", store->printStorePath(storePath));
                 sources.insert(std::move(storePath));
-                traverse(input.second, jsonObj3);
+                traverse(*lockedInput, jsonObj3);
             }
         };
 
-        traverse(flake.lockFile, jsonRoot);
+        traverse(*flake.lockFile.root, jsonRoot);
 
         if (!dryRun && !dstUri.empty()) {
             ref<Store> dstStore = dstUri.empty() ? openStore() : openStore(dstUri);

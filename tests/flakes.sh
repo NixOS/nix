@@ -517,7 +517,7 @@ cat > $flake3Dir/flake.nix <<EOF
 EOF
 
 nix flake update $flake3Dir
-[[ $(jq .inputs.foo.locked $flake3Dir/flake.lock) = $(jq .inputs.bar.locked $flake3Dir/flake.lock) ]]
+[[ $(jq .nodes.foo.locked $flake3Dir/flake.lock) = $(jq .nodes.bar.locked $flake3Dir/flake.lock) ]]
 
 cat > $flake3Dir/flake.nix <<EOF
 {
@@ -531,7 +531,7 @@ cat > $flake3Dir/flake.nix <<EOF
 EOF
 
 nix flake update $flake3Dir
-[[ $(jq .inputs.bar.locked.url $flake3Dir/flake.lock) =~ flake1 ]]
+[[ $(jq .nodes.bar.locked.url $flake3Dir/flake.lock) =~ flake1 ]]
 
 cat > $flake3Dir/flake.nix <<EOF
 {
@@ -545,7 +545,7 @@ cat > $flake3Dir/flake.nix <<EOF
 EOF
 
 nix flake update $flake3Dir
-[[ $(jq .inputs.bar.locked.url $flake3Dir/flake.lock) =~ flake2 ]]
+[[ $(jq .nodes.bar.locked.url $flake3Dir/flake.lock) =~ flake2 ]]
 
 # Test overriding inputs of inputs.
 cat > $flake3Dir/flake.nix <<EOF
@@ -563,7 +563,7 @@ cat > $flake3Dir/flake.nix <<EOF
 EOF
 
 nix flake update $flake3Dir
-[[ $(jq .inputs.flake2.inputs.flake1.locked.url $flake3Dir/flake.lock) =~ flake7 ]]
+[[ $(jq .nodes.flake1.locked.url $flake3Dir/flake.lock) =~ flake7 ]]
 
 cat > $flake3Dir/flake.nix <<EOF
 {
@@ -578,7 +578,7 @@ cat > $flake3Dir/flake.nix <<EOF
 EOF
 
 nix flake update $flake3Dir --recreate-lock-file
-[[ $(jq .inputs.flake2.inputs.flake1.locked.url $flake3Dir/flake.lock) =~ flake7 ]]
+[[ $(jq .nodes.flake1.locked.url $flake3Dir/flake.lock) =~ flake7 ]]
 
 # Test Mercurial flakes.
 rm -rf $flake5Dir
@@ -636,21 +636,21 @@ nix build -o $TEST_ROOT/result "file://$TEST_ROOT/flake.tar.gz?narHash=sha256-qQ
 
 # Test --override-input.
 git -C $flake3Dir reset --hard
-nix flake update $flake3Dir --override-input flake2/flake1 flake5
-[[ $(jq .inputs.flake2.inputs.flake1.locked.url $flake3Dir/flake.lock) =~ flake5 ]]
+nix flake update $flake3Dir --override-input flake2/flake1 flake5 -vvvvv
+[[ $(jq .nodes.flake1_2.locked.url $flake3Dir/flake.lock) =~ flake5 ]]
 
 nix flake update $flake3Dir --override-input flake2/flake1 flake1
-[[ $(jq -r .inputs.flake2.inputs.flake1.locked.rev $flake3Dir/flake.lock) =~ $hash2 ]]
+[[ $(jq -r .nodes.flake1_2.locked.rev $flake3Dir/flake.lock) =~ $hash2 ]]
 
 nix flake update $flake3Dir --override-input flake2/flake1 flake1/master/$hash1
-[[ $(jq -r .inputs.flake2.inputs.flake1.locked.rev $flake3Dir/flake.lock) =~ $hash1 ]]
+[[ $(jq -r .nodes.flake1_2.locked.rev $flake3Dir/flake.lock) =~ $hash1 ]]
 
 # Test --update-input.
 nix flake update $flake3Dir
-[[ $(jq -r .inputs.flake2.inputs.flake1.locked.rev $flake3Dir/flake.lock) = $hash1 ]]
+[[ $(jq -r .nodes.flake1_2.locked.rev $flake3Dir/flake.lock) = $hash1 ]]
 
 nix flake update $flake3Dir --update-input flake2/flake1
-[[ $(jq -r .inputs.flake2.inputs.flake1.locked.rev $flake3Dir/flake.lock) =~ $hash2 ]]
+[[ $(jq -r .nodes.flake1_2.locked.rev $flake3Dir/flake.lock) =~ $hash2 ]]
 
 # Test 'nix flake list-inputs'.
 [[ $(nix flake list-inputs $flake3Dir | wc -l) == 5 ]]

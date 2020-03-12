@@ -67,9 +67,8 @@ static TreeInfo parseTreeInfo(const nlohmann::json & json)
     throw Error("attribute 'info' missing in lock file");
 }
 
-LockedInput::LockedInput(const nlohmann::json & json)
-    : LockedInputs(json)
-    , lockedRef(getFlakeRef(json, "url", "uri", "locked"))
+LockedNode::LockedNode(const nlohmann::json & json)
+    : lockedRef(getFlakeRef(json, "url", "uri", "locked"))
     , originalRef(getFlakeRef(json, "originalUrl", "originalUri", "original"))
     , info(parseTreeInfo(json))
     , isFlake(json.find("flake") != json.end() ? (bool) json["flake"] : true)
@@ -90,103 +89,139 @@ static nlohmann::json treeInfoToJson(const TreeInfo & info)
     return json;
 }
 
-nlohmann::json LockedInput::toJson() const
-{
-    auto json = LockedInputs::toJson();
-    json["original"] = fetchers::attrsToJson(originalRef.toAttrs());
-    json["locked"] = fetchers::attrsToJson(lockedRef.toAttrs());
-    json["info"] = treeInfoToJson(info);
-    if (!isFlake) json["flake"] = false;
-    return json;
-}
-
-StorePath LockedInput::computeStorePath(Store & store) const
+StorePath LockedNode::computeStorePath(Store & store) const
 {
     return info.computeStorePath(store);
 }
 
-LockedInputs::LockedInputs(const nlohmann::json & json)
-{
-    for (auto & i : json["inputs"].items())
-        inputs.insert_or_assign(i.key(), LockedInput(i.value()));
-}
-
-nlohmann::json LockedInputs::toJson() const
-{
-    nlohmann::json json;
-    {
-        auto j = nlohmann::json::object();
-        for (auto & i : inputs)
-            j[i.first] = i.second.toJson();
-        json["inputs"] = std::move(j);
-    }
-    return json;
-}
-
-std::string LockedInputs::to_string() const
-{
-    return toJson().dump(2);
-}
-
-bool LockedInputs::isImmutable() const
-{
-    for (auto & i : inputs)
-        if (!i.second.lockedRef.input->isImmutable() || !i.second.isImmutable()) return false;
-
-    return true;
-}
-
-std::optional<LockedInput *> LockedInputs::findInput(const InputPath & path)
+std::shared_ptr<Node> Node::findInput(const InputPath & path)
 {
     assert(!path.empty());
 
-    LockedInputs * pos = this;
+    auto pos = shared_from_this();
 
     for (auto & elem : path) {
         auto i = pos->inputs.find(elem);
         if (i == pos->inputs.end())
             return {};
-        pos = &i->second;
+        pos = i->second;
     }
 
-    return (LockedInput *) pos;
+    return pos;
 }
 
-void LockedInputs::removeInput(const InputPath & path)
+LockFile::LockFile(const nlohmann::json & json, const Path & path)
 {
-    assert(!path.empty());
+    auto version = json.value("version", 0);
+    if (version < 3 || version > 5)
+        throw Error("lock file '%s' has unsupported version %d", path, version);
 
-    LockedInputs * pos = this;
+    if (version < 5) {
+        std::function<void(Node & node, const nlohmann::json & json)> getInputs;
 
-    for (size_t n = 0; n < path.size(); n++) {
-        auto i = pos->inputs.find(path[n]);
-        if (i == pos->inputs.end()) return;
-        if (n + 1 == path.size())
-            pos->inputs.erase(i);
-        else
-            pos = &i->second;
+        getInputs = [&](Node & node, const nlohmann::json & json)
+        {
+            for (auto & i : json["inputs"].items()) {
+                auto input = std::make_shared<LockedNode>(i.value());
+                getInputs(*input, i.value());
+                node.inputs.insert_or_assign(i.key(), input);
+            }
+        };
+
+        getInputs(*root, json);
+    }
+
+    else {
+        std::unordered_map<std::string, std::shared_ptr<Node>> nodeMap;
+
+        std::function<void(Node & node, const nlohmann::json & jsonNode)> getInputs;
+
+        getInputs = [&](Node & node, const nlohmann::json & jsonNode)
+        {
+            if (jsonNode.find("inputs") == jsonNode.end()) return;
+            for (auto & i : jsonNode["inputs"].items()) {
+                std::string inputKey = i.value();
+                auto k = nodeMap.find(inputKey);
+                if (k == nodeMap.end()) {
+                    auto jsonNode2 = json["nodes"][inputKey];
+                    auto input = std::make_shared<LockedNode>(jsonNode2);
+                    k = nodeMap.insert_or_assign(inputKey, input).first;
+                    getInputs(*input, jsonNode2);
+                }
+                node.inputs.insert_or_assign(i.key(), k->second);
+            }
+        };
+
+        std::string rootKey = json["root"];
+        nodeMap.insert_or_assign(rootKey, root);
+        getInputs(*root, json["nodes"][rootKey]);
     }
 }
 
 nlohmann::json LockFile::toJson() const
 {
-    auto json = LockedInputs::toJson();
-    json["version"] = 4;
+    nlohmann::json nodes;
+    std::unordered_map<std::shared_ptr<const Node>, std::string> nodeKeys;
+    std::unordered_set<std::string> keys;
+
+    std::function<std::string(const std::string & key, std::shared_ptr<const Node> node)> dumpNode;
+
+    dumpNode = [&](std::string key, std::shared_ptr<const Node> node) -> std::string
+    {
+        auto k = nodeKeys.find(node);
+        if (k != nodeKeys.end())
+            return k->second;
+
+        if (!keys.insert(key).second) {
+            for (int n = 2; ; ++n) {
+                auto k = fmt("%s_%d", key, n);
+                if (keys.insert(k).second) {
+                    key = k;
+                    break;
+                }
+            }
+        }
+
+        nodeKeys.insert_or_assign(node, key);
+
+        auto n = nlohmann::json::object();
+
+        if (!node->inputs.empty()) {
+            auto inputs = nlohmann::json::object();
+            for (auto & i : node->inputs)
+                inputs[i.first] = dumpNode(i.first, i.second);
+            n["inputs"] = std::move(inputs);
+        }
+
+        if (auto lockedNode = std::dynamic_pointer_cast<const LockedNode>(node)) {
+            n["original"] = fetchers::attrsToJson(lockedNode->originalRef.toAttrs());
+            n["locked"] = fetchers::attrsToJson(lockedNode->lockedRef.toAttrs());
+            n["info"] = treeInfoToJson(lockedNode->info);
+            if (!lockedNode->isFlake) n["flake"] = false;
+        }
+
+        nodes[key] = std::move(n);
+
+        return key;
+    };
+
+    nlohmann::json json;
+    json["version"] = 5;
+    json["root"] = dumpNode("root", root);
+    json["nodes"] = std::move(nodes);
+
     return json;
+}
+
+std::string LockFile::to_string() const
+{
+    return toJson().dump(2);
 }
 
 LockFile LockFile::read(const Path & path)
 {
-    if (pathExists(path)) {
-        auto json = nlohmann::json::parse(readFile(path));
-
-        auto version = json.value("version", 0);
-        if (version != 3 && version != 4)
-            throw Error("lock file '%s' has unsupported version %d", path, version);
-
-        return LockFile(json);
-    } else
-        return LockFile();
+    if (!pathExists(path)) return LockFile();
+    return LockFile(nlohmann::json::parse(readFile(path)), path);
 }
 
 std::ostream & operator <<(std::ostream & stream, const LockFile & lockFile)
@@ -199,6 +234,35 @@ void LockFile::write(const Path & path) const
 {
     createDirs(dirOf(path));
     writeFile(path, fmt("%s\n", *this));
+}
+
+bool LockFile::isImmutable() const
+{
+    std::unordered_set<std::shared_ptr<const Node>> nodes;
+
+    std::function<void(std::shared_ptr<const Node> node)> visit;
+
+    visit = [&](std::shared_ptr<const Node> node)
+    {
+        if (!nodes.insert(node).second) return;
+        for (auto & i : node->inputs) visit(i.second);
+    };
+
+    visit(root);
+
+    for (auto & i : nodes) {
+        if (i == root) continue;
+        auto lockedNode = std::dynamic_pointer_cast<const LockedNode>(i);
+        if (lockedNode && !lockedNode->lockedRef.input->isImmutable()) return false;
+    }
+
+    return true;
+}
+
+bool LockFile::operator ==(const LockFile & other) const
+{
+    // FIXME: slow
+    return toJson() == other.toJson();
 }
 
 InputPath parseInputPath(std::string_view s)
@@ -215,6 +279,54 @@ InputPath parseInputPath(std::string_view s)
         throw Error("flake input path is empty");
 
     return path;
+}
+
+static void flattenLockFile(
+    std::shared_ptr<const Node> node,
+    const InputPath & prefix,
+    std::map<InputPath, std::shared_ptr<const LockedNode>> & res)
+{
+    // FIXME: handle cycles
+    for (auto &[id, input] : node->inputs) {
+        auto inputPath(prefix);
+        inputPath.push_back(id);
+        if (auto lockedInput = std::dynamic_pointer_cast<const LockedNode>(input))
+            res.emplace(inputPath, lockedInput);
+        flattenLockFile(input, inputPath, res);
+    }
+}
+
+std::string diffLockFiles(const LockFile & oldLocks, const LockFile & newLocks)
+{
+    std::map<InputPath, std::shared_ptr<const LockedNode>> oldFlat, newFlat;
+    flattenLockFile(oldLocks.root, {}, oldFlat);
+    flattenLockFile(newLocks.root, {}, newFlat);
+
+    auto i = oldFlat.begin();
+    auto j = newFlat.begin();
+    std::string res;
+
+    while (i != oldFlat.end() || j != newFlat.end()) {
+        if (j != newFlat.end() && (i == oldFlat.end() || i->first > j->first)) {
+            res += fmt("* Added '%s': '%s'\n", concatStringsSep("/", j->first), j->second->lockedRef);
+            ++j;
+        } else if (i != oldFlat.end() && (j == newFlat.end() || i->first < j->first)) {
+            res += fmt("* Removed '%s'\n", concatStringsSep("/", i->first));
+            ++i;
+        } else {
+            if (!(i->second->lockedRef == j->second->lockedRef)) {
+                assert(i->second->lockedRef.to_string() != j->second->lockedRef.to_string());
+                res += fmt("* Updated '%s': '%s' -> '%s'\n",
+                    concatStringsSep("/", i->first),
+                    i->second->lockedRef,
+                    j->second->lockedRef);
+            }
+            ++i;
+            ++j;
+        }
+    }
+
+    return res;
 }
 
 }

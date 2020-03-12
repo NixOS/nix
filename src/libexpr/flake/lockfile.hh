@@ -15,35 +15,26 @@ using namespace fetchers;
 
 typedef std::vector<FlakeId> InputPath;
 
-struct LockedInput;
-
-/* Lock file information about the dependencies of a flake. */
-struct LockedInputs
+/* A node in the lock file. It has outgoing edges to other nodes (its
+   inputs). Only the root node has this type; all other nodes have
+   type LockedNode. */
+struct Node : std::enable_shared_from_this<Node>
 {
-    std::map<FlakeId, LockedInput> inputs;
+    std::map<FlakeId, std::shared_ptr<Node>> inputs;
 
-    LockedInputs() {};
-    LockedInputs(const nlohmann::json & json);
+    virtual ~Node() { }
 
-    nlohmann::json toJson() const;
-
-    std::string to_string() const;
-
-    bool isImmutable() const;
-
-    std::optional<LockedInput *> findInput(const InputPath & path);
-
-    void removeInput(const InputPath & path);
+    std::shared_ptr<Node> findInput(const InputPath & path);
 };
 
-/* Lock file information about a flake input. */
-struct LockedInput : LockedInputs
+/* A non-root node in the lock file. */
+struct LockedNode : Node
 {
     FlakeRef lockedRef, originalRef;
     TreeInfo info;
     bool isFlake = true;
 
-    LockedInput(
+    LockedNode(
         const FlakeRef & lockedRef,
         const FlakeRef & originalRef,
         const TreeInfo & info,
@@ -51,51 +42,36 @@ struct LockedInput : LockedInputs
         : lockedRef(lockedRef), originalRef(originalRef), info(info), isFlake(isFlake)
     { }
 
-    LockedInput(const nlohmann::json & json);
-
-    bool operator ==(const LockedInput & other) const
-    {
-        return
-            lockedRef == other.lockedRef
-            && originalRef == other.originalRef
-            && info == other.info
-            && inputs == other.inputs
-            && isFlake == other.isFlake;
-    }
-
-    nlohmann::json toJson() const;
+    LockedNode(const nlohmann::json & json);
 
     StorePath computeStorePath(Store & store) const;
 };
 
-/* An entire lock file. Note that this cannot be a FlakeInput for the
-   top-level flake, because then the lock file would need to contain
-   the hash of the top-level flake, but committing the lock file
-   would invalidate that hash. */
-struct LockFile : LockedInputs
+struct LockFile
 {
-    bool operator ==(const LockFile & other) const
-    {
-        return inputs == other.inputs;
-    }
+    std::shared_ptr<Node> root = std::make_shared<Node>();
 
-    LockFile() {}
-    LockFile(const nlohmann::json & json) : LockedInputs(json) {}
-    LockFile(LockedInput && dep)
-    {
-        inputs = std::move(dep.inputs);
-    }
+    LockFile() {};
+    LockFile(const nlohmann::json & json, const Path & path);
 
     nlohmann::json toJson() const;
+
+    std::string to_string() const;
 
     static LockFile read(const Path & path);
 
     void write(const Path & path) const;
+
+    bool isImmutable() const;
+
+    bool operator ==(const LockFile & other) const;
 };
 
 std::ostream & operator <<(std::ostream & stream, const LockFile & lockFile);
 
 InputPath parseInputPath(std::string_view s);
+
+std::string diffLockFiles(const LockFile & oldLocks, const LockFile & newLocks);
 
 }
 

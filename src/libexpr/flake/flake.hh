@@ -96,13 +96,7 @@ LockedFlake lockFlake(
 
 void callFlake(
     EvalState & state,
-    const Flake & flake,
-    const LockedInputs & inputs,
-    Value & v);
-
-void callFlake(
-    EvalState & state,
-    const LockedFlake & resFlake,
+    const LockedFlake & lockedFlake,
     Value & v);
 
 }

@@ -1,22 +1,27 @@
-locks: rootSrc: rootSubdir:
+lockFileStr: rootSrc: rootSubdir:
 
 let
 
-  callFlake = sourceInfo: subdir: locks:
-    let
-      flake = import (sourceInfo + "/" + subdir + "/flake.nix");
+  lockFile = builtins.fromJSON lockFileStr;
 
-      inputs = builtins.mapAttrs (n: v:
-        if v.flake or true
-        then callFlake (fetchTree (removeAttrs v.locked ["dir"])) (v.locked.dir or "") v.inputs
-        else fetchTree v.locked) locks;
+  allNodes =
+    builtins.mapAttrs
+      (key: node:
+        let
+          sourceInfo = if key == lockFile.root then rootSrc else fetchTree (removeAttrs node.locked ["dir"]);
+          subdir = if key == lockFile.root then rootSubdir else node.locked.dir or "";
+          flake = import (sourceInfo + (if subdir != "" then "/" else "") + subdir + "/flake.nix");
+          inputs = builtins.mapAttrs (inputName: key: allNodes.${key}) (node.inputs or {});
+          outputs = flake.outputs (inputs // { self = result; });
+          result = outputs // sourceInfo // { inherit inputs; inherit outputs; inherit sourceInfo; };
+        in
+          if node.flake or true then
+            assert flake.edition or flake.epoch or 0 == 201909;
+            assert builtins.isFunction flake.outputs;
+            result
+          else
+            sourceInfo
+      )
+      lockFile.nodes;
 
-      outputs = flake.outputs (inputs // { self = result; });
-
-      result = outputs // sourceInfo // { inherit inputs; inherit outputs; inherit sourceInfo; };
-    in
-      assert flake.edition == 201909;
-
-      result;
-
-in callFlake rootSrc rootSubdir (builtins.fromJSON locks).inputs
+in allNodes.${lockFile.root}

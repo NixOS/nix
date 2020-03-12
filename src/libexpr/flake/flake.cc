@@ -293,52 +293,6 @@ Flake getFlake(EvalState & state, const FlakeRef & originalRef, bool allowLookup
     return getFlake(state, originalRef, {}, allowLookup, flakeCache);
 }
 
-static void flattenLockFile(
-    const LockedInputs & inputs,
-    const InputPath & prefix,
-    std::map<InputPath, const LockedInput *> & res)
-{
-    for (auto &[id, input] : inputs.inputs) {
-        auto inputPath(prefix);
-        inputPath.push_back(id);
-        res.emplace(inputPath, &input);
-        flattenLockFile(input, inputPath, res);
-    }
-}
-
-static std::string diffLockFiles(const LockedInputs & oldLocks, const LockedInputs & newLocks)
-{
-    std::map<InputPath, const LockedInput *> oldFlat, newFlat;
-    flattenLockFile(oldLocks, {}, oldFlat);
-    flattenLockFile(newLocks, {}, newFlat);
-
-    auto i = oldFlat.begin();
-    auto j = newFlat.begin();
-    std::string res;
-
-    while (i != oldFlat.end() || j != newFlat.end()) {
-        if (j != newFlat.end() && (i == oldFlat.end() || i->first > j->first)) {
-            res += fmt("* Added '%s': '%s'\n", concatStringsSep("/", j->first), j->second->lockedRef);
-            ++j;
-        } else if (i != oldFlat.end() && (j == newFlat.end() || i->first < j->first)) {
-            res += fmt("* Removed '%s'\n", concatStringsSep("/", i->first));
-            ++i;
-        } else {
-            if (!(i->second->lockedRef == j->second->lockedRef)) {
-                assert(i->second->lockedRef.to_string() != j->second->lockedRef.to_string());
-                res += fmt("* Updated '%s': '%s' -> '%s'\n",
-                    concatStringsSep("/", i->first),
-                    i->second->lockedRef,
-                    j->second->lockedRef);
-            }
-            ++i;
-            ++j;
-        }
-    }
-
-    return res;
-}
-
 /* Compute an in-memory lock file for the specified top-level flake,
    and optionally write it to file, it the flake is writable. */
 LockedFlake lockFlake(
@@ -380,8 +334,8 @@ LockedFlake lockFlake(
         /* Recurse into the flake inputs. */
         std::function<void(
             const FlakeInputs & flakeInputs,
-            const LockedInputs & oldLocks,
-            LockedInputs & newLocks,
+            std::shared_ptr<const Node> oldLocks,
+            std::shared_ptr<Node> newLocks,
             const InputPath & inputPathPrefix)>
             updateLocks;
 
@@ -389,8 +343,8 @@ LockedFlake lockFlake(
 
         updateLocks = [&](
             const FlakeInputs & flakeInputs,
-            const LockedInputs & oldLocks,
-            LockedInputs & newLocks,
+            std::shared_ptr<const Node> oldLocks,
+            std::shared_ptr<Node> newLocks,
             const InputPath & inputPathPrefix)
         {
             /* Get the overrides (i.e. attributes of the form
@@ -428,14 +382,16 @@ LockedFlake lockFlake(
                        input of the dwarffs input of the root flake),
                        but if it's from an override, it's relative to
                        the *root* of the lock file. */
-                    auto follows = (hasOverride ? newLockFile : newLocks).findInput(*input.follows);
+                    auto follows = (hasOverride ? newLockFile.root : newLocks)->findInput(*input.follows);
                     if (follows)
-                        newLocks.inputs.insert_or_assign(id, **follows);
+                        newLocks->inputs.insert_or_assign(id, follows);
                     else
                         /* We haven't processed the source of the
                            "follows" yet (e.g. "dwarffs/nixpkgs"). So
                            we'll need another round of the fixpoint
                            iteration. */
+                        // FIXME: now that LockFile is a graph, we
+                        // could pre-create the missing node.
                         unresolved.push_back(inputPath);
                     continue;
                 }
@@ -443,16 +399,25 @@ LockedFlake lockFlake(
                 /* Do we have an entry in the existing lock file? And
                    we don't have a --update-input flag for this
                    input? */
-                auto oldLock =
+                auto oldLockIt =
                     lockFlags.inputUpdates.count(inputPath)
-                    ? oldLocks.inputs.end()
-                    : oldLocks.inputs.find(id);
+                    ? oldLocks->inputs.end()
+                    : oldLocks->inputs.find(id);
 
-                if (oldLock != oldLocks.inputs.end() && oldLock->second.originalRef == input.ref && !hasOverride) {
+                std::shared_ptr<const LockedNode> oldLock;
+                if (oldLockIt != oldLocks->inputs.end()) {
+                    oldLock = std::dynamic_pointer_cast<const LockedNode>(oldLockIt->second);
+                    assert(oldLock);
+                }
+
+                if (oldLock
+                    && oldLock->originalRef == input.ref
+                    && !hasOverride)
+                {
                     /* Copy the input from the old lock file if its
                        flakeref didn't change and there is no override
                        from a higher level flake. */
-                    newLocks.inputs.insert_or_assign(id, oldLock->second);
+                    newLocks->inputs.insert_or_assign(id, std::make_shared<LockedNode>(*oldLock));
 
                     /* If we have an --update-input flag for an input
                        of this input, then we must fetch the flake to
@@ -466,11 +431,11 @@ LockedFlake lockFlake(
 
                     if (hasChildUpdate) {
                         auto inputFlake = getFlake(
-                            state, oldLock->second.lockedRef, oldLock->second.info, false, flakeCache);
+                            state, oldLock->lockedRef, oldLock->info, false, flakeCache);
 
                         updateLocks(inputFlake.inputs,
-                            (const LockedInputs &) oldLock->second,
-                            newLocks.inputs.find(id)->second,
+                            oldLock,
+                            newLocks->inputs.find(id)->second,
                             inputPath);
 
                     } else {
@@ -480,12 +445,14 @@ LockedFlake lockFlake(
                            check those. */
                         FlakeInputs fakeInputs;
 
-                        for (auto & i : oldLock->second.inputs)
-                            fakeInputs.emplace(i.first, FlakeInput { .ref = i.second.originalRef });
+                        for (auto & i : oldLock->inputs)
+                            fakeInputs.emplace(i.first, FlakeInput {
+                                .ref = std::dynamic_pointer_cast<LockedNode>(i.second)->originalRef
+                            });
 
                         updateLocks(fakeInputs,
-                            oldLock->second,
-                            newLocks.inputs.find(id)->second,
+                            oldLock,
+                            newLocks->inputs.find(id)->second,
                             inputPath);
                     }
 
@@ -499,8 +466,8 @@ LockedFlake lockFlake(
                     if (input.isFlake) {
                         auto inputFlake = getFlake(state, input.ref, {}, lockFlags.useRegistries, flakeCache);
 
-                        newLocks.inputs.insert_or_assign(id,
-                            LockedInput(inputFlake.lockedRef, inputFlake.originalRef, inputFlake.sourceInfo->info));
+                        newLocks->inputs.insert_or_assign(id,
+                            std::make_shared<LockedNode>(inputFlake.lockedRef, inputFlake.originalRef, inputFlake.sourceInfo->info));
 
                         /* Recursively process the inputs of this
                            flake. Also, unless we already have this
@@ -515,25 +482,25 @@ LockedFlake lockFlake(
                         Finally cleanup([&]() { parents.pop_back(); });
 
                         updateLocks(inputFlake.inputs,
-                            oldLock != oldLocks.inputs.end()
-                            ? (const LockedInputs &) oldLock->second
+                            oldLock
+                            ? std::dynamic_pointer_cast<const Node>(oldLock)
                             : LockFile::read(
-                                inputFlake.sourceInfo->actualPath + "/" + inputFlake.lockedRef.subdir + "/flake.lock"),
-                            newLocks.inputs.find(id)->second,
+                                inputFlake.sourceInfo->actualPath + "/" + inputFlake.lockedRef.subdir + "/flake.lock").root,
+                            newLocks->inputs.find(id)->second,
                             inputPath);
                     }
 
                     else {
                         auto [sourceInfo, lockedRef] = fetchOrSubstituteTree(
                             state, input.ref, {}, lockFlags.useRegistries, flakeCache);
-                        newLocks.inputs.insert_or_assign(id,
-                            LockedInput(lockedRef, input.ref, sourceInfo.info, false));
+                        newLocks->inputs.insert_or_assign(id,
+                            std::make_shared<LockedNode>(lockedRef, input.ref, sourceInfo.info, false));
                     }
                 }
             }
         };
 
-        updateLocks(flake.inputs, oldLockFile, newLockFile, {});
+        updateLocks(flake.inputs, oldLockFile.root, newLockFile.root, {});
 
         /* Check if there is a cycle in the "follows" inputs. */
         if (!unresolved.empty() && unresolved == prevUnresolved) {
@@ -619,8 +586,7 @@ LockedFlake lockFlake(
 }
 
 void callFlake(EvalState & state,
-    const Flake & flake,
-    const LockedInputs & lockedInputs,
+    const LockedFlake & lockedFlake,
     Value & vRes)
 {
     auto vLocks = state.allocValue();
@@ -629,11 +595,11 @@ void callFlake(EvalState & state,
     auto vTmp1 = state.allocValue();
     auto vTmp2 = state.allocValue();
 
-    mkString(*vLocks, lockedInputs.to_string());
+    mkString(*vLocks, lockedFlake.lockFile.to_string());
 
-    emitTreeAttrs(state, *flake.sourceInfo, flake.lockedRef.input, *vRootSrc);
+    emitTreeAttrs(state, *lockedFlake.flake.sourceInfo, lockedFlake.flake.lockedRef.input, *vRootSrc);
 
-    mkString(*vRootSubdir, flake.lockedRef.subdir);
+    mkString(*vRootSubdir, lockedFlake.flake.lockedRef.subdir);
 
     static Value * vCallFlake = nullptr;
 
@@ -647,13 +613,6 @@ void callFlake(EvalState & state,
     state.callFunction(*vCallFlake, *vLocks, *vTmp1, noPos);
     state.callFunction(*vTmp1, *vRootSrc, *vTmp2, noPos);
     state.callFunction(*vTmp2, *vRootSubdir, vRes, noPos);
-}
-
-void callFlake(EvalState & state,
-    const LockedFlake & lockedFlake,
-    Value & v)
-{
-    callFlake(state, lockedFlake.flake, lockedFlake.lockFile, v);
 }
 
 static void prim_getFlake(EvalState & state, const Pos & pos, Value * * args, Value & v)
