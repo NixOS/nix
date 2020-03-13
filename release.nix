@@ -340,8 +340,7 @@ let
 
     installerScript =
       pkgs.runCommand "installer-script"
-        { buildInputs = [ build.x86_64-linux ];
-        }
+        { buildInputs = [ build.${builtins.currentSystem or "x86_64-linux"} ]; }
         ''
           mkdir -p $out/nix-support
 
