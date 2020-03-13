@@ -1,0 +1,14 @@
+name: "Test"
+on:
+  pull_request:
+  push:
+jobs:
+  tests:
+    strategy:
+      matrix:
+        os: [ubuntu-18.04, macos]
+    runs-on: ${{ matrix.os }}
+    steps:
+    - uses: actions/checkout@v2
+    - uses: cachix/install-nix-action@v8
+    - run: nix-build release.nix --arg nix '{ outPath = ./.; revCount = 123; shortRev = "abcdefgh"; }' --arg systems '[ builtins.currentSystem ]' -A installerScript -A perlBindings
