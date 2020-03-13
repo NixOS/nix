@@ -3334,6 +3334,10 @@ void DerivationGoal::runChild()
                 throw SysError("setuid failed");
         }
 
+        /* Prevent users from doing something very dangerous. */
+        if (geteuid() == 0 || getegid() == 0)
+            throw Error("build seems to be running as root, refusing");
+
         /* Fill in the arguments. */
         Strings args;
 
