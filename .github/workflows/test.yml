@@ -11,4 +11,4 @@ jobs:
     steps:
     - uses: actions/checkout@v2
     - uses: cachix/install-nix-action@v8
-    - run: nix-build release.nix --arg nix '{ outPath = ./.; revCount = 123; shortRev = "abcdefgh"; }' --arg systems '[ builtins.currentSystem ]' -A build -A binaryTarball -A perlBindings -A installerScript
+    - run: nix-build release.nix --arg nix '{ outPath = ./.; revCount = 123; shortRev = "abcdefgh"; }' --arg systems '[ builtins.currentSystem ]' -A installerScript -A perlBindings
