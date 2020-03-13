@@ -9,6 +9,12 @@
 
     let
 
+      version =
+        builtins.readFile ./.version
+        + (if officialRelease
+           then ""
+           else "pre${builtins.substring 0 8 self.lastModified}_${self.shortRev or "dirty"}");
+
       officialRelease = false;
 
       systems = [ "x86_64-linux" "i686-linux" "x86_64-darwin" "aarch64-linux" ];
@@ -55,7 +61,7 @@
             "--with-sandbox-shell=${sh}/bin/busybox"
           ];
 
-        tarballDeps =
+        buildDeps =
           [ bison
             flex
             libxml2
@@ -64,10 +70,8 @@
             docbook_xsl_ns
             autoconf-archive
             autoreconfHook
-          ];
 
-        buildDeps =
-          [ curl
+            curl
             bzip2 xz brotli zlib editline
             openssl pkgconfig sqlite
             libarchive
@@ -104,20 +108,21 @@
       # 'nix.perl-bindings' packages.
       overlay = final: prev: {
 
-        nix = with final; with commonDeps pkgs; (releaseTools.nixBuild {
-          name = "nix";
-          src = self.hydraJobs.tarball;
+        nix = with final; with commonDeps pkgs; (stdenv.mkDerivation {
+          name = "nix-${version}";
 
-          outputs = [ "out" "dev" ];
+          src = self;
+
+          outputs = [ "out" "dev" "doc" ];
 
           buildInputs = buildDeps;
 
           propagatedBuildInputs = propagatedDeps;
 
           preConfigure =
-            # Copy libboost_context so we don't get all of Boost in our closure.
-            # https://github.com/NixOS/nixpkgs/issues/45462
             ''
+              # Copy libboost_context so we don't get all of Boost in our closure.
+              # https://github.com/NixOS/nixpkgs/issues/45462
               mkdir -p $out/lib
               cp -pd ${boost}/lib/{libboost_context*,libboost_thread*,libboost_system*} $out/lib
               rm -f $out/lib/*.a
@@ -125,6 +130,10 @@
                 chmod u+w $out/lib/*.so.*
                 patchelf --set-rpath $out/lib:${stdenv.cc.cc.lib}/lib $out/lib/libboost_thread.so.*
               ''}
+
+              ln -sfn ${self.hydraJobs.vendoredCrates}/vendor/ nix-rust/vendor
+
+              (cd perl; autoreconf --install --force --verbose)
             '';
 
           configureFlags = configureFlags ++
@@ -134,20 +143,37 @@
 
           makeFlags = "profiledir=$(out)/etc/profile.d";
 
+          doCheck = true;
+
           installFlags = "sysconfdir=$(out)/etc";
 
           doInstallCheck = true;
           installCheckFlags = "sysconfdir=$(out)/etc";
 
           separateDebugInfo = true;
+
+          preDist = ''
+            mkdir -p $doc/nix-support
+            echo "doc manual $doc/share/doc/nix/manual" >> $doc/nix-support/hydra-build-products
+          '';
         }) // {
 
-          perl-bindings = with final; releaseTools.nixBuild {
-            name = "nix-perl";
-            src = self.hydraJobs.tarball;
+          perl-bindings = with final; stdenv.mkDerivation {
+            name = "nix-perl-${version}";
+
+            src = self;
 
             buildInputs =
-              [ nix curl bzip2 xz pkgconfig pkgs.perl boost ]
+              [ autoconf-archive
+                autoreconfHook
+                nix
+                curl
+                bzip2
+                xz
+                pkgconfig
+                pkgs.perl
+                boost
+              ]
               ++ lib.optional (stdenv.isLinux || stdenv.isDarwin) libsodium;
 
             configureFlags = ''
@@ -212,48 +238,6 @@
               '') files)}
             '';
 
-        # Source tarball.
-        tarball =
-          with nixpkgsFor.x86_64-linux;
-          with commonDeps pkgs;
-
-          releaseTools.sourceTarball {
-            name = "nix-tarball";
-            version = builtins.readFile ./.version;
-            versionSuffix = if officialRelease then "" else
-              "pre${builtins.substring 0 8 self.lastModified}_${self.shortRev or "dirty"}";
-            src = self;
-            inherit officialRelease;
-
-            buildInputs = tarballDeps ++ buildDeps ++ propagatedDeps;
-
-            postUnpack = ''
-              (cd $sourceRoot && find . -type f) | cut -c3- > $sourceRoot/.dist-files
-              cat $sourceRoot/.dist-files
-            '';
-
-            preConfigure = ''
-              (cd perl ; autoreconf --install --force --verbose)
-              # TeX needs a writable font cache.
-              export VARTEXFONTS=$TMPDIR/texfonts
-            '';
-
-            distPhase =
-              ''
-                cp -prd ${self.hydraJobs.vendoredCrates}/vendor/ nix-rust/vendor/
-
-                runHook preDist
-                make dist
-                mkdir -p $out/tarballs
-                cp *.tar.* $out/tarballs
-              '';
-
-            preDist = ''
-              make install docdir=$out/share/doc/nix makefiles=doc/manual/local.mk
-              echo "doc manual $out/share/doc/nix/manual" >> $out/nix-support/hydra-build-products
-            '';
-          };
-
         # Binary package for various platforms.
         build = nixpkgs.lib.genAttrs systems (system: nixpkgsFor.${system}.nix);
 
@@ -268,7 +252,6 @@
           with nixpkgsFor.${system};
 
           let
-            version = nix.src.version;
             installerClosureInfo = closureInfo { rootPaths = [ nix cacert ]; };
           in
 
@@ -348,7 +331,7 @@
                   (system: "--replace '@binaryTarball_${system}@' $(nix --experimental-features nix-command hash-file --base16 --type sha256 ${self.hydraJobs.binaryTarball.${system}}/*.tar.xz) ")
                   [ "x86_64-linux" "i686-linux" "x86_64-darwin" "aarch64-linux" ]
                 } \
-                --replace '@nixVersion@' ${nix.src.version}
+                --replace '@nixVersion@' ${version}
 
               echo "file installer $out/install" >> $out/nix-support/hydra-build-products
             '';
@@ -359,8 +342,9 @@
           with commonDeps pkgs;
 
           releaseTools.coverageAnalysis {
-            name = "nix-build";
-            src = self.hydraJobs.tarball;
+            name = "nix-coverage-${version}";
+
+            src = self;
 
             enableParallelBuilding = true;
 
@@ -468,11 +452,10 @@
         release =
           with self.hydraJobs;
           nixpkgsFor.x86_64-linux.releaseTools.aggregate {
-            name = "nix-${tarball.version}";
+            name = "nix-${version}";
             meta.description = "Release-critical builds";
             constituents =
-              [ "tarball"
-                "build.i686-linux"
+              [ "build.i686-linux"
                 "build.x86_64-darwin"
                 "build.x86_64-linux"
                 "build.aarch64-linux"
@@ -509,7 +492,7 @@
         stdenv.mkDerivation {
           name = "nix";
 
-          buildInputs = buildDeps ++ propagatedDeps ++ tarballDeps ++ perlDeps ++ [ pkgs.rustfmt ];
+          buildInputs = buildDeps ++ propagatedDeps ++ perlDeps ++ [ pkgs.rustfmt ];
 
           inherit configureFlags;
 
