@@ -7,7 +7,7 @@ XSLTPROC = $(xsltproc) --nonet $(xmlflags) \
   --param xref.with.number.and.title 1 \
   --param toc.section.depth 3 \
   --param admon.style \'\' \
-  --param callout.graphics.extension \'.gif\' \
+  --param callout.graphics 0 \
   --param contrib.inline.enabled 0 \
   --stringparam generate.toc "book toc" \
   --param keep.relative.image.uris 0
@@ -68,8 +68,6 @@ $(d)/manual.html: $(d)/manual.xml $(MANUAL_SRCS) $(d)/manual.is-valid
 $(foreach file, $(d)/manual.html, $(eval $(call install-data-in, $(file), $(docdir)/manual)))
 
 $(foreach file, $(wildcard $(d)/figures/*.png), $(eval $(call install-data-in, $(file), $(docdir)/manual/figures)))
-
-$(foreach file, $(wildcard $(d)/images/callouts/*.gif), $(eval $(call install-data-in, $(file), $(docdir)/manual/images/callouts)))
 
 $(eval $(call install-symlink, manual.html, $(docdir)/manual/index.html))
 
