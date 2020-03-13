@@ -337,29 +337,6 @@ let
           echo "file installer $out/install" >> $out/nix-support/hydra-build-products
         '';
 
-
-    # Aggregate job containing the release-critical jobs.
-    release = pkgs.releaseTools.aggregate {
-      name = "nix-${version}";
-      meta.description = "Release-critical builds";
-      constituents =
-        [ build.i686-linux
-          build.x86_64-darwin
-          build.x86_64-linux
-          build.aarch64-linux
-          binaryTarball.i686-linux
-          binaryTarball.x86_64-darwin
-          binaryTarball.x86_64-linux
-          binaryTarball.aarch64-linux
-          tests.remoteBuilds
-          tests.nix-copy-closure
-          tests.binaryTarball
-          #tests.evalNixpkgs
-          #tests.evalNixOS
-          installerScript
-        ];
-    };
-
   };
 
 
