@@ -24,6 +24,6 @@ $(foreach name, \
   $(eval $(call install-symlink, nix, $(bindir)/$(name))))
 $(eval $(call install-symlink, $(bindir)/nix, $(libexecdir)/nix/build-remote))
 
-src/nix-env/nix-env.cc: src/nix-env/buildenv.nix.gen.hh
+src/nix-env/user-env.cc: src/nix-env/buildenv.nix.gen.hh
 
 $(d)/flake.cc: $(d)/flake-template.nix.gen.hh

@@ -106,7 +106,7 @@ void BinaryCacheStore::writeNarInfo(ref<NarInfo> narInfo)
 
     {
         auto state_(state.lock());
-        state_->pathInfoCache.upsert(hashPart, std::shared_ptr<NarInfo>(narInfo));
+        state_->pathInfoCache.upsert(hashPart, PathInfoCacheValue { .value = std::shared_ptr<NarInfo>(narInfo) });
     }
 
     if (diskCache)
