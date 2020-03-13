@@ -348,9 +348,9 @@ let
           substitute ${./scripts/install.in} $out/install \
             ${pkgs.lib.concatMapStrings
               (system: "--replace '@binaryTarball_${system}@' $(nix --experimental-features nix-command hash-file --base16 --type sha256 ${binaryTarball.${system}}/*.tar.xz) ")
-              [ "x86_64-linux" "i686-linux" "x86_64-darwin" "aarch64-linux" ]
+              systems
             } \
-            --replace '@nixVersion@' ${build.x86_64-linux.src.version}
+            --replace '@nixVersion@' ${build.${builtins.head systems}.src.version}
 
           echo "file installer $out/install" >> $out/nix-support/hydra-build-products
         '';
