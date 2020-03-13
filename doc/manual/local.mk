@@ -4,7 +4,6 @@ ifeq ($(doc_generate),yes)
 XSLTPROC = $(xsltproc) --nonet $(xmlflags) \
   --param section.autolabel 1 \
   --param section.label.includes.component.label 1 \
-  --param html.stylesheet \'style.css\' \
   --param xref.with.number.and.title 1 \
   --param toc.section.depth 3 \
   --param admon.style \'\' \
@@ -66,7 +65,7 @@ $(d)/manual.html: $(d)/manual.xml $(MANUAL_SRCS) $(d)/manual.is-valid
 	  $(docbookxsl)/profiling/profile.xsl $< | \
 	  $(XSLTPROC) --output $@ $(docbookxsl)/xhtml/docbook.xsl -
 
-$(foreach file, $(d)/manual.html $(d)/style.css, $(eval $(call install-data-in, $(file), $(docdir)/manual)))
+$(foreach file, $(d)/manual.html, $(eval $(call install-data-in, $(file), $(docdir)/manual)))
 
 $(foreach file, $(wildcard $(d)/figures/*.png), $(eval $(call install-data-in, $(file), $(docdir)/manual/figures)))
 
