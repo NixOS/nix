@@ -1066,7 +1066,8 @@ user environment elements, etc. -->
     the derivation, which can be used to unambiguously select it using
     the <link linkend="opt-attr"><option>--attr</option> option</link>
     available in commands that install derivations like
-    <literal>nix-env --install</literal>.</para></listitem>
+    <literal>nix-env --install</literal>. This option only works
+    together with <option>--available</option></para></listitem>
 
   </varlistentry>
 
