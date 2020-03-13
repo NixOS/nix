@@ -131,7 +131,7 @@
                 patchelf --set-rpath $out/lib:${stdenv.cc.cc.lib}/lib $out/lib/libboost_thread.so.*
               ''}
 
-              ln -sfn ${self.hydraJobs.vendoredCrates}/vendor/ nix-rust/vendor
+              ln -sfn ${final.nixVendoredCrates}/vendor/ nix-rust/vendor
 
               (cd perl; autoreconf --install --force --verbose)
             '';
@@ -188,16 +188,10 @@
 
         };
 
-      };
-
-      hydraJobs = {
-
         # Create a "vendor" directory that contains the crates listed in
         # Cargo.lock, and include it in the Nix tarball. This allows Nix
         # to be built without network access.
-        vendoredCrates =
-          with nixpkgsFor.x86_64-linux;
-
+        nixVendoredCrates =
           let
             lockFile = builtins.fromTOML (builtins.readFile nix-rust/Cargo.lock);
 
@@ -206,7 +200,7 @@
               sha256 = lockFile.metadata."checksum ${pkg.name} ${pkg.version} (registry+https://github.com/rust-lang/crates.io-index)";
             }) (builtins.filter (pkg: pkg.source or "" == "registry+https://github.com/rust-lang/crates.io-index") lockFile.package);
 
-          in pkgs.runCommand "cargo-vendor-dir" {}
+          in final.runCommand "cargo-vendor-dir" {}
             ''
               mkdir -p $out/vendor
 
@@ -237,6 +231,10 @@
                 rm -rf $out/vendor/tmp
               '') files)}
             '';
+
+      };
+
+      hydraJobs = {
 
         # Binary package for various platforms.
         build = nixpkgs.lib.genAttrs systems (system: nixpkgsFor.${system}.nix);
