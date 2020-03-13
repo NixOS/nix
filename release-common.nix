@@ -34,7 +34,7 @@ rec {
       "--with-sandbox-shell=${sh}/bin/busybox"
     ];
 
-  tarballDeps =
+  buildDeps =
     [ bison
       flex
       libxml2
@@ -43,10 +43,8 @@ rec {
       docbook_xsl_ns
       autoconf-archive
       autoreconfHook
-    ];
 
-  buildDeps =
-    [ curl
+      curl
       bzip2 xz brotli zlib editline
       openssl pkgconfig sqlite
       libarchive
