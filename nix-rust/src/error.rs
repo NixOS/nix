@@ -6,7 +6,9 @@ pub enum Error {
     BadStorePath(std::path::PathBuf),
     NotInStore(std::path::PathBuf),
     BadNarInfo,
+    BadBase16,
     BadBase32,
+    BadBase64,
     StorePathNameEmpty,
     StorePathNameTooLong,
     BadStorePathName,
@@ -50,7 +52,9 @@ impl fmt::Display for Error {
             Error::NotInStore(path) => {
                 write!(f, "path '{}' is not in the Nix store", path.display())
             }
+            Error::BadBase16 => write!(f, "invalid base16 string"),
             Error::BadBase32 => write!(f, "invalid base32 string"),
+            Error::BadBase64 => write!(f, "invalid base64 string"),
             Error::StorePathNameEmpty => write!(f, "store path name is empty"),
             Error::StorePathNameTooLong => {
                 write!(f, "store path name is longer than 211 characters")

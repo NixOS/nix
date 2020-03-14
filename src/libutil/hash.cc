@@ -15,16 +15,18 @@
 
 namespace nix {
 
+extern "C" {
+    HashType ffi_Hash_zero(HashType);
+}
 
-void Hash::init()
+HashTypeHash::zero()
 {
-    if (type == htMD5) hashSize = md5HashSize;
-    else if (type == htSHA1) hashSize = sha1HashSize;
-    else if (type == htSHA256) hashSize = sha256HashSize;
-    else if (type == htSHA512) hashSize = sha512HashSize;
-    else abort();
-    assert(hashSize <= maxHashSize);
-    memset(hash, 0, maxHashSize);
+    HashTypeHash::zero(htUnknown)
+}
+
+HashTypeHash::zero(HashType type)
+{
+    ffi_Hash_zero(type)
 }
 
 

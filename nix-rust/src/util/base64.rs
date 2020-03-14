@@ -1,25 +1,26 @@
 use crate::error::Error;
 use lazy_static::lazy_static;
 
-// Returns the length of a base-32 representation of this hash.
+// Returns the length of a base-64 representation of this hash.
 pub fn encoded_len(input_len: usize) -> usize {
     if input_len == 0 {
         0
     } else {
-        (input_len * 8 - 1) / 5 + 1
+        ((4 * input_len / 3) + 3) & !3
     }
 }
 
 pub fn decoded_len(input_len: usize) -> usize {
-    input_len * 5 / 8
+    3 * (input_len / 4)
 }
 
-static BASE32_CHARS: &'static [u8; 32] = &b"0123456789abcdfghijklmnpqrsvwxyz";
+static BASE64_CHARS: &'static [u8; 64] =
+    &b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
 
 lazy_static! {
-    static ref BASE32_CHARS_REVERSE: Box<[u8; 256]> = {
+    static ref BASE64_CHARS_REVERSE: Box<[u8; 256]> = {
         let mut xs = [0xffu8; 256];
-        for (n, c) in BASE32_CHARS.iter().enumerate() {
+        for (n, c) in BASE64_CHARS.iter().enumerate() {
             xs[*c as usize] = n as u8;
         }
         Box::new(xs)
@@ -36,51 +37,52 @@ pub fn encode_into(input: &[u8], output: &mut [u8]) {
     let len = encoded_len(input.len());
     assert_eq!(len, output.len());
 
-    let mut nr_bits_left: usize = 0;
-    let mut bits_left: u16 = 0;
-    let mut pos = len;
+    let mut idx: usize = 0;
+    let mut data: usize = 0;
+    let mut nbits: usize = 0;
 
-    for b in input {
-        bits_left |= (*b as u16) << nr_bits_left;
-        nr_bits_left += 8;
-        while nr_bits_left > 5 {
-            output[pos - 1] = BASE32_CHARS[(bits_left & 0x1f) as usize];
-            pos -= 1;
-            bits_left >>= 5;
-            nr_bits_left -= 5;
+    for &c in input {
+        data = data << 8 | (c as usize);
+        nbits += 8;
+        while nbits >= 6 {
+            nbits -= 6;
+            output[idx] = BASE64_CHARS[data >> nbits & 0x3f];
+            idx += 1;
         }
     }
 
-    if nr_bits_left > 0 {
-        output[pos - 1] = BASE32_CHARS[(bits_left & 0x1f) as usize];
-        pos -= 1;
+    if nbits != 0 {
+        output[idx] = BASE64_CHARS[data << (6 - nbits) & 0x3f];
+        idx += 1;
     }
-
-    assert_eq!(pos, 0);
+    while idx % 4 != 0 {
+        output[idx] = '=' as _;
+        idx += 1;
+    }
 }
 
 pub fn decode(input: &str) -> Result<Vec<u8>, crate::Error> {
     let mut res = Vec::with_capacity(decoded_len(input.len()));
-
-    let mut nr_bits_left: usize = 0;
-    let mut bits_left: u16 = 0;
+    let mut d: u8 = 0;
+    let mut bits: u8 = 0;
 
     for c in input.chars() {
-        let b = BASE32_CHARS_REVERSE[c as usize];
+        if c == '=' {
+            break;
+        }
+        if c == '\n' {
+            continue;
+        }
+        let b = BASE64_CHARS_REVERSE[c as usize];
         if b == 0xff {
-            return Err(Error::BadBase32);
+            return Err(Error::BadBase64);
         }
-        bits_left |= (b as u16) << nr_bits_left;
-        nr_bits_left += 5;
-        if nr_bits_left >= 8 {
-            res.push((bits_left & 0xff) as u8);
-            bits_left >>= 8;
-            nr_bits_left -= 8;
+        bits += 6;
+        d = d << 6 | b;
+        if bits >= 8 {
+            res.push(d >> (bits - 8) & 0xff);
+            bits -= 8;
         }
-    }
-
-    if nr_bits_left > 0 && bits_left != 0 {
-        return Err(Error::BadBase32);
     }
 
     Ok(res)
@@ -140,15 +142,15 @@ mod tests {
 
         assert_matches!(
             decode("xoxf8v9fxf3jk8zln1cwlsrmhqvp0f88"),
-            Err(Error::BadBase32)
+            Err(Error::BadBase64)
         );
         assert_matches!(
             decode("2b8m03r63zqhnjf7l5wnldhh7c134ap5vpj0850ymkq1iyzicy5s"),
-            Err(Error::BadBase32)
+            Err(Error::BadBase64)
         );
-        assert_matches!(decode("2"), Err(Error::BadBase32));
-        assert_matches!(decode("2gs"), Err(Error::BadBase32));
-        assert_matches!(decode("2gs8"), Err(Error::BadBase32));
+        assert_matches!(decode("2"), Err(Error::BadBase64));
+        assert_matches!(decode("2gs"), Err(Error::BadBase64));
+        assert_matches!(decode("2gs8"), Err(Error::BadBase64));
     }
 
     proptest! {

@@ -1,4 +1,4 @@
-use super::{error, store::path, store::StorePath, util};
+use super::{error, store::path, store::StorePath, util, util::hash::{HashType, Hash}};
 
 #[no_mangle]
 pub unsafe extern "C" fn ffi_String_new(s: &str, out: *mut String) {
@@ -12,7 +12,24 @@ pub unsafe extern "C" fn ffi_String_drop(self_: *mut String) {
 }
 
 #[no_mangle]
-pub extern "C" fn ffi_StorePath_new(
+pub extern "C" fn ffi_Hash_new(
+    algo: HashType,
+) -> Hash {
+    Hash::zero(algo)
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn ffi_Hash_drop(self_: *mut Hash) {
+    std::ptr::drop_in_place(self_);
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn ffi_Hash_print_hash16_or_32(self_: *const Hash) -> String {
+    (&*self_).print_hash16_or_32()
+}
+
+#[no_mangle]
+pub extern "C" fn ffi_StorePath_zero(
     path: &str,
     store_dir: &str,
 ) -> Result<StorePath, error::CppException> {

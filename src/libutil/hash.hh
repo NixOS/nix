@@ -22,20 +22,19 @@ extern const string base32Chars;
 
 enum Base : int { Base64, Base32, Base16, SRI };
 
+// hash.rs
+struct Hash;
+
+extern "C" {
+    void ffi_Hash_drop(void *);
+}
+
+const unsigned int maxHashSize = 64;
 
 struct Hash
+struct DerivationOutput : rust::Value<sizeof(HashType) + maxHashSize, ffi_Hash_drop>
 {
-    static const unsigned int maxHashSize = 64;
-    unsigned int hashSize = 0;
-    unsigned char hash[maxHashSize] = {};
-
-    HashType type = htUnknown;
-
-    /* Create an unset hash object. */
-    Hash() { };
-
-    /* Create a zero-filled hash object. */
-    Hash(HashType type) : type(type) { init(); };
+    Hash() = delete;
 
     /* Initialize the hash from a string representation, in the format
        "[<type>:]<base16|base32|base64>" or "<type>-<base64>" (a
@@ -81,6 +80,10 @@ struct Hash
        (e.g. "sha256:"). */
     std::string to_string(Base base = Base32, bool includeType = true) const;
 };
+
+/* Create a zero-filled hash object. */
+Hash Hash::zero();
+Hash Hash::zero(HashType type);
 
 
 /* Print a hash in base-16 if it's MD5, or base-32 otherwise. */

@@ -6,13 +6,18 @@
 
 #include <map>
 
-
 namespace nix {
 
+/* See derivation.rs. */
+struct DerivationOutput;
+
+extern "C" {
+    void ffi_DerivationOutput_drop(void *);
+}
 
 /* Abstract syntax of derivations. */
 
-struct DerivationOutput
+struct DerivationOutput : rust::Value<3 * sizeof(void *) + 24, ffi_DerivationOutput_drop>
 {
     StorePath path;
     std::string hashAlgo; /* hash used for expected hash computation */
