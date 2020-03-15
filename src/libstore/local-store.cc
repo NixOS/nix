@@ -559,21 +559,29 @@ void LocalStore::checkDerivationOutputs(const StorePath & drvPath, const Derivat
     };
 
 
-    if (drv.isFixedOutput()) {
-        DerivationOutputs::const_iterator out = drv.outputs.find("out");
-        if (out == drv.outputs.end())
-            throw Error("derivation '%s' does not have an output named 'out'", printStorePath(drvPath));
+    // Don't need the answer, but do this anways to assert is proper
+    // combination. The code below is more general and naturally allows
+    // combinations that currently prohibited.
+    drv.type();
 
-        bool recursive; Hash h;
-        out->second.parseHashInfo(recursive, h);
-
-        check(makeFixedOutputPath(recursive, h, drvName), out->second.path, "out");
-    }
-
-    else {
-        Hash h = hashDerivationModulo(*this, drv, true);
-        for (auto & i : drv.outputs)
-            check(makeOutputPath(i.first, h, drvName), i.second.path, i.first);
+    std::optional<Hash> h;
+    for (auto & i : drv.outputs) {
+        if (i.second.hashAlgo == "") {
+            if (!h) {
+                // somewhat expensive so we do lazily
+                h = hashDerivationModulo(*this, drv, true);
+            }
+            StorePath path = makeOutputPath(i.first, *h, drvName);
+            check(path, i.second.path, i.first);
+        } else {
+            if (i.second.hash == "") {
+                throw Error("Fixed output derivation needs hash");
+            }
+            bool recursive; Hash h;
+            i.second.parseHashInfo(recursive, h);
+            StorePath path = makeFixedOutputPath(recursive, h, drvName);
+            check(path, i.second.path, i.first);
+        }
     }
 }
 

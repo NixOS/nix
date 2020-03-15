@@ -795,8 +795,8 @@ private:
     /* RAII object to delete the chroot directory. */
     std::shared_ptr<AutoDelete> autoDelChroot;
 
-    /* Whether this is a fixed-output derivation. */
-    bool fixedOutput;
+    /* The sort of derivation we are building. */
+    DerivationType derivationType;
 
     /* Whether to run the build in a private network namespace. */
     bool privateNetwork = false;
@@ -1369,12 +1369,12 @@ void DerivationGoal::inputsRealised()
 
     debug("added input paths %s", worker.store.showPaths(inputPaths));
 
-    /* Is this a fixed-output derivation? */
-    fixedOutput = drv->isFixedOutput();
+    /* What type of derivation are we building? */
+    derivationType = drv->type();
 
     /* Don't repeat fixed-output derivations since they're already
        verified by their output hash.*/
-    nrRounds = fixedOutput ? 1 : settings.buildRepeat + 1;
+    nrRounds = DtAxisFixed & derivationType ? 1 : settings.buildRepeat + 1;
 
     /* Okay, try to build.  Note that here we don't wait for a build
        slot to become available, since we don't need one if there is a
@@ -1724,7 +1724,7 @@ void DerivationGoal::buildDone()
             st =
                 dynamic_cast<NotDeterministic*>(&e) ? BuildResult::NotDeterministic :
                 statusOk(status) ? BuildResult::OutputRejected :
-                fixedOutput || diskFull ? BuildResult::TransientFailure :
+                DtAxisImpure & derivationType || diskFull ? BuildResult::TransientFailure :
                 BuildResult::PermanentFailure;
         }
 
@@ -1930,7 +1930,7 @@ void DerivationGoal::startBuilder()
         else if (settings.sandboxMode == smDisabled)
             useChroot = false;
         else if (settings.sandboxMode == smRelaxed)
-            useChroot = !fixedOutput && !noChroot;
+            useChroot = !(DtAxisImpure & derivationType) && !noChroot;
     }
 
     if (worker.store.storeDir != worker.store.realStoreDir) {
@@ -2112,7 +2112,7 @@ void DerivationGoal::startBuilder()
                 "nogroup:x:65534:\n") % sandboxGid).str());
 
         /* Create /etc/hosts with localhost entry. */
-        if (!fixedOutput)
+        if (!(DtAxisImpure & derivationType))
             writeFile(chrootRootDir + "/etc/hosts", "127.0.0.1 localhost\n::1 localhost\n");
 
         /* Make the closure of the inputs available in the chroot,
@@ -2318,7 +2318,7 @@ void DerivationGoal::startBuilder()
            us.
         */
 
-        if (!fixedOutput)
+        if (!(DtAxisImpure & derivationType))
             privateNetwork = true;
 
         userNamespaceSync.create();
@@ -2519,7 +2519,7 @@ void DerivationGoal::initEnv()
        derivation, tell the builder, so that for instance `fetchurl'
        can skip checking the output.  On older Nixes, this environment
        variable won't be set, so `fetchurl' will do the check. */
-    if (fixedOutput) env["NIX_OUTPUT_CHECKED"] = "1";
+    if (DtAxisFixed & derivationType) env["NIX_OUTPUT_CHECKED"] = "1";
 
     /* *Only* if this is a fixed-output derivation, propagate the
        values of the environment variables specified in the
@@ -2530,7 +2530,7 @@ void DerivationGoal::initEnv()
        to the builder is generally impure, but the output of
        fixed-output derivations is by definition pure (since we
        already know the cryptographic hash of the output). */
-    if (fixedOutput) {
+    if (derivationType & DtAxisImpure) {
         for (auto & i : parsedDrv->getStringsAttr("impureEnvVars").value_or(Strings()))
             env[i] = getEnv(i).value_or("");
     }
@@ -3144,7 +3144,7 @@ void DerivationGoal::runChild()
             /* Fixed-output derivations typically need to access the
                network, so give them access to /etc/resolv.conf and so
                on. */
-            if (fixedOutput) {
+            if (DtAxisImpure & derivationType) {
                 ss.push_back("/etc/resolv.conf");
 
                 // Only use nss functions to resolve hosts and
@@ -3385,7 +3385,7 @@ void DerivationGoal::runChild()
 
                 sandboxProfile += "(import \"sandbox-defaults.sb\")\n";
 
-                if (fixedOutput)
+                if (DtAxisImpure & derivationType)
                     sandboxProfile += "(import \"sandbox-network.sb\")\n";
 
                 /* Our rwx outputs */
@@ -3644,10 +3644,10 @@ void DerivationGoal::registerOutputs()
            hash). */
         std::string ca;
 
-        if (fixedOutput) {
+        if (i.second.hashAlgo != "") {
 
-            bool recursive; Hash h;
-            i.second.parseHashInfo(recursive, h);
+            bool recursive; HashType ht;
+            i.second.parseHashType(recursive, ht);
 
             if (!recursive) {
                 /* The output path should be a regular file without execute permission. */
@@ -3658,11 +3658,16 @@ void DerivationGoal::registerOutputs()
 
             /* Check the hash. In hash mode, move the path produced by
                the derivation to its content-addressed location. */
-            Hash h2 = recursive ? hashPath(h.type, actualPath).first : hashFile(h.type, actualPath);
+            Hash h2 = recursive ? hashPath(ht, actualPath).first : hashFile(ht, actualPath);
 
             auto dest = worker.store.makeFixedOutputPath(recursive, h2, i.second.path.name());
 
-            if (h != h2) {
+            // true if ither floating CA, or incorrect fixed hash.
+            bool needsMove = true;
+
+            if (i.second.hash != "") {
+              Hash h = Hash(i.second.hash, ht);
+              if (h != h2) {
 
                 /* Throw an error after registering the path as
                    valid. */
@@ -3670,7 +3675,13 @@ void DerivationGoal::registerOutputs()
                 delayedException = std::make_exception_ptr(
                     BuildError("hash mismatch in fixed-output derivation '%s':\n  wanted: %s\n  got:    %s",
                         worker.store.printStorePath(dest), h.to_string(SRI), h2.to_string(SRI)));
+              } else {
+                  // matched the fixed hash, so no move needed.
+                  needsMove = false;
+              }
+            }
 
+            if (needsMove) {
                 Path actualDest = worker.store.toRealPath(worker.store.printStorePath(dest));
 
                 if (worker.store.isValidPath(dest))

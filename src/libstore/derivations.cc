@@ -8,8 +8,12 @@
 
 namespace nix {
 
+// Avoid shadow
+HashType parseHashAlgo(const string & s) {
+    return parseHashType(s);
+}
 
-void DerivationOutput::parseHashInfo(bool & recursive, Hash & hash) const
+void DerivationOutput::parseHashType(bool & recursive, HashType & hashType) const
 {
     recursive = false;
     string algo = hashAlgo;
@@ -19,10 +23,16 @@ void DerivationOutput::parseHashInfo(bool & recursive, Hash & hash) const
         algo = string(algo, 2);
     }
 
-    HashType hashType = parseHashType(algo);
-    if (hashType == htUnknown)
+    HashType hashType_loc = parseHashAlgo(algo);
+    if (hashType_loc == htUnknown)
         throw Error("unknown hash algorithm '%s'", algo);
+    hashType = hashType_loc;
+}
 
+void DerivationOutput::parseHashInfo(bool & recursive, Hash & hash) const
+{
+    HashType hashType;
+    parseHashType(recursive, hashType);
     hash = Hash(this->hash, hashType);
 }
 
@@ -328,11 +338,28 @@ bool isDerivation(const string & fileName)
 }
 
 
-bool BasicDerivation::isFixedOutput() const
+DerivationType BasicDerivation::type() const
 {
-    return outputs.size() == 1 &&
+    if (outputs.size() == 1 &&
         outputs.begin()->first == "out" &&
-        outputs.begin()->second.hash != "";
+        outputs.begin()->second.hash != "")
+    {
+        return DtCAFixed;
+    }
+
+    auto const algo = outputs.begin()->second.hashAlgo;
+    if (algo != "") {
+        throw Error("Invalid mix of CA and regular outputs");
+    }
+    for (auto & i : outputs) {
+        if (i.second.hash != "") {
+            throw Error("Non-fixed-output derivation has fixed output");
+        }
+        if (i.second.hashAlgo != "") {
+            throw Error("Invalid mix of CA and regular outputs");
+        }
+    }
+    return DtRegular;
 }
 
 
@@ -362,12 +389,16 @@ DrvHashes drvHashes;
 Hash hashDerivationModulo(Store & store, const Derivation & drv, bool maskOutputs)
 {
     /* Return a fixed hash for fixed-output derivations. */
-    if (drv.isFixedOutput()) {
+    switch (drv.type()) {
+    case DtCAFixed: {
         DerivationOutputs::const_iterator i = drv.outputs.begin();
         return hashString(htSHA256, "fixed:out:"
             + i->second.hashAlgo + ":"
             + i->second.hash + ":"
             + store.printStorePath(i->second.path));
+    }
+    default:
+        break;
     }
 
     /* For other derivations, replace the inputs paths with recursive

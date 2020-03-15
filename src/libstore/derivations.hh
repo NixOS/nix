@@ -22,6 +22,7 @@ struct DerivationOutput
         , hashAlgo(std::move(hashAlgo))
         , hash(std::move(hash))
     { }
+    void parseHashType(bool & recursive, HashType & hashType) const;
     void parseHashInfo(bool & recursive, Hash & hash) const;
 };
 
@@ -32,6 +33,21 @@ typedef std::map<string, DerivationOutput> DerivationOutputs;
 typedef std::map<StorePath, StringSet> DerivationInputs;
 
 typedef std::map<string, string> StringPairs;
+
+// Bit:
+//  7: regular vs ca
+//  6: floating vs fixed hash if ca, regular always floating
+//  5: pure vs impure if ca, regular always pure
+//  _: Unassigned
+enum DerivationTypeAxis : uint8_t {
+    DtAxisCA = 0b10000000,
+    DtAxisFixed = 0b01000000,
+    DtAxisImpure = 0b00100000,
+};
+enum DerivationType : uint8_t {
+    DtRegular = 0b0000000,
+    DtCAFixed = 0b11100000,
+};
 
 struct BasicDerivation
 {
@@ -53,7 +69,7 @@ struct BasicDerivation
     bool isBuiltin() const;
 
     /* Return true iff this is a fixed-output derivation. */
-    bool isFixedOutput() const;
+    DerivationType type() const;
 
     /* Return the output paths of a derivation. */
     StorePathSet outputPaths() const;
