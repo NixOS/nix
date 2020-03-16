@@ -11,7 +11,7 @@ repo=$TEST_ROOT/git
 
 export _NIX_FORCE_HTTP=1
 
-rm -rf $repo ${repo}-tmp $TEST_HOME/.cache/nix/gitv* $TEST_ROOT/worktree
+rm -rf $repo ${repo}-tmp $TEST_HOME/.cache/nix/git* $TEST_ROOT/worktree $TEST_ROOT/shallow
 
 git init $repo
 git -C $repo config user.email "foobar@example.com"
@@ -147,3 +147,9 @@ NIX=$(command -v nix)
 # Try again, with 'git' available.  This should work.
 path5=$(nix eval --impure --raw --expr "(builtins.fetchGit { url = $repo; ref = \"dev\"; }).outPath")
 [[ $path3 = $path5 ]]
+
+# Check that shallow clones work and don't return a revcount.
+git clone --depth 1 file://$repo $TEST_ROOT/shallow
+path6=$(nix eval --impure --raw --expr "(builtins.fetchGit { url = $TEST_ROOT/shallow; ref = \"dev\"; }).outPath")
+[[ $path3 = $path6 ]]
+[[ $(nix eval --impure --expr "(builtins.fetchTree { type = \"git\"; url = \"file://$TEST_ROOT/shallow\"; ref = \"dev\"; }).revCount or 123") == 123 ]]

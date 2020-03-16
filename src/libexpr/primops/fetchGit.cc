@@ -67,8 +67,9 @@ static void prim_fetchGit(EvalState & state, const Pos & pos, Value * * args, Va
     auto rev2 = input2->getRev().value_or(Hash(htSHA1));
     mkString(*state.allocAttr(v, state.symbols.create("rev")), rev2.gitRev());
     mkString(*state.allocAttr(v, state.symbols.create("shortRev")), rev2.gitShortRev());
-    assert(tree.info.revCount);
-    mkInt(*state.allocAttr(v, state.symbols.create("revCount")), *tree.info.revCount);
+    // Backward compatibility: set 'revCount' to 0 for a dirty tree.
+    mkInt(*state.allocAttr(v, state.symbols.create("revCount")),
+        tree.info.revCount.value_or(0));
     v.attrs->sort();
 
     if (state.allowedPaths)

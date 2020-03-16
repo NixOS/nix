@@ -34,6 +34,8 @@ static void cacheGitInfo(
     const Tree & tree,
     const Hash & rev)
 {
+    if (!tree.info.revCount || !tree.info.lastModified) return;
+
     nlohmann::json json;
     json["storePath"] = store.printStorePath(tree.storePath);
     json["name"] = name;
@@ -169,6 +171,7 @@ struct GitInput : Input
             return url.path;
         return {};
     }
+
     void markChangedFile(std::string_view file, std::optional<std::string> commitMsg) const override
     {
         auto sourcePath = getSourcePath();
@@ -271,7 +274,6 @@ struct GitInput : Input
                     .actualPath = store->printStorePath(storePath),
                     .storePath = std::move(storePath),
                     .info = TreeInfo {
-                        .revCount = haveCommits ? std::stoull(runProgram("git", true, { "-C", actualUrl, "rev-list", "--count", "HEAD" })) : 0,
                         // FIXME: maybe we should use the timestamp of the last
                         // modified dirty file?
                         .lastModified = haveCommits ? std::stoull(runProgram("git", true, { "-C", actualUrl, "log", "-1", "--format=%ct", "HEAD" })) : 0,
@@ -357,8 +359,11 @@ struct GitInput : Input
                 input->rev = Hash(chomp(readFile(localRefFile)), htSHA1);
         }
 
+        bool isShallow = chomp(runProgram("git", true, { "-C", repoDir, "rev-parse", "--is-shallow-repository" })) == "true";
+
         if (auto tree = lookupGitInfo(store, name, *input->rev)) {
             assert(*input->rev == tree->first);
+            if (isShallow) tree->second.info.revCount.reset();
             return {std::move(tree->second), input};
         }
 
@@ -380,14 +385,17 @@ struct GitInput : Input
         unpackTarfile(*source, tmpDir);
 
         auto storePath = store->addToStore(name, tmpDir);
-        auto revCount = std::stoull(runProgram("git", true, { "-C", repoDir, "rev-list", "--count", input->rev->gitRev() }));
+
         auto lastModified = std::stoull(runProgram("git", true, { "-C", repoDir, "log", "-1", "--format=%ct", input->rev->gitRev() }));
 
         auto tree = Tree {
             .actualPath = store->toRealPath(storePath),
             .storePath = std::move(storePath),
             .info = TreeInfo {
-                .revCount = revCount,
+                .revCount =
+                    !isShallow
+                    ? std::optional(std::stoull(runProgram("git", true, { "-C", repoDir, "rev-list", "--count", input->rev->gitRev() })))
+                    : std::nullopt,
                 .lastModified = lastModified
             }
         };
