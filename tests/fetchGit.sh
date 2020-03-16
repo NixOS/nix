@@ -11,7 +11,7 @@ repo=$TEST_ROOT/git
 
 export _NIX_FORCE_HTTP=1
 
-rm -rf $repo ${repo}-tmp $TEST_HOME/.cache/nix/gitv*
+rm -rf $repo ${repo}-tmp $TEST_HOME/.cache/nix/gitv* $TEST_ROOT/worktree
 
 git init $repo
 git -C $repo config user.email "foobar@example.com"
