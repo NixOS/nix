@@ -561,7 +561,7 @@ void LocalStore::checkDerivationOutputs(const StorePath & drvPath, const Derivat
 
     // Don't need the answer, but do this anways to assert is proper
     // combination. The code below is more general and naturally allows
-    // combinations that currently prohibited.
+    // combinations that are currently prohibited.
     drv.type();
 
     std::optional<Hash> h;
