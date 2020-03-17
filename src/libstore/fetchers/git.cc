@@ -1,5 +1,6 @@
-#include "fetchers.hh"
-#include "parse.hh"
+#include "fetchers/fetchers.hh"
+#include "fetchers/cache.hh"
+#include "fetchers/parse.hh"
 #include "globals.hh"
 #include "tarfile.hh"
 #include "store-api.hh"
@@ -7,75 +8,13 @@
 
 #include <sys/time.h>
 
-#include <nlohmann/json.hpp>
-
 using namespace std::string_literals;
 
 namespace nix::fetchers {
 
-static Path getCacheInfoPathFor(const std::string & name, const Hash & rev)
-{
-    Path cacheDir = getCacheDir() + "/nix/git-revs-v2";
-    std::string linkName =
-        name == "source"
-        ? rev.gitRev()
-        : hashString(htSHA512, name + std::string("\0"s) + rev.gitRev()).to_string(Base32, false);
-    return cacheDir + "/" + linkName + ".link";
-}
-
 static std::string readHead(const Path & path)
 {
     return chomp(runProgram("git", true, { "-C", path, "rev-parse", "--abbrev-ref", "HEAD" }));
-}
-
-static void cacheGitInfo(
-    Store & store,
-    const std::string & name,
-    const Tree & tree,
-    const Hash & rev)
-{
-    if (!tree.info.revCount || !tree.info.lastModified) return;
-
-    nlohmann::json json;
-    json["storePath"] = store.printStorePath(tree.storePath);
-    json["name"] = name;
-    json["rev"] = rev.gitRev();
-    json["revCount"] = *tree.info.revCount;
-    json["lastModified"] = *tree.info.lastModified;
-
-    auto cacheInfoPath = getCacheInfoPathFor(name, rev);
-    createDirs(dirOf(cacheInfoPath));
-    writeFile(cacheInfoPath, json.dump());
-}
-
-static std::optional<std::pair<Hash, Tree>> lookupGitInfo(
-    ref<Store> store,
-    const std::string & name,
-    const Hash & rev)
-{
-    try {
-        auto json = nlohmann::json::parse(readFile(getCacheInfoPathFor(name, rev)));
-
-        assert(json["name"] == name && Hash((std::string) json["rev"], htSHA1) == rev);
-
-        auto storePath = store->parseStorePath((std::string) json["storePath"]);
-
-        if (store->isValidPath(storePath)) {
-            return {{rev, Tree{
-                .actualPath = store->toRealPath(storePath),
-                .storePath = std::move(storePath),
-                .info = TreeInfo {
-                    .revCount = json["revCount"],
-                    .lastModified = json["lastModified"],
-                }
-            }}};
-        }
-
-    } catch (SysError & e) {
-        if (e.errNo != ENOENT) throw;
-    }
-
-    return {};
 }
 
 struct GitInput : Input
@@ -207,11 +146,38 @@ struct GitInput : Input
 
         assert(!rev || rev->type == htSHA1);
 
+        auto cacheType = shallow ? "git-shallow" : "git";
+
+        auto getImmutableAttrs = [&]()
+        {
+            return Attrs({
+                {"type", cacheType},
+                {"name", name},
+                {"rev", input->rev->gitRev()},
+            });
+        };
+
+        auto makeResult = [&](const Attrs & infoAttrs, StorePath && storePath)
+            -> std::pair<Tree, std::shared_ptr<const Input>>
+        {
+            assert(input->rev);
+            assert(!rev || rev == input->rev);
+            return {
+                Tree{
+                    .actualPath = store->toRealPath(storePath),
+                    .storePath = std::move(storePath),
+                    .info = TreeInfo {
+                        .revCount = shallow ? std::nullopt : std::optional(getIntAttr(infoAttrs, "revCount")),
+                        .lastModified = getIntAttr(infoAttrs, "lastModified"),
+                    },
+                },
+                input
+            };
+        };
+
         if (rev) {
-            if (auto tree = lookupGitInfo(store, name, *rev)) {
-                input->rev = tree->first;
-                return {std::move(tree->second), input};
-            }
+            if (auto res = getCache()->lookup(store, getImmutableAttrs()))
+                return makeResult(res->first, std::move(res->second));
         }
 
         auto [isLocal, actualUrl_] = getActualUrl();
@@ -290,6 +256,13 @@ struct GitInput : Input
 
         if (!input->ref) input->ref = isLocal ? readHead(actualUrl) : "master";
 
+        Attrs mutableAttrs({
+            {"type", cacheType},
+            {"name", name},
+            {"url", actualUrl},
+            {"ref", *input->ref},
+        });
+
         Path repoDir;
 
         if (isLocal) {
@@ -300,6 +273,14 @@ struct GitInput : Input
             repoDir = actualUrl;
 
         } else {
+
+            if (auto res = getCache()->lookup(store, mutableAttrs)) {
+                auto rev2 = Hash(getStrAttr(res->first, "rev"), htSHA1);
+                if (!rev || rev == rev2) {
+                    input->rev = rev2;
+                    return makeResult(res->first, std::move(res->second));
+                }
+            }
 
             Path cacheDir = getCacheDir() + "/nix/gitv3/" + hashString(htSHA256, actualUrl).to_string(Base32, false);
             repoDir = cacheDir;
@@ -368,15 +349,14 @@ struct GitInput : Input
         if (isShallow && !shallow)
             throw Error("'%s' is a shallow Git repository, but a non-shallow repository is needed", actualUrl);
 
-        if (auto tree = lookupGitInfo(store, name, *input->rev)) {
-            assert(*input->rev == tree->first);
-            if (shallow) tree->second.info.revCount.reset();
-            return {std::move(tree->second), input};
-        }
-
         // FIXME: check whether rev is an ancestor of ref.
 
         printTalkative("using revision %s of repo '%s'", input->rev->gitRev(), actualUrl);
+
+        /* Now that we know the ref, check again whether we have it in
+           the store. */
+        if (auto res = getCache()->lookup(store, getImmutableAttrs()))
+            return makeResult(res->first, std::move(res->second));
 
         // FIXME: should pipe this, or find some better way to extract a
         // revision.
@@ -395,21 +375,31 @@ struct GitInput : Input
 
         auto lastModified = std::stoull(runProgram("git", true, { "-C", repoDir, "log", "-1", "--format=%ct", input->rev->gitRev() }));
 
-        auto tree = Tree {
-            .actualPath = store->toRealPath(storePath),
-            .storePath = std::move(storePath),
-            .info = TreeInfo {
-                .revCount =
-                    !shallow
-                    ? std::optional(std::stoull(runProgram("git", true, { "-C", repoDir, "rev-list", "--count", input->rev->gitRev() })))
-                    : std::nullopt,
-                .lastModified = lastModified
-            }
-        };
+        Attrs infoAttrs({
+            {"rev", input->rev->gitRev()},
+            {"lastModified", lastModified},
+        });
 
-        cacheGitInfo(*store, name, tree, *input->rev);
+        if (!shallow)
+            infoAttrs.insert_or_assign("revCount",
+                std::stoull(runProgram("git", true, { "-C", repoDir, "rev-list", "--count", input->rev->gitRev() })));
 
-        return {std::move(tree), input};
+        if (!this->rev)
+            getCache()->add(
+                store,
+                mutableAttrs,
+                infoAttrs,
+                storePath,
+                false);
+
+        getCache()->add(
+            store,
+            getImmutableAttrs(),
+            infoAttrs,
+            storePath,
+            true);
+
+        return makeResult(infoAttrs, std::move(storePath));
     }
 };
 

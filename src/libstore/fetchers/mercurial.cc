@@ -174,7 +174,7 @@ struct MercurialInput : Input
         auto makeResult = [&](const Attrs & infoAttrs, StorePath && storePath)
             -> std::pair<Tree, std::shared_ptr<const Input>>
         {
-            input->rev = Hash(getStrAttr(infoAttrs, "rev"), htSHA1);
+            assert(input->rev);
             assert(!rev || rev == input->rev);
             return {
                 Tree{
@@ -203,8 +203,13 @@ struct MercurialInput : Input
             {"ref", *input->ref},
         });
 
-        if (auto res = getCache()->lookup(store, mutableAttrs))
-            return makeResult(res->first, std::move(res->second));
+        if (auto res = getCache()->lookup(store, mutableAttrs)) {
+            auto rev2 = Hash(getStrAttr(res->first, "rev"), htSHA1);
+            if (!rev || rev == rev2) {
+                input->rev = rev2;
+                return makeResult(res->first, std::move(res->second));
+            }
+        }
 
         Path cacheDir = fmt("%s/nix/hg/%s", getCacheDir(), hashString(htSHA256, actualUrl).to_string(Base32, false));
 

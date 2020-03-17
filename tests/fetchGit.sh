@@ -11,7 +11,7 @@ repo=$TEST_ROOT/git
 
 export _NIX_FORCE_HTTP=1
 
-rm -rf $repo ${repo}-tmp $TEST_HOME/.cache/nix/git* $TEST_ROOT/worktree $TEST_ROOT/shallow
+rm -rf $repo ${repo}-tmp $TEST_HOME/.cache/nix $TEST_ROOT/worktree $TEST_ROOT/shallow
 
 git init $repo
 git -C $repo config user.email "foobar@example.com"
@@ -59,10 +59,10 @@ path2=$(nix eval --impure --raw --expr "(builtins.fetchGit file://$repo).outPath
 [[ $(nix eval --impure --raw --expr "(builtins.fetchGit file://$repo).rev") = $rev2 ]]
 
 # Fetching with a explicit hash should succeed.
-path2=$(nix eval --tarball-ttl 0 --raw --expr "(builtins.fetchGit { url = file://$repo; rev = \"$rev2\"; }).outPath")
+path2=$(nix eval --refresh --raw --expr "(builtins.fetchGit { url = file://$repo; rev = \"$rev2\"; }).outPath")
 [[ $path = $path2 ]]
 
-path2=$(nix eval --tarball-ttl 0 --raw --expr "(builtins.fetchGit { url = file://$repo; rev = \"$rev1\"; }).outPath")
+path2=$(nix eval --refresh --raw --expr "(builtins.fetchGit { url = file://$repo; rev = \"$rev1\"; }).outPath")
 [[ $(cat $path2/hello) = utrecht ]]
 
 mv ${repo}-tmp $repo
@@ -99,7 +99,7 @@ path3=$(nix eval --raw --expr "(builtins.fetchGit { url = $repo; rev = \"$rev2\"
 # Committing should not affect the store path.
 git -C $repo commit -m 'Bla3' -a
 
-path4=$(nix eval --impure --tarball-ttl 0 --raw --expr "(builtins.fetchGit file://$repo).outPath")
+path4=$(nix eval --impure --refresh --raw --expr "(builtins.fetchGit file://$repo).outPath")
 [[ $path2 = $path4 ]]
 
 # tarball-ttl should be ignored if we specify a rev
@@ -137,11 +137,10 @@ path5=$(nix eval --impure --raw --expr "(builtins.fetchGit { url = $repo; ref = 
 
 
 # Nuke the cache
-rm -rf $TEST_HOME/.cache/nix/gitv2
+rm -rf $TEST_HOME/.cache/nix
 
-# Try again, but without 'git' on PATH
+# Try again, but without 'git' on PATH. This should fail.
 NIX=$(command -v nix)
-# This should fail
 (! PATH= $NIX eval --impure --raw --expr "(builtins.fetchGit { url = $repo; ref = \"dev\"; }).outPath" )
 
 # Try again, with 'git' available.  This should work.
