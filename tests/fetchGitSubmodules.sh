@@ -38,10 +38,6 @@ git -C $rootRepo commit -m "Add submodule"
 
 rev=$(git -C $rootRepo rev-parse HEAD)
 
-pathWithoutSubmodules=$(nix eval --raw "(builtins.fetchGit { url = file://$rootRepo; rev = \"$rev\"; }).outPath")
-pathWithSubmodules=$(nix eval --raw "(builtins.fetchGit { url = file://$rootRepo; rev = \"$rev\"; submodules = true; }).outPath")
-pathWithSubmodulesAgain=$(nix eval --raw "(builtins.fetchGit { url = file://$rootRepo; rev = \"$rev\"; submodules = true; }).outPath")
-
 r1=$(nix eval --raw "(builtins.fetchGit { url = file://$rootRepo; rev = \"$rev\"; }).outPath")
 r2=$(nix eval --raw "(builtins.fetchGit { url = file://$rootRepo; rev = \"$rev\"; submodules = false; }).outPath")
 r3=$(nix eval --raw "(builtins.fetchGit { url = file://$rootRepo; rev = \"$rev\"; submodules = true; }).outPath")
@@ -70,15 +66,25 @@ have_submodules=$(nix eval "(builtins.fetchGit { url = $rootRepo; rev = \"$rev\"
 have_submodules=$(nix eval "(builtins.fetchGit { url = $rootRepo; rev = \"$rev\"; submodules = true; }).submodules")
 [[ $have_submodules == true ]]
 
+pathWithoutSubmodules=$(nix eval --raw "(builtins.fetchGit { url = file://$rootRepo; rev = \"$rev\"; }).outPath")
+pathWithSubmodules=$(nix eval --raw "(builtins.fetchGit { url = file://$rootRepo; rev = \"$rev\"; submodules = true; }).outPath")
+pathWithSubmodulesAgain=$(nix eval --raw "(builtins.fetchGit { url = file://$rootRepo; rev = \"$rev\"; submodules = true; }).outPath")
+pathWithSubmodulesAgainWithRef=$(nix eval --raw "(builtins.fetchGit { url = file://$rootRepo; ref = \"refs/heads/master\"; rev = \"$rev\"; submodules = true; }).outPath")
+
 # The resulting store path cannot be the same.
 [[ $pathWithoutSubmodules != $pathWithSubmodules ]]
 
 # Checking out the same repo with submodules returns in the same store path.
 [[ $pathWithSubmodules == $pathWithSubmodulesAgain ]]
 
+# Checking out the same repo with submodules returns in the same store path.
+[[ $pathWithSubmodulesAgain == $pathWithSubmodulesAgainWithRef ]]
+
 # The submodules flag is actually honored.
 [[ ! -e $pathWithoutSubmodules/sub/content ]]
 [[ -e $pathWithSubmodules/sub/content ]]
+
+[[ -e $pathWithSubmodulesAgainWithRef/sub/content ]]
 
 # No .git directory or submodule reference files must be left
 test "$(find "$pathWithSubmodules" -name .git)" = ""
