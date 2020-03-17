@@ -32,6 +32,9 @@ GitInfo exportGit(ref<Store> store, const std::string & uri,
     std::optional<std::string> ref, std::string rev,
     const std::string & name, bool fetchSubmodules)
 {
+    GitInfo gitInfo;
+    gitInfo.submodules = fetchSubmodules;
+
     if (evalSettings.pureEval && rev == "")
         throw Error("in pure evaluation mode, 'fetchGit' requires a Git revision");
 
@@ -49,7 +52,6 @@ GitInfo exportGit(ref<Store> store, const std::string & uri,
         if (!clean) {
 
             /* This is an unclean working tree. So copy all tracked files. */
-            GitInfo gitInfo;
             gitInfo.rev = "0000000000000000000000000000000000000000";
             gitInfo.shortRev = std::string(gitInfo.rev, 0, 7);
 
@@ -141,7 +143,6 @@ GitInfo exportGit(ref<Store> store, const std::string & uri,
     }
 
     // FIXME: check whether rev is an ancestor of ref.
-    GitInfo gitInfo;
     gitInfo.rev = rev != "" ? rev : chomp(readFile(localRefFile));
     gitInfo.shortRev = std::string(gitInfo.rev, 0, 7);
 
@@ -190,8 +191,6 @@ GitInfo exportGit(ref<Store> store, const std::string & uri,
                 std::filesystem::remove_all(p.path());
             }
         }
-
-        gitInfo.submodules = true;
     } else {
         auto source = sinkToSource([&](Sink & sink) {
             RunOptions gitOptions("git", { "-C", cacheDir, "archive", gitInfo.rev });

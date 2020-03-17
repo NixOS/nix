@@ -61,6 +61,15 @@ r8=$(nix eval --raw "(builtins.fetchGit { url = $rootRepo; rev = \"$rev\"; submo
 [[ $r6 == $r7 ]]
 [[ $r7 == $r8 ]]
 
+have_submodules=$(nix eval "(builtins.fetchGit { url = $rootRepo; rev = \"$rev\"; }).submodules")
+[[ $have_submodules == false ]]
+
+have_submodules=$(nix eval "(builtins.fetchGit { url = $rootRepo; rev = \"$rev\"; submodules = false; }).submodules")
+[[ $have_submodules == false ]]
+
+have_submodules=$(nix eval "(builtins.fetchGit { url = $rootRepo; rev = \"$rev\"; submodules = true; }).submodules")
+[[ $have_submodules == true ]]
+
 # The resulting store path cannot be the same.
 [[ $pathWithoutSubmodules != $pathWithSubmodules ]]
 
