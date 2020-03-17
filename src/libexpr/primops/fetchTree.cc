@@ -52,7 +52,7 @@ static void prim_fetchTree(EvalState & state, const Pos & pos, Value * * args, V
     if (args[0]->type == tAttrs) {
         state.forceAttrs(*args[0], pos);
 
-        fetchers::Input::Attrs attrs;
+        fetchers::Attrs attrs;
 
         for (auto & attr : *args[0]->attrs) {
             state.forceValue(*attr.value);

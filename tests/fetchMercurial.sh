@@ -9,7 +9,7 @@ clearStore
 
 repo=$TEST_ROOT/hg
 
-rm -rf $repo ${repo}-tmp $TEST_HOME/.cache/nix/hg
+rm -rf $repo ${repo}-tmp $TEST_HOME/.cache/nix
 
 hg init $repo
 echo '[ui]' >> $repo/.hg/hgrc
@@ -50,13 +50,13 @@ path2=$(nix eval --impure --raw --expr "(builtins.fetchMercurial file://$repo).o
 [[ $(nix eval --impure --raw --expr "(builtins.fetchMercurial file://$repo).rev") = $rev2 ]]
 
 # But with TTL 0, it should fail.
-(! nix eval --impure --tarball-ttl 0 --expr "builtins.fetchMercurial file://$repo")
+(! nix eval --impure --refresh --expr "builtins.fetchMercurial file://$repo")
 
 # Fetching with a explicit hash should succeed.
-path2=$(nix eval --tarball-ttl 0 --raw --expr "(builtins.fetchMercurial { url = file://$repo; rev = \"$rev2\"; }).outPath")
+path2=$(nix eval --refresh --raw --expr "(builtins.fetchMercurial { url = file://$repo; rev = \"$rev2\"; }).outPath")
 [[ $path = $path2 ]]
 
-path2=$(nix eval --tarball-ttl 0 --raw --expr "(builtins.fetchMercurial { url = file://$repo; rev = \"$rev1\"; }).outPath")
+path2=$(nix eval --refresh --raw --expr "(builtins.fetchMercurial { url = file://$repo; rev = \"$rev1\"; }).outPath")
 [[ $(cat $path2/hello) = utrecht ]]
 
 mv ${repo}-tmp $repo
@@ -89,5 +89,5 @@ path3=$(nix eval --impure --raw --expr "(builtins.fetchMercurial { url = $repo; 
 # Committing should not affect the store path.
 hg commit --cwd $repo -m 'Bla3'
 
-path4=$(nix eval --impure --tarball-ttl 0 --raw --expr "(builtins.fetchMercurial file://$repo).outPath")
+path4=$(nix eval --impure --refresh --raw --expr "(builtins.fetchMercurial file://$repo).outPath")
 [[ $path2 = $path4 ]]

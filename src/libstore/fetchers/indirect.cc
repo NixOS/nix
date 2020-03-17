@@ -120,7 +120,7 @@ struct IndirectInputScheme : InputScheme
         return input;
     }
 
-    std::unique_ptr<Input> inputFromAttrs(const Input::Attrs & attrs) override
+    std::unique_ptr<Input> inputFromAttrs(const Attrs & attrs) override
     {
         if (maybeGetStrAttr(attrs, "type") != "indirect") return {};
 

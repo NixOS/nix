@@ -19,7 +19,7 @@ std::string FlakeRef::to_string() const
     return input->to_string();
 }
 
-fetchers::Input::Attrs FlakeRef::toAttrs() const
+fetchers::Attrs FlakeRef::toAttrs() const
 {
     auto attrs = input->toAttrs();
     if (subdir != "")
@@ -168,7 +168,7 @@ std::optional<std::pair<FlakeRef, std::string>> maybeParseFlakeRefWithFragment(
     }
 }
 
-FlakeRef FlakeRef::fromAttrs(const fetchers::Input::Attrs & attrs)
+FlakeRef FlakeRef::fromAttrs(const fetchers::Attrs & attrs)
 {
     auto attrs2(attrs);
     attrs2.erase("dir");

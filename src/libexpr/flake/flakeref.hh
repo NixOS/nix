@@ -29,11 +29,11 @@ struct FlakeRef
     // FIXME: change to operator <<.
     std::string to_string() const;
 
-    fetchers::Input::Attrs toAttrs() const;
+    fetchers::Attrs toAttrs() const;
 
     FlakeRef resolve(ref<Store> store) const;
 
-    static FlakeRef fromAttrs(const fetchers::Input::Attrs & attrs);
+    static FlakeRef fromAttrs(const fetchers::Attrs & attrs);
 
     std::pair<fetchers::Tree, FlakeRef> fetchTree(ref<Store> store) const;
 };

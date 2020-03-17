@@ -420,7 +420,7 @@ struct GitInputScheme : InputScheme
         if (hasPrefix(url2.scheme, "git+")) url2.scheme = std::string(url2.scheme, 4);
         url2.query.clear();
 
-        Input::Attrs attrs;
+        Attrs attrs;
         attrs.emplace("type", "git");
 
         for (auto &[name, value] : url.query) {
@@ -435,7 +435,7 @@ struct GitInputScheme : InputScheme
         return inputFromAttrs(attrs);
     }
 
-    std::unique_ptr<Input> inputFromAttrs(const Input::Attrs & attrs) override
+    std::unique_ptr<Input> inputFromAttrs(const Attrs & attrs) override
     {
         if (maybeGetStrAttr(attrs, "type") != "git") return {};
 

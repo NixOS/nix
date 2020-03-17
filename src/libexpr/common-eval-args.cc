@@ -44,7 +44,7 @@ MixEvalArgs::MixEvalArgs()
       .handler([&](std::vector<std::string> ss) {
           auto from = parseFlakeRef(ss[0], absPath("."));
           auto to = parseFlakeRef(ss[1], absPath("."));
-          fetchers::Input::Attrs extraAttrs;
+          fetchers::Attrs extraAttrs;
           if (to.subdir != "") extraAttrs["dir"] = to.subdir;
           fetchers::overrideRegistry(from.input, to.input, extraAttrs);
       });

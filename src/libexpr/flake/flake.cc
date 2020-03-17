@@ -132,10 +132,10 @@ static FlakeInput parseFlakeInput(EvalState & state,
     auto sFlake = state.symbols.create("flake");
     auto sFollows = state.symbols.create("follows");
 
-    fetchers::Input::Attrs attrs;
+    fetchers::Attrs attrs;
     std::optional<std::string> url;
 
-    for (Attr attr : *(value->attrs)) {
+    for (nix::Attr attr : *(value->attrs)) {
         try {
             if (attr.name == sUrl || attr.name == sUri) {
                 expectType(state, tString, *attr.value, *attr.pos);
@@ -188,7 +188,7 @@ static std::map<FlakeId, FlakeInput> parseFlakeInputs(
 
     expectType(state, tAttrs, *value, pos);
 
-    for (Attr & inputAttr : *(*value).attrs) {
+    for (nix::Attr & inputAttr : *(*value).attrs) {
         inputs.emplace(inputAttr.name,
             parseFlakeInput(state,
                 inputAttr.name,

@@ -1,8 +1,9 @@
-#include "fetchers.hh"
 #include "download.hh"
+#include "fetchers/cache.hh"
+#include "fetchers/fetchers.hh"
+#include "fetchers/parse.hh"
+#include "fetchers/regex.hh"
 #include "globals.hh"
-#include "parse.hh"
-#include "regex.hh"
 #include "store-api.hh"
 
 #include <nlohmann/json.hpp>
@@ -72,23 +73,64 @@ struct GitHubInput : Input
     std::pair<Tree, std::shared_ptr<const Input>> fetchTreeInternal(nix::ref<Store> store) const override
     {
         auto rev = this->rev;
+        auto ref = this->ref.value_or("master");
 
-    #if 0
-        if (rev) {
-            if (auto gitInfo = lookupGitInfo(store, "source", *rev))
-                return *gitInfo;
+        Attrs mutableAttrs({
+            {"type", "github"},
+            {"owner", owner},
+            {"repo", repo},
+            {"ref", ref},
+        });
+
+        if (!rev) {
+            if (auto res = getCache()->lookup(store, mutableAttrs)) {
+                auto input = std::make_shared<GitHubInput>(*this);
+                input->ref = {};
+                input->rev = Hash(getStrAttr(res->first, "rev"), htSHA1);
+                return {
+                    Tree{
+                        .actualPath = store->toRealPath(res->second),
+                        .storePath = std::move(res->second),
+                        .info = TreeInfo {
+                            .lastModified = getIntAttr(res->first, "lastModified"),
+                        },
+                    },
+                    input
+                };
+            }
         }
-    #endif
 
         if (!rev) {
             auto url = fmt("https://api.github.com/repos/%s/%s/commits/%s",
-                owner, repo, ref ? *ref : "master");
+                owner, repo, ref);
             CachedDownloadRequest request(url);
             request.ttl = rev ? 1000000000 : settings.tarballTtl;
             auto result = getDownloader()->downloadCached(store, request);
             auto json = nlohmann::json::parse(readFile(result.path));
             rev = Hash(json["sha"], htSHA1);
             debug("HEAD revision for '%s' is %s", url, rev->gitRev());
+        }
+
+        auto input = std::make_shared<GitHubInput>(*this);
+        input->ref = {};
+        input->rev = *rev;
+
+        Attrs immutableAttrs({
+            {"type", "git-tarball"},
+            {"rev", rev->gitRev()},
+        });
+
+        if (auto res = getCache()->lookup(store, immutableAttrs)) {
+            return {
+                Tree{
+                    .actualPath = store->toRealPath(res->second),
+                    .storePath = std::move(res->second),
+                    .info = TreeInfo {
+                        .lastModified = getIntAttr(res->first, "lastModified"),
+                    },
+                },
+                input
+            };
         }
 
         // FIXME: use regular /archive URLs instead? api.github.com
@@ -118,14 +160,25 @@ struct GitHubInput : Input
             },
         };
 
-    #if 0
-        // FIXME: this can overwrite a cache file that contains a revCount.
-        cacheGitInfo("source", gitInfo);
-    #endif
+        Attrs infoAttrs({
+            {"rev", rev->gitRev()},
+            {"lastModified", *result.info.lastModified}
+        });
 
-        auto input = std::make_shared<GitHubInput>(*this);
-        input->ref = {};
-        input->rev = *rev;
+        if (!this->rev)
+            getCache()->add(
+                store,
+                mutableAttrs,
+                infoAttrs,
+                result.storePath,
+                false);
+
+        getCache()->add(
+            store,
+            immutableAttrs,
+            infoAttrs,
+            result.storePath,
+            true);
 
         return {std::move(result), input};
     }
@@ -189,7 +242,7 @@ struct GitHubInputScheme : InputScheme
         return input;
     }
 
-    std::unique_ptr<Input> inputFromAttrs(const Input::Attrs & attrs) override
+    std::unique_ptr<Input> inputFromAttrs(const Attrs & attrs) override
     {
         if (maybeGetStrAttr(attrs, "type") != "github") return {};
 

@@ -4,11 +4,9 @@
 #include "hash.hh"
 #include "path.hh"
 #include "tree-info.hh"
+#include "attrs.hh"
 
 #include <memory>
-#include <variant>
-
-#include <nlohmann/json_fwd.hpp>
 
 namespace nix { class Store; }
 
@@ -49,9 +47,6 @@ struct Input : std::enable_shared_from_this<Input>
 
     virtual std::string to_string() const = 0;
 
-    typedef std::variant<std::string, int64_t> Attr;
-    typedef std::map<std::string, Attr> Attrs;
-
     Attrs toAttrs() const;
 
     std::pair<Tree, std::shared_ptr<const Input>> fetchTree(ref<Store> store) const;
@@ -87,23 +82,15 @@ struct InputScheme
 
     virtual std::unique_ptr<Input> inputFromURL(const ParsedURL & url) = 0;
 
-    virtual std::unique_ptr<Input> inputFromAttrs(const Input::Attrs & attrs) = 0;
+    virtual std::unique_ptr<Input> inputFromAttrs(const Attrs & attrs) = 0;
 };
 
 std::unique_ptr<Input> inputFromURL(const ParsedURL & url);
 
 std::unique_ptr<Input> inputFromURL(const std::string & url);
 
-std::unique_ptr<Input> inputFromAttrs(const Input::Attrs & attrs);
+std::unique_ptr<Input> inputFromAttrs(const Attrs & attrs);
 
 void registerInputScheme(std::unique_ptr<InputScheme> && fetcher);
-
-Input::Attrs jsonToAttrs(const nlohmann::json & json);
-
-nlohmann::json attrsToJson(const Input::Attrs & attrs);
-
-std::optional<std::string> maybeGetStrAttr(const Input::Attrs & attrs, const std::string & name);
-
-std::string getStrAttr(const Input::Attrs & attrs, const std::string & name);
 
 }

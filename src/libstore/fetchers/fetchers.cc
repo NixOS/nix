@@ -28,7 +28,7 @@ std::unique_ptr<Input> inputFromURL(const std::string & url)
     return inputFromURL(parseURL(url));
 }
 
-std::unique_ptr<Input> inputFromAttrs(const Input::Attrs & attrs)
+std::unique_ptr<Input> inputFromAttrs(const Attrs & attrs)
 {
     for (auto & inputScheme : *inputSchemes) {
         auto res = inputScheme->inputFromAttrs(attrs);
@@ -42,59 +42,13 @@ std::unique_ptr<Input> inputFromAttrs(const Input::Attrs & attrs)
     throw Error("input '%s' is unsupported", attrsToJson(attrs));
 }
 
-Input::Attrs jsonToAttrs(const nlohmann::json & json)
-{
-    fetchers::Input::Attrs attrs;
-
-    for (auto & i : json.items()) {
-        if (i.value().is_number())
-            attrs.emplace(i.key(), i.value().get<int64_t>());
-        else if (i.value().is_string())
-            attrs.emplace(i.key(), i.value().get<std::string>());
-        else
-            throw Error("unsupported input attribute type in lock file");
-    }
-
-    return attrs;
-}
-
-nlohmann::json attrsToJson(const fetchers::Input::Attrs & attrs)
-{
-    nlohmann::json json;
-    for (auto & attr : attrs) {
-        if (auto v = std::get_if<int64_t>(&attr.second)) {
-            json[attr.first] = *v;
-        } else if (auto v = std::get_if<std::string>(&attr.second)) {
-            json[attr.first] = *v;
-        } else abort();
-    }
-    return json;
-}
-
-Input::Attrs Input::toAttrs() const
+Attrs Input::toAttrs() const
 {
     auto attrs = toAttrsInternal();
     if (narHash)
         attrs.emplace("narHash", narHash->to_string(SRI));
     attrs.emplace("type", type());
     return attrs;
-}
-
-std::optional<std::string> maybeGetStrAttr(const Input::Attrs & attrs, const std::string & name)
-{
-    auto i = attrs.find(name);
-    if (i == attrs.end()) return {};
-    if (auto v = std::get_if<std::string>(&i->second))
-        return *v;
-    throw Error("input attribute '%s' is not a string", name);
-}
-
-std::string getStrAttr(const Input::Attrs & attrs, const std::string & name)
-{
-    auto s = maybeGetStrAttr(attrs, name);
-    if (!s)
-        throw Error("input attribute '%s' is missing", name);
-    return *s;
 }
 
 std::pair<Tree, std::shared_ptr<const Input>> Input::fetchTree(ref<Store> store) const

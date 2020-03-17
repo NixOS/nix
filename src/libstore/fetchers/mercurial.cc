@@ -1,13 +1,12 @@
-#include "fetchers.hh"
-#include "parse.hh"
+#include "fetchers/fetchers.hh"
+#include "fetchers/cache.hh"
+#include "fetchers/parse.hh"
 #include "globals.hh"
 #include "tarfile.hh"
 #include "store-api.hh"
 #include "regex.hh"
 
 #include <sys/time.h>
-
-#include <nlohmann/json.hpp>
 
 using namespace std::string_literals;
 
@@ -163,51 +162,80 @@ struct MercurialInput : Input
 
         if (!input->ref) input->ref = "default";
 
-        Path cacheDir = fmt("%s/nix/hg/%s", getCacheDir(), hashString(htSHA256, actualUrl).to_string(Base32, false));
+        auto getImmutableAttrs = [&]()
+        {
+            return Attrs({
+                {"type", "hg"},
+                {"name", name},
+                {"rev", input->rev->gitRev()},
+            });
+        };
+
+        auto makeResult = [&](const Attrs & infoAttrs, StorePath && storePath)
+            -> std::pair<Tree, std::shared_ptr<const Input>>
+        {
+            input->rev = Hash(getStrAttr(infoAttrs, "rev"), htSHA1);
+            assert(!rev || rev == input->rev);
+            return {
+                Tree{
+                    .actualPath = store->toRealPath(storePath),
+                    .storePath = std::move(storePath),
+                    .info = TreeInfo {
+                        .revCount = getIntAttr(infoAttrs, "revCount"),
+                    },
+                },
+                input
+            };
+        };
+
+        if (input->rev) {
+            if (auto res = getCache()->lookup(store, getImmutableAttrs()))
+                return makeResult(res->first, std::move(res->second));
+        }
 
         assert(input->rev || input->ref);
         auto revOrRef = input->rev ? input->rev->gitRev() : *input->ref;
 
-        Path stampFile = fmt("%s/.hg/%s.stamp", cacheDir, hashString(htSHA512, revOrRef).to_string(Base32, false));
+        Attrs mutableAttrs({
+            {"type", "hg"},
+            {"name", name},
+            {"url", actualUrl},
+            {"ref", *input->ref},
+        });
 
-        /* If we haven't pulled this repo less than ‘tarball-ttl’ seconds,
-           do so now. */
-        time_t now = time(0);
-        struct stat st;
-        if (stat(stampFile.c_str(), &st) != 0 ||
-            (uint64_t) st.st_mtime + settings.tarballTtl <= (uint64_t) now)
+        if (auto res = getCache()->lookup(store, mutableAttrs))
+            return makeResult(res->first, std::move(res->second));
+
+        Path cacheDir = fmt("%s/nix/hg/%s", getCacheDir(), hashString(htSHA256, actualUrl).to_string(Base32, false));
+
+        /* If this is a commit hash that we already have, we don't
+           have to pull again. */
+        if (!(input->rev
+                && pathExists(cacheDir)
+                && runProgram(
+                    RunOptions("hg", { "log", "-R", cacheDir, "-r", input->rev->gitRev(), "--template", "1" })
+                    .killStderr(true)).second == "1"))
         {
-            /* Except that if this is a commit hash that we already have,
-               we don't have to pull again. */
-            if (!(input->rev
-                    && pathExists(cacheDir)
-                    && runProgram(
-                        RunOptions("hg", { "log", "-R", cacheDir, "-r", input->rev->gitRev(), "--template", "1" })
-                        .killStderr(true)).second == "1"))
-            {
-                Activity act(*logger, lvlTalkative, actUnknown, fmt("fetching Mercurial repository '%s'", actualUrl));
+            Activity act(*logger, lvlTalkative, actUnknown, fmt("fetching Mercurial repository '%s'", actualUrl));
 
-                if (pathExists(cacheDir)) {
-                    try {
-                        runProgram("hg", true, { "pull", "-R", cacheDir, "--", actualUrl });
-                    }
-                    catch (ExecError & e) {
-                        string transJournal = cacheDir + "/.hg/store/journal";
-                        /* hg throws "abandoned transaction" error only if this file exists */
-                        if (pathExists(transJournal)) {
-                            runProgram("hg", true, { "recover", "-R", cacheDir });
-                            runProgram("hg", true, { "pull", "-R", cacheDir, "--", actualUrl });
-                        } else {
-                            throw ExecError(e.status, fmt("'hg pull' %s", statusToString(e.status)));
-                        }
-                    }
-                } else {
-                    createDirs(dirOf(cacheDir));
-                    runProgram("hg", true, { "clone", "--noupdate", "--", actualUrl, cacheDir });
+            if (pathExists(cacheDir)) {
+                try {
+                    runProgram("hg", true, { "pull", "-R", cacheDir, "--", actualUrl });
                 }
+                catch (ExecError & e) {
+                    string transJournal = cacheDir + "/.hg/store/journal";
+                    /* hg throws "abandoned transaction" error only if this file exists */
+                    if (pathExists(transJournal)) {
+                        runProgram("hg", true, { "recover", "-R", cacheDir });
+                        runProgram("hg", true, { "pull", "-R", cacheDir, "--", actualUrl });
+                    } else {
+                        throw ExecError(e.status, fmt("'hg pull' %s", statusToString(e.status)));
+                    }
+                }
+            } else {
+                createDirs(dirOf(cacheDir));
+                runProgram("hg", true, { "clone", "--noupdate", "--", actualUrl, cacheDir });
             }
-
-            writeFile(stampFile, "");
         }
 
         auto tokens = tokenizeString<std::vector<std::string>>(
@@ -218,33 +246,8 @@ struct MercurialInput : Input
         auto revCount = std::stoull(tokens[1]);
         input->ref = tokens[2];
 
-        std::string storeLinkName = hashString(htSHA512, name + std::string("\0"s) + input->rev->gitRev()).to_string(Base32, false);
-        Path storeLink = fmt("%s/.hg/%s.link", cacheDir, storeLinkName);
-
-        try {
-            auto json = nlohmann::json::parse(readFile(storeLink));
-
-            assert(json["name"] == name && json["rev"] == input->rev->gitRev());
-
-            auto storePath = store->parseStorePath((std::string) json["storePath"]);
-
-            if (store->isValidPath(storePath)) {
-                printTalkative("using cached Mercurial store path '%s'", store->printStorePath(storePath));
-                return {
-                    Tree {
-                        .actualPath = store->printStorePath(storePath),
-                        .storePath = std::move(storePath),
-                        .info = TreeInfo {
-                            .revCount = revCount,
-                        },
-                    },
-                    input
-                };
-            }
-
-        } catch (SysError & e) {
-            if (e.errNo != ENOENT) throw;
-        }
+        if (auto res = getCache()->lookup(store, getImmutableAttrs()))
+            return makeResult(res->first, std::move(res->second));
 
         Path tmpDir = createTempDir();
         AutoDelete delTmpDir(tmpDir, true);
@@ -255,26 +258,27 @@ struct MercurialInput : Input
 
         auto storePath = store->addToStore(name, tmpDir);
 
-        nlohmann::json json;
-        json["storePath"] = store->printStorePath(storePath);
-        json["uri"] = actualUrl;
-        json["name"] = name;
-        json["branch"] = *input->ref;
-        json["rev"] = input->rev->gitRev();
-        json["revCount"] = revCount;
+        Attrs infoAttrs({
+            {"rev", input->rev->gitRev()},
+            {"revCount", revCount},
+        });
 
-        writeFile(storeLink, json.dump());
+        if (!this->rev)
+            getCache()->add(
+                store,
+                mutableAttrs,
+                infoAttrs,
+                storePath,
+                false);
 
-        return {
-            Tree {
-                .actualPath = store->printStorePath(storePath),
-                .storePath = std::move(storePath),
-                .info = TreeInfo {
-                    .revCount = revCount
-                }
-            },
-            input
-        };
+        getCache()->add(
+            store,
+            getImmutableAttrs(),
+            infoAttrs,
+            storePath,
+            true);
+
+        return makeResult(infoAttrs, std::move(storePath));
     }
 };
 
@@ -291,7 +295,7 @@ struct MercurialInputScheme : InputScheme
         url2.scheme = std::string(url2.scheme, 3);
         url2.query.clear();
 
-        Input::Attrs attrs;
+        Attrs attrs;
         attrs.emplace("type", "hg");
 
         for (auto &[name, value] : url.query) {
@@ -306,7 +310,7 @@ struct MercurialInputScheme : InputScheme
         return inputFromAttrs(attrs);
     }
 
-    std::unique_ptr<Input> inputFromAttrs(const Input::Attrs & attrs) override
+    std::unique_ptr<Input> inputFromAttrs(const Attrs & attrs) override
     {
         if (maybeGetStrAttr(attrs, "type") != "hg") return {};
 

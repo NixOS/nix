@@ -36,7 +36,7 @@ std::shared_ptr<Registry> Registry::read(
     else if (version == 2) {
         for (auto & i : json["flakes"]) {
             auto toAttrs = jsonToAttrs(i["to"]);
-            Input::Attrs extraAttrs;
+            Attrs extraAttrs;
             auto j = toAttrs.find("dir");
             if (j != toAttrs.end()) {
                 extraAttrs.insert(*j);
@@ -80,7 +80,7 @@ void Registry::write(const Path & path)
 void Registry::add(
     const std::shared_ptr<const Input> & from,
     const std::shared_ptr<const Input> & to,
-    const Input::Attrs & extraAttrs)
+    const Attrs & extraAttrs)
 {
     entries.emplace_back(from, to, extraAttrs);
 }
@@ -116,7 +116,7 @@ std::shared_ptr<Registry> getFlagRegistry()
 void overrideRegistry(
     const std::shared_ptr<const Input> & from,
     const std::shared_ptr<const Input> & to,
-    const Input::Attrs & extraAttrs)
+    const Attrs & extraAttrs)
 {
     flagRegistry->add(from, to, extraAttrs);
 }
@@ -148,11 +148,11 @@ Registries getRegistries(ref<Store> store)
     return registries;
 }
 
-std::pair<std::shared_ptr<const Input>, Input::Attrs> lookupInRegistries(
+std::pair<std::shared_ptr<const Input>, Attrs> lookupInRegistries(
     ref<Store> store,
     std::shared_ptr<const Input> input)
 {
-    Input::Attrs extraAttrs;
+    Attrs extraAttrs;
     int n = 0;
 
  restart:
