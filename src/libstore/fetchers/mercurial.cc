@@ -260,7 +260,7 @@ struct MercurialInput : Input
 
         Attrs infoAttrs({
             {"rev", input->rev->gitRev()},
-            {"revCount", revCount},
+            {"revCount", (int64_t) revCount},
         });
 
         if (!this->rev)

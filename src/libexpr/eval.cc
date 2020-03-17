@@ -158,7 +158,7 @@ string showType(ValueType type)
 {
     switch (type) {
         case tInt: return "an integer";
-        case tBool: return "a boolean";
+        case tBool: return "a Boolean";
         case tString: return "a string";
         case tPath: return "a path";
         case tNull: return "null";

@@ -83,6 +83,7 @@ struct GitInput : Input
     ParsedURL url;
     std::optional<std::string> ref;
     std::optional<Hash> rev;
+    bool shallow = false;
 
     GitInput(const ParsedURL & url) : url(url)
     { }
@@ -114,6 +115,7 @@ struct GitInput : Input
         if (url2.scheme != "git") url2.scheme = "git+" + url2.scheme;
         if (rev) url2.query.insert_or_assign("rev", rev->gitRev());
         if (ref) url2.query.insert_or_assign("ref", *ref);
+        if (shallow) url2.query.insert_or_assign("shallow", "1");
         return url2.to_string();
     }
 
@@ -125,6 +127,8 @@ struct GitInput : Input
             attrs.emplace("ref", *ref);
         if (rev)
             attrs.emplace("rev", rev->gitRev());
+        if (shallow)
+            attrs.emplace("shallow", true);
         return attrs;
     }
 
@@ -361,9 +365,12 @@ struct GitInput : Input
 
         bool isShallow = chomp(runProgram("git", true, { "-C", repoDir, "rev-parse", "--is-shallow-repository" })) == "true";
 
+        if (isShallow && !shallow)
+            throw Error("'%s' is a shallow Git repository, but a non-shallow repository is needed", actualUrl);
+
         if (auto tree = lookupGitInfo(store, name, *input->rev)) {
             assert(*input->rev == tree->first);
-            if (isShallow) tree->second.info.revCount.reset();
+            if (shallow) tree->second.info.revCount.reset();
             return {std::move(tree->second), input};
         }
 
@@ -393,7 +400,7 @@ struct GitInput : Input
             .storePath = std::move(storePath),
             .info = TreeInfo {
                 .revCount =
-                    !isShallow
+                    !shallow
                     ? std::optional(std::stoull(runProgram("git", true, { "-C", repoDir, "rev-list", "--count", input->rev->gitRev() })))
                     : std::nullopt,
                 .lastModified = lastModified
@@ -440,7 +447,7 @@ struct GitInputScheme : InputScheme
         if (maybeGetStrAttr(attrs, "type") != "git") return {};
 
         for (auto & [name, value] : attrs)
-            if (name != "type" && name != "url" && name != "ref" && name != "rev")
+            if (name != "type" && name != "url" && name != "ref" && name != "rev" && name != "shallow")
                 throw Error("unsupported Git input attribute '%s'", name);
 
         auto input = std::make_unique<GitInput>(parseURL(getStrAttr(attrs, "url")));
@@ -451,6 +458,9 @@ struct GitInputScheme : InputScheme
         }
         if (auto rev = maybeGetStrAttr(attrs, "rev"))
             input->rev = Hash(*rev, htSHA1);
+
+        input->shallow = maybeGetBoolAttr(attrs, "shallow").value_or(false);
+
         return input;
     }
 };

@@ -148,8 +148,12 @@ NIX=$(command -v nix)
 path5=$(nix eval --impure --raw --expr "(builtins.fetchGit { url = $repo; ref = \"dev\"; }).outPath")
 [[ $path3 = $path5 ]]
 
-# Check that shallow clones work and don't return a revcount.
+# Fetching a shallow repo shouldn't work by default, because we can't
+# return a revCount.
 git clone --depth 1 file://$repo $TEST_ROOT/shallow
-path6=$(nix eval --impure --raw --expr "(builtins.fetchGit { url = $TEST_ROOT/shallow; ref = \"dev\"; }).outPath")
+(! nix eval --impure --raw --expr "(builtins.fetchGit { url = $TEST_ROOT/shallow; ref = \"dev\"; }).outPath")
+
+# But you can request a shallow clone, which won't return a revCount.
+path6=$(nix eval --impure --raw --expr "(builtins.fetchTree { type = \"git\"; url = \"file://$TEST_ROOT/shallow\"; ref = \"dev\"; shallow = true; }).outPath")
 [[ $path3 = $path6 ]]
-[[ $(nix eval --impure --expr "(builtins.fetchTree { type = \"git\"; url = \"file://$TEST_ROOT/shallow\"; ref = \"dev\"; }).revCount or 123") == 123 ]]
+[[ $(nix eval --impure --expr "(builtins.fetchTree { type = \"git\"; url = \"file://$TEST_ROOT/shallow\"; ref = \"dev\"; shallow = true; }).revCount or 123") == 123 ]]

@@ -58,8 +58,10 @@ static void prim_fetchTree(EvalState & state, const Pos & pos, Value * * args, V
             state.forceValue(*attr.value);
             if (attr.value->type == tString)
                 attrs.emplace(attr.name, attr.value->string.s);
+            else if (attr.value->type == tBool)
+                attrs.emplace(attr.name, attr.value->boolean);
             else
-                throw TypeError("fetchTree argument '%s' is %s while a string is expected",
+                throw TypeError("fetchTree argument '%s' is %s while a string or Boolean is expected",
                     attr.name, showType(*attr.value));
         }
 

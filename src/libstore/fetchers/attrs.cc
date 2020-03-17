@@ -14,6 +14,8 @@ Attrs jsonToAttrs(const nlohmann::json & json)
             attrs.emplace(i.key(), i.value().get<int64_t>());
         else if (i.value().is_string())
             attrs.emplace(i.key(), i.value().get<std::string>());
+        else if (i.value().is_boolean())
+            attrs.emplace(i.key(), i.value().get<bool>());
         else
             throw Error("unsupported input attribute type in lock file");
     }
@@ -29,6 +31,8 @@ nlohmann::json attrsToJson(const Attrs & attrs)
             json[attr.first] = *v;
         } else if (auto v = std::get_if<std::string>(&attr.second)) {
             json[attr.first] = *v;
+        } else if (auto v = std::get_if<Explicit<bool>>(&attr.second)) {
+            json[attr.first] = v->t;
         } else abort();
     }
     return json;
@@ -40,7 +44,7 @@ std::optional<std::string> maybeGetStrAttr(const Attrs & attrs, const std::strin
     if (i == attrs.end()) return {};
     if (auto v = std::get_if<std::string>(&i->second))
         return *v;
-    throw Error("input attribute '%s' is not a string", name);
+    throw Error("input attribute '%s' is not a string %s", name, attrsToJson(attrs).dump());
 }
 
 std::string getStrAttr(const Attrs & attrs, const std::string & name)
@@ -57,12 +61,29 @@ std::optional<int64_t> maybeGetIntAttr(const Attrs & attrs, const std::string & 
     if (i == attrs.end()) return {};
     if (auto v = std::get_if<int64_t>(&i->second))
         return *v;
-    throw Error("input attribute '%s' is not a string", name);
+    throw Error("input attribute '%s' is not an integer", name);
 }
 
 int64_t getIntAttr(const Attrs & attrs, const std::string & name)
 {
     auto s = maybeGetIntAttr(attrs, name);
+    if (!s)
+        throw Error("input attribute '%s' is missing", name);
+    return *s;
+}
+
+std::optional<bool> maybeGetBoolAttr(const Attrs & attrs, const std::string & name)
+{
+    auto i = attrs.find(name);
+    if (i == attrs.end()) return {};
+    if (auto v = std::get_if<int64_t>(&i->second))
+        return *v;
+    throw Error("input attribute '%s' is not a Boolean", name);
+}
+
+bool getBoolAttr(const Attrs & attrs, const std::string & name)
+{
+    auto s = maybeGetBoolAttr(attrs, name);
     if (!s)
         throw Error("input attribute '%s' is missing", name);
     return *s;

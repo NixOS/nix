@@ -8,7 +8,14 @@
 
 namespace nix::fetchers {
 
-typedef std::variant<std::string, int64_t> Attr;
+/* Wrap bools to prevent string literals (i.e. 'char *') from being
+   cast to a bool in Attr. */
+template<typename T>
+struct Explicit {
+    T t;
+};
+
+typedef std::variant<std::string, int64_t, Explicit<bool>> Attr;
 typedef std::map<std::string, Attr> Attrs;
 
 Attrs jsonToAttrs(const nlohmann::json & json);
@@ -22,5 +29,9 @@ std::string getStrAttr(const Attrs & attrs, const std::string & name);
 std::optional<int64_t> maybeGetIntAttr(const Attrs & attrs, const std::string & name);
 
 int64_t getIntAttr(const Attrs & attrs, const std::string & name);
+
+std::optional<bool> maybeGetBoolAttr(const Attrs & attrs, const std::string & name);
+
+bool getBoolAttr(const Attrs & attrs, const std::string & name);
 
 }
