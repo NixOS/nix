@@ -211,6 +211,7 @@ GitInfo exportGit(ref<Store> store, const std::string & uri,
     json["name"] = name;
     json["rev"] = gitInfo.rev;
     json["revCount"] = gitInfo.revCount;
+    json["submodules"] = gitInfo.submodules;
 
     writeFile(storeLink, json.dump());
 
