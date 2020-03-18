@@ -39,11 +39,15 @@ find_nix_volume() {
 }
 
 test_fstab() {
-    grep -q "/nix" /etc/fstab 2>/dev/null
+    grep -q "/nix apfs rw" /etc/fstab 2>/dev/null
+}
+
+test_nix_symlink() {
+    [ -L "/nix" ] || grep -q "^nix." /etc/synthetic.conf 2>/dev/null
 }
 
 test_synthetic_conf() {
-    grep -q "^nix" /etc/synthetic.conf 2>/dev/null
+    grep -q "^nix$" /etc/synthetic.conf 2>/dev/null
 }
 
 test_nix() {
@@ -60,12 +64,12 @@ main() {
         echo ""
         echo "  1. Remove the entry from fstab using 'sudo vifs'"
         echo "  2. Destroy the data volume using 'diskutil apfs deleteVolume'"
-        echo "  3. Delete /etc/synthetic.conf"
+        echo "  3. Remove the 'nix' line from /etc/synthetic.conf or the file"
         echo ""
     ) >&2
 
-    if [ -L "/nix" ]; then
-        echo "error: /nix is a symlink, please remove it or edit synthetic.conf (requires reboot)" >&2
+    if test_nix_symlink; then
+        echo "error: /nix is a symlink, please remove it and make sure it's not in synthetic.conf (in which case a reboot is required)" >&2
         echo "  /nix -> $(readlink "/nix")" >&2
         exit 2
     fi
