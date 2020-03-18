@@ -163,7 +163,7 @@ struct GitInput : Input
             assert(input->rev);
             assert(!rev || rev == input->rev);
             return {
-                Tree{
+                Tree {
                     .actualPath = store->toRealPath(storePath),
                     .storePath = std::move(storePath),
                     .info = TreeInfo {

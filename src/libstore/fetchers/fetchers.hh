@@ -93,4 +93,16 @@ std::unique_ptr<Input> inputFromAttrs(const Attrs & attrs);
 
 void registerInputScheme(std::unique_ptr<InputScheme> && fetcher);
 
+StorePath downloadFile(
+    ref<Store> store,
+    const std::string & url,
+    const std::string & name,
+    bool immutable);
+
+Tree downloadTarball(
+    ref<Store> store,
+    const std::string & url,
+    const std::string & name,
+    bool immutable);
+
 }

@@ -1,8 +1,9 @@
-#include "registry.hh"
+#include "fetchers/registry.hh"
+#include "fetchers/fetchers.hh"
 #include "util.hh"
-#include "fetchers.hh"
 #include "globals.hh"
 #include "download.hh"
+#include "store-api.hh"
 
 #include <nlohmann/json.hpp>
 
@@ -126,12 +127,10 @@ static std::shared_ptr<Registry> getGlobalRegistry(ref<Store> store)
     static auto reg = [&]() {
         auto path = settings.flakeRegistry;
 
-        if (!hasPrefix(path, "/")) {
-            CachedDownloadRequest request(path);
-            request.name = "flake-registry.json";
-            request.gcRoot = true;
-            path = getDownloader()->downloadCached(store, request).path;
-        }
+        if (!hasPrefix(path, "/"))
+            // FIXME: register as GC root.
+            // FIXME: if download fails, use previous version if available.
+            path = store->toRealPath(downloadFile(store, path, "flake-registry.json", false));
 
         return Registry::read(path, Registry::Global);
     }();

@@ -75,38 +75,13 @@ struct GitHubInput : Input
         auto rev = this->rev;
         auto ref = this->ref.value_or("master");
 
-        Attrs mutableAttrs({
-            {"type", "github"},
-            {"owner", owner},
-            {"repo", repo},
-            {"ref", ref},
-        });
-
-        if (!rev) {
-            if (auto res = getCache()->lookup(store, mutableAttrs)) {
-                auto input = std::make_shared<GitHubInput>(*this);
-                input->ref = {};
-                input->rev = Hash(getStrAttr(res->first, "rev"), htSHA1);
-                return {
-                    Tree{
-                        .actualPath = store->toRealPath(res->second),
-                        .storePath = std::move(res->second),
-                        .info = TreeInfo {
-                            .lastModified = getIntAttr(res->first, "lastModified"),
-                        },
-                    },
-                    input
-                };
-            }
-        }
-
         if (!rev) {
             auto url = fmt("https://api.github.com/repos/%s/%s/commits/%s",
                 owner, repo, ref);
-            CachedDownloadRequest request(url);
-            request.ttl = rev ? 1000000000 : settings.tarballTtl;
-            auto result = getDownloader()->downloadCached(store, request);
-            auto json = nlohmann::json::parse(readFile(result.path));
+            auto json = nlohmann::json::parse(
+                readFile(
+                    store->toRealPath(
+                        downloadFile(store, url, "source", false))));
             rev = Hash(json["sha"], htSHA1);
             debug("HEAD revision for '%s' is %s", url, rev->gitRev());
         }
@@ -143,44 +118,19 @@ struct GitHubInput : Input
         if (accessToken != "")
             url += "?access_token=" + accessToken;
 
-        CachedDownloadRequest request(url);
-        request.unpack = true;
-        request.name = "source";
-        request.ttl = 1000000000;
-        request.getLastModified = true;
-        auto dresult = getDownloader()->downloadCached(store, request);
-
-        assert(dresult.lastModified);
-
-        Tree result{
-            .actualPath = dresult.path,
-            .storePath = store->parseStorePath(dresult.storePath),
-            .info = TreeInfo {
-                .lastModified = *dresult.lastModified,
-            },
-        };
-
-        Attrs infoAttrs({
-            {"rev", rev->gitRev()},
-            {"lastModified", *result.info.lastModified}
-        });
-
-        if (!this->rev)
-            getCache()->add(
-                store,
-                mutableAttrs,
-                infoAttrs,
-                result.storePath,
-                false);
+        auto tree = downloadTarball(store, url, "source", true);
 
         getCache()->add(
             store,
             immutableAttrs,
-            infoAttrs,
-            result.storePath,
+            {
+                {"rev", rev->gitRev()},
+                {"lastModified", *tree.info.lastModified}
+            },
+            tree.storePath,
             true);
 
-        return {std::move(result), input};
+        return {std::move(tree), input};
     }
 
     std::shared_ptr<const Input> applyOverrides(

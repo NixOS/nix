@@ -1,10 +1,113 @@
-#include "fetchers.hh"
+#include "fetchers/fetchers.hh"
+#include "fetchers/parse.hh"
+#include "fetchers/cache.hh"
 #include "download.hh"
 #include "globals.hh"
-#include "parse.hh"
 #include "store-api.hh"
+#include "archive.hh"
+#include "tarfile.hh"
 
 namespace nix::fetchers {
+
+StorePath downloadFile(
+    ref<Store> store,
+    const std::string & url,
+    const std::string & name,
+    bool immutable)
+{
+    // FIXME: check store
+
+    Attrs inAttrs({
+        {"type", "file"},
+        {"url", url},
+        {"name", name},
+    });
+
+    if (auto res = getCache()->lookup(store, inAttrs))
+        return std::move(res->second);
+
+    // FIXME: use ETag.
+
+    DownloadRequest request(url);
+    auto res = getDownloader()->download(request);
+
+    // FIXME: write to temporary file.
+
+    StringSink sink;
+    dumpString(*res.data, sink);
+    auto hash = hashString(htSHA256, *res.data);
+    ValidPathInfo info(store->makeFixedOutputPath(false, hash, name));
+    info.narHash = hashString(htSHA256, *sink.s);
+    info.narSize = sink.s->size();
+    info.ca = makeFixedOutputCA(false, hash);
+    store->addToStore(info, sink.s, NoRepair, NoCheckSigs);
+
+    Attrs infoAttrs({
+        {"etag", res.etag},
+    });
+
+    getCache()->add(
+        store,
+        inAttrs,
+        infoAttrs,
+        info.path.clone(),
+        immutable);
+
+    return std::move(info.path);
+}
+
+Tree downloadTarball(
+    ref<Store> store,
+    const std::string & url,
+    const std::string & name,
+    bool immutable)
+{
+    Attrs inAttrs({
+        {"type", "tarball"},
+        {"url", url},
+        {"name", name},
+    });
+
+    if (auto res = getCache()->lookup(store, inAttrs))
+        return Tree {
+            .actualPath = store->toRealPath(res->second),
+            .storePath = std::move(res->second),
+            .info = TreeInfo {
+                .lastModified = getIntAttr(res->first, "lastModified"),
+            },
+        };
+
+    auto tarball = downloadFile(store, url, name, immutable);
+
+    Path tmpDir = createTempDir();
+    AutoDelete autoDelete(tmpDir, true);
+    unpackTarfile(store->toRealPath(tarball), tmpDir);
+    auto members = readDirectory(tmpDir);
+    if (members.size() != 1)
+        throw nix::Error("tarball '%s' contains an unexpected number of top-level files", url);
+    auto topDir = tmpDir + "/" + members.begin()->name;
+    auto lastModified = lstat(topDir).st_mtime;
+    auto unpackedStorePath = store->addToStore(name, topDir, true, htSHA256, defaultPathFilter, NoRepair);
+
+    Attrs infoAttrs({
+        {"lastModified", lastModified},
+    });
+
+    getCache()->add(
+        store,
+        inAttrs,
+        infoAttrs,
+        unpackedStorePath,
+        immutable);
+
+    return Tree {
+        .actualPath = store->toRealPath(unpackedStorePath),
+        .storePath = std::move(unpackedStorePath),
+        .info = TreeInfo {
+            .lastModified = lastModified,
+        },
+    };
+}
 
 struct TarballInput : Input
 {
@@ -55,29 +158,12 @@ struct TarballInput : Input
 
     std::pair<Tree, std::shared_ptr<const Input>> fetchTreeInternal(nix::ref<Store> store) const override
     {
-        CachedDownloadRequest request(url.to_string());
-        request.unpack = true;
-        request.getLastModified = true;
-        request.name = "source";
-
-        auto res = getDownloader()->downloadCached(store, request);
+        auto tree = downloadTarball(store, url.to_string(), "source", false);
 
         auto input = std::make_shared<TarballInput>(*this);
+        input->narHash = store->queryPathInfo(tree.storePath)->narHash;
 
-        auto storePath = store->parseStorePath(res.storePath);
-
-        input->narHash = store->queryPathInfo(storePath)->narHash;
-
-        return {
-            Tree {
-                .actualPath = res.path,
-                .storePath = std::move(storePath),
-                .info = TreeInfo {
-                    .lastModified = *res.lastModified,
-                },
-            },
-            input
-        };
+        return {std::move(tree), input};
     }
 };
 
@@ -96,15 +182,19 @@ struct TarballInputScheme : InputScheme
 
         auto input = std::make_unique<TarballInput>(url);
 
-        auto hash = url.query.find("hash");
-        if (hash != url.query.end())
+        auto hash = input->url.query.find("hash");
+        if (hash != input->url.query.end()) {
             // FIXME: require SRI hash.
             input->hash = Hash(hash->second);
+            input->url.query.erase(hash);
+        }
 
-        auto narHash = url.query.find("narHash");
-        if (narHash != url.query.end())
+        auto narHash = input->url.query.find("narHash");
+        if (narHash != input->url.query.end()) {
             // FIXME: require SRI hash.
             input->narHash = Hash(narHash->second);
+            input->url.query.erase(narHash);
+        }
 
         return input;
     }
