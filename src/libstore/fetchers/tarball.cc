@@ -9,7 +9,7 @@
 
 namespace nix::fetchers {
 
-StorePath downloadFile(
+DownloadFileResult downloadFile(
     ref<Store> store,
     const std::string & url,
     const std::string & name,
@@ -23,37 +23,54 @@ StorePath downloadFile(
         {"name", name},
     });
 
-    if (auto res = getCache()->lookup(store, inAttrs))
-        return std::move(res->second);
+    auto cached = getCache()->lookupExpired(store, inAttrs);
 
-    // FIXME: use ETag.
+    if (cached && !cached->expired)
+        return {
+            .storePath = std::move(cached->storePath),
+            .etag = getStrAttr(cached->infoAttrs, "etag")
+        };
 
     DownloadRequest request(url);
+    if (cached)
+        request.expectedETag = getStrAttr(cached->infoAttrs, "etag");
     auto res = getDownloader()->download(request);
 
     // FIXME: write to temporary file.
-
-    StringSink sink;
-    dumpString(*res.data, sink);
-    auto hash = hashString(htSHA256, *res.data);
-    ValidPathInfo info(store->makeFixedOutputPath(false, hash, name));
-    info.narHash = hashString(htSHA256, *sink.s);
-    info.narSize = sink.s->size();
-    info.ca = makeFixedOutputCA(false, hash);
-    store->addToStore(info, sink.s, NoRepair, NoCheckSigs);
 
     Attrs infoAttrs({
         {"etag", res.etag},
     });
 
+    std::optional<StorePath> storePath;
+
+    if (res.cached) {
+        assert(cached);
+        assert(request.expectedETag == res.etag);
+        storePath = std::move(cached->storePath);
+    } else {
+        StringSink sink;
+        dumpString(*res.data, sink);
+        auto hash = hashString(htSHA256, *res.data);
+        ValidPathInfo info(store->makeFixedOutputPath(false, hash, name));
+        info.narHash = hashString(htSHA256, *sink.s);
+        info.narSize = sink.s->size();
+        info.ca = makeFixedOutputCA(false, hash);
+        store->addToStore(info, sink.s, NoRepair, NoCheckSigs);
+        storePath = std::move(info.path);
+    }
+
     getCache()->add(
         store,
         inAttrs,
         infoAttrs,
-        info.path.clone(),
+        *storePath,
         immutable);
 
-    return std::move(info.path);
+    return {
+        .storePath = std::move(*storePath),
+        .etag = res.etag,
+    };
 }
 
 Tree downloadTarball(
@@ -68,41 +85,52 @@ Tree downloadTarball(
         {"name", name},
     });
 
-    if (auto res = getCache()->lookup(store, inAttrs))
+    auto cached = getCache()->lookupExpired(store, inAttrs);
+
+    if (cached && !cached->expired)
         return Tree {
-            .actualPath = store->toRealPath(res->second),
-            .storePath = std::move(res->second),
+            .actualPath = store->toRealPath(cached->storePath),
+            .storePath = std::move(cached->storePath),
             .info = TreeInfo {
-                .lastModified = getIntAttr(res->first, "lastModified"),
+                .lastModified = getIntAttr(cached->infoAttrs, "lastModified"),
             },
         };
 
-    auto tarball = downloadFile(store, url, name, immutable);
+    auto res = downloadFile(store, url, name, immutable);
 
-    Path tmpDir = createTempDir();
-    AutoDelete autoDelete(tmpDir, true);
-    unpackTarfile(store->toRealPath(tarball), tmpDir);
-    auto members = readDirectory(tmpDir);
-    if (members.size() != 1)
-        throw nix::Error("tarball '%s' contains an unexpected number of top-level files", url);
-    auto topDir = tmpDir + "/" + members.begin()->name;
-    auto lastModified = lstat(topDir).st_mtime;
-    auto unpackedStorePath = store->addToStore(name, topDir, true, htSHA256, defaultPathFilter, NoRepair);
+    std::optional<StorePath> unpackedStorePath;
+    time_t lastModified;
+
+    if (cached && res.etag != "" && getStrAttr(cached->infoAttrs, "etag") == res.etag) {
+        unpackedStorePath = std::move(cached->storePath);
+        lastModified = getIntAttr(cached->infoAttrs, "lastModified");
+    } else {
+        Path tmpDir = createTempDir();
+        AutoDelete autoDelete(tmpDir, true);
+        unpackTarfile(store->toRealPath(res.storePath), tmpDir);
+        auto members = readDirectory(tmpDir);
+        if (members.size() != 1)
+            throw nix::Error("tarball '%s' contains an unexpected number of top-level files", url);
+        auto topDir = tmpDir + "/" + members.begin()->name;
+        lastModified = lstat(topDir).st_mtime;
+        unpackedStorePath = store->addToStore(name, topDir, true, htSHA256, defaultPathFilter, NoRepair);
+    }
 
     Attrs infoAttrs({
         {"lastModified", lastModified},
+        {"etag", res.etag},
     });
 
     getCache()->add(
         store,
         inAttrs,
         infoAttrs,
-        unpackedStorePath,
+        *unpackedStorePath,
         immutable);
 
     return Tree {
-        .actualPath = store->toRealPath(unpackedStorePath),
-        .storePath = std::move(unpackedStorePath),
+        .actualPath = store->toRealPath(*unpackedStorePath),
+        .storePath = std::move(*unpackedStorePath),
         .info = TreeInfo {
             .lastModified = lastModified,
         },

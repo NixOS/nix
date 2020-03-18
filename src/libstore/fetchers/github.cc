@@ -81,7 +81,7 @@ struct GitHubInput : Input
             auto json = nlohmann::json::parse(
                 readFile(
                     store->toRealPath(
-                        downloadFile(store, url, "source", false))));
+                        downloadFile(store, url, "source", false).storePath)));
             rev = Hash(json["sha"], htSHA1);
             debug("HEAD revision for '%s' is %s", url, rev->gitRev());
         }

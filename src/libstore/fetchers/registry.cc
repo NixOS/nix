@@ -130,7 +130,7 @@ static std::shared_ptr<Registry> getGlobalRegistry(ref<Store> store)
         if (!hasPrefix(path, "/"))
             // FIXME: register as GC root.
             // FIXME: if download fails, use previous version if available.
-            path = store->toRealPath(downloadFile(store, path, "flake-registry.json", false));
+            path = store->toRealPath(downloadFile(store, path, "flake-registry.json", false).storePath);
 
         return Registry::read(path, Registry::Global);
     }();

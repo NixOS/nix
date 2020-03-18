@@ -93,7 +93,13 @@ std::unique_ptr<Input> inputFromAttrs(const Attrs & attrs);
 
 void registerInputScheme(std::unique_ptr<InputScheme> && fetcher);
 
-StorePath downloadFile(
+struct DownloadFileResult
+{
+    StorePath storePath;
+    std::string etag;
+};
+
+DownloadFileResult downloadFile(
     ref<Store> store,
     const std::string & url,
     const std::string & name,

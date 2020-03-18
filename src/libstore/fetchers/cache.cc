@@ -66,6 +66,19 @@ struct CacheImpl : Cache
         ref<Store> store,
         const Attrs & inAttrs) override
     {
+        if (auto res = lookupExpired(store, inAttrs)) {
+            if (!res->expired)
+                return std::make_pair(std::move(res->infoAttrs), std::move(res->storePath));
+            debug("ignoring expired cache entry '%s'",
+                attrsToJson(inAttrs).dump());
+        }
+        return {};
+    }
+
+    std::optional<Result> lookupExpired(
+        ref<Store> store,
+        const Attrs & inAttrs) override
+    {
         auto state(_state.lock());
 
         auto inAttrsJson = attrsToJson(inAttrs).dump();
@@ -81,11 +94,6 @@ struct CacheImpl : Cache
         auto immutable = stmt.getInt(2) != 0;
         auto timestamp = stmt.getInt(3);
 
-        if (!immutable && (settings.tarballTtl.get() == 0 || timestamp + settings.tarballTtl < time(0))) {
-            debug("ignoring expired cache entry '%s'", inAttrsJson);
-            return {};
-        }
-
         store->addTempRoot(storePath);
         if (!store->isValidPath(storePath)) {
             // FIXME: we could try to substitute 'storePath'.
@@ -96,7 +104,11 @@ struct CacheImpl : Cache
         debug("using cache entry '%s' -> '%s', '%s'",
             inAttrsJson, infoJson, store->printStorePath(storePath));
 
-        return {{jsonToAttrs(nlohmann::json::parse(infoJson)), std::move(storePath)}};
+        return Result {
+            .expired = !immutable && (settings.tarballTtl.get() == 0 || timestamp + settings.tarballTtl < time(0)),
+            .infoAttrs = jsonToAttrs(nlohmann::json::parse(infoJson)),
+            .storePath = std::move(storePath)
+        };
     }
 };
 
