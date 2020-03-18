@@ -55,8 +55,12 @@ GitInfo exportGit(ref<Store> store, const std::string & uri,
             gitInfo.rev = "0000000000000000000000000000000000000000";
             gitInfo.shortRev = std::string(gitInfo.rev, 0, 7);
 
+            auto gitOpts = Strings({ "-C", uri, "ls-files", "-z" });
+            if (fetchSubmodules) {
+                gitOpts.emplace_back("--recurse-submodules");
+            }
             auto files = tokenizeString<std::set<std::string>>(
-                runProgram("git", true, { "-C", uri, "ls-files", "-z" }), "\0"s);
+                runProgram("git", true, gitOpts), "\0"s);
 
             PathFilter filter = [&](const Path & p) -> bool {
                 assert(hasPrefix(p, uri));
