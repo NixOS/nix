@@ -28,7 +28,8 @@ DownloadFileResult downloadFile(
     if (cached && !cached->expired)
         return {
             .storePath = std::move(cached->storePath),
-            .etag = getStrAttr(cached->infoAttrs, "etag")
+            .etag = getStrAttr(cached->infoAttrs, "etag"),
+            .effectiveUrl = getStrAttr(cached->infoAttrs, "url")
         };
 
     DownloadRequest request(url);
@@ -40,6 +41,7 @@ DownloadFileResult downloadFile(
 
     Attrs infoAttrs({
         {"etag", res.etag},
+        {"url", res.effectiveUri},
     });
 
     std::optional<StorePath> storePath;
@@ -67,9 +69,22 @@ DownloadFileResult downloadFile(
         *storePath,
         immutable);
 
+    if (url != res.effectiveUri)
+        getCache()->add(
+            store,
+            {
+                {"type", "file"},
+                {"url", res.effectiveUri},
+                {"name", name},
+            },
+            infoAttrs,
+            *storePath,
+            immutable);
+
     return {
         .storePath = std::move(*storePath),
         .etag = res.etag,
+        .effectiveUrl = res.effectiveUri,
     };
 }
 

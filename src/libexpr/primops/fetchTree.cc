@@ -3,6 +3,7 @@
 #include "store-api.hh"
 #include "fetchers/fetchers.hh"
 #include "fetchers/registry.hh"
+#include "download.hh"
 
 #include <ctime>
 #include <iomanip>
@@ -88,5 +89,81 @@ static void prim_fetchTree(EvalState & state, const Pos & pos, Value * * args, V
 }
 
 static RegisterPrimOp r("fetchTree", 1, prim_fetchTree);
+
+static void fetch(EvalState & state, const Pos & pos, Value * * args, Value & v,
+    const string & who, bool unpack, std::string name)
+{
+    std::optional<std::string> url;
+    std::optional<Hash> expectedHash;
+
+    state.forceValue(*args[0]);
+
+    if (args[0]->type == tAttrs) {
+
+        state.forceAttrs(*args[0], pos);
+
+        for (auto & attr : *args[0]->attrs) {
+            string n(attr.name);
+            if (n == "url")
+                url = state.forceStringNoCtx(*attr.value, *attr.pos);
+            else if (n == "sha256")
+                expectedHash = Hash(state.forceStringNoCtx(*attr.value, *attr.pos), htSHA256);
+            else if (n == "name")
+                name = state.forceStringNoCtx(*attr.value, *attr.pos);
+            else
+                throw EvalError("unsupported argument '%s' to '%s', at %s",
+                    attr.name, who, attr.pos);
+        }
+
+        if (!url)
+            throw EvalError("'url' argument required, at %s", pos);
+
+    } else
+        url = state.forceStringNoCtx(*args[0], pos);
+
+    url = resolveUri(*url);
+
+    state.checkURI(*url);
+
+    if (name == "")
+        name = baseNameOf(*url);
+
+    if (evalSettings.pureEval && !expectedHash)
+        throw Error("in pure evaluation mode, '%s' requires a 'sha256' argument", who);
+
+    auto storePath =
+        unpack
+        ? fetchers::downloadTarball(state.store, *url, name, (bool) expectedHash).storePath
+        : fetchers::downloadFile(state.store, *url, name, (bool) expectedHash).storePath;
+
+    auto path = state.store->toRealPath(storePath);
+
+    if (expectedHash) {
+        auto hash = unpack
+            ? state.store->queryPathInfo(storePath)->narHash
+            : hashFile(htSHA256, path);
+        if (hash != *expectedHash)
+            throw Error((unsigned int) 102, "hash mismatch in file downloaded from '%s':\n  wanted: %s\n  got:    %s",
+                *url, expectedHash->to_string(), hash.to_string());
+    }
+
+    if (state.allowedPaths)
+        state.allowedPaths->insert(path);
+
+    mkString(v, path, PathSet({path}));
+}
+
+static void prim_fetchurl(EvalState & state, const Pos & pos, Value * * args, Value & v)
+{
+    fetch(state, pos, args, v, "fetchurl", false, "");
+}
+
+static void prim_fetchTarball(EvalState & state, const Pos & pos, Value * * args, Value & v)
+{
+    fetch(state, pos, args, v, "fetchTarball", true, "source");
+}
+
+static RegisterPrimOp r2("__fetchurl", 1, prim_fetchurl);
+static RegisterPrimOp r3("fetchTarball", 1, prim_fetchTarball);
 
 }

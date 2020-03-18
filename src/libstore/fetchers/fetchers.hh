@@ -97,6 +97,7 @@ struct DownloadFileResult
 {
     StorePath storePath;
     std::string etag;
+    std::string effectiveUrl;
 };
 
 DownloadFileResult downloadFile(
