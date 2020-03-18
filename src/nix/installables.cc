@@ -256,56 +256,6 @@ struct InstallableAttrPath : InstallableValue
     }
 };
 
-void makeFlakeClosureGCRoot(Store & store,
-    const FlakeRef & origFlakeRef,
-    const flake::LockedFlake & lockedFlake)
-{
-#if 0
-    if (std::get_if<FlakeRef::IsPath>(&origFlakeRef.data)) return;
-
-    /* Get the store paths of all non-local flakes. */
-    StorePathSet closure;
-
-    assert(store.isValidPath(store.parseStorePath(lockedFlake.flake.sourceInfo.storePath)));
-    closure.insert(store.parseStorePath(lockedFlake.flake.sourceInfo.storePath));
-
-    std::queue<std::reference_wrapper<const flake::LockedInputs>> queue;
-    queue.push(lockedFlake.lockFile);
-
-    while (!queue.empty()) {
-        const flake::LockedInputs & flake = queue.front();
-        queue.pop();
-        /* Note: due to lazy fetching, these paths might not exist
-           yet. */
-        for (auto & dep : flake.inputs) {
-            auto path = dep.second.computeStorePath(store);
-            if (store.isValidPath(store.parseStorePath(path)))
-                closure.insert(store.parseStorePath(path));
-            queue.push(dep.second);
-        }
-    }
-
-    if (closure.empty()) return;
-
-    /* Write the closure to a file in the store. */
-    auto closurePath = store.addTextToStore("flake-closure",
-        concatStringsSep(" ", store.printStorePathSet(closure)), closure);
-
-    Path cacheDir = getCacheDir() + "/nix/flake-closures";
-    createDirs(cacheDir);
-
-    auto s = origFlakeRef.to_string();
-    assert(s[0] != '.');
-    s = replaceStrings(s, "%", "%25");
-    s = replaceStrings(s, "/", "%2f");
-    s = replaceStrings(s, ":", "%3a");
-    Path symlink = cacheDir + "/" + s;
-    debug("writing GC root '%s' for flake closure of '%s'", symlink, origFlakeRef);
-    replaceSymlink(store.printStorePath(closurePath), symlink);
-    store.addIndirectRoot(symlink);
-#endif
-}
-
 std::vector<std::string> InstallableFlake::getActualAttrPaths()
 {
     std::vector<std::string> res;
@@ -324,8 +274,6 @@ Value * InstallableFlake::getFlakeOutputs(EvalState & state, const flake::Locked
     auto vFlake = state.allocValue();
 
     callFlake(state, lockedFlake, *vFlake);
-
-    makeFlakeClosureGCRoot(*state.store, flakeRef, lockedFlake);
 
     auto aOutputs = vFlake->attrs->get(state.symbols.create("outputs"));
     assert(aOutputs);
