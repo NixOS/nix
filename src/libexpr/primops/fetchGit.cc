@@ -182,7 +182,7 @@ GitInfo exportGit(ref<Store> store, const std::string & uri,
         runProgram("git", true, { "-C", tmpDir, "fetch", "--quiet", "--force",
                                   "--", cacheDir, fmt("%s", *ref) });
 
-        runProgram("git", true, { "-C", tmpDir, "checkout", "--quiet", "FETCH_HEAD" });
+        runProgram("git", true, { "-C", tmpDir, "checkout", "--quiet", gitInfo.rev });
         runProgram("git", true, { "-C", tmpDir, "remote", "add", "origin", uri });
         runProgram("git", true, { "-C", tmpDir, "submodule", "--quiet", "update", "--init", "--recursive" });
 
