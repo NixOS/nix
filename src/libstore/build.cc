@@ -3662,7 +3662,7 @@ void DerivationGoal::registerOutputs()
 
             auto dest = worker.store.makeFixedOutputPath(recursive, h2, i.second.path.name());
 
-            // true if ither floating CA, or incorrect fixed hash.
+            // true if either floating CA, or incorrect fixed hash.
             bool needsMove = true;
 
             if (i.second.hash != "") {
