@@ -338,49 +338,81 @@ bool BasicDerivation::isFixedOutput() const
 
 DrvHashes drvHashes;
 
+/* pathDerivationModulo and hashDerivationModulo are mutually recursive
+ */
 
-/* Returns the hash of a derivation modulo fixed-output
-   subderivations.  A fixed-output derivation is a derivation with one
-   output (`out') for which an expected hash and hash algorithm are
-   specified (using the `outputHash' and `outputHashAlgo'
-   attributes).  We don't want changes to such derivations to
-   propagate upwards through the dependency graph, changing output
-   paths everywhere.
+/* Look up the derivation by value and memoize the
+   `hashDerivationModulo` call.
+ */
+static DrvHashModulo & pathDerivationModulo(Store & store, const StorePath & drvPath)
+{
+    auto h = drvHashes.find(drvPath);
+    if (h == drvHashes.end()) {
+        assert(store.isValidPath(drvPath));
+        // Cache it
+        h = drvHashes.insert_or_assign(
+            drvPath.clone(),
+            hashDerivationModulo(
+                store,
+                readDerivation(
+                    store,
+                    store.toRealPath(store.printStorePath(drvPath))),
+                false)).first;
+    }
+    return h->second;
+}
 
-   For instance, if we change the url in a call to the `fetchurl'
-   function, we do not want to rebuild everything depending on it
-   (after all, (the hash of) the file being downloaded is unchanged).
-   So the *output paths* should not change.  On the other hand, the
-   *derivation paths* should change to reflect the new dependency
-   graph.
+/* See the header for interface details. These are the implementation details.
 
-   That's what this function does: it returns a hash which is just the
-   hash of the derivation ATerm, except that any input derivation
-   paths have been replaced by the result of a recursive call to this
-   function, and that for fixed-output derivations we return a hash of
-   its output path. */
-Hash hashDerivationModulo(Store & store, const Derivation & drv, bool maskOutputs)
+   For fixed ouput derivations, each hash in the map is not the
+   corresponding output's content hash, but a hash of that hash along
+   with other constant data. The key point is that the value is a pure
+   function of the output's contents, and there are no preimage attacks
+   spoofing an either an output's contents for a derivation, or
+   derivation for an output's contents.
+
+   For regular derivations, it looks up each subderivation from its hash
+   and recurs. If the subderivation is also regular, it simply
+   substitutes the derivation path with its hash. If the subderivation
+   is fixed-output, however, it takes each output hash and pretends it
+   is a derivation hash producing a single "out" output. This is so we
+   don't leak the provenance of fixed outputs, reducing pointless cache
+   misses as the build itself won't know this.
+ */
+DrvHashModulo hashDerivationModulo(Store & store, const Derivation & drv, bool maskOutputs)
 {
     /* Return a fixed hash for fixed-output derivations. */
     if (drv.isFixedOutput()) {
-        DerivationOutputs::const_iterator i = drv.outputs.begin();
-        return hashString(htSHA256, "fixed:out:"
-            + i->second.hashAlgo + ":"
-            + i->second.hash + ":"
-            + store.printStorePath(i->second.path));
+        std::map<std::string, Hash> outputHashes;
+        for (const auto & i : drv.outputs) {
+            const Hash h = hashString(htSHA256, "fixed:out:"
+                + i.second.hashAlgo + ":"
+                + i.second.hash + ":"
+                + store.printStorePath(i.second.path));
+            outputHashes.insert_or_assign(std::string(i.first), std::move(h));
+        }
+        return outputHashes;
     }
 
     /* For other derivations, replace the inputs paths with recursive
-       calls to this function.*/
+       calls to this function. */
     std::map<std::string, StringSet> inputs2;
     for (auto & i : drv.inputDrvs) {
-        auto h = drvHashes.find(i.first);
-        if (h == drvHashes.end()) {
-            assert(store.isValidPath(i.first));
-            h = drvHashes.insert_or_assign(i.first.clone(), hashDerivationModulo(store,
-                readDerivation(store, store.toRealPath(store.printStorePath(i.first))), false)).first;
+        const auto res = pathDerivationModulo(store, i.first);
+        if (const Hash *pval = std::get_if<0>(&res)) {
+            // regular non-CA derivation, replace derivation
+            inputs2.insert_or_assign(pval->to_string(Base16, false), i.second);
+        } else if (const std::map<std::string, Hash> *pval = std::get_if<1>(&res)) {
+            // CA derivation's output hashes
+            std::set justOut = { std::string("out") };
+            for (auto & output : i.second) {
+                /* Put each one in with a single "out" output.. */
+                const auto h = pval->at(output);
+                inputs2.insert_or_assign(
+                    h.to_string(Base16, false),
+                    justOut);
+            }
         }
-        inputs2.insert_or_assign(h->second.to_string(Base16, false), i.second);
     }
 
     return hashString(htSHA256, drv.unparse(store, maskOutputs, &inputs2));

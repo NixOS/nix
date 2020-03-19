@@ -742,7 +742,9 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
                 DerivationOutput(StorePath::dummy.clone(), "", ""));
         }
 
-        Hash h = hashDerivationModulo(*state.store, Derivation(drv), true);
+        // Regular, non-CA derivation should always return a single hash and not
+        // hash per output.
+        Hash h = std::get<0>(hashDerivationModulo(*state.store, Derivation(drv), true));
 
         for (auto & i : outputs) {
             auto outPath = state.store->makeOutputPath(i, h, drvName);

@@ -571,7 +571,9 @@ void LocalStore::checkDerivationOutputs(const StorePath & drvPath, const Derivat
     }
 
     else {
-        Hash h = hashDerivationModulo(*this, drv, true);
+        // Regular, non-CA derivation should always return a single hash and not
+        // hash per output.
+        Hash h = std::get<0>(hashDerivationModulo(*this, drv, true));
         for (auto & i : drv.outputs)
             check(makeOutputPath(i.first, h, drvName), i.second.path, i.first);
     }

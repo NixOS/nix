@@ -5,6 +5,7 @@
 #include "store-api.hh"
 
 #include <map>
+#include <variant>
 
 
 namespace nix {
@@ -87,10 +88,38 @@ Derivation readDerivation(const Store & store, const Path & drvPath);
 // FIXME: remove
 bool isDerivation(const string & fileName);
 
-Hash hashDerivationModulo(Store & store, const Derivation & drv, bool maskOutputs);
+typedef std::variant<
+    Hash, // regular DRV normalized hash
+    std::map<std::string, Hash> // known CA drv's output hashes
+> DrvHashModulo;
+
+/* Returns hashes with the details of fixed-output subderivations
+   expunged.
+
+   A fixed-output derivation is a derivation whose outputs have a
+   specified content hash and hash algorithm. (Currently they must have
+   exactly one output (`out'), which is specified using the `outputHash'
+   and `outputHashAlgo' attributes, but the algorithm doesn't assume
+   this). We don't want changes to such derivations to propagate upwards
+   through the dependency graph, changing output paths everywhere.
+
+   For instance, if we change the url in a call to the `fetchurl'
+   function, we do not want to rebuild everything depending on it (after
+   all, (the hash of) the file being downloaded is unchanged).  So the
+ *output paths* should not change. On the other hand, the *derivation
+ paths* should change to reflect the new dependency graph.
+
+   For fixed output derivations, this returns a map from the names of
+   each output to hashes unique up to the outputs' contents.
+
+   For regular derivations, it returns a single hash of the derivation
+   ATerm, after subderivations have been likewise expunged from that
+   derivation.
+ */
+DrvHashModulo hashDerivationModulo(Store & store, const Derivation & drv, bool maskOutputs);
 
 /* Memoisation of hashDerivationModulo(). */
-typedef std::map<StorePath, Hash> DrvHashes;
+typedef std::map<StorePath, DrvHashModulo> DrvHashes;
 
 extern DrvHashes drvHashes; // FIXME: global, not thread-safe
 
