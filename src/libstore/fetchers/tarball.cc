@@ -25,17 +25,31 @@ DownloadFileResult downloadFile(
 
     auto cached = getCache()->lookupExpired(store, inAttrs);
 
-    if (cached && !cached->expired)
+    auto useCached = [&]() -> DownloadFileResult
+    {
         return {
             .storePath = std::move(cached->storePath),
             .etag = getStrAttr(cached->infoAttrs, "etag"),
             .effectiveUrl = getStrAttr(cached->infoAttrs, "url")
         };
+    };
+
+    if (cached && !cached->expired)
+        return useCached();
 
     DownloadRequest request(url);
     if (cached)
         request.expectedETag = getStrAttr(cached->infoAttrs, "etag");
-    auto res = getDownloader()->download(request);
+    DownloadResult res;
+    try {
+        res = getDownloader()->download(request);
+    } catch (DownloadError & e) {
+        if (cached) {
+            warn("%s; using cached version", e.msg());
+            return useCached();
+        } else
+            throw;
+    }
 
     // FIXME: write to temporary file.
 
