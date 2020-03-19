@@ -32,6 +32,9 @@ extern "C" {
 #include "command.hh"
 #include "finally.hh"
 
+#define GC_INCLUDE_NEW
+#include <gc/gc_cpp.h>
+
 namespace nix {
 
 #define ESC_RED "\033[31m"
@@ -42,7 +45,7 @@ namespace nix {
 #define ESC_CYA "\033[36m"
 #define ESC_END "\033[0m"
 
-struct NixRepl
+struct NixRepl : gc
 {
     string curDir;
     EvalState state;
