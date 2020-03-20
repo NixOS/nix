@@ -71,6 +71,12 @@
        (literal "/dev/zero")
        (subpath "/dev/fd"))
 
+; Allow pseudo-terminals.
+(allow file*
+       (literal "/dev/ptmx")
+       (regex #"^/dev/pty[a-z]+")
+       (regex #"^/dev/ttys[0-9]+"))
+
 ; Does nothing, but reduces build noise.
 (allow file* (literal "/dev/dtracehelper"))
 
