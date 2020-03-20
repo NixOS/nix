@@ -20,13 +20,6 @@ namespace nix {
    must be deleted and recreated on startup.) */
 #define DEFAULT_SOCKET_PATH "/daemon-socket/socket"
 
-/* chroot-like behavior from Apple's sandbox */
-#if __APPLE__
-    #define DEFAULT_ALLOWED_IMPURE_PREFIXES "/System/Library /usr/lib /dev /bin/sh"
-#else
-    #define DEFAULT_ALLOWED_IMPURE_PREFIXES ""
-#endif
-
 Settings settings;
 
 static GlobalConfig::Register r1(&settings);
@@ -68,7 +61,12 @@ Settings::Settings()
     sandboxPaths = tokenizeString<StringSet>("/bin/sh=" SANDBOX_SHELL);
 #endif
 
-    allowedImpureHostPrefixes = tokenizeString<StringSet>(DEFAULT_ALLOWED_IMPURE_PREFIXES);
+
+/* chroot-like behavior from Apple's sandbox */
+#if __APPLE__
+    sandboxPaths = tokenizeString<StringSet>("/System/Library/Frameworks /System/Library/PrivateFrameworks /bin/sh /private/tmp /private/var/tmp /usr/lib");
+    allowedImpureHostPrefixes = tokenizeString<StringSet>("/System/Library /usr/lib /dev /bin/sh");
+#endif
 }
 
 void loadConfFile()
