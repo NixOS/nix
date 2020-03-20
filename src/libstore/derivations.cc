@@ -364,12 +364,12 @@ static DrvHashModulo & pathDerivationModulo(Store & store, const StorePath & drv
 
 /* See the header for interface details. These are the implementation details.
 
-   For fixed ouput derivations, each hash in the map is not the
+   For fixed-output derivations, each hash in the map is not the
    corresponding output's content hash, but a hash of that hash along
    with other constant data. The key point is that the value is a pure
    function of the output's contents, and there are no preimage attacks
-   spoofing an either an output's contents for a derivation, or
-   derivation for an output's contents.
+   either spoofing an output's contents for a derivation, or
+   spoofing a derivation for an output's contents.
 
    For regular derivations, it looks up each subderivation from its hash
    and recurs. If the subderivation is also regular, it simply
