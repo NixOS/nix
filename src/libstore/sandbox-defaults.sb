@@ -91,3 +91,7 @@
        (literal "/etc")
        (literal "/var")
        (literal "/private/var/tmp"))
+
+; This is used by /bin/sh on macOS 10.15 and later.
+(allow file*
+       (literal "/private/var/select/sh"))
