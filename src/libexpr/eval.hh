@@ -6,6 +6,7 @@
 #include "symbol-table.hh"
 #include "config.hh"
 
+#include <regex>
 #include <map>
 #include <optional>
 #include <unordered_map>
