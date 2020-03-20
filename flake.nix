@@ -132,8 +132,6 @@
               ''}
 
               ln -sfn ${final.nixVendoredCrates}/vendor/ nix-rust/vendor
-
-              (cd perl; autoreconf --install --force --verbose)
             '';
 
           configureFlags = configureFlags ++
@@ -343,6 +341,11 @@
             name = "nix-coverage-${version}";
 
             src = self;
+
+            preConfigure =
+              ''
+                ln -sfn ${nixVendoredCrates}/vendor/ nix-rust/vendor
+              '';
 
             enableParallelBuilding = true;
 
