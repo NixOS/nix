@@ -3,7 +3,7 @@
 
   edition = 201909;
 
-  inputs.nixpkgs.uri = "nixpkgs/release-19.09";
+  inputs.nixpkgs.uri = "nixpkgs/nixos-20.03-small";
 
   outputs = { self, nixpkgs }:
 
@@ -76,7 +76,7 @@
             openssl pkgconfig sqlite
             libarchive
             boost
-            (nlohmann_json.override { multipleHeaders = true; })
+            nlohmann_json
             rustc cargo
 
             # Tests
