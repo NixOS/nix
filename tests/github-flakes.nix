@@ -68,29 +68,26 @@ makeTest (
           services.httpd.extraConfig = ''
             ErrorLog syslog:local6
           '';
-          services.httpd.virtualHosts =
-            [ { hostName = "github.com";
-                enableSSL = true;
-                sslServerKey = "${cert}/server.key";
-                sslServerCert = "${cert}/server.crt";
-                servedDirs =
-                  [ { urlPath = "/NixOS/flake-registry/raw/master";
-                      dir = registry;
-                    }
-                  ];
-              }
-
-              { hostName = "api.github.com";
-                enableSSL = true;
-                sslServerKey = "${cert}/server.key";
-                sslServerCert = "${cert}/server.crt";
-                servedDirs =
-                  [ { urlPath = "/repos/NixOS/nixpkgs";
-                      dir = api;
-                    }
-                  ];
-              }
-            ];
+          services.httpd.virtualHosts."github.com" =
+            { forceSSL = true;
+              sslServerKey = "${cert}/server.key";
+              sslServerCert = "${cert}/server.crt";
+              servedDirs =
+                [ { urlPath = "/NixOS/flake-registry/raw/master";
+                    dir = registry;
+                  }
+                ];
+            };
+          services.httpd.virtualHosts."api.github.com" =
+            { forceSSL = true;
+              sslServerKey = "${cert}/server.key";
+              sslServerCert = "${cert}/server.crt";
+              servedDirs =
+                [ { urlPath = "/repos/NixOS/nixpkgs";
+                    dir = api;
+                  }
+                ];
+            };
         };
 
       client =
@@ -98,6 +95,7 @@ makeTest (
         { virtualisation.writableStore = true;
           virtualisation.diskSize = 2048;
           virtualisation.pathsInNixDB = [ pkgs.hello pkgs.fuse ];
+          virtualisation.memorySize = 4096;
           nix.binaryCaches = lib.mkForce [ ];
           nix.extraOptions = "experimental-features = nix-command flakes";
           environment.systemPackages = [ pkgs.jq ];
