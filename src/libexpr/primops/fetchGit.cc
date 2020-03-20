@@ -183,8 +183,11 @@ GitInfo exportGit(ref<Store> store, const std::string & uri,
         AutoDelete delTmpGitDir(tmpGitDir, true);
 
         runProgram("git", true, { "init", tmpDir, "--separate-git-dir", tmpGitDir });
+        // TODO: the cacheDir repo might lack the ref (it only checks if rev
+        // exists, see FIXME above) so use a big hammer and fetch everything to
+        // ensure we get the rev.
         runProgram("git", true, { "-C", tmpDir, "fetch", "--quiet", "--force",
-                                  "--", cacheDir, fmt("%s", *ref) });
+                                  "--update-head-ok", "--", cacheDir, "refs/*:refs/*" });
 
         runProgram("git", true, { "-C", tmpDir, "checkout", "--quiet", gitInfo.rev });
         runProgram("git", true, { "-C", tmpDir, "remote", "add", "origin", uri });
