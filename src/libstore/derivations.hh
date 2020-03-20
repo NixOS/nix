@@ -109,8 +109,8 @@ typedef std::variant<
    *output paths* should not change. On the other hand, the *derivation
    paths* should change to reflect the new dependency graph.
 
-   For fixed output derivations, this returns a map from the names of
-   each output to hashes unique up to the outputs' contents.
+   For fixed-output derivations, this returns a map from the name of
+   each output to its hash, unique up to the output's contents.
 
    For regular derivations, it returns a single hash of the derivation
    ATerm, after subderivations have been likewise expunged from that
