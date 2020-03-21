@@ -1,8 +1,8 @@
 #pragma once
 
+#include "path.hh"
 #include "types.hh"
 #include "hash.hh"
-#include "store-api.hh"
 
 #include <map>
 
@@ -76,6 +76,7 @@ struct Derivation : BasicDerivation
 
 class Store;
 
+enum RepairFlag : bool { NoRepair = false, Repair = true };
 
 /* Write a derivation to the Nix store, and return its path. */
 StorePath writeDerivation(ref<Store> store,
