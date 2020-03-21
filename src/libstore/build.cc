@@ -1034,7 +1034,7 @@ DerivationGoal::DerivationGoal(StorePath && drvPath, const BasicDerivation & drv
 {
     this->drv = std::make_unique<BasicDerivation>(BasicDerivation(drv));
     state = &DerivationGoal::haveDerivation;
-    name = fmt("building of %s", worker.store.showPaths(drv.outputPaths()));
+    name = fmt("building of %s", worker.store.showPaths(outputPaths(drv)));
     trace("created");
 
     mcExpectedBuilds = std::make_unique<MaintainCount<uint64_t>>(worker.expectedBuilds);
@@ -1397,7 +1397,7 @@ void DerivationGoal::tryToBuild()
        goal can start a build, and if not, the main loop will sleep a
        few seconds and then retry this goal. */
     PathSet lockFiles;
-    for (auto & outPath : drv->outputPaths())
+    for (auto & outPath : outputPaths(*drv))
         lockFiles.insert(worker.store.Store::toRealPath(outPath));
 
     if (!outputLocks.lockPaths(lockFiles, "", false)) {
@@ -1420,7 +1420,7 @@ void DerivationGoal::tryToBuild()
         return;
     }
 
-    missingPaths = cloneStorePathSet(drv->outputPaths());
+    missingPaths = cloneStorePathSet(outputPaths(*drv));
     if (buildMode != bmCheck)
         for (auto & i : validPaths) missingPaths.erase(i);
 
@@ -1629,11 +1629,12 @@ void DerivationGoal::buildDone()
                 fmt("running post-build-hook '%s'", settings.postBuildHook),
                 Logger::Fields{worker.store.printStorePath(drvPath)});
             PushActivity pact(act.id);
-            auto outputPaths = drv->outputPaths();
             std::map<std::string, std::string> hookEnvironment = getEnv();
 
             hookEnvironment.emplace("DRV_PATH", worker.store.printStorePath(drvPath));
-            hookEnvironment.emplace("OUT_PATHS", chomp(concatStringsSep(" ", worker.store.printStorePathSet(outputPaths))));
+            hookEnvironment.emplace("OUT_PATHS", chomp(concatStringsSep(
+                " ",
+                worker.store.printStorePathSet(outputPaths(*drv)))));
 
             RunOptions opts(settings.postBuildHook, {});
             opts.environment = hookEnvironment;

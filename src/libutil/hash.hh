@@ -81,6 +81,10 @@ struct Hash
        (e.g. "sha256:"). */
     std::string to_string(Base base = Base32, bool includeType = true) const;
 
+    Hash clone() const {
+        return *this;
+    }
+
     std::string gitRev() const
     {
         assert(type == htSHA1);

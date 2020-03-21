@@ -23,9 +23,6 @@ namespace nix {
 const int nixSchemaVersion = 10;
 
 
-struct Derivation;
-
-
 struct OptimiseStats
 {
     unsigned long filesLinked = 0;

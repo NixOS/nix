@@ -9,7 +9,8 @@
 namespace nix {
 
 
-void DerivationOutput::parseHashInfo(bool & recursive, Hash & hash) const
+template<typename Path>
+void DerivationOutputT<Path>::parseHashInfo(bool & recursive, Hash & hash) const
 {
     recursive = false;
     string algo = hashAlgo;
@@ -26,8 +27,8 @@ void DerivationOutput::parseHashInfo(bool & recursive, Hash & hash) const
     hash = Hash(this->hash, hashType);
 }
 
-
-BasicDerivation::BasicDerivation(const BasicDerivation & other)
+template<typename Path>
+BasicDerivationT<Path>::BasicDerivationT(const BasicDerivationT<Path> & other)
     : platform(other.platform)
     , builder(other.builder)
     , args(other.args)
@@ -35,21 +36,23 @@ BasicDerivation::BasicDerivation(const BasicDerivation & other)
 {
     for (auto & i : other.outputs)
         outputs.insert_or_assign(i.first,
-            DerivationOutput(i.second.path.clone(), std::string(i.second.hashAlgo), std::string(i.second.hash)));
+            DerivationOutputT(i.second.path.clone(), std::string(i.second.hashAlgo), std::string(i.second.hash)));
     for (auto & i : other.inputSrcs)
         inputSrcs.insert(i.clone());
 }
 
 
-Derivation::Derivation(const Derivation & other)
-    : BasicDerivation(other)
+template<typename InputDrvPath, typename OutputPath>
+DerivationT<InputDrvPath, OutputPath>::DerivationT(const DerivationT<InputDrvPath, OutputPath> & other)
+    : BasicDerivationT<OutputPath>(other)
 {
     for (auto & i : other.inputDrvs)
         inputDrvs.insert_or_assign(i.first.clone(), i.second);
 }
 
 
-const StorePath & BasicDerivation::findOutput(const string & id) const
+template<typename Path>
+const Path & BasicDerivationT<Path>::findOutput(const string & id) const
 {
     auto i = outputs.find(id);
     if (i == outputs.end())
@@ -58,7 +61,8 @@ const StorePath & BasicDerivation::findOutput(const string & id) const
 }
 
 
-bool BasicDerivation::isBuiltin() const
+template<typename Path>
+bool BasicDerivationT<Path>::isBuiltin() const
 {
     return string(builder, 0, 8) == "builtin:";
 }
@@ -262,8 +266,24 @@ static void printUnquotedStrings(string & res, ForwardIterator i, ForwardIterato
     res += ']';
 }
 
+static string printStorePath(const Store & store, const StorePath & path) {
+    return store.printStorePath(path);
+}
 
-string Derivation::unparse(const Store & store, bool maskOutputs,
+static string printStorePath(const Store & store, const NoPath & _path) {
+    return "";
+}
+
+static string printStoreDrvPath(const Store & store, const StorePath & path) {
+    return store.printStorePath(path);
+}
+
+static string printStoreDrvPath(const Store & store, const Hash & hash) {
+    return hash.to_string(Base16, false);
+}
+
+template<typename InputDrvPath, typename OutputPath>
+string DerivationT<InputDrvPath, OutputPath>::unparse(const Store & store, bool maskOutputs,
     std::map<std::string, StringSet> * actualInputs) const
 {
     string s;
@@ -271,10 +291,10 @@ string Derivation::unparse(const Store & store, bool maskOutputs,
     s += "Derive([";
 
     bool first = true;
-    for (auto & i : outputs) {
+    for (auto & i : this->outputs) {
         if (first) first = false; else s += ',';
         s += '('; printUnquotedString(s, i.first);
-        s += ','; printUnquotedString(s, maskOutputs ? "" : store.printStorePath(i.second.path));
+        s += ','; printUnquotedString(s, maskOutputs ? "" : printStorePath(store, i.second.path));
         s += ','; printUnquotedString(s, i.second.hashAlgo);
         s += ','; printUnquotedString(s, i.second.hash);
         s += ')';
@@ -292,26 +312,26 @@ string Derivation::unparse(const Store & store, bool maskOutputs,
     } else {
         for (auto & i : inputDrvs) {
             if (first) first = false; else s += ',';
-            s += '('; printUnquotedString(s, store.printStorePath(i.first));
+            s += '('; printUnquotedString(s, printStoreDrvPath(store, i.first));
             s += ','; printUnquotedStrings(s, i.second.begin(), i.second.end());
             s += ')';
         }
     }
 
     s += "],";
-    auto paths = store.printStorePathSet(inputSrcs); // FIXME: slow
+    auto paths = store.printStorePathSet(this->inputSrcs); // FIXME: slow
     printUnquotedStrings(s, paths.begin(), paths.end());
 
-    s += ','; printUnquotedString(s, platform);
-    s += ','; printString(s, builder);
-    s += ','; printStrings(s, args.begin(), args.end());
+    s += ','; printUnquotedString(s, this->platform);
+    s += ','; printString(s, this->builder);
+    s += ','; printStrings(s, this->args.begin(), this->args.end());
 
     s += ",[";
     first = true;
-    for (auto & i : env) {
+    for (auto & i : this->env) {
         if (first) first = false; else s += ',';
         s += '('; printString(s, i.first);
-        s += ','; printString(s, maskOutputs && outputs.count(i.first) ? "" : i.second);
+        s += ','; printString(s, maskOutputs && this->outputs.count(i.first) ? "" : i.second);
         s += ')';
     }
 
@@ -328,7 +348,8 @@ bool isDerivation(const string & fileName)
 }
 
 
-bool BasicDerivation::isFixedOutput() const
+template<typename Path>
+bool BasicDerivationT<Path>::isFixedOutput() const
 {
     return outputs.size() == 1 &&
         outputs.begin()->first == "out" &&
@@ -401,10 +422,10 @@ bool wantOutput(const string & output, const std::set<string> & wanted)
 }
 
 
-StorePathSet BasicDerivation::outputPaths() const
+std::set<StorePath> outputPaths(const BasicDerivation & drv)
 {
     StorePathSet paths;
-    for (auto & i : outputs)
+    for (auto & i : drv.outputs)
         paths.insert(i.second.path.clone());
     return paths;
 }
@@ -456,5 +477,13 @@ std::string hashPlaceholder(const std::string & outputName)
     return "/" + hashString(htSHA256, "nix-output:" + outputName).to_string(Base32, false);
 }
 
+template struct DerivationOutputT<StorePath>;
+template struct DerivationOutputT<NoPath>;
+
+template struct BasicDerivationT<StorePath>;
+template struct BasicDerivationT<NoPath>;
+
+template struct DerivationT<StorePath, StorePath>;
+template struct DerivationT<Hash, NoPath>;
 
 }
