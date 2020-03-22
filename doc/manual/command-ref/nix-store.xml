@@ -1139,7 +1139,7 @@ the information that Nix considers important.  For instance,
 timestamps are elided because all files in the Nix store have their
 timestamp set to 0 anyway.  Likewise, all permissions are left out
 except for the execute bit, because all files in the Nix store have
-644 or 755 permission.</para>
+444 or 555 permission.</para>
 
 <para>Also, a NAR archive is <emphasis>canonical</emphasis>, meaning
 that “equal” paths always produce the same NAR archive.  For instance,
