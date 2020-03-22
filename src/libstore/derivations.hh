@@ -101,11 +101,11 @@ struct DerivationT : BasicDerivationT<OutputPath>
     DerivationInputsT<InputDrvPath> inputDrvs; /* inputs that are sub-derivations */
 
     /* Print a derivation. */
-    std::string unparse(const Store & store, bool maskOutputs,
-        std::map<std::string, StringSet> * actualInputs = nullptr) const;
+    std::string unparse(const Store & store) const;
 
     DerivationT() { }
     DerivationT(DerivationT<InputDrvPath, OutputPath> && other) = default;
+    DerivationT(const BasicDerivationT<OutputPath> & other);
     explicit DerivationT(const DerivationT<InputDrvPath, OutputPath> & other);
 };
 
@@ -125,7 +125,15 @@ Derivation readDerivation(const Store & store, const Path & drvPath);
 // FIXME: remove
 bool isDerivation(const string & fileName);
 
-Hash hashDerivationModulo(Store & store, const Derivation & drv, bool maskOutputs);
+template<typename OutPath>
+std::variant<DerivationT<Hash, OutPath>, string> derivationModulo(
+    Store & store,
+    const DerivationT<StorePath, OutPath> & drv);
+
+template<typename OutPath>
+Hash hashDerivation(
+    Store & store,
+    const DerivationT<Hash, OutPath> & drv);
 
 /* Memoisation of hashDerivationModulo(). */
 typedef std::map<StorePath, Hash> DrvHashes;

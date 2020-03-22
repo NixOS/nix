@@ -566,7 +566,8 @@ void LocalStore::checkDerivationOutputs(const StorePath & drvPath, const Derivat
     }
 
     else {
-        Hash h = hashDerivationModulo(*this, drv, true);
+        const Hash h = hashDerivation(*this,
+            std::get<0>(derivationModulo<StorePath>(*this, drv)));
         for (auto & i : drv.outputs)
             check(makeOutputPath(i.first, h, drvName), i.second.path, i.first);
     }
