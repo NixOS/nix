@@ -368,6 +368,29 @@ bool BasicDerivationT<Path>::isFixedOutput() const
 
 DrvHashes drvHashes;
 
+/* pathDerivationModulo and hashDerivationModulo are mutually recursive
+ */
+
+/* Look up the derivation by value and memoize the
+   `hashDerivationModulo` call.
+ */
+static const Hash & pathDerivationModulo(Store & store, const StorePath & drvPath)
+{
+    auto h = drvHashes.find(drvPath);
+    if (h == drvHashes.end()) {
+        assert(store.isValidPath(drvPath));
+        // Cache it
+        h = drvHashes.insert_or_assign(
+            drvPath.clone(),
+            hashDerivationModulo(
+                store,
+                readDerivation(
+                    store,
+                    store.toRealPath(store.printStorePath(drvPath))),
+                false)).first;
+    }
+    return h->second;
+}
 
 /* Returns the hash of a derivation modulo fixed-output
    subderivations.  A fixed-output derivation is a derivation with one
@@ -401,16 +424,11 @@ Hash hashDerivationModulo(Store & store, const Derivation & drv, bool maskOutput
     }
 
     /* For other derivations, replace the inputs paths with recursive
-       calls to this function.*/
+       calls to this function. */
     std::map<std::string, StringSet> inputs2;
     for (auto & i : drv.inputDrvs) {
-        auto h = drvHashes.find(i.first);
-        if (h == drvHashes.end()) {
-            assert(store.isValidPath(i.first));
-            h = drvHashes.insert_or_assign(i.first.clone(), hashDerivationModulo(store,
-                readDerivation(store, store.toRealPath(store.printStorePath(i.first))), false)).first;
-        }
-        inputs2.insert_or_assign(h->second.to_string(Base16, false), i.second);
+        const auto h = pathDerivationModulo(store, i.first);
+        inputs2.insert_or_assign(h.to_string(Base16, false), i.second);
     }
 
     return hashString(htSHA256, drv.unparse(store, maskOutputs, &inputs2));
