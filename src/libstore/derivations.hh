@@ -22,6 +22,9 @@ struct DerivationOutput
         , hashAlgo(std::move(hashAlgo))
         , hash(std::move(hash))
     { }
+    DerivationOutput(const DerivationOutput &) = default;
+    DerivationOutput(DerivationOutput &&) = default;
+    DerivationOutput & operator = (const DerivationOutput &) = default;
     void parseHashInfo(bool & recursive, Hash & hash) const;
 };
 

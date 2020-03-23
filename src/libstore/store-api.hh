@@ -189,8 +189,9 @@ struct ValidPathInfo
 
     Strings shortRefs() const;
 
-    ValidPathInfo(StorePath && path) : path(std::move(path)) { }
-    explicit ValidPathInfo(const ValidPathInfo & other);
+    ValidPathInfo(StorePath && path) : path(std::move(path)) { };
+    ValidPathInfo(const StorePath & path) : path(path) { };
+    ValidPathInfo(const ValidPathInfo & other) = default;
 
     virtual ~ValidPathInfo() { }
 };

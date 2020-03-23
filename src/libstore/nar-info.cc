@@ -4,7 +4,7 @@
 namespace nix {
 
 NarInfo::NarInfo(const Store & store, const std::string & s, const std::string & whence)
-    : ValidPathInfo(StorePath::dummy.clone()) // FIXME: hack
+    : ValidPathInfo(StorePath::dummy) // FIXME: hack
 {
     auto corrupt = [&]() {
         throw Error(format("NAR info file '%1%' is corrupt") % whence);
