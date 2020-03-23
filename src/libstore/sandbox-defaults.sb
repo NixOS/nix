@@ -71,6 +71,12 @@
        (literal "/dev/zero")
        (subpath "/dev/fd"))
 
+; Allow pseudo-terminals.
+(allow file*
+       (literal "/dev/ptmx")
+       (regex #"^/dev/pty[a-z]+")
+       (regex #"^/dev/ttys[0-9]+"))
+
 ; Does nothing, but reduces build noise.
 (allow file* (literal "/dev/dtracehelper"))
 
@@ -85,3 +91,7 @@
        (literal "/etc")
        (literal "/var")
        (literal "/private/var/tmp"))
+
+; This is used by /bin/sh on macOS 10.15 and later.
+(allow file*
+       (literal "/private/var/select/sh"))
