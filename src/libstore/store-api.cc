@@ -171,18 +171,18 @@ static std::string makeType(
 
 
 StorePath Store::makeFixedOutputPath(
-    FileIngestionMethod recursive,
+    FileIngestionMethod method,
     const Hash & hash,
     std::string_view name,
     const StorePathSet & references,
     bool hasSelfReference) const
 {
-    if (hash.type == htSHA256  && recursive == FileIngestionMethod::Recursive) {
+    if (hash.type == htSHA256 && method == FileIngestionMethod::Recursive) {
         return makeStorePath(makeType(*this, "source", references, hasSelfReference), hash, name);
     } else {
         assert(references.empty());
         return makeStorePath("output:out", hashString(htSHA256,
-                "fixed:out:" + (static_cast<bool>(recursive) ? (string) "r:" : "") +
+                "fixed:out:" + makeFileIngestionPrefix(method) +
                 hash.to_string(Base16) + ":"), name);
     }
 }
@@ -811,9 +811,22 @@ Strings ValidPathInfo::shortRefs() const
 }
 
 
-std::string makeFixedOutputCA(FileIngestionMethod recursive, const Hash & hash)
+std::string makeFileIngestionPrefix(const FileIngestionMethod m) {
+    switch (m) {
+    case FileIngestionMethod::Flat:
+        return "";
+    case FileIngestionMethod::Recursive:
+        return "r:";
+    default:
+        throw Error("impossible, caught both cases");
+    }
+}
+
+std::string makeFixedOutputCA(FileIngestionMethod method, const Hash & hash)
 {
-    return "fixed:" + (static_cast<bool>(recursive) ? (std::string) "r:" : "") + hash.to_string();
+    return "fixed:"
+        + makeFileIngestionPrefix(method)
+        + hash.to_string();
 }
 
 

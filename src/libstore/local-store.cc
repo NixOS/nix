@@ -557,10 +557,12 @@ void LocalStore::checkDerivationOutputs(const StorePath & drvPath, const Derivat
         if (out == drv.outputs.end())
             throw Error("derivation '%s' does not have an output named 'out'", printStorePath(drvPath));
 
-        FileIngestionMethod recursive; Hash h;
-        out->second.parseHashInfo(recursive, h);
-
-        check(makeFixedOutputPath(recursive, h, drvName), out->second.path, "out");
+        check(
+            makeFixedOutputPath(
+                out->second.hash->method,
+                out->second.hash->hash,
+                drvName),
+            out->second.path, "out");
     }
 
     else {
