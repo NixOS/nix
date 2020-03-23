@@ -311,12 +311,7 @@ public:
     Setting<bool> printMissing{this, true, "print-missing",
         "Whether to print what paths need to be built or downloaded."};
 
-    Setting<std::string> preBuildHook{this,
-#if __APPLE__
-        nixLibexecDir + "/nix/resolve-system-dependencies",
-#else
-        "",
-#endif
+    Setting<std::string> preBuildHook{this, "",
         "pre-build-hook",
         "A program to run just before a build to set derivation-specific build settings."};
 
