@@ -3,11 +3,9 @@
 #include "types.hh"
 #include <string>
 #include <optional>
-// #include <boost/format.hpp>
 
 using std::string;
 using std::optional;
-// using boost::format;
 
 namespace nix {
 

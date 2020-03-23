@@ -8,7 +8,7 @@ using std::cout;
 using std::endl;
 
 // return basic_format?
-string showErrLine(ErrLine &errLine) 
+string showErrLine(ErrLine &errLine)
 {
   if (errLine.columnRange.has_value()) 
   {
@@ -22,15 +22,26 @@ string showErrLine(ErrLine &errLine)
 
 void print_code_lines(string &prefix, NixCode &nix_code) 
 {
+  
   if (nix_code.errLine.has_value()) 
   {
     // previous line of code.
     if (nix_code.errLine->prevLineOfCode.has_value()) { 
-      cout << format("%1% %2$+5d%| %3%") %  prefix % (nix_code.errLine->lineNumber - 1) % *nix_code.errLine->prevLineOfCode;
+      cout << format("%1% %|2$5d|| %3%")
+        %  prefix
+        % (nix_code.errLine->lineNumber - 1)
+        % *nix_code.errLine->prevLineOfCode
+        << endl;
     }
 
-    // line of code containing the error.
-    cout << format("%1% %2$+5d%| %3%") %  prefix % (nix_code.errLine->lineNumber) % nix_code.errLine->errLineOfCode;
+    // line of code containing the error.%2$+5d%
+    cout << format("%1% %|2$5d|| %3%")
+      %  prefix
+      % (nix_code.errLine->lineNumber)
+      % nix_code.errLine->errLineOfCode
+      << endl;
+    
+
 
     // error arrows for the column range.
     if (nix_code.errLine->columnRange.has_value()) 
@@ -49,18 +60,20 @@ void print_code_lines(string &prefix, NixCode &nix_code)
         arrows.append("^");
       }
     
-      cout << format("%1%     |%2%%3%") % prefix % spaces % arrows;
+      cout << format("%1%      |%2%%3%") % prefix % spaces % arrows;
     }
+
 
 
     // next line of code.
     if (nix_code.errLine->nextLineOfCode.has_value()) { 
-      cout << format("%1% %2$+5d%| %3%") %  prefix % (nix_code.errLine->lineNumber + 1) % *nix_code.errLine->nextLineOfCode;
+      cout << format("%1% %|2$5d|| %3%")
+      %  prefix
+      % (nix_code.errLine->lineNumber + 1)
+      % *nix_code.errLine->nextLineOfCode
+      << endl;
     }
 
-  }
-  else 
-  {
   }
     
 }
@@ -99,7 +112,8 @@ void print_error(ErrorInfo &einfo)
     % "---"
     % einfo.errName
     % dashes
-    % einfo.toolName;
+    % einfo.toolName
+    << endl;
 
   // filename.
   if (einfo.nixCode.has_value()) 
@@ -110,7 +124,7 @@ void print_error(ErrorInfo &einfo)
         ? string(" ") + showErrLine(*einfo.nixCode->errLine)
         : "";
 
-      cout << format("%1%in file: %2%%3%") % prefix % *einfo.nixCode->nixFile % eline;
+      cout << format("%1%in file: %2%%3%") % prefix % *einfo.nixCode->nixFile % eline << endl;
       cout << prefix << endl;
     }
     else
