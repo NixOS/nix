@@ -53,7 +53,7 @@ using namespace nix;
                   MkNixCode()
                     .nixFile("myfile.nix")
                     .errLine(MkErrLine().lineNumber(40)
-                           .columnRange(50,10)
+                           .columnRange(13,7)
                            .linesOfCode(nullopt
                                       ,"this is the problem line of code"
                                       ,nullopt))));
@@ -65,7 +65,7 @@ using namespace nix;
                   MkNixCode()
                     .nixFile("myfile.nix")
                     .errLine(MkErrLine().lineNumber(40)
-                           .columnRange(50,10)
+                           .columnRange(13,7)
                            .linesOfCode(nullopt
                                       ,"this is the problem line of code"
                                       ,nullopt))));
