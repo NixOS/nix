@@ -94,7 +94,11 @@ void print_error(ErrorInfo &einfo)
         level_string = "warning:";  // TODO make yellow.
         break;
       }
-  }
+    default: 
+      {
+        level_string = "wat:";  
+        break;
+      }}
 
   int ndl = level_string.length() + 3 + einfo.name.length() + einfo.program.length();
   int dashwidth = errwidth - 3 ? 3 : 80 - ndl; 

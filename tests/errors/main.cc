@@ -4,11 +4,13 @@
 #include <iostream>
 
 using std::optional;
+using std::nullopt;
 
 int main() {
 
 using namespace nix; 
 
+  /*
   ColumnRange columnRange;
   columnRange.start = 24;
   columnRange.len = 14;
@@ -30,11 +32,43 @@ using namespace nix;
   generic.nixCode = nixcode;
 
   print_error(generic);
-
+  */
 
   StandardError standardError;
 
-  print_error(standardError.name("blah").description("blah"));
+  print_error(standardError
+                .name("name")
+                .description("description"));
+
+  StandardWarning standardWarning;
+
+  print_error(standardWarning
+                .name("warning name")
+                .description("warning description"));
+
+  print_error(MkNixError()
+                .name("name")
+                .description("description")
+                .nixcode(
+                  MkNixCode()
+                    .nixFile("myfile.nix")
+                    .errLine(MkErrLine().lineNumber(40)
+                           .columnRange(50,10)
+                           .linesOfCode(nullopt
+                                      ,"this is the problem line of code"
+                                      ,nullopt))));
+
+  print_error(MkNixWarning()
+                .name("name")
+                .description("description")
+                .nixcode(
+                  MkNixCode()
+                    .nixFile("myfile.nix")
+                    .errLine(MkErrLine().lineNumber(40)
+                           .columnRange(50,10)
+                           .linesOfCode(nullopt
+                                      ,"this is the problem line of code"
+                                      ,nullopt))));
 
   return 0;
 }
