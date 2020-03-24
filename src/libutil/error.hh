@@ -39,12 +39,39 @@ class NixCode {
 class ErrorInfo { 
   public:
   ErrLevel level;
-  string errName;
+  string name;
   string description;
-  string toolName;
+  string program;
   optional<NixCode> nixCode;
   string hint;
+  ErrorInfo& GetEI() { return *this; }
 };
+
+template <class T>
+class AddName : private T
+{
+  public:
+    T& name(const std::string &name){
+      GetEI().name = name;
+      return *this;
+    }
+  protected:
+    ErrorInfo& GetEI() { return T::GetEI(); }
+};
+
+template <class T>
+class AddDescription : private T 
+{
+  public:
+    T& description(const std::string &description){
+      GetEI().description = description;
+      return *this;
+    }
+  protected:
+    ErrorInfo& GetEI() { return T::GetEI(); }
+};
+
+typedef AddName<AddDescription<ErrorInfo>> StandardError;
 
 string showErrLine(ErrLine &errLine);
 

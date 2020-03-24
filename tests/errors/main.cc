@@ -24,12 +24,17 @@ using namespace nix;
   
   ErrorInfo generic;
   generic.level = elError;
-  generic.errName = "error name";
+  generic.name = "error name";
   generic.description = "general error description";
-  generic.toolName = "nixtool.exe";
+  generic.program = "nixtool.exe";
   generic.nixCode = nixcode;
 
   print_error(generic);
+
+
+  StandardError standardError;
+
+  print_error(standardError.name("blah").description("blah"));
 
   return 0;
 }

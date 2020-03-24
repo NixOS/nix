@@ -41,8 +41,6 @@ void print_code_lines(string &prefix, NixCode &nix_code)
       % nix_code.errLine->errLineOfCode
       << endl;
     
-
-
     // error arrows for the column range.
     if (nix_code.errLine->columnRange.has_value()) 
     {
@@ -98,7 +96,7 @@ void print_error(ErrorInfo &einfo)
       }
   }
 
-  int ndl = level_string.length() + 3 + einfo.errName.length() + einfo.toolName.length();
+  int ndl = level_string.length() + 3 + einfo.name.length() + einfo.program.length();
   int dashwidth = errwidth - 3 ? 3 : 80 - ndl; 
 
   string dashes;
@@ -110,9 +108,9 @@ void print_error(ErrorInfo &einfo)
     % prefix
     % level_string
     % "---"
-    % einfo.errName
+    % einfo.name
     % dashes
-    % einfo.toolName
+    % einfo.program
     << endl;
 
   // filename.
