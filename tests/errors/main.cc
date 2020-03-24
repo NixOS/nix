@@ -34,41 +34,34 @@ using namespace nix;
   print_error(generic);
   */
 
-  StandardError standardError;
-
-  print_error(standardError
+  print_error(StandardError()
                 .name("name")
                 .description("description"));
 
-  StandardWarning standardWarning;
-
-  print_error(standardWarning
+  print_error(StandardWarning()
                 .name("warning name")
                 .description("warning description"));
 
-  print_error(MkNixError()
-                .name("name")
-                .description("description")
-                .nixcode(
-                  MkNixCode()
-                    .nixFile("myfile.nix")
-                    .errLine(MkErrLine().lineNumber(40)
-                           .columnRange(13,7)
-                           .linesOfCode(nullopt
-                                      ,"this is the problem line of code"
-                                      ,nullopt))));
 
   print_error(MkNixWarning()
-                .name("name")
-                .description("description")
-                .nixcode(
-                  MkNixCode()
-                    .nixFile("myfile.nix")
-                    .errLine(MkErrLine().lineNumber(40)
-                           .columnRange(13,7)
-                           .linesOfCode(nullopt
-                                      ,"this is the problem line of code"
-                                      ,nullopt))));
+                .name("warning name")
+                .description("warning description")
+                .nixFile("myfile.nix")
+                .lineNumber(40)
+                .columnRange(13,7)
+                .linesOfCode(nullopt
+                            ,"this is the problem line of code"
+                            ,nullopt));
+
+  print_error(MkNixError()
+                .name("error name")
+                .description("warning description")
+                .nixFile("myfile.nix")
+                .lineNumber(40)
+                .columnRange(13,7)
+                .linesOfCode(nullopt
+                            ,"this is the problem line of code"
+                            ,nullopt));
 
   return 0;
 }

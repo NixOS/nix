@@ -23,17 +23,6 @@ class ColumnRange {
 
 class ErrorInfo;
 
-// -------------------------------------------------
-// forward declarations before ErrLine.
-template <class T> 
-class AddLineNumber;
-
-template <class T> 
-class AddColumnRange;
-
-template <class T> 
-class AddLOC;
-
 class ErrLine { 
   public:
     int lineNumber;
@@ -42,107 +31,25 @@ class ErrLine {
     string errLineOfCode;
     optional<string> nextLineOfCode;
 
-    friend AddLineNumber<ErrLine>;
-    friend AddColumnRange<ErrLine>;
-    friend AddLOC<ErrLine>;
-    ErrLine& GetEL() { return *this; }
-  private:
-    ErrLine() {}
 };
-
-template <class T> 
-class AddLineNumber : public T
-{
-  public:
-    T& lineNumber(int lineNumber) { 
-      GetEL().lineNumber = lineNumber;
-      return *this;
-    }
-  protected:
-    ErrLine& GetEL() { return T::GetEL(); }
-};
-
-template <class T> 
-class AddColumnRange : public T
-{
-  public:
-    T& columnRange(unsigned int start, unsigned int len) { 
-      GetEL().columnRange = { start, len };
-      return *this;
-    }
-  protected:
-    ErrLine& GetEL() { return T::GetEL(); }
-};
-
-template <class T> 
-class AddLOC : public T
-{
-  public:
-    T& linesOfCode(optional<string> prevloc, string loc, optional<string> nextloc) { 
-      GetEL().prevLineOfCode = prevloc;
-      GetEL().errLineOfCode = loc;
-      GetEL().nextLineOfCode = nextloc;
-      return *this;
-    }
-  protected:
-    ErrLine& GetEL() { return T::GetEL(); }
-};
-
-typedef AddLineNumber<AddColumnRange<AddLOC<ErrLine>>> MkErrLine;
-MkErrLine mkErrLine;
-
-
-// -------------------------------------------------
-// NixCode.
-
-template <class T>
-class AddNixFile;
-
-template <class T>
-class AddErrLine;
 
 class NixCode { 
   public:
     optional<string> nixFile;
     optional<ErrLine> errLine;
 
-    friend AddNixFile<NixCode>;
-    friend AddErrLine<NixCode>;
-    friend ErrorInfo;
-    NixCode& GetNC() { return *this; }
-  private:
-    NixCode() {}
-};
-
-template <class T> 
-class AddNixFile : public T
-{
-  public:
-    T& nixFile(string filename) { 
-      GetNC().nixFile = filename;
-      return *this;
+    ErrLine& ensureErrLine() 
+    { 
+      if (!this->errLine.has_value())
+         this->errLine = optional(ErrLine());
+      return *this->errLine; 
     }
-  protected:
-    NixCode& GetNC() { return T::GetNC(); }
 };
-
-template <class T> 
-class AddErrLine : public T
-{
-  public:
-    T& errLine(ErrLine errline) { 
-      GetNC().errLine = errline;
-      return *this;
-    }
-  protected:
-    NixCode& GetNC() { return T::GetNC(); }
-};
-
-typedef AddNixFile<AddErrLine<NixCode>> MkNixCode;
 
 // -------------------------------------------------
 // ErrorInfo.
 
+// Forward friend class declarations.  "builder classes"
 template <class T>
 class AddName;
 
@@ -152,6 +59,22 @@ class AddDescription;
 template <class T>
 class AddNixCode;
 
+template <class T>
+class AddNixFile;
+
+template <class T>
+class AddErrLine;
+
+template <class T> 
+class AddLineNumber;
+
+template <class T> 
+class AddColumnRange;
+
+template <class T> 
+class AddLOC;
+
+// The error info class itself.
 class ErrorInfo { 
   public:
     ErrLevel level;
@@ -167,9 +90,23 @@ class ErrorInfo {
     friend AddName<ErrorInfo>;
     friend AddDescription<ErrorInfo>;
     friend AddNixCode<ErrorInfo>;
+    friend AddNixFile<ErrorInfo>;
+    friend AddErrLine<ErrorInfo>;
+    friend AddLineNumber<ErrorInfo>;
+    friend AddColumnRange<ErrorInfo>;
+    friend AddLOC<ErrorInfo>;
     
+    NixCode& ensureNixCode() 
+    { 
+      if (!this->nixCode.has_value())
+         this->nixCode = optional(NixCode());
+      return *this->nixCode; 
+    }
   protected:
+    // constructor is protected, so only the builder classes can create an ErrorInfo.
     ErrorInfo(ErrLevel level) { this->level = level; }
+
+
 };
 
 class EIError : public ErrorInfo
@@ -208,23 +145,73 @@ class AddDescription : private T
     ErrorInfo& GetEI() { return T::GetEI(); }
 };
 
-template <class T>
-class AddNixCode : private T 
+template <class T> 
+class AddNixFile : public T
 {
   public:
-    T& nixcode(const NixCode &nixcode){
-      GetEI().nixCode = nixcode;
+    T& nixFile(string filename) { 
+     GetEI().ensureNixCode().nixFile = filename;
+     return *this;
+    }
+  protected:
+    ErrorInfo& GetEI() { return T::GetEI(); }
+};
+
+template <class T> 
+class AddLineNumber : public T
+{
+  public:
+    T& lineNumber(int lineNumber) { 
+      GetEI().ensureNixCode().ensureErrLine().lineNumber = lineNumber;
       return *this;
     }
   protected:
     ErrorInfo& GetEI() { return T::GetEI(); }
 };
 
+template <class T> 
+class AddColumnRange : public T
+{
+  public:
+    T& columnRange(unsigned int start, unsigned int len) { 
+      GetEI().ensureNixCode().ensureErrLine().columnRange = { start, len };
+      return *this;
+    }
+  protected:
+    ErrorInfo& GetEI() { return T::GetEI(); }
+};
+
+template <class T> 
+class AddLOC : public T
+{
+  public:
+    T& linesOfCode(optional<string> prevloc, string loc, optional<string> nextloc) { 
+      GetEI().ensureNixCode().ensureErrLine().prevLineOfCode = prevloc;
+      GetEI().ensureNixCode().ensureErrLine().errLineOfCode = loc;
+      GetEI().ensureNixCode().ensureErrLine().nextLineOfCode = nextloc;
+      return *this;
+    }
+  protected:
+    ErrorInfo& GetEI() { return T::GetEI(); }
+};
+
+typedef AddNixFile<AddErrLine<NixCode>> MkNixCode;
+
 typedef AddName<AddDescription<EIError>> StandardError;
 typedef AddName<AddDescription<EIWarning>> StandardWarning;
 
-typedef AddName<AddDescription<AddNixCode<EIError>>> MkNixError;
-typedef AddName<AddDescription<AddNixCode<EIWarning>>> MkNixWarning;
+typedef AddName<
+        AddDescription<
+        AddNixFile<
+        AddLineNumber<
+        AddColumnRange<
+        AddLOC<EIError>>>>>> MkNixError;
+typedef AddName<
+        AddDescription<
+        AddNixFile<
+        AddLineNumber<
+        AddColumnRange<
+        AddLOC<EIWarning>>>>>> MkNixWarning;
 
 string showErrLine(ErrLine &errLine);
 
