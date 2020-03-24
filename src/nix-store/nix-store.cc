@@ -229,12 +229,6 @@ static StorePathSet maybeUseOutputs(const StorePath & storePath, bool useOutput,
 /* Some code to print a tree representation of a derivation dependency
    graph.  Topological sorting is used to keep the tree relatively
    flat. */
-
-const string treeConn = "+---";
-const string treeLine = "|   ";
-const string treeNull = "    ";
-
-
 static void printTree(const StorePath & path,
     const string & firstPad, const string & tailPad, StorePathSet & done)
 {
@@ -254,10 +248,11 @@ static void printTree(const StorePath & path,
     auto sorted = store->topoSortPaths(info->references);
     reverse(sorted.begin(), sorted.end());
 
-    for (auto i = sorted.begin(); i != sorted.end(); ++i) {
-        auto j = i; ++j;
-        printTree(*i, tailPad + treeConn,
-            j == sorted.end() ? tailPad + treeNull : tailPad + treeLine,
+    for (const auto &[n, i] : enumerate(sorted)) {
+        bool last = n + 1 == sorted.size();
+        printTree(i,
+            tailPad + (last ? treeLast : treeConn),
+            tailPad + (last ? treeNull : treeLine),
             done);
     }
 }
