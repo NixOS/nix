@@ -256,4 +256,22 @@ string optimisticLockProfile(const Path & profile)
 }
 
 
+Path getDefaultProfile()
+{
+    Path profileLink = getHome() + "/.nix-profile";
+    try {
+        if (!pathExists(profileLink)) {
+            replaceSymlink(
+                getuid() == 0
+                ? settings.nixStateDir + "/profiles/default"
+                : fmt("%s/profiles/per-user/%s/profile", settings.nixStateDir, getUserName()),
+                profileLink);
+        }
+        return absPath(readLink(profileLink), dirOf(profileLink));
+    } catch (Error &) {
+        return profileLink;
+    }
+}
+
+
 }

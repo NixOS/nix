@@ -64,4 +64,8 @@ void lockProfile(PathLocks & lock, const Path & profile);
    rebuilt. */
 string optimisticLockProfile(const Path & profile);
 
+/* Resolve ~/.nix-profile. If ~/.nix-profile doesn't exist yet, create
+   it. */
+Path getDefaultProfile();
+
 }

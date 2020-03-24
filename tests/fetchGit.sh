@@ -9,6 +9,8 @@ clearStore
 
 repo=$TEST_ROOT/git
 
+export _NIX_FORCE_HTTP=1
+
 rm -rf $repo ${repo}-tmp $TEST_HOME/.cache/nix/gitv2
 
 git init $repo
