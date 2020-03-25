@@ -263,8 +263,12 @@ struct CmdSearch : SourceExprCommand, MixJSON
                 throw SysError("cannot rename '%s' to '%s'", tmpFile, jsonCacheFileName);
         }
 
-        if (results.size() == 0)
+        if (results.size() == 0 && !json) {
             throw Error("no results for the given search term(s)!");
+        }
+        if (json) {
+            return;
+        }
 
         RunPager pager;
         for (auto el : results) std::cout << el.second << "\n";
