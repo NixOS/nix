@@ -62,7 +62,7 @@ void print_code_lines(string &prefix, NixCode &nix_code)
         arrows.append("^");
       }
     
-      cout << format("%1%      |%2%%3%") % prefix % spaces % arrows;
+      cout << format("%1%      |%2%" ANSI_RED "%3%" ANSI_NORMAL) % prefix % spaces % arrows;
     }
 
 
@@ -90,12 +90,16 @@ void print_error(ErrorInfo &einfo)
   {
     case ErrLevel::elError: 
       {
-        level_string = "error:";  // TODO make red.
+        level_string = ANSI_RED;
+        level_string += "error:";
+        level_string += ANSI_NORMAL;
         break;
       }
     case ErrLevel::elWarning: 
       {
-        level_string = "warning:";  // TODO make yellow.
+        level_string = ANSI_YELLOW;
+        level_string += "warning:";  
+        level_string += ANSI_NORMAL;
         break;
       }
     default: 
@@ -113,7 +117,7 @@ void print_error(ErrorInfo &einfo)
     dashes.append("-");
 
   // divider.
-  cout << format("%1%%2% %3% %4% %5% %6%")
+  cout << format("%1%%2%" ANSI_BLUE " %3% %4% %5% %6%" ANSI_NORMAL)
     % prefix
     % level_string
     % "---"
@@ -131,7 +135,8 @@ void print_error(ErrorInfo &einfo)
         ? string(" ") + showErrLine(*einfo.nixCode->errLine)
         : "";
 
-      cout << format("%1%in file: %2%%3%") % prefix % *einfo.nixCode->nixFile % eline << endl;
+      cout << format("%1%in file: " ANSI_BLUE "%2%%3%" ANSI_NORMAL) 
+        % prefix % *einfo.nixCode->nixFile % eline << endl;
       cout << prefix << endl;
     }
     else

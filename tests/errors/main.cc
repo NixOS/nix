@@ -59,7 +59,7 @@ using namespace nix;
 
   print_error(MkNixError()
                 .name("error name")
-                .description("warning description")
+                .description("error description")
                 .nixFile("myfile.nix")
                 .lineNumber(40)
                 .columnRange(13,7)
