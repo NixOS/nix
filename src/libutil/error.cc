@@ -1,11 +1,15 @@
 #include "error.hh"
 
 #include <iostream>
+#include <optional>
 
 namespace nix {
 
 using std::cout;
 using std::endl;
+using std::nullopt;
+
+optional<string> ErrorInfo::programName = nullopt;
 
 // return basic_format?
 string showErrLine(ErrLine &errLine)
@@ -98,10 +102,11 @@ void print_error(ErrorInfo &einfo)
       {
         level_string = "wat:";  
         break;
-      }}
+      }
+  }
 
-  int ndl = level_string.length() + 3 + einfo.name.length() + einfo.program.length();
-  int dashwidth = errwidth - 3 ? 3 : 80 - ndl; 
+  int ndl = prefix.length() + level_string.length() + 3 + einfo.name.length() + einfo.programName.value_or("").length();
+  int dashwidth = ndl > (errwidth - 3) ? 3 : 80 - ndl; 
 
   string dashes;
   for (int i = 0; i < dashwidth; ++i)
@@ -114,7 +119,7 @@ void print_error(ErrorInfo &einfo)
     % "---"
     % einfo.name
     % dashes
-    % einfo.program
+    % einfo.programName.value_or("")
     << endl;
 
   // filename.

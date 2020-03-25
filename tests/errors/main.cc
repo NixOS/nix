@@ -5,10 +5,14 @@
 
 using std::optional;
 using std::nullopt;
+using std::cout;
+using std::endl;
 
 int main() {
 
 using namespace nix; 
+
+  ErrorInfo::programName = optional("errorTest");
 
   /*
   ColumnRange columnRange;

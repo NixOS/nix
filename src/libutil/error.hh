@@ -80,10 +80,11 @@ class ErrorInfo {
     ErrLevel level;
     string name;
     string description;
-    string program;
     optional<NixCode> nixCode;
     string hint;
     ErrorInfo& GetEI() { return *this; }
+
+    static optional<string> programName;
 
     // give these access to the private constructor, 
     // when they are direct descendants.
@@ -109,18 +110,21 @@ class ErrorInfo {
 
 };
 
+// Init as error
 class EIError : public ErrorInfo
 {
   protected:
     EIError() : ErrorInfo(elError) {}
 };
 
+// Init as warning
 class EIWarning : public ErrorInfo
 {
   protected:
     EIWarning() : ErrorInfo(elWarning) {}
 };
 
+// Builder class definitions.
 template <class T>
 class AddName : private T
 {
