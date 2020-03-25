@@ -1021,7 +1021,9 @@ static void prim_toFile(EvalState & state, const Pos & pos, Value * * args, Valu
 
     for (auto path : context) {
         if (path.at(0) != '/')
-            throw EvalError(format("in 'toFile': the file '%1%' cannot refer to derivation outputs, at %2%") % name % pos);
+            throw EvalError(format(
+                "in 'toFile': the file named '%1%' must not contain a reference "
+                "to a derivation but contains (%2%), at %3%") % name % path % pos);
         refs.insert(state.store->parseStorePath(path));
     }
 
