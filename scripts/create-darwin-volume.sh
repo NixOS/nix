@@ -14,7 +14,12 @@ disk_identifier() {
     xpath "/plist/dict/key[text()='ParentWholeDisk']/following-sibling::string[1]/text()" 2>/dev/null
 }
 
-volume_get() {
+volume_list_true() {
+    key=$1 t=$2
+    xpath "/plist/dict/array/dict/key[text()='Volumes']/following-sibling::array/dict/key[text()='$key']/following-sibling::true[1]" 2> /dev/null
+}
+
+volume_get_string() {
     key=$1 i=$2
     xpath "/plist/dict/array/dict/key[text()='Volumes']/following-sibling::array/dict[$i]/key[text()='$key']/following-sibling::string[1]/text()" 2> /dev/null
 }
@@ -24,7 +29,7 @@ find_nix_volume() {
     i=1
     volumes=$(apfs_volumes_for "$disk")
     while true; do
-        name=$(echo "$volumes" | volume_get "Name" "$i")
+        name=$(echo "$volumes" | volume_get_string "Name" "$i")
         if [ -z "$name" ]; then
             break
         fi
@@ -52,6 +57,12 @@ test_synthetic_conf() {
 
 test_nix() {
     test -d "/nix"
+}
+
+test_filevault() {
+    disk=$1
+    apfs_volumes_for "$disk" | volume_list_true FileVault | grep -q true || return
+    ! sudo xartutil --list >/dev/null 2>/dev/null
 }
 
 main() {
@@ -99,6 +110,13 @@ main() {
     volume=$(find_nix_volume "$disk")
     if [ -z "$volume" ]; then
         echo "Creating a Nix Store volume..." >&2
+
+        if test_filevault "$disk"; then
+            echo "error: FileVault detected, refusing to create unencrypted volume" >&2
+            echo "See https://nixos.org/nix/manual/#sect-apfs-volume-installation" >&2
+            exit 1
+        fi
+
         sudo diskutil apfs addVolume "$disk" APFS 'Nix Store' -mountpoint /nix
         volume="Nix Store"
     else

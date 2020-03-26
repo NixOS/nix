@@ -230,8 +230,10 @@ LABEL=Nix\040Store /nix apfs rw
       </para>
 
       <para>
-        This new volume also won't be encrypted by default, and enabling is
-        only possible interactively?
+        This new volume also won't be encrypted by default, and enabling it
+        requires extra setup.  For machines with a <link xlink:href="https://www.apple.com/euro/mac/shared/docs/Apple_T2_Security_Chip_Overview.pdf">T2 chip</link>
+        all data is already entrypted at rest, older hardware won't even when
+        FileVault is enabled for the rest of the system.
       </para>
 
 <screen>
