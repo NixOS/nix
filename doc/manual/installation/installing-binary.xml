@@ -141,13 +141,14 @@ sudo rm /Library/LaunchDaemons/org.nixos.nix-daemon.plist
 
   <para>
     The root filesystem is read-only as of macOS 10.15 Catalina, all writable
-    paths to a separate data volume.  This means creating or writing to <filename>/nix</filename>
-    is not allowed.  While changing the default prefix would be possible, it's
-    a very intrusive change that has side effects we want to avoid for now.
+    paths were moved to a separate data volume.  This means creating or writing
+    to <filename>/nix</filename> is not allowed.  While changing the default prefix
+    would be possible, it's a very intrusive change that has side effects we want to
+    avoid for now.
   </para>
 
   <para>
-    For common writable locations <literal>firmlinks</literal> where introduced,
+    For common writable locations <literal>firmlinks</literal> were introduced,
     described by Apple as a "bi-directional wormhole" between two filesystems.
     Essentially a bind mount for APFS volumes.  However this is (currently) not
     user configurable and only available for paths like <filename>/Users</filename>.
@@ -156,8 +157,10 @@ sudo rm /Library/LaunchDaemons/org.nixos.nix-daemon.plist
   <para>
     For special cases like NFS mount points or package manager roots <link xlink:href="https://developer.apple.com/library/archive/documentation/System/Conceptual/ManPages_iPhoneOS/man5/synthetic.conf.5.html">synthetic.conf(5)</link>
     provides a mechanism for some limited, user-controlled file-creation at <filename>/</filename>.
-    This only applies on a reboot, but <command>apfs.util</command> can be used
-    to trigger the creation (not deletion) of new entries.
+    This only applies at boot time, however <command>apfs.util</command> can be used
+    to trigger the creation (not deletion) of new entries without a reboot.
+    It would be ideal if this could create firmlinks, however a symlink or mountpoint
+    are the only options.
   </para>
 
 <screen>
