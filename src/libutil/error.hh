@@ -1,12 +1,16 @@
 #pragma once
 
-#include "types.hh"
+#include "util.hh"
 #include <string>
 #include <optional>
 #include <iostream>
+#include <iomanip>
 
 using std::string;
 using std::optional;
+using boost::format;
+using std::cout;
+using std::endl;
 
 namespace nix {
 
@@ -81,13 +85,13 @@ class ErrorInfo {
     string name;
     string description;
     optional<NixCode> nixCode;
-    string hint;
+    optional<string> hint;
     ErrorInfo& GetEI() { return *this; }
 
     static optional<string> programName;
 
     // give these access to the private constructor, 
-    // when they are direct descendants.
+    // when they are direct descendants (children but not grandchildren).
     friend AddName<ErrorInfo>;
     friend AddDescription<ErrorInfo>;
     friend AddNixCode<ErrorInfo>;
@@ -150,7 +154,7 @@ class AddDescription : private T
 };
 
 template <class T> 
-class AddNixFile : public T
+class AddNixFile : private T
 {
   public:
     T& nixFile(string filename) { 
@@ -162,7 +166,7 @@ class AddNixFile : public T
 };
 
 template <class T> 
-class AddLineNumber : public T
+class AddLineNumber : private T
 {
   public:
     T& lineNumber(int lineNumber) { 
@@ -174,7 +178,7 @@ class AddLineNumber : public T
 };
 
 template <class T> 
-class AddColumnRange : public T
+class AddColumnRange : private T
 {
   public:
     T& columnRange(unsigned int start, unsigned int len) { 
@@ -186,7 +190,7 @@ class AddColumnRange : public T
 };
 
 template <class T> 
-class AddLOC : public T
+class AddLOC : private T
 {
   public:
     T& linesOfCode(optional<string> prevloc, string loc, optional<string> nextloc) { 
@@ -199,17 +203,64 @@ class AddLOC : public T
     ErrorInfo& GetEI() { return T::GetEI(); }
 };
 
-typedef AddNixFile<AddErrLine<NixCode>> MkNixCode;
+template <class T>
+class yellowify
+{
+public:
+    yellowify(T &s) : value(s) {}
+    T &value;
+};
 
-typedef AddName<AddDescription<EIError>> StandardError;
-typedef AddName<AddDescription<EIWarning>> StandardWarning;
+template <class T>
+std::ostream& operator<<(std::ostream &out, const yellowify<T> &y)
+{
+  return out << ANSI_YELLOW << y.value << ANSI_NORMAL;
+}
+
+// hint format shows templated values in yellow.
+class hintfmt 
+{
+  public:
+    hintfmt(string format) :fmt(format) {}
+    template<class T>
+      hintfmt& operator%(const T &value) { fmt % yellowify(value); return *this; }
+
+    template <typename U>
+    friend class AddHint;
+  private:
+    format fmt;
+      
+};
+
+template <class T> 
+class AddHint : private T
+{
+  public:
+    T& hint(hintfmt &hfmt) {
+      GetEI().hint = optional(hfmt.fmt.str());
+      return *this;
+    }
+    T& nohint() {
+      GetEI().hint = std::nullopt;
+      return *this;
+    }
+  protected:
+    ErrorInfo& GetEI() { return T::GetEI(); }
+};
+
+// --------------------------------------------------------
+// error types
+
+typedef AddName<AddDescription<AddHint<EIError>>> StandardError;
+typedef AddName<AddDescription<AddHint<EIWarning>>> StandardWarning;
 
 typedef AddName<
         AddDescription<
         AddNixFile<
         AddLineNumber<
         AddColumnRange<
-        AddLOC<EIError>>>>>> MkNixError;
+        AddLOC<
+        AddHint<EIError>>>>>>> MkNixError;
 typedef AddName<
         AddDescription<
         AddNixFile<
@@ -217,10 +268,15 @@ typedef AddName<
         AddColumnRange<
         AddLOC<EIWarning>>>>>> MkNixWarning;
 
+
+// --------------------------------------------------------
+// error printing
+
+void printErrorInfo(ErrorInfo &einfo);
+
 string showErrLine(ErrLine &errLine);
 
-void print_code_lines(string &prefix, NixCode &nix_code); 
+void printCodeLines(string &prefix, NixCode &nixCode); 
 
-void print_error(ErrorInfo &einfo);
 }
 

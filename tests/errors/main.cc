@@ -8,9 +8,9 @@ using std::nullopt;
 using std::cout;
 using std::endl;
 
-int main() {
-
-using namespace nix; 
+int main() 
+{
+  using namespace nix; 
 
   ErrorInfo::programName = optional("errorTest");
 
@@ -35,19 +35,23 @@ using namespace nix;
   generic.program = "nixtool.exe";
   generic.nixCode = nixcode;
 
-  print_error(generic);
+  printErrorInfo(generic);
   */
 
-  print_error(StandardError()
+  printErrorInfo(StandardError()
                 .name("name")
-                .description("description"));
+                .description("description")
+                .nohint()
+                );
 
-  print_error(StandardWarning()
+  printErrorInfo(StandardWarning()
                 .name("warning name")
-                .description("warning description"));
+                .description("warning description")
+                .nohint()
+                );
 
 
-  print_error(MkNixWarning()
+  printErrorInfo(MkNixWarning()
                 .name("warning name")
                 .description("warning description")
                 .nixFile("myfile.nix")
@@ -57,19 +61,17 @@ using namespace nix;
                             ,"this is the problem line of code"
                             ,nullopt));
 
-  print_error(MkNixError()
+  printErrorInfo(MkNixError()
                 .name("error name")
                 .description("error description")
                 .nixFile("myfile.nix")
                 .lineNumber(40)
                 .columnRange(13,7)
-                .linesOfCode(nullopt
+                .linesOfCode(optional("previous line of code")
                             ,"this is the problem line of code"
-                            ,nullopt));
+                            ,optional("next line of code"))
+                .hint(hintfmt("this hint has %1% templated %2%!!") % "yellow" % "values")
+                );
 
   return 0;
 }
-
-
-
-

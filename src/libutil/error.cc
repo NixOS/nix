@@ -24,55 +24,55 @@ string showErrLine(ErrLine &errLine)
   };
 }
 
-void print_code_lines(string &prefix, NixCode &nix_code) 
+void printCodeLines(string &prefix, NixCode &nixCode) 
 {
   
-  if (nix_code.errLine.has_value()) 
+  if (nixCode.errLine.has_value()) 
   {
     // previous line of code.
-    if (nix_code.errLine->prevLineOfCode.has_value()) { 
+    if (nixCode.errLine->prevLineOfCode.has_value()) { 
       cout << format("%1% %|2$5d|| %3%")
         %  prefix
-        % (nix_code.errLine->lineNumber - 1)
-        % *nix_code.errLine->prevLineOfCode
+        % (nixCode.errLine->lineNumber - 1)
+        % *nixCode.errLine->prevLineOfCode
         << endl;
     }
 
     // line of code containing the error.%2$+5d%
     cout << format("%1% %|2$5d|| %3%")
       %  prefix
-      % (nix_code.errLine->lineNumber)
-      % nix_code.errLine->errLineOfCode
+      % (nixCode.errLine->lineNumber)
+      % nixCode.errLine->errLineOfCode
       << endl;
     
     // error arrows for the column range.
-    if (nix_code.errLine->columnRange.has_value()) 
+    if (nixCode.errLine->columnRange.has_value()) 
     {
-      int start = nix_code.errLine->columnRange->start;
+      int start = nixCode.errLine->columnRange->start;
       std::string spaces;
       for (int i = 0; i < start; ++i)
       {
         spaces.append(" ");
       }
 
-      int len = nix_code.errLine->columnRange->len;
+      int len = nixCode.errLine->columnRange->len;
       std::string arrows;
       for (int i = 0; i < len; ++i)
       {
         arrows.append("^");
       }
     
-      cout << format("%1%      |%2%" ANSI_RED "%3%" ANSI_NORMAL) % prefix % spaces % arrows;
+      cout << format("%1%      |%2%" ANSI_RED "%3%" ANSI_NORMAL) % prefix % spaces % arrows << endl;
     }
 
 
 
     // next line of code.
-    if (nix_code.errLine->nextLineOfCode.has_value()) { 
+    if (nixCode.errLine->nextLineOfCode.has_value()) { 
       cout << format("%1% %|2$5d|| %3%")
       %  prefix
-      % (nix_code.errLine->lineNumber + 1)
-      % *nix_code.errLine->nextLineOfCode
+      % (nixCode.errLine->lineNumber + 1)
+      % *nixCode.errLine->nextLineOfCode
       << endl;
     }
 
@@ -80,36 +80,36 @@ void print_code_lines(string &prefix, NixCode &nix_code)
     
 }
 
-void print_error(ErrorInfo &einfo) 
+void printErrorInfo(ErrorInfo &einfo) 
 {
   int errwidth = 80;
   string prefix = "  ";
 
-  string level_string;
+  string levelString;
   switch (einfo.level) 
   {
     case ErrLevel::elError: 
       {
-        level_string = ANSI_RED;
-        level_string += "error:";
-        level_string += ANSI_NORMAL;
+        levelString = ANSI_RED;
+        levelString += "error:";
+        levelString += ANSI_NORMAL;
         break;
       }
     case ErrLevel::elWarning: 
       {
-        level_string = ANSI_YELLOW;
-        level_string += "warning:";  
-        level_string += ANSI_NORMAL;
+        levelString = ANSI_YELLOW;
+        levelString += "warning:";  
+        levelString += ANSI_NORMAL;
         break;
       }
     default: 
       {
-        level_string = "wat:";  
+        levelString = "wat:";  
         break;
       }
   }
 
-  int ndl = prefix.length() + level_string.length() + 3 + einfo.name.length() + einfo.programName.value_or("").length();
+  int ndl = prefix.length() + levelString.length() + 3 + einfo.name.length() + einfo.programName.value_or("").length();
   int dashwidth = ndl > (errwidth - 3) ? 3 : 80 - ndl; 
 
   string dashes;
@@ -119,7 +119,7 @@ void print_error(ErrorInfo &einfo)
   // divider.
   cout << format("%1%%2%" ANSI_BLUE " %3% %4% %5% %6%" ANSI_NORMAL)
     % prefix
-    % level_string
+    % levelString
     % "---"
     % einfo.name
     % dashes
@@ -152,11 +152,15 @@ void print_error(ErrorInfo &einfo)
 
   // lines of code.
   if (einfo.nixCode.has_value())
-    print_code_lines(prefix, *einfo.nixCode);
+    printCodeLines(prefix, *einfo.nixCode);
 
   // hint
-  cout << prefix << einfo.hint << endl;
-  cout << prefix << endl;
+  if (einfo.hint.has_value()) 
+  {
+    cout << prefix << endl;
+    cout << prefix << *einfo.hint << endl;
+    cout << prefix << endl;
+  }
 
 }
 
