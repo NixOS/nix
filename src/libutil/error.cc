@@ -104,13 +104,13 @@ void printErrorInfo(ErrorInfo &einfo)
       }
     default: 
       {
-        levelString = "wat:";  
+        levelString = format("invalid error level: %1%") % einfo.level;  
         break;
       }
   }
 
   int ndl = prefix.length() + levelString.length() + 3 + einfo.name.length() + einfo.programName.value_or("").length();
-  int dashwidth = ndl > (errwidth - 3) ? 3 : 80 - ndl; 
+  int dashwidth = ndl > (errwidth - 3) ? 3 : errwidth - ndl; 
 
   string dashes;
   for (int i = 0; i < dashwidth; ++i)
@@ -161,7 +161,6 @@ void printErrorInfo(ErrorInfo &einfo)
     cout << prefix << *einfo.hint << endl;
     cout << prefix << endl;
   }
-
 }
 
 }
