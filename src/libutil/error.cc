@@ -104,7 +104,7 @@ void printErrorInfo(ErrorInfo &einfo)
       }
     default: 
       {
-        levelString = format("invalid error level: %1%") % einfo.level;  
+        levelString = (format("invalid error level: %1%") % einfo.level).str();  
         break;
       }
   }

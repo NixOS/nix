@@ -1,10 +1,12 @@
 #pragma once
 
-#include "util.hh"
+#include "ansicolor.hh"
 #include <string>
 #include <optional>
 #include <iostream>
 #include <iomanip>
+
+#include <boost/format.hpp>
 
 using std::string;
 using std::optional;
@@ -251,8 +253,14 @@ class AddHint : private T
 // --------------------------------------------------------
 // error types
 
-typedef AddName<AddDescription<AddHint<EIError>>> StandardError;
-typedef AddName<AddDescription<AddHint<EIWarning>>> StandardWarning;
+typedef AddName<
+        AddDescription<
+        AddHint<
+        EIError>>> StandardError;
+typedef AddName<
+        AddDescription<
+        AddHint<
+        EIWarning>>> StandardWarning;
 
 typedef AddName<
         AddDescription<
@@ -260,23 +268,22 @@ typedef AddName<
         AddLineNumber<
         AddColumnRange<
         AddLOC<
-        AddHint<EIError>>>>>>> MkNixError;
+        AddHint<
+        EIError>>>>>>> MkNixError;
 typedef AddName<
         AddDescription<
         AddNixFile<
         AddLineNumber<
         AddColumnRange<
-        AddLOC<EIWarning>>>>>> MkNixWarning;
+        AddLOC<
+        AddHint<
+        EIWarning>>>>>>> MkNixWarning;
 
 
 // --------------------------------------------------------
 // error printing
 
 void printErrorInfo(ErrorInfo &einfo);
-
-string showErrLine(ErrLine &errLine);
-
-void printCodeLines(string &prefix, NixCode &nixCode); 
 
 }
 
