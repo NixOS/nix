@@ -96,8 +96,6 @@ StorePath LockedNode::computeStorePath(Store & store) const
 
 std::shared_ptr<Node> Node::findInput(const InputPath & path)
 {
-    assert(!path.empty());
-
     auto pos = shared_from_this();
 
     for (auto & elem : path) {
@@ -275,32 +273,33 @@ InputPath parseInputPath(std::string_view s)
         path.push_back(elem);
     }
 
-    if (path.empty())
-        throw Error("flake input path is empty");
-
     return path;
 }
 
 static void flattenLockFile(
     std::shared_ptr<const Node> node,
     const InputPath & prefix,
+    std::unordered_set<std::shared_ptr<const Node>> & done,
     std::map<InputPath, std::shared_ptr<const LockedNode>> & res)
 {
-    // FIXME: handle cycles
+    if (!done.insert(node).second) return;
+
     for (auto &[id, input] : node->inputs) {
         auto inputPath(prefix);
         inputPath.push_back(id);
         if (auto lockedInput = std::dynamic_pointer_cast<const LockedNode>(input))
             res.emplace(inputPath, lockedInput);
-        flattenLockFile(input, inputPath, res);
+        flattenLockFile(input, inputPath, done, res);
     }
 }
 
 std::string diffLockFiles(const LockFile & oldLocks, const LockFile & newLocks)
 {
+    std::unordered_set<std::shared_ptr<const Node>> done;
     std::map<InputPath, std::shared_ptr<const LockedNode>> oldFlat, newFlat;
-    flattenLockFile(oldLocks.root, {}, oldFlat);
-    flattenLockFile(newLocks.root, {}, newFlat);
+    flattenLockFile(oldLocks.root, {}, done, oldFlat);
+    done.clear();
+    flattenLockFile(newLocks.root, {}, done, newFlat);
 
     auto i = oldFlat.begin();
     auto j = newFlat.begin();
