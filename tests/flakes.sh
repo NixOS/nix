@@ -518,7 +518,7 @@ cat > $flake3Dir/flake.nix <<EOF
 EOF
 
 nix flake update $flake3Dir
-[[ $(jq .nodes.foo.locked $flake3Dir/flake.lock) = $(jq .nodes.bar.locked $flake3Dir/flake.lock) ]]
+[[ $(jq .nodes.root.inputs.foo $flake3Dir/flake.lock) = $(jq .nodes.root.inputs.bar $flake3Dir/flake.lock) ]]
 
 cat > $flake3Dir/flake.nix <<EOF
 {

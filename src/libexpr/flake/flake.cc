@@ -306,18 +306,11 @@ LockedFlake lockFlake(
 
     auto flake = getFlake(state, topRef, {}, lockFlags.useRegistries, flakeCache);
 
-    LockFile oldLockFile;
-
-    if (!lockFlags.recreateLockFile) {
-        // FIXME: symlink attack
-        oldLockFile = LockFile::read(
-            flake.sourceInfo->actualPath + "/" + flake.lockedRef.subdir + "/flake.lock");
-    }
+    // FIXME: symlink attack
+    auto oldLockFile = LockFile::read(
+        flake.sourceInfo->actualPath + "/" + flake.lockedRef.subdir + "/flake.lock");
 
     debug("old lock file: %s", oldLockFile);
-
-    LockFile newLockFile, prevLockFile;
-    std::vector<InputPath> prevUnresolved;
 
     // FIXME: check whether all overrides are used.
     std::map<InputPath, FlakeInput> overrides;
@@ -325,197 +318,202 @@ LockedFlake lockFlake(
     for (auto & i : lockFlags.inputOverrides)
         overrides.insert_or_assign(i.first, FlakeInput { .ref = i.second });
 
-    /* Compute the new lock file. This is dones as a fixpoint
-       iteration: we repeat until the new lock file no longer changes
-       and there are no unresolved "follows" inputs. */
-    while (true) {
-        std::vector<InputPath> unresolved;
+    LockFile newLockFile;
 
-        /* Recurse into the flake inputs. */
-        std::function<void(
-            const FlakeInputs & flakeInputs,
-            std::shared_ptr<const Node> oldLocks,
-            std::shared_ptr<Node> newLocks,
-            const InputPath & inputPathPrefix)>
-            updateLocks;
+    std::vector<FlakeRef> parents;
+    std::map<InputPath, InputPath> follows;
 
-        std::vector<FlakeRef> parents;
+    std::function<void(
+        const FlakeInputs & flakeInputs,
+        std::shared_ptr<Node> node,
+        const InputPath & inputPathPrefix,
+        std::shared_ptr<const Node> oldNode)>
+        computeLocks;
 
-        updateLocks = [&](
-            const FlakeInputs & flakeInputs,
-            std::shared_ptr<const Node> oldLocks,
-            std::shared_ptr<Node> newLocks,
-            const InputPath & inputPathPrefix)
-        {
-            /* Get the overrides (i.e. attributes of the form
-               'inputs.nixops.inputs.nixpkgs.url = ...'). */
-            for (auto & [id, input] : flake.inputs) {
-                for (auto & [idOverride, inputOverride] : input.overrides) {
-                    auto inputPath(inputPathPrefix);
-                    inputPath.push_back(id);
-                    inputPath.push_back(idOverride);
-                    overrides.insert_or_assign(inputPath, inputOverride);
-                }
-            }
+    computeLocks = [&](
+        const FlakeInputs & flakeInputs,
+        std::shared_ptr<Node> node,
+        const InputPath & inputPathPrefix,
+        std::shared_ptr<const Node> oldNode)
+    {
+        debug("computing lock file node '%s'", concatStringsSep("/", inputPathPrefix));
 
-            /* Go over the flake inputs, resolve/fetch them if
-               necessary (i.e. if they're new or the flakeref changed
-               from what's in the lock file). */
-            for (auto & [id, input2] : flakeInputs) {
+        /* Get the overrides (i.e. attributes of the form
+           'inputs.nixops.inputs.nixpkgs.url = ...'). */
+        // FIXME: check this
+        for (auto & [id, input] : flake.inputs) {
+            for (auto & [idOverride, inputOverride] : input.overrides) {
                 auto inputPath(inputPathPrefix);
                 inputPath.push_back(id);
-                auto inputPathS = concatStringsSep("/", inputPath);
-
-                /* Do we have an override for this input from one of
-                   the ancestors? */
-                auto i = overrides.find(inputPath);
-                bool hasOverride = i != overrides.end();
-                auto & input = hasOverride ? i->second : input2;
-
-                if (input.follows) {
-                    /* This is a "follows" input
-                       (i.e. 'inputs.nixpkgs.follows =
-                       "dwarffs/nixpkgs"). Resolve the source and copy
-                       its inputs. Note that the source is normally
-                       relative to the current node of the lock file
-                       (e.g. "dwarffs/nixpkgs" refers to the nixpkgs
-                       input of the dwarffs input of the root flake),
-                       but if it's from an override, it's relative to
-                       the *root* of the lock file. */
-                    auto follows = (hasOverride ? newLockFile.root : newLocks)->findInput(*input.follows);
-                    if (follows)
-                        newLocks->inputs.insert_or_assign(id, follows);
-                    else
-                        /* We haven't processed the source of the
-                           "follows" yet (e.g. "dwarffs/nixpkgs"). So
-                           we'll need another round of the fixpoint
-                           iteration. */
-                        // FIXME: now that LockFile is a graph, we
-                        // could pre-create the missing node.
-                        unresolved.push_back(inputPath);
-                    continue;
-                }
-
-                /* Do we have an entry in the existing lock file? And
-                   we don't have a --update-input flag for this
-                   input? */
-                auto oldLockIt =
-                    lockFlags.inputUpdates.count(inputPath)
-                    ? oldLocks->inputs.end()
-                    : oldLocks->inputs.find(id);
-
-                std::shared_ptr<const LockedNode> oldLock;
-                if (oldLockIt != oldLocks->inputs.end()) {
-                    oldLock = std::dynamic_pointer_cast<const LockedNode>(oldLockIt->second);
-                    assert(oldLock);
-                }
-
-                if (oldLock
-                    && oldLock->originalRef == input.ref
-                    && !hasOverride)
-                {
-                    /* Copy the input from the old lock file if its
-                       flakeref didn't change and there is no override
-                       from a higher level flake. */
-                    newLocks->inputs.insert_or_assign(id, std::make_shared<LockedNode>(*oldLock));
-
-                    /* If we have an --update-input flag for an input
-                       of this input, then we must fetch the flake to
-                       to update it. */
-                    auto lb = lockFlags.inputUpdates.lower_bound(inputPath);
-
-                    auto hasChildUpdate =
-                        lb != lockFlags.inputUpdates.end()
-                        && lb->size() > inputPath.size()
-                        && std::equal(inputPath.begin(), inputPath.end(), lb->begin());
-
-                    if (hasChildUpdate) {
-                        auto inputFlake = getFlake(
-                            state, oldLock->lockedRef, oldLock->info, false, flakeCache);
-
-                        updateLocks(inputFlake.inputs,
-                            oldLock,
-                            newLocks->inputs.find(id)->second,
-                            inputPath);
-
-                    } else {
-                        /* No need to fetch this flake, we can be
-                           lazy. However there may be new overrides on
-                           the inputs of this flake, so we need to
-                           check those. */
-                        FlakeInputs fakeInputs;
-
-                        for (auto & i : oldLock->inputs)
-                            fakeInputs.emplace(i.first, FlakeInput {
-                                .ref = std::dynamic_pointer_cast<LockedNode>(i.second)->originalRef
-                            });
-
-                        updateLocks(fakeInputs,
-                            oldLock,
-                            newLocks->inputs.find(id)->second,
-                            inputPath);
-                    }
-
-                } else {
-                    /* We need to update/create a new lock file
-                       entry. So fetch the flake/non-flake. */
-
-                    if (!lockFlags.allowMutable && !input.ref.input->isImmutable())
-                        throw Error("cannot update flake input '%s' in pure mode", inputPathS);
-
-                    if (input.isFlake) {
-                        auto inputFlake = getFlake(state, input.ref, {}, lockFlags.useRegistries, flakeCache);
-
-                        newLocks->inputs.insert_or_assign(id,
-                            std::make_shared<LockedNode>(inputFlake.lockedRef, inputFlake.originalRef, inputFlake.sourceInfo->info));
-
-                        /* Recursively process the inputs of this
-                           flake. Also, unless we already have this
-                           flake in the top-level lock file, use this
-                           flake's own lock file. */
-
-                        /* Guard against circular flake imports. */
-                        for (auto & parent : parents)
-                            if (parent == input.ref)
-                                throw Error("found circular import of flake '%s'", parent);
-                        parents.push_back(input.ref);
-                        Finally cleanup([&]() { parents.pop_back(); });
-
-                        updateLocks(inputFlake.inputs,
-                            oldLock
-                            ? std::dynamic_pointer_cast<const Node>(oldLock)
-                            : LockFile::read(
-                                inputFlake.sourceInfo->actualPath + "/" + inputFlake.lockedRef.subdir + "/flake.lock").root,
-                            newLocks->inputs.find(id)->second,
-                            inputPath);
-                    }
-
-                    else {
-                        auto [sourceInfo, lockedRef] = fetchOrSubstituteTree(
-                            state, input.ref, {}, lockFlags.useRegistries, flakeCache);
-                        newLocks->inputs.insert_or_assign(id,
-                            std::make_shared<LockedNode>(lockedRef, input.ref, sourceInfo.info, false));
-                    }
-                }
+                inputPath.push_back(idOverride);
+                overrides.insert_or_assign(inputPath, inputOverride);
             }
-        };
-
-        updateLocks(flake.inputs, oldLockFile.root, newLockFile.root, {});
-
-        /* Check if there is a cycle in the "follows" inputs. */
-        if (!unresolved.empty() && unresolved == prevUnresolved) {
-            std::vector<std::string> ss;
-            for (auto & i : unresolved)
-                ss.push_back(concatStringsSep("/", i));
-            throw Error("cycle or missing input detected in flake inputs: %s", concatStringsSep(", ", ss));
         }
 
-        std::swap(unresolved, prevUnresolved);
+        /* Go over the flake inputs, resolve/fetch them if
+           necessary (i.e. if they're new or the flakeref changed
+           from what's in the lock file). */
+        for (auto & [id, input2] : flakeInputs) {
+            auto inputPath(inputPathPrefix);
+            inputPath.push_back(id);
+            auto inputPathS = concatStringsSep("/", inputPath);
+            debug("computing input '%s'", concatStringsSep("/", inputPath));
 
-        /* Done with the fixpoint iteration? */
-        if (newLockFile == prevLockFile) break;
-        prevLockFile = newLockFile;
+            /* Do we have an override for this input from one of the
+               ancestors? */
+            auto i = overrides.find(inputPath);
+            bool hasOverride = i != overrides.end();
+            auto & input = hasOverride ? i->second : input2;
+
+            /* Resolve 'follows' later (since it may refer to an input
+               path we haven't processed yet. */
+            if (input.follows) {
+                if (hasOverride)
+                    /* 'follows' from an override is relative to the
+                       root of the graph. */
+                    follows.insert_or_assign(inputPath, *input.follows);
+                else {
+                    /* Otherwise, it's relative to the current flake. */
+                    InputPath path(inputPathPrefix);
+                    for (auto & i : *input.follows) path.push_back(i);
+                    follows.insert_or_assign(inputPath, path);
+                }
+                continue;
+            }
+
+            /* Do we have an entry in the existing lock file? And we
+               don't have a --update-input flag for this input? */
+            std::shared_ptr<const LockedNode> oldLock;
+
+            if (oldNode && !lockFlags.inputUpdates.count(inputPath)) {
+                auto oldLockIt = oldNode->inputs.find(id);
+                if (oldLockIt != oldNode->inputs.end())
+                    oldLock = std::dynamic_pointer_cast<const LockedNode>(oldLockIt->second);
+            }
+
+            if (oldLock
+                && oldLock->originalRef == input.ref
+                && !hasOverride)
+            {
+                debug("keeping existing input '%s'", inputPathS);
+
+                /* Copy the input from the old lock since its flakeref
+                   didn't change and there is no override from a
+                   higher level flake. */
+                auto childNode = std::make_shared<LockedNode>(
+                    oldLock->lockedRef, oldLock->originalRef, oldLock->info, oldLock->isFlake);
+
+                node->inputs.insert_or_assign(id, childNode);
+
+                /* If we have an --update-input flag for an input
+                   of this input, then we must fetch the flake to
+                   to update it. */
+                auto lb = lockFlags.inputUpdates.lower_bound(inputPath);
+
+                auto hasChildUpdate =
+                    lb != lockFlags.inputUpdates.end()
+                    && lb->size() > inputPath.size()
+                    && std::equal(inputPath.begin(), inputPath.end(), lb->begin());
+
+                if (hasChildUpdate) {
+                    auto inputFlake = getFlake(
+                        state, oldLock->lockedRef, oldLock->info, false, flakeCache);
+                    computeLocks(inputFlake.inputs, childNode, inputPath, oldLock);
+                } else {
+                    /* No need to fetch this flake, we can be
+                       lazy. However there may be new overrides on the
+                       inputs of this flake, so we need to check
+                       those. */
+                    FlakeInputs fakeInputs;
+
+                    for (auto & i : oldLock->inputs) {
+                        auto lockedNode = std::dynamic_pointer_cast<LockedNode>(i.second);
+                        // Note: this node is not locked in case
+                        // of a circular reference back to the root.
+                        if (lockedNode)
+                            fakeInputs.emplace(i.first, FlakeInput {
+                                .ref = lockedNode->originalRef
+                            });
+                        else {
+                            InputPath path(inputPath);
+                            path.push_back(i.first);
+                            follows.insert_or_assign(path, InputPath());
+                        }
+                    }
+
+                    computeLocks(fakeInputs, childNode, inputPath, oldLock);
+                }
+
+            } else {
+                /* We need to create a new lock file entry. So fetch
+                   this input. */
+
+                if (!lockFlags.allowMutable && !input.ref.input->isImmutable())
+                    throw Error("cannot update flake input '%s' in pure mode", inputPathS);
+
+                if (input.isFlake) {
+                    auto inputFlake = getFlake(state, input.ref, {}, lockFlags.useRegistries, flakeCache);
+
+                    auto childNode = std::make_shared<LockedNode>(
+                        inputFlake.lockedRef, inputFlake.originalRef, inputFlake.sourceInfo->info);
+
+                    node->inputs.insert_or_assign(id, childNode);
+
+                    /* Guard against circular flake imports. */
+                    for (auto & parent : parents)
+                        if (parent == input.ref)
+                            throw Error("found circular import of flake '%s'", parent);
+                    parents.push_back(input.ref);
+                    Finally cleanup([&]() { parents.pop_back(); });
+
+                    /* Recursively process the inputs of this
+                       flake. Also, unless we already have this flake
+                       in the top-level lock file, use this flake's
+                       own lock file. */
+                    computeLocks(
+                        inputFlake.inputs, childNode, inputPath,
+                        oldLock
+                        ? std::dynamic_pointer_cast<const Node>(oldLock)
+                        : LockFile::read(
+                            inputFlake.sourceInfo->actualPath + "/" + inputFlake.lockedRef.subdir + "/flake.lock").root);
+                }
+
+                else {
+                    auto [sourceInfo, lockedRef] = fetchOrSubstituteTree(
+                        state, input.ref, {}, lockFlags.useRegistries, flakeCache);
+                    node->inputs.insert_or_assign(id,
+                        std::make_shared<LockedNode>(lockedRef, input.ref, sourceInfo.info, false));
+                }
+            }
+        }
     };
+
+    computeLocks(
+        flake.inputs, newLockFile.root, {},
+        lockFlags.recreateLockFile ? nullptr : oldLockFile.root);
+
+    /* Insert edges for 'follows' overrides. */
+    for (auto & [from, to] : follows) {
+        debug("adding 'follows' node from '%s' to '%s'",
+            concatStringsSep("/", from),
+            concatStringsSep("/", to));
+
+        assert(!from.empty());
+
+        InputPath fromParent(from);
+        fromParent.pop_back();
+
+        auto fromParentNode = newLockFile.root->findInput(fromParent);
+        assert(fromParentNode);
+
+        auto toNode = newLockFile.root->findInput(to);
+        if (!toNode)
+            throw Error("flake input '%s' follows non-existent flake input '%s'",
+                concatStringsSep("/", from),
+                concatStringsSep("/", to));
+
+        fromParentNode->inputs.insert_or_assign(from.back(), toNode);
+    }
 
     debug("new lock file: %s", newLockFile);
 
