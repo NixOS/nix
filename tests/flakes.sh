@@ -22,8 +22,10 @@ flake4Dir=$TEST_ROOT/flake4
 flake5Dir=$TEST_ROOT/flake5
 flake7Dir=$TEST_ROOT/flake7
 nonFlakeDir=$TEST_ROOT/nonFlake
+flakeA=$TEST_ROOT/flakeA
+flakeB=$TEST_ROOT/flakeB
 
-for repo in $flake1Dir $flake2Dir $flake3Dir $flake7Dir $nonFlakeDir; do
+for repo in $flake1Dir $flake2Dir $flake3Dir $flake7Dir $nonFlakeDir $flakeA $flakeB; do
     rm -rf $repo $repo.tmp
     mkdir $repo
     git -C $repo init
@@ -656,3 +658,43 @@ nix flake update $flake3Dir --update-input flake2/flake1
 # Test 'nix flake list-inputs'.
 [[ $(nix flake list-inputs $flake3Dir | wc -l) == 5 ]]
 nix flake list-inputs $flake3Dir --json | jq .
+
+# Test circular flake dependencies.
+cat > $flakeA/flake.nix <<EOF
+{
+  edition = 201909;
+
+  inputs.b.url = git+file://$flakeB;
+  inputs.b.inputs.a.follows = "/";
+
+  outputs = { self, nixpkgs, b }: {
+    foo = 123 + b.bar;
+    xyzzy = 1000;
+  };
+}
+EOF
+
+git -C $flakeA add flake.nix
+
+cat > $flakeB/flake.nix <<EOF
+{
+  edition = 201909;
+
+  inputs.a.url = git+file://$flakeA;
+
+  outputs = { self, nixpkgs, a }: {
+    bar = 456 + a.xyzzy;
+  };
+}
+EOF
+
+git -C $flakeB add flake.nix
+git -C $flakeB commit -a -m 'Foo'
+
+[[ $(nix eval $flakeA#foo) = 1579 ]]
+[[ $(nix eval $flakeA#foo) = 1579 ]]
+
+sed -i $flakeB/flake.nix -e 's/456/789/'
+git -C $flakeB commit -a -m 'Foo'
+
+[[ $(nix eval --update-input b $flakeA#foo) = 1912 ]]
