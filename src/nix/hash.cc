@@ -11,18 +11,18 @@ struct CmdHash : Command
 {
     enum Mode { mFile, mPath };
     Mode mode;
-    Base base = SRI;
+    Base base = Base::SRI;
     bool truncate = false;
-    HashType ht = htSHA256;
+    HashType ht = HashType::SHA256;
     std::vector<std::string> paths;
     std::optional<std::string> modulus;
 
     CmdHash(Mode mode) : mode(mode)
     {
-        mkFlag(0, "sri", "print hash in SRI format", &base, SRI);
-        mkFlag(0, "base64", "print hash in base-64", &base, Base64);
-        mkFlag(0, "base32", "print hash in base-32 (Nix-specific)", &base, Base32);
-        mkFlag(0, "base16", "print hash in base-16", &base, Base16);
+        mkFlag(0, "sri", "print hash in Base::SRI format", &base, Base::SRI);
+        mkFlag(0, "base64", "print hash in base-64", &base, Base::Base64);
+        mkFlag(0, "base32", "print hash in base-32 (Nix-specific)", &base, Base::Base32);
+        mkFlag(0, "base16", "print hash in base-16", &base, Base::Base16);
         mkFlag()
             .longName("type")
             .mkHashTypeFlag(&ht);
@@ -61,7 +61,7 @@ struct CmdHash : Command
             Hash h = hashSink->finish().first;
             if (truncate && h.hashSize > 20) h = compressHash(h, 20);
             std::cout << format("%1%\n") %
-                h.to_string(base, base == SRI);
+                h.to_string(base, base == Base::SRI);
         }
     }
 };
@@ -72,7 +72,7 @@ static RegisterCommand r2("hash-path", [](){ return make_ref<CmdHash>(CmdHash::m
 struct CmdToBase : Command
 {
     Base base;
-    HashType ht = htUnknown;
+    HashType ht = HashType::Unknown;
     std::vector<std::string> args;
 
     CmdToBase(Base base) : base(base)
@@ -86,28 +86,28 @@ struct CmdToBase : Command
     std::string description() override
     {
         return fmt("convert a hash to %s representation",
-            base == Base16 ? "base-16" :
-            base == Base32 ? "base-32" :
-            base == Base64 ? "base-64" :
-            "SRI");
+            base == Base::Base16 ? "base-16" :
+            base == Base::Base32 ? "base-32" :
+            base == Base::Base64 ? "base-64" :
+            "Base::SRI");
     }
 
     void run() override
     {
         for (auto s : args)
-            std::cout << fmt("%s\n", Hash(s, ht).to_string(base, base == SRI));
+            std::cout << fmt("%s\n", Hash(s, ht).to_string(base, base == Base::SRI));
     }
 };
 
-static RegisterCommand r3("to-base16", [](){ return make_ref<CmdToBase>(Base16); });
-static RegisterCommand r4("to-base32", [](){ return make_ref<CmdToBase>(Base32); });
-static RegisterCommand r5("to-base64", [](){ return make_ref<CmdToBase>(Base64); });
-static RegisterCommand r6("to-sri", [](){ return make_ref<CmdToBase>(SRI); });
+static RegisterCommand r3("to-base16", [](){ return make_ref<CmdToBase>(Base::Base16); });
+static RegisterCommand r4("to-base32", [](){ return make_ref<CmdToBase>(Base::Base32); });
+static RegisterCommand r5("to-base64", [](){ return make_ref<CmdToBase>(Base::Base64); });
+static RegisterCommand r6("to-sri", [](){ return make_ref<CmdToBase>(Base::SRI); });
 
 /* Legacy nix-hash command. */
 static int compatNixHash(int argc, char * * argv)
 {
-    HashType ht = htMD5;
+    HashType ht = HashType::MD5;
     bool flat = false;
     bool base32 = false;
     bool truncate = false;
@@ -125,7 +125,7 @@ static int compatNixHash(int argc, char * * argv)
         else if (*arg == "--type") {
             string s = getArg(*arg, arg, end);
             ht = parseHashType(s);
-            if (ht == htUnknown)
+            if (ht == HashType::Unknown)
                 throw UsageError(format("unknown hash type '%1%'") % s);
         }
         else if (*arg == "--to-base16") op = opTo16;
@@ -140,14 +140,14 @@ static int compatNixHash(int argc, char * * argv)
     if (op == opHash) {
         CmdHash cmd(flat ? CmdHash::mFile : CmdHash::mPath);
         cmd.ht = ht;
-        cmd.base = base32 ? Base32 : Base16;
+        cmd.base = base32 ? Base::Base32 : Base::Base16;
         cmd.truncate = truncate;
         cmd.paths = ss;
         cmd.run();
     }
 
     else {
-        CmdToBase cmd(op == opTo32 ? Base32 : Base16);
+        CmdToBase cmd(op == opTo32 ? Base::Base32 : Base::Base16);
         cmd.args = ss;
         cmd.ht = ht;
         cmd.run();

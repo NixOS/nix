@@ -69,7 +69,7 @@ GitInfo exportGit(ref<Store> store, const std::string & uri,
                 return files.count(file);
             };
 
-            gitInfo.storePath = store->printStorePath(store->addToStore("source", uri, true, htSHA256, filter));
+            gitInfo.storePath = store->printStorePath(store->addToStore("source", uri, true, HashType::SHA256, filter));
 
             return gitInfo;
         }
@@ -86,7 +86,7 @@ GitInfo exportGit(ref<Store> store, const std::string & uri,
 
     deletePath(getCacheDir() + "/nix/git");
 
-    Path cacheDir = getCacheDir() + "/nix/gitv2/" + hashString(htSHA256, uri).to_string(Base32, false);
+    Path cacheDir = getCacheDir() + "/nix/gitv2/" + hashString(HashType::SHA256, uri).to_string(Base::Base32, false);
 
     if (!pathExists(cacheDir)) {
         createDirs(dirOf(cacheDir));
@@ -123,7 +123,7 @@ GitInfo exportGit(ref<Store> store, const std::string & uri,
     }
     if (doFetch)
     {
-        Activity act(*logger, lvlTalkative, actUnknown, fmt("fetching Git repository '%s'", uri));
+        Activity act(*logger, Verbosity::Talkative, ActivityType::Unknown, fmt("fetching Git repository '%s'", uri));
 
         // FIXME: git stderr messes up our progress indicator, so
         // we're using --quiet for now. Should process its stderr.
@@ -145,7 +145,7 @@ GitInfo exportGit(ref<Store> store, const std::string & uri,
 
     printTalkative("using revision %s of repo '%s'", gitInfo.rev, uri);
 
-    std::string storeLinkName = hashString(htSHA512, name + std::string("\0"s) + gitInfo.rev).to_string(Base32, false);
+    std::string storeLinkName = hashString(HashType::SHA512, name + std::string("\0"s) + gitInfo.rev).to_string(Base::Base32, false);
     Path storeLink = cacheDir + "/" + storeLinkName + ".link";
     PathLocks storeLinkLock({storeLink}, fmt("waiting for lock on '%1%'...", storeLink)); // FIXME: broken
 

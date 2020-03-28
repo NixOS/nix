@@ -40,7 +40,7 @@ struct CmdAddToStore : MixDryRun, StoreCommand
         StringSink sink;
         dumpPath(path, sink);
 
-        auto narHash = hashString(htSHA256, *sink.s);
+        auto narHash = hashString(HashType::SHA256, *sink.s);
 
         ValidPathInfo info(store->makeFixedOutputPath(true, narHash, *namePart));
         info.narHash = narHash;

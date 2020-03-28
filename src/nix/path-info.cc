@@ -89,7 +89,7 @@ struct CmdPathInfo : StorePathsCommand, MixJSON
             store->pathInfoToJSON(jsonRoot,
                 // FIXME: preserve order?
                 storePathsToSet(storePaths),
-                true, showClosureSize, SRI, AllowInvalid);
+                true, showClosureSize, Base::SRI, AllowInvalid);
         }
 
         else {

@@ -359,7 +359,7 @@ public:
        path and the cryptographic hash of the contents of srcPath. */
     std::pair<StorePath, Hash> computeStorePathForPath(std::string_view name,
         const Path & srcPath, bool recursive = true,
-        HashType hashAlgo = htSHA256, PathFilter & filter = defaultPathFilter) const;
+        HashType hashAlgo = HashType::SHA256, PathFilter & filter = defaultPathFilter) const;
 
     /* Preparatory part of addTextToStore().
 
@@ -462,12 +462,12 @@ public:
        The function object `filter' can be used to exclude files (see
        libutil/archive.hh). */
     virtual StorePath addToStore(const string & name, const Path & srcPath,
-        bool recursive = true, HashType hashAlgo = htSHA256,
+        bool recursive = true, HashType hashAlgo = HashType::SHA256,
         PathFilter & filter = defaultPathFilter, RepairFlag repair = NoRepair) = 0;
 
     // FIXME: remove?
     virtual StorePath addToStoreFromDump(const string & dump, const string & name,
-        bool recursive = true, HashType hashAlgo = htSHA256, RepairFlag repair = NoRepair)
+        bool recursive = true, HashType hashAlgo = HashType::SHA256, RepairFlag repair = NoRepair)
     {
         throw Error("addToStoreFromDump() is not supported by this store");
     }
@@ -561,7 +561,7 @@ public:
        each path is included. */
     void pathInfoToJSON(JSONPlaceholder & jsonOut, const StorePathSet & storePaths,
         bool includeImpureInfo, bool showClosureSize,
-        Base hashBase = Base32,
+        Base hashBase = Base::Base32,
         AllowInvalidFlag allowInvalid = DisallowInvalid);
 
     /* Return the size of the closure of the specified path, that is,

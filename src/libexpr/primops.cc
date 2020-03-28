@@ -719,14 +719,14 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
         if (outputs.size() != 1 || *(outputs.begin()) != "out")
             throw Error(format("multiple outputs are not supported in fixed-output derivations, at %1%") % posDrvName);
 
-        HashType ht = outputHashAlgo.empty() ? htUnknown : parseHashType(outputHashAlgo);
+        HashType ht = outputHashAlgo.empty() ? HashType::Unknown : parseHashType(outputHashAlgo);
         Hash h(*outputHash, ht);
 
         auto outPath = state.store->makeFixedOutputPath(outputHashRecursive, h, drvName);
         if (!jsonObject) drv.env["out"] = state.store->printStorePath(outPath);
         drv.outputs.insert_or_assign("out", DerivationOutput(std::move(outPath),
                 (outputHashRecursive ? "r:" : "") + printHashType(h.type),
-                h.to_string(Base16, false)));
+                h.to_string(Base::Base16, false)));
     }
 
     else {
@@ -756,7 +756,7 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
     auto drvPath = writeDerivation(state.store, drv, drvName, state.repair);
     auto drvPathS = state.store->printStorePath(drvPath);
 
-    printMsg(lvlChatty, "instantiated '%1%' -> '%2%'", drvName, drvPathS);
+    printMsg(Verbosity::Chatty, "instantiated '%1%' -> '%2%'", drvName, drvPathS);
 
     /* Optimisation, but required in read-only mode! because in that
        case we don't actually write store derivations, so we can't
@@ -933,13 +933,13 @@ static void prim_hashFile(EvalState & state, const Pos & pos, Value * * args, Va
 {
     string type = state.forceStringNoCtx(*args[0], pos);
     HashType ht = parseHashType(type);
-    if (ht == htUnknown)
+    if (ht == HashType::Unknown)
       throw Error(format("unknown hash type '%1%', at %2%") % type % pos);
 
     PathSet context; // discarded
     Path p = state.coerceToPath(pos, *args[1], context);
 
-    mkString(v, hashFile(ht, state.checkSourcePath(p)).to_string(Base16, false), context);
+    mkString(v, hashFile(ht, state.checkSourcePath(p)).to_string(Base::Base16, false), context);
 }
 
 /* Read a directory (without . or ..) */
@@ -1073,8 +1073,8 @@ static void addPath(EvalState & state, const Pos & pos, const string & name, con
     Path dstPath;
     if (!expectedHash || !state.store->isValidPath(*expectedStorePath)) {
         dstPath = state.store->printStorePath(settings.readOnlyMode
-            ? state.store->computeStorePathForPath(name, path, recursive, htSHA256, filter).first
-            : state.store->addToStore(name, path, recursive, htSHA256, filter, state.repair));
+            ? state.store->computeStorePathForPath(name, path, recursive, HashType::SHA256, filter).first
+            : state.store->addToStore(name, path, recursive, HashType::SHA256, filter, state.repair));
         if (expectedHash && expectedStorePath != state.store->parseStorePath(dstPath))
             throw Error("store path mismatch in (possibly filtered) path added from '%s'", path);
     } else
@@ -1122,7 +1122,7 @@ static void prim_path(EvalState & state, const Pos & pos, Value * * args, Value 
         } else if (n == "recursive")
             recursive = state.forceBool(*attr.value, *attr.pos);
         else if (n == "sha256")
-            expectedHash = Hash(state.forceStringNoCtx(*attr.value, *attr.pos), htSHA256);
+            expectedHash = Hash(state.forceStringNoCtx(*attr.value, *attr.pos), HashType::SHA256);
         else
             throw EvalError(format("unsupported argument '%1%' to 'addPath', at %2%") % attr.name % *attr.pos);
     }
@@ -1806,13 +1806,13 @@ static void prim_hashString(EvalState & state, const Pos & pos, Value * * args, 
 {
     string type = state.forceStringNoCtx(*args[0], pos);
     HashType ht = parseHashType(type);
-    if (ht == htUnknown)
+    if (ht == HashType::Unknown)
       throw Error(format("unknown hash type '%1%', at %2%") % type % pos);
 
     PathSet context; // discarded
     string s = state.forceString(*args[1], context, pos);
 
-    mkString(v, hashString(ht, s).to_string(Base16, false), context);
+    mkString(v, hashString(ht, s).to_string(Base::Base16, false), context);
 }
 
 
@@ -2068,7 +2068,7 @@ void fetch(EvalState & state, const Pos & pos, Value * * args, Value & v,
             if (n == "url")
                 request.uri = state.forceStringNoCtx(*attr.value, *attr.pos);
             else if (n == "sha256")
-                request.expectedHash = Hash(state.forceStringNoCtx(*attr.value, *attr.pos), htSHA256);
+                request.expectedHash = Hash(state.forceStringNoCtx(*attr.value, *attr.pos), HashType::SHA256);
             else if (n == "name")
                 request.name = state.forceStringNoCtx(*attr.value, *attr.pos);
             else

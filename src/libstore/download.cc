@@ -85,7 +85,7 @@ struct CurlDownloader : public Downloader
             Callback<DownloadResult> && callback)
             : downloader(downloader)
             , request(request)
-            , act(*logger, lvlTalkative, actDownload,
+            , act(*logger, Verbosity::Talkative, ActivityType::Download,
                 fmt(request.data ? "uploading '%s'" : "downloading '%s'", request.uri),
                 {request.uri}, request.parentAct)
             , callback(std::move(callback))
@@ -164,7 +164,7 @@ struct CurlDownloader : public Downloader
         {
             size_t realSize = size * nmemb;
             std::string line((char *) contents, realSize);
-            printMsg(lvlVomit, format("got header for '%s': %s") % request.uri % trim(line));
+            printMsg(Verbosity::Vomit, format("got header for '%s': %s") % request.uri % trim(line));
             if (line.compare(0, 5, "HTTP/") == 0) { // new response starts
                 result.etag = "";
                 auto ss = tokenizeString<vector<string>>(line, " ");
@@ -247,7 +247,7 @@ struct CurlDownloader : public Downloader
 
             curl_easy_reset(req);
 
-            if (verbosity >= lvlVomit) {
+            if (verbosity >= Verbosity::Vomit) {
                 curl_easy_setopt(req, CURLOPT_VERBOSE, 1);
                 curl_easy_setopt(req, CURLOPT_DEBUGFUNCTION, DownloadItem::debugCallback);
             }
@@ -826,7 +826,7 @@ CachedDownloadResult Downloader::downloadCached(
     Path cacheDir = getCacheDir() + "/nix/tarballs";
     createDirs(cacheDir);
 
-    string urlHash = hashString(htSHA256, name + std::string("\0"s) + url).to_string(Base32, false);
+    string urlHash = hashString(HashType::SHA256, name + std::string("\0"s) + url).to_string(Base::Base32, false);
 
     Path dataFile = cacheDir + "/" + urlHash + ".info";
     Path fileLink = cacheDir + "/" + urlHash + "-file";
@@ -874,9 +874,9 @@ CachedDownloadResult Downloader::downloadCached(
             if (!res.cached) {
                 StringSink sink;
                 dumpString(*res.data, sink);
-                Hash hash = hashString(request.expectedHash ? request.expectedHash.type : htSHA256, *res.data);
+                Hash hash = hashString(request.expectedHash ? request.expectedHash.type : HashType::SHA256, *res.data);
                 ValidPathInfo info(store->makeFixedOutputPath(false, hash, name));
-                info.narHash = hashString(htSHA256, *sink.s);
+                info.narHash = hashString(HashType::SHA256, *sink.s);
                 info.narSize = sink.s->size();
                 info.ca = makeFixedOutputCA(false, hash);
                 store->addToStore(info, sink.s, NoRepair, NoCheckSigs);
@@ -914,7 +914,7 @@ CachedDownloadResult Downloader::downloadCached(
             if (members.size() != 1)
                 throw nix::Error("tarball '%s' contains an unexpected number of top-level files", url);
             auto topDir = tmpDir + "/" + members.begin()->name;
-            unpackedStorePath = store->addToStore(name, topDir, true, htSHA256, defaultPathFilter, NoRepair);
+            unpackedStorePath = store->addToStore(name, topDir, true, HashType::SHA256, defaultPathFilter, NoRepair);
         }
         replaceSymlink(store->printStorePath(*unpackedStorePath), unpackedLink);
         storePath = std::move(*unpackedStorePath);

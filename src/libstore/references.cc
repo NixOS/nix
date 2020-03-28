@@ -54,7 +54,7 @@ struct RefScanSink : Sink
 
     string tail;
 
-    RefScanSink() : hashSink(htSHA256) { }
+    RefScanSink() : hashSink(HashType::SHA256) { }
 
     void operator () (const unsigned char * data, size_t len);
 };
@@ -96,7 +96,7 @@ PathSet scanForReferences(const string & path,
         string s = string(baseName, 0, pos);
         assert(s.size() == refLength);
         assert(backMap.find(s) == backMap.end());
-        // parseHash(htSHA256, s);
+        // parseHash(HashType::SHA256, s);
         sink.hashes.insert(s);
         backMap[s] = i;
     }

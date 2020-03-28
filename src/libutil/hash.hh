@@ -10,7 +10,13 @@ namespace nix {
 MakeError(BadHash, Error);
 
 
-enum HashType : char { htUnknown, htMD5, htSHA1, htSHA256, htSHA512 };
+enum struct HashType : char {
+    Unknown,
+    MD5,
+    SHA1,
+    SHA256,
+    SHA512,
+};
 
 
 const int md5HashSize = 16;
@@ -20,7 +26,12 @@ const int sha512HashSize = 64;
 
 extern const string base32Chars;
 
-enum Base : int { Base64, Base32, Base16, SRI };
+enum struct Base : int {
+    Base64,
+    Base32,
+    Base16,
+    SRI,
+};
 
 
 struct Hash
@@ -29,7 +40,7 @@ struct Hash
     unsigned int hashSize = 0;
     unsigned char hash[maxHashSize] = {};
 
-    HashType type = htUnknown;
+    HashType type = HashType::Unknown;
 
     /* Create an unset hash object. */
     Hash() { };
@@ -40,14 +51,14 @@ struct Hash
     /* Initialize the hash from a string representation, in the format
        "[<type>:]<base16|base32|base64>" or "<type>-<base64>" (a
        Subresource Integrity hash expression). If the 'type' argument
-       is htUnknown, then the hash type must be specified in the
+       is HashType::Unknown, then the hash type must be specified in the
        string. */
-    Hash(const std::string & s, HashType type = htUnknown);
+    Hash(const std::string & s, HashType type = HashType::Unknown);
 
     void init();
 
     /* Check whether a hash is set. */
-    operator bool () const { return type != htUnknown; }
+    operator bool () const { return type != HashType::Unknown; }
 
     /* Check whether two hash are equal. */
     bool operator == (const Hash & h2) const;
@@ -79,18 +90,18 @@ struct Hash
     /* Return a string representation of the hash, in base-16, base-32
        or base-64. By default, this is prefixed by the hash type
        (e.g. "sha256:"). */
-    std::string to_string(Base base = Base32, bool includeType = true) const;
+    std::string to_string(Base base = Base::Base32, bool includeType = true) const;
 
     std::string gitRev() const
     {
-        assert(type == htSHA1);
-        return to_string(Base16, false);
+        assert(type == HashType::SHA1);
+        return to_string(Base::Base16, false);
     }
 
     std::string gitShortRev() const
     {
-        assert(type == htSHA1);
-        return std::string(to_string(Base16, false), 0, 7);
+        assert(type == HashType::SHA1);
+        return std::string(to_string(Base::Base16, false), 0, 7);
     }
 };
 

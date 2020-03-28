@@ -184,7 +184,7 @@ static int _main(int argc, char * * argv)
 
                 try {
 
-                    Activity act(*logger, lvlTalkative, actUnknown, fmt("connecting to '%s'", bestMachine->storeUri));
+                    Activity act(*logger, Verbosity::Talkative, ActivityType::Unknown, fmt("connecting to '%s'", bestMachine->storeUri));
 
                     Store::Params storeParams;
                     if (hasPrefix(bestMachine->storeUri, "ssh://")) {
@@ -222,7 +222,7 @@ connected:
         AutoCloseFD uploadLock = openLockFile(currentLoad + "/" + escapeUri(storeUri) + ".upload-lock", true);
 
         {
-            Activity act(*logger, lvlTalkative, actUnknown, fmt("waiting for the upload lock to '%s'", storeUri));
+            Activity act(*logger, Verbosity::Talkative, ActivityType::Unknown, fmt("waiting for the upload lock to '%s'", storeUri));
 
             auto old = signal(SIGALRM, handleAlarm);
             alarm(15 * 60);
@@ -235,7 +235,7 @@ connected:
         auto substitute = settings.buildersUseSubstitutes ? Substitute : NoSubstitute;
 
         {
-            Activity act(*logger, lvlTalkative, actUnknown, fmt("copying dependencies to '%s'", storeUri));
+            Activity act(*logger, Verbosity::Talkative, ActivityType::Unknown, fmt("copying dependencies to '%s'", storeUri));
             copyPaths(store, ref<Store>(sshStore), store->parseStorePathSet(inputs), NoRepair, NoCheckSigs, substitute);
         }
 
@@ -254,7 +254,7 @@ connected:
             if (!store->isValidPath(store->parseStorePath(path))) missing.insert(store->parseStorePath(path));
 
         if (!missing.empty()) {
-            Activity act(*logger, lvlTalkative, actUnknown, fmt("copying outputs from '%s'", storeUri));
+            Activity act(*logger, Verbosity::Talkative, ActivityType::Unknown, fmt("copying outputs from '%s'", storeUri));
             for (auto & i : missing)
                 store->locksHeld.insert(store->printStorePath(i)); /* FIXME: ugly */
             copyPaths(ref<Store>(sshStore), store, missing, NoRepair, NoCheckSigs, NoSubstitute);

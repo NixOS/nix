@@ -57,7 +57,7 @@ struct CmdVerify : StorePathsCommand
 
         auto publicKeys = getDefaultPublicKeys();
 
-        Activity act(*logger, actVerifyPaths);
+        Activity act(*logger, ActivityType::VerifyPaths);
 
         std::atomic<size_t> done{0};
         std::atomic<size_t> untrusted{0};
@@ -75,7 +75,7 @@ struct CmdVerify : StorePathsCommand
             try {
                 checkInterrupt();
 
-                Activity act2(*logger, lvlInfo, actUnknown, fmt("checking '%s'", storePath));
+                Activity act2(*logger, Verbosity::Info, ActivityType::Unknown, fmt("checking '%s'", storePath));
 
                 MaintainCount<std::atomic<size_t>> mcActive(active);
                 update();
@@ -96,7 +96,7 @@ struct CmdVerify : StorePathsCommand
 
                     if (hash.first != info->narHash) {
                         corrupted++;
-                        act2.result(resCorruptedPath, store->printStorePath(info->path));
+                        act2.result(ResultType::CorruptedPath, store->printStorePath(info->path));
                         printError(
                             "path '%s' was modified! expected hash '%s', got '%s'",
                             store->printStorePath(info->path), info->narHash.to_string(), hash.first.to_string());
@@ -147,7 +147,7 @@ struct CmdVerify : StorePathsCommand
 
                     if (!good) {
                         untrusted++;
-                        act2.result(resUntrustedPath, store->printStorePath(info->path));
+                        act2.result(ResultType::UntrustedPath, store->printStorePath(info->path));
                         printError("path '%s' is untrusted", store->printStorePath(info->path));
                     }
 

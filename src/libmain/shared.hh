@@ -43,11 +43,11 @@ struct StorePathWithOutputs;
 void printMissing(
     ref<Store> store,
     const std::vector<StorePathWithOutputs> & paths,
-    Verbosity lvl = lvlInfo);
+    Verbosity lvl = Verbosity::Info);
 
 void printMissing(ref<Store> store, const StorePathSet & willBuild,
     const StorePathSet & willSubstitute, const StorePathSet & unknown,
-    unsigned long long downloadSize, unsigned long long narSize, Verbosity lvl = lvlInfo);
+    unsigned long long downloadSize, unsigned long long narSize, Verbosity lvl = Verbosity::Info);
 
 string getArg(const string & opt,
     Strings::iterator & i, const Strings::iterator & end);

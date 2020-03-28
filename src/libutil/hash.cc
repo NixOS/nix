@@ -18,10 +18,10 @@ namespace nix {
 
 void Hash::init()
 {
-    if (type == htMD5) hashSize = md5HashSize;
-    else if (type == htSHA1) hashSize = sha1HashSize;
-    else if (type == htSHA256) hashSize = sha256HashSize;
-    else if (type == htSHA512) hashSize = sha512HashSize;
+    if (type == HashType::MD5) hashSize = md5HashSize;
+    else if (type == HashType::SHA1) hashSize = sha1HashSize;
+    else if (type == HashType::SHA256) hashSize = sha256HashSize;
+    else if (type == HashType::SHA512) hashSize = sha512HashSize;
     else abort();
     assert(hashSize <= maxHashSize);
     memset(hash, 0, maxHashSize);
@@ -98,26 +98,26 @@ static string printHash32(const Hash & hash)
 
 string printHash16or32(const Hash & hash)
 {
-    return hash.to_string(hash.type == htMD5 ? Base16 : Base32, false);
+    return hash.to_string(hash.type == HashType::MD5 ? Base::Base16 : Base::Base32, false);
 }
 
 
 std::string Hash::to_string(Base base, bool includeType) const
 {
     std::string s;
-    if (base == SRI || includeType) {
+    if (base == Base::SRI || includeType) {
         s += printHashType(type);
-        s += base == SRI ? '-' : ':';
+        s += base == Base::SRI ? '-' : ':';
     }
     switch (base) {
-    case Base16:
+    case Base::Base16:
         s += printHash16(*this);
         break;
-    case Base32:
+    case Base::Base32:
         s += printHash32(*this);
         break;
-    case Base64:
-    case SRI:
+    case Base::Base64:
+    case Base::SRI:
         s += base64Encode(std::string((const char *) hash, hashSize));
         break;
     }
@@ -136,16 +136,16 @@ Hash::Hash(const std::string & s, HashType type)
         sep = s.find('-');
         if (sep != string::npos) {
             isSRI = true;
-        } else if (type == htUnknown)
+        } else if (type == HashType::Unknown)
             throw BadHash("hash '%s' does not include a type", s);
     }
 
     if (sep != string::npos) {
         string hts = string(s, 0, sep);
         this->type = parseHashType(hts);
-        if (this->type == htUnknown)
+        if (this->type == HashType::Unknown)
             throw BadHash("unknown hash type '%s'", hts);
-        if (type != htUnknown && type != this->type)
+        if (type != HashType::Unknown && type != this->type)
             throw BadHash("hash '%s' should have type '%s'", s, printHashType(type));
         pos = sep + 1;
     }
@@ -217,29 +217,29 @@ union Ctx
 
 static void start(HashType ht, Ctx & ctx)
 {
-    if (ht == htMD5) MD5_Init(&ctx.md5);
-    else if (ht == htSHA1) SHA1_Init(&ctx.sha1);
-    else if (ht == htSHA256) SHA256_Init(&ctx.sha256);
-    else if (ht == htSHA512) SHA512_Init(&ctx.sha512);
+    if (ht == HashType::MD5) MD5_Init(&ctx.md5);
+    else if (ht == HashType::SHA1) SHA1_Init(&ctx.sha1);
+    else if (ht == HashType::SHA256) SHA256_Init(&ctx.sha256);
+    else if (ht == HashType::SHA512) SHA512_Init(&ctx.sha512);
 }
 
 
 static void update(HashType ht, Ctx & ctx,
     const unsigned char * bytes, size_t len)
 {
-    if (ht == htMD5) MD5_Update(&ctx.md5, bytes, len);
-    else if (ht == htSHA1) SHA1_Update(&ctx.sha1, bytes, len);
-    else if (ht == htSHA256) SHA256_Update(&ctx.sha256, bytes, len);
-    else if (ht == htSHA512) SHA512_Update(&ctx.sha512, bytes, len);
+    if (ht == HashType::MD5) MD5_Update(&ctx.md5, bytes, len);
+    else if (ht == HashType::SHA1) SHA1_Update(&ctx.sha1, bytes, len);
+    else if (ht == HashType::SHA256) SHA256_Update(&ctx.sha256, bytes, len);
+    else if (ht == HashType::SHA512) SHA512_Update(&ctx.sha512, bytes, len);
 }
 
 
 static void finish(HashType ht, Ctx & ctx, unsigned char * hash)
 {
-    if (ht == htMD5) MD5_Final(hash, &ctx.md5);
-    else if (ht == htSHA1) SHA1_Final(hash, &ctx.sha1);
-    else if (ht == htSHA256) SHA256_Final(hash, &ctx.sha256);
-    else if (ht == htSHA512) SHA512_Final(hash, &ctx.sha512);
+    if (ht == HashType::MD5) MD5_Final(hash, &ctx.md5);
+    else if (ht == HashType::SHA1) SHA1_Final(hash, &ctx.sha1);
+    else if (ht == HashType::SHA256) SHA256_Final(hash, &ctx.sha256);
+    else if (ht == HashType::SHA512) SHA512_Final(hash, &ctx.sha512);
 }
 
 
@@ -320,20 +320,20 @@ Hash compressHash(const Hash & hash, unsigned int newSize)
 
 HashType parseHashType(const string & s)
 {
-    if (s == "md5") return htMD5;
-    else if (s == "sha1") return htSHA1;
-    else if (s == "sha256") return htSHA256;
-    else if (s == "sha512") return htSHA512;
-    else return htUnknown;
+    if (s == "md5") return HashType::MD5;
+    else if (s == "sha1") return HashType::SHA1;
+    else if (s == "sha256") return HashType::SHA256;
+    else if (s == "sha512") return HashType::SHA512;
+    else return HashType::Unknown;
 }
 
 
 string printHashType(HashType ht)
 {
-    if (ht == htMD5) return "md5";
-    else if (ht == htSHA1) return "sha1";
-    else if (ht == htSHA256) return "sha256";
-    else if (ht == htSHA512) return "sha512";
+    if (ht == HashType::MD5) return "md5";
+    else if (ht == HashType::SHA1) return "sha1";
+    else if (ht == HashType::SHA256) return "sha256";
+    else if (ht == HashType::SHA512) return "sha512";
     else abort();
 }
 

@@ -10,17 +10,19 @@ MixCommonArgs::MixCommonArgs(const string & programName)
         .longName("verbose")
         .shortName('v')
         .description("increase verbosity level")
-        .handler([]() { verbosity = (Verbosity) (verbosity + 1); });
+        .handler([]() { verbosity = (Verbosity) ((uint64_t) verbosity + 1); });
 
     mkFlag()
         .longName("quiet")
         .description("decrease verbosity level")
-        .handler([]() { verbosity = verbosity > lvlError ? (Verbosity) (verbosity - 1) : lvlError; });
+        .handler([]() { verbosity = verbosity > Verbosity::Error
+            ? (Verbosity) ((uint64_t) verbosity - 1)
+            : Verbosity::Error; });
 
     mkFlag()
         .longName("debug")
         .description("enable debug output")
-        .handler([]() { verbosity = lvlDebug; });
+        .handler([]() { verbosity = Verbosity::Debug; });
 
     mkFlag()
         .longName("option")

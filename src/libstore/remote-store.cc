@@ -177,11 +177,11 @@ void RemoteStore::setOptions(Connection & conn)
        << settings.keepFailed
        << settings.keepGoing
        << settings.tryFallback
-       << verbosity
+       << (uint64_t) verbosity
        << settings.maxBuildJobs
        << settings.maxSilentTime
        << true
-       << (settings.verboseBuild ? lvlError : lvlVomit)
+       << (uint64_t) (settings.verboseBuild ? Verbosity::Error : Verbosity::Vomit)
        << 0 // obsolete log type
        << 0 /* obsolete print build trace */
        << settings.buildCores
@@ -375,7 +375,7 @@ void RemoteStore::queryPathInfoUncached(const StorePath & path,
             info = std::make_shared<ValidPathInfo>(path.clone());
             auto deriver = readString(conn->from);
             if (deriver != "") info->deriver = parseStorePath(deriver);
-            info->narHash = Hash(readString(conn->from), htSHA256);
+            info->narHash = Hash(readString(conn->from), HashType::SHA256);
             info->references = readStorePaths<StorePathSet>(*this, conn->from);
             conn->from >> info->registrationTime >> info->narSize;
             if (GET_PROTOCOL_MINOR(conn->daemonVersion) >= 16) {
@@ -471,7 +471,7 @@ void RemoteStore::addToStore(const ValidPathInfo & info, Source & source,
         conn->to << wopAddToStoreNar
                  << printStorePath(info.path)
                  << (info.deriver ? printStorePath(*info.deriver) : "")
-                 << info.narHash.to_string(Base16, false);
+                 << info.narHash.to_string(Base::Base16, false);
         writeStorePaths(*this, conn->to, info.references);
         conn->to << info.registrationTime << info.narSize
                  << info.ultimate << info.sigs << info.ca
@@ -493,7 +493,7 @@ StorePath RemoteStore::addToStore(const string & name, const Path & _srcPath,
     Path srcPath(absPath(_srcPath));
 
     conn->to << wopAddToStore << name
-       << ((hashAlgo == htSHA256 && recursive) ? 0 : 1) /* backwards compatibility hack */
+       << ((hashAlgo == HashType::SHA256 && recursive) ? 0 : 1) /* backwards compatibility hack */
        << (recursive ? 1 : 0)
        << printHashType(hashAlgo);
 

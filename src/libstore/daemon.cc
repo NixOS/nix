@@ -114,7 +114,13 @@ struct TunnelLogger : public Logger
         }
 
         StringSink buf;
-        buf << STDERR_START_ACTIVITY << act << lvl << type << s << fields << parent;
+        buf << STDERR_START_ACTIVITY 
+            << act
+            << (uint64_t) lvl
+            << (uint64_t) type
+            << s
+            << fields
+            << parent;
         enqueueMsg(*buf.s);
     }
 
@@ -130,7 +136,10 @@ struct TunnelLogger : public Logger
     {
         if (GET_PROTOCOL_MINOR(clientVersion) < 20) return;
         StringSink buf;
-        buf << STDERR_RESULT << act << type << fields;
+        buf << STDERR_RESULT
+            << act
+            << (uint64_t) type
+            << fields;
         enqueueMsg(*buf.s);
     }
 };
@@ -302,7 +311,7 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
         logger->startWork();
         auto hash = store->queryPathInfo(path)->narHash;
         logger->stopWork();
-        to << hash.to_string(Base16, false);
+        to << hash.to_string(Base::Base16, false);
         break;
     }
 
@@ -542,7 +551,7 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
         clientSettings.maxBuildJobs = readInt(from);
         clientSettings.maxSilentTime = readInt(from);
         readInt(from); // obsolete useBuildHook
-        clientSettings.verboseBuild = lvlError == (Verbosity) readInt(from);
+        clientSettings.verboseBuild = Verbosity::Error == (Verbosity) readInt(from);
         readInt(from); // obsolete logType
         readInt(from); // obsolete printBuildTrace
         clientSettings.buildCores = readInt(from);
@@ -627,7 +636,7 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
             if (GET_PROTOCOL_MINOR(clientVersion) >= 17)
                 to << 1;
             to << (info->deriver ? store->printStorePath(*info->deriver) : "")
-               << info->narHash.to_string(Base16, false);
+               << info->narHash.to_string(Base::Base16, false);
             writeStorePaths(*store, to, info->references);
             to << info->registrationTime << info->narSize;
             if (GET_PROTOCOL_MINOR(clientVersion) >= 16) {
@@ -687,7 +696,7 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
         auto deriver = readString(from);
         if (deriver != "")
             info.deriver = store->parseStorePath(deriver);
-        info.narHash = Hash(readString(from), htSHA256);
+        info.narHash = Hash(readString(from), HashType::SHA256);
         info.references = readStorePaths<StorePathSet>(*store, from);
         from >> info.registrationTime >> info.narSize >> info.ultimate;
         info.sigs = readStrings<StringSet>(from);
@@ -770,7 +779,7 @@ void processConnection(
 
     Finally finally([&]() {
         _isInterrupted = false;
-        prevLogger->log(lvlDebug, fmt("%d operations", opCount));
+        prevLogger->log(Verbosity::Debug, fmt("%d operations", opCount));
     });
 
     if (GET_PROTOCOL_MINOR(clientVersion) >= 14 && readInt(from)) {

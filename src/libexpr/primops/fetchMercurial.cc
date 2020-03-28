@@ -63,7 +63,7 @@ HgInfo exportMercurial(ref<Store> store, const std::string & uri,
                 return files.count(file);
             };
 
-            hgInfo.storePath = store->printStorePath(store->addToStore("source", uri, true, htSHA256, filter));
+            hgInfo.storePath = store->printStorePath(store->addToStore("source", uri, true, HashType::SHA256, filter));
 
             return hgInfo;
         }
@@ -71,9 +71,9 @@ HgInfo exportMercurial(ref<Store> store, const std::string & uri,
 
     if (rev == "") rev = "default";
 
-    Path cacheDir = fmt("%s/nix/hg/%s", getCacheDir(), hashString(htSHA256, uri).to_string(Base32, false));
+    Path cacheDir = fmt("%s/nix/hg/%s", getCacheDir(), hashString(HashType::SHA256, uri).to_string(Base::Base32, false));
 
-    Path stampFile = fmt("%s/.hg/%s.stamp", cacheDir, hashString(htSHA512, rev).to_string(Base32, false));
+    Path stampFile = fmt("%s/.hg/%s.stamp", cacheDir, hashString(HashType::SHA512, rev).to_string(Base::Base32, false));
 
     /* If we haven't pulled this repo less than ‘tarball-ttl’ seconds,
        do so now. */
@@ -90,7 +90,7 @@ HgInfo exportMercurial(ref<Store> store, const std::string & uri,
                     RunOptions("hg", { "log", "-R", cacheDir, "-r", rev, "--template", "1" })
                     .killStderr(true)).second == "1"))
         {
-            Activity act(*logger, lvlTalkative, actUnknown, fmt("fetching Mercurial repository '%s'", uri));
+            Activity act(*logger, Verbosity::Talkative, ActivityType::Unknown, fmt("fetching Mercurial repository '%s'", uri));
 
             if (pathExists(cacheDir)) {
                 try {
@@ -124,7 +124,7 @@ HgInfo exportMercurial(ref<Store> store, const std::string & uri,
     hgInfo.revCount = std::stoull(tokens[1]);
     hgInfo.branch = tokens[2];
 
-    std::string storeLinkName = hashString(htSHA512, name + std::string("\0"s) + hgInfo.rev).to_string(Base32, false);
+    std::string storeLinkName = hashString(HashType::SHA512, name + std::string("\0"s) + hgInfo.rev).to_string(Base::Base32, false);
     Path storeLink = fmt("%s/.hg/%s.link", cacheDir, storeLinkName);
 
     try {

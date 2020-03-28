@@ -10,7 +10,7 @@ namespace nix {
 
 MakeError(UsageError, Error);
 
-enum HashType : char;
+enum struct HashType : char;
 
 class Args
 {
