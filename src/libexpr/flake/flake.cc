@@ -314,6 +314,7 @@ LockedFlake lockFlake(
 
     // FIXME: check whether all overrides are used.
     std::map<InputPath, FlakeInput> overrides;
+    std::set<InputPath> overridesUsed, updatesUsed;
 
     for (auto & i : lockFlags.inputOverrides)
         overrides.insert_or_assign(i.first, FlakeInput { .ref = i.second });
@@ -363,6 +364,7 @@ LockedFlake lockFlake(
                ancestors? */
             auto i = overrides.find(inputPath);
             bool hasOverride = i != overrides.end();
+            if (hasOverride) overridesUsed.insert(inputPath);
             auto & input = hasOverride ? i->second : input2;
 
             /* Resolve 'follows' later (since it may refer to an input
@@ -384,6 +386,8 @@ LockedFlake lockFlake(
             /* Do we have an entry in the existing lock file? And we
                don't have a --update-input flag for this input? */
             std::shared_ptr<const LockedNode> oldLock;
+
+            updatesUsed.insert(inputPath);
 
             if (oldNode && !lockFlags.inputUpdates.count(inputPath)) {
                 auto oldLockIt = oldNode->inputs.find(id);
@@ -514,6 +518,15 @@ LockedFlake lockFlake(
 
         fromParentNode->inputs.insert_or_assign(from.back(), toNode);
     }
+
+    for (auto & i : lockFlags.inputOverrides)
+        if (!overridesUsed.count(i.first))
+            warn("the flag '--override-input %s %s' does not match any input",
+                concatStringsSep("/", i.first), i.second);
+
+    for (auto & i : lockFlags.inputUpdates)
+        if (!updatesUsed.count(i))
+            warn("the flag '--update-input %s' does not match any input", concatStringsSep("/", i));
 
     debug("new lock file: %s", newLockFile);
 
