@@ -16,7 +16,10 @@ const static std::string subDirRegex = subDirElemRegex + "(?:/" + subDirElemRege
 
 std::string FlakeRef::to_string() const
 {
-    return input->to_string();
+    auto url = input->toURL();
+    if (subdir != "")
+        url.query.insert_or_assign("dir", subdir);
+    return url.to_string();
 }
 
 fetchers::Attrs FlakeRef::toAttrs() const

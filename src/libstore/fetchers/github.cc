@@ -42,13 +42,16 @@ struct GitHubInput : Input
 
     std::optional<Hash> getRev() const override { return rev; }
 
-    std::string to_string() const override
+    ParsedURL toURL() const override
     {
-        auto s = fmt("github:%s/%s", owner, repo);
+        auto path = owner + "/" + repo;
         assert(!(ref && rev));
-        if (ref) s += "/" + *ref;
-        if (rev) s += "/" + rev->to_string(Base16, false);
-        return s;
+        if (ref) path += "/" + *ref;
+        if (rev) path += "/" + rev->to_string(Base16, false);
+        return ParsedURL {
+            .scheme = "github",
+            .path = path,
+        };
     }
 
     Attrs toAttrsInternal() const override

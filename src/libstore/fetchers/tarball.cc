@@ -190,7 +190,7 @@ struct TarballInput : Input
         return hash || narHash;
     }
 
-    std::string to_string() const override
+    ParsedURL toURL() const override
     {
         auto url2(url);
         // NAR hashes are preferred over file hashes since tar/zip files
@@ -199,7 +199,7 @@ struct TarballInput : Input
             url2.query.insert_or_assign("narHash", narHash->to_string(SRI));
         else if (hash)
             url2.query.insert_or_assign("hash", hash->to_string(SRI));
-        return url2.to_string();
+        return url2;
     }
 
     Attrs toAttrsInternal() const override

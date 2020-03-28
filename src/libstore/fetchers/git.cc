@@ -48,14 +48,14 @@ struct GitInput : Input
 
     std::optional<Hash> getRev() const override { return rev; }
 
-    std::string to_string() const override
+    ParsedURL toURL() const override
     {
         ParsedURL url2(url);
         if (url2.scheme != "git") url2.scheme = "git+" + url2.scheme;
         if (rev) url2.query.insert_or_assign("rev", rev->gitRev());
         if (ref) url2.query.insert_or_assign("ref", *ref);
         if (shallow) url2.query.insert_or_assign("shallow", "1");
-        return url2.to_string();
+        return url2;
     }
 
     Attrs toAttrsInternal() const override

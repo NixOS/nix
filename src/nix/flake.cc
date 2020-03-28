@@ -79,7 +79,7 @@ struct CmdFlakeList : EvalCommand
 
 static void printFlakeInfo(const Store & store, const Flake & flake)
 {
-    std::cout << fmt("URL:           %s\n", flake.lockedRef.input->to_string());
+    std::cout << fmt("URL:           %s\n", flake.lockedRef.to_string());
     std::cout << fmt("Edition:       %s\n", flake.edition);
     if (flake.description)
         std::cout << fmt("Description:   %s\n", *flake.description);
@@ -99,7 +99,7 @@ static nlohmann::json flakeToJson(const Store & store, const Flake & flake)
     if (flake.description)
         j["description"] = *flake.description;
     j["edition"] = flake.edition;
-    j["url"] = flake.lockedRef.input->to_string();
+    j["url"] = flake.lockedRef.to_string();
     if (auto rev = flake.lockedRef.input->getRev())
         j["revision"] = rev->to_string(Base16, false);
     if (flake.sourceInfo->info.revCount)

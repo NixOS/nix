@@ -43,14 +43,14 @@ struct IndirectInput : Input
             && (!rev || rev == other2->rev);
     }
 
-    std::string to_string() const override
+    ParsedURL toURL() const override
     {
         ParsedURL url;
         url.scheme = "flake";
         url.path = id;
         if (ref) { url.path += '/'; url.path += *ref; };
         if (rev) { url.path += '/'; url.path += rev->gitRev(); };
-        return url.to_string();
+        return url;
     }
 
     Attrs toAttrsInternal() const override

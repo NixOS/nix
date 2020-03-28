@@ -5,6 +5,7 @@
 #include "path.hh"
 #include "tree-info.hh"
 #include "attrs.hh"
+#include "parse.hh"
 
 #include <memory>
 
@@ -45,7 +46,12 @@ struct Input : std::enable_shared_from_this<Input>
 
     virtual std::optional<Hash> getRev() const { return {}; }
 
-    virtual std::string to_string() const = 0;
+    virtual ParsedURL toURL() const = 0;
+
+    std::string to_string() const
+    {
+        return toURL().to_string();
+    }
 
     Attrs toAttrs() const;
 
@@ -73,8 +79,6 @@ private:
 
     virtual Attrs toAttrsInternal() const = 0;
 };
-
-struct ParsedURL;
 
 struct InputScheme
 {
