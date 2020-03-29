@@ -814,7 +814,8 @@ CachedDownloadResult Downloader::downloadCached(
 
     std::optional<StorePath> expectedStorePath;
     if (request.expectedHash) {
-        expectedStorePath = store->makeFixedOutputPath(request.unpack, request.expectedHash, name);
+        auto method = request.unpack ? FileIngestionMethod::Recursive : FileIngestionMethod::Flat;
+        expectedStorePath = store->makeFixedOutputPath(method, request.expectedHash, name);
         if (store->isValidPath(*expectedStorePath)) {
             CachedDownloadResult result;
             result.storePath = store->printStorePath(*expectedStorePath);
@@ -875,10 +876,10 @@ CachedDownloadResult Downloader::downloadCached(
                 StringSink sink;
                 dumpString(*res.data, sink);
                 Hash hash = hashString(request.expectedHash ? request.expectedHash.type : htSHA256, *res.data);
-                ValidPathInfo info(store->makeFixedOutputPath(false, hash, name));
+                ValidPathInfo info(store->makeFixedOutputPath(FileIngestionMethod::Flat, hash, name));
                 info.narHash = hashString(htSHA256, *sink.s);
                 info.narSize = sink.s->size();
-                info.ca = makeFixedOutputCA(false, hash);
+                info.ca = makeFixedOutputCA(FileIngestionMethod::Flat, hash);
                 store->addToStore(info, sink.s, NoRepair, NoCheckSigs);
                 storePath = info.path.clone();
             }
@@ -914,7 +915,7 @@ CachedDownloadResult Downloader::downloadCached(
             if (members.size() != 1)
                 throw nix::Error("tarball '%s' contains an unexpected number of top-level files", url);
             auto topDir = tmpDir + "/" + members.begin()->name;
-            unpackedStorePath = store->addToStore(name, topDir, true, htSHA256, defaultPathFilter, NoRepair);
+            unpackedStorePath = store->addToStore(name, topDir, FileIngestionMethod::Recursive, htSHA256, defaultPathFilter, NoRepair);
         }
         replaceSymlink(store->printStorePath(*unpackedStorePath), unpackedLink);
         storePath = std::move(*unpackedStorePath);

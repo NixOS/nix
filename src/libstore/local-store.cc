@@ -557,7 +557,7 @@ void LocalStore::checkDerivationOutputs(const StorePath & drvPath, const Derivat
         if (out == drv.outputs.end())
             throw Error("derivation '%s' does not have an output named 'out'", printStorePath(drvPath));
 
-        bool recursive; Hash h;
+        FileIngestionMethod recursive; Hash h;
         out->second.parseHashInfo(recursive, h);
 
         check(makeFixedOutputPath(recursive, h, drvName), out->second.path, "out");
@@ -1043,7 +1043,7 @@ void LocalStore::addToStore(const ValidPathInfo & info, Source & source,
 
 
 StorePath LocalStore::addToStoreFromDump(const string & dump, const string & name,
-    bool recursive, HashType hashAlgo, RepairFlag repair)
+    FileIngestionMethod recursive, HashType hashAlgo, RepairFlag repair)
 {
     Hash h = hashString(hashAlgo, dump);
 
@@ -1067,7 +1067,7 @@ StorePath LocalStore::addToStoreFromDump(const string & dump, const string & nam
 
             autoGC();
 
-            if (recursive) {
+            if (recursive == FileIngestionMethod::Recursive) {
                 StringSource source(dump);
                 restorePath(realPath, source);
             } else
@@ -1080,7 +1080,7 @@ StorePath LocalStore::addToStoreFromDump(const string & dump, const string & nam
                above (if called with recursive == true and hashAlgo ==
                sha256); otherwise, compute it here. */
             HashResult hash;
-            if (recursive) {
+            if (recursive == FileIngestionMethod::Recursive) {
                 hash.first = hashAlgo == htSHA256 ? h : hashString(htSHA256, dump);
                 hash.second = dump.size();
             } else
@@ -1103,7 +1103,7 @@ StorePath LocalStore::addToStoreFromDump(const string & dump, const string & nam
 
 
 StorePath LocalStore::addToStore(const string & name, const Path & _srcPath,
-    bool recursive, HashType hashAlgo, PathFilter & filter, RepairFlag repair)
+    FileIngestionMethod recursive, HashType hashAlgo, PathFilter & filter, RepairFlag repair)
 {
     Path srcPath(absPath(_srcPath));
 
@@ -1111,7 +1111,7 @@ StorePath LocalStore::addToStore(const string & name, const Path & _srcPath,
        method for very large paths, but `copyPath' is mainly used for
        small files. */
     StringSink sink;
-    if (recursive)
+    if (recursive == FileIngestionMethod::Recursive)
         dumpPath(srcPath, sink, filter);
     else
         sink.s = make_ref<std::string>(readFile(srcPath));

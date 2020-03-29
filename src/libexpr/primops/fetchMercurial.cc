@@ -63,7 +63,7 @@ HgInfo exportMercurial(ref<Store> store, const std::string & uri,
                 return files.count(file);
             };
 
-            hgInfo.storePath = store->printStorePath(store->addToStore("source", uri, true, htSHA256, filter));
+            hgInfo.storePath = store->printStorePath(store->addToStore("source", uri, FileIngestionMethod::Recursive, htSHA256, filter));
 
             return hgInfo;
         }
