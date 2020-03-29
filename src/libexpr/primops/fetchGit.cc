@@ -6,7 +6,6 @@
 #include "hash.hh"
 #include "tarfile.hh"
 
-#include <filesystem>
 #include <sys/time.h>
 
 #include <regex>
@@ -27,6 +26,13 @@ struct GitInfo
 };
 
 std::regex revRegex("^[0-9a-fA-F]{40}$");
+
+static bool isNotDotGitDirectory(const Path & path)
+{
+  static const std::regex gitDirRegex("^(?:.*/)?\\.git$");
+
+  return not std::regex_match(path, gitDirRegex);
+}
 
 GitInfo exportGit(ref<Store> store, const std::string & uri,
     std::optional<std::string> ref, std::string rev,
@@ -175,6 +181,7 @@ GitInfo exportGit(ref<Store> store, const std::string & uri,
 
     Path tmpDir = createTempDir();
     AutoDelete delTmpDir(tmpDir, true);
+    PathFilter filter = defaultPathFilter;
 
     // Submodule support can be improved by adding caching to the submodules themselves. At the moment, only the root
     // repo is cached.
@@ -193,11 +200,7 @@ GitInfo exportGit(ref<Store> store, const std::string & uri,
         runProgram("git", true, { "-C", tmpDir, "remote", "add", "origin", uri });
         runProgram("git", true, { "-C", tmpDir, "submodule", "--quiet", "update", "--init", "--recursive" });
 
-        for (const auto& p : std::filesystem::recursive_directory_iterator(tmpDir)) {
-            if (p.path().filename() == ".git") {
-                std::filesystem::remove_all(p.path());
-            }
-        }
+	filter = isNotDotGitDirectory;
     } else {
         auto source = sinkToSource([&](Sink & sink) {
             RunOptions gitOptions("git", { "-C", cacheDir, "archive", gitInfo.rev });
@@ -208,7 +211,7 @@ GitInfo exportGit(ref<Store> store, const std::string & uri,
         unpackTarfile(*source, tmpDir);
     }
 
-    gitInfo.storePath = store->printStorePath(store->addToStore(name, tmpDir));
+    gitInfo.storePath = store->printStorePath(store->addToStore(name, tmpDir, true, htSHA256, filter));
 
     gitInfo.revCount = std::stoull(runProgram("git", true, { "-C", cacheDir, "rev-list", "--count", gitInfo.rev }));
 
