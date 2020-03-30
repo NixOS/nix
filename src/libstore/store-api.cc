@@ -177,13 +177,16 @@ StorePath Store::makeFixedOutputPath(
     const StorePathSet & references,
     bool hasSelfReference) const
 {
-    if (hash.type == htSHA256  && recursive == FileIngestionMethod::Recursive) {
+    if (hash.type == htSHA256 && recursive == FileIngestionMethod::Recursive) {
         return makeStorePath(makeType(*this, "source", references, hasSelfReference), hash, name);
     } else {
         assert(references.empty());
-        return makeStorePath("output:out", hashString(htSHA256,
-                "fixed:out:" + (static_cast<bool>(recursive) ? (string) "r:" : "") +
-                hash.to_string(Base16) + ":"), name);
+        return makeStorePath("output:out",
+            hashString(htSHA256,
+                "fixed:out:"
+                + (recursive == FileIngestionMethod::Recursive ? (string) "r:" : "")
+                + hash.to_string(Base16) + ":"),
+            name);
     }
 }
 
@@ -202,7 +205,9 @@ StorePath Store::makeTextPath(std::string_view name, const Hash & hash,
 std::pair<StorePath, Hash> Store::computeStorePathForPath(std::string_view name,
     const Path & srcPath, FileIngestionMethod recursive, HashType hashAlgo, PathFilter & filter) const
 {
-    Hash h = static_cast<bool>(recursive) ? hashPath(hashAlgo, srcPath, filter).first : hashFile(hashAlgo, srcPath);
+    Hash h = recursive == FileIngestionMethod::Recursive
+        ? hashPath(hashAlgo, srcPath, filter).first
+        : hashFile(hashAlgo, srcPath);
     return std::make_pair(makeFixedOutputPath(recursive, h, name), h);
 }
 
@@ -782,7 +787,7 @@ bool ValidPathInfo::isContentAddressed(const Store & store) const
 
     else if (hasPrefix(ca, "fixed:")) {
         FileIngestionMethod recursive { ca.compare(6, 2, "r:") == 0 };
-        Hash hash(std::string(ca, static_cast<bool>(recursive) ? 8 : 6));
+        Hash hash(std::string(ca, recursive == FileIngestionMethod::Recursive ? 8 : 6));
         auto refs = cloneStorePathSet(references);
         bool hasSelfReference = false;
         if (refs.count(path)) {
@@ -828,7 +833,9 @@ Strings ValidPathInfo::shortRefs() const
 
 std::string makeFixedOutputCA(FileIngestionMethod recursive, const Hash & hash)
 {
-    return "fixed:" + (static_cast<bool>(recursive) ? (std::string) "r:" : "") + hash.to_string();
+    return "fixed:"
+        + (recursive == FileIngestionMethod::Recursive ? (std::string) "r:" : "")
+        + hash.to_string();
 }
 
 

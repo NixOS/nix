@@ -724,9 +724,12 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
 
         auto outPath = state.store->makeFixedOutputPath(outputHashRecursive, h, drvName);
         if (!jsonObject) drv.env["out"] = state.store->printStorePath(outPath);
-        drv.outputs.insert_or_assign("out", DerivationOutput(std::move(outPath),
-                (static_cast<bool>(outputHashRecursive) ? "r:" : "") + printHashType(h.type),
-                h.to_string(Base16, false)));
+        drv.outputs.insert_or_assign("out", DerivationOutput {
+            std::move(outPath),
+            (outputHashRecursive == FileIngestionMethod::Recursive ? "r:" : "")
+                + printHashType(h.type),
+            h.to_string(Base16, false),
+        });
     }
 
     else {
