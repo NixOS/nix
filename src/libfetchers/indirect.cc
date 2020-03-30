@@ -1,6 +1,4 @@
 #include "fetchers.hh"
-#include "parse.hh"
-#include "regex.hh"
 
 namespace nix::fetchers {
 

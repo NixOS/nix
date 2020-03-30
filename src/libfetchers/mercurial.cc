@@ -1,10 +1,8 @@
-#include "fetchers/fetchers.hh"
-#include "fetchers/cache.hh"
-#include "fetchers/parse.hh"
+#include "fetchers.hh"
+#include "cache.hh"
 #include "globals.hh"
 #include "tarfile.hh"
 #include "store-api.hh"
-#include "regex.hh"
 
 #include <sys/time.h>
 

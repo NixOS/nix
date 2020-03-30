@@ -2,7 +2,7 @@
 
 #include "types.hh"
 #include "hash.hh"
-#include "fetchers/fetchers.hh"
+#include "fetchers.hh"
 
 #include <variant>
 

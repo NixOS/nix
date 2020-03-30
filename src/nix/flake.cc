@@ -9,8 +9,8 @@
 #include "store-api.hh"
 #include "derivations.hh"
 #include "attr-path.hh"
-#include "fetchers/fetchers.hh"
-#include "fetchers/registry.hh"
+#include "fetchers.hh"
+#include "registry.hh"
 #include "json.hh"
 
 #include <nlohmann/json.hpp>

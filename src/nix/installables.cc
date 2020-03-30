@@ -10,7 +10,7 @@
 #include "shared.hh"
 #include "flake/flake.hh"
 #include "flake/eval-cache.hh"
-#include "fetchers/parse.hh"
+#include "url.hh"
 
 #include <regex>
 #include <queue>

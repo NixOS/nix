@@ -1,8 +1,7 @@
-#include "parse.hh"
+#include "url.hh"
 #include "util.hh"
-#include "regex.hh"
 
-namespace nix::fetchers {
+namespace nix {
 
 std::regex refRegex(refRegexS, std::regex::ECMAScript);
 std::regex revRegex(revRegexS, std::regex::ECMAScript);

@@ -1,4 +1,4 @@
-#include "fetchers/cache.hh"
+#include "cache.hh"
 #include "sqlite.hh"
 #include "sync.hh"
 #include "store-api.hh"

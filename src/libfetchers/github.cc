@@ -1,8 +1,6 @@
 #include "download.hh"
-#include "fetchers/cache.hh"
-#include "fetchers/fetchers.hh"
-#include "fetchers/parse.hh"
-#include "fetchers/regex.hh"
+#include "cache.hh"
+#include "fetchers.hh"
 #include "globals.hh"
 #include "store-api.hh"
 

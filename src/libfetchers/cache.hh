@@ -1,7 +1,6 @@
 #pragma once
 
-#include "types.hh"
-#include "fetchers/fetchers.hh"
+#include "fetchers.hh"
 
 namespace nix::fetchers {
 

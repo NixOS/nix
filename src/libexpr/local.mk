@@ -11,7 +11,7 @@ libexpr_SOURCES := \
   $(d)/lexer-tab.cc \
   $(d)/parser-tab.cc
 
-libexpr_LIBS = libutil libstore libnixrust
+libexpr_LIBS = libutil libstore libfetchers libnixrust
 
 libexpr_LDFLAGS =
 ifneq ($(OS), FreeBSD)

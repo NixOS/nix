@@ -2,8 +2,8 @@
 #include "eval-inline.hh"
 #include "store-api.hh"
 #include "hash.hh"
-#include "fetchers/fetchers.hh"
-#include "fetchers/parse.hh"
+#include "fetchers.hh"
+#include "url.hh"
 
 namespace nix {
 
@@ -48,14 +48,14 @@ static void prim_fetchGit(EvalState & state, const Pos & pos, Value * * args, Va
     if (evalSettings.pureEval && !rev)
         throw Error("in pure evaluation mode, 'fetchGit' requires a Git revision");
 
-    auto parsedUrl = fetchers::parseURL(
+    auto parsedUrl = parseURL(
         url.find("://") != std::string::npos
         ? "git+" + url
         : "git+file://" + url);
     if (ref) parsedUrl.query.insert_or_assign("ref", *ref);
     if (rev) parsedUrl.query.insert_or_assign("rev", rev->gitRev());
     // FIXME: use name
-    auto input = inputFromURL(parsedUrl);
+    auto input = fetchers::inputFromURL(parsedUrl);
 
     auto [tree, input2] = input->fetchTree(state.store);
 

@@ -1,9 +1,8 @@
 #include "flakeref.hh"
 #include "store-api.hh"
-#include "fetchers/parse.hh"
-#include "fetchers/fetchers.hh"
-#include "fetchers/registry.hh"
-#include "fetchers/regex.hh"
+#include "url.hh"
+#include "fetchers.hh"
+#include "registry.hh"
 
 namespace nix {
 

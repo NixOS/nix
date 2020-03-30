@@ -545,7 +545,7 @@ formal
 
 #include "eval.hh"
 #include "download.hh"
-#include "fetchers/fetchers.hh"
+#include "fetchers.hh"
 #include "store-api.hh"
 
 

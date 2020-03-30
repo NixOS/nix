@@ -3,7 +3,7 @@
 #include "download.hh"
 #include "store-api.hh"
 #include "legacy.hh"
-#include "fetchers/fetchers.hh"
+#include "fetchers.hh"
 
 #include <fcntl.h>
 #include <regex>

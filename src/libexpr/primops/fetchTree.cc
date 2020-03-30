@@ -1,8 +1,8 @@
 #include "primops.hh"
 #include "eval-inline.hh"
 #include "store-api.hh"
-#include "fetchers/fetchers.hh"
-#include "fetchers/registry.hh"
+#include "fetchers.hh"
+#include "registry.hh"
 #include "download.hh"
 
 #include <ctime>

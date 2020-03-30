@@ -1,9 +1,8 @@
 #include "primops.hh"
 #include "eval-inline.hh"
 #include "store-api.hh"
-#include "fetchers/fetchers.hh"
-#include "fetchers/parse.hh"
-#include "fetchers/regex.hh"
+#include "fetchers.hh"
+#include "url.hh"
 
 #include <regex>
 
@@ -31,7 +30,7 @@ static void prim_fetchMercurial(EvalState & state, const Pos & pos, Value * * ar
                 // Ugly: unlike fetchGit, here the "rev" attribute can
                 // be both a revision or a branch/tag name.
                 auto value = state.forceStringNoCtx(*attr.value, *attr.pos);
-                if (std::regex_match(value, fetchers::revRegex))
+                if (std::regex_match(value, revRegex))
                     rev = Hash(value, htSHA1);
                 else
                     ref = value;
@@ -55,14 +54,14 @@ static void prim_fetchMercurial(EvalState & state, const Pos & pos, Value * * ar
     if (evalSettings.pureEval && !rev)
         throw Error("in pure evaluation mode, 'fetchMercurial' requires a Mercurial revision");
 
-    auto parsedUrl = fetchers::parseURL(
+    auto parsedUrl = parseURL(
         url.find("://") != std::string::npos
         ? "hg+" + url
         : "hg+file://" + url);
     if (rev) parsedUrl.query.insert_or_assign("rev", rev->gitRev());
     if (ref) parsedUrl.query.insert_or_assign("ref", *ref);
     // FIXME: use name
-    auto input = inputFromURL(parsedUrl);
+    auto input = fetchers::inputFromURL(parsedUrl);
 
     auto [tree, input2] = input->fetchTree(state.store);
 

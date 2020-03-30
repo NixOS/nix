@@ -1,5 +1,5 @@
-#include "fetchers/registry.hh"
-#include "fetchers/fetchers.hh"
+#include "registry.hh"
+#include "fetchers.hh"
 #include "util.hh"
 #include "globals.hh"
 #include "download.hh"

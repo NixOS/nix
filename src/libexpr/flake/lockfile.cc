@@ -1,6 +1,5 @@
 #include "lockfile.hh"
 #include "store-api.hh"
-#include "fetchers/regex.hh"
 
 #include <nlohmann/json.hpp>
 
@@ -268,7 +267,7 @@ InputPath parseInputPath(std::string_view s)
     InputPath path;
 
     for (auto & elem : tokenizeString<std::vector<std::string>>(s, "/")) {
-        if (!std::regex_match(elem, fetchers::flakeIdRegex))
+        if (!std::regex_match(elem, flakeIdRegex))
             throw Error("invalid flake input path element '%s'", elem);
         path.push_back(elem);
     }

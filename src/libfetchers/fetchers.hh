@@ -5,7 +5,7 @@
 #include "path.hh"
 #include "tree-info.hh"
 #include "attrs.hh"
-#include "parse.hh"
+#include "url.hh"
 
 #include <memory>
 

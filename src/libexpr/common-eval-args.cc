@@ -3,8 +3,8 @@
 #include "download.hh"
 #include "util.hh"
 #include "eval.hh"
-#include "fetchers/registry.hh"
-#include "fetchers/fetchers.hh"
+#include "registry.hh"
+#include "fetchers.hh"
 #include "flake/flakeref.hh"
 #include "store-api.hh"
 
