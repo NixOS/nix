@@ -207,7 +207,7 @@ struct TarballInput : Input
         Attrs attrs;
         attrs.emplace("url", url.to_string());
         if (narHash)
-            attrs.emplace("narHash", hash->to_string(SRI));
+            attrs.emplace("narHash", narHash->to_string(SRI));
         else if (hash)
             attrs.emplace("hash", hash->to_string(SRI));
         return attrs;
