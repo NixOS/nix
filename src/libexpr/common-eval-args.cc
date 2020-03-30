@@ -3,6 +3,8 @@
 #include "download.hh"
 #include "util.hh"
 #include "eval.hh"
+#include "fetchers.hh"
+#include "store-api.hh"
 
 namespace nix {
 
@@ -46,9 +48,9 @@ Bindings * MixEvalArgs::getAutoArgs(EvalState & state)
 Path lookupFileArg(EvalState & state, string s)
 {
     if (isUri(s)) {
-        CachedDownloadRequest request(s);
-        request.unpack = true;
-        return getDownloader()->downloadCached(state.store, request).path;
+        return state.store->toRealPath(
+            fetchers::downloadTarball(
+                state.store, resolveUri(s), "source", false).storePath);
     } else if (s.size() > 2 && s.at(0) == '<' && s.at(s.size() - 1) == '>') {
         Path p = s.substr(1, s.size() - 2);
         return state.findFile(p);

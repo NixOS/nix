@@ -351,12 +351,21 @@ public:
     Setting<Paths> pluginFiles{this, {}, "plugin-files",
         "Plugins to dynamically load at nix initialization time."};
 
+    Setting<std::string> githubAccessToken{this, "", "github-access-token",
+        "GitHub access token to get access to GitHub data through the GitHub API for github:<..> flakes."};
+
     Setting<Strings> experimentalFeatures{this, {}, "experimental-features",
         "Experimental Nix features to enable."};
 
     bool isExperimentalFeatureEnabled(const std::string & name);
 
     void requireExperimentalFeature(const std::string & name);
+
+    Setting<bool> allowDirty{this, true, "allow-dirty",
+        "Whether to allow dirty Git/Mercurial trees."};
+
+    Setting<bool> warnDirty{this, true, "warn-dirty",
+        "Whether to warn about dirty Git/Mercurial trees."};
 };
 
 

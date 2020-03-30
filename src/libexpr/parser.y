@@ -545,6 +545,7 @@ formal
 
 #include "eval.hh"
 #include "download.hh"
+#include "fetchers.hh"
 #include "store-api.hh"
 
 
@@ -687,9 +688,8 @@ std::pair<bool, std::string> EvalState::resolveSearchPathElem(const SearchPathEl
 
     if (isUri(elem.second)) {
         try {
-            CachedDownloadRequest request(elem.second);
-            request.unpack = true;
-            res = { true, getDownloader()->downloadCached(store, request).path };
+            res = { true, store->toRealPath(fetchers::downloadTarball(
+                        store, resolveUri(elem.second), "source", false).storePath) };
         } catch (DownloadError & e) {
             printError(format("warning: Nix search path entry '%1%' cannot be downloaded, ignoring") % elem.second);
             res = { false, "" };
