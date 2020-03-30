@@ -13,7 +13,7 @@
 #include "json.hh"
 #include "value-to-json.hh"
 #include "xml-writer.hh"
-#include "legacy.hh"
+#include "../nix/legacy.hh"
 
 #include <cerrno>
 #include <ctime>
