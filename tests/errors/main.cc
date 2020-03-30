@@ -12,7 +12,7 @@ int main()
 {
   using namespace nix; 
 
-  ErrorInfo::programName = optional("errorTest");
+  ErrorInfo::programName = optional("error-test");
 
   /*
   ColumnRange columnRange;
@@ -59,7 +59,9 @@ int main()
                 .columnRange(13,7)
                 .linesOfCode(nullopt
                             ,"this is the problem line of code"
-                            ,nullopt));
+                            ,nullopt)
+                .hint(hintfmt("this hint has %1% templated %2%!!") % "yellow" % "values")
+                );
 
   printErrorInfo(MkNixError()
                 .name("error name")

@@ -3,6 +3,7 @@
 #include "types.hh"
 #include "logging.hh"
 #include "ansicolor.hh"
+#include "error.hh"
 
 #include <sys/types.h>
 #include <sys/stat.h>
