@@ -563,7 +563,7 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
 
     std::optional<std::string> outputHash;
     std::string outputHashAlgo;
-    auto outputHashRecursive = FileIngestionMethod::Flat;
+    auto ingestionMethod = FileIngestionMethod::Flat;
 
     StringSet outputs;
     outputs.insert("out");
@@ -574,8 +574,8 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
         vomit("processing attribute '%1%'", key);
 
         auto handleHashMode = [&](const std::string & s) {
-            if (s == "recursive") outputHashRecursive = FileIngestionMethod::Recursive;
-            else if (s == "flat") outputHashRecursive = FileIngestionMethod::Flat;
+            if (s == "recursive") ingestionMethod = FileIngestionMethod::Recursive;
+            else if (s == "flat") ingestionMethod = FileIngestionMethod::Flat;
             else throw EvalError("invalid value '%s' for 'outputHashMode' attribute, at %s", s, posDrvName);
         };
 
@@ -722,11 +722,11 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
         HashType ht = outputHashAlgo.empty() ? htUnknown : parseHashType(outputHashAlgo);
         Hash h(*outputHash, ht);
 
-        auto outPath = state.store->makeFixedOutputPath(outputHashRecursive, h, drvName);
+        auto outPath = state.store->makeFixedOutputPath(ingestionMethod, h, drvName);
         if (!jsonObject) drv.env["out"] = state.store->printStorePath(outPath);
         drv.outputs.insert_or_assign("out", DerivationOutput {
             std::move(outPath),
-            (outputHashRecursive == FileIngestionMethod::Recursive ? "r:" : "")
+            (ingestionMethod == FileIngestionMethod::Recursive ? "r:" : "")
                 + printHashType(h.type),
             h.to_string(Base16, false),
         });
