@@ -174,7 +174,7 @@ static void opAdd(Strings opFlags, Strings opArgs)
    store. */
 static void opAddFixed(Strings opFlags, Strings opArgs)
 {
-    FileIngestionMethod recursive = FileIngestionMethod::Flat;
+    auto recursive = FileIngestionMethod::Flat;
 
     for (auto & i : opFlags)
         if (i == "--recursive") recursive = FileIngestionMethod::Recursive;
@@ -194,7 +194,7 @@ static void opAddFixed(Strings opFlags, Strings opArgs)
 /* Hack to support caching in `nix-prefetch-url'. */
 static void opPrintFixedPath(Strings opFlags, Strings opArgs)
 {
-    FileIngestionMethod recursive = FileIngestionMethod::Flat;
+    auto recursive = FileIngestionMethod::Flat;
 
     for (auto i : opFlags)
         if (i == "--recursive") recursive = FileIngestionMethod::Recursive;

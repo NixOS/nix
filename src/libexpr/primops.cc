@@ -563,7 +563,7 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
 
     std::optional<std::string> outputHash;
     std::string outputHashAlgo;
-    FileIngestionMethod outputHashRecursive = FileIngestionMethod::Flat;
+    auto outputHashRecursive = FileIngestionMethod::Flat;
 
     StringSet outputs;
     outputs.insert("out");
