@@ -6,9 +6,9 @@
 #include "eval-inline.hh"
 #include "common-eval-args.hh"
 #include "attr-path.hh"
-#include "legacy.hh"
 #include "finally.hh"
-#include "progress-bar.hh"
+#include "../nix/legacy.hh"
+#include "../nix/progress-bar.hh"
 #include "tarfile.hh"
 
 #include <iostream>

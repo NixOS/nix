@@ -9,7 +9,7 @@
 #include "util.hh"
 #include "worker-protocol.hh"
 #include "graphml.hh"
-#include "legacy.hh"
+#include "../nix/legacy.hh"
 
 #include <iostream>
 #include <algorithm>
