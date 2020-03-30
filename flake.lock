@@ -1,15 +1,14 @@
 {
-  "inputs": {
+  "nodes": {
     "nixpkgs": {
       "info": {
-        "lastModified": 1584712526,
-        "narHash": "sha256-aoYSp+cpgZT7o4tC7XeXqHCC60Acw7SSGxMvdnQfuZQ="
+        "lastModified": 1585405475,
+        "narHash": "sha256-bESW0n4KgPmZ0luxvwJ+UyATrC6iIltVCsGdLiphVeE="
       },
-      "inputs": {},
       "locked": {
         "owner": "NixOS",
         "repo": "nixpkgs",
-        "rev": "81fa5f4501372671b464fe0104fe47f5327b46fe",
+        "rev": "b88ff468e9850410070d4e0ccd68c7011f15b2be",
         "type": "github"
       },
       "original": {
@@ -17,7 +16,13 @@
         "ref": "nixos-20.03-small",
         "type": "indirect"
       }
+    },
+    "root": {
+      "inputs": {
+        "nixpkgs": "nixpkgs"
+      }
     }
   },
-  "version": 4
+  "root": "root",
+  "version": 5
 }
