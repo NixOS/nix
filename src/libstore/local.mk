@@ -4,7 +4,7 @@ libstore_NAME = libnixstore
 
 libstore_DIR := $(d)
 
-libstore_SOURCES := $(wildcard $(d)/*.cc $(d)/builtins/*.cc $(d)/fetchers/*.cc)
+libstore_SOURCES := $(wildcard $(d)/*.cc $(d)/builtins/*.cc)
 
 libstore_LIBS = libutil libnixrust
 
@@ -64,6 +64,3 @@ $(eval $(call install-file-in, $(d)/nix-store.pc, $(prefix)/lib/pkgconfig, 0644)
 
 $(foreach i, $(wildcard src/libstore/builtins/*.hh), \
   $(eval $(call install-file-in, $(i), $(includedir)/nix/builtins, 0644)))
-
-$(foreach i, $(wildcard src/libstore/fetchers/*.hh), \
-  $(eval $(call install-file-in, $(i), $(includedir)/nix/fetchers, 0644)))
