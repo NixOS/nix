@@ -367,10 +367,38 @@ bool BasicDerivationT<Path>::isFixedOutput() const
         outputs.begin()->second.hash;
 }
 
+template<typename Path>
+static std::string printLogicalPrefix(const DerivationOutputT<Path> & output) {
+    return "fixed:out:"
+        + output.hash->printMethodAlgo() + ":"
+        + output.hash->hash.to_string(Base16, false) + ":";
+}
+
+std::optional<std::string> printLogicalOutput(
+    Store & store,
+    const DerivationOutputT<StorePath> & output)
+{
+    return printLogicalPrefix(output) + store.printStorePath(output.path);
+}
+
+std::optional<std::string> printLogicalOutput(
+    Store & store,
+    const DerivationOutputT<NoPath> & output,
+    const std::string & drvName)
+{
+    if (!output.hash)
+        return std::optional<std::string> {};
+    return printLogicalPrefix(output)
+        + store.printStorePath(store.makeFixedOutputPath(
+                output.hash->method,
+                output.hash->hash,
+                drvName));
+}
+
 
 DrvHashes drvHashes;
 
-/* pathDerivationModulo and hashDerivationModulo are mutually recursive
+/* pathDerivationModulo and derivationModulo are mutually recursive
  */
 
 /* Look up the derivation by value and memoize the
@@ -380,22 +408,53 @@ static const Hash & pathDerivationModulo(Store & store, const StorePath & drvPat
 {
     auto h = drvHashes.find(drvPath);
     if (h == drvHashes.end()) {
-        assert(store.isValidPath(drvPath));
-        const std::variant<DerivationT<Hash, StorePath>, std::string> drvOrPseudo = derivationModulo(
-            store,
-            readDerivation(
+        const std::variant<DerivationT<Hash, StorePath>, std::string> drvOrPseudo =
+            derivationModuloOrOutput(
                 store,
-                store.toRealPath(store.printStorePath(drvPath))));
-        Hash hash;
-        if (const DerivationT<Hash, StorePath> *pval = std::get_if<0>(&drvOrPseudo)) {
-            hash = hashDerivation(store, *pval);
-        } else if (const std::string *pval = std::get_if<1>(&drvOrPseudo)) {
-            hash = hashString(htSHA256, *pval);
-        }
-        // Cache it
-        h = drvHashes.insert_or_assign(drvPath.clone(), hash).first;
+                readDerivation(
+                    store,
+                    store.toRealPath(store.printStorePath(drvPath))));
+        const auto hash = hashDerivationOrPseudo(store, std::move(drvOrPseudo));
+        h = drvHashes.insert_or_assign(drvPath.clone(), std::move(hash)).first;
     }
+    // Cache it
     return h->second;
+}
+
+template<typename OutPath>
+Hash hashDerivationOrPseudo(
+    Store & store,
+    typename std::variant<DerivationT<Hash, OutPath>, std::string> drvOrPseudo)
+{
+    Hash hash;
+    if (const DerivationT<Hash, OutPath> *pval = std::get_if<0>(&drvOrPseudo)) {
+        hash = hashDerivation(store, *pval);
+    } else if (const std::string *pval = std::get_if<1>(&drvOrPseudo)) {
+        hash = hashString(htSHA256, *pval);
+    }
+    return hash;
+}
+
+template<typename OutPath>
+DerivationT<Hash, OutPath> derivationModulo(
+    Store & store,
+    const DerivationT<StorePath, OutPath> & drv)
+{
+    DerivationT<Hash, OutPath> drvNorm((BasicDerivationT<OutPath>)drv);
+    for (auto & i : drv.inputDrvs) {
+        const auto h = pathDerivationModulo(store, i.first);
+        drvNorm.inputDrvs.insert_or_assign(h, i.second);
+    }
+
+    return drvNorm;
+}
+
+template<typename OutPath>
+DerivationT<Hash, OutPath> derivationModulo(
+    Store & store,
+    const DerivationT<Hash, OutPath> & drv)
+{
+    return drv;
 }
 
 /* Returns the hash of a derivation modulo fixed-output
@@ -418,31 +477,100 @@ static const Hash & pathDerivationModulo(Store & store, const StorePath & drvPat
    paths have been replaced by the result of a recursive call to this
    function, and that for fixed-output derivations we return a hash of
    its output path. */
-template<typename OutPath>
-std::variant<DerivationT<Hash, OutPath>, string> derivationModulo(
+
+template<typename InputDrvPath>
+std::variant<DerivationT<Hash, StorePath>, string> derivationModuloOrOutput(
     Store & store,
-    const DerivationT<StorePath, OutPath> & drv)
+    const DerivationT<InputDrvPath, StorePath> & drv)
 {
     /* Return a fixed hash for fixed-output derivations. */
     if (drv.isFixedOutput()) {
-        typename DerivationOutputsT<OutPath>::const_iterator i = drv.outputs.begin();
-        return "fixed:out:"
-            + i->second.hash->printMethodAlgo() + ":"
-            + i->second.hash->hash.to_string(Base16, false) + ":"
-            + printStorePath(store, i->second.path);
+        DerivationOutputsT<StorePath>::const_iterator i = drv.outputs.begin();
+        auto res = printLogicalOutput(store, i->second);
+        assert(res);
+        return *res;
     }
 
     /* For other derivations, replace the inputs paths with recursive
        calls to this function. */
-    DerivationT<Hash, OutPath> drvNorm((BasicDerivationT<OutPath>)drv);
-    for (auto & i : drv.inputDrvs) {
-        const auto h = pathDerivationModulo(store, i.first);
-        drvNorm.inputDrvs.insert_or_assign(h, i.second);
-    }
-
-    return drvNorm;
+    return derivationModulo(store, drv);
 }
 
+template<typename InputDrvPath>
+std::variant<DerivationT<Hash, NoPath>, string> derivationModuloOrOutput(
+    Store & store,
+    const DerivationT<InputDrvPath, NoPath> & drv,
+    const std::string & drvName)
+{
+    if (drv.isFixedOutput()) {
+        DerivationOutputsT<NoPath>::const_iterator i = drv.outputs.begin();
+        auto res = printLogicalOutput(store, i->second, drvName);
+        assert(res);
+        return *res;
+    }
+    return derivationModulo(store, drv);
+}
+
+template<typename InputDrvPath>
+DerivationT<InputDrvPath, StorePath> bakeDerivationPaths(
+    Store & store,
+    const DerivationT<InputDrvPath, NoPath> & drv,
+    const std::string & drvName)
+{
+    DerivationT<InputDrvPath, StorePath> drvFinal;
+    //drvFinal.inputSrcs = drv.inputSrcs;
+    for (auto & i : drv.inputSrcs)
+        drvFinal.inputSrcs.insert(i.clone());
+    drvFinal.platform = drv.platform;
+    drvFinal.builder = drv.builder;
+    drvFinal.args = drv.args;
+    drvFinal.env = drv.env;
+    const auto drvOrPseudo = derivationModuloOrOutput(store, drv, drvName);
+    if (const DerivationT<Hash, NoPath> *pval = std::get_if<0>(&drvOrPseudo)) {
+        Hash hash = hashDerivation(store, *pval);
+        for (const auto i : drv.outputs) {
+            auto outPath = store.makeOutputPath(i.first, hash, drvName);
+            drvFinal.outputs.insert_or_assign(i.first, DerivationOutput {
+                std::move(outPath),
+                std::optional<FileSystemHash> {},
+            });
+        }
+    } else if (std::get_if<1>(&drvOrPseudo)) {
+        DerivationOutputsT<NoPath>::const_iterator out = drv.outputs.find("out");
+        if (out == drv.outputs.end())
+            throw Error("derivation does not have an output named 'out'");
+        auto & output = out->second;
+        assert(output.hash);
+        auto outPath = store.makeFixedOutputPath(output.hash->method, output.hash->hash, drvName);
+        drvFinal.outputs.insert_or_assign("out", DerivationOutput {
+            std::move(outPath),
+            std::optional { output.hash },
+        });
+    }
+    return drvFinal;
+}
+
+template<typename InputDrvPath>
+DerivationT<InputDrvPath, NoPath> stripDerivationPaths(
+    Store & store,
+    const DerivationT<InputDrvPath, StorePath> & drv)
+{
+    DerivationT<InputDrvPath, NoPath> drvInitial;
+    //drvInitial.inputSrcs = drv.inputSrcs;
+    for (auto & i : drv.inputSrcs)
+        drvInitial.inputSrcs.insert(i.clone());
+    drvInitial.platform = drv.platform;
+    drvInitial.builder = drv.builder;
+    drvInitial.args = drv.args;
+    drvInitial.env = drv.env;
+    for (const auto & i : drv.outputs) {
+        drvInitial.outputs.insert_or_assign(i.first, DerivationOutputT {
+            NoPath {},
+            std::optional { i.second.hash },
+        });
+    }
+    return drvInitial;
+}
 
 std::string StorePathWithOutputs::to_string(const Store & store) const
 {
@@ -549,15 +677,71 @@ template struct DerivationT<Hash, StorePath>;
 template struct DerivationT<Hash, NoPath>;
 
 template
-std::variant<DerivationT<Hash, StorePath>, std::string> derivationModulo(
+DerivationT<Hash, StorePath> derivationModulo(
     Store & store,
     const DerivationT<StorePath, StorePath> & drv);
 template
-std::variant<DerivationT<Hash, NoPath>, std::string> derivationModulo(
+DerivationT<Hash, NoPath> derivationModulo(
     Store & store,
     const DerivationT<StorePath, NoPath> & drv);
+template
+DerivationT<Hash, StorePath> derivationModulo(
+    Store & store,
+    const DerivationT<Hash, StorePath> & drv);
+template
+DerivationT<Hash, NoPath> derivationModulo(
+    Store & store,
+    const DerivationT<Hash, NoPath> & drv);
+
+template
+std::variant<DerivationT<Hash, StorePath>, std::string> derivationModuloOrOutput(
+    Store & store,
+    const DerivationT<StorePath, StorePath> & drv);
+template
+std::variant<DerivationT<Hash, StorePath>, std::string> derivationModuloOrOutput(
+    Store & store,
+    const DerivationT<Hash, StorePath> & drv);
+template
+std::variant<DerivationT<Hash, NoPath>, std::string> derivationModuloOrOutput(
+    Store & store,
+    const DerivationT<StorePath, NoPath> & drv,
+    const std::string & drvName);
+template
+std::variant<DerivationT<Hash, NoPath>, std::string> derivationModuloOrOutput(
+    Store & store,
+    const DerivationT<Hash, NoPath> & drv,
+    const std::string & drvName);
+
+template
+Hash hashDerivationOrPseudo(
+    Store & store,
+    typename std::variant<DerivationT<Hash, StorePath>, std::string> drvOrPseudo);
+template
+Hash hashDerivationOrPseudo(
+    Store & store,
+    typename std::variant<DerivationT<Hash, NoPath>, std::string> drvOrPseudo);
 
 template Hash hashDerivation(Store & store, const DerivationT<Hash, StorePath> & drv);
 template Hash hashDerivation(Store & store, const DerivationT<Hash, NoPath> & drv);
+
+template
+DerivationT<StorePath, StorePath> bakeDerivationPaths(
+    Store & store,
+    const DerivationT<StorePath, NoPath> & drv,
+    const std::string & drvName);
+template
+DerivationT<Hash, StorePath> bakeDerivationPaths(
+    Store & store,
+    const DerivationT<Hash, NoPath> & drv,
+    const std::string & drvName);
+
+template
+DerivationT<StorePath, NoPath> stripDerivationPaths(
+    Store & store,
+    const DerivationT<StorePath, StorePath> & drv);
+template
+DerivationT<Hash, NoPath> stripDerivationPaths(
+    Store & store,
+    const DerivationT<Hash, StorePath> & drv);
 
 }

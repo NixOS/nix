@@ -32,7 +32,8 @@ struct DerivationOutputT
 {
     Path path;
     std::optional<FileSystemHash> hash; /* hash used for expected hash computation */
-    DerivationOutputT(Path && path, std::optional<FileSystemHash> && hash)
+
+    DerivationOutputT(Path path, std::optional<FileSystemHash> hash)
         : path(std::move(path))
         , hash(std::move(hash))
     { }
@@ -125,15 +126,68 @@ Derivation readDerivation(const Store & store, const Path & drvPath);
 // FIXME: remove
 bool isDerivation(const string & fileName);
 
+
+// TODO dedup some with `Store::makeFixedOutputPath` after DerivationOutput
+// doesn't just contain strings but actual `Hash` and recursive vs flat enum.
+
+/// Print the symbolic output path if it is fixed output
+std::optional<std::string> printLogicalOutput(
+    Store & store,
+    const DerivationOutputT<StorePath> & output);
+std::optional<std::string> printLogicalOutput(
+    Store & store,
+    const DerivationOutputT<NoPath> & output,
+    const std::string & drvName);
+
+/// Reduce a derivation down to a resolved normal form
 template<typename OutPath>
-std::variant<DerivationT<Hash, OutPath>, string> derivationModulo(
+DerivationT<Hash, OutPath> derivationModulo(
     Store & store,
     const DerivationT<StorePath, OutPath> & drv);
 
+/// Identity function, but useful to be called from polymorphic code.
+template<typename OutPath>
+DerivationT<Hash, OutPath> derivationModulo(
+    Store & store,
+    const DerivationT<Hash, OutPath> & drv);
+
+/* Reduce a derivation down to a resolved normal form if it is regular, or
+   symbolic output path if it is fixed output. */
+template<typename InputDrvPath>
+std::variant<DerivationT<Hash, StorePath>, string> derivationModuloOrOutput(
+    Store & store,
+    const DerivationT<InputDrvPath, StorePath> & drv);
+template<typename InputDrvPath>
+std::variant<DerivationT<Hash, NoPath>, string> derivationModuloOrOutput(
+    Store & store,
+    const DerivationT<InputDrvPath, NoPath> & drv,
+    const std::string & drvName);
+
+/// Turn the output of derivationModuloOrOutput into a plain hash.
+template<typename OutPath>
+Hash hashDerivationOrPseudo(
+    Store & store,
+    typename std::variant<DerivationT<Hash, OutPath>, std::string> drvOrPseudo);
+
+/* Hash a resolved normal form derivation. */
 template<typename OutPath>
 Hash hashDerivation(
     Store & store,
     const DerivationT<Hash, OutPath> & drv);
+
+/* Compute a "baked" derivation, made from the which additionally contains the
+   outputs paths created from the hash of the initial one. */
+template<typename InputDrvPath>
+DerivationT<InputDrvPath, StorePath> bakeDerivationPaths(
+    Store & store,
+    const DerivationT<InputDrvPath, NoPath> & drv,
+    const std::string & drvName);
+
+/* Opposite of bakeDerivationPaths */
+template<typename InputDrvPath>
+DerivationT<InputDrvPath, NoPath> stripDerivationPaths(
+    Store & store,
+    const DerivationT<InputDrvPath, StorePath> & drv);
 
 /* Memoisation of hashDerivationModulo(). */
 typedef std::map<StorePath, Hash> DrvHashes;

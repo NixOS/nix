@@ -718,43 +718,15 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
         /* Set "out" output with hash algo and hash for fixed-output derivations. */
         if (outputs.size() != 1 || *(outputs.begin()) != "out")
             throw Error(format("multiple outputs are not supported in fixed-output derivations, at %1%") % posDrvName);
-
-        HashType ht = outputHashAlgo.empty() ? htUnknown : parseHashType(outputHashAlgo);
-        Hash h(*outputHash, ht);
-        drv.outputs.insert_or_assign("out", DerivationOutputT(
-                NoPath {},
-                FileSystemHash(outputHashRecursive, std::move(h))));
     }
 
     /* Compute the final derivation, which additionally contains the outputs
        paths created from the hash of the initial one. */
-    Derivation drvFinal;
-    //drvFinal.inputSrcs = drv.inputSrcs;
-    for (auto & i : drv.inputSrcs)
-        drvFinal.inputSrcs.insert(i.clone());
-    drvFinal.platform = drv.platform;
-    drvFinal.builder = drv.builder;
-    drvFinal.args = drv.args;
-    drvFinal.env = drv.env;
-    {
-        const auto drvOrPseudo = derivationModulo(*state.store, drv);
-        if (const DerivationT<Hash, NoPath> *pval = std::get_if<0>(&drvOrPseudo)) {
-            Hash hash = hashDerivation(*state.store, *pval);
-            for (auto & i : outputs) {
-                auto outPath = state.store->makeOutputPath(i, hash, drvName);
-                if (!jsonObject) drvFinal.env[i] = state.store->printStorePath(outPath);
-                drvFinal.outputs.insert_or_assign(i,
-                    DerivationOutput(std::move(outPath), std::optional<FileSystemHash>()));
-            }
-        } else if (std::get_if<1>(&drvOrPseudo)) {
-            HashType ht = outputHashAlgo.empty() ? htUnknown : parseHashType(outputHashAlgo);
-            Hash h(*outputHash, ht);
-            auto outPath = state.store->makeFixedOutputPath(outputHashRecursive, h, drvName);
-            auto & output = drv.outputs.find("out")->second;
-            drvFinal.outputs.insert_or_assign("out", DerivationOutput(
-                    std::move(outPath),
-                    FileSystemHash { outputHashRecursive, std::move(h) }));
-            if (!jsonObject) drv.env["out"] = state.store->printStorePath(outPath);
+    Derivation drvFinal = bakeDerivationPaths(*state.store, drv, drvName);
+
+    if (!jsonObject) {
+        for (const auto & i : drvFinal.outputs) {
+            drvFinal.env[i.first] = state.store->printStorePath(i.second.path);
         }
     }
 
@@ -768,17 +740,11 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
        case we don't actually write store derivations, so we can't
        read them later. */
     {
-        const auto drvOrPseudo = derivationModulo<StorePath>(*state.store, drvFinal);
-        Hash hash;
-        if (const DerivationT<Hash, StorePath> *pval = std::get_if<0>(&drvOrPseudo)) {
-            hash = hashDerivation(*state.store, *pval);
-        } else if (const std::string *pval = std::get_if<1>(&drvOrPseudo)) {
-            hash = hashString(htSHA256, *pval);
-        }
-        // Cache it
+        const std::variant<DerivationT<Hash, StorePath>, std::string> drvOrPseudo =
+            derivationModuloOrOutput(*state.store, drvFinal);
+        auto hash = hashDerivationOrPseudo(*state.store, std::move(drvOrPseudo));
         drvHashes.insert_or_assign(drvPath.clone(), std::move(hash));
     }
-
     state.mkAttrs(v, 1 + drvFinal.outputs.size());
     mkString(*state.allocAttr(v, state.sDrvPath), drvPathS, {"=" + drvPathS});
     for (auto & i : drvFinal.outputs) {
