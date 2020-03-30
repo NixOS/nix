@@ -484,7 +484,7 @@ void RemoteStore::addToStore(const ValidPathInfo & info, Source & source,
 
 
 StorePath RemoteStore::addToStore(const string & name, const Path & _srcPath,
-    bool recursive, HashType hashAlgo, PathFilter & filter, RepairFlag repair)
+    FileIngestionMethod method, HashType hashAlgo, PathFilter & filter, RepairFlag repair)
 {
     if (repair) throw Error("repairing is not supported when building through the Nix daemon");
 
@@ -492,10 +492,12 @@ StorePath RemoteStore::addToStore(const string & name, const Path & _srcPath,
 
     Path srcPath(absPath(_srcPath));
 
-    conn->to << wopAddToStore << name
-       << ((hashAlgo == htSHA256 && recursive) ? 0 : 1) /* backwards compatibility hack */
-       << (recursive ? 1 : 0)
-       << printHashType(hashAlgo);
+    conn->to
+        << wopAddToStore
+        << name
+        << ((hashAlgo == htSHA256 && method == FileIngestionMethod::Recursive) ? 0 : 1) /* backwards compatibility hack */
+        << (method == FileIngestionMethod::Recursive ? 1 : 0)
+        << printHashType(hashAlgo);
 
     try {
         conn->to.written = 0;

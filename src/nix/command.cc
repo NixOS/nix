@@ -28,20 +28,20 @@ void StoreCommand::run()
     run(getStore());
 }
 
-StorePathsCommand::StorePathsCommand(bool recursive)
+StorePathsCommand::StorePathsCommand(FileIngestionMethod recursive)
     : recursive(recursive)
 {
-    if (recursive)
+    if (recursive == FileIngestionMethod::Recursive)
         mkFlag()
             .longName("no-recursive")
             .description("apply operation to specified paths only")
-            .set(&this->recursive, false);
+            .set(&this->recursive, FileIngestionMethod::Flat);
     else
         mkFlag()
             .longName("recursive")
             .shortName('r')
             .description("apply operation to closure of the specified paths")
-            .set(&this->recursive, true);
+            .set(&this->recursive, FileIngestionMethod::Recursive);
 
     mkFlag(0, "all", "apply operation to the entire store", &all);
 }
@@ -61,7 +61,7 @@ void StorePathsCommand::run(ref<Store> store)
         for (auto & p : toStorePaths(store, realiseMode, installables))
             storePaths.push_back(p.clone());
 
-        if (recursive) {
+        if (recursive == FileIngestionMethod::Recursive) {
             StorePathSet closure;
             store->computeFSClosure(storePathsToSet(storePaths), closure, false, false);
             storePaths.clear();

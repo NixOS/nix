@@ -355,20 +355,24 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
     }
 
     case wopAddToStore: {
-        bool fixed, recursive;
         std::string s, baseName;
-        from >> baseName >> fixed /* obsolete */ >> recursive >> s;
-        /* Compatibility hack. */
-        if (!fixed) {
-            s = "sha256";
-            recursive = true;
+        FileIngestionMethod method;
+        {
+            bool fixed, recursive;
+            from >> baseName >> fixed /* obsolete */ >> recursive >> s;
+            method = FileIngestionMethod { recursive };
+            /* Compatibility hack. */
+            if (!fixed) {
+                s = "sha256";
+                method = FileIngestionMethod::Recursive;
+            }
         }
         HashType hashAlgo = parseHashType(s);
 
         TeeSource savedNAR(from);
         RetrieveRegularNARSink savedRegular;
 
-        if (recursive) {
+        if (method == FileIngestionMethod::Recursive) {
             /* Get the entire NAR dump from the client and save it to
                a string so that we can pass it to
                addToStoreFromDump(). */
@@ -380,7 +384,11 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
         logger->startWork();
         if (!savedRegular.regular) throw Error("regular file expected");
 
-        auto path = store->addToStoreFromDump(recursive ? *savedNAR.data : savedRegular.s, baseName, recursive, hashAlgo);
+        auto path = store->addToStoreFromDump(
+            method == FileIngestionMethod::Recursive ? *savedNAR.data : savedRegular.s,
+            baseName,
+            method,
+            hashAlgo);
         logger->stopWork();
 
         to << store->printStorePath(path);

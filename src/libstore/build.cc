@@ -2712,7 +2712,7 @@ struct RestrictedStore : public LocalFSStore
     { throw Error("queryPathFromHashPart"); }
 
     StorePath addToStore(const string & name, const Path & srcPath,
-        bool recursive = true, HashType hashAlgo = htSHA256,
+        FileIngestionMethod recursive = FileIngestionMethod::Recursive, HashType hashAlgo = htSHA256,
         PathFilter & filter = defaultPathFilter, RepairFlag repair = NoRepair) override
     { throw Error("addToStore"); }
 
@@ -2725,7 +2725,7 @@ struct RestrictedStore : public LocalFSStore
     }
 
     StorePath addToStoreFromDump(const string & dump, const string & name,
-        bool recursive = true, HashType hashAlgo = htSHA256, RepairFlag repair = NoRepair) override
+        FileIngestionMethod recursive = FileIngestionMethod::Recursive, HashType hashAlgo = htSHA256, RepairFlag repair = NoRepair) override
     {
         auto path = next->addToStoreFromDump(dump, name, recursive, hashAlgo, repair);
         goal.addDependency(path);
@@ -3647,10 +3647,10 @@ void DerivationGoal::registerOutputs()
 
         if (fixedOutput) {
 
-            bool recursive; Hash h;
+            FileIngestionMethod recursive; Hash h;
             i.second.parseHashInfo(recursive, h);
 
-            if (!recursive) {
+            if (!static_cast<bool>(recursive)) {
                 /* The output path should be a regular file without execute permission. */
                 if (!S_ISREG(st.st_mode) || (st.st_mode & S_IXUSR) != 0)
                     throw BuildError(
@@ -3659,7 +3659,7 @@ void DerivationGoal::registerOutputs()
 
             /* Check the hash. In hash mode, move the path produced by
                the derivation to its content-addressed location. */
-            Hash h2 = recursive ? hashPath(h.type, actualPath).first : hashFile(h.type, actualPath);
+            Hash h2 = static_cast<bool>(recursive) ? hashPath(h.type, actualPath).first : hashFile(h.type, actualPath);
 
             auto dest = worker.store.makeFixedOutputPath(recursive, h2, i.second.path.name());
 
@@ -3912,7 +3912,7 @@ void DerivationGoal::checkOutputs(const std::map<Path, ValidPathInfo> & outputs)
 
                 auto spec = parseReferenceSpecifiers(worker.store, *drv, *value);
 
-                auto used = recursive ? cloneStorePathSet(getClosure(info.path).first) : cloneStorePathSet(info.references);
+                auto used = static_cast<bool>(recursive) ? cloneStorePathSet(getClosure(info.path).first) : cloneStorePathSet(info.references);
 
                 if (recursive && checks.ignoreSelfRefs)
                     used.erase(info.path);

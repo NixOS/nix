@@ -65,7 +65,7 @@ public:
         std::shared_ptr<FSAccessor> accessor) override;
 
     StorePath addToStore(const string & name, const Path & srcPath,
-        bool recursive = true, HashType hashAlgo = htSHA256,
+        FileIngestionMethod method = FileIngestionMethod::Recursive, HashType hashAlgo = htSHA256,
         PathFilter & filter = defaultPathFilter, RepairFlag repair = NoRepair) override;
 
     StorePath addTextToStore(const string & name, const string & s,
