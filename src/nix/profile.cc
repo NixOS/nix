@@ -6,7 +6,7 @@
 #include "archive.hh"
 #include "builtins/buildenv.hh"
 #include "flake/flakeref.hh"
-#include "nix-env/user-env.hh"
+#include "../nix-env/user-env.hh"
 
 #include <nlohmann/json.hpp>
 #include <regex>

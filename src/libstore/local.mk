@@ -31,7 +31,8 @@ ifeq ($(HAVE_SECCOMP), 1)
 	libstore_LDFLAGS += -lseccomp
 endif
 
-libstore_CXXFLAGS = \
+libstore_CXXFLAGS += \
+ -I src/libutil -I src/libstore \
  -DNIX_PREFIX=\"$(prefix)\" \
  -DNIX_STORE_DIR=\"$(storedir)\" \
  -DNIX_DATA_DIR=\"$(datadir)\" \
