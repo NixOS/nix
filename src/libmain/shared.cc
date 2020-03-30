@@ -260,7 +260,10 @@ void printVersion(const string & programName)
         cfg.push_back("signed-caches");
 #endif
         std::cout << "Features: " << concatStringsSep(", ", cfg) << "\n";
-        std::cout << "Configuration file: " << settings.nixConfDir + "/nix.conf" << "\n";
+        std::cout << "System configuration file: " << settings.nixConfDir + "/nix.conf" << "\n";
+        std::cout << "User configuration files: " <<
+            concatStringsSep(":", settings.nixUserConfFiles)
+            << "\n";
         std::cout << "Store directory: " << settings.nixStore << "\n";
         std::cout << "State directory: " << settings.nixStateDir << "\n";
     }
