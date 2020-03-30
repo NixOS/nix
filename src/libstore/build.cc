@@ -2713,7 +2713,7 @@ struct RestrictedStore : public LocalFSStore
     { throw Error("queryPathFromHashPart"); }
 
     StorePath addToStore(const string & name, const Path & srcPath,
-        bool recursive = true, HashType hashAlgo = htSHA256,
+        FileIngestionMethod recursive = FileIngestionMethod::Recursive, HashType hashAlgo = htSHA256,
         PathFilter & filter = defaultPathFilter, RepairFlag repair = NoRepair) override
     { throw Error("addToStore"); }
 
@@ -2726,7 +2726,7 @@ struct RestrictedStore : public LocalFSStore
     }
 
     StorePath addToStoreFromDump(const string & dump, const string & name,
-        bool recursive = true, HashType hashAlgo = htSHA256, RepairFlag repair = NoRepair) override
+        FileIngestionMethod recursive = FileIngestionMethod::Recursive, HashType hashAlgo = htSHA256, RepairFlag repair = NoRepair) override
     {
         auto path = next->addToStoreFromDump(dump, name, recursive, hashAlgo, repair);
         goal.addDependency(path);
@@ -3648,10 +3648,7 @@ void DerivationGoal::registerOutputs()
 
         if (fixedOutput) {
 
-            bool recursive; Hash h;
-            i.second.parseHashInfo(recursive, h);
-
-            if (!recursive) {
+            if (i.second.hash->method == FileIngestionMethod::Flat) {
                 /* The output path should be a regular file without execute permission. */
                 if (!S_ISREG(st.st_mode) || (st.st_mode & S_IXUSR) != 0)
                     throw BuildError(
@@ -3660,18 +3657,22 @@ void DerivationGoal::registerOutputs()
 
             /* Check the hash. In hash mode, move the path produced by
                the derivation to its content-addressed location. */
-            Hash h2 = recursive ? hashPath(h.type, actualPath).first : hashFile(h.type, actualPath);
+            Hash h2 = i.second.hash->method == FileIngestionMethod::Recursive
+                ? hashPath(i.second.hash->hash.type, actualPath).first
+                : hashFile(i.second.hash->hash.type, actualPath);
 
-            auto dest = worker.store.makeFixedOutputPath(recursive, h2, i.second.path.name());
+            auto dest = worker.store.makeFixedOutputPath(i.second.hash->method, h2, i.second.path.name());
 
-            if (h != h2) {
+            if (i.second.hash->hash != h2) {
 
                 /* Throw an error after registering the path as
                    valid. */
                 worker.hashMismatch = true;
                 delayedException = std::make_exception_ptr(
                     BuildError("hash mismatch in fixed-output derivation '%s':\n  wanted: %s\n  got:    %s",
-                        worker.store.printStorePath(dest), h.to_string(SRI), h2.to_string(SRI)));
+                        worker.store.printStorePath(dest),
+                        i.second.hash->hash.to_string(SRI),
+                        h2.to_string(SRI)));
 
                 Path actualDest = worker.store.Store::toRealPath(dest);
 
@@ -3691,7 +3692,7 @@ void DerivationGoal::registerOutputs()
             else
                 assert(worker.store.parseStorePath(path) == dest);
 
-            ca = makeFixedOutputCA(recursive, h2);
+            ca = makeFixedOutputCA(i.second.hash->method, h2);
         }
 
         /* Get rid of all weird permissions.  This also checks that
@@ -3913,7 +3914,7 @@ void DerivationGoal::checkOutputs(const std::map<Path, ValidPathInfo> & outputs)
 
                 auto spec = parseReferenceSpecifiers(worker.store, *drv, *value);
 
-                auto used = recursive ? cloneStorePathSet(getClosure(info.path).first) : cloneStorePathSet(info.references);
+                auto used = static_cast<bool>(recursive) ? cloneStorePathSet(getClosure(info.path).first) : cloneStorePathSet(info.references);
 
                 if (recursive && checks.ignoreSelfRefs)
                     used.erase(info.path);

@@ -65,6 +65,13 @@ pub extern "C" fn ffi_StorePath_clone(self_: &StorePath) -> StorePath {
 }
 
 #[no_mangle]
+pub extern "C" fn ffi_StorePath_clone_to(self_: &StorePath, other: *mut StorePath) {
+    unsafe {
+        core::ptr::write(other, self_.clone());
+    }
+}
+
+#[no_mangle]
 pub extern "C" fn ffi_StorePath_name(self_: &StorePath) -> &str {
     self_.name.name()
 }

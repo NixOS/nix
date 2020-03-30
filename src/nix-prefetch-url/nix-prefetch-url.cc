@@ -159,7 +159,8 @@ static int _main(int argc, char * * argv)
         std::optional<StorePath> storePath;
         if (args.size() == 2) {
             expectedHash = Hash(args[1], ht);
-            storePath = store->makeFixedOutputPath(unpack, expectedHash, name);
+            const auto recursive = unpack ? FileIngestionMethod::Recursive : FileIngestionMethod::Flat;
+            storePath = store->makeFixedOutputPath(recursive, expectedHash, name);
             if (store->isValidPath(*storePath))
                 hash = expectedHash;
             else
@@ -208,13 +209,15 @@ static int _main(int argc, char * * argv)
             if (expectedHash != Hash(ht) && expectedHash != hash)
                 throw Error(format("hash mismatch for '%1%'") % uri);
 
+            const auto recursive = unpack ? FileIngestionMethod::Recursive : FileIngestionMethod::Flat;
+
             /* Copy the file to the Nix store. FIXME: if RemoteStore
                implemented addToStoreFromDump() and downloadFile()
                supported a sink, we could stream the download directly
                into the Nix store. */
-            storePath = store->addToStore(name, tmpFile, unpack, ht);
+            storePath = store->addToStore(name, tmpFile, recursive, ht);
 
-            assert(*storePath == store->makeFixedOutputPath(unpack, hash, name));
+            assert(*storePath == store->makeFixedOutputPath(recursive, hash, name));
         }
 
         stopProgressBar();

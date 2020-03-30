@@ -13,18 +13,32 @@ namespace nix {
 
 /* Abstract syntax of derivations. */
 
+/// Pair of a hash, and how the file system was ingested
+struct FileSystemHash {
+    FileIngestionMethod method;
+    Hash hash;
+    FileSystemHash(FileIngestionMethod method, Hash hash)
+        : method(std::move(method))
+        , hash(std::move(hash))
+    { }
+    FileSystemHash(const FileSystemHash &) = default;
+    FileSystemHash(FileSystemHash &&) = default;
+    FileSystemHash & operator = (const FileSystemHash &) = default;
+    std::string printMethodAlgo() const;
+};
+
 template<typename Path>
 struct DerivationOutputT
 {
     Path path;
-    std::string hashAlgo; /* hash used for expected hash computation */
-    std::string hash; /* expected hash, may be null */
-    DerivationOutputT(Path && path, std::string && hashAlgo, std::string && hash)
+    std::optional<FileSystemHash> hash; /* hash used for expected hash computation */
+    DerivationOutputT(Path && path, std::optional<FileSystemHash> && hash)
         : path(std::move(path))
-        , hashAlgo(std::move(hashAlgo))
         , hash(std::move(hash))
     { }
-    void parseHashInfo(bool & recursive, Hash & hash) const;
+    DerivationOutputT(const DerivationOutputT<Path> &) = default;
+    DerivationOutputT(DerivationOutputT<Path> &&) = default;
+    DerivationOutputT & operator = (const DerivationOutputT<Path> &) = default;
 };
 
 typedef DerivationOutputT<StorePath> DerivationOutput;

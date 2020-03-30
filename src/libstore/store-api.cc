@@ -171,18 +171,18 @@ static std::string makeType(
 
 
 StorePath Store::makeFixedOutputPath(
-    bool recursive,
+    FileIngestionMethod method,
     const Hash & hash,
     std::string_view name,
     const StorePathSet & references,
     bool hasSelfReference) const
 {
-    if (hash.type == htSHA256 && recursive) {
+    if (hash.type == htSHA256 && method == FileIngestionMethod::Recursive) {
         return makeStorePath(makeType(*this, "source", references, hasSelfReference), hash, name);
     } else {
         assert(references.empty());
         return makeStorePath("output:out", hashString(htSHA256,
-                "fixed:out:" + (recursive ? (string) "r:" : "") +
+                "fixed:out:" + makeFileIngestionPrefix(method) +
                 hash.to_string(Base16) + ":"), name);
     }
 }
@@ -200,9 +200,9 @@ StorePath Store::makeTextPath(std::string_view name, const Hash & hash,
 
 
 std::pair<StorePath, Hash> Store::computeStorePathForPath(std::string_view name,
-    const Path & srcPath, bool recursive, HashType hashAlgo, PathFilter & filter) const
+    const Path & srcPath, FileIngestionMethod recursive, HashType hashAlgo, PathFilter & filter) const
 {
-    Hash h = recursive ? hashPath(hashAlgo, srcPath, filter).first : hashFile(hashAlgo, srcPath);
+    Hash h = static_cast<bool>(recursive) ? hashPath(hashAlgo, srcPath, filter).first : hashFile(hashAlgo, srcPath);
     return std::make_pair(makeFixedOutputPath(recursive, h, name), h);
 }
 
@@ -687,21 +687,6 @@ void copyClosure(ref<Store> srcStore, ref<Store> dstStore,
 }
 
 
-ValidPathInfo::ValidPathInfo(const ValidPathInfo & other)
-    : path(other.path.clone())
-    , deriver(other.deriver ? other.deriver->clone(): std::optional<StorePath>{})
-    , narHash(other.narHash)
-    , references(cloneStorePathSet(other.references))
-    , registrationTime(other.registrationTime)
-    , narSize(other.narSize)
-    , id(other.id)
-    , ultimate(other.ultimate)
-    , sigs(other.sigs)
-    , ca(other.ca)
-{
-}
-
-
 std::optional<ValidPathInfo> decodeValidPathInfo(const Store & store, std::istream & str, bool hashGiven)
 {
     std::string path;
@@ -781,8 +766,8 @@ bool ValidPathInfo::isContentAddressed(const Store & store) const
     }
 
     else if (hasPrefix(ca, "fixed:")) {
-        bool recursive = ca.compare(6, 2, "r:") == 0;
-        Hash hash(std::string(ca, recursive ? 8 : 6));
+        FileIngestionMethod recursive { ca.compare(6, 2, "r:") == 0 };
+        Hash hash(std::string(ca, static_cast<bool>(recursive) ? 8 : 6));
         auto refs = cloneStorePathSet(references);
         bool hasSelfReference = false;
         if (refs.count(path)) {
@@ -826,9 +811,22 @@ Strings ValidPathInfo::shortRefs() const
 }
 
 
-std::string makeFixedOutputCA(bool recursive, const Hash & hash)
+std::string makeFileIngestionPrefix(const FileIngestionMethod m) {
+    switch (m) {
+    case FileIngestionMethod::Flat:
+        return "";
+    case FileIngestionMethod::Recursive:
+        return "r:";
+    default:
+        throw Error("impossible, caught both cases");
+    }
+}
+
+std::string makeFixedOutputCA(FileIngestionMethod method, const Hash & hash)
 {
-    return "fixed:" + (recursive ? (std::string) "r:" : "") + hash.to_string();
+    return "fixed:"
+        + makeFileIngestionPrefix(method)
+        + hash.to_string();
 }
 
 
