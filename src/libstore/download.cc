@@ -308,7 +308,7 @@ struct CurlDownloader : public Downloader
             curl_easy_setopt(req, CURLOPT_NETRC_FILE, settings.netrcFile.get().c_str());
             curl_easy_setopt(req, CURLOPT_NETRC, CURL_NETRC_OPTIONAL);
 
-            if (writtenToSink)
+            if (writtenToSink && acceptRanges && encoding.empty())
                 curl_easy_setopt(req, CURLOPT_RESUME_FROM_LARGE, writtenToSink);
 
             result.data = std::make_shared<std::string>();
@@ -414,16 +414,14 @@ struct CurlDownloader : public Downloader
 
                 /* If this is a transient error, then maybe retry the
                    download after a while. If we're writing to a
-                   sink, we can only retry if the server supports
-                   ranged requests. */
-                if (err == Transient
-                    && attempt < request.tries
-                    && (!this->request.dataCallback
-                        || writtenToSink == 0
-                        || (acceptRanges && encoding.empty())))
+                   sink, we can only resume if the server supports
+                   ranged requests, otherwise fallback to a plain
+                   retry.
+                */
+                if (err == Transient && attempt < request.tries)
                 {
                     int ms = request.baseRetryTimeMs * std::pow(2.0f, attempt - 1 + std::uniform_real_distribution<>(0.0, 0.5)(downloader.mt19937));
-                    if (writtenToSink)
+                    if (writtenToSink && acceptRanges && encoding.empty())
                         warn("%s; retrying from offset %d in %d ms", exc.what(), writtenToSink, ms);
                     else
                         warn("%s; retrying in %d ms", exc.what(), ms);
