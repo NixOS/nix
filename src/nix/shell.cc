@@ -92,7 +92,7 @@ StorePath getDerivationEnvironment(ref<Store> store, Derivation drv)
 {
     auto builder = baseNameOf(drv.builder);
     if (builder != "bash")
-        throw Error("'nix shell' only works on derivations that use 'bash' as their builder");
+        throw Error("'nix dev-shell' only works on derivations that use 'bash' as their builder");
 
     drv.args = {
         "-c",
