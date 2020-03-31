@@ -92,7 +92,7 @@ StorePath getDerivationEnvironment(ref<Store> store, Derivation drv)
 {
     auto builder = baseNameOf(drv.builder);
     if (builder != "bash")
-        throw Error("'nix shell' only works on derivations that use 'bash' as their builder");
+        throw Error("'nix dev-shell' only works on derivations that use 'bash' as their builder");
 
     drv.args = {
         "-c",
@@ -136,21 +136,6 @@ StorePath getDerivationEnvironment(ref<Store> store, Derivation drv)
 
 struct Common : InstallableCommand, MixProfile
 {
-    /*
-    std::set<string> keepVars{
-        "DISPLAY",
-        "HOME",
-        "IN_NIX_SHELL",
-        "LOGNAME",
-        "NIX_BUILD_SHELL",
-        "PAGER",
-        "PATH",
-        "TERM",
-        "TZ",
-        "USER",
-    };
-    */
-
     std::set<string> ignoreVars{
         "BASHOPTS",
         "EUID",
@@ -258,7 +243,7 @@ struct CmdDevShell : Common, MixEnvironment
         return {
             Example{
                 "To get the build environment of GNU hello:",
-                "nix dev-shell nixpkgs:hello"
+                "nix dev-shell nixpkgs#hello"
             },
             Example{
                 "To get the build environment of the default package of flake in the current directory:",
@@ -266,7 +251,7 @@ struct CmdDevShell : Common, MixEnvironment
             },
             Example{
                 "To store the build environment in a profile:",
-                "nix dev-shell --profile /tmp/my-shell nixpkgs:hello"
+                "nix dev-shell --profile /tmp/my-shell nixpkgs#hello"
             },
             Example{
                 "To use a build environment previously recorded in a profile:",
@@ -324,7 +309,7 @@ struct CmdPrintDevEnv : Common
         return {
             Example{
                 "To apply the build environment of GNU hello to the current shell:",
-                ". <(nix print-dev-env nixpkgs:hello)"
+                ". <(nix print-dev-env nixpkgs#hello)"
             },
         };
     }

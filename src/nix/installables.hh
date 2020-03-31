@@ -2,8 +2,8 @@
 
 #include "util.hh"
 #include "path.hh"
-#include "flake/eval-cache.hh"
 #include "eval.hh"
+#include "flake/eval-cache.hh"
 
 #include <optional>
 

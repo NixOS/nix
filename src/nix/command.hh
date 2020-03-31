@@ -171,7 +171,7 @@ std::set<StorePath> toDerivations(ref<Store> store,
    filename:lineno. */
 Strings editorFor(const Pos & pos);
 
-struct MixProfile : virtual Args, virtual StoreCommand
+struct MixProfile : virtual StoreCommand
 {
     std::optional<Path> profile;
 

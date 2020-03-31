@@ -2465,7 +2465,7 @@ void DerivationGoal::initTmpDir() {
                 auto hash = hashString(htSHA256, i.first);
                 string fn = ".attr-" + hash.to_string(Base32, false);
                 Path p = tmpDir + "/" + fn;
-                writeFile(p, i.second);
+                writeFile(p, rewriteStrings(i.second, inputRewrites));
                 chownToBuilder(p);
                 env[i.first + "Path"] = tmpDirInSandbox + "/" + fn;
             }
