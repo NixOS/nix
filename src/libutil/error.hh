@@ -16,10 +16,10 @@ using std::endl;
 
 namespace nix {
 
-enum ErrLevel 
+typedef enum  
   { elWarning
   , elError
-  };
+  } ErrLevel;
 
 class ColumnRange { 
   public:

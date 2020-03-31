@@ -40,7 +40,7 @@ int main()
 
   printErrorInfo(StandardError()
                 .name("name")
-                .description("description")
+                .description("error description")
                 .nohint()
                 );
 
