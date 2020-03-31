@@ -478,6 +478,17 @@ Path createTempDir(const Path & tmpRoot, const Path & prefix,
 }
 
 
+std::pair<AutoCloseFD, Path> createTempFile(const Path & prefix)
+{
+    Path tmpl(getEnv("TMPDIR").value_or("/tmp") + "/" + prefix + ".XXXXXX");
+    // Strictly speaking, this is UB, but who cares...
+    AutoCloseFD fd(mkstemp((char *) tmpl.c_str()));
+    if (!fd)
+        throw SysError("creating temporary file '%s'", tmpl);
+    return {std::move(fd), tmpl};
+}
+
+
 std::string getUserName()
 {
     auto pw = getpwuid(geteuid());

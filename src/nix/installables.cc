@@ -109,6 +109,11 @@ struct InstallableStorePath : Installable
         bs.push_back(std::move(b));
         return bs;
     }
+
+    std::optional<StorePath> getStorePath() override
+    {
+        return storePath.clone();
+    }
 };
 
 struct InstallableValue : Installable
