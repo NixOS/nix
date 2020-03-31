@@ -9,11 +9,11 @@
 
     let
 
-      version =
-        builtins.readFile ./.version
-        + (if officialRelease
-           then ""
-           else "pre${builtins.substring 0 8 self.lastModified}_${self.shortRev or "dirty"}");
+      version = builtins.readFile ./.version + versionSuffix;
+      versionSuffix =
+        if officialRelease
+        then ""
+        else "pre${builtins.substring 0 8 self.lastModified}_${self.shortRev or "dirty"}";
 
       officialRelease = false;
 
@@ -115,6 +115,8 @@
           name = "nix-${version}";
 
           src = self;
+
+          VERSION_SUFFIX = versionSuffix;
 
           outputs = [ "out" "dev" "doc" ];
 
