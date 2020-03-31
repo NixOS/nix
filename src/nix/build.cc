@@ -43,7 +43,7 @@ struct CmdBuild : MixDryRun, MixProfile, InstallablesCommand
             },
             Example{
                 "To make a profile point at GNU Hello:",
-                "nix build --profile /tmp/profile nixpkgs:hello"
+                "nix build --profile /tmp/profile nixpkgs#hello"
             },
         };
     }
