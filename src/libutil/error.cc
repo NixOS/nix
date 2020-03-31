@@ -152,12 +152,14 @@ void printErrorInfo(ErrorInfo &einfo)
 
   // lines of code.
   if (einfo.nixCode.has_value())
+  {
     printCodeLines(prefix, *einfo.nixCode);
+    cout << prefix << endl;
+  }
 
   // hint
   if (einfo.hint.has_value()) 
   {
-    cout << prefix << endl;
     cout << prefix << *einfo.hint << endl;
     cout << prefix << endl;
   }

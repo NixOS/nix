@@ -257,6 +257,7 @@ typedef AddName<
         AddDescription<
         AddHint<
         EIError>>> ProgramError;
+
 typedef AddName<
         AddDescription<
         AddHint<
@@ -270,6 +271,7 @@ typedef AddName<
         AddLOC<
         AddHint<
         EIError>>>>>>> NixLangError;
+
 typedef AddName<
         AddDescription<
         AddNixFile<
