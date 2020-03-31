@@ -14,44 +14,20 @@ int main()
 
   ErrorInfo::programName = optional("error-test");
 
-  /*
-  ColumnRange columnRange;
-  columnRange.start = 24;
-  columnRange.len = 14;
-
-  ErrLine errline;
-  errline.lineNumber = 7;
-  errline.columnRange = optional(columnRange);
-  errline.errLineOfCode = "line of code where the error occurred";
-
-  NixCode nixcode;
-  nixcode.nixFile = optional("myfile.nix");
-  nixcode.errLine = errline; 
-  
-  ErrorInfo generic;
-  generic.level = elError;
-  generic.name = "error name";
-  generic.description = "general error description";
-  generic.program = "nixtool.exe";
-  generic.nixCode = nixcode;
-
-  printErrorInfo(generic);
-  */
-
-  printErrorInfo(StandardError()
+  printErrorInfo(ProgramError()
                 .name("name")
                 .description("error description")
                 .nohint()
                 );
 
-  printErrorInfo(StandardWarning()
+  printErrorInfo(ProgramWarning()
                 .name("warning name")
                 .description("warning description")
                 .nohint()
                 );
 
 
-  printErrorInfo(MkNixWarning()
+  printErrorInfo(NixLangWarning()
                 .name("warning name")
                 .description("warning description")
                 .nixFile("myfile.nix")
@@ -63,7 +39,7 @@ int main()
                 .hint(hintfmt("this hint has %1% templated %2%!!") % "yellow" % "values")
                 );
 
-  printErrorInfo(MkNixError()
+  printErrorInfo(NixLangError()
                 .name("error name")
                 .description("error description")
                 .nixFile("myfile.nix")

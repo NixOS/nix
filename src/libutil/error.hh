@@ -256,11 +256,11 @@ class AddHint : private T
 typedef AddName<
         AddDescription<
         AddHint<
-        EIError>>> StandardError;
+        EIError>>> ProgramError;
 typedef AddName<
         AddDescription<
         AddHint<
-        EIWarning>>> StandardWarning;
+        EIWarning>>> ProgramWarning;
 
 typedef AddName<
         AddDescription<
@@ -269,7 +269,7 @@ typedef AddName<
         AddColumnRange<
         AddLOC<
         AddHint<
-        EIError>>>>>>> MkNixError;
+        EIError>>>>>>> NixLangError;
 typedef AddName<
         AddDescription<
         AddNixFile<
@@ -277,7 +277,7 @@ typedef AddName<
         AddColumnRange<
         AddLOC<
         AddHint<
-        EIWarning>>>>>>> MkNixWarning;
+        EIWarning>>>>>>> NixLangWarning;
 
 
 // --------------------------------------------------------
