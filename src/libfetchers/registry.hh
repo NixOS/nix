@@ -23,6 +23,7 @@ struct Registry
         std::shared_ptr<const Input> from;
         std::shared_ptr<const Input> to;
         Attrs extraAttrs;
+        bool exact = false;
     };
 
     std::vector<Entry> entries;

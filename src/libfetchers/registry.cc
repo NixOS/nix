@@ -43,11 +43,13 @@ std::shared_ptr<Registry> Registry::read(
                 extraAttrs.insert(*j);
                 toAttrs.erase(j);
             }
+            auto exact = i.find("exact");
             registry->entries.push_back(
                 Entry {
                     .from = inputFromAttrs(jsonToAttrs(i["from"])),
                     .to = inputFromAttrs(toAttrs),
                     .extraAttrs = extraAttrs,
+                    .exact = exact != i.end() && exact.value()
                 });
         }
     }
@@ -68,6 +70,8 @@ void Registry::write(const Path & path)
         obj["to"] = attrsToJson(entry.to->toAttrs());
         if (!entry.extraAttrs.empty())
             obj["to"].update(attrsToJson(entry.extraAttrs));
+        if (entry.exact)
+            obj["exact"] = true;
         arr.emplace_back(std::move(obj));
     }
 
@@ -185,12 +189,20 @@ std::pair<std::shared_ptr<const Input>, Attrs> lookupInRegistries(
     for (auto & registry : getRegistries(store)) {
         // FIXME: O(n)
         for (auto & entry : registry->entries) {
-            if (entry.from->contains(*input)) {
-                input = entry.to->applyOverrides(
-                    !entry.from->getRef() && input->getRef() ? input->getRef() : std::optional<std::string>(),
-                    !entry.from->getRev() && input->getRev() ? input->getRev() : std::optional<Hash>());
-                extraAttrs = entry.extraAttrs;
-                goto restart;
+            if (entry.exact) {
+                if (*entry.from == *input) {
+                    input = entry.to;
+                    extraAttrs = entry.extraAttrs;
+                    goto restart;
+                }
+            } else {
+                if (entry.from->contains(*input)) {
+                    input = entry.to->applyOverrides(
+                        !entry.from->getRef() && input->getRef() ? input->getRef() : std::optional<std::string>(),
+                        !entry.from->getRev() && input->getRev() ? input->getRev() : std::optional<Hash>());
+                    extraAttrs = entry.extraAttrs;
+                    goto restart;
+                }
             }
         }
     }
