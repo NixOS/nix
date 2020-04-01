@@ -16,8 +16,10 @@ int main()
   // In each program where errors occur, this has to be set.
   ErrorInfo::programName = optional("error-test");
 
-  // There are currently four error types - 
+  // There are currently four error types:
+  //  
   // 			ProgramError, ProgramWarning, NixLangError, NixLangWarning.
+  // 			
   // Each error type is created with a specific sequence of builder functions.
   // Unlike with a constructor, each parameter is clearly named.
   // If the sequence of function calls isn't followed, then there's a type error.
@@ -40,6 +42,27 @@ int main()
       .description("warning description")
       .hint(hintfmt("there was a %1%") % "warning") // 'warning' will be yellow.
       );
+
+  /*
+    // some invalid errors:
+    
+    // type error: no hint function.
+    ProgramError()
+      .name("name")
+      .description("error description");
+
+    // type error:  description before name.
+    ProgramError()
+      .description("error description")
+      .name("name")
+      .nohint();
+
+    // type error: hint function with regular boost format, not special hintfmt.
+    ProgramError()
+      .description("error description")
+      .name("name")
+      .hint(format("there was a %1%") % "warning");
+  */
 
   // NixLangWarning adds nix file, line number, column range, and the lines of code 
   // where a warning occurred.
