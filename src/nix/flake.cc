@@ -67,8 +67,9 @@ struct CmdFlakeList : EvalCommand
             for (auto & entry : registry->entries) {
                 // FIXME: format nicely
                 std::cout << fmt("%s %s %s\n",
-                    registry->type == Registry::Flag ? "flags " :
-                    registry->type == Registry::User ? "user  " :
+                    registry->type == Registry::Flag   ? "flags " :
+                    registry->type == Registry::User   ? "user  " :
+                    registry->type == Registry::System ? "system" :
                     "global",
                     std::get<0>(entry)->to_string(),
                     std::get<1>(entry)->to_string());

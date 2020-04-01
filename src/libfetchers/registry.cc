@@ -96,6 +96,18 @@ void Registry::remove(const std::shared_ptr<const Input> & input)
             ++i;
 }
 
+static Path getSystemRegistryPath()
+{
+    return settings.nixConfDir + "/registry.json";
+}
+
+static std::shared_ptr<Registry> getSystemRegistry()
+{
+    static auto systemRegistry =
+        Registry::read(getSystemRegistryPath(), Registry::System);
+    return systemRegistry;
+}
+
 Path getUserRegistryPath()
 {
     return getHome() + "/.config/nix/registry.json";
@@ -103,7 +115,9 @@ Path getUserRegistryPath()
 
 std::shared_ptr<Registry> getUserRegistry()
 {
-    return Registry::read(getUserRegistryPath(), Registry::User);
+    static auto userRegistry =
+        Registry::read(getUserRegistryPath(), Registry::User);
+    return userRegistry;
 }
 
 static std::shared_ptr<Registry> flagRegistry =
@@ -145,6 +159,7 @@ Registries getRegistries(ref<Store> store)
     Registries registries;
     registries.push_back(getFlagRegistry());
     registries.push_back(getUserRegistry());
+    registries.push_back(getSystemRegistry());
     registries.push_back(getGlobalRegistry(store));
     return registries;
 }

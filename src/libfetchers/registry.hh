@@ -12,7 +12,8 @@ struct Registry
     enum RegistryType {
         Flag = 0,
         User = 1,
-        Global = 2,
+        System = 2,
+        Global = 3,
     };
 
     RegistryType type;
