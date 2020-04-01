@@ -5,11 +5,7 @@
 
 namespace nix {
 
-using std::cout;
-using std::endl;
-using std::nullopt;
-
-optional<string> ErrorInfo::programName = nullopt;
+optional<string> ErrorInfo::programName = std::nullopt;
 
 // return basic_format?
 string showErrLine(ErrLine &errLine)

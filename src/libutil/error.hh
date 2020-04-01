@@ -1,4 +1,5 @@
-#pragma once
+#ifndef error_hh
+#define error_hh
 
 #include "ansicolor.hh"
 #include <string>
@@ -7,12 +8,6 @@
 #include <iomanip>
 
 #include <boost/format.hpp>
-
-using std::string;
-using std::optional;
-using boost::format;
-using std::cout;
-using std::endl;
 
 namespace nix {
 
@@ -36,7 +31,6 @@ class ErrLine {
     optional<string> prevLineOfCode;
     string errLineOfCode;
     optional<string> nextLineOfCode;
-
 };
 
 class NixCode { 
@@ -112,8 +106,6 @@ class ErrorInfo {
   protected:
     // constructor is protected, so only the builder classes can create an ErrorInfo.
     ErrorInfo(ErrLevel level) { this->level = level; }
-
-
 };
 
 // Init as error
@@ -285,7 +277,9 @@ typedef AddName<
 // --------------------------------------------------------
 // error printing
 
+// just to cout for now.
 void printErrorInfo(ErrorInfo &einfo);
 
 }
 
+#endif
