@@ -18,13 +18,14 @@ struct Registry
 
     RegistryType type;
 
-    std::vector<
-        std::tuple<
-            std::shared_ptr<const Input>, // from
-            std::shared_ptr<const Input>, // to
-            Attrs // extra attributes
-            >
-        > entries;
+    struct Entry
+    {
+        std::shared_ptr<const Input> from;
+        std::shared_ptr<const Input> to;
+        Attrs extraAttrs;
+    };
+
+    std::vector<Entry> entries;
 
     Registry(RegistryType type)
         : type(type)

@@ -44,9 +44,10 @@ std::shared_ptr<Registry> Registry::read(
                 toAttrs.erase(j);
             }
             registry->entries.push_back(
-                { inputFromAttrs(jsonToAttrs(i["from"]))
-                , inputFromAttrs(toAttrs)
-                , extraAttrs
+                Entry {
+                    .from = inputFromAttrs(jsonToAttrs(i["from"])),
+                    .to = inputFromAttrs(toAttrs),
+                    .extraAttrs = extraAttrs,
                 });
         }
     }
@@ -61,12 +62,12 @@ std::shared_ptr<Registry> Registry::read(
 void Registry::write(const Path & path)
 {
     nlohmann::json arr;
-    for (auto & elem : entries) {
+    for (auto & entry : entries) {
         nlohmann::json obj;
-        obj["from"] = attrsToJson(std::get<0>(elem)->toAttrs());
-        obj["to"] = attrsToJson(std::get<1>(elem)->toAttrs());
-        if (!std::get<2>(elem).empty())
-            obj["to"].update(attrsToJson(std::get<2>(elem)));
+        obj["from"] = attrsToJson(entry.from->toAttrs());
+        obj["to"] = attrsToJson(entry.to->toAttrs());
+        if (!entry.extraAttrs.empty())
+            obj["to"].update(attrsToJson(entry.extraAttrs));
         arr.emplace_back(std::move(obj));
     }
 
@@ -83,14 +84,19 @@ void Registry::add(
     const std::shared_ptr<const Input> & to,
     const Attrs & extraAttrs)
 {
-    entries.emplace_back(from, to, extraAttrs);
+    entries.emplace_back(
+        Entry {
+            .from = from,
+            .to = to,
+            .extraAttrs = extraAttrs
+        });
 }
 
 void Registry::remove(const std::shared_ptr<const Input> & input)
 {
     // FIXME: use C++20 std::erase.
     for (auto i = entries.begin(); i != entries.end(); )
-        if (*std::get<0>(*i) == *input)
+        if (*i->from == *input)
             i = entries.erase(i);
         else
             ++i;
@@ -179,12 +185,11 @@ std::pair<std::shared_ptr<const Input>, Attrs> lookupInRegistries(
     for (auto & registry : getRegistries(store)) {
         // FIXME: O(n)
         for (auto & entry : registry->entries) {
-            auto from = std::get<0>(entry);
-            if (from->contains(*input)) {
-                input = std::get<1>(entry)->applyOverrides(
-                    !from->getRef() && input->getRef() ? input->getRef() : std::optional<std::string>(),
-                    !from->getRev() && input->getRev() ? input->getRev() : std::optional<Hash>());
-                extraAttrs = std::get<2>(entry);
+            if (entry.from->contains(*input)) {
+                input = entry.to->applyOverrides(
+                    !entry.from->getRef() && input->getRef() ? input->getRef() : std::optional<std::string>(),
+                    !entry.from->getRev() && input->getRev() ? input->getRev() : std::optional<Hash>());
+                extraAttrs = entry.extraAttrs;
                 goto restart;
             }
         }

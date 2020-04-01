@@ -71,8 +71,8 @@ struct CmdFlakeList : EvalCommand
                     registry->type == Registry::User   ? "user  " :
                     registry->type == Registry::System ? "system" :
                     "global",
-                    std::get<0>(entry)->to_string(),
-                    std::get<1>(entry)->to_string());
+                    entry.from->to_string(),
+                    entry.to->to_string());
             }
         }
     }
