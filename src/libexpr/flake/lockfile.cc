@@ -76,18 +76,6 @@ LockedNode::LockedNode(const nlohmann::json & json)
         throw Error("lockfile contains mutable flakeref '%s'", lockedRef);
 }
 
-static nlohmann::json treeInfoToJson(const TreeInfo & info)
-{
-    nlohmann::json json;
-    assert(info.narHash);
-    json["narHash"] = info.narHash.to_string(SRI);
-    if (info.revCount)
-        json["revCount"] = *info.revCount;
-    if (info.lastModified)
-        json["lastModified"] = *info.lastModified;
-    return json;
-}
-
 StorePath LockedNode::computeStorePath(Store & store) const
 {
     return info.computeStorePath(store);
@@ -193,7 +181,7 @@ nlohmann::json LockFile::toJson() const
         if (auto lockedNode = std::dynamic_pointer_cast<const LockedNode>(node)) {
             n["original"] = fetchers::attrsToJson(lockedNode->originalRef.toAttrs());
             n["locked"] = fetchers::attrsToJson(lockedNode->lockedRef.toAttrs());
-            n["info"] = treeInfoToJson(lockedNode->info);
+            n["info"] = lockedNode->info.toJson();
             if (!lockedNode->isFlake) n["flake"] = false;
         }
 

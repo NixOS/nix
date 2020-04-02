@@ -103,6 +103,7 @@ static nlohmann::json flakeToJson(const Store & store, const Flake & flake)
     j["url"] = flake.lockedRef.to_string();
     j["original"] = attrsToJson(flake.originalRef.toAttrs());
     j["locked"] = attrsToJson(flake.lockedRef.toAttrs());
+    j["info"] = flake.sourceInfo->info.toJson();
     if (auto rev = flake.lockedRef.input->getRev())
         j["revision"] = rev->to_string(Base16, false);
     if (flake.sourceInfo->info.revCount)

@@ -1,6 +1,9 @@
 #pragma once
 
 #include "path.hh"
+#include "hash.hh"
+
+#include <nlohmann/json_fwd.hpp>
 
 namespace nix { class Store; }
 
@@ -21,6 +24,8 @@ struct TreeInfo
     }
 
     StorePath computeStorePath(Store & store) const;
+
+    nlohmann::json toJson() const;
 };
 
 }
