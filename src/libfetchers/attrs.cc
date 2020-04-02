@@ -89,4 +89,19 @@ bool getBoolAttr(const Attrs & attrs, const std::string & name)
     return *s;
 }
 
+std::map<std::string, std::string> attrsToQuery(const Attrs & attrs)
+{
+    std::map<std::string, std::string> query;
+    for (auto & attr : attrs) {
+        if (auto v = std::get_if<int64_t>(&attr.second)) {
+            query.insert_or_assign(attr.first, fmt("%d", *v));
+        } else if (auto v = std::get_if<std::string>(&attr.second)) {
+            query.insert_or_assign(attr.first, *v);
+        } else if (auto v = std::get_if<Explicit<bool>>(&attr.second)) {
+            query.insert_or_assign(attr.first, v->t ? "1" : "0");
+        } else abort();
+    }
+    return query;
+}
+
 }
