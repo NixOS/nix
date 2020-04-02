@@ -209,9 +209,10 @@ struct ExprList : Expr
 
 struct Formal
 {
+    Pos pos;
     Symbol name;
     Expr * def;
-    Formal(const Symbol & name, Expr * def) : name(name), def(def) { };
+    Formal(const Pos & pos, const Symbol & name, Expr * def) : pos(pos), name(name), def(def) { };
 };
 
 struct Formals

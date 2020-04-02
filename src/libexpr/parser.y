@@ -531,8 +531,8 @@ formals
   ;
 
 formal
-  : ID { $$ = new Formal(data->symbols.create($1), 0); }
-  | ID '?' expr { $$ = new Formal(data->symbols.create($1), $3); }
+  : ID { $$ = new Formal(CUR_POS, data->symbols.create($1), 0); }
+  | ID '?' expr { $$ = new Formal(CUR_POS, data->symbols.create($1), $3); }
   ;
 
 %%
