@@ -25,6 +25,8 @@ struct TreeInfo
 
     StorePath computeStorePath(Store & store) const;
 
+    static TreeInfo fromJson(const nlohmann::json & json);
+
     nlohmann::json toJson() const;
 };
 
