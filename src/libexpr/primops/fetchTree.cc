@@ -34,9 +34,11 @@ void emitTreeAttrs(
     if (tree.info.revCount)
         mkInt(*state.allocAttr(v, state.symbols.create("revCount")), *tree.info.revCount);
 
-    if (tree.info.lastModified)
-        mkString(*state.allocAttr(v, state.symbols.create("lastModified")),
+    if (tree.info.lastModified) {
+        mkInt(*state.allocAttr(v, state.symbols.create("lastModified")), *tree.info.lastModified);
+        mkString(*state.allocAttr(v, state.symbols.create("lastModifiedDate")),
             fmt("%s", std::put_time(std::gmtime(&*tree.info.lastModified), "%Y%m%d%H%M%S")));
+    }
 
     v.attrs->sort();
 }

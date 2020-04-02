@@ -13,7 +13,7 @@
       versionSuffix =
         if officialRelease
         then ""
-        else "pre${builtins.substring 0 8 self.lastModified}_${self.shortRev or "dirty"}";
+        else "pre${builtins.substring 0 8 self.lastModifiedDate}_${self.shortRev or "dirty"}";
 
       officialRelease = false;
 
