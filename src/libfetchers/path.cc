@@ -19,6 +19,22 @@ struct PathInput : Input
 
     std::optional<Hash> getRev() const override { return rev; }
 
+    bool operator ==(const Input & other) const override
+    {
+        auto other2 = dynamic_cast<const PathInput *>(&other);
+        return
+            other2
+            && path == other2->path
+            && rev == other2->rev
+            && revCount == other2->revCount
+            && lastModified == other2->lastModified;
+    }
+
+    bool isImmutable() const override
+    {
+        return (bool) narHash;
+    }
+
     ParsedURL toURL() const override
     {
         auto query = attrsToQuery(toAttrsInternal());
