@@ -12,9 +12,9 @@
 namespace nix {
 
 typedef enum { 
-    elWarning
-    , elError
-    } ErrLevel;
+    elWarning,
+    elError
+} ErrLevel;
 
 class ColumnRange { 
     public:
