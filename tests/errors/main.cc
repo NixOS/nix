@@ -3,14 +3,12 @@
 #include <optional>
 #include <iostream>
 
-
-
 int main() 
 {
     using namespace nix; 
 
     // In each program where errors occur, this has to be set.
-    ErrorInfo::programName = optional("error-test");
+    ErrorInfo::programName = std::optional("error-test");
 
     // There are currently four error types:
     //  
@@ -83,9 +81,9 @@ int main()
             .nixFile("myfile.nix")
             .lineNumber(40)
             .columnRange(13,7)
-            .linesOfCode(optional("previous line of code")
+            .linesOfCode(std::optional("previous line of code")
                         ,"this is the problem line of code"
-                        ,optional("next line of code"))
+                        ,std::optional("next line of code"))
             .hint(hintfmt("this hint has %1% templated %2%!!") % "yellow" % "values")
             );
 

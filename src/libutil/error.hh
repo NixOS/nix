@@ -27,21 +27,21 @@ class ErrorInfo;
 class ErrLine { 
     public:
         int lineNumber;
-        optional<ColumnRange> columnRange;
-        optional<string> prevLineOfCode;
+        std::optional<ColumnRange> columnRange;
+        std::optional<string> prevLineOfCode;
         string errLineOfCode;
-        optional<string> nextLineOfCode;
+        std::optional<string> nextLineOfCode;
 };
 
 class NixCode { 
     public:
-        optional<string> nixFile;
-        optional<ErrLine> errLine;
+        std::optional<string> nixFile;
+        std::optional<ErrLine> errLine;
 
         ErrLine& ensureErrLine() 
         { 
             if (!this->errLine.has_value())
-                 this->errLine = optional(ErrLine());
+                 this->errLine = std::optional(ErrLine());
             return *this->errLine; 
         }
 };
@@ -80,11 +80,11 @@ class ErrorInfo {
         ErrLevel level;
         string name;
         string description;
-        optional<NixCode> nixCode;
-        optional<string> hint;
+        std::optional<NixCode> nixCode;
+        std::optional<string> hint;
         ErrorInfo& GetEI() { return *this; }
 
-        static optional<string> programName;
+        static std::optional<string> programName;
 
         // give these access to the private constructor, 
         // when they are direct descendants (children but not grandchildren).
@@ -100,7 +100,7 @@ class ErrorInfo {
         NixCode& ensureNixCode() 
         { 
             if (!this->nixCode.has_value())
-                 this->nixCode = optional(NixCode());
+                 this->nixCode = std::optional(NixCode());
             return *this->nixCode; 
         }
     protected:
@@ -187,7 +187,7 @@ template <class T>
 class AddLOC : private T
 {
     public:
-        T& linesOfCode(optional<string> prevloc, string loc, optional<string> nextloc) { 
+        T& linesOfCode(std::optional<string> prevloc, string loc, std::optional<string> nextloc) { 
             GetEI().ensureNixCode().ensureErrLine().prevLineOfCode = prevloc;
             GetEI().ensureNixCode().ensureErrLine().errLineOfCode = loc;
             GetEI().ensureNixCode().ensureErrLine().nextLineOfCode = nextloc;
@@ -196,6 +196,11 @@ class AddLOC : private T
     protected:
         ErrorInfo& GetEI() { return T::GetEI(); }
 };
+
+
+// ----------------------------------------------------------------
+// format for hints.  same as boost format, except templated values 
+// are always in yellow.
 
 template <class T>
 class yellowify
@@ -211,11 +216,12 @@ std::ostream& operator<<(std::ostream &out, const yellowify<T> &y)
     return out << ANSI_YELLOW << y.value << ANSI_NORMAL;
 }
 
-// hint format shows templated values in yellow.
 class hintfmt 
 {
     public:
-        hintfmt(string format) :fmt(format) {}
+        hintfmt(string format) :fmt(format) {
+            fmt.exceptions(boost::io::all_error_bits ^ boost::io::too_many_args_bit);
+          }
         template<class T>
             hintfmt& operator%(const T &value) { fmt % yellowify(value); return *this; }
 
@@ -226,12 +232,13 @@ class hintfmt
 
 };
 
+// the template layer for adding a hint.
 template <class T> 
 class AddHint : private T
 {
     public:
         T& hint(hintfmt &hfmt) {
-            GetEI().hint = optional(hfmt.fmt.str());
+            GetEI().hint = std::optional(hfmt.fmt.str());
             return *this;
         }
         T& nohint() {
