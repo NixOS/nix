@@ -33,7 +33,7 @@ struct GitHubInput : Input
 
     bool isImmutable() const override
     {
-        return (bool) rev;
+        return (bool) rev || narHash;
     }
 
     std::optional<std::string> getRef() const override { return ref; }
