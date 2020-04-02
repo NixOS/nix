@@ -29,8 +29,10 @@ std::unique_ptr<Input> inputFromURL(const std::string & url)
 
 std::unique_ptr<Input> inputFromAttrs(const Attrs & attrs)
 {
+    auto attrs2(attrs);
+    attrs2.erase("narHash");
     for (auto & inputScheme : *inputSchemes) {
-        auto res = inputScheme->inputFromAttrs(attrs);
+        auto res = inputScheme->inputFromAttrs(attrs2);
         if (res) {
             if (auto narHash = maybeGetStrAttr(attrs, "narHash"))
                 // FIXME: require SRI hash.

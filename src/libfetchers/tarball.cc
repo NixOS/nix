@@ -205,9 +205,7 @@ struct TarballInput : Input
     {
         Attrs attrs;
         attrs.emplace("url", url.to_string());
-        if (narHash)
-            attrs.emplace("narHash", narHash->to_string(SRI));
-        else if (hash)
+        if (hash)
             attrs.emplace("hash", hash->to_string(SRI));
         return attrs;
     }
@@ -260,7 +258,7 @@ struct TarballInputScheme : InputScheme
         if (maybeGetStrAttr(attrs, "type") != "tarball") return {};
 
         for (auto & [name, value] : attrs)
-            if (name != "type" && name != "url" && name != "hash" && name != "narHash")
+            if (name != "type" && name != "url" && name != "hash")
                 throw Error("unsupported tarball input attribute '%s'", name);
 
         auto input = std::make_unique<TarballInput>(parseURL(getStrAttr(attrs, "url")));
