@@ -17,46 +17,51 @@ std::shared_ptr<Registry> Registry::read(
     if (!pathExists(path))
         return std::make_shared<Registry>(type);
 
-    auto json = nlohmann::json::parse(readFile(path));
+    try {
 
-    auto version = json.value("version", 0);
+        auto json = nlohmann::json::parse(readFile(path));
 
-    // FIXME: remove soon
-    if (version == 1) {
-        auto flakes = json["flakes"];
-        for (auto i = flakes.begin(); i != flakes.end(); ++i) {
-            auto url = i->value("url", i->value("uri", ""));
-            if (url.empty())
-                throw Error("flake registry '%s' lacks a 'url' attribute for entry '%s'",
-                    path, i.key());
-            registry->entries.push_back(
-                {inputFromURL(i.key()), inputFromURL(url), {}});
-        }
-    }
+        auto version = json.value("version", 0);
 
-    else if (version == 2) {
-        for (auto & i : json["flakes"]) {
-            auto toAttrs = jsonToAttrs(i["to"]);
-            Attrs extraAttrs;
-            auto j = toAttrs.find("dir");
-            if (j != toAttrs.end()) {
-                extraAttrs.insert(*j);
-                toAttrs.erase(j);
+        // FIXME: remove soon
+        if (version == 1) {
+            auto flakes = json["flakes"];
+            for (auto i = flakes.begin(); i != flakes.end(); ++i) {
+                auto url = i->value("url", i->value("uri", ""));
+                if (url.empty())
+                    throw Error("flake registry '%s' lacks a 'url' attribute for entry '%s'",
+                        path, i.key());
+                registry->entries.push_back(
+                    {inputFromURL(i.key()), inputFromURL(url), {}});
             }
-            auto exact = i.find("exact");
-            registry->entries.push_back(
-                Entry {
-                    .from = inputFromAttrs(jsonToAttrs(i["from"])),
-                    .to = inputFromAttrs(toAttrs),
-                    .extraAttrs = extraAttrs,
-                    .exact = exact != i.end() && exact.value()
-                });
         }
+
+        else if (version == 2) {
+            for (auto & i : json["flakes"]) {
+                auto toAttrs = jsonToAttrs(i["to"]);
+                Attrs extraAttrs;
+                auto j = toAttrs.find("dir");
+                if (j != toAttrs.end()) {
+                    extraAttrs.insert(*j);
+                    toAttrs.erase(j);
+                }
+                auto exact = i.find("exact");
+                registry->entries.push_back(
+                    Entry {
+                        .from = inputFromAttrs(jsonToAttrs(i["from"])),
+                        .to = inputFromAttrs(toAttrs),
+                        .extraAttrs = extraAttrs,
+                        .exact = exact != i.end() && exact.value()
+                    });
+            }
+        }
+
+        else
+            throw Error("flake registry '%s' has unsupported version %d", path, version);
+
+    } catch (nlohmann::json::exception & e) {
+        warn("cannot parse flake registry '%s': %s", path, e.what());
     }
-
-    else
-        throw Error("flake registry '%s' has unsupported version %d", path, version);
-
 
     return registry;
 }
