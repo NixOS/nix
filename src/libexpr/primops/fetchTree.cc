@@ -81,7 +81,7 @@ static void prim_fetchTree(EvalState & state, const Pos & pos, Value * * args, V
         input = lookupInRegistries(state.store, input).first;
 
     if (evalSettings.pureEval && !input->isImmutable())
-        throw Error("in pure evaluation mode, 'fetchTree' requires an immutable input");
+        throw Error("in pure evaluation mode, 'fetchTree' requires an immutable input, at %s", pos);
 
     // FIXME: use fetchOrSubstituteTree
     auto [tree, input2] = input->fetchTree(state.store);
