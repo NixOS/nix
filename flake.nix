@@ -239,6 +239,20 @@
 
       hydraJobs = {
 
+        nixVendoredCrates =
+          with nixpkgsFor.x86_64-linux;
+
+          runCommand "vendored-crates" {}
+            ''
+              mkdir -p $out/nix-support
+              name=nix-vendored-crates-${version}
+              fn=$out/$name.tar.xz
+              tar cvfJ $fn -C ${nixVendoredCrates} vendor \
+                --owner=0 --group=0 --mode=u+rw,uga+r \
+                --transform "s,vendor,$name,"
+              echo "file crates-tarball $fn" >> $out/nix-support/hydra-build-products
+            '';
+
         # Binary package for various platforms.
         build = nixpkgs.lib.genAttrs systems (system: nixpkgsFor.${system}.nix);
 
