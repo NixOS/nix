@@ -628,8 +628,13 @@ void callFlake(EvalState & state,
 
 static void prim_getFlake(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
+    auto flakeRefS = state.forceStringNoCtx(*args[0], pos);
+    auto flakeRef = parseFlakeRef(flakeRefS);
+    if (evalSettings.pureEval && !flakeRef.input->isImmutable())
+        throw Error("cannot call 'getFlake' on mutable flake reference '%s', at %s (use --impure to override)", flakeRefS, pos);
+
     callFlake(state,
-        lockFlake(state, parseFlakeRef(state.forceStringNoCtx(*args[0], pos)),
+        lockFlake(state, flakeRef,
             LockFlags {
                 .updateLockFile = false,
                 .useRegistries = !evalSettings.pureEval,
