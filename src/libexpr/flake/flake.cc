@@ -458,8 +458,15 @@ LockedFlake lockFlake(
                 if (input.isFlake) {
                     auto inputFlake = getFlake(state, input.ref, {}, lockFlags.useRegistries, flakeCache);
 
+                    /* Note: in case of an --override-input, we use
+                       the *original* ref (input2.ref) for the
+                       "original" field, rather than the
+                       override. This ensures that the override isn't
+                       nuked the next time we update the lock
+                       file. That is, overrides are sticky unless you
+                       use --no-write-lock-file. */
                     auto childNode = std::make_shared<LockedNode>(
-                        inputFlake.lockedRef, inputFlake.originalRef, inputFlake.sourceInfo->info);
+                        inputFlake.lockedRef, input2.ref, inputFlake.sourceInfo->info);
 
                     node->inputs.insert_or_assign(id, childNode);
 
