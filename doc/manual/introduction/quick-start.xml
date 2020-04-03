@@ -69,9 +69,10 @@ $ nix-env -e hello</screen>
 $ nix-shell -p hello
 </screen>
 
-This builds or downloads GNU Hello and its dependencies, then drops
-you into a Bash shell where the <command>hello</command> command is
-present, all without affecting your normal environment:
+This builds or downloads GNU Hello and its build-time and runtime
+dependencies, then drops you into a Bash shell where the
+<command>hello</command> command is present, all without affecting
+your normal environment:
 
 <screen>
 [nix-shell:~]$ hello
