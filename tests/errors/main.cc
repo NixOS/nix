@@ -33,8 +33,8 @@ int main()
     printErrorInfo( ProgramWarning()
                     .name("warning name")
                     .description("warning description")
-                    .hint(hintfmt("there was a %1%") %
-                          "warning") // 'warning' will be yellow.
+                    // the templated value, 'warning', is automatically colored yellow.
+                    .hint(hintfmt("there was a %1%", "warning")) 
                   );
 
     /*
@@ -67,8 +67,7 @@ int main()
                    .linesOfCode(std::nullopt,
                                 "this is the problem line of code",
                                 std::nullopt)
-                   .hint(hintfmt("this hint has %1% templated %2%!!") %
-                         "yellow" % "values"));
+                   .hint(hintfmt("this hint has %1% templated %2%!!", "yellow" , "values")));
 
     // NixLangError is just the same as NixLangWarning, except for the Error
     // flag.
@@ -81,8 +80,7 @@ int main()
                    .linesOfCode(std::optional("previous line of code"),
                                 "this is the problem line of code",
                                 std::optional("next line of code"))
-                   .hint(hintfmt("this hint has %1% templated %2%!!") %
-                         "yellow" % "values"));
+                   .hint(hintfmt("this hint has %1% templated %2%!!", "yellow", "values")));
 
     return 0;
 }

@@ -7,6 +7,7 @@
 #include <iostream>
 #include <iomanip>
 
+#include "types.hh"
 #include <boost/format.hpp>
 
 namespace nix
@@ -234,7 +235,7 @@ protected:
 
 
 // ----------------------------------------------------------------
-// format for hints.  same as boost format, except templated values
+// format for hints.  same as fmt, except templated values
 // are always in yellow.
 
 template <class T>
@@ -251,18 +252,23 @@ std::ostream& operator<<(std::ostream &out, const yellowify<T> &y)
     return out << ANSI_YELLOW << y.value << ANSI_NORMAL;
 }
 
-class hintfmt
+class hintformat
 {
 public:
-    hintfmt(string format) :fmt(format)
+    hintformat(string format) :fmt(format)
     {
         fmt.exceptions(boost::io::all_error_bits ^ boost::io::too_many_args_bit);
     }
     template<class T>
-    hintfmt& operator%(const T &value)
+    hintformat& operator%(const T &value)
     {
         fmt % yellowify(value);
         return *this;
+    }
+
+    std::string str() const
+    {
+        return fmt.str();
     }
 
     template <typename U>
@@ -272,14 +278,22 @@ private:
 
 };
 
+template<typename... Args>
+inline hintformat hintfmt(const std::string & fs, const Args & ... args)
+{
+    hintformat f(fs);
+    formatHelper(f, args...);
+    return f;
+}
+
 // the template layer for adding a hint.
 template <class T>
 class AddHint : private T
 {
 public:
-    T& hint(hintfmt &hfmt)
+    T& hint(const hintformat &hf)
     {
-        GetEI().hint = std::optional(hfmt.fmt.str());
+        GetEI().hint = std::optional(hf.str());
         return *this;
     }
     T& nohint()
