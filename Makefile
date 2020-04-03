@@ -16,7 +16,7 @@ makefiles = \
   doc/manual/local.mk \
   tests/local.mk \
   tests/plugins/local.mk \
-  tests/errors/local.mk
+  src/error-demo/local.mk
 
 -include Makefile.config
 

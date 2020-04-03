@@ -1,5 +1,5 @@
-#include "../../src/libutil/error.hh"
-#include "../../src/libexpr/nixexpr.hh"
+#include "error.hh"
+#include "nixexpr.hh"
 
 #include <iostream>
 #include <optional>
@@ -9,7 +9,7 @@ int main()
     using namespace nix;
 
     // In each program where errors occur, this has to be set.
-    ErrorInfo::programName = std::optional("error-test");
+    ErrorInfo::programName = std::optional("error-demo");
 
     // There are currently four error types:
     //
