@@ -44,7 +44,7 @@ let
       dir=NixOS-nixpkgs-${nixpkgs.shortRev}
       cp -prd ${nixpkgs} $dir
       # Set the correct timestamp in the tarball.
-      find $dir -print0 | xargs -0 touch -t ${builtins.substring 0 12 nixpkgs.lastModified}.${builtins.substring 12 2 nixpkgs.lastModified} --
+      find $dir -print0 | xargs -0 touch -t ${builtins.substring 0 12 nixpkgs.lastModifiedDate}.${builtins.substring 12 2 nixpkgs.lastModifiedDate} --
       tar cfz $out/tarball/${nixpkgs.rev} $dir --hard-dereference
 
       mkdir -p $out/commits
@@ -128,7 +128,7 @@ makeTest (
       $github->succeed("systemctl stop httpd.service");
 
       my $date = $client->succeed("nix flake info nixpkgs --json | jq -M .lastModified");
-      strftime("%Y%m%d%H%M%S", gmtime($date)) eq "${nixpkgs.lastModified}" or die "time mismatch";
+      strftime("%Y%m%d%H%M%S", gmtime($date)) eq "${nixpkgs.lastModifiedDate}" or die "time mismatch";
 
       $client->succeed("nix build nixpkgs#hello");
 
