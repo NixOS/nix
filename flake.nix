@@ -239,7 +239,7 @@
 
       hydraJobs = {
 
-        nixVendoredCrates =
+        vendoredCrates =
           with nixpkgsFor.x86_64-linux;
 
           runCommand "vendored-crates" {}
