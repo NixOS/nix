@@ -1,4 +1,5 @@
 #include "../../src/libutil/error.hh"
+#include "../../src/libexpr/nixexpr.hh"
 
 #include <iostream>
 #include <optional>
@@ -58,12 +59,14 @@ int main()
 
     // NixLangWarning adds nix file, line number, column range, and the lines of
     // code where a warning occurred.
+
+    SymbolTable testTable;
+    auto problem_symbol = testTable.create("problem");
+
     printErrorInfo(NixLangWarning()
                    .name("warning name")
                    .description("warning description")
-                   .nixFile("myfile.nix")
-                   .lineNumber(40)
-                   .columnRange(13, 7)
+                   .pos(Pos(problem_symbol, 40, 13))
                    .linesOfCode(std::nullopt,
                                 "this is the problem line of code",
                                 std::nullopt)
@@ -74,9 +77,7 @@ int main()
     printErrorInfo(NixLangError()
                    .name("error name")
                    .description("error description")
-                   .nixFile("myfile.nix")
-                   .lineNumber(40)
-                   .columnRange(13, 7)
+                   .pos(Pos(problem_symbol, 40, 13))
                    .linesOfCode(std::optional("previous line of code"),
                                 "this is the problem line of code",
                                 std::optional("next line of code"))

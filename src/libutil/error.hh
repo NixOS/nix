@@ -8,7 +8,6 @@
 #include <iomanip>
 
 #include "types.hh"
-#include <boost/format.hpp>
 
 namespace nix
 {
@@ -62,19 +61,7 @@ template <class T>
 class AddDescription;
 
 template <class T>
-class AddNixCode;
-
-template <class T>
-class AddNixFile;
-
-template <class T>
-class AddErrLine;
-
-template <class T>
-class AddLineNumber;
-
-template <class T>
-class AddColumnRange;
+class AddPos;
 
 template <class T>
 class AddLOC;
@@ -99,11 +86,7 @@ public:
     // when they are direct descendants (children but not grandchildren).
     friend AddName<ErrorInfo>;
     friend AddDescription<ErrorInfo>;
-    friend AddNixCode<ErrorInfo>;
-    friend AddNixFile<ErrorInfo>;
-    friend AddErrLine<ErrorInfo>;
-    friend AddLineNumber<ErrorInfo>;
-    friend AddColumnRange<ErrorInfo>;
+    friend AddPos<ErrorInfo>;
     friend AddLOC<ErrorInfo>;
 
     NixCode& ensureNixCode()
@@ -168,44 +151,15 @@ protected:
 };
 
 template <class T>
-class AddNixFile : private T
+class AddPos : private T
 {
 public:
-    T& nixFile(string filename)
+    template <class P>
+    T& pos(const P &aPos)
     {
-        GetEI().ensureNixCode().nixFile = filename;
-        return *this;
-    }
-protected:
-    ErrorInfo& GetEI()
-    {
-        return T::GetEI();
-    }
-};
-
-template <class T>
-class AddLineNumber : private T
-{
-public:
-    T& lineNumber(int lineNumber)
-    {
-        GetEI().ensureNixCode().ensureErrLine().lineNumber = lineNumber;
-        return *this;
-    }
-protected:
-    ErrorInfo& GetEI()
-    {
-        return T::GetEI();
-    }
-};
-
-template <class T>
-class AddColumnRange : private T
-{
-public:
-    T& columnRange(unsigned int start, unsigned int len)
-    {
-        GetEI().ensureNixCode().ensureErrLine().columnRange = { start, len };
+        GetEI().ensureNixCode().nixFile = aPos.file;
+        GetEI().ensureNixCode().ensureErrLine().lineNumber = aPos.line;
+        GetEI().ensureNixCode().ensureErrLine().columnRange = { .start = aPos.column, .len = 1 };
         return *this;
     }
 protected:
@@ -312,32 +266,28 @@ protected:
 // error types
 
 typedef AddName<
-AddDescription<
-AddHint<
-EIError>>> ProgramError;
+        AddDescription<
+        AddHint<
+        EIError>>> ProgramError;
 
 typedef AddName<
-AddDescription<
-AddHint<
-EIWarning>>> ProgramWarning;
+        AddDescription<
+        AddHint<
+        EIWarning>>> ProgramWarning;
 
 typedef AddName<
-AddDescription<
-AddNixFile<
-AddLineNumber<
-AddColumnRange<
-AddLOC<
-AddHint<
-EIError>>>>>>> NixLangError;
+        AddDescription<
+        AddPos<
+        AddLOC<
+        AddHint<
+        EIError>>>>> NixLangError;
 
 typedef AddName<
-AddDescription<
-AddNixFile<
-AddLineNumber<
-AddColumnRange<
-AddLOC<
-AddHint<
-EIWarning>>>>>>> NixLangWarning;
+        AddDescription<
+        AddPos<
+        AddLOC<
+        AddHint<
+        EIWarning>>>>> NixLangWarning;
 
 
 // --------------------------------------------------------
