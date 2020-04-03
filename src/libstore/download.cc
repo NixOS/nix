@@ -922,11 +922,12 @@ CachedDownloadResult Downloader::downloadCached(
 
     if (expectedStorePath && *storePath != *expectedStorePath) {
         unsigned int statusCode = 102;
+        Base base = settings.hashBase;
         Hash gotHash = request.unpack
             ? hashPath(request.expectedHash.type, store->toRealPath(store->printStorePath(*storePath))).first
             : hashFile(request.expectedHash.type, store->toRealPath(store->printStorePath(*storePath)));
         throw nix::Error(statusCode, "hash mismatch in file downloaded from '%s':\n  wanted: %s\n  got:    %s",
-            url, request.expectedHash.to_string(), gotHash.to_string());
+            url, request.expectedHash.to_string(base), gotHash.to_string(base));
     }
 
     result.storePath = store->printStorePath(*storePath);
