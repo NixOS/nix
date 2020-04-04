@@ -9,11 +9,13 @@ struct StorePath;
 
 class Store;
 
+typedef unsigned char StorePathHash[20];
+
 extern "C" {
     void ffi_StorePath_drop(void *);
     bool ffi_StorePath_less_than(const StorePath & a, const StorePath & b);
     bool ffi_StorePath_eq(const StorePath & a, const StorePath & b);
-    unsigned char * ffi_StorePath_hash_data(const StorePath & p);
+    StorePathHash * ffi_StorePath_hash_data(const StorePath & p);
 }
 
 struct StorePath : rust::Value<3 * sizeof(void *) + 24, ffi_StorePath_drop>
@@ -22,7 +24,7 @@ struct StorePath : rust::Value<3 * sizeof(void *) + 24, ffi_StorePath_drop>
 
     static StorePath make(std::string_view path, std::string_view storeDir);
 
-    static StorePath make(unsigned char hash[20], std::string_view name);
+    static StorePath make(StorePathHash hash, std::string_view name);
 
     static StorePath fromBaseName(std::string_view baseName);
 
@@ -51,7 +53,7 @@ struct StorePath : rust::Value<3 * sizeof(void *) + 24, ffi_StorePath_drop>
 
     std::string_view name() const;
 
-    unsigned char * hashData() const
+    StorePathHash * hashData() const
     {
         return ffi_StorePath_hash_data(*this);
     }

@@ -16,7 +16,7 @@ StorePath StorePath::make(std::string_view path, std::string_view storeDir)
     return ffi_StorePath_new((rust::StringSlice) path, (rust::StringSlice) storeDir).unwrap();
 }
 
-StorePath StorePath::make(unsigned char hash[20], std::string_view name)
+StorePath StorePath::make(StorePathHash hash, std::string_view name)
 {
     return ffi_StorePath_new2(hash, (rust::StringSlice) name).unwrap();
 }
