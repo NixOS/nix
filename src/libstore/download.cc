@@ -391,6 +391,7 @@ struct CurlDownloader : public Downloader
                         case CURLE_SSL_CACERT_BADFILE:
                         case CURLE_TOO_MANY_REDIRECTS:
                         case CURLE_WRITE_ERROR:
+                        case CURLE_UNSUPPORTED_PROTOCOL:
                             err = Misc;
                             break;
                         default: // Shut up warnings
