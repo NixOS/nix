@@ -142,7 +142,7 @@ protected:
 
         auto callbackPtr = std::make_shared<decltype(callback)>(std::move(callback));
 
-        getDownloader()->enqueueDownload(request,
+        getDownloader()->enqueueDataTransfer(request,
             {[callbackPtr, this](std::future<DataTransferResult> result) {
                 try {
                     (*callbackPtr)(result.get().data);

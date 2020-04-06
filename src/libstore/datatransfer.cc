@@ -641,7 +641,7 @@ struct CurlDownloader : public Downloader
     }
 #endif
 
-    void enqueueDownload(const DataTransferRequest & request,
+    void enqueueDataTransfer(const DataTransferRequest & request,
         Callback<DataTransferResult> callback) override
     {
         /* Ugly hack to support s3:// URIs. */
@@ -687,10 +687,10 @@ ref<Downloader> makeDownloader()
     return make_ref<CurlDownloader>();
 }
 
-std::future<DataTransferResult> Downloader::enqueueDownload(const DataTransferRequest & request)
+std::future<DataTransferResult> Downloader::enqueueDataTransfer(const DataTransferRequest & request)
 {
     auto promise = std::make_shared<std::promise<DataTransferResult>>();
-    enqueueDownload(request,
+    enqueueDataTransfer(request,
         {[promise](std::future<DataTransferResult> fut) {
             try {
                 promise->set_value(fut.get());
@@ -703,7 +703,7 @@ std::future<DataTransferResult> Downloader::enqueueDownload(const DataTransferRe
 
 DataTransferResult Downloader::download(const DataTransferRequest & request)
 {
-    return enqueueDownload(request).get();
+    return enqueueDataTransfer(request).get();
 }
 
 void Downloader::download(DataTransferRequest && request, Sink & sink)
@@ -755,7 +755,7 @@ void Downloader::download(DataTransferRequest && request, Sink & sink)
         state->avail.notify_one();
     };
 
-    enqueueDownload(request,
+    enqueueDataTransfer(request,
         {[_state](std::future<DataTransferResult> fut) {
             auto state(_state->lock());
             state->quit = true;

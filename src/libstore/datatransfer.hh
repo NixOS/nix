@@ -74,10 +74,10 @@ struct Downloader
     /* Enqueue a download request, returning a future to the result of
        the download. The future may throw a DownloadError
        exception. */
-    virtual void enqueueDownload(const DataTransferRequest & request,
+    virtual void enqueueDataTransfer(const DataTransferRequest & request,
         Callback<DataTransferResult> callback) = 0;
 
-    std::future<DataTransferResult> enqueueDownload(const DataTransferRequest & request);
+    std::future<DataTransferResult> enqueueDataTransfer(const DataTransferRequest & request);
 
     /* Synchronously download a file. */
     DataTransferResult download(const DataTransferRequest & request);
