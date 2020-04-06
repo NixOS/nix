@@ -77,7 +77,7 @@ struct curlDataTransfer : public DataTransfer
             Callback<DataTransferResult> && callback)
             : dataTransfer(dataTransfer)
             , request(request)
-            , act(*logger, lvlTalkative, actDownload,
+            , act(*logger, lvlTalkative, actDataTransfer,
                 fmt(request.data ? "uploading '%s'" : "downloading '%s'", request.uri),
                 {request.uri}, request.parentAct)
             , callback(std::move(callback))

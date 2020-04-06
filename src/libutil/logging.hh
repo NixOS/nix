@@ -17,7 +17,7 @@ typedef enum {
 typedef enum {
     actUnknown = 0,
     actCopyPath = 100,
-    actDownload = 101,
+    actDataTransfer = 101,
     actRealise = 102,
     actCopyPaths = 103,
     actBuilds = 104,
