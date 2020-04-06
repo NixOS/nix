@@ -85,14 +85,14 @@ protected:
         checkEnabled();
 
         try {
-            DataTransferRequest request(cacheUri + "/" + path);
+            FileTransferRequest request(cacheUri + "/" + path);
             request.head = true;
-            getDataTransfer()->download(request);
+            getFileTransfer()->download(request);
             return true;
-        } catch (DataTransferError & e) {
+        } catch (FileTransferError & e) {
             /* S3 buckets return 403 if a file doesn't exist and the
                bucket is unlistable, so treat 403 as 404. */
-            if (e.error == DataTransfer::NotFound || e.error == DataTransfer::Forbidden)
+            if (e.error == FileTransfer::NotFound || e.error == FileTransfer::Forbidden)
                 return false;
             maybeDisable();
             throw;
@@ -103,19 +103,19 @@ protected:
         const std::string & data,
         const std::string & mimeType) override
     {
-        auto req = DataTransferRequest(cacheUri + "/" + path);
+        auto req = FileTransferRequest(cacheUri + "/" + path);
         req.data = std::make_shared<string>(data); // FIXME: inefficient
         req.mimeType = mimeType;
         try {
-            getDataTransfer()->upload(req);
-        } catch (DataTransferError & e) {
+            getFileTransfer()->upload(req);
+        } catch (FileTransferError & e) {
             throw UploadToHTTP("while uploading to HTTP binary cache at '%s': %s", cacheUri, e.msg());
         }
     }
 
-    DataTransferRequest makeRequest(const std::string & path)
+    FileTransferRequest makeRequest(const std::string & path)
     {
-        DataTransferRequest request(cacheUri + "/" + path);
+        FileTransferRequest request(cacheUri + "/" + path);
         return request;
     }
 
@@ -124,9 +124,9 @@ protected:
         checkEnabled();
         auto request(makeRequest(path));
         try {
-            getDataTransfer()->download(std::move(request), sink);
-        } catch (DataTransferError & e) {
-            if (e.error == DataTransfer::NotFound || e.error == DataTransfer::Forbidden)
+            getFileTransfer()->download(std::move(request), sink);
+        } catch (FileTransferError & e) {
+            if (e.error == FileTransfer::NotFound || e.error == FileTransfer::Forbidden)
                 throw NoSuchBinaryCacheFile("file '%s' does not exist in binary cache '%s'", path, getUri());
             maybeDisable();
             throw;
@@ -142,12 +142,12 @@ protected:
 
         auto callbackPtr = std::make_shared<decltype(callback)>(std::move(callback));
 
-        getDataTransfer()->enqueueDataTransfer(request,
-            {[callbackPtr, this](std::future<DataTransferResult> result) {
+        getFileTransfer()->enqueueFileTransfer(request,
+            {[callbackPtr, this](std::future<FileTransferResult> result) {
                 try {
                     (*callbackPtr)(result.get().data);
-                } catch (DataTransferError & e) {
-                    if (e.error == DataTransfer::NotFound || e.error == DataTransfer::Forbidden)
+                } catch (FileTransferError & e) {
+                    if (e.error == FileTransfer::NotFound || e.error == FileTransfer::Forbidden)
                         return (*callbackPtr)(std::shared_ptr<std::string>());
                     maybeDisable();
                     callbackPtr->rethrow();

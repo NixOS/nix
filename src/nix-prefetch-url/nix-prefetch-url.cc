@@ -180,9 +180,9 @@ static int _main(int argc, char * * argv)
 
                 FdSink sink(fd.get());
 
-                DataTransferRequest req(actualUri);
+                FileTransferRequest req(actualUri);
                 req.decompress = false;
-                getDataTransfer()->download(std::move(req), sink);
+                getFileTransfer()->download(std::move(req), sink);
             }
 
             /* Optionally unpack the file. */

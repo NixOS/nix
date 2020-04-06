@@ -9,7 +9,7 @@
 
 namespace nix {
 
-struct DataTransferSettings : Config
+struct FileTransferSettings : Config
 {
     Setting<bool> enableHttp2{this, true, "http2",
         "Whether to enable HTTP/2 support."};
@@ -31,15 +31,15 @@ struct DataTransferSettings : Config
         "How often Nix will attempt to download a file before giving up."};
 };
 
-extern DataTransferSettings dataTransferSettings;
+extern FileTransferSettings fileTransferSettings;
 
-struct DataTransferRequest
+struct FileTransferRequest
 {
     std::string uri;
     std::string expectedETag;
     bool verifyTLS = true;
     bool head = false;
-    size_t tries = dataTransferSettings.tries;
+    size_t tries = fileTransferSettings.tries;
     unsigned int baseRetryTimeMs = 250;
     ActivityId parentAct;
     bool decompress = true;
@@ -47,7 +47,7 @@ struct DataTransferRequest
     std::string mimeType;
     std::function<void(char *, size_t)> dataCallback;
 
-    DataTransferRequest(const std::string & uri)
+    FileTransferRequest(const std::string & uri)
         : uri(uri), parentAct(getCurActivity()) { }
 
     std::string verb()
@@ -56,7 +56,7 @@ struct DataTransferRequest
     }
 };
 
-struct DataTransferResult
+struct FileTransferResult
 {
     bool cached = false;
     std::string etag;
@@ -67,43 +67,43 @@ struct DataTransferResult
 
 class Store;
 
-struct DataTransfer
+struct FileTransfer
 {
-    virtual ~DataTransfer() { }
+    virtual ~FileTransfer() { }
 
     /* Enqueue a data transfer request, returning a future to the result of
-       the download. The future may throw a DataTransferError
+       the download. The future may throw a FileTransferError
        exception. */
-    virtual void enqueueDataTransfer(const DataTransferRequest & request,
-        Callback<DataTransferResult> callback) = 0;
+    virtual void enqueueFileTransfer(const FileTransferRequest & request,
+        Callback<FileTransferResult> callback) = 0;
 
-    std::future<DataTransferResult> enqueueDataTransfer(const DataTransferRequest & request);
+    std::future<FileTransferResult> enqueueFileTransfer(const FileTransferRequest & request);
 
     /* Synchronously download a file. */
-    DataTransferResult download(const DataTransferRequest & request);
+    FileTransferResult download(const FileTransferRequest & request);
 
     /* Synchronously upload a file. */
-    DataTransferResult upload(const DataTransferRequest & request);
+    FileTransferResult upload(const FileTransferRequest & request);
 
     /* Download a file, writing its data to a sink. The sink will be
        invoked on the thread of the caller. */
-    void download(DataTransferRequest && request, Sink & sink);
+    void download(FileTransferRequest && request, Sink & sink);
 
     enum Error { NotFound, Forbidden, Misc, Transient, Interrupted };
 };
 
-/* Return a shared DataTransfer object. Using this object is preferred
+/* Return a shared FileTransfer object. Using this object is preferred
    because it enables connection reuse and HTTP/2 multiplexing. */
-ref<DataTransfer> getDataTransfer();
+ref<FileTransfer> getFileTransfer();
 
-/* Return a new DataTransfer object. */
-ref<DataTransfer> makeDataTransfer();
+/* Return a new FileTransfer object. */
+ref<FileTransfer> makeFileTransfer();
 
-class DataTransferError : public Error
+class FileTransferError : public Error
 {
 public:
-    DataTransfer::Error error;
-    DataTransferError(DataTransfer::Error error, const FormatOrString & fs)
+    FileTransfer::Error error;
+    FileTransferError(FileTransfer::Error error, const FormatOrString & fs)
         : Error(fs), error(error)
     { }
 };

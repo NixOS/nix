@@ -176,10 +176,10 @@ void mainWrapped(int argc, char * * argv)
             settings.useSubstitutes = false;
         if (!settings.tarballTtl.overriden)
             settings.tarballTtl = std::numeric_limits<unsigned int>::max();
-        if (!dataTransferSettings.tries.overriden)
-            dataTransferSettings.tries = 0;
-        if (!dataTransferSettings.connectTimeout.overriden)
-            dataTransferSettings.connectTimeout = 1;
+        if (!fileTransferSettings.tries.overriden)
+            fileTransferSettings.tries = 0;
+        if (!fileTransferSettings.connectTimeout.overriden)
+            fileTransferSettings.connectTimeout = 1;
     }
 
     if (args.refresh)

@@ -132,7 +132,7 @@ ref<Aws::Client::ClientConfiguration> S3Helper::makeConfig(const string & region
     return res;
 }
 
-S3Helper::DataTransferResult S3Helper::getObject(
+S3Helper::FileTransferResult S3Helper::getObject(
     const std::string & bucketName, const std::string & key)
 {
     debug("fetching 's3://%s/%s'...", bucketName, key);
@@ -146,7 +146,7 @@ S3Helper::DataTransferResult S3Helper::getObject(
         return Aws::New<std::stringstream>("STRINGSTREAM");
     });
 
-    DataTransferResult res;
+    FileTransferResult res;
 
     auto now1 = std::chrono::steady_clock::now();
 
