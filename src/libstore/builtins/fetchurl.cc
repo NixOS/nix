@@ -36,7 +36,7 @@ void builtinFetchurl(const BasicDerivation & drv, const std::string & netrcData)
 
             /* No need to do TLS verification, because we check the hash of
                the result anyway. */
-            DownloadRequest request(url);
+            DataTransferRequest request(url);
             request.verifyTLS = false;
             request.decompress = false;
 

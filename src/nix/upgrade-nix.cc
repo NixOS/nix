@@ -138,7 +138,7 @@ struct CmdUpgradeNix : MixDryRun, StoreCommand
         Activity act(*logger, lvlInfo, actUnknown, "querying latest Nix version");
 
         // FIXME: use nixos.org?
-        auto req = DownloadRequest(storePathsUrl);
+        auto req = DataTransferRequest(storePathsUrl);
         auto res = getDownloader()->download(req);
 
         auto state = std::make_unique<EvalState>(Strings(), store);

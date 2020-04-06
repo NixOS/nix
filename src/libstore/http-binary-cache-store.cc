@@ -85,7 +85,7 @@ protected:
         checkEnabled();
 
         try {
-            DownloadRequest request(cacheUri + "/" + path);
+            DataTransferRequest request(cacheUri + "/" + path);
             request.head = true;
             getDownloader()->download(request);
             return true;
@@ -103,7 +103,7 @@ protected:
         const std::string & data,
         const std::string & mimeType) override
     {
-        auto req = DownloadRequest(cacheUri + "/" + path);
+        auto req = DataTransferRequest(cacheUri + "/" + path);
         req.data = std::make_shared<string>(data); // FIXME: inefficient
         req.mimeType = mimeType;
         try {
@@ -113,9 +113,9 @@ protected:
         }
     }
 
-    DownloadRequest makeRequest(const std::string & path)
+    DataTransferRequest makeRequest(const std::string & path)
     {
-        DownloadRequest request(cacheUri + "/" + path);
+        DataTransferRequest request(cacheUri + "/" + path);
         return request;
     }
 

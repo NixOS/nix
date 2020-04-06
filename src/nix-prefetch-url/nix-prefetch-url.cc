@@ -180,7 +180,7 @@ static int _main(int argc, char * * argv)
 
                 FdSink sink(fd.get());
 
-                DownloadRequest req(actualUri);
+                DataTransferRequest req(actualUri);
                 req.decompress = false;
                 getDownloader()->download(std::move(req), sink);
             }

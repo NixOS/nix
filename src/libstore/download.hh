@@ -33,7 +33,7 @@ struct DownloadSettings : Config
 
 extern DownloadSettings downloadSettings;
 
-struct DownloadRequest
+struct DataTransferRequest
 {
     std::string uri;
     std::string expectedETag;
@@ -47,7 +47,7 @@ struct DownloadRequest
     std::string mimeType;
     std::function<void(char *, size_t)> dataCallback;
 
-    DownloadRequest(const std::string & uri)
+    DataTransferRequest(const std::string & uri)
         : uri(uri), parentAct(getCurActivity()) { }
 
     std::string verb()
@@ -74,17 +74,17 @@ struct Downloader
     /* Enqueue a download request, returning a future to the result of
        the download. The future may throw a DownloadError
        exception. */
-    virtual void enqueueDownload(const DownloadRequest & request,
+    virtual void enqueueDownload(const DataTransferRequest & request,
         Callback<DownloadResult> callback) = 0;
 
-    std::future<DownloadResult> enqueueDownload(const DownloadRequest & request);
+    std::future<DownloadResult> enqueueDownload(const DataTransferRequest & request);
 
     /* Synchronously download a file. */
-    DownloadResult download(const DownloadRequest & request);
+    DownloadResult download(const DataTransferRequest & request);
 
     /* Download a file, writing its data to a sink. The sink will be
        invoked on the thread of the caller. */
-    void download(DownloadRequest && request, Sink & sink);
+    void download(DataTransferRequest && request, Sink & sink);
 
     enum Error { NotFound, Forbidden, Misc, Transient, Interrupted };
 };

@@ -49,7 +49,7 @@ struct CurlDownloader : public Downloader
     struct DownloadItem : public std::enable_shared_from_this<DownloadItem>
     {
         CurlDownloader & downloader;
-        DownloadRequest request;
+        DataTransferRequest request;
         DownloadResult result;
         Activity act;
         bool done = false; // whether either the success or failure function has been called
@@ -73,7 +73,7 @@ struct CurlDownloader : public Downloader
         curl_off_t writtenToSink = 0;
 
         DownloadItem(CurlDownloader & downloader,
-            const DownloadRequest & request,
+            const DataTransferRequest & request,
             Callback<DownloadResult> && callback)
             : downloader(downloader)
             , request(request)
@@ -641,7 +641,7 @@ struct CurlDownloader : public Downloader
     }
 #endif
 
-    void enqueueDownload(const DownloadRequest & request,
+    void enqueueDownload(const DataTransferRequest & request,
         Callback<DownloadResult> callback) override
     {
         /* Ugly hack to support s3:// URIs. */
@@ -687,7 +687,7 @@ ref<Downloader> makeDownloader()
     return make_ref<CurlDownloader>();
 }
 
-std::future<DownloadResult> Downloader::enqueueDownload(const DownloadRequest & request)
+std::future<DownloadResult> Downloader::enqueueDownload(const DataTransferRequest & request)
 {
     auto promise = std::make_shared<std::promise<DownloadResult>>();
     enqueueDownload(request,
@@ -701,12 +701,12 @@ std::future<DownloadResult> Downloader::enqueueDownload(const DownloadRequest & 
     return promise->get_future();
 }
 
-DownloadResult Downloader::download(const DownloadRequest & request)
+DownloadResult Downloader::download(const DataTransferRequest & request)
 {
     return enqueueDownload(request).get();
 }
 
-void Downloader::download(DownloadRequest && request, Sink & sink)
+void Downloader::download(DataTransferRequest && request, Sink & sink)
 {
     /* Note: we can't call 'sink' via request.dataCallback, because
        that would cause the sink to execute on the downloader
@@ -800,7 +800,6 @@ void Downloader::download(DownloadRequest && request, Sink & sink)
         sink((unsigned char *) chunk.data(), chunk.size());
     }
 }
-
 
 bool isUri(const string & s)
 {
