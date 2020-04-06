@@ -153,39 +153,14 @@ struct CmdFlakeInfo : FlakeCommand, MixJSON
 
     void run(nix::ref<nix::Store> store) override
     {
+        auto flake = getFlake();
+        stopProgressBar();
+
         if (json) {
-            auto state = getEvalState();
-            auto flake = lockFlake();
-
-            auto json = flakeToJson(*store, flake.flake);
-
-            auto vFlake = state->allocValue();
-            flake::callFlake(*state, flake, *vFlake);
-
-            auto outputs = nlohmann::json::object();
-
-            enumerateOutputs(*state,
-                *vFlake,
-                [&](const std::string & name, Value & vProvide, const Pos & pos) {
-                    auto provide = nlohmann::json::object();
-
-                    if (name == "checks" || name == "packages") {
-                        state->forceAttrs(vProvide, pos);
-                        for (auto & aCheck : *vProvide.attrs)
-                            provide[aCheck.name] = nlohmann::json::object();
-                    }
-
-                    outputs[name] = provide;
-                });
-
-            json["outputs"] = std::move(outputs);
-
+            auto json = flakeToJson(*store, flake);
             std::cout << json.dump() << std::endl;
-        } else {
-            auto flake = getFlake();
-            stopProgressBar();
+        } else
             printFlakeInfo(*store, flake);
-        }
     }
 };
 
