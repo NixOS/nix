@@ -52,7 +52,7 @@ struct CmdEval : MixJSON, InstallableCommand
 
         auto state = getEvalState();
 
-        auto v = installable->toValue(*state);
+        auto v = installable->toValue(*state).first;
         PathSet context;
 
         stopProgressBar();

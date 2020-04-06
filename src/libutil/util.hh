@@ -48,7 +48,7 @@ void clearEnv();
 /* Return an absolutized path, resolving paths relative to the
    specified directory, or the current directory otherwise.  The path
    is also canonicalised. */
-Path absPath(Path path, Path dir = "");
+Path absPath(Path path, std::optional<Path> dir = {});
 
 /* Canonicalise a path by removing all `.' or `..' components and
    double or trailing slashes.  Optionally resolves all symlink
@@ -123,10 +123,6 @@ void writeLine(int fd, string s);
 void deletePath(const Path & path);
 
 void deletePath(const Path & path, unsigned long long & bytesFreed);
-
-/* Create a temporary directory. */
-Path createTempDir(const Path & tmpRoot = "", const Path & prefix = "nix",
-    bool includePid = true, bool useGlobalCounter = true, mode_t mode = 0755);
 
 std::string getUserName();
 
@@ -205,6 +201,14 @@ public:
     explicit operator bool() const;
     int release();
 };
+
+
+/* Create a temporary directory. */
+Path createTempDir(const Path & tmpRoot = "", const Path & prefix = "nix",
+    bool includePid = true, bool useGlobalCounter = true, mode_t mode = 0755);
+
+/* Create a temporary file, returning a file handle and its path. */
+std::pair<AutoCloseFD, Path> createTempFile(const Path & prefix = "nix");
 
 
 class Pipe
@@ -347,8 +351,26 @@ template<class C> C tokenizeString(std::string_view s, const string & separators
 
 /* Concatenate the given strings with a separator between the
    elements. */
-string concatStringsSep(const string & sep, const Strings & ss);
-string concatStringsSep(const string & sep, const StringSet & ss);
+template<class C>
+string concatStringsSep(const string & sep, const C & ss)
+{
+    string s;
+    for (auto & i : ss) {
+        if (s.size() != 0) s += sep;
+        s += i;
+    }
+    return s;
+}
+
+
+/* Add quotes around a collection of strings. */
+template<class C> Strings quoteStrings(const C & c)
+{
+    Strings res;
+    for (auto & s : c)
+        res.push_back("'" + s + "'");
+    return res;
+}
 
 
 /* Remove trailing whitespace from a string. */
@@ -426,6 +448,13 @@ void ignoreException();
 
 
 
+/* Tree formatting. */
+constexpr char treeConn[] = "├───";
+constexpr char treeLast[] = "└───";
+constexpr char treeLine[] = "│   ";
+constexpr char treeNull[] = "    ";
+
+
 /* Truncate a string to 'width' printable characters. If 'filterAll'
    is true, all ANSI escape sequences are filtered out. Otherwise,
    some escape sequences (such as colour setting) are copied but not
@@ -444,10 +473,11 @@ string base64Decode(const string & s);
 /* Get a value for the specified key from an associate container, or a
    default value if the key doesn't exist. */
 template <class T>
-std::optional<std::string> get(const T & map, const std::string & key)
+std::optional<typename T::mapped_type> get(const T & map, const typename T::key_type & key)
 {
     auto i = map.find(key);
-    return i == map.end() ? std::optional<std::string>() : i->second;
+    if (i == map.end()) return {};
+    return std::optional<typename T::mapped_type>(i->second);
 }
 
 
@@ -549,6 +579,33 @@ extern PathFilter defaultPathFilter;
 
 /* Create a Unix domain socket in listen mode. */
 AutoCloseFD createUnixDomainSocket(const Path & path, mode_t mode);
+
+
+// A Rust/Python-like enumerate() iterator adapter.
+// Borrowed from http://reedbeta.com/blog/python-like-enumerate-in-cpp17.
+template <typename T,
+          typename TIter = decltype(std::begin(std::declval<T>())),
+          typename = decltype(std::end(std::declval<T>()))>
+constexpr auto enumerate(T && iterable)
+{
+    struct iterator
+    {
+        size_t i;
+        TIter iter;
+        bool operator != (const iterator & other) const { return iter != other.iter; }
+        void operator ++ () { ++i; ++iter; }
+        auto operator * () const { return std::tie(i, *iter); }
+    };
+
+    struct iterable_wrapper
+    {
+        T iterable;
+        auto begin() { return iterator{ 0, std::begin(iterable) }; }
+        auto end() { return iterator{ 0, std::end(iterable) }; }
+    };
+
+    return iterable_wrapper{ std::forward<T>(iterable) };
+}
 
 
 }

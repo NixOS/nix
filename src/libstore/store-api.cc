@@ -441,7 +441,9 @@ string Store::makeValidityRegistration(const StorePathSet & paths,
 
 
 void Store::pathInfoToJSON(JSONPlaceholder & jsonOut, const StorePathSet & storePaths,
-    bool includeImpureInfo, bool showClosureSize, AllowInvalidFlag allowInvalid)
+    bool includeImpureInfo, bool showClosureSize,
+    Base hashBase,
+    AllowInvalidFlag allowInvalid)
 {
     auto jsonList = jsonOut.list();
 
@@ -453,7 +455,7 @@ void Store::pathInfoToJSON(JSONPlaceholder & jsonOut, const StorePathSet & store
             auto info = queryPathInfo(storePath);
 
             jsonPath
-                .attr("narHash", info->narHash.to_string())
+                .attr("narHash", info->narHash.to_string(hashBase))
                 .attr("narSize", info->narSize);
 
             {
@@ -741,12 +743,7 @@ std::string Store::showPaths(const StorePathSet & paths)
 
 string showPaths(const PathSet & paths)
 {
-    string s;
-    for (auto & i : paths) {
-        if (s.size() != 0) s += ", ";
-        s += "'" + i + "'";
-    }
-    return s;
+    return concatStringsSep(", ", quoteStrings(paths));
 }
 
 

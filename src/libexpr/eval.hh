@@ -272,6 +272,7 @@ public:
     Env & allocEnv(size_t size);
 
     Value * allocAttr(Value & vAttrs, const Symbol & name);
+    Value * allocAttr(Value & vAttrs, const std::string & name);
 
     Bindings * allocBindings(size_t capacity);
 
@@ -367,7 +368,7 @@ struct EvalSettings : Config
         "Prefixes of URIs that builtin functions such as fetchurl and fetchGit are allowed to fetch."};
 
     Setting<bool> traceFunctionCalls{this, false, "trace-function-calls",
-        "Emit log messages for each function entry and exit at the 'vomit' log level (-vvvv)"};
+        "Emit log messages for each function entry and exit at the 'vomit' log level (-vvvv)."};
 };
 
 extern EvalSettings evalSettings;

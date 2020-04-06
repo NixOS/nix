@@ -2,7 +2,7 @@
 #include "globals.hh"
 #include "download.hh"
 #include "store-api.hh"
-#include "legacy.hh"
+#include "../nix/legacy.hh"
 
 #include <fcntl.h>
 #include <regex>

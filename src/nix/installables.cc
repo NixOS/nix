@@ -109,6 +109,11 @@ struct InstallableStorePath : Installable
         bs.push_back(std::move(b));
         return bs;
     }
+
+    std::optional<StorePath> getStorePath() override
+    {
+        return storePath.clone();
+    }
 };
 
 struct InstallableValue : Installable
@@ -121,7 +126,7 @@ struct InstallableValue : Installable
     {
         auto state = cmd.getEvalState();
 
-        auto v = toValue(*state);
+        auto v = toValue(*state).first;
 
         Bindings & autoArgs = *cmd.getAutoArgs(*state);
 
@@ -169,11 +174,11 @@ struct InstallableExpr : InstallableValue
 
     std::string what() override { return text; }
 
-    Value * toValue(EvalState & state) override
+    std::pair<Value *, Pos> toValue(EvalState & state) override
     {
         auto v = state.allocValue();
         state.eval(state.parseExprFromString(text, absPath(".")), *v);
-        return v;
+        return {v, noPos};
     }
 };
 
@@ -187,16 +192,16 @@ struct InstallableAttrPath : InstallableValue
 
     std::string what() override { return attrPath; }
 
-    Value * toValue(EvalState & state) override
+    std::pair<Value *, Pos> toValue(EvalState & state) override
     {
         auto source = cmd.getSourceExpr(state);
 
         Bindings & autoArgs = *cmd.getAutoArgs(state);
 
-        Value * v = findAlongAttrPath(state, attrPath, autoArgs, *source);
+        auto v = findAlongAttrPath(state, attrPath, autoArgs, *source).first;
         state.forceValue(*v);
 
-        return v;
+        return {v, noPos};
     }
 };
 

@@ -48,7 +48,7 @@ basicTests
 
 
 # Test HttpBinaryCacheStore.
-export _NIX_FORCE_HTTP_BINARY_CACHE_STORE=1
+export _NIX_FORCE_HTTP=1
 basicTests
 
 
@@ -126,7 +126,7 @@ badKey="$(cat $TEST_ROOT/pk2)"
 res=($(nix-store --generate-binary-cache-key foo.nixos.org-1 $TEST_ROOT/sk3 $TEST_ROOT/pk3))
 otherKey="$(cat $TEST_ROOT/pk3)"
 
-_NIX_FORCE_HTTP_BINARY_CACHE_STORE= nix copy --to file://$cacheDir?secret-key=$TEST_ROOT/sk1 $outPath
+_NIX_FORCE_HTTP= nix copy --to file://$cacheDir?secret-key=$TEST_ROOT/sk1 $outPath
 
 
 # Downloading should fail if we don't provide a key.
