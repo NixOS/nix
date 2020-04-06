@@ -56,7 +56,7 @@ struct DataTransferRequest
     }
 };
 
-struct DownloadResult
+struct DataTransferResult
 {
     bool cached = false;
     std::string etag;
@@ -75,12 +75,12 @@ struct Downloader
        the download. The future may throw a DownloadError
        exception. */
     virtual void enqueueDownload(const DataTransferRequest & request,
-        Callback<DownloadResult> callback) = 0;
+        Callback<DataTransferResult> callback) = 0;
 
-    std::future<DownloadResult> enqueueDownload(const DataTransferRequest & request);
+    std::future<DataTransferResult> enqueueDownload(const DataTransferRequest & request);
 
     /* Synchronously download a file. */
-    DownloadResult download(const DataTransferRequest & request);
+    DataTransferResult download(const DataTransferRequest & request);
 
     /* Download a file, writing its data to a sink. The sink will be
        invoked on the thread of the caller. */

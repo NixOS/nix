@@ -50,10 +50,10 @@ struct CurlDownloader : public Downloader
     {
         CurlDownloader & downloader;
         DataTransferRequest request;
-        DownloadResult result;
+        DataTransferResult result;
         Activity act;
         bool done = false; // whether either the success or failure function has been called
-        Callback<DownloadResult> callback;
+        Callback<DataTransferResult> callback;
         CURL * req = 0;
         bool active = false; // whether the handle has been added to the multi object
         std::string status;
@@ -74,7 +74,7 @@ struct CurlDownloader : public Downloader
 
         DownloadItem(CurlDownloader & downloader,
             const DataTransferRequest & request,
-            Callback<DownloadResult> && callback)
+            Callback<DataTransferResult> && callback)
             : downloader(downloader)
             , request(request)
             , act(*logger, lvlTalkative, actDownload,
@@ -642,7 +642,7 @@ struct CurlDownloader : public Downloader
 #endif
 
     void enqueueDownload(const DataTransferRequest & request,
-        Callback<DownloadResult> callback) override
+        Callback<DataTransferResult> callback) override
     {
         /* Ugly hack to support s3:// URIs. */
         if (hasPrefix(request.uri, "s3://")) {
@@ -660,7 +660,7 @@ struct CurlDownloader : public Downloader
 
                 // FIXME: implement ETag
                 auto s3Res = s3Helper.getObject(bucketName, key);
-                DownloadResult res;
+                DataTransferResult res;
                 if (!s3Res.data)
                     throw DownloadError(NotFound, fmt("S3 object '%s' does not exist", request.uri));
                 res.data = s3Res.data;
@@ -687,11 +687,11 @@ ref<Downloader> makeDownloader()
     return make_ref<CurlDownloader>();
 }
 
-std::future<DownloadResult> Downloader::enqueueDownload(const DataTransferRequest & request)
+std::future<DataTransferResult> Downloader::enqueueDownload(const DataTransferRequest & request)
 {
-    auto promise = std::make_shared<std::promise<DownloadResult>>();
+    auto promise = std::make_shared<std::promise<DataTransferResult>>();
     enqueueDownload(request,
-        {[promise](std::future<DownloadResult> fut) {
+        {[promise](std::future<DataTransferResult> fut) {
             try {
                 promise->set_value(fut.get());
             } catch (...) {
@@ -701,7 +701,7 @@ std::future<DownloadResult> Downloader::enqueueDownload(const DataTransferReques
     return promise->get_future();
 }
 
-DownloadResult Downloader::download(const DataTransferRequest & request)
+DataTransferResult Downloader::download(const DataTransferRequest & request)
 {
     return enqueueDownload(request).get();
 }
@@ -756,7 +756,7 @@ void Downloader::download(DataTransferRequest && request, Sink & sink)
     };
 
     enqueueDownload(request,
-        {[_state](std::future<DownloadResult> fut) {
+        {[_state](std::future<DataTransferResult> fut) {
             auto state(_state->lock());
             state->quit = true;
             try {
