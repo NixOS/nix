@@ -46,7 +46,7 @@ struct curlDataTransfer : public DataTransfer
     std::random_device rd;
     std::mt19937 mt19937;
 
-    struct DownloadItem : public std::enable_shared_from_this<DownloadItem>
+    struct TransferItem : public std::enable_shared_from_this<TransferItem>
     {
         curlDataTransfer & dataTransfer;
         DataTransferRequest request;
@@ -72,7 +72,7 @@ struct curlDataTransfer : public DataTransfer
 
         curl_off_t writtenToSink = 0;
 
-        DownloadItem(curlDataTransfer & dataTransfer,
+        TransferItem(curlDataTransfer & dataTransfer,
             const DataTransferRequest & request,
             Callback<DataTransferResult> && callback)
             : dataTransfer(dataTransfer)
@@ -102,7 +102,7 @@ struct curlDataTransfer : public DataTransfer
                 requestHeaders = curl_slist_append(requestHeaders, ("Content-Type: " + request.mimeType).c_str());
         }
 
-        ~DownloadItem()
+        ~TransferItem()
         {
             if (req) {
                 if (active)
@@ -156,7 +156,7 @@ struct curlDataTransfer : public DataTransfer
 
         static size_t writeCallbackWrapper(void * contents, size_t size, size_t nmemb, void * userp)
         {
-            return ((DownloadItem *) userp)->writeCallback(contents, size, nmemb);
+            return ((TransferItem *) userp)->writeCallback(contents, size, nmemb);
         }
 
         size_t headerCallback(void * contents, size_t size, size_t nmemb)
@@ -198,7 +198,7 @@ struct curlDataTransfer : public DataTransfer
 
         static size_t headerCallbackWrapper(void * contents, size_t size, size_t nmemb, void * userp)
         {
-            return ((DownloadItem *) userp)->headerCallback(contents, size, nmemb);
+            return ((TransferItem *) userp)->headerCallback(contents, size, nmemb);
         }
 
         int progressCallback(double dltotal, double dlnow)
@@ -213,7 +213,7 @@ struct curlDataTransfer : public DataTransfer
 
         static int progressCallbackWrapper(void * userp, double dltotal, double dlnow, double ultotal, double ulnow)
         {
-            return ((DownloadItem *) userp)->progressCallback(dltotal, dlnow);
+            return ((TransferItem *) userp)->progressCallback(dltotal, dlnow);
         }
 
         static int debugCallback(CURL * handle, curl_infotype type, char * data, size_t size, void * userptr)
@@ -237,7 +237,7 @@ struct curlDataTransfer : public DataTransfer
 
         static size_t readCallbackWrapper(char *buffer, size_t size, size_t nitems, void * userp)
         {
-            return ((DownloadItem *) userp)->readCallback(buffer, size, nitems);
+            return ((TransferItem *) userp)->readCallback(buffer, size, nitems);
         }
 
         void init()
@@ -248,7 +248,7 @@ struct curlDataTransfer : public DataTransfer
 
             if (verbosity >= lvlVomit) {
                 curl_easy_setopt(req, CURLOPT_VERBOSE, 1);
-                curl_easy_setopt(req, CURLOPT_DEBUGFUNCTION, DownloadItem::debugCallback);
+                curl_easy_setopt(req, CURLOPT_DEBUGFUNCTION, TransferItem::debugCallback);
             }
 
             curl_easy_setopt(req, CURLOPT_URL, request.uri.c_str());
@@ -267,9 +267,9 @@ struct curlDataTransfer : public DataTransfer
             else
                 curl_easy_setopt(req, CURLOPT_HTTP_VERSION, CURL_HTTP_VERSION_1_1);
             #endif
-            curl_easy_setopt(req, CURLOPT_WRITEFUNCTION, DownloadItem::writeCallbackWrapper);
+            curl_easy_setopt(req, CURLOPT_WRITEFUNCTION, TransferItem::writeCallbackWrapper);
             curl_easy_setopt(req, CURLOPT_WRITEDATA, this);
-            curl_easy_setopt(req, CURLOPT_HEADERFUNCTION, DownloadItem::headerCallbackWrapper);
+            curl_easy_setopt(req, CURLOPT_HEADERFUNCTION, TransferItem::headerCallbackWrapper);
             curl_easy_setopt(req, CURLOPT_HEADERDATA, this);
 
             curl_easy_setopt(req, CURLOPT_PROGRESSFUNCTION, progressCallbackWrapper);
@@ -439,12 +439,12 @@ struct curlDataTransfer : public DataTransfer
     struct State
     {
         struct EmbargoComparator {
-            bool operator() (const std::shared_ptr<DownloadItem> & i1, const std::shared_ptr<DownloadItem> & i2) {
+            bool operator() (const std::shared_ptr<TransferItem> & i1, const std::shared_ptr<TransferItem> & i2) {
                 return i1->embargo > i2->embargo;
             }
         };
         bool quit = false;
-        std::priority_queue<std::shared_ptr<DownloadItem>, std::vector<std::shared_ptr<DownloadItem>>, EmbargoComparator> incoming;
+        std::priority_queue<std::shared_ptr<TransferItem>, std::vector<std::shared_ptr<TransferItem>>, EmbargoComparator> incoming;
     };
 
     Sync<State> state_;
@@ -504,7 +504,7 @@ struct curlDataTransfer : public DataTransfer
             stopWorkerThread();
         });
 
-        std::map<CURL *, std::shared_ptr<DownloadItem>> items;
+        std::map<CURL *, std::shared_ptr<TransferItem>> items;
 
         bool quit = false;
 
@@ -561,7 +561,7 @@ struct curlDataTransfer : public DataTransfer
                     throw SysError("reading curl wakeup socket");
             }
 
-            std::vector<std::shared_ptr<DownloadItem>> incoming;
+            std::vector<std::shared_ptr<TransferItem>> incoming;
             auto now = std::chrono::steady_clock::now();
 
             {
@@ -609,7 +609,7 @@ struct curlDataTransfer : public DataTransfer
         }
     }
 
-    void enqueueItem(std::shared_ptr<DownloadItem> item)
+    void enqueueItem(std::shared_ptr<TransferItem> item)
     {
         if (item->request.data
             && !hasPrefix(item->request.uri, "http://")
@@ -672,7 +672,7 @@ struct curlDataTransfer : public DataTransfer
             return;
         }
 
-        enqueueItem(std::make_shared<DownloadItem>(*this, request, std::move(callback)));
+        enqueueItem(std::make_shared<TransferItem>(*this, request, std::move(callback)));
     }
 };
 
