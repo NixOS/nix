@@ -706,6 +706,12 @@ DataTransferResult DataTransfer::download(const DataTransferRequest & request)
     return enqueueDataTransfer(request).get();
 }
 
+DataTransferResult DataTransfer::upload(const DataTransferRequest & request)
+{
+    /* Note: this method is the same as download, but helps in readability */
+    return enqueueDataTransfer(request).get();
+}
+
 void DataTransfer::download(DataTransferRequest && request, Sink & sink)
 {
     /* Note: we can't call 'sink' via request.dataCallback, because

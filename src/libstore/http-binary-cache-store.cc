@@ -107,7 +107,7 @@ protected:
         req.data = std::make_shared<string>(data); // FIXME: inefficient
         req.mimeType = mimeType;
         try {
-            getDataTransfer()->download(req);
+            getDataTransfer()->upload(req);
         } catch (DataTransferError & e) {
             throw UploadToHTTP("while uploading to HTTP binary cache at '%s': %s", cacheUri, e.msg());
         }
@@ -174,4 +174,3 @@ static RegisterStoreImplementation regStore([](
 });
 
 }
-

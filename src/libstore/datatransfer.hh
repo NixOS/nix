@@ -82,6 +82,9 @@ struct DataTransfer
     /* Synchronously download a file. */
     DataTransferResult download(const DataTransferRequest & request);
 
+    /* Synchronously upload a file. */
+    DataTransferResult upload(const DataTransferRequest & request);
+
     /* Download a file, writing its data to a sink. The sink will be
        invoked on the thread of the caller. */
     void download(DataTransferRequest && request, Sink & sink);
