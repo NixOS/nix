@@ -1,6 +1,6 @@
 #include "shared.hh"
 #include "globals.hh"
-#include "datatransfer.hh"
+#include "filetransfer.hh"
 #include "store-api.hh"
 #include "../nix/legacy.hh"
 #include "fetchers.hh"

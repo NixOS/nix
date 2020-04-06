@@ -1,7 +1,7 @@
 #include "command.hh"
 #include "common-args.hh"
 #include "store-api.hh"
-#include "datatransfer.hh"
+#include "filetransfer.hh"
 #include "eval.hh"
 #include "attr-path.hh"
 #include "names.hh"

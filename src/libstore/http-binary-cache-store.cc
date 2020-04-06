@@ -1,5 +1,5 @@
 #include "binary-cache-store.hh"
-#include "datatransfer.hh"
+#include "filetransfer.hh"
 #include "globals.hh"
 #include "nar-info-disk-cache.hh"
 
