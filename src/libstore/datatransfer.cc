@@ -112,7 +112,7 @@ struct curlDataTransfer : public DataTransfer
             if (requestHeaders) curl_slist_free_all(requestHeaders);
             try {
                 if (!done)
-                    fail(DownloadError(Interrupted, format("download of '%s' was interrupted") % request.uri));
+                    fail(DataTransferError(Interrupted, format("download of '%s' was interrupted") % request.uri));
             } catch (...) {
                 ignoreException();
             }
@@ -401,14 +401,14 @@ struct curlDataTransfer : public DataTransfer
 
                 auto exc =
                     code == CURLE_ABORTED_BY_CALLBACK && _isInterrupted
-                    ? DownloadError(Interrupted, fmt("%s of '%s' was interrupted", request.verb(), request.uri))
+                    ? DataTransferError(Interrupted, fmt("%s of '%s' was interrupted", request.verb(), request.uri))
                     : httpStatus != 0
-                    ? DownloadError(err,
+                    ? DataTransferError(err,
                         fmt("unable to %s '%s': HTTP error %d",
                             request.verb(), request.uri, httpStatus)
                         + (code == CURLE_OK ? "" : fmt(" (curl error: %s)", curl_easy_strerror(code)))
                         )
-                    : DownloadError(err,
+                    : DataTransferError(err,
                         fmt("unable to %s '%s': %s (%d)",
                             request.verb(), request.uri, curl_easy_strerror(code), code));
 
@@ -662,7 +662,7 @@ struct curlDataTransfer : public DataTransfer
                 auto s3Res = s3Helper.getObject(bucketName, key);
                 DataTransferResult res;
                 if (!s3Res.data)
-                    throw DownloadError(NotFound, fmt("S3 object '%s' does not exist", request.uri));
+                    throw DataTransferError(NotFound, fmt("S3 object '%s' does not exist", request.uri));
                 res.data = s3Res.data;
                 callback(std::move(res));
 #else

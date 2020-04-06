@@ -72,7 +72,7 @@ struct DataTransfer
     virtual ~DataTransfer() { }
 
     /* Enqueue a data transfer request, returning a future to the result of
-       the download. The future may throw a DownloadError
+       the download. The future may throw a DataTransferError
        exception. */
     virtual void enqueueDataTransfer(const DataTransferRequest & request,
         Callback<DataTransferResult> callback) = 0;
@@ -96,11 +96,11 @@ ref<DataTransfer> getDataTransfer();
 /* Return a new DataTransfer object. */
 ref<DataTransfer> makeDataTransfer();
 
-class DownloadError : public Error
+class DataTransferError : public Error
 {
 public:
     DataTransfer::Error error;
-    DownloadError(DataTransfer::Error error, const FormatOrString & fs)
+    DataTransferError(DataTransfer::Error error, const FormatOrString & fs)
         : Error(fs), error(error)
     { }
 };

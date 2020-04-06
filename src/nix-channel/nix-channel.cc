@@ -113,7 +113,7 @@ static void update(const StringSet & channelNames)
             // Download the channel tarball.
             try {
                 filename = store->toRealPath(fetchers::downloadFile(store, url + "/nixexprs.tar.xz", "nixexprs.tar.xz", false).storePath);
-            } catch (DownloadError & e) {
+            } catch (DataTransferError & e) {
                 filename = store->toRealPath(fetchers::downloadFile(store, url + "/nixexprs.tar.bz2", "nixexprs.tar.bz2", false).storePath);
             }
         }

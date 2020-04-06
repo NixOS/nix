@@ -89,7 +89,7 @@ protected:
             request.head = true;
             getDataTransfer()->download(request);
             return true;
-        } catch (DownloadError & e) {
+        } catch (DataTransferError & e) {
             /* S3 buckets return 403 if a file doesn't exist and the
                bucket is unlistable, so treat 403 as 404. */
             if (e.error == DataTransfer::NotFound || e.error == DataTransfer::Forbidden)
@@ -108,7 +108,7 @@ protected:
         req.mimeType = mimeType;
         try {
             getDataTransfer()->download(req);
-        } catch (DownloadError & e) {
+        } catch (DataTransferError & e) {
             throw UploadToHTTP("while uploading to HTTP binary cache at '%s': %s", cacheUri, e.msg());
         }
     }
@@ -125,7 +125,7 @@ protected:
         auto request(makeRequest(path));
         try {
             getDataTransfer()->download(std::move(request), sink);
-        } catch (DownloadError & e) {
+        } catch (DataTransferError & e) {
             if (e.error == DataTransfer::NotFound || e.error == DataTransfer::Forbidden)
                 throw NoSuchBinaryCacheFile("file '%s' does not exist in binary cache '%s'", path, getUri());
             maybeDisable();
@@ -146,7 +146,7 @@ protected:
             {[callbackPtr, this](std::future<DataTransferResult> result) {
                 try {
                     (*callbackPtr)(result.get().data);
-                } catch (DownloadError & e) {
+                } catch (DataTransferError & e) {
                     if (e.error == DataTransfer::NotFound || e.error == DataTransfer::Forbidden)
                         return (*callbackPtr)(std::shared_ptr<std::string>());
                     maybeDisable();
