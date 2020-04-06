@@ -6,7 +6,7 @@
 #include "nar-info-disk-cache.hh"
 #include "globals.hh"
 #include "compression.hh"
-#include "download.hh"
+#include "datatransfer.hh"
 #include "istringstream_nocopy.hh"
 
 #include <aws/core/Aws.h>

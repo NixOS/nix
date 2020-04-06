@@ -7,7 +7,7 @@
 #include "affinity.hh"
 #include "builtins.hh"
 #include "builtins/buildenv.hh"
-#include "download.hh"
+#include "datatransfer.hh"
 #include "finally.hh"
 #include "compression.hh"
 #include "json.hh"

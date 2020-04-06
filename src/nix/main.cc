@@ -8,7 +8,7 @@
 #include "shared.hh"
 #include "store-api.hh"
 #include "progress-bar.hh"
-#include "download.hh"
+#include "datatransfer.hh"
 #include "finally.hh"
 
 #include <sys/types.h>

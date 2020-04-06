@@ -1,4 +1,4 @@
-#include "download.hh"
+#include "datatransfer.hh"
 #include "util.hh"
 #include "globals.hh"
 #include "store-api.hh"

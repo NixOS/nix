@@ -544,7 +544,7 @@ formal
 #include <unistd.h>
 
 #include "eval.hh"
-#include "download.hh"
+#include "datatransfer.hh"
 #include "fetchers.hh"
 #include "store-api.hh"
 

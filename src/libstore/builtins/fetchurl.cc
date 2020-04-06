@@ -1,5 +1,5 @@
 #include "builtins.hh"
-#include "download.hh"
+#include "datatransfer.hh"
 #include "store-api.hh"
 #include "archive.hh"
 #include "compression.hh"

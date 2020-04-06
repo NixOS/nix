@@ -1,6 +1,6 @@
 #include "hash.hh"
 #include "shared.hh"
-#include "download.hh"
+#include "datatransfer.hh"
 #include "store-api.hh"
 #include "eval.hh"
 #include "eval-inline.hh"

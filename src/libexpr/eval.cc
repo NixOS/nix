@@ -5,7 +5,7 @@
 #include "derivations.hh"
 #include "globals.hh"
 #include "eval-inline.hh"
-#include "download.hh"
+#include "datatransfer.hh"
 #include "json.hh"
 #include "function-trace.hh"
 
