@@ -39,7 +39,7 @@ std::string resolveUri(const std::string & uri)
         return uri;
 }
 
-struct CurlDownloader : public Downloader
+struct curlDataTransfer : public DataTransfer
 {
     CURLM * curlm = 0;
 
@@ -48,7 +48,7 @@ struct CurlDownloader : public Downloader
 
     struct DownloadItem : public std::enable_shared_from_this<DownloadItem>
     {
-        CurlDownloader & downloader;
+        curlDataTransfer & dataTransfer;
         DataTransferRequest request;
         DataTransferResult result;
         Activity act;
@@ -72,10 +72,10 @@ struct CurlDownloader : public Downloader
 
         curl_off_t writtenToSink = 0;
 
-        DownloadItem(CurlDownloader & downloader,
+        DownloadItem(curlDataTransfer & dataTransfer,
             const DataTransferRequest & request,
             Callback<DataTransferResult> && callback)
-            : downloader(downloader)
+            : dataTransfer(dataTransfer)
             , request(request)
             , act(*logger, lvlTalkative, actDownload,
                 fmt(request.data ? "uploading '%s'" : "downloading '%s'", request.uri),
@@ -106,7 +106,7 @@ struct CurlDownloader : public Downloader
         {
             if (req) {
                 if (active)
-                    curl_multi_remove_handle(downloader.curlm, req);
+                    curl_multi_remove_handle(dataTransfer.curlm, req);
                 curl_easy_cleanup(req);
             }
             if (requestHeaders) curl_slist_free_all(requestHeaders);
@@ -422,13 +422,13 @@ struct CurlDownloader : public Downloader
                         || writtenToSink == 0
                         || (acceptRanges && encoding.empty())))
                 {
-                    int ms = request.baseRetryTimeMs * std::pow(2.0f, attempt - 1 + std::uniform_real_distribution<>(0.0, 0.5)(downloader.mt19937));
+                    int ms = request.baseRetryTimeMs * std::pow(2.0f, attempt - 1 + std::uniform_real_distribution<>(0.0, 0.5)(dataTransfer.mt19937));
                     if (writtenToSink)
                         warn("%s; retrying from offset %d in %d ms", exc.what(), writtenToSink, ms);
                     else
                         warn("%s; retrying in %d ms", exc.what(), ms);
                     embargo = std::chrono::steady_clock::now() + std::chrono::milliseconds(ms);
-                    downloader.enqueueItem(shared_from_this());
+                    dataTransfer.enqueueItem(shared_from_this());
                 }
                 else
                     fail(exc);
@@ -456,7 +456,7 @@ struct CurlDownloader : public Downloader
 
     std::thread workerThread;
 
-    CurlDownloader()
+    curlDataTransfer()
         : mt19937(rd())
     {
         static std::once_flag globalInit;
@@ -478,7 +478,7 @@ struct CurlDownloader : public Downloader
         workerThread = std::thread([&]() { workerThreadEntry(); });
     }
 
-    ~CurlDownloader()
+    ~curlDataTransfer()
     {
         stopWorkerThread();
 
@@ -676,18 +676,18 @@ struct CurlDownloader : public Downloader
     }
 };
 
-ref<Downloader> getDownloader()
+ref<DataTransfer> getDataTransfer()
 {
-    static ref<Downloader> downloader = makeDownloader();
-    return downloader;
+    static ref<DataTransfer> dataTransfer = makeDataTransfer();
+    return dataTransfer;
 }
 
-ref<Downloader> makeDownloader()
+ref<DataTransfer> makeDataTransfer()
 {
-    return make_ref<CurlDownloader>();
+    return make_ref<curlDataTransfer>();
 }
 
-std::future<DataTransferResult> Downloader::enqueueDataTransfer(const DataTransferRequest & request)
+std::future<DataTransferResult> DataTransfer::enqueueDataTransfer(const DataTransferRequest & request)
 {
     auto promise = std::make_shared<std::promise<DataTransferResult>>();
     enqueueDataTransfer(request,
@@ -701,15 +701,15 @@ std::future<DataTransferResult> Downloader::enqueueDataTransfer(const DataTransf
     return promise->get_future();
 }
 
-DataTransferResult Downloader::download(const DataTransferRequest & request)
+DataTransferResult DataTransfer::download(const DataTransferRequest & request)
 {
     return enqueueDataTransfer(request).get();
 }
 
-void Downloader::download(DataTransferRequest && request, Sink & sink)
+void DataTransfer::download(DataTransferRequest && request, Sink & sink)
 {
     /* Note: we can't call 'sink' via request.dataCallback, because
-       that would cause the sink to execute on the downloader
+       that would cause the sink to execute on the dataTransfer
        thread. If 'sink' is a coroutine, this will fail. Also, if the
        sink is expensive (e.g. one that does decompression and writing
        to the Nix store), it would stall the download thread too much.

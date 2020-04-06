@@ -87,12 +87,12 @@ protected:
         try {
             DataTransferRequest request(cacheUri + "/" + path);
             request.head = true;
-            getDownloader()->download(request);
+            getDataTransfer()->download(request);
             return true;
         } catch (DownloadError & e) {
             /* S3 buckets return 403 if a file doesn't exist and the
                bucket is unlistable, so treat 403 as 404. */
-            if (e.error == Downloader::NotFound || e.error == Downloader::Forbidden)
+            if (e.error == DataTransfer::NotFound || e.error == DataTransfer::Forbidden)
                 return false;
             maybeDisable();
             throw;
@@ -107,7 +107,7 @@ protected:
         req.data = std::make_shared<string>(data); // FIXME: inefficient
         req.mimeType = mimeType;
         try {
-            getDownloader()->download(req);
+            getDataTransfer()->download(req);
         } catch (DownloadError & e) {
             throw UploadToHTTP("while uploading to HTTP binary cache at '%s': %s", cacheUri, e.msg());
         }
@@ -124,9 +124,9 @@ protected:
         checkEnabled();
         auto request(makeRequest(path));
         try {
-            getDownloader()->download(std::move(request), sink);
+            getDataTransfer()->download(std::move(request), sink);
         } catch (DownloadError & e) {
-            if (e.error == Downloader::NotFound || e.error == Downloader::Forbidden)
+            if (e.error == DataTransfer::NotFound || e.error == DataTransfer::Forbidden)
                 throw NoSuchBinaryCacheFile("file '%s' does not exist in binary cache '%s'", path, getUri());
             maybeDisable();
             throw;
@@ -142,12 +142,12 @@ protected:
 
         auto callbackPtr = std::make_shared<decltype(callback)>(std::move(callback));
 
-        getDownloader()->enqueueDataTransfer(request,
+        getDataTransfer()->enqueueDataTransfer(request,
             {[callbackPtr, this](std::future<DataTransferResult> result) {
                 try {
                     (*callbackPtr)(result.get().data);
                 } catch (DownloadError & e) {
-                    if (e.error == Downloader::NotFound || e.error == Downloader::Forbidden)
+                    if (e.error == DataTransfer::NotFound || e.error == DataTransfer::Forbidden)
                         return (*callbackPtr)(std::shared_ptr<std::string>());
                     maybeDisable();
                     callbackPtr->rethrow();

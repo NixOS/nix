@@ -182,7 +182,7 @@ static int _main(int argc, char * * argv)
 
                 DataTransferRequest req(actualUri);
                 req.decompress = false;
-                getDownloader()->download(std::move(req), sink);
+                getDataTransfer()->download(std::move(req), sink);
             }
 
             /* Optionally unpack the file. */

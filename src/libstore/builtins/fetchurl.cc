@@ -26,9 +26,9 @@ void builtinFetchurl(const BasicDerivation & drv, const std::string & netrcData)
     auto mainUrl = getAttr("url");
     bool unpack = get(drv.env, "unpack").value_or("") == "1";
 
-    /* Note: have to use a fresh downloader here because we're in
+    /* Note: have to use a fresh dataTransfer here because we're in
        a forked process. */
-    auto downloader = makeDownloader();
+    auto dataTransfer = makeDataTransfer();
 
     auto fetch = [&](const std::string & url) {
 
@@ -42,7 +42,7 @@ void builtinFetchurl(const BasicDerivation & drv, const std::string & netrcData)
 
             auto decompressor = makeDecompressionSink(
                 unpack && hasSuffix(mainUrl, ".xz") ? "xz" : "none", sink);
-            downloader->download(std::move(request), *decompressor);
+            dataTransfer->download(std::move(request), *decompressor);
             decompressor->finish();
         });
 

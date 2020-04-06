@@ -139,7 +139,7 @@ struct CmdUpgradeNix : MixDryRun, StoreCommand
 
         // FIXME: use nixos.org?
         auto req = DataTransferRequest(storePathsUrl);
-        auto res = getDownloader()->download(req);
+        auto res = getDataTransfer()->download(req);
 
         auto state = std::make_unique<EvalState>(Strings(), store);
         auto v = state->allocValue();

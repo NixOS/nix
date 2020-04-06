@@ -67,11 +67,11 @@ struct DataTransferResult
 
 class Store;
 
-struct Downloader
+struct DataTransfer
 {
-    virtual ~Downloader() { }
+    virtual ~DataTransfer() { }
 
-    /* Enqueue a download request, returning a future to the result of
+    /* Enqueue a data transfer request, returning a future to the result of
        the download. The future may throw a DownloadError
        exception. */
     virtual void enqueueDataTransfer(const DataTransferRequest & request,
@@ -89,18 +89,18 @@ struct Downloader
     enum Error { NotFound, Forbidden, Misc, Transient, Interrupted };
 };
 
-/* Return a shared Downloader object. Using this object is preferred
+/* Return a shared DataTransfer object. Using this object is preferred
    because it enables connection reuse and HTTP/2 multiplexing. */
-ref<Downloader> getDownloader();
+ref<DataTransfer> getDataTransfer();
 
-/* Return a new Downloader object. */
-ref<Downloader> makeDownloader();
+/* Return a new DataTransfer object. */
+ref<DataTransfer> makeDataTransfer();
 
 class DownloadError : public Error
 {
 public:
-    Downloader::Error error;
-    DownloadError(Downloader::Error error, const FormatOrString & fs)
+    DataTransfer::Error error;
+    DownloadError(DataTransfer::Error error, const FormatOrString & fs)
         : Error(fs), error(error)
     { }
 };
