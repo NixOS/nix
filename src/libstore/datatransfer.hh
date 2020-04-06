@@ -9,7 +9,7 @@
 
 namespace nix {
 
-struct DownloadSettings : Config
+struct DataTransferSettings : Config
 {
     Setting<bool> enableHttp2{this, true, "http2",
         "Whether to enable HTTP/2 support."};
@@ -31,7 +31,7 @@ struct DownloadSettings : Config
         "How often Nix will attempt to download a file before giving up."};
 };
 
-extern DownloadSettings downloadSettings;
+extern DataTransferSettings dataTransferSettings;
 
 struct DataTransferRequest
 {
@@ -39,7 +39,7 @@ struct DataTransferRequest
     std::string expectedETag;
     bool verifyTLS = true;
     bool head = false;
-    size_t tries = downloadSettings.tries;
+    size_t tries = dataTransferSettings.tries;
     unsigned int baseRetryTimeMs = 250;
     ActivityId parentAct;
     bool decompress = true;
