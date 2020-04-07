@@ -54,15 +54,14 @@ static void prim_fetchMercurial(EvalState & state, const Pos & pos, Value * * ar
     if (evalSettings.pureEval && !rev)
         throw Error("in pure evaluation mode, 'fetchMercurial' requires a Mercurial revision");
 
-    auto parsedUrl = parseURL(
-        url.find("://") != std::string::npos
-        ? "hg+" + url
-        : "hg+file://" + url);
-    if (rev) parsedUrl.query.insert_or_assign("rev", rev->gitRev());
-    if (ref) parsedUrl.query.insert_or_assign("ref", *ref);
-    // FIXME: use name
-    auto input = fetchers::inputFromURL(parsedUrl);
+    fetchers::Attrs attrs;
+    attrs.insert_or_assign("type", "hg");
+    attrs.insert_or_assign("url", url.find("://") != std::string::npos ? url : "file://" + url);
+    if (ref) attrs.insert_or_assign("ref", *ref);
+    if (rev) attrs.insert_or_assign("rev", rev->gitRev());
+    auto input = fetchers::inputFromAttrs(attrs);
 
+    // FIXME: use name
     auto [tree, input2] = input->fetchTree(state.store);
 
     state.mkAttrs(v, 8);
