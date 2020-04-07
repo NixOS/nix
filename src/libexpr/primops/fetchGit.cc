@@ -13,6 +13,7 @@ static void prim_fetchGit(EvalState & state, const Pos & pos, Value * * args, Va
     std::optional<std::string> ref;
     std::optional<Hash> rev;
     std::string name = "source";
+    bool fetchSubmodules = false;
     PathSet context;
 
     state.forceValue(*args[0]);
@@ -31,6 +32,8 @@ static void prim_fetchGit(EvalState & state, const Pos & pos, Value * * args, Va
                 rev = Hash(state.forceStringNoCtx(*attr.value, *attr.pos), htSHA1);
             else if (n == "name")
                 name = state.forceStringNoCtx(*attr.value, *attr.pos);
+            else if (n == "submodules")
+                fetchSubmodules = state.forceBool(*attr.value, *attr.pos);
             else
                 throw EvalError("unsupported argument '%s' to 'fetchGit', at %s", attr.name, *attr.pos);
         }
@@ -48,15 +51,15 @@ static void prim_fetchGit(EvalState & state, const Pos & pos, Value * * args, Va
     if (evalSettings.pureEval && !rev)
         throw Error("in pure evaluation mode, 'fetchGit' requires a Git revision");
 
-    auto parsedUrl = parseURL(
-        url.find("://") != std::string::npos
-        ? "git+" + url
-        : "git+file://" + url);
-    if (ref) parsedUrl.query.insert_or_assign("ref", *ref);
-    if (rev) parsedUrl.query.insert_or_assign("rev", rev->gitRev());
-    // FIXME: use name
-    auto input = fetchers::inputFromURL(parsedUrl);
+    fetchers::Attrs attrs;
+    attrs.insert_or_assign("type", "git");
+    attrs.insert_or_assign("url", url.find("://") != std::string::npos ? url : "file://" + url);
+    if (ref) attrs.insert_or_assign("ref", *ref);
+    if (rev) attrs.insert_or_assign("rev", rev->gitRev());
+    if (fetchSubmodules) attrs.insert_or_assign("submodules", true);
+    auto input = fetchers::inputFromAttrs(attrs);
 
+    // FIXME: use name?
     auto [tree, input2] = input->fetchTree(state.store);
 
     state.mkAttrs(v, 8);
@@ -70,6 +73,7 @@ static void prim_fetchGit(EvalState & state, const Pos & pos, Value * * args, Va
     // Backward compatibility: set 'revCount' to 0 for a dirty tree.
     mkInt(*state.allocAttr(v, state.symbols.create("revCount")),
         tree.info.revCount.value_or(0));
+    mkBool(*state.allocAttr(v, state.symbols.create("submodules")), fetchSubmodules);
     v.attrs->sort();
 
     if (state.allowedPaths)

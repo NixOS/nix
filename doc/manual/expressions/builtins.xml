@@ -422,6 +422,16 @@ stdenv.mkDerivation { … }
             </para>
           </listitem>
         </varlistentry>
+        <varlistentry>
+          <term>submodules</term>
+          <listitem>
+            <para>
+              A Boolean parameter that specifies whether submodules
+              should be checked out. Defaults to
+              <literal>false</literal>.
+            </para>
+          </listitem>
+        </varlistentry>
       </variablelist>
 
       <example>

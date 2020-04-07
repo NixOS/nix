@@ -15,12 +15,20 @@ static std::string readHead(const Path & path)
     return chomp(runProgram("git", true, { "-C", path, "rev-parse", "--abbrev-ref", "HEAD" }));
 }
 
+static bool isNotDotGitDirectory(const Path & path)
+{
+    static const std::regex gitDirRegex("^(?:.*/)?\\.git$");
+
+    return not std::regex_match(path, gitDirRegex);
+}
+
 struct GitInput : Input
 {
     ParsedURL url;
     std::optional<std::string> ref;
     std::optional<Hash> rev;
     bool shallow = false;
+    bool submodules = false;
 
     GitInput(const ParsedURL & url) : url(url)
     { }
@@ -66,6 +74,8 @@ struct GitInput : Input
             attrs.emplace("rev", rev->gitRev());
         if (shallow)
             attrs.emplace("shallow", true);
+        if (submodules)
+            attrs.emplace("submodules", true);
         return attrs;
     }
 
@@ -87,7 +97,9 @@ struct GitInput : Input
 
         assert(!rev || rev->type == htSHA1);
 
-        auto cacheType = shallow ? "git-shallow" : "git";
+        std::string cacheType = "git";
+        if (shallow) cacheType += "-shallow";
+        if (submodules) cacheType += "-submodules";
 
         auto getImmutableAttrs = [&]()
         {
@@ -161,8 +173,12 @@ struct GitInput : Input
                 if (settings.warnDirty)
                     warn("Git tree '%s' is dirty", actualUrl);
 
+                auto gitOpts = Strings({ "-C", actualUrl, "ls-files", "-z" });
+                if (submodules)
+                    gitOpts.emplace_back("--recurse-submodules");
+
                 auto files = tokenizeString<std::set<std::string>>(
-                    runProgram("git", true, { "-C", actualUrl, "ls-files", "-z" }), "\0"s);
+                    runProgram("git", true, gitOpts), "\0"s);
 
                 PathFilter filter = [&](const Path & p) -> bool {
                     assert(hasPrefix(p, actualUrl));
@@ -299,20 +315,39 @@ struct GitInput : Input
         if (auto res = getCache()->lookup(store, getImmutableAttrs()))
             return makeResult(res->first, std::move(res->second));
 
-        // FIXME: should pipe this, or find some better way to extract a
-        // revision.
-        auto source = sinkToSource([&](Sink & sink) {
-            RunOptions gitOptions("git", { "-C", repoDir, "archive", input->rev->gitRev() });
-            gitOptions.standardOut = &sink;
-            runProgram2(gitOptions);
-        });
-
         Path tmpDir = createTempDir();
         AutoDelete delTmpDir(tmpDir, true);
+        PathFilter filter = defaultPathFilter;
 
-        unpackTarfile(*source, tmpDir);
+        if (submodules) {
+            Path tmpGitDir = createTempDir();
+            AutoDelete delTmpGitDir(tmpGitDir, true);
 
-        auto storePath = store->addToStore(name, tmpDir);
+            runProgram("git", true, { "init", tmpDir, "--separate-git-dir", tmpGitDir });
+            // TODO: repoDir might lack the ref (it only checks if rev
+            // exists, see FIXME above) so use a big hammer and fetch
+            // everything to ensure we get the rev.
+            runProgram("git", true, { "-C", tmpDir, "fetch", "--quiet", "--force",
+                                      "--update-head-ok", "--", repoDir, "refs/*:refs/*" });
+
+            runProgram("git", true, { "-C", tmpDir, "checkout", "--quiet", input->rev->gitRev() });
+            runProgram("git", true, { "-C", tmpDir, "remote", "add", "origin", actualUrl });
+            runProgram("git", true, { "-C", tmpDir, "submodule", "--quiet", "update", "--init", "--recursive" });
+
+            filter = isNotDotGitDirectory;
+        } else {
+            // FIXME: should pipe this, or find some better way to extract a
+            // revision.
+            auto source = sinkToSource([&](Sink & sink) {
+                RunOptions gitOptions("git", { "-C", repoDir, "archive", input->rev->gitRev() });
+                gitOptions.standardOut = &sink;
+                runProgram2(gitOptions);
+            });
+
+            unpackTarfile(*source, tmpDir);
+        }
+
+        auto storePath = store->addToStore(name, tmpDir, true, htSHA256, filter);
 
         auto lastModified = std::stoull(runProgram("git", true, { "-C", repoDir, "log", "-1", "--format=%ct", input->rev->gitRev() }));
 
@@ -378,7 +413,7 @@ struct GitInputScheme : InputScheme
         if (maybeGetStrAttr(attrs, "type") != "git") return {};
 
         for (auto & [name, value] : attrs)
-            if (name != "type" && name != "url" && name != "ref" && name != "rev" && name != "shallow")
+            if (name != "type" && name != "url" && name != "ref" && name != "rev" && name != "shallow" && name != "submodules")
                 throw Error("unsupported Git input attribute '%s'", name);
 
         auto input = std::make_unique<GitInput>(parseURL(getStrAttr(attrs, "url")));
@@ -391,6 +426,8 @@ struct GitInputScheme : InputScheme
             input->rev = Hash(*rev, htSHA1);
 
         input->shallow = maybeGetBoolAttr(attrs, "shallow").value_or(false);
+
+        input->submodules = maybeGetBoolAttr(attrs, "submodules").value_or(false);
 
         return input;
     }
