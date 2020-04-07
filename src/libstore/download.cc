@@ -1,14 +1,10 @@
 #include "download.hh"
 #include "util.hh"
 #include "globals.hh"
-#include "hash.hh"
 #include "store-api.hh"
-#include "archive.hh"
 #include "s3.hh"
 #include "compression.hh"
-#include "pathlocks.hh"
 #include "finally.hh"
-#include "tarfile.hh"
 
 #ifdef ENABLE_S3
 #include <aws/core/client/ClientConfiguration.h>
