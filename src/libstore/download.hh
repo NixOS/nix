@@ -65,28 +65,6 @@ struct DownloadResult
     uint64_t bodySize = 0;
 };
 
-struct CachedDownloadRequest
-{
-    std::string uri;
-    bool unpack = false;
-    std::string name;
-    Hash expectedHash;
-    unsigned int ttl;
-
-    CachedDownloadRequest(const std::string & uri);
-    CachedDownloadRequest() = delete;
-};
-
-struct CachedDownloadResult
-{
-    // Note: 'storePath' may be different from 'path' when using a
-    // chroot store.
-    Path storePath;
-    Path path;
-    std::optional<std::string> etag;
-    std::string effectiveUri;
-};
-
 class Store;
 
 struct Downloader
@@ -108,12 +86,6 @@ struct Downloader
        invoked on the thread of the caller. */
     void download(DownloadRequest && request, Sink & sink);
 
-    /* Check if the specified file is already in ~/.cache/nix/tarballs
-       and is more recent than ‘tarball-ttl’ seconds. Otherwise,
-       use the recorded ETag to verify if the server has a more
-       recent version, and if so, download it to the Nix store. */
-    CachedDownloadResult downloadCached(ref<Store> store, const CachedDownloadRequest & request);
-
     enum Error { NotFound, Forbidden, Misc, Transient, Interrupted };
 };
 
@@ -134,5 +106,8 @@ public:
 };
 
 bool isUri(const string & s);
+
+/* Resolve deprecated 'channel:<foo>' URLs. */
+std::string resolveUri(const std::string & uri);
 
 }

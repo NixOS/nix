@@ -1,6 +1,5 @@
 #include "archive.hh"
 #include "derivations.hh"
-#include "download.hh"
 #include "eval-inline.hh"
 #include "eval.hh"
 #include "globals.hh"
@@ -2046,68 +2045,6 @@ static void prim_splitVersion(EvalState & state, const Pos & pos, Value * * args
 
 
 /*************************************************************
- * Networking
- *************************************************************/
-
-
-void fetch(EvalState & state, const Pos & pos, Value * * args, Value & v,
-    const string & who, bool unpack, const std::string & defaultName)
-{
-    CachedDownloadRequest request("");
-    request.unpack = unpack;
-    request.name = defaultName;
-
-    state.forceValue(*args[0]);
-
-    if (args[0]->type == tAttrs) {
-
-        state.forceAttrs(*args[0], pos);
-
-        for (auto & attr : *args[0]->attrs) {
-            string n(attr.name);
-            if (n == "url")
-                request.uri = state.forceStringNoCtx(*attr.value, *attr.pos);
-            else if (n == "sha256")
-                request.expectedHash = Hash(state.forceStringNoCtx(*attr.value, *attr.pos), htSHA256);
-            else if (n == "name")
-                request.name = state.forceStringNoCtx(*attr.value, *attr.pos);
-            else
-                throw EvalError(format("unsupported argument '%1%' to '%2%', at %3%") % attr.name % who % attr.pos);
-        }
-
-        if (request.uri.empty())
-            throw EvalError(format("'url' argument required, at %1%") % pos);
-
-    } else
-        request.uri = state.forceStringNoCtx(*args[0], pos);
-
-    state.checkURI(request.uri);
-
-    if (evalSettings.pureEval && !request.expectedHash)
-        throw Error("in pure evaluation mode, '%s' requires a 'sha256' argument", who);
-
-    auto res = getDownloader()->downloadCached(state.store, request);
-
-    if (state.allowedPaths)
-        state.allowedPaths->insert(res.path);
-
-    mkString(v, res.storePath, PathSet({res.storePath}));
-}
-
-
-static void prim_fetchurl(EvalState & state, const Pos & pos, Value * * args, Value & v)
-{
-    fetch(state, pos, args, v, "fetchurl", false, "");
-}
-
-
-static void prim_fetchTarball(EvalState & state, const Pos & pos, Value * * args, Value & v)
-{
-    fetch(state, pos, args, v, "fetchTarball", true, "source");
-}
-
-
-/*************************************************************
  * Primop registration
  *************************************************************/
 
@@ -2288,10 +2225,6 @@ void EvalState::createBaseEnv()
     // Derivations
     addPrimOp("derivationStrict", 1, prim_derivationStrict);
     addPrimOp("placeholder", 1, prim_placeholder);
-
-    // Networking
-    addPrimOp("__fetchurl", 1, prim_fetchurl);
-    addPrimOp("fetchTarball", 1, prim_fetchTarball);
 
     /* Add a wrapper around the derivation primop that computes the
        `drvPath' and `outPath' attributes lazily. */

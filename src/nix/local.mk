@@ -15,9 +15,9 @@ nix_SOURCES := \
   $(wildcard src/nix-prefetch-url/*.cc) \
   $(wildcard src/nix-store/*.cc) \
 
-nix_CXXFLAGS += -I src/libutil -I src/libstore -I src/libexpr -I src/libmain
+nix_CXXFLAGS += -I src/libutil -I src/libstore -I src/libfetchers -I src/libexpr -I src/libmain
 
-nix_LIBS = libexpr libmain libstore libutil libnixrust
+nix_LIBS = libexpr libmain libfetchers libstore libutil libnixrust
 
 nix_LDFLAGS = -pthread $(SODIUM_LIBS) $(EDITLINE_LIBS) $(BOOST_LDFLAGS) -lboost_context -lboost_thread -lboost_system
 
