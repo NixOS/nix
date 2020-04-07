@@ -46,7 +46,7 @@ static FlakeRef lookupInFlakeCache(
     return flakeRef;
 }
 
-static std::pair<fetchers::Tree, FlakeRef> fetchOrSubstituteTree(
+static std::tuple<fetchers::Tree, FlakeRef, FlakeRef> fetchOrSubstituteTree(
     EvalState & state,
     const FlakeRef & originalRef,
     std::optional<TreeInfo> treeInfo,
@@ -76,6 +76,7 @@ static std::pair<fetchers::Tree, FlakeRef> fetchOrSubstituteTree(
                     .storePath = std::move(storePath),
                     .info = *treeInfo,
                 },
+                originalRef,
                 originalRef
             };
         } catch (Error & e) {
@@ -101,7 +102,7 @@ static std::pair<fetchers::Tree, FlakeRef> fetchOrSubstituteTree(
     if (treeInfo)
         assert(tree.storePath == treeInfo->computeStorePath(*state.store));
 
-    return {std::move(tree), lockedRef};
+    return {std::move(tree), resolvedRef, lockedRef};
 }
 
 static void expectType(EvalState & state, ValueType type,
@@ -206,7 +207,7 @@ static Flake getFlake(
     bool allowLookup,
     FlakeCache & flakeCache)
 {
-    auto [sourceInfo, lockedRef] = fetchOrSubstituteTree(
+    auto [sourceInfo, resolvedRef, lockedRef] = fetchOrSubstituteTree(
         state, originalRef, treeInfo, allowLookup, flakeCache);
 
     // Guard against symlink attacks.
@@ -217,6 +218,7 @@ static Flake getFlake(
 
     Flake flake {
         .originalRef = originalRef,
+        .resolvedRef = resolvedRef,
         .lockedRef = lockedRef,
         .sourceInfo = std::make_shared<fetchers::Tree>(std::move(sourceInfo))
     };
@@ -490,7 +492,7 @@ LockedFlake lockFlake(
                 }
 
                 else {
-                    auto [sourceInfo, lockedRef] = fetchOrSubstituteTree(
+                    auto [sourceInfo, resolvedRef, lockedRef] = fetchOrSubstituteTree(
                         state, input.ref, {}, lockFlags.useRegistries, flakeCache);
                     node->inputs.insert_or_assign(id,
                         std::make_shared<LockedNode>(lockedRef, input.ref, sourceInfo.info, false));

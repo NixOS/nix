@@ -80,7 +80,8 @@ struct CmdFlakeList : EvalCommand
 
 static void printFlakeInfo(const Store & store, const Flake & flake)
 {
-    std::cout << fmt("URL:           %s\n", flake.lockedRef.to_string());
+    std::cout << fmt("Resolved URL:  %s\n", flake.resolvedRef.to_string());
+    std::cout << fmt("Locked URL:    %s\n", flake.lockedRef.to_string());
     std::cout << fmt("Edition:       %s\n", flake.edition);
     if (flake.description)
         std::cout << fmt("Description:   %s\n", *flake.description);
@@ -100,8 +101,11 @@ static nlohmann::json flakeToJson(const Store & store, const Flake & flake)
     if (flake.description)
         j["description"] = *flake.description;
     j["edition"] = flake.edition;
-    j["url"] = flake.lockedRef.to_string();
+    j["originalUrl"] = flake.originalRef.to_string();
     j["original"] = attrsToJson(flake.originalRef.toAttrs());
+    j["resolvedUrl"] = flake.resolvedRef.to_string();
+    j["resolved"] = attrsToJson(flake.resolvedRef.toAttrs());
+    j["url"] = flake.lockedRef.to_string(); // FIXME: rename to lockedUrl
     j["locked"] = attrsToJson(flake.lockedRef.toAttrs());
     j["info"] = flake.sourceInfo->info.toJson();
     if (auto rev = flake.lockedRef.input->getRev())
@@ -153,39 +157,14 @@ struct CmdFlakeInfo : FlakeCommand, MixJSON
 
     void run(nix::ref<nix::Store> store) override
     {
+        auto flake = getFlake();
+        stopProgressBar();
+
         if (json) {
-            auto state = getEvalState();
-            auto flake = lockFlake();
-
-            auto json = flakeToJson(*store, flake.flake);
-
-            auto vFlake = state->allocValue();
-            flake::callFlake(*state, flake, *vFlake);
-
-            auto outputs = nlohmann::json::object();
-
-            enumerateOutputs(*state,
-                *vFlake,
-                [&](const std::string & name, Value & vProvide, const Pos & pos) {
-                    auto provide = nlohmann::json::object();
-
-                    if (name == "checks" || name == "packages") {
-                        state->forceAttrs(vProvide, pos);
-                        for (auto & aCheck : *vProvide.attrs)
-                            provide[aCheck.name] = nlohmann::json::object();
-                    }
-
-                    outputs[name] = provide;
-                });
-
-            json["outputs"] = std::move(outputs);
-
+            auto json = flakeToJson(*store, flake);
             std::cout << json.dump() << std::endl;
-        } else {
-            auto flake = getFlake();
-            stopProgressBar();
+        } else
             printFlakeInfo(*store, flake);
-        }
     }
 };
 
