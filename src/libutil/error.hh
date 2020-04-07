@@ -41,152 +41,7 @@ class NixCode
 public:
     std::optional<string> nixFile;
     std::optional<ErrLine> errLine;
-
-    ErrLine& ensureErrLine()
-    {
-        if (!this->errLine.has_value())
-            this->errLine = std::optional(ErrLine());
-        return *this->errLine;
-    }
 };
-
-// -------------------------------------------------
-// ErrorInfo.
-
-// Forward friend class declarations.    "builder classes"
-template <class T>
-class AddName;
-
-template <class T>
-class AddDescription;
-
-template <class T>
-class AddPos;
-
-template <class T>
-class AddLOC;
-
-// The error info class itself.
-class ErrorInfo
-{
-public:
-    ErrLevel level;
-    string name;
-    string description;
-    std::optional<NixCode> nixCode;
-    std::optional<string> hint;
-    ErrorInfo& GetEI()
-    {
-        return *this;
-    }
-
-    static std::optional<string> programName;
-
-    // give these access to the private constructor,
-    // when they are direct descendants (children but not grandchildren).
-    friend AddName<ErrorInfo>;
-    friend AddDescription<ErrorInfo>;
-    friend AddPos<ErrorInfo>;
-    friend AddLOC<ErrorInfo>;
-
-    NixCode& ensureNixCode()
-    {
-        if (!this->nixCode.has_value())
-            this->nixCode = std::optional(NixCode());
-        return *this->nixCode;
-    }
-protected:
-    // constructor is protected, so only the builder classes can create an ErrorInfo.
-    ErrorInfo(ErrLevel level)
-    {
-        this->level = level;
-    }
-};
-
-// Init as error
-class EIError : public ErrorInfo
-{
-protected:
-    EIError() : ErrorInfo(elError) {}
-};
-
-// Init as warning
-class EIWarning : public ErrorInfo
-{
-protected:
-    EIWarning() : ErrorInfo(elWarning) {}
-};
-
-// Builder class definitions.
-template <class T>
-class AddName : private T
-{
-public:
-    T& name(const std::string &name)
-    {
-        GetEI().name = name;
-        return *this;
-    }
-protected:
-    ErrorInfo& GetEI()
-    {
-        return T::GetEI();
-    }
-};
-
-template <class T>
-class AddDescription : private T
-{
-public:
-    T& description(const std::string &description)
-    {
-        GetEI().description = description;
-        return *this;
-    }
-protected:
-    ErrorInfo& GetEI()
-    {
-        return T::GetEI();
-    }
-};
-
-template <class T>
-class AddPos : private T
-{
-public:
-    template <class P>
-    T& pos(const P &aPos)
-    {
-        GetEI().ensureNixCode().nixFile = aPos.file;
-        GetEI().ensureNixCode().ensureErrLine().lineNumber = aPos.line;
-        GetEI().ensureNixCode().ensureErrLine().columnRange = { .start = aPos.column, .len = 1 };
-        return *this;
-    }
-protected:
-    ErrorInfo& GetEI()
-    {
-        return T::GetEI();
-    }
-};
-
-template <class T>
-class AddLOC : private T
-{
-public:
-    T& linesOfCode(std::optional<string> prevloc, string loc, std::optional<string> nextloc)
-    {
-        GetEI().ensureNixCode().ensureErrLine().prevLineOfCode = prevloc;
-        GetEI().ensureNixCode().ensureErrLine().errLineOfCode = loc;
-        GetEI().ensureNixCode().ensureErrLine().nextLineOfCode = nextloc;
-        return *this;
-    }
-protected:
-    ErrorInfo& GetEI()
-    {
-        return T::GetEI();
-    }
-};
-
 
 // ----------------------------------------------------------------
 // format for hints.  same as fmt, except templated values
@@ -229,7 +84,6 @@ public:
     friend class AddHint;
 private:
     format fmt;
-
 };
 
 template<typename... Args>
@@ -240,6 +94,143 @@ inline hintformat hintfmt(const std::string & fs, const Args & ... args)
     return f;
 }
 
+// -------------------------------------------------
+// ErrorInfo.
+class ErrorInfo
+{
+public:
+    ErrLevel level;
+    string name;
+    string description;
+    std::optional<NixCode> nixCode;
+    std::optional<string> hint;
+
+    static std::optional<string> programName;
+
+    static ErrorInfo ProgramError(const string &name,
+                                  const string &description,
+                                  const std::optional<hintformat> &hf);
+
+
+    static ErrorInfo ProgramWarning(const string &name,
+                                    const string &description,
+                                    const std::optional<hintformat> &hf);
+
+
+    template <class P>
+    static ErrorInfo NixLangError(const string &name,
+                                  const string &description,
+                                  const P &pos,
+                                  std::optional<string> prevloc,
+                                  string loc,
+                                  std::optional<string> nextloc,
+                                  const std::optional<hintformat> &hf)
+    {
+        return NixLangEI(elError, name, description, pos, prevloc, loc, nextloc, hf);
+    }
+
+
+    template <class P>
+    static ErrorInfo NixLangWarning(const string &name,
+                                    const string &description,
+                                    const P &pos,
+                                    std::optional<string> prevloc,
+                                    string loc,
+                                    std::optional<string> nextloc,
+                                    const std::optional<hintformat> &hf)
+    {
+        return NixLangEI(elWarning, name, description, pos, prevloc, loc, nextloc, hf);
+    }
+
+
+
+private:
+    template <class P>
+    static ErrorInfo NixLangEI(ErrLevel level,
+                               const string &name,
+                               const string &description,
+                               const P &pos,
+                               std::optional<string> prevloc,
+                               string loc,
+                               std::optional<string> nextloc,
+                               const std::optional<hintformat> &hf)
+    {
+        ErrorInfo ei(level);
+        ei.name = name;
+        ei.description = description;
+        if (hf.has_value())
+            ei.hint = std::optional<string>(hf->str());
+        else
+            ei.hint = std::nullopt;
+
+        ErrLine errline;
+        errline.lineNumber = pos.line;
+        errline.columnRange = { .start = pos.column, .len = 1 };
+        errline.prevLineOfCode = prevloc;
+        errline.errLineOfCode = loc;
+        errline.nextLineOfCode = nextloc;
+        NixCode nixcode;
+        nixcode.nixFile = pos.file;
+        nixcode.errLine = std::optional(errline);
+        ei.nixCode = std::optional(nixcode);
+
+        return ei;
+    }
+
+    static ErrorInfo ProgramEI(ErrLevel level,
+                               const string &name,
+                               const string &description,
+                               const std::optional<hintformat> &hf);
+
+
+
+    // constructor is protected, so only the builder classes can create an ErrorInfo.
+    ErrorInfo(ErrLevel level)
+    {
+        this->level = level;
+    }
+};
+
+/*
+template <class T>
+class AddPos : private T
+{
+public:
+    template <class P>
+    T& pos(const P &aPos)
+    {
+        GetEI().ensureNixCode().nixFile = aPos.file;
+        GetEI().ensureNixCode().ensureErrLine().lineNumber = aPos.line;
+        GetEI().ensureNixCode().ensureErrLine().columnRange = { .start = aPos.column, .len = 1 };
+        return *this;
+    }
+protected:
+    ErrorInfo& GetEI()
+    {
+        return T::GetEI();
+    }
+};
+
+template <class T>
+class AddLOC : private T
+{
+public:
+    T& linesOfCode(std::optional<string> prevloc, string loc, std::optional<string> nextloc)
+    {
+        GetEI().ensureNixCode().ensureErrLine().prevLineOfCode = prevloc;
+        GetEI().ensureNixCode().ensureErrLine().errLineOfCode = loc;
+        GetEI().ensureNixCode().ensureErrLine().nextLineOfCode = nextloc;
+        return *this;
+    }
+protected:
+    ErrorInfo& GetEI()
+    {
+        return T::GetEI();
+    }
+};
+*/
+
+/*
 // the template layer for adding a hint.
 template <class T>
 class AddHint : private T
@@ -261,11 +252,12 @@ protected:
         return T::GetEI();
     }
 };
+*/
 
 // --------------------------------------------------------
 // error types
 
-typedef AddName<
+/*typedef AddName<
         AddDescription<
         AddHint<
         EIError>>> ProgramError;
@@ -290,11 +282,12 @@ typedef AddName<
         EIWarning>>>>> NixLangWarning;
 
 
+*/
 // --------------------------------------------------------
 // error printing
 
 // just to cout for now.
-void printErrorInfo(ErrorInfo &einfo);
+void printErrorInfo(const ErrorInfo &einfo);
 
 }
 

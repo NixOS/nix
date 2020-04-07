@@ -22,21 +22,25 @@ int main()
     // created.
 
     // ProgramError takes name, description, and an optional hint.
-    printErrorInfo( ProgramError()
-                    .name("name")
-                    .description("error description")
-                    .nohint()
-                  );
+    printErrorInfo(
+        ErrorInfo::ProgramError("name",
+                                "error description",
+                                std::nullopt));
 
     // ProgramWarning takes name, description, and an optional hint.
     // The hint is in the form of a hintfmt class, which wraps boost::format(),
     // and makes all the substituted text yellow.
-    printErrorInfo( ProgramWarning()
-                    .name("warning name")
-                    .description("warning description")
-                    // the templated value, 'warning', is automatically colored yellow.
-                    .hint(hintfmt("there was a %1%", "warning")) 
-                  );
+    printErrorInfo(
+        ErrorInfo::ProgramWarning("name",
+                                  "warning description",
+                                  std::optional(hintfmt("there was a %1%", "warning"))));
+
+    // printErrorInfo( ProgramWarning()
+    //                 .name("warning name")
+    //                 .description("warning description")
+    //                 // the templated value, 'warning', is automatically colored yellow.
+    //                 .hint(hintfmt("there was a %1%", "warning"))
+    //               );
 
     /*
       // some invalid errors:
@@ -63,25 +67,34 @@ int main()
     SymbolTable testTable;
     auto problem_symbol = testTable.create("problem");
 
-    printErrorInfo(NixLangWarning()
-                   .name("warning name")
-                   .description("warning description")
-                   .pos(Pos(problem_symbol, 40, 13))
-                   .linesOfCode(std::nullopt,
-                                "this is the problem line of code",
-                                std::nullopt)
-                   .hint(hintfmt("this hint has %1% templated %2%!!", "yellow" , "values")));
+    printErrorInfo(ErrorInfo::NixLangWarning(
+                       "warning name",
+                       "warning description",
+                       Pos(problem_symbol, 40, 13),
+                       std::nullopt,
+                       "this is the problem line of code",
+                       std::nullopt,
+                       hintfmt("this hint has %1% templated %2%!!", "yellow", "values")));
 
-    // NixLangError is just the same as NixLangWarning, except for the Error
-    // flag.
-    printErrorInfo(NixLangError()
-                   .name("error name")
-                   .description("error description")
-                   .pos(Pos(problem_symbol, 40, 13))
-                   .linesOfCode(std::optional("previous line of code"),
-                                "this is the problem line of code",
-                                std::optional("next line of code"))
-                   .hint(hintfmt("this hint has %1% templated %2%!!", "yellow", "values")));
+    // // NixLangError is just the same as NixLangWarning, except for the Error
+    // // flag.
+    // printErrorInfo(NixLangError()
+    //                .name("error name")
+    //                .description("error description")
+    //                .pos(Pos(problem_symbol, 40, 13))
+    //                .linesOfCode(std::optional("previous line of code"),
+    //                             "this is the problem line of code",
+    //                             std::optional("next line of code"))
+    //                .hint(hintfmt("this hint has %1% templated %2%!!", "yellow", "values")));
+    printErrorInfo(ErrorInfo::NixLangError(
+                       "error name",
+                       "error description",
+                       Pos(problem_symbol, 40, 13),
+                       std::optional("previous line of code"),
+                       "this is the problem line of code",
+                       std::optional("next line of code"),
+                       hintfmt("this hint has %1% templated %2%!!", "yellow", "values")));
+
 
     return 0;
 }

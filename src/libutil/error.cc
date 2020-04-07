@@ -8,7 +8,43 @@ namespace nix
 
 std::optional<string> ErrorInfo::programName = std::nullopt;
 
-string showErrLine(ErrLine &errLine)
+ErrorInfo ErrorInfo::ProgramError(const string &name,
+                                  const string &description,
+                                  const std::optional<hintformat> &hf)
+{
+    return ProgramEI(elError, name, description, hf);
+}
+
+ErrorInfo ErrorInfo::ProgramWarning(const string &name,
+                                    const string &description,
+                                    const std::optional<hintformat> &hf)
+{
+    return ProgramEI(elWarning, name, description, hf);
+}
+
+
+
+ErrorInfo ErrorInfo::ProgramEI(ErrLevel level,
+                               const string &name,
+                               const string &description,
+                               const std::optional<hintformat> &hf)
+{
+    ErrorInfo ei(elError);
+    ei.name = name;
+    ei.description = description;
+    if (hf.has_value())
+        ei.hint = std::optional<string>(hf->str());
+    else
+        ei.hint = std::nullopt;
+    return ei;
+}
+
+
+
+
+
+
+string showErrLine(const ErrLine &errLine)
 {
     if (errLine.columnRange.has_value()) {
         return (format("(%1%:%2%)") % errLine.lineNumber % errLine.columnRange->start).str();
@@ -17,7 +53,7 @@ string showErrLine(ErrLine &errLine)
     };
 }
 
-void printCodeLines(string &prefix, NixCode &nixCode)
+void printCodeLines(const string &prefix, const NixCode &nixCode)
 {
 
     if (nixCode.errLine.has_value()) {
@@ -69,7 +105,7 @@ void printCodeLines(string &prefix, NixCode &nixCode)
 
 }
 
-void printErrorInfo(ErrorInfo &einfo)
+void printErrorInfo(const ErrorInfo &einfo)
 {
     int errwidth = 80;
     string prefix = "    ";
