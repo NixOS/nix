@@ -17,20 +17,13 @@ typedef enum {
     elError
 } ErrLevel;
 
-class ColumnRange
-{
-public:
-    unsigned int start;
-    unsigned int len;
-};
-
 class ErrorInfo;
 
 class ErrLine
 {
 public:
     int lineNumber;
-    std::optional<ColumnRange> columnRange;
+    int column;
     std::optional<string> prevLineOfCode;
     string errLineOfCode;
     std::optional<string> nextLineOfCode;
@@ -159,7 +152,7 @@ public:
     {
         GetEI().ensureNixCode().nixFile = aPos.file;
         GetEI().ensureNixCode().ensureErrLine().lineNumber = aPos.line;
-        GetEI().ensureNixCode().ensureErrLine().columnRange = { .start = aPos.column, .len = 1 };
+        GetEI().ensureNixCode().ensureErrLine().column = aPos.column;
         return *this;
     }
 protected:

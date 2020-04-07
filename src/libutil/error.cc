@@ -10,10 +10,10 @@ std::optional<string> ErrorInfo::programName = std::nullopt;
 
 string showErrLine(ErrLine &errLine)
 {
-    if (errLine.columnRange.has_value()) {
-        return (format("(%1%:%2%)") % errLine.lineNumber % errLine.columnRange->start).str();
+    if (errLine.column > 0) {
+        return fmt("(%1%:%2%)", errLine.lineNumber, errLine.column);
     } else {
-        return (format("(%1%)") % errLine.lineNumber).str();
+        return fmt("(%1%)", errLine.lineNumber);
     };
 }
 
@@ -23,45 +23,45 @@ void printCodeLines(string &prefix, NixCode &nixCode)
     if (nixCode.errLine.has_value()) {
         // previous line of code.
         if (nixCode.errLine->prevLineOfCode.has_value()) {
-            std::cout << format("%1% %|2$5d|| %3%")
-                      %    prefix
-                      % (nixCode.errLine->lineNumber - 1)
-                      % *nixCode.errLine->prevLineOfCode
+            std::cout << fmt("%1% %|2$5d|| %3%",
+                             prefix,
+                             (nixCode.errLine->lineNumber - 1),
+                             *nixCode.errLine->prevLineOfCode)
                       << std::endl;
         }
 
         // line of code containing the error.%2$+5d%
-        std::cout << format("%1% %|2$5d|| %3%")
-                  %    prefix
-                  % (nixCode.errLine->lineNumber)
-                  % nixCode.errLine->errLineOfCode
+        std::cout << fmt("%1% %|2$5d|| %3%",
+                         prefix,
+                         (nixCode.errLine->lineNumber),
+                         nixCode.errLine->errLineOfCode)
                   << std::endl;
 
         // error arrows for the column range.
-        if (nixCode.errLine->columnRange.has_value()) {
-            int start = nixCode.errLine->columnRange->start;
+        if (nixCode.errLine->column > 0) {
+            int start = nixCode.errLine->column;
             std::string spaces;
             for (int i = 0; i < start; ++i) {
                 spaces.append(" ");
             }
 
-            int len = nixCode.errLine->columnRange->len;
-            std::string arrows;
-            for (int i = 0; i < len; ++i) {
-                arrows.append("^");
-            }
+            // for now, length of 1.
+            std::string arrows("^");
 
-            std::cout << format("%1%      |%2%" ANSI_RED "%3%" ANSI_NORMAL) % prefix % spaces % arrows << std::endl;
+            std::cout << fmt("%1%      |%2%" ANSI_RED "%3%" ANSI_NORMAL,
+                             prefix,
+                             spaces,
+                             arrows) << std::endl;
         }
 
 
 
         // next line of code.
         if (nixCode.errLine->nextLineOfCode.has_value()) {
-            std::cout << format("%1% %|2$5d|| %3%")
-                      %    prefix
-                      % (nixCode.errLine->lineNumber + 1)
-                      % *nixCode.errLine->nextLineOfCode
+            std::cout << fmt("%1% %|2$5d|| %3%",
+                             prefix,
+                             (nixCode.errLine->lineNumber + 1),
+                             *nixCode.errLine->nextLineOfCode)
                       << std::endl;
         }
 
@@ -89,7 +89,7 @@ void printErrorInfo(ErrorInfo &einfo)
         break;
     }
     default: {
-        levelString = (format("invalid error level: %1%") % einfo.level).str();
+        levelString = fmt("invalid error level: %1%", einfo.level);
         break;
     }
     }
@@ -102,13 +102,13 @@ void printErrorInfo(ErrorInfo &einfo)
         dashes.append("-");
 
     // divider.
-    std::cout << format("%1%%2%" ANSI_BLUE " %3% %4% %5% %6%" ANSI_NORMAL)
-              % prefix
-              % levelString
-              % "---"
-              % einfo.name
-              % dashes
-              % einfo.programName.value_or("")
+    std::cout << fmt("%1%%2%" ANSI_BLUE " %3% %4% %5% %6%" ANSI_NORMAL
+                     , prefix
+                     , levelString
+                     , "---"
+                     , einfo.name
+                     , dashes
+                     , einfo.programName.value_or(""))
               << std::endl;
 
     // filename.
@@ -118,11 +118,11 @@ void printErrorInfo(ErrorInfo &einfo)
                            ? string(" ") + showErrLine(*einfo.nixCode->errLine)
                            : "";
 
-            std::cout << format("%1%in file: " ANSI_BLUE "%2%%3%" ANSI_NORMAL)
-                      % prefix % *einfo.nixCode->nixFile % eline << std::endl;
+            std::cout << fmt("%1%in file: " ANSI_BLUE "%2%%3%" ANSI_NORMAL
+                             , prefix, *einfo.nixCode->nixFile, eline) << std::endl;
             std::cout << prefix << std::endl;
         } else {
-            std::cout << format("%1%from command line argument") % prefix << std::endl;
+            std::cout << fmt("%1%from command line argument", prefix) << std::endl;
             std::cout << prefix << std::endl;
         }
     }
