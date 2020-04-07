@@ -1,14 +1,10 @@
 #include "download.hh"
 #include "util.hh"
 #include "globals.hh"
-#include "hash.hh"
 #include "store-api.hh"
-#include "archive.hh"
 #include "s3.hh"
 #include "compression.hh"
-#include "pathlocks.hh"
 #include "finally.hh"
-#include "tarfile.hh"
 
 #ifdef ENABLE_S3
 #include <aws/core/client/ClientConfiguration.h>
@@ -386,6 +382,7 @@ struct CurlDownloader : public Downloader
                         case CURLE_SSL_CACERT_BADFILE:
                         case CURLE_TOO_MANY_REDIRECTS:
                         case CURLE_WRITE_ERROR:
+                        case CURLE_UNSUPPORTED_PROTOCOL:
                             err = Misc;
                             break;
                         default: // Shut up warnings

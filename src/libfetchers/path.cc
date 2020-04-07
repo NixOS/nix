@@ -63,6 +63,8 @@ struct PathInput : Input
     {
         auto input = std::make_shared<PathInput>(*this);
 
+        // FIXME: check whether access to 'path' is allowed.
+
         auto storePath = store->maybeParseStorePath(path);
 
         if (storePath)

@@ -2,8 +2,8 @@
 #include "eval-inline.hh"
 #include "store-api.hh"
 #include "fetchers.hh"
-#include "registry.hh"
 #include "download.hh"
+#include "registry.hh"
 
 #include <ctime>
 #include <iomanip>

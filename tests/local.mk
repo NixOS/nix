@@ -17,6 +17,7 @@ nix_tests = \
   nar-access.sh \
   structured-attrs.sh \
   fetchGit.sh \
+  fetchGitSubmodules.sh \
   fetchMercurial.sh \
   signing.sh \
   run.sh \
