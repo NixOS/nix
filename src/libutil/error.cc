@@ -46,8 +46,8 @@ ErrorInfo ErrorInfo::ProgramEI(ErrLevel level,
 
 string showErrLine(const ErrLine &errLine)
 {
-    if (errLine.columnRange.has_value()) {
-        return (format("(%1%:%2%)") % errLine.lineNumber % errLine.columnRange->start).str();
+    if (errLine.column > 0) {
+        return (format("(%1%:%2%)") % errLine.lineNumber % errLine.column).str();
     } else {
         return (format("(%1%)") % errLine.lineNumber).str();
     };
@@ -74,18 +74,14 @@ void printCodeLines(const string &prefix, const NixCode &nixCode)
                   << std::endl;
 
         // error arrows for the column range.
-        if (nixCode.errLine->columnRange.has_value()) {
-            int start = nixCode.errLine->columnRange->start;
+        if (nixCode.errLine->column > 0) {
+            int start = nixCode.errLine->column;
             std::string spaces;
             for (int i = 0; i < start; ++i) {
                 spaces.append(" ");
             }
 
-            int len = nixCode.errLine->columnRange->len;
-            std::string arrows;
-            for (int i = 0; i < len; ++i) {
-                arrows.append("^");
-            }
+            std::string arrows("^");
 
             std::cout << format("%1%      |%2%" ANSI_RED "%3%" ANSI_NORMAL) % prefix % spaces % arrows << std::endl;
         }

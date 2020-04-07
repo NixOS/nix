@@ -17,20 +17,13 @@ typedef enum {
     elError
 } ErrLevel;
 
-class ColumnRange
-{
-public:
-    unsigned int start;
-    unsigned int len;
-};
-
 class ErrorInfo;
 
 class ErrLine
 {
 public:
     int lineNumber;
-    std::optional<ColumnRange> columnRange;
+    int column;
     std::optional<string> prevLineOfCode;
     string errLineOfCode;
     std::optional<string> nextLineOfCode;
@@ -107,6 +100,8 @@ public:
 
     static std::optional<string> programName;
 
+    ErrorInfo& set_name(const string &name) { this->name = name; return *this; }
+
     static ErrorInfo ProgramError(const string &name,
                                   const string &description,
                                   const std::optional<hintformat> &hf);
@@ -165,7 +160,7 @@ private:
 
         ErrLine errline;
         errline.lineNumber = pos.line;
-        errline.columnRange = { .start = pos.column, .len = 1 };
+        errline.column = pos.column;
         errline.prevLineOfCode = prevloc;
         errline.errLineOfCode = loc;
         errline.nextLineOfCode = nextloc;
