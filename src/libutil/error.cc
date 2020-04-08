@@ -11,9 +11,9 @@ std::optional<string> ErrorInfo::programName = std::nullopt;
 string showErrPos(const ErrPos &errPos)
 {
     if (errPos.column > 0) {
-        return (format("(%1%:%2%)") % errPos.lineNumber % errPos.column).str();
+        return fmt("(%1%:%2%)", errPos.lineNumber, errPos.column);
     } else {
-        return (format("(%1%)") % errPos.lineNumber).str();
+        return fmt("(%1%)", errPos.lineNumber);
     };
 }
 
@@ -21,18 +21,18 @@ void printCodeLines(const string &prefix, const NixCode &nixCode)
 {
     // previous line of code.
     if (nixCode.prevLineOfCode.has_value()) {
-        std::cout << format("%1% %|2$5d|| %3%")
-                  % prefix
-                  % (nixCode.errPos.lineNumber - 1)
-                  % *nixCode.prevLineOfCode
+        std::cout << fmt("%1% %|2$5d|| %3%",
+                         prefix,
+                         (nixCode.errPos.lineNumber - 1),
+                         *nixCode.prevLineOfCode)
                   << std::endl;
     }
 
     // line of code containing the error.%2$+5d%
-    std::cout << format("%1% %|2$5d|| %3%")
-              % prefix
-              % (nixCode.errPos.lineNumber)
-              % nixCode.errLineOfCode
+    std::cout << fmt("%1% %|2$5d|| %3%",
+                     prefix,
+                     (nixCode.errPos.lineNumber),
+                     nixCode.errLineOfCode)
               << std::endl;
 
     // error arrows for the column range.
@@ -45,15 +45,18 @@ void printCodeLines(const string &prefix, const NixCode &nixCode)
 
         std::string arrows("^");
 
-        std::cout << format("%1%      |%2%" ANSI_RED "%3%" ANSI_NORMAL) % prefix % spaces % arrows << std::endl;
+        std::cout << fmt("%1%      |%2%" ANSI_RED "%3%" ANSI_NORMAL,
+                         prefix,
+                         spaces,
+                         arrows) << std::endl;
     }
 
     // next line of code.
     if (nixCode.nextLineOfCode.has_value()) {
-        std::cout << format("%1% %|2$5d|| %3%")
-                  %    prefix
-                  % (nixCode.errPos.lineNumber + 1)
-                  % *nixCode.nextLineOfCode
+        std::cout << fmt("%1% %|2$5d|| %3%",
+                         prefix,
+                         (nixCode.errPos.lineNumber + 1),
+                         *nixCode.nextLineOfCode)
                   << std::endl;
     }
 }
@@ -78,8 +81,8 @@ void printErrorInfo(const ErrorInfo &einfo)
         break;
     }
     default: {
-        levelString = (format("invalid error level: %1%") % einfo.level).str();
-        break;
+        levelString = fmt("invalid error level: %1%", einfo.level);
+                       break;
     }
     }
 
@@ -91,13 +94,13 @@ void printErrorInfo(const ErrorInfo &einfo)
         dashes.append("-");
 
     // divider.
-    std::cout << format("%1%%2%" ANSI_BLUE " %3% %4% %5% %6%" ANSI_NORMAL)
-              % prefix
-              % levelString
-              % "---"
-              % einfo.name
-              % dashes
-              % einfo.programName.value_or("")
+    std::cout << fmt("%1%%2%" ANSI_BLUE " %3% %4% %5% %6%" ANSI_NORMAL,
+                     prefix,
+                     levelString,
+                     "---",
+                     einfo.name,
+                     dashes,
+                     einfo.programName.value_or(""))
               << std::endl;
 
     // filename.
@@ -107,11 +110,11 @@ void printErrorInfo(const ErrorInfo &einfo)
                            ? string(" ") + showErrPos(einfo.nixCode->errPos)
                            : "";
 
-            std::cout << format("%1%in file: " ANSI_BLUE "%2%%3%" ANSI_NORMAL)
-                      % prefix % einfo.nixCode->errPos.nixFile % eline << std::endl;
+            std::cout << fmt("%1%in file: " ANSI_BLUE "%2%%3%" ANSI_NORMAL
+                             , prefix, einfo.nixCode->errPos.nixFile, eline) << std::endl;
             std::cout << prefix << std::endl;
         } else {
-            std::cout << format("%1%from command line argument") % prefix << std::endl;
+            std::cout << fmt("%1%from command line argument", prefix) << std::endl;
             std::cout << prefix << std::endl;
         }
     }
