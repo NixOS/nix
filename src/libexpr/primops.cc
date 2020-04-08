@@ -1353,9 +1353,12 @@ static void prim_functionArgs(EvalState & state, const Pos & pos, Value * * args
     }
 
     state.mkAttrs(v, args[0]->lambda.fun->formals->formals.size());
-    for (auto & i : args[0]->lambda.fun->formals->formals)
+    for (auto & i : args[0]->lambda.fun->formals->formals) {
         // !!! should optimise booleans (allocate only once)
-        mkBool(*state.allocAttr(v, i.name), i.def);
+        Value * value = state.allocValue();
+        v.attrs->push_back(Attr(i.name, value, &i.pos));
+        mkBool(*value, i.def);
+    }
     v.attrs->sort();
 }
 
