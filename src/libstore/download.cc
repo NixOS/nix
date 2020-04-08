@@ -86,8 +86,15 @@ struct CurlDownloader : public Downloader
             , callback(std::move(callback))
             , finalSink([this](const unsigned char * data, size_t len) {
                 if (this->request.dataCallback) {
-                    writtenToSink += len;
-                    this->request.dataCallback((char *) data, len);
+                    long httpStatus = 0;
+                    curl_easy_getinfo(req, CURLINFO_RESPONSE_CODE, &httpStatus);
+
+                    /* Only write data to the sink if this is a
+                       successful response. */
+                    if (httpStatus == 0 || httpStatus == 200 || httpStatus == 201 || httpStatus == 206) {
+                        writtenToSink += len;
+                        this->request.dataCallback((char *) data, len);
+                    }
                 } else
                     this->result.data->append((char *) data, len);
               })
