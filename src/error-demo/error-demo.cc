@@ -31,36 +31,43 @@ int main()
                     .name = "name",
                     .description = "error description",
                     .hint =  std::optional(
-                                      hintfmt("there was a %1%", "warning"))
+                                 hintfmt("there was a %1%", "warning")),
                   });
 
 
     // NixLangWarning adds nix file, line number, column range, and the lines of
     // code where a warning occurred.
-/*    SymbolTable testTable;
-    auto problem_symbol = testTable.create("problem");
+    SymbolTable testTable;
+    auto problem_file = testTable.create("myfile.nix");
 
     printErrorInfo(
-        ErrorInfo::NixLangWarning(
-            "warning name",
-            "warning description",
-            Pos(problem_symbol, 40, 13),
-            std::nullopt,
-            "this is the problem line of code",
-            std::nullopt,
-            hintfmt("this hint has %1% templated %2%!!", "yellow", "values")));
+        ErrorInfo{
+            .level = elWarning,
+            .name = "warning name",
+            .description = "warning description",
+            .hint = hintfmt("this hint has %1% templated %2%!!", "yellow", "values"),
+            .nixCode = NixCode {
+                .errPos = Pos(problem_file, 40, 13),
+                .prevLineOfCode = std::nullopt,
+                .errLineOfCode = "this is the problem line of code",
+                .nextLineOfCode = std::nullopt
+            }});
 
     // NixLangError is just the same as NixLangWarning, except for the Error
     // flag.
     printErrorInfo(
-        ErrorInfo::NixLangError(
-            "error name",
-            "error description",
-            Pos(problem_symbol, 40, 13),
-            std::optional("previous line of code"),
-            "this is the problem line of code",
-            std::optional("next line of code"),
-            hintfmt("this hint has %1% templated %2%!!", "yellow", "values")));
+        ErrorInfo{
+            .level = elError,
+            .name = "error name",
+            .description = "error description",
+            .hint = hintfmt("this hint has %1% templated %2%!!", "yellow", "values"),
+            .nixCode = NixCode {
+                .errPos = Pos(problem_file, 40, 13),
+                .prevLineOfCode = std::optional("previous line of code"),
+                .errLineOfCode = "this is the problem line of code",
+                .nextLineOfCode = std::optional("next line of code"),
+            }});
 
-*/    return 0;
+
+    return 0;
 }

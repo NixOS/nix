@@ -29,9 +29,24 @@ public:
     {
         lineNumber = pos.line;
         column = pos.column;
-        nixFile = pos.file.str();
+        nixFile = pos.file;
         return *this;
     }
+
+    template <class P>
+    ErrPos(const P &p)
+    {
+      *this = p;
+    }
+};
+
+class NixCode
+{
+public:
+    ErrPos errPos;
+    std::optional<string> prevLineOfCode;
+    string errLineOfCode;
+    std::optional<string> nextLineOfCode;
 };
 
 // ----------------------------------------------------------------
@@ -99,55 +114,11 @@ public:
     string name;
     string description;
     std::optional<hintformat> hint;
-    std::optional<string> prevLineOfCode;
-    string errLineOfCode;
-    std::optional<string> nextLineOfCode;
-    std::optional<ErrPos> errPos;
+    std::optional<NixCode> nixCode;
 
     static std::optional<string> programName;
 
 private:
-    // template <class P>
-    // static ErrorInfo NixLangEI(ErrLevel level,
-    //                            const string &name,
-    //                            const string &description,
-    //                            const P &pos,
-    //                            std::optional<string> prevloc,
-    //                            string loc,
-    //                            std::optional<string> nextloc,
-    //                            const std::optional<hintformat> &hf)
-    // {
-    //     ErrorInfo ei(level);
-    //     ei.name = name;
-    //     ei.description = description;
-    //     if (hf.has_value())
-    //         ei.hint = std::optional<string>(hf->str());
-    //     else
-    //         ei.hint = std::nullopt;
-
-    //     ErrLine errline;
-    //     errline.lineNumber = pos.line;
-    //     errline.column = pos.column;
-    //     errline.prevLineOfCode = prevloc;
-    //     errline.errLineOfCode = loc;
-    //     errline.nextLineOfCode = nextloc;
-    //     NixCode nixcode;
-    //     nixcode.nixFile = pos.file;
-    //     nixcode.errLine = std::optional(errline);
-    //     ei.nixCode = std::optional(nixcode);
-
-    //     return ei;
-    // }
-
-    // static ErrorInfo ProgramEI(ErrLevel level,
-    //                            const string &name,
-    //                            const string &description,
-    //                            const std::optional<hintformat> &hf);
-
-
-
-    // constructor is protected, so only the builder classes can create an ErrorInfo.
-
 };
 
 // --------------------------------------------------------

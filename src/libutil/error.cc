@@ -17,51 +17,45 @@ string showErrPos(const ErrPos &errPos)
     };
 }
 
-void printCodeLines(const string &prefix, const ErrorInfo &einfo)
+void printCodeLines(const string &prefix, const NixCode &nixCode)
 {
-    if (einfo.errPos.has_value()) {
-        // previous line of code.
-        if (einfo.prevLineOfCode.has_value()) {
-            std::cout << format("%1% %|2$5d|| %3%")
-                      % prefix
-                      % (einfo.errPos->lineNumber - 1)
-                      % *einfo.prevLineOfCode
-                      << std::endl;
-        }
-
-        // line of code containing the error.%2$+5d%
+    // previous line of code.
+    if (nixCode.prevLineOfCode.has_value()) {
         std::cout << format("%1% %|2$5d|| %3%")
-                  %    prefix
-                  % (einfo.errPos->lineNumber)
-                  % einfo.errLineOfCode
+                  % prefix
+                  % (nixCode.errPos.lineNumber - 1)
+                  % *nixCode.prevLineOfCode
                   << std::endl;
-
-        // error arrows for the column range.
-        if (einfo.errPos->column > 0) {
-            int start = einfo.errPos->column;
-            std::string spaces;
-            for (int i = 0; i < start; ++i) {
-                spaces.append(" ");
-            }
-
-            std::string arrows("^");
-
-            std::cout << format("%1%      |%2%" ANSI_RED "%3%" ANSI_NORMAL) % prefix % spaces % arrows << std::endl;
-        }
-
-
-
-        // next line of code.
-        if (einfo.nextLineOfCode.has_value()) {
-            std::cout << format("%1% %|2$5d|| %3%")
-                      %    prefix
-                      % (einfo.errPos->lineNumber + 1)
-                      % *einfo.nextLineOfCode
-                      << std::endl;
-        }
-
     }
 
+    // line of code containing the error.%2$+5d%
+    std::cout << format("%1% %|2$5d|| %3%")
+              % prefix
+              % (nixCode.errPos.lineNumber)
+              % nixCode.errLineOfCode
+              << std::endl;
+
+    // error arrows for the column range.
+    if (nixCode.errPos.column > 0) {
+        int start = nixCode.errPos.column;
+        std::string spaces;
+        for (int i = 0; i < start; ++i) {
+            spaces.append(" ");
+        }
+
+        std::string arrows("^");
+
+        std::cout << format("%1%      |%2%" ANSI_RED "%3%" ANSI_NORMAL) % prefix % spaces % arrows << std::endl;
+    }
+
+    // next line of code.
+    if (nixCode.nextLineOfCode.has_value()) {
+        std::cout << format("%1% %|2$5d|| %3%")
+                  %    prefix
+                  % (nixCode.errPos.lineNumber + 1)
+                  % *nixCode.nextLineOfCode
+                  << std::endl;
+    }
 }
 
 void printErrorInfo(const ErrorInfo &einfo)
@@ -107,14 +101,14 @@ void printErrorInfo(const ErrorInfo &einfo)
               << std::endl;
 
     // filename.
-    if (einfo.errPos.has_value()) {
-        if (einfo.errPos->nixFile != "") {
-            string eline = einfo.errLineOfCode != ""
-                           ? string(" ") + showErrPos(*einfo.errPos)
+    if (einfo.nixCode.has_value()) {
+        if (einfo.nixCode->errPos.nixFile != "") {
+            string eline = einfo.nixCode->errLineOfCode != ""
+                           ? string(" ") + showErrPos(einfo.nixCode->errPos)
                            : "";
 
             std::cout << format("%1%in file: " ANSI_BLUE "%2%%3%" ANSI_NORMAL)
-                      % prefix % einfo.errPos->nixFile % eline << std::endl;
+                      % prefix % einfo.nixCode->errPos.nixFile % eline << std::endl;
             std::cout << prefix << std::endl;
         } else {
             std::cout << format("%1%from command line argument") % prefix << std::endl;
@@ -127,8 +121,8 @@ void printErrorInfo(const ErrorInfo &einfo)
     std::cout << prefix << std::endl;
 
     // lines of code.
-    if (einfo.errLineOfCode != "") {
-        printCodeLines(prefix, einfo);
+    if (einfo.nixCode->errLineOfCode != "") {
+        printCodeLines(prefix, *einfo.nixCode);
         std::cout << prefix << std::endl;
     }
 
