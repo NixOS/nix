@@ -82,7 +82,7 @@ void printErrorInfo(const ErrorInfo &einfo)
     }
     default: {
         levelString = fmt("invalid error level: %1%", einfo.level);
-                       break;
+        break;
     }
     }
 
