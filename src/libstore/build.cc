@@ -2161,7 +2161,7 @@ void DerivationGoal::startBuilder()
     if (needsHashRewrite()) {
 
         if (pathExists(homeDir))
-            throw Error(format("directory '%1%' exists; please remove it") % homeDir);
+            throw Error(format("home directory '%1%' exists; please remove it to assure purity of builds without sandboxing") % homeDir);
 
         /* We're not doing a chroot build, but we have some valid
            output paths.  Since we can't just overwrite or delete
