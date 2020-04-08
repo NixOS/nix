@@ -11,21 +11,15 @@ int main()
     // In each program where errors occur, this has to be set.
     ErrorInfo::programName = std::optional("error-demo");
 
-    // There are currently four constructor functions:
-    //
-    // 			ProgramError, ProgramWarning, NixLangError, NixLangWarning.
-    //
-
-    // ProgramError takes name, description, and an optional hint.
+    // Error in a program; no hint and no nix code.
     printErrorInfo(
         ErrorInfo { .level = elError,
                     .name = "name",
                     .description = "error description",
                   });
 
-    // ProgramWarning takes name, description, and an optional hint.
-    // The hint is in the form of a hintfmt class, which wraps boost::format(),
-    // and makes all the substituted text yellow.
+    // Warning with name, description, and hint.
+    // The hintfmt function makes all the substituted text yellow.
     printErrorInfo(
         ErrorInfo { .level = elWarning,
                     .name = "name",
@@ -35,7 +29,7 @@ int main()
                   });
 
 
-    // NixLangWarning adds nix file, line number, column range, and the lines of
+    // Warning with nix file, line number, column, and the lines of
     // code where a warning occurred.
     SymbolTable testTable;
     auto problem_file = testTable.create("myfile.nix");
@@ -53,8 +47,7 @@ int main()
                 .nextLineOfCode = std::nullopt
             }});
 
-    // NixLangError is just the same as NixLangWarning, except for the Error
-    // flag.
+    // Error with previous and next lines of code.
     printErrorInfo(
         ErrorInfo{
             .level = elError,

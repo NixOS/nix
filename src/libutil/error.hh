@@ -50,7 +50,7 @@ public:
 };
 
 // ----------------------------------------------------------------
-// format for hints.  same as fmt, except templated values
+// format function for hints.  same as fmt, except templated values
 // are always in yellow.
 
 template <class T>
