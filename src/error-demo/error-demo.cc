@@ -18,22 +18,26 @@ int main()
 
     // ProgramError takes name, description, and an optional hint.
     printErrorInfo(
-        ErrorInfo::ProgramError("name",
-                                "error description",
-                                std::nullopt));
+        ErrorInfo { .level = elError,
+                    .name = "name",
+                    .description = "error description",
+                  });
 
     // ProgramWarning takes name, description, and an optional hint.
     // The hint is in the form of a hintfmt class, which wraps boost::format(),
     // and makes all the substituted text yellow.
     printErrorInfo(
-        ErrorInfo::ProgramWarning("name",
-                                  "warning description",
-                                  std::optional(
-                                      hintfmt("there was a %1%", "warning"))));
+        ErrorInfo { .level = elWarning,
+                    .name = "name",
+                    .description = "error description",
+                    .hint =  std::optional(
+                                      hintfmt("there was a %1%", "warning"))
+                  });
+
 
     // NixLangWarning adds nix file, line number, column range, and the lines of
     // code where a warning occurred.
-    SymbolTable testTable;
+/*    SymbolTable testTable;
     auto problem_symbol = testTable.create("problem");
 
     printErrorInfo(
@@ -58,5 +62,5 @@ int main()
             std::optional("next line of code"),
             hintfmt("this hint has %1% templated %2%!!", "yellow", "values")));
 
-    return 0;
+*/    return 0;
 }

@@ -17,23 +17,21 @@ typedef enum {
     elError
 } ErrLevel;
 
-class ErrorInfo;
-
-class ErrLine
+class ErrPos
 {
 public:
     int lineNumber;
     int column;
-    std::optional<string> prevLineOfCode;
-    string errLineOfCode;
-    std::optional<string> nextLineOfCode;
-};
+    string nixFile;
 
-class NixCode
-{
-public:
-    std::optional<string> nixFile;
-    std::optional<ErrLine> errLine;
+    template <class P>
+    ErrPos& operator=(const P &pos)
+    {
+        lineNumber = pos.line;
+        column = pos.column;
+        nixFile = pos.file.str();
+        return *this;
+    }
 };
 
 // ----------------------------------------------------------------
@@ -79,6 +77,11 @@ private:
     format fmt;
 };
 
+std::ostream& operator<<(std::ostream &os, const hintformat &hf)
+{
+    return os << hf.str();
+}
+
 template<typename... Args>
 inline hintformat hintfmt(const std::string & fs, const Args & ... args)
 {
@@ -95,95 +98,56 @@ public:
     ErrLevel level;
     string name;
     string description;
-    std::optional<NixCode> nixCode;
-    std::optional<string> hint;
+    std::optional<hintformat> hint;
+    std::optional<string> prevLineOfCode;
+    string errLineOfCode;
+    std::optional<string> nextLineOfCode;
+    std::optional<ErrPos> errPos;
 
     static std::optional<string> programName;
 
-    ErrorInfo& set_name(const string &name) { this->name = name; return *this; }
-
-    static ErrorInfo ProgramError(const string &name,
-                                  const string &description,
-                                  const std::optional<hintformat> &hf);
-
-
-    static ErrorInfo ProgramWarning(const string &name,
-                                    const string &description,
-                                    const std::optional<hintformat> &hf);
-
-
-    template <class P>
-    static ErrorInfo NixLangError(const string &name,
-                                  const string &description,
-                                  const P &pos,
-                                  std::optional<string> prevloc,
-                                  string loc,
-                                  std::optional<string> nextloc,
-                                  const std::optional<hintformat> &hf)
-    {
-        return NixLangEI(elError, name, description, pos, prevloc, loc, nextloc, hf);
-    }
-
-
-    template <class P>
-    static ErrorInfo NixLangWarning(const string &name,
-                                    const string &description,
-                                    const P &pos,
-                                    std::optional<string> prevloc,
-                                    string loc,
-                                    std::optional<string> nextloc,
-                                    const std::optional<hintformat> &hf)
-    {
-        return NixLangEI(elWarning, name, description, pos, prevloc, loc, nextloc, hf);
-    }
-
-
-
 private:
-    template <class P>
-    static ErrorInfo NixLangEI(ErrLevel level,
-                               const string &name,
-                               const string &description,
-                               const P &pos,
-                               std::optional<string> prevloc,
-                               string loc,
-                               std::optional<string> nextloc,
-                               const std::optional<hintformat> &hf)
-    {
-        ErrorInfo ei(level);
-        ei.name = name;
-        ei.description = description;
-        if (hf.has_value())
-            ei.hint = std::optional<string>(hf->str());
-        else
-            ei.hint = std::nullopt;
+    // template <class P>
+    // static ErrorInfo NixLangEI(ErrLevel level,
+    //                            const string &name,
+    //                            const string &description,
+    //                            const P &pos,
+    //                            std::optional<string> prevloc,
+    //                            string loc,
+    //                            std::optional<string> nextloc,
+    //                            const std::optional<hintformat> &hf)
+    // {
+    //     ErrorInfo ei(level);
+    //     ei.name = name;
+    //     ei.description = description;
+    //     if (hf.has_value())
+    //         ei.hint = std::optional<string>(hf->str());
+    //     else
+    //         ei.hint = std::nullopt;
 
-        ErrLine errline;
-        errline.lineNumber = pos.line;
-        errline.column = pos.column;
-        errline.prevLineOfCode = prevloc;
-        errline.errLineOfCode = loc;
-        errline.nextLineOfCode = nextloc;
-        NixCode nixcode;
-        nixcode.nixFile = pos.file;
-        nixcode.errLine = std::optional(errline);
-        ei.nixCode = std::optional(nixcode);
+    //     ErrLine errline;
+    //     errline.lineNumber = pos.line;
+    //     errline.column = pos.column;
+    //     errline.prevLineOfCode = prevloc;
+    //     errline.errLineOfCode = loc;
+    //     errline.nextLineOfCode = nextloc;
+    //     NixCode nixcode;
+    //     nixcode.nixFile = pos.file;
+    //     nixcode.errLine = std::optional(errline);
+    //     ei.nixCode = std::optional(nixcode);
 
-        return ei;
-    }
+    //     return ei;
+    // }
 
-    static ErrorInfo ProgramEI(ErrLevel level,
-                               const string &name,
-                               const string &description,
-                               const std::optional<hintformat> &hf);
+    // static ErrorInfo ProgramEI(ErrLevel level,
+    //                            const string &name,
+    //                            const string &description,
+    //                            const std::optional<hintformat> &hf);
 
 
 
     // constructor is protected, so only the builder classes can create an ErrorInfo.
-    ErrorInfo(ErrLevel level)
-    {
-        this->level = level;
-    }
+
 };
 
 // --------------------------------------------------------

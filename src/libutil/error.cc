@@ -8,74 +8,37 @@ namespace nix
 
 std::optional<string> ErrorInfo::programName = std::nullopt;
 
-ErrorInfo ErrorInfo::ProgramError(const string &name,
-                                  const string &description,
-                                  const std::optional<hintformat> &hf)
+string showErrPos(const ErrPos &errPos)
 {
-    return ProgramEI(elError, name, description, hf);
-}
-
-ErrorInfo ErrorInfo::ProgramWarning(const string &name,
-                                    const string &description,
-                                    const std::optional<hintformat> &hf)
-{
-    return ProgramEI(elWarning, name, description, hf);
-}
-
-
-
-ErrorInfo ErrorInfo::ProgramEI(ErrLevel level,
-                               const string &name,
-                               const string &description,
-                               const std::optional<hintformat> &hf)
-{
-    ErrorInfo ei(elError);
-    ei.name = name;
-    ei.description = description;
-    if (hf.has_value())
-        ei.hint = std::optional<string>(hf->str());
-    else
-        ei.hint = std::nullopt;
-    return ei;
-}
-
-
-
-
-
-
-string showErrLine(const ErrLine &errLine)
-{
-    if (errLine.column > 0) {
-        return (format("(%1%:%2%)") % errLine.lineNumber % errLine.column).str();
+    if (errPos.column > 0) {
+        return (format("(%1%:%2%)") % errPos.lineNumber % errPos.column).str();
     } else {
-        return (format("(%1%)") % errLine.lineNumber).str();
+        return (format("(%1%)") % errPos.lineNumber).str();
     };
 }
 
-void printCodeLines(const string &prefix, const NixCode &nixCode)
+void printCodeLines(const string &prefix, const ErrorInfo &einfo)
 {
-
-    if (nixCode.errLine.has_value()) {
+    if (einfo.errPos.has_value()) {
         // previous line of code.
-        if (nixCode.errLine->prevLineOfCode.has_value()) {
+        if (einfo.prevLineOfCode.has_value()) {
             std::cout << format("%1% %|2$5d|| %3%")
-                      %    prefix
-                      % (nixCode.errLine->lineNumber - 1)
-                      % *nixCode.errLine->prevLineOfCode
+                      % prefix
+                      % (einfo.errPos->lineNumber - 1)
+                      % *einfo.prevLineOfCode
                       << std::endl;
         }
 
         // line of code containing the error.%2$+5d%
         std::cout << format("%1% %|2$5d|| %3%")
                   %    prefix
-                  % (nixCode.errLine->lineNumber)
-                  % nixCode.errLine->errLineOfCode
+                  % (einfo.errPos->lineNumber)
+                  % einfo.errLineOfCode
                   << std::endl;
 
         // error arrows for the column range.
-        if (nixCode.errLine->column > 0) {
-            int start = nixCode.errLine->column;
+        if (einfo.errPos->column > 0) {
+            int start = einfo.errPos->column;
             std::string spaces;
             for (int i = 0; i < start; ++i) {
                 spaces.append(" ");
@@ -89,11 +52,11 @@ void printCodeLines(const string &prefix, const NixCode &nixCode)
 
 
         // next line of code.
-        if (nixCode.errLine->nextLineOfCode.has_value()) {
+        if (einfo.nextLineOfCode.has_value()) {
             std::cout << format("%1% %|2$5d|| %3%")
                       %    prefix
-                      % (nixCode.errLine->lineNumber + 1)
-                      % *nixCode.errLine->nextLineOfCode
+                      % (einfo.errPos->lineNumber + 1)
+                      % *einfo.nextLineOfCode
                       << std::endl;
         }
 
@@ -144,14 +107,14 @@ void printErrorInfo(const ErrorInfo &einfo)
               << std::endl;
 
     // filename.
-    if (einfo.nixCode.has_value()) {
-        if (einfo.nixCode->nixFile.has_value()) {
-            string eline = einfo.nixCode->errLine.has_value()
-                           ? string(" ") + showErrLine(*einfo.nixCode->errLine)
+    if (einfo.errPos.has_value()) {
+        if (einfo.errPos->nixFile != "") {
+            string eline = einfo.errLineOfCode != ""
+                           ? string(" ") + showErrPos(*einfo.errPos)
                            : "";
 
             std::cout << format("%1%in file: " ANSI_BLUE "%2%%3%" ANSI_NORMAL)
-                      % prefix % *einfo.nixCode->nixFile % eline << std::endl;
+                      % prefix % einfo.errPos->nixFile % eline << std::endl;
             std::cout << prefix << std::endl;
         } else {
             std::cout << format("%1%from command line argument") % prefix << std::endl;
@@ -164,8 +127,8 @@ void printErrorInfo(const ErrorInfo &einfo)
     std::cout << prefix << std::endl;
 
     // lines of code.
-    if (einfo.nixCode.has_value()) {
-        printCodeLines(prefix, *einfo.nixCode);
+    if (einfo.errLineOfCode != "") {
+        printCodeLines(prefix, einfo);
         std::cout << prefix << std::endl;
     }
 
