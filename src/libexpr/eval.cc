@@ -1256,7 +1256,7 @@ void ExprWith::eval(EvalState & state, Env & env, Value & v)
 
 void ExprIf::eval(EvalState & state, Env & env, Value & v)
 {
-    (state.evalBool(env, cond) ? then : else_)->eval(state, env, v);
+    (state.evalBool(env, cond, pos) ? then : else_)->eval(state, env, v);
 }
 
 
