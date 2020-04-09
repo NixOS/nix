@@ -2,7 +2,7 @@
 #include "eval-inline.hh"
 #include "store-api.hh"
 #include "fetchers.hh"
-#include "download.hh"
+#include "filetransfer.hh"
 
 #include <ctime>
 #include <iomanip>

@@ -18,13 +18,13 @@ struct S3Helper
 
     ref<Aws::Client::ClientConfiguration> makeConfig(const std::string & region, const std::string & scheme, const std::string & endpoint);
 
-    struct DownloadResult
+    struct FileTransferResult
     {
         std::shared_ptr<std::string> data;
         unsigned int durationMs;
     };
 
-    DownloadResult getObject(
+    FileTransferResult getObject(
         const std::string & bucketName, const std::string & key);
 };
 

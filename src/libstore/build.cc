@@ -7,7 +7,7 @@
 #include "affinity.hh"
 #include "builtins.hh"
 #include "builtins/buildenv.hh"
-#include "download.hh"
+#include "filetransfer.hh"
 #include "finally.hh"
 #include "compression.hh"
 #include "json.hh"
@@ -361,7 +361,7 @@ public:
     {
         actDerivations.progress(doneBuilds, expectedBuilds + doneBuilds, runningBuilds, failedBuilds);
         actSubstitutions.progress(doneSubstitutions, expectedSubstitutions + doneSubstitutions, runningSubstitutions, failedSubstitutions);
-        act.setExpected(actDownload, expectedDownloadSize + doneDownloadSize);
+        act.setExpected(actFileTransfer, expectedDownloadSize + doneDownloadSize);
         act.setExpected(actCopyPath, expectedNarSize + doneNarSize);
     }
 };

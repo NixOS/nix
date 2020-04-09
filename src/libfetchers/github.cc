@@ -1,4 +1,4 @@
-#include "download.hh"
+#include "filetransfer.hh"
 #include "cache.hh"
 #include "fetchers.hh"
 #include "globals.hh"

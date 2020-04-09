@@ -544,7 +544,7 @@ formal
 #include <unistd.h>
 
 #include "eval.hh"
-#include "download.hh"
+#include "filetransfer.hh"
 #include "fetchers.hh"
 #include "store-api.hh"
 
@@ -690,7 +690,7 @@ std::pair<bool, std::string> EvalState::resolveSearchPathElem(const SearchPathEl
         try {
             res = { true, store->toRealPath(fetchers::downloadTarball(
                         store, resolveUri(elem.second), "source", false).storePath) };
-        } catch (DownloadError & e) {
+        } catch (FileTransferError & e) {
             printError(format("warning: Nix search path entry '%1%' cannot be downloaded, ignoring") % elem.second);
             res = { false, "" };
         }

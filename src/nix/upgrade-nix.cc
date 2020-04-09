@@ -1,7 +1,7 @@
 #include "command.hh"
 #include "common-args.hh"
 #include "store-api.hh"
-#include "download.hh"
+#include "filetransfer.hh"
 #include "eval.hh"
 #include "attr-path.hh"
 #include "names.hh"
@@ -138,8 +138,8 @@ struct CmdUpgradeNix : MixDryRun, StoreCommand
         Activity act(*logger, lvlInfo, actUnknown, "querying latest Nix version");
 
         // FIXME: use nixos.org?
-        auto req = DownloadRequest(storePathsUrl);
-        auto res = getDownloader()->download(req);
+        auto req = FileTransferRequest(storePathsUrl);
+        auto res = getFileTransfer()->download(req);
 
         auto state = std::make_unique<EvalState>(Strings(), store);
         auto v = state->allocValue();

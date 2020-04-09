@@ -8,7 +8,7 @@
 #include "shared.hh"
 #include "store-api.hh"
 #include "progress-bar.hh"
-#include "download.hh"
+#include "filetransfer.hh"
 #include "finally.hh"
 
 #include <sys/types.h>
@@ -176,10 +176,10 @@ void mainWrapped(int argc, char * * argv)
             settings.useSubstitutes = false;
         if (!settings.tarballTtl.overriden)
             settings.tarballTtl = std::numeric_limits<unsigned int>::max();
-        if (!downloadSettings.tries.overriden)
-            downloadSettings.tries = 0;
-        if (!downloadSettings.connectTimeout.overriden)
-            downloadSettings.connectTimeout = 1;
+        if (!fileTransferSettings.tries.overriden)
+            fileTransferSettings.tries = 0;
+        if (!fileTransferSettings.connectTimeout.overriden)
+            fileTransferSettings.connectTimeout = 1;
     }
 
     if (args.refresh)
