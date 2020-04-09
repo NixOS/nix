@@ -1,6 +1,6 @@
 #include "fetchers.hh"
 #include "cache.hh"
-#include "download.hh"
+#include "filetransfer.hh"
 #include "globals.hh"
 #include "store-api.hh"
 #include "archive.hh"
@@ -36,13 +36,13 @@ DownloadFileResult downloadFile(
     if (cached && !cached->expired)
         return useCached();
 
-    DownloadRequest request(url);
+    FileTransferRequest request(url);
     if (cached)
         request.expectedETag = getStrAttr(cached->infoAttrs, "etag");
-    DownloadResult res;
+    FileTransferResult res;
     try {
-        res = getDownloader()->download(request);
-    } catch (DownloadError & e) {
+        res = getFileTransfer()->download(request);
+    } catch (FileTransferError & e) {
         if (cached) {
             warn("%s; using cached version", e.msg());
             return useCached();

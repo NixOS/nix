@@ -7,7 +7,7 @@
 #include "affinity.hh"
 #include "builtins.hh"
 #include "builtins/buildenv.hh"
-#include "download.hh"
+#include "filetransfer.hh"
 #include "finally.hh"
 #include "compression.hh"
 #include "json.hh"
@@ -361,7 +361,7 @@ public:
     {
         actDerivations.progress(doneBuilds, expectedBuilds + doneBuilds, runningBuilds, failedBuilds);
         actSubstitutions.progress(doneSubstitutions, expectedSubstitutions + doneSubstitutions, runningSubstitutions, failedSubstitutions);
-        act.setExpected(actDownload, expectedDownloadSize + doneDownloadSize);
+        act.setExpected(actFileTransfer, expectedDownloadSize + doneDownloadSize);
         act.setExpected(actCopyPath, expectedNarSize + doneNarSize);
     }
 };
@@ -2161,7 +2161,7 @@ void DerivationGoal::startBuilder()
     if (needsHashRewrite()) {
 
         if (pathExists(homeDir))
-            throw Error(format("directory '%1%' exists; please remove it") % homeDir);
+            throw Error(format("home directory '%1%' exists; please remove it to assure purity of builds without sandboxing") % homeDir);
 
         /* We're not doing a chroot build, but we have some valid
            output paths.  Since we can't just overwrite or delete

@@ -1,6 +1,6 @@
 #include "common-eval-args.hh"
 #include "shared.hh"
-#include "download.hh"
+#include "filetransfer.hh"
 #include "util.hh"
 #include "eval.hh"
 #include "fetchers.hh"

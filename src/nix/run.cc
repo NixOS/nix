@@ -59,14 +59,14 @@ struct RunCommon : virtual Command
 
 struct CmdRun : InstallablesCommand, RunCommon, MixEnvironment
 {
-    std::vector<std::string> command = { "bash" };
+    std::vector<std::string> command = { getEnv("SHELL").value_or("bash") };
 
     CmdRun()
     {
         mkFlag()
             .longName("command")
             .shortName('c')
-            .description("command and arguments to be executed; defaults to 'bash'")
+            .description("command and arguments to be executed; defaults to '$SHELL'")
             .labels({"command", "args"})
             .arity(ArityAny)
             .handler([&](std::vector<std::string> ss) {

@@ -5,7 +5,7 @@
 #include "derivations.hh"
 #include "globals.hh"
 #include "eval-inline.hh"
-#include "download.hh"
+#include "filetransfer.hh"
 #include "json.hh"
 #include "function-trace.hh"
 #include "flake/flake.hh"
@@ -1296,7 +1296,7 @@ void ExprWith::eval(EvalState & state, Env & env, Value & v)
 
 void ExprIf::eval(EvalState & state, Env & env, Value & v)
 {
-    (state.evalBool(env, cond) ? then : else_)->eval(state, env, v);
+    (state.evalBool(env, cond, pos) ? then : else_)->eval(state, env, v);
 }
 
 
