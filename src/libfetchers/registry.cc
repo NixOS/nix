@@ -2,7 +2,6 @@
 #include "fetchers.hh"
 #include "util.hh"
 #include "globals.hh"
-#include "download.hh"
 #include "store-api.hh"
 
 #include <nlohmann/json.hpp>
