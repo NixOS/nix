@@ -1680,6 +1680,7 @@ void DerivationGoal::buildDone()
         }
 
         if (buildMode == bmCheck) {
+            deleteTmpDir(true);
             done(BuildResult::Built);
             return;
         }
