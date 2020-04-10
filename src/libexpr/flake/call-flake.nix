@@ -19,7 +19,6 @@ let
           result = outputs // sourceInfo // { inherit inputs; inherit outputs; inherit sourceInfo; };
         in
           if node.flake or true then
-            assert flake.edition or flake.epoch or 0 == 201909;
             assert builtins.isFunction flake.outputs;
             result
           else

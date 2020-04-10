@@ -34,7 +34,6 @@ struct Flake
     std::shared_ptr<const fetchers::Tree> sourceInfo;
     FlakeInputs inputs;
     Value * vOutputs; // FIXME: gc
-    unsigned int edition;
     ~Flake();
 };
 

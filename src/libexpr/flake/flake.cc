@@ -231,22 +231,14 @@ static Flake getFlake(
 
     expectType(state, tAttrs, vInfo, Pos(state.symbols.create(flakeFile), 0, 0));
 
-    auto sEdition = state.symbols.create("edition");
+    auto sEdition = state.symbols.create("edition"); // FIXME: remove soon
     auto sEpoch = state.symbols.create("epoch"); // FIXME: remove soon
 
-    auto edition = vInfo.attrs->get(sEdition);
-    if (!edition)
-        edition = vInfo.attrs->get(sEpoch);
+    if (vInfo.attrs->get(sEdition))
+        warn("flake '%s' has deprecated attribution 'edition'", lockedRef);
 
-    if (edition) {
-        expectType(state, tInt, *edition->value, *edition->pos);
-        flake.edition = edition->value->integer;
-        if (flake.edition > 201909)
-            throw Error("flake '%s' requires unsupported edition %d; please upgrade Nix", lockedRef, flake.edition);
-        if (flake.edition < 201909)
-            throw Error("flake '%s' has illegal edition %d", lockedRef, flake.edition);
-    } else
-        throw Error("flake '%s' lacks attribute 'edition'", lockedRef);
+    if (vInfo.attrs->get(sEpoch))
+        warn("flake '%s' has deprecated attribution 'epoch'", lockedRef);
 
     if (auto description = vInfo.attrs->get(state.sDescription)) {
         expectType(state, tString, *description->value, *description->pos);

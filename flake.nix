@@ -1,7 +1,7 @@
 {
   description = "The purely functional package manager";
 
-  edition = 201909;
+  edition = 201909; # FIXME: remove
 
   inputs.nixpkgs.uri = "nixpkgs/nixos-20.03-small";
 

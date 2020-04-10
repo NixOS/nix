@@ -82,7 +82,6 @@ static void printFlakeInfo(const Store & store, const Flake & flake)
 {
     std::cout << fmt("Resolved URL:  %s\n", flake.resolvedRef.to_string());
     std::cout << fmt("Locked URL:    %s\n", flake.lockedRef.to_string());
-    std::cout << fmt("Edition:       %s\n", flake.edition);
     if (flake.description)
         std::cout << fmt("Description:   %s\n", *flake.description);
     std::cout << fmt("Path:          %s\n", store.printStorePath(flake.sourceInfo->storePath));
@@ -100,7 +99,6 @@ static nlohmann::json flakeToJson(const Store & store, const Flake & flake)
     nlohmann::json j;
     if (flake.description)
         j["description"] = *flake.description;
-    j["edition"] = flake.edition;
     j["originalUrl"] = flake.originalRef.to_string();
     j["original"] = attrsToJson(flake.originalRef.toAttrs());
     j["resolvedUrl"] = flake.resolvedRef.to_string();

@@ -35,8 +35,6 @@ done
 
 cat > $flake1Dir/flake.nix <<EOF
 {
-  edition = 201909;
-
   description = "Bla bla";
 
   outputs = inputs: rec {
@@ -55,8 +53,6 @@ git -C $flake1Dir commit -m 'Initial'
 
 cat > $flake2Dir/flake.nix <<EOF
 {
-  edition = 201909;
-
   description = "Fnord";
 
   outputs = { self, flake1 }: rec {
@@ -70,8 +66,6 @@ git -C $flake2Dir commit -m 'Initial'
 
 cat > $flake3Dir/flake.nix <<EOF
 {
-  edition = 201909;
-
   description = "Fnord";
 
   outputs = { self, flake2 }: rec {
@@ -246,8 +240,6 @@ rm $flake3Dir/flake.nix
 
 cat > $flake3Dir/flake.nix <<EOF
 {
-  edition = 201909;
-
   description = "Fnord";
 
   outputs = { self, flake1, flake2 }: rec {
@@ -270,10 +262,6 @@ nix build -o $TEST_ROOT/result $flake3Dir#"sth%20sth"
 git -C $flake3Dir add flake.lock
 
 git -C $flake3Dir commit -m 'Add lockfile'
-
-# Unsupported editions should be an error.
-sed -i $flake3Dir/flake.nix -e s/201909/201912/
-nix build -o $TEST_ROOT/result $flake3Dir#sth 2>&1 | grep 'unsupported edition'
 
 # Test whether registry caching works.
 nix flake list --flake-registry file://$registry | grep -q flake3
@@ -300,8 +288,6 @@ rm $flake3Dir/flake.nix
 
 cat > $flake3Dir/flake.nix <<EOF
 {
-  edition = 201909;
-
   inputs = {
     flake1 = {};
     flake2 = {};
@@ -370,8 +356,6 @@ rm $flake3Dir/flake.nix
 
 cat > $flake3Dir/flake.nix <<EOF
 {
-  edition = 201909;
-
   inputs = {
     nonFlake = {
       url = "$nonFlakeDir";
@@ -428,8 +412,6 @@ nix flake clone flake1 --dest $TEST_ROOT/flake1-v2
 # More 'nix flake check' tests.
 cat > $flake3Dir/flake.nix <<EOF
 {
-  edition = 201909;
-
   outputs = { flake1, self }: {
     overlay = final: prev: {
     };
@@ -441,8 +423,6 @@ nix flake check $flake3Dir
 
 cat > $flake3Dir/flake.nix <<EOF
 {
-  edition = 201909;
-
   outputs = { flake1, self }: {
     overlay = finalll: prev: {
     };
@@ -454,8 +434,6 @@ EOF
 
 cat > $flake3Dir/flake.nix <<EOF
 {
-  edition = 201909;
-
   outputs = { flake1, self }: {
     nixosModules.foo = {
       a.b.c = 123;
@@ -469,8 +447,6 @@ nix flake check $flake3Dir
 
 cat > $flake3Dir/flake.nix <<EOF
 {
-  edition = 201909;
-
   outputs = { flake1, self }: {
     nixosModules.foo = {
       a.b.c = 123;
@@ -484,8 +460,6 @@ EOF
 
 cat > $flake3Dir/flake.nix <<EOF
 {
-  edition = 201909;
-
   outputs = { flake1, self }: {
     nixosModule = { config, pkgs, ... }: {
       a.b.c = 123;
@@ -498,8 +472,6 @@ nix flake check $flake3Dir
 
 cat > $flake3Dir/flake.nix <<EOF
 {
-  edition = 201909;
-
   outputs = { flake1, self }: {
     nixosModule = { config, pkgs }: {
       a.b.c = 123;
@@ -513,8 +485,6 @@ EOF
 # Test 'follows' inputs.
 cat > $flake3Dir/flake.nix <<EOF
 {
-  edition = 201909;
-
   inputs.foo = {
     type = "indirect";
     id = "flake1";
@@ -531,8 +501,6 @@ nix flake update $flake3Dir
 
 cat > $flake3Dir/flake.nix <<EOF
 {
-  edition = 201909;
-
   inputs.bar.follows = "flake2/flake1";
 
   outputs = { self, flake2, bar }: {
@@ -545,8 +513,6 @@ nix flake update $flake3Dir
 
 cat > $flake3Dir/flake.nix <<EOF
 {
-  edition = 201909;
-
   inputs.bar.follows = "flake2";
 
   outputs = { self, flake2, bar }: {
@@ -560,8 +526,6 @@ nix flake update $flake3Dir
 # Test overriding inputs of inputs.
 cat > $flake3Dir/flake.nix <<EOF
 {
-  edition = 201909;
-
   inputs.flake2.inputs.flake1 = {
     type = "git";
     url = file://$flake7Dir;
@@ -577,8 +541,6 @@ nix flake update $flake3Dir
 
 cat > $flake3Dir/flake.nix <<EOF
 {
-  edition = 201909;
-
   inputs.flake2.inputs.flake1.follows = "foo";
   inputs.foo.url = git+file://$flake7Dir;
 
@@ -596,8 +558,6 @@ hg init $flake5Dir
 
 cat > $flake5Dir/flake.nix <<EOF
 {
-  edition = 201909;
-
   outputs = { self, flake1 }: {
     defaultPackage.$system = flake1.defaultPackage.$system;
 
@@ -669,8 +629,6 @@ nix flake list-inputs $flake3Dir --json | jq .
 # Test circular flake dependencies.
 cat > $flakeA/flake.nix <<EOF
 {
-  edition = 201909;
-
   inputs.b.url = git+file://$flakeB;
   inputs.b.inputs.a.follows = "/";
 
@@ -685,8 +643,6 @@ git -C $flakeA add flake.nix
 
 cat > $flakeB/flake.nix <<EOF
 {
-  edition = 201909;
-
   inputs.a.url = git+file://$flakeA;
 
   outputs = { self, nixpkgs, a }: {
