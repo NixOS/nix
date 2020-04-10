@@ -159,6 +159,8 @@
             mkdir -p $doc/nix-support
             echo "doc manual $doc/share/doc/nix/manual" >> $doc/nix-support/hydra-build-products
           '';
+
+          inherit (prev.nix) meta;
         }) // {
 
           perl-bindings = with final; stdenv.mkDerivation {
