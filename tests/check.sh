@@ -49,13 +49,8 @@ checkBuildTempDirRemoved $TEST_ROOT/log
 
 nix-build check.nix -A nondeterministic --argstr checkBuildId $checkBuildId \
     --no-out-link --check --keep-failed 2> $TEST_ROOT/log || status=$?
-
-# The above nix-build fails with status=1 on darwin (not sure why)
-# ...but the primary purpose of the test case is to verify the temp directory is retained
-if [ "$(uname -s)" != "Darwin" ]; then
 grep 'may not be deterministic' $TEST_ROOT/log
 [ "$status" = "104" ]
-fi
 if checkBuildTempDirRemoved $TEST_ROOT/log; then false; fi
 
 clearStore
