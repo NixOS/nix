@@ -41,7 +41,7 @@ private:
 
     std::shared_ptr<EvalState> evalState;
 
-    Value * vSourceExpr = 0;
+    std::shared_ptr<Value> vSourceExpr;
 };
 
 enum RealiseMode { Build, NoBuild, DryRun };
