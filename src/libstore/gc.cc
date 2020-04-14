@@ -202,6 +202,11 @@ void LocalStore::findTempRoots(FDs & fds, Roots & tempRoots, bool censor)
     /* Read the `temproots' directory for per-process temporary root
        files. */
     for (auto & i : readDirectory(tempRootsDir)) {
+        if (i.name[0] == '.') {
+            // Ignore hidden files. Some package managers (notably portage) create
+            // those to keep the directory alive.
+            continue;
+        }
         Path path = tempRootsDir + "/" + i.name;
 
         pid_t pid = std::stoi(i.name);
