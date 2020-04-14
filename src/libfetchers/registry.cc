@@ -60,6 +60,8 @@ std::shared_ptr<Registry> Registry::read(
 
     } catch (nlohmann::json::exception & e) {
         warn("cannot parse flake registry '%s': %s", path, e.what());
+    } catch (Error & e) {
+        warn("cannot read flake registry '%s': %s", path, e.what());
     }
 
     return registry;
