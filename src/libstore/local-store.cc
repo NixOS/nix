@@ -6,6 +6,7 @@
 #include "derivations.hh"
 #include "nar-info.hh"
 #include "references.hh"
+#include "rewrite-derivation.hh"
 
 #include <iostream>
 #include <algorithm>
@@ -578,6 +579,24 @@ void LocalStore::checkDerivationOutputs(const StorePath & drvPath, const Derivat
     }
 }
 
+void LocalStore::resolveDerivation(Derivation & drv) {
+    // Input paths that we'll want to rewrite in the derivation
+    std::map<Path, Path> inputRewrites;
+
+    for (auto & input : drv.inputDrvs) {
+        auto inputDrv = readDerivation(*this, printStorePath(input.first));
+        for (auto & outputName : input.second) {
+            DrvOutputId outputId { input.first.clone(), outputName };
+            if (auto actualPath = queryOutPath(outputId)) {
+                inputRewrites.emplace(
+                        printStorePath(inputDrv.outputs.at(outputName).path),
+                        printStorePath(*actualPath)
+                );
+            }
+        }
+    }
+    rewriteDerivation(*this, drv, inputRewrites);
+}
 
 uint64_t LocalStore::addValidPath(State & state,
     const ValidPathInfo & info, bool checkOutputs)

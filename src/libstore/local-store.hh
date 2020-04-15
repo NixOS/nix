@@ -303,6 +303,10 @@ private:
 
     void createUser(const std::string & userName, uid_t userId) override;
 
+    /* Rewrite a derivation by replacing its input derivations by their actual
+       store path */
+    void resolveDerivation(Derivation & drv);
+
     friend class DerivationGoal;
     friend class SubstitutionGoal;
 };
