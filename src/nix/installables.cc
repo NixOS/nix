@@ -8,9 +8,12 @@
 #include "store-api.hh"
 #include "shared.hh"
 
+#include <gc/gc.h>
+
 #include <regex>
 
 namespace nix {
+
 
 SourceExprCommand::SourceExprCommand()
 {
@@ -24,11 +27,14 @@ SourceExprCommand::SourceExprCommand()
 
 Value * SourceExprCommand::getSourceExpr(EvalState & state)
 {
-    if (vSourceExpr) return vSourceExpr;
+    if (vSourceExpr) return vSourceExpr.get();
 
     auto sToplevel = state.symbols.create("_toplevel");
 
-    vSourceExpr = state.allocValue();
+    // Allocate the vSourceExpr Value as uncollectable. Boehm GC doesn't
+    // consider the member variable "alive" during execution causing it to be
+    // GC'ed in the middle of evaluation.
+    vSourceExpr = std::allocate_shared<Value>(traceable_allocator<Value>());
 
     if (file != "")
         state.evalFile(lookupFileArg(state, file), *vSourceExpr);
@@ -69,7 +75,7 @@ Value * SourceExprCommand::getSourceExpr(EvalState & state)
         vSourceExpr->attrs->sort();
     }
 
-    return vSourceExpr;
+    return vSourceExpr.get();
 }
 
 ref<EvalState> SourceExprCommand::getEvalState()
