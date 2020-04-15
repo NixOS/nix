@@ -8,6 +8,11 @@ namespace nix
 
 std::optional<string> ErrorInfo::programName = std::nullopt;
 
+std::ostream& operator<<(std::ostream &os, const hintformat &hf)
+{
+    return os << hf.str();
+}
+
 string showErrPos(const ErrPos &errPos)
 {
     if (errPos.column > 0) {

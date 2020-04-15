@@ -92,10 +92,7 @@ private:
     format fmt;
 };
 
-std::ostream& operator<<(std::ostream &os, const hintformat &hf)
-{
-    return os << hf.str();
-}
+std::ostream& operator<<(std::ostream &os, const hintformat &hf);
 
 template<typename... Args>
 inline hintformat hintfmt(const std::string & fs, const Args & ... args)
