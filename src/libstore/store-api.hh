@@ -198,6 +198,20 @@ struct ValidPathInfo
 
 typedef list<ValidPathInfo> ValidPathInfos;
 
+/*
+ * Unique identifier for a specific output of a specific derivation
+ */
+struct DrvOutputId {
+    StorePath deriver;
+    string outputName;
+
+    bool operator < (const DrvOutputId & other) const
+    {
+        return deriver < other.deriver && outputName < other.outputName;
+    }
+};
+
+typedef std::map<DrvOutputId, StorePath> OutputMappings;
 
 enum BuildMode { bmNormal, bmRepair, bmCheck };
 

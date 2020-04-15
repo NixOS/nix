@@ -50,6 +50,8 @@ private:
         SQLiteStmt stmtRegisterValidPath;
         SQLiteStmt stmtUpdatePathInfo;
         SQLiteStmt stmtAddReference;
+        SQLiteStmt stmtRegisterPathOf;
+        SQLiteStmt stmtGetPathOf;
         SQLiteStmt stmtQueryPathInfo;
         SQLiteStmt stmtQueryReferences;
         SQLiteStmt stmtQueryReferrers;
@@ -209,6 +211,10 @@ public:
 
     void registerValidPaths(const ValidPathInfos & infos);
 
+    void registerOutputMappings(const OutputMappings & outputMappings);
+
+    std::optional<StorePath> queryOutPath(const DrvOutputId & outputId);
+
     unsigned int getProtocol() override;
 
     void vacuumDB();
@@ -290,6 +296,8 @@ private:
     /* Add signatures to a ValidPathInfo using the secret keys
        specified by the ‘secret-key-files’ option. */
     void signPathInfo(ValidPathInfo & info);
+
+    void makeContentAddressed(ValidPathInfo & info);
 
     Path getRealStoreDir() override { return realStoreDir; }
 

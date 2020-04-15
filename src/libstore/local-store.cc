@@ -227,6 +227,10 @@ LocalStore::LocalStore(const Params & params)
         "update ValidPaths set narSize = ?, hash = ?, ultimate = ?, sigs = ?, ca = ? where path = ?;");
     state->stmtAddReference.create(state->db,
         "insert or replace into Refs (referrer, reference) values (?, ?);");
+    state->stmtRegisterPathOf.create(state->db,
+        "insert into PathOf (drv, output, path) values (?, ?, ?);");
+    state->stmtGetPathOf.create(state->db,
+        "select path from PathOf where drv = ? and output = ?;");
     state->stmtQueryPathInfo.create(state->db,
         "select id, hash, registrationTime, deriver, narSize, ultimate, sigs, ca from ValidPaths where path = ?;");
     state->stmtQueryReferences.create(state->db,
@@ -879,6 +883,44 @@ void LocalStore::registerValidPath(const ValidPathInfo & info)
     registerValidPaths(infos);
 }
 
+void LocalStore::registerOutputMappings(const OutputMappings & mappings)
+{
+    return retrySQLite<void>([&]() {
+        auto state(_state.lock());
+
+        SQLiteTxn txn(state->db);
+
+        for (auto & mapping : mappings) {
+            state->stmtRegisterPathOf.use()
+              (printStorePath(mapping.first.deriver))
+              (mapping.first.outputName)
+              (printStorePath(mapping.second))
+              .exec();
+
+        txn.commit();
+        }
+    });
+}
+
+std::optional<StorePath> LocalStore::queryOutPath(const DrvOutputId & outputId) {
+
+    return retrySQLite<std::optional<StorePath>>([&]() -> std::optional<StorePath> {
+        auto state(_state.lock());
+
+        auto useGetPathOf(
+            state->stmtGetPathOf.use()
+              (printStorePath(outputId.deriver))
+              (outputId.outputName)
+        );
+
+        if (!useGetPathOf.next()) return {};
+
+        const char * s = (const char *) sqlite3_column_text(state->stmtGetPathOf, 0);
+        if (s)
+            return parseStorePath(s);
+        return {};
+    });
+}
 
 void LocalStore::registerValidPaths(const ValidPathInfos & infos)
 {
@@ -1473,5 +1515,33 @@ void LocalStore::createUser(const std::string & userName, uid_t userId)
     }
 }
 
+void LocalStore::makeContentAddressed(ValidPathInfo & info) {
+
+    auto aliasPath = info.path;
+    Path rawAliasPath = printStorePath(aliasPath);
+    auto recursive = FileIngestionMethod::Recursive;
+    auto hashAlgo = htSHA256;
+    auto pathName = aliasPath.name();
+    Hash contentHash = hashPath(hashAlgo, rawAliasPath).first;
+
+    StorePath casPath = makeFixedOutputPath(recursive, contentHash, pathName);
+    debug(
+        "Moving path %s to %s",
+        printStorePath(info.path),
+        printStorePath(casPath)
+    );
+
+    // Move the path to its ca location
+    // XXX: We could probably actually move it instead of copy it
+    if (!pathExists(printStorePath(casPath))) {
+        StringSink sink;
+        dumpPath(rawAliasPath, sink);
+        StringSource source(*sink.s);
+        restorePath(printStorePath(casPath), source);
+    };
+    deletePath(rawAliasPath);
+
+    info.path = std::move(casPath);
+}
 
 }

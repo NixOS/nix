@@ -1206,6 +1206,8 @@ void DerivationGoal::haveDerivation()
     }
 
 
+    contentAddressed = parsedDrv->contentAddressed();
+
     /* We are first going to try to create the invalid output paths
        through substitutes.  If that doesn't work, we'll build
        them. */
@@ -3622,6 +3624,7 @@ void DerivationGoal::registerOutputs()
     }
 
     std::map<std::string, ValidPathInfo> infos;
+    OutputMappings outputMappings;
 
     /* Set of inodes seen during calls to canonicalisePathMetaData()
        for this build's outputs.  This needs to be shared between
@@ -3845,6 +3848,15 @@ void DerivationGoal::registerOutputs()
 
         if (!info.references.empty()) info.ca.clear();
 
+        /* If the derivation is content addressed, move its outputs to the right
+         * place and update the path info
+         */
+        if (contentAddressed) {
+            worker.store.makeContentAddressed(info);
+            DrvOutputId thisOutputId { drvPath.clone(), i.first };
+            outputMappings.emplace(std::move(thisOutputId), info.path.clone());
+        }
+
         infos.emplace(i.first, std::move(info));
     }
 
@@ -3920,6 +3932,10 @@ void DerivationGoal::registerOutputs()
         for (auto & i : infos) infos2.push_back(i.second);
         worker.store.registerValidPaths(infos2);
     }
+
+    /* Register the output mappings in case the derivation was
+       content-addressed */
+    worker.store.registerOutputMappings(outputMappings);
 
     /* In case of a fixed-output derivation hash mismatch, throw an
        exception now that we have registered the output as valid. */
