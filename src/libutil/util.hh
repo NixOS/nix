@@ -16,6 +16,7 @@
 #include <sstream>
 #include <optional>
 #include <future>
+#include <iterator>
 
 #ifndef HAVE_STRUCT_DIRENT_D_TYPE
 #define DT_UNKNOWN 0
