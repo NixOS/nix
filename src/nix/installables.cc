@@ -8,8 +8,6 @@
 #include "store-api.hh"
 #include "shared.hh"
 
-#include <gc/gc.h>
-
 #include <regex>
 
 namespace nix {
@@ -27,17 +25,14 @@ SourceExprCommand::SourceExprCommand()
 
 Value * SourceExprCommand::getSourceExpr(EvalState & state)
 {
-    if (vSourceExpr) return vSourceExpr.get();
+    if (vSourceExpr) return *vSourceExpr;
 
     auto sToplevel = state.symbols.create("_toplevel");
 
-    // Allocate the vSourceExpr Value as uncollectable. Boehm GC doesn't
-    // consider the member variable "alive" during execution causing it to be
-    // GC'ed in the middle of evaluation.
-    vSourceExpr = std::allocate_shared<Value>(traceable_allocator<Value>());
+    vSourceExpr = allocRootValue(state.allocValue());
 
     if (file != "")
-        state.evalFile(lookupFileArg(state, file), *vSourceExpr);
+        state.evalFile(lookupFileArg(state, file), **vSourceExpr);
 
     else {
 
@@ -45,9 +40,9 @@ Value * SourceExprCommand::getSourceExpr(EvalState & state)
 
         auto searchPath = state.getSearchPath();
 
-        state.mkAttrs(*vSourceExpr, 1024);
+        state.mkAttrs(**vSourceExpr, 1024);
 
-        mkBool(*state.allocAttr(*vSourceExpr, sToplevel), true);
+        mkBool(*state.allocAttr(**vSourceExpr, sToplevel), true);
 
         std::unordered_set<std::string> seen;
 
@@ -58,7 +53,7 @@ Value * SourceExprCommand::getSourceExpr(EvalState & state)
             mkPrimOpApp(*v1, state.getBuiltin("findFile"), state.getBuiltin("nixPath"));
             Value * v2 = state.allocValue();
             mkApp(*v2, *v1, mkString(*state.allocValue(), name));
-            mkApp(*state.allocAttr(*vSourceExpr, state.symbols.create(name)),
+            mkApp(*state.allocAttr(**vSourceExpr, state.symbols.create(name)),
                 state.getBuiltin("import"), *v2);
         };
 
@@ -72,10 +67,10 @@ Value * SourceExprCommand::getSourceExpr(EvalState & state)
             } else
                 addEntry(i.first);
 
-        vSourceExpr->attrs->sort();
+        (*vSourceExpr)->attrs->sort();
     }
 
-    return vSourceExpr.get();
+    return *vSourceExpr;
 }
 
 ref<EvalState> SourceExprCommand::getEvalState()

@@ -121,16 +121,16 @@ static void prim_scopedImport(EvalState & state, const Pos & pos, Value * * args
         }
         w.attrs->sort();
 
-        static Value * fun = nullptr;
+        static RootValue fun;
         if (!fun) {
-            fun = state.allocValue();
+            fun = allocRootValue(state.allocValue());
             state.eval(state.parseExprFromString(
                 #include "imported-drv-to-derivation.nix.gen.hh"
-                , "/"), *fun);
+                , "/"), **fun);
         }
 
-        state.forceFunction(*fun, pos);
-        mkApp(v, *fun, w);
+        state.forceFunction(**fun, pos);
+        mkApp(v, **fun, w);
         state.forceAttrs(v, pos);
     } else {
         state.forceAttrs(*args[0]);
