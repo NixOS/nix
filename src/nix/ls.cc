@@ -34,16 +34,14 @@ struct MixLs : virtual Args, MixJSON
                         (st.isExecutable ? "-r-xr-xr-x" : "-r--r--r--") :
                     st.type == FSAccessor::Type::tSymlink ? "lrwxrwxrwx" :
                     "dr-xr-xr-x";
-                std::cout <<
-                    (format("%s %20d %s") % tp % st.fileSize % relPath);
+                auto line = fmt("%s %20d %s", tp, st.fileSize, relPath);
                 if (st.type == FSAccessor::Type::tSymlink)
-                    std::cout << " -> " << accessor->readLink(curPath)
-                    ;
-                std::cout << "\n";
+                    line += " -> " + accessor->readLink(curPath);
+                logger->stdout(line);
                 if (recursive && st.type == FSAccessor::Type::tDirectory)
                     doPath(st, curPath, relPath, false);
             } else {
-                std::cout << relPath << "\n";
+                logger->stdout(relPath);
                 if (recursive) {
                     auto st = accessor->stat(curPath);
                     if (st.type == FSAccessor::Type::tDirectory)

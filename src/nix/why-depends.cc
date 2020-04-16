@@ -149,7 +149,7 @@ struct CmdWhyDepends : SourceExprCommand
             auto pathS = store->printStorePath(node.path);
 
             assert(node.dist != inf);
-            std::cout << fmt("%s%s%s%s" ANSI_NORMAL "\n",
+            logger->stdout("%s%s%s%s" ANSI_NORMAL,
                 firstPad,
                 node.visited ? "\e[38;5;244m" : "",
                 firstPad != "" ? "→ " : "",
