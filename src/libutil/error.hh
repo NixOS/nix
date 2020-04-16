@@ -5,8 +5,6 @@
 #include <string>
 #include <optional>
 #include <iostream>
-#include <iomanip>
-
 #include "types.hh"
 
 namespace nix
