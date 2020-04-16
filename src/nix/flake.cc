@@ -156,7 +156,7 @@ struct CmdFlakeInfo : FlakeCommand, MixJSON
 
         if (json) {
             auto json = flakeToJson(*store, flake);
-            logger->stdout(json.dump());
+            logger->stdout("%s", json.dump());
         } else
             printFlakeInfo(*store, flake);
     }
@@ -174,7 +174,7 @@ struct CmdFlakeListInputs : FlakeCommand, MixJSON
         auto flake = lockFlake();
 
         if (json)
-            logger->stdout(flake.lockFile.toJson());
+            logger->stdout("%s", flake.lockFile.toJson());
         else {
             logger->stdout("%s", flake.flake.lockedRef);
 
