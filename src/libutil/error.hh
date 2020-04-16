@@ -17,9 +17,8 @@ typedef enum {
     elError
 } ErrLevel;
 
-class ErrPos
+struct ErrPos
 {
-public:
     int lineNumber;
     int column;
     string nixFile;
@@ -40,9 +39,8 @@ public:
     }
 };
 
-class NixCode
+struct NixCode
 {
-public:
     ErrPos errPos;
     std::optional<string> prevLineOfCode;
     string errLineOfCode;
@@ -54,9 +52,8 @@ public:
 // are always in yellow.
 
 template <class T>
-class yellowify
+struct yellowify
 {
-public:
     yellowify(T &s) : value(s) {}
     T &value;
 };
@@ -104,9 +101,8 @@ inline hintformat hintfmt(const std::string & fs, const Args & ... args)
 
 // -------------------------------------------------
 // ErrorInfo.
-class ErrorInfo
+struct ErrorInfo
 {
-public:
     ErrLevel level;
     string name;
     string description;
@@ -114,8 +110,6 @@ public:
     std::optional<NixCode> nixCode;
 
     static std::optional<string> programName;
-
-private:
 };
 
 // --------------------------------------------------------
