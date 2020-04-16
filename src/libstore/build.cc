@@ -982,6 +982,10 @@ private:
        as valid. */
     void registerOutputs();
 
+    /* Register the mappings from the derivation's output ids to their actual
+       store path */
+    void registerOutputMappings();
+
     /* Check that an output meets the requirements specified by the
        'outputChecks' attribute (or the legacy
        '{allowed,disallowed}{References,Requisites}' attributes). */
@@ -1696,6 +1700,9 @@ void DerivationGoal::buildDone()
         /* Compute the FS closure of the outputs and register them as
            being valid. */
         registerOutputs();
+        if (curRound == nrRounds) {
+            registerOutputMappings();
+        }
 
         if (settings.postBuildHook != "") {
             Activity act(*logger, lvlInfo, actPostBuildHook,
@@ -3627,7 +3634,6 @@ void DerivationGoal::registerOutputs()
     }
 
     std::map<std::string, ValidPathInfo> infos;
-    OutputMappings outputMappings;
 
     /* Set of inodes seen during calls to canonicalisePathMetaData()
        for this build's outputs.  This needs to be shared between
@@ -3856,8 +3862,7 @@ void DerivationGoal::registerOutputs()
          */
         if (contentAddressed) {
             worker.store.makeContentAddressed(info);
-            DrvOutputId thisOutputId { drvPath.clone(), i.first };
-            outputMappings.emplace(std::move(thisOutputId), info.path.clone());
+            i.second.path = info.path;
         }
 
         infos.emplace(i.first, std::move(info));
@@ -3936,14 +3941,26 @@ void DerivationGoal::registerOutputs()
         worker.store.registerValidPaths(infos2);
     }
 
-    /* Register the output mappings in case the derivation was
-       content-addressed */
-    worker.store.registerOutputMappings(outputMappings);
-
     /* In case of a fixed-output derivation hash mismatch, throw an
        exception now that we have registered the output as valid. */
     if (delayedException)
         std::rethrow_exception(delayedException);
+}
+
+
+void DerivationGoal::registerOutputMappings() {
+
+    OutputMappings outputMappings;
+
+    for (auto & output : drv->outputs) {
+        debug("Path for %s: %s", output.first, worker.store.printStorePath(output.second.path));
+        DrvOutputId thisOutputId { drvPath, output.first };
+        outputMappings.emplace(std::move(thisOutputId), output.second.path);
+    }
+
+    /* Register the output mappings in case the derivation was
+       content-addressed */
+    worker.store.registerOutputMappings(outputMappings);
 }
 
 
@@ -4264,6 +4281,7 @@ void DerivationGoal::done(BuildResult::Status status, std::optional<Error> ex)
     mcRunningBuilds.reset();
 
     if (result.success()) {
+        registerOutputMappings();
         if (status == BuildResult::Built)
             worker.doneBuilds++;
     } else {

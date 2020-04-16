@@ -7,10 +7,18 @@ clearCache
 
 export REMOTE_STORE=file://$cacheDir
 
-out1=$(nix-build ./content-addressed.nix -A dependent --arg seed 1 -vvv)
-out2=$(nix-build ./content-addressed.nix -A dependent --arg seed 2 -vvv)
+checkBuild () {
+    drvToBuild="$1"
 
-test $out1 == $out2
+    out1=$(nix-build ./content-addressed.nix -A "$drvToBuild" --arg seed 1 -vvv)
+    out2=$(nix-build ./content-addressed.nix -A "$drvToBuild" --arg seed 2 -vvv)
+
+    test $out1 == $out2
+}
+
+checkBuild contentAddressed
+checkBuild dependent
+checkBuild transitivelyDependent
 
 # nix-build ./content-addressed.nix --arg seed 3 |& (! grep -q "building transitively-dependent")
 

@@ -607,7 +607,6 @@ void LocalStore::resolveDerivation(Derivation & drv) {
     }
     drv.inputDrvs = std::move(newInputs);
     rewriteDerivation(*this, drv, inputRewrites);
-    debug(drv.unparse(*this, false));
 }
 
 uint64_t LocalStore::addValidPath(State & state,
