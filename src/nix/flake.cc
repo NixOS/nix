@@ -1,7 +1,6 @@
 #include "command.hh"
 #include "common-args.hh"
 #include "shared.hh"
-#include "progress-bar.hh"
 #include "eval.hh"
 #include "eval-inline.hh"
 #include "flake/flake.hh"
@@ -61,12 +60,10 @@ struct CmdFlakeList : EvalCommand
 
         auto registries = getRegistries(store);
 
-        stopProgressBar();
-
         for (auto & registry : registries) {
             for (auto & entry : registry->entries) {
                 // FIXME: format nicely
-                std::cout << fmt("%s %s %s\n",
+                logger->stdout("%s %s %s",
                     registry->type == Registry::Flag   ? "flags " :
                     registry->type == Registry::User   ? "user  " :
                     registry->type == Registry::System ? "system" :
@@ -80,17 +77,17 @@ struct CmdFlakeList : EvalCommand
 
 static void printFlakeInfo(const Store & store, const Flake & flake)
 {
-    std::cout << fmt("Resolved URL:  %s\n", flake.resolvedRef.to_string());
-    std::cout << fmt("Locked URL:    %s\n", flake.lockedRef.to_string());
+    logger->stdout("Resolved URL:  %s", flake.resolvedRef.to_string());
+    logger->stdout("Locked URL:    %s", flake.lockedRef.to_string());
     if (flake.description)
-        std::cout << fmt("Description:   %s\n", *flake.description);
-    std::cout << fmt("Path:          %s\n", store.printStorePath(flake.sourceInfo->storePath));
+        logger->stdout("Description:   %s", *flake.description);
+    logger->stdout("Path:          %s", store.printStorePath(flake.sourceInfo->storePath));
     if (auto rev = flake.lockedRef.input->getRev())
-        std::cout << fmt("Revision:      %s\n", rev->to_string(Base16, false));
+        logger->stdout("Revision:      %s", rev->to_string(Base16, false));
     if (flake.sourceInfo->info.revCount)
-        std::cout << fmt("Revisions:     %s\n", *flake.sourceInfo->info.revCount);
+        logger->stdout("Revisions:     %s", *flake.sourceInfo->info.revCount);
     if (flake.sourceInfo->info.lastModified)
-        std::cout << fmt("Last modified: %s\n",
+        logger->stdout("Last modified: %s",
             std::put_time(std::localtime(&*flake.sourceInfo->info.lastModified), "%F %T"));
 }
 
@@ -156,11 +153,10 @@ struct CmdFlakeInfo : FlakeCommand, MixJSON
     void run(nix::ref<nix::Store> store) override
     {
         auto flake = getFlake();
-        stopProgressBar();
 
         if (json) {
             auto json = flakeToJson(*store, flake);
-            std::cout << json.dump() << std::endl;
+            logger->stdout(json.dump());
         } else
             printFlakeInfo(*store, flake);
     }
@@ -177,12 +173,10 @@ struct CmdFlakeListInputs : FlakeCommand, MixJSON
     {
         auto flake = lockFlake();
 
-        stopProgressBar();
-
         if (json)
-            std::cout << flake.lockFile.toJson() << "\n";
+            logger->stdout(flake.lockFile.toJson());
         else {
-            std::cout << fmt("%s\n", flake.flake.lockedRef);
+            logger->stdout("%s", flake.flake.lockedRef);
 
             std::function<void(const Node & node, const std::string & prefix)> recurse;
 
@@ -191,7 +185,7 @@ struct CmdFlakeListInputs : FlakeCommand, MixJSON
                 for (const auto & [i, input] : enumerate(node.inputs)) {
                     //auto tree2 = tree.child(i + 1 == inputs.inputs.size());
                     bool last = i + 1 == node.inputs.size();
-                    std::cout << fmt("%s" ANSI_BOLD "%s" ANSI_NORMAL ": %s\n",
+                    logger->stdout("%s" ANSI_BOLD "%s" ANSI_NORMAL ": %s",
                         prefix + (last ? treeLast : treeConn), input.first,
                         std::dynamic_pointer_cast<const LockedNode>(input.second)->lockedRef);
                     recurse(*input.second, prefix + (last ? treeNull : treeLine));

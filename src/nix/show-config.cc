@@ -23,7 +23,7 @@ struct CmdShowConfig : Command, MixJSON
             std::map<std::string, Config::SettingInfo> settings;
             globalConfig.getSettings(settings);
             for (auto & s : settings)
-                std::cout << s.first + " = " + s.second.value + "\n";
+                logger->stdout(s.first + " = " + s.second.value);
         }
     }
 };

@@ -385,7 +385,7 @@ struct CmdProfileInfo : virtual EvalCommand, virtual StoreCommand, MixDefaultPro
 
         for (size_t i = 0; i < manifest.elements.size(); ++i) {
             auto & element(manifest.elements[i]);
-            std::cout << fmt("%d %s %s %s\n", i,
+            logger->stdout("%d %s %s %s", i,
                 element.source ? element.source->originalRef.to_string() + "#" + element.source->attrPath : "-",
                 element.source ? element.source->resolvedRef.to_string() + "#" + element.source->attrPath : "-",
                 concatStringsSep(" ", store->printStorePathSet(element.storePaths)));
