@@ -5,35 +5,37 @@
 namespace nix {
 
 void recomputeOutputs(Store & store, Derivation & drv) {
-    DerivationOutputs oldOutputs = std::move(drv.outputs);
-
     for (auto & i : drv.outputs) {
+        debug("Rewriting env var %s", i.first);
         auto outputEnvVar = drv.env.find(i.first);
-        if (outputEnvVar != drv.env.end())
+        if (outputEnvVar != drv.env.end()) {
             outputEnvVar->second = "";
+            debug("Rewrote env var %s", outputEnvVar->first);
+        }
+        i.second = DerivationOutput{ StorePath::dummy, "", "" };
     }
 
-    /* Use the masked derivation expression to compute the output
-        path. */
+    /* Use the masked derivation expression to compute the output path. */
     Hash h = hashDerivationModulo(store, drv, true);
 
-    for (auto & i : drv.outputs)
-        if (i.second.path == StorePath::dummy) {
-            // XXX: There's certainly a better and less error-prone way
-            // of getting the name than to look it up in the drv environment
-            string name = ParsedDerivation(StorePath::dummy.clone(), drv).getStringAttr("name").value_or("");
-            StorePath outPath = store.makeOutputPath(i.first, h, name);
-            auto outputEnvVar = drv.env.find(i.first);
-            if (outputEnvVar != drv.env.end())
-                outputEnvVar->second = store.printStorePath(outPath);
-            debug(format("Rewrote output %1% to %2%")
-                % store.printStorePath(oldOutputs.at(i.first).path)
-                % store.printStorePath(outPath));
-            i.second.path = std::move(outPath);
-        }
+    for (auto & i : drv.outputs) {
+        // XXX: There's certainly a better and less error-prone way
+        // of getting the name than to look it up in the drv environment
+        string name = ParsedDerivation(StorePath::dummy, drv).getStringAttr("name").value_or("");
+        StorePath outPath = store.makeOutputPath(i.first, h, name);
+        auto outputEnvVar = drv.env.find(i.first);
+        if (outputEnvVar != drv.env.end())
+            outputEnvVar->second = store.printStorePath(outPath);
+        debug(format("Rewrote output %1% to %2%")
+            % store.printStorePath(drv.outputs.at(i.first).path)
+            % store.printStorePath(outPath));
+        i.second = DerivationOutput { outPath, "", "" };
+    }
 }
 
 void rewriteDerivation(Store & store, Derivation & drv, const StringMap & rewrites) {
+
+    debug("Rewriting the derivation");
 
     for (auto &rewrite: rewrites) {
         debug("rewriting %s as %s", rewrite.first, rewrite.second);

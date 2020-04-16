@@ -7,8 +7,8 @@ clearCache
 
 export REMOTE_STORE=file://$cacheDir
 
-out1=$(nix-build ./content-addressed.nix -A contentAddressed --arg seed 1 -vvv)
-out2=$(nix-build ./content-addressed.nix -A contentAddressed --arg seed 2 -vvv)
+out1=$(nix-build ./content-addressed.nix -A dependent --arg seed 1 -vvv)
+out2=$(nix-build ./content-addressed.nix -A dependent --arg seed 2 -vvv)
 
 test $out1 == $out2
 

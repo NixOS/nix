@@ -583,8 +583,11 @@ void LocalStore::resolveDerivation(Derivation & drv) {
     // Input paths that we'll want to rewrite in the derivation
     std::map<Path, Path> inputRewrites;
 
+    DerivationInputs newInputs;
+
     for (auto & input : drv.inputDrvs) {
         auto inputDrv = readDerivation(*this, printStorePath(input.first));
+        StringSet newOutputNames;
         for (auto & outputName : input.second) {
             DrvOutputId outputId { input.first.clone(), outputName };
             if (auto actualPath = queryOutPath(outputId)) {
@@ -592,10 +595,19 @@ void LocalStore::resolveDerivation(Derivation & drv) {
                         printStorePath(inputDrv.outputs.at(outputName).path),
                         printStorePath(*actualPath)
                 );
+                drv.inputSrcs.emplace(std::move(*actualPath));
+            }
+            else {
+                newOutputNames.emplace(outputName);
             }
         }
+        if (!newOutputNames.empty()) {
+            newInputs.emplace(input.first, newOutputNames);
+        }
     }
+    drv.inputDrvs = std::move(newInputs);
     rewriteDerivation(*this, drv, inputRewrites);
+    debug(drv.unparse(*this, false));
 }
 
 uint64_t LocalStore::addValidPath(State & state,

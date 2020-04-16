@@ -1226,9 +1226,6 @@ void DerivationGoal::outputsSubstituted()
 {
     trace("all outputs substituted (maybe)");
 
-    if (useDerivation)
-        worker.store.resolveDerivation(*(dynamic_cast<Derivation *>(drv.get())));
-
     if (nrFailed > 0 && nrFailed > nrNoSubstituters + nrIncompleteClosure && !settings.tryFallback) {
         done(BuildResult::TransientFailure,
             fmt("some substitutes for the outputs of derivation '%s' failed (usually happens due to networking issues); try '--fallback' to build derivation from source ",
@@ -1358,6 +1355,9 @@ void DerivationGoal::closureRepaired()
 void DerivationGoal::inputsRealised()
 {
     trace("all inputs realised");
+
+    if (useDerivation)
+        worker.store.resolveDerivation(*(dynamic_cast<Derivation *>(drv.get())));
 
     if (nrFailed != 0) {
         if (!useDerivation)
