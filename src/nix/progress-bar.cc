@@ -7,6 +7,7 @@
 #include <atomic>
 #include <map>
 #include <thread>
+#include <iostream>
 
 namespace nix {
 
@@ -441,6 +442,18 @@ public:
         }
 
         return res;
+    }
+
+    void writeToStdout(std::string_view s) override
+    {
+        auto state(state_.lock());
+        if (state->active) {
+            std::cerr << "\r\e[K";
+            Logger::writeToStdout(s);
+            draw(*state);
+        } else {
+            Logger::writeToStdout(s);
+        }
     }
 };
 
