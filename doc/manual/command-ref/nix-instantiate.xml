@@ -162,6 +162,13 @@ input.</para>
 
   </varlistentry>
 
+  <varlistentry><term><option>--include-ifd</option></term>
+
+    <listitem><para>Print all imported derivations along with the
+    final derivation.</para></listitem>
+
+  </varlistentry>
+
 </variablelist>
 
 <variablelist condition="manpage">

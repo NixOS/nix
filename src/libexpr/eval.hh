@@ -88,6 +88,9 @@ public:
 
     const ref<Store> store;
 
+    /* List of derivations that got imported. */
+    std::list<std::pair<string, string>> importedDrvs;
+
 private:
     SrcToStore srcToStore;
 
