@@ -261,4 +261,9 @@ typedef std::map<Symbol, Value *> ValueMap;
 #endif
 
 
+/* A value allocated in traceable memory. */
+typedef std::shared_ptr<Value *> RootValue;
+
+RootValue allocRootValue(Value * v);
+
 }

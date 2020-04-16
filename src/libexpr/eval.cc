@@ -22,6 +22,8 @@
 
 #if HAVE_BOEHMGC
 
+#define GC_INCLUDE_NEW
+
 #include <gc/gc.h>
 #include <gc/gc_cpp.h>
 
@@ -53,6 +55,12 @@ static char * dupStringWithLen(const char * s, size_t size)
 #endif
     if (!t) throw std::bad_alloc();
     return t;
+}
+
+
+RootValue allocRootValue(Value * v)
+{
+    return std::allocate_shared<Value *>(traceable_allocator<Value *>(), v);
 }
 
 
