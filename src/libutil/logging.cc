@@ -3,6 +3,7 @@
 
 #include <atomic>
 #include <nlohmann/json.hpp>
+#include <iostream>
 
 namespace nix {
 
@@ -22,6 +23,11 @@ Logger * logger = makeDefaultLogger();
 void Logger::warn(const std::string & msg)
 {
     log(lvlWarn, ANSI_YELLOW "warning:" ANSI_NORMAL " " + msg);
+}
+
+void Logger::writeToStdout(std::string_view s)
+{
+    std::cout << s << "\n";
 }
 
 class SimpleLogger : public Logger
