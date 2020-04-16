@@ -29,7 +29,7 @@ std::string hilite(const std::string & s, const std::smatch & m, std::string pos
           + std::string(m.suffix());
 }
 
-struct CmdSearch : SourceExprCommand, MixJSON
+struct CmdSearch : InstallableCommand, MixJSON
 {
     std::vector<std::string> res;
 
@@ -79,6 +79,11 @@ struct CmdSearch : SourceExprCommand, MixJSON
         };
     }
 
+    Strings getDefaultFlakeAttrPaths() override
+    {
+        return {""};
+    }
+
     void run(ref<Store> store) override
     {
         settings.readOnlyMode = true;
@@ -93,12 +98,14 @@ struct CmdSearch : SourceExprCommand, MixJSON
         std::vector<std::regex> regexes;
         regexes.reserve(res.size());
 
-        for (auto &re : res) {
+        for (auto & re : res)
             regexes.push_back(std::regex(re, std::regex::extended | std::regex::icase));
-        }
 
         auto state = getEvalState();
 
+        //auto [value, pos] = installable->toValue(*state);
+
+#if 0
         auto jsonOut = json ? std::make_unique<JSONObject>(std::cout) : nullptr;
 
         auto sToplevel = state->symbols.create("_toplevel");
@@ -270,7 +277,7 @@ struct CmdSearch : SourceExprCommand, MixJSON
 
         RunPager pager;
         for (auto el : results) std::cout << el.second << "\n";
-
+#endif
     }
 };
 

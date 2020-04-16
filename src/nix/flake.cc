@@ -668,6 +668,218 @@ struct CmdFlakeArchive : FlakeCommand, MixJSON, MixDryRun
     }
 };
 
+struct AttrCursor : std::enable_shared_from_this<AttrCursor>
+{
+    EvalState & state;
+    typedef std::optional<std::pair<std::shared_ptr<AttrCursor>, std::string>> Parent;
+    Parent parent;
+    RootValue value;
+
+    AttrCursor(
+        EvalState & state,
+        Parent parent,
+        Value * value)
+        : state(state), parent(parent), value(allocRootValue(value))
+    {
+    }
+
+    std::vector<std::string> getAttrPath() const
+    {
+        if (parent) {
+            auto attrPath = parent->first->getAttrPath();
+            attrPath.push_back(parent->second);
+            return attrPath;
+        } else
+            return {};
+    }
+
+    std::shared_ptr<AttrCursor> maybeGetAttr(const std::string & name)
+    {
+        state.forceValue(**value);
+
+        if ((*value)->type != tAttrs)
+            return nullptr;
+
+        auto attr = (*value)->attrs->get(state.symbols.create(name));
+
+        if (!attr)
+            return nullptr;
+
+        return std::allocate_shared<AttrCursor>(traceable_allocator<AttrCursor>(), state, std::make_pair(shared_from_this(), name), attr->value);
+    }
+
+    std::shared_ptr<AttrCursor> getAttr(const std::string & name)
+    {
+        auto p = maybeGetAttr(name);
+        if (!p) {
+            auto attrPath = getAttrPath();
+            attrPath.push_back(name);
+            throw Error("attribute '%s' does not exist", concatStringsSep(".", attrPath));
+        }
+        return p;
+    }
+
+    std::string getString()
+    {
+        return state.forceString(**value);
+    }
+
+    StringSet getAttrs()
+    {
+        StringSet attrs;
+        state.forceAttrs(**value);
+        for (auto & attr : *(*value)->attrs)
+            attrs.insert(attr.name);
+        return attrs;
+    }
+
+    bool isDerivation()
+    {
+        auto aType = maybeGetAttr("type");
+        return aType && aType->getString() == "derivation";
+    }
+};
+
+struct CmdFlakeShow : FlakeCommand
+{
+    bool showLegacy = false;
+
+    CmdFlakeShow()
+    {
+        mkFlag()
+            .longName("legacy")
+            .description("enumerate the contents of the 'legacyPackages' output")
+            .set(&showLegacy, true);
+    }
+
+    std::string description() override
+    {
+        return "show the outputs provided by a flake";
+    }
+
+    void run(nix::ref<nix::Store> store) override
+    {
+        auto state = getEvalState();
+        auto flake = lockFlake();
+
+        auto vFlake = state->allocValue();
+        flake::callFlake(*state, flake, *vFlake);
+
+        state->forceAttrs(*vFlake);
+
+        auto aOutputs = vFlake->attrs->get(state->symbols.create("outputs"));
+        assert(aOutputs);
+
+        std::function<void(AttrCursor & visitor, const std::vector<std::string> & attrPath, const std::string & headerPrefix, const std::string & nextPrefix)> visit;
+
+        visit = [&](AttrCursor & visitor, const std::vector<std::string> & attrPath, const std::string & headerPrefix, const std::string & nextPrefix)
+        {
+            Activity act(*logger, lvlInfo, actUnknown,
+                fmt("evaluating '%s'", concatStringsSep(".", attrPath)));
+            try {
+                auto recurse = [&]()
+                {
+                    logger->stdout("%s", headerPrefix);
+                    auto attrs = visitor.getAttrs();
+                    for (const auto & [i, attr] : enumerate(attrs)) {
+                        bool last = i + 1 == attrs.size();
+                        auto visitor2 = visitor.getAttr(attr);
+                        auto attrPath2(attrPath);
+                        attrPath2.push_back(attr);
+                        visit(*visitor2, attrPath2,
+                            fmt(ANSI_GREEN "%s%s" ANSI_NORMAL ANSI_BOLD "%s" ANSI_NORMAL, nextPrefix, last ? treeLast : treeConn, attr),
+                            nextPrefix + (last ? treeNull : treeLine));
+                    }
+                };
+
+                auto showDerivation = [&]()
+                {
+                    auto name = visitor.getAttr("name")->getString();
+
+                    /*
+                    std::string description;
+
+                    if (auto aMeta = visitor.maybeGetAttr("meta")) {
+                        if (auto aDescription = aMeta->maybeGetAttr("description"))
+                            description = aDescription->getString();
+                    }
+                    */
+
+                    logger->stdout("%s: %s '%s'",
+                        headerPrefix,
+                        attrPath.size() == 2 && attrPath[0] == "devShell" ? "development environment" :
+                        attrPath.size() == 3 && attrPath[0] == "checks" ? "derivation" :
+                        attrPath.size() >= 1 && attrPath[0] == "hydraJobs" ? "derivation" :
+                        "package",
+                        name);
+                };
+
+                if (attrPath.size() == 0
+                    || (attrPath.size() == 1 && (
+                            attrPath[0] == "defaultPackage"
+                            || attrPath[0] == "devShell"
+                            || attrPath[0] == "nixosConfigurations"
+                            || attrPath[0] == "nixosModules"))
+                    || ((attrPath.size() == 1 || attrPath.size() == 2)
+                        && (attrPath[0] == "checks"
+                            || attrPath[0] == "packages"))
+                    )
+                {
+                    recurse();
+                }
+
+                else if (
+                    (attrPath.size() == 2 && (attrPath[0] == "defaultPackage" || attrPath[0] == "devShell"))
+                    || (attrPath.size() == 3 && (attrPath[0] == "checks" || attrPath[0] == "packages"))
+                    )
+                {
+                    if (visitor.isDerivation())
+                        showDerivation();
+                    else
+                        throw Error("expected a derivation");
+                }
+
+                else if (attrPath.size() > 0 && attrPath[0] == "hydraJobs") {
+                    if (visitor.isDerivation())
+                        showDerivation();
+                    else
+                        recurse();
+                }
+
+                else if (attrPath.size() > 0 && attrPath[0] == "legacyPackages") {
+                    if (attrPath.size() == 1)
+                        recurse();
+                    else if (!showLegacy)
+                        logger->stdout("%s: " ANSI_YELLOW "omitted" ANSI_NORMAL " (use '--legacy' to show)", headerPrefix);
+                    else {
+                        if (visitor.isDerivation())
+                            showDerivation();
+                        else if (attrPath.size() <= 2)
+                            // FIXME: handle recurseIntoAttrs
+                            recurse();
+                    }
+                }
+
+                else {
+                    logger->stdout("%s: %s",
+                        headerPrefix,
+                        attrPath.size() == 1 && attrPath[0] == "overlay" ? "Nixpkgs overlay" :
+                        attrPath.size() == 2 && attrPath[0] == "nixosConfigurations" ? "NixOS configuration" :
+                        attrPath.size() == 2 && attrPath[0] == "nixosModules" ? "NixOS module" :
+                        ANSI_YELLOW "unknown" ANSI_NORMAL);
+                }
+            } catch (EvalError & e) {
+                if (!(attrPath.size() > 0 && attrPath[0] == "legacyPackages"))
+                    logger->stdout("%s: " ANSI_RED "%s" ANSI_NORMAL, headerPrefix, e.what());
+            }
+        };
+
+        auto root = std::make_shared<AttrCursor>(*state, std::nullopt, aOutputs->value);
+
+        visit(*root, {}, fmt(ANSI_BOLD "%s" ANSI_NORMAL, flake.flake.lockedRef), "");
+    }
+};
+
 struct CmdFlake : virtual MultiCommand, virtual Command
 {
     CmdFlake()
@@ -683,6 +895,7 @@ struct CmdFlake : virtual MultiCommand, virtual Command
                 {"init", []() { return make_ref<CmdFlakeInit>(); }},
                 {"clone", []() { return make_ref<CmdFlakeClone>(); }},
                 {"archive", []() { return make_ref<CmdFlakeArchive>(); }},
+                {"show", []() { return make_ref<CmdFlakeShow>(); }},
             })
     {
     }
