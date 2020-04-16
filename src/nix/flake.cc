@@ -1065,10 +1065,12 @@ struct CmdFlakeShow : FlakeCommand
                             attrPath[0] == "defaultPackage"
                             || attrPath[0] == "devShell"
                             || attrPath[0] == "nixosConfigurations"
-                            || attrPath[0] == "nixosModules"))
+                            || attrPath[0] == "nixosModules"
+                            || attrPath[0] == "defaultApp"))
                     || ((attrPath.size() == 1 || attrPath.size() == 2)
                         && (attrPath[0] == "checks"
-                            || attrPath[0] == "packages"))
+                            || attrPath[0] == "packages"
+                            || attrPath[0] == "apps"))
                     )
                 {
                     recurse();
@@ -1104,6 +1106,16 @@ struct CmdFlakeShow : FlakeCommand
                             // FIXME: handle recurseIntoAttrs
                             recurse();
                     }
+                }
+
+                else if (
+                    (attrPath.size() == 2 && attrPath[0] == "defaultApp") ||
+                    (attrPath.size() == 3 && attrPath[0] == "apps"))
+                {
+                    auto aType = visitor.maybeGetAttr("type");
+                    if (!aType || aType->getString() != "app")
+                        throw EvalError("not an app definition");
+                    logger->stdout("%s: app", headerPrefix);
                 }
 
                 else {
