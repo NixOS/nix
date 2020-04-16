@@ -12,8 +12,6 @@
 #include "flake/eval-cache.hh"
 #include "url.hh"
 
-#include <gc/gc.h>
-
 #include <regex>
 #include <queue>
 
