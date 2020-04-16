@@ -254,10 +254,10 @@ static Flake getFlake(
 
     if (auto outputs = vInfo.attrs->get(sOutputs)) {
         expectType(state, tLambda, *outputs->value, *outputs->pos);
-        flake.vOutputs = outputs->value;
+        flake.vOutputs = allocRootValue(outputs->value);
 
-        if (flake.vOutputs->lambda.fun->matchAttrs) {
-            for (auto & formal : flake.vOutputs->lambda.fun->formals->formals) {
+        if ((*flake.vOutputs)->lambda.fun->matchAttrs) {
+            for (auto & formal : (*flake.vOutputs)->lambda.fun->formals->formals) {
                 if (formal.name != state.sSelf)
                     flake.inputs.emplace(formal.name, FlakeInput {
                         .ref = parseFlakeRef(formal.name)
@@ -613,16 +613,16 @@ void callFlake(EvalState & state,
 
     mkString(*vRootSubdir, lockedFlake.flake.lockedRef.subdir);
 
-    static Value * vCallFlake = nullptr;
+    static RootValue vCallFlake = nullptr;
 
     if (!vCallFlake) {
-        vCallFlake = state.allocValue();
+        vCallFlake = allocRootValue(state.allocValue());
         state.eval(state.parseExprFromString(
             #include "call-flake.nix.gen.hh"
-            , "/"), *vCallFlake);
+            , "/"), **vCallFlake);
     }
 
-    state.callFunction(*vCallFlake, *vLocks, *vTmp1, noPos);
+    state.callFunction(**vCallFlake, *vLocks, *vTmp1, noPos);
     state.callFunction(*vTmp1, *vRootSrc, *vTmp2, noPos);
     state.callFunction(*vTmp2, *vRootSubdir, vRes, noPos);
 }

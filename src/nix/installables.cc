@@ -239,18 +239,18 @@ struct InstallableExpr : InstallableValue
 
 struct InstallableAttrPath : InstallableValue
 {
-    Value * v;
+    RootValue v;
     std::string attrPath;
 
     InstallableAttrPath(SourceExprCommand & cmd, Value * v, const std::string & attrPath)
-        : InstallableValue(cmd), v(v), attrPath(attrPath)
+        : InstallableValue(cmd), v(allocRootValue(v)), attrPath(attrPath)
     { }
 
     std::string what() override { return attrPath; }
 
     std::pair<Value *, Pos> toValue(EvalState & state) override
     {
-        auto [vRes, pos] = findAlongAttrPath(state, attrPath, *cmd.getAutoArgs(state), *v);
+        auto [vRes, pos] = findAlongAttrPath(state, attrPath, *cmd.getAutoArgs(state), **v);
         state.forceValue(*vRes);
         return {vRes, pos};
     }

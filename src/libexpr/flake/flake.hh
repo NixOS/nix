@@ -3,10 +3,10 @@
 #include "types.hh"
 #include "flakeref.hh"
 #include "lockfile.hh"
+#include "value.hh"
 
 namespace nix {
 
-struct Value;
 class EvalState;
 
 namespace fetchers { struct Tree; }
@@ -33,7 +33,7 @@ struct Flake
     std::optional<std::string> description;
     std::shared_ptr<const fetchers::Tree> sourceInfo;
     FlakeInputs inputs;
-    Value * vOutputs; // FIXME: gc
+    RootValue vOutputs;
     ~Flake();
 };
 
