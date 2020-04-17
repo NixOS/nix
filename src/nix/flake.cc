@@ -672,13 +672,17 @@ struct CmdFlakeArchive : FlakeCommand, MixJSON, MixDryRun
 // FIXME: inefficient representation of attrs
 static const char * schema = R"sql(
 create table if not exists Attributes (
-    attrPath    text primary key,
+    parent      integer not null,
+    name        text,
     type        integer not null,
-    value       text not null
+    value       text,
+    primary key (parent, name)
 );
 )sql";
 
 enum AttrType {
+    Placeholder = 0,
+    // FIXME: distinguish between full / partial attrsets
     Attrs = 1,
     String = 2,
 };
@@ -690,7 +694,13 @@ struct AttrDb
         SQLite db;
         SQLiteStmt insertAttribute;
         SQLiteStmt queryAttribute;
+        SQLiteStmt queryAttributes;
     };
+
+    struct placeholder_t {};
+    typedef uint64_t AttrId;
+    typedef std::pair<AttrId, Symbol> AttrKey;
+    typedef std::variant<std::vector<Symbol>, std::string, placeholder_t> AttrValue;
 
     std::unique_ptr<Sync<State>> _state;
 
@@ -709,57 +719,78 @@ struct AttrDb
         state->db.exec(schema);
 
         state->insertAttribute.create(state->db,
-            "insert or replace into Attributes(attrPath, type, value) values (?, ?, ?)");
+            "insert or replace into Attributes(parent, name, type, value) values (?, ?, ?, ?)");
 
         state->queryAttribute.create(state->db,
-            "select type, value from Attributes where attrPath = ?");
+            "select rowid, type, value from Attributes where parent = ? and name = ?");
+
+        state->queryAttributes.create(state->db,
+            "select name from Attributes where parent = ?");
     }
 
-    void setAttr(
-        const std::vector<Symbol> & attrPath,
+    AttrId setAttr(
+        AttrKey key,
         const std::vector<Symbol> & attrs)
     {
         auto state(_state->lock());
 
         state->insertAttribute.use()
-            (concatStringsSep(".", attrPath))
+            (key.first)
+            (key.second)
             (AttrType::Attrs)
-            (concatStringsSep("\n", attrs)).exec();
+            (0, false).exec();
+
+        AttrId rowId = state->db.getLastInsertedRowId();
+        assert(rowId);
+
+        for (auto & attr : attrs)
+            state->insertAttribute.use()
+                (rowId)
+                (attr)
+                (AttrType::Placeholder)
+                (0, false).exec();
+
+        return rowId;
     }
 
-    void setAttr(
-        const std::vector<Symbol> & attrPath,
+    AttrId setAttr(
+        AttrKey key,
         std::string_view s)
     {
         auto state(_state->lock());
 
         state->insertAttribute.use()
-            (concatStringsSep(".", attrPath))
+            (key.first)
+            (key.second)
             (AttrType::String)
             (s).exec();
+
+        return state->db.getLastInsertedRowId();
     }
 
-    typedef std::variant<std::vector<Symbol>, std::string> AttrValue;
-
-    std::optional<AttrValue> getAttr(
-        const std::vector<Symbol> & attrPath,
+    std::optional<std::pair<AttrId, AttrValue>> getAttr(
+        AttrKey key,
         SymbolTable & symbols)
     {
         auto state(_state->lock());
 
-        auto queryAttribute(state->queryAttribute.use()
-            (concatStringsSep(".", attrPath)));
+        auto queryAttribute(state->queryAttribute.use()(key.first)(key.second));
         if (!queryAttribute.next()) return {};
 
-        auto type = (AttrType) queryAttribute.getInt(0);
+        auto rowId = (AttrType) queryAttribute.getInt(0);
+        auto type = (AttrType) queryAttribute.getInt(1);
 
-        if (type == AttrType::Attrs) {
+        if (type == AttrType::Placeholder)
+            return {{rowId, placeholder_t()}};
+        else if (type == AttrType::Attrs) {
+            // FIXME: expensive, should separate this out.
             std::vector<Symbol> attrs;
-            for (auto & s : tokenizeString<std::vector<std::string>>(queryAttribute.getStr(1), "\n"))
-                attrs.push_back(symbols.create(s));
-            return attrs;
+            auto queryAttributes(state->queryAttributes.use()(rowId));
+            while (queryAttributes.next())
+                attrs.push_back(symbols.create(queryAttributes.getStr(0)));
+            return {{rowId, attrs}};
         } else if (type == AttrType::String) {
-            return queryAttribute.getStr(1);
+            return {{rowId, queryAttribute.getStr(2)}};
         } else
             throw Error("unexpected type in evaluation cache");
     }
@@ -803,17 +834,29 @@ struct AttrCursor : std::enable_shared_from_this<AttrCursor>
     typedef std::optional<std::pair<std::shared_ptr<AttrCursor>, Symbol>> Parent;
     Parent parent;
     RootValue _value;
-    std::optional<AttrDb::AttrValue> cachedValue;
+    std::optional<std::pair<AttrDb::AttrId, AttrDb::AttrValue>> cachedValue;
 
     AttrCursor(
         ref<AttrRoot> root,
         Parent parent,
         Value * value = nullptr,
-        std::optional<AttrDb::AttrValue> && cachedValue = {})
+        std::optional<std::pair<AttrDb::AttrId, AttrDb::AttrValue>> && cachedValue = {})
         : root(root), parent(parent), cachedValue(std::move(cachedValue))
     {
         if (value)
             _value = allocRootValue(value);
+    }
+
+    AttrDb::AttrKey getAttrKey()
+    {
+        if (!parent)
+            return {0, root->state.sEpsilon};
+        if (!parent->first->cachedValue) {
+            parent->first->cachedValue = root->db->getAttr(
+                parent->first->getAttrKey(), root->state.symbols);
+            assert(parent->first->cachedValue);
+        }
+        return {parent->first->cachedValue->first, parent->second};
     }
 
     Value & getValue()
@@ -863,20 +906,24 @@ struct AttrCursor : std::enable_shared_from_this<AttrCursor>
     {
         if (root->db) {
             if (!cachedValue)
-                cachedValue = root->db->getAttr(getAttrPath(), root->state.symbols);
+                cachedValue = root->db->getAttr(getAttrKey(), root->state.symbols);
 
             if (cachedValue) {
-                if (auto attrs = std::get_if<std::vector<Symbol>>(&*cachedValue)) {
+                if (auto attrs = std::get_if<std::vector<Symbol>>(&cachedValue->second)) {
                     for (auto & attr : *attrs)
                         if (attr == name)
                             return std::make_shared<AttrCursor>(root, std::make_pair(shared_from_this(), name));
-                }
-                return nullptr;
+                    return nullptr;
+                } else if (std::get_if<AttrDb::placeholder_t>(&cachedValue->second)) {
+                    auto attr = root->db->getAttr({cachedValue->first, name}, root->state.symbols);
+                    if (attr)
+                        return std::make_shared<AttrCursor>(root, std::make_pair(shared_from_this(), name), nullptr, std::move(attr));
+                    // Incomplete attrset, so need to fall thru and
+                    // evaluate to see whether 'name' exists
+                } else
+                    // FIXME: throw error?
+                    return nullptr;
             }
-
-            auto attr = root->db->getAttr(getAttrPath(name), root->state.symbols);
-            if (attr)
-                return std::make_shared<AttrCursor>(root, std::make_pair(shared_from_this(), name), nullptr, std::move(attr));
         }
 
         //printError("GET ATTR %s", getAttrPathStr(name));
@@ -916,22 +963,20 @@ struct AttrCursor : std::enable_shared_from_this<AttrCursor>
     {
         if (root->db) {
             if (!cachedValue)
-                cachedValue = root->db->getAttr(getAttrPath(), root->state.symbols);
-            if (cachedValue) {
-                if (auto s = std::get_if<std::string>(&*cachedValue)) {
+                cachedValue = root->db->getAttr(getAttrKey(), root->state.symbols);
+            if (cachedValue && !std::get_if<AttrDb::placeholder_t>(&cachedValue->second)) {
+                if (auto s = std::get_if<std::string>(&cachedValue->second)) {
                     //printError("GOT STRING %s", getAttrPathStr());
                     return *s;
                 } else
-                    throw Error("unexpected type mismatch in evaluation cache");
+                    throw Error("unexpected type mismatch in evaluation cache (string expected)");
             }
         }
 
         //printError("GET STRING %s", getAttrPathStr());
         auto s = root->state.forceString(getValue());
-        if (root->db) {
-            root->db->setAttr(getAttrPath(), s);
-            cachedValue = s;
-        }
+        if (root->db)
+            cachedValue = {root->db->setAttr(getAttrKey(), s), s};
 
         return s;
     }
@@ -940,13 +985,13 @@ struct AttrCursor : std::enable_shared_from_this<AttrCursor>
     {
         if (root->db) {
             if (!cachedValue)
-                cachedValue = root->db->getAttr(getAttrPath(), root->state.symbols);
-            if (cachedValue) {
-                if (auto attrs = std::get_if<std::vector<Symbol>>(&*cachedValue)) {
+                cachedValue = root->db->getAttr(getAttrKey(), root->state.symbols);
+            if (cachedValue && !std::get_if<AttrDb::placeholder_t>(&cachedValue->second)) {
+                if (auto attrs = std::get_if<std::vector<Symbol>>(&cachedValue->second)) {
                     //printError("GOT ATTRS %s", getAttrPathStr());
                     return *attrs;
                 } else
-                    throw Error("unexpected type mismatch in evaluation cache");
+                    throw Error("unexpected type mismatch in evaluation cache (attrs expected)");
             }
         }
 
@@ -958,10 +1003,8 @@ struct AttrCursor : std::enable_shared_from_this<AttrCursor>
         std::sort(attrs.begin(), attrs.end(), [](const Symbol & a, const Symbol & b) {
             return (const string &) a < (const string &) b;
         });
-        if (root->db) {
-            root->db->setAttr(getAttrPath(), attrs);
-            cachedValue = attrs;
-        }
+        if (root->db)
+            cachedValue = {root->db->setAttr(getAttrKey(), attrs), attrs};
 
         return attrs;
     }

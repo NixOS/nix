@@ -26,6 +26,8 @@ struct SQLite
     void isCache();
 
     void exec(const std::string & stmt);
+
+    uint64_t getLastInsertedRowId();
 };
 
 /* RAII wrapper to create and destroy SQLite prepared statements. */

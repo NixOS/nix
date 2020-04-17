@@ -61,6 +61,11 @@ void SQLite::exec(const std::string & stmt)
     });
 }
 
+uint64_t SQLite::getLastInsertedRowId()
+{
+    return sqlite3_last_insert_rowid(db);
+}
+
 void SQLiteStmt::create(sqlite3 * db, const string & sql)
 {
     checkInterrupt();
