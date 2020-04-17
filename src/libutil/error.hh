@@ -22,16 +22,16 @@ typedef enum {
 
 struct ErrPos
 {
-    int lineNumber;
+    int line;
     int column;
-    string nixFile;
+    string file;
 
     template <class P>
     ErrPos& operator=(const P &pos)
     {
-        lineNumber = pos.line;
+        line = pos.line;
         column = pos.column;
-        nixFile = pos.file;
+        file = pos.file;
         return *this;
     }
 

@@ -17,9 +17,9 @@ std::ostream& operator<<(std::ostream &os, const hintformat &hf)
 string showErrPos(const ErrPos &errPos)
 {
     if (errPos.column > 0) {
-        return fmt("(%1%:%2%)", errPos.lineNumber, errPos.column);
+        return fmt("(%1%:%2%)", errPos.line, errPos.column);
     } else {
-        return fmt("(%1%)", errPos.lineNumber);
+        return fmt("(%1%)", errPos.line);
     };
 }
 
@@ -29,7 +29,7 @@ void printCodeLines(const string &prefix, const NixCode &nixCode)
     if (nixCode.prevLineOfCode.has_value()) {
         std::cout << fmt("%1% %|2$5d|| %3%",
                          prefix,
-                         (nixCode.errPos.lineNumber - 1),
+                         (nixCode.errPos.line - 1),
                          *nixCode.prevLineOfCode)
                   << std::endl;
     }
@@ -37,7 +37,7 @@ void printCodeLines(const string &prefix, const NixCode &nixCode)
     // line of code containing the error.%2$+5d%
     std::cout << fmt("%1% %|2$5d|| %3%",
                      prefix,
-                     (nixCode.errPos.lineNumber),
+                     (nixCode.errPos.line),
                      nixCode.errLineOfCode)
               << std::endl;
 
@@ -61,7 +61,7 @@ void printCodeLines(const string &prefix, const NixCode &nixCode)
     if (nixCode.nextLineOfCode.has_value()) {
         std::cout << fmt("%1% %|2$5d|| %3%",
                          prefix,
-                         (nixCode.errPos.lineNumber + 1),
+                         (nixCode.errPos.line + 1),
                          *nixCode.nextLineOfCode)
                   << std::endl;
     }
@@ -87,16 +87,26 @@ std::ostream& operator<<(std::ostream &out, const ErrorInfo &einfo)
         break;
     }
     case Verbosity::lvlInfo: {
-        levelString = ANSI_YELLOW;
+        levelString = ANSI_GREEN;
         levelString += "info:";
         levelString += ANSI_NORMAL;
         break;
     }
-    case Verbosity::lvlTalkative:
-    case Verbosity::lvlChatty:
+    case Verbosity::lvlTalkative: {
+        levelString = ANSI_GREEN;
+        levelString += "talk:";
+        levelString += ANSI_NORMAL;
+        break;
+    }
+    case Verbosity::lvlChatty: {
+        levelString = ANSI_GREEN;
+        levelString += "chat:";
+        levelString += ANSI_NORMAL;
+        break;
+    }
     case Verbosity::lvlVomit: {
         levelString = ANSI_GREEN;
-        levelString += "info:";
+        levelString += "vomit:";
         levelString += ANSI_NORMAL;
         break;
     }
@@ -121,25 +131,25 @@ std::ostream& operator<<(std::ostream &out, const ErrorInfo &einfo)
 
     // divider.
     out << fmt("%1%%2%" ANSI_BLUE " %3% %4% %5% %6%" ANSI_NORMAL,
-                     prefix,
-                     levelString,
-                     "---",
-                     einfo.name,
-                     dashes,
-                     einfo.programName.value_or(""))
-              << std::endl;
+               prefix,
+               levelString,
+               "---",
+               einfo.name,
+               dashes,
+               einfo.programName.value_or(""))
+        << std::endl;
 
     // filename.
     if (einfo.nixCode.has_value()) {
-        if (einfo.nixCode->errPos.nixFile != "") {
+        if (einfo.nixCode->errPos.file != "") {
             string eline = einfo.nixCode->errLineOfCode != ""
                            ? string(" ") + showErrPos(einfo.nixCode->errPos)
                            : "";
 
             out << fmt("%1%in file: " ANSI_BLUE "%2%%3%" ANSI_NORMAL,
-                             prefix, 
-                             einfo.nixCode->errPos.nixFile,
-                             eline) << std::endl;
+                       prefix,
+                       einfo.nixCode->errPos.file,
+                       eline) << std::endl;
             out << prefix << std::endl;
         } else {
             out << fmt("%1%from command line argument", prefix) << std::endl;

@@ -146,11 +146,40 @@ struct JSONLogger : Logger
 
     void logEI(const ErrorInfo & ei) override
     {
-        // nlohmann::json json;
-        // json["action"] = "msg";
-        // json["level"] = lvl;
-        // json["msg"] = fs.s;
-        // write(json);
+        // add fields like Pos info and etc?
+        std::ostringstream oss;
+        oss << ei;
+
+        nlohmann::json json;
+        json["action"] = "msg";
+        json["level"] = ei.level;
+        json["msg"] = oss.str();
+
+        // Extra things that COULD go into json.  Useful?  
+        // TODO: decide if useful.
+        // TODO: make a json obj that goes into json["msg"]?
+        json["name"] = ei.name;
+        json["description"] = ei.description;
+        if (ei.hint.has_value())
+        {
+          json["hint"] = ei.hint->str();
+        }
+        if (ei.nixCode.has_value())
+        {
+          if (ei.nixCode->errPos.line != 0)
+            json["line"] = ei.nixCode->errPos.line;
+          if (ei.nixCode->errPos.column != 0)
+            json["column"] = ei.nixCode->errPos.column;
+          if (ei.nixCode->errPos.file != "")
+            json["file"] = ei.nixCode->errPos.file;
+          if (ei.nixCode->prevLineOfCode.has_value())
+            json["prevLineOfCode"] = *ei.nixCode->prevLineOfCode;
+          json["errLineOfCode"] = ei.nixCode->errLineOfCode;
+          if (ei.nixCode->nextLineOfCode.has_value())
+            json["nextLineOfCode"] = *ei.nixCode->nextLineOfCode;
+        }
+
+        write(json);
     }
 
     void startActivity(ActivityId act, Verbosity lvl, ActivityType type,

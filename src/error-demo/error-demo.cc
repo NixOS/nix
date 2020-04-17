@@ -8,12 +8,45 @@ int main()
 {
     using namespace nix;
 
-    std::unique_ptr<Logger> logger(makeDefaultLogger());
+    makeDefaultLogger();
 
-    verbosity = lvlError;
+    verbosity = lvlVomit;
 
     // In each program where errors occur, this has to be set.
     ErrorInfo::programName = std::optional("error-demo");
+
+    // For completeness sake, info through vomit levels.
+    // But this is maybe a heavy format for those.
+    logger->logEI(
+        ErrorInfo { .level = lvlInfo,
+                    .name = "Info name",
+                    .description = "Info description",
+                  });
+
+    logger->logEI(
+        ErrorInfo { .level = lvlTalkative,
+                    .name = "Talkative name",
+                    .description = "Talkative description",
+                  });
+
+    logger->logEI(
+        ErrorInfo { .level = lvlChatty,
+                    .name = "Chatty name",
+                    .description = "Chatty description",
+                  });
+
+    logger->logEI(
+        ErrorInfo { .level = lvlDebug,
+                    .name = "Debug name",
+                    .description = "Debug description",
+                  });
+
+    logger->logEI(
+        ErrorInfo { .level = lvlVomit,
+                    .name = "Vomit name",
+                    .description = "Vomit description",
+                  });
+
 
     // Error in a program; no hint and no nix code.
     logError(
