@@ -11,9 +11,14 @@ namespace nix
 {
 
 typedef enum {
-    elWarning,
-    elError
-} ErrLevel;
+    lvlError = 0,
+    lvlWarn,
+    lvlInfo,
+    lvlTalkative,
+    lvlChatty,
+    lvlDebug,
+    lvlVomit
+} Verbosity;
 
 struct ErrPos
 {
@@ -101,7 +106,7 @@ inline hintformat hintfmt(const std::string & fs, const Args & ... args)
 // ErrorInfo.
 struct ErrorInfo
 {
-    ErrLevel level;
+    Verbosity level;
     string name;
     string description;
     std::optional<hintformat> hint;
@@ -110,11 +115,7 @@ struct ErrorInfo
     static std::optional<string> programName;
 };
 
-// --------------------------------------------------------
-// error printing
-
-// just to cout for now.
-void printErrorInfo(const ErrorInfo &einfo);
+std::ostream& operator<<(std::ostream &out, const ErrorInfo &einfo);
 
 }
 

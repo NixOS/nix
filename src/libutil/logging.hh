@@ -1,18 +1,9 @@
 #pragma once
 
 #include "types.hh"
+#include "error.hh"
 
 namespace nix {
-
-typedef enum {
-    lvlError = 0,
-    lvlWarn,
-    lvlInfo,
-    lvlTalkative,
-    lvlChatty,
-    lvlDebug,
-    lvlVomit
-} Verbosity;
 
 typedef enum {
     actUnknown = 0,
@@ -68,6 +59,13 @@ public:
     void log(const FormatOrString & fs)
     {
         log(lvlInfo, fs);
+    }
+
+    virtual void logEI(const ErrorInfo &ei) = 0;
+
+    void logEI(Verbosity lvl, ErrorInfo ei) {
+      ei.level = lvl;
+      logEI(ei);
     }
 
     virtual void warn(const std::string & msg);
@@ -156,6 +154,18 @@ extern Verbosity verbosity; /* suppress msgs > this */
 #define printTalkative(args...) printMsg(lvlTalkative, args)
 #define debug(args...) printMsg(lvlDebug, args)
 #define vomit(args...) printMsg(lvlVomit, args)
+
+#define logErrorInfo(level, errorInfo...) \
+    do { \
+        if (level <= nix::verbosity) { \
+            logger->logEI(level, errorInfo); \
+        } \
+    } while (0)
+
+#define logError(errorInfo...) logErrorInfo(lvlError, errorInfo)
+#define logWarning(errorInfo...) logErrorInfo(lvlWarn, errorInfo)
+
+
 
 template<typename... Args>
 inline void warn(const std::string & fs, const Args & ... args)

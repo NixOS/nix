@@ -2,6 +2,7 @@
 
 #include <iostream>
 #include <optional>
+#include "serialise.hh"
 
 namespace nix
 {
@@ -66,22 +67,42 @@ void printCodeLines(const string &prefix, const NixCode &nixCode)
     }
 }
 
-void printErrorInfo(const ErrorInfo &einfo)
+std::ostream& operator<<(std::ostream &out, const ErrorInfo &einfo)
 {
     int errwidth = 80;
     string prefix = "    ";
 
     string levelString;
     switch (einfo.level) {
-    case ErrLevel::elError: {
+    case Verbosity::lvlError: {
         levelString = ANSI_RED;
         levelString += "error:";
         levelString += ANSI_NORMAL;
         break;
     }
-    case ErrLevel::elWarning: {
+    case Verbosity::lvlWarn: {
         levelString = ANSI_YELLOW;
         levelString += "warning:";
+        levelString += ANSI_NORMAL;
+        break;
+    }
+    case Verbosity::lvlInfo: {
+        levelString = ANSI_YELLOW;
+        levelString += "info:";
+        levelString += ANSI_NORMAL;
+        break;
+    }
+    case Verbosity::lvlTalkative:
+    case Verbosity::lvlChatty:
+    case Verbosity::lvlVomit: {
+        levelString = ANSI_GREEN;
+        levelString += "info:";
+        levelString += ANSI_NORMAL;
+        break;
+    }
+    case Verbosity::lvlDebug: {
+        levelString = ANSI_YELLOW;
+        levelString += "debug:";
         levelString += ANSI_NORMAL;
         break;
     }
@@ -99,7 +120,7 @@ void printErrorInfo(const ErrorInfo &einfo)
         dashes.append("-");
 
     // divider.
-    std::cout << fmt("%1%%2%" ANSI_BLUE " %3% %4% %5% %6%" ANSI_NORMAL,
+    out << fmt("%1%%2%" ANSI_BLUE " %3% %4% %5% %6%" ANSI_NORMAL,
                      prefix,
                      levelString,
                      "---",
@@ -115,32 +136,33 @@ void printErrorInfo(const ErrorInfo &einfo)
                            ? string(" ") + showErrPos(einfo.nixCode->errPos)
                            : "";
 
-            std::cout << fmt("%1%in file: " ANSI_BLUE "%2%%3%" ANSI_NORMAL,
+            out << fmt("%1%in file: " ANSI_BLUE "%2%%3%" ANSI_NORMAL,
                              prefix, 
                              einfo.nixCode->errPos.nixFile,
                              eline) << std::endl;
-            std::cout << prefix << std::endl;
+            out << prefix << std::endl;
         } else {
-            std::cout << fmt("%1%from command line argument", prefix) << std::endl;
-            std::cout << prefix << std::endl;
+            out << fmt("%1%from command line argument", prefix) << std::endl;
+            out << prefix << std::endl;
         }
     }
 
     // description
-    std::cout << prefix << einfo.description << std::endl;
-    std::cout << prefix << std::endl;
+    out << prefix << einfo.description << std::endl;
+    out << prefix << std::endl;
 
     // lines of code.
     if (einfo.nixCode->errLineOfCode != "") {
         printCodeLines(prefix, *einfo.nixCode);
-        std::cout << prefix << std::endl;
+        out << prefix << std::endl;
     }
 
     // hint
     if (einfo.hint.has_value()) {
-        std::cout << prefix << *einfo.hint << std::endl;
-        std::cout << prefix << std::endl;
+        out << prefix << *einfo.hint << std::endl;
+        out << prefix << std::endl;
     }
-}
 
+    return out;
+}
 }

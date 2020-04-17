@@ -73,6 +73,10 @@ struct TunnelLogger : public Logger
         enqueueMsg(*buf.s);
     }
 
+    void logEI(const ErrorInfo & ei) override
+    {
+    }
+
     /* startWork() means that we're starting an operation for which we
       want to send out stderr to the client. */
     void startWork()

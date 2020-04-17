@@ -3,6 +3,7 @@
 
 #include <atomic>
 #include <nlohmann/json.hpp>
+#include <sstream>
 
 namespace nix {
 
@@ -55,6 +56,14 @@ public:
         }
 
         writeToStderr(prefix + filterANSIEscapes(fs.s, !tty) + "\n");
+    }
+
+    void logEI(const ErrorInfo & ei) override
+    {
+        std::stringstream oss; 
+        oss << ei;
+
+        log(ei.level, oss.str());
     }
 
     void startActivity(ActivityId act, Verbosity lvl, ActivityType type,
@@ -133,6 +142,15 @@ struct JSONLogger : Logger
         json["level"] = lvl;
         json["msg"] = fs.s;
         write(json);
+    }
+
+    void logEI(const ErrorInfo & ei) override
+    {
+        // nlohmann::json json;
+        // json["action"] = "msg";
+        // json["level"] = lvl;
+        // json["msg"] = fs.s;
+        // write(json);
     }
 
     void startActivity(ActivityId act, Verbosity lvl, ActivityType type,

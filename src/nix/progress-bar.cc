@@ -124,6 +124,12 @@ public:
         log(*state, lvl, fs.s);
     }
 
+    void logEI(const ErrorInfo &ei) override
+    {
+        auto state(state_.lock());
+        // log(*state, lvl, ei.as_str());
+    }
+
     void log(State & state, Verbosity lvl, const std::string & s)
     {
         if (state.active) {
