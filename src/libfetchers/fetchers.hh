@@ -55,6 +55,11 @@ struct Input : std::enable_shared_from_this<Input>
 
     Attrs toAttrs() const;
 
+    /* The tree may already be in the Nix store, or it could be
+       substituted (which is often faster than fetching from the
+       original source). */
+    Tree substituteTree(ref<Store> store) const;
+
     std::pair<Tree, std::shared_ptr<const Input>> fetchTree(ref<Store> store) const;
 
     virtual std::shared_ptr<const Input> applyOverrides(

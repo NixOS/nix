@@ -52,8 +52,38 @@ Attrs Input::toAttrs() const
     return attrs;
 }
 
+Tree Input::substituteTree(ref<Store> store) const
+{
+    assert(narHash);
+    auto storePath = store->makeFixedOutputPath(true, narHash.value(), "source");
+
+    store->ensurePath(storePath);
+
+    debug("using substituted/cached input '%s' in '%s'",
+        to_string(), store->printStorePath(storePath));
+
+    auto actualPath = store->toRealPath(storePath);
+
+    return {
+        Tree {
+            .actualPath = actualPath,
+            .storePath = std::move(storePath),
+            .info = { narHash.value() }
+        }
+    };
+}
+
 std::pair<Tree, std::shared_ptr<const Input>> Input::fetchTree(ref<Store> store) const
 {
+    if (narHash) {
+        try {
+            auto tree = substituteTree(store);
+            return {std::move(tree), shared_from_this()};
+        } catch (Error & e) {
+            debug("substitution of input '%s' failed: %s", to_string(), e.what());
+        }
+    }
+
     auto [tree, input] = fetchTreeInternal(store);
 
     if (tree.actualPath == "")
