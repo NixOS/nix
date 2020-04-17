@@ -976,6 +976,7 @@ struct AttrCursor : std::enable_shared_from_this<AttrCursor>
 struct CmdFlakeShow : FlakeCommand
 {
     bool showLegacy = false;
+    bool useEvalCache = true;
 
     CmdFlakeShow()
     {
@@ -983,6 +984,11 @@ struct CmdFlakeShow : FlakeCommand
             .longName("legacy")
             .description("show the contents of the 'legacyPackages' output")
             .set(&showLegacy, true);
+
+        mkFlag()
+            .longName("no-eval-cache")
+            .description("do not use the flake evaluation cache")
+            .handler([&]() { useEvalCache = false; });
     }
 
     std::string description() override
@@ -1111,7 +1117,7 @@ struct CmdFlakeShow : FlakeCommand
             }
         };
 
-        auto db = std::make_shared<AttrDb>(flake.getFingerprint());
+        auto db = useEvalCache ? std::make_shared<AttrDb>(flake.getFingerprint()) : nullptr;
 
         auto root = std::make_shared<AttrRoot>(db, *state,
             [&]()
