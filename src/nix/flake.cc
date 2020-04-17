@@ -695,6 +695,7 @@ struct AttrDb
         SQLiteStmt insertAttribute;
         SQLiteStmt queryAttribute;
         SQLiteStmt queryAttributes;
+        std::unique_ptr<SQLiteTxn> txn;
     };
 
     struct placeholder_t {};
@@ -726,6 +727,19 @@ struct AttrDb
 
         state->queryAttributes.create(state->db,
             "select name from Attributes where parent = ?");
+
+        state->txn = std::make_unique<SQLiteTxn>(state->db);
+    }
+
+    ~AttrDb()
+    {
+        try {
+            auto state(_state->lock());
+            state->txn->commit();
+            state->txn.reset();
+        } catch (...) {
+            ignoreException();
+        }
     }
 
     AttrId setAttr(
