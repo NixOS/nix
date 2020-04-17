@@ -669,21 +669,12 @@ struct CmdFlakeArchive : FlakeCommand, MixJSON, MixDryRun
     }
 };
 
-// FIXME: inefficient representation of attrs / fingerprints
+// FIXME: inefficient representation of attrs
 static const char * schema = R"sql(
-
-create table if not exists Fingerprints (
-    fingerprint blob primary key not null,
-    timestamp   integer not null
-);
-
 create table if not exists Attributes (
-    fingerprint blob not null,
-    attrPath    text not null,
-    type        integer,
-    value       text,
-    primary key (fingerprint, attrPath),
-    foreign key (fingerprint) references Fingerprints(fingerprint) on delete cascade
+    attrPath    text primary key,
+    type        integer not null,
+    value       text not null
 );
 )sql";
 
@@ -697,72 +688,52 @@ struct AttrDb
     struct State
     {
         SQLite db;
-        SQLiteStmt insertFingerprint;
         SQLiteStmt insertAttribute;
         SQLiteStmt queryAttribute;
-        std::set<Fingerprint> fingerprints;
     };
 
     std::unique_ptr<Sync<State>> _state;
 
-    AttrDb()
+    AttrDb(const Fingerprint & fingerprint)
         : _state(std::make_unique<Sync<State>>())
     {
         auto state(_state->lock());
 
-        Path dbPath = getCacheDir() + "/nix/eval-cache-v2.sqlite";
-        createDirs(dirOf(dbPath));
+        Path cacheDir = getCacheDir() + "/nix/eval-cache-v2";
+        createDirs(cacheDir);
+
+        Path dbPath = cacheDir + "/" + fingerprint.to_string(Base16, false) + ".sqlite";
 
         state->db = SQLite(dbPath);
         state->db.isCache();
         state->db.exec(schema);
 
-        state->insertFingerprint.create(state->db,
-            "insert or ignore into Fingerprints(fingerprint, timestamp) values (?, ?)");
-
         state->insertAttribute.create(state->db,
-            "insert or replace into Attributes(fingerprint, attrPath, type, value) values (?, ?, ?, ?)");
+            "insert or replace into Attributes(attrPath, type, value) values (?, ?, ?)");
 
         state->queryAttribute.create(state->db,
-            "select type, value from Attributes where fingerprint = ? and attrPath = ?");
-    }
-
-    void addFingerprint(State & state, const Fingerprint & fingerprint)
-    {
-        if (state.fingerprints.insert(fingerprint).second)
-            // FIXME: update timestamp
-            state.insertFingerprint.use()
-                (fingerprint.hash, fingerprint.hashSize)
-                (time(0)).exec();
+            "select type, value from Attributes where attrPath = ?");
     }
 
     void setAttr(
-        const Fingerprint & fingerprint,
         const std::vector<Symbol> & attrPath,
         const std::vector<Symbol> & attrs)
     {
         auto state(_state->lock());
 
-        addFingerprint(*state, fingerprint);
-
         state->insertAttribute.use()
-            (fingerprint.hash, fingerprint.hashSize)
             (concatStringsSep(".", attrPath))
             (AttrType::Attrs)
             (concatStringsSep("\n", attrs)).exec();
     }
 
     void setAttr(
-        const Fingerprint & fingerprint,
         const std::vector<Symbol> & attrPath,
         std::string_view s)
     {
         auto state(_state->lock());
 
-        addFingerprint(*state, fingerprint);
-
         state->insertAttribute.use()
-            (fingerprint.hash, fingerprint.hashSize)
             (concatStringsSep(".", attrPath))
             (AttrType::String)
             (s).exec();
@@ -771,16 +742,12 @@ struct AttrDb
     typedef std::variant<std::vector<Symbol>, std::string> AttrValue;
 
     std::optional<AttrValue> getAttr(
-        const Fingerprint & fingerprint,
         const std::vector<Symbol> & attrPath,
         SymbolTable & symbols)
     {
         auto state(_state->lock());
 
-        addFingerprint(*state, fingerprint);
-
         auto queryAttribute(state->queryAttribute.use()
-            (fingerprint.hash, fingerprint.hashSize)
             (concatStringsSep(".", attrPath)));
         if (!queryAttribute.next()) return {};
 
@@ -804,15 +771,13 @@ struct AttrRoot : std::enable_shared_from_this<AttrRoot>
 {
     std::shared_ptr<AttrDb> db;
     EvalState & state;
-    Fingerprint fingerprint;
     typedef std::function<Value *()> RootLoader;
     RootLoader rootLoader;
     RootValue value;
 
-    AttrRoot(std::shared_ptr<AttrDb> db, EvalState & state, const Fingerprint & fingerprint, RootLoader rootLoader)
+    AttrRoot(std::shared_ptr<AttrDb> db, EvalState & state, RootLoader rootLoader)
         : db(db)
         , state(state)
-        , fingerprint(fingerprint)
         , rootLoader(rootLoader)
     {
     }
@@ -838,12 +803,14 @@ struct AttrCursor : std::enable_shared_from_this<AttrCursor>
     typedef std::optional<std::pair<std::shared_ptr<AttrCursor>, Symbol>> Parent;
     Parent parent;
     RootValue _value;
+    std::optional<AttrDb::AttrValue> cachedValue;
 
     AttrCursor(
         ref<AttrRoot> root,
         Parent parent,
-        Value * value = nullptr)
-        : root(root), parent(parent)
+        Value * value = nullptr,
+        std::optional<AttrDb::AttrValue> && cachedValue = {})
+        : root(root), parent(parent), cachedValue(std::move(cachedValue))
     {
         if (value)
             _value = allocRootValue(value);
@@ -895,9 +862,11 @@ struct AttrCursor : std::enable_shared_from_this<AttrCursor>
     std::shared_ptr<AttrCursor> maybeGetAttr(Symbol name)
     {
         if (root->db) {
-            auto attr = root->db->getAttr(root->fingerprint, getAttrPath(), root->state.symbols);
-            if (attr) {
-                if (auto attrs = std::get_if<std::vector<Symbol>>(&*attr)) {
+            if (!cachedValue)
+                cachedValue = root->db->getAttr(getAttrPath(), root->state.symbols);
+
+            if (cachedValue) {
+                if (auto attrs = std::get_if<std::vector<Symbol>>(&*cachedValue)) {
                     for (auto & attr : *attrs)
                         if (attr == name)
                             return std::make_shared<AttrCursor>(root, std::make_pair(shared_from_this(), name));
@@ -905,10 +874,9 @@ struct AttrCursor : std::enable_shared_from_this<AttrCursor>
                 return nullptr;
             }
 
-            attr = root->db->getAttr(root->fingerprint, getAttrPath(name), root->state.symbols);
+            auto attr = root->db->getAttr(getAttrPath(name), root->state.symbols);
             if (attr)
-                // FIXME: store *attr
-                return std::make_shared<AttrCursor>(root, std::make_pair(shared_from_this(), name));
+                return std::make_shared<AttrCursor>(root, std::make_pair(shared_from_this(), name), nullptr, std::move(attr));
         }
 
         //printError("GET ATTR %s", getAttrPathStr(name));
@@ -947,28 +915,36 @@ struct AttrCursor : std::enable_shared_from_this<AttrCursor>
     std::string getString()
     {
         if (root->db) {
-            auto attr = root->db->getAttr(root->fingerprint, getAttrPath(), root->state.symbols);
-            if (auto s = std::get_if<std::string>(&*attr)) {
-                //printError("GOT STRING %s", getAttrPathStr());
-                return *s;
+            if (!cachedValue)
+                cachedValue = root->db->getAttr(getAttrPath(), root->state.symbols);
+            if (cachedValue) {
+                if (auto s = std::get_if<std::string>(&*cachedValue)) {
+                    //printError("GOT STRING %s", getAttrPathStr());
+                    return *s;
+                } else
+                    throw Error("unexpected type mismatch in evaluation cache");
             }
         }
 
         //printError("GET STRING %s", getAttrPathStr());
         auto s = root->state.forceString(getValue());
-        if (root->db)
-            root->db->setAttr(root->fingerprint, getAttrPath(), s);
+        if (root->db) {
+            root->db->setAttr(getAttrPath(), s);
+            cachedValue = s;
+        }
+
         return s;
     }
 
     std::vector<Symbol> getAttrs()
     {
         if (root->db) {
-            auto attr = root->db->getAttr(root->fingerprint, getAttrPath(), root->state.symbols);
-            if (attr) {
-                if (auto attrs = std::get_if<std::vector<Symbol>>(&*attr)) {
+            if (!cachedValue)
+                cachedValue = root->db->getAttr(getAttrPath(), root->state.symbols);
+            if (cachedValue) {
+                if (auto attrs = std::get_if<std::vector<Symbol>>(&*cachedValue)) {
                     //printError("GOT ATTRS %s", getAttrPathStr());
-                    return std::move(*attrs);
+                    return *attrs;
                 } else
                     throw Error("unexpected type mismatch in evaluation cache");
             }
@@ -982,8 +958,11 @@ struct AttrCursor : std::enable_shared_from_this<AttrCursor>
         std::sort(attrs.begin(), attrs.end(), [](const Symbol & a, const Symbol & b) {
             return (const string &) a < (const string &) b;
         });
-        if (root->db)
-            root->db->setAttr(root->fingerprint, getAttrPath(), attrs);
+        if (root->db) {
+            root->db->setAttr(getAttrPath(), attrs);
+            cachedValue = attrs;
+        }
+
         return attrs;
     }
 
@@ -1132,10 +1111,9 @@ struct CmdFlakeShow : FlakeCommand
             }
         };
 
-        auto db = std::make_shared<AttrDb>();
+        auto db = std::make_shared<AttrDb>(flake.getFingerprint());
 
         auto root = std::make_shared<AttrRoot>(db, *state,
-            flake.getFingerprint(),
             [&]()
             {
                 auto vFlake = state->allocValue();
