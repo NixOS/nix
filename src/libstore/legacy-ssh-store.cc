@@ -286,12 +286,12 @@ struct LegacySSHStore : public Store
     }
 };
 
-static RegisterStoreImplementation regStore([](
+OpenStore openLegacySSHStore = [](
     const std::string & uri, const Store::Params & params)
     -> std::shared_ptr<Store>
 {
     if (std::string(uri, 0, uriScheme.size()) != uriScheme) return 0;
     return std::make_shared<LegacySSHStore>(std::string(uri, uriScheme.size()), params);
-});
+};
 
 }

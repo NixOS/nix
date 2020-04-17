@@ -824,6 +824,15 @@ std::list<ref<Store>> getDefaultSubstituters();
 typedef std::function<std::shared_ptr<Store>(
     const std::string & uri, const Store::Params & params)> OpenStore;
 
+#if ENABLE_S3
+extern OpenStore openS3Store;
+#endif
+extern OpenStore openSSHStore;
+extern OpenStore openRemoteStore;
+extern OpenStore openLegacySSHStore;
+extern OpenStore openHttpBinaryCacheStore;
+extern OpenStore openLocalBinaryCacheStore;
+
 struct RegisterStoreImplementation
 {
     typedef std::vector<OpenStore> Implementations;
@@ -831,7 +840,16 @@ struct RegisterStoreImplementation
 
     RegisterStoreImplementation(OpenStore fun)
     {
-        if (!implementations) implementations = new Implementations;
+        if (!implementations) implementations = new Implementations {
+#if ENABLE_S3
+                openS3Store,
+#endif
+                openSSHStore,
+                openRemoteStore,
+                openLegacySSHStore,
+                openHttpBinaryCacheStore,
+                openLocalBinaryCacheStore,
+        };
         implementations->push_back(fun);
     }
 };

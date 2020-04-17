@@ -159,7 +159,7 @@ protected:
 
 };
 
-static RegisterStoreImplementation regStore([](
+OpenStore openHttpBinaryCacheStore = [](
     const std::string & uri, const Store::Params & params)
     -> std::shared_ptr<Store>
 {
@@ -171,6 +171,6 @@ static RegisterStoreImplementation regStore([](
     auto store = std::make_shared<HttpBinaryCacheStore>(params, uri);
     store->init();
     return store;
-});
+};
 
 }

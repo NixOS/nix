@@ -417,7 +417,7 @@ struct S3BinaryCacheStoreImpl : public S3BinaryCacheStore
 
 };
 
-static RegisterStoreImplementation regStore([](
+OpenStore openS3Store = [](
     const std::string & uri, const Store::Params & params)
     -> std::shared_ptr<Store>
 {
@@ -425,7 +425,7 @@ static RegisterStoreImplementation regStore([](
     auto store = std::make_shared<S3BinaryCacheStoreImpl>(params, std::string(uri, 5));
     store->init();
     return store;
-});
+};
 
 }
 

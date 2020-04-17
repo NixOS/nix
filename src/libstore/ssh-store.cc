@@ -93,12 +93,12 @@ ref<RemoteStore::Connection> SSHStore::openConnection()
     return conn;
 }
 
-static RegisterStoreImplementation regStore([](
+OpenStore openSSHStore = [](
     const std::string & uri, const Store::Params & params)
     -> std::shared_ptr<Store>
 {
     if (std::string(uri, 0, uriScheme.size()) != uriScheme) return 0;
     return std::make_shared<SSHStore>(std::string(uri, uriScheme.size()), params);
-});
+};
 
 }
