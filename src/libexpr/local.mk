@@ -15,6 +15,8 @@ ifneq ($(OS), FreeBSD)
  libexpr_LDFLAGS += -ldl
 endif
 
+libexpr_WHOLE_ARCHIVE = 1
+
 # The dependency on libgc must be propagated (i.e. meaning that
 # programs/libraries that use libexpr must explicitly pass -lgc),
 # because inline functions in libexpr's header files call libgc.
