@@ -1510,7 +1510,7 @@ NixFloat EvalState::forceFloat(Value & v, const Pos & pos)
 
 bool EvalState::forceBool(Value & v, const Pos & pos)
 {
-    forceValue(v);
+    forceValue(v, pos);
     if (v.type != tBool)
         throwTypeError("value is %1% while a Boolean was expected, at %2%", v, pos);
     return v.boolean;
@@ -1525,7 +1525,7 @@ bool EvalState::isFunctor(Value & fun)
 
 void EvalState::forceFunction(Value & v, const Pos & pos)
 {
-    forceValue(v);
+    forceValue(v, pos);
     if (v.type != tLambda && v.type != tPrimOp && v.type != tPrimOpApp && !isFunctor(v))
         throwTypeError("value is %1% while a function was expected, at %2%", v, pos);
 }
@@ -1602,7 +1602,7 @@ std::optional<string> EvalState::tryAttrsToString(const Pos & pos, Value & v,
 string EvalState::coerceToString(const Pos & pos, Value & v, PathSet & context,
     bool coerceMore, bool copyToStore)
 {
-    forceValue(v);
+    forceValue(v, pos);
 
     string s;
 
