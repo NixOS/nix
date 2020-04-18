@@ -693,6 +693,7 @@ struct AttrDb
     {
         SQLite db;
         SQLiteStmt insertAttribute;
+        SQLiteStmt insertPlaceholder;
         SQLiteStmt queryAttribute;
         SQLiteStmt queryAttributes;
         std::unique_ptr<SQLiteTxn> txn;
@@ -721,6 +722,9 @@ struct AttrDb
 
         state->insertAttribute.create(state->db,
             "insert or replace into Attributes(parent, name, type, value) values (?, ?, ?, ?)");
+
+        state->insertPlaceholder.create(state->db,
+            fmt("insert or ignore into Attributes(parent, name, type) values (?, ?, %d)", Placeholder));
 
         state->queryAttribute.create(state->db,
             "select rowid, type, value from Attributes where parent = ? and name = ?");
@@ -758,11 +762,9 @@ struct AttrDb
         assert(rowId);
 
         for (auto & attr : attrs)
-            state->insertAttribute.use()
+            state->insertPlaceholder.use()
                 (rowId)
-                (attr)
-                (AttrType::Placeholder)
-                (0, false).exec();
+                (attr).exec();
 
         return rowId;
     }
