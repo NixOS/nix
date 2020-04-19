@@ -682,9 +682,11 @@ create table if not exists Attributes (
 
 enum AttrType {
     Placeholder = 0,
-    // FIXME: distinguish between full / partial attrsets
-    Attrs = 1,
+    FullAttrs = 1,
     String = 2,
+    Missing = 3,
+    Misc = 4,
+    Failed = 5,
 };
 
 struct AttrDb
@@ -693,16 +695,18 @@ struct AttrDb
     {
         SQLite db;
         SQLiteStmt insertAttribute;
-        SQLiteStmt insertPlaceholder;
         SQLiteStmt queryAttribute;
         SQLiteStmt queryAttributes;
         std::unique_ptr<SQLiteTxn> txn;
     };
 
     struct placeholder_t {};
+    struct missing_t {};
+    struct misc_t {};
+    struct failed_t {};
     typedef uint64_t AttrId;
     typedef std::pair<AttrId, Symbol> AttrKey;
-    typedef std::variant<std::vector<Symbol>, std::string, placeholder_t> AttrValue;
+    typedef std::variant<std::vector<Symbol>, std::string, placeholder_t, missing_t, misc_t, failed_t> AttrValue;
 
     std::unique_ptr<Sync<State>> _state;
 
@@ -722,9 +726,6 @@ struct AttrDb
 
         state->insertAttribute.create(state->db,
             "insert or replace into Attributes(parent, name, type, value) values (?, ?, ?, ?)");
-
-        state->insertPlaceholder.create(state->db,
-            fmt("insert or ignore into Attributes(parent, name, type) values (?, ?, %d)", Placeholder));
 
         state->queryAttribute.create(state->db,
             "select rowid, type, value from Attributes where parent = ? and name = ?");
@@ -746,7 +747,7 @@ struct AttrDb
         }
     }
 
-    AttrId setAttr(
+    AttrId setAttrs(
         AttrKey key,
         const std::vector<Symbol> & attrs)
     {
@@ -755,21 +756,23 @@ struct AttrDb
         state->insertAttribute.use()
             (key.first)
             (key.second)
-            (AttrType::Attrs)
+            (AttrType::FullAttrs)
             (0, false).exec();
 
         AttrId rowId = state->db.getLastInsertedRowId();
         assert(rowId);
 
         for (auto & attr : attrs)
-            state->insertPlaceholder.use()
+            state->insertAttribute.use()
                 (rowId)
-                (attr).exec();
+                (attr)
+                (AttrType::Placeholder)
+                (0, false).exec();
 
         return rowId;
     }
 
-    AttrId setAttr(
+    AttrId setString(
         AttrKey key,
         std::string_view s)
     {
@@ -780,6 +783,58 @@ struct AttrDb
             (key.second)
             (AttrType::String)
             (s).exec();
+
+        return state->db.getLastInsertedRowId();
+    }
+
+    AttrId setPlaceholder(AttrKey key)
+    {
+        auto state(_state->lock());
+
+        state->insertAttribute.use()
+            (key.first)
+            (key.second)
+            (AttrType::Placeholder)
+            (0, false).exec();
+
+        return state->db.getLastInsertedRowId();
+    }
+
+    AttrId setMissing(AttrKey key)
+    {
+        auto state(_state->lock());
+
+        state->insertAttribute.use()
+            (key.first)
+            (key.second)
+            (AttrType::Missing)
+            (0, false).exec();
+
+        return state->db.getLastInsertedRowId();
+    }
+
+    AttrId setMisc(AttrKey key)
+    {
+        auto state(_state->lock());
+
+        state->insertAttribute.use()
+            (key.first)
+            (key.second)
+            (AttrType::Misc)
+            (0, false).exec();
+
+        return state->db.getLastInsertedRowId();
+    }
+
+    AttrId setFailed(AttrKey key)
+    {
+        auto state(_state->lock());
+
+        state->insertAttribute.use()
+            (key.first)
+            (key.second)
+            (AttrType::Failed)
+            (0, false).exec();
 
         return state->db.getLastInsertedRowId();
     }
@@ -798,7 +853,7 @@ struct AttrDb
 
         if (type == AttrType::Placeholder)
             return {{rowId, placeholder_t()}};
-        else if (type == AttrType::Attrs) {
+        else if (type == AttrType::FullAttrs) {
             // FIXME: expensive, should separate this out.
             std::vector<Symbol> attrs;
             auto queryAttributes(state->queryAttributes.use()(rowId));
@@ -807,6 +862,12 @@ struct AttrDb
             return {{rowId, attrs}};
         } else if (type == AttrType::String) {
             return {{rowId, queryAttribute.getStr(2)}};
+        } else if (type == AttrType::Missing) {
+            return {{rowId, missing_t()}};
+        } else if (type == AttrType::Misc) {
+            return {{rowId, misc_t()}};
+        } else if (type == AttrType::Failed) {
+            return {{rowId, failed_t()}};
         } else
             throw Error("unexpected type in evaluation cache");
     }
@@ -832,7 +893,7 @@ struct AttrRoot : std::enable_shared_from_this<AttrRoot>
     Value * getRootValue()
     {
         if (!value) {
-            //printError("GET ROOT");
+            debug("getting root value");
             value = allocRootValue(rootLoader());
         }
         return *value;
@@ -918,6 +979,33 @@ struct AttrCursor : std::enable_shared_from_this<AttrCursor>
         return concatStringsSep(".", getAttrPath(name));
     }
 
+    Value & forceValue()
+    {
+        debug("evaluating uncached attribute %s", getAttrPathStr());
+
+        auto & v = getValue();
+
+        try {
+            root->state.forceValue(v);
+        } catch (EvalError &) {
+            debug("setting '%s' to failed", getAttrPathStr());
+            if (root->db)
+                cachedValue = {root->db->setFailed(getAttrKey()), AttrDb::failed_t()};
+            throw;
+        }
+
+        if (root->db && (!cachedValue || std::get_if<AttrDb::placeholder_t>(&cachedValue->second))) {
+            if (v.type == tString)
+                cachedValue = {root->db->setString(getAttrKey(), v.string.s), v.string.s};
+            else if (v.type == tAttrs)
+                ; // FIXME: do something?
+            else
+                cachedValue = {root->db->setMisc(getAttrKey()), AttrDb::misc_t()};
+        }
+
+        return v;
+    }
+
     std::shared_ptr<AttrCursor> maybeGetAttr(Symbol name)
     {
         if (root->db) {
@@ -932,29 +1020,47 @@ struct AttrCursor : std::enable_shared_from_this<AttrCursor>
                     return nullptr;
                 } else if (std::get_if<AttrDb::placeholder_t>(&cachedValue->second)) {
                     auto attr = root->db->getAttr({cachedValue->first, name}, root->state.symbols);
-                    if (attr)
-                        return std::make_shared<AttrCursor>(root, std::make_pair(shared_from_this(), name), nullptr, std::move(attr));
+                    if (attr) {
+                        if (std::get_if<AttrDb::missing_t>(&attr->second))
+                            return nullptr;
+                        else if (std::get_if<AttrDb::failed_t>(&attr->second))
+                            throw EvalError("cached failure of attribute '%s'", getAttrPathStr(name));
+                        else
+                            return std::make_shared<AttrCursor>(root,
+                                std::make_pair(shared_from_this(), name), nullptr, std::move(attr));
+                    }
                     // Incomplete attrset, so need to fall thru and
                     // evaluate to see whether 'name' exists
                 } else
-                    // FIXME: throw error?
                     return nullptr;
+                    //throw TypeError("'%s' is not an attribute set", getAttrPathStr());
             }
         }
 
-        //printError("GET ATTR %s", getAttrPathStr(name));
+        auto & v = forceValue();
 
-        root->state.forceValue(getValue());
-
-        if (getValue().type != tAttrs)
+        if (v.type != tAttrs)
             return nullptr;
+            //throw TypeError("'%s' is not an attribute set", getAttrPathStr());
 
-        auto attr = getValue().attrs->get(name);
+        auto attr = v.attrs->get(name);
 
-        if (!attr)
+        if (!attr) {
+            if (root->db) {
+                assert(cachedValue);
+                root->db->setMissing({cachedValue->first, name});
+            }
             return nullptr;
+        }
 
-        return std::make_shared<AttrCursor>(root, std::make_pair(shared_from_this(), name), attr->value);
+        std::optional<std::pair<AttrDb::AttrId, AttrDb::AttrValue>> cachedValue2;
+        if (root->db) {
+            assert(cachedValue);
+            cachedValue2 = {root->db->setPlaceholder({cachedValue->first, name}), AttrDb::placeholder_t()};
+        }
+
+        return std::make_shared<AttrCursor>(
+            root, std::make_pair(shared_from_this(), name), attr->value, std::move(cachedValue2));
     }
 
     std::shared_ptr<AttrCursor> maybeGetAttr(std::string_view name)
@@ -982,19 +1088,19 @@ struct AttrCursor : std::enable_shared_from_this<AttrCursor>
                 cachedValue = root->db->getAttr(getAttrKey(), root->state.symbols);
             if (cachedValue && !std::get_if<AttrDb::placeholder_t>(&cachedValue->second)) {
                 if (auto s = std::get_if<std::string>(&cachedValue->second)) {
-                    //printError("GOT STRING %s", getAttrPathStr());
+                    debug("using cached string attribute '%s'", getAttrPathStr());
                     return *s;
                 } else
-                    throw Error("unexpected type mismatch in evaluation cache (string expected)");
+                    throw TypeError("'%s' is not a string", getAttrPathStr());
             }
         }
 
-        //printError("GET STRING %s", getAttrPathStr());
-        auto s = root->state.forceString(getValue());
-        if (root->db)
-            cachedValue = {root->db->setAttr(getAttrKey(), s), s};
+        auto & v = forceValue();
 
-        return s;
+        if (v.type != tString)
+            throw TypeError("'%s' is not a string", getAttrPathStr());
+
+        return v.string.s;
     }
 
     std::vector<Symbol> getAttrs()
@@ -1004,23 +1110,27 @@ struct AttrCursor : std::enable_shared_from_this<AttrCursor>
                 cachedValue = root->db->getAttr(getAttrKey(), root->state.symbols);
             if (cachedValue && !std::get_if<AttrDb::placeholder_t>(&cachedValue->second)) {
                 if (auto attrs = std::get_if<std::vector<Symbol>>(&cachedValue->second)) {
-                    //printError("GOT ATTRS %s", getAttrPathStr());
+                    debug("using cached attrset attribute '%s'", getAttrPathStr());
                     return *attrs;
                 } else
-                    throw Error("unexpected type mismatch in evaluation cache (attrs expected)");
+                    throw TypeError("'%s' is not an attribute set", getAttrPathStr());
             }
         }
 
-        //printError("GET ATTRS %s", getAttrPathStr());
+        auto & v = forceValue();
+
+        if (v.type != tAttrs)
+            throw TypeError("'%s' is not an attribute set", getAttrPathStr());
+
         std::vector<Symbol> attrs;
-        root->state.forceAttrs(getValue());
         for (auto & attr : *getValue().attrs)
             attrs.push_back(attr.name);
         std::sort(attrs.begin(), attrs.end(), [](const Symbol & a, const Symbol & b) {
             return (const string &) a < (const string &) b;
         });
+
         if (root->db)
-            cachedValue = {root->db->setAttr(getAttrKey(), attrs), attrs};
+            cachedValue = {root->db->setAttrs(getAttrKey(), attrs), attrs};
 
         return attrs;
     }
@@ -1172,7 +1282,7 @@ struct CmdFlakeShow : FlakeCommand
                 }
             } catch (EvalError & e) {
                 if (!(attrPath.size() > 0 && attrPath[0] == "legacyPackages"))
-                    logger->stdout("%s: " ANSI_RED "%s" ANSI_NORMAL, headerPrefix, e.what());
+                    throw;
             }
         };
 
@@ -1181,6 +1291,11 @@ struct CmdFlakeShow : FlakeCommand
         auto root = std::make_shared<AttrRoot>(db, *state,
             [&]()
             {
+                /* For testing whether the evaluation cache is
+                   complete. */
+                if (getEnv("NIX_ALLOW_EVAL").value_or("1") == "0")
+                    throw Error("not everything is cached, but evaluation is not allowed");
+
                 auto vFlake = state->allocValue();
                 flake::callFlake(*state, flake, *vFlake);
 
