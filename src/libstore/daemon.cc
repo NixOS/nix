@@ -75,6 +75,14 @@ struct TunnelLogger : public Logger
 
     void logEI(const ErrorInfo & ei) override
     {
+        if (ei.level > verbosity) return;
+
+        std::stringstream oss; 
+        oss << ei;
+
+        StringSink buf;
+        buf << STDERR_NEXT << oss.str() << "\n"; // (fs.s + "\n");
+        enqueueMsg(*buf.s);
     }
 
     /* startWork() means that we're starting an operation for which we
