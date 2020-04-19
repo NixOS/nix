@@ -76,6 +76,7 @@ static void _main(int argc, char * * argv)
     auto packages = false;
     // Same condition as bash uses for interactive shells
     auto interactive = isatty(STDIN_FILENO) && isatty(STDERR_FILENO);
+    auto save = false;
     Strings attrPaths;
     Strings left;
     RepairFlag repair = NoRepair;
@@ -225,6 +226,9 @@ static void _main(int argc, char * * argv)
         else if (*arg == "--keep")
             keepVars.insert(getArg(*arg, arg, end));
 
+        else if (*arg == "--save")
+            save = true;
+
         else if (*arg == "-")
             readStdin = true;
 
@@ -259,6 +263,32 @@ static void _main(int argc, char * * argv)
         for (auto & i : *autoArgs) newArgs->push_back(i);
         newArgs->sort();
         autoArgs = newArgs;
+    }
+
+    if (save) {
+        if (pathExists("shell.nix"))
+            throw UsageError("cannot generate shell.nix: file already exists");
+
+        std::ofstream shellnix("shell.nix");
+
+        if (!shellnix.is_open())
+            throw UsageError("could not open shell.nix");
+
+        shellnix << "{ pkgs ? import <nixpkgs> {} }:\n\n";
+        shellnix << "pkgs.mkShell {\n";
+
+        if (!packages)
+            shellnix << "  buildInputs = [];\n";
+        else {
+            shellnix << "  buildInputs = [\n";
+            for (const auto & i : left)
+                shellnix << "    pkgs." << i << "\n";
+            shellnix << "  ];\n";
+        }
+
+        shellnix << "}";
+        shellnix.close();
+        return;
     }
 
     if (packages) {
