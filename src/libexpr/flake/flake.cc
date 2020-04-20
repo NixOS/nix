@@ -235,10 +235,10 @@ static Flake getFlake(
     auto sEpoch = state.symbols.create("epoch"); // FIXME: remove soon
 
     if (vInfo.attrs->get(sEdition))
-        warn("flake '%s' has deprecated attribution 'edition'", lockedRef);
+        warn("flake '%s' has deprecated attribute 'edition'", lockedRef);
 
     if (vInfo.attrs->get(sEpoch))
-        warn("flake '%s' has deprecated attribution 'epoch'", lockedRef);
+        warn("flake '%s' has deprecated attribute 'epoch'", lockedRef);
 
     if (auto description = vInfo.attrs->get(state.sDescription)) {
         expectType(state, tString, *description->value, *description->pos);
