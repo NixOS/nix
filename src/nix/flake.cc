@@ -695,7 +695,7 @@ struct CmdFlakeShow : FlakeCommand
     void run(nix::ref<nix::Store> store) override
     {
         auto state = getEvalState();
-        auto flake = lockFlake();
+        auto flake = std::make_shared<LockedFlake>(lockFlake());
 
         std::function<void(eval_cache::AttrCursor & visitor, const std::vector<Symbol> & attrPath, const std::string & headerPrefix, const std::string & nextPrefix)> visit;
 
@@ -815,7 +815,7 @@ struct CmdFlakeShow : FlakeCommand
 
         auto cache = openEvalCache(*state, flake, useEvalCache);
 
-        visit(*cache->getRoot(), {}, fmt(ANSI_BOLD "%s" ANSI_NORMAL, flake.flake.lockedRef), "");
+        visit(*cache->getRoot(), {}, fmt(ANSI_BOLD "%s" ANSI_NORMAL, flake->flake.lockedRef), "");
     }
 };
 

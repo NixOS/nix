@@ -12,7 +12,7 @@ namespace nix {
 struct DrvInfo;
 struct SourceExprCommand;
 
-namespace eval_cache { class EvalCache; }
+namespace eval_cache { class EvalCache; class AttrCursor; }
 
 struct Buildable
 {
@@ -57,6 +57,9 @@ struct Installable
     {
         return {};
     }
+
+    virtual std::vector<std::pair<std::shared_ptr<eval_cache::AttrCursor>, std::string>>
+    getCursor(EvalState & state, bool useEvalCache);
 };
 
 struct InstallableValue : Installable
@@ -100,11 +103,14 @@ struct InstallableFlake : InstallableValue
     std::vector<DerivationInfo> toDerivations() override;
 
     std::pair<Value *, Pos> toValue(EvalState & state) override;
+
+    std::vector<std::pair<std::shared_ptr<eval_cache::AttrCursor>, std::string>>
+    getCursor(EvalState & state, bool useEvalCache) override;
 };
 
 ref<eval_cache::EvalCache> openEvalCache(
     EvalState & state,
-    const flake::LockedFlake & lockedFlake,
+    std::shared_ptr<flake::LockedFlake> lockedFlake,
     bool useEvalCache);
 
 }

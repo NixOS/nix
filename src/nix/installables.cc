@@ -133,6 +133,15 @@ App Installable::toApp(EvalState & state)
     return App(state, *toValue(state).first);
 }
 
+std::vector<std::pair<std::shared_ptr<eval_cache::AttrCursor>, std::string>>
+Installable::getCursor(EvalState & state, bool useEvalCache)
+{
+    auto evalCache =
+        std::make_shared<nix::eval_cache::EvalCache>(false, Hash(), state,
+            [&]() { return toValue(state).first; });
+    return {{evalCache->getRoot(), ""}};
+}
+
 struct InstallableStorePath : Installable
 {
     ref<Store> store;
@@ -285,14 +294,14 @@ Value * InstallableFlake::getFlakeOutputs(EvalState & state, const flake::Locked
 
 ref<eval_cache::EvalCache> openEvalCache(
     EvalState & state,
-    const flake::LockedFlake & lockedFlake,
+    std::shared_ptr<flake::LockedFlake> lockedFlake,
     bool useEvalCache)
 {
     return ref(std::make_shared<nix::eval_cache::EvalCache>(
         useEvalCache,
-        lockedFlake.getFingerprint(),
+        lockedFlake->getFingerprint(),
         state,
-        [&]()
+        [&state, lockedFlake]()
         {
             /* For testing whether the evaluation cache is
                complete. */
@@ -300,7 +309,7 @@ ref<eval_cache::EvalCache> openEvalCache(
                 throw Error("not everything is cached, but evaluation is not allowed");
 
             auto vFlake = state.allocValue();
-            flake::callFlake(state, lockedFlake, *vFlake);
+            flake::callFlake(state, *lockedFlake, *vFlake);
 
             state.forceAttrs(*vFlake);
 
@@ -315,7 +324,8 @@ std::tuple<std::string, FlakeRef, InstallableValue::DerivationInfo> InstallableF
 {
     auto state = cmd.getEvalState();
 
-    auto lockedFlake = lockFlake(*state, flakeRef, cmd.lockFlags);
+    auto lockedFlake = std::make_shared<flake::LockedFlake>(
+        lockFlake(*state, flakeRef, cmd.lockFlags));
 
     auto cache = openEvalCache(*state, lockedFlake, true);
     auto root = cache->getRoot();
@@ -343,7 +353,7 @@ std::tuple<std::string, FlakeRef, InstallableValue::DerivationInfo> InstallableF
             attr->getAttr(state->sOutputName)->getString()
         };
 
-        return {attrPath, lockedFlake.flake.lockedRef, std::move(drvInfo)};
+        return {attrPath, lockedFlake->flake.lockedRef, std::move(drvInfo)};
     }
 
     throw Error("flake '%s' does not provide attribute %s",
@@ -376,6 +386,25 @@ std::pair<Value *, Pos> InstallableFlake::toValue(EvalState & state)
 
     throw Error("flake '%s' does not provide attribute %s",
         flakeRef, concatStringsSep(", ", quoteStrings(attrPaths)));
+}
+
+std::vector<std::pair<std::shared_ptr<eval_cache::AttrCursor>, std::string>>
+InstallableFlake::getCursor(EvalState & state, bool useEvalCache)
+{
+    auto evalCache = openEvalCache(state,
+        std::make_shared<flake::LockedFlake>(lockFlake(state, flakeRef, cmd.lockFlags)),
+        useEvalCache);
+
+    auto root = evalCache->getRoot();
+
+    std::vector<std::pair<std::shared_ptr<eval_cache::AttrCursor>, std::string>> res;
+
+    for (auto & attrPath : getActualAttrPaths()) {
+        auto attr = root->findAlongAttrPath(parseAttrPath(state, attrPath));
+        if (attr) res.push_back({attr, attrPath});
+    }
+
+    return res;
 }
 
 // FIXME: extend
