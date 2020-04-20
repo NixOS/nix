@@ -162,7 +162,7 @@ struct InstallableStorePath : Installable
     }
 };
 
-std::vector<flake::EvalCache::Derivation> InstallableValue::toDerivations()
+std::vector<InstallableValue::DerivationInfo> InstallableValue::toDerivations()
 {
     auto state = cmd.getEvalState();
 
@@ -173,7 +173,7 @@ std::vector<flake::EvalCache::Derivation> InstallableValue::toDerivations()
     DrvInfos drvInfos;
     getDerivations(*state, *v, "", autoArgs, drvInfos, false);
 
-    std::vector<flake::EvalCache::Derivation> res;
+    std::vector<DerivationInfo> res;
     for (auto & drvInfo : drvInfos) {
         res.push_back({
             state->store->parseStorePath(drvInfo.queryDrvPath()),
@@ -283,58 +283,76 @@ Value * InstallableFlake::getFlakeOutputs(EvalState & state, const flake::Locked
     return aOutputs->value;
 }
 
-std::tuple<std::string, FlakeRef, flake::EvalCache::Derivation> InstallableFlake::toDerivation()
+ref<eval_cache::EvalCache> openEvalCache(
+    EvalState & state,
+    const flake::LockedFlake & lockedFlake,
+    bool useEvalCache)
+{
+    return ref(std::make_shared<nix::eval_cache::EvalCache>(
+        useEvalCache,
+        lockedFlake.getFingerprint(),
+        state,
+        [&]()
+        {
+            /* For testing whether the evaluation cache is
+               complete. */
+            if (getEnv("NIX_ALLOW_EVAL").value_or("1") == "0")
+                throw Error("not everything is cached, but evaluation is not allowed");
+
+            auto vFlake = state.allocValue();
+            flake::callFlake(state, lockedFlake, *vFlake);
+
+            state.forceAttrs(*vFlake);
+
+            auto aOutputs = vFlake->attrs->get(state.symbols.create("outputs"));
+            assert(aOutputs);
+
+            return aOutputs->value;
+        }));
+}
+
+std::tuple<std::string, FlakeRef, InstallableValue::DerivationInfo> InstallableFlake::toDerivation()
 {
     auto state = cmd.getEvalState();
 
     auto lockedFlake = lockFlake(*state, flakeRef, cmd.lockFlags);
 
-    Value * vOutputs = nullptr;
-
-    auto emptyArgs = state->allocBindings(0);
-
-    auto & evalCache = flake::EvalCache::singleton();
-
-    auto fingerprint = lockedFlake.getFingerprint();
+    auto cache = openEvalCache(*state, lockedFlake, true);
+    auto root = cache->getRoot();
 
     for (auto & attrPath : getActualAttrPaths()) {
-        auto drv = evalCache.getDerivation(fingerprint, attrPath);
-        if (drv) {
-            if (state->store->isValidPath(drv->drvPath))
-                return {attrPath, lockedFlake.flake.lockedRef, std::move(*drv)};
+        auto attr = root->findAlongAttrPath(parseAttrPath(*state, attrPath));
+        if (!attr) continue;
+
+        if (!attr->isDerivation())
+            throw Error("flake output attribute '%s' is not a derivation", attrPath);
+
+        auto aDrvPath = attr->getAttr(state->sDrvPath);
+        auto drvPath = state->store->parseStorePath(aDrvPath->getString());
+        if (!state->store->isValidPath(drvPath)) {
+            /* The eval cache contains 'drvPath', but the actual path
+               has been garbage-collected. So force it to be
+               regenerated. */
+            aDrvPath->forceValue();
+            assert(state->store->isValidPath(drvPath));
         }
 
-        if (!vOutputs)
-            vOutputs = getFlakeOutputs(*state, lockedFlake);
+        auto drvInfo = DerivationInfo{
+            std::move(drvPath),
+            state->store->parseStorePath(attr->getAttr(state->sOutPath)->getString()),
+            attr->getAttr(state->sOutputName)->getString()
+        };
 
-        try {
-            auto * v = findAlongAttrPath(*state, attrPath, *emptyArgs, *vOutputs).first;
-            state->forceValue(*v);
-
-            auto drvInfo = getDerivation(*state, *v, false);
-            if (!drvInfo)
-                throw Error("flake output attribute '%s' is not a derivation", attrPath);
-
-            auto drv = flake::EvalCache::Derivation{
-                state->store->parseStorePath(drvInfo->queryDrvPath()),
-                state->store->parseStorePath(drvInfo->queryOutPath()),
-                drvInfo->queryOutputName()
-            };
-
-            evalCache.addDerivation(fingerprint, attrPath, drv);
-
-            return {attrPath, lockedFlake.flake.lockedRef, std::move(drv)};
-        } catch (AttrPathNotFound & e) {
-        }
+        return {attrPath, lockedFlake.flake.lockedRef, std::move(drvInfo)};
     }
 
     throw Error("flake '%s' does not provide attribute %s",
         flakeRef, concatStringsSep(", ", quoteStrings(attrPaths)));
 }
 
-std::vector<flake::EvalCache::Derivation> InstallableFlake::toDerivations()
+std::vector<InstallableValue::DerivationInfo> InstallableFlake::toDerivations()
 {
-    std::vector<flake::EvalCache::Derivation> res;
+    std::vector<DerivationInfo> res;
     res.push_back(std::get<2>(toDerivation()));
     return res;
 }

@@ -6,11 +6,11 @@
 namespace nix {
 
 
-static Strings parseAttrPath(const string & s)
+static Strings parseAttrPath(std::string_view s)
 {
     Strings res;
     string cur;
-    string::const_iterator i = s.begin();
+    auto i = s.begin();
     while (i != s.end()) {
         if (*i == '.') {
             res.push_back(cur);
@@ -28,6 +28,15 @@ static Strings parseAttrPath(const string & s)
         ++i;
     }
     if (!cur.empty()) res.push_back(cur);
+    return res;
+}
+
+
+std::vector<Symbol> parseAttrPath(EvalState & state, std::string_view s)
+{
+    std::vector<Symbol> res;
+    for (auto & a : parseAttrPath(s))
+        res.push_back(state.symbols.create(a));
     return res;
 }
 

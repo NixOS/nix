@@ -3,7 +3,7 @@
 #include "util.hh"
 #include "path.hh"
 #include "eval.hh"
-#include "flake/eval-cache.hh"
+#include "flake/flake.hh"
 
 #include <optional>
 
@@ -11,6 +11,8 @@ namespace nix {
 
 struct DrvInfo;
 struct SourceExprCommand;
+
+namespace eval_cache { class EvalCache; }
 
 struct Buildable
 {
@@ -63,7 +65,14 @@ struct InstallableValue : Installable
 
     InstallableValue(SourceExprCommand & cmd) : cmd(cmd) { }
 
-    virtual std::vector<flake::EvalCache::Derivation> toDerivations();
+    struct DerivationInfo
+    {
+        StorePath drvPath;
+        StorePath outPath;
+        std::string outputName;
+    };
+
+    virtual std::vector<DerivationInfo> toDerivations();
 
     Buildables toBuildables() override;
 };
@@ -86,11 +95,16 @@ struct InstallableFlake : InstallableValue
 
     Value * getFlakeOutputs(EvalState & state, const flake::LockedFlake & lockedFlake);
 
-    std::tuple<std::string, FlakeRef, flake::EvalCache::Derivation> toDerivation();
+    std::tuple<std::string, FlakeRef, DerivationInfo> toDerivation();
 
-    std::vector<flake::EvalCache::Derivation> toDerivations() override;
+    std::vector<DerivationInfo> toDerivations() override;
 
     std::pair<Value *, Pos> toValue(EvalState & state) override;
 };
+
+ref<eval_cache::EvalCache> openEvalCache(
+    EvalState & state,
+    const flake::LockedFlake & lockedFlake,
+    bool useEvalCache);
 
 }
