@@ -1,7 +1,6 @@
 #pragma once
 
 #include "types.hh"
-#include "error.hh"
 
 namespace nix {
 

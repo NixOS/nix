@@ -3,13 +3,13 @@
 
 #include "ref.hh"
 
-#include <string>
 #include <list>
 #include <set>
 #include <memory>
 #include <map>
+#include <optional>
 
-#include <boost/format.hpp>
+#include "fmt.hh"
 
 /* Before 4.7, gcc's std::exception uses empty throw() specifiers for
  * its (virtual) destructor and what() in c++11 mode, in violation of spec
@@ -20,73 +20,66 @@
 #endif
 #endif
 
-
 namespace nix {
 
-
-/* Inherit some names from other namespaces for convenience. */
-using std::string;
 using std::list;
 using std::set;
 using std::vector;
-using boost::format;
 
+typedef enum {
+    lvlError = 0,
+    lvlWarn,
+    lvlInfo,
+    lvlTalkative,
+    lvlChatty,
+    lvlDebug,
+    lvlVomit
+} Verbosity;
 
-/* A variadic template that does nothing. Useful to call a function
-   for all variadic arguments but ignoring the result. */
-struct nop { template<typename... T> nop(T...) {} };
-
-
-struct FormatOrString
+struct ErrPos
 {
-    string s;
-    FormatOrString(const string & s) : s(s) { };
-    template<class F>
-    FormatOrString(const F & f) : s(f.str()) { };
-    FormatOrString(const char * s) : s(s) { };
+    int line;
+    int column;
+    string file;
+
+    template <class P>
+    ErrPos& operator=(const P &pos)
+    {
+        line = pos.line;
+        column = pos.column;
+        file = pos.file;
+        return *this;
+    }
+
+    template <class P>
+    ErrPos(const P &p)
+    {
+      *this = p;
+    }
 };
 
-
-/* A helper for formatting strings. ‘fmt(format, a_0, ..., a_n)’ is
-   equivalent to ‘boost::format(format) % a_0 % ... %
-   ... a_n’. However, ‘fmt(s)’ is equivalent to ‘s’ (so no %-expansion
-   takes place). */
-
-template<class F>
-inline void formatHelper(F & f)
+struct NixCode
 {
-}
+    ErrPos errPos;
+    std::optional<string> prevLineOfCode;
+    string errLineOfCode;
+    std::optional<string> nextLineOfCode;
+};
 
-template<class F, typename T, typename... Args>
-inline void formatHelper(F & f, const T & x, const Args & ... args)
+// -------------------------------------------------
+// ErrorInfo.
+struct ErrorInfo
 {
-    formatHelper(f % x, args...);
-}
+    Verbosity level;
+    string name;
+    string description;
+    std::optional<hintformat> hint;
+    std::optional<NixCode> nixCode;
 
-inline std::string fmt(const std::string & s)
-{
-    return s;
-}
+    static std::optional<string> programName;
+};
 
-inline std::string fmt(const char * s)
-{
-    return s;
-}
-
-inline std::string fmt(const FormatOrString & fs)
-{
-    return fs.s;
-}
-
-template<typename... Args>
-inline std::string fmt(const std::string & fs, const Args & ... args)
-{
-    boost::format f(fs);
-    f.exceptions(boost::io::all_error_bits ^ boost::io::too_many_args_bit);
-    formatHelper(f, args...);
-    return f.str();
-}
-
+std::ostream& operator<<(std::ostream &out, const ErrorInfo &einfo);
 
 /* BaseError should generally not be caught, as it has Interrupted as
    a subclass. Catch Error instead. */
@@ -94,33 +87,42 @@ class BaseError : public std::exception
 {
 protected:
     string prefix_; // used for location traces etc.
-    string err;
+    ErrorInfo err;
 public:
     unsigned int status = 1; // exit status
 
     template<typename... Args>
     BaseError(unsigned int status, const Args & ... args)
-        : err(fmt(args...))
+        : err(hintfmt(args...))
         , status(status)
     {
     }
 
     template<typename... Args>
     BaseError(const Args & ... args)
-        : err(fmt(args...))
+        : err { .level = lvlError, 
+                .hint = hintfmt(args...)
+              }
+    {
+    }
+
+    BaseError(ErrorInfo e)
+        : err(e)
     {
     }
 
 #ifdef EXCEPTION_NEEDS_THROW_SPEC
     ~BaseError() throw () { };
-    const char * what() const throw () { return err.c_str(); }
+    const char * what() const throw () { return err.description.c_str(); }
 #else
-    const char * what() const noexcept { return err.c_str(); }
+    const char * what() const noexcept { return err.description.c_str(); }
 #endif
 
-    const string & msg() const { return err; }
+    const string & msg() const { return err.description; }
     const string & prefix() const { return prefix_; }
     BaseError & addPrefix(const FormatOrString & fs);
+
+    const ErrorInfo & info() const { return err; }
 };
 
 #define MakeError(newClass, superClass) \
@@ -139,7 +141,8 @@ public:
 
     template<typename... Args>
     SysError(const Args & ... args)
-        : Error(addErrno(fmt(args...)))
+        : Error(args...)  // TODO addErrNo for hintfmt
+        // : Error(addErrno(hintfmt(args...)))
     { }
 
 private:
