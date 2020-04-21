@@ -32,8 +32,10 @@ namespace nix {
 struct S3Error : public Error
 {
     Aws::S3::S3Errors err;
-    S3Error(Aws::S3::S3Errors err, const FormatOrString & fs)
-        : Error(fs), err(err) { };
+
+    template<typename... Args>
+    S3Error(Aws::S3::S3Errors err, const Args & ... args)
+        : Error(args...), err(err) { };
 };
 
 /* Helper: given an Outcome<R, E>, return R in case of success, or
@@ -249,7 +251,7 @@ struct S3BinaryCacheStoreImpl : public S3BinaryCacheStore
                 // If bucket listing is disabled, 404s turn into 403s
                 || error.GetErrorType() == Aws::S3::S3Errors::ACCESS_DENIED)
                 return false;
-            throw Error(format("AWS error fetching '%s': %s") % path % error.GetMessage());
+            throw Error("AWS error fetching '%s': %s", path, error.GetMessage());
         }
 
         return true;

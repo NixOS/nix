@@ -20,7 +20,7 @@ AutoCloseFD openLockFile(const Path & path, bool create)
 
     fd = open(path.c_str(), O_CLOEXEC | O_RDWR | (create ? O_CREAT : 0), 0600);
     if (!fd && (create || errno != ENOENT))
-        throw SysError(format("opening lock file '%1%'") % path);
+        throw SysError("opening lock file '%1%'", path);
 
     return fd;
 }
@@ -51,7 +51,7 @@ bool lockFile(int fd, LockType lockType, bool wait)
         while (flock(fd, type) != 0) {
             checkInterrupt();
             if (errno != EINTR)
-                throw SysError(format("acquiring/releasing lock"));
+                throw SysError("acquiring/releasing lock");
             else
                 return false;
         }
@@ -60,7 +60,7 @@ bool lockFile(int fd, LockType lockType, bool wait)
             checkInterrupt();
             if (errno == EWOULDBLOCK) return false;
             if (errno != EINTR)
-                throw SysError(format("acquiring/releasing lock"));
+                throw SysError("acquiring/releasing lock");
         }
     }
 
@@ -124,7 +124,7 @@ bool PathLocks::lockPaths(const PathSet & paths,
                hasn't been unlinked). */
             struct stat st;
             if (fstat(fd.get(), &st) == -1)
-                throw SysError(format("statting lock file '%1%'") % lockPath);
+                throw SysError("statting lock file '%1%'", lockPath);
             if (st.st_size != 0)
                 /* This lock file has been unlinked, so we're holding
                    a lock on a deleted file.  This means that other

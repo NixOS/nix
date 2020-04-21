@@ -37,11 +37,11 @@ string resolveMirrorUri(EvalState & state, string uri)
 
     auto mirrorList = vMirrors.attrs->find(state.symbols.create(mirrorName));
     if (mirrorList == vMirrors.attrs->end())
-        throw Error(format("unknown mirror name '%1%'") % mirrorName);
+        throw Error("unknown mirror name '%1%'", mirrorName);
     state.forceList(*mirrorList->value);
 
     if (mirrorList->value->listSize() < 1)
-        throw Error(format("mirror URI '%1%' did not expand to anything") % uri);
+        throw Error("mirror URI '%1%' did not expand to anything", uri);
 
     string mirror = state.forceString(*mirrorList->value->listElems()[0]);
     return mirror + (hasSuffix(mirror, "/") ? "" : "/") + string(s, p + 1);
@@ -73,7 +73,7 @@ static int _main(int argc, char * * argv)
                 string s = getArg(*arg, arg, end);
                 ht = parseHashType(s);
                 if (ht == htUnknown)
-                    throw UsageError(format("unknown hash type '%1%'") % s);
+                    throw UsageError("unknown hash type '%1%'", s);
             }
             else if (*arg == "--print-path")
                 printPath = true;
@@ -151,7 +151,7 @@ static int _main(int argc, char * * argv)
         if (name.empty())
             name = baseNameOf(uri);
         if (name.empty())
-            throw Error(format("cannot figure out file name for '%1%'") % uri);
+            throw Error("cannot figure out file name for '%1%'", uri);
 
         /* If an expected hash is given, the file may already exist in
            the store. */
@@ -206,7 +206,7 @@ static int _main(int argc, char * * argv)
             hash = unpack ? hashPath(ht, tmpFile).first : hashFile(ht, tmpFile);
 
             if (expectedHash != Hash(ht) && expectedHash != hash)
-                throw Error(format("hash mismatch for '%1%'") % uri);
+                throw Error("hash mismatch for '%1%'", uri);
 
             /* Copy the file to the Nix store. FIXME: if RemoteStore
                implemented addToStoreFromDump() and downloadFile()

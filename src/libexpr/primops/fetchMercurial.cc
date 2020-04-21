@@ -191,7 +191,7 @@ static void prim_fetchMercurial(EvalState & state, const Pos & pos, Value * * ar
         }
 
         if (url.empty())
-            throw EvalError(format("'url' argument required, at %1%") % pos);
+            throw EvalError("'url' argument required, at %1%", pos);
 
     } else
         url = state.coerceToString(pos, *args[0], context, false, false);

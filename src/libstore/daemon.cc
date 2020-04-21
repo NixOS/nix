@@ -747,7 +747,7 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
     }
 
     default:
-        throw Error(format("invalid operation %1%") % op);
+        throw Error("invalid operation %1%", op);
     }
 }
 

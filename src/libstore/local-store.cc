@@ -92,13 +92,13 @@ LocalStore::LocalStore(const Params & params)
         else {
             struct stat st;
             if (stat(realStoreDir.c_str(), &st))
-                throw SysError(format("getting attributes of path '%1%'") % realStoreDir);
+                throw SysError("getting attributes of path '%1%'", realStoreDir);
 
             if (st.st_uid != 0 || st.st_gid != gr->gr_gid || (st.st_mode & ~S_IFMT) != perm) {
                 if (chown(realStoreDir.c_str(), 0, gr->gr_gid) == -1)
-                    throw SysError(format("changing ownership of path '%1%'") % realStoreDir);
+                    throw SysError("changing ownership of path '%1%'", realStoreDir);
                 if (chmod(realStoreDir.c_str(), perm) == -1)
-                    throw SysError(format("changing permissions on path '%1%'") % realStoreDir);
+                    throw SysError("changing permissions on path '%1%'", realStoreDir);
             }
         }
     }
@@ -109,12 +109,12 @@ LocalStore::LocalStore(const Params & params)
         struct stat st;
         while (path != "/") {
             if (lstat(path.c_str(), &st))
-                throw SysError(format("getting status of '%1%'") % path);
+                throw SysError("getting status of '%1%'", path);
             if (S_ISLNK(st.st_mode))
-                throw Error(format(
+                throw Error(
                         "the path '%1%' is a symlink; "
-                        "this is not allowed for the Nix store and its parent directories")
-                    % path);
+                        "this is not allowed for the Nix store and its parent directories",
+                        path);
             path = dirOf(path);
         }
     }
@@ -155,8 +155,8 @@ LocalStore::LocalStore(const Params & params)
        upgrade.  */
     int curSchema = getSchema();
     if (curSchema > nixSchemaVersion)
-        throw Error(format("current Nix store schema is version %1%, but I only support %2%")
-            % curSchema % nixSchemaVersion);
+        throw Error("current Nix store schema is version %1%, but I only support %2%",
+             curSchema, nixSchemaVersion);
 
     else if (curSchema == 0) { /* new store */
         curSchema = nixSchemaVersion;
@@ -284,7 +284,7 @@ int LocalStore::getSchema()
     if (pathExists(schemaPath)) {
         string s = readFile(schemaPath);
         if (!string2Int(s, curSchema))
-            throw Error(format("'%1%' is corrupt") % schemaPath);
+            throw Error("'%1%' is corrupt", schemaPath);
     }
     return curSchema;
 }
@@ -293,7 +293,7 @@ int LocalStore::getSchema()
 void LocalStore::openDB(State & state, bool create)
 {
     if (access(dbDir.c_str(), R_OK | W_OK))
-        throw SysError(format("Nix database directory '%1%' is not writable") % dbDir);
+        throw SysError("Nix database directory '%1%' is not writable", dbDir);
 
     /* Open the Nix database. */
     string dbPath = dbDir + "/db.sqlite";
@@ -367,7 +367,7 @@ void LocalStore::makeStoreWritable()
             throw SysError("setting up a private mount namespace");
 
         if (mount(0, realStoreDir.c_str(), "none", MS_REMOUNT | MS_BIND, 0) == -1)
-            throw SysError(format("remounting %1% writable") % realStoreDir);
+            throw SysError("remounting %1% writable", realStoreDir);
     }
 #endif
 }
@@ -388,7 +388,7 @@ static void canonicaliseTimestampAndPermissions(const Path & path, const struct 
                  | 0444
                  | (st.st_mode & S_IXUSR ? 0111 : 0);
             if (chmod(path.c_str(), mode) == -1)
-                throw SysError(format("changing mode of '%1%' to %2$o") % path % mode);
+                throw SysError("changing mode of '%1%' to %2$o", path, mode);
         }
 
     }
@@ -406,7 +406,7 @@ static void canonicaliseTimestampAndPermissions(const Path & path, const struct 
 #else
         if (!S_ISLNK(st.st_mode) && utimes(path.c_str(), times) == -1)
 #endif
-            throw SysError(format("changing modification time of '%1%'") % path);
+            throw SysError("changing modification time of '%1%'", path);
     }
 }
 
@@ -415,7 +415,7 @@ void canonicaliseTimestampAndPermissions(const Path & path)
 {
     struct stat st;
     if (lstat(path.c_str(), &st))
-        throw SysError(format("getting attributes of path '%1%'") % path);
+        throw SysError("getting attributes of path '%1%'", path);
     canonicaliseTimestampAndPermissions(path, st);
 }
 
@@ -430,17 +430,17 @@ static void canonicalisePathMetaData_(const Path & path, uid_t fromUid, InodesSe
        setattrlist() to remove other attributes as well. */
     if (lchflags(path.c_str(), 0)) {
         if (errno != ENOTSUP)
-            throw SysError(format("clearing flags of path '%1%'") % path);
+            throw SysError("clearing flags of path '%1%'", path);
     }
 #endif
 
     struct stat st;
     if (lstat(path.c_str(), &st))
-        throw SysError(format("getting attributes of path '%1%'") % path);
+        throw SysError("getting attributes of path '%1%'", path);
 
     /* Really make sure that the path is of a supported type. */
     if (!(S_ISREG(st.st_mode) || S_ISDIR(st.st_mode) || S_ISLNK(st.st_mode)))
-        throw Error(format("file '%1%' has an unsupported type") % path);
+        throw Error("file '%1%' has an unsupported type", path);
 
 #if __linux__
     /* Remove extended attributes / ACLs. */
@@ -474,7 +474,7 @@ static void canonicalisePathMetaData_(const Path & path, uid_t fromUid, InodesSe
     if (fromUid != (uid_t) -1 && st.st_uid != fromUid) {
         assert(!S_ISDIR(st.st_mode));
         if (inodesSeen.find(Inode(st.st_dev, st.st_ino)) == inodesSeen.end())
-            throw BuildError(format("invalid ownership on file '%1%'") % path);
+            throw BuildError("invalid ownership on file '%1%'", path);
         mode_t mode = st.st_mode & ~S_IFMT;
         assert(S_ISLNK(st.st_mode) || (st.st_uid == geteuid() && (mode == 0444 || mode == 0555) && st.st_mtime == mtimeStore));
         return;
@@ -498,8 +498,8 @@ static void canonicalisePathMetaData_(const Path & path, uid_t fromUid, InodesSe
         if (!S_ISLNK(st.st_mode) &&
             chown(path.c_str(), geteuid(), getegid()) == -1)
 #endif
-            throw SysError(format("changing owner of '%1%' to %2%")
-                % path % geteuid());
+            throw SysError("changing owner of '%1%' to %2%",
+                  path, geteuid());
     }
 
     if (S_ISDIR(st.st_mode)) {
@@ -518,11 +518,11 @@ void canonicalisePathMetaData(const Path & path, uid_t fromUid, InodesSeen & ino
        be a symlink, since we can't change its ownership. */
     struct stat st;
     if (lstat(path.c_str(), &st))
-        throw SysError(format("getting attributes of path '%1%'") % path);
+        throw SysError("getting attributes of path '%1%'", path);
 
     if (st.st_uid != geteuid()) {
         assert(S_ISLNK(st.st_mode));
-        throw Error(format("wrong ownership of top-level store path '%1%'") % path);
+        throw Error("wrong ownership of top-level store path '%1%'", path);
     }
 }
 
@@ -1392,7 +1392,7 @@ static void makeMutable(const Path & path)
     AutoCloseFD fd = open(path.c_str(), O_RDONLY | O_NOFOLLOW | O_CLOEXEC);
     if (fd == -1) {
         if (errno == ELOOP) return; // it's a symlink
-        throw SysError(format("opening file '%1%'") % path);
+        throw SysError("opening file '%1%'", path);
     }
 
     unsigned int flags = 0, old;

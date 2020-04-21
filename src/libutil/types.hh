@@ -93,7 +93,9 @@ public:
 
     template<typename... Args>
     BaseError(unsigned int status, const Args & ... args)
-        : err(hintfmt(args...))
+        : err { .level = lvlError,
+                .hint = hintfmt(args...)
+              }
         , status(status)
     {
     }

@@ -453,7 +453,7 @@ static void commonChildInit(Pipe & logPipe)
        that e.g. ssh cannot open /dev/tty) and it doesn't receive
        terminal signals. */
     if (setsid() == -1)
-        throw SysError(format("creating a new session"));
+        throw SysError("creating a new session");
 
     /* Dup the write side of the logger pipe into stderr. */
     if (dup2(logPipe.writeSide.get(), STDERR_FILENO) == -1)
@@ -466,7 +466,7 @@ static void commonChildInit(Pipe & logPipe)
     /* Reroute stdin to /dev/null. */
     int fdDevNull = open(pathNullDevice.c_str(), O_RDWR);
     if (fdDevNull == -1)
-        throw SysError(format("cannot open '%1%'") % pathNullDevice);
+        throw SysError("cannot open '%1%'", pathNullDevice);
     if (dup2(fdDevNull, STDIN_FILENO) == -1)
         throw SysError("cannot dup null device into stdin");
     close(fdDevNull);
@@ -488,7 +488,7 @@ void handleDiffHook(
 
             auto diffRes = runProgram(diffHookOptions);
             if (!statusOk(diffRes.first))
-                throw ExecError(diffRes.first, fmt("diff-hook program '%1%' %2%", diffHook, statusToString(diffRes.first)));
+                throw ExecError(diffRes.first, "diff-hook program '%1%' %2%", diffHook, statusToString(diffRes.first));
 
             if (diffRes.second != "")
                 printError(chomp(diffRes.second));
@@ -534,8 +534,8 @@ UserLock::UserLock()
     /* Get the members of the build-users-group. */
     struct group * gr = getgrnam(settings.buildUsersGroup.get().c_str());
     if (!gr)
-        throw Error(format("the group '%1%' specified in 'build-users-group' does not exist")
-            % settings.buildUsersGroup);
+        throw Error("the group '%1%' specified in 'build-users-group' does not exist",
+            settings.buildUsersGroup);
     gid = gr->gr_gid;
 
     /* Copy the result of getgrnam. */
@@ -546,8 +546,8 @@ UserLock::UserLock()
     }
 
     if (users.empty())
-        throw Error(format("the build users group '%1%' has no members")
-            % settings.buildUsersGroup);
+        throw Error("the build users group '%1%' has no members",
+            settings.buildUsersGroup);
 
     /* Find a user account that isn't currently in use for another
        build. */
@@ -556,8 +556,8 @@ UserLock::UserLock()
 
         struct passwd * pw = getpwnam(i.c_str());
         if (!pw)
-            throw Error(format("the user '%1%' in the group '%2%' does not exist")
-                % i % settings.buildUsersGroup);
+            throw Error("the user '%1%' in the group '%2%' does not exist",
+                i, settings.buildUsersGroup);
 
         createDirs(settings.nixStateDir + "/userpool");
 
@@ -565,7 +565,7 @@ UserLock::UserLock()
 
         AutoCloseFD fd = open(fnUserLock.c_str(), O_RDWR | O_CREAT | O_CLOEXEC, 0600);
         if (!fd)
-            throw SysError(format("opening user lock '%1%'") % fnUserLock);
+            throw SysError("opening user lock '%1%'", fnUserLock);
 
         if (lockFile(fd.get(), ltWrite, false)) {
             fdUserLock = std::move(fd);
@@ -574,8 +574,8 @@ UserLock::UserLock()
 
             /* Sanity check... */
             if (uid == getuid() || uid == geteuid())
-                throw Error(format("the Nix user should not be a member of '%1%'")
-                    % settings.buildUsersGroup);
+                throw Error("the Nix user should not be a member of '%1%'",
+                    settings.buildUsersGroup);
 
 #if __linux__
             /* Get the list of supplementary groups of this build user.  This
@@ -585,7 +585,7 @@ UserLock::UserLock()
             int err = getgrouplist(pw->pw_name, pw->pw_gid,
                 supplementaryGIDs.data(), &ngroups);
             if (err == -1)
-                throw Error(format("failed to get list of supplementary groups for '%1%'") % pw->pw_name);
+                throw Error("failed to get list of supplementary groups for '%1%'", pw->pw_name);
 
             supplementaryGIDs.resize(ngroups);
 #endif
@@ -594,9 +594,9 @@ UserLock::UserLock()
         }
     }
 
-    throw Error(format("all build users are currently in use; "
-        "consider creating additional users and adding them to the '%1%' group")
-        % settings.buildUsersGroup);
+    throw Error("all build users are currently in use; "
+        "consider creating additional users and adding them to the '%1%' group",
+        settings.buildUsersGroup);
 }
 
 
@@ -1985,7 +1985,7 @@ void DerivationGoal::startBuilder()
         string s = get(drv->env, "exportReferencesGraph").value_or("");
         Strings ss = tokenizeString<Strings>(s);
         if (ss.size() % 2 != 0)
-            throw BuildError(format("odd number of tokens in 'exportReferencesGraph': '%1%'") % s);
+            throw BuildError("odd number of tokens in 'exportReferencesGraph': '%1%'", s);
         for (Strings::iterator i = ss.begin(); i != ss.end(); ) {
             string fileName = *i++;
             static std::regex regex("[A-Za-z_][A-Za-z0-9_.-]*");
@@ -2034,7 +2034,7 @@ void DerivationGoal::startBuilder()
                     worker.store.computeFSClosure(worker.store.parseStorePath(worker.store.toStorePath(i.second.source)), closure);
             } catch (InvalidPath & e) {
             } catch (Error & e) {
-                throw Error(format("while processing 'sandbox-paths': %s") % e.what());
+                throw Error("while processing 'sandbox-paths': %s", e.what());
             }
         for (auto & i : closure) {
             auto p = worker.store.printStorePath(i);
@@ -2081,10 +2081,10 @@ void DerivationGoal::startBuilder()
         printMsg(lvlChatty, format("setting up chroot environment in '%1%'") % chrootRootDir);
 
         if (mkdir(chrootRootDir.c_str(), 0750) == -1)
-            throw SysError(format("cannot create '%1%'") % chrootRootDir);
+            throw SysError("cannot create '%1%'", chrootRootDir);
 
         if (buildUser && chown(chrootRootDir.c_str(), 0, buildUser->getGID()) == -1)
-            throw SysError(format("cannot change ownership of '%1%'") % chrootRootDir);
+            throw SysError("cannot change ownership of '%1%'", chrootRootDir);
 
         /* Create a writable /tmp in the chroot.  Many builders need
            this.  (Of course they should really respect $TMPDIR
@@ -2128,7 +2128,7 @@ void DerivationGoal::startBuilder()
         chmod_(chrootStoreDir, 01775);
 
         if (buildUser && chown(chrootStoreDir.c_str(), 0, buildUser->getGID()) == -1)
-            throw SysError(format("cannot change ownership of '%1%'") % chrootStoreDir);
+            throw SysError("cannot change ownership of '%1%'", chrootStoreDir);
 
         for (auto & i : inputPaths) {
             auto p = worker.store.printStorePath(i);
@@ -2161,7 +2161,7 @@ void DerivationGoal::startBuilder()
     if (needsHashRewrite()) {
 
         if (pathExists(homeDir))
-            throw Error(format("directory '%1%' exists; please remove it") % homeDir);
+            throw Error("directory '%1%' exists; please remove it", homeDir);
 
         /* We're not doing a chroot build, but we have some valid
            output paths.  Since we can't just overwrite or delete
@@ -2206,8 +2206,7 @@ void DerivationGoal::startBuilder()
                 if (line == "extra-sandbox-paths" || line == "extra-chroot-dirs") {
                     state = stExtraChrootDirs;
                 } else {
-                    throw Error(format("unknown pre-build hook command '%1%'")
-                        % line);
+                    throw Error("unknown pre-build hook command '%1%'", line);
                 }
             } else if (state == stExtraChrootDirs) {
                 if (line == "") {
@@ -2967,7 +2966,7 @@ void DerivationGoal::chownToBuilder(const Path & path)
 {
     if (!buildUser) return;
     if (chown(path.c_str(), buildUser->getUID(), buildUser->getGID()) == -1)
-        throw SysError(format("cannot change ownership of '%1%'") % path);
+        throw SysError("cannot change ownership of '%1%'", path);
 }
 
 
@@ -3104,7 +3103,7 @@ void DerivationGoal::runChild()
             /* Bind-mount chroot directory to itself, to treat it as a
                different filesystem from /, as needed for pivot_root. */
             if (mount(chrootRootDir.c_str(), chrootRootDir.c_str(), 0, MS_BIND, 0) == -1)
-                throw SysError(format("unable to bind mount '%1%'") % chrootRootDir);
+                throw SysError("unable to bind mount '%1%'", chrootRootDir);
 
             /* Bind-mount the sandbox's Nix store onto itself so that
                we can mark it as a "shared" subtree, allowing bind
@@ -3238,16 +3237,16 @@ void DerivationGoal::runChild()
 
             /* Do the chroot(). */
             if (chdir(chrootRootDir.c_str()) == -1)
-                throw SysError(format("cannot change directory to '%1%'") % chrootRootDir);
+                throw SysError("cannot change directory to '%1%'", chrootRootDir);
 
             if (mkdir("real-root", 0) == -1)
                 throw SysError("cannot create real-root directory");
 
             if (pivot_root(".", "real-root") == -1)
-                throw SysError(format("cannot pivot old root directory onto '%1%'") % (chrootRootDir + "/real-root"));
+                throw SysError("cannot pivot old root directory onto '%1%'", (chrootRootDir + "/real-root"));
 
             if (chroot(".") == -1)
-                throw SysError(format("cannot change root directory to '%1%'") % chrootRootDir);
+                throw SysError("cannot change root directory to '%1%'", chrootRootDir);
 
             if (umount2("real-root", MNT_DETACH) == -1)
                 throw SysError("cannot unmount real root filesystem");
@@ -3268,7 +3267,7 @@ void DerivationGoal::runChild()
 #endif
 
         if (chdir(tmpDirInSandbox.c_str()) == -1)
-            throw SysError(format("changing into '%1%'") % tmpDir);
+            throw SysError("changing into '%1%'", tmpDir);
 
         /* Close all other file descriptors. */
         closeMostFDs({STDIN_FILENO, STDOUT_FILENO, STDERR_FILENO});
@@ -3407,9 +3406,9 @@ void DerivationGoal::runChild()
                 sandboxProfile += "(allow file-read* file-write* process-exec\n";
                 for (auto & i : dirsInChroot) {
                     if (i.first != i.second.source)
-                        throw Error(format(
-                            "can't map '%1%' to '%2%': mismatched impure paths not supported on Darwin")
-                            % i.first % i.second.source);
+                        throw Error(
+                            "can't map '%1%' to '%2%': mismatched impure paths not supported on Darwin",
+                            i.first, i.second.source);
 
                     string path = i.first;
                     struct stat st;
@@ -3500,7 +3499,7 @@ void DerivationGoal::runChild()
                 else if (drv->builder == "builtin:unpack-channel")
                     builtinUnpackChannel(drv2);
                 else
-                    throw Error(format("unsupported builtin function '%1%'") % string(drv->builder, 8));
+                    throw Error("unsupported builtin function '%1%'", string(drv->builder, 8));
                 _exit(0);
             } catch (std::exception & e) {
                 writeFull(STDERR_FILENO, "error: " + string(e.what()) + "\n");
@@ -3510,7 +3509,7 @@ void DerivationGoal::runChild()
 
         execve(builder, stringsToCharPtrs(args).data(), stringsToCharPtrs(envStrs).data());
 
-        throw SysError(format("executing '%1%'") % drv->builder);
+        throw SysError("executing '%1%'", drv->builder);
 
     } catch (std::exception & e) {
         writeFull(STDERR_FILENO, "\1while setting up the build environment: " + string(e.what()) + "\n");
@@ -3595,7 +3594,7 @@ void DerivationGoal::registerOutputs()
                     replaceValidPath(path, actualPath);
                 else
                     if (buildMode != bmCheck && rename(actualPath.c_str(), worker.store.toRealPath(path).c_str()) == -1)
-                        throw SysError(format("moving build output '%1%' from the sandbox to the Nix store") % path);
+                        throw SysError("moving build output '%1%' from the sandbox to the Nix store", path);
             }
             if (buildMode != bmCheck) actualPath = worker.store.toRealPath(path);
         }
@@ -3616,13 +3615,13 @@ void DerivationGoal::registerOutputs()
            user. */
         if ((!S_ISLNK(st.st_mode) && (st.st_mode & (S_IWGRP | S_IWOTH))) ||
             (buildUser && st.st_uid != buildUser->getUID()))
-            throw BuildError(format("suspicious ownership or permission on '%1%'; rejecting this build output") % path);
+            throw BuildError("suspicious ownership or permission on '%1%'; rejecting this build output", path);
 #endif
 
         /* Apply hash rewriting if necessary. */
         bool rewritten = false;
         if (!outputRewrites.empty()) {
-            printError(format("warning: rewriting hashes in '%1%'; cross fingers") % path);
+            printError("warning: rewriting hashes in '%1%'; cross fingers", path);
 
             /* Canonicalise first.  This ensures that the path we're
                rewriting doesn't contain a hard link to /etc/shadow or
@@ -3654,7 +3653,8 @@ void DerivationGoal::registerOutputs()
                 /* The output path should be a regular file without execute permission. */
                 if (!S_ISREG(st.st_mode) || (st.st_mode & S_IXUSR) != 0)
                     throw BuildError(
-                        format("output path '%1%' should be a non-executable regular file") % path);
+                        "output path '%1%' should be a non-executable regular file",
+                        path);
             }
 
             /* Check the hash. In hash mode, move the path produced by
@@ -3715,7 +3715,7 @@ void DerivationGoal::registerOutputs()
                     Path dst = worker.store.toRealPath(path + checkSuffix);
                     deletePath(dst);
                     if (rename(actualPath.c_str(), dst.c_str()))
-                        throw SysError(format("renaming '%1%' to '%2%'") % actualPath % dst);
+                        throw SysError("renaming '%1%' to '%2%'", actualPath, dst);
 
                     handleDiffHook(
                         buildUser ? buildUser->getUID() : getuid(),
@@ -4014,7 +4014,7 @@ Path DerivationGoal::openLogFile()
         settings.compressLog ? ".bz2" : "");
 
     fdLogFile = open(logFileName.c_str(), O_CREAT | O_WRONLY | O_TRUNC | O_CLOEXEC, 0666);
-    if (!fdLogFile) throw SysError(format("creating log file '%1%'") % logFileName);
+    if (!fdLogFile) throw SysError("creating log file '%1%'", logFileName);
 
     logFileSink = std::make_shared<FdSink>(fdLogFile.get());
 
@@ -4522,7 +4522,6 @@ void SubstitutionGoal::handleEOF(int fd)
     if (fd == outPipe.readSide.get()) worker.wakeUp(shared_from_this());
 }
 
-
 //////////////////////////////////////////////////////////////////////
 
 
@@ -4739,9 +4738,9 @@ void Worker::run(const Goals & _topGoals)
         if (!children.empty() || !waitingForAWhile.empty())
             waitForInput();
         else {
-            if (awake.empty() && 0 == settings.maxBuildJobs) throw Error(
-                "unable to start any build; either increase '--max-jobs' "
-                "or enable remote builds");
+            if (awake.empty() && 0 == settings.maxBuildJobs) 
+                throw Error("unable to start any build; either increase '--max-jobs' "
+                            "or enable remote builds");
             assert(!awake.empty());
         }
     }
@@ -4753,7 +4752,6 @@ void Worker::run(const Goals & _topGoals)
     assert(!settings.keepGoing || wantingToBuild.empty());
     assert(!settings.keepGoing || children.empty());
 }
-
 
 void Worker::waitForInput()
 {
@@ -4895,6 +4893,9 @@ void Worker::waitForInput()
 }
 
 
+
+
+
 unsigned int Worker::exitStatus()
 {
     /*
@@ -4994,7 +4995,6 @@ void LocalStore::buildPaths(const std::vector<StorePathWithOutputs> & drvPaths, 
         throw Error(worker.exitStatus(), "build of %s failed", showPaths(failed));
 }
 
-
 BuildResult LocalStore::buildDerivation(const StorePath & drvPath, const BasicDerivation & drv,
     BuildMode buildMode)
 {
@@ -5055,4 +5055,8 @@ void LocalStore::repairPath(const StorePath & path)
 }
 
 
+
 }
+
+
+

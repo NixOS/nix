@@ -75,7 +75,7 @@ string getArg(const string & opt,
     Strings::iterator & i, const Strings::iterator & end)
 {
     ++i;
-    if (i == end) throw UsageError(format("'%1%' requires an argument") % opt);
+    if (i == end) throw UsageError("'%1%' requires an argument", opt);
     return *i;
 }
 
@@ -229,7 +229,7 @@ bool LegacyArgs::processArgs(const Strings & args, bool finish)
     Strings ss(args);
     auto pos = ss.begin();
     if (!parseArg(pos, ss.end()))
-        throw UsageError(format("unexpected argument '%1%'") % args.front());
+        throw UsageError("unexpected argument '%1%'", args.front());
     return true;
 }
 
@@ -273,7 +273,7 @@ void showManPage(const string & name)
     restoreSignals();
     setenv("MANPATH", settings.nixManDir.c_str(), 1);
     execlp("man", "man", name.c_str(), nullptr);
-    throw SysError(format("command 'man %1%' failed") % name.c_str());
+    throw SysError("command 'man %1%' failed", name.c_str());
 }
 
 
@@ -301,7 +301,7 @@ int handleExceptions(const string & programName, std::function<void()> fun)
             % e.what() % programName);
         return 1;
     } catch (BaseError & e) {
-        printError(format(error + "%1%%2%") % (settings.showTrace ? e.prefix() : "") % e.msg());
+        printError(error + "%1%%2%", (settings.showTrace ? e.prefix() : ""), e.msg());
         if (e.prefix() != "" && !settings.showTrace)
             printError("(use '--show-trace' to show detailed location information)");
         return e.status;
@@ -338,7 +338,7 @@ RunPager::RunPager()
         execlp("pager", "pager", nullptr);
         execlp("less", "less", nullptr);
         execlp("more", "more", nullptr);
-        throw SysError(format("executing '%1%'") % pager);
+        throw SysError("executing '%1%'", pager);
     });
 
     pid.setKillSignal(SIGINT);

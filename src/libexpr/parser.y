@@ -64,15 +64,15 @@ namespace nix {
 
 static void dupAttr(const AttrPath & attrPath, const Pos & pos, const Pos & prevPos)
 {
-    throw ParseError(format("attribute '%1%' at %2% already defined at %3%")
-        % showAttrPath(attrPath) % pos % prevPos);
+    throw ParseError("attribute '%1%' at %2% already defined at %3%",
+        showAttrPath(attrPath), pos, prevPos);
 }
 
 
 static void dupAttr(Symbol attr, const Pos & pos, const Pos & prevPos)
 {
-    throw ParseError(format("attribute '%1%' at %2% already defined at %3%")
-        % attr % pos % prevPos);
+    throw ParseError("attribute '%1%' at %2% already defined at %3%",
+        attr, pos, prevPos);
 }
 
 
@@ -140,8 +140,8 @@ static void addAttr(ExprAttrs * attrs, AttrPath & attrPath,
 static void addFormal(const Pos & pos, Formals * formals, const Formal & formal)
 {
     if (!formals->argNames.insert(formal.name).second)
-        throw ParseError(format("duplicate formal function argument '%1%' at %2%")
-            % formal.name % pos);
+        throw ParseError("duplicate formal function argument '%1%' at %2%",
+            formal.name, pos);
     formals->formals.push_front(formal);
 }
 
@@ -327,8 +327,7 @@ expr_function
     { $$ = new ExprWith(CUR_POS, $2, $4); }
   | LET binds IN expr_function
     { if (!$2->dynamicAttrs.empty())
-        throw ParseError(format("dynamic attributes not allowed in let at %1%")
-            % CUR_POS);
+        throw ParseError("dynamic attributes not allowed in let at %1%", CUR_POS);
       $$ = new ExprLet($2, $4);
     }
   | expr_if
@@ -475,8 +474,8 @@ attrs
           $$->push_back(AttrName(str->s));
           delete str;
       } else
-          throw ParseError(format("dynamic attributes not allowed in inherit at %1%")
-              % makeCurPos(@2, data));
+          throw ParseError("dynamic attributes not allowed in inherit at %1%",
+              makeCurPos(@2, data));
     }
   | { $$ = new AttrPath; }
   ;
@@ -670,11 +669,10 @@ Path EvalState::findFile(SearchPath & searchPath, const string & path, const Pos
         Path res = r.second + suffix;
         if (pathExists(res)) return canonPath(res);
     }
-    format f = format(
+    string f = 
         "file '%1%' was not found in the Nix search path (add it using $NIX_PATH or -I)"
-        + string(pos ? ", at %2%" : ""));
-    f.exceptions(boost::io::all_error_bits ^ boost::io::too_many_args_bit);
-    throw ThrownError(f % path % pos);
+        + string(pos ? ", at %2%" : "");
+    throw ThrownError(f, path, pos);
 }
 
 
@@ -691,7 +689,8 @@ std::pair<bool, std::string> EvalState::resolveSearchPathElem(const SearchPathEl
             request.unpack = true;
             res = { true, getDownloader()->downloadCached(store, request).path };
         } catch (DownloadError & e) {
-            printError(format("warning: Nix search path entry '%1%' cannot be downloaded, ignoring") % elem.second);
+            // TODO: change to warn()?
+            printError("warning: Nix search path entry '%1%' cannot be downloaded, ignoring", elem.second);
             res = { false, "" };
         }
     } else {
@@ -699,7 +698,8 @@ std::pair<bool, std::string> EvalState::resolveSearchPathElem(const SearchPathEl
         if (pathExists(path))
             res = { true, path };
         else {
-            printError(format("warning: Nix search path entry '%1%' does not exist, ignoring") % elem.second);
+            // TODO: change to warn()?
+            printError("warning: Nix search path entry '%1%' does not exist, ignoring", elem.second);
             res = { false, "" };
         }
     }

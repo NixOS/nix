@@ -128,8 +128,10 @@ class DownloadError : public Error
 {
 public:
     Downloader::Error error;
-    DownloadError(Downloader::Error error, const FormatOrString & fs)
-        : Error(fs), error(error)
+
+    template<typename... Args>
+    DownloadError(Downloader::Error error, const Args & ... args)
+        : Error(args...), error(error)
     { }
 };
 

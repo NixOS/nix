@@ -252,12 +252,12 @@ void NixRepl::mainLoop(const std::vector<std::string> & files)
                 // input without clearing the input so far.
                 continue;
             } else {
-              printMsg(lvlError, format(error + "%1%%2%") % (settings.showTrace ? e.prefix() : "") % e.msg());
+              printMsg(lvlError, error + "%1%%2%", (settings.showTrace ? e.prefix() : ""), e.msg());
             }
         } catch (Error & e) {
-            printMsg(lvlError, format(error + "%1%%2%") % (settings.showTrace ? e.prefix() : "") % e.msg());
+            printMsg(lvlError, error + "%1%%2%", (settings.showTrace ? e.prefix() : ""), e.msg());
         } catch (Interrupted & e) {
-            printMsg(lvlError, format(error + "%1%%2%") % (settings.showTrace ? e.prefix() : "") % e.msg());
+            printMsg(lvlError, error + "%1%%2%", (settings.showTrace ? e.prefix() : ""), e.msg());
         }
 
         // We handled the current input fully, so we should clear it
@@ -546,7 +546,7 @@ bool NixRepl::processLine(string line)
         return false;
 
     else if (command != "")
-        throw Error(format("unknown command '%1%'") % command);
+        throw Error("unknown command '%1%'", command);
 
     else {
         size_t p = line.find('=');

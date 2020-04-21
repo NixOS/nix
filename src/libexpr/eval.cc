@@ -493,52 +493,52 @@ Value & EvalState::getBuiltin(const string & name)
 
 LocalNoInlineNoReturn(void throwEvalError(const char * s, const string & s2))
 {
-    throw EvalError(format(s) % s2);
+    throw EvalError(s, s2);
 }
 
 LocalNoInlineNoReturn(void throwEvalError(const char * s, const string & s2, const Pos & pos))
 {
-    throw EvalError(format(s) % s2 % pos);
+    throw EvalError(s, s2, pos);
 }
 
 LocalNoInlineNoReturn(void throwEvalError(const char * s, const string & s2, const string & s3))
 {
-    throw EvalError(format(s) % s2 % s3);
+    throw EvalError(s, s2, s3);
 }
 
 LocalNoInlineNoReturn(void throwEvalError(const char * s, const string & s2, const string & s3, const Pos & pos))
 {
-    throw EvalError(format(s) % s2 % s3 % pos);
+    throw EvalError(s, s2, s3, pos);
 }
 
 LocalNoInlineNoReturn(void throwEvalError(const char * s, const Symbol & sym, const Pos & p1, const Pos & p2))
 {
-    throw EvalError(format(s) % sym % p1 % p2);
+    throw EvalError(s, sym, p1, p2);
 }
 
 LocalNoInlineNoReturn(void throwTypeError(const char * s, const Pos & pos))
 {
-    throw TypeError(format(s) % pos);
+    throw TypeError(s, pos);
 }
 
 LocalNoInlineNoReturn(void throwTypeError(const char * s, const string & s1))
 {
-    throw TypeError(format(s) % s1);
+    throw TypeError(s, s1);
 }
 
 LocalNoInlineNoReturn(void throwTypeError(const char * s, const ExprLambda & fun, const Symbol & s2, const Pos & pos))
 {
-    throw TypeError(format(s) % fun.showNamePos() % s2 % pos);
+    throw TypeError(s, fun.showNamePos(), s2, pos);
 }
 
 LocalNoInlineNoReturn(void throwAssertionError(const char * s, const string & s1, const Pos & pos))
 {
-    throw AssertionError(format(s) % s1 % pos);
+    throw AssertionError(s, s1, pos);
 }
 
 LocalNoInlineNoReturn(void throwUndefinedVarError(const char * s, const string & s1, const Pos & pos))
 {
-    throw UndefinedVarError(format(s) % s1 % pos);
+    throw UndefinedVarError(s, s1, pos);
 }
 
 LocalNoInline(void addErrorPrefix(Error & e, const char * s, const string & s2))
@@ -1883,8 +1883,7 @@ void EvalState::printStats()
 
 string ExternalValueBase::coerceToString(const Pos & pos, PathSet & context, bool copyMore, bool copyToStore) const
 {
-    throw TypeError(format("cannot coerce %1% to a string, at %2%") %
-        showType() % pos);
+    throw TypeError("cannot coerce %1% to a string, at %2%", showType(), pos);
 }
 
 

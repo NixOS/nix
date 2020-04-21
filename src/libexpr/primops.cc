@@ -94,8 +94,8 @@ static void prim_scopedImport(EvalState & state, const Pos & pos, Value * * args
     try {
         state.realiseContext(context);
     } catch (InvalidPathError & e) {
-        throw EvalError(format("cannot import '%1%', since path '%2%' is not valid, at %3%")
-            % path % e.path % pos);
+        throw EvalError("cannot import '%1%', since path '%2%' is not valid, at %3%",
+                        path, e.path, pos);
     }
 
     Path realPath = state.checkSourcePath(state.toRealPath(path, context));
@@ -171,8 +171,8 @@ void prim_importNative(EvalState & state, const Pos & pos, Value * * args, Value
     try {
         state.realiseContext(context);
     } catch (InvalidPathError & e) {
-        throw EvalError(format("cannot import '%1%', since path '%2%' is not valid, at %3%")
-            % path % e.path % pos);
+        throw EvalError("cannot import '%1%', since path '%2%' is not valid, at %3%"
+           , path, e.path, pos);
     }
 
     path = state.checkSourcePath(path);
@@ -181,17 +181,17 @@ void prim_importNative(EvalState & state, const Pos & pos, Value * * args, Value
 
     void *handle = dlopen(path.c_str(), RTLD_LAZY | RTLD_LOCAL);
     if (!handle)
-        throw EvalError(format("could not open '%1%': %2%") % path % dlerror());
+        throw EvalError("could not open '%1%': %2%", path, dlerror());
 
     dlerror();
     ValueInitializer func = (ValueInitializer) dlsym(handle, sym.c_str());
     if(!func) {
         char *message = dlerror();
         if (message)
-            throw EvalError(format("could not load symbol '%1%' from '%2%': %3%") % sym % path % message);
+            throw EvalError("could not load symbol '%1%' from '%2%': %3%", sym, path, message);
         else
-            throw EvalError(format("symbol '%1%' from '%2%' resolved to NULL when a function pointer was expected")
-                    % sym % path);
+            throw EvalError("symbol '%1%' from '%2%' resolved to NULL when a function pointer was expected"
+                   , sym, path);
     }
 
     (func)(state, v);
@@ -207,7 +207,7 @@ void prim_exec(EvalState & state, const Pos & pos, Value * * args, Value & v)
     auto elems = args[0]->listElems();
     auto count = args[0]->listSize();
     if (count == 0) {
-        throw EvalError(format("at least one argument to 'exec' required, at %1%") % pos);
+        throw EvalError("at least one argument to 'exec' required, at %1%", pos);
     }
     PathSet context;
     auto program = state.coerceToString(pos, *elems[0], context, false, false);
@@ -218,8 +218,8 @@ void prim_exec(EvalState & state, const Pos & pos, Value * * args, Value & v)
     try {
         state.realiseContext(context);
     } catch (InvalidPathError & e) {
-        throw EvalError(format("cannot execute '%1%', since path '%2%' is not valid, at %3%")
-            % program % e.path % pos);
+        throw EvalError("cannot execute '%1%', since path '%2%' is not valid, at %3%"
+           , program, e.path, pos);
     }
 
     auto output = runProgram(program, true, commandArgs);
@@ -227,13 +227,13 @@ void prim_exec(EvalState & state, const Pos & pos, Value * * args, Value & v)
     try {
         parsed = state.parseExprFromString(output, pos.file);
     } catch (Error & e) {
-        e.addPrefix(format("While parsing the output from '%1%', at %2%\n") % program % pos);
+        e.addPrefix(fmt("While parsing the output from '%1%', at %2%\n", program, pos));
         throw;
     }
     try {
         state.eval(parsed, v);
     } catch (Error & e) {
-        e.addPrefix(format("While evaluating the output from '%1%', at %2%\n") % program % pos);
+        e.addPrefix(fmt("While evaluating the output from '%1%', at %2%\n", program, pos));
         throw;
     }
 }
@@ -339,7 +339,7 @@ struct CompareValues
         if (v1->type == tInt && v2->type == tFloat)
             return v1->integer < v2->fpoint;
         if (v1->type != v2->type)
-            throw EvalError(format("cannot compare %1% with %2%") % showType(*v1) % showType(*v2));
+            throw EvalError("cannot compare %1% with %2%", showType(*v1), showType(*v2));
         switch (v1->type) {
             case tInt:
                 return v1->integer < v2->integer;
@@ -350,7 +350,7 @@ struct CompareValues
             case tPath:
                 return strcmp(v1->path, v2->path) < 0;
             default:
-                throw EvalError(format("cannot compare %1% with %2%") % showType(*v1) % showType(*v2));
+                throw EvalError("cannot compare %1% with %2%", showType(*v1), showType(*v2));
         }
     }
 };
@@ -371,7 +371,7 @@ static void prim_genericClosure(EvalState & state, const Pos & pos, Value * * ar
     Bindings::iterator startSet =
         args[0]->attrs->find(state.symbols.create("startSet"));
     if (startSet == args[0]->attrs->end())
-        throw EvalError(format("attribute 'startSet' required, at %1%") % pos);
+        throw EvalError("attribute 'startSet' required, at %1%", pos);
     state.forceList(*startSet->value, pos);
 
     ValueList workSet;
@@ -382,7 +382,7 @@ static void prim_genericClosure(EvalState & state, const Pos & pos, Value * * ar
     Bindings::iterator op =
         args[0]->attrs->find(state.symbols.create("operator"));
     if (op == args[0]->attrs->end())
-        throw EvalError(format("attribute 'operator' required, at %1%") % pos);
+        throw EvalError("attribute 'operator' required, at %1%", pos);
     state.forceValue(*op->value);
 
     /* Construct the closure by applying the operator to element of
@@ -401,7 +401,7 @@ static void prim_genericClosure(EvalState & state, const Pos & pos, Value * * ar
         Bindings::iterator key =
             e->attrs->find(state.symbols.create("key"));
         if (key == e->attrs->end())
-            throw EvalError(format("attribute 'key' required, at %1%") % pos);
+            throw EvalError("attribute 'key' required, at %1%", pos);
         state.forceValue(*key->value);
 
         if (!doneKeys.insert(key->value).second) continue;
@@ -431,7 +431,7 @@ static void prim_abort(EvalState & state, const Pos & pos, Value * * args, Value
 {
     PathSet context;
     string s = state.coerceToString(pos, *args[0], context);
-    throw Abort(format("evaluation aborted with the following error message: '%1%'") % s);
+    throw Abort("evaluation aborted with the following error message: '%1%'", s);
 }
 
 
@@ -506,9 +506,9 @@ static void prim_trace(EvalState & state, const Pos & pos, Value * * args, Value
 {
     state.forceValue(*args[0]);
     if (args[0]->type == tString)
-        printError(format("trace: %1%") % args[0]->string.s);
+        printError("trace: %1%", args[0]->string.s);
     else
-        printError(format("trace: %1%") % *args[0]);
+        printError("trace: %1%", *args[0]);
     state.forceValue(*args[1]);
     v = *args[1];
 }
@@ -533,13 +533,13 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
     /* Figure out the name first (for stack backtraces). */
     Bindings::iterator attr = args[0]->attrs->find(state.sName);
     if (attr == args[0]->attrs->end())
-        throw EvalError(format("required attribute 'name' missing, at %1%") % pos);
+        throw EvalError("required attribute 'name' missing, at %1%", pos);
     string drvName;
     Pos & posDrvName(*attr->pos);
     try {
         drvName = state.forceStringNoCtx(*attr->value, pos);
     } catch (Error & e) {
-        e.addPrefix(format("while evaluating the derivation attribute 'name' at %1%:\n") % posDrvName);
+        e.addPrefix(fmt("while evaluating the derivation attribute 'name' at %1%:\n", posDrvName));
         throw;
     }
 
@@ -583,18 +583,18 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
             outputs.clear();
             for (auto & j : ss) {
                 if (outputs.find(j) != outputs.end())
-                    throw EvalError(format("duplicate derivation output '%1%', at %2%") % j % posDrvName);
+                    throw EvalError("duplicate derivation output '%1%', at %2%", j, posDrvName);
                 /* !!! Check whether j is a valid attribute
                    name. */
                 /* Derivations cannot be named ‘drv’, because
                    then we'd have an attribute ‘drvPath’ in
                    the resulting set. */
                 if (j == "drv")
-                    throw EvalError(format("invalid derivation output name 'drv', at %1%") % posDrvName);
+                    throw EvalError("invalid derivation output name 'drv', at %1%", posDrvName);
                 outputs.insert(j);
             }
             if (outputs.empty())
-                throw EvalError(format("derivation cannot have an empty set of outputs, at %1%") % posDrvName);
+                throw EvalError("derivation cannot have an empty set of outputs, at %1%", posDrvName);
         };
 
         try {
@@ -706,9 +706,9 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
 
     /* Do we have all required attributes? */
     if (drv.builder == "")
-        throw EvalError(format("required attribute 'builder' missing, at %1%") % posDrvName);
+        throw EvalError("required attribute 'builder' missing, at %1%", posDrvName);
     if (drv.platform == "")
-        throw EvalError(format("required attribute 'system' missing, at %1%") % posDrvName);
+        throw EvalError("required attribute 'system' missing, at %1%", posDrvName);
 
     /* Check whether the derivation name is valid. */
     if (isDerivation(drvName))
@@ -717,7 +717,7 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
     if (outputHash) {
         /* Handle fixed-output derivations. */
         if (outputs.size() != 1 || *(outputs.begin()) != "out")
-            throw Error(format("multiple outputs are not supported in fixed-output derivations, at %1%") % posDrvName);
+            throw Error("multiple outputs are not supported in fixed-output derivations, at %1%", posDrvName);
 
         HashType ht = outputHashAlgo.empty() ? htUnknown : parseHashType(outputHashAlgo);
         Hash h(*outputHash, ht);
@@ -818,7 +818,7 @@ static void prim_storePath(EvalState & state, const Pos & pos, Value * * args, V
        e.g. nix-push does the right thing. */
     if (!state.store->isStorePath(path)) path = canonPath(path, true);
     if (!state.store->isInStore(path))
-        throw EvalError(format("path '%1%' is not in the Nix store, at %2%") % path % pos);
+        throw EvalError("path '%1%' is not in the Nix store, at %2%", path, pos);
     Path path2 = state.store->toStorePath(path);
     if (!settings.readOnlyMode)
         state.store->ensurePath(state.store->parseStorePath(path2));
@@ -834,9 +834,9 @@ static void prim_pathExists(EvalState & state, const Pos & pos, Value * * args, 
     try {
         state.realiseContext(context);
     } catch (InvalidPathError & e) {
-        throw EvalError(format(
-                "cannot check the existence of '%1%', since path '%2%' is not valid, at %3%")
-            % path % e.path % pos);
+        throw EvalError(
+                "cannot check the existence of '%1%', since path '%2%' is not valid, at %3%", 
+                path, e.path, pos);
     }
 
     try {
@@ -879,12 +879,12 @@ static void prim_readFile(EvalState & state, const Pos & pos, Value * * args, Va
     try {
         state.realiseContext(context);
     } catch (InvalidPathError & e) {
-        throw EvalError(format("cannot read '%1%', since path '%2%' is not valid, at %3%")
-            % path % e.path % pos);
+        throw EvalError("cannot read '%1%', since path '%2%' is not valid, at %3%"
+           , path, e.path, pos);
     }
     string s = readFile(state.checkSourcePath(state.toRealPath(path, context)));
     if (s.find((char) 0) != string::npos)
-        throw Error(format("the contents of the file '%1%' cannot be represented as a Nix string") % path);
+        throw Error("the contents of the file '%1%' cannot be represented as a Nix string", path);
     mkString(v, s.c_str());
 }
 
@@ -908,7 +908,7 @@ static void prim_findFile(EvalState & state, const Pos & pos, Value * * args, Va
 
         i = v2.attrs->find(state.symbols.create("path"));
         if (i == v2.attrs->end())
-            throw EvalError(format("attribute 'path' missing, at %1%") % pos);
+            throw EvalError("attribute 'path' missing, at %1%", pos);
 
         PathSet context;
         string path = state.coerceToString(pos, *i->value, context, false, false);
@@ -916,8 +916,8 @@ static void prim_findFile(EvalState & state, const Pos & pos, Value * * args, Va
         try {
             state.realiseContext(context);
         } catch (InvalidPathError & e) {
-            throw EvalError(format("cannot find '%1%', since path '%2%' is not valid, at %3%")
-                % path % e.path % pos);
+            throw EvalError("cannot find '%1%', since path '%2%' is not valid, at %3%",
+                        path, e.path, pos);
         }
 
         searchPath.emplace_back(prefix, path);
@@ -934,7 +934,7 @@ static void prim_hashFile(EvalState & state, const Pos & pos, Value * * args, Va
     string type = state.forceStringNoCtx(*args[0], pos);
     HashType ht = parseHashType(type);
     if (ht == htUnknown)
-      throw Error(format("unknown hash type '%1%', at %2%") % type % pos);
+      throw Error("unknown hash type '%1%', at %2%", type, pos);
 
     PathSet context; // discarded
     Path p = state.coerceToPath(pos, *args[1], context);
@@ -950,8 +950,8 @@ static void prim_readDir(EvalState & state, const Pos & pos, Value * * args, Val
     try {
         state.realiseContext(ctx);
     } catch (InvalidPathError & e) {
-        throw EvalError(format("cannot read '%1%', since path '%2%' is not valid, at %3%")
-            % path % e.path % pos);
+        throw EvalError("cannot read '%1%', since path '%2%' is not valid, at %3%",
+                        path, e.path, pos);
     }
 
     DirEntries entries = readDirectory(state.checkSourcePath(path));
@@ -1021,7 +1021,7 @@ static void prim_toFile(EvalState & state, const Pos & pos, Value * * args, Valu
 
     for (auto path : context) {
         if (path.at(0) != '/')
-            throw EvalError(format("in 'toFile': the file '%1%' cannot refer to derivation outputs, at %2%") % name % pos);
+            throw EvalError("in 'toFile': the file '%1%' cannot refer to derivation outputs, at %2%", name, pos);
         refs.insert(state.store->parseStorePath(path));
     }
 
@@ -1089,11 +1089,11 @@ static void prim_filterSource(EvalState & state, const Pos & pos, Value * * args
     PathSet context;
     Path path = state.coerceToPath(pos, *args[1], context);
     if (!context.empty())
-        throw EvalError(format("string '%1%' cannot refer to other paths, at %2%") % path % pos);
+        throw EvalError("string '%1%' cannot refer to other paths, at %2%", path, pos);
 
     state.forceValue(*args[0]);
     if (args[0]->type != tLambda)
-        throw TypeError(format("first argument in call to 'filterSource' is not a function but %1%, at %2%") % showType(*args[0]) % pos);
+        throw TypeError("first argument in call to 'filterSource' is not a function but %1%, at %2%", showType(*args[0]), pos);
 
     addPath(state, pos, std::string(baseNameOf(path)), path, args[0], true, Hash(), v);
 }
@@ -1113,7 +1113,7 @@ static void prim_path(EvalState & state, const Pos & pos, Value * * args, Value 
             PathSet context;
             path = state.coerceToPath(*attr.pos, *attr.value, context);
             if (!context.empty())
-                throw EvalError(format("string '%1%' cannot refer to other paths, at %2%") % path % *attr.pos);
+                throw EvalError("string '%1%' cannot refer to other paths, at %2%", path, *attr.pos);
         } else if (attr.name == state.sName)
             name = state.forceStringNoCtx(*attr.value, *attr.pos);
         else if (n == "filter") {
@@ -1124,10 +1124,10 @@ static void prim_path(EvalState & state, const Pos & pos, Value * * args, Value 
         else if (n == "sha256")
             expectedHash = Hash(state.forceStringNoCtx(*attr.value, *attr.pos), htSHA256);
         else
-            throw EvalError(format("unsupported argument '%1%' to 'addPath', at %2%") % attr.name % *attr.pos);
+            throw EvalError("unsupported argument '%1%' to 'addPath', at %2%", attr.name, *attr.pos);
     }
     if (path.empty())
-        throw EvalError(format("'path' required, at %1%") % pos);
+        throw EvalError("'path' required, at %1%", pos);
     if (name.empty())
         name = baseNameOf(path);
 
@@ -1185,7 +1185,7 @@ void prim_getAttr(EvalState & state, const Pos & pos, Value * * args, Value & v)
     // !!! Should we create a symbol here or just do a lookup?
     Bindings::iterator i = args[1]->attrs->find(state.symbols.create(attr));
     if (i == args[1]->attrs->end())
-        throw EvalError(format("attribute '%1%' missing, at %2%") % attr % pos);
+        throw EvalError("attribute '%1%' missing, at %2%", attr, pos);
     // !!! add to stack trace?
     if (state.countCalls && i->pos) state.attrSelects[*i->pos]++;
     state.forceValue(*i->value);
@@ -1265,14 +1265,14 @@ static void prim_listToAttrs(EvalState & state, const Pos & pos, Value * * args,
 
         Bindings::iterator j = v2.attrs->find(state.sName);
         if (j == v2.attrs->end())
-            throw TypeError(format("'name' attribute missing in a call to 'listToAttrs', at %1%") % pos);
+            throw TypeError("'name' attribute missing in a call to 'listToAttrs', at %1%", pos);
         string name = state.forceStringNoCtx(*j->value, pos);
 
         Symbol sym = state.symbols.create(name);
         if (seen.insert(sym).second) {
             Bindings::iterator j2 = v2.attrs->find(state.symbols.create(state.sValue));
             if (j2 == v2.attrs->end())
-                throw TypeError(format("'value' attribute missing in a call to 'listToAttrs', at %1%") % pos);
+                throw TypeError("'value' attribute missing in a call to 'listToAttrs', at %1%", pos);
 
             v.attrs->push_back(Attr(sym, j2->value, j2->pos));
         }
@@ -1346,7 +1346,7 @@ static void prim_functionArgs(EvalState & state, const Pos & pos, Value * * args
 {
     state.forceValue(*args[0]);
     if (args[0]->type != tLambda)
-        throw TypeError(format("'functionArgs' requires a function, at %1%") % pos);
+        throw TypeError("'functionArgs' requires a function, at %1%", pos);
 
     if (!args[0]->lambda.fun->matchAttrs) {
         state.mkAttrs(v, 0);
@@ -1396,7 +1396,7 @@ static void elemAt(EvalState & state, const Pos & pos, Value & list, int n, Valu
 {
     state.forceList(list, pos);
     if (n < 0 || (unsigned int) n >= list.listSize())
-        throw Error(format("list index %1% is out of bounds, at %2%") % n % pos);
+        throw Error("list index %1% is out of bounds, at %2%", n, pos);
     state.forceValue(*list.listElems()[n]);
     v = *list.listElems()[n];
 }
@@ -1423,7 +1423,7 @@ static void prim_tail(EvalState & state, const Pos & pos, Value * * args, Value 
 {
     state.forceList(*args[0], pos);
     if (args[0]->listSize() == 0)
-        throw Error(format("'tail' called on an empty list, at %1%") % pos);
+        throw Error("'tail' called on an empty list, at %1%", pos);
     state.mkList(v, args[0]->listSize() - 1);
     for (unsigned int n = 0; n < v.listSize(); ++n)
         v.listElems()[n] = args[0]->listElems()[n + 1];
@@ -1564,7 +1564,7 @@ static void prim_genList(EvalState & state, const Pos & pos, Value * * args, Val
     auto len = state.forceInt(*args[1], pos);
 
     if (len < 0)
-        throw EvalError(format("cannot create list of size %1%, at %2%") % len % pos);
+        throw EvalError("cannot create list of size %1%, at %2%", len, pos);
 
     state.mkList(v, len);
 
@@ -1722,7 +1722,7 @@ static void prim_div(EvalState & state, const Pos & pos, Value * * args, Value &
     state.forceValue(*args[1], pos);
 
     NixFloat f2 = state.forceFloat(*args[1], pos);
-    if (f2 == 0) throw EvalError(format("division by zero, at %1%") % pos);
+    if (f2 == 0) throw EvalError("division by zero, at %1%", pos);
 
     if (args[0]->type == tFloat || args[1]->type == tFloat) {
         mkFloat(v, state.forceFloat(*args[0], pos) / state.forceFloat(*args[1], pos));
@@ -1731,7 +1731,7 @@ static void prim_div(EvalState & state, const Pos & pos, Value * * args, Value &
         NixInt i2 = state.forceInt(*args[1], pos);
         /* Avoid division overflow as it might raise SIGFPE. */
         if (i1 == std::numeric_limits<NixInt>::min() && i2 == -1)
-            throw EvalError(format("overflow in integer division, at %1%") % pos);
+            throw EvalError("overflow in integer division, at %1%", pos);
         mkInt(v, i1 / i2);
     }
 }
@@ -1787,7 +1787,7 @@ static void prim_substring(EvalState & state, const Pos & pos, Value * * args, V
     PathSet context;
     string s = state.coerceToString(pos, *args[2], context);
 
-    if (start < 0) throw EvalError(format("negative start position in 'substring', at %1%") % pos);
+    if (start < 0) throw EvalError("negative start position in 'substring', at %1%", pos);
 
     mkString(v, (unsigned int) start >= s.size() ? "" : string(s, start, len), context);
 }
@@ -1807,7 +1807,7 @@ static void prim_hashString(EvalState & state, const Pos & pos, Value * * args, 
     string type = state.forceStringNoCtx(*args[0], pos);
     HashType ht = parseHashType(type);
     if (ht == htUnknown)
-      throw Error(format("unknown hash type '%1%', at %2%") % type % pos);
+      throw Error("unknown hash type '%1%', at %2%", type, pos);
 
     PathSet context; // discarded
     string s = state.forceString(*args[1], context, pos);
@@ -1950,7 +1950,7 @@ static void prim_replaceStrings(EvalState & state, const Pos & pos, Value * * ar
     state.forceList(*args[0], pos);
     state.forceList(*args[1], pos);
     if (args[0]->listSize() != args[1]->listSize())
-        throw EvalError(format("'from' and 'to' arguments to 'replaceStrings' have different lengths, at %1%") % pos);
+        throw EvalError("'from' and 'to' arguments to 'replaceStrings' have different lengths, at %1%", pos);
 
     vector<string> from;
     from.reserve(args[0]->listSize());
@@ -2072,11 +2072,11 @@ void fetch(EvalState & state, const Pos & pos, Value * * args, Value & v,
             else if (n == "name")
                 request.name = state.forceStringNoCtx(*attr.value, *attr.pos);
             else
-                throw EvalError(format("unsupported argument '%1%' to '%2%', at %3%") % attr.name % who % attr.pos);
+                throw EvalError("unsupported argument '%1%' to '%2%', at %3%", attr.name, who, attr.pos);
         }
 
         if (request.uri.empty())
-            throw EvalError(format("'url' argument required, at %1%") % pos);
+            throw EvalError("'url' argument required, at %1%", pos);
 
     } else
         request.uri = state.forceStringNoCtx(*args[0], pos);

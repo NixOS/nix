@@ -197,10 +197,10 @@ void chrootHelper(int argc, char * * argv)
         Finally freeCwd([&]() { free(cwd); });
 
         if (chroot(tmpDir.c_str()) == -1)
-            throw SysError(format("chrooting into '%s'") % tmpDir);
+            throw SysError("chrooting into '%s'", tmpDir);
 
         if (chdir(cwd) == -1)
-            throw SysError(format("chdir to '%s' in chroot") % cwd);
+            throw SysError("chdir to '%s' in chroot", cwd);
     } else
         if (mount(realStoreDir.c_str(), storeDir.c_str(), "", MS_BIND, 0) == -1)
             throw SysError("mounting '%s' on '%s'", realStoreDir, storeDir);

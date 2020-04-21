@@ -113,7 +113,7 @@ struct CurlDownloader : public Downloader
             if (requestHeaders) curl_slist_free_all(requestHeaders);
             try {
                 if (!done)
-                    fail(DownloadError(Interrupted, format("download of '%s' was interrupted") % request.uri));
+                    fail(DownloadError(Interrupted, "download of '%s' was interrupted", request.uri));
             } catch (...) {
                 ignoreException();
             }
@@ -518,7 +518,7 @@ struct CurlDownloader : public Downloader
             int running;
             CURLMcode mc = curl_multi_perform(curlm, &running);
             if (mc != CURLM_OK)
-                throw nix::Error(format("unexpected error from curl_multi_perform(): %s") % curl_multi_strerror(mc));
+                throw nix::Error("unexpected error from curl_multi_perform(): %s", curl_multi_strerror(mc));
 
             /* Set the promises of any finished requests. */
             CURLMsg * msg;
@@ -548,7 +548,7 @@ struct CurlDownloader : public Downloader
             vomit("download thread waiting for %d ms", sleepTimeMs);
             mc = curl_multi_wait(curlm, extraFDs, 1, sleepTimeMs, &numfds);
             if (mc != CURLM_OK)
-                throw nix::Error(format("unexpected error from curl_multi_wait(): %s") % curl_multi_strerror(mc));
+                throw nix::Error("unexpected error from curl_multi_wait(): %s", curl_multi_strerror(mc));
 
             nextWakeup = std::chrono::steady_clock::time_point();
 

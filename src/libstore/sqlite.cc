@@ -29,7 +29,7 @@ SQLite::SQLite(const Path & path, bool create)
 {
     if (sqlite3_open_v2(path.c_str(), &db,
             SQLITE_OPEN_READWRITE | (create ? SQLITE_OPEN_CREATE : 0), 0) != SQLITE_OK)
-        throw Error(format("cannot open SQLite database '%s'") % path);
+        throw Error("cannot open SQLite database '%s'", path);
 
     if (sqlite3_busy_timeout(db, 60 * 60 * 1000) != SQLITE_OK)
         throwSQLiteError(db, "setting timeout");
