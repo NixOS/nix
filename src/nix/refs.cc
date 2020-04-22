@@ -66,7 +66,12 @@ struct CmdRefs : InstallablesCommand
             StorePathSet paths;
 
             if (_eval) {
-                auto state = std::make_shared<EvalState>(searchPath, getStore());
+                auto state = getEvalState();
+
+                for (auto & b : i->toBuildables()) {
+                    if (!b.drvPath)
+                        throw UsageError("Cannot find eval references without a derivation path");
+                }
 
                 // force evaluation of package argument
                 i->toValue(*state);
