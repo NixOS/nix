@@ -72,7 +72,7 @@ struct PathInput : Input
 
         if (!storePath || storePath->name() != "source" || !store->isValidPath(*storePath))
             // FIXME: try to substitute storePath.
-            storePath = store->addToStore("name", path);
+            storePath = store->addToStore("source", path);
 
         return
             {
