@@ -75,6 +75,8 @@ perl/Makefile.config
 
 /src/nix-copy-closure/nix-copy-closure
 
+/src/error-demo/error-demo
+
 /src/build-remote/build-remote
 
 # /tests/
