@@ -28,7 +28,7 @@ enum OutputKind { okPlain, okXML, okJSON };
 
 void processExpr(EvalState & state, const Strings & attrPaths,
     bool parseOnly, bool strict, Bindings & autoArgs,
-    bool evalOnly, OutputKind output, bool location, bool includeIfd, Expr * e)
+    bool evalOnly, OutputKind output, bool location, Expr * e)
 {
     if (parseOnly) {
         std::cout << format("%1%\n") % *e;
@@ -79,11 +79,6 @@ void processExpr(EvalState & state, const Strings & attrPaths,
                 }
                 std::cout << fmt("%s%s\n", drvPath, (outputName != "out" ? "!" + outputName : ""));
             }
-            if (includeIfd) {
-                for (auto & i : state.importedDrvs) {
-                    std::cout << fmt("%s%s\n", i.first, (i.second != "out" ? "!" + i.second : ""));
-                }
-            }
         }
     }
 }
@@ -101,7 +96,6 @@ static int _main(int argc, char * * argv)
         OutputKind outputKind = okPlain;
         bool xmlOutputSourceLocation = true;
         bool strict = false;
-        bool includeIfd = false;
         Strings attrPaths;
         bool wantsReadWrite = false;
         RepairFlag repair = NoRepair;
@@ -146,8 +140,6 @@ static int _main(int argc, char * * argv)
                 repair = Repair;
             else if (*arg == "--dry-run")
                 settings.readOnlyMode = true;
-            else if (*arg == "--include-ifd")
-                includeIfd = true;
             else if (*arg != "" && arg->at(0) == '-')
                 return false;
             else
@@ -183,7 +175,7 @@ static int _main(int argc, char * * argv)
         if (readStdin) {
             Expr * e = state->parseStdin();
             processExpr(*state, attrPaths, parseOnly, strict, autoArgs,
-                evalOnly, outputKind, xmlOutputSourceLocation, includeIfd, e);
+                evalOnly, outputKind, xmlOutputSourceLocation, e);
         } else if (files.empty() && !fromArgs)
             files.push_back("./default.nix");
 
@@ -192,7 +184,7 @@ static int _main(int argc, char * * argv)
                 ? state->parseExprFromString(i, absPath("."))
                 : state->parseExprFromFile(resolveExprPath(state->checkSourcePath(lookupFileArg(*state, i))));
             processExpr(*state, attrPaths, parseOnly, strict, autoArgs,
-                evalOnly, outputKind, xmlOutputSourceLocation, includeIfd, e);
+                evalOnly, outputKind, xmlOutputSourceLocation, e);
         }
 
         state->printStats();
