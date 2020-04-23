@@ -242,7 +242,7 @@ void prim_exec(EvalState & state, const Pos & pos, Value * * args, Value & v)
 /* Return a string representing the type of the expression. */
 static void prim_typeOf(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
-    state.forceValue(*args[0]);
+    state.forceValue(*args[0], pos);
     string t;
     switch (args[0]->type) {
         case tInt: t = "int"; break;
@@ -270,7 +270,7 @@ static void prim_typeOf(EvalState & state, const Pos & pos, Value * * args, Valu
 /* Determine whether the argument is the null value. */
 static void prim_isNull(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
-    state.forceValue(*args[0]);
+    state.forceValue(*args[0], pos);
     mkBool(v, args[0]->type == tNull);
 }
 
@@ -278,7 +278,7 @@ static void prim_isNull(EvalState & state, const Pos & pos, Value * * args, Valu
 /* Determine whether the argument is a function. */
 static void prim_isFunction(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
-    state.forceValue(*args[0]);
+    state.forceValue(*args[0], pos);
     bool res;
     switch (args[0]->type) {
         case tLambda:
@@ -297,21 +297,21 @@ static void prim_isFunction(EvalState & state, const Pos & pos, Value * * args, 
 /* Determine whether the argument is an integer. */
 static void prim_isInt(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
-    state.forceValue(*args[0]);
+    state.forceValue(*args[0], pos);
     mkBool(v, args[0]->type == tInt);
 }
 
 /* Determine whether the argument is a float. */
 static void prim_isFloat(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
-    state.forceValue(*args[0]);
+    state.forceValue(*args[0], pos);
     mkBool(v, args[0]->type == tFloat);
 }
 
 /* Determine whether the argument is a string. */
 static void prim_isString(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
-    state.forceValue(*args[0]);
+    state.forceValue(*args[0], pos);
     mkBool(v, args[0]->type == tString);
 }
 
@@ -319,14 +319,14 @@ static void prim_isString(EvalState & state, const Pos & pos, Value * * args, Va
 /* Determine whether the argument is a Boolean. */
 static void prim_isBool(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
-    state.forceValue(*args[0]);
+    state.forceValue(*args[0], pos);
     mkBool(v, args[0]->type == tBool);
 }
 
 /* Determine whether the argument is a path. */
 static void prim_isPath(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
-    state.forceValue(*args[0]);
+    state.forceValue(*args[0], pos);
     mkBool(v, args[0]->type == tPath);
 }
 
@@ -383,7 +383,7 @@ static void prim_genericClosure(EvalState & state, const Pos & pos, Value * * ar
         args[0]->attrs->find(state.symbols.create("operator"));
     if (op == args[0]->attrs->end())
         throw EvalError(format("attribute 'operator' required, at %1%") % pos);
-    state.forceValue(*op->value);
+    state.forceValue(*op->value, pos);
 
     /* Construct the closure by applying the operator to element of
        `workSet', adding the result to `workSet', continuing until
@@ -402,7 +402,7 @@ static void prim_genericClosure(EvalState & state, const Pos & pos, Value * * ar
             e->attrs->find(state.symbols.create("key"));
         if (key == e->attrs->end())
             throw EvalError(format("attribute 'key' required, at %1%") % pos);
-        state.forceValue(*key->value);
+        state.forceValue(*key->value, pos);
 
         if (!doneKeys.insert(key->value).second) continue;
         res.push_back(e);
@@ -414,7 +414,7 @@ static void prim_genericClosure(EvalState & state, const Pos & pos, Value * * ar
 
         /* Add the values returned by the operator to the work set. */
         for (unsigned int n = 0; n < call.listSize(); ++n) {
-            state.forceValue(*call.listElems()[n]);
+            state.forceValue(*call.listElems()[n], pos);
             workSet.push_back(call.listElems()[n]);
         }
     }
@@ -446,7 +446,7 @@ static void prim_throw(EvalState & state, const Pos & pos, Value * * args, Value
 static void prim_addErrorContext(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
     try {
-        state.forceValue(*args[1]);
+        state.forceValue(*args[1], pos);
         v = *args[1];
     } catch (Error & e) {
         PathSet context;
@@ -462,7 +462,7 @@ static void prim_tryEval(EvalState & state, const Pos & pos, Value * * args, Val
 {
     state.mkAttrs(v, 2);
     try {
-        state.forceValue(*args[0]);
+        state.forceValue(*args[0], pos);
         v.attrs->push_back(Attr(state.sValue, args[0]));
         mkBool(*state.allocAttr(v, state.symbols.create("success")), true);
     } catch (AssertionError & e) {
@@ -484,8 +484,8 @@ static void prim_getEnv(EvalState & state, const Pos & pos, Value * * args, Valu
 /* Evaluate the first argument, then return the second argument. */
 static void prim_seq(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
-    state.forceValue(*args[0]);
-    state.forceValue(*args[1]);
+    state.forceValue(*args[0], pos);
+    state.forceValue(*args[1], pos);
     v = *args[1];
 }
 
@@ -495,7 +495,7 @@ static void prim_seq(EvalState & state, const Pos & pos, Value * * args, Value &
 static void prim_deepSeq(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
     state.forceValueDeep(*args[0]);
-    state.forceValue(*args[1]);
+    state.forceValue(*args[1], pos);
     v = *args[1];
 }
 
@@ -504,12 +504,12 @@ static void prim_deepSeq(EvalState & state, const Pos & pos, Value * * args, Val
    return the second expression.  Useful for debugging. */
 static void prim_trace(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
-    state.forceValue(*args[0]);
+    state.forceValue(*args[0], pos);
     if (args[0]->type == tString)
         printError(format("trace: %1%") % args[0]->string.s);
     else
         printError(format("trace: %1%") % *args[0]);
-    state.forceValue(*args[1]);
+    state.forceValue(*args[1], pos);
     v = *args[1];
 }
 
@@ -600,7 +600,7 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
         try {
 
             if (ignoreNulls) {
-                state.forceValue(*i->value);
+                state.forceValue(*i->value, pos);
                 if (i->value->type == tNull) continue;
             }
 
@@ -1093,7 +1093,7 @@ static void prim_filterSource(EvalState & state, const Pos & pos, Value * * args
     if (!context.empty())
         throw EvalError(format("string '%1%' cannot refer to other paths, at %2%") % path % pos);
 
-    state.forceValue(*args[0]);
+    state.forceValue(*args[0], pos);
     if (args[0]->type != tLambda)
         throw TypeError(format("first argument in call to 'filterSource' is not a function but %1%, at %2%") % showType(*args[0]) % pos);
 
@@ -1119,7 +1119,7 @@ static void prim_path(EvalState & state, const Pos & pos, Value * * args, Value 
         } else if (attr.name == state.sName)
             name = state.forceStringNoCtx(*attr.value, *attr.pos);
         else if (n == "filter") {
-            state.forceValue(*attr.value);
+            state.forceValue(*attr.value, pos);
             filterFun = attr.value;
         } else if (n == "recursive")
             recursive = state.forceBool(*attr.value, *attr.pos);
@@ -1190,7 +1190,7 @@ void prim_getAttr(EvalState & state, const Pos & pos, Value * * args, Value & v)
         throw EvalError(format("attribute '%1%' missing, at %2%") % attr % pos);
     // !!! add to stack trace?
     if (state.countCalls && i->pos) state.attrSelects[*i->pos]++;
-    state.forceValue(*i->value);
+    state.forceValue(*i->value, pos);
     v = *i->value;
 }
 
@@ -1220,7 +1220,7 @@ static void prim_hasAttr(EvalState & state, const Pos & pos, Value * * args, Val
 /* Determine whether the argument is a set. */
 static void prim_isAttrs(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
-    state.forceValue(*args[0]);
+    state.forceValue(*args[0], pos);
     mkBool(v, args[0]->type == tAttrs);
 }
 
@@ -1346,7 +1346,7 @@ static void prim_catAttrs(EvalState & state, const Pos & pos, Value * * args, Va
 */
 static void prim_functionArgs(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
-    state.forceValue(*args[0]);
+    state.forceValue(*args[0], pos);
     if (args[0]->type != tLambda)
         throw TypeError(format("'functionArgs' requires a function, at %1%") % pos);
 
@@ -1392,7 +1392,7 @@ static void prim_mapAttrs(EvalState & state, const Pos & pos, Value * * args, Va
 /* Determine whether the argument is a list. */
 static void prim_isList(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
-    state.forceValue(*args[0]);
+    state.forceValue(*args[0], pos);
     mkBool(v, args[0]->isList());
 }
 
@@ -1402,7 +1402,7 @@ static void elemAt(EvalState & state, const Pos & pos, Value & list, int n, Valu
     state.forceList(list, pos);
     if (n < 0 || (unsigned int) n >= list.listSize())
         throw Error(format("list index %1% is out of bounds, at %2%") % n % pos);
-    state.forceValue(*list.listElems()[n]);
+    state.forceValue(*list.listElems()[n], pos);
     v = *list.listElems()[n];
 }
 
@@ -1525,9 +1525,9 @@ static void prim_foldlStrict(EvalState & state, const Pos & pos, Value * * args,
             vCur = n == args[2]->listSize() - 1 ? &v : state.allocValue();
             state.callFunction(vTmp, *args[2]->listElems()[n], *vCur, pos);
         }
-        state.forceValue(v);
+        state.forceValue(v, pos);
     } else {
-        state.forceValue(*args[1]);
+        state.forceValue(*args[1], pos);
         v = *args[1];
     }
 }
@@ -1592,7 +1592,7 @@ static void prim_sort(EvalState & state, const Pos & pos, Value * * args, Value 
     auto len = args[1]->listSize();
     state.mkList(v, len);
     for (unsigned int n = 0; n < len; ++n) {
-        state.forceValue(*args[1]->listElems()[n]);
+        state.forceValue(*args[1]->listElems()[n], pos);
         v.listElems()[n] = args[1]->listElems()[n];
     }
 
@@ -1627,7 +1627,7 @@ static void prim_partition(EvalState & state, const Pos & pos, Value * * args, V
 
     for (unsigned int n = 0; n < len; ++n) {
         auto vElem = args[1]->listElems()[n];
-        state.forceValue(*vElem);
+        state.forceValue(*vElem, pos);
         Value res;
         state.callFunction(*args[0], *vElem, res, pos);
         if (state.forceBool(res, pos))
@@ -1758,8 +1758,8 @@ static void prim_bitXor(EvalState & state, const Pos & pos, Value * * args, Valu
 
 static void prim_lessThan(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
-    state.forceValue(*args[0]);
-    state.forceValue(*args[1]);
+    state.forceValue(*args[0], pos);
+    state.forceValue(*args[1], pos);
     CompareValues comp;
     mkBool(v, comp(args[0], args[1]));
 }

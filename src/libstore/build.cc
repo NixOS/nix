@@ -33,7 +33,6 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <sys/utsname.h>
-#include <sys/select.h>
 #include <sys/resource.h>
 #include <sys/socket.h>
 #include <sys/un.h>
@@ -43,6 +42,7 @@
 #include <errno.h>
 #include <cstring>
 #include <termios.h>
+#include <poll.h>
 
 #include <pwd.h>
 #include <grp.h>
@@ -4789,8 +4789,7 @@ void Worker::waitForInput()
        terminated. */
 
     bool useTimeout = false;
-    struct timeval timeout;
-    timeout.tv_usec = 0;
+    long timeout = 0;
     auto before = steady_time_point::clock::now();
 
     /* If we're monitoring for silence on stdout/stderr, or if there
@@ -4808,7 +4807,7 @@ void Worker::waitForInput()
             nearest = std::min(nearest, i.timeStarted + std::chrono::seconds(settings.buildTimeout));
     }
     if (nearest != steady_time_point::max()) {
-        timeout.tv_sec = std::max(1L, (long) std::chrono::duration_cast<std::chrono::seconds>(nearest - before).count());
+        timeout = std::max(1L, (long) std::chrono::duration_cast<std::chrono::seconds>(nearest - before).count());
         useTimeout = true;
     }
 
@@ -4819,30 +4818,28 @@ void Worker::waitForInput()
         if (lastWokenUp == steady_time_point::min())
             printError("waiting for locks or build slots...");
         if (lastWokenUp == steady_time_point::min() || lastWokenUp > before) lastWokenUp = before;
-        timeout.tv_sec = std::max(1L,
+        timeout = std::max(1L,
             (long) std::chrono::duration_cast<std::chrono::seconds>(
                 lastWokenUp + std::chrono::seconds(settings.pollInterval) - before).count());
     } else lastWokenUp = steady_time_point::min();
 
     if (useTimeout)
-        vomit("sleeping %d seconds", timeout.tv_sec);
+        vomit("sleeping %d seconds", timeout);
 
     /* Use select() to wait for the input side of any logger pipe to
        become `available'.  Note that `available' (i.e., non-blocking)
        includes EOF. */
-    fd_set fds;
-    FD_ZERO(&fds);
-    int fdMax = 0;
+    std::vector<struct pollfd> pollStatus;
+    std::map <int, int> fdToPollStatus;
     for (auto & i : children) {
         for (auto & j : i.fds) {
-            if (j >= FD_SETSIZE)
-                throw Error("reached FD_SETSIZE limit");
-            FD_SET(j, &fds);
-            if (j >= fdMax) fdMax = j + 1;
+            pollStatus.push_back((struct pollfd) { .fd = j, .events = POLLIN });
+            fdToPollStatus[j] = pollStatus.size() - 1;
         }
     }
 
-    if (select(fdMax, &fds, 0, 0, useTimeout ? &timeout : 0) == -1) {
+    if (poll(pollStatus.data(), pollStatus.size(),
+            useTimeout ? timeout * 1000 : -1) == -1) {
         if (errno == EINTR) return;
         throw SysError("waiting for input");
     }
@@ -4863,7 +4860,7 @@ void Worker::waitForInput()
         set<int> fds2(j->fds);
         std::vector<unsigned char> buffer(4096);
         for (auto & k : fds2) {
-            if (FD_ISSET(k, &fds)) {
+            if (pollStatus.at(fdToPollStatus.at(k)).revents) {
                 ssize_t rd = read(k, buffer.data(), buffer.size());
                 // FIXME: is there a cleaner way to handle pt close
                 // than EIO? Is this even standard?
