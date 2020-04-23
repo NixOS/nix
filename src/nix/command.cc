@@ -2,6 +2,7 @@
 #include "store-api.hh"
 #include "derivations.hh"
 #include "nixexpr.hh"
+#include "eval.hh"
 
 namespace nix {
 
@@ -44,6 +45,10 @@ StorePathsCommand::StorePathsCommand(bool recursive)
             .set(&this->recursive, true);
 
     mkFlag(0, "all", "apply operation to the entire store", &all);
+
+    // these options only make sense when recursing
+    mkFlag('b', "build", "include build dependencies of specified path", &includeBuildDeps);
+    mkFlag('e', "eval", "include eval dependencies of specified path", &includeEvalDeps);
 }
 
 void StorePathsCommand::run(ref<Store> store)
@@ -58,15 +63,48 @@ void StorePathsCommand::run(ref<Store> store)
     }
 
     else {
+        if (!recursive && (includeBuildDeps || includeEvalDeps))
+            throw UsageError("--build and --eval require --recursive");
+
         for (auto & p : toStorePaths(store, realiseMode, installables))
             storePaths.push_back(p.clone());
 
         if (recursive) {
+            if (includeEvalDeps) {
+                for (auto & i : installables) {
+                    auto state = getEvalState();
+
+                    for (auto & b : i->toBuildables()) {
+                        if (!b.drvPath)
+                            throw UsageError("Cannot find eval references without a derivation path");
+                    }
+
+                    // force evaluation of package argument
+                    i->toValue(*state);
+
+                    for (auto & d : (*state).importedDrvs)
+                        storePaths.push_back(store->parseStorePath(d.first));
+                }
+            }
+
+            if (includeBuildDeps) {
+                for (auto & i : installables) {
+                    for (auto & b : i->toBuildables()) {
+                        if (!b.drvPath) // Note we could lookup deriver from the DB to get drvPath
+                            throw UsageError("Cannot find build references without a derivation path");
+                        storePaths.push_back(b.drvPath->clone());
+                    }
+                }
+            }
+
+            auto includeDerivers = includeBuildDeps || includeEvalDeps;
+
             StorePathSet closure;
-            store->computeFSClosure(storePathsToSet(storePaths), closure, false, false);
+            store->computeFSClosure(storePathsToSet(storePaths), closure, false, includeDerivers);
             storePaths.clear();
             for (auto & p : closure)
-                storePaths.push_back(p.clone());
+                if (!(includeDerivers && p.isDerivation()))
+                    storePaths.push_back(p.clone());
         }
     }
 

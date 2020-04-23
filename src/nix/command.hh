@@ -122,6 +122,9 @@ private:
     bool recursive = false;
     bool all = false;
 
+    bool includeBuildDeps = false;
+    bool includeEvalDeps = false;
+
 protected:
 
     RealiseMode realiseMode = NoBuild;
