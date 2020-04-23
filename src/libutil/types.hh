@@ -88,6 +88,13 @@ class BaseError : public std::exception
 protected:
     string prefix_; // used for location traces etc.
     ErrorInfo err;
+    string what_;
+    void initWhat() 
+    {
+      std::ostringstream oss;
+      oss << err;
+      what_ = oss.str();
+    }
 public:
     unsigned int status = 1; // exit status
 
@@ -97,30 +104,27 @@ public:
                 .hint = hintfmt(args...)
               }
         , status(status)
-    {
-    }
+    { initWhat(); }
 
     template<typename... Args>
     BaseError(const Args & ... args)
         : err { .level = lvlError, 
                 .hint = hintfmt(args...)
               }
-    {
-    }
+    { initWhat(); }
 
     BaseError(ErrorInfo e)
         : err(e)
-    {
-    }
+    { initWhat(); }
 
 #ifdef EXCEPTION_NEEDS_THROW_SPEC
     ~BaseError() throw () { };
-    const char * what() const throw () { return err.description.c_str(); }
+    const char * what() const throw () { return what_.c_str(); }
 #else
-    const char * what() const noexcept { return err.description.c_str(); }
+    const char * what() const noexcept { return what_.c_str(); }
 #endif
 
-    const string & msg() const { return err.description; }
+    const string & msg() const { return what_; }
     const string & prefix() const { return prefix_; }
     BaseError & addPrefix(const FormatOrString & fs);
 
