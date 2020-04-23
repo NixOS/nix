@@ -12,6 +12,7 @@
 
 namespace nix {
 
+
 SourceExprCommand::SourceExprCommand()
 {
     mkFlag()
@@ -24,14 +25,14 @@ SourceExprCommand::SourceExprCommand()
 
 Value * SourceExprCommand::getSourceExpr(EvalState & state)
 {
-    if (vSourceExpr) return vSourceExpr;
+    if (vSourceExpr) return *vSourceExpr;
 
     auto sToplevel = state.symbols.create("_toplevel");
 
-    vSourceExpr = state.allocValue();
+    vSourceExpr = allocRootValue(state.allocValue());
 
     if (file != "")
-        state.evalFile(lookupFileArg(state, file), *vSourceExpr);
+        state.evalFile(lookupFileArg(state, file), **vSourceExpr);
 
     else {
 
@@ -39,9 +40,9 @@ Value * SourceExprCommand::getSourceExpr(EvalState & state)
 
         auto searchPath = state.getSearchPath();
 
-        state.mkAttrs(*vSourceExpr, 1024);
+        state.mkAttrs(**vSourceExpr, 1024);
 
-        mkBool(*state.allocAttr(*vSourceExpr, sToplevel), true);
+        mkBool(*state.allocAttr(**vSourceExpr, sToplevel), true);
 
         std::unordered_set<std::string> seen;
 
@@ -52,7 +53,7 @@ Value * SourceExprCommand::getSourceExpr(EvalState & state)
             mkPrimOpApp(*v1, state.getBuiltin("findFile"), state.getBuiltin("nixPath"));
             Value * v2 = state.allocValue();
             mkApp(*v2, *v1, mkString(*state.allocValue(), name));
-            mkApp(*state.allocAttr(*vSourceExpr, state.symbols.create(name)),
+            mkApp(*state.allocAttr(**vSourceExpr, state.symbols.create(name)),
                 state.getBuiltin("import"), *v2);
         };
 
@@ -66,10 +67,10 @@ Value * SourceExprCommand::getSourceExpr(EvalState & state)
             } else
                 addEntry(i.first);
 
-        vSourceExpr->attrs->sort();
+        (*vSourceExpr)->attrs->sort();
     }
 
-    return vSourceExpr;
+    return *vSourceExpr;
 }
 
 ref<EvalState> SourceExprCommand::getEvalState()
@@ -109,6 +110,11 @@ struct InstallableStorePath : Installable
         bs.push_back(std::move(b));
         return bs;
     }
+
+    std::optional<StorePath> getStorePath() override
+    {
+        return storePath.clone();
+    }
 };
 
 struct InstallableValue : Installable
@@ -121,7 +127,7 @@ struct InstallableValue : Installable
     {
         auto state = cmd.getEvalState();
 
-        auto v = toValue(*state);
+        auto v = toValue(*state).first;
 
         Bindings & autoArgs = *cmd.getAutoArgs(*state);
 
@@ -169,11 +175,11 @@ struct InstallableExpr : InstallableValue
 
     std::string what() override { return text; }
 
-    Value * toValue(EvalState & state) override
+    std::pair<Value *, Pos> toValue(EvalState & state) override
     {
         auto v = state.allocValue();
         state.eval(state.parseExprFromString(text, absPath(".")), *v);
-        return v;
+        return {v, noPos};
     }
 };
 
@@ -187,16 +193,16 @@ struct InstallableAttrPath : InstallableValue
 
     std::string what() override { return attrPath; }
 
-    Value * toValue(EvalState & state) override
+    std::pair<Value *, Pos> toValue(EvalState & state) override
     {
         auto source = cmd.getSourceExpr(state);
 
         Bindings & autoArgs = *cmd.getAutoArgs(state);
 
-        Value * v = findAlongAttrPath(state, attrPath, autoArgs, *source);
+        auto v = findAlongAttrPath(state, attrPath, autoArgs, *source).first;
         state.forceValue(*v);
 
-        return v;
+        return {v, noPos};
     }
 };
 

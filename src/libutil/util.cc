@@ -97,10 +97,10 @@ void replaceEnv(std::map<std::string, std::string> newEnv)
 }
 
 
-Path absPath(Path path, Path dir)
+Path absPath(Path path, std::optional<Path> dir)
 {
     if (path[0] != '/') {
-        if (dir == "") {
+        if (!dir) {
 #ifdef __GNU__
             /* GNU (aka. GNU/Hurd) doesn't have any limitation on path
                lengths and doesn't define `PATH_MAX'.  */
@@ -116,7 +116,7 @@ Path absPath(Path path, Path dir)
             free(buf);
 #endif
         }
-        path = dir + "/" + path;
+        path = *dir + "/" + path;
     }
     return canonPath(path);
 }
@@ -475,6 +475,17 @@ Path createTempDir(const Path & tmpRoot, const Path & prefix,
         if (errno != EEXIST)
             throw SysError(format("creating directory '%1%'") % tmpDir);
     }
+}
+
+
+std::pair<AutoCloseFD, Path> createTempFile(const Path & prefix)
+{
+    Path tmpl(getEnv("TMPDIR").value_or("/tmp") + "/" + prefix + ".XXXXXX");
+    // Strictly speaking, this is UB, but who cares...
+    AutoCloseFD fd(mkstemp((char *) tmpl.c_str()));
+    if (!fd)
+        throw SysError("creating temporary file '%s'", tmpl);
+    return {std::move(fd), tmpl};
 }
 
 
@@ -1203,28 +1214,6 @@ template<class C> C tokenizeString(std::string_view s, const string & separators
 template Strings tokenizeString(std::string_view s, const string & separators);
 template StringSet tokenizeString(std::string_view s, const string & separators);
 template vector<string> tokenizeString(std::string_view s, const string & separators);
-
-
-string concatStringsSep(const string & sep, const Strings & ss)
-{
-    string s;
-    for (auto & i : ss) {
-        if (s.size() != 0) s += sep;
-        s += i;
-    }
-    return s;
-}
-
-
-string concatStringsSep(const string & sep, const StringSet & ss)
-{
-    string s;
-    for (auto & i : ss) {
-        if (s.size() != 0) s += sep;
-        s += i;
-    }
-    return s;
-}
 
 
 string chomp(const string & s)

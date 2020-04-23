@@ -16,7 +16,7 @@
 #include "get-drvs.hh"
 #include "common-eval-args.hh"
 #include "attr-path.hh"
-#include "legacy.hh"
+#include "../nix/legacy.hh"
 
 using namespace nix;
 using namespace std::string_literals;
@@ -314,7 +314,7 @@ static void _main(int argc, char * * argv)
         state->eval(e, vRoot);
 
         for (auto & i : attrPaths) {
-            Value & v(*findAlongAttrPath(*state, i, *autoArgs, vRoot));
+            Value & v(*findAlongAttrPath(*state, i, *autoArgs, vRoot).first);
             state->forceValue(v);
             getDerivations(*state, v, "", *autoArgs, drvs, false);
         }

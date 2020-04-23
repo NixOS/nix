@@ -28,6 +28,7 @@ MakeError(InvalidPath, Error);
 MakeError(Unsupported, Error);
 MakeError(SubstituteGone, Error);
 MakeError(SubstituterDisabled, Error);
+MakeError(NotInStore, Error);
 
 
 struct BasicDerivation;
@@ -561,6 +562,7 @@ public:
        each path is included. */
     void pathInfoToJSON(JSONPlaceholder & jsonOut, const StorePathSet & storePaths,
         bool includeImpureInfo, bool showClosureSize,
+        Base hashBase = Base32,
         AllowInvalidFlag allowInvalid = DisallowInvalid);
 
     /* Return the size of the closure of the specified path, that is,
@@ -674,6 +676,11 @@ public:
     virtual Path toRealPath(const Path & storePath)
     {
         return storePath;
+    }
+
+    Path toRealPath(const StorePath & storePath)
+    {
+        return toRealPath(printStorePath(storePath));
     }
 
     virtual void createUser(const std::string & userName, uid_t userId)

@@ -8,7 +8,7 @@
 #include "shared.hh"
 #include "store-api.hh"
 #include "progress-bar.hh"
-#include "download.hh"
+#include "filetransfer.hh"
 #include "finally.hh"
 
 #include <sys/types.h>
@@ -55,6 +55,7 @@ struct NixArgs : virtual MultiCommand, virtual MixCommonArgs
 {
     bool printBuildLogs = false;
     bool useNet = true;
+    bool refresh = false;
 
     NixArgs() : MultiCommand(*RegisterCommand::commands), MixCommonArgs("nix")
     {
@@ -92,6 +93,11 @@ struct NixArgs : virtual MultiCommand, virtual MixCommonArgs
             .longName("no-net")
             .description("disable substituters and consider all previously downloaded files up-to-date")
             .handler([&]() { useNet = false; });
+
+        mkFlag()
+            .longName("refresh")
+            .description("consider all previously downloaded files out-of-date")
+            .handler([&]() { refresh = true; });
     }
 
     void printFlags(std::ostream & out) override
@@ -170,11 +176,14 @@ void mainWrapped(int argc, char * * argv)
             settings.useSubstitutes = false;
         if (!settings.tarballTtl.overriden)
             settings.tarballTtl = std::numeric_limits<unsigned int>::max();
-        if (!downloadSettings.tries.overriden)
-            downloadSettings.tries = 0;
-        if (!downloadSettings.connectTimeout.overriden)
-            downloadSettings.connectTimeout = 1;
+        if (!fileTransferSettings.tries.overriden)
+            fileTransferSettings.tries = 0;
+        if (!fileTransferSettings.connectTimeout.overriden)
+            fileTransferSettings.connectTimeout = 1;
     }
+
+    if (args.refresh)
+        settings.tarballTtl = 0;
 
     args.command->prepare();
     args.command->run();

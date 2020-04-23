@@ -6,7 +6,8 @@
 #include "archive.hh"
 #include "affinity.hh"
 #include "builtins.hh"
-#include "download.hh"
+#include "builtins/buildenv.hh"
+#include "filetransfer.hh"
 #include "finally.hh"
 #include "compression.hh"
 #include "json.hh"
@@ -32,7 +33,6 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <sys/utsname.h>
-#include <sys/select.h>
 #include <sys/resource.h>
 #include <sys/socket.h>
 #include <sys/un.h>
@@ -42,6 +42,7 @@
 #include <errno.h>
 #include <cstring>
 #include <termios.h>
+#include <poll.h>
 
 #include <pwd.h>
 #include <grp.h>
@@ -360,7 +361,7 @@ public:
     {
         actDerivations.progress(doneBuilds, expectedBuilds + doneBuilds, runningBuilds, failedBuilds);
         actSubstitutions.progress(doneSubstitutions, expectedSubstitutions + doneSubstitutions, runningSubstitutions, failedSubstitutions);
-        act.setExpected(actDownload, expectedDownloadSize + doneDownloadSize);
+        act.setExpected(actFileTransfer, expectedDownloadSize + doneDownloadSize);
         act.setExpected(actCopyPath, expectedNarSize + doneNarSize);
     }
 };
@@ -1397,7 +1398,7 @@ void DerivationGoal::tryToBuild()
        few seconds and then retry this goal. */
     PathSet lockFiles;
     for (auto & outPath : drv->outputPaths())
-        lockFiles.insert(worker.store.toRealPath(worker.store.printStorePath(outPath)));
+        lockFiles.insert(worker.store.Store::toRealPath(outPath));
 
     if (!outputLocks.lockPaths(lockFiles, "", false)) {
         worker.waitForAWhile(shared_from_this());
@@ -1428,7 +1429,7 @@ void DerivationGoal::tryToBuild()
     for (auto & i : drv->outputs) {
         if (worker.store.isValidPath(i.second.path)) continue;
         debug("removing invalid path '%s'", worker.store.printStorePath(i.second.path));
-        deletePath(worker.store.toRealPath(worker.store.printStorePath(i.second.path)));
+        deletePath(worker.store.Store::toRealPath(i.second.path));
     }
 
     /* Don't do a remote build if the derivation has the attribute
@@ -1679,13 +1680,14 @@ void DerivationGoal::buildDone()
         }
 
         if (buildMode == bmCheck) {
+            deleteTmpDir(true);
             done(BuildResult::Built);
             return;
         }
 
         /* Delete unused redirected outputs (when doing hash rewriting). */
         for (auto & i : redirectedOutputs)
-            deletePath(worker.store.toRealPath(worker.store.printStorePath(i.second)));
+            deletePath(worker.store.Store::toRealPath(i.second));
 
         /* Delete the chroot (if we were using one). */
         autoDelChroot.reset(); /* this runs the destructor */
@@ -1904,7 +1906,7 @@ void DerivationGoal::startBuilder()
             concatStringsSep(", ", parsedDrv->getRequiredSystemFeatures()),
             worker.store.printStorePath(drvPath),
             settings.thisSystem,
-            concatStringsSep(", ", settings.systemFeatures));
+            concatStringsSep<StringSet>(", ", settings.systemFeatures));
 
     if (drv->isBuiltin())
         preloadNSS();
@@ -2071,7 +2073,7 @@ void DerivationGoal::startBuilder()
            environment using bind-mounts.  We put it in the Nix store
            to ensure that we can create hard-links to non-directory
            inputs in the fake Nix store in the chroot (see below). */
-        chrootRootDir = worker.store.toRealPath(worker.store.printStorePath(drvPath)) + ".chroot";
+        chrootRootDir = worker.store.Store::toRealPath(drvPath) + ".chroot";
         deletePath(chrootRootDir);
 
         /* Clean up the chroot directory automatically. */
@@ -2160,7 +2162,7 @@ void DerivationGoal::startBuilder()
     if (needsHashRewrite()) {
 
         if (pathExists(homeDir))
-            throw Error(format("directory '%1%' exists; please remove it") % homeDir);
+            throw Error(format("home directory '%1%' exists; please remove it to assure purity of builds without sandboxing") % homeDir);
 
         /* We're not doing a chroot build, but we have some valid
            output paths.  Since we can't just overwrite or delete
@@ -2464,7 +2466,7 @@ void DerivationGoal::initTmpDir() {
                 auto hash = hashString(htSHA256, i.first);
                 string fn = ".attr-" + hash.to_string(Base32, false);
                 Path p = tmpDir + "/" + fn;
-                writeFile(p, i.second);
+                writeFile(p, rewriteStrings(i.second, inputRewrites));
                 chownToBuilder(p);
                 env[i.first + "Path"] = tmpDirInSandbox + "/" + fn;
             }
@@ -2550,7 +2552,7 @@ static std::regex shVarName("[A-Za-z_][A-Za-z0-9_]*");
 
 void DerivationGoal::writeStructuredAttrs()
 {
-    auto & structuredAttrs = parsedDrv->getStructuredAttrs();
+    auto structuredAttrs = parsedDrv->getStructuredAttrs();
     if (!structuredAttrs) return;
 
     auto json = *structuredAttrs;
@@ -2916,7 +2918,7 @@ void DerivationGoal::addDependency(const StorePath & path)
 
         #if __linux__
 
-            Path source = worker.store.toRealPath(worker.store.printStorePath(path));
+            Path source = worker.store.Store::toRealPath(path);
             Path target = chrootRootDir + worker.store.printStorePath(path);
             debug("bind-mounting %s -> %s", target, source);
 
@@ -3535,6 +3537,29 @@ StorePathSet parseReferenceSpecifiers(Store & store, const BasicDerivation & drv
 }
 
 
+static void moveCheckToStore(const Path & src, const Path & dst)
+{
+    /* For the rename of directory to succeed, we must be running as root or
+       the directory must be made temporarily writable (to update the
+       directory's parent link ".."). */
+    struct stat st;
+    if (lstat(src.c_str(), &st) == -1) {
+        throw SysError(format("getting attributes of path '%1%'") % src);
+    }
+
+    bool changePerm = (geteuid() && S_ISDIR(st.st_mode) && !(st.st_mode & S_IWUSR));
+
+    if (changePerm)
+        chmod_(src, st.st_mode | S_IWUSR);
+
+    if (rename(src.c_str(), dst.c_str()))
+        throw SysError(format("renaming '%1%' to '%2%'") % src % dst);
+
+    if (changePerm)
+        chmod_(dst, st.st_mode);
+}
+
+
 void DerivationGoal::registerOutputs()
 {
     /* When using a build hook, the build hook can register the output
@@ -3578,7 +3603,7 @@ void DerivationGoal::registerOutputs()
         if (needsHashRewrite()) {
             auto r = redirectedOutputs.find(i.second.path);
             if (r != redirectedOutputs.end()) {
-                auto redirected = worker.store.toRealPath(worker.store.printStorePath(r->second));
+                auto redirected = worker.store.Store::toRealPath(r->second);
                 if (buildMode == bmRepair
                     && redirectedBadOutputs.count(i.second.path)
                     && pathExists(redirected))
@@ -3671,7 +3696,7 @@ void DerivationGoal::registerOutputs()
                     BuildError("hash mismatch in fixed-output derivation '%s':\n  wanted: %s\n  got:    %s",
                         worker.store.printStorePath(dest), h.to_string(SRI), h2.to_string(SRI)));
 
-                Path actualDest = worker.store.toRealPath(worker.store.printStorePath(dest));
+                Path actualDest = worker.store.Store::toRealPath(dest);
 
                 if (worker.store.isValidPath(dest))
                     std::rethrow_exception(delayedException);
@@ -3713,8 +3738,7 @@ void DerivationGoal::registerOutputs()
                 if (settings.runDiffHook || settings.keepFailed) {
                     Path dst = worker.store.toRealPath(path + checkSuffix);
                     deletePath(dst);
-                    if (rename(actualPath.c_str(), dst.c_str()))
-                        throw SysError(format("renaming '%1%' to '%2%'") % actualPath % dst);
+                    moveCheckToStore(actualPath, dst);
 
                     handleDiffHook(
                         buildUser ? buildUser->getUID() : getuid(),
@@ -3722,10 +3746,10 @@ void DerivationGoal::registerOutputs()
                         path, dst, worker.store.printStorePath(drvPath), tmpDir);
 
                     throw NotDeterministic("derivation '%s' may not be deterministic: output '%s' differs from '%s'",
-                        worker.store.printStorePath(drvPath), path, dst);
+                        worker.store.printStorePath(drvPath), worker.store.toRealPath(path), dst);
                 } else
                     throw NotDeterministic("derivation '%s' may not be deterministic: output '%s' differs",
-                        worker.store.printStorePath(drvPath), path);
+                        worker.store.printStorePath(drvPath), worker.store.toRealPath(path));
             }
 
             /* Since we verified the build, it's now ultimately trusted. */
@@ -4765,8 +4789,7 @@ void Worker::waitForInput()
        terminated. */
 
     bool useTimeout = false;
-    struct timeval timeout;
-    timeout.tv_usec = 0;
+    long timeout = 0;
     auto before = steady_time_point::clock::now();
 
     /* If we're monitoring for silence on stdout/stderr, or if there
@@ -4784,7 +4807,7 @@ void Worker::waitForInput()
             nearest = std::min(nearest, i.timeStarted + std::chrono::seconds(settings.buildTimeout));
     }
     if (nearest != steady_time_point::max()) {
-        timeout.tv_sec = std::max(1L, (long) std::chrono::duration_cast<std::chrono::seconds>(nearest - before).count());
+        timeout = std::max(1L, (long) std::chrono::duration_cast<std::chrono::seconds>(nearest - before).count());
         useTimeout = true;
     }
 
@@ -4795,30 +4818,28 @@ void Worker::waitForInput()
         if (lastWokenUp == steady_time_point::min())
             printError("waiting for locks or build slots...");
         if (lastWokenUp == steady_time_point::min() || lastWokenUp > before) lastWokenUp = before;
-        timeout.tv_sec = std::max(1L,
+        timeout = std::max(1L,
             (long) std::chrono::duration_cast<std::chrono::seconds>(
                 lastWokenUp + std::chrono::seconds(settings.pollInterval) - before).count());
     } else lastWokenUp = steady_time_point::min();
 
     if (useTimeout)
-        vomit("sleeping %d seconds", timeout.tv_sec);
+        vomit("sleeping %d seconds", timeout);
 
     /* Use select() to wait for the input side of any logger pipe to
        become `available'.  Note that `available' (i.e., non-blocking)
        includes EOF. */
-    fd_set fds;
-    FD_ZERO(&fds);
-    int fdMax = 0;
+    std::vector<struct pollfd> pollStatus;
+    std::map <int, int> fdToPollStatus;
     for (auto & i : children) {
         for (auto & j : i.fds) {
-            if (j >= FD_SETSIZE)
-                throw Error("reached FD_SETSIZE limit");
-            FD_SET(j, &fds);
-            if (j >= fdMax) fdMax = j + 1;
+            pollStatus.push_back((struct pollfd) { .fd = j, .events = POLLIN });
+            fdToPollStatus[j] = pollStatus.size() - 1;
         }
     }
 
-    if (select(fdMax, &fds, 0, 0, useTimeout ? &timeout : 0) == -1) {
+    if (poll(pollStatus.data(), pollStatus.size(),
+            useTimeout ? timeout * 1000 : -1) == -1) {
         if (errno == EINTR) return;
         throw SysError("waiting for input");
     }
@@ -4839,7 +4860,7 @@ void Worker::waitForInput()
         set<int> fds2(j->fds);
         std::vector<unsigned char> buffer(4096);
         for (auto & k : fds2) {
-            if (FD_ISSET(k, &fds)) {
+            if (pollStatus.at(fdToPollStatus.at(k)).revents) {
                 ssize_t rd = read(k, buffer.data(), buffer.size());
                 // FIXME: is there a cleaner way to handle pt close
                 // than EIO? Is this even standard?

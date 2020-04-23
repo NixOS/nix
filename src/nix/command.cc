@@ -3,6 +3,9 @@
 #include "derivations.hh"
 #include "nixexpr.hh"
 #include "eval.hh"
+#include "profiles.hh"
+
+extern char * * environ;
 
 namespace nix {
 
@@ -132,6 +135,97 @@ Strings editorFor(const Pos & pos)
         args.push_back(fmt("+%d", pos.line));
     args.push_back(pos.file);
     return args;
+}
+
+MixProfile::MixProfile()
+{
+    mkFlag()
+        .longName("profile")
+        .description("profile to update")
+        .labels({"path"})
+        .dest(&profile);
+}
+
+void MixProfile::updateProfile(const StorePath & storePath)
+{
+    if (!profile) return;
+    auto store = getStore().dynamic_pointer_cast<LocalFSStore>();
+    if (!store) throw Error("'--profile' is not supported for this Nix store");
+    auto profile2 = absPath(*profile);
+    switchLink(profile2,
+        createGeneration(
+            ref<LocalFSStore>(store),
+            profile2, store->printStorePath(storePath)));
+}
+
+void MixProfile::updateProfile(const Buildables & buildables)
+{
+    if (!profile) return;
+
+    std::optional<StorePath> result;
+
+    for (auto & buildable : buildables) {
+        for (auto & output : buildable.outputs) {
+            if (result)
+                throw Error("'--profile' requires that the arguments produce a single store path, but there are multiple");
+            result = output.second.clone();
+        }
+    }
+
+    if (!result)
+        throw Error("'--profile' requires that the arguments produce a single store path, but there are none");
+
+    updateProfile(*result);
+}
+
+MixDefaultProfile::MixDefaultProfile()
+{
+    profile = getDefaultProfile();
+}
+
+MixEnvironment::MixEnvironment() : ignoreEnvironment(false) {
+    mkFlag()
+        .longName("ignore-environment")
+        .shortName('i')
+        .description("clear the entire environment (except those specified with --keep)")
+        .set(&ignoreEnvironment, true);
+
+    mkFlag()
+        .longName("keep")
+        .shortName('k')
+        .description("keep specified environment variable")
+        .arity(1)
+        .labels({"name"})
+        .handler([&](std::vector<std::string> ss) { keep.insert(ss.front()); });
+
+    mkFlag()
+        .longName("unset")
+        .shortName('u')
+        .description("unset specified environment variable")
+        .arity(1)
+        .labels({"name"})
+        .handler([&](std::vector<std::string> ss) { unset.insert(ss.front()); });
+}
+
+void MixEnvironment::setEnviron() {
+    if (ignoreEnvironment) {
+        if (!unset.empty())
+            throw UsageError("--unset does not make sense with --ignore-environment");
+
+        for (const auto & var : keep) {
+            auto val = getenv(var.c_str());
+            if (val) stringsEnv.emplace_back(fmt("%s=%s", var.c_str(), val));
+        }
+
+        vectorEnv = stringsToCharPtrs(stringsEnv);
+        environ = vectorEnv.data();
+    } else {
+        if (!keep.empty())
+            throw UsageError("--keep does not make sense without --ignore-environment");
+
+        for (const auto & var : unset)
+            unsetenv(var.c_str());
+    }
 }
 
 }

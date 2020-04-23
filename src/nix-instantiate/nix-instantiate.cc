@@ -9,7 +9,7 @@
 #include "util.hh"
 #include "store-api.hh"
 #include "common-eval-args.hh"
-#include "legacy.hh"
+#include "../nix/legacy.hh"
 
 #include <map>
 #include <iostream>
@@ -39,7 +39,7 @@ void processExpr(EvalState & state, const Strings & attrPaths,
     state.eval(e, vRoot);
 
     for (auto & i : attrPaths) {
-        Value & v(*findAlongAttrPath(state, i, autoArgs, vRoot));
+        Value & v(*findAlongAttrPath(state, i, autoArgs, vRoot).first);
         state.forceValue(v);
 
         PathSet context;

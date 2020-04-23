@@ -32,6 +32,9 @@ extern "C" {
 #include "command.hh"
 #include "finally.hh"
 
+#define GC_INCLUDE_NEW
+#include <gc/gc_cpp.h>
+
 namespace nix {
 
 #define ESC_RED "\033[31m"
@@ -42,10 +45,10 @@ namespace nix {
 #define ESC_CYA "\033[36m"
 #define ESC_END "\033[0m"
 
-struct NixRepl
+struct NixRepl : gc
 {
     string curDir;
-    EvalState state;
+    std::unique_ptr<EvalState> state;
     Bindings * autoArgs;
 
     Strings loadedFiles;
@@ -123,8 +126,8 @@ string removeWhitespace(string s)
 
 
 NixRepl::NixRepl(const Strings & searchPath, nix::ref<Store> store)
-    : state(searchPath, store)
-    , staticEnv(false, &state.staticBaseEnv)
+    : state(std::make_unique<EvalState>(searchPath, store))
+    , staticEnv(false, &state->staticBaseEnv)
     , historyFile(getDataDir() + "/nix/repl-history")
 {
     curDir = absPath(".");
@@ -353,8 +356,8 @@ StringSet NixRepl::completePrefix(string prefix)
 
             Expr * e = parseString(expr);
             Value v;
-            e->eval(state, *env, v);
-            state.forceAttrs(v);
+            e->eval(*state, *env, v);
+            state->forceAttrs(v);
 
             for (auto & i : *v.attrs) {
                 string name = i.name;
@@ -409,11 +412,11 @@ bool isVarName(const string & s)
 
 
 Path NixRepl::getDerivationPath(Value & v) {
-    auto drvInfo = getDerivation(state, v, false);
+    auto drvInfo = getDerivation(*state, v, false);
     if (!drvInfo)
         throw Error("expression does not evaluate to a derivation, so I can't build it");
     Path drvPath = drvInfo->queryDrvPath();
-    if (drvPath == "" || !state.store->isValidPath(state.store->parseStorePath(drvPath)))
+    if (drvPath == "" || !state->store->isValidPath(state->store->parseStorePath(drvPath)))
         throw Error("expression did not evaluate to a valid derivation");
     return drvPath;
 }
@@ -459,12 +462,12 @@ bool NixRepl::processLine(string line)
     }
 
     else if (command == ":l" || command == ":load") {
-        state.resetFileCache();
+        state->resetFileCache();
         loadFile(arg);
     }
 
     else if (command == ":r" || command == ":reload") {
-        state.resetFileCache();
+        state->resetFileCache();
         reloadFiles();
     }
 
@@ -476,13 +479,13 @@ bool NixRepl::processLine(string line)
 
         if (v.type == tPath || v.type == tString) {
             PathSet context;
-            auto filename = state.coerceToString(noPos, v, context);
-            pos.file = state.symbols.create(filename);
+            auto filename = state->coerceToString(noPos, v, context);
+            pos.file = state->symbols.create(filename);
         } else if (v.type == tLambda) {
             pos = v.lambda.fun->pos;
         } else {
             // assume it's a derivation
-            pos = findDerivationFilename(state, v, arg);
+            pos = findDerivationFilename(*state, v, arg);
         }
 
         // Open in EDITOR
@@ -492,7 +495,7 @@ bool NixRepl::processLine(string line)
         runProgram(editor, args);
 
         // Reload right after exiting the editor
-        state.resetFileCache();
+        state->resetFileCache();
         reloadFiles();
     }
 
@@ -505,7 +508,7 @@ bool NixRepl::processLine(string line)
         Value v, f, result;
         evalString(arg, v);
         evalString("drv: (import <nixpkgs> {}).runCommand \"shell\" { buildInputs = [ drv ]; } \"\"", f);
-        state.callFunction(f, v, result, Pos());
+        state->callFunction(f, v, result, Pos());
 
         Path drvPath = getDerivationPath(result);
         runProgram(settings.nixBinDir + "/nix-shell", Strings{drvPath});
@@ -521,10 +524,10 @@ bool NixRepl::processLine(string line)
                but doing it in a child makes it easier to recover from
                problems / SIGINT. */
             if (runProgram(settings.nixBinDir + "/nix", Strings{"build", "--no-link", drvPath}) == 0) {
-                auto drv = readDerivation(*state.store, drvPath);
+                auto drv = readDerivation(*state->store, drvPath);
                 std::cout << std::endl << "this derivation produced the following outputs:" << std::endl;
                 for (auto & i : drv.outputs)
-                    std::cout << fmt("  %s -> %s\n", i.first, state.store->printStorePath(i.second.path));
+                    std::cout << fmt("  %s -> %s\n", i.first, state->store->printStorePath(i.second.path));
             }
         } else if (command == ":i") {
             runProgram(settings.nixBinDir + "/nix-env", Strings{"-i", drvPath});
@@ -554,11 +557,11 @@ bool NixRepl::processLine(string line)
             isVarName(name = removeWhitespace(string(line, 0, p))))
         {
             Expr * e = parseString(string(line, p + 1));
-            Value & v(*state.allocValue());
+            Value & v(*state->allocValue());
             v.type = tThunk;
             v.thunk.env = env;
             v.thunk.expr = e;
-            addVarToScope(state.symbols.create(name), v);
+            addVarToScope(state->symbols.create(name), v);
         } else {
             Value v;
             evalString(line, v);
@@ -575,21 +578,21 @@ void NixRepl::loadFile(const Path & path)
     loadedFiles.remove(path);
     loadedFiles.push_back(path);
     Value v, v2;
-    state.evalFile(lookupFileArg(state, path), v);
-    state.autoCallFunction(*autoArgs, v, v2);
+    state->evalFile(lookupFileArg(*state, path), v);
+    state->autoCallFunction(*autoArgs, v, v2);
     addAttrsToScope(v2);
 }
 
 
 void NixRepl::initEnv()
 {
-    env = &state.allocEnv(envSize);
-    env->up = &state.baseEnv;
+    env = &state->allocEnv(envSize);
+    env->up = &state->baseEnv;
     displ = 0;
     staticEnv.vars.clear();
 
     varNames.clear();
-    for (auto & i : state.staticBaseEnv.vars)
+    for (auto & i : state->staticBaseEnv.vars)
         varNames.insert(i.first);
 }
 
@@ -613,7 +616,7 @@ void NixRepl::reloadFiles()
 
 void NixRepl::addAttrsToScope(Value & attrs)
 {
-    state.forceAttrs(attrs);
+    state->forceAttrs(attrs);
     for (auto & i : *attrs.attrs)
         addVarToScope(i.name, *i.value);
     std::cout << format("Added %1% variables.") % attrs.attrs->size() << std::endl;
@@ -632,7 +635,7 @@ void NixRepl::addVarToScope(const Symbol & name, Value & v)
 
 Expr * NixRepl::parseString(string s)
 {
-    Expr * e = state.parseExprFromString(s, curDir, staticEnv);
+    Expr * e = state->parseExprFromString(s, curDir, staticEnv);
     return e;
 }
 
@@ -640,8 +643,8 @@ Expr * NixRepl::parseString(string s)
 void NixRepl::evalString(string s, Value & v)
 {
     Expr * e = parseString(s);
-    e->eval(state, *env, v);
-    state.forceValue(v);
+    e->eval(*state, *env, v);
+    state->forceValue(v);
 }
 
 
@@ -671,7 +674,7 @@ std::ostream & NixRepl::printValue(std::ostream & str, Value & v, unsigned int m
     str.flush();
     checkInterrupt();
 
-    state.forceValue(v);
+    state->forceValue(v);
 
     switch (v.type) {
 
@@ -700,13 +703,13 @@ std::ostream & NixRepl::printValue(std::ostream & str, Value & v, unsigned int m
     case tAttrs: {
         seen.insert(&v);
 
-        bool isDrv = state.isDerivation(v);
+        bool isDrv = state->isDerivation(v);
 
         if (isDrv) {
             str << "«derivation ";
-            Bindings::iterator i = v.attrs->find(state.sDrvPath);
+            Bindings::iterator i = v.attrs->find(state->sDrvPath);
             PathSet context;
-            Path drvPath = i != v.attrs->end() ? state.coerceToPath(*i->pos, *i->value, context) : "???";
+            Path drvPath = i != v.attrs->end() ? state->coerceToPath(*i->pos, *i->value, context) : "???";
             str << drvPath << "»";
         }
 
@@ -809,7 +812,7 @@ struct CmdRepl : StoreCommand, MixEvalArgs
     void run(ref<Store> store) override
     {
         auto repl = std::make_unique<NixRepl>(searchPath, openStore());
-        repl->autoArgs = getAutoArgs(repl->state);
+        repl->autoArgs = getAutoArgs(*repl->state);
         repl->mainLoop(files);
     }
 };

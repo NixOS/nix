@@ -13,12 +13,12 @@ set -o pipefail
 # however tracking which bits came from which would be impossible.
 
 readonly ESC='\033[0m'
-readonly BOLD='\033[38;1m'
-readonly BLUE='\033[38;34m'
-readonly BLUE_UL='\033[38;4;34m'
-readonly GREEN='\033[38;32m'
-readonly GREEN_UL='\033[38;4;32m'
-readonly RED='\033[38;31m'
+readonly BOLD='\033[1m'
+readonly BLUE='\033[34m'
+readonly BLUE_UL='\033[4;34m'
+readonly GREEN='\033[32m'
+readonly GREEN_UL='\033[4;32m'
+readonly RED='\033[31m'
 
 readonly NIX_USER_COUNT="32"
 readonly NIX_BUILD_GROUP_ID="30000"
@@ -567,7 +567,7 @@ install_from_extracted_nix() {
         cd "$EXTRACTED_NIX_PATH"
 
         _sudo "to copy the basic Nix files to the new store at $NIX_ROOT/store" \
-              rsync -rlpt ./store/* "$NIX_ROOT/store/"
+              rsync -rlpt --chmod=-w ./store/* "$NIX_ROOT/store/"
 
         if [ -d "$NIX_INSTALLED_NIX" ]; then
             echo "      Alright! We have our first nix at $NIX_INSTALLED_NIX"

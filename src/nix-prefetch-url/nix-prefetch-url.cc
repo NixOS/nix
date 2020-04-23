@@ -1,14 +1,14 @@
 #include "hash.hh"
 #include "shared.hh"
-#include "download.hh"
+#include "filetransfer.hh"
 #include "store-api.hh"
 #include "eval.hh"
 #include "eval-inline.hh"
 #include "common-eval-args.hh"
 #include "attr-path.hh"
-#include "legacy.hh"
 #include "finally.hh"
-#include "progress-bar.hh"
+#include "../nix/legacy.hh"
+#include "../nix/progress-bar.hh"
 #include "tarfile.hh"
 
 #include <iostream>
@@ -120,7 +120,7 @@ static int _main(int argc, char * * argv)
             Path path = resolveExprPath(lookupFileArg(*state, args.empty() ? "." : args[0]));
             Value vRoot;
             state->evalFile(path, vRoot);
-            Value & v(*findAlongAttrPath(*state, attrPath, autoArgs, vRoot));
+            Value & v(*findAlongAttrPath(*state, attrPath, autoArgs, vRoot).first);
             state->forceAttrs(v);
 
             /* Extract the URI. */
@@ -180,9 +180,9 @@ static int _main(int argc, char * * argv)
 
                 FdSink sink(fd.get());
 
-                DownloadRequest req(actualUri);
+                FileTransferRequest req(actualUri);
                 req.decompress = false;
-                getDownloader()->download(std::move(req), sink);
+                getFileTransfer()->download(std::move(req), sink);
             }
 
             /* Optionally unpack the file. */

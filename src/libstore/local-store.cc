@@ -298,9 +298,7 @@ void LocalStore::openDB(State & state, bool create)
     /* Open the Nix database. */
     string dbPath = dbDir + "/db.sqlite";
     auto & db(state.db);
-    if (sqlite3_open_v2(dbPath.c_str(), &db.db,
-            SQLITE_OPEN_READWRITE | (create ? SQLITE_OPEN_CREATE : 0), 0) != SQLITE_OK)
-        throw Error(format("cannot open Nix database '%1%'") % dbPath);
+    state.db = SQLite(dbPath, create);
 
 #ifdef __CYGWIN__
     /* The cygwin version of sqlite3 has a patch which calls
@@ -311,11 +309,6 @@ void LocalStore::openDB(State & state, bool create)
        checkPhase on openssh), so we set it back to default behaviour. */
     SetDllDirectoryW(L"");
 #endif
-
-    if (sqlite3_busy_timeout(db, 60 * 60 * 1000) != SQLITE_OK)
-        throwSQLiteError(db, "setting timeout");
-
-    db.exec("pragma foreign_keys = 1");
 
     /* !!! check whether sqlite has been built with foreign key
        support */
@@ -350,7 +343,7 @@ void LocalStore::openDB(State & state, bool create)
 
     /* Initialise the database schema, if necessary. */
     if (create) {
-        const char * schema =
+        static const char schema[] =
 #include "schema.sql.gen.hh"
             ;
         db.exec(schema);
@@ -1275,7 +1268,7 @@ bool LocalStore::verifyStore(bool checkContents, RepairFlag repair)
                 else
                     hashSink = std::make_unique<HashModuloSink>(info->narHash.type, storePathToHash(printStorePath(info->path)));
 
-                dumpPath(toRealPath(printStorePath(i)), *hashSink);
+                dumpPath(Store::toRealPath(i), *hashSink);
                 auto current = hashSink->finish();
 
                 if (info->narHash != nullHash && info->narHash != current.first) {

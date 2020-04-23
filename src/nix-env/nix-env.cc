@@ -13,7 +13,7 @@
 #include "json.hh"
 #include "value-to-json.hh"
 #include "xml-writer.hh"
-#include "legacy.hh"
+#include "../nix/legacy.hh"
 
 #include <cerrno>
 #include <ctime>
@@ -178,7 +178,7 @@ static void loadDerivations(EvalState & state, Path nixExprPath,
     Value vRoot;
     loadSourceExpr(state, nixExprPath, vRoot);
 
-    Value & v(*findAlongAttrPath(state, pathPrefix, autoArgs, vRoot));
+    Value & v(*findAlongAttrPath(state, pathPrefix, autoArgs, vRoot).first);
 
     getDerivations(state, v, pathPrefix, autoArgs, elems, true);
 
@@ -408,7 +408,7 @@ static void queryInstSources(EvalState & state,
             Value vRoot;
             loadSourceExpr(state, instSource.nixExprPath, vRoot);
             for (auto & i : args) {
-                Value & v(*findAlongAttrPath(state, i, *instSource.autoArgs, vRoot));
+                Value & v(*findAlongAttrPath(state, i, *instSource.autoArgs, vRoot).first);
                 getDerivations(state, v, "", *instSource.autoArgs, elems, true);
             }
             break;
@@ -1428,21 +1428,8 @@ static int _main(int argc, char * * argv)
         if (globals.profile == "")
             globals.profile = getEnv("NIX_PROFILE").value_or("");
 
-        if (globals.profile == "") {
-            Path profileLink = getHome() + "/.nix-profile";
-            try {
-                if (!pathExists(profileLink)) {
-                    replaceSymlink(
-                        getuid() == 0
-                        ? settings.nixStateDir + "/profiles/default"
-                        : fmt("%s/profiles/per-user/%s/profile", settings.nixStateDir, getUserName()),
-                        profileLink);
-                }
-                globals.profile = absPath(readLink(profileLink), dirOf(profileLink));
-            } catch (Error &) {
-                globals.profile = profileLink;
-            }
-        }
+        if (globals.profile == "")
+            globals.profile = getDefaultProfile();
 
         op(globals, opFlags, opArgs);
 
