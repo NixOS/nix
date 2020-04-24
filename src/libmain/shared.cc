@@ -281,6 +281,8 @@ int handleExceptions(const string & programName, std::function<void()> fun)
 {
     ReceiveInterrupts receiveInterrupts; // FIXME: need better place for this
 
+    ErrorInfo::programName = programName;
+
     string error = ANSI_RED "error:" ANSI_NORMAL " ";
     try {
         try {
@@ -296,12 +298,15 @@ int handleExceptions(const string & programName, std::function<void()> fun)
     } catch (Exit & e) {
         return e.status;
     } catch (UsageError & e) {
+        // TODO: switch to logError
+        // logError(e.info());
         printError(
-            format(error + "%1%\nTry '%2% --help' for more information.")
+            format("%1%\nTry '%2% --help' for more information.")
             % e.what() % programName);
         return 1;
     } catch (BaseError & e) {
-        printError(error + "%1%%2%", (settings.showTrace ? e.prefix() : ""), e.msg());
+        // logError(e.info());
+        printError("%1%%2%", (settings.showTrace ? e.prefix() : ""), e.msg());
         if (e.prefix() != "" && !settings.showTrace)
             printError("(use '--show-trace' to show detailed location information)");
         return e.status;

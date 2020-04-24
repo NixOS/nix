@@ -40,24 +40,6 @@ extern char * * environ;
 
 namespace nix {
 
-
-const std::string nativeSystem = SYSTEM;
-
-
-BaseError & BaseError::addPrefix(const FormatOrString & fs)
-{
-    prefix_ = fs.s + prefix_;
-    return *this;
-}
-
-
-std::string SysError::addErrno(const std::string & s)
-{
-    errNo = errno;
-    return s + ": " + strerror(errNo);
-}
-
-
 std::optional<std::string> getEnv(const std::string & key)
 {
     char * value = getenv(key.c_str());

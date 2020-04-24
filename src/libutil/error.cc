@@ -7,6 +7,24 @@
 namespace nix
 {
 
+
+const std::string nativeSystem = SYSTEM;
+
+
+BaseError & BaseError::addPrefix(const FormatOrString & fs)
+{
+    prefix_ = fs.s + prefix_;
+    return *this;
+}
+
+
+std::string SysError::addErrno(const std::string & s)
+{
+    errNo = errno;
+    return s + ": " + strerror(errNo);
+}
+
+
 std::optional<string> ErrorInfo::programName = std::nullopt;
 
 std::ostream& operator<<(std::ostream &os, const hintformat &hf)
