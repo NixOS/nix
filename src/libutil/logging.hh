@@ -62,11 +62,12 @@ public:
 
     virtual void logEI(const ErrorInfo &ei) = 0;
 
-    void logEI(Verbosity lvl, ErrorInfo ei) {
-      ei.level = lvl;
-      logEI(ei);
+    void logEI(Verbosity lvl, ErrorInfo ei) 
+    {
+        ei.level = lvl;
+        logEI(ei);
     }
-
+    
     virtual void warn(const std::string & msg);
 
     virtual void startActivity(ActivityId act, Verbosity lvl, ActivityType type,

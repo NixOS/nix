@@ -162,7 +162,7 @@ std::ostream& operator<<(std::ostream &out, const ErrorInfo &einfo)
     out << prefix << std::endl;
 
     // lines of code.
-    if (einfo.nixCode->errLineOfCode != "") {
+    if (einfo.nixCode.has_value() && einfo.nixCode->errLineOfCode != "") {
         printCodeLines(prefix, *einfo.nixCode);
         out << prefix << std::endl;
     }

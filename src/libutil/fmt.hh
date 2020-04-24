@@ -92,9 +92,11 @@ public:
     {
         fmt.exceptions(boost::io::all_error_bits ^ boost::io::too_many_args_bit);
     }
+
     hintformat(const hintformat &hf)
     : fmt(hf.fmt)
     {}
+
     template<class T>
     hintformat& operator%(const T &value)
     {
@@ -102,14 +104,11 @@ public:
         return *this;
     }
 
-
     std::string str() const
     {
         return fmt.str();
     }
 
-    template <typename U>
-    friend class AddHint;
 private:
     format fmt;
 };
