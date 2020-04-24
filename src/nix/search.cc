@@ -142,17 +142,16 @@ struct CmdSearch : InstallableCommand, MixJSON
                         results++;
                         if (json) {
                             auto jsonElem = jsonOut->object(attrPath2);
-                            jsonElem.attr("pkgName", name.name);
+                            jsonElem.attr("pname", name.name);
                             jsonElem.attr("version", name.version);
                             jsonElem.attr("description", description);
                         } else {
-                            auto name2 = hilite(name.name, nameMatch, "\e[0;2m")
-                                + std::string(name.fullName, name.name.length());
+                            auto name2 = hilite(name.name, nameMatch, "\e[0;2m");
                             if (results > 1) logger->stdout("");
                             logger->stdout(
-                                "* %s (%s)",
+                                "* %s%s",
                                 wrap("\e[0;1m", hilite(attrPath2, attrPathMatch, "\e[0;1m")),
-                                wrap("\e[0;2m", hilite(name2, nameMatch, "\e[0;2m")));
+                                name.version != "" ? " (" + name.version + ")" : "");
                             if (description != "")
                                 logger->stdout(
                                     "  %s", hilite(description, descriptionMatch, ANSI_NORMAL));
