@@ -148,14 +148,21 @@ std::ostream& operator<<(std::ostream &out, const ErrorInfo &einfo)
         dashes.append("-");
 
     // divider.
-    out << fmt("%1%%2%" ANSI_BLUE " %3% %4% %5% %6%" ANSI_NORMAL,
-               prefix,
-               levelString,
-               "---",
-               einfo.name,
-               dashes,
-               einfo.programName.value_or(""))
-        << std::endl;
+    if (einfo.name != "")
+      out << fmt("%1%%2%" ANSI_BLUE " --- %3% %4% %5%" ANSI_NORMAL,
+                 prefix,
+                 levelString,
+                 einfo.name,
+                 dashes,
+                 einfo.programName.value_or(""))
+          << std::endl;
+    else
+      out << fmt("%1%%2%" ANSI_BLUE " -----%3% %4%" ANSI_NORMAL,
+                 prefix,
+                 levelString,
+                 dashes,
+                 einfo.programName.value_or(""))
+          << std::endl;
 
     // filename.
     if (einfo.nixCode.has_value()) {
