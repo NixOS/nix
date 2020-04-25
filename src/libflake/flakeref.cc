@@ -142,7 +142,7 @@ std::pair<FlakeRef, std::string> parsePathFlakeRefWithFragment(
                 if (pathExists(flakeRoot + "/.git")) {
                     auto parsedURL = ParsedURL{
                         .scheme = "git+file",
-                        .authority = "",
+                        .authority = ParsedURL::Authority{},
                         .path = flakeRoot,
                         .query = query,
                         .fragment = fragment,
@@ -172,7 +172,7 @@ std::pair<FlakeRef, std::string> parsePathFlakeRefWithFragment(
 
     return fromParsedURL(
         fetchSettings,
-        {.scheme = "path", .authority = "", .path = path, .query = query, .fragment = fragment},
+        {.scheme = "path", .authority = ParsedURL::Authority{}, .path = path, .query = query, .fragment = fragment},
         isFlake);
 }
 
@@ -192,7 +192,7 @@ parseFlakeIdRef(const fetchers::Settings & fetchSettings, const std::string & ur
     if (std::regex_match(url, match, flakeRegex)) {
         auto parsedURL = ParsedURL{
             .scheme = "flake",
-            .authority = "",
+            .authority = ParsedURL::Authority{},
             .path = match[1],
         };
 

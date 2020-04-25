@@ -48,7 +48,7 @@ StoreReference StoreReference::parse(const std::string & uri, const StoreReferen
         auto parsedUri = parseURL(uri);
         params.insert(parsedUri.query.begin(), parsedUri.query.end());
 
-        auto baseURI = parsedUri.authority.value_or("") + parsedUri.path;
+        auto baseURI = parsedUri.authority.value_or(ParsedURL::Authority{}).to_string() + parsedUri.path;
 
         return {
             .variant =

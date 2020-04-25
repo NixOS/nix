@@ -18,7 +18,7 @@ namespace nix {
 
 LegacySSHStoreConfig::LegacySSHStoreConfig(std::string_view scheme, std::string_view authority, const Params & params)
     : StoreConfig(params)
-    , CommonSSHStoreConfig(scheme, authority, params)
+    , CommonSSHStoreConfig(scheme, ParsedURL::Authority::parse(authority), params)
 {
 }
 
@@ -71,7 +71,7 @@ ref<LegacySSHStore::Connection> LegacySSHStore::openConnection()
     TeeSource tee(conn->from, saved);
     try {
         conn->remoteVersion =
-            ServeProto::BasicClientConnection::handshake(conn->to, tee, SERVE_PROTOCOL_VERSION, config->host);
+            ServeProto::BasicClientConnection::handshake(conn->to, tee, SERVE_PROTOCOL_VERSION, config->authority.host);
     } catch (SerialisationError & e) {
         // in.close(): Don't let the remote block on us not writing.
         conn->sshConn->in.close();
@@ -79,9 +79,10 @@ ref<LegacySSHStore::Connection> LegacySSHStore::openConnection()
             NullSink nullSink;
             tee.drainInto(nullSink);
         }
-        throw Error("'nix-store --serve' protocol mismatch from '%s', got '%s'", config->host, chomp(saved.s));
+        throw Error(
+            "'nix-store --serve' protocol mismatch from '%s', got '%s'", config->authority.host, chomp(saved.s));
     } catch (EndOfFile & e) {
-        throw Error("cannot connect to '%1%'", config->host);
+        throw Error("cannot connect to '%1%'", config->authority.host);
     }
 
     return conn;
@@ -89,7 +90,7 @@ ref<LegacySSHStore::Connection> LegacySSHStore::openConnection()
 
 std::string LegacySSHStore::getUri()
 {
-    return *Config::uriSchemes().begin() + "://" + config->host;
+    return *Config::uriSchemes().begin() + "://" + config->authority.to_string();
 }
 
 std::map<StorePath, UnkeyedValidPathInfo> LegacySSHStore::queryPathInfosUncached(const StorePathSet & paths)
@@ -99,7 +100,10 @@ std::map<StorePath, UnkeyedValidPathInfo> LegacySSHStore::queryPathInfosUncached
     /* No longer support missing NAR hash */
     assert(GET_PROTOCOL_MINOR(conn->remoteVersion) >= 4);
 
-    debug("querying remote host '%s' for info on '%s'", config->host, concatStringsSep(", ", printStorePathSet(paths)));
+    debug(
+        "querying remote host '%s' for info on '%s'",
+        config->authority.host,
+        concatStringsSep(", ", printStorePathSet(paths)));
 
     auto infos = conn->queryPathInfos(*this, paths);
 
@@ -136,7 +140,7 @@ void LegacySSHStore::queryPathInfoUncached(
 
 void LegacySSHStore::addToStore(const ValidPathInfo & info, Source & source, RepairFlag repair, CheckSigsFlag checkSigs)
 {
-    debug("adding path '%s' to remote host '%s'", printStorePath(info.path), config->host);
+    debug("adding path '%s' to remote host '%s'", printStorePath(info.path), config->authority.host);
 
     auto conn(connections->get());
 
@@ -157,7 +161,8 @@ void LegacySSHStore::addToStore(const ValidPathInfo & info, Source & source, Rep
         conn->to.flush();
 
         if (readInt(conn->from) != 1)
-            throw Error("failed to add path '%s' to remote host '%s'", printStorePath(info.path), config->host);
+            throw Error(
+                "failed to add path '%s' to remote host '%s'", printStorePath(info.path), config->authority.host);
 
     } else {
 
