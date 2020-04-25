@@ -88,7 +88,7 @@ void printCodeLines(const string &prefix, const NixCode &nixCode)
 std::ostream& operator<<(std::ostream &out, const ErrorInfo &einfo)
 {
     int errwidth = 80;
-    string prefix = "    ";
+    string prefix = "";
 
     string levelString;
     switch (einfo.level) {
@@ -176,8 +176,10 @@ std::ostream& operator<<(std::ostream &out, const ErrorInfo &einfo)
     }
 
     // description
-    out << prefix << einfo.description << std::endl;
-    out << prefix << std::endl;
+    if (einfo.description != "") {
+        out << prefix << einfo.description << std::endl;
+        out << prefix << std::endl;
+    }
 
     // lines of code.
     if (einfo.nixCode.has_value() && einfo.nixCode->errLineOfCode != "") {
