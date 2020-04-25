@@ -100,7 +100,7 @@ std::pair<FlakeRef, std::string> parseFlakeRefWithFragment(
             .url = url,
             .base = "flake:" + match.str(1),
             .scheme = "flake",
-            .authority = "",
+            .authority = ParsedURLAuthority{},
             .path = match[1],
         };
 
@@ -161,7 +161,7 @@ std::pair<FlakeRef, std::string> parseFlakeRefWithFragment(
                             .url = base, // FIXME
                             .base = base,
                             .scheme = "git+file",
-                            .authority = "",
+                            .authority = {{}},
                             .path = flakeRoot,
                             .query = decodeQuery(match[2]),
                         };

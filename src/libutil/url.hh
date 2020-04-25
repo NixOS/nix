@@ -5,13 +5,24 @@
 
 namespace nix {
 
+struct ParsedURLAuthority
+{
+    std::optional<std::string> user;
+    std::string host;
+    std::optional<uint16_t> port;
+
+    std::string to_string() const;
+
+    bool operator ==(const ParsedURLAuthority & other) const;
+};
+
 struct ParsedURL
 {
     std::string url;
     /// URL without query/fragment
     std::string base;
     std::string scheme;
-    std::optional<std::string> authority;
+    std::optional<ParsedURLAuthority> authority;
     std::string path;
     std::map<std::string, std::string> query;
     std::string fragment;

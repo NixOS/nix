@@ -10,8 +10,8 @@ struct PathInputScheme : InputScheme
     {
         if (url.scheme != "path") return {};
 
-        if (url.authority && *url.authority != "")
-            throw Error("path URL '%s' should not have an authority ('%s')", url.url, *url.authority);
+        if (url.authority && *url.authority != ParsedURLAuthority {})
+            throw Error("path URL '%s' should not have an authority ('%s')", url.url, url.authority->to_string());
 
         Input input;
         input.attrs.insert_or_assign("type", "path");

@@ -41,13 +41,14 @@ public:
     HttpBinaryCacheStore(
         const std::string & scheme,
         const Path & _cacheUri,
+        std::optional<uint16_t> port,
         const Params & params)
         : StoreConfig(params)
         , BinaryCacheStoreConfig(params)
         , HttpBinaryCacheStoreConfig(params)
         , Store(params)
         , BinaryCacheStore(params)
-        , cacheUri(scheme + "://" + _cacheUri)
+        , cacheUri(scheme + "://" + _cacheUri + (port ? fmt(":%d", *port) : ""))
     {
         if (cacheUri.back() == '/')
             cacheUri.pop_back();

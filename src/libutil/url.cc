@@ -14,7 +14,7 @@ ParsedURL parseURL(const std::string & url)
 {
     static std::regex uriRegex(
         "((" + schemeRegex + "):"
-        + "(?:(?://(" + authorityRegex + ")(" + absPathRegex + "))|(/?" + pathRegex + ")))"
+        + "(?:(?://" + authorityRegex + "(" + absPathRegex + "))|(/?" + pathRegex + ")))"
         + "(?:\\?(" + queryRegex + "))?"
         + "(?:#(" + queryRegex + "))?",
         std::regex::ECMAScript);
@@ -24,17 +24,33 @@ ParsedURL parseURL(const std::string & url)
     if (std::regex_match(url, match, uriRegex)) {
         auto & base = match[1];
         std::string scheme = match[2];
-        auto authority = match[3].matched
-            ? std::optional<std::string>(match[3]) : std::nullopt;
-        std::string path = match[4].matched ? match[4] : match[5];
-        auto & query = match[6];
-        auto & fragment = match[7];
+        auto authority = match[4].matched
+            ? std::optional { ParsedURLAuthority {
+                .user = match[3].matched
+                    ? std::optional<std::string> { match[3] }
+                    : std::nullopt,
+                .host = std::string { match[4] },
+                .port = match[5].matched
+                    ? std::optional<uint16_t> { ({
+                        size_t p = std::stoul(match[5]);
+                        if (p == 0)
+                            throw BadURL("URL '%s', has port number '%d' which cannot be zero");
+                        if (p > std::numeric_limits<uint16_t>::max())
+                            throw BadURL("URL '%s', has port number '%d' which is too large");
+                        p;
+                    }) }
+                    : std::nullopt,
+              }}
+            : std::nullopt;
+        std::string path = match[6].matched ? match[6] : match[7];
+        auto & query = match[8];
+        auto & fragment = match[9];
 
         auto transportIsFile = parseUrlScheme(scheme).transport == "file";
 
-        if (authority && *authority != "" && transportIsFile)
+        if (authority && *authority != ParsedURLAuthority {} && transportIsFile)
             throw BadURL("file:// URL '%s' has unexpected authority '%s'",
-                url, *authority);
+                url, authority->to_string());
 
         if (transportIsFile && path.empty())
             path = "/";
@@ -121,12 +137,28 @@ std::string encodeQuery(const std::map<std::string, std::string> & ss)
     return res;
 }
 
+std::string ParsedURLAuthority::to_string() const
+{
+    return
+        (user ? *user + "@" : "")
+        + host
+        + (port ? fmt(":%d", *port) : "");
+}
+
+bool ParsedURLAuthority::operator ==(const ParsedURLAuthority & other) const
+{
+    return
+        user == other.user
+        && host == other.host
+        && port == other.port;
+}
+
 std::string ParsedURL::to_string() const
 {
     return
         scheme
         + ":"
-        + (authority ? "//" + *authority : "")
+        + (authority ? "//" + authority->to_string() : "")
         + percentEncode(path, allowedInPath)
         + (query.empty() ? "" : "?" + encodeQuery(query))
         + (fragment.empty() ? "" : "#" + percentEncode(fragment));

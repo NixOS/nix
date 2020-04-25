@@ -25,7 +25,8 @@ namespace nix {
                   << "url:       " << p.url << "\n"
                   << "base:      " << p.base << "\n"
                   << "scheme:    " << p.scheme << "\n"
-                  << "authority: " << p.authority.value() << "\n"
+                  << "host:      " << p.authority.value().host << "\n"
+                  << "port:      " << p.authority.value().port.value() << "\n"
                   << "path:      " << p.path << "\n"
                   << "query:     " << print_map(p.query) << "\n"
                   << "fragment:  " << p.fragment << "\n";
@@ -39,7 +40,9 @@ namespace nix {
             .url = "http://www.example.org/file.tar.gz",
             .base = "http://www.example.org/file.tar.gz",
             .scheme = "http",
-            .authority = "www.example.org",
+            .authority = {{
+                .host = "www.example.org",
+            }},
             .path = "/file.tar.gz",
             .query = (StringMap) { },
             .fragment = "",
@@ -56,7 +59,9 @@ namespace nix {
             .url = "https://www.example.org/file.tar.gz",
             .base = "https://www.example.org/file.tar.gz",
             .scheme = "https",
-            .authority = "www.example.org",
+            .authority = {{
+                .host = "www.example.org",
+            }},
             .path = "/file.tar.gz",
             .query = (StringMap) { },
             .fragment = "",
@@ -73,7 +78,9 @@ namespace nix {
             .url = "https://www.example.org/file.tar.gz",
             .base = "https://www.example.org/file.tar.gz",
             .scheme = "https",
-            .authority = "www.example.org",
+            .authority = {{
+                .host = "www.example.org",
+            }},
             .path = "/file.tar.gz",
             .query = (StringMap) { { "download", "fast" }, { "when", "now" } },
             .fragment = "hello",
@@ -90,7 +97,9 @@ namespace nix {
             .url = "http://www.example.org/file.tar.gz",
             .base = "http://www.example.org/file.tar.gz",
             .scheme = "http",
-            .authority = "www.example.org",
+            .authority = {{
+                .host = "www.example.org",
+            }},
             .path = "/file.tar.gz",
             .query = (StringMap) { { "field", "value" } },
             .fragment = "?foo=bar#",
@@ -107,7 +116,9 @@ namespace nix {
             .url = "file+https://www.example.org/video.mp4",
             .base = "https://www.example.org/video.mp4",
             .scheme = "file+https",
-            .authority = "www.example.org",
+            .authority = {{
+                .host = "www.example.org",
+            }},
             .path = "/video.mp4",
             .query = (StringMap) { },
             .fragment = "",
@@ -129,7 +140,10 @@ namespace nix {
             .url = "http://127.0.0.1:8080/file.tar.gz",
             .base = "https://127.0.0.1:8080/file.tar.gz",
             .scheme = "http",
-            .authority = "127.0.0.1:8080",
+            .authority = {{
+                .host = "127.0.0.1",
+                .port = 8080,
+            }},
             .path = "/file.tar.gz",
             .query = (StringMap) { { "download", "fast" }, { "when", "now" } },
             .fragment = "hello",
@@ -146,7 +160,10 @@ namespace nix {
             .url = "http://[fe80::818c:da4d:8975:415c\%enp0s25]:8080",
             .base = "http://[fe80::818c:da4d:8975:415c\%enp0s25]:8080",
             .scheme = "http",
-            .authority = "[fe80::818c:da4d:8975:415c\%enp0s25]:8080",
+            .authority = {{
+                .host = "[fe80::818c:da4d:8975:415c\%enp0s25]",
+                .port = 8080,
+            }},
             .path = "",
             .query = (StringMap) { },
             .fragment = "",
@@ -164,7 +181,10 @@ namespace nix {
             .url = "http://[2a02:8071:8192:c100:311d:192d:81ac:11ea]:8080",
             .base = "http://[2a02:8071:8192:c100:311d:192d:81ac:11ea]:8080",
             .scheme = "http",
-            .authority = "[2a02:8071:8192:c100:311d:192d:81ac:11ea]:8080",
+            .authority = {{
+                .host = "[2a02:8071:8192:c100:311d:192d:81ac:11ea]",
+                .port = 8080,
+            }},
             .path = "",
             .query = (StringMap) { },
             .fragment = "",
@@ -188,7 +208,11 @@ namespace nix {
             .url = "http://user:pass@www.example.org/file.tar.gz",
             .base = "http://user:pass@www.example.org/file.tar.gz",
             .scheme = "http",
-            .authority = "user:pass@www.example.org:8080",
+            .authority = {{
+                .user = "user:pass",
+                .host = "www.example.org",
+                .port = 8080,
+            }},
             .path = "/file.tar.gz",
             .query = (StringMap) { },
             .fragment = "",
@@ -206,7 +230,7 @@ namespace nix {
             .url = "",
             .base = "",
             .scheme = "file",
-            .authority = "",
+            .authority = {{}},
             .path = "/none/of//your/business",
             .query = (StringMap) { },
             .fragment = "",
@@ -231,7 +255,9 @@ namespace nix {
             .url = "ftp://ftp.nixos.org/downloads/nixos.iso",
             .base = "ftp://ftp.nixos.org/downloads/nixos.iso",
             .scheme = "ftp",
-            .authority = "ftp.nixos.org",
+            .authority = {{
+                .host = "ftp.nixos.org",
+            }},
             .path = "/downloads/nixos.iso",
             .query = (StringMap) { },
             .fragment = "",

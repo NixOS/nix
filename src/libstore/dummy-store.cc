@@ -18,7 +18,7 @@ struct DummyStoreConfig : virtual StoreConfig {
 
 struct DummyStore : public virtual DummyStoreConfig, public virtual Store
 {
-    DummyStore(const std::string scheme, const std::string uri, const Params & params)
+    DummyStore(const std::string scheme, const std::string uri, std::optional<uint16_t> port, const Params & params)
         : DummyStore(params)
     { }
 

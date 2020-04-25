@@ -11,6 +11,7 @@ class SSHMaster
 private:
 
     const std::string host;
+    const std::optional<int> port;
     bool fakeSSH;
     const std::string keyFile;
     const std::string sshPublicHostKey;
@@ -32,7 +33,7 @@ private:
 
 public:
 
-    SSHMaster(const std::string & host, const std::string & keyFile, const std::string & sshPublicHostKey, bool useMaster, bool compress, int logFD = -1);
+    SSHMaster(const std::string & host, std::optional<uint16_t> port, const std::string & keyFile, const std::string & sshPublicHostKey, bool useMaster, bool compress, int logFD = -1);
 
     struct Connection
     {
