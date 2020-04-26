@@ -590,14 +590,14 @@ void LocalStore::resolveDerivation(Derivation & drv) {
         StringSet newOutputNames;
         for (auto & outputName : input.second) {
             DrvOutputId outputId { input.first.clone(), outputName };
-            if (auto actualPath = queryOutPath(outputId)) {
+            auto actualPath = queryOutPath(outputId);
+            if (actualPath != drv.findOutput(outputName)) {
                 inputRewrites.emplace(
                         printStorePath(inputDrv.outputs.at(outputName).path),
-                        printStorePath(*actualPath)
+                        printStorePath(actualPath)
                 );
-                drv.inputSrcs.emplace(std::move(*actualPath));
-            }
-            else {
+                drv.inputSrcs.emplace(std::move(actualPath));
+            } else {
                 newOutputNames.emplace(outputName);
             }
         }
@@ -932,9 +932,13 @@ void LocalStore::registerOutputMappings(const OutputMappings & mappings)
     });
 }
 
-std::optional<StorePath> LocalStore::queryOutPath(const DrvOutputId & outputId) {
+StorePath LocalStore::queryOutPath(const DrvOutputId & outputId) {
+  return queryOutPath(outputId, derivationFromPath(outputId.deriver));
+}
 
-    return retrySQLite<std::optional<StorePath>>([&]() -> std::optional<StorePath> {
+StorePath LocalStore::queryOutPath(const DrvOutputId & outputId, const Derivation & drv) {
+
+    auto dbQuery = retrySQLite<std::optional<StorePath>>([&]() -> std::optional<StorePath> {
         auto state(_state.lock());
 
         auto useGetPathOf(
@@ -950,6 +954,9 @@ std::optional<StorePath> LocalStore::queryOutPath(const DrvOutputId & outputId) 
             return parseStorePath(s);
         return {};
     });
+    if (dbQuery)
+      return std::move(*dbQuery);
+    return drv.findOutput(outputId.outputName);
 }
 
 void LocalStore::registerValidPaths(const ValidPathInfos & infos)

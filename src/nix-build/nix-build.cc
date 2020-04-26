@@ -512,9 +512,7 @@ static void _main(int argc, char * * argv)
             auto store2 = store.dynamic_pointer_cast<LocalStore>();
             if (store2) {
               auto outPath = store2->queryOutPath(DrvOutputId{ store->parseStorePath(drvPath), outputName});
-              if (outPath) {
-                rawOutPath = store2->printStorePath(*outPath);
-              }
+              rawOutPath = store2->printStorePath(outPath);
             }
 
             std::string drvPrefix;

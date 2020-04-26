@@ -213,7 +213,8 @@ public:
 
     void registerOutputMappings(const OutputMappings & outputMappings);
 
-    std::optional<StorePath> queryOutPath(const DrvOutputId & outputId);
+    StorePath queryOutPath(const DrvOutputId & outputId);
+    StorePath queryOutPath(const DrvOutputId & outputId, const Derivation & drv);
 
     unsigned int getProtocol() override;
 
