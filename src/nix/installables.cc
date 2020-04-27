@@ -468,7 +468,10 @@ std::vector<std::shared_ptr<Installable>> SourceExprCommand::parseInstallables(
                     if (s.find('/') != std::string::npos && (storePath = follow(s)))
                         result.push_back(std::make_shared<InstallableStorePath>(store, store->printStorePath(*storePath)));
                     else
-                        throw Error("unrecognized argument '%s'", s);
+                        throw Error(
+                            pathExists(s)
+                            ? "path '%s' is not a flake or a store path"
+                            : "don't know how to handle argument '%s'", s);
                 }
             }
         }
