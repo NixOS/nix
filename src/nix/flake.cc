@@ -551,17 +551,18 @@ struct CmdFlakeInit : virtual Args, Command
     {
         Path flakeDir = absPath(".");
 
-        if (!pathExists(flakeDir + "/.git"))
-            throw Error("the directory '%s' is not a Git repository", flakeDir);
-
         Path flakePath = flakeDir + "/flake.nix";
 
         if (pathExists(flakePath))
             throw Error("file '%s' already exists", flakePath);
 
         writeFile(flakePath,
-#include "flake-template.nix.gen.hh"
-            );
+          #include "flake-template.nix.gen.hh"
+        );
+
+        if (pathExists(flakeDir + "/.git"))
+            runProgram("git", true,
+                { "-C", flakeDir, "add", "--intent-to-add", "flake.nix" });
     }
 };
 

@@ -47,9 +47,9 @@ FlakeRef FlakeRef::resolve(ref<Store> store) const
 }
 
 FlakeRef parseFlakeRef(
-    const std::string & url, const std::optional<Path> & baseDir)
+    const std::string & url, const std::optional<Path> & baseDir, bool allowMissing)
 {
-    auto [flakeRef, fragment] = parseFlakeRefWithFragment(url, baseDir);
+    auto [flakeRef, fragment] = parseFlakeRefWithFragment(url, baseDir, allowMissing);
     if (fragment != "")
         throw Error("unexpected fragment '%s' in flake reference '%s'", fragment, url);
     return flakeRef;
@@ -66,7 +66,7 @@ std::optional<FlakeRef> maybeParseFlakeRef(
 }
 
 std::pair<FlakeRef, std::string> parseFlakeRefWithFragment(
-    const std::string & url, const std::optional<Path> & baseDir)
+    const std::string & url, const std::optional<Path> & baseDir, bool allowMissing)
 {
     using namespace fetchers;
 
@@ -115,39 +115,47 @@ std::pair<FlakeRef, std::string> parseFlakeRefWithFragment(
         if (!S_ISDIR(lstat(path).st_mode))
             throw BadURL("path '%s' is not a flake (because it's not a directory)", path);
 
-        auto flakeRoot = path;
-        std::string subdir;
-
-        while (true) {
-            if (pathExists(flakeRoot + "/.git")) break;
-            subdir = std::string(baseNameOf(flakeRoot)) + (subdir.empty() ? "" : "/" + subdir);
-            flakeRoot = dirOf(flakeRoot);
-            if (flakeRoot == "/")
-                throw BadURL("path '%s' is not a flake (because it does not reference a Git repository)", path);
-        }
-
-        auto base = std::string("git+file://") + flakeRoot;
-
-        auto parsedURL = ParsedURL{
-            .url = base, // FIXME
-            .base = base,
-            .scheme = "git+file",
-            .authority = "",
-            .path = flakeRoot,
-            .query = decodeQuery(match[2]),
-        };
+        if (!allowMissing && !pathExists(path + "/flake.nix"))
+            throw BadURL("path '%s' is not a flake (because it doesn't contain a 'flake.nix' file)", path);
 
         auto fragment = percentDecode(std::string(match[3]));
 
-        if (subdir != "") {
-            if (parsedURL.query.count("dir"))
-                throw Error("flake URL '%s' has an inconsistent 'dir' parameter", url);
-            parsedURL.query.insert_or_assign("dir", subdir);
+        auto flakeRoot = path;
+        std::string subdir;
+
+        while (flakeRoot != "/") {
+            if (pathExists(flakeRoot + "/.git")) {
+                auto base = std::string("git+file://") + flakeRoot;
+
+                auto parsedURL = ParsedURL{
+                    .url = base, // FIXME
+                    .base = base,
+                    .scheme = "git+file",
+                    .authority = "",
+                    .path = flakeRoot,
+                    .query = decodeQuery(match[2]),
+                };
+
+                if (subdir != "") {
+                    if (parsedURL.query.count("dir"))
+                        throw Error("flake URL '%s' has an inconsistent 'dir' parameter", url);
+                    parsedURL.query.insert_or_assign("dir", subdir);
+                }
+
+                return std::make_pair(
+                    FlakeRef(inputFromURL(parsedURL), get(parsedURL.query, "dir").value_or("")),
+                    fragment);
+            }
+
+            subdir = std::string(baseNameOf(flakeRoot)) + (subdir.empty() ? "" : "/" + subdir);
+            flakeRoot = dirOf(flakeRoot);
         }
 
-        return std::make_pair(
-            FlakeRef(inputFromURL(parsedURL), get(parsedURL.query, "dir").value_or("")),
-            fragment);
+        fetchers::Attrs attrs;
+        attrs.insert_or_assign("type", "path");
+        attrs.insert_or_assign("path", path);
+
+        return std::make_pair(FlakeRef(inputFromAttrs(attrs), ""), fragment);
     }
 
     else {

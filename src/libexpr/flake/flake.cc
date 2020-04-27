@@ -176,7 +176,7 @@ static FlakeInput parseFlakeInput(EvalState & state,
         if (!attrs.empty())
             throw Error("unexpected flake input attribute '%s', at %s", attrs.begin()->first, pos);
         if (url)
-            input.ref = parseFlakeRef(*url);
+            input.ref = parseFlakeRef(*url, {}, true);
     }
 
     return input;
@@ -630,7 +630,7 @@ void callFlake(EvalState & state,
 static void prim_getFlake(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
     auto flakeRefS = state.forceStringNoCtx(*args[0], pos);
-    auto flakeRef = parseFlakeRef(flakeRefS);
+    auto flakeRef = parseFlakeRef(flakeRefS, {}, true);
     if (evalSettings.pureEval && !flakeRef.input->isImmutable())
         throw Error("cannot call 'getFlake' on mutable flake reference '%s', at %s (use --impure to override)", flakeRefS, pos);
 

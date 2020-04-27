@@ -438,14 +438,6 @@ std::vector<std::shared_ptr<Installable>> SourceExprCommand::parseInstallables(
 
     } else {
 
-        auto follow = [&](const std::string & s) -> std::optional<StorePath> {
-            try {
-                return store->followLinksToStorePath(s);
-            } catch (NotInStore &) {
-                return {};
-            }
-        };
-
         for (auto & s : ss) {
             if (hasPrefix(s, "nixpkgs.")) {
                 bool static warned;
@@ -456,23 +448,38 @@ std::vector<std::shared_ptr<Installable>> SourceExprCommand::parseInstallables(
             }
 
             else {
-                auto res = maybeParseFlakeRefWithFragment(s, absPath("."));
-                if (res) {
-                    auto &[flakeRef, fragment] = *res;
+                std::exception_ptr ex;
+
+                try {
+                    auto [flakeRef, fragment] = parseFlakeRefWithFragment(s, absPath("."));
                     result.push_back(std::make_shared<InstallableFlake>(
                             *this, std::move(flakeRef),
                             fragment == "" ? getDefaultFlakeAttrPaths() : Strings{fragment},
                             getDefaultFlakeAttrPathPrefixes()));
-                } else {
-                    std::optional<StorePath> storePath;
-                    if (s.find('/') != std::string::npos && (storePath = follow(s)))
-                        result.push_back(std::make_shared<InstallableStorePath>(store, store->printStorePath(*storePath)));
-                    else
-                        throw Error(
-                            pathExists(s)
-                            ? "path '%s' is not a flake or a store path"
-                            : "don't know how to handle argument '%s'", s);
+                    continue;
+                } catch (...) {
+                    ex = std::current_exception();
                 }
+
+                if (s.find('/') != std::string::npos) {
+                    try {
+                        result.push_back(std::make_shared<InstallableStorePath>(store, store->printStorePath(store->followLinksToStorePath(s))));
+                        continue;
+                    } catch (NotInStore &) {
+                    } catch (...) {
+                        if (!ex)
+                            ex = std::current_exception();
+                    }
+                }
+
+                std::rethrow_exception(ex);
+
+                /*
+                throw Error(
+                    pathExists(s)
+                    ? "path '%s' is not a flake or a store path"
+                    : "don't know how to handle argument '%s'", s);
+                */
             }
         }
     }

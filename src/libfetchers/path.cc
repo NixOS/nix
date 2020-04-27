@@ -32,7 +32,7 @@ struct PathInput : Input
 
     bool isImmutable() const override
     {
-        return (bool) narHash;
+        return narHash || rev;
     }
 
     ParsedURL toURL() const override
@@ -56,7 +56,18 @@ struct PathInput : Input
             attrs.emplace("revCount", *revCount);
         if (lastModified)
             attrs.emplace("lastModified", *lastModified);
+        if (!rev && narHash)
+            attrs.emplace("narHash", narHash->to_string(SRI));
         return attrs;
+    }
+
+    std::optional<Path> getSourcePath() const override
+    {
+        return path;
+    }
+
+    void markChangedFile(std::string_view file, std::optional<std::string> commitMsg) const override
+    {
     }
 
     std::pair<Tree, std::shared_ptr<const Input>> fetchTreeInternal(nix::ref<Store> store) const override
@@ -73,6 +84,8 @@ struct PathInput : Input
         if (!storePath || storePath->name() != "source" || !store->isValidPath(*storePath))
             // FIXME: try to substitute storePath.
             storePath = store->addToStore("source", path);
+
+        input->narHash = store->queryPathInfo(*storePath)->narHash;
 
         return
             {
@@ -99,6 +112,9 @@ struct PathInputScheme : InputScheme
         auto input = std::make_unique<PathInput>();
         input->path = url.path;
 
+        if (url.authority && *url.authority != "")
+            throw Error("path URL '%s' should not have an authority ('%s')", url.url, *url.authority);
+
         for (auto & [name, value] : url.query)
             if (name == "rev")
                 input->rev = Hash(value, htSHA1);
@@ -114,6 +130,9 @@ struct PathInputScheme : InputScheme
                     throw Error("path URL '%s' has invalid parameter '%s'", url.to_string(), name);
                 input->lastModified = lastModified;
             }
+            else if (name == "narHash")
+                // FIXME: require SRI hash.
+                input->narHash = Hash(value);
             else
                 throw Error("path URL '%s' has unsupported parameter '%s'", url.to_string(), name);
 
@@ -134,6 +153,9 @@ struct PathInputScheme : InputScheme
                 input->revCount = getIntAttr(attrs, "revCount");
             else if (name == "lastModified")
                 input->lastModified = getIntAttr(attrs, "lastModified");
+            else if (name == "narHash")
+                // FIXME: require SRI hash.
+                input->narHash = Hash(getStrAttr(attrs, "narHash"));
             else if (name == "type" || name == "path")
                 ;
             else
