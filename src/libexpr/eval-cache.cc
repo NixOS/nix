@@ -106,6 +106,21 @@ struct AttrDb
         return state->db.getLastInsertedRowId();
     }
 
+    AttrId setBool(
+        AttrKey key,
+        bool b)
+    {
+        auto state(_state->lock());
+
+        state->insertAttribute.use()
+            (key.first)
+            (key.second)
+            (AttrType::Bool)
+            (b ? 1 : 0).exec();
+
+        return state->db.getLastInsertedRowId();
+    }
+
     AttrId setPlaceholder(AttrKey key)
     {
         auto state(_state->lock());
@@ -170,25 +185,30 @@ struct AttrDb
         auto rowId = (AttrType) queryAttribute.getInt(0);
         auto type = (AttrType) queryAttribute.getInt(1);
 
-        if (type == AttrType::Placeholder)
-            return {{rowId, placeholder_t()}};
-        else if (type == AttrType::FullAttrs) {
-            // FIXME: expensive, should separate this out.
-            std::vector<Symbol> attrs;
-            auto queryAttributes(state->queryAttributes.use()(rowId));
-            while (queryAttributes.next())
-                attrs.push_back(symbols.create(queryAttributes.getStr(0)));
-            return {{rowId, attrs}};
-        } else if (type == AttrType::String) {
-            return {{rowId, queryAttribute.getStr(2)}};
-        } else if (type == AttrType::Missing) {
-            return {{rowId, missing_t()}};
-        } else if (type == AttrType::Misc) {
-            return {{rowId, misc_t()}};
-        } else if (type == AttrType::Failed) {
-            return {{rowId, failed_t()}};
-        } else
-            throw Error("unexpected type in evaluation cache");
+        switch (type) {
+            case AttrType::Placeholder:
+                return {{rowId, placeholder_t()}};
+            case AttrType::FullAttrs: {
+                // FIXME: expensive, should separate this out.
+                std::vector<Symbol> attrs;
+                auto queryAttributes(state->queryAttributes.use()(rowId));
+                while (queryAttributes.next())
+                    attrs.push_back(symbols.create(queryAttributes.getStr(0)));
+                return {{rowId, attrs}};
+            }
+            case AttrType::String:
+                return {{rowId, queryAttribute.getStr(2)}};
+            case AttrType::Bool:
+                return {{rowId, queryAttribute.getInt(2) != 0}};
+            case AttrType::Missing:
+                return {{rowId, missing_t()}};
+            case AttrType::Misc:
+                return {{rowId, misc_t()}};
+            case AttrType::Failed:
+                return {{rowId, failed_t()}};
+            default:
+                throw Error("unexpected type in evaluation cache");
+        }
     }
 };
 
@@ -301,6 +321,8 @@ Value & AttrCursor::forceValue()
     if (root->db && (!cachedValue || std::get_if<placeholder_t>(&cachedValue->second))) {
         if (v.type == tString)
             cachedValue = {root->db->setString(getKey(), v.string.s), v.string.s};
+        else if (v.type == tBool)
+            cachedValue = {root->db->setBool(getKey(), v.boolean), v.boolean};
         else if (v.type == tAttrs)
             ; // FIXME: do something?
         else
@@ -417,6 +439,28 @@ std::string AttrCursor::getString()
         throw TypeError("'%s' is not a string", getAttrPathStr());
 
     return v.string.s;
+}
+
+bool AttrCursor::getBool()
+{
+    if (root->db) {
+        if (!cachedValue)
+            cachedValue = root->db->getAttr(getKey(), root->state.symbols);
+        if (cachedValue && !std::get_if<placeholder_t>(&cachedValue->second)) {
+            if (auto b = std::get_if<bool>(&cachedValue->second)) {
+                debug("using cached Boolean attribute '%s'", getAttrPathStr());
+                return *b;
+            } else
+                throw TypeError("'%s' is not a Boolean", getAttrPathStr());
+        }
+    }
+
+    auto & v = forceValue();
+
+    if (v.type != tBool)
+        throw TypeError("'%s' is not a Boolean", getAttrPathStr());
+
+    return v.boolean;
 }
 
 std::vector<Symbol> AttrCursor::getAttrs()

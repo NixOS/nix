@@ -75,7 +75,7 @@ public:
         sFile, sLine, sColumn, sFunctor, sToString,
         sRight, sWrong, sStructuredAttrs, sBuilder, sArgs,
         sOutputHash, sOutputHashAlgo, sOutputHashMode,
-        sDescription, sSelf, sEpsilon;
+        sDescription, sSelf, sEpsilon, sRecurseForDerivations;
     Symbol sDerivationNix;
 
     /* If set, force copying files to the Nix store even if they

@@ -41,6 +41,7 @@ enum AttrType {
     Missing = 3,
     Misc = 4,
     Failed = 5,
+    Bool = 6,
 };
 
 struct placeholder_t {};
@@ -49,7 +50,7 @@ struct misc_t {};
 struct failed_t {};
 typedef uint64_t AttrId;
 typedef std::pair<AttrId, Symbol> AttrKey;
-typedef std::variant<std::vector<Symbol>, std::string, placeholder_t, missing_t, misc_t, failed_t> AttrValue;
+typedef std::variant<std::vector<Symbol>, std::string, placeholder_t, missing_t, misc_t, failed_t, bool> AttrValue;
 
 class AttrCursor : public std::enable_shared_from_this<AttrCursor>
 {
@@ -92,6 +93,8 @@ public:
     std::shared_ptr<AttrCursor> findAlongAttrPath(const std::vector<Symbol> & attrPath);
 
     std::string getString();
+
+    bool getBool();
 
     std::vector<Symbol> getAttrs();
 
