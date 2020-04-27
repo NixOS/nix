@@ -12,6 +12,10 @@ struct Buildable
 {
     std::optional<StorePath> drvPath;
     std::map<std::string, StorePath> outputs;
+
+    std::string what() {
+        return fmt("%s", outputs.at("out").name());
+    }
 };
 
 typedef std::vector<Buildable> Buildables;

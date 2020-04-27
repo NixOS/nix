@@ -79,7 +79,7 @@ void StorePathsCommand::run(ref<Store> store)
 
                     for (auto & b : i->toBuildables()) {
                         if (!b.drvPath)
-                            throw UsageError("Cannot find eval references without a derivation path");
+                            throw UsageError("Cannot find eval references for '%s' without a derivation path", b.what());
                     }
 
                     // force evaluation of package argument
@@ -94,7 +94,7 @@ void StorePathsCommand::run(ref<Store> store)
                 for (auto & i : installables) {
                     for (auto & b : i->toBuildables()) {
                         if (!b.drvPath) // Note we could lookup deriver from the DB to get drvPath
-                            throw UsageError("Cannot find build references without a derivation path");
+                            throw UsageError("Cannot find build references for '%s' without a derivation path", b.what());
                         storePaths.push_back(b.drvPath->clone());
                     }
                 }
