@@ -24,7 +24,8 @@ namespace nix {
 using std::list;
 using std::vector;
 
-typedef enum {
+typedef enum
+{
     lvlError = 0,
     lvlWarn,
     lvlInfo,
@@ -52,7 +53,7 @@ struct ErrPos
     template <class P>
     ErrPos(const P &p)
     {
-      *this = p;
+        *this = p;
     }
 };
 
@@ -87,7 +88,7 @@ protected:
     string prefix_; // used for location traces etc.
     ErrorInfo err;
     string what_;
-    void initWhat() 
+    void initWhat()
     {
         std::ostringstream oss;
         oss << err;
@@ -106,7 +107,7 @@ public:
 
     template<typename... Args>
     BaseError(const Args & ... args)
-        : err { .level = lvlError, 
+        : err { .level = lvlError,
                 .hint = hintfmt(args...)
               }
     { initWhat(); }
@@ -146,7 +147,7 @@ public:
     template<typename... Args>
     SysError(const Args & ... args)
         : Error(args...)  // TODO addErrNo for hintfmt
-        // : Error(addErrno(hintfmt(args...)))
+          // : Error(addErrno(hintfmt(args...)))
     { }
 
 private:
