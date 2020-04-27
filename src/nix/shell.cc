@@ -278,6 +278,7 @@ struct CmdDevShell : Common, MixEnvironment
         auto shell = getEnv("SHELL").value_or("bash");
 
         setEnviron();
+        // prevent garbage collection until shell exits
         setenv("GCROOT", gcroot.data(), 1);
 
         auto args = Strings{std::string(baseNameOf(shell)), "--rcfile", rcFilePath};
