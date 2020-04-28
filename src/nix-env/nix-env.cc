@@ -741,7 +741,7 @@ static void uninstallDerivations(Globals & globals, Strings & selectors,
                 );
             }
             if (split == workingElems.end())
-                warn("Selector '%s' matched no installed paths", selector);
+                warn("selector '%s' matched no installed derivations", selector);
             for (auto removedElem = split; removedElem != workingElems.end(); removedElem++) {
                 printInfo("uninstalling '%s'", removedElem->queryName());
             }
