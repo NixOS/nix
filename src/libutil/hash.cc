@@ -201,6 +201,10 @@ Hash::Hash(const std::string & s, HashType type)
         memcpy(hash, d.data(), hashSize);
     }
 
+    else if (s == "") {
+        printError("warning: found empty hash, assuming you wanted '%s'", this->to_string());
+    }
+
     else
         throw BadHash("hash '%s' has wrong length for hash type '%s'", s, printHashType(type));
 }
