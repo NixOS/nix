@@ -279,7 +279,7 @@ struct CmdDevShell : Common, MixEnvironment
 
         setEnviron();
         // prevent garbage collection until shell exits
-        setenv("GCROOT", gcroot.data(), 1);
+        setenv("NIX_GCROOT", gcroot.data(), 1);
 
         auto args = Strings{std::string(baseNameOf(shell)), "--rcfile", rcFilePath};
 
