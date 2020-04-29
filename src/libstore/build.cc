@@ -2250,10 +2250,13 @@ void DerivationGoal::startBuilder()
 
         if (chown(slaveName.c_str(), buildUser->getUID(), 0))
             throw SysError("changing owner of pseudoterminal slave");
-    } else {
+    }
+#if __APPLE__
+    else {
         if (grantpt(builderOut.readSide.get()))
             throw SysError("granting access to pseudoterminal slave");
     }
+#endif
 
     #if 0
     // Mount the pt in the sandbox so that the "tty" command works.
