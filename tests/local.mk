@@ -21,7 +21,7 @@ nix_tests = \
   fetchGitSubmodules.sh \
   fetchMercurial.sh \
   signing.sh \
-  run.sh \
+  shell.sh \
   brotli.sh \
   pure-eval.sh \
   check.sh \
