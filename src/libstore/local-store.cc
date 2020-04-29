@@ -586,7 +586,7 @@ void LocalStore::resolveDerivation(Derivation & drv) {
     DerivationInputs newInputs;
 
     for (auto & input : drv.inputDrvs) {
-        auto inputDrv = readDerivation(*this, printStorePath(input.first));
+        auto inputDrv = readDerivation(input.first);
         StringSet newOutputNames;
         for (auto & outputName : input.second) {
             DrvOutputId outputId { input.first.clone(), outputName };
