@@ -339,12 +339,14 @@ std::tuple<std::string, FlakeRef, InstallableValue::DerivationInfo> InstallableF
 
         auto aDrvPath = attr->getAttr(state->sDrvPath);
         auto drvPath = state->store->parseStorePath(aDrvPath->getString());
-        if (!state->store->isValidPath(drvPath)) {
+        if (!state->store->isValidPath(drvPath) && !settings.readOnlyMode) {
             /* The eval cache contains 'drvPath', but the actual path
                has been garbage-collected. So force it to be
                regenerated. */
             aDrvPath->forceValue();
-            assert(state->store->isValidPath(drvPath));
+            if (!state->store->isValidPath(drvPath))
+                throw Error("don't know how to recreate store derivation '%s'!",
+                    state->store->printStorePath(drvPath));
         }
 
         auto drvInfo = DerivationInfo{
