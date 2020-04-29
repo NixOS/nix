@@ -337,7 +337,7 @@ public:
      * XXX: The implementation is only valid atm for `LocalStore`
      */
     StorePath queryOutPath(const DrvOutputId & outputId);
-    StorePath queryOutPath(const DrvOutputId & outputId, const Derivation & drv);
+    StorePath queryOutPath(const DrvOutputId & outputId, const BasicDerivation & drv);
 
     /* Return true if ‘path’ is in the Nix store (but not the Nix
        store itself). */

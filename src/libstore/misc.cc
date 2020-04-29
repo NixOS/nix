@@ -112,8 +112,8 @@ StorePath Store::queryOutPath(const DrvOutputId & outputId) {
     return queryOutPath(outputId, derivationFromPath(outputId.deriver));
 }
 
-StorePath Store::queryOutPath(const DrvOutputId & outputId, const Derivation & drv) {
-    return drv.findOutput(outputId.outputName).clone();
+StorePath Store::queryOutPath(const DrvOutputId & outputId, const BasicDerivation & drv) {
+    return drv.findOutput(outputId.outputName);
 }
 
 

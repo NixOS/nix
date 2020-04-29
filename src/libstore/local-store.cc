@@ -589,8 +589,8 @@ void LocalStore::resolveDerivation(Derivation & drv) {
         auto inputDrv = readDerivation(input.first);
         StringSet newOutputNames;
         for (auto & outputName : input.second) {
-            DrvOutputId outputId { input.first.clone(), outputName };
-            auto actualPath = queryOutPath(outputId);
+            DrvOutputId outputId { input.first, outputName };
+            auto actualPath = queryOutPath(outputId, inputDrv);
             if (actualPath != drv.findOutput(outputName)) {
                 inputRewrites.emplace(
                         printStorePath(inputDrv.outputs.at(outputName).path),
@@ -936,7 +936,7 @@ StorePath LocalStore::queryOutPath(const DrvOutputId & outputId) {
     return queryOutPath(outputId, derivationFromPath(outputId.deriver));
 }
 
-StorePath LocalStore::queryOutPath(const DrvOutputId & outputId, const Derivation & drv) {
+StorePath LocalStore::queryOutPath(const DrvOutputId & outputId, const BasicDerivation & drv) {
 
     auto dbQuery = retrySQLite<std::optional<StorePath>>([&]() -> std::optional<StorePath> {
         auto state(_state.lock());
