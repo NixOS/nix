@@ -205,13 +205,15 @@ struct Common : InstallableCommand, MixProfile
         }
     }
 
-    BuildEnvironment getBuildEnvironment(ref<Store> store)
+    std::pair<BuildEnvironment, std::string> getBuildEnvironment(ref<Store> store)
     {
         auto shellOutPath = getShellOutPath(store);
 
+        auto strPath = store->printStorePath(shellOutPath);
+
         updateProfile(shellOutPath);
 
-        return readEnvironment(store->printStorePath(shellOutPath));
+        return {readEnvironment(strPath), strPath};
     }
 };
 
@@ -262,7 +264,7 @@ struct CmdDevShell : Common, MixEnvironment
 
     void run(ref<Store> store) override
     {
-        auto buildEnvironment = getBuildEnvironment(store);
+        auto [buildEnvironment, gcroot] = getBuildEnvironment(store);
 
         auto [rcFileFd, rcFilePath] = createTempFile("nix-shell");
 
@@ -285,6 +287,8 @@ struct CmdDevShell : Common, MixEnvironment
         auto shell = getEnv("SHELL").value_or("bash");
 
         setEnviron();
+        // prevent garbage collection until shell exits
+        setenv("NIX_GCROOT", gcroot.data(), 1);
 
         auto args = Strings{std::string(baseNameOf(shell)), "--rcfile", rcFilePath};
 
@@ -316,7 +320,7 @@ struct CmdPrintDevEnv : Common
 
     void run(ref<Store> store) override
     {
-        auto buildEnvironment = getBuildEnvironment(store);
+        auto buildEnvironment = getBuildEnvironment(store).first;
 
         stopProgressBar();
 
