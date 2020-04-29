@@ -196,7 +196,7 @@ SQLiteTxn::~SQLiteTxn()
     }
 }
 
-void handleSQLiteBusy(const SQLiteBusy & e)
+void handleSQLiteBusy(SQLiteBusy & e)
 {
     static std::atomic<time_t> lastWarned{0};
 

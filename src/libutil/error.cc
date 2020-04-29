@@ -4,8 +4,7 @@
 #include <optional>
 #include "serialise.hh"
 
-namespace nix
-{
+namespace nix {
 
 
 const std::string nativeSystem = SYSTEM;
@@ -149,20 +148,20 @@ std::ostream& operator<<(std::ostream &out, const ErrorInfo &einfo)
 
     // divider.
     if (einfo.name != "")
-      out << fmt("%1%%2%" ANSI_BLUE " --- %3% %4% %5%" ANSI_NORMAL,
-                 prefix,
-                 levelString,
-                 einfo.name,
-                 dashes,
-                 einfo.programName.value_or(""))
-          << std::endl;
+        out << fmt("%1%%2%" ANSI_BLUE " --- %3% %4% %5%" ANSI_NORMAL,
+                   prefix,
+                   levelString,
+                   einfo.name,
+                   dashes,
+                   einfo.programName.value_or(""))
+            << std::endl;
     else
-      out << fmt("%1%%2%" ANSI_BLUE " -----%3% %4%" ANSI_NORMAL,
-                 prefix,
-                 levelString,
-                 dashes,
-                 einfo.programName.value_or(""))
-          << std::endl;
+        out << fmt("%1%%2%" ANSI_BLUE " -----%3% %4%" ANSI_NORMAL,
+                   prefix,
+                   levelString,
+                   dashes,
+                   einfo.programName.value_or(""))
+            << std::endl;
 
     // filename.
     if (einfo.nixCode.has_value()) {

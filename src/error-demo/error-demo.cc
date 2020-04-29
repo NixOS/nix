@@ -4,16 +4,24 @@
 #include <iostream>
 #include <optional>
 
+using namespace nix;
+
+MakeError(DemoError, Error);
+
 int main()
 {
-    using namespace nix;
-
     makeDefaultLogger();
 
     verbosity = lvlVomit;
 
     // In each program where errors occur, this has to be set.
     ErrorInfo::programName = std::optional("error-demo");
+
+    try {
+        throw DemoError("demo error was thrown");
+    } catch (Error &e) {
+        logger->logEI(e.info());
+    }
 
     // For completeness sake, info through vomit levels.
     // But this is maybe a heavy format for those.
@@ -79,7 +87,7 @@ int main()
                         .prevLineOfCode = std::nullopt,
                         .errLineOfCode = "this is the problem line of code",
                         .nextLineOfCode = std::nullopt
-                    }});
+                  }});
 
     // Error with previous and next lines of code.
     logError(
@@ -93,7 +101,7 @@ int main()
                         .prevLineOfCode = std::optional("previous line of code"),
                         .errLineOfCode = "this is the problem line of code",
                         .nextLineOfCode = std::optional("next line of code"),
-                    }});
+                  }});
 
 
     return 0;

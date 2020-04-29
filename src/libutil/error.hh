@@ -24,8 +24,7 @@ namespace nix {
 using std::list;
 using std::vector;
 
-typedef enum
-{
+typedef enum {
     lvlError = 0,
     lvlWarn,
     lvlInfo,
@@ -35,8 +34,7 @@ typedef enum
     lvlVomit
 } Verbosity;
 
-struct ErrPos
-{
+struct ErrPos {
     int line;
     int column;
     string file;
@@ -57,8 +55,7 @@ struct ErrPos
     }
 };
 
-struct NixCode
-{
+struct NixCode {
     ErrPos errPos;
     std::optional<string> prevLineOfCode;
     string errLineOfCode;
@@ -67,8 +64,7 @@ struct NixCode
 
 // -------------------------------------------------
 // ErrorInfo.
-struct ErrorInfo
-{
+struct ErrorInfo {
     Verbosity level;
     string name;
     string description;
@@ -87,12 +83,20 @@ class BaseError : public std::exception
 protected:
     string prefix_; // used for location traces etc.
     ErrorInfo err;
-    string what_;
-    void initWhat()
+    std::optional<string> what_;
+    const string& calcWhat()
     {
-        std::ostringstream oss;
-        oss << err;
-        what_ = oss.str();
+        if (what_.has_value())
+            return *what_;
+        else {
+            err.name = sname();
+
+            std::ostringstream oss;
+            oss << err;
+            what_ = oss.str();
+
+            return *what_;
+        }
     }
 public:
     unsigned int status = 1; // exit status
@@ -103,31 +107,33 @@ public:
                 .hint = hintfmt(args...)
               }
         , status(status)
-    { initWhat(); }
+    {  }
 
     template<typename... Args>
     BaseError(const Args & ... args)
         : err { .level = lvlError,
                 .hint = hintfmt(args...)
               }
-    { initWhat(); }
+    {  }
 
     BaseError(ErrorInfo e)
         : err(e)
-    { initWhat(); }
+    {  }
+
+    virtual const char* sname() const { return "BaseError"; }
 
 #ifdef EXCEPTION_NEEDS_THROW_SPEC
     ~BaseError() throw () { };
-    const char * what() const throw () { return what_.c_str(); }
+    const char * what() throw () { return calcWhat().c_str(); }
 #else
-    const char * what() const noexcept { return what_.c_str(); }
+    const char * what() noexcept { return calcWhat().c_str(); }
 #endif
 
-    const string & msg() const { return what_; }
+    const string & msg() { return calcWhat(); }
     const string & prefix() const { return prefix_; }
     BaseError & addPrefix(const FormatOrString & fs);
 
-    const ErrorInfo & info() const { return err; }
+    const ErrorInfo & info() { calcWhat(); return err; }
 };
 
 #define MakeError(newClass, superClass) \
@@ -135,6 +141,7 @@ public:
     {                                                   \
     public:                                             \
         using superClass::superClass;                   \
+        virtual const char* sname() const override { return #newClass; } \
     }
 
 MakeError(Error, BaseError);
