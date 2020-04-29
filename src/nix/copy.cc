@@ -40,6 +40,8 @@ struct CmdCopy : StorePathsCommand
             .shortName('s')
             .description("whether to try substitutes on the destination store (only supported by SSH)")
             .set(&substitute, Substitute);
+
+        realiseMode = Build;
     }
 
     std::string description() override
