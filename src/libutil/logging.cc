@@ -60,7 +60,7 @@ public:
 
     void logEI(const ErrorInfo & ei) override
     {
-        std::stringstream oss; 
+        std::stringstream oss;
         oss << ei;
 
         log(ei.level, oss.str());
@@ -68,7 +68,7 @@ public:
 
     void startActivity(ActivityId act, Verbosity lvl, ActivityType type,
         const std::string & s, const Fields & fields, ActivityId parent)
-        override
+    override
     {
         if (lvl <= verbosity && !s.empty())
             log(lvl, s + "...");
@@ -111,8 +111,7 @@ Activity::Activity(Logger & logger, Verbosity lvl, ActivityType type,
     logger.startActivity(id, lvl, type, s, fields, parent);
 }
 
-struct JSONLogger : Logger
-{
+struct JSONLogger : Logger {
     Logger & prevLogger;
 
     JSONLogger(Logger & prevLogger) : prevLogger(prevLogger) { }
@@ -155,28 +154,26 @@ struct JSONLogger : Logger
         json["level"] = ei.level;
         json["msg"] = oss.str();
 
-        // Extra things that COULD go into json.  Useful?  
+        // Extra things that COULD go into json.  Useful?
         // TODO: decide if useful.
         // TODO: make a json obj that goes into json["msg"]?
         json["name"] = ei.name;
         json["description"] = ei.description;
-        if (ei.hint.has_value())
-        {
-          json["hint"] = ei.hint->str();
+        if (ei.hint.has_value()) {
+            json["hint"] = ei.hint->str();
         }
-        if (ei.nixCode.has_value())
-        {
-          if (ei.nixCode->errPos.line != 0)
-            json["line"] = ei.nixCode->errPos.line;
-          if (ei.nixCode->errPos.column != 0)
-            json["column"] = ei.nixCode->errPos.column;
-          if (ei.nixCode->errPos.file != "")
-            json["file"] = ei.nixCode->errPos.file;
-          if (ei.nixCode->prevLineOfCode.has_value())
-            json["prevLineOfCode"] = *ei.nixCode->prevLineOfCode;
-          json["errLineOfCode"] = ei.nixCode->errLineOfCode;
-          if (ei.nixCode->nextLineOfCode.has_value())
-            json["nextLineOfCode"] = *ei.nixCode->nextLineOfCode;
+        if (ei.nixCode.has_value()) {
+            if (ei.nixCode->errPos.line != 0)
+                json["line"] = ei.nixCode->errPos.line;
+            if (ei.nixCode->errPos.column != 0)
+                json["column"] = ei.nixCode->errPos.column;
+            if (ei.nixCode->errPos.file != "")
+                json["file"] = ei.nixCode->errPos.file;
+            if (ei.nixCode->prevLineOfCode.has_value())
+                json["prevLineOfCode"] = *ei.nixCode->prevLineOfCode;
+            json["errLineOfCode"] = ei.nixCode->errLineOfCode;
+            if (ei.nixCode->nextLineOfCode.has_value())
+                json["nextLineOfCode"] = *ei.nixCode->nextLineOfCode;
         }
 
         write(json);
@@ -278,7 +275,8 @@ bool handleJSONLogMessage(const std::string & msg,
     return true;
 }
 
-Activity::~Activity() {
+Activity::~Activity()
+{
     try {
         logger.stopActivity(id);
     } catch (...) {

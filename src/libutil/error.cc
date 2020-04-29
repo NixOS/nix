@@ -45,17 +45,17 @@ void printCodeLines(const string &prefix, const NixCode &nixCode)
     // previous line of code.
     if (nixCode.prevLineOfCode.has_value()) {
         std::cout << fmt("%1% %|2$5d|| %3%",
-                         prefix,
-                         (nixCode.errPos.line - 1),
-                         *nixCode.prevLineOfCode)
+            prefix,
+            (nixCode.errPos.line - 1),
+            *nixCode.prevLineOfCode)
                   << std::endl;
     }
 
     // line of code containing the error.%2$+5d%
     std::cout << fmt("%1% %|2$5d|| %3%",
-                     prefix,
-                     (nixCode.errPos.line),
-                     nixCode.errLineOfCode)
+        prefix,
+        (nixCode.errPos.line),
+        nixCode.errLineOfCode)
               << std::endl;
 
     // error arrows for the column range.
@@ -69,17 +69,17 @@ void printCodeLines(const string &prefix, const NixCode &nixCode)
         std::string arrows("^");
 
         std::cout << fmt("%1%      |%2%" ANSI_RED "%3%" ANSI_NORMAL,
-                         prefix,
-                         spaces,
-                         arrows) << std::endl;
+            prefix,
+            spaces,
+            arrows) << std::endl;
     }
 
     // next line of code.
     if (nixCode.nextLineOfCode.has_value()) {
         std::cout << fmt("%1% %|2$5d|| %3%",
-                         prefix,
-                         (nixCode.errPos.line + 1),
-                         *nixCode.nextLineOfCode)
+            prefix,
+            (nixCode.errPos.line + 1),
+            *nixCode.nextLineOfCode)
                   << std::endl;
     }
 }
@@ -149,18 +149,18 @@ std::ostream& operator<<(std::ostream &out, const ErrorInfo &einfo)
     // divider.
     if (einfo.name != "")
         out << fmt("%1%%2%" ANSI_BLUE " --- %3% %4% %5%" ANSI_NORMAL,
-                   prefix,
-                   levelString,
-                   einfo.name,
-                   dashes,
-                   einfo.programName.value_or(""))
+            prefix,
+            levelString,
+            einfo.name,
+            dashes,
+            einfo.programName.value_or(""))
             << std::endl;
     else
         out << fmt("%1%%2%" ANSI_BLUE " -----%3% %4%" ANSI_NORMAL,
-                   prefix,
-                   levelString,
-                   dashes,
-                   einfo.programName.value_or(""))
+            prefix,
+            levelString,
+            dashes,
+            einfo.programName.value_or(""))
             << std::endl;
 
     // filename.
@@ -171,9 +171,9 @@ std::ostream& operator<<(std::ostream &out, const ErrorInfo &einfo)
                            : "";
 
             out << fmt("%1%in file: " ANSI_BLUE "%2%%3%" ANSI_NORMAL,
-                       prefix,
-                       einfo.nixCode->errPos.file,
-                       eline) << std::endl;
+                prefix,
+                einfo.nixCode->errPos.file,
+                eline) << std::endl;
             out << prefix << std::endl;
         } else {
             out << fmt("%1%from command line argument", prefix) << std::endl;
