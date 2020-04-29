@@ -32,6 +32,8 @@ rev2=$(git -C $repo rev-parse HEAD)
 # Fetch a worktree
 unset _NIX_FORCE_HTTP
 path0=$(nix eval --impure --raw --expr "(builtins.fetchGit file://$TEST_ROOT/worktree).outPath")
+path0_=$(nix eval --impure --raw --expr "(builtins.fetchTree { type = \"git\"; url = file://$TEST_ROOT/worktree; }).outPath")
+[[ $path0 = $path0_ ]]
 export _NIX_FORCE_HTTP=1
 [[ $(tail -n 1 $path0/hello) = "hello" ]]
 
@@ -87,8 +89,6 @@ path2=$(nix eval --impure --raw --expr "(builtins.fetchGit $repo).outPath")
 [ ! -e $path2/.git ]
 [[ $(cat $path2/dir1/foo) = foo ]]
 
-[[ $(nix eval --impure --raw --expr "(builtins.fetchGit $repo).rev") = 0000000000000000000000000000000000000000 ]]
-
 # ... unless we're using an explicit ref or rev.
 path3=$(nix eval --impure --raw --expr "(builtins.fetchGit { url = $repo; ref = \"master\"; }).outPath")
 [[ $path = $path3 ]]
@@ -101,6 +101,12 @@ git -C $repo commit -m 'Bla3' -a
 
 path4=$(nix eval --impure --refresh --raw --expr "(builtins.fetchGit file://$repo).outPath")
 [[ $path2 = $path4 ]]
+
+nix eval --impure --raw --expr "(builtins.fetchGit { url = $repo; rev = \"$rev2\"; narHash = \"sha256-B5yIPHhEm0eysJKEsO7nqxprh9vcblFxpJG11gXJus1=\"; }).outPath" || status=$?
+[[ "$status" = "102" ]]
+
+path5=$(nix eval --impure --raw --expr "(builtins.fetchGit { url = $repo; rev = \"$rev2\"; narHash = \"sha256-Hr8g6AqANb3xqX28eu1XnjK/3ab8Gv6TJSnkb1LezG9=\"; }).outPath")
+[[ $path = $path5 ]]
 
 # tarball-ttl should be ignored if we specify a rev
 echo delft > $repo/hello
@@ -123,7 +129,7 @@ path2=$(nix eval --impure --raw --expr "(builtins.fetchGit file://$repo).outPath
 # Using local path with branch other than 'master' should work when clean or dirty
 path3=$(nix eval --impure --raw --expr "(builtins.fetchGit $repo).outPath")
 # (check dirty-tree handling was used)
-[[ $(nix eval --impure --raw --expr "(builtins.fetchGit $repo).rev") = 0000000000000000000000000000000000000000 ]]
+[[ $(nix eval --impure --expr "(builtins.fetchGit $repo).rev or null") = null ]]
 
 # Committing shouldn't change store path, or switch to using 'master'
 git -C $repo commit -m 'Bla5' -a
