@@ -205,10 +205,14 @@ void Store::queryMissing(const std::vector<StorePathWithOutputs> & targets,
             ParsedDerivation parsedDrv(StorePath(path.path), *drv);
 
             PathSet invalid;
-            for (auto & j : drv->outputs)
+            for (auto & j : drv->outputs) {
+                auto outPath = queryOutPath(
+                  DrvOutputId { path.path, j.first }
+                );
                 if (wantOutput(j.first, path.outputs)
-                    && !isValidPath(j.second.path))
-                    invalid.insert(printStorePath(j.second.path));
+                    && !isValidPath(outPath))
+                    invalid.insert(printStorePath(outPath));
+            }
             if (invalid.empty()) return;
 
             if (settings.useSubstitutes && parsedDrv.substitutesAllowed()) {

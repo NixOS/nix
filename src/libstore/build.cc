@@ -4243,10 +4243,14 @@ StorePathSet DerivationGoal::checkPathValidity(bool returnValid, bool checkHash)
     StorePathSet result;
     for (auto & i : drv->outputs) {
         if (!wantOutput(i.first, wantedOutputs)) continue;
+        StorePath outPath = worker.store.queryOutPath(
+            DrvOutputId{ drvPath, i.first },
+            *(drv.get())
+          );
         bool good =
-            worker.store.isValidPath(i.second.path) &&
-            (!checkHash || worker.pathContentsGood(i.second.path));
-        if (good == returnValid) result.insert(i.second.path);
+            worker.store.isValidPath(outPath) &&
+            (!checkHash || worker.pathContentsGood(outPath));
+        if (good == returnValid) result.insert(outPath);
     }
     return result;
 }
