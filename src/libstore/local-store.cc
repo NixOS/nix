@@ -933,7 +933,7 @@ void LocalStore::registerOutputMappings(const OutputMappings & mappings)
 }
 
 StorePath LocalStore::queryOutPath(const DrvOutputId & outputId) {
-  return queryOutPath(outputId, derivationFromPath(outputId.deriver));
+    return queryOutPath(outputId, derivationFromPath(outputId.deriver));
 }
 
 StorePath LocalStore::queryOutPath(const DrvOutputId & outputId, const Derivation & drv) {

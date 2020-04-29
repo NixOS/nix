@@ -108,6 +108,15 @@ void Store::computeFSClosure(const StorePath & startPath,
 }
 
 
+StorePath Store::queryOutPath(const DrvOutputId & outputId) {
+    return queryOutPath(outputId, derivationFromPath(outputId.deriver));
+}
+
+StorePath Store::queryOutPath(const DrvOutputId & outputId, const Derivation & drv) {
+    return drv.findOutput(outputId.outputName).clone();
+}
+
+
 void Store::queryMissing(const std::vector<StorePathWithOutputs> & targets,
     StorePathSet & willBuild_, StorePathSet & willSubstitute_, StorePathSet & unknown_,
     unsigned long long & downloadSize_, unsigned long long & narSize_)
