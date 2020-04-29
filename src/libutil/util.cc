@@ -312,14 +312,7 @@ unsigned char getFileType(const Path & path)
 
 string readFile(int fd)
 {
-    struct stat st;
-    if (fstat(fd, &st) == -1)
-        throw SysError("statting file");
-
-    std::vector<unsigned char> buf(st.st_size);
-    readFull(fd, buf.data(), st.st_size);
-
-    return string((char *) buf.data(), st.st_size);
+    return drainFD(fd, true);
 }
 
 
