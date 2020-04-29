@@ -162,7 +162,7 @@ MakeError(EndOfFile, Error);
 
 
 /* Read a file descriptor until EOF occurs. */
-string drainFD(int fd, bool block = true);
+string drainFD(int fd, bool block = true, const size_t reserveSize=0);
 
 void drainFD(int fd, Sink & sink, bool block = true);
 

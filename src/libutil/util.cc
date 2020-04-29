@@ -312,7 +312,11 @@ unsigned char getFileType(const Path & path)
 
 string readFile(int fd)
 {
-    return drainFD(fd, true);
+    struct stat st;
+    if (fstat(fd, &st) == -1)
+        throw SysError("statting file");
+
+    return drainFD(fd, true, st.st_size);
 }
 
 
@@ -658,9 +662,9 @@ void writeFull(int fd, const string & s, bool allowInterrupts)
 }
 
 
-string drainFD(int fd, bool block)
+string drainFD(int fd, bool block, const size_t reserveSize)
 {
-    StringSink sink;
+    StringSink sink(reserveSize);
     drainFD(fd, sink, block);
     return std::move(*sink.s);
 }
