@@ -906,7 +906,7 @@ static void opServe(Strings opFlags, Strings opArgs)
 
                 if (!writeAllowed) throw Error("building paths is not allowed");
 
-                auto drvPath = store->parseStorePath(readString(in)); // inonal ony
+                auto drvPath = store->parseStorePath(readString(in)); // informational only
                 BasicDerivation drv;
                 readDerivation(in, *store, drv);
 
