@@ -83,6 +83,10 @@ BuildEnvironment readEnvironment(const Path & path)
     return res;
 }
 
+const static std::string getEnvSh =
+    #include "get-env.sh.gen.hh"
+    ;
+
 /* Given an existing derivation, return the shell environment as
    initialised by stdenv's setup script. We do this by building a
    modified derivation with the same dependencies and nearly the same
@@ -94,16 +98,9 @@ StorePath getDerivationEnvironment(ref<Store> store, Derivation drv)
     if (builder != "bash")
         throw Error("'nix dev-shell' only works on derivations that use 'bash' as their builder");
 
-    drv.args = {
-        "-c",
-        "set -e; "
-        "export IN_NIX_SHELL=impure; "
-        "export dontAddDisableDepTrack=1; "
-        "if [[ -n $stdenv ]]; then "
-        "  source $stdenv/setup; "
-        "fi; "
-        "export > $out; "
-        "set >> $out "};
+    auto getEnvShPath = store->addTextToStore("get-env.sh", getEnvSh, {});
+
+    drv.args = {store->printStorePath(getEnvShPath)};
 
     /* Remove derivation checks. */
     drv.env.erase("allowedReferences");
@@ -120,6 +117,7 @@ StorePath getDerivationEnvironment(ref<Store> store, Derivation drv)
         drv.env.erase(output.first);
     drv.env["out"] = "";
     drv.env["outputs"] = "out";
+    drv.inputSrcs.insert(std::move(getEnvShPath));
     Hash h = hashDerivationModulo(*store, drv, true);
     auto shellOutPath = store->makeOutputPath("out", h, drvName);
     drv.outputs.insert_or_assign("out", DerivationOutput(shellOutPath.clone(), "", ""));
