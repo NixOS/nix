@@ -83,6 +83,7 @@ class BaseError : public std::exception
 protected:
     string prefix_; // used for location traces etc.
     ErrorInfo err;
+
     std::optional<string> what_;
     const string& calcWhat()
     {
@@ -107,18 +108,18 @@ public:
                 .hint = hintfmt(args...)
               }
         , status(status)
-    {  }
+    { }
 
     template<typename... Args>
     BaseError(const Args & ... args)
         : err { .level = lvlError,
                 .hint = hintfmt(args...)
               }
-    {  }
+    { }
 
     BaseError(ErrorInfo e)
         : err(e)
-    {  }
+    { }
 
     virtual const char* sname() const { return "BaseError"; }
 

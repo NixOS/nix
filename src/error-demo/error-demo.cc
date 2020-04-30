@@ -23,6 +23,16 @@ int main()
         logger->logEI(e.info());
     }
 
+
+    // ErrorInfo constructor
+    try {
+        auto e = Error("generic error");
+        throw DemoError(e.info());
+    } catch (Error &e) {
+        logger->logEI(e.info());
+    }
+
+
     // For completeness sake, info through vomit levels.
     // But this is maybe a heavy format for those.
     logger->logEI(
