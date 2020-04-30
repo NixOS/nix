@@ -137,7 +137,7 @@ struct CmdVerify : StorePathsCommand
                                 doSigs(info2->sigs);
                             } catch (InvalidPath &) {
                             } catch (Error & e) {
-                                printError(format(ANSI_RED "error:" ANSI_NORMAL " %s") % e.what());
+                                logError(e.info());
                             }
                         }
 
@@ -156,7 +156,7 @@ struct CmdVerify : StorePathsCommand
                 done++;
 
             } catch (Error & e) {
-                printError(format(ANSI_RED "error:" ANSI_NORMAL " %s") % e.what());
+                logError(e.info());
                 failed++;
             }
 

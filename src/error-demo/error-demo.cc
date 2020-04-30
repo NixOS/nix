@@ -65,7 +65,6 @@ int main()
                     .description = "Vomit description",
         });
 
-
     // Error in a program; no hint and no nix code.
     logError(
         ErrorInfo { .name = "name",
@@ -79,7 +78,6 @@ int main()
                     .description = "error description",
                     .hint = hintfmt("there was a %1%", "warning"),
         });
-
 
     // Warning with nix file, line number, column, and the lines of
     // code where a warning occurred.
