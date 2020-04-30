@@ -219,7 +219,7 @@ struct CmdDevShell : Common, MixEnvironment
         mkFlag()
             .longName("command")
             .shortName('c')
-            .description("command and arguments to be executed insted of an interactive shell")
+            .description("command and arguments to be executed instead of an interactive shell")
             .labels({"command", "args"})
             .arity(ArityAny)
             .handler([&](std::vector<std::string> ss) {
