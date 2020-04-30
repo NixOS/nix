@@ -172,6 +172,8 @@ struct Common : InstallableCommand, MixProfile
 
     void makeRcScript(const BuildEnvironment & buildEnvironment, std::ostream & out)
     {
+        out << "unset shellHook\n";
+
         out << "nix_saved_PATH=\"$PATH\"\n";
 
         for (auto & i : buildEnvironment.env) {
