@@ -33,7 +33,7 @@ $ nix-build ./release.nix -A build.x86_64-linux
 
 ### Development Environment
 
-You can use the provided `shell.nix` to easily bootstrap working development environment:
+You can use the provided `shell.nix` to easily bootstrap a working development environment:
 
 ```
 $ nix-shell
