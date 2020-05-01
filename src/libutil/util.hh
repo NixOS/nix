@@ -9,6 +9,7 @@
 #include <dirent.h>
 #include <unistd.h>
 #include <signal.h>
+#include <time.h>
 
 #include <functional>
 #include <limits>
@@ -74,6 +75,9 @@ bool isDirOrInDir(const Path & path, const Path & dir);
 
 /* Get status of `path'. */
 struct stat lstat(const Path & path);
+
+/* Get current time. */
+struct timespec now();
 
 /* Return true iff the given path exists. */
 bool pathExists(const Path & path);

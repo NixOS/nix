@@ -231,6 +231,15 @@ struct stat lstat(const Path & path)
 }
 
 
+struct timespec now()
+{
+    struct timespec time;
+    if (timespec_get(&time, TIME_UTC) == 0)
+        throw SysError("getting current time");
+    return time;
+}
+
+
 bool pathExists(const Path & path)
 {
     int res;

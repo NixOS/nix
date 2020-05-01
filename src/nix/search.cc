@@ -29,6 +29,15 @@ std::string hilite(const std::string & s, const std::smatch & m, std::string pos
           + std::string(m.suffix());
 }
 
+const int daysUntilCacheOutdated = 3;
+const int daysInSeconds = 24 * 3600;
+
+bool cacheOutdated(const Path & cacheFileName) {
+    const auto lastModified = lstat(cacheFileName).st_mtim;
+    const int cacheAge = now().tv_sec - lastModified.tv_sec;
+    return cacheAge > daysUntilCacheOutdated * daysInSeconds;
+}
+
 struct CmdSearch : SourceExprCommand, MixJSON
 {
     std::vector<std::string> res;
@@ -224,7 +233,9 @@ struct CmdSearch : SourceExprCommand, MixJSON
 
         if (useCache && pathExists(jsonCacheFileName)) {
 
-            warn("using cached results; pass '-u' to update the cache");
+            if (cacheOutdated(jsonCacheFileName)) {
+                warn("using cached results older than %1% days; pass '-u' to update the cache", daysUntilCacheOutdated);
+            }
 
             Value vRoot;
             parseJSON(*state, readFile(jsonCacheFileName), vRoot);
