@@ -45,7 +45,7 @@ $ make
 ## Additional Resources
 
 - [Nix manual](https://nixos.org/nix/manual)
-- [Nix jobs on nixos.hydra.org](https://hydra.nixos.org/project/nix)
+- [Nix jobsets on hydra.nixos.org](https://hydra.nixos.org/project/nix)
 - [Nix - A One Pager](https://github.com/tazjin/nix-1p)
 - [NixOS Discourse](https://discourse.nixos.org/)
 - #nix / #nixos on irc.freenode.net
