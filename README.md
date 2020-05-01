@@ -48,7 +48,7 @@ $ make
 - [Nix jobsets on hydra.nixos.org](https://hydra.nixos.org/project/nix)
 - [Nix - A One Pager](https://github.com/tazjin/nix-1p)
 - [NixOS Discourse](https://discourse.nixos.org/)
-- #nix / #nixos on irc.freenode.net
+- [IRC - #nixos on freenode.net](irc://irc.freenode.net/#nixos)
 
 ## License
 
