@@ -22,7 +22,7 @@ Information on additional installation methods is available on the [Nix download
 
 ### Building Nix
 
-You can build Nix via Nix via one of the targets provided by [release.nix](./release.nix):
+You can build Nix using one of the targets provided by [release.nix](./release.nix):
 
 ```
 $ nix-build ./release.nix -A build.aarch64-linux
@@ -33,7 +33,7 @@ $ nix-build ./release.nix -A build.x86_64-linux
 
 ### Development Environment
 
-You can use the provided `shell.nix` to easily bootstrap a working development environment:
+You can use the provided `shell.nix` to get a working development environment:
 
 ```
 $ nix-shell
@@ -46,10 +46,9 @@ $ make
 
 - [Nix manual](https://nixos.org/nix/manual)
 - [Nix jobsets on hydra.nixos.org](https://hydra.nixos.org/project/nix)
-- [Nix - A One Pager](https://github.com/tazjin/nix-1p)
 - [NixOS Discourse](https://discourse.nixos.org/)
 - [IRC - #nixos on freenode.net](irc://irc.freenode.net/#nixos)
 
 ## License
 
-Nix is released under the [LGPL v2.1](./COPYING)
+Nix is released under the [LGPL v2.1](./COPYING).
