@@ -600,7 +600,12 @@ struct CurlDownloader : public Downloader
             workerThreadMain();
         } catch (nix::Interrupted & e) {
         } catch (std::exception & e) {
-            printError("unexpected error in download thread: %s", e.what());
+            logError(
+                ErrorInfo { 
+                    .name = "download",
+                    .hint = hintfmt("unexpected error in download thread: %s", 
+                                    e.what())
+                });
         }
 
         {

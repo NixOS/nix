@@ -204,7 +204,10 @@ void handleSQLiteBusy(SQLiteBusy & e)
 
     if (now > lastWarned + 10) {
         lastWarned = now;
-        printError("warning: %s", e.what());
+        logWarning(
+            ErrorInfo { .name = "sqlite busy",
+                        .hint = hintfmt(e.what())
+            });
     }
 
     /* Sleep for a while since retrying the transaction right away

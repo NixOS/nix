@@ -41,7 +41,8 @@ AutoCloseFD LocalStore::openGCLock(LockType lockType)
         throw SysError("opening global GC lock '%1%'", fnGCLock);
 
     if (!lockFile(fdGCLock.get(), lockType, false)) {
-        printError(format("waiting for the big garbage collector lock..."));
+        // TODO: info?
+        printError("waiting for the big garbage collector lock...");
         lockFile(fdGCLock.get(), lockType, true);
     }
 
@@ -129,10 +130,14 @@ Path LocalFSStore::addPermRoot(const StorePath & storePath,
     if (settings.checkRootReachability) {
         auto roots = findRoots(false);
         if (roots[storePath.clone()].count(gcRoot) == 0)
-            printError(
-                "warning: '%1%' is not in a directory where the garbage collector looks for roots; "
+
+            logWarning(
+                ErrorInfo { 
+                    .name = "GC Root",
+                    .hint = hintfmt("warning: '%1%' is not in a directory where the garbage collector looks for roots; "
                 "therefore, '%2%' might be removed by the garbage collector",
-                gcRoot, printStorePath(storePath));
+                gcRoot, printStorePath(storePath))
+            });
     }
 
     /* Grab the global GC root, causing us to block while a GC is in

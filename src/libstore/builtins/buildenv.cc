@@ -22,7 +22,11 @@ static void createLinks(State & state, const Path & srcDir, const Path & dstDir,
         srcFiles = readDirectory(srcDir);
     } catch (SysError & e) {
         if (e.errNo == ENOTDIR) {
-            printError("warning: not including '%s' in the user environment because it's not a directory", srcDir);
+            logWarning(
+                ErrorInfo { 
+                    .name = "Create Links - Directory",
+                    .hint = hintfmt("not including '%s' in the user environment because it's not a directory", srcDir)
+            });
             return;
         }
         throw;
@@ -41,7 +45,11 @@ static void createLinks(State & state, const Path & srcDir, const Path & dstDir,
                 throw SysError("getting status of '%1%'", srcFile);
         } catch (SysError & e) {
             if (e.errNo == ENOENT || e.errNo == ENOTDIR) {
-                printError("warning: skipping dangling symlink '%s'", dstFile);
+                logWarning(
+                    ErrorInfo { 
+                        .name = "Create Links - Skipping Symlink",
+                        .hint = hintfmt("skipping dangling symlink '%s'", dstFile)
+                });
                 continue;
             }
             throw;

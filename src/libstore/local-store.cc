@@ -87,8 +87,13 @@ LocalStore::LocalStore(const Params & params)
 
         struct group * gr = getgrnam(settings.buildUsersGroup.get().c_str());
         if (!gr)
-            printError(format("warning: the group '%1%' specified in 'build-users-group' does not exist")
-                % settings.buildUsersGroup);
+            logError(
+                ErrorInfo { 
+                    .name = "'build-users-group' not found",
+                    .hint = hintfmt(
+                        "warning: the group '%1%' specified in 'build-users-group' does not exist",
+                        settings.buildUsersGroup)
+            });
         else {
             struct stat st;
             if (stat(realStoreDir.c_str(), &st))
@@ -876,7 +881,7 @@ void LocalStore::querySubstitutablePathInfos(const StorePathSet & paths,
             } catch (SubstituterDisabled &) {
             } catch (Error & e) {
                 if (settings.tryFallback)
-                    printError(e.what());
+                    logError(e.info());
                 else
                     throw;
             }
@@ -1237,9 +1242,13 @@ bool LocalStore::verifyStore(bool checkContents, RepairFlag repair)
             Path linkPath = linksDir + "/" + link.name;
             string hash = hashPath(htSHA256, linkPath).first.to_string(Base32, false);
             if (hash != link.name) {
-                printError(
+                logError(
+                    ErrorInfo { 
+                        .name = "Invalid Hash",
+                        .hint = hintfmt(
                     "link '%s' was modified! expected hash '%s', got '%s'",
-                    linkPath, link.name, hash);
+                    linkPath, link.name, hash)
+                });
                 if (repair) {
                     if (unlink(linkPath.c_str()) == 0)
                         printError("removed link '%s'", linkPath);
@@ -1272,8 +1281,12 @@ bool LocalStore::verifyStore(bool checkContents, RepairFlag repair)
                 auto current = hashSink->finish();
 
                 if (info->narHash != nullHash && info->narHash != current.first) {
-                    printError("path '%s' was modified! expected hash '%s', got '%s'",
-                        printStorePath(i), info->narHash.to_string(), current.first.to_string());
+                    logError(
+                        ErrorInfo { 
+                            .name = "Invalid Hash - Path Modified",
+                            .hint = hintfmt("path '%s' was modified! expected hash '%s', got '%s'",
+                            printStorePath(i), info->narHash.to_string(), current.first.to_string())
+                    });
                     if (repair) repairPath(i); else errors = true;
                 } else {
 
@@ -1304,7 +1317,7 @@ bool LocalStore::verifyStore(bool checkContents, RepairFlag repair)
                 /* It's possible that the path got GC'ed, so ignore
                    errors on invalid paths. */
                 if (isValidPath(i))
-                    printError("error: %s", e.msg());
+                    logError(e.info());
                 else
                     warn(e.msg());
                 errors = true;
@@ -1324,7 +1337,11 @@ void LocalStore::verifyPath(const Path & pathS, const StringSet & store,
     if (!done.insert(pathS).second) return;
 
     if (!isStorePath(pathS)) {
-        printError("path '%s' is not in the Nix store", pathS);
+        logError(
+            ErrorInfo { 
+                .name = "Nix path not found",
+                .hint = hintfmt("path '%s' is not in the Nix store", pathS)
+        });
         return;
     }
 
@@ -1347,12 +1364,17 @@ void LocalStore::verifyPath(const Path & pathS, const StringSet & store,
             auto state(_state.lock());
             invalidatePath(*state, path);
         } else {
-            printError("path '%s' disappeared, but it still has valid referrers!", pathS);
+            // TODO log as warning if repair successful??
+            logError(
+                ErrorInfo { 
+                    .name = "Missing path with referrers",
+                    .hint = hintfmt("path '%s' disappeared, but it still has valid referrers!", pathS)
+            });
             if (repair)
                 try {
                     repairPath(path);
                 } catch (Error & e) {
-                    warn(e.msg());
+                    logWarning(e.info());
                     errors = true;
                 }
             else errors = true;

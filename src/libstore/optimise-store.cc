@@ -130,7 +130,11 @@ void LocalStore::optimisePath_(Activity * act, OptimiseStats & stats,
        NixOS (example: $fontconfig/var/cache being modified).  Skip
        those files.  FIXME: check the modification time. */
     if (S_ISREG(st.st_mode) && (st.st_mode & S_IWUSR)) {
-        printError("skipping suspicious writable file '%1%'", path);
+        logWarning(
+            ErrorInfo { 
+                .name = "Suspicious File",
+                .hint = hintfmt("skipping suspicious writable file '%1%'", path)
+        });
         return;
     }
 
@@ -194,7 +198,11 @@ void LocalStore::optimisePath_(Activity * act, OptimiseStats & stats,
     }
 
     if (st.st_size != stLink.st_size) {
-        printError("removing corrupted link '%1%'", linkPath);
+        logWarning(
+            ErrorInfo { 
+                .name = "Corrupted Link",
+                .hint = hintfmt("removing corrupted link '%1%'", linkPath)
+        });
         unlink(linkPath.c_str());
         goto retry;
     }
@@ -229,7 +237,11 @@ void LocalStore::optimisePath_(Activity * act, OptimiseStats & stats,
     /* Atomically replace the old file with the new hard link. */
     if (rename(tempLink.c_str(), path.c_str()) == -1) {
         if (unlink(tempLink.c_str()) == -1)
-            printError("unable to unlink '%1%'", tempLink);
+            logError(
+                ErrorInfo { 
+                    .name = "Unlink error",
+                    .hint = hintfmt("unable to unlink '%1%'", tempLink)
+            });
         if (errno == EMLINK) {
             /* Some filesystems generate too many links on the rename,
                rather than on the original link.  (Probably it
