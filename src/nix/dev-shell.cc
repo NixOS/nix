@@ -13,7 +13,8 @@ using namespace nix;
 
 struct Var
 {
-    bool exported;
+    bool exported = true;
+    bool associative = false;
     std::string value; // quoted string or array
 };
 
@@ -48,11 +49,17 @@ BuildEnvironment readEnvironment(const Path & path)
     static std::string quotedStringRegex =
         R"re((?:\$?'(?:[^'\\]|\\[abeEfnrtv\\'"?])*'))re";
 
-    static std::string arrayRegex =
-        R"re((?:\(( *\[[^\]]+\]="(?:[^"\\]|\\.)*")*\)))re";
+    static std::string indexedArrayRegex =
+        R"re((?:\(( *\[[0-9]+]="(?:[^"\\]|\\.)*")**\)))re";
 
     static std::regex varRegex(
-        "^(" + varNameRegex + ")=(" + simpleStringRegex + "|" + quotedStringRegex + "|" + arrayRegex + ")\n");
+        "^(" + varNameRegex + ")=(" + simpleStringRegex + "|" + quotedStringRegex + "|" + indexedArrayRegex + ")\n");
+
+    /* Note: we distinguish between an indexed and associative array
+       using the space before the closing parenthesis. Will
+       undoubtedly regret this some day. */
+    static std::regex assocArrayRegex(
+        "^(" + varNameRegex + ")=" + R"re((?:\(( *\[[^\]]+\]="(?:[^"\\]|\\.)*")* *\)))re" + "\n");
 
     static std::regex functionRegex(
         "^" + varNameRegex + " \\(\\) *\n");
@@ -68,7 +75,12 @@ BuildEnvironment readEnvironment(const Path & path)
 
         else if (std::regex_search(pos, file.cend(), match, varRegex)) {
             pos = match[0].second;
-            res.env.insert({match[1], Var { (bool) exported.count(match[1]), match[2] }});
+            res.env.insert({match[1], Var { .exported = exported.count(match[1]) > 0, .value = match[2] }});
+        }
+
+        else if (std::regex_search(pos, file.cend(), match, assocArrayRegex)) {
+            pos = match[0].second;
+            res.env.insert({match[1], Var { .associative = true, .value = match[2] }});
         }
 
         else if (std::regex_search(pos, file.cend(), match, functionRegex)) {
@@ -83,27 +95,26 @@ BuildEnvironment readEnvironment(const Path & path)
     return res;
 }
 
+const static std::string getEnvSh =
+    #include "get-env.sh.gen.hh"
+    ;
+
 /* Given an existing derivation, return the shell environment as
    initialised by stdenv's setup script. We do this by building a
    modified derivation with the same dependencies and nearly the same
    initial environment variables, that just writes the resulting
    environment to a file and exits. */
-StorePath getDerivationEnvironment(ref<Store> store, Derivation drv)
+StorePath getDerivationEnvironment(ref<Store> store, const StorePath & drvPath)
 {
+    auto drv = store->derivationFromPath(drvPath);
+
     auto builder = baseNameOf(drv.builder);
     if (builder != "bash")
         throw Error("'nix dev-shell' only works on derivations that use 'bash' as their builder");
 
-    drv.args = {
-        "-c",
-        "set -e; "
-        "export IN_NIX_SHELL=impure; "
-        "export dontAddDisableDepTrack=1; "
-        "if [[ -n $stdenv ]]; then "
-        "  source $stdenv/setup; "
-        "fi; "
-        "export > $out; "
-        "set >> $out "};
+    auto getEnvShPath = store->addTextToStore("get-env.sh", getEnvSh, {});
+
+    drv.args = {store->printStorePath(getEnvShPath)};
 
     /* Remove derivation checks. */
     drv.env.erase("allowedReferences");
@@ -111,15 +122,17 @@ StorePath getDerivationEnvironment(ref<Store> store, Derivation drv)
     drv.env.erase("disallowedReferences");
     drv.env.erase("disallowedRequisites");
 
-    // FIXME: handle structured attrs
-
     /* Rehash and write the derivation. FIXME: would be nice to use
        'buildDerivation', but that's privileged. */
-    auto drvName = drv.env["name"] + "-env";
+    auto drvName = std::string(drvPath.name());
+    assert(hasSuffix(drvName, ".drv"));
+    drvName.resize(drvName.size() - 4);
+    drvName += "-env";
     for (auto & output : drv.outputs)
         drv.env.erase(output.first);
     drv.env["out"] = "";
     drv.env["outputs"] = "out";
+    drv.inputSrcs.insert(std::move(getEnvShPath));
     Hash h = hashDerivationModulo(*store, drv, true);
     auto shellOutPath = store->makeOutputPath("out", h, drvName);
     drv.outputs.insert_or_assign("out", DerivationOutput(shellOutPath.clone(), "", ""));
@@ -159,13 +172,19 @@ struct Common : InstallableCommand, MixProfile
 
     void makeRcScript(const BuildEnvironment & buildEnvironment, std::ostream & out)
     {
+        out << "unset shellHook\n";
+
         out << "nix_saved_PATH=\"$PATH\"\n";
 
         for (auto & i : buildEnvironment.env) {
             if (!ignoreVars.count(i.first) && !hasPrefix(i.first, "BASH_")) {
-                out << fmt("%s=%s\n", i.first, i.second.value);
-                if (i.second.exported)
-                    out << fmt("export %s\n", i.first);
+                if (i.second.associative)
+                    out << fmt("declare -A %s=(%s)\n", i.first, i.second.value);
+                else {
+                    out << fmt("%s=%s\n", i.first, i.second.value);
+                    if (i.second.exported)
+                        out << fmt("export %s\n", i.first);
+                }
             }
         }
 
@@ -201,7 +220,7 @@ struct Common : InstallableCommand, MixProfile
 
             auto & drvPath = *drvs.begin();
 
-            return getDerivationEnvironment(store, store->derivationFromPath(drvPath));
+            return getDerivationEnvironment(store, drvPath);
         }
     }
 

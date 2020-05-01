@@ -116,7 +116,7 @@ static void fetch(EvalState & state, const Pos & pos, Value * * args, Value & v,
                 name = state.forceStringNoCtx(*attr.value, *attr.pos);
             else
                 throw EvalError("unsupported argument '%s' to '%s', at %s",
-                    attr.name, who, attr.pos);
+                    attr.name, who, *attr.pos);
         }
 
         if (!url)
