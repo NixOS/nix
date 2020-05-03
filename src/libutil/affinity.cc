@@ -25,7 +25,7 @@ void setAffinityTo(int cpu)
     CPU_ZERO(&newAffinity);
     CPU_SET(cpu, &newAffinity);
     if (sched_setaffinity(0, sizeof(cpu_set_t), &newAffinity) == -1)
-        printError(format("failed to lock thread to CPU %1%") % cpu);
+        printError("failed to lock thread to CPU %1%", cpu);
 #endif
 }
 
@@ -47,7 +47,7 @@ void restoreAffinity()
 #if __linux__
     if (!didSaveAffinity) return;
     if (sched_setaffinity(0, sizeof(cpu_set_t), &savedAffinity) == -1)
-        printError("failed to restore affinity %1%");
+        _printError("failed to restore affinity");
 #endif
 }
 

@@ -247,7 +247,8 @@ static void daemonLoop(char * * argv)
         } catch (Interrupted & e) {
             return;
         } catch (Error & e) {
-            printError("error processing connection: %1%", e.msg());
+            // TODO append error message
+            _printError("error processing connection: %1%", e.msg());
         }
     }
 }

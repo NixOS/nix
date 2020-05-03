@@ -726,9 +726,15 @@ static void opVerifyPath(Strings opFlags, Strings opArgs)
         store->narFromPath(path, sink);
         auto current = sink.finish();
         if (current.first != info->narHash) {
-            printError(
-                "path '%s' was modified! expected hash '%s', got '%s'",
-                store->printStorePath(path), info->narHash.to_string(), current.first.to_string());
+            logError(
+                ErrorInfo { 
+                    .name = "Hash match error",
+                    .hint = hintfmt(
+                        "path '%s' was modified! expected hash '%s', got '%s'",
+                        store->printStorePath(path),
+                        info->narHash.to_string(),
+                        current.first.to_string())
+            });
             status = 1;
         }
     }
@@ -835,7 +841,8 @@ static void opServe(Strings opFlags, Strings opArgs)
                             for (auto & p : willSubstitute) subs.emplace_back(p.clone());
                             store->buildPaths(subs);
                         } catch (Error & e) {
-                            printError("warning: %1%", e.msg());
+                            // logWarning(e.info())  TODO:  
+                            _printError("warning: %1%", e.msg());
                         }
                 }
 

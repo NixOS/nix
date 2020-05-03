@@ -97,9 +97,15 @@ struct CmdVerify : StorePathsCommand
                     if (hash.first != info->narHash) {
                         corrupted++;
                         act2.result(resCorruptedPath, store->printStorePath(info->path));
-                        printError(
-                            "path '%s' was modified! expected hash '%s', got '%s'",
-                            store->printStorePath(info->path), info->narHash.to_string(), hash.first.to_string());
+                        logError(
+                            ErrorInfo { 
+                                .name = "Hash error - path modified",
+                                .hint = hintfmt(
+                                    "path '%s' was modified! expected hash '%s', got '%s'",
+                                    store->printStorePath(info->path),
+                                    info->narHash.to_string(),
+                                    hash.first.to_string())
+                            });
                     }
 
                 }
@@ -148,7 +154,13 @@ struct CmdVerify : StorePathsCommand
                     if (!good) {
                         untrusted++;
                         act2.result(resUntrustedPath, store->printStorePath(info->path));
-                        printError("path '%s' is untrusted", store->printStorePath(info->path));
+                        logError(
+                            ErrorInfo { 
+                                .name = "Untrusted path",
+                                .hint = hintfmt("path '%s' is untrusted",
+                                    store->printStorePath(info->path))
+                        });
+
                     }
 
                 }

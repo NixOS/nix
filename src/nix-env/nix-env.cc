@@ -123,7 +123,11 @@ static void getAllExprs(EvalState & state,
             if (hasSuffix(attrName, ".nix"))
                 attrName = string(attrName, 0, attrName.size() - 4);
             if (!attrs.insert(attrName).second) {
-                printError(format("warning: name collision in input Nix expressions, skipping '%1%'") % path2);
+                logError(
+                    ErrorInfo { 
+                        .name = "Name collision",
+                        .hint = hintfmt("warning: name collision in input Nix expressions, skipping '%1%'", path2)
+                });
                 continue;
             }
             /* Load the expression on demand. */
@@ -860,7 +864,12 @@ static void queryJSON(Globals & globals, vector<DrvInfo> & elems)
             auto placeholder = metaObj.placeholder(j);
             Value * v = i.queryMeta(j);
             if (!v) {
-                printError("derivation '%s' has invalid meta attribute '%s'", i.queryName(), j);
+                logError(
+                    ErrorInfo { 
+                        .name = "Invalid meta attribute",
+                        .hint = hintfmt("derivation '%s' has invalid meta attribute '%s'",
+                            i.queryName(), j)
+                });
                 placeholder.write(nullptr);
             } else {
                 PathSet context;
@@ -1110,8 +1119,14 @@ static void opQuery(Globals & globals, Strings opFlags, Strings opArgs)
                             XMLAttrs attrs2;
                             attrs2["name"] = j;
                             Value * v = i.queryMeta(j);
-                            if (!v)
-                                printError("derivation '%s' has invalid meta attribute '%s'", i.queryName(), j);
+                            if (!v) 
+                                logError(
+                                    ErrorInfo { 
+                                        .name = "Invalid meta attribute",
+                                        .hint = hintfmt(
+                                            "derivation '%s' has invalid meta attribute '%s'",
+                                            i.queryName(), j)
+                                });
                             else {
                                 if (v->type == tString) {
                                     attrs2["type"] = "string";

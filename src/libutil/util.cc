@@ -1417,15 +1417,15 @@ string base64Decode(const string & s)
 }
 
 
-void callFailure(const std::function<void(std::exception_ptr exc)> & failure, std::exception_ptr exc)
-{
-    try {
-        failure(exc);
-    } catch (std::exception & e) {
-        printError("uncaught exception: %s", e.what());
-        abort();
-    }
-}
+// void callFailure(const std::function<void(std::exception_ptr exc)> & failure, std::exception_ptr exc)
+// {
+//     try {
+//         failure(exc);
+//     } catch (std::exception & e) {
+//         printError("uncaught exception: %s", e.what());
+//         abort();
+//     }
+// }
 
 
 static Sync<std::pair<unsigned short, unsigned short>> windowSize{{0, 0}};

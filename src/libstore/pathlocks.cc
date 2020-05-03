@@ -160,7 +160,8 @@ void PathLocks::unlock()
 
         if (close(i.first) == -1)
             printError(
-                format("error (ignored): cannot close lock file on '%1%'") % i.second);
+                "error (ignored): cannot close lock file on '%1%'",
+                i.second);
 
         debug(format("lock released on '%1%'") % i.second);
     }

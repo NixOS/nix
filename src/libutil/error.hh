@@ -117,6 +117,12 @@ public:
               }
     { }
 
+    BaseError(hintformat hint)
+        : err { .level = lvlError,
+                .hint = hint
+              }
+    { }
+
     BaseError(ErrorInfo e)
         : err(e)
     { }

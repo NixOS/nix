@@ -111,7 +111,9 @@ class RetryStrategy : public Aws::Client::DefaultRetryStrategy
         auto retry = Aws::Client::DefaultRetryStrategy::ShouldRetry(error, attemptedRetries);
         if (retry)
             printError("AWS error '%s' (%s), will retry in %d ms",
-                error.GetExceptionName(), error.GetMessage(), CalculateDelayBeforeNextRetry(error, attemptedRetries));
+                error.GetExceptionName(),
+                error.GetMessage(),
+                CalculateDelayBeforeNextRetry(error, attemptedRetries));
         return retry;
     }
 };

@@ -300,21 +300,21 @@ int handleExceptions(const string & programName, std::function<void()> fun)
     } catch (UsageError & e) {
         // TODO: switch to logError
         // logError(e.info());
-        printError(
+        _printError(
             format("%1%\nTry '%2% --help' for more information.")
             % e.what() % programName);
         return 1;
     } catch (BaseError & e) {
         // logError(e.info());
-        printError("%1%%2%", (settings.showTrace ? e.prefix() : ""), e.msg());
+        _printError("%1%%2%", (settings.showTrace ? e.prefix() : ""), e.msg());
         if (e.prefix() != "" && !settings.showTrace)
-            printError("(use '--show-trace' to show detailed location information)");
+            _printError("(use '--show-trace' to show detailed location information)");
         return e.status;
     } catch (std::bad_alloc & e) {
-        printError(error + "out of memory");
+        _printError(error + "out of memory");
         return 1;
     } catch (std::exception & e) {
-        printError(error + e.what());
+        _printError(error + e.what());
         return 1;
     }
 

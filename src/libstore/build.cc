@@ -493,7 +493,9 @@ void handleDiffHook(
             if (diffRes.second != "")
                 printError(chomp(diffRes.second));
         } catch (Error & error) {
-            printError("diff hook execution failed: %s", error.what());
+            // logError(error.info())
+            // TODO append message onto errorinfo...
+            _printError("diff hook execution failed: %s", error.what());
         }
     }
 }
@@ -1144,7 +1146,11 @@ void DerivationGoal::loadDerivation()
     trace("loading derivation");
 
     if (nrFailed != 0) {
-        printError("cannot build missing derivation '%s'", worker.store.printStorePath(drvPath));
+        logError(
+            ErrorInfo { 
+                .name = "missing derivation during build",
+                .hint = hintfmt("cannot build missing derivation '%s'", worker.store.printStorePath(drvPath))
+        });
         done(BuildResult::MiscFailure);
         return;
     }
@@ -1295,8 +1301,14 @@ void DerivationGoal::repairClosure()
     /* Check each path (slow!). */
     for (auto & i : outputClosure) {
         if (worker.pathContentsGood(i)) continue;
-        printError("found corrupted or missing path '%s' in the output closure of '%s'",
-            worker.store.printStorePath(i), worker.store.printStorePath(drvPath));
+        logError(
+            ErrorInfo { 
+                .name = "Corrupt path in closure",
+                .hint = hintfmt(
+                    "found corrupted or missing path '%s' in the output closure of '%s'",
+                    worker.store.printStorePath(i), worker.store.printStorePath(drvPath))
+        });
+
         auto drvPath2 = outputsToDrv.find(i);
         if (drvPath2 == outputsToDrv.end())
             addWaitee(worker.makeSubstitutionGoal(i, Repair));
@@ -1330,8 +1342,13 @@ void DerivationGoal::inputsRealised()
     if (nrFailed != 0) {
         if (!useDerivation)
             throw Error("some dependencies of '%s' are missing", worker.store.printStorePath(drvPath));
-        printError("cannot build derivation '%s': %s dependencies couldn't be built",
-            worker.store.printStorePath(drvPath), nrFailed);
+        logError(
+            ErrorInfo { 
+                .name = "Dependencies could not be built",
+                .hint = hintfmt(
+                    "cannot build derivation '%s': %s dependencies couldn't be built",
+                    worker.store.printStorePath(drvPath), nrFailed)
+        });
         done(BuildResult::DependencyFailed);
         return;
     }
@@ -1489,7 +1506,7 @@ void DerivationGoal::tryToBuild()
         startBuilder();
 
     } catch (BuildError & e) {
-        printError(e.msg());
+        logError(e.info());
         outputLocks.unlock();
         buildUser.reset();
         worker.permanentFailure = true;
@@ -1709,7 +1726,7 @@ void DerivationGoal::buildDone()
         outputLocks.unlock();
 
     } catch (BuildError & e) {
-        printError(e.msg());
+        logError(e.info());
 
         outputLocks.unlock();
 
@@ -1788,8 +1805,13 @@ HookReply DerivationGoal::tryBuildHook()
 
     } catch (SysError & e) {
         if (e.errNo == EPIPE) {
-            printError("build hook died unexpectedly: %s",
-                chomp(drainFD(worker.hook->fromHook.readSide.get())));
+            logError(
+                ErrorInfo { 
+                    .name = "Build hook died",
+                    .hint = hintfmt(
+                        "build hook died unexpectedly: %s",
+                        chomp(drainFD(worker.hook->fromHook.readSide.get())))
+            });
             worker.hook = 0;
             return rpDecline;
         } else
@@ -3783,10 +3805,10 @@ void DerivationGoal::registerOutputs()
                 result.isNonDeterministic = true;
                 Path prev = worker.store.printStorePath(i->second.path) + checkSuffix;
                 bool prevExists = keepPreviousRound && pathExists(prev);
-                auto msg = prevExists
-                    ? fmt("output '%s' of '%s' differs from '%s' from previous round",
+                hintformat hint = prevExists
+                    ? hintfmt("output '%s' of '%s' differs from '%s' from previous round",
                         worker.store.printStorePath(i->second.path), worker.store.printStorePath(drvPath), prev)
-                    : fmt("output '%s' of '%s' differs from previous round",
+                    : hintfmt("output '%s' of '%s' differs from previous round",
                         worker.store.printStorePath(i->second.path), worker.store.printStorePath(drvPath));
 
                 handleDiffHook(
@@ -3796,9 +3818,15 @@ void DerivationGoal::registerOutputs()
                     worker.store.printStorePath(drvPath), tmpDir);
 
                 if (settings.enforceDeterminism)
-                    throw NotDeterministic(msg);
+                    throw NotDeterministic(hint);
 
-                printError(msg);
+                logError(
+                    ErrorInfo { 
+                        .name = "Output determinism error",
+                        .hint = hint
+                });
+
+
                 curRound = nrRounds; // we know enough, bail out early
             }
     }
@@ -4060,9 +4088,13 @@ void DerivationGoal::handleChildOutput(int fd, const string & data)
     {
         logSize += data.size();
         if (settings.maxLogSize && logSize > settings.maxLogSize) {
-            printError(
-                format("%1% killed after writing more than %2% bytes of log output")
-                % getName() % settings.maxLogSize);
+            logError(
+                ErrorInfo { 
+                    .name = "Max log size exceeded",
+                    .hint = hintfmt(
+                        "%1% killed after writing more than %2% bytes of log output",
+                        getName(), settings.maxLogSize)
+            });
             killChild();
             done(BuildResult::LogLimitExceeded);
             return;
@@ -4352,7 +4384,7 @@ void SubstitutionGoal::tryNext()
         throw;
     } catch (Error & e) {
         if (settings.tryFallback) {
-            printError(e.what());
+            logError(e.info());
             tryNext();
             return;
         }
@@ -4864,9 +4896,13 @@ void Worker::waitForInput()
             j->respectTimeouts &&
             after - j->lastOutput >= std::chrono::seconds(settings.maxSilentTime))
         {
-            printError(
-                format("%1% timed out after %2% seconds of silence")
-                % goal->getName() % settings.maxSilentTime);
+            logError(
+                ErrorInfo { 
+                    .name = "Silent build timeout",
+                    .hint = hintfmt(
+                        "%1% timed out after %2% seconds of silence",
+                        goal->getName(), settings.maxSilentTime)
+            });
             goal->timedOut();
         }
 
@@ -4875,9 +4911,13 @@ void Worker::waitForInput()
             j->respectTimeouts &&
             after - j->timeStarted >= std::chrono::seconds(settings.buildTimeout))
         {
-            printError(
-                format("%1% timed out after %2% seconds")
-                % goal->getName() % settings.buildTimeout);
+            logError(
+                ErrorInfo { 
+                    .name = "Build timeout",
+                    .hint = hintfmt(
+                        "%1% timed out after %2% seconds",
+                        goal->getName(), settings.buildTimeout)
+            });
             goal->timedOut();
         }
     }
@@ -4939,7 +4979,12 @@ bool Worker::pathContentsGood(const StorePath & path)
         res = info->narHash == nullHash || info->narHash == current.first;
     }
     pathContentsGoodCache.insert_or_assign(path.clone(), res);
-    if (!res) printError("path '%s' is corrupted or missing!", store.printStorePath(path));
+    if (!res) 
+        logError(
+            ErrorInfo { 
+                .name = "Corrupted path",
+                .hint = hintfmt("path '%s' is corrupted or missing!", store.printStorePath(path))
+        });
     return res;
 }
 
