@@ -73,16 +73,29 @@ inline std::string fmt(const std::string & fs, const Args & ... args)
 // are always in yellow.
 
 template <class T>
-struct yellowify
+struct yellowtxt
 {
-    yellowify(T &s) : value(s) {}
+    yellowtxt(T &s) : value(s) {}
     T &value;
 };
 
 template <class T>
-std::ostream& operator<<(std::ostream &out, const yellowify<T> &y)
+std::ostream& operator<<(std::ostream &out, const yellowtxt<T> &y)
 {
     return out << ANSI_YELLOW << y.value << ANSI_NORMAL;
+}
+
+template <class T>
+struct normaltxt
+{
+    normaltxt(T &s) : value(s) {}
+    T &value;
+};
+
+template <class T>
+std::ostream& operator<<(std::ostream &out, const normaltxt<T> &y)
+{
+    return out << ANSI_NORMAL << y.value;
 }
 
 class hintformat
@@ -100,7 +113,7 @@ public:
     template<class T>
     hintformat& operator%(const T &value)
     {
-        fmt % yellowify(value);
+        fmt % yellowtxt(value);
         return *this;
     }
 
