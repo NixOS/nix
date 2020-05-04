@@ -26,10 +26,13 @@ int main()
 
     // ErrorInfo constructor
     try {
-        auto e = Error("generic error");
+        auto e = Error("some error");
         throw DemoError(e.info());
     } catch (Error &e) {
-        logger->logEI(e.info());
+        ErrorInfo ei = e.info();
+        string prevhint = (e.info().hint.has_value() ? e.info().hint->str() : "");
+        ei.hint = std::optional(hintfmt("previous hint was: %s", normaltxt(prevhint)));
+        logger->logEI(ei);
     }
 
 

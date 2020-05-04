@@ -488,14 +488,18 @@ void handleDiffHook(
 
             auto diffRes = runProgram(diffHookOptions);
             if (!statusOk(diffRes.first))
-                throw ExecError(diffRes.first, "diff-hook program '%1%' %2%", diffHook, statusToString(diffRes.first));
+                throw ExecError(diffRes.first,
+                    "diff-hook program '%1%' %2%",
+                    diffHook,
+                    statusToString(diffRes.first));
 
             if (diffRes.second != "")
                 printError(chomp(diffRes.second));
         } catch (Error & error) {
-            // logError(error.info())
-            // TODO append message onto errorinfo...
-            _printError("diff hook execution failed: %s", error.what());
+            ErrorInfo ei = error.info();
+            string prevhint = (error.info().hint.has_value() ? error.info().hint->str() : "");
+            ei.hint = std::optional(hintfmt("diff hook execution failed: %s", prevhint));
+            logError(ei);
         }
     }
 }

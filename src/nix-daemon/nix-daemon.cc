@@ -246,9 +246,12 @@ static void daemonLoop(char * * argv)
 
         } catch (Interrupted & e) {
             return;
-        } catch (Error & e) {
+        } catch (Error & error) {
             // TODO append error message
-            _printError("error processing connection: %1%", e.msg());
+            ErrorInfo ei = error.info();
+            string prevhint = (error.info().hint.has_value() ? error.info().hint->str() : "");
+            ei.hint = std::optional(hintfmt("error processing connection: %1%", prevhint));
+            logError(ei);
         }
     }
 }
