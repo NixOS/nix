@@ -177,12 +177,13 @@ void BaseSetting<T>::toJSON(JSONPlaceholder & out)
 template<typename T>
 void BaseSetting<T>::convertToArg(Args & args, const std::string & category)
 {
-    args.mkFlag()
-        .longName(name)
-        .description(description)
-        .arity(1)
-        .handler([=](std::vector<std::string> ss) { overriden = true; set(ss[0]); })
-        .category(category);
+    args.addFlag({
+        .longName = name,
+        .description = description,
+        .category = category,
+        .labels = {"value"},
+        .handler = {[=](std::string s) { overriden = true; set(s); }},
+    });
 }
 
 template<> void BaseSetting<std::string>::set(const std::string & str)
@@ -227,16 +228,18 @@ template<> std::string BaseSetting<bool>::to_string() const
 
 template<> void BaseSetting<bool>::convertToArg(Args & args, const std::string & category)
 {
-    args.mkFlag()
-        .longName(name)
-        .description(description)
-        .handler([=](std::vector<std::string> ss) { override(true); })
-        .category(category);
-    args.mkFlag()
-        .longName("no-" + name)
-        .description(description)
-        .handler([=](std::vector<std::string> ss) { override(false); })
-        .category(category);
+    args.addFlag({
+        .longName = name,
+        .description = description,
+        .category = category,
+        .handler = {[=]() { override(true); }}
+    });
+    args.addFlag({
+        .longName = "no-" + name,
+        .description = description,
+        .category = category,
+        .handler = {[=]() { override(false); }}
+    });
 }
 
 template<> void BaseSetting<Strings>::set(const std::string & str)

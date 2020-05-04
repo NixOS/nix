@@ -40,16 +40,18 @@ struct CmdSearch : SourceExprCommand, MixJSON
     {
         expectArgs("regex", &res);
 
-        mkFlag()
-            .longName("update-cache")
-            .shortName('u')
-            .description("update the package search cache")
-            .handler([&]() { writeCache = true; useCache = false; });
+        addFlag({
+            .longName = "update-cache",
+            .shortName = 'u',
+            .description = "update the package search cache",
+            .handler = {[&]() { writeCache = true; useCache = false; }}
+        });
 
-        mkFlag()
-            .longName("no-cache")
-            .description("do not use or update the package search cache")
-            .handler([&]() { writeCache = false; useCache = false; });
+        addFlag({
+            .longName = "no-cache",
+            .description = "do not use or update the package search cache",
+            .handler = {[&]() { writeCache = false; useCache = false; }}
+        });
     }
 
     std::string description() override

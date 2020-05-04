@@ -3,16 +3,14 @@
 
 namespace nix {
 
-Args::FlagMaker Args::mkFlag()
+void Args::addFlag(Flag && flag_)
 {
-    return FlagMaker(*this);
-}
-
-Args::FlagMaker::~FlagMaker()
-{
+    auto flag = std::make_shared<Flag>(std::move(flag_));
+    if (flag->handler.arity != ArityAny)
+        assert(flag->handler.arity == flag->labels.size());
     assert(flag->longName != "");
-    args.longFlags[flag->longName] = flag;
-    if (flag->shortName) args.shortFlags[flag->shortName] = flag;
+    longFlags[flag->longName] = flag;
+    if (flag->shortName) shortFlags[flag->shortName] = flag;
 }
 
 void Args::parseCmdline(const Strings & _cmdline)
@@ -101,15 +99,14 @@ bool Args::processFlag(Strings::iterator & pos, Strings::iterator end)
     auto process = [&](const std::string & name, const Flag & flag) -> bool {
         ++pos;
         std::vector<std::string> args;
-        for (size_t n = 0 ; n < flag.arity; ++n) {
+        for (size_t n = 0 ; n < flag.handler.arity; ++n) {
             if (pos == end) {
-                if (flag.arity == ArityAny) break;
-                throw UsageError(format("flag '%1%' requires %2% argument(s)")
-                    % name % flag.arity);
+                if (flag.handler.arity == ArityAny) break;
+                throw UsageError("flag '%s' requires %d argument(s)", name, flag.handler.arity);
             }
             args.push_back(*pos++);
         }
-        flag.handler(std::move(args));
+        flag.handler.fun(std::move(args));
         return true;
     };
 
@@ -157,17 +154,18 @@ bool Args::processArgs(const Strings & args, bool finish)
     return res;
 }
 
-Args::FlagMaker & Args::FlagMaker::mkHashTypeFlag(HashType * ht)
+Args::Flag Args::Flag::mkHashTypeFlag(std::string && longName, HashType * ht)
 {
-    arity(1);
-    label("type");
-    description("hash algorithm ('md5', 'sha1', 'sha256', or 'sha512')");
-    handler([ht](std::string s) {
-        *ht = parseHashType(s);
-        if (*ht == htUnknown)
-            throw UsageError("unknown hash type '%1%'", s);
-    });
-    return *this;
+    return Flag {
+        .longName = std::move(longName),
+        .description = "hash algorithm ('md5', 'sha1', 'sha256', or 'sha512')",
+        .labels = {"hash-algo"},
+        .handler = {[ht](std::string s) {
+            *ht = parseHashType(s);
+            if (*ht == htUnknown)
+                throw UsageError("unknown hash type '%1%'", s);
+        }}
+    };
 }
 
 Strings argvToStrings(int argc, char * * argv)

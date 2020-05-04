@@ -37,11 +37,12 @@ struct CmdWhyDepends : SourceExprCommand
         expectArg("package", &_package);
         expectArg("dependency", &_dependency);
 
-        mkFlag()
-            .longName("all")
-            .shortName('a')
-            .description("show all edges in the dependency graph leading from 'package' to 'dependency', rather than just a shortest path")
-            .set(&all, true);
+        addFlag({
+            .longName = "all",
+            .shortName = 'a',
+            .description = "show all edges in the dependency graph leading from 'package' to 'dependency', rather than just a shortest path",
+            .handler = {&all, true},
+        });
     }
 
     std::string description() override

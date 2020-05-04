@@ -59,15 +59,16 @@ struct NixArgs : virtual MultiCommand, virtual MixCommonArgs
 
     NixArgs() : MultiCommand(*RegisterCommand::commands), MixCommonArgs("nix")
     {
-        mkFlag()
-            .longName("help")
-            .description("show usage information")
-            .handler([&]() { showHelpAndExit(); });
+        addFlag({
+            .longName = "help",
+            .description = "show usage information",
+            .handler = {[&]() { showHelpAndExit(); }},
+        });
 
-        mkFlag()
-            .longName("help-config")
-            .description("show configuration options")
-            .handler([&]() {
+        addFlag({
+            .longName = "help-config",
+            .description = "show configuration options",
+            .handler = {[&]() {
                 std::cout << "The following configuration options are available:\n\n";
                 Table2 tbl;
                 std::map<std::string, Config::SettingInfo> settings;
@@ -76,28 +77,33 @@ struct NixArgs : virtual MultiCommand, virtual MixCommonArgs
                     tbl.emplace_back(s.first, s.second.description);
                 printTable(std::cout, tbl);
                 throw Exit();
-            });
+            }},
+        });
 
-        mkFlag()
-            .longName("print-build-logs")
-            .shortName('L')
-            .description("print full build logs on stderr")
-            .set(&printBuildLogs, true);
+        addFlag({
+            .longName = "print-build-logs",
+            .shortName = 'L',
+            .description = "print full build logs on stderr",
+            .handler = {&printBuildLogs, true},
+        });
 
-        mkFlag()
-            .longName("version")
-            .description("show version information")
-            .handler([&]() { printVersion(programName); });
+        addFlag({
+            .longName = "version",
+            .description = "show version information",
+            .handler = {[&]() { printVersion(programName); }},
+        });
 
-        mkFlag()
-            .longName("no-net")
-            .description("disable substituters and consider all previously downloaded files up-to-date")
-            .handler([&]() { useNet = false; });
+        addFlag({
+            .longName = "no-net",
+            .description = "disable substituters and consider all previously downloaded files up-to-date",
+            .handler = {[&]() { useNet = false; }},
+        });
 
-        mkFlag()
-            .longName("refresh")
-            .description("consider all previously downloaded files out-of-date")
-            .handler([&]() { refresh = true; });
+        addFlag({
+            .longName = "refresh",
+            .description = "consider all previously downloaded files out-of-date",
+            .handler = {[&]() { refresh = true; }},
+        });
     }
 
     void printFlags(std::ostream & out) override

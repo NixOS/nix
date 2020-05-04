@@ -63,16 +63,16 @@ struct CmdShell : InstallablesCommand, RunCommon, MixEnvironment
 
     CmdShell()
     {
-        mkFlag()
-            .longName("command")
-            .shortName('c')
-            .description("command and arguments to be executed; defaults to '$SHELL'")
-            .labels({"command", "args"})
-            .arity(ArityAny)
-            .handler([&](std::vector<std::string> ss) {
+        addFlag({
+            .longName = "command",
+            .shortName = 'c',
+            .description = "command and arguments to be executed; defaults to '$SHELL'",
+            .labels = {"command", "args"},
+            .handler = {[&](std::vector<std::string> ss) {
                 if (ss.empty()) throw UsageError("--command requires at least one argument");
                 command = ss;
-            });
+            }}
+        });
     }
 
     std::string description() override

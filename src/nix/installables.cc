@@ -15,12 +15,13 @@ namespace nix {
 
 SourceExprCommand::SourceExprCommand()
 {
-    mkFlag()
-        .shortName('f')
-        .longName("file")
-        .label("file")
-        .description("evaluate FILE rather than the default")
-        .dest(&file);
+    addFlag({
+        .longName = "file",
+        .shortName = 'f',
+        .description = "evaluate FILE rather than the default",
+        .labels = {"file"},
+        .handler = {&file}
+    });
 }
 
 Value * SourceExprCommand::getSourceExpr(EvalState & state)

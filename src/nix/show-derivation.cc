@@ -15,11 +15,12 @@ struct CmdShowDerivation : InstallablesCommand
 
     CmdShowDerivation()
     {
-        mkFlag()
-            .longName("recursive")
-            .shortName('r')
-            .description("include the dependencies of the specified derivations")
-            .set(&recursive, true);
+        addFlag({
+            .longName = "recursive",
+            .shortName = 'r',
+            .description = "include the dependencies of the specified derivations",
+            .handler = {&recursive, true}
+        });
     }
 
     std::string description() override

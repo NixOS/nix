@@ -13,13 +13,13 @@ struct CmdCopySigs : StorePathsCommand
 
     CmdCopySigs()
     {
-        mkFlag()
-            .longName("substituter")
-            .shortName('s')
-            .labels({"store-uri"})
-            .description("use signatures from specified store")
-            .arity(1)
-            .handler([&](std::vector<std::string> ss) { substituterUris.push_back(ss[0]); });
+        addFlag({
+            .longName = "substituter",
+            .shortName = 's',
+            .description = "use signatures from specified store",
+            .labels = {"store-uri"},
+            .handler = {[&](std::string s) { substituterUris.push_back(s); }},
+        });
     }
 
     std::string description() override
@@ -98,12 +98,13 @@ struct CmdSignPaths : StorePathsCommand
 
     CmdSignPaths()
     {
-        mkFlag()
-            .shortName('k')
-            .longName("key-file")
-            .label("file")
-            .description("file containing the secret signing key")
-            .dest(&secretKeyFile);
+        addFlag({
+            .longName = "key-file",
+            .shortName = 'k',
+            .description = "file containing the secret signing key",
+            .labels = {"file"},
+            .handler = {&secretKeyFile}
+        });
     }
 
     std::string description() override
