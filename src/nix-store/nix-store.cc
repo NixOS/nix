@@ -841,8 +841,7 @@ static void opServe(Strings opFlags, Strings opArgs)
                             for (auto & p : willSubstitute) subs.emplace_back(p.clone());
                             store->buildPaths(subs);
                         } catch (Error & e) {
-                            // logWarning(e.info())  TODO:  
-                            _printError("warning: %1%", e.msg());
+                            logWarning(e.info());
                         }
                 }
 
