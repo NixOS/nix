@@ -51,6 +51,8 @@ struct CmdUpgradeNix : MixDryRun, StoreCommand
         };
     }
 
+    Category category() override { return catNixInstallation; }
+
     void run(ref<Store> store) override
     {
         evalSettings.pureEval = true;

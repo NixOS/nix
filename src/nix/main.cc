@@ -59,6 +59,12 @@ struct NixArgs : virtual MultiCommand, virtual MixCommonArgs
 
     NixArgs() : MultiCommand(*RegisterCommand::commands), MixCommonArgs("nix")
     {
+        categories.clear();
+        categories[Command::catDefault] = "Main commands";
+        categories[catSecondary] = "Infrequently used commands";
+        categories[catUtility] = "Utility/scripting commands";
+        categories[catNixInstallation] = "Commands for upgrading or troubleshooting your Nix installation";
+
         addFlag({
             .longName = "help",
             .description = "show usage information",
@@ -111,8 +117,8 @@ struct NixArgs : virtual MultiCommand, virtual MixCommonArgs
         Args::printFlags(out);
         std::cout <<
             "\n"
-            "In addition, most configuration settings can be overriden using '--<name> <value>'.\n"
-            "Boolean settings can be overriden using '--<name>' or '--no-<name>'. See 'nix\n"
+            "In addition, most configuration settings can be overriden using '--" ANSI_ITALIC "name value" ANSI_NORMAL "'.\n"
+            "Boolean settings can be overriden using '--" ANSI_ITALIC "name" ANSI_NORMAL "' or '--no-" ANSI_ITALIC "name" ANSI_NORMAL "'. See 'nix\n"
             "--help-config' for a list of configuration settings.\n";
     }
 
@@ -121,10 +127,10 @@ struct NixArgs : virtual MultiCommand, virtual MixCommonArgs
         MultiCommand::printHelp(programName, out);
 
 #if 0
-        out << "\nFor full documentation, run 'man " << programName << "' or 'man " << programName << "-<COMMAND>'.\n";
+        out << "\nFor full documentation, run 'man " << programName << "' or 'man " << programName << "-" ANSI_ITALIC "COMMAND" ANSI_NORMAL "'.\n";
 #endif
 
-        std::cout << "\nNote: this program is EXPERIMENTAL and subject to change.\n";
+        std::cout << "\nNote: this program is " ANSI_RED "EXPERIMENTAL" ANSI_NORMAL " and subject to change.\n";
     }
 
     void showHelpAndExit()
@@ -191,8 +197,8 @@ void mainWrapped(int argc, char * * argv)
     if (args.refresh)
         settings.tarballTtl = 0;
 
-    args.command->prepare();
-    args.command->run();
+    args.command->second->prepare();
+    args.command->second->run();
 }
 
 }

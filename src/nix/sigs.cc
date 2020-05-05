@@ -27,6 +27,8 @@ struct CmdCopySigs : StorePathsCommand
         return "copy path signatures from substituters (like binary caches)";
     }
 
+    Category category() override { return catUtility; }
+
     void run(ref<Store> store, StorePaths storePaths) override
     {
         if (substituterUris.empty())
@@ -111,6 +113,8 @@ struct CmdSignPaths : StorePathsCommand
     {
         return "sign the specified paths";
     }
+
+    Category category() override { return catUtility; }
 
     void run(ref<Store> store, StorePaths storePaths) override
     {

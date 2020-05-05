@@ -80,6 +80,8 @@ struct CmdCopy : StorePathsCommand
         };
     }
 
+    Category category() override { return catSecondary; }
+
     ref<Store> createStore() override
     {
         return srcUri.empty() ? StoreCommand::createStore() : openStore(srcUri);

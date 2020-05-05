@@ -100,8 +100,10 @@ struct CmdLsStore : StoreCommand, MixLs
 
     std::string description() override
     {
-        return "show information about a store path";
+        return "show information about a path in the Nix store";
     }
+
+    Category category() override { return catUtility; }
 
     void run(ref<Store> store) override
     {
@@ -131,8 +133,10 @@ struct CmdLsNar : Command, MixLs
 
     std::string description() override
     {
-        return "show information about the contents of a NAR file";
+        return "show information about a path inside a NAR file";
     }
+
+    Category category() override { return catUtility; }
 
     void run() override
     {

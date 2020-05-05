@@ -42,6 +42,8 @@ struct CmdShowDerivation : InstallablesCommand
         };
     }
 
+    Category category() override { return catUtility; }
+
     void run(ref<Store> store) override
     {
         auto drvPaths = toDerivations(store, installables, true);

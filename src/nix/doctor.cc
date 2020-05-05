@@ -43,6 +43,8 @@ struct CmdDoctor : StoreCommand
         return "check your system for potential problems and print a PASS or FAIL for each check.";
     }
 
+    Category category() override { return catNixInstallation; }
+
     void run(ref<Store> store) override
     {
         logger->log("Running checks against store uri: " + store->getUri());

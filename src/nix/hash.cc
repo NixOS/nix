@@ -41,6 +41,8 @@ struct CmdHash : Command
             : "print cryptographic hash of the NAR serialisation of a path";
     }
 
+    Category category() override { return catUtility; }
+
     void run() override
     {
         for (auto path : paths) {
@@ -86,6 +88,8 @@ struct CmdToBase : Command
             base == Base64 ? "base-64" :
             "SRI");
     }
+
+    Category category() override { return catUtility; }
 
     void run() override
     {

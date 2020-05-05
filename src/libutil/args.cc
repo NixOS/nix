@@ -59,7 +59,7 @@ void Args::parseCmdline(const Strings & _cmdline)
 
 void Args::printHelp(const string & programName, std::ostream & out)
 {
-    std::cout << "Usage: " << programName << " <FLAGS>...";
+    std::cout << fmt(ANSI_BOLD "Usage:" ANSI_NORMAL " %s " ANSI_ITALIC "FLAGS..." ANSI_NORMAL, programName);
     for (auto & exp : expectedArgs) {
         std::cout << renderLabels({exp.label});
         // FIXME: handle arity > 1
@@ -70,11 +70,11 @@ void Args::printHelp(const string & programName, std::ostream & out)
 
     auto s = description();
     if (s != "")
-        std::cout << "\nSummary: " << s << ".\n";
+        std::cout << "\n" ANSI_BOLD "Summary:" ANSI_NORMAL " " << s << ".\n";
 
     if (longFlags.size()) {
         std::cout << "\n";
-        std::cout << "Flags:\n";
+        std::cout << ANSI_BOLD "Flags:" ANSI_NORMAL "\n";
         printFlags(out);
     }
 }
@@ -181,7 +181,7 @@ std::string renderLabels(const Strings & labels)
     std::string res;
     for (auto label : labels) {
         for (auto & c : label) c = std::toupper(c);
-        res += " <" + label + ">";
+        res += " " ANSI_ITALIC + label + ANSI_NORMAL;
     }
     return res;
 }
@@ -190,10 +190,10 @@ void printTable(std::ostream & out, const Table2 & table)
 {
     size_t max = 0;
     for (auto & row : table)
-        max = std::max(max, row.first.size());
+        max = std::max(max, filterANSIEscapes(row.first, true).size());
     for (auto & row : table) {
         out << "  " << row.first
-            << std::string(max - row.first.size() + 2, ' ')
+            << std::string(max - filterANSIEscapes(row.first, true).size() + 2, ' ')
             << row.second << "\n";
     }
 }
@@ -204,8 +204,7 @@ void Command::printHelp(const string & programName, std::ostream & out)
 
     auto exs = examples();
     if (!exs.empty()) {
-        out << "\n";
-        out << "Examples:\n";
+        out << "\n" ANSI_BOLD "Examples:" ANSI_NORMAL "\n";
         for (auto & ex : exs)
             out << "\n"
                 << "  " << ex.description << "\n" // FIXME: wrap
@@ -221,49 +220,55 @@ MultiCommand::MultiCommand(const Commands & commands)
         auto i = commands.find(ss[0]);
         if (i == commands.end())
             throw UsageError("'%s' is not a recognised command", ss[0]);
-        command = i->second();
-        command->_name = ss[0];
+        command = {ss[0], i->second()};
     }});
+
+    categories[Command::catDefault] = "Available commands";
 }
 
 void MultiCommand::printHelp(const string & programName, std::ostream & out)
 {
     if (command) {
-        command->printHelp(programName + " " + command->name(), out);
+        command->second->printHelp(programName + " " + command->first, out);
         return;
     }
 
-    out << "Usage: " << programName << " <COMMAND> <FLAGS>... <ARGS>...\n";
+    out << fmt(ANSI_BOLD "Usage:" ANSI_NORMAL " %s " ANSI_ITALIC "COMMAND FLAGS... ARGS..." ANSI_NORMAL "\n", programName);
 
-    out << "\n";
-    out << "Common flags:\n";
+    out << "\n" ANSI_BOLD "Common flags:" ANSI_NORMAL "\n";
     printFlags(out);
 
-    out << "\n";
-    out << "Available commands:\n";
+    std::map<Command::Category, std::map<std::string, ref<Command>>> commandsByCategory;
 
-    Table2 table;
-    for (auto & i : commands) {
-        auto command = i.second();
-        command->_name = i.first;
-        auto descr = command->description();
-        if (!descr.empty())
-            table.push_back(std::make_pair(command->name(), descr));
+    for (auto & [name, commandFun] : commands) {
+        auto command = commandFun();
+        commandsByCategory[command->category()].insert_or_assign(name, command);
     }
-    printTable(out, table);
+
+    for (auto & [category, commands] : commandsByCategory) {
+        out << fmt("\n" ANSI_BOLD "%s:" ANSI_NORMAL "\n", categories[category]);
+
+        Table2 table;
+        for (auto & [name, command] : commands) {
+            auto descr = command->description();
+            if (!descr.empty())
+                table.push_back(std::make_pair(name, descr));
+        }
+        printTable(out, table);
+    }
 }
 
 bool MultiCommand::processFlag(Strings::iterator & pos, Strings::iterator end)
 {
     if (Args::processFlag(pos, end)) return true;
-    if (command && command->processFlag(pos, end)) return true;
+    if (command && command->second->processFlag(pos, end)) return true;
     return false;
 }
 
 bool MultiCommand::processArgs(const Strings & args, bool finish)
 {
     if (command)
-        return command->processArgs(args, finish);
+        return command->second->processArgs(args, finish);
     else
         return Args::processArgs(args, finish);
 }

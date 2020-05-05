@@ -328,6 +328,8 @@ struct CmdPrintDevEnv : Common
         };
     }
 
+    Category category() override { return catUtility; }
+
     void run(ref<Store> store) override
     {
         auto buildEnvironment = getBuildEnvironment(store).first;

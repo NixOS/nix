@@ -34,6 +34,8 @@ struct CmdAddToStore : MixDryRun, StoreCommand
         };
     }
 
+    Category category() override { return catUtility; }
+
     void run(ref<Store> store) override
     {
         if (!namePart) namePart = baseNameOf(path);

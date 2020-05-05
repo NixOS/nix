@@ -197,16 +197,9 @@ public:
    run() method. */
 struct Command : virtual Args
 {
-private:
-    std::string _name;
-
     friend class MultiCommand;
 
-public:
-
     virtual ~Command() { }
-
-    std::string name() { return _name; }
 
     virtual void prepare() { };
     virtual void run() = 0;
@@ -221,6 +214,12 @@ public:
 
     virtual Examples examples() { return Examples(); }
 
+    typedef int Category;
+
+    static constexpr Category catDefault = 0;
+
+    virtual Category category() { return catDefault; }
+
     void printHelp(const string & programName, std::ostream & out) override;
 };
 
@@ -233,7 +232,10 @@ class MultiCommand : virtual Args
 public:
     Commands commands;
 
-    std::shared_ptr<Command> command;
+    std::map<Command::Category, std::string> categories;
+
+    // Selected command, if any.
+    std::optional<std::pair<std::string, ref<Command>>> command;
 
     MultiCommand(const Commands & commands);
 

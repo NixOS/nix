@@ -49,6 +49,8 @@ struct CmdVerify : StorePathsCommand
         };
     }
 
+    Category category() override { return catSecondary; }
+
     void run(ref<Store> store, StorePaths storePaths) override
     {
         std::vector<ref<Store>> substituters;

@@ -68,6 +68,8 @@ struct CmdWhyDepends : SourceExprCommand
         };
     }
 
+    Category category() override { return catSecondary; }
+
     void run(ref<Store> store) override
     {
         auto package = parseInstallable(*this, store, _package, false);
