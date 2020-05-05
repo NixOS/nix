@@ -265,7 +265,7 @@ struct CmdSearch : SourceExprCommand, MixJSON
                 throw SysError("cannot rename '%s' to '%s'", tmpFile, jsonCacheFileName);
         }
 
-        if (results.size() == 0)
+        if (!json && results.size() == 0)
             throw Error("no results for the given search term(s)!");
 
         RunPager pager;
