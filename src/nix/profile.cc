@@ -413,8 +413,8 @@ struct CmdProfile : virtual MultiCommand, virtual Command
     {
         if (!command)
             throw UsageError("'nix profile' requires a sub-command.");
-        command->prepare();
-        command->run();
+        command->second->prepare();
+        command->second->run();
     }
 
     void printHelp(const string & programName, std::ostream & out) override

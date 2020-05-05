@@ -16,6 +16,10 @@ class EvalState;
 struct Pos;
 class Store;
 
+static constexpr Command::Category catSecondary = 100;
+static constexpr Command::Category catUtility = 101;
+static constexpr Command::Category catNixInstallation = 102;
+
 /* A command that requires a Nix store. */
 struct StoreCommand : virtual Command
 {

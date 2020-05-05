@@ -31,6 +31,9 @@ struct CmdMakeContentAddressable : StorePathsCommand, MixJSON
             },
         };
     }
+
+    Category category() override { return catUtility; }
+
     void run(ref<Store> store, StorePaths storePaths) override
     {
         auto paths = store->topoSortPaths(storePathsToSet(storePaths));

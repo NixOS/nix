@@ -23,6 +23,8 @@ struct CmdOptimiseStore : StoreCommand
         };
     }
 
+    Category category() override { return catUtility; }
+
     void run(ref<Store> store) override
     {
         store->optimiseStore();

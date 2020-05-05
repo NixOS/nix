@@ -165,28 +165,32 @@ LegacyArgs::LegacyArgs(const std::string & programName,
     std::function<bool(Strings::iterator & arg, const Strings::iterator & end)> parseArg)
     : MixCommonArgs(programName), parseArg(parseArg)
 {
-    mkFlag()
-        .longName("no-build-output")
-        .shortName('Q')
-        .description("do not show build output")
-        .set(&settings.verboseBuild, false);
+    addFlag({
+        .longName = "no-build-output",
+        .shortName = 'Q',
+        .description = "do not show build output",
+        .handler = {&settings.verboseBuild, false},
+    });
 
-    mkFlag()
-        .longName("keep-failed")
-        .shortName('K')
-        .description("keep temporary directories of failed builds")
-        .set(&(bool&) settings.keepFailed, true);
+    addFlag({
+        .longName = "keep-failed",
+        .shortName ='K',
+        .description = "keep temporary directories of failed builds",
+        .handler = {&(bool&) settings.keepFailed, true},
+    });
 
-    mkFlag()
-        .longName("keep-going")
-        .shortName('k')
-        .description("keep going after a build fails")
-        .set(&(bool&) settings.keepGoing, true);
+    addFlag({
+        .longName = "keep-going",
+        .shortName ='k',
+        .description = "keep going after a build fails",
+        .handler = {&(bool&) settings.keepGoing, true},
+    });
 
-    mkFlag()
-        .longName("fallback")
-        .description("build from source if substitution fails")
-        .set(&(bool&) settings.tryFallback, true);
+    addFlag({
+        .longName = "fallback",
+        .description = "build from source if substitution fails",
+        .handler = {&(bool&) settings.tryFallback, true},
+    });
 
     auto intSettingAlias = [&](char shortName, const std::string & longName,
         const std::string & description, const std::string & dest) {
@@ -205,11 +209,12 @@ LegacyArgs::LegacyArgs(const std::string & programName,
     mkFlag(0, "no-gc-warning", "disable warning about not using '--add-root'",
         &gcWarning, false);
 
-    mkFlag()
-        .longName("store")
-        .label("store-uri")
-        .description("URI of the Nix store to use")
-        .dest(&(std::string&) settings.storeUri);
+    addFlag({
+        .longName = "store",
+        .description = "URI of the Nix store to use",
+        .labels = {"store-uri"},
+        .handler = {&(std::string&) settings.storeUri},
+    });
 }
 
 

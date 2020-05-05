@@ -167,21 +167,24 @@ template<> void BaseSetting<SandboxMode>::toJSON(JSONPlaceholder & out)
 
 template<> void BaseSetting<SandboxMode>::convertToArg(Args & args, const std::string & category)
 {
-    args.mkFlag()
-        .longName(name)
-        .description("Enable sandboxing.")
-        .handler([=](std::vector<std::string> ss) { override(smEnabled); })
-        .category(category);
-    args.mkFlag()
-        .longName("no-" + name)
-        .description("Disable sandboxing.")
-        .handler([=](std::vector<std::string> ss) { override(smDisabled); })
-        .category(category);
-    args.mkFlag()
-        .longName("relaxed-" + name)
-        .description("Enable sandboxing, but allow builds to disable it.")
-        .handler([=](std::vector<std::string> ss) { override(smRelaxed); })
-        .category(category);
+    args.addFlag({
+        .longName = name,
+        .description = "Enable sandboxing.",
+        .category = category,
+        .handler = {[=]() { override(smEnabled); }}
+    });
+    args.addFlag({
+        .longName = "no-" + name,
+        .description = "Disable sandboxing.",
+        .category = category,
+        .handler = {[=]() { override(smDisabled); }}
+    });
+    args.addFlag({
+        .longName = "relaxed-" + name,
+        .description = "Enable sandboxing, but allow builds to disable it.",
+        .category = category,
+        .handler = {[=]() { override(smRelaxed); }}
+    });
 }
 
 void MaxBuildJobsSetting::set(const std::string & str)

@@ -204,10 +204,11 @@ struct CmdFlakeCheck : FlakeCommand
 
     CmdFlakeCheck()
     {
-        mkFlag()
-            .longName("no-build")
-            .description("do not build checks")
-            .set(&build, false);
+        addFlag({
+            .longName = "no-build",
+            .description = "do not build checks",
+            .handler = {&build, false}
+        });
     }
 
     std::string description() override
@@ -577,12 +578,13 @@ struct CmdFlakeClone : FlakeCommand
 
     CmdFlakeClone()
     {
-        mkFlag()
-            .shortName('f')
-            .longName("dest")
-            .label("path")
-            .description("destination path")
-            .dest(&destDir);
+        addFlag({
+            .longName = "dest",
+            .shortName = 'f',
+            .description = "destination path",
+            .labels = {"path"},
+            .handler = {&destDir}
+        });
     }
 
     void run(nix::ref<nix::Store> store) override
@@ -600,11 +602,12 @@ struct CmdFlakeArchive : FlakeCommand, MixJSON, MixDryRun
 
     CmdFlakeArchive()
     {
-        mkFlag()
-            .longName("to")
-            .labels({"store-uri"})
-            .description("URI of the destination Nix store")
-            .dest(&dstUri);
+        addFlag({
+            .longName = "to",
+            .description = "URI of the destination Nix store",
+            .labels = {"store-uri"},
+            .handler = {&dstUri}
+        });
     }
 
     std::string description() override
@@ -677,15 +680,17 @@ struct CmdFlakeShow : FlakeCommand
 
     CmdFlakeShow()
     {
-        mkFlag()
-            .longName("legacy")
-            .description("show the contents of the 'legacyPackages' output")
-            .set(&showLegacy, true);
+        addFlag({
+            .longName = "legacy",
+            .description = "show the contents of the 'legacyPackages' output",
+            .handler = {&showLegacy, true}
+        });
 
-        mkFlag()
-            .longName("no-eval-cache")
-            .description("do not use the flake evaluation cache")
-            .handler([&]() { useEvalCache = false; });
+        addFlag({
+            .longName = "no-eval-cache",
+            .description = "do not use the flake evaluation cache",
+            .handler = {[&]() { useEvalCache = false; }}
+        });
     }
 
     std::string description() override
@@ -849,8 +854,8 @@ struct CmdFlake : virtual MultiCommand, virtual Command
     {
         if (!command)
             throw UsageError("'nix flake' requires a sub-command.");
-        command->prepare();
-        command->run();
+        command->second->prepare();
+        command->second->run();
     }
 
     void printHelp(const string & programName, std::ostream & out) override

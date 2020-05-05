@@ -23,9 +23,7 @@ struct CmdHash : Command
         mkFlag(0, "base64", "print hash in base-64", &base, Base64);
         mkFlag(0, "base32", "print hash in base-32 (Nix-specific)", &base, Base32);
         mkFlag(0, "base16", "print hash in base-16", &base, Base16);
-        mkFlag()
-            .longName("type")
-            .mkHashTypeFlag(&ht);
+        addFlag(Flag::mkHashTypeFlag("type", &ht));
         #if 0
         mkFlag()
             .longName("modulo")
@@ -42,6 +40,8 @@ struct CmdHash : Command
             ? "print cryptographic hash of a regular file"
             : "print cryptographic hash of the NAR serialisation of a path";
     }
+
+    Category category() override { return catUtility; }
 
     void run() override
     {
@@ -76,9 +76,7 @@ struct CmdToBase : Command
 
     CmdToBase(Base base) : base(base)
     {
-        mkFlag()
-            .longName("type")
-            .mkHashTypeFlag(&ht);
+        addFlag(Flag::mkHashTypeFlag("type", &ht));
         expectArgs("strings", &args);
     }
 
@@ -90,6 +88,8 @@ struct CmdToBase : Command
             base == Base64 ? "base-64" :
             "SRI");
     }
+
+    Category category() override { return catUtility; }
 
     void run() override
     {

@@ -19,65 +19,73 @@ namespace nix {
 
 MixFlakeOptions::MixFlakeOptions()
 {
-    mkFlag()
-        .longName("recreate-lock-file")
-        .description("recreate lock file from scratch")
-        .set(&lockFlags.recreateLockFile, true);
+    addFlag({
+        .longName = "recreate-lock-file",
+        .description = "recreate lock file from scratch",
+        .handler = {&lockFlags.recreateLockFile, true}
+    });
 
-    mkFlag()
-        .longName("no-update-lock-file")
-        .description("do not allow any updates to the lock file")
-        .set(&lockFlags.updateLockFile, false);
+    addFlag({
+        .longName = "no-update-lock-file",
+        .description = "do not allow any updates to the lock file",
+        .handler = {&lockFlags.updateLockFile, false}
+    });
 
-    mkFlag()
-        .longName("no-write-lock-file")
-        .description("do not write the newly generated lock file")
-        .set(&lockFlags.writeLockFile, false);
+    addFlag({
+        .longName = "no-write-lock-file",
+        .description = "do not write the newly generated lock file",
+        .handler = {&lockFlags.writeLockFile, false}
+    });
 
-    mkFlag()
-        .longName("no-registries")
-        .description("don't use flake registries")
-        .set(&lockFlags.useRegistries, false);
+    addFlag({
+        .longName = "no-registries",
+        .description = "don't use flake registries",
+        .handler = {&lockFlags.useRegistries, false}
+    });
 
-    mkFlag()
-        .longName("commit-lock-file")
-        .description("commit changes to the lock file")
-        .set(&lockFlags.commitLockFile, true);
+    addFlag({
+        .longName = "commit-lock-file",
+        .description = "commit changes to the lock file",
+        .handler = {&lockFlags.commitLockFile, true}
+    });
 
-    mkFlag()
-        .longName("update-input")
-        .description("update a specific flake input")
-        .label("input-path")
-        .handler([&](std::vector<std::string> ss) {
-            lockFlags.inputUpdates.insert(flake::parseInputPath(ss[0]));
-        });
+    addFlag({
+        .longName = "update-input",
+        .description = "update a specific flake input",
+        .labels = {"input-path"},
+        .handler = {[&](std::string s) {
+            lockFlags.inputUpdates.insert(flake::parseInputPath(s));
+        }}
+    });
 
-    mkFlag()
-        .longName("override-input")
-        .description("override a specific flake input (e.g. 'dwarffs/nixpkgs')")
-        .arity(2)
-        .labels({"input-path", "flake-url"})
-        .handler([&](std::vector<std::string> ss) {
+    addFlag({
+        .longName = "override-input",
+        .description = "override a specific flake input (e.g. 'dwarffs/nixpkgs')",
+        .labels = {"input-path", "flake-url"},
+        .handler = {[&](std::string inputPath, std::string flakeRef) {
             lockFlags.inputOverrides.insert_or_assign(
-                flake::parseInputPath(ss[0]),
-                parseFlakeRef(ss[1], absPath(".")));
-        });
+                flake::parseInputPath(inputPath),
+                parseFlakeRef(flakeRef, absPath(".")));
+        }}
+    });
 }
 
 SourceExprCommand::SourceExprCommand()
 {
-    mkFlag()
-        .shortName('f')
-        .longName("file")
-        .label("file")
-        .description("evaluate attributes from FILE")
-        .dest(&file);
+    addFlag({
+        .longName = "file",
+        .shortName = 'f',
+        .description = "evaluate FILE rather than the default",
+        .labels = {"file"},
+        .handler = {&file}
+    });
 
-    mkFlag()
-        .longName("expr")
-        .label("expr")
-        .description("evaluate attributes from EXPR")
-        .dest(&expr);
+    addFlag({
+        .longName ="expr",
+        .description = "evaluate attributes from EXPR",
+        .labels = {"expr"},
+        .handler = {&expr}
+    });
 }
 
 Strings SourceExprCommand::getDefaultFlakeAttrPaths()

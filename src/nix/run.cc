@@ -63,16 +63,16 @@ struct CmdShell : InstallablesCommand, RunCommon, MixEnvironment
 
     CmdShell()
     {
-        mkFlag()
-            .longName("command")
-            .shortName('c')
-            .description("command and arguments to be executed; defaults to '$SHELL'")
-            .labels({"command", "args"})
-            .arity(ArityAny)
-            .handler([&](std::vector<std::string> ss) {
+        addFlag({
+            .longName = "command",
+            .shortName = 'c',
+            .description = "command and arguments to be executed; defaults to '$SHELL'",
+            .labels = {"command", "args"},
+            .handler = {[&](std::vector<std::string> ss) {
                 if (ss.empty()) throw UsageError("--command requires at least one argument");
                 command = ss;
-            });
+            }}
+        });
     }
 
     std::string description() override
@@ -84,8 +84,8 @@ struct CmdShell : InstallablesCommand, RunCommon, MixEnvironment
     {
         return {
             Example{
-                "To start a shell providing GNU Hello from NixOS 17.03:",
-                "nix shell -f channel:nixos-17.03 hello"
+                "To start a shell providing GNU Hello from NixOS 20.03:",
+                "nix shell nixpkgs/nixos-20.03#hello"
             },
             Example{
                 "To start a shell providing youtube-dl from your 'nixpkgs' channel:",

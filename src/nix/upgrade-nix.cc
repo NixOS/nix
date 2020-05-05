@@ -16,18 +16,20 @@ struct CmdUpgradeNix : MixDryRun, StoreCommand
 
     CmdUpgradeNix()
     {
-        mkFlag()
-            .longName("profile")
-            .shortName('p')
-            .labels({"profile-dir"})
-            .description("the Nix profile to upgrade")
-            .dest(&profileDir);
+        addFlag({
+            .longName = "profile",
+            .shortName = 'p',
+            .description = "the Nix profile to upgrade",
+            .labels = {"profile-dir"},
+            .handler = {&profileDir}
+        });
 
-        mkFlag()
-            .longName("nix-store-paths-url")
-            .labels({"url"})
-            .description("URL of the file that contains the store paths of the latest Nix release")
-            .dest(&storePathsUrl);
+        addFlag({
+            .longName = "nix-store-paths-url",
+            .description = "URL of the file that contains the store paths of the latest Nix release",
+            .labels = {"url"},
+            .handler = {&storePathsUrl}
+        });
     }
 
     std::string description() override
@@ -48,6 +50,8 @@ struct CmdUpgradeNix : MixDryRun, StoreCommand
             },
         };
     }
+
+    Category category() override { return catNixInstallation; }
 
     void run(ref<Store> store) override
     {
