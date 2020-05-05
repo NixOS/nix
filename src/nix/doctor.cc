@@ -40,7 +40,7 @@ struct CmdDoctor : StoreCommand
 
     std::string description() override
     {
-        return "check your system for potential problems and print a PASS or FAIL for each check.";
+        return "check your system for potential problems and print a PASS or FAIL for each check";
     }
 
     Category category() override { return catNixInstallation; }
