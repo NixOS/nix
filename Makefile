@@ -16,7 +16,8 @@ makefiles = \
   misc/upstart/local.mk \
   doc/manual/local.mk \
   tests/local.mk \
-  tests/plugins/local.mk
+  tests/plugins/local.mk \
+  tests/unit-tests/local.mk
 
 -include Makefile.config
 
