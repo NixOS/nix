@@ -507,6 +507,9 @@ private:
     Path fnUserLock;
     AutoCloseFD fdUserLock;
 
+    bool findFreeUser();
+
+
     string user;
     uid_t uid;
     gid_t gid;
@@ -526,10 +529,19 @@ public:
 
 };
 
-
 UserLock::UserLock()
 {
     assert(settings.buildUsersGroup != "");
+    createDirs(settings.nixStateDir + "/userpool");
+
+    if (findFreeUser()) return;
+
+    printError("waiting for build users");
+
+    do std::this_thread::sleep_for(std::chrono::seconds(2)); while (! findFreeUser());
+}
+
+bool UserLock::findFreeUser() {
 
     /* Get the members of the build-users-group. */
     struct group * gr = getgrnam(settings.buildUsersGroup.get().c_str());
@@ -559,7 +571,6 @@ UserLock::UserLock()
             throw Error(format("the user '%1%' in the group '%2%' does not exist")
                 % i % settings.buildUsersGroup);
 
-        createDirs(settings.nixStateDir + "/userpool");
 
         fnUserLock = (format("%1%/userpool/%2%") % settings.nixStateDir % pw->pw_uid).str();
 
@@ -590,15 +601,11 @@ UserLock::UserLock()
             supplementaryGIDs.resize(ngroups);
 #endif
 
-            return;
+            return true;
         }
     }
-
-    throw Error(format("all build users are currently in use; "
-        "consider creating additional users and adding them to the '%1%' group")
-        % settings.buildUsersGroup);
+    return false;
 }
-
 
 void UserLock::kill()
 {
