@@ -57,6 +57,11 @@ struct Installable
 
     virtual std::vector<std::pair<std::shared_ptr<eval_cache::AttrCursor>, std::string>>
     getCursor(EvalState & state, bool useEvalCache);
+
+    virtual FlakeRef nixpkgsFlakeRef() const
+    {
+        return std::move(FlakeRef::fromAttrs({{"type","indirect"}, {"id", "nixpkgs"}}));
+    }
 };
 
 struct InstallableValue : Installable
@@ -104,6 +109,8 @@ struct InstallableFlake : InstallableValue
 
     std::vector<std::pair<std::shared_ptr<eval_cache::AttrCursor>, std::string>>
     getCursor(EvalState & state, bool useEvalCache) override;
+
+    FlakeRef nixpkgsFlakeRef() const override;
 };
 
 ref<eval_cache::EvalCache> openEvalCache(

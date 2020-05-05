@@ -493,6 +493,18 @@ InstallableFlake::getCursor(EvalState & state, bool useEvalCache)
     return res;
 }
 
+FlakeRef InstallableFlake::nixpkgsFlakeRef() const
+{
+    auto lockedFlake = lockFlake(*(cmd.getEvalState()), flakeRef, cmd.lockFlags);
+
+    auto nixpkgsInput = lockedFlake.flake.inputs.find("nixpkgs");
+    if (nixpkgsInput != lockedFlake.flake.inputs.end()) {
+        return std::move(nixpkgsInput->second.ref);
+    }
+
+    return Installable::nixpkgsFlakeRef();
+}
+
 std::vector<std::shared_ptr<Installable>> SourceExprCommand::parseInstallables(
     ref<Store> store, std::vector<std::string> ss)
 {

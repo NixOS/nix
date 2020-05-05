@@ -286,9 +286,8 @@ struct CmdDevShell : Common, MixEnvironment
 
     std::string getBashPath(ref<Store> store)
     {
-        auto flakeRef = FlakeRef::fromAttrs({{"type","indirect"}, {"id", "nixpkgs"}});
         auto state = getEvalState();
-        auto lockedFlake = std::make_shared<flake::LockedFlake>(lockFlake(*state, flakeRef, lockFlags));
+        auto lockedFlake = std::make_shared<flake::LockedFlake>(lockFlake(*state, installable->nixpkgsFlakeRef(), lockFlags));
         auto cache = openEvalCache(*state, lockedFlake, true);
         auto root = cache->getRoot();
 
