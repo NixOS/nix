@@ -61,7 +61,7 @@ static StorePath useDeriver(const StorePath & path)
    other paths it means ensure their validity. */
 static PathSet realisePath(StorePathWithOutputs path, bool build = true)
 {
-    auto store2 = std::dynamic_pointer_cast<LocalFSStore>(store);
+    auto store2 = std::dynamic_pointer_cast<LocalStore>(store);
 
     if (path.path.isDerivation()) {
         if (build) store->buildPaths({path});
@@ -221,10 +221,7 @@ static StorePathSet maybeUseOutputs(const StorePath & storePath, bool useOutput,
         auto drv = store->derivationFromPath(storePath);
         StorePathSet outputs;
         for (auto & i : drv.outputs) {
-            auto outPath = i.second.path.clone();
-            if (store2) {
-                outPath = store2->queryOutPath(DrvOutputId{ storePath.clone(), i.first });
-            }
+            auto outPath = ensureLocalStore()->queryOutPath(DrvOutputId{ storePath, i.first }, drv);
             outputs.insert(outPath);
         }
         return outputs;
@@ -319,8 +316,13 @@ static void opQuery(Strings opFlags, Strings opArgs)
                 auto i2 = store->followLinksToStorePath(i);
                 if (forceRealise) realisePath({i2});
                 Derivation drv = store->derivationFromPath(i2);
-                for (auto & j : drv.outputs)
-                    cout << fmt("%1%\n", store->printStorePath(j.second.path));
+                for (auto & j : drv.outputs) {
+                    auto outPath = store->queryOutPath(
+                        DrvOutputId{ i2, j.first},
+                        drv
+                    );
+                    cout << fmt("%1%\n", store->printStorePath(outPath));
+                }
             }
             break;
         }

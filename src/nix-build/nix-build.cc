@@ -507,8 +507,9 @@ static void _main(int argc, char * * argv)
         for (auto & drvInfo : drvs) {
             auto outputName = drvInfo.queryOutputName();
             auto drvPath = drvInfo.queryDrvPath();
-
             auto outPath = store->queryOutPath(DrvOutputId{ store->parseStorePath(drvPath), outputName});
+            if (auto store2 = store.dynamic_pointer_cast<LocalStore>())
+                outPath = store2->queryOutPath(DrvOutputId{ store->parseStorePath(drvPath), outputName});
             string rawOutPath = store->printStorePath(outPath);
 
             std::string drvPrefix;
