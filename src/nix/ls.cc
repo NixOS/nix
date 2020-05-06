@@ -140,7 +140,7 @@ struct CmdLsNar : Command, MixLs
 
     void run() override
     {
-        list(makeNarAccessor(make_ref<std::string>(readFile(narPath, true))));
+        list(makeNarAccessor(make_ref<std::string>(readFile(narPath))));
     }
 };
 

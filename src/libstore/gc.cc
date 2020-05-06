@@ -419,7 +419,7 @@ void LocalStore::findRuntimeRoots(Roots & roots, bool censor)
 
                 try {
                     auto mapFile = fmt("/proc/%s/maps", ent->d_name);
-                    auto mapLines = tokenizeString<std::vector<string>>(readFile(mapFile, true), "\n");
+                    auto mapLines = tokenizeString<std::vector<string>>(readFile(mapFile), "\n");
                     for (const auto & line : mapLines) {
                         auto match = std::smatch{};
                         if (std::regex_match(line, match, mapRegex))
@@ -427,7 +427,7 @@ void LocalStore::findRuntimeRoots(Roots & roots, bool censor)
                     }
 
                     auto envFile = fmt("/proc/%s/environ", ent->d_name);
-                    auto envString = readFile(envFile, true);
+                    auto envString = readFile(envFile);
                     auto env_end = std::sregex_iterator{};
                     for (auto i = std::sregex_iterator{envString.begin(), envString.end(), storePathRegex}; i != env_end; ++i)
                         unchecked[i->str()].emplace(envFile);

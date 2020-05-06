@@ -316,19 +316,16 @@ string readFile(int fd)
     if (fstat(fd, &st) == -1)
         throw SysError("statting file");
 
-    std::vector<unsigned char> buf(st.st_size);
-    readFull(fd, buf.data(), st.st_size);
-
-    return string((char *) buf.data(), st.st_size);
+    return drainFD(fd, true, st.st_size);
 }
 
 
-string readFile(const Path & path, bool drain)
+string readFile(const Path & path)
 {
     AutoCloseFD fd = open(path.c_str(), O_RDONLY | O_CLOEXEC);
     if (!fd)
         throw SysError(format("opening file '%1%'") % path);
-    return drain ? drainFD(fd.get()) : readFile(fd.get());
+    return readFile(fd.get());
 }
 
 
@@ -665,9 +662,9 @@ void writeFull(int fd, const string & s, bool allowInterrupts)
 }
 
 
-string drainFD(int fd, bool block)
+string drainFD(int fd, bool block, const size_t reserveSize)
 {
-    StringSink sink;
+    StringSink sink(reserveSize);
     drainFD(fd, sink, block);
     return std::move(*sink.s);
 }
