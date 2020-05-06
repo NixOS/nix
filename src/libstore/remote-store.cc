@@ -779,10 +779,8 @@ std::exception_ptr RemoteStore::Connection::processStderr(Sink * sink, Source * 
             return std::make_exception_ptr(Error(status, error));
         }
 
-        else if (msg == STDERR_NEXT) {
-            string s = chomp(readString(from));
-            printMsg(lvlVomit, "stderr %s", s);
-        }
+        else if (msg == STDERR_NEXT)
+            printError(chomp(readString(from)));
 
         else if (msg == STDERR_START_ACTIVITY) {
             auto act = readNum<ActivityId>(from);
