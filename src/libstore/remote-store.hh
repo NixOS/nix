@@ -47,6 +47,9 @@ public:
 
     void queryReferrers(const StorePath & path, StorePathSet & referrers) override;
 
+    StorePath queryOutPath(const DrvOutputId & outputId);
+    StorePath queryOutPath(const DrvOutputId & outputId, const BasicDerivation & drv);
+
     StorePathSet queryValidDerivers(const StorePath & path) override;
 
     StorePathSet queryDerivationOutputs(const StorePath & path) override;

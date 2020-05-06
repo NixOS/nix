@@ -76,9 +76,9 @@ static PathSet realisePath(StorePathWithOutputs path, bool build = true)
             DerivationOutputs::iterator i = drv.outputs.find(j);
             if (i == drv.outputs.end())
                 throw Error("derivation '%s' does not have an output named '%s'",
-                    store2->printStorePath(path.path), j);
-            auto outPath = store2->printStorePath(
-                store2->queryOutPath(DrvOutputId{ path.path.clone(), j})
+                    store->printStorePath(path.path), j);
+            auto outPath = store->printStorePath(
+                store->queryOutPath(DrvOutputId{ path.path, j})
             );
             if (store2) {
                 if (gcRoot == "")

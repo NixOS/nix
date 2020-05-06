@@ -336,8 +336,8 @@ public:
     /* Get the out path for the given DrvOutputId.
      * XXX: The implementation is only valid atm for `LocalStore`
      */
-    StorePath queryOutPath(const DrvOutputId & outputId);
-    StorePath queryOutPath(const DrvOutputId & outputId, const BasicDerivation & drv);
+    virtual StorePath queryOutPath(const DrvOutputId & outputId);
+    virtual StorePath queryOutPath(const DrvOutputId & outputId, const BasicDerivation & drv);
 
     /* Return true if ‘path’ is in the Nix store (but not the Nix
        store itself). */

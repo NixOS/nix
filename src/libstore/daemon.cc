@@ -753,6 +753,16 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
         break;
     }
 
+    case wopQueryOutPath: {
+        auto deriver = store->parseStorePath(readString(from));
+        auto outputName = readString(from);
+        logger->startWork();
+        auto outPath = store->queryOutPath(DrvOutputId{ std::move(deriver), outputName });
+        logger->stopWork();
+        to << store->printStorePath(outPath);
+        break;
+    }
+
     default:
         throw Error("invalid operation %1%", op);
     }

@@ -388,6 +388,17 @@ void RemoteStore::queryPathInfoUncached(const StorePath & path,
     } catch (...) { callback.rethrow(); }
 }
 
+StorePath RemoteStore::queryOutPath(const DrvOutputId & outputId, const BasicDerivation & _drv) {
+    return queryOutPath(outputId);
+}
+
+StorePath RemoteStore::queryOutPath(const DrvOutputId & outputId) {
+    auto conn(getConnection());
+    conn->to << wopQueryOutPath << printStorePath(outputId.deriver) << outputId.outputName;
+    conn.processStderr();
+    return parseStorePath(readString(conn->from));
+}
+
 
 void RemoteStore::queryReferrers(const StorePath & path,
     StorePathSet & referrers)

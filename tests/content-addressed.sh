@@ -16,9 +16,24 @@ checkBuild () {
     test $out1 == $out2
 }
 
-checkBuild contentAddressed
-checkBuild dependent
-checkBuild transitivelyDependent
+checkAll () {
+    checkBuild contentAddressed
+    checkBuild dependent
+    checkBuild transitivelyDependent
+    # Ensure that in addition to the out paths being the same, we don't rebuild
+    # the derivations that don't need it
+    nix-build ./content-addressed.nix --arg seed 3 |& (! grep -q "building transitively-dependent")
+}
+
+# Ensure that everything works locally
+checkAll
+
+# Same thing, but with the daemon
+clearStore
+startDaemon
+checkAll
+killDaemon
+unset NIX_REMOTE
 
 # nix-build ./content-addressed.nix --arg seed 3 |& (! grep -q "building transitively-dependent")
 
