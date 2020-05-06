@@ -591,7 +591,7 @@ void LocalStore::resolveDerivation(Derivation & drv) {
         for (auto & outputName : input.second) {
             DrvOutputId outputId { input.first, outputName };
             auto actualPath = queryOutPath(outputId, inputDrv);
-            if (actualPath != drv.findOutput(outputName)) {
+            if (actualPath != inputDrv.findOutput(outputName)) {
                 inputRewrites.emplace(
                         printStorePath(inputDrv.outputs.at(outputName).path),
                         printStorePath(actualPath)
