@@ -63,16 +63,6 @@ public:
         writeToStderr(prefix + filterANSIEscapes(fs.s, !tty) + "\n");
     }
 
-    void result(ActivityId act, ResultType type, const std::vector<Field> & fields) override
-    {
-        if (type == resBuildLogLine || type == resPostBuildLogLine) {
-            assert(0 < fields.size());
-            assert(fields[0].type == Logger::Field::tString);
-            auto lastLine = fields[0].s;
-            log(lvlInfo, lastLine);
-        }
-    }
-
     void startActivity(ActivityId act, Verbosity lvl, ActivityType type,
         const std::string & s, const Fields & fields, ActivityId parent)
         override
