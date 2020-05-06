@@ -129,7 +129,6 @@ static FlakeInput parseFlakeInput(EvalState & state,
 
     auto sInputs = state.symbols.create("inputs");
     auto sUrl = state.symbols.create("url");
-    auto sUri = state.symbols.create("uri"); // FIXME: remove soon
     auto sFlake = state.symbols.create("flake");
     auto sFollows = state.symbols.create("follows");
 
@@ -138,7 +137,7 @@ static FlakeInput parseFlakeInput(EvalState & state,
 
     for (nix::Attr attr : *(value->attrs)) {
         try {
-            if (attr.name == sUrl || attr.name == sUri) {
+            if (attr.name == sUrl) {
                 expectType(state, tString, *attr.value, *attr.pos);
                 url = attr.value->string.s;
                 attrs.emplace("url", *url);
@@ -232,13 +231,9 @@ static Flake getFlake(
     expectType(state, tAttrs, vInfo, Pos(state.symbols.create(flakeFile), 0, 0));
 
     auto sEdition = state.symbols.create("edition"); // FIXME: remove soon
-    auto sEpoch = state.symbols.create("epoch"); // FIXME: remove soon
 
     if (vInfo.attrs->get(sEdition))
         warn("flake '%s' has deprecated attribute 'edition'", lockedRef);
-
-    if (vInfo.attrs->get(sEpoch))
-        warn("flake '%s' has deprecated attribute 'epoch'", lockedRef);
 
     if (auto description = vInfo.attrs->get(state.sDescription)) {
         expectType(state, tString, *description->value, *description->pos);
@@ -270,7 +265,6 @@ static Flake getFlake(
 
     for (auto & attr : *vInfo.attrs) {
         if (attr.name != sEdition &&
-            attr.name != sEpoch &&
             attr.name != state.sDescription &&
             attr.name != sInputs &&
             attr.name != sOutputs)

@@ -12,29 +12,18 @@ FlakeRef flakeRefFromJson(const nlohmann::json & json)
 
 FlakeRef getFlakeRef(
     const nlohmann::json & json,
-    const char * version3Attr1,
-    const char * version3Attr2,
-    const char * version4Attr)
+    const char * attr)
 {
-    auto i = json.find(version4Attr);
+    auto i = json.find(attr);
     if (i != json.end())
         return flakeRefFromJson(*i);
 
-    // FIXME: remove these.
-    i = json.find(version3Attr1);
-    if (i != json.end())
-        return parseFlakeRef(*i);
-
-    i = json.find(version3Attr2);
-    if (i != json.end())
-        return parseFlakeRef(*i);
-
-    throw Error("attribute '%s' missing in lock file", version4Attr);
+    throw Error("attribute '%s' missing in lock file", attr);
 }
 
 LockedNode::LockedNode(const nlohmann::json & json)
-    : lockedRef(getFlakeRef(json, "url", "uri", "locked"))
-    , originalRef(getFlakeRef(json, "originalUrl", "originalUri", "original"))
+    : lockedRef(getFlakeRef(json, "locked"))
+    , originalRef(getFlakeRef(json, "original"))
     , info(TreeInfo::fromJson(json))
     , isFlake(json.find("flake") != json.end() ? (bool) json["flake"] : true)
 {
@@ -64,49 +53,32 @@ std::shared_ptr<Node> Node::findInput(const InputPath & path)
 LockFile::LockFile(const nlohmann::json & json, const Path & path)
 {
     auto version = json.value("version", 0);
-    if (version < 3 || version > 5)
+    if (version != 5)
         throw Error("lock file '%s' has unsupported version %d", path, version);
 
-    if (version < 5) {
-        std::function<void(Node & node, const nlohmann::json & json)> getInputs;
+    std::unordered_map<std::string, std::shared_ptr<Node>> nodeMap;
 
-        getInputs = [&](Node & node, const nlohmann::json & json)
-        {
-            for (auto & i : json["inputs"].items()) {
-                auto input = std::make_shared<LockedNode>(i.value());
-                getInputs(*input, i.value());
-                node.inputs.insert_or_assign(i.key(), input);
+    std::function<void(Node & node, const nlohmann::json & jsonNode)> getInputs;
+
+    getInputs = [&](Node & node, const nlohmann::json & jsonNode)
+    {
+        if (jsonNode.find("inputs") == jsonNode.end()) return;
+        for (auto & i : jsonNode["inputs"].items()) {
+            std::string inputKey = i.value();
+            auto k = nodeMap.find(inputKey);
+            if (k == nodeMap.end()) {
+                auto jsonNode2 = json["nodes"][inputKey];
+                auto input = std::make_shared<LockedNode>(jsonNode2);
+                k = nodeMap.insert_or_assign(inputKey, input).first;
+                getInputs(*input, jsonNode2);
             }
-        };
+            node.inputs.insert_or_assign(i.key(), k->second);
+        }
+    };
 
-        getInputs(*root, json);
-    }
-
-    else {
-        std::unordered_map<std::string, std::shared_ptr<Node>> nodeMap;
-
-        std::function<void(Node & node, const nlohmann::json & jsonNode)> getInputs;
-
-        getInputs = [&](Node & node, const nlohmann::json & jsonNode)
-        {
-            if (jsonNode.find("inputs") == jsonNode.end()) return;
-            for (auto & i : jsonNode["inputs"].items()) {
-                std::string inputKey = i.value();
-                auto k = nodeMap.find(inputKey);
-                if (k == nodeMap.end()) {
-                    auto jsonNode2 = json["nodes"][inputKey];
-                    auto input = std::make_shared<LockedNode>(jsonNode2);
-                    k = nodeMap.insert_or_assign(inputKey, input).first;
-                    getInputs(*input, jsonNode2);
-                }
-                node.inputs.insert_or_assign(i.key(), k->second);
-            }
-        };
-
-        std::string rootKey = json["root"];
-        nodeMap.insert_or_assign(rootKey, root);
-        getInputs(*root, json["nodes"][rootKey]);
-    }
+    std::string rootKey = json["root"];
+    nodeMap.insert_or_assign(rootKey, root);
+    getInputs(*root, json["nodes"][rootKey]);
 }
 
 nlohmann::json LockFile::toJson() const

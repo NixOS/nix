@@ -3,7 +3,7 @@
 
   edition = 201909; # FIXME: remove
 
-  inputs.nixpkgs.uri = "nixpkgs/nixos-20.03-small";
+  inputs.nixpkgs.url = "nixpkgs/nixos-20.03-small";
 
   outputs = { self, nixpkgs }:
 
