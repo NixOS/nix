@@ -5,7 +5,6 @@
 
 namespace nix::eval_cache {
 
-// FIXME: inefficient representation of attrs
 static const char * schema = R"sql(
 create table if not exists Attributes (
     parent      integer not null,
