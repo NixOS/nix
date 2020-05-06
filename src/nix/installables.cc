@@ -417,10 +417,6 @@ InstallableFlake::getCursor(EvalState & state, bool useEvalCache)
     return res;
 }
 
-// FIXME: extend
-std::string attrRegex = R"([A-Za-z_][A-Za-z0-9-_+]*)";
-static std::regex attrPathRegex(fmt(R"(%1%(\.%1%)*)", attrRegex));
-
 std::vector<std::shared_ptr<Installable>> SourceExprCommand::parseInstallables(
     ref<Store> store, std::vector<std::string> ss)
 {
@@ -449,48 +445,38 @@ std::vector<std::shared_ptr<Installable>> SourceExprCommand::parseInstallables(
     } else {
 
         for (auto & s : ss) {
-            if (hasPrefix(s, "nixpkgs.")) {
-                bool static warned;
-                warnOnce(warned, "the syntax 'nixpkgs.<attr>' is deprecated; use 'nixpkgs#<attr>' instead");
-                result.push_back(std::make_shared<InstallableFlake>(*this,
-                        FlakeRef::fromAttrs({{"type", "indirect"}, {"id", "nixpkgs"}}),
-                        Strings{"legacyPackages." + settings.thisSystem.get() + "." + std::string(s, 8)}, Strings{}));
+            std::exception_ptr ex;
+
+            try {
+                auto [flakeRef, fragment] = parseFlakeRefWithFragment(s, absPath("."));
+                result.push_back(std::make_shared<InstallableFlake>(
+                        *this, std::move(flakeRef),
+                        fragment == "" ? getDefaultFlakeAttrPaths() : Strings{fragment},
+                        getDefaultFlakeAttrPathPrefixes()));
+                continue;
+            } catch (...) {
+                ex = std::current_exception();
             }
 
-            else {
-                std::exception_ptr ex;
-
+            if (s.find('/') != std::string::npos) {
                 try {
-                    auto [flakeRef, fragment] = parseFlakeRefWithFragment(s, absPath("."));
-                    result.push_back(std::make_shared<InstallableFlake>(
-                            *this, std::move(flakeRef),
-                            fragment == "" ? getDefaultFlakeAttrPaths() : Strings{fragment},
-                            getDefaultFlakeAttrPathPrefixes()));
+                    result.push_back(std::make_shared<InstallableStorePath>(store, store->printStorePath(store->followLinksToStorePath(s))));
                     continue;
+                } catch (NotInStore &) {
                 } catch (...) {
-                    ex = std::current_exception();
+                    if (!ex)
+                        ex = std::current_exception();
                 }
-
-                if (s.find('/') != std::string::npos) {
-                    try {
-                        result.push_back(std::make_shared<InstallableStorePath>(store, store->printStorePath(store->followLinksToStorePath(s))));
-                        continue;
-                    } catch (NotInStore &) {
-                    } catch (...) {
-                        if (!ex)
-                            ex = std::current_exception();
-                    }
-                }
-
-                std::rethrow_exception(ex);
-
-                /*
-                throw Error(
-                    pathExists(s)
-                    ? "path '%s' is not a flake or a store path"
-                    : "don't know how to handle argument '%s'", s);
-                */
             }
+
+            std::rethrow_exception(ex);
+
+            /*
+            throw Error(
+                pathExists(s)
+                ? "path '%s' is not a flake or a store path"
+                : "don't know how to handle argument '%s'", s);
+            */
         }
     }
 
