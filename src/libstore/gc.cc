@@ -41,7 +41,6 @@ AutoCloseFD LocalStore::openGCLock(LockType lockType)
         throw SysError("opening global GC lock '%1%'", fnGCLock);
 
     if (!lockFile(fdGCLock.get(), lockType, false)) {
-        // TODO: info?
         printError("waiting for the big garbage collector lock...");
         lockFile(fdGCLock.get(), lockType, true);
     }

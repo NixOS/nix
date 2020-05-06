@@ -23,7 +23,6 @@ int main()
         logger->logEI(e.info());
     }
 
-
     // ErrorInfo constructor
     try {
         auto e = Error("some error");
