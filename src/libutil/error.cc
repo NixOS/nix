@@ -16,14 +16,6 @@ BaseError & BaseError::addPrefix(const FormatOrString & fs)
     return *this;
 }
 
-
-std::string SysError::addErrno(const std::string & s)
-{
-    errNo = errno;
-    return s + ": " + strerror(errNo);
-}
-
-
 std::optional<string> ErrorInfo::programName = std::nullopt;
 
 std::ostream& operator<<(std::ostream &os, const hintformat &hf)

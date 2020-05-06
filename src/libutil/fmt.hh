@@ -75,8 +75,8 @@ inline std::string fmt(const std::string & fs, const Args & ... args)
 template <class T>
 struct yellowtxt
 {
-    yellowtxt(T &s) : value(s) {}
-    T &value;
+    yellowtxt(const T &s) : value(s) {}
+    const T &value;
 };
 
 template <class T>
@@ -88,8 +88,8 @@ std::ostream& operator<<(std::ostream &out, const yellowtxt<T> &y)
 template <class T>
 struct normaltxt
 {
-    normaltxt(T &s) : value(s) {}
-    T &value;
+    normaltxt(const T &s) : value(s) {}
+    const T &value;
 };
 
 template <class T>

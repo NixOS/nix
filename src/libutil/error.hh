@@ -160,13 +160,14 @@ public:
 
     template<typename... Args>
     SysError(const Args & ... args)
-        : Error(args...)  // TODO addErrNo for hintfmt
-          // : Error(addErrno(hintfmt(args...)))
-    { }
+      :Error("")
+    {
+        errNo = errno;
+        auto hf = hintfmt(args...);
+        err.hint = hintfmt("%1% : %2%", normaltxt(hf.str()), strerror(errNo));
+    }
 
-private:
-
-    std::string addErrno(const std::string & s);
+    virtual const char* sname() const override { return "SysError"; }
 };
 
 }

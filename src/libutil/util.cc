@@ -312,7 +312,8 @@ string readFile(const Path & path, bool drain)
 void readFile(const Path & path, Sink & sink)
 {
     AutoCloseFD fd = open(path.c_str(), O_RDONLY | O_CLOEXEC);
-    if (!fd) throw SysError("opening file '%s'", path);
+    if (!fd)  
+        throw SysError("opening file '%s'", path);
     drainFD(fd.get(), sink);
 }
 

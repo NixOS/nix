@@ -35,6 +35,14 @@ int main()
         logger->logEI(ei);
     }
 
+    // SysError; picks up errno
+    try {
+        auto x = readFile(-1);
+    }
+    catch (Error &e) {
+        std::cout << "error: " << e.sname() << std::endl;
+        logError(e.info());
+    }
 
     // For completeness sake, info through vomit levels.
     // But this is maybe a heavy format for those.
