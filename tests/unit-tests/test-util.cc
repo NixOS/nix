@@ -12,14 +12,14 @@ namespace nix {
     TEST(absPath, doesntChangeRoot) {
         auto p = absPath("/");
 
-        ASSERT_STREQ(p.c_str(), "/");
+        ASSERT_EQ(p, "/");
     }
 
     TEST(absPath, turnsEmptyPathIntoCWD) {
         char cwd[PATH_MAX+1];
         auto p = absPath("");
 
-        ASSERT_STREQ(p.c_str(), getcwd((char*)&cwd, PATH_MAX));
+        ASSERT_EQ(p, getcwd((char*)&cwd, PATH_MAX));
     }
 
     TEST(absPath, usesOptionalBasePathWhenGiven) {
@@ -28,7 +28,7 @@ namespace nix {
 
         auto p = absPath("", cwd);
 
-        ASSERT_STREQ(p.c_str(), cwd);
+        ASSERT_EQ(p, cwd);
     }
 
     TEST(absPath, isIdempotent) {
@@ -37,7 +37,7 @@ namespace nix {
         auto p1 = absPath(cwd);
         auto p2 = absPath(p1);
 
-        ASSERT_STREQ(p1.c_str(), p2.c_str());
+        ASSERT_EQ(p1, p2);
     }
 
 
@@ -46,8 +46,8 @@ namespace nix {
         auto p1 = absPath(path);
         auto p2 = absPath(p1);
 
-        ASSERT_STREQ(p1.c_str(), "/some/path/with/trailing/dot");
-        ASSERT_STREQ(p1.c_str(), p2.c_str());
+        ASSERT_EQ(p1, "/some/path/with/trailing/dot");
+        ASSERT_EQ(p1, p2);
     }
 
     /* ----------------------------------------------------------------------------
@@ -58,21 +58,21 @@ namespace nix {
         auto path = "/this/is/a/path//";
         auto p = canonPath(path);
 
-        ASSERT_STREQ(p.c_str(), "/this/is/a/path");
+        ASSERT_EQ(p, "/this/is/a/path");
     }
 
     TEST(canonPath, removesDots) {
         auto path = "/this/./is/a/path/./";
         auto p = canonPath(path);
 
-        ASSERT_STREQ(p.c_str(), "/this/is/a/path");
+        ASSERT_EQ(p, "/this/is/a/path");
     }
 
     TEST(canonPath, removesDots2) {
         auto path = "/this/a/../is/a////path/foo/..";
         auto p = canonPath(path);
 
-        ASSERT_STREQ(p.c_str(), "/this/is/a/path");
+        ASSERT_EQ(p, "/this/is/a/path");
     }
 
     TEST(canonPath, requiresAbsolutePath) {
@@ -91,18 +91,18 @@ namespace nix {
     TEST(dirOf, DISABLED_returnsEmptyStringForRoot) {
         auto p = dirOf("/");
 
-        ASSERT_STREQ(p.c_str(), "");
+        ASSERT_EQ(p, "");
     }
 
     TEST(dirOf, returnsFirstPathComponent) {
         auto p1 = dirOf("/dir/");
-        ASSERT_STREQ(p1.c_str(), "/dir");
+        ASSERT_EQ(p1, "/dir");
         auto p2 = dirOf("/dir");
-        ASSERT_STREQ(p2.c_str(), "/");
+        ASSERT_EQ(p2, "/");
         auto p3 = dirOf("/dir/..");
-        ASSERT_STREQ(p3.c_str(), "/dir");
+        ASSERT_EQ(p3, "/dir");
         auto p4 = dirOf("/dir/../");
-        ASSERT_STREQ(p4.c_str(), "/dir/..");
+        ASSERT_EQ(p4, "/dir/..");
     }
 
     /* ----------------------------------------------------------------------------
@@ -111,29 +111,29 @@ namespace nix {
 
     TEST(baseNameOf, emptyPath) {
         auto p1 = baseNameOf("");
-        ASSERT_STREQ(std::string(p1).c_str(), "");
+        ASSERT_EQ(std::string(p1), "");
     }
 
     TEST(baseNameOf, pathOnRoot) {
         auto p1 = baseNameOf("/dir");
-        ASSERT_STREQ(std::string(p1).c_str(), "dir");
+        ASSERT_EQ(std::string(p1), "dir");
     }
 
     TEST(baseNameOf, relativePath) {
         auto p1 = baseNameOf("dir/foo");
-        ASSERT_STREQ(std::string(p1).c_str(), "foo");
+        ASSERT_EQ(std::string(p1), "foo");
     }
 
     TEST(baseNameOf, pathWithTrailingSlashRoot) {
         auto p1 = baseNameOf("/");
-        ASSERT_STREQ(std::string(p1).c_str(), "");
+        ASSERT_EQ(std::string(p1), "");
     }
 
     // XXX: according to the doc of `baseNameOf`, baseNameOf("/dir/") should return
     // "" but it actually returns "dir"
     TEST(baseNameOf, DISABLED_trailingSlash) {
         auto p1 = baseNameOf("/dir/");
-        ASSERT_STREQ(std::string(p1).c_str(), "");
+        ASSERT_EQ(std::string(p1), "");
     }
 
     /* ----------------------------------------------------------------------------
@@ -265,11 +265,11 @@ namespace nix {
      * --------------------------------------------------------------------------*/
 
     TEST(base64Encode, emptyString) {
-        ASSERT_STREQ(base64Encode("").c_str(), "");
+        ASSERT_EQ(base64Encode(""), "");
     }
 
     TEST(base64Encode, encodesAString) {
-        ASSERT_STREQ(base64Encode("quod erat demonstrandum").c_str(), "cXVvZCBlcmF0IGRlbW9uc3RyYW5kdW0=");
+        ASSERT_EQ(base64Encode("quod erat demonstrandum"), "cXVvZCBlcmF0IGRlbW9uc3RyYW5kdW0=");
     }
 
     TEST(base64Encode, encodeAndDecode) {
@@ -277,7 +277,7 @@ namespace nix {
         auto encoded = base64Encode(s);
         auto decoded = base64Decode(encoded);
 
-        ASSERT_STREQ(decoded.c_str(), s);
+        ASSERT_EQ(decoded, s);
     }
 
     /* ----------------------------------------------------------------------------
@@ -285,11 +285,11 @@ namespace nix {
      * --------------------------------------------------------------------------*/
 
     TEST(base64Decode, emptyString) {
-        ASSERT_STREQ(base64Decode("").c_str(), "");
+        ASSERT_EQ(base64Decode(""), "");
     }
 
     TEST(base64Decode, decodeAString) {
-        ASSERT_STREQ(base64Decode("cXVvZCBlcmF0IGRlbW9uc3RyYW5kdW0=").c_str(), "quod erat demonstrandum");
+        ASSERT_EQ(base64Decode("cXVvZCBlcmF0IGRlbW9uc3RyYW5kdW0="), "quod erat demonstrandum");
     }
 
     /* ----------------------------------------------------------------------------
@@ -297,12 +297,12 @@ namespace nix {
      * --------------------------------------------------------------------------*/
 
     TEST(toLower, emptyString) {
-        ASSERT_STREQ(toLower("").c_str(), "");
+        ASSERT_EQ(toLower(""), "");
     }
 
     TEST(toLower, nonLetters) {
         auto s = "!@(*$#)(@#=\\234_";
-        ASSERT_STREQ(toLower(s).c_str(), s);
+        ASSERT_EQ(toLower(s), s);
     }
 
     // XXX: std::tolower() doesn't cover this. This probably doesn't matter
@@ -310,7 +310,7 @@ namespace nix {
     // characters are not allowed.
     TEST(toLower, DISABLED_umlauts) {
         auto s = "ÄÖÜ";
-        ASSERT_STREQ(toLower(s).c_str(), "äöü");
+        ASSERT_EQ(toLower(s), "äöü");
     }
 
     /* ----------------------------------------------------------------------------
@@ -377,27 +377,27 @@ namespace nix {
         StringMap rewrites;
         rewrites["this"] = "that";
 
-        ASSERT_STREQ(rewriteStrings("", rewrites).c_str(), "");
+        ASSERT_EQ(rewriteStrings("", rewrites), "");
     }
 
     TEST(rewriteStrings, emptyRewrites) {
         StringMap rewrites;
 
-        ASSERT_STREQ(rewriteStrings("this and that", rewrites).c_str(), "this and that");
+        ASSERT_EQ(rewriteStrings("this and that", rewrites), "this and that");
     }
 
     TEST(rewriteStrings, successfulRewrite) {
         StringMap rewrites;
         rewrites["this"] = "that";
 
-        ASSERT_STREQ(rewriteStrings("this and that", rewrites).c_str(), "that and that");
+        ASSERT_EQ(rewriteStrings("this and that", rewrites), "that and that");
     }
 
     TEST(rewriteStrings, doesntOccur) {
         StringMap rewrites;
         rewrites["foo"] = "bar";
 
-        ASSERT_STREQ(rewriteStrings("this and that", rewrites).c_str(), "this and that");
+        ASSERT_EQ(rewriteStrings("this and that", rewrites), "this and that");
     }
 
     /* ----------------------------------------------------------------------------
@@ -405,16 +405,16 @@ namespace nix {
      * --------------------------------------------------------------------------*/
 
     TEST(replaceStrings, emptyString) {
-        ASSERT_STREQ(replaceStrings("", "this", "that").c_str(), "");
-        ASSERT_STREQ(replaceStrings("this and that", "", "").c_str(), "this and that");
+        ASSERT_EQ(replaceStrings("", "this", "that"), "");
+        ASSERT_EQ(replaceStrings("this and that", "", ""), "this and that");
     }
 
     TEST(replaceStrings, successfulReplace) {
-        ASSERT_STREQ(replaceStrings("this and that", "this", "that").c_str(), "that and that");
+        ASSERT_EQ(replaceStrings("this and that", "this", "that"), "that and that");
     }
 
     TEST(replaceStrings, doesntOccur) {
-        ASSERT_STREQ(replaceStrings("this and that", "foo", "bar").c_str(), "this and that");
+        ASSERT_EQ(replaceStrings("this and that", "foo", "bar"), "this and that");
     }
 
     /* ----------------------------------------------------------------------------
@@ -422,14 +422,14 @@ namespace nix {
      * --------------------------------------------------------------------------*/
 
     TEST(trim, emptyString) {
-        ASSERT_STREQ(trim("").c_str(), "");
+        ASSERT_EQ(trim(""), "");
     }
 
     TEST(trim, removesWhitespace) {
-        ASSERT_STREQ(trim("foo").c_str(), "foo");
-        ASSERT_STREQ(trim("     foo ").c_str(), "foo");
-        ASSERT_STREQ(trim("     foo bar baz").c_str(), "foo bar baz");
-        ASSERT_STREQ(trim("     \t foo bar baz\n").c_str(), "foo bar baz");
+        ASSERT_EQ(trim("foo"), "foo");
+        ASSERT_EQ(trim("     foo "), "foo");
+        ASSERT_EQ(trim("     foo bar baz"), "foo bar baz");
+        ASSERT_EQ(trim("     \t foo bar baz\n"), "foo bar baz");
     }
 
     /* ----------------------------------------------------------------------------
@@ -437,15 +437,15 @@ namespace nix {
      * --------------------------------------------------------------------------*/
 
     TEST(chomp, emptyString) {
-        ASSERT_STREQ(chomp("").c_str(), "");
+        ASSERT_EQ(chomp(""), "");
     }
 
     TEST(chomp, removesWhitespace) {
-        ASSERT_STREQ(chomp("foo").c_str(), "foo");
-        ASSERT_STREQ(chomp("foo ").c_str(), "foo");
-        ASSERT_STREQ(chomp(" foo ").c_str(), " foo");
-        ASSERT_STREQ(chomp(" foo bar baz  ").c_str(), " foo bar baz");
-        ASSERT_STREQ(chomp("\t foo bar baz\n").c_str(), "\t foo bar baz");
+        ASSERT_EQ(chomp("foo"), "foo");
+        ASSERT_EQ(chomp("foo "), "foo");
+        ASSERT_EQ(chomp(" foo "), " foo");
+        ASSERT_EQ(chomp(" foo bar baz  "), " foo bar baz");
+        ASSERT_EQ(chomp("\t foo bar baz\n"), "\t foo bar baz");
     }
 
     /* ----------------------------------------------------------------------------
@@ -566,29 +566,29 @@ namespace nix {
         auto s = "";
         auto expected = "";
 
-        ASSERT_STREQ(filterANSIEscapes(s).c_str(), expected);
+        ASSERT_EQ(filterANSIEscapes(s), expected);
     }
 
     TEST(filterANSIEscapes, doesntChangePrintableChars) {
         auto s = "09 2q304ruyhr slk2-19024 kjsadh sar f";
 
-        ASSERT_STREQ(filterANSIEscapes(s).c_str(), s);
+        ASSERT_EQ(filterANSIEscapes(s), s);
     }
 
     TEST(filterANSIEscapes, filtersColorCodes) {
         auto s = "\u001b[30m A \u001b[31m B \u001b[32m C \u001b[33m D \u001b[0m";
 
-        ASSERT_STREQ(filterANSIEscapes(s, true, 2).c_str(), " A" );
-        ASSERT_STREQ(filterANSIEscapes(s, true, 3).c_str(), " A " );
-        ASSERT_STREQ(filterANSIEscapes(s, true, 4).c_str(), " A  " );
-        ASSERT_STREQ(filterANSIEscapes(s, true, 5).c_str(), " A  B" );
-        ASSERT_STREQ(filterANSIEscapes(s, true, 8).c_str(), " A  B  C" );
+        ASSERT_EQ(filterANSIEscapes(s, true, 2), " A" );
+        ASSERT_EQ(filterANSIEscapes(s, true, 3), " A " );
+        ASSERT_EQ(filterANSIEscapes(s, true, 4), " A  " );
+        ASSERT_EQ(filterANSIEscapes(s, true, 5), " A  B" );
+        ASSERT_EQ(filterANSIEscapes(s, true, 8), " A  B  C" );
     }
 
     TEST(filterANSIEscapes, expandsTabs) {
         auto s = "foo\tbar\tbaz";
 
-        ASSERT_STREQ(filterANSIEscapes(s, true).c_str(), "foo     bar     baz" );
+        ASSERT_EQ(filterANSIEscapes(s, true), "foo     bar     baz" );
     }
 
 }
