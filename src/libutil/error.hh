@@ -82,10 +82,10 @@ class BaseError : public std::exception
 {
 protected:
     string prefix_; // used for location traces etc.
-    ErrorInfo err;
+    mutable ErrorInfo err;
 
-    std::optional<string> what_;
-    const string& calcWhat()
+    mutable std::optional<string> what_;
+    const string& calcWhat() const
     {
         if (what_.has_value())
             return *what_;
@@ -131,12 +131,12 @@ public:
 
 #ifdef EXCEPTION_NEEDS_THROW_SPEC
     ~BaseError() throw () { };
-    const char * what() throw () { return calcWhat().c_str(); }
+    const char * what() const throw () { return calcWhat().c_str(); }
 #else
-    const char * what() noexcept { return calcWhat().c_str(); }
+    const char * what() const noexcept override { return calcWhat().c_str(); }
 #endif
 
-    const string & msg() { return calcWhat(); }
+    const string & msg() const { return calcWhat(); }
     const string & prefix() const { return prefix_; }
     BaseError & addPrefix(const FormatOrString & fs);
 

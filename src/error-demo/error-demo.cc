@@ -43,6 +43,22 @@ int main()
         logError(e.info());
     }
 
+    // current exception
+    try {
+        throw DemoError("DemoError handled as a %1%", "std::exception");
+    }
+    catch (...) {
+        const std::exception_ptr &eptr = std::current_exception();
+        try
+        {
+            std::rethrow_exception(eptr);
+        }
+        catch (std::exception& e)
+        {
+            std::cerr << e.what() << std::endl;
+        }
+    }
+
     // For completeness sake, info through vomit levels.
     // But this is maybe a heavy format for those.
     logger->logEI(
