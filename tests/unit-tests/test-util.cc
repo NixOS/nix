@@ -111,29 +111,29 @@ namespace nix {
 
     TEST(baseNameOf, emptyPath) {
         auto p1 = baseNameOf("");
-        ASSERT_EQ(std::string(p1), "");
+        ASSERT_EQ(p1, "");
     }
 
     TEST(baseNameOf, pathOnRoot) {
         auto p1 = baseNameOf("/dir");
-        ASSERT_EQ(std::string(p1), "dir");
+        ASSERT_EQ(p1, "dir");
     }
 
     TEST(baseNameOf, relativePath) {
         auto p1 = baseNameOf("dir/foo");
-        ASSERT_EQ(std::string(p1), "foo");
+        ASSERT_EQ(p1, "foo");
     }
 
     TEST(baseNameOf, pathWithTrailingSlashRoot) {
         auto p1 = baseNameOf("/");
-        ASSERT_EQ(std::string(p1), "");
+        ASSERT_EQ(p1, "");
     }
 
     // XXX: according to the doc of `baseNameOf`, baseNameOf("/dir/") should return
     // "" but it actually returns "dir"
     TEST(baseNameOf, DISABLED_trailingSlash) {
         auto p1 = baseNameOf("/dir/");
-        ASSERT_EQ(std::string(p1), "");
+        ASSERT_EQ(p1, "");
     }
 
     /* ----------------------------------------------------------------------------
