@@ -61,7 +61,7 @@ substituters = https://cache.nixos.org/ s3://example-nix-cache
 trusted-public-keys = cache.nixos.org-1:6NCHdD59X431o0gWypbMrAURkbJ16ZPMQFGspcDShjY= example-nix-cache-1:1/cKDz3QCCOmwcztD2eV6Coggp6rqc9DGjWv7C0G+rM=
 </programlisting>
 
-<para>we will restart the Nix daemon a later step.</para>
+<para>We will restart the Nix daemon in a later step.</para>
 </section>
 
 <section>
