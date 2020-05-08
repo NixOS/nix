@@ -4475,7 +4475,7 @@ void Worker::waitForInput()
     if (!waitingForAWhile.empty()) {
         useTimeout = true;
         if (lastWokenUp == steady_time_point::min())
-            printError("waiting for locks or build slots...");
+            printError("waiting for locks, build slots or build users...");
         if (lastWokenUp == steady_time_point::min() || lastWokenUp > before) lastWokenUp = before;
         timeout.tv_sec = std::max(1L,
             (long) std::chrono::duration_cast<std::chrono::seconds>(
