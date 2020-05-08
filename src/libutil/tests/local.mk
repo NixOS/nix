@@ -1,3 +1,5 @@
+check: libutil-tests_RUN
+
 programs += libutil-tests
 
 libutil-tests_DIR := $(d)
