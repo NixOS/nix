@@ -507,9 +507,6 @@ private:
     Path fnUserLock;
     AutoCloseFD fdUserLock;
 
-    bool findFreeUser();
-
-
     string user;
     uid_t uid;
     gid_t gid;
@@ -525,20 +522,19 @@ public:
     uid_t getGID() { assert(gid); return gid; }
     std::vector<gid_t> getSupplementaryGIDs() { return supplementaryGIDs; }
 
+    bool findFreeUser();
+
     bool enabled() { return uid != 0; }
 
 };
+
 
 UserLock::UserLock()
 {
     assert(settings.buildUsersGroup != "");
     createDirs(settings.nixStateDir + "/userpool");
-
-    if (findFreeUser()) return;
-
-    printError("waiting for build users");
-
-    do std::this_thread::sleep_for(std::chrono::seconds(2)); while (! findFreeUser());
+    /* Mark that user is not enabled by default */
+    uid = 0;
 }
 
 bool UserLock::findFreeUser() {
@@ -1398,6 +1394,30 @@ void DerivationGoal::tryToBuild()
 {
     trace("trying to build");
 
+    /* If `build-users-group' is not empty, then we have to build as
+       one of the members of that group. */
+    if (settings.buildUsersGroup != "" && getuid() == 0) {
+#if defined(__linux__) || defined(__APPLE__)
+        if (!buildUser) buildUser = std::make_unique<UserLock>();
+
+        if (!buildUser->enabled()) {
+            if (!buildUser->findFreeUser()) {
+                debug("waiting for build users");
+                worker.waitForAWhile(shared_from_this());
+                return;
+            }
+
+            /* Make sure that no other processes are executing under this
+               uid. */
+            buildUser->kill();
+        }
+#else
+        /* Don't know how to block the creation of setuid/setgid
+           binaries on this platform. */
+        throw Error("build users are not supported on this platform for security reasons");
+#endif
+    }
+
     /* Obtain locks on all output paths.  The locks are automatically
        released when we exit this function or Nix crashes.  If we
        can't acquire the lock, then continue; hopefully some other
@@ -1948,22 +1968,6 @@ void DerivationGoal::startBuilder()
         #else
             throw Error("building using a diverted store is not supported on this platform");
         #endif
-    }
-
-    /* If `build-users-group' is not empty, then we have to build as
-       one of the members of that group. */
-    if (settings.buildUsersGroup != "" && getuid() == 0) {
-#if defined(__linux__) || defined(__APPLE__)
-        buildUser = std::make_unique<UserLock>();
-
-        /* Make sure that no other processes are executing under this
-           uid. */
-        buildUser->kill();
-#else
-        /* Don't know how to block the creation of setuid/setgid
-           binaries on this platform. */
-        throw Error("build users are not supported on this platform for security reasons");
-#endif
     }
 
     /* Create a temporary directory where the build will take
