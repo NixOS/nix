@@ -257,6 +257,11 @@ private:
     /* Cache for pathContentsGood(). */
     std::map<StorePath, bool> pathContentsGoodCache;
 
+    /* Name of resource for which we are currently waiting (e.g locks, build slots) */
+    string blockingResourceName;
+
+    void updateBlockingResourceName(string resourceName);
+
 public:
 
     const Activity act;
@@ -331,17 +336,17 @@ public:
 
     /* Put `goal' to sleep until a build slot becomes available (which
        might be right away). */
-    void waitForBuildSlot(GoalPtr goal);
+    void waitForBuildSlot(GoalPtr goal, string resourceName = "build slots");
 
     /* Wait for any goal to finish.  Pretty indiscriminate way to
        wait for some resource that some other goal is holding. */
-    void waitForAnyGoal(GoalPtr goal);
+    void waitForAnyGoal(GoalPtr goal, string resourceName = "locks");
 
     /* Wait for a few seconds and then retry this goal.  Used when
        waiting for a lock held by another process.  This kind of
        polling is inefficient, but POSIX doesn't really provide a way
        to wait for multiple locks in the main select() loop. */
-    void waitForAWhile(GoalPtr goal);
+    void waitForAWhile(GoalPtr goal, string resourceName = "locks");
 
     /* Loop until the specified top-level goals have finished. */
     void run(const Goals & topGoals);
@@ -1401,7 +1406,7 @@ void DerivationGoal::tryToBuild()
         lockFiles.insert(worker.store.Store::toRealPath(outPath));
 
     if (!outputLocks.lockPaths(lockFiles, "", false)) {
-        worker.waitForAWhile(shared_from_this());
+        worker.waitForAWhile(shared_from_this(), "locks on output paths");
         return;
     }
 
@@ -1464,7 +1469,7 @@ void DerivationGoal::tryToBuild()
             case rpPostpone:
                 /* Not now; wait until at least one child finishes or
                    the wake-up timeout expires. */
-                worker.waitForAWhile(shared_from_this());
+                worker.waitForAWhile(shared_from_this(), "build hook");
                 outputLocks.unlock();
                 return;
             case rpDecline:
@@ -4451,7 +4456,7 @@ void SubstitutionGoal::tryToRun()
        a substituter to run.  This is because substitutions cannot be
        distributed to another machine via the build hook. */
     if (worker.getNrLocalBuilds() >= std::max(1U, (unsigned int) settings.maxBuildJobs)) {
-        worker.waitForBuildSlot(shared_from_this());
+        worker.waitForBuildSlot(shared_from_this(), "substitution slot");
         return;
     }
 
@@ -4706,10 +4711,17 @@ void Worker::childTerminated(Goal * goal, bool wakeSleepers)
     }
 }
 
+void Worker::updateBlockingResourceName(string resourceName) {
+    if (blockingResourceName != resourceName) {
+        blockingResourceName = resourceName;
+        printError(format("waiting for %1%...") % resourceName);
+    }
+}
 
-void Worker::waitForBuildSlot(GoalPtr goal)
+void Worker::waitForBuildSlot(GoalPtr goal, string resourceName)
 {
-    debug("wait for build slot");
+    debug("wait for build slots");
+    updateBlockingResourceName(resourceName);
     if (getNrLocalBuilds() < settings.maxBuildJobs)
         wakeUp(goal); /* we can do it right away */
     else
@@ -4717,16 +4729,18 @@ void Worker::waitForBuildSlot(GoalPtr goal)
 }
 
 
-void Worker::waitForAnyGoal(GoalPtr goal)
+void Worker::waitForAnyGoal(GoalPtr goal, string resourceName)
 {
     debug("wait for any goal");
+    updateBlockingResourceName(resourceName);
     addToWeakGoals(waitingForAnyGoal, goal);
 }
 
 
-void Worker::waitForAWhile(GoalPtr goal)
+void Worker::waitForAWhile(GoalPtr goal, string resourceName)
 {
     debug("wait for a while");
+    updateBlockingResourceName(resourceName);
     addToWeakGoals(waitingForAWhile, goal);
 }
 
@@ -4818,8 +4832,6 @@ void Worker::waitForInput()
        up after a few seconds at most. */
     if (!waitingForAWhile.empty()) {
         useTimeout = true;
-        if (lastWokenUp == steady_time_point::min())
-            printError("waiting for locks or build slots...");
         if (lastWokenUp == steady_time_point::min() || lastWokenUp > before) lastWokenUp = before;
         timeout = std::max(1L,
             (long) std::chrono::duration_cast<std::chrono::seconds>(
