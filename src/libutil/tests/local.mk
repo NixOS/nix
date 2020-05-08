@@ -12,4 +12,4 @@ libutil-tests_CXXFLAGS += -I src/libutil
 
 libutil-tests_LIBS = libutil
 
-libutil-tests_LDFLAGS := $$(pkg-config --libs gtest_main)
+libutil-tests_LDFLAGS := $(GTEST_LIBS)
