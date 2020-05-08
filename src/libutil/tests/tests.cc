@@ -301,12 +301,12 @@ namespace nix {
         ASSERT_EQ(toLower(s), s);
     }
 
-    // XXX: std::tolower() doesn't cover this. This probably doesn't matter
-    // since the context is paths and store paths specifically where such
-    // characters are not allowed.
-    TEST(toLower, DISABLED_umlauts) {
+    // std::tolower() doesn't handle unicode characters. In the context of
+    // store paths this isn't relevant but doesn't hurt to record this behavior
+    // here.
+    TEST(toLower, umlauts) {
         auto s = "ÄÖÜ";
-        ASSERT_EQ(toLower(s), "äöü");
+        ASSERT_EQ(toLower(s), "ÄÖÜ");
     }
 
     /* ----------------------------------------------------------------------------
