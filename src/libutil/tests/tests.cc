@@ -127,11 +127,9 @@ namespace nix {
         ASSERT_EQ(p1, "");
     }
 
-    // XXX: according to the doc of `baseNameOf`, baseNameOf("/dir/") should return
-    // "" but it actually returns "dir"
-    TEST(baseNameOf, DISABLED_trailingSlash) {
+    TEST(baseNameOf, trailingSlash) {
         auto p1 = baseNameOf("/dir/");
-        ASSERT_EQ(p1, "");
+        ASSERT_EQ(p1, "dir");
     }
 
     /* ----------------------------------------------------------------------------

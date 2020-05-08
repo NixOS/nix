@@ -63,7 +63,7 @@ Path canonPath(const Path & path, bool resolveSymlinks = false);
 Path dirOf(const Path & path);
 
 /* Return the base name of the given canonical path, i.e., everything
-   following the final `/'. */
+   following the final `/' (trailing slashes are removed). */
 std::string_view baseNameOf(std::string_view path);
 
 /* Check whether 'path' is a descendant of 'dir'. */
