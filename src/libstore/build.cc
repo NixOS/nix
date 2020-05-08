@@ -4721,11 +4721,12 @@ void Worker::updateBlockingResourceName(string resourceName) {
 void Worker::waitForBuildSlot(GoalPtr goal, string resourceName)
 {
     debug("wait for build slots");
-    updateBlockingResourceName(resourceName);
     if (getNrLocalBuilds() < settings.maxBuildJobs)
         wakeUp(goal); /* we can do it right away */
-    else
+    else {
         addToWeakGoals(wantingToBuild, goal);
+        updateBlockingResourceName(resourceName);
+    }
 }
 
 
