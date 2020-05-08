@@ -1,5 +1,5 @@
-#include "../../src/libutil/util.hh"
-#include "../../src/libutil/types.hh"
+#include "util.hh"
+#include "types.hh"
 
 #include <gtest/gtest.h>
 
