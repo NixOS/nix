@@ -1469,7 +1469,7 @@ void DerivationGoal::tryToBuild()
             case rpPostpone:
                 /* Not now; wait until at least one child finishes or
                    the wake-up timeout expires. */
-                worker.waitForAWhile(shared_from_this(), "build hook");
+                worker.waitForAWhile(shared_from_this(), "a build hook");
                 outputLocks.unlock();
                 return;
             case rpDecline:
@@ -4456,7 +4456,7 @@ void SubstitutionGoal::tryToRun()
        a substituter to run.  This is because substitutions cannot be
        distributed to another machine via the build hook. */
     if (worker.getNrLocalBuilds() >= std::max(1U, (unsigned int) settings.maxBuildJobs)) {
-        worker.waitForBuildSlot(shared_from_this(), "substitution slot");
+        worker.waitForBuildSlot(shared_from_this(), "a substitution slot");
         return;
     }
 
