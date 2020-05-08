@@ -481,8 +481,7 @@ namespace nix {
      * --------------------------------------------------------------------------*/
 
     TEST(tokenizeString, empty) {
-        auto s = "";
-        Strings expected = {  };
+        Strings expected = { };
 
         ASSERT_EQ(tokenizeString<Strings>(""), expected);
     }
