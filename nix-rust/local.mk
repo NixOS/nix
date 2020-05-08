@@ -41,5 +41,5 @@ ifneq ($(OS), Darwin)
 check: rust-tests
 
 rust-tests:
-	cd nix-rust && CARGO_HOME=$$(if [[ -d vendor ]]; then echo vendor; fi) cargo test --release $$(if [[ -d vendor ]]; then echo --offline; fi)
+	$(trace-test) cd nix-rust && CARGO_HOME=$$(if [[ -d vendor ]]; then echo vendor; fi) cargo test --release $$(if [[ -d vendor ]]; then echo --offline; fi)
 endif
