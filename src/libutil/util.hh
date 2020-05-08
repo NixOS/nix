@@ -58,8 +58,8 @@ Path canonPath(const Path & path, bool resolveSymlinks = false);
 
 /* Return the directory part of the given canonical path, i.e.,
    everything before the final `/'.  If the path is the root or an
-   immediate child thereof (e.g., `/foo'), this means an empty string
-   is returned. */
+   immediate child thereof (e.g., `/foo'), this means `/'
+   is returned.*/
 Path dirOf(const Path & path);
 
 /* Return the base name of the given canonical path, i.e., everything

@@ -86,12 +86,10 @@ namespace nix {
      * dirOf
      * --------------------------------------------------------------------------*/
 
-    // XXX: according to the doc of `dirOf`, dirOf("/") and dirOf("/foo")
-    // should both return "" but it actually returns "/" in both cases
-    TEST(dirOf, DISABLED_returnsEmptyStringForRoot) {
+    TEST(dirOf, returnsEmptyStringForRoot) {
         auto p = dirOf("/");
 
-        ASSERT_EQ(p, "");
+        ASSERT_EQ(p, "/");
     }
 
     TEST(dirOf, returnsFirstPathComponent) {
