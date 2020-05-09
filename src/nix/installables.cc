@@ -237,23 +237,6 @@ Buildables InstallableValue::toBuildables()
         return res;
 }
 
-struct InstallableExpr : InstallableValue
-{
-    std::string text;
-
-    InstallableExpr(SourceExprCommand & cmd, const std::string & text)
-         : InstallableValue(cmd), text(text) { }
-
-    std::string what() override { return text; }
-
-    std::pair<Value *, Pos> toValue(EvalState & state) override
-    {
-        auto v = state.allocValue();
-        state.eval(state.parseExprFromString(text, absPath(".")), *v);
-        return {v, noPos};
-    }
-};
-
 struct InstallableAttrPath : InstallableValue
 {
     RootValue v;
