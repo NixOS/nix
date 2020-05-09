@@ -179,27 +179,6 @@ struct InstallableStorePath : Installable
     }
 };
 
-std::vector<InstallableValue::DerivationInfo> InstallableAttrPath::toDerivations()
-{
-    auto v = toValue(*state).first;
-
-    Bindings & autoArgs = *cmd.getAutoArgs(*state);
-
-    DrvInfos drvInfos;
-    getDerivations(*state, *v, "", autoArgs, drvInfos, false);
-
-    std::vector<DerivationInfo> res;
-    for (auto & drvInfo : drvInfos) {
-        res.push_back({
-            state->store->parseStorePath(drvInfo.queryDrvPath()),
-            state->store->parseStorePath(drvInfo.queryOutPath()),
-            drvInfo.queryOutputName()
-        });
-    }
-
-    return res;
-}
-
 Buildables InstallableValue::toBuildables()
 {
     Buildables res;
@@ -254,6 +233,27 @@ struct InstallableAttrPath : InstallableValue
 
     virtual std::vector<InstallableValue::DerivationInfo> toDerivations() override;
 };
+
+std::vector<InstallableValue::DerivationInfo> InstallableAttrPath::toDerivations()
+{
+    auto v = toValue(*state).first;
+
+    Bindings & autoArgs = *cmd.getAutoArgs(*state);
+
+    DrvInfos drvInfos;
+    getDerivations(*state, *v, "", autoArgs, drvInfos, false);
+
+    std::vector<DerivationInfo> res;
+    for (auto & drvInfo : drvInfos) {
+        res.push_back({
+            state->store->parseStorePath(drvInfo.queryDrvPath()),
+            state->store->parseStorePath(drvInfo.queryOutPath()),
+            drvInfo.queryOutputName()
+        });
+    }
+
+    return res;
+}
 
 std::vector<std::string> InstallableFlake::getActualAttrPaths()
 {
