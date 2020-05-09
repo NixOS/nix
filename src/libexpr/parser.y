@@ -404,7 +404,12 @@ expr_simple
   | URI {
       static bool noURLLiterals = settings.isExperimentalFeatureEnabled("no-url-literals");
       if (noURLLiterals)
-          throw ParseError("URL literals are disabled, at %s", CUR_POS);
+          throw ParseError(
+              ErrorInfo { 
+                  .hint = hintfmt("URL literals are disabled"),
+                  .nixCode = NixCode { .errPos = CUR_POS }
+              });
+
       $$ = new ExprString(data->symbols.create($1));
   }
   | '(' expr ')' { $$ = $2; }
@@ -669,10 +674,12 @@ Path EvalState::findFile(SearchPath & searchPath, const string & path, const Pos
         Path res = r.second + suffix;
         if (pathExists(res)) return canonPath(res);
     }
-    string f = 
-        "file '%1%' was not found in the Nix search path (add it using $NIX_PATH or -I)"
-        + string(pos ? ", at %2%" : "");
-    throw ThrownError(f, path, pos);
+
+    throw ThrownError(
+        ErrorInfo { 
+            .hint = hintfmt("file '%1%' was not found in the Nix search path (add it using $NIX_PATH or -I)", path),
+            .nixCode = NixCode { .errPos = pos }
+        });
 }
 
 

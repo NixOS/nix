@@ -126,17 +126,28 @@ int main()
     // Error with previous and next lines of code.
     logError(
         ErrorInfo { .name = "error name",
-                    .description = "error description",
+                    .description = "error with code lines",
                     .hint = hintfmt("this hint has %1% templated %2%!!",
                         "yellow",
                         "values"),
                     .nixCode = NixCode {
                         .errPos = Pos(problem_file, 40, 13),
-                        .prevLineOfCode = std::optional("previous line of code"),
+                        .prevLineOfCode = "previous line of code",
                         .errLineOfCode = "this is the problem line of code",
-                        .nextLineOfCode = std::optional("next line of code"),
+                        .nextLineOfCode = "next line of code",
                     }});
 
+
+    // Error without lines of code.
+    logError(
+        ErrorInfo { .name = "error name",
+                    .description = "error without any code lines.",
+                    .hint = hintfmt("this hint has %1% templated %2%!!",
+                        "yellow",
+                        "values"),
+                    .nixCode = NixCode {
+                        .errPos = Pos(problem_file, 40, 13)
+                    }});
 
     return 0;
 }

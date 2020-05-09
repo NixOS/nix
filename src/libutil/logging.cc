@@ -171,7 +171,8 @@ struct JSONLogger : Logger {
                 json["file"] = ei.nixCode->errPos.file;
             if (ei.nixCode->prevLineOfCode.has_value())
                 json["prevLineOfCode"] = *ei.nixCode->prevLineOfCode;
-            json["errLineOfCode"] = ei.nixCode->errLineOfCode;
+            if (ei.nixCode->errLineOfCode.has_value())
+                json["errLineOfCode"] = *ei.nixCode->errLineOfCode;
             if (ei.nixCode->nextLineOfCode.has_value())
                 json["nextLineOfCode"] = *ei.nixCode->nextLineOfCode;
         }

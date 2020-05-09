@@ -35,9 +35,14 @@ typedef enum {
 } Verbosity;
 
 struct ErrPos {
-    int line;
-    int column;
+    int line = 0;
+    int column = 0;
     string file;
+
+    operator bool() const
+    {
+        return line != 0;
+    }
 
     template <class P>
     ErrPos& operator=(const P &pos)
@@ -58,7 +63,7 @@ struct ErrPos {
 struct NixCode {
     ErrPos errPos;
     std::optional<string> prevLineOfCode;
-    string errLineOfCode;
+    std::optional<string> errLineOfCode;
     std::optional<string> nextLineOfCode;
 };
 
