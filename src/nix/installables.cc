@@ -179,10 +179,8 @@ struct InstallableStorePath : Installable
     }
 };
 
-std::vector<InstallableValue::DerivationInfo> InstallableValue::toDerivations()
+std::vector<InstallableValue::DerivationInfo> InstallableAttrPath::toDerivations()
 {
-    auto state = cmd.getEvalState();
-
     auto v = toValue(*state).first;
 
     Bindings & autoArgs = *cmd.getAutoArgs(*state);
@@ -204,8 +202,6 @@ std::vector<InstallableValue::DerivationInfo> InstallableValue::toDerivations()
 
 Buildables InstallableValue::toBuildables()
 {
-    auto state = cmd.getEvalState();
-
     Buildables res;
 
     StorePathSet drvPaths;
@@ -239,11 +235,12 @@ Buildables InstallableValue::toBuildables()
 
 struct InstallableAttrPath : InstallableValue
 {
+    SourceExprCommand & cmd;
     RootValue v;
     std::string attrPath;
 
-    InstallableAttrPath(SourceExprCommand & cmd, Value * v, const std::string & attrPath)
-        : InstallableValue(cmd), v(allocRootValue(v)), attrPath(attrPath)
+    InstallableAttrPath(ref<EvalState> state, SourceExprCommand & cmd, Value * v, const std::string & attrPath)
+        : InstallableValue(state), cmd(cmd), v(allocRootValue(v)), attrPath(attrPath)
     { }
 
     std::string what() override { return attrPath; }
@@ -254,6 +251,8 @@ struct InstallableAttrPath : InstallableValue
         state.forceValue(*vRes);
         return {vRes, pos};
     }
+
+    virtual std::vector<InstallableValue::DerivationInfo> toDerivations() override;
 };
 
 std::vector<std::string> InstallableFlake::getActualAttrPaths()
@@ -313,10 +312,9 @@ ref<eval_cache::EvalCache> openEvalCache(
 
 std::tuple<std::string, FlakeRef, InstallableValue::DerivationInfo> InstallableFlake::toDerivation()
 {
-    auto state = cmd.getEvalState();
 
     auto lockedFlake = std::make_shared<flake::LockedFlake>(
-        lockFlake(*state, flakeRef, cmd.lockFlags));
+        lockFlake(*state, flakeRef, lockFlags));
 
     auto cache = openEvalCache(*state, lockedFlake, true);
     auto root = cache->getRoot();
@@ -362,7 +360,7 @@ std::vector<InstallableValue::DerivationInfo> InstallableFlake::toDerivations()
 
 std::pair<Value *, Pos> InstallableFlake::toValue(EvalState & state)
 {
-    auto lockedFlake = lockFlake(state, flakeRef, cmd.lockFlags);
+    auto lockedFlake = lockFlake(state, flakeRef, lockFlags);
 
     auto vOutputs = getFlakeOutputs(state, lockedFlake);
 
@@ -385,7 +383,7 @@ std::vector<std::pair<std::shared_ptr<eval_cache::AttrCursor>, std::string>>
 InstallableFlake::getCursor(EvalState & state, bool useEvalCache)
 {
     auto evalCache = openEvalCache(state,
-        std::make_shared<flake::LockedFlake>(lockFlake(state, flakeRef, cmd.lockFlags)),
+        std::make_shared<flake::LockedFlake>(lockFlake(state, flakeRef, lockFlags)),
         useEvalCache);
 
     auto root = evalCache->getRoot();
@@ -423,7 +421,7 @@ std::vector<std::shared_ptr<Installable>> SourceExprCommand::parseInstallables(
         }
 
         for (auto & s : ss)
-            result.push_back(std::make_shared<InstallableAttrPath>(*this, vFile, s == "." ? "" : s));
+            result.push_back(std::make_shared<InstallableAttrPath>(state, *this, vFile, s == "." ? "" : s));
 
     } else {
 
@@ -433,9 +431,9 @@ std::vector<std::shared_ptr<Installable>> SourceExprCommand::parseInstallables(
             try {
                 auto [flakeRef, fragment] = parseFlakeRefWithFragment(s, absPath("."));
                 result.push_back(std::make_shared<InstallableFlake>(
-                        *this, std::move(flakeRef),
+                        getEvalState(), std::move(flakeRef),
                         fragment == "" ? getDefaultFlakeAttrPaths() : Strings{fragment},
-                        getDefaultFlakeAttrPathPrefixes()));
+                        getDefaultFlakeAttrPathPrefixes(), lockFlags));
                 continue;
             } catch (...) {
                 ex = std::current_exception();

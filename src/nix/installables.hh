@@ -37,10 +37,7 @@ struct Installable
 
     virtual std::string what() = 0;
 
-    virtual Buildables toBuildables()
-    {
-        throw Error("argument '%s' cannot be built", what());
-    }
+    virtual Buildables toBuildables() = 0;
 
     Buildable toBuildable();
 
@@ -64,9 +61,9 @@ struct Installable
 
 struct InstallableValue : Installable
 {
-    SourceExprCommand & cmd;
+    ref<EvalState> state;
 
-    InstallableValue(SourceExprCommand & cmd) : cmd(cmd) { }
+    InstallableValue(ref<EvalState> state) : state(state) {}
 
     struct DerivationInfo
     {
@@ -75,7 +72,7 @@ struct InstallableValue : Installable
         std::string outputName;
     };
 
-    virtual std::vector<DerivationInfo> toDerivations();
+    virtual std::vector<DerivationInfo> toDerivations() = 0;
 
     Buildables toBuildables() override;
 };
@@ -85,11 +82,12 @@ struct InstallableFlake : InstallableValue
     FlakeRef flakeRef;
     Strings attrPaths;
     Strings prefixes;
+    const flake::LockFlags & lockFlags;
 
-    InstallableFlake(SourceExprCommand & cmd, FlakeRef && flakeRef,
-        Strings && attrPaths, Strings && prefixes)
-        : InstallableValue(cmd), flakeRef(flakeRef), attrPaths(attrPaths),
-          prefixes(prefixes)
+    InstallableFlake(ref<EvalState> state, FlakeRef && flakeRef,
+        Strings && attrPaths, Strings && prefixes, const flake::LockFlags & lockFlags)
+        : InstallableValue(state), flakeRef(flakeRef), attrPaths(attrPaths),
+          prefixes(prefixes), lockFlags(lockFlags)
     { }
 
     std::string what() override { return flakeRef.to_string() + "#" + *attrPaths.begin(); }
