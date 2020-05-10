@@ -31,9 +31,17 @@ MixCommonArgs::MixCommonArgs(const string & programName)
         .labels = {"name", "value"},
         .handler = {[](std::string name, std::string value) {
             try {
+                if (auto prefix = needsCompletion(name)) {
+                    std::map<std::string, Config::SettingInfo> settings;
+                    globalConfig.getSettings(settings);
+                    for (auto & s : settings)
+                        if (hasPrefix(s.first, *prefix))
+                            completions->insert(s.first);
+                }
                 globalConfig.set(name, value);
             } catch (UsageError & e) {
-                warn(e.what());
+                if (!completions)
+                    warn(e.what());
             }
         }},
     });

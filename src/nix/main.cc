@@ -166,7 +166,21 @@ void mainWrapped(int argc, char * * argv)
 
     NixArgs args;
 
-    args.parseCmdline(argvToStrings(argc, argv));
+    Finally printCompletions([&]()
+    {
+        if (completions) {
+            for (auto & s : *completions)
+                std::cout << s << "\n";
+        }
+    });
+
+    try {
+        args.parseCmdline(argvToStrings(argc, argv));
+    } catch (UsageError &) {
+        if (!completions) throw;
+    }
+
+    if (completions) return;
 
     settings.requireExperimentalFeature("nix-command");
 

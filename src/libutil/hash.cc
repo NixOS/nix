@@ -16,6 +16,9 @@
 namespace nix {
 
 
+std::set<std::string> hashTypes = { "md5", "sha1", "sha256", "sha512" };
+
+
 void Hash::init()
 {
     if (type == htMD5) hashSize = md5HashSize;
