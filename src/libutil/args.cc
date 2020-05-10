@@ -122,22 +122,15 @@ bool Args::processFlag(Strings::iterator & pos, Strings::iterator end)
     auto process = [&](const std::string & name, const Flag & flag) -> bool {
         ++pos;
         std::vector<std::string> args;
-        bool anyNeedsCompletion = false;
         for (size_t n = 0 ; n < flag.handler.arity; ++n) {
             if (pos == end) {
                 if (flag.handler.arity == ArityAny) break;
-                if (anyNeedsCompletion)
-                    args.push_back("");
-                else
-                    throw UsageError("flag '%s' requires %d argument(s)", name, flag.handler.arity);
-            } else {
-                if (needsCompletion(*pos)) {
-                    if (flag.completer)
-                        flag.completer(n, *pos);
-                    anyNeedsCompletion = true;
-                }
-                args.push_back(*pos++);
+                throw UsageError("flag '%s' requires %d argument(s)", name, flag.handler.arity);
             }
+            if (auto prefix = needsCompletion(*pos))
+                if (flag.completer)
+                    flag.completer(n, *prefix);
+            args.push_back(*pos++);
         }
         flag.handler.fun(std::move(args));
         return true;
@@ -209,14 +202,15 @@ Args::Flag Args::Flag::mkHashTypeFlag(std::string && longName, HashType * ht)
         .description = "hash algorithm ('md5', 'sha1', 'sha256', or 'sha512')",
         .labels = {"hash-algo"},
         .handler = {[ht](std::string s) {
-            if (auto prefix = needsCompletion(s))
-                for (auto & type : hashTypes)
-                    if (hasPrefix(type, *prefix))
-                        completions->insert(type);
             *ht = parseHashType(s);
             if (*ht == htUnknown)
                 throw UsageError("unknown hash type '%1%'", s);
-        }}
+        }},
+        .completer = [](size_t index, std::string_view prefix) {
+            for (auto & type : hashTypes)
+                if (hasPrefix(type, prefix))
+                    completions->insert(type);
+        }
     };
 }
 
