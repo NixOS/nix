@@ -68,7 +68,7 @@ struct NixArgs : virtual MultiCommand, virtual MixCommonArgs
         addFlag({
             .longName = "help",
             .description = "show usage information",
-            .handler = {[&]() { showHelpAndExit(); }},
+            .handler = {[&]() { if (!completions) showHelpAndExit(); }},
         });
 
         addFlag({
@@ -96,7 +96,7 @@ struct NixArgs : virtual MultiCommand, virtual MixCommonArgs
         addFlag({
             .longName = "version",
             .description = "show version information",
-            .handler = {[&]() { printVersion(programName); }},
+            .handler = {[&]() { if (!completions) printVersion(programName); }},
         });
 
         addFlag({
@@ -169,6 +169,7 @@ void mainWrapped(int argc, char * * argv)
     Finally printCompletions([&]()
     {
         if (completions) {
+            std::cout << (pathCompletions ? "filenames\n" : "no-filenames\n");
             for (auto & s : *completions)
                 std::cout << s << "\n";
         }

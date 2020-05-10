@@ -1,6 +1,8 @@
 #include "args.hh"
 #include "hash.hh"
 
+#include <glob.h>
+
 namespace nix {
 
 void Args::addFlag(Flag && flag_)
@@ -13,6 +15,7 @@ void Args::addFlag(Flag && flag_)
     if (flag->shortName) shortFlags[flag->shortName] = flag;
 }
 
+bool pathCompletions = false;
 std::shared_ptr<std::set<std::string>> completions;
 
 std::string completionMarker = "___COMPLETE___";
@@ -128,8 +131,11 @@ bool Args::processFlag(Strings::iterator & pos, Strings::iterator end)
                 else
                     throw UsageError("flag '%s' requires %d argument(s)", name, flag.handler.arity);
             } else {
-                if (needsCompletion(*pos))
+                if (needsCompletion(*pos)) {
+                    if (flag.completer)
+                        flag.completer(n, *pos);
                     anyNeedsCompletion = true;
+                }
                 args.push_back(*pos++);
             }
         }
@@ -212,6 +218,46 @@ Args::Flag Args::Flag::mkHashTypeFlag(std::string && longName, HashType * ht)
                 throw UsageError("unknown hash type '%1%'", s);
         }}
     };
+}
+
+void completePath(size_t, std::string_view s)
+{
+    if (auto prefix = needsCompletion(s)) {
+        pathCompletions = true;
+        glob_t globbuf;
+        if (glob((*prefix + "*").c_str(), GLOB_NOESCAPE | GLOB_TILDE, nullptr, &globbuf) == 0) {
+            for (size_t i = 0; i < globbuf.gl_pathc; ++i)
+                completions->insert(globbuf.gl_pathv[i]);
+            globfree(&globbuf);
+        }
+    }
+}
+
+void Args::expectPathArg(const std::string & label, string * dest, bool optional)
+{
+    expectedArgs.push_back({
+        .label = label,
+        .arity = 1,
+        .optional = optional,
+        .handler = {[=](std::vector<std::string> ss) {
+            completePath(0, ss[0]);
+            *dest = ss[0];
+        }}
+    });
+}
+
+void Args::expectPathArgs(const std::string & label, std::vector<std::string> * dest)
+{
+    expectedArgs.push_back({
+        .label = label,
+        .arity = 0,
+        .optional = false,
+        .handler = {[=](std::vector<std::string> ss) {
+            for (auto & s : ss)
+                completePath(0, s);
+            *dest = std::move(ss);
+        }}
+    });
 }
 
 Strings argvToStrings(int argc, char * * argv)

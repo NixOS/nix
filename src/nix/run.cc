@@ -149,7 +149,7 @@ struct CmdRun : InstallableCommand, RunCommon
 
     CmdRun()
     {
-        expectArgs("args", &args);
+        expectPathArgs("args", &args);
     }
 
     std::string description() override

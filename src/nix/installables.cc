@@ -77,7 +77,8 @@ SourceExprCommand::SourceExprCommand()
         .shortName = 'f',
         .description = "evaluate FILE rather than the default",
         .labels = {"file"},
-        .handler = {&file}
+        .handler = {&file},
+        .completer = completePath
     });
 
     addFlag({

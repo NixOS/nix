@@ -83,6 +83,7 @@ protected:
         std::string category;
         Strings labels;
         Handler handler;
+        std::function<void(size_t, std::string_view)> completer;
 
         static Flag mkHashTypeFlag(std::string && longName, HashType * ht);
     };
@@ -98,8 +99,8 @@ protected:
     struct ExpectedArg
     {
         std::string label;
-        size_t arity; // 0 = any
-        bool optional;
+        size_t arity = 0; // 0 = any
+        bool optional = false;
         std::function<void(std::vector<std::string>)> handler;
     };
 
@@ -182,6 +183,8 @@ public:
         }});
     }
 
+    void expectPathArg(const std::string & label, string * dest, bool optional = false);
+
     /* Expect 0 or more arguments. */
     void expectArgs(const std::string & label, std::vector<std::string> * dest)
     {
@@ -189,6 +192,8 @@ public:
             *dest = std::move(ss);
         }});
     }
+
+    void expectPathArgs(const std::string & label, std::vector<std::string> * dest);
 
     friend class MultiCommand;
 };
@@ -257,7 +262,10 @@ typedef std::vector<std::pair<std::string, std::string>> Table2;
 void printTable(std::ostream & out, const Table2 & table);
 
 extern std::shared_ptr<std::set<std::string>> completions;
+extern bool pathCompletions;
 
 std::optional<std::string> needsCompletion(std::string_view s);
+
+void completePath(size_t, std::string_view s);
 
 }

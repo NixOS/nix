@@ -108,6 +108,7 @@ MixProfile::MixProfile()
         .description = "profile to update",
         .labels = {"path"},
         .handler = {&profile},
+        .completer = completePath
     });
 }
 

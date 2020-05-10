@@ -31,7 +31,7 @@ struct CmdHash : Command
             .labels({"modulus"})
             .dest(&modulus);
         #endif
-        expectArgs("paths", &paths);
+        expectPathArgs("paths", &paths);
     }
 
     std::string description() override
