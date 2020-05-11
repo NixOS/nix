@@ -86,7 +86,7 @@ void Args::printHelp(const string & programName, std::ostream & out)
     for (auto & exp : expectedArgs) {
         std::cout << renderLabels({exp.label});
         // FIXME: handle arity > 1
-        if (exp.arity == 0) std::cout << "...";
+        if (exp.handler.arity == ArityAny) std::cout << "...";
         if (exp.optional) std::cout << "?";
     }
     std::cout << "\n";
@@ -127,8 +127,8 @@ bool Args::processFlag(Strings::iterator & pos, Strings::iterator end)
                 if (flag.handler.arity == ArityAny) break;
                 throw UsageError("flag '%s' requires %d argument(s)", name, flag.handler.arity);
             }
-            if (auto prefix = needsCompletion(*pos))
-                if (flag.completer)
+            if (flag.completer)
+                if (auto prefix = needsCompletion(*pos))
                     flag.completer(n, *prefix);
             args.push_back(*pos++);
         }
@@ -179,12 +179,17 @@ bool Args::processArgs(const Strings & args, bool finish)
 
     bool res = false;
 
-    if ((exp.arity == 0 && finish) ||
-        (exp.arity > 0 && args.size() == exp.arity))
+    if ((exp.handler.arity == ArityAny && finish) ||
+        (exp.handler.arity != ArityAny && args.size() == exp.handler.arity))
     {
         std::vector<std::string> ss;
-        for (auto & s : args) ss.push_back(s);
-        exp.handler(std::move(ss));
+        for (const auto &[n, s] : enumerate(args)) {
+            ss.push_back(s);
+            if (exp.completer)
+                if (auto prefix = needsCompletion(s))
+                    exp.completer(n, *prefix);
+        }
+        exp.handler.fun(ss);
         expectedArgs.pop_front();
         res = true;
     }
@@ -214,44 +219,15 @@ Args::Flag Args::Flag::mkHashTypeFlag(std::string && longName, HashType * ht)
     };
 }
 
-void completePath(size_t, std::string_view s)
+void completePath(size_t, std::string_view prefix)
 {
-    if (auto prefix = needsCompletion(s)) {
-        pathCompletions = true;
-        glob_t globbuf;
-        if (glob((*prefix + "*").c_str(), GLOB_NOESCAPE | GLOB_TILDE, nullptr, &globbuf) == 0) {
-            for (size_t i = 0; i < globbuf.gl_pathc; ++i)
-                completions->insert(globbuf.gl_pathv[i]);
-            globfree(&globbuf);
-        }
+    pathCompletions = true;
+    glob_t globbuf;
+    if (glob((std::string(prefix) + "*").c_str(), GLOB_NOESCAPE | GLOB_TILDE, nullptr, &globbuf) == 0) {
+        for (size_t i = 0; i < globbuf.gl_pathc; ++i)
+            completions->insert(globbuf.gl_pathv[i]);
+        globfree(&globbuf);
     }
-}
-
-void Args::expectPathArg(const std::string & label, string * dest, bool optional)
-{
-    expectedArgs.push_back({
-        .label = label,
-        .arity = 1,
-        .optional = optional,
-        .handler = {[=](std::vector<std::string> ss) {
-            completePath(0, ss[0]);
-            *dest = ss[0];
-        }}
-    });
-}
-
-void Args::expectPathArgs(const std::string & label, std::vector<std::string> * dest)
-{
-    expectedArgs.push_back({
-        .label = label,
-        .arity = 0,
-        .optional = false,
-        .handler = {[=](std::vector<std::string> ss) {
-            for (auto & s : ss)
-                completePath(0, s);
-            *dest = std::move(ss);
-        }}
-    });
 }
 
 Strings argvToStrings(int argc, char * * argv)
@@ -301,18 +277,22 @@ void Command::printHelp(const string & programName, std::ostream & out)
 MultiCommand::MultiCommand(const Commands & commands)
     : commands(commands)
 {
-    expectedArgs.push_back(ExpectedArg{"command", 1, true, [=](std::vector<std::string> ss) {
-        assert(!command);
-        if (auto prefix = needsCompletion(ss[0])) {
-            for (auto & [name, command] : commands)
-                if (hasPrefix(name, *prefix))
-                    completions->insert(name);
-        }
-        auto i = commands.find(ss[0]);
-        if (i == commands.end())
-            throw UsageError("'%s' is not a recognised command", ss[0]);
-        command = {ss[0], i->second()};
-    }});
+    expectArgs({
+        .label = "command",
+        .optional = true,
+        .handler = {[=](std::string s) {
+            assert(!command);
+            if (auto prefix = needsCompletion(s)) {
+                for (auto & [name, command] : commands)
+                    if (hasPrefix(name, *prefix))
+                        completions->insert(name);
+            }
+            auto i = commands.find(s);
+            if (i == commands.end())
+                throw UsageError("'%s' is not a recognised command", s);
+            command = {s, i->second()};
+        }}
+    });
 
     categories[Command::catDefault] = "Available commands";
 }

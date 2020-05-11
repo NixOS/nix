@@ -31,7 +31,11 @@ struct CmdHash : Command
             .labels({"modulus"})
             .dest(&modulus);
         #endif
-        expectPathArgs("paths", &paths);
+        expectArgs({
+            .label = "paths",
+            .handler = {&paths},
+            .completer = completePath
+        });
     }
 
     std::string description() override

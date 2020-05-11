@@ -571,6 +571,14 @@ StorePathSet toDerivations(ref<Store> store,
     return drvPaths;
 }
 
+InstallablesCommand::InstallablesCommand()
+{
+    expectArgs({
+        .label = "installables",
+        .handler = {&_installables},
+    });
+}
+
 void InstallablesCommand::prepare()
 {
     if (_installables.empty() && useDefaultInstallables())

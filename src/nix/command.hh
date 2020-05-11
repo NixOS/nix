@@ -73,10 +73,7 @@ struct InstallablesCommand : virtual Args, SourceExprCommand
 {
     std::vector<std::shared_ptr<Installable>> installables;
 
-    InstallablesCommand()
-    {
-        expectArgs("installables", &_installables);
-    }
+    InstallablesCommand();
 
     void prepare() override;
 
