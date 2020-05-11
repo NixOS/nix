@@ -10,27 +10,27 @@ MakeError(DemoError, Error);
 
 int main()
 {
-    makeDefaultLogger();
-
     verbosity = lvlVomit;
 
     // In each program where errors occur, this has to be set.
     ErrorInfo::programName = std::optional("error-demo");
 
+    // 'DemoError' appears as error name.
     try {
         throw DemoError("demo error was thrown");
     } catch (Error &e) {
         logger->logEI(e.info());
     }
 
-    // ErrorInfo constructor
+    // appending to the hint from the previous error
     try {
-        auto e = Error("some error");
+        auto e = Error("initial error");
         throw DemoError(e.info());
     } catch (Error &e) {
         ErrorInfo ei = e.info();
-        string prevhint = (e.info().hint.has_value() ? e.info().hint->str() : "");
-        ei.hint = std::optional(hintfmt("previous hint was: %s", normaltxt(prevhint)));
+        // using normaltxt to avoid the default yellow highlighting.
+        ei.hint = hintfmt("%s; subsequent error message.", 
+            normaltxt(e.info().hint ? e.info().hint->str() : ""));
         logger->logEI(ei);
     }
 
@@ -38,8 +38,8 @@ int main()
     try {
         auto x = readFile(-1);
     }
-    catch (Error &e) {
-        std::cout << "error: " << e.sname() << std::endl;
+    catch (SysError &e) {
+        std::cout << "errno was: " << e.errNo << std::endl;
         logError(e.info());
     }
 
@@ -59,7 +59,7 @@ int main()
         }
     }
 
-    // For completeness sake, info through vomit levels.
+    // For completeness sake, show 'info' through 'vomit' levels.
     // But this is maybe a heavy format for those.
     logger->logEI(
         ErrorInfo { .level = lvlInfo,
