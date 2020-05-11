@@ -241,6 +241,11 @@ let
 
         src = nix;
 
+        preConfigure =
+          ''
+            ln -sfn ${vendoredCrates'}/vendor/ nix-rust/vendor
+          '';
+
         enableParallelBuilding = true;
 
         buildInputs = buildDeps ++ propagatedDeps;

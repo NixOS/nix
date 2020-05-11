@@ -1,6 +1,6 @@
 #include "hash.hh"
 #include "shared.hh"
-#include "download.hh"
+#include "filetransfer.hh"
 #include "store-api.hh"
 #include "eval.hh"
 #include "eval-inline.hh"
@@ -180,9 +180,9 @@ static int _main(int argc, char * * argv)
 
                 FdSink sink(fd.get());
 
-                DownloadRequest req(actualUri);
+                FileTransferRequest req(actualUri);
                 req.decompress = false;
-                getDownloader()->download(std::move(req), sink);
+                getFileTransfer()->download(std::move(req), sink);
             }
 
             /* Optionally unpack the file. */

@@ -1,5 +1,5 @@
 #include "builtins.hh"
-#include "download.hh"
+#include "filetransfer.hh"
 #include "store-api.hh"
 #include "archive.hh"
 #include "compression.hh"
@@ -26,9 +26,9 @@ void builtinFetchurl(const BasicDerivation & drv, const std::string & netrcData)
     auto mainUrl = getAttr("url");
     bool unpack = get(drv.env, "unpack").value_or("") == "1";
 
-    /* Note: have to use a fresh downloader here because we're in
+    /* Note: have to use a fresh fileTransfer here because we're in
        a forked process. */
-    auto downloader = makeDownloader();
+    auto fileTransfer = makeFileTransfer();
 
     auto fetch = [&](const std::string & url) {
 
@@ -36,13 +36,13 @@ void builtinFetchurl(const BasicDerivation & drv, const std::string & netrcData)
 
             /* No need to do TLS verification, because we check the hash of
                the result anyway. */
-            DownloadRequest request(url);
+            FileTransferRequest request(url);
             request.verifyTLS = false;
             request.decompress = false;
 
             auto decompressor = makeDecompressionSink(
                 unpack && hasSuffix(mainUrl, ".xz") ? "xz" : "none", sink);
-            downloader->download(std::move(request), *decompressor);
+            fileTransfer->download(std::move(request), *decompressor);
             decompressor->finish();
         });
 

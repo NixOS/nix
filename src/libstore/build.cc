@@ -7,7 +7,7 @@
 #include "affinity.hh"
 #include "builtins.hh"
 #include "builtins/buildenv.hh"
-#include "download.hh"
+#include "filetransfer.hh"
 #include "finally.hh"
 #include "compression.hh"
 #include "json.hh"
@@ -33,7 +33,6 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <sys/utsname.h>
-#include <sys/select.h>
 #include <sys/resource.h>
 #include <sys/socket.h>
 #include <sys/un.h>
@@ -43,6 +42,7 @@
 #include <errno.h>
 #include <cstring>
 #include <termios.h>
+#include <poll.h>
 
 #include <pwd.h>
 #include <grp.h>
@@ -361,7 +361,7 @@ public:
     {
         actDerivations.progress(doneBuilds, expectedBuilds + doneBuilds, runningBuilds, failedBuilds);
         actSubstitutions.progress(doneSubstitutions, expectedSubstitutions + doneSubstitutions, runningSubstitutions, failedSubstitutions);
-        act.setExpected(actDownload, expectedDownloadSize + doneDownloadSize);
+        act.setExpected(actFileTransfer, expectedDownloadSize + doneDownloadSize);
         act.setExpected(actCopyPath, expectedNarSize + doneNarSize);
     }
 };
@@ -1701,6 +1701,7 @@ void DerivationGoal::buildDone()
         }
 
         if (buildMode == bmCheck) {
+            deleteTmpDir(true);
             done(BuildResult::Built);
             return;
         }
@@ -2187,7 +2188,7 @@ void DerivationGoal::startBuilder()
     if (needsHashRewrite()) {
 
         if (pathExists(homeDir))
-            throw Error("directory '%1%' exists; please remove it", homeDir);
+            throw Error("home directory '%1%' exists; please remove it to assure purity of builds without sandboxing", homeDir);
 
         /* We're not doing a chroot build, but we have some valid
            output paths.  Since we can't just overwrite or delete
@@ -2274,10 +2275,13 @@ void DerivationGoal::startBuilder()
 
         if (chown(slaveName.c_str(), buildUser->getUID(), 0))
             throw SysError("changing owner of pseudoterminal slave");
-    } else {
+    }
+#if __APPLE__
+    else {
         if (grantpt(builderOut.readSide.get()))
             throw SysError("granting access to pseudoterminal slave");
     }
+#endif
 
     #if 0
     // Mount the pt in the sandbox so that the "tty" command works.
@@ -3176,7 +3180,7 @@ void DerivationGoal::runChild()
                 // Only use nss functions to resolve hosts and
                 // services. Don’t use it for anything else that may
                 // be configured for this system. This limits the
-                // potential impurities introduced in fixed outputs.
+                // potential impurities introduced in fixed-outputs.
                 writeFile(chrootRootDir + "/etc/nsswitch.conf", "hosts: files dns\nservices: files\n");
 
                 ss.push_back("/etc/services");
@@ -3561,6 +3565,29 @@ StorePathSet parseReferenceSpecifiers(Store & store, const BasicDerivation & drv
 }
 
 
+static void moveCheckToStore(const Path & src, const Path & dst)
+{
+    /* For the rename of directory to succeed, we must be running as root or
+       the directory must be made temporarily writable (to update the
+       directory's parent link ".."). */
+    struct stat st;
+    if (lstat(src.c_str(), &st) == -1) {
+        throw SysError(format("getting attributes of path '%1%'") % src);
+    }
+
+    bool changePerm = (geteuid() && S_ISDIR(st.st_mode) && !(st.st_mode & S_IWUSR));
+
+    if (changePerm)
+        chmod_(src, st.st_mode | S_IWUSR);
+
+    if (rename(src.c_str(), dst.c_str()))
+        throw SysError(format("renaming '%1%' to '%2%'") % src % dst);
+
+    if (changePerm)
+        chmod_(dst, st.st_mode);
+}
+
+
 void DerivationGoal::registerOutputs()
 {
     /* When using a build hook, the build hook can register the output
@@ -3683,7 +3710,8 @@ void DerivationGoal::registerOutputs()
                 /* The output path should be a regular file without execute permission. */
                 if (!S_ISREG(st.st_mode) || (st.st_mode & S_IXUSR) != 0)
                     throw BuildError(
-                        "output path '%1%' should be a non-executable regular file",
+                        "output path '%1%' should be a non-executable regular file "
+                        "since recursive hashing is not enabled (outputHashMode=flat)",
                         path);
             }
 
@@ -3744,8 +3772,7 @@ void DerivationGoal::registerOutputs()
                 if (settings.runDiffHook || settings.keepFailed) {
                     Path dst = worker.store.toRealPath(path + checkSuffix);
                     deletePath(dst);
-                    if (rename(actualPath.c_str(), dst.c_str()))
-                        throw SysError("renaming '%1%' to '%2%'", actualPath, dst);
+                    moveCheckToStore(actualPath, dst);
 
                     handleDiffHook(
                         buildUser ? buildUser->getUID() : getuid(),
@@ -3753,10 +3780,10 @@ void DerivationGoal::registerOutputs()
                         path, dst, worker.store.printStorePath(drvPath), tmpDir);
 
                     throw NotDeterministic("derivation '%s' may not be deterministic: output '%s' differs from '%s'",
-                        worker.store.printStorePath(drvPath), path, dst);
+                        worker.store.printStorePath(drvPath), worker.store.toRealPath(path), dst);
                 } else
                     throw NotDeterministic("derivation '%s' may not be deterministic: output '%s' differs",
-                        worker.store.printStorePath(drvPath), path);
+                        worker.store.printStorePath(drvPath), worker.store.toRealPath(path));
             }
 
             /* Since we verified the build, it's now ultimately trusted. */
@@ -4808,8 +4835,7 @@ void Worker::waitForInput()
        terminated. */
 
     bool useTimeout = false;
-    struct timeval timeout;
-    timeout.tv_usec = 0;
+    long timeout = 0;
     auto before = steady_time_point::clock::now();
 
     /* If we're monitoring for silence on stdout/stderr, or if there
@@ -4827,7 +4853,7 @@ void Worker::waitForInput()
             nearest = std::min(nearest, i.timeStarted + std::chrono::seconds(settings.buildTimeout));
     }
     if (nearest != steady_time_point::max()) {
-        timeout.tv_sec = std::max(1L, (long) std::chrono::duration_cast<std::chrono::seconds>(nearest - before).count());
+        timeout = std::max(1L, (long) std::chrono::duration_cast<std::chrono::seconds>(nearest - before).count());
         useTimeout = true;
     }
 
@@ -4838,30 +4864,28 @@ void Worker::waitForInput()
         if (lastWokenUp == steady_time_point::min())
             printError("waiting for locks or build slots...");
         if (lastWokenUp == steady_time_point::min() || lastWokenUp > before) lastWokenUp = before;
-        timeout.tv_sec = std::max(1L,
+        timeout = std::max(1L,
             (long) std::chrono::duration_cast<std::chrono::seconds>(
                 lastWokenUp + std::chrono::seconds(settings.pollInterval) - before).count());
     } else lastWokenUp = steady_time_point::min();
 
     if (useTimeout)
-        vomit("sleeping %d seconds", timeout.tv_sec);
+        vomit("sleeping %d seconds", timeout);
 
     /* Use select() to wait for the input side of any logger pipe to
        become `available'.  Note that `available' (i.e., non-blocking)
        includes EOF. */
-    fd_set fds;
-    FD_ZERO(&fds);
-    int fdMax = 0;
+    std::vector<struct pollfd> pollStatus;
+    std::map <int, int> fdToPollStatus;
     for (auto & i : children) {
         for (auto & j : i.fds) {
-            if (j >= FD_SETSIZE)
-                throw Error("reached FD_SETSIZE limit");
-            FD_SET(j, &fds);
-            if (j >= fdMax) fdMax = j + 1;
+            pollStatus.push_back((struct pollfd) { .fd = j, .events = POLLIN });
+            fdToPollStatus[j] = pollStatus.size() - 1;
         }
     }
 
-    if (select(fdMax, &fds, 0, 0, useTimeout ? &timeout : 0) == -1) {
+    if (poll(pollStatus.data(), pollStatus.size(),
+            useTimeout ? timeout * 1000 : -1) == -1) {
         if (errno == EINTR) return;
         throw SysError("waiting for input");
     }
@@ -4882,7 +4906,7 @@ void Worker::waitForInput()
         set<int> fds2(j->fds);
         std::vector<unsigned char> buffer(4096);
         for (auto & k : fds2) {
-            if (FD_ISSET(k, &fds)) {
+            if (pollStatus.at(fdToPollStatus.at(k)).revents) {
                 ssize_t rd = read(k, buffer.data(), buffer.size());
                 // FIXME: is there a cleaner way to handle pt close
                 // than EIO? Is this even standard?

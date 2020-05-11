@@ -3,7 +3,9 @@ makefiles = \
   local.mk \
   nix-rust/local.mk \
   src/libutil/local.mk \
+  src/libutil/tests/local.mk \
   src/libstore/local.mk \
+  src/libfetchers/local.mk \
   src/libmain/local.mk \
   src/libexpr/local.mk \
   src/nix/local.mk \
@@ -15,8 +17,7 @@ makefiles = \
   misc/upstart/local.mk \
   doc/manual/local.mk \
   tests/local.mk \
-  tests/plugins/local.mk \
-  src/error-demo/local.mk
+  tests/plugins/local.mk
 
 -include Makefile.config
 

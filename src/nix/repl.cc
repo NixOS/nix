@@ -82,40 +82,6 @@ struct NixRepl : gc
 };
 
 
-void printHelp()
-{
-    std::cout
-         << "Usage: nix-repl [--help] [--version] [-I path] paths...\n"
-         << "\n"
-         << "nix-repl is a simple read-eval-print loop (REPL) for the Nix package manager.\n"
-         << "\n"
-         << "Options:\n"
-         << "    --help\n"
-         << "        Prints out a summary of the command syntax and exits.\n"
-         << "\n"
-         << "    --version\n"
-         << "        Prints out the Nix version number on standard output and exits.\n"
-         << "\n"
-         << "    -I path\n"
-         << "        Add a path to the Nix expression search path. This option may be given\n"
-         << "        multiple times. See the NIX_PATH environment variable for information on\n"
-         << "        the semantics of the Nix search path. Paths added through -I take\n"
-         << "        precedence over NIX_PATH.\n"
-         << "\n"
-         << "    paths...\n"
-         << "        A list of paths to files containing Nix expressions which nix-repl will\n"
-         << "        load and add to its scope.\n"
-         << "\n"
-         << "        A path surrounded in < and > will be looked up in the Nix expression search\n"
-         << "        path, as in the Nix language itself.\n"
-         << "\n"
-         << "        If an element of paths starts with http:// or https://, it is interpreted\n"
-         << "        as the URL of a tarball that will be downloaded and unpacked to a temporary\n"
-         << "        location. The tarball must include a single top-level directory containing\n"
-         << "        at least a file named default.nix.\n";
-}
-
-
 string removeWhitespace(string s)
 {
     s = chomp(s);
@@ -807,6 +773,16 @@ struct CmdRepl : StoreCommand, MixEvalArgs
     std::string description() override
     {
         return "start an interactive environment for evaluating Nix expressions";
+    }
+
+    Examples examples() override
+    {
+        return {
+          Example{
+            "Display all special commands within the REPL:",
+              "nix repl\n  nix-repl> :?"
+          }
+        };
     }
 
     void run(ref<Store> store) override

@@ -7,7 +7,7 @@ namespace nix {
 typedef enum {
     actUnknown = 0,
     actCopyPath = 100,
-    actDownload = 101,
+    actFileTransfer = 101,
     actRealise = 102,
     actCopyPaths = 103,
     actBuilds = 104,
@@ -76,6 +76,16 @@ public:
     virtual void stopActivity(ActivityId act) { };
 
     virtual void result(ActivityId act, ResultType type, const Fields & fields) { };
+
+    virtual void writeToStdout(std::string_view s);
+
+    template<typename... Args>
+    inline void stdout(const std::string & fs, const Args & ... args)
+    {
+        boost::format f(fs);
+        formatHelper(f, args...);
+        writeToStdout(f.str());
+    }
 };
 
 ActivityId getCurActivity();

@@ -334,7 +334,7 @@ expr_function
   ;
 
 expr_if
-  : IF expr THEN expr ELSE expr { $$ = new ExprIf($2, $4, $6); }
+  : IF expr THEN expr ELSE expr { $$ = new ExprIf(CUR_POS, $2, $4, $6); }
   | expr_op
   ;
 
@@ -535,8 +535,8 @@ formals
   ;
 
 formal
-  : ID { $$ = new Formal(data->symbols.create($1), 0); }
-  | ID '?' expr { $$ = new Formal(data->symbols.create($1), $3); }
+  : ID { $$ = new Formal(CUR_POS, data->symbols.create($1), 0); }
+  | ID '?' expr { $$ = new Formal(CUR_POS, data->symbols.create($1), $3); }
   ;
 
 %%
@@ -548,7 +548,8 @@ formal
 #include <unistd.h>
 
 #include "eval.hh"
-#include "download.hh"
+#include "filetransfer.hh"
+#include "fetchers.hh"
 #include "store-api.hh"
 
 
@@ -692,16 +693,10 @@ std::pair<bool, std::string> EvalState::resolveSearchPathElem(const SearchPathEl
 
     if (isUri(elem.second)) {
         try {
-            CachedDownloadRequest request(elem.second);
-            request.unpack = true;
-            res = { true, getDownloader()->downloadCached(store, request).path };
-        } catch (DownloadError & e) {
-            logWarning(
-                ErrorInfo { 
-                    .name = "Download Error",
-                    .hint = hintfmt("warning: Nix search path entry '%1%' cannot be downloaded, ignoring", elem.second)
-            });
-
+            res = { true, store->toRealPath(fetchers::downloadTarball(
+                        store, resolveUri(elem.second), "source", false).storePath) };
+        } catch (FileTransferError & e) {
+            printError("warning: Nix search path entry '%1%' cannot be downloaded, ignoring", elem.second);
             res = { false, "" };
         }
     } else {

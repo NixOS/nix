@@ -11,17 +11,19 @@ struct CmdBuild : InstallablesCommand, MixDryRun, MixProfile
 
     CmdBuild()
     {
-        mkFlag()
-            .longName("out-link")
-            .shortName('o')
-            .description("path of the symlink to the build result")
-            .labels({"path"})
-            .dest(&outLink);
+        addFlag({
+            .longName = "out-link",
+            .shortName = 'o',
+            .description = "path of the symlink to the build result",
+            .labels = {"path"},
+            .handler = {&outLink},
+        });
 
-        mkFlag()
-            .longName("no-link")
-            .description("do not create a symlink to the build result")
-            .set(&outLink, Path(""));
+        addFlag({
+            .longName = "no-link",
+            .description = "do not create a symlink to the build result",
+            .handler = {&outLink, Path("")},
+        });
     }
 
     std::string description() override

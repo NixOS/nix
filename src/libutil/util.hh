@@ -18,6 +18,7 @@
 #include <sstream>
 #include <optional>
 #include <future>
+#include <iterator>
 
 #ifndef HAVE_STRUCT_DIRENT_D_TYPE
 #define DT_UNKNOWN 0
@@ -58,12 +59,12 @@ Path canonPath(const Path & path, bool resolveSymlinks = false);
 
 /* Return the directory part of the given canonical path, i.e.,
    everything before the final `/'.  If the path is the root or an
-   immediate child thereof (e.g., `/foo'), this means an empty string
-   is returned. */
+   immediate child thereof (e.g., `/foo'), this means `/'
+   is returned.*/
 Path dirOf(const Path & path);
 
 /* Return the base name of the given canonical path, i.e., everything
-   following the final `/'. */
+   following the final `/' (trailing slashes are removed). */
 std::string_view baseNameOf(std::string_view path);
 
 /* Check whether 'path' is a descendant of 'dir'. */
@@ -103,7 +104,7 @@ unsigned char getFileType(const Path & path);
 
 /* Read the contents of a file into a string. */
 string readFile(int fd);
-string readFile(const Path & path, bool drain = false);
+string readFile(const Path & path);
 void readFile(const Path & path, Sink & sink);
 
 /* Write a string to a file. */
@@ -162,7 +163,7 @@ MakeError(EndOfFile, Error);
 
 
 /* Read a file descriptor until EOF occurs. */
-string drainFD(int fd, bool block = true);
+string drainFD(int fd, bool block = true, const size_t reserveSize=0);
 
 void drainFD(int fd, Sink & sink, bool block = true);
 
@@ -387,17 +388,6 @@ string replaceStrings(const std::string & s,
 
 
 std::string rewriteStrings(const std::string & s, const StringMap & rewrites);
-
-
-/* If a set contains 'from', remove it and insert 'to'. */
-template<typename T>
-void replaceInSet(std::set<T> & set, const T & from, const T & to)
-{
-    auto i = set.find(from);
-    if (i == set.end()) return;
-    set.erase(i);
-    set.insert(to);
-}
 
 
 /* Convert the exit status of a child as returned by wait() into an

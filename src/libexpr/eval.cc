@@ -5,7 +5,7 @@
 #include "derivations.hh"
 #include "globals.hh"
 #include "eval-inline.hh"
-#include "download.hh"
+#include "filetransfer.hh"
 #include "json.hh"
 #include "function-trace.hh"
 
@@ -21,6 +21,8 @@
 #include <sys/resource.h>
 
 #if HAVE_BOEHMGC
+
+#define GC_INCLUDE_NEW
 
 #include <gc/gc.h>
 #include <gc/gc_cpp.h>
@@ -53,6 +55,12 @@ static char * dupStringWithLen(const char * s, size_t size)
 #endif
     if (!t) throw std::bad_alloc();
     return t;
+}
+
+
+RootValue allocRootValue(Value * v)
+{
+    return std::allocate_shared<Value *>(traceable_allocator<Value *>(), v);
 }
 
 
@@ -1280,7 +1288,7 @@ void ExprWith::eval(EvalState & state, Env & env, Value & v)
 
 void ExprIf::eval(EvalState & state, Env & env, Value & v)
 {
-    (state.evalBool(env, cond) ? then : else_)->eval(state, env, v);
+    (state.evalBool(env, cond, pos) ? then : else_)->eval(state, env, v);
 }
 
 
@@ -1526,7 +1534,7 @@ NixFloat EvalState::forceFloat(Value & v, const Pos & pos)
 
 bool EvalState::forceBool(Value & v, const Pos & pos)
 {
-    forceValue(v);
+    forceValue(v, pos);
     if (v.type != tBool)
         throwTypeError("value is %1% while a Boolean was expected", v, pos);
     return v.boolean;
@@ -1541,7 +1549,7 @@ bool EvalState::isFunctor(Value & fun)
 
 void EvalState::forceFunction(Value & v, const Pos & pos)
 {
-    forceValue(v);
+    forceValue(v, pos);
     if (v.type != tLambda && v.type != tPrimOp && v.type != tPrimOpApp && !isFunctor(v))
         throwTypeError("value is %1% while a function was expected", v, pos);
 }
@@ -1618,7 +1626,7 @@ std::optional<string> EvalState::tryAttrsToString(const Pos & pos, Value & v,
 string EvalState::coerceToString(const Pos & pos, Value & v, PathSet & context,
     bool coerceMore, bool copyToStore)
 {
-    forceValue(v);
+    forceValue(v, pos);
 
     string s;
 
