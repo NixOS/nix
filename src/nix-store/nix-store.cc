@@ -704,7 +704,10 @@ static void opVerify(Strings opFlags, Strings opArgs)
         else throw UsageError("unknown flag '%1%'", i);
 
     if (store->verifyStore(checkContents, repair)) {
-        printError("warning: not all errors were fixed");
+        logWarning(ErrorInfo { 
+            .name = "Store consistency",
+            .description = "not all errors were fixed"
+            });
         throw Exit(1);
     }
 }

@@ -368,9 +368,12 @@ static void _main(int argc, char * * argv)
                 shell = drv->queryOutPath() + "/bin/bash";
 
             } catch (Error & e) {
-                // TODO: append error msg; warn()?
-                logError(e.info());
-                printError("warning: %s; will use bash from your environment", e.what());
+                logWarning(
+                    ErrorInfo {
+                        .name = "bashInteractive",
+                        .hint = hintfmt("%s; will use bash from your environment", 
+                            (e.info().hint ? e.info().hint->str() : ""))
+                    });
                 shell = "bash";
             }
         }

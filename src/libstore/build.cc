@@ -3647,7 +3647,11 @@ void DerivationGoal::registerOutputs()
         /* Apply hash rewriting if necessary. */
         bool rewritten = false;
         if (!outputRewrites.empty()) {
-            printError("warning: rewriting hashes in '%1%'; cross fingers", path);
+            logWarning(
+                ErrorInfo {
+                    .name = "Rewriting hashes", 
+                    .hint = hintfmt("rewriting hashes in '%1%'; cross fingers", path)
+                    });
 
             /* Canonicalise first.  This ensures that the path we're
                rewriting doesn't contain a hard link to /etc/shadow or
@@ -4414,8 +4418,12 @@ void SubstitutionGoal::tryNext()
         && !sub->isTrusted
         && !info->checkSignatures(worker.store, worker.store.getPublicKeys()))
     {
-        printError("warning: substituter '%s' does not have a valid signature for path '%s'",
-            sub->getUri(), worker.store.printStorePath(storePath));
+        logWarning(
+            ErrorInfo {
+                .name = "Invalid path signature", 
+                .hint = hintfmt("substituter '%s' does not have a valid signature for path '%s'",
+            sub->getUri(), worker.store.printStorePath(storePath))
+            });
         tryNext();
         return;
     }

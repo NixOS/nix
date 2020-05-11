@@ -161,7 +161,7 @@ std::ostream& operator<<(std::ostream &out, const ErrorInfo &einfo)
             einfo.programName.value_or(""))
             << std::endl;
 
-    // filename.
+    // filename, line, column.
     if (einfo.nixCode.has_value()) {
         if (einfo.nixCode->errPos.file != "") {
             out << fmt("%1%in file: " ANSI_BLUE "%2% %3%" ANSI_NORMAL,

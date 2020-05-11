@@ -769,7 +769,11 @@ void ValidPathInfo::sign(const Store & store, const SecretKey & secretKey)
 bool ValidPathInfo::isContentAddressed(const Store & store) const
 {
     auto warn = [&]() {
-        printError("warning: path '%s' claims to be content-addressed but isn't", store.printStorePath(path));
+        logWarning(
+            ErrorInfo{
+                .name = "Path not content-addressed", 
+                .hint = hintfmt("path '%s' claims to be content-addressed but isn't", store.printStorePath(path))
+            });
     };
 
     if (hasPrefix(ca, "text:")) {
