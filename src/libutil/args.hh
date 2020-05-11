@@ -277,4 +277,6 @@ std::optional<std::string> needsCompletion(std::string_view s);
 
 void completePath(size_t, std::string_view prefix);
 
+void completeDir(size_t, std::string_view prefix);
+
 }

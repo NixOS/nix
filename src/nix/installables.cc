@@ -109,7 +109,7 @@ Strings SourceExprCommand::getDefaultFlakeAttrPathPrefixes()
 
 void SourceExprCommand::completeInstallable(std::string_view prefix)
 {
-    completePath(0, prefix);
+    completeDir(0, prefix);
 
     if (file) return; // FIXME
 
