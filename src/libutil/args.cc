@@ -101,15 +101,8 @@ bool Args::processFlag(Strings::iterator & pos, Strings::iterator end)
         std::vector<std::string> args;
         for (size_t n = 0 ; n < flag.handler.arity; ++n) {
             if (pos == end) {
-<<<<<<< HEAD
-                if (flag.arity == ArityAny) break;
-                throw UsageError("flag '%1%' requires %2% argument(s)",
-                    name,
-                    flag.arity);
-=======
                 if (flag.handler.arity == ArityAny) break;
                 throw UsageError("flag '%s' requires %d argument(s)", name, flag.handler.arity);
->>>>>>> master
             }
             args.push_back(*pos++);
         }

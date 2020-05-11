@@ -547,7 +547,7 @@ UserLock::UserLock()
     /* Copy the result of getgrnam. */
     Strings users;
     for (char * * p = gr->gr_mem; *p; ++p) {
-        debug(format("found build user '%1%'") % *p);
+        debug("found build user '%1%'", *p);
         users.push_back(*p);
     }
 
@@ -558,7 +558,7 @@ UserLock::UserLock()
     /* Find a user account that isn't currently in use for another
        build. */
     for (auto & i : users) {
-        debug(format("trying user '%1%'") % i);
+        debug("trying user '%1%'", i);
 
         struct passwd * pw = getpwnam(i.c_str());
         if (!pw)
@@ -1794,7 +1794,7 @@ HookReply DerivationGoal::tryBuildHook()
             }
         }
 
-        debug(format("hook reply is '%1%'") % reply);
+        debug("hook reply is '%1%'", reply);
 
         if (reply == "decline")
             return rpDecline;
@@ -2255,7 +2255,7 @@ void DerivationGoal::startBuilder()
         startDaemon();
 
     /* Run the builder. */
-    printMsg(lvlChatty, format("executing builder '%1%'") % drv->builder);
+    printMsg(lvlChatty, "executing builder '%1%'", drv->builder);
 
     /* Create the log file. */
     Path logFile = openLogFile();
@@ -3195,7 +3195,7 @@ void DerivationGoal::runChild()
                filesystem that we want in the chroot
                environment. */
             auto doBind = [&](const Path & source, const Path & target, bool optional = false) {
-                debug(format("bind mounting '%1%' to '%2%'") % source % target);
+                debug("bind mounting '%1%' to '%2%'", source, target);
                 struct stat st;
                 if (stat(source.c_str(), &st) == -1) {
                     if (optional && errno == ENOENT)
@@ -3572,7 +3572,7 @@ static void moveCheckToStore(const Path & src, const Path & dst)
        directory's parent link ".."). */
     struct stat st;
     if (lstat(src.c_str(), &st) == -1) {
-        throw SysError(format("getting attributes of path '%1%'") % src);
+        throw SysError("getting attributes of path '%1%'", src);
     }
 
     bool changePerm = (geteuid() && S_ISDIR(st.st_mode) && !(st.st_mode & S_IWUSR));
@@ -3581,7 +3581,7 @@ static void moveCheckToStore(const Path & src, const Path & dst)
         chmod_(src, st.st_mode | S_IWUSR);
 
     if (rename(src.c_str(), dst.c_str()))
-        throw SysError(format("renaming '%1%' to '%2%'") % src % dst);
+        throw SysError("renaming '%1%' to '%2%'", src, dst);
 
     if (changePerm)
         chmod_(dst, st.st_mode);
@@ -4911,15 +4911,15 @@ void Worker::waitForInput()
                 // FIXME: is there a cleaner way to handle pt close
                 // than EIO? Is this even standard?
                 if (rd == 0 || (rd == -1 && errno == EIO)) {
-                    debug(format("%1%: got EOF") % goal->getName());
+                    debug("%1%: got EOF", goal->getName());
                     goal->handleEOF(k);
                     j->fds.erase(k);
                 } else if (rd == -1) {
                     if (errno != EINTR)
                         throw SysError("%s: read failed", goal->getName());
                 } else {
-                    printMsg(lvlVomit, format("%1%: read %2% bytes")
-                        % goal->getName() % rd);
+                    printMsg(lvlVomit, "%1%: read %2% bytes",
+                        goal->getName(), rd);
                     string data((char *) buffer.data(), rd);
                     j->lastOutput = after;
                     goal->handleChildOutput(k, data);

@@ -13,6 +13,7 @@ namespace nix {
 using std::list;
 using std::set;
 using std::vector;
+using std::string;
 
 typedef list<std::string> Strings;
 typedef set<std::string> StringSet;

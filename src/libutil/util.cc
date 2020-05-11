@@ -276,7 +276,7 @@ DirEntries readDirectory(DIR *dir, const Path & path)
 DirEntries readDirectory(const Path & path)
 {
     AutoCloseDir dir(opendir(path.c_str()));
-    if (!dir) throw SysError(format("opening directory '%1%'") % path);
+    if (!dir) throw SysError("opening directory '%1%'", path);
 
     return readDirectory(dir.get(), path);
 }
@@ -306,7 +306,7 @@ string readFile(const Path & path)
 {
     AutoCloseFD fd = open(path.c_str(), O_RDONLY | O_CLOEXEC);
     if (!fd)
-        throw SysError(format("opening file '%1%'") % path);
+        throw SysError("opening file '%1%'", path);
     return readFile(fd.get());
 }
 
@@ -394,15 +394,15 @@ static void _deletePath(int parentfd, const Path & path, unsigned long long & by
         const auto PERM_MASK = S_IRUSR | S_IWUSR | S_IXUSR;
         if ((st.st_mode & PERM_MASK) != PERM_MASK) {
             if (fchmodat(parentfd, name.c_str(), st.st_mode | PERM_MASK, 0) == -1)
-                throw SysError(format("chmod '%1%'") % path);
+                throw SysError("chmod '%1%'", path);
         }
 
         int fd = openat(parentfd, path.c_str(), O_RDONLY);
         if (!fd)
-            throw SysError(format("opening directory '%1%'") % path);
+            throw SysError("opening directory '%1%'", path);
         AutoCloseDir dir(fdopendir(fd));
         if (!dir)
-            throw SysError(format("opening directory '%1%'") % path);
+            throw SysError("opening directory '%1%'", path);
         for (auto & i : readDirectory(dir.get(), path))
             _deletePath(dirfd(dir.get()), path + "/" + i.name, bytesFreed);
     }
@@ -426,7 +426,7 @@ static void _deletePath(const Path & path, unsigned long long & bytesFreed)
         // for backwards compatibility.
         if (errno == ENOENT) return;
 
-        throw SysError(format("opening directory '%1%'") % path);
+        throw SysError("opening directory '%1%'", path);
     }
 
     _deletePath(dirfd.get(), path, bytesFreed);
@@ -845,7 +845,7 @@ int Pid::kill()
 {
     assert(pid != -1);
 
-    debug(format("killing process %1%") % pid);
+    debug("killing process %1%", pid);
 
     /* Send the requested signal to the child.  If it has its own
        process group, send the signal to every process in the child
@@ -903,7 +903,7 @@ pid_t Pid::release()
 
 void killUser(uid_t uid)
 {
-    debug(format("killing all processes running under uid '%1%'") % uid);
+    debug("killing all processes running under uid '%1%'", uid);
 
     assert(uid != 0); /* just to be safe... */
 

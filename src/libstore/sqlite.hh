@@ -3,7 +3,7 @@
 #include <functional>
 #include <string>
 
-#include "types.hh"
+#include "error.hh"
 
 struct sqlite3;
 struct sqlite3_stmt;

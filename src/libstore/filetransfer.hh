@@ -103,8 +103,9 @@ class FileTransferError : public Error
 {
 public:
     FileTransfer::Error error;
+    template<typename... Args>
     FileTransferError(FileTransfer::Error error, const Args & ... args)
-        : Error(fs), error(error)
+        : Error(args...), error(error)
     { }
 };
 

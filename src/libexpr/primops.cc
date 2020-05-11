@@ -1124,7 +1124,7 @@ static void prim_toFile(EvalState & state, const Pos & pos, Value * * args, Valu
                 ErrorInfo { 
                     .hint = hintfmt(
                         "in 'toFile': the file named '%1%' must not contain a reference "
-                        "to a derivation but contains (%2%)"
+                        "to a derivation but contains (%2%)",
                         name,
                         path),
                     .nixCode = NixCode { .errPos = pos }

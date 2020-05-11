@@ -2,6 +2,7 @@
 
 
 #include "ref.hh"
+#include "types.hh"
 
 #include <list>
 #include <memory>
@@ -20,9 +21,6 @@
 #endif
 
 namespace nix {
-
-using std::list;
-using std::vector;
 
 typedef enum {
     lvlError = 0,
