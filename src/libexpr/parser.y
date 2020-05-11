@@ -31,7 +31,7 @@ namespace nix {
         Expr * result;
         Path basePath;
         Symbol path;
-        string error;
+        ErrorInfo error;
         Symbol sLetBody;
         ParseData(EvalState & state)
             : state(state)
@@ -261,8 +261,10 @@ static inline Pos makeCurPos(const YYLTYPE & loc, ParseData * data)
 
 void yyerror(YYLTYPE * loc, yyscan_t scanner, ParseData * data, const char * error)
 {
-    data->error = (format("%1%, at %2%")
-        % error % makeCurPos(*loc, data)).str();
+    data->error = ErrorInfo { 
+        .hint = hintfmt(error),
+        .nixCode = NixCode { .errPos = makeCurPos(*loc, data) }
+        };
 }
 
 
