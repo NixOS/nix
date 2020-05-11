@@ -3679,7 +3679,7 @@ void DerivationGoal::registerOutputs()
                 if (!S_ISREG(st.st_mode) || (st.st_mode & S_IXUSR) != 0)
                     throw BuildError(
                         format("output path '%1%' should be a non-executable regular file "
-                               "since recursive hashing is not enabled (outputHashMode=flat).") % path);
+                               "since recursive hashing is not enabled (outputHashMode=flat)") % path);
             }
 
             /* Check the hash. In hash mode, move the path produced by
