@@ -41,6 +41,7 @@ void Args::parseCmdline(const Strings & _cmdline)
         assert(n > 0 && n <= cmdline.size());
         *std::next(cmdline.begin(), n - 1) += completionMarker;
         completions = std::make_shared<decltype(completions)::element_type>();
+        verbosity = lvlError;
     }
 
     for (auto pos = cmdline.begin(); pos != cmdline.end(); ) {
