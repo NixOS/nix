@@ -64,15 +64,23 @@ namespace nix {
 
 static void dupAttr(const AttrPath & attrPath, const Pos & pos, const Pos & prevPos)
 {
-    throw ParseError("attribute '%1%' at %2% already defined at %3%",
-        showAttrPath(attrPath), pos, prevPos);
+    throw ParseError(
+        ErrorInfo {
+            .hint = hintfmt("attribute '%1%' already defined at %2%",
+                showAttrPath(attrPath), prevPos),
+            .nixCode = NixCode { .errPos = pos },
+        });
 }
 
 
 static void dupAttr(Symbol attr, const Pos & pos, const Pos & prevPos)
 {
-    throw ParseError("attribute '%1%' at %2% already defined at %3%",
-        attr, pos, prevPos);
+    throw ParseError(
+        ErrorInfo {
+            .hint = hintfmt("attribute '%1%' already defined at %2%",
+                attr, prevPos),
+            .nixCode = NixCode { .errPos = pos },
+        });
 }
 
 
@@ -140,8 +148,12 @@ static void addAttr(ExprAttrs * attrs, AttrPath & attrPath,
 static void addFormal(const Pos & pos, Formals * formals, const Formal & formal)
 {
     if (!formals->argNames.insert(formal.name).second)
-        throw ParseError("duplicate formal function argument '%1%' at %2%",
-            formal.name, pos);
+        throw ParseError(
+            ErrorInfo {
+                .hint = hintfmt("duplicate formal function argument '%1%'",
+                    formal.name),
+                .nixCode = NixCode { .errPos = pos },
+            });
     formals->formals.push_front(formal);
 }
 
@@ -327,7 +339,11 @@ expr_function
     { $$ = new ExprWith(CUR_POS, $2, $4); }
   | LET binds IN expr_function
     { if (!$2->dynamicAttrs.empty())
-        throw ParseError("dynamic attributes not allowed in let at %1%", CUR_POS);
+        throw ParseError(
+            ErrorInfo {
+                .hint = hintfmt("dynamic attributes not allowed in let"),
+                .nixCode = NixCode { .errPos = CUR_POS },
+            });
       $$ = new ExprLet($2, $4);
     }
   | expr_if
@@ -479,8 +495,11 @@ attrs
           $$->push_back(AttrName(str->s));
           delete str;
       } else
-          throw ParseError("dynamic attributes not allowed in inherit at %1%",
-              makeCurPos(@2, data));
+          throw ParseError(
+              ErrorInfo {
+                  .hint = hintfmt("dynamic attributes not allowed in inherit"),
+                  .nixCode = NixCode { .errPos = makeCurPos(@2, data) },
+              });
     }
   | { $$ = new AttrPath; }
   ;
