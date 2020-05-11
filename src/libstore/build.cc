@@ -3155,7 +3155,7 @@ void DerivationGoal::runChild()
                 // Only use nss functions to resolve hosts and
                 // services. Don’t use it for anything else that may
                 // be configured for this system. This limits the
-                // potential impurities introduced in fixed outputs.
+                // potential impurities introduced in fixed-outputs.
                 writeFile(chrootRootDir + "/etc/nsswitch.conf", "hosts: files dns\nservices: files\n");
 
                 ss.push_back("/etc/services");
