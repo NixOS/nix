@@ -109,8 +109,6 @@ Strings SourceExprCommand::getDefaultFlakeAttrPathPrefixes()
 
 void SourceExprCommand::completeInstallable(std::string_view prefix)
 {
-    completeDir(0, prefix);
-
     if (file) return; // FIXME
 
     /* Look for flake output attributes that match the
@@ -176,6 +174,23 @@ void SourceExprCommand::completeInstallable(std::string_view prefix)
         warn(e.msg());
     }
 
+    completeFlakeRef(prefix);
+}
+
+ref<EvalState> EvalCommand::getEvalState()
+{
+    if (!evalState)
+        evalState = std::make_shared<EvalState>(searchPath, getStore());
+    return ref<EvalState>(evalState);
+}
+
+void EvalCommand::completeFlakeRef(std::string_view prefix)
+{
+    if (prefix == "")
+        completions->insert(".");
+
+    completeDir(0, prefix);
+
     /* Look for registry entries that match the prefix. */
     for (auto & registry : fetchers::getRegistries(getStore())) {
         for (auto & entry : registry->entries) {
@@ -190,13 +205,6 @@ void SourceExprCommand::completeInstallable(std::string_view prefix)
             }
         }
     }
-}
-
-ref<EvalState> EvalCommand::getEvalState()
-{
-    if (!evalState)
-        evalState = std::make_shared<EvalState>(searchPath, getStore());
-    return ref<EvalState>(evalState);
 }
 
 Buildable Installable::toBuildable()
