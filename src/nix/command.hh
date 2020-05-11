@@ -63,6 +63,8 @@ struct SourceExprCommand : virtual Args, EvalCommand, MixFlakeOptions
     virtual Strings getDefaultFlakeAttrPaths();
 
     virtual Strings getDefaultFlakeAttrPathPrefixes();
+
+    void completeInstallable(std::string_view prefix);
 };
 
 enum RealiseMode { Build, NoBuild, DryRun };
@@ -89,10 +91,7 @@ struct InstallableCommand : virtual Args, SourceExprCommand
 {
     std::shared_ptr<Installable> installable;
 
-    InstallableCommand()
-    {
-        expectArg("installable", &_installable, true);
-    }
+    InstallableCommand();
 
     void prepare() override;
 
