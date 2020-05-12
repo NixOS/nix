@@ -767,7 +767,11 @@ struct CmdRepl : StoreCommand, MixEvalArgs
 
     CmdRepl()
     {
-        expectArgs("files", &files);
+        expectArgs({
+            .label = "files",
+            .handler = {&files},
+            .completer = completePath
+        });
     }
 
     std::string description() override

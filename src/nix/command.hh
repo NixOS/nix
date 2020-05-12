@@ -38,6 +38,8 @@ struct EvalCommand : virtual StoreCommand, MixEvalArgs
     ref<EvalState> getEvalState();
 
     std::shared_ptr<EvalState> evalState;
+
+    void completeFlakeRef(std::string_view prefix);
 };
 
 struct MixFlakeOptions : virtual Args
@@ -63,6 +65,8 @@ struct SourceExprCommand : virtual Args, EvalCommand, MixFlakeOptions
     virtual Strings getDefaultFlakeAttrPaths();
 
     virtual Strings getDefaultFlakeAttrPathPrefixes();
+
+    void completeInstallable(std::string_view prefix);
 };
 
 enum RealiseMode { Build, NoBuild, DryRun };
@@ -73,10 +77,7 @@ struct InstallablesCommand : virtual Args, SourceExprCommand
 {
     std::vector<std::shared_ptr<Installable>> installables;
 
-    InstallablesCommand()
-    {
-        expectArgs("installables", &_installables);
-    }
+    InstallablesCommand();
 
     void prepare() override;
 
@@ -92,10 +93,7 @@ struct InstallableCommand : virtual Args, SourceExprCommand
 {
     std::shared_ptr<Installable> installable;
 
-    InstallableCommand()
-    {
-        expectArg("installable", &_installable, true);
-    }
+    InstallableCommand();
 
     void prepare() override;
 

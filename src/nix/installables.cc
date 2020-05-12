@@ -11,6 +11,7 @@
 #include "flake/flake.hh"
 #include "eval-cache.hh"
 #include "url.hh"
+#include "registry.hh"
 
 #include <regex>
 #include <queue>
@@ -77,7 +78,8 @@ SourceExprCommand::SourceExprCommand()
         .shortName = 'f',
         .description = "evaluate FILE rather than the default",
         .labels = {"file"},
-        .handler = {&file}
+        .handler = {&file},
+        .completer = completePath
     });
 
     addFlag({
@@ -105,11 +107,104 @@ Strings SourceExprCommand::getDefaultFlakeAttrPathPrefixes()
     };
 }
 
+void SourceExprCommand::completeInstallable(std::string_view prefix)
+{
+    if (file) return; // FIXME
+
+    /* Look for flake output attributes that match the
+       prefix. */
+    try {
+        auto hash = prefix.find('#');
+        if (hash != std::string::npos) {
+            auto fragment = prefix.substr(hash + 1);
+            auto flakeRefS = std::string(prefix.substr(0, hash));
+            // FIXME: do tilde expansion.
+            auto flakeRef = parseFlakeRef(flakeRefS, absPath("."));
+
+            auto state = getEvalState();
+
+            auto evalCache = openEvalCache(*state,
+                std::make_shared<flake::LockedFlake>(lockFlake(*state, flakeRef, lockFlags)),
+                true);
+
+            auto root = evalCache->getRoot();
+
+            /* Complete 'fragment' relative to all the
+               attrpath prefixes as well as the root of the
+               flake. */
+            auto attrPathPrefixes = getDefaultFlakeAttrPathPrefixes();
+            attrPathPrefixes.push_back("");
+
+            for (auto & attrPathPrefixS : attrPathPrefixes) {
+                auto attrPathPrefix = parseAttrPath(*state, attrPathPrefixS);
+                auto attrPathS = attrPathPrefixS + std::string(fragment);
+                auto attrPath = parseAttrPath(*state, attrPathS);
+
+                std::string lastAttr;
+                if (!attrPath.empty() && !hasSuffix(attrPathS, ".")) {
+                    lastAttr = attrPath.back();
+                    attrPath.pop_back();
+                }
+
+                auto attr = root->findAlongAttrPath(attrPath);
+                if (!attr) continue;
+
+                auto attrs = attr->getAttrs();
+                for (auto & attr2 : attrs) {
+                    if (hasPrefix(attr2, lastAttr)) {
+                        auto attrPath2 = attr->getAttrPath(attr2);
+                        /* Strip the attrpath prefix. */
+                        attrPath2.erase(attrPath2.begin(), attrPath2.begin() + attrPathPrefix.size());
+                        completions->insert(flakeRefS + "#" + concatStringsSep(".", attrPath2));
+                    }
+                }
+            }
+
+            /* And add an empty completion for the default
+               attrpaths. */
+            if (fragment.empty()) {
+                for (auto & attrPath : getDefaultFlakeAttrPaths()) {
+                    auto attr = root->findAlongAttrPath(parseAttrPath(*state, attrPath));
+                    if (!attr) continue;
+                    completions->insert(flakeRefS + "#");
+                }
+            }
+        }
+    } catch (Error & e) {
+        warn(e.msg());
+    }
+
+    completeFlakeRef(prefix);
+}
+
 ref<EvalState> EvalCommand::getEvalState()
 {
     if (!evalState)
         evalState = std::make_shared<EvalState>(searchPath, getStore());
     return ref<EvalState>(evalState);
+}
+
+void EvalCommand::completeFlakeRef(std::string_view prefix)
+{
+    if (prefix == "")
+        completions->insert(".");
+
+    completeDir(0, prefix);
+
+    /* Look for registry entries that match the prefix. */
+    for (auto & registry : fetchers::getRegistries(getStore())) {
+        for (auto & entry : registry->entries) {
+            auto from = entry.from->to_string();
+            if (!hasPrefix(prefix, "flake:") && hasPrefix(from, "flake:")) {
+                std::string from2(from, 6);
+                if (hasPrefix(from2, prefix))
+                    completions->insert(from2);
+            } else {
+                if (hasPrefix(from, prefix))
+                    completions->insert(from);
+            }
+        }
+    }
 }
 
 Buildable Installable::toBuildable()
@@ -551,6 +646,17 @@ StorePathSet toDerivations(ref<Store> store,
     return drvPaths;
 }
 
+InstallablesCommand::InstallablesCommand()
+{
+    expectArgs({
+        .label = "installables",
+        .handler = {&_installables},
+        .completer = {[&](size_t, std::string_view prefix) {
+            completeInstallable(prefix);
+        }}
+    });
+}
+
 void InstallablesCommand::prepare()
 {
     if (_installables.empty() && useDefaultInstallables())
@@ -558,6 +664,18 @@ void InstallablesCommand::prepare()
         // default, probably.
         _installables.push_back(".");
     installables = parseInstallables(getStore(), _installables);
+}
+
+InstallableCommand::InstallableCommand()
+{
+    expectArgs({
+        .label = "installable",
+        .optional = true,
+        .handler = {&_installable},
+        .completer = {[&](size_t, std::string_view prefix) {
+            completeInstallable(prefix);
+        }}
+    });
 }
 
 void InstallableCommand::prepare()

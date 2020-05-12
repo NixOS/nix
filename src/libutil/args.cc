@@ -1,6 +1,8 @@
 #include "args.hh"
 #include "hash.hh"
 
+#include <glob.h>
+
 namespace nix {
 
 void Args::addFlag(Flag && flag_)
@@ -13,12 +15,34 @@ void Args::addFlag(Flag && flag_)
     if (flag->shortName) shortFlags[flag->shortName] = flag;
 }
 
+bool pathCompletions = false;
+std::shared_ptr<std::set<std::string>> completions;
+
+std::string completionMarker = "___COMPLETE___";
+
+std::optional<std::string> needsCompletion(std::string_view s)
+{
+    if (!completions) return {};
+    auto i = s.find(completionMarker);
+    if (i != std::string::npos)
+        return std::string(s.begin(), i);
+    return {};
+}
+
 void Args::parseCmdline(const Strings & _cmdline)
 {
     Strings pendingArgs;
     bool dashDash = false;
 
     Strings cmdline(_cmdline);
+
+    if (auto s = getEnv("NIX_GET_COMPLETIONS")) {
+        size_t n = std::stoi(*s);
+        assert(n > 0 && n <= cmdline.size());
+        *std::next(cmdline.begin(), n - 1) += completionMarker;
+        completions = std::make_shared<decltype(completions)::element_type>();
+        verbosity = lvlError;
+    }
 
     for (auto pos = cmdline.begin(); pos != cmdline.end(); ) {
 
@@ -63,7 +87,7 @@ void Args::printHelp(const string & programName, std::ostream & out)
     for (auto & exp : expectedArgs) {
         std::cout << renderLabels({exp.label});
         // FIXME: handle arity > 1
-        if (exp.arity == 0) std::cout << "...";
+        if (exp.handler.arity == ArityAny) std::cout << "...";
         if (exp.optional) std::cout << "?";
     }
     std::cout << "\n";
@@ -104,6 +128,9 @@ bool Args::processFlag(Strings::iterator & pos, Strings::iterator end)
                 if (flag.handler.arity == ArityAny) break;
                 throw UsageError("flag '%s' requires %d argument(s)", name, flag.handler.arity);
             }
+            if (flag.completer)
+                if (auto prefix = needsCompletion(*pos))
+                    flag.completer(n, *prefix);
             args.push_back(*pos++);
         }
         flag.handler.fun(std::move(args));
@@ -111,6 +138,13 @@ bool Args::processFlag(Strings::iterator & pos, Strings::iterator end)
     };
 
     if (string(*pos, 0, 2) == "--") {
+        if (auto prefix = needsCompletion(*pos)) {
+            for (auto & [name, flag] : longFlags) {
+                if (!hiddenCategories.count(flag->category)
+                    && hasPrefix(name, std::string(*prefix, 2)))
+                    completions->insert("--" + name);
+            }
+        }
         auto i = longFlags.find(string(*pos, 2));
         if (i == longFlags.end()) return false;
         return process("--" + i->first, *i->second);
@@ -121,6 +155,14 @@ bool Args::processFlag(Strings::iterator & pos, Strings::iterator end)
         auto i = shortFlags.find(c);
         if (i == shortFlags.end()) return false;
         return process(std::string("-") + c, *i->second);
+    }
+
+    if (auto prefix = needsCompletion(*pos)) {
+        if (prefix == "-") {
+            completions->insert("--");
+            for (auto & [flag, _] : shortFlags)
+                completions->insert(std::string("-") + flag);
+        }
     }
 
     return false;
@@ -138,12 +180,17 @@ bool Args::processArgs(const Strings & args, bool finish)
 
     bool res = false;
 
-    if ((exp.arity == 0 && finish) ||
-        (exp.arity > 0 && args.size() == exp.arity))
+    if ((exp.handler.arity == ArityAny && finish) ||
+        (exp.handler.arity != ArityAny && args.size() == exp.handler.arity))
     {
         std::vector<std::string> ss;
-        for (auto & s : args) ss.push_back(s);
-        exp.handler(std::move(ss));
+        for (const auto &[n, s] : enumerate(args)) {
+            ss.push_back(s);
+            if (exp.completer)
+                if (auto prefix = needsCompletion(s))
+                    exp.completer(n, *prefix);
+        }
+        exp.handler.fun(ss);
         expectedArgs.pop_front();
         res = true;
     }
@@ -164,8 +211,44 @@ Args::Flag Args::Flag::mkHashTypeFlag(std::string && longName, HashType * ht)
             *ht = parseHashType(s);
             if (*ht == htUnknown)
                 throw UsageError("unknown hash type '%1%'", s);
-        }}
+        }},
+        .completer = [](size_t index, std::string_view prefix) {
+            for (auto & type : hashTypes)
+                if (hasPrefix(type, prefix))
+                    completions->insert(type);
+        }
     };
+}
+
+static void completePath(std::string_view prefix, bool onlyDirs)
+{
+    pathCompletions = true;
+    glob_t globbuf;
+    int flags = GLOB_NOESCAPE | GLOB_TILDE;
+    #ifdef GLOB_ONLYDIR
+    if (onlyDirs)
+        flags |= GLOB_ONLYDIR;
+    #endif
+    if (glob((std::string(prefix) + "*").c_str(), flags, nullptr, &globbuf) == 0) {
+        for (size_t i = 0; i < globbuf.gl_pathc; ++i) {
+            if (onlyDirs) {
+                auto st = lstat(globbuf.gl_pathv[i]);
+                if (!S_ISDIR(st.st_mode)) continue;
+            }
+            completions->insert(globbuf.gl_pathv[i]);
+        }
+        globfree(&globbuf);
+    }
+}
+
+void completePath(size_t, std::string_view prefix)
+{
+    completePath(prefix, false);
+}
+
+void completeDir(size_t, std::string_view prefix)
+{
+    completePath(prefix, true);
 }
 
 Strings argvToStrings(int argc, char * * argv)
@@ -215,13 +298,22 @@ void Command::printHelp(const string & programName, std::ostream & out)
 MultiCommand::MultiCommand(const Commands & commands)
     : commands(commands)
 {
-    expectedArgs.push_back(ExpectedArg{"command", 1, true, [=](std::vector<std::string> ss) {
-        assert(!command);
-        auto i = commands.find(ss[0]);
-        if (i == commands.end())
-            throw UsageError("'%s' is not a recognised command", ss[0]);
-        command = {ss[0], i->second()};
-    }});
+    expectArgs({
+        .label = "command",
+        .optional = true,
+        .handler = {[=](std::string s) {
+            assert(!command);
+            if (auto prefix = needsCompletion(s)) {
+                for (auto & [name, command] : commands)
+                    if (hasPrefix(name, *prefix))
+                        completions->insert(name);
+            }
+            auto i = commands.find(s);
+            if (i == commands.end())
+                throw UsageError("'%s' is not a recognised command", s);
+            command = {s, i->second()};
+        }}
+    });
 
     categories[Command::catDefault] = "Available commands";
 }

@@ -155,7 +155,7 @@ void overrideRegistry(
 static std::shared_ptr<Registry> getGlobalRegistry(ref<Store> store)
 {
     static auto reg = [&]() {
-        auto path = settings.flakeRegistry;
+        auto path = settings.flakeRegistry.get();
 
         if (!hasPrefix(path, "/")) {
             auto storePath = downloadFile(store, path, "flake-registry.json", false).storePath;

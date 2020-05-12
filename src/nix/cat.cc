@@ -25,7 +25,11 @@ struct CmdCatStore : StoreCommand, MixCat
 {
     CmdCatStore()
     {
-        expectArg("path", &path);
+        expectArgs({
+            .label = "path",
+            .handler = {&path},
+            .completer = completePath
+        });
     }
 
     std::string description() override
@@ -47,7 +51,11 @@ struct CmdCatNar : StoreCommand, MixCat
 
     CmdCatNar()
     {
-        expectArg("nar", &narPath);
+        expectArgs({
+            .label = "nar",
+            .handler = {&narPath},
+            .completer = completePath
+        });
         expectArg("path", &path);
     }
 

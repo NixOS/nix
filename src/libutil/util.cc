@@ -1330,7 +1330,7 @@ bool statusOk(int status)
 }
 
 
-bool hasPrefix(const string & s, const string & prefix)
+bool hasPrefix(std::string_view s, std::string_view prefix)
 {
     return s.compare(0, prefix.size(), prefix) == 0;
 }

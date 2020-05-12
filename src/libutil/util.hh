@@ -431,7 +431,7 @@ template<class N> bool string2Float(const string & s, N & n)
 
 
 /* Return true iff `s' starts with `prefix'. */
-bool hasPrefix(const string & s, const string & prefix);
+bool hasPrefix(std::string_view s, std::string_view prefix);
 
 
 /* Return true iff `s' ends in `suffix'. */

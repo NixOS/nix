@@ -18,6 +18,7 @@ struct CmdBuild : InstallablesCommand, MixDryRun, MixProfile
             .description = "path of the symlink to the build result",
             .labels = {"path"},
             .handler = {&outLink},
+            .completer = completePath
         });
 
         addFlag({

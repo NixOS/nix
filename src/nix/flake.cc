@@ -28,7 +28,14 @@ public:
 
     FlakeCommand()
     {
-        expectArg("flake-url", &flakeUrl, true);
+        expectArgs({
+            .label = "flake-url",
+            .optional = true,
+            .handler = {&flakeUrl},
+            .completer = {[&](size_t, std::string_view prefix) {
+                completeFlakeRef(prefix);
+            }}
+        });
     }
 
     FlakeRef getFlakeRef()
