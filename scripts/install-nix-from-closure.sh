@@ -130,13 +130,15 @@ if [ -z "$NIX_SSL_CERT_FILE" ] || ! [ -f "$NIX_SSL_CERT_FILE" ]; then
 fi
 
 # Subscribe the user to the Nixpkgs channel and fetch it.
-if ! $nix/bin/nix-channel --list | grep -q "^nixpkgs "; then
-    $nix/bin/nix-channel --add https://nixos.org/channels/nixpkgs-unstable
-fi
-if [ -z "$_NIX_INSTALLER_TEST" ]; then
-    if ! $nix/bin/nix-channel --update nixpkgs; then
-        echo "Fetching the nixpkgs channel failed. (Are you offline?)"
-        echo "To try again later, run \"nix-channel --update nixpkgs\"."
+if [ -z "$NIX_INSTALLER_NO_CHANNEL_ADD" ]; then
+    if ! $nix/bin/nix-channel --list | grep -q "^nixpkgs "; then
+        $nix/bin/nix-channel --add https://nixos.org/channels/nixpkgs-unstable
+    fi
+    if [ -z "$_NIX_INSTALLER_TEST" ]; then
+        if ! $nix/bin/nix-channel --update nixpkgs; then
+            echo "Fetching the nixpkgs channel failed. (Are you offline?)"
+            echo "To try again later, run \"nix-channel --update nixpkgs\"."
+        fi
     fi
 fi
 
