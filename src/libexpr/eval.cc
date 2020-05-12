@@ -504,7 +504,7 @@ LocalNoInlineNoReturn(void throwEvalError(const char * s, const string & s2))
     throw EvalError(s, s2);
 }
 
-LocalNoInlineNoReturn(void throwEvalError(const char * s, const string & s2, const Pos & pos))
+LocalNoInlineNoReturn(void throwEvalError(const Pos & pos, const char * s, const string & s2))
 {
     throw EvalError(
         ErrorInfo { 
@@ -518,7 +518,7 @@ LocalNoInlineNoReturn(void throwEvalError(const char * s, const string & s2, con
     throw EvalError(s, s2, s3);
 }
 
-LocalNoInlineNoReturn(void throwEvalError(const char * s, const string & s2, const string & s3, const Pos & pos))
+LocalNoInlineNoReturn(void throwEvalError(const Pos & pos, const char * s, const string & s2, const string & s3))
 {
     throw EvalError(
         ErrorInfo { 
@@ -527,7 +527,7 @@ LocalNoInlineNoReturn(void throwEvalError(const char * s, const string & s2, con
         });
 }
 
-LocalNoInlineNoReturn(void throwEvalError(const char * s, const Symbol & sym, const Pos & p1, const Pos & p2))
+LocalNoInlineNoReturn(void throwEvalError(const Pos & p1, const char * s, const Symbol & sym, const Pos & p2))
 {
     // p1 is where the error occurred; p2 is a position mentioned in the message.
     throw EvalError(
@@ -537,7 +537,7 @@ LocalNoInlineNoReturn(void throwEvalError(const char * s, const Symbol & sym, co
         });
 }
 
-LocalNoInlineNoReturn(void throwTypeError(const char * s, const Pos & pos))
+LocalNoInlineNoReturn(void throwTypeError(const Pos & pos, const char * s))
 {
     throw TypeError(
         ErrorInfo { 
@@ -551,7 +551,7 @@ LocalNoInlineNoReturn(void throwTypeError(const char * s, const string & s1))
     throw TypeError(s, s1);
 }
 
-LocalNoInlineNoReturn(void throwTypeError(const char * s, const ExprLambda & fun, const Symbol & s2, const Pos & pos))
+LocalNoInlineNoReturn(void throwTypeError(const Pos & pos, const char * s, const ExprLambda & fun, const Symbol & s2))
 {
     throw TypeError(
         ErrorInfo { 
@@ -560,7 +560,7 @@ LocalNoInlineNoReturn(void throwTypeError(const char * s, const ExprLambda & fun
         });
 }
 
-LocalNoInlineNoReturn(void throwAssertionError(const char * s, const string & s1, const Pos & pos))
+LocalNoInlineNoReturn(void throwAssertionError(const Pos & pos, const char * s, const string & s1))
 {
     throw AssertionError(
         ErrorInfo { 
@@ -569,7 +569,7 @@ LocalNoInlineNoReturn(void throwAssertionError(const char * s, const string & s1
         });
 }
 
-LocalNoInlineNoReturn(void throwUndefinedVarError(const char * s, const string & s1, const Pos & pos))
+LocalNoInlineNoReturn(void throwUndefinedVarError(const Pos & pos, const char * s, const string & s1))
 {
     throw UndefinedVarError(
         ErrorInfo { 
@@ -643,7 +643,7 @@ inline Value * EvalState::lookupVar(Env * env, const ExprVar & var, bool noEval)
             return j->value;
         }
         if (!env->prevWith)
-            throwUndefinedVarError("undefined variable '%1%'", var.name, var.pos);
+            throwUndefinedVarError(var.pos, "undefined variable '%1%'", var.name);
         for (size_t l = env->prevWith; l; --l, env = env->up) ;
     }
 }
@@ -841,7 +841,7 @@ inline bool EvalState::evalBool(Env & env, Expr * e, const Pos & pos)
     Value v;
     e->eval(*this, env, v);
     if (v.type != tBool)
-        throwTypeError("value is %1% while a Boolean was expected", v, pos);
+        throwTypeError(pos, "value is %1% while a Boolean was expected", v);
     return v.boolean;
 }
 
@@ -955,7 +955,7 @@ void ExprAttrs::eval(EvalState & state, Env & env, Value & v)
         Symbol nameSym = state.symbols.create(nameVal.string.s);
         Bindings::iterator j = v.attrs->find(nameSym);
         if (j != v.attrs->end())
-            throwEvalError("dynamic attribute '%1%' already defined at %2%", nameSym, i.pos, *j->pos);
+            throwEvalError(i.pos, "dynamic attribute '%1%' already defined at %2%", nameSym, *j->pos);
 
         i.valueExpr->setName(nameSym);
         /* Keep sorted order so find can catch duplicates */
@@ -1043,7 +1043,7 @@ void ExprSelect::eval(EvalState & state, Env & env, Value & v)
             } else {
                 state.forceAttrs(*vAttrs, pos);
                 if ((j = vAttrs->attrs->find(name)) == vAttrs->attrs->end())
-                    throwEvalError("attribute '%1%' missing", name, pos);
+                    throwEvalError(pos, "attribute '%1%' missing", name);
             }
             vAttrs = j->value;
             pos2 = j->pos;
@@ -1169,7 +1169,7 @@ void EvalState::callFunction(Value & fun, Value & arg, Value & v, const Pos & po
     }
 
     if (fun.type != tLambda)
-        throwTypeError("attempt to call something which is not a function but %1%", fun, pos);
+        throwTypeError(pos, "attempt to call something which is not a function but %1%", fun);
 
     ExprLambda & lambda(*fun.lambda.fun);
 
@@ -1197,8 +1197,8 @@ void EvalState::callFunction(Value & fun, Value & arg, Value & v, const Pos & po
         for (auto & i : lambda.formals->formals) {
             Bindings::iterator j = arg.attrs->find(i.name);
             if (j == arg.attrs->end()) {
-                if (!i.def) throwTypeError("%1% called without required argument '%2%'",
-                    lambda, i.name, pos);
+                if (!i.def) throwTypeError(pos, "%1% called without required argument '%2%'",
+                    lambda, i.name);
                 env2.values[displ++] = i.def->maybeThunk(*this, env2);
             } else {
                 attrsUsed++;
@@ -1213,7 +1213,7 @@ void EvalState::callFunction(Value & fun, Value & arg, Value & v, const Pos & po
                user. */
             for (auto & i : *arg.attrs)
                 if (lambda.formals->argNames.find(i.name) == lambda.formals->argNames.end())
-                    throwTypeError("%1% called with unexpected argument '%2%'", lambda, i.name, pos);
+                    throwTypeError(pos, "%1% called with unexpected argument '%2%'", lambda, i.name);
             abort(); // can't happen
         }
     }
@@ -1302,7 +1302,7 @@ void ExprAssert::eval(EvalState & state, Env & env, Value & v)
     if (!state.evalBool(env, cond, pos)) {
         std::ostringstream out;
         cond->show(out);
-        throwAssertionError("assertion '%1%' failed at %2%", out.str(), pos);
+        throwAssertionError(pos, "assertion '%1%' failed at %2%", out.str());
     }
     body->eval(state, env, v);
 }
@@ -1454,14 +1454,14 @@ void ExprConcatStrings::eval(EvalState & state, Env & env, Value & v)
                 nf = n;
                 nf += vTmp.fpoint;
             } else
-                throwEvalError("cannot add %1% to an integer", showType(vTmp), pos);
+                throwEvalError(pos, "cannot add %1% to an integer", showType(vTmp));
         } else if (firstType == tFloat) {
             if (vTmp.type == tInt) {
                 nf += vTmp.integer;
             } else if (vTmp.type == tFloat) {
                 nf += vTmp.fpoint;
             } else
-                throwEvalError("cannot add %1% to a float", showType(vTmp), pos);
+                throwEvalError(pos, "cannot add %1% to a float", showType(vTmp));
         } else
             s << state.coerceToString(pos, vTmp, context, false, firstType == tString);
     }
@@ -1472,7 +1472,7 @@ void ExprConcatStrings::eval(EvalState & state, Env & env, Value & v)
         mkFloat(v, nf);
     else if (firstType == tPath) {
         if (!context.empty())
-            throwEvalError("a string that refers to a store path cannot be appended to a path", pos);
+            throwEvalError(pos, "a string that refers to a store path cannot be appended to a path");
         auto path = canonPath(s.str());
         mkPath(v, path.c_str());
     } else
@@ -1521,7 +1521,7 @@ NixInt EvalState::forceInt(Value & v, const Pos & pos)
 {
     forceValue(v, pos);
     if (v.type != tInt)
-        throwTypeError("value is %1% while an integer was expected", v, pos);
+        throwTypeError(pos, "value is %1% while an integer was expected", v);
     return v.integer;
 }
 
@@ -1532,7 +1532,7 @@ NixFloat EvalState::forceFloat(Value & v, const Pos & pos)
     if (v.type == tInt)
         return v.integer;
     else if (v.type != tFloat)
-        throwTypeError("value is %1% while a float was expected", v, pos);
+        throwTypeError(pos, "value is %1% while a float was expected", v);
     return v.fpoint;
 }
 
@@ -1541,7 +1541,7 @@ bool EvalState::forceBool(Value & v, const Pos & pos)
 {
     forceValue(v, pos);
     if (v.type != tBool)
-        throwTypeError("value is %1% while a Boolean was expected", v, pos);
+        throwTypeError(pos, "value is %1% while a Boolean was expected", v);
     return v.boolean;
 }
 
@@ -1556,7 +1556,7 @@ void EvalState::forceFunction(Value & v, const Pos & pos)
 {
     forceValue(v, pos);
     if (v.type != tLambda && v.type != tPrimOp && v.type != tPrimOpApp && !isFunctor(v))
-        throwTypeError("value is %1% while a function was expected", v, pos);
+        throwTypeError(pos, "value is %1% while a function was expected", v);
 }
 
 
@@ -1565,7 +1565,7 @@ string EvalState::forceString(Value & v, const Pos & pos)
     forceValue(v, pos);
     if (v.type != tString) {
         if (pos)
-            throwTypeError("value is %1% while a string was expected", v, pos);
+            throwTypeError(pos, "value is %1% while a string was expected", v);
         else
             throwTypeError("value is %1% while a string was expected", v);
     }
@@ -1594,8 +1594,8 @@ string EvalState::forceStringNoCtx(Value & v, const Pos & pos)
     string s = forceString(v, pos);
     if (v.string.context) {
         if (pos)
-            throwEvalError("the string '%1%' is not allowed to refer to a store path (such as '%2%')",
-                v.string.s, v.string.context[0], pos);
+            throwEvalError(pos, "the string '%1%' is not allowed to refer to a store path (such as '%2%')", 
+                v.string.s, v.string.context[0]);
         else
             throwEvalError("the string '%1%' is not allowed to refer to a store path (such as '%2%')",
                 v.string.s, v.string.context[0]);
@@ -1651,7 +1651,7 @@ string EvalState::coerceToString(const Pos & pos, Value & v, PathSet & context,
             return *maybeString;
         }
         auto i = v.attrs->find(sOutPath);
-        if (i == v.attrs->end()) throwTypeError("cannot coerce a set to a string", pos);
+        if (i == v.attrs->end()) throwTypeError(pos, "cannot coerce a set to a string");
         return coerceToString(pos, *i->value, context, coerceMore, copyToStore);
     }
 
@@ -1682,7 +1682,7 @@ string EvalState::coerceToString(const Pos & pos, Value & v, PathSet & context,
         }
     }
 
-    throwTypeError("cannot coerce %1% to a string", v, pos);
+    throwTypeError(pos, "cannot coerce %1% to a string", v);
 }
 
 
@@ -1713,7 +1713,7 @@ Path EvalState::coerceToPath(const Pos & pos, Value & v, PathSet & context)
 {
     string path = coerceToString(pos, v, context, false, false);
     if (path == "" || path[0] != '/')
-        throwEvalError("string '%1%' doesn't represent an absolute path", path, pos);
+        throwEvalError(pos, "string '%1%' doesn't represent an absolute path", path);
     return path;
 }
 
