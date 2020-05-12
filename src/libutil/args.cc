@@ -220,25 +220,35 @@ Args::Flag Args::Flag::mkHashTypeFlag(std::string && longName, HashType * ht)
     };
 }
 
-static void completePath(std::string_view prefix, int flags)
+static void completePath(std::string_view prefix, bool onlyDirs)
 {
     pathCompletions = true;
     glob_t globbuf;
-    if (glob((std::string(prefix) + "*").c_str(), GLOB_NOESCAPE | GLOB_TILDE | flags, nullptr, &globbuf) == 0) {
-        for (size_t i = 0; i < globbuf.gl_pathc; ++i)
+    int flags = GLOB_NOESCAPE | GLOB_TILDE;
+    #ifdef GLOB_ONLYDIR
+    if (onlyDirs)
+        flags |= GLOB_ONLYDIR;
+    #endif
+    if (glob((std::string(prefix) + "*").c_str(), flags, nullptr, &globbuf) == 0) {
+        for (size_t i = 0; i < globbuf.gl_pathc; ++i) {
+            if (onlyDirs) {
+                auto st = lstat(globbuf.gl_pathv[i]);
+                if (!S_ISDIR(st.st_mode)) continue;
+            }
             completions->insert(globbuf.gl_pathv[i]);
+        }
         globfree(&globbuf);
     }
 }
 
 void completePath(size_t, std::string_view prefix)
 {
-    completePath(prefix, 0);
+    completePath(prefix, false);
 }
 
 void completeDir(size_t, std::string_view prefix)
 {
-    completePath(prefix, GLOB_ONLYDIR);
+    completePath(prefix, true);
 }
 
 Strings argvToStrings(int argc, char * * argv)
