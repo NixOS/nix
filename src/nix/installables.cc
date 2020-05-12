@@ -689,6 +689,7 @@ InstallableCommand::InstallableCommand()
 {
     expectArgs({
         .label = "installable",
+        .optional = true,
         .handler = {&_installable},
         .completer = {[&](size_t, std::string_view prefix) {
             completeInstallable(prefix);
