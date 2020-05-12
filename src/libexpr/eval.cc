@@ -529,7 +529,12 @@ LocalNoInlineNoReturn(void throwEvalError(const char * s, const string & s2, con
 
 LocalNoInlineNoReturn(void throwEvalError(const char * s, const Symbol & sym, const Pos & p1, const Pos & p2))
 {
-    throw EvalError(s, sym, p1, p2);
+    // p1 is where the error occurred; p2 is a position mentioned in the message.
+    throw EvalError(
+        ErrorInfo { 
+            .hint = hintfmt(s, sym, p2),
+            .nixCode = NixCode { .errPos = p1 }
+        });
 }
 
 LocalNoInlineNoReturn(void throwTypeError(const char * s, const Pos & pos))
@@ -638,7 +643,7 @@ inline Value * EvalState::lookupVar(Env * env, const ExprVar & var, bool noEval)
             return j->value;
         }
         if (!env->prevWith)
-            throwUndefinedVarError("undefined variable '%1%' at %2%", var.name, var.pos);
+            throwUndefinedVarError("undefined variable '%1%'", var.name, var.pos);
         for (size_t l = env->prevWith; l; --l, env = env->up) ;
     }
 }
@@ -950,7 +955,7 @@ void ExprAttrs::eval(EvalState & state, Env & env, Value & v)
         Symbol nameSym = state.symbols.create(nameVal.string.s);
         Bindings::iterator j = v.attrs->find(nameSym);
         if (j != v.attrs->end())
-            throwEvalError("dynamic attribute '%1%' at %2% already defined at %3%", nameSym, i.pos, *j->pos);
+            throwEvalError("dynamic attribute '%1%' already defined at %2%", nameSym, i.pos, *j->pos);
 
         i.valueExpr->setName(nameSym);
         /* Keep sorted order so find can catch duplicates */
