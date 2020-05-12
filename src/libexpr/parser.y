@@ -717,7 +717,11 @@ std::pair<bool, std::string> EvalState::resolveSearchPathElem(const SearchPathEl
             res = { true, store->toRealPath(fetchers::downloadTarball(
                         store, resolveUri(elem.second), "source", false).storePath) };
         } catch (FileTransferError & e) {
-            printError("warning: Nix search path entry '%1%' cannot be downloaded, ignoring", elem.second);
+            logWarning(
+                ErrorInfo { 
+                    .name = "Entry download",
+                    .hint = hintfmt("Nix search path entry '%1%' cannot be downloaded, ignoring", elem.second)
+            });
             res = { false, "" };
         }
     } else {
@@ -727,7 +731,7 @@ std::pair<bool, std::string> EvalState::resolveSearchPathElem(const SearchPathEl
         else {
             logWarning(
                 ErrorInfo { 
-                    .name = "Search path not found",
+                    .name = "Entry not found",
                     .hint = hintfmt("warning: Nix search path entry '%1%' does not exist, ignoring", elem.second)
             });
             res = { false, "" };
