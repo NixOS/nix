@@ -149,5 +149,13 @@ int main()
                         .errPos = Pos(problem_file, 40, 13)
                     }});
 
+    // Error with only hint and name..
+    logError(
+        ErrorInfo { .name = "error name",
+                    .hint = hintfmt("hint %1%", "only"),
+                    .nixCode = NixCode {
+                        .errPos = Pos(problem_file, 40, 13)
+                    }});
+
     return 0;
 }
