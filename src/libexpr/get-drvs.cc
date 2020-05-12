@@ -117,7 +117,7 @@ DrvInfo::Outputs DrvInfo::queryOutputs(bool onlyOutputsToInstall)
     /* Check for `meta.outputsToInstall` and return `outputs` reduced to that. */
     const Value * outTI = queryMeta("outputsToInstall");
     if (!outTI) return outputs;
-    const auto errMsg = Error("this derivation has bad 'meta.outputsToInstall'");
+    const auto errMsg = Error("derivation '%s' has bad 'meta.outputsToInstall'", name);
         /* ^ this shows during `nix-env -i` right under the bad derivation */
     if (!outTI->isList()) throw errMsg;
     Outputs result;
