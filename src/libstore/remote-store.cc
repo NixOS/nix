@@ -780,15 +780,6 @@ std::exception_ptr RemoteStore::Connection::processStderr(Sink * sink, Source * 
         }
 
         else if (msg == STDERR_NEXT)
-            // TODO: is this really an ErrorInfo error?  Seems like we're forwarding the 
-            // stderr output of the remote to current stderr/log 
-            // ErrorInfo gets lost in this scenario.
-            // An alternative might be a logger on the remote that forwards ErrorInfo and etc.
-            // logError(
-            //     ErrorInfo { 
-            //         // .name = "Remote Store" TODO reasonable name.
-            //         .hint = hintfmt(chomp(readString(from)))
-            // });
             printError(chomp(readString(from)));
 
         else if (msg == STDERR_START_ACTIVITY) {

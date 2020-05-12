@@ -1364,7 +1364,6 @@ void LocalStore::verifyPath(const Path & pathS, const StringSet & store,
             auto state(_state.lock());
             invalidatePath(*state, path);
         } else {
-            // TODO log as warning if repair successful??
             logError(
                 ErrorInfo { 
                     .name = "Missing path with referrers",
