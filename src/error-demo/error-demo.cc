@@ -1,5 +1,6 @@
 #include "logging.hh"
 #include "nixexpr.hh"
+#include "util.hh"
 
 #include <iostream>
 #include <optional>
