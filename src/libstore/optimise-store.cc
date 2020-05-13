@@ -132,7 +132,7 @@ void LocalStore::optimisePath_(Activity * act, OptimiseStats & stats,
     if (S_ISREG(st.st_mode) && (st.st_mode & S_IWUSR)) {
         logWarning(
             ErrorInfo { 
-                .name = "Suspicious File",
+                .name = "Suspicious file",
                 .hint = hintfmt("skipping suspicious writable file '%1%'", path)
         });
         return;
@@ -200,7 +200,7 @@ void LocalStore::optimisePath_(Activity * act, OptimiseStats & stats,
     if (st.st_size != stLink.st_size) {
         logWarning(
             ErrorInfo { 
-                .name = "Corrupted Link",
+                .name = "Corrupted link",
                 .hint = hintfmt("removing corrupted link '%1%'", linkPath)
         });
         unlink(linkPath.c_str());

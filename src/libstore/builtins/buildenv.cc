@@ -24,7 +24,7 @@ static void createLinks(State & state, const Path & srcDir, const Path & dstDir,
         if (e.errNo == ENOTDIR) {
             logWarning(
                 ErrorInfo { 
-                    .name = "Create Links - Directory",
+                    .name = "Create links - directory",
                     .hint = hintfmt("not including '%s' in the user environment because it's not a directory", srcDir)
             });
             return;
@@ -47,7 +47,7 @@ static void createLinks(State & state, const Path & srcDir, const Path & dstDir,
             if (e.errNo == ENOENT || e.errNo == ENOTDIR) {
                 logWarning(
                     ErrorInfo { 
-                        .name = "Create Links - Skipping Symlink",
+                        .name = "Create links - skipping symlink",
                         .hint = hintfmt("skipping dangling symlink '%s'", dstFile)
                 });
                 continue;

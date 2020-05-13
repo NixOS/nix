@@ -601,7 +601,7 @@ struct curlFileTransfer : public FileTransfer
         } catch (std::exception & e) {
             logError(
                 ErrorInfo { 
-                    .name = "download",
+                    .name = "File transfer",
                     .hint = hintfmt("unexpected error in download thread: %s", 
                                     e.what())
                 });

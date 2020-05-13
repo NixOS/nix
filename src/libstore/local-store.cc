@@ -1244,7 +1244,7 @@ bool LocalStore::verifyStore(bool checkContents, RepairFlag repair)
             if (hash != link.name) {
                 logError(
                     ErrorInfo { 
-                        .name = "Invalid Hash",
+                        .name = "Invalid hash",
                         .hint = hintfmt(
                     "link '%s' was modified! expected hash '%s', got '%s'",
                     linkPath, link.name, hash)
@@ -1283,7 +1283,7 @@ bool LocalStore::verifyStore(bool checkContents, RepairFlag repair)
                 if (info->narHash != nullHash && info->narHash != current.first) {
                     logError(
                         ErrorInfo { 
-                            .name = "Invalid Hash - Path Modified",
+                            .name = "Invalid hash - path modified",
                             .hint = hintfmt("path '%s' was modified! expected hash '%s', got '%s'",
                             printStorePath(i), info->narHash.to_string(), current.first.to_string())
                     });

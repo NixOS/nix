@@ -205,7 +205,7 @@ void handleSQLiteBusy(SQLiteBusy & e)
     if (now > lastWarned + 10) {
         lastWarned = now;
         logWarning(
-            ErrorInfo { .name = "sqlite busy",
+            ErrorInfo { .name = "Sqlite busy",
                         .hint = hintfmt(e.what())
             });
     }

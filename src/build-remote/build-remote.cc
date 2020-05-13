@@ -202,7 +202,7 @@ static int _main(int argc, char * * argv)
                     auto msg = chomp(drainFD(5, false));
                     logError(
                         ErrorInfo { 
-                            .name = "remote build",
+                            .name = "Remote build",
                             .hint = hintfmt("cannot build on '%s': %s%s",
                         bestMachine->storeUri, e.what(),
                         (msg.empty() ? "" : ": " + msg))
