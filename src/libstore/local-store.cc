@@ -152,7 +152,7 @@ LocalStore::LocalStore(const Params & params)
     globalLock = openLockFile(globalLockPath.c_str(), true);
 
     if (!lockFile(globalLock.get(), ltRead, false)) {
-        printError("waiting for the big Nix store lock...");
+        printInfo("waiting for the big Nix store lock...");
         lockFile(globalLock.get(), ltRead, true);
     }
 
@@ -183,7 +183,7 @@ LocalStore::LocalStore(const Params & params)
                 "please upgrade Nix to version 1.11 first.");
 
         if (!lockFile(globalLock.get(), ltWrite, false)) {
-            printError("waiting for exclusive access to the Nix store...");
+            printInfo("waiting for exclusive access to the Nix store...");
             lockFile(globalLock.get(), ltWrite, true);
         }
 
@@ -261,7 +261,7 @@ LocalStore::~LocalStore()
     }
 
     if (future.valid()) {
-        printError("waiting for auto-GC to finish on exit...");
+        printInfo("waiting for auto-GC to finish on exit...");
         future.get();
     }
 
@@ -1210,7 +1210,7 @@ void LocalStore::invalidatePathChecked(const StorePath & path)
 
 bool LocalStore::verifyStore(bool checkContents, RepairFlag repair)
 {
-    printError(format("reading the Nix store..."));
+    printInfo(format("reading the Nix store..."));
 
     bool errors = false;
 
@@ -1251,7 +1251,7 @@ bool LocalStore::verifyStore(bool checkContents, RepairFlag repair)
                 });
                 if (repair) {
                     if (unlink(linkPath.c_str()) == 0)
-                        printError("removed link '%s'", linkPath);
+                        printInfo("removed link '%s'", linkPath);
                     else
                         throw SysError("removing corrupt link '%s'", linkPath);
                 } else {
@@ -1294,14 +1294,14 @@ bool LocalStore::verifyStore(bool checkContents, RepairFlag repair)
 
                     /* Fill in missing hashes. */
                     if (info->narHash == nullHash) {
-                        printError("fixing missing hash on '%s'", printStorePath(i));
+                        printInfo("fixing missing hash on '%s'", printStorePath(i));
                         info->narHash = current.first;
                         update = true;
                     }
 
                     /* Fill in missing narSize fields (from old stores). */
                     if (info->narSize == 0) {
-                        printError("updating size field on '%s' to %s", printStorePath(i), current.second);
+                        printInfo("updating size field on '%s' to %s", printStorePath(i), current.second);
                         info->narSize = current.second;
                         update = true;
                     }
@@ -1360,7 +1360,7 @@ void LocalStore::verifyPath(const Path & pathS, const StringSet & store,
             }
 
         if (canInvalidate) {
-            printError("path '%s' disappeared, removing from database...", pathS);
+            printInfo("path '%s' disappeared, removing from database...", pathS);
             auto state(_state.lock());
             invalidatePath(*state, path);
         } else {
@@ -1431,7 +1431,7 @@ static void makeMutable(const Path & path)
 void LocalStore::upgradeStore7()
 {
     if (getuid() != 0) return;
-    printError("removing immutable bits from the Nix store (this may take a while)...");
+    printInfo("removing immutable bits from the Nix store (this may take a while)...");
     makeMutable(realStoreDir);
 }
 

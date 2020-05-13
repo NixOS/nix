@@ -85,7 +85,7 @@ struct CmdMakeContentAddressable : StorePathsCommand, MixJSON
             info.ca = makeFixedOutputCA(true, info.narHash);
 
             if (!json)
-                printError("rewrote '%s' to '%s'", pathS, store->printStorePath(info.path));
+                printInfo("rewrote '%s' to '%s'", pathS, store->printStorePath(info.path));
 
             auto source = sinkToSource([&](Sink & nextSink) {
                 RewritingSink rsink2(oldHashPart, storePathToHash(store->printStorePath(info.path)), nextSink);

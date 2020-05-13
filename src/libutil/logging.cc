@@ -251,7 +251,11 @@ bool handleJSONLogMessage(const std::string & msg,
         }
 
     } catch (std::exception & e) {
-        printError("bad log message from builder: %s", e.what());
+        logError(
+            ErrorInfo { 
+                .name = "Json log message",
+                .hint = hintfmt("bad log message from builder: %s", e.what())
+        });
     }
 
     return true;

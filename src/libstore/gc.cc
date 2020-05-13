@@ -41,7 +41,7 @@ AutoCloseFD LocalStore::openGCLock(LockType lockType)
         throw SysError("opening global GC lock '%1%'", fnGCLock);
 
     if (!lockFile(fdGCLock.get(), lockType, false)) {
-        printError("waiting for the big garbage collector lock...");
+        printInfo("waiting for the big garbage collector lock...");
         lockFile(fdGCLock.get(), lockType, true);
     }
 
@@ -231,7 +231,7 @@ void LocalStore::findTempRoots(FDs & fds, Roots & tempRoots, bool censor)
            only succeed if the owning process has died.  In that case
            we don't care about its temporary roots. */
         if (lockFile(fd->get(), ltWrite, false)) {
-            printError("removing stale temporary roots file '%1%'", path);
+            printInfo("removing stale temporary roots file '%1%'", path);
             unlink(path.c_str());
             writeFull(fd->get(), "d");
             continue;
@@ -751,7 +751,7 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
 
     /* Find the roots.  Since we've grabbed the GC lock, the set of
        permanent roots cannot increase now. */
-    printError("finding garbage collector roots...");
+    printInfo("finding garbage collector roots...");
     Roots rootMap;
     if (!options.ignoreLiveness)
         findRootsNoTemp(rootMap, true);
@@ -803,9 +803,9 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
     } else if (options.maxFreed > 0) {
 
         if (state.shouldDelete)
-            printError("deleting garbage...");
+            printInfo("deleting garbage...");
         else
-            printError("determining live/dead paths...");
+            printInfo("determining live/dead paths...");
 
         try {
 
@@ -872,7 +872,7 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
 
     /* Clean up the links directory. */
     if (options.action == GCOptions::gcDeleteDead || options.action == GCOptions::gcDeleteSpecific) {
-        printError("deleting unused links...");
+        printInfo("deleting unused links...");
         removeUnusedLinks(state);
     }
 

@@ -857,7 +857,7 @@ int Pid::kill()
 #if __FreeBSD__ || __APPLE__
         if (errno != EPERM || ::kill(pid, 0) != 0)
 #endif
-            printError((SysError("killing process %d", pid).msg()));
+            logError(SysError("killing process %d", pid).info());
     }
 
     return wait();
@@ -1445,17 +1445,6 @@ string base64Decode(const string & s)
 
     return res;
 }
-
-
-// void callFailure(const std::function<void(std::exception_ptr exc)> & failure, std::exception_ptr exc)
-// {
-//     try {
-//         failure(exc);
-//     } catch (std::exception & e) {
-//         printError("uncaught exception: %s", e.what());
-//         abort();
-//     }
-// }
 
 
 static Sync<std::pair<unsigned short, unsigned short>> windowSize{{0, 0}};
