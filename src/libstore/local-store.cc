@@ -504,7 +504,7 @@ static void canonicalisePathMetaData_(const Path & path, uid_t fromUid, InodesSe
             chown(path.c_str(), geteuid(), getegid()) == -1)
 #endif
             throw SysError("changing owner of '%1%' to %2%",
-                  path, geteuid());
+                path, geteuid());
     }
 
     if (S_ISDIR(st.st_mode)) {

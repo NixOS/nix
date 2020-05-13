@@ -99,7 +99,6 @@ static void prim_scopedImport(EvalState & state, const Pos & pos, Value * * args
                         path, e.path),
                 .nixCode = NixCode { .errPos = pos }
             });
-
     }
 
     Path realPath = state.checkSourcePath(state.toRealPath(path, context));
@@ -179,7 +178,7 @@ void prim_importNative(EvalState & state, const Pos & pos, Value * * args, Value
             ErrorInfo {
                 .hint = hintfmt(
                     "cannot import '%1%', since path '%2%' is not valid",
-                   path, e.path),
+                    path, e.path),
                 .nixCode = NixCode { .errPos = pos }
             });
     }
@@ -199,8 +198,8 @@ void prim_importNative(EvalState & state, const Pos & pos, Value * * args, Value
         if (message)
             throw EvalError("could not load symbol '%1%' from '%2%': %3%", sym, path, message);
         else
-            throw EvalError("symbol '%1%' from '%2%' resolved to NULL when a function pointer was expected"
-                   , sym, path);
+            throw EvalError("symbol '%1%' from '%2%' resolved to NULL when a function pointer was expected",
+                sym, path);
     }
 
     (func)(state, v);
@@ -233,8 +232,8 @@ void prim_exec(EvalState & state, const Pos & pos, Value * * args, Value & v)
     } catch (InvalidPathError & e) {
         throw EvalError(
             ErrorInfo {
-                .hint = hintfmt("cannot execute '%1%', since path '%2%' is not valid"
-                     , program, e.path),
+                .hint = hintfmt("cannot execute '%1%', since path '%2%' is not valid",
+                    program, e.path),
                 .nixCode = NixCode { .errPos = pos }
             });}
 
@@ -625,8 +624,6 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
                             .hint = hintfmt("duplicate derivation output '%1%'", j),
                             .nixCode = NixCode { .errPos = posDrvName }
                         });
-
-
                 /* !!! Check whether j is a valid attribute
                    name. */
                 /* Derivations cannot be named ‘drv’, because
@@ -638,7 +635,6 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
                             .hint = hintfmt("invalid derivation output name 'drv'" ),
                             .nixCode = NixCode { .errPos = posDrvName }
                         });
-
                 outputs.insert(j);
             }
             if (outputs.empty())
@@ -1236,7 +1232,6 @@ static void prim_path(EvalState & state, const Pos & pos, Value * * args, Value 
                             path),
                         .nixCode = NixCode { .errPos = *attr.pos }
                     });
-
         } else if (attr.name == state.sName)
             name = state.forceStringNoCtx(*attr.value, *attr.pos);
         else if (n == "filter") {
@@ -1322,7 +1317,6 @@ void prim_getAttr(EvalState & state, const Pos & pos, Value * * args, Value & v)
                 .hint = hintfmt("attribute '%1%' missing", attr),
                 .nixCode = NixCode { .errPos = pos }
             });
-
     // !!! add to stack trace?
     if (state.countCalls && i->pos) state.attrSelects[*i->pos]++;
     state.forceValue(*i->value, pos);
@@ -1407,7 +1401,6 @@ static void prim_listToAttrs(EvalState & state, const Pos & pos, Value * * args,
                     .hint = hintfmt("'name' attribute missing in a call to 'listToAttrs'"), 
                     .nixCode = NixCode { .errPos = pos }
                 });
-
         string name = state.forceStringNoCtx(*j->value, pos);
 
         Symbol sym = state.symbols.create(name);
@@ -1419,7 +1412,6 @@ static void prim_listToAttrs(EvalState & state, const Pos & pos, Value * * args,
                         .hint = hintfmt("'value' attribute missing in a call to 'listToAttrs'"), 
                         .nixCode = NixCode { .errPos = pos }
                     });
-
             v.attrs->push_back(Attr(sym, j2->value, j2->pos));
         }
     }
@@ -1497,7 +1489,6 @@ static void prim_functionArgs(EvalState & state, const Pos & pos, Value * * args
                 .hint = hintfmt("'functionArgs' requires a function"), 
                 .nixCode = NixCode { .errPos = pos }
             });
-
 
     if (!args[0]->lambda.fun->matchAttrs) {
         state.mkAttrs(v, 0);
@@ -2038,16 +2029,16 @@ void prim_match(EvalState & state, const Pos & pos, Value * * args, Value & v)
         if (e.code() == std::regex_constants::error_space) {
             // limit is _GLIBCXX_REGEX_STATE_LIMIT for libstdc++
             throw EvalError(
-                ErrorInfo { 
-                    .hint = hintfmt("memory limit exceeded by regular expression '%s'", re), 
+                ErrorInfo {
+                    .hint = hintfmt("memory limit exceeded by regular expression '%s'", re),
                     .nixCode = NixCode { .errPos = pos }
                 });
         } else {
-          throw EvalError(
-              ErrorInfo { 
-                  .hint = hintfmt("invalid regular expression '%s'", re), 
-                  .nixCode = NixCode { .errPos = pos }
-              });
+            throw EvalError(
+                ErrorInfo {
+                    .hint = hintfmt("invalid regular expression '%s'", re),
+                    .nixCode = NixCode { .errPos = pos }
+                });
         }
     }
 }
@@ -2111,19 +2102,19 @@ static void prim_split(EvalState & state, const Pos & pos, Value * * args, Value
 
     } catch (std::regex_error &e) {
         if (e.code() == std::regex_constants::error_space) {
-          // limit is _GLIBCXX_REGEX_STATE_LIMIT for libstdc++
-          throw EvalError(
-              ErrorInfo { 
-                  .hint = hintfmt("memory limit exceeded by regular expression '%s'", re), 
-                  .nixCode = NixCode { .errPos = pos }
-              });
-         } else {
-          throw EvalError(
-              ErrorInfo { 
-                  .hint = hintfmt("invalid regular expression '%s'", re), 
-                  .nixCode = NixCode { .errPos = pos }
-              });
-         }
+            // limit is _GLIBCXX_REGEX_STATE_LIMIT for libstdc++
+            throw EvalError(
+                ErrorInfo {
+                    .hint = hintfmt("memory limit exceeded by regular expression '%s'", re),
+                    .nixCode = NixCode { .errPos = pos }
+                });
+        } else {
+            throw EvalError(
+                ErrorInfo {
+                    .hint = hintfmt("invalid regular expression '%s'", re),
+                    .nixCode = NixCode { .errPos = pos }
+                });
+        }
     }
 }
 

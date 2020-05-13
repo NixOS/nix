@@ -43,7 +43,6 @@ static void prim_fetchMercurial(EvalState & state, const Pos & pos, Value * * ar
                         .hint = hintfmt("unsupported argument '%s' to 'fetchMercurial'", attr.name),
                         .nixCode = NixCode { .errPos = *attr.pos }
                     });
-
         }
 
         if (url.empty())

@@ -129,7 +129,6 @@ Path LocalFSStore::addPermRoot(const StorePath & storePath,
     if (settings.checkRootReachability) {
         auto roots = findRoots(false);
         if (roots[storePath.clone()].count(gcRoot) == 0)
-
             logWarning(
                 ErrorInfo { 
                     .name = "GC root",

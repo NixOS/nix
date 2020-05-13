@@ -731,7 +731,7 @@ static void opVerifyPath(Strings opFlags, Strings opArgs)
         if (current.first != info->narHash) {
             logError(
                 ErrorInfo { 
-                    .name = "Hash match error",
+                    .name = "Hash mismatch",
                     .hint = hintfmt(
                         "path '%s' was modified! expected hash '%s', got '%s'",
                         store->printStorePath(path),

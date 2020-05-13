@@ -69,7 +69,7 @@ typedef void (* Operation) (Globals & globals,
 static string needArg(Strings::iterator & i,
     Strings & args, const string & arg)
 {
-    if (i == args.end()) throw UsageError( "'%1%' requires an argument", arg);
+    if (i == args.end()) throw UsageError("'%1%' requires an argument", arg);
     return *i++;
 }
 
@@ -151,7 +151,7 @@ static void loadSourceExpr(EvalState & state, const Path & path, Value & v)
 {
     struct stat st;
     if (stat(path.c_str(), &st) == -1)
-        throw SysError("getting inon about '%1%'", path);
+        throw SysError("getting information about '%1%'", path);
 
     if (isNixExpr(path, st))
         state.evalFile(path, v);
@@ -1233,7 +1233,7 @@ static void switchGeneration(Globals & globals, int dstGen)
     if (!dst) {
         if (dstGen == prevGen)
             throw Error("no generation older than the current (%1%) exists",
-                        curGen);
+                curGen);
         else
             throw Error("generation %1% does not exist", dstGen);
     }

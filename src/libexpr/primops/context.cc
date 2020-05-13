@@ -151,7 +151,6 @@ static void prim_appendContext(EvalState & state, const Pos & pos, Value * * arg
                     .hint = hintfmt("Context key '%s' is not a store path", i.name),
                     .nixCode = NixCode { .errPos = *i.pos }
                 });
-
         if (!settings.readOnlyMode)
             state.store->ensurePath(state.store->parseStorePath(i.name));
         state.forceAttrs(*i.value, *i.pos);
@@ -170,7 +169,6 @@ static void prim_appendContext(EvalState & state, const Pos & pos, Value * * arg
                             .hint = hintfmt("Tried to add all-outputs context of %s, which is not a derivation, to a string", i.name),
                             .nixCode = NixCode { .errPos = *i.pos }
                         });
-
                 }
                 context.insert("=" + string(i.name));
             }

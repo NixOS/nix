@@ -99,7 +99,7 @@ MakeError(SQLiteBusy, SQLiteError);
 
 [[noreturn]] void throwSQLiteError(sqlite3 * db, const FormatOrString & fs);
 
-void handleSQLiteBusy(SQLiteBusy & e);
+void handleSQLiteBusy(const SQLiteBusy & e);
 
 /* Convenience function for retrying a SQLite transaction when the
    database is busy. */

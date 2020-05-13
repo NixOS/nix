@@ -15,13 +15,13 @@ using std::set;
 using std::vector;
 using std::string;
 
-typedef list<std::string> Strings;
-typedef set<std::string> StringSet;
-typedef std::map<std::string, std::string> StringMap;
+typedef list<string> Strings;
+typedef set<string> StringSet;
+typedef std::map<string, string> StringMap;
 
 /* Paths are just strings. */
 
-typedef std::string Path;
+typedef string Path;
 typedef list<Path> Paths;
 typedef set<Path> PathSet;
 

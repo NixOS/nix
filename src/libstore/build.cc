@@ -497,8 +497,8 @@ void handleDiffHook(
                 printError(chomp(diffRes.second));
         } catch (Error & error) {
             ErrorInfo ei = error.info();
-            string prevhint = (error.info().hint.has_value() ? error.info().hint->str() : "");
-            ei.hint = std::optional(hintfmt("diff hook execution failed: %s", prevhint));
+            ei.hint = hintfmt("diff hook execution failed: %s",
+                (error.info().hint.has_value() ? error.info().hint->str() : ""));
             logError(ei);
         }
     }
@@ -1151,7 +1151,7 @@ void DerivationGoal::loadDerivation()
 
     if (nrFailed != 0) {
         logError(
-            ErrorInfo { 
+            ErrorInfo {
                 .name = "missing derivation during build",
                 .hint = hintfmt("cannot build missing derivation '%s'", worker.store.printStorePath(drvPath))
         });
@@ -1306,13 +1306,12 @@ void DerivationGoal::repairClosure()
     for (auto & i : outputClosure) {
         if (worker.pathContentsGood(i)) continue;
         logError(
-            ErrorInfo { 
+            ErrorInfo {
                 .name = "Corrupt path in closure",
                 .hint = hintfmt(
                     "found corrupted or missing path '%s' in the output closure of '%s'",
                     worker.store.printStorePath(i), worker.store.printStorePath(drvPath))
         });
-
         auto drvPath2 = outputsToDrv.find(i);
         if (drvPath2 == outputsToDrv.end())
             addWaitee(worker.makeSubstitutionGoal(i, Repair));
@@ -1347,7 +1346,7 @@ void DerivationGoal::inputsRealised()
         if (!useDerivation)
             throw Error("some dependencies of '%s' are missing", worker.store.printStorePath(drvPath));
         logError(
-            ErrorInfo { 
+            ErrorInfo {
                 .name = "Dependencies could not be built",
                 .hint = hintfmt(
                     "cannot build derivation '%s': %s dependencies couldn't be built",
@@ -1811,7 +1810,7 @@ HookReply DerivationGoal::tryBuildHook()
     } catch (SysError & e) {
         if (e.errNo == EPIPE) {
             logError(
-                ErrorInfo { 
+                ErrorInfo {
                     .name = "Build hook died",
                     .hint = hintfmt(
                         "build hook died unexpectedly: %s",
@@ -3676,7 +3675,7 @@ void DerivationGoal::registerOutputs()
         if (!outputRewrites.empty()) {
             logWarning(
                 ErrorInfo {
-                    .name = "Rewriting hashes", 
+                    .name = "Rewriting hashes",
                     .hint = hintfmt("rewriting hashes in '%1%'; cross fingers", path)
                     });
 
@@ -3856,7 +3855,7 @@ void DerivationGoal::registerOutputs()
                     throw NotDeterministic(hint);
 
                 logError(
-                    ErrorInfo { 
+                    ErrorInfo {
                         .name = "Output determinism error",
                         .hint = hint
                 });
@@ -4124,7 +4123,7 @@ void DerivationGoal::handleChildOutput(int fd, const string & data)
         logSize += data.size();
         if (settings.maxLogSize && logSize > settings.maxLogSize) {
             logError(
-                ErrorInfo { 
+                ErrorInfo {
                     .name = "Max log size exceeded",
                     .hint = hintfmt(
                         "%1% killed after writing more than %2% bytes of log output",
@@ -4447,9 +4446,9 @@ void SubstitutionGoal::tryNext()
     {
         logWarning(
             ErrorInfo {
-                .name = "Invalid path signature", 
+                .name = "Invalid path signature",
                 .hint = hintfmt("substituter '%s' does not have a valid signature for path '%s'",
-            sub->getUri(), worker.store.printStorePath(storePath))
+                    sub->getUri(), worker.store.printStorePath(storePath))
             });
         tryNext();
         return;
@@ -4809,7 +4808,7 @@ void Worker::run(const Goals & _topGoals)
         if (!children.empty() || !waitingForAWhile.empty())
             waitForInput();
         else {
-            if (awake.empty() && 0 == settings.maxBuildJobs) 
+            if (awake.empty() && 0 == settings.maxBuildJobs)
                 throw Error("unable to start any build; either increase '--max-jobs' "
                             "or enable remote builds");
             assert(!awake.empty());
@@ -4933,7 +4932,7 @@ void Worker::waitForInput()
             after - j->lastOutput >= std::chrono::seconds(settings.maxSilentTime))
         {
             logError(
-                ErrorInfo { 
+                ErrorInfo {
                     .name = "Silent build timeout",
                     .hint = hintfmt(
                         "%1% timed out after %2% seconds of silence",
@@ -4948,7 +4947,7 @@ void Worker::waitForInput()
             after - j->timeStarted >= std::chrono::seconds(settings.buildTimeout))
         {
             logError(
-                ErrorInfo { 
+                ErrorInfo {
                     .name = "Build timeout",
                     .hint = hintfmt(
                         "%1% timed out after %2% seconds",
@@ -4967,9 +4966,6 @@ void Worker::waitForInput()
         waitingForAWhile.clear();
     }
 }
-
-
-
 
 
 unsigned int Worker::exitStatus()
@@ -5015,9 +5011,9 @@ bool Worker::pathContentsGood(const StorePath & path)
         res = info->narHash == nullHash || info->narHash == current.first;
     }
     pathContentsGoodCache.insert_or_assign(path.clone(), res);
-    if (!res) 
+    if (!res)
         logError(
-            ErrorInfo { 
+            ErrorInfo {
                 .name = "Corrupted path",
                 .hint = hintfmt("path '%s' is corrupted or missing!", store.printStorePath(path))
         });
@@ -5136,8 +5132,4 @@ void LocalStore::repairPath(const StorePath & path)
 }
 
 
-
 }
-
-
-

@@ -427,7 +427,6 @@ expr_simple
                   .hint = hintfmt("URL literals are disabled"),
                   .nixCode = NixCode { .errPos = CUR_POS }
               });
-
       $$ = new ExprString(data->symbols.create($1));
   }
   | '(' expr ')' { $$ = $2; }
@@ -696,7 +695,6 @@ Path EvalState::findFile(SearchPath & searchPath, const string & path, const Pos
         Path res = r.second + suffix;
         if (pathExists(res)) return canonPath(res);
     }
-
     throw ThrownError(
         ErrorInfo { 
             .hint = hintfmt("file '%1%' was not found in the Nix search path (add it using $NIX_PATH or -I)", path),

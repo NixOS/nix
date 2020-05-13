@@ -248,8 +248,8 @@ static void daemonLoop(char * * argv)
             return;
         } catch (Error & error) {
             ErrorInfo ei = error.info();
-            string prevhint = (error.info().hint.has_value() ? error.info().hint->str() : "");
-            ei.hint = std::optional(hintfmt("error processing connection: %1%", prevhint));
+            ei.hint = std::optional(hintfmt("error processing connection: %1%",
+                (error.info().hint.has_value() ? error.info().hint->str() : "")));
             logError(ei);
         }
     }
