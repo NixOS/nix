@@ -129,7 +129,7 @@ struct GitInput : Input
         assert(sourcePath);
 
         runProgram("git", true,
-            { "-C", *sourcePath, "add", "--force", "--intent-to-add", std::string(file) });
+            { "-C", *sourcePath, "add", "--force", "--intent-to-add", "--", std::string(file) });
 
         if (commitMsg)
             runProgram("git", true,
