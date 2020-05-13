@@ -408,8 +408,7 @@ ref<eval_cache::EvalCache> openEvalCache(
 std::tuple<std::string, FlakeRef, InstallableValue::DerivationInfo> InstallableFlake::toDerivation()
 {
 
-    auto lockedFlake = std::make_shared<flake::LockedFlake>(
-        lockFlake(*state, flakeRef, lockFlags));
+    auto lockedFlake = getLockedFlake();
 
     auto cache = openEvalCache(*state, lockedFlake, true);
     auto root = cache->getRoot();
@@ -455,9 +454,9 @@ std::vector<InstallableValue::DerivationInfo> InstallableFlake::toDerivations()
 
 std::pair<Value *, Pos> InstallableFlake::toValue(EvalState & state)
 {
-    auto lockedFlake = lockFlake(state, flakeRef, lockFlags);
+    auto lockedFlake = getLockedFlake();
 
-    auto vOutputs = getFlakeOutputs(state, lockedFlake);
+    auto vOutputs = getFlakeOutputs(state, *lockedFlake);
 
     auto emptyArgs = state.allocBindings(0);
 
@@ -493,12 +492,19 @@ InstallableFlake::getCursor(EvalState & state, bool useEvalCache)
     return res;
 }
 
+std::shared_ptr<flake::LockedFlake> InstallableFlake::getLockedFlake() const
+{
+    if (!_lockedFlake)
+        _lockedFlake = std::make_shared<flake::LockedFlake>(lockFlake(*state, flakeRef, lockFlags));
+    return _lockedFlake;
+}
+
 FlakeRef InstallableFlake::nixpkgsFlakeRef() const
 {
-    auto lockedFlake = lockFlake(*(cmd.getEvalState()), flakeRef, cmd.lockFlags);
+    auto lockedFlake = getLockedFlake();
 
-    auto nixpkgsInput = lockedFlake.flake.inputs.find("nixpkgs");
-    if (nixpkgsInput != lockedFlake.flake.inputs.end()) {
+    auto nixpkgsInput = lockedFlake->flake.inputs.find("nixpkgs");
+    if (nixpkgsInput != lockedFlake->flake.inputs.end()) {
         return std::move(nixpkgsInput->second.ref);
     }
 
