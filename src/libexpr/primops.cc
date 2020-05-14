@@ -767,7 +767,6 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
                 .nixCode = NixCode { .errPos = posDrvName }
             });
 
-
     /* Check whether the derivation name is valid. */
     if (isDerivation(drvName))
         throw EvalError(
@@ -775,7 +774,6 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
                 .hint = hintfmt("derivation names are not allowed to end in '%s'", drvExtension),
                 .nixCode = NixCode { .errPos = posDrvName }
             });
-
 
     if (outputHash) {
         /* Handle fixed-output derivations. */
