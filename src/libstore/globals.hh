@@ -149,7 +149,7 @@ public:
         "The Unix group that contains the build users."};
 
     #if __linux__
-    const uint32_t idsPerBuild = 1 << 18;
+    const uint32_t idsPerBuild = 1 << 16;
 
     Setting<uint32_t> startId{this, 872415232, "start-id",
         "The first UID and GID to use for dynamic ID allocation. (0 means disable.)"};
