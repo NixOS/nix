@@ -524,7 +524,7 @@ public:
 
     uid_t getUID() { assert(uid); return uid; }
     gid_t getGID() { assert(gid); return gid; }
-    uint32_t getIDCount() { return 1; }
+    uint32_t getIDCount() { return settings.idsPerBuild; }
     std::vector<gid_t> getSupplementaryGIDs() { return supplementaryGIDs; }
 
     bool findFreeUser();
@@ -3744,7 +3744,10 @@ void DerivationGoal::registerOutputs()
             /* Canonicalise first.  This ensures that the path we're
                rewriting doesn't contain a hard link to /etc/shadow or
                something like that. */
-            canonicalisePathMetaData(actualPath, buildUser ? buildUser->getUID() : -1, inodesSeen);
+            canonicalisePathMetaData(
+                actualPath,
+                buildUser ? std::optional(std::make_pair(buildUser->getUID(), buildUser->getUID() + buildUser->getIDCount() - 1)) : std::nullopt,
+                inodesSeen);
 
             /* FIXME: this is in-memory. */
             StringSink sink;
@@ -3819,7 +3822,10 @@ void DerivationGoal::registerOutputs()
         /* Get rid of all weird permissions.  This also checks that
            all files are owned by the build user, if applicable. */
         canonicalisePathMetaData(actualPath,
-            buildUser && !rewritten ? buildUser->getUID() : -1, inodesSeen);
+            buildUser && !rewritten
+            ? std::optional(std::make_pair(buildUser->getUID(), buildUser->getUID() + buildUser->getIDCount() - 1))
+            : std::nullopt,
+            inodesSeen);
 
         /* For this output path, find the references to other paths
            contained in it.  Compute the SHA-256 NAR hash at the same
