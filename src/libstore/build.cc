@@ -507,6 +507,7 @@ private:
     Path fnUserLock;
     AutoCloseFD fdUserLock;
 
+    bool isEnabled;
     string user;
     uid_t uid;
     gid_t gid;
@@ -524,7 +525,7 @@ public:
 
     bool findFreeUser();
 
-    bool enabled() { return uid != 0; }
+    bool enabled() { return isEnabled; }
 
 };
 
@@ -535,9 +536,11 @@ UserLock::UserLock()
     createDirs(settings.nixStateDir + "/userpool");
     /* Mark that user is not enabled by default */
     uid = 0;
+    isEnabled = false;
 }
 
 bool UserLock::findFreeUser() {
+    if (enabled()) return true;
 
     /* Get the members of the build-users-group. */
     struct group * gr = getgrnam(settings.buildUsersGroup.get().c_str());
@@ -597,6 +600,7 @@ bool UserLock::findFreeUser() {
             supplementaryGIDs.resize(ngroups);
 #endif
 
+            isEnabled = true;
             return true;
         }
     }
@@ -931,6 +935,7 @@ private:
     void closureRepaired();
     void inputsRealised();
     void tryToBuild();
+    void tryLocalBuild();
     void buildDone();
 
     /* Is the build hook willing to perform the build? */
@@ -1001,6 +1006,8 @@ private:
     {
         Goal::amDone(result);
     }
+
+    void started();
 
     void done(BuildResult::Status status, const string & msg = "");
 
@@ -1389,34 +1396,23 @@ void DerivationGoal::inputsRealised()
     result = BuildResult();
 }
 
+void DerivationGoal::started() {
+    auto msg = fmt(
+        buildMode == bmRepair ? "repairing outputs of '%s'" :
+        buildMode == bmCheck ? "checking outputs of '%s'" :
+        nrRounds > 1 ? "building '%s' (round %d/%d)" :
+        "building '%s'", worker.store.printStorePath(drvPath), curRound, nrRounds);
+    fmt("building '%s'", worker.store.printStorePath(drvPath));
+    if (hook) msg += fmt(" on '%s'", machineName);
+    act = std::make_unique<Activity>(*logger, lvlInfo, actBuild, msg,
+        Logger::Fields{worker.store.printStorePath(drvPath), hook ? machineName : "", curRound, nrRounds});
+    mcRunningBuilds = std::make_unique<MaintainCount<uint64_t>>(worker.runningBuilds);
+    worker.updateProgress();
+}
 
 void DerivationGoal::tryToBuild()
 {
     trace("trying to build");
-
-    /* If `build-users-group' is not empty, then we have to build as
-       one of the members of that group. */
-    if (settings.buildUsersGroup != "" && getuid() == 0) {
-#if defined(__linux__) || defined(__APPLE__)
-        if (!buildUser) buildUser = std::make_unique<UserLock>();
-
-        if (!buildUser->enabled()) {
-            if (!buildUser->findFreeUser()) {
-                debug("waiting for build users");
-                worker.waitForAWhile(shared_from_this());
-                return;
-            }
-
-            /* Make sure that no other processes are executing under this
-               uid. */
-            buildUser->kill();
-        }
-#else
-        /* Don't know how to block the creation of setuid/setgid
-           binaries on this platform. */
-        throw Error("build users are not supported on this platform for security reasons");
-#endif
-    }
 
     /* Obtain locks on all output paths.  The locks are automatically
        released when we exit this function or Nix crashes.  If we
@@ -1464,20 +1460,6 @@ void DerivationGoal::tryToBuild()
        supported for local builds. */
     bool buildLocally = buildMode != bmNormal || parsedDrv->willBuildLocally();
 
-    auto started = [&]() {
-        auto msg = fmt(
-            buildMode == bmRepair ? "repairing outputs of '%s'" :
-            buildMode == bmCheck ? "checking outputs of '%s'" :
-            nrRounds > 1 ? "building '%s' (round %d/%d)" :
-            "building '%s'", worker.store.printStorePath(drvPath), curRound, nrRounds);
-        fmt("building '%s'", worker.store.printStorePath(drvPath));
-        if (hook) msg += fmt(" on '%s'", machineName);
-        act = std::make_unique<Activity>(*logger, lvlInfo, actBuild, msg,
-            Logger::Fields{worker.store.printStorePath(drvPath), hook ? machineName : "", curRound, nrRounds});
-        mcRunningBuilds = std::make_unique<MaintainCount<uint64_t>>(worker.runningBuilds);
-        worker.updateProgress();
-    };
-
     /* Is the build hook willing to accept this job? */
     if (!buildLocally) {
         switch (tryBuildHook()) {
@@ -1508,6 +1490,34 @@ void DerivationGoal::tryToBuild()
         worker.waitForBuildSlot(shared_from_this());
         outputLocks.unlock();
         return;
+    }
+
+    state = &DerivationGoal::tryLocalBuild;
+    worker.wakeUp(shared_from_this());
+}
+
+void DerivationGoal::tryLocalBuild() {
+
+    /* If `build-users-group' is not empty, then we have to build as
+       one of the members of that group. */
+    if (settings.buildUsersGroup != "" && getuid() == 0) {
+#if defined(__linux__) || defined(__APPLE__)
+        if (!buildUser) buildUser = std::make_unique<UserLock>();
+
+        if (buildUser->findFreeUser()) {
+            /* Make sure that no other processes are executing under this
+               uid. */
+            buildUser->kill();
+        } else {
+            debug("waiting for build users");
+            worker.waitForAWhile(shared_from_this());
+            return;
+        }
+#else
+        /* Don't know how to block the creation of setuid/setgid
+           binaries on this platform. */
+        throw Error("build users are not supported on this platform for security reasons");
+#endif
     }
 
     try {
