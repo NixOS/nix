@@ -88,20 +88,8 @@ protected:
     mutable ErrorInfo err;
 
     mutable std::optional<string> what_;
-    const string& calcWhat() const
-    {
-        if (what_.has_value())
-            return *what_;
-        else {
-            err.name = sname();
-
-            std::ostringstream oss;
-            oss << err;
-            what_ = oss.str();
-
-            return *what_;
-        }
-    }
+    const string& calcWhat() const;
+    
 public:
     unsigned int status = 1; // exit status
 

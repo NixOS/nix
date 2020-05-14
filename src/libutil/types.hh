@@ -6,7 +6,7 @@
 #include <list>
 #include <set>
 #include <map>
-
+#include <vector>
 
 namespace nix {
 

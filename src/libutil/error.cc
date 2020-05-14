@@ -3,6 +3,7 @@
 #include <iostream>
 #include <optional>
 #include "serialise.hh"
+#include <sstream>
 
 namespace nix {
 
@@ -14,6 +15,21 @@ BaseError & BaseError::addPrefix(const FormatOrString & fs)
 {
     prefix_ = fs.s + prefix_;
     return *this;
+}
+
+const string& BaseError::calcWhat() const
+{
+    if (what_.has_value())
+        return *what_;
+    else {
+        err.name = sname();
+
+        std::ostringstream oss;
+        oss << err;
+        what_ = oss.str();
+
+        return *what_;
+    }
 }
 
 std::optional<string> ErrorInfo::programName = std::nullopt;
