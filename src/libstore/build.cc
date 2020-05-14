@@ -2168,7 +2168,8 @@ void DerivationGoal::startBuilder()
         if (mkdir(chrootRootDir.c_str(), 0755) == -1)
             throw SysError("cannot create '%1%'", chrootRootDir);
 
-        if (buildUser && chown(chrootRootDir.c_str(), 0, buildUser->getGID()) == -1)
+        // FIXME: only make root writable for user namespace builds.
+        if (buildUser && chown(chrootRootDir.c_str(), buildUser->getUID(), buildUser->getGID()) == -1)
             throw SysError("cannot change ownership of '%1%'", chrootRootDir);
 
         /* Create a writable /tmp in the chroot.  Many builders need
@@ -2182,6 +2183,7 @@ void DerivationGoal::startBuilder()
            nobody account.  The latter is kind of a hack to support
            Samba-in-QEMU. */
         createDirs(chrootRootDir + "/etc");
+        chownToBuilder(chrootRootDir + "/etc");
 
         writeFile(chrootRootDir + "/etc/passwd", fmt(
                 "root:x:0:0:Nix build user:%3%:/noshell\n"
@@ -2372,6 +2374,52 @@ void DerivationGoal::startBuilder()
 
 #if __linux__
     if (useChroot) {
+        /* Create a cgroup. */
+        // FIXME: do we want to use the parent cgroup? We should
+        // always use the same cgroup regardless of whether we're the
+        // daemon or run from a user session via sudo.
+        std::string msg;
+        std::vector<Path> cgroups;
+        for (auto & line : tokenizeString<std::vector<std::string>>(readFile("/proc/self/cgroup"), "\n")) {
+            static std::regex regex("([0-9]+):([^:]*):(.*)");
+            std::smatch match;
+            if (!std::regex_match(line, match, regex))
+                throw Error("invalid line '%s' in '/proc/self/cgroup'", line);
+
+            /* We only create a systemd cgroup, since that's enough
+               for running systemd-nspawn. */
+            std::string name;
+            if (match[2] == "name=systemd")
+                name = "systemd";
+            //else if (match[2] == "")
+            //    name = "unified";
+            else continue;
+
+            std::string cgroup = match[3];
+
+            auto hostCgroup = canonPath("/sys/fs/cgroup/" + name + "/" + cgroup);
+
+            if (!pathExists(hostCgroup))
+                throw Error("expected unified cgroup directory '%s'", hostCgroup);
+
+            auto childCgroup = fmt("%s/nix-%d", hostCgroup, buildUser->getUID());
+
+            // FIXME: if the cgroup already exists, kill all processes
+            // in it and destroy it.
+
+            if (mkdir(childCgroup.c_str(), 0755) == -1 && errno != EEXIST)
+                throw SysError("creating cgroup '%s'", childCgroup);
+
+            chownToBuilder(childCgroup);
+            chownToBuilder(childCgroup + "/cgroup.procs");
+            if (name == "unified") {
+                chownToBuilder(childCgroup + "/cgroup.threads");
+                chownToBuilder(childCgroup + "/cgroup.subtree_control");
+            }
+
+            cgroups.push_back(childCgroup);
+        }
+
         /* Set up private namespaces for the build:
 
            - The PID namespace causes the build to start as PID 1.
@@ -2495,6 +2543,10 @@ void DerivationGoal::startBuilder()
         sandboxMountNamespace = open(fmt("/proc/%d/ns/mnt", (pid_t) pid).c_str(), O_RDONLY);
         if (sandboxMountNamespace.get() == -1)
             throw SysError("getting sandbox mount namespace");
+
+        /* Move the child into its own cgroup. */
+        for (auto & childCgroup : cgroups)
+            writeFile(childCgroup + "/cgroup.procs", fmt("%d", (pid_t) pid));
 
         /* Signal the builder that we've updated its user namespace. */
         writeFull(userNamespaceSync.writeSide.get(), "1");
@@ -3279,6 +3331,12 @@ void DerivationGoal::runChild()
             if (mount("none", (chrootRootDir + "/proc").c_str(), "proc", 0, 0) == -1)
                 throw SysError("mounting /proc");
 
+            /* Mount sysfs on /sys. FIXME: only in user namespace
+               builds. */
+            createDirs(chrootRootDir + "/sys");
+            if (mount("none", (chrootRootDir + "/sys").c_str(), "sysfs", 0, 0) == -1)
+                throw SysError("mounting /sys");
+
             /* Mount a new tmpfs on /dev/shm to ensure that whatever
                the builder puts in /dev/shm is cleaned up automatically. */
             if (pathExists("/dev/shm") && mount("none", (chrootRootDir + "/dev/shm").c_str(), "tmpfs", 0,
@@ -3320,6 +3378,12 @@ void DerivationGoal::runChild()
                make paths appear in the sandbox. */
             if (unshare(CLONE_NEWNS) == -1)
                 throw SysError("unsharing mount namespace");
+
+            /* Unshare the cgroup namespace. This means
+               /proc/self/cgroup will show the child's cgroup as '/'
+               rather than whatever it is in the parent. */
+            if (unshare(CLONE_NEWCGROUP) == -1)
+                throw SysError("unsharing cgroup namespace");
 
             /* Do the chroot(). */
             if (chdir(chrootRootDir.c_str()) == -1)
