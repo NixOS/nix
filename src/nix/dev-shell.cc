@@ -284,40 +284,6 @@ struct CmdDevShell : Common, MixEnvironment
         };
     }
 
-    std::string getBashPath(ref<Store> store)
-    {
-        auto state = getEvalState();
-        auto lockedFlake = std::make_shared<flake::LockedFlake>(lockFlake(*state, installable->nixpkgsFlakeRef(), lockFlags));
-        auto cache = openEvalCache(*state, lockedFlake, true);
-        auto root = cache->getRoot();
-
-        auto attrPath = "legacyPackages." + settings.thisSystem.get() + ".bashInteractive";
-        auto attr = root->findAlongAttrPath(parseAttrPath(*state, attrPath));
-        if (!attr || !attr->isDerivation()) throw Error("couldn't find bashInteractive derivation");
-
-        auto aDrvPath = attr->getAttr(state->sDrvPath);
-        auto drvPath = store->parseStorePath(aDrvPath->getString());
-        if (!store->isValidPath(drvPath) && !settings.readOnlyMode) {
-            /* The eval cache contains 'drvPath', but the actual path
-            has been garbage-collected. So force it to be
-            regenerated. */
-            aDrvPath->forceValue();
-            if (!store->isValidPath(drvPath))
-                throw Error("don't know how to recreate store derivation '%s'!",
-                    store->printStorePath(drvPath));
-        }
-
-        auto outputName = attr->getAttr(state->sOutputName)->getString();
-        if (outputName == "")
-            throw Error("derivation '%s' lacks an 'outputName' attribute", store->printStorePath(drvPath));
-
-        auto outPath = store->parseStorePath(attr->getAttr(state->sOutPath)->getString());
-
-        store->buildPaths({{drvPath, {outputName}}});
-
-        return store->printStorePath(outPath) + "/bin/bash";
-    }
-
     void run(ref<Store> store) override
     {
         auto [buildEnvironment, gcroot] = getBuildEnvironment(store);
@@ -344,7 +310,9 @@ struct CmdDevShell : Common, MixEnvironment
         // prevent garbage collection until shell exits
         setenv("NIX_GCROOT", gcroot.data(), 1);
 
-        auto shell = getBashPath(store);
+        auto state = getEvalState(); 
+        auto bashInstallable = std::make_shared<InstallableFlake>(state, std::move(installable->nixpkgsFlakeRef()), Strings{"bashInteractive"}, Strings{"legacyPackages." + settings.thisSystem.get() + "."}, lockFlags);
+        auto shell = state->store->printStorePath(toStorePath(state->store, Build, bashInstallable)) + "/bin/bash";
         auto args = Strings{std::string(baseNameOf(shell)), "--rcfile", rcFilePath};
 
         restoreAffinity();
