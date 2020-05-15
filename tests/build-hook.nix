@@ -4,13 +4,13 @@ let
 
   input1 = mkDerivation {
     name = "build-hook-input-1";
-    builder = ./dependencies.builder1.sh;
+    buildCommand = "mkdir $out; echo FOO > $out/foo";
     requiredSystemFeatures = ["foo"];
   };
 
   input2 = mkDerivation {
     name = "build-hook-input-2";
-    builder = ./dependencies.builder2.sh;
+    buildCommand = "mkdir $out; echo BAR > $out/bar";
   };
 
 in

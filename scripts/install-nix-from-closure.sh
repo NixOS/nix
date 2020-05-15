@@ -40,30 +40,43 @@ elif [ "$(uname -s)" = "Linux" ] && [ -e /run/systemd/system ]; then
 fi
 
 INSTALL_MODE=no-daemon
-# Trivially handle the --daemon / --no-daemon options
-if [ "x${1:-}" = "x--no-daemon" ]; then
-    INSTALL_MODE=no-daemon
-elif [ "x${1:-}" = "x--daemon" ]; then
-    INSTALL_MODE=daemon
-elif [ "x${1:-}" != "x" ]; then
-    (
-        echo "Nix Installer [--daemon|--no-daemon]"
 
-        echo "Choose installation method."
-        echo ""
-        echo " --daemon:    Installs and configures a background daemon that manages the store,"
-        echo "              providing multi-user support and better isolation for local builds."
-        echo "              Both for security and reproducibility, this method is recommended if"
-        echo "              supported on your platform."
-        echo "              See https://nixos.org/nix/manual/#sect-multi-user-installation"
-        echo ""
-        echo " --no-daemon: Simple, single-user installation that does not require root and is"
-        echo "              trivial to uninstall."
-        echo "              (default)"
-        echo ""
-    ) >&2
-    exit
-fi
+# handle the command line flags
+while [ "x${1:-}" != "x" ]; do
+    if [ "x${1:-}" = "x--no-daemon" ]; then
+        INSTALL_MODE=no-daemon
+    elif [ "x${1:-}" = "x--daemon" ]; then
+        INSTALL_MODE=daemon
+    elif [ "x${1:-}" = "x--no-channel-add" ]; then
+        NIX_INSTALLER_NO_CHANNEL_ADD=1
+    elif [ "x${1:-}" = "x--no-modify-profile" ]; then
+        NIX_INSTALLER_NO_MODIFY_PROFILE=1
+    elif [ "x${1:-}" != "x" ]; then
+        (
+            echo "Nix Installer [--daemon|--no-daemon] [--no-channel-add] [--no-modify-profile]"
+
+            echo "Choose installation method."
+            echo ""
+            echo " --daemon:            Installs and configures a background daemon that manages the store,"
+            echo "                      providing multi-user support and better isolation for local builds."
+            echo "                      Both for security and reproducibility, this method is recommended if"
+            echo "                      supported on your platform."
+            echo "                      See https://nixos.org/nix/manual/#sect-multi-user-installation"
+            echo ""
+            echo " --no-daemon:         Simple, single-user installation that does not require root and is"
+            echo "                      trivial to uninstall."
+            echo "                      (default)"
+            echo ""
+            echo " --no-channel-add:    Don't add any channels. nixpkgs-unstable is installed by default."
+            echo ""
+            echo " --no-modify-profile: Skip channel installation. When not provided nixpkgs-unstable"
+            echo "                      is installed by default."
+            echo ""
+        ) >&2
+        exit
+    fi
+    shift
+done
 
 if [ "$INSTALL_MODE" = "daemon" ]; then
     printf '\e[1;31mSwitching to the Daemon-based Installer\e[0m\n'
@@ -130,13 +143,15 @@ if [ -z "$NIX_SSL_CERT_FILE" ] || ! [ -f "$NIX_SSL_CERT_FILE" ]; then
 fi
 
 # Subscribe the user to the Nixpkgs channel and fetch it.
-if ! $nix/bin/nix-channel --list | grep -q "^nixpkgs "; then
-    $nix/bin/nix-channel --add https://nixos.org/channels/nixpkgs-unstable
-fi
-if [ -z "$_NIX_INSTALLER_TEST" ]; then
-    if ! $nix/bin/nix-channel --update nixpkgs; then
-        echo "Fetching the nixpkgs channel failed. (Are you offline?)"
-        echo "To try again later, run \"nix-channel --update nixpkgs\"."
+if [ -z "$NIX_INSTALLER_NO_CHANNEL_ADD" ]; then
+    if ! $nix/bin/nix-channel --list | grep -q "^nixpkgs "; then
+        $nix/bin/nix-channel --add https://nixos.org/channels/nixpkgs-unstable
+    fi
+    if [ -z "$_NIX_INSTALLER_TEST" ]; then
+        if ! $nix/bin/nix-channel --update nixpkgs; then
+            echo "Fetching the nixpkgs channel failed. (Are you offline?)"
+            echo "To try again later, run \"nix-channel --update nixpkgs\"."
+        fi
     fi
 fi
 

@@ -167,11 +167,14 @@ void mainWrapped(int argc, char * * argv)
 
     args.parseCmdline(argvToStrings(argc, argv));
 
-    settings.requireExperimentalFeature("nix-command");
-
     initPlugins();
 
     if (!args.command) args.showHelpAndExit();
+
+    if (args.command->first != "repl"
+        && args.command->first != "doctor"
+        && args.command->first != "upgrade-nix")
+        settings.requireExperimentalFeature("nix-command");
 
     Finally f([]() { stopProgressBar(); });
 
