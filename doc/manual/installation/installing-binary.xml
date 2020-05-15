@@ -6,16 +6,30 @@
 
 <title>Installing a Binary Distribution</title>
 
-<para>If you are using Linux or macOS, the easiest way to install Nix
-is to run the following command:
+<para>
+  If you are using Linux or macOS versions up to 10.14 (Mojave), the
+  easiest way to install Nix is to run the following command:
+</para>
 
 <screen>
   $ sh &lt;(curl https://nixos.org/nix/install)
 </screen>
 
-As of Nix 2.1.0, the Nix installer will always default to creating a
-single-user installation, however opting in to the multi-user
-installation is highly recommended.
+<para>
+  If you're using macOS 10.15 (Catalina) or newer, consult
+  <link linkend="sect-macos-installation">the macOS installation instructions</link>
+  before installing.
+</para>
+
+<para>
+  As of Nix 2.1.0, the Nix installer will always default to creating a
+  single-user installation, however opting in to the multi-user
+  installation is highly recommended.
+  <!-- TODO: this explains *neither* why the default version is
+  single-user, nor why we'd recommend multi-user over the default.
+  True prospective users don't have much basis for evaluating this.
+  What's it to me? Who should pick which? Why? What if I pick wrong?
+  -->
 </para>
 
 <section xml:id="sect-single-user-installation">
@@ -36,7 +50,7 @@ run this under your usual user account, <emphasis>not</emphasis> as
 root.  The script will invoke <command>sudo</command> to create
 <filename>/nix</filename> if it doesn’t already exist.  If you don’t
 have <command>sudo</command>, you should manually create
-<command>/nix</command> first as root, e.g.:
+<filename>/nix</filename> first as root, e.g.:
 
 <screen>
 $ mkdir /nix
@@ -47,7 +61,7 @@ The install script will modify the first writable file from amongst
 <filename>.bash_profile</filename>, <filename>.bash_login</filename>
 and <filename>.profile</filename> to source
 <filename>~/.nix-profile/etc/profile.d/nix.sh</filename>. You can set
-the <command>NIX_INSTALLER_NO_MODIFY_PROFILE</command> environment
+the <envar>NIX_INSTALLER_NO_MODIFY_PROFILE</envar> environment
 variable before executing the install script to disable this
 behaviour.
 </para>
@@ -81,11 +95,9 @@ $ rm -rf /nix
   <para>
     You can instruct the installer to perform a multi-user
     installation on your system:
-
-    <screen>
-  sh &lt;(curl https://nixos.org/nix/install) --daemon
-</screen>
   </para>
+
+  <screen>sh &lt;(curl https://nixos.org/nix/install) --daemon</screen>
 
   <para>
     The multi-user installation of Nix will create build users between
@@ -136,82 +148,253 @@ sudo rm /Library/LaunchDaemons/org.nixos.nix-daemon.plist
 
 </section>
 
-<section xml:id="sect-apfs-volume-installation">
-  <title>APFS Volume Installation</title>
+<section xml:id="sect-macos-installation">
+  <title>macOS Installation</title>
 
   <para>
-    The root filesystem is read-only as of macOS 10.15 Catalina, all writable
-    paths were moved to a separate data volume.  This means creating or writing
-    to <filename>/nix</filename> is not allowed.  While changing the default prefix
-    would be possible, it's a very intrusive change that has side effects we want to
-    avoid for now.
+    Starting with macOS 10.15 (Catalina), the root filesystem is read-only.
+    This means <filename>/nix</filename> can no longer live on your system
+    volume, and that you'll need a workaround to install Nix.
   </para>
 
   <para>
-    For common writable locations <literal>firmlinks</literal> were introduced,
-    described by Apple as a "bi-directional wormhole" between two filesystems.
-    Essentially a bind mount for APFS volumes.  However this is (currently) not
-    user configurable and only available for paths like <filename>/Users</filename>.
+    The recommended approach, which creates an unencrypted APFS volume
+    for your Nix store and a "synthetic" empty directory to mount it
+    over at <filename>/nix</filename>, is least likely to impair Nix
+    or your system.
   </para>
+
+  <note><para>
+    With all separate-volume approaches, it's possible something on
+    your system (particularly daemons/services and restored apps) may
+    need access to your Nix store before the volume is mounted. Adding
+    additional encryption makes this more likely.
+  </para></note>
 
   <para>
-    For special cases like NFS mount points or package manager roots <link xlink:href="https://developer.apple.com/library/archive/documentation/System/Conceptual/ManPages_iPhoneOS/man5/synthetic.conf.5.html">synthetic.conf(5)</link>
-    provides a mechanism for some limited, user-controlled file-creation at <filename>/</filename>.
-    This only applies at boot time, however <command>apfs.util</command> can be used
-    to trigger the creation (not deletion) of new entries without a reboot.
-    It would be ideal if this could create firmlinks, however a symlink or mountpoint
-    are the only options.
+    If you're using a recent Mac with a
+    <link xlink:href="https://www.apple.com/euro/mac/shared/docs/Apple_T2_Security_Chip_Overview.pdf">T2 chip</link>,
+    your drive will still be encrypted at rest (in which case "unencrypted"
+    is a bit of a misnomer). To use this approach, just install Nix with:
   </para>
 
-<screen>
-alice$ /System/Library/Filesystems/apfs.fs/Contents/Resources/apfs.util -B
-</screen>
+  <screen>$ sh &lt;(curl https://nixos.org/nix/install) --darwin-use-unencrypted-nix-store-volume</screen>
 
-  <itemizedlist>
-    <listitem>
-      <para>
-        The simplest solution is creating a symlink with <filename>/etc/synthetic.conf</filename>
-        to the data volume. (not recommended)
-      </para>
+  <para>
+    If you don't like the sound of this, you'll want to weigh the
+    other approaches and tradeoffs detailed in this section.
+  </para>
 
-<screen>
-nix    /System/Volumes/Data/nix
-</screen>
+  <note>
+    <title>Eventual solutions?</title>
+    <para>
+      All of the known workarounds have drawbacks, but we hope
+      better solutions will be available in the future. Some that
+      we have our eye on are:
+    </para>
+    <orderedlist>
+      <listitem>
+        <para>
+          A true firmlink would enable the Nix store to live on the
+          primary data volume without the build problems caused by
+          the symlink approach. End users cannot currently
+          create true firmlinks.
+        </para>
+      </listitem>
+      <listitem>
+        <para>
+          If the Nix store volume shared FileVault encryption
+          with the primary data volume (probably by using the same
+          volume group and role), FileVault encryption could be
+          easily supported by the installer without requiring
+          manual setup by each user.
+        </para>
+      </listitem>
+    </orderedlist>
+  </note>
 
-<screen>
-alice$ ls -l /
-lrwxr-xr-x   1 root  wheel    25 Jan  1  2019 nix -> /System/Volumes/Data/nix
-</screen>
+  <section xml:id="sect-macos-installation-change-store-prefix">
+    <title>Change the Nix store path prefix</title>
+    <para>
+      Changing the default prefix for the Nix store is a simple
+      approach which enables you to leave it on your root volume,
+      where it can take full advantage of FileVault encryption if
+      enabled. Unfortunately, this approach also opts your device out
+      of some benefits that are enabled by using the same prefix
+      across systems:
 
-      <para>
-        However builds that detect or resolve this symlink will leak the canonical
-        location or even fail in certain cases, making this approach undesirable.
-      </para>
-    </listitem>
+      <itemizedlist>
+        <listitem>
+          <para>
+            Your system won't be able to take advantage of the binary
+            cache (unless someone is able to stand up and support
+            duplicate caching infrastructure), which means you'll
+            spend more time waiting for builds.
+          </para>
+        </listitem>
+        <listitem>
+          <para>
+            It's harder to build and deploy packages to Linux systems.
+          </para>
+        </listitem>
+        <!-- TODO: may be more here -->
+      </itemizedlist>
 
-    <listitem>
-      <para>
-        An empty directory can also be created using <filename>/etc/synthetic.conf</filename>,
-        this won't be writable but can be used as a mount point.  And with
-        <literal>APFS</literal> it's relatively easy to create an separate
-        volume for nix instead.
-      </para>
+      <!-- TODO: Yes, but how?! -->
 
-<screen>
-nix
-</screen>
+      It would also possible (and often requested) to just apply this
+      change ecosystem-wide, but it's an intrusive process that has
+      side effects we want to avoid for now.
+      <!-- magnificent hand-wavy gesture -->
+    </para>
+    <para>
+    </para>
+  </section>
 
-<screen>
-alice$ /System/Library/Filesystems/apfs.fs/Contents/Resources/apfs.util -B
-alice$ sudo diskutil apfs addVolume diskX APFS 'Nix Store' -mountpoint /nix
-alice$ mount
-/dev/disk1s6 on /nix (apfs, local, journaled)
-</screen>
+  <section xml:id="sect-macos-installation-encrypted-volume">
+    <title>Use a separate encrypted volume</title>
+    <para>
+      If you like, you can also add encryption to the recommended
+      approach taken by the installer. You can do this by pre-creating
+      an encrypted volume before you run the installer--or you can
+      run the installer and encrypt the volume it creates later.
+      <!-- TODO: see later note about whether this needs both add-encryption and from-scratch directions -->
+    </para>
+    <para>
+      In either case, adding encryption to a second volume isn't quite
+      as simple as enabling FileVault for your boot volume. Before you
+      dive in, there are a few things to weigh:
+    </para>
+    <orderedlist>
+      <listitem>
+        <para>
+          The additional volume won't be encrypted with your existing
+          FileVault key, so you'll need another mechanism to decrypt
+          the volume.
+        </para>
+      </listitem>
+      <listitem>
+        <para>
+          You can store the password in Keychain to automatically
+          decrypt the volume on boot--but it'll have to wait on Keychain
+          and may not mount before your GUI apps restore. If any of
+          your launchd agents or apps depend on Nix-installed software
+          (for example, if you use a Nix-installed login shell), the
+          restore may fail or break.
+        </para>
+        <para>
+          On a case-by-case basis, you may be able to work around this
+          problem by using <command>wait4path</command> to block
+          execution until your executable is available.
+        </para>
+        <para>
+          It's also possible to decrypt and mount the volume earlier
+          with a login hook--but this mechanism appears to be
+          deprecated and its future is unclear.
+        </para>
+      </listitem>
+      <listitem>
+        <para>
+          You can hard-code the password in the clear, so that your
+          store volume can be decrypted before Keychain is available.
+        </para>
+      </listitem>
+    </orderedlist>
+    <para>
+      If you are comfortable navigating these tradeoffs, you can encrypt the volume with
+      something along the lines of:
+      <!-- TODO:
+      I don't know if this also needs from-scratch instructions?
+      can we just recommend use-the-installer-and-then-encrypt?
+      -->
+    </para>
+    <!--
+    TODO: it looks like this option can be encryptVolume|encrypt|enableFileVault
 
-      <para>
-        This does make the installation more complicated, requiring both
-        <filename>/etc/synthetic.conf</filename> as well as <filename>/etc/fstab</filename>
-      </para>
+    It may be more clear to use encryptVolume, here? FileVault seems
+    heavily associated with the boot-volume behavior; I worry
+    a little that it can mislead here, especially as it gets
+    copied around minus doc context...?
+    -->
+    <screen>alice$ diskutil apfs enableFileVault /nix -user disk</screen>
+
+    <!-- TODO: and then go into detail on the mount/decrypt approaches? -->
+  </section>
+
+  <section xml:id="sect-macos-installation-symlink">
+    <!--
+    Maybe a good razor is: if we'd hate having to support someone who
+    installed Nix this way, it shouldn't even be detailed?
+    -->
+    <title>Symlink the Nix store to a custom location</title>
+    <para>
+      Another simple approach is using <filename>/etc/synthetic.conf</filename>
+      to symlink the Nix store to the data volume. This option also
+      enables your store to share any configured FileVault encryption.
+      Unfortunately, builds that resolve the symlink may leak the
+      canonical path or even fail.
+    </para>
+    <para>
+      Because of these downsides, we can't recommend this approach.
+    </para>
+    <!-- Leaving out instructions for this one. -->
+  </section>
+
+  <section xml:id="sect-macos-installation-recommended-notes">
+    <title>Notes on the recommended approach</title>
+    <para>
+      This section goes into a little more detail on the recommended
+      approach. You don't need to understand it to run the installer,
+      but it can serve as a helpful reference if you run into trouble.
+    </para>
+    <orderedlist>
+      <listitem>
+        <para>
+          In order to compose user-writable locations into the new
+          read-only system root, Apple introduced a new concept called
+          <literal>firmlinks</literal>, which it describes as a
+          "bi-directional wormhole" between two filesystems. You can
+          see the current firmlinks in <filename>/usr/share/firmlinks</filename>.
+          Unfortunately, firmlinks aren't (currently?) user-configurable.
+        </para>
+
+        <para>
+          For special cases like NFS mount points or package manager roots,
+          <link xlink:href="https://developer.apple.com/library/archive/documentation/System/Conceptual/ManPages_iPhoneOS/man5/synthetic.conf.5.html">synthetic.conf(5)</link>
+          supports limited user-controlled file-creation (of symlinks,
+          and synthetic empty directories) at <filename>/</filename>.
+          To create a synthetic empty directory for mounting at <filename>/nix</filename>,
+          add the following line to <filename>/etc/synthetic.conf</filename>
+          (create it if necessary):
+        </para>
+
+        <screen>nix</screen>
+      </listitem>
+
+      <listitem>
+        <para>
+          This configuration is applied at boot time, but you can use
+          <command>apfs.util</command> to trigger creation (not deletion)
+          of new entries without a reboot:
+        </para>
+
+        <screen>alice$ /System/Library/Filesystems/apfs.fs/Contents/Resources/apfs.util -B</screen>
+      </listitem>
+
+      <listitem>
+        <para>
+          Create the new APFS volume with diskutil:
+        </para>
+
+        <screen>alice$ sudo diskutil apfs addVolume diskX APFS 'Nix Store' -mountpoint /nix</screen>
+      </listitem>
+
+      <listitem>
+        <para>
+          Using <command>vifs</command>, add the new mount to
+          <filename>/etc/fstab</filename>. If it doesn't already have
+          other entries, it should look something like:
+        </para>
 
 <screen>
 #
@@ -219,29 +402,16 @@ alice$ mount
 #
 # Failure to do so is unsupported and may be destructive.
 #
-LABEL=Nix\040Store /nix apfs rw
+LABEL=Nix\040Store /nix apfs rw,nobrowse
 </screen>
 
-      <para>
-        On macOS volumes are also mounted quite late, launchd services or other
-        things that start during login will start before our volume is mounted.
-        For these cases eg. <command>wait4path</command> must be used for
-        things that depend on <filename>/nix</filename>.
-      </para>
-
-      <para>
-        This new volume also won't be encrypted by default, and enabling it
-        requires extra setup.  For machines with a <link xlink:href="https://www.apple.com/euro/mac/shared/docs/Apple_T2_Security_Chip_Overview.pdf">T2 chip</link>
-        all data is already entrypted at rest, older hardware won't even when
-        FileVault is enabled for the rest of the system.
-      </para>
-
-<screen>
-alice$ diskutil apfs enableFileVault /nix -user disk
-</screen>
-
-    </listitem>
-  </itemizedlist>
+        <para>
+          The nobrowse setting will keep Spotlight from indexing this
+          volume, and keep it from showing up on your desktop.
+        </para>
+      </listitem>
+    </orderedlist>
+  </section>
 
 </section>
 
