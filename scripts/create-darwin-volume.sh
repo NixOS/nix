@@ -59,10 +59,45 @@ test_nix() {
     test -d "/nix"
 }
 
-test_filevault() {
+test_t2_chip_present(){
+    # Use xartutil to see if system has a t2 chip.
+    #
+    # This isn't well-documented on its own; until it is,
+    # let's keep track of knowledge/assumptions.
+    #
+    # Warnings:
+    # - Don't search "xart" if porn will cause you trouble :)
+    # - Other xartutil flags do dangerous things. Don't run them
+    #   naively. If you must, search "xartutil" first.
+    #
+    # Assumptions:
+    # - the "xART session seeds recovery utility"
+    #   appears to interact with xartstorageremoted
+    # - `sudo xartutil --list` lists xART sessions
+    #   and their seeds and exits 0 if successful. If
+    #   not, it exits 1 and prints an error such as:
+    #   xartutil: ERROR: No supported link to the SEP present
+    # - xART sessions/seeds are present when a T2 chip is
+    #   (and not, otherwise)
+    # - the presence of a T2 chip means a newly-created
+    #   volume on the primary drive will be
+    #   encrypted at rest
+    # - all together: `sudo xartutil --list`
+    #   should exit 0 if a new Nix Store volume will
+    #   be encrypted at rest, and exit 1 if not.
+    sudo xartutil --list >/dev/null 2>/dev/null
+}
+
+test_filevault_in_use() {
     disk=$1
-    apfs_volumes_for "$disk" | volume_list_true FileVault | grep -q true || return
-    ! sudo xartutil --list >/dev/null 2>/dev/null
+    #      list vols on disk | get value of Filevault key | value is true
+    apfs_volumes_for "$disk" | volume_list_true FileVault | grep -q true
+}
+
+# use after error msg for conditions we don't understand
+suggest_report_error(){
+    # ex "error: something sad happened :(" >&2
+    echo "       please report this @ https://github.com/nixos/nix/issues" >&2
 }
 
 main() {
@@ -89,7 +124,8 @@ main() {
         echo "Configuring /etc/synthetic.conf..." >&2
         echo nix | sudo tee /etc/synthetic.conf
         if ! test_synthetic_conf; then
-            echo "error: failed to configure synthetic.conf" >&2
+            echo "error: failed to configure synthetic.conf;" >&2
+            suggest_report_error
             exit 1
         fi
     fi
@@ -101,7 +137,8 @@ main() {
             sudo mkdir -p /nix 2>/dev/null || true
         fi
         if ! test_nix; then
-            echo "error: failed to bootstrap /nix, a reboot might be required" >&2
+            echo "error: failed to bootstrap /nix; if a reboot doesn't help," >&2
+            suggest_report_error
             exit 1
         fi
     fi
@@ -111,10 +148,25 @@ main() {
     if [ -z "$volume" ]; then
         echo "Creating a Nix Store volume..." >&2
 
-        if test_filevault "$disk"; then
-            echo "error: FileVault detected, refusing to create unencrypted volume" >&2
-            echo "See https://nixos.org/nix/manual/#sect-apfs-volume-installation" >&2
-            exit 1
+        if test_filevault_in_use "$disk"; then
+            # TODO: Not sure if it's in-scope now, but `diskutil apfs list`
+            # shows both filevault and encrypted at rest status, and it
+            # may be the more semantic way to test for this? It'll show
+            # `FileVault:                 No (Encrypted at rest)`
+            # `FileVault:                 No`
+            # `FileVault:                 Yes (Unlocked)`
+            # and so on.
+            if test_t2_chip_present; then
+                echo "warning: boot volume is FileVault-encrypted, but the Nix store volume" >&2
+                echo "         is only encrypted at rest." >&2
+                echo "         See https://nixos.org/nix/manual/#sect-macos-installation" >&2
+            else
+                echo "error: refusing to create Nix store volume because the boot volume is" >&2
+                echo "       FileVault encrypted, but encryption-at-rest is not available." >&2
+                echo "       Manually create a volume for the store and re-run this script." >&2
+                echo "       See https://nixos.org/nix/manual/#sect-macos-installation" >&2
+                exit 1
+            fi
         fi
 
         sudo diskutil apfs addVolume "$disk" APFS 'Nix Store' -mountpoint /nix
@@ -128,13 +180,6 @@ main() {
         label=$(echo "$volume" | sed 's/ /\\040/g')
         printf "\$a\nLABEL=%s /nix apfs rw,nobrowse\n.\nwq\n" "$label" | EDITOR=ed sudo vifs
     fi
-
-    echo "" >&2
-    echo "The following options can be enabled to disable spotlight indexing" >&2
-    echo "of the volume, which might be desirable." >&2
-    echo "" >&2
-    echo "   $ sudo mdutil -i off /nix" >&2
-    echo "" >&2
 }
 
 main "$@"
