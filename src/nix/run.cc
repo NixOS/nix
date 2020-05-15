@@ -108,7 +108,6 @@ struct CmdShell : InstallablesCommand, RunCommon, MixEnvironment
 
         auto accessor = store->getFSAccessor();
 
-
         std::unordered_set<StorePath> done;
         std::queue<StorePath> todo;
         for (auto & path : outPaths) todo.push(path.clone());

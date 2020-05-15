@@ -151,7 +151,7 @@ cat > $registry <<EOF
 EOF
 
 # Test 'nix flake list'.
-[[ $(nix flake list | wc -l) == 6 ]]
+[[ $(nix registry list | wc -l) == 6 ]]
 
 # Test 'nix flake info'.
 nix flake info flake1 | grep -q 'URL: .*flake1.*'
@@ -264,10 +264,10 @@ git -C $flake3Dir add flake.lock
 git -C $flake3Dir commit -m 'Add lockfile'
 
 # Test whether registry caching works.
-nix flake list --flake-registry file://$registry | grep -q flake3
+nix registry list --flake-registry file://$registry | grep -q flake3
 mv $registry $registry.tmp
 nix-store --gc
-nix flake list --flake-registry file://$registry --refresh | grep -q flake3
+nix registry list --flake-registry file://$registry --refresh | grep -q flake3
 mv $registry.tmp $registry
 
 # Test whether flakes are registered as GC roots for offline use.
@@ -391,12 +391,12 @@ git -C $flake3Dir checkout master
 nix build -o $TEST_ROOT/result flake4/removeXyzzy#sth
 
 # Testing the nix CLI
-nix flake add flake1 flake3
-[[ $(nix flake list | wc -l) == 7 ]]
-nix flake pin flake1
-[[ $(nix flake list | wc -l) == 7 ]]
-nix flake remove flake1
-[[ $(nix flake list | wc -l) == 6 ]]
+nix registry add flake1 flake3
+[[ $(nix registry list | wc -l) == 7 ]]
+nix registry pin flake1
+[[ $(nix registry list | wc -l) == 7 ]]
+nix registry remove flake1
+[[ $(nix registry list | wc -l) == 6 ]]
 
 # Test 'nix flake init'.
 (cd $flake7Dir && nix flake init)

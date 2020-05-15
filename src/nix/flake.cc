@@ -55,34 +55,6 @@ public:
     }
 };
 
-struct CmdFlakeList : EvalCommand
-{
-    std::string description() override
-    {
-        return "list available Nix flakes";
-    }
-
-    void run(nix::ref<nix::Store> store) override
-    {
-        using namespace fetchers;
-
-        auto registries = getRegistries(store);
-
-        for (auto & registry : registries) {
-            for (auto & entry : registry->entries) {
-                // FIXME: format nicely
-                logger->stdout("%s %s %s",
-                    registry->type == Registry::Flag   ? "flags " :
-                    registry->type == Registry::User   ? "user  " :
-                    registry->type == Registry::System ? "system" :
-                    "global",
-                    entry.from->to_string(),
-                    entry.to->to_string());
-            }
-        }
-    }
-};
-
 static void printFlakeInfo(const Store & store, const Flake & flake)
 {
     logger->stdout("Resolved URL:  %s", flake.resolvedRef.to_string());
@@ -472,82 +444,6 @@ struct CmdFlakeCheck : FlakeCommand
     }
 };
 
-struct CmdFlakeAdd : MixEvalArgs, Command
-{
-    std::string fromUrl, toUrl;
-
-    std::string description() override
-    {
-        return "upsert flake in user flake registry";
-    }
-
-    CmdFlakeAdd()
-    {
-        expectArg("from-url", &fromUrl);
-        expectArg("to-url", &toUrl);
-    }
-
-    void run() override
-    {
-        auto fromRef = parseFlakeRef(fromUrl);
-        auto toRef = parseFlakeRef(toUrl);
-        fetchers::Attrs extraAttrs;
-        if (toRef.subdir != "") extraAttrs["dir"] = toRef.subdir;
-        auto userRegistry = fetchers::getUserRegistry();
-        userRegistry->remove(fromRef.input);
-        userRegistry->add(fromRef.input, toRef.input, extraAttrs);
-        userRegistry->write(fetchers::getUserRegistryPath());
-    }
-};
-
-struct CmdFlakeRemove : virtual Args, MixEvalArgs, Command
-{
-    std::string url;
-
-    std::string description() override
-    {
-        return "remove flake from user flake registry";
-    }
-
-    CmdFlakeRemove()
-    {
-        expectArg("url", &url);
-    }
-
-    void run() override
-    {
-        auto userRegistry = fetchers::getUserRegistry();
-        userRegistry->remove(parseFlakeRef(url).input);
-        userRegistry->write(fetchers::getUserRegistryPath());
-    }
-};
-
-struct CmdFlakePin : virtual Args, EvalCommand
-{
-    std::string url;
-
-    std::string description() override
-    {
-        return "pin a flake to its current version in user flake registry";
-    }
-
-    CmdFlakePin()
-    {
-        expectArg("url", &url);
-    }
-
-    void run(nix::ref<nix::Store> store) override
-    {
-        auto ref = parseFlakeRef(url);
-        auto userRegistry = fetchers::getUserRegistry();
-        userRegistry->remove(ref.input);
-        auto [tree, resolved] = ref.resolve(store).input->fetchTree(store);
-        fetchers::Attrs extraAttrs;
-        if (ref.subdir != "") extraAttrs["dir"] = ref.subdir;
-        userRegistry->add(ref.input, resolved, extraAttrs);
-    }
-};
-
 struct CmdFlakeInit : virtual Args, Command
 {
     std::string description() override
@@ -836,14 +732,10 @@ struct CmdFlake : virtual MultiCommand, virtual Command
 {
     CmdFlake()
         : MultiCommand({
-                {"list", []() { return make_ref<CmdFlakeList>(); }},
                 {"update", []() { return make_ref<CmdFlakeUpdate>(); }},
                 {"info", []() { return make_ref<CmdFlakeInfo>(); }},
                 {"list-inputs", []() { return make_ref<CmdFlakeListInputs>(); }},
                 {"check", []() { return make_ref<CmdFlakeCheck>(); }},
-                {"add", []() { return make_ref<CmdFlakeAdd>(); }},
-                {"remove", []() { return make_ref<CmdFlakeRemove>(); }},
-                {"pin", []() { return make_ref<CmdFlakePin>(); }},
                 {"init", []() { return make_ref<CmdFlakeInit>(); }},
                 {"clone", []() { return make_ref<CmdFlakeClone>(); }},
                 {"archive", []() { return make_ref<CmdFlakeArchive>(); }},
