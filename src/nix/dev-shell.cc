@@ -6,9 +6,6 @@
 #include "derivations.hh"
 #include "affinity.hh"
 #include "progress-bar.hh"
-#include "attr-path.hh"
-#include "eval-cache.hh"
-#include "flake/flake.hh"
 
 #include <regex>
 
