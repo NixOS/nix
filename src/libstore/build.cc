@@ -16,6 +16,7 @@
 #include "machines.hh"
 #include "daemon.hh"
 #include "worker-protocol.hh"
+#include "cgroup.hh"
 
 #include <algorithm>
 #include <iostream>
@@ -2400,14 +2401,13 @@ void DerivationGoal::startBuilder()
             auto hostCgroup = canonPath("/sys/fs/cgroup/" + name + "/" + cgroup);
 
             if (!pathExists(hostCgroup))
-                throw Error("expected unified cgroup directory '%s'", hostCgroup);
+                throw Error("expected cgroup directory '%s'", hostCgroup);
 
             auto childCgroup = fmt("%s/nix-%d", hostCgroup, buildUser->getUID());
 
-            // FIXME: if the cgroup already exists, kill all processes
-            // in it and destroy it.
+            destroyCgroup(childCgroup);
 
-            if (mkdir(childCgroup.c_str(), 0755) == -1 && errno != EEXIST)
+            if (mkdir(childCgroup.c_str(), 0755) == -1)
                 throw SysError("creating cgroup '%s'", childCgroup);
 
             chownToBuilder(childCgroup);
