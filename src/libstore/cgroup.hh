@@ -6,6 +6,8 @@
 
 namespace nix {
 
+std::map<std::string, std::string> getCgroups(const Path & cgroupFile);
+
 void destroyCgroup(const Path & cgroup);
 
 }

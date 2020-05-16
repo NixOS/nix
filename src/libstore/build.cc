@@ -2375,50 +2375,30 @@ void DerivationGoal::startBuilder()
 
 #if __linux__
     if (useChroot) {
-        /* Create a cgroup. */
+        /* Create a systemd cgroup since that's the minimum required
+           by systemd-nspawn. */
         // FIXME: do we want to use the parent cgroup? We should
         // always use the same cgroup regardless of whether we're the
         // daemon or run from a user session via sudo.
-        std::string msg;
-        std::vector<Path> cgroups;
-        for (auto & line : tokenizeString<std::vector<std::string>>(readFile("/proc/self/cgroup"), "\n")) {
-            static std::regex regex("([0-9]+):([^:]*):(.*)");
-            std::smatch match;
-            if (!std::regex_match(line, match, regex))
-                throw Error("invalid line '%s' in '/proc/self/cgroup'", line);
+        auto ourCgroups = getCgroups("/proc/self/cgroup");
+        auto systemdCgroup = ourCgroups["systemd"];
+        if (systemdCgroup == "")
+            throw Error("'systemd' cgroup does not exist");
 
-            /* We only create a systemd cgroup, since that's enough
-               for running systemd-nspawn. */
-            std::string name;
-            if (match[2] == "name=systemd")
-                name = "systemd";
-            //else if (match[2] == "")
-            //    name = "unified";
-            else continue;
+        auto hostCgroup = canonPath("/sys/fs/cgroup/systemd/" + systemdCgroup);
 
-            std::string cgroup = match[3];
+        if (!pathExists(hostCgroup))
+            throw Error("expected cgroup directory '%s'", hostCgroup);
 
-            auto hostCgroup = canonPath("/sys/fs/cgroup/" + name + "/" + cgroup);
+        auto childCgroup = fmt("%s/nix-%d", hostCgroup, buildUser->getUID());
 
-            if (!pathExists(hostCgroup))
-                throw Error("expected cgroup directory '%s'", hostCgroup);
+        destroyCgroup(childCgroup);
 
-            auto childCgroup = fmt("%s/nix-%d", hostCgroup, buildUser->getUID());
+        if (mkdir(childCgroup.c_str(), 0755) == -1)
+            throw SysError("creating cgroup '%s'", childCgroup);
 
-            destroyCgroup(childCgroup);
-
-            if (mkdir(childCgroup.c_str(), 0755) == -1)
-                throw SysError("creating cgroup '%s'", childCgroup);
-
-            chownToBuilder(childCgroup);
-            chownToBuilder(childCgroup + "/cgroup.procs");
-            if (name == "unified") {
-                chownToBuilder(childCgroup + "/cgroup.threads");
-                chownToBuilder(childCgroup + "/cgroup.subtree_control");
-            }
-
-            cgroups.push_back(childCgroup);
-        }
+        chownToBuilder(childCgroup);
+        chownToBuilder(childCgroup + "/cgroup.procs");
 
         /* Set up private namespaces for the build:
 
@@ -2545,8 +2525,7 @@ void DerivationGoal::startBuilder()
             throw SysError("getting sandbox mount namespace");
 
         /* Move the child into its own cgroup. */
-        for (auto & childCgroup : cgroups)
-            writeFile(childCgroup + "/cgroup.procs", fmt("%d", (pid_t) pid));
+        writeFile(childCgroup + "/cgroup.procs", fmt("%d", (pid_t) pid));
 
         /* Signal the builder that we've updated its user namespace. */
         writeFull(userNamespaceSync.writeSide.get(), "1");

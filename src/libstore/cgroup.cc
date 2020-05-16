@@ -9,6 +9,23 @@
 
 namespace nix {
 
+std::map<std::string, std::string> getCgroups(const Path & cgroupFile)
+{
+    std::map<std::string, std::string> cgroups;
+
+    for (auto & line : tokenizeString<std::vector<std::string>>(readFile(cgroupFile), "\n")) {
+        static std::regex regex("([0-9]+):([^:]*):(.*)");
+        std::smatch match;
+        if (!std::regex_match(line, match, regex))
+            throw Error("invalid line '%s' in '%s'", line, cgroupFile);
+
+        std::string name = hasPrefix(match[2], "name=") ? std::string(match[2], 5) : match[2];
+        cgroups.insert_or_assign(name, match[3]);
+    }
+
+    return cgroups;
+}
+
 void destroyCgroup(const Path & cgroup)
 {
     for (auto & entry : readDirectory(cgroup)) {
