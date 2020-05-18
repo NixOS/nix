@@ -507,10 +507,10 @@ private:
     Path fnUserLock;
     AutoCloseFD fdUserLock;
 
-    bool isEnabled;
+    bool isEnabled = false;
     string user;
-    uid_t uid;
-    gid_t gid;
+    uid_t uid = 0;
+    gid_t gid = 0;
     std::vector<gid_t> supplementaryGIDs;
 
 public:
@@ -534,9 +534,6 @@ UserLock::UserLock()
 {
     assert(settings.buildUsersGroup != "");
     createDirs(settings.nixStateDir + "/userpool");
-    /* Mark that user is not enabled by default */
-    uid = 0;
-    isEnabled = false;
 }
 
 bool UserLock::findFreeUser() {
