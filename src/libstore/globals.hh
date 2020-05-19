@@ -149,10 +149,13 @@ public:
         "The Unix group that contains the build users."};
 
     #if __linux__
+    Setting<bool> autoAllocateUids{this, false, "auto-allocate-uids",
+        "Whether to allocate UIDs for builders automatically."};
+
     const uint32_t idsPerBuild = 1 << 16;
 
     Setting<uint32_t> startId{this, 872415232, "start-id",
-        "The first UID and GID to use for dynamic ID allocation. (0 means disable.)"};
+        "The first UID and GID to use for dynamic ID allocation."};
 
     Setting<uint32_t> uidCount{this, idsPerBuild * 128, "id-count",
         "The number of UIDs/GIDs to use for dynamic ID allocation."};
