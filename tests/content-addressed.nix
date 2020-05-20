@@ -7,11 +7,14 @@ rec {
   # but the output will always be the same
   contentAddressed = mkDerivation {
     name = "simple-content-addressed";
-    builder = ./simple.builder.sh;
-    PATH = "";
-    goodPath = "${path}:${toString seed}";
+    buildCommand = ''
+      set -x
+      echo "Building a CA derivation"
+      echo "The seed is ${toString seed}"
+      mkdir -p $out
+      echo "Hello World" > $out/hello
+    '';
     __contentAddressed = true;
-    MSG = "Hello from ${placeholder "out"}";
   };
   dependent = mkDerivation {
     name = "dependent";
