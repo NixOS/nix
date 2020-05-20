@@ -209,4 +209,17 @@ std::unique_ptr<UserLock> acquireUserLock()
         return SimpleUserLock::acquire();
 }
 
+bool useBuildUsers()
+{
+    #if __linux__
+    static bool b = (settings.buildUsersGroup != "" || settings.startId.get() != 0) && getuid() == 0;
+    return b;
+    #elif __APPLE__
+    static bool b = settings.buildUsersGroup != "" && getuid() == 0;
+    return b;
+    #else
+    return false;
+    #endif
+}
+
 }

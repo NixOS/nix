@@ -1420,11 +1420,7 @@ void DerivationGoal::tryToBuild()
 
 void DerivationGoal::tryLocalBuild() {
 
-    /* If `build-users-group' is not empty, then we have to build as
-       one of the members of that group. */
-    static bool useBuildUsers = (settings.buildUsersGroup != "" || settings.startId.get() != 0) && getuid() == 0;
-    if (useBuildUsers) {
-#if defined(__linux__) || defined(__APPLE__)
+    if (useBuildUsers()) {
         if (!buildUser)
             buildUser = acquireUserLock();
 
@@ -1439,11 +1435,6 @@ void DerivationGoal::tryLocalBuild() {
         /* Make sure that no other processes are executing under this
            uid. */
         buildUser->kill();
-#else
-        /* Don't know how to block the creation of setuid/setgid
-           binaries on this platform. */
-        throw Error("build users are not supported on this platform for security reasons");
-#endif
     }
 
     actLock.reset();

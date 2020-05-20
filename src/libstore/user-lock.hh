@@ -36,4 +36,6 @@ struct UserLock
    is available. */
 std::unique_ptr<UserLock> acquireUserLock();
 
+bool useBuildUsers();
+
 }
