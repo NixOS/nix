@@ -53,6 +53,52 @@ string showErrPos(const ErrPos &errPos)
     }
 }
 
+void getCodeLines(NixCode &nixCode)
+{
+    if (nixCode.errPos.line <= 0) 
+        return;
+
+    // check this magic value!
+    if (nixCode.errPos.file == "(string)")
+        return;
+
+    try {
+        AutoCloseFD fd = open(nixCode.errPos.file.c_str(), O_RDONLY | O_CLOEXEC);
+        if (!fd)
+            throw SysError("opening file '%1%'", nixCode.errPos.file);
+
+        // count the newlines.
+        
+        int count = 0;
+        string line;
+        int pl = nixCode.errPos.line - 1;
+        do 
+        {
+            line = readLine(fd.get());
+            ++count;
+            if (count < pl) 
+            {
+              ;
+            }
+            else if (count == pl) {
+                nixCode.prevLineOfCode = line;
+            } else if (count == pl + 1) {
+                nixCode.errLineOfCode = line;
+            } else if (count == pl + 2) {
+                nixCode.nextLineOfCode = line;
+                break;
+            }
+        } while (true);
+    }
+    catch (EndOfFile &eof) {
+        ;
+    }
+    catch (std::exception &e) {
+        printError("error reading nix file: %s\n%s", nixCode.errPos.file, e.what());
+    }
+}
+
+
 void printCodeLines(std::ostream &out, const string &prefix, const NixCode &nixCode)
 {
     // previous line of code.
@@ -197,16 +243,21 @@ std::ostream& operator<<(std::ostream &out, const ErrorInfo &einfo)
         out << prefix << std::endl;
     }
 
-    // lines of code.
-    if (einfo.nixCode.has_value() && einfo.nixCode->errLineOfCode.has_value()) {
-        printCodeLines(out, prefix, *einfo.nixCode);
-        out << prefix << std::endl;
-    }
 
-    // hint
-    if (einfo.hint.has_value()) {
-        out << prefix << *einfo.hint << std::endl;
-        out << prefix << std::endl;
+    if (einfo.nixCode.has_value()) {
+        NixCode nixcode = *einfo.nixCode;
+        getCodeLines(nixcode);
+      
+        // lines of code.
+        if (nixcode.errLineOfCode.has_value()) {
+            printCodeLines(out, prefix, nixcode);
+            out << prefix << std::endl;
+        }
+
+        // hint
+            out << prefix << *einfo.hint << std::endl;
+            out << prefix << std::endl;
+
     }
 
     return out;
