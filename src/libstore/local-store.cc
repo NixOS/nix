@@ -579,7 +579,7 @@ void LocalStore::checkDerivationOutputs(const StorePath & drvPath, const Derivat
     }
 }
 
-void LocalStore::resolveDerivation(Derivation & drv) {
+bool LocalStore::resolveDerivation(Derivation & drv) {
     // Input paths that we'll want to rewrite in the derivation
     std::map<Path, Path> inputRewrites;
 
@@ -607,6 +607,8 @@ void LocalStore::resolveDerivation(Derivation & drv) {
     }
     drv.inputDrvs = std::move(newInputs);
     rewriteDerivation(*this, drv, inputRewrites);
+
+    return (! inputRewrites.empty());
 }
 
 uint64_t LocalStore::addValidPath(State & state,

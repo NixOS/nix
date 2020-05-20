@@ -25,21 +25,30 @@ checkAll () {
     nix-build ./content-addressed.nix --arg seed 3 |& (! grep -q "building transitively-dependent")
 }
 
-# Ensure that everything works locally
+checkAllWithDaemon () {
+    clearStore
+    startDaemon
+    checkAll
+    killDaemon
+    unset NIX_REMOTE
+}
+
+checkRemoteCache () {
+    # Push all the paths to the cache
+    clearStore
+    nix-build content-addressed.nix \
+        --arg seed 1 \
+        --post-build-hook $PWD/push-to-store.sh
+
+    # Rebuild with a clean store using the remote cache, and ensure that we
+    # don't really build anything
+    clearStore
+    nix-build ./content-addressed.nix --arg seed 2 \
+    --substituters "file://$cacheDir" \
+    --no-require-sigs \
+        |& (! grep -q "building transitively-dependent")
+}
+
 checkAll
-
-# Same thing, but with the daemon
-clearStore
-startDaemon
-checkAll
-killDaemon
-unset NIX_REMOTE
-
-# nix-build ./content-addressed.nix --arg seed 3 |& (! grep -q "building transitively-dependent")
-
-# clearStore
-
-# nix-build ./content-addressed.nix --arg seed 1 \
-#   --substituters "file://$cacheDir" \
-#   --no-require-sigs \
-#   --max-jobs 0
+checkAllWithDaemon
+checkRemoteCache

@@ -1360,8 +1360,14 @@ void DerivationGoal::inputsRealised()
 {
     trace("all inputs realised");
 
-    if (useDerivation)
-        worker.store.resolveDerivation(*(dynamic_cast<Derivation *>(drv.get())));
+    if (useDerivation) {
+        bool isModified = worker.store.resolveDerivation(*(dynamic_cast<Derivation *>(drv.get())));
+        if (isModified) {
+            debug("Trying the substitution again");
+            haveDerivation();
+            return;
+        }
+    }
 
     if (nrFailed != 0) {
         if (!useDerivation)
