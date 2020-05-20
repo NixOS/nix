@@ -122,7 +122,7 @@ struct CgroupUserLock : UserLock
         return uid;
     }
 
-    std::vector<gid_t> getSupplementaryGIDs() override { return {}; } // FIXME
+    std::vector<gid_t> getSupplementaryGIDs() override { return {}; }
 
     static std::unique_ptr<UserLock> acquire()
     {

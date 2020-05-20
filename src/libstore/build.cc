@@ -3173,11 +3173,12 @@ void DerivationGoal::runChild()
             if (mount("none", (chrootRootDir + "/proc").c_str(), "proc", 0, 0) == -1)
                 throw SysError("mounting /proc");
 
-            /* Mount sysfs on /sys. FIXME: only in user namespace
-               builds. */
-            createDirs(chrootRootDir + "/sys");
-            if (mount("none", (chrootRootDir + "/sys").c_str(), "sysfs", 0, 0) == -1)
-                throw SysError("mounting /sys");
+            /* Mount sysfs on /sys. */
+            if (useUidRange) {
+                createDirs(chrootRootDir + "/sys");
+                if (mount("none", (chrootRootDir + "/sys").c_str(), "sysfs", 0, 0) == -1)
+                    throw SysError("mounting /sys");
+            }
 
             /* Mount a new tmpfs on /dev/shm to ensure that whatever
                the builder puts in /dev/shm is cleaned up automatically. */
