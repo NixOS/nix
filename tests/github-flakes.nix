@@ -115,12 +115,12 @@ makeTest (
 
       $client->succeed("curl -v https://github.com/ >&2");
 
-      $client->succeed("nix flake list | grep nixpkgs");
+      $client->succeed("nix registry list | grep nixpkgs");
 
       $client->succeed("nix flake info nixpkgs --json | jq -r .revision") eq "${nixpkgs.rev}\n"
         or die "revision mismatch";
 
-      $client->succeed("nix flake pin nixpkgs");
+      $client->succeed("nix registry pin nixpkgs");
 
       $client->succeed("nix flake info nixpkgs --tarball-ttl 0 >&2");
 
