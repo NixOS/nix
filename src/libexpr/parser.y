@@ -663,7 +663,6 @@ Expr * EvalState::parseExprFromString(std::string_view s, const Path & basePath)
 Expr * EvalState::parseStdin()
 {
     //Activity act(*logger, lvlTalkative, format("parsing standard input"));
-    // return parseExprFromString(foStdin, drainFD(0), absPath("."));
     return parse(drainFD(0).data(), foStdin, "", absPath("."), staticBaseEnv);
 }
 
