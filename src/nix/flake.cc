@@ -158,20 +158,26 @@ struct CmdFlakeListInputs : FlakeCommand, MixJSON
         else {
             logger->stdout("%s", flake.flake.lockedRef);
 
+            std::unordered_set<std::shared_ptr<Node>> visited;
+
             std::function<void(const Node & node, const std::string & prefix)> recurse;
 
             recurse = [&](const Node & node, const std::string & prefix)
             {
                 for (const auto & [i, input] : enumerate(node.inputs)) {
-                    //auto tree2 = tree.child(i + 1 == inputs.inputs.size());
+                    bool firstVisit = visited.insert(input.second).second;
                     bool last = i + 1 == node.inputs.size();
+                    auto lockedNode = std::dynamic_pointer_cast<const LockedNode>(input.second);
+
                     logger->stdout("%s" ANSI_BOLD "%s" ANSI_NORMAL ": %s",
                         prefix + (last ? treeLast : treeConn), input.first,
-                        std::dynamic_pointer_cast<const LockedNode>(input.second)->lockedRef);
-                    recurse(*input.second, prefix + (last ? treeNull : treeLine));
+                        lockedNode ? lockedNode->lockedRef : flake.flake.lockedRef);
+                        
+                    if (firstVisit) recurse(*input.second, prefix + (last ? treeNull : treeLine));
                 }
             };
 
+            visited.insert(flake.lockFile.root);
             recurse(*flake.lockFile.root, "");
         }
     }
