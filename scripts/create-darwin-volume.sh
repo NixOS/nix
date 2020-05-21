@@ -122,7 +122,7 @@ main() {
 
     if ! test_synthetic_conf; then
         echo "Configuring /etc/synthetic.conf..." >&2
-        echo nix | sudo tee /etc/synthetic.conf
+        echo nix | sudo tee -a /etc/synthetic.conf
         if ! test_synthetic_conf; then
             echo "error: failed to configure synthetic.conf;" >&2
             suggest_report_error
