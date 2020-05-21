@@ -58,34 +58,35 @@ void getCodeLines(NixCode &nixCode)
     if (nixCode.errPos.line <= 0) 
         return;
 
-    // check this magic value!
     if (nixCode.errPos.origin == foFile) {
         try {
             AutoCloseFD fd = open(nixCode.errPos.file.c_str(), O_RDONLY | O_CLOEXEC);
             if (!fd)
-                throw SysError("opening file '%1%'", nixCode.errPos.file);
-
-            // count the newlines.
-            int count = 0;
-            string line;
-            int pl = nixCode.errPos.line - 1;
-            do 
+                logError(SysError("opening file '%1%'", nixCode.errPos.file).info());
+            else
             {
-                line = readLine(fd.get());
-                ++count;
-                if (count < pl) 
+                // count the newlines.
+                int count = 0;
+                string line;
+                int pl = nixCode.errPos.line - 1;
+                do 
                 {
-                  ;
-                }
-                else if (count == pl) {
-                    nixCode.prevLineOfCode = line;
-                } else if (count == pl + 1) {
-                    nixCode.errLineOfCode = line;
-                } else if (count == pl + 2) {
-                    nixCode.nextLineOfCode = line;
-                    break;
-                }
-            } while (true);
+                    line = readLine(fd.get());
+                    ++count;
+                    if (count < pl) 
+                    {
+                      ;
+                    }
+                    else if (count == pl) {
+                        nixCode.prevLineOfCode = line;
+                    } else if (count == pl + 1) {
+                        nixCode.errLineOfCode = line;
+                    } else if (count == pl + 2) {
+                        nixCode.nextLineOfCode = line;
+                        break;
+                    }
+                } while (true);
+             }
         }
         catch (EndOfFile &eof) {
             ;
@@ -103,7 +104,6 @@ void getCodeLines(NixCode &nixCode)
         do 
         {
             std::getline(iss, line);
-            // std::cout << "getline result: " << std::getline(iss, line) << std::endl;
             ++count;
             if (count < pl) 
             {
@@ -261,12 +261,12 @@ std::ostream& operator<<(std::ostream &out, const ErrorInfo &einfo)
                 break;
             }
             case foString: {
-                out << fmt("%1%from command line argument", prefix) << std::endl;
+                out << fmt("%1%from command line argument %2%", prefix, showErrPos(einfo.nixCode->errPos)) << std::endl;
                 out << prefix << std::endl;
                 break;
             }
             case foStdin: {
-                out << fmt("%1%from stdin", prefix) << std::endl;
+                out << fmt("%1%from stdin %2%", prefix, showErrPos(einfo.nixCode->errPos)) << std::endl;
                 out << prefix << std::endl;
                 break;
             }
@@ -291,11 +291,12 @@ std::ostream& operator<<(std::ostream &out, const ErrorInfo &einfo)
             printCodeLines(out, prefix, nixcode);
             out << prefix << std::endl;
         }
+    }
 
-        // hint
-            out << prefix << *einfo.hint << std::endl;
-            out << prefix << std::endl;
-
+    // hint
+    if (einfo.hint.has_value()) {
+        out << prefix << *einfo.hint << std::endl;
+        out << prefix << std::endl;
     }
 
     return out;
