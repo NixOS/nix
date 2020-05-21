@@ -59,22 +59,51 @@ void getCodeLines(NixCode &nixCode)
         return;
 
     // check this magic value!
-    if (nixCode.errPos.file == "(string)")
-        return;
+    if (nixCode.errPos.origin == foFile) {
+        try {
+            AutoCloseFD fd = open(nixCode.errPos.file.c_str(), O_RDONLY | O_CLOEXEC);
+            if (!fd)
+                throw SysError("opening file '%1%'", nixCode.errPos.file);
 
-    try {
-        AutoCloseFD fd = open(nixCode.errPos.file.c_str(), O_RDONLY | O_CLOEXEC);
-        if (!fd)
-            throw SysError("opening file '%1%'", nixCode.errPos.file);
-
+            // count the newlines.
+            int count = 0;
+            string line;
+            int pl = nixCode.errPos.line - 1;
+            do 
+            {
+                line = readLine(fd.get());
+                ++count;
+                if (count < pl) 
+                {
+                  ;
+                }
+                else if (count == pl) {
+                    nixCode.prevLineOfCode = line;
+                } else if (count == pl + 1) {
+                    nixCode.errLineOfCode = line;
+                } else if (count == pl + 2) {
+                    nixCode.nextLineOfCode = line;
+                    break;
+                }
+            } while (true);
+        }
+        catch (EndOfFile &eof) {
+            ;
+        }
+        catch (std::exception &e) {
+            printError("error reading nix file: %s\n%s", nixCode.errPos.file, e.what());
+        }
+    } else { 
+        std::istringstream iss(nixCode.errPos.file);
         // count the newlines.
-        
         int count = 0;
         string line;
         int pl = nixCode.errPos.line - 1;
+
         do 
         {
-            line = readLine(fd.get());
+            std::getline(iss, line);
+            // std::cout << "getline result: " << std::getline(iss, line) << std::endl;
             ++count;
             if (count < pl) 
             {
@@ -88,13 +117,10 @@ void getCodeLines(NixCode &nixCode)
                 nixCode.nextLineOfCode = line;
                 break;
             }
+
+            if (!iss.good())
+                break;
         } while (true);
-    }
-    catch (EndOfFile &eof) {
-        ;
-    }
-    catch (std::exception &e) {
-        printError("error reading nix file: %s\n%s", nixCode.errPos.file, e.what());
     }
 }
 
@@ -225,15 +251,27 @@ std::ostream& operator<<(std::ostream &out, const ErrorInfo &einfo)
 
     // filename, line, column.
     if (einfo.nixCode.has_value()) {
-        if (einfo.nixCode->errPos.file != "") {
-            out << fmt("%1%in file: " ANSI_BLUE "%2% %3%" ANSI_NORMAL,
-                prefix,
-                einfo.nixCode->errPos.file,
-                showErrPos(einfo.nixCode->errPos)) << std::endl;
-            out << prefix << std::endl;
-        } else {
-            out << fmt("%1%from command line argument", prefix) << std::endl;
-            out << prefix << std::endl;
+        switch (einfo.nixCode->errPos.origin) {
+            case foFile: {
+                out << fmt("%1%in file: " ANSI_BLUE "%2% %3%" ANSI_NORMAL,
+                    prefix,
+                    einfo.nixCode->errPos.file,
+                    showErrPos(einfo.nixCode->errPos)) << std::endl;
+                out << prefix << std::endl;
+                break;
+            }
+            case foString: {
+                out << fmt("%1%from command line argument", prefix) << std::endl;
+                out << prefix << std::endl;
+                break;
+            }
+            case foStdin: {
+                out << fmt("%1%from stdin", prefix) << std::endl;
+                out << prefix << std::endl;
+                break;
+            }
+            default:
+                throw Error("invalid FileOrigin in errPos");
         }
     }
 

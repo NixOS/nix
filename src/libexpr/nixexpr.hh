@@ -24,11 +24,12 @@ MakeError(RestrictedPathError, Error);
 
 struct Pos
 {
+    FileOrigin origin;
     Symbol file;
     unsigned int line, column;
-    Pos() : line(0), column(0) { };
-    Pos(const Symbol & file, unsigned int line, unsigned int column)
-        : file(file), line(line), column(column) { };
+    Pos() : origin(foString), line(0), column(0) { };
+    Pos(FileOrigin origin, const Symbol & file, unsigned int line, unsigned int column)
+        : origin(origin), file(file), line(line), column(column) { };
     operator bool() const
     {
         return line != 0;

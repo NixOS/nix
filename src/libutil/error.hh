@@ -32,10 +32,18 @@ typedef enum {
     lvlVomit
 } Verbosity;
 
+typedef enum { 
+    foFile,
+    foStdin,
+    foString
+} FileOrigin;
+
+
 struct ErrPos {
     int line = 0;
     int column = 0;
     string file;
+    FileOrigin origin;
 
     operator bool() const
     {
@@ -45,6 +53,7 @@ struct ErrPos {
     template <class P>
     ErrPos& operator=(const P &pos)
     {
+        origin = pos.origin;
         line = pos.line;
         column = pos.column;
         file = pos.file;

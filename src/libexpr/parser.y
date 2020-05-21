@@ -30,7 +30,8 @@ namespace nix {
         SymbolTable & symbols;
         Expr * result;
         Path basePath;
-        Symbol path;
+        Symbol file;
+        FileOrigin origin;
         ErrorInfo error;
         Symbol sLetBody;
         ParseData(EvalState & state)
@@ -250,7 +251,7 @@ static Expr * stripIndentation(const Pos & pos, SymbolTable & symbols, vector<Ex
 
 static inline Pos makeCurPos(const YYLTYPE & loc, ParseData * data)
 {
-    return Pos(data->path, loc.first_line, loc.first_column);
+    return Pos(data->origin, data->file, loc.first_line, loc.first_column);
 }
 
 #define CUR_POS makeCurPos(*yylocp, data)
@@ -576,13 +577,24 @@ formal
 namespace nix {
 
 
-Expr * EvalState::parse(const char * text,
+Expr * EvalState::parse(const char * text, FileOrigin origin,
     const Path & path, const Path & basePath, StaticEnv & staticEnv)
 {
     yyscan_t scanner;
     ParseData data(*this);
+    data.origin = origin;
+    switch (origin) {
+        case foFile: 
+            data.file = data.symbols.create(path);
+            break;
+        case foStdin:
+        case foString:
+            data.file = data.symbols.create(text);
+            break;
+        default:
+            throw Error("invalid FileOrigin in parse");
+    }
     data.basePath = basePath;
-    data.path = data.symbols.create(path);
 
     yylex_init(&scanner);
     yy_scan_string(text, scanner);
@@ -632,13 +644,13 @@ Expr * EvalState::parseExprFromFile(const Path & path)
 
 Expr * EvalState::parseExprFromFile(const Path & path, StaticEnv & staticEnv)
 {
-    return parse(readFile(path).c_str(), path, dirOf(path), staticEnv);
+    return parse(readFile(path).c_str(), foFile, path, dirOf(path), staticEnv);
 }
 
 
 Expr * EvalState::parseExprFromString(std::string_view s, const Path & basePath, StaticEnv & staticEnv)
 {
-    return parse(s.data(), "(string)", basePath, staticEnv);
+    return parse(s.data(), foString, "", basePath, staticEnv);
 }
 
 
@@ -651,7 +663,8 @@ Expr * EvalState::parseExprFromString(std::string_view s, const Path & basePath)
 Expr * EvalState::parseStdin()
 {
     //Activity act(*logger, lvlTalkative, format("parsing standard input"));
-    return parseExprFromString(drainFD(0), absPath("."));
+    // return parseExprFromString(foStdin, drainFD(0), absPath("."));
+    return parse(drainFD(0).data(), foStdin, "", absPath("."), staticBaseEnv);
 }
 
 
