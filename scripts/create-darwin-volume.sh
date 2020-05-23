@@ -15,7 +15,7 @@ disk_identifier() {
 }
 
 volume_list_true() {
-    key=$1 t=$2
+    key=$1
     xpath "/plist/dict/array/dict/key[text()='Volumes']/following-sibling::array/dict/key[text()='$key']/following-sibling::true[1]" 2> /dev/null
 }
 
