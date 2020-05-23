@@ -115,17 +115,17 @@ let
 
         installFlags = "sysconfdir=$(out)/etc";
 
+        postInstall = ''
+          mkdir -p $doc/nix-support
+          echo "doc manual $doc/share/doc/nix/manual" >> $doc/nix-support/hydra-build-products
+        '';
+
         doCheck = true;
 
         doInstallCheck = true;
         installCheckFlags = "sysconfdir=$(out)/etc";
 
         separateDebugInfo = true;
-
-        preDist = ''
-          mkdir -p $doc/nix-support
-          echo "doc manual $doc/share/doc/nix/manual" >> $doc/nix-support/hydra-build-products
-        '';
       });
 
 
