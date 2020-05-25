@@ -41,6 +41,7 @@ fi
 
 INSTALL_MODE=no-daemon
 CREATE_DARWIN_VOLUME=0
+NIX_EXTRA_CONF=
 # handle the command line flags
 while [ $# -gt 0 ]; do
     case $1 in
@@ -54,6 +55,9 @@ while [ $# -gt 0 ]; do
             NIX_INSTALLER_NO_MODIFY_PROFILE=1;;
         --darwin-use-unencrypted-nix-store-volume)
             CREATE_DARWIN_VOLUME=1;;
+        --nix-extra-conf-file)
+            NIX_EXTRA_CONF=$(cat $2)
+            shift;;
         *)
             (
                 echo "Nix Installer [--daemon|--no-daemon] [--no-channel-add] [--no-modify-profile]"
