@@ -20,7 +20,9 @@ readonly GREEN='\033[32m'
 readonly GREEN_UL='\033[4;32m'
 readonly RED='\033[31m'
 
-readonly NIX_USER_COUNT="32"
+# installer allows overriding build user count to speed up installation
+# as creating each user takes non-trivial amount of time on macos
+readonly NIX_USER_COUNT=${NIX_USER_COUNT:-32}
 readonly NIX_BUILD_GROUP_ID="30000"
 readonly NIX_BUILD_GROUP_NAME="nixbld"
 readonly NIX_FIRST_BUILD_UID="30001"
