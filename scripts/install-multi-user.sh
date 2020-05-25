@@ -646,6 +646,7 @@ setup_default_profile() {
 
 place_nix_configuration() {
     cat <<EOF > "$SCRATCH/nix.conf"
+$NIX_EXTRA_CONF
 build-users-group = $NIX_BUILD_GROUP_NAME
 EOF
     _sudo "to place the default nix daemon configuration (part 2)" \
