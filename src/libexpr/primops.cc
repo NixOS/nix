@@ -1346,6 +1346,10 @@ static void prim_catAttrs(EvalState & state, const Pos & pos, Value * * args, Va
 static void prim_functionArgs(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
     state.forceValue(*args[0], pos);
+    if (args[0]->type == tPrimOpApp || args[0]->type == tPrimOp) {
+        state.mkAttrs(v, 0);
+        return;
+    }
     if (args[0]->type != tLambda)
         throw TypeError(format("'functionArgs' requires a function, at %1%") % pos);
 
