@@ -195,7 +195,7 @@ struct GitInput : Input
                     return files.count(file);
                 };
 
-                auto storePath = store->addToStore("source", actualUrl, true, htSHA256, filter);
+                auto storePath = store->addToStore("source", actualUrl, FileIngestionMethod::Recursive, htSHA256, filter);
 
                 auto tree = Tree {
                     .actualPath = store->printStorePath(storePath),
@@ -347,7 +347,7 @@ struct GitInput : Input
             unpackTarfile(*source, tmpDir);
         }
 
-        auto storePath = store->addToStore(name, tmpDir, true, htSHA256, filter);
+        auto storePath = store->addToStore(name, tmpDir, FileIngestionMethod::Recursive, htSHA256, filter);
 
         auto lastModified = std::stoull(runProgram("git", true, { "-C", repoDir, "log", "-1", "--format=%ct", input->rev->gitRev() }));
 
