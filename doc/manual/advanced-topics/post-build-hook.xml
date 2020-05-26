@@ -61,7 +61,7 @@ substituters = https://cache.nixos.org/ s3://example-nix-cache
 trusted-public-keys = cache.nixos.org-1:6NCHdD59X431o0gWypbMrAURkbJ16ZPMQFGspcDShjY= example-nix-cache-1:1/cKDz3QCCOmwcztD2eV6Coggp6rqc9DGjWv7C0G+rM=
 </programlisting>
 
-<para>we will restart the Nix daemon a later step.</para>
+<para>We will restart the Nix daemon in a later step.</para>
 </section>
 
 <section>
@@ -139,7 +139,7 @@ $ nix-store --delete /nix/store/ibcyipq5gf91838ldx40mjsp0b8w9n18-example
 
 <para>Now, copy the path back from the cache:</para>
 <screen>
-$ nix store --realize /nix/store/ibcyipq5gf91838ldx40mjsp0b8w9n18-example
+$ nix-store --realise /nix/store/ibcyipq5gf91838ldx40mjsp0b8w9n18-example
 copying path '/nix/store/m8bmqwrch6l3h8s0k3d673xpmipcdpsa-example from 's3://example-nix-cache'...
 warning: you did not specify '--add-root'; the result might be removed by the garbage collector
 /nix/store/m8bmqwrch6l3h8s0k3d673xpmipcdpsa-example

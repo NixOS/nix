@@ -266,6 +266,10 @@ if test "$gc" = yes; then
 fi
 
 
+# Look for gtest.
+PKG_CHECK_MODULES([GTEST], [gtest_main])
+
+
 # documentation generation switch
 AC_ARG_ENABLE(doc-gen, AC_HELP_STRING([--disable-doc-gen],
   [disable documentation generation]),

@@ -19,27 +19,32 @@ struct CmdCopy : StorePathsCommand
     CmdCopy()
         : StorePathsCommand(true)
     {
-        mkFlag()
-            .longName("from")
-            .labels({"store-uri"})
-            .description("URI of the source Nix store")
-            .dest(&srcUri);
-        mkFlag()
-            .longName("to")
-            .labels({"store-uri"})
-            .description("URI of the destination Nix store")
-            .dest(&dstUri);
+        addFlag({
+            .longName = "from",
+            .description = "URI of the source Nix store",
+            .labels = {"store-uri"},
+            .handler = {&srcUri},
+        });
 
-        mkFlag()
-            .longName("no-check-sigs")
-            .description("do not require that paths are signed by trusted keys")
-            .set(&checkSigs, NoCheckSigs);
+        addFlag({
+            .longName = "to",
+            .description = "URI of the destination Nix store",
+            .labels = {"store-uri"},
+            .handler = {&dstUri},
+        });
 
-        mkFlag()
-            .longName("substitute-on-destination")
-            .shortName('s')
-            .description("whether to try substitutes on the destination store (only supported by SSH)")
-            .set(&substitute, Substitute);
+        addFlag({
+            .longName = "no-check-sigs",
+            .description = "do not require that paths are signed by trusted keys",
+            .handler = {&checkSigs, NoCheckSigs},
+        });
+
+        addFlag({
+            .longName = "substitute-on-destination",
+            .shortName = 's',
+            .description = "whether to try substitutes on the destination store (only supported by SSH)",
+            .handler = {&substitute, Substitute},
+        });
     }
 
     std::string description() override
@@ -74,6 +79,8 @@ struct CmdCopy : StorePathsCommand
 #endif
         };
     }
+
+    Category category() override { return catSecondary; }
 
     ref<Store> createStore() override
     {

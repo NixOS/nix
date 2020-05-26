@@ -1,203 +1,19 @@
 #include "primops.hh"
 #include "eval-inline.hh"
-#include "download.hh"
 #include "store-api.hh"
-#include "pathlocks.hh"
 #include "hash.hh"
-#include "tarfile.hh"
-
-#include <sys/time.h>
-
-#include <regex>
-
-#include <nlohmann/json.hpp>
-
-using namespace std::string_literals;
+#include "fetchers.hh"
+#include "url.hh"
 
 namespace nix {
-
-struct GitInfo
-{
-    Path storePath;
-    std::string rev;
-    std::string shortRev;
-    uint64_t revCount = 0;
-};
-
-std::regex revRegex("^[0-9a-fA-F]{40}$");
-
-GitInfo exportGit(ref<Store> store, const std::string & uri,
-    std::optional<std::string> ref, std::string rev,
-    const std::string & name)
-{
-    if (evalSettings.pureEval && rev == "")
-        throw Error("in pure evaluation mode, 'fetchGit' requires a Git revision");
-
-    if (!ref && rev == "" && hasPrefix(uri, "/") && pathExists(uri + "/.git")) {
-
-        bool clean = true;
-
-        try {
-            runProgram("git", true, { "-C", uri, "diff-index", "--quiet", "HEAD", "--" });
-        } catch (ExecError & e) {
-            if (!WIFEXITED(e.status) || WEXITSTATUS(e.status) != 1) throw;
-            clean = false;
-        }
-
-        if (!clean) {
-
-            /* This is an unclean working tree. So copy all tracked files. */
-            GitInfo gitInfo;
-            gitInfo.rev = "0000000000000000000000000000000000000000";
-            gitInfo.shortRev = std::string(gitInfo.rev, 0, 7);
-
-            auto files = tokenizeString<std::set<std::string>>(
-                runProgram("git", true, { "-C", uri, "ls-files", "-z" }), "\0"s);
-
-            PathFilter filter = [&](const Path & p) -> bool {
-                assert(hasPrefix(p, uri));
-                std::string file(p, uri.size() + 1);
-
-                auto st = lstat(p);
-
-                if (S_ISDIR(st.st_mode)) {
-                    auto prefix = file + "/";
-                    auto i = files.lower_bound(prefix);
-                    return i != files.end() && hasPrefix(*i, prefix);
-                }
-
-                return files.count(file);
-            };
-
-            gitInfo.storePath = store->printStorePath(store->addToStore("source", uri, true, htSHA256, filter));
-
-            return gitInfo;
-        }
-
-        // clean working tree, but no ref or rev specified.  Use 'HEAD'.
-        rev = chomp(runProgram("git", true, { "-C", uri, "rev-parse", "HEAD" }));
-        ref = "HEAD"s;
-    }
-
-    if (!ref) ref = "HEAD"s;
-
-    if (rev != "" && !std::regex_match(rev, revRegex))
-        throw Error("invalid Git revision '%s'", rev);
-
-    deletePath(getCacheDir() + "/nix/git");
-
-    Path cacheDir = getCacheDir() + "/nix/gitv2/" + hashString(htSHA256, uri).to_string(Base32, false);
-
-    if (!pathExists(cacheDir)) {
-        createDirs(dirOf(cacheDir));
-        runProgram("git", true, { "init", "--bare", cacheDir });
-    }
-
-    Path localRefFile;
-    if (ref->compare(0, 5, "refs/") == 0)
-        localRefFile = cacheDir + "/" + *ref;
-    else
-        localRefFile = cacheDir + "/refs/heads/" + *ref;
-
-    bool doFetch;
-    time_t now = time(0);
-    /* If a rev was specified, we need to fetch if it's not in the
-       repo. */
-    if (rev != "") {
-        try {
-            runProgram("git", true, { "-C", cacheDir, "cat-file", "-e", rev });
-            doFetch = false;
-        } catch (ExecError & e) {
-            if (WIFEXITED(e.status)) {
-                doFetch = true;
-            } else {
-                throw;
-            }
-        }
-    } else {
-        /* If the local ref is older than ‘tarball-ttl’ seconds, do a
-           git fetch to update the local ref to the remote ref. */
-        struct stat st;
-        doFetch = stat(localRefFile.c_str(), &st) != 0 ||
-            (uint64_t) st.st_mtime + settings.tarballTtl <= (uint64_t) now;
-    }
-    if (doFetch)
-    {
-        Activity act(*logger, lvlTalkative, actUnknown, fmt("fetching Git repository '%s'", uri));
-
-        // FIXME: git stderr messes up our progress indicator, so
-        // we're using --quiet for now. Should process its stderr.
-        runProgram("git", true, { "-C", cacheDir, "fetch", "--quiet", "--force", "--", uri, fmt("%s:%s", *ref, *ref) });
-
-        struct timeval times[2];
-        times[0].tv_sec = now;
-        times[0].tv_usec = 0;
-        times[1].tv_sec = now;
-        times[1].tv_usec = 0;
-
-        utimes(localRefFile.c_str(), times);
-    }
-
-    // FIXME: check whether rev is an ancestor of ref.
-    GitInfo gitInfo;
-    gitInfo.rev = rev != "" ? rev : chomp(readFile(localRefFile));
-    gitInfo.shortRev = std::string(gitInfo.rev, 0, 7);
-
-    printTalkative("using revision %s of repo '%s'", gitInfo.rev, uri);
-
-    std::string storeLinkName = hashString(htSHA512, name + std::string("\0"s) + gitInfo.rev).to_string(Base32, false);
-    Path storeLink = cacheDir + "/" + storeLinkName + ".link";
-    PathLocks storeLinkLock({storeLink}, fmt("waiting for lock on '%1%'...", storeLink)); // FIXME: broken
-
-    try {
-        auto json = nlohmann::json::parse(readFile(storeLink));
-
-        assert(json["name"] == name && json["rev"] == gitInfo.rev);
-
-        gitInfo.storePath = json["storePath"];
-
-        if (store->isValidPath(store->parseStorePath(gitInfo.storePath))) {
-            gitInfo.revCount = json["revCount"];
-            return gitInfo;
-        }
-
-    } catch (SysError & e) {
-        if (e.errNo != ENOENT) throw;
-    }
-
-    auto source = sinkToSource([&](Sink & sink) {
-        RunOptions gitOptions("git", { "-C", cacheDir, "archive", gitInfo.rev });
-        gitOptions.standardOut = &sink;
-        runProgram2(gitOptions);
-    });
-
-    Path tmpDir = createTempDir();
-    AutoDelete delTmpDir(tmpDir, true);
-
-    unpackTarfile(*source, tmpDir);
-
-    gitInfo.storePath = store->printStorePath(store->addToStore(name, tmpDir));
-
-    gitInfo.revCount = std::stoull(runProgram("git", true, { "-C", cacheDir, "rev-list", "--count", gitInfo.rev }));
-
-    nlohmann::json json;
-    json["storePath"] = gitInfo.storePath;
-    json["uri"] = uri;
-    json["name"] = name;
-    json["rev"] = gitInfo.rev;
-    json["revCount"] = gitInfo.revCount;
-
-    writeFile(storeLink, json.dump());
-
-    return gitInfo;
-}
 
 static void prim_fetchGit(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
     std::string url;
     std::optional<std::string> ref;
-    std::string rev;
+    std::optional<Hash> rev;
     std::string name = "source";
+    bool fetchSubmodules = false;
     PathSet context;
 
     state.forceValue(*args[0]);
@@ -213,9 +29,11 @@ static void prim_fetchGit(EvalState & state, const Pos & pos, Value * * args, Va
             else if (n == "ref")
                 ref = state.forceStringNoCtx(*attr.value, *attr.pos);
             else if (n == "rev")
-                rev = state.forceStringNoCtx(*attr.value, *attr.pos);
+                rev = Hash(state.forceStringNoCtx(*attr.value, *attr.pos), htSHA1);
             else if (n == "name")
                 name = state.forceStringNoCtx(*attr.value, *attr.pos);
+            else if (n == "submodules")
+                fetchSubmodules = state.forceBool(*attr.value, *attr.pos);
             else
                 throw EvalError("unsupported argument '%s' to 'fetchGit', at %s", attr.name, *attr.pos);
         }
@@ -230,17 +48,36 @@ static void prim_fetchGit(EvalState & state, const Pos & pos, Value * * args, Va
     // whitelist. Ah well.
     state.checkURI(url);
 
-    auto gitInfo = exportGit(state.store, url, ref, rev, name);
+    if (evalSettings.pureEval && !rev)
+        throw Error("in pure evaluation mode, 'fetchGit' requires a Git revision");
+
+    fetchers::Attrs attrs;
+    attrs.insert_or_assign("type", "git");
+    attrs.insert_or_assign("url", url.find("://") != std::string::npos ? url : "file://" + url);
+    if (ref) attrs.insert_or_assign("ref", *ref);
+    if (rev) attrs.insert_or_assign("rev", rev->gitRev());
+    if (fetchSubmodules) attrs.insert_or_assign("submodules", true);
+    auto input = fetchers::inputFromAttrs(attrs);
+
+    // FIXME: use name?
+    auto [tree, input2] = input->fetchTree(state.store);
 
     state.mkAttrs(v, 8);
-    mkString(*state.allocAttr(v, state.sOutPath), gitInfo.storePath, PathSet({gitInfo.storePath}));
-    mkString(*state.allocAttr(v, state.symbols.create("rev")), gitInfo.rev);
-    mkString(*state.allocAttr(v, state.symbols.create("shortRev")), gitInfo.shortRev);
-    mkInt(*state.allocAttr(v, state.symbols.create("revCount")), gitInfo.revCount);
+    auto storePath = state.store->printStorePath(tree.storePath);
+    mkString(*state.allocAttr(v, state.sOutPath), storePath, PathSet({storePath}));
+    // Backward compatibility: set 'rev' to
+    // 0000000000000000000000000000000000000000 for a dirty tree.
+    auto rev2 = input2->getRev().value_or(Hash(htSHA1));
+    mkString(*state.allocAttr(v, state.symbols.create("rev")), rev2.gitRev());
+    mkString(*state.allocAttr(v, state.symbols.create("shortRev")), rev2.gitShortRev());
+    // Backward compatibility: set 'revCount' to 0 for a dirty tree.
+    mkInt(*state.allocAttr(v, state.symbols.create("revCount")),
+        tree.info.revCount.value_or(0));
+    mkBool(*state.allocAttr(v, state.symbols.create("submodules")), fetchSubmodules);
     v.attrs->sort();
 
     if (state.allowedPaths)
-        state.allowedPaths->insert(state.store->toRealPath(gitInfo.storePath));
+        state.allowedPaths->insert(tree.actualPath);
 }
 
 static RegisterPrimOp r("fetchGit", 1, prim_fetchGit);

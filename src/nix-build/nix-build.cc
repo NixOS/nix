@@ -16,7 +16,7 @@
 #include "get-drvs.hh"
 #include "common-eval-args.hh"
 #include "attr-path.hh"
-#include "legacy.hh"
+#include "../nix/legacy.hh"
 
 using namespace nix;
 using namespace std::string_literals;
