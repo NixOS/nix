@@ -11,6 +11,7 @@ ifeq ($(V), 0)
   trace-javac   = @echo "  JAVAC " $@;
   trace-jar     = @echo "  JAR   " $@;
   trace-mkdir   = @echo "  MKDIR " $@;
+  trace-test    = @echo "  TEST  " $@;
 
   suppress  = @
 

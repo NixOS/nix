@@ -40,29 +40,85 @@ elif [ "$(uname -s)" = "Linux" ] && [ -e /run/systemd/system ]; then
 fi
 
 INSTALL_MODE=no-daemon
-# Trivially handle the --daemon / --no-daemon options
-if [ "x${1:-}" = "x--no-daemon" ]; then
-    INSTALL_MODE=no-daemon
-elif [ "x${1:-}" = "x--daemon" ]; then
-    INSTALL_MODE=daemon
-elif [ "x${1:-}" != "x" ]; then
-    (
-        echo "Nix Installer [--daemon|--no-daemon]"
+CREATE_DARWIN_VOLUME=0
+# handle the command line flags
+while [ $# -gt 0 ]; do
+    case $1 in
+        --daemon)
+            INSTALL_MODE=daemon;;
+        --no-daemon)
+            INSTALL_MODE=no-daemon;;
+        --no-channel-add)
+            export NIX_INSTALLER_NO_CHANNEL_ADD=1;;
+        --daemon-user-count)
+            export NIX_USER_COUNT=$2
+            shift;;
+        --no-modify-profile)
+            NIX_INSTALLER_NO_MODIFY_PROFILE=1;;
+        --darwin-use-unencrypted-nix-store-volume)
+            CREATE_DARWIN_VOLUME=1;;
+        --nix-extra-conf-file)
+            export NIX_EXTRA_CONF="$(cat $2)"
+            shift;;
+        *)
+            (
+                echo "Nix Installer [--daemon|--no-daemon] [--daemon-user-count INT] [--no-channel-add] [--no-modify-profile] [--darwin-use-unencrypted-nix-store-volume] [--nix-extra-conf-file FILE]"
 
-        echo "Choose installation method."
-        echo ""
-        echo " --daemon:    Installs and configures a background daemon that manages the store,"
-        echo "              providing multi-user support and better isolation for local builds."
-        echo "              Both for security and reproducibility, this method is recommended if"
-        echo "              supported on your platform."
-        echo "              See https://nixos.org/nix/manual/#sect-multi-user-installation"
-        echo ""
-        echo " --no-daemon: Simple, single-user installation that does not require root and is"
-        echo "              trivial to uninstall."
-        echo "              (default)"
-        echo ""
-    ) >&2
-    exit
+                echo "Choose installation method."
+                echo ""
+                echo " --daemon:    Installs and configures a background daemon that manages the store,"
+                echo "              providing multi-user support and better isolation for local builds."
+                echo "              Both for security and reproducibility, this method is recommended if"
+                echo "              supported on your platform."
+                echo "              See https://nixos.org/nix/manual/#sect-multi-user-installation"
+                echo ""
+                echo " --no-daemon: Simple, single-user installation that does not require root and is"
+                echo "              trivial to uninstall."
+                echo "              (default)"
+                echo ""
+                echo " --no-channel-add:    Don't add any channels. nixpkgs-unstable is installed by default."
+                echo ""
+                echo " --no-modify-profile: Skip channel installation. When not provided nixpkgs-unstable"
+                echo "                      is installed by default."
+                echo ""
+                echo " --daemon-user-count: Number of build users to create. Defaults to 32."
+                echo ""
+                echo " --nix-extra-conf-file: Path to nix.conf to prepend when installing /etc/nix.conf"
+                echo ""
+            ) >&2
+
+            # darwin and Catalina+
+            if [ "$(uname -s)" = "Darwin" ] && [ "$macos_major" -gt 14 ]; then
+                (
+                    echo " --darwin-use-unencrypted-nix-store-volume: Create an APFS volume for the Nix"
+                    echo "              store and mount it at /nix. This is the recommended way to create"
+                    echo "              /nix with a read-only / on macOS >=10.15."
+                    echo "              See: https://nixos.org/nix/manual/#sect-macos-installation"
+                    echo ""
+                ) >&2
+            fi
+            exit;;
+    esac
+    shift
+done
+
+if [ "$(uname -s)" = "Darwin" ]; then
+    if [ "$CREATE_DARWIN_VOLUME" = 1 ]; then
+        printf '\e[1;31mCreating volume and mountpoint /nix.\e[0m\n'
+        "$self/create-darwin-volume.sh"
+    fi
+
+    info=$(diskutil info -plist / | xpath "/plist/dict/key[text()='Writable']/following-sibling::true[1]" 2> /dev/null)
+    if ! [ -e $dest ] && [ -n "$info" ] && [ "$macos_major" -gt 14 ]; then
+        (
+            echo ""
+            echo "Installing on macOS >=10.15 requires relocating the store to an apfs volume."
+            echo "Use sh <(curl https://nixos.org/nix/install) --darwin-use-unencrypted-nix-store-volume or run the preparation steps manually."
+            echo "See https://nixos.org/nix/manual/#sect-macos-installation"
+            echo ""
+        ) >&2
+        exit 1
+    fi
 fi
 
 if [ "$INSTALL_MODE" = "daemon" ]; then
@@ -130,13 +186,15 @@ if [ -z "$NIX_SSL_CERT_FILE" ] || ! [ -f "$NIX_SSL_CERT_FILE" ]; then
 fi
 
 # Subscribe the user to the Nixpkgs channel and fetch it.
-if ! $nix/bin/nix-channel --list | grep -q "^nixpkgs "; then
-    $nix/bin/nix-channel --add https://nixos.org/channels/nixpkgs-unstable
-fi
-if [ -z "$_NIX_INSTALLER_TEST" ]; then
-    if ! $nix/bin/nix-channel --update nixpkgs; then
-        echo "Fetching the nixpkgs channel failed. (Are you offline?)"
-        echo "To try again later, run \"nix-channel --update nixpkgs\"."
+if [ -z "$NIX_INSTALLER_NO_CHANNEL_ADD" ]; then
+    if ! $nix/bin/nix-channel --list | grep -q "^nixpkgs "; then
+        $nix/bin/nix-channel --add https://nixos.org/channels/nixpkgs-unstable
+    fi
+    if [ -z "$_NIX_INSTALLER_TEST" ]; then
+        if ! $nix/bin/nix-channel --update nixpkgs; then
+            echo "Fetching the nixpkgs channel failed. (Are you offline?)"
+            echo "To try again later, run \"nix-channel --update nixpkgs\"."
+        fi
     fi
 fi
 
@@ -145,6 +203,17 @@ p=$HOME/.nix-profile/etc/profile.d/nix.sh
 if [ -z "$NIX_INSTALLER_NO_MODIFY_PROFILE" ]; then
     # Make the shell source nix.sh during login.
     for i in .bash_profile .bash_login .profile; do
+        fn="$HOME/$i"
+        if [ -w "$fn" ]; then
+            if ! grep -q "$p" "$fn"; then
+                echo "modifying $fn..." >&2
+                echo "if [ -e $p ]; then . $p; fi # added by Nix installer" >> "$fn"
+            fi
+            added=1
+            break
+        fi
+    done
+    for i in .zshenv .zshrc; do
         fn="$HOME/$i"
         if [ -w "$fn" ]; then
             if ! grep -q "$p" "$fn"; then

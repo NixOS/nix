@@ -29,6 +29,8 @@ struct CmdPathInfo : StorePathsCommand, MixJSON
         return "query information about store paths";
     }
 
+    Category category() override { return catSecondary; }
+
     Examples examples() override
     {
         return {

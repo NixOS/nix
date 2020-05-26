@@ -4,12 +4,12 @@ rec {
 
   input1 = mkDerivation {
     name = "dependencies-input-1";
-    builder = ./dependencies.builder1.sh;
+    buildCommand = "mkdir $out; echo FOO > $out/foo";
   };
 
   input2 = mkDerivation {
     name = "dependencies-input-2";
-    builder = ./dependencies.builder2.sh;
+    buildCommand = "mkdir $out; echo BAR > $out/bar";
   };
 
   test1 = mkDerivation {
@@ -23,5 +23,5 @@ rec {
     builder = ./gc-concurrent2.builder.sh;
     inherit input1 input2;
   };
-  
+
 }

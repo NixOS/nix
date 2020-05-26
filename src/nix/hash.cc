@@ -23,9 +23,7 @@ struct CmdHash : Command
         mkFlag(0, "base64", "print hash in base-64", &base, Base64);
         mkFlag(0, "base32", "print hash in base-32 (Nix-specific)", &base, Base32);
         mkFlag(0, "base16", "print hash in base-16", &base, Base16);
-        mkFlag()
-            .longName("type")
-            .mkHashTypeFlag(&ht);
+        addFlag(Flag::mkHashTypeFlag("type", &ht));
         #if 0
         mkFlag()
             .longName("modulo")
@@ -42,6 +40,8 @@ struct CmdHash : Command
             ? "print cryptographic hash of a regular file"
             : "print cryptographic hash of the NAR serialisation of a path";
     }
+
+    Category category() override { return catUtility; }
 
     void run() override
     {
@@ -60,8 +60,7 @@ struct CmdHash : Command
 
             Hash h = hashSink->finish().first;
             if (truncate && h.hashSize > 20) h = compressHash(h, 20);
-            std::cout << format("%1%\n") %
-                h.to_string(base, base == SRI);
+            logger->stdout(h.to_string(base, base == SRI));
         }
     }
 };
@@ -77,9 +76,7 @@ struct CmdToBase : Command
 
     CmdToBase(Base base) : base(base)
     {
-        mkFlag()
-            .longName("type")
-            .mkHashTypeFlag(&ht);
+        addFlag(Flag::mkHashTypeFlag("type", &ht));
         expectArgs("strings", &args);
     }
 
@@ -92,10 +89,12 @@ struct CmdToBase : Command
             "SRI");
     }
 
+    Category category() override { return catUtility; }
+
     void run() override
     {
         for (auto s : args)
-            std::cout << fmt("%s\n", Hash(s, ht).to_string(base, base == SRI));
+            logger->stdout(Hash(s, ht).to_string(base, base == SRI));
     }
 };
 

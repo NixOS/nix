@@ -56,6 +56,3 @@
 #include <sys/wait.h>
 #include <termios.h>
 #include <unistd.h>
-
-#include "util.hh"
-#include "args.hh"
