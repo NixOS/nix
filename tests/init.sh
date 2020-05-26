@@ -17,7 +17,7 @@ cat > "$NIX_CONF_DIR"/nix.conf <<EOF
 build-users-group =
 keep-derivations = false
 sandbox = false
-experimental-features = nix-command
+experimental-features = nix-command flakes
 include nix.conf.extra
 EOF
 

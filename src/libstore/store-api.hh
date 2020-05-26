@@ -28,6 +28,7 @@ MakeError(InvalidPath, Error);
 MakeError(Unsupported, Error);
 MakeError(SubstituteGone, Error);
 MakeError(SubstituterDisabled, Error);
+MakeError(NotInStore, Error);
 
 
 struct BasicDerivation;

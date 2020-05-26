@@ -25,6 +25,8 @@ struct CmdEdit : InstallableCommand
         };
     }
 
+    Category category() override { return catSecondary; }
+
     void run(ref<Store> store) override
     {
         auto state = getEvalState();

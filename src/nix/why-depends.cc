@@ -37,11 +37,12 @@ struct CmdWhyDepends : SourceExprCommand
         expectArg("package", &_package);
         expectArg("dependency", &_dependency);
 
-        mkFlag()
-            .longName("all")
-            .shortName('a')
-            .description("show all edges in the dependency graph leading from 'package' to 'dependency', rather than just a shortest path")
-            .set(&all, true);
+        addFlag({
+            .longName = "all",
+            .shortName = 'a',
+            .description = "show all edges in the dependency graph leading from 'package' to 'dependency', rather than just a shortest path",
+            .handler = {&all, true},
+        });
     }
 
     std::string description() override
@@ -66,6 +67,8 @@ struct CmdWhyDepends : SourceExprCommand
             },
         };
     }
+
+    Category category() override { return catSecondary; }
 
     void run(ref<Store> store) override
     {
@@ -149,7 +152,7 @@ struct CmdWhyDepends : SourceExprCommand
             auto pathS = store->printStorePath(node.path);
 
             assert(node.dist != inf);
-            std::cout << fmt("%s%s%s%s" ANSI_NORMAL "\n",
+            logger->stdout("%s%s%s%s" ANSI_NORMAL,
                 firstPad,
                 node.visited ? "\e[38;5;244m" : "",
                 firstPad != "" ? "→ " : "",

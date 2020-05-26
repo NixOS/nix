@@ -526,13 +526,10 @@ these paths will be fetched (0.04 MiB download, 0.19 MiB unpacked):
 14.12 channel:
 
 <screen>
-$ nix-env -f https://github.com/NixOS/nixpkgs-channels/archive/nixos-14.12.tar.gz -iA firefox
+$ nix-env -f https://github.com/NixOS/nixpkgs/archive/nixos-14.12.tar.gz -iA firefox
 </screen>
 
-(The GitHub repository <literal>nixpkgs-channels</literal> is updated
-automatically from the main <literal>nixpkgs</literal> repository
-after certain tests have succeeded and binaries have been built and
-uploaded to the binary cache at <uri>cache.nixos.org</uri>.)</para>
+</para>
 
 </refsection>
 

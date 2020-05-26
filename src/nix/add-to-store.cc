@@ -14,12 +14,13 @@ struct CmdAddToStore : MixDryRun, StoreCommand
     {
         expectArg("path", &path);
 
-        mkFlag()
-            .longName("name")
-            .shortName('n')
-            .description("name component of the store path")
-            .labels({"name"})
-            .dest(&namePart);
+        addFlag({
+            .longName = "name",
+            .shortName = 'n',
+            .description = "name component of the store path",
+            .labels = {"name"},
+            .handler = {&namePart},
+        });
     }
 
     std::string description() override
@@ -32,6 +33,8 @@ struct CmdAddToStore : MixDryRun, StoreCommand
         return {
         };
     }
+
+    Category category() override { return catUtility; }
 
     void run(ref<Store> store) override
     {
@@ -50,7 +53,7 @@ struct CmdAddToStore : MixDryRun, StoreCommand
         if (!dryRun)
             store->addToStore(info, sink.s);
 
-        std::cout << fmt("%s\n", store->printStorePath(info.path));
+        logger->stdout("%s", store->printStorePath(info.path));
     }
 };
 

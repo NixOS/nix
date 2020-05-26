@@ -258,7 +258,7 @@ path. You can override it by passing <option>-I</option> or setting
 containing the Pan package from a specific revision of Nixpkgs:
 
 <screen>
-$ nix-shell -p pan -I nixpkgs=https://github.com/NixOS/nixpkgs-channels/archive/8a3eea054838b55aca962c3fbde9c83c102b8bf2.tar.gz
+$ nix-shell -p pan -I nixpkgs=https://github.com/NixOS/nixpkgs/archive/8a3eea054838b55aca962c3fbde9c83c102b8bf2.tar.gz
 
 [nix-shell:~]$ pan --version
 Pan 0.139
@@ -352,7 +352,7 @@ following Haskell script uses a specific branch of Nixpkgs/NixOS (the
 <programlisting><![CDATA[
 #! /usr/bin/env nix-shell
 #! nix-shell -i runghc -p "haskellPackages.ghcWithPackages (ps: [ps.HTTP ps.tagsoup])"
-#! nix-shell -I nixpkgs=https://github.com/NixOS/nixpkgs-channels/archive/nixos-18.03.tar.gz
+#! nix-shell -I nixpkgs=https://github.com/NixOS/nixpkgs/archive/nixos-18.03.tar.gz
 
 import Network.HTTP
 import Text.HTML.TagSoup
@@ -370,7 +370,7 @@ If you want to be even more precise, you can specify a specific
 revision of Nixpkgs:
 
 <programlisting>
-#! nix-shell -I nixpkgs=https://github.com/NixOS/nixpkgs-channels/archive/0672315759b3e15e2121365f067c1c8c56bb4722.tar.gz
+#! nix-shell -I nixpkgs=https://github.com/NixOS/nixpkgs/archive/0672315759b3e15e2121365f067c1c8c56bb4722.tar.gz
 </programlisting>
 
 </para>

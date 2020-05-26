@@ -40,16 +40,18 @@ struct CmdSearch : SourceExprCommand, MixJSON
     {
         expectArgs("regex", &res);
 
-        mkFlag()
-            .longName("update-cache")
-            .shortName('u')
-            .description("update the package search cache")
-            .handler([&]() { writeCache = true; useCache = false; });
+        addFlag({
+            .longName = "update-cache",
+            .shortName = 'u',
+            .description = "update the package search cache",
+            .handler = {[&]() { writeCache = true; useCache = false; }}
+        });
 
-        mkFlag()
-            .longName("no-cache")
-            .description("do not use or update the package search cache")
-            .handler([&]() { writeCache = false; useCache = false; });
+        addFlag({
+            .longName = "no-cache",
+            .description = "do not use or update the package search cache",
+            .handler = {[&]() { writeCache = false; useCache = false; }}
+        });
     }
 
     std::string description() override
@@ -263,7 +265,7 @@ struct CmdSearch : SourceExprCommand, MixJSON
                 throw SysError("cannot rename '%s' to '%s'", tmpFile, jsonCacheFileName);
         }
 
-        if (results.size() == 0)
+        if (!json && results.size() == 0)
             throw Error("no results for the given search term(s)!");
 
         RunPager pager;

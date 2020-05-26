@@ -11,6 +11,7 @@ export NIX_LOCALSTATE_DIR=$TEST_ROOT/var
 export NIX_LOG_DIR=$TEST_ROOT/var/log/nix
 export NIX_STATE_DIR=$TEST_ROOT/var/nix
 export NIX_CONF_DIR=$TEST_ROOT/etc
+unset NIX_USER_CONF_FILES
 export _NIX_TEST_SHARED=$TEST_ROOT/shared
 if [[ -n $NIX_STORE ]]; then
     export _NIX_TEST_NO_SANDBOX=1
@@ -21,6 +22,8 @@ export NIX_REMOTE=$NIX_REMOTE_
 unset NIX_PATH
 export TEST_HOME=$TEST_ROOT/test-home
 export HOME=$TEST_HOME
+unset XDG_CONFIG_HOME
+unset XDG_CONFIG_DIRS
 unset XDG_CACHE_HOME
 mkdir -p $TEST_HOME
 

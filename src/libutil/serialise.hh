@@ -148,6 +148,9 @@ struct StringSink : Sink
 {
     ref<std::string> s;
     StringSink() : s(make_ref<std::string>()) { };
+    explicit StringSink(const size_t reservedSize) : s(make_ref<std::string>()) {
+      s->reserve(reservedSize);
+    };
     StringSink(ref<std::string> s) : s(s) { };
     void operator () (const unsigned char * data, size_t len) override;
 };
