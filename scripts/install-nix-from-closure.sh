@@ -41,7 +41,6 @@ fi
 
 INSTALL_MODE=no-daemon
 CREATE_DARWIN_VOLUME=0
-NIX_EXTRA_CONF=
 # handle the command line flags
 while [ $# -gt 0 ]; do
     case $1 in
@@ -50,20 +49,20 @@ while [ $# -gt 0 ]; do
         --no-daemon)
             INSTALL_MODE=no-daemon;;
         --no-channel-add)
-            NIX_INSTALLER_NO_CHANNEL_ADD=1;;
+            export NIX_INSTALLER_NO_CHANNEL_ADD=1;;
         --daemon-user-count)
-            NIX_USER_COUNT=$2
+            export NIX_USER_COUNT=$2
             shift;;
         --no-modify-profile)
             NIX_INSTALLER_NO_MODIFY_PROFILE=1;;
         --darwin-use-unencrypted-nix-store-volume)
             CREATE_DARWIN_VOLUME=1;;
         --nix-extra-conf-file)
-            NIX_EXTRA_CONF=$(cat $2)
+            export NIX_EXTRA_CONF="$(cat $2)"
             shift;;
         *)
             (
-                echo "Nix Installer [--daemon|--no-daemon] [--no-channel-add] [--no-modify-profile]"
+                echo "Nix Installer [--daemon|--no-daemon] [--daemon-user-count INT] [--no-channel-add] [--no-modify-profile] [--darwin-use-unencrypted-nix-store-volume] [--nix-extra-conf-file FILE]"
 
                 echo "Choose installation method."
                 echo ""
@@ -81,6 +80,10 @@ while [ $# -gt 0 ]; do
                 echo ""
                 echo " --no-modify-profile: Skip channel installation. When not provided nixpkgs-unstable"
                 echo "                      is installed by default."
+                echo ""
+                echo " --daemon-user-count: Number of build users to create. Defaults to 32."
+                echo ""
+                echo " --nix-extra-conf-file: Path to nix.conf to prepend when installing /etc/nix.conf"
                 echo ""
             ) >&2
 

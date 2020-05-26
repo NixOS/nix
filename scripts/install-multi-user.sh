@@ -29,6 +29,7 @@ readonly NIX_FIRST_BUILD_UID="30001"
 # Please don't change this. We don't support it, because the
 # default shell profile that comes with Nix doesn't support it.
 readonly NIX_ROOT="/nix"
+readonly NIX_EXTRA_CONF=${NIX_EXTRA_CONF:-}
 
 readonly PROFILE_TARGETS=("/etc/bashrc" "/etc/profile.d/nix.sh" "/etc/zshrc")
 readonly PROFILE_BACKUP_SUFFIX=".backup-before-nix"
@@ -544,9 +545,11 @@ create_directories() {
 }
 
 place_channel_configuration() {
-    echo "https://nixos.org/channels/nixpkgs-unstable nixpkgs" > "$SCRATCH/.nix-channels"
-    _sudo "to set up the default system channel (part 1)" \
-          install -m 0664 "$SCRATCH/.nix-channels" "$ROOT_HOME/.nix-channels"
+    if [ -z "$NIX_INSTALLER_NO_CHANNEL_ADD" ]; then
+        echo "https://nixos.org/channels/nixpkgs-unstable nixpkgs" > "$SCRATCH/.nix-channels"
+        _sudo "to set up the default system channel (part 1)" \
+            install -m 0664 "$SCRATCH/.nix-channels" "$ROOT_HOME/.nix-channels"
+    fi
 }
 
 welcome_to_nix() {
@@ -728,13 +731,14 @@ setup_default_profile() {
         export NIX_SSL_CERT_FILE=/nix/var/nix/profiles/default/etc/ssl/certs/ca-bundle.crt
     fi
 
-    # Have to explicitly pass NIX_SSL_CERT_FILE as part of the sudo call,
-    # otherwise it will be lost in environments where sudo doesn't pass
-    # all the environment variables by default.
-    _sudo "to update the default channel in the default profile" \
-          HOME="$ROOT_HOME" NIX_SSL_CERT_FILE="$NIX_SSL_CERT_FILE" "$NIX_INSTALLED_NIX/bin/nix-channel" --update nixpkgs \
-          || channel_update_failed=1
-
+    if [ -z "$NIX_INSTALLER_NO_CHANNEL_ADD" ]; then
+        # Have to explicitly pass NIX_SSL_CERT_FILE as part of the sudo call,
+        # otherwise it will be lost in environments where sudo doesn't pass
+        # all the environment variables by default.
+        _sudo "to update the default channel in the default profile" \
+            HOME="$ROOT_HOME" NIX_SSL_CERT_FILE="$NIX_SSL_CERT_FILE" "$NIX_INSTALLED_NIX/bin/nix-channel" --update nixpkgs \
+            || channel_update_failed=1
+    fi
 }
 
 
