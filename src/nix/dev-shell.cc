@@ -136,8 +136,7 @@ StorePath getDerivationEnvironment(ref<Store> store, const StorePath & drvPath)
     Hash h = hashDerivationModulo(*store, drv, true);
     auto shellOutPath = store->makeOutputPath("out", h, drvName);
     drv.outputs.insert_or_assign("out", DerivationOutput(shellOutPath.clone(), FileSystemHash {
-        .method = FileIngestionMethod::Flat,
-        .hash = Hash { }
+        FileIngestionMethod::Flat, Hash { }
     }));
     drv.env["out"] = store->printStorePath(shellOutPath);
     auto shellDrvPath2 = writeDerivation(store, drv, drvName);
