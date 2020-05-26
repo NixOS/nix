@@ -453,7 +453,7 @@ create_directories() {
 }
 
 place_channel_configuration() {
-    if [ -z "$NIX_INSTALLER_NO_CHANNEL_ADD" ]; then
+    if [ -z "${NIX_INSTALLER_NO_CHANNEL_ADD:-}" ]; then
         echo "https://nixos.org/channels/nixpkgs-unstable nixpkgs" > "$SCRATCH/.nix-channels"
         _sudo "to set up the default system channel (part 1)" \
             install -m 0664 "$SCRATCH/.nix-channels" "$ROOT_HOME/.nix-channels"
@@ -639,7 +639,7 @@ setup_default_profile() {
         export NIX_SSL_CERT_FILE=/nix/var/nix/profiles/default/etc/ssl/certs/ca-bundle.crt
     fi
 
-    if [ -z "$NIX_INSTALLER_NO_CHANNEL_ADD" ]; then
+    if [ -z "${NIX_INSTALLER_NO_CHANNEL_ADD:-}" ]; then
         # Have to explicitly pass NIX_SSL_CERT_FILE as part of the sudo call,
         # otherwise it will be lost in environments where sudo doesn't pass
         # all the environment variables by default.
