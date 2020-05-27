@@ -33,6 +33,7 @@ public:
 
     virtual void getSettings(std::map<std::string, SettingInfo> & res, bool overridenOnly = false) = 0;
 
+    void applyConfig(const std::string & contents, const std::string & path = "<unknown>");
     void applyConfigFile(const Path & path);
 
     virtual void resetOverriden() = 0;
