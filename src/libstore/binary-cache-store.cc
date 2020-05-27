@@ -341,15 +341,14 @@ StorePath BinaryCacheStore::addToStore(const string & name, const Path & srcPath
         dumpPath(srcPath, sink, filter);
         h = hashString(hashAlgo, *sink.s);
         break;
-    }
-    case FileIngestionMethod::Flat:
+    case FileIngestionMethod::Flat: {
         auto s = readFile(srcPath);
         dumpString(s, sink);
         h = hashString(hashAlgo, s);
         break;
+    }
     case FileIngestionMethod::Git:
         throw Error("cannot add to binary cache store using the git file ingestion method");
-    default: throw;
     }
 
     ValidPathInfo info(makeFixedOutputPath(method, h, name));

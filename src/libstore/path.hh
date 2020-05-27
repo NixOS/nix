@@ -76,7 +76,7 @@ const std::string drvExtension = ".drv";
 enum struct FileIngestionMethod : uint8_t {
     Flat,
     Recursive,
-    Git
+    Git,
 };
 
 inline std::string ingestionMethodPrefix(FileIngestionMethod method) {

@@ -4,6 +4,7 @@
 #include "shared.hh"
 #include "references.hh"
 #include "archive.hh"
+#include "git.hh"
 
 using namespace nix;
 
@@ -41,6 +42,8 @@ struct CmdHash : Command
             d = "print cryptographic hash of a regular file";
         case FileIngestionMethod::Recursive:
             d = "print cryptographic hash of the NAR serialisation of a path";
+        case FileIngestionMethod::Git:
+            d = "print cryptographic hash of the Git serialisation of a path";
         };
         return d;
     }
@@ -51,22 +54,34 @@ struct CmdHash : Command
     {
         for (auto path : paths) {
 
-            std::unique_ptr<AbstractHashSink> hashSink;
-            if (modulus)
-                hashSink = std::make_unique<HashModuloSink>(ht, *modulus);
-            else
-                hashSink = std::make_unique<HashSink>(ht);
+            auto makeHashSink = [&]() -> std::unique_ptr<AbstractHashSink> {
+                std::unique_ptr<AbstractHashSink> t;
+                if (modulus)
+                    t = std::make_unique<HashModuloSink>(ht, *modulus);
+                else
+                    t = std::make_unique<HashSink>(ht);
+                return t;
+            };
 
+            Hash h;
             switch (mode) {
-            case FileIngestionMethod::Flat:
+            case FileIngestionMethod::Flat: {
+                auto hashSink = makeHashSink();
                 readFile(path, *hashSink);
+                h = hashSink->finish().first;
                 break;
-            case FileIngestionMethod::Recursive:
+            }
+            case FileIngestionMethod::Recursive: {
+                auto hashSink = makeHashSink();
                 dumpPath(path, *hashSink);
+                h = hashSink->finish().first;
+                break;
+            }
+            case FileIngestionMethod::Git:
+                h = dumpGitHash(makeHashSink, path);
                 break;
             }
 
-            Hash h = hashSink->finish().first;
             if (truncate && h.hashSize > 20) h = compressHash(h, 20);
             logger->stdout(h.to_string(base, base == SRI));
         }
@@ -75,6 +90,7 @@ struct CmdHash : Command
 
 static RegisterCommand r1("hash-file", [](){ return make_ref<CmdHash>(FileIngestionMethod::Flat); });
 static RegisterCommand r2("hash-path", [](){ return make_ref<CmdHash>(FileIngestionMethod::Recursive); });
+static RegisterCommand r3("hash-git", [](){ return make_ref<CmdHash>(FileIngestionMethod::Git); });
 
 struct CmdToBase : Command
 {
@@ -106,10 +122,10 @@ struct CmdToBase : Command
     }
 };
 
-static RegisterCommand r3("to-base16", [](){ return make_ref<CmdToBase>(Base16); });
-static RegisterCommand r4("to-base32", [](){ return make_ref<CmdToBase>(Base32); });
-static RegisterCommand r5("to-base64", [](){ return make_ref<CmdToBase>(Base64); });
-static RegisterCommand r6("to-sri", [](){ return make_ref<CmdToBase>(SRI); });
+static RegisterCommand r4("to-base16", [](){ return make_ref<CmdToBase>(Base16); });
+static RegisterCommand r5("to-base32", [](){ return make_ref<CmdToBase>(Base32); });
+static RegisterCommand r6("to-base64", [](){ return make_ref<CmdToBase>(Base64); });
+static RegisterCommand r7("to-sri", [](){ return make_ref<CmdToBase>(SRI); });
 
 /* Legacy nix-hash command. */
 static int compatNixHash(int argc, char * * argv)

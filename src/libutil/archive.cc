@@ -12,7 +12,6 @@
 #include <fcntl.h>
 
 #include "archive.hh"
-#include "restore-sink.hh"
 #include "util.hh"
 #include "config.hh"
 

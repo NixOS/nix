@@ -1,5 +1,6 @@
 #include "local-store.hh"
 #include "globals.hh"
+#include "git.hh"
 #include "archive.hh"
 #include "pathlocks.hh"
 #include "worker-protocol.hh"
@@ -1067,18 +1068,20 @@ StorePath LocalStore::addToStoreFromDump(const string & dump, const string & nam
 
             autoGC();
 
-            switch method{
+            switch (method) {
             case FileIngestionMethod::Flat:
                 writeFile(realPath, dump);
                 break;
-            case FileIngestionMethod::Recursive:
+            case FileIngestionMethod::Recursive: {
                 StringSource source(dump);
                 restorePath(realPath, source);
                 break;
-            case FileIngestionMethod::Git:
+            }
+            case FileIngestionMethod::Git: {
                 StringSource source(dump);
                 restoreGit(realPath, source);
                 break;
+            }
             }
 
             canonicalisePathMetaData(realPath, -1);

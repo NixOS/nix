@@ -2,7 +2,7 @@
 
 #include "types.hh"
 #include "serialise.hh"
-
+#include "fs-sink.hh"
 
 namespace nix {
 
@@ -49,19 +49,6 @@ void dumpPath(const Path & path, Sink & sink,
     PathFilter & filter = defaultPathFilter);
 
 void dumpString(const std::string & s, Sink & sink);
-
-/* FIXME: fix this API, it sucks. */
-struct ParseSink
-{
-    virtual void createDirectory(const Path & path) { };
-
-    virtual void createRegularFile(const Path & path) { };
-    virtual void isExecutable() { };
-    virtual void preallocateContents(unsigned long long size) { };
-    virtual void receiveContents(unsigned char * data, unsigned int len) { };
-
-    virtual void createSymlink(const Path & path, const string & target) { };
-};
 
 struct TeeSink : ParseSink
 {

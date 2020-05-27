@@ -85,3 +85,18 @@ try3() {
 try3 sha1 "800d59cfcd3c05e900cb4e214be48f6b886a08df" "vw46m23bizj4n8afrc0fj19wrp7mj3c0" "gA1Zz808BekAy04hS+SPa4hqCN8="
 try3 sha256 "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad" "1b8m03r63zqhnjf7l5wnldhh7c134ap5vpj0850ymkq1iyzicy5s" "ungWv48Bz+pBQUDeXa4iI7ADYaOWF3qctBD/YfIAFa0="
 try3 sha512 "204a8fc6dda82f0a0ced7beb8e08a41657c16ef468b228a8279be331a703c33596fd15c13b1b07f9aa1d3bea57789ca031ad85c7a71dd70354ec631238ca3445" "12k9jiq29iyqm03swfsgiw5mlqs173qazm3n7daz43infy12pyrcdf30fkk3qwv4yl2ick8yipc2mqnlh48xsvvxl60lbx8vp38yji0" "IEqPxt2oLwoM7XvrjgikFlfBbvRosiioJ5vjMacDwzWW/RXBOxsH+aodO+pXeJygMa2Fx6cd1wNU7GMSOMo0RQ=="
+
+# Git.
+try4 () {
+    hash=$(nix hash-git --base16 --type sha1 $TEST_ROOT/hash-path)
+    if test "$hash" != "$1"; then
+        echo "git hash, expected $1, got $hash"
+        exit 1
+    fi
+}
+
+rm -rf $TEST_ROOT/hash-path
+mkdir $TEST_ROOT/hash-path
+echo "Hello World" > $TEST_ROOT/hash-path/hello
+
+try4 "117c62a8c5e01758bd284126a6af69deab9dbbe2"
