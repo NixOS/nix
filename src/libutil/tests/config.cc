@@ -201,4 +201,64 @@ namespace nix {
         config.reapplyUnknownSettings();
         ASSERT_EQ(setting.get(), "unknownvalue");
     }
+
+    TEST(Config, applyConfigEmpty) {
+        Config config;
+        std::map<std::string, Config::SettingInfo> settings;
+        config.applyConfig("");
+        config.getSettings(settings);
+        ASSERT_TRUE(settings.empty());
+    }
+
+    TEST(Config, applyConfigEmptyWithComment) {
+        Config config;
+        std::map<std::string, Config::SettingInfo> settings;
+        config.applyConfig("# just a comment");
+        config.getSettings(settings);
+        ASSERT_TRUE(settings.empty());
+    }
+
+    TEST(Config, applyConfigAssignment) {
+        Config config;
+        std::map<std::string, Config::SettingInfo> settings;
+        Setting<std::string> setting{&config, "", "name-of-the-setting", "description"};
+        config.applyConfig(
+            "name-of-the-setting = value-from-file #useful comment\n"
+            "# name-of-the-setting = foo\n"
+        );
+        config.getSettings(settings);
+        ASSERT_FALSE(settings.empty());
+        ASSERT_EQ(settings["name-of-the-setting"].value, "value-from-file");
+    }
+
+    TEST(Config, applyConfigWithReassignedSetting) {
+        Config config;
+        std::map<std::string, Config::SettingInfo> settings;
+        Setting<std::string> setting{&config, "", "name-of-the-setting", "description"};
+        config.applyConfig(
+            "name-of-the-setting = first-value\n"
+            "name-of-the-setting = second-value\n"
+        );
+        config.getSettings(settings);
+        ASSERT_FALSE(settings.empty());
+        ASSERT_EQ(settings["name-of-the-setting"].value, "second-value");
+    }
+
+    TEST(Config, applyConfigFailsOnMissingIncludes) {
+        Config config;
+        std::map<std::string, Config::SettingInfo> settings;
+        Setting<std::string> setting{&config, "", "name-of-the-setting", "description"};
+
+        ASSERT_THROW(config.applyConfig(
+            "name-of-the-setting = value-from-file\n"
+            "# name-of-the-setting = foo\n"
+            "include /nix/store/does/not/exist.nix"
+        ), Error);
+    }
+
+    TEST(Config, applyConfigInvalidThrows) {
+        Config config;
+        ASSERT_THROW(config.applyConfig("value == key"), UsageError);
+        ASSERT_THROW(config.applyConfig("value "), UsageError);
+    }
 }
