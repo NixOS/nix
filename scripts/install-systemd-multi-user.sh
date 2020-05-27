@@ -88,7 +88,7 @@ poly_configure_nix_daemon_service() {
           systemctl start nix-daemon.socket
 
     _sudo "to start the nix-daemon.service" \
-          systemctl start nix-daemon.service
+          systemctl restart nix-daemon.service
 
 }
 
