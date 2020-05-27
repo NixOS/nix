@@ -118,7 +118,7 @@ string storePathToHash(const Path & path)
        for paths copied by addToStore() or produced by fixed-output
        derivations:
          the string "fixed:out:<rec><algo>:<hash>:", where
-           <rec> = "r:" for recursive (path) hashes, "g:" for git
+           <rec> = "r:" for recursive (path) hashes, "git:" for git
              paths, or "" for flat (file) hashes
            <algo> = "md5", "sha1" or "sha256"
            <hash> = base-16 representation of the path or flat hash of
@@ -790,7 +790,7 @@ bool ValidPathInfo::isContentAddressed(const Store & store) const
         FileIngestionMethod method = FileIngestionMethod::Flat;
         if (ca.compare(6, 2, "r:") == 0)
             method = FileIngestionMethod::Recursive;
-        else if (ca.compare(6, 2, "g:") == 0)
+        else if (ca.compare(6, 4, "git:") == 0)
             method = FileIngestionMethod::Git;
         Hash hash(std::string(ca, 6 + ingestionMethodPrefix(method).length()));
         auto refs = cloneStorePathSet(references);

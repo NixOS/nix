@@ -86,7 +86,7 @@ inline std::string ingestionMethodPrefix(FileIngestionMethod method) {
     case FileIngestionMethod::Recursive:
         return "r:";
     case FileIngestionMethod::Git:
-        return "g:";
+        return "git:";
     }
     throw;
 }

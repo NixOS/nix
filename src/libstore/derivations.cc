@@ -17,7 +17,7 @@ void DerivationOutput::parseHashInfo(FileIngestionMethod & recursive, Hash & has
     if (string(algo, 0, 2) == "r:") {
         recursive = FileIngestionMethod::Recursive;
         algo = string(algo, 2);
-    } else if (string(algo, 0, 2) == "g:") {
+    } else if (string(algo, 0, 4) == "git:") {
         recursive = FileIngestionMethod::Git;
         algo = string(algo, 2);
     }
