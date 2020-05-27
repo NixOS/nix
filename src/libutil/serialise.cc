@@ -89,6 +89,10 @@ void Source::operator () (unsigned char * data, size_t len)
     }
 }
 
+void Source::operator () (std::basic_string_view<unsigned char> & data)
+{
+    (*this)((unsigned char *) data.data(), data.size());
+}
 
 std::string Source::drain()
 {

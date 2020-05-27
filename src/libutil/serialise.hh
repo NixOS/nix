@@ -54,6 +54,7 @@ struct Source
        It blocks until all the requested data is available, or throws
        an error if it is not going to be available.   */
     void operator () (unsigned char * data, size_t len);
+    void operator () (std::basic_string_view<unsigned char> & data);
 
     /* Store up to ‘len’ in the buffer pointed to by ‘data’, and
        return the number of bytes stored.  It blocks until at least

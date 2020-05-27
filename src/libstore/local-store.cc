@@ -1067,11 +1067,19 @@ StorePath LocalStore::addToStoreFromDump(const string & dump, const string & nam
 
             autoGC();
 
-            if (method == FileIngestionMethod::Recursive) {
+            switch method{
+            case FileIngestionMethod::Flat:
+                writeFile(realPath, dump);
+                break;
+            case FileIngestionMethod::Recursive:
                 StringSource source(dump);
                 restorePath(realPath, source);
-            } else
-                writeFile(realPath, dump);
+                break;
+            case FileIngestionMethod::Git:
+                StringSource source(dump);
+                restoreGit(realPath, source);
+                break;
+            }
 
             canonicalisePathMetaData(realPath, -1);
 
