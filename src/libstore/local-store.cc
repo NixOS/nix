@@ -557,10 +557,10 @@ void LocalStore::checkDerivationOutputs(const StorePath & drvPath, const Derivat
         if (out == drv.outputs.end())
             throw Error("derivation '%s' does not have an output named 'out'", printStorePath(drvPath));
 
-        FileIngestionMethod recursive; Hash h;
-        out->second.parseHashInfo(recursive, h);
+        FileIngestionMethod method; Hash h;
+        out->second.parseHashInfo(method, h);
 
-        check(makeFixedOutputPath(recursive, h, drvName), out->second.path, "out");
+        check(makeFixedOutputPath(method, h, drvName), out->second.path, "out");
     }
 
     else {
@@ -1043,11 +1043,11 @@ void LocalStore::addToStore(const ValidPathInfo & info, Source & source,
 
 
 StorePath LocalStore::addToStoreFromDump(const string & dump, const string & name,
-    FileIngestionMethod recursive, HashType hashAlgo, RepairFlag repair)
+    FileIngestionMethod method, HashType hashAlgo, RepairFlag repair)
 {
     Hash h = hashString(hashAlgo, dump);
 
-    auto dstPath = makeFixedOutputPath(recursive, h, name);
+    auto dstPath = makeFixedOutputPath(method, h, name);
 
     addTempRoot(dstPath);
 
@@ -1067,7 +1067,7 @@ StorePath LocalStore::addToStoreFromDump(const string & dump, const string & nam
 
             autoGC();
 
-            if (recursive == FileIngestionMethod::Recursive) {
+            if (method == FileIngestionMethod::Recursive) {
                 StringSource source(dump);
                 restorePath(realPath, source);
             } else
@@ -1080,7 +1080,7 @@ StorePath LocalStore::addToStoreFromDump(const string & dump, const string & nam
                above (if called with recursive == true and hashAlgo ==
                sha256); otherwise, compute it here. */
             HashResult hash;
-            if (recursive == FileIngestionMethod::Recursive) {
+            if (method == FileIngestionMethod::Recursive) {
                 hash.first = hashAlgo == htSHA256 ? h : hashString(htSHA256, dump);
                 hash.second = dump.size();
             } else
@@ -1091,7 +1091,7 @@ StorePath LocalStore::addToStoreFromDump(const string & dump, const string & nam
             ValidPathInfo info(dstPath.clone());
             info.narHash = hash.first;
             info.narSize = hash.second;
-            info.ca = makeFixedOutputCA(recursive, h);
+            info.ca = makeFixedOutputCA(method, h);
             registerValidPath(info);
         }
 
@@ -1103,7 +1103,7 @@ StorePath LocalStore::addToStoreFromDump(const string & dump, const string & nam
 
 
 StorePath LocalStore::addToStore(const string & name, const Path & _srcPath,
-    FileIngestionMethod recursive, HashType hashAlgo, PathFilter & filter, RepairFlag repair)
+    FileIngestionMethod method, HashType hashAlgo, PathFilter & filter, RepairFlag repair)
 {
     Path srcPath(absPath(_srcPath));
 
@@ -1111,12 +1111,12 @@ StorePath LocalStore::addToStore(const string & name, const Path & _srcPath,
        method for very large paths, but `copyPath' is mainly used for
        small files. */
     StringSink sink;
-    if (recursive == FileIngestionMethod::Recursive)
+    if (method == FileIngestionMethod::Recursive)
         dumpPath(srcPath, sink, filter);
     else
         sink.s = make_ref<std::string>(readFile(srcPath));
 
-    return addToStoreFromDump(*sink.s, name, recursive, hashAlgo, repair);
+    return addToStoreFromDump(*sink.s, name, method, hashAlgo, repair);
 }
 
 

@@ -204,12 +204,12 @@ StorePath Store::makeTextPath(std::string_view name, const Hash & hash,
 
 
 std::pair<StorePath, Hash> Store::computeStorePathForPath(std::string_view name,
-    const Path & srcPath, FileIngestionMethod recursive, HashType hashAlgo, PathFilter & filter) const
+    const Path & srcPath, FileIngestionMethod method, HashType hashAlgo, PathFilter & filter) const
 {
-    Hash h = recursive == FileIngestionMethod::Recursive
+    Hash h = method == FileIngestionMethod::Recursive
         ? hashPath(hashAlgo, srcPath, filter).first
         : hashFile(hashAlgo, srcPath);
-    return std::make_pair(makeFixedOutputPath(recursive, h, name), h);
+    return std::make_pair(makeFixedOutputPath(method, h, name), h);
 }
 
 

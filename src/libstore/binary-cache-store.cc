@@ -327,7 +327,7 @@ void BinaryCacheStore::queryPathInfoUncached(const StorePath & storePath,
 }
 
 StorePath BinaryCacheStore::addToStore(const string & name, const Path & srcPath,
-    FileIngestionMethod recursive, HashType hashAlgo, PathFilter & filter, RepairFlag repair)
+    FileIngestionMethod method, HashType hashAlgo, PathFilter & filter, RepairFlag repair)
 {
     // FIXME: some cut&paste from LocalStore::addToStore().
 
@@ -336,7 +336,7 @@ StorePath BinaryCacheStore::addToStore(const string & name, const Path & srcPath
        small files. */
     StringSink sink;
     Hash h;
-    if (recursive == FileIngestionMethod::Recursive) {
+    if (method == FileIngestionMethod::Recursive) {
         dumpPath(srcPath, sink, filter);
         h = hashString(hashAlgo, *sink.s);
     } else {
@@ -345,7 +345,7 @@ StorePath BinaryCacheStore::addToStore(const string & name, const Path & srcPath
         h = hashString(hashAlgo, s);
     }
 
-    ValidPathInfo info(makeFixedOutputPath(recursive, h, name));
+    ValidPathInfo info(makeFixedOutputPath(method, h, name));
 
     addToStore(info, sink.s, repair, CheckSigs, nullptr);
 

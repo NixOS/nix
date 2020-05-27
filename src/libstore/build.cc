@@ -2734,7 +2734,7 @@ struct RestrictedStore : public LocalFSStore
     { throw Error("queryPathFromHashPart"); }
 
     StorePath addToStore(const string & name, const Path & srcPath,
-        FileIngestionMethod recursive = FileIngestionMethod::Recursive, HashType hashAlgo = htSHA256,
+        FileIngestionMethod method = FileIngestionMethod::Recursive, HashType hashAlgo = htSHA256,
         PathFilter & filter = defaultPathFilter, RepairFlag repair = NoRepair) override
     { throw Error("addToStore"); }
 
@@ -2747,9 +2747,9 @@ struct RestrictedStore : public LocalFSStore
     }
 
     StorePath addToStoreFromDump(const string & dump, const string & name,
-        FileIngestionMethod recursive = FileIngestionMethod::Recursive, HashType hashAlgo = htSHA256, RepairFlag repair = NoRepair) override
+        FileIngestionMethod method = FileIngestionMethod::Recursive, HashType hashAlgo = htSHA256, RepairFlag repair = NoRepair) override
     {
-        auto path = next->addToStoreFromDump(dump, name, recursive, hashAlgo, repair);
+        auto path = next->addToStoreFromDump(dump, name, method, hashAlgo, repair);
         goal.addDependency(path);
         return path;
     }
@@ -3692,10 +3692,10 @@ void DerivationGoal::registerOutputs()
 
         if (fixedOutput) {
 
-            FileIngestionMethod recursive; Hash h;
-            i.second.parseHashInfo(recursive, h);
+            FileIngestionMethod outputHashMode; Hash h;
+            i.second.parseHashInfo(outputHashMode, h);
 
-            if (recursive == FileIngestionMethod::Flat) {
+            if (outputHashMode == FileIngestionMethod::Flat) {
                 /* The output path should be a regular file without execute permission. */
                 if (!S_ISREG(st.st_mode) || (st.st_mode & S_IXUSR) != 0)
                     throw BuildError(
@@ -3705,11 +3705,11 @@ void DerivationGoal::registerOutputs()
 
             /* Check the hash. In hash mode, move the path produced by
                the derivation to its content-addressed location. */
-            Hash h2 = recursive == FileIngestionMethod::Recursive
+            Hash h2 = outputHashMode == FileIngestionMethod::Recursive
                 ? hashPath(h.type, actualPath).first
                 : hashFile(h.type, actualPath);
 
-            auto dest = worker.store.makeFixedOutputPath(recursive, h2, i.second.path.name());
+            auto dest = worker.store.makeFixedOutputPath(outputHashMode, h2, i.second.path.name());
 
             if (h != h2) {
 
@@ -3738,7 +3738,7 @@ void DerivationGoal::registerOutputs()
             else
                 assert(worker.store.parseStorePath(path) == dest);
 
-            ca = makeFixedOutputCA(recursive, h2);
+            ca = makeFixedOutputCA(outputHashMode, h2);
         }
 
         /* Get rid of all weird permissions.  This also checks that

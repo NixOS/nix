@@ -1042,7 +1042,7 @@ static void prim_toFile(EvalState & state, const Pos & pos, Value * * args, Valu
 
 
 static void addPath(EvalState & state, const Pos & pos, const string & name, const Path & path_,
-    Value * filterFun, FileIngestionMethod recursive, const Hash & expectedHash, Value & v)
+    Value * filterFun, FileIngestionMethod method, const Hash & expectedHash, Value & v)
 {
     const auto path = evalSettings.pureEval && expectedHash ?
         path_ :
@@ -1073,12 +1073,12 @@ static void addPath(EvalState & state, const Pos & pos, const string & name, con
 
     std::optional<StorePath> expectedStorePath;
     if (expectedHash)
-        expectedStorePath = state.store->makeFixedOutputPath(recursive, expectedHash, name);
+        expectedStorePath = state.store->makeFixedOutputPath(method, expectedHash, name);
     Path dstPath;
     if (!expectedHash || !state.store->isValidPath(*expectedStorePath)) {
         dstPath = state.store->printStorePath(settings.readOnlyMode
-            ? state.store->computeStorePathForPath(name, path, recursive, htSHA256, filter).first
-            : state.store->addToStore(name, path, recursive, htSHA256, filter, state.repair));
+            ? state.store->computeStorePathForPath(name, path, method, htSHA256, filter).first
+            : state.store->addToStore(name, path, method, htSHA256, filter, state.repair));
         if (expectedHash && expectedStorePath != state.store->parseStorePath(dstPath))
             throw Error("store path mismatch in (possibly filtered) path added from '%s'", path);
     } else
@@ -1108,7 +1108,7 @@ static void prim_path(EvalState & state, const Pos & pos, Value * * args, Value 
     Path path;
     string name;
     Value * filterFun = nullptr;
-    auto recursive = FileIngestionMethod::Recursive;
+    auto method = FileIngestionMethod::Recursive;
     Hash expectedHash;
 
     for (auto & attr : *args[0]->attrs) {
@@ -1124,7 +1124,7 @@ static void prim_path(EvalState & state, const Pos & pos, Value * * args, Value 
             state.forceValue(*attr.value, pos);
             filterFun = attr.value;
         } else if (n == "recursive")
-            recursive = FileIngestionMethod { state.forceBool(*attr.value, *attr.pos) };
+            method = FileIngestionMethod { state.forceBool(*attr.value, *attr.pos) };
         else if (n == "sha256")
             expectedHash = Hash(state.forceStringNoCtx(*attr.value, *attr.pos), htSHA256);
         else
@@ -1135,7 +1135,7 @@ static void prim_path(EvalState & state, const Pos & pos, Value * * args, Value 
     if (name.empty())
         name = baseNameOf(path);
 
-    addPath(state, pos, name, path, filterFun, recursive, expectedHash, v);
+    addPath(state, pos, name, path, filterFun, method, expectedHash, v);
 }
 
 
