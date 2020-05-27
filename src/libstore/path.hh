@@ -74,8 +74,9 @@ const size_t storePathHashLen = 32; // i.e. 160 bits
 const std::string drvExtension = ".drv";
 
 enum struct FileIngestionMethod : uint8_t {
-    Flat = false,
-    Recursive = true
+    Flat,
+    Recursive,
+    Git
 };
 
 inline std::string ingestionMethodPrefix(FileIngestionMethod method) {
@@ -84,6 +85,8 @@ inline std::string ingestionMethodPrefix(FileIngestionMethod method) {
         return "";
     case FileIngestionMethod::Recursive:
         return "r:";
+    case FileIngestionMethod::Git:
+        return "g:";
     }
     throw;
 }
