@@ -725,8 +725,7 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
         if (!jsonObject) drv.env["out"] = state.store->printStorePath(outPath);
         drv.outputs.insert_or_assign("out", DerivationOutput {
             std::move(outPath),
-            (ingestionMethod == FileIngestionMethod::Recursive ? "r:" : "")
-                + printHashType(h.type),
+            ingestionMethodPrefix(ingestionMethod) + printHashType(h.type),
             h.to_string(Base16, false),
         });
     }

@@ -78,6 +78,16 @@ enum struct FileIngestionMethod : uint8_t {
     Recursive = true
 };
 
+inline std::string ingestionMethodPrefix(FileIngestionMethod method) {
+    switch (method) {
+    case FileIngestionMethod::Flat:
+        return "";
+    case FileIngestionMethod::Recursive:
+        return "r:";
+    }
+    throw;
+}
+
 struct StorePathWithOutputs
 {
     StorePath path;
