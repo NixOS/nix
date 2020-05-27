@@ -9,16 +9,16 @@
 namespace nix {
 
 
-void DerivationOutput::parseHashInfo(FileIngestionMethod & recursive, Hash & hash) const
+void DerivationOutput::parseHashInfo(FileIngestionMethod & method, Hash & hash) const
 {
-    recursive = FileIngestionMethod::Flat;
+    method = FileIngestionMethod::Flat;
     string algo = hashAlgo;
 
     if (string(algo, 0, 2) == "r:") {
-        recursive = FileIngestionMethod::Recursive;
+        method = FileIngestionMethod::Recursive;
         algo = string(algo, 2);
     } else if (string(algo, 0, 4) == "git:") {
-        recursive = FileIngestionMethod::Git;
+        method = FileIngestionMethod::Git;
         algo = string(algo, 2);
     }
 

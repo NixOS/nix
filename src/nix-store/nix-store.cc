@@ -174,10 +174,10 @@ static void opAdd(Strings opFlags, Strings opArgs)
    store. */
 static void opAddFixed(Strings opFlags, Strings opArgs)
 {
-    auto recursive = FileIngestionMethod::Flat;
+    auto method = FileIngestionMethod::Flat;
 
     for (auto & i : opFlags)
-        if (i == "--recursive") recursive = FileIngestionMethod::Recursive;
+        if (i == "--recursive") method = FileIngestionMethod::Recursive;
         else throw UsageError(format("unknown flag '%1%'") % i);
 
     if (opArgs.empty())
@@ -187,17 +187,17 @@ static void opAddFixed(Strings opFlags, Strings opArgs)
     opArgs.pop_front();
 
     for (auto & i : opArgs)
-        cout << fmt("%s\n", store->printStorePath(store->addToStore(std::string(baseNameOf(i)), i, recursive, hashAlgo)));
+        cout << fmt("%s\n", store->printStorePath(store->addToStore(std::string(baseNameOf(i)), i, method, hashAlgo)));
 }
 
 
 /* Hack to support caching in `nix-prefetch-url'. */
 static void opPrintFixedPath(Strings opFlags, Strings opArgs)
 {
-    auto recursive = FileIngestionMethod::Flat;
+    auto method = FileIngestionMethod::Flat;
 
     for (auto i : opFlags)
-        if (i == "--recursive") recursive = FileIngestionMethod::Recursive;
+        if (i == "--recursive") method = FileIngestionMethod::Recursive;
         else throw UsageError(format("unknown flag '%1%'") % i);
 
     if (opArgs.size() != 3)
@@ -208,7 +208,7 @@ static void opPrintFixedPath(Strings opFlags, Strings opArgs)
     string hash = *i++;
     string name = *i++;
 
-    cout << fmt("%s\n", store->printStorePath(store->makeFixedOutputPath(recursive, Hash(hash, hashAlgo), name)));
+    cout << fmt("%s\n", store->printStorePath(store->makeFixedOutputPath(method, Hash(hash, hashAlgo), name)));
 }
 
 

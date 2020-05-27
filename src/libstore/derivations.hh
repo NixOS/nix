@@ -22,7 +22,7 @@ struct DerivationOutput
         , hashAlgo(std::move(hashAlgo))
         , hash(std::move(hash))
     { }
-    void parseHashInfo(FileIngestionMethod & recursive, Hash & hash) const;
+    void parseHashInfo(FileIngestionMethod & method, Hash & hash) const;
 };
 
 typedef std::map<string, DerivationOutput> DerivationOutputs;
