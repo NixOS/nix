@@ -488,6 +488,8 @@ StorePath RemoteStore::addToStore(const string & name, const Path & _srcPath,
 {
     if (repair) throw Error("repairing is not supported when building through the Nix daemon");
 
+    if (method == FileIngestionMethod::Git) throw Error("cannot remotely add to store using the git file ingestion method");
+
     auto conn(getConnection());
 
     Path srcPath(absPath(_srcPath));

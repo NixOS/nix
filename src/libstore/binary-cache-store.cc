@@ -339,6 +339,8 @@ StorePath BinaryCacheStore::addToStore(const string & name, const Path & srcPath
     if (method == FileIngestionMethod::Recursive) {
         dumpPath(srcPath, sink, filter);
         h = hashString(hashAlgo, *sink.s);
+    } else if (method == FileIngestionMethod::Git) {
+        throw Error("cannot add to binary cache store using the git file ingestion method");
     } else {
         auto s = readFile(srcPath);
         dumpString(s, sink);
