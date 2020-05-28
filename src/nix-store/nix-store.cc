@@ -174,10 +174,10 @@ static void opAdd(Strings opFlags, Strings opArgs)
    store. */
 static void opAddFixed(Strings opFlags, Strings opArgs)
 {
-    bool recursive = false;
+    auto recursive = FileIngestionMethod::Flat;
 
     for (auto & i : opFlags)
-        if (i == "--recursive") recursive = true;
+        if (i == "--recursive") recursive = FileIngestionMethod::Recursive;
         else throw UsageError(format("unknown flag '%1%'") % i);
 
     if (opArgs.empty())
@@ -194,10 +194,10 @@ static void opAddFixed(Strings opFlags, Strings opArgs)
 /* Hack to support caching in `nix-prefetch-url'. */
 static void opPrintFixedPath(Strings opFlags, Strings opArgs)
 {
-    bool recursive = false;
+    auto recursive = FileIngestionMethod::Flat;
 
     for (auto i : opFlags)
-        if (i == "--recursive") recursive = true;
+        if (i == "--recursive") recursive = FileIngestionMethod::Recursive;
         else throw UsageError(format("unknown flag '%1%'") % i);
 
     if (opArgs.size() != 3)

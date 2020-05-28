@@ -67,10 +67,10 @@ DownloadFileResult downloadFile(
         StringSink sink;
         dumpString(*res.data, sink);
         auto hash = hashString(htSHA256, *res.data);
-        ValidPathInfo info(store->makeFixedOutputPath(false, hash, name));
+        ValidPathInfo info(store->makeFixedOutputPath(FileIngestionMethod::Flat, hash, name));
         info.narHash = hashString(htSHA256, *sink.s);
         info.narSize = sink.s->size();
-        info.ca = makeFixedOutputCA(false, hash);
+        info.ca = makeFixedOutputCA(FileIngestionMethod::Flat, hash);
         store->addToStore(info, sink.s, NoRepair, NoCheckSigs);
         storePath = std::move(info.path);
     }
@@ -141,7 +141,7 @@ Tree downloadTarball(
             throw nix::Error("tarball '%s' contains an unexpected number of top-level files", url);
         auto topDir = tmpDir + "/" + members.begin()->name;
         lastModified = lstat(topDir).st_mtime;
-        unpackedStorePath = store->addToStore(name, topDir, true, htSHA256, defaultPathFilter, NoRepair);
+        unpackedStorePath = store->addToStore(name, topDir, FileIngestionMethod::Recursive, htSHA256, defaultPathFilter, NoRepair);
     }
 
     Attrs infoAttrs({

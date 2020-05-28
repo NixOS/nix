@@ -562,7 +562,7 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
 
     std::optional<std::string> outputHash;
     std::string outputHashAlgo;
-    bool outputHashRecursive = false;
+    auto ingestionMethod = FileIngestionMethod::Flat;
 
     StringSet outputs;
     outputs.insert("out");
@@ -573,8 +573,8 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
         vomit("processing attribute '%1%'", key);
 
         auto handleHashMode = [&](const std::string & s) {
-            if (s == "recursive") outputHashRecursive = true;
-            else if (s == "flat") outputHashRecursive = false;
+            if (s == "recursive") ingestionMethod = FileIngestionMethod::Recursive;
+            else if (s == "flat") ingestionMethod = FileIngestionMethod::Flat;
             else throw EvalError("invalid value '%s' for 'outputHashMode' attribute, at %s", s, posDrvName);
         };
 
@@ -721,11 +721,14 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
         HashType ht = outputHashAlgo.empty() ? htUnknown : parseHashType(outputHashAlgo);
         Hash h(*outputHash, ht);
 
-        auto outPath = state.store->makeFixedOutputPath(outputHashRecursive, h, drvName);
+        auto outPath = state.store->makeFixedOutputPath(ingestionMethod, h, drvName);
         if (!jsonObject) drv.env["out"] = state.store->printStorePath(outPath);
-        drv.outputs.insert_or_assign("out", DerivationOutput(std::move(outPath),
-                (outputHashRecursive ? "r:" : "") + printHashType(h.type),
-                h.to_string(Base16, false)));
+        drv.outputs.insert_or_assign("out", DerivationOutput {
+            std::move(outPath),
+            (ingestionMethod == FileIngestionMethod::Recursive ? "r:" : "")
+                + printHashType(h.type),
+            h.to_string(Base16, false),
+        });
     }
 
     else {
@@ -1039,7 +1042,7 @@ static void prim_toFile(EvalState & state, const Pos & pos, Value * * args, Valu
 
 
 static void addPath(EvalState & state, const Pos & pos, const string & name, const Path & path_,
-    Value * filterFun, bool recursive, const Hash & expectedHash, Value & v)
+    Value * filterFun, FileIngestionMethod method, const Hash & expectedHash, Value & v)
 {
     const auto path = evalSettings.pureEval && expectedHash ?
         path_ :
@@ -1070,12 +1073,12 @@ static void addPath(EvalState & state, const Pos & pos, const string & name, con
 
     std::optional<StorePath> expectedStorePath;
     if (expectedHash)
-        expectedStorePath = state.store->makeFixedOutputPath(recursive, expectedHash, name);
+        expectedStorePath = state.store->makeFixedOutputPath(method, expectedHash, name);
     Path dstPath;
     if (!expectedHash || !state.store->isValidPath(*expectedStorePath)) {
         dstPath = state.store->printStorePath(settings.readOnlyMode
-            ? state.store->computeStorePathForPath(name, path, recursive, htSHA256, filter).first
-            : state.store->addToStore(name, path, recursive, htSHA256, filter, state.repair));
+            ? state.store->computeStorePathForPath(name, path, method, htSHA256, filter).first
+            : state.store->addToStore(name, path, method, htSHA256, filter, state.repair));
         if (expectedHash && expectedStorePath != state.store->parseStorePath(dstPath))
             throw Error("store path mismatch in (possibly filtered) path added from '%s'", path);
     } else
@@ -1096,7 +1099,7 @@ static void prim_filterSource(EvalState & state, const Pos & pos, Value * * args
     if (args[0]->type != tLambda)
         throw TypeError(format("first argument in call to 'filterSource' is not a function but %1%, at %2%") % showType(*args[0]) % pos);
 
-    addPath(state, pos, std::string(baseNameOf(path)), path, args[0], true, Hash(), v);
+    addPath(state, pos, std::string(baseNameOf(path)), path, args[0], FileIngestionMethod::Recursive, Hash(), v);
 }
 
 static void prim_path(EvalState & state, const Pos & pos, Value * * args, Value & v)
@@ -1105,7 +1108,7 @@ static void prim_path(EvalState & state, const Pos & pos, Value * * args, Value 
     Path path;
     string name;
     Value * filterFun = nullptr;
-    auto recursive = true;
+    auto method = FileIngestionMethod::Recursive;
     Hash expectedHash;
 
     for (auto & attr : *args[0]->attrs) {
@@ -1121,7 +1124,7 @@ static void prim_path(EvalState & state, const Pos & pos, Value * * args, Value 
             state.forceValue(*attr.value, pos);
             filterFun = attr.value;
         } else if (n == "recursive")
-            recursive = state.forceBool(*attr.value, *attr.pos);
+            method = FileIngestionMethod { state.forceBool(*attr.value, *attr.pos) };
         else if (n == "sha256")
             expectedHash = Hash(state.forceStringNoCtx(*attr.value, *attr.pos), htSHA256);
         else
@@ -1132,7 +1135,7 @@ static void prim_path(EvalState & state, const Pos & pos, Value * * args, Value 
     if (name.empty())
         name = baseNameOf(path);
 
-    addPath(state, pos, name, path, filterFun, recursive, expectedHash, v);
+    addPath(state, pos, name, path, filterFun, method, expectedHash, v);
 }
 
 
