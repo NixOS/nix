@@ -8,7 +8,7 @@ define run-install-test
 endef
 
 # Color code from https://unix.stackexchange.com/a/10065
-installcheck:
+installcheck: install
 	@total=0; failed=0; \
 	red=""; \
 	green=""; \
