@@ -36,14 +36,17 @@ struct CmdHash : Command
 
     std::string description() override
     {
-        const char* d;
+        const char *d;
         switch (mode) {
         case FileIngestionMethod::Flat:
             d = "print cryptographic hash of a regular file";
+            break;
         case FileIngestionMethod::Recursive:
             d = "print cryptographic hash of the NAR serialisation of a path";
+            break;
         case FileIngestionMethod::Git:
             d = "print cryptographic hash of the Git serialisation of a path";
+            break;
         };
         return d;
     }

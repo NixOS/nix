@@ -57,7 +57,7 @@ GitMode dumpGitBlob(const Path & path, const struct stat st, Sink & sink)
 {
     auto s = (format("blob %d\0%s"s) % std::to_string(st.st_size) % readFile(path)).str();
 
-    vector<unsigned char> v;
+    vector<uint8_t> v;
     std::copy(s.begin(), s.end(), std::back_inserter(v));
     sink(v.data(), v.size());
     return st.st_mode & S_IXUSR
@@ -75,12 +75,12 @@ GitMode dumpGitTree(const GitTree & entries, Sink & sink)
         case GitMode::Executable: mode = 100755; break;
         case GitMode::Regular: mode = 100644; break;
         }
-        s1 += (format("%6d %s\0%s"s) % mode % i.first % i.second.second).str();
+        s1 += (format("%6d %s\0%s"s) % mode % i.first % i.second.second.hash).str();
     }
 
     std::string s2 = (format("tree %d\0%s"s) % s1.size() % s1).str();
 
-    vector<unsigned char> v;
+    vector<uint8_t> v;
     std::copy(s2.begin(), s2.end(), std::back_inserter(v));
     sink(v.data(), v.size());
     return GitMode::Directory;
