@@ -202,6 +202,11 @@ void LocalStore::findTempRoots(FDs & fds, Roots & tempRoots, bool censor)
     /* Read the `temproots' directory for per-process temporary root
        files. */
     for (auto & i : readDirectory(tempRootsDir)) {
+        if (i.name[0] == '.') {
+            // Ignore hidden files. Some package managers (notably portage) create
+            // those to keep the directory alive.
+            continue;
+        }
         Path path = tempRootsDir + "/" + i.name;
 
         pid_t pid = std::stoi(i.name);
@@ -414,7 +419,7 @@ void LocalStore::findRuntimeRoots(Roots & roots, bool censor)
 
                 try {
                     auto mapFile = fmt("/proc/%s/maps", ent->d_name);
-                    auto mapLines = tokenizeString<std::vector<string>>(readFile(mapFile, true), "\n");
+                    auto mapLines = tokenizeString<std::vector<string>>(readFile(mapFile), "\n");
                     for (const auto & line : mapLines) {
                         auto match = std::smatch{};
                         if (std::regex_match(line, match, mapRegex))
@@ -422,7 +427,7 @@ void LocalStore::findRuntimeRoots(Roots & roots, bool censor)
                     }
 
                     auto envFile = fmt("/proc/%s/environ", ent->d_name);
-                    auto envString = readFile(envFile, true);
+                    auto envString = readFile(envFile);
                     auto env_end = std::sregex_iterator{};
                     for (auto i = std::sregex_iterator{envString.begin(), envString.end(), storePathRegex}; i != env_end; ++i)
                         unchecked[i->str()].emplace(envFile);
@@ -884,7 +889,7 @@ void LocalStore::autoGC(bool sync)
         if (statvfs(realStoreDir.c_str(), &st))
             throw SysError("getting filesystem info about '%s'", realStoreDir);
 
-        return (uint64_t) st.f_bavail * st.f_bsize;
+        return (uint64_t) st.f_bavail * st.f_frsize;
     };
 
     std::shared_future<void> future;

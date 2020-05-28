@@ -73,12 +73,4 @@ waiting for lock on `/nix/store/0h5b7hp8d4hqfrw8igvx97x1xawrjnac-hello-2.1.1x'</
 So it is always safe to run multiple instances of Nix in parallel
 (which isn’t the case with, say, <command>make</command>).</para>
 
-<para>If you have a system with multiple CPUs, you may want to have
-Nix build different derivations in parallel (insofar as possible).
-Just pass the option <link linkend='opt-max-jobs'><option>-j
-<replaceable>N</replaceable></option></link>, where
-<replaceable>N</replaceable> is the maximum number of jobs to be run
-in parallel, or set.  Typically this should be the number of
-CPUs.</para>
-
 </section>

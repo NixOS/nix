@@ -9,7 +9,7 @@
 #include "util.hh"
 #include "store-api.hh"
 #include "common-eval-args.hh"
-#include "legacy.hh"
+#include "../nix/legacy.hh"
 
 #include <map>
 #include <iostream>

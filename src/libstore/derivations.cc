@@ -10,13 +10,13 @@ namespace nix {
 
 
 template<typename Path>
-void DerivationOutputT<Path>::parseHashInfo(bool & recursive, Hash & hash) const
+void DerivationOutputT<Path>::parseHashInfo(FileIngestionMethod & recursive, Hash & hash) const
 {
-    recursive = false;
+    recursive = FileIngestionMethod::Flat;
     string algo = hashAlgo;
 
     if (string(algo, 0, 2) == "r:") {
-        recursive = true;
+        recursive = FileIngestionMethod::Recursive;
         algo = string(algo, 2);
     }
 
@@ -399,7 +399,7 @@ Hash hashDerivationModulo(Store & store, const Derivation & drv, bool maskOutput
         if (h == drvHashes.end()) {
             assert(store.isValidPath(i.first));
             h = drvHashes.insert_or_assign(i.first.clone(), hashDerivationModulo(store,
-                readDerivation(store, store.toRealPath(store.printStorePath(i.first))), false)).first;
+                readDerivation(store, store.toRealPath(i.first)), false)).first;
         }
         inputs2.insert_or_assign(h->second.to_string(Base16, false), i.second);
     }

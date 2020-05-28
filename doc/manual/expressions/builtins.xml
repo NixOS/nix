@@ -324,7 +324,7 @@ if builtins ? getEnv then builtins.getEnv "PATH" else ""</programlisting>
     particular version of Nixpkgs, e.g.
 
 <programlisting>
-with import (fetchTarball https://github.com/NixOS/nixpkgs-channels/archive/nixos-14.12.tar.gz) {};
+with import (fetchTarball https://github.com/NixOS/nixpkgs/archive/nixos-14.12.tar.gz) {};
 
 stdenv.mkDerivation { … }
 </programlisting>
@@ -349,7 +349,7 @@ stdenv.mkDerivation { … }
 
 <programlisting>
 with import (fetchTarball {
-  url = https://github.com/NixOS/nixpkgs-channels/archive/nixos-14.12.tar.gz;
+  url = "https://github.com/NixOS/nixpkgs/archive/nixos-14.12.tar.gz";
   sha256 = "1jppksrfvbk5ypiqdz4cddxdl8z6zyzdb2srq8fcffr327ld5jj2";
 }) {};
 
@@ -419,6 +419,16 @@ stdenv.mkDerivation { … }
               with <literal>refs/heads/</literal>. As of Nix 2.3.0
               Nix will not prefix <literal>refs/heads/</literal> if
               <varname>ref</varname> starts with <literal>refs/</literal>.
+            </para>
+          </listitem>
+        </varlistentry>
+        <varlistentry>
+          <term>submodules</term>
+          <listitem>
+            <para>
+              A Boolean parameter that specifies whether submodules
+              should be checked out. Defaults to
+              <literal>false</literal>.
             </para>
           </listitem>
         </varlistentry>
@@ -1396,7 +1406,7 @@ stdenv.mkDerivation {
   ";
 
   src = fetchurl {
-    url = http://ftp.nluug.nl/pub/gnu/hello/hello-2.1.1.tar.gz;
+    url = "http://ftp.nluug.nl/pub/gnu/hello/hello-2.1.1.tar.gz";
     sha256 = "1md7jsfd8pa45z73bz1kszpp01yw6x5ljkjk2hx7wl800any6465";
   };
   inherit perl;

@@ -29,6 +29,7 @@ MakeError(InvalidPath, Error);
 MakeError(Unsupported, Error);
 MakeError(SubstituteGone, Error);
 MakeError(SubstituterDisabled, Error);
+MakeError(NotInStore, Error);
 
 
 class FSAccessor;
@@ -40,7 +41,6 @@ class JSONPlaceholder;
 enum CheckSigsFlag : bool { NoCheckSigs = false, CheckSigs = true };
 enum SubstituteFlag : bool { NoSubstitute = false, Substitute = true };
 enum AllowInvalidFlag : bool { DisallowInvalid = false, AllowInvalid = true };
-
 
 /* Magic header of exportPath() output (obsolete). */
 const uint32_t exportMagic = 0x4558494e;
@@ -344,7 +344,7 @@ public:
     StorePath makeOutputPath(const string & id,
         const Hash & hash, std::string_view name) const;
 
-    StorePath makeFixedOutputPath(bool recursive,
+    StorePath makeFixedOutputPath(FileIngestionMethod method,
         const Hash & hash, std::string_view name,
         const StorePathSet & references = {},
         bool hasSelfReference = false) const;
@@ -356,7 +356,7 @@ public:
        store path to which srcPath is to be copied.  Returns the store
        path and the cryptographic hash of the contents of srcPath. */
     std::pair<StorePath, Hash> computeStorePathForPath(std::string_view name,
-        const Path & srcPath, bool recursive = true,
+        const Path & srcPath, FileIngestionMethod method = FileIngestionMethod::Recursive,
         HashType hashAlgo = htSHA256, PathFilter & filter = defaultPathFilter) const;
 
     /* Preparatory part of addTextToStore().
@@ -460,12 +460,12 @@ public:
        The function object `filter' can be used to exclude files (see
        libutil/archive.hh). */
     virtual StorePath addToStore(const string & name, const Path & srcPath,
-        bool recursive = true, HashType hashAlgo = htSHA256,
+        FileIngestionMethod method = FileIngestionMethod::Recursive, HashType hashAlgo = htSHA256,
         PathFilter & filter = defaultPathFilter, RepairFlag repair = NoRepair) = 0;
 
     // FIXME: remove?
     virtual StorePath addToStoreFromDump(const string & dump, const string & name,
-        bool recursive = true, HashType hashAlgo = htSHA256, RepairFlag repair = NoRepair)
+        FileIngestionMethod method = FileIngestionMethod::Recursive, HashType hashAlgo = htSHA256, RepairFlag repair = NoRepair)
     {
         throw Error("addToStoreFromDump() is not supported by this store");
     }
@@ -848,7 +848,7 @@ std::optional<ValidPathInfo> decodeValidPathInfo(
 
 /* Compute the content-addressability assertion (ValidPathInfo::ca)
    for paths created by makeFixedOutputPath() / addToStore(). */
-std::string makeFixedOutputCA(bool recursive, const Hash & hash);
+std::string makeFixedOutputCA(FileIngestionMethod method, const Hash & hash);
 
 
 /* Split URI into protocol+hierarchy part and its parameter set. */

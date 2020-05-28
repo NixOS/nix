@@ -24,7 +24,7 @@ struct DerivationOutputT
         , hashAlgo(std::move(hashAlgo))
         , hash(std::move(hash))
     { }
-    void parseHashInfo(bool & recursive, Hash & hash) const;
+    void parseHashInfo(FileIngestionMethod & recursive, Hash & hash) const;
 };
 
 typedef DerivationOutputT<StorePath> DerivationOutput;
