@@ -2,6 +2,7 @@
 #include "common-args.hh"
 #include "store-api.hh"
 #include "archive.hh"
+#include "git.hh"
 
 using namespace nix;
 
@@ -9,6 +10,7 @@ struct CmdAddToStore : MixDryRun, StoreCommand
 {
     Path path;
     std::optional<std::string> namePart;
+    bool git = false;
 
     CmdAddToStore()
     {
@@ -20,6 +22,12 @@ struct CmdAddToStore : MixDryRun, StoreCommand
             .description = "name component of the store path",
             .labels = {"name"},
             .handler = {&namePart},
+        });
+
+        addFlag({
+            .longName = "git",
+            .description = "treat path as a git object",
+            .handler = {&this->git, true},
         });
     }
 
@@ -40,15 +48,20 @@ struct CmdAddToStore : MixDryRun, StoreCommand
     {
         if (!namePart) namePart = baseNameOf(path);
 
+        auto ingestionMethod = git ? FileIngestionMethod::Git : FileIngestionMethod::Recursive;
+
         StringSink sink;
-        dumpPath(path, sink);
+        if (git)
+            dumpGit(path, sink);
+        else
+            dumpPath(path, sink);
 
         auto narHash = hashString(htSHA256, *sink.s);
 
-        ValidPathInfo info(store->makeFixedOutputPath(FileIngestionMethod::Recursive, narHash, *namePart));
+        ValidPathInfo info(store->makeFixedOutputPath(ingestionMethod, narHash, *namePart));
         info.narHash = narHash;
         info.narSize = sink.s->size();
-        info.ca = makeFixedOutputCA(FileIngestionMethod::Recursive, info.narHash);
+        info.ca = makeFixedOutputCA(ingestionMethod, info.narHash);
 
         if (!dryRun) {
             auto source = StringSource { *sink.s };
