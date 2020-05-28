@@ -1407,7 +1407,7 @@ void DerivationGoal::started() {
         "building '%s'", worker.store.printStorePath(drvPath), curRound, nrRounds);
     fmt("building '%s'", worker.store.printStorePath(drvPath));
     if (hook) msg += fmt(" on '%s'", machineName);
-    act = std::make_unique<Activity>(*logger, lvlInfo, actBuild, msg,
+    act = std::make_unique<Activity>(*logger, Verbosity::Info, ActivityType::Build, msg,
         Logger::Fields{worker.store.printStorePath(drvPath), hook ? machineName : "", curRound, nrRounds});
     mcRunningBuilds = std::make_unique<MaintainCount<uint64_t>>(worker.runningBuilds);
     worker.updateProgress();
