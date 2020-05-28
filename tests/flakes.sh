@@ -661,3 +661,6 @@ sed -i $flakeB/flake.nix -e 's/456/789/'
 git -C $flakeB commit -a -m 'Foo'
 
 [[ $(nix eval --update-input b $flakeA#foo) = 1912 ]]
+
+# Test list-inputs with circular dependencies
+nix flake list-inputs $flakeA
