@@ -106,21 +106,33 @@ const static std::string getEnvSh =
    environment to a file and exits. */
 StorePath getDerivationEnvironment(ref<Store> store, const StorePath & drvPath)
 {
-    auto drv = store->derivationFromPath(drvPath);
+    auto drvOriginal = store->derivationFromPath(drvPath);
 
-    auto builder = baseNameOf(drv.builder);
+    auto builder = baseNameOf(drvOriginal.builder);
     if (builder != "bash")
         throw Error("'nix dev-shell' only works on derivations that use 'bash' as their builder");
 
     auto getEnvShPath = store->addTextToStore("get-env.sh", getEnvSh, {});
 
+    DerivationT<StorePath, NoPath> drv;
+
     drv.args = {store->printStorePath(getEnvShPath)};
 
-    /* Remove derivation checks. */
+    /* Copy original but remove derivation checks. */
+    drv.env = drvOriginal.env;
+    drv.platform = drvOriginal.platform;
+    drv.inputSrcs = drvOriginal.inputSrcs;
+    drv.inputDrvs = drvOriginal.inputDrvs;
+    for (const auto i : drvOriginal.outputs) {
+        drv.outputs.insert_or_assign(i.first, DerivationOutputT(NoPath, i.second.hash));
+    }
     drv.env.erase("allowedReferences");
     drv.env.erase("allowedRequisites");
     drv.env.erase("disallowedReferences");
     drv.env.erase("disallowedRequisites");
+    // drv.outputs.insert_or_assign("out", DerivationOutputT(NoPath, FileSystemHash {
+    //     FileIngestionMethod::Flat, Hash { }
+    // }));
 
     /* Rehash and write the derivation. FIXME: would be nice to use
        'buildDerivation', but that's privileged. */
@@ -133,12 +145,8 @@ StorePath getDerivationEnvironment(ref<Store> store, const StorePath & drvPath)
     drv.env["out"] = "";
     drv.env["outputs"] = "out";
     drv.inputSrcs.insert(std::move(getEnvShPath));
-    Hash h = hashDerivationModulo(*store, drv, true);
-    auto shellOutPath = store->makeOutputPath("out", h, drvName);
-    drv.outputs.insert_or_assign("out", DerivationOutput(shellOutPath.clone(), FileSystemHash {
-        FileIngestionMethod::Flat, Hash { }
-    }));
-    drv.env["out"] = store->printStorePath(shellOutPath);
+    Derivation drvFinal = bakeDerivationPaths(*state.store, drv, drvName);
+    drv.env["out"] = store->printStorePath(drvFinal["out"].path);
     auto shellDrvPath2 = writeDerivation(store, drv, drvName);
 
     /* Build the derivation. */

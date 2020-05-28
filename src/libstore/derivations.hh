@@ -88,6 +88,9 @@ struct NoPath: std::monostate {
     constexpr NoPath clone() const {
         return *this;
     };
+    NoPath(const NoPath &) = default;
+    NoPath(NoPath &&) = default;
+    NoPath & operator = (const NoPath &) = default;
 };
 
 /* For inputs that are sub-derivations, we specify exactly which
