@@ -498,7 +498,7 @@ StorePath RemoteStore::addToStore(const string & name, const Path & _srcPath,
         << wopAddToStore
         << name
         << ((hashAlgo == htSHA256 && method == FileIngestionMethod::Recursive) ? 0 : 1) /* backwards compatibility hack */
-        << (method == FileIngestionMethod::Recursive ? 1 : 0)
+        << (uint8_t) method
         << printHashType(hashAlgo);
 
     try {

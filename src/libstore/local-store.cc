@@ -1017,7 +1017,10 @@ void LocalStore::addToStore(const ValidPathInfo & info, Source & source,
                 return n;
             });
 
-            restorePath(realPath, wrapperSource);
+            if (hasPrefix(info.ca, "fixed:git:"))
+                restoreGit(realPath, wrapperSource);
+            else 
+                restorePath(realPath, wrapperSource);
 
             auto hashResult = hashSink->finish();
 
@@ -1122,10 +1125,19 @@ StorePath LocalStore::addToStore(const string & name, const Path & _srcPath,
        method for very large paths, but `copyPath' is mainly used for
        small files. */
     StringSink sink;
-    if (method == FileIngestionMethod::Recursive)
+    switch (method) {
+    case FileIngestionMethod::Recursive:
         dumpPath(srcPath, sink, filter);
-    else
+        break;
+    case FileIngestionMethod::Git:{
+        dumpGit(srcPath, sink, filter);
+        break;
+    }
+    case FileIngestionMethod::Flat: {
         sink.s = make_ref<std::string>(readFile(srcPath));
+        break;
+    }
+    }
 
     return addToStoreFromDump(*sink.s, name, method, hashAlgo, repair);
 }
