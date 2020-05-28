@@ -86,6 +86,7 @@
             git
             mercurial
             jq
+            gmock
           ]
           ++ lib.optionals stdenv.isLinux [libseccomp utillinuxMinimal]
           ++ lib.optional (stdenv.isLinux || stdenv.isDarwin) libsodium
@@ -150,15 +151,15 @@
 
           installFlags = "sysconfdir=$(out)/etc";
 
+          postInstall = ''
+            mkdir -p $doc/nix-support
+            echo "doc manual $doc/share/doc/nix/manual" >> $doc/nix-support/hydra-build-products
+          '';
+
           doInstallCheck = true;
           installCheckFlags = "sysconfdir=$(out)/etc";
 
           separateDebugInfo = true;
-
-          preDist = ''
-            mkdir -p $doc/nix-support
-            echo "doc manual $doc/share/doc/nix/manual" >> $doc/nix-support/hydra-build-products
-          '';
         }) // {
 
           perl-bindings = with final; stdenv.mkDerivation {

@@ -183,11 +183,14 @@ void mainWrapped(int argc, char * * argv)
 
     if (completions) return;
 
-    settings.requireExperimentalFeature("nix-command");
-
     initPlugins();
 
     if (!args.command) args.showHelpAndExit();
+
+    if (args.command->first != "repl"
+        && args.command->first != "doctor"
+        && args.command->first != "upgrade-nix")
+        settings.requireExperimentalFeature("nix-command");
 
     Finally f([]() { stopProgressBar(); });
 

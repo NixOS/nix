@@ -130,7 +130,7 @@ bool Settings::isExperimentalFeatureEnabled(const std::string & name)
 void Settings::requireExperimentalFeature(const std::string & name)
 {
     if (!isExperimentalFeatureEnabled(name))
-        throw Error("experimental Nix feature '%s' is disabled", name);
+        throw Error("experimental Nix feature '%1%' is disabled; use '--experimental-features %1%' to override", name);
 }
 
 bool Settings::isWSL1()
