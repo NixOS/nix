@@ -503,9 +503,12 @@ FlakeRef InstallableFlake::nixpkgsFlakeRef() const
 {
     auto lockedFlake = getLockedFlake();
 
-    auto nixpkgsInput = lockedFlake->flake.inputs.find("nixpkgs");
-    if (nixpkgsInput != lockedFlake->flake.inputs.end()) {
-        return std::move(nixpkgsInput->second.ref);
+    auto nixpkgsInput = lockedFlake->lockFile.root->inputs.find("nixpkgs");
+    if (nixpkgsInput != lockedFlake->lockFile.root->inputs.end()) {
+        if (auto lockedNode = std::dynamic_pointer_cast<const flake::LockedNode>(nixpkgsInput->second)) {
+            debug("using nixpkgs flake '%s'", lockedNode->lockedRef);
+            return std::move(lockedNode->lockedRef);
+        }
     }
 
     return Installable::nixpkgsFlakeRef();
