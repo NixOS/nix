@@ -36,20 +36,74 @@ void parseGit(ParseSink & sink, Source & source) {
     parse(sink, source, "");
 }
 
-static void parse(ParseSink & sink, Source & source, const Path & path) {
-    uint8_t buf[4];
+string getStringUntil(Source & source, char byte) {
+    string s;
+    unsigned char n[1];
+    source(n, 1);
+    while (*n != byte) {
+        s += *n;
+        source(n, 1);
+    }
+    return s;
+}
 
-    std::basic_string_view<uint8_t> buf_v {
-        (const uint8_t *) & buf,
-        std::size(buf)
-    };
-    source(buf_v);
-    if (buf_v.compare((const uint8_t *)"blob")) {
-        uint8_t space;
-        source(& space, 1);
-    }
-    else {
-    }
+string getString(Source & source, int n){
+    std::vector<unsigned char> v(n);
+    source(v.data(), n);
+    return std::string(v.begin(), v.end());
+}
+
+static void parse(ParseSink & sink, Source & source, const Path & path) {
+    auto type = getString(source, 5);
+
+    if (type == "blob ") {
+        sink.createRegularFile(path);
+
+        unsigned long long size = std::stoi(getStringUntil(source, 0));
+
+        sink.preallocateContents(size);
+
+        unsigned long long left = size;
+        std::vector<unsigned char> buf(65536);
+
+        while (left) {
+            checkInterrupt();
+            auto n = buf.size();
+            if ((unsigned long long)n > left) n = left;
+            source(buf.data(), n);
+            sink.receiveContents(buf.data(), n);
+            left -= n;
+        }
+    } else if (type == "tree ") {
+        unsigned long long size = std::stoi(getStringUntil(source, 0));
+        unsigned long long left = size;
+
+        sink.createDirectory(path);
+
+        while (left) {
+            string perms = getStringUntil(source, ' ');
+            left -= perms.size();
+            left -= 1;
+
+            int perm = std::stoi(perms);
+            if (perm != 100644 && perm != 100755 && perm != 644 && perm != 755 && perm != 40000)
+              throw Error(format("Unknown Git permission: %d") % perm);
+
+            // TODO: handle permissions somehow
+
+            string name = getStringUntil(source, 0);
+            left -= name.size();
+            left -= 1;
+
+            string hashs = getString(source, 20);
+            left -= 20;
+
+            Hash hash(htSHA1);
+            std::copy(hashs.begin(), hashs.end(), hash.hash);
+
+            sink.createSymlink(path + "/" + name, "../" + name);
+        }
+    } else throw Error("input doesn't look like a Git object");
 }
 
 // TODO stream file into sink, rather than reading into vector
