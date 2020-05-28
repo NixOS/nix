@@ -1,5 +1,7 @@
 #pragma once
 
+#include <fcntl.h>
+
 #include "types.hh"
 #include "serialise.hh"
 
