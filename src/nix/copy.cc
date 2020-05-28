@@ -17,7 +17,7 @@ struct CmdCopy : StorePathsCommand
     SubstituteFlag substitute = NoSubstitute;
 
     CmdCopy()
-        : StorePathsCommand(FileIngestionMethod::Recursive)
+        : StorePathsCommand(true)
     {
         addFlag({
             .longName = "from",

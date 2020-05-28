@@ -92,7 +92,7 @@ struct StorePathsCommand : public InstallablesCommand
 {
 private:
 
-    FileIngestionMethod recursive = FileIngestionMethod::Flat;
+    bool recursive = false;
     bool all = false;
 
 protected:
@@ -101,7 +101,7 @@ protected:
 
 public:
 
-    StorePathsCommand(FileIngestionMethod recursive = FileIngestionMethod::Flat);
+    StorePathsCommand(bool recursive = false);
 
     using StoreCommand::run;
 
