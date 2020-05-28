@@ -36,7 +36,9 @@ tarball="$tmpDir/$(basename "$tmpDir/nix-@nixVersion@-$system.tar.xz")"
 
 require_util curl "download the binary tarball"
 require_util tar "unpack the binary tarball"
-require_util xz "unpack the binary tarball"
+if [ "$(uname -s)" != "Darwin" ]; then
+    require_util xz "unpack the binary tarball"
+fi
 
 echo "downloading Nix @nixVersion@ binary tarball for $system from '$url' to '$tmpDir'..."
 curl -L "$url" -o "$tarball" || oops "failed to download '$url'"

@@ -42,7 +42,7 @@ protected:
     }
 
     // Not all Rust types are Clone / Copy, but our base Value class needs to
-    // have a copy constructor so that ones which do implement Copy/Clone
+    // have a copy constructor so that types which do implement Copy/Clone
     // can be copied/cloned.
     Value(const Value & other)
         : raw(other.raw)

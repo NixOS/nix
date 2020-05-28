@@ -87,7 +87,7 @@ const size_t storePathHashLen = 32; // i.e. 160 bits
 /* Extension of derivations in the Nix store. */
 const std::string drvExtension = ".drv";
 
-enum struct FileIngestionMethod : bool {
+enum struct FileIngestionMethod : uint8_t {
     Flat = false,
     Recursive = true
 };

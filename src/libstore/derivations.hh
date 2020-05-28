@@ -40,6 +40,7 @@ struct DerivationOutputT
     DerivationOutputT(const DerivationOutputT<Path> &) = default;
     DerivationOutputT(DerivationOutputT<Path> &&) = default;
     DerivationOutputT & operator = (const DerivationOutputT<Path> &) = default;
+    void parseHashInfo(FileIngestionMethod & recursive, Hash & hash) const;
 };
 
 typedef DerivationOutputT<StorePath> DerivationOutput;

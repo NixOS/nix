@@ -2,7 +2,7 @@
 #include "profiles.hh"
 #include "shared.hh"
 #include "globals.hh"
-#include "legacy.hh"
+#include "../nix/legacy.hh"
 
 #include <iostream>
 #include <cerrno>
