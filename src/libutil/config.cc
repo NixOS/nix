@@ -65,60 +65,63 @@ void Config::getSettings(std::map<std::string, SettingInfo> & res, bool override
             res.emplace(opt.first, SettingInfo{opt.second.setting->to_string(), opt.second.setting->description});
 }
 
+void AbstractConfig::applyConfig(const std::string & contents, const std::string & path) {
+    unsigned int pos = 0;
+
+    while (pos < contents.size()) {
+        string line;
+        while (pos < contents.size() && contents[pos] != '\n')
+            line += contents[pos++];
+        pos++;
+
+        string::size_type hash = line.find('#');
+        if (hash != string::npos)
+            line = string(line, 0, hash);
+
+        vector<string> tokens = tokenizeString<vector<string> >(line);
+        if (tokens.empty()) continue;
+
+        if (tokens.size() < 2)
+            throw UsageError("illegal configuration line '%1%' in '%2%'", line, path);
+
+        auto include = false;
+        auto ignoreMissing = false;
+        if (tokens[0] == "include")
+            include = true;
+        else if (tokens[0] == "!include") {
+            include = true;
+            ignoreMissing = true;
+        }
+
+        if (include) {
+            if (tokens.size() != 2)
+                throw UsageError("illegal configuration line '%1%' in '%2%'", line, path);
+            auto p = absPath(tokens[1], dirOf(path));
+            if (pathExists(p)) {
+                applyConfigFile(p);
+            } else if (!ignoreMissing) {
+                throw Error("file '%1%' included from '%2%' not found", p, path);
+            }
+            continue;
+        }
+
+        if (tokens[1] != "=")
+            throw UsageError("illegal configuration line '%1%' in '%2%'", line, path);
+
+        string name = tokens[0];
+
+        vector<string>::iterator i = tokens.begin();
+        advance(i, 2);
+
+        set(name, concatStringsSep(" ", Strings(i, tokens.end()))); // FIXME: slow
+    };
+}
+
 void AbstractConfig::applyConfigFile(const Path & path)
 {
     try {
         string contents = readFile(path);
-
-        unsigned int pos = 0;
-
-        while (pos < contents.size()) {
-            string line;
-            while (pos < contents.size() && contents[pos] != '\n')
-                line += contents[pos++];
-            pos++;
-
-            string::size_type hash = line.find('#');
-            if (hash != string::npos)
-                line = string(line, 0, hash);
-
-            vector<string> tokens = tokenizeString<vector<string> >(line);
-            if (tokens.empty()) continue;
-
-            if (tokens.size() < 2)
-                throw UsageError("illegal configuration line '%1%' in '%2%'", line, path);
-
-            auto include = false;
-            auto ignoreMissing = false;
-            if (tokens[0] == "include")
-                include = true;
-            else if (tokens[0] == "!include") {
-                include = true;
-                ignoreMissing = true;
-            }
-
-            if (include) {
-                if (tokens.size() != 2)
-                    throw UsageError("illegal configuration line '%1%' in '%2%'", line, path);
-                auto p = absPath(tokens[1], dirOf(path));
-                if (pathExists(p)) {
-                    applyConfigFile(p);
-                } else if (!ignoreMissing) {
-                    throw Error("file '%1%' included from '%2%' not found", p, path);
-                }
-                continue;
-            }
-
-            if (tokens[1] != "=")
-                throw UsageError("illegal configuration line '%1%' in '%2%'", line, path);
-
-            string name = tokens[0];
-
-            vector<string>::iterator i = tokens.begin();
-            advance(i, 2);
-
-            set(name, concatStringsSep(" ", Strings(i, tokens.end()))); // FIXME: slow
-        };
+        applyConfig(contents, path);
     } catch (SysError &) { }
 }
 
