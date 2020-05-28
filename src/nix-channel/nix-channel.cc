@@ -1,8 +1,9 @@
 #include "shared.hh"
 #include "globals.hh"
-#include "download.hh"
+#include "filetransfer.hh"
 #include "store-api.hh"
-#include "legacy.hh"
+#include "../nix/legacy.hh"
+#include "fetchers.hh"
 
 #include <fcntl.h>
 #include <regex>
@@ -86,12 +87,9 @@ static void update(const StringSet & channelNames)
         // We want to download the url to a file to see if it's a tarball while also checking if we
         // got redirected in the process, so that we can grab the various parts of a nix channel
         // definition from a consistent location if the redirect changes mid-download.
-        CachedDownloadRequest request(url);
-        request.ttl = 0;
-        auto dl = getDownloader();
-        auto result = dl->downloadCached(store, request);
-        auto filename = result.path;
-        url = chomp(result.effectiveUri);
+        auto result = fetchers::downloadFile(store, url, std::string(baseNameOf(url)), false);
+        auto filename = store->toRealPath(result.storePath);
+        url = result.effectiveUrl;
 
         // If the URL contains a version number, append it to the name
         // attribute (so that "nix-env -q" on the channels profile
@@ -114,11 +112,10 @@ static void update(const StringSet & channelNames)
         if (!unpacked) {
             // Download the channel tarball.
             try {
-                filename = dl->downloadCached(store, CachedDownloadRequest(url + "/nixexprs.tar.xz")).path;
-            } catch (DownloadError & e) {
-                filename = dl->downloadCached(store, CachedDownloadRequest(url + "/nixexprs.tar.bz2")).path;
+                filename = store->toRealPath(fetchers::downloadFile(store, url + "/nixexprs.tar.xz", "nixexprs.tar.xz", false).storePath);
+            } catch (FileTransferError & e) {
+                filename = store->toRealPath(fetchers::downloadFile(store, url + "/nixexprs.tar.bz2", "nixexprs.tar.bz2", false).storePath);
             }
-            chomp(filename);
         }
 
         // Regardless of where it came from, add the expression representing this channel to accumulated expression
@@ -185,6 +182,8 @@ static int _main(int argc, char ** argv)
             } else if (*arg == "--rollback") {
                 cmd = cRollback;
             } else {
+                if (hasPrefix(*arg, "-"))
+                    throw UsageError("unsupported argument '%s'", *arg);
                 args.push_back(std::move(*arg));
             }
             return true;

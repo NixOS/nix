@@ -1,6 +1,5 @@
 #include "archive.hh"
 #include "derivations.hh"
-#include "download.hh"
 #include "eval-inline.hh"
 #include "eval.hh"
 #include "globals.hh"
@@ -122,16 +121,16 @@ static void prim_scopedImport(EvalState & state, const Pos & pos, Value * * args
         }
         w.attrs->sort();
 
-        static Value * fun = nullptr;
+        static RootValue fun;
         if (!fun) {
-            fun = state.allocValue();
+            fun = allocRootValue(state.allocValue());
             state.eval(state.parseExprFromString(
                 #include "imported-drv-to-derivation.nix.gen.hh"
-                , "/"), *fun);
+                , "/"), **fun);
         }
 
-        state.forceFunction(*fun, pos);
-        mkApp(v, *fun, w);
+        state.forceFunction(**fun, pos);
+        mkApp(v, **fun, w);
         state.forceAttrs(v, pos);
     } else {
         state.forceAttrs(*args[0]);
@@ -242,7 +241,7 @@ void prim_exec(EvalState & state, const Pos & pos, Value * * args, Value & v)
 /* Return a string representing the type of the expression. */
 static void prim_typeOf(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
-    state.forceValue(*args[0]);
+    state.forceValue(*args[0], pos);
     string t;
     switch (args[0]->type) {
         case tInt: t = "int"; break;
@@ -270,7 +269,7 @@ static void prim_typeOf(EvalState & state, const Pos & pos, Value * * args, Valu
 /* Determine whether the argument is the null value. */
 static void prim_isNull(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
-    state.forceValue(*args[0]);
+    state.forceValue(*args[0], pos);
     mkBool(v, args[0]->type == tNull);
 }
 
@@ -278,7 +277,7 @@ static void prim_isNull(EvalState & state, const Pos & pos, Value * * args, Valu
 /* Determine whether the argument is a function. */
 static void prim_isFunction(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
-    state.forceValue(*args[0]);
+    state.forceValue(*args[0], pos);
     bool res;
     switch (args[0]->type) {
         case tLambda:
@@ -297,21 +296,21 @@ static void prim_isFunction(EvalState & state, const Pos & pos, Value * * args, 
 /* Determine whether the argument is an integer. */
 static void prim_isInt(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
-    state.forceValue(*args[0]);
+    state.forceValue(*args[0], pos);
     mkBool(v, args[0]->type == tInt);
 }
 
 /* Determine whether the argument is a float. */
 static void prim_isFloat(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
-    state.forceValue(*args[0]);
+    state.forceValue(*args[0], pos);
     mkBool(v, args[0]->type == tFloat);
 }
 
 /* Determine whether the argument is a string. */
 static void prim_isString(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
-    state.forceValue(*args[0]);
+    state.forceValue(*args[0], pos);
     mkBool(v, args[0]->type == tString);
 }
 
@@ -319,14 +318,14 @@ static void prim_isString(EvalState & state, const Pos & pos, Value * * args, Va
 /* Determine whether the argument is a Boolean. */
 static void prim_isBool(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
-    state.forceValue(*args[0]);
+    state.forceValue(*args[0], pos);
     mkBool(v, args[0]->type == tBool);
 }
 
 /* Determine whether the argument is a path. */
 static void prim_isPath(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
-    state.forceValue(*args[0]);
+    state.forceValue(*args[0], pos);
     mkBool(v, args[0]->type == tPath);
 }
 
@@ -383,7 +382,7 @@ static void prim_genericClosure(EvalState & state, const Pos & pos, Value * * ar
         args[0]->attrs->find(state.symbols.create("operator"));
     if (op == args[0]->attrs->end())
         throw EvalError(format("attribute 'operator' required, at %1%") % pos);
-    state.forceValue(*op->value);
+    state.forceValue(*op->value, pos);
 
     /* Construct the closure by applying the operator to element of
        `workSet', adding the result to `workSet', continuing until
@@ -402,7 +401,7 @@ static void prim_genericClosure(EvalState & state, const Pos & pos, Value * * ar
             e->attrs->find(state.symbols.create("key"));
         if (key == e->attrs->end())
             throw EvalError(format("attribute 'key' required, at %1%") % pos);
-        state.forceValue(*key->value);
+        state.forceValue(*key->value, pos);
 
         if (!doneKeys.insert(key->value).second) continue;
         res.push_back(e);
@@ -414,7 +413,7 @@ static void prim_genericClosure(EvalState & state, const Pos & pos, Value * * ar
 
         /* Add the values returned by the operator to the work set. */
         for (unsigned int n = 0; n < call.listSize(); ++n) {
-            state.forceValue(*call.listElems()[n]);
+            state.forceValue(*call.listElems()[n], pos);
             workSet.push_back(call.listElems()[n]);
         }
     }
@@ -446,7 +445,7 @@ static void prim_throw(EvalState & state, const Pos & pos, Value * * args, Value
 static void prim_addErrorContext(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
     try {
-        state.forceValue(*args[1]);
+        state.forceValue(*args[1], pos);
         v = *args[1];
     } catch (Error & e) {
         PathSet context;
@@ -462,7 +461,7 @@ static void prim_tryEval(EvalState & state, const Pos & pos, Value * * args, Val
 {
     state.mkAttrs(v, 2);
     try {
-        state.forceValue(*args[0]);
+        state.forceValue(*args[0], pos);
         v.attrs->push_back(Attr(state.sValue, args[0]));
         mkBool(*state.allocAttr(v, state.symbols.create("success")), true);
     } catch (AssertionError & e) {
@@ -484,8 +483,8 @@ static void prim_getEnv(EvalState & state, const Pos & pos, Value * * args, Valu
 /* Evaluate the first argument, then return the second argument. */
 static void prim_seq(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
-    state.forceValue(*args[0]);
-    state.forceValue(*args[1]);
+    state.forceValue(*args[0], pos);
+    state.forceValue(*args[1], pos);
     v = *args[1];
 }
 
@@ -495,7 +494,7 @@ static void prim_seq(EvalState & state, const Pos & pos, Value * * args, Value &
 static void prim_deepSeq(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
     state.forceValueDeep(*args[0]);
-    state.forceValue(*args[1]);
+    state.forceValue(*args[1], pos);
     v = *args[1];
 }
 
@@ -504,12 +503,12 @@ static void prim_deepSeq(EvalState & state, const Pos & pos, Value * * args, Val
    return the second expression.  Useful for debugging. */
 static void prim_trace(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
-    state.forceValue(*args[0]);
+    state.forceValue(*args[0], pos);
     if (args[0]->type == tString)
         printError(format("trace: %1%") % args[0]->string.s);
     else
         printError(format("trace: %1%") % *args[0]);
-    state.forceValue(*args[1]);
+    state.forceValue(*args[1], pos);
     v = *args[1];
 }
 
@@ -563,7 +562,7 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
 
     std::optional<std::string> outputHash;
     std::string outputHashAlgo;
-    bool outputHashRecursive = false;
+    auto ingestionMethod = FileIngestionMethod::Flat;
 
     StringSet outputs;
     outputs.insert("out");
@@ -574,8 +573,8 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
         vomit("processing attribute '%1%'", key);
 
         auto handleHashMode = [&](const std::string & s) {
-            if (s == "recursive") outputHashRecursive = true;
-            else if (s == "flat") outputHashRecursive = false;
+            if (s == "recursive") ingestionMethod = FileIngestionMethod::Recursive;
+            else if (s == "flat") ingestionMethod = FileIngestionMethod::Flat;
             else throw EvalError("invalid value '%s' for 'outputHashMode' attribute, at %s", s, posDrvName);
         };
 
@@ -600,7 +599,7 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
         try {
 
             if (ignoreNulls) {
-                state.forceValue(*i->value);
+                state.forceValue(*i->value, pos);
                 if (i->value->type == tNull) continue;
             }
 
@@ -722,11 +721,14 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
         HashType ht = outputHashAlgo.empty() ? HashType::Unknown : parseHashType(outputHashAlgo);
         Hash h(*outputHash, ht);
 
-        auto outPath = state.store->makeFixedOutputPath(outputHashRecursive, h, drvName);
+        auto outPath = state.store->makeFixedOutputPath(ingestionMethod, h, drvName);
         if (!jsonObject) drv.env["out"] = state.store->printStorePath(outPath);
-        drv.outputs.insert_or_assign("out", DerivationOutput(std::move(outPath),
-                (outputHashRecursive ? "r:" : "") + printHashType(h.type),
-                h.to_string(Base::Base16, false)));
+        drv.outputs.insert_or_assign("out", DerivationOutput {
+            std::move(outPath),
+            (ingestionMethod == FileIngestionMethod::Recursive ? "r:" : "")
+                + printHashType(h.type),
+            h.to_string(Base::Base16, false),
+        });
     }
 
     else {
@@ -1021,7 +1023,9 @@ static void prim_toFile(EvalState & state, const Pos & pos, Value * * args, Valu
 
     for (auto path : context) {
         if (path.at(0) != '/')
-            throw EvalError(format("in 'toFile': the file '%1%' cannot refer to derivation outputs, at %2%") % name % pos);
+            throw EvalError(format(
+                "in 'toFile': the file named '%1%' must not contain a reference "
+                "to a derivation but contains (%2%), at %3%") % name % path % pos);
         refs.insert(state.store->parseStorePath(path));
     }
 
@@ -1038,7 +1042,7 @@ static void prim_toFile(EvalState & state, const Pos & pos, Value * * args, Valu
 
 
 static void addPath(EvalState & state, const Pos & pos, const string & name, const Path & path_,
-    Value * filterFun, bool recursive, const Hash & expectedHash, Value & v)
+    Value * filterFun, FileIngestionMethod method, const Hash & expectedHash, Value & v)
 {
     const auto path = evalSettings.pureEval && expectedHash ?
         path_ :
@@ -1069,12 +1073,12 @@ static void addPath(EvalState & state, const Pos & pos, const string & name, con
 
     std::optional<StorePath> expectedStorePath;
     if (expectedHash)
-        expectedStorePath = state.store->makeFixedOutputPath(recursive, expectedHash, name);
+        expectedStorePath = state.store->makeFixedOutputPath(method, expectedHash, name);
     Path dstPath;
     if (!expectedHash || !state.store->isValidPath(*expectedStorePath)) {
         dstPath = state.store->printStorePath(settings.readOnlyMode
-            ? state.store->computeStorePathForPath(name, path, recursive, HashType::SHA256, filter).first
-            : state.store->addToStore(name, path, recursive, HashType::SHA256, filter, state.repair));
+            ? state.store->computeStorePathForPath(name, path, method, HashType::SHA256, filter).first
+            : state.store->addToStore(name, path, method, HashType::SHA256, filter, state.repair));
         if (expectedHash && expectedStorePath != state.store->parseStorePath(dstPath))
             throw Error("store path mismatch in (possibly filtered) path added from '%s'", path);
     } else
@@ -1091,11 +1095,11 @@ static void prim_filterSource(EvalState & state, const Pos & pos, Value * * args
     if (!context.empty())
         throw EvalError(format("string '%1%' cannot refer to other paths, at %2%") % path % pos);
 
-    state.forceValue(*args[0]);
+    state.forceValue(*args[0], pos);
     if (args[0]->type != tLambda)
         throw TypeError(format("first argument in call to 'filterSource' is not a function but %1%, at %2%") % showType(*args[0]) % pos);
 
-    addPath(state, pos, std::string(baseNameOf(path)), path, args[0], true, Hash(), v);
+    addPath(state, pos, std::string(baseNameOf(path)), path, args[0], FileIngestionMethod::Recursive, Hash(), v);
 }
 
 static void prim_path(EvalState & state, const Pos & pos, Value * * args, Value & v)
@@ -1104,7 +1108,7 @@ static void prim_path(EvalState & state, const Pos & pos, Value * * args, Value 
     Path path;
     string name;
     Value * filterFun = nullptr;
-    auto recursive = true;
+    auto method = FileIngestionMethod::Recursive;
     Hash expectedHash;
 
     for (auto & attr : *args[0]->attrs) {
@@ -1117,10 +1121,10 @@ static void prim_path(EvalState & state, const Pos & pos, Value * * args, Value 
         } else if (attr.name == state.sName)
             name = state.forceStringNoCtx(*attr.value, *attr.pos);
         else if (n == "filter") {
-            state.forceValue(*attr.value);
+            state.forceValue(*attr.value, pos);
             filterFun = attr.value;
         } else if (n == "recursive")
-            recursive = state.forceBool(*attr.value, *attr.pos);
+            method = FileIngestionMethod { state.forceBool(*attr.value, *attr.pos) };
         else if (n == "sha256")
             expectedHash = Hash(state.forceStringNoCtx(*attr.value, *attr.pos), HashType::SHA256);
         else
@@ -1131,7 +1135,7 @@ static void prim_path(EvalState & state, const Pos & pos, Value * * args, Value 
     if (name.empty())
         name = baseNameOf(path);
 
-    addPath(state, pos, name, path, filterFun, recursive, expectedHash, v);
+    addPath(state, pos, name, path, filterFun, method, expectedHash, v);
 }
 
 
@@ -1188,7 +1192,7 @@ void prim_getAttr(EvalState & state, const Pos & pos, Value * * args, Value & v)
         throw EvalError(format("attribute '%1%' missing, at %2%") % attr % pos);
     // !!! add to stack trace?
     if (state.countCalls && i->pos) state.attrSelects[*i->pos]++;
-    state.forceValue(*i->value);
+    state.forceValue(*i->value, pos);
     v = *i->value;
 }
 
@@ -1218,7 +1222,7 @@ static void prim_hasAttr(EvalState & state, const Pos & pos, Value * * args, Val
 /* Determine whether the argument is a set. */
 static void prim_isAttrs(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
-    state.forceValue(*args[0]);
+    state.forceValue(*args[0], pos);
     mkBool(v, args[0]->type == tAttrs);
 }
 
@@ -1344,7 +1348,7 @@ static void prim_catAttrs(EvalState & state, const Pos & pos, Value * * args, Va
 */
 static void prim_functionArgs(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
-    state.forceValue(*args[0]);
+    state.forceValue(*args[0], pos);
     if (args[0]->type != tLambda)
         throw TypeError(format("'functionArgs' requires a function, at %1%") % pos);
 
@@ -1354,9 +1358,12 @@ static void prim_functionArgs(EvalState & state, const Pos & pos, Value * * args
     }
 
     state.mkAttrs(v, args[0]->lambda.fun->formals->formals.size());
-    for (auto & i : args[0]->lambda.fun->formals->formals)
+    for (auto & i : args[0]->lambda.fun->formals->formals) {
         // !!! should optimise booleans (allocate only once)
-        mkBool(*state.allocAttr(v, i.name), i.def);
+        Value * value = state.allocValue();
+        v.attrs->push_back(Attr(i.name, value, &i.pos));
+        mkBool(*value, i.def);
+    }
     v.attrs->sort();
 }
 
@@ -1387,7 +1394,7 @@ static void prim_mapAttrs(EvalState & state, const Pos & pos, Value * * args, Va
 /* Determine whether the argument is a list. */
 static void prim_isList(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
-    state.forceValue(*args[0]);
+    state.forceValue(*args[0], pos);
     mkBool(v, args[0]->isList());
 }
 
@@ -1397,7 +1404,7 @@ static void elemAt(EvalState & state, const Pos & pos, Value & list, int n, Valu
     state.forceList(list, pos);
     if (n < 0 || (unsigned int) n >= list.listSize())
         throw Error(format("list index %1% is out of bounds, at %2%") % n % pos);
-    state.forceValue(*list.listElems()[n]);
+    state.forceValue(*list.listElems()[n], pos);
     v = *list.listElems()[n];
 }
 
@@ -1520,9 +1527,9 @@ static void prim_foldlStrict(EvalState & state, const Pos & pos, Value * * args,
             vCur = n == args[2]->listSize() - 1 ? &v : state.allocValue();
             state.callFunction(vTmp, *args[2]->listElems()[n], *vCur, pos);
         }
-        state.forceValue(v);
+        state.forceValue(v, pos);
     } else {
-        state.forceValue(*args[1]);
+        state.forceValue(*args[1], pos);
         v = *args[1];
     }
 }
@@ -1587,7 +1594,7 @@ static void prim_sort(EvalState & state, const Pos & pos, Value * * args, Value 
     auto len = args[1]->listSize();
     state.mkList(v, len);
     for (unsigned int n = 0; n < len; ++n) {
-        state.forceValue(*args[1]->listElems()[n]);
+        state.forceValue(*args[1]->listElems()[n], pos);
         v.listElems()[n] = args[1]->listElems()[n];
     }
 
@@ -1622,7 +1629,7 @@ static void prim_partition(EvalState & state, const Pos & pos, Value * * args, V
 
     for (unsigned int n = 0; n < len; ++n) {
         auto vElem = args[1]->listElems()[n];
-        state.forceValue(*vElem);
+        state.forceValue(*vElem, pos);
         Value res;
         state.callFunction(*args[0], *vElem, res, pos);
         if (state.forceBool(res, pos))
@@ -1753,8 +1760,8 @@ static void prim_bitXor(EvalState & state, const Pos & pos, Value * * args, Valu
 
 static void prim_lessThan(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
-    state.forceValue(*args[0]);
-    state.forceValue(*args[1]);
+    state.forceValue(*args[0], pos);
+    state.forceValue(*args[1], pos);
     CompareValues comp;
     mkBool(v, comp(args[0], args[1]));
 }
@@ -2046,6 +2053,7 @@ static void prim_splitVersion(EvalState & state, const Pos & pos, Value * * args
 
 
 /*************************************************************
+<<<<<<< HEAD
  * Networking
  *************************************************************/
 
@@ -2108,6 +2116,71 @@ static void prim_fetchTarball(EvalState & state, const Pos & pos, Value * * args
 
 
 /*************************************************************
+||||||| merged common ancestors
+ * Networking
+ *************************************************************/
+
+
+void fetch(EvalState & state, const Pos & pos, Value * * args, Value & v,
+    const string & who, bool unpack, const std::string & defaultName)
+{
+    CachedDownloadRequest request("");
+    request.unpack = unpack;
+    request.name = defaultName;
+
+    state.forceValue(*args[0]);
+
+    if (args[0]->type == tAttrs) {
+
+        state.forceAttrs(*args[0], pos);
+
+        for (auto & attr : *args[0]->attrs) {
+            string n(attr.name);
+            if (n == "url")
+                request.uri = state.forceStringNoCtx(*attr.value, *attr.pos);
+            else if (n == "sha256")
+                request.expectedHash = Hash(state.forceStringNoCtx(*attr.value, *attr.pos), htSHA256);
+            else if (n == "name")
+                request.name = state.forceStringNoCtx(*attr.value, *attr.pos);
+            else
+                throw EvalError(format("unsupported argument '%1%' to '%2%', at %3%") % attr.name % who % attr.pos);
+        }
+
+        if (request.uri.empty())
+            throw EvalError(format("'url' argument required, at %1%") % pos);
+
+    } else
+        request.uri = state.forceStringNoCtx(*args[0], pos);
+
+    state.checkURI(request.uri);
+
+    if (evalSettings.pureEval && !request.expectedHash)
+        throw Error("in pure evaluation mode, '%s' requires a 'sha256' argument", who);
+
+    auto res = getDownloader()->downloadCached(state.store, request);
+
+    if (state.allowedPaths)
+        state.allowedPaths->insert(res.path);
+
+    mkString(v, res.storePath, PathSet({res.storePath}));
+}
+
+
+static void prim_fetchurl(EvalState & state, const Pos & pos, Value * * args, Value & v)
+{
+    fetch(state, pos, args, v, "fetchurl", false, "");
+}
+
+
+static void prim_fetchTarball(EvalState & state, const Pos & pos, Value * * args, Value & v)
+{
+    fetch(state, pos, args, v, "fetchTarball", true, "source");
+}
+
+
+/*************************************************************
+=======
+>>>>>>> f60ce4fa207a210e23a1142d3a8ead611526e6e1
  * Primop registration
  *************************************************************/
 
@@ -2288,10 +2361,6 @@ void EvalState::createBaseEnv()
     // Derivations
     addPrimOp("derivationStrict", 1, prim_derivationStrict);
     addPrimOp("placeholder", 1, prim_placeholder);
-
-    // Networking
-    addPrimOp("__fetchurl", 1, prim_fetchurl);
-    addPrimOp("fetchTarball", 1, prim_fetchTarball);
 
     /* Add a wrapper around the derivation primop that computes the
        `drvPath' and `outPath' attributes lazily. */

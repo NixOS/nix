@@ -37,9 +37,6 @@ std::pair<Value *, Pos> findAlongAttrPath(EvalState & state, const string & attr
 {
     Strings tokens = parseAttrPath(attrPath);
 
-    Error attrError =
-        Error(format("attribute selection path '%1%' does not match expression") % attrPath);
-
     Value * v = &vIn;
     Pos pos = noPos;
 

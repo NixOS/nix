@@ -7,7 +7,7 @@
 #include "affinity.hh"
 #include "builtins.hh"
 #include "builtins/buildenv.hh"
-#include "download.hh"
+#include "filetransfer.hh"
 #include "finally.hh"
 #include "compression.hh"
 #include "json.hh"
@@ -33,7 +33,6 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <sys/utsname.h>
-#include <sys/select.h>
 #include <sys/resource.h>
 #include <sys/socket.h>
 #include <sys/un.h>
@@ -43,6 +42,7 @@
 #include <errno.h>
 #include <cstring>
 #include <termios.h>
+#include <poll.h>
 
 #include <pwd.h>
 #include <grp.h>
@@ -513,9 +513,10 @@ private:
     Path fnUserLock;
     AutoCloseFD fdUserLock;
 
+    bool isEnabled = false;
     string user;
-    uid_t uid;
-    gid_t gid;
+    uid_t uid = 0;
+    gid_t gid = 0;
     std::vector<gid_t> supplementaryGIDs;
 
 public:
@@ -528,7 +529,9 @@ public:
     uid_t getGID() { assert(gid); return gid; }
     std::vector<gid_t> getSupplementaryGIDs() { return supplementaryGIDs; }
 
-    bool enabled() { return uid != 0; }
+    bool findFreeUser();
+
+    bool enabled() { return isEnabled; }
 
 };
 
@@ -536,6 +539,11 @@ public:
 UserLock::UserLock()
 {
     assert(settings.buildUsersGroup != "");
+    createDirs(settings.nixStateDir + "/userpool");
+}
+
+bool UserLock::findFreeUser() {
+    if (enabled()) return true;
 
     /* Get the members of the build-users-group. */
     struct group * gr = getgrnam(settings.buildUsersGroup.get().c_str());
@@ -565,7 +573,6 @@ UserLock::UserLock()
             throw Error(format("the user '%1%' in the group '%2%' does not exist")
                 % i % settings.buildUsersGroup);
 
-        createDirs(settings.nixStateDir + "/userpool");
 
         fnUserLock = (format("%1%/userpool/%2%") % settings.nixStateDir % pw->pw_uid).str();
 
@@ -596,15 +603,12 @@ UserLock::UserLock()
             supplementaryGIDs.resize(ngroups);
 #endif
 
-            return;
+            isEnabled = true;
+            return true;
         }
     }
-
-    throw Error(format("all build users are currently in use; "
-        "consider creating additional users and adding them to the '%1%' group")
-        % settings.buildUsersGroup);
+    return false;
 }
-
 
 void UserLock::kill()
 {
@@ -934,6 +938,7 @@ private:
     void closureRepaired();
     void inputsRealised();
     void tryToBuild();
+    void tryLocalBuild();
     void buildDone();
 
     /* Is the build hook willing to perform the build? */
@@ -1004,6 +1009,8 @@ private:
     {
         Goal::amDone(result);
     }
+
+    void started();
 
     void done(BuildResult::Status status, const string & msg = "");
 
@@ -1392,6 +1399,19 @@ void DerivationGoal::inputsRealised()
     result = BuildResult();
 }
 
+void DerivationGoal::started() {
+    auto msg = fmt(
+        buildMode == bmRepair ? "repairing outputs of '%s'" :
+        buildMode == bmCheck ? "checking outputs of '%s'" :
+        nrRounds > 1 ? "building '%s' (round %d/%d)" :
+        "building '%s'", worker.store.printStorePath(drvPath), curRound, nrRounds);
+    fmt("building '%s'", worker.store.printStorePath(drvPath));
+    if (hook) msg += fmt(" on '%s'", machineName);
+    act = std::make_unique<Activity>(*logger, lvlInfo, actBuild, msg,
+        Logger::Fields{worker.store.printStorePath(drvPath), hook ? machineName : "", curRound, nrRounds});
+    mcRunningBuilds = std::make_unique<MaintainCount<uint64_t>>(worker.runningBuilds);
+    worker.updateProgress();
+}
 
 void DerivationGoal::tryToBuild()
 {
@@ -1487,6 +1507,34 @@ void DerivationGoal::tryToBuild()
         worker.waitForBuildSlot(shared_from_this());
         outputLocks.unlock();
         return;
+    }
+
+    state = &DerivationGoal::tryLocalBuild;
+    worker.wakeUp(shared_from_this());
+}
+
+void DerivationGoal::tryLocalBuild() {
+
+    /* If `build-users-group' is not empty, then we have to build as
+       one of the members of that group. */
+    if (settings.buildUsersGroup != "" && getuid() == 0) {
+#if defined(__linux__) || defined(__APPLE__)
+        if (!buildUser) buildUser = std::make_unique<UserLock>();
+
+        if (buildUser->findFreeUser()) {
+            /* Make sure that no other processes are executing under this
+               uid. */
+            buildUser->kill();
+        } else {
+            debug("waiting for build users");
+            worker.waitForAWhile(shared_from_this());
+            return;
+        }
+#else
+        /* Don't know how to block the creation of setuid/setgid
+           binaries on this platform. */
+        throw Error("build users are not supported on this platform for security reasons");
+#endif
     }
 
     try {
@@ -1686,6 +1734,7 @@ void DerivationGoal::buildDone()
         }
 
         if (buildMode == bmCheck) {
+            deleteTmpDir(true);
             done(BuildResult::Built);
             return;
         }
@@ -1948,22 +1997,6 @@ void DerivationGoal::startBuilder()
         #endif
     }
 
-    /* If `build-users-group' is not empty, then we have to build as
-       one of the members of that group. */
-    if (settings.buildUsersGroup != "" && getuid() == 0) {
-#if defined(__linux__) || defined(__APPLE__)
-        buildUser = std::make_unique<UserLock>();
-
-        /* Make sure that no other processes are executing under this
-           uid. */
-        buildUser->kill();
-#else
-        /* Don't know how to block the creation of setuid/setgid
-           binaries on this platform. */
-        throw Error("build users are not supported on this platform for security reasons");
-#endif
-    }
-
     /* Create a temporary directory where the build will take
        place. */
     tmpDir = createTempDir("", "nix-build-" + std::string(drvPath.name()), false, false, 0700);
@@ -2167,7 +2200,7 @@ void DerivationGoal::startBuilder()
     if (needsHashRewrite()) {
 
         if (pathExists(homeDir))
-            throw Error(format("directory '%1%' exists; please remove it") % homeDir);
+            throw Error(format("home directory '%1%' exists; please remove it to assure purity of builds without sandboxing") % homeDir);
 
         /* We're not doing a chroot build, but we have some valid
            output paths.  Since we can't just overwrite or delete
@@ -2255,10 +2288,13 @@ void DerivationGoal::startBuilder()
 
         if (chown(slaveName.c_str(), buildUser->getUID(), 0))
             throw SysError("changing owner of pseudoterminal slave");
-    } else {
+    }
+#if __APPLE__
+    else {
         if (grantpt(builderOut.readSide.get()))
             throw SysError("granting access to pseudoterminal slave");
     }
+#endif
 
     #if 0
     // Mount the pt in the sandbox so that the "tty" command works.
@@ -2471,7 +2507,7 @@ void DerivationGoal::initTmpDir() {
                 auto hash = hashString(HashType::SHA256, i.first);
                 string fn = ".attr-" + hash.to_string(Base::Base32, false);
                 Path p = tmpDir + "/" + fn;
-                writeFile(p, i.second);
+                writeFile(p, rewriteStrings(i.second, inputRewrites));
                 chownToBuilder(p);
                 env[i.first + "Path"] = tmpDirInSandbox + "/" + fn;
             }
@@ -2718,7 +2754,7 @@ struct RestrictedStore : public LocalFSStore
     { throw Error("queryPathFromHashPart"); }
 
     StorePath addToStore(const string & name, const Path & srcPath,
-        bool recursive = true, HashType hashAlgo = HashType::SHA256,
+        FileIngestionMethod method = FileIngestionMethod::Recursive, HashType hashAlgo = HashType::SHA256,
         PathFilter & filter = defaultPathFilter, RepairFlag repair = NoRepair) override
     { throw Error("addToStore"); }
 
@@ -2731,9 +2767,9 @@ struct RestrictedStore : public LocalFSStore
     }
 
     StorePath addToStoreFromDump(const string & dump, const string & name,
-        bool recursive = true, HashType hashAlgo = HashType::SHA256, RepairFlag repair = NoRepair) override
+        FileIngestionMethod method = FileIngestionMethod::Recursive, HashType hashAlgo = HashType::SHA256, RepairFlag repair = NoRepair) override
     {
-        auto path = next->addToStoreFromDump(dump, name, recursive, hashAlgo, repair);
+        auto path = next->addToStoreFromDump(dump, name, method, hashAlgo, repair);
         goal.addDependency(path);
         return path;
     }
@@ -3157,7 +3193,7 @@ void DerivationGoal::runChild()
                 // Only use nss functions to resolve hosts and
                 // services. Don’t use it for anything else that may
                 // be configured for this system. This limits the
-                // potential impurities introduced in fixed outputs.
+                // potential impurities introduced in fixed-outputs.
                 writeFile(chrootRootDir + "/etc/nsswitch.conf", "hosts: files dns\nservices: files\n");
 
                 ss.push_back("/etc/services");
@@ -3542,6 +3578,29 @@ StorePathSet parseReferenceSpecifiers(Store & store, const BasicDerivation & drv
 }
 
 
+static void moveCheckToStore(const Path & src, const Path & dst)
+{
+    /* For the rename of directory to succeed, we must be running as root or
+       the directory must be made temporarily writable (to update the
+       directory's parent link ".."). */
+    struct stat st;
+    if (lstat(src.c_str(), &st) == -1) {
+        throw SysError(format("getting attributes of path '%1%'") % src);
+    }
+
+    bool changePerm = (geteuid() && S_ISDIR(st.st_mode) && !(st.st_mode & S_IWUSR));
+
+    if (changePerm)
+        chmod_(src, st.st_mode | S_IWUSR);
+
+    if (rename(src.c_str(), dst.c_str()))
+        throw SysError(format("renaming '%1%' to '%2%'") % src % dst);
+
+    if (changePerm)
+        chmod_(dst, st.st_mode);
+}
+
+
 void DerivationGoal::registerOutputs()
 {
     /* When using a build hook, the build hook can register the output
@@ -3653,21 +3712,24 @@ void DerivationGoal::registerOutputs()
 
         if (fixedOutput) {
 
-            bool recursive; Hash h;
-            i.second.parseHashInfo(recursive, h);
+            FileIngestionMethod outputHashMode; Hash h;
+            i.second.parseHashInfo(outputHashMode, h);
 
-            if (!recursive) {
+            if (outputHashMode == FileIngestionMethod::Flat) {
                 /* The output path should be a regular file without execute permission. */
                 if (!S_ISREG(st.st_mode) || (st.st_mode & S_IXUSR) != 0)
                     throw BuildError(
-                        format("output path '%1%' should be a non-executable regular file") % path);
+                        format("output path '%1%' should be a non-executable regular file "
+                               "since recursive hashing is not enabled (outputHashMode=flat)") % path);
             }
 
             /* Check the hash. In hash mode, move the path produced by
                the derivation to its content-addressed location. */
-            Hash h2 = recursive ? hashPath(h.type, actualPath).first : hashFile(h.type, actualPath);
+            Hash h2 = outputHashMode == FileIngestionMethod::Recursive
+                ? hashPath(h.type, actualPath).first
+                : hashFile(h.type, actualPath);
 
-            auto dest = worker.store.makeFixedOutputPath(recursive, h2, i.second.path.name());
+            auto dest = worker.store.makeFixedOutputPath(outputHashMode, h2, i.second.path.name());
 
             if (h != h2) {
 
@@ -3696,7 +3758,7 @@ void DerivationGoal::registerOutputs()
             else
                 assert(worker.store.parseStorePath(path) == dest);
 
-            ca = makeFixedOutputCA(recursive, h2);
+            ca = makeFixedOutputCA(outputHashMode, h2);
         }
 
         /* Get rid of all weird permissions.  This also checks that
@@ -3720,8 +3782,7 @@ void DerivationGoal::registerOutputs()
                 if (settings.runDiffHook || settings.keepFailed) {
                     Path dst = worker.store.toRealPath(path + checkSuffix);
                     deletePath(dst);
-                    if (rename(actualPath.c_str(), dst.c_str()))
-                        throw SysError(format("renaming '%1%' to '%2%'") % actualPath % dst);
+                    moveCheckToStore(actualPath, dst);
 
                     handleDiffHook(
                         buildUser ? buildUser->getUID() : getuid(),
@@ -3729,10 +3790,10 @@ void DerivationGoal::registerOutputs()
                         path, dst, worker.store.printStorePath(drvPath), tmpDir);
 
                     throw NotDeterministic("derivation '%s' may not be deterministic: output '%s' differs from '%s'",
-                        worker.store.printStorePath(drvPath), path, dst);
+                        worker.store.printStorePath(drvPath), worker.store.toRealPath(path), dst);
                 } else
                     throw NotDeterministic("derivation '%s' may not be deterministic: output '%s' differs",
-                        worker.store.printStorePath(drvPath), path);
+                        worker.store.printStorePath(drvPath), worker.store.toRealPath(path));
             }
 
             /* Since we verified the build, it's now ultimately trusted. */
@@ -3918,7 +3979,9 @@ void DerivationGoal::checkOutputs(const std::map<Path, ValidPathInfo> & outputs)
 
                 auto spec = parseReferenceSpecifiers(worker.store, *drv, *value);
 
-                auto used = recursive ? cloneStorePathSet(getClosure(info.path).first) : cloneStorePathSet(info.references);
+                auto used = recursive
+                    ? cloneStorePathSet(getClosure(info.path).first)
+                    : cloneStorePathSet(info.references);
 
                 if (recursive && checks.ignoreSelfRefs)
                     used.erase(info.path);
@@ -4772,8 +4835,7 @@ void Worker::waitForInput()
        terminated. */
 
     bool useTimeout = false;
-    struct timeval timeout;
-    timeout.tv_usec = 0;
+    long timeout = 0;
     auto before = steady_time_point::clock::now();
 
     /* If we're monitoring for silence on stdout/stderr, or if there
@@ -4791,7 +4853,7 @@ void Worker::waitForInput()
             nearest = std::min(nearest, i.timeStarted + std::chrono::seconds(settings.buildTimeout));
     }
     if (nearest != steady_time_point::max()) {
-        timeout.tv_sec = std::max(1L, (long) std::chrono::duration_cast<std::chrono::seconds>(nearest - before).count());
+        timeout = std::max(1L, (long) std::chrono::duration_cast<std::chrono::seconds>(nearest - before).count());
         useTimeout = true;
     }
 
@@ -4800,32 +4862,30 @@ void Worker::waitForInput()
     if (!waitingForAWhile.empty()) {
         useTimeout = true;
         if (lastWokenUp == steady_time_point::min())
-            printError("waiting for locks or build slots...");
+            printError("waiting for locks, build slots or build users...");
         if (lastWokenUp == steady_time_point::min() || lastWokenUp > before) lastWokenUp = before;
-        timeout.tv_sec = std::max(1L,
+        timeout = std::max(1L,
             (long) std::chrono::duration_cast<std::chrono::seconds>(
                 lastWokenUp + std::chrono::seconds(settings.pollInterval) - before).count());
     } else lastWokenUp = steady_time_point::min();
 
     if (useTimeout)
-        vomit("sleeping %d seconds", timeout.tv_sec);
+        vomit("sleeping %d seconds", timeout);
 
     /* Use select() to wait for the input side of any logger pipe to
        become `available'.  Note that `available' (i.e., non-blocking)
        includes EOF. */
-    fd_set fds;
-    FD_ZERO(&fds);
-    int fdMax = 0;
+    std::vector<struct pollfd> pollStatus;
+    std::map <int, int> fdToPollStatus;
     for (auto & i : children) {
         for (auto & j : i.fds) {
-            if (j >= FD_SETSIZE)
-                throw Error("reached FD_SETSIZE limit");
-            FD_SET(j, &fds);
-            if (j >= fdMax) fdMax = j + 1;
+            pollStatus.push_back((struct pollfd) { .fd = j, .events = POLLIN });
+            fdToPollStatus[j] = pollStatus.size() - 1;
         }
     }
 
-    if (select(fdMax, &fds, 0, 0, useTimeout ? &timeout : 0) == -1) {
+    if (poll(pollStatus.data(), pollStatus.size(),
+            useTimeout ? timeout * 1000 : -1) == -1) {
         if (errno == EINTR) return;
         throw SysError("waiting for input");
     }
@@ -4846,7 +4906,7 @@ void Worker::waitForInput()
         set<int> fds2(j->fds);
         std::vector<unsigned char> buffer(4096);
         for (auto & k : fds2) {
-            if (FD_ISSET(k, &fds)) {
+            if (pollStatus.at(fdToPollStatus.at(k)).revents) {
                 ssize_t rd = read(k, buffer.data(), buffer.size());
                 // FIXME: is there a cleaner way to handle pt close
                 // than EIO? Is this even standard?

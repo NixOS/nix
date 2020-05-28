@@ -31,6 +31,8 @@ struct CmdLog : InstallableCommand
         };
     }
 
+    Category category() override { return catSecondary; }
+
     void run(ref<Store> store) override
     {
         settings.readOnlyMode = true;

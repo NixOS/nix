@@ -20,13 +20,13 @@ struct CmdVerify : StorePathsCommand
     {
         mkFlag(0, "no-contents", "do not verify the contents of each store path", &noContents);
         mkFlag(0, "no-trust", "do not verify whether each store path is trusted", &noTrust);
-        mkFlag()
-            .longName("substituter")
-            .shortName('s')
-            .labels({"store-uri"})
-            .description("use signatures from specified store")
-            .arity(1)
-            .handler([&](std::vector<std::string> ss) { substituterUris.push_back(ss[0]); });
+        addFlag({
+            .longName = "substituter",
+            .shortName = 's',
+            .description = "use signatures from specified store",
+            .labels = {"store-uri"},
+            .handler = {[&](std::string s) { substituterUris.push_back(s); }}
+        });
         mkIntFlag('n', "sigs-needed", "require that each path has at least N valid signatures", &sigsNeeded);
     }
 
@@ -48,6 +48,8 @@ struct CmdVerify : StorePathsCommand
             },
         };
     }
+
+    Category category() override { return catSecondary; }
 
     void run(ref<Store> store, StorePaths storePaths) override
     {

@@ -13,6 +13,8 @@ struct CmdShowConfig : Command, MixJSON
         return "show the Nix configuration";
     }
 
+    Category category() override { return catUtility; }
+
     void run() override
     {
         if (json) {
@@ -23,7 +25,7 @@ struct CmdShowConfig : Command, MixJSON
             std::map<std::string, Config::SettingInfo> settings;
             globalConfig.getSettings(settings);
             for (auto & s : settings)
-                std::cout << s.first + " = " + s.second.value + "\n";
+                logger->stdout("%s = %s", s.first, s.second.value);
         }
     }
 };

@@ -6,7 +6,7 @@
 #include "nar-info-disk-cache.hh"
 #include "globals.hh"
 #include "compression.hh"
-#include "download.hh"
+#include "filetransfer.hh"
 #include "istringstream_nocopy.hh"
 
 #include <aws/core/Aws.h>
@@ -132,7 +132,7 @@ ref<Aws::Client::ClientConfiguration> S3Helper::makeConfig(const string & region
     return res;
 }
 
-S3Helper::DownloadResult S3Helper::getObject(
+S3Helper::FileTransferResult S3Helper::getObject(
     const std::string & bucketName, const std::string & key)
 {
     debug("fetching 's3://%s/%s'...", bucketName, key);
@@ -146,7 +146,7 @@ S3Helper::DownloadResult S3Helper::getObject(
         return Aws::New<std::stringstream>("STRINGSTREAM");
     });
 
-    DownloadResult res;
+    FileTransferResult res;
 
     auto now1 = std::chrono::steady_clock::now();
 

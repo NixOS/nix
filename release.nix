@@ -12,51 +12,63 @@ let
     builtins.readFile ./.version
     + (if officialRelease then "" else "pre${toString nix.revCount}_${nix.shortRev}");
 
+  # Create a "vendor" directory that contains the crates listed in
+  # Cargo.lock. This allows Nix to be built without network access.
+  vendoredCrates' =
+    let
+      lockFile = builtins.fromTOML (builtins.readFile nix-rust/Cargo.lock);
+
+      files = map (pkg: import <nix/fetchurl.nix> {
+        url = "https://crates.io/api/v1/crates/${pkg.name}/${pkg.version}/download";
+        sha256 = lockFile.metadata."checksum ${pkg.name} ${pkg.version} (registry+https://github.com/rust-lang/crates.io-index)";
+      }) (builtins.filter (pkg: pkg.source or "" == "registry+https://github.com/rust-lang/crates.io-index") lockFile.package);
+
+    in pkgs.runCommand "cargo-vendor-dir" {}
+      ''
+        mkdir -p $out/vendor
+
+        cat > $out/vendor/config <<EOF
+        [source.crates-io]
+        replace-with = "vendored-sources"
+
+        [source.vendored-sources]
+        directory = "vendor"
+        EOF
+
+        ${toString (builtins.map (file: ''
+          mkdir $out/vendor/tmp
+          tar xvf ${file} -C $out/vendor/tmp
+          dir=$(echo $out/vendor/tmp/*)
+
+          # Add just enough metadata to keep Cargo happy.
+          printf '{"files":{},"package":"${file.outputHash}"}' > "$dir/.cargo-checksum.json"
+
+          # Clean up some cruft from the winapi crates. FIXME: find
+          # a way to remove winapi* from our dependencies.
+          if [[ $dir =~ /winapi ]]; then
+            find $dir -name "*.a" -print0 | xargs -0 rm -f --
+          fi
+
+          mv "$dir" $out/vendor/
+
+          rm -rf $out/vendor/tmp
+        '') files)}
+      '';
+
   jobs = rec {
 
-    # Create a "vendor" directory that contains the crates listed in
-    # Cargo.lock. This allows Nix to be built without network access.
     vendoredCrates =
-      let
-        lockFile = builtins.fromTOML (builtins.readFile nix-rust/Cargo.lock);
-
-        files = map (pkg: import <nix/fetchurl.nix> {
-          url = "https://crates.io/api/v1/crates/${pkg.name}/${pkg.version}/download";
-          sha256 = lockFile.metadata."checksum ${pkg.name} ${pkg.version} (registry+https://github.com/rust-lang/crates.io-index)";
-        }) (builtins.filter (pkg: pkg.source or "" == "registry+https://github.com/rust-lang/crates.io-index") lockFile.package);
-
-      in pkgs.runCommand "cargo-vendor-dir" {}
+      with pkgs;
+      runCommand "vendored-crates" {}
         ''
-          mkdir -p $out/vendor
-
-          cat > $out/vendor/config <<EOF
-          [source.crates-io]
-          replace-with = "vendored-sources"
-
-          [source.vendored-sources]
-          directory = "vendor"
-          EOF
-
-          ${toString (builtins.map (file: ''
-            mkdir $out/vendor/tmp
-            tar xvf ${file} -C $out/vendor/tmp
-            dir=$(echo $out/vendor/tmp/*)
-
-            # Add just enough metadata to keep Cargo happy.
-            printf '{"files":{},"package":"${file.outputHash}"}' > "$dir/.cargo-checksum.json"
-
-            # Clean up some cruft from the winapi crates. FIXME: find
-            # a way to remove winapi* from our dependencies.
-            if [[ $dir =~ /winapi ]]; then
-              find $dir -name "*.a" -print0 | xargs -0 rm -f --
-            fi
-
-            mv "$dir" $out/vendor/
-
-            rm -rf $out/vendor/tmp
-          '') files)}
+          mkdir -p $out/nix-support
+          name=nix-vendored-crates-${version}
+          fn=$out/$name.tar.xz
+            tar cvfJ $fn -C ${vendoredCrates'} vendor \
+              --owner=0 --group=0 --mode=u+rw,uga+r \
+              --transform "s,vendor,$name,"
+            echo "file crates-tarball $fn" >> $out/nix-support/hydra-build-products
         '';
-
 
     build = pkgs.lib.genAttrs systems (system:
 
@@ -89,7 +101,7 @@ let
               patchelf --set-rpath $out/lib:${stdenv.cc.cc.lib}/lib $out/lib/libboost_thread.so.*
             ''}
 
-            ln -sfn ${vendoredCrates}/vendor/ nix-rust/vendor
+            ln -sfn ${vendoredCrates'}/vendor/ nix-rust/vendor
 
             (cd perl; autoreconf --install --force --verbose)
           '';
@@ -103,17 +115,17 @@ let
 
         installFlags = "sysconfdir=$(out)/etc";
 
+        postInstall = ''
+          mkdir -p $doc/nix-support
+          echo "doc manual $doc/share/doc/nix/manual" >> $doc/nix-support/hydra-build-products
+        '';
+
         doCheck = true;
 
         doInstallCheck = true;
         installCheckFlags = "sysconfdir=$(out)/etc";
 
         separateDebugInfo = true;
-
-        preDist = ''
-          mkdir -p $doc/nix-support
-          echo "doc manual $doc/share/doc/nix/manual" >> $doc/nix-support/hydra-build-products
-        '';
       });
 
 
@@ -165,10 +177,10 @@ let
         }
         ''
           cp ${installerClosureInfo}/registration $TMPDIR/reginfo
+          cp ${./scripts/create-darwin-volume.sh} $TMPDIR/create-darwin-volume.sh
           substitute ${./scripts/install-nix-from-closure.sh} $TMPDIR/install \
             --subst-var-by nix ${toplevel} \
             --subst-var-by cacert ${cacert}
-
           substitute ${./scripts/install-darwin-multi-user.sh} $TMPDIR/install-darwin-multi-user.sh \
             --subst-var-by nix ${toplevel} \
             --subst-var-by cacert ${cacert}
@@ -183,6 +195,7 @@ let
             # SC1090: Don't worry about not being able to find
             #         $nix/etc/profile.d/nix.sh
             shellcheck --exclude SC1090 $TMPDIR/install
+            shellcheck $TMPDIR/create-darwin-volume.sh
             shellcheck $TMPDIR/install-darwin-multi-user.sh
             shellcheck $TMPDIR/install-systemd-multi-user.sh
 
@@ -198,6 +211,7 @@ let
           fi
 
           chmod +x $TMPDIR/install
+          chmod +x $TMPDIR/create-darwin-volume.sh
           chmod +x $TMPDIR/install-darwin-multi-user.sh
           chmod +x $TMPDIR/install-systemd-multi-user.sh
           chmod +x $TMPDIR/install-multi-user
@@ -210,11 +224,15 @@ let
             --absolute-names \
             --hard-dereference \
             --transform "s,$TMPDIR/install,$dir/install," \
+            --transform "s,$TMPDIR/create-darwin-volume.sh,$dir/create-darwin-volume.sh," \
             --transform "s,$TMPDIR/reginfo,$dir/.reginfo," \
             --transform "s,$NIX_STORE,$dir/store,S" \
-            $TMPDIR/install $TMPDIR/install-darwin-multi-user.sh \
+            $TMPDIR/install \
+            $TMPDIR/create-darwin-volume.sh \
+            $TMPDIR/install-darwin-multi-user.sh \
             $TMPDIR/install-systemd-multi-user.sh \
-            $TMPDIR/install-multi-user $TMPDIR/reginfo \
+            $TMPDIR/install-multi-user \
+            $TMPDIR/reginfo \
             $(cat ${installerClosureInfo}/store-paths)
         '');
 
@@ -228,6 +246,11 @@ let
         name = "nix-coverage-${version}";
 
         src = nix;
+
+        preConfigure =
+          ''
+            ln -sfn ${vendoredCrates'}/vendor/ nix-rust/vendor
+          '';
 
         enableParallelBuilding = true;
 

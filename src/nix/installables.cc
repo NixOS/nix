@@ -12,26 +12,28 @@
 
 namespace nix {
 
+
 SourceExprCommand::SourceExprCommand()
 {
-    mkFlag()
-        .shortName('f')
-        .longName("file")
-        .label("file")
-        .description("evaluate FILE rather than the default")
-        .dest(&file);
+    addFlag({
+        .longName = "file",
+        .shortName = 'f',
+        .description = "evaluate FILE rather than the default",
+        .labels = {"file"},
+        .handler = {&file}
+    });
 }
 
 Value * SourceExprCommand::getSourceExpr(EvalState & state)
 {
-    if (vSourceExpr) return vSourceExpr;
+    if (vSourceExpr) return *vSourceExpr;
 
     auto sToplevel = state.symbols.create("_toplevel");
 
-    vSourceExpr = state.allocValue();
+    vSourceExpr = allocRootValue(state.allocValue());
 
     if (file != "")
-        state.evalFile(lookupFileArg(state, file), *vSourceExpr);
+        state.evalFile(lookupFileArg(state, file), **vSourceExpr);
 
     else {
 
@@ -39,9 +41,9 @@ Value * SourceExprCommand::getSourceExpr(EvalState & state)
 
         auto searchPath = state.getSearchPath();
 
-        state.mkAttrs(*vSourceExpr, 1024);
+        state.mkAttrs(**vSourceExpr, 1024);
 
-        mkBool(*state.allocAttr(*vSourceExpr, sToplevel), true);
+        mkBool(*state.allocAttr(**vSourceExpr, sToplevel), true);
 
         std::unordered_set<std::string> seen;
 
@@ -52,7 +54,7 @@ Value * SourceExprCommand::getSourceExpr(EvalState & state)
             mkPrimOpApp(*v1, state.getBuiltin("findFile"), state.getBuiltin("nixPath"));
             Value * v2 = state.allocValue();
             mkApp(*v2, *v1, mkString(*state.allocValue(), name));
-            mkApp(*state.allocAttr(*vSourceExpr, state.symbols.create(name)),
+            mkApp(*state.allocAttr(**vSourceExpr, state.symbols.create(name)),
                 state.getBuiltin("import"), *v2);
         };
 
@@ -66,10 +68,10 @@ Value * SourceExprCommand::getSourceExpr(EvalState & state)
             } else
                 addEntry(i.first);
 
-        vSourceExpr->attrs->sort();
+        (*vSourceExpr)->attrs->sort();
     }
 
-    return vSourceExpr;
+    return *vSourceExpr;
 }
 
 ref<EvalState> SourceExprCommand::getEvalState()
@@ -108,6 +110,11 @@ struct InstallableStorePath : Installable
         Buildables bs;
         bs.push_back(std::move(b));
         return bs;
+    }
+
+    std::optional<StorePath> getStorePath() override
+    {
+        return storePath.clone();
     }
 };
 
