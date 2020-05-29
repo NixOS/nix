@@ -31,15 +31,13 @@ struct Node : std::enable_shared_from_this<Node>
 struct LockedNode : Node
 {
     FlakeRef lockedRef, originalRef;
-    TreeInfo info;
     bool isFlake = true;
 
     LockedNode(
         const FlakeRef & lockedRef,
         const FlakeRef & originalRef,
-        const TreeInfo & info,
         bool isFlake = true)
-        : lockedRef(lockedRef), originalRef(originalRef), info(info), isFlake(isFlake)
+        : lockedRef(lockedRef), originalRef(originalRef), isFlake(isFlake)
     { }
 
     LockedNode(const nlohmann::json & json);

@@ -14,17 +14,15 @@ typedef std::string FlakeId;
 
 struct FlakeRef
 {
-    std::shared_ptr<const fetchers::Input> input;
+    fetchers::Input input;
 
     Path subdir;
 
     bool operator==(const FlakeRef & other) const;
 
-    FlakeRef(const std::shared_ptr<const fetchers::Input> & input, const Path & subdir)
-        : input(input), subdir(subdir)
-    {
-        assert(input);
-    }
+    FlakeRef(fetchers::Input && input, const Path & subdir)
+        : input(std::move(input)), subdir(subdir)
+    { }
 
     // FIXME: change to operator <<.
     std::string to_string() const;

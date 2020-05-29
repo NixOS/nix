@@ -8,37 +8,80 @@
 
 namespace nix::fetchers {
 
-struct GitArchiveInput : Input
+struct GitArchiveInputScheme : InputScheme
 {
-    std::string owner;
-    std::string repo;
-    std::optional<std::string> ref;
-    std::optional<Hash> rev;
+    virtual std::string type() = 0;
 
-    virtual std::shared_ptr<GitArchiveInput> _clone() const = 0;
-
-    bool operator ==(const Input & other) const override
+    std::optional<Input> inputFromURL(const ParsedURL & url) override
     {
-        auto other2 = dynamic_cast<const GitArchiveInput *>(&other);
-        return
-            other2
-            && owner == other2->owner
-            && repo == other2->repo
-            && rev == other2->rev
-            && ref == other2->ref;
+        if (url.scheme != type()) return {};
+
+        auto path = tokenizeString<std::vector<std::string>>(url.path, "/");
+
+        std::optional<Hash> rev;
+        std::optional<std::string> ref;
+
+        if (path.size() == 2) {
+        } else if (path.size() == 3) {
+            if (std::regex_match(path[2], revRegex))
+                rev = Hash(path[2], htSHA1);
+            else if (std::regex_match(path[2], refRegex))
+                ref = path[2];
+            else
+                throw BadURL("in URL '%s', '%s' is not a commit hash or branch/tag name", url.url, path[2]);
+        } else
+            throw BadURL("URL '%s' is invalid", url.url);
+
+        for (auto &[name, value] : url.query) {
+            if (name == "rev") {
+                if (rev)
+                    throw BadURL("URL '%s' contains multiple commit hashes", url.url);
+                rev = Hash(value, htSHA1);
+            }
+            else if (name == "ref") {
+                if (!std::regex_match(value, refRegex))
+                    throw BadURL("URL '%s' contains an invalid branch/tag name", url.url);
+                if (ref)
+                    throw BadURL("URL '%s' contains multiple branch/tag names", url.url);
+                ref = value;
+            }
+        }
+
+        if (ref && rev)
+            throw BadURL("URL '%s' contains both a commit hash and a branch/tag name", url.url);
+
+        Input input;
+        input.attrs.insert_or_assign("type", type());
+        input.attrs.insert_or_assign("owner", path[0]);
+        input.attrs.insert_or_assign("repo", path[1]);
+        if (rev) input.attrs.insert_or_assign("rev", rev->gitRev());
+        if (ref) input.attrs.insert_or_assign("ref", *ref);
+
+        return input;
     }
 
-    bool isImmutable() const override
+    std::optional<Input> inputFromAttrs(const Attrs & attrs) override
     {
-        return (bool) rev || narHash;
+        if (maybeGetStrAttr(attrs, "type") != type()) return {};
+
+        for (auto & [name, value] : attrs)
+            if (name != "type" && name != "owner" && name != "repo" && name != "ref" && name != "rev" && name != "narHash" && name != "lastModified")
+                throw Error("unsupported input attribute '%s'", name);
+
+        getStrAttr(attrs, "owner");
+        getStrAttr(attrs, "repo");
+
+        Input input;
+        input.attrs = attrs;
+        return input;
     }
 
-    std::optional<std::string> getRef() const override { return ref; }
-
-    std::optional<Hash> getRev() const override { return rev; }
-
-    ParsedURL toURL() const override
+    ParsedURL toURL(const Input & input) override
     {
+        auto owner = getStrAttr(input.attrs, "owner");
+        auto repo = getStrAttr(input.attrs, "repo");
+        auto ref = input.getRef();
+        auto rev = input.getRev();
         auto path = owner + "/" + repo;
         assert(!(ref && rev));
         if (ref) path += "/" + *ref;
@@ -49,32 +92,44 @@ struct GitArchiveInput : Input
         };
     }
 
-    Attrs toAttrsInternal() const override
+    bool hasAllInfo(const Input & input) override
     {
-        Attrs attrs;
-        attrs.emplace("owner", owner);
-        attrs.emplace("repo", repo);
-        if (ref)
-            attrs.emplace("ref", *ref);
-        if (rev)
-            attrs.emplace("rev", rev->gitRev());
-        return attrs;
+        return input.getRev() && maybeGetIntAttr(input.attrs, "lastModified");
     }
 
-    virtual Hash getRevFromRef(nix::ref<Store> store, std::string_view ref) const = 0;
-
-    virtual std::string getDownloadUrl() const = 0;
-
-    std::pair<Tree, std::shared_ptr<const Input>> fetchTreeInternal(nix::ref<Store> store) const override
+    Input applyOverrides(
+        const Input & _input,
+        std::optional<std::string> ref,
+        std::optional<Hash> rev) override
     {
-        auto rev = this->rev;
-        auto ref = this->ref.value_or("master");
+        auto input(_input);
+        if (rev) {
+            input.attrs.insert_or_assign("rev", rev->gitRev());
+            input.attrs.erase("ref");
+        }
+        if (ref) {
+            if (input.getRev())
+                throw BadURL("input '%s' contains both a commit hash and a branch/tag name", input.to_string());
+            input.attrs.insert_or_assign("ref", *ref);
+        }
+        return input;
+    }
 
-        if (!rev) rev = getRevFromRef(store, ref);
+    virtual Hash getRevFromRef(nix::ref<Store> store, const Input & input) const = 0;
 
-        auto input = _clone();
-        input->ref = {};
-        input->rev = *rev;
+    virtual std::string getDownloadUrl(const Input & input) const = 0;
+
+    std::pair<Tree, Input> fetch(ref<Store> store, const Input & _input) override
+    {
+        Input input(_input);
+
+        if (!maybeGetStrAttr(input.attrs, "ref")) input.attrs.insert_or_assign("ref", "master");
+
+        auto rev = input.getRev();
+        if (!rev) rev = getRevFromRef(store, input);
+
+        input.attrs.erase("ref");
+        input.attrs.insert_or_assign("rev", rev->gitRev());
 
         Attrs immutableAttrs({
             {"type", "git-tarball"},
@@ -82,131 +137,44 @@ struct GitArchiveInput : Input
         });
 
         if (auto res = getCache()->lookup(store, immutableAttrs)) {
+            input.attrs.insert_or_assign("lastModified", getIntAttr(res->first, "lastModified"));
             return {
                 Tree{
                     .actualPath = store->toRealPath(res->second),
                     .storePath = std::move(res->second),
-                    .info = TreeInfo {
-                        .lastModified = getIntAttr(res->first, "lastModified"),
-                    },
                 },
                 input
             };
         }
 
-        auto url = input->getDownloadUrl();
+        auto url = getDownloadUrl(input);
 
+        auto [tree, lastModified] = downloadTarball(store, url, "source", true);
 
-        auto tree = downloadTarball(store, url, "source", true);
+        input.attrs.insert_or_assign("lastModified", lastModified);
 
         getCache()->add(
             store,
             immutableAttrs,
             {
                 {"rev", rev->gitRev()},
-                {"lastModified", *tree.info.lastModified}
+                {"lastModified", lastModified}
             },
             tree.storePath,
             true);
 
         return {std::move(tree), input};
     }
-
-    std::shared_ptr<const Input> applyOverrides(
-        std::optional<std::string> ref,
-        std::optional<Hash> rev) const override
-    {
-        if (!ref && !rev) return shared_from_this();
-
-        auto res = _clone();
-
-        if (ref) res->ref = ref;
-        if (rev) res->rev = rev;
-
-        return res;
-    }
 };
 
-struct GitArchiveInputScheme : InputScheme
+struct GitHubInputScheme : GitArchiveInputScheme
 {
-    std::string type;
+    std::string type() override { return "github"; }
 
-    GitArchiveInputScheme(std::string && type) : type(type)
-    { }
-
-    virtual std::unique_ptr<GitArchiveInput> create() = 0;
-
-    std::unique_ptr<Input> inputFromURL(const ParsedURL & url) override
-    {
-        if (url.scheme != type) return nullptr;
-
-        auto path = tokenizeString<std::vector<std::string>>(url.path, "/");
-        auto input = create();
-
-        if (path.size() == 2) {
-        } else if (path.size() == 3) {
-            if (std::regex_match(path[2], revRegex))
-                input->rev = Hash(path[2], htSHA1);
-            else if (std::regex_match(path[2], refRegex))
-                input->ref = path[2];
-            else
-                throw BadURL("in URL '%s', '%s' is not a commit hash or branch/tag name", url.url, path[2]);
-        } else
-            throw BadURL("URL '%s' is invalid", url.url);
-
-        for (auto &[name, value] : url.query) {
-            if (name == "rev") {
-                if (input->rev)
-                    throw BadURL("URL '%s' contains multiple commit hashes", url.url);
-                input->rev = Hash(value, htSHA1);
-            }
-            else if (name == "ref") {
-                if (!std::regex_match(value, refRegex))
-                    throw BadURL("URL '%s' contains an invalid branch/tag name", url.url);
-                if (input->ref)
-                    throw BadURL("URL '%s' contains multiple branch/tag names", url.url);
-                input->ref = value;
-            }
-        }
-
-        if (input->ref && input->rev)
-            throw BadURL("URL '%s' contains both a commit hash and a branch/tag name", url.url);
-
-        input->owner = path[0];
-        input->repo = path[1];
-
-        return input;
-    }
-
-    std::unique_ptr<Input> inputFromAttrs(const Attrs & attrs) override
-    {
-        if (maybeGetStrAttr(attrs, "type") != type) return {};
-
-        for (auto & [name, value] : attrs)
-            if (name != "type" && name != "owner" && name != "repo" && name != "ref" && name != "rev")
-                throw Error("unsupported input attribute '%s'", name);
-
-        auto input = create();
-        input->owner = getStrAttr(attrs, "owner");
-        input->repo = getStrAttr(attrs, "repo");
-        input->ref = maybeGetStrAttr(attrs, "ref");
-        if (auto rev = maybeGetStrAttr(attrs, "rev"))
-            input->rev = Hash(*rev, htSHA1);
-        return input;
-    }
-};
-
-struct GitHubInput : GitArchiveInput
-{
-    std::string type() const override { return "github"; }
-
-    std::shared_ptr<GitArchiveInput> _clone() const override
-    { return std::make_shared<GitHubInput>(*this); }
-
-    Hash getRevFromRef(nix::ref<Store> store, std::string_view ref) const override
+    Hash getRevFromRef(nix::ref<Store> store, const Input & input) const override
     {
         auto url = fmt("https://api.github.com/repos/%s/%s/commits/%s",
-            owner, repo, ref);
+            getStrAttr(input.attrs, "owner"), getStrAttr(input.attrs, "repo"), *input.getRef());
         auto json = nlohmann::json::parse(
             readFile(
                 store->toRealPath(
@@ -216,13 +184,14 @@ struct GitHubInput : GitArchiveInput
         return rev;
     }
 
-    std::string getDownloadUrl() const override
+    std::string getDownloadUrl(const Input & input) const override
     {
         // FIXME: use regular /archive URLs instead? api.github.com
         // might have stricter rate limits.
 
         auto url = fmt("https://api.github.com/repos/%s/%s/tarball/%s",
-            owner, repo, rev->to_string(Base16, false));
+            getStrAttr(input.attrs, "owner"), getStrAttr(input.attrs, "repo"),
+            input.getRev()->to_string(Base16, false));
 
         std::string accessToken = settings.githubAccessToken.get();
         if (accessToken != "")
@@ -231,35 +200,23 @@ struct GitHubInput : GitArchiveInput
         return url;
     }
 
-    void clone(const Path & destDir) const override
+    void clone(const Input & input, const Path & destDir) override
     {
-        std::shared_ptr<const Input> input = inputFromURL(fmt("git+ssh://git@github.com/%s/%s.git", owner, repo));
-        input = input->applyOverrides(ref.value_or("master"), rev);
-        input->clone(destDir);
+        Input::fromURL(fmt("git+ssh://git@github.com/%s/%s.git",
+                getStrAttr(input.attrs, "owner"), getStrAttr(input.attrs, "repo")))
+            .applyOverrides(input.getRef().value_or("master"), input.getRev())
+            .clone(destDir);
     }
 };
 
-struct GitHubInputScheme : GitArchiveInputScheme
+struct GitLabInputScheme : GitArchiveInputScheme
 {
-    GitHubInputScheme() : GitArchiveInputScheme("github") { }
+    std::string type() override { return "gitlab"; }
 
-    std::unique_ptr<GitArchiveInput> create() override
-    {
-        return std::make_unique<GitHubInput>();
-    }
-};
-
-struct GitLabInput : GitArchiveInput
-{
-    std::string type() const override { return "gitlab"; }
-
-    std::shared_ptr<GitArchiveInput> _clone() const override
-    { return std::make_shared<GitLabInput>(*this); }
-
-    Hash getRevFromRef(nix::ref<Store> store, std::string_view ref) const override
+    Hash getRevFromRef(nix::ref<Store> store, const Input & input) const override
     {
         auto url = fmt("https://gitlab.com/api/v4/projects/%s%%2F%s/repository/branches/%s",
-            owner, repo, ref);
+            getStrAttr(input.attrs, "owner"), getStrAttr(input.attrs, "repo"), *input.getRef());
         auto json = nlohmann::json::parse(
             readFile(
                 store->toRealPath(
@@ -269,12 +226,13 @@ struct GitLabInput : GitArchiveInput
         return rev;
     }
 
-    std::string getDownloadUrl() const override
+    std::string getDownloadUrl(const Input & input) const override
     {
         // FIXME: This endpoint has a rate limit threshold of 5 requests per minute.
 
         auto url = fmt("https://gitlab.com/api/v4/projects/%s%%2F%s/repository/archive.tar.gz?sha=%s",
-            owner, repo, rev->to_string(Base16, false));
+            getStrAttr(input.attrs, "owner"), getStrAttr(input.attrs, "repo"),
+            input.getRev()->to_string(Base16, false));
 
         /* # FIXME: add privat token auth (`curl --header "PRIVATE-TOKEN: <your_access_token>"`)
         std::string accessToken = settings.githubAccessToken.get();
@@ -284,21 +242,12 @@ struct GitLabInput : GitArchiveInput
         return url;
     }
 
-    void clone(const Path & destDir) const override
+    void clone(const Input & input, const Path & destDir) override
     {
-        std::shared_ptr<const Input> input = inputFromURL(fmt("git+ssh://git@gitlab.com/%s/%s.git", owner, repo));
-        input = input->applyOverrides(ref.value_or("master"), rev);
-        input->clone(destDir);
-    }
-};
-
-struct GitLabInputScheme : GitArchiveInputScheme
-{
-    GitLabInputScheme() : GitArchiveInputScheme("gitlab") { }
-
-    std::unique_ptr<GitArchiveInput> create() override
-    {
-        return std::make_unique<GitLabInput>();
+        Input::fromURL(fmt("git+ssh://git@gitlab.com/%s/%s.git",
+                getStrAttr(input.attrs, "owner"), getStrAttr(input.attrs, "repo")))
+            .applyOverrides(input.getRef().value_or("master"), input.getRev())
+            .clone(destDir);
     }
 };
 

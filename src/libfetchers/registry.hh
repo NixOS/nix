@@ -20,8 +20,7 @@ struct Registry
 
     struct Entry
     {
-        std::shared_ptr<const Input> from;
-        std::shared_ptr<const Input> to;
+        Input from, to;
         Attrs extraAttrs;
         bool exact = false;
     };
@@ -38,11 +37,11 @@ struct Registry
     void write(const Path & path);
 
     void add(
-        const std::shared_ptr<const Input> & from,
-        const std::shared_ptr<const Input> & to,
+        const Input & from,
+        const Input & to,
         const Attrs & extraAttrs);
 
-    void remove(const std::shared_ptr<const Input> & input);
+    void remove(const Input & input);
 };
 
 typedef std::vector<std::shared_ptr<Registry>> Registries;
@@ -54,12 +53,12 @@ Path getUserRegistryPath();
 Registries getRegistries(ref<Store> store);
 
 void overrideRegistry(
-    const std::shared_ptr<const Input> & from,
-    const std::shared_ptr<const Input> & to,
+    const Input & from,
+    const Input & to,
     const Attrs & extraAttrs);
 
-std::pair<std::shared_ptr<const Input>, Attrs> lookupInRegistries(
+std::pair<Input, Attrs> lookupInRegistries(
     ref<Store> store,
-    std::shared_ptr<const Input> input);
+    const Input & input);
 
 }

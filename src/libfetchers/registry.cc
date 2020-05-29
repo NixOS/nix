@@ -22,20 +22,7 @@ std::shared_ptr<Registry> Registry::read(
 
         auto version = json.value("version", 0);
 
-        // FIXME: remove soon
-        if (version == 1) {
-            auto flakes = json["flakes"];
-            for (auto i = flakes.begin(); i != flakes.end(); ++i) {
-                auto url = i->value("url", i->value("uri", ""));
-                if (url.empty())
-                    throw Error("flake registry '%s' lacks a 'url' attribute for entry '%s'",
-                        path, i.key());
-                registry->entries.push_back(
-                    {inputFromURL(i.key()), inputFromURL(url), {}});
-            }
-        }
-
-        else if (version == 2) {
+        if (version == 2) {
             for (auto & i : json["flakes"]) {
                 auto toAttrs = jsonToAttrs(i["to"]);
                 Attrs extraAttrs;
@@ -47,8 +34,8 @@ std::shared_ptr<Registry> Registry::read(
                 auto exact = i.find("exact");
                 registry->entries.push_back(
                     Entry {
-                        .from = inputFromAttrs(jsonToAttrs(i["from"])),
-                        .to = inputFromAttrs(toAttrs),
+                        .from = Input::fromAttrs(jsonToAttrs(i["from"])),
+                        .to = Input::fromAttrs(std::move(toAttrs)),
                         .extraAttrs = extraAttrs,
                         .exact = exact != i.end() && exact.value()
                     });
@@ -72,8 +59,8 @@ void Registry::write(const Path & path)
     nlohmann::json arr;
     for (auto & entry : entries) {
         nlohmann::json obj;
-        obj["from"] = attrsToJson(entry.from->toAttrs());
-        obj["to"] = attrsToJson(entry.to->toAttrs());
+        obj["from"] = attrsToJson(entry.from.toAttrs());
+        obj["to"] = attrsToJson(entry.to.toAttrs());
         if (!entry.extraAttrs.empty())
             obj["to"].update(attrsToJson(entry.extraAttrs));
         if (entry.exact)
@@ -90,8 +77,8 @@ void Registry::write(const Path & path)
 }
 
 void Registry::add(
-    const std::shared_ptr<const Input> & from,
-    const std::shared_ptr<const Input> & to,
+    const Input & from,
+    const Input & to,
     const Attrs & extraAttrs)
 {
     entries.emplace_back(
@@ -102,11 +89,11 @@ void Registry::add(
         });
 }
 
-void Registry::remove(const std::shared_ptr<const Input> & input)
+void Registry::remove(const Input & input)
 {
     // FIXME: use C++20 std::erase.
     for (auto i = entries.begin(); i != entries.end(); )
-        if (*i->from == *input)
+        if (i->from == input)
             i = entries.erase(i);
         else
             ++i;
@@ -145,8 +132,8 @@ std::shared_ptr<Registry> getFlagRegistry()
 }
 
 void overrideRegistry(
-    const std::shared_ptr<const Input> & from,
-    const std::shared_ptr<const Input> & to,
+    const Input & from,
+    const Input & to,
     const Attrs & extraAttrs)
 {
     flagRegistry->add(from, to, extraAttrs);
@@ -180,32 +167,33 @@ Registries getRegistries(ref<Store> store)
     return registries;
 }
 
-std::pair<std::shared_ptr<const Input>, Attrs> lookupInRegistries(
+std::pair<Input, Attrs> lookupInRegistries(
     ref<Store> store,
-    std::shared_ptr<const Input> input)
+    const Input & _input)
 {
     Attrs extraAttrs;
     int n = 0;
+    Input input(_input);
 
  restart:
 
     n++;
-    if (n > 100) throw Error("cycle detected in flake registr for '%s'", input);
+    if (n > 100) throw Error("cycle detected in flake registry for '%s'", input.to_string());
 
     for (auto & registry : getRegistries(store)) {
         // FIXME: O(n)
         for (auto & entry : registry->entries) {
             if (entry.exact) {
-                if (*entry.from == *input) {
+                if (entry.from == input) {
                     input = entry.to;
                     extraAttrs = entry.extraAttrs;
                     goto restart;
                 }
             } else {
-                if (entry.from->contains(*input)) {
-                    input = entry.to->applyOverrides(
-                        !entry.from->getRef() && input->getRef() ? input->getRef() : std::optional<std::string>(),
-                        !entry.from->getRev() && input->getRev() ? input->getRev() : std::optional<Hash>());
+                if (entry.from.contains(input)) {
+                    input = entry.to.applyOverrides(
+                        !entry.from.getRef() && input.getRef() ? input.getRef() : std::optional<std::string>(),
+                        !entry.from.getRev() && input.getRev() ? input.getRev() : std::optional<Hash>());
                     extraAttrs = entry.extraAttrs;
                     goto restart;
                 }
@@ -213,8 +201,8 @@ std::pair<std::shared_ptr<const Input>, Attrs> lookupInRegistries(
         }
     }
 
-    if (!input->isDirect())
-        throw Error("cannot find flake '%s' in the flake registries", input->to_string());
+    if (!input.isDirect())
+        throw Error("cannot find flake '%s' in the flake registries", input.to_string());
 
     return {input, extraAttrs};
 }

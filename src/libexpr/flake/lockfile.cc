@@ -5,35 +5,40 @@
 
 namespace nix::flake {
 
-FlakeRef flakeRefFromJson(const nlohmann::json & json)
-{
-    return FlakeRef::fromAttrs(jsonToAttrs(json));
-}
-
 FlakeRef getFlakeRef(
     const nlohmann::json & json,
-    const char * attr)
+    const char * attr,
+    const char * info)
 {
     auto i = json.find(attr);
-    if (i != json.end())
-        return flakeRefFromJson(*i);
+    if (i != json.end()) {
+        auto attrs = jsonToAttrs(*i);
+        // FIXME: remove when we drop support for version 5.
+        if (info) {
+            auto j = json.find(info);
+            if (j != json.end()) {
+                for (auto k : jsonToAttrs(*j))
+                    attrs.insert_or_assign(k.first, k.second);
+            }
+        }
+        return FlakeRef::fromAttrs(attrs);
+    }
 
     throw Error("attribute '%s' missing in lock file", attr);
 }
 
 LockedNode::LockedNode(const nlohmann::json & json)
-    : lockedRef(getFlakeRef(json, "locked"))
-    , originalRef(getFlakeRef(json, "original"))
-    , info(TreeInfo::fromJson(json))
+    : lockedRef(getFlakeRef(json, "locked", "info"))
+    , originalRef(getFlakeRef(json, "original", nullptr))
     , isFlake(json.find("flake") != json.end() ? (bool) json["flake"] : true)
 {
-    if (!lockedRef.input->isImmutable())
-        throw Error("lockfile contains mutable flakeref '%s'", lockedRef);
+    if (!lockedRef.input.isImmutable())
+        throw Error("lockfile contains mutable lock '%s'", attrsToJson(lockedRef.input.toAttrs()));
 }
 
 StorePath LockedNode::computeStorePath(Store & store) const
 {
-    return info.computeStorePath(store);
+    return lockedRef.input.computeStorePath(store);
 }
 
 std::shared_ptr<Node> Node::findInput(const InputPath & path)
@@ -53,7 +58,7 @@ std::shared_ptr<Node> Node::findInput(const InputPath & path)
 LockFile::LockFile(const nlohmann::json & json, const Path & path)
 {
     auto version = json.value("version", 0);
-    if (version != 5)
+    if (version < 5 || version > 6)
         throw Error("lock file '%s' has unsupported version %d", path, version);
 
     std::unordered_map<std::string, std::shared_ptr<Node>> nodeMap;
@@ -119,7 +124,6 @@ nlohmann::json LockFile::toJson() const
         if (auto lockedNode = std::dynamic_pointer_cast<const LockedNode>(node)) {
             n["original"] = fetchers::attrsToJson(lockedNode->originalRef.toAttrs());
             n["locked"] = fetchers::attrsToJson(lockedNode->lockedRef.toAttrs());
-            n["info"] = lockedNode->info.toJson();
             if (!lockedNode->isFlake) n["flake"] = false;
         }
 
@@ -129,7 +133,7 @@ nlohmann::json LockFile::toJson() const
     };
 
     nlohmann::json json;
-    json["version"] = 5;
+    json["version"] = 6;
     json["root"] = dumpNode("root", root);
     json["nodes"] = std::move(nodes);
 
@@ -176,7 +180,7 @@ bool LockFile::isImmutable() const
     for (auto & i : nodes) {
         if (i == root) continue;
         auto lockedNode = std::dynamic_pointer_cast<const LockedNode>(i);
-        if (lockedNode && !lockedNode->lockedRef.input->isImmutable()) return false;
+        if (lockedNode && !lockedNode->lockedRef.input.isImmutable()) return false;
     }
 
     return true;

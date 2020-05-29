@@ -15,7 +15,7 @@ const static std::string subDirRegex = subDirElemRegex + "(?:/" + subDirElemRege
 
 std::string FlakeRef::to_string() const
 {
-    auto url = input->toURL();
+    auto url = input.toURL();
     if (subdir != "")
         url.query.insert_or_assign("dir", subdir);
     return url.to_string();
@@ -23,7 +23,7 @@ std::string FlakeRef::to_string() const
 
 fetchers::Attrs FlakeRef::toAttrs() const
 {
-    auto attrs = input->toAttrs();
+    auto attrs = input.toAttrs();
     if (subdir != "")
         attrs.emplace("dir", subdir);
     return attrs;
@@ -37,13 +37,13 @@ std::ostream & operator << (std::ostream & str, const FlakeRef & flakeRef)
 
 bool FlakeRef::operator ==(const FlakeRef & other) const
 {
-    return *input == *other.input && subdir == other.subdir;
+    return input == other.input && subdir == other.subdir;
 }
 
 FlakeRef FlakeRef::resolve(ref<Store> store) const
 {
     auto [input2, extraAttrs] = lookupInRegistries(store, input);
-    return FlakeRef(input2, fetchers::maybeGetStrAttr(extraAttrs, "dir").value_or(subdir));
+    return FlakeRef(std::move(input2), fetchers::maybeGetStrAttr(extraAttrs, "dir").value_or(subdir));
 }
 
 FlakeRef parseFlakeRef(
@@ -98,7 +98,7 @@ std::pair<FlakeRef, std::string> parseFlakeRefWithFragment(
         };
 
         return std::make_pair(
-            FlakeRef(inputFromURL(parsedURL), ""),
+            FlakeRef(Input::fromURL(parsedURL), ""),
             percentDecode(std::string(match[6])));
     }
 
@@ -143,7 +143,7 @@ std::pair<FlakeRef, std::string> parseFlakeRefWithFragment(
                 }
 
                 return std::make_pair(
-                    FlakeRef(inputFromURL(parsedURL), get(parsedURL.query, "dir").value_or("")),
+                    FlakeRef(Input::fromURL(parsedURL), get(parsedURL.query, "dir").value_or("")),
                     fragment);
             }
 
@@ -155,7 +155,7 @@ std::pair<FlakeRef, std::string> parseFlakeRefWithFragment(
         attrs.insert_or_assign("type", "path");
         attrs.insert_or_assign("path", path);
 
-        return std::make_pair(FlakeRef(inputFromAttrs(attrs), ""), fragment);
+        return std::make_pair(FlakeRef(Input::fromAttrs(std::move(attrs)), ""), fragment);
     }
 
     else {
@@ -163,7 +163,7 @@ std::pair<FlakeRef, std::string> parseFlakeRefWithFragment(
         std::string fragment;
         std::swap(fragment, parsedURL.fragment);
         return std::make_pair(
-            FlakeRef(inputFromURL(parsedURL), get(parsedURL.query, "dir").value_or("")),
+            FlakeRef(Input::fromURL(parsedURL), get(parsedURL.query, "dir").value_or("")),
             fragment);
     }
 }
@@ -183,14 +183,14 @@ FlakeRef FlakeRef::fromAttrs(const fetchers::Attrs & attrs)
     auto attrs2(attrs);
     attrs2.erase("dir");
     return FlakeRef(
-        fetchers::inputFromAttrs(attrs2),
+        fetchers::Input::fromAttrs(std::move(attrs2)),
         fetchers::maybeGetStrAttr(attrs, "dir").value_or(""));
 }
 
 std::pair<fetchers::Tree, FlakeRef> FlakeRef::fetchTree(ref<Store> store) const
 {
-    auto [tree, lockedInput] = input->fetchTree(store);
-    return {std::move(tree), FlakeRef(lockedInput, subdir)};
+    auto [tree, lockedInput] = input.fetch(store);
+    return {std::move(tree), FlakeRef(std::move(lockedInput), subdir)};
 }
 
 }

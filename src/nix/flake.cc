@@ -62,13 +62,13 @@ static void printFlakeInfo(const Store & store, const Flake & flake)
     if (flake.description)
         logger->stdout("Description:   %s", *flake.description);
     logger->stdout("Path:          %s", store.printStorePath(flake.sourceInfo->storePath));
-    if (auto rev = flake.lockedRef.input->getRev())
+    if (auto rev = flake.lockedRef.input.getRev())
         logger->stdout("Revision:      %s", rev->to_string(Base16, false));
-    if (flake.sourceInfo->info.revCount)
-        logger->stdout("Revisions:     %s", *flake.sourceInfo->info.revCount);
-    if (flake.sourceInfo->info.lastModified)
+    if (auto revCount = flake.lockedRef.input.getRevCount())
+        logger->stdout("Revisions:     %s", *revCount);
+    if (auto lastModified = flake.lockedRef.input.getLastModified())
         logger->stdout("Last modified: %s",
-            std::put_time(std::localtime(&*flake.sourceInfo->info.lastModified), "%F %T"));
+            std::put_time(std::localtime(&*lastModified), "%F %T"));
 }
 
 static nlohmann::json flakeToJson(const Store & store, const Flake & flake)
@@ -82,13 +82,12 @@ static nlohmann::json flakeToJson(const Store & store, const Flake & flake)
     j["resolved"] = attrsToJson(flake.resolvedRef.toAttrs());
     j["url"] = flake.lockedRef.to_string(); // FIXME: rename to lockedUrl
     j["locked"] = attrsToJson(flake.lockedRef.toAttrs());
-    j["info"] = flake.sourceInfo->info.toJson();
-    if (auto rev = flake.lockedRef.input->getRev())
+    if (auto rev = flake.lockedRef.input.getRev())
         j["revision"] = rev->to_string(Base16, false);
-    if (flake.sourceInfo->info.revCount)
-        j["revCount"] = *flake.sourceInfo->info.revCount;
-    if (flake.sourceInfo->info.lastModified)
-        j["lastModified"] = *flake.sourceInfo->info.lastModified;
+    if (auto revCount = flake.lockedRef.input.getRevCount())
+        j["revCount"] = *revCount;
+    if (auto lastModified = flake.lockedRef.input.getLastModified())
+        j["lastModified"] = *lastModified;
     j["path"] = store.printStorePath(flake.sourceInfo->storePath);
     return j;
 }
@@ -172,7 +171,7 @@ struct CmdFlakeListInputs : FlakeCommand, MixJSON
                     logger->stdout("%s" ANSI_BOLD "%s" ANSI_NORMAL ": %s",
                         prefix + (last ? treeLast : treeConn), input.first,
                         lockedNode ? lockedNode->lockedRef : flake.flake.lockedRef);
-                        
+
                     if (firstVisit) recurse(*input.second, prefix + (last ? treeNull : treeLine));
                 }
             };
@@ -501,7 +500,7 @@ struct CmdFlakeClone : FlakeCommand
         if (destDir.empty())
             throw Error("missing flag '--dest'");
 
-        getFlakeRef().resolve(store).input->clone(destDir);
+        getFlakeRef().resolve(store).input.clone(destDir);
     }
 };
 
@@ -563,9 +562,10 @@ struct CmdFlakeArchive : FlakeCommand, MixJSON, MixDryRun
                 auto lockedInput = std::dynamic_pointer_cast<const LockedNode>(input.second);
                 assert(lockedInput);
                 auto jsonObj3 = jsonObj2 ? jsonObj2->object(input.first) : std::optional<JSONObject>();
-                if (!dryRun)
-                    lockedInput->lockedRef.input->fetchTree(store);
-                auto storePath = lockedInput->computeStorePath(*store);
+                auto storePath =
+                    dryRun
+                    ? lockedInput->lockedRef.input.computeStorePath(*store)
+                    : lockedInput->lockedRef.input.fetch(store).first.storePath;
                 if (jsonObj3)
                     jsonObj3->attr("path", store->printStorePath(storePath));
                 sources.insert(std::move(storePath));

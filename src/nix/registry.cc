@@ -31,8 +31,8 @@ struct CmdRegistryList : StoreCommand
                     registry->type == Registry::User   ? "user  " :
                     registry->type == Registry::System ? "system" :
                     "global",
-                    entry.from->to_string(),
-                    entry.to->to_string());
+                    entry.from.to_string(),
+                    entry.to.to_string());
             }
         }
     }
@@ -107,7 +107,7 @@ struct CmdRegistryPin : virtual Args, EvalCommand
         auto ref = parseFlakeRef(url);
         auto userRegistry = fetchers::getUserRegistry();
         userRegistry->remove(ref.input);
-        auto [tree, resolved] = ref.resolve(store).input->fetchTree(store);
+        auto [tree, resolved] = ref.resolve(store).input.fetch(store);
         fetchers::Attrs extraAttrs;
         if (ref.subdir != "") extraAttrs["dir"] = ref.subdir;
         userRegistry->add(ref.input, resolved, extraAttrs);

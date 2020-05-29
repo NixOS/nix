@@ -104,7 +104,7 @@ void callFlake(
 void emitTreeAttrs(
     EvalState & state,
     const fetchers::Tree & tree,
-    std::shared_ptr<const fetchers::Input> input,
+    const fetchers::Input & input,
     Value & v);
 
 }

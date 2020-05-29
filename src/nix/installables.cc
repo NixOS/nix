@@ -194,7 +194,7 @@ void EvalCommand::completeFlakeRef(std::string_view prefix)
     /* Look for registry entries that match the prefix. */
     for (auto & registry : fetchers::getRegistries(getStore())) {
         for (auto & entry : registry->entries) {
-            auto from = entry.from->to_string();
+            auto from = entry.from.to_string();
             if (!hasPrefix(prefix, "flake:") && hasPrefix(from, "flake:")) {
                 std::string from2(from, 6);
                 if (hasPrefix(from2, prefix))

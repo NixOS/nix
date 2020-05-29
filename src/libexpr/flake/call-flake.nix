@@ -11,7 +11,7 @@ let
           sourceInfo =
             if key == lockFile.root
             then rootSrc
-            else fetchTree ({ inherit (node.info) narHash; } // removeAttrs node.locked ["dir"]);
+            else fetchTree (node.info or {} // removeAttrs node.locked ["dir"]);
           subdir = if key == lockFile.root then rootSubdir else node.locked.dir or "";
           flake = import (sourceInfo + (if subdir != "" then "/" else "") + subdir + "/flake.nix");
           inputs = builtins.mapAttrs (inputName: key: allNodes.${key}) (node.inputs or {});
