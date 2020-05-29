@@ -1,3 +1,4 @@
+#include "serialise.hh"
 #include "store-api.hh"
 #include "archive.hh"
 #include "worker-protocol.hh"
@@ -100,7 +101,9 @@ StorePaths Store::importPaths(Source & source, std::shared_ptr<FSAccessor> acces
         if (readInt(source) == 1)
             readString(source);
 
-        addToStore(info, tee.source.data, NoRepair, checkSigs, accessor);
+        // Can't use underlying source, which would have been exhausted
+        auto source = StringSource { *tee.source.data };
+        addToStore(info, source, NoRepair, checkSigs, accessor);
 
         res.push_back(info.path.clone());
     }
