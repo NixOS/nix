@@ -127,7 +127,7 @@ GitMode dumpGitTree(const GitTree & entries, Sink & sink)
         case GitMode::Executable: mode = 100755; break;
         case GitMode::Regular: mode = 100644; break;
         }
-        s1 += (format("%6d %s\0%s"s) % mode % i.first % i.second.second.hash).str();
+        s1 += (format("%06d %s\0%s"s) % mode % i.first % i.second.second.hash).str();
     }
 
     std::string s2 = (format("tree %d\0%s"s) % s1.size() % s1).str();
@@ -138,39 +138,45 @@ GitMode dumpGitTree(const GitTree & entries, Sink & sink)
     return GitMode::Directory;
 }
 
-// Returns the perm in addition
-std::pair<GitMode, Hash> dumpGitHashInternal(
-    std::function<std::unique_ptr<AbstractHashSink>()> makeHashSink,
-    const Path & path, PathFilter & filter)
+static std::pair<GitMode, Hash> dumpGitHashInternal(HashType ht, const Path & path, PathFilter & filter);
+
+static GitMode dumpGitInternal(HashType ht, const Path & path, Sink & sink, PathFilter & filter)
 {
-    auto hashSink = makeHashSink();
     struct stat st;
     GitMode perm;
     if (lstat(path.c_str(), &st))
         throw SysError(format("getting attributes of path '%1%'") % path);
 
-    if (S_ISREG(st.st_mode)) {
-        perm = dumpGitBlob(path, st, *hashSink);
-    } else if (S_ISDIR(st.st_mode)) {
+    if (S_ISREG(st.st_mode))
+        perm = dumpGitBlob(path, st, sink);
+    else if (S_ISDIR(st.st_mode)) {
         GitTree entries;
         for (auto & i : readDirectory(path))
-            if (filter(path + "/" + i.name)) {
-                entries[i.name] = dumpGitHashInternal(makeHashSink, path + "/" + i.name, filter);
-            }
-        perm = dumpGitTree(entries, *hashSink);
-    } else {
-        throw Error(format("file '%1%' has an unsupported type") % path);
-    }
+            if (filter(path + "/" + i.name))
+                entries[i.name] = dumpGitHashInternal(ht, path + "/" + i.name, filter);
+        perm = dumpGitTree(entries, sink);
+    } else throw Error(format("file '%1%' has an unsupported type") % path);
 
+    return perm;
+}
+
+
+static std::pair<GitMode, Hash> dumpGitHashInternal(HashType ht, const Path & path, PathFilter & filter)
+{
+    auto hashSink = new HashSink(ht);
+    auto perm = dumpGitInternal(ht, path, *hashSink, filter);
     auto hash = hashSink->finish().first;
     return std::pair { perm, hash };
 }
 
-Hash dumpGitHash(
-    std::function<std::unique_ptr<AbstractHashSink>()> makeHashSink,
-    const Path & path, PathFilter & filter)
+Hash dumpGitHash(HashType ht, const Path & path, PathFilter & filter)
 {
-    return dumpGitHashInternal(makeHashSink, path, filter).second;
+    return dumpGitHashInternal(ht, path, filter).second;
+}
+
+void dumpGit(HashType ht, const Path & path, Sink & sink, PathFilter & filter)
+{
+    dumpGitInternal(ht, path, sink, filter);
 }
 
 }
