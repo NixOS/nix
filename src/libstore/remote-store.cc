@@ -8,6 +8,7 @@
 #include "derivations.hh"
 #include "pool.hh"
 #include "finally.hh"
+#include "git.hh"
 
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -493,7 +494,6 @@ StorePath RemoteStore::addToStore(const string & name, const Path & _srcPath,
 {
     if (repair) throw Error("repairing is not supported when building through the Nix daemon");
 
-    if (method == FileIngestionMethod::Git) throw Error("cannot remotely add to store using the git file ingestion method");
 
     auto conn(getConnection());
 
@@ -512,7 +512,10 @@ StorePath RemoteStore::addToStore(const string & name, const Path & _srcPath,
         connections->incCapacity();
         {
             Finally cleanup([&]() { connections->decCapacity(); });
-            dumpPath(srcPath, conn->to, filter);
+            if (method == FileIngestionMethod::Git)
+                dumpGit(hashAlgo, srcPath, conn->to, filter);
+            else
+                dumpPath(srcPath, conn->to, filter);
         }
         conn->to.warn = false;
         conn.processStderr();
