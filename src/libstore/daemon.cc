@@ -708,11 +708,20 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
         auto deriver = readString(from);
         if (deriver != "")
             info.deriver = store->parseStorePath(deriver);
-        info.narHash = Hash(readString(from), htSHA256);
+
+        auto narHashString = readString(from);
+
         info.references = readStorePaths<StorePathSet>(*store, from);
         from >> info.registrationTime >> info.narSize >> info.ultimate;
         info.sigs = readStrings<StringSet>(from);
         from >> info.ca >> repair >> dontCheckSigs;
+
+        // git hashes are still using sha1
+        if (hasPrefix(info.ca, "fixed:git:sha1:"))
+            info.narHash = Hash(narHashString, htSHA1);
+        else
+            info.narHash = Hash(narHashString, htSHA256);
+
         if (!trusted && dontCheckSigs)
             dontCheckSigs = false;
         if (!trusted)

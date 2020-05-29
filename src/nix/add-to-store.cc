@@ -56,7 +56,7 @@ struct CmdAddToStore : MixDryRun, StoreCommand
         else
             dumpPath(path, sink);
 
-        auto narHash = hashString(htSHA256, *sink.s);
+        auto narHash = hashString(git ? htSHA1 : htSHA256, *sink.s);
 
         ValidPathInfo info(store->makeFixedOutputPath(ingestionMethod, narHash, *namePart));
         info.narHash = narHash;
