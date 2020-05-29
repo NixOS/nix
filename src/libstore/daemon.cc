@@ -385,7 +385,7 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
         }
         case FileIngestionMethod::Git: {
             ParseSink sink;
-            parseGit(sink, savedNAR, store->storeDir);
+            parseGit(sink, savedNAR, store->storeDir, store->storeDir);
             break;
         }
         case FileIngestionMethod::Flat: {

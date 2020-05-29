@@ -12,9 +12,9 @@ enum struct GitMode {
     Regular,
 };
 
-void restoreGit(const Path & path, Source & source, const Path & storeDir);
+void restoreGit(const Path & path, Source & source, const Path & realStoreDir, const Path & storeDir);
 
-void parseGit(ParseSink & sink, Source & source, const Path & storeDir);
+void parseGit(ParseSink & sink, Source & source, const Path & realStoreDir, const Path & storeDir);
 
 // Dumps a single file to a sink
 GitMode dumpGitBlob(const Path & path, const struct stat st, Sink & sink);
