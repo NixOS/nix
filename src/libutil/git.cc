@@ -87,8 +87,6 @@ static void parse(ParseSink & sink, Source & source, const Path & path, const Pa
             if (perm != 100644 && perm != 100755 && perm != 644 && perm != 755 && perm != 40000)
               throw Error(format("Unknown Git permission: %d") % perm);
 
-            // TODO: handle permissions somehow
-
             string name = getStringUntil(source, 0);
             left -= name.size();
             left -= 1;
@@ -96,10 +94,53 @@ static void parse(ParseSink & sink, Source & source, const Path & path, const Pa
             string hashs = getString(source, 20);
             left -= 20;
 
-            Hash hash(htSHA1);
-            std::copy(hashs.begin(), hashs.end(), hash.hash);
+            Hash hash1(htSHA1);
+            std::copy(hashs.begin(), hashs.end(), hash1.hash);
 
-            sink.createSymlink(path + "/" + name, "../" + name);
+            Hash hash2 = hashString(htSHA256, "fixed:out:git:" + hash1.to_string(Base16) + ":");
+            Hash hash3 = hashString(htSHA256, "output:out:" + hash2.to_string(Base16) + ":" + storeDir + ":" + name);
+            Hash hash4 = compressHash(hash3, 20);
+
+            string entryName = hash4.to_string(Base32, false) + "-" + name;
+            Path entry = storeDir + "/" + entryName;
+
+            struct stat st;
+            if (lstat(entry.c_str(), &st))
+                throw SysError(format("getting attributes of path '%1%'") % entry);
+
+            if (S_ISREG(st.st_mode)) {
+                if (perm == 40000)
+                    throw SysError(format("file is a file but expected to be a directory '%1%'") % entry);
+
+                if (perm == 100755 || perm == 755)
+                    sink.createExecutableFile(path + "/" + name);
+                else
+                    sink.createRegularFile(path + "/" + name);
+
+                unsigned long long size = st.st_size;
+                sink.preallocateContents(size);
+
+                unsigned long long left = size;
+                std::vector<unsigned char> buf(65536);
+
+                StringSink ssink;
+                readFile(entry, ssink);
+                AutoCloseFD fd = open(entry.c_str(), O_RDONLY | O_CLOEXEC);
+
+                while (left) {
+                    checkInterrupt();
+                    auto n = buf.size();
+                    if ((unsigned long long)n > left) n = left;
+                    ssink(buf.data(), n);
+                    sink.receiveContents(buf.data(), n);
+                    left -= n;
+                }
+            } else if (S_ISDIR(st.st_mode)) {
+                if (perm != 40000)
+                    throw SysError(format("file is a directory but expected to be a file '%1%'") % entry);
+
+                sink.createSymlink(path + "/" + name, "../" + entryName);
+            } else throw Error(format("file '%1%' has an unsupported type") % entry);
         }
     } else throw Error("input doesn't look like a Git object");
 }
