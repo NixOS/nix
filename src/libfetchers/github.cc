@@ -45,6 +45,7 @@ struct GitArchiveInputScheme : InputScheme
                     throw BadURL("URL '%s' contains multiple branch/tag names", url.url);
                 ref = value;
             }
+            // FIXME: barf on unsupported attributes
         }
 
         if (ref && rev)

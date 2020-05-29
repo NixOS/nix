@@ -111,13 +111,23 @@ std::pair<Tree, Input> Input::fetch(ref<Store> store) const
     auto narHash = store->queryPathInfo(tree.storePath)->narHash;
     input.attrs.insert_or_assign("narHash", narHash.to_string(SRI));
 
-    if (auto narHash2 = getNarHash()) {
-        if (narHash != *narHash2)
+    if (auto prevNarHash = getNarHash()) {
+        if (narHash != *prevNarHash)
             throw Error("NAR hash mismatch in input '%s' (%s), expected '%s', got '%s'",
-                to_string(), tree.actualPath, narHash2->to_string(SRI), narHash.to_string(SRI));
+                to_string(), tree.actualPath, prevNarHash->to_string(SRI), narHash.to_string(SRI));
     }
 
-    // FIXME: check lastModified, revCount
+    if (auto prevLastModified = getLastModified()) {
+        if (input.getLastModified() != prevLastModified)
+            throw Error("'lastModified' attribute mismatch in input '%s', expected %d",
+                input.to_string(), *prevLastModified);
+    }
+
+    if (auto prevRevCount = getRevCount()) {
+        if (input.getRevCount() != prevRevCount)
+            throw Error("'revCount' attribute mismatch in input '%s', expected %d",
+                input.to_string(), *prevRevCount);
+    }
 
     input.immutable = true;
 
