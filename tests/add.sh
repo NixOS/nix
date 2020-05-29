@@ -36,7 +36,6 @@ test "$hash3" = "sha1:$(nix hash-git --type sha1 --base32 ./dummy)"
 rm -rf dummy2
 mkdir -p dummy2
 echo hello > dummy2/hello
-nix add-to-store --git ./dummy2/hello
 path6=$(nix add-to-store --git ./dummy2)
 hash4=$(nix-store -q --hash $path6)
 test "$hash4" = "sha1:$(nix hash-git --type sha1 --base32 ./dummy2)"
@@ -45,8 +44,6 @@ rm -rf dummy3
 mkdir -p dummy3
 mkdir -p dummy3/hello
 echo hello > dummy3/hello/hello
-nix add-to-store --git ./dummy3/hello/hello
-nix add-to-store --git ./dummy3/hello
 path7=$(nix add-to-store --git ./dummy3)
 hash5=$(nix-store -q --hash $path7)
 test "$hash5" = "sha1:$(nix hash-git --type sha1 --base32 ./dummy3)"

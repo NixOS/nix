@@ -494,10 +494,19 @@ StorePath RemoteStore::addToStore(const string & name, const Path & _srcPath,
 {
     if (repair) throw Error("repairing is not supported when building through the Nix daemon");
 
+    Path srcPath(absPath(_srcPath));
+
+    // recursively add to store if path is a directory
+    if (method == FileIngestionMethod::Git) {
+        struct stat st;
+        if (lstat(srcPath.c_str(), &st))
+            throw SysError(format("getting attributes of path '%1%'") % srcPath);
+        if (S_ISDIR(st.st_mode))
+            for (auto & i : readDirectory(srcPath))
+                addToStore(i.name, srcPath + "/" + i.name, method, hashAlgo, filter, repair);
+    }
 
     auto conn(getConnection());
-
-    Path srcPath(absPath(_srcPath));
 
     conn->to
         << wopAddToStore
