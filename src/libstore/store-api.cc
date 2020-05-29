@@ -178,6 +178,9 @@ StorePath Store::makeFixedOutputPath(
     const StorePathSet & references,
     bool hasSelfReference) const
 {
+    if (method == FileIngestionMethod::Git && hash.type != htSHA1)
+        throw Error("Git file ingestion must use sha1 hash");
+
     if (hash.type == htSHA256 && method == FileIngestionMethod::Recursive) {
         return makeStorePath(makeType(*this, "source", references, hasSelfReference), hash, name);
     } else {
