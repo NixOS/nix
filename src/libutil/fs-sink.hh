@@ -13,6 +13,7 @@ struct ParseSink
     virtual void createDirectory(const Path & path) { };
 
     virtual void createRegularFile(const Path & path) { };
+    virtual void createExecutableFile(const Path & path) { };
     virtual void isExecutable() { };
     virtual void preallocateContents(unsigned long long size) { };
     virtual void receiveContents(unsigned char * data, unsigned int len) { };
@@ -36,6 +37,13 @@ struct RestoreSink : ParseSink
     {
         Path p = dstPath + path;
         fd = open(p.c_str(), O_CREAT | O_EXCL | O_WRONLY | O_CLOEXEC, 0666);
+        if (!fd) throw SysError(format("creating file '%1%'") % p);
+    }
+
+    void createExecutableFile(const Path & path)
+    {
+        Path p = dstPath + path;
+        fd = open(p.c_str(), O_CREAT | O_EXCL | O_WRONLY | O_CLOEXEC, 0777);
         if (!fd) throw SysError(format("creating file '%1%'") % p);
     }
 
