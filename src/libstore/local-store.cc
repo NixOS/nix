@@ -1020,8 +1020,8 @@ void LocalStore::addToStore(const ValidPathInfo & info, Source & source,
             });
 
             if (hasPrefix(info.ca, "fixed:git:"))
-                restoreGit(realPath, wrapperSource);
-            else 
+                restoreGit(realPath, wrapperSource, realStoreDir);
+            else
                 restorePath(realPath, wrapperSource);
 
             auto hashResult = hashSink->finish();
@@ -1084,7 +1084,7 @@ StorePath LocalStore::addToStoreFromDump(const string & dump, const string & nam
             }
             case FileIngestionMethod::Git: {
                 StringSource source(dump);
-                restoreGit(realPath, source);
+                restoreGit(realPath, source, realStoreDir);
                 break;
             }
             }

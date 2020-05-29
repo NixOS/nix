@@ -21,19 +21,17 @@ using namespace std::string_literals;
 
 namespace nix {
 
-static void parse(ParseSink & sink, Source & source, const Path & path);
+static void parse(ParseSink & sink, Source & source, const Path & path, const Path & storeDir);
 
 // Converts a Path to a ParseSink
-void restoreGit(const Path & path, Source & source) {
-
+void restoreGit(const Path & path, Source & source, const Path & storeDir) {
     RestoreSink sink;
     sink.dstPath = path;
-    parseGit(sink, source);
-
+    parseGit(sink, source, storeDir);
 }
 
-void parseGit(ParseSink & sink, Source & source) {
-    parse(sink, source, "");
+void parseGit(ParseSink & sink, Source & source, const Path & storeDir) {
+    parse(sink, source, "", storeDir);
 }
 
 string getStringUntil(Source & source, char byte) {
@@ -53,7 +51,7 @@ string getString(Source & source, int n){
     return std::string(v.begin(), v.end());
 }
 
-static void parse(ParseSink & sink, Source & source, const Path & path) {
+static void parse(ParseSink & sink, Source & source, const Path & path, const Path & storeDir) {
     auto type = getString(source, 5);
 
     if (type == "blob ") {
