@@ -721,11 +721,13 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
         HashType ht = outputHashAlgo.empty() ? htUnknown : parseHashType(outputHashAlgo);
         Hash h(*outputHash, ht);
 
-        auto outPath = state.store->makeFixedOutputPath(ingestionMethod, h, drvName);
-        if (!jsonObject) drv.env["out"] = state.store->printStorePath(outPath);
-        drv.outputs.insert_or_assign("out", DerivationOutput(
-                std::move(outPath),
-                FileSystemHash(ingestionMethod, std::move(h))));
+        drv.outputs.insert_or_assign("out", DerivationOutputT {
+            .path = NoPath {},
+            .hash = FileSystemHash {
+                .method = FileIngestionMethod::Flat,
+                .hash = h
+            }
+        });
     }
 
     /* Compute the final derivation, which additionally contains the outputs

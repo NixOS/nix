@@ -124,15 +124,22 @@ StorePath getDerivationEnvironment(ref<Store> store, const StorePath & drvPath)
     drv.inputSrcs = drvOriginal.inputSrcs;
     drv.inputDrvs = drvOriginal.inputDrvs;
     for (const auto i : drvOriginal.outputs) {
-        drv.outputs.insert_or_assign(i.first, DerivationOutputT(NoPath, i.second.hash));
+        drv .outputs.insert_or_assign(i.first, DerivationOutputT {
+            .path = NoPath {},
+            .hash = i.second.hash
+        });
     }
     drv.env.erase("allowedReferences");
     drv.env.erase("allowedRequisites");
     drv.env.erase("disallowedReferences");
     drv.env.erase("disallowedRequisites");
-    // drv.outputs.insert_or_assign("out", DerivationOutputT(NoPath, FileSystemHash {
-    //     FileIngestionMethod::Flat, Hash { }
-    // }));
+    drv.outputs.insert_or_assign("out", DerivationOutputT{
+        .path = NoPath {},
+        .hash = FileSystemHash {
+            .method = FileIngestionMethod::Flat,
+            .hash = Hash { }
+        }
+    });
 
     /* Rehash and write the derivation. FIXME: would be nice to use
        'buildDerivation', but that's privileged. */
@@ -145,16 +152,14 @@ StorePath getDerivationEnvironment(ref<Store> store, const StorePath & drvPath)
     drv.env["out"] = "";
     drv.env["outputs"] = "out";
     drv.inputSrcs.insert(std::move(getEnvShPath));
-    Derivation drvFinal = bakeDerivationPaths(*state.store, drv, drvName);
-    drv.env["out"] = store->printStorePath(drvFinal["out"].path);
-    auto shellDrvPath2 = writeDerivation(store, drv, drvName);
+    Derivation drvFinal = bakeDerivationPaths(*store, drv, drvName);
+    drv.env.insert_or_assign("out", store->printStorePath(drvFinal.outputs.at("out").path));
+    auto shellDrvPath2 = writeDerivation(store, drvFinal, drvName);
 
     /* Build the derivation. */
     store->buildPaths({shellDrvPath2});
 
-    assert(store->isValidPath(shellOutPath));
-
-    return shellOutPath;
+    return drvFinal.outputs.at("out").path;
 }
 
 struct Common : InstallableCommand, MixProfile
