@@ -30,3 +30,10 @@ test "$hash1" = "sha256:$hash2"
 path5=$(nix add-to-store --git ./dummy)
 hash3=$(nix-store -q --hash $path5)
 test "$hash3" = "sha256:$(nix hash-git --base32 ./dummy)"
+
+mkdir -p dummy2
+echo hello > dummy2/hello
+nix add-to-store --git ./dummy2/hello
+path6=$(nix add-to-store --git ./dummy2)
+hash4=$(nix-store -q --hash $path6)
+test "$hash4" = "sha256:$(nix hash-git --base32 ./dummy2)"
