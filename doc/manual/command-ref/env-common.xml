@@ -53,7 +53,7 @@ nixpkgs=/home/eelco/Dev/nixpkgs-branch:/etc/nixos</screen>
     <envar>NIX_PATH</envar> to
 
     <screen>
-nixpkgs=https://github.com/NixOS/nixpkgs-channels/archive/nixos-15.09.tar.gz</screen>
+nixpkgs=https://github.com/NixOS/nixpkgs/archive/nixos-15.09.tar.gz</screen>
 
     tells Nix to download the latest revision in the Nixpkgs/NixOS
     15.09 channel.</para>

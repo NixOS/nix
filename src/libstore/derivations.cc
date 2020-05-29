@@ -9,13 +9,13 @@
 namespace nix {
 
 
-void DerivationOutput::parseHashInfo(bool & recursive, Hash & hash) const
+void DerivationOutput::parseHashInfo(FileIngestionMethod & recursive, Hash & hash) const
 {
-    recursive = false;
+    recursive = FileIngestionMethod::Flat;
     string algo = hashAlgo;
 
     if (string(algo, 0, 2) == "r:") {
-        recursive = true;
+        recursive = FileIngestionMethod::Recursive;
         algo = string(algo, 2);
     }
 
