@@ -842,21 +842,6 @@ std::string makeFixedOutputCA(FileIngestionMethod method, const Hash & hash)
 }
 
 
-void Store::addToStore(const ValidPathInfo & info, Source & narSource,
-    RepairFlag repair, CheckSigsFlag checkSigs,
-    std::shared_ptr<FSAccessor> accessor)
-{
-    addToStore(info, make_ref<std::string>(narSource.drain()), repair, checkSigs, accessor);
-}
-
-void Store::addToStore(const ValidPathInfo & info, const ref<std::string> & nar,
-    RepairFlag repair, CheckSigsFlag checkSigs,
-    std::shared_ptr<FSAccessor> accessor)
-{
-    StringSource source(*nar);
-    addToStore(info, source, repair, checkSigs, accessor);
-}
-
 }
 
 
