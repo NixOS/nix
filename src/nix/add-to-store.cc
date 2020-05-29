@@ -63,10 +63,8 @@ struct CmdAddToStore : MixDryRun, StoreCommand
         info.narSize = sink.s->size();
         info.ca = makeFixedOutputCA(ingestionMethod, info.narHash);
 
-        if (!dryRun) {
-            auto source = StringSource { *sink.s };
-            store->addToStore(info, source);
-        }
+        if (!dryRun)
+            store->addToStore(*namePart, path, ingestionMethod, git ? htSHA1 : htSHA256);
 
         logger->stdout("%s", store->printStorePath(info.path));
     }
