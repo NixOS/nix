@@ -88,31 +88,6 @@ static void prim_fetchTree(EvalState & state, const Pos & pos, Value * * args, V
     if (evalSettings.pureEval && !input.isImmutable())
         throw Error("in pure evaluation mode, 'fetchTree' requires an immutable input, at %s", pos);
 
-    /* The tree may already be in the Nix store, or it could be
-       substituted (which is often faster than fetching from the
-       original source). So check that. */
-    if (input.hasAllInfo()) {
-        auto storePath = input.computeStorePath(*state.store);
-
-        try {
-            state.store->ensurePath(storePath);
-
-            debug("using substituted/cached input '%s' in '%s'",
-                input.to_string(), state.store->printStorePath(storePath));
-
-            auto actualPath = state.store->toRealPath(storePath);
-
-            if (state.allowedPaths)
-                state.allowedPaths->insert(actualPath);
-
-            emitTreeAttrs(state, fetchers::Tree { .actualPath = actualPath, .storePath = std::move(storePath) }, input, v);
-
-            return;
-        } catch (Error & e) {
-            debug("substitution of input '%s' failed: %s", input.to_string(), e.what());
-        }
-    }
-
     auto [tree, input2] = input.fetch(state.store);
 
     if (state.allowedPaths)

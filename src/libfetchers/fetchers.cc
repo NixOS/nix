@@ -103,6 +103,26 @@ std::pair<Tree, Input> Input::fetch(ref<Store> store) const
     if (!scheme)
         throw Error("cannot fetch unsupported input '%s'", attrsToJson(toAttrs()));
 
+    /* The tree may already be in the Nix store, or it could be
+       substituted (which is often faster than fetching from the
+       original source). So check that. */
+    if (hasAllInfo()) {
+        try {
+            auto storePath = computeStorePath(*store);
+
+            store->ensurePath(storePath);
+
+            debug("using substituted/cached input '%s' in '%s'",
+                to_string(), store->printStorePath(storePath));
+
+            auto actualPath = store->toRealPath(storePath);
+
+            return {fetchers::Tree { .actualPath = actualPath, .storePath = std::move(storePath) }, *this};
+        } catch (Error & e) {
+            debug("substitution of input '%s' failed: %s", to_string(), e.what());
+        }
+    }
+
     auto [tree, input] = scheme->fetch(store, *this);
 
     if (tree.actualPath == "")
