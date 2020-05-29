@@ -30,11 +30,13 @@ void restoreGit(const Path & path, Source & source, const Path & storeDir) {
     parseGit(sink, source, storeDir);
 }
 
-void parseGit(ParseSink & sink, Source & source, const Path & storeDir) {
+void parseGit(ParseSink & sink, Source & source, const Path & storeDir)
+{
     parse(sink, source, "", storeDir);
 }
 
-string getStringUntil(Source & source, char byte) {
+static string getStringUntil(Source & source, char byte)
+{
     string s;
     unsigned char n[1];
     source(n, 1);
@@ -45,13 +47,25 @@ string getStringUntil(Source & source, char byte) {
     return s;
 }
 
-string getString(Source & source, int n){
+static string getString(Source & source, int n)
+{
     std::vector<unsigned char> v(n);
     source(v.data(), n);
     return std::string(v.begin(), v.end());
 }
 
-static void parse(ParseSink & sink, Source & source, const Path & path, const Path & storeDir) {
+// Unfortunately, no access to libstore headers here.
+static Path getStorePath(const Path & storeDir, Hash hash, string name)
+{
+    Hash hash1 = hashString(htSHA256, "fixed:out:git:" + hash.to_string(Base16) + ":");
+    Hash hash2 = hashString(htSHA256, "output:out:" + hash1.to_string(Base16) + ":" + storeDir + ":" + name);
+    Hash hash3 = compressHash(hash2, 20);
+
+    return storeDir + "/" + hash3.to_string(Base32, false) + "-" + name;
+}
+
+static void parse(ParseSink & sink, Source & source, const Path & path, const Path & storeDir)
+{
     auto type = getString(source, 5);
 
     if (type == "blob ") {
@@ -94,15 +108,10 @@ static void parse(ParseSink & sink, Source & source, const Path & path, const Pa
             string hashs = getString(source, 20);
             left -= 20;
 
-            Hash hash1(htSHA1);
-            std::copy(hashs.begin(), hashs.end(), hash1.hash);
+            Hash hash(htSHA1);
+            std::copy(hashs.begin(), hashs.end(), hash.hash);
 
-            Hash hash2 = hashString(htSHA256, "fixed:out:git:" + hash1.to_string(Base16) + ":");
-            Hash hash3 = hashString(htSHA256, "output:out:" + hash2.to_string(Base16) + ":" + storeDir + ":" + name);
-            Hash hash4 = compressHash(hash3, 20);
-
-            string entryName = hash4.to_string(Base32, false) + "-" + name;
-            Path entry = storeDir + "/" + entryName;
+            Path entry = getStorePath(storeDir, hash, name);
 
             struct stat st;
             if (lstat(entry.c_str(), &st))
@@ -139,7 +148,7 @@ static void parse(ParseSink & sink, Source & source, const Path & path, const Pa
                 if (perm != 40000)
                     throw SysError(format("file is a directory but expected to be a file '%1%'") % entry);
 
-                sink.createSymlink(path + "/" + name, "../" + entryName);
+                sink.createSymlink(path + "/" + name, entry);
             } else throw Error(format("file '%1%' has an unsupported type") % entry);
         }
     } else throw Error("input doesn't look like a Git object");
