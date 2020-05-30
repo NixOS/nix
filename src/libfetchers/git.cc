@@ -418,7 +418,7 @@ struct GitInputScheme : InputScheme
 
         auto input = std::make_unique<GitInput>(parseURL(getStrAttr(attrs, "url")));
         if (auto ref = maybeGetStrAttr(attrs, "ref")) {
-            if (!std::regex_match(*ref, refRegex))
+            if (std::regex_search(*ref, badGitRefRegex))
                 throw BadURL("invalid Git branch/tag name '%s'", *ref);
             input->ref = *ref;
         }
