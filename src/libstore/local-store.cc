@@ -1096,7 +1096,12 @@ StorePath LocalStore::addToStoreFromDump(const string & dump, const string & nam
                above (if called with recursive == true and hashAlgo ==
                sha256); otherwise, compute it here. */
             HashResult hash;
-            if (method == FileIngestionMethod::Recursive) {
+            if (method == FileIngestionMethod::Git) {
+                if (hashAlgo != htSHA1)
+                    throw Error("Git must use sha1 hash");
+                hash.first = h;
+                hash.second = dump.size();
+            } else if (method == FileIngestionMethod::Recursive) {
                 hash.first = hashAlgo == htSHA256 ? h : hashString(htSHA256, dump);
                 hash.second = dump.size();
             } else
