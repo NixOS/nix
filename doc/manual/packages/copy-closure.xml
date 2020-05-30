@@ -32,7 +32,7 @@ writes the closure of Firefox to a file.  You can then copy this file
 to another machine and install the closure:
 
 <screen>
-$ nix-store --import &lt; firefox.closure</screen>
+# nix-store --import &lt; firefox.closure</screen>
 
 Any store paths in the closure that are already present in the target
 store are ignored.  It is also possible to pipe the export into
