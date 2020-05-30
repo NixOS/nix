@@ -8,8 +8,14 @@
 
 namespace nix::fetchers {
 
-std::regex ownerRegex("[a-zA-Z][a-zA-Z0-9_-]*", std::regex::ECMAScript);
-std::regex repoRegex("[a-zA-Z][a-zA-Z0-9_-]*", std::regex::ECMAScript);
+// According to the form validation messages on Join Github page,
+// - Github username (owner) may only contain alphanumeric characters or hyphens.
+// - Github username (owner) cannot have multiple consecutive hyphens.
+// - Github username (owner) cannot begin or end with a hyphen.
+// - Maximum is 39 characters.
+std::regex ownerRegex("[a-zA-Z0-9](?:[a-zA-Z0-9]|-(?=[a-zA-Z0-9])){0,38}", std::regex::ECMAScript);
+// Repository name can be any alphanumeric, -, _, or a .
+std::regex repoRegex("[a-zA-Z0-9_.-]+", std::regex::ECMAScript);
 
 struct GitHubInput : Input
 {
