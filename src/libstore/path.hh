@@ -88,15 +88,6 @@ const size_t storePathHashLen = 32; // i.e. 160 bits
 /* Extension of derivations in the Nix store. */
 const std::string drvExtension = ".drv";
 
-std::string to_string(FileIngestionMethod m) {
-    switch(m) {
-    case FileIngestionMethod::Flat:
-        return "false";
-    case FileIngestionMethod::Recursive:
-        return "true";
-    }
-}
-
 struct StorePathWithOutputs
 {
     StorePath path;

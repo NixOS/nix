@@ -24,4 +24,22 @@ std::string makeFixedOutputCA(FileIngestionMethod method, const Hash & hash)
         + hash.to_string();
 }
 
+template<class... Ts> struct overloaded : Ts... { using Ts::operator()...; };
+template<class... Ts> overloaded(Ts...) -> overloaded<Ts...>;
+
+std::string renderContentAddress(ContentAddress ca) {
+    return std::visit(overloaded {
+        [](TextHash th) {
+            return "text:" + th.hash.to_string();
+        },
+        [](FileSystemHash fsh) {
+            return makeFixedOutputCA(fsh.method, fsh.hash);
+        }
+    }, ca);
+}
+
+std::string renderContentAddress(std::optionalContent<Address> ca) {
+    return ca ? renderContentAddress(*ca) else "";
+}
+
 }

@@ -10,6 +10,10 @@ enum struct FileIngestionMethod : uint8_t {
     Recursive = true
 };
 
+struct TextHash {
+    Hash hash;
+};
+
 /// Pair of a hash, and how the file system was ingested
 struct FileSystemHash {
     FileIngestionMethod method;
@@ -36,7 +40,7 @@ struct FileSystemHash {
     makeFixedOutputPath() / addToStore().
 */
 typedef std::variant<
-    Hash, // for paths computed by makeTextPath() / addTextToStore
+    TextHash, // for paths computed by makeTextPath() / addTextToStore
     FileSystemHash // for path computed by makeFixedOutputPath
 > ContentAddress;
 
@@ -47,5 +51,9 @@ std::string makeFileIngestionPrefix(const FileIngestionMethod m);
 /* Compute the content-addressability assertion (ValidPathInfo::ca)
    for paths created by makeFixedOutputPath() / addToStore(). */
 std::string makeFixedOutputCA(FileIngestionMethod method, const Hash & hash);
+
+std::string renderContentAddress(ContentAddress ca);
+
+std::string renderContentAddress(std::optional<ContentAddress> ca);
 
 }

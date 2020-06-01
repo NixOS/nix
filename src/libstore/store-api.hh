@@ -111,20 +111,6 @@ struct SubstitutablePathInfo
 
 typedef std::map<StorePath, SubstitutablePathInfo> SubstitutablePathInfos;
 
-template<class... Ts> struct overloaded : Ts... { using Ts::operator()...; };
-template<class... Ts> overloaded(Ts...) -> overloaded<Ts...>;
-
-std::string renderContentAddress(ContentAddress ca) {
-    return std::visit(overloaded {
-        [](Hash hash) {
-            return "text:" + hash.to_string();
-        },
-        [](FileSystemHash fsh) {
-            return makeFixedOutputCA(fsh.method, fsh.hash);
-        }
-    }, ca);
-}
-
 struct ValidPathInfo
 {
     StorePath path;
