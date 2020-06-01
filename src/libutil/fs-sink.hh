@@ -19,6 +19,8 @@ struct ParseSink
     virtual void receiveContents(unsigned char * data, unsigned int len) { };
 
     virtual void createSymlink(const Path & path, const string & target) { };
+
+    virtual int getFD() { return 0; };
 };
 
 struct RestoreSink : ParseSink
@@ -80,6 +82,11 @@ struct RestoreSink : ParseSink
     {
         Path p = dstPath + path;
         nix::createSymlink(target, p);
+    }
+
+    int getFD()
+    {
+        return fd.get();
     }
 };
 

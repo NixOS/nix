@@ -16,6 +16,7 @@
 #include "hash.hh"
 
 #include "git.hh"
+#include "serialise.hh"
 
 using namespace std::string_literals;
 
@@ -112,7 +113,7 @@ static void parse(ParseSink & sink, Source & source, const Path & path, const Pa
             std::copy(hashs.begin(), hashs.end(), hash.hash);
 
             string entryName = getStoreEntry(storeDir, hash, name);
-            Path entry = realStoreDir + "/" + entryName;
+            Path entry = absPath(realStoreDir + "/" + entryName);
 
             struct stat st;
             if (lstat(entry.c_str(), &st))
@@ -127,24 +128,9 @@ static void parse(ParseSink & sink, Source & source, const Path & path, const Pa
                 else
                     sink.createRegularFile(path + "/" + name);
 
-                unsigned long long size = st.st_size;
-                sink.preallocateContents(size);
-
-                unsigned long long left = size;
-                std::vector<unsigned char> buf(65536);
-
-                StringSink ssink;
-                readFile(entry, ssink);
-                AutoCloseFD fd = open(entry.c_str(), O_RDONLY | O_CLOEXEC);
-
-                while (left) {
-                    checkInterrupt();
-                    auto n = buf.size();
-                    if ((unsigned long long)n > left) n = left;
-                    ssink(buf.data(), n);
-                    sink.receiveContents(buf.data(), n);
-                    left -= n;
-                }
+                sink.preallocateContents(st.st_size);
+                FdSink fsink(sink.getFD());
+                readFile(entry, fsink);
             } else if (S_ISDIR(st.st_mode)) {
                 if (perm != 40000)
                     throw SysError(format("file is a directory but expected to be a file '%1%'") % entry);
