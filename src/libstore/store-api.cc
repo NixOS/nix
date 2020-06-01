@@ -814,25 +814,6 @@ Strings ValidPathInfo::shortRefs() const
 }
 
 
-std::string makeFileIngestionPrefix(const FileIngestionMethod m) {
-    switch (m) {
-    case FileIngestionMethod::Flat:
-        return "";
-    case FileIngestionMethod::Recursive:
-        return "r:";
-    default:
-        throw Error("impossible, caught both cases");
-    }
-}
-
-std::string makeFixedOutputCA(FileIngestionMethod method, const Hash & hash)
-{
-    return "fixed:"
-        + makeFileIngestionPrefix(method)
-        + hash.to_string();
-}
-
-
 void Store::addToStore(const ValidPathInfo & info, Source & narSource,
     RepairFlag repair, CheckSigsFlag checkSigs,
     std::shared_ptr<FSAccessor> accessor)

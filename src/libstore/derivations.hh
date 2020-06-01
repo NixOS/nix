@@ -3,6 +3,7 @@
 #include "path.hh"
 #include "types.hh"
 #include "hash.hh"
+#include "file-hash.hh"
 
 #include <map>
 
@@ -11,20 +12,6 @@ namespace nix {
 
 
 /* Abstract syntax of derivations. */
-
-/// Pair of a hash, and how the file system was ingested
-struct FileSystemHash {
-    FileIngestionMethod method;
-    Hash hash;
-    FileSystemHash(FileIngestionMethod method, Hash hash)
-        : method(std::move(method))
-        , hash(std::move(hash))
-    { }
-    FileSystemHash(const FileSystemHash &) = default;
-    FileSystemHash(FileSystemHash &&) = default;
-    FileSystemHash & operator = (const FileSystemHash &) = default;
-    std::string printMethodAlgo() const;
-};
 
 struct DerivationOutput
 {

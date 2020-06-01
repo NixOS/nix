@@ -8,11 +8,6 @@
 
 namespace nix {
 
-std::string FileSystemHash::printMethodAlgo() const {
-    return makeFileIngestionPrefix(method) + printHashType(hash.type);
-}
-
-
 BasicDerivation::BasicDerivation(const BasicDerivation & other)
     : platform(other.platform)
     , builder(other.builder)

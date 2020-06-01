@@ -2,6 +2,7 @@
 
 #include "path.hh"
 #include "hash.hh"
+#include "file-hash.hh"
 #include "serialise.hh"
 #include "crypto.hh"
 #include "lru-cache.hh"
@@ -845,15 +846,6 @@ std::optional<ValidPathInfo> decodeValidPathInfo(
     const Store & store,
     std::istream & str,
     bool hashGiven = false);
-
-/* Compute the prefix to the hash algorithm which indicates how the files were
-   ingested. */
-std::string makeFileIngestionPrefix(const FileIngestionMethod m);
-
-/* Compute the content-addressability assertion (ValidPathInfo::ca)
-   for paths created by makeFixedOutputPath() / addToStore(). */
-std::string makeFixedOutputCA(FileIngestionMethod method, const Hash & hash);
-
 
 /* Split URI into protocol+hierarchy part and its parameter set. */
 std::pair<std::string, Store::Params> splitUriAndParams(const std::string & uri);
