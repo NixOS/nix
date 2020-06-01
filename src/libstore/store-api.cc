@@ -209,9 +209,21 @@ StorePath Store::makeTextPath(std::string_view name, const Hash & hash,
 std::pair<StorePath, Hash> Store::computeStorePathForPath(std::string_view name,
     const Path & srcPath, FileIngestionMethod method, HashType hashAlgo, PathFilter & filter) const
 {
-    Hash h = method == FileIngestionMethod::Recursive
-        ? hashPath(hashAlgo, srcPath, filter).first
-        : hashFile(hashAlgo, srcPath);
+    Hash h;
+    switch (method) {
+    case FileIngestionMethod::Recursive: {
+        h = hashPath(hashAlgo, srcPath, filter).first;
+        break;
+    }
+    case FileIngestionMethod::Git: {
+        h = hashGit(hashAlgo, srcPath, filter).first;
+        break;
+    }
+    case FileIngestionMethod::Flat: {
+        h = hashFile(hashAlgo, srcPath);
+        break;
+    }
+    }
     return std::make_pair(makeFixedOutputPath(method, h, name), h);
 }
 
