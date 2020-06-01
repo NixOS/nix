@@ -128,7 +128,6 @@ static void parse(ParseSink & sink, Source & source, const Path & path, const Pa
                 else
                     sink.createRegularFile(path + "/" + name);
 
-                sink.preallocateContents(st.st_size);
                 FdSink fsink(sink.getFD());
                 readFile(entry, fsink);
             } else if (S_ISDIR(st.st_mode)) {
