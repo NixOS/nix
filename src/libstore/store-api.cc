@@ -216,7 +216,7 @@ std::pair<StorePath, Hash> Store::computeStorePathForPath(std::string_view name,
         break;
     }
     case FileIngestionMethod::Git: {
-        h = hashGit(htSHA1, srcPath, filter).first;
+        h = hashGit(hashAlgo, srcPath, filter).first;
         break;
     }
     case FileIngestionMethod::Flat: {

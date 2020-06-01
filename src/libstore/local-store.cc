@@ -1049,7 +1049,10 @@ void LocalStore::addToStore(const ValidPathInfo & info, Source & source,
 StorePath LocalStore::addToStoreFromDump(const string & dump, const string & name,
     FileIngestionMethod method, HashType hashAlgo, RepairFlag repair)
 {
-    Hash h = hashString(method == FileIngestionMethod::Git ? htSHA1 : hashAlgo, dump);
+    if (method == FileIngestionMethod::Git && hashAlgo != htSHA1)
+        throw Error("git ingestion must use sha1 hash");
+
+    Hash h = hashString(hashAlgo, dump);
 
     auto dstPath = makeFixedOutputPath(method, h, name);
 
@@ -1121,6 +1124,9 @@ StorePath LocalStore::addToStore(const string & name, const Path & _srcPath,
 {
     Path srcPath(absPath(_srcPath));
 
+    if (method == FileIngestionMethod::Git && hashAlgo != htSHA1)
+        throw Error("git ingestion must use sha1 hash");
+
     /* Read the whole path into memory. This is not a very scalable
        method for very large paths, but `copyPath' is mainly used for
        small files. */
@@ -1139,7 +1145,7 @@ StorePath LocalStore::addToStore(const string & name, const Path & _srcPath,
             for (auto & i : readDirectory(srcPath))
                 addToStore(i.name, srcPath + "/" + i.name, method, hashAlgo, filter, repair);
 
-        dumpGit(htSHA1, srcPath, sink, filter);
+        dumpGit(hashAlgo, srcPath, sink, filter);
         break;
     }
     case FileIngestionMethod::Flat: {
