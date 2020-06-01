@@ -909,7 +909,7 @@ void LocalStore::registerValidPaths(const ValidPathInfos & infos)
         StorePathSet paths;
 
         for (auto & i : infos) {
-            assert(i.narHash.type == htSHA256 || (i.narHash.type == htSHA1 && hasPrefix(i.ca, "fixed:git:")));
+            assert(i.narHash.type == htSHA256);
             if (isValidPath_(*state, i.path))
                 updatePathInfo(*state, i);
             else
@@ -1006,9 +1006,7 @@ void LocalStore::addToStore(const ValidPathInfo & info, Source & source,
             /* While restoring the path from the NAR, compute the hash
                of the NAR. */
             std::unique_ptr<AbstractHashSink> hashSink;
-            if (hasPrefix(info.ca, "fixed:git:sha1:"))
-                hashSink = std::make_unique<HashSink>(htSHA1); // git objects use sha1
-            else if (info.ca == "" || !info.references.count(info.path))
+            if (info.ca == "" || !info.references.count(info.path))
                 hashSink = std::make_unique<HashSink>(htSHA256);
             else
                 hashSink = std::make_unique<HashModuloSink>(htSHA256, storePathToHash(printStorePath(info.path)));
@@ -1051,7 +1049,7 @@ void LocalStore::addToStore(const ValidPathInfo & info, Source & source,
 StorePath LocalStore::addToStoreFromDump(const string & dump, const string & name,
     FileIngestionMethod method, HashType hashAlgo, RepairFlag repair)
 {
-    Hash h = hashString(hashAlgo, dump);
+    Hash h = hashString(method == FileIngestionMethod::Git ? htSHA1 : hashAlgo, dump);
 
     auto dstPath = makeFixedOutputPath(method, h, name);
 
@@ -1096,12 +1094,7 @@ StorePath LocalStore::addToStoreFromDump(const string & dump, const string & nam
                above (if called with recursive == true and hashAlgo ==
                sha256); otherwise, compute it here. */
             HashResult hash;
-            if (method == FileIngestionMethod::Git) {
-                if (hashAlgo != htSHA1)
-                    throw Error("Git must use sha1 hash");
-                hash.first = h;
-                hash.second = dump.size();
-            } else if (method == FileIngestionMethod::Recursive) {
+            if (method == FileIngestionMethod::Recursive) {
                 hash.first = hashAlgo == htSHA256 ? h : hashString(htSHA256, dump);
                 hash.second = dump.size();
             } else
@@ -1146,7 +1139,7 @@ StorePath LocalStore::addToStore(const string & name, const Path & _srcPath,
             for (auto & i : readDirectory(srcPath))
                 addToStore(i.name, srcPath + "/" + i.name, method, hashAlgo, filter, repair);
 
-        dumpGit(srcPath, sink, filter);
+        dumpGit(htSHA1, srcPath, sink, filter);
         break;
     }
     case FileIngestionMethod::Flat: {

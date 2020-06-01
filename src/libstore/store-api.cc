@@ -216,7 +216,7 @@ std::pair<StorePath, Hash> Store::computeStorePathForPath(std::string_view name,
         break;
     }
     case FileIngestionMethod::Git: {
-        h = hashGit(hashAlgo, srcPath, filter).first;
+        h = hashGit(htSHA1, srcPath, filter).first;
         break;
     }
     case FileIngestionMethod::Flat: {
@@ -853,6 +853,8 @@ Strings ValidPathInfo::shortRefs() const
 
 std::string makeFixedOutputCA(FileIngestionMethod method, const Hash & hash)
 {
+    if (method == FileIngestionMethod::Git && hash.type != htSHA1)
+        throw Error("git file ingestion must use sha1 hashes");
     return "fixed:" + ingestionMethodPrefix(method) + hash.to_string();
 }
 

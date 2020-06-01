@@ -376,18 +376,13 @@ void RemoteStore::queryPathInfoUncached(const StorePath & path,
             info = std::make_shared<ValidPathInfo>(path.clone());
             auto deriver = readString(conn->from);
             if (deriver != "") info->deriver = parseStorePath(deriver);
-
-            auto narHashString = readString(conn->from);
-
+            info->narHash = Hash(readString(conn->from), htSHA256);
             info->references = readStorePaths<StorePathSet>(*this, conn->from);
             conn->from >> info->registrationTime >> info->narSize;
             if (GET_PROTOCOL_MINOR(conn->daemonVersion) >= 16) {
                 conn->from >> info->ultimate;
                 info->sigs = readStrings<StringSet>(conn->from);
                 conn->from >> info->ca;
-                info->narHash = Hash(narHashString, hasPrefix(info->ca, "fixed:git:") ? htSHA1 : htSHA256);
-            } else {
-                info->narHash = Hash(narHashString, htSHA256);
             }
         }
         callback(std::move(info));
@@ -522,7 +517,7 @@ StorePath RemoteStore::addToStore(const string & name, const Path & _srcPath,
         {
             Finally cleanup([&]() { connections->decCapacity(); });
             if (method == FileIngestionMethod::Git)
-                dumpGit(hashAlgo, srcPath, conn->to, filter);
+                dumpGit(htSHA1, srcPath, conn->to, filter);
             else
                 dumpPath(srcPath, conn->to, filter);
         }

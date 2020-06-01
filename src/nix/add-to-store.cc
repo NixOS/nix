@@ -56,12 +56,12 @@ struct CmdAddToStore : MixDryRun, StoreCommand
         else
             dumpPath(path, sink);
 
-        auto narHash = hashString(git ? htSHA1 : htSHA256, *sink.s);
+        auto hash = hashString(git ? htSHA1 : htSHA256, *sink.s);
 
-        ValidPathInfo info(store->makeFixedOutputPath(ingestionMethod, narHash, *namePart));
-        info.narHash = narHash;
+        ValidPathInfo info(store->makeFixedOutputPath(ingestionMethod, hash, *namePart));
+        info.narHash = hashString(htSHA256, *sink.s);
         info.narSize = sink.s->size();
-        info.ca = makeFixedOutputCA(ingestionMethod, info.narHash);
+        info.ca = makeFixedOutputCA(ingestionMethod, hash);
 
         if (!dryRun)
             store->addToStore(*namePart, path, ingestionMethod, git ? htSHA1 : htSHA256);

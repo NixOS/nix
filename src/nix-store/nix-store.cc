@@ -372,7 +372,7 @@ static void opQuery(Strings opFlags, Strings opArgs)
                 for (auto & j : maybeUseOutputs(store->followLinksToStorePath(i), useOutput, forceRealise)) {
                     auto info = store->queryPathInfo(j);
                     if (query == qHash) {
-                        assert(info->narHash.type == htSHA256 || (info->narHash.type == htSHA1 && hasPrefix(info->ca, "fixed:git:")));
+                        assert(info->narHash.type == htSHA256);
                         cout << fmt("%s\n", info->narHash.to_string(Base32));
                     } else if (query == qSize)
                         cout << fmt("%d\n", info->narSize);
