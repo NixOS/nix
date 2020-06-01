@@ -13,6 +13,7 @@ extern "C" {
     void ffi_StorePath_drop(void *);
     bool ffi_StorePath_less_than(const StorePath & a, const StorePath & b);
     bool ffi_StorePath_eq(const StorePath & a, const StorePath & b);
+    void ffi_StorePath_clone_to(const StorePath & _other, StorePath & _this);
     unsigned char * ffi_StorePath_hash_data(const StorePath & p);
 }
 
@@ -41,6 +42,19 @@ struct StorePath : rust::Value<3 * sizeof(void *) + 24, ffi_StorePath_drop>
     bool operator != (const StorePath & other) const
     {
         return !(*this == other);
+    }
+
+    StorePath(StorePath && that) = default;
+
+    StorePath(const StorePath & that)
+    {
+        ffi_StorePath_clone_to(that, *this);
+    }
+
+    void operator = (const StorePath & that)
+    {
+        (rust::Value<3 * sizeof(void *) + 24, ffi_StorePath_drop>::operator = (that));
+        ffi_StorePath_clone_to(that, *this);
     }
 
     StorePath clone() const;

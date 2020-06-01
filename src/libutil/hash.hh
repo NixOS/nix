@@ -55,6 +55,12 @@ struct Hash
        string. */
     Hash(const std::string & s, HashType type = HashType::Unknown);
 
+    Hash(const Hash &) = default;
+
+    Hash(Hash &&) = default;
+
+    Hash & operator = (const Hash &) = default;
+
     void init();
 
     /* Check whether a hash is set. */

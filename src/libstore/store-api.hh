@@ -189,8 +189,9 @@ struct ValidPathInfo
 
     Strings shortRefs() const;
 
-    ValidPathInfo(StorePath && path) : path(std::move(path)) { }
-    explicit ValidPathInfo(const ValidPathInfo & other);
+    ValidPathInfo(StorePath && path) : path(std::move(path)) { };
+    ValidPathInfo(const StorePath & path) : path(path) { };
+    ValidPathInfo(const ValidPathInfo & other) = default;
 
     virtual ~ValidPathInfo() { }
 };
@@ -847,6 +848,9 @@ std::optional<ValidPathInfo> decodeValidPathInfo(
     std::istream & str,
     bool hashGiven = false);
 
+/* Compute the prefix to the hash algorithm which indicates how the files were
+   ingested. */
+std::string makeFileIngestionPrefix(const FileIngestionMethod m);
 
 /* Compute the content-addressability assertion (ValidPathInfo::ca)
    for paths created by makeFixedOutputPath() / addToStore(). */

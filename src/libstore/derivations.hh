@@ -12,16 +12,31 @@ namespace nix {
 
 /* Abstract syntax of derivations. */
 
+/// Pair of a hash, and how the file system was ingested
+struct FileSystemHash {
+    FileIngestionMethod method;
+    Hash hash;
+    FileSystemHash(FileIngestionMethod method, Hash hash)
+        : method(std::move(method))
+        , hash(std::move(hash))
+    { }
+    FileSystemHash(const FileSystemHash &) = default;
+    FileSystemHash(FileSystemHash &&) = default;
+    FileSystemHash & operator = (const FileSystemHash &) = default;
+    std::string printMethodAlgo() const;
+};
+
 struct DerivationOutput
 {
     StorePath path;
-    std::string hashAlgo; /* hash used for expected hash computation */
-    std::string hash; /* expected hash, may be null */
-    DerivationOutput(StorePath && path, std::string && hashAlgo, std::string && hash)
+    std::optional<FileSystemHash> hash; /* hash used for expected hash computation */
+    DerivationOutput(StorePath && path, std::optional<FileSystemHash> && hash)
         : path(std::move(path))
-        , hashAlgo(std::move(hashAlgo))
         , hash(std::move(hash))
     { }
+    DerivationOutput(const DerivationOutput &) = default;
+    DerivationOutput(DerivationOutput &&) = default;
+    DerivationOutput & operator = (const DerivationOutput &) = default;
     void parseHashInfo(FileIngestionMethod & recursive, Hash & hash) const;
 };
 

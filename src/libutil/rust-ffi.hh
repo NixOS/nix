@@ -30,12 +30,28 @@ protected:
 
     // Must not be called directly.
     Value()
-    { }
+    {
+        // Precaution, in case this is used improperly
+        evacuate();
+    }
 
     Value(Value && other)
         : raw(other.raw)
     {
         other.evacuate();
+    }
+
+    // Not all Rust types are Clone / Copy, but our base Value class needs to
+    // have a copy constructor so that types which do implement Copy/Clone
+    // can be copied/cloned.
+    Value(const Value & other)
+        : raw(other.raw)
+    {
+    }
+    void operator =(const Value & other)
+    {
+        if (!isEvacuated())
+            drop(this);
     }
 
     void operator =(Value && other)
@@ -76,6 +92,16 @@ struct Vec : Value<3 * sizeof(void *), drop>
     {
         return ((const T * *) &this->raw)[0];
     }
+
+protected:
+
+    // Must not be called directly.
+    Vec<T, drop>();
+
+    Vec<T, drop>(Vec<T, drop> && other) = default;
+
+    // Delete until we know how to do this properly.
+    Vec<T, drop>(const Vec<T, drop> & other) = delete;
 };
 
 /* A Rust slice. */
@@ -144,7 +170,7 @@ struct Result
         std::exception_ptr * exc;
     };
 
-    Result() : tag(Uninit) { }; // FIXME: remove
+    Result() = delete;
 
     Result(const Result &) = delete;
 
@@ -171,7 +197,7 @@ struct Result
     }
 
     /* Rethrow the wrapped exception or return the wrapped value. */
-    T unwrap()
+    T unwrap() &&
     {
         if (tag == Ok) {
             tag = Uninit;
