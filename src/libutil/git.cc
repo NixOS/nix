@@ -55,13 +55,13 @@ static string getString(Source & source, int n)
 }
 
 // Unfortunately, no access to libstore headers here.
-static Path getStorePath(const Path & realStoreDir, const Path & storeDir, Hash hash, string name)
+static string getStoreEntry(const Path & storeDir, Hash hash, string name)
 {
     Hash hash1 = hashString(htSHA256, "fixed:out:git:" + hash.to_string(Base16) + ":");
     Hash hash2 = hashString(htSHA256, "output:out:" + hash1.to_string(Base16) + ":" + storeDir + ":" + name);
     Hash hash3 = compressHash(hash2, 20);
 
-    return realStoreDir + "/" + hash3.to_string(Base32, false) + "-" + name;
+    return hash3.to_string(Base32, false) + "-" + name;
 }
 
 static void parse(ParseSink & sink, Source & source, const Path & path, const Path & realStoreDir, const Path & storeDir)
@@ -111,7 +111,8 @@ static void parse(ParseSink & sink, Source & source, const Path & path, const Pa
             Hash hash(htSHA1);
             std::copy(hashs.begin(), hashs.end(), hash.hash);
 
-            Path entry = getStorePath(realStoreDir, storeDir, hash, name);
+            string entryName = getStoreEntry(storeDir, hash, name);
+            Path entry = realStoreDir + "/" + entryName;
 
             struct stat st;
             if (lstat(entry.c_str(), &st))
@@ -148,7 +149,7 @@ static void parse(ParseSink & sink, Source & source, const Path & path, const Pa
                 if (perm != 40000)
                     throw SysError(format("file is a directory but expected to be a file '%1%'") % entry);
 
-                sink.createSymlink(path + "/" + name, entry);
+                sink.createSymlink(path + "/" + name, "../" + entryName);
             } else throw Error(format("file '%1%' has an unsupported type") % entry);
         }
     } else throw Error("input doesn't look like a Git object");
