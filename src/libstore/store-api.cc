@@ -467,7 +467,7 @@ void Store::pathInfoToJSON(JSONPlaceholder & jsonOut, const StorePathSet & store
                     jsonRefs.elem(printStorePath(ref));
             }
 
-            if (info->ca != "")
+            if (info->ca)
                 jsonPath.attr("ca", info->ca);
 
             std::pair<uint64_t, uint64_t> closureSizes;

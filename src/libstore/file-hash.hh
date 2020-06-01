@@ -1,5 +1,6 @@
 #pragma once
 
+#include <variant>
 #include "hash.hh"
 
 namespace nix {
@@ -22,6 +23,22 @@ struct FileSystemHash {
     FileSystemHash & operator = (const FileSystemHash &) = default;
     std::string printMethodAlgo() const;
 };
+
+/*
+  We've accumulated several types of content-addressed paths over the years;
+  fixed-output derivations support multiple hash algorithms and serialisation
+  methods (flat file vs NAR). Thus, ‘ca’ has one of the following forms:
+
+  * ‘text:sha256:<sha256 hash of file contents>’: For paths
+    computed by makeTextPath() / addTextToStore().
+
+  * ‘fixed:<r?>:<ht>:<h>’: For paths computed by
+    makeFixedOutputPath() / addToStore().
+*/
+typedef std::variant<
+    Hash, // for paths computed by makeTextPath() / addTextToStore
+    FileSystemHash // for path computed by makeFixedOutputPath
+> ContentAddress;
 
 /* Compute the prefix to the hash algorithm which indicates how the files were
    ingested. */

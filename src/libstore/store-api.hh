@@ -19,6 +19,7 @@
 #include <memory>
 #include <string>
 #include <chrono>
+#include <variant>
 
 
 namespace nix {
@@ -110,6 +111,19 @@ struct SubstitutablePathInfo
 
 typedef std::map<StorePath, SubstitutablePathInfo> SubstitutablePathInfos;
 
+template<class... Ts> struct overloaded : Ts... { using Ts::operator()...; };
+template<class... Ts> overloaded(Ts...) -> overloaded<Ts...>;
+
+std::string renderContentAddress(ContentAddress ca) {
+    return std::visit(overloaded {
+        [](Hash hash) {
+            return "text:" + hash.to_string();
+        },
+        [](FileSystemHash fsh) {
+            return makeFixedOutputCA(fsh.method, fsh.hash);
+        }
+    }, ca);
+}
 
 struct ValidPathInfo
 {
@@ -139,21 +153,11 @@ struct ValidPathInfo
        that a particular output path was produced by a derivation; the
        path then implies the contents.)
 
-       Ideally, the content-addressability assertion would just be a
-       Boolean, and the store path would be computed from
-       the name component, ‘narHash’ and ‘references’. However,
-       1) we've accumulated several types of content-addressed paths
-       over the years; and 2) fixed-output derivations support
-       multiple hash algorithms and serialisation methods (flat file
-       vs NAR). Thus, ‘ca’ has one of the following forms:
-
-       * ‘text:sha256:<sha256 hash of file contents>’: For paths
-         computed by makeTextPath() / addTextToStore().
-
-       * ‘fixed:<r?>:<ht>:<h>’: For paths computed by
-         makeFixedOutputPath() / addToStore().
+       Ideally, the content-addressability assertion would just be a Boolean,
+       and the store path would be computed from the name component, ‘narHash’
+       and ‘references’. However, we support many types of content addresses.
     */
-    std::string ca;
+    std::optional<ContentAddress> ca;
 
     bool operator == (const ValidPathInfo & i) const
     {
