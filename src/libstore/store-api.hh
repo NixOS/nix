@@ -8,6 +8,7 @@
 #include "sync.hh"
 #include "globals.hh"
 #include "config.hh"
+#include "derivations.hh"
 
 #include <atomic>
 #include <limits>
@@ -31,15 +32,12 @@ MakeError(SubstituterDisabled, Error);
 MakeError(NotInStore, Error);
 
 
-struct BasicDerivation;
-struct Derivation;
 class FSAccessor;
 class NarInfoDiskCache;
 class Store;
 class JSONPlaceholder;
 
 
-enum RepairFlag : bool { NoRepair = false, Repair = true };
 enum CheckSigsFlag : bool { NoCheckSigs = false, CheckSigs = true };
 enum SubstituteFlag : bool { NoSubstitute = false, Substitute = true };
 enum AllowInvalidFlag : bool { DisallowInvalid = false, AllowInvalid = true };
