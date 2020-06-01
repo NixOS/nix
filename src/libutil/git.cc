@@ -133,7 +133,6 @@ static void parse(ParseSink & sink, Source & source, const Path & path, const Pa
                 if (perm != 40000)
                     throw SysError(format("file is a directory but expected to be a file '%1%'") % entry);
 
-                sink.createDirectory(path + "/" + name);
                 sink.copyDirectory(realStoreDir + "/" + entryName, path + "/" + name);
             } else throw Error(format("file '%1%' has an unsupported type") % entry);
         }

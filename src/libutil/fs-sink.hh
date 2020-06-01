@@ -1,7 +1,6 @@
 #pragma once
 
 #include <fcntl.h>
-#include <filesystem>
 
 #include "types.hh"
 #include "serialise.hh"
@@ -95,7 +94,20 @@ struct RestoreSink : ParseSink
     void copyDirectory(const Path & source, const Path & destination)
     {
         Path p = dstPath + destination;
-        std::filesystem::copy(source, p);
+        createDirectory(destination);
+        for (auto & i : readDirectory(source)) {
+            struct stat st;
+            Path entry = source + "/" + i.name;
+            if (lstat(entry.c_str(), &st))
+                throw SysError(format("getting attributes of path '%1%'") % entry);
+            if (S_ISREG(st.st_mode)) {
+                createRegularFile(destination + "/" + i.name);
+                copyFile(entry);
+            } else if (S_ISDIR(st.st_mode))
+                copyDirectory(entry, destination + "/" + i.name);
+            else
+                throw Error(format("Unknown file: %s") % entry);
+        }
     }
 };
 
