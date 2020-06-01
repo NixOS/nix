@@ -25,7 +25,7 @@ mkdir -p $TEST_ROOT/dummy2
 echo hello > $TEST_ROOT/dummy2/hello
 path2=$(nix add-to-store --git $TEST_ROOT/dummy2)
 hash2=$(nix-store -q --hash $path2)
-test "$hash2" = "sha256:1wnx6ldp06c1riiyhgqvfmhzpm664066i5hdq5fdcf1wg19mz45i"
+test "$hash2" = "sha256:1pgyz59p65wd11vfxp3vi673ijwjfg7i4ynlqlsgzvg9dvh67dpj"
 
 rm -rf $TEST_ROOT/dummy3
 mkdir -p $TEST_ROOT/dummy3
