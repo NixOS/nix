@@ -103,6 +103,15 @@ StringSet Settings::getDefaultSystemFeatures()
     return features;
 }
 
+bool Settings::isWSL1()
+{
+    struct utsname utsbuf;
+    uname(&utsbuf);
+    // WSL1 uses -Microsoft suffix
+    // WSL2 uses -microsoft-standard suffix
+    return hasSuffix(utsbuf.release, "-Microsoft");
+}
+
 const string nixVersion = PACKAGE_VERSION;
 
 template<> void BaseSetting<SandboxMode>::set(const std::string & str)
