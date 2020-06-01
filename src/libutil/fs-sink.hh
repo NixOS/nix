@@ -1,6 +1,7 @@
 #pragma once
 
 #include <fcntl.h>
+#include <filesystem>
 
 #include "types.hh"
 #include "serialise.hh"
@@ -20,7 +21,8 @@ struct ParseSink
 
     virtual void createSymlink(const Path & path, const string & target) { };
 
-    virtual int getFD() { return 0; };
+    virtual void copyFile(const Path & source) { };
+    virtual void copyDirectory(const Path & source, const Path & destination) { };
 };
 
 struct RestoreSink : ParseSink
@@ -84,9 +86,16 @@ struct RestoreSink : ParseSink
         nix::createSymlink(target, p);
     }
 
-    int getFD()
+    void copyFile(const Path & source)
     {
-        return fd.get();
+        FdSink sink(fd.get());
+        readFile(source, sink);
+    }
+
+    void copyDirectory(const Path & source, const Path & destination)
+    {
+        Path p = dstPath + destination;
+        std::filesystem::copy(source, p);
     }
 };
 

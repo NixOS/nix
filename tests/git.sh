@@ -33,4 +33,4 @@ mkdir -p $TEST_ROOT/dummy3/hello
 echo Hello World! > $TEST_ROOT/dummy3/hello/hello
 path3=$(nix add-to-store --git $TEST_ROOT/dummy3)
 hash3=$(nix-store -q --hash $path3)
-test "$hash3" = "sha256:14qzv6n72xgr71sgb3ilpchaqzrh1vm61qj3qf0vmdfr721sm48z"
+test "$hash3" = "sha256:1i2x80840igikhbyy7nqf08ymx3a6n83x1fzyrxvddf0sdl5nqvp"
