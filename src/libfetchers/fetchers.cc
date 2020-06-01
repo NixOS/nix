@@ -117,7 +117,7 @@ std::pair<Tree, Input> Input::fetch(ref<Store> store) const
 
             auto actualPath = store->toRealPath(storePath);
 
-            return {fetchers::Tree { .actualPath = actualPath, .storePath = std::move(storePath) }, *this};
+            return {fetchers::Tree(std::move(actualPath), std::move(storePath)), *this};
         } catch (Error & e) {
             debug("substitution of input '%s' failed: %s", to_string(), e.what());
         }

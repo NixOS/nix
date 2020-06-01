@@ -96,10 +96,7 @@ struct PathInputScheme : InputScheme
             storePath = store->addToStore("source", path);
 
         return {
-            Tree {
-                .actualPath = store->toRealPath(*storePath),
-                .storePath = std::move(*storePath),
-            },
+            Tree(store->toRealPath(*storePath), std::move(*storePath)),
             input
         };
     }
