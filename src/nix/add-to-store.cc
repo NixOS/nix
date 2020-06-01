@@ -51,15 +51,13 @@ struct CmdAddToStore : MixDryRun, StoreCommand
         auto ingestionMethod = git ? FileIngestionMethod::Git : FileIngestionMethod::Recursive;
 
         StringSink sink;
-        if (git)
-            dumpGit(path, sink);
-        else
-            dumpPath(path, sink);
+        dumpPath(path, sink);
 
-        auto hash = hashString(git ? htSHA1 : htSHA256, *sink.s);
+        auto narHash = hashString(htSHA256, *sink.s);
+        auto hash = git ? dumpGitHash(htSHA1, path) : narHash;
 
         ValidPathInfo info(store->makeFixedOutputPath(ingestionMethod, hash, *namePart));
-        info.narHash = hashString(htSHA256, *sink.s);
+        info.narHash = narHash;
         info.narSize = sink.s->size();
         info.ca = makeFixedOutputCA(ingestionMethod, hash);
 
