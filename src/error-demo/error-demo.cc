@@ -62,101 +62,96 @@ int main()
 
     // For completeness sake, show 'info' through 'vomit' levels.
     // But this is maybe a heavy format for those.
-    logger->logEI(
-        ErrorInfo { .level = lvlInfo,
+    logger->logEI({ .level = lvlInfo,
                     .name = "Info name",
                     .description = "Info description",
         });
 
-    logger->logEI(
-        ErrorInfo { .level = lvlTalkative,
+    logger->logEI({ .level = lvlTalkative,
                     .name = "Talkative name",
                     .description = "Talkative description",
         });
 
-    logger->logEI(
-        ErrorInfo { .level = lvlChatty,
+    logger->logEI({ .level = lvlChatty,
                     .name = "Chatty name",
                     .description = "Chatty description",
         });
 
-    logger->logEI(
-        ErrorInfo { .level = lvlDebug,
+    logger->logEI({ .level = lvlDebug,
                     .name = "Debug name",
                     .description = "Debug description",
         });
 
-    logger->logEI(
-        ErrorInfo { .level = lvlVomit,
+    logger->logEI({ .level = lvlVomit,
                     .name = "Vomit name",
                     .description = "Vomit description",
         });
 
     // Error in a program; no hint and no nix code.
-    logError(
-        ErrorInfo { .name = "name",
-                    .description = "error description",
-        });
+    logError({ 
+        .name = "name",
+        .description = "error description",
+    });
 
     // Warning with name, description, and hint.
     // The hintfmt function makes all the substituted text yellow.
-    logWarning(
-        ErrorInfo { .name = "name",
-                    .description = "error description",
-                    .hint = hintfmt("there was a %1%", "warning"),
-        });
+    logWarning({ 
+        .name = "name",
+        .description = "error description",
+        .hint = hintfmt("there was a %1%", "warning"),
+    });
 
     // Warning with nix file, line number, column, and the lines of
     // code where a warning occurred.
     SymbolTable testTable;
     auto problem_file = testTable.create("myfile.nix");
 
-    logWarning(
-        ErrorInfo { .name = "warning name",
-                    .description = "warning description",
-                    .hint = hintfmt("this hint has %1% templated %2%!!",
-                        "yellow",
-                        "values"),
-                    .nixCode = NixCode {
-                        .errPos = Pos(problem_file, 40, 13),
-                        .prevLineOfCode = std::nullopt,
-                        .errLineOfCode = "this is the problem line of code",
-                        .nextLineOfCode = std::nullopt
-                    }});
+    logWarning({ 
+        .name = "warning name",
+        .description = "warning description",
+        .hint = hintfmt("this hint has %1% templated %2%!!",
+            "yellow",
+            "values"),
+        .nixCode = NixCode {
+            .errPos = Pos(problem_file, 40, 13),
+            .prevLineOfCode = std::nullopt,
+            .errLineOfCode = "this is the problem line of code",
+            .nextLineOfCode = std::nullopt
+    }});
 
     // Error with previous and next lines of code.
-    logError(
-        ErrorInfo { .name = "error name",
-                    .description = "error with code lines",
-                    .hint = hintfmt("this hint has %1% templated %2%!!",
-                        "yellow",
-                        "values"),
-                    .nixCode = NixCode {
-                        .errPos = Pos(problem_file, 40, 13),
-                        .prevLineOfCode = "previous line of code",
-                        .errLineOfCode = "this is the problem line of code",
-                        .nextLineOfCode = "next line of code",
-                    }});
+    logError({ 
+        .name = "error name",
+        .description = "error with code lines",
+        .hint = hintfmt("this hint has %1% templated %2%!!",
+            "yellow",
+            "values"),
+        .nixCode = NixCode {
+            .errPos = Pos(problem_file, 40, 13),
+            .prevLineOfCode = "previous line of code",
+            .errLineOfCode = "this is the problem line of code",
+            .nextLineOfCode = "next line of code",
+    }});
 
 
     // Error without lines of code.
-    logError(
-        ErrorInfo { .name = "error name",
-                    .description = "error without any code lines.",
-                    .hint = hintfmt("this hint has %1% templated %2%!!",
-                        "yellow",
-                        "values"),
-                    .nixCode = NixCode {
-                        .errPos = Pos(problem_file, 40, 13)
-                    }});
+    logError({ 
+        .name = "error name",
+        .description = "error without any code lines.",
+        .hint = hintfmt("this hint has %1% templated %2%!!",
+            "yellow",
+            "values"),
+        .nixCode = NixCode {
+            .errPos = Pos(problem_file, 40, 13)
+    }});
 
     // Error with only hint and name..
-    logError(
-        ErrorInfo { .name = "error name",
-                    .hint = hintfmt("hint %1%", "only"),
-                    .nixCode = NixCode {
-                        .errPos = Pos(problem_file, 40, 13)
-                    }});
+    logError({ 
+        .name = "error name",
+        .hint = hintfmt("hint %1%", "only"),
+        .nixCode = NixCode {
+            .errPos = Pos(problem_file, 40, 13)
+    }});
 
     return 0;
 }

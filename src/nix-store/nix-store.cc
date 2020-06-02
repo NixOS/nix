@@ -704,7 +704,7 @@ static void opVerify(Strings opFlags, Strings opArgs)
         else throw UsageError("unknown flag '%1%'", i);
 
     if (store->verifyStore(checkContents, repair)) {
-        logWarning(ErrorInfo { 
+        logWarning({ 
             .name = "Store consistency",
             .description = "not all errors were fixed"
             });
@@ -729,14 +729,13 @@ static void opVerifyPath(Strings opFlags, Strings opArgs)
         store->narFromPath(path, sink);
         auto current = sink.finish();
         if (current.first != info->narHash) {
-            logError(
-                ErrorInfo { 
-                    .name = "Hash mismatch",
-                    .hint = hintfmt(
-                        "path '%s' was modified! expected hash '%s', got '%s'",
-                        store->printStorePath(path),
-                        info->narHash.to_string(),
-                        current.first.to_string())
+            logError({ 
+                .name = "Hash mismatch",
+                .hint = hintfmt(
+                    "path '%s' was modified! expected hash '%s', got '%s'",
+                    store->printStorePath(path),
+                    info->narHash.to_string(),
+                    current.first.to_string())
             });
             status = 1;
         }

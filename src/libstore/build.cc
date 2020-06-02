@@ -1158,10 +1158,9 @@ void DerivationGoal::loadDerivation()
     trace("loading derivation");
 
     if (nrFailed != 0) {
-        logError(
-            ErrorInfo {
-                .name = "missing derivation during build",
-                .hint = hintfmt("cannot build missing derivation '%s'", worker.store.printStorePath(drvPath))
+        logError({
+            .name = "missing derivation during build",
+            .hint = hintfmt("cannot build missing derivation '%s'", worker.store.printStorePath(drvPath))
         });
         done(BuildResult::MiscFailure);
         return;
@@ -1313,12 +1312,11 @@ void DerivationGoal::repairClosure()
     /* Check each path (slow!). */
     for (auto & i : outputClosure) {
         if (worker.pathContentsGood(i)) continue;
-        logError(
-            ErrorInfo {
-                .name = "Corrupt path in closure",
-                .hint = hintfmt(
-                    "found corrupted or missing path '%s' in the output closure of '%s'",
-                    worker.store.printStorePath(i), worker.store.printStorePath(drvPath))
+        logError({
+            .name = "Corrupt path in closure",
+            .hint = hintfmt(
+                "found corrupted or missing path '%s' in the output closure of '%s'",
+                worker.store.printStorePath(i), worker.store.printStorePath(drvPath))
         });
         auto drvPath2 = outputsToDrv.find(i);
         if (drvPath2 == outputsToDrv.end())
@@ -1353,12 +1351,11 @@ void DerivationGoal::inputsRealised()
     if (nrFailed != 0) {
         if (!useDerivation)
             throw Error("some dependencies of '%s' are missing", worker.store.printStorePath(drvPath));
-        logError(
-            ErrorInfo {
-                .name = "Dependencies could not be built",
-                .hint = hintfmt(
-                    "cannot build derivation '%s': %s dependencies couldn't be built",
-                    worker.store.printStorePath(drvPath), nrFailed)
+        logError({
+            .name = "Dependencies could not be built",
+            .hint = hintfmt(
+                "cannot build derivation '%s': %s dependencies couldn't be built",
+                worker.store.printStorePath(drvPath), nrFailed)
         });
         done(BuildResult::DependencyFailed);
         return;
@@ -1844,12 +1841,11 @@ HookReply DerivationGoal::tryBuildHook()
 
     } catch (SysError & e) {
         if (e.errNo == EPIPE) {
-            logError(
-                ErrorInfo {
-                    .name = "Build hook died",
-                    .hint = hintfmt(
-                        "build hook died unexpectedly: %s",
-                        chomp(drainFD(worker.hook->fromHook.readSide.get())))
+            logError({
+                .name = "Build hook died",
+                .hint = hintfmt(
+                    "build hook died unexpectedly: %s",
+                    chomp(drainFD(worker.hook->fromHook.readSide.get())))
             });
             worker.hook = 0;
             return rpDecline;
@@ -3692,11 +3688,10 @@ void DerivationGoal::registerOutputs()
         /* Apply hash rewriting if necessary. */
         bool rewritten = false;
         if (!outputRewrites.empty()) {
-            logWarning(
-                ErrorInfo {
-                    .name = "Rewriting hashes",
-                    .hint = hintfmt("rewriting hashes in '%1%'; cross fingers", path)
-                    });
+            logWarning({
+                .name = "Rewriting hashes",
+                .hint = hintfmt("rewriting hashes in '%1%'; cross fingers", path)
+            });
 
             /* Canonicalise first.  This ensures that the path we're
                rewriting doesn't contain a hard link to /etc/shadow or
@@ -3875,10 +3870,9 @@ void DerivationGoal::registerOutputs()
                 if (settings.enforceDeterminism)
                     throw NotDeterministic(hint);
 
-                logError(
-                    ErrorInfo {
-                        .name = "Output determinism error",
-                        .hint = hint
+                logError({
+                    .name = "Output determinism error",
+                    .hint = hint
                 });
 
 
@@ -4145,12 +4139,11 @@ void DerivationGoal::handleChildOutput(int fd, const string & data)
     {
         logSize += data.size();
         if (settings.maxLogSize && logSize > settings.maxLogSize) {
-            logError(
-                ErrorInfo {
-                    .name = "Max log size exceeded",
-                    .hint = hintfmt(
-                        "%1% killed after writing more than %2% bytes of log output",
-                        getName(), settings.maxLogSize)
+            logError({
+                .name = "Max log size exceeded",
+                .hint = hintfmt(
+                    "%1% killed after writing more than %2% bytes of log output",
+                    getName(), settings.maxLogSize)
             });
             killChild();
             done(BuildResult::LogLimitExceeded);
@@ -4467,12 +4460,11 @@ void SubstitutionGoal::tryNext()
         && !sub->isTrusted
         && !info->checkSignatures(worker.store, worker.store.getPublicKeys()))
     {
-        logWarning(
-            ErrorInfo {
-                .name = "Invalid path signature",
-                .hint = hintfmt("substituter '%s' does not have a valid signature for path '%s'",
-                    sub->getUri(), worker.store.printStorePath(storePath))
-            });
+        logWarning({
+            .name = "Invalid path signature",
+            .hint = hintfmt("substituter '%s' does not have a valid signature for path '%s'",
+                sub->getUri(), worker.store.printStorePath(storePath))
+        });
         tryNext();
         return;
     }
@@ -4954,12 +4946,11 @@ void Worker::waitForInput()
             j->respectTimeouts &&
             after - j->lastOutput >= std::chrono::seconds(settings.maxSilentTime))
         {
-            logError(
-                ErrorInfo {
-                    .name = "Silent build timeout",
-                    .hint = hintfmt(
-                        "%1% timed out after %2% seconds of silence",
-                        goal->getName(), settings.maxSilentTime)
+            logError({
+                .name = "Silent build timeout",
+                .hint = hintfmt(
+                    "%1% timed out after %2% seconds of silence",
+                    goal->getName(), settings.maxSilentTime)
             });
             goal->timedOut();
         }
@@ -4969,12 +4960,11 @@ void Worker::waitForInput()
             j->respectTimeouts &&
             after - j->timeStarted >= std::chrono::seconds(settings.buildTimeout))
         {
-            logError(
-                ErrorInfo {
-                    .name = "Build timeout",
-                    .hint = hintfmt(
-                        "%1% timed out after %2% seconds",
-                        goal->getName(), settings.buildTimeout)
+            logError({
+                .name = "Build timeout",
+                .hint = hintfmt(
+                    "%1% timed out after %2% seconds",
+                    goal->getName(), settings.buildTimeout)
             });
             goal->timedOut();
         }
@@ -5035,10 +5025,9 @@ bool Worker::pathContentsGood(const StorePath & path)
     }
     pathContentsGoodCache.insert_or_assign(path.clone(), res);
     if (!res)
-        logError(
-            ErrorInfo {
-                .name = "Corrupted path",
-                .hint = hintfmt("path '%s' is corrupted or missing!", store.printStorePath(path))
+        logError({
+            .name = "Corrupted path",
+            .hint = hintfmt("path '%s' is corrupted or missing!", store.printStorePath(path))
         });
     return res;
 }

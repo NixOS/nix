@@ -599,12 +599,11 @@ struct curlFileTransfer : public FileTransfer
             workerThreadMain();
         } catch (nix::Interrupted & e) {
         } catch (std::exception & e) {
-            logError(
-                ErrorInfo { 
-                    .name = "File transfer",
-                    .hint = hintfmt("unexpected error in download thread: %s", 
-                                    e.what())
-                });
+            logError({ 
+                .name = "File transfer",
+                .hint = hintfmt("unexpected error in download thread: %s", 
+                                e.what())
+            });
         }
 
         {
