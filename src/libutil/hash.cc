@@ -19,13 +19,13 @@ namespace nix {
 
 void Hash::init()
 {
-	if (!type) abort();
-	switch (*type) {
+    if (!type) abort();
+    switch (*type) {
     case HashType::MD5: hashSize = md5HashSize; break;
     case HashType::SHA1: hashSize = sha1HashSize; break;
     case HashType::SHA256: hashSize = sha256HashSize; break;
     case HashType::SHA512: hashSize = sha512HashSize; break;
-	}
+    }
     assert(hashSize <= maxHashSize);
     memset(hash, 0, maxHashSize);
 }
