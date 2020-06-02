@@ -85,6 +85,7 @@ protected:
         Handler handler;
 
         static Flag mkHashTypeFlag(std::string && longName, HashType * ht);
+        static Flag mkHashTypeOptFlag(std::string && longName, std::optional<HashType> * oht);
     };
 
     std::map<std::string, Flag::ptr> longFlags;

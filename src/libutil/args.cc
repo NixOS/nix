@@ -166,6 +166,18 @@ Args::Flag Args::Flag::mkHashTypeFlag(std::string && longName, HashType * ht)
     };
 }
 
+Args::Flag Args::Flag::mkHashTypeOptFlag(std::string && longName, std::optional<HashType> * oht)
+{
+    return Flag {
+        .longName = std::move(longName),
+        .description = "hash algorithm ('md5', 'sha1', 'sha256', or 'sha512'). Optional as can also be gotten from SRI hash itself.",
+        .labels = {"hash-algo"},
+        .handler = {[oht](std::string s) {
+            *oht = std::optional<HashType> { parseHashType(s) };
+        }}
+    };
+}
+
 Strings argvToStrings(int argc, char * * argv)
 {
     Strings args;

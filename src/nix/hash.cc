@@ -84,7 +84,7 @@ struct CmdToBase : Command
 
     CmdToBase(Base base) : base(base)
     {
-        addFlag(Flag::mkHashTypeFlag("type", &*ht));
+        addFlag(Flag::mkHashTypeOptFlag("type", &ht));
         expectArgs("strings", &args);
     }
 
