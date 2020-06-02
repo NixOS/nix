@@ -80,12 +80,12 @@ static RegisterCommand r2("hash-path", [](){ return make_ref<CmdHash>(FileIngest
 struct CmdToBase : Command
 {
     Base base;
-    HashType ht = HashType::Unknown;
+    std::optional<HashType> ht;
     std::vector<std::string> args;
 
     CmdToBase(Base base) : base(base)
     {
-        addFlag(Flag::mkHashTypeFlag("type", &ht));
+        addFlag(Flag::mkHashTypeOptFlag("type", &ht));
         expectArgs("strings", &args);
     }
 
@@ -133,8 +133,6 @@ static int compatNixHash(int argc, char * * argv)
         else if (*arg == "--type") {
             string s = getArg(*arg, arg, end);
             ht = parseHashType(s);
-            if (ht == HashType::Unknown)
-                throw UsageError(format("unknown hash type '%1%'") % s);
         }
         else if (*arg == "--to-base16") op = opTo16;
         else if (*arg == "--to-base32") op = opTo32;
