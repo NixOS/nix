@@ -12,6 +12,9 @@ enum struct FileIngestionMethod : uint8_t {
 
 struct TextHash {
     Hash hash;
+    TextHash(const TextHash &) = default;
+    TextHash(TextHash &&) = default;
+    TextHash & operator = (const TextHash &) = default;
 };
 
 /// Pair of a hash, and how the file system was ingested
@@ -55,5 +58,9 @@ std::string makeFixedOutputCA(FileIngestionMethod method, const Hash & hash);
 std::string renderContentAddress(ContentAddress ca);
 
 std::string renderContentAddress(std::optional<ContentAddress> ca);
+
+ContentAddress parseCa(std::string_view rawCa);
+
+std::optional<ContentAddress> parseCaOpt(std::string_view rawCaOpt);
 
 }

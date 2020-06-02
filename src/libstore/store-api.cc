@@ -468,7 +468,7 @@ void Store::pathInfoToJSON(JSONPlaceholder & jsonOut, const StorePathSet & store
             }
 
             if (info->ca)
-                jsonPath.attr("ca", info->ca);
+                jsonPath.attr("ca", renderContentAddress(info->ca));
 
             std::pair<uint64_t, uint64_t> closureSizes;
 
@@ -760,24 +760,23 @@ bool ValidPathInfo::isContentAddressed(const Store & store) const
         printError("warning: path '%s' claims to be content-addressed but isn't", store.printStorePath(path));
     };
 
-    if (hasPrefix(ca, "text:")) {
-        Hash hash(std::string(ca, 5));
-        if (store.makeTextPath(path.name(), hash, references) == path)
+    if (! ca) {}
+
+    else if (auto p = std::get_if<TextHash>(&*ca)) {
+        if (store.makeTextPath(path.name(), p->hash, references) == path)
             return true;
         else
             warn();
     }
 
-    else if (hasPrefix(ca, "fixed:")) {
-        FileIngestionMethod recursive { ca.compare(6, 2, "r:") == 0 };
-        Hash hash(std::string(ca, recursive == FileIngestionMethod::Recursive ? 8 : 6));
+    else if (auto p = std::get_if<FileSystemHash>(&*ca)) {
         auto refs = cloneStorePathSet(references);
         bool hasSelfReference = false;
         if (refs.count(path)) {
             hasSelfReference = true;
             refs.erase(path);
         }
-        if (store.makeFixedOutputPath(recursive, hash, path.name(), refs, hasSelfReference) == path)
+        if (store.makeFixedOutputPath(p->method, p->hash, path.name(), refs, hasSelfReference) == path)
             return true;
         else
             warn();

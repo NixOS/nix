@@ -114,7 +114,11 @@ struct LegacySSHStore : public Store
             if (GET_PROTOCOL_MINOR(conn->remoteVersion) >= 4) {
                 auto s = readString(conn->from);
                 info->narHash = s.empty() ? Hash() : Hash(s);
-                conn->from >> info->ca;
+                {
+                    std::string rawCaOpt;
+                    conn->from >> rawCaOpt;
+                    info->ca = parseCaOpt(rawCaOpt);
+                }
                 info->sigs = readStrings<StringSet>(conn->from);
             }
 
@@ -146,7 +150,7 @@ struct LegacySSHStore : public Store
                 << info.narSize
                 << info.ultimate
                 << info.sigs
-                << info.ca;
+                << renderContentAddress(info.ca);
             try {
                 copyNAR(source, conn->to);
             } catch (...) {

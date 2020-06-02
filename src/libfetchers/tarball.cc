@@ -70,7 +70,10 @@ DownloadFileResult downloadFile(
         ValidPathInfo info(store->makeFixedOutputPath(FileIngestionMethod::Flat, hash, name));
         info.narHash = hashString(HashType::SHA256, *sink.s);
         info.narSize = sink.s->size();
-        info.ca = makeFixedOutputCA(FileIngestionMethod::Flat, hash);
+        info.ca = FileSystemHash {
+            .method = FileIngestionMethod::Flat,
+            .hash = hash,
+        };
         store->addToStore(info, sink.s, NoRepair, NoCheckSigs);
         storePath = std::move(info.path);
     }

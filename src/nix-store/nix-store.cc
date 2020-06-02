@@ -944,7 +944,11 @@ static void opServe(Strings opFlags, Strings opArgs)
                 info.references = readStorePaths<StorePathSet>(*store, in);
                 in >> info.registrationTime >> info.narSize >> info.ultimate;
                 info.sigs = readStrings<StringSet>(in);
-                in >> info.ca;
+                {
+                    std::string rawCA;
+                    in >> rawCA;
+                    info.ca = parseCaOpt(rawCA);
+                }
 
                 if (info.narSize == 0)
                     throw Error("narInfo is too old and missing the narSize field");
