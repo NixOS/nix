@@ -74,7 +74,8 @@ DownloadFileResult downloadFile(
             .method = FileIngestionMethod::Flat,
             .hash = hash,
         };
-        store->addToStore(info, sink.s, NoRepair, NoCheckSigs);
+        auto source = StringSource { *sink.s };
+        store->addToStore(info, source, NoRepair, NoCheckSigs);
         storePath = std::move(info.path);
     }
 

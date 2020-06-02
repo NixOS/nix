@@ -53,8 +53,10 @@ struct CmdAddToStore : MixDryRun, StoreCommand
             .hash = info.narHash
         };
 
-        if (!dryRun)
-            store->addToStore(info, sink.s);
+        if (!dryRun) {
+            auto source = StringSource { *sink.s };
+            store->addToStore(info, source);
+        }
 
         logger->stdout("%s", store->printStorePath(info.path));
     }
