@@ -8,6 +8,7 @@
 #include "archive.hh"
 #include "derivations.hh"
 #include "args.hh"
+#include "git.hh"
 
 namespace nix::daemon {
 
@@ -367,7 +368,8 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
         std::string s, baseName;
         FileIngestionMethod method;
         {
-            bool fixed, recursive;
+            bool fixed;
+            unsigned char recursive;
             from >> baseName >> fixed /* obsolete */ >> recursive >> s;
             method = FileIngestionMethod { recursive };
             /* Compatibility hack. */
@@ -381,20 +383,31 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
         TeeSource savedNAR(from);
         RetrieveRegularNARSink savedRegular;
 
-        if (method == FileIngestionMethod::Recursive) {
+        switch (method) {
+        case FileIngestionMethod::Recursive: {
             /* Get the entire NAR dump from the client and save it to
                a string so that we can pass it to
                addToStoreFromDump(). */
             ParseSink sink; /* null sink; just parse the NAR */
             parseDump(sink, savedNAR);
-        } else
+            break;
+        }
+        case FileIngestionMethod::Git: {
+            ParseSink sink;
+            parseGit(sink, savedNAR, store->storeDir, store->storeDir);
+            break;
+        }
+        case FileIngestionMethod::Flat: {
             parseDump(savedRegular, from);
+            break;
+        }
+        }
 
         logger->startWork();
         if (!savedRegular.regular) throw Error("regular file expected");
 
         auto path = store->addToStoreFromDump(
-            method == FileIngestionMethod::Recursive ? *savedNAR.data : savedRegular.s,
+            method == FileIngestionMethod::Flat ? savedRegular.s : *savedNAR.data,
             baseName,
             method,
             hashAlgo);

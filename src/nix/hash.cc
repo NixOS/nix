@@ -4,6 +4,7 @@
 #include "shared.hh"
 #include "references.hh"
 #include "archive.hh"
+#include "git.hh"
 
 using namespace nix;
 
@@ -35,12 +36,17 @@ struct CmdHash : Command
 
     std::string description() override
     {
-        const char* d;
+        const char *d;
         switch (mode) {
         case FileIngestionMethod::Flat:
             d = "print cryptographic hash of a regular file";
+            break;
         case FileIngestionMethod::Recursive:
             d = "print cryptographic hash of the NAR serialisation of a path";
+            break;
+        case FileIngestionMethod::Git:
+            d = "print cryptographic hash of the Git serialisation of a path";
+            break;
         };
         return d;
     }
@@ -57,16 +63,23 @@ struct CmdHash : Command
             else
                 hashSink = std::make_unique<HashSink>(ht);
 
+            Hash h;
             switch (mode) {
-            case FileIngestionMethod::Flat:
+            case FileIngestionMethod::Flat: {
                 readFile(path, *hashSink);
                 break;
-            case FileIngestionMethod::Recursive:
+            }
+            case FileIngestionMethod::Recursive: {
                 dumpPath(path, *hashSink);
                 break;
             }
+            case FileIngestionMethod::Git:
+                dumpGit(ht, path, *hashSink);
+                break;
+            }
 
-            Hash h = hashSink->finish().first;
+            h = hashSink->finish().first;
+
             if (truncate && h.hashSize > 20) h = compressHash(h, 20);
             logger->stdout(h.to_string(base, base == Base::SRI));
         }
@@ -75,6 +88,7 @@ struct CmdHash : Command
 
 static RegisterCommand r1("hash-file", [](){ return make_ref<CmdHash>(FileIngestionMethod::Flat); });
 static RegisterCommand r2("hash-path", [](){ return make_ref<CmdHash>(FileIngestionMethod::Recursive); });
+static RegisterCommand r3("hash-git", [](){ return make_ref<CmdHash>(FileIngestionMethod::Git); });
 
 struct CmdToBase : Command
 {
@@ -106,10 +120,10 @@ struct CmdToBase : Command
     }
 };
 
-static RegisterCommand r3("to-base16", [](){ return make_ref<CmdToBase>(Base::Base16); });
-static RegisterCommand r4("to-base32", [](){ return make_ref<CmdToBase>(Base::Base32); });
-static RegisterCommand r5("to-base64", [](){ return make_ref<CmdToBase>(Base::Base64); });
-static RegisterCommand r6("to-sri", [](){ return make_ref<CmdToBase>(Base::SRI); });
+static RegisterCommand r4("to-base16", [](){ return make_ref<CmdToBase>(Base::Base16); });
+static RegisterCommand r5("to-base32", [](){ return make_ref<CmdToBase>(Base::Base32); });
+static RegisterCommand r6("to-base64", [](){ return make_ref<CmdToBase>(Base::Base64); });
+static RegisterCommand r7("to-sri", [](){ return make_ref<CmdToBase>(Base::SRI); });
 
 /* Legacy nix-hash command. */
 static int compatNixHash(int argc, char * * argv)
