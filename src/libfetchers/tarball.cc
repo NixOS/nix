@@ -71,7 +71,8 @@ DownloadFileResult downloadFile(
         info.narHash = hashString(htSHA256, *sink.s);
         info.narSize = sink.s->size();
         info.ca = makeFixedOutputCA(FileIngestionMethod::Flat, hash);
-        store->addToStore(info, sink.s, NoRepair, NoCheckSigs);
+        auto source = StringSource { *sink.s };
+        store->addToStore(info, source, NoRepair, NoCheckSigs);
         storePath = std::move(info.path);
     }
 
