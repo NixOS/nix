@@ -72,8 +72,6 @@ static int _main(int argc, char * * argv)
             else if (*arg == "--type") {
                 string s = getArg(*arg, arg, end);
                 ht = parseHashType(s);
-                if (ht == HashType::Unknown)
-                    throw UsageError(format("unknown hash type '%1%'") % s);
             }
             else if (*arg == "--print-path")
                 printPath = true;

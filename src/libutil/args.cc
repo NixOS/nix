@@ -162,8 +162,6 @@ Args::Flag Args::Flag::mkHashTypeFlag(std::string && longName, HashType * ht)
         .labels = {"hash-algo"},
         .handler = {[ht](std::string s) {
             *ht = parseHashType(s);
-            if (*ht == HashType::Unknown)
-                throw UsageError("unknown hash type '%1%'", s);
         }}
     };
 }

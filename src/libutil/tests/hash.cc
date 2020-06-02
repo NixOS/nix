@@ -75,6 +75,6 @@ namespace nix {
 
     TEST(hashString, hashingWithUnknownAlgoExits) {
         auto s = "unknown";
-        ASSERT_DEATH(hashString(HashType::Unknown, s), "");
+        ASSERT_DEATH(hashString(HashType::SHA512, s), "");
     }
 }

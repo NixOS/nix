@@ -20,8 +20,6 @@ void DerivationOutput::parseHashInfo(FileIngestionMethod & recursive, Hash & has
     }
 
     HashType hashType = parseHashType(algo);
-    if (hashType == HashType::Unknown)
-        throw Error("unknown hash algorithm '%s'", algo);
 
     hash = Hash(this->hash, hashType);
 }

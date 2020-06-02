@@ -11,7 +11,6 @@ MakeError(BadHash, Error);
 
 
 enum struct HashType : char {
-    Unknown,
     MD5,
     SHA1,
     SHA256,
@@ -40,7 +39,7 @@ struct Hash
     unsigned int hashSize = 0;
     unsigned char hash[maxHashSize] = {};
 
-    HashType type = HashType::Unknown;
+    std::optional<HashType> type = {};
 
     /* Create an unset hash object. */
     Hash() { };
@@ -51,14 +50,18 @@ struct Hash
     /* Initialize the hash from a string representation, in the format
        "[<type>:]<base16|base32|base64>" or "<type>-<base64>" (a
        Subresource Integrity hash expression). If the 'type' argument
-       is HashType::Unknown, then the hash type must be specified in the
+       is not present, then the hash type must be specified in the
        string. */
-    Hash(const std::string & s, HashType type = HashType::Unknown);
+    Hash(const std::string & s, std::optional<HashType> type);
+    // type must be provided
+    Hash(const std::string & s, HashType type);
+    // hash type must be part of string
+    Hash(const std::string & s);
 
     void init();
 
     /* Check whether a hash is set. */
-    operator bool () const { return type != HashType::Unknown; }
+    operator bool () const { return (bool) type; }
 
     /* Check whether two hash are equal. */
     bool operator == (const Hash & h2) const;
@@ -127,6 +130,8 @@ Hash compressHash(const Hash & hash, unsigned int newSize);
 
 /* Parse a string representing a hash type. */
 HashType parseHashType(const string & s);
+/* Will return nothing on parse error */
+std::optional<HashType> parseHashTypeOpt(const string & s);
 
 /* And the reverse. */
 string printHashType(HashType ht);

@@ -4,6 +4,7 @@
 #include <openssl/md5.h>
 #include <openssl/sha.h>
 
+#include "args.hh"
 #include "hash.hh"
 #include "archive.hh"
 #include "util.hh"
@@ -18,11 +19,13 @@ namespace nix {
 
 void Hash::init()
 {
-    if (type == HashType::MD5) hashSize = md5HashSize;
-    else if (type == HashType::SHA1) hashSize = sha1HashSize;
-    else if (type == HashType::SHA256) hashSize = sha256HashSize;
-    else if (type == HashType::SHA512) hashSize = sha512HashSize;
-    else abort();
+	if (!type) abort();
+	switch (*type) {
+    case HashType::MD5: hashSize = md5HashSize; break;
+    case HashType::SHA1: hashSize = sha1HashSize; break;
+    case HashType::SHA256: hashSize = sha256HashSize; break;
+    case HashType::SHA512: hashSize = sha512HashSize; break;
+	}
     assert(hashSize <= maxHashSize);
     memset(hash, 0, maxHashSize);
 }
@@ -102,11 +105,18 @@ string printHash16or32(const Hash & hash)
 }
 
 
+HashType assertInitHashType(const Hash & h) {
+    if (h.type)
+        return *h.type;
+    else
+        abort();
+}
+
 std::string Hash::to_string(Base base, bool includeType) const
 {
     std::string s;
     if (base == Base::SRI || includeType) {
-        s += printHashType(type);
+        s += printHashType(assertInitHashType(*this));
         s += base == Base::SRI ? '-' : ':';
     }
     switch (base) {
@@ -124,8 +134,10 @@ std::string Hash::to_string(Base base, bool includeType) const
     return s;
 }
 
+Hash::Hash(const std::string & s, HashType type) : Hash(s, std::optional { type }) { }
+Hash::Hash(const std::string & s) : Hash(s, std::optional<HashType>{}) { }
 
-Hash::Hash(const std::string & s, HashType type)
+Hash::Hash(const std::string & s, std::optional<HashType> type)
     : type(type)
 {
     size_t pos = 0;
@@ -136,17 +148,17 @@ Hash::Hash(const std::string & s, HashType type)
         sep = s.find('-');
         if (sep != string::npos) {
             isSRI = true;
-        } else if (type == HashType::Unknown)
+        } else if (! type)
             throw BadHash("hash '%s' does not include a type", s);
     }
 
     if (sep != string::npos) {
         string hts = string(s, 0, sep);
         this->type = parseHashType(hts);
-        if (this->type == HashType::Unknown)
+        if (!this->type)
             throw BadHash("unknown hash type '%s'", hts);
-        if (type != HashType::Unknown && type != this->type)
-            throw BadHash("hash '%s' should have type '%s'", s, printHashType(type));
+        if (type && type != this->type)
+            throw BadHash("hash '%s' should have type '%s'", s, printHashType(*type));
         pos = sep + 1;
     }
 
@@ -202,7 +214,7 @@ Hash::Hash(const std::string & s, HashType type)
     }
 
     else
-        throw BadHash("hash '%s' has wrong length for hash type '%s'", s, printHashType(type));
+        throw BadHash("hash '%s' has wrong length for hash type '%s'", s, printHashType(*type));
 }
 
 
@@ -318,24 +330,34 @@ Hash compressHash(const Hash & hash, unsigned int newSize)
 }
 
 
-HashType parseHashType(const string & s)
+std::optional<HashType> parseHashTypeOpt(const string & s)
 {
     if (s == "md5") return HashType::MD5;
     else if (s == "sha1") return HashType::SHA1;
     else if (s == "sha256") return HashType::SHA256;
     else if (s == "sha512") return HashType::SHA512;
-    else return HashType::Unknown;
+    else return std::optional<HashType> {};
 }
 
+HashType parseHashType(const string & s)
+{
+    auto opt_h = parseHashTypeOpt(s);
+    if (opt_h)
+        return *opt_h;
+    else
+        throw UsageError("unknown hash algorithm '%1%'", s);
+}
 
 string printHashType(HashType ht)
 {
-    if (ht == HashType::MD5) return "md5";
-    else if (ht == HashType::SHA1) return "sha1";
-    else if (ht == HashType::SHA256) return "sha256";
-    else if (ht == HashType::SHA512) return "sha512";
-    else abort();
+    string ret;
+    switch (ht) {
+    case HashType::MD5: ret = "md5"; break;
+    case HashType::SHA1: ret = "sha1"; break;
+    case HashType::SHA256: ret = "sha256"; break;
+    case HashType::SHA512: ret = "sha512"; break;
+    }
+    return ret;
 }
-
 
 }

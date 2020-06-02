@@ -718,7 +718,7 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
         if (outputs.size() != 1 || *(outputs.begin()) != "out")
             throw Error(format("multiple outputs are not supported in fixed-output derivations, at %1%") % posDrvName);
 
-        HashType ht = outputHashAlgo.empty() ? HashType::Unknown : parseHashType(outputHashAlgo);
+        std::optional<HashType> ht = parseHashTypeOpt(outputHashAlgo);
         Hash h(*outputHash, ht);
 
         auto outPath = state.store->makeFixedOutputPath(ingestionMethod, h, drvName);
@@ -726,7 +726,7 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
         drv.outputs.insert_or_assign("out", DerivationOutput {
             std::move(outPath),
             (ingestionMethod == FileIngestionMethod::Recursive ? "r:" : "")
-                + printHashType(h.type),
+                + printHashType(*h.type),
             h.to_string(Base::Base16, false),
         });
     }
@@ -934,14 +934,14 @@ static void prim_findFile(EvalState & state, const Pos & pos, Value * * args, Va
 static void prim_hashFile(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
     string type = state.forceStringNoCtx(*args[0], pos);
-    HashType ht = parseHashType(type);
-    if (ht == HashType::Unknown)
+    std::optional<HashType> ht = parseHashType(type);
+    if (!ht)
       throw Error(format("unknown hash type '%1%', at %2%") % type % pos);
 
     PathSet context; // discarded
     Path p = state.coerceToPath(pos, *args[1], context);
 
-    mkString(v, hashFile(ht, state.checkSourcePath(p)).to_string(Base::Base16, false), context);
+    mkString(v, hashFile(*ht, state.checkSourcePath(p)).to_string(Base::Base16, false), context);
 }
 
 /* Read a directory (without . or ..) */
@@ -1812,14 +1812,14 @@ static void prim_stringLength(EvalState & state, const Pos & pos, Value * * args
 static void prim_hashString(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
     string type = state.forceStringNoCtx(*args[0], pos);
-    HashType ht = parseHashType(type);
-    if (ht == HashType::Unknown)
+    std::optional<HashType> ht = parseHashType(type);
+    if (!ht)
       throw Error(format("unknown hash type '%1%', at %2%") % type % pos);
 
     PathSet context; // discarded
     string s = state.forceString(*args[1], context, pos);
 
-    mkString(v, hashString(ht, s).to_string(Base::Base16, false), context);
+    mkString(v, hashString(*ht, s).to_string(Base::Base16, false), context);
 }
 
 
