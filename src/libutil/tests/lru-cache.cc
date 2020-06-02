@@ -108,14 +108,14 @@ namespace nix {
 
     TEST(LRUCache, eraseFromEmptyCache) {
         LRUCache<std::string, std::string> c(10);
-        c.erase("foo");
+        ASSERT_EQ(c.erase("foo"), false);
         ASSERT_EQ(c.size(), 0);
     }
 
     TEST(LRUCache, eraseMissingFromNonEmptyCache) {
         LRUCache<std::string, std::string> c(10);
         c.upsert("one", "eins");
-        c.erase("foo");
+        ASSERT_EQ(c.erase("foo"), false);
         ASSERT_EQ(c.size(), 1);
         ASSERT_EQ(c.get("one").value_or("error"), "eins");
     }
@@ -123,7 +123,7 @@ namespace nix {
     TEST(LRUCache, eraseFromNonEmptyCache) {
         LRUCache<std::string, std::string> c(10);
         c.upsert("one", "eins");
-        c.erase("one");
+        ASSERT_EQ(c.erase("one"), true);
         ASSERT_EQ(c.size(), 0);
         ASSERT_EQ(c.get("one").value_or("empty"), "empty");
     }
