@@ -1017,7 +1017,10 @@ void LocalStore::addToStore(const ValidPathInfo & info, Source & source,
                 return n;
             });
 
-            restorePath(realPath, wrapperSource);
+            if (hasPrefix(info.ca, "fixed:git:"))
+                restoreGit(realPath, wrapperSource, realStoreDir, storeDir);
+            else
+                restorePath(realPath, wrapperSource);
 
             auto hashResult = hashSink->finish();
 
@@ -1046,6 +1049,9 @@ void LocalStore::addToStore(const ValidPathInfo & info, Source & source,
 StorePath LocalStore::addToStoreFromDump(const string & dump, const string & name,
     FileIngestionMethod method, HashType hashAlgo, RepairFlag repair)
 {
+    if (method == FileIngestionMethod::Git && hashAlgo != htSHA1)
+        throw Error("git ingestion must use sha1 hash");
+
     Hash h = hashString(hashAlgo, dump);
 
     auto dstPath = makeFixedOutputPath(method, h, name);
@@ -1079,7 +1085,7 @@ StorePath LocalStore::addToStoreFromDump(const string & dump, const string & nam
             }
             case FileIngestionMethod::Git: {
                 StringSource source(dump);
-                restoreGit(realPath, source);
+                restoreGit(realPath, source, realStoreDir, storeDir);
                 break;
             }
             }
@@ -1118,14 +1124,35 @@ StorePath LocalStore::addToStore(const string & name, const Path & _srcPath,
 {
     Path srcPath(absPath(_srcPath));
 
+    if (method == FileIngestionMethod::Git && hashAlgo != htSHA1)
+        throw Error("git ingestion must use sha1 hash");
+
     /* Read the whole path into memory. This is not a very scalable
        method for very large paths, but `copyPath' is mainly used for
        small files. */
     StringSink sink;
-    if (method == FileIngestionMethod::Recursive)
+    switch (method) {
+    case FileIngestionMethod::Recursive: {
         dumpPath(srcPath, sink, filter);
-    else
+        break;
+    }
+    case FileIngestionMethod::Git: {
+        // recursively add to store if path is a directory
+        struct stat st;
+        if (lstat(srcPath.c_str(), &st))
+            throw SysError(format("getting attributes of path '%1%'") % srcPath);
+        if (S_ISDIR(st.st_mode))
+            for (auto & i : readDirectory(srcPath))
+                addToStore(i.name, srcPath + "/" + i.name, method, hashAlgo, filter, repair);
+
+        dumpGit(hashAlgo, srcPath, sink, filter);
+        break;
+    }
+    case FileIngestionMethod::Flat: {
         sink.s = make_ref<std::string>(readFile(srcPath));
+        break;
+    }
+    }
 
     return addToStoreFromDump(*sink.s, name, method, hashAlgo, repair);
 }

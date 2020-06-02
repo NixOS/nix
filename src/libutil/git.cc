@@ -16,40 +16,127 @@
 #include "hash.hh"
 
 #include "git.hh"
+#include "serialise.hh"
 
 using namespace std::string_literals;
 
 namespace nix {
 
-static void parse(ParseSink & sink, Source & source, const Path & path);
+static void parse(ParseSink & sink, Source & source, const Path & path, const Path & realStoreDir, const Path & storeDir);
 
 // Converts a Path to a ParseSink
-void restoreGit(const Path & path, Source & source) {
-
+void restoreGit(const Path & path, Source & source, const Path & realStoreDir, const Path & storeDir) {
     RestoreSink sink;
     sink.dstPath = path;
-    parseGit(sink, source);
-
+    parseGit(sink, source, realStoreDir, storeDir);
 }
 
-void parseGit(ParseSink & sink, Source & source) {
-    parse(sink, source, "");
+void parseGit(ParseSink & sink, Source & source, const Path & realStoreDir, const Path & storeDir)
+{
+    parse(sink, source, "", realStoreDir, storeDir);
 }
 
-static void parse(ParseSink & sink, Source & source, const Path & path) {
-    uint8_t buf[4];
+static string getStringUntil(Source & source, char byte)
+{
+    string s;
+    unsigned char n[1];
+    source(n, 1);
+    while (*n != byte) {
+        s += *n;
+        source(n, 1);
+    }
+    return s;
+}
 
-    std::basic_string_view<uint8_t> buf_v {
-        (const uint8_t *) & buf,
-        std::size(buf)
-    };
-    source(buf_v);
-    if (buf_v.compare((const uint8_t *)"blob")) {
-        uint8_t space;
-        source(& space, 1);
-    }
-    else {
-    }
+static string getString(Source & source, int n)
+{
+    std::vector<unsigned char> v(n);
+    source(v.data(), n);
+    return std::string(v.begin(), v.end());
+}
+
+// Unfortunately, no access to libstore headers here.
+static string getStoreEntry(const Path & storeDir, Hash hash, string name)
+{
+    Hash hash1 = hashString(htSHA256, "fixed:out:git:" + hash.to_string(Base16) + ":");
+    Hash hash2 = hashString(htSHA256, "output:out:" + hash1.to_string(Base16) + ":" + storeDir + ":" + name);
+    Hash hash3 = compressHash(hash2, 20);
+
+    return hash3.to_string(Base32, false) + "-" + name;
+}
+
+static void parse(ParseSink & sink, Source & source, const Path & path, const Path & realStoreDir, const Path & storeDir)
+{
+    auto type = getString(source, 5);
+
+    if (type == "blob ") {
+        sink.createRegularFile(path);
+
+        unsigned long long size = std::stoi(getStringUntil(source, 0));
+
+        sink.preallocateContents(size);
+
+        unsigned long long left = size;
+        std::vector<unsigned char> buf(65536);
+
+        while (left) {
+            checkInterrupt();
+            auto n = buf.size();
+            if ((unsigned long long)n > left) n = left;
+            source(buf.data(), n);
+            sink.receiveContents(buf.data(), n);
+            left -= n;
+        }
+    } else if (type == "tree ") {
+        unsigned long long size = std::stoi(getStringUntil(source, 0));
+        unsigned long long left = size;
+
+        sink.createDirectory(path);
+
+        while (left) {
+            string perms = getStringUntil(source, ' ');
+            left -= perms.size();
+            left -= 1;
+
+            int perm = std::stoi(perms);
+            if (perm != 100644 && perm != 100755 && perm != 644 && perm != 755 && perm != 40000)
+              throw Error(format("Unknown Git permission: %d") % perm);
+
+            string name = getStringUntil(source, 0);
+            left -= name.size();
+            left -= 1;
+
+            string hashs = getString(source, 20);
+            left -= 20;
+
+            Hash hash(htSHA1);
+            std::copy(hashs.begin(), hashs.end(), hash.hash);
+
+            string entryName = getStoreEntry(storeDir, hash, name);
+            Path entry = absPath(realStoreDir + "/" + entryName);
+
+            struct stat st;
+            if (lstat(entry.c_str(), &st))
+                throw SysError(format("getting attributes of path '%1%'") % entry);
+
+            if (S_ISREG(st.st_mode)) {
+                if (perm == 40000)
+                    throw SysError(format("file is a file but expected to be a directory '%1%'") % entry);
+
+                if (perm == 100755 || perm == 755)
+                    sink.createExecutableFile(path + "/" + name);
+                else
+                    sink.createRegularFile(path + "/" + name);
+
+                sink.copyFile(entry);
+            } else if (S_ISDIR(st.st_mode)) {
+                if (perm != 40000)
+                    throw SysError(format("file is a directory but expected to be a file '%1%'") % entry);
+
+                sink.copyDirectory(realStoreDir + "/" + entryName, path + "/" + name);
+            } else throw Error(format("file '%1%' has an unsupported type") % entry);
+        }
+    } else throw Error("input doesn't look like a Git object");
 }
 
 // TODO stream file into sink, rather than reading into vector
@@ -75,7 +162,7 @@ GitMode dumpGitTree(const GitTree & entries, Sink & sink)
         case GitMode::Executable: mode = 100755; break;
         case GitMode::Regular: mode = 100644; break;
         }
-        s1 += (format("%6d %s\0%s"s) % mode % i.first % i.second.second.hash).str();
+        s1 += (format("%06d %s\0%s"s) % mode % i.first % i.second.second.hash).str();
     }
 
     std::string s2 = (format("tree %d\0%s"s) % s1.size() % s1).str();
@@ -86,39 +173,45 @@ GitMode dumpGitTree(const GitTree & entries, Sink & sink)
     return GitMode::Directory;
 }
 
-// Returns the perm in addition
-std::pair<GitMode, Hash> dumpGitHashInternal(
-    std::function<std::unique_ptr<AbstractHashSink>()> makeHashSink,
-    const Path & path, PathFilter & filter)
+static std::pair<GitMode, Hash> dumpGitHashInternal(HashType ht, const Path & path, PathFilter & filter);
+
+static GitMode dumpGitInternal(HashType ht, const Path & path, Sink & sink, PathFilter & filter)
 {
-    auto hashSink = makeHashSink();
     struct stat st;
     GitMode perm;
     if (lstat(path.c_str(), &st))
         throw SysError(format("getting attributes of path '%1%'") % path);
 
-    if (S_ISREG(st.st_mode)) {
-        perm = dumpGitBlob(path, st, *hashSink);
-    } else if (S_ISDIR(st.st_mode)) {
+    if (S_ISREG(st.st_mode))
+        perm = dumpGitBlob(path, st, sink);
+    else if (S_ISDIR(st.st_mode)) {
         GitTree entries;
         for (auto & i : readDirectory(path))
-            if (filter(path + "/" + i.name)) {
-                entries[i.name] = dumpGitHashInternal(makeHashSink, path + "/" + i.name, filter);
-            }
-        perm = dumpGitTree(entries, *hashSink);
-    } else {
-        throw Error(format("file '%1%' has an unsupported type") % path);
-    }
+            if (filter(path + "/" + i.name))
+                entries[i.name] = dumpGitHashInternal(ht, path + "/" + i.name, filter);
+        perm = dumpGitTree(entries, sink);
+    } else throw Error(format("file '%1%' has an unsupported type") % path);
 
+    return perm;
+}
+
+
+static std::pair<GitMode, Hash> dumpGitHashInternal(HashType ht, const Path & path, PathFilter & filter)
+{
+    auto hashSink = new HashSink(ht);
+    auto perm = dumpGitInternal(ht, path, *hashSink, filter);
     auto hash = hashSink->finish().first;
     return std::pair { perm, hash };
 }
 
-Hash dumpGitHash(
-    std::function<std::unique_ptr<AbstractHashSink>()> makeHashSink,
-    const Path & path, PathFilter & filter)
+Hash dumpGitHash(HashType ht, const Path & path, PathFilter & filter)
 {
-    return dumpGitHashInternal(makeHashSink, path, filter).second;
+    return dumpGitHashInternal(ht, path, filter).second;
+}
+
+void dumpGit(HashType ht, const Path & path, Sink & sink, PathFilter & filter)
+{
+    dumpGitInternal(ht, path, sink, filter);
 }
 
 }

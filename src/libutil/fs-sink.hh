@@ -13,11 +13,15 @@ struct ParseSink
     virtual void createDirectory(const Path & path) { };
 
     virtual void createRegularFile(const Path & path) { };
+    virtual void createExecutableFile(const Path & path) { };
     virtual void isExecutable() { };
     virtual void preallocateContents(unsigned long long size) { };
     virtual void receiveContents(unsigned char * data, unsigned int len) { };
 
     virtual void createSymlink(const Path & path, const string & target) { };
+
+    virtual void copyFile(const Path & source) { };
+    virtual void copyDirectory(const Path & source, const Path & destination) { };
 };
 
 struct RestoreSink : ParseSink
@@ -36,6 +40,13 @@ struct RestoreSink : ParseSink
     {
         Path p = dstPath + path;
         fd = open(p.c_str(), O_CREAT | O_EXCL | O_WRONLY | O_CLOEXEC, 0666);
+        if (!fd) throw SysError(format("creating file '%1%'") % p);
+    }
+
+    void createExecutableFile(const Path & path)
+    {
+        Path p = dstPath + path;
+        fd = open(p.c_str(), O_CREAT | O_EXCL | O_WRONLY | O_CLOEXEC, 0777);
         if (!fd) throw SysError(format("creating file '%1%'") % p);
     }
 
@@ -72,6 +83,31 @@ struct RestoreSink : ParseSink
     {
         Path p = dstPath + path;
         nix::createSymlink(target, p);
+    }
+
+    void copyFile(const Path & source)
+    {
+        FdSink sink(fd.get());
+        readFile(source, sink);
+    }
+
+    void copyDirectory(const Path & source, const Path & destination)
+    {
+        Path p = dstPath + destination;
+        createDirectory(destination);
+        for (auto & i : readDirectory(source)) {
+            struct stat st;
+            Path entry = source + "/" + i.name;
+            if (lstat(entry.c_str(), &st))
+                throw SysError(format("getting attributes of path '%1%'") % entry);
+            if (S_ISREG(st.st_mode)) {
+                createRegularFile(destination + "/" + i.name);
+                copyFile(entry);
+            } else if (S_ISDIR(st.st_mode))
+                copyDirectory(entry, destination + "/" + i.name);
+            else
+                throw Error(format("Unknown file: %s") % entry);
+        }
     }
 };
 

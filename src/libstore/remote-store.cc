@@ -8,6 +8,7 @@
 #include "derivations.hh"
 #include "pool.hh"
 #include "finally.hh"
+#include "git.hh"
 
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -488,17 +489,28 @@ StorePath RemoteStore::addToStore(const string & name, const Path & _srcPath,
 {
     if (repair) throw Error("repairing is not supported when building through the Nix daemon");
 
-    if (method == FileIngestionMethod::Git) throw Error("cannot remotely add to store using the git file ingestion method");
-
-    auto conn(getConnection());
+    if (method == FileIngestionMethod::Git && hashAlgo != htSHA1)
+        throw Error("git ingestion must use sha1 hash");
 
     Path srcPath(absPath(_srcPath));
+
+    // recursively add to store if path is a directory
+    if (method == FileIngestionMethod::Git) {
+        struct stat st;
+        if (lstat(srcPath.c_str(), &st))
+            throw SysError(format("getting attributes of path '%1%'") % srcPath);
+        if (S_ISDIR(st.st_mode))
+            for (auto & i : readDirectory(srcPath))
+                addToStore(i.name, srcPath + "/" + i.name, method, hashAlgo, filter, repair);
+    }
+
+    auto conn(getConnection());
 
     conn->to
         << wopAddToStore
         << name
         << ((hashAlgo == htSHA256 && method == FileIngestionMethod::Recursive) ? 0 : 1) /* backwards compatibility hack */
-        << (method == FileIngestionMethod::Recursive ? 1 : 0)
+        << (uint8_t) method
         << printHashType(hashAlgo);
 
     try {
@@ -507,7 +519,10 @@ StorePath RemoteStore::addToStore(const string & name, const Path & _srcPath,
         connections->incCapacity();
         {
             Finally cleanup([&]() { connections->decCapacity(); });
-            dumpPath(srcPath, conn->to, filter);
+            if (method == FileIngestionMethod::Git)
+                dumpGit(hashAlgo, srcPath, conn->to, filter);
+            else
+                dumpPath(srcPath, conn->to, filter);
         }
         conn->to.warn = false;
         conn.processStderr();

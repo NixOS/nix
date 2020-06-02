@@ -110,6 +110,9 @@ typedef std::pair<Hash, unsigned long long> HashResult;
 HashResult hashPath(HashType ht, const Path & path,
     PathFilter & filter = defaultPathFilter);
 
+HashResult hashGit(HashType ht, const Path & path,
+    PathFilter & filter = defaultPathFilter);
+
 /* Compress a hash to the specified number of bytes by cyclically
    XORing bytes together. */
 Hash compressHash(const Hash & hash, unsigned int newSize);

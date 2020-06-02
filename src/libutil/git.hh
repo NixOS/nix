@@ -12,9 +12,9 @@ enum struct GitMode {
     Regular,
 };
 
-void restoreGit(const Path & path, Source & source);
+void restoreGit(const Path & path, Source & source, const Path & realStoreDir, const Path & storeDir);
 
-void parseGit(ParseSink & sink, Source & source);
+void parseGit(ParseSink & sink, Source & source, const Path & realStoreDir, const Path & storeDir);
 
 // Dumps a single file to a sink
 GitMode dumpGitBlob(const Path & path, const struct stat st, Sink & sink);
@@ -25,11 +25,8 @@ typedef std::map<string, std::pair<GitMode, Hash>> GitTree;
 GitMode dumpGitTree(const GitTree & entries, Sink & sink);
 
 // Recursively dumps path, hashing as we go
-Hash dumpGitHash(
-    std::function<std::unique_ptr<AbstractHashSink>()>,
-    const Path & path,
-    PathFilter & filter = defaultPathFilter);
+Hash dumpGitHash(HashType ht, const Path & path, PathFilter & filter = defaultPathFilter);
 
-// N.B. There is no way to recursively dump to a sink, as that doesn't make
-// sense with the git hash/data model where the information is Merklized.
+void dumpGit(HashType ht, const Path & path, Sink & sink, PathFilter & filter = defaultPathFilter);
+
 }

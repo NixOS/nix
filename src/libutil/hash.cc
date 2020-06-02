@@ -6,6 +6,7 @@
 
 #include "hash.hh"
 #include "archive.hh"
+#include "git.hh"
 #include "util.hh"
 #include "istringstream_nocopy.hh"
 
@@ -307,6 +308,13 @@ HashResult hashPath(
     return sink.finish();
 }
 
+HashResult hashGit(
+    HashType ht, const Path & path, PathFilter & filter)
+{
+    HashSink sink(ht);
+    dumpGit(ht, path, sink, filter);
+    return sink.finish();
+}
 
 Hash compressHash(const Hash & hash, unsigned int newSize)
 {
