@@ -155,7 +155,7 @@ public:
     {
         errNo = errno;
         auto hf = hintfmt(args...);
-        err.hint = hintfmt("%1% : %2%", normaltxt(hf.str()), strerror(errNo));
+        err.hint = hintfmt("%1%: %2%", normaltxt(hf.str()), strerror(errNo));
     }
 
     virtual const char* sname() const override { return "SysError"; }
