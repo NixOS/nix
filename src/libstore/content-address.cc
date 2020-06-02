@@ -51,7 +51,7 @@ ContentAddress parseContentAddress(std::string_view rawCa) {
             }
             return TextHash { hash };
         } else if (prefix == "fixed") {
-            // This has to be an inverse to makeFixedOutputCA
+            // This has to be an inverse of makeFixedOutputCA
             auto methodAndHash = rawCa.substr(prefixSeparator+1, string::npos);
             if (methodAndHash.substr(0,2) == "r:") {
                 std::string_view hashRaw = methodAndHash.substr(2,string::npos);
