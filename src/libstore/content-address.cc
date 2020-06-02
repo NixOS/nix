@@ -51,10 +51,14 @@ ContentAddress parseContentAddress(std::string_view rawCa) {
             auto methodAndHash = rawCa.substr(prefixSeparator+1, string::npos);
             if (methodAndHash.substr(0,2) == "r:") {
                 std::string_view hashRaw = methodAndHash.substr(2,string::npos);
-                return FileSystemHash { FileIngestionMethod::Recursive, Hash(string(hashRaw)) };
+                Hash hash = Hash(string(hashRaw));
+                assert(hash.type == HashType::SHA256);
+                return FileSystemHash { FileIngestionMethod::Recursive, hash };
             } else {
                 std::string_view hashRaw = methodAndHash;
-                return FileSystemHash { FileIngestionMethod::Flat, Hash(string(hashRaw)) };
+                Hash hash = Hash(string(hashRaw));
+                assert(hash.type == HashType::SHA256);
+                return FileSystemHash { FileIngestionMethod::Flat, hash };
             }
         } else {
             throw "parseContentAddress: format not recognized; has to be text or fixed";
