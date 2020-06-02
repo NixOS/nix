@@ -947,7 +947,7 @@ static void opServe(Strings opFlags, Strings opArgs)
                 {
                     std::string rawCA;
                     in >> rawCA;
-                    info.ca = parseCaOpt(rawCA);
+                    info.ca = parseContentAddressOpt(rawCA);
                 }
 
                 if (info.narSize == 0)

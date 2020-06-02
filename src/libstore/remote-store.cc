@@ -383,7 +383,7 @@ void RemoteStore::queryPathInfoUncached(const StorePath & path,
                 info->sigs = readStrings<StringSet>(conn->from);
                 string caOptRaw;
                 conn->from >> caOptRaw;
-                info->ca = parseCaOpt(caOptRaw);
+                info->ca = parseContentAddressOpt(caOptRaw);
             }
         }
         callback(std::move(info));

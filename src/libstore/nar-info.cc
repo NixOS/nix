@@ -69,7 +69,7 @@ NarInfo::NarInfo(const Store & store, const std::string & s, const std::string &
         else if (name == "CA") {
             if (ca) corrupt();
             // FIXME: allow blank ca or require skipping field?
-            ca = parseCaOpt(value);
+            ca = parseContentAddressOpt(value);
         }
 
         pos = eol + 1;

@@ -117,7 +117,7 @@ struct LegacySSHStore : public Store
                 {
                     std::string rawCaOpt;
                     conn->from >> rawCaOpt;
-                    info->ca = parseCaOpt(rawCaOpt);
+                    info->ca = parseContentAddressOpt(rawCaOpt);
                 }
                 info->sigs = readStrings<StringSet>(conn->from);
             }

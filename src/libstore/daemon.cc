@@ -711,7 +711,7 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
         {
             string caOptRaw;
             from >> caOptRaw;
-            info.ca = parseCaOpt(caOptRaw);
+            info.ca = parseContentAddressOpt(caOptRaw);
         }
         from >> repair >> dontCheckSigs;
         if (!trusted && dontCheckSigs)

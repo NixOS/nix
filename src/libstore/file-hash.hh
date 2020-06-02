@@ -59,8 +59,8 @@ std::string renderContentAddress(ContentAddress ca);
 
 std::string renderContentAddress(std::optional<ContentAddress> ca);
 
-ContentAddress parseCa(std::string_view rawCa);
+ContentAddress parseContentAddress(std::string_view rawCa);
 
-std::optional<ContentAddress> parseCaOpt(std::string_view rawCaOpt);
+std::optional<ContentAddress> parseContentAddressOpt(std::string_view rawCaOpt);
 
 }

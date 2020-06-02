@@ -203,7 +203,7 @@ public:
                 narInfo->deriver = StorePath::fromBaseName(queryNAR.getStr(9));
             for (auto & sig : tokenizeString<Strings>(queryNAR.getStr(10), " "))
                 narInfo->sigs.insert(sig);
-            narInfo->ca = parseCaOpt(queryNAR.getStr(11));
+            narInfo->ca = parseContentAddressOpt(queryNAR.getStr(11));
 
             return {oValid, narInfo};
         });

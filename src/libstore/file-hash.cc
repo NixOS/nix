@@ -38,12 +38,12 @@ std::string renderContentAddress(ContentAddress ca) {
     }, ca);
 }
 
-ContentAddress parseCa(std::string_view rawCa) {
+ContentAddress parseContentAddress(std::string_view rawCa) {
     throw Error("TODO");
 };
 
-std::optional<ContentAddress> parseCaOpt(std::string_view rawCaOpt) {
-    return rawCaOpt == "" ? std::optional<ContentAddress> {} : parseCa(rawCaOpt);
+std::optional<ContentAddress> parseContentAddressOpt(std::string_view rawCaOpt) {
+    return rawCaOpt == "" ? std::optional<ContentAddress> {} : parseContentAddress(rawCaOpt);
 };
 
 std::string renderContentAddress(std::optional<ContentAddress> ca) {
