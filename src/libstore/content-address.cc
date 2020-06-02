@@ -45,26 +45,26 @@ ContentAddress parseContentAddress(std::string_view rawCa) {
         auto prefix = string(rawCa, 0, prefixSeparator);
         if (prefix == "text") {
             auto hashTypeAndHash = rawCa.substr(prefixSeparator+1, string::npos);
-            return TextHash { Hash(string(hashTypeAndHash)) };
+            Hash hash = Hash(string(hashTypeAndHash));
+            if (hash.type != HashType::SHA256) {
+                throw Error("parseContentAddress: the text hash should have type SHA256");
+            }
+            return TextHash { hash };
         } else if (prefix == "fixed") {
             // This has to be an inverse to makeFixedOutputCA
             auto methodAndHash = rawCa.substr(prefixSeparator+1, string::npos);
             if (methodAndHash.substr(0,2) == "r:") {
                 std::string_view hashRaw = methodAndHash.substr(2,string::npos);
-                Hash hash = Hash(string(hashRaw));
-                assert(hash.type == HashType::SHA256);
-                return FileSystemHash { FileIngestionMethod::Recursive, hash };
+                return FileSystemHash { FileIngestionMethod::Recursive, Hash(string(hashRaw)) };
             } else {
                 std::string_view hashRaw = methodAndHash;
-                Hash hash = Hash(string(hashRaw));
-                assert(hash.type == HashType::SHA256);
-                return FileSystemHash { FileIngestionMethod::Flat, hash };
+                return FileSystemHash { FileIngestionMethod::Flat, Hash(string(hashRaw)) };
             }
         } else {
-            throw "parseContentAddress: format not recognized; has to be text or fixed";
+            throw Error("parseContentAddress: format not recognized; has to be text or fixed");
         }
     } else {
-        throw "Not a content address because it lacks an appropriate prefix";
+        throw Error("Not a content address because it lacks an appropriate prefix");
     }
 };
 
