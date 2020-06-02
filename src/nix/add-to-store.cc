@@ -61,8 +61,11 @@ struct CmdAddToStore : MixDryRun, StoreCommand
         info.narSize = sink.s->size();
         info.ca = makeFixedOutputCA(ingestionMethod, hash);
 
-        if (!dryRun)
-            store->addToStore(*namePart, path, ingestionMethod, git ? htSHA1 : htSHA256);
+        if (!dryRun) {
+            auto addedPath = store->addToStore(*namePart, path, ingestionMethod, git ? htSHA1 : htSHA256);
+            if (addedPath != info.path)
+                throw Error(format("Added path %s does not match calculated path %s; something has changed") % addedPath.to_string() % info.path.to_string());
+        }
 
         logger->stdout("%s", store->printStorePath(info.path));
     }
