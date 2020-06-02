@@ -29,7 +29,7 @@ static void prim_fetchGit(EvalState & state, const Pos & pos, Value * * args, Va
             else if (n == "ref")
                 ref = state.forceStringNoCtx(*attr.value, *attr.pos);
             else if (n == "rev")
-                rev = Hash(state.forceStringNoCtx(*attr.value, *attr.pos), htSHA1);
+                rev = Hash(state.forceStringNoCtx(*attr.value, *attr.pos), HashType::SHA1);
             else if (n == "name")
                 name = state.forceStringNoCtx(*attr.value, *attr.pos);
             else if (n == "submodules")
@@ -67,7 +67,7 @@ static void prim_fetchGit(EvalState & state, const Pos & pos, Value * * args, Va
     mkString(*state.allocAttr(v, state.sOutPath), storePath, PathSet({storePath}));
     // Backward compatibility: set 'rev' to
     // 0000000000000000000000000000000000000000 for a dirty tree.
-    auto rev2 = input2->getRev().value_or(Hash(htSHA1));
+    auto rev2 = input2->getRev().value_or(Hash(HashType::SHA1));
     mkString(*state.allocAttr(v, state.symbols.create("rev")), rev2.gitRev());
     mkString(*state.allocAttr(v, state.symbols.create("shortRev")), rev2.gitShortRev());
     // Backward compatibility: set 'revCount' to 0 for a dirty tree.

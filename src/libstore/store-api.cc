@@ -142,8 +142,8 @@ StorePath Store::makeStorePath(const string & type,
     const Hash & hash, std::string_view name) const
 {
     /* e.g., "source:sha256:1abc...:/nix/store:foo.tar.gz" */
-    string s = type + ":" + hash.to_string(Base16) + ":" + storeDir + ":" + std::string(name);
-    auto h = compressHash(hashString(htSHA256, s), 20);
+    string s = type + ":" + hash.to_string(Base::Base16) + ":" + storeDir + ":" + std::string(name);
+    auto h = compressHash(hashString(HashType::SHA256, s), 20);
     return StorePath::make(h.hash, name);
 }
 
@@ -178,18 +178,18 @@ StorePath Store::makeFixedOutputPath(
     const StorePathSet & references,
     bool hasSelfReference) const
 {
-    if (method == FileIngestionMethod::Git && hash.type != htSHA1)
+    if (method == FileIngestionMethod::Git && hash.type != HashType::SHA1)
         throw Error("Git file ingestion must use sha1 hash");
 
-    if (hash.type == htSHA256 && method == FileIngestionMethod::Recursive) {
+    if (hash.type == HashType::SHA256 && method == FileIngestionMethod::Recursive) {
         return makeStorePath(makeType(*this, "source", references, hasSelfReference), hash, name);
     } else {
         assert(references.empty());
         return makeStorePath("output:out",
-            hashString(htSHA256,
+            hashString(HashType::SHA256,
                 "fixed:out:"
                 + ingestionMethodPrefix(method)
-                + hash.to_string(Base16) + ":"),
+                + hash.to_string(Base::Base16) + ":"),
             name);
     }
 }
@@ -198,7 +198,7 @@ StorePath Store::makeFixedOutputPath(
 StorePath Store::makeTextPath(std::string_view name, const Hash & hash,
     const StorePathSet & references) const
 {
-    assert(hash.type == htSHA256);
+    assert(hash.type == HashType::SHA256);
     /* Stuff the references (if any) into the type.  This is a bit
        hacky, but we can't put them in `s' since that would be
        ambiguous. */
@@ -231,7 +231,7 @@ std::pair<StorePath, Hash> Store::computeStorePathForPath(std::string_view name,
 StorePath Store::computeStorePathForText(const string & name, const string & s,
     const StorePathSet & references) const
 {
-    return makeTextPath(name, hashString(htSHA256, s), references);
+    return makeTextPath(name, hashString(HashType::SHA256, s), references);
 }
 
 
@@ -444,7 +444,7 @@ string Store::makeValidityRegistration(const StorePathSet & paths,
         auto info = queryPathInfo(i);
 
         if (showHash) {
-            s += info->narHash.to_string(Base16, false) + "\n";
+            s += info->narHash.to_string(Base::Base16, false) + "\n";
             s += (format("%1%\n") % info->narSize).str();
         }
 
@@ -582,7 +582,7 @@ void copyStorePath(ref<Store> srcStore, ref<Store> dstStore,
     auto srcUri = srcStore->getUri();
     auto dstUri = dstStore->getUri();
 
-    Activity act(*logger, lvlInfo, actCopyPath,
+    Activity act(*logger, Verbosity::Info, ActivityType::CopyPath,
         srcUri == "local" || srcUri == "daemon"
         ? fmt("copying path '%s' to '%s'", srcStore->printStorePath(storePath), dstUri)
           : dstUri == "local" || dstUri == "daemon"
@@ -599,7 +599,7 @@ void copyStorePath(ref<Store> srcStore, ref<Store> dstStore,
         StringSink sink;
         srcStore->narFromPath({storePath}, sink);
         auto info2 = make_ref<ValidPathInfo>(*info);
-        info2->narHash = hashString(htSHA256, *sink.s);
+        info2->narHash = hashString(HashType::SHA256, *sink.s);
         if (!info->narSize) info2->narSize = sink.s->size();
         if (info->ultimate) info2->ultimate = false;
         info = info2;
@@ -641,7 +641,7 @@ void copyPaths(ref<Store> srcStore, ref<Store> dstStore, const StorePathSet & st
 
     if (missing.empty()) return;
 
-    Activity act(*logger, lvlInfo, actCopyPaths, fmt("copying %d paths", missing.size()));
+    Activity act(*logger, Verbosity::Info, ActivityType::CopyPaths, fmt("copying %d paths", missing.size()));
 
     std::atomic<size_t> nrDone{0};
     std::atomic<size_t> nrFailed{0};
@@ -667,7 +667,7 @@ void copyPaths(ref<Store> srcStore, ref<Store> dstStore, const StorePathSet & st
             auto info = srcStore->queryPathInfo(srcStore->parseStorePath(storePath));
 
             bytesExpected += info->narSize;
-            act.setExpected(actCopyPath, bytesExpected);
+            act.setExpected(ActivityType::CopyPath, bytesExpected);
 
             return srcStore->printStorePathSet(info->references);
         },
@@ -686,7 +686,7 @@ void copyPaths(ref<Store> srcStore, ref<Store> dstStore, const StorePathSet & st
                     nrFailed++;
                     if (!settings.keepGoing)
                         throw e;
-                    logger->log(lvlError, fmt("could not copy %s: %s", storePathS, e.what()));
+                    logger->log(Verbosity::Error, fmt("could not copy %s: %s", storePathS, e.what()));
                     showProgress();
                     return;
                 }
@@ -732,7 +732,7 @@ std::optional<ValidPathInfo> decodeValidPathInfo(const Store & store, std::istre
     if (hashGiven) {
         string s;
         getline(str, s);
-        info.narHash = Hash(s, htSHA256);
+        info.narHash = Hash(s, HashType::SHA256);
         getline(str, s);
         if (!string2Int(s, info.narSize)) throw Error("number expected");
     }
@@ -775,7 +775,7 @@ std::string ValidPathInfo::fingerprint(const Store & store) const
             store.printStorePath(path));
     return
         "1;" + store.printStorePath(path) + ";"
-        + narHash.to_string(Base32) + ";"
+        + narHash.to_string(Base::Base32) + ";"
         + std::to_string(narSize) + ";"
         + concatStringsSep(",", store.printStorePathSet(references));
 }
@@ -853,7 +853,7 @@ Strings ValidPathInfo::shortRefs() const
 
 std::string makeFixedOutputCA(FileIngestionMethod method, const Hash & hash)
 {
-    if (method == FileIngestionMethod::Git && hash.type != htSHA1)
+    if (method == FileIngestionMethod::Git && hash.type != HashType::SHA1)
         throw Error("git file ingestion must use sha1 hashes");
     return "fixed:" + ingestionMethodPrefix(method) + hash.to_string();
 }

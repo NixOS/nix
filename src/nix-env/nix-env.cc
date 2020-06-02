@@ -972,7 +972,7 @@ static void opQuery(Globals & globals, Strings opFlags, Strings opArgs)
             try {
                 paths.insert(globals.state->store->parseStorePath(i.queryOutPath()));
             } catch (AssertionError & e) {
-                printMsg(lvlTalkative, "skipping derivation named '%s' which gives an assertion failure", i.queryName());
+                printMsg(Verbosity::Talkative, "skipping derivation named '%s' which gives an assertion failure", i.queryName());
                 i.setFailed();
             }
         validPaths = globals.state->store->queryValidPaths(paths);
@@ -998,7 +998,7 @@ static void opQuery(Globals & globals, Strings opFlags, Strings opArgs)
         try {
             if (i.hasFailed()) continue;
 
-            //Activity act(*logger, lvlDebug, format("outputting query result '%1%'") % i.attrPath);
+            //Activity act(*logger, Verbosity::Debug, format("outputting query result '%1%'") % i.attrPath);
 
             if (globals.prebuiltOnly &&
                 !validPaths.count(globals.state->store->parseStorePath(i.queryOutPath())) &&
@@ -1174,7 +1174,7 @@ static void opQuery(Globals & globals, Strings opFlags, Strings opArgs)
             cout.flush();
 
         } catch (AssertionError & e) {
-            printMsg(lvlTalkative, "skipping derivation named '%1%' which gives an assertion failure", i.queryName());
+            printMsg(Verbosity::Talkative, "skipping derivation named '%1%' which gives an assertion failure", i.queryName());
         } catch (Error & e) {
             e.addPrefix(fmt("while querying the derivation named '%1%':\n", i.queryName()));
             throw;

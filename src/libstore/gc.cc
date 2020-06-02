@@ -78,7 +78,7 @@ void LocalStore::syncWithGC()
 
 void LocalStore::addIndirectRoot(const Path & path)
 {
-    string hash = hashString(htSHA1, path).to_string(Base32, false);
+    string hash = hashString(HashType::SHA1, path).to_string(Base::Base32, false);
     Path realRoot = canonPath((format("%1%/%2%/auto/%3%")
         % stateDir % gcRootsDir % hash).str());
     makeSymlink(realRoot, path);
@@ -637,7 +637,7 @@ void LocalStore::tryToDelete(GCState & state, const Path & path)
     auto realPath = realStoreDir + "/" + std::string(baseNameOf(path));
     if (realPath == linksDir || realPath == trashDir) return;
 
-    //Activity act(*logger, lvlDebug, format("considering whether to delete '%1%'") % path);
+    //Activity act(*logger, Verbosity::Debug, format("considering whether to delete '%1%'") % path);
 
     auto storePath = maybeParseStorePath(path);
 
@@ -702,7 +702,7 @@ void LocalStore::removeUnusedLinks(const GCState & state)
             continue;
         }
 
-        printMsg(lvlTalkative, format("deleting unused link '%1%'") % path);
+        printMsg(Verbosity::Talkative, format("deleting unused link '%1%'") % path);
 
         if (unlink(path.c_str()) == -1)
             throw SysError(format("deleting '%1%'") % path);

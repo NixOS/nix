@@ -626,7 +626,7 @@ Expr * EvalState::parseExprFromString(std::string_view s, const Path & basePath)
 
 Expr * EvalState::parseStdin()
 {
-    //Activity act(*logger, lvlTalkative, format("parsing standard input"));
+    //Activity act(*logger, Verbosity::Talkative, format("parsing standard input"));
     return parseExprFromString(drainFD(0), absPath("."));
 }
 

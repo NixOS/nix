@@ -39,7 +39,7 @@ private:
     struct ActInfo
     {
         std::string s, lastLine, phase;
-        ActivityType type = actUnknown;
+        ActivityType type = ActivityType::Unknown;
         uint64_t done = 0;
         uint64_t expected = 0;
         uint64_t running = 0;
@@ -153,7 +153,7 @@ public:
         state->its.emplace(act, i);
         state->activitiesByType[type].its.emplace(act, i);
 
-        if (type == actBuild) {
+        if (type == ActivityType::Build) {
             auto name = storePathToName(getS(fields, 0));
             if (hasSuffix(name, ".drv"))
                 name = name.substr(0, name.size() - 4);
@@ -168,7 +168,7 @@ public:
             i->name = DrvName(name).name;
         }
 
-        if (type == actSubstitute) {
+        if (type == ActivityType::Substitute) {
             auto name = storePathToName(getS(fields, 0));
             auto sub = getS(fields, 1);
             i->s = fmt(
@@ -178,7 +178,7 @@ public:
                 name, sub);
         }
 
-        if (type == actPostBuildHook) {
+        if (type == ActivityType::PostBuildHook) {
             auto name = storePathToName(getS(fields, 0));
             if (hasSuffix(name, ".drv"))
                 name = name.substr(0, name.size() - 4);
@@ -186,14 +186,14 @@ public:
             i->name = DrvName(name).name;
         }
 
-        if (type == actQueryPathInfo) {
+        if (type == ActivityType::QueryPathInfo) {
             auto name = storePathToName(getS(fields, 0));
             i->s = fmt("querying " ANSI_BOLD "%s" ANSI_NORMAL " on %s", name, getS(fields, 1));
         }
 
-        if ((type == actFileTransfer && hasAncestor(*state, actCopyPath, parent))
-            || (type == actFileTransfer && hasAncestor(*state, actQueryPathInfo, parent))
-            || (type == actCopyPath && hasAncestor(*state, actSubstitute, parent)))
+        if ((type == ActivityType::Download && hasAncestor(*state, ActivityType::CopyPath, parent))
+            || (type == ActivityType::Download && hasAncestor(*state, ActivityType::QueryPathInfo, parent))
+            || (type == ActivityType::CopyPath && hasAncestor(*state, ActivityType::Substitute, parent)))
             i->visible = false;
 
         update(*state);
@@ -238,13 +238,13 @@ public:
     {
         auto state(state_.lock());
 
-        if (type == resFileLinked) {
+        if (type == ResultType::FileLinked) {
             state->filesLinked++;
             state->bytesLinked += getI(fields, 0);
             update(*state);
         }
 
-        else if (type == resBuildLogLine || type == resPostBuildLogLine) {
+        else if (type == ResultType::BuildLogLine || type == ResultType::PostBuildLogLine) {
             auto lastLine = trim(getS(fields, 0));
             if (!lastLine.empty()) {
                 auto i = state->its.find(act);
@@ -252,10 +252,10 @@ public:
                 ActInfo info = *i->second;
                 if (printBuildLogs) {
                     auto suffix = "> ";
-                    if (type == resPostBuildLogLine) {
+                    if (type == ResultType::PostBuildLogLine) {
                         suffix = " (post)> ";
                     }
-                    log(*state, lvlInfo, ANSI_FAINT + info.name.value_or("unnamed") + suffix + ANSI_NORMAL + lastLine);
+                    log(*state, Verbosity::Info, ANSI_FAINT + info.name.value_or("unnamed") + suffix + ANSI_NORMAL + lastLine);
                 } else {
                     state->activities.erase(i->second);
                     info.lastLine = lastLine;
@@ -266,24 +266,24 @@ public:
             }
         }
 
-        else if (type == resUntrustedPath) {
+        else if (type == ResultType::UntrustedPath) {
             state->untrustedPaths++;
             update(*state);
         }
 
-        else if (type == resCorruptedPath) {
+        else if (type == ResultType::CorruptedPath) {
             state->corruptedPaths++;
             update(*state);
         }
 
-        else if (type == resSetPhase) {
+        else if (type == ResultType::SetPhase) {
             auto i = state->its.find(act);
             assert(i != state->its.end());
             i->second->phase = getS(fields, 0);
             update(*state);
         }
 
-        else if (type == resProgress) {
+        else if (type == ResultType::Progress) {
             auto i = state->its.find(act);
             assert(i != state->its.end());
             ActInfo & actInfo = *i->second;
@@ -294,7 +294,7 @@ public:
             update(*state);
         }
 
-        else if (type == resSetExpected) {
+        else if (type == ResultType::SetExpected) {
             auto i = state->its.find(act);
             assert(i != state->its.end());
             ActInfo & actInfo = *i->second;
@@ -406,10 +406,10 @@ public:
             res += s;
         };
 
-        showActivity(actBuilds, "%s built");
+        showActivity(ActivityType::Builds, "%s built");
 
-        auto s1 = renderActivity(actCopyPaths, "%s copied");
-        auto s2 = renderActivity(actCopyPath, "%s MiB", "%.1f", MiB);
+        auto s1 = renderActivity(ActivityType::CopyPaths, "%s copied");
+        auto s2 = renderActivity(ActivityType::CopyPath, "%s MiB", "%.1f", MiB);
 
         if (!s1.empty() || !s2.empty()) {
             if (!res.empty()) res += ", ";
@@ -417,10 +417,10 @@ public:
             if (!s2.empty()) { res += " ("; res += s2; res += ')'; }
         }
 
-        showActivity(actFileTransfer, "%s MiB DL", "%.1f", MiB);
+        showActivity(ActivityType::Download, "%s MiB DL", "%.1f", MiB);
 
         {
-            auto s = renderActivity(actOptimiseStore, "%s paths optimised");
+            auto s = renderActivity(ActivityType::OptimiseStore, "%s paths optimised");
             if (s != "") {
                 s += fmt(", %.1f MiB / %d inodes freed", state.bytesLinked / MiB, state.filesLinked);
                 if (!res.empty()) res += ", ";
@@ -429,7 +429,7 @@ public:
         }
 
         // FIXME: don't show "done" paths in green.
-        showActivity(actVerifyPaths, "%s paths verified");
+        showActivity(ActivityType::VerifyPaths, "%s paths verified");
 
         if (state.corruptedPaths) {
             if (!res.empty()) res += ", ";

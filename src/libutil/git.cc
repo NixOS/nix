@@ -58,11 +58,11 @@ static string getString(Source & source, int n)
 // Unfortunately, no access to libstore headers here.
 static string getStoreEntry(const Path & storeDir, Hash hash, string name)
 {
-    Hash hash1 = hashString(htSHA256, "fixed:out:git:" + hash.to_string(Base16) + ":");
-    Hash hash2 = hashString(htSHA256, "output:out:" + hash1.to_string(Base16) + ":" + storeDir + ":" + name);
+    Hash hash1 = hashString(HashType::SHA256, "fixed:out:git:" + hash.to_string(Base::Base16) + ":");
+    Hash hash2 = hashString(HashType::SHA256, "output:out:" + hash1.to_string(Base::Base16) + ":" + storeDir + ":" + name);
     Hash hash3 = compressHash(hash2, 20);
 
-    return hash3.to_string(Base32, false) + "-" + name;
+    return hash3.to_string(Base::Base32, false) + "-" + name;
 }
 
 static void parse(ParseSink & sink, Source & source, const Path & path, const Path & realStoreDir, const Path & storeDir)
@@ -109,7 +109,7 @@ static void parse(ParseSink & sink, Source & source, const Path & path, const Pa
             string hashs = getString(source, 20);
             left -= 20;
 
-            Hash hash(htSHA1);
+            Hash hash(HashType::SHA1);
             std::copy(hashs.begin(), hashs.end(), hash.hash);
 
             string entryName = getStoreEntry(storeDir, hash, name);

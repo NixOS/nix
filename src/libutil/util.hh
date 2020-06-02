@@ -454,7 +454,7 @@ std::string filterANSIEscapes(const std::string & s,
     unsigned int width = std::numeric_limits<unsigned int>::max());
 
 
-/* Base64 encoding/decoding. */
+/* Base::Base64 encoding/decoding. */
 string base64Encode(const string & s);
 string base64Decode(const string & s);
 

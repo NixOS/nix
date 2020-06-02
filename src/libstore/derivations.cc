@@ -23,8 +23,6 @@ void DerivationOutput::parseHashInfo(FileIngestionMethod & method, Hash & hash) 
     }
 
     HashType hashType = parseHashType(algo);
-    if (hashType == htUnknown)
-        throw Error("unknown hash algorithm '%s'", algo);
 
     hash = Hash(this->hash, hashType);
 }
@@ -367,7 +365,7 @@ Hash hashDerivationModulo(Store & store, const Derivation & drv, bool maskOutput
     /* Return a fixed hash for fixed-output derivations. */
     if (drv.isFixedOutput()) {
         DerivationOutputs::const_iterator i = drv.outputs.begin();
-        return hashString(htSHA256, "fixed:out:"
+        return hashString(HashType::SHA256, "fixed:out:"
             + i->second.hashAlgo + ":"
             + i->second.hash + ":"
             + store.printStorePath(i->second.path));
@@ -383,10 +381,10 @@ Hash hashDerivationModulo(Store & store, const Derivation & drv, bool maskOutput
             h = drvHashes.insert_or_assign(i.first.clone(), hashDerivationModulo(store,
                 readDerivation(store, store.toRealPath(i.first)), false)).first;
         }
-        inputs2.insert_or_assign(h->second.to_string(Base16, false), i.second);
+        inputs2.insert_or_assign(h->second.to_string(Base::Base16, false), i.second);
     }
 
-    return hashString(htSHA256, drv.unparse(store, maskOutputs, &inputs2));
+    return hashString(HashType::SHA256, drv.unparse(store, maskOutputs, &inputs2));
 }
 
 
@@ -456,7 +454,7 @@ void writeDerivation(Sink & out, const Store & store, const BasicDerivation & dr
 std::string hashPlaceholder(const std::string & outputName)
 {
     // FIXME: memoize?
-    return "/" + hashString(htSHA256, "nix-output:" + outputName).to_string(Base32, false);
+    return "/" + hashString(HashType::SHA256, "nix-output:" + outputName).to_string(Base::Base32, false);
 }
 
 

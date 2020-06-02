@@ -11,18 +11,18 @@ using namespace nix;
 struct CmdHash : Command
 {
     FileIngestionMethod mode;
-    Base base = SRI;
+    Base base = Base::SRI;
     bool truncate = false;
-    HashType ht = htSHA256;
+    HashType ht = HashType::SHA256;
     std::vector<std::string> paths;
     std::optional<std::string> modulus;
 
     CmdHash(FileIngestionMethod mode) : mode(mode)
     {
-        mkFlag(0, "sri", "print hash in SRI format", &base, SRI);
-        mkFlag(0, "base64", "print hash in base-64", &base, Base64);
-        mkFlag(0, "base32", "print hash in base-32 (Nix-specific)", &base, Base32);
-        mkFlag(0, "base16", "print hash in base-16", &base, Base16);
+        mkFlag(0, "sri", "print hash in Base::SRI format", &base, Base::SRI);
+        mkFlag(0, "base64", "print hash in base-64", &base, Base::Base64);
+        mkFlag(0, "base32", "print hash in base-32 (Nix-specific)", &base, Base::Base32);
+        mkFlag(0, "base16", "print hash in base-16", &base, Base::Base16);
         addFlag(Flag::mkHashTypeFlag("type", &ht));
         #if 0
         mkFlag()
@@ -81,7 +81,7 @@ struct CmdHash : Command
             h = hashSink->finish().first;
 
             if (truncate && h.hashSize > 20) h = compressHash(h, 20);
-            logger->stdout(h.to_string(base, base == SRI));
+            logger->stdout(h.to_string(base, base == Base::SRI));
         }
     }
 };
@@ -93,22 +93,22 @@ static RegisterCommand r3("hash-git", [](){ return make_ref<CmdHash>(FileIngesti
 struct CmdToBase : Command
 {
     Base base;
-    HashType ht = htUnknown;
+    std::optional<HashType> ht;
     std::vector<std::string> args;
 
     CmdToBase(Base base) : base(base)
     {
-        addFlag(Flag::mkHashTypeFlag("type", &ht));
+        addFlag(Flag::mkHashTypeOptFlag("type", &ht));
         expectArgs("strings", &args);
     }
 
     std::string description() override
     {
         return fmt("convert a hash to %s representation",
-            base == Base16 ? "base-16" :
-            base == Base32 ? "base-32" :
-            base == Base64 ? "base-64" :
-            "SRI");
+            base == Base::Base16 ? "base-16" :
+            base == Base::Base32 ? "base-32" :
+            base == Base::Base64 ? "base-64" :
+            "Base::SRI");
     }
 
     Category category() override { return catUtility; }
@@ -116,19 +116,19 @@ struct CmdToBase : Command
     void run() override
     {
         for (auto s : args)
-            logger->stdout(Hash(s, ht).to_string(base, base == SRI));
+            logger->stdout(Hash(s, ht).to_string(base, base == Base::SRI));
     }
 };
 
-static RegisterCommand r4("to-base16", [](){ return make_ref<CmdToBase>(Base16); });
-static RegisterCommand r5("to-base32", [](){ return make_ref<CmdToBase>(Base32); });
-static RegisterCommand r6("to-base64", [](){ return make_ref<CmdToBase>(Base64); });
-static RegisterCommand r7("to-sri", [](){ return make_ref<CmdToBase>(SRI); });
+static RegisterCommand r4("to-base16", [](){ return make_ref<CmdToBase>(Base::Base16); });
+static RegisterCommand r5("to-base32", [](){ return make_ref<CmdToBase>(Base::Base32); });
+static RegisterCommand r6("to-base64", [](){ return make_ref<CmdToBase>(Base::Base64); });
+static RegisterCommand r7("to-sri", [](){ return make_ref<CmdToBase>(Base::SRI); });
 
 /* Legacy nix-hash command. */
 static int compatNixHash(int argc, char * * argv)
 {
-    HashType ht = htMD5;
+    HashType ht = HashType::MD5;
     bool flat = false;
     bool base32 = false;
     bool truncate = false;
@@ -146,8 +146,6 @@ static int compatNixHash(int argc, char * * argv)
         else if (*arg == "--type") {
             string s = getArg(*arg, arg, end);
             ht = parseHashType(s);
-            if (ht == htUnknown)
-                throw UsageError(format("unknown hash type '%1%'") % s);
         }
         else if (*arg == "--to-base16") op = opTo16;
         else if (*arg == "--to-base32") op = opTo32;
@@ -161,14 +159,14 @@ static int compatNixHash(int argc, char * * argv)
     if (op == opHash) {
         CmdHash cmd(flat ? FileIngestionMethod::Flat : FileIngestionMethod::Recursive);
         cmd.ht = ht;
-        cmd.base = base32 ? Base32 : Base16;
+        cmd.base = base32 ? Base::Base32 : Base::Base16;
         cmd.truncate = truncate;
         cmd.paths = ss;
         cmd.run();
     }
 
     else {
-        CmdToBase cmd(op == opTo32 ? Base32 : Base16);
+        CmdToBase cmd(op == opTo32 ? Base::Base32 : Base::Base16);
         cmd.args = ss;
         cmd.ht = ht;
         cmd.run();

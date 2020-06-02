@@ -11,7 +11,7 @@ struct HashAndWriteSink : Sink
 {
     Sink & writeSink;
     HashSink hashSink;
-    HashAndWriteSink(Sink & writeSink) : writeSink(writeSink), hashSink(htSHA256)
+    HashAndWriteSink(Sink & writeSink) : writeSink(writeSink), hashSink(HashType::SHA256)
     {
     }
     virtual void operator () (const unsigned char * data, size_t len)
@@ -34,7 +34,7 @@ void Store::exportPaths(const StorePathSet & paths, Sink & sink)
     //logger->incExpected(doneLabel, sorted.size());
 
     for (auto & path : sorted) {
-        //Activity act(*logger, lvlInfo, format("exporting path '%s'") % path);
+        //Activity act(*logger, Verbosity::Info, format("exporting path '%s'") % path);
         sink << 1;
         exportPath(path, sink);
         //logger->incProgress(doneLabel);
@@ -55,7 +55,7 @@ void Store::exportPath(const StorePath & path, Sink & sink)
        filesystem corruption from spreading to other machines.
        Don't complain if the stored hash is zero (unknown). */
     Hash hash = hashAndWriteSink.currentHash();
-    if (hash != info->narHash && info->narHash != Hash(info->narHash.type))
+    if (hash != info->narHash && info->narHash != Hash(*info->narHash.type))
         throw Error("hash of path '%s' has changed from '%s' to '%s'!",
             printStorePath(path), info->narHash.to_string(), hash.to_string());
 
@@ -86,7 +86,7 @@ StorePaths Store::importPaths(Source & source, std::shared_ptr<FSAccessor> acces
 
         ValidPathInfo info(parseStorePath(readString(source)));
 
-        //Activity act(*logger, lvlInfo, format("importing path '%s'") % info.path);
+        //Activity act(*logger, Verbosity::Info, format("importing path '%s'") % info.path);
 
         info.references = readStorePaths<StorePathSet>(*this, source);
 
@@ -94,7 +94,7 @@ StorePaths Store::importPaths(Source & source, std::shared_ptr<FSAccessor> acces
         if (deriver != "")
             info.deriver = parseStorePath(deriver);
 
-        info.narHash = hashString(htSHA256, *tee.source.data);
+        info.narHash = hashString(HashType::SHA256, *tee.source.data);
         info.narSize = tee.source.data->size();
 
         // Ignore optional legacy signature.

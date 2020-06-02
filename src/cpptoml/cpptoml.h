@@ -51,7 +51,7 @@ using string_to_base_map
     = std::unordered_map<std::string, std::shared_ptr<base>>;
 #endif
 
-// if defined, `base` will retain type information in form of an enum class
+// if defined, `base` will retain type information in form of an enum struct
 // such that static_cast can be used instead of dynamic_cast
 // #define CPPTOML_NO_RTTI
 
@@ -405,7 +405,7 @@ inline std::shared_ptr<table_array> make_table_array(bool is_inline = false);
 
 #if defined(CPPTOML_NO_RTTI)
 /// Base type used to store underlying data type explicitly if RTTI is disabled
-enum class base_type
+enum struct base_type
 {
     NONE,
     STRING,
@@ -2268,7 +2268,7 @@ class parser
         return key;
     }
 
-    enum class parse_type
+    enum struct parse_type
     {
         STRING = 1,
         LOCAL_TIME,

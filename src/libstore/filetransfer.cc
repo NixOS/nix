@@ -77,7 +77,7 @@ struct curlFileTransfer : public FileTransfer
             Callback<FileTransferResult> && callback)
             : fileTransfer(fileTransfer)
             , request(request)
-            , act(*logger, lvlTalkative, actFileTransfer,
+            , act(*logger, Verbosity::Talkative, ActivityType::Download,
                 fmt(request.data ? "uploading '%s'" : "downloading '%s'", request.uri),
                 {request.uri}, request.parentAct)
             , callback(std::move(callback))
@@ -163,7 +163,7 @@ struct curlFileTransfer : public FileTransfer
         {
             size_t realSize = size * nmemb;
             std::string line((char *) contents, realSize);
-            printMsg(lvlVomit, format("got header for '%s': %s") % request.uri % trim(line));
+            printMsg(Verbosity::Vomit, format("got header for '%s': %s") % request.uri % trim(line));
             if (line.compare(0, 5, "HTTP/") == 0) { // new response starts
                 result.etag = "";
                 auto ss = tokenizeString<vector<string>>(line, " ");
@@ -246,7 +246,7 @@ struct curlFileTransfer : public FileTransfer
 
             curl_easy_reset(req);
 
-            if (verbosity >= lvlVomit) {
+            if (verbosity >= Verbosity::Vomit) {
                 curl_easy_setopt(req, CURLOPT_VERBOSE, 1);
                 curl_easy_setopt(req, CURLOPT_DEBUGFUNCTION, TransferItem::debugCallback);
             }

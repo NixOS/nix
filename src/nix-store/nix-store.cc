@@ -372,8 +372,8 @@ static void opQuery(Strings opFlags, Strings opArgs)
                 for (auto & j : maybeUseOutputs(store->followLinksToStorePath(i), useOutput, forceRealise)) {
                     auto info = store->queryPathInfo(j);
                     if (query == qHash) {
-                        assert(info->narHash.type == htSHA256);
-                        cout << fmt("%s\n", info->narHash.to_string(Base32));
+                        assert(info->narHash.type == HashType::SHA256);
+                        cout << fmt("%s\n", info->narHash.to_string(Base::Base32));
                     } else if (query == qSize)
                         cout << fmt("%d\n", info->narSize);
                 }
@@ -502,7 +502,7 @@ static void registerValidity(bool reregister, bool hashGiven, bool canonicalise)
             if (canonicalise)
                 canonicalisePathMetaData(store->printStorePath(info->path), -1);
             if (!hashGiven) {
-                HashResult hash = hashPath(htSHA256, store->printStorePath(info->path));
+                HashResult hash = hashPath(HashType::SHA256, store->printStorePath(info->path));
                 info->narHash = hash.first;
                 info->narSize = hash.second;
             }
@@ -720,9 +720,9 @@ static void opVerifyPath(Strings opFlags, Strings opArgs)
 
     for (auto & i : opArgs) {
         auto path = store->followLinksToStorePath(i);
-        printMsg(lvlTalkative, "checking path '%s'...", store->printStorePath(path));
+        printMsg(Verbosity::Talkative, "checking path '%s'...", store->printStorePath(path));
         auto info = store->queryPathInfo(path);
-        HashSink sink(info->narHash.type);
+        HashSink sink(*info->narHash.type);
         store->narFromPath(path, sink);
         auto current = sink.finish();
         if (current.first != info->narHash) {
@@ -781,7 +781,7 @@ static void opServe(Strings opFlags, Strings opArgs)
     auto getBuildSettings = [&]() {
         // FIXME: changing options here doesn't work if we're
         // building through the daemon.
-        verbosity = lvlError;
+        verbosity = Verbosity::Error;
         settings.keepLog = false;
         settings.useSubstitutes = false;
         settings.maxSilentTime = readInt(in);
@@ -940,7 +940,7 @@ static void opServe(Strings opFlags, Strings opArgs)
                 auto deriver = readString(in);
                 if (deriver != "")
                     info.deriver = store->parseStorePath(deriver);
-                info.narHash = Hash(readString(in), htSHA256);
+                info.narHash = Hash(readString(in), HashType::SHA256);
                 info.references = readStorePaths<StorePathSet>(*store, in);
                 in >> info.registrationTime >> info.narSize >> info.ultimate;
                 info.sigs = readStrings<StringSet>(in);

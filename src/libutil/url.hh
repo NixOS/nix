@@ -49,6 +49,12 @@ const static std::string pathRegex = "(?:" + segmentRegex + "(?:/" + segmentRege
 const static std::string refRegexS = "[a-zA-Z0-9][a-zA-Z0-9_.-]*"; // FIXME: check
 extern std::regex refRegex;
 
+// Instead of defining what a good Git Ref is, we define what a bad Git Ref is
+// This is because of the definition of a ref in refs.c in https://github.com/git/git
+// See tests/fetchGitRefs.sh for the full definition
+const static std::string badGitRefRegexS = "//|^[./]|/\\.|\\.\\.|[[:cntrl:][:space:]:?^~\[]|\\\\|\\*|\\.lock$|\\.lock/|@\\{|[/.]$|^@$|^$";
+extern std::regex badGitRefRegex;
+
 // A Git revision (a SHA-1 commit hash).
 const static std::string revRegexS = "[0-9a-fA-F]{40}";
 extern std::regex revRegex;

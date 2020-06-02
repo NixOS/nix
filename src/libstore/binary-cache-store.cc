@@ -137,7 +137,7 @@ void BinaryCacheStore::addToStore(const ValidPathInfo & info, Source & narSource
     auto narInfo = make_ref<NarInfo>(info);
 
     narInfo->narSize = nar->size();
-    narInfo->narHash = hashString(htSHA256, *nar);
+    narInfo->narHash = hashString(HashType::SHA256, *nar);
 
     if (info.narHash && info.narHash != narInfo->narHash)
         throw Error("refusing to copy corrupted path '%1%' to binary cache", printStorePath(info.path));
@@ -172,16 +172,16 @@ void BinaryCacheStore::addToStore(const ValidPathInfo & info, Source & narSource
     auto now1 = std::chrono::steady_clock::now();
     auto narCompressed = compress(compression, *nar, parallelCompression);
     auto now2 = std::chrono::steady_clock::now();
-    narInfo->fileHash = hashString(htSHA256, *narCompressed);
+    narInfo->fileHash = hashString(HashType::SHA256, *narCompressed);
     narInfo->fileSize = narCompressed->size();
 
     auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(now2 - now1).count();
-    printMsg(lvlTalkative, "copying path '%1%' (%2% bytes, compressed %3$.1f%% in %4% ms) to binary cache",
+    printMsg(Verbosity::Talkative, "copying path '%1%' (%2% bytes, compressed %3$.1f%% in %4% ms) to binary cache",
         printStorePath(narInfo->path), narInfo->narSize,
         ((1.0 - (double) narCompressed->size() / nar->size()) * 100.0),
         duration);
 
-    narInfo->url = "nar/" + narInfo->fileHash.to_string(Base32, false) + ".nar"
+    narInfo->url = "nar/" + narInfo->fileHash.to_string(Base::Base32, false) + ".nar"
         + (compression == "xz" ? ".xz" :
            compression == "bzip2" ? ".bz2" :
            compression == "br" ? ".br" :
@@ -209,7 +209,7 @@ void BinaryCacheStore::addToStore(const ValidPathInfo & info, Source & narSource
                 // to a GC'ed file, so overwriting might be useful...
                 if (fileExists(key)) return;
 
-                printMsg(lvlTalkative, "creating debuginfo link from '%s' to '%s'", key, target);
+                printMsg(Verbosity::Talkative, "creating debuginfo link from '%s' to '%s'", key, target);
 
                 upsertFile(key, json.dump(), "application/json");
             };
@@ -302,7 +302,7 @@ void BinaryCacheStore::queryPathInfoUncached(const StorePath & storePath,
 {
     auto uri = getUri();
     auto storePathS = printStorePath(storePath);
-    auto act = std::make_shared<Activity>(*logger, lvlTalkative, actQueryPathInfo,
+    auto act = std::make_shared<Activity>(*logger, Verbosity::Talkative, ActivityType::QueryPathInfo,
         fmt("querying info about '%s' on '%s'", storePathS, uri), Logger::Fields{storePathS, uri});
     PushActivity pact(act->id);
 

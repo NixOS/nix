@@ -53,8 +53,8 @@ struct CmdAddToStore : MixDryRun, StoreCommand
         StringSink sink;
         dumpPath(path, sink);
 
-        auto narHash = hashString(htSHA256, *sink.s);
-        auto hash = git ? dumpGitHash(htSHA1, path) : narHash;
+        auto narHash = hashString(HashType::SHA256, *sink.s);
+        auto hash = git ? dumpGitHash(HashType::SHA1, path) : narHash;
 
         ValidPathInfo info(store->makeFixedOutputPath(ingestionMethod, hash, *namePart));
         info.narHash = narHash;
@@ -62,7 +62,7 @@ struct CmdAddToStore : MixDryRun, StoreCommand
         info.ca = makeFixedOutputCA(ingestionMethod, hash);
 
         if (!dryRun) {
-            auto addedPath = store->addToStore(*namePart, path, ingestionMethod, git ? htSHA1 : htSHA256);
+            auto addedPath = store->addToStore(*namePart, path, ingestionMethod, git ? HashType::SHA1 : HashType::SHA256);
             if (addedPath != info.path)
                 throw Error(format("Added path %s does not match calculated path %s; something has changed") % addedPath.to_string() % info.path.to_string());
         }

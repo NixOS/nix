@@ -23,7 +23,7 @@ void emitTreeAttrs(
 
     assert(tree.info.narHash);
     mkString(*state.allocAttr(v, state.symbols.create("narHash")),
-        tree.info.narHash.to_string(SRI));
+        tree.info.narHash.to_string(Base::SRI));
 
     if (input->getRev()) {
         mkString(*state.allocAttr(v, state.symbols.create("rev")), input->getRev()->gitRev());
@@ -103,7 +103,7 @@ static void fetch(EvalState & state, const Pos & pos, Value * * args, Value & v,
             if (n == "url")
                 url = state.forceStringNoCtx(*attr.value, *attr.pos);
             else if (n == "sha256")
-                expectedHash = Hash(state.forceStringNoCtx(*attr.value, *attr.pos), htSHA256);
+                expectedHash = Hash(state.forceStringNoCtx(*attr.value, *attr.pos), HashType::SHA256);
             else if (n == "name")
                 name = state.forceStringNoCtx(*attr.value, *attr.pos);
             else
@@ -137,7 +137,7 @@ static void fetch(EvalState & state, const Pos & pos, Value * * args, Value & v,
     if (expectedHash) {
         auto hash = unpack
             ? state.store->queryPathInfo(storePath)->narHash
-            : hashFile(htSHA256, path);
+            : hashFile(HashType::SHA256, path);
         if (hash != *expectedHash)
             throw Error((unsigned int) 102, "hash mismatch in file downloaded from '%s':\n  wanted: %s\n  got:    %s",
                 *url, expectedHash->to_string(), hash.to_string());
