@@ -1,7 +1,7 @@
 #pragma once
 
 #include "rust-ffi.hh"
-#include "file-hash.hh"
+#include "content-address.hh"
 
 namespace nix {
 

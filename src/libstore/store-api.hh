@@ -2,7 +2,7 @@
 
 #include "path.hh"
 #include "hash.hh"
-#include "file-hash.hh"
+#include "content-address.hh"
 #include "serialise.hh"
 #include "crypto.hh"
 #include "lru-cache.hh"

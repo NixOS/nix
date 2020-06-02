@@ -1,6 +1,6 @@
 #include "command.hh"
 #include "hash.hh"
-#include "file-hash.hh"
+#include "content-address.hh"
 #include "legacy.hh"
 #include "shared.hh"
 #include "references.hh"
