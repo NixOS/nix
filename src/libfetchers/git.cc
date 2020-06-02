@@ -189,10 +189,7 @@ struct GitInputScheme : InputScheme
                 input.attrs.insert_or_assign("revCount", getIntAttr(infoAttrs, "revCount"));
             input.attrs.insert_or_assign("lastModified", getIntAttr(infoAttrs, "lastModified"));
             return {
-                Tree {
-                    .actualPath = store->toRealPath(storePath),
-                    .storePath = std::move(storePath),
-                },
+                Tree(store->toRealPath(storePath), std::move(storePath)),
                 input
             };
         };
@@ -273,10 +270,8 @@ struct GitInputScheme : InputScheme
                     haveCommits ? std::stoull(runProgram("git", true, { "-C", actualUrl, "log", "-1", "--format=%ct", "HEAD" })) : 0);
 
                 return {
-                    Tree {
-                        .actualPath = store->printStorePath(storePath),
-                        .storePath = std::move(storePath),
-                    }, input
+                    Tree(store->printStorePath(storePath), std::move(storePath)),
+                    input
                 };
             }
         }

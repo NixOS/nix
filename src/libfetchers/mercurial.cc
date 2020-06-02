@@ -164,10 +164,10 @@ struct MercurialInputScheme : InputScheme
 
                 auto storePath = store->addToStore("source", actualUrl, true, htSHA256, filter);
 
-                return {Tree {
-                    .actualPath = store->printStorePath(storePath),
-                    .storePath = std::move(storePath),
-                }, input};
+                return {
+                    Tree(store->printStorePath(storePath), std::move(storePath)),
+                    input
+                };
             }
         }
 
@@ -189,10 +189,7 @@ struct MercurialInputScheme : InputScheme
             assert(!_input.getRev() || _input.getRev() == input.getRev());
             input.attrs.insert_or_assign("revCount", getIntAttr(infoAttrs, "revCount"));
             return {
-                Tree{
-                    .actualPath = store->toRealPath(storePath),
-                    .storePath = std::move(storePath),
-                },
+                Tree(store->toRealPath(storePath), std::move(storePath)),
                 input
             };
         };

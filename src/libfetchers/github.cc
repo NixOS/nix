@@ -140,10 +140,7 @@ struct GitArchiveInputScheme : InputScheme
         if (auto res = getCache()->lookup(store, immutableAttrs)) {
             input.attrs.insert_or_assign("lastModified", getIntAttr(res->first, "lastModified"));
             return {
-                Tree{
-                    .actualPath = store->toRealPath(res->second),
-                    .storePath = std::move(res->second),
-                },
+                Tree(store->toRealPath(res->second), std::move(res->second)),
                 input
             };
         }

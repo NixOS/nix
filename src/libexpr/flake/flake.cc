@@ -12,25 +12,10 @@ using namespace flake;
 
 namespace flake {
 
-/* If 'allowLookup' is true, then resolve 'flakeRef' using the
-   registries. */
-static FlakeRef maybeLookupFlake(
-    ref<Store> store,
-    const FlakeRef & flakeRef,
-    bool allowLookup)
-{
-    if (!flakeRef.input.isDirect()) {
-        if (allowLookup)
-            return flakeRef.resolve(store);
-        else
-            throw Error("'%s' is an indirect flake reference, but registry lookups are not allowed", flakeRef);
-    } else
-        return flakeRef;
-}
+typedef std::pair<Tree, FlakeRef> FetchedFlake;
+typedef std::vector<std::pair<FlakeRef, FetchedFlake>> FlakeCache;
 
-typedef std::vector<std::pair<FlakeRef, FlakeRef>> FlakeCache;
-
-static FlakeRef lookupInFlakeCache(
+static std::optional<FetchedFlake> lookupInFlakeCache(
     const FlakeCache & flakeCache,
     const FlakeRef & flakeRef)
 {
@@ -38,12 +23,12 @@ static FlakeRef lookupInFlakeCache(
     for (auto & i : flakeCache) {
         if (flakeRef == i.first) {
             debug("mapping '%s' to previously seen input '%s' -> '%s",
-                flakeRef, i.first, i.second);
+                flakeRef, i.first, i.second.second);
             return i.second;
         }
     }
 
-    return flakeRef;
+    return std::nullopt;
 }
 
 static std::tuple<fetchers::Tree, FlakeRef, FlakeRef> fetchOrSubstituteTree(
@@ -52,17 +37,32 @@ static std::tuple<fetchers::Tree, FlakeRef, FlakeRef> fetchOrSubstituteTree(
     bool allowLookup,
     FlakeCache & flakeCache)
 {
-    auto resolvedRef = lookupInFlakeCache(flakeCache,
-        maybeLookupFlake(state.store,
-            lookupInFlakeCache(flakeCache, originalRef), allowLookup));
+    auto fetched = lookupInFlakeCache(flakeCache, originalRef);
+    FlakeRef resolvedRef = originalRef;
 
-    auto [tree, lockedRef] = resolvedRef.fetchTree(state.store);
+    if (!fetched) {
+        if (originalRef.input.isDirect()) {
+            fetched.emplace(originalRef.fetchTree(state.store));
+        } else {
+            if (allowLookup) {
+                resolvedRef = originalRef.resolve(state.store);
+                auto fetchedResolved = lookupInFlakeCache(flakeCache, originalRef);
+                if (!fetchedResolved) fetchedResolved.emplace(resolvedRef.fetchTree(state.store));
+                flakeCache.push_back({resolvedRef, fetchedResolved.value()});
+                fetched.emplace(fetchedResolved.value());
+            }
+            else {
+                throw Error("'%s' is an indirect flake reference, but registry lookups are not allowed", originalRef);
+            }
+        }
+        flakeCache.push_back({originalRef, fetched.value()});
+    }
+    
+    auto [tree, lockedRef] = fetched.value();
 
     debug("got tree '%s' from '%s'",
         state.store->printStorePath(tree.storePath), lockedRef);
 
-    flakeCache.push_back({originalRef, lockedRef});
-    flakeCache.push_back({resolvedRef, lockedRef});
 
     if (state.allowedPaths)
         state.allowedPaths->insert(tree.actualPath);

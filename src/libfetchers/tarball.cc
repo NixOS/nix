@@ -117,10 +117,7 @@ std::pair<Tree, time_t> downloadTarball(
 
     if (cached && !cached->expired)
         return {
-            Tree {
-                .actualPath = store->toRealPath(cached->storePath),
-                .storePath = std::move(cached->storePath),
-            },
+            Tree(store->toRealPath(cached->storePath), std::move(cached->storePath)),
             getIntAttr(cached->infoAttrs, "lastModified")
         };
 
@@ -157,10 +154,7 @@ std::pair<Tree, time_t> downloadTarball(
         immutable);
 
     return {
-        Tree {
-            .actualPath = store->toRealPath(*unpackedStorePath),
-            .storePath = std::move(*unpackedStorePath),
-        },
+        Tree(store->toRealPath(*unpackedStorePath), std::move(*unpackedStorePath)),
         lastModified,
     };
 }
