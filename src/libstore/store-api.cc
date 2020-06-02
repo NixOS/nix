@@ -753,36 +753,35 @@ void ValidPathInfo::sign(const Store & store, const SecretKey & secretKey)
     sigs.insert(secretKey.signDetached(fingerprint(store)));
 }
 
+// FIXME Put this somewhere?
+template<class... Ts> struct overloaded : Ts... { using Ts::operator()...; };
+template<class... Ts> overloaded(Ts...) -> overloaded<Ts...>;
 
 bool ValidPathInfo::isContentAddressed(const Store & store) const
 {
-    auto warn = [&]() {
-        printError("warning: path '%s' claims to be content-addressed but isn't", store.printStorePath(path));
-    };
+    if (! ca) return false;
 
-    if (! ca) {}
-
-    else if (auto p = std::get_if<TextHash>(&*ca)) {
-        if (store.makeTextPath(path.name(), p->hash, references) == path)
-            return true;
-        else
-            warn();
-    }
-
-    else if (auto p = std::get_if<FileSystemHash>(&*ca)) {
-        auto refs = cloneStorePathSet(references);
-        bool hasSelfReference = false;
-        if (refs.count(path)) {
-            hasSelfReference = true;
-            refs.erase(path);
+    auto caPath = std::visit(overloaded {
+        [&](TextHash th) {
+            return store.makeTextPath(path.name(), th.hash, references);
+        },
+        [&](FileSystemHash fsh) {
+            auto refs = cloneStorePathSet(references);
+            bool hasSelfReference = false;
+            if (refs.count(path)) {
+                hasSelfReference = true;
+                refs.erase(path);
+            }
+            return store.makeFixedOutputPath(fsh.method, fsh.hash, path.name(), refs, hasSelfReference);
         }
-        if (store.makeFixedOutputPath(p->method, p->hash, path.name(), refs, hasSelfReference) == path)
-            return true;
-        else
-            warn();
-    }
+    }, *ca);
 
-    return false;
+    bool res = caPath == path;
+
+    if (!res)
+        printError("warning: path '%s' claims to be content-addressed but isn't", store.printStorePath(path));
+
+    return res;
 }
 
 

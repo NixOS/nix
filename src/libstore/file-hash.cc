@@ -24,6 +24,7 @@ std::string makeFixedOutputCA(FileIngestionMethod method, const Hash & hash)
         + hash.to_string();
 }
 
+// FIXME Put this somewhere?
 template<class... Ts> struct overloaded : Ts... { using Ts::operator()...; };
 template<class... Ts> overloaded(Ts...) -> overloaded<Ts...>;
 
