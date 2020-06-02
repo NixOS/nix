@@ -381,9 +381,7 @@ void RemoteStore::queryPathInfoUncached(const StorePath & path,
             if (GET_PROTOCOL_MINOR(conn->daemonVersion) >= 16) {
                 conn->from >> info->ultimate;
                 info->sigs = readStrings<StringSet>(conn->from);
-                string caOptRaw;
-                conn->from >> caOptRaw;
-                info->ca = parseContentAddressOpt(caOptRaw);
+                info->ca = parseContentAddressOpt(readString(conn->from));
             }
         }
         callback(std::move(info));

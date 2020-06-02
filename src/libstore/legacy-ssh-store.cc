@@ -114,11 +114,7 @@ struct LegacySSHStore : public Store
             if (GET_PROTOCOL_MINOR(conn->remoteVersion) >= 4) {
                 auto s = readString(conn->from);
                 info->narHash = s.empty() ? Hash() : Hash(s);
-                {
-                    std::string rawCaOpt;
-                    conn->from >> rawCaOpt;
-                    info->ca = parseContentAddressOpt(rawCaOpt);
-                }
+                info->ca = parseContentAddressOpt(readString(conn->from));
                 info->sigs = readStrings<StringSet>(conn->from);
             }
 
