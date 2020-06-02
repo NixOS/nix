@@ -79,12 +79,12 @@ static RegisterCommand r2("hash-path", [](){ return make_ref<CmdHash>(FileIngest
 struct CmdToBase : Command
 {
     Base base;
-    HashType ht;
+    std::optional<HashType> ht;
     std::vector<std::string> args;
 
     CmdToBase(Base base) : base(base)
     {
-        addFlag(Flag::mkHashTypeFlag("type", &ht));
+        addFlag(Flag::mkHashTypeFlag("type", &*ht));
         expectArgs("strings", &args);
     }
 
