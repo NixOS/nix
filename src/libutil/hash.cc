@@ -201,6 +201,9 @@ Hash::Hash(const std::string & s, HashType type)
         memcpy(hash, d.data(), hashSize);
     }
 
+    else if (type == htUnknown)
+        throw BadHash("cannot determine hash type for '%s'", s);
+
     else
         throw BadHash("hash '%s' has wrong length for hash type '%s'", s, printHashType(type));
 }
