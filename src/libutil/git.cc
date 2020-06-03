@@ -154,7 +154,8 @@ GitMode dumpGitBlob(const Path & path, const struct stat st, Sink & sink)
 
 GitMode dumpGitTree(const GitTree & entries, Sink & sink)
 {
-    std::string s1 = "";
+    vector<uint8_t> v1;
+
     for (auto & i : entries) {
         unsigned int mode;
         switch (i.second.first) {
@@ -162,14 +163,20 @@ GitMode dumpGitTree(const GitTree & entries, Sink & sink)
         case GitMode::Executable: mode = 100755; break;
         case GitMode::Regular: mode = 100644; break;
         }
-        s1 += (format("%06d %s\0%s"s) % mode % i.first % i.second.second.hash).str();
+        auto s1 = (format("%06d %s") % mode % i.first).str();
+        std::copy(s1.begin(), s1.end(), std::back_inserter(v1));
+        v1.push_back(0);
+        std::copy(i.second.second.hash, i.second.second.hash + 20, std::back_inserter(v1));
     }
 
-    std::string s2 = (format("tree %d\0%s"s) % s1.size() % s1).str();
+    vector<uint8_t> v2;
+    auto s2 = (format("tree %d"s) % v1.size()).str();
+    std::copy(s2.begin(), s2.end(), std::back_inserter(v2));
+    v2.push_back(0);
+    std::copy(v1.begin(), v1.end(), std::back_inserter(v2));
 
-    vector<uint8_t> v;
-    std::copy(s2.begin(), s2.end(), std::back_inserter(v));
-    sink(v.data(), v.size());
+    sink(v2.data(), v2.size());
+
     return GitMode::Directory;
 }
 
