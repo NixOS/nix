@@ -26,12 +26,20 @@ let
     name = "registry";
     text = ''
       {
-        "flakes": {
-          "flake:nixpkgs": {
-            "uri": "github:NixOS/nixpkgs"
+        "flakes": [
+          {
+            "from": {
+              "type": "indirect",
+              "id": "nixpkgs"
+            },
+            "to": {
+              "type": "github",
+              "owner": "NixOS",
+              "repo": "nixpkgs"
+            }
           }
-        },
-        "version": 1
+        ],
+        "version": 2
       }
     '';
     destination = "/flake-registry.json";
