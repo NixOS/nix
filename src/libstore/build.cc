@@ -3690,10 +3690,10 @@ void DerivationGoal::registerOutputs()
            hash). */
         std::string ca;
 
-        if (i.second.hashAlgo != "") {
+        if (derivationIsFixed(derivationType)) {
 
-            FileIngestionMethod outputHashMode; HashType ht;
-            i.second.parseHashType(outputHashMode, ht);
+            FileIngestionMethod outputHashMode; Hash h;
+            i.second.parseHashInfo(outputHashMode, h);
 
             if (outputHashMode == FileIngestionMethod::Flat) {
                 /* The output path should be a regular file without execute permission. */
@@ -3706,17 +3706,12 @@ void DerivationGoal::registerOutputs()
             /* Check the hash. In hash mode, move the path produced by
                the derivation to its content-addressed location. */
             Hash h2 = outputHashMode == FileIngestionMethod::Recursive
-                ? hashPath(ht, actualPath).first
-                : hashFile(ht, actualPath);
+                ? hashPath(h.type, actualPath).first
+                : hashFile(h.type, actualPath);
 
             auto dest = worker.store.makeFixedOutputPath(outputHashMode, h2, i.second.path.name());
 
-            // true if either floating CA, or incorrect fixed hash.
-            bool needsMove = true;
-
-            if (i.second.hash != "") {
-              Hash h = Hash(i.second.hash, ht);
-              if (h != h2) {
+            if (h != h2) {
 
                 /* Throw an error after registering the path as
                    valid. */
@@ -3724,13 +3719,7 @@ void DerivationGoal::registerOutputs()
                 delayedException = std::make_exception_ptr(
                     BuildError("hash mismatch in fixed-output derivation '%s':\n  wanted: %s\n  got:    %s",
                         worker.store.printStorePath(dest), h.to_string(SRI), h2.to_string(SRI)));
-              } else {
-                  // matched the fixed hash, so no move needed.
-                  needsMove = false;
-              }
-            }
 
-            if (needsMove) {
                 Path actualDest = worker.store.Store::toRealPath(dest);
 
                 if (worker.store.isValidPath(dest))
