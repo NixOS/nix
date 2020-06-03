@@ -552,29 +552,21 @@ void LocalStore::checkDerivationOutputs(const StorePath & drvPath, const Derivat
     };
 
 
-    // Don't need the answer, but do this anyways to assert is proper
-    // combination. The code below is more general and naturally allows
-    // combinations that are currently prohibited.
-    drv.type();
+    if (derivationIsFixed(drv.type())) {
+        DerivationOutputs::const_iterator out = drv.outputs.find("out");
+        if (out == drv.outputs.end())
+            throw Error("derivation '%s' does not have an output named 'out'", printStorePath(drvPath));
 
-    std::optional<Hash> h;
-    for (auto & i : drv.outputs) {
-        if (i.second.hashAlgo == "") {
-            if (!h) {
-                // somewhat expensive so we do lazily
-                h = hashDerivationModulo(*this, drv, true);
-            }
-            StorePath path = makeOutputPath(i.first, *h, drvName);
-            check(path, i.second.path, i.first);
-        } else {
-            if (i.second.hash == "") {
-                throw Error("Fixed output derivation needs hash");
-            }
-            FileIngestionMethod recursive; Hash h;
-            i.second.parseHashInfo(recursive, h);
-            StorePath path = makeFixedOutputPath(recursive, h, drvName);
-            check(path, i.second.path, i.first);
-        }
+        FileIngestionMethod method; Hash h;
+        out->second.parseHashInfo(method, h);
+
+        check(makeFixedOutputPath(method, h, drvName), out->second.path, "out");
+    }
+
+    else {
+        Hash h = hashDerivationModulo(*this, drv, true);
+        for (auto & i : drv.outputs)
+            check(makeOutputPath(i.first, h, drvName), i.second.path, i.first);
     }
 }
 
