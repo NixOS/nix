@@ -324,6 +324,12 @@ struct GitInput : Input
                 input->rev = Hash(chomp(readFile(localRefFile)), htSHA1);
         }
 
+        if (input->treeHash) {
+            auto type = chomp(runProgram("git", true, { "-C", repoDir, "cat-file", "-t", input->treeHash->gitRev() }));
+            if (type != "tree")
+                throw Error(format("Need a tree object, found '%s' object in %s") % type % input->treeHash->gitRev());
+        }
+
         bool isShallow = chomp(runProgram("git", true, { "-C", repoDir, "rev-parse", "--is-shallow-repository" })) == "true";
 
         if (isShallow && !shallow)
