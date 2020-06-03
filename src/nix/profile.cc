@@ -128,13 +128,14 @@ struct ProfileManifest
 
         auto narHash = hashString(htSHA256, *sink.s);
 
-        ValidPathInfo info(store->makeFixedOutputPath(true, narHash, "profile", references));
+        ValidPathInfo info(store->makeFixedOutputPath(FileIngestionMethod::Recursive, narHash, "profile", references));
         info.references = std::move(references);
         info.narHash = narHash;
         info.narSize = sink.s->size();
-        info.ca = makeFixedOutputCA(true, info.narHash);
+        info.ca = makeFixedOutputCA(FileIngestionMethod::Recursive, info.narHash);
 
-        store->addToStore(info, sink.s);
+        auto source = StringSource { *sink.s };
+        store->addToStore(info, source);
 
         return std::move(info.path);
     }

@@ -162,7 +162,7 @@ struct MercurialInputScheme : InputScheme
                     return files.count(file);
                 };
 
-                auto storePath = store->addToStore("source", actualUrl, true, htSHA256, filter);
+                auto storePath = store->addToStore("source", actualUrl, FileIngestionMethod::Recursive, htSHA256, filter);
 
                 return {
                     Tree(store->printStorePath(storePath), std::move(storePath)),
