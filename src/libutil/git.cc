@@ -163,7 +163,10 @@ GitMode dumpGitTree(const GitTree & entries, Sink & sink)
         case GitMode::Executable: mode = 100755; break;
         case GitMode::Regular: mode = 100644; break;
         }
-        auto s1 = (format("%d %s") % mode % i.first).str();
+        auto name = i.first;
+        if (i.second.first == GitMode::Directory)
+            name.pop_back();
+        auto s1 = (format("%d %s") % mode % name).str();
         std::copy(s1.begin(), s1.end(), std::back_inserter(v1));
         v1.push_back(0);
         std::copy(i.second.second.hash, i.second.second.hash + 20, std::back_inserter(v1));
@@ -194,8 +197,17 @@ static GitMode dumpGitInternal(HashType ht, const Path & path, Sink & sink, Path
     else if (S_ISDIR(st.st_mode)) {
         GitTree entries;
         for (auto & i : readDirectory(path))
-            if (filter(path + "/" + i.name))
-                entries[i.name] = dumpGitHashInternal(ht, path + "/" + i.name, filter);
+            if (filter(path + "/" + i.name)) {
+                auto result = dumpGitHashInternal(ht, path + "/" + i.name, filter);
+
+                // correctly observe git order, see
+                // https://github.com/mirage/irmin/issues/352
+                auto name = i.name;
+                if (result.first == GitMode::Directory)
+                    name += "/";
+
+                entries[name] = result;
+            }
         perm = dumpGitTree(entries, sink);
     } else throw Error(format("file '%1%' has an unsupported type") % path);
 
