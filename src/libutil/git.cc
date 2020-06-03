@@ -163,7 +163,7 @@ GitMode dumpGitTree(const GitTree & entries, Sink & sink)
         case GitMode::Executable: mode = 100755; break;
         case GitMode::Regular: mode = 100644; break;
         }
-        auto s1 = (format("%06d %s") % mode % i.first).str();
+        auto s1 = (format("%d %s") % mode % i.first).str();
         std::copy(s1.begin(), s1.end(), std::back_inserter(v1));
         v1.push_back(0);
         std::copy(i.second.second.hash, i.second.second.hash + 20, std::back_inserter(v1));
