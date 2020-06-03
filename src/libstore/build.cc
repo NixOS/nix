@@ -1382,7 +1382,7 @@ void DerivationGoal::inputsRealised()
 
     /* Don't repeat fixed-output derivations since they're already
        verified by their output hash.*/
-    nrRounds = DtAxisFixed & derivationType ? 1 : settings.buildRepeat + 1;
+    nrRounds = derivationIsFixed(derivationType) ? 1 : settings.buildRepeat + 1;
 
     /* Okay, try to build.  Note that here we don't wait for a build
        slot to become available, since we don't need one if there is a
@@ -1760,7 +1760,7 @@ void DerivationGoal::buildDone()
             st =
                 dynamic_cast<NotDeterministic*>(&e) ? BuildResult::NotDeterministic :
                 statusOk(status) ? BuildResult::OutputRejected :
-                DtAxisImpure & derivationType || diskFull ? BuildResult::TransientFailure :
+                derivationIsImpure(derivationType) || diskFull ? BuildResult::TransientFailure :
                 BuildResult::PermanentFailure;
         }
 
@@ -1966,7 +1966,7 @@ void DerivationGoal::startBuilder()
         else if (settings.sandboxMode == smDisabled)
             useChroot = false;
         else if (settings.sandboxMode == smRelaxed)
-            useChroot = !(DtAxisImpure & derivationType) && !noChroot;
+            useChroot = !(derivationIsImpure(derivationType)) && !noChroot;
     }
 
     if (worker.store.storeDir != worker.store.realStoreDir) {
@@ -2132,7 +2132,7 @@ void DerivationGoal::startBuilder()
                 "nogroup:x:65534:\n") % sandboxGid).str());
 
         /* Create /etc/hosts with localhost entry. */
-        if (!(DtAxisImpure & derivationType))
+        if (!(derivationIsImpure(derivationType)))
             writeFile(chrootRootDir + "/etc/hosts", "127.0.0.1 localhost\n::1 localhost\n");
 
         /* Make the closure of the inputs available in the chroot,
@@ -2341,7 +2341,7 @@ void DerivationGoal::startBuilder()
            us.
         */
 
-        if (!(DtAxisImpure & derivationType))
+        if (!(derivationIsImpure(derivationType)))
             privateNetwork = true;
 
         userNamespaceSync.create();
@@ -2542,7 +2542,7 @@ void DerivationGoal::initEnv()
        derivation, tell the builder, so that for instance `fetchurl'
        can skip checking the output.  On older Nixes, this environment
        variable won't be set, so `fetchurl' will do the check. */
-    if (DtAxisFixed & derivationType) env["NIX_OUTPUT_CHECKED"] = "1";
+    if (derivationIsFixed(derivationType)) env["NIX_OUTPUT_CHECKED"] = "1";
 
     /* *Only* if this is a fixed-output derivation, propagate the
        values of the environment variables specified in the
@@ -2553,7 +2553,7 @@ void DerivationGoal::initEnv()
        to the builder is generally impure, but the output of
        fixed-output derivations is by definition pure (since we
        already know the cryptographic hash of the output). */
-    if (derivationType & DtAxisImpure) {
+    if (derivationIsImpure(derivationType)) {
         for (auto & i : parsedDrv->getStringsAttr("impureEnvVars").value_or(Strings()))
             env[i] = getEnv(i).value_or("");
     }
@@ -3167,7 +3167,7 @@ void DerivationGoal::runChild()
             /* Fixed-output derivations typically need to access the
                network, so give them access to /etc/resolv.conf and so
                on. */
-            if (DtAxisImpure & derivationType) {
+            if (derivationIsImpure(derivationType)) {
                 ss.push_back("/etc/resolv.conf");
 
                 // Only use nss functions to resolve hosts and
@@ -3408,7 +3408,7 @@ void DerivationGoal::runChild()
 
                 sandboxProfile += "(import \"sandbox-defaults.sb\")\n";
 
-                if (DtAxisImpure & derivationType)
+                if (derivationIsImpure(derivationType))
                     sandboxProfile += "(import \"sandbox-network.sb\")\n";
 
                 /* Our rwx outputs */

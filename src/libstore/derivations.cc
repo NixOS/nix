@@ -37,6 +37,32 @@ void DerivationOutput::parseHashInfo(FileIngestionMethod & recursive, Hash & has
 }
 
 
+bool derivationIsCA(DerivationType dt) {
+    switch (dt) {
+    case DerivationType::Regular: return false;
+    case DerivationType::CAFixed: return true;
+    };
+    // Since enums can have non-variant values, but making a `default:` would
+    // disable exhaustiveness warnings.
+    abort();
+}
+
+bool derivationIsFixed(DerivationType dt) {
+    switch (dt) {
+    case DerivationType::Regular: return false;
+    case DerivationType::CAFixed: return true;
+    };
+    abort();
+}
+
+bool derivationIsImpure(DerivationType dt) {
+    switch (dt) {
+    case DerivationType::Regular: return false;
+    case DerivationType::CAFixed: return true;
+    };
+    abort();
+}
+
 BasicDerivation::BasicDerivation(const BasicDerivation & other)
     : platform(other.platform)
     , builder(other.builder)
@@ -344,7 +370,7 @@ DerivationType BasicDerivation::type() const
         outputs.begin()->first == "out" &&
         outputs.begin()->second.hash != "")
     {
-        return DtCAFixed;
+        return DerivationType::CAFixed;
     }
 
     auto const algo = outputs.begin()->second.hashAlgo;
@@ -359,7 +385,7 @@ DerivationType BasicDerivation::type() const
             throw Error("Invalid mix of CA and regular outputs");
         }
     }
-    return DtRegular;
+    return DerivationType::Regular;
 }
 
 
@@ -390,7 +416,7 @@ Hash hashDerivationModulo(Store & store, const Derivation & drv, bool maskOutput
 {
     /* Return a fixed hash for fixed-output derivations. */
     switch (drv.type()) {
-    case DtCAFixed: {
+    case DerivationType::CAFixed: {
         DerivationOutputs::const_iterator i = drv.outputs.begin();
         return hashString(htSHA256, "fixed:out:"
             + i->second.hashAlgo + ":"

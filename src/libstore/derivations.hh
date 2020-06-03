@@ -34,20 +34,23 @@ typedef std::map<StorePath, StringSet> DerivationInputs;
 
 typedef std::map<string, string> StringPairs;
 
-// Bit:
-//  7: regular vs ca
-//  6: floating vs fixed hash if ca, regular always floating
-//  5: pure vs impure if ca, regular always pure
-//  _: Unassigned
-enum DerivationTypeAxis : uint8_t {
-    DtAxisCA = 0b10000000,
-    DtAxisFixed = 0b01000000,
-    DtAxisImpure = 0b00100000,
+enum struct DerivationType : uint8_t {
+    Regular,
+    CAFixed,
 };
-enum DerivationType : uint8_t {
-    DtRegular = 0b0000000,
-    DtCAFixed = 0b11100000,
-};
+
+/* Do the outputs of the derivation have paths calculated from their content,
+   or from the derivation itself? */
+bool derivationIsCA(DerivationType);
+
+/* Is the content of the outputs fixed a-priori via a hash? Never true for
+   non-CA derivations. */
+bool derivationIsFixed(DerivationType);
+
+/* Is the derivation impure and needs to access non-deterministic resources, or
+   pure and can be sandboxed? Note that whether or not we actually sandbox the
+   derivation is controlled separately. Never true for non-CA derivations. */
+bool derivationIsImpure(DerivationType);
 
 struct BasicDerivation
 {
