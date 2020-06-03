@@ -2417,11 +2417,13 @@ void DerivationGoal::startBuilder()
         uid_t hostGid = buildUser ? buildUser->getGID() : getgid();
 
         writeFile("/proc/" + std::to_string(pid) + "/uid_map",
+            (settings.allowNewPrivileges ? "0 0 1\n" : "") +
             (format("%d %d 1") % sandboxUid % hostUid).str());
 
         writeFile("/proc/" + std::to_string(pid) + "/setgroups", "deny");
 
         writeFile("/proc/" + std::to_string(pid) + "/gid_map",
+            (settings.allowNewPrivileges ? "0 0 1\n" : "") +
             (format("%d %d 1") % sandboxGid % hostGid).str());
 
         /* Save the mount namespace of the child. We have to do this
