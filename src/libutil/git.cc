@@ -112,7 +112,7 @@ static void parse(ParseSink & sink, Source & source, const Path & path, const Pa
             Hash hash(htSHA1);
             std::copy(hashs.begin(), hashs.end(), hash.hash);
 
-            string entryName = getStoreEntry(storeDir, hash, name);
+            string entryName = getStoreEntry(storeDir, hash, "git");
             Path entry = absPath(realStoreDir + "/" + entryName);
 
             struct stat st;
