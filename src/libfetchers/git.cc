@@ -282,7 +282,10 @@ struct GitInput : Input
                 // FIXME: git stderr messes up our progress indicator, so
                 // we're using --quiet for now. Should process its stderr.
                 try {
-                    runProgram("git", true, { "-C", repoDir, "fetch", "--quiet", "--force", "--", actualUrl, fmt("%s:%s", *input->ref, *input->ref) });
+                    auto fetchRef = input->ref->compare(0, 5, "refs/") == 0
+                        ? *input->ref
+                        : "refs/heads/" + *input->ref;
+                    runProgram("git", true, { "-C", repoDir, "fetch", "--quiet", "--force", "--", actualUrl, fmt("%s:%s", fetchRef, fetchRef) });
                 } catch (Error & e) {
                     if (!pathExists(localRefFile)) throw;
                     warn("could not update local clone of Git repository '%s'; continuing with the most recent version", actualUrl);
@@ -418,7 +421,7 @@ struct GitInputScheme : InputScheme
 
         auto input = std::make_unique<GitInput>(parseURL(getStrAttr(attrs, "url")));
         if (auto ref = maybeGetStrAttr(attrs, "ref")) {
-            if (!std::regex_match(*ref, refRegex))
+            if (std::regex_search(*ref, badGitRefRegex))
                 throw BadURL("invalid Git branch/tag name '%s'", *ref);
             input->ref = *ref;
         }
