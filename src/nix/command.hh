@@ -1,18 +1,18 @@
 #pragma once
 
+#include "installables.hh"
 #include "args.hh"
 #include "common-eval-args.hh"
 #include "path.hh"
+#include "eval.hh"
 
 namespace nix {
 
 extern std::string programPath;
 
-struct Value;
-class Bindings;
-class EvalState;
-struct Pos;
-class Store;
+static constexpr Command::Category catSecondary = 100;
+static constexpr Command::Category catUtility = 101;
+static constexpr Command::Category catNixInstallation = 102;
 
 /* A command that requires a Nix store. */
 struct StoreCommand : virtual Command
@@ -27,34 +27,7 @@ private:
     std::shared_ptr<Store> _store;
 };
 
-struct Buildable
-{
-    std::optional<StorePath> drvPath;
-    std::map<std::string, StorePath> outputs;
-};
-
-typedef std::vector<Buildable> Buildables;
-
-struct Installable
-{
-    virtual ~Installable() { }
-
-    virtual std::string what() = 0;
-
-    virtual Buildables toBuildables()
-    {
-        throw Error("argument '%s' cannot be built", what());
-    }
-
-    Buildable toBuildable();
-
-    virtual Value * toValue(EvalState & state)
-    {
-        throw Error("argument '%s' cannot be evaluated", what());
-    }
-};
-
-struct SourceExprCommand : virtual Args, StoreCommand, MixEvalArgs
+struct SourceExprCommand : virtual StoreCommand, MixEvalArgs
 {
     Path file;
 
@@ -72,7 +45,7 @@ private:
 
     std::shared_ptr<EvalState> evalState;
 
-    Value * vSourceExpr = 0;
+    RootValue vSourceExpr;
 };
 
 enum RealiseMode { Build, NoBuild, DryRun };
@@ -188,5 +161,37 @@ std::set<StorePath> toDerivations(ref<Store> store,
 /* Helper function to generate args that invoke $EDITOR on
    filename:lineno. */
 Strings editorFor(const Pos & pos);
+
+struct MixProfile : virtual StoreCommand
+{
+    std::optional<Path> profile;
+
+    MixProfile();
+
+    /* If 'profile' is set, make it point at 'storePath'. */
+    void updateProfile(const StorePath & storePath);
+
+    /* If 'profile' is set, make it point at the store path produced
+       by 'buildables'. */
+    void updateProfile(const Buildables & buildables);
+};
+
+struct MixDefaultProfile : MixProfile
+{
+    MixDefaultProfile();
+};
+
+struct MixEnvironment : virtual Args {
+
+    StringSet keep, unset;
+    Strings stringsEnv;
+    std::vector<char*> vectorEnv;
+    bool ignoreEnvironment;
+
+    MixEnvironment();
+
+    /* Modify global environ based on ignoreEnvironment, keep, and unset. It's expected that exec will be called before this class goes out of scope, otherwise environ will become invalid. */
+    void setEnviron();
+};
 
 }

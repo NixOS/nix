@@ -14,12 +14,13 @@ struct CmdAddToStore : MixDryRun, StoreCommand
     {
         expectArg("path", &path);
 
-        mkFlag()
-            .longName("name")
-            .shortName('n')
-            .description("name component of the store path")
-            .labels({"name"})
-            .dest(&namePart);
+        addFlag({
+            .longName = "name",
+            .shortName = 'n',
+            .description = "name component of the store path",
+            .labels = {"name"},
+            .handler = {&namePart},
+        });
     }
 
     std::string description() override
@@ -33,6 +34,8 @@ struct CmdAddToStore : MixDryRun, StoreCommand
         };
     }
 
+    Category category() override { return catUtility; }
+
     void run(ref<Store> store) override
     {
         if (!namePart) namePart = baseNameOf(path);
@@ -42,15 +45,17 @@ struct CmdAddToStore : MixDryRun, StoreCommand
 
         auto narHash = hashString(htSHA256, *sink.s);
 
-        ValidPathInfo info(store->makeFixedOutputPath(true, narHash, *namePart));
+        ValidPathInfo info(store->makeFixedOutputPath(FileIngestionMethod::Recursive, narHash, *namePart));
         info.narHash = narHash;
         info.narSize = sink.s->size();
-        info.ca = makeFixedOutputCA(true, info.narHash);
+        info.ca = makeFixedOutputCA(FileIngestionMethod::Recursive, info.narHash);
 
-        if (!dryRun)
-            store->addToStore(info, sink.s);
+        if (!dryRun) {
+            auto source = StringSource { *sink.s };
+            store->addToStore(info, source);
+        }
 
-        std::cout << fmt("%s\n", store->printStorePath(info.path));
+        logger->stdout("%s", store->printStorePath(info.path));
     }
 };
 

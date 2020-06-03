@@ -1,4 +1,4 @@
-#include "builtins.hh"
+#include "buildenv.hh"
 
 #include <sys/stat.h>
 #include <sys/types.h>
@@ -7,16 +7,14 @@
 
 namespace nix {
 
-typedef std::map<Path,int> Priorities;
-
-// FIXME: change into local variables.
-
-static Priorities priorities;
-
-static unsigned long symlinks;
+struct State
+{
+    std::map<Path, int> priorities;
+    unsigned long symlinks = 0;
+};
 
 /* For each activated package, create symlinks */
-static void createLinks(const Path & srcDir, const Path & dstDir, int priority)
+static void createLinks(State & state, const Path & srcDir, const Path & dstDir, int priority)
 {
     DirEntries srcFiles;
 
@@ -67,7 +65,7 @@ static void createLinks(const Path & srcDir, const Path & dstDir, int priority)
             auto res = lstat(dstFile.c_str(), &dstSt);
             if (res == 0) {
                 if (S_ISDIR(dstSt.st_mode)) {
-                    createLinks(srcFile, dstFile, priority);
+                    createLinks(state, srcFile, dstFile, priority);
                     continue;
                 } else if (S_ISLNK(dstSt.st_mode)) {
                     auto target = canonPath(dstFile, true);
@@ -77,8 +75,8 @@ static void createLinks(const Path & srcDir, const Path & dstDir, int priority)
                         throw SysError(format("unlinking '%1%'") % dstFile);
                     if (mkdir(dstFile.c_str(), 0755) == -1)
                         throw SysError(format("creating directory '%1%'"));
-                    createLinks(target, dstFile, priorities[dstFile]);
-                    createLinks(srcFile, dstFile, priority);
+                    createLinks(state, target, dstFile, state.priorities[dstFile]);
+                    createLinks(state, srcFile, dstFile, priority);
                     continue;
                 }
             } else if (errno != ENOENT)
@@ -90,7 +88,7 @@ static void createLinks(const Path & srcDir, const Path & dstDir, int priority)
             auto res = lstat(dstFile.c_str(), &dstSt);
             if (res == 0) {
                 if (S_ISLNK(dstSt.st_mode)) {
-                    auto prevPriority = priorities[dstFile];
+                    auto prevPriority = state.priorities[dstFile];
                     if (prevPriority == priority)
                         throw Error(
                                 "packages '%1%' and '%2%' have the same priority %3%; "
@@ -109,67 +107,30 @@ static void createLinks(const Path & srcDir, const Path & dstDir, int priority)
         }
 
         createSymlink(srcFile, dstFile);
-        priorities[dstFile] = priority;
-        symlinks++;
+        state.priorities[dstFile] = priority;
+        state.symlinks++;
     }
 }
 
-typedef std::set<Path> FileProp;
-
-static FileProp done;
-static FileProp postponed = FileProp{};
-
-static Path out;
-
-static void addPkg(const Path & pkgDir, int priority)
+void buildProfile(const Path & out, Packages && pkgs)
 {
-    if (!done.insert(pkgDir).second) return;
-    createLinks(pkgDir, out, priority);
+    State state;
 
-    try {
-        for (const auto & p : tokenizeString<std::vector<string>>(
-                readFile(pkgDir + "/nix-support/propagated-user-env-packages"), " \n"))
-            if (!done.count(p))
-                postponed.insert(p);
-    } catch (SysError & e) {
-        if (e.errNo != ENOENT && e.errNo != ENOTDIR) throw;
-    }
-}
+    std::set<Path> done, postponed;
 
-struct Package {
-    Path path;
-    bool active;
-    int priority;
-    Package(Path path, bool active, int priority) : path{path}, active{active}, priority{priority} {}
-};
+    auto addPkg = [&](const Path & pkgDir, int priority) {
+        if (!done.insert(pkgDir).second) return;
+        createLinks(state, pkgDir, out, priority);
 
-typedef std::vector<Package> Packages;
-
-void builtinBuildenv(const BasicDerivation & drv)
-{
-    auto getAttr = [&](const string & name) {
-        auto i = drv.env.find(name);
-        if (i == drv.env.end()) throw Error("attribute '%s' missing", name);
-        return i->second;
-    };
-
-    out = getAttr("out");
-    createDirs(out);
-
-    /* Convert the stuff we get from the environment back into a
-     * coherent data type. */
-    Packages pkgs;
-    auto derivations = tokenizeString<Strings>(getAttr("derivations"));
-    while (!derivations.empty()) {
-        /* !!! We're trusting the caller to structure derivations env var correctly */
-        auto active = derivations.front(); derivations.pop_front();
-        auto priority = stoi(derivations.front()); derivations.pop_front();
-        auto outputs = stoi(derivations.front()); derivations.pop_front();
-        for (auto n = 0; n < outputs; n++) {
-            auto path = derivations.front(); derivations.pop_front();
-            pkgs.emplace_back(path, active != "false", priority);
+        try {
+            for (const auto & p : tokenizeString<std::vector<string>>(
+                    readFile(pkgDir + "/nix-support/propagated-user-env-packages"), " \n"))
+                if (!done.count(p))
+                    postponed.insert(p);
+        } catch (SysError & e) {
+            if (e.errNo != ENOENT && e.errNo != ENOTDIR) throw;
         }
-    }
+    };
 
     /* Symlink to the packages that have been installed explicitly by the
      * user. Process in priority order to reduce unnecessary
@@ -189,13 +150,42 @@ void builtinBuildenv(const BasicDerivation & drv)
      */
     auto priorityCounter = 1000;
     while (!postponed.empty()) {
-        auto pkgDirs = postponed;
-        postponed = FileProp{};
+        std::set<Path> pkgDirs;
+        postponed.swap(pkgDirs);
         for (const auto & pkgDir : pkgDirs)
             addPkg(pkgDir, priorityCounter++);
     }
 
-    printError("created %d symlinks in user environment", symlinks);
+    debug("created %d symlinks in user environment", state.symlinks);
+}
+
+void builtinBuildenv(const BasicDerivation & drv)
+{
+    auto getAttr = [&](const string & name) {
+        auto i = drv.env.find(name);
+        if (i == drv.env.end()) throw Error("attribute '%s' missing", name);
+        return i->second;
+    };
+
+    Path out = getAttr("out");
+    createDirs(out);
+
+    /* Convert the stuff we get from the environment back into a
+     * coherent data type. */
+    Packages pkgs;
+    auto derivations = tokenizeString<Strings>(getAttr("derivations"));
+    while (!derivations.empty()) {
+        /* !!! We're trusting the caller to structure derivations env var correctly */
+        auto active = derivations.front(); derivations.pop_front();
+        auto priority = stoi(derivations.front()); derivations.pop_front();
+        auto outputs = stoi(derivations.front()); derivations.pop_front();
+        for (auto n = 0; n < outputs; n++) {
+            auto path = derivations.front(); derivations.pop_front();
+            pkgs.emplace_back(path, active != "false", priority);
+        }
+    }
+
+    buildProfile(out, std::move(pkgs));
 
     createSymlink(getAttr("manifest"), out + "/manifest.nix");
 }

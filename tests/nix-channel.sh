@@ -32,10 +32,10 @@ if [ "$xmllint" != false ]; then
     $xmllint --noout $TEST_ROOT/meta.xml || fail "malformed XML"
 fi
 grep -q 'meta.*description.*Random test package' $TEST_ROOT/meta.xml
-grep -q 'item.*attrPath="foo".*name="dependencies"' $TEST_ROOT/meta.xml
+grep -q 'item.*attrPath="foo".*name="dependencies-top"' $TEST_ROOT/meta.xml
 
 # Do an install.
-nix-env -i dependencies
+nix-env -i dependencies-top
 [ -e $TEST_HOME/.nix-profile/foobar ]
 
 clearProfiles
@@ -51,9 +51,9 @@ if [ "$xmllint" != false ]; then
     $xmllint --noout $TEST_ROOT/meta.xml || fail "malformed XML"
 fi
 grep -q 'meta.*description.*Random test package' $TEST_ROOT/meta.xml
-grep -q 'item.*attrPath="foo".*name="dependencies"' $TEST_ROOT/meta.xml
+grep -q 'item.*attrPath="foo".*name="dependencies-top"' $TEST_ROOT/meta.xml
 
 # Do an install.
-nix-env -i dependencies
+nix-env -i dependencies-top
 [ -e $TEST_HOME/.nix-profile/foobar ]
 

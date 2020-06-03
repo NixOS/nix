@@ -20,13 +20,6 @@ namespace nix {
    must be deleted and recreated on startup.) */
 #define DEFAULT_SOCKET_PATH "/daemon-socket/socket"
 
-/* chroot-like behavior from Apple's sandbox */
-#if __APPLE__
-    #define DEFAULT_ALLOWED_IMPURE_PREFIXES "/System/Library /usr/lib /dev /bin/sh"
-#else
-    #define DEFAULT_ALLOWED_IMPURE_PREFIXES ""
-#endif
-
 Settings settings;
 
 static GlobalConfig::Register r1(&settings);
@@ -38,6 +31,7 @@ Settings::Settings()
     , nixLogDir(canonPath(getEnv("NIX_LOG_DIR").value_or(NIX_LOG_DIR)))
     , nixStateDir(canonPath(getEnv("NIX_STATE_DIR").value_or(NIX_STATE_DIR)))
     , nixConfDir(canonPath(getEnv("NIX_CONF_DIR").value_or(NIX_CONF_DIR)))
+    , nixUserConfFiles(getUserConfigFiles())
     , nixLibexecDir(canonPath(getEnv("NIX_LIBEXEC_DIR").value_or(NIX_LIBEXEC_DIR)))
     , nixBinDir(canonPath(getEnv("NIX_BIN_DIR").value_or(NIX_BIN_DIR)))
     , nixManDir(canonPath(NIX_MAN_DIR))
@@ -68,7 +62,12 @@ Settings::Settings()
     sandboxPaths = tokenizeString<StringSet>("/bin/sh=" SANDBOX_SHELL);
 #endif
 
-    allowedImpureHostPrefixes = tokenizeString<StringSet>(DEFAULT_ALLOWED_IMPURE_PREFIXES);
+
+/* chroot-like behavior from Apple's sandbox */
+#if __APPLE__
+    sandboxPaths = tokenizeString<StringSet>("/System/Library/Frameworks /System/Library/PrivateFrameworks /bin/sh /bin/bash /private/tmp /private/var/tmp /usr/lib");
+    allowedImpureHostPrefixes = tokenizeString<StringSet>("/System/Library /usr/lib /dev /bin/sh");
+#endif
 }
 
 void loadConfFile()
@@ -79,11 +78,27 @@ void loadConfFile()
        ~/.nix/nix.conf or the command line. */
     globalConfig.resetOverriden();
 
-    auto dirs = getConfigDirs();
-    // Iterate over them in reverse so that the ones appearing first in the path take priority
-    for (auto dir = dirs.rbegin(); dir != dirs.rend(); dir++) {
-        globalConfig.applyConfigFile(*dir + "/nix/nix.conf");
+    auto files = settings.nixUserConfFiles;
+    for (auto file = files.rbegin(); file != files.rend(); file++) {
+        globalConfig.applyConfigFile(*file);
     }
+}
+
+std::vector<Path> getUserConfigFiles()
+{
+    // Use the paths specified in NIX_USER_CONF_FILES if it has been defined
+    auto nixConfFiles = getEnv("NIX_USER_CONF_FILES");
+    if (nixConfFiles.has_value()) {
+        return tokenizeString<std::vector<string>>(nixConfFiles.value(), ":");
+    }
+
+    // Use the paths specified by the XDG spec
+    std::vector<Path> files;
+    auto dirs = getConfigDirs();
+    for (auto & dir : dirs) {
+        files.insert(files.end(), dir + "/nix/nix.conf");
+    }
+    return files;
 }
 
 unsigned int Settings::getDefaultCores()
@@ -115,7 +130,7 @@ bool Settings::isExperimentalFeatureEnabled(const std::string & name)
 void Settings::requireExperimentalFeature(const std::string & name)
 {
     if (!isExperimentalFeatureEnabled(name))
-        throw Error("experimental Nix feature '%s' is disabled", name);
+        throw Error("experimental Nix feature '%1%' is disabled; use '--experimental-features %1%' to override", name);
 }
 
 bool Settings::isWSL1()
@@ -152,21 +167,24 @@ template<> void BaseSetting<SandboxMode>::toJSON(JSONPlaceholder & out)
 
 template<> void BaseSetting<SandboxMode>::convertToArg(Args & args, const std::string & category)
 {
-    args.mkFlag()
-        .longName(name)
-        .description("Enable sandboxing.")
-        .handler([=](std::vector<std::string> ss) { override(smEnabled); })
-        .category(category);
-    args.mkFlag()
-        .longName("no-" + name)
-        .description("Disable sandboxing.")
-        .handler([=](std::vector<std::string> ss) { override(smDisabled); })
-        .category(category);
-    args.mkFlag()
-        .longName("relaxed-" + name)
-        .description("Enable sandboxing, but allow builds to disable it.")
-        .handler([=](std::vector<std::string> ss) { override(smRelaxed); })
-        .category(category);
+    args.addFlag({
+        .longName = name,
+        .description = "Enable sandboxing.",
+        .category = category,
+        .handler = {[=]() { override(smEnabled); }}
+    });
+    args.addFlag({
+        .longName = "no-" + name,
+        .description = "Disable sandboxing.",
+        .category = category,
+        .handler = {[=]() { override(smDisabled); }}
+    });
+    args.addFlag({
+        .longName = "relaxed-" + name,
+        .description = "Enable sandboxing, but allow builds to disable it.",
+        .category = category,
+        .handler = {[=]() { override(smRelaxed); }}
+    });
 }
 
 void MaxBuildJobsSetting::set(const std::string & str)

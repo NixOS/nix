@@ -30,8 +30,10 @@ struct CmdCatStore : StoreCommand, MixCat
 
     std::string description() override
     {
-        return "print the contents of a store file on stdout";
+        return "print the contents of a file in the Nix store on stdout";
     }
+
+    Category category() override { return catUtility; }
 
     void run(ref<Store> store) override
     {
@@ -51,8 +53,10 @@ struct CmdCatNar : StoreCommand, MixCat
 
     std::string description() override
     {
-        return "print the contents of a file inside a NAR file";
+        return "print the contents of a file inside a NAR file on stdout";
     }
+
+    Category category() override { return catUtility; }
 
     void run(ref<Store> store) override
     {

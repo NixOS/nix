@@ -5,23 +5,25 @@
 
 using namespace nix;
 
-struct CmdBuild : MixDryRun, InstallablesCommand
+struct CmdBuild : InstallablesCommand, MixDryRun, MixProfile
 {
     Path outLink = "result";
 
     CmdBuild()
     {
-        mkFlag()
-            .longName("out-link")
-            .shortName('o')
-            .description("path of the symlink to the build result")
-            .labels({"path"})
-            .dest(&outLink);
+        addFlag({
+            .longName = "out-link",
+            .shortName = 'o',
+            .description = "path of the symlink to the build result",
+            .labels = {"path"},
+            .handler = {&outLink},
+        });
 
-        mkFlag()
-            .longName("no-link")
-            .description("do not create a symlink to the build result")
-            .set(&outLink, Path(""));
+        addFlag({
+            .longName = "no-link",
+            .description = "do not create a symlink to the build result",
+            .handler = {&outLink, Path("")},
+        });
     }
 
     std::string description() override
@@ -40,6 +42,10 @@ struct CmdBuild : MixDryRun, InstallablesCommand
                 "To build the build.x86_64-linux attribute from release.nix:",
                 "nix build -f release.nix build.x86_64-linux"
             },
+            Example{
+                "To make a profile point at GNU Hello:",
+                "nix build --profile /tmp/profile nixpkgs.hello"
+            },
         };
     }
 
@@ -49,18 +55,19 @@ struct CmdBuild : MixDryRun, InstallablesCommand
 
         if (dryRun) return;
 
-        for (size_t i = 0; i < buildables.size(); ++i) {
-            auto & b(buildables[i]);
-
-            if (outLink != "")
-                for (auto & output : b.outputs)
+        if (outLink != "") {
+            for (size_t i = 0; i < buildables.size(); ++i) {
+                for (auto & output : buildables[i].outputs)
                     if (auto store2 = store.dynamic_pointer_cast<LocalFSStore>()) {
                         std::string symlink = outLink;
                         if (i) symlink += fmt("-%d", i);
                         if (output.first != "out") symlink += fmt("-%s", output.first);
                         store2->addPermRoot(output.second, absPath(symlink), true);
                     }
+            }
         }
+
+        updateProfile(buildables);
     }
 };
 

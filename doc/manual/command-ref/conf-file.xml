@@ -19,26 +19,30 @@
 
 <refsection><title>Description</title>
 
-<para>Nix reads settings from two configuration files:</para>
+<para>By default Nix reads settings from the following places:</para>
 
-<itemizedlist>
+<para>The system-wide configuration file
+<filename><replaceable>sysconfdir</replaceable>/nix/nix.conf</filename>
+(i.e. <filename>/etc/nix/nix.conf</filename> on most systems), or
+<filename>$NIX_CONF_DIR/nix.conf</filename> if
+<envar>NIX_CONF_DIR</envar> is set. Values loaded in this file are not forwarded to the Nix daemon. The
+client assumes that the daemon has already loaded them.
+</para>
 
-  <listitem>
-    <para>The system-wide configuration file
-    <filename><replaceable>sysconfdir</replaceable>/nix/nix.conf</filename>
-    (i.e. <filename>/etc/nix/nix.conf</filename> on most systems), or
-    <filename>$NIX_CONF_DIR/nix.conf</filename> if
-    <envar>NIX_CONF_DIR</envar> is set.</para>
-  </listitem>
+<para>User-specific configuration files:</para>
 
-  <listitem>
-    <para>The user configuration file
-    <filename>$XDG_CONFIG_HOME/nix/nix.conf</filename>, or
-    <filename>~/.config/nix/nix.conf</filename> if
-    <envar>XDG_CONFIG_HOME</envar> is not set.</para>
-  </listitem>
+<para>
+  If <envar>NIX_USER_CONF_FILES</envar> is set, then each path separated by
+  <literal>:</literal> will be loaded in reverse order.
+</para>
 
-</itemizedlist>
+<para>
+  Otherwise it will look for <filename>nix/nix.conf</filename> files in
+  <envar>XDG_CONFIG_DIRS</envar> and <envar>XDG_CONFIG_HOME</envar>.
+
+  The default location is <filename>$HOME/.config/nix.conf</filename> if
+  those environment variables are unset.
+</para>
 
 <para>The configuration files consist of
 <literal><replaceable>name</replaceable> =
@@ -382,7 +386,7 @@ false</literal>.</para>
 
 <programlisting>
 builtins.fetchurl {
-  url = https://example.org/foo-1.2.3.tar.xz;
+  url = "https://example.org/foo-1.2.3.tar.xz";
   sha256 = "2c26b46b68ffc68ff99b453c1d30413413422d706483bfa0f98a5e886266e7ae";
 }
 </programlisting>

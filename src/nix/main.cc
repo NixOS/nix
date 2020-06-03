@@ -8,7 +8,7 @@
 #include "shared.hh"
 #include "store-api.hh"
 #include "progress-bar.hh"
-#include "download.hh"
+#include "filetransfer.hh"
 #include "finally.hh"
 
 #include <sys/types.h>
@@ -55,18 +55,26 @@ struct NixArgs : virtual MultiCommand, virtual MixCommonArgs
 {
     bool printBuildLogs = false;
     bool useNet = true;
+    bool refresh = false;
 
     NixArgs() : MultiCommand(*RegisterCommand::commands), MixCommonArgs("nix")
     {
-        mkFlag()
-            .longName("help")
-            .description("show usage information")
-            .handler([&]() { showHelpAndExit(); });
+        categories.clear();
+        categories[Command::catDefault] = "Main commands";
+        categories[catSecondary] = "Infrequently used commands";
+        categories[catUtility] = "Utility/scripting commands";
+        categories[catNixInstallation] = "Commands for upgrading or troubleshooting your Nix installation";
 
-        mkFlag()
-            .longName("help-config")
-            .description("show configuration options")
-            .handler([&]() {
+        addFlag({
+            .longName = "help",
+            .description = "show usage information",
+            .handler = {[&]() { showHelpAndExit(); }},
+        });
+
+        addFlag({
+            .longName = "help-config",
+            .description = "show configuration options",
+            .handler = {[&]() {
                 std::cout << "The following configuration options are available:\n\n";
                 Table2 tbl;
                 std::map<std::string, Config::SettingInfo> settings;
@@ -75,23 +83,33 @@ struct NixArgs : virtual MultiCommand, virtual MixCommonArgs
                     tbl.emplace_back(s.first, s.second.description);
                 printTable(std::cout, tbl);
                 throw Exit();
-            });
+            }},
+        });
 
-        mkFlag()
-            .longName("print-build-logs")
-            .shortName('L')
-            .description("print full build logs on stderr")
-            .set(&printBuildLogs, true);
+        addFlag({
+            .longName = "print-build-logs",
+            .shortName = 'L',
+            .description = "print full build logs on stderr",
+            .handler = {&printBuildLogs, true},
+        });
 
-        mkFlag()
-            .longName("version")
-            .description("show version information")
-            .handler([&]() { printVersion(programName); });
+        addFlag({
+            .longName = "version",
+            .description = "show version information",
+            .handler = {[&]() { printVersion(programName); }},
+        });
 
-        mkFlag()
-            .longName("no-net")
-            .description("disable substituters and consider all previously downloaded files up-to-date")
-            .handler([&]() { useNet = false; });
+        addFlag({
+            .longName = "no-net",
+            .description = "disable substituters and consider all previously downloaded files up-to-date",
+            .handler = {[&]() { useNet = false; }},
+        });
+
+        addFlag({
+            .longName = "refresh",
+            .description = "consider all previously downloaded files out-of-date",
+            .handler = {[&]() { refresh = true; }},
+        });
     }
 
     void printFlags(std::ostream & out) override
@@ -99,8 +117,8 @@ struct NixArgs : virtual MultiCommand, virtual MixCommonArgs
         Args::printFlags(out);
         std::cout <<
             "\n"
-            "In addition, most configuration settings can be overriden using '--<name> <value>'.\n"
-            "Boolean settings can be overriden using '--<name>' or '--no-<name>'. See 'nix\n"
+            "In addition, most configuration settings can be overriden using '--" ANSI_ITALIC "name value" ANSI_NORMAL "'.\n"
+            "Boolean settings can be overriden using '--" ANSI_ITALIC "name" ANSI_NORMAL "' or '--no-" ANSI_ITALIC "name" ANSI_NORMAL "'. See 'nix\n"
             "--help-config' for a list of configuration settings.\n";
     }
 
@@ -109,10 +127,10 @@ struct NixArgs : virtual MultiCommand, virtual MixCommonArgs
         MultiCommand::printHelp(programName, out);
 
 #if 0
-        out << "\nFor full documentation, run 'man " << programName << "' or 'man " << programName << "-<COMMAND>'.\n";
+        out << "\nFor full documentation, run 'man " << programName << "' or 'man " << programName << "-" ANSI_ITALIC "COMMAND" ANSI_NORMAL "'.\n";
 #endif
 
-        std::cout << "\nNote: this program is EXPERIMENTAL and subject to change.\n";
+        std::cout << "\nNote: this program is " ANSI_RED "EXPERIMENTAL" ANSI_NORMAL " and subject to change.\n";
     }
 
     void showHelpAndExit()
@@ -149,11 +167,14 @@ void mainWrapped(int argc, char * * argv)
 
     args.parseCmdline(argvToStrings(argc, argv));
 
-    settings.requireExperimentalFeature("nix-command");
-
     initPlugins();
 
     if (!args.command) args.showHelpAndExit();
+
+    if (args.command->first != "repl"
+        && args.command->first != "doctor"
+        && args.command->first != "upgrade-nix")
+        settings.requireExperimentalFeature("nix-command");
 
     Finally f([]() { stopProgressBar(); });
 
@@ -170,14 +191,17 @@ void mainWrapped(int argc, char * * argv)
             settings.useSubstitutes = false;
         if (!settings.tarballTtl.overriden)
             settings.tarballTtl = std::numeric_limits<unsigned int>::max();
-        if (!downloadSettings.tries.overriden)
-            downloadSettings.tries = 0;
-        if (!downloadSettings.connectTimeout.overriden)
-            downloadSettings.connectTimeout = 1;
+        if (!fileTransferSettings.tries.overriden)
+            fileTransferSettings.tries = 0;
+        if (!fileTransferSettings.connectTimeout.overriden)
+            fileTransferSettings.connectTimeout = 1;
     }
 
-    args.command->prepare();
-    args.command->run();
+    if (args.refresh)
+        settings.tarballTtl = 0;
+
+    args.command->second->prepare();
+    args.command->second->run();
 }
 
 }

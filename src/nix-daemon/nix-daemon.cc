@@ -6,7 +6,7 @@
 #include "globals.hh"
 #include "derivations.hh"
 #include "finally.hh"
-#include "legacy.hh"
+#include "../nix/legacy.hh"
 #include "daemon.hh"
 
 #include <algorithm>

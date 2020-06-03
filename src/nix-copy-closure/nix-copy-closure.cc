@@ -1,6 +1,6 @@
 #include "shared.hh"
 #include "store-api.hh"
-#include "legacy.hh"
+#include "../nix/legacy.hh"
 
 using namespace nix;
 

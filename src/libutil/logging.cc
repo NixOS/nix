@@ -3,6 +3,7 @@
 
 #include <atomic>
 #include <nlohmann/json.hpp>
+#include <iostream>
 
 namespace nix {
 
@@ -22,6 +23,11 @@ Logger * logger = makeDefaultLogger();
 void Logger::warn(const std::string & msg)
 {
     log(lvlWarn, ANSI_YELLOW "warning:" ANSI_NORMAL " " + msg);
+}
+
+void Logger::writeToStdout(std::string_view s)
+{
+    std::cout << s << "\n";
 }
 
 class SimpleLogger : public Logger
@@ -198,7 +204,7 @@ bool handleJSONLogMessage(const std::string & msg,
 
         if (action == "start") {
             auto type = (ActivityType) json["type"];
-            if (trusted || type == actDownload)
+            if (trusted || type == actFileTransfer)
                 activities.emplace(std::piecewise_construct,
                     std::forward_as_tuple(json["id"]),
                     std::forward_as_tuple(*logger, (Verbosity) json["level"], type,

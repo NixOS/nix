@@ -13,13 +13,13 @@ HashType parseHashAlgo(const string & s) {
     return parseHashType(s);
 }
 
-void DerivationOutput::parseHashType(bool & recursive, HashType & hashType) const
+void DerivationOutput::parseHashType(FileIngestionMethod & recursive, HashType & hashType) const
 {
-    recursive = false;
+    recursive = FileIngestionMethod::Flat;
     string algo = hashAlgo;
 
     if (string(algo, 0, 2) == "r:") {
-        recursive = true;
+        recursive = FileIngestionMethod::Recursive;
         algo = string(algo, 2);
     }
 
@@ -29,7 +29,7 @@ void DerivationOutput::parseHashType(bool & recursive, HashType & hashType) cons
     hashType = hashType_loc;
 }
 
-void DerivationOutput::parseHashInfo(bool & recursive, Hash & hash) const
+void DerivationOutput::parseHashInfo(FileIngestionMethod & recursive, Hash & hash) const
 {
     HashType hashType;
     parseHashType(recursive, hashType);
@@ -75,7 +75,7 @@ bool BasicDerivation::isBuiltin() const
 
 
 StorePath writeDerivation(ref<Store> store,
-    const Derivation & drv, const string & name, RepairFlag repair)
+    const Derivation & drv, std::string_view name, RepairFlag repair)
 {
     auto references = cloneStorePathSet(drv.inputSrcs);
     for (auto & i : drv.inputDrvs)
@@ -83,8 +83,8 @@ StorePath writeDerivation(ref<Store> store,
     /* Note that the outputs of a derivation are *not* references
        (that can be missing (of course) and should not necessarily be
        held during a garbage collection). */
-    string suffix = name + drvExtension;
-    string contents = drv.unparse(*store, false);
+    auto suffix = std::string(name) + drvExtension;
+    auto contents = drv.unparse(*store, false);
     return settings.readOnlyMode
         ? store->computeStorePathForText(suffix, contents, references)
         : store->addTextToStore(suffix, contents, references, repair);
@@ -409,7 +409,7 @@ Hash hashDerivationModulo(Store & store, const Derivation & drv, bool maskOutput
         if (h == drvHashes.end()) {
             assert(store.isValidPath(i.first));
             h = drvHashes.insert_or_assign(i.first.clone(), hashDerivationModulo(store,
-                readDerivation(store, store.toRealPath(store.printStorePath(i.first))), false)).first;
+                readDerivation(store, store.toRealPath(i.first)), false)).first;
         }
         inputs2.insert_or_assign(h->second.to_string(Base16, false), i.second);
     }

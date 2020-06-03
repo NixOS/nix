@@ -4,7 +4,6 @@
 #include <nlohmann/json.hpp>
 
 using json = nlohmann::json;
-using std::unique_ptr;
 
 namespace nix {
 
@@ -13,69 +12,69 @@ namespace nix {
 class JSONSax : nlohmann::json_sax<json> {
     class JSONState {
     protected:
-        unique_ptr<JSONState> parent;
-        Value * v;
+        std::unique_ptr<JSONState> parent;
+        RootValue v;
     public:
-        virtual unique_ptr<JSONState> resolve(EvalState &)
+        virtual std::unique_ptr<JSONState> resolve(EvalState &)
         {
             throw std::logic_error("tried to close toplevel json parser state");
-        };
-        explicit JSONState(unique_ptr<JSONState>&& p) : parent(std::move(p)), v(nullptr) {};
-        explicit JSONState(Value* v) : v(v) {};
-        JSONState(JSONState& p) = delete;
-        Value& value(EvalState & state)
+        }
+        explicit JSONState(std::unique_ptr<JSONState> && p) : parent(std::move(p)) {}
+        explicit JSONState(Value * v) : v(allocRootValue(v)) {}
+        JSONState(JSONState & p) = delete;
+        Value & value(EvalState & state)
         {
-            if (v == nullptr)
-                v = state.allocValue();
-            return *v;
-        };
-        virtual ~JSONState() {};
-        virtual void add() {};
+            if (!v)
+                v = allocRootValue(state.allocValue());
+            return **v;
+        }
+        virtual ~JSONState() {}
+        virtual void add() {}
     };
 
     class JSONObjectState : public JSONState {
         using JSONState::JSONState;
-        ValueMap attrs = ValueMap();
-        virtual unique_ptr<JSONState> resolve(EvalState & state) override
+        ValueMap attrs;
+        std::unique_ptr<JSONState> resolve(EvalState & state) override
         {
-            Value& v = parent->value(state);
+            Value & v = parent->value(state);
             state.mkAttrs(v, attrs.size());
             for (auto & i : attrs)
                 v.attrs->push_back(Attr(i.first, i.second));
             return std::move(parent);
         }
-        virtual void add() override { v = nullptr; };
+        void add() override { v = nullptr; }
     public:
-        void key(string_t& name, EvalState & state)
+        void key(string_t & name, EvalState & state)
         {
-            attrs[state.symbols.create(name)] = &value(state);
+            attrs.insert_or_assign(state.symbols.create(name), &value(state));
         }
     };
 
     class JSONListState : public JSONState {
-        ValueVector values = ValueVector();
-        virtual unique_ptr<JSONState> resolve(EvalState & state) override
+        ValueVector values;
+        std::unique_ptr<JSONState> resolve(EvalState & state) override
         {
-            Value& v = parent->value(state);
+            Value & v = parent->value(state);
             state.mkList(v, values.size());
             for (size_t n = 0; n < values.size(); ++n) {
                 v.listElems()[n] = values[n];
             }
             return std::move(parent);
         }
-        virtual void add() override {
-            values.push_back(v);
+        void add() override {
+            values.push_back(*v);
             v = nullptr;
-        };
+        }
     public:
-        JSONListState(unique_ptr<JSONState>&& p, std::size_t reserve) : JSONState(std::move(p))
+        JSONListState(std::unique_ptr<JSONState> && p, std::size_t reserve) : JSONState(std::move(p))
         {
             values.reserve(reserve);
         }
     };
 
     EvalState & state;
-    unique_ptr<JSONState> rs;
+    std::unique_ptr<JSONState> rs;
 
     template<typename T, typename... Args> inline bool handle_value(T f, Args... args)
     {
@@ -107,12 +106,12 @@ public:
         return handle_value(mkInt, val);
     }
 
-    bool number_float(number_float_t val, const string_t& s)
+    bool number_float(number_float_t val, const string_t & s)
     {
         return handle_value(mkFloat, val);
     }
 
-    bool string(string_t& val)
+    bool string(string_t & val)
     {
         return handle_value<void(Value&, const char*)>(mkString, val.c_str());
     }
@@ -123,7 +122,7 @@ public:
         return true;
     }
 
-    bool key(string_t& name)
+    bool key(string_t & name)
     {
         dynamic_cast<JSONObjectState*>(rs.get())->key(name, state);
         return true;

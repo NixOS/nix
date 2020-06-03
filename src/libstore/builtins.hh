@@ -6,7 +6,6 @@ namespace nix {
 
 // TODO: make pluggable.
 void builtinFetchurl(const BasicDerivation & drv, const std::string & netrcData);
-void builtinBuildenv(const BasicDerivation & drv);
 void builtinUnpackChannel(const BasicDerivation & drv);
 
 }

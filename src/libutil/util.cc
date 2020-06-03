@@ -97,10 +97,10 @@ void replaceEnv(std::map<std::string, std::string> newEnv)
 }
 
 
-Path absPath(Path path, Path dir)
+Path absPath(Path path, std::optional<Path> dir)
 {
     if (path[0] != '/') {
-        if (dir == "") {
+        if (!dir) {
 #ifdef __GNU__
             /* GNU (aka. GNU/Hurd) doesn't have any limitation on path
                lengths and doesn't define `PATH_MAX'.  */
@@ -116,7 +116,7 @@ Path absPath(Path path, Path dir)
             free(buf);
 #endif
         }
-        path = dir + "/" + path;
+        path = *dir + "/" + path;
     }
     return canonPath(path);
 }
@@ -268,16 +268,13 @@ bool isLink(const Path & path)
 }
 
 
-DirEntries readDirectory(const Path & path)
+DirEntries readDirectory(DIR *dir, const Path & path)
 {
     DirEntries entries;
     entries.reserve(64);
 
-    AutoCloseDir dir(opendir(path.c_str()));
-    if (!dir) throw SysError(format("opening directory '%1%'") % path);
-
     struct dirent * dirent;
-    while (errno = 0, dirent = readdir(dir.get())) { /* sic */
+    while (errno = 0, dirent = readdir(dir)) { /* sic */
         checkInterrupt();
         string name = dirent->d_name;
         if (name == "." || name == "..") continue;
@@ -292,6 +289,14 @@ DirEntries readDirectory(const Path & path)
     if (errno) throw SysError(format("reading directory '%1%'") % path);
 
     return entries;
+}
+
+DirEntries readDirectory(const Path & path)
+{
+    AutoCloseDir dir(opendir(path.c_str()));
+    if (!dir) throw SysError(format("opening directory '%1%'") % path);
+
+    return readDirectory(dir.get(), path);
 }
 
 
@@ -311,19 +316,16 @@ string readFile(int fd)
     if (fstat(fd, &st) == -1)
         throw SysError("statting file");
 
-    std::vector<unsigned char> buf(st.st_size);
-    readFull(fd, buf.data(), st.st_size);
-
-    return string((char *) buf.data(), st.st_size);
+    return drainFD(fd, true, st.st_size);
 }
 
 
-string readFile(const Path & path, bool drain)
+string readFile(const Path & path)
 {
     AutoCloseFD fd = open(path.c_str(), O_RDONLY | O_CLOEXEC);
     if (!fd)
         throw SysError(format("opening file '%1%'") % path);
-    return drain ? drainFD(fd.get()) : readFile(fd.get());
+    return readFile(fd.get());
 }
 
 
@@ -389,12 +391,14 @@ void writeLine(int fd, string s)
 }
 
 
-static void _deletePath(const Path & path, unsigned long long & bytesFreed)
+static void _deletePath(int parentfd, const Path & path, unsigned long long & bytesFreed)
 {
     checkInterrupt();
 
+    string name(baseNameOf(path));
+
     struct stat st;
-    if (lstat(path.c_str(), &st) == -1) {
+    if (fstatat(parentfd, name.c_str(), &st, AT_SYMLINK_NOFOLLOW) == -1) {
         if (errno == ENOENT) return;
         throw SysError(format("getting status of '%1%'") % path);
     }
@@ -406,18 +410,43 @@ static void _deletePath(const Path & path, unsigned long long & bytesFreed)
         /* Make the directory accessible. */
         const auto PERM_MASK = S_IRUSR | S_IWUSR | S_IXUSR;
         if ((st.st_mode & PERM_MASK) != PERM_MASK) {
-            if (chmod(path.c_str(), st.st_mode | PERM_MASK) == -1)
+            if (fchmodat(parentfd, name.c_str(), st.st_mode | PERM_MASK, 0) == -1)
                 throw SysError(format("chmod '%1%'") % path);
         }
 
-        for (auto & i : readDirectory(path))
-            _deletePath(path + "/" + i.name, bytesFreed);
+        int fd = openat(parentfd, path.c_str(), O_RDONLY);
+        if (!fd)
+            throw SysError(format("opening directory '%1%'") % path);
+        AutoCloseDir dir(fdopendir(fd));
+        if (!dir)
+            throw SysError(format("opening directory '%1%'") % path);
+        for (auto & i : readDirectory(dir.get(), path))
+            _deletePath(dirfd(dir.get()), path + "/" + i.name, bytesFreed);
     }
 
-    if (remove(path.c_str()) == -1) {
+    int flags = S_ISDIR(st.st_mode) ? AT_REMOVEDIR : 0;
+    if (unlinkat(parentfd, name.c_str(), flags) == -1) {
         if (errno == ENOENT) return;
         throw SysError(format("cannot unlink '%1%'") % path);
     }
+}
+
+static void _deletePath(const Path & path, unsigned long long & bytesFreed)
+{
+    Path dir = dirOf(path);
+    if (dir == "")
+        dir = "/";
+
+    AutoCloseFD dirfd(open(dir.c_str(), O_RDONLY));
+    if (!dirfd) {
+        // This really shouldn't fail silently, but it's left this way
+        // for backwards compatibility.
+        if (errno == ENOENT) return;
+
+        throw SysError(format("opening directory '%1%'") % path);
+    }
+
+    _deletePath(dirfd.get(), path, bytesFreed);
 }
 
 
@@ -475,6 +504,17 @@ Path createTempDir(const Path & tmpRoot, const Path & prefix,
         if (errno != EEXIST)
             throw SysError(format("creating directory '%1%'") % tmpDir);
     }
+}
+
+
+std::pair<AutoCloseFD, Path> createTempFile(const Path & prefix)
+{
+    Path tmpl(getEnv("TMPDIR").value_or("/tmp") + "/" + prefix + ".XXXXXX");
+    // Strictly speaking, this is UB, but who cares...
+    AutoCloseFD fd(mkstemp((char *) tmpl.c_str()));
+    if (!fd)
+        throw SysError("creating temporary file '%s'", tmpl);
+    return {std::move(fd), tmpl};
 }
 
 
@@ -622,9 +662,9 @@ void writeFull(int fd, const string & s, bool allowInterrupts)
 }
 
 
-string drainFD(int fd, bool block)
+string drainFD(int fd, bool block, const size_t reserveSize)
 {
-    StringSink sink;
+    StringSink sink(reserveSize);
     drainFD(fd, sink, block);
     return std::move(*sink.s);
 }
@@ -1203,28 +1243,6 @@ template<class C> C tokenizeString(std::string_view s, const string & separators
 template Strings tokenizeString(std::string_view s, const string & separators);
 template StringSet tokenizeString(std::string_view s, const string & separators);
 template vector<string> tokenizeString(std::string_view s, const string & separators);
-
-
-string concatStringsSep(const string & sep, const Strings & ss)
-{
-    string s;
-    for (auto & i : ss) {
-        if (s.size() != 0) s += sep;
-        s += i;
-    }
-    return s;
-}
-
-
-string concatStringsSep(const string & sep, const StringSet & ss)
-{
-    string s;
-    for (auto & i : ss) {
-        if (s.size() != 0) s += sep;
-        s += i;
-    }
-    return s;
-}
 
 
 string chomp(const string & s)

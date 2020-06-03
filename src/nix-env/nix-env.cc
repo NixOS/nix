@@ -13,7 +13,7 @@
 #include "json.hh"
 #include "value-to-json.hh"
 #include "xml-writer.hh"
-#include "legacy.hh"
+#include "../nix/legacy.hh"
 
 #include <cerrno>
 #include <ctime>
@@ -178,7 +178,7 @@ static void loadDerivations(EvalState & state, Path nixExprPath,
     Value vRoot;
     loadSourceExpr(state, nixExprPath, vRoot);
 
-    Value & v(*findAlongAttrPath(state, pathPrefix, autoArgs, vRoot));
+    Value & v(*findAlongAttrPath(state, pathPrefix, autoArgs, vRoot).first);
 
     getDerivations(state, v, pathPrefix, autoArgs, elems, true);
 
@@ -408,7 +408,7 @@ static void queryInstSources(EvalState & state,
             Value vRoot;
             loadSourceExpr(state, instSource.nixExprPath, vRoot);
             for (auto & i : args) {
-                Value & v(*findAlongAttrPath(state, i, *instSource.autoArgs, vRoot));
+                Value & v(*findAlongAttrPath(state, i, *instSource.autoArgs, vRoot).first);
                 getDerivations(state, v, "", *instSource.autoArgs, elems, true);
             }
             break;
@@ -718,28 +718,39 @@ static void uninstallDerivations(Globals & globals, Strings & selectors,
     while (true) {
         string lockToken = optimisticLockProfile(profile);
 
-        DrvInfos installedElems = queryInstalled(*globals.state, profile);
-        DrvInfos newElems;
+        DrvInfos workingElems = queryInstalled(*globals.state, profile);
 
-        for (auto & i : installedElems) {
-            DrvName drvName(i.queryName());
-            bool found = false;
-            for (auto & j : selectors)
-                /* !!! the repeated calls to followLinksToStorePath()
-                   are expensive, should pre-compute them. */
-                if ((isPath(j) && globals.state->store->parseStorePath(i.queryOutPath()) == globals.state->store->followLinksToStorePath(j))
-                    || DrvName(j).matches(drvName))
-                {
-                    printInfo("uninstalling '%s'", i.queryName());
-                    found = true;
-                    break;
-                }
-            if (!found) newElems.push_back(i);
+        for (auto & selector : selectors) {
+            DrvInfos::iterator split = workingElems.begin();
+            if (isPath(selector)) {
+                StorePath selectorStorePath = globals.state->store->followLinksToStorePath(selector);
+                split = std::partition(
+                    workingElems.begin(), workingElems.end(),
+                    [&selectorStorePath, globals](auto &elem) {
+                        return selectorStorePath != globals.state->store->parseStorePath(elem.queryOutPath());
+                    }
+                );
+            } else {
+                DrvName selectorName(selector);
+                split = std::partition(
+                    workingElems.begin(), workingElems.end(),
+                    [&selectorName](auto &elem){
+                        DrvName elemName(elem.queryName());
+                        return !selectorName.matches(elemName);
+                    }
+                );
+            }
+            if (split == workingElems.end())
+                warn("selector '%s' matched no installed derivations", selector);
+            for (auto removedElem = split; removedElem != workingElems.end(); removedElem++) {
+                printInfo("uninstalling '%s'", removedElem->queryName());
+            }
+            workingElems.erase(split, workingElems.end());
         }
 
         if (globals.dryRun) return;
 
-        if (createUserEnv(*globals.state, newElems,
+        if (createUserEnv(*globals.state, workingElems,
                 profile, settings.envKeepDerivations, lockToken)) break;
     }
 }
@@ -1428,21 +1439,8 @@ static int _main(int argc, char * * argv)
         if (globals.profile == "")
             globals.profile = getEnv("NIX_PROFILE").value_or("");
 
-        if (globals.profile == "") {
-            Path profileLink = getHome() + "/.nix-profile";
-            try {
-                if (!pathExists(profileLink)) {
-                    replaceSymlink(
-                        getuid() == 0
-                        ? settings.nixStateDir + "/profiles/default"
-                        : fmt("%s/profiles/per-user/%s/profile", settings.nixStateDir, getUserName()),
-                        profileLink);
-                }
-                globals.profile = absPath(readLink(profileLink), dirOf(profileLink));
-            } catch (Error &) {
-                globals.profile = profileLink;
-            }
-        }
+        if (globals.profile == "")
+            globals.profile = getDefaultProfile();
 
         op(globals, opFlags, opArgs);
 
