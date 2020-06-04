@@ -1007,7 +1007,7 @@ void LocalStore::addToStore(const ValidPathInfo & info, Source & source,
             /* While restoring the path from the NAR, compute the hash
                of the NAR. */
             std::unique_ptr<AbstractHashSink> hashSink;
-            if (info.ca.has_value() || !info.references.count(info.path))
+            if (!info.ca.has_value() || !info.references.count(info.path))
                 hashSink = std::make_unique<HashSink>(HashType::SHA256);
             else
                 hashSink = std::make_unique<HashModuloSink>(HashType::SHA256, storePathToHash(printStorePath(info.path)));
