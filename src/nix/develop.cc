@@ -110,7 +110,7 @@ StorePath getDerivationEnvironment(ref<Store> store, const StorePath & drvPath)
 
     auto builder = baseNameOf(drv.builder);
     if (builder != "bash")
-        throw Error("'nix dev-shell' only works on derivations that use 'bash' as their builder");
+        throw Error("'nix develop' only works on derivations that use 'bash' as their builder");
 
     auto getEnvShPath = store->addTextToStore("get-env.sh", getEnvSh, {});
 
@@ -236,11 +236,11 @@ struct Common : InstallableCommand, MixProfile
     }
 };
 
-struct CmdDevShell : Common, MixEnvironment
+struct CmdDevelop : Common, MixEnvironment
 {
     std::vector<std::string> command;
 
-    CmdDevShell()
+    CmdDevelop()
     {
         addFlag({
             .longName = "command",
@@ -264,19 +264,19 @@ struct CmdDevShell : Common, MixEnvironment
         return {
             Example{
                 "To get the build environment of GNU hello:",
-                "nix dev-shell nixpkgs#hello"
+                "nix develop nixpkgs#hello"
             },
             Example{
                 "To get the build environment of the default package of flake in the current directory:",
-                "nix dev-shell"
+                "nix develop"
             },
             Example{
                 "To store the build environment in a profile:",
-                "nix dev-shell --profile /tmp/my-shell nixpkgs#hello"
+                "nix develop --profile /tmp/my-shell nixpkgs#hello"
             },
             Example{
                 "To use a build environment previously recorded in a profile:",
-                "nix dev-shell /tmp/my-shell"
+                "nix develop /tmp/my-shell"
             },
         };
     }
@@ -351,4 +351,4 @@ struct CmdPrintDevEnv : Common
 };
 
 static auto r1 = registerCommand<CmdPrintDevEnv>("print-dev-env");
-static auto r2 = registerCommand<CmdDevShell>("dev-shell");
+static auto r2 = registerCommand<CmdDevelop>("develop");

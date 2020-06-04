@@ -303,6 +303,10 @@ MultiCommand::MultiCommand(const Commands & commands)
         .optional = true,
         .handler = {[=](std::string s) {
             assert(!command);
+            if (auto alias = get(deprecatedAliases, s)) {
+                warn("'%s' is a deprecated alias for '%s'", s, *alias);
+                s = *alias;
+            }
             if (auto prefix = needsCompletion(s)) {
                 for (auto & [name, command] : commands)
                     if (hasPrefix(name, *prefix))
