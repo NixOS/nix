@@ -110,6 +110,8 @@ struct NixArgs : virtual MultiCommand, virtual MixCommonArgs
             .description = "consider all previously downloaded files out-of-date",
             .handler = {[&]() { refresh = true; }},
         });
+
+        deprecatedAliases.insert({"dev-shell", "develop"});
     }
 
     void printFlags(std::ostream & out) override
