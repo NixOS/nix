@@ -227,10 +227,15 @@ MultiCommand::MultiCommand(const Commands & commands)
 {
     expectedArgs.push_back(ExpectedArg{"command", 1, true, [=](std::vector<std::string> ss) {
         assert(!command);
-        auto i = commands.find(ss[0]);
+        auto cmd = ss[0];
+        if (auto alias = get(deprecatedAliases, cmd)) {
+            warn("'%s' is a deprecated alias for '%s'", cmd, *alias);
+            cmd = *alias;
+        }
+        auto i = commands.find(cmd);
         if (i == commands.end())
-            throw UsageError("'%s' is not a recognised command", ss[0]);
-        command = {ss[0], i->second()};
+            throw UsageError("'%s' is not a recognised command", cmd);
+        command = {cmd, i->second()};
     }});
 
     categories[Command::catDefault] = "Available commands";

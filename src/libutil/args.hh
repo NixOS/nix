@@ -235,6 +235,8 @@ public:
 
     std::map<Command::Category, std::string> categories;
 
+    std::map<std::string, std::string> deprecatedAliases;
+
     // Selected command, if any.
     std::optional<std::pair<std::string, ref<Command>>> command;
 
