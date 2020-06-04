@@ -10,13 +10,16 @@ namespace nix {
 
 const std::string nativeSystem = SYSTEM;
 
-
+// addPrefix is used for show-trace.  Strings added with addPrefix
+// will print ahead of the error itself.
 BaseError & BaseError::addPrefix(const FormatOrString & fs)
 {
     prefix_ = fs.s + prefix_;
     return *this;
 }
 
+// c++ std::exception descendants must have a 'const char* what()' function.
+// This stringifies the error and caches it for use by what(), or similarly by msg().
 const string& BaseError::calcWhat() const
 {
     if (what_.has_value())
@@ -53,6 +56,7 @@ string showErrPos(const ErrPos &errPos)
     }
 }
 
+// if nixCode contains lines of code, print them to the ostream, indicating the error column.
 void printCodeLines(std::ostream &out, const string &prefix, const NixCode &nixCode)
 {
     // previous line of code.
