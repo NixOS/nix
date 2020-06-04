@@ -1265,7 +1265,7 @@ bool LocalStore::verifyStore(bool checkContents, RepairFlag repair)
                 printMsg(Verbosity::Talkative, "checking contents of '%s'", printStorePath(i));
 
                 std::unique_ptr<AbstractHashSink> hashSink;
-                if (info->ca || !info->references.count(info->path))
+                if (!info->ca || !info->references.count(info->path))
                     hashSink = std::make_unique<HashSink>(*info->narHash.type);
                 else
                     hashSink = std::make_unique<HashModuloSink>(*info->narHash.type, storePathToHash(printStorePath(info->path)));
