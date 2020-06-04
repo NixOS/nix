@@ -61,6 +61,9 @@ if [[ -n $(type -p git) ]]; then
     # Fetch the default branch.
     path=$(nix eval --raw "(builtins.fetchTree { type = \"git\"; url = file://$repo; treeHash = \"$treeHash\"; }).outPath")
     [[ $(cat $path/hello) = world ]]
+
+    # Submodules cause error.
+    (! nix eval --raw "(builtins.fetchTree { type = \"git\"; url = file://$repo; treeHash = \"$treeHash\"; submodules = true; }).outPath")
 else
     echo "Git not installed; skipping Git tests"
 fi
