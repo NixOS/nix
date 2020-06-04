@@ -56,6 +56,9 @@ struct Installable
     }
 
     virtual std::vector<std::pair<std::shared_ptr<eval_cache::AttrCursor>, std::string>>
+    getCursors(EvalState & state, bool useEvalCache);
+
+    std::pair<std::shared_ptr<eval_cache::AttrCursor>, std::string>
     getCursor(EvalState & state, bool useEvalCache);
 
     virtual FlakeRef nixpkgsFlakeRef() const
@@ -109,7 +112,7 @@ struct InstallableFlake : InstallableValue
     std::pair<Value *, Pos> toValue(EvalState & state) override;
 
     std::vector<std::pair<std::shared_ptr<eval_cache::AttrCursor>, std::string>>
-    getCursor(EvalState & state, bool useEvalCache) override;
+    getCursors(EvalState & state, bool useEvalCache) override;
 
     std::shared_ptr<flake::LockedFlake> getLockedFlake() const;
 

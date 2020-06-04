@@ -20,12 +20,14 @@ flake2Dir=$TEST_ROOT/flake2
 flake3Dir=$TEST_ROOT/flake3
 flake4Dir=$TEST_ROOT/flake4
 flake5Dir=$TEST_ROOT/flake5
+flake6Dir=$TEST_ROOT/flake6
 flake7Dir=$TEST_ROOT/flake7
+templatesDir=$TEST_ROOT/templates
 nonFlakeDir=$TEST_ROOT/nonFlake
 flakeA=$TEST_ROOT/flakeA
 flakeB=$TEST_ROOT/flakeB
 
-for repo in $flake1Dir $flake2Dir $flake3Dir $flake7Dir $nonFlakeDir $flakeA $flakeB; do
+for repo in $flake1Dir $flake2Dir $flake3Dir $flake7Dir $templatesDir $nonFlakeDir $flakeA $flakeB; do
     rm -rf $repo $repo.tmp
     mkdir $repo
     git -C $repo init
@@ -145,13 +147,22 @@ cat > $registry <<EOF
         "type": "indirect",
         "id": "flake1"
       }
+    },
+    { "from": {
+        "type": "indirect",
+        "id": "templates"
+      },
+      "to": {
+        "type": "git",
+        "url": "file://$templatesDir"
+      }
     }
   ]
 }
 EOF
 
 # Test 'nix flake list'.
-[[ $(nix registry list | wc -l) == 6 ]]
+[[ $(nix registry list | wc -l) == 7 ]]
 
 # Test 'nix flake info'.
 nix flake info flake1 | grep -q 'URL: .*flake1.*'
@@ -392,17 +403,60 @@ nix build -o $TEST_ROOT/result flake4/removeXyzzy#sth
 
 # Testing the nix CLI
 nix registry add flake1 flake3
-[[ $(nix registry list | wc -l) == 7 ]]
+[[ $(nix registry list | wc -l) == 8 ]]
 nix registry pin flake1
-[[ $(nix registry list | wc -l) == 7 ]]
+[[ $(nix registry list | wc -l) == 8 ]]
 nix registry remove flake1
-[[ $(nix registry list | wc -l) == 6 ]]
+[[ $(nix registry list | wc -l) == 7 ]]
 
 # Test 'nix flake init'.
+cat > $templatesDir/flake.nix <<EOF
+{
+  description = "Some templates";
+
+  outputs = { self }: {
+    templates = {
+      trivial = {
+        path = ./trivial;
+        description = "A trivial flake";
+      };
+    };
+    defaultTemplate = self.templates.trivial;
+  };
+}
+EOF
+
+mkdir $templatesDir/trivial
+
+cat > $templatesDir/trivial/flake.nix <<EOF
+{
+  description = "A flake for building Hello World";
+
+  outputs = { self, nixpkgs }: {
+    packages.x86_64-linux.hello = nixpkgs.legacyPackages.x86_64-linux.hello;
+    defaultPackage.x86_64-linux = self.packages.x86_64-linux.hello;
+  };
+}
+EOF
+
+git -C $templatesDir add flake.nix trivial/flake.nix
+git -C $templatesDir commit -m 'Initial'
+
+nix flake check templates
+nix flake show templates
+
 (cd $flake7Dir && nix flake init)
+(cd $flake7Dir && nix flake init) # check idempotence
 git -C $flake7Dir add flake.nix
 nix flake check $flake7Dir
+nix flake show $flake7Dir
 git -C $flake7Dir commit -a -m 'Initial'
+
+# Test 'nix flake new'.
+rm -rf $flake6Dir
+nix flake new -t templates#trivial $flake6Dir
+nix flake new -t templates#trivial $flake6Dir # check idempotence
+nix flake check $flake6Dir
 
 # Test 'nix flake clone'.
 rm -rf $TEST_ROOT/flake1-v2

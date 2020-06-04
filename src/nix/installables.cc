@@ -237,12 +237,21 @@ App Installable::toApp(EvalState & state)
 }
 
 std::vector<std::pair<std::shared_ptr<eval_cache::AttrCursor>, std::string>>
-Installable::getCursor(EvalState & state, bool useEvalCache)
+Installable::getCursors(EvalState & state, bool useEvalCache)
 {
     auto evalCache =
         std::make_shared<nix::eval_cache::EvalCache>(false, Hash(), state,
             [&]() { return toValue(state).first; });
     return {{evalCache->getRoot(), ""}};
+}
+
+std::pair<std::shared_ptr<eval_cache::AttrCursor>, std::string>
+Installable::getCursor(EvalState & state, bool useEvalCache)
+{
+    auto cursors = getCursors(state, useEvalCache);
+    if (cursors.empty())
+        throw Error("cannot find flake attribute '%s'", what());
+    return cursors[0];
 }
 
 struct InstallableStorePath : Installable
@@ -474,7 +483,7 @@ std::pair<Value *, Pos> InstallableFlake::toValue(EvalState & state)
 }
 
 std::vector<std::pair<std::shared_ptr<eval_cache::AttrCursor>, std::string>>
-InstallableFlake::getCursor(EvalState & state, bool useEvalCache)
+InstallableFlake::getCursors(EvalState & state, bool useEvalCache)
 {
     auto evalCache = openEvalCache(state,
         std::make_shared<flake::LockedFlake>(lockFlake(state, flakeRef, lockFlags)),

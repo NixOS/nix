@@ -320,6 +320,8 @@ Value & AttrCursor::forceValue()
     if (root->db && (!cachedValue || std::get_if<placeholder_t>(&cachedValue->second))) {
         if (v.type == tString)
             cachedValue = {root->db->setString(getKey(), v.string.s), v.string.s};
+        else if (v.type == tPath)
+            cachedValue = {root->db->setString(getKey(), v.path), v.path};
         else if (v.type == tBool)
             cachedValue = {root->db->setBool(getKey(), v.boolean), v.boolean};
         else if (v.type == tAttrs)
@@ -434,10 +436,10 @@ std::string AttrCursor::getString()
 
     auto & v = forceValue();
 
-    if (v.type != tString)
-        throw TypeError("'%s' is not a string", getAttrPathStr());
+    if (v.type != tString && v.type != tPath)
+        throw TypeError("'%s' is not a string but %s", getAttrPathStr(), showType(v.type));
 
-    return v.string.s;
+    return v.type == tString ? v.string.s : v.path;
 }
 
 bool AttrCursor::getBool()

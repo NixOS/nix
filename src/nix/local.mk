@@ -29,5 +29,3 @@ $(eval $(call install-symlink, $(bindir)/nix, $(libexecdir)/nix/build-remote))
 src/nix-env/user-env.cc: src/nix-env/buildenv.nix.gen.hh
 
 src/nix/develop.cc: src/nix/get-env.sh.gen.hh
-
-$(d)/flake.cc: $(d)/flake-template.nix.gen.hh

@@ -207,6 +207,8 @@ struct CmdFlakeCheck : FlakeCommand
         auto state = getEvalState();
         auto flake = lockFlake();
 
+        // FIXME: rewrite to use EvalCache.
+
         auto checkSystemName = [&](const std::string & system, const Pos & pos) {
             // FIXME: what's the format of "system"?
             if (system.find('-') == std::string::npos)
@@ -316,6 +318,40 @@ struct CmdFlakeCheck : FlakeCommand
                     throw Error("attribute 'config.system.build.toplevel' is not a derivation");
             } catch (Error & e) {
                 e.addPrefix(fmt("while checking the NixOS configuration '" ANSI_BOLD "%s" ANSI_NORMAL "' at %s:\n", attrPath, pos));
+                throw;
+            }
+        };
+
+        auto checkTemplate = [&](const std::string & attrPath, Value & v, const Pos & pos) {
+            try {
+                Activity act(*logger, lvlChatty, actUnknown,
+                    fmt("checking template '%s'", attrPath));
+
+                state->forceAttrs(v, pos);
+
+                if (auto attr = v.attrs->get(state->symbols.create("path"))) {
+                    if (attr->name == state->symbols.create("path")) {
+                        PathSet context;
+                        auto path = state->coerceToPath(*attr->pos, *attr->value, context);
+                        if (!store->isInStore(path))
+                            throw Error("template '%s' has a bad 'path' attribute");
+                        // TODO: recursively check the flake in 'path'.
+                    }
+                } else
+                    throw Error("template '%s' lacks attribute 'path'", attrPath);
+
+                if (auto attr = v.attrs->get(state->symbols.create("description")))
+                    state->forceStringNoCtx(*attr->value, *attr->pos);
+                else
+                    throw Error("template '%s' lacks attribute 'description'", attrPath);
+
+                for (auto & attr : *v.attrs) {
+                    std::string name(attr.name);
+                    if (name != "path" && name != "description")
+                        throw Error("template '%s' has unsupported attribute '%s'", attrPath, name);
+                }
+            } catch (Error & e) {
+                e.addPrefix(fmt("while checking the template '" ANSI_BOLD "%s" ANSI_NORMAL "' at %s:\n", attrPath, pos));
                 throw;
             }
         };
@@ -432,6 +468,16 @@ struct CmdFlakeCheck : FlakeCommand
                         else if (name == "hydraJobs")
                             checkHydraJobs(name, vOutput, pos);
 
+                        else if (name == "defaultTemplate")
+                            checkTemplate(name, vOutput, pos);
+
+                        else if (name == "templates") {
+                            state->forceAttrs(vOutput, pos);
+                            for (auto & attr : *vOutput.attrs)
+                                checkTemplate(fmt("%s.%s", name, attr.name),
+                                    *attr.value, *attr.pos);
+                        }
+
                         else
                             warn("unknown flake output '%s'", name);
 
@@ -449,29 +495,135 @@ struct CmdFlakeCheck : FlakeCommand
     }
 };
 
-struct CmdFlakeInit : virtual Args, Command
+struct CmdFlakeInitCommon : virtual Args, EvalCommand
+{
+    std::string templateUrl = "templates";
+    Path destDir;
+
+    CmdFlakeInitCommon()
+    {
+        addFlag({
+            .longName = "template",
+            .shortName = 't',
+            .description = "the template to use",
+            .labels = {"template"},
+            .handler = {&templateUrl},
+            .completer = {[&](size_t, std::string_view prefix) {
+                completeFlakeRef(prefix);
+            }}
+        });
+    }
+
+    void run(nix::ref<nix::Store> store) override
+    {
+        auto flakeDir = absPath(destDir);
+
+        auto evalState = getEvalState();
+
+        auto [templateFlakeRef, templateName] = parseFlakeRefWithFragment(templateUrl, absPath("."));
+
+        auto installable = InstallableFlake(
+            evalState, std::move(templateFlakeRef),
+            Strings{templateName == "" ? "defaultTemplate" : templateName},
+            Strings{"templates."}, { .writeLockFile = false });
+
+        auto cursor = installable.getCursor(*evalState, true);
+
+        auto templateDir = cursor.first->getAttr("path")->getString();
+
+        assert(store->isInStore(templateDir));
+
+        std::vector<Path> files;
+
+        std::function<void(const Path & from, const Path & to)> copyDir;
+        copyDir = [&](const Path & from, const Path & to)
+        {
+            createDirs(to);
+
+            for (auto & entry : readDirectory(from)) {
+                auto from2 = from + "/" + entry.name;
+                auto to2 = to + "/" + entry.name;
+                auto st = lstat(from2);
+                if (S_ISDIR(st.st_mode))
+                    copyDir(from2, to2);
+                else if (S_ISREG(st.st_mode)) {
+                    auto contents = readFile(from2);
+                    if (pathExists(to2)) {
+                        auto contents2 = readFile(to2);
+                        if (contents != contents2)
+                            throw Error("refusing to overwrite existing file '%s'", to2);
+                    } else
+                        writeFile(to2, contents);
+                }
+                else if (S_ISLNK(st.st_mode)) {
+                    auto target = readLink(from2);
+                    if (pathExists(to2)) {
+                        if (readLink(to2) != target)
+                            throw Error("refusing to overwrite existing symlink '%s'", to2);
+                    } else
+                          createSymlink(target, to2);
+                }
+                else
+                    throw Error("file '%s' has unsupported type", from2);
+                files.push_back(to2);
+            }
+        };
+
+        copyDir(templateDir, flakeDir);
+
+        if (pathExists(flakeDir + "/.git")) {
+            Strings args = { "-C", flakeDir, "add", "--intent-to-add", "--" };
+            for (auto & s : files) args.push_back(s);
+            runProgram("git", true, args);
+        }
+    }
+};
+
+struct CmdFlakeInit : CmdFlakeInitCommon
 {
     std::string description() override
     {
-        return "create a skeleton 'flake.nix' file in the current directory";
+        return "create a flake in the current directory from a template";
     }
 
-    void run() override
+    Examples examples() override
     {
-        Path flakeDir = absPath(".");
+        return {
+            Example{
+                "To create a flake using the default template:",
+                "nix flake init"
+            },
+            Example{
+                "To see available templates:",
+                "nix flake show templates"
+            },
+            Example{
+                "To create a flake from a specific template:",
+                "nix flake init -t templates#nixos-container"
+            },
+        };
+    }
 
-        Path flakePath = flakeDir + "/flake.nix";
+    CmdFlakeInit()
+    {
+        destDir = ".";
+    }
+};
 
-        if (pathExists(flakePath))
-            throw Error("file '%s' already exists", flakePath);
+struct CmdFlakeNew : CmdFlakeInitCommon
+{
+    std::string description() override
+    {
+        return "create a flake in the specified directory from a template";
+    }
 
-        writeFile(flakePath,
-          #include "flake-template.nix.gen.hh"
-        );
-
-        if (pathExists(flakeDir + "/.git"))
-            runProgram("git", true,
-                { "-C", flakeDir, "add", "--intent-to-add", "flake.nix" });
+    CmdFlakeNew()
+    {
+        expectArgs({
+            .label = "dest-dir",
+            .handler = {&destDir},
+            .completer = completePath
+        });
     }
 };
 
@@ -662,7 +814,8 @@ struct CmdFlakeShow : FlakeCommand
                             || attrPath[0] == "devShell"
                             || attrPath[0] == "nixosConfigurations"
                             || attrPath[0] == "nixosModules"
-                            || attrPath[0] == "defaultApp"))
+                            || attrPath[0] == "defaultApp"
+                            || attrPath[0] == "templates"))
                     || ((attrPath.size() == 1 || attrPath.size() == 2)
                         && (attrPath[0] == "checks"
                             || attrPath[0] == "packages"
@@ -714,6 +867,14 @@ struct CmdFlakeShow : FlakeCommand
                     logger->stdout("%s: app", headerPrefix);
                 }
 
+                else if (
+                    (attrPath.size() == 1 && attrPath[0] == "defaultTemplate") ||
+                    (attrPath.size() == 2 && attrPath[0] == "templates"))
+                {
+                    auto description = visitor.getAttr("description")->getString();
+                    logger->stdout("%s: template: " ANSI_BOLD "%s" ANSI_NORMAL, headerPrefix, description);
+                }
+
                 else {
                     logger->stdout("%s: %s",
                         headerPrefix,
@@ -743,6 +904,7 @@ struct CmdFlake : virtual MultiCommand, virtual Command
                 {"list-inputs", []() { return make_ref<CmdFlakeListInputs>(); }},
                 {"check", []() { return make_ref<CmdFlakeCheck>(); }},
                 {"init", []() { return make_ref<CmdFlakeInit>(); }},
+                {"new", []() { return make_ref<CmdFlakeNew>(); }},
                 {"clone", []() { return make_ref<CmdFlakeClone>(); }},
                 {"archive", []() { return make_ref<CmdFlakeArchive>(); }},
                 {"show", []() { return make_ref<CmdFlakeShow>(); }},
