@@ -501,7 +501,7 @@ StorePath RemoteStore::addToStore(const string & name, const Path & _srcPath,
             throw SysError(format("getting attributes of path '%1%'") % srcPath);
         if (S_ISDIR(st.st_mode))
             for (auto & i : readDirectory(srcPath))
-                addToStore(i.name, srcPath + "/" + i.name, method, hashAlgo, filter, repair);
+                addToStore("git", srcPath + "/" + i.name, method, hashAlgo, filter, repair);
     }
 
     auto conn(getConnection());

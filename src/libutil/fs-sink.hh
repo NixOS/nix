@@ -101,7 +101,10 @@ struct RestoreSink : ParseSink
             if (lstat(entry.c_str(), &st))
                 throw SysError(format("getting attributes of path '%1%'") % entry);
             if (S_ISREG(st.st_mode)) {
-                createRegularFile(destination + "/" + i.name);
+                if (st.st_mode & S_IXUSR)
+                    createExecutableFile(destination + "/" + i.name);
+                else
+                    createRegularFile(destination + "/" + i.name);
                 copyFile(entry);
             } else if (S_ISDIR(st.st_mode))
                 copyDirectory(entry, destination + "/" + i.name);
