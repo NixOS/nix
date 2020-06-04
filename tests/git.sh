@@ -1,5 +1,7 @@
 source common.sh
 
+clearStore
+
 try () {
     hash=$(nix hash-git --base16 --type sha1 $TEST_ROOT/hash-path)
     if test "$hash" != "$1"; then
@@ -34,3 +36,31 @@ echo Hello World! > $TEST_ROOT/dummy3/hello/hello
 path3=$(nix add-to-store --git $TEST_ROOT/dummy3)
 hash3=$(nix-store -q --hash $path3)
 test "$hash3" = "sha256:1i2x80840igikhbyy7nqf08ymx3a6n83x1fzyrxvddf0sdl5nqvp"
+
+if [[ -n $(type -p git) ]]; then
+    repo=$TEST_ROOT/git
+
+    export _NIX_FORCE_HTTP=1
+
+    rm -rf $repo $TEST_HOME/.cache/nix
+
+    git init $repo
+    git -C $repo config user.email "foobar@example.com"
+    git -C $repo config user.name "Foobar"
+
+    echo utrecht > $repo/hello
+    touch $repo/.gitignore
+    git -C $repo add hello .gitignore
+    git -C $repo commit -m 'Bla1'
+
+    echo world > $repo/hello
+    git -C $repo commit -m 'Bla2' -a
+
+    treeHash=$(git -C $repo rev-parse HEAD:)
+
+    # Fetch the default branch.
+    path=$(nix eval --raw "(builtins.fetchTree { type = \"git\"; url = file://$repo; treeHash = \"$treeHash\"; }).outPath")
+    [[ $(cat $path/hello) = world ]]
+else
+    echo "Git not installed; skipping Git tests"
+fi
