@@ -8,6 +8,20 @@
 
 namespace nix::fetchers {
 
+// get the default url attribute
+std::string getDefaultUrl(const Attrs & attrs, const std::string & url) {
+  auto s = maybeGetStrAttr(attrs, "url");
+  if (!s)
+    return url;
+  return *s;
+}
+
+
+// A github or gitlab url
+const static std::string urlRegexS = "[a-zA-Z0-9.]*"; // FIXME: check
+std::regex urlRegex(urlRegexS, std::regex::ECMAScript);
+
+
 struct GitArchiveInputScheme : InputScheme
 {
     virtual std::string type() = 0;
@@ -20,6 +34,7 @@ struct GitArchiveInputScheme : InputScheme
 
         std::optional<Hash> rev;
         std::optional<std::string> ref;
+        std::optional<std::string> host_url;
 
         if (path.size() == 2) {
         } else if (path.size() == 3) {
@@ -45,6 +60,11 @@ struct GitArchiveInputScheme : InputScheme
                     throw BadURL("URL '%s' contains multiple branch/tag names", url.url);
                 ref = value;
             }
+            else if (name == "url") {
+                if (!std::regex_match(value, urlRegex))
+                    throw BadURL("URL '%s' contains an invalid instance url", url.url);
+                host_url = value;
+            }
             // FIXME: barf on unsupported attributes
         }
 
@@ -57,6 +77,7 @@ struct GitArchiveInputScheme : InputScheme
         input.attrs.insert_or_assign("repo", path[1]);
         if (rev) input.attrs.insert_or_assign("rev", rev->gitRev());
         if (ref) input.attrs.insert_or_assign("ref", *ref);
+        if (host_url) input.attrs.insert_or_assign("url", *host_url);
 
         return input;
     }
@@ -171,8 +192,9 @@ struct GitHubInputScheme : GitArchiveInputScheme
 
     Hash getRevFromRef(nix::ref<Store> store, const Input & input) const override
     {
-        auto url = fmt("https://api.github.com/repos/%s/%s/commits/%s",
-            getStrAttr(input.attrs, "owner"), getStrAttr(input.attrs, "repo"), *input.getRef());
+        auto host_url = getDefaultUrl(input.attrs, "github.com");
+        auto url = fmt("https://api.%s/repos/%s/%s/commits/%s", // FIXME: check
+            host_url, getStrAttr(input.attrs, "owner"), getStrAttr(input.attrs, "repo"), *input.getRef());
         auto json = nlohmann::json::parse(
             readFile(
                 store->toRealPath(
@@ -186,9 +208,9 @@ struct GitHubInputScheme : GitArchiveInputScheme
     {
         // FIXME: use regular /archive URLs instead? api.github.com
         // might have stricter rate limits.
-
-        auto url = fmt("https://api.github.com/repos/%s/%s/tarball/%s",
-            getStrAttr(input.attrs, "owner"), getStrAttr(input.attrs, "repo"),
+        auto host_url = getDefaultUrl(input.attrs, "github.com");
+        auto url = fmt("https://api.%s/repos/%s/%s/tarball/%s", // FIXME: check if this is correct for self hosted instances
+            host_url, getStrAttr(input.attrs, "owner"), getStrAttr(input.attrs, "repo"),
             input.getRev()->to_string(Base16, false));
 
         std::string accessToken = settings.githubAccessToken.get();
@@ -200,8 +222,9 @@ struct GitHubInputScheme : GitArchiveInputScheme
 
     void clone(const Input & input, const Path & destDir) override
     {
-        Input::fromURL(fmt("git+ssh://git@github.com/%s/%s.git",
-                getStrAttr(input.attrs, "owner"), getStrAttr(input.attrs, "repo")))
+        auto host_url = getDefaultUrl(input.attrs, "github.com");
+        Input::fromURL(fmt("git+ssh://git@%s/%s/%s.git",
+                host_url, getStrAttr(input.attrs, "owner"), getStrAttr(input.attrs, "repo")))
             .applyOverrides(input.getRef().value_or("master"), input.getRev())
             .clone(destDir);
     }
@@ -213,8 +236,9 @@ struct GitLabInputScheme : GitArchiveInputScheme
 
     Hash getRevFromRef(nix::ref<Store> store, const Input & input) const override
     {
-        auto url = fmt("https://gitlab.com/api/v4/projects/%s%%2F%s/repository/branches/%s",
-            getStrAttr(input.attrs, "owner"), getStrAttr(input.attrs, "repo"), *input.getRef());
+        auto host_url = getDefaultUrl(input.attrs, "gitlab.com");
+        auto url = fmt("https://%s/api/v4/projects/%s%%2F%s/repository/branches/%s",
+            host_url, getStrAttr(input.attrs, "owner"), getStrAttr(input.attrs, "repo"), *input.getRef());
         auto json = nlohmann::json::parse(
             readFile(
                 store->toRealPath(
@@ -226,10 +250,10 @@ struct GitLabInputScheme : GitArchiveInputScheme
 
     std::string getDownloadUrl(const Input & input) const override
     {
-        // FIXME: This endpoint has a rate limit threshold of 5 requests per minute.
-
-        auto url = fmt("https://gitlab.com/api/v4/projects/%s%%2F%s/repository/archive.tar.gz?sha=%s",
-            getStrAttr(input.attrs, "owner"), getStrAttr(input.attrs, "repo"),
+        // FIXME: This endpoint has a rate limit threshold of 5 requests per minute
+        auto host_url = getDefaultUrl(input.attrs, "gitlab.com");
+        auto url = fmt("https://%s/api/v4/projects/%s%%2F%s/repository/archive.tar.gz?sha=%s",
+            host_url, getStrAttr(input.attrs, "owner"), getStrAttr(input.attrs, "repo"),
             input.getRev()->to_string(Base16, false));
 
         /* # FIXME: add privat token auth (`curl --header "PRIVATE-TOKEN: <your_access_token>"`)
@@ -242,8 +266,10 @@ struct GitLabInputScheme : GitArchiveInputScheme
 
     void clone(const Input & input, const Path & destDir) override
     {
-        Input::fromURL(fmt("git+ssh://git@gitlab.com/%s/%s.git",
-                getStrAttr(input.attrs, "owner"), getStrAttr(input.attrs, "repo")))
+        auto host_url = getDefaultUrl(input.attrs, "gitlab.com");
+        // FIXME: get username somewhere
+        Input::fromURL(fmt("git+ssh://git@%s/%s/%s.git",
+                host_url, getStrAttr(input.attrs, "owner"), getStrAttr(input.attrs, "repo")))
             .applyOverrides(input.getRef().value_or("master"), input.getRev())
             .clone(destDir);
     }
