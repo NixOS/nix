@@ -576,7 +576,7 @@ void LocalStore::checkDerivationOutputs(const StorePath & drvPath, const Derivat
 uint64_t LocalStore::addValidPath(State & state,
     const ValidPathInfo & info, bool checkOutputs)
 {
-    if (info.ca && !info.isContentAddressed(*this))
+    if (info.ca.has_value() && !info.isContentAddressed(*this))
         throw Error("cannot add path '%s' to the Nix store because it claims to be content-addressed but isn't",
             printStorePath(info.path));
 
@@ -1001,13 +1001,13 @@ void LocalStore::addToStore(const ValidPathInfo & info, Source & source,
 
             // text hashing has long been allowed to have non-self-references because it is used for drv files.
             bool refersToSelf = info.references.count(info.path) > 0;
-            if (info.ca && !info.references.empty() && !(std::holds_alternative<TextHash>(*info.ca) && !refersToSelf))
+            if (info.ca.has_value() && !info.references.empty() && !(std::holds_alternative<TextHash>(*info.ca) && !refersToSelf))
                 settings.requireExperimentalFeature("ca-references");
 
             /* While restoring the path from the NAR, compute the hash
                of the NAR. */
             std::unique_ptr<AbstractHashSink> hashSink;
-            if (info.ca || !info.references.count(info.path))
+            if (info.ca.has_value() || !info.references.count(info.path))
                 hashSink = std::make_unique<HashSink>(HashType::SHA256);
             else
                 hashSink = std::make_unique<HashModuloSink>(HashType::SHA256, storePathToHash(printStorePath(info.path)));
