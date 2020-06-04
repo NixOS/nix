@@ -157,10 +157,12 @@ public:
             auto name = storePathToName(getS(fields, 0));
             if (hasSuffix(name, ".drv"))
                 name = name.substr(0, name.size() - 4);
-            i->s = fmt("building " ANSI_BOLD "%s" ANSI_NORMAL, name);
             auto machineName = getS(fields, 1);
-            if (machineName != "")
-                i->s += fmt(" on " ANSI_BOLD "%s" ANSI_NORMAL, machineName);
+            i->s = fmt(
+                "building " ANSI_BOLD "%s" ANSI_NORMAL "%s",
+                name,
+                machineName != "" ? fmt(" on " ANSI_BOLD "%s" ANSI_NORMAL, machineName) : ""
+            );
             auto curRound = getI(fields, 2);
             auto nrRounds = getI(fields, 3);
             if (nrRounds != 1)
