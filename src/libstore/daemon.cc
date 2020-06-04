@@ -708,11 +708,7 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
         info.references = readStorePaths<StorePathSet>(*store, from);
         from >> info.registrationTime >> info.narSize >> info.ultimate;
         info.sigs = readStrings<StringSet>(from);
-        {
-            string caOptRaw;
-            from >> caOptRaw;
-            info.ca = parseContentAddressOpt(caOptRaw);
-        }
+        info.ca = parseContentAddressOpt(readString(from));
         from >> repair >> dontCheckSigs;
         if (!trusted && dontCheckSigs)
             dontCheckSigs = false;
