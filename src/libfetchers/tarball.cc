@@ -71,8 +71,8 @@ DownloadFileResult downloadFile(
         info.narHash = hashString(HashType::SHA256, *sink.s);
         info.narSize = sink.s->size();
         info.ca = FileSystemHash {
-            .method = FileIngestionMethod::Flat,
-            .hash = hash,
+            FileIngestionMethod::Flat,
+            hash,
         };
         auto source = StringSource { *sink.s };
         store->addToStore(info, source, NoRepair, NoCheckSigs);
