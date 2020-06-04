@@ -48,10 +48,10 @@ struct CmdAddToStore : MixDryRun, StoreCommand
         ValidPathInfo info(store->makeFixedOutputPath(FileIngestionMethod::Recursive, narHash, *namePart));
         info.narHash = narHash;
         info.narSize = sink.s->size();
-        *info.ca = FileSystemHash {
+        info.ca = std::optional { FileSystemHash {
             FileIngestionMethod::Recursive,
             info.narHash,
-        };
+        } };
 
         if (!dryRun) {
             auto source = StringSource { *sink.s };
