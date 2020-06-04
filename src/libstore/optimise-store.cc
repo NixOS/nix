@@ -57,7 +57,7 @@ LocalStore::InodeHash LocalStore::loadInodeHash()
     }
     if (errno) throw SysError(format("reading directory '%1%'") % linksDir);
 
-    printMsg(lvlTalkative, format("loaded %1% hash inodes") % inodeHash.size());
+    printMsg(Verbosity::Talkative, format("loaded %1% hash inodes") % inodeHash.size());
 
     return inodeHash;
 }
@@ -149,11 +149,11 @@ void LocalStore::optimisePath_(Activity * act, OptimiseStats & stats,
        Also note that if `path' is a symlink, then we're hashing the
        contents of the symlink (i.e. the result of readlink()), not
        the contents of the target (which may not even exist). */
-    Hash hash = hashPath(htSHA256, path).first;
+    Hash hash = hashPath(HashType::SHA256, path).first;
     debug(format("'%1%' has hash '%2%'") % path % hash.to_string());
 
     /* Check if this is a known hash. */
-    Path linkPath = linksDir + "/" + hash.to_string(Base32, false);
+    Path linkPath = linksDir + "/" + hash.to_string(Base::Base32, false);
 
  retry:
     if (!pathExists(linkPath)) {
@@ -199,7 +199,7 @@ void LocalStore::optimisePath_(Activity * act, OptimiseStats & stats,
         goto retry;
     }
 
-    printMsg(lvlTalkative, format("linking '%1%' to '%2%'") % path % linkPath);
+    printMsg(Verbosity::Talkative, format("linking '%1%' to '%2%'") % path % linkPath);
 
     /* Make the containing directory writable, but only if it's not
        the store itself (we don't want or need to mess with its
@@ -246,13 +246,13 @@ void LocalStore::optimisePath_(Activity * act, OptimiseStats & stats,
     stats.blocksFreed += st.st_blocks;
 
     if (act)
-        act->result(resFileLinked, st.st_size, st.st_blocks);
+        act->result(ResultType::FileLinked, st.st_size, st.st_blocks);
 }
 
 
 void LocalStore::optimiseStore(OptimiseStats & stats)
 {
-    Activity act(*logger, actOptimiseStore);
+    Activity act(*logger, ActivityType::OptimiseStore);
 
     auto paths = queryAllValidPaths();
     InodeHash inodeHash = loadInodeHash();
@@ -265,7 +265,7 @@ void LocalStore::optimiseStore(OptimiseStats & stats)
         addTempRoot(i);
         if (!isValidPath(i)) continue; /* path was GC'ed, probably */
         {
-            Activity act(*logger, lvlTalkative, actUnknown, fmt("optimising path '%s'", printStorePath(i)));
+            Activity act(*logger, Verbosity::Talkative, ActivityType::Unknown, fmt("optimising path '%s'", printStorePath(i)));
             optimisePath_(&act, stats, realStoreDir + "/" + std::string(i.to_string()), inodeHash);
         }
         done++;

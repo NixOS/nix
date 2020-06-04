@@ -47,7 +47,7 @@ Attrs Input::toAttrs() const
 {
     auto attrs = toAttrsInternal();
     if (narHash)
-        attrs.emplace("narHash", narHash->to_string(SRI));
+        attrs.emplace("narHash", narHash->to_string(Base::SRI));
     attrs.emplace("type", type());
     return attrs;
 }
@@ -67,7 +67,7 @@ std::pair<Tree, std::shared_ptr<const Input>> Input::fetchTree(ref<Store> store)
 
     if (narHash && narHash != input->narHash)
         throw Error("NAR hash mismatch in input '%s' (%s), expected '%s', got '%s'",
-            to_string(), tree.actualPath, narHash->to_string(SRI), input->narHash->to_string(SRI));
+            to_string(), tree.actualPath, narHash->to_string(Base::SRI), input->narHash->to_string(Base::SRI));
 
     return {std::move(tree), input};
 }

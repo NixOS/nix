@@ -18,6 +18,7 @@ nix_tests = \
   nar-access.sh \
   structured-attrs.sh \
   fetchGit.sh \
+  fetchGitRefs.sh \
   fetchGitSubmodules.sh \
   fetchMercurial.sh \
   signing.sh \
@@ -30,8 +31,7 @@ nix_tests = \
   nix-copy-ssh.sh \
   post-hook.sh \
   function-trace.sh \
-  recursive.sh \
-  git.sh
+  recursive.sh
   # parallel.sh
 
 install-tests += $(foreach x, $(nix_tests), tests/$(x))

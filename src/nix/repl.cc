@@ -218,12 +218,12 @@ void NixRepl::mainLoop(const std::vector<std::string> & files)
                 // input without clearing the input so far.
                 continue;
             } else {
-              printMsg(lvlError, format(error + "%1%%2%") % (settings.showTrace ? e.prefix() : "") % e.msg());
+              printMsg(Verbosity::Error, format(error + "%1%%2%") % (settings.showTrace ? e.prefix() : "") % e.msg());
             }
         } catch (Error & e) {
-            printMsg(lvlError, format(error + "%1%%2%") % (settings.showTrace ? e.prefix() : "") % e.msg());
+            printMsg(Verbosity::Error, format(error + "%1%%2%") % (settings.showTrace ? e.prefix() : "") % e.msg());
         } catch (Interrupted & e) {
-            printMsg(lvlError, format(error + "%1%%2%") % (settings.showTrace ? e.prefix() : "") % e.msg());
+            printMsg(Verbosity::Error, format(error + "%1%%2%") % (settings.showTrace ? e.prefix() : "") % e.msg());
         }
 
         // We handled the current input fully, so we should clear it

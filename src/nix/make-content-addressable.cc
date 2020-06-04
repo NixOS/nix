@@ -72,7 +72,7 @@ struct CmdMakeContentAddressable : StorePathsCommand, MixJSON
 
             *sink.s = rewriteStrings(*sink.s, rewrites);
 
-            HashModuloSink hashModuloSink(htSHA256, oldHashPart);
+            HashModuloSink hashModuloSink(HashType::SHA256, oldHashPart);
             hashModuloSink((unsigned char *) sink.s->data(), sink.s->size());
 
             auto narHash = hashModuloSink.finish().first;

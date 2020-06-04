@@ -314,7 +314,7 @@ struct XzCompressionSink : CompressionSink
             ret = lzma_stream_encoder_mt(&strm, &mt_options);
             done = true;
 #else
-            printMsg(lvlError, "warning: parallel XZ compression requested but not supported, falling back to single-threaded compression");
+            printMsg(Verbosity::Error, "warning: parallel XZ compression requested but not supported, falling back to single-threaded compression");
 #endif
         }
 

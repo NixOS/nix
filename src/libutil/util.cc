@@ -459,7 +459,7 @@ void deletePath(const Path & path)
 
 void deletePath(const Path & path, unsigned long long & bytesFreed)
 {
-    //Activity act(*logger, lvlDebug, format("recursively deleting path '%1%'") % path);
+    //Activity act(*logger, Verbosity::Debug, format("recursively deleting path '%1%'") % path);
     bytesFreed = 0;
     _deletePath(path, bytesFreed);
 }
@@ -1450,7 +1450,7 @@ string base64Decode(const string & s)
 
         char digit = decode[(unsigned char) c];
         if (digit == -1)
-            throw Error("invalid character in Base64 string");
+            throw Error("invalid character in Base::Base64 string");
 
         bits += 6;
         d = d << 6 | digit;

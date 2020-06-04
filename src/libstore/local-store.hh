@@ -157,7 +157,7 @@ public:
        true) or simply the contents of a regular file (if recursive ==
        false). */
     StorePath addToStoreFromDump(const string & dump, const string & name,
-        FileIngestionMethod method = FileIngestionMethod::Recursive, HashType hashAlgo = htSHA256, RepairFlag repair = NoRepair) override;
+        FileIngestionMethod method = FileIngestionMethod::Recursive, HashType hashAlgo = HashType::SHA256, RepairFlag repair = NoRepair) override;
 
     StorePath addTextToStore(const string & name, const string & s,
         const StorePathSet & references, RepairFlag repair) override;
