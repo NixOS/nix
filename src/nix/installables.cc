@@ -383,7 +383,7 @@ ref<eval_cache::EvalCache> openEvalCache(
     bool useEvalCache)
 {
     return ref(std::make_shared<nix::eval_cache::EvalCache>(
-        useEvalCache,
+        useEvalCache && evalSettings.pureEval,
         lockedFlake->getFingerprint(),
         state,
         [&state, lockedFlake]()
