@@ -154,7 +154,7 @@ public:
         state->activitiesByType[type].its.emplace(act, i);
 
         if (type == actBuild) {
-            auto name = storePathToName(getS(fields, 0));
+            std::string name(storePathToName(getS(fields, 0)));
             if (hasSuffix(name, ".drv"))
                 name = name.substr(0, name.size() - 4);
             i->s = fmt("building " ANSI_BOLD "%s" ANSI_NORMAL, name);
