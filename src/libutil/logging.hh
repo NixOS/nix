@@ -65,6 +65,9 @@ public:
 
     virtual void stop() { };
 
+    // Whether the logger prints the whole build log
+    virtual bool isVerbose() { return false; }
+
     virtual void log(Verbosity lvl, const FormatOrString & fs) = 0;
 
     void log(const FormatOrString & fs)
@@ -143,7 +146,7 @@ struct PushActivity
 
 extern Logger * logger;
 
-Logger * makeSimpleLogger();
+Logger * makeSimpleLogger(bool printBuildLogs = true);
 
 Logger * makeJSONLogger(Logger & prevLogger);
 

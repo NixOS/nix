@@ -8,6 +8,8 @@ LogFormat defaultLogFormat = LogFormat::raw;
 LogFormat parseLogFormat(const string &logFormatStr) {
     if (logFormatStr == "raw")
         return LogFormat::raw;
+    else if (logFormatStr == "raw-with-logs")
+        return LogFormat::rawWithLogs;
     else if (logFormatStr == "internal-json")
         return LogFormat::internalJson;
     else if (logFormatStr == "bar")
@@ -21,7 +23,9 @@ LogFormat parseLogFormat(const string &logFormatStr) {
 Logger *makeDefaultLogger() {
     switch (defaultLogFormat) {
     case LogFormat::raw:
-        return makeSimpleLogger();
+        return makeSimpleLogger(false);
+    case LogFormat::rawWithLogs:
+        return makeSimpleLogger(true);
     case LogFormat::internalJson:
         return makeJSONLogger(*makeSimpleLogger());
     case LogFormat::bar:

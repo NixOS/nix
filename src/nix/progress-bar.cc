@@ -119,6 +119,10 @@ public:
         quitCV.notify_one();
     }
 
+    bool isVerbose() override {
+        return printBuildLogs;
+    }
+
     void log(Verbosity lvl, const FormatOrString & fs) override
     {
         auto state(state_.lock());

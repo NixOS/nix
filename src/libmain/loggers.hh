@@ -6,6 +6,7 @@ namespace nix {
 
 enum class LogFormat {
   raw,
+  rawWithLogs,
   internalJson,
   bar,
   barWithLogs,

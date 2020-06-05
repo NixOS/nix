@@ -1642,7 +1642,7 @@ void DerivationGoal::buildDone()
                 worker.store.printStorePath(drvPath),
                 statusToString(status));
 
-            if (!settings.verboseBuild && !logTail.empty()) {
+            if (!logger->isVerbose() && !logTail.empty()) {
                 msg += (format("; last %d log lines:") % logTail.size()).str();
                 for (auto & line : logTail)
                     msg += "\n  " + line;
@@ -1691,11 +1691,7 @@ void DerivationGoal::buildDone()
                 }
 
                 void flushLine() {
-                    if (settings.verboseBuild) {
-                        printError("post-build-hook: " + currentLine);
-                    } else {
-                        act.result(resPostBuildLogLine, currentLine);
-                    }
+                    act.result(resPostBuildLogLine, currentLine);
                     currentLine.clear();
                 }
 
@@ -4155,13 +4151,8 @@ void DerivationGoal::flushLine()
         ;
 
     else {
-        if (settings.verboseBuild &&
-            (settings.printRepeatedBuilds || curRound == 1))
-            printError(currentLogLine);
-        else {
-            logTail.push_back(currentLogLine);
-            if (logTail.size() > settings.logLines) logTail.pop_front();
-        }
+        logTail.push_back(currentLogLine);
+        if (logTail.size() > settings.logLines) logTail.pop_front();
 
         act->result(resBuildLogLine, currentLogLine);
     }
