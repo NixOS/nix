@@ -63,6 +63,8 @@ public:
 
     virtual ~Logger() { }
 
+    virtual void stop() { };
+
     virtual void log(Verbosity lvl, const FormatOrString & fs) = 0;
 
     void log(const FormatOrString & fs)
@@ -141,7 +143,7 @@ struct PushActivity
 
 extern Logger * logger;
 
-Logger * makeDefaultLogger();
+Logger * makeSimpleLogger();
 
 Logger * makeJSONLogger(Logger & prevLogger);
 

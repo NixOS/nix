@@ -18,7 +18,7 @@ void setCurActivity(const ActivityId activityId)
     curActivity = activityId;
 }
 
-Logger * logger = makeDefaultLogger();
+Logger * logger = makeSimpleLogger();
 
 void Logger::warn(const std::string & msg)
 {
@@ -94,7 +94,7 @@ void writeToStderr(const string & s)
     }
 }
 
-Logger * makeDefaultLogger()
+Logger * makeSimpleLogger()
 {
     return new SimpleLogger();
 }

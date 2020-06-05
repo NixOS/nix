@@ -106,7 +106,7 @@ public:
         updateThread.join();
     }
 
-    void stop()
+    void stop() override
     {
         auto state(state_.lock());
         if (!state->active) return;
@@ -457,11 +457,17 @@ public:
     }
 };
 
+Logger *makeProgressBar(bool printBuildLogs)
+{
+    return new ProgressBar(
+        printBuildLogs,
+        isatty(STDERR_FILENO) && getEnv("TERM").value_or("dumb") != "dumb"
+    );
+}
+
 void startProgressBar(bool printBuildLogs)
 {
-    logger = new ProgressBar(
-        printBuildLogs,
-        isatty(STDERR_FILENO) && getEnv("TERM").value_or("dumb") != "dumb");
+    logger = makeProgressBar(printBuildLogs);
 }
 
 void stopProgressBar()
