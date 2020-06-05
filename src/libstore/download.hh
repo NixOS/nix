@@ -13,17 +13,18 @@ struct DownloadRequest
     std::string uri;
     std::string expectedETag;
     bool verifyTLS = true;
-    enum { yes, no, automatic } showProgress = yes;
     bool head = false;
-    size_t tries = 1;
+    size_t tries = 5;
     unsigned int baseRetryTimeMs = 250;
+    ActivityId parentAct;
 
-    DownloadRequest(const std::string & uri) : uri(uri) { }
+    DownloadRequest(const std::string & uri)
+        : uri(uri), parentAct(curActivity) { }
 };
 
 struct DownloadResult
 {
-    bool cached;
+    bool cached = false;
     std::string etag;
     std::string effectiveUrl;
     std::shared_ptr<std::string> data;
@@ -74,5 +75,8 @@ public:
 };
 
 bool isUri(const string & s);
+
+/* Decode data according to the Content-Encoding header. */
+ref<std::string> decodeContent(const std::string & encoding, ref<std::string> data);
 
 }

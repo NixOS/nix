@@ -1,7 +1,7 @@
 Nix, the purely functional package manager
 ------------------------------------------
 
-Nix is a new take on package management that is fairly unique. Because of it's
+Nix is a new take on package management that is fairly unique. Because of its
 purity aspects, a lot of issues found in traditional package managers don't
 appear with Nix.
 

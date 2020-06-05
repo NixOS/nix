@@ -124,13 +124,13 @@ or          { return OR_KW; }
 {INT}       { errno = 0;
               yylval->n = strtol(yytext, 0, 10);
               if (errno != 0)
-                  throw ParseError(format("invalid integer ‘%1%’") % yytext);
+                  throw ParseError(format("invalid integer '%1%'") % yytext);
               return INT;
             }
 {FLOAT}     { errno = 0;
               yylval->nf = strtod(yytext, 0);
               if (errno != 0)
-                  throw ParseError(format("invalid float ‘%1%’") % yytext);
+                  throw ParseError(format("invalid float '%1%'") % yytext);
               return FLOAT;
             }
 
@@ -142,25 +142,34 @@ or          { return OR_KW; }
 \{                           { return '{'; }
 <INSIDE_DOLLAR_CURLY>\{      { PUSH_STATE(INSIDE_DOLLAR_CURLY); return '{'; }
 
-<INITIAL,INSIDE_DOLLAR_CURLY>\"          { PUSH_STATE(STRING); return '"'; }
+<INITIAL,INSIDE_DOLLAR_CURLY>\" {
+                PUSH_STATE(STRING); return '"';
+              }
 <STRING>([^\$\"\\]|\$[^\{\"\\]|\\.|\$\\.)*\$/\" |
 <STRING>([^\$\"\\]|\$[^\{\"\\]|\\.|\$\\.)+ {
-              /* It is impossible to match strings ending with '$' with one
-                 regex because trailing contexts are only valid at the end
-                 of a rule. (A sane but undocumented limitation.) */
-              yylval->e = unescapeStr(data->symbols, yytext);
-              return STR;
-            }
+                /* It is impossible to match strings ending with '$' with one
+                   regex because trailing contexts are only valid at the end
+                   of a rule. (A sane but undocumented limitation.) */
+                yylval->e = unescapeStr(data->symbols, yytext);
+                return STR;
+              }
 <STRING>\$\{  { PUSH_STATE(INSIDE_DOLLAR_CURLY); return DOLLAR_CURLY; }
-<STRING>\"  { POP_STATE(); return '"'; }
-<STRING>.   return yytext[0]; /* just in case: shouldn't be reached */
+<STRING>\"    { POP_STATE(); return '"'; }
+<STRING>\$|\\|\$\\ {
+                /* This can only occur when we reach EOF, otherwise the above
+                   (...|\$[^\{\"\\]|\\.|\$\\.)+ would have triggered.
+                   This is technically invalid, but we leave the problem to the
+                   parser who fails with exact location. */
+                return STR;
+              }
 
 <INITIAL,INSIDE_DOLLAR_CURLY>\'\'(\ *\n)?     { PUSH_STATE(IND_STRING); return IND_STRING_OPEN; }
 <IND_STRING>([^\$\']|\$[^\{\']|\'[^\'\$])+ {
                    yylval->e = new ExprIndStr(yytext);
                    return IND_STR;
                  }
-<IND_STRING>\'\'\$ {
+<IND_STRING>\'\'\$ |
+<IND_STRING>\$   {
                    yylval->e = new ExprIndStr("$");
                    return IND_STR;
                  }
@@ -178,17 +187,16 @@ or          { return OR_KW; }
                    yylval->e = new ExprIndStr("'");
                    return IND_STR;
                  }
-<IND_STRING>.    return yytext[0]; /* just in case: shouldn't be reached */
 
 <INITIAL,INSIDE_DOLLAR_CURLY>{
 
 {PATH}      { if (yytext[yyleng-1] == '/')
-                  throw ParseError("path ‘%s’ has a trailing slash", yytext);
+                  throw ParseError("path '%s' has a trailing slash", yytext);
               yylval->path = strdup(yytext);
               return PATH;
             }
 {HPATH}     { if (yytext[yyleng-1] == '/')
-                  throw ParseError("path ‘%s’ has a trailing slash", yytext);
+                  throw ParseError("path '%s' has a trailing slash", yytext);
               yylval->path = strdup(yytext);
               return HPATH;
             }

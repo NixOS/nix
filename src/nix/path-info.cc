@@ -2,25 +2,24 @@
 #include "shared.hh"
 #include "store-api.hh"
 #include "json.hh"
+#include "common-args.hh"
 
 #include <iomanip>
 #include <algorithm>
 
 using namespace nix;
 
-struct CmdPathInfo : StorePathsCommand
+struct CmdPathInfo : StorePathsCommand, MixJSON
 {
     bool showSize = false;
     bool showClosureSize = false;
     bool showSigs = false;
-    bool json = false;
 
     CmdPathInfo()
     {
         mkFlag('s', "size", "print size of the NAR dump of each path", &showSize);
         mkFlag('S', "closure-size", "print sum size of the NAR dumps of the closure of each path", &showClosureSize);
         mkFlag(0, "sigs", "show signatures", &showSigs);
-        mkFlag(0, "json", "produce JSON output", &json);
     }
 
     std::string name() override
@@ -65,55 +64,12 @@ struct CmdPathInfo : StorePathsCommand
         for (auto & storePath : storePaths)
             pathLen = std::max(pathLen, storePath.size());
 
-        auto getClosureSize = [&](const Path & storePath) -> unsigned long long {
-            unsigned long long totalSize = 0;
-            PathSet closure;
-            store->computeFSClosure(storePath, closure, false, false);
-            for (auto & p : closure)
-                totalSize += store->queryPathInfo(p)->narSize;
-            return totalSize;
-        };
-
         if (json) {
-            JSONList jsonRoot(std::cout, true);
-
-            for (auto storePath : storePaths) {
-                auto info = store->queryPathInfo(storePath);
-                storePath = info->path;
-
-                auto jsonPath = jsonRoot.object();
-                jsonPath
-                    .attr("path", storePath)
-                    .attr("narHash", info->narHash.to_string())
-                    .attr("narSize", info->narSize);
-
-                if (showClosureSize)
-                    jsonPath.attr("closureSize", getClosureSize(storePath));
-
-                if (info->deriver != "")
-                    jsonPath.attr("deriver", info->deriver);
-
-                {
-                    auto jsonRefs = jsonPath.list("references");
-                    for (auto & ref : info->references)
-                        jsonRefs.elem(ref);
-                }
-
-                if (info->registrationTime)
-                    jsonPath.attr("registrationTime", info->registrationTime);
-
-                if (info->ultimate)
-                    jsonPath.attr("ultimate", info->ultimate);
-
-                if (info->ca != "")
-                    jsonPath.attr("ca", info->ca);
-
-                if (!info->sigs.empty()) {
-                    auto jsonSigs = jsonPath.list("signatures");
-                    for (auto & sig : info->sigs)
-                        jsonSigs.elem(sig);
-                }
-            }
+            JSONPlaceholder jsonRoot(std::cout, true);
+            store->pathInfoToJSON(jsonRoot,
+                // FIXME: preserve order?
+                PathSet(storePaths.begin(), storePaths.end()),
+                true, showClosureSize, AllowInvalid);
         }
 
         else {
@@ -128,7 +84,7 @@ struct CmdPathInfo : StorePathsCommand
                     std::cout << '\t' << std::setw(11) << info->narSize;
 
                 if (showClosureSize)
-                    std::cout << '\t' << std::setw(11) << getClosureSize(storePath);
+                    std::cout << '\t' << std::setw(11) << store->getClosureSize(storePath).first;
 
                 if (showSigs) {
                     std::cout << '\t';
@@ -143,7 +99,6 @@ struct CmdPathInfo : StorePathsCommand
             }
 
         }
-
     }
 };
 

@@ -37,23 +37,37 @@ template<class T> T readStorePaths(Store & store, Source & from)
 }
 
 template PathSet readStorePaths(Store & store, Source & from);
+template Paths readStorePaths(Store & store, Source & from);
 
 /* TODO: Separate these store impls into different files, give them better names */
-RemoteStore::RemoteStore(const Params & params, size_t maxConnections)
+RemoteStore::RemoteStore(const Params & params)
     : Store(params)
     , connections(make_ref<Pool<Connection>>(
-            maxConnections,
-            [this]() { return openConnection(); },
+            std::max(1, (int) maxConnections),
+            [this]() { return openConnectionWrapper(); },
             [](const ref<Connection> & r) { return r->to.good() && r->from.good(); }
             ))
 {
 }
 
 
-UDSRemoteStore::UDSRemoteStore(const Params & params, size_t maxConnections)
+ref<RemoteStore::Connection> RemoteStore::openConnectionWrapper()
+{
+    if (failed)
+        throw Error("opening a connection to remote store '%s' previously failed", getUri());
+    try {
+        return openConnection();
+    } catch (...) {
+        failed = true;
+        throw;
+    }
+}
+
+
+UDSRemoteStore::UDSRemoteStore(const Params & params)
     : Store(params)
     , LocalFSStore(params)
-    , RemoteStore(params, maxConnections)
+    , RemoteStore(params)
 {
 }
 
@@ -83,11 +97,11 @@ ref<RemoteStore::Connection> UDSRemoteStore::openConnection()
     struct sockaddr_un addr;
     addr.sun_family = AF_UNIX;
     if (socketPath.size() + 1 >= sizeof(addr.sun_path))
-        throw Error(format("socket path ‘%1%’ is too long") % socketPath);
+        throw Error(format("socket path '%1%' is too long") % socketPath);
     strcpy(addr.sun_path, socketPath.c_str());
 
-    if (connect(conn->fd.get(), (struct sockaddr *) &addr, sizeof(addr)) == -1)
-        throw SysError(format("cannot connect to daemon at ‘%1%’") % socketPath);
+    if (::connect(conn->fd.get(), (struct sockaddr *) &addr, sizeof(addr)) == -1)
+        throw SysError(format("cannot connect to daemon at '%1%'") % socketPath);
 
     conn->from.fd = conn->fd.get();
     conn->to.fd = conn->fd.get();
@@ -107,7 +121,7 @@ void RemoteStore::initConnection(Connection & conn)
         unsigned int magic = readInt(conn.from);
         if (magic != WORKER_MAGIC_2) throw Error("protocol mismatch");
 
-        conn.daemonVersion = readInt(conn.from);
+        conn.from >> conn.daemonVersion;
         if (GET_PROTOCOL_MAJOR(conn.daemonVersion) != GET_PROTOCOL_MAJOR(PROTOCOL_VERSION))
             throw Error("Nix daemon protocol version not supported");
         if (GET_PROTOCOL_MINOR(conn.daemonVersion) < 10)
@@ -128,7 +142,7 @@ void RemoteStore::initConnection(Connection & conn)
         conn.processStderr();
     }
     catch (Error & e) {
-        throw Error(format("cannot start daemon worker: %1%") % e.msg());
+        throw Error("cannot open connection to remote store '%s': %s", getUri(), e.what());
     }
 
     setOptions(conn);
@@ -152,9 +166,7 @@ void RemoteStore::setOptions(Connection & conn)
        << settings.useSubstitutes;
 
     if (GET_PROTOCOL_MINOR(conn.daemonVersion) >= 12) {
-        Settings::SettingsMap overrides = settings.getOverrides();
-        if (overrides["ssh-auth-sock"] == "")
-            overrides["ssh-auth-sock"] = getEnv("SSH_AUTH_SOCK");
+        auto overrides = settings.getSettings(true);
         conn.to << overrides.size();
         for (auto & i : overrides)
             conn.to << i.first << i.second;
@@ -169,12 +181,11 @@ bool RemoteStore::isValidPathUncached(const Path & path)
     auto conn(connections->get());
     conn->to << wopIsValidPath << path;
     conn->processStderr();
-    unsigned int reply = readInt(conn->from);
-    return reply != 0;
+    return readInt(conn->from);
 }
 
 
-PathSet RemoteStore::queryValidPaths(const PathSet & paths)
+PathSet RemoteStore::queryValidPaths(const PathSet & paths, SubstituteFlag maybeSubstitute)
 {
     auto conn(connections->get());
     if (GET_PROTOCOL_MINOR(conn->daemonVersion) < 12) {
@@ -245,8 +256,8 @@ void RemoteStore::querySubstitutablePathInfos(const PathSet & paths,
 
         conn->to << wopQuerySubstitutablePathInfos << paths;
         conn->processStderr();
-        unsigned int count = readInt(conn->from);
-        for (unsigned int n = 0; n < count; n++) {
+        size_t count = readNum<size_t>(conn->from);
+        for (size_t n = 0; n < count; n++) {
             Path path = readStorePath(*this, conn->from);
             SubstitutablePathInfo & info(infos[path]);
             info.deriver = readString(conn->from);
@@ -276,21 +287,20 @@ void RemoteStore::queryPathInfoUncached(const Path & path,
             throw;
         }
         if (GET_PROTOCOL_MINOR(conn->daemonVersion) >= 17) {
-            bool valid = readInt(conn->from) != 0;
-            if (!valid) throw InvalidPath(format("path ‘%s’ is not valid") % path);
+            bool valid; conn->from >> valid;
+            if (!valid) throw InvalidPath(format("path '%s' is not valid") % path);
         }
         auto info = std::make_shared<ValidPathInfo>();
         info->path = path;
         info->deriver = readString(conn->from);
         if (info->deriver != "") assertStorePath(info->deriver);
-        info->narHash = parseHash(htSHA256, readString(conn->from));
+        info->narHash = Hash(readString(conn->from), htSHA256);
         info->references = readStorePaths<PathSet>(*this, conn->from);
-        info->registrationTime = readInt(conn->from);
-        info->narSize = readLongLong(conn->from);
+        conn->from >> info->registrationTime >> info->narSize;
         if (GET_PROTOCOL_MINOR(conn->daemonVersion) >= 16) {
-            info->ultimate = readInt(conn->from) != 0;
+            conn->from >> info->ultimate;
             info->sigs = readStrings<StringSet>(conn->from);
-            info->ca = readString(conn->from);
+            conn->from >> info->ca;
         }
         return info;
     });
@@ -347,7 +357,7 @@ Path RemoteStore::queryPathFromHashPart(const string & hashPart)
 
 
 void RemoteStore::addToStore(const ValidPathInfo & info, const ref<std::string> & nar,
-    bool repair, bool dontCheckSigs, std::shared_ptr<FSAccessor> accessor)
+    RepairFlag repair, CheckSigsFlag checkSigs, std::shared_ptr<FSAccessor> accessor)
 {
     auto conn(connections->get());
 
@@ -377,17 +387,18 @@ void RemoteStore::addToStore(const ValidPathInfo & info, const ref<std::string> 
 
     else {
         conn->to << wopAddToStoreNar
-                 << info.path << info.deriver << printHash(info.narHash)
+                 << info.path << info.deriver << info.narHash.to_string(Base16, false)
                  << info.references << info.registrationTime << info.narSize
-                 << info.ultimate << info.sigs << *nar << repair << dontCheckSigs;
-        // FIXME: don't send nar as a string
+                 << info.ultimate << info.sigs << info.ca
+                 << repair << !checkSigs;
+        conn->to(*nar);
         conn->processStderr();
     }
 }
 
 
 Path RemoteStore::addToStore(const string & name, const Path & _srcPath,
-    bool recursive, HashType hashAlgo, PathFilter & filter, bool repair)
+    bool recursive, HashType hashAlgo, PathFilter & filter, RepairFlag repair)
 {
     if (repair) throw Error("repairing is not supported when building through the Nix daemon");
 
@@ -403,7 +414,9 @@ Path RemoteStore::addToStore(const string & name, const Path & _srcPath,
     try {
         conn->to.written = 0;
         conn->to.warn = true;
+        connections->incCapacity();
         dumpPath(srcPath, conn->to, filter);
+        connections->decCapacity();
         conn->to.warn = false;
         conn->processStderr();
     } catch (SysError & e) {
@@ -421,7 +434,7 @@ Path RemoteStore::addToStore(const string & name, const Path & _srcPath,
 
 
 Path RemoteStore::addTextToStore(const string & name, const string & s,
-    const PathSet & references, bool repair)
+    const PathSet & references, RepairFlag repair)
 {
     if (repair) throw Error("repairing is not supported when building through the Nix daemon");
 
@@ -514,7 +527,7 @@ Roots RemoteStore::findRoots()
     auto conn(connections->get());
     conn->to << wopFindRoots;
     conn->processStderr();
-    unsigned int count = readInt(conn->from);
+    size_t count = readNum<size_t>(conn->from);
     Roots result;
     while (count--) {
         Path link = readString(conn->from);
@@ -557,12 +570,12 @@ void RemoteStore::optimiseStore()
 }
 
 
-bool RemoteStore::verifyStore(bool checkContents, bool repair)
+bool RemoteStore::verifyStore(bool checkContents, RepairFlag repair)
 {
     auto conn(connections->get());
     conn->to << wopVerifyStore << checkContents << repair;
     conn->processStderr();
-    return readInt(conn->from) != 0;
+    return readInt(conn->from);
 }
 
 
@@ -572,6 +585,37 @@ void RemoteStore::addSignatures(const Path & storePath, const StringSet & sigs)
     conn->to << wopAddSignatures << storePath << sigs;
     conn->processStderr();
     readInt(conn->from);
+}
+
+
+void RemoteStore::queryMissing(const PathSet & targets,
+    PathSet & willBuild, PathSet & willSubstitute, PathSet & unknown,
+    unsigned long long & downloadSize, unsigned long long & narSize)
+{
+    {
+        auto conn(connections->get());
+        if (GET_PROTOCOL_MINOR(conn->daemonVersion) < 19)
+            // Don't hold the connection handle in the fallback case
+            // to prevent a deadlock.
+            goto fallback;
+        conn->to << wopQueryMissing << targets;
+        conn->processStderr();
+        willBuild = readStorePaths<PathSet>(*this, conn->from);
+        willSubstitute = readStorePaths<PathSet>(*this, conn->from);
+        unknown = readStorePaths<PathSet>(*this, conn->from);
+        conn->from >> downloadSize >> narSize;
+        return;
+    }
+
+ fallback:
+    return Store::queryMissing(targets, willBuild, willSubstitute,
+        unknown, downloadSize, narSize);
+}
+
+
+void RemoteStore::connect()
+{
+    auto conn(connections->get());
 }
 
 
@@ -585,34 +629,82 @@ RemoteStore::Connection::~Connection()
 }
 
 
+static Logger::Fields readFields(Source & from)
+{
+    Logger::Fields fields;
+    size_t size = readInt(from);
+    for (size_t n = 0; n < size; n++) {
+        auto type = (decltype(Logger::Field::type)) readInt(from);
+        if (type == Logger::Field::tInt)
+            fields.push_back(readNum<uint64_t>(from));
+        else if (type == Logger::Field::tString)
+            fields.push_back(readString(from));
+        else
+            throw Error("got unsupported field type %x from Nix daemon", (int) type);
+    }
+    return fields;
+}
+
+
 void RemoteStore::Connection::processStderr(Sink * sink, Source * source)
 {
     to.flush();
-    unsigned int msg;
-    while ((msg = readInt(from)) == STDERR_NEXT
-        || msg == STDERR_READ || msg == STDERR_WRITE) {
+
+    while (true) {
+
+        auto msg = readNum<uint64_t>(from);
+
         if (msg == STDERR_WRITE) {
             string s = readString(from);
             if (!sink) throw Error("no sink");
             (*sink)(s);
         }
+
         else if (msg == STDERR_READ) {
             if (!source) throw Error("no source");
-            size_t len = readInt(from);
+            size_t len = readNum<size_t>(from);
             auto buf = std::make_unique<unsigned char[]>(len);
             writeString(buf.get(), source->read(buf.get(), len), to);
             to.flush();
         }
-        else
+
+        else if (msg == STDERR_ERROR) {
+            string error = readString(from);
+            unsigned int status = readInt(from);
+            throw Error(status, error);
+        }
+
+        else if (msg == STDERR_NEXT)
             printError(chomp(readString(from)));
+
+        else if (msg == STDERR_START_ACTIVITY) {
+            auto act = readNum<ActivityId>(from);
+            auto lvl = (Verbosity) readInt(from);
+            auto type = (ActivityType) readInt(from);
+            auto s = readString(from);
+            auto fields = readFields(from);
+            auto parent = readNum<ActivityId>(from);
+            logger->startActivity(act, lvl, type, s, fields, parent);
+        }
+
+        else if (msg == STDERR_STOP_ACTIVITY) {
+            auto act = readNum<ActivityId>(from);
+            logger->stopActivity(act);
+        }
+
+        else if (msg == STDERR_RESULT) {
+            auto act = readNum<ActivityId>(from);
+            auto type = (ResultType) readInt(from);
+            auto fields = readFields(from);
+            logger->result(act, type, fields);
+        }
+
+        else if (msg == STDERR_LAST)
+            break;
+
+        else
+            throw Error("got unknown message type %x from Nix daemon", msg);
     }
-    if (msg == STDERR_ERROR) {
-        string error = readString(from);
-        unsigned int status = readInt(from);
-        throw Error(status, error);
-    }
-    else if (msg != STDERR_LAST)
-        throw Error("protocol error processing standard error");
 }
 
 

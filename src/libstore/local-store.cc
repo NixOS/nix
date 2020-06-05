@@ -1,4 +1,3 @@
-#include "config.h"
 #include "local-store.hh"
 #include "globals.hh"
 #include "archive.hh"
@@ -28,6 +27,11 @@
 #include <sys/statvfs.h>
 #include <sys/mount.h>
 #include <sys/ioctl.h>
+#include <sys/xattr.h>
+#endif
+
+#ifdef __CYGWIN__
+#include <windows.h>
 #endif
 
 #include <sqlite3.h>
@@ -39,13 +43,14 @@ namespace nix {
 LocalStore::LocalStore(const Params & params)
     : Store(params)
     , LocalFSStore(params)
-    , realStoreDir(get(params, "real", rootDir != "" ? rootDir + "/nix/store" : storeDir))
+    , realStoreDir_{this, false, rootDir != "" ? rootDir + "/nix/store" : storeDir, "real",
+        "physical path to the Nix store"}
+    , realStoreDir(realStoreDir_)
     , dbDir(stateDir + "/db")
     , linksDir(realStoreDir + "/.links")
     , reservedPath(dbDir + "/reserved")
     , schemaPath(dbDir + "/schema")
     , trashDir(realStoreDir + "/trash")
-    , requireSigs(trim(settings.get("signed-binary-caches", std::string(""))) != "") // FIXME: rename option
     , publicKeys(getDefaultPublicKeys())
 {
     auto state(_state.lock());
@@ -71,24 +76,24 @@ LocalStore::LocalStore(const Params & params)
         Path perUserDir = profilesDir + "/per-user";
         createDirs(perUserDir);
         if (chmod(perUserDir.c_str(), 01777) == -1)
-            throw SysError(format("could not set permissions on ‘%1%’ to 1777") % perUserDir);
+            throw SysError(format("could not set permissions on '%1%' to 1777") % perUserDir);
 
         mode_t perm = 01775;
 
-        struct group * gr = getgrnam(settings.buildUsersGroup.c_str());
+        struct group * gr = getgrnam(settings.buildUsersGroup.get().c_str());
         if (!gr)
-            printError(format("warning: the group ‘%1%’ specified in ‘build-users-group’ does not exist")
+            printError(format("warning: the group '%1%' specified in 'build-users-group' does not exist")
                 % settings.buildUsersGroup);
         else {
             struct stat st;
             if (stat(realStoreDir.c_str(), &st))
-                throw SysError(format("getting attributes of path ‘%1%’") % realStoreDir);
+                throw SysError(format("getting attributes of path '%1%'") % realStoreDir);
 
             if (st.st_uid != 0 || st.st_gid != gr->gr_gid || (st.st_mode & ~S_IFMT) != perm) {
                 if (chown(realStoreDir.c_str(), 0, gr->gr_gid) == -1)
-                    throw SysError(format("changing ownership of path ‘%1%’") % realStoreDir);
+                    throw SysError(format("changing ownership of path '%1%'") % realStoreDir);
                 if (chmod(realStoreDir.c_str(), perm) == -1)
-                    throw SysError(format("changing permissions on path ‘%1%’") % realStoreDir);
+                    throw SysError(format("changing permissions on path '%1%'") % realStoreDir);
             }
         }
     }
@@ -99,10 +104,10 @@ LocalStore::LocalStore(const Params & params)
         struct stat st;
         while (path != "/") {
             if (lstat(path.c_str(), &st))
-                throw SysError(format("getting status of ‘%1%’") % path);
+                throw SysError(format("getting status of '%1%'") % path);
             if (S_ISLNK(st.st_mode))
                 throw Error(format(
-                        "the path ‘%1%’ is a symlink; "
+                        "the path '%1%' is a symlink; "
                         "this is not allowed for the Nix store and its parent directories")
                     % path);
             path = dirOf(path);
@@ -262,7 +267,7 @@ int LocalStore::getSchema()
     if (pathExists(schemaPath)) {
         string s = readFile(schemaPath);
         if (!string2Int(s, curSchema))
-            throw Error(format("‘%1%’ is corrupt") % schemaPath);
+            throw Error(format("'%1%' is corrupt") % schemaPath);
     }
     return curSchema;
 }
@@ -271,14 +276,24 @@ int LocalStore::getSchema()
 void LocalStore::openDB(State & state, bool create)
 {
     if (access(dbDir.c_str(), R_OK | W_OK))
-        throw SysError(format("Nix database directory ‘%1%’ is not writable") % dbDir);
+        throw SysError(format("Nix database directory '%1%' is not writable") % dbDir);
 
     /* Open the Nix database. */
     string dbPath = dbDir + "/db.sqlite";
     auto & db(state.db);
     if (sqlite3_open_v2(dbPath.c_str(), &db.db,
             SQLITE_OPEN_READWRITE | (create ? SQLITE_OPEN_CREATE : 0), 0) != SQLITE_OK)
-        throw Error(format("cannot open Nix database ‘%1%’") % dbPath);
+        throw Error(format("cannot open Nix database '%1%'") % dbPath);
+
+#ifdef __CYGWIN__
+    /* The cygwin version of sqlite3 has a patch which calls
+       SetDllDirectory("/usr/bin") on init. It was intended to fix extension
+       loading, which we don't use, and the effect of SetDllDirectory is
+       inherited by child processes, and causes libraries to be loaded from
+       /usr/bin instead of $PATH. This breaks quite a few things (e.g.
+       checkPhase on openssh), so we set it back to default behaviour. */
+    SetDllDirectoryW(L"");
+#endif
 
     if (sqlite3_busy_timeout(db, 60 * 60 * 1000) != SQLITE_OK)
         throwSQLiteError(db, "setting timeout");
@@ -319,7 +334,7 @@ void LocalStore::openDB(State & state, bool create)
     /* Initialise the database schema, if necessary. */
     if (create) {
         const char * schema =
-#include "schema.sql.hh"
+#include "schema.sql.gen.hh"
             ;
         db.exec(schema);
     }
@@ -363,7 +378,7 @@ static void canonicaliseTimestampAndPermissions(const Path & path, const struct 
                  | 0444
                  | (st.st_mode & S_IXUSR ? 0111 : 0);
             if (chmod(path.c_str(), mode) == -1)
-                throw SysError(format("changing mode of ‘%1%’ to %2$o") % path % mode);
+                throw SysError(format("changing mode of '%1%' to %2$o") % path % mode);
         }
 
     }
@@ -381,7 +396,7 @@ static void canonicaliseTimestampAndPermissions(const Path & path, const struct 
 #else
         if (!S_ISLNK(st.st_mode) && utimes(path.c_str(), times) == -1)
 #endif
-            throw SysError(format("changing modification time of ‘%1%’") % path);
+            throw SysError(format("changing modification time of '%1%'") % path);
     }
 }
 
@@ -390,7 +405,7 @@ void canonicaliseTimestampAndPermissions(const Path & path)
 {
     struct stat st;
     if (lstat(path.c_str(), &st))
-        throw SysError(format("getting attributes of path ‘%1%’") % path);
+        throw SysError(format("getting attributes of path '%1%'") % path);
     canonicaliseTimestampAndPermissions(path, st);
 }
 
@@ -399,13 +414,46 @@ static void canonicalisePathMetaData_(const Path & path, uid_t fromUid, InodesSe
 {
     checkInterrupt();
 
+#if __APPLE__
+    /* Remove flags, in particular UF_IMMUTABLE which would prevent
+       the file from being garbage-collected. FIXME: Use
+       setattrlist() to remove other attributes as well. */
+    if (lchflags(path.c_str(), 0)) {
+        if (errno != ENOTSUP)
+            throw SysError(format("clearing flags of path '%1%'") % path);
+    }
+#endif
+
     struct stat st;
     if (lstat(path.c_str(), &st))
-        throw SysError(format("getting attributes of path ‘%1%’") % path);
+        throw SysError(format("getting attributes of path '%1%'") % path);
 
     /* Really make sure that the path is of a supported type. */
     if (!(S_ISREG(st.st_mode) || S_ISDIR(st.st_mode) || S_ISLNK(st.st_mode)))
-        throw Error(format("file ‘%1%’ has an unsupported type") % path);
+        throw Error(format("file '%1%' has an unsupported type") % path);
+
+#if __linux__
+    /* Remove extended attributes / ACLs. */
+    ssize_t eaSize = llistxattr(path.c_str(), nullptr, 0);
+
+    if (eaSize < 0) {
+        if (errno != ENOTSUP)
+            throw SysError("querying extended attributes of '%s'", path);
+    } else if (eaSize > 0) {
+        std::vector<char> eaBuf(eaSize);
+
+        if ((eaSize = llistxattr(path.c_str(), eaBuf.data(), eaBuf.size())) < 0)
+            throw SysError("querying extended attributes of '%s'", path);
+
+        for (auto & eaName: tokenizeString<Strings>(std::string(eaBuf.data(), eaSize), std::string("\000", 1))) {
+            /* Ignore SELinux security labels since these cannot be
+               removed even by root. */
+            if (eaName == "security.selinux") continue;
+            if (lremovexattr(path.c_str(), eaName.c_str()) == -1)
+                throw SysError("removing extended attribute '%s' from '%s'", eaName, path);
+        }
+     }
+#endif
 
     /* Fail if the file is not owned by the build user.  This prevents
        us from messing up the ownership/permissions of files
@@ -416,7 +464,7 @@ static void canonicalisePathMetaData_(const Path & path, uid_t fromUid, InodesSe
     if (fromUid != (uid_t) -1 && st.st_uid != fromUid) {
         assert(!S_ISDIR(st.st_mode));
         if (inodesSeen.find(Inode(st.st_dev, st.st_ino)) == inodesSeen.end())
-            throw BuildError(format("invalid ownership on file ‘%1%’") % path);
+            throw BuildError(format("invalid ownership on file '%1%'") % path);
         mode_t mode = st.st_mode & ~S_IFMT;
         assert(S_ISLNK(st.st_mode) || (st.st_uid == geteuid() && (mode == 0444 || mode == 0555) && st.st_mtime == mtimeStore));
         return;
@@ -440,7 +488,7 @@ static void canonicalisePathMetaData_(const Path & path, uid_t fromUid, InodesSe
         if (!S_ISLNK(st.st_mode) &&
             chown(path.c_str(), geteuid(), getegid()) == -1)
 #endif
-            throw SysError(format("changing owner of ‘%1%’ to %2%")
+            throw SysError(format("changing owner of '%1%' to %2%")
                 % path % geteuid());
     }
 
@@ -460,11 +508,11 @@ void canonicalisePathMetaData(const Path & path, uid_t fromUid, InodesSeen & ino
        be a symlink, since we can't change its ownership. */
     struct stat st;
     if (lstat(path.c_str(), &st))
-        throw SysError(format("getting attributes of path ‘%1%’") % path);
+        throw SysError(format("getting attributes of path '%1%'") % path);
 
     if (st.st_uid != geteuid()) {
         assert(S_ISLNK(st.st_mode));
-        throw Error(format("wrong ownership of top-level store path ‘%1%’") % path);
+        throw Error(format("wrong ownership of top-level store path '%1%'") % path);
     }
 }
 
@@ -485,7 +533,7 @@ void LocalStore::checkDerivationOutputs(const Path & drvPath, const Derivation &
     if (drv.isFixedOutput()) {
         DerivationOutputs::const_iterator out = drv.outputs.find("out");
         if (out == drv.outputs.end())
-            throw Error(format("derivation ‘%1%’ does not have an output named ‘out’") % drvPath);
+            throw Error(format("derivation '%1%' does not have an output named 'out'") % drvPath);
 
         bool recursive; Hash h;
         out->second.parseHashInfo(recursive, h);
@@ -493,7 +541,7 @@ void LocalStore::checkDerivationOutputs(const Path & drvPath, const Derivation &
 
         StringPairs::const_iterator j = drv.env.find("out");
         if (out->second.path != outPath || j == drv.env.end() || j->second != outPath)
-            throw Error(format("derivation ‘%1%’ has incorrect output ‘%2%’, should be ‘%3%’")
+            throw Error(format("derivation '%1%' has incorrect output '%2%', should be '%3%'")
                 % drvPath % out->second.path % outPath);
     }
 
@@ -510,7 +558,7 @@ void LocalStore::checkDerivationOutputs(const Path & drvPath, const Derivation &
             Path outPath = makeOutputPath(i.first, h, drvName);
             StringPairs::const_iterator j = drv.env.find(i.first);
             if (i.second.path != outPath || j == drv.env.end() || j->second != outPath)
-                throw Error(format("derivation ‘%1%’ has incorrect output ‘%2%’, should be ‘%3%’")
+                throw Error(format("derivation '%1%' has incorrect output '%2%', should be '%3%'")
                     % drvPath % i.second.path % outPath);
         }
     }
@@ -520,9 +568,11 @@ void LocalStore::checkDerivationOutputs(const Path & drvPath, const Derivation &
 uint64_t LocalStore::addValidPath(State & state,
     const ValidPathInfo & info, bool checkOutputs)
 {
+    assert(info.ca == "" || info.isContentAddressed(*this));
+
     state.stmtRegisterValidPath.use()
         (info.path)
-        ("sha256:" + printHash(info.narHash))
+        (info.narHash.to_string(Base16))
         (info.registrationTime == 0 ? time(0) : info.registrationTime)
         (info.deriver, info.deriver != "")
         (info.narSize, info.narSize != 0)
@@ -564,20 +614,6 @@ uint64_t LocalStore::addValidPath(State & state,
 }
 
 
-Hash parseHashField(const Path & path, const string & s)
-{
-    string::size_type colon = s.find(':');
-    if (colon == string::npos)
-        throw Error(format("corrupt hash ‘%1%’ in valid-path entry for ‘%2%’")
-            % s % path);
-    HashType ht = parseHashType(string(s, 0, colon));
-    if (ht == htUnknown)
-        throw Error(format("unknown hash type ‘%1%’ in valid-path entry for ‘%2%’")
-            % string(s, 0, colon) % path);
-    return parseHash(ht, string(s, colon + 1));
-}
-
-
 void LocalStore::queryPathInfoUncached(const Path & path,
     std::function<void(std::shared_ptr<ValidPathInfo>)> success,
     std::function<void(std::exception_ptr exc)> failure)
@@ -600,7 +636,11 @@ void LocalStore::queryPathInfoUncached(const Path & path,
 
             info->id = useQueryPathInfo.getInt(0);
 
-            info->narHash = parseHashField(path, useQueryPathInfo.getStr(1));
+            try {
+                info->narHash = Hash(useQueryPathInfo.getStr(1));
+            } catch (BadHash & e) {
+                throw Error("in valid-path entry for '%s': %s", path, e.what());
+            }
 
             info->registrationTime = useQueryPathInfo.getInt(2);
 
@@ -635,7 +675,7 @@ void LocalStore::updatePathInfo(State & state, const ValidPathInfo & info)
 {
     state.stmtUpdatePathInfo.use()
         (info.narSize, info.narSize != 0)
-        ("sha256:" + printHash(info.narHash))
+        (info.narHash.to_string(Base16))
         (info.ultimate ? 1 : 0, info.ultimate)
         (concatStringsSep(" ", info.sigs), !info.sigs.empty())
         (info.ca, !info.ca.empty())
@@ -648,7 +688,7 @@ uint64_t LocalStore::queryValidPathId(State & state, const Path & path)
 {
     auto use(state.stmtQueryPathInfo.use()(path));
     if (!use.next())
-        throw Error(format("path ‘%1%’ is not valid") % path);
+        throw Error(format("path '%1%' is not valid") % path);
     return use.getInt(0);
 }
 
@@ -668,7 +708,7 @@ bool LocalStore::isValidPathUncached(const Path & path)
 }
 
 
-PathSet LocalStore::queryValidPaths(const PathSet & paths)
+PathSet LocalStore::queryValidPaths(const PathSet & paths, SubstituteFlag maybeSubstitute)
 {
     PathSet res;
     for (auto & i : paths)
@@ -815,7 +855,7 @@ void LocalStore::querySubstitutablePathInfos(const PathSet & paths,
         if (sub->storeDir != storeDir) continue;
         for (auto & path : paths) {
             if (infos.count(path)) continue;
-            debug(format("checking substituter ‘%s’ for path ‘%s’")
+            debug(format("checking substituter '%s' for path '%s'")
                 % sub->getUri() % path);
             try {
                 auto info = sub->queryPathInfo(path);
@@ -896,7 +936,7 @@ void LocalStore::registerValidPaths(const ValidPathInfos & infos)
    there are no referrers. */
 void LocalStore::invalidatePath(State & state, const Path & path)
 {
-    debug(format("invalidating path ‘%1%’") % path);
+    debug(format("invalidating path '%1%'") % path);
 
     state.stmtInvalidatePath.use()(path).exec();
 
@@ -911,15 +951,21 @@ void LocalStore::invalidatePath(State & state, const Path & path)
 
 
 void LocalStore::addToStore(const ValidPathInfo & info, const ref<std::string> & nar,
-    bool repair, bool dontCheckSigs, std::shared_ptr<FSAccessor> accessor)
+    RepairFlag repair, CheckSigsFlag checkSigs, std::shared_ptr<FSAccessor> accessor)
 {
+    assert(info.narHash);
+
     Hash h = hashString(htSHA256, *nar);
     if (h != info.narHash)
-        throw Error(format("hash mismatch importing path ‘%s’; expected hash ‘%s’, got ‘%s’") %
-            info.path % info.narHash.to_string() % h.to_string());
+        throw Error("hash mismatch importing path '%s'; expected hash '%s', got '%s'",
+            info.path, info.narHash.to_string(), h.to_string());
 
-    if (requireSigs && !dontCheckSigs && !info.checkSignatures(*this, publicKeys))
-        throw Error(format("cannot import path ‘%s’ because it lacks a valid signature") % info.path);
+    if (nar->size() != info.narSize)
+        throw Error("size mismatch importing path '%s'; expected %s, got %s",
+            info.path, info.narSize, nar->size());
+
+    if (requireSigs && checkSigs && !info.checkSignatures(*this, publicKeys))
+        throw Error("cannot add path '%s' because it lacks a valid signature", info.path);
 
     addTempRoot(info.path);
 
@@ -956,7 +1002,7 @@ void LocalStore::addToStore(const ValidPathInfo & info, const ref<std::string> &
 
 
 Path LocalStore::addToStoreFromDump(const string & dump, const string & name,
-    bool recursive, HashType hashAlgo, bool repair)
+    bool recursive, HashType hashAlgo, RepairFlag repair)
 {
     Hash h = hashString(hashAlgo, dump);
 
@@ -1002,8 +1048,7 @@ Path LocalStore::addToStoreFromDump(const string & dump, const string & name,
             info.path = dstPath;
             info.narHash = hash.first;
             info.narSize = hash.second;
-            info.ultimate = true;
-            info.ca = "fixed:" + (recursive ? (std::string) "r:" : "") + h.to_string();
+            info.ca = makeFixedOutputCA(recursive, h);
             registerValidPath(info);
         }
 
@@ -1015,7 +1060,7 @@ Path LocalStore::addToStoreFromDump(const string & dump, const string & name,
 
 
 Path LocalStore::addToStore(const string & name, const Path & _srcPath,
-    bool recursive, HashType hashAlgo, PathFilter & filter, bool repair)
+    bool recursive, HashType hashAlgo, PathFilter & filter, RepairFlag repair)
 {
     Path srcPath(absPath(_srcPath));
 
@@ -1033,7 +1078,7 @@ Path LocalStore::addToStore(const string & name, const Path & _srcPath,
 
 
 Path LocalStore::addTextToStore(const string & name, const string & s,
-    const PathSet & references, bool repair)
+    const PathSet & references, RepairFlag repair)
 {
     auto hash = hashString(htSHA256, s);
     auto dstPath = makeTextPath(name, hash, references);
@@ -1065,7 +1110,6 @@ Path LocalStore::addTextToStore(const string & name, const string & s,
             info.narHash = narHash;
             info.narSize = sink.s->size();
             info.references = references;
-            info.ultimate = true;
             info.ca = "text:" + hash.to_string();
             registerValidPath(info);
         }
@@ -1106,7 +1150,7 @@ void LocalStore::invalidatePathChecked(const Path & path)
             PathSet referrers; queryReferrers(*state, path, referrers);
             referrers.erase(path); /* ignore self-references */
             if (!referrers.empty())
-                throw PathInUse(format("cannot delete path ‘%1%’ because it is in use by %2%")
+                throw PathInUse(format("cannot delete path '%1%' because it is in use by %2%")
                     % path % showPaths(referrers));
             invalidatePath(*state, path);
         }
@@ -1116,7 +1160,7 @@ void LocalStore::invalidatePathChecked(const Path & path)
 }
 
 
-bool LocalStore::verifyStore(bool checkContents, bool repair)
+bool LocalStore::verifyStore(bool checkContents, RepairFlag repair)
 {
     printError(format("reading the Nix store..."));
 
@@ -1151,13 +1195,13 @@ bool LocalStore::verifyStore(bool checkContents, bool repair)
                 auto info = std::const_pointer_cast<ValidPathInfo>(std::shared_ptr<const ValidPathInfo>(queryPathInfo(i)));
 
                 /* Check the content hash (optionally - slow). */
-                printMsg(lvlTalkative, format("checking contents of ‘%1%’") % i);
+                printMsg(lvlTalkative, format("checking contents of '%1%'") % i);
                 HashResult current = hashPath(info->narHash.type, i);
 
                 if (info->narHash != nullHash && info->narHash != current.first) {
-                    printError(format("path ‘%1%’ was modified! "
-                            "expected hash ‘%2%’, got ‘%3%’")
-                        % i % printHash(info->narHash) % printHash(current.first));
+                    printError(format("path '%1%' was modified! "
+                            "expected hash '%2%', got '%3%'")
+                        % i % info->narHash.to_string() % current.first.to_string());
                     if (repair) repairPath(i); else errors = true;
                 } else {
 
@@ -1165,14 +1209,14 @@ bool LocalStore::verifyStore(bool checkContents, bool repair)
 
                     /* Fill in missing hashes. */
                     if (info->narHash == nullHash) {
-                        printError(format("fixing missing hash on ‘%1%’") % i);
+                        printError(format("fixing missing hash on '%1%'") % i);
                         info->narHash = current.first;
                         update = true;
                     }
 
                     /* Fill in missing narSize fields (from old stores). */
                     if (info->narSize == 0) {
-                        printError(format("updating size field on ‘%1%’ to %2%") % i % current.second);
+                        printError(format("updating size field on '%1%' to %2%") % i % current.second);
                         info->narSize = current.second;
                         update = true;
                     }
@@ -1201,7 +1245,7 @@ bool LocalStore::verifyStore(bool checkContents, bool repair)
 
 
 void LocalStore::verifyPath(const Path & path, const PathSet & store,
-    PathSet & done, PathSet & validPaths, bool repair, bool & errors)
+    PathSet & done, PathSet & validPaths, RepairFlag repair, bool & errors)
 {
     checkInterrupt();
 
@@ -1209,7 +1253,7 @@ void LocalStore::verifyPath(const Path & path, const PathSet & store,
     done.insert(path);
 
     if (!isStorePath(path)) {
-        printError(format("path ‘%1%’ is not in the Nix store") % path);
+        printError(format("path '%1%' is not in the Nix store") % path);
         auto state(_state.lock());
         invalidatePath(*state, path);
         return;
@@ -1228,11 +1272,11 @@ void LocalStore::verifyPath(const Path & path, const PathSet & store,
             }
 
         if (canInvalidate) {
-            printError(format("path ‘%1%’ disappeared, removing from database...") % path);
+            printError(format("path '%1%' disappeared, removing from database...") % path);
             auto state(_state.lock());
             invalidatePath(*state, path);
         } else {
-            printError(format("path ‘%1%’ disappeared, but it still has valid referrers!") % path);
+            printError(format("path '%1%' disappeared, but it still has valid referrers!") % path);
             if (repair)
                 try {
                     repairPath(path);
@@ -1271,7 +1315,7 @@ static void makeMutable(const Path & path)
     AutoCloseFD fd = open(path.c_str(), O_RDONLY | O_NOFOLLOW | O_CLOEXEC);
     if (fd == -1) {
         if (errno == ELOOP) return; // it's a symlink
-        throw SysError(format("opening file ‘%1%’") % path);
+        throw SysError(format("opening file '%1%'") % path);
     }
 
     unsigned int flags = 0, old;
@@ -1331,9 +1375,9 @@ void LocalStore::signPathInfo(ValidPathInfo & info)
 {
     // FIXME: keep secret keys in memory.
 
-    auto secretKeyFiles = settings.get("secret-key-files", Strings());
+    auto secretKeyFiles = settings.secretKeyFiles;
 
-    for (auto & secretKeyFile : secretKeyFiles) {
+    for (auto & secretKeyFile : secretKeyFiles.get()) {
         SecretKey secretKey(readFile(secretKeyFile));
         info.sign(secretKey);
     }

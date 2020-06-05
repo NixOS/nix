@@ -2,6 +2,7 @@
 
 #include "types.hh"
 #include "hash.hh"
+#include "store-api.hh"
 
 #include <map>
 
@@ -85,7 +86,7 @@ class Store;
 
 /* Write a derivation to the Nix store, and return its path. */
 Path writeDerivation(ref<Store> store,
-    const Derivation & drv, const string & name, bool repair = false);
+    const Derivation & drv, const string & name, RepairFlag repair = NoRepair);
 
 /* Read a derivation from a file. */
 Derivation readDerivation(const Path & drvPath);

@@ -100,7 +100,7 @@ outputs = [ "lib" "headers" "doc" ];
 <programlisting>
 buildInputs = [ pkg.lib pkg.headers ];
 </programlisting>
-  The first element of <varname>output</varname> determines the
+  The first element of <varname>outputs</varname> determines the
   <emphasis>default output</emphasis>.  Thus, you could also write
 <programlisting>
 buildInputs = [ pkg pkg.headers ];

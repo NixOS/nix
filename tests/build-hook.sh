@@ -1,8 +1,8 @@
 source common.sh
 
-export NIX_BUILD_HOOK="$(pwd)/build-hook.hook.sh"
+clearStore
 
-outPath=$(nix-build build-hook.nix --no-out-link)
+outPath=$(nix-build build-hook.nix --no-out-link --option build-hook $(pwd)/build-hook.hook.sh)
 
 echo "output path is $outPath"
 

@@ -11,24 +11,22 @@ makefiles = \
   src/nix-env/local.mk \
   src/nix-daemon/local.mk \
   src/nix-collect-garbage/local.mk \
+  src/nix-copy-closure/local.mk \
   src/nix-prefetch-url/local.mk \
   src/buildenv/local.mk \
   src/resolve-system-dependencies/local.mk \
   src/nix-channel/local.mk \
   src/nix-build/local.mk \
   src/build-remote/local.mk \
-  perl/local.mk \
   scripts/local.mk \
   corepkgs/local.mk \
   misc/systemd/local.mk \
   misc/launchd/local.mk \
   misc/upstart/local.mk \
-  misc/emacs/local.mk \
   doc/manual/local.mk \
   tests/local.mk
-  #src/download-via-ssh/local.mk \
 
-GLOBAL_CXXFLAGS += -std=c++14 -g -Wall
+GLOBAL_CXXFLAGS += -std=c++14 -g -Wall -include config.h
 
 -include Makefile.config
 

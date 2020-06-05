@@ -51,7 +51,7 @@ nix copy --recursive --to file://$cacheDir $path
 chmod u+w $path2
 rm -rf $path2
 
-nix-store --verify --check-contents --repair --option binary-caches "file://$cacheDir"
+nix-store --verify --check-contents --repair --option binary-caches "file://$cacheDir" --option signed-binary-caches ''
 
 if [ "$(nix-hash $path2)" != "$hash" -o -e $path2/bad ]; then
     echo "path not repaired properly" >&2
@@ -69,7 +69,7 @@ if nix-store --verify-path $path2; then
     exit 1
 fi
 
-nix-store --repair-path $path2 --option binary-caches "file://$cacheDir"
+nix-store --repair-path $path2 --option binary-caches "file://$cacheDir" --option signed-binary-caches ''
 
 if [ "$(nix-hash $path2)" != "$hash" -o -e $path2/bad ]; then
     echo "path not repaired properly" >&2

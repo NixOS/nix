@@ -17,13 +17,6 @@
 using namespace nix;
 
 
-static Expr * parseStdin(EvalState & state)
-{
-    Activity act(*logger, lvlTalkative, format("parsing standard input"));
-    return state.parseExprFromString(drainFD(0), absPath("."));
-}
-
-
 static Path gcRoot;
 static int rootNr = 0;
 static bool indirectRoot = false;
@@ -72,7 +65,7 @@ void processExpr(EvalState & state, const Strings & attrPaths,
                 /* What output do we want? */
                 string outputName = i.queryOutputName();
                 if (outputName == "")
-                    throw Error(format("derivation ‘%1%’ lacks an ‘outputName’ attribute ") % drvPath);
+                    throw Error(format("derivation '%1%' lacks an 'outputName' attribute ") % drvPath);
 
                 if (gcRoot == "")
                     printGCWarning();
@@ -108,7 +101,7 @@ int main(int argc, char * * argv)
         Strings attrPaths;
         bool wantsReadWrite = false;
         std::map<string, string> autoArgs_;
-        bool repair = false;
+        RepairFlag repair = NoRepair;
 
         parseCmdLine(argc, argv, [&](Strings::iterator & arg, const Strings::iterator & end) {
             if (*arg == "--help")
@@ -146,7 +139,7 @@ int main(int argc, char * * argv)
             else if (*arg == "--strict")
                 strict = true;
             else if (*arg == "--repair")
-                repair = true;
+                repair = Repair;
             else if (*arg == "--dry-run")
                 settings.readOnlyMode = true;
             else if (*arg != "" && arg->at(0) == '-')
@@ -166,19 +159,19 @@ int main(int argc, char * * argv)
 
         Bindings & autoArgs(*evalAutoArgs(state, autoArgs_));
 
-        if (attrPaths.empty()) attrPaths.push_back("");
+        if (attrPaths.empty()) attrPaths = {""};
 
         if (findFile) {
             for (auto & i : files) {
                 Path p = state.findFile(i);
-                if (p == "") throw Error(format("unable to find ‘%1%’") % i);
+                if (p == "") throw Error(format("unable to find '%1%'") % i);
                 std::cout << p << std::endl;
             }
             return;
         }
 
         if (readStdin) {
-            Expr * e = parseStdin(state);
+            Expr * e = state.parseStdin();
             processExpr(state, attrPaths, parseOnly, strict, autoArgs,
                 evalOnly, outputKind, xmlOutputSourceLocation, e);
         } else if (files.empty() && !fromArgs)

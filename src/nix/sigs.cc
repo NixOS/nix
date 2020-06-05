@@ -13,8 +13,13 @@ struct CmdCopySigs : StorePathsCommand
 
     CmdCopySigs()
     {
-        mkFlag('s', "substituter", {"store-uri"}, "use signatures from specified store", 1,
-            [&](Strings ss) { substituterUris.push_back(ss.front()); });
+        mkFlag()
+            .longName("substituter")
+            .shortName('s')
+            .labels({"store-uri"})
+            .description("use signatures from specified store")
+            .arity(1)
+            .handler([&](Strings ss) { substituterUris.push_back(ss.front()); });
     }
 
     std::string name() override
@@ -30,7 +35,7 @@ struct CmdCopySigs : StorePathsCommand
     void run(ref<Store> store, Paths storePaths) override
     {
         if (substituterUris.empty())
-            throw UsageError("you must specify at least one substituter using ‘-s’");
+            throw UsageError("you must specify at least one substituter using '-s'");
 
         // FIXME: factor out commonality with MixVerify.
         std::vector<ref<Store>> substituters;
@@ -42,10 +47,10 @@ struct CmdCopySigs : StorePathsCommand
         std::string doneLabel = "done";
         std::atomic<size_t> added{0};
 
-        logger->setExpected(doneLabel, storePaths.size());
+        //logger->setExpected(doneLabel, storePaths.size());
 
         auto doPath = [&](const Path & storePath) {
-            Activity act(*logger, lvlInfo, format("getting signatures for ‘%s’") % storePath);
+            //Activity act(*logger, lvlInfo, format("getting signatures for '%s'") % storePath);
 
             checkInterrupt();
 
@@ -76,7 +81,7 @@ struct CmdCopySigs : StorePathsCommand
                 added += newSigs.size();
             }
 
-            logger->incProgress(doneLabel);
+            //logger->incProgress(doneLabel);
         };
 
         for (auto & storePath : storePaths)
@@ -112,7 +117,7 @@ struct CmdSignPaths : StorePathsCommand
     void run(ref<Store> store, Paths storePaths) override
     {
         if (secretKeyFile.empty())
-            throw UsageError("you must specify a secret key file using ‘-k’");
+            throw UsageError("you must specify a secret key file using '-k'");
 
         SecretKey secretKey(readFile(secretKeyFile));
 

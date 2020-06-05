@@ -4,7 +4,7 @@
 #include "util.hh"
 #include "worker-protocol.hh"
 #include "fs-accessor.hh"
-
+#include "istringstream_nocopy.hh"
 
 namespace nix {
 
@@ -21,9 +21,9 @@ void DerivationOutput::parseHashInfo(bool & recursive, Hash & hash) const
 
     HashType hashType = parseHashType(algo);
     if (hashType == htUnknown)
-        throw Error(format("unknown hash algorithm ‘%1%’") % algo);
+        throw Error(format("unknown hash algorithm '%1%'") % algo);
 
-    hash = parseHash(hashType, this->hash);
+    hash = Hash(this->hash, hashType);
 }
 
 
@@ -31,7 +31,7 @@ Path BasicDerivation::findOutput(const string & id) const
 {
     auto i = outputs.find(id);
     if (i == outputs.end())
-        throw Error(format("derivation has no output ‘%1%’") % id);
+        throw Error(format("derivation has no output '%1%'") % id);
     return i->second.path;
 }
 
@@ -71,7 +71,7 @@ bool BasicDerivation::canBuildLocally() const
 
 
 Path writeDerivation(ref<Store> store,
-    const Derivation & drv, const string & name, bool repair)
+    const Derivation & drv, const string & name, RepairFlag repair)
 {
     PathSet references;
     references.insert(drv.inputSrcs.begin(), drv.inputSrcs.end());
@@ -94,7 +94,7 @@ static void expect(std::istream & str, const string & s)
     char s2[s.size()];
     str.read(s2, s.size());
     if (string(s2, s.size()) != s)
-        throw FormatError(format("expected string ‘%1%’") % s);
+        throw FormatError(format("expected string '%1%'") % s);
 }
 
 
@@ -121,7 +121,7 @@ static Path parsePath(std::istream & str)
 {
     string s = parseString(str);
     if (s.size() == 0 || s[0] != '/')
-        throw FormatError(format("bad path ‘%1%’ in derivation") % s);
+        throw FormatError(format("bad path '%1%' in derivation") % s);
     return s;
 }
 
@@ -152,7 +152,7 @@ static StringSet parseStrings(std::istream & str, bool arePaths)
 static Derivation parseDerivation(const string & s)
 {
     Derivation drv;
-    std::istringstream str(s);
+    istringstream_nocopy str(s);
     expect(str, "Derive([");
 
     /* Parse the list of outputs. */
@@ -204,7 +204,7 @@ Derivation readDerivation(const Path & drvPath)
     try {
         return parseDerivation(readFile(drvPath));
     } catch (FormatError & e) {
-        throw Error(format("error parsing derivation ‘%1%’: %2%") % drvPath % e.msg());
+        throw Error(format("error parsing derivation '%1%': %2%") % drvPath % e.msg());
     }
 }
 
@@ -217,7 +217,7 @@ Derivation Store::derivationFromPath(const Path & drvPath)
     try {
         return parseDerivation(accessor->readFile(drvPath));
     } catch (FormatError & e) {
-        throw Error(format("error parsing derivation ‘%1%’: %2%") % drvPath % e.msg());
+        throw Error(format("error parsing derivation '%1%': %2%") % drvPath % e.msg());
     }
 }
 
@@ -354,7 +354,7 @@ Hash hashDerivationModulo(Store & store, Derivation drv)
             h = hashDerivationModulo(store, drv2);
             drvHashes[i.first] = h;
         }
-        inputs2[printHash(h)] = i.second;
+        inputs2[h.to_string(Base16, false)] = i.second;
     }
     drv.inputDrvs = inputs2;
 
@@ -397,8 +397,8 @@ PathSet BasicDerivation::outputPaths() const
 Source & readDerivation(Source & in, Store & store, BasicDerivation & drv)
 {
     drv.outputs.clear();
-    auto nr = readInt(in);
-    for (unsigned int n = 0; n < nr; n++) {
+    auto nr = readNum<size_t>(in);
+    for (size_t n = 0; n < nr; n++) {
         auto name = readString(in);
         DerivationOutput o;
         in >> o.path >> o.hashAlgo >> o.hash;
@@ -410,8 +410,8 @@ Source & readDerivation(Source & in, Store & store, BasicDerivation & drv)
     in >> drv.platform >> drv.builder;
     drv.args = readStrings<Strings>(in);
 
-    nr = readInt(in);
-    for (unsigned int n = 0; n < nr; n++) {
+    nr = readNum<size_t>(in);
+    for (size_t n = 0; n < nr; n++) {
         auto key = readString(in);
         auto value = readString(in);
         drv.env[key] = value;
@@ -437,7 +437,7 @@ Sink & operator << (Sink & out, const BasicDerivation & drv)
 std::string hashPlaceholder(const std::string & outputName)
 {
     // FIXME: memoize?
-    return "/" + printHash32(hashString(htSHA256, "nix-output:" + outputName));
+    return "/" + hashString(htSHA256, "nix-output:" + outputName).to_string(Base32, false);
 }
 
 

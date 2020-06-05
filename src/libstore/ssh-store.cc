@@ -4,16 +4,36 @@
 #include "archive.hh"
 #include "worker-protocol.hh"
 #include "pool.hh"
+#include "ssh.hh"
 
 namespace nix {
+
+static std::string uriScheme = "ssh-ng://";
 
 class SSHStore : public RemoteStore
 {
 public:
 
-    SSHStore(string uri, const Params & params, size_t maxConnections = std::numeric_limits<size_t>::max());
+    const Setting<Path> sshKey{(Store*) this, "", "ssh-key", "path to an SSH private key"};
+    const Setting<bool> compress{(Store*) this, false, "compress", "whether to compress the connection"};
 
-    std::string getUri() override;
+    SSHStore(const std::string & host, const Params & params)
+        : Store(params)
+        , RemoteStore(params)
+        , host(host)
+        , master(
+            host,
+            sshKey,
+            // Use SSH master only if using more than 1 connection.
+            connections->capacity() > 1,
+            compress)
+    {
+    }
+
+    std::string getUri() override
+    {
+        return uriScheme + host;
+    }
 
     void narFromPath(const Path & path, Sink & sink) override;
 
@@ -23,40 +43,16 @@ private:
 
     struct Connection : RemoteStore::Connection
     {
-        Pid sshPid;
-        AutoCloseFD out;
-        AutoCloseFD in;
+        std::unique_ptr<SSHMaster::Connection> sshConn;
     };
 
     ref<RemoteStore::Connection> openConnection() override;
 
-    AutoDelete tmpDir;
+    std::string host;
 
-    Path socketPath;
-
-    Pid sshMaster;
-
-    string uri;
-
-    Path key;
+    SSHMaster master;
 };
 
-SSHStore::SSHStore(string uri, const Params & params, size_t maxConnections)
-    : Store(params)
-    , RemoteStore(params, maxConnections)
-    , tmpDir(createTempDir("", "nix", true, true, 0700))
-    , socketPath((Path) tmpDir + "/ssh.sock")
-    , uri(std::move(uri))
-    , key(get(params, "ssh-key", ""))
-{
-    /* open a connection and perform the handshake to verify all is well */
-    connections->get();
-}
-
-string SSHStore::getUri()
-{
-    return "ssh://" + uri;
-}
 
 class ForwardSource : public Source
 {
@@ -89,34 +85,10 @@ ref<FSAccessor> SSHStore::getFSAccessor()
 
 ref<RemoteStore::Connection> SSHStore::openConnection()
 {
-    if ((pid_t) sshMaster == -1) {
-        sshMaster = startProcess([&]() {
-            if (key.empty())
-                execlp("ssh", "ssh", "-N", "-M", "-S", socketPath.c_str(), uri.c_str(), NULL);
-            else
-                execlp("ssh", "ssh", "-N", "-M", "-S", socketPath.c_str(), "-i", key.c_str(), uri.c_str(), NULL);
-            throw SysError("starting ssh master");
-        });
-    }
-
     auto conn = make_ref<Connection>();
-    Pipe in, out;
-    in.create();
-    out.create();
-    conn->sshPid = startProcess([&]() {
-        if (dup2(in.readSide.get(), STDIN_FILENO) == -1)
-            throw SysError("duping over STDIN");
-        if (dup2(out.writeSide.get(), STDOUT_FILENO) == -1)
-            throw SysError("duping over STDOUT");
-        execlp("ssh", "ssh", "-S", socketPath.c_str(), uri.c_str(), "nix-daemon", "--stdio", NULL);
-        throw SysError("executing nix-daemon --stdio over ssh");
-    });
-    in.readSide = -1;
-    out.writeSide = -1;
-    conn->out = std::move(out.readSide);
-    conn->in = std::move(in.writeSide);
-    conn->to = FdSink(conn->in.get());
-    conn->from = FdSource(conn->out.get());
+    conn->sshConn = master.startCommand("nix-daemon --stdio");
+    conn->to = FdSink(conn->sshConn->in.get());
+    conn->from = FdSource(conn->sshConn->out.get());
     initConnection(*conn);
     return conn;
 }
@@ -125,8 +97,8 @@ static RegisterStoreImplementation regStore([](
     const std::string & uri, const Store::Params & params)
     -> std::shared_ptr<Store>
 {
-    if (std::string(uri, 0, 6) != "ssh://") return 0;
-    return std::make_shared<SSHStore>(uri.substr(6), params);
+    if (std::string(uri, 0, uriScheme.size()) != uriScheme) return 0;
+    return std::make_shared<SSHStore>(std::string(uri, uriScheme.size()), params);
 });
 
 }

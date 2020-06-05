@@ -13,6 +13,8 @@
 #include <limits>
 #include <cstdio>
 #include <map>
+#include <sstream>
+#include <experimental/optional>
 
 #ifndef HAVE_STRUCT_DIRENT_D_TYPE
 #define DT_UNKNOWN 0
@@ -89,7 +91,7 @@ string readFile(int fd);
 string readFile(const Path & path, bool drain = false);
 
 /* Write a string to a file. */
-void writeFile(const Path & path, const string & s);
+void writeFile(const Path & path, const string & s, mode_t mode = 0666);
 
 /* Read a line from a file descriptor. */
 string readLine(int fd);
@@ -108,8 +110,17 @@ void deletePath(const Path & path, unsigned long long & bytesFreed);
 Path createTempDir(const Path & tmpRoot = "", const Path & prefix = "nix",
     bool includePid = true, bool useGlobalCounter = true, mode_t mode = 0755);
 
-/* Return the path to $XDG_CACHE_HOME/.cache. */
+/* Return $HOME or the user's home directory from /etc/passwd. */
+Path getHome();
+
+/* Return $XDG_CACHE_HOME or $HOME/.cache. */
 Path getCacheDir();
+
+/* Return $XDG_CONFIG_HOME or $HOME/.config. */
+Path getConfigDir();
+
+/* Return $XDG_DATA_HOME or $HOME/.local/share. */
+Path getDataDir();
 
 /* Create a directory and all its parents, if necessary.  Returns the
    list of created directories, in order of creation. */
@@ -201,7 +212,7 @@ public:
     ~Pid();
     void operator =(pid_t pid);
     operator pid_t();
-    int kill(bool quiet = false);
+    int kill();
     int wait();
 
     void setSeparatePG(bool separatePG);
@@ -231,7 +242,8 @@ pid_t startProcess(std::function<void()> fun, const ProcessOptions & options = P
 /* Run a program and return its stdout in a string (i.e., like the
    shell backtick operator). */
 string runProgram(Path program, bool searchPath = false,
-    const Strings & args = Strings(), const string & input = "");
+    const Strings & args = Strings(),
+    const std::experimental::optional<std::string> & input = {});
 
 class ExecError : public Error
 {
@@ -249,23 +261,19 @@ public:
    list of strings. */
 std::vector<char *> stringsToCharPtrs(const Strings & ss);
 
-/* Close all file descriptors except stdin, stdout, stderr, and those
-   listed in the given set.  Good practice in child processes. */
+/* Close all file descriptors except those listed in the given set.
+   Good practice in child processes. */
 void closeMostFDs(const set<int> & exceptions);
 
 /* Set the close-on-exec flag for the given file descriptor. */
 void closeOnExec(int fd);
-
-/* Restore default handling of SIGPIPE, otherwise some programs will
-   randomly say "Broken pipe". */
-void restoreSIGPIPE();
 
 
 /* User interruption. */
 
 extern bool _isInterrupted;
 
-extern thread_local bool interruptThrown;
+void setInterruptThrown();
 
 void _interrupted();
 
@@ -356,6 +364,8 @@ void ignoreException();
 #define ANSI_NORMAL "\e[0m"
 #define ANSI_BOLD "\e[1m"
 #define ANSI_RED "\e[31;1m"
+#define ANSI_GREEN "\e[32;1m"
+#define ANSI_BLUE "\e[34;1m"
 
 
 /* Filter out ANSI escape codes from the given string. If ‘nixOnly’ is
@@ -423,6 +433,9 @@ void callSuccess(
    on the current thread (and thus any threads created by it). */
 void startSignalHandlerThread();
 
+/* Restore default signal handling. */
+void restoreSignals();
+
 struct InterruptCallback
 {
     virtual ~InterruptCallback() { };
@@ -432,6 +445,39 @@ struct InterruptCallback
    context). */
 std::unique_ptr<InterruptCallback> createInterruptCallback(
     std::function<void()> callback);
+
+void triggerInterrupt();
+
+/* A RAII class that causes the current thread to receive SIGUSR1 when
+   the signal handler thread receives SIGINT. That is, this allows
+   SIGINT to be multiplexed to multiple threads. */
+struct ReceiveInterrupts
+{
+    pthread_t target;
+    std::unique_ptr<InterruptCallback> callback;
+
+    ReceiveInterrupts()
+        : target(pthread_self())
+        , callback(createInterruptCallback([&]() { pthread_kill(target, SIGUSR1); }))
+    { }
+};
+
+
+
+/* A RAII helper that increments a counter on construction and
+   decrements it on destruction. */
+template<typename T>
+struct MaintainCount
+{
+    T & counter;
+    long delta;
+    MaintainCount(T & counter, long delta = 1) : counter(counter), delta(delta) { counter += delta; }
+    ~MaintainCount() { counter -= delta; }
+};
+
+
+/* Return the number of rows and columns of the terminal. */
+std::pair<unsigned short, unsigned short> getWindowSize();
 
 
 }

@@ -1,5 +1,6 @@
 #include "command.hh"
 #include "store-api.hh"
+#include "derivations.hh"
 
 namespace nix {
 
@@ -23,11 +24,11 @@ void Command::printHelp(const string & programName, std::ostream & out)
 MultiCommand::MultiCommand(const Commands & _commands)
     : commands(_commands)
 {
-    expectedArgs.push_back(ExpectedArg{"command", 1, [=](Strings ss) {
+    expectedArgs.push_back(ExpectedArg{"command", 1, true, [=](Strings ss) {
         assert(!command);
         auto i = commands.find(ss.front());
         if (i == commands.end())
-            throw UsageError(format("‘%1%’ is not a recognised command") % ss.front());
+            throw UsageError(format("'%1%' is not a recognised command") % ss.front());
         command = i->second;
     }});
 }
@@ -49,12 +50,15 @@ void MultiCommand::printHelp(const string & programName, std::ostream & out)
     out << "Available commands:\n";
 
     Table2 table;
-    for (auto & command : commands)
-        table.push_back(std::make_pair(command.second->name(), command.second->description()));
+    for (auto & command : commands) {
+        auto descr = command.second->description();
+        if (!descr.empty())
+            table.push_back(std::make_pair(command.second->name(), descr));
+    }
     printTable(out, table);
 
     out << "\n";
-    out << "For full documentation, run ‘man " << programName << "’ or ‘man " << programName << "-<COMMAND>’.\n";
+    out << "For full documentation, run 'man " << programName << "' or 'man " << programName << "-<COMMAND>'.\n";
 }
 
 bool MultiCommand::processFlag(Strings::iterator & pos, Strings::iterator end)
@@ -79,30 +83,43 @@ StoreCommand::StoreCommand()
     mkFlag(0, "store", "store-uri", "URI of the Nix store to use", &storeUri);
 }
 
+ref<Store> StoreCommand::getStore()
+{
+    if (!_store)
+        _store = createStore();
+    return ref<Store>(_store);
+}
+
+ref<Store> StoreCommand::createStore()
+{
+    return openStore(storeUri);
+}
+
 void StoreCommand::run()
 {
-    run(openStore(storeUri));
+    run(createStore());
 }
 
 StorePathsCommand::StorePathsCommand()
 {
-    expectArgs("paths", &storePaths);
     mkFlag('r', "recursive", "apply operation to closure of the specified paths", &recursive);
     mkFlag(0, "all", "apply operation to the entire store", &all);
 }
 
 void StorePathsCommand::run(ref<Store> store)
 {
+    Paths storePaths;
+
     if (all) {
-        if (storePaths.size())
-            throw UsageError("‘--all’ does not expect arguments");
+        if (installables.size())
+            throw UsageError("'--all' does not expect arguments");
         for (auto & p : store->queryAllValidPaths())
             storePaths.push_back(p);
     }
 
     else {
-        for (auto & storePath : storePaths)
-            storePath = store->followLinksToStorePath(storePath);
+        for (auto & p : toStorePaths(store, NoBuild))
+            storePaths.push_back(p);
 
         if (recursive) {
             PathSet closure;
@@ -113,6 +130,16 @@ void StorePathsCommand::run(ref<Store> store)
     }
 
     run(store, storePaths);
+}
+
+void StorePathCommand::run(ref<Store> store)
+{
+    auto storePaths = toStorePaths(store, NoBuild);
+
+    if (storePaths.size() != 1)
+        throw UsageError("this command requires exactly one store path");
+
+    run(store, *storePaths.begin());
 }
 
 }

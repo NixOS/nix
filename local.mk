@@ -3,14 +3,13 @@ ifeq ($(MAKECMDGOALS), dist)
   dist-files += $(shell git --git-dir=.git ls-files || find * -type f)
 endif
 
-dist-files += configure config.h.in nix.spec
+dist-files += configure config.h.in nix.spec perl/configure src/nlohmann/json.hpp
 
 clean-files += Makefile.config
 
-GLOBAL_CXXFLAGS += -I . -I src -I src/libutil -I src/libstore -I src/libmain -I src/libexpr \
-  -Wno-unneeded-internal-declaration
+GLOBAL_CXXFLAGS += -I . -I src -I src/libutil -I src/libstore -I src/libmain -I src/libexpr
 
-$(foreach i, config.h $(call rwildcard, src/lib*, *.hh) src/nix-store/serve-protocol.hh, \
+$(foreach i, config.h $(call rwildcard, src/lib*, *.hh), \
   $(eval $(call install-file-in, $(i), $(includedir)/nix, 0644)))
 
 $(foreach i, $(call rwildcard, src/boost, *.hpp), $(eval $(call install-file-in, $(i), $(includedir)/nix/$(patsubst src/%/,%,$(dir $(i))), 0644)))

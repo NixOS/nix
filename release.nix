@@ -1,14 +1,12 @@
 { nix ? { outPath = ./.; revCount = 1234; shortRev = "abcdef"; }
 , nixpkgs ? { outPath = <nixpkgs>; revCount = 1234; shortRev = "abcdef"; }
 , officialRelease ? false
+, systems ? [ "x86_64-linux" "i686-linux" "x86_64-darwin" "aarch64-linux" ]
 }:
 
 let
 
   pkgs = import <nixpkgs> {};
-
-  systems = [ "x86_64-linux" "i686-linux" "x86_64-darwin" /* "x86_64-freebsd" "i686-freebsd" */ ];
-
 
   jobs = rec {
 
@@ -20,21 +18,19 @@ let
         name = "nix-tarball";
         version = builtins.readFile ./version;
         versionSuffix = if officialRelease then "" else "pre${toString nix.revCount}_${nix.shortRev}";
-        src = if lib.inNixShell then null else nix;
+        src = nix;
         inherit officialRelease;
 
         buildInputs =
-          [ curl bison flex perl libxml2 libxslt bzip2 xz
+          [ curl bison flex libxml2 libxslt
+            bzip2 xz brotli
             pkgconfig sqlite libsodium boehmgc
             docbook5 docbook5_xsl
             autoconf-archive
-          ] ++ lib.optional (!lib.inNixShell) git;
+            git
+          ] ++ lib.optional stdenv.isLinux libseccomp;
 
-        configureFlags = ''
-          --with-dbi=${perlPackages.DBI}/${perl.libPrefix}
-          --with-dbd-sqlite=${perlPackages.DBDSQLite}/${perl.libPrefix}
-          --enable-gc
-        '';
+        configureFlags = "--enable-gc";
 
         postUnpack = ''
           # Clean up when building from a working tree.
@@ -44,8 +40,11 @@ let
         '';
 
         preConfigure = ''
+          (cd perl ; autoreconf --install --force --verbose)
           # TeX needs a writable font cache.
           export VARTEXFONTS=$TMPDIR/texfonts
+
+          cp -rv ${nlohmann_json}/include/nlohmann src/nlohmann
         '';
 
         distPhase =
@@ -67,26 +66,28 @@ let
 
       with import <nixpkgs> { inherit system; };
 
+      with import ./release-common.nix { inherit pkgs; };
+
       releaseTools.nixBuild {
         name = "nix";
         src = tarball;
 
         buildInputs =
-          [ curl perl bzip2 xz openssl pkgconfig sqlite boehmgc ]
-          ++ lib.optional stdenv.isLinux libsodium
-          ++ lib.optional stdenv.isLinux
+          [ curl
+            bzip2 xz brotli
+            openssl pkgconfig sqlite boehmgc
+
+          ]
+          ++ lib.optional stdenv.isLinux libseccomp
+          ++ lib.optional (stdenv.isLinux || stdenv.isDarwin) libsodium
+          ++ lib.optional (stdenv.isLinux || stdenv.isDarwin)
             (aws-sdk-cpp.override {
               apis = ["s3"];
               customMemoryManagement = false;
             });
 
-        configureFlags = ''
-          --disable-init-state
-          --with-dbi=${perlPackages.DBI}/${perl.libPrefix}
-          --with-dbd-sqlite=${perlPackages.DBDSQLite}/${perl.libPrefix}
-          --enable-gc
-          --sysconfdir=/etc
-        '';
+        configureFlags = configureFlags ++
+          [ "--sysconfdir=/etc" ];
 
         enableParallelBuilding = true;
 
@@ -98,6 +99,31 @@ let
 
         doInstallCheck = true;
         installCheckFlags = "sysconfdir=$(out)/etc";
+      });
+
+
+    perlBindings = pkgs.lib.genAttrs systems (system:
+
+      let pkgs = import <nixpkgs> { inherit system; }; in with pkgs;
+
+      releaseTools.nixBuild {
+        name = "nix-perl";
+        src = tarball;
+
+        buildInputs =
+          [ (builtins.getAttr system jobs.build) curl bzip2 xz pkgconfig pkgs.perl ]
+          ++ lib.optional (stdenv.isLinux || stdenv.isDarwin) libsodium;
+
+        configureFlags = ''
+          --with-dbi=${perlPackages.DBI}/${pkgs.perl.libPrefix}
+          --with-dbd-sqlite=${perlPackages.DBDSQLite}/${pkgs.perl.libPrefix}
+        '';
+
+        enableParallelBuilding = true;
+
+        postUnpack = "sourceRoot=$sourceRoot/perl";
+
+        preBuild = "unset NIX_INDENT_MAKE";
       });
 
 
@@ -113,7 +139,7 @@ let
 
       runCommand "nix-binary-tarball-${version}"
         { exportReferencesGraph = [ "closure1" toplevel "closure2" cacert ];
-          buildInputs = [ perl ];
+          buildInputs = [ perl shellcheck ];
           meta.description = "Distribution-independent Nix bootstrap binaries for ${system}";
         }
         ''
@@ -122,7 +148,15 @@ let
           substitute ${./scripts/install-nix-from-closure.sh} $TMPDIR/install \
             --subst-var-by nix ${toplevel} \
             --subst-var-by cacert ${cacert}
+          substitute ${./scripts/install-darwin-multi-user.sh} $TMPDIR/install-darwin-multi-user \
+            --subst-var-by nix ${toplevel} \
+            --subst-var-by cacert ${cacert}
+
+          shellcheck -e SC1090 $TMPDIR/install
+          shellcheck -e SC1091,SC2002 $TMPDIR/install-darwin-multi-user
+
           chmod +x $TMPDIR/install
+          chmod +x $TMPDIR/install-darwin-multi-user
           dir=nix-${version}-${system}
           fn=$out/$dir.tar.bz2
           mkdir -p $out/nix-support
@@ -134,7 +168,7 @@ let
             --transform "s,$TMPDIR/install,$dir/install," \
             --transform "s,$TMPDIR/reginfo,$dir/.reginfo," \
             --transform "s,$NIX_STORE,$dir/store,S" \
-            $TMPDIR/install $TMPDIR/reginfo $storePaths
+            $TMPDIR/install $TMPDIR/install-darwin-multi-user $TMPDIR/reginfo $storePaths
         '');
 
 
@@ -146,15 +180,13 @@ let
         src = tarball;
 
         buildInputs =
-          [ curl perl bzip2 openssl pkgconfig sqlite xz libsodium
+          [ curl bzip2 openssl pkgconfig sqlite xz libsodium libseccomp
             # These are for "make check" only:
             graphviz libxml2 libxslt
           ];
 
         configureFlags = ''
           --disable-init-state
-          --with-dbi=${perlPackages.DBI}/${perl.libPrefix}
-          --with-dbd-sqlite=${perlPackages.DBDSQLite}/${perl.libPrefix}
         '';
 
         dontInstall = false;
@@ -170,8 +202,8 @@ let
       };
 
 
-    rpm_fedora21i386 = makeRPM_i686 (diskImageFuns: diskImageFuns.fedora21i386) [ "libsodium-devel" ];
-    rpm_fedora21x86_64 = makeRPM_x86_64 (diskImageFunsFun: diskImageFunsFun.fedora21x86_64) [ "libsodium-devel" ];
+    rpm_fedora25i386 = makeRPM_i686 (diskImageFuns: diskImageFuns.fedora25i386) [ "libsodium-devel" ];
+    rpm_fedora25x86_64 = makeRPM_x86_64 (diskImageFunsFun: diskImageFunsFun.fedora25x86_64) [ "libsodium-devel" ];
 
 
     deb_debian8i386 = makeDeb_i686 (diskImageFuns: diskImageFuns.debian8i386) [ "libsodium-dev" ] [ "libsodium13" ];
@@ -179,12 +211,10 @@ let
 
     deb_ubuntu1410i386 = makeDeb_i686 (diskImageFuns: diskImageFuns.ubuntu1410i386) [] [];
     deb_ubuntu1410x86_64 = makeDeb_x86_64 (diskImageFuns: diskImageFuns.ubuntu1410x86_64) [] [];
-    deb_ubuntu1504i386 = makeDeb_i686 (diskImageFuns: diskImageFuns.ubuntu1504i386) [ "libsodium-dev" ] [ "libsodium13" ];
-    deb_ubuntu1504x86_64 = makeDeb_x86_64 (diskImageFuns: diskImageFuns.ubuntu1504x86_64) [ "libsodium-dev" ] [ "libsodium13" ];
-    deb_ubuntu1510i386 = makeDeb_i686 (diskImageFuns: diskImageFuns.ubuntu1510i386) [ "libsodium-dev" ] [ "libsodium13"];
-    deb_ubuntu1510x86_64 = makeDeb_x86_64 (diskImageFuns: diskImageFuns.ubuntu1510x86_64) [ "libsodium-dev" ] [ "libsodium13" ];
     deb_ubuntu1604i386 = makeDeb_i686 (diskImageFuns: diskImageFuns.ubuntu1604i386) [ "libsodium-dev" ] [ "libsodium18" ];
     deb_ubuntu1604x86_64 = makeDeb_x86_64 (diskImageFuns: diskImageFuns.ubuntu1604x86_64) [ "libsodium-dev" ] [ "libsodium18" ];
+    deb_ubuntu1610i386 = makeDeb_i686 (diskImageFuns: diskImageFuns.ubuntu1610i386) [ "libsodium-dev" ] [ "libsodium18" ];
+    deb_ubuntu1610x86_64 = makeDeb_x86_64 (diskImageFuns: diskImageFuns.ubuntu1610x86_64) [ "libsodium-dev" ] [ "libsodium18" ];
 
 
     # System tests.
@@ -195,6 +225,11 @@ let
     tests.nix-copy-closure = (import ./tests/nix-copy-closure.nix rec {
       nix = build.x86_64-linux; system = "x86_64-linux";
     });
+
+    tests.setuid = pkgs.lib.genAttrs (pkgs.lib.filter (pkgs.lib.hasSuffix "-linux") systems) (system:
+      import ./tests/setuid.nix rec {
+        nix = build.${system}; inherit system;
+      });
 
     tests.binaryTarball =
       with import <nixpkgs> { system = "x86_64-linux"; };
@@ -241,22 +276,18 @@ let
       meta.description = "Release-critical builds";
       constituents =
         [ tarball
-          #build.i686-freebsd
           build.i686-linux
           build.x86_64-darwin
-          #build.x86_64-freebsd
           build.x86_64-linux
-          #binaryTarball.i686-freebsd
           binaryTarball.i686-linux
           binaryTarball.x86_64-darwin
-          #binaryTarball.x86_64-freebsd
           binaryTarball.x86_64-linux
           deb_debian8i386
           deb_debian8x86_64
-          deb_ubuntu1504i386
-          deb_ubuntu1504x86_64
-          rpm_fedora21i386
-          rpm_fedora21x86_64
+          deb_ubuntu1604i386
+          deb_ubuntu1604x86_64
+          rpm_fedora25i386
+          rpm_fedora25x86_64
           tests.remoteBuilds
           tests.nix-copy-closure
           tests.binaryTarball
@@ -281,11 +312,12 @@ let
       src = jobs.tarball;
       diskImage = (diskImageFun vmTools.diskImageFuns)
         { extraPackages =
-            [ "perl-DBD-SQLite" "perl-devel" "sqlite" "sqlite-devel" "bzip2-devel" "emacs" "libcurl-devel" "openssl-devel" "xz-devel" ]
+            [ "sqlite" "sqlite-devel" "bzip2-devel" "libcurl-devel" "openssl-devel" "xz-devel" "libseccomp-devel" ]
             ++ extraPackages; };
       memSize = 1024;
       meta.schedulingPriority = 50;
       postRPMInstall = "cd /tmp/rpmout/BUILD/nix-* && make installcheck";
+      #enableParallelBuilding = true;
     };
 
 
@@ -302,17 +334,18 @@ let
       src = jobs.tarball;
       diskImage = (diskImageFun vmTools.diskImageFuns)
         { extraPackages =
-            [ "libdbd-sqlite3-perl" "libsqlite3-dev" "libbz2-dev" "libwww-curl-perl" "libcurl-dev" "libcurl3-nss" "libssl-dev" "liblzma-dev" ]
+            [ "libsqlite3-dev" "libbz2-dev" "libcurl-dev" "libcurl3-nss" "libssl-dev" "liblzma-dev" "libseccomp-dev" ]
             ++ extraPackages; };
       memSize = 1024;
       meta.schedulingPriority = 50;
       postInstall = "make installcheck";
       configureFlags = "--sysconfdir=/etc";
       debRequires =
-        [ "curl" "libdbd-sqlite3-perl" "libsqlite3-0" "libbz2-1.0" "bzip2" "xz-utils" "libwww-curl-perl" "libssl1.0.0" "liblzma5" ]
+        [ "curl" "libsqlite3-0" "libbz2-1.0" "bzip2" "xz-utils" "libssl1.0.0" "liblzma5" "libseccomp2" ]
         ++ extraDebPackages;
       debMaintainer = "Eelco Dolstra <eelco.dolstra@logicblox.com>";
       doInstallCheck = true;
+      #enableParallelBuilding = true;
     };
 
 

@@ -22,8 +22,7 @@
 </varlistentry>
 
 
-<varlistentry><term><option>--verbose</option></term>
-  <term><option>-v</option></term>
+<varlistentry><term><option>--verbose</option> / <option>-v</option></term>
 
   <listitem>
 
@@ -76,8 +75,7 @@
 </varlistentry>
 
 
-<varlistentry><term><option>--no-build-output</option></term>
-  <term><option>-Q</option></term>
+<varlistentry><term><option>--no-build-output</option> / <option>-Q</option></term>
 
   <listitem><para>By default, output written by builders to standard
   output and standard error is echoed to the Nix command's standard
@@ -89,13 +87,14 @@
 </varlistentry>
 
 
-<varlistentry xml:id="opt-max-jobs"><term><option>--max-jobs</option></term>
-  <term><option>-j</option></term>
+<varlistentry xml:id="opt-max-jobs"><term><option>--max-jobs</option> / <option>-j</option>
+<replaceable>number</replaceable></term>
 
   <listitem><para>Sets the maximum number of build jobs that Nix will
-  perform in parallel to the specified number.  The default is
-  specified by the <link
-  linkend='conf-build-max-jobs'><literal>build-max-jobs</literal></link>
+  perform in parallel to the specified number.  Specify
+  <literal>auto</literal> to use the number of CPUs in the system.
+  The default is specified by the <link
+  linkend='conf-max-jobs'><literal>max-jobs</literal></link>
   configuration setting, which itself defaults to
   <literal>1</literal>.  A higher value is useful on SMP systems or to
   exploit I/O latency.</para></listitem>
@@ -113,7 +112,7 @@
   <literal>true</literal>, the builder passes the
   <option>-j<replaceable>N</replaceable></option> flag to GNU Make.
   It defaults to the value of the <link
-  linkend='conf-build-cores'><literal>build-cores</literal></link>
+  linkend='conf-cores'><literal>cores</literal></link>
   configuration setting, if set, or <literal>1</literal> otherwise.
   The value <literal>0</literal> means that the builder should use all
   available CPU cores in the system.</para></listitem>
@@ -126,7 +125,7 @@
   <listitem><para>Sets the maximum number of seconds that a builder
   can go without producing any data on standard output or standard
   error.  The default is specified by the <link
-  linkend='conf-build-max-silent-time'><literal>build-max-silent-time</literal></link>
+  linkend='conf-max-silent-time'><literal>max-silent-time</literal></link>
   configuration setting.  <literal>0</literal> means no
   time-out.</para></listitem>
 
@@ -136,14 +135,13 @@
 
   <listitem><para>Sets the maximum number of seconds that a builder
   can run.  The default is specified by the <link
-  linkend='conf-build-timeout'><literal>build-timeout</literal></link>
+  linkend='conf-timeout'><literal>timeout</literal></link>
   configuration setting.  <literal>0</literal> means no
   timeout.</para></listitem>
 
 </varlistentry>
 
-<varlistentry><term><option>--keep-going</option></term>
-  <term><option>-k</option></term>
+<varlistentry><term><option>--keep-going</option> / <option>-k</option></term>
 
   <listitem><para>Keep going in case of failed builds, to the
   greatest extent possible.  That is, if building an input of some
@@ -155,8 +153,7 @@
 </varlistentry>
 
 
-<varlistentry><term><option>--keep-failed</option></term>
-  <term><option>-K</option></term>
+<varlistentry><term><option>--keep-failed</option> / <option>-K</option></term>
 
   <listitem><para>Specifies that in case of a build failure, the
   temporary directory (usually in <filename>/tmp</filename>) in which

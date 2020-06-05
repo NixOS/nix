@@ -2,11 +2,14 @@
 
 with import <nixpkgs> {};
 
+with import ./release-common.nix { inherit pkgs; };
+
 (if useClang then clangStdenv else stdenv).mkDerivation {
   name = "nix";
 
   buildInputs =
-    [ curl bison flex perl libxml2 libxslt bzip2 xz
+    [ curl bison flex libxml2 libxslt
+      bzip2 xz brotli
       pkgconfig sqlite libsodium boehmgc
       docbook5 docbook5_xsl
       autoconf-archive
@@ -15,15 +18,15 @@ with import <nixpkgs> {};
         customMemoryManagement = false;
       })
       autoreconfHook
-      perlPackages.DBDSQLite
-    ];
+      nlohmann_json
 
-  configureFlags =
-    [ "--disable-init-state"
-      "--enable-gc"
-      "--with-dbi=${perlPackages.DBI}/${perl.libPrefix}"
-      "--with-dbd-sqlite=${perlPackages.DBDSQLite}/${perl.libPrefix}"
-    ];
+      # For nix-perl
+      perl
+      perlPackages.DBDSQLite
+    ]
+    ++ lib.optional stdenv.isLinux libseccomp;
+
+  inherit configureFlags;
 
   enableParallelBuilding = true;
 
@@ -31,6 +34,9 @@ with import <nixpkgs> {};
 
   shellHook =
     ''
-      configureFlags+=" --prefix=$(pwd)/inst"
+      export prefix=$(pwd)/inst
+      configureFlags+=" --prefix=$prefix"
+      PKG_CONFIG_PATH=$prefix/lib/pkgconfig:$PKG_CONFIG_PATH
+      PATH=$prefix/bin:$PATH
     '';
 }

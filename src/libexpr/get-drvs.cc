@@ -3,12 +3,40 @@
 #include "eval-inline.hh"
 
 #include <cstring>
+#include <regex>
 
 
 namespace nix {
 
 
-string DrvInfo::queryDrvPath()
+DrvInfo::DrvInfo(EvalState & state, const string & attrPath, Bindings * attrs)
+    : state(&state), attrs(attrs), attrPath(attrPath)
+{
+}
+
+
+string DrvInfo::queryName() const
+{
+    if (name == "" && attrs) {
+        auto i = attrs->find(state->sName);
+        if (i == attrs->end()) throw TypeError("derivation name missing");
+        name = state->forceStringNoCtx(*i->value);
+    }
+    return name;
+}
+
+
+string DrvInfo::querySystem() const
+{
+    if (system == "" && attrs) {
+        auto i = attrs->find(state->sSystem);
+        system = i == attrs->end() ? "unknown" : state->forceStringNoCtx(*i->value, *i->pos);
+    }
+    return system;
+}
+
+
+string DrvInfo::queryDrvPath() const
 {
     if (drvPath == "" && attrs) {
         Bindings::iterator i = attrs->find(state->sDrvPath);
@@ -19,7 +47,7 @@ string DrvInfo::queryDrvPath()
 }
 
 
-string DrvInfo::queryOutPath()
+string DrvInfo::queryOutPath() const
 {
     if (outPath == "" && attrs) {
         Bindings::iterator i = attrs->find(state->sOutPath);
@@ -61,7 +89,7 @@ DrvInfo::Outputs DrvInfo::queryOutputs(bool onlyOutputsToInstall)
     /* Check for `meta.outputsToInstall` and return `outputs` reduced to that. */
     const Value * outTI = queryMeta("outputsToInstall");
     if (!outTI) return outputs;
-    const auto errMsg = Error("this derivation has bad ‘meta.outputsToInstall’");
+    const auto errMsg = Error("this derivation has bad 'meta.outputsToInstall'");
         /* ^ this shows during `nix-env -i` right under the bad derivation */
     if (!outTI->isList()) throw errMsg;
     Outputs result;
@@ -75,7 +103,7 @@ DrvInfo::Outputs DrvInfo::queryOutputs(bool onlyOutputsToInstall)
 }
 
 
-string DrvInfo::queryOutputName()
+string DrvInfo::queryOutputName() const
 {
     if (outputName == "" && attrs) {
         Bindings::iterator i = attrs->find(state->sOutputName);
@@ -224,17 +252,12 @@ static bool getDerivation(EvalState & state, Value & v,
         if (done.find(v.attrs) != done.end()) return false;
         done.insert(v.attrs);
 
-        Bindings::iterator i = v.attrs->find(state.sName);
-        /* !!! We really would like to have a decent back trace here. */
-        if (i == v.attrs->end()) throw TypeError("derivation name missing");
+        DrvInfo drv(state, attrPath, v.attrs);
 
-        Bindings::iterator i2 = v.attrs->find(state.sSystem);
-
-        DrvInfo drv(state, state.forceStringNoCtx(*i->value), attrPath,
-            i2 == v.attrs->end() ? "unknown" : state.forceStringNoCtx(*i2->value, *i2->pos),
-            v.attrs);
+        drv.queryName();
 
         drvs.push_back(drv);
+
         return false;
 
     } catch (AssertionError & e) {
@@ -244,15 +267,14 @@ static bool getDerivation(EvalState & state, Value & v,
 }
 
 
-bool getDerivation(EvalState & state, Value & v, DrvInfo & drv,
+std::experimental::optional<DrvInfo> getDerivation(EvalState & state, Value & v,
     bool ignoreAssertionFailures)
 {
     Done done;
     DrvInfos drvs;
     getDerivation(state, v, "", drvs, done, ignoreAssertionFailures);
-    if (drvs.size() != 1) return false;
-    drv = drvs.front();
-    return true;
+    if (drvs.size() != 1) return {};
+    return std::move(drvs.front());
 }
 
 
@@ -260,6 +282,9 @@ static string addToPath(const string & s1, const string & s2)
 {
     return s1.empty() ? s2 : s1 + "." + s2;
 }
+
+
+static std::regex attrRegex("[A-Za-z_][A-Za-z0-9-_+]*");
 
 
 static void getDerivations(EvalState & state, Value & vIn,
@@ -284,25 +309,21 @@ static void getDerivations(EvalState & state, Value & vIn,
            there are names clashes between derivations, the derivation
            bound to the attribute with the "lower" name should take
            precedence). */
-        typedef std::map<string, Symbol> SortedSymbols;
-        SortedSymbols attrs;
-        for (auto & i : *v.attrs)
-            attrs.insert(std::pair<string, Symbol>(i.name, i.name));
-
-        for (auto & i : attrs) {
-            Activity act(*logger, lvlDebug, format("evaluating attribute ‘%1%’") % i.first);
-            string pathPrefix2 = addToPath(pathPrefix, i.first);
-            Value & v2(*v.attrs->find(i.second)->value);
+        for (auto & i : v.attrs->lexicographicOrder()) {
+            debug("evaluating attribute '%1%'", i->name);
+            if (!std::regex_match(std::string(i->name), attrRegex))
+                continue;
+            string pathPrefix2 = addToPath(pathPrefix, i->name);
             if (combineChannels)
-                getDerivations(state, v2, pathPrefix2, autoArgs, drvs, done, ignoreAssertionFailures);
-            else if (getDerivation(state, v2, pathPrefix2, drvs, done, ignoreAssertionFailures)) {
+                getDerivations(state, *i->value, pathPrefix2, autoArgs, drvs, done, ignoreAssertionFailures);
+            else if (getDerivation(state, *i->value, pathPrefix2, drvs, done, ignoreAssertionFailures)) {
                 /* If the value of this attribute is itself a set,
                    should we recurse into it?  => Only if it has a
                    `recurseForDerivations = true' attribute. */
-                if (v2.type == tAttrs) {
-                    Bindings::iterator j = v2.attrs->find(state.symbols.create("recurseForDerivations"));
-                    if (j != v2.attrs->end() && state.forceBool(*j->value, *j->pos))
-                        getDerivations(state, v2, pathPrefix2, autoArgs, drvs, done, ignoreAssertionFailures);
+                if (i->value->type == tAttrs) {
+                    Bindings::iterator j = i->value->attrs->find(state.symbols.create("recurseForDerivations"));
+                    if (j != i->value->attrs->end() && state.forceBool(*j->value, *j->pos))
+                        getDerivations(state, *i->value, pathPrefix2, autoArgs, drvs, done, ignoreAssertionFailures);
                 }
             }
         }
@@ -310,7 +331,6 @@ static void getDerivations(EvalState & state, Value & vIn,
 
     else if (v.isList()) {
         for (unsigned int n = 0; n < v.listSize(); ++n) {
-            Activity act(*logger, lvlDebug, "evaluating list element");
             string pathPrefix2 = addToPath(pathPrefix, (format("%1%") % n).str());
             if (getDerivation(state, *v.listElems()[n], pathPrefix2, drvs, done, ignoreAssertionFailures))
                 getDerivations(state, *v.listElems()[n], pathPrefix2, autoArgs, drvs, done, ignoreAssertionFailures);

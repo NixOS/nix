@@ -89,7 +89,7 @@ protected:
         auto uri = constructIPFSRequest(path);
         try {
             DownloadRequest request(uri);
-            request.showProgress = DownloadRequest::no;
+            //request.showProgress = DownloadRequest::no;
             request.tries = 5;
             if (useIpfsGateway)
                 request.head = true;
@@ -102,7 +102,7 @@ protected:
         }
     }
 
-    void upsertFile(const std::string & path, const std::string & data) override
+    void upsertFile(const std::string & path, const std::string & data, const std::string & mimeType) override
     {
         throw UploadToIPFS("uploading to an IPFS binary cache is not supported");
     }
@@ -117,7 +117,7 @@ protected:
          */
         auto uri = constructIPFSRequest(path);
         DownloadRequest request(uri);
-        request.showProgress = DownloadRequest::no;
+        //request.showProgress = DownloadRequest::no;
         request.tries = 8;
 
         getDownloader()->enqueueDownload(request,

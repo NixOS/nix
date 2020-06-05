@@ -1,8 +1,8 @@
-#include "config.h"
-
+#include "lazy.hh"
 #include "util.hh"
 #include "affinity.hh"
 #include "sync.hh"
+#include "finally.hh"
 
 #include <cctype>
 #include <cerrno>
@@ -12,11 +12,15 @@
 #include <iostream>
 #include <sstream>
 #include <thread>
+#include <future>
 
-#include <sys/wait.h>
-#include <unistd.h>
 #include <fcntl.h>
 #include <limits.h>
+#include <pwd.h>
+#include <sys/ioctl.h>
+#include <sys/types.h>
+#include <sys/wait.h>
+#include <unistd.h>
 
 #ifdef __APPLE__
 #include <sys/syscall.h>
@@ -96,10 +100,12 @@ Path absPath(Path path, Path dir)
 
 Path canonPath(const Path & path, bool resolveSymlinks)
 {
+    assert(path != "");
+
     string s;
 
     if (path[0] != '/')
-        throw Error(format("not an absolute path: ‘%1%’") % path);
+        throw Error(format("not an absolute path: '%1%'") % path);
 
     string::const_iterator i = path.begin(), end = path.end();
     string temp;
@@ -135,7 +141,7 @@ Path canonPath(const Path & path, bool resolveSymlinks)
                the symlink target might contain new symlinks). */
             if (resolveSymlinks && isLink(s)) {
                 if (++followCount >= maxFollow)
-                    throw Error(format("infinite symlink recursion in path ‘%1%’") % path);
+                    throw Error(format("infinite symlink recursion in path '%1%'") % path);
                 temp = absPath(readLink(s), dirOf(s))
                     + string(i, end);
                 i = temp.begin(); /* restart */
@@ -153,7 +159,7 @@ Path dirOf(const Path & path)
 {
     Path::size_type pos = path.rfind('/');
     if (pos == string::npos)
-        throw Error(format("invalid file name ‘%1%’") % path);
+        throw Error(format("invalid file name '%1%'") % path);
     return pos == 0 ? "/" : Path(path, 0, pos);
 }
 
@@ -190,7 +196,7 @@ struct stat lstat(const Path & path)
 {
     struct stat st;
     if (lstat(path.c_str(), &st))
-        throw SysError(format("getting status of ‘%1%’") % path);
+        throw SysError(format("getting status of '%1%'") % path);
     return st;
 }
 
@@ -212,14 +218,15 @@ Path readLink(const Path & path)
     checkInterrupt();
     struct stat st = lstat(path);
     if (!S_ISLNK(st.st_mode))
-        throw Error(format("‘%1%’ is not a symlink") % path);
-    char buf[st.st_size];
-    ssize_t rlsize = readlink(path.c_str(), buf, st.st_size);
+        throw Error(format("'%1%' is not a symlink") % path);
+    auto bufSize = std::max(st.st_size, (off_t) PATH_MAX + 1);
+    char buf[bufSize];
+    ssize_t rlsize = readlink(path.c_str(), buf, bufSize);
     if (rlsize == -1)
-        throw SysError(format("reading symbolic link ‘%1%’") % path);
-    else if (rlsize > st.st_size)
-        throw Error(format("symbolic link ‘%1%’ size overflow %2% > %3%")
-            % path % rlsize % st.st_size);
+        throw SysError(format("reading symbolic link '%1%'") % path);
+    else if (rlsize > bufSize)
+        throw Error(format("symbolic link '%1%' size overflow %2% > %3%")
+            % path % rlsize % bufSize);
     return string(buf, rlsize);
 }
 
@@ -237,7 +244,7 @@ DirEntries readDirectory(const Path & path)
     entries.reserve(64);
 
     AutoCloseDir dir(opendir(path.c_str()));
-    if (!dir) throw SysError(format("opening directory ‘%1%’") % path);
+    if (!dir) throw SysError(format("opening directory '%1%'") % path);
 
     struct dirent * dirent;
     while (errno = 0, dirent = readdir(dir.get())) { /* sic */
@@ -252,7 +259,7 @@ DirEntries readDirectory(const Path & path)
 #endif
         );
     }
-    if (errno) throw SysError(format("reading directory ‘%1%’") % path);
+    if (errno) throw SysError(format("reading directory '%1%'") % path);
 
     return entries;
 }
@@ -285,16 +292,16 @@ string readFile(const Path & path, bool drain)
 {
     AutoCloseFD fd = open(path.c_str(), O_RDONLY | O_CLOEXEC);
     if (!fd)
-        throw SysError(format("opening file ‘%1%’") % path);
+        throw SysError(format("opening file '%1%'") % path);
     return drain ? drainFD(fd.get()) : readFile(fd.get());
 }
 
 
-void writeFile(const Path & path, const string & s)
+void writeFile(const Path & path, const string & s, mode_t mode)
 {
-    AutoCloseFD fd = open(path.c_str(), O_WRONLY | O_TRUNC | O_CREAT | O_CLOEXEC, 0666);
+    AutoCloseFD fd = open(path.c_str(), O_WRONLY | O_TRUNC | O_CREAT | O_CLOEXEC, mode);
     if (!fd)
-        throw SysError(format("opening file ‘%1%’") % path);
+        throw SysError(format("opening file '%1%'") % path);
     writeFull(fd.get(), s);
 }
 
@@ -305,6 +312,7 @@ string readLine(int fd)
     while (1) {
         checkInterrupt();
         char ch;
+        // FIXME: inefficient
         ssize_t rd = read(fd, &ch, 1);
         if (rd == -1) {
             if (errno != EINTR)
@@ -333,7 +341,7 @@ static void _deletePath(const Path & path, unsigned long long & bytesFreed)
     struct stat st;
     if (lstat(path.c_str(), &st) == -1) {
         if (errno == ENOENT) return;
-        throw SysError(format("getting status of ‘%1%’") % path);
+        throw SysError(format("getting status of '%1%'") % path);
     }
 
     if (!S_ISDIR(st.st_mode) && st.st_nlink == 1)
@@ -344,7 +352,7 @@ static void _deletePath(const Path & path, unsigned long long & bytesFreed)
         const auto PERM_MASK = S_IRUSR | S_IWUSR | S_IXUSR;
         if ((st.st_mode & PERM_MASK) != PERM_MASK) {
             if (chmod(path.c_str(), st.st_mode | PERM_MASK) == -1)
-                throw SysError(format("chmod ‘%1%’") % path);
+                throw SysError(format("chmod '%1%'") % path);
         }
 
         for (auto & i : readDirectory(path))
@@ -353,7 +361,7 @@ static void _deletePath(const Path & path, unsigned long long & bytesFreed)
 
     if (remove(path.c_str()) == -1) {
         if (errno == ENOENT) return;
-        throw SysError(format("cannot unlink ‘%1%’") % path);
+        throw SysError(format("cannot unlink '%1%'") % path);
     }
 }
 
@@ -367,7 +375,7 @@ void deletePath(const Path & path)
 
 void deletePath(const Path & path, unsigned long long & bytesFreed)
 {
-    Activity act(*logger, lvlDebug, format("recursively deleting path ‘%1%’") % path);
+    //Activity act(*logger, lvlDebug, format("recursively deleting path '%1%'") % path);
     bytesFreed = 0;
     _deletePath(path, bytesFreed);
 }
@@ -405,25 +413,57 @@ Path createTempDir(const Path & tmpRoot, const Path & prefix,
                "wheel", then "tar" will fail to unpack archives that
                have the setgid bit set on directories. */
             if (chown(tmpDir.c_str(), (uid_t) -1, getegid()) != 0)
-                throw SysError(format("setting group of directory ‘%1%’") % tmpDir);
+                throw SysError(format("setting group of directory '%1%'") % tmpDir);
 #endif
             return tmpDir;
         }
         if (errno != EEXIST)
-            throw SysError(format("creating directory ‘%1%’") % tmpDir);
+            throw SysError(format("creating directory '%1%'") % tmpDir);
     }
 }
+
+
+static Lazy<Path> getHome2([]() {
+    Path homeDir = getEnv("HOME");
+    if (homeDir.empty()) {
+        char buf[16384];
+        struct passwd pwbuf;
+        struct passwd * pw;
+        if (getpwuid_r(getuid(), &pwbuf, buf, sizeof(buf), &pw) != 0
+            || !pw || !pw->pw_dir || !pw->pw_dir[0])
+            throw Error("cannot determine user's home directory");
+        homeDir = pw->pw_dir;
+    }
+    return homeDir;
+});
+
+Path getHome() { return getHome2(); }
 
 
 Path getCacheDir()
 {
     Path cacheDir = getEnv("XDG_CACHE_HOME");
-    if (cacheDir.empty()) {
-        Path homeDir = getEnv("HOME");
-        if (homeDir.empty()) throw Error("$XDG_CACHE_HOME and $HOME are not set");
-        cacheDir = homeDir + "/.cache";
-    }
+    if (cacheDir.empty())
+        cacheDir = getHome() + "/.cache";
     return cacheDir;
+}
+
+
+Path getConfigDir()
+{
+    Path configDir = getEnv("XDG_CONFIG_HOME");
+    if (configDir.empty())
+        configDir = getHome() + "/.config";
+    return configDir;
+}
+
+
+Path getDataDir()
+{
+    Path dataDir = getEnv("XDG_DATA_HOME");
+    if (dataDir.empty())
+        dataDir = getHome() + "/.local/share";
+    return dataDir;
 }
 
 
@@ -436,15 +476,15 @@ Paths createDirs(const Path & path)
     if (lstat(path.c_str(), &st) == -1) {
         created = createDirs(dirOf(path));
         if (mkdir(path.c_str(), 0777) == -1 && errno != EEXIST)
-            throw SysError(format("creating directory ‘%1%’") % path);
+            throw SysError(format("creating directory '%1%'") % path);
         st = lstat(path);
         created.push_back(path);
     }
 
     if (S_ISLNK(st.st_mode) && stat(path.c_str(), &st) == -1)
-        throw SysError(format("statting symlink ‘%1%’") % path);
+        throw SysError(format("statting symlink '%1%'") % path);
 
-    if (!S_ISDIR(st.st_mode)) throw Error(format("‘%1%’ is not a directory") % path);
+    if (!S_ISDIR(st.st_mode)) throw Error(format("'%1%' is not a directory") % path);
 
     return created;
 }
@@ -453,18 +493,27 @@ Paths createDirs(const Path & path)
 void createSymlink(const Path & target, const Path & link)
 {
     if (symlink(target.c_str(), link.c_str()))
-        throw SysError(format("creating symlink from ‘%1%’ to ‘%2%’") % link % target);
+        throw SysError(format("creating symlink from '%1%' to '%2%'") % link % target);
 }
 
 
 void replaceSymlink(const Path & target, const Path & link)
 {
-    Path tmp = canonPath(dirOf(link) + "/.new_" + baseNameOf(link));
+    for (unsigned int n = 0; true; n++) {
+        Path tmp = canonPath(fmt("%s/.%d_%s", dirOf(link), n, baseNameOf(link)));
 
-    createSymlink(target, tmp);
+        try {
+            createSymlink(target, tmp);
+        } catch (SysError & e) {
+            if (e.errNo == EEXIST) continue;
+            throw;
+        }
 
-    if (rename(tmp.c_str(), link.c_str()) != 0)
-        throw SysError(format("renaming ‘%1%’ to ‘%2%’") % tmp % link);
+        if (rename(tmp.c_str(), link.c_str()) != 0)
+            throw SysError(format("renaming '%1%' to '%2%'") % tmp % link);
+
+        break;
+    }
 }
 
 
@@ -487,6 +536,7 @@ void readFull(int fd, unsigned char * buf, size_t count)
 void writeFull(int fd, const unsigned char * buf, size_t count, bool allowInterrupts)
 {
     while (count) {
+        if (allowInterrupts) checkInterrupt();
         ssize_t res = write(fd, (char *) buf, count);
         if (res == -1 && errno != EINTR)
             throw SysError("writing to file");
@@ -494,7 +544,6 @@ void writeFull(int fd, const unsigned char * buf, size_t count, bool allowInterr
             count -= res;
             buf += res;
         }
-        if (allowInterrupts) checkInterrupt();
     }
 }
 
@@ -543,7 +592,7 @@ AutoDelete::~AutoDelete()
                 deletePath(path);
             else {
                 if (remove(path.c_str()) == -1)
-                    throw SysError(format("cannot unlink ‘%1%’") % path);
+                    throw SysError(format("cannot unlink '%1%'") % path);
             }
         }
     } catch (...) {
@@ -678,18 +727,24 @@ Pid::operator pid_t()
 }
 
 
-int Pid::kill(bool quiet)
+int Pid::kill()
 {
     assert(pid != -1);
 
-    if (!quiet)
-        printError(format("killing process %1%") % pid);
+    debug(format("killing process %1%") % pid);
 
     /* Send the requested signal to the child.  If it has its own
        process group, send the signal to every process in the child
        process group (which hopefully includes *all* its children). */
-    if (::kill(separatePG ? -pid : pid, killSignal) != 0)
-        printError((SysError(format("killing process %1%") % pid).msg()));
+    if (::kill(separatePG ? -pid : pid, killSignal) != 0) {
+        /* On BSDs, killing a process group will return EPERM if all
+           processes in the group are zombies (or something like
+           that). So try to detect and ignore that situation. */
+#if __FreeBSD__ || __APPLE__
+        if (errno != EPERM || ::kill(pid, 0) != 0)
+#endif
+            printError((SysError("killing process %d", pid).msg()));
+    }
 
     return wait();
 }
@@ -734,7 +789,7 @@ pid_t Pid::release()
 
 void killUser(uid_t uid)
 {
-    debug(format("killing all processes running under uid ‘%1%’") % uid);
+    debug(format("killing all processes running under uid '%1%'") % uid);
 
     assert(uid != 0); /* just to be safe... */
 
@@ -763,7 +818,7 @@ void killUser(uid_t uid)
 #endif
             if (errno == ESRCH) break; /* no more processes */
             if (errno != EINTR)
-                throw SysError(format("cannot kill processes for uid ‘%1%’") % uid);
+                throw SysError(format("cannot kill processes for uid '%1%'") % uid);
         }
 
         _exit(0);
@@ -771,7 +826,7 @@ void killUser(uid_t uid)
 
     int status = pid.wait();
     if (status != 0)
-        throw Error(format("cannot kill processes for uid ‘%1%’: %2%") % uid % statusToString(status));
+        throw Error(format("cannot kill processes for uid '%1%': %2%") % uid % statusToString(status));
 
     /* !!! We should really do some check to make sure that there are
        no processes left running under `uid', but there is no portable
@@ -839,42 +894,58 @@ std::vector<char *> stringsToCharPtrs(const Strings & ss)
 
 
 string runProgram(Path program, bool searchPath, const Strings & args,
-    const string & input)
+    const std::experimental::optional<std::string> & input)
 {
     checkInterrupt();
 
     /* Create a pipe. */
     Pipe out, in;
     out.create();
-    if (!input.empty()) in.create();
+    if (input) in.create();
 
     /* Fork. */
     Pid pid = startProcess([&]() {
         if (dup2(out.writeSide.get(), STDOUT_FILENO) == -1)
             throw SysError("dupping stdout");
-        if (!input.empty()) {
-            if (dup2(in.readSide.get(), STDIN_FILENO) == -1)
-                throw SysError("dupping stdin");
-        }
+        if (input && dup2(in.readSide.get(), STDIN_FILENO) == -1)
+            throw SysError("dupping stdin");
 
         Strings args_(args);
         args_.push_front(program);
+
+        restoreSignals();
 
         if (searchPath)
             execvp(program.c_str(), stringsToCharPtrs(args_).data());
         else
             execv(program.c_str(), stringsToCharPtrs(args_).data());
 
-        throw SysError(format("executing ‘%1%’") % program);
+        throw SysError(format("executing '%1%'") % program);
     });
 
     out.writeSide = -1;
 
-    /* FIXME: This can deadlock if the input is too long. */
-    if (!input.empty()) {
+    std::thread writerThread;
+
+    std::promise<void> promise;
+
+    Finally doJoin([&]() {
+        if (writerThread.joinable())
+            writerThread.join();
+    });
+
+
+    if (input) {
         in.readSide = -1;
-        writeFull(in.writeSide.get(), input);
-        in.writeSide = -1;
+        writerThread = std::thread([&]() {
+            try {
+                writeFull(in.writeSide.get(), *input);
+                promise.set_value();
+            } catch (...) {
+                promise.set_exception(std::current_exception());
+            }
+            in.writeSide = -1;
+        });
     }
 
     string result = drainFD(out.readSide.get());
@@ -882,8 +953,11 @@ string runProgram(Path program, bool searchPath, const Strings & args,
     /* Wait for the child to finish. */
     int status = pid.wait();
     if (!statusOk(status))
-        throw ExecError(status, format("program ‘%1%’ %2%")
+        throw ExecError(status, format("program '%1%' %2%")
             % program % statusToString(status));
+
+    /* Wait for the writer thread to finish. */
+    if (input) promise.get_future().get();
 
     return result;
 }
@@ -891,11 +965,24 @@ string runProgram(Path program, bool searchPath, const Strings & args,
 
 void closeMostFDs(const set<int> & exceptions)
 {
+#if __linux__
+    try {
+        for (auto & s : readDirectory("/proc/self/fd")) {
+            auto fd = std::stoi(s.name);
+            if (!exceptions.count(fd)) {
+                debug("closing leaked FD %d", fd);
+                close(fd);
+            }
+        }
+        return;
+    } catch (SysError &) {
+    }
+#endif
+
     int maxFD = 0;
     maxFD = sysconf(_SC_OPEN_MAX);
     for (int fd = 0; fd < maxFD; ++fd)
-        if (fd != STDIN_FILENO && fd != STDOUT_FILENO && fd != STDERR_FILENO
-            && exceptions.find(fd) == exceptions.end())
+        if (!exceptions.count(fd))
             close(fd); /* ignore result */
 }
 
@@ -909,22 +996,17 @@ void closeOnExec(int fd)
 }
 
 
-void restoreSIGPIPE()
-{
-    struct sigaction act;
-    act.sa_handler = SIG_DFL;
-    act.sa_flags = 0;
-    sigemptyset(&act.sa_mask);
-    if (sigaction(SIGPIPE, &act, 0)) throw SysError("resetting SIGPIPE");
-}
-
-
 //////////////////////////////////////////////////////////////////////
 
 
 bool _isInterrupted = false;
 
-thread_local bool interruptThrown = false;
+static thread_local bool interruptThrown = false;
+
+void setInterruptThrown()
+{
+    interruptThrown = true;
+}
 
 void _interrupted()
 {
@@ -1039,9 +1121,9 @@ bool statusOk(int status)
 }
 
 
-bool hasPrefix(const string & s, const string & suffix)
+bool hasPrefix(const string & s, const string & prefix)
 {
-    return s.compare(0, suffix.size(), suffix) == 0;
+    return s.compare(0, prefix.size(), prefix) == 0;
 }
 
 
@@ -1056,21 +1138,6 @@ std::string toLower(const std::string & s)
     std::string r(s);
     for (auto & c : r)
         c = std::tolower(c);
-    return r;
-}
-
-
-string decodeOctalEscaped(const string & s)
-{
-    string r;
-    for (string::const_iterator i = s.begin(); i != s.end(); ) {
-        if (*i != '\\') { r += *i++; continue; }
-        unsigned char c = 0;
-        ++i;
-        while (i != s.end() && *i >= '0' && *i < '8')
-            c = c * 8 + (*i++ - '0');
-        r += c;
-    }
     return r;
 }
 
@@ -1106,7 +1173,7 @@ string filterANSIEscapes(const string & s, bool nixOnly)
             }
         } else {
             r += c;
-            if (c >= 0x40 && c != 0x7e) {
+            if (c >= 0x40 && c <= 0x7e) {
                 if (nixOnly && (c != 'p' && c != 'q' && c != 's' && c != 'a' && c != 'b'))
                     t += r;
                 state = stTop;
@@ -1189,6 +1256,26 @@ void callFailure(const std::function<void(std::exception_ptr exc)> & failure, st
 }
 
 
+static Sync<std::pair<unsigned short, unsigned short>> windowSize{{0, 0}};
+
+
+static void updateWindowSize()
+{
+    struct winsize ws;
+    if (ioctl(1, TIOCGWINSZ, &ws) == 0) {
+        auto windowSize_(windowSize.lock());
+        windowSize_->first = ws.ws_row;
+        windowSize_->second = ws.ws_col;
+    }
+}
+
+
+std::pair<unsigned short, unsigned short> getWindowSize()
+{
+    return *windowSize.lock();
+}
+
+
 static Sync<std::list<std::function<void()>>> _interruptCallbacks;
 
 static void signalHandlerThread(sigset_t set)
@@ -1197,34 +1284,57 @@ static void signalHandlerThread(sigset_t set)
         int signal = 0;
         sigwait(&set, &signal);
 
-        if (signal == SIGINT || signal == SIGTERM || signal == SIGHUP) {
-            _isInterrupted = 1;
+        if (signal == SIGINT || signal == SIGTERM || signal == SIGHUP)
+            triggerInterrupt();
 
-            {
-                auto interruptCallbacks(_interruptCallbacks.lock());
-                for (auto & callback : *interruptCallbacks) {
-                    try {
-                        callback();
-                    } catch (...) {
-                        ignoreException();
-                    }
-                }
+        else if (signal == SIGWINCH) {
+            updateWindowSize();
+        }
+    }
+}
+
+void triggerInterrupt()
+{
+    _isInterrupted = true;
+
+    {
+        auto interruptCallbacks(_interruptCallbacks.lock());
+        for (auto & callback : *interruptCallbacks) {
+            try {
+                callback();
+            } catch (...) {
+                ignoreException();
             }
         }
     }
 }
 
+static sigset_t savedSignalMask;
+
 void startSignalHandlerThread()
 {
+    updateWindowSize();
+
+    if (sigprocmask(SIG_BLOCK, nullptr, &savedSignalMask))
+        throw SysError("quering signal mask");
+
     sigset_t set;
     sigemptyset(&set);
     sigaddset(&set, SIGINT);
     sigaddset(&set, SIGTERM);
     sigaddset(&set, SIGHUP);
+    sigaddset(&set, SIGPIPE);
+    sigaddset(&set, SIGWINCH);
     if (pthread_sigmask(SIG_BLOCK, &set, nullptr))
         throw SysError("blocking signals");
 
     std::thread(signalHandlerThread, set).detach();
+}
+
+void restoreSignals()
+{
+    if (sigprocmask(SIG_SETMASK, &savedSignalMask, nullptr))
+        throw SysError("restoring signals");
 }
 
 /* RAII helper to automatically deregister a callback. */

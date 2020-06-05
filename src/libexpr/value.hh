@@ -1,6 +1,5 @@
 #pragma once
 
-#include "config.h"
 #include "symbol-table.hh"
 
 #if HAVE_BOEHMGC
@@ -221,6 +220,14 @@ static inline void mkApp(Value & v, Value & left, Value & right)
 }
 
 
+static inline void mkPrimOpApp(Value & v, Value & left, Value & right)
+{
+    v.type = tPrimOpApp;
+    v.app.left = &left;
+    v.app.right = &right;
+}
+
+
 static inline void mkStringNoCopy(Value & v, const char * s)
 {
     v.type = tString;
@@ -257,7 +264,7 @@ size_t valueSize(Value & v);
 
 #if HAVE_BOEHMGC
 typedef std::vector<Value *, gc_allocator<Value *> > ValueVector;
-typedef std::map<Symbol, Value *, std::less<Symbol>, gc_allocator<Value *> > ValueMap;
+typedef std::map<Symbol, Value *, std::less<Symbol>, gc_allocator<std::pair<const Symbol, Value *> > > ValueMap;
 #else
 typedef std::vector<Value *> ValueVector;
 typedef std::map<Symbol, Value *> ValueMap;

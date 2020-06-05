@@ -5,6 +5,7 @@ let
   input1 = mkDerivation {
     name = "build-hook-input-1";
     builder = ./dependencies.builder1.sh;
+    requiredSystemFeatures = ["foo"];
   };
 
   input2 = mkDerivation {

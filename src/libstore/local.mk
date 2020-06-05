@@ -46,6 +46,10 @@ ifeq ($(OS), SunOS)
 	libstore_LDFLAGS += -lsocket
 endif
 
+ifeq ($(OS), Linux)
+	libstore_LDFLAGS += -lseccomp
+endif
+
 libstore_CXXFLAGS = \
  -DNIX_PREFIX=\"$(prefix)\" \
  -DNIX_STORE_DIR=\"$(storedir)\" \
@@ -55,14 +59,21 @@ libstore_CXXFLAGS = \
  -DNIX_CONF_DIR=\"$(sysconfdir)/nix\" \
  -DNIX_LIBEXEC_DIR=\"$(libexecdir)\" \
  -DNIX_BIN_DIR=\"$(bindir)\" \
- -DBASH_PATH="\"$(bash)\""
+ -DSANDBOX_SHELL="\"$(sandbox_shell)\"" \
+ -DLSOF=\"$(lsof)\"
 
-$(d)/local-store.cc: $(d)/schema.sql.hh
+$(d)/local-store.cc: $(d)/schema.sql.gen.hh
 
-%.sql.hh: %.sql
-	$(trace-gen) sed -e 's/"/\\"/g' -e 's/\(.*\)/"\1\\n"/' < $< > $@ || (rm $@ && exit 1)
+sandbox-headers = $(d)/sandbox-defaults.sb.gen.hh $(d)/sandbox-network.sb.gen.hh $(d)/sandbox-minimal.sb.gen.hh
 
-clean-files += $(d)/schema.sql.hh
+$(d)/build.cc: $(sandbox-headers)
+
+%.gen.hh: %
+	@echo 'R"foo(' >> $@.tmp
+	$(trace-gen) cat $< >> $@.tmp
+	@echo ')foo"' >> $@.tmp
+	@mv $@.tmp $@
+
+clean-files += $(d)/schema.sql.gen.hh $(sandbox-headers)
 
 $(eval $(call install-file-in, $(d)/nix-store.pc, $(prefix)/lib/pkgconfig, 0644))
-$(eval $(call install-file-in, $(d)/sandbox-defaults.sb, $(datadir)/nix, 0644))

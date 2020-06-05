@@ -107,6 +107,8 @@ void Store::queryMissing(const PathSet & targets,
     PathSet & willBuild_, PathSet & willSubstitute_, PathSet & unknown_,
     unsigned long long & downloadSize_, unsigned long long & narSize_)
 {
+    Activity act(*logger, lvlDebug, actUnknown, "querying info about missing paths");
+
     downloadSize_ = narSize_ = 0;
 
     ThreadPool pool;
@@ -245,7 +247,7 @@ Paths Store::topoSortPaths(const PathSet & paths)
 
     dfsVisit = [&](const Path & path, const Path * parent) {
         if (parents.find(path) != parents.end())
-            throw BuildError(format("cycle detected in the references of ‘%1%’ from ‘%2%’") % path % *parent);
+            throw BuildError(format("cycle detected in the references of '%1%' from '%2%'") % path % *parent);
 
         if (visited.find(path) != visited.end()) return;
         visited.insert(path);

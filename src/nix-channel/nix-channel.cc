@@ -35,7 +35,7 @@ static void writeChannels()
 {
     auto channelsFD = AutoCloseFD{open(channelsList.c_str(), O_WRONLY | O_CLOEXEC | O_CREAT | O_TRUNC, 0644)};
     if (!channelsFD)
-        throw SysError(format("opening ‘%1%’ for writing") % channelsList);
+        throw SysError(format("opening '%1%' for writing") % channelsList);
     for (const auto & channel : channels)
         writeFull(channelsFD.get(), channel.second + " " + channel.first + "\n");
 }
@@ -44,9 +44,9 @@ static void writeChannels()
 static void addChannel(const string & url, const string & name)
 {
     if (!regex_search(url, std::regex("^(file|http|https)://")))
-        throw Error(format("invalid channel URL ‘%1%’") % url);
+        throw Error(format("invalid channel URL '%1%'") % url);
     if (!regex_search(name, std::regex("^[a-zA-Z0-9_][a-zA-Z0-9_\\.-]*$")))
-        throw Error(format("invalid channel identifier ‘%1%’") % name);
+        throw Error(format("invalid channel identifier '%1%'") % name);
     readChannels();
     channels[name] = url;
     writeChannels();
@@ -103,19 +103,15 @@ static void update(const StringSet & channelNames)
 
         auto unpacked = false;
         if (std::regex_search(filename, std::regex("\\.tar\\.(gz|bz2|xz)$"))) {
-            try {
-                runProgram(settings.nixBinDir + "/nix-build", false, { "--no-out-link", "--expr", "import <nix/unpack-channel.nix> "
-                            "{ name = \"" + cname + "\"; channelName = \"" + name + "\"; src = builtins.storePath \"" + filename + "\"; }" });
-                unpacked = true;
-            } catch (ExecError & e) {
-            }
+            runProgram(settings.nixBinDir + "/nix-build", false, { "--no-out-link", "--expr", "import <nix/unpack-channel.nix> "
+                        "{ name = \"" + cname + "\"; channelName = \"" + name + "\"; src = builtins.storePath \"" + filename + "\"; }" });
+            unpacked = true;
         }
 
         if (!unpacked) {
             // The URL doesn't unpack directly, so let's try treating it like a full channel folder with files in it
             // Check if the channel advertises a binary cache.
             DownloadRequest request(url + "/binary-cache-url");
-            request.showProgress = DownloadRequest::no;
             try {
                 auto dlRes = dl->download(request);
                 extraAttrs = "binaryCacheURL = \"" + *dlRes.data + "\";";
@@ -172,9 +168,7 @@ int main(int argc, char ** argv)
         setenv("NIX_DOWNLOAD_CACHE", channelCache.c_str(), 1);
 
         // Figure out the name of the `.nix-channels' file to use
-        auto home = getEnv("HOME");
-        if (home.empty())
-            throw Error("$HOME not set");
+        auto home = getHome();
         channelsList = home + "/.nix-channels";
         nixDefExpr = home + "/.nix-defexpr";
 
@@ -224,7 +218,7 @@ int main(int argc, char ** argv)
                 throw UsageError("no command specified");
             case cAdd:
                 if (args.size() < 1 || args.size() > 2)
-                    throw UsageError("‘--add’ requires one or two arguments");
+                    throw UsageError("'--add' requires one or two arguments");
                 {
                 auto url = args[0];
                 auto name = string{};
@@ -240,12 +234,12 @@ int main(int argc, char ** argv)
                 break;
             case cRemove:
                 if (args.size() != 1)
-                    throw UsageError("‘--remove’ requires one argument");
+                    throw UsageError("'--remove' requires one argument");
                 removeChannel(args[0]);
                 break;
             case cList:
                 if (!args.empty())
-                    throw UsageError("‘--list’ expects no arguments");
+                    throw UsageError("'--list' expects no arguments");
                 readChannels();
                 for (const auto & channel : channels)
                     std::cout << channel.first << ' ' << channel.second << '\n';
@@ -255,7 +249,7 @@ int main(int argc, char ** argv)
                 break;
             case cRollback:
                 if (args.size() > 1)
-                    throw UsageError("‘--rollback’ has at most one argument");
+                    throw UsageError("'--rollback' has at most one argument");
                 auto envArgs = Strings{"--profile", profile};
                 if (args.size() == 1) {
                     envArgs.push_back("--switch-generation");

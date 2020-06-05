@@ -4,6 +4,8 @@
 #include "util.hh"
 #include "nar-info-disk-cache.hh"
 #include "thread-pool.hh"
+#include "json.hh"
+#include "derivations.hh"
 
 #include <future>
 
@@ -28,14 +30,14 @@ bool Store::isStorePath(const Path & path) const
 void Store::assertStorePath(const Path & path) const
 {
     if (!isStorePath(path))
-        throw Error(format("path ‘%1%’ is not in the Nix store") % path);
+        throw Error(format("path '%1%' is not in the Nix store") % path);
 }
 
 
 Path Store::toStorePath(const Path & path) const
 {
     if (!isInStore(path))
-        throw Error(format("path ‘%1%’ is not in the Nix store") % path);
+        throw Error(format("path '%1%' is not in the Nix store") % path);
     Path::size_type slash = path.find('/', storeDir.size() + 1);
     if (slash == Path::npos)
         return path;
@@ -53,7 +55,7 @@ Path Store::followLinksToStore(const Path & _path) const
         path = absPath(target, dirOf(path));
     }
     if (!isInStore(path))
-        throw Error(format("path ‘%1%’ is not in the Nix store") % path);
+        throw Error(format("path '%1%' is not in the Nix store") % path);
     return path;
 }
 
@@ -86,14 +88,14 @@ void checkStoreName(const string & name)
     /* Disallow names starting with a dot for possible security
        reasons (e.g., "." and ".."). */
     if (string(name, 0, 1) == ".")
-        throw Error(format("illegal name: ‘%1%’") % name);
+        throw Error(format("illegal name: '%1%'") % name);
     for (auto & i : name)
         if (!((i >= 'A' && i <= 'Z') ||
               (i >= 'a' && i <= 'z') ||
               (i >= '0' && i <= '9') ||
               validChars.find(i) != string::npos))
         {
-            throw Error(format("invalid character ‘%1%’ in name ‘%2%’")
+            throw Error(format("invalid character '%1%' in name '%2%'")
                 % i % name);
         }
 }
@@ -165,7 +167,7 @@ void checkStoreName(const string & name)
    collisions (for security).  For instance, it shouldn't be feasible
    to come up with a derivation whose output path collides with the
    path for a copied source.  The former would have a <s> starting with
-   "output:out:", while the latter would have a <2> starting with
+   "output:out:", while the latter would have a <s> starting with
    "source:".
 */
 
@@ -174,13 +176,12 @@ Path Store::makeStorePath(const string & type,
     const Hash & hash, const string & name) const
 {
     /* e.g., "source:sha256:1abc...:/nix/store:foo.tar.gz" */
-    string s = type + ":sha256:" + printHash(hash) + ":"
-        + storeDir + ":" + name;
+    string s = type + ":" + hash.to_string(Base16) + ":" + storeDir + ":" + name;
 
     checkStoreName(name);
 
     return storeDir + "/"
-        + printHash32(compressHash(hashString(htSHA256, s), 20))
+        + compressHash(hashString(htSHA256, s), 20).to_string(Base32, false)
         + "-" + name;
 }
 
@@ -200,7 +201,7 @@ Path Store::makeFixedOutputPath(bool recursive,
         ? makeStorePath("source", hash, name)
         : makeStorePath("output:out", hashString(htSHA256,
                 "fixed:out:" + (recursive ? (string) "r:" : "") +
-                printHashType(hash.type) + ":" + printHash(hash) + ":"),
+                hash.to_string(Base16) + ":"),
             name);
 }
 
@@ -239,7 +240,8 @@ Path Store::computeStorePathForText(const string & name, const string & s,
 
 
 Store::Store(const Params & params)
-    : storeDir(get(params, "store", settings.nixStore))
+    : Config(params)
+    , state({(size_t) pathInfoCacheSize})
 {
 }
 
@@ -284,6 +286,19 @@ bool Store::isValidPath(const Path & storePath)
 }
 
 
+/* Default implementation for stores that only implement
+   queryPathInfoUncached(). */
+bool Store::isValidPathUncached(const Path & path)
+{
+    try {
+        queryPathInfo(path);
+        return true;
+    } catch (InvalidPath &) {
+        return false;
+    }
+}
+
+
 ref<const ValidPathInfo> Store::queryPathInfo(const Path & storePath)
 {
     std::promise<ref<ValidPathInfo>> promise;
@@ -313,7 +328,7 @@ void Store::queryPathInfo(const Path & storePath,
             if (res) {
                 stats.narInfoReadAverted++;
                 if (!*res)
-                    throw InvalidPath(format("path ‘%s’ is not valid") % storePath);
+                    throw InvalidPath(format("path '%s' is not valid") % storePath);
                 return success(ref<ValidPathInfo>(*res));
             }
         }
@@ -328,7 +343,7 @@ void Store::queryPathInfo(const Path & storePath,
                         res.first == NarInfoDiskCache::oInvalid ? 0 : res.second);
                     if (res.first == NarInfoDiskCache::oInvalid ||
                         (res.second->path != storePath && storePathToName(storePath) != ""))
-                        throw InvalidPath(format("path ‘%s’ is not valid") % storePath);
+                        throw InvalidPath(format("path '%s' is not valid") % storePath);
                 }
                 return success(ref<ValidPathInfo>(res.second));
             }
@@ -353,7 +368,7 @@ void Store::queryPathInfo(const Path & storePath,
                 || (info->path != storePath && storePathToName(storePath) != ""))
             {
                 stats.narInfoMissing++;
-                return failure(std::make_exception_ptr(InvalidPath(format("path ‘%s’ is not valid") % storePath)));
+                return failure(std::make_exception_ptr(InvalidPath(format("path '%s' is not valid") % storePath)));
             }
 
             callSuccess(success, failure, ref<ValidPathInfo>(info));
@@ -362,7 +377,7 @@ void Store::queryPathInfo(const Path & storePath,
 }
 
 
-PathSet Store::queryValidPaths(const PathSet & paths)
+PathSet Store::queryValidPaths(const PathSet & paths, SubstituteFlag maybeSubstitute)
 {
     struct State
     {
@@ -422,7 +437,7 @@ string Store::makeValidityRegistration(const PathSet & paths,
         auto info = queryPathInfo(i);
 
         if (showHash) {
-            s += printHash(info->narHash) + "\n";
+            s += info->narHash.to_string(Base16, false) + "\n";
             s += (format("%1%\n") % info->narSize).str();
         }
 
@@ -439,6 +454,93 @@ string Store::makeValidityRegistration(const PathSet & paths,
 }
 
 
+void Store::pathInfoToJSON(JSONPlaceholder & jsonOut, const PathSet & storePaths,
+    bool includeImpureInfo, bool showClosureSize, AllowInvalidFlag allowInvalid)
+{
+    auto jsonList = jsonOut.list();
+
+    for (auto storePath : storePaths) {
+        auto jsonPath = jsonList.object();
+        jsonPath.attr("path", storePath);
+
+        try {
+            auto info = queryPathInfo(storePath);
+            storePath = info->path;
+
+            jsonPath
+                .attr("narHash", info->narHash.to_string())
+                .attr("narSize", info->narSize);
+
+            {
+                auto jsonRefs = jsonPath.list("references");
+                for (auto & ref : info->references)
+                    jsonRefs.elem(ref);
+            }
+
+            if (info->ca != "")
+                jsonPath.attr("ca", info->ca);
+
+            std::pair<uint64_t, uint64_t> closureSizes;
+
+            if (showClosureSize) {
+                closureSizes = getClosureSize(storePath);
+                jsonPath.attr("closureSize", closureSizes.first);
+            }
+
+            if (includeImpureInfo) {
+
+                if (info->deriver != "")
+                    jsonPath.attr("deriver", info->deriver);
+
+                if (info->registrationTime)
+                    jsonPath.attr("registrationTime", info->registrationTime);
+
+                if (info->ultimate)
+                    jsonPath.attr("ultimate", info->ultimate);
+
+                if (!info->sigs.empty()) {
+                    auto jsonSigs = jsonPath.list("signatures");
+                    for (auto & sig : info->sigs)
+                        jsonSigs.elem(sig);
+                }
+
+                auto narInfo = std::dynamic_pointer_cast<const NarInfo>(
+                    std::shared_ptr<const ValidPathInfo>(info));
+
+                if (narInfo) {
+                    if (narInfo->fileHash)
+                        jsonPath.attr("downloadHash", narInfo->fileHash.to_string());
+                    if (narInfo->fileSize)
+                        jsonPath.attr("downloadSize", narInfo->fileSize);
+                    if (showClosureSize)
+                        jsonPath.attr("closureDownloadSize", closureSizes.second);
+                }
+            }
+
+        } catch (InvalidPath &) {
+            jsonPath.attr("valid", false);
+        }
+    }
+}
+
+
+std::pair<uint64_t, uint64_t> Store::getClosureSize(const Path & storePath)
+{
+    uint64_t totalNarSize = 0, totalDownloadSize = 0;
+    PathSet closure;
+    computeFSClosure(storePath, closure, false, false);
+    for (auto & p : closure) {
+        auto info = queryPathInfo(p);
+        totalNarSize += info->narSize;
+        auto narInfo = std::dynamic_pointer_cast<const NarInfo>(
+            std::shared_ptr<const ValidPathInfo>(info));
+        if (narInfo)
+            totalDownloadSize += narInfo->fileSize;
+    }
+    return {totalNarSize, totalDownloadSize};
+}
+
+
 const Store::Stats & Store::getStats()
 {
     {
@@ -449,39 +551,130 @@ const Store::Stats & Store::getStats()
 }
 
 
-void copyStorePath(ref<Store> srcStore, ref<Store> dstStore,
-    const Path & storePath, bool repair, bool dontCheckSigs)
+void Store::buildPaths(const PathSet & paths, BuildMode buildMode)
 {
+    for (auto & path : paths)
+        if (isDerivation(path))
+            unsupported();
+
+    if (queryValidPaths(paths).size() != paths.size())
+        unsupported();
+}
+
+
+void copyStorePath(ref<Store> srcStore, ref<Store> dstStore,
+    const Path & storePath, RepairFlag repair, CheckSigsFlag checkSigs)
+{
+    Activity act(*logger, lvlInfo, actCopyPath, fmt("copying path '%s'", storePath),
+        {storePath, srcStore->getUri(), dstStore->getUri()});
+    PushActivity pact(act.id);
+
     auto info = srcStore->queryPathInfo(storePath);
 
-    StringSink sink;
+    uint64_t total = 0;
+
+    auto progress = [&](size_t len) {
+        total += len;
+        act.progress(total, info->narSize);
+    };
+
+    struct MyStringSink : StringSink
+    {
+        typedef std::function<void(size_t)> Callback;
+        Callback callback;
+        MyStringSink(Callback callback) : callback(callback) { }
+        void operator () (const unsigned char * data, size_t len) override
+        {
+            StringSink::operator ()(data, len);
+            callback(len);
+        };
+    };
+
+    MyStringSink sink(progress);
     srcStore->narFromPath({storePath}, sink);
 
-    dstStore->addToStore(*info, sink.s, repair, dontCheckSigs);
+    if (!info->narHash && !checkSigs) {
+        auto info2 = make_ref<ValidPathInfo>(*info);
+        info2->narHash = hashString(htSHA256, *sink.s);
+        if (!info->narSize) info2->narSize = sink.s->size();
+        info = info2;
+    }
+
+    assert(info->narHash);
+
+    if (info->ultimate) {
+        auto info2 = make_ref<ValidPathInfo>(*info);
+        info2->ultimate = false;
+        info = info2;
+    }
+
+    assert(info->narHash);
+
+    dstStore->addToStore(*info, sink.s, repair, checkSigs);
+}
+
+
+void copyPaths(ref<Store> srcStore, ref<Store> dstStore, const PathSet & storePaths,
+    RepairFlag repair, CheckSigsFlag checkSigs, SubstituteFlag substitute)
+{
+    PathSet valid = dstStore->queryValidPaths(storePaths, substitute);
+
+    PathSet missing;
+    for (auto & path : storePaths)
+        if (!valid.count(path)) missing.insert(path);
+
+    Activity act(*logger, lvlInfo, actCopyPaths, fmt("copying %d paths", missing.size()));
+
+    std::atomic<size_t> nrDone{0};
+    std::atomic<uint64_t> bytesExpected{0};
+    std::atomic<uint64_t> nrRunning{0};
+
+    auto showProgress = [&]() {
+        act.progress(nrDone, missing.size(), nrRunning);
+    };
+
+    ThreadPool pool;
+
+    processGraph<Path>(pool,
+        PathSet(missing.begin(), missing.end()),
+
+        [&](const Path & storePath) {
+            if (dstStore->isValidPath(storePath)) {
+                nrDone++;
+                showProgress();
+                return PathSet();
+            }
+
+            auto info = srcStore->queryPathInfo(storePath);
+
+            bytesExpected += info->narSize;
+            act.setExpected(actCopyPath, bytesExpected);
+
+            return info->references;
+        },
+
+        [&](const Path & storePath) {
+            checkInterrupt();
+
+            if (!dstStore->isValidPath(storePath)) {
+                MaintainCount<decltype(nrRunning)> mc(nrRunning);
+                showProgress();
+                copyStorePath(srcStore, dstStore, storePath, repair, checkSigs);
+            }
+
+            nrDone++;
+            showProgress();
+        });
 }
 
 
 void copyClosure(ref<Store> srcStore, ref<Store> dstStore,
-    const PathSet & storePaths, bool repair, bool dontCheckSigs)
+    const PathSet & storePaths, RepairFlag repair, CheckSigsFlag checkSigs,
+    SubstituteFlag substitute)
 {
     PathSet closure;
-    for (auto & path : storePaths)
-        srcStore->computeFSClosure(path, closure);
-
-    PathSet valid = dstStore->queryValidPaths(closure);
-
-    if (valid.size() == closure.size()) return;
-
-    Paths sorted = srcStore->topoSortPaths(closure);
-
-    Paths missing;
-    for (auto i = sorted.rbegin(); i != sorted.rend(); ++i)
-        if (!valid.count(*i)) missing.push_back(*i);
-
-    printMsg(lvlDebug, format("copying %1% missing paths") % missing.size());
-
-    for (auto & i : missing)
-        copyStorePath(srcStore, dstStore, i, repair, dontCheckSigs);
+    srcStore->computeFSClosure({storePaths}, closure);
+    copyPaths(srcStore, dstStore, closure, repair, checkSigs, substitute);
 }
 
 
@@ -493,7 +686,7 @@ ValidPathInfo decodeValidPathInfo(std::istream & str, bool hashGiven)
     if (hashGiven) {
         string s;
         getline(str, s);
-        info.narHash = parseHash(htSHA256, s);
+        info.narHash = Hash(s, htSHA256);
         getline(str, s);
         if (!string2Int(s, info.narSize)) throw Error("number expected");
     }
@@ -515,7 +708,7 @@ string showPaths(const PathSet & paths)
     string s;
     for (auto & i : paths) {
         if (s.size() != 0) s += ", ";
-        s += "‘" + i + "’";
+        s += "'" + i + "'";
     }
     return s;
 }
@@ -524,11 +717,11 @@ string showPaths(const PathSet & paths)
 std::string ValidPathInfo::fingerprint() const
 {
     if (narSize == 0 || !narHash)
-        throw Error(format("cannot calculate fingerprint of path ‘%s’ because its size/hash is not known")
+        throw Error(format("cannot calculate fingerprint of path '%s' because its size/hash is not known")
             % path);
     return
         "1;" + path + ";"
-        + printHashType(narHash.type) + ":" + printHash32(narHash) + ";"
+        + narHash.to_string(Base32) + ";"
         + std::to_string(narSize) + ";"
         + concatStringsSep(",", references);
 }
@@ -543,11 +736,11 @@ void ValidPathInfo::sign(const SecretKey & secretKey)
 bool ValidPathInfo::isContentAddressed(const Store & store) const
 {
     auto warn = [&]() {
-        printError(format("warning: path ‘%s’ claims to be content-addressed but isn't") % path);
+        printError(format("warning: path '%s' claims to be content-addressed but isn't") % path);
     };
 
     if (hasPrefix(ca, "text:")) {
-        auto hash = parseHash(std::string(ca, 5));
+        Hash hash(std::string(ca, 5));
         if (store.makeTextPath(storePathToName(path), hash, references) == path)
             return true;
         else
@@ -556,7 +749,7 @@ bool ValidPathInfo::isContentAddressed(const Store & store) const
 
     else if (hasPrefix(ca, "fixed:")) {
         bool recursive = ca.compare(6, 2, "r:") == 0;
-        auto hash = parseHash(std::string(ca, recursive ? 8 : 6));
+        Hash hash(std::string(ca, recursive ? 8 : 6));
         if (store.makeFixedOutputPath(recursive, hash, storePathToName(path)) == path)
             return true;
         else
@@ -594,6 +787,12 @@ Strings ValidPathInfo::shortRefs() const
 }
 
 
+std::string makeFixedOutputCA(bool recursive, const Hash & hash)
+{
+    return "fixed:" + (recursive ? (std::string) "r:" : "") + hash.to_string();
+}
+
+
 }
 
 
@@ -607,10 +806,11 @@ namespace nix {
 RegisterStoreImplementation::Implementations * RegisterStoreImplementation::implementations = 0;
 
 
-ref<Store> openStore(const std::string & uri_)
+ref<Store> openStore(const std::string & uri_,
+    const Store::Params & extraParams)
 {
     auto uri(uri_);
-    Store::Params params;
+    Store::Params params(extraParams);
     auto q = uri.find('?');
     if (q != std::string::npos) {
         for (auto s : tokenizeString<Strings>(uri.substr(q + 1), "&")) {
@@ -623,10 +823,13 @@ ref<Store> openStore(const std::string & uri_)
 
     for (auto fun : *RegisterStoreImplementation::implementations) {
         auto store = fun(uri, params);
-        if (store) return ref<Store>(store);
+        if (store) {
+            store->warnUnknownSettings();
+            return ref<Store>(store);
+        }
     }
 
-    throw Error(format("don't know how to open Nix store ‘%s’") % uri);
+    throw Error("don't know how to open Nix store '%s'", uri);
 }
 
 
@@ -636,7 +839,7 @@ StoreType getStoreType(const std::string & uri, const std::string & stateDir)
         return tDaemon;
     } else if (uri == "local") {
         return tLocal;
-    } else if (uri == "") {
+    } else if (uri == "" || uri == "auto") {
         if (access(stateDir.c_str(), R_OK | W_OK) == 0)
             return tLocal;
         else if (pathExists(settings.nixDaemonSocketFile))
@@ -666,68 +869,31 @@ static RegisterStoreImplementation regStore([](
 
 std::list<ref<Store>> getDefaultSubstituters()
 {
-    struct State {
-        bool done = false;
+    static auto stores([]() {
         std::list<ref<Store>> stores;
-    };
-    static Sync<State> state_;
 
-    auto state(state_.lock());
+        StringSet done;
 
-    if (state->done) return state->stores;
+        auto addStore = [&](const std::string & uri) {
+            if (done.count(uri)) return;
+            done.insert(uri);
+            stores.push_back(openStore(uri));
+        };
 
-    StringSet done;
+        for (auto uri : settings.substituters.get())
+            addStore(uri);
 
-    auto addStore = [&](const std::string & uri) {
-        if (done.count(uri)) return;
-        done.insert(uri);
-        state->stores.push_back(openStore(uri));
-    };
+        for (auto uri : settings.extraSubstituters.get())
+            addStore(uri);
 
-    for (auto uri : settings.get("substituters", Strings()))
-        addStore(uri);
-
-    for (auto uri : settings.get("binary-caches", Strings()))
-        addStore(uri);
-
-    for (auto uri : settings.get("extra-binary-caches", Strings()))
-        addStore(uri);
-
-    state->done = true;
-
-    return state->stores;
-}
-
-
-void copyPaths(ref<Store> from, ref<Store> to, const Paths & storePaths)
-{
-    std::string copiedLabel = "copied";
-
-    logger->setExpected(copiedLabel, storePaths.size());
-
-    ThreadPool pool;
-
-    processGraph<Path>(pool,
-        PathSet(storePaths.begin(), storePaths.end()),
-
-        [&](const Path & storePath) {
-            return from->queryPathInfo(storePath)->references;
-        },
-
-        [&](const Path & storePath) {
-            checkInterrupt();
-
-            if (!to->isValidPath(storePath)) {
-                Activity act(*logger, lvlInfo, format("copying ‘%s’...") % storePath);
-
-                copyStorePath(from, to, storePath);
-
-                logger->incProgress(copiedLabel);
-            } else
-                logger->incExpected(copiedLabel, -1);
+        stores.sort([](ref<Store> & a, ref<Store> & b) {
+            return a->getPriority() < b->getPriority();
         });
 
-    pool.process();
+        return stores;
+    } ());
+
+    return stores;
 }
 
 

@@ -30,7 +30,9 @@ struct SQLiteStmt
 {
     sqlite3 * db = 0;
     sqlite3_stmt * stmt = 0;
+    std::string sql;
     SQLiteStmt() { }
+    SQLiteStmt(sqlite3 * db, const std::string & sql) { create(db, sql); }
     void create(sqlite3 * db, const std::string & s);
     ~SQLiteStmt();
     operator sqlite3_stmt * () { return stmt; }
@@ -93,6 +95,8 @@ MakeError(SQLiteBusy, SQLiteError);
 
 [[noreturn]] void throwSQLiteError(sqlite3 * db, const format & f);
 
+void handleSQLiteBusy(const SQLiteBusy & e);
+
 /* Convenience function for retrying a SQLite transaction when the
    database is busy. */
 template<typename T>
@@ -102,6 +106,7 @@ T retrySQLite(std::function<T()> fun)
         try {
             return fun();
         } catch (SQLiteBusy & e) {
+            handleSQLiteBusy(e);
         }
     }
 }

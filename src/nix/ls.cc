@@ -61,9 +61,13 @@ struct MixLs : virtual Args
                 showFile(curPath, relPath);
         };
 
+        if (path == "/") {
+            path = "";
+        }
+
         auto st = accessor->stat(path);
         if (st.type == FSAccessor::Type::tMissing)
-            throw Error(format("path ‘%1%’ does not exist") % path);
+            throw Error(format("path '%1%' does not exist") % path);
         doPath(st, path,
             st.type == FSAccessor::Type::tDirectory ? "." : baseNameOf(path),
             showDirectory);

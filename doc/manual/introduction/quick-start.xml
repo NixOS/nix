@@ -40,7 +40,7 @@ libxslt-1.1.28
 <step><para>Install some packages from the channel:
 
 <screen>
-$ nix-env -i hello <replaceable>...</replaceable> </screen>
+$ nix-env -i hello</screen>
 
 This should download pre-built packages; it should not build them
 locally (if it does, something went wrong).</para></step>

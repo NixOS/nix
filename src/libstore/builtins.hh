@@ -4,6 +4,6 @@
 
 namespace nix {
 
-void builtinFetchurl(const BasicDerivation & drv);
+void builtinFetchurl(const BasicDerivation & drv, const std::string & netrcData);
 
 }

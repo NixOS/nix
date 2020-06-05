@@ -1,4 +1,5 @@
 Makefile.config
+perl/Makefile.config
 
 # /
 /aclocal.m4
@@ -35,7 +36,6 @@ Makefile.config
 # /scripts/
 /scripts/nix-profile.sh
 /scripts/nix-copy-closure
-/scripts/build-remote.pl
 /scripts/nix-reduce-build
 /scripts/nix-http-export.cgi
 
@@ -48,8 +48,7 @@ Makefile.config
 /src/libexpr/nix.tbl
 
 # /src/libstore/
-/src/libstore/schema.sql.hh
-/src/libstore/sandbox-defaults.sb
+/src/libstore/*.gen.hh
 
 /src/nix/nix
 
@@ -72,14 +71,13 @@ Makefile.config
 # /src/nix-channel/
 /src/nix-channel/nix-channel
 
-# /src/download-via-ssh/
-/src/download-via-ssh/download-via-ssh
-
 # /src/buildenv/
 /src/buildenv/buildenv
 
 # /src/nix-build/
 /src/nix-build/nix-build
+
+/src/nix-copy-closure/nix-copy-closure
 
 /src/build-remote/build-remote
 

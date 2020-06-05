@@ -1,5 +1,3 @@
-#include "config.h"
-
 #include "common-args.hh"
 #include "globals.hh"
 #include "shared.hh"
@@ -31,7 +29,7 @@ void printGCWarning()
     if (!gcWarning) return;
     static bool haveWarned = false;
     warnOnce(haveWarned,
-        "you did not specify ‘--add-root’; "
+        "you did not specify '--add-root'; "
         "the result might be removed by the garbage collector");
 }
 
@@ -78,7 +76,7 @@ string getArg(const string & opt,
     Strings::iterator & i, const Strings::iterator & end)
 {
     ++i;
-    if (i == end) throw UsageError(format("‘%1%’ requires an argument") % opt);
+    if (i == end) throw UsageError(format("'%1%' requires an argument") % opt);
     return *i;
 }
 
@@ -97,6 +95,9 @@ static void opensslLockCallback(int mode, int type, const char * file, int line)
 }
 
 
+static void sigHandler(int signo) { }
+
+
 void initNix()
 {
     /* Turn on buffering for cerr. */
@@ -105,30 +106,25 @@ void initNix()
     std::cerr.rdbuf()->pubsetbuf(buf, sizeof(buf));
 #endif
 
-    logger = makeDefaultLogger();
-
     /* Initialise OpenSSL locking. */
     opensslLocks = std::vector<std::mutex>(CRYPTO_num_locks());
     CRYPTO_set_locking_callback(opensslLockCallback);
 
-    settings.processEnvironment();
     settings.loadConfFile();
 
     startSignalHandlerThread();
 
-    /* Ignore SIGPIPE. */
+    /* Reset SIGCHLD to its default. */
     struct sigaction act;
     sigemptyset(&act.sa_mask);
-    act.sa_handler = SIG_IGN;
-    act.sa_flags = 0;
-    if (sigaction(SIGPIPE, &act, 0))
-        throw SysError("ignoring SIGPIPE");
-
-    /* Reset SIGCHLD to its default. */
     act.sa_handler = SIG_DFL;
     act.sa_flags = 0;
     if (sigaction(SIGCHLD, &act, 0))
         throw SysError("resetting SIGCHLD");
+
+    /* Install a dummy SIGUSR1 handler for use with pthread_kill(). */
+    act.sa_handler = sigHandler;
+    if (sigaction(SIGUSR1, &act, 0)) throw SysError("handling SIGUSR1");
 
     /* Register a SIGSEGV handler to detect stack overflows. */
     detectStackOverflow();
@@ -143,8 +139,13 @@ void initNix()
     gettimeofday(&tv, 0);
     srandom(tv.tv_usec);
 
-    if (char *pack = getenv("_NIX_OPTIONS"))
-        settings.unpack(pack);
+    /* On macOS, don't use the per-session TMPDIR (as set e.g. by
+       sshd). This breaks build users because they don't have access
+       to the TMPDIR, in particular in ‘nix-store --serve’. */
+#if __APPLE__
+    if (getuid() == 0 && hasPrefix(getEnv("TMPDIR"), "/var/folders/"))
+        unsetenv("TMPDIR");
+#endif
 }
 
 
@@ -160,13 +161,17 @@ struct LegacyArgs : public MixCommonArgs
             &settings.verboseBuild, false);
 
         mkFlag('K', "keep-failed", "keep temporary directories of failed builds",
-            &settings.keepFailed);
+            &(bool&) settings.keepFailed);
 
         mkFlag('k', "keep-going", "keep going after a build fails",
-            &settings.keepGoing);
+            &(bool&) settings.keepGoing);
 
         mkFlag(0, "fallback", "build from source if substitution fails", []() {
-            settings.set("build-fallback", "true");
+            settings.tryFallback = true;
+        });
+
+        mkFlag1('j', "max-jobs", "jobs", "maximum number of parallel builds", [=](std::string s) {
+            settings.set("max-jobs", s);
         });
 
         auto intSettingAlias = [&](char shortName, const std::string & longName,
@@ -176,21 +181,20 @@ struct LegacyArgs : public MixCommonArgs
             });
         };
 
-        intSettingAlias('j', "max-jobs", "maximum number of parallel builds", "build-max-jobs");
-        intSettingAlias(0, "cores", "maximum number of CPU cores to use inside a build", "build-cores");
-        intSettingAlias(0, "max-silent-time", "number of seconds of silence before a build is killed", "build-max-silent-time");
-        intSettingAlias(0, "timeout", "number of seconds before a build is killed", "build-timeout");
+        intSettingAlias(0, "cores", "maximum number of CPU cores to use inside a build", "cores");
+        intSettingAlias(0, "max-silent-time", "number of seconds of silence before a build is killed", "max-silent-time");
+        intSettingAlias(0, "timeout", "number of seconds before a build is killed", "timeout");
 
         mkFlag(0, "readonly-mode", "do not write to the Nix store",
             &settings.readOnlyMode);
 
         mkFlag(0, "no-build-hook", "disable use of the build hook mechanism",
-            &settings.useBuildHook, false);
+            &(bool&) settings.useBuildHook, false);
 
         mkFlag(0, "show-trace", "show Nix expression stack trace in evaluation errors",
             &settings.showTrace);
 
-        mkFlag(0, "no-gc-warning", "disable warning about not using ‘--add-root’",
+        mkFlag(0, "no-gc-warning", "disable warning about not using '--add-root'",
             &gcWarning, false);
     }
 
@@ -209,7 +213,7 @@ struct LegacyArgs : public MixCommonArgs
         Strings ss(args);
         auto pos = ss.begin();
         if (!parseArg(pos, ss.end()))
-            throw UsageError(format("unexpected argument ‘%1%’") % args.front());
+            throw UsageError(format("unexpected argument '%1%'") % args.front());
         return true;
     }
 };
@@ -218,8 +222,14 @@ struct LegacyArgs : public MixCommonArgs
 void parseCmdLine(int argc, char * * argv,
     std::function<bool(Strings::iterator & arg, const Strings::iterator & end)> parseArg)
 {
-    LegacyArgs(baseNameOf(argv[0]), parseArg).parseCmdline(argvToStrings(argc, argv));
-    settings.update();
+    parseCmdLine(baseNameOf(argv[0]), argvToStrings(argc, argv), parseArg);
+}
+
+
+void parseCmdLine(const string & programName, const Strings & args,
+    std::function<bool(Strings::iterator & arg, const Strings::iterator & end)> parseArg)
+{
+    LegacyArgs(programName, parseArg).parseCmdline(args);
 }
 
 
@@ -245,14 +255,16 @@ void printVersion(const string & programName)
 
 void showManPage(const string & name)
 {
-    restoreSIGPIPE();
+    restoreSignals();
     execlp("man", "man", name.c_str(), NULL);
-    throw SysError(format("command ‘man %1%’ failed") % name.c_str());
+    throw SysError(format("command 'man %1%' failed") % name.c_str());
 }
 
 
 int handleExceptions(const string & programName, std::function<void()> fun)
 {
+    ReceiveInterrupts receiveInterrupts; // FIXME: need better place for this
+
     string error = ANSI_RED "error:" ANSI_NORMAL " ";
     try {
         try {
@@ -262,20 +274,20 @@ int handleExceptions(const string & programName, std::function<void()> fun)
                condition is discharged before we reach printMsg()
                below, since otherwise it will throw an (uncaught)
                exception. */
-            interruptThrown = true;
+            setInterruptThrown();
             throw;
         }
     } catch (Exit & e) {
         return e.status;
     } catch (UsageError & e) {
         printError(
-            format(error + "%1%\nTry ‘%2% --help’ for more information.")
+            format(error + "%1%\nTry '%2% --help' for more information.")
             % e.what() % programName);
         return 1;
     } catch (BaseError & e) {
         printError(format(error + "%1%%2%") % (settings.showTrace ? e.prefix() : "") % e.msg());
         if (e.prefix() != "" && !settings.showTrace)
-            printError("(use ‘--show-trace’ to show detailed location information)");
+            printError("(use '--show-trace' to show detailed location information)");
         return e.status;
     } catch (std::bad_alloc & e) {
         printError(error + "out of memory");
@@ -296,16 +308,6 @@ RunPager::RunPager()
     if (!pager) pager = getenv("PAGER");
     if (pager && ((string) pager == "" || (string) pager == "cat")) return;
 
-    /* Ignore SIGINT. The pager will handle it (and we'll get
-       SIGPIPE). */
-    struct sigaction act;
-    act.sa_handler = SIG_IGN;
-    act.sa_flags = 0;
-    sigemptyset(&act.sa_mask);
-    if (sigaction(SIGINT, &act, 0)) throw SysError("ignoring SIGINT");
-
-    restoreSIGPIPE();
-
     Pipe toPager;
     toPager.create();
 
@@ -314,13 +316,16 @@ RunPager::RunPager()
             throw SysError("dupping stdin");
         if (!getenv("LESS"))
             setenv("LESS", "FRSXMK", 1);
+        restoreSignals();
         if (pager)
             execl("/bin/sh", "sh", "-c", pager, NULL);
         execlp("pager", "pager", NULL);
         execlp("less", "less", NULL);
         execlp("more", "more", NULL);
-        throw SysError(format("executing ‘%1%’") % pager);
+        throw SysError(format("executing '%1%'") % pager);
     });
+
+    pid.setKillSignal(SIGINT);
 
     if (dup2(toPager.writeSide.get(), STDOUT_FILENO) == -1)
         throw SysError("dupping stdout");

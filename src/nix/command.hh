@@ -4,6 +4,9 @@
 
 namespace nix {
 
+struct Value;
+class EvalState;
+
 /* A command is an argument parser that can be executed by calling its
    run() method. */
 struct Command : virtual Args
@@ -33,15 +36,101 @@ struct StoreCommand : virtual Command
     std::string storeUri;
     StoreCommand();
     void run() override;
+    ref<Store> getStore();
+    virtual ref<Store> createStore();
     virtual void run(ref<Store>) = 0;
+
+private:
+    std::shared_ptr<Store> _store;
+};
+
+struct Whence { std::string outputName; Path drvPath; };
+typedef std::map<Path, Whence> Buildables;
+
+struct Installable
+{
+    virtual std::string what() = 0;
+
+    virtual Buildables toBuildable(bool singular = false)
+    {
+        throw Error("argument '%s' cannot be built", what());
+    }
+
+    virtual Value * toValue(EvalState & state)
+    {
+        throw Error("argument '%s' cannot be evaluated", what());
+    }
+};
+
+struct SourceExprCommand : virtual Args, StoreCommand
+{
+    Path file;
+
+    SourceExprCommand()
+    {
+        mkFlag('f', "file", "file", "evaluate FILE rather than the default", &file);
+    }
+
+    /* Return a value representing the Nix expression from which we
+       are installing. This is either the file specified by ‘--file’,
+       or an attribute set constructed from $NIX_PATH, e.g. ‘{ nixpkgs
+       = import ...; bla = import ...; }’. */
+    Value * getSourceExpr(EvalState & state);
+
+    ref<EvalState> getEvalState();
+
+private:
+
+    std::shared_ptr<EvalState> evalState;
+
+    Value * vSourceExpr = 0;
+};
+
+/* A command that operates on a list of "installables", which can be
+   store paths, attribute paths, Nix expressions, etc. */
+struct InstallablesCommand : virtual Args, SourceExprCommand
+{
+    std::vector<std::shared_ptr<Installable>> installables;
+
+    InstallablesCommand()
+    {
+        expectArgs("installables", &_installables);
+    }
+
+    enum ToStorePathsMode { Build, NoBuild, DryRun };
+
+    PathSet toStorePaths(ref<Store> store, ToStorePathsMode mode);
+
+    void prepare() override;
+
+    virtual bool useDefaultInstallables() { return true; }
+
+private:
+
+    Strings _installables;
+};
+
+struct InstallableCommand : virtual Args, SourceExprCommand
+{
+    std::shared_ptr<Installable> installable;
+
+    InstallableCommand()
+    {
+        expectArg("installable", &_installable);
+    }
+
+    void prepare() override;
+
+private:
+
+    std::string _installable;
 };
 
 /* A command that operates on zero or more store paths. */
-struct StorePathsCommand : public StoreCommand
+struct StorePathsCommand : public InstallablesCommand
 {
 private:
 
-    Paths storePaths;
     bool recursive = false;
     bool all = false;
 
@@ -52,6 +141,18 @@ public:
     using StoreCommand::run;
 
     virtual void run(ref<Store> store, Paths storePaths) = 0;
+
+    void run(ref<Store> store) override;
+
+    bool useDefaultInstallables() override { return !all; }
+};
+
+/* A command that operates on exactly one store path. */
+struct StorePathCommand : public InstallablesCommand
+{
+    using StoreCommand::run;
+
+    virtual void run(ref<Store> store, const Path & storePath) = 0;
 
     void run(ref<Store> store) override;
 };

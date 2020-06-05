@@ -13,25 +13,27 @@ struct NarInfo;
 
 class BinaryCacheStore : public Store
 {
+public:
+
+    const Setting<std::string> compression{this, "xz", "compression", "NAR compression method ('xz', 'bzip2', or 'none')"};
+    const Setting<bool> writeNARListing{this, false, "write-nar-listing", "whether to write a JSON file listing the files in each NAR"};
+    const Setting<Path> secretKeyFile{this, "", "secret-key", "path to secret key used to sign the binary cache"};
+
 private:
 
     std::unique_ptr<SecretKey> secretKey;
-
-    std::string compression;
-
-    bool writeNARListing;
 
 protected:
 
     BinaryCacheStore(const Params & params);
 
-    [[noreturn]] void notImpl();
-
 public:
 
     virtual bool fileExists(const std::string & path) = 0;
 
-    virtual void upsertFile(const std::string & path, const std::string & data) = 0;
+    virtual void upsertFile(const std::string & path,
+        const std::string & data,
+        const std::string & mimeType) = 0;
 
     /* Return the contents of the specified file, or null if it
        doesn't exist. */
@@ -61,7 +63,7 @@ public:
     bool isValidPathUncached(const Path & path) override;
 
     PathSet queryAllValidPaths() override
-    { notImpl(); }
+    { unsupported(); }
 
     void queryPathInfoUncached(const Path & path,
         std::function<void(std::shared_ptr<ValidPathInfo>)> success,
@@ -69,79 +71,59 @@ public:
 
     void queryReferrers(const Path & path,
         PathSet & referrers) override
-    { notImpl(); }
-
-    PathSet queryValidDerivers(const Path & path) override
-    { return {}; }
+    { unsupported(); }
 
     PathSet queryDerivationOutputs(const Path & path) override
-    { notImpl(); }
+    { unsupported(); }
 
     StringSet queryDerivationOutputNames(const Path & path) override
-    { notImpl(); }
+    { unsupported(); }
 
     Path queryPathFromHashPart(const string & hashPart) override
-    { notImpl(); }
-
-    PathSet querySubstitutablePaths(const PathSet & paths) override
-    { return {}; }
-
-    void querySubstitutablePathInfos(const PathSet & paths,
-        SubstitutablePathInfos & infos) override
-    { }
+    { unsupported(); }
 
     bool wantMassQuery() override { return wantMassQuery_; }
 
     void addToStore(const ValidPathInfo & info, const ref<std::string> & nar,
-        bool repair, bool dontCheckSigs,
+        RepairFlag repair, CheckSigsFlag checkSigs,
         std::shared_ptr<FSAccessor> accessor) override;
 
     Path addToStore(const string & name, const Path & srcPath,
         bool recursive, HashType hashAlgo,
-        PathFilter & filter, bool repair) override;
+        PathFilter & filter, RepairFlag repair) override;
 
     Path addTextToStore(const string & name, const string & s,
-        const PathSet & references, bool repair) override;
+        const PathSet & references, RepairFlag repair) override;
 
     void narFromPath(const Path & path, Sink & sink) override;
 
-    void buildPaths(const PathSet & paths, BuildMode buildMode) override
-    { notImpl(); }
-
     BuildResult buildDerivation(const Path & drvPath, const BasicDerivation & drv,
         BuildMode buildMode) override
-    { notImpl(); }
+    { unsupported(); }
 
     void ensurePath(const Path & path) override
-    { notImpl(); }
+    { unsupported(); }
 
     void addTempRoot(const Path & path) override
-    { notImpl(); }
+    { unsupported(); }
 
     void addIndirectRoot(const Path & path) override
-    { notImpl(); }
-
-    void syncWithGC() override
-    { }
+    { unsupported(); }
 
     Roots findRoots() override
-    { notImpl(); }
+    { unsupported(); }
 
     void collectGarbage(const GCOptions & options, GCResults & results) override
-    { notImpl(); }
-
-    void optimiseStore() override
-    { }
-
-    bool verifyStore(bool checkContents, bool repair) override
-    { return true; }
+    { unsupported(); }
 
     ref<FSAccessor> getFSAccessor() override;
 
-public:
-
     void addSignatures(const Path & storePath, const StringSet & sigs) override
-    { notImpl(); }
+    { unsupported(); }
+
+    std::shared_ptr<std::string> getBuildLog(const Path & path) override;
+
+    int getPriority() override { return priority; }
 
 };
 

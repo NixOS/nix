@@ -11,7 +11,7 @@ class LRUCache
 {
 private:
 
-    size_t maxSize;
+    size_t capacity;
 
     // Stupid wrapper to get around circular dependency between Data
     // and LRU.
@@ -27,14 +27,16 @@ private:
 
 public:
 
-    LRUCache(size_t maxSize) : maxSize(maxSize) { }
+    LRUCache(size_t capacity) : capacity(capacity) { }
 
     /* Insert or upsert an item in the cache. */
     void upsert(const Key & key, const Value & value)
     {
+        if (capacity == 0) return;
+
         erase(key);
 
-        if (data.size() >= maxSize) {
+        if (data.size() >= capacity) {
             /* Retire the oldest item. */
             auto oldest = lru.begin();
             data.erase(*oldest);

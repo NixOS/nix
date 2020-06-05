@@ -1,6 +1,5 @@
 #pragma once
 
-#include "config.h"
 
 #include "ref.hh"
 
@@ -8,6 +7,7 @@
 #include <list>
 #include <set>
 #include <memory>
+#include <map>
 
 #include <boost/format.hpp>
 
@@ -32,6 +32,11 @@ using std::vector;
 using boost::format;
 
 
+/* A variadic template that does nothing. Useful to call a function
+   for all variadic arguments but ignoring the result. */
+struct nop { template<typename... T> nop(T...) {} };
+
+
 struct FormatOrString
 {
     string s;
@@ -45,16 +50,6 @@ struct FormatOrString
    equivalent to ‘boost::format(format) % a_0 % ... %
    ... a_n’. However, ‘fmt(s)’ is equivalent to ‘s’ (so no %-expansion
    takes place). */
-
-inline void formatHelper(boost::format & f)
-{
-}
-
-template<typename T, typename... Args>
-inline void formatHelper(boost::format & f, T x, Args... args)
-{
-    formatHelper(f % x, args...);
-}
 
 inline std::string fmt(const std::string & s)
 {
@@ -75,7 +70,8 @@ template<typename... Args>
 inline std::string fmt(const std::string & fs, Args... args)
 {
     boost::format f(fs);
-    formatHelper(f, args...);
+    f.exceptions(boost::io::all_error_bits ^ boost::io::too_many_args_bit);
+    nop{boost::io::detail::feed(f, args)...};
     return f.str();
 }
 
@@ -142,6 +138,7 @@ private:
 
 typedef list<string> Strings;
 typedef set<string> StringSet;
+typedef std::map<std::string, std::string> StringMap;
 
 
 /* Paths are just strings. */

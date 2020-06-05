@@ -65,7 +65,7 @@ available as <function>builtins.derivation</function>.</para>
   <replaceable>set</replaceable></term>
 
     <listitem><para>Return the names of the attributes in the set
-    <replaceable>set</replaceable> in a sorted list.  For instance,
+    <replaceable>set</replaceable> in an alphabetically sorted list.  For instance,
     <literal>builtins.attrNames { y = 1; x = "foo"; }</literal>
     evaluates to <literal>[ "x" "y" ]</literal>.</para></listitem>
 
@@ -210,36 +210,6 @@ if builtins ? getEnv then builtins.getEnv "PATH" else ""</programlisting>
 
   </varlistentry>
 
-  <varlistentry><term><function>builtins.match</function>
-  <replaceable>regex</replaceable> <replaceable>str</replaceable></term>
-
-  <listitem><para>Returns a list if
-    <replaceable>regex</replaceable> matches
-    <replaceable>str</replaceable> precisely, otherwise returns <literal>null</literal>.
-    Each item in the list is a regex group.
-
-<programlisting>
-builtins.match "ab" "abc"
-</programlisting>
-
-Evaluates to <literal>null</literal>.
-
-<programlisting>
-builtins.match "abc" "abc"
-</programlisting>
-
-Evaluates to <literal>[ ]</literal>.
-
-<programlisting>
-builtins.match "a(b)(c)" "abc"
-</programlisting>
-
-Evaluates to <literal>[ "b" "c" ]</literal>.
-
-
-  </para></listitem>
-  </varlistentry>
-
   <varlistentry><term><function>builtins.elem</function>
   <replaceable>x</replaceable> <replaceable>xs</replaceable></term>
 
@@ -292,6 +262,24 @@ with import (fetchTarball https://github.com/NixOS/nixpkgs-channels/archive/nixo
 stdenv.mkDerivation { … }
 </programlisting>
 
+    Note that when obtaining the hash with <varname>nix-prefetch-url
+    </varname> the option <varname>--unpack</varname> is required.
+    </para> 
+      
+    <para>This function can also verify the contents against a hash. 
+    In that case, the function takes a set instead of a URL. The set 
+    requires the attribute <varname>url</varname> and the attribute
+    <varname>sha256</varname>, e.g.
+      
+<programlisting>
+with import (fetchTarball {
+  url = https://github.com/NixOS/nixpkgs-channels/archive/nixos-14.12.tar.gz;
+  sha256 = "1jppksrfvbk5ypiqdz4cddxdl8z6zyzdb2srq8fcffr327ld5jj2";
+}) {};
+
+stdenv.mkDerivation { … }
+</programlisting>
+      
     </para>
 
     <para>This function is not available if <link
@@ -416,7 +404,7 @@ builtins.fromJSON ''{"x": [1, 2, 3], "y": null}''
 
     <listitem><para>Generate list of size
     <replaceable>length</replaceable>, with each element
-    <replaceable>i></replaceable> equal to the value returned by
+    <replaceable>i</replaceable> equal to the value returned by
     <replaceable>generator</replaceable> <literal>i</literal>. For
     example,
 
@@ -702,6 +690,42 @@ map (x: "foo" + x) [ "bar" "bla" "abc" ]</programlisting>
   </varlistentry>
 
 
+  <varlistentry><term><function>builtins.match</function>
+  <replaceable>regex</replaceable> <replaceable>str</replaceable></term>
+
+  <listitem><para>Returns a list if the <link
+  xlink:href="http://pubs.opengroup.org/onlinepubs/9699919799/basedefs/V1_chap09.html#tag_09_04">extended
+  POSIX regular expression</link> <replaceable>regex</replaceable>
+  matches <replaceable>str</replaceable> precisely, otherwise returns
+  <literal>null</literal>.  Each item in the list is a regex group.
+
+<programlisting>
+builtins.match "ab" "abc"
+</programlisting>
+
+Evaluates to <literal>null</literal>.
+
+<programlisting>
+builtins.match "abc" "abc"
+</programlisting>
+
+Evaluates to <literal>[ ]</literal>.
+
+<programlisting>
+builtins.match "a(b)(c)" "abc"
+</programlisting>
+
+Evaluates to <literal>[ "b" "c" ]</literal>.
+
+<programlisting>
+builtins.match "[[:space:]]+([[:upper:]]+)[[:space:]]+" "  FOO   "
+</programlisting>
+
+Evaluates to <literal>[ "foo" ]</literal>.
+
+  </para></listitem>
+  </varlistentry>
+
   <varlistentry><term><function>builtins.mul</function>
   <replaceable>e1</replaceable> <replaceable>e2</replaceable></term>
 
@@ -849,6 +873,43 @@ builtins.sort builtins.lessThan [ 483 249 526 147 42 77 ]
   </varlistentry>
 
 
+  <varlistentry><term><function>builtins.split</function>
+  <replaceable>regex</replaceable> <replaceable>str</replaceable></term>
+
+  <listitem><para>Returns a list composed of non matched strings interleaved
+  with the lists of the <link
+  xlink:href="http://pubs.opengroup.org/onlinepubs/9699919799/basedefs/V1_chap09.html#tag_09_04">extended
+  POSIX regular expression</link> <replaceable>regex</replaceable> matches
+  of <replaceable>str</replaceable>. Each item in the lists of matched
+  sequences is a regex group.
+
+<programlisting>
+builtins.split "(a)b" "abc"
+</programlisting>
+
+Evaluates to <literal>[ "" [ "a" ] "c" ]</literal>.
+
+<programlisting>
+builtins.split "([ac])" "abc"
+</programlisting>
+
+Evaluates to <literal>[ "" [ "a" ] "b" [ "c" ] "" ]</literal>.
+
+<programlisting>
+builtins.split "(a)|(c)" "abc"
+</programlisting>
+
+Evaluates to <literal>[ "" [ "a" null ] "b" [ null "c" ] "" ]</literal>.
+
+<programlisting>
+builtins.split "([[:upper:]]+)" "  FOO   "
+</programlisting>
+
+Evaluates to <literal>[ "  " [ "FOO" ] "   " ]</literal>.
+
+  </para></listitem>
+  </varlistentry>
+
   <varlistentry><term><function>builtins.stringLength</function>
   <replaceable>e</replaceable></term>
 
@@ -949,8 +1010,8 @@ stdenv.mkDerivation {
   ";
 
   src = fetchurl {
-    url = http://nix.cs.uu.nl/dist/tarballs/hello-2.1.1.tar.gz;
-    md5 = "70c9ccf9fac07f762c24f2df2290784d";
+    url = http://ftp.nluug.nl/pub/gnu/hello/hello-2.1.1.tar.gz;
+    sha256 = "1md7jsfd8pa45z73bz1kszpp01yw6x5ljkjk2hx7wl800any6465";
   };
   inherit perl;
 }</programlisting>
@@ -1023,10 +1084,17 @@ in foo</programlisting>
 
     <listitem><para>Convert the expression
     <replaceable>e</replaceable> to a string.
-    <replaceable>e</replaceable> can be a string (in which case
-    <function>toString</function> is a no-op), a path (e.g.,
-    <literal>toString /foo/bar</literal> yields
-    <literal>"/foo/bar"</literal> or a set containing <literal>{ __toString = self: ...; }</literal>.</para></listitem>
+    <replaceable>e</replaceable> can be:</para>
+    <itemizedlist>
+      <listitem><para>A string (in which case the string is returned unmodified).</para></listitem>
+      <listitem><para>A path (e.g., <literal>toString /foo/bar</literal> yields <literal>"/foo/bar"</literal>.</para></listitem>
+      <listitem><para>A set containing <literal>{ __toString = self: ...; }</literal>.</para></listitem>
+      <listitem><para>An integer.</para></listitem>
+      <listitem><para>A list, in which case the string representations of its elements are joined with spaces.</para></listitem>
+      <listitem><para>A Boolean (<literal>false</literal> yields <literal>""</literal>, <literal>true</literal> yields <literal>"1"</literal>.</para></listitem>
+      <listitem><para><literal>null</literal>, which yields the empty string.</para></listitem>
+    </itemizedlist>
+    </listitem>
 
   </varlistentry>
 
@@ -1153,6 +1221,19 @@ stdenv.mkDerivation (rec {
     abstract syntax representation on standard error.  Then return
     <replaceable>e2</replaceable>.  This function is useful for
     debugging.</para></listitem>
+
+  </varlistentry>
+
+  <varlistentry><term><function>builtins.tryEval</function>
+  <replaceable>e</replaceable></term>
+
+    <listitem><para>Try to evaluate <replaceable>e</replaceable>.
+    Return a set containing the attributes <literal>success</literal>
+    (<literal>true</literal> if <replaceable>e</replaceable> evaluated
+    successfully, <literal>false</literal> if an error was thrown) and
+    <literal>value</literal>, equalling <replaceable>e</replaceable>
+    if successful and <literal>false</literal> otherwise.
+    </para></listitem>
 
   </varlistentry>
 

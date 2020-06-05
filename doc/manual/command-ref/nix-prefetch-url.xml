@@ -19,13 +19,15 @@
 <refsynopsisdiv>
   <cmdsynopsis>
     <command>nix-prefetch-url</command>
+    <arg><option>--version</option></arg>
     <arg><option>--type</option> <replaceable>hashAlgo</replaceable></arg>
     <arg><option>--print-path</option></arg>
+    <arg><option>--unpack</option></arg>
+    <arg><option>--name</option> <replaceable>name</replaceable></arg>
     <arg choice='plain'><replaceable>url</replaceable></arg>
     <arg><replaceable>hash</replaceable></arg>
   </cmdsynopsis>
 </refsynopsisdiv>
-
 
 <refsection><title>Description</title>
 
@@ -91,7 +93,7 @@ downloaded file in the Nix store is also printed.</para>
 
   </varlistentry>
 
-  <varlistentry><term><option>--name</option></term>
+  <varlistentry><term><option>--name</option> <replaceable>name</replaceable></term>
 
     <listitem><para>Override the name of the file in the Nix store. By
     default, this is

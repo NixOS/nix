@@ -1,5 +1,3 @@
-#include "config.h"
-
 #include "references.hh"
 #include "pathlocks.hh"
 #include "globals.hh"
@@ -10,6 +8,8 @@
 #include "builtins.hh"
 #include "finally.hh"
 #include "compression.hh"
+#include "json.hh"
+#include "nar-info.hh"
 
 #include <algorithm>
 #include <iostream>
@@ -35,13 +35,6 @@
 #include <pwd.h>
 #include <grp.h>
 
-/* chroot-like behavior from Apple's sandbox */
-#if __APPLE__
-    #define DEFAULT_ALLOWED_IMPURE_PREFIXES "/System/Library /usr/lib /dev /bin/sh"
-#else
-    #define DEFAULT_ALLOWED_IMPURE_PREFIXES ""
-#endif
-
 /* Includes required for chroot support. */
 #if __linux__
 #include <sys/socket.h>
@@ -54,12 +47,15 @@
 #include <sys/param.h>
 #include <sys/mount.h>
 #include <sys/syscall.h>
+#include <seccomp.h>
 #define pivot_root(new_root, put_old) (syscall(SYS_pivot_root, new_root, put_old))
 #endif
 
 #if HAVE_STATVFS
 #include <sys/statvfs.h>
 #endif
+
+#include <nlohmann/json.hpp>
 
 
 namespace nix {
@@ -176,7 +172,8 @@ public:
     virtual string key() = 0;
 
 protected:
-    void amDone(ExitCode result);
+
+    virtual void amDone(ExitCode result);
 };
 
 
@@ -248,6 +245,10 @@ private:
 
 public:
 
+    const Activity act;
+    const Activity actDerivations;
+    const Activity actSubstitutions;
+
     /* Set if at least one derivation had a BuildError (i.e. permanent
        failure). */
     bool permanentFailure;
@@ -259,6 +260,20 @@ public:
 
     std::unique_ptr<HookInstance> hook;
 
+    uint64_t expectedBuilds = 0;
+    uint64_t doneBuilds = 0;
+    uint64_t failedBuilds = 0;
+    uint64_t runningBuilds = 0;
+
+    uint64_t expectedSubstitutions = 0;
+    uint64_t doneSubstitutions = 0;
+    uint64_t failedSubstitutions = 0;
+    uint64_t runningSubstitutions = 0;
+    uint64_t expectedDownloadSize = 0;
+    uint64_t doneDownloadSize = 0;
+    uint64_t expectedNarSize = 0;
+    uint64_t doneNarSize = 0;
+
     Worker(LocalStore & store);
     ~Worker();
 
@@ -266,7 +281,7 @@ public:
     GoalPtr makeDerivationGoal(const Path & drvPath, const StringSet & wantedOutputs, BuildMode buildMode = bmNormal);
     std::shared_ptr<DerivationGoal> makeBasicDerivationGoal(const Path & drvPath,
         const BasicDerivation & drv, BuildMode buildMode = bmNormal);
-    GoalPtr makeSubstitutionGoal(const Path & storePath, bool repair = false);
+    GoalPtr makeSubstitutionGoal(const Path & storePath, RepairFlag repair = NoRepair);
 
     /* Remove a dead goal. */
     void removeGoal(GoalPtr goal);
@@ -317,6 +332,14 @@ public:
     bool pathContentsGood(const Path & path);
 
     void markContentsGood(const Path & path);
+
+    void updateProgress()
+    {
+        actDerivations.progress(doneBuilds, expectedBuilds + doneBuilds, runningBuilds, failedBuilds);
+        actSubstitutions.progress(doneSubstitutions, expectedSubstitutions + doneSubstitutions, runningSubstitutions, failedSubstitutions);
+        act.setExpected(actDownload, expectedDownloadSize + doneDownloadSize);
+        act.setExpected(actCopyPath, expectedNarSize + doneNarSize);
+    }
 };
 
 
@@ -345,7 +368,7 @@ void Goal::waiteeDone(GoalPtr waitee, ExitCode result)
     assert(waitees.find(waitee) != waitees.end());
     waitees.erase(waitee);
 
-    trace(format("waitee ‘%1%’ done; %2% left") %
+    trace(format("waitee '%1%' done; %2% left") %
         waitee->name % waitees.size());
 
     if (result == ecFailed || result == ecNoSubstituters || result == ecIncompleteClosure) ++nrFailed;
@@ -399,6 +422,8 @@ void Goal::trace(const format & f)
 /* Common initialisation performed in child processes. */
 static void commonChildInit(Pipe & logPipe)
 {
+    restoreSignals();
+
     /* Put the child in a separate session (and thus a separate
        process group) so that it has no controlling terminal (meaning
        that e.g. ssh cannot open /dev/tty) and it doesn't receive
@@ -417,7 +442,7 @@ static void commonChildInit(Pipe & logPipe)
     /* Reroute stdin to /dev/null. */
     int fdDevNull = open(pathNullDevice.c_str(), O_RDWR);
     if (fdDevNull == -1)
-        throw SysError(format("cannot open ‘%1%’") % pathNullDevice);
+        throw SysError(format("cannot open '%1%'") % pathNullDevice);
     if (dup2(fdDevNull, STDIN_FILENO) == -1)
         throw SysError("cannot dup null device into stdin");
     close(fdDevNull);
@@ -434,21 +459,19 @@ private:
        close that file again (without closing the original file
        descriptor), we lose the lock.  So we have to be *very* careful
        not to open a lock file on which we are holding a lock. */
-    static PathSet lockedPaths; /* !!! not thread-safe */
+    static Sync<PathSet> lockedPaths_;
 
     Path fnUserLock;
     AutoCloseFD fdUserLock;
 
     string user;
-    uid_t uid = 0;
-    gid_t gid = 0;
+    uid_t uid;
+    gid_t gid;
     std::vector<gid_t> supplementaryGIDs;
 
 public:
+    UserLock();
     ~UserLock();
-
-    void acquire();
-    void release();
 
     void kill();
 
@@ -462,109 +485,106 @@ public:
 };
 
 
-PathSet UserLock::lockedPaths;
+Sync<PathSet> UserLock::lockedPaths_;
 
 
-UserLock::~UserLock()
+UserLock::UserLock()
 {
-    release();
-}
-
-
-void UserLock::acquire()
-{
-    assert(uid == 0);
-
     assert(settings.buildUsersGroup != "");
 
     /* Get the members of the build-users-group. */
-    struct group * gr = getgrnam(settings.buildUsersGroup.c_str());
+    struct group * gr = getgrnam(settings.buildUsersGroup.get().c_str());
     if (!gr)
-        throw Error(format("the group ‘%1%’ specified in ‘build-users-group’ does not exist")
+        throw Error(format("the group '%1%' specified in 'build-users-group' does not exist")
             % settings.buildUsersGroup);
     gid = gr->gr_gid;
 
     /* Copy the result of getgrnam. */
     Strings users;
     for (char * * p = gr->gr_mem; *p; ++p) {
-        debug(format("found build user ‘%1%’") % *p);
+        debug(format("found build user '%1%'") % *p);
         users.push_back(*p);
     }
 
     if (users.empty())
-        throw Error(format("the build users group ‘%1%’ has no members")
+        throw Error(format("the build users group '%1%' has no members")
             % settings.buildUsersGroup);
 
     /* Find a user account that isn't currently in use for another
        build. */
     for (auto & i : users) {
-        debug(format("trying user ‘%1%’") % i);
+        debug(format("trying user '%1%'") % i);
 
         struct passwd * pw = getpwnam(i.c_str());
         if (!pw)
-            throw Error(format("the user ‘%1%’ in the group ‘%2%’ does not exist")
+            throw Error(format("the user '%1%' in the group '%2%' does not exist")
                 % i % settings.buildUsersGroup);
 
         createDirs(settings.nixStateDir + "/userpool");
 
         fnUserLock = (format("%1%/userpool/%2%") % settings.nixStateDir % pw->pw_uid).str();
 
-        if (lockedPaths.find(fnUserLock) != lockedPaths.end())
-            /* We already have a lock on this one. */
-            continue;
+        {
+            auto lockedPaths(lockedPaths_.lock());
+            if (lockedPaths->count(fnUserLock))
+                /* We already have a lock on this one. */
+                continue;
+            lockedPaths->insert(fnUserLock);
+        }
 
-        AutoCloseFD fd = open(fnUserLock.c_str(), O_RDWR | O_CREAT | O_CLOEXEC, 0600);
-        if (!fd)
-            throw SysError(format("opening user lock ‘%1%’") % fnUserLock);
+        try {
 
-        if (lockFile(fd.get(), ltWrite, false)) {
-            fdUserLock = std::move(fd);
-            lockedPaths.insert(fnUserLock);
-            user = i;
-            uid = pw->pw_uid;
+            AutoCloseFD fd = open(fnUserLock.c_str(), O_RDWR | O_CREAT | O_CLOEXEC, 0600);
+            if (!fd)
+                throw SysError(format("opening user lock '%1%'") % fnUserLock);
 
-            /* Sanity check... */
-            if (uid == getuid() || uid == geteuid())
-                throw Error(format("the Nix user should not be a member of ‘%1%’")
-                    % settings.buildUsersGroup);
+            if (lockFile(fd.get(), ltWrite, false)) {
+                fdUserLock = std::move(fd);
+                user = i;
+                uid = pw->pw_uid;
+
+                /* Sanity check... */
+                if (uid == getuid() || uid == geteuid())
+                    throw Error(format("the Nix user should not be a member of '%1%'")
+                        % settings.buildUsersGroup);
 
 #if __linux__
-            /* Get the list of supplementary groups of this build user.  This
-               is usually either empty or contains a group such as "kvm".  */
-            supplementaryGIDs.resize(10);
-            int ngroups = supplementaryGIDs.size();
-            int err = getgrouplist(pw->pw_name, pw->pw_gid,
-                supplementaryGIDs.data(), &ngroups);
-            if (err == -1)
-                throw Error(format("failed to get list of supplementary groups for ‘%1%’") % pw->pw_name);
+                /* Get the list of supplementary groups of this build user.  This
+                   is usually either empty or contains a group such as "kvm".  */
+                supplementaryGIDs.resize(10);
+                int ngroups = supplementaryGIDs.size();
+                int err = getgrouplist(pw->pw_name, pw->pw_gid,
+                    supplementaryGIDs.data(), &ngroups);
+                if (err == -1)
+                    throw Error(format("failed to get list of supplementary groups for '%1%'") % pw->pw_name);
 
-            supplementaryGIDs.resize(ngroups);
+                supplementaryGIDs.resize(ngroups);
 #endif
 
-            return;
+                return;
+            }
+
+        } catch (...) {
+            lockedPaths_.lock()->erase(fnUserLock);
         }
     }
 
     throw Error(format("all build users are currently in use; "
-        "consider creating additional users and adding them to the ‘%1%’ group")
+        "consider creating additional users and adding them to the '%1%' group")
         % settings.buildUsersGroup);
 }
 
 
-void UserLock::release()
+UserLock::~UserLock()
 {
-    if (uid == 0) return;
-    fdUserLock = -1; /* releases lock */
-    assert(lockedPaths.find(fnUserLock) != lockedPaths.end());
-    lockedPaths.erase(fnUserLock);
-    fnUserLock = "";
-    uid = 0;
+    auto lockedPaths(lockedPaths_.lock());
+    assert(lockedPaths->count(fnUserLock));
+    lockedPaths->erase(fnUserLock);
 }
 
 
 void UserLock::kill()
 {
-    assert(enabled());
     killUser(uid);
 }
 
@@ -594,11 +614,7 @@ struct HookInstance
 
 HookInstance::HookInstance()
 {
-    debug("starting build hook");
-
-    Path buildHook = getEnv("NIX_BUILD_HOOK");
-    if (string(buildHook, 0, 1) != "/") buildHook = settings.nixLibexecDir + "/nix/" + buildHook;
-    buildHook = canonPath(buildHook);
+    debug("starting build hook '%s'", settings.buildHook);
 
     /* Create a pipe to get the output of the child. */
     fromHook.create();
@@ -625,15 +641,17 @@ HookInstance::HookInstance()
             throw SysError("dupping builder's stdout/stderr");
 
         Strings args = {
-            baseNameOf(buildHook),
+            baseNameOf(settings.buildHook),
             settings.thisSystem,
-            (format("%1%") % settings.maxSilentTime).str(),
-            (format("%1%") % settings.buildTimeout).str()
+            std::to_string(settings.maxSilentTime),
+            std::to_string(settings.buildTimeout),
+            std::to_string(verbosity),
+            settings.builders
         };
 
-        execv(buildHook.c_str(), stringsToCharPtrs(args).data());
+        execv(settings.buildHook.get().c_str(), stringsToCharPtrs(args).data());
 
-        throw SysError(format("executing ‘%1%’") % buildHook);
+        throw SysError("executing '%s'", settings.buildHook);
     });
 
     pid.setSeparatePG(true);
@@ -646,7 +664,7 @@ HookInstance::~HookInstance()
 {
     try {
         toHook.writeSide = -1;
-        if (pid != -1) pid.kill(true);
+        if (pid != -1) pid.kill();
     } catch (...) {
         ignoreException();
     }
@@ -720,7 +738,7 @@ private:
     PathSet missingPaths;
 
     /* User selected for running the builder. */
-    UserLock buildUser;
+    std::unique_ptr<UserLock> buildUser;
 
     /* The process ID of the builder. */
     Pid pid;
@@ -780,13 +798,13 @@ private:
     };
     typedef map<Path, ChrootPath> DirsInChroot; // maps target path to source path
     DirsInChroot dirsInChroot;
+
     typedef map<string, string> Environment;
     Environment env;
 
 #if __APPLE__
     typedef string SandboxProfile;
     SandboxProfile additionalSandboxProfile;
-    AutoDelete autoDelSandbox;
 #endif
 
     /* Hash rewriting. */
@@ -816,6 +834,14 @@ private:
 
     const uid_t sandboxUid = 1000;
     const gid_t sandboxGid = 100;
+
+    const static Path homeDir;
+
+    std::unique_ptr<MaintainCount<uint64_t>> mcExpectedBuilds, mcRunningBuilds;
+
+    std::unique_ptr<Activity> act;
+
+    std::map<ActivityId, Activity> builderActivities;
 
 public:
     DerivationGoal(const Path & drvPath, const StringSet & wantedOutputs,
@@ -864,6 +890,18 @@ private:
     /* Start building a derivation. */
     void startBuilder();
 
+    /* Fill in the environment for the builder. */
+    void initEnv();
+
+    /* Write a JSON file containing the derivation attributes. */
+    void writeStructuredAttrs();
+
+    /* Make a file owned by the builder. */
+    void chownToBuilder(const Path & path);
+
+    /* Handle the exportReferencesGraph attribute. */
+    void doExportReferencesGraph();
+
     /* Run the builder's process. */
     void runChild();
 
@@ -900,8 +938,16 @@ private:
 
     void repairClosure();
 
+    void amDone(ExitCode result) override
+    {
+        Goal::amDone(result);
+    }
+
     void done(BuildResult::Status status, const string & msg = "");
 };
+
+
+const Path DerivationGoal::homeDir = "/homeless-shelter";
 
 
 DerivationGoal::DerivationGoal(const Path & drvPath, const StringSet & wantedOutputs,
@@ -913,8 +959,11 @@ DerivationGoal::DerivationGoal(const Path & drvPath, const StringSet & wantedOut
     , buildMode(buildMode)
 {
     state = &DerivationGoal::getDerivation;
-    name = (format("building of ‘%1%’") % drvPath).str();
+    name = (format("building of '%1%'") % drvPath).str();
     trace("created");
+
+    mcExpectedBuilds = std::make_unique<MaintainCount<uint64_t>>(worker.expectedBuilds);
+    worker.updateProgress();
 }
 
 
@@ -929,6 +978,9 @@ DerivationGoal::DerivationGoal(const Path & drvPath, const BasicDerivation & drv
     state = &DerivationGoal::haveDerivation;
     name = (format("building of %1%") % showPaths(drv.outputPaths())).str();
     trace("created");
+
+    mcExpectedBuilds = std::make_unique<MaintainCount<uint64_t>>(worker.expectedBuilds);
+    worker.updateProgress();
 
     /* Prevent the .chroot directory from being
        garbage-collected. (See isActiveTempFile() in gc.cc.) */
@@ -951,7 +1003,7 @@ void DerivationGoal::killChild()
     if (pid != -1) {
         worker.childTerminated(this);
 
-        if (buildUser.enabled()) {
+        if (buildUser) {
             /* If we're using a build user, then there is a tricky
                race condition: if we kill the build user before the
                child has done its setuid() to the build user uid, then
@@ -959,7 +1011,7 @@ void DerivationGoal::killChild()
                pid.wait().  So also send a conventional kill to the
                child. */
             ::kill(-pid, SIGKILL); /* ignore the result */
-            buildUser.kill();
+            buildUser->kill();
             pid.wait();
         } else
             pid.kill();
@@ -1024,7 +1076,7 @@ void DerivationGoal::loadDerivation()
     trace("loading derivation");
 
     if (nrFailed != 0) {
-        printError(format("cannot build missing derivation ‘%1%’") % drvPath);
+        printError(format("cannot build missing derivation '%1%'") % drvPath);
         done(BuildResult::MiscFailure);
         return;
     }
@@ -1061,19 +1113,15 @@ void DerivationGoal::haveDerivation()
 
     /* Reject doing a hash build of anything other than a fixed-output
        derivation. */
-    if (buildMode == bmHash) {
-        if (drv->outputs.size() != 1 ||
-            drv->outputs.find("out") == drv->outputs.end() ||
-            drv->outputs["out"].hashAlgo == "")
-            throw Error(format("cannot do a hash build of non-fixed-output derivation ‘%1%’") % drvPath);
-    }
+    if (buildMode == bmHash && !drv->isFixedOutput())
+        throw Error("cannot do a hash build of non-fixed-output derivation '%1%'", drvPath);
 
     /* We are first going to try to create the invalid output paths
        through substitutes.  If that doesn't work, we'll build
        them. */
     if (settings.useSubstitutes && drv->substitutesAllowed())
         for (auto & i : invalidOutputs)
-            addWaitee(worker.makeSubstitutionGoal(i, buildMode == bmRepair));
+            addWaitee(worker.makeSubstitutionGoal(i, buildMode == bmRepair ? Repair : NoRepair));
 
     if (waitees.empty()) /* to prevent hang (no wake-up event) */
         outputsSubstituted();
@@ -1087,7 +1135,7 @@ void DerivationGoal::outputsSubstituted()
     trace("all outputs substituted (maybe)");
 
     if (nrFailed > 0 && nrFailed > nrNoSubstituters + nrIncompleteClosure && !settings.tryFallback) {
-        done(BuildResult::TransientFailure, (format("some substitutes for the outputs of derivation ‘%1%’ failed (usually happens due to networking issues); try ‘--fallback’ to build derivation from source ") % drvPath).str());
+        done(BuildResult::TransientFailure, (format("some substitutes for the outputs of derivation '%1%' failed (usually happens due to networking issues); try '--fallback' to build derivation from source ") % drvPath).str());
         return;
     }
 
@@ -1114,7 +1162,7 @@ void DerivationGoal::outputsSubstituted()
         return;
     }
     if (buildMode == bmCheck && nrInvalid > 0)
-        throw Error(format("some outputs of ‘%1%’ are not valid, so checking is not possible") % drvPath);
+        throw Error(format("some outputs of '%1%' are not valid, so checking is not possible") % drvPath);
 
     /* Otherwise, at least one of the output paths could not be
        produced using a substitute.  So we have to build instead. */
@@ -1131,7 +1179,7 @@ void DerivationGoal::outputsSubstituted()
     for (auto & i : drv->inputSrcs) {
         if (worker.store.isValidPath(i)) continue;
         if (!settings.useSubstitutes)
-            throw Error(format("dependency of ‘%1%’ of ‘%2%’ does not exist, and substitution is disabled")
+            throw Error(format("dependency of '%1%' of '%2%' does not exist, and substitution is disabled")
                 % i % drvPath);
         addWaitee(worker.makeSubstitutionGoal(i));
     }
@@ -1178,10 +1226,10 @@ void DerivationGoal::repairClosure()
     PathSet broken;
     for (auto & i : outputClosure) {
         if (worker.pathContentsGood(i)) continue;
-        printError(format("found corrupted or missing path ‘%1%’ in the output closure of ‘%2%’") % i % drvPath);
+        printError(format("found corrupted or missing path '%1%' in the output closure of '%2%'") % i % drvPath);
         Path drvPath2 = outputsToDrv[i];
         if (drvPath2 == "")
-            addWaitee(worker.makeSubstitutionGoal(i, true));
+            addWaitee(worker.makeSubstitutionGoal(i, Repair));
         else
             addWaitee(worker.makeDerivationGoal(drvPath2, PathSet(), bmRepair));
     }
@@ -1199,7 +1247,7 @@ void DerivationGoal::closureRepaired()
 {
     trace("closure repaired");
     if (nrFailed > 0)
-        throw Error(format("some paths in the output closure of derivation ‘%1%’ could not be repaired") % drvPath);
+        throw Error(format("some paths in the output closure of derivation '%1%' could not be repaired") % drvPath);
     done(BuildResult::AlreadyValid);
 }
 
@@ -1210,9 +1258,9 @@ void DerivationGoal::inputsRealised()
 
     if (nrFailed != 0) {
         if (!useDerivation)
-            throw Error(format("some dependencies of ‘%1%’ are missing") % drvPath);
+            throw Error(format("some dependencies of '%1%' are missing") % drvPath);
         printError(
-            format("cannot build derivation ‘%1%’: %2% dependencies couldn't be built")
+            format("cannot build derivation '%1%': %2% dependencies couldn't be built")
             % drvPath % nrFailed);
         done(BuildResult::DependencyFailed);
         return;
@@ -1228,7 +1276,7 @@ void DerivationGoal::inputsRealised()
 
     /* The outputs are referenceable paths. */
     for (auto & i : drv->outputs) {
-        debug(format("building path ‘%1%’") % i.second.path);
+        debug(format("building path '%1%'") % i.second.path);
         allPaths.insert(i.second.path);
     }
 
@@ -1247,7 +1295,7 @@ void DerivationGoal::inputsRealised()
                     worker.store.computeFSClosure(inDrv.outputs[j].path, inputPaths);
                 else
                     throw Error(
-                        format("derivation ‘%1%’ requires non-existent output ‘%2%’ from input derivation ‘%3%’")
+                        format("derivation '%1%' requires non-existent output '%2%' from input derivation '%3%'")
                         % drvPath % j % i.first);
         }
 
@@ -1265,7 +1313,7 @@ void DerivationGoal::inputsRealised()
 
     /* Don't repeat fixed-output derivations since they're already
        verified by their output hash.*/
-    nrRounds = fixedOutput ? 1 : settings.get("build-repeat", 0) + 1;
+    nrRounds = fixedOutput ? 1 : settings.buildRepeat + 1;
 
     /* Okay, try to build.  Note that here we don't wait for a build
        slot to become available, since we don't need one if there is a
@@ -1288,7 +1336,7 @@ void DerivationGoal::tryToBuild()
        goal to sleep until another goal finishes, then try again. */
     for (auto & i : drv->outputs)
         if (pathIsLockedByMe(worker.store.toRealPath(i.second.path))) {
-            debug(format("putting derivation ‘%1%’ to sleep because ‘%2%’ is locked by another goal")
+            debug(format("putting derivation '%1%' to sleep because '%2%' is locked by another goal")
                 % drvPath % i.second.path);
             worker.waitForAnyGoal(shared_from_this());
             return;
@@ -1317,7 +1365,7 @@ void DerivationGoal::tryToBuild()
        build this derivation, so no further checks are necessary. */
     validPaths = checkPathValidity(true, buildMode == bmRepair);
     if (buildMode != bmCheck && validPaths.size() == drv->outputs.size()) {
-        debug(format("skipping build of derivation ‘%1%’, someone beat us to it") % drvPath);
+        debug(format("skipping build of derivation '%1%', someone beat us to it") % drvPath);
         outputLocks.setDeletion(true);
         done(BuildResult::AlreadyValid);
         return;
@@ -1332,7 +1380,7 @@ void DerivationGoal::tryToBuild()
     for (auto & i : drv->outputs) {
         Path path = i.second.path;
         if (worker.store.isValidPath(path)) continue;
-        debug(format("removing invalid path ‘%1%’") % path);
+        debug(format("removing invalid path '%1%'") % path);
         deletePath(worker.store.toRealPath(path));
     }
 
@@ -1340,6 +1388,13 @@ void DerivationGoal::tryToBuild()
        `preferLocalBuild' set.  Also, check and repair modes are only
        supported for local builds. */
     bool buildLocally = buildMode != bmNormal || drv->willBuildLocally();
+
+    auto started = [&]() {
+        act = std::make_unique<Activity>(*logger, lvlInfo, actBuild,
+            fmt("building '%s'", drvPath), Logger::Fields{drvPath});
+        mcRunningBuilds = std::make_unique<MaintainCount<uint64_t>>(worker.runningBuilds);
+        worker.updateProgress();
+    };
 
     /* Is the build hook willing to accept this job? */
     if (!buildLocally) {
@@ -1349,6 +1404,7 @@ void DerivationGoal::tryToBuild()
                    EOF from the hook. */
                 result.startTime = time(0); // inexact
                 state = &DerivationGoal::buildDone;
+                started();
                 return;
             case rpPostpone:
                 /* Not now; wait until at least one child finishes or
@@ -1380,7 +1436,7 @@ void DerivationGoal::tryToBuild()
     } catch (BuildError & e) {
         printError(e.msg());
         outputLocks.unlock();
-        buildUser.release();
+        buildUser.reset();
         worker.permanentFailure = true;
         done(BuildResult::InputRejected, e.msg());
         return;
@@ -1389,6 +1445,8 @@ void DerivationGoal::tryToBuild()
     /* This state will be reached when we get EOF on the child's
        log pipe. */
     state = &DerivationGoal::buildDone;
+
+    started();
 }
 
 
@@ -1402,7 +1460,7 @@ void replaceValidPath(const Path & storePath, const Path tmpPath)
     if (pathExists(storePath))
         rename(storePath.c_str(), oldPath.c_str());
     if (rename(tmpPath.c_str(), storePath.c_str()) == -1)
-        throw SysError(format("moving ‘%1%’ to ‘%2%’") % tmpPath % storePath);
+        throw SysError(format("moving '%1%' to '%2%'") % tmpPath % storePath);
     deletePath(oldPath);
 }
 
@@ -1414,13 +1472,18 @@ void DerivationGoal::buildDone()
 {
     trace("build done");
 
+    /* Release the build user at the end of this function. We don't do
+       it right away because we don't want another build grabbing this
+       uid and then messing around with our output. */
+    Finally releaseBuildUser([&]() { buildUser.reset(); });
+
     /* Since we got an EOF on the logger pipe, the builder is presumed
        to have terminated.  In fact, the builder could also have
        simply have closed its end of the pipe, so just to be sure,
        kill it. */
-    int status = hook ? hook->pid.kill(true) : pid.kill(true);
+    int status = hook ? hook->pid.kill() : pid.kill();
 
-    debug(format("builder process for ‘%1%’ finished") % drvPath);
+    debug(format("builder process for '%1%' finished") % drvPath);
 
     result.timesBuilt++;
     result.stopTime = time(0);
@@ -1443,7 +1506,7 @@ void DerivationGoal::buildDone()
        malicious user from leaving behind a process that keeps files
        open and modifies them after they have been chown'ed to
        root. */
-    if (buildUser.enabled()) buildUser.kill();
+    if (buildUser) buildUser->kill();
 
     bool diskFull = false;
 
@@ -1477,7 +1540,7 @@ void DerivationGoal::buildDone()
                     if (pathExists(chrootRootDir + i))
                         rename((chrootRootDir + i).c_str(), i.c_str());
 
-            std::string msg = (format("builder for ‘%1%’ %2%")
+            std::string msg = (format("builder for '%1%' %2%")
                 % drvPath % statusToString(status)).str();
 
             if (!settings.verboseBuild && !logTail.empty()) {
@@ -1513,7 +1576,6 @@ void DerivationGoal::buildDone()
         /* Repeat the build if necessary. */
         if (curRound++ < nrRounds) {
             outputLocks.unlock();
-            buildUser.release();
             state = &DerivationGoal::tryToBuild;
             worker.wakeUp(shared_from_this());
             return;
@@ -1530,7 +1592,6 @@ void DerivationGoal::buildDone()
         if (!hook)
             printError(e.msg());
         outputLocks.unlock();
-        buildUser.release();
 
         BuildResult::Status st = BuildResult::MiscFailure;
 
@@ -1552,73 +1613,78 @@ void DerivationGoal::buildDone()
         return;
     }
 
-    /* Release the build user, if applicable. */
-    buildUser.release();
-
     done(BuildResult::Built);
 }
 
 
 HookReply DerivationGoal::tryBuildHook()
 {
-    if (!settings.useBuildHook || getEnv("NIX_BUILD_HOOK") == "" || !useDerivation) return rpDecline;
+    if (!settings.useBuildHook || !useDerivation) return rpDecline;
 
     if (!worker.hook)
         worker.hook = std::make_unique<HookInstance>();
 
-    /* Tell the hook about system features (beyond the system type)
-       required from the build machine.  (The hook could parse the
-       drv file itself, but this is easier.) */
-    Strings features = tokenizeString<Strings>(get(drv->env, "requiredSystemFeatures"));
-    for (auto & i : features) checkStoreName(i); /* !!! abuse */
+    try {
 
-    /* Send the request to the hook. */
-    writeLine(worker.hook->toHook.writeSide.get(), (format("%1% %2% %3% %4%")
-        % (worker.getNrLocalBuilds() < settings.maxBuildJobs ? "1" : "0")
-        % drv->platform % drvPath % concatStringsSep(",", features)).str());
+        /* Tell the hook about system features (beyond the system type)
+           required from the build machine.  (The hook could parse the
+           drv file itself, but this is easier.) */
+        Strings features = tokenizeString<Strings>(get(drv->env, "requiredSystemFeatures"));
+        for (auto & i : features) checkStoreName(i); /* !!! abuse */
 
-    /* Read the first line of input, which should be a word indicating
-       whether the hook wishes to perform the build. */
-    string reply;
-    while (true) {
-        string s = readLine(worker.hook->fromHook.readSide.get());
-        if (string(s, 0, 2) == "# ") {
-            reply = string(s, 2);
-            break;
+        /* Send the request to the hook. */
+        writeLine(worker.hook->toHook.writeSide.get(), (format("%1% %2% %3% %4%")
+                % (worker.getNrLocalBuilds() < settings.maxBuildJobs ? "1" : "0")
+                % drv->platform % drvPath % concatStringsSep(",", features)).str());
+
+        /* Read the first line of input, which should be a word indicating
+           whether the hook wishes to perform the build. */
+        string reply;
+        while (true) {
+            string s = readLine(worker.hook->fromHook.readSide.get());
+            if (string(s, 0, 2) == "# ") {
+                reply = string(s, 2);
+                break;
+            }
+            s += "\n";
+            writeToStderr(s);
         }
-        s += "\n";
-        writeToStderr(s);
+
+        debug(format("hook reply is '%1%'") % reply);
+
+        if (reply == "decline")
+            return rpDecline;
+        else if (reply == "decline-permanently") {
+            settings.useBuildHook = false;
+            worker.hook = 0;
+            return rpDecline;
+        }
+        else if (reply == "postpone")
+            return rpPostpone;
+        else if (reply != "accept")
+            throw Error(format("bad hook reply '%1%'") % reply);
+
+    } catch (SysError & e) {
+        if (e.errNo == EPIPE) {
+            printError("build hook died unexpectedly: %s",
+                chomp(drainFD(worker.hook->fromHook.readSide.get())));
+            worker.hook = 0;
+            return rpDecline;
+        } else
+            throw;
     }
-
-    debug(format("hook reply is ‘%1%’") % reply);
-
-    if (reply == "decline" || reply == "postpone")
-        return reply == "decline" ? rpDecline : rpPostpone;
-    else if (reply != "accept")
-        throw Error(format("bad hook reply ‘%1%’") % reply);
 
     printMsg(lvlTalkative, format("using hook to build path(s) %1%") % showPaths(missingPaths));
 
     hook = std::move(worker.hook);
 
     /* Tell the hook all the inputs that have to be copied to the
-       remote system.  This unfortunately has to contain the entire
-       derivation closure to ensure that the validity invariant holds
-       on the remote system.  (I.e., it's unfortunate that we have to
-       list it since the remote system *probably* already has it.) */
-    PathSet allInputs;
-    allInputs.insert(inputPaths.begin(), inputPaths.end());
-    worker.store.computeFSClosure(drvPath, allInputs);
-
-    string s;
-    for (auto & i : allInputs) { s += i; s += ' '; }
-    writeLine(hook->toHook.writeSide.get(), s);
+       remote system. */
+    writeLine(hook->toHook.writeSide.get(), concatStringsSep(" ", inputPaths));
 
     /* Tell the hooks the missing outputs that have to be copied back
        from the remote system. */
-    s = "";
-    for (auto & i : missingPaths) { s += i; s += ' '; }
-    writeLine(hook->toHook.writeSide.get(), s);
+    writeLine(hook->toHook.writeSide.get(), concatStringsSep(" ", missingPaths));
 
     hook->toHook.writeSide = -1;
 
@@ -1637,7 +1703,7 @@ HookReply DerivationGoal::tryBuildHook()
 void chmod_(const Path & path, mode_t mode)
 {
     if (chmod(path.c_str(), mode) == -1)
-        throw SysError(format("setting permissions on ‘%1%’") % path);
+        throw SysError(format("setting permissions on '%1%'") % path);
 }
 
 
@@ -1661,7 +1727,7 @@ void DerivationGoal::startBuilder()
     /* Right platform? */
     if (!drv->canBuildLocally()) {
         throw Error(
-            format("a ‘%1%’ is required to build ‘%3%’, but I am a ‘%2%’")
+            format("a '%1%' is required to build '%3%', but I am a '%2%'")
             % drv->platform % settings.thisSystem % drvPath);
     }
 
@@ -1669,62 +1735,43 @@ void DerivationGoal::startBuilder()
     additionalSandboxProfile = get(drv->env, "__sandboxProfile");
 #endif
 
-    /* Are we doing a chroot build?  Note that fixed-output
-       derivations are never done in a chroot, mainly so that
-       functions like fetchurl (which needs a proper /etc/resolv.conf)
-       work properly.  Purity checking for fixed-output derivations
-       is somewhat pointless anyway. */
+    /* Are we doing a chroot build? */
     {
-        string x = settings.get("build-use-sandbox",
-            /* deprecated alias */
-            settings.get("build-use-chroot", string("false")));
-        if (x != "true" && x != "false" && x != "relaxed")
-            throw Error("option ‘build-use-sandbox’ must be set to one of ‘true’, ‘false’ or ‘relaxed’");
-        if (x == "true") {
+        if (settings.sandboxMode == smEnabled) {
             if (get(drv->env, "__noChroot") == "1")
-                throw Error(format("derivation ‘%1%’ has ‘__noChroot’ set, "
-                    "but that's not allowed when ‘build-use-sandbox’ is ‘true’") % drvPath);
+                throw Error(format("derivation '%1%' has '__noChroot' set, "
+                    "but that's not allowed when 'sandbox' is 'true'") % drvPath);
 #if __APPLE__
             if (additionalSandboxProfile != "")
-                throw Error(format("derivation ‘%1%’ specifies a sandbox profile, "
-                    "but this is only allowed when ‘build-use-sandbox’ is ‘relaxed’") % drvPath);
+                throw Error(format("derivation '%1%' specifies a sandbox profile, "
+                    "but this is only allowed when 'sandbox' is 'relaxed'") % drvPath);
 #endif
             useChroot = true;
         }
-        else if (x == "false")
+        else if (settings.sandboxMode == smDisabled)
             useChroot = false;
-        else if (x == "relaxed")
+        else if (settings.sandboxMode == smRelaxed)
             useChroot = !fixedOutput && get(drv->env, "__noChroot") != "1";
     }
 
     if (worker.store.storeDir != worker.store.realStoreDir)
         useChroot = true;
 
-    /* Construct the environment passed to the builder. */
-    env.clear();
+    /* If `build-users-group' is not empty, then we have to build as
+       one of the members of that group. */
+    if (settings.buildUsersGroup != "" && getuid() == 0) {
+#if defined(__linux__) || defined(__APPLE__)
+        buildUser = std::make_unique<UserLock>();
 
-    /* Most shells initialise PATH to some default (/bin:/usr/bin:...) when
-       PATH is not set.  We don't want this, so we fill it in with some dummy
-       value. */
-    env["PATH"] = "/path-not-set";
-
-    /* Set HOME to a non-existing path to prevent certain programs from using
-       /etc/passwd (or NIS, or whatever) to locate the home directory (for
-       example, wget looks for ~/.wgetrc).  I.e., these tools use /etc/passwd
-       if HOME is not set, but they will just assume that the settings file
-       they are looking for does not exist if HOME is set but points to some
-       non-existing path. */
-    Path homeDir = "/homeless-shelter";
-    env["HOME"] = homeDir;
-
-    /* Tell the builder where the Nix store is.  Usually they
-       shouldn't care, but this is useful for purity checking (e.g.,
-       the compiler or linker might only want to accept paths to files
-       in the store or in the build directory). */
-    env["NIX_STORE"] = worker.store.storeDir;
-
-    /* The maximum number of cores to utilize for parallel building. */
-    env["NIX_BUILD_CORES"] = (format("%d") % settings.buildCores).str();
+        /* Make sure that no other processes are executing under this
+           uid. */
+        buildUser->kill();
+#else
+        /* Don't know how to block the creation of setuid/setgid
+           binaries on this platform. */
+        throw Error("build users are not supported on this platform for security reasons");
+#endif
+    }
 
     /* Create a temporary directory where the build will take
        place. */
@@ -1733,146 +1780,31 @@ void DerivationGoal::startBuilder()
 
     /* In a sandbox, for determinism, always use the same temporary
        directory. */
-    tmpDirInSandbox = useChroot ? canonPath("/tmp", true) + "/nix-build-" + drvName + "-0" : tmpDir;
-
-    /* Add all bindings specified in the derivation via the
-       environments, except those listed in the passAsFile
-       attribute. Those are passed as file names pointing to
-       temporary files containing the contents. */
-    PathSet filesToChown;
-    StringSet passAsFile = tokenizeString<StringSet>(get(drv->env, "passAsFile"));
-    int fileNr = 0;
-    for (auto & i : drv->env) {
-        if (passAsFile.find(i.first) == passAsFile.end()) {
-            env[i.first] = i.second;
-        } else {
-            string fn = ".attr-" + std::to_string(fileNr++);
-            Path p = tmpDir + "/" + fn;
-            writeFile(p, i.second);
-            filesToChown.insert(p);
-            env[i.first + "Path"] = tmpDirInSandbox + "/" + fn;
-        }
-    }
-
-    /* For convenience, set an environment pointing to the top build
-       directory. */
-    env["NIX_BUILD_TOP"] = tmpDirInSandbox;
-
-    /* Also set TMPDIR and variants to point to this directory. */
-    env["TMPDIR"] = env["TEMPDIR"] = env["TMP"] = env["TEMP"] = tmpDirInSandbox;
-
-    /* Explicitly set PWD to prevent problems with chroot builds.  In
-       particular, dietlibc cannot figure out the cwd because the
-       inode of the current directory doesn't appear in .. (because
-       getdents returns the inode of the mount point). */
-    env["PWD"] = tmpDirInSandbox;
-
-    /* Compatibility hack with Nix <= 0.7: if this is a fixed-output
-       derivation, tell the builder, so that for instance `fetchurl'
-       can skip checking the output.  On older Nixes, this environment
-       variable won't be set, so `fetchurl' will do the check. */
-    if (fixedOutput) env["NIX_OUTPUT_CHECKED"] = "1";
-
-    /* *Only* if this is a fixed-output derivation, propagate the
-       values of the environment variables specified in the
-       `impureEnvVars' attribute to the builder.  This allows for
-       instance environment variables for proxy configuration such as
-       `http_proxy' to be easily passed to downloaders like
-       `fetchurl'.  Passing such environment variables from the caller
-       to the builder is generally impure, but the output of
-       fixed-output derivations is by definition pure (since we
-       already know the cryptographic hash of the output). */
-    if (fixedOutput) {
-        Strings varNames = tokenizeString<Strings>(get(drv->env, "impureEnvVars"));
-        for (auto & i : varNames) env[i] = getEnv(i);
-    }
+#if __linux__
+    tmpDirInSandbox = useChroot ? settings.sandboxBuildDir : tmpDir;
+#else
+    tmpDirInSandbox = tmpDir;
+#endif
+    chownToBuilder(tmpDir);
 
     /* Substitute output placeholders with the actual output paths. */
     for (auto & output : drv->outputs)
         inputRewrites[hashPlaceholder(output.first)] = output.second.path;
 
-    /* The `exportReferencesGraph' feature allows the references graph
-       to be passed to a builder.  This attribute should be a list of
-       pairs [name1 path1 name2 path2 ...].  The references graph of
-       each `pathN' will be stored in a text file `nameN' in the
-       temporary build directory.  The text files have the format used
-       by `nix-store --register-validity'.  However, the deriver
-       fields are left empty. */
-    string s = get(drv->env, "exportReferencesGraph");
-    Strings ss = tokenizeString<Strings>(s);
-    if (ss.size() % 2 != 0)
-        throw BuildError(format("odd number of tokens in ‘exportReferencesGraph’: ‘%1%’") % s);
-    for (Strings::iterator i = ss.begin(); i != ss.end(); ) {
-        string fileName = *i++;
-        checkStoreName(fileName); /* !!! abuse of this function */
+    /* Construct the environment passed to the builder. */
+    initEnv();
 
-        /* Check that the store path is valid. */
-        Path storePath = *i++;
-        if (!worker.store.isInStore(storePath))
-            throw BuildError(format("‘exportReferencesGraph’ contains a non-store path ‘%1%’")
-                % storePath);
-        storePath = worker.store.toStorePath(storePath);
-        if (!worker.store.isValidPath(storePath))
-            throw BuildError(format("‘exportReferencesGraph’ contains an invalid path ‘%1%’")
-                % storePath);
+    writeStructuredAttrs();
 
-        /* If there are derivations in the graph, then include their
-           outputs as well.  This is useful if you want to do things
-           like passing all build-time dependencies of some path to a
-           derivation that builds a NixOS DVD image. */
-        PathSet paths, paths2;
-        worker.store.computeFSClosure(storePath, paths);
-        paths2 = paths;
-
-        for (auto & j : paths2) {
-            if (isDerivation(j)) {
-                Derivation drv = worker.store.derivationFromPath(j);
-                for (auto & k : drv.outputs)
-                    worker.store.computeFSClosure(k.second.path, paths);
-            }
-        }
-
-        /* Write closure info to `fileName'. */
-        writeFile(tmpDir + "/" + fileName,
-            worker.store.makeValidityRegistration(paths, false, false));
-    }
-
-
-    /* If `build-users-group' is not empty, then we have to build as
-       one of the members of that group. */
-    if (settings.buildUsersGroup != "" && getuid() == 0) {
-        buildUser.acquire();
-
-        /* Make sure that no other processes are executing under this
-           uid. */
-        buildUser.kill();
-
-        /* Change ownership of the temporary build directory. */
-        filesToChown.insert(tmpDir);
-
-        for (auto & p : filesToChown)
-            if (chown(p.c_str(), buildUser.getUID(), buildUser.getGID()) == -1)
-                throw SysError(format("cannot change ownership of ‘%1%’") % p);
-    }
-
+    /* Handle exportReferencesGraph(), if set. */
+    doExportReferencesGraph();
 
     if (useChroot) {
 
-        string defaultChrootDirs;
-#if __linux__
-        if (worker.store.isInStore(BASH_PATH))
-            defaultChrootDirs = "/bin/sh=" BASH_PATH;
-#endif
-
         /* Allow a user-configurable set of directories from the
            host file system. */
-        PathSet dirs = tokenizeString<StringSet>(
-            settings.get("build-sandbox-paths",
-                /* deprecated alias with lower priority */
-                settings.get("build-chroot-dirs", defaultChrootDirs)));
-        PathSet dirs2 = tokenizeString<StringSet>(
-            settings.get("build-extra-chroot-dirs",
-                settings.get("build-extra-sandbox-paths", string(""))));
+        PathSet dirs = settings.sandboxPaths;
+        PathSet dirs2 = settings.extraSandboxPaths;
         dirs.insert(dirs2.begin(), dirs2.end());
 
         dirsInChroot.clear();
@@ -1898,14 +1830,14 @@ void DerivationGoal::startBuilder()
             try {
                 if (worker.store.isInStore(i.second.source))
                     worker.store.computeFSClosure(worker.store.toStorePath(i.second.source), closure);
+            } catch (InvalidPath & e) {
             } catch (Error & e) {
-                throw Error(format("while processing ‘build-sandbox-paths’: %s") % e.what());
+                throw Error(format("while processing 'sandbox-paths': %s") % e.what());
             }
         for (auto & i : closure)
             dirsInChroot[i] = i;
 
-        string allowed = settings.get("allowed-impure-host-deps", string(DEFAULT_ALLOWED_IMPURE_PREFIXES));
-        PathSet allowedPaths = tokenizeString<StringSet>(allowed);
+        PathSet allowedPaths = settings.allowedImpureHostPrefixes;
 
         /* This works like the above, except on a per-derivation level */
         Strings impurePaths = tokenizeString<Strings>(get(drv->env, "__impureHostDeps"));
@@ -1925,7 +1857,7 @@ void DerivationGoal::startBuilder()
                 }
             }
             if (!found)
-                throw Error(format("derivation ‘%1%’ requested impure path ‘%2%’, but it was not in allowed-impure-host-deps (‘%3%’)") % drvPath % i % allowed);
+                throw Error(format("derivation '%1%' requested impure path '%2%', but it was not in allowed-impure-host-deps") % drvPath % i);
 
             dirsInChroot[i] = i;
         }
@@ -1941,13 +1873,13 @@ void DerivationGoal::startBuilder()
         /* Clean up the chroot directory automatically. */
         autoDelChroot = std::make_shared<AutoDelete>(chrootRootDir);
 
-        printMsg(lvlChatty, format("setting up chroot environment in ‘%1%’") % chrootRootDir);
+        printMsg(lvlChatty, format("setting up chroot environment in '%1%'") % chrootRootDir);
 
         if (mkdir(chrootRootDir.c_str(), 0750) == -1)
-            throw SysError(format("cannot create ‘%1%’") % chrootRootDir);
+            throw SysError(format("cannot create '%1%'") % chrootRootDir);
 
-        if (buildUser.enabled() && chown(chrootRootDir.c_str(), 0, buildUser.getGID()) == -1)
-            throw SysError(format("cannot change ownership of ‘%1%’") % chrootRootDir);
+        if (buildUser && chown(chrootRootDir.c_str(), 0, buildUser->getGID()) == -1)
+            throw SysError(format("cannot change ownership of '%1%'") % chrootRootDir);
 
         /* Create a writable /tmp in the chroot.  Many builders need
            this.  (Of course they should really respect $TMPDIR
@@ -1961,11 +1893,11 @@ void DerivationGoal::startBuilder()
            Samba-in-QEMU. */
         createDirs(chrootRootDir + "/etc");
 
-        writeFile(chrootRootDir + "/etc/passwd",
-            (format(
-                "root:x:0:0:Nix build user:/:/noshell\n"
-                "nixbld:x:%1%:%2%:Nix build user:/:/noshell\n"
-                "nobody:x:65534:65534:Nobody:/:/noshell\n") % sandboxUid % sandboxGid).str());
+        writeFile(chrootRootDir + "/etc/passwd", fmt(
+                "root:x:0:0:Nix build user:%3%:/noshell\n"
+                "nixbld:x:%1%:%2%:Nix build user:%3%:/noshell\n"
+                "nobody:x:65534:65534:Nobody:/:/noshell\n",
+                sandboxUid, sandboxGid, settings.sandboxBuildDir));
 
         /* Declare the build user's group so that programs get a consistent
            view of the system (e.g., "id -gn"). */
@@ -1990,25 +1922,26 @@ void DerivationGoal::startBuilder()
         createDirs(chrootStoreDir);
         chmod_(chrootStoreDir, 01775);
 
-        if (buildUser.enabled() && chown(chrootStoreDir.c_str(), 0, buildUser.getGID()) == -1)
-            throw SysError(format("cannot change ownership of ‘%1%’") % chrootStoreDir);
+        if (buildUser && chown(chrootStoreDir.c_str(), 0, buildUser->getGID()) == -1)
+            throw SysError(format("cannot change ownership of '%1%'") % chrootStoreDir);
 
         for (auto & i : inputPaths) {
             Path r = worker.store.toRealPath(i);
             struct stat st;
             if (lstat(r.c_str(), &st))
-                throw SysError(format("getting attributes of path ‘%1%’") % i);
+                throw SysError(format("getting attributes of path '%1%'") % i);
             if (S_ISDIR(st.st_mode))
                 dirsInChroot[i] = r;
             else {
                 Path p = chrootRootDir + i;
+                debug("linking '%1%' to '%2%'", p, r);
                 if (link(r.c_str(), p.c_str()) == -1) {
                     /* Hard-linking fails if we exceed the maximum
                        link count on a file (e.g. 32000 of ext3),
                        which is quite possible after a `nix-store
                        --optimise'. */
                     if (errno != EMLINK)
-                        throw SysError(format("linking ‘%1%’ to ‘%2%’") % p % i);
+                        throw SysError(format("linking '%1%' to '%2%'") % p % i);
                     StringSink sink;
                     dumpPath(r, sink);
                     StringSource source(*sink.s);
@@ -2036,7 +1969,7 @@ void DerivationGoal::startBuilder()
     else {
 
         if (pathExists(homeDir))
-            throw Error(format("directory ‘%1%’ exists; please remove it") % homeDir);
+            throw Error(format("directory '%1%' exists; please remove it") % homeDir);
 
         /* We're not doing a chroot build, but we have some valid
            output paths.  Since we can't just overwrite or delete
@@ -2061,8 +1994,8 @@ void DerivationGoal::startBuilder()
                 }
     }
 
-    if (settings.preBuildHook != "") {
-        printMsg(lvlChatty, format("executing pre-build hook ‘%1%’")
+    if (useChroot && settings.preBuildHook != "" && dynamic_cast<Derivation *>(drv.get())) {
+        printMsg(lvlChatty, format("executing pre-build hook '%1%'")
             % settings.preBuildHook);
         auto args = useChroot ? Strings({drvPath, chrootRootDir}) :
             Strings({ drvPath });
@@ -2081,7 +2014,7 @@ void DerivationGoal::startBuilder()
                 if (line == "extra-sandbox-paths" || line == "extra-chroot-dirs") {
                     state = stExtraChrootDirs;
                 } else {
-                    throw Error(format("unknown pre-build hook command ‘%1%’")
+                    throw Error(format("unknown pre-build hook command '%1%'")
                         % line);
                 }
             } else if (state == stExtraChrootDirs) {
@@ -2099,7 +2032,7 @@ void DerivationGoal::startBuilder()
     }
 
     /* Run the builder. */
-    printMsg(lvlChatty, format("executing builder ‘%1%’") % drv->builder);
+    printMsg(lvlChatty, format("executing builder '%1%'") % drv->builder);
 
     /* Create the log file. */
     Path logFile = openLogFile();
@@ -2200,8 +2133,8 @@ void DerivationGoal::startBuilder()
         /* Set the UID/GID mapping of the builder's user namespace
            such that the sandbox user maps to the build user, or to
            the calling user (if build users are disabled). */
-        uid_t hostUid = buildUser.enabled() ? buildUser.getUID() : getuid();
-        uid_t hostGid = buildUser.enabled() ? buildUser.getGID() : getgid();
+        uid_t hostUid = buildUser ? buildUser->getUID() : getuid();
+        uid_t hostGid = buildUser ? buildUser->getGID() : getgid();
 
         writeFile("/proc/" + std::to_string(pid) + "/uid_map",
             (format("%d %d 1") % sandboxUid % hostUid).str());
@@ -2219,7 +2152,7 @@ void DerivationGoal::startBuilder()
     } else
 #endif
     {
-        options.allowVfork = !buildUser.enabled() && !drv->isBuiltin();
+        options.allowVfork = !buildUser && !drv->isBuiltin();
         pid = startProcess([&]() {
             runChild();
         }, options);
@@ -2242,6 +2175,284 @@ void DerivationGoal::startBuilder()
 }
 
 
+void DerivationGoal::initEnv()
+{
+    env.clear();
+
+    /* Most shells initialise PATH to some default (/bin:/usr/bin:...) when
+       PATH is not set.  We don't want this, so we fill it in with some dummy
+       value. */
+    env["PATH"] = "/path-not-set";
+
+    /* Set HOME to a non-existing path to prevent certain programs from using
+       /etc/passwd (or NIS, or whatever) to locate the home directory (for
+       example, wget looks for ~/.wgetrc).  I.e., these tools use /etc/passwd
+       if HOME is not set, but they will just assume that the settings file
+       they are looking for does not exist if HOME is set but points to some
+       non-existing path. */
+    env["HOME"] = homeDir;
+
+    /* Tell the builder where the Nix store is.  Usually they
+       shouldn't care, but this is useful for purity checking (e.g.,
+       the compiler or linker might only want to accept paths to files
+       in the store or in the build directory). */
+    env["NIX_STORE"] = worker.store.storeDir;
+
+    /* The maximum number of cores to utilize for parallel building. */
+    env["NIX_BUILD_CORES"] = (format("%d") % settings.buildCores).str();
+
+    /* In non-structured mode, add all bindings specified in the
+       derivation via the environments, except those listed in the
+       passAsFile attribute. Those are passed as file names pointing
+       to temporary files containing the contents. Note that
+       passAsFile is ignored in structure mode because it's not
+       needed (attributes are not passed through the environment, so
+       there is no size constraint). */
+    if (!drv->env.count("__json")) {
+
+        StringSet passAsFile = tokenizeString<StringSet>(get(drv->env, "passAsFile"));
+        int fileNr = 0;
+        for (auto & i : drv->env) {
+            if (passAsFile.find(i.first) == passAsFile.end()) {
+                env[i.first] = i.second;
+            } else {
+                string fn = ".attr-" + std::to_string(fileNr++);
+                Path p = tmpDir + "/" + fn;
+                writeFile(p, i.second);
+                chownToBuilder(p);
+                env[i.first + "Path"] = tmpDirInSandbox + "/" + fn;
+            }
+        }
+
+    }
+
+    /* For convenience, set an environment pointing to the top build
+       directory. */
+    env["NIX_BUILD_TOP"] = tmpDirInSandbox;
+
+    /* Also set TMPDIR and variants to point to this directory. */
+    env["TMPDIR"] = env["TEMPDIR"] = env["TMP"] = env["TEMP"] = tmpDirInSandbox;
+
+    /* Explicitly set PWD to prevent problems with chroot builds.  In
+       particular, dietlibc cannot figure out the cwd because the
+       inode of the current directory doesn't appear in .. (because
+       getdents returns the inode of the mount point). */
+    env["PWD"] = tmpDirInSandbox;
+
+    /* Compatibility hack with Nix <= 0.7: if this is a fixed-output
+       derivation, tell the builder, so that for instance `fetchurl'
+       can skip checking the output.  On older Nixes, this environment
+       variable won't be set, so `fetchurl' will do the check. */
+    if (fixedOutput) env["NIX_OUTPUT_CHECKED"] = "1";
+
+    /* *Only* if this is a fixed-output derivation, propagate the
+       values of the environment variables specified in the
+       `impureEnvVars' attribute to the builder.  This allows for
+       instance environment variables for proxy configuration such as
+       `http_proxy' to be easily passed to downloaders like
+       `fetchurl'.  Passing such environment variables from the caller
+       to the builder is generally impure, but the output of
+       fixed-output derivations is by definition pure (since we
+       already know the cryptographic hash of the output). */
+    if (fixedOutput) {
+        Strings varNames = tokenizeString<Strings>(get(drv->env, "impureEnvVars"));
+        for (auto & i : varNames) env[i] = getEnv(i);
+    }
+}
+
+
+void DerivationGoal::writeStructuredAttrs()
+{
+    auto json = drv->env.find("__json");
+    if (json == drv->env.end()) return;
+
+    writeFile(tmpDir + "/.attrs.json", rewriteStrings(json->second, inputRewrites));
+}
+
+
+void DerivationGoal::chownToBuilder(const Path & path)
+{
+    if (!buildUser) return;
+    if (chown(path.c_str(), buildUser->getUID(), buildUser->getGID()) == -1)
+        throw SysError(format("cannot change ownership of '%1%'") % path);
+}
+
+
+void DerivationGoal::doExportReferencesGraph()
+{
+    /* The `exportReferencesGraph' feature allows the references graph
+       to be passed to a builder.  This attribute should be a list of
+       pairs [name1 path1 name2 path2 ...].  The references graph of
+       each `pathN' will be stored in a text file `nameN' in the
+       temporary build directory.  The text files have the format used
+       by `nix-store --register-validity'.  However, the deriver
+       fields are left empty. */
+    string s = get(drv->env, "exportReferencesGraph");
+    Strings ss = tokenizeString<Strings>(s);
+    if (ss.size() % 2 != 0)
+        throw BuildError(format("odd number of tokens in 'exportReferencesGraph': '%1%'") % s);
+    for (Strings::iterator i = ss.begin(); i != ss.end(); ) {
+        string fileName = *i++;
+        checkStoreName(fileName); /* !!! abuse of this function */
+
+        /* Check that the store path is valid. */
+        Path storePath = *i++;
+        if (!worker.store.isInStore(storePath))
+            throw BuildError(format("'exportReferencesGraph' contains a non-store path '%1%'")
+                % storePath);
+        storePath = worker.store.toStorePath(storePath);
+        if (!worker.store.isValidPath(storePath))
+            throw BuildError(format("'exportReferencesGraph' contains an invalid path '%1%'")
+                % storePath);
+
+        /* If there are derivations in the graph, then include their
+           outputs as well.  This is useful if you want to do things
+           like passing all build-time dependencies of some path to a
+           derivation that builds a NixOS DVD image. */
+        PathSet paths, paths2;
+        worker.store.computeFSClosure(storePath, paths);
+        paths2 = paths;
+
+        for (auto & j : paths2) {
+            if (isDerivation(j)) {
+                Derivation drv = worker.store.derivationFromPath(j);
+                for (auto & k : drv.outputs)
+                    worker.store.computeFSClosure(k.second.path, paths);
+            }
+        }
+
+        if (!drv->env.count("__json")) {
+
+            /* Write closure info to <fileName>. */
+            writeFile(tmpDir + "/" + fileName,
+                worker.store.makeValidityRegistration(paths, false, false));
+
+        } else {
+
+            /* Write a more comprehensive JSON serialisation to
+               <fileName>. */
+            std::ostringstream str;
+            {
+                JSONPlaceholder jsonRoot(str, true);
+                worker.store.pathInfoToJSON(jsonRoot, paths, false, true);
+            }
+            writeFile(tmpDir + "/" + fileName, str.str());
+
+        }
+    }
+}
+
+
+void setupSeccomp()
+{
+#if __linux__
+    scmp_filter_ctx ctx;
+
+    if (!(ctx = seccomp_init(SCMP_ACT_ALLOW)))
+        throw SysError("unable to initialize seccomp mode 2");
+
+    Finally cleanup([&]() {
+        seccomp_release(ctx);
+    });
+
+    if (settings.thisSystem == "x86_64-linux" &&
+        seccomp_arch_add(ctx, SCMP_ARCH_X86) != 0)
+        throw SysError("unable to add 32-bit seccomp architecture");
+
+    if (settings.thisSystem == "x86_64-linux" &&
+        seccomp_arch_add(ctx, SCMP_ARCH_X32) != 0)
+        throw SysError("unable to add X32 seccomp architecture");
+
+    /* Prevent builders from creating setuid/setgid binaries. */
+    for (int perm : { S_ISUID, S_ISGID }) {
+        if (seccomp_rule_add(ctx, SCMP_ACT_ERRNO(EPERM), SCMP_SYS(chmod), 1,
+                SCMP_A1(SCMP_CMP_MASKED_EQ, (scmp_datum_t) perm, (scmp_datum_t) perm)) != 0)
+            throw SysError("unable to add seccomp rule");
+
+        if (seccomp_rule_add(ctx, SCMP_ACT_ERRNO(EPERM), SCMP_SYS(fchmod), 1,
+                SCMP_A1(SCMP_CMP_MASKED_EQ, (scmp_datum_t) perm, (scmp_datum_t) perm)) != 0)
+            throw SysError("unable to add seccomp rule");
+
+        if (seccomp_rule_add(ctx, SCMP_ACT_ERRNO(EPERM), SCMP_SYS(fchmodat), 1,
+                SCMP_A2(SCMP_CMP_MASKED_EQ, (scmp_datum_t) perm, (scmp_datum_t) perm)) != 0)
+            throw SysError("unable to add seccomp rule");
+    }
+
+    /* Prevent builders from creating EAs or ACLs. Not all filesystems
+       support these, and they're not allowed in the Nix store because
+       they're not representable in the NAR serialisation. */
+    if (seccomp_rule_add(ctx, SCMP_ACT_ERRNO(ENOTSUP), SCMP_SYS(setxattr), 0) != 0 ||
+        seccomp_rule_add(ctx, SCMP_ACT_ERRNO(ENOTSUP), SCMP_SYS(lsetxattr), 0) != 0 ||
+        seccomp_rule_add(ctx, SCMP_ACT_ERRNO(ENOTSUP), SCMP_SYS(fsetxattr), 0) != 0)
+        throw SysError("unable to add seccomp rule");
+
+    if (seccomp_attr_set(ctx, SCMP_FLTATR_CTL_NNP, settings.allowNewPrivileges ? 0 : 1) != 0)
+        throw SysError("unable to set 'no new privileges' seccomp attribute");
+
+    if (seccomp_load(ctx) != 0)
+        throw SysError("unable to load seccomp BPF program");
+#endif
+}
+
+
+struct BuilderLogger : Logger
+{
+    Logger & prevLogger;
+
+    BuilderLogger(Logger & prevLogger) : prevLogger(prevLogger) { }
+
+    void addFields(nlohmann::json & json, const Fields & fields)
+    {
+        if (fields.empty()) return;
+        auto & arr = json["fields"] = nlohmann::json::array();
+        for (auto & f : fields)
+            if (f.type == Logger::Field::tInt)
+                arr.push_back(f.i);
+            else if (f.type == Logger::Field::tString)
+                arr.push_back(f.s);
+            else
+                abort();
+    }
+
+    void log(Verbosity lvl, const FormatOrString & fs) override
+    {
+        prevLogger.log(lvl, fs);
+    }
+
+    void startActivity(ActivityId act, Verbosity lvl, ActivityType type,
+        const std::string & s, const Fields & fields, ActivityId parent) override
+    {
+        nlohmann::json json;
+        json["action"] = "start";
+        json["id"] = act;
+        json["level"] = lvl;
+        json["type"] = type;
+        json["text"] = s;
+        addFields(json, fields);
+        // FIXME: handle parent
+        log(lvlError, "@nix " + json.dump());
+    }
+
+    void stopActivity(ActivityId act) override
+    {
+        nlohmann::json json;
+        json["action"] = "stop";
+        json["id"] = act;
+        log(lvlError, "@nix " + json.dump());
+    }
+
+    void result(ActivityId act, ResultType type, const Fields & fields) override
+    {
+        nlohmann::json json;
+        json["action"] = "result";
+        json["id"] = act;
+        json["type"] = type;
+        addFields(json, fields);
+        log(lvlError, "@nix " + json.dump());
+    }
+};
+
+
 void DerivationGoal::runChild()
 {
     /* Warning: in the child we should absolutely not make any SQLite
@@ -2251,7 +2462,21 @@ void DerivationGoal::runChild()
 
         commonChildInit(builderOut);
 
+        try {
+            setupSeccomp();
+        } catch (...) {
+            if (buildUser) throw;
+        }
+
         bool setUser = true;
+
+        /* Make the contents of netrc available to builtin:fetchurl
+           (which may run under a different uid and/or in a sandbox). */
+        std::string netrcData;
+        try {
+            if (drv->isBuiltin() && drv->builder == "builtin:fetchurl")
+                netrcData = readFile(settings.netrcFile);
+        } catch (SysError &) { }
 
 #if __linux__
         if (useChroot) {
@@ -2293,13 +2518,13 @@ void DerivationGoal::runChild()
                local to the namespace, though, so setting MS_PRIVATE
                does not affect the outside world. */
             if (mount(0, "/", 0, MS_REC|MS_PRIVATE, 0) == -1) {
-                throw SysError("unable to make ‘/’ private mount");
+                throw SysError("unable to make '/' private mount");
             }
 
             /* Bind-mount chroot directory to itself, to treat it as a
                different filesystem from /, as needed for pivot_root. */
             if (mount(chrootRootDir.c_str(), chrootRootDir.c_str(), 0, MS_BIND, 0) == -1)
-                throw SysError(format("unable to bind mount ‘%1%’") % chrootRootDir);
+                throw SysError(format("unable to bind mount '%1%'") % chrootRootDir);
 
             /* Set up a nearly empty /dev, unless the user asked to
                bind-mount the host /dev. */
@@ -2308,17 +2533,13 @@ void DerivationGoal::runChild()
                 createDirs(chrootRootDir + "/dev/shm");
                 createDirs(chrootRootDir + "/dev/pts");
                 ss.push_back("/dev/full");
-#ifdef __linux__
                 if (pathExists("/dev/kvm"))
                     ss.push_back("/dev/kvm");
-#endif
                 ss.push_back("/dev/null");
                 ss.push_back("/dev/random");
                 ss.push_back("/dev/tty");
                 ss.push_back("/dev/urandom");
                 ss.push_back("/dev/zero");
-                ss.push_back("/dev/ptmx");
-                ss.push_back("/dev/pts");
                 createSymlink("/proc/self/fd", chrootRootDir + "/dev/fd");
                 createSymlink("/proc/self/fd/0", chrootRootDir + "/dev/stdin");
                 createSymlink("/proc/self/fd/1", chrootRootDir + "/dev/stdout");
@@ -2333,25 +2554,23 @@ void DerivationGoal::runChild()
                 ss.push_back("/etc/nsswitch.conf");
                 ss.push_back("/etc/services");
                 ss.push_back("/etc/hosts");
-                ss.push_back("/var/run/nscd/socket");
+                if (pathExists("/var/run/nscd/socket"))
+                    ss.push_back("/var/run/nscd/socket");
             }
 
-            for (auto & i : ss) dirsInChroot[i] = i;
+            for (auto & i : ss) dirsInChroot.emplace(i, i);
 
             /* Bind-mount all the directories from the "host"
                filesystem that we want in the chroot
                environment. */
-            for (auto & i : dirsInChroot) {
+            auto doBind = [&](const Path & source, const Path & target, bool optional = false) {
+                debug(format("bind mounting '%1%' to '%2%'") % source % target);
                 struct stat st;
-                Path source = i.second.source;
-                Path target = chrootRootDir + i.first;
-                if (source == "/proc") continue; // backwards compatibility
-                debug(format("bind mounting ‘%1%’ to ‘%2%’") % source % target);
                 if (stat(source.c_str(), &st) == -1) {
-                    if (i.second.optional && errno == ENOENT)
-                        continue;
+                    if (optional && errno == ENOENT)
+                        return;
                     else
-                        throw SysError(format("getting attributes of path ‘%1%’") % source);
+                        throw SysError("getting attributes of path '%1%'", source);
                 }
                 if (S_ISDIR(st.st_mode))
                     createDirs(target);
@@ -2360,7 +2579,12 @@ void DerivationGoal::runChild()
                     writeFile(target, "");
                 }
                 if (mount(source.c_str(), target.c_str(), "", MS_BIND | MS_REC, 0) == -1)
-                    throw SysError(format("bind mount from ‘%1%’ to ‘%2%’ failed") % source % target);
+                    throw SysError("bind mount from '%1%' to '%2%' failed", source, target);
+            };
+
+            for (auto & i : dirsInChroot) {
+                if (i.second.source == "/proc") continue; // backwards compatibility
+                doBind(i.second.source, chrootRootDir + i.first, i.second.optional);
             }
 
             /* Bind a new instance of procfs on /proc. */
@@ -2371,12 +2595,8 @@ void DerivationGoal::runChild()
             /* Mount a new tmpfs on /dev/shm to ensure that whatever
                the builder puts in /dev/shm is cleaned up automatically. */
             if (pathExists("/dev/shm") && mount("none", (chrootRootDir + "/dev/shm").c_str(), "tmpfs", 0,
-                    fmt("size=%s", settings.get("sandbox-dev-shm-size", std::string("50%"))).c_str()) == -1)
+                    fmt("size=%s", settings.sandboxShmSize).c_str()) == -1)
                 throw SysError("mounting /dev/shm");
-
-#if 0
-            // FIXME: can't figure out how to do this in a user
-            // namespace.
 
             /* Mount a new devpts on /dev/pts.  Note that this
                requires the kernel to be compiled with
@@ -2384,30 +2604,35 @@ void DerivationGoal::runChild()
                if /dev/ptx/ptmx exists). */
             if (pathExists("/dev/pts/ptmx") &&
                 !pathExists(chrootRootDir + "/dev/ptmx")
-                && dirsInChroot.find("/dev/pts") == dirsInChroot.end())
+                && !dirsInChroot.count("/dev/pts"))
             {
-                if (mount("none", (chrootRootDir + "/dev/pts").c_str(), "devpts", 0, "newinstance,mode=0620") == -1)
-                    throw SysError("mounting /dev/pts");
-                createSymlink("/dev/pts/ptmx", chrootRootDir + "/dev/ptmx");
+                if (mount("none", (chrootRootDir + "/dev/pts").c_str(), "devpts", 0, "newinstance,mode=0620") == 0)
+                {
+                    createSymlink("/dev/pts/ptmx", chrootRootDir + "/dev/ptmx");
 
-                /* Make sure /dev/pts/ptmx is world-writable.  With some
-                   Linux versions, it is created with permissions 0.  */
-                chmod_(chrootRootDir + "/dev/pts/ptmx", 0666);
+                    /* Make sure /dev/pts/ptmx is world-writable.  With some
+                       Linux versions, it is created with permissions 0.  */
+                    chmod_(chrootRootDir + "/dev/pts/ptmx", 0666);
+                } else {
+                    if (errno != EINVAL)
+                        throw SysError("mounting /dev/pts");
+                    doBind("/dev/pts", "/dev/pts");
+                    doBind("/dev/ptmx", "/dev/ptmx");
+                }
             }
-#endif
 
             /* Do the chroot(). */
             if (chdir(chrootRootDir.c_str()) == -1)
-                throw SysError(format("cannot change directory to ‘%1%’") % chrootRootDir);
+                throw SysError(format("cannot change directory to '%1%'") % chrootRootDir);
 
             if (mkdir("real-root", 0) == -1)
                 throw SysError("cannot create real-root directory");
 
             if (pivot_root(".", "real-root") == -1)
-                throw SysError(format("cannot pivot old root directory onto ‘%1%’") % (chrootRootDir + "/real-root"));
+                throw SysError(format("cannot pivot old root directory onto '%1%'") % (chrootRootDir + "/real-root"));
 
             if (chroot(".") == -1)
-                throw SysError(format("cannot change root directory to ‘%1%’") % chrootRootDir);
+                throw SysError(format("cannot change root directory to '%1%'") % chrootRootDir);
 
             if (umount2("real-root", MNT_DETACH) == -1)
                 throw SysError("cannot unmount real root filesystem");
@@ -2428,10 +2653,10 @@ void DerivationGoal::runChild()
 #endif
 
         if (chdir(tmpDirInSandbox.c_str()) == -1)
-            throw SysError(format("changing into ‘%1%’") % tmpDir);
+            throw SysError(format("changing into '%1%'") % tmpDir);
 
         /* Close all other file descriptors. */
-        closeMostFDs(set<int>());
+        closeMostFDs({STDIN_FILENO, STDOUT_FILENO, STDERR_FILENO});
 
 #if __linux__
         /* Change the personality to 32-bit if we're doing an
@@ -2475,22 +2700,22 @@ void DerivationGoal::runChild()
            descriptors except std*, so that's safe.  Also note that
            setuid() when run as root sets the real, effective and
            saved UIDs. */
-        if (setUser && buildUser.enabled()) {
+        if (setUser && buildUser) {
             /* Preserve supplementary groups of the build user, to allow
                admins to specify groups such as "kvm".  */
-            if (!buildUser.getSupplementaryGIDs().empty() &&
-                setgroups(buildUser.getSupplementaryGIDs().size(),
-                          buildUser.getSupplementaryGIDs().data()) == -1)
+            if (!buildUser->getSupplementaryGIDs().empty() &&
+                setgroups(buildUser->getSupplementaryGIDs().size(),
+                          buildUser->getSupplementaryGIDs().data()) == -1)
                 throw SysError("cannot set supplementary groups of build user");
 
-            if (setgid(buildUser.getGID()) == -1 ||
-                getgid() != buildUser.getGID() ||
-                getegid() != buildUser.getGID())
+            if (setgid(buildUser->getGID()) == -1 ||
+                getgid() != buildUser->getGID() ||
+                getegid() != buildUser->getGID())
                 throw SysError("setgid failed");
 
-            if (setuid(buildUser.getUID()) == -1 ||
-                getuid() != buildUser.getUID() ||
-                geteuid() != buildUser.getUID())
+            if (setuid(buildUser->getUID()) == -1 ||
+                getuid() != buildUser->getUID() ||
+                geteuid() != buildUser->getUID())
                 throw SysError("setuid failed");
         }
 
@@ -2499,46 +2724,109 @@ void DerivationGoal::runChild()
 
         const char *builder = "invalid";
 
-        string sandboxProfile;
         if (drv->isBuiltin()) {
             ;
+        }
 #if __APPLE__
-        } else if (useChroot) {
-            /* Lots and lots and lots of file functions freak out if they can't stat their full ancestry */
-            PathSet ancestry;
+        else if (getEnv("_NIX_TEST_NO_SANDBOX") == "") {
+            /* This has to appear before import statements. */
+            std::string sandboxProfile = "(version 1)\n";
 
-            /* We build the ancestry before adding all inputPaths to the store because we know they'll
-               all have the same parents (the store), and there might be lots of inputs. This isn't
-               particularly efficient... I doubt it'll be a bottleneck in practice */
-            for (auto & i : dirsInChroot) {
-                Path cur = i.first;
-                while (cur.compare("/") != 0) {
-                    cur = dirOf(cur);
-                    ancestry.insert(cur);
+            if (useChroot) {
+
+                /* Lots and lots and lots of file functions freak out if they can't stat their full ancestry */
+                PathSet ancestry;
+
+                /* We build the ancestry before adding all inputPaths to the store because we know they'll
+                   all have the same parents (the store), and there might be lots of inputs. This isn't
+                   particularly efficient... I doubt it'll be a bottleneck in practice */
+                for (auto & i : dirsInChroot) {
+                    Path cur = i.first;
+                    while (cur.compare("/") != 0) {
+                        cur = dirOf(cur);
+                        ancestry.insert(cur);
+                    }
                 }
-            }
 
-            /* And we want the store in there regardless of how empty dirsInChroot. We include the innermost
-               path component this time, since it's typically /nix/store and we care about that. */
-            Path cur = worker.store.storeDir;
-            while (cur.compare("/") != 0) {
-                ancestry.insert(cur);
-                cur = dirOf(cur);
-            }
+                /* And we want the store in there regardless of how empty dirsInChroot. We include the innermost
+                   path component this time, since it's typically /nix/store and we care about that. */
+                Path cur = worker.store.storeDir;
+                while (cur.compare("/") != 0) {
+                    ancestry.insert(cur);
+                    cur = dirOf(cur);
+                }
 
-            /* Add all our input paths to the chroot */
-            for (auto & i : inputPaths)
-                dirsInChroot[i] = i;
+                /* Add all our input paths to the chroot */
+                for (auto & i : inputPaths)
+                    dirsInChroot[i] = i;
 
-            /* This has to appear before import statements */
-            sandboxProfile += "(version 1)\n";
+                /* Violations will go to the syslog if you set this. Unfortunately the destination does not appear to be configurable */
+                if (settings.darwinLogSandboxViolations) {
+                    sandboxProfile += "(deny default)\n";
+                } else {
+                    sandboxProfile += "(deny default (with no-log))\n";
+                }
 
-            /* Violations will go to the syslog if you set this. Unfortunately the destination does not appear to be configurable */
-            if (settings.get("darwin-log-sandbox-violations", false)) {
-                sandboxProfile += "(deny default)\n";
-            } else {
-                sandboxProfile += "(deny default (with no-log))\n";
-            }
+                sandboxProfile +=
+                    #include "sandbox-defaults.sb.gen.hh"
+                    ;
+
+                if (fixedOutput)
+                    sandboxProfile +=
+                        #include "sandbox-network.sb.gen.hh"
+                        ;
+
+                /* Our rwx outputs */
+                sandboxProfile += "(allow file-read* file-write* process-exec\n";
+                for (auto & i : missingPaths) {
+                    sandboxProfile += (format("\t(subpath \"%1%\")\n") % i.c_str()).str();
+                }
+                sandboxProfile += ")\n";
+
+                /* Our inputs (transitive dependencies and any impurities computed above)
+
+                   without file-write* allowed, access() incorrectly returns EPERM
+                 */
+                sandboxProfile += "(allow file-read* file-write* process-exec\n";
+                for (auto & i : dirsInChroot) {
+                    if (i.first != i.second.source)
+                        throw Error(format(
+                            "can't map '%1%' to '%2%': mismatched impure paths not supported on Darwin")
+                            % i.first % i.second.source);
+
+                    string path = i.first;
+                    struct stat st;
+                    if (lstat(path.c_str(), &st)) {
+                        if (i.second.optional && errno == ENOENT)
+                            continue;
+                        throw SysError(format("getting attributes of path '%1%'") % path);
+                    }
+                    if (S_ISDIR(st.st_mode))
+                        sandboxProfile += (format("\t(subpath \"%1%\")\n") % path).str();
+                    else
+                        sandboxProfile += (format("\t(literal \"%1%\")\n") % path).str();
+                }
+                sandboxProfile += ")\n";
+
+                /* Allow file-read* on full directory hierarchy to self. Allows realpath() */
+                sandboxProfile += "(allow file-read*\n";
+                for (auto & i : ancestry) {
+                    sandboxProfile += (format("\t(literal \"%1%\")\n") % i.c_str()).str();
+                }
+                sandboxProfile += ")\n";
+
+                sandboxProfile += additionalSandboxProfile;
+            } else
+                sandboxProfile +=
+                    #include "sandbox-minimal.sb.gen.hh"
+                    ;
+
+            debug("Generated sandbox profile:");
+            debug(sandboxProfile);
+
+            Path sandboxFile = tmpDir + "/.sandbox.sb";
+
+            writeFile(sandboxFile, sandboxProfile);
 
             /* The tmpDir in scope points at the temporary build directory for our derivation. Some packages try different mechanisms
                to find temporary directories, so we want to open up a broader place for them to dump their files, if needed. */
@@ -2547,56 +2835,6 @@ void DerivationGoal::runChild()
             /* They don't like trailing slashes on subpath directives */
             if (globalTmpDir.back() == '/') globalTmpDir.pop_back();
 
-            /* Our rwx outputs */
-            sandboxProfile += "(allow file-read* file-write* process-exec\n";
-            for (auto & i : missingPaths) {
-                sandboxProfile += (format("\t(subpath \"%1%\")\n") % i.c_str()).str();
-            }
-            sandboxProfile += ")\n";
-
-            /* Our inputs (transitive dependencies and any impurities computed above)
-
-               without file-write* allowed, access() incorrectly returns EPERM
-             */
-            sandboxProfile += "(allow file-read* file-write* process-exec\n";
-            for (auto & i : dirsInChroot) {
-                if (i.first != i.second.source)
-                    throw Error(format(
-                        "can't map '%1%' to '%2%': mismatched impure paths not supported on Darwin")
-                        % i.first % i.second.source);
-
-                string path = i.first;
-                struct stat st;
-                if (lstat(path.c_str(), &st)) {
-                    if (i.second.optional && errno == ENOENT)
-                        continue;
-                    throw SysError(format("getting attributes of path ‘%1%’") % path);
-                }
-                if (S_ISDIR(st.st_mode))
-                    sandboxProfile += (format("\t(subpath \"%1%\")\n") % path).str();
-                else
-                    sandboxProfile += (format("\t(literal \"%1%\")\n") % path).str();
-            }
-            sandboxProfile += ")\n";
-
-            /* Allow file-read* on full directory hierarchy to self. Allows realpath() */
-            sandboxProfile += "(allow file-read*\n";
-            for (auto & i : ancestry) {
-                sandboxProfile += (format("\t(literal \"%1%\")\n") % i.c_str()).str();
-            }
-            sandboxProfile += ")\n";
-
-            sandboxProfile += additionalSandboxProfile;
-
-            debug("Generated sandbox profile:");
-            debug(sandboxProfile);
-
-            Path sandboxFile = drvPath + ".sb";
-            deletePath(sandboxFile);
-            autoDelSandbox.reset(sandboxFile, false);
-
-            writeFile(sandboxFile, sandboxProfile);
-
             builder = "/usr/bin/sandbox-exec";
             args.push_back("sandbox-exec");
             args.push_back("-f");
@@ -2604,8 +2842,9 @@ void DerivationGoal::runChild()
             args.push_back("-D");
             args.push_back("_GLOBAL_TMP_DIR=" + globalTmpDir);
             args.push_back(drv->builder);
+        }
 #endif
-        } else {
+        else {
             builder = drv->builder.c_str();
             string builderBasename = baseNameOf(drv->builder);
             args.push_back(builderBasename);
@@ -2614,18 +2853,17 @@ void DerivationGoal::runChild()
         for (auto & i : drv->args)
             args.push_back(rewriteStrings(i, inputRewrites));
 
-        restoreSIGPIPE();
-
         /* Indicate that we managed to set up the build environment. */
         writeFull(STDERR_FILENO, string("\1\n"));
 
         /* Execute the program.  This should not return. */
         if (drv->isBuiltin()) {
             try {
+                logger = new BuilderLogger(*logger);
                 if (drv->builder == "builtin:fetchurl")
-                    builtinFetchurl(*drv);
+                    builtinFetchurl(*drv, netrcData);
                 else
-                    throw Error(format("unsupported builtin function ‘%1%’") % string(drv->builder, 8));
+                    throw Error(format("unsupported builtin function '%1%'") % string(drv->builder, 8));
                 _exit(0);
             } catch (std::exception & e) {
                 writeFull(STDERR_FILENO, "error: " + string(e.what()) + "\n");
@@ -2635,7 +2873,7 @@ void DerivationGoal::runChild()
 
         execve(builder, stringsToCharPtrs(args).data(), stringsToCharPtrs(envStrs).data());
 
-        throw SysError(format("executing ‘%1%’") % drv->builder);
+        throw SysError(format("executing '%1%'") % drv->builder);
 
     } catch (std::exception & e) {
         writeFull(STDERR_FILENO, "\1while setting up the build environment: " + string(e.what()) + "\n");
@@ -2657,7 +2895,7 @@ PathSet parseReferenceSpecifiers(Store & store, const BasicDerivation & drv, str
         else if (drv.outputs.find(i) != drv.outputs.end())
             result.insert(drv.outputs.find(i)->second.path);
         else throw BuildError(
-            format("derivation contains an illegal reference specifier ‘%1%’") % i);
+            format("derivation contains an illegal reference specifier '%1%'") % i);
     }
     return result;
 }
@@ -2683,7 +2921,7 @@ void DerivationGoal::registerOutputs()
     InodesSeen inodesSeen;
 
     Path checkSuffix = ".check";
-    bool runDiffHook = settings.get("run-diff-hook", false);
+    bool runDiffHook = settings.runDiffHook;
     bool keepPreviousRound = settings.keepFailed || runDiffHook;
 
     /* Check whether the output paths were created, and grep each
@@ -2692,6 +2930,8 @@ void DerivationGoal::registerOutputs()
     for (auto & i : drv->outputs) {
         Path path = i.second.path;
         if (missingPaths.find(path) == missingPaths.end()) continue;
+
+        ValidPathInfo info;
 
         Path actualPath = path;
         if (useChroot) {
@@ -2702,7 +2942,7 @@ void DerivationGoal::registerOutputs()
                     replaceValidPath(path, actualPath);
                 else
                     if (buildMode != bmCheck && rename(actualPath.c_str(), worker.store.toRealPath(path).c_str()) == -1)
-                        throw SysError(format("moving build output ‘%1%’ from the sandbox to the Nix store") % path);
+                        throw SysError(format("moving build output '%1%' from the sandbox to the Nix store") % path);
             }
             if (buildMode != bmCheck) actualPath = worker.store.toRealPath(path);
         } else {
@@ -2719,9 +2959,9 @@ void DerivationGoal::registerOutputs()
         if (lstat(actualPath.c_str(), &st) == -1) {
             if (errno == ENOENT)
                 throw BuildError(
-                    format("builder for ‘%1%’ failed to produce output path ‘%2%’")
+                    format("builder for '%1%' failed to produce output path '%2%'")
                     % drvPath % path);
-            throw SysError(format("getting attributes of path ‘%1%’") % actualPath);
+            throw SysError(format("getting attributes of path '%1%'") % actualPath);
         }
 
 #ifndef __CYGWIN__
@@ -2730,19 +2970,19 @@ void DerivationGoal::registerOutputs()
            build.  Also, the output should be owned by the build
            user. */
         if ((!S_ISLNK(st.st_mode) && (st.st_mode & (S_IWGRP | S_IWOTH))) ||
-            (buildUser.enabled() && st.st_uid != buildUser.getUID()))
-            throw BuildError(format("suspicious ownership or permission on ‘%1%’; rejecting this build output") % path);
+            (buildUser && st.st_uid != buildUser->getUID()))
+            throw BuildError(format("suspicious ownership or permission on '%1%'; rejecting this build output") % path);
 #endif
 
         /* Apply hash rewriting if necessary. */
         bool rewritten = false;
         if (!outputRewrites.empty()) {
-            printError(format("warning: rewriting hashes in ‘%1%’; cross fingers") % path);
+            printError(format("warning: rewriting hashes in '%1%'; cross fingers") % path);
 
             /* Canonicalise first.  This ensures that the path we're
                rewriting doesn't contain a hard link to /etc/shadow or
                something like that. */
-            canonicalisePathMetaData(actualPath, buildUser.enabled() ? buildUser.getUID() : -1, inodesSeen);
+            canonicalisePathMetaData(actualPath, buildUser ? buildUser->getUID() : -1, inodesSeen);
 
             /* FIXME: this is in-memory. */
             StringSink sink;
@@ -2768,7 +3008,7 @@ void DerivationGoal::registerOutputs()
                    execute permission. */
                 if (!S_ISREG(st.st_mode) || (st.st_mode & S_IXUSR) != 0)
                     throw BuildError(
-                        format("output path ‘%1%’ should be a non-executable regular file") % path);
+                        format("output path '%1%' should be a non-executable regular file") % path);
             }
 
             /* Check the hash. In hash mode, move the path produced by
@@ -2776,7 +3016,7 @@ void DerivationGoal::registerOutputs()
             Hash h2 = recursive ? hashPath(h.type, actualPath).first : hashFile(h.type, actualPath);
             if (buildMode == bmHash) {
                 Path dest = worker.store.makeFixedOutputPath(recursive, h2, drv->env["name"]);
-                printError(format("build produced path ‘%1%’ with %2% hash ‘%3%’")
+                printError(format("build produced path '%1%' with %2% hash '%3%'")
                     % dest % printHashType(h.type) % printHash16or32(h2));
                 if (worker.store.isValidPath(dest))
                     return;
@@ -2785,28 +3025,30 @@ void DerivationGoal::registerOutputs()
                     PathLocks outputLocks({actualDest});
                     deletePath(actualDest);
                     if (rename(actualPath.c_str(), actualDest.c_str()) == -1)
-                        throw SysError(format("moving ‘%1%’ to ‘%2%’") % actualPath % dest);
+                        throw SysError(format("moving '%1%' to '%2%'") % actualPath % dest);
                 }
                 path = dest;
                 actualPath = actualDest;
             } else {
                 if (h != h2)
                     throw BuildError(
-                        format("output path ‘%1%’ has %2% hash ‘%3%’ when ‘%4%’ was expected")
+                        format("output path '%1%' has %2% hash '%3%' when '%4%' was expected")
                         % path % i.second.hashAlgo % printHash16or32(h2) % printHash16or32(h));
             }
+
+            info.ca = makeFixedOutputCA(recursive, h2);
         }
 
         /* Get rid of all weird permissions.  This also checks that
            all files are owned by the build user, if applicable. */
         canonicalisePathMetaData(actualPath,
-            buildUser.enabled() && !rewritten ? buildUser.getUID() : -1, inodesSeen);
+            buildUser && !rewritten ? buildUser->getUID() : -1, inodesSeen);
 
         /* For this output path, find the references to other paths
            contained in it.  Compute the SHA-256 NAR hash at the same
            time.  The hash is stored in the database so that we can
            verify later on whether nobody has messed with the store. */
-        Activity act(*logger, lvlTalkative, format("scanning for references inside ‘%1%’") % path);
+        debug("scanning for references inside '%1%'", path);
         HashResult hash;
         PathSet references = scanForReferences(actualPath, allPaths, hash);
 
@@ -2818,11 +3060,11 @@ void DerivationGoal::registerOutputs()
                     Path dst = worker.store.toRealPath(path + checkSuffix);
                     deletePath(dst);
                     if (rename(actualPath.c_str(), dst.c_str()))
-                        throw SysError(format("renaming ‘%1%’ to ‘%2%’") % actualPath % dst);
-                    throw Error(format("derivation ‘%1%’ may not be deterministic: output ‘%2%’ differs from ‘%3%’")
+                        throw SysError(format("renaming '%1%' to '%2%'") % actualPath % dst);
+                    throw Error(format("derivation '%1%' may not be deterministic: output '%2%' differs from '%3%'")
                         % drvPath % path % dst);
                 } else
-                    throw Error(format("derivation ‘%1%’ may not be deterministic: output ‘%2%’ differs")
+                    throw Error(format("derivation '%1%' may not be deterministic: output '%2%' differs")
                         % drvPath % path);
             }
 
@@ -2842,9 +3084,9 @@ void DerivationGoal::registerOutputs()
         for (auto & i : inputPaths) {
             PathSet::iterator j = references.find(i);
             if (j == references.end())
-                debug(format("unreferenced input: ‘%1%’") % i);
+                debug(format("unreferenced input: '%1%'") % i);
             else
-                debug(format("referenced input: ‘%1%’") % i);
+                debug(format("referenced input: '%1%'") % i);
         }
 
         /* Enforce `allowedReferences' and friends. */
@@ -2880,7 +3122,7 @@ void DerivationGoal::registerOutputs()
                     badPathsStr += "\n\t";
                     badPathsStr += i;
                 }
-                throw BuildError(format("output ‘%1%’ is not allowed to refer to the following paths:%2%") % actualPath % badPathsStr);
+                throw BuildError(format("output '%1%' is not allowed to refer to the following paths:%2%") % actualPath % badPathsStr);
             }
         };
 
@@ -2894,7 +3136,6 @@ void DerivationGoal::registerOutputs()
             worker.markContentsGood(path);
         }
 
-        ValidPathInfo info;
         info.path = path;
         info.narHash = hash.first;
         info.narSize = hash.second;
@@ -2918,10 +3159,10 @@ void DerivationGoal::registerOutputs()
                 Path prev = i->path + checkSuffix;
                 bool prevExists = keepPreviousRound && pathExists(prev);
                 auto msg = prevExists
-                    ? fmt("output ‘%1%’ of ‘%2%’ differs from ‘%3%’ from previous round", i->path, drvPath, prev)
-                    : fmt("output ‘%1%’ of ‘%2%’ differs from previous round", i->path, drvPath);
+                    ? fmt("output '%1%' of '%2%' differs from '%3%' from previous round", i->path, drvPath, prev)
+                    : fmt("output '%1%' of '%2%' differs from previous round", i->path, drvPath);
 
-                auto diffHook = settings.get("diff-hook", std::string(""));
+                auto diffHook = settings.diffHook;
                 if (prevExists && diffHook != "" && runDiffHook) {
                     try {
                         auto diff = runProgram(diffHook, true, {prev, i->path});
@@ -2932,7 +3173,7 @@ void DerivationGoal::registerOutputs()
                     }
                 }
 
-                if (settings.get("enforce-determinism", true))
+                if (settings.enforceDeterminism)
                     throw NotDeterministic(msg);
 
                 printError(msg);
@@ -2948,7 +3189,7 @@ void DerivationGoal::registerOutputs()
             deletePath(prev);
             Path dst = i.second.path + checkSuffix;
             if (rename(i.second.path.c_str(), dst.c_str()))
-                throw SysError(format("renaming ‘%1%’ to ‘%2%’") % i.second.path % dst);
+                throw SysError(format("renaming '%1%' to '%2%'") % i.second.path % dst);
         }
     }
 
@@ -2973,9 +3214,6 @@ void DerivationGoal::registerOutputs()
 }
 
 
-string drvsLogDir = "drvs";
-
-
 Path DerivationGoal::openLogFile()
 {
     logSize = 0;
@@ -2985,16 +3223,14 @@ Path DerivationGoal::openLogFile()
     string baseName = baseNameOf(drvPath);
 
     /* Create a log file. */
-    Path dir = (format("%1%/%2%/%3%/") % worker.store.logDir % drvsLogDir % string(baseName, 0, 2)).str();
+    Path dir = fmt("%s/%s/%s/", worker.store.logDir, worker.store.drvsLogDir, string(baseName, 0, 2));
     createDirs(dir);
 
-    Path logFileName = (format("%1%/%2%%3%")
-        % dir
-        % string(baseName, 2)
-        % (settings.compressLog ? ".bz2" : "")).str();
+    Path logFileName = fmt("%s/%s%s", dir, string(baseName, 2),
+        settings.compressLog ? ".bz2" : "");
 
     fdLogFile = open(logFileName.c_str(), O_CREAT | O_WRONLY | O_TRUNC | O_CLOEXEC, 0666);
-    if (!fdLogFile) throw SysError(format("creating log file ‘%1%’") % logFileName);
+    if (!fdLogFile) throw SysError(format("creating log file '%1%'") % logFileName);
 
     logFileSink = std::make_shared<FdSink>(fdLogFile.get());
 
@@ -3020,9 +3256,11 @@ void DerivationGoal::closeLogFile()
 void DerivationGoal::deleteTmpDir(bool force)
 {
     if (tmpDir != "") {
-        if (settings.keepFailed && !force) {
+        /* Don't keep temporary directories for builtins because they
+           might have privileged stuff (like a copy of netrc). */
+        if (settings.keepFailed && !force && !drv->isBuiltin()) {
             printError(
-                format("note: keeping build directory ‘%2%’")
+                format("note: keeping build directory '%2%'")
                 % drvPath % tmpDir);
             chmod(tmpDir.c_str(), 0755);
         }
@@ -3063,7 +3301,7 @@ void DerivationGoal::handleChildOutput(int fd, const string & data)
     }
 
     if (hook && fd == hook->fromHook.readSide.get())
-        printError(data); // FIXME?
+        printError(chomp(data));
 }
 
 
@@ -3074,15 +3312,69 @@ void DerivationGoal::handleEOF(int fd)
 }
 
 
+static Logger::Fields getFields(nlohmann::json & json)
+{
+    Logger::Fields fields;
+    for (auto & f : json) {
+        if (f.type() == nlohmann::json::value_t::number_unsigned)
+            fields.emplace_back(Logger::Field(f.get<uint64_t>()));
+        else if (f.type() == nlohmann::json::value_t::string)
+            fields.emplace_back(Logger::Field(f.get<std::string>()));
+        else throw Error("unsupported JSON type %d", (int) f.type());
+    }
+    return fields;
+}
+
+
 void DerivationGoal::flushLine()
 {
-    if (settings.verboseBuild &&
-        (settings.printRepeatedBuilds || curRound == 1))
-        printError(filterANSIEscapes(currentLogLine, true));
-    else {
-        logTail.push_back(currentLogLine);
-        if (logTail.size() > settings.logLines) logTail.pop_front();
+    if (hasPrefix(currentLogLine, "@nix ")) {
+
+        try {
+            auto json = nlohmann::json::parse(std::string(currentLogLine, 5));
+
+            std::string action = json["action"];
+
+            if (action == "start") {
+                auto type = (ActivityType) json["type"];
+                if (type == actDownload)
+                    builderActivities.emplace(std::piecewise_construct,
+                        std::forward_as_tuple(json["id"]),
+                        std::forward_as_tuple(*logger, (Verbosity) json["level"], type,
+                            json["text"], getFields(json["fields"]), act->id));
+            }
+
+            else if (action == "stop")
+                builderActivities.erase((ActivityId) json["id"]);
+
+            else if (action == "result") {
+                auto i = builderActivities.find((ActivityId) json["id"]);
+                if (i != builderActivities.end())
+                    i->second.result((ResultType) json["type"], getFields(json["fields"]));
+            }
+
+            else if (action == "setPhase") {
+                std::string phase = json["phase"];
+                act->result(resSetPhase, phase);
+            }
+
+        } catch (std::exception & e) {
+            printError("bad log message from builder: %s", e.what());
+        }
     }
+
+    else {
+        if (settings.verboseBuild &&
+            (settings.printRepeatedBuilds || curRound == 1))
+            printError(filterANSIEscapes(currentLogLine, true));
+        else {
+            logTail.push_back(currentLogLine);
+            if (logTail.size() > settings.logLines) logTail.pop_front();
+        }
+
+        act->result(resBuildLogLine, currentLogLine);
+    }
+
     currentLogLine = "";
     currentLogLinePos = 0;
 }
@@ -3105,7 +3397,7 @@ PathSet DerivationGoal::checkPathValidity(bool returnValid, bool checkHash)
 Path DerivationGoal::addHashRewrite(const Path & path)
 {
     string h1 = string(path, worker.store.storeDir.size() + 1, 32);
-    string h2 = string(printHash32(hashString(htSHA256, "rewrite:" + drvPath + ":" + path)), 0, 32);
+    string h2 = string(hashString(htSHA256, "rewrite:" + drvPath + ":" + path).to_string(Base32, false), 0, 32);
     Path p = worker.store.storeDir + "/" + h2 + string(path, worker.store.storeDir.size() + 33);
     deletePath(p);
     assert(path.size() == p.size());
@@ -3125,6 +3417,19 @@ void DerivationGoal::done(BuildResult::Status status, const string & msg)
         worker.timedOut = true;
     if (result.status == BuildResult::PermanentFailure)
         worker.permanentFailure = true;
+
+    mcExpectedBuilds.reset();
+    mcRunningBuilds.reset();
+
+    if (result.success()) {
+        if (status == BuildResult::Built)
+            worker.doneBuilds++;
+    } else {
+        if (status != BuildResult::DependencyFailed)
+            worker.failedBuilds++;
+    }
+
+    worker.updateProgress();
 }
 
 
@@ -3160,29 +3465,32 @@ private:
     std::promise<void> promise;
 
     /* Whether to try to repair a valid path. */
-    bool repair;
+    RepairFlag repair;
 
     /* Location where we're downloading the substitute.  Differs from
        storePath when doing a repair. */
     Path destPath;
 
+    std::unique_ptr<MaintainCount<uint64_t>> maintainExpectedSubstitutions,
+        maintainRunningSubstitutions, maintainExpectedNar, maintainExpectedDownload;
+
     typedef void (SubstitutionGoal::*GoalState)();
     GoalState state;
 
 public:
-    SubstitutionGoal(const Path & storePath, Worker & worker, bool repair = false);
+    SubstitutionGoal(const Path & storePath, Worker & worker, RepairFlag repair = NoRepair);
     ~SubstitutionGoal();
 
-    void timedOut() { abort(); };
+    void timedOut() override { abort(); };
 
-    string key()
+    string key() override
     {
         /* "a$" ensures substitution goals happen before derivation
            goals. */
         return "a$" + storePathToName(storePath) + "$" + storePath;
     }
 
-    void work();
+    void work() override;
 
     /* The states. */
     void init();
@@ -3193,22 +3501,28 @@ public:
     void finished();
 
     /* Callback used by the worker to write to the log. */
-    void handleChildOutput(int fd, const string & data);
-    void handleEOF(int fd);
+    void handleChildOutput(int fd, const string & data) override;
+    void handleEOF(int fd) override;
 
     Path getStorePath() { return storePath; }
+
+    void amDone(ExitCode result) override
+    {
+        Goal::amDone(result);
+    }
 };
 
 
-SubstitutionGoal::SubstitutionGoal(const Path & storePath, Worker & worker, bool repair)
+SubstitutionGoal::SubstitutionGoal(const Path & storePath, Worker & worker, RepairFlag repair)
     : Goal(worker)
     , hasSubstitute(false)
     , repair(repair)
 {
     this->storePath = storePath;
     state = &SubstitutionGoal::init;
-    name = (format("substitution of ‘%1%’") % storePath).str();
+    name = (format("substitution of '%1%'") % storePath).str();
     trace("created");
+    maintainExpectedSubstitutions = std::make_unique<MaintainCount<uint64_t>>(worker.expectedSubstitutions);
 }
 
 
@@ -3245,7 +3559,7 @@ void SubstitutionGoal::init()
     }
 
     if (settings.readOnlyMode)
-        throw Error(format("cannot substitute path ‘%1%’ - no write access to the Nix store") % storePath);
+        throw Error(format("cannot substitute path '%1%' - no write access to the Nix store") % storePath);
 
     subs = settings.useSubstitutes ? getDefaultSubstituters() : std::list<ref<Store>>();
 
@@ -3260,12 +3574,18 @@ void SubstitutionGoal::tryNext()
     if (subs.size() == 0) {
         /* None left.  Terminate this goal and let someone else deal
            with it. */
-        debug(format("path ‘%1%’ is required, but there is no substituter that can build it") % storePath);
+        debug(format("path '%1%' is required, but there is no substituter that can build it") % storePath);
 
         /* Hack: don't indicate failure if there were no substituters.
            In that case the calling derivation should just do a
            build. */
         amDone(hasSubstitute ? ecFailed : ecNoSubstituters);
+
+        if (hasSubstitute) {
+            worker.failedSubstitutions++;
+            worker.updateProgress();
+        }
+
         return;
     }
 
@@ -3285,13 +3605,25 @@ void SubstitutionGoal::tryNext()
         return;
     }
 
+    /* Update the total expected download size. */
+    auto narInfo = std::dynamic_pointer_cast<const NarInfo>(info);
+
+    maintainExpectedNar = std::make_unique<MaintainCount<uint64_t>>(worker.expectedNarSize, narInfo->narSize);
+
+    maintainExpectedDownload =
+        narInfo && narInfo->fileSize
+        ? std::make_unique<MaintainCount<uint64_t>>(worker.expectedDownloadSize, narInfo->fileSize)
+        : nullptr;
+
+    worker.updateProgress();
+
     hasSubstitute = true;
 
     /* Bail out early if this substituter lacks a valid
        signature. LocalStore::addToStore() also checks for this, but
        only after we've downloaded the path. */
     if (worker.store.requireSigs && !info->checkSignatures(worker.store, worker.store.publicKeys)) {
-        printInfo(format("warning: substituter ‘%s’ does not have a valid signature for path ‘%s’")
+        printInfo(format("warning: substituter '%s' does not have a valid signature for path '%s'")
             % sub->getUri() % storePath);
         tryNext();
         return;
@@ -3315,7 +3647,7 @@ void SubstitutionGoal::referencesValid()
     trace("all references realised");
 
     if (nrFailed > 0) {
-        debug(format("some references of path ‘%1%’ could not be realised") % storePath);
+        debug(format("some references of path '%1%' could not be realised") % storePath);
         amDone(nrNoSubstituters > 0 || nrIncompleteClosure > 0 ? ecIncompleteClosure : ecFailed);
         return;
     }
@@ -3334,15 +3666,18 @@ void SubstitutionGoal::tryToRun()
     trace("trying to run");
 
     /* Make sure that we are allowed to start a build.  Note that even
-       is maxBuildJobs == 0 (no local builds allowed), we still allow
+       if maxBuildJobs == 0 (no local builds allowed), we still allow
        a substituter to run.  This is because substitutions cannot be
        distributed to another machine via the build hook. */
-    if (worker.getNrLocalBuilds() >= (settings.maxBuildJobs == 0 ? 1 : settings.maxBuildJobs)) {
+    if (worker.getNrLocalBuilds() >= std::max(1U, (unsigned int) settings.maxBuildJobs)) {
         worker.waitForBuildSlot(shared_from_this());
         return;
     }
 
-    printInfo(format("fetching path ‘%1%’...") % storePath);
+    printInfo(format("fetching path '%1%'...") % storePath);
+
+    maintainRunningSubstitutions = std::make_unique<MaintainCount<uint64_t>>(worker.runningSubstitutions);
+    worker.updateProgress();
 
     outPipe.create();
 
@@ -3352,6 +3687,9 @@ void SubstitutionGoal::tryToRun()
         try {
             /* Wake up the worker loop when we're done. */
             Finally updateStats([this]() { outPipe.writeSide = -1; });
+
+            Activity act(*logger, actSubstitute, Logger::Fields{storePath, sub->getUri()});
+            PushActivity pact(act.id);
 
             copyStorePath(ref<Store>(sub), ref<Store>(worker.store.shared_from_this()),
                 storePath, repair);
@@ -3389,7 +3727,23 @@ void SubstitutionGoal::finished()
     worker.markContentsGood(storePath);
 
     printMsg(lvlChatty,
-        format("substitution of path ‘%1%’ succeeded") % storePath);
+        format("substitution of path '%1%' succeeded") % storePath);
+
+    maintainRunningSubstitutions.reset();
+
+    maintainExpectedSubstitutions.reset();
+    worker.doneSubstitutions++;
+
+    if (maintainExpectedDownload) {
+        auto fileSize = maintainExpectedDownload->delta;
+        maintainExpectedDownload.reset();
+        worker.doneDownloadSize += fileSize;
+    }
+
+    worker.doneNarSize += maintainExpectedNar->delta;
+    maintainExpectedNar.reset();
+
+    worker.updateProgress();
 
     amDone(ecSuccess);
 }
@@ -3413,7 +3767,10 @@ static bool working = false;
 
 
 Worker::Worker(LocalStore & store)
-    : store(store)
+    : act(*logger, actRealise)
+    , actDerivations(*logger, actBuilds)
+    , actSubstitutions(*logger, actCopyPaths)
+    , store(store)
 {
     /* Debugging: prevent recursive workers. */
     if (working) abort();
@@ -3434,6 +3791,10 @@ Worker::~Worker()
        are in trouble, since goals may call childTerminated() etc. in
        their destructors). */
     topGoals.clear();
+
+    assert(expectedSubstitutions == 0);
+    assert(expectedDownloadSize == 0);
+    assert(expectedNarSize == 0);
 }
 
 
@@ -3460,7 +3821,7 @@ std::shared_ptr<DerivationGoal> Worker::makeBasicDerivationGoal(const Path & drv
 }
 
 
-GoalPtr Worker::makeSubstitutionGoal(const Path & path, bool repair)
+GoalPtr Worker::makeSubstitutionGoal(const Path & path, RepairFlag repair)
 {
     GoalPtr goal = substitutionGoals[path].lock();
     if (!goal) {
@@ -3590,7 +3951,7 @@ void Worker::run(const Goals & _topGoals)
 {
     for (auto & i : _topGoals) topGoals.insert(i);
 
-    Activity act(*logger, lvlDebug, "entered goal loop");
+    debug("entered goal loop");
 
     while (1) {
 
@@ -3618,8 +3979,8 @@ void Worker::run(const Goals & _topGoals)
         if (!children.empty() || !waitingForAWhile.empty())
             waitForInput();
         else {
-            if (awake.empty() && settings.maxBuildJobs == 0) throw Error(
-                "unable to start any build; either increase ‘--max-jobs’ "
+            if (awake.empty() && 0 == settings.maxBuildJobs) throw Error(
+                "unable to start any build; either increase '--max-jobs' "
                 "or enable distributed builds");
             assert(!awake.empty());
         }
@@ -3655,9 +4016,9 @@ void Worker::waitForInput()
     auto nearest = steady_time_point::max(); // nearest deadline
     for (auto & i : children) {
         if (!i.respectTimeouts) continue;
-        if (settings.maxSilentTime != 0)
+        if (0 != settings.maxSilentTime)
             nearest = std::min(nearest, i.lastOutput + std::chrono::seconds(settings.maxSilentTime));
-        if (settings.buildTimeout != 0)
+        if (0 != settings.buildTimeout)
             nearest = std::min(nearest, i.timeStarted + std::chrono::seconds(settings.buildTimeout));
     }
     if (nearest != steady_time_point::max()) {
@@ -3688,6 +4049,8 @@ void Worker::waitForInput()
     int fdMax = 0;
     for (auto & i : children) {
         for (auto & j : i.fds) {
+            if (j >= FD_SETSIZE)
+                throw Error("reached FD_SETSIZE limit");
             FD_SET(j, &fds);
             if (j >= fdMax) fdMax = j + 1;
         }
@@ -3735,7 +4098,7 @@ void Worker::waitForInput()
         }
 
         if (goal->getExitCode() == Goal::ecBusy &&
-            settings.maxSilentTime != 0 &&
+            0 != settings.maxSilentTime &&
             j->respectTimeouts &&
             after - j->lastOutput >= std::chrono::seconds(settings.maxSilentTime))
         {
@@ -3746,7 +4109,7 @@ void Worker::waitForInput()
         }
 
         else if (goal->getExitCode() == Goal::ecBusy &&
-            settings.buildTimeout != 0 &&
+            0 != settings.buildTimeout &&
             j->respectTimeouts &&
             after - j->timeStarted >= std::chrono::seconds(settings.buildTimeout))
         {
@@ -3778,7 +4141,7 @@ bool Worker::pathContentsGood(const Path & path)
 {
     std::map<Path, bool>::iterator i = pathContentsGoodCache.find(path);
     if (i != pathContentsGoodCache.end()) return i->second;
-    printInfo(format("checking path ‘%1%’...") % path);
+    printInfo(format("checking path '%1%'...") % path);
     auto info = store.queryPathInfo(path);
     bool res;
     if (!pathExists(path))
@@ -3789,7 +4152,7 @@ bool Worker::pathContentsGood(const Path & path)
         res = info->narHash == nullHash || info->narHash == current.first;
     }
     pathContentsGoodCache[path] = res;
-    if (!res) printError(format("path ‘%1%’ is corrupted or missing!") % path);
+    if (!res) printError(format("path '%1%' is corrupted or missing!") % path);
     return res;
 }
 
@@ -3803,9 +4166,19 @@ void Worker::markContentsGood(const Path & path)
 //////////////////////////////////////////////////////////////////////
 
 
+static void primeCache(Store & store, const PathSet & paths)
+{
+    PathSet willBuild, willSubstitute, unknown;
+    unsigned long long downloadSize, narSize;
+    store.queryMissing(paths, willBuild, willSubstitute, unknown, downloadSize, narSize);
+}
+
+
 void LocalStore::buildPaths(const PathSet & drvPaths, BuildMode buildMode)
 {
     Worker worker(*this);
+
+    primeCache(*this, drvPaths);
 
     Goals goals;
     for (auto & i : drvPaths) {
@@ -3813,7 +4186,7 @@ void LocalStore::buildPaths(const PathSet & drvPaths, BuildMode buildMode)
         if (isDerivation(i2.first))
             goals.insert(worker.makeDerivationGoal(i2.first, i2.second, buildMode));
         else
-            goals.insert(worker.makeSubstitutionGoal(i, buildMode));
+            goals.insert(worker.makeSubstitutionGoal(i, buildMode == bmRepair ? Repair : NoRepair));
     }
 
     worker.run(goals);
@@ -3857,6 +4230,8 @@ void LocalStore::ensurePath(const Path & path)
     /* If the path is already valid, we're done. */
     if (isValidPath(path)) return;
 
+    primeCache(*this, {path});
+
     Worker worker(*this);
     GoalPtr goal = worker.makeSubstitutionGoal(path);
     Goals goals = {goal};
@@ -3864,14 +4239,14 @@ void LocalStore::ensurePath(const Path & path)
     worker.run(goals);
 
     if (goal->getExitCode() != Goal::ecSuccess)
-        throw Error(worker.exitStatus(), "path ‘%s’ does not exist and cannot be created", path);
+        throw Error(worker.exitStatus(), "path '%s' does not exist and cannot be created", path);
 }
 
 
 void LocalStore::repairPath(const Path & path)
 {
     Worker worker(*this);
-    GoalPtr goal = worker.makeSubstitutionGoal(path, true);
+    GoalPtr goal = worker.makeSubstitutionGoal(path, Repair);
     Goals goals = {goal};
 
     worker.run(goals);
@@ -3885,7 +4260,7 @@ void LocalStore::repairPath(const Path & path)
             goals.insert(worker.makeDerivationGoal(deriver, StringSet(), bmRepair));
             worker.run(goals);
         } else
-            throw Error(worker.exitStatus(), "cannot repair path ‘%s’", path);
+            throw Error(worker.exitStatus(), "cannot repair path '%s'", path);
     }
 }
 

@@ -38,7 +38,7 @@ public:
             try {
                 BinaryCacheStore::init();
             } catch (UploadToHTTP &) {
-                throw Error(format("‘%s’ does not appear to be a binary cache") % cacheUri);
+                throw Error(format("'%s' does not appear to be a binary cache") % cacheUri);
             }
             diskCache->createCache(cacheUri, storeDir, wantMassQuery_, priority);
         }
@@ -50,7 +50,6 @@ protected:
     {
         try {
             DownloadRequest request(cacheUri + "/" + path);
-            request.showProgress = DownloadRequest::no;
             request.head = true;
             request.tries = 5;
             getDownloader()->download(request);
@@ -64,7 +63,9 @@ protected:
         }
     }
 
-    void upsertFile(const std::string & path, const std::string & data) override
+    void upsertFile(const std::string & path,
+        const std::string & data,
+        const std::string & mimeType) override
     {
         throw UploadToHTTP("uploading to an HTTP binary cache is not supported");
     }
@@ -74,7 +75,6 @@ protected:
         std::function<void(std::exception_ptr exc)> failure) override
     {
         DownloadRequest request(cacheUri + "/" + path);
-        request.showProgress = DownloadRequest::no;
         request.tries = 8;
 
         getDownloader()->enqueueDownload(request,

@@ -1,0 +1,2 @@
+os: osx
+script: ./tests/install-darwin.sh

@@ -8,6 +8,7 @@
 #include "globals.hh"
 #include "monitor-fd.hh"
 #include "derivations.hh"
+#include "finally.hh"
 
 #include <algorithm>
 
@@ -23,6 +24,7 @@
 #include <pwd.h>
 #include <grp.h>
 #include <fcntl.h>
+#include <limits.h>
 
 #if __APPLE__ || __FreeBSD__
 #include <sys/ucred.h>
@@ -53,66 +55,130 @@ static ssize_t splice(int fd_in, void *off_in, int fd_out, void *off_out, size_t
 static FdSource from(STDIN_FILENO);
 static FdSink to(STDOUT_FILENO);
 
-static bool canSendStderr;
 
-static Logger * defaultLogger;
+Sink & operator << (Sink & sink, const Logger::Fields & fields)
+{
+    sink << fields.size();
+    for (auto & f : fields) {
+        sink << f.type;
+        if (f.type == Logger::Field::tInt)
+            sink << f.i;
+        else if (f.type == Logger::Field::tString)
+            sink << f.s;
+        else abort();
+    }
+    return sink;
+}
 
 
 /* Logger that forwards log messages to the client, *if* we're in a
    state where the protocol allows it (i.e., when canSendStderr is
    true). */
-class TunnelLogger : public Logger
+struct TunnelLogger : public Logger
 {
-    void log(Verbosity lvl, const FormatOrString & fs) override
+    struct State
     {
-        if (lvl > verbosity) return;
+        bool canSendStderr = false;
+        std::vector<std::string> pendingMsgs;
+    };
 
-        if (canSendStderr) {
+    Sync<State> state_;
+
+    unsigned int clientVersion;
+
+    TunnelLogger(unsigned int clientVersion) : clientVersion(clientVersion) { }
+
+    void enqueueMsg(const std::string & s)
+    {
+        auto state(state_.lock());
+
+        if (state->canSendStderr) {
+            assert(state->pendingMsgs.empty());
             try {
-                to << STDERR_NEXT << (fs.s + "\n");
+                to(s);
                 to.flush();
             } catch (...) {
                 /* Write failed; that means that the other side is
                    gone. */
-                canSendStderr = false;
+                state->canSendStderr = false;
                 throw;
             }
         } else
-            defaultLogger->log(lvl, fs);
+            state->pendingMsgs.push_back(s);
     }
 
-    void startActivity(Activity & activity, Verbosity lvl, const FormatOrString & fs) override
+    void log(Verbosity lvl, const FormatOrString & fs) override
     {
-        log(lvl, fs);
+        if (lvl > verbosity) return;
+
+        StringSink buf;
+        buf << STDERR_NEXT << (fs.s + "\n");
+        enqueueMsg(*buf.s);
     }
 
-    void stopActivity(Activity & activity) override
+    /* startWork() means that we're starting an operation for which we
+      want to send out stderr to the client. */
+    void startWork()
     {
+        std::vector<std::string> pendingMsgs;
+
+        auto state(state_.lock());
+        state->canSendStderr = true;
+
+        for (auto & msg : state->pendingMsgs)
+            to(msg);
+
+        state->pendingMsgs.clear();
+
+        to.flush();
+    }
+
+    /* stopWork() means that we're done; stop sending stderr to the
+       client. */
+    void stopWork(bool success = true, const string & msg = "", unsigned int status = 0)
+    {
+        auto state(state_.lock());
+
+        state->canSendStderr = false;
+
+        if (success)
+            to << STDERR_LAST;
+        else {
+            to << STDERR_ERROR << msg;
+            if (status != 0) to << status;
+        }
+    }
+
+    void startActivity(ActivityId act, Verbosity lvl, ActivityType type,
+        const std::string & s, const Fields & fields, ActivityId parent) override
+    {
+        if (GET_PROTOCOL_MINOR(clientVersion) < 20) {
+            if (!s.empty())
+                log(lvl, s + "...");
+            return;
+        }
+
+        StringSink buf;
+        buf << STDERR_START_ACTIVITY << act << lvl << type << s << fields << parent;
+        enqueueMsg(*buf.s);
+    }
+
+    void stopActivity(ActivityId act) override
+    {
+        if (GET_PROTOCOL_MINOR(clientVersion) < 20) return;
+        StringSink buf;
+        buf << STDERR_STOP_ACTIVITY << act;
+        enqueueMsg(*buf.s);
+    }
+
+    void result(ActivityId act, ResultType type, const Fields & fields) override
+    {
+        if (GET_PROTOCOL_MINOR(clientVersion) < 20) return;
+        StringSink buf;
+        buf << STDERR_RESULT << act << type << fields;
+        enqueueMsg(*buf.s);
     }
 };
-
-
-/* startWork() means that we're starting an operation for which we
-   want to send out stderr to the client. */
-static void startWork()
-{
-    canSendStderr = true;
-}
-
-
-/* stopWork() means that we're done; stop sending stderr to the
-   client. */
-static void stopWork(bool success = true, const string & msg = "", unsigned int status = 0)
-{
-    canSendStderr = false;
-
-    if (success)
-        to << STDERR_LAST;
-    else {
-        to << STDERR_ERROR << msg;
-        if (status != 0) to << status;
-    }
-}
 
 
 struct TunnelSink : Sink
@@ -168,22 +234,8 @@ struct RetrieveRegularNARSink : ParseSink
 };
 
 
-/* Adapter class of a Source that saves all data read to `s'. */
-struct SavingSourceAdapter : Source
-{
-    Source & orig;
-    string s;
-    SavingSourceAdapter(Source & orig) : orig(orig) { }
-    size_t read(unsigned char * data, size_t len)
-    {
-        size_t n = orig.read(data, len);
-        s.append((const char *) data, n);
-        return n;
-    }
-};
-
-
-static void performOp(ref<LocalStore> store, bool trusted, unsigned int clientVersion,
+static void performOp(TunnelLogger * logger, ref<LocalStore> store,
+    bool trusted, unsigned int clientVersion,
     Source & from, Sink & to, unsigned int op)
 {
     switch (op) {
@@ -195,47 +247,47 @@ static void performOp(ref<LocalStore> store, bool trusted, unsigned int clientVe
            that the 'Error' exception handler doesn't close the
            connection.  */
         Path path = readString(from);
-        startWork();
+        logger->startWork();
         store->assertStorePath(path);
         bool result = store->isValidPath(path);
-        stopWork();
+        logger->stopWork();
         to << result;
         break;
     }
 
     case wopQueryValidPaths: {
         PathSet paths = readStorePaths<PathSet>(*store, from);
-        startWork();
+        logger->startWork();
         PathSet res = store->queryValidPaths(paths);
-        stopWork();
+        logger->stopWork();
         to << res;
         break;
     }
 
     case wopHasSubstitutes: {
         Path path = readStorePath(*store, from);
-        startWork();
+        logger->startWork();
         PathSet res = store->querySubstitutablePaths({path});
-        stopWork();
+        logger->stopWork();
         to << (res.find(path) != res.end());
         break;
     }
 
     case wopQuerySubstitutablePaths: {
         PathSet paths = readStorePaths<PathSet>(*store, from);
-        startWork();
+        logger->startWork();
         PathSet res = store->querySubstitutablePaths(paths);
-        stopWork();
+        logger->stopWork();
         to << res;
         break;
     }
 
     case wopQueryPathHash: {
         Path path = readStorePath(*store, from);
-        startWork();
+        logger->startWork();
         auto hash = store->queryPathInfo(path)->narHash;
-        stopWork();
-        to << printHash(hash);
+        logger->stopWork();
+        to << hash.to_string(Base16, false);
         break;
     }
 
@@ -244,7 +296,7 @@ static void performOp(ref<LocalStore> store, bool trusted, unsigned int clientVe
     case wopQueryValidDerivers:
     case wopQueryDerivationOutputs: {
         Path path = readStorePath(*store, from);
-        startWork();
+        logger->startWork();
         PathSet paths;
         if (op == wopQueryReferences)
             paths = store->queryPathInfo(path)->references;
@@ -253,44 +305,43 @@ static void performOp(ref<LocalStore> store, bool trusted, unsigned int clientVe
         else if (op == wopQueryValidDerivers)
             paths = store->queryValidDerivers(path);
         else paths = store->queryDerivationOutputs(path);
-        stopWork();
+        logger->stopWork();
         to << paths;
         break;
     }
 
     case wopQueryDerivationOutputNames: {
         Path path = readStorePath(*store, from);
-        startWork();
+        logger->startWork();
         StringSet names;
         names = store->queryDerivationOutputNames(path);
-        stopWork();
+        logger->stopWork();
         to << names;
         break;
     }
 
     case wopQueryDeriver: {
         Path path = readStorePath(*store, from);
-        startWork();
+        logger->startWork();
         auto deriver = store->queryPathInfo(path)->deriver;
-        stopWork();
+        logger->stopWork();
         to << deriver;
         break;
     }
 
     case wopQueryPathFromHashPart: {
         string hashPart = readString(from);
-        startWork();
+        logger->startWork();
         Path path = store->queryPathFromHashPart(hashPart);
-        stopWork();
+        logger->stopWork();
         to << path;
         break;
     }
 
     case wopAddToStore: {
-        string baseName = readString(from);
-        bool fixed = readInt(from) == 1; /* obsolete */
-        bool recursive = readInt(from) == 1;
-        string s = readString(from);
+        bool fixed, recursive;
+        std::string s, baseName;
+        from >> baseName >> fixed /* obsolete */ >> recursive >> s;
         /* Compatibility hack. */
         if (!fixed) {
             s = "sha256";
@@ -298,7 +349,7 @@ static void performOp(ref<LocalStore> store, bool trusted, unsigned int clientVe
         }
         HashType hashAlgo = parseHashType(s);
 
-        SavingSourceAdapter savedNAR(from);
+        TeeSource savedNAR(from);
         RetrieveRegularNARSink savedRegular;
 
         if (recursive) {
@@ -310,10 +361,10 @@ static void performOp(ref<LocalStore> store, bool trusted, unsigned int clientVe
         } else
             parseDump(savedRegular, from);
 
-        startWork();
+        logger->startWork();
         if (!savedRegular.regular) throw Error("regular file expected");
-        Path path = store->addToStoreFromDump(recursive ? savedNAR.s : savedRegular.s, baseName, recursive, hashAlgo);
-        stopWork();
+        Path path = store->addToStoreFromDump(recursive ? *savedNAR.data : savedRegular.s, baseName, recursive, hashAlgo);
+        logger->stopWork();
 
         to << path;
         break;
@@ -323,9 +374,9 @@ static void performOp(ref<LocalStore> store, bool trusted, unsigned int clientVe
         string suffix = readString(from);
         string s = readString(from);
         PathSet refs = readStorePaths<PathSet>(*store, from);
-        startWork();
-        Path path = store->addTextToStore(suffix, s, refs, false);
-        stopWork();
+        logger->startWork();
+        Path path = store->addTextToStore(suffix, s, refs, NoRepair);
+        logger->stopWork();
         to << path;
         break;
     }
@@ -333,19 +384,20 @@ static void performOp(ref<LocalStore> store, bool trusted, unsigned int clientVe
     case wopExportPath: {
         Path path = readStorePath(*store, from);
         readInt(from); // obsolete
-        startWork();
+        logger->startWork();
         TunnelSink sink(to);
         store->exportPath(path, sink);
-        stopWork();
+        logger->stopWork();
         to << 1;
         break;
     }
 
     case wopImportPaths: {
-        startWork();
+        logger->startWork();
         TunnelSource source(from);
-        Paths paths = store->importPaths(source, 0, trusted);
-        stopWork();
+        Paths paths = store->importPaths(source, nullptr,
+            trusted ? NoCheckSigs : CheckSigs);
+        logger->stopWork();
         to << paths;
         break;
     }
@@ -354,16 +406,16 @@ static void performOp(ref<LocalStore> store, bool trusted, unsigned int clientVe
         PathSet drvs = readStorePaths<PathSet>(*store, from);
         BuildMode mode = bmNormal;
         if (GET_PROTOCOL_MINOR(clientVersion) >= 15) {
-            mode = (BuildMode)readInt(from);
+            mode = (BuildMode) readInt(from);
 
             /* Repairing is not atomic, so disallowed for "untrusted"
                clients.  */
             if (mode == bmRepair && !trusted)
                 throw Error("repairing is not supported when building through the Nix daemon");
         }
-        startWork();
+        logger->startWork();
         store->buildPaths(drvs, mode);
-        stopWork();
+        logger->stopWork();
         to << 1;
         break;
     }
@@ -373,54 +425,54 @@ static void performOp(ref<LocalStore> store, bool trusted, unsigned int clientVe
         BasicDerivation drv;
         readDerivation(from, *store, drv);
         BuildMode buildMode = (BuildMode) readInt(from);
-        startWork();
+        logger->startWork();
         if (!trusted)
             throw Error("you are not privileged to build derivations");
         auto res = store->buildDerivation(drvPath, drv, buildMode);
-        stopWork();
+        logger->stopWork();
         to << res.status << res.errorMsg;
         break;
     }
 
     case wopEnsurePath: {
         Path path = readStorePath(*store, from);
-        startWork();
+        logger->startWork();
         store->ensurePath(path);
-        stopWork();
+        logger->stopWork();
         to << 1;
         break;
     }
 
     case wopAddTempRoot: {
         Path path = readStorePath(*store, from);
-        startWork();
+        logger->startWork();
         store->addTempRoot(path);
-        stopWork();
+        logger->stopWork();
         to << 1;
         break;
     }
 
     case wopAddIndirectRoot: {
         Path path = absPath(readString(from));
-        startWork();
+        logger->startWork();
         store->addIndirectRoot(path);
-        stopWork();
+        logger->stopWork();
         to << 1;
         break;
     }
 
     case wopSyncWithGC: {
-        startWork();
+        logger->startWork();
         store->syncWithGC();
-        stopWork();
+        logger->stopWork();
         to << 1;
         break;
     }
 
     case wopFindRoots: {
-        startWork();
+        logger->startWork();
         Roots roots = store->findRoots();
-        stopWork();
+        logger->stopWork();
         to << roots.size();
         for (auto & i : roots)
             to << i.first << i.second;
@@ -431,8 +483,7 @@ static void performOp(ref<LocalStore> store, bool trusted, unsigned int clientVe
         GCOptions options;
         options.action = (GCOptions::GCAction) readInt(from);
         options.pathsToDelete = readStorePaths<PathSet>(*store, from);
-        options.ignoreLiveness = readInt(from);
-        options.maxFreed = readLongLong(from);
+        from >> options.ignoreLiveness >> options.maxFreed;
         // obsolete fields
         readInt(from);
         readInt(from);
@@ -440,11 +491,11 @@ static void performOp(ref<LocalStore> store, bool trusted, unsigned int clientVe
 
         GCResults results;
 
-        startWork();
+        logger->startWork();
         if (options.ignoreLiveness)
             throw Error("you are not allowed to ignore liveness");
         store->collectGarbage(options, results);
-        stopWork();
+        logger->stopWork();
 
         to << results.paths << results.bytesFreed << 0 /* obsolete */;
 
@@ -452,41 +503,80 @@ static void performOp(ref<LocalStore> store, bool trusted, unsigned int clientVe
     }
 
     case wopSetOptions: {
-        settings.keepFailed = readInt(from) != 0;
-        settings.keepGoing = readInt(from) != 0;
-        settings.set("build-fallback", readInt(from) ? "true" : "false");
+        settings.keepFailed = readInt(from);
+        settings.keepGoing = readInt(from);
+        settings.tryFallback = readInt(from);
         verbosity = (Verbosity) readInt(from);
-        settings.set("build-max-jobs", std::to_string(readInt(from)));
-        settings.set("build-max-silent-time", std::to_string(readInt(from)));
+        settings.maxBuildJobs.assign(readInt(from));
+        settings.maxSilentTime = readInt(from);
         settings.useBuildHook = readInt(from) != 0;
         settings.verboseBuild = lvlError == (Verbosity) readInt(from);
         readInt(from); // obsolete logType
         readInt(from); // obsolete printBuildTrace
-        settings.set("build-cores", std::to_string(readInt(from)));
-        settings.set("build-use-substitutes", readInt(from) ? "true" : "false");
+        settings.buildCores = readInt(from);
+        settings.useSubstitutes  = readInt(from);
+
+        StringMap overrides;
         if (GET_PROTOCOL_MINOR(clientVersion) >= 12) {
             unsigned int n = readInt(from);
             for (unsigned int i = 0; i < n; i++) {
                 string name = readString(from);
                 string value = readString(from);
-                if (name == "build-timeout" || name == "use-ssh-substituter")
-                    settings.set(name, value);
-                else
-                    settings.set(trusted ? name : "untrusted-" + name, value);
+                overrides.emplace(name, value);
             }
         }
-        settings.update();
-        startWork();
-        stopWork();
+
+        logger->startWork();
+
+        for (auto & i : overrides) {
+            auto & name(i.first);
+            auto & value(i.second);
+
+            auto setSubstituters = [&](Setting<Strings> & res) {
+                if (name != res.name && res.aliases.count(name) == 0)
+                    return false;
+                StringSet trusted = settings.trustedSubstituters;
+                for (auto & s : settings.substituters.get())
+                    trusted.insert(s);
+                Strings subs;
+                auto ss = tokenizeString<Strings>(value);
+                for (auto & s : ss)
+                    if (trusted.count(s))
+                        subs.push_back(s);
+                    else
+                        warn("ignoring untrusted substituter '%s'", s);
+                res = subs;
+                return true;
+            };
+
+            try {
+                if (name == "ssh-auth-sock") // obsolete
+                    ;
+                else if (trusted
+                    || name == settings.buildTimeout.name
+                    || name == settings.connectTimeout.name)
+                    settings.set(name, value);
+                else if (setSubstituters(settings.substituters))
+                    ;
+                else if (setSubstituters(settings.extraSubstituters))
+                    ;
+                else
+                    debug("ignoring untrusted setting '%s'", name);
+            } catch (UsageError & e) {
+                warn(e.what());
+            }
+        }
+
+        logger->stopWork();
         break;
     }
 
     case wopQuerySubstitutablePathInfo: {
         Path path = absPath(readString(from));
-        startWork();
+        logger->startWork();
         SubstitutablePathInfos infos;
         store->querySubstitutablePathInfos({path}, infos);
-        stopWork();
+        logger->stopWork();
         SubstitutablePathInfos::iterator i = infos.find(path);
         if (i == infos.end())
             to << 0;
@@ -498,10 +588,10 @@ static void performOp(ref<LocalStore> store, bool trusted, unsigned int clientVe
 
     case wopQuerySubstitutablePathInfos: {
         PathSet paths = readStorePaths<PathSet>(*store, from);
-        startWork();
+        logger->startWork();
         SubstitutablePathInfos infos;
         store->querySubstitutablePathInfos(paths, infos);
-        stopWork();
+        logger->stopWork();
         to << infos.size();
         for (auto & i : infos) {
             to << i.first << i.second.deriver << i.second.references
@@ -511,9 +601,9 @@ static void performOp(ref<LocalStore> store, bool trusted, unsigned int clientVe
     }
 
     case wopQueryAllValidPaths: {
-        startWork();
+        logger->startWork();
         PathSet paths = store->queryAllValidPaths();
-        stopWork();
+        logger->stopWork();
         to << paths;
         break;
     }
@@ -521,17 +611,17 @@ static void performOp(ref<LocalStore> store, bool trusted, unsigned int clientVe
     case wopQueryPathInfo: {
         Path path = readStorePath(*store, from);
         std::shared_ptr<const ValidPathInfo> info;
-        startWork();
+        logger->startWork();
         try {
             info = store->queryPathInfo(path);
         } catch (InvalidPath &) {
             if (GET_PROTOCOL_MINOR(clientVersion) < 17) throw;
         }
-        stopWork();
+        logger->stopWork();
         if (info) {
             if (GET_PROTOCOL_MINOR(clientVersion) >= 17)
                 to << 1;
-            to << info->deriver << printHash(info->narHash) << info->references
+            to << info->deriver << info->narHash.to_string(Base16, false) << info->references
                << info->registrationTime << info->narSize;
             if (GET_PROTOCOL_MINOR(clientVersion) >= 16) {
                 to << info->ultimate
@@ -546,20 +636,20 @@ static void performOp(ref<LocalStore> store, bool trusted, unsigned int clientVe
     }
 
     case wopOptimiseStore:
-        startWork();
+        logger->startWork();
         store->optimiseStore();
-        stopWork();
+        logger->stopWork();
         to << 1;
         break;
 
     case wopVerifyStore: {
-        bool checkContents = readInt(from) != 0;
-        bool repair = readInt(from) != 0;
-        startWork();
+        bool checkContents, repair;
+        from >> checkContents >> repair;
+        logger->startWork();
         if (repair && !trusted)
             throw Error("you are not privileged to repair paths");
-        bool errors = store->verifyStore(checkContents, repair);
-        stopWork();
+        bool errors = store->verifyStore(checkContents, (RepairFlag) repair);
+        logger->stopWork();
         to << errors;
         break;
     }
@@ -567,43 +657,58 @@ static void performOp(ref<LocalStore> store, bool trusted, unsigned int clientVe
     case wopAddSignatures: {
         Path path = readStorePath(*store, from);
         StringSet sigs = readStrings<StringSet>(from);
-        startWork();
+        logger->startWork();
         if (!trusted)
             throw Error("you are not privileged to add signatures");
         store->addSignatures(path, sigs);
-        stopWork();
+        logger->stopWork();
         to << 1;
         break;
     }
 
     case wopNarFromPath: {
         auto path = readStorePath(*store, from);
-        startWork();
-        stopWork();
+        logger->startWork();
+        logger->stopWork();
         dumpPath(path, to);
         break;
     }
 
     case wopAddToStoreNar: {
+        bool repair, dontCheckSigs;
         ValidPathInfo info;
         info.path = readStorePath(*store, from);
-        info.deriver = readString(from);
+        from >> info.deriver;
         if (!info.deriver.empty())
             store->assertStorePath(info.deriver);
-        info.narHash = parseHash(htSHA256, readString(from));
+        info.narHash = Hash(readString(from), htSHA256);
         info.references = readStorePaths<PathSet>(*store, from);
-        info.registrationTime = readInt(from);
-        info.narSize = readLongLong(from);
-        info.ultimate = readLongLong(from);
+        from >> info.registrationTime >> info.narSize >> info.ultimate;
         info.sigs = readStrings<StringSet>(from);
-        auto nar = make_ref<std::string>(readString(from));
-        auto repair = readInt(from) ? true : false;
-        auto dontCheckSigs = readInt(from) ? true : false;
+        from >> info.ca >> repair >> dontCheckSigs;
         if (!trusted && dontCheckSigs)
             dontCheckSigs = false;
-        startWork();
-        store->addToStore(info, nar, repair, dontCheckSigs, nullptr);
-        stopWork();
+        if (!trusted)
+            info.ultimate = false;
+
+        TeeSink tee(from);
+        parseDump(tee, tee.source);
+
+        logger->startWork();
+        store->addToStore(info, tee.source.data, (RepairFlag) repair,
+            dontCheckSigs ? NoCheckSigs : CheckSigs, nullptr);
+        logger->stopWork();
+        break;
+    }
+
+    case wopQueryMissing: {
+        PathSet targets = readStorePaths<PathSet>(*store, from);
+        logger->startWork();
+        PathSet willBuild, willSubstitute, unknown;
+        unsigned long long downloadSize, narSize;
+        store->queryMissing(targets, willBuild, willSubstitute, unknown, downloadSize, narSize);
+        logger->stopWork();
+        to << willBuild << willSubstitute << unknown << downloadSize << narSize;
         break;
     }
 
@@ -617,10 +722,6 @@ static void processConnection(bool trusted)
 {
     MonitorFdHup monitor(from.fd);
 
-    canSendStderr = false;
-    defaultLogger = logger;
-    logger = new TunnelLogger();
-
     /* Exchange the greeting. */
     unsigned int magic = readInt(from);
     if (magic != WORKER_MAGIC_1) throw Error("protocol mismatch");
@@ -631,13 +732,24 @@ static void processConnection(bool trusted)
     if (clientVersion < 0x10a)
         throw Error("the Nix client version is too old");
 
+    auto tunnelLogger = new TunnelLogger(clientVersion);
+    auto prevLogger = nix::logger;
+    logger = tunnelLogger;
+
+    unsigned int opCount = 0;
+
+    Finally finally([&]() {
+        _isInterrupted = false;
+        prevLogger->log(lvlDebug, fmt("%d operations", opCount));
+    });
+
     if (GET_PROTOCOL_MINOR(clientVersion) >= 14 && readInt(from))
         setAffinityTo(readInt(from));
 
     readInt(from); // obsolete reserveSpace
 
     /* Send startup error messages to the client. */
-    startWork();
+    tunnelLogger->startWork();
 
     try {
 
@@ -648,18 +760,19 @@ static void processConnection(bool trusted)
         /* Prevent users from doing something very dangerous. */
         if (geteuid() == 0 &&
             querySetting("build-users-group", "") == "")
-            throw Error("if you run ‘nix-daemon’ as root, then you MUST set ‘build-users-group’!");
+            throw Error("if you run 'nix-daemon' as root, then you MUST set 'build-users-group'!");
 #endif
 
         /* Open the store. */
-        auto store = make_ref<LocalStore>(Store::Params()); // FIXME: get params from somewhere
+        Store::Params params; // FIXME: get params from somewhere
+        // Disable caching since the client already does that.
+        params["path-info-cache-size"] = "0";
+        auto store = make_ref<LocalStore>(params);
 
-        stopWork();
+        tunnelLogger->stopWork();
         to.flush();
 
         /* Process client requests. */
-        unsigned int opCount = 0;
-
         while (true) {
             WorkerOp op;
             try {
@@ -673,32 +786,28 @@ static void processConnection(bool trusted)
             opCount++;
 
             try {
-                performOp(store, trusted, clientVersion, from, to, op);
+                performOp(tunnelLogger, store, trusted, clientVersion, from, to, op);
             } catch (Error & e) {
                 /* If we're not in a state where we can send replies, then
                    something went wrong processing the input of the
                    client.  This can happen especially if I/O errors occur
                    during addTextToStore() / importPath().  If that
                    happens, just send the error message and exit. */
-                bool errorAllowed = canSendStderr;
-                stopWork(false, e.msg(), e.status);
+                bool errorAllowed = tunnelLogger->state_.lock()->canSendStderr;
+                tunnelLogger->stopWork(false, e.msg(), e.status);
                 if (!errorAllowed) throw;
             } catch (std::bad_alloc & e) {
-                stopWork(false, "Nix daemon out of memory", 1);
+                tunnelLogger->stopWork(false, "Nix daemon out of memory", 1);
                 throw;
             }
 
             to.flush();
 
-            assert(!canSendStderr);
+            assert(!tunnelLogger->state_.lock()->canSendStderr);
         };
 
-        canSendStderr = false;
-        _isInterrupted = false;
-        debug(format("%1% operations") % opCount);
-
-    } catch (Error & e) {
-        stopWork(false, e.msg(), 1);
+    } catch (std::exception & e) {
+        tunnelLogger->stopWork(false, e.what(), 1);
         to.flush();
         return;
     }
@@ -829,7 +938,7 @@ static void daemonLoop(char * * argv)
         struct sockaddr_un addr;
         addr.sun_family = AF_UNIX;
         if (socketPathRel.size() >= sizeof(addr.sun_path))
-            throw Error(format("socket path ‘%1%’ is too long") % socketPathRel);
+            throw Error(format("socket path '%1%' is too long") % socketPathRel);
         strcpy(addr.sun_path, socketPathRel.c_str());
 
         unlink(socketPath.c_str());
@@ -841,13 +950,13 @@ static void daemonLoop(char * * argv)
         int res = bind(fdSocket.get(), (struct sockaddr *) &addr, sizeof(addr));
         umask(oldMode);
         if (res == -1)
-            throw SysError(format("cannot bind to socket ‘%1%’") % socketPath);
+            throw SysError(format("cannot bind to socket '%1%'") % socketPath);
 
         if (chdir("/") == -1) /* back to the root */
             throw SysError("cannot change current directory");
 
         if (listen(fdSocket.get(), 5) == -1)
-            throw SysError(format("cannot listen on socket ‘%1%’") % socketPath);
+            throw SysError(format("cannot listen on socket '%1%'") % socketPath);
     }
 
     closeOnExec(fdSocket.get());
@@ -879,14 +988,14 @@ static void daemonLoop(char * * argv)
             struct group * gr = peer.gidKnown ? getgrgid(peer.gid) : 0;
             string group = gr ? gr->gr_name : std::to_string(peer.gid);
 
-            Strings trustedUsers = settings.get("trusted-users", Strings({"root"}));
-            Strings allowedUsers = settings.get("allowed-users", Strings({"*"}));
+            Strings trustedUsers = settings.trustedUsers;
+            Strings allowedUsers = settings.allowedUsers;
 
             if (matchUser(user, group, trustedUsers))
                 trusted = true;
 
             if (!trusted && !matchUser(user, group, allowedUsers))
-                throw Error(format("user ‘%1%’ is not allowed to connect to the Nix daemon") % user);
+                throw Error(format("user '%1%' is not allowed to connect to the Nix daemon") % user);
 
             printInfo(format((string) "accepted connection from pid %1%, user %2%" + (trusted ? " (trusted)" : ""))
                 % (peer.pidKnown ? std::to_string(peer.pid) : "<unknown>")
@@ -961,7 +1070,7 @@ int main(int argc, char * * argv)
 
                 auto socketDir = dirOf(socketPath);
                 if (chdir(socketDir.c_str()) == -1)
-                    throw SysError(format("changing to socket directory ‘%1%’") % socketDir);
+                    throw SysError(format("changing to socket directory '%1%'") % socketDir);
 
                 auto socketName = baseNameOf(socketPath);
                 auto addr = sockaddr_un{};
@@ -982,14 +1091,14 @@ int main(int argc, char * * argv)
                     if (select(nfds, &fds, nullptr, nullptr, nullptr) == -1)
                         throw SysError("waiting for data from client or server");
                     if (FD_ISSET(s, &fds)) {
-                        auto res = splice(s, nullptr, STDOUT_FILENO, nullptr, SIZE_MAX, SPLICE_F_MOVE);
+                        auto res = splice(s, nullptr, STDOUT_FILENO, nullptr, SSIZE_MAX, SPLICE_F_MOVE);
                         if (res == -1)
                             throw SysError("splicing data from daemon socket to stdout");
                         else if (res == 0)
                             throw EndOfFile("unexpected EOF from daemon socket");
                     }
                     if (FD_ISSET(STDIN_FILENO, &fds)) {
-                        auto res = splice(STDIN_FILENO, nullptr, s, nullptr, SIZE_MAX, SPLICE_F_MOVE);
+                        auto res = splice(STDIN_FILENO, nullptr, s, nullptr, SSIZE_MAX, SPLICE_F_MOVE);
                         if (res == -1)
                             throw SysError("splicing data from stdin to daemon socket");
                         else if (res == 0)

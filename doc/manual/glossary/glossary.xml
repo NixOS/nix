@@ -54,7 +54,7 @@
 
   <glossdef><para>A substitute is a command invocation stored in the
   Nix database that describes how to build a store object, bypassing
-  normal the build mechanism (i.e., derivations).  Typically, the
+  the normal build mechanism (i.e., derivations).  Typically, the
   substitute builds the store object by downloading a pre-built
   version of the store object from some server.</para></glossdef>
 

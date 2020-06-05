@@ -52,7 +52,7 @@ This creates 10 build users. There can never be more concurrent builds
 than the number of build users, so you may want to increase this if
 you expect to do many builds at the same time.</para>
 
-<para>On Mac OS X, you can create the required group and users by
+<para>On macOS, you can create the required group and users by
 running the following script:
 
 <programlisting>

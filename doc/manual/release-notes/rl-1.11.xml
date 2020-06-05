@@ -122,13 +122,6 @@ $ diffoscope /nix/store/11a27shh6n2i…-zlib-1.2.8 /nix/store/11a27shh6n2i…-zl
   </listitem>
 
   <listitem>
-    <para>The Nix language now supports floating point numbers. They are
-    based on regular C++ <literal>float</literal> and compatible with
-    existing integers and number-related operations. Export and import to and
-    from JSON and XML works, too.
-  </para>
-  </listitem>
-  <listitem>
     <para>All "chroot"-containing strings got renamed to "sandbox".
       In particular, some Nix options got renamed, but the old names
       are still accepted as lower-priority aliases.

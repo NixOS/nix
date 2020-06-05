@@ -9,154 +9,75 @@
 #include <sys/time.h>
 #endif
 
+#include "machines.hh"
 #include "shared.hh"
 #include "pathlocks.hh"
 #include "globals.hh"
-#include "serve-protocol.hh"
 #include "serialise.hh"
 #include "store-api.hh"
 #include "derivations.hh"
 
 using namespace nix;
-using std::cerr;
 using std::cin;
 
-static void handle_alarm(int sig) {
+static void handleAlarm(int sig) {
 }
 
-class machine {
-    const std::set<string> supportedFeatures;
-    const std::set<string> mandatoryFeatures;
-
-public:
-    const string hostName;
-    const std::vector<string> systemTypes;
-    const string sshKey;
-    const unsigned long long maxJobs;
-    const unsigned long long speedFactor;
-    bool enabled;
-
-    bool allSupported(const std::set<string> & features) const {
-        return std::all_of(features.begin(), features.end(),
-            [&](const string & feature) {
-                return supportedFeatures.count(feature) ||
-                    mandatoryFeatures.count(feature);
-            });
-    }
-
-    bool mandatoryMet(const std::set<string> & features) const {
-        return std::all_of(mandatoryFeatures.begin(), mandatoryFeatures.end(),
-            [&](const string & feature) {
-                return features.count(feature);
-            });
-    }
-
-    machine(decltype(hostName) hostName,
-        decltype(systemTypes) systemTypes,
-        decltype(sshKey) sshKey,
-        decltype(maxJobs) maxJobs,
-        decltype(speedFactor) speedFactor,
-        decltype(supportedFeatures) supportedFeatures,
-        decltype(mandatoryFeatures) mandatoryFeatures) :
-        supportedFeatures{std::move(supportedFeatures)},
-        mandatoryFeatures{std::move(mandatoryFeatures)},
-        hostName{std::move(hostName)},
-        systemTypes{std::move(systemTypes)},
-        sshKey{std::move(sshKey)},
-        maxJobs{std::move(maxJobs)},
-        speedFactor{speedFactor == 0 ? 1 : std::move(speedFactor)},
-        enabled{true} {};
-};;
-
-static std::vector<machine> read_conf()
+std::string escapeUri(std::string uri)
 {
-    auto conf = getEnv("NIX_REMOTE_SYSTEMS", SYSCONFDIR "/nix/machines");
-
-    auto machines = std::vector<machine>{};
-    auto lines = std::vector<string>{};
-    try {
-        lines = tokenizeString<std::vector<string>>(readFile(conf), "\n");
-    } catch (const SysError & e) {
-        if (e.errNo != ENOENT)
-            throw;
-    }
-    for (auto line : lines) {
-        chomp(line);
-        line.erase(std::find(line.begin(), line.end(), '#'), line.end());
-        if (line.empty()) {
-            continue;
-        }
-        auto tokens = tokenizeString<std::vector<string>>(line);
-        auto sz = tokens.size();
-        if (sz < 4) {
-            throw new FormatError(format("Bad machines.conf file %1%")
-                % conf);
-        }
-        machines.emplace_back(tokens[0],
-            tokenizeString<std::vector<string>>(tokens[1], ","),
-            tokens[2],
-            stoull(tokens[3]),
-            sz >= 5 ? stoull(tokens[4]) : 1LL,
-            sz >= 6 ?
-            tokenizeString<std::set<string>>(tokens[5], ",") :
-            std::set<string>{},
-            sz >= 7 ?
-            tokenizeString<std::set<string>>(tokens[6], ",") :
-            std::set<string>{});
-    }
-    return machines;
+    std::replace(uri.begin(), uri.end(), '/', '_');
+    return uri;
 }
 
 static string currentLoad;
 
-static int openSlotLock(const machine & m, unsigned long long slot)
+static AutoCloseFD openSlotLock(const Machine & m, unsigned long long slot)
 {
-    std::ostringstream fn_stream(currentLoad, std::ios_base::ate | std::ios_base::out);
-    fn_stream << "/";
-    for (auto t : m.systemTypes) {
-        fn_stream << t << "-";
-    }
-    fn_stream << m.hostName << "-" << slot;
-    return openLockFile(fn_stream.str(), true);
+    return openLockFile(fmt("%s/%s-%d", currentLoad, escapeUri(m.storeUri), slot), true);
 }
-
-static char display_env[] = "DISPLAY=";
-static char ssh_env[] = "SSH_ASKPASS=";
 
 int main (int argc, char * * argv)
 {
     return handleExceptions(argv[0], [&]() {
         initNix();
-        /* Ensure we don't get any SSH passphrase or host key popups. */
-        if (putenv(display_env) == -1 ||
-            putenv(ssh_env) == -1) {
-            throw SysError("Setting SSH env vars");
-        }
 
-        if (argc != 4) {
+        /* Ensure we don't get any SSH passphrase or host key popups. */
+        unsetenv("DISPLAY");
+        unsetenv("SSH_ASKPASS");
+
+        if (argc != 6)
             throw UsageError("called without required arguments");
-        }
 
         auto store = openStore();
 
         auto localSystem = argv[1];
-        settings.maxSilentTime = stoull(string(argv[2]));
-        settings.buildTimeout = stoull(string(argv[3]));
+        settings.maxSilentTime = std::stoll(argv[2]);
+        settings.buildTimeout = std::stoll(argv[3]);
+        verbosity = (Verbosity) std::stoll(argv[4]);
+        settings.builders = argv[5];
 
-        currentLoad = getEnv("NIX_CURRENT_LOAD", "/run/nix/current-load");
+        /* It would be more appropriate to use $XDG_RUNTIME_DIR, since
+           that gets cleared on reboot, but it wouldn't work on macOS. */
+        currentLoad = settings.nixStateDir + "/current-load";
 
         std::shared_ptr<Store> sshStore;
         AutoCloseFD bestSlotLock;
 
-        auto machines = read_conf();
+        auto machines = getMachines();
+        debug("got %d remote builders", machines.size());
+
+        if (machines.empty()) {
+            std::cerr << "# decline-permanently\n";
+            return;
+        }
+
         string drvPath;
-        string hostName;
+        string storeUri;
         for (string line; getline(cin, line);) {
             auto tokens = tokenizeString<std::vector<string>>(line);
             auto sz = tokens.size();
-            if (sz != 3 && sz != 4) {
-                throw Error(format("invalid build hook line %1%") % line);
-            }
+            if (sz != 3 && sz != 4)
+                throw Error("invalid build hook line '%1%'", line);
             auto amWilling = tokens[0] == "1";
             auto neededSystem = tokens[1];
             drvPath = tokens[2];
@@ -175,9 +96,11 @@ int main (int argc, char * * argv)
 
                 bool rightType = false;
 
-                machine * bestMachine = nullptr;
+                Machine * bestMachine = nullptr;
                 unsigned long long bestLoad = 0;
                 for (auto & m : machines) {
+                    debug("considering building on '%s'", m.storeUri);
+
                     if (m.enabled && std::find(m.systemTypes.begin(),
                             m.systemTypes.end(),
                             neededSystem) != m.systemTypes.end() &&
@@ -187,7 +110,7 @@ int main (int argc, char * * argv)
                         AutoCloseFD free;
                         unsigned long long load = 0;
                         for (unsigned long long slot = 0; slot < m.maxJobs; ++slot) {
-                            AutoCloseFD slotLock = openSlotLock(m, slot);
+                            auto slotLock = openSlotLock(m, slot);
                             if (lockFile(slotLock.get(), ltWrite, false)) {
                                 if (!free) {
                                     free = std::move(slotLock);
@@ -222,11 +145,10 @@ int main (int argc, char * * argv)
                 }
 
                 if (!bestSlotLock) {
-                    if (rightType && !canBuildLocally) {
-                        cerr << "# postpone\n";
-                    } else {
-                        cerr << "# decline\n";
-                    }
+                    if (rightType && !canBuildLocally)
+                        std::cerr << "# postpone\n";
+                    else
+                        std::cerr << "# decline\n";
                     break;
                 }
 
@@ -239,47 +161,67 @@ int main (int argc, char * * argv)
                 lock = -1;
 
                 try {
-                    sshStore = openStore("ssh://" + bestMachine->hostName + "?key=" + bestMachine->sshKey);
-                    hostName = bestMachine->hostName;
+
+                    Store::Params storeParams{{"max-connections", "1"}, {"log-fd", "4"}};
+                    if (bestMachine->sshKey != "")
+                        storeParams["ssh-key"] = bestMachine->sshKey;
+
+                    sshStore = openStore(bestMachine->storeUri, storeParams);
+                    sshStore->connect();
+                    storeUri = bestMachine->storeUri;
+
                 } catch (std::exception & e) {
-                    cerr << e.what() << '\n';
-                    cerr << "unable to open SSH connection to ‘" << bestMachine->hostName << "’, trying other available machines...\n";
+                    printError("unable to open SSH connection to '%s': %s; trying other available machines...",
+                        bestMachine->storeUri, e.what());
                     bestMachine->enabled = false;
                     continue;
                 }
+
                 goto connected;
             }
         }
+
 connected:
-        cerr << "# accept\n";
+        std::cerr << "# accept\n";
         string line;
-        if (!getline(cin, line)) {
+        if (!getline(cin, line))
             throw Error("hook caller didn't send inputs");
-        }
-        auto inputs = tokenizeString<std::list<string>>(line);
-        if (!getline(cin, line)) {
+
+        auto inputs = tokenizeString<PathSet>(line);
+        if (!getline(cin, line))
             throw Error("hook caller didn't send outputs");
-        }
-        auto outputs = tokenizeString<Strings>(line);
-        AutoCloseFD uploadLock = openLockFile(currentLoad + "/" + hostName + ".upload-lock", true);
-        auto old = signal(SIGALRM, handle_alarm);
+
+        auto outputs = tokenizeString<PathSet>(line);
+
+        AutoCloseFD uploadLock = openLockFile(currentLoad + "/" + escapeUri(storeUri) + ".upload-lock", true);
+
+        auto old = signal(SIGALRM, handleAlarm);
         alarm(15 * 60);
-        if (!lockFile(uploadLock.get(), ltWrite, true)) {
-            cerr << "somebody is hogging the upload lock for " << hostName << ", continuing...\n";
-        }
+        if (!lockFile(uploadLock.get(), ltWrite, true))
+            printError("somebody is hogging the upload lock for '%s', continuing...");
         alarm(0);
         signal(SIGALRM, old);
-        copyPaths(store, ref<Store>(sshStore), inputs);
+        copyPaths(store, ref<Store>(sshStore), inputs, NoRepair, NoCheckSigs);
         uploadLock = -1;
 
-        cerr << "building ‘" << drvPath << "’ on ‘" << hostName << "’\n";
-        sshStore->buildDerivation(drvPath, readDerivation(drvPath));
+        BasicDerivation drv(readDerivation(drvPath));
+        drv.inputSrcs = inputs;
 
-        std::remove_if(outputs.begin(), outputs.end(), [=](const Path & path) { return store->isValidPath(path); });
-        if (!outputs.empty()) {
-            setenv("NIX_HELD_LOCKS", concatStringsSep(" ", outputs).c_str(), 1); /* FIXME: ugly */
-            copyPaths(ref<Store>(sshStore), store, outputs);
+        printError("building '%s' on '%s'", drvPath, storeUri);
+        auto result = sshStore->buildDerivation(drvPath, drv);
+
+        if (!result.success())
+            throw Error("build of '%s' on '%s' failed: %s", drvPath, storeUri, result.errorMsg);
+
+        PathSet missing;
+        for (auto & path : outputs)
+            if (!store->isValidPath(path)) missing.insert(path);
+
+        if (!missing.empty()) {
+            setenv("NIX_HELD_LOCKS", concatStringsSep(" ", missing).c_str(), 1); /* FIXME: ugly */
+            copyPaths(ref<Store>(sshStore), store, missing, NoRepair, NoCheckSigs);
         }
+
         return;
     });
 }

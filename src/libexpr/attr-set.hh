@@ -75,6 +75,19 @@ public:
 
     size_t capacity() { return capacity_; }
 
+    /* Returns the attributes in lexicographically sorted order. */
+    std::vector<const Attr *> lexicographicOrder() const
+    {
+        std::vector<const Attr *> res;
+        res.reserve(size_);
+        for (size_t n = 0; n < size_; n++)
+            res.emplace_back(&attrs[n]);
+        std::sort(res.begin(), res.end(), [](const Attr * a, const Attr * b) {
+            return (string) a->name < (string) b->name;
+        });
+        return res;
+    }
+
     friend class EvalState;
 };
 

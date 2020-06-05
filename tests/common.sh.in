@@ -1,7 +1,5 @@
 set -e
 
-datadir="@datadir@"
-
 export TEST_ROOT=$(realpath ${TMPDIR:-/tmp}/nix-test)
 export NIX_STORE_DIR
 if ! NIX_STORE_DIR=$(readlink -f $TEST_ROOT/store 2> /dev/null); then
@@ -15,6 +13,10 @@ export NIX_STATE_DIR=$TEST_ROOT/var/nix
 export NIX_CONF_DIR=$TEST_ROOT/etc
 export NIX_MANIFESTS_DIR=$TEST_ROOT/var/nix/manifests
 export _NIX_TEST_SHARED=$TEST_ROOT/shared
+if [[ -n $NIX_STORE ]]; then
+    export _NIX_TEST_NO_SANDBOX=1
+fi
+export _NIX_IN_TEST=$TEST_ROOT/shared
 export NIX_REMOTE=$NIX_REMOTE_
 unset NIX_PATH
 export TEST_HOME=$TEST_ROOT/test-home

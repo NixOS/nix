@@ -1,9 +1,18 @@
 #include "logging.hh"
 #include "util.hh"
 
+#include <atomic>
+
 namespace nix {
 
-Logger * logger = 0;
+thread_local ActivityId curActivity = 0;
+
+Logger * logger = makeDefaultLogger();
+
+void Logger::warn(const std::string & msg)
+{
+    log(lvlInfo, ANSI_RED "warning:" ANSI_NORMAL " " + msg);
+}
 
 class SimpleLogger : public Logger
 {
@@ -37,13 +46,11 @@ public:
         writeToStderr(prefix + (tty ? fs.s : filterANSIEscapes(fs.s)) + "\n");
     }
 
-    void startActivity(Activity & activity, Verbosity lvl, const FormatOrString & fs) override
+    void startActivity(ActivityId act, Verbosity lvl, ActivityType type,
+        const std::string & s, const Fields & fields, ActivityId parent)
     {
-        log(lvl, fs);
-    }
-
-    void stopActivity(Activity & activity) override
-    {
+        if (lvl <= verbosity && !s.empty())
+            log(lvl, s + "...");
     }
 };
 
@@ -52,7 +59,7 @@ Verbosity verbosity = lvlInfo;
 void warnOnce(bool & haveWarned, const FormatOrString & fs)
 {
     if (!haveWarned) {
-        printError(format("warning: %1%") % fs.s);
+        warn(fs.s);
         haveWarned = true;
     }
 }
@@ -72,6 +79,15 @@ void writeToStderr(const string & s)
 Logger * makeDefaultLogger()
 {
     return new SimpleLogger();
+}
+
+std::atomic<uint64_t> nextId{(uint64_t) getpid() << 32};
+
+Activity::Activity(Logger & logger, Verbosity lvl, ActivityType type,
+    const std::string & s, const Logger::Fields & fields, ActivityId parent)
+    : logger(logger), id(nextId++)
+{
+    logger.startActivity(id, lvl, type, s, fields, parent);
 }
 
 }

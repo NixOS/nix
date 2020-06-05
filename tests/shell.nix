@@ -2,7 +2,7 @@
 
 with import ./config.nix;
 
-rec {
+let pkgs = rec {
   setupSh = builtins.toFile "setup" ''
     export VAR_FROM_STDENV_SETUP=foo
     for pkg in $buildInputs; do
@@ -34,6 +34,7 @@ rec {
     mkdir -p $out/bin
     echo 'echo foo' > $out/bin/foo
     chmod a+rx $out/bin/foo
+    ln -s ${shell} $out/bin/bash
   '';
 
   bar = runCommand "bar" {} ''
@@ -43,4 +44,6 @@ rec {
   '';
 
   bash = shell;
-}
+
+  inherit pkgs;
+}; in pkgs

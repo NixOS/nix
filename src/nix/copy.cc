@@ -12,10 +12,17 @@ struct CmdCopy : StorePathsCommand
 {
     std::string srcUri, dstUri;
 
+    CheckSigsFlag checkSigs = CheckSigs;
+
     CmdCopy()
     {
         mkFlag(0, "from", "store-uri", "URI of the source Nix store", &srcUri);
         mkFlag(0, "to", "store-uri", "URI of the destination Nix store", &dstUri);
+
+        mkFlag()
+            .longName("no-check-sigs")
+            .description("do not require that paths are signed by trusted keys")
+            .handler([&](Strings ss) { checkSigs = NoCheckSigs; });
     }
 
     std::string name() override
@@ -38,15 +45,20 @@ struct CmdCopy : StorePathsCommand
         };
     }
 
-    void run(ref<Store> store, Paths storePaths) override
+    ref<Store> createStore() override
+    {
+        return srcUri.empty() ? StoreCommand::createStore() : openStore(srcUri);
+    }
+
+    void run(ref<Store> srcStore, Paths storePaths) override
     {
         if (srcUri.empty() && dstUri.empty())
-            throw UsageError("you must pass ‘--from’ and/or ‘--to’");
+            throw UsageError("you must pass '--from' and/or '--to'");
 
-        ref<Store> srcStore = srcUri.empty() ? store : openStore(srcUri);
-        ref<Store> dstStore = dstUri.empty() ? store : openStore(dstUri);
+        ref<Store> dstStore = dstUri.empty() ? openStore() : openStore(dstUri);
 
-        copyPaths(srcStore, dstStore, storePaths);
+        copyPaths(srcStore, dstStore, PathSet(storePaths.begin(), storePaths.end()),
+            NoRepair, checkSigs);
     }
 };
 

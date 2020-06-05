@@ -68,6 +68,22 @@ public:
         state_->max = max;
     }
 
+    void incCapacity()
+    {
+        auto state_(state.lock());
+        state_->max++;
+        /* we could wakeup here, but this is only used when we're
+         * about to nest Pool usages, and we want to save the slot for
+         * the nested use if we can
+         */
+    }
+
+    void decCapacity()
+    {
+        auto state_(state.lock());
+        state_->max--;
+    }
+
     ~Pool()
     {
         auto state_(state.lock());
@@ -137,14 +153,20 @@ public:
         } catch (...) {
             auto state_(state.lock());
             state_->inUse--;
+            wakeup.notify_one();
             throw;
         }
     }
 
-    unsigned int count()
+    size_t count()
     {
         auto state_(state.lock());
         return state_->idle.size() + state_->inUse;
+    }
+
+    size_t capacity()
+    {
+        return state.lock()->max;
     }
 };
 

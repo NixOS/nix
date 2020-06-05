@@ -21,22 +21,14 @@ namespace nix {
 const int nixSchemaVersion = 10;
 
 
-extern string drvsLogDir;
-
-
 struct Derivation;
 
 
 struct OptimiseStats
 {
-    unsigned long filesLinked;
-    unsigned long long bytesFreed;
-    unsigned long long blocksFreed;
-    OptimiseStats()
-    {
-        filesLinked = 0;
-        bytesFreed = blocksFreed = 0;
-    }
+    unsigned long filesLinked = 0;
+    unsigned long long bytesFreed = 0;
+    unsigned long long blocksFreed = 0;
 };
 
 
@@ -75,6 +67,8 @@ private:
 
 public:
 
+    PathSetting realStoreDir_;
+
     const Path realStoreDir;
     const Path dbDir;
     const Path linksDir;
@@ -84,7 +78,9 @@ public:
 
 private:
 
-    bool requireSigs;
+    Setting<bool> requireSigs{(Store*) this,
+        settings.signedBinaryCaches != "", // FIXME
+        "require-sigs", "whether store paths should have a trusted signature on import"};
 
     PublicKeys publicKeys;
 
@@ -102,7 +98,8 @@ public:
 
     bool isValidPathUncached(const Path & path) override;
 
-    PathSet queryValidPaths(const PathSet & paths) override;
+    PathSet queryValidPaths(const PathSet & paths,
+        SubstituteFlag maybeSubstitute = NoSubstitute) override;
 
     PathSet queryAllValidPaths() override;
 
@@ -126,22 +123,22 @@ public:
         SubstitutablePathInfos & infos) override;
 
     void addToStore(const ValidPathInfo & info, const ref<std::string> & nar,
-        bool repair, bool dontCheckSigs,
+        RepairFlag repair, CheckSigsFlag checkSigs,
         std::shared_ptr<FSAccessor> accessor) override;
 
     Path addToStore(const string & name, const Path & srcPath,
         bool recursive, HashType hashAlgo,
-        PathFilter & filter, bool repair) override;
+        PathFilter & filter, RepairFlag repair) override;
 
     /* Like addToStore(), but the contents of the path are contained
        in `dump', which is either a NAR serialisation (if recursive ==
        true) or simply the contents of a regular file (if recursive ==
        false). */
     Path addToStoreFromDump(const string & dump, const string & name,
-        bool recursive = true, HashType hashAlgo = htSHA256, bool repair = false);
+        bool recursive = true, HashType hashAlgo = htSHA256, RepairFlag repair = NoRepair);
 
     Path addTextToStore(const string & name, const string & s,
-        const PathSet & references, bool repair) override;
+        const PathSet & references, RepairFlag repair) override;
 
     void buildPaths(const PathSet & paths, BuildMode buildMode) override;
 
@@ -178,7 +175,7 @@ public:
     /* Optimise a single store path. */
     void optimisePath(const Path & path);
 
-    bool verifyStore(bool checkContents, bool repair) override;
+    bool verifyStore(bool checkContents, RepairFlag repair) override;
 
     /* Register the validity of a path, i.e., that `path' exists, that
        the paths referenced by it exists, and in the case of an output
@@ -216,7 +213,7 @@ private:
     void invalidatePathChecked(const Path & path);
 
     void verifyPath(const Path & path, const PathSet & store,
-        PathSet & done, PathSet & validPaths, bool repair, bool & errors);
+        PathSet & done, PathSet & validPaths, RepairFlag repair, bool & errors);
 
     void updatePathInfo(State & state, const ValidPathInfo & info);
 
@@ -254,7 +251,7 @@ private:
 
     InodeHash loadInodeHash();
     Strings readDirectoryIgnoringInodes(const Path & path, const InodeHash & inodeHash);
-    void optimisePath_(OptimiseStats & stats, const Path & path, InodeHash & inodeHash);
+    void optimisePath_(Activity * act, OptimiseStats & stats, const Path & path, InodeHash & inodeHash);
 
     // Internal versions that are not wrapped in retry_sqlite.
     bool isValidPath_(State & state, const Path & path);

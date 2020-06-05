@@ -139,6 +139,22 @@ struct StringSource : Source
 };
 
 
+/* Adapter class of a Source that saves all data read to `s'. */
+struct TeeSource : Source
+{
+    Source & orig;
+    ref<std::string> data;
+    TeeSource(Source & orig)
+        : orig(orig), data(make_ref<std::string>()) { }
+    size_t read(unsigned char * data, size_t len)
+    {
+        size_t n = orig.read(data, len);
+        this->data->append((const char *) data, n);
+        return n;
+    }
+};
+
+
 void writePadding(size_t len, Sink & sink);
 void writeString(const unsigned char * buf, size_t len, Sink & sink);
 
@@ -162,18 +178,64 @@ Sink & operator << (Sink & sink, const Strings & s);
 Sink & operator << (Sink & sink, const StringSet & s);
 
 
+MakeError(SerialisationError, Error)
+
+
+template<typename T>
+T readNum(Source & source)
+{
+    unsigned char buf[8];
+    source(buf, sizeof(buf));
+
+    uint64_t n =
+        ((unsigned long long) buf[0]) |
+        ((unsigned long long) buf[1] << 8) |
+        ((unsigned long long) buf[2] << 16) |
+        ((unsigned long long) buf[3] << 24) |
+        ((unsigned long long) buf[4] << 32) |
+        ((unsigned long long) buf[5] << 40) |
+        ((unsigned long long) buf[6] << 48) |
+        ((unsigned long long) buf[7] << 56);
+
+    if (n > std::numeric_limits<T>::max())
+        throw SerialisationError("serialised integer %d is too large for type '%s'", n, typeid(T).name());
+
+    return n;
+}
+
+
+inline unsigned int readInt(Source & source)
+{
+    return readNum<unsigned int>(source);
+}
+
+
+inline uint64_t readLongLong(Source & source)
+{
+    return readNum<uint64_t>(source);
+}
+
+
 void readPadding(size_t len, Source & source);
-unsigned int readInt(Source & source);
-unsigned long long readLongLong(Source & source);
 size_t readString(unsigned char * buf, size_t max, Source & source);
 string readString(Source & source);
 template<class T> T readStrings(Source & source);
 
 Source & operator >> (Source & in, string & s);
-Source & operator >> (Source & in, unsigned int & n);
 
+template<typename T>
+Source & operator >> (Source & in, T & n)
+{
+    n = readNum<T>(in);
+    return in;
+}
 
-MakeError(SerialisationError, Error)
+template<typename T>
+Source & operator >> (Source & in, bool & b)
+{
+    b = readNum<uint64_t>(in);
+    return in;
+}
 
 
 }

@@ -13,13 +13,50 @@ typedef enum {
     lvlVomit
 } Verbosity;
 
-class Activity;
+typedef enum {
+    actUnknown = 0,
+    actCopyPath = 100,
+    actDownload = 101,
+    actRealise = 102,
+    actCopyPaths = 103,
+    actBuilds = 104,
+    actBuild = 105,
+    actOptimiseStore = 106,
+    actVerifyPaths = 107,
+    actSubstitute = 108,
+    actQueryPathInfo = 109,
+} ActivityType;
+
+typedef enum {
+    resFileLinked = 100,
+    resBuildLogLine = 101,
+    resUntrustedPath = 102,
+    resCorruptedPath = 103,
+    resSetPhase = 104,
+    resProgress = 105,
+    resSetExpected = 106,
+} ResultType;
+
+typedef uint64_t ActivityId;
 
 class Logger
 {
-    friend class Activity;
+    friend struct Activity;
 
 public:
+
+    struct Field
+    {
+        // FIXME: use std::variant.
+        enum { tInt = 0, tString = 1 } type;
+        uint64_t i = 0;
+        std::string s;
+        Field(const std::string & s) : type(tString), s(s) { }
+        Field(const char * s) : type(tString), s(s) { }
+        Field(const uint64_t & i) : type(tInt), i(i) { }
+    };
+
+    typedef std::vector<Field> Fields;
 
     virtual ~Logger() { }
 
@@ -30,34 +67,63 @@ public:
         log(lvlInfo, fs);
     }
 
-    virtual void setExpected(const std::string & label, uint64_t value = 1) { }
-    virtual void setProgress(const std::string & label, uint64_t value = 1) { }
-    virtual void incExpected(const std::string & label, uint64_t value = 1) { }
-    virtual void incProgress(const std::string & label, uint64_t value = 1) { }
+    virtual void warn(const std::string & msg);
 
-private:
+    virtual void startActivity(ActivityId act, Verbosity lvl, ActivityType type,
+        const std::string & s, const Fields & fields, ActivityId parent) { };
 
-    virtual void startActivity(Activity & activity, Verbosity lvl, const FormatOrString & fs) = 0;
+    virtual void stopActivity(ActivityId act) { };
 
-    virtual void stopActivity(Activity & activity) = 0;
-
+    virtual void result(ActivityId act, ResultType type, const Fields & fields) { };
 };
 
-class Activity
+extern thread_local ActivityId curActivity;
+
+struct Activity
 {
-public:
     Logger & logger;
 
-    Activity(Logger & logger, Verbosity lvl, const FormatOrString & fs)
-        : logger(logger)
-    {
-        logger.startActivity(*this, lvl, fs);
-    }
+    const ActivityId id;
+
+    Activity(Logger & logger, Verbosity lvl, ActivityType type, const std::string & s = "",
+        const Logger::Fields & fields = {}, ActivityId parent = curActivity);
+
+    Activity(Logger & logger, ActivityType type,
+        const Logger::Fields & fields = {}, ActivityId parent = curActivity)
+        : Activity(logger, lvlError, type, "", fields, parent) { };
+
+    Activity(const Activity & act) = delete;
 
     ~Activity()
+    { logger.stopActivity(id); }
+
+    void progress(uint64_t done = 0, uint64_t expected = 0, uint64_t running = 0, uint64_t failed = 0) const
+    { result(resProgress, done, expected, running, failed); }
+
+    void setExpected(ActivityType type2, uint64_t expected) const
+    { result(resSetExpected, type2, expected); }
+
+    template<typename... Args>
+    void result(ResultType type, const Args & ... args) const
     {
-        logger.stopActivity(*this);
+        Logger::Fields fields;
+        nop{(fields.emplace_back(Logger::Field(args)), 1)...};
+        result(type, fields);
     }
+
+    void result(ResultType type, const Logger::Fields & fields) const
+    {
+        logger.result(id, type, fields);
+    }
+
+    friend class Logger;
+};
+
+struct PushActivity
+{
+    const ActivityId prevAct;
+    PushActivity(ActivityId act) : prevAct(curActivity) { curActivity = act; }
+    ~PushActivity() { curActivity = prevAct; }
 };
 
 extern Logger * logger;
@@ -78,8 +144,17 @@ extern Verbosity verbosity; /* suppress msgs > this */
 
 #define printError(args...) printMsg(lvlError, args)
 #define printInfo(args...) printMsg(lvlInfo, args)
+#define printTalkative(args...) printMsg(lvlTalkative, args)
 #define debug(args...) printMsg(lvlDebug, args)
 #define vomit(args...) printMsg(lvlVomit, args)
+
+template<typename... Args>
+inline void warn(const std::string & fs, Args... args)
+{
+    boost::format f(fs);
+    nop{boost::io::detail::feed(f, args)...};
+    logger->warn(f.str());
+}
 
 void warnOnce(bool & haveWarned, const FormatOrString & fs);
 

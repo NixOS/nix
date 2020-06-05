@@ -30,7 +30,9 @@ protected:
 
     bool fileExists(const std::string & path) override;
 
-    void upsertFile(const std::string & path, const std::string & data) override;
+    void upsertFile(const std::string & path,
+        const std::string & data,
+        const std::string & mimeType) override;
 
     void getFile(const std::string & path,
         std::function<void(std::shared_ptr<std::string>)> success,
@@ -74,7 +76,7 @@ static void atomicWrite(const Path & path, const std::string & s)
     AutoDelete del(tmp, false);
     writeFile(tmp, s);
     if (rename(tmp.c_str(), path.c_str()))
-        throw SysError(format("renaming ‘%1%’ to ‘%2%’") % tmp % path);
+        throw SysError(format("renaming '%1%' to '%2%'") % tmp % path);
     del.cancel();
 }
 
@@ -83,7 +85,9 @@ bool LocalBinaryCacheStore::fileExists(const std::string & path)
     return pathExists(binaryCacheDir + "/" + path);
 }
 
-void LocalBinaryCacheStore::upsertFile(const std::string & path, const std::string & data)
+void LocalBinaryCacheStore::upsertFile(const std::string & path,
+    const std::string & data,
+    const std::string & mimeType)
 {
     atomicWrite(binaryCacheDir + "/" + path, data);
 }

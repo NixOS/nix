@@ -2,10 +2,18 @@
   
 <arg><option>--help</option></arg>
 <arg><option>--version</option></arg>
-<arg rep='repeat'><option>--verbose</option></arg>
-<arg rep='repeat'><option>-v</option></arg>
-<arg><option>--no-build-output</option></arg>
-<arg><option>-Q</option></arg>
+<arg rep='repeat'>
+  <group choice='req'>
+    <arg choice='plain'><option>--verbose</option></arg>
+    <arg choice='plain'><option>-v</option></arg>
+  </group>
+</arg>
+<arg>
+  <group choice='plain'>
+    <arg choice='plain'><option>--no-build-output</option></arg>
+    <arg choice='plain'><option>-Q</option></arg>
+  </group>
+</arg>
 <arg>
   <group choice='req'>
     <arg choice='plain'><option>--max-jobs</option></arg>
@@ -25,10 +33,18 @@
   <option>--timeout</option>
   <replaceable>number</replaceable>
 </arg>
-<arg><option>--keep-going</option></arg>
-<arg><option>-k</option></arg>
-<arg><option>--keep-failed</option></arg>
-<arg><option>-K</option></arg>
+<arg>
+  <group choice='plain'>
+    <arg choice='plain'><option>--keep-going</option></arg>
+    <arg choice='plain'><option>-k</option></arg>
+  </group>
+</arg>
+<arg>
+  <group choice='plain'>
+    <arg choice='plain'><option>--keep-failed</option></arg>
+    <arg choice='plain'><option>-K</option></arg>
+  </group>
+</arg>
 <arg><option>--fallback</option></arg>
 <arg><option>--readonly-mode</option></arg>
 <arg><option>--show-trace</option></arg>

@@ -4,12 +4,8 @@
 
 namespace nix {
 
-class StartProgressBar
-{
-    Logger * prev = 0;
-public:
-    StartProgressBar();
-    ~StartProgressBar();
-};
+void startProgressBar();
+
+void stopProgressBar();
 
 }

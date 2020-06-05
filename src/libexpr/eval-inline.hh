@@ -33,7 +33,7 @@ void EvalState::forceValue(Value & v, const Pos & pos)
             v.type = tBlackhole;
             //checkInterrupt();
             expr->eval(*this, *env, v);
-        } catch (Error & e) {
+        } catch (...) {
             v.type = tThunk;
             v.thunk.env = env;
             v.thunk.expr = expr;

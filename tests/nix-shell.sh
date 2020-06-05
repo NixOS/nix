@@ -4,6 +4,7 @@ clearStore
 
 # Test nix-shell -A
 export IMPURE_VAR=foo
+export NIX_BUILD_SHELL=$SHELL
 output=$(nix-shell --pure shell.nix -A shellDrv --run \
     'echo "$IMPURE_VAR - $VAR_FROM_STDENV_SETUP - $VAR_FROM_NIX"')
 

@@ -14,6 +14,7 @@ namespace nix {
 
 class Store;
 class EvalState;
+enum RepairFlag : bool;
 
 
 typedef void (* PrimOpFun) (EvalState & state, const Pos & pos, Value * * args, Value & v);
@@ -68,12 +69,12 @@ public:
     const Symbol sWith, sOutPath, sDrvPath, sType, sMeta, sName, sValue,
         sSystem, sOverrides, sOutputs, sOutputName, sIgnoreNulls,
         sFile, sLine, sColumn, sFunctor, sToString,
-        sRight, sWrong;
+        sRight, sWrong, sStructuredAttrs, sBuilder;
     Symbol sDerivationNix;
 
     /* If set, force copying files to the Nix store even if they
        already exist there. */
-    bool repair = false;
+    RepairFlag repair;
 
     /* If set, don't allow access to files outside of the Nix search
        path or to environment variables. */
@@ -116,6 +117,8 @@ public:
     /* Parse a Nix expression from the specified string. */
     Expr * parseExprFromString(const string & s, const Path & basePath, StaticEnv & staticEnv);
     Expr * parseExprFromString(const string & s, const Path & basePath);
+
+    Expr * parseStdin();
 
     /* Evaluate an expression read from the given file to normal
        form. */

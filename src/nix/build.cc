@@ -1,12 +1,11 @@
 #include "command.hh"
 #include "common-args.hh"
-#include "installables.hh"
 #include "shared.hh"
 #include "store-api.hh"
 
 using namespace nix;
 
-struct CmdBuild : StoreCommand, MixDryRun, MixInstallables
+struct CmdBuild : MixDryRun, InstallablesCommand
 {
     CmdBuild()
     {
@@ -24,22 +23,9 @@ struct CmdBuild : StoreCommand, MixDryRun, MixInstallables
 
     void run(ref<Store> store) override
     {
-        auto elems = evalInstallables(store);
+        auto paths = toStorePaths(store, dryRun ? DryRun : Build);
 
-        PathSet pathsToBuild;
-
-        for (auto & elem : elems) {
-            if (elem.isDrv)
-                pathsToBuild.insert(elem.drvPath);
-            else
-                pathsToBuild.insert(elem.outPaths.begin(), elem.outPaths.end());
-        }
-
-        printMissing(store, pathsToBuild);
-
-        if (dryRun) return;
-
-        store->buildPaths(pathsToBuild);
+        printInfo("build result: %s", showPaths(paths));
     }
 };
 

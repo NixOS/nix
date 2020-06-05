@@ -22,13 +22,17 @@ class RemoteStore : public virtual Store
 {
 public:
 
-    RemoteStore(const Params & params, size_t maxConnections = std::numeric_limits<size_t>::max());
+    const Setting<int> maxConnections{(Store*) this, 1,
+            "max-connections", "maximum number of concurrent connections to the Nix daemon"};
+
+    RemoteStore(const Params & params);
 
     /* Implementations of abstract store API methods. */
 
     bool isValidPathUncached(const Path & path) override;
 
-    PathSet queryValidPaths(const PathSet & paths) override;
+    PathSet queryValidPaths(const PathSet & paths,
+        SubstituteFlag maybeSubstitute = NoSubstitute) override;
 
     PathSet queryAllValidPaths() override;
 
@@ -52,15 +56,15 @@ public:
         SubstitutablePathInfos & infos) override;
 
     void addToStore(const ValidPathInfo & info, const ref<std::string> & nar,
-        bool repair, bool dontCheckSigs,
+        RepairFlag repair, CheckSigsFlag checkSigs,
         std::shared_ptr<FSAccessor> accessor) override;
 
     Path addToStore(const string & name, const Path & srcPath,
         bool recursive = true, HashType hashAlgo = htSHA256,
-        PathFilter & filter = defaultPathFilter, bool repair = false) override;
+        PathFilter & filter = defaultPathFilter, RepairFlag repair = NoRepair) override;
 
     Path addTextToStore(const string & name, const string & s,
-        const PathSet & references, bool repair = false) override;
+        const PathSet & references, RepairFlag repair) override;
 
     void buildPaths(const PathSet & paths, BuildMode buildMode) override;
 
@@ -81,9 +85,15 @@ public:
 
     void optimiseStore() override;
 
-    bool verifyStore(bool checkContents, bool repair) override;
+    bool verifyStore(bool checkContents, RepairFlag repair) override;
 
     void addSignatures(const Path & storePath, const StringSet & sigs) override;
+
+    void queryMissing(const PathSet & targets,
+        PathSet & willBuild, PathSet & willSubstitute, PathSet & unknown,
+        unsigned long long & downloadSize, unsigned long long & narSize) override;
+
+    void connect() override;
 
 protected:
 
@@ -98,6 +108,8 @@ protected:
         void processStderr(Sink * sink = 0, Source * source = 0);
     };
 
+    ref<Connection> openConnectionWrapper();
+
     virtual ref<Connection> openConnection() = 0;
 
     void initConnection(Connection & conn);
@@ -106,6 +118,8 @@ protected:
 
 private:
 
+    std::atomic_bool failed{false};
+
     void setOptions(Connection & conn);
 };
 
@@ -113,7 +127,7 @@ class UDSRemoteStore : public LocalFSStore, public RemoteStore
 {
 public:
 
-    UDSRemoteStore(const Params & params, size_t maxConnections = std::numeric_limits<size_t>::max());
+    UDSRemoteStore(const Params & params);
 
     std::string getUri() override;
 

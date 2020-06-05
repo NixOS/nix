@@ -6,8 +6,6 @@ libexpr_DIR := $(d)
 
 libexpr_SOURCES := $(wildcard $(d)/*.cc) $(wildcard $(d)/primops/*.cc) $(d)/lexer-tab.cc $(d)/parser-tab.cc
 
-libexpr_CXXFLAGS := -Wno-deprecated-register
-
 libexpr_LIBS = libutil libstore libformat
 
 libexpr_LDFLAGS =

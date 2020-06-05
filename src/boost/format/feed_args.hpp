@@ -41,6 +41,13 @@ namespace  {
                 std::streamsize w, 
                 const char c, 
                 std::ios::fmtflags f, 
+                bool center)
+    __attribute__ ((unused));
+
+  void do_pad( std::string & s, 
+                std::streamsize w, 
+                const char c, 
+                std::ios::fmtflags f, 
                 bool center) 
     // applies centered / left / right  padding  to the string s.
     // Effects : string s is padded.

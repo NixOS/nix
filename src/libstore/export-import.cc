@@ -30,13 +30,13 @@ void Store::exportPaths(const Paths & paths, Sink & sink)
     std::reverse(sorted.begin(), sorted.end());
 
     std::string doneLabel("paths exported");
-    logger->incExpected(doneLabel, sorted.size());
+    //logger->incExpected(doneLabel, sorted.size());
 
     for (auto & path : sorted) {
-        Activity act(*logger, lvlInfo, format("exporting path ‘%s’") % path);
+        //Activity act(*logger, lvlInfo, format("exporting path '%s'") % path);
         sink << 1;
         exportPath(path, sink);
-        logger->incProgress(doneLabel);
+        //logger->incProgress(doneLabel);
     }
 
     sink << 0;
@@ -55,45 +55,23 @@ void Store::exportPath(const Path & path, Sink & sink)
        Don't complain if the stored hash is zero (unknown). */
     Hash hash = hashAndWriteSink.currentHash();
     if (hash != info->narHash && info->narHash != Hash(info->narHash.type))
-        throw Error(format("hash of path ‘%1%’ has changed from ‘%2%’ to ‘%3%’!") % path
-            % printHash(info->narHash) % printHash(hash));
+        throw Error(format("hash of path '%1%' has changed from '%2%' to '%3%'!") % path
+            % info->narHash.to_string() % hash.to_string());
 
     hashAndWriteSink << exportMagic << path << info->references << info->deriver << 0;
 }
 
-struct TeeSource : Source
-{
-    Source & readSource;
-    ref<std::string> data;
-    TeeSource(Source & readSource)
-        : readSource(readSource)
-        , data(make_ref<std::string>())
-    {
-    }
-    size_t read(unsigned char * data, size_t len)
-    {
-        size_t n = readSource.read(data, len);
-        this->data->append((char *) data, n);
-        return n;
-    }
-};
-
-struct NopSink : ParseSink
-{
-};
-
-Paths Store::importPaths(Source & source, std::shared_ptr<FSAccessor> accessor, bool dontCheckSigs)
+Paths Store::importPaths(Source & source, std::shared_ptr<FSAccessor> accessor, CheckSigsFlag checkSigs)
 {
     Paths res;
     while (true) {
-        unsigned long long n = readLongLong(source);
+        auto n = readNum<uint64_t>(source);
         if (n == 0) break;
-        if (n != 1) throw Error("input doesn't look like something created by ‘nix-store --export’");
+        if (n != 1) throw Error("input doesn't look like something created by 'nix-store --export'");
 
         /* Extract the NAR from the source. */
-        TeeSource tee(source);
-        NopSink sink;
-        parseDump(sink, tee);
+        TeeSink tee(source);
+        parseDump(tee, tee.source);
 
         uint32_t magic = readInt(source);
         if (magic != exportMagic)
@@ -103,21 +81,21 @@ Paths Store::importPaths(Source & source, std::shared_ptr<FSAccessor> accessor, 
 
         info.path = readStorePath(*this, source);
 
-        Activity act(*logger, lvlInfo, format("importing path ‘%s’") % info.path);
+        //Activity act(*logger, lvlInfo, format("importing path '%s'") % info.path);
 
         info.references = readStorePaths<PathSet>(*this, source);
 
         info.deriver = readString(source);
         if (info.deriver != "") assertStorePath(info.deriver);
 
-        info.narHash = hashString(htSHA256, *tee.data);
-        info.narSize = tee.data->size();
+        info.narHash = hashString(htSHA256, *tee.source.data);
+        info.narSize = tee.source.data->size();
 
         // Ignore optional legacy signature.
         if (readInt(source) == 1)
             readString(source);
 
-        addToStore(info, tee.data, false, dontCheckSigs, accessor);
+        addToStore(info, tee.source.data, NoRepair, checkSigs, accessor);
 
         res.push_back(info.path);
     }

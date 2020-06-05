@@ -8,20 +8,30 @@ nix="@nix@"
 cacert="@cacert@"
 
 
-# macOS support for 10.10 or higher
-if [[ "$(uname -s)" = "Darwin" && $(($(sw_vers -productVersion | cut -d '.' -f 2))) -lt 10 ]]; then
-    echo "$0: macOS $(sw_vers -productVersion) is not supported, upgrade to 10.10 or higher"
-    exit 1
-fi
-
 if ! [ -e "$self/.reginfo" ]; then
     echo "$0: incomplete installer (.reginfo is missing)" >&2
-    exit 1
 fi
 
 if [ -z "$USER" ]; then
     echo "$0: \$USER is not set" >&2
     exit 1
+fi
+
+if [ -z "$HOME" ]; then
+    echo "$0: \$HOME is not set" >&2
+    exit 1
+fi
+
+# macOS support for 10.10 or higher
+if [ "$(uname -s)" = "Darwin" ]; then
+    if [ $(($(sw_vers -productVersion | cut -d '.' -f 2))) -lt 10 ]; then
+        echo "$0: macOS $(sw_vers -productVersion) is not supported, upgrade to 10.10 or higher"
+        exit 1
+    fi
+
+    printf '\e[1;31mSwitching to the Multi-User Darwin Installer\e[0m\n'
+    exec "$self/install-darwin-multi-user"
+    exit 0
 fi
 
 if [ "$(id -u)" -eq 0 ]; then
@@ -34,13 +44,13 @@ if ! [ -e $dest ]; then
     cmd="mkdir -m 0755 $dest && chown $USER $dest"
     echo "directory $dest does not exist; creating it by running '$cmd' using sudo" >&2
     if ! sudo sh -c "$cmd"; then
-        echo "$0: please manually run ‘$cmd’ as root to create $dest" >&2
+        echo "$0: please manually run '$cmd' as root to create $dest" >&2
         exit 1
     fi
 fi
 
 if ! [ -w $dest ]; then
-    echo "$0: directory $dest exists, but is not writable by you. This could indicate that another user has already performed a single-user installation of Nix on this system. If you wish to enable multi-user support see http://nixos.org/nix/manual/#ssec-multi-user. If you wish to continue with a single-user install for $USER please run ‘chown -R $USER $dest’ as root." >&2
+    echo "$0: directory $dest exists, but is not writable by you. This could indicate that another user has already performed a single-user installation of Nix on this system. If you wish to enable multi-user support see http://nixos.org/nix/manual/#ssec-multi-user. If you wish to continue with a single-user install for $USER please run 'chown -R $USER $dest' as root." >&2
     exit 1
 fi
 

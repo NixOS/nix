@@ -56,9 +56,10 @@ bool createUserEnv(EvalState & state, DrvInfos & elems,
         state.mkAttrs(v, 16);
 
         mkString(*state.allocAttr(v, state.sType), "derivation");
-        mkString(*state.allocAttr(v, state.sName), i.name);
-        if (!i.system.empty())
-            mkString(*state.allocAttr(v, state.sSystem), i.system);
+        mkString(*state.allocAttr(v, state.sName), i.queryName());
+        auto system = i.querySystem();
+        if (!system.empty())
+            mkString(*state.allocAttr(v, state.sSystem), system);
         mkString(*state.allocAttr(v, state.sOutPath), i.queryOutPath());
         if (drvPath != "")
             mkString(*state.allocAttr(v, state.sDrvPath), i.queryDrvPath());
@@ -139,7 +140,7 @@ bool createUserEnv(EvalState & state, DrvInfos & elems,
 
         Path lockTokenCur = optimisticLockProfile(profile);
         if (lockToken != lockTokenCur) {
-            printError(format("profile ‘%1%’ changed while we were busy; restarting") % profile);
+            printError(format("profile '%1%' changed while we were busy; restarting") % profile);
             return false;
         }
 

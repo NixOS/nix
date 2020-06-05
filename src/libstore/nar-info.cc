@@ -6,12 +6,12 @@ namespace nix {
 NarInfo::NarInfo(const Store & store, const std::string & s, const std::string & whence)
 {
     auto corrupt = [&]() {
-        throw Error(format("NAR info file ‘%1%’ is corrupt") % whence);
+        throw Error(format("NAR info file '%1%' is corrupt") % whence);
     };
 
     auto parseHashField = [&](const string & s) {
         try {
-            return parseHash(s);
+            return Hash(s);
         } catch (BadHash &) {
             corrupt();
             return Hash(); // never reached
@@ -59,9 +59,11 @@ NarInfo::NarInfo(const Store & store, const std::string & s, const std::string &
             }
         }
         else if (name == "Deriver") {
-            auto p = store.storeDir + "/" + value;
-            if (!store.isStorePath(p)) corrupt();
-            deriver = p;
+            if (value != "unknown-deriver") {
+                auto p = store.storeDir + "/" + value;
+                if (!store.isStorePath(p)) corrupt();
+                deriver = p;
+            }
         }
         else if (name == "System")
             system = value;
@@ -88,10 +90,10 @@ std::string NarInfo::to_string() const
     assert(compression != "");
     res += "Compression: " + compression + "\n";
     assert(fileHash.type == htSHA256);
-    res += "FileHash: sha256:" + printHash32(fileHash) + "\n";
+    res += "FileHash: " + fileHash.to_string(Base32) + "\n";
     res += "FileSize: " + std::to_string(fileSize) + "\n";
     assert(narHash.type == htSHA256);
-    res += "NarHash: sha256:" + printHash32(narHash) + "\n";
+    res += "NarHash: " + narHash.to_string(Base32) + "\n";
     res += "NarSize: " + std::to_string(narSize) + "\n";
 
     res += "References: " + concatStringsSep(" ", shortRefs()) + "\n";

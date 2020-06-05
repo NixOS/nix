@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstdlib>
 #include <mutex>
 #include <condition_variable>
 #include <cassert>
@@ -33,6 +34,7 @@ public:
 
     Sync() { }
     Sync(const T & data) : data(data) { }
+    Sync(T && data) noexcept : data(std::move(data)) { }
 
     class Lock
     {
