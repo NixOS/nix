@@ -17,7 +17,11 @@ Machine::Machine(decltype(storeUri) storeUri,
     storeUri(
         // Backwards compatibility: if the URI is a hostname,
         // prepend ssh://.
-        storeUri.find("://") != std::string::npos || hasPrefix(storeUri, "local") || hasPrefix(storeUri, "remote") || hasPrefix(storeUri, "auto")
+        storeUri.find("://") != std::string::npos
+        || hasPrefix(storeUri, "local")
+        || hasPrefix(storeUri, "remote")
+        || hasPrefix(storeUri, "auto")
+        || hasPrefix(storeUri, "/")
         ? storeUri
         : "ssh://" + storeUri),
     systemTypes(systemTypes),
@@ -47,9 +51,22 @@ bool Machine::mandatoryMet(const std::set<string> & features) const {
 void parseMachines(const std::string & s, Machines & machines)
 {
     for (auto line : tokenizeString<std::vector<string>>(s, "\n;")) {
-        chomp(line);
+        trim(line);
         line.erase(std::find(line.begin(), line.end(), '#'), line.end());
         if (line.empty()) continue;
+
+        if (line[0] == '@') {
+            auto file = trim(std::string(line, 1));
+            try {
+                parseMachines(readFile(file), machines);
+            } catch (const SysError & e) {
+                if (e.errNo != ENOENT)
+                    throw;
+                debug("cannot find machines file '%s'", file);
+            }
+            continue;
+        }
+
         auto tokens = tokenizeString<std::vector<string>>(line);
         auto sz = tokens.size();
         if (sz < 1)
@@ -72,19 +89,11 @@ void parseMachines(const std::string & s, Machines & machines)
 
 Machines getMachines()
 {
-    Machines machines;
-
-    for (auto & file : settings.builderFiles.get()) {
-        try {
-            parseMachines(readFile(file), machines);
-        } catch (const SysError & e) {
-            if (e.errNo != ENOENT)
-                throw;
-        }
-    }
-
-    parseMachines(settings.builders, machines);
-
+    static auto machines = [&]() {
+        Machines machines;
+        parseMachines(settings.builders, machines);
+        return machines;
+    }();
     return machines;
 }
 

@@ -22,12 +22,6 @@
     <arg><option>--delete-old</option></arg>
     <arg><option>-d</option></arg>
     <arg><option>--delete-older-than</option> <replaceable>period</replaceable></arg>
-    <group choice='opt'>
-      <arg choice='plain'><option>--print-roots</option></arg>
-      <arg choice='plain'><option>--print-live</option></arg>
-      <arg choice='plain'><option>--print-dead</option></arg>
-      <arg choice='plain'><option>--delete</option></arg>
-    </group>
     <arg><option>--max-freed</option> <replaceable>bytes</replaceable></arg>
     <arg><option>--dry-run</option></arg>
   </cmdsynopsis>

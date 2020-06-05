@@ -204,7 +204,7 @@ printed.)</para>
     with <option>-K</option>, if an output path is not identical to
     the corresponding output from the previous build, the new output
     path is left in
-    <filename>/nix/store/<replaceable>name</replaceable>-check.</filename></para>
+    <filename>/nix/store/<replaceable>name</replaceable>.check.</filename></para>
 
     <para>See also the <option>build-repeat</option> configuration
     option, which repeats a derivation a number of times and prevents
@@ -214,6 +214,48 @@ printed.)</para>
   </varlistentry>
 
 </variablelist>
+
+<para>Special exit codes:</para>
+
+<variablelist>
+
+  <varlistentry><term><literal>100</literal></term>
+    <listitem><para>Generic build failure, the builder process
+    returned with a non-zero exit code.</para></listitem>
+  </varlistentry>
+
+  <varlistentry><term><literal>101</literal></term>
+    <listitem><para>Build timeout, the build was aborted because it
+    did not complete within the specified <link
+    linkend='conf-timeout'><literal>timeout</literal></link>.
+    </para></listitem>
+  </varlistentry>
+
+  <varlistentry><term><literal>102</literal></term>
+    <listitem><para>Hash mismatch, the build output was rejected
+    because it does not match the specified <link
+    linkend="fixed-output-drvs"><varname>outputHash</varname></link>.
+    </para></listitem>
+  </varlistentry>
+
+  <varlistentry><term><literal>104</literal></term>
+    <listitem><para>Not deterministic, the build succeeded in check
+    mode but the resulting output is not binary reproducable.</para>
+    </listitem>
+  </varlistentry>
+
+</variablelist>
+
+<para>With the <option>--keep-going</option> flag it's possible for
+multiple failures to occur, in this case the 1xx status codes are or combined
+using binary or. <screen>
+1100100
+   ^^^^
+   |||`- timeout
+   ||`-- output hash mismatch
+   |`--- build failure
+   `---- not deterministic
+</screen></para>
 
 </refsection>
 
@@ -275,7 +317,7 @@ as a means of providing Nix store access to a restricted ssh user.
 
     <listitem><para>Allow the connected client to request the realization
     of derivations. In effect, this can be used to make the host act
-    as a build slave.</para></listitem>
+    as a remote builder.</para></listitem>
 
   </varlistentry>
 
@@ -318,7 +360,6 @@ EOF
     <arg choice='plain'><option>--print-roots</option></arg>
     <arg choice='plain'><option>--print-live</option></arg>
     <arg choice='plain'><option>--print-dead</option></arg>
-    <arg choice='plain'><option>--delete</option></arg>
   </group>
   <arg><option>--max-freed</option> <replaceable>bytes</replaceable></arg>
 </cmdsynopsis>
@@ -365,14 +406,6 @@ the Nix store not reachable via file system references from a set of
 
   </varlistentry>
 
-  <varlistentry><term><option>--delete</option></term>
-
-    <listitem><para>This operation performs an actual garbage
-    collection.  All dead paths are removed from the
-    store.  This is the default.</para></listitem>
-
-  </varlistentry>
-
 </variablelist>
 
 <para>By default, all unreachable paths are deleted.  The following
@@ -402,10 +435,10 @@ and <link
 linkend="conf-keep-derivations"><literal>keep-derivations</literal></link>
 variables in the Nix configuration file.</para>
 
-<para>With <option>--delete</option>, the collector prints the total
-number of freed bytes when it finishes (or when it is interrupted).
-With <option>--print-dead</option>, it prints the number of bytes that
-would be freed.</para>
+<para>By default, the collector prints the total number of freed bytes
+when it finishes (or when it is interrupted). With
+<option>--print-dead</option>, it prints the number of bytes that would
+be freed.</para>
 
 </refsection>
 
@@ -501,10 +534,11 @@ error: cannot delete path `/nix/store/zq0h41l75vlb4z45kzgjjmsjxvcv1qk7-mesa-6.4'
     <arg choice='plain'><option>--referrers</option></arg>
     <arg choice='plain'><option>--referrers-closure</option></arg>
     <arg choice='plain'><option>--deriver</option></arg>
-    <arg choice='plain'><option>--deriver</option></arg>
+    <arg choice='plain'><option>-d</option></arg>
     <arg choice='plain'><option>--graph</option></arg>
     <arg choice='plain'><option>--tree</option></arg>
     <arg choice='plain'><option>--binding</option> <replaceable>name</replaceable></arg>
+    <arg choice='plain'><option>-b</option> <replaceable>name</replaceable></arg>
     <arg choice='plain'><option>--hash</option></arg>
     <arg choice='plain'><option>--size</option></arg>
     <arg choice='plain'><option>--roots</option></arg>
@@ -642,6 +676,7 @@ query is applied to the target of the symlink.</para>
   </varlistentry>
 
   <varlistentry><term><option>--deriver</option></term>
+    <term><option>-d</option></term>
 
     <listitem><para>Prints the <link
     linkend="gloss-deriver">deriver</link> of the store paths
@@ -677,7 +712,20 @@ query is applied to the target of the symlink.</para>
 
   </varlistentry>
 
+  <varlistentry><term><option>--graphml</option></term>
+
+    <listitem><para>Prints the references graph of the store paths
+    <replaceable>paths</replaceable> in the <link
+    xlink:href="http://graphml.graphdrawing.org/">GraphML</link> file format.
+    This can be used to visualise dependency graphs. To obtain a
+    build-time dependency graph, apply this to a store derivation. To
+    obtain a runtime dependency graph, apply it to an output
+    path.</para></listitem>
+
+  </varlistentry>
+
   <varlistentry><term><option>--binding</option> <replaceable>name</replaceable></term>
+    <term><option>-b</option> <replaceable>name</replaceable></term>
 
     <listitem><para>Prints the value of the attribute
     <replaceable>name</replaceable> (i.e., environment variable) of
@@ -868,6 +916,60 @@ $ nix-store --add ./foo.c
 
 </refsection>
 
+<!--######################################################################-->
+
+<refsection><title>Operation <option>--add-fixed</option></title>
+
+<refsection><title>Synopsis</title>
+
+<cmdsynopsis>
+  <command>nix-store</command>
+  <arg><option>--recursive</option></arg>
+  <arg choice='plain'><option>--add-fixed</option></arg>
+  <arg choice='plain'><replaceable>algorithm</replaceable></arg>
+  <arg choice='plain' rep='repeat'><replaceable>paths</replaceable></arg>
+</cmdsynopsis>
+
+</refsection>
+
+<refsection><title>Description</title>
+
+<para>The operation <option>--add-fixed</option> adds the specified paths to
+the Nix store.  Unlike <option>--add</option> paths are registered using the
+specified hashing algorithm, resulting in the same output path as a fixed output
+derivation.  This can be used for sources that are not available from a public
+url or broke since the download expression was written.
+</para>
+
+<para>This operation has the following options:
+
+<variablelist>
+
+  <varlistentry><term><option>--recursive</option></term>
+
+    <listitem><para>
+      Use recursive instead of flat hashing mode, used when adding directories
+      to the store.
+    </para></listitem>
+
+  </varlistentry>
+
+</variablelist>
+
+</para>
+
+</refsection>
+
+<refsection><title>Example</title>
+
+<screen>
+$ nix-store --add-fixed sha256 ./hello-2.10.tar.gz
+/nix/store/3x7dwzq014bblazs7kq20p9hyzz0qh8g-hello-2.10.tar.gz</screen>
+
+</refsection>
+
+</refsection>
+
 
 
 <!--######################################################################-->
@@ -1037,7 +1139,7 @@ the information that Nix considers important.  For instance,
 timestamps are elided because all files in the Nix store have their
 timestamp set to 0 anyway.  Likewise, all permissions are left out
 except for the execute bit, because all files in the Nix store have
-644 or 755 permission.</para>
+444 or 555 permission.</para>
 
 <para>Also, a NAR archive is <emphasis>canonical</emphasis>, meaning
 that “equal” paths always produce the same NAR archive.  For instance,
@@ -1267,6 +1369,7 @@ ktorrent-2.2.1/NEWS
   <cmdsynopsis>
     <command>nix-store</command>
     <arg choice='plain'><option>--dump-db</option></arg>
+    <arg rep='repeat'><replaceable>paths</replaceable></arg>
   </cmdsynopsis>
 </refsection>
 
@@ -1276,6 +1379,13 @@ ktorrent-2.2.1/NEWS
 Nix database to standard output.  It can be loaded into an empty Nix
 store using <option>--load-db</option>.  This is useful for making
 backups and when migrating to different database schemas.</para>
+
+<para>By default, <option>--dump-db</option> will dump the entire Nix
+database.  When one or more store paths is passed, only the subset of
+the Nix database for those store paths is dumped.  As with
+<option>--export</option>, the user is responsible for passing all the
+store paths for a closure.  See <option>--export</option> for an
+example.</para>
 
 </refsection>
 

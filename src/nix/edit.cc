@@ -10,11 +10,6 @@ using namespace nix;
 
 struct CmdEdit : InstallableCommand
 {
-    std::string name() override
-    {
-        return "edit";
-    }
-
     std::string description() override
     {
         return "open the Nix expression of a Nix package in $EDITOR";
@@ -34,43 +29,26 @@ struct CmdEdit : InstallableCommand
     {
         auto state = getEvalState();
 
-        auto v = installable->toValue(*state);
+        auto [v, pos] = installable->toValue(*state);
 
-        Value * v2;
         try {
-            auto dummyArgs = state->allocBindings(0);
-            v2 = findAlongAttrPath(*state, "meta.position", *dummyArgs, *v);
-        } catch (Error &) {
-            throw Error("package '%s' has no source location information", installable->what());
+            pos = findDerivationFilename(*state, *v, installable->what());
+        } catch (NoPositionInfo &) {
         }
 
-        auto pos = state->forceString(*v2);
-        debug("position is %s", pos);
-
-        auto colon = pos.rfind(':');
-        if (colon == std::string::npos)
-            throw Error("cannot parse meta.position attribute '%s'", pos);
-
-        std::string filename(pos, 0, colon);
-        int lineno = std::stoi(std::string(pos, colon + 1));
-
-        auto editor = getEnv("EDITOR", "cat");
-
-        Strings args{editor};
-
-        if (editor.find("emacs") != std::string::npos ||
-            editor.find("nano") != std::string::npos ||
-            editor.find("vim") != std::string::npos)
-            args.push_back(fmt("+%d", lineno));
-
-        args.push_back(filename);
+        if (pos == noPos)
+            throw Error("cannot find position information for '%s", installable->what());
 
         stopProgressBar();
 
-        execvp(editor.c_str(), stringsToCharPtrs(args).data());
+        auto args = editorFor(pos);
 
-        throw SysError("cannot run editor '%s'", editor);
+        execvp(args.front().c_str(), stringsToCharPtrs(args).data());
+
+        std::string command;
+        for (const auto &arg : args) command += " '" + arg + "'";
+        throw SysError("cannot run command%s", command);
     }
 };
 
-static RegisterCommand r1(make_ref<CmdEdit>());
+static auto r1 = registerCommand<CmdEdit>("edit");

@@ -1,0 +1,22 @@
+<chapter xmlns="http://docbook.org/ns/docbook"
+      xmlns:xlink="http://www.w3.org/1999/xlink"
+      xmlns:xi="http://www.w3.org/2001/XInclude"
+      version="5.0"
+      xml:id="ch-upgrading-nix">
+
+  <title>Upgrading Nix</title>
+
+  <para>
+    Multi-user Nix users on macOS can upgrade Nix by running:
+    <command>sudo -i sh -c 'nix-channel --update &amp;&amp;
+    nix-env -iA nixpkgs.nix &amp;&amp;
+    launchctl remove org.nixos.nix-daemon &amp;&amp;
+    launchctl load /Library/LaunchDaemons/org.nixos.nix-daemon.plist'</command>
+  </para>
+
+
+  <para>
+    Single-user installations of Nix should run this:
+    <command>nix-channel --update; nix-env -iA nixpkgs.nix</command>
+  </para>
+</chapter>

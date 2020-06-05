@@ -6,11 +6,18 @@
 #include "globals.hh"
 #include "eval-inline.hh"
 #include "download.hh"
+#include "json.hh"
+#include "function-trace.hh"
 
 #include <algorithm>
+#include <chrono>
 #include <cstring>
 #include <unistd.h>
 #include <sys/time.h>
+#include <sys/resource.h>
+#include <iostream>
+#include <fstream>
+
 #include <sys/resource.h>
 
 #if HAVE_BOEHMGC
@@ -18,14 +25,7 @@
 #include <gc/gc.h>
 #include <gc/gc_cpp.h>
 
-#define NEW new (UseGC)
-
-#else
-
-#define NEW new
-
 #endif
-
 
 namespace nix {
 
@@ -34,7 +34,7 @@ static char * dupString(const char * s)
 {
     char * t;
 #if HAVE_BOEHMGC
-    t = GC_strdup(s);
+    t = GC_STRDUP(s);
 #else
     t = strdup(s);
 #endif
@@ -43,16 +43,16 @@ static char * dupString(const char * s)
 }
 
 
-static void * allocBytes(size_t n)
+static char * dupStringWithLen(const char * s, size_t size)
 {
-    void * p;
+    char * t;
 #if HAVE_BOEHMGC
-    p = GC_malloc(n);
+    t = GC_STRNDUP(s, size);
 #else
-    p = malloc(n);
+    t = strndup(s, size);
 #endif
-    if (!p) throw std::bad_alloc();
-    return p;
+    if (!t) throw std::bad_alloc();
+    return t;
 }
 
 
@@ -60,11 +60,10 @@ static void printValue(std::ostream & str, std::set<const Value *> & active, con
 {
     checkInterrupt();
 
-    if (active.find(&v) != active.end()) {
+    if (!active.insert(&v).second) {
         str << "<CYCLE>";
         return;
     }
-    active.insert(&v);
 
     switch (v.type) {
     case tInt:
@@ -144,12 +143,22 @@ std::ostream & operator << (std::ostream & str, const Value & v)
 }
 
 
+const Value *getPrimOp(const Value &v) {
+    const Value * primOp = &v;
+    while (primOp->type == tPrimOpApp) {
+        primOp = primOp->primOpApp.left;
+    }
+    assert(primOp->type == tPrimOp);
+    return primOp;
+}
+
+
 string showType(const Value & v)
 {
     switch (v.type) {
         case tInt: return "an integer";
         case tBool: return "a boolean";
-        case tString: return "a string";
+        case tString: return v.string.context ? "a string with context" : "a string";
         case tPath: return "a path";
         case tNull: return "null";
         case tAttrs: return "a set";
@@ -158,8 +167,10 @@ string showType(const Value & v)
         case tApp: return "a function application";
         case tLambda: return "a function";
         case tBlackhole: return "a black hole";
-        case tPrimOp: return "a built-in function";
-        case tPrimOpApp: return "a partially applied built-in function";
+        case tPrimOp:
+            return fmt("the built-in function '%s'", string(v.primOp->name));
+        case tPrimOpApp:
+            return fmt("the partially applied built-in function '%s'", string(getPrimOp(v)->primOp->name));
         case tExternal: return v.external->showType();
         case tFloat: return "a float";
     }
@@ -198,7 +209,14 @@ void initGC()
 
 #if HAVE_BOEHMGC
     /* Initialise the Boehm garbage collector. */
+
+    /* Don't look for interior pointers. This reduces the odds of
+       misdetection a bit. */
     GC_set_all_interior_pointers(0);
+
+    /* We don't have any roots in data segments, so don't scan from
+       there. */
+    GC_set_no_dls(1);
 
     GC_INIT();
 
@@ -213,7 +231,7 @@ void initGC()
        that GC_expand_hp() causes a lot of virtual, but not physical
        (resident) memory to be allocated.  This might be a problem on
        systems that don't overcommit. */
-    if (!getenv("GC_INITIAL_HEAP_SIZE")) {
+    if (!getEnv("GC_INITIAL_HEAP_SIZE")) {
         size_t size = 32 * 1024 * 1024;
 #if HAVE_SYSCONF && defined(_SC_PAGESIZE) && defined(_SC_PHYS_PAGES)
         size_t maxSize = 384 * 1024 * 1024;
@@ -293,22 +311,46 @@ EvalState::EvalState(const Strings & _searchPath, ref<Store> store)
     , sWrong(symbols.create("wrong"))
     , sStructuredAttrs(symbols.create("__structuredAttrs"))
     , sBuilder(symbols.create("builder"))
+    , sArgs(symbols.create("args"))
+    , sOutputHash(symbols.create("outputHash"))
+    , sOutputHashAlgo(symbols.create("outputHashAlgo"))
+    , sOutputHashMode(symbols.create("outputHashMode"))
     , repair(NoRepair)
     , store(store)
     , baseEnv(allocEnv(128))
     , staticBaseEnv(false, 0)
 {
-    countCalls = getEnv("NIX_COUNT_CALLS", "0") != "0";
-
-    restricted = settings.restrictEval;
+    countCalls = getEnv("NIX_COUNT_CALLS").value_or("0") != "0";
 
     assert(gcInitialised);
 
+    static_assert(sizeof(Env) <= 16, "environment must be <= 16 bytes");
+
     /* Initialise the Nix expression search path. */
-    Strings paths = parseNixPath(getEnv("NIX_PATH", ""));
-    for (auto & i : _searchPath) addToSearchPath(i);
-    for (auto & i : paths) addToSearchPath(i);
-    addToSearchPath("nix=" + settings.nixDataDir + "/nix/corepkgs");
+    if (!evalSettings.pureEval) {
+        for (auto & i : _searchPath) addToSearchPath(i);
+        for (auto & i : evalSettings.nixPath.get()) addToSearchPath(i);
+    }
+    addToSearchPath("nix=" + canonPath(settings.nixDataDir + "/nix/corepkgs", true));
+
+    if (evalSettings.restrictEval || evalSettings.pureEval) {
+        allowedPaths = PathSet();
+
+        for (auto & i : searchPath) {
+            auto r = resolveSearchPathElem(i);
+            if (!r.first) continue;
+
+            auto path = r.second;
+
+            if (store->isInStore(r.second)) {
+                StorePathSet closure;
+                store->computeFSClosure(store->parseStorePath(store->toStorePath(r.second)), closure);
+                for (auto & path : closure)
+                    allowedPaths->insert(store->printStorePath(path));
+            } else
+                allowedPaths->insert(r.second);
+        }
+    }
 
     clearValue(vEmptySet);
     vEmptySet.type = tAttrs;
@@ -320,42 +362,93 @@ EvalState::EvalState(const Strings & _searchPath, ref<Store> store)
 
 EvalState::~EvalState()
 {
-    fileEvalCache.clear();
 }
 
 
 Path EvalState::checkSourcePath(const Path & path_)
 {
-    if (!restricted) return path_;
+    if (!allowedPaths) return path_;
 
-    /* Resolve symlinks. */
-    debug(format("checking access to '%s'") % path_);
-    Path path = canonPath(path_, true);
+    auto i = resolvedPaths.find(path_);
+    if (i != resolvedPaths.end())
+        return i->second;
 
-    for (auto & i : searchPath) {
-        auto r = resolveSearchPathElem(i);
-        if (!r.first) continue;
-        if (path == r.second || isInDir(path, r.second))
-            return path;
+    bool found = false;
+
+    /* First canonicalize the path without symlinks, so we make sure an
+     * attacker can't append ../../... to a path that would be in allowedPaths
+     * and thus leak symlink targets.
+     */
+    Path abspath = canonPath(path_);
+
+    for (auto & i : *allowedPaths) {
+        if (isDirOrInDir(abspath, i)) {
+            found = true;
+            break;
+        }
     }
 
-    /* To support import-from-derivation, allow access to anything in
-       the store. FIXME: only allow access to paths that have been
-       constructed by this evaluation. */
-    if (store->isInStore(path)) return path;
+    if (!found)
+        throw RestrictedPathError("access to path '%1%' is forbidden in restricted mode", abspath);
 
-#if 0
-    /* Hack to support the chroot dependencies of corepkgs (see
-       corepkgs/config.nix.in). */
-    if (path == settings.nixPrefix && isStorePath(settings.nixPrefix))
-        return path;
-#endif
+    /* Resolve symlinks. */
+    debug(format("checking access to '%s'") % abspath);
+    Path path = canonPath(abspath, true);
 
-    throw RestrictedPathError(format("access to path '%1%' is forbidden in restricted mode") % path_);
+    for (auto & i : *allowedPaths) {
+        if (isDirOrInDir(path, i)) {
+            resolvedPaths[path_] = path;
+            return path;
+        }
+    }
+
+    throw RestrictedPathError("access to path '%1%' is forbidden in restricted mode", path);
 }
 
 
-void EvalState::addConstant(const string & name, Value & v)
+void EvalState::checkURI(const std::string & uri)
+{
+    if (!evalSettings.restrictEval) return;
+
+    /* 'uri' should be equal to a prefix, or in a subdirectory of a
+       prefix. Thus, the prefix https://github.co does not permit
+       access to https://github.com. Note: this allows 'http://' and
+       'https://' as prefixes for any http/https URI. */
+    for (auto & prefix : evalSettings.allowedUris.get())
+        if (uri == prefix ||
+            (uri.size() > prefix.size()
+            && prefix.size() > 0
+            && hasPrefix(uri, prefix)
+            && (prefix[prefix.size() - 1] == '/' || uri[prefix.size()] == '/')))
+            return;
+
+    /* If the URI is a path, then check it against allowedPaths as
+       well. */
+    if (hasPrefix(uri, "/")) {
+        checkSourcePath(uri);
+        return;
+    }
+
+    if (hasPrefix(uri, "file://")) {
+        checkSourcePath(std::string(uri, 7));
+        return;
+    }
+
+    throw RestrictedPathError("access to URI '%s' is forbidden in restricted mode", uri);
+}
+
+
+Path EvalState::toRealPath(const Path & path, const PathSet & context)
+{
+    // FIXME: check whether 'path' is in 'context'.
+    return
+        !context.empty() && store->isInStore(path)
+        ? store->toRealPath(path)
+        : path;
+}
+
+
+Value * EvalState::addConstant(const string & name, Value & v)
 {
     Value * v2 = allocValue();
     *v2 = v;
@@ -363,20 +456,27 @@ void EvalState::addConstant(const string & name, Value & v)
     baseEnv.values[baseEnvDispl++] = v2;
     string name2 = string(name, 0, 2) == "__" ? string(name, 2) : name;
     baseEnv.values[0]->attrs->push_back(Attr(symbols.create(name2), v2));
+    return v2;
 }
 
 
-void EvalState::addPrimOp(const string & name,
-    unsigned int arity, PrimOpFun primOp)
+Value * EvalState::addPrimOp(const string & name,
+    size_t arity, PrimOpFun primOp)
 {
+    if (arity == 0) {
+        Value v;
+        primOp(*this, noPos, nullptr, v);
+        return addConstant(name, v);
+    }
     Value * v = allocValue();
     string name2 = string(name, 0, 2) == "__" ? string(name, 2) : name;
     Symbol sym = symbols.create(name2);
     v->type = tPrimOp;
-    v->primOp = NEW PrimOp(primOp, arity, sym);
+    v->primOp = new PrimOp(primOp, arity, sym);
     staticBaseEnv.vars[symbols.create(name)] = baseEnvDispl;
     baseEnv.values[baseEnvDispl++] = v;
     baseEnv.values[0]->attrs->push_back(Attr(sym, v));
+    return v;
 }
 
 
@@ -431,9 +531,9 @@ LocalNoInlineNoReturn(void throwTypeError(const char * s, const ExprLambda & fun
     throw TypeError(format(s) % fun.showNamePos() % s2 % pos);
 }
 
-LocalNoInlineNoReturn(void throwAssertionError(const char * s, const Pos & pos))
+LocalNoInlineNoReturn(void throwAssertionError(const char * s, const string & s1, const Pos & pos))
 {
-    throw AssertionError(format(s) % pos);
+    throw AssertionError(format(s) % s1 % pos);
 }
 
 LocalNoInlineNoReturn(void throwUndefinedVarError(const char * s, const string & s1, const Pos & pos))
@@ -463,11 +563,13 @@ void mkString(Value & v, const char * s)
 }
 
 
-Value & mkString(Value & v, const string & s, const PathSet & context)
+Value & mkString(Value & v, std::string_view s, const PathSet & context)
 {
-    mkString(v, s.c_str());
+    v.type = tString;
+    v.string.s = dupStringWithLen(s.data(), s.size());
+    v.string.context = 0;
     if (!context.empty()) {
-        unsigned int n = 0;
+        size_t n = 0;
         v.string.context = (const char * *)
             allocBytes((context.size() + 1) * sizeof(char *));
         for (auto & i : context)
@@ -486,17 +588,17 @@ void mkPath(Value & v, const char * s)
 
 inline Value * EvalState::lookupVar(Env * env, const ExprVar & var, bool noEval)
 {
-    for (unsigned int l = var.level; l; --l, env = env->up) ;
+    for (size_t l = var.level; l; --l, env = env->up) ;
 
     if (!var.fromWith) return env->values[var.displ];
 
     while (1) {
-        if (!env->haveWithAttrs) {
+        if (env->type == Env::HasWithExpr) {
             if (noEval) return 0;
             Value * v = allocValue();
             evalAttrs(*env->up, (Expr *) env->values[0], *v);
             env->values[0] = v;
-            env->haveWithAttrs = true;
+            env->type = Env::HasWithAttrs;
         }
         Bindings::iterator j = env->values[0]->attrs->find(var.name);
         if (j != env->values[0]->attrs->end()) {
@@ -505,36 +607,41 @@ inline Value * EvalState::lookupVar(Env * env, const ExprVar & var, bool noEval)
         }
         if (!env->prevWith)
             throwUndefinedVarError("undefined variable '%1%' at %2%", var.name, var.pos);
-        for (unsigned int l = env->prevWith; l; --l, env = env->up) ;
+        for (size_t l = env->prevWith; l; --l, env = env->up) ;
     }
 }
 
 
+std::atomic<uint64_t> nrValuesFreed{0};
+
+void finalizeValue(void * obj, void * data)
+{
+    nrValuesFreed++;
+}
+
 Value * EvalState::allocValue()
 {
     nrValues++;
-    return (Value *) allocBytes(sizeof(Value));
+    auto v = (Value *) allocBytes(sizeof(Value));
+    //GC_register_finalizer_no_order(v, finalizeValue, nullptr, nullptr, nullptr);
+    return v;
 }
 
 
-Env & EvalState::allocEnv(unsigned int size)
+Env & EvalState::allocEnv(size_t size)
 {
-    assert(size <= std::numeric_limits<decltype(Env::size)>::max());
-
     nrEnvs++;
     nrValuesInEnvs += size;
     Env * env = (Env *) allocBytes(sizeof(Env) + size * sizeof(Value *));
-    env->size = size;
+    env->type = Env::Plain;
 
-    /* Clear the values because maybeThunk() and lookupVar fromWith expect this. */
-    for (unsigned i = 0; i < size; ++i)
-        env->values[i] = 0;
+    /* We assume that env->values has been cleared by the allocator; maybeThunk() and lookupVar fromWith expect this. */
 
     return *env;
 }
 
 
-void EvalState::mkList(Value & v, unsigned int size)
+void EvalState::mkList(Value & v, size_t size)
 {
     clearValue(v);
     if (size == 1)
@@ -569,7 +676,7 @@ void EvalState::mkThunk_(Value & v, Expr * expr)
 
 void EvalState::mkPos(Value & v, Pos * pos)
 {
-    if (pos) {
+    if (pos && pos->file.set()) {
         mkAttrs(v, 3);
         mkString(*allocAttr(v, sFile), pos->file);
         mkInt(*allocAttr(v, sLine), pos->line);
@@ -629,8 +736,10 @@ Value * ExprPath::maybeThunk(EvalState & state, Env & env)
 }
 
 
-void EvalState::evalFile(const Path & path, Value & v)
+void EvalState::evalFile(const Path & path_, Value & v)
 {
+    auto path = checkSourcePath(path_);
+
     FileEvalCache::iterator i;
     if ((i = fileEvalCache.find(path)) != fileEvalCache.end()) {
         v = i->second;
@@ -644,7 +753,17 @@ void EvalState::evalFile(const Path & path, Value & v)
     }
 
     printTalkative("evaluating file '%1%'", path2);
-    Expr * e = parseExprFromFile(checkSourcePath(path2));
+    Expr * e = nullptr;
+
+    auto j = fileParseCache.find(path2);
+    if (j != fileParseCache.end())
+        e = j->second;
+
+    if (!e)
+        e = parseExprFromFile(checkSourcePath(path2));
+
+    fileParseCache[path2] = e;
+
     try {
         eval(e, v);
     } catch (Error & e) {
@@ -660,6 +779,7 @@ void EvalState::evalFile(const Path & path, Value & v)
 void EvalState::resetFileCache()
 {
     fileEvalCache.clear();
+    fileParseCache.clear();
 }
 
 
@@ -744,7 +864,7 @@ void ExprAttrs::eval(EvalState & state, Env & env, Value & v)
         /* The recursive attributes are evaluated in the new
            environment, while the inherited attributes are evaluated
            in the original environment. */
-        unsigned int displ = 0;
+        size_t displ = 0;
         for (auto & i : attrs) {
             Value * vAttr;
             if (hasOverrides && !i.second.inherited) {
@@ -767,7 +887,7 @@ void ExprAttrs::eval(EvalState & state, Env & env, Value & v)
         if (hasOverrides) {
             Value * vOverrides = (*v.attrs)[overrides->second.displ].value;
             state.forceAttrs(*vOverrides);
-            Bindings * newBnds = state.allocBindings(v.attrs->size() + vOverrides->attrs->size());
+            Bindings * newBnds = state.allocBindings(v.attrs->capacity() + vOverrides->attrs->size());
             for (auto & i : *v.attrs)
                 newBnds->push_back(i);
             for (auto & i : *vOverrides->attrs) {
@@ -818,7 +938,7 @@ void ExprLet::eval(EvalState & state, Env & env, Value & v)
     /* The recursive attributes are evaluated in the new environment,
        while the inherited attributes are evaluated in the original
        environment. */
-    unsigned int displ = 0;
+    size_t displ = 0;
     for (auto & i : attrs->attrs)
         env2.values[displ++] = i.second.e->maybeThunk(state, i.second.inherited ? env : env2);
 
@@ -829,7 +949,7 @@ void ExprLet::eval(EvalState & state, Env & env, Value & v)
 void ExprList::eval(EvalState & state, Env & env, Value & v)
 {
     state.mkList(v, elems.size());
-    for (unsigned int n = 0; n < elems.size(); ++n)
+    for (size_t n = 0; n < elems.size(); ++n)
         v.listElems()[n] = elems[n]->maybeThunk(state, env);
 }
 
@@ -951,22 +1071,22 @@ void ExprApp::eval(EvalState & state, Env & env, Value & v)
 void EvalState::callPrimOp(Value & fun, Value & arg, Value & v, const Pos & pos)
 {
     /* Figure out the number of arguments still needed. */
-    unsigned int argsDone = 0;
+    size_t argsDone = 0;
     Value * primOp = &fun;
     while (primOp->type == tPrimOpApp) {
         argsDone++;
         primOp = primOp->primOpApp.left;
     }
     assert(primOp->type == tPrimOp);
-    unsigned int arity = primOp->primOp->arity;
-    unsigned int argsLeft = arity - argsDone;
+    auto arity = primOp->primOp->arity;
+    auto argsLeft = arity - argsDone;
 
     if (argsLeft == 1) {
         /* We have all the arguments, so call the primop. */
 
         /* Put all the arguments in an array. */
         Value * vArgs[arity];
-        unsigned int n = arity - 1;
+        auto n = arity - 1;
         vArgs[n--] = &arg;
         for (Value * arg = &fun; arg->type == tPrimOpApp; arg = arg->primOpApp.left)
             vArgs[n--] = arg->primOpApp.right;
@@ -984,9 +1104,12 @@ void EvalState::callPrimOp(Value & fun, Value & arg, Value & v, const Pos & pos)
     }
 }
 
-
 void EvalState::callFunction(Value & fun, Value & arg, Value & v, const Pos & pos)
 {
+    auto trace = evalSettings.traceFunctionCalls ? std::make_unique<FunctionCallTrace>(pos) : nullptr;
+
+    forceValue(fun, pos);
+
     if (fun.type == tPrimOp || fun.type == tPrimOpApp) {
         callPrimOp(fun, arg, v, pos);
         return;
@@ -1002,10 +1125,8 @@ void EvalState::callFunction(Value & fun, Value & arg, Value & v, const Pos & po
         auto & fun2 = *allocValue();
         fun2 = fun;
         /* !!! Should we use the attr pos here? */
-        forceValue(*found->value, pos);
         Value v2;
         callFunction(*found->value, fun2, v2, pos);
-        forceValue(v2, pos);
         return callFunction(v2, arg, v, pos);
       }
     }
@@ -1015,13 +1136,13 @@ void EvalState::callFunction(Value & fun, Value & arg, Value & v, const Pos & po
 
     ExprLambda & lambda(*fun.lambda.fun);
 
-    unsigned int size =
+    auto size =
         (lambda.arg.empty() ? 0 : 1) +
         (lambda.matchAttrs ? lambda.formals->formals.size() : 0);
     Env & env2(allocEnv(size));
     env2.up = fun.lambda.env;
 
-    unsigned int displ = 0;
+    size_t displ = 0;
 
     if (!lambda.matchAttrs)
         env2.values[displ++] = &arg;
@@ -1035,7 +1156,7 @@ void EvalState::callFunction(Value & fun, Value & arg, Value & v, const Pos & po
         /* For each formal argument, get the actual argument.  If
            there is no matching actual argument but the formal
            argument has a default, use the default. */
-        unsigned int attrsUsed = 0;
+        size_t attrsUsed = 0;
         for (auto & i : lambda.formals->formals) {
             Bindings::iterator j = arg.attrs->find(i.name);
             if (j == arg.attrs->end()) {
@@ -1092,7 +1213,6 @@ void EvalState::autoCallFunction(Bindings & args, Value & fun, Value & res)
     if (fun.type == tAttrs) {
         auto found = fun.attrs->find(sFunctor);
         if (found != fun.attrs->end()) {
-            forceValue(*found->value);
             Value * v = allocValue();
             callFunction(*found->value, fun, *v, noPos);
             forceValue(*v);
@@ -1127,7 +1247,7 @@ void ExprWith::eval(EvalState & state, Env & env, Value & v)
     Env & env2(state.allocEnv(1));
     env2.up = &env;
     env2.prevWith = prevWith;
-    env2.haveWithAttrs = false;
+    env2.type = Env::HasWithExpr;
     env2.values[0] = (Value *) attrs;
 
     body->eval(state, env2, v);
@@ -1142,8 +1262,11 @@ void ExprIf::eval(EvalState & state, Env & env, Value & v)
 
 void ExprAssert::eval(EvalState & state, Env & env, Value & v)
 {
-    if (!state.evalBool(env, cond, pos))
-        throwAssertionError("assertion failed at %1%", pos);
+    if (!state.evalBool(env, cond, pos)) {
+        std::ostringstream out;
+        cond->show(out);
+        throwAssertionError("assertion '%1%' failed at %2%", out.str(), pos);
+    }
     body->eval(state, env, v);
 }
 
@@ -1233,15 +1356,15 @@ void ExprOpConcatLists::eval(EvalState & state, Env & env, Value & v)
 }
 
 
-void EvalState::concatLists(Value & v, unsigned int nrLists, Value * * lists, const Pos & pos)
+void EvalState::concatLists(Value & v, size_t nrLists, Value * * lists, const Pos & pos)
 {
     nrListConcats++;
 
     Value * nonEmpty = 0;
-    unsigned int len = 0;
-    for (unsigned int n = 0; n < nrLists; ++n) {
+    size_t len = 0;
+    for (size_t n = 0; n < nrLists; ++n) {
         forceList(*lists[n], pos);
-        unsigned int l = lists[n]->listSize();
+        auto l = lists[n]->listSize();
         len += l;
         if (l) nonEmpty = lists[n];
     }
@@ -1253,9 +1376,10 @@ void EvalState::concatLists(Value & v, unsigned int nrLists, Value * * lists, co
 
     mkList(v, len);
     auto out = v.listElems();
-    for (unsigned int n = 0, pos = 0; n < nrLists; ++n) {
-        unsigned int l = lists[n]->listSize();
-        memcpy(out + pos, lists[n]->listElems(), l * sizeof(Value *));
+    for (size_t n = 0, pos = 0; n < nrLists; ++n) {
+        auto l = lists[n]->listSize();
+        if (l)
+            memcpy(out + pos, lists[n]->listElems(), l * sizeof(Value *));
         pos += l;
     }
 }
@@ -1332,8 +1456,7 @@ void EvalState::forceValueDeep(Value & v)
     std::function<void(Value & v)> recurse;
 
     recurse = [&](Value & v) {
-        if (seen.find(&v) != seen.end()) return;
-        seen.insert(&v);
+        if (!seen.insert(&v).second) return;
 
         forceValue(v);
 
@@ -1348,7 +1471,7 @@ void EvalState::forceValueDeep(Value & v)
         }
 
         else if (v.isList()) {
-            for (unsigned int n = 0; n < v.listSize(); ++n)
+            for (size_t n = 0; n < v.listSize(); ++n)
                 recurse(*v.listElems()[n]);
         }
     };
@@ -1455,6 +1578,19 @@ bool EvalState::isDerivation(Value & v)
 }
 
 
+std::optional<string> EvalState::tryAttrsToString(const Pos & pos, Value & v,
+    PathSet & context, bool coerceMore, bool copyToStore)
+{
+    auto i = v.attrs->find(sToString);
+    if (i != v.attrs->end()) {
+        Value v1;
+        callFunction(*i->value, v, v1, pos);
+        return coerceToString(pos, v1, context, coerceMore, copyToStore);
+    }
+
+    return {};
+}
+
 string EvalState::coerceToString(const Pos & pos, Value & v, PathSet & context,
     bool coerceMore, bool copyToStore)
 {
@@ -1473,14 +1609,11 @@ string EvalState::coerceToString(const Pos & pos, Value & v, PathSet & context,
     }
 
     if (v.type == tAttrs) {
-        auto i = v.attrs->find(sToString);
-        if (i != v.attrs->end()) {
-            forceValue(*i->value, pos);
-            Value v1;
-            callFunction(*i->value, v, v1, pos);
-            return coerceToString(pos, v1, context, coerceMore, copyToStore);
+        auto maybeString = tryAttrsToString(pos, v, context, coerceMore, copyToStore);
+        if (maybeString) {
+            return *maybeString;
         }
-        i = v.attrs->find(sOutPath);
+        auto i = v.attrs->find(sOutPath);
         if (i == v.attrs->end()) throwTypeError("cannot coerce a set to a string, at %1%", pos);
         return coerceToString(pos, *i->value, context, coerceMore, copyToStore);
     }
@@ -1500,7 +1633,7 @@ string EvalState::coerceToString(const Pos & pos, Value & v, PathSet & context,
 
         if (v.isList()) {
             string result;
-            for (unsigned int n = 0; n < v.listSize(); ++n) {
+            for (size_t n = 0; n < v.listSize(); ++n) {
                 result += coerceToString(pos, *v.listElems()[n],
                     context, coerceMore, copyToStore);
                 if (n < v.listSize() - 1
@@ -1522,15 +1655,16 @@ string EvalState::copyPathToStore(PathSet & context, const Path & path)
         throwEvalError("file names are not allowed to end in '%1%'", drvExtension);
 
     Path dstPath;
-    if (srcToStore[path] != "")
-        dstPath = srcToStore[path];
+    auto i = srcToStore.find(path);
+    if (i != srcToStore.end())
+        dstPath = store->printStorePath(i->second);
     else {
-        dstPath = settings.readOnlyMode
-            ? store->computeStorePathForPath(checkSourcePath(path)).first
-            : store->addToStore(baseNameOf(path), checkSourcePath(path), true, htSHA256, defaultPathFilter, repair);
-        srcToStore[path] = dstPath;
-        printMsg(lvlChatty, format("copied source '%1%' -> '%2%'")
-            % path % dstPath);
+        auto p = settings.readOnlyMode
+            ? store->computeStorePathForPath(std::string(baseNameOf(path)), checkSourcePath(path)).first
+            : store->addToStore(std::string(baseNameOf(path)), checkSourcePath(path), true, htSHA256, defaultPathFilter, repair);
+        dstPath = store->printStorePath(p);
+        srcToStore.insert_or_assign(path, std::move(p));
+        printMsg(lvlChatty, "copied source '%1%' -> '%2%'", path, dstPath);
     }
 
     context.insert(dstPath);
@@ -1587,7 +1721,7 @@ bool EvalState::eqValues(Value & v1, Value & v2)
         case tList2:
         case tListN:
             if (v1.listSize() != v2.listSize()) return false;
-            for (unsigned int n = 0; n < v1.listSize(); ++n)
+            for (size_t n = 0; n < v1.listSize(); ++n)
                 if (!eqValues(*v1.listElems()[n], *v2.listElems()[n])) return false;
             return true;
 
@@ -1629,12 +1763,9 @@ bool EvalState::eqValues(Value & v1, Value & v2)
     }
 }
 
-
 void EvalState::printStats()
 {
-    bool showStats = getEnv("NIX_SHOW_STATS", "0") != "0";
-    Verbosity v = showStats ? lvlInfo : lvlDebug;
-    printMsg(v, "evaluation statistics:");
+    bool showStats = getEnv("NIX_SHOW_STATS").value_or("0") != "0";
 
     struct rusage buf;
     getrusage(RUSAGE_SELF, &buf);
@@ -1645,152 +1776,108 @@ void EvalState::printStats()
     uint64_t bValues = nrValues * sizeof(Value);
     uint64_t bAttrsets = nrAttrsets * sizeof(Bindings) + nrAttrsInAttrsets * sizeof(Attr);
 
-    printMsg(v, format("  time elapsed: %1%") % cpuTime);
-    printMsg(v, format("  size of a value: %1%") % sizeof(Value));
-    printMsg(v, format("  size of an attr: %1%") % sizeof(Attr));
-    printMsg(v, format("  environments allocated: %1% (%2% bytes)") % nrEnvs % bEnvs);
-    printMsg(v, format("  list elements: %1% (%2% bytes)") % nrListElems % bLists);
-    printMsg(v, format("  list concatenations: %1%") % nrListConcats);
-    printMsg(v, format("  values allocated: %1% (%2% bytes)") % nrValues % bValues);
-    printMsg(v, format("  sets allocated: %1% (%2% bytes)") % nrAttrsets % bAttrsets);
-    printMsg(v, format("  right-biased unions: %1%") % nrOpUpdates);
-    printMsg(v, format("  values copied in right-biased unions: %1%") % nrOpUpdateValuesCopied);
-    printMsg(v, format("  symbols in symbol table: %1%") % symbols.size());
-    printMsg(v, format("  size of symbol table: %1%") % symbols.totalSize());
-    printMsg(v, format("  number of thunks: %1%") % nrThunks);
-    printMsg(v, format("  number of thunks avoided: %1%") % nrAvoided);
-    printMsg(v, format("  number of attr lookups: %1%") % nrLookups);
-    printMsg(v, format("  number of primop calls: %1%") % nrPrimOpCalls);
-    printMsg(v, format("  number of function calls: %1%") % nrFunctionCalls);
-    printMsg(v, format("  total allocations: %1% bytes") % (bEnvs + bLists + bValues + bAttrsets));
-
 #if HAVE_BOEHMGC
     GC_word heapSize, totalBytes;
     GC_get_heap_usage_safe(&heapSize, 0, 0, 0, &totalBytes);
-    printMsg(v, format("  current Boehm heap size: %1% bytes") % heapSize);
-    printMsg(v, format("  total Boehm heap allocations: %1% bytes") % totalBytes);
+#endif
+    if (showStats) {
+        auto outPath = getEnv("NIX_SHOW_STATS_PATH").value_or("-");
+        std::fstream fs;
+        if (outPath != "-")
+            fs.open(outPath, std::fstream::out);
+        JSONObject topObj(outPath == "-" ? std::cerr : fs, true);
+        topObj.attr("cpuTime",cpuTime);
+        {
+            auto envs = topObj.object("envs");
+            envs.attr("number", nrEnvs);
+            envs.attr("elements", nrValuesInEnvs);
+            envs.attr("bytes", bEnvs);
+        }
+        {
+            auto lists = topObj.object("list");
+            lists.attr("elements", nrListElems);
+            lists.attr("bytes", bLists);
+            lists.attr("concats", nrListConcats);
+        }
+        {
+            auto values = topObj.object("values");
+            values.attr("number", nrValues);
+            values.attr("bytes", bValues);
+        }
+        {
+            auto syms = topObj.object("symbols");
+            syms.attr("number", symbols.size());
+            syms.attr("bytes", symbols.totalSize());
+        }
+        {
+            auto sets = topObj.object("sets");
+            sets.attr("number", nrAttrsets);
+            sets.attr("bytes", bAttrsets);
+            sets.attr("elements", nrAttrsInAttrsets);
+        }
+        {
+            auto sizes = topObj.object("sizes");
+            sizes.attr("Env", sizeof(Env));
+            sizes.attr("Value", sizeof(Value));
+            sizes.attr("Bindings", sizeof(Bindings));
+            sizes.attr("Attr", sizeof(Attr));
+        }
+        topObj.attr("nrOpUpdates", nrOpUpdates);
+        topObj.attr("nrOpUpdateValuesCopied", nrOpUpdateValuesCopied);
+        topObj.attr("nrThunks", nrThunks);
+        topObj.attr("nrAvoided", nrAvoided);
+        topObj.attr("nrLookups", nrLookups);
+        topObj.attr("nrPrimOpCalls", nrPrimOpCalls);
+        topObj.attr("nrFunctionCalls", nrFunctionCalls);
+#if HAVE_BOEHMGC
+        {
+            auto gc = topObj.object("gc");
+            gc.attr("heapSize", heapSize);
+            gc.attr("totalBytes", totalBytes);
+        }
 #endif
 
-    if (countCalls) {
-        v = lvlInfo;
-
-        printMsg(v, format("calls to %1% primops:") % primOpCalls.size());
-        typedef std::multimap<unsigned int, Symbol> PrimOpCalls_;
-        PrimOpCalls_ primOpCalls_;
-        for (auto & i : primOpCalls)
-            primOpCalls_.insert(std::pair<unsigned int, Symbol>(i.second, i.first));
-        for (auto i = primOpCalls_.rbegin(); i != primOpCalls_.rend(); ++i)
-            printMsg(v, format("%1$10d %2%") % i->first % i->second);
-
-        printMsg(v, format("calls to %1% functions:") % functionCalls.size());
-        typedef std::multimap<unsigned int, ExprLambda *> FunctionCalls_;
-        FunctionCalls_ functionCalls_;
-        for (auto & i : functionCalls)
-            functionCalls_.insert(std::pair<unsigned int, ExprLambda *>(i.second, i.first));
-        for (auto i = functionCalls_.rbegin(); i != functionCalls_.rend(); ++i)
-            printMsg(v, format("%1$10d %2%") % i->first % i->second->showNamePos());
-
-        printMsg(v, format("evaluations of %1% attributes:") % attrSelects.size());
-        typedef std::multimap<unsigned int, Pos> AttrSelects_;
-        AttrSelects_ attrSelects_;
-        for (auto & i : attrSelects)
-            attrSelects_.insert(std::pair<unsigned int, Pos>(i.second, i.first));
-        for (auto i = attrSelects_.rbegin(); i != attrSelects_.rend(); ++i)
-            printMsg(v, format("%1$10d %2%") % i->first % i->second);
-
-    }
-}
-
-
-size_t valueSize(Value & v)
-{
-    std::set<const void *> seen;
-
-    auto doString = [&](const char * s) -> size_t {
-        if (seen.find(s) != seen.end()) return 0;
-        seen.insert(s);
-        return strlen(s) + 1;
-    };
-
-    std::function<size_t(Value & v)> doValue;
-    std::function<size_t(Env & v)> doEnv;
-
-    doValue = [&](Value & v) -> size_t {
-        if (seen.find(&v) != seen.end()) return 0;
-        seen.insert(&v);
-
-        size_t sz = sizeof(Value);
-
-        switch (v.type) {
-        case tString:
-            sz += doString(v.string.s);
-            if (v.string.context)
-                for (const char * * p = v.string.context; *p; ++p)
-                    sz += doString(*p);
-            break;
-        case tPath:
-            sz += doString(v.path);
-            break;
-        case tAttrs:
-            if (seen.find(v.attrs) == seen.end()) {
-                seen.insert(v.attrs);
-                sz += sizeof(Bindings) + sizeof(Attr) * v.attrs->capacity();
-                for (auto & i : *v.attrs)
-                    sz += doValue(*i.value);
+        if (countCalls) {
+            {
+                auto obj = topObj.object("primops");
+                for (auto & i : primOpCalls)
+                    obj.attr(i.first, i.second);
             }
-            break;
-        case tList1:
-        case tList2:
-        case tListN:
-            if (seen.find(v.listElems()) == seen.end()) {
-                seen.insert(v.listElems());
-                sz += v.listSize() * sizeof(Value *);
-                for (unsigned int n = 0; n < v.listSize(); ++n)
-                    sz += doValue(*v.listElems()[n]);
+            {
+                auto list = topObj.list("functions");
+                for (auto & i : functionCalls) {
+                    auto obj = list.object();
+                    if (i.first->name.set())
+                        obj.attr("name", (const string &) i.first->name);
+                    else
+                        obj.attr("name", nullptr);
+                    if (i.first->pos) {
+                        obj.attr("file", (const string &) i.first->pos.file);
+                        obj.attr("line", i.first->pos.line);
+                        obj.attr("column", i.first->pos.column);
+                    }
+                    obj.attr("count", i.second);
+                }
             }
-            break;
-        case tThunk:
-            sz += doEnv(*v.thunk.env);
-            break;
-        case tApp:
-            sz += doValue(*v.app.left);
-            sz += doValue(*v.app.right);
-            break;
-        case tLambda:
-            sz += doEnv(*v.lambda.env);
-            break;
-        case tPrimOpApp:
-            sz += doValue(*v.primOpApp.left);
-            sz += doValue(*v.primOpApp.right);
-            break;
-        case tExternal:
-            if (seen.find(v.external) != seen.end()) break;
-            seen.insert(v.external);
-            sz += v.external->valueSize(seen);
-            break;
-        default:
-            ;
+            {
+                auto list = topObj.list("attributes");
+                for (auto & i : attrSelects) {
+                    auto obj = list.object();
+                    if (i.first) {
+                        obj.attr("file", (const string &) i.first.file);
+                        obj.attr("line", i.first.line);
+                        obj.attr("column", i.first.column);
+                    }
+                    obj.attr("count", i.second);
+                }
+            }
         }
 
-        return sz;
-    };
-
-    doEnv = [&](Env & env) -> size_t {
-        if (seen.find(&env) != seen.end()) return 0;
-        seen.insert(&env);
-
-        size_t sz = sizeof(Env) + sizeof(Value *) * env.size;
-
-        for (unsigned int i = 0; i < env.size; ++i)
-            if (env.values[i])
-                sz += doValue(*env.values[i]);
-
-        if (env.up) sz += doEnv(*env.up);
-
-        return sz;
-    };
-
-    return doValue(v);
+        if (getEnv("NIX_SHOW_SYMBOLS").value_or("0") != "0") {
+            auto list = topObj.list("symbols");
+            symbols.dump([&](const std::string & s) { list.elem(s); });
+        }
+    }
 }
 
 
@@ -1810,6 +1897,27 @@ bool ExternalValueBase::operator==(const ExternalValueBase & b) const
 std::ostream & operator << (std::ostream & str, const ExternalValueBase & v) {
     return v.print(str);
 }
+
+
+EvalSettings::EvalSettings()
+{
+    auto var = getEnv("NIX_PATH");
+    if (var) nixPath = parseNixPath(*var);
+}
+
+Strings EvalSettings::getDefaultNixPath()
+{
+    Strings res;
+    auto add = [&](const Path & p) { if (pathExists(p)) { res.push_back(p); } };
+    add(getHome() + "/.nix-defexpr/channels");
+    add("nixpkgs=" + settings.nixStateDir + "/nix/profiles/per-user/root/channels/nixpkgs");
+    add(settings.nixStateDir + "/nix/profiles/per-user/root/channels");
+    return res;
+}
+
+EvalSettings evalSettings;
+
+static GlobalConfig::Register r1(&evalSettings);
 
 
 }

@@ -52,6 +52,15 @@ garbage collector as follows:
 <screen>
 $ nix-store --gc</screen>
 
+The behaviour of the gargage collector is affected by the 
+<literal>keep-derivations</literal> (default: true) and <literal>keep-outputs</literal>
+(default: false) options in the Nix configuration file. The defaults will ensure
+that all derivations that are build-time dependencies of garbage collector roots
+will be kept and that all output paths that are runtime dependencies
+will be kept as well. All other derivations or paths will be collected. 
+(This is usually what you want, but while you are developing
+it may make sense to keep outputs to ensure that rebuild times are quick.)
+
 If you are feeling uncertain, you can also first view what files would
 be deleted:
 

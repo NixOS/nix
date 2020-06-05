@@ -41,9 +41,9 @@ encountered</quote>).</para></footnote>.</para>
 </simplesect>
 
 
-<simplesect><title>Let-expressions</title>
+<simplesect xml:id="sect-let-expressions"><title>Let-expressions</title>
 
-<para>A let-expression allows you define local variables for an
+<para>A let-expression allows you to define local variables for an
 expression.  For instance,
 
 <programlisting>
@@ -61,7 +61,7 @@ evaluates to <literal>"foobar"</literal>.
 
 <simplesect><title>Inheriting attributes</title>
 
-<para>When defining a set it is often convenient to copy variables
+<para>When defining a set or in a let-expression it is often convenient to copy variables
 from the surrounding lexical scope (e.g., when you want to propagate
 attributes).  This can be shortened using the
 <literal>inherit</literal> keyword.  For instance,
@@ -72,7 +72,15 @@ let x = 123; in
   y = 456;
 }</programlisting>
 
-evaluates to <literal>{ x = 123; y = 456; }</literal>.  (Note that
+is equivalent to
+
+<programlisting>
+let x = 123; in
+{ x = x;
+  y = 456;
+}</programlisting>
+
+and both evaluate to <literal>{ x = 123; y = 456; }</literal>. (Note that
 this works because <varname>x</varname> is added to the lexical scope
 by the <literal>let</literal> construct.)  It is also possible to
 inherit attributes from another set.  For instance, in this fragment
@@ -100,6 +108,26 @@ variables from the surrounding scope (<varname>fetchurl</varname>
 ... <varname>yacc</varname>), but also inherits
 <varname>libXaw</varname> (the X Athena Widgets) from the
 <varname>xlibs</varname> (X11 client-side libraries) set.</para>
+
+<para>
+Summarizing the fragment
+
+<programlisting>
+...
+inherit x y z;
+inherit (src-set) a b c;
+...</programlisting>
+
+is equivalent to
+
+<programlisting>
+...
+x = x; y = y; z = z;
+a = src-set.a; b = src-set.b; c = src-set.c;
+...</programlisting>
+
+when used while defining local variables in a let-expression or
+while defining a set.</para>
 
 </simplesect>
 
@@ -189,7 +217,25 @@ but can also be written as:
   ellipsis(<literal>...</literal>) as you can access attribute names as 
   <literal>a</literal>, using <literal>args.a</literal>, which was given as an
   additional attribute to the function.
-  </para></listitem>
+  </para>
+
+  <warning>
+   <para>
+    The <literal>args@</literal> expression is bound to the argument passed to the function which
+    means that attributes with defaults that aren't explicitly specified in the function call
+    won't cause an evaluation error, but won't exist in <literal>args</literal>.
+   </para>
+   <para>
+    For instance
+<programlisting>
+let
+  function = args@{ a ? 23, ... }: args;
+in
+ function {}
+</programlisting>
+    will evaluate to an empty attribute set.
+   </para>
+  </warning></listitem>
 
 </itemizedlist>
 
@@ -333,7 +379,20 @@ with (import ./definitions.nix); ...</programlisting>
 
 makes all attributes defined in the file
 <filename>definitions.nix</filename> available as if they were defined
-locally in a <literal>rec</literal>-expression.</para>
+locally in a <literal>let</literal>-expression.</para>
+
+<para>The bindings introduced by <literal>with</literal> do not shadow bindings
+introduced by other means, e.g.
+
+<programlisting>
+let a = 3; in with { a = 1; }; let a = 4; in with { a = 2; }; ...</programlisting>
+
+establishes the same scope as
+
+<programlisting>
+let a = 1; in let a = 2; in let a = 3; in let a = 4; in ...</programlisting>
+
+</para>
 
 </simplesect>
 

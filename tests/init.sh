@@ -16,7 +16,14 @@ mkdir "$NIX_CONF_DIR"
 cat > "$NIX_CONF_DIR"/nix.conf <<EOF
 build-users-group =
 keep-derivations = false
+sandbox = false
+experimental-features = nix-command flakes
+include nix.conf.extra
+EOF
+
+cat > "$NIX_CONF_DIR"/nix.conf.extra <<EOF
 fsync-metadata = false
+!include nix.conf.extra.not-there
 EOF
 
 # Initialise the database.

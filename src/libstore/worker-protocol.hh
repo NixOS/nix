@@ -6,7 +6,7 @@ namespace nix {
 #define WORKER_MAGIC_1 0x6e697863
 #define WORKER_MAGIC_2 0x6478696f
 
-#define PROTOCOL_VERSION 0x114
+#define PROTOCOL_VERSION 0x115
 #define GET_PROTOCOL_MAJOR(x) ((x) & 0xff00)
 #define GET_PROTOCOL_MINOR(x) ((x) & 0x00ff)
 
@@ -62,8 +62,12 @@ typedef enum {
 #define STDERR_RESULT         0x52534c54
 
 
-Path readStorePath(Store & store, Source & from);
-template<class T> T readStorePaths(Store & store, Source & from);
+class Store;
+struct Source;
+
+template<class T> T readStorePaths(const Store & store, Source & from);
+
+void writeStorePaths(const Store & store, Sink & out, const StorePathSet & paths);
 
 
 }

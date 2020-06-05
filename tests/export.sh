@@ -8,6 +8,11 @@ nix-store --export $outPath > $TEST_ROOT/exp
 
 nix-store --export $(nix-store -qR $outPath) > $TEST_ROOT/exp_all
 
+if nix-store --export $outPath >/dev/full ; then
+    echo "exporting to a bad file descriptor should fail"
+    exit 1
+fi
+
 
 clearStore
 

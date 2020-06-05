@@ -9,6 +9,9 @@
   </group>
 </arg>
 <arg>
+  <arg choice='plain'><option>--quiet</option></arg>
+</arg>
+<arg>
   <group choice='plain'>
     <arg choice='plain'><option>--no-build-output</option></arg>
     <arg choice='plain'><option>-Q</option></arg>
@@ -47,7 +50,6 @@
 </arg>
 <arg><option>--fallback</option></arg>
 <arg><option>--readonly-mode</option></arg>
-<arg><option>--show-trace</option></arg>
 <arg>
   <option>-I</option>
   <replaceable>path</replaceable>

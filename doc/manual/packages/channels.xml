@@ -17,6 +17,9 @@ a set of Nix expressions and a manifest.  Using the command <link
 linkend="sec-nix-channel"><command>nix-channel</command></link> you
 can automatically stay up to date with whatever is available at that
 URL.</para>
+      
+<para>To see the list of official NixOS channels, visit <link
+xlink:href="https://nixos.org/channels" />.</para>
 
 <para>You can “subscribe” to a channel using
 <command>nix-channel --add</command>, e.g.,

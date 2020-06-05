@@ -1,6 +1,6 @@
 #include "command.hh"
 #include "attr-path.hh"
-#include "common-opts.hh"
+#include "common-eval-args.hh"
 #include "derivations.hh"
 #include "eval-inline.hh"
 #include "eval.hh"
@@ -12,6 +12,16 @@
 
 namespace nix {
 
+SourceExprCommand::SourceExprCommand()
+{
+    mkFlag()
+        .shortName('f')
+        .longName("file")
+        .label("file")
+        .description("evaluate FILE rather than the default")
+        .dest(&file);
+}
+
 Value * SourceExprCommand::getSourceExpr(EvalState & state)
 {
     if (vSourceExpr) return vSourceExpr;
@@ -20,10 +30,8 @@ Value * SourceExprCommand::getSourceExpr(EvalState & state)
 
     vSourceExpr = state.allocValue();
 
-    if (file != "") {
-        Expr * e = state.parseExprFromFile(resolveExprPath(lookupFileArg(state, file)));
-        state.eval(e, *vSourceExpr);
-    }
+    if (file != "")
+        state.evalFile(lookupFileArg(state, file), *vSourceExpr);
 
     else {
 
@@ -31,31 +39,32 @@ Value * SourceExprCommand::getSourceExpr(EvalState & state)
 
         auto searchPath = state.getSearchPath();
 
-        state.mkAttrs(*vSourceExpr, searchPath.size() + 1);
+        state.mkAttrs(*vSourceExpr, 1024);
 
         mkBool(*state.allocAttr(*vSourceExpr, sToplevel), true);
 
         std::unordered_set<std::string> seen;
 
-        for (auto & i : searchPath) {
-            if (i.first == "") continue;
-            if (seen.count(i.first)) continue;
-            seen.insert(i.first);
-#if 0
-            auto res = state.resolveSearchPathElem(i);
-            if (!res.first) continue;
-            if (!pathExists(res.second)) continue;
-            mkApp(*state.allocAttr(*vSourceExpr, state.symbols.create(i.first)),
-                state.getBuiltin("import"),
-                mkString(*state.allocValue(), res.second));
-#endif
+        auto addEntry = [&](const std::string & name) {
+            if (name == "") return;
+            if (!seen.insert(name).second) return;
             Value * v1 = state.allocValue();
             mkPrimOpApp(*v1, state.getBuiltin("findFile"), state.getBuiltin("nixPath"));
             Value * v2 = state.allocValue();
-            mkApp(*v2, *v1, mkString(*state.allocValue(), i.first));
-            mkApp(*state.allocAttr(*vSourceExpr, state.symbols.create(i.first)),
+            mkApp(*v2, *v1, mkString(*state.allocValue(), name));
+            mkApp(*state.allocAttr(*vSourceExpr, state.symbols.create(name)),
                 state.getBuiltin("import"), *v2);
-        }
+        };
+
+        for (auto & i : searchPath)
+            /* Hack to handle channels. */
+            if (i.first.empty() && pathExists(i.second + "/manifest.nix")) {
+                for (auto & j : readDirectory(i.second))
+                    if (j.name != "manifest.nix"
+                        && pathExists(fmt("%s/%s/default.nix", i.second, j.name)))
+                        addEntry(j.name);
+            } else
+                addEntry(i.first);
 
         vSourceExpr->attrs->sort();
     }
@@ -66,35 +75,44 @@ Value * SourceExprCommand::getSourceExpr(EvalState & state)
 ref<EvalState> SourceExprCommand::getEvalState()
 {
     if (!evalState)
-        evalState = std::make_shared<EvalState>(Strings{}, getStore());
+        evalState = std::make_shared<EvalState>(searchPath, getStore());
     return ref<EvalState>(evalState);
 }
 
-struct InstallableStoreDrv : Installable
+Buildable Installable::toBuildable()
 {
-    Path storePath;
-
-    InstallableStoreDrv(const Path & storePath) : storePath(storePath) { }
-
-    std::string what() override { return storePath; }
-
-    Buildables toBuildable(bool singular) override
-    {
-        return {{storePath, {}}};
-    }
-};
+    auto buildables = toBuildables();
+    if (buildables.size() != 1)
+        throw Error("installable '%s' evaluates to %d derivations, where only one is expected", what(), buildables.size());
+    return std::move(buildables[0]);
+}
 
 struct InstallableStorePath : Installable
 {
-    Path storePath;
+    ref<Store> store;
+    StorePath storePath;
 
-    InstallableStorePath(const Path & storePath) : storePath(storePath) { }
+    InstallableStorePath(ref<Store> store, const Path & storePath)
+        : store(store), storePath(store->parseStorePath(storePath)) { }
 
-    std::string what() override { return storePath; }
+    std::string what() override { return store->printStorePath(storePath); }
 
-    Buildables toBuildable(bool singular) override
+    Buildables toBuildables() override
     {
-        return {{storePath, {}}};
+        std::map<std::string, StorePath> outputs;
+        outputs.insert_or_assign("out", storePath.clone());
+        Buildable b{
+            .drvPath = storePath.isDerivation() ? storePath.clone() : std::optional<StorePath>(),
+            .outputs = std::move(outputs)
+        };
+        Buildables bs;
+        bs.push_back(std::move(b));
+        return bs;
+    }
+
+    std::optional<StorePath> getStorePath() override
+    {
+        return storePath.clone();
     }
 };
 
@@ -104,29 +122,46 @@ struct InstallableValue : Installable
 
     InstallableValue(SourceExprCommand & cmd) : cmd(cmd) { }
 
-    Buildables toBuildable(bool singular) override
+    Buildables toBuildables() override
     {
         auto state = cmd.getEvalState();
 
-        auto v = toValue(*state);
+        auto v = toValue(*state).first;
 
-        // FIXME
-        std::map<string, string> autoArgs_;
-        Bindings & autoArgs(*evalAutoArgs(*state, autoArgs_));
+        Bindings & autoArgs = *cmd.getAutoArgs(*state);
 
         DrvInfos drvs;
         getDerivations(*state, *v, "", autoArgs, drvs, false);
 
-        if (singular && drvs.size() != 1)
-            throw Error("installable '%s' evaluates to %d derivations, where only one is expected", what(), drvs.size());
-
         Buildables res;
 
-        for (auto & drv : drvs)
-            for (auto & output : drv.queryOutputs())
-                res.emplace(output.second, Whence{output.first, drv.queryDrvPath()});
+        StorePathSet drvPaths;
 
-        return res;
+        for (auto & drv : drvs) {
+            Buildable b{.drvPath = state->store->parseStorePath(drv.queryDrvPath())};
+            drvPaths.insert(b.drvPath->clone());
+
+            auto outputName = drv.queryOutputName();
+            if (outputName == "")
+                throw Error("derivation '%s' lacks an 'outputName' attribute", state->store->printStorePath(*b.drvPath));
+
+            b.outputs.emplace(outputName, state->store->parseStorePath(drv.queryOutPath()));
+
+            res.push_back(std::move(b));
+        }
+
+        // Hack to recognize .all: if all drvs have the same drvPath,
+        // merge the buildables.
+        if (drvPaths.size() == 1) {
+            Buildable b{.drvPath = drvPaths.begin()->clone()};
+            for (auto & b2 : res)
+                for (auto & output : b2.outputs)
+                    b.outputs.insert_or_assign(output.first, output.second.clone());
+            Buildables bs;
+            bs.push_back(std::move(b));
+            return bs;
+        } else
+            return res;
     }
 };
 
@@ -139,11 +174,11 @@ struct InstallableExpr : InstallableValue
 
     std::string what() override { return text; }
 
-    Value * toValue(EvalState & state) override
+    std::pair<Value *, Pos> toValue(EvalState & state) override
     {
         auto v = state.allocValue();
         state.eval(state.parseExprFromString(text, absPath(".")), *v);
-        return v;
+        return {v, noPos};
     }
 };
 
@@ -157,18 +192,16 @@ struct InstallableAttrPath : InstallableValue
 
     std::string what() override { return attrPath; }
 
-    Value * toValue(EvalState & state) override
+    std::pair<Value *, Pos> toValue(EvalState & state) override
     {
         auto source = cmd.getSourceExpr(state);
 
-        // FIXME
-        std::map<string, string> autoArgs_;
-        Bindings & autoArgs(*evalAutoArgs(state, autoArgs_));
+        Bindings & autoArgs = *cmd.getAutoArgs(state);
 
-        Value * v = findAlongAttrPath(state, attrPath, autoArgs, *source);
+        auto v = findAlongAttrPath(state, attrPath, autoArgs, *source).first;
         state.forceValue(*v);
 
-        return v;
+        return {v, noPos};
     }
 };
 
@@ -177,14 +210,14 @@ std::string attrRegex = R"([A-Za-z_][A-Za-z0-9-_+]*)";
 static std::regex attrPathRegex(fmt(R"(%1%(\.%1%)*)", attrRegex));
 
 static std::vector<std::shared_ptr<Installable>> parseInstallables(
-    SourceExprCommand & cmd, ref<Store> store, Strings ss, bool useDefaultInstallables)
+    SourceExprCommand & cmd, ref<Store> store, std::vector<std::string> ss, bool useDefaultInstallables)
 {
     std::vector<std::shared_ptr<Installable>> result;
 
     if (ss.empty() && useDefaultInstallables) {
         if (cmd.file == "")
             cmd.file = ".";
-        ss = Strings{""};
+        ss = {""};
     }
 
     for (auto & s : ss) {
@@ -196,12 +229,8 @@ static std::vector<std::shared_ptr<Installable>> parseInstallables(
 
             auto path = store->toStorePath(store->followLinksToStore(s));
 
-            if (store->isStorePath(path)) {
-                if (isDerivation(path))
-                    result.push_back(std::make_shared<InstallableStoreDrv>(path));
-                else
-                    result.push_back(std::make_shared<InstallableStorePath>(path));
-            }
+            if (store->isStorePath(path))
+                result.push_back(std::make_shared<InstallableStorePath>(store, path));
         }
 
         else if (s == "" || std::regex_match(s, attrPathRegex))
@@ -214,25 +243,92 @@ static std::vector<std::shared_ptr<Installable>> parseInstallables(
     return result;
 }
 
-PathSet InstallablesCommand::toStorePaths(ref<Store> store, ToStorePathsMode mode)
+std::shared_ptr<Installable> parseInstallable(
+    SourceExprCommand & cmd, ref<Store> store, const std::string & installable,
+    bool useDefaultInstallables)
+{
+    auto installables = parseInstallables(cmd, store, {installable}, false);
+    assert(installables.size() == 1);
+    return installables.front();
+}
+
+Buildables build(ref<Store> store, RealiseMode mode,
+    std::vector<std::shared_ptr<Installable>> installables)
 {
     if (mode != Build)
         settings.readOnlyMode = true;
 
-    PathSet outPaths, buildables;
+    Buildables buildables;
 
-    for (auto & i : installables)
-        for (auto & b : i->toBuildable()) {
-            outPaths.insert(b.first);
-            buildables.insert(b.second.drvPath != "" ? b.second.drvPath : b.first);
+    std::vector<StorePathWithOutputs> pathsToBuild;
+
+    for (auto & i : installables) {
+        for (auto & b : i->toBuildables()) {
+            if (b.drvPath) {
+                StringSet outputNames;
+                for (auto & output : b.outputs)
+                    outputNames.insert(output.first);
+                pathsToBuild.push_back({*b.drvPath, outputNames});
+            } else
+                for (auto & output : b.outputs)
+                    pathsToBuild.push_back({output.second.clone()});
+            buildables.push_back(std::move(b));
         }
+    }
 
     if (mode == DryRun)
-        printMissing(store, buildables);
+        printMissing(store, pathsToBuild, lvlError);
     else if (mode == Build)
-        store->buildPaths(buildables);
+        store->buildPaths(pathsToBuild);
+
+    return buildables;
+}
+
+StorePathSet toStorePaths(ref<Store> store, RealiseMode mode,
+    std::vector<std::shared_ptr<Installable>> installables)
+{
+    StorePathSet outPaths;
+
+    for (auto & b : build(store, mode, installables))
+        for (auto & output : b.outputs)
+            outPaths.insert(output.second.clone());
 
     return outPaths;
+}
+
+StorePath toStorePath(ref<Store> store, RealiseMode mode,
+    std::shared_ptr<Installable> installable)
+{
+    auto paths = toStorePaths(store, mode, {installable});
+
+    if (paths.size() != 1)
+            throw Error("argument '%s' should evaluate to one store path", installable->what());
+
+    return paths.begin()->clone();
+}
+
+StorePathSet toDerivations(ref<Store> store,
+    std::vector<std::shared_ptr<Installable>> installables, bool useDeriver)
+{
+    StorePathSet drvPaths;
+
+    for (auto & i : installables)
+        for (auto & b : i->toBuildables()) {
+            if (!b.drvPath) {
+                if (!useDeriver)
+                    throw Error("argument '%s' did not evaluate to a derivation", i->what());
+                for (auto & output : b.outputs) {
+                    auto derivers = store->queryValidDerivers(output.second);
+                    if (derivers.empty())
+                        throw Error("'%s' does not have a known deriver", i->what());
+                    // FIXME: use all derivers?
+                    drvPaths.insert(derivers.begin()->clone());
+                }
+            } else
+                drvPaths.insert(b.drvPath->clone());
+        }
+
+    return drvPaths;
 }
 
 void InstallablesCommand::prepare()
@@ -242,9 +338,7 @@ void InstallablesCommand::prepare()
 
 void InstallableCommand::prepare()
 {
-    auto installables = parseInstallables(*this, getStore(), {_installable}, false);
-    assert(installables.size() == 1);
-    installable = installables.front();
+    installable = parseInstallable(*this, getStore(), _installable, false);
 }
 
 }

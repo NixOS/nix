@@ -6,6 +6,7 @@ namespace nix {
 
 typedef enum {
     lvlError = 0,
+    lvlWarn,
     lvlInfo,
     lvlTalkative,
     lvlChatty,
@@ -25,6 +26,7 @@ typedef enum {
     actVerifyPaths = 107,
     actSubstitute = 108,
     actQueryPathInfo = 109,
+    actPostBuildHook = 110,
 } ActivityType;
 
 typedef enum {
@@ -35,6 +37,7 @@ typedef enum {
     resSetPhase = 104,
     resProgress = 105,
     resSetExpected = 106,
+    resPostBuildLogLine = 107,
 } ResultType;
 
 typedef uint64_t ActivityId;
@@ -77,7 +80,8 @@ public:
     virtual void result(ActivityId act, ResultType type, const Fields & fields) { };
 };
 
-extern thread_local ActivityId curActivity;
+ActivityId getCurActivity();
+void setCurActivity(const ActivityId activityId);
 
 struct Activity
 {
@@ -86,16 +90,15 @@ struct Activity
     const ActivityId id;
 
     Activity(Logger & logger, Verbosity lvl, ActivityType type, const std::string & s = "",
-        const Logger::Fields & fields = {}, ActivityId parent = curActivity);
+        const Logger::Fields & fields = {}, ActivityId parent = getCurActivity());
 
     Activity(Logger & logger, ActivityType type,
-        const Logger::Fields & fields = {}, ActivityId parent = curActivity)
+        const Logger::Fields & fields = {}, ActivityId parent = getCurActivity())
         : Activity(logger, lvlError, type, "", fields, parent) { };
 
     Activity(const Activity & act) = delete;
 
-    ~Activity()
-    { logger.stopActivity(id); }
+    ~Activity();
 
     void progress(uint64_t done = 0, uint64_t expected = 0, uint64_t running = 0, uint64_t failed = 0) const
     { result(resProgress, done, expected, running, failed); }
@@ -122,13 +125,19 @@ struct Activity
 struct PushActivity
 {
     const ActivityId prevAct;
-    PushActivity(ActivityId act) : prevAct(curActivity) { curActivity = act; }
-    ~PushActivity() { curActivity = prevAct; }
+    PushActivity(ActivityId act) : prevAct(getCurActivity()) { setCurActivity(act); }
+    ~PushActivity() { setCurActivity(prevAct); }
 };
 
 extern Logger * logger;
 
 Logger * makeDefaultLogger();
+
+Logger * makeJSONLogger(Logger & prevLogger);
+
+bool handleJSONLogMessage(const std::string & msg,
+    const Activity & act, std::map<ActivityId, Activity> & activities,
+    bool trusted);
 
 extern Verbosity verbosity; /* suppress msgs > this */
 
@@ -149,10 +158,10 @@ extern Verbosity verbosity; /* suppress msgs > this */
 #define vomit(args...) printMsg(lvlVomit, args)
 
 template<typename... Args>
-inline void warn(const std::string & fs, Args... args)
+inline void warn(const std::string & fs, const Args & ... args)
 {
     boost::format f(fs);
-    nop{boost::io::detail::feed(f, args)...};
+    formatHelper(f, args...);
     logger->warn(f.str());
 }
 

@@ -10,7 +10,10 @@ let
       '';
   };
 
-  value = import bar;
+  value =
+    # Test that pathExists can check the existence of /nix/store paths
+    assert builtins.pathExists bar;
+    import bar;
 
 in
 

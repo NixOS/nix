@@ -2,34 +2,16 @@
 
 #include "types.hh"
 #include "config.hh"
+#include "util.hh"
 
 #include <map>
-#include <sys/types.h>
+#include <limits>
 
+#include <sys/types.h>
 
 namespace nix {
 
 typedef enum { smEnabled, smRelaxed, smDisabled } SandboxMode;
-
-extern bool useCaseHack; // FIXME
-
-struct CaseHackSetting : public BaseSetting<bool>
-{
-    CaseHackSetting(Config * options,
-        const std::string & name,
-        const std::string & description,
-        const std::set<std::string> & aliases = {})
-        : BaseSetting<bool>(useCaseHack, name, description, aliases)
-    {
-        options->addSetting(this);
-    }
-
-    void set(const std::string & str) override
-    {
-        BaseSetting<bool>::set(str);
-        nix::useCaseHack = true;
-    }
-};
 
 struct MaxBuildJobsSetting : public BaseSetting<unsigned int>
 {
@@ -50,13 +32,13 @@ class Settings : public Config {
 
     unsigned int getDefaultCores();
 
+    StringSet getDefaultSystemFeatures();
+
+    bool isWSL1();
+
 public:
 
     Settings();
-
-    void loadConfFile();
-
-    void set(const string & name, const string & value);
 
     Path nixPrefix;
 
@@ -80,8 +62,14 @@ public:
     /* The directory where the main programs are stored. */
     Path nixBinDir;
 
+    /* The directory where the man pages are stored. */
+    Path nixManDir;
+
     /* File name of the socket the daemon listens to.  */
     Path nixDaemonSocketFile;
+
+    Setting<std::string> storeUri{this, getEnv("NIX_REMOTE").value_or("auto"), "store",
+        "The default Nix store to use."};
 
     Setting<bool> keepFailed{this, false, "keep-failed",
         "Whether to keep temporary directories of failed builds."};
@@ -96,9 +84,9 @@ public:
     /* Whether to show build log output in real time. */
     bool verboseBuild = true;
 
-    /* If verboseBuild is false, the number of lines of the tail of
-       the log to show if a build fails. */
-    size_t logLines = 10;
+    Setting<size_t> logLines{this, 10, "log-lines",
+        "If verbose-build is false, the number of lines of the tail of "
+        "the log to show if a build fails."};
 
     MaxBuildJobsSetting maxBuildJobs{this, 1, "max-jobs",
         "Maximum number of parallel build jobs. \"auto\" means use number of cores.",
@@ -127,18 +115,16 @@ public:
         "The maximum duration in seconds that a builder can run. "
         "0 means infinity.", {"build-timeout"}};
 
-    Setting<bool> useBuildHook{this, true, "remote-builds",
-        "Whether to use build hooks (for distributed builds)."};
-
     PathSetting buildHook{this, true, nixLibexecDir + "/nix/build-remote", "build-hook",
         "The path of the helper program that executes builds to remote machines."};
 
-    Setting<std::string> builders{this, "", "builders",
+    Setting<std::string> builders{this, "@" + nixConfDir + "/machines", "builders",
         "A semicolon-separated list of build machines, in the format of nix.machines."};
 
-    Setting<Strings> builderFiles{this,
-        {nixConfDir + "/machines"}, "builder-files",
-        "A list of files specifying build machines."};
+    Setting<bool> buildersUseSubstitutes{this, false, "builders-use-substitutes",
+        "Whether build machines should use their own substitutes for obtaining "
+        "build dependencies if possible, rather than waiting for this host to "
+        "upload them."};
 
     Setting<off_t> reservedSize{this, 8 * 1024 * 1024, "gc-reserved-space",
         "Amount of reserved disk space for the garbage collector."};
@@ -146,13 +132,13 @@ public:
     Setting<bool> fsyncMetadata{this, true, "fsync-metadata",
         "Whether SQLite should use fsync()."};
 
-    Setting<bool> useSQLiteWAL{this, true, "use-sqlite-wal",
+    Setting<bool> useSQLiteWAL{this, !isWSL1(), "use-sqlite-wal",
         "Whether SQLite should use WAL mode."};
 
     Setting<bool> syncBeforeRegistering{this, false, "sync-before-registering",
         "Whether to call sync() before registering a path as valid."};
 
-    Setting<bool> useSubstitutes{this, true, "use-substitutes",
+    Setting<bool> useSubstitutes{this, true, "substitute",
         "Whether to use substitutes.",
         {"build-use-substitutes"}};
 
@@ -208,12 +194,16 @@ public:
     bool lockCPU;
 
     /* Whether to show a stack trace if Nix evaluation fails. */
-    bool showTrace = false;
+    Setting<bool> showTrace{this, false, "show-trace",
+        "Whether to show a stack trace on evaluation errors."};
 
-    Setting<bool> enableNativeCode{this, false, "allow-unsafe-native-code-during-evaluation",
-        "Whether builtin functions that allow executing native code should be enabled."};
-
-    Setting<SandboxMode> sandboxMode{this, smDisabled, "sandbox",
+    Setting<SandboxMode> sandboxMode{this,
+        #if __linux__
+          smEnabled
+        #else
+          smDisabled
+        #endif
+        , "sandbox",
         "Whether to enable sandboxed builds. Can be \"true\", \"false\" or \"relaxed\".",
         {"build-use-chroot", "build-use-sandbox"}};
 
@@ -221,13 +211,12 @@ public:
         "The paths to make available inside the build sandbox.",
         {"build-chroot-dirs", "build-sandbox-paths"}};
 
+    Setting<bool> sandboxFallback{this, true, "sandbox-fallback",
+        "Whether to disable sandboxing when the kernel doesn't allow it."};
+
     Setting<PathSet> extraSandboxPaths{this, {}, "extra-sandbox-paths",
         "Additional paths to make available inside the build sandbox.",
         {"build-extra-chroot-dirs", "build-extra-sandbox-paths"}};
-
-    Setting<bool> restrictEval{this, false, "restrict-eval",
-        "Whether to restrict file system access to paths in $NIX_PATH, "
-        "and to disallow fetching files from the network."};
 
     Setting<size_t> buildRepeat{this, 0, "repeat",
         "The number of times to repeat a build in order to verify determinism.",
@@ -261,26 +250,33 @@ public:
     Setting<bool> enforceDeterminism{this, true, "enforce-determinism",
         "Whether to fail if repeated builds produce different output."};
 
-    Setting<Strings> binaryCachePublicKeys{this,
+    Setting<Strings> trustedPublicKeys{this,
         {"cache.nixos.org-1:6NCHdD59X431o0gWypbMrAURkbJ16ZPMQFGspcDShjY="},
-        "binary-cache-public-keys",
-        "Trusted public keys for secure substitution."};
+        "trusted-public-keys",
+        "Trusted public keys for secure substitution.",
+        {"binary-cache-public-keys"}};
 
     Setting<Strings> secretKeyFiles{this, {}, "secret-key-files",
         "Secret keys with which to sign local builds."};
 
-    Setting<size_t> binaryCachesParallelConnections{this, 25, "http-connections",
-        "Number of parallel HTTP connections.",
-        {"binary-caches-parallel-connections"}};
-
-    Setting<bool> enableHttp2{this, true, "enable-http2",
-        "Whether to enable HTTP/2 support."};
-
     Setting<unsigned int> tarballTtl{this, 60 * 60, "tarball-ttl",
-        "How soon to expire files fetched by builtins.fetchTarball and builtins.fetchurl."};
+        "How long downloaded files are considered up-to-date."};
 
-    Setting<std::string> signedBinaryCaches{this, "*", "signed-binary-caches",
-        "Obsolete."};
+    Setting<bool> requireSigs{this, true, "require-sigs",
+        "Whether to check that any non-content-addressed path added to the "
+        "Nix store has a valid signature (that is, one signed using a key "
+        "listed in 'trusted-public-keys'."};
+
+    Setting<StringSet> extraPlatforms{this,
+        std::string{SYSTEM} == "x86_64-linux" ? StringSet{"i686-linux"} : StringSet{},
+        "extra-platforms",
+        "Additional platforms that can be built on the local system. "
+        "These may be supported natively (e.g. armv7 on some aarch64 CPUs "
+        "or using hacks like qemu-user."};
+
+    Setting<StringSet> systemFeatures{this, getDefaultSystemFeatures(),
+        "system-features",
+        "Optional features that this system implements (like \"kvm\")."};
 
     Setting<Strings> substituters{this,
         nixStore == "/nix/store" ? Strings{"https://cache.nixos.org/"} : Strings(),
@@ -300,6 +296,14 @@ public:
     Setting<Strings> trustedUsers{this, {"root"}, "trusted-users",
         "Which users or groups are trusted to ask the daemon to do unsafe things."};
 
+    Setting<unsigned int> ttlNegativeNarInfoCache{this, 3600, "narinfo-cache-negative-ttl",
+        "The TTL in seconds for negative lookups in the disk cache i.e binary cache lookups that "
+        "return an invalid path result"};
+
+    Setting<unsigned int> ttlPositiveNarInfoCache{this, 30 * 24 * 3600, "narinfo-cache-positive-ttl",
+        "The TTL in seconds for positive lookups in the disk cache i.e binary cache lookups that "
+        "return a valid path result."};
+
     /* ?Who we trust to use the daemon in safe ways */
     Setting<Strings> allowedUsers{this, {"*"}, "allowed-users",
         "Which users or groups are allowed to connect to the daemon."};
@@ -307,14 +311,12 @@ public:
     Setting<bool> printMissing{this, true, "print-missing",
         "Whether to print what paths need to be built or downloaded."};
 
-    Setting<std::string> preBuildHook{this,
-#if __APPLE__
-        nixLibexecDir + "/nix/resolve-system-dependencies",
-#else
-        "",
-#endif
+    Setting<std::string> preBuildHook{this, "",
         "pre-build-hook",
         "A program to run just before a build to set derivation-specific build settings."};
+
+    Setting<std::string> postBuildHook{this, "", "post-build-hook",
+        "A program to run just after each successful build."};
 
     Setting<std::string> netrcFile{this, fmt("%s/%s", nixConfDir, "netrc"), "netrc-file",
         "Path to the netrc file used to obtain usernames/passwords for downloads."};
@@ -322,19 +324,13 @@ public:
     /* Path to the SSL CA file used */
     Path caFile;
 
-    Setting<bool> enableImportFromDerivation{this, true, "allow-import-from-derivation",
-        "Whether the evaluator allows importing the result of a derivation."};
-
-    CaseHackSetting useCaseHack{this, "use-case-hack",
-        "Whether to enable a Darwin-specific hack for dealing with file name collisions."};
-
-    Setting<unsigned long> connectTimeout{this, 0, "connect-timeout",
-        "Timeout for connecting to servers during downloads. 0 means use curl's builtin default."};
-
-    Setting<std::string> userAgentSuffix{this, "", "user-agent-suffix",
-        "String appended to the user agent in HTTP requests."};
-
 #if __linux__
+    Setting<bool> filterSyscalls{this, true, "filter-syscalls",
+            "Whether to prevent certain dangerous system calls, such as "
+            "creation of setuid/setgid files or adding ACLs or extended "
+            "attributes. Only disable this if you're aware of the "
+            "security implications."};
+
     Setting<bool> allowNewPrivileges{this, false, "allow-new-privileges",
         "Whether builders can acquire new privileges by calling programs with "
         "setuid/setgid bits or with file capabilities."};
@@ -342,14 +338,46 @@ public:
 
     Setting<Strings> hashedMirrors{this, {"http://tarballs.nixos.org/"}, "hashed-mirrors",
         "A list of servers used by builtins.fetchurl to fetch files by hash."};
+
+    Setting<uint64_t> minFree{this, 0, "min-free",
+        "Automatically run the garbage collector when free disk space drops below the specified amount."};
+
+    Setting<uint64_t> maxFree{this, std::numeric_limits<uint64_t>::max(), "max-free",
+        "Stop deleting garbage when free disk space is above the specified amount."};
+
+    Setting<uint64_t> minFreeCheckInterval{this, 5, "min-free-check-interval",
+        "Number of seconds between checking free disk space."};
+
+    Setting<Paths> pluginFiles{this, {}, "plugin-files",
+        "Plugins to dynamically load at nix initialization time."};
+
+    Setting<std::string> githubAccessToken{this, "", "github-access-token",
+        "GitHub access token to get access to GitHub data through the GitHub API for github:<..> flakes."};
+
+    Setting<Strings> experimentalFeatures{this, {}, "experimental-features",
+        "Experimental Nix features to enable."};
+
+    bool isExperimentalFeatureEnabled(const std::string & name);
+
+    void requireExperimentalFeature(const std::string & name);
+
+    Setting<bool> allowDirty{this, true, "allow-dirty",
+        "Whether to allow dirty Git/Mercurial trees."};
+
+    Setting<bool> warnDirty{this, true, "warn-dirty",
+        "Whether to warn about dirty Git/Mercurial trees."};
 };
 
 
 // FIXME: don't use a global variable.
 extern Settings settings;
 
+/* This should be called after settings are initialized, but before
+   anything else */
+void initPlugins();
+
+void loadConfFile();
 
 extern const string nixVersion;
-
 
 }

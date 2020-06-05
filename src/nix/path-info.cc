@@ -4,8 +4,8 @@
 #include "json.hh"
 #include "common-args.hh"
 
-#include <iomanip>
 #include <algorithm>
+#include <array>
 
 using namespace nix;
 
@@ -13,18 +13,15 @@ struct CmdPathInfo : StorePathsCommand, MixJSON
 {
     bool showSize = false;
     bool showClosureSize = false;
+    bool humanReadable = false;
     bool showSigs = false;
 
     CmdPathInfo()
     {
         mkFlag('s', "size", "print size of the NAR dump of each path", &showSize);
         mkFlag('S', "closure-size", "print sum size of the NAR dumps of the closure of each path", &showClosureSize);
+        mkFlag('h', "human-readable", "with -s and -S, print sizes like 1K 234M 5.67G etc.", &humanReadable);
         mkFlag(0, "sigs", "show signatures", &showSigs);
-    }
-
-    std::string name() override
-    {
-        return "path-info";
     }
 
     std::string description() override
@@ -38,6 +35,10 @@ struct CmdPathInfo : StorePathsCommand, MixJSON
             Example{
                 "To show the closure sizes of every path in the current NixOS system closure, sorted by size:",
                 "nix path-info -rS /run/current-system | sort -nk2"
+            },
+            Example{
+                "To show a package's closure size and all its dependencies with human readable sizes:",
+                "nix path-info -rsSh nixpkgs.rust"
             },
             Example{
                 "To check the existence of a path in a binary cache:",
@@ -58,33 +59,55 @@ struct CmdPathInfo : StorePathsCommand, MixJSON
         };
     }
 
-    void run(ref<Store> store, Paths storePaths) override
+    void printSize(unsigned long long value)
+    {
+        if (!humanReadable) {
+            std::cout << fmt("\t%11d", value);
+            return;
+        }
+
+        static const std::array<char, 9> idents{{
+            ' ', 'K', 'M', 'G', 'T', 'P', 'E', 'Z', 'Y'
+        }};
+        size_t power = 0;
+        double res = value;
+        while (res > 1024 && power < idents.size()) {
+            ++power;
+            res /= 1024;
+        }
+        std::cout << fmt("\t%6.1f%c", res, idents.at(power));
+    }
+
+    void run(ref<Store> store, StorePaths storePaths) override
     {
         size_t pathLen = 0;
         for (auto & storePath : storePaths)
-            pathLen = std::max(pathLen, storePath.size());
+            pathLen = std::max(pathLen, store->printStorePath(storePath).size());
 
         if (json) {
-            JSONPlaceholder jsonRoot(std::cout, true);
+            JSONPlaceholder jsonRoot(std::cout);
             store->pathInfoToJSON(jsonRoot,
                 // FIXME: preserve order?
-                PathSet(storePaths.begin(), storePaths.end()),
-                true, showClosureSize, AllowInvalid);
+                storePathsToSet(storePaths),
+                true, showClosureSize, SRI, AllowInvalid);
         }
 
         else {
 
-            for (auto storePath : storePaths) {
+            for (auto & storePath : storePaths) {
                 auto info = store->queryPathInfo(storePath);
-                storePath = info->path; // FIXME: screws up padding
+                auto storePathS = store->printStorePath(storePath);
 
-                std::cout << storePath << std::string(std::max(0, (int) pathLen - (int) storePath.size()), ' ');
+                std::cout << storePathS;
+
+                if (showSize || showClosureSize || showSigs)
+                    std::cout << std::string(std::max(0, (int) pathLen - (int) storePathS.size()), ' ');
 
                 if (showSize)
-                    std::cout << '\t' << std::setw(11) << info->narSize;
+                    printSize(info->narSize);
 
                 if (showClosureSize)
-                    std::cout << '\t' << std::setw(11) << store->getClosureSize(storePath).first;
+                    printSize(store->getClosureSize(info->path).first);
 
                 if (showSigs) {
                     std::cout << '\t';
@@ -102,4 +125,4 @@ struct CmdPathInfo : StorePathsCommand, MixJSON
     }
 };
 
-static RegisterCommand r1(make_ref<CmdPathInfo>());
+static auto r1 = registerCommand<CmdPathInfo>("path-info");

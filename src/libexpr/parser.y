@@ -1,7 +1,7 @@
 %glr-parser
-%pure-parser
+%define api.pure
 %locations
-%error-verbose
+%define parse.error verbose
 %defines
 /* %no-lines */
 %parse-param { void * scanner }
@@ -20,6 +20,7 @@
 
 #include "nixexpr.hh"
 #include "eval.hh"
+#include "globals.hh"
 
 namespace nix {
 
@@ -31,12 +32,10 @@ namespace nix {
         Path basePath;
         Symbol path;
         string error;
-        bool atEnd;
         Symbol sLetBody;
         ParseData(EvalState & state)
             : state(state)
             , symbols(state.symbols)
-            , atEnd(false)
             , sLetBody(symbols.create("<let-body>"))
             { };
     };
@@ -83,6 +82,8 @@ static void addAttr(ExprAttrs * attrs, AttrPath & attrPath,
     AttrPath::iterator i;
     // All attrpaths have at least one attr
     assert(!attrPath.empty());
+    // Checking attrPath validity.
+    // ===========================
     for (i = attrPath.begin(); i + 1 < attrPath.end(); i++) {
         if (i->symbol.set()) {
             ExprAttrs::AttrDefs::iterator j = attrs->attrs.find(i->symbol);
@@ -104,11 +105,29 @@ static void addAttr(ExprAttrs * attrs, AttrPath & attrPath,
             attrs = nested;
         }
     }
+    // Expr insertion.
+    // ==========================
     if (i->symbol.set()) {
         ExprAttrs::AttrDefs::iterator j = attrs->attrs.find(i->symbol);
         if (j != attrs->attrs.end()) {
-            dupAttr(attrPath, pos, j->second.pos);
+            // This attr path is already defined. However, if both
+            // e and the expr pointed by the attr path are two attribute sets,
+            // we want to merge them.
+            // Otherwise, throw an error.
+            auto ae = dynamic_cast<ExprAttrs *>(e);
+            auto jAttrs = dynamic_cast<ExprAttrs *>(j->second.e);
+            if (jAttrs && ae) {
+                for (auto & ad : ae->attrs) {
+                    auto j2 = jAttrs->attrs.find(ad.first);
+                    if (j2 != jAttrs->attrs.end()) // Attr already defined in iAttrs, error.
+                        dupAttr(ad.first, j2->second.pos, ad.second.pos);
+                    jAttrs->attrs[ad.first] = ad.second;
+                }
+            } else {
+                dupAttr(attrPath, pos, j->second.pos);
+            }
         } else {
+            // This attr path is not defined. Let's create it.
             attrs->attrs[i->symbol] = ExprAttrs::AttrDef(e, pos);
             e->setName(i->symbol);
         }
@@ -120,11 +139,10 @@ static void addAttr(ExprAttrs * attrs, AttrPath & attrPath,
 
 static void addFormal(const Pos & pos, Formals * formals, const Formal & formal)
 {
-    if (formals->argNames.find(formal.name) != formals->argNames.end())
+    if (!formals->argNames.insert(formal.name).second)
         throw ParseError(format("duplicate formal function argument '%1%' at %2%")
             % formal.name % pos);
     formals->formals.push_front(formal);
-    formals->argNames.insert(formal.name);
 }
 
 
@@ -136,8 +154,8 @@ static Expr * stripIndentation(const Pos & pos, SymbolTable & symbols, vector<Ex
        whitespace-only final lines are not taken into account.  (So
        the " " in "\n ''" is ignored, but the " " in "\n foo''" is.) */
     bool atStartOfLine = true; /* = seen only whitespace in the current line */
-    unsigned int minIndent = 1000000;
-    unsigned int curIndent = 0;
+    size_t minIndent = 1000000;
+    size_t curIndent = 0;
     for (auto & i : es) {
         ExprIndStr * e = dynamic_cast<ExprIndStr *>(i);
         if (!e) {
@@ -148,7 +166,7 @@ static Expr * stripIndentation(const Pos & pos, SymbolTable & symbols, vector<Ex
             }
             continue;
         }
-        for (unsigned int j = 0; j < e->s.size(); ++j) {
+        for (size_t j = 0; j < e->s.size(); ++j) {
             if (atStartOfLine) {
                 if (e->s[j] == ' ')
                     curIndent++;
@@ -170,8 +188,8 @@ static Expr * stripIndentation(const Pos & pos, SymbolTable & symbols, vector<Ex
     /* Strip spaces from each line. */
     vector<Expr *> * es2 = new vector<Expr *>;
     atStartOfLine = true;
-    unsigned int curDropped = 0;
-    unsigned int n = es.size();
+    size_t curDropped = 0;
+    size_t n = es.size();
     for (vector<Expr *>::iterator i = es.begin(); i != es.end(); ++i, --n) {
         ExprIndStr * e = dynamic_cast<ExprIndStr *>(*i);
         if (!e) {
@@ -182,7 +200,7 @@ static Expr * stripIndentation(const Pos & pos, SymbolTable & symbols, vector<Ex
         }
 
         string s2;
-        for (unsigned int j = 0; j < e->s.size(); ++j) {
+        for (size_t j = 0; j < e->s.size(); ++j) {
             if (atStartOfLine) {
                 if (e->s[j] == ' ') {
                     if (curDropped++ >= minIndent)
@@ -275,11 +293,11 @@ void yyerror(YYLTYPE * loc, yyscan_t scanner, ParseData * data, const char * err
 %token IND_STRING_OPEN IND_STRING_CLOSE
 %token ELLIPSIS
 
-%nonassoc IMPL
+%right IMPL
 %left OR
 %left AND
 %nonassoc EQ NEQ
-%left '<' '>' LEQ GEQ
+%nonassoc '<' '>' LEQ GEQ
 %right UPDATE
 %left NOT
 %left '+' '-'
@@ -384,7 +402,12 @@ expr_simple
               new ExprVar(data->symbols.create("__nixPath"))),
           new ExprString(data->symbols.create(path)));
   }
-  | URI { $$ = new ExprString(data->symbols.create($1)); }
+  | URI {
+      static bool noURLLiterals = settings.isExperimentalFeatureEnabled("no-url-literals");
+      if (noURLLiterals)
+          throw ParseError("URL literals are disabled, at %s", CUR_POS);
+      $$ = new ExprString(data->symbols.create($1));
+  }
   | '(' expr ')' { $$ = $2; }
   /* Let expressions `let {..., body = ...}' are just desugared
      into `(rec {..., body = ...}).body'. */
@@ -508,8 +531,8 @@ formals
   ;
 
 formal
-  : ID { $$ = new Formal(data->symbols.create($1), 0); }
-  | ID '?' expr { $$ = new Formal(data->symbols.create($1), $3); }
+  : ID { $$ = new Formal(CUR_POS, data->symbols.create($1), 0); }
+  | ID '?' expr { $$ = new Formal(CUR_POS, data->symbols.create($1), $3); }
   ;
 
 %%
@@ -522,8 +545,8 @@ formal
 
 #include "eval.hh"
 #include "download.hh"
+#include "fetchers.hh"
 #include "store-api.hh"
-#include "primops/fetchgit.hh"
 
 
 namespace nix {
@@ -542,12 +565,7 @@ Expr * EvalState::parse(const char * text,
     int res = yyparse(scanner, &data);
     yylex_destroy(scanner);
 
-    if (res) {
-      if (data.atEnd)
-        throw IncompleteParseError(data.error);
-      else
-        throw ParseError(data.error);
-    }
+    if (res) throw ParseError(data.error);
 
     data.result->bindVars(staticEnv);
 
@@ -559,12 +577,17 @@ Path resolveExprPath(Path path)
 {
     assert(path[0] == '/');
 
+    unsigned int followCount = 0, maxFollow = 1024;
+
     /* If `path' is a symlink, follow it.  This is so that relative
        path references work. */
     struct stat st;
     while (true) {
+        // Basic cycle/depth limit to avoid infinite loops.
+        if (++followCount >= maxFollow)
+            throw Error("too many symbolic links encountered while traversing the path '%s'", path);
         if (lstat(path.c_str(), &st))
-            throw SysError(format("getting status of '%1%'") % path);
+            throw SysError("getting status of '%s'", path);
         if (!S_ISLNK(st.st_mode)) break;
         path = absPath(readLink(path), dirOf(path));
     }
@@ -589,13 +612,13 @@ Expr * EvalState::parseExprFromFile(const Path & path, StaticEnv & staticEnv)
 }
 
 
-Expr * EvalState::parseExprFromString(const string & s, const Path & basePath, StaticEnv & staticEnv)
+Expr * EvalState::parseExprFromString(std::string_view s, const Path & basePath, StaticEnv & staticEnv)
 {
-    return parse(s.c_str(), "(string)", basePath, staticEnv);
+    return parse(s.data(), "(string)", basePath, staticEnv);
 }
 
 
-Expr * EvalState::parseExprFromString(const string & s, const Path & basePath)
+Expr * EvalState::parseExprFromString(std::string_view s, const Path & basePath)
 {
     return parseExprFromString(s, basePath, staticBaseEnv);
 }
@@ -665,11 +688,8 @@ std::pair<bool, std::string> EvalState::resolveSearchPathElem(const SearchPathEl
 
     if (isUri(elem.second)) {
         try {
-            if (hasPrefix(elem.second, "git://") || hasSuffix(elem.second, ".git"))
-                // FIXME: support specifying revision/branch
-                res = { true, exportGit(store, elem.second, "master") };
-            else
-                res = { true, getDownloader()->downloadCached(store, elem.second, true) };
+            res = { true, store->toRealPath(fetchers::downloadTarball(
+                        store, resolveUri(elem.second), "source", false).storePath) };
         } catch (DownloadError & e) {
             printError(format("warning: Nix search path entry '%1%' cannot be downloaded, ignoring") % elem.second);
             res = { false, "" };

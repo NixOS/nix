@@ -1,18 +1,18 @@
 # Test ‘nix-copy-closure’.
 
-{ system, nix }:
+{ nixpkgs, system, nix }:
 
-with import <nixpkgs/nixos/lib/testing.nix> { inherit system; };
+with import (nixpkgs + "/nixos/lib/testing.nix") { inherit system; };
 
 makeTest (let pkgA = pkgs.cowsay; pkgB = pkgs.wget; pkgC = pkgs.hello; in {
 
   nodes =
     { client =
-        { config, pkgs, ... }:
+        { config, lib, pkgs, ... }:
         { virtualisation.writableStore = true;
           virtualisation.pathsInNixDB = [ pkgA ];
           nix.package = nix;
-          nix.binaryCaches = [ ];
+          nix.binaryCaches = lib.mkForce [ ];
         };
 
       server =
@@ -29,10 +29,10 @@ makeTest (let pkgA = pkgs.cowsay; pkgB = pkgs.wget; pkgC = pkgs.hello; in {
       startAll;
 
       # Create an SSH key on the client.
-      my $key = `${pkgs.openssh}/bin/ssh-keygen -t dsa -f key -N ""`;
+      my $key = `${pkgs.openssh}/bin/ssh-keygen -t ed25519 -f key -N ""`;
       $client->succeed("mkdir -m 700 /root/.ssh");
-      $client->copyFileFromHost("key", "/root/.ssh/id_dsa");
-      $client->succeed("chmod 600 /root/.ssh/id_dsa");
+      $client->copyFileFromHost("key", "/root/.ssh/id_ed25519");
+      $client->succeed("chmod 600 /root/.ssh/id_ed25519");
 
       # Install the SSH key on the server.
       $server->succeed("mkdir -m 700 /root/.ssh");

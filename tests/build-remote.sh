@@ -2,27 +2,23 @@ source common.sh
 
 clearStore
 
-if [[ $(uname) != Linux ]]; then exit; fi
+if ! canUseSandbox; then exit; fi
 if [[ ! $SHELL =~ /nix/store ]]; then exit; fi
 
 chmod -R u+w $TEST_ROOT/store0 || true
 chmod -R u+w $TEST_ROOT/store1 || true
 rm -rf $TEST_ROOT/store0 $TEST_ROOT/store1
 
-# FIXME: --option is not passed to build-remote, so have to create a config file.
-export NIX_CONF_DIR=$TEST_ROOT/etc2
-mkdir -p $NIX_CONF_DIR
-echo "
-sandbox-paths = /nix/store
-sandbox-build-dir = /build-tmp
-" > $NIX_CONF_DIR/nix.conf
+nix build -f build-hook.nix -o $TEST_ROOT/result --max-jobs 0 \
+  --sandbox-paths /nix/store --sandbox-build-dir /build-tmp \
+  --builders "$TEST_ROOT/store0; $TEST_ROOT/store1 - - 1 1 foo" \
+  --system-features foo
 
-outPath=$(nix-build build-hook.nix --no-out-link -j0 \
-  --option builders "local?root=$TEST_ROOT/store0; local?root=$TEST_ROOT/store1 - - 1 1 foo")
+outPath=$TEST_ROOT/result
 
 cat $outPath/foobar | grep FOOBAR
 
 # Ensure that input1 was built on store1 due to the required feature.
 p=$(readlink -f $outPath/input-2)
-(! nix path-info --store local?root=$TEST_ROOT/store0 --all | grep dependencies.builder1.sh)
-nix path-info --store local?root=$TEST_ROOT/store1 --all | grep dependencies.builder1.sh
+(! nix path-info --store $TEST_ROOT/store0 --all | grep dependencies.builder1.sh)
+nix path-info --store $TEST_ROOT/store1 --all | grep dependencies.builder1.sh

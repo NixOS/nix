@@ -40,7 +40,7 @@ Generations findGenerations(Path profile, int & curGen)
     Generations gens;
 
     Path profileDir = dirOf(profile);
-    string profileName = baseNameOf(profile);
+    auto profileName = std::string(baseNameOf(profile));
 
     for (auto & i : readDirectory(profileDir)) {
         int n;
@@ -108,7 +108,7 @@ Path createGeneration(ref<LocalFSStore> store, Path profile, Path outPath)
        user environment etc. we've just built. */
     Path generation;
     makeName(profile, num + 1, generation);
-    store->addPermRoot(outPath, generation, false, true);
+    store->addPermRoot(store->parseStorePath(outPath), generation, false, true);
 
     return generation;
 }
@@ -157,6 +157,29 @@ void deleteGenerations(const Path & profile, const std::set<unsigned int> & gens
     }
 }
 
+void deleteGenerationsGreaterThan(const Path & profile, int max, bool dryRun)
+{
+    PathLocks lock;
+    lockProfile(lock, profile);
+
+    int curGen;
+    bool fromCurGen = false;
+    Generations gens = findGenerations(profile, curGen);
+    for (auto i = gens.rbegin(); i != gens.rend(); ++i) {
+        if (i->number == curGen) {
+            fromCurGen = true;
+            max--;
+            continue;
+        }
+        if (fromCurGen) {
+            if (max) {
+                max--;
+                continue;
+            }
+            deleteGeneration2(profile, i->number, dryRun);
+        }
+    }
+}
 
 void deleteOldGenerations(const Path & profile, bool dryRun)
 {
@@ -230,6 +253,24 @@ void lockProfile(PathLocks & lock, const Path & profile)
 string optimisticLockProfile(const Path & profile)
 {
     return pathExists(profile) ? readLink(profile) : "";
+}
+
+
+Path getDefaultProfile()
+{
+    Path profileLink = getHome() + "/.nix-profile";
+    try {
+        if (!pathExists(profileLink)) {
+            replaceSymlink(
+                getuid() == 0
+                ? settings.nixStateDir + "/profiles/default"
+                : fmt("%s/profiles/per-user/%s/profile", settings.nixStateDir, getUserName()),
+                profileLink);
+        }
+        return absPath(readLink(profileLink), dirOf(profileLink));
+    } catch (Error &) {
+        return profileLink;
+    }
 }
 
 

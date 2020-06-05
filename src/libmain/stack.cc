@@ -30,7 +30,7 @@ static void sigsegvHandler(int signo, siginfo_t * info, void * ctx)
         if (diff < 0) diff = -diff;
         if (diff < 4096) {
             char msg[] = "error: stack overflow (possible infinite recursion)\n";
-            [[gnu::unused]] int res = write(2, msg, strlen(msg));
+            [[gnu::unused]] auto res = write(2, msg, strlen(msg));
             _exit(1); // maybe abort instead?
         }
     }
@@ -63,7 +63,7 @@ void detectStackOverflow()
     act.sa_sigaction = sigsegvHandler;
     act.sa_flags = SA_SIGINFO | SA_ONSTACK;
     if (sigaction(SIGSEGV, &act, 0))
-        throw SysError("resetting SIGCHLD");
+        throw SysError("resetting SIGSEGV");
 #endif
 }
 

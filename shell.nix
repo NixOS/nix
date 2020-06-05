@@ -1,30 +1,13 @@
 { useClang ? false }:
 
-with import <nixpkgs> {};
+with import (builtins.fetchTarball https://github.com/NixOS/nixpkgs/archive/nixos-20.03-small.tar.gz) {};
 
 with import ./release-common.nix { inherit pkgs; };
 
 (if useClang then clangStdenv else stdenv).mkDerivation {
   name = "nix";
 
-  buildInputs =
-    [ curl bison flex libxml2 libxslt
-      bzip2 xz brotli
-      pkgconfig sqlite libsodium boehmgc
-      docbook5 docbook5_xsl
-      autoconf-archive
-      (aws-sdk-cpp.override {
-        apis = ["s3"];
-        customMemoryManagement = false;
-      })
-      autoreconfHook
-      nlohmann_json
-
-      # For nix-perl
-      perl
-      perlPackages.DBDSQLite
-    ]
-    ++ lib.optional stdenv.isLinux libseccomp;
+  buildInputs = buildDeps ++ propagatedDeps ++ perlDeps ++ [ pkgs.rustfmt ];
 
   inherit configureFlags;
 

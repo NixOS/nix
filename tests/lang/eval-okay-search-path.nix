@@ -1,7 +1,7 @@
 with import ./lib.nix;
 with builtins;
 
-assert pathExists <nix/buildenv.nix>;
+assert pathExists <nix/fetchurl.nix>;
 
 assert length __nixPath == 6;
 assert length (filter (x: x.prefix == "nix") __nixPath) == 1;

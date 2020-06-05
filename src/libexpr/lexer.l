@@ -6,12 +6,14 @@
 %option nounput noyy_top_state
 
 
+%s DEFAULT
 %x STRING
 %x IND_STRING
-%x INSIDE_DOLLAR_CURLY
 
 
 %{
+#include <boost/lexical_cast.hpp>
+
 #include "nixexpr.hh"
 #include "parser-tab.hh"
 
@@ -49,9 +51,10 @@ static void adjustLoc(YYLTYPE * loc, const char * s, size_t len)
 }
 
 
-static Expr * unescapeStr(SymbolTable & symbols, const char * s)
+static Expr * unescapeStr(SymbolTable & symbols, const char * s, size_t length)
 {
     string t;
+    t.reserve(length);
     char c;
     while ((c = *s++)) {
         if (c == '\\') {
@@ -84,6 +87,7 @@ static Expr * unescapeStr(SymbolTable & symbols, const char * s)
 %}
 
 
+ANY         .|\n
 ID          [a-zA-Z\_][a-zA-Z0-9\_\'\-]*
 INT         [0-9]+
 FLOAT       (([1-9][0-9]*\.[0-9]*)|(0?\.[0-9]+))([Ee][+-]?[0-9]+)?
@@ -94,8 +98,6 @@ URI         [a-zA-Z][a-zA-Z0-9\+\-\.]*\:[a-zA-Z0-9\%\/\?\:\@\&\=\+\$\,\-\_\.\!\~
 
 
 %%
-
-<INITIAL,INSIDE_DOLLAR_CURLY>{
 
 
 if          { return IF; }
@@ -122,9 +124,11 @@ or          { return OR_KW; }
 
 {ID}        { yylval->id = strdup(yytext); return ID; }
 {INT}       { errno = 0;
-              yylval->n = strtol(yytext, 0, 10);
-              if (errno != 0)
+              try {
+                  yylval->n = boost::lexical_cast<int64_t>(yytext);
+              } catch (const boost::bad_lexical_cast &) {
                   throw ParseError(format("invalid integer '%1%'") % yytext);
+              }
               return INT;
             }
 {FLOAT}     { errno = 0;
@@ -134,26 +138,28 @@ or          { return OR_KW; }
               return FLOAT;
             }
 
-\$\{        { PUSH_STATE(INSIDE_DOLLAR_CURLY); return DOLLAR_CURLY; }
-}
+\$\{        { PUSH_STATE(DEFAULT); return DOLLAR_CURLY; }
 
-\}                           { return '}'; }
-<INSIDE_DOLLAR_CURLY>\}      { POP_STATE(); return '}'; }
-\{                           { return '{'; }
-<INSIDE_DOLLAR_CURLY>\{      { PUSH_STATE(INSIDE_DOLLAR_CURLY); return '{'; }
+\}          { /* State INITIAL only exists at the bottom of the stack and is
+                 used as a marker. DEFAULT replaces it everywhere else.
+                 Popping when in INITIAL state causes an empty stack exception,
+                 so don't */
+              if (YYSTATE != INITIAL)
+                POP_STATE();
+              return '}';
+            }
+\{          { PUSH_STATE(DEFAULT); return '{'; }
 
-<INITIAL,INSIDE_DOLLAR_CURLY>\" {
-                PUSH_STATE(STRING); return '"';
-              }
-<STRING>([^\$\"\\]|\$[^\{\"\\]|\\.|\$\\.)*\$/\" |
-<STRING>([^\$\"\\]|\$[^\{\"\\]|\\.|\$\\.)+ {
+\"          { PUSH_STATE(STRING); return '"'; }
+<STRING>([^\$\"\\]|\$[^\{\"\\]|\\{ANY}|\$\\{ANY})*\$/\" |
+<STRING>([^\$\"\\]|\$[^\{\"\\]|\\{ANY}|\$\\{ANY})+ {
                 /* It is impossible to match strings ending with '$' with one
                    regex because trailing contexts are only valid at the end
                    of a rule. (A sane but undocumented limitation.) */
-                yylval->e = unescapeStr(data->symbols, yytext);
+                yylval->e = unescapeStr(data->symbols, yytext, yyleng);
                 return STR;
               }
-<STRING>\$\{  { PUSH_STATE(INSIDE_DOLLAR_CURLY); return DOLLAR_CURLY; }
+<STRING>\$\{  { PUSH_STATE(DEFAULT); return DOLLAR_CURLY; }
 <STRING>\"    { POP_STATE(); return '"'; }
 <STRING>\$|\\|\$\\ {
                 /* This can only occur when we reach EOF, otherwise the above
@@ -163,7 +169,7 @@ or          { return OR_KW; }
                 return STR;
               }
 
-<INITIAL,INSIDE_DOLLAR_CURLY>\'\'(\ *\n)?     { PUSH_STATE(IND_STRING); return IND_STRING_OPEN; }
+\'\'(\ *\n)?     { PUSH_STATE(IND_STRING); return IND_STRING_OPEN; }
 <IND_STRING>([^\$\']|\$[^\{\']|\'[^\'\$])+ {
                    yylval->e = new ExprIndStr(yytext);
                    return IND_STR;
@@ -177,18 +183,17 @@ or          { return OR_KW; }
                    yylval->e = new ExprIndStr("''");
                    return IND_STR;
                  }
-<IND_STRING>\'\'\\. {
-                   yylval->e = unescapeStr(data->symbols, yytext + 2);
+<IND_STRING>\'\'\\{ANY} {
+                   yylval->e = unescapeStr(data->symbols, yytext + 2, yyleng - 2);
                    return IND_STR;
                  }
-<IND_STRING>\$\{ { PUSH_STATE(INSIDE_DOLLAR_CURLY); return DOLLAR_CURLY; }
+<IND_STRING>\$\{ { PUSH_STATE(DEFAULT); return DOLLAR_CURLY; }
 <IND_STRING>\'\' { POP_STATE(); return IND_STRING_CLOSE; }
 <IND_STRING>\'   {
                    yylval->e = new ExprIndStr("'");
                    return IND_STR;
                  }
 
-<INITIAL,INSIDE_DOLLAR_CURLY>{
 
 {PATH}      { if (yytext[yyleng-1] == '/')
                   throw ParseError("path '%s' has a trailing slash", yytext);
@@ -207,11 +212,11 @@ or          { return OR_KW; }
 \#[^\r\n]*    /* single-line comments */
 \/\*([^*]|\*+[^*/])*\*+\/  /* long comments */
 
-.           return yytext[0];
-
-}
-
-<<EOF>> { data->atEnd = true; return 0; }
+{ANY}       {
+              /* Don't return a negative number, as this will cause
+                 Bison to stop parsing without an error. */
+              return (unsigned char) yytext[0];
+            }
 
 %%
 

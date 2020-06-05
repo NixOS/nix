@@ -1,0 +1,133 @@
+<section xmlns="http://docbook.org/ns/docbook"
+      xmlns:xlink="http://www.w3.org/1999/xlink"
+      xmlns:xi="http://www.w3.org/2001/XInclude"
+      version="5.0"
+      xml:id="ssec-relnotes-2.1">
+
+<title>Release 2.1 (2018-09-02)</title>
+
+<para>This is primarily a bug fix release. It also reduces memory
+consumption in certain situations. In addition, it has the following
+new features:</para>
+
+<itemizedlist>
+
+  <listitem>
+    <para>The Nix installer will no longer default to the Multi-User
+    installation for macOS. You can still <link
+    linkend="sect-multi-user-installation">instruct the installer to
+    run in multi-user mode</link>.
+    </para>
+  </listitem>
+
+  <listitem>
+    <para>The Nix installer now supports performing a Multi-User
+    installation for Linux computers which are running systemd. You
+    can <link
+    linkend="sect-multi-user-installation">select a Multi-User installation</link> by passing the
+    <option>--daemon</option> flag to the installer: <command>sh &lt;(curl
+    https://nixos.org/nix/install) --daemon</command>.
+    </para>
+
+    <para>The multi-user installer cannot handle systems with SELinux.
+    If your system has SELinux enabled, you can <link
+    linkend="sect-single-user-installation">force the installer to run
+    in single-user mode</link>.</para>
+  </listitem>
+
+  <listitem>
+    <para>New builtin functions:
+    <literal>builtins.bitAnd</literal>,
+    <literal>builtins.bitOr</literal>,
+    <literal>builtins.bitXor</literal>,
+    <literal>builtins.fromTOML</literal>,
+    <literal>builtins.concatMap</literal>,
+    <literal>builtins.mapAttrs</literal>.
+    </para>
+  </listitem>
+
+  <listitem>
+    <para>The S3 binary cache store now supports uploading NARs larger
+    than 5 GiB.</para>
+  </listitem>
+
+  <listitem>
+    <para>The S3 binary cache store now supports uploading to
+    S3-compatible services with the <literal>endpoint</literal>
+    option.</para>
+  </listitem>
+
+  <listitem>
+    <para>The flag <option>--fallback</option> is no longer required
+    to recover from disappeared NARs in binary caches.</para>
+  </listitem>
+
+  <listitem>
+    <para><command>nix-daemon</command> now respects
+    <option>--store</option>.</para>
+  </listitem>
+
+  <listitem>
+    <para><command>nix run</command> now respects
+    <varname>nix-support/propagated-user-env-packages</varname>.</para>
+  </listitem>
+
+</itemizedlist>
+
+<para>This release has contributions from
+
+Adrien Devresse,
+Aleksandr Pashkov,
+Alexandre Esteves,
+Amine Chikhaoui,
+Andrew Dunham,
+Asad Saeeduddin,
+aszlig,
+Ben Challenor,
+Ben Gamari,
+Benjamin Hipple,
+Bogdan Seniuc,
+Corey O'Connor,
+Daiderd Jordan,
+Daniel Peebles,
+Daniel Poelzleithner,
+Danylo Hlynskyi,
+Dmitry Kalinkin,
+Domen Kožar,
+Doug Beardsley,
+Eelco Dolstra,
+Erik Arvstedt,
+Félix Baylac-Jacqué,
+Gleb Peregud,
+Graham Christensen,
+Guillaume Maudoux,
+Ivan Kozik,
+John Arnold,
+Justin Humm,
+Linus Heckemann,
+Lorenzo Manacorda,
+Matthew Justin Bauer,
+Matthew O'Gorman,
+Maximilian Bosch,
+Michael Bishop,
+Michael Fiano,
+Michael Mercier,
+Michael Raskin,
+Michael Weiss,
+Nicolas Dudebout,
+Peter Simons,
+Ryan Trinkle,
+Samuel Dionne-Riel,
+Sean Seefried,
+Shea Levy,
+Symphorien Gibol,
+Tim Engler,
+Tim Sears,
+Tuomas Tynkkynen,
+volth,
+Will Dietz,
+Yorick van Pelt and
+zimbatm.
+</para>
+
+</section>

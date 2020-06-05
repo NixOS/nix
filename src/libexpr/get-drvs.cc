@@ -1,6 +1,7 @@
 #include "get-drvs.hh"
 #include "util.hh"
 #include "eval-inline.hh"
+#include "derivations.hh"
 
 #include <cstring>
 #include <regex>
@@ -12,6 +13,33 @@ namespace nix {
 DrvInfo::DrvInfo(EvalState & state, const string & attrPath, Bindings * attrs)
     : state(&state), attrs(attrs), attrPath(attrPath)
 {
+}
+
+
+DrvInfo::DrvInfo(EvalState & state, ref<Store> store, const std::string & drvPathWithOutputs)
+    : state(&state), attrs(nullptr), attrPath("")
+{
+    auto [drvPath, selectedOutputs] = store->parsePathWithOutputs(drvPathWithOutputs);
+
+    this->drvPath = store->printStorePath(drvPath);
+
+    auto drv = store->derivationFromPath(drvPath);
+
+    name = drvPath.name();
+
+    if (selectedOutputs.size() > 1)
+        throw Error("building more than one derivation output is not supported, in '%s'", drvPathWithOutputs);
+
+    outputName =
+        selectedOutputs.empty()
+        ? get(drv.env, "outputName").value_or("out")
+        : *selectedOutputs.begin();
+
+    auto i = drv.outputs.find(outputName);
+    if (i == drv.outputs.end())
+        throw Error("derivation '%s' does not have output '%s'", store->printStorePath(drvPath), outputName);
+
+    outPath = store->printStorePath(i->second.path);
 }
 
 
@@ -249,8 +277,7 @@ static bool getDerivation(EvalState & state, Value & v,
 
         /* Remove spurious duplicates (e.g., a set like `rec { x =
            derivation {...}; y = x;}'. */
-        if (done.find(v.attrs) != done.end()) return false;
-        done.insert(v.attrs);
+        if (!done.insert(v.attrs).second) return false;
 
         DrvInfo drv(state, attrPath, v.attrs);
 
@@ -267,7 +294,7 @@ static bool getDerivation(EvalState & state, Value & v,
 }
 
 
-std::experimental::optional<DrvInfo> getDerivation(EvalState & state, Value & v,
+std::optional<DrvInfo> getDerivation(EvalState & state, Value & v,
     bool ignoreAssertionFailures)
 {
     Done done;

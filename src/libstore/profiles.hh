@@ -39,6 +39,8 @@ void deleteGeneration(const Path & profile, unsigned int gen);
 
 void deleteGenerations(const Path & profile, const std::set<unsigned int> & gensToDelete, bool dryRun);
 
+void deleteGenerationsGreaterThan(const Path & profile, const int max, bool dryRun);
+
 void deleteOldGenerations(const Path & profile, bool dryRun);
 
 void deleteGenerationsOlderThan(const Path & profile, time_t t, bool dryRun);
@@ -61,5 +63,9 @@ void lockProfile(PathLocks & lock, const Path & profile);
    store.  Most of the time, only the user environment has to be
    rebuilt. */
 string optimisticLockProfile(const Path & profile);
+
+/* Resolve ~/.nix-profile. If ~/.nix-profile doesn't exist yet, create
+   it. */
+Path getDefaultProfile();
 
 }

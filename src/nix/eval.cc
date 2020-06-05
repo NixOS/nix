@@ -5,10 +5,11 @@
 #include "eval.hh"
 #include "json.hh"
 #include "value-to-json.hh"
+#include "progress-bar.hh"
 
 using namespace nix;
 
-struct CmdEval : MixJSON, InstallablesCommand
+struct CmdEval : MixJSON, InstallableCommand
 {
     bool raw = false;
 
@@ -17,14 +18,31 @@ struct CmdEval : MixJSON, InstallablesCommand
         mkFlag(0, "raw", "print strings unquoted", &raw);
     }
 
-    std::string name() override
-    {
-        return "eval";
-    }
-
     std::string description() override
     {
         return "evaluate a Nix expression";
+    }
+
+    Examples examples() override
+    {
+        return {
+            Example{
+                "To evaluate a Nix expression given on the command line:",
+                "nix eval '(1 + 2)'"
+            },
+            Example{
+                "To evaluate a Nix expression from a file or URI:",
+                "nix eval -f channel:nixos-17.09 hello.name"
+            },
+            Example{
+                "To get the current version of Nixpkgs:",
+                "nix eval --raw nixpkgs.lib.version"
+            },
+            Example{
+                "To print the store path of the Hello package:",
+                "nix eval --raw nixpkgs.hello"
+            },
+        };
     }
 
     void run(ref<Store> store) override
@@ -34,22 +52,21 @@ struct CmdEval : MixJSON, InstallablesCommand
 
         auto state = getEvalState();
 
-        auto jsonOut = json ? std::make_unique<JSONList>(std::cout) : nullptr;
+        auto v = installable->toValue(*state).first;
+        PathSet context;
 
-        for (auto & i : installables) {
-            auto v = i->toValue(*state);
-            if (raw) {
-                std::cout << state->forceString(*v);
-            } else if (json) {
-                PathSet context;
-                auto jsonElem = jsonOut->placeholder();
-                printValueAsJSON(*state, true, *v, jsonElem, context);
-            } else {
-                state->forceValueDeep(*v);
-                std::cout << *v << "\n";
-            }
+        stopProgressBar();
+
+        if (raw) {
+            std::cout << state->coerceToString(noPos, *v, context);
+        } else if (json) {
+            JSONPlaceholder jsonOut(std::cout);
+            printValueAsJSON(*state, true, *v, jsonOut, context);
+        } else {
+            state->forceValueDeep(*v);
+            std::cout << *v << "\n";
         }
     }
 };
 
-static RegisterCommand r1(make_ref<CmdEval>());
+static auto r1 = registerCommand<CmdEval>("eval");

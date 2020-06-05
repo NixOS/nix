@@ -1,86 +1,17 @@
 #include "command.hh"
 #include "store-api.hh"
 #include "derivations.hh"
+#include "nixexpr.hh"
+#include "profiles.hh"
+
+extern char * * environ;
 
 namespace nix {
 
-Commands * RegisterCommand::commands = 0;
-
-void Command::printHelp(const string & programName, std::ostream & out)
-{
-    Args::printHelp(programName, out);
-
-    auto exs = examples();
-    if (!exs.empty()) {
-        out << "\n";
-        out << "Examples:\n";
-        for (auto & ex : exs)
-            out << "\n"
-                << "  " << ex.description << "\n" // FIXME: wrap
-                << "  $ " << ex.command << "\n";
-    }
-}
-
-MultiCommand::MultiCommand(const Commands & _commands)
-    : commands(_commands)
-{
-    expectedArgs.push_back(ExpectedArg{"command", 1, true, [=](Strings ss) {
-        assert(!command);
-        auto i = commands.find(ss.front());
-        if (i == commands.end())
-            throw UsageError(format("'%1%' is not a recognised command") % ss.front());
-        command = i->second;
-    }});
-}
-
-void MultiCommand::printHelp(const string & programName, std::ostream & out)
-{
-    if (command) {
-        command->printHelp(programName + " " + command->name(), out);
-        return;
-    }
-
-    out << "Usage: " << programName << " <COMMAND> <FLAGS>... <ARGS>...\n";
-
-    out << "\n";
-    out << "Common flags:\n";
-    printFlags(out);
-
-    out << "\n";
-    out << "Available commands:\n";
-
-    Table2 table;
-    for (auto & command : commands) {
-        auto descr = command.second->description();
-        if (!descr.empty())
-            table.push_back(std::make_pair(command.second->name(), descr));
-    }
-    printTable(out, table);
-
-    out << "\n";
-    out << "For full documentation, run 'man " << programName << "' or 'man " << programName << "-<COMMAND>'.\n";
-}
-
-bool MultiCommand::processFlag(Strings::iterator & pos, Strings::iterator end)
-{
-    if (Args::processFlag(pos, end)) return true;
-    if (command && command->processFlag(pos, end)) return true;
-    return false;
-}
-
-bool MultiCommand::processArgs(const Strings & args, bool finish)
-{
-    if (command)
-        return command->processArgs(args, finish);
-    else
-        return Args::processArgs(args, finish);
-}
+Commands * RegisterCommand::commands = nullptr;
 
 StoreCommand::StoreCommand()
 {
-    storeUri = getEnv("NIX_REMOTE");
-
-    mkFlag(0, "store", "store-uri", "URI of the Nix store to use", &storeUri);
 }
 
 ref<Store> StoreCommand::getStore()
@@ -92,54 +23,171 @@ ref<Store> StoreCommand::getStore()
 
 ref<Store> StoreCommand::createStore()
 {
-    return openStore(storeUri);
+    return openStore();
 }
 
 void StoreCommand::run()
 {
-    run(createStore());
+    run(getStore());
 }
 
-StorePathsCommand::StorePathsCommand()
+StorePathsCommand::StorePathsCommand(bool recursive)
+    : recursive(recursive)
 {
-    mkFlag('r', "recursive", "apply operation to closure of the specified paths", &recursive);
+    if (recursive)
+        mkFlag()
+            .longName("no-recursive")
+            .description("apply operation to specified paths only")
+            .set(&this->recursive, false);
+    else
+        mkFlag()
+            .longName("recursive")
+            .shortName('r')
+            .description("apply operation to closure of the specified paths")
+            .set(&this->recursive, true);
+
     mkFlag(0, "all", "apply operation to the entire store", &all);
 }
 
 void StorePathsCommand::run(ref<Store> store)
 {
-    Paths storePaths;
+    StorePaths storePaths;
 
     if (all) {
         if (installables.size())
             throw UsageError("'--all' does not expect arguments");
         for (auto & p : store->queryAllValidPaths())
-            storePaths.push_back(p);
+            storePaths.push_back(p.clone());
     }
 
     else {
-        for (auto & p : toStorePaths(store, NoBuild))
-            storePaths.push_back(p);
+        for (auto & p : toStorePaths(store, realiseMode, installables))
+            storePaths.push_back(p.clone());
 
         if (recursive) {
-            PathSet closure;
-            store->computeFSClosure(PathSet(storePaths.begin(), storePaths.end()),
-                closure, false, false);
-            storePaths = Paths(closure.begin(), closure.end());
+            StorePathSet closure;
+            store->computeFSClosure(storePathsToSet(storePaths), closure, false, false);
+            storePaths.clear();
+            for (auto & p : closure)
+                storePaths.push_back(p.clone());
         }
     }
 
-    run(store, storePaths);
+    run(store, std::move(storePaths));
 }
 
 void StorePathCommand::run(ref<Store> store)
 {
-    auto storePaths = toStorePaths(store, NoBuild);
+    auto storePaths = toStorePaths(store, NoBuild, installables);
 
     if (storePaths.size() != 1)
         throw UsageError("this command requires exactly one store path");
 
     run(store, *storePaths.begin());
+}
+
+Strings editorFor(const Pos & pos)
+{
+    auto editor = getEnv("EDITOR").value_or("cat");
+    auto args = tokenizeString<Strings>(editor);
+    if (pos.line > 0 && (
+        editor.find("emacs") != std::string::npos ||
+        editor.find("nano") != std::string::npos ||
+        editor.find("vim") != std::string::npos))
+        args.push_back(fmt("+%d", pos.line));
+    args.push_back(pos.file);
+    return args;
+}
+
+MixProfile::MixProfile()
+{
+    mkFlag()
+        .longName("profile")
+        .description("profile to update")
+        .labels({"path"})
+        .dest(&profile);
+}
+
+void MixProfile::updateProfile(const StorePath & storePath)
+{
+    if (!profile) return;
+    auto store = getStore().dynamic_pointer_cast<LocalFSStore>();
+    if (!store) throw Error("'--profile' is not supported for this Nix store");
+    auto profile2 = absPath(*profile);
+    switchLink(profile2,
+        createGeneration(
+            ref<LocalFSStore>(store),
+            profile2, store->printStorePath(storePath)));
+}
+
+void MixProfile::updateProfile(const Buildables & buildables)
+{
+    if (!profile) return;
+
+    std::optional<StorePath> result;
+
+    for (auto & buildable : buildables) {
+        for (auto & output : buildable.outputs) {
+            if (result)
+                throw Error("'--profile' requires that the arguments produce a single store path, but there are multiple");
+            result = output.second.clone();
+        }
+    }
+
+    if (!result)
+        throw Error("'--profile' requires that the arguments produce a single store path, but there are none");
+
+    updateProfile(*result);
+}
+
+MixDefaultProfile::MixDefaultProfile()
+{
+    profile = getDefaultProfile();
+}
+
+MixEnvironment::MixEnvironment() : ignoreEnvironment(false) {
+    mkFlag()
+        .longName("ignore-environment")
+        .shortName('i')
+        .description("clear the entire environment (except those specified with --keep)")
+        .set(&ignoreEnvironment, true);
+
+    mkFlag()
+        .longName("keep")
+        .shortName('k')
+        .description("keep specified environment variable")
+        .arity(1)
+        .labels({"name"})
+        .handler([&](std::vector<std::string> ss) { keep.insert(ss.front()); });
+
+    mkFlag()
+        .longName("unset")
+        .shortName('u')
+        .description("unset specified environment variable")
+        .arity(1)
+        .labels({"name"})
+        .handler([&](std::vector<std::string> ss) { unset.insert(ss.front()); });
+}
+
+void MixEnvironment::setEnviron() {
+    if (ignoreEnvironment) {
+        if (!unset.empty())
+            throw UsageError("--unset does not make sense with --ignore-environment");
+
+        for (const auto & var : keep) {
+            auto val = getenv(var.c_str());
+            if (val) stringsEnv.emplace_back(fmt("%s=%s", var.c_str(), val));
+        }
+
+        vectorEnv = stringsToCharPtrs(stringsEnv);
+        environ = vectorEnv.data();
+    } else {
+        if (!keep.empty())
+            throw UsageError("--keep does not make sense without --ignore-environment");
+
+        for (const auto & var : unset)
+            unsetenv(var.c_str());
+    }
 }
 
 }

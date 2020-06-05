@@ -6,7 +6,9 @@ libexpr_DIR := $(d)
 
 libexpr_SOURCES := $(wildcard $(d)/*.cc) $(wildcard $(d)/primops/*.cc) $(d)/lexer-tab.cc $(d)/parser-tab.cc
 
-libexpr_LIBS = libutil libstore libformat
+libexpr_CXXFLAGS += -I src/libutil -I src/libstore -I src/libfetchers -I src/libmain -I src/libexpr
+
+libexpr_LIBS = libutil libstore libfetchers libnixrust
 
 libexpr_LDFLAGS =
 ifneq ($(OS), FreeBSD)
@@ -31,3 +33,5 @@ clean-files += $(d)/parser-tab.cc $(d)/parser-tab.hh $(d)/lexer-tab.cc $(d)/lexe
 dist-files += $(d)/parser-tab.cc $(d)/parser-tab.hh $(d)/lexer-tab.cc $(d)/lexer-tab.hh
 
 $(eval $(call install-file-in, $(d)/nix-expr.pc, $(prefix)/lib/pkgconfig, 0644))
+
+$(d)/primops.cc: $(d)/imported-drv-to-derivation.nix.gen.hh

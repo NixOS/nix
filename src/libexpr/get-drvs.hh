@@ -37,13 +37,14 @@ public:
 
     DrvInfo(EvalState & state) : state(&state) { };
     DrvInfo(EvalState & state, const string & attrPath, Bindings * attrs);
+    DrvInfo(EvalState & state, ref<Store> store, const std::string & drvPathWithOutputs);
 
     string queryName() const;
     string querySystem() const;
     string queryDrvPath() const;
     string queryOutPath() const;
     string queryOutputName() const;
-    /** Return the list of outputs. The "outputs to install" are determined by `mesa.outputsToInstall`. */
+    /** Return the list of outputs. The "outputs to install" are determined by `meta.outputsToInstall`. */
     Outputs queryOutputs(bool onlyOutputsToInstall = false);
 
     StringSet queryMetaNames();
@@ -77,7 +78,7 @@ typedef list<DrvInfo> DrvInfos;
 
 /* If value `v' denotes a derivation, return a DrvInfo object
    describing it. Otherwise return nothing. */
-std::experimental::optional<DrvInfo> getDerivation(EvalState & state,
+std::optional<DrvInfo> getDerivation(EvalState & state,
     Value & v, bool ignoreAssertionFailures);
 
 void getDerivations(EvalState & state, Value & v, const string & pathPrefix,

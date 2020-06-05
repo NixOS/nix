@@ -32,15 +32,13 @@ static Strings parseAttrPath(const string & s)
 }
 
 
-Value * findAlongAttrPath(EvalState & state, const string & attrPath,
+std::pair<Value *, Pos> findAlongAttrPath(EvalState & state, const string & attrPath,
     Bindings & autoArgs, Value & vIn)
 {
     Strings tokens = parseAttrPath(attrPath);
 
-    Error attrError =
-        Error(format("attribute selection path '%1%' does not match expression") % attrPath);
-
     Value * v = &vIn;
+    Pos pos = noPos;
 
     for (auto & attr : tokens) {
 
@@ -70,8 +68,9 @@ Value * findAlongAttrPath(EvalState & state, const string & attrPath,
 
             Bindings::iterator a = v->attrs->find(state.symbols.create(attr));
             if (a == v->attrs->end())
-                throw Error(format("attribute '%1%' in selection path '%2%' not found") % attr % attrPath);
+                throw AttrPathNotFound("attribute '%1%' in selection path '%2%' not found", attr, attrPath);
             v = &*a->value;
+            pos = *a->pos;
         }
 
         else if (apType == apIndex) {
@@ -82,14 +81,47 @@ Value * findAlongAttrPath(EvalState & state, const string & attrPath,
                     % attrPath % showType(*v));
 
             if (attrIndex >= v->listSize())
-                throw Error(format("list index %1% in selection path '%2%' is out of range") % attrIndex % attrPath);
+                throw AttrPathNotFound("list index %1% in selection path '%2%' is out of range", attrIndex, attrPath);
 
             v = v->listElems()[attrIndex];
+            pos = noPos;
         }
 
     }
 
-    return v;
+    return {v, pos};
+}
+
+
+Pos findDerivationFilename(EvalState & state, Value & v, std::string what)
+{
+    Value * v2;
+    try {
+        auto dummyArgs = state.allocBindings(0);
+        v2 = findAlongAttrPath(state, "meta.position", *dummyArgs, v).first;
+    } catch (Error &) {
+        throw NoPositionInfo("package '%s' has no source location information", what);
+    }
+
+    // FIXME: is it possible to extract the Pos object instead of doing this
+    //        toString + parsing?
+    auto pos = state.forceString(*v2);
+
+    auto colon = pos.rfind(':');
+    if (colon == std::string::npos)
+        throw Error("cannot parse meta.position attribute '%s'", pos);
+
+    std::string filename(pos, 0, colon);
+    unsigned int lineno;
+    try {
+        lineno = std::stoi(std::string(pos, colon + 1));
+    } catch (std::invalid_argument & e) {
+        throw Error("cannot parse line number '%s'", pos);
+    }
+
+    Symbol file = state.symbols.create(filename);
+
+    return { file, lineno, 0 };
 }
 
 

@@ -8,7 +8,8 @@
 #include "value-to-json.hh"
 #include "util.hh"
 #include "store-api.hh"
-#include "common-opts.hh"
+#include "common-eval-args.hh"
+#include "../nix/legacy.hh"
 
 #include <map>
 #include <iostream>
@@ -38,7 +39,7 @@ void processExpr(EvalState & state, const Strings & attrPaths,
     state.eval(e, vRoot);
 
     for (auto & i : attrPaths) {
-        Value & v(*findAlongAttrPath(state, i, autoArgs, vRoot));
+        Value & v(*findAlongAttrPath(state, i, autoArgs, vRoot).first);
         state.forceValue(v);
 
         PathSet context;
@@ -70,26 +71,23 @@ void processExpr(EvalState & state, const Strings & attrPaths,
                 if (gcRoot == "")
                     printGCWarning();
                 else {
-                    Path rootName = gcRoot;
+                    Path rootName = indirectRoot ? absPath(gcRoot) : gcRoot;
                     if (++rootNr > 1) rootName += "-" + std::to_string(rootNr);
                     auto store2 = state.store.dynamic_pointer_cast<LocalFSStore>();
                     if (store2)
-                        drvPath = store2->addPermRoot(drvPath, rootName, indirectRoot);
+                        drvPath = store2->addPermRoot(store2->parseStorePath(drvPath), rootName, indirectRoot);
                 }
-                std::cout << format("%1%%2%\n") % drvPath % (outputName != "out" ? "!" + outputName : "");
+                std::cout << fmt("%s%s\n", drvPath, (outputName != "out" ? "!" + outputName : ""));
             }
         }
     }
 }
 
 
-int main(int argc, char * * argv)
+static int _main(int argc, char * * argv)
 {
-    return handleExceptions(argv[0], [&]() {
-        initNix();
-        initGC();
-
-        Strings files, searchPath;
+    {
+        Strings files;
         bool readStdin = false;
         bool fromArgs = false;
         bool findFile = false;
@@ -100,10 +98,14 @@ int main(int argc, char * * argv)
         bool strict = false;
         Strings attrPaths;
         bool wantsReadWrite = false;
-        std::map<string, string> autoArgs_;
         RepairFlag repair = NoRepair;
 
-        parseCmdLine(argc, argv, [&](Strings::iterator & arg, const Strings::iterator & end) {
+        struct MyArgs : LegacyArgs, MixEvalArgs
+        {
+            using LegacyArgs::LegacyArgs;
+        };
+
+        MyArgs myArgs(std::string(baseNameOf(argv[0])), [&](Strings::iterator & arg, const Strings::iterator & end) {
             if (*arg == "--help")
                 showManPage("nix-instantiate");
             else if (*arg == "--version")
@@ -122,10 +124,6 @@ int main(int argc, char * * argv)
                 findFile = true;
             else if (*arg == "--attr" || *arg == "-A")
                 attrPaths.push_back(getArg(*arg, arg, end));
-            else if (parseAutoArgs(arg, end, autoArgs_))
-                ;
-            else if (parseSearchPathArg(arg, end, searchPath))
-                ;
             else if (*arg == "--add-root")
                 gcRoot = getArg(*arg, arg, end);
             else if (*arg == "--indirect")
@@ -149,42 +147,50 @@ int main(int argc, char * * argv)
             return true;
         });
 
+        myArgs.parseCmdline(argvToStrings(argc, argv));
+
+        initPlugins();
+
         if (evalOnly && !wantsReadWrite)
             settings.readOnlyMode = true;
 
         auto store = openStore();
 
-        EvalState state(searchPath, store);
-        state.repair = repair;
+        auto state = std::make_unique<EvalState>(myArgs.searchPath, store);
+        state->repair = repair;
 
-        Bindings & autoArgs(*evalAutoArgs(state, autoArgs_));
+        Bindings & autoArgs = *myArgs.getAutoArgs(*state);
 
         if (attrPaths.empty()) attrPaths = {""};
 
         if (findFile) {
             for (auto & i : files) {
-                Path p = state.findFile(i);
+                Path p = state->findFile(i);
                 if (p == "") throw Error(format("unable to find '%1%'") % i);
                 std::cout << p << std::endl;
             }
-            return;
+            return 0;
         }
 
         if (readStdin) {
-            Expr * e = state.parseStdin();
-            processExpr(state, attrPaths, parseOnly, strict, autoArgs,
+            Expr * e = state->parseStdin();
+            processExpr(*state, attrPaths, parseOnly, strict, autoArgs,
                 evalOnly, outputKind, xmlOutputSourceLocation, e);
         } else if (files.empty() && !fromArgs)
             files.push_back("./default.nix");
 
         for (auto & i : files) {
             Expr * e = fromArgs
-                ? state.parseExprFromString(i, absPath("."))
-                : state.parseExprFromFile(resolveExprPath(lookupFileArg(state, i)));
-            processExpr(state, attrPaths, parseOnly, strict, autoArgs,
+                ? state->parseExprFromString(i, absPath("."))
+                : state->parseExprFromFile(resolveExprPath(state->checkSourcePath(lookupFileArg(*state, i))));
+            processExpr(*state, attrPaths, parseOnly, strict, autoArgs,
                 evalOnly, outputKind, xmlOutputSourceLocation, e);
         }
 
-        state.printStats();
-    });
+        state->printStats();
+
+        return 0;
+    }
 }
+
+static RegisterLegacyCommand s1("nix-instantiate", _main);

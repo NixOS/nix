@@ -15,7 +15,7 @@ struct DrvName
     unsigned int hits;
 
     DrvName();
-    DrvName(const string & s);
+    DrvName(std::string_view s);
     bool matches(DrvName & n);
 
 private:
@@ -24,6 +24,8 @@ private:
 
 typedef list<DrvName> DrvNames;
 
+string nextComponent(string::const_iterator & p,
+    const string::const_iterator end);
 int compareVersions(const string & v1, const string & v2);
 DrvNames drvNamesFromArgs(const Strings & opArgs);
 

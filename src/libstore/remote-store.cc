@@ -7,6 +7,7 @@
 #include "globals.hh"
 #include "derivations.hh"
 #include "pool.hh"
+#include "finally.hh"
 
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -21,23 +22,22 @@
 namespace nix {
 
 
-Path readStorePath(Store & store, Source & from)
+template<> StorePathSet readStorePaths(const Store & store, Source & from)
 {
-    Path path = readString(from);
-    store.assertStorePath(path);
-    return path;
-}
-
-
-template<class T> T readStorePaths(Store & store, Source & from)
-{
-    T paths = readStrings<T>(from);
-    for (auto & i : paths) store.assertStorePath(i);
+    StorePathSet paths;
+    for (auto & i : readStrings<Strings>(from))
+        paths.insert(store.parseStorePath(i));
     return paths;
 }
 
-template PathSet readStorePaths(Store & store, Source & from);
-template Paths readStorePaths(Store & store, Source & from);
+
+void writeStorePaths(const Store & store, Sink & out, const StorePathSet & paths)
+{
+    out << paths.size();
+    for (auto & i : paths)
+        out << store.printStorePath(i);
+}
+
 
 /* TODO: Separate these store impls into different files, give them better names */
 RemoteStore::RemoteStore(const Params & params)
@@ -45,7 +45,13 @@ RemoteStore::RemoteStore(const Params & params)
     , connections(make_ref<Pool<Connection>>(
             std::max(1, (int) maxConnections),
             [this]() { return openConnectionWrapper(); },
-            [](const ref<Connection> & r) { return r->to.good() && r->from.good(); }
+            [this](const ref<Connection> & r) {
+                return
+                    r->to.good()
+                    && r->from.good()
+                    && std::chrono::duration_cast<std::chrono::seconds>(
+                        std::chrono::steady_clock::now() - r->startTime).count() < maxConnectionAge;
+            }
             ))
 {
 }
@@ -72,9 +78,22 @@ UDSRemoteStore::UDSRemoteStore(const Params & params)
 }
 
 
+UDSRemoteStore::UDSRemoteStore(std::string socket_path, const Params & params)
+    : Store(params)
+    , LocalFSStore(params)
+    , RemoteStore(params)
+    , path(socket_path)
+{
+}
+
+
 std::string UDSRemoteStore::getUri()
 {
-    return "daemon";
+    if (path) {
+        return std::string("unix://") + *path;
+    } else {
+        return "daemon";
+    }
 }
 
 
@@ -92,7 +111,7 @@ ref<RemoteStore::Connection> UDSRemoteStore::openConnection()
         throw SysError("cannot create Unix domain socket");
     closeOnExec(conn->fd.get());
 
-    string socketPath = settings.nixDaemonSocketFile;
+    string socketPath = path ? *path : settings.nixDaemonSocketFile;
 
     struct sockaddr_un addr;
     addr.sun_family = AF_UNIX;
@@ -105,6 +124,8 @@ ref<RemoteStore::Connection> UDSRemoteStore::openConnection()
 
     conn->from.fd = conn->fd.get();
     conn->to.fd = conn->fd.get();
+
+    conn->startTime = std::chrono::steady_clock::now();
 
     initConnection(*conn);
 
@@ -129,7 +150,7 @@ void RemoteStore::initConnection(Connection & conn)
         conn.to << PROTOCOL_VERSION;
 
         if (GET_PROTOCOL_MINOR(conn.daemonVersion) >= 14) {
-            int cpu = settings.lockCPU ? lockToCurrentCPU() : -1;
+            int cpu = sameMachine() && settings.lockCPU ? lockToCurrentCPU() : -1;
             if (cpu != -1)
                 conn.to << 1 << cpu;
             else
@@ -139,7 +160,8 @@ void RemoteStore::initConnection(Connection & conn)
         if (GET_PROTOCOL_MINOR(conn.daemonVersion) >= 11)
             conn.to << false;
 
-        conn.processStderr();
+        auto ex = conn.processStderr();
+        if (ex) std::rethrow_exception(ex);
     }
     catch (Error & e) {
         throw Error("cannot open connection to remote store '%s': %s", getUri(), e.what());
@@ -158,7 +180,7 @@ void RemoteStore::setOptions(Connection & conn)
        << verbosity
        << settings.maxBuildJobs
        << settings.maxSilentTime
-       << settings.useBuildHook
+       << true
        << (settings.verboseBuild ? lvlError : lvlVomit)
        << 0 // obsolete log type
        << 0 /* obsolete print build trace */
@@ -166,103 +188,162 @@ void RemoteStore::setOptions(Connection & conn)
        << settings.useSubstitutes;
 
     if (GET_PROTOCOL_MINOR(conn.daemonVersion) >= 12) {
-        auto overrides = settings.getSettings(true);
+        std::map<std::string, Config::SettingInfo> overrides;
+        globalConfig.getSettings(overrides, true);
+        overrides.erase(settings.keepFailed.name);
+        overrides.erase(settings.keepGoing.name);
+        overrides.erase(settings.tryFallback.name);
+        overrides.erase(settings.maxBuildJobs.name);
+        overrides.erase(settings.maxSilentTime.name);
+        overrides.erase(settings.buildCores.name);
+        overrides.erase(settings.useSubstitutes.name);
+        overrides.erase(settings.showTrace.name);
         conn.to << overrides.size();
         for (auto & i : overrides)
-            conn.to << i.first << i.second;
+            conn.to << i.first << i.second.value;
     }
 
-    conn.processStderr();
+    auto ex = conn.processStderr();
+    if (ex) std::rethrow_exception(ex);
 }
 
 
-bool RemoteStore::isValidPathUncached(const Path & path)
+/* A wrapper around Pool<RemoteStore::Connection>::Handle that marks
+   the connection as bad (causing it to be closed) if a non-daemon
+   exception is thrown before the handle is closed. Such an exception
+   causes a deviation from the expected protocol and therefore a
+   desynchronization between the client and daemon. */
+struct ConnectionHandle
 {
-    auto conn(connections->get());
-    conn->to << wopIsValidPath << path;
-    conn->processStderr();
+    Pool<RemoteStore::Connection>::Handle handle;
+    bool daemonException = false;
+
+    ConnectionHandle(Pool<RemoteStore::Connection>::Handle && handle)
+        : handle(std::move(handle))
+    { }
+
+    ConnectionHandle(ConnectionHandle && h)
+        : handle(std::move(h.handle))
+    { }
+
+    ~ConnectionHandle()
+    {
+        if (!daemonException && std::uncaught_exception()) {
+            handle.markBad();
+            debug("closing daemon connection because of an exception");
+        }
+    }
+
+    RemoteStore::Connection * operator -> () { return &*handle; }
+
+    void processStderr(Sink * sink = 0, Source * source = 0)
+    {
+        auto ex = handle->processStderr(sink, source);
+        if (ex) {
+            daemonException = true;
+            std::rethrow_exception(ex);
+        }
+    }
+};
+
+
+ConnectionHandle RemoteStore::getConnection()
+{
+    return ConnectionHandle(connections->get());
+}
+
+
+bool RemoteStore::isValidPathUncached(const StorePath & path)
+{
+    auto conn(getConnection());
+    conn->to << wopIsValidPath << printStorePath(path);
+    conn.processStderr();
     return readInt(conn->from);
 }
 
 
-PathSet RemoteStore::queryValidPaths(const PathSet & paths, SubstituteFlag maybeSubstitute)
+StorePathSet RemoteStore::queryValidPaths(const StorePathSet & paths, SubstituteFlag maybeSubstitute)
 {
-    auto conn(connections->get());
+    auto conn(getConnection());
     if (GET_PROTOCOL_MINOR(conn->daemonVersion) < 12) {
-        PathSet res;
+        StorePathSet res;
         for (auto & i : paths)
-            if (isValidPath(i)) res.insert(i);
+            if (isValidPath(i)) res.insert(i.clone());
         return res;
     } else {
-        conn->to << wopQueryValidPaths << paths;
-        conn->processStderr();
-        return readStorePaths<PathSet>(*this, conn->from);
+        conn->to << wopQueryValidPaths;
+        writeStorePaths(*this, conn->to, paths);
+        conn.processStderr();
+        return readStorePaths<StorePathSet>(*this, conn->from);
     }
 }
 
 
-PathSet RemoteStore::queryAllValidPaths()
+StorePathSet RemoteStore::queryAllValidPaths()
 {
-    auto conn(connections->get());
+    auto conn(getConnection());
     conn->to << wopQueryAllValidPaths;
-    conn->processStderr();
-    return readStorePaths<PathSet>(*this, conn->from);
+    conn.processStderr();
+    return readStorePaths<StorePathSet>(*this, conn->from);
 }
 
 
-PathSet RemoteStore::querySubstitutablePaths(const PathSet & paths)
+StorePathSet RemoteStore::querySubstitutablePaths(const StorePathSet & paths)
 {
-    auto conn(connections->get());
+    auto conn(getConnection());
     if (GET_PROTOCOL_MINOR(conn->daemonVersion) < 12) {
-        PathSet res;
+        StorePathSet res;
         for (auto & i : paths) {
-            conn->to << wopHasSubstitutes << i;
-            conn->processStderr();
-            if (readInt(conn->from)) res.insert(i);
+            conn->to << wopHasSubstitutes << printStorePath(i);
+            conn.processStderr();
+            if (readInt(conn->from)) res.insert(i.clone());
         }
         return res;
     } else {
-        conn->to << wopQuerySubstitutablePaths << paths;
-        conn->processStderr();
-        return readStorePaths<PathSet>(*this, conn->from);
+        conn->to << wopQuerySubstitutablePaths;
+        writeStorePaths(*this, conn->to, paths);
+        conn.processStderr();
+        return readStorePaths<StorePathSet>(*this, conn->from);
     }
 }
 
 
-void RemoteStore::querySubstitutablePathInfos(const PathSet & paths,
+void RemoteStore::querySubstitutablePathInfos(const StorePathSet & paths,
     SubstitutablePathInfos & infos)
 {
     if (paths.empty()) return;
 
-    auto conn(connections->get());
+    auto conn(getConnection());
 
     if (GET_PROTOCOL_MINOR(conn->daemonVersion) < 12) {
 
         for (auto & i : paths) {
             SubstitutablePathInfo info;
-            conn->to << wopQuerySubstitutablePathInfo << i;
-            conn->processStderr();
+            conn->to << wopQuerySubstitutablePathInfo << printStorePath(i);
+            conn.processStderr();
             unsigned int reply = readInt(conn->from);
             if (reply == 0) continue;
-            info.deriver = readString(conn->from);
-            if (info.deriver != "") assertStorePath(info.deriver);
-            info.references = readStorePaths<PathSet>(*this, conn->from);
+            auto deriver = readString(conn->from);
+            if (deriver != "")
+                info.deriver = parseStorePath(deriver);
+            info.references = readStorePaths<StorePathSet>(*this, conn->from);
             info.downloadSize = readLongLong(conn->from);
             info.narSize = readLongLong(conn->from);
-            infos[i] = info;
+            infos.insert_or_assign(i.clone(), std::move(info));
         }
 
     } else {
 
-        conn->to << wopQuerySubstitutablePathInfos << paths;
-        conn->processStderr();
+        conn->to << wopQuerySubstitutablePathInfos;
+        writeStorePaths(*this, conn->to, paths);
+        conn.processStderr();
         size_t count = readNum<size_t>(conn->from);
         for (size_t n = 0; n < count; n++) {
-            Path path = readStorePath(*this, conn->from);
-            SubstitutablePathInfo & info(infos[path]);
-            info.deriver = readString(conn->from);
-            if (info.deriver != "") assertStorePath(info.deriver);
-            info.references = readStorePaths<PathSet>(*this, conn->from);
+            SubstitutablePathInfo & info(infos[parseStorePath(readString(conn->from))]);
+            auto deriver = readString(conn->from);
+            if (deriver != "")
+                info.deriver = parseStorePath(deriver);
+            info.references = readStorePaths<StorePathSet>(*this, conn->from);
             info.downloadSize = readLongLong(conn->from);
             info.narSize = readLongLong(conn->from);
         }
@@ -271,138 +352,143 @@ void RemoteStore::querySubstitutablePathInfos(const PathSet & paths,
 }
 
 
-void RemoteStore::queryPathInfoUncached(const Path & path,
-    std::function<void(std::shared_ptr<ValidPathInfo>)> success,
-    std::function<void(std::exception_ptr exc)> failure)
+void RemoteStore::queryPathInfoUncached(const StorePath & path,
+    Callback<std::shared_ptr<const ValidPathInfo>> callback) noexcept
 {
-    sync2async<std::shared_ptr<ValidPathInfo>>(success, failure, [&]() {
-        auto conn(connections->get());
-        conn->to << wopQueryPathInfo << path;
-        try {
-            conn->processStderr();
-        } catch (Error & e) {
-            // Ugly backwards compatibility hack.
-            if (e.msg().find("is not valid") != std::string::npos)
-                throw InvalidPath(e.what());
-            throw;
+    try {
+        std::shared_ptr<ValidPathInfo> info;
+        {
+            auto conn(getConnection());
+            conn->to << wopQueryPathInfo << printStorePath(path);
+            try {
+                conn.processStderr();
+            } catch (Error & e) {
+                // Ugly backwards compatibility hack.
+                if (e.msg().find("is not valid") != std::string::npos)
+                    throw InvalidPath(e.what());
+                throw;
+            }
+            if (GET_PROTOCOL_MINOR(conn->daemonVersion) >= 17) {
+                bool valid; conn->from >> valid;
+                if (!valid) throw InvalidPath("path '%s' is not valid", printStorePath(path));
+            }
+            info = std::make_shared<ValidPathInfo>(path.clone());
+            auto deriver = readString(conn->from);
+            if (deriver != "") info->deriver = parseStorePath(deriver);
+            info->narHash = Hash(readString(conn->from), htSHA256);
+            info->references = readStorePaths<StorePathSet>(*this, conn->from);
+            conn->from >> info->registrationTime >> info->narSize;
+            if (GET_PROTOCOL_MINOR(conn->daemonVersion) >= 16) {
+                conn->from >> info->ultimate;
+                info->sigs = readStrings<StringSet>(conn->from);
+                conn->from >> info->ca;
+            }
         }
-        if (GET_PROTOCOL_MINOR(conn->daemonVersion) >= 17) {
-            bool valid; conn->from >> valid;
-            if (!valid) throw InvalidPath(format("path '%s' is not valid") % path);
-        }
-        auto info = std::make_shared<ValidPathInfo>();
-        info->path = path;
-        info->deriver = readString(conn->from);
-        if (info->deriver != "") assertStorePath(info->deriver);
-        info->narHash = Hash(readString(conn->from), htSHA256);
-        info->references = readStorePaths<PathSet>(*this, conn->from);
-        conn->from >> info->registrationTime >> info->narSize;
-        if (GET_PROTOCOL_MINOR(conn->daemonVersion) >= 16) {
-            conn->from >> info->ultimate;
-            info->sigs = readStrings<StringSet>(conn->from);
-            conn->from >> info->ca;
-        }
-        return info;
-    });
+        callback(std::move(info));
+    } catch (...) { callback.rethrow(); }
 }
 
 
-void RemoteStore::queryReferrers(const Path & path,
-    PathSet & referrers)
+void RemoteStore::queryReferrers(const StorePath & path,
+    StorePathSet & referrers)
 {
-    auto conn(connections->get());
-    conn->to << wopQueryReferrers << path;
-    conn->processStderr();
-    PathSet referrers2 = readStorePaths<PathSet>(*this, conn->from);
-    referrers.insert(referrers2.begin(), referrers2.end());
+    auto conn(getConnection());
+    conn->to << wopQueryReferrers << printStorePath(path);
+    conn.processStderr();
+    for (auto & i : readStorePaths<StorePathSet>(*this, conn->from))
+        referrers.insert(i.clone());
 }
 
 
-PathSet RemoteStore::queryValidDerivers(const Path & path)
+StorePathSet RemoteStore::queryValidDerivers(const StorePath & path)
 {
-    auto conn(connections->get());
-    conn->to << wopQueryValidDerivers << path;
-    conn->processStderr();
-    return readStorePaths<PathSet>(*this, conn->from);
+    auto conn(getConnection());
+    conn->to << wopQueryValidDerivers << printStorePath(path);
+    conn.processStderr();
+    return readStorePaths<StorePathSet>(*this, conn->from);
 }
 
 
-PathSet RemoteStore::queryDerivationOutputs(const Path & path)
+StorePathSet RemoteStore::queryDerivationOutputs(const StorePath & path)
 {
-    auto conn(connections->get());
-    conn->to << wopQueryDerivationOutputs << path;
-    conn->processStderr();
-    return readStorePaths<PathSet>(*this, conn->from);
+    auto conn(getConnection());
+    conn->to << wopQueryDerivationOutputs << printStorePath(path);
+    conn.processStderr();
+    return readStorePaths<StorePathSet>(*this, conn->from);
 }
 
 
-PathSet RemoteStore::queryDerivationOutputNames(const Path & path)
+PathSet RemoteStore::queryDerivationOutputNames(const StorePath & path)
 {
-    auto conn(connections->get());
-    conn->to << wopQueryDerivationOutputNames << path;
-    conn->processStderr();
+    auto conn(getConnection());
+    conn->to << wopQueryDerivationOutputNames << printStorePath(path);
+    conn.processStderr();
     return readStrings<PathSet>(conn->from);
 }
 
 
-Path RemoteStore::queryPathFromHashPart(const string & hashPart)
+std::optional<StorePath> RemoteStore::queryPathFromHashPart(const std::string & hashPart)
 {
-    auto conn(connections->get());
+    auto conn(getConnection());
     conn->to << wopQueryPathFromHashPart << hashPart;
-    conn->processStderr();
+    conn.processStderr();
     Path path = readString(conn->from);
-    if (!path.empty()) assertStorePath(path);
-    return path;
+    if (path.empty()) return {};
+    return parseStorePath(path);
 }
 
 
-void RemoteStore::addToStore(const ValidPathInfo & info, const ref<std::string> & nar,
+void RemoteStore::addToStore(const ValidPathInfo & info, Source & source,
     RepairFlag repair, CheckSigsFlag checkSigs, std::shared_ptr<FSAccessor> accessor)
 {
-    auto conn(connections->get());
+    auto conn(getConnection());
 
     if (GET_PROTOCOL_MINOR(conn->daemonVersion) < 18) {
         conn->to << wopImportPaths;
 
-        StringSink sink;
-        sink << 1 // == path follows
-            ;
-        assert(nar->size() % 8 == 0);
-        sink((unsigned char *) nar->data(), nar->size());
-        sink
-            << exportMagic
-            << info.path
-            << info.references
-            << info.deriver
-            << 0 // == no legacy signature
-            << 0 // == no path follows
-            ;
+        auto source2 = sinkToSource([&](Sink & sink) {
+            sink << 1 // == path follows
+                ;
+            copyNAR(source, sink);
+            sink
+                << exportMagic
+                << printStorePath(info.path);
+            writeStorePaths(*this, sink, info.references);
+            sink
+                << (info.deriver ? printStorePath(*info.deriver) : "")
+                << 0 // == no legacy signature
+                << 0 // == no path follows
+                ;
+        });
 
-        StringSource source(*sink.s);
-        conn->processStderr(0, &source);
+        conn.processStderr(0, source2.get());
 
-        auto importedPaths = readStorePaths<PathSet>(*this, conn->from);
+        auto importedPaths = readStorePaths<StorePathSet>(*this, conn->from);
         assert(importedPaths.size() <= 1);
     }
 
     else {
         conn->to << wopAddToStoreNar
-                 << info.path << info.deriver << info.narHash.to_string(Base16, false)
-                 << info.references << info.registrationTime << info.narSize
+                 << printStorePath(info.path)
+                 << (info.deriver ? printStorePath(*info.deriver) : "")
+                 << info.narHash.to_string(Base16, false);
+        writeStorePaths(*this, conn->to, info.references);
+        conn->to << info.registrationTime << info.narSize
                  << info.ultimate << info.sigs << info.ca
                  << repair << !checkSigs;
-        conn->to(*nar);
-        conn->processStderr();
+        bool tunnel = GET_PROTOCOL_MINOR(conn->daemonVersion) >= 21;
+        if (!tunnel) copyNAR(source, conn->to);
+        conn.processStderr(0, tunnel ? &source : nullptr);
     }
 }
 
 
-Path RemoteStore::addToStore(const string & name, const Path & _srcPath,
+StorePath RemoteStore::addToStore(const string & name, const Path & _srcPath,
     bool recursive, HashType hashAlgo, PathFilter & filter, RepairFlag repair)
 {
     if (repair) throw Error("repairing is not supported when building through the Nix daemon");
 
-    auto conn(connections->get());
+    auto conn(getConnection());
 
     Path srcPath(absPath(_srcPath));
 
@@ -415,69 +501,69 @@ Path RemoteStore::addToStore(const string & name, const Path & _srcPath,
         conn->to.written = 0;
         conn->to.warn = true;
         connections->incCapacity();
-        dumpPath(srcPath, conn->to, filter);
-        connections->decCapacity();
+        {
+            Finally cleanup([&]() { connections->decCapacity(); });
+            dumpPath(srcPath, conn->to, filter);
+        }
         conn->to.warn = false;
-        conn->processStderr();
+        conn.processStderr();
     } catch (SysError & e) {
         /* Daemon closed while we were sending the path. Probably OOM
            or I/O error. */
         if (e.errNo == EPIPE)
             try {
-                conn->processStderr();
+                conn.processStderr();
             } catch (EndOfFile & e) { }
         throw;
     }
 
-    return readStorePath(*this, conn->from);
+    return parseStorePath(readString(conn->from));
 }
 
 
-Path RemoteStore::addTextToStore(const string & name, const string & s,
-    const PathSet & references, RepairFlag repair)
+StorePath RemoteStore::addTextToStore(const string & name, const string & s,
+    const StorePathSet & references, RepairFlag repair)
 {
     if (repair) throw Error("repairing is not supported when building through the Nix daemon");
 
-    auto conn(connections->get());
-    conn->to << wopAddTextToStore << name << s << references;
+    auto conn(getConnection());
+    conn->to << wopAddTextToStore << name << s;
+    writeStorePaths(*this, conn->to, references);
 
-    conn->processStderr();
-    return readStorePath(*this, conn->from);
+    conn.processStderr();
+    return parseStorePath(readString(conn->from));
 }
 
 
-void RemoteStore::buildPaths(const PathSet & drvPaths, BuildMode buildMode)
+void RemoteStore::buildPaths(const std::vector<StorePathWithOutputs> & drvPaths, BuildMode buildMode)
 {
-    auto conn(connections->get());
+    auto conn(getConnection());
     conn->to << wopBuildPaths;
-    if (GET_PROTOCOL_MINOR(conn->daemonVersion) >= 13) {
-        conn->to << drvPaths;
-        if (GET_PROTOCOL_MINOR(conn->daemonVersion) >= 15)
-            conn->to << buildMode;
-        else
-            /* Old daemons did not take a 'buildMode' parameter, so we
-               need to validate it here on the client side.  */
-            if (buildMode != bmNormal)
-                throw Error("repairing or checking is not supported when building through the Nix daemon");
-    } else {
-        /* For backwards compatibility with old daemons, strip output
-           identifiers. */
-        PathSet drvPaths2;
-        for (auto & i : drvPaths)
-            drvPaths2.insert(string(i, 0, i.find('!')));
-        conn->to << drvPaths2;
-    }
-    conn->processStderr();
+    assert(GET_PROTOCOL_MINOR(conn->daemonVersion) >= 13);
+    Strings ss;
+    for (auto & p : drvPaths)
+        ss.push_back(p.to_string(*this));
+    conn->to << ss;
+    if (GET_PROTOCOL_MINOR(conn->daemonVersion) >= 15)
+        conn->to << buildMode;
+    else
+        /* Old daemons did not take a 'buildMode' parameter, so we
+           need to validate it here on the client side.  */
+        if (buildMode != bmNormal)
+            throw Error("repairing or checking is not supported when building through the Nix daemon");
+    conn.processStderr();
     readInt(conn->from);
 }
 
 
-BuildResult RemoteStore::buildDerivation(const Path & drvPath, const BasicDerivation & drv,
+BuildResult RemoteStore::buildDerivation(const StorePath & drvPath, const BasicDerivation & drv,
     BuildMode buildMode)
 {
-    auto conn(connections->get());
-    conn->to << wopBuildDerivation << drvPath << drv << buildMode;
-    conn->processStderr();
+    auto conn(getConnection());
+    conn->to << wopBuildDerivation << printStorePath(drvPath);
+    writeDerivation(conn->to, *this, drv);
+    conn->to << buildMode;
+    conn.processStderr();
     BuildResult res;
     unsigned int status;
     conn->from >> status >> res.errorMsg;
@@ -486,53 +572,53 @@ BuildResult RemoteStore::buildDerivation(const Path & drvPath, const BasicDeriva
 }
 
 
-void RemoteStore::ensurePath(const Path & path)
+void RemoteStore::ensurePath(const StorePath & path)
 {
-    auto conn(connections->get());
-    conn->to << wopEnsurePath << path;
-    conn->processStderr();
+    auto conn(getConnection());
+    conn->to << wopEnsurePath << printStorePath(path);
+    conn.processStderr();
     readInt(conn->from);
 }
 
 
-void RemoteStore::addTempRoot(const Path & path)
+void RemoteStore::addTempRoot(const StorePath & path)
 {
-    auto conn(connections->get());
-    conn->to << wopAddTempRoot << path;
-    conn->processStderr();
+    auto conn(getConnection());
+    conn->to << wopAddTempRoot << printStorePath(path);
+    conn.processStderr();
     readInt(conn->from);
 }
 
 
 void RemoteStore::addIndirectRoot(const Path & path)
 {
-    auto conn(connections->get());
+    auto conn(getConnection());
     conn->to << wopAddIndirectRoot << path;
-    conn->processStderr();
+    conn.processStderr();
     readInt(conn->from);
 }
 
 
 void RemoteStore::syncWithGC()
 {
-    auto conn(connections->get());
+    auto conn(getConnection());
     conn->to << wopSyncWithGC;
-    conn->processStderr();
+    conn.processStderr();
     readInt(conn->from);
 }
 
 
-Roots RemoteStore::findRoots()
+Roots RemoteStore::findRoots(bool censor)
 {
-    auto conn(connections->get());
+    auto conn(getConnection());
     conn->to << wopFindRoots;
-    conn->processStderr();
+    conn.processStderr();
     size_t count = readNum<size_t>(conn->from);
     Roots result;
     while (count--) {
         Path link = readString(conn->from);
-        Path target = readStorePath(*this, conn->from);
-        result[link] = target;
+        auto target = parseStorePath(readString(conn->from));
+        result[std::move(target)].emplace(link);
     }
     return result;
 }
@@ -540,15 +626,17 @@ Roots RemoteStore::findRoots()
 
 void RemoteStore::collectGarbage(const GCOptions & options, GCResults & results)
 {
-    auto conn(connections->get());
+    auto conn(getConnection());
 
     conn->to
-        << wopCollectGarbage << options.action << options.pathsToDelete << options.ignoreLiveness
+        << wopCollectGarbage << options.action;
+    writeStorePaths(*this, conn->to, options.pathsToDelete);
+    conn->to << options.ignoreLiveness
         << options.maxFreed
         /* removed options */
         << 0 << 0 << 0;
 
-    conn->processStderr();
+    conn.processStderr();
 
     results.paths = readStrings<PathSet>(conn->from);
     results.bytesFreed = readLongLong(conn->from);
@@ -563,46 +651,50 @@ void RemoteStore::collectGarbage(const GCOptions & options, GCResults & results)
 
 void RemoteStore::optimiseStore()
 {
-    auto conn(connections->get());
+    auto conn(getConnection());
     conn->to << wopOptimiseStore;
-    conn->processStderr();
+    conn.processStderr();
     readInt(conn->from);
 }
 
 
 bool RemoteStore::verifyStore(bool checkContents, RepairFlag repair)
 {
-    auto conn(connections->get());
+    auto conn(getConnection());
     conn->to << wopVerifyStore << checkContents << repair;
-    conn->processStderr();
+    conn.processStderr();
     return readInt(conn->from);
 }
 
 
-void RemoteStore::addSignatures(const Path & storePath, const StringSet & sigs)
+void RemoteStore::addSignatures(const StorePath & storePath, const StringSet & sigs)
 {
-    auto conn(connections->get());
-    conn->to << wopAddSignatures << storePath << sigs;
-    conn->processStderr();
+    auto conn(getConnection());
+    conn->to << wopAddSignatures << printStorePath(storePath) << sigs;
+    conn.processStderr();
     readInt(conn->from);
 }
 
 
-void RemoteStore::queryMissing(const PathSet & targets,
-    PathSet & willBuild, PathSet & willSubstitute, PathSet & unknown,
+void RemoteStore::queryMissing(const std::vector<StorePathWithOutputs> & targets,
+    StorePathSet & willBuild, StorePathSet & willSubstitute, StorePathSet & unknown,
     unsigned long long & downloadSize, unsigned long long & narSize)
 {
     {
-        auto conn(connections->get());
+        auto conn(getConnection());
         if (GET_PROTOCOL_MINOR(conn->daemonVersion) < 19)
             // Don't hold the connection handle in the fallback case
             // to prevent a deadlock.
             goto fallback;
-        conn->to << wopQueryMissing << targets;
-        conn->processStderr();
-        willBuild = readStorePaths<PathSet>(*this, conn->from);
-        willSubstitute = readStorePaths<PathSet>(*this, conn->from);
-        unknown = readStorePaths<PathSet>(*this, conn->from);
+        conn->to << wopQueryMissing;
+        Strings ss;
+        for (auto & p : targets)
+            ss.push_back(p.to_string(*this));
+        conn->to << ss;
+        conn.processStderr();
+        willBuild = readStorePaths<StorePathSet>(*this, conn->from);
+        willSubstitute = readStorePaths<StorePathSet>(*this, conn->from);
+        unknown = readStorePaths<StorePathSet>(*this, conn->from);
         conn->from >> downloadSize >> narSize;
         return;
     }
@@ -615,7 +707,20 @@ void RemoteStore::queryMissing(const PathSet & targets,
 
 void RemoteStore::connect()
 {
+    auto conn(getConnection());
+}
+
+
+unsigned int RemoteStore::getProtocol()
+{
     auto conn(connections->get());
+    return conn->daemonVersion;
+}
+
+
+void RemoteStore::flushBadConnections()
+{
+    connections->flushBad();
 }
 
 
@@ -646,7 +751,7 @@ static Logger::Fields readFields(Source & from)
 }
 
 
-void RemoteStore::Connection::processStderr(Sink * sink, Source * source)
+std::exception_ptr RemoteStore::Connection::processStderr(Sink * sink, Source * source)
 {
     to.flush();
 
@@ -671,7 +776,7 @@ void RemoteStore::Connection::processStderr(Sink * sink, Source * source)
         else if (msg == STDERR_ERROR) {
             string error = readString(from);
             unsigned int status = readInt(from);
-            throw Error(status, error);
+            return std::make_exception_ptr(Error(status, error));
         }
 
         else if (msg == STDERR_NEXT)
@@ -705,7 +810,18 @@ void RemoteStore::Connection::processStderr(Sink * sink, Source * source)
         else
             throw Error("got unknown message type %x from Nix daemon", msg);
     }
+
+    return nullptr;
 }
 
+static std::string uriScheme = "unix://";
+
+static RegisterStoreImplementation regStore([](
+    const std::string & uri, const Store::Params & params)
+    -> std::shared_ptr<Store>
+{
+    if (std::string(uri, 0, uriScheme.size()) != uriScheme) return 0;
+    return std::make_shared<UDSRemoteStore>(std::string(uri, uriScheme.size()), params);
+});
 
 }

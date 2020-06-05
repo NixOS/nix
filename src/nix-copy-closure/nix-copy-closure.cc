@@ -1,13 +1,12 @@
 #include "shared.hh"
 #include "store-api.hh"
+#include "../nix/legacy.hh"
 
 using namespace nix;
 
-int main(int argc, char ** argv)
+static int _main(int argc, char ** argv)
 {
-    return handleExceptions(argv[0], [&]() {
-        initNix();
-
+    {
         auto gzip = false;
         auto toMode = true;
         auto includeOutputs = false;
@@ -44,6 +43,8 @@ int main(int argc, char ** argv)
             return true;
         });
 
+        initPlugins();
+
         if (sshHost.empty())
             throw UsageError("no host name specified");
 
@@ -51,13 +52,17 @@ int main(int argc, char ** argv)
         auto to = toMode ? openStore(remoteUri) : openStore();
         auto from = toMode ? openStore() : openStore(remoteUri);
 
-        PathSet storePaths2;
+        StorePathSet storePaths2;
         for (auto & path : storePaths)
             storePaths2.insert(from->followLinksToStorePath(path));
 
-        PathSet closure;
+        StorePathSet closure;
         from->computeFSClosure(storePaths2, closure, false, includeOutputs);
 
         copyPaths(from, to, closure, NoRepair, NoCheckSigs, useSubstitutes);
-    });
+
+        return 0;
+    }
 }
+
+static RegisterLegacyCommand s1("nix-copy-closure", _main);

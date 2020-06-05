@@ -1,4 +1,3 @@
-#include "common-args.hh"
 #include "globals.hh"
 #include "shared.hh"
 #include "store-api.hh"
@@ -34,40 +33,40 @@ void printGCWarning()
 }
 
 
-void printMissing(ref<Store> store, const PathSet & paths)
+void printMissing(ref<Store> store, const std::vector<StorePathWithOutputs> & paths, Verbosity lvl)
 {
     unsigned long long downloadSize, narSize;
-    PathSet willBuild, willSubstitute, unknown;
+    StorePathSet willBuild, willSubstitute, unknown;
     store->queryMissing(paths, willBuild, willSubstitute, unknown, downloadSize, narSize);
-    printMissing(store, willBuild, willSubstitute, unknown, downloadSize, narSize);
+    printMissing(store, willBuild, willSubstitute, unknown, downloadSize, narSize, lvl);
 }
 
 
-void printMissing(ref<Store> store, const PathSet & willBuild,
-    const PathSet & willSubstitute, const PathSet & unknown,
-    unsigned long long downloadSize, unsigned long long narSize)
+void printMissing(ref<Store> store, const StorePathSet & willBuild,
+    const StorePathSet & willSubstitute, const StorePathSet & unknown,
+    unsigned long long downloadSize, unsigned long long narSize, Verbosity lvl)
 {
     if (!willBuild.empty()) {
-        printInfo(format("these derivations will be built:"));
-        Paths sorted = store->topoSortPaths(willBuild);
+        printMsg(lvl, "these derivations will be built:");
+        auto sorted = store->topoSortPaths(willBuild);
         reverse(sorted.begin(), sorted.end());
         for (auto & i : sorted)
-            printInfo(format("  %1%") % i);
+            printMsg(lvl, fmt("  %s", store->printStorePath(i)));
     }
 
     if (!willSubstitute.empty()) {
-        printInfo(format("these paths will be fetched (%.2f MiB download, %.2f MiB unpacked):")
-            % (downloadSize / (1024.0 * 1024.0))
-            % (narSize / (1024.0 * 1024.0)));
+        printMsg(lvl, fmt("these paths will be fetched (%.2f MiB download, %.2f MiB unpacked):",
+                downloadSize / (1024.0 * 1024.0),
+                narSize / (1024.0 * 1024.0)));
         for (auto & i : willSubstitute)
-            printInfo(format("  %1%") % i);
+            printMsg(lvl, fmt("  %s", store->printStorePath(i)));
     }
 
     if (!unknown.empty()) {
-        printInfo(format("don't know how to build these paths%1%:")
-            % (settings.readOnlyMode ? " (may be caused by read-only store access)" : ""));
+        printMsg(lvl, fmt("don't know how to build these paths%s:",
+                (settings.readOnlyMode ? " (may be caused by read-only store access)" : "")));
         for (auto & i : unknown)
-            printInfo(format("  %1%") % i);
+            printMsg(lvl, fmt("  %s", store->printStorePath(i)));
     }
 }
 
@@ -81,6 +80,7 @@ string getArg(const string & opt,
 }
 
 
+#if OPENSSL_VERSION_NUMBER < 0x10101000L
 /* OpenSSL is not thread-safe by default - it will randomly crash
    unless the user supplies a mutex locking function. So let's do
    that. */
@@ -93,6 +93,7 @@ static void opensslLockCallback(int mode, int type, const char * file, int line)
     else
         opensslLocks[type].unlock();
 }
+#endif
 
 
 static void sigHandler(int signo) { }
@@ -106,11 +107,13 @@ void initNix()
     std::cerr.rdbuf()->pubsetbuf(buf, sizeof(buf));
 #endif
 
+#if OPENSSL_VERSION_NUMBER < 0x10101000L
     /* Initialise OpenSSL locking. */
     opensslLocks = std::vector<std::mutex>(CRYPTO_num_locks());
     CRYPTO_set_locking_callback(opensslLockCallback);
+#endif
 
-    settings.loadConfFile();
+    loadConfFile();
 
     startSignalHandlerThread();
 
@@ -125,6 +128,15 @@ void initNix()
     /* Install a dummy SIGUSR1 handler for use with pthread_kill(). */
     act.sa_handler = sigHandler;
     if (sigaction(SIGUSR1, &act, 0)) throw SysError("handling SIGUSR1");
+
+#if __APPLE__
+    /* HACK: on darwin, we need can’t use sigprocmask with SIGWINCH.
+     * Instead, add a dummy sigaction handler, and signalHandlerThread
+     * can handle the rest. */
+    struct sigaction sa;
+    sa.sa_handler = sigHandler;
+    if (sigaction(SIGWINCH, &sa, 0)) throw SysError("handling SIGWINCH");
+#endif
 
     /* Register a SIGSEGV handler to detect stack overflows. */
     detectStackOverflow();
@@ -143,86 +155,89 @@ void initNix()
        sshd). This breaks build users because they don't have access
        to the TMPDIR, in particular in ‘nix-store --serve’. */
 #if __APPLE__
-    if (getuid() == 0 && hasPrefix(getEnv("TMPDIR"), "/var/folders/"))
+    if (getuid() == 0 && hasPrefix(getEnv("TMPDIR").value_or("/tmp"), "/var/folders/"))
         unsetenv("TMPDIR");
 #endif
 }
 
 
-struct LegacyArgs : public MixCommonArgs
+LegacyArgs::LegacyArgs(const std::string & programName,
+    std::function<bool(Strings::iterator & arg, const Strings::iterator & end)> parseArg)
+    : MixCommonArgs(programName), parseArg(parseArg)
 {
-    std::function<bool(Strings::iterator & arg, const Strings::iterator & end)> parseArg;
+    mkFlag()
+        .longName("no-build-output")
+        .shortName('Q')
+        .description("do not show build output")
+        .set(&settings.verboseBuild, false);
 
-    LegacyArgs(const std::string & programName,
-        std::function<bool(Strings::iterator & arg, const Strings::iterator & end)> parseArg)
-        : MixCommonArgs(programName), parseArg(parseArg)
-    {
-        mkFlag('Q', "no-build-output", "do not show build output",
-            &settings.verboseBuild, false);
+    mkFlag()
+        .longName("keep-failed")
+        .shortName('K')
+        .description("keep temporary directories of failed builds")
+        .set(&(bool&) settings.keepFailed, true);
 
-        mkFlag('K', "keep-failed", "keep temporary directories of failed builds",
-            &(bool&) settings.keepFailed);
+    mkFlag()
+        .longName("keep-going")
+        .shortName('k')
+        .description("keep going after a build fails")
+        .set(&(bool&) settings.keepGoing, true);
 
-        mkFlag('k', "keep-going", "keep going after a build fails",
-            &(bool&) settings.keepGoing);
+    mkFlag()
+        .longName("fallback")
+        .description("build from source if substitution fails")
+        .set(&(bool&) settings.tryFallback, true);
 
-        mkFlag(0, "fallback", "build from source if substitution fails", []() {
-            settings.tryFallback = true;
+    auto intSettingAlias = [&](char shortName, const std::string & longName,
+        const std::string & description, const std::string & dest) {
+        mkFlag<unsigned int>(shortName, longName, description, [=](unsigned int n) {
+            settings.set(dest, std::to_string(n));
         });
+    };
 
-        mkFlag1('j', "max-jobs", "jobs", "maximum number of parallel builds", [=](std::string s) {
-            settings.set("max-jobs", s);
-        });
+    intSettingAlias(0, "cores", "maximum number of CPU cores to use inside a build", "cores");
+    intSettingAlias(0, "max-silent-time", "number of seconds of silence before a build is killed", "max-silent-time");
+    intSettingAlias(0, "timeout", "number of seconds before a build is killed", "timeout");
 
-        auto intSettingAlias = [&](char shortName, const std::string & longName,
-            const std::string & description, const std::string & dest) {
-            mkFlag<unsigned int>(shortName, longName, description, [=](unsigned int n) {
-                settings.set(dest, std::to_string(n));
-            });
-        };
+    mkFlag(0, "readonly-mode", "do not write to the Nix store",
+        &settings.readOnlyMode);
 
-        intSettingAlias(0, "cores", "maximum number of CPU cores to use inside a build", "cores");
-        intSettingAlias(0, "max-silent-time", "number of seconds of silence before a build is killed", "max-silent-time");
-        intSettingAlias(0, "timeout", "number of seconds before a build is killed", "timeout");
+    mkFlag(0, "no-gc-warning", "disable warning about not using '--add-root'",
+        &gcWarning, false);
 
-        mkFlag(0, "readonly-mode", "do not write to the Nix store",
-            &settings.readOnlyMode);
+    mkFlag()
+        .longName("store")
+        .label("store-uri")
+        .description("URI of the Nix store to use")
+        .dest(&(std::string&) settings.storeUri);
+}
 
-        mkFlag(0, "no-build-hook", "disable use of the build hook mechanism",
-            &(bool&) settings.useBuildHook, false);
 
-        mkFlag(0, "show-trace", "show Nix expression stack trace in evaluation errors",
-            &settings.showTrace);
+bool LegacyArgs::processFlag(Strings::iterator & pos, Strings::iterator end)
+{
+    if (MixCommonArgs::processFlag(pos, end)) return true;
+    bool res = parseArg(pos, end);
+    if (res) ++pos;
+    return res;
+}
 
-        mkFlag(0, "no-gc-warning", "disable warning about not using '--add-root'",
-            &gcWarning, false);
-    }
 
-    bool processFlag(Strings::iterator & pos, Strings::iterator end) override
-    {
-        if (MixCommonArgs::processFlag(pos, end)) return true;
-        bool res = parseArg(pos, end);
-        if (res) ++pos;
-        return res;
-    }
-
-    bool processArgs(const Strings & args, bool finish) override
-    {
-        if (args.empty()) return true;
-        assert(args.size() == 1);
-        Strings ss(args);
-        auto pos = ss.begin();
-        if (!parseArg(pos, ss.end()))
-            throw UsageError(format("unexpected argument '%1%'") % args.front());
-        return true;
-    }
-};
+bool LegacyArgs::processArgs(const Strings & args, bool finish)
+{
+    if (args.empty()) return true;
+    assert(args.size() == 1);
+    Strings ss(args);
+    auto pos = ss.begin();
+    if (!parseArg(pos, ss.end()))
+        throw UsageError(format("unexpected argument '%1%'") % args.front());
+    return true;
+}
 
 
 void parseCmdLine(int argc, char * * argv,
     std::function<bool(Strings::iterator & arg, const Strings::iterator & end)> parseArg)
 {
-    parseCmdLine(baseNameOf(argv[0]), argvToStrings(argc, argv), parseArg);
+    parseCmdLine(std::string(baseNameOf(argv[0])), argvToStrings(argc, argv), parseArg);
 }
 
 
@@ -256,7 +271,8 @@ void printVersion(const string & programName)
 void showManPage(const string & name)
 {
     restoreSignals();
-    execlp("man", "man", name.c_str(), NULL);
+    setenv("MANPATH", settings.nixManDir.c_str(), 1);
+    execlp("man", "man", name.c_str(), nullptr);
     throw SysError(format("command 'man %1%' failed") % name.c_str());
 }
 
@@ -318,10 +334,10 @@ RunPager::RunPager()
             setenv("LESS", "FRSXMK", 1);
         restoreSignals();
         if (pager)
-            execl("/bin/sh", "sh", "-c", pager, NULL);
-        execlp("pager", "pager", NULL);
-        execlp("less", "less", NULL);
-        execlp("more", "more", NULL);
+            execl("/bin/sh", "sh", "-c", pager, nullptr);
+        execlp("pager", "pager", nullptr);
+        execlp("less", "less", nullptr);
+        execlp("more", "more", nullptr);
         throw SysError(format("executing '%1%'") % pager);
     });
 
@@ -360,5 +376,6 @@ PrintFreed::~PrintFreed()
             % showBytes(results.bytesFreed);
 }
 
+Exit::~Exit() { }
 
 }

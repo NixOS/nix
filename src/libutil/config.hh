@@ -12,6 +12,40 @@ class AbstractSetting;
 class JSONPlaceholder;
 class JSONObject;
 
+class AbstractConfig
+{
+protected:
+    StringMap unknownSettings;
+
+    AbstractConfig(const StringMap & initials = {})
+        : unknownSettings(initials)
+    { }
+
+public:
+
+    virtual bool set(const std::string & name, const std::string & value) = 0;
+
+    struct SettingInfo
+    {
+        std::string value;
+        std::string description;
+    };
+
+    virtual void getSettings(std::map<std::string, SettingInfo> & res, bool overridenOnly = false) = 0;
+
+    void applyConfigFile(const Path & path);
+
+    virtual void resetOverriden() = 0;
+
+    virtual void toJSON(JSONObject & out) = 0;
+
+    virtual void convertToArgs(Args & args, const std::string & category) = 0;
+
+    void warnUnknownSettings();
+
+    void reapplyUnknownSettings();
+};
+
 /* A class to simplify providing configuration settings. The typical
    use is to inherit Config and add Setting<T> members:
 
@@ -27,7 +61,7 @@ class JSONObject;
    };
 */
 
-class Config
+class Config : public AbstractConfig
 {
     friend class AbstractSetting;
 
@@ -48,31 +82,23 @@ private:
 
     Settings _settings;
 
-    StringMap initials;
-
 public:
 
-    Config(const StringMap & initials)
-        : initials(initials)
+    Config(const StringMap & initials = {})
+        : AbstractConfig(initials)
     { }
 
-    void set(const std::string & name, const std::string & value);
+    bool set(const std::string & name, const std::string & value) override;
 
     void addSetting(AbstractSetting * setting);
 
-    void warnUnknownSettings();
+    void getSettings(std::map<std::string, SettingInfo> & res, bool overridenOnly = false) override;
 
-    StringMap getSettings(bool overridenOnly = false);
+    void resetOverriden() override;
 
-    const Settings & _getSettings() { return _settings; }
+    void toJSON(JSONObject & out) override;
 
-    void applyConfigFile(const Path & path, bool fatal = false);
-
-    void resetOverriden();
-
-    void toJSON(JSONObject & out);
-
-    void convertToArgs(Args & args, const std::string & category);
+    void convertToArgs(Args & args, const std::string & category) override;
 };
 
 class AbstractSetting
@@ -88,6 +114,8 @@ public:
     int created = 123;
 
     bool overriden = false;
+
+    void setDefault(const std::string & str);
 
 protected:
 
@@ -105,13 +133,13 @@ protected:
 
     virtual void set(const std::string & value) = 0;
 
-    virtual std::string to_string() = 0;
+    virtual std::string to_string() const = 0;
 
     virtual void toJSON(JSONPlaceholder & out);
 
     virtual void convertToArg(Args & args, const std::string & category);
 
-    bool isOverriden() { return overriden; }
+    bool isOverriden() const { return overriden; }
 };
 
 /* A setting of type T. */
@@ -142,7 +170,13 @@ public:
 
     void set(const std::string & str) override;
 
-    std::string to_string() override;
+    virtual void override(const T & v)
+    {
+        overriden = true;
+        value = v;
+    }
+
+    std::string to_string() const override;
 
     void convertToArg(Args & args, const std::string & category) override;
 
@@ -202,5 +236,28 @@ public:
 
     void operator =(const Path & v) { this->assign(v); }
 };
+
+struct GlobalConfig : public AbstractConfig
+{
+    typedef std::vector<Config*> ConfigRegistrations;
+    static ConfigRegistrations * configRegistrations;
+
+    bool set(const std::string & name, const std::string & value) override;
+
+    void getSettings(std::map<std::string, SettingInfo> & res, bool overridenOnly = false) override;
+
+    void resetOverriden() override;
+
+    void toJSON(JSONObject & out) override;
+
+    void convertToArgs(Args & args, const std::string & category) override;
+
+    struct Register
+    {
+        Register(Config * config);
+    };
+};
+
+extern GlobalConfig globalConfig;
 
 }

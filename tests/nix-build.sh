@@ -2,7 +2,7 @@ source common.sh
 
 clearStore
 
-nix-build dependencies.nix -o $TEST_ROOT/result
+outPath=$(nix-build dependencies.nix -o $TEST_ROOT/result)
 test "$(cat $TEST_ROOT/result/foobar)" = FOOBAR
 
 # The result should be retained by a GC.
@@ -17,3 +17,12 @@ test -e $target/foobar
 rm $TEST_ROOT/result
 nix-store --gc
 if test -e $target/foobar; then false; fi
+
+outPath2=$(nix-build $(nix-instantiate dependencies.nix) --no-out-link)
+[[ $outPath = $outPath2 ]]
+
+outPath2=$(nix-build $(nix-instantiate dependencies.nix)!out --no-out-link)
+[[ $outPath = $outPath2 ]]
+
+outPath2=$(nix-store -r $(nix-instantiate --indirect --add-root $TEST_ROOT/indirect dependencies.nix)!out)
+[[ $outPath = $outPath2 ]]

@@ -10,6 +10,7 @@ class SSHMaster
 private:
 
     const std::string host;
+    bool fakeSSH;
     const std::string keyFile;
     const bool useMaster;
     const bool compress;

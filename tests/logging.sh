@@ -11,5 +11,5 @@ path=$(nix-build dependencies.nix --no-out-link)
 clearStore
 rm -rf $NIX_LOG_DIR
 (! nix-store -l $path)
-nix-build dependencies.nix --no-out-link --option compress-build-log true
+nix-build dependencies.nix --no-out-link --compress-build-log
 [ "$(nix-store -l $path)" = FOO ]

@@ -97,6 +97,7 @@ public:
     private:
         Pool & pool;
         std::shared_ptr<R> r;
+        bool bad = false;
 
         friend Pool;
 
@@ -112,7 +113,8 @@ public:
             if (!r) return;
             {
                 auto state_(pool.state.lock());
-                state_->idle.push_back(ref<R>(r));
+                if (!bad)
+                    state_->idle.push_back(ref<R>(r));
                 assert(state_->inUse);
                 state_->inUse--;
             }
@@ -121,6 +123,8 @@ public:
 
         R * operator -> () { return &*r; }
         R & operator * () { return *r; }
+
+        void markBad() { bad = true; }
     };
 
     Handle get()
@@ -167,6 +171,16 @@ public:
     size_t capacity()
     {
         return state.lock()->max;
+    }
+
+    void flushBad()
+    {
+        auto state_(state.lock());
+        std::vector<ref<R>> left;
+        for (auto & p : state_->idle)
+            if (validator(p))
+                left.push_back(p);
+        std::swap(state_->idle, left);
     }
 };
 

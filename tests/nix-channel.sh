@@ -15,7 +15,7 @@ nix-channel --remove xyzzy
 # Create a channel.
 rm -rf $TEST_ROOT/foo
 mkdir -p $TEST_ROOT/foo
-nix copy --recursive --to file://$TEST_ROOT/foo?compression="bzip2" $(nix-store -r $(nix-instantiate dependencies.nix))
+nix copy --to file://$TEST_ROOT/foo?compression="bzip2" $(nix-store -r $(nix-instantiate dependencies.nix))
 rm -rf $TEST_ROOT/nixexprs
 mkdir -p $TEST_ROOT/nixexprs
 cp config.nix dependencies.nix dependencies.builder*.sh $TEST_ROOT/nixexprs/
@@ -36,7 +36,7 @@ grep -q 'item.*attrPath="foo".*name="dependencies"' $TEST_ROOT/meta.xml
 
 # Do an install.
 nix-env -i dependencies
-[ -e $TEST_ROOT/var/nix/profiles/default/foobar ]
+[ -e $TEST_HOME/.nix-profile/foobar ]
 
 clearProfiles
 rm -f $TEST_HOME/.nix-channels
@@ -55,5 +55,5 @@ grep -q 'item.*attrPath="foo".*name="dependencies"' $TEST_ROOT/meta.xml
 
 # Do an install.
 nix-env -i dependencies
-[ -e $TEST_ROOT/var/nix/profiles/default/foobar ]
+[ -e $TEST_HOME/.nix-profile/foobar ]
 

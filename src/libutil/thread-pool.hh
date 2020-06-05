@@ -7,10 +7,11 @@
 #include <functional>
 #include <thread>
 #include <map>
+#include <atomic>
 
 namespace nix {
 
-MakeError(ThreadPoolShutDown, Error)
+MakeError(ThreadPoolShutDown, Error);
 
 /* A simple thread pool that executes a queue of work items
    (lambdas). */
@@ -43,18 +44,22 @@ private:
 
     struct State
     {
-        std::queue<work_t> left;
-        size_t pending = 0;
+        std::queue<work_t> pending;
+        size_t active = 0;
         std::exception_ptr exception;
         std::vector<std::thread> workers;
-        bool quit = false;
+        bool draining = false;
     };
+
+    std::atomic_bool quit{false};
 
     Sync<State> state_;
 
-    std::condition_variable work, done;
+    std::condition_variable work;
 
-    void workerEntry();
+    void doWork(bool mainThread);
+
+    void shutdown();
 };
 
 /* Process in parallel a set of items of type T that have a partial

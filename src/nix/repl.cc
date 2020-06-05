@@ -1,13 +1,30 @@
 #include <iostream>
 #include <cstdlib>
+#include <cstring>
+#include <climits>
 
 #include <setjmp.h>
+
+#ifdef READLINE
+#include <readline/history.h>
+#include <readline/readline.h>
+#else
+// editline < 1.15.2 don't wrap their API for C++ usage
+// (added in https://github.com/troglobit/editline/commit/91398ceb3427b730995357e9d120539fb9bb7461).
+// This results in linker errors due to to name-mangling of editline C symbols.
+// For compatibility with these versions, we wrap the API here
+// (wrapping multiple times on newer versions is no problem).
+extern "C" {
+#include <editline.h>
+}
+#endif
 
 #include "shared.hh"
 #include "eval.hh"
 #include "eval-inline.hh"
+#include "attr-path.hh"
 #include "store-api.hh"
-#include "common-opts.hh"
+#include "common-eval-args.hh"
 #include "get-drvs.hh"
 #include "derivations.hh"
 #include "affinity.hh"
@@ -15,7 +32,8 @@
 #include "command.hh"
 #include "finally.hh"
 
-#include "src/linenoise/linenoise.h"
+#define GC_INCLUDE_NEW
+#include <gc/gc_cpp.h>
 
 namespace nix {
 
@@ -27,10 +45,11 @@ namespace nix {
 #define ESC_CYA "\033[36m"
 #define ESC_END "\033[0m"
 
-struct NixRepl
+struct NixRepl : gc
 {
     string curDir;
-    EvalState state;
+    std::unique_ptr<EvalState> state;
+    Bindings * autoArgs;
 
     Strings loadedFiles;
 
@@ -44,7 +63,7 @@ struct NixRepl
 
     NixRepl(const Strings & searchPath, nix::ref<Store> store);
     ~NixRepl();
-    void mainLoop(const Strings & files);
+    void mainLoop(const std::vector<std::string> & files);
     StringSet completePrefix(string prefix);
     bool getLine(string & input, const std::string &prompt);
     Path getDerivationPath(Value & v);
@@ -107,8 +126,8 @@ string removeWhitespace(string s)
 
 
 NixRepl::NixRepl(const Strings & searchPath, nix::ref<Store> store)
-    : state(searchPath, store)
-    , staticEnv(false, &state.staticBaseEnv)
+    : state(std::make_unique<EvalState>(searchPath, store))
+    , staticEnv(false, &state->staticBaseEnv)
     , historyFile(getDataDir() + "/nix/repl-history")
 {
     curDir = absPath(".");
@@ -117,21 +136,83 @@ NixRepl::NixRepl(const Strings & searchPath, nix::ref<Store> store)
 
 NixRepl::~NixRepl()
 {
-    linenoiseHistorySave(historyFile.c_str());
+    write_history(historyFile.c_str());
 }
-
 
 static NixRepl * curRepl; // ugly
 
-static void completionCallback(const char * s, linenoiseCompletions *lc)
-{
-    /* Otherwise, return all symbols that start with the prefix. */
-    for (auto & c : curRepl->completePrefix(s))
-        linenoiseAddCompletion(lc, c.c_str());
+static char * completionCallback(char * s, int *match) {
+  auto possible = curRepl->completePrefix(s);
+  if (possible.size() == 1) {
+    *match = 1;
+    auto *res = strdup(possible.begin()->c_str() + strlen(s));
+    if (!res) throw Error("allocation failure");
+    return res;
+  } else if (possible.size() > 1) {
+    auto checkAllHaveSameAt = [&](size_t pos) {
+      auto &first = *possible.begin();
+      for (auto &p : possible) {
+        if (p.size() <= pos || p[pos] != first[pos])
+          return false;
+      }
+      return true;
+    };
+    size_t start = strlen(s);
+    size_t len = 0;
+    while (checkAllHaveSameAt(start + len)) ++len;
+    if (len > 0) {
+      *match = 1;
+      auto *res = strdup(std::string(*possible.begin(), start, len).c_str());
+      if (!res) throw Error("allocation failure");
+      return res;
+    }
+  }
+
+  *match = 0;
+  return nullptr;
 }
 
+static int listPossibleCallback(char *s, char ***avp) {
+  auto possible = curRepl->completePrefix(s);
 
-void NixRepl::mainLoop(const Strings & files)
+  if (possible.size() > (INT_MAX / sizeof(char*)))
+    throw Error("too many completions");
+
+  int ac = 0;
+  char **vp = nullptr;
+
+  auto check = [&](auto *p) {
+    if (!p) {
+      if (vp) {
+        while (--ac >= 0)
+          free(vp[ac]);
+        free(vp);
+      }
+      throw Error("allocation failure");
+    }
+    return p;
+  };
+
+  vp = check((char **)malloc(possible.size() * sizeof(char*)));
+
+  for (auto & p : possible)
+    vp[ac++] = check(strdup(p.c_str()));
+
+  *avp = vp;
+
+  return ac;
+}
+
+namespace {
+    // Used to communicate to NixRepl::getLine whether a signal occurred in ::readline.
+    volatile sig_atomic_t g_signal_received = 0;
+
+    void sigintHandler(int signo) {
+        g_signal_received = signo;
+    }
+}
+
+void NixRepl::mainLoop(const std::vector<std::string> & files)
 {
     string error = ANSI_RED "error:" ANSI_NORMAL " ";
     std::cout << "Welcome to Nix version " << nixVersion << ". Type :? for help." << std::endl << std::endl;
@@ -142,12 +223,18 @@ void NixRepl::mainLoop(const Strings & files)
     reloadFiles();
     if (!loadedFiles.empty()) std::cout << std::endl;
 
+    // Allow nix-repl specific settings in .inputrc
+    rl_readline_name = "nix-repl";
     createDirs(dirOf(historyFile));
-    linenoiseHistorySetMaxLen(1000);
-    linenoiseHistoryLoad(historyFile.c_str());
-
+#ifndef READLINE
+    el_hist_size = 1000;
+#endif
+    read_history(historyFile.c_str());
     curRepl = this;
-    linenoiseSetCompletionCallback(completionCallback);
+#ifndef READLINE
+    rl_set_complete_func(completionCallback);
+    rl_set_list_possib_func(listPossibleCallback);
+#endif
 
     std::string input;
 
@@ -175,7 +262,6 @@ void NixRepl::mainLoop(const Strings & files)
 
         // We handled the current input fully, so we should clear it
         // and read brand new input.
-        linenoiseHistoryAdd(input.c_str());
         input.clear();
         std::cout << std::endl;
     }
@@ -184,10 +270,44 @@ void NixRepl::mainLoop(const Strings & files)
 
 bool NixRepl::getLine(string & input, const std::string &prompt)
 {
-    char * s = linenoise(prompt.c_str());
-    Finally doFree([&]() { linenoiseFree(s); });
-    if (!s) return false;
+    struct sigaction act, old;
+    sigset_t savedSignalMask, set;
+
+    auto setupSignals = [&]() {
+        act.sa_handler = sigintHandler;
+        sigfillset(&act.sa_mask);
+        act.sa_flags = 0;
+        if (sigaction(SIGINT, &act, &old))
+            throw SysError("installing handler for SIGINT");
+
+        sigemptyset(&set);
+        sigaddset(&set, SIGINT);
+        if (sigprocmask(SIG_UNBLOCK, &set, &savedSignalMask))
+            throw SysError("unblocking SIGINT");
+    };
+    auto restoreSignals = [&]() {
+        if (sigprocmask(SIG_SETMASK, &savedSignalMask, nullptr))
+            throw SysError("restoring signals");
+
+        if (sigaction(SIGINT, &old, 0))
+            throw SysError("restoring handler for SIGINT");
+    };
+
+    setupSignals();
+    char * s = readline(prompt.c_str());
+    Finally doFree([&]() { free(s); });
+    restoreSignals();
+
+    if (g_signal_received) {
+        g_signal_received = 0;
+        input.clear();
+        return true;
+    }
+
+    if (!s)
+      return false;
     input += s;
+    input += '\n';
     return true;
 }
 
@@ -236,8 +356,8 @@ StringSet NixRepl::completePrefix(string prefix)
 
             Expr * e = parseString(expr);
             Value v;
-            e->eval(state, *env, v);
-            state.forceAttrs(v);
+            e->eval(*state, *env, v);
+            state->forceAttrs(v);
 
             for (auto & i : *v.attrs) {
                 string name = i.name;
@@ -292,11 +412,11 @@ bool isVarName(const string & s)
 
 
 Path NixRepl::getDerivationPath(Value & v) {
-    auto drvInfo = getDerivation(state, v, false);
+    auto drvInfo = getDerivation(*state, v, false);
     if (!drvInfo)
         throw Error("expression does not evaluate to a derivation, so I can't build it");
     Path drvPath = drvInfo->queryDrvPath();
-    if (drvPath == "" || !state.store->isValidPath(drvPath))
+    if (drvPath == "" || !state->store->isValidPath(state->store->parseStorePath(drvPath)))
         throw Error("expression did not evaluate to a valid derivation");
     return drvPath;
 }
@@ -324,6 +444,7 @@ bool NixRepl::processLine(string line)
              << "  <x> = <expr>  Bind expression to variable\n"
              << "  :a <expr>     Add attributes from resulting set to scope\n"
              << "  :b <expr>     Build derivation\n"
+             << "  :e <expr>     Open the derivation in $EDITOR\n"
              << "  :i <expr>     Build derivation, then install result into current profile\n"
              << "  :l <path>     Load Nix expression and add it to scope\n"
              << "  :p <expr>     Evaluate and print expression recursively\n"
@@ -341,12 +462,40 @@ bool NixRepl::processLine(string line)
     }
 
     else if (command == ":l" || command == ":load") {
-        state.resetFileCache();
+        state->resetFileCache();
         loadFile(arg);
     }
 
     else if (command == ":r" || command == ":reload") {
-        state.resetFileCache();
+        state->resetFileCache();
+        reloadFiles();
+    }
+
+    else if (command == ":e" || command == ":edit") {
+        Value v;
+        evalString(arg, v);
+
+        Pos pos;
+
+        if (v.type == tPath || v.type == tString) {
+            PathSet context;
+            auto filename = state->coerceToString(noPos, v, context);
+            pos.file = state->symbols.create(filename);
+        } else if (v.type == tLambda) {
+            pos = v.lambda.fun->pos;
+        } else {
+            // assume it's a derivation
+            pos = findDerivationFilename(*state, v, arg);
+        }
+
+        // Open in EDITOR
+        auto args = editorFor(pos);
+        auto editor = args.front();
+        args.pop_front();
+        runProgram(editor, args);
+
+        // Reload right after exiting the editor
+        state->resetFileCache();
         reloadFiles();
     }
 
@@ -359,7 +508,7 @@ bool NixRepl::processLine(string line)
         Value v, f, result;
         evalString(arg, v);
         evalString("drv: (import <nixpkgs> {}).runCommand \"shell\" { buildInputs = [ drv ]; } \"\"", f);
-        state.callFunction(f, v, result, Pos());
+        state->callFunction(f, v, result, Pos());
 
         Path drvPath = getDerivationPath(result);
         runProgram(settings.nixBinDir + "/nix-shell", Strings{drvPath});
@@ -374,11 +523,11 @@ bool NixRepl::processLine(string line)
             /* We could do the build in this process using buildPaths(),
                but doing it in a child makes it easier to recover from
                problems / SIGINT. */
-            if (runProgram(settings.nixBinDir + "/nix-store", Strings{"-r", drvPath}) == 0) {
-                Derivation drv = readDerivation(drvPath);
+            if (runProgram(settings.nixBinDir + "/nix", Strings{"build", "--no-link", drvPath}) == 0) {
+                auto drv = readDerivation(*state->store, drvPath);
                 std::cout << std::endl << "this derivation produced the following outputs:" << std::endl;
                 for (auto & i : drv.outputs)
-                    std::cout << format("  %1% -> %2%") % i.first % i.second.path << std::endl;
+                    std::cout << fmt("  %s -> %s\n", i.first, state->store->printStorePath(i.second.path));
             }
         } else if (command == ":i") {
             runProgram(settings.nixBinDir + "/nix-env", Strings{"-i", drvPath});
@@ -408,11 +557,11 @@ bool NixRepl::processLine(string line)
             isVarName(name = removeWhitespace(string(line, 0, p))))
         {
             Expr * e = parseString(string(line, p + 1));
-            Value & v(*state.allocValue());
+            Value & v(*state->allocValue());
             v.type = tThunk;
             v.thunk.env = env;
             v.thunk.expr = e;
-            addVarToScope(state.symbols.create(name), v);
+            addVarToScope(state->symbols.create(name), v);
         } else {
             Value v;
             evalString(line, v);
@@ -429,22 +578,21 @@ void NixRepl::loadFile(const Path & path)
     loadedFiles.remove(path);
     loadedFiles.push_back(path);
     Value v, v2;
-    state.evalFile(lookupFileArg(state, path), v);
-    Bindings & bindings(*state.allocBindings(0));
-    state.autoCallFunction(bindings, v, v2);
+    state->evalFile(lookupFileArg(*state, path), v);
+    state->autoCallFunction(*autoArgs, v, v2);
     addAttrsToScope(v2);
 }
 
 
 void NixRepl::initEnv()
 {
-    env = &state.allocEnv(envSize);
-    env->up = &state.baseEnv;
+    env = &state->allocEnv(envSize);
+    env->up = &state->baseEnv;
     displ = 0;
     staticEnv.vars.clear();
 
     varNames.clear();
-    for (auto & i : state.staticBaseEnv.vars)
+    for (auto & i : state->staticBaseEnv.vars)
         varNames.insert(i.first);
 }
 
@@ -468,7 +616,7 @@ void NixRepl::reloadFiles()
 
 void NixRepl::addAttrsToScope(Value & attrs)
 {
-    state.forceAttrs(attrs);
+    state->forceAttrs(attrs);
     for (auto & i : *attrs.attrs)
         addVarToScope(i.name, *i.value);
     std::cout << format("Added %1% variables.") % attrs.attrs->size() << std::endl;
@@ -487,7 +635,7 @@ void NixRepl::addVarToScope(const Symbol & name, Value & v)
 
 Expr * NixRepl::parseString(string s)
 {
-    Expr * e = state.parseExprFromString(s, curDir, staticEnv);
+    Expr * e = state->parseExprFromString(s, curDir, staticEnv);
     return e;
 }
 
@@ -495,8 +643,8 @@ Expr * NixRepl::parseString(string s)
 void NixRepl::evalString(string s, Value & v)
 {
     Expr * e = parseString(s);
-    e->eval(state, *env, v);
-    state.forceValue(v);
+    e->eval(*state, *env, v);
+    state->forceValue(v);
 }
 
 
@@ -526,7 +674,7 @@ std::ostream & NixRepl::printValue(std::ostream & str, Value & v, unsigned int m
     str.flush();
     checkInterrupt();
 
-    state.forceValue(v);
+    state->forceValue(v);
 
     switch (v.type) {
 
@@ -555,13 +703,13 @@ std::ostream & NixRepl::printValue(std::ostream & str, Value & v, unsigned int m
     case tAttrs: {
         seen.insert(&v);
 
-        bool isDrv = state.isDerivation(v);
+        bool isDrv = state->isDerivation(v);
 
         if (isDrv) {
             str << "«derivation ";
-            Bindings::iterator i = v.attrs->find(state.sDrvPath);
+            Bindings::iterator i = v.attrs->find(state->sDrvPath);
             PathSet context;
-            Path drvPath = i != v.attrs->end() ? state.coerceToPath(*i->pos, *i->value, context) : "???";
+            Path drvPath = i != v.attrs->end() ? state->coerceToPath(*i->pos, *i->value, context) : "???";
             str << drvPath << "»";
         }
 
@@ -573,30 +721,13 @@ std::ostream & NixRepl::printValue(std::ostream & str, Value & v, unsigned int m
             for (auto & i : *v.attrs)
                 sorted[i.name] = i.value;
 
-            /* If this is a derivation, then don't show the
-               self-references ("all", "out", etc.). */
-            StringSet hidden;
-            if (isDrv) {
-                hidden.insert("all");
-                Bindings::iterator i = v.attrs->find(state.sOutputs);
-                if (i == v.attrs->end())
-                    hidden.insert("out");
-                else {
-                    state.forceList(*i->value);
-                    for (unsigned int j = 0; j < i->value->listSize(); ++j)
-                        hidden.insert(state.forceStringNoCtx(*i->value->listElems()[j]));
-                }
-            }
-
             for (auto & i : sorted) {
                 if (isVarName(i.first))
                     str << i.first;
                 else
                     printStringValue(str, i.first.c_str());
                 str << " = ";
-                if (hidden.find(i.first) != hidden.end())
-                    str << "«...»";
-                else if (seen.find(i.second) != seen.end())
+                if (seen.find(i.second) != seen.end())
                     str << "«repeated»";
                 else
                     try {
@@ -664,16 +795,14 @@ std::ostream & NixRepl::printValue(std::ostream & str, Value & v, unsigned int m
     return str;
 }
 
-struct CmdRepl : StoreCommand
+struct CmdRepl : StoreCommand, MixEvalArgs
 {
-    Strings files;
+    std::vector<std::string> files;
 
     CmdRepl()
     {
         expectArgs("files", &files);
     }
-
-    std::string name() override { return "repl"; }
 
     std::string description() override
     {
@@ -682,12 +811,12 @@ struct CmdRepl : StoreCommand
 
     void run(ref<Store> store) override
     {
-        // FIXME: pass searchPath
-        NixRepl repl({}, openStore());
-        repl.mainLoop(files);
+        auto repl = std::make_unique<NixRepl>(searchPath, openStore());
+        repl->autoArgs = getAutoArgs(*repl->state);
+        repl->mainLoop(files);
     }
 };
 
-static RegisterCommand r1(make_ref<CmdRepl>());
+static auto r1 = registerCommand<CmdRepl>("repl");
 
 }

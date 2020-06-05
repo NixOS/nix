@@ -31,12 +31,14 @@
 
 <refsection><title>Description</title>
 
-<para>A Nix channel is mechanism that allows you to automatically stay
-up-to-date with a set of pre-built Nix expressions.  A Nix channel is
-just a URL that points to a place containing both a set of Nix
-expressions and a pointer to a binary cache.  <phrase
-condition="manual">See also <xref linkend="sec-channels"
-/>.</phrase></para>
+<para>A Nix channel is a mechanism that allows you to automatically
+stay up-to-date with a set of pre-built Nix expressions.  A Nix
+channel is just a URL that points to a place containing a set of Nix
+expressions.  <phrase condition="manual">See also <xref
+linkend="sec-channels" />.</phrase></para>
+      
+<para>To see the list of official NixOS channels, visit <link
+xlink:href="https://nixos.org/channels" />.</para>
 
 <para>This command has the following operations:
 
@@ -112,13 +114,13 @@ $ nix-env -iA nixpkgs.hello</screen>
 <para>You can revert channel updates using <option>--rollback</option>:</para>
 
 <screen>
-$ nix-instantiate --eval -E '(import &lt;nixpkgs> {}).lib.nixpkgsVersion'
+$ nix-instantiate --eval -E '(import &lt;nixpkgs> {}).lib.version'
 "14.04.527.0e935f1"
 
 $ nix-channel --rollback
 switching from generation 483 to 482
 
-$ nix-instantiate --eval -E '(import &lt;nixpkgs> {}).lib.nixpkgsVersion'
+$ nix-instantiate --eval -E '(import &lt;nixpkgs> {}).lib.version'
 "14.04.526.dbadfad"
 </screen>
 
@@ -165,22 +167,10 @@ following files:</para>
   <varlistentry><term><filename>nixexprs.tar.xz</filename></term>
 
     <listitem><para>A tarball containing Nix expressions and files
-    referenced by them (such as build scripts and patches). At
-    top-level, the tarball should contain a single directory. That
+    referenced by them (such as build scripts and patches). At the
+    top level, the tarball should contain a single directory. That
     directory must contain a file <filename>default.nix</filename>
     that serves as the channel’s “entry point”.</para></listitem>
-
-  </varlistentry>
-
-  <varlistentry><term><filename>binary-cache-url</filename></term>
-
-    <listitem><para>A file containing the URL to a binary cache (such
-    as <uri>https://cache.nixos.org</uri>. Nix will automatically
-    check this cache for pre-built binaries, if the user has
-    sufficient rights to add binary caches. For instance, in a
-    multi-user Nix setup, the binary caches provided by the channels
-    of the root user are used automatically, but caches corresponding
-    to the channels of non-root users are ignored.</para></listitem>
 
   </varlistentry>
 

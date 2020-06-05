@@ -1,10 +1,14 @@
-{ system ? builtins.currentSystem
+{ system ? "" # obsolete
 , url
+, hash ? "" # an SRI ash
+
+# Legacy hash specification
 , md5 ? "", sha1 ? "", sha256 ? "", sha512 ? ""
 , outputHash ?
-    if sha512 != "" then sha512 else if sha1 != "" then sha1 else if md5 != "" then md5 else sha256
+    if hash != "" then hash else if sha512 != "" then sha512 else if sha1 != "" then sha1 else if md5 != "" then md5 else sha256
 , outputHashAlgo ?
-    if sha512 != "" then "sha512" else if sha1 != "" then "sha1" else if md5 != "" then "md5" else "sha256"
+    if hash != "" then "" else if sha512 != "" then "sha512" else if sha1 != "" then "sha1" else if md5 != "" then "md5" else "sha256"
+
 , executable ? false
 , unpack ? false
 , name ? baseNameOf (toString url)
@@ -17,7 +21,9 @@ derivation {
   inherit outputHashAlgo outputHash;
   outputHashMode = if unpack || executable then "recursive" else "flat";
 
-  inherit name system url executable unpack;
+  inherit name url executable unpack;
+
+  system = "builtin";
 
   # No need to double the amount of network traffic
   preferLocalBuild = true;

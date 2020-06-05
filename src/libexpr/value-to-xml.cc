@@ -105,10 +105,9 @@ static void printValueAsXML(EvalState & state, bool strict, bool location,
 
                 XMLOpenElement _(doc, "derivation", xmlAttrs);
 
-                if (drvPath != "" && drvsSeen.find(drvPath) == drvsSeen.end()) {
-                    drvsSeen.insert(drvPath);
+                if (drvPath != "" && drvsSeen.insert(drvPath).second)
                     showAttrs(state, strict, location, *v.attrs, doc, context, drvsSeen);
-                } else
+                else
                     doc.writeEmptyElement("repeated");
             }
 

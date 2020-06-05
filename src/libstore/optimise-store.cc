@@ -104,8 +104,7 @@ void LocalStore::optimisePath_(Activity * act, OptimiseStats & stats,
        *.app/Contents/Resources/\*.lproj seem to be the only paths affected. See
        https://github.com/NixOS/nix/issues/1443 for more discussion. */
 
-    if (std::regex_search(path, std::regex("\\.app/Contents/PkgInfo$")) ||
-        std::regex_search(path, std::regex("\\.app/Contents/Resources/.+\\.lproj$")))
+    if (std::regex_search(path, std::regex("\\.app/Contents/.+$")))
     {
         debug(format("'%1%' is not allowed to be linked in macOS") % path);
         return;
@@ -213,7 +212,7 @@ void LocalStore::optimisePath_(Activity * act, OptimiseStats & stats,
     MakeReadOnly makeReadOnly(mustToggle ? dirOf(path) : "");
 
     Path tempLink = (format("%1%/.tmp-link-%2%-%3%")
-        % realStoreDir % getpid() % rand()).str();
+        % realStoreDir % getpid() % random()).str();
 
     if (link(linkPath.c_str(), tempLink.c_str()) == -1) {
         if (errno == EMLINK) {
@@ -255,7 +254,7 @@ void LocalStore::optimiseStore(OptimiseStats & stats)
 {
     Activity act(*logger, actOptimiseStore);
 
-    PathSet paths = queryAllValidPaths();
+    auto paths = queryAllValidPaths();
     InodeHash inodeHash = loadInodeHash();
 
     act.progress(0, paths.size());
@@ -266,8 +265,8 @@ void LocalStore::optimiseStore(OptimiseStats & stats)
         addTempRoot(i);
         if (!isValidPath(i)) continue; /* path was GC'ed, probably */
         {
-            Activity act(*logger, lvlTalkative, actUnknown, fmt("optimising path '%s'", i));
-            optimisePath_(&act, stats, realStoreDir + "/" + baseNameOf(i), inodeHash);
+            Activity act(*logger, lvlTalkative, actUnknown, fmt("optimising path '%s'", printStorePath(i)));
+            optimisePath_(&act, stats, realStoreDir + "/" + std::string(i.to_string()), inodeHash);
         }
         done++;
         act.progress(done, paths.size());

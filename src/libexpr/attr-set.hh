@@ -4,6 +4,7 @@
 #include "symbol-table.hh"
 
 #include <algorithm>
+#include <optional>
 
 namespace nix {
 
@@ -63,6 +64,22 @@ public:
         return end();
     }
 
+    Attr * get(const Symbol & name)
+    {
+        Attr key(name, 0);
+        iterator i = std::lower_bound(begin(), end(), key);
+        if (i != end() && i->name == name) return &*i;
+        return nullptr;
+    }
+
+    Attr & need(const Symbol & name, const Pos & pos = noPos)
+    {
+        auto a = get(name);
+        if (!a)
+            throw Error("attribute '%s' missing, at %s", name, pos);
+        return *a;
+    }
+
     iterator begin() { return &attrs[0]; }
     iterator end() { return &attrs[size_]; }
 
@@ -83,7 +100,7 @@ public:
         for (size_t n = 0; n < size_; n++)
             res.emplace_back(&attrs[n]);
         std::sort(res.begin(), res.end(), [](const Attr * a, const Attr * b) {
-            return (string) a->name < (string) b->name;
+            return (const string &) a->name < (const string &) b->name;
         });
         return res;
     }

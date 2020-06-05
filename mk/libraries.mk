@@ -45,6 +45,11 @@ endif
 # - $(1)_INSTALL_DIR: the directory where the library will be
 #   installed.  Defaults to $(libdir).
 #
+# - $(1)_EXCLUDE_FROM_LIBRARY_LIST: if defined, the library will not
+#   be automatically marked as a dependency of the top-level all
+#   target andwill not be listed in the make help output. This is
+#   useful for libraries built solely for testing, for example.
+#
 # - BUILD_SHARED_LIBS: if equal to ‘1’, a dynamic library will be
 #   built, otherwise a static library.
 define build-library
@@ -86,7 +91,7 @@ define build-library
     $(1)_PATH := $$(_d)/$$($(1)_NAME).$(SO_EXT)
 
     $$($(1)_PATH): $$($(1)_OBJS) $$(_libs) | $$(_d)/
-	$$(trace-ld) $(CXX) -o $$(abspath $$@) -shared $$(GLOBAL_LDFLAGS) $$($(1)_OBJS) $$($(1)_LDFLAGS) $$($(1)_LDFLAGS_PROPAGATED) $$(foreach lib, $$($(1)_LIBS), $$($$(lib)_LDFLAGS_USE)) $$($(1)_LDFLAGS_UNINSTALLED)
+	$$(trace-ld) $(CXX) -o $$(abspath $$@) -shared $$(LDFLAGS) $$(GLOBAL_LDFLAGS) $$($(1)_OBJS) $$($(1)_LDFLAGS) $$($(1)_LDFLAGS_PROPAGATED) $$(foreach lib, $$($(1)_LIBS), $$($$(lib)_LDFLAGS_USE)) $$($(1)_LDFLAGS_UNINSTALLED)
 
     ifneq ($(OS), Darwin)
       $(1)_LDFLAGS_USE += -Wl,-rpath,$$(abspath $$(_d))
@@ -100,7 +105,7 @@ define build-library
     $$(eval $$(call create-dir, $$($(1)_INSTALL_DIR)))
 
     $$($(1)_INSTALL_PATH): $$($(1)_OBJS) $$(_libs_final) | $(DESTDIR)$$($(1)_INSTALL_DIR)/
-	$$(trace-ld) $(CXX) -o $$@ -shared $$(GLOBAL_LDFLAGS) $$($(1)_OBJS) $$($(1)_LDFLAGS) $$($(1)_LDFLAGS_PROPAGATED) $$(foreach lib, $$($(1)_LIBS), $$($$(lib)_LDFLAGS_USE_INSTALLED))
+	$$(trace-ld) $(CXX) -o $$@ -shared $$(LDFLAGS) $$(GLOBAL_LDFLAGS) $$($(1)_OBJS) $$($(1)_LDFLAGS) $$($(1)_LDFLAGS_PROPAGATED) $$(foreach lib, $$($(1)_LIBS), $$($$(lib)_LDFLAGS_USE_INSTALLED))
 
     $(1)_LDFLAGS_USE_INSTALLED += -L$$(DESTDIR)$$($(1)_INSTALL_DIR) -l$$(patsubst lib%,%,$$(strip $$($(1)_NAME)))
     ifneq ($(OS), Darwin)
@@ -120,7 +125,7 @@ define build-library
     $(1)_PATH := $$(_d)/$$($(1)_NAME).a
 
     $$($(1)_PATH): $$($(1)_OBJS) | $$(_d)/
-	$(trace-ar) ar crs $$@ $$?
+	$(trace-ar) $(AR) crs $$@ $$?
 
     $(1)_LDFLAGS_USE += $$($(1)_PATH) $$($(1)_LDFLAGS)
 
@@ -149,7 +154,9 @@ define build-library
   $(1)_DEPS := $$(foreach fn, $$($(1)_OBJS), $$(call filename-to-dep, $$(fn)))
   -include $$($(1)_DEPS)
 
+  ifndef $(1)_EXCLUDE_FROM_LIBRARY_LIST
   libs-list += $$($(1)_PATH)
+  endif
   clean-files += $$(_d)/*.a $$(_d)/*.$(SO_EXT) $$(_d)/*.o $$(_d)/.*.dep $$($(1)_DEPS) $$($(1)_OBJS)
   dist-files += $$(_srcs)
 endef

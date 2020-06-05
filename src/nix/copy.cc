@@ -14,20 +14,32 @@ struct CmdCopy : StorePathsCommand
 
     CheckSigsFlag checkSigs = CheckSigs;
 
+    SubstituteFlag substitute = NoSubstitute;
+
     CmdCopy()
+        : StorePathsCommand(true)
     {
-        mkFlag(0, "from", "store-uri", "URI of the source Nix store", &srcUri);
-        mkFlag(0, "to", "store-uri", "URI of the destination Nix store", &dstUri);
+        mkFlag()
+            .longName("from")
+            .labels({"store-uri"})
+            .description("URI of the source Nix store")
+            .dest(&srcUri);
+        mkFlag()
+            .longName("to")
+            .labels({"store-uri"})
+            .description("URI of the destination Nix store")
+            .dest(&dstUri);
 
         mkFlag()
             .longName("no-check-sigs")
             .description("do not require that paths are signed by trusted keys")
-            .handler([&](Strings ss) { checkSigs = NoCheckSigs; });
-    }
+            .set(&checkSigs, NoCheckSigs);
 
-    std::string name() override
-    {
-        return "copy";
+        mkFlag()
+            .longName("substitute-on-destination")
+            .shortName('s')
+            .description("whether to try substitutes on the destination store (only supported by SSH)")
+            .set(&substitute, Substitute);
     }
 
     std::string description() override
@@ -39,9 +51,27 @@ struct CmdCopy : StorePathsCommand
     {
         return {
             Example{
-                "To copy Firefox to the local store to a binary cache in file:///tmp/cache:",
-                "nix copy --to file:///tmp/cache -r $(type -p firefox)"
+                "To copy Firefox from the local store to a binary cache in file:///tmp/cache:",
+                "nix copy --to file:///tmp/cache $(type -p firefox)"
             },
+            Example{
+                "To copy the entire current NixOS system closure to another machine via SSH:",
+                "nix copy --to ssh://server /run/current-system"
+            },
+            Example{
+                "To copy a closure from another machine via SSH:",
+                "nix copy --from ssh://server /nix/store/a6cnl93nk1wxnq84brbbwr6hxw9gp2w9-blender-2.79-rc2"
+            },
+#ifdef ENABLE_S3
+            Example{
+                "To copy Hello to an S3 binary cache:",
+                "nix copy --to s3://my-bucket?region=eu-west-1 nixpkgs.hello"
+            },
+            Example{
+                "To copy Hello to an S3-compatible binary cache:",
+                "nix copy --to s3://my-bucket?region=eu-west-1&endpoint=example.com nixpkgs.hello"
+            },
+#endif
         };
     }
 
@@ -50,16 +80,16 @@ struct CmdCopy : StorePathsCommand
         return srcUri.empty() ? StoreCommand::createStore() : openStore(srcUri);
     }
 
-    void run(ref<Store> srcStore, Paths storePaths) override
+    void run(ref<Store> srcStore, StorePaths storePaths) override
     {
         if (srcUri.empty() && dstUri.empty())
             throw UsageError("you must pass '--from' and/or '--to'");
 
         ref<Store> dstStore = dstUri.empty() ? openStore() : openStore(dstUri);
 
-        copyPaths(srcStore, dstStore, PathSet(storePaths.begin(), storePaths.end()),
-            NoRepair, checkSigs);
+        copyPaths(srcStore, dstStore, storePathsToSet(storePaths),
+            NoRepair, checkSigs, substitute);
     }
 };
 
-static RegisterCommand r1(make_ref<CmdCopy>());
+static auto r1 = registerCommand<CmdCopy>("copy");

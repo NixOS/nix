@@ -24,7 +24,7 @@ struct Sink
 
 
 /* A buffered abstract sink. */
-struct BufferedSink : Sink
+struct BufferedSink : virtual Sink
 {
     size_t bufSize, bufPos;
     std::unique_ptr<unsigned char[]> buffer;
@@ -56,11 +56,13 @@ struct Source
     void operator () (unsigned char * data, size_t len);
 
     /* Store up to ‘len’ in the buffer pointed to by ‘data’, and
-       return the number of bytes stored.  If blocks until at least
+       return the number of bytes stored.  It blocks until at least
        one byte is available. */
     virtual size_t read(unsigned char * data, size_t len) = 0;
 
     virtual bool good() { return true; }
+
+    std::string drain();
 };
 
 
@@ -75,10 +77,11 @@ struct BufferedSource : Source
 
     size_t read(unsigned char * data, size_t len) override;
 
+    bool hasData();
+
+protected:
     /* Underlying read call, to be overridden. */
     virtual size_t readUnbuffered(unsigned char * data, size_t len) = 0;
-
-    bool hasData();
 };
 
 
@@ -92,7 +95,17 @@ struct FdSink : BufferedSink
     FdSink() : fd(-1) { }
     FdSink(int fd) : fd(fd) { }
     FdSink(FdSink&&) = default;
-    FdSink& operator=(FdSink&&) = default;
+
+    FdSink& operator=(FdSink && s)
+    {
+        flush();
+        fd = s.fd;
+        s.fd = -1;
+        warn = s.warn;
+        written = s.written;
+        return *this;
+    }
+
     ~FdSink();
 
     void write(const unsigned char * data, size_t len) override;
@@ -112,8 +125,19 @@ struct FdSource : BufferedSource
 
     FdSource() : fd(-1) { }
     FdSource(int fd) : fd(fd) { }
-    size_t readUnbuffered(unsigned char * data, size_t len) override;
+    FdSource(FdSource&&) = default;
+
+    FdSource& operator=(FdSource && s)
+    {
+        fd = s.fd;
+        s.fd = -1;
+        read = s.read;
+        return *this;
+    }
+
     bool good() override;
+protected:
+    size_t readUnbuffered(unsigned char * data, size_t len) override;
 private:
     bool _good = true;
 };
@@ -154,6 +178,77 @@ struct TeeSource : Source
     }
 };
 
+/* A reader that consumes the original Source until 'size'. */
+struct SizedSource : Source
+{
+    Source & orig;
+    size_t remain;
+    SizedSource(Source & orig, size_t size)
+        : orig(orig), remain(size) { }
+    size_t read(unsigned char * data, size_t len)
+    {
+        if (this->remain <= 0) {
+            throw EndOfFile("sized: unexpected end-of-file");
+        }
+        len = std::min(len, this->remain);
+        size_t n = this->orig.read(data, len);
+        this->remain -= n;
+        return n;
+    }
+
+    /* Consume the original source until no remain data is left to consume. */
+    size_t drainAll()
+    {
+        std::vector<unsigned char> buf(8192);
+        size_t sum = 0;
+        while (this->remain > 0) {
+            size_t n = read(buf.data(), buf.size());
+            sum += n;
+        }
+        return sum;
+    }
+};
+
+/* Convert a function into a sink. */
+struct LambdaSink : Sink
+{
+    typedef std::function<void(const unsigned char *, size_t)> lambda_t;
+
+    lambda_t lambda;
+
+    LambdaSink(const lambda_t & lambda) : lambda(lambda) { }
+
+    virtual void operator () (const unsigned char * data, size_t len)
+    {
+        lambda(data, len);
+    }
+};
+
+
+/* Convert a function into a source. */
+struct LambdaSource : Source
+{
+    typedef std::function<size_t(unsigned char *, size_t)> lambda_t;
+
+    lambda_t lambda;
+
+    LambdaSource(const lambda_t & lambda) : lambda(lambda) { }
+
+    size_t read(unsigned char * data, size_t len) override
+    {
+        return lambda(data, len);
+    }
+};
+
+
+/* Convert a function that feeds data into a Sink into a Source. The
+   Source executes the function as a coroutine. */
+std::unique_ptr<Source> sinkToSource(
+    std::function<void(Sink &)> fun,
+    std::function<void()> eof = []() {
+        throw EndOfFile("coroutine has finished");
+    });
+
 
 void writePadding(size_t len, Sink & sink);
 void writeString(const unsigned char * buf, size_t len, Sink & sink);
@@ -168,7 +263,7 @@ inline Sink & operator << (Sink & sink, uint64_t n)
     buf[4] = (n >> 32) & 0xff;
     buf[5] = (n >> 40) & 0xff;
     buf[6] = (n >> 48) & 0xff;
-    buf[7] = (n >> 56) & 0xff;
+    buf[7] = (unsigned char) (n >> 56) & 0xff;
     sink(buf, sizeof(buf));
     return sink;
 }
@@ -178,7 +273,7 @@ Sink & operator << (Sink & sink, const Strings & s);
 Sink & operator << (Sink & sink, const StringSet & s);
 
 
-MakeError(SerialisationError, Error)
+MakeError(SerialisationError, Error);
 
 
 template<typename T>
@@ -200,7 +295,7 @@ T readNum(Source & source)
     if (n > std::numeric_limits<T>::max())
         throw SerialisationError("serialised integer %d is too large for type '%s'", n, typeid(T).name());
 
-    return n;
+    return (T) n;
 }
 
 
@@ -218,7 +313,7 @@ inline uint64_t readLongLong(Source & source)
 
 void readPadding(size_t len, Source & source);
 size_t readString(unsigned char * buf, size_t max, Source & source);
-string readString(Source & source);
+string readString(Source & source, size_t max = std::numeric_limits<size_t>::max());
 template<class T> T readStrings(Source & source);
 
 Source & operator >> (Source & in, string & s);

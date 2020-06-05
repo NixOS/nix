@@ -1,0 +1,143 @@
+<section xmlns="http://docbook.org/ns/docbook"
+      xmlns:xlink="http://www.w3.org/1999/xlink"
+      xmlns:xi="http://www.w3.org/2001/XInclude"
+      version="5.0"
+      xml:id="ssec-relnotes-2.2">
+
+<title>Release 2.2 (2019-01-11)</title>
+
+<para>This is primarily a bug fix release. It also has the following
+changes:</para>
+
+<itemizedlist>
+
+  <listitem>
+    <para>In derivations that use structured attributes (i.e. that
+    specify set the <varname>__structuredAttrs</varname> attribute to
+    <literal>true</literal> to cause all attributes to be passed to
+    the builder in JSON format), you can now specify closure checks
+    per output, e.g.:
+
+<programlisting>
+outputChecks."out" = {
+  # The closure of 'out' must not be larger than 256 MiB.
+  maxClosureSize = 256 * 1024 * 1024;
+
+  # It must not refer to C compiler or to the 'dev' output.
+  disallowedRequisites = [ stdenv.cc "dev" ];
+};
+
+outputChecks."dev" = {
+  # The 'dev' output must not be larger than 128 KiB.
+  maxSize = 128 * 1024;
+};
+</programlisting>
+
+    </para>
+  </listitem>
+
+
+  <listitem>
+    <para>The derivation attribute
+    <varname>requiredSystemFeatures</varname> is now enforced for
+    local builds, and not just to route builds to remote builders.
+    The supported features of a machine can be specified through the
+    configuration setting <varname>system-features</varname>.</para>
+
+    <para>By default, <varname>system-features</varname> includes
+    <literal>kvm</literal> if <filename>/dev/kvm</filename>
+    exists. For compatibility, it also includes the pseudo-features
+    <literal>nixos-test</literal>, <literal>benchmark</literal> and
+    <literal>big-parallel</literal> which are used by Nixpkgs to route
+    builds to particular Hydra build machines.</para>
+
+  </listitem>
+
+  <listitem>
+    <para>Sandbox builds are now enabled by default on Linux.</para>
+  </listitem>
+
+  <listitem>
+    <para>The new command <command>nix doctor</command> shows
+    potential issues with your Nix installation.</para>
+  </listitem>
+
+  <listitem>
+    <para>The <literal>fetchGit</literal> builtin function now uses a
+    caching scheme that puts different remote repositories in distinct
+    local repositories, rather than a single shared repository. This
+    may require more disk space but is faster.</para>
+  </listitem>
+
+  <listitem>
+    <para>The <literal>dirOf</literal> builtin function now works on
+    relative paths.</para>
+  </listitem>
+
+  <listitem>
+    <para>Nix now supports <link
+    xlink:href="https://www.w3.org/TR/SRI/">SRI hashes</link>,
+    allowing the hash algorithm and hash to be specified in a single
+    string. For example, you can write:
+
+<programlisting>
+import &lt;nix/fetchurl.nix> {
+  url = https://nixos.org/releases/nix/nix-2.1.3/nix-2.1.3.tar.xz;
+  hash = "sha256-XSLa0FjVyADWWhFfkZ2iKTjFDda6mMXjoYMXLRSYQKQ=";
+};
+</programlisting>
+
+    instead of
+
+<programlisting>
+import &lt;nix/fetchurl.nix> {
+  url = https://nixos.org/releases/nix/nix-2.1.3/nix-2.1.3.tar.xz;
+  sha256 = "5d22dad058d5c800d65a115f919da22938c50dd6ba98c5e3a183172d149840a4";
+};
+</programlisting>
+
+    </para>
+
+    <para>In fixed-output derivations, the
+    <varname>outputHashAlgo</varname> attribute is no longer mandatory
+    if <varname>outputHash</varname> specifies the hash.</para>
+
+    <para><command>nix hash-file</command> and <command>nix
+    hash-path</command> now print hashes in SRI format by
+    default. They also use SHA-256 by default instead of SHA-512
+    because that's what we use most of the time in Nixpkgs.</para>
+  </listitem>
+
+  <listitem>
+    <para>Integers are now 64 bits on all platforms.</para>
+  </listitem>
+
+  <listitem>
+    <para>The evaluator now prints profiling statistics (enabled via
+    the <envar>NIX_SHOW_STATS</envar> and
+    <envar>NIX_COUNT_CALLS</envar> environment variables) in JSON
+    format.</para>
+  </listitem>
+
+  <listitem>
+    <para>The option <option>--xml</option> in <command>nix-store
+    --query</command> has been removed. Instead, there now is an
+    option <option>--graphml</option> to output the dependency graph
+    in GraphML format.</para>
+  </listitem>
+
+  <listitem>
+    <para>All <filename>nix-*</filename> commands are now symlinks to
+    <filename>nix</filename>. This saves a bit of disk space.</para>
+  </listitem>
+
+  <listitem>
+    <para><command>nix repl</command> now uses
+    <literal>libeditline</literal> or
+    <literal>libreadline</literal>.</para>
+  </listitem>
+
+</itemizedlist>
+
+</section>
+

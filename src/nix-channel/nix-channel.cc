@@ -1,17 +1,20 @@
 #include "shared.hh"
 #include "globals.hh"
 #include "download.hh"
+#include "store-api.hh"
+#include "../nix/legacy.hh"
+#include "fetchers.hh"
+
 #include <fcntl.h>
 #include <regex>
-#include "store-api.hh"
 #include <pwd.h>
 
 using namespace nix;
 
 typedef std::map<string,string> Channels;
 
-static auto channels = Channels{};
-static auto channelsList = Path{};
+static Channels channels;
+static Path channelsList;
 
 // Reads the list of channels.
 static void readChannels()
@@ -25,7 +28,7 @@ static void readChannels()
             continue;
         auto split = tokenizeString<std::vector<string>>(line, " ");
         auto url = std::regex_replace(split[0], std::regex("/*$"), "");
-        auto name = split.size() > 1 ? split[1] : baseNameOf(url);
+        auto name = split.size() > 1 ? split[1] : std::string(baseNameOf(url));
         channels[name] = url;
     }
 }
@@ -52,7 +55,7 @@ static void addChannel(const string & url, const string & name)
     writeChannels();
 }
 
-static auto profile = Path{};
+static Path profile;
 
 // Remove a channel.
 static void removeChannel(const string & name)
@@ -64,7 +67,7 @@ static void removeChannel(const string & name)
     runProgram(settings.nixBinDir + "/nix-env", true, { "--profile", profile, "--uninstall", name });
 }
 
-static auto nixDefExpr = Path{};
+static Path nixDefExpr;
 
 // Fetch Nix expressions and binary cache URLs from the subscribed channels.
 static void update(const StringSet & channelNames)
@@ -74,7 +77,7 @@ static void update(const StringSet & channelNames)
     auto store = openStore();
 
     // Download each channel.
-    auto exprs = Strings{};
+    Strings exprs;
     for (const auto & channel : channels) {
         auto name = channel.first;
         auto url = channel.second;
@@ -84,24 +87,22 @@ static void update(const StringSet & channelNames)
         // We want to download the url to a file to see if it's a tarball while also checking if we
         // got redirected in the process, so that we can grab the various parts of a nix channel
         // definition from a consistent location if the redirect changes mid-download.
-        auto effectiveUrl = string{};
-        auto dl = getDownloader();
-        auto filename = dl->downloadCached(store, url, false, "", Hash(), &effectiveUrl);
-        url = chomp(std::move(effectiveUrl));
+        auto result = fetchers::downloadFile(store, url, std::string(baseNameOf(url)), false);
+        auto filename = store->toRealPath(result.storePath);
+        url = result.effectiveUrl;
 
         // If the URL contains a version number, append it to the name
         // attribute (so that "nix-env -q" on the channels profile
         // shows something useful).
         auto cname = name;
         std::smatch match;
-        auto urlBase = baseNameOf(url);
-        if (std::regex_search(urlBase, match, std::regex("(-\\d.*)$"))) {
+        auto urlBase = std::string(baseNameOf(url));
+        if (std::regex_search(urlBase, match, std::regex("(-\\d.*)$")))
             cname = cname + (string) match[1];
-        }
 
-        auto extraAttrs = string{};
+        std::string extraAttrs;
 
-        auto unpacked = false;
+        bool unpacked = false;
         if (std::regex_search(filename, std::regex("\\.tar\\.(gz|bz2|xz)$"))) {
             runProgram(settings.nixBinDir + "/nix-build", false, { "--no-out-link", "--expr", "import <nix/unpack-channel.nix> "
                         "{ name = \"" + cname + "\"; channelName = \"" + name + "\"; src = builtins.storePath \"" + filename + "\"; }" });
@@ -109,24 +110,12 @@ static void update(const StringSet & channelNames)
         }
 
         if (!unpacked) {
-            // The URL doesn't unpack directly, so let's try treating it like a full channel folder with files in it
-            // Check if the channel advertises a binary cache.
-            DownloadRequest request(url + "/binary-cache-url");
-            try {
-                auto dlRes = dl->download(request);
-                extraAttrs = "binaryCacheURL = \"" + *dlRes.data + "\";";
-            } catch (DownloadError & e) {
-            }
-
             // Download the channel tarball.
-            auto fullURL = url + "/nixexprs.tar.xz";
             try {
-                filename = dl->downloadCached(store, fullURL, false);
+                filename = store->toRealPath(fetchers::downloadFile(store, url + "/nixexprs.tar.xz", "nixexprs.tar.xz", false).storePath);
             } catch (DownloadError & e) {
-                fullURL = url + "/nixexprs.tar.bz2";
-                filename = dl->downloadCached(store, fullURL, false);
+                filename = store->toRealPath(fetchers::downloadFile(store, url + "/nixexprs.tar.bz2", "nixexprs.tar.bz2", false).storePath);
             }
-            chomp(filename);
         }
 
         // Regardless of where it came from, add the expression representing this channel to accumulated expression
@@ -136,7 +125,7 @@ static void update(const StringSet & channelNames)
     // Unpack the channel tarballs into the Nix store and install them
     // into the channels profile.
     std::cerr << "unpacking channels...\n";
-    auto envArgs = Strings{ "--profile", profile, "--file", "<nix/unpack-channel.nix>", "--install", "--from-expression" };
+    Strings envArgs{ "--profile", profile, "--file", "<nix/unpack-channel.nix>", "--install", "--from-expression" };
     for (auto & expr : exprs)
         envArgs.push_back(std::move(expr));
     envArgs.push_back("--quiet");
@@ -157,32 +146,16 @@ static void update(const StringSet & channelNames)
     replaceSymlink(profile, channelLink);
 }
 
-int main(int argc, char ** argv)
+static int _main(int argc, char ** argv)
 {
-    return handleExceptions(argv[0], [&]() {
-        initNix();
-
-        // Turn on caching in nix-prefetch-url.
-        auto channelCache = settings.nixStateDir + "/channel-cache";
-        createDirs(channelCache);
-        setenv("NIX_DOWNLOAD_CACHE", channelCache.c_str(), 1);
-
+    {
         // Figure out the name of the `.nix-channels' file to use
         auto home = getHome();
         channelsList = home + "/.nix-channels";
         nixDefExpr = home + "/.nix-defexpr";
 
         // Figure out the name of the channels profile.
-        auto name = string{};
-        auto pw = getpwuid(getuid());
-        if (!pw)
-            name = getEnv("USER", "");
-        else
-            name = pw->pw_name;
-        if (name.empty())
-            throw Error("cannot figure out user name");
-        profile = settings.nixStateDir + "/profiles/per-user/" + name + "/channels";
-        createDirs(dirOf(profile));
+        profile = fmt("%s/profiles/per-user/%s/channels", settings.nixStateDir, getUserName());
 
         enum {
             cNone,
@@ -192,7 +165,7 @@ int main(int argc, char ** argv)
             cUpdate,
             cRollback
         } cmd = cNone;
-        auto args = std::vector<string>{};
+        std::vector<string> args;
         parseCmdLine(argc, argv, [&](Strings::iterator & arg, const Strings::iterator & end) {
             if (*arg == "--help") {
                 showManPage("nix-channel");
@@ -209,10 +182,15 @@ int main(int argc, char ** argv)
             } else if (*arg == "--rollback") {
                 cmd = cRollback;
             } else {
+                if (hasPrefix(*arg, "-"))
+                    throw UsageError("unsupported argument '%s'", *arg);
                 args.push_back(std::move(*arg));
             }
             return true;
         });
+
+        initPlugins();
+
         switch (cmd) {
             case cNone:
                 throw UsageError("no command specified");
@@ -221,7 +199,7 @@ int main(int argc, char ** argv)
                     throw UsageError("'--add' requires one or two arguments");
                 {
                 auto url = args[0];
-                auto name = string{};
+                std::string name;
                 if (args.size() == 2) {
                     name = args[1];
                 } else {
@@ -250,7 +228,7 @@ int main(int argc, char ** argv)
             case cRollback:
                 if (args.size() > 1)
                     throw UsageError("'--rollback' has at most one argument");
-                auto envArgs = Strings{"--profile", profile};
+                Strings envArgs{"--profile", profile};
                 if (args.size() == 1) {
                     envArgs.push_back("--switch-generation");
                     envArgs.push_back(args[0]);
@@ -260,5 +238,9 @@ int main(int argc, char ** argv)
                 runProgram(settings.nixBinDir + "/nix-env", false, envArgs);
                 break;
         }
-    });
+
+        return 0;
+    }
 }
+
+static RegisterLegacyCommand s1("nix-channel", _main);

@@ -12,10 +12,21 @@ class RemoteFSAccessor : public FSAccessor
 
     std::map<Path, ref<FSAccessor>> nars;
 
+    Path cacheDir;
+
     std::pair<ref<FSAccessor>, Path> fetch(const Path & path_);
+
+    friend class BinaryCacheStore;
+
+    Path makeCacheFile(const Path & storePath, const std::string & ext);
+
+    void addToCache(const Path & storePath, const std::string & nar,
+        ref<FSAccessor> narAccessor);
+
 public:
 
-    RemoteFSAccessor(ref<Store> store);
+    RemoteFSAccessor(ref<Store> store,
+        const /* FIXME: use std::optional */ Path & cacheDir = "");
 
     Stat stat(const Path & path) override;
 

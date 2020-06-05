@@ -2,9 +2,11 @@
 #include "util.hh"
 #include "sync.hh"
 #include "store-api.hh"
+#include "names.hh"
 
-#include <map>
 #include <atomic>
+#include <map>
+#include <thread>
 
 namespace nix {
 
@@ -22,42 +24,11 @@ static uint64_t getI(const std::vector<Logger::Field> & fields, size_t n)
     return fields[n].i;
 }
 
-/* Truncate a string to 'width' printable characters. ANSI escape
-   sequences are copied but not included in the character count. Also,
-   tabs are expanded to spaces. */
-static std::string ansiTruncate(const std::string & s, int width)
+static std::string_view storePathToName(std::string_view path)
 {
-    if (width <= 0) return s;
-
-    std::string t;
-    size_t w = 0;
-    auto i = s.begin();
-
-    while (w < (size_t) width && i != s.end()) {
-        if (*i == '\e') {
-            t += *i++;
-            if (i != s.end() && *i == '[') {
-                t += *i++;
-                while (i != s.end() && (*i < 0x40 || *i > 0x7e)) {
-                    t += *i++;
-                }
-                if (i != s.end()) t += *i++;
-            }
-        }
-
-        else if (*i == '\t') {
-            t += ' '; w++;
-            while (w < (size_t) width && w & 8) {
-                t += ' '; w++;
-            }
-        }
-
-        else {
-            t += *i++; w++;
-        }
-    }
-
-    return t;
+    auto base = baseNameOf(path);
+    auto i = base.find('-');
+    return i == std::string::npos ? base.substr(0, 0) : base.substr(i + 1);
 }
 
 class ProgressBar : public Logger
@@ -75,6 +46,7 @@ private:
         std::map<ActivityType, uint64_t> expectedByType;
         bool visible = true;
         ActivityId parent;
+        std::optional<std::string> name;
     };
 
     struct ActivitiesByType
@@ -97,19 +69,40 @@ private:
         uint64_t corruptedPaths = 0, untrustedPaths = 0;
 
         bool active = true;
+        bool haveUpdate = true;
     };
 
     Sync<State> state_;
 
+    std::thread updateThread;
+
+    std::condition_variable quitCV, updateCV;
+
+    bool printBuildLogs;
+    bool isTTY;
+
 public:
 
-    ProgressBar()
+    ProgressBar(bool printBuildLogs, bool isTTY)
+        : printBuildLogs(printBuildLogs)
+        , isTTY(isTTY)
     {
+        state_.lock()->active = isTTY;
+        updateThread = std::thread([&]() {
+            auto state(state_.lock());
+            while (state->active) {
+                if (!state->haveUpdate)
+                    state.wait(updateCV);
+                draw(*state);
+                state.wait_for(quitCV, std::chrono::milliseconds(50));
+            }
+        });
     }
 
     ~ProgressBar()
     {
         stop();
+        updateThread.join();
     }
 
     void stop()
@@ -121,6 +114,8 @@ public:
         writeToStderr("\r\e[K");
         if (status != "")
             writeToStderr("[" + status + "]\n");
+        updateCV.notify_one();
+        quitCV.notify_one();
     }
 
     void log(Verbosity lvl, const FormatOrString & fs) override
@@ -131,8 +126,14 @@ public:
 
     void log(State & state, Verbosity lvl, const std::string & s)
     {
-        writeToStderr("\r\e[K" + s + ANSI_NORMAL "\n");
-        update(state);
+        if (state.active) {
+            writeToStderr("\r\e[K" + filterANSIEscapes(s, !isTTY) + ANSI_NORMAL "\n");
+            draw(state);
+        } else {
+            auto s2 = s + ANSI_NORMAL "\n";
+            if (!isTTY) s2 = filterANSIEscapes(s2, true);
+            writeToStderr(s2);
+        }
     }
 
     void startActivity(ActivityId act, Verbosity lvl, ActivityType type,
@@ -154,18 +155,39 @@ public:
         if (type == actBuild) {
             auto name = storePathToName(getS(fields, 0));
             if (hasSuffix(name, ".drv"))
-                name.resize(name.size() - 4);
+                name = name.substr(0, name.size() - 4);
             i->s = fmt("building " ANSI_BOLD "%s" ANSI_NORMAL, name);
+            auto machineName = getS(fields, 1);
+            if (machineName != "")
+                i->s += fmt(" on " ANSI_BOLD "%s" ANSI_NORMAL, machineName);
+            auto curRound = getI(fields, 2);
+            auto nrRounds = getI(fields, 3);
+            if (nrRounds != 1)
+                i->s += fmt(" (round %d/%d)", curRound, nrRounds);
+            i->name = DrvName(name).name;
         }
 
         if (type == actSubstitute) {
             auto name = storePathToName(getS(fields, 0));
-            i->s = fmt("fetching " ANSI_BOLD "%s" ANSI_NORMAL " from %s", name, getS(fields, 1));
+            auto sub = getS(fields, 1);
+            i->s = fmt(
+                hasPrefix(sub, "local")
+                ? "copying " ANSI_BOLD "%s" ANSI_NORMAL " from %s"
+                : "fetching " ANSI_BOLD "%s" ANSI_NORMAL " from %s",
+                name, sub);
+        }
+
+        if (type == actPostBuildHook) {
+            auto name = storePathToName(getS(fields, 0));
+            if (hasSuffix(name, ".drv"))
+                name = name.substr(0, name.size() - 4);
+            i->s = fmt("post-build " ANSI_BOLD "%s" ANSI_NORMAL, name);
+            i->name = DrvName(name).name;
         }
 
         if (type == actQueryPathInfo) {
             auto name = storePathToName(getS(fields, 0));
-            i->s = fmt("querying about " ANSI_BOLD "%s" ANSI_NORMAL " on %s", name, getS(fields, 1));
+            i->s = fmt("querying " ANSI_BOLD "%s" ANSI_NORMAL " on %s", name, getS(fields, 1));
         }
 
         if ((type == actDownload && hasAncestor(*state, actCopyPath, parent))
@@ -221,17 +243,25 @@ public:
             update(*state);
         }
 
-        else if (type == resBuildLogLine) {
+        else if (type == resBuildLogLine || type == resPostBuildLogLine) {
             auto lastLine = trim(getS(fields, 0));
             if (!lastLine.empty()) {
                 auto i = state->its.find(act);
                 assert(i != state->its.end());
                 ActInfo info = *i->second;
-                state->activities.erase(i->second);
-                info.lastLine = lastLine;
-                state->activities.emplace_back(info);
-                i->second = std::prev(state->activities.end());
-                update(*state);
+                if (printBuildLogs) {
+                    auto suffix = "> ";
+                    if (type == resPostBuildLogLine) {
+                        suffix = " (post)> ";
+                    }
+                    log(*state, lvlInfo, ANSI_FAINT + info.name.value_or("unnamed") + suffix + ANSI_NORMAL + lastLine);
+                } else {
+                    state->activities.erase(i->second);
+                    info.lastLine = lastLine;
+                    state->activities.emplace_back(info);
+                    i->second = std::prev(state->activities.end());
+                    update(*state);
+                }
             }
         }
 
@@ -276,14 +306,15 @@ public:
         }
     }
 
-    void update()
-    {
-        auto state(state_.lock());
-        update(*state);
-    }
-
     void update(State & state)
     {
+        state.haveUpdate = true;
+        updateCV.notify_one();
+    }
+
+    void draw(State & state)
+    {
+        state.haveUpdate = false;
         if (!state.active) return;
 
         std::string line;
@@ -316,7 +347,10 @@ public:
             }
         }
 
-        writeToStderr("\r" + ansiTruncate(line, getWindowSize().second) + "\e[K");
+        auto width = getWindowSize().second;
+        if (width <= 0) width = std::numeric_limits<decltype(width)>::max();
+
+        writeToStderr("\r" + filterANSIEscapes(line, false, width) + "\e[K");
     }
 
     std::string getStatus(State & state)
@@ -341,11 +375,18 @@ public:
 
             if (running || done || expected || failed) {
                 if (running)
-                    s = fmt(ANSI_BLUE + numberFmt + ANSI_NORMAL "/" ANSI_GREEN + numberFmt + ANSI_NORMAL "/" + numberFmt,
-                        running / unit, done / unit, expected / unit);
+                    if (expected != 0)
+                        s = fmt(ANSI_BLUE + numberFmt + ANSI_NORMAL "/" ANSI_GREEN + numberFmt + ANSI_NORMAL "/" + numberFmt,
+                            running / unit, done / unit, expected / unit);
+                    else
+                        s = fmt(ANSI_BLUE + numberFmt + ANSI_NORMAL "/" ANSI_GREEN + numberFmt + ANSI_NORMAL,
+                            running / unit, done / unit);
                 else if (expected != done)
-                    s = fmt(ANSI_GREEN + numberFmt + ANSI_NORMAL "/" + numberFmt,
-                        done / unit, expected / unit);
+                    if (expected != 0)
+                        s = fmt(ANSI_GREEN + numberFmt + ANSI_NORMAL "/" + numberFmt,
+                            done / unit, expected / unit);
+                    else
+                        s = fmt(ANSI_GREEN + numberFmt + ANSI_NORMAL, done / unit);
                 else
                     s = fmt(done ? ANSI_GREEN + numberFmt + ANSI_NORMAL : numberFmt, done / unit);
                 s = fmt(itemFmt, s);
@@ -403,9 +444,11 @@ public:
     }
 };
 
-void startProgressBar()
+void startProgressBar(bool printBuildLogs)
 {
-    logger = new ProgressBar();
+    logger = new ProgressBar(
+        printBuildLogs,
+        isatty(STDERR_FILENO) && getEnv("TERM").value_or("dumb") != "dumb");
 }
 
 void stopProgressBar()

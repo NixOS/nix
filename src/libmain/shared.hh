@@ -2,6 +2,8 @@
 
 #include "util.hh"
 #include "args.hh"
+#include "common-args.hh"
+#include "path.hh"
 
 #include <signal.h>
 
@@ -16,10 +18,12 @@ public:
     int status;
     Exit() : status(0) { }
     Exit(int status) : status(status) { }
+    virtual ~Exit();
 };
 
 int handleExceptions(const string & programName, std::function<void()> fun);
 
+/* Don't forget to call initPlugins() after settings are initialized! */
 void initNix();
 
 void parseCmdLine(int argc, char * * argv,
@@ -34,12 +38,16 @@ void printVersion(const string & programName);
 void printGCWarning();
 
 class Store;
+struct StorePathWithOutputs;
 
-void printMissing(ref<Store> store, const PathSet & paths);
+void printMissing(
+    ref<Store> store,
+    const std::vector<StorePathWithOutputs> & paths,
+    Verbosity lvl = lvlInfo);
 
-void printMissing(ref<Store> store, const PathSet & willBuild,
-    const PathSet & willSubstitute, const PathSet & unknown,
-    unsigned long long downloadSize, unsigned long long narSize);
+void printMissing(ref<Store> store, const StorePathSet & willBuild,
+    const StorePathSet & willSubstitute, const StorePathSet & unknown,
+    unsigned long long downloadSize, unsigned long long narSize, Verbosity lvl = lvlInfo);
 
 string getArg(const string & opt,
     Strings::iterator & i, const Strings::iterator & end);
@@ -67,6 +75,19 @@ template<class N> N getIntArg(const string & opt,
         throw UsageError(format("'%1%' requires an integer argument") % opt);
     return n * multiplier;
 }
+
+
+struct LegacyArgs : public MixCommonArgs
+{
+    std::function<bool(Strings::iterator & arg, const Strings::iterator & end)> parseArg;
+
+    LegacyArgs(const std::string & programName,
+        std::function<bool(Strings::iterator & arg, const Strings::iterator & end)> parseArg);
+
+    bool processFlag(Strings::iterator & pos, Strings::iterator end) override;
+
+    bool processArgs(const Strings & args, bool finish) override;
+};
 
 
 /* Show the manual page for the specified program. */

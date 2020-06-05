@@ -44,7 +44,9 @@
 cryptographic hash of the contents of each
 <replaceable>path</replaceable> and prints it on standard output.  By
 default, it computes an MD5 hash, but other hash algorithms are
-available as well.  The hash is printed in hexadecimal.</para>
+available as well.  The hash is printed in hexadecimal.  To generate
+the same hash as <command>nix-prefetch-url</command> you have to
+specify multiple arguments, see below for an example.</para>
 
 <para>The hash is computed over a <emphasis>serialisation</emphasis>
 of each path: a dump of the file system tree rooted at the path.  This
@@ -121,6 +123,15 @@ cryptographic hash as <literal>nix-store --dump
 
 
 <refsection><title>Examples</title>
+
+<para>Computing the same hash as <command>nix-prefetch-url</command>:
+<screen>
+$ nix-prefetch-url file://&lt;(echo test)
+1lkgqb6fclns49861dwk9rzb6xnfkxbpws74mxnx01z9qyv1pjpj
+$ nix-hash --type sha256 --flat --base32 &lt;(echo test)
+1lkgqb6fclns49861dwk9rzb6xnfkxbpws74mxnx01z9qyv1pjpj
+</screen>
+</para>
 
 <para>Computing hashes:
 

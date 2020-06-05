@@ -12,7 +12,7 @@ automatically fetching any store paths in Firefox’s closure if they
 are available on the server <literal>avalon</literal>:
 
 <screen>
-$ nix-env -i firefox --option ssh-substituter-hosts alice@avalon
+$ nix-env -i firefox --substituters ssh://alice@avalon
 </screen>
 
 This works similar to the binary cache substituter that Nix usually
@@ -31,7 +31,7 @@ an SSH passphrase interactively. Therefore, you should use
 installing it into your profile, e.g.
 
 <screen>
-$ nix-store -r /nix/store/m85bxg…-firefox-34.0.5 --option ssh-substituter-hosts alice@avalon
+$ nix-store -r /nix/store/m85bxg…-firefox-34.0.5 --substituters ssh://alice@avalon
 </screen>
 
 This is essentially equivalent to doing

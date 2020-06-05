@@ -8,7 +8,14 @@
 #include "shared.hh"
 #include "store-api.hh"
 #include "progress-bar.hh"
+#include "download.hh"
 #include "finally.hh"
+
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <ifaddrs.h>
+#include <netdb.h>
+#include <netinet/in.h>
 
 extern std::string chrootHelperName;
 
@@ -16,27 +23,81 @@ void chrootHelper(int argc, char * * argv);
 
 namespace nix {
 
+/* Check if we have a non-loopback/link-local network interface. */
+static bool haveInternet()
+{
+    struct ifaddrs * addrs;
+
+    if (getifaddrs(&addrs))
+        return true;
+
+    Finally free([&]() { freeifaddrs(addrs); });
+
+    for (auto i = addrs; i; i = i->ifa_next) {
+        if (!i->ifa_addr) continue;
+        if (i->ifa_addr->sa_family == AF_INET) {
+            if (ntohl(((sockaddr_in *) i->ifa_addr)->sin_addr.s_addr) != INADDR_LOOPBACK) {
+                return true;
+            }
+        } else if (i->ifa_addr->sa_family == AF_INET6) {
+            if (!IN6_IS_ADDR_LOOPBACK(&((sockaddr_in6 *) i->ifa_addr)->sin6_addr) &&
+                !IN6_IS_ADDR_LINKLOCAL(&((sockaddr_in6 *) i->ifa_addr)->sin6_addr))
+                return true;
+        }
+    }
+
+    return false;
+}
+
+std::string programPath;
+
 struct NixArgs : virtual MultiCommand, virtual MixCommonArgs
 {
+    bool printBuildLogs = false;
+    bool useNet = true;
+    bool refresh = false;
+
     NixArgs() : MultiCommand(*RegisterCommand::commands), MixCommonArgs("nix")
     {
-        mkFlag('h', "help", "show usage information", [&]() { showHelpAndExit(); });
+        mkFlag()
+            .longName("help")
+            .description("show usage information")
+            .handler([&]() { showHelpAndExit(); });
 
-        mkFlag(0, "help-config", "show configuration options", [=]() {
-            std::cout << "The following configuration options are available:\n\n";
-            Table2 tbl;
-            for (const auto & s : settings._getSettings())
-                if (!s.second.isAlias)
-                    tbl.emplace_back(s.first, s.second.setting->description);
-            printTable(std::cout, tbl);
-            throw Exit();
-        });
+        mkFlag()
+            .longName("help-config")
+            .description("show configuration options")
+            .handler([&]() {
+                std::cout << "The following configuration options are available:\n\n";
+                Table2 tbl;
+                std::map<std::string, Config::SettingInfo> settings;
+                globalConfig.getSettings(settings);
+                for (const auto & s : settings)
+                    tbl.emplace_back(s.first, s.second.description);
+                printTable(std::cout, tbl);
+                throw Exit();
+            });
 
-        mkFlag(0, "version", "show version information", std::bind(printVersion, programName));
+        mkFlag()
+            .longName("print-build-logs")
+            .shortName('L')
+            .description("print full build logs on stderr")
+            .set(&printBuildLogs, true);
 
-        std::string cat = "config";
-        settings.convertToArgs(*this, cat);
-        hiddenCategories.insert(cat);
+        mkFlag()
+            .longName("version")
+            .description("show version information")
+            .handler([&]() { printVersion(programName); });
+
+        mkFlag()
+            .longName("no-net")
+            .description("disable substituters and consider all previously downloaded files up-to-date")
+            .handler([&]() { useNet = false; });
+
+        mkFlag()
+            .longName("refresh")
+            .description("consider all previously downloaded files out-of-date")
+            .handler([&]() { refresh = true; });
     }
 
     void printFlags(std::ostream & out) override
@@ -49,19 +110,26 @@ struct NixArgs : virtual MultiCommand, virtual MixCommonArgs
             "--help-config' for a list of configuration settings.\n";
     }
 
+    void printHelp(const string & programName, std::ostream & out) override
+    {
+        MultiCommand::printHelp(programName, out);
+
+#if 0
+        out << "\nFor full documentation, run 'man " << programName << "' or 'man " << programName << "-<COMMAND>'.\n";
+#endif
+
+        std::cout << "\nNote: this program is EXPERIMENTAL and subject to change.\n";
+    }
+
     void showHelpAndExit()
     {
         printHelp(programName, std::cout);
-        std::cout << "\nNote: this program is EXPERIMENTAL and subject to change.\n";
         throw Exit();
     }
 };
 
 void mainWrapped(int argc, char * * argv)
 {
-    verbosity = lvlError;
-    settings.verboseBuild = false;
-
     /* The chroot helper needs to be run before any threads have been
        started. */
     if (argc > 0 && argv[0] == chrootHelperName) {
@@ -72,23 +140,50 @@ void mainWrapped(int argc, char * * argv)
     initNix();
     initGC();
 
-    string programName = baseNameOf(argv[0]);
+    programPath = argv[0];
+    auto programName = std::string(baseNameOf(programPath));
 
     {
         auto legacy = (*RegisterLegacyCommand::commands)[programName];
         if (legacy) return legacy(argc, argv);
     }
 
+    verbosity = lvlWarn;
+    settings.verboseBuild = false;
+
     NixArgs args;
 
     args.parseCmdline(argvToStrings(argc, argv));
+
+    settings.requireExperimentalFeature("nix-command");
+
+    initPlugins();
 
     if (!args.command) args.showHelpAndExit();
 
     Finally f([]() { stopProgressBar(); });
 
-    if (isatty(STDERR_FILENO))
-        startProgressBar();
+    startProgressBar(args.printBuildLogs);
+
+    if (args.useNet && !haveInternet()) {
+        warn("you don't have Internet access; disabling some network-dependent features");
+        args.useNet = false;
+    }
+
+    if (!args.useNet) {
+        // FIXME: should check for command line overrides only.
+        if (!settings.useSubstitutes.overriden)
+            settings.useSubstitutes = false;
+        if (!settings.tarballTtl.overriden)
+            settings.tarballTtl = std::numeric_limits<unsigned int>::max();
+        if (!downloadSettings.tries.overriden)
+            downloadSettings.tries = 0;
+        if (!downloadSettings.connectTimeout.overriden)
+            downloadSettings.connectTimeout = 1;
+    }
+
+    if (args.refresh)
+        settings.tarballTtl = 0;
 
     args.command->prepare();
     args.command->run();

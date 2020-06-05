@@ -28,11 +28,6 @@ struct CmdCatStore : StoreCommand, MixCat
         expectArg("path", &path);
     }
 
-    std::string name() override
-    {
-        return "cat-store";
-    }
-
     std::string description() override
     {
         return "print the contents of a store file on stdout";
@@ -54,11 +49,6 @@ struct CmdCatNar : StoreCommand, MixCat
         expectArg("path", &path);
     }
 
-    std::string name() override
-    {
-        return "cat-nar";
-    }
-
     std::string description() override
     {
         return "print the contents of a file inside a NAR file";
@@ -70,5 +60,5 @@ struct CmdCatNar : StoreCommand, MixCat
     }
 };
 
-static RegisterCommand r1(make_ref<CmdCatStore>());
-static RegisterCommand r2(make_ref<CmdCatNar>());
+static auto r1 = registerCommand<CmdCatStore>("cat-store");
+static auto r2 = registerCommand<CmdCatNar>("cat-nar");

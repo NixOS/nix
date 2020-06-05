@@ -40,7 +40,12 @@ void printValueAsJSON(EvalState & state, bool strict,
             break;
 
         case tAttrs: {
-            Bindings::iterator i = v.attrs->find(state.sOutPath);
+            auto maybeString = state.tryAttrsToString(noPos, v, context, false, false);
+            if (maybeString) {
+                out.write(*maybeString);
+                break;
+            }
+            auto i = v.attrs->find(state.sOutPath);
             if (i == v.attrs->end()) {
                 auto obj(out.object());
                 StringSet names;

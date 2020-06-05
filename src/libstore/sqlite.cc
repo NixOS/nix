@@ -7,9 +7,10 @@
 
 namespace nix {
 
-[[noreturn]] void throwSQLiteError(sqlite3 * db, const format & f)
+[[noreturn]] void throwSQLiteError(sqlite3 * db, const FormatOrString & fs)
 {
     int err = sqlite3_errcode(db);
+    int exterr = sqlite3_extended_errcode(db);
 
     auto path = sqlite3_db_filename(db, nullptr);
     if (!path) path = "(in-memory)";
@@ -21,14 +22,19 @@ namespace nix {
             : fmt("SQLite database '%s' is busy", path));
     }
     else
-        throw SQLiteError("%s: %s (in '%s')", f.str(), sqlite3_errstr(err), path);
+        throw SQLiteError("%s: %s (in '%s')", fs.s, sqlite3_errstr(exterr), path);
 }
 
-SQLite::SQLite(const Path & path)
+SQLite::SQLite(const Path & path, bool create)
 {
     if (sqlite3_open_v2(path.c_str(), &db,
-            SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE, 0) != SQLITE_OK)
+            SQLITE_OPEN_READWRITE | (create ? SQLITE_OPEN_CREATE : 0), 0) != SQLITE_OK)
         throw Error(format("cannot open SQLite database '%s'") % path);
+
+    if (sqlite3_busy_timeout(db, 60 * 60 * 1000) != SQLITE_OK)
+        throwSQLiteError(db, "setting timeout");
+
+    exec("pragma foreign_keys = 1");
 }
 
 SQLite::~SQLite()
@@ -39,6 +45,12 @@ SQLite::~SQLite()
     } catch (...) {
         ignoreException();
     }
+}
+
+void SQLite::isCache()
+{
+    exec("pragma synchronous = off");
+    exec("pragma main.journal_mode = truncate");
 }
 
 void SQLite::exec(const std::string & stmt)
@@ -87,6 +99,16 @@ SQLiteStmt::Use & SQLiteStmt::Use::operator () (const std::string & value, bool 
 {
     if (notNull) {
         if (sqlite3_bind_text(stmt, curArg++, value.c_str(), -1, SQLITE_TRANSIENT) != SQLITE_OK)
+            throwSQLiteError(stmt.db, "binding argument");
+    } else
+        bind();
+    return *this;
+}
+
+SQLiteStmt::Use & SQLiteStmt::Use::operator () (const unsigned char * data, size_t len, bool notNull)
+{
+    if (notNull) {
+        if (sqlite3_bind_blob(stmt, curArg++, data, len, SQLITE_TRANSIENT) != SQLITE_OK)
             throwSQLiteError(stmt.db, "binding argument");
     } else
         bind();

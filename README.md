@@ -1,3 +1,5 @@
+[![Open Collective supporters](https://opencollective.com/nixos/tiers/supporter/badge.svg?label=Supporters&color=brightgreen)](https://opencollective.com/nixos)
+
 Nix, the purely functional package manager
 ------------------------------------------
 
@@ -7,16 +9,13 @@ appear with Nix.
 
 To find out more about the tool, usage and installation instructions, please
 read the manual, which is available on the Nix website at
-<http://nixos.org/nix/manual>.
+<https://nixos.org/nix/manual>.
 
 ## Contributing
 
-Take a look at the [Hacking Section](http://nixos.org/nix/manual/#chap-hacking)
+Take a look at the [Hacking Section](https://nixos.org/nix/manual/#chap-hacking)
 of the manual. It helps you to get started with building Nix from source.
 
 ## License
 
 Nix is released under the LGPL v2.1
-
-This product includes software developed by the OpenSSL Project for
-use in the [OpenSSL Toolkit](http://www.OpenSSL.org/).

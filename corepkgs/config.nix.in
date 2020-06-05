@@ -1,29 +1,13 @@
+# FIXME: remove this file?
 let
   fromEnv = var: def:
     let val = builtins.getEnv var; in
     if val != "" then val else def;
 in rec {
-  shell = "@bash@";
-  coreutils = "@coreutils@";
-  bzip2 = "@bzip2@";
-  gzip = "@gzip@";
-  xz = "@xz@";
-  tar = "@tar@";
-  tarFlags = "@tarFlags@";
-  tr = "@tr@";
   nixBinDir = fromEnv "NIX_BIN_DIR" "@bindir@";
   nixPrefix = "@prefix@";
   nixLibexecDir = fromEnv "NIX_LIBEXEC_DIR" "@libexecdir@";
   nixLocalstateDir = "@localstatedir@";
   nixSysconfDir = "@sysconfdir@";
   nixStoreDir = fromEnv "NIX_STORE_DIR" "@storedir@";
-
-  # If Nix is installed in the Nix store, then automatically add it as
-  # a dependency to the core packages. This ensures that they work
-  # properly in a chroot.
-  chrootDeps =
-    if dirOf nixPrefix == builtins.storeDir then
-      [ (builtins.storePath nixPrefix) ]
-    else
-      [ ];
 }

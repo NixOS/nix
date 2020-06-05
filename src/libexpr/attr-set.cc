@@ -1,5 +1,5 @@
 #include "attr-set.hh"
-#include "eval.hh"
+#include "eval-inline.hh"
 
 #include <algorithm>
 
@@ -7,29 +7,18 @@
 namespace nix {
 
 
-static void * allocBytes(size_t n)
-{
-    void * p;
-#if HAVE_BOEHMGC
-    p = GC_malloc(n);
-#else
-    p = malloc(n);
-#endif
-    if (!p) throw std::bad_alloc();
-    return p;
-}
-
-
 /* Allocate a new array of attributes for an attribute set with a specific
    capacity. The space is implicitly reserved after the Bindings
    structure. */
-Bindings * EvalState::allocBindings(Bindings::size_t capacity)
+Bindings * EvalState::allocBindings(size_t capacity)
 {
-    return new (allocBytes(sizeof(Bindings) + sizeof(Attr) * capacity)) Bindings(capacity);
+    if (capacity > std::numeric_limits<Bindings::size_t>::max())
+        throw Error("attribute set of size %d is too big", capacity);
+    return new (allocBytes(sizeof(Bindings) + sizeof(Attr) * capacity)) Bindings((Bindings::size_t) capacity);
 }
 
 
-void EvalState::mkAttrs(Value & v, unsigned int capacity)
+void EvalState::mkAttrs(Value & v, size_t capacity)
 {
     if (capacity == 0) {
         v = vEmptySet;
@@ -51,6 +40,12 @@ Value * EvalState::allocAttr(Value & vAttrs, const Symbol & name)
     Value * v = allocValue();
     vAttrs.attrs->push_back(Attr(name, v));
     return v;
+}
+
+
+Value * EvalState::allocAttr(Value & vAttrs, const std::string & name)
+{
+    return allocAttr(vAttrs, symbols.create(name));
 }
 
 

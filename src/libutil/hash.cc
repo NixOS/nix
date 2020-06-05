@@ -82,7 +82,7 @@ static string printHash32(const Hash & hash)
     string s;
     s.reserve(len);
 
-    for (int n = len - 1; n >= 0; n--) {
+    for (int n = (int) len - 1; n >= 0; n--) {
         unsigned int b = n * 5;
         unsigned int i = b / 8;
         unsigned int j = b % 8;
@@ -105,9 +105,9 @@ string printHash16or32(const Hash & hash)
 std::string Hash::to_string(Base base, bool includeType) const
 {
     std::string s;
-    if (includeType) {
+    if (base == SRI || includeType) {
         s += printHashType(type);
-        s += ':';
+        s += base == SRI ? '-' : ':';
     }
     switch (base) {
     case Base16:
@@ -117,6 +117,7 @@ std::string Hash::to_string(Base base, bool includeType) const
         s += printHash32(*this);
         break;
     case Base64:
+    case SRI:
         s += base64Encode(std::string((const char *) hash, hashSize));
         break;
     }
@@ -127,28 +128,33 @@ std::string Hash::to_string(Base base, bool includeType) const
 Hash::Hash(const std::string & s, HashType type)
     : type(type)
 {
-    auto colon = s.find(':');
-
     size_t pos = 0;
+    bool isSRI = false;
 
-    if (colon == string::npos) {
-        if (type == htUnknown)
+    auto sep = s.find(':');
+    if (sep == string::npos) {
+        sep = s.find('-');
+        if (sep != string::npos) {
+            isSRI = true;
+        } else if (type == htUnknown)
             throw BadHash("hash '%s' does not include a type", s);
-    } else {
-        string hts = string(s, 0, colon);
+    }
+
+    if (sep != string::npos) {
+        string hts = string(s, 0, sep);
         this->type = parseHashType(hts);
         if (this->type == htUnknown)
             throw BadHash("unknown hash type '%s'", hts);
         if (type != htUnknown && type != this->type)
             throw BadHash("hash '%s' should have type '%s'", s, printHashType(type));
-        pos = colon + 1;
+        pos = sep + 1;
     }
 
     init();
 
     size_t size = s.size() - pos;
 
-    if (size == base16Len()) {
+    if (!isSRI && size == base16Len()) {
 
         auto parseHexDigit = [&](char c) {
             if (c >= '0' && c <= '9') return c - '0';
@@ -164,7 +170,7 @@ Hash::Hash(const std::string & s, HashType type)
         }
     }
 
-    else if (size == base32Len()) {
+    else if (!isSRI && size == base32Len()) {
 
         for (unsigned int n = 0; n < size; ++n) {
             char c = s[pos + size - n - 1];
@@ -187,9 +193,11 @@ Hash::Hash(const std::string & s, HashType type)
         }
     }
 
-    else if (size == base64Len()) {
+    else if (isSRI || size == base64Len()) {
         auto d = base64Decode(std::string(s, pos));
-        assert(d.size() == hashSize);
+        if (d.size() != hashSize)
+            throw BadHash("invalid %s hash '%s'", isSRI ? "SRI" : "base-64", s);
+        assert(hashSize);
         memcpy(hash, d.data(), hashSize);
     }
 
@@ -248,23 +256,9 @@ Hash hashString(HashType ht, const string & s)
 
 Hash hashFile(HashType ht, const Path & path)
 {
-    Ctx ctx;
-    Hash hash(ht);
-    start(ht, ctx);
-
-    AutoCloseFD fd = open(path.c_str(), O_RDONLY | O_CLOEXEC);
-    if (!fd) throw SysError(format("opening file '%1%'") % path);
-
-    unsigned char buf[8192];
-    ssize_t n;
-    while ((n = read(fd.get(), buf, sizeof(buf)))) {
-        checkInterrupt();
-        if (n == -1) throw SysError(format("reading file '%1%'") % path);
-        update(ht, ctx, buf, n);
-    }
-
-    finish(ht, ctx, hash.hash);
-    return hash;
+    HashSink sink(ht);
+    readFile(path, sink);
+    return sink.finish().first;
 }
 
 

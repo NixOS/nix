@@ -1,0 +1,91 @@
+<section xmlns="http://docbook.org/ns/docbook"
+      xmlns:xlink="http://www.w3.org/1999/xlink"
+      xmlns:xi="http://www.w3.org/2001/XInclude"
+      version="5.0"
+      xml:id="ssec-relnotes-2.3">
+
+<title>Release 2.3 (2019-09-04)</title>
+
+<para>This is primarily a bug fix release. However, it makes some
+incompatible changes:</para>
+
+<itemizedlist>
+
+  <listitem>
+    <para>Nix now uses BSD file locks instead of POSIX file
+    locks. Because of this, you should not use Nix 2.3 and previous
+    releases at the same time on a Nix store.</para>
+  </listitem>
+
+</itemizedlist>
+
+<para>It also has the following changes:</para>
+
+<itemizedlist>
+
+  <listitem>
+    <para><function>builtins.fetchGit</function>'s <varname>ref</varname>
+    argument now allows specifying an absolute remote ref.
+    Nix will automatically prefix <varname>ref</varname> with
+    <literal>refs/heads</literal> only if <varname>ref</varname> doesn't
+    already begin with <literal>refs/</literal>.
+    </para>
+  </listitem>
+
+  <listitem>
+    <para>The installer now enables sandboxing by default on Linux when the
+    system has the necessary kernel support.
+    </para>
+  </listitem>
+
+  <listitem>
+    <para>The <literal>max-jobs</literal> setting now defaults to 1.</para>
+  </listitem>
+
+  <listitem>
+    <para>New builtin functions:
+    <literal>builtins.isPath</literal>,
+    <literal>builtins.hashFile</literal>.
+    </para>
+  </listitem>
+
+  <listitem>
+    <para>The <command>nix</command> command has a new
+    <option>--print-build-logs</option> (<option>-L</option>) flag to
+    print build log output to stderr, rather than showing the last log
+    line in the progress bar. To distinguish between concurrent
+    builds, log lines are prefixed by the name of the package.
+    </para>
+  </listitem>
+
+  <listitem>
+    <para>Builds are now executed in a pseudo-terminal, and the
+    <envar>TERM</envar> environment variable is set to
+    <literal>xterm-256color</literal>. This allows many programs
+    (e.g. <command>gcc</command>, <command>clang</command>,
+    <command>cmake</command>) to print colorized log output.</para>
+  </listitem>
+
+  <listitem>
+    <para>Add <option>--no-net</option> convenience flag. This flag
+    disables substituters; sets the <literal>tarball-ttl</literal>
+    setting to infinity (ensuring that any previously downloaded files
+    are considered current); and disables retrying downloads and sets
+    the connection timeout to the minimum. This flag is enabled
+    automatically if there are no configured non-loopback network
+    interfaces.</para>
+  </listitem>
+
+  <listitem>
+    <para>Add a <literal>post-build-hook</literal> setting to run a
+    program after a build has succeeded.</para>
+  </listitem>
+
+  <listitem>
+    <para>Add a <literal>trace-function-calls</literal> setting to log
+    the duration of Nix function calls to stderr.</para>
+  </listitem>
+
+</itemizedlist>
+
+</section>

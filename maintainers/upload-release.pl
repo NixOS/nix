@@ -6,6 +6,7 @@ use Data::Dumper;
 use File::Basename;
 use File::Path;
 use File::Slurp;
+use File::Copy;
 use JSON::PP;
 use LWP::UserAgent;
 
@@ -43,7 +44,7 @@ print STDERR "Nix revision is $nixRev, version is $version\n";
 
 File::Path::make_path($releasesDir);
 if (system("mountpoint -q $releasesDir") != 0) {
-    system("sshfs hydra-mirror:/releases $releasesDir") == 0 or die;
+    system("sshfs hydra-mirror\@nixos.org:/releases $releasesDir") == 0 or die;
 }
 
 my $releaseDir = "$releasesDir/nix/$releaseName";
@@ -54,7 +55,7 @@ sub downloadFile {
 
     my $buildInfo = decode_json(fetch("$evalUrl/job/$jobName", 'application/json'));
 
-    my $srcFile = $buildInfo->{buildproducts}->{$productNr}->{path} or die;
+    my $srcFile = $buildInfo->{buildproducts}->{$productNr}->{path} or die "job '$jobName' lacks product $productNr\n";
     $dstName //= basename($srcFile);
     my $dstFile = "$releaseDir/" . $dstName;
 
@@ -66,24 +67,31 @@ sub downloadFile {
     }
 
     my $sha256_expected = $buildInfo->{buildproducts}->{$productNr}->{sha256hash} or die;
-    my $sha256_actual = `nix hash-file --type sha256 '$dstFile'`;
+    my $sha256_actual = `nix hash-file --base16 --type sha256 '$dstFile'`;
     chomp $sha256_actual;
     if ($sha256_expected ne $sha256_actual) {
-        print STDERR "file $dstFile is corrupt\n";
+        print STDERR "file $dstFile is corrupt, got $sha256_actual, expected $sha256_expected\n";
         exit 1;
     }
 
     write_file("$dstFile.sha256", $sha256_expected);
 
+    if (! -e "$dstFile.asc") {
+        system("gpg2 --detach-sign --armor $dstFile") == 0 or die "unable to sign $dstFile\n";
+    }
+
     return ($dstFile, $sha256_expected);
 }
 
-downloadFile("tarball", "2"); # PDF
-downloadFile("tarball", "3"); # .tar.bz2
-my ($tarball, $tarballHash) = downloadFile("tarball", "4"); # .tar.xz
-my ($tarball_i686_linux, $tarball_i686_linux_hash) = downloadFile("binaryTarball.i686-linux", "1");
-my ($tarball_x86_64_linux, $tarball_x86_64_linux_hash) = downloadFile("binaryTarball.x86_64-linux", "1");
-my ($tarball_x86_64_darwin, $tarball_x86_64_darwin_hash) = downloadFile("binaryTarball.x86_64-darwin", "1");
+downloadFile("tarball", "2"); # .tar.bz2
+my ($tarball, $tarballHash) = downloadFile("tarball", "3"); # .tar.xz
+downloadFile("binaryTarball.i686-linux", "1");
+downloadFile("binaryTarball.x86_64-linux", "1");
+downloadFile("binaryTarball.aarch64-linux", "1");
+downloadFile("binaryTarball.x86_64-darwin", "1");
+downloadFile("installerScript", "1");
+
+exit if $version =~ /pre/;
 
 # Update Nixpkgs in a very hacky way.
 system("cd $nixpkgsDir && git pull") == 0 or die;
@@ -111,6 +119,7 @@ write_file("$nixpkgsDir/nixos/modules/installer/tools/nix-fallback-paths.nix",
            "{\n" .
            "  x86_64-linux = \"" . getStorePath("build.x86_64-linux") . "\";\n" .
            "  i686-linux = \"" . getStorePath("build.i686-linux") . "\";\n" .
+           "  aarch64-linux = \"" . getStorePath("build.aarch64-linux") . "\";\n" .
            "  x86_64-darwin = \"" . getStorePath("build.x86_64-darwin") . "\";\n" .
            "}\n");
 
@@ -142,11 +151,6 @@ system("cd $siteDir && git pull") == 0 or die;
 write_file("$siteDir/nix-release.tt",
            "[%-\n" .
            "latestNixVersion = \"$version\"\n" .
-           "nix_hash_i686_linux = \"$tarball_i686_linux_hash\"\n" .
-           "nix_hash_x86_64_linux = \"$tarball_x86_64_linux_hash\"\n" .
-           "nix_hash_x86_64_darwin = \"$tarball_x86_64_darwin_hash\"\n" .
            "-%]\n");
-
-system("cd $siteDir && nix-shell --run 'make nix/install nix/install.sig'") == 0 or die;
 
 system("cd $siteDir && git commit -a -m 'Nix $version released'") == 0 or die;

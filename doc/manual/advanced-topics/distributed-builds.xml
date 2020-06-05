@@ -4,71 +4,110 @@
       version="5.0"
       xml:id='chap-distributed-builds'>
 
-<title>Distributed Builds</title>
+<title>Remote Builds</title>
 
-<para>Nix supports distributed builds, where a local Nix installation can
-forward Nix builds to other machines over the network.  This allows
-multiple builds to be performed in parallel (thus improving
-performance) and allows Nix to perform multi-platform builds in a
-semi-transparent way.  For instance, if you perform a build for a
-<literal>x86_64-darwin</literal> on an <literal>i686-linux</literal>
-machine, Nix can automatically forward the build to a
-<literal>x86_64-darwin</literal> machine, if available.</para>
+<para>Nix supports remote builds, where a local Nix installation can
+forward Nix builds to other machines.  This allows multiple builds to
+be performed in parallel and allows Nix to perform multi-platform
+builds in a semi-transparent way.  For instance, if you perform a
+build for a <literal>x86_64-darwin</literal> on an
+<literal>i686-linux</literal> machine, Nix can automatically forward
+the build to a <literal>x86_64-darwin</literal> machine, if
+available.</para>
 
-<para>You can enable distributed builds by setting the environment
-variable <envar>NIX_BUILD_HOOK</envar> to point to a program that Nix
-will call whenever it wants to build a derivation.  The build hook
-(typically a shell or Perl script) can decline the build, in which Nix
-will perform it in the usual way if possible, or it can accept it, in
-which case it is responsible for somehow getting the inputs of the
-build to another machine, doing the build there, and getting the
-results back.</para>
+<para>To forward a build to a remote machine, it’s required that the
+remote machine is accessible via SSH and that it has Nix
+installed. You can test whether connecting to the remote Nix instance
+works, e.g.
 
-<example xml:id='ex-remote-systems'><title>Remote machine configuration:
-<filename>remote-systems.conf</filename></title>
-<programlisting>
-nix@mcflurry.labs.cs.uu.nl  x86_64-darwin   /home/nix/.ssh/id_quarterpounder_auto  2
-nix@scratchy.labs.cs.uu.nl  i686-linux      /home/nix/.ssh/id_scratchy_auto        8 1 kvm
-nix@itchy.labs.cs.uu.nl     i686-linux      /home/nix/.ssh/id_scratchy_auto        8 2
-nix@poochie.labs.cs.uu.nl   i686-linux      /home/nix/.ssh/id_scratchy_auto        8 2 kvm perf
-</programlisting>
-</example>
+<screen>
+$ nix ping-store --store ssh://mac
+</screen>
 
-<para>Nix ships with a build hook that should be suitable for most
-purposes.  It uses <command>ssh</command> and
-<command>nix-copy-closure</command> to copy the build inputs and
-outputs and perform the remote build.  To use it, you should set
-<envar>NIX_BUILD_HOOK</envar> to
-<filename><replaceable>prefix</replaceable>/libexec/nix/build-remote</filename>.
-You should also define a list of available build machines and point
-the environment variable <envar>NIX_REMOTE_SYSTEMS</envar> to
-it. <envar>NIX_REMOTE_SYSTEMS</envar> must be an absolute path. An
-example configuration is shown in <xref linkend='ex-remote-systems'
-/>.  Each line in the file specifies a machine, with the following
-bits of information:
+will try to connect to the machine named <literal>mac</literal>. It is
+possible to specify an SSH identity file as part of the remote store
+URI, e.g.
+
+<screen>
+$ nix ping-store --store ssh://mac?ssh-key=/home/alice/my-key
+</screen>
+
+Since builds should be non-interactive, the key should not have a
+passphrase. Alternatively, you can load identities ahead of time into
+<command>ssh-agent</command> or <command>gpg-agent</command>.</para>
+
+<para>If you get the error
+
+<screen>
+bash: nix-store: command not found
+error: cannot connect to 'mac'
+</screen>
+
+then you need to ensure that the <envar>PATH</envar> of
+non-interactive login shells contains Nix.</para>
+
+<warning><para>If you are building via the Nix daemon, it is the Nix
+daemon user account (that is, <literal>root</literal>) that should
+have SSH access to the remote machine. If you can’t or don’t want to
+configure <literal>root</literal> to be able to access to remote
+machine, you can use a private Nix store instead by passing
+e.g. <literal>--store ~/my-nix</literal>.</para></warning>
+
+<para>The list of remote machines can be specified on the command line
+or in the Nix configuration file. The former is convenient for
+testing. For example, the following command allows you to build a
+derivation for <literal>x86_64-darwin</literal> on a Linux machine:
+
+<screen>
+$ uname
+Linux
+
+$ nix build \
+  '(with import &lt;nixpkgs> { system = "x86_64-darwin"; }; runCommand "foo" {} "uname > $out")' \
+  --builders 'ssh://mac x86_64-darwin'
+[1/0/1 built, 0.0 MiB DL] building foo on ssh://mac
+
+$ cat ./result
+Darwin
+</screen>
+
+It is possible to specify multiple builders separated by a semicolon
+or a newline, e.g.
+
+<screen>
+  --builders 'ssh://mac x86_64-darwin ; ssh://beastie x86_64-freebsd'
+</screen>
+</para>
+
+<para>Each machine specification consists of the following elements,
+separated by spaces. Only the first element is required.
+To leave a field at its default, set it to <literal>-</literal>.
 
 <orderedlist>
 
-  <listitem><para>The name of the remote machine, with optionally the
-  user under which the remote build should be performed.  This is
-  actually passed as an argument to <command>ssh</command>, so it can
-  be an alias defined in your
+  <listitem><para>The URI of the remote store in the format
+  <literal>ssh://[<replaceable>username</replaceable>@]<replaceable>hostname</replaceable></literal>,
+  e.g. <literal>ssh://nix@mac</literal> or
+  <literal>ssh://mac</literal>. For backward compatibility,
+  <literal>ssh://</literal> may be omitted. The hostname may be an
+  alias defined in your
   <filename>~/.ssh/config</filename>.</para></listitem>
 
   <listitem><para>A comma-separated list of Nix platform type
   identifiers, such as <literal>x86_64-darwin</literal>.  It is
   possible for a machine to support multiple platform types, e.g.,
-  <literal>i686-linux,x86_64-linux</literal>.</para></listitem>
+  <literal>i686-linux,x86_64-linux</literal>. If omitted, this
+  defaults to the local platform type.</para></listitem>
 
-  <listitem><para>The SSH private key to be used to log in to the
-  remote machine.  Since builds should be non-interactive, this key
-  should not have a passphrase!</para></listitem>
+  <listitem><para>The SSH identity file to be used to log in to the
+  remote machine. If omitted, SSH will use its regular
+  identities.</para></listitem>
 
-  <listitem><para>The maximum number of builds that
-  <filename>build-remote</filename> will execute in parallel on the
-  machine.  Typically this should be equal to the number of CPU cores.
-  For instance, the machine <literal>itchy</literal> in the example
-  will execute up to 8 builds in parallel.</para></listitem>
+  <listitem><para>The maximum number of builds that Nix will execute
+  in parallel on the machine.  Typically this should be equal to the
+  number of CPU cores.  For instance, the machine
+  <literal>itchy</literal> in the example will execute up to 8 builds
+  in parallel.</para></listitem>
 
   <listitem><para>The “speed factor”, indicating the relative speed of
   the machine.  If there are multiple machines of the right type, Nix
@@ -76,30 +115,76 @@ bits of information:
 
   <listitem><para>A comma-separated list of <emphasis>supported
   features</emphasis>.  If a derivation has the
-  <varname>requiredSystemFeatures</varname> attribute, then
-  <filename>build-remote</filename> will only perform the
-  derivation on a machine that has the specified features.  For
-  instance, the attribute
+  <varname>requiredSystemFeatures</varname> attribute, then Nix will
+  only perform the derivation on a machine that has the specified
+  features.  For instance, the attribute
 
 <programlisting>
 requiredSystemFeatures = [ "kvm" ];
 </programlisting>
 
   will cause the build to be performed on a machine that has the
-  <literal>kvm</literal> feature (i.e., <literal>scratchy</literal> in
-  the example above).</para></listitem>
+  <literal>kvm</literal> feature.</para></listitem>
 
   <listitem><para>A comma-separated list of <emphasis>mandatory
   features</emphasis>.  A machine will only be used to build a
   derivation if all of the machine’s mandatory features appear in the
-  derivation’s <varname>requiredSystemFeatures</varname> attribute.
-  Thus, in the example, the machine <literal>poochie</literal> will
-  only do derivations that have
-  <varname>requiredSystemFeatures</varname> set to <literal>["kvm"
-  "perf"]</literal> or <literal>["perf"]</literal>.</para></listitem>
+  derivation’s <varname>requiredSystemFeatures</varname>
+  attribute..</para></listitem>
 
 </orderedlist>
 
-</para>
+For example, the machine specification
+
+<programlisting>
+nix@scratchy.labs.cs.uu.nl  i686-linux      /home/nix/.ssh/id_scratchy_auto        8 1 kvm
+nix@itchy.labs.cs.uu.nl     i686-linux      /home/nix/.ssh/id_scratchy_auto        8 2
+nix@poochie.labs.cs.uu.nl   i686-linux      /home/nix/.ssh/id_scratchy_auto        1 2 kvm benchmark
+</programlisting>
+
+specifies several machines that can perform
+<literal>i686-linux</literal> builds. However,
+<literal>poochie</literal> will only do builds that have the attribute
+
+<programlisting>
+requiredSystemFeatures = [ "benchmark" ];
+</programlisting>
+
+or
+
+<programlisting>
+requiredSystemFeatures = [ "benchmark" "kvm" ];
+</programlisting>
+
+<literal>itchy</literal> cannot do builds that require
+<literal>kvm</literal>, but <literal>scratchy</literal> does support
+such builds. For regular builds, <literal>itchy</literal> will be
+preferred over <literal>scratchy</literal> because it has a higher
+speed factor.</para>
+
+<para>Remote builders can also be configured in
+<filename>nix.conf</filename>, e.g.
+
+<programlisting>
+builders = ssh://mac x86_64-darwin ; ssh://beastie x86_64-freebsd
+</programlisting>
+
+Finally, remote builders can be configured in a separate configuration
+file included in <option>builders</option> via the syntax
+<literal>@<replaceable>file</replaceable></literal>. For example,
+
+<programlisting>
+builders = @/etc/nix/machines
+</programlisting>
+
+causes the list of machines in <filename>/etc/nix/machines</filename>
+to be included. (This is the default.)</para>
+
+<para>If you want the builders to use caches, you likely want to set
+the option <link linkend='conf-builders-use-substitutes'><literal>builders-use-substitutes</literal></link>
+in your local <filename>nix.conf</filename>.</para>
+
+<para>To build only on remote builders and disable building on the local machine,
+you can use the option <option>--max-jobs 0</option>.</para>
 
 </chapter>

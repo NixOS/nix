@@ -16,6 +16,8 @@ public:
 
     const Setting<Path> sshKey{(Store*) this, "", "ssh-key", "path to an SSH private key"};
     const Setting<bool> compress{(Store*) this, false, "compress", "whether to compress the connection"};
+    const Setting<Path> remoteProgram{(Store*) this, "nix-daemon", "remote-program", "path to the nix-daemon executable on the remote system"};
+    const Setting<std::string> remoteStore{(Store*) this, "", "remote-store", "URI of the store on the remote system"};
 
     SSHStore(const std::string & host, const Params & params)
         : Store(params)
@@ -35,7 +37,10 @@ public:
         return uriScheme + host;
     }
 
-    void narFromPath(const Path & path, Sink & sink) override;
+    bool sameMachine() override
+    { return false; }
+
+    void narFromPath(const StorePath & path, Sink & sink) override;
 
     ref<FSAccessor> getFSAccessor() override;
 
@@ -51,31 +56,24 @@ private:
     std::string host;
 
     SSHMaster master;
-};
 
-
-class ForwardSource : public Source
-{
-    Source & readSource;
-    Sink & writeSink;
-public:
-    ForwardSource(Source & readSource, Sink & writeSink) : readSource(readSource), writeSink(writeSink) {}
-    size_t read(unsigned char * data, size_t len) override
+    void setOptions(RemoteStore::Connection & conn) override
     {
-        auto res = readSource.read(data, len);
-        writeSink(data, len);
-        return res;
-    }
+        /* TODO Add a way to explicitly ask for some options to be
+           forwarded. One option: A way to query the daemon for its
+           settings, and then a series of params to SSHStore like
+           forward-cores or forward-overridden-cores that only
+           override the requested settings.
+        */
+    };
 };
 
-void SSHStore::narFromPath(const Path & path, Sink & sink)
+void SSHStore::narFromPath(const StorePath & path, Sink & sink)
 {
     auto conn(connections->get());
-    conn->to << wopNarFromPath << path;
+    conn->to << wopNarFromPath << printStorePath(path);
     conn->processStderr();
-    ParseSink ps;
-    auto fwd = ForwardSource(conn->from, sink);
-    parseDump(ps, fwd);
+    copyNAR(conn->from, sink);
 }
 
 ref<FSAccessor> SSHStore::getFSAccessor()
@@ -86,7 +84,9 @@ ref<FSAccessor> SSHStore::getFSAccessor()
 ref<RemoteStore::Connection> SSHStore::openConnection()
 {
     auto conn = make_ref<Connection>();
-    conn->sshConn = master.startCommand("nix-daemon --stdio");
+    conn->sshConn = master.startCommand(
+        fmt("%s --stdio", remoteProgram)
+        + (remoteStore.get() == "" ? "" : " --store " + shellEscape(remoteStore.get())));
     conn->to = FdSink(conn->sshConn->in.get());
     conn->from = FdSource(conn->sshConn->out.get());
     initConnection(*conn);

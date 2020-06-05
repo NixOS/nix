@@ -7,48 +7,49 @@
 #include "common-args.hh"
 #include "json.hh"
 #include "json-to-value.hh"
+#include "shared.hh"
 
 #include <regex>
 #include <fstream>
 
 using namespace nix;
 
-std::string hilite(const std::string & s, const std::smatch & m)
+std::string wrap(std::string prefix, std::string s)
+{
+    return prefix + s + ANSI_NORMAL;
+}
+
+std::string hilite(const std::string & s, const std::smatch & m, std::string postfix)
 {
     return
         m.empty()
         ? s
         : std::string(m.prefix())
-          + ANSI_RED + std::string(m.str()) + ANSI_NORMAL
+          + ANSI_RED + std::string(m.str()) + postfix
           + std::string(m.suffix());
 }
 
 struct CmdSearch : SourceExprCommand, MixJSON
 {
-    std::string re;
+    std::vector<std::string> res;
 
     bool writeCache = true;
     bool useCache = true;
 
     CmdSearch()
     {
-        expectArg("regex", &re, true);
+        expectArgs("regex", &res);
 
         mkFlag()
             .longName("update-cache")
             .shortName('u')
             .description("update the package search cache")
-            .handler([&](Strings ss) { writeCache = true; useCache = false; });
+            .handler([&]() { writeCache = true; useCache = false; });
 
         mkFlag()
             .longName("no-cache")
             .description("do not use or update the package search cache")
-            .handler([&](Strings ss) { writeCache = false; useCache = false; });
-    }
-
-    std::string name() override
-    {
-        return "search";
+            .handler([&]() { writeCache = false; useCache = false; });
     }
 
     std::string description() override
@@ -56,22 +57,56 @@ struct CmdSearch : SourceExprCommand, MixJSON
         return "query available packages";
     }
 
+    Examples examples() override
+    {
+        return {
+            Example{
+                "To show all available packages:",
+                "nix search"
+            },
+            Example{
+                "To show any packages containing 'blender' in its name or description:",
+                "nix search blender"
+            },
+            Example{
+                "To search for Firefox or Chromium:",
+                "nix search 'firefox|chromium'"
+            },
+            Example{
+                "To search for git and frontend or gui:",
+                "nix search git 'frontend|gui'"
+            }
+        };
+    }
+
     void run(ref<Store> store) override
     {
         settings.readOnlyMode = true;
 
-        std::regex regex(re, std::regex::extended | std::regex::icase);
+        // Empty search string should match all packages
+        // Use "^" here instead of ".*" due to differences in resulting highlighting
+        // (see #1893 -- libc++ claims empty search string is not in POSIX grammar)
+        if (res.empty()) {
+            res.push_back("^");
+        }
+
+        std::vector<std::regex> regexes;
+        regexes.reserve(res.size());
+
+        for (auto &re : res) {
+            regexes.push_back(std::regex(re, std::regex::extended | std::regex::icase));
+        }
 
         auto state = getEvalState();
 
-        bool first = true;
-
-        auto jsonOut = json ? std::make_unique<JSONObject>(std::cout, true) : nullptr;
+        auto jsonOut = json ? std::make_unique<JSONObject>(std::cout) : nullptr;
 
         auto sToplevel = state->symbols.create("_toplevel");
         auto sRecurse = state->symbols.create("recurseForDerivations");
 
         bool fromCache = false;
+
+        std::map<std::string, std::string> results;
 
         std::function<void(Value *, std::string, bool, JSONObject *)> doExpr;
 
@@ -79,6 +114,7 @@ struct CmdSearch : SourceExprCommand, MixJSON
             debug("at attribute '%s'", attrPath);
 
             try {
+                uint found = 0;
 
                 state->forceValue(*v);
 
@@ -92,25 +128,33 @@ struct CmdSearch : SourceExprCommand, MixJSON
                 if (state->isDerivation(*v)) {
 
                     DrvInfo drv(*state, attrPath, v->attrs);
+                    std::string description;
+                    std::smatch attrPathMatch;
+                    std::smatch descriptionMatch;
+                    std::smatch nameMatch;
+                    std::string name;
 
                     DrvName parsed(drv.queryName());
 
-                    std::smatch attrPathMatch;
-                    std::regex_search(attrPath, attrPathMatch, regex);
+                    for (auto &regex : regexes) {
+                        std::regex_search(attrPath, attrPathMatch, regex);
 
-                    auto name = parsed.name;
-                    std::smatch nameMatch;
-                    std::regex_search(name, nameMatch, regex);
+                        name = parsed.name;
+                        std::regex_search(name, nameMatch, regex);
 
-                    std::string description = drv.queryMetaString("description");
-                    std::replace(description.begin(), description.end(), '\n', ' ');
-                    std::smatch descriptionMatch;
-                    std::regex_search(description, descriptionMatch, regex);
+                        description = drv.queryMetaString("description");
+                        std::replace(description.begin(), description.end(), '\n', ' ');
+                        std::regex_search(description, descriptionMatch, regex);
 
-                    if (!attrPathMatch.empty()
-                        || !nameMatch.empty()
-                        || !descriptionMatch.empty())
-                    {
+                        if (!attrPathMatch.empty()
+                            || !nameMatch.empty()
+                            || !descriptionMatch.empty())
+                        {
+                            found++;
+                        }
+                    }
+
+                    if (found == res.size()) {
                         if (json) {
 
                             auto jsonElem = jsonOut->object(attrPath);
@@ -120,18 +164,13 @@ struct CmdSearch : SourceExprCommand, MixJSON
                             jsonElem.attr("description", description);
 
                         } else {
-                            if (!first) std::cout << "\n";
-                            first = false;
-
-                            std::cout << fmt(
-                                "Attribute name: %s\n"
-                                "Package name: %s\n"
-                                "Version: %s\n"
-                                "Description: %s\n",
-                                hilite(attrPath, attrPathMatch),
-                                hilite(name, nameMatch),
-                                parsed.version,
-                                hilite(description, descriptionMatch));
+                            auto name = hilite(parsed.name, nameMatch, "\e[0;2m")
+                                + std::string(parsed.fullName, parsed.name.length());
+                            results[attrPath] = fmt(
+                                "* %s (%s)\n  %s\n",
+                                wrap("\e[0;1m", hilite(attrPath, attrPathMatch, "\e[0;1m")),
+                                wrap("\e[0;2m", hilite(name, nameMatch, "\e[0;2m")),
+                                hilite(description, descriptionMatch, ANSI_NORMAL));
                         }
                     }
 
@@ -196,18 +235,41 @@ struct CmdSearch : SourceExprCommand, MixJSON
         }
 
         else {
+            createDirs(dirOf(jsonCacheFileName));
+
             Path tmpFile = fmt("%s.tmp.%d", jsonCacheFileName, getpid());
 
-            std::ofstream jsonCacheFile(tmpFile);
+            std::ofstream jsonCacheFile;
 
-            auto cache = writeCache ? std::make_unique<JSONObject>(jsonCacheFile, false) : nullptr;
+            try {
+                // iostream considered harmful
+                jsonCacheFile.exceptions(std::ofstream::failbit);
+                jsonCacheFile.open(tmpFile);
 
-            doExpr(getSourceExpr(*state), "", true, cache.get());
+                auto cache = writeCache ? std::make_unique<JSONObject>(jsonCacheFile, false) : nullptr;
 
-            if (rename(tmpFile.c_str(), jsonCacheFileName.c_str()) == -1)
+                doExpr(getSourceExpr(*state), "", true, cache.get());
+
+            } catch (std::exception &) {
+                /* Fun fact: catching std::ios::failure does not work
+                   due to C++11 ABI shenanigans.
+                   https://gcc.gnu.org/bugzilla/show_bug.cgi?id=66145 */
+                if (!jsonCacheFile)
+                    throw Error("error writing to %s", tmpFile);
+                throw;
+            }
+
+            if (writeCache && rename(tmpFile.c_str(), jsonCacheFileName.c_str()) == -1)
                 throw SysError("cannot rename '%s' to '%s'", tmpFile, jsonCacheFileName);
         }
+
+        if (results.size() == 0)
+            throw Error("no results for the given search term(s)!");
+
+        RunPager pager;
+        for (auto el : results) std::cout << el.second << "\n";
+
     }
 };
 
-static RegisterCommand r1(make_ref<CmdSearch>());
+static auto r1 = registerCommand<CmdSearch>("search");

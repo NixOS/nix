@@ -4,17 +4,15 @@ perl/Makefile.config
 # /
 /aclocal.m4
 /autom4te.cache
+/precompiled-headers.h.gch
+/precompiled-headers.h.pch
 /config.*
 /configure
-/nix.spec
 /stamp-h1
 /svn-revision
 /libtool
 
 /corepkgs/config.nix
-
-# /corepkgs/buildenv/
-/corepkgs/buildenv/builder.pl
 
 # /corepkgs/channels/
 /corepkgs/channels/unpack.sh
@@ -38,6 +36,7 @@ perl/Makefile.config
 /scripts/nix-copy-closure
 /scripts/nix-reduce-build
 /scripts/nix-http-export.cgi
+/scripts/nix-profile-daemon.sh
 
 # /src/libexpr/
 /src/libexpr/lexer-tab.cc
@@ -48,7 +47,7 @@ perl/Makefile.config
 /src/libexpr/nix.tbl
 
 # /src/libstore/
-/src/libstore/*.gen.hh
+*.gen.*
 
 /src/nix/nix
 
@@ -71,9 +70,6 @@ perl/Makefile.config
 # /src/nix-channel/
 /src/nix-channel/nix-channel
 
-# /src/buildenv/
-/src/buildenv/buildenv
-
 # /src/nix-build/
 /src/nix-build/nix-build
 
@@ -86,6 +82,10 @@ perl/Makefile.config
 /tests/common.sh
 /tests/dummy
 /tests/result*
+/tests/restricted-innocent
+/tests/shell
+/tests/shell.drv
+/tests/config.nix
 
 # /tests/lang/
 /tests/lang/*.out
@@ -99,19 +99,25 @@ perl/Makefile.config
 /misc/systemd/nix-daemon.socket
 /misc/upstart/nix-daemon.conf
 
+/src/resolve-system-dependencies/resolve-system-dependencies
+
 inst/
 
 *.a
 *.o
 *.so
+*.dylib
 *.dll
 *.exe
 *.dep
 *~
 *.pc
+*.plist
 
 # GNU Global
 GPATH
 GRTAGS
 GSYMS
 GTAGS
+
+nix-rust/target

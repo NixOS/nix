@@ -46,12 +46,12 @@ fi
 # --verify can fix it.
 clearCache
 
-nix copy --recursive --to file://$cacheDir $path
+nix copy --to file://$cacheDir $path
 
 chmod u+w $path2
 rm -rf $path2
 
-nix-store --verify --check-contents --repair --option binary-caches "file://$cacheDir" --option signed-binary-caches ''
+nix-store --verify --check-contents --repair --substituters "file://$cacheDir" --no-require-sigs
 
 if [ "$(nix-hash $path2)" != "$hash" -o -e $path2/bad ]; then
     echo "path not repaired properly" >&2
@@ -69,7 +69,7 @@ if nix-store --verify-path $path2; then
     exit 1
 fi
 
-nix-store --repair-path $path2 --option binary-caches "file://$cacheDir" --option signed-binary-caches ''
+nix-store --repair-path $path2 --substituters "file://$cacheDir" --no-require-sigs
 
 if [ "$(nix-hash $path2)" != "$hash" -o -e $path2/bad ]; then
     echo "path not repaired properly" >&2

@@ -16,14 +16,14 @@ DrvName::DrvName()
    a letter.  The `version' part is the rest (excluding the separating
    dash).  E.g., `apache-httpd-2.0.48' is parsed to (`apache-httpd',
    '2.0.48'). */
-DrvName::DrvName(const string & s) : hits(0)
+DrvName::DrvName(std::string_view s) : hits(0)
 {
-    name = fullName = s;
+    name = fullName = std::string(s);
     for (unsigned int i = 0; i < s.size(); ++i) {
         /* !!! isalpha/isdigit are affected by the locale. */
         if (s[i] == '-' && i + 1 < s.size() && !isalpha(s[i + 1])) {
-            name = string(s, 0, i);
-            version = string(s, i + 1);
+            name = s.substr(0, i);
+            version = s.substr(i + 1);
             break;
         }
     }
@@ -41,7 +41,7 @@ bool DrvName::matches(DrvName & n)
 }
 
 
-static string nextComponent(string::const_iterator & p,
+string nextComponent(string::const_iterator & p,
     const string::const_iterator end)
 {
     /* Skip any dots and dashes (component separators). */

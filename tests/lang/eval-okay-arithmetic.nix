@@ -26,6 +26,10 @@ let {
       (56088 / 123 / 2)
       (3 + 4 * const 5 0 - 6 / id 2)
 
+      (builtins.bitAnd 12 10) # 0b1100 & 0b1010 =  8
+      (builtins.bitOr  12 10) # 0b1100 | 0b1010 = 14
+      (builtins.bitXor 12 10) # 0b1100 ^ 0b1010 =  6
+
       (if 3 < 7 then 1 else err)
       (if 7 < 3 then err else 1)
       (if 3 < 3 then err else 1)

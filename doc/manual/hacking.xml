@@ -30,7 +30,7 @@ To build Nix itself in this shell:
 [nix-shell]$ configurePhase
 [nix-shell]$ make
 </screen>
-To install it in <literal>$(pwd)/nix</literal> and test it:
+To install it in <literal>$(pwd)/inst</literal> and test it:
 <screen>
 [nix-shell]$ make install
 [nix-shell]$ make installcheck

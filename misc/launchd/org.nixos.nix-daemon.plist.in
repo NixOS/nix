@@ -2,12 +2,23 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
   <dict>
+    <key>EnvironmentVariables</key>
+    <dict>
+      <key>OBJC_DISABLE_INITIALIZE_FORK_SAFETY</key>
+      <string>YES</string>
+    </dict>
     <key>Label</key>
     <string>org.nixos.nix-daemon</string>
+    <key>KeepAlive</key>
+    <true/>
     <key>RunAtLoad</key>
     <true/>
-    <key>Program</key>
-    <string>@bindir@/nix-daemon</string>
+    <key>ProgramArguments</key>
+    <array>
+      <string>/bin/sh</string>
+      <string>-c</string>
+      <string>/bin/wait4path /nix/var/nix/profiles/default/bin/nix-daemon &amp;&amp; /nix/var/nix/profiles/default/bin/nix-daemon</string>
+    </array>
     <key>StandardErrorPath</key>
     <string>/var/log/nix-daemon.log</string>
     <key>StandardOutPath</key>
