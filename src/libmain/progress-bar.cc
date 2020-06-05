@@ -3,6 +3,7 @@
 #include "sync.hh"
 #include "store-api.hh"
 #include "names.hh"
+#include "globals.hh"
 
 #include <atomic>
 #include <map>
@@ -65,9 +66,12 @@ private:
 
         std::map<ActivityType, ActivitiesByType> activitiesByType;
 
+        int lastLines = 1;
+
         uint64_t filesLinked = 0, bytesLinked = 0;
 
         uint64_t corruptedPaths = 0, untrustedPaths = 0;
+
 
         bool active = true;
         bool haveUpdate = true;
@@ -81,12 +85,14 @@ private:
 
     bool printBuildLogs;
     bool isTTY;
+    bool printMultiline;
 
 public:
 
-    ProgressBar(bool printBuildLogs, bool isTTY)
+    ProgressBar(bool printBuildLogs, bool isTTY, bool printMultiline)
         : printBuildLogs(printBuildLogs)
         , isTTY(isTTY)
+        , printMultiline(printMultiline)
     {
         state_.lock()->active = isTTY;
         updateThread = std::thread([&]() {
@@ -94,7 +100,7 @@ public:
             while (state->active) {
                 if (!state->haveUpdate)
                     state.wait(updateCV);
-                draw(*state);
+                draw(*state, std::nullopt);
                 state.wait_for(quitCV, std::chrono::milliseconds(50));
             }
         });
@@ -140,8 +146,7 @@ public:
     void log(State & state, Verbosity lvl, const std::string & s)
     {
         if (state.active) {
-            writeToStderr("\r\e[K" + filterANSIEscapes(s, !isTTY) + ANSI_NORMAL "\n");
-            draw(state);
+            draw(state, std::optional(s));
         } else {
             auto s2 = s + ANSI_NORMAL "\n";
             if (!isTTY) s2 = filterANSIEscapes(s2, true);
@@ -325,12 +330,14 @@ public:
         updateCV.notify_one();
     }
 
-    void draw(State & state)
+    void draw(State & state, const std::optional<std::string> & s)
     {
         state.haveUpdate = false;
         if (!state.active) return;
 
         std::string line;
+        auto width = getWindowSize().second;
+        if (width <= 0) width = std::numeric_limits<decltype(width)>::max();
 
         std::string status = getStatus(state);
         if (!status.empty()) {
@@ -339,31 +346,54 @@ public:
             line += "]";
         }
 
+        if (printMultiline) {
+#if defined(WIN32) || defined(_WIN32) || defined(__WIN32__) || defined(__NT__)
+            system("cls");
+#else
+            writeToStderr("\r\033[K\r");
+            for (auto i = 1; i < state.lastLines; i++) {
+                writeToStderr("\033[1A\r\033[K\r"); // \r
+            }
+#endif
+        }
+
+        if (s != std::nullopt)
+            writeToStderr("\r\e[K" + filterANSIEscapes(s.value(), !isTTY) + ANSI_NORMAL "\n");
+
+        if (printMultiline)
+            writeToStderr(filterANSIEscapes(line, false, width));
+
+        state.lastLines = 1;
         if (!state.activities.empty()) {
-            if (!status.empty()) line += " ";
-            auto i = state.activities.rbegin();
+            for (auto i = state.activities.begin(); i != state.activities.end(); ++i) {
+                if (!i->visible || (i->s.empty() && i->lastLine.empty())) {
+                    continue;
+                }
 
-            while (i != state.activities.rend() && (!i->visible || (i->s.empty() && i->lastLine.empty())))
-                ++i;
+                if (!printMultiline) {
+                    line += i->s;
+                } else {
+                    line = i->s;
+                }
 
-            if (i != state.activities.rend()) {
-                line += i->s;
                 if (!i->phase.empty()) {
                     line += " (";
                     line += i->phase;
                     line += ")";
                 }
+
                 if (!i->lastLine.empty()) {
                     if (!i->s.empty()) line += ": ";
                     line += i->lastLine;
                 }
+                if (printMultiline) {
+                    state.lastLines += 1;
+                    writeToStderr("\n" + filterANSIEscapes(line, false, width));
+                }
             }
         }
-
-        auto width = getWindowSize().second;
-        if (width <= 0) width = std::numeric_limits<decltype(width)>::max();
-
-        writeToStderr("\r" + filterANSIEscapes(line, false, width) + ANSI_NORMAL + "\e[K");
+        if (!printMultiline)
+            writeToStderr("\r" + filterANSIEscapes(line, false, width) + ANSI_NORMAL + "\e[K");
     }
 
     std::string getStatus(State & state)
@@ -462,7 +492,7 @@ public:
         if (state->active) {
             std::cerr << "\r\e[K";
             Logger::writeToStdout(s);
-            draw(*state);
+            draw(*state, std::nullopt);
         } else {
             Logger::writeToStdout(s);
         }
@@ -475,16 +505,17 @@ public:
         std::cerr << fmt("\r\e[K%s ", msg);
         auto s = trim(readLine(STDIN_FILENO));
         if (s.size() != 1) return {};
-        draw(*state);
+        draw(*state, std::nullopt);
         return s[0];
     }
 };
 
-Logger * makeProgressBar(bool printBuildLogs)
+Logger * makeProgressBar(bool printBuildLogs, bool printMultiline)
 {
     return new ProgressBar(
         printBuildLogs,
-        isatty(STDERR_FILENO) && getEnv("TERM").value_or("dumb") != "dumb"
+        isatty(STDERR_FILENO) && getEnv("TERM").value_or("dumb") != "dumb",
+        printMultiline
     );
 }
 
