@@ -150,6 +150,8 @@ private:
     friend class JSONList;
     friend class JSONObject;
 
+    int uncaught_exceptions = std::uncaught_exceptions();
+
     JSONPlaceholder(JSONState * state)
         : JSONWriter(state)
     {
