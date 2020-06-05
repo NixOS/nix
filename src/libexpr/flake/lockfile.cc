@@ -243,7 +243,6 @@ std::string diffLockFiles(const LockFile & oldLocks, const LockFile & newLocks)
             ++i;
         } else {
             if (!(i->second->lockedRef == j->second->lockedRef)) {
-                assert(i->second->lockedRef.to_string() != j->second->lockedRef.to_string());
                 res += fmt("* Updated '%s': '%s' -> '%s'\n",
                     concatStringsSep("/", i->first),
                     i->second->lockedRef,
