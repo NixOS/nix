@@ -3,6 +3,7 @@
 #include "sync.hh"
 #include "store-api.hh"
 #include "names.hh"
+#include "globals.hh"
 
 #include <atomic>
 #include <map>
@@ -65,9 +66,12 @@ private:
 
         std::map<ActivityType, ActivitiesByType> activitiesByType;
 
+        uint64_t lastLines = 0;
+
         uint64_t filesLinked = 0, bytesLinked = 0;
 
         uint64_t corruptedPaths = 0, untrustedPaths = 0;
+
 
         bool active = true;
         bool haveUpdate = true;
@@ -315,10 +319,12 @@ public:
         updateCV.notify_one();
     }
 
-    void draw(State & state)
+    void draw_single(State & state)
     {
         state.haveUpdate = false;
         if (!state.active) return;
+
+        state.lastLines = 1;
 
         std::string line;
 
@@ -354,6 +360,67 @@ public:
         if (width <= 0) width = std::numeric_limits<decltype(width)>::max();
 
         writeToStderr("\r" + filterANSIEscapes(line, false, width) + "\e[K");
+    }
+
+    void draw_multi(State & state)
+    {
+        state.haveUpdate = false;
+        if (!state.active) return;
+
+        std::string line;
+        auto width = getWindowSize().second;
+        if (width <= 0) width = std::numeric_limits<decltype(width)>::max();
+
+        std::string status = getStatus(state);
+        if (!status.empty()) {
+            line += '[';
+            line += status;
+            line += "]";
+        }
+
+        #if defined(WIN32) || defined(_WIN32) || defined(__WIN32__) || defined(__NT__)
+            system("cls");
+        #else
+            //writeToStderr("\033[2J\033[0;0H" + filterANSIEscapes("\n" + line, false, width));
+            writeToStderr("\r\033[K\r");
+            for (auto i = 1; i < state.lastLines; i++) {
+              writeToStderr("\033[1A\r\033[K\r");
+            }
+        #endif
+        writeToStderr(filterANSIEscapes(line, false, width));
+
+        state.lastLines = 1;
+
+        if (!state.activities.empty()) {
+            /*if (!status.empty()) line += " ";
+            auto i = state.activities.rbegin();*/
+
+          for (auto i = state.activities.begin(); i != state.activities.end(); ++i) {
+            if (!i->visible || (i->s.empty() && i->lastLine.empty())) {
+              continue;
+            }
+            line = i->s;
+
+                if (!i->phase.empty()) {
+                    line += " (";
+                    line += i->phase;
+                    line += ")";
+                }
+                if (!i->lastLine.empty()) {
+                    if (!i->s.empty()) line += ": ";
+                    line += i->lastLine;
+                }
+                state.lastLines += 1;
+                writeToStderr("\n" + filterANSIEscapes(line, false, width));
+            }
+        }
+    }
+
+    void draw(State & state)
+    {
+        if (settings.isExperimentalFeatureEnabled("progress-bar")) {
+            draw_multi(state);
+        } else draw_single(state);
     }
 
     std::string getStatus(State & state)
