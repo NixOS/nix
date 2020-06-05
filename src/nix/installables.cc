@@ -111,6 +111,21 @@ void SourceExprCommand::completeInstallable(std::string_view prefix)
 {
     if (file) return; // FIXME
 
+    completeFlakeRefWithFragment(
+        getEvalState(),
+        lockFlags,
+        getDefaultFlakeAttrPathPrefixes(),
+        getDefaultFlakeAttrPaths(),
+        prefix);
+}
+
+void completeFlakeRefWithFragment(
+    ref<EvalState> evalState,
+    flake::LockFlags lockFlags,
+    Strings attrPathPrefixes,
+    const Strings & defaultFlakeAttrPaths,
+    std::string_view prefix)
+{
     /* Look for flake output attributes that match the
        prefix. */
     try {
@@ -121,10 +136,8 @@ void SourceExprCommand::completeInstallable(std::string_view prefix)
             // FIXME: do tilde expansion.
             auto flakeRef = parseFlakeRef(flakeRefS, absPath("."));
 
-            auto state = getEvalState();
-
-            auto evalCache = openEvalCache(*state,
-                std::make_shared<flake::LockedFlake>(lockFlake(*state, flakeRef, lockFlags)),
+            auto evalCache = openEvalCache(*evalState,
+                std::make_shared<flake::LockedFlake>(lockFlake(*evalState, flakeRef, lockFlags)),
                 true);
 
             auto root = evalCache->getRoot();
@@ -132,13 +145,12 @@ void SourceExprCommand::completeInstallable(std::string_view prefix)
             /* Complete 'fragment' relative to all the
                attrpath prefixes as well as the root of the
                flake. */
-            auto attrPathPrefixes = getDefaultFlakeAttrPathPrefixes();
             attrPathPrefixes.push_back("");
 
             for (auto & attrPathPrefixS : attrPathPrefixes) {
-                auto attrPathPrefix = parseAttrPath(*state, attrPathPrefixS);
+                auto attrPathPrefix = parseAttrPath(*evalState, attrPathPrefixS);
                 auto attrPathS = attrPathPrefixS + std::string(fragment);
-                auto attrPath = parseAttrPath(*state, attrPathS);
+                auto attrPath = parseAttrPath(*evalState, attrPathS);
 
                 std::string lastAttr;
                 if (!attrPath.empty() && !hasSuffix(attrPathS, ".")) {
@@ -149,8 +161,7 @@ void SourceExprCommand::completeInstallable(std::string_view prefix)
                 auto attr = root->findAlongAttrPath(attrPath);
                 if (!attr) continue;
 
-                auto attrs = attr->getAttrs();
-                for (auto & attr2 : attrs) {
+                for (auto & attr2 : attr->getAttrs()) {
                     if (hasPrefix(attr2, lastAttr)) {
                         auto attrPath2 = attr->getAttrPath(attr2);
                         /* Strip the attrpath prefix. */
@@ -163,8 +174,8 @@ void SourceExprCommand::completeInstallable(std::string_view prefix)
             /* And add an empty completion for the default
                attrpaths. */
             if (fragment.empty()) {
-                for (auto & attrPath : getDefaultFlakeAttrPaths()) {
-                    auto attr = root->findAlongAttrPath(parseAttrPath(*state, attrPath));
+                for (auto & attrPath : defaultFlakeAttrPaths) {
+                    auto attr = root->findAlongAttrPath(parseAttrPath(*evalState, attrPath));
                     if (!attr) continue;
                     completions->insert(flakeRefS + "#");
                 }
@@ -174,7 +185,7 @@ void SourceExprCommand::completeInstallable(std::string_view prefix)
         warn(e.msg());
     }
 
-    completeFlakeRef(prefix);
+    completeFlakeRef(evalState->store, prefix);
 }
 
 ref<EvalState> EvalCommand::getEvalState()
@@ -184,7 +195,7 @@ ref<EvalState> EvalCommand::getEvalState()
     return ref<EvalState>(evalState);
 }
 
-void EvalCommand::completeFlakeRef(std::string_view prefix)
+void completeFlakeRef(ref<Store> store, std::string_view prefix)
 {
     if (prefix == "")
         completions->insert(".");
@@ -192,7 +203,7 @@ void EvalCommand::completeFlakeRef(std::string_view prefix)
     completeDir(0, prefix);
 
     /* Look for registry entries that match the prefix. */
-    for (auto & registry : fetchers::getRegistries(getStore())) {
+    for (auto & registry : fetchers::getRegistries(store)) {
         for (auto & entry : registry->entries) {
             auto from = entry.from.to_string();
             if (!hasPrefix(prefix, "flake:") && hasPrefix(from, "flake:")) {

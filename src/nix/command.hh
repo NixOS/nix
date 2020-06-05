@@ -38,8 +38,6 @@ struct EvalCommand : virtual StoreCommand, MixEvalArgs
     ref<EvalState> getEvalState();
 
     std::shared_ptr<EvalState> evalState;
-
-    void completeFlakeRef(std::string_view prefix);
 };
 
 struct MixFlakeOptions : virtual Args
@@ -204,5 +202,14 @@ struct MixEnvironment : virtual Args {
     /* Modify global environ based on ignoreEnvironment, keep, and unset. It's expected that exec will be called before this class goes out of scope, otherwise environ will become invalid. */
     void setEnviron();
 };
+
+void completeFlakeRef(ref<Store> store, std::string_view prefix);
+
+void completeFlakeRefWithFragment(
+    ref<EvalState> evalState,
+    flake::LockFlags lockFlags,
+    Strings attrPathPrefixes,
+    const Strings & defaultFlakeAttrPaths,
+    std::string_view prefix);
 
 }

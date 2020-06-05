@@ -33,7 +33,7 @@ public:
             .optional = true,
             .handler = {&flakeUrl},
             .completer = {[&](size_t, std::string_view prefix) {
-                completeFlakeRef(prefix);
+                completeFlakeRef(getStore(), prefix);
             }}
         });
     }
@@ -500,6 +500,9 @@ struct CmdFlakeInitCommon : virtual Args, EvalCommand
     std::string templateUrl = "templates";
     Path destDir;
 
+    const Strings attrsPathPrefixes{"templates."};
+    const LockFlags lockFlags{ .writeLockFile = false };
+
     CmdFlakeInitCommon()
     {
         addFlag({
@@ -509,7 +512,12 @@ struct CmdFlakeInitCommon : virtual Args, EvalCommand
             .labels = {"template"},
             .handler = {&templateUrl},
             .completer = {[&](size_t, std::string_view prefix) {
-                completeFlakeRef(prefix);
+                completeFlakeRefWithFragment(
+                    getEvalState(),
+                    lockFlags,
+                    attrsPathPrefixes,
+                    {"defaultTemplate"},
+                    prefix);
             }}
         });
     }
@@ -525,7 +533,7 @@ struct CmdFlakeInitCommon : virtual Args, EvalCommand
         auto installable = InstallableFlake(
             evalState, std::move(templateFlakeRef),
             Strings{templateName == "" ? "defaultTemplate" : templateName},
-            Strings{"templates."}, { .writeLockFile = false });
+            Strings(attrsPathPrefixes), lockFlags);
 
         auto cursor = installable.getCursor(*evalState, true);
 
