@@ -78,6 +78,8 @@ namespace nix {
     }
 
     TEST(logEI, loggingErrorOnTalkativeLevel) {
+        verbosity = lvlTalkative;
+
         testing::internal::CaptureStderr();
 
         logger->logEI({ .level = lvlTalkative,
@@ -86,11 +88,12 @@ namespace nix {
                         });
 
         auto str = testing::internal::GetCapturedStderr();
-        // XXX: why is this the empty string?
-        ASSERT_STREQ(str.c_str(), "");
+        ASSERT_STREQ(str.c_str(), "\x1B[32;1mtalk:\x1B[0m\x1B[34;1m --- Talkative name -------------------------------- error-unit-test\x1B[0m\nTalkative description\n");
     }
 
     TEST(logEI, loggingErrorOnChattyLevel) {
+        verbosity = lvlChatty;
+
         testing::internal::CaptureStderr();
 
         logger->logEI({ .level = lvlChatty,
@@ -99,11 +102,12 @@ namespace nix {
                         });
 
         auto str = testing::internal::GetCapturedStderr();
-        // XXX: why is this the empty string?
-        ASSERT_STREQ(str.c_str(), "");
+        ASSERT_STREQ(str.c_str(), "\x1B[32;1mchat:\x1B[0m\x1B[34;1m --- Chatty name ----------------------------------- error-unit-test\x1B[0m\nTalkative description\n");
     }
 
     TEST(logEI, loggingErrorOnDebugLevel) {
+        verbosity = lvlDebug;
+
         testing::internal::CaptureStderr();
 
         logger->logEI({ .level = lvlDebug,
@@ -112,11 +116,12 @@ namespace nix {
                         });
 
         auto str = testing::internal::GetCapturedStderr();
-        // XXX: why is this the empty string?
-        ASSERT_STREQ(str.c_str(), "");
+        ASSERT_STREQ(str.c_str(), "\x1B[33;1mdebug:\x1B[0m\x1B[34;1m --- Debug name ----------------------------------- error-unit-test\x1B[0m\nDebug description\n");
     }
 
     TEST(logEI, loggingErrorOnVomitLevel) {
+        verbosity = lvlVomit;
+
         testing::internal::CaptureStderr();
 
         logger->logEI({ .level = lvlVomit,
@@ -125,8 +130,7 @@ namespace nix {
                         });
 
         auto str = testing::internal::GetCapturedStderr();
-        // XXX: why is this the empty string?
-        ASSERT_STREQ(str.c_str(), "");
+        ASSERT_STREQ(str.c_str(), "\x1B[32;1mvomit:\x1B[0m\x1B[34;1m --- Vomit name ----------------------------------- error-unit-test\x1B[0m\nVomit description\n");
     }
 
     /* ----------------------------------------------------------------------------
