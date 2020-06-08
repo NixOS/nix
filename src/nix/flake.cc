@@ -934,6 +934,7 @@ struct CmdFlake : virtual MultiCommand, virtual Command
     {
         if (!command)
             throw UsageError("'nix flake' requires a sub-command.");
+        settings.requireExperimentalFeature("flakes");
         command->second->prepare();
         command->second->run();
     }
