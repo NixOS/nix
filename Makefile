@@ -6,6 +6,7 @@ makefiles = \
   src/libutil/tests/local.mk \
   src/libstore/local.mk \
   src/libfetchers/local.mk \
+  src/libfetchers/tests/local.mk \
   src/libmain/local.mk \
   src/libexpr/local.mk \
   src/nix/local.mk \

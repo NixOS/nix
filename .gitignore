@@ -49,6 +49,9 @@ perl/Makefile.config
 # /src/libstore/
 *.gen.*
 
+# /src/libfetchers
+/src/libfetchers/tests/libfetchers-tests
+
 # /src/libutil/
 /src/libutil/tests/libutil-tests
 
