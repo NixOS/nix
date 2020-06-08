@@ -10,6 +10,6 @@ libutil-tests_SOURCES := $(wildcard $(d)/*.cc)
 
 libutil-tests_CXXFLAGS += -I src/libutil
 
-libutil-tests_LIBS = libutil
+libutil-tests_LIBS = libutil libnixrust
 
 libutil-tests_LDFLAGS := $(GTEST_LIBS)
