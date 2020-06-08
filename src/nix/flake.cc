@@ -20,7 +20,7 @@
 using namespace nix;
 using namespace nix::flake;
 
-class FlakeCommand : virtual Args, public EvalCommand, public MixFlakeOptions
+class FlakeCommand : virtual Args, public MixFlakeOptions
 {
     std::string flakeUrl = ".";
 
@@ -52,6 +52,11 @@ public:
     LockedFlake lockFlake()
     {
         return flake::lockFlake(*getEvalState(), getFlakeRef(), lockFlags);
+    }
+
+    std::optional<FlakeRef> getFlakeRefForCompletion() override
+    {
+        return getFlakeRef();
     }
 };
 

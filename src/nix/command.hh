@@ -40,14 +40,17 @@ struct EvalCommand : virtual StoreCommand, MixEvalArgs
     std::shared_ptr<EvalState> evalState;
 };
 
-struct MixFlakeOptions : virtual Args
+struct MixFlakeOptions : virtual Args, EvalCommand
 {
     flake::LockFlags lockFlags;
 
     MixFlakeOptions();
+
+    virtual std::optional<FlakeRef> getFlakeRefForCompletion()
+    { return {}; }
 };
 
-struct SourceExprCommand : virtual Args, EvalCommand, MixFlakeOptions
+struct SourceExprCommand : virtual Args, MixFlakeOptions
 {
     std::optional<Path> file;
     std::optional<std::string> expr;
@@ -81,6 +84,8 @@ struct InstallablesCommand : virtual Args, SourceExprCommand
 
     virtual bool useDefaultInstallables() { return true; }
 
+    std::optional<FlakeRef> getFlakeRefForCompletion() override;
+
 private:
 
     std::vector<std::string> _installables;
@@ -94,6 +99,11 @@ struct InstallableCommand : virtual Args, SourceExprCommand
     InstallableCommand();
 
     void prepare() override;
+
+    std::optional<FlakeRef> getFlakeRefForCompletion() override
+    {
+        return parseFlakeRef(_installable, absPath("."));
+    }
 
 private:
 

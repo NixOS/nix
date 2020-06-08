@@ -72,4 +72,3 @@ InputPath parseInputPath(std::string_view s);
 std::string diffLockFiles(const LockFile & oldLocks, const LockFile & newLocks);
 
 }
-

@@ -18,6 +18,17 @@
 
 namespace nix {
 
+void completeFlakeInputPath(
+    ref<EvalState> evalState,
+    const FlakeRef & flakeRef,
+    std::string_view prefix)
+{
+    auto flake = flake::getFlake(*evalState, flakeRef, true);
+    for (auto & input : flake.inputs)
+        if (hasPrefix(input.first, prefix))
+            completions->insert(input.first);
+}
+
 MixFlakeOptions::MixFlakeOptions()
 {
     addFlag({
@@ -56,6 +67,10 @@ MixFlakeOptions::MixFlakeOptions()
         .labels = {"input-path"},
         .handler = {[&](std::string s) {
             lockFlags.inputUpdates.insert(flake::parseInputPath(s));
+        }},
+        .completer = {[&](size_t, std::string_view prefix) {
+            if (auto flakeRef = getFlakeRefForCompletion())
+                completeFlakeInputPath(getEvalState(), *flakeRef, prefix);
         }}
     });
 
@@ -705,6 +720,16 @@ void InstallablesCommand::prepare()
         // default, probably.
         _installables.push_back(".");
     installables = parseInstallables(getStore(), _installables);
+}
+
+std::optional<FlakeRef> InstallablesCommand::getFlakeRefForCompletion()
+{
+    if (_installables.empty()) {
+        if (useDefaultInstallables())
+            return parseFlakeRef(".", absPath("."));
+        return {};
+    }
+    return parseFlakeRef(_installables.front(), absPath("."));
 }
 
 InstallableCommand::InstallableCommand()

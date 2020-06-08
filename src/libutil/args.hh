@@ -8,8 +8,6 @@
 
 namespace nix {
 
-MakeError(UsageError, Error);
-
 enum HashType : char;
 
 class Args
