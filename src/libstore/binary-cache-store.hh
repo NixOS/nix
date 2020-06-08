@@ -74,12 +74,12 @@ public:
     std::optional<StorePath> queryPathFromHashPart(const std::string & hashPart) override
     { unsupported("queryPathFromHashPart"); }
 
-    void addToStore(const ValidPathInfo & info, const ref<std::string> & nar,
+    void addToStore(const ValidPathInfo & info, Source & narSource,
         RepairFlag repair, CheckSigsFlag checkSigs,
         std::shared_ptr<FSAccessor> accessor) override;
 
     StorePath addToStore(const string & name, const Path & srcPath,
-        bool recursive, HashType hashAlgo,
+        FileIngestionMethod method, HashType hashAlgo,
         PathFilter & filter, RepairFlag repair) override;
 
     StorePath addTextToStore(const string & name, const string & s,

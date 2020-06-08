@@ -5,6 +5,8 @@
 
 namespace nix {
 
+/* ----------- tests for util.hh ------------------------------------------------*/
+
     /* ----------------------------------------------------------------------------
      * absPath
      * --------------------------------------------------------------------------*/
@@ -14,6 +16,9 @@ namespace nix {
 
         ASSERT_EQ(p, "/");
     }
+
+
+
 
     TEST(absPath, turnsEmptyPathIntoCWD) {
         char cwd[PATH_MAX+1];
@@ -581,5 +586,4 @@ namespace nix {
 
         ASSERT_EQ(filterANSIEscapes(s, true), "foo     bar     baz" );
     }
-
 }

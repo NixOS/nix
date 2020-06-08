@@ -513,9 +513,10 @@ private:
     Path fnUserLock;
     AutoCloseFD fdUserLock;
 
+    bool isEnabled = false;
     string user;
-    uid_t uid;
-    gid_t gid;
+    uid_t uid = 0;
+    gid_t gid = 0;
     std::vector<gid_t> supplementaryGIDs;
 
 public:
@@ -528,7 +529,9 @@ public:
     uid_t getGID() { assert(gid); return gid; }
     std::vector<gid_t> getSupplementaryGIDs() { return supplementaryGIDs; }
 
-    bool enabled() { return uid != 0; }
+    bool findFreeUser();
+
+    bool enabled() { return isEnabled; }
 
 };
 
@@ -536,6 +539,11 @@ public:
 UserLock::UserLock()
 {
     assert(settings.buildUsersGroup != "");
+    createDirs(settings.nixStateDir + "/userpool");
+}
+
+bool UserLock::findFreeUser() {
+    if (enabled()) return true;
 
     /* Get the members of the build-users-group. */
     struct group * gr = getgrnam(settings.buildUsersGroup.get().c_str());
@@ -565,7 +573,6 @@ UserLock::UserLock()
             throw Error("the user '%1%' in the group '%2%' does not exist",
                 i, settings.buildUsersGroup);
 
-        createDirs(settings.nixStateDir + "/userpool");
 
         fnUserLock = (format("%1%/userpool/%2%") % settings.nixStateDir % pw->pw_uid).str();
 
@@ -596,15 +603,13 @@ UserLock::UserLock()
             supplementaryGIDs.resize(ngroups);
 #endif
 
-            return;
+            isEnabled = true;
+            return true;
         }
     }
 
-    throw Error("all build users are currently in use; "
-        "consider creating additional users and adding them to the '%1%' group",
-        settings.buildUsersGroup);
+    return false;
 }
-
 
 void UserLock::kill()
 {
@@ -934,6 +939,7 @@ private:
     void closureRepaired();
     void inputsRealised();
     void tryToBuild();
+    void tryLocalBuild();
     void buildDone();
 
     /* Is the build hook willing to perform the build? */
@@ -1004,6 +1010,8 @@ private:
     {
         Goal::amDone(result);
     }
+
+    void started();
 
     void done(BuildResult::Status status, const string & msg = "");
 
@@ -1150,10 +1158,9 @@ void DerivationGoal::loadDerivation()
     trace("loading derivation");
 
     if (nrFailed != 0) {
-        logError(
-            ErrorInfo {
-                .name = "missing derivation during build",
-                .hint = hintfmt("cannot build missing derivation '%s'", worker.store.printStorePath(drvPath))
+        logError({
+            .name = "missing derivation during build",
+            .hint = hintfmt("cannot build missing derivation '%s'", worker.store.printStorePath(drvPath))
         });
         done(BuildResult::MiscFailure);
         return;
@@ -1305,12 +1312,11 @@ void DerivationGoal::repairClosure()
     /* Check each path (slow!). */
     for (auto & i : outputClosure) {
         if (worker.pathContentsGood(i)) continue;
-        logError(
-            ErrorInfo {
-                .name = "Corrupt path in closure",
-                .hint = hintfmt(
-                    "found corrupted or missing path '%s' in the output closure of '%s'",
-                    worker.store.printStorePath(i), worker.store.printStorePath(drvPath))
+        logError({
+            .name = "Corrupt path in closure",
+            .hint = hintfmt(
+                "found corrupted or missing path '%s' in the output closure of '%s'",
+                worker.store.printStorePath(i), worker.store.printStorePath(drvPath))
         });
         auto drvPath2 = outputsToDrv.find(i);
         if (drvPath2 == outputsToDrv.end())
@@ -1345,12 +1351,11 @@ void DerivationGoal::inputsRealised()
     if (nrFailed != 0) {
         if (!useDerivation)
             throw Error("some dependencies of '%s' are missing", worker.store.printStorePath(drvPath));
-        logError(
-            ErrorInfo {
-                .name = "Dependencies could not be built",
-                .hint = hintfmt(
-                    "cannot build derivation '%s': %s dependencies couldn't be built",
-                    worker.store.printStorePath(drvPath), nrFailed)
+        logError({
+            .name = "Dependencies could not be built",
+            .hint = hintfmt(
+                "cannot build derivation '%s': %s dependencies couldn't be built",
+                worker.store.printStorePath(drvPath), nrFailed)
         });
         done(BuildResult::DependencyFailed);
         return;
@@ -1406,6 +1411,19 @@ void DerivationGoal::inputsRealised()
     result = BuildResult();
 }
 
+void DerivationGoal::started() {
+    auto msg = fmt(
+        buildMode == bmRepair ? "repairing outputs of '%s'" :
+        buildMode == bmCheck ? "checking outputs of '%s'" :
+        nrRounds > 1 ? "building '%s' (round %d/%d)" :
+        "building '%s'", worker.store.printStorePath(drvPath), curRound, nrRounds);
+    fmt("building '%s'", worker.store.printStorePath(drvPath));
+    if (hook) msg += fmt(" on '%s'", machineName);
+    act = std::make_unique<Activity>(*logger, lvlInfo, actBuild, msg,
+        Logger::Fields{worker.store.printStorePath(drvPath), hook ? machineName : "", curRound, nrRounds});
+    mcRunningBuilds = std::make_unique<MaintainCount<uint64_t>>(worker.runningBuilds);
+    worker.updateProgress();
+}
 
 void DerivationGoal::tryToBuild()
 {
@@ -1457,20 +1475,6 @@ void DerivationGoal::tryToBuild()
        supported for local builds. */
     bool buildLocally = buildMode != bmNormal || parsedDrv->willBuildLocally();
 
-    auto started = [&]() {
-        auto msg = fmt(
-            buildMode == bmRepair ? "repairing outputs of '%s'" :
-            buildMode == bmCheck ? "checking outputs of '%s'" :
-            nrRounds > 1 ? "building '%s' (round %d/%d)" :
-            "building '%s'", worker.store.printStorePath(drvPath), curRound, nrRounds);
-        fmt("building '%s'", worker.store.printStorePath(drvPath));
-        if (hook) msg += fmt(" on '%s'", machineName);
-        act = std::make_unique<Activity>(*logger, lvlInfo, actBuild, msg,
-            Logger::Fields{worker.store.printStorePath(drvPath), hook ? machineName : "", curRound, nrRounds});
-        mcRunningBuilds = std::make_unique<MaintainCount<uint64_t>>(worker.runningBuilds);
-        worker.updateProgress();
-    };
-
     /* Is the build hook willing to accept this job? */
     if (!buildLocally) {
         switch (tryBuildHook()) {
@@ -1501,6 +1505,34 @@ void DerivationGoal::tryToBuild()
         worker.waitForBuildSlot(shared_from_this());
         outputLocks.unlock();
         return;
+    }
+
+    state = &DerivationGoal::tryLocalBuild;
+    worker.wakeUp(shared_from_this());
+}
+
+void DerivationGoal::tryLocalBuild() {
+
+    /* If `build-users-group' is not empty, then we have to build as
+       one of the members of that group. */
+    if (settings.buildUsersGroup != "" && getuid() == 0) {
+#if defined(__linux__) || defined(__APPLE__)
+        if (!buildUser) buildUser = std::make_unique<UserLock>();
+
+        if (buildUser->findFreeUser()) {
+            /* Make sure that no other processes are executing under this
+               uid. */
+            buildUser->kill();
+        } else {
+            debug("waiting for build users");
+            worker.waitForAWhile(shared_from_this());
+            return;
+        }
+#else
+        /* Don't know how to block the creation of setuid/setgid
+           binaries on this platform. */
+        throw Error("build users are not supported on this platform for security reasons");
+#endif
     }
 
     try {
@@ -1809,12 +1841,11 @@ HookReply DerivationGoal::tryBuildHook()
 
     } catch (SysError & e) {
         if (e.errNo == EPIPE) {
-            logError(
-                ErrorInfo {
-                    .name = "Build hook died",
-                    .hint = hintfmt(
-                        "build hook died unexpectedly: %s",
-                        chomp(drainFD(worker.hook->fromHook.readSide.get())))
+            logError({
+                .name = "Build hook died",
+                .hint = hintfmt(
+                    "build hook died unexpectedly: %s",
+                    chomp(drainFD(worker.hook->fromHook.readSide.get())))
             });
             worker.hook = 0;
             return rpDecline;
@@ -1966,22 +1997,6 @@ void DerivationGoal::startBuilder()
         #else
             throw Error("building using a diverted store is not supported on this platform");
         #endif
-    }
-
-    /* If `build-users-group' is not empty, then we have to build as
-       one of the members of that group. */
-    if (settings.buildUsersGroup != "" && getuid() == 0) {
-#if defined(__linux__) || defined(__APPLE__)
-        buildUser = std::make_unique<UserLock>();
-
-        /* Make sure that no other processes are executing under this
-           uid. */
-        buildUser->kill();
-#else
-        /* Don't know how to block the creation of setuid/setgid
-           binaries on this platform. */
-        throw Error("build users are not supported on this platform for security reasons");
-#endif
     }
 
     /* Create a temporary directory where the build will take
@@ -2740,7 +2755,7 @@ struct RestrictedStore : public LocalFSStore
     { throw Error("queryPathFromHashPart"); }
 
     StorePath addToStore(const string & name, const Path & srcPath,
-        bool recursive = true, HashType hashAlgo = htSHA256,
+        FileIngestionMethod method = FileIngestionMethod::Recursive, HashType hashAlgo = htSHA256,
         PathFilter & filter = defaultPathFilter, RepairFlag repair = NoRepair) override
     { throw Error("addToStore"); }
 
@@ -2753,9 +2768,9 @@ struct RestrictedStore : public LocalFSStore
     }
 
     StorePath addToStoreFromDump(const string & dump, const string & name,
-        bool recursive = true, HashType hashAlgo = htSHA256, RepairFlag repair = NoRepair) override
+        FileIngestionMethod method = FileIngestionMethod::Recursive, HashType hashAlgo = htSHA256, RepairFlag repair = NoRepair) override
     {
-        auto path = next->addToStoreFromDump(dump, name, recursive, hashAlgo, repair);
+        auto path = next->addToStoreFromDump(dump, name, method, hashAlgo, repair);
         goal.addDependency(path);
         return path;
     }
@@ -3673,11 +3688,10 @@ void DerivationGoal::registerOutputs()
         /* Apply hash rewriting if necessary. */
         bool rewritten = false;
         if (!outputRewrites.empty()) {
-            logWarning(
-                ErrorInfo {
-                    .name = "Rewriting hashes",
-                    .hint = hintfmt("rewriting hashes in '%1%'; cross fingers", path)
-                    });
+            logWarning({
+                .name = "Rewriting hashes",
+                .hint = hintfmt("rewriting hashes in '%1%'; cross fingers", path)
+            });
 
             /* Canonicalise first.  This ensures that the path we're
                rewriting doesn't contain a hard link to /etc/shadow or
@@ -3702,10 +3716,10 @@ void DerivationGoal::registerOutputs()
 
         if (fixedOutput) {
 
-            bool recursive; Hash h;
-            i.second.parseHashInfo(recursive, h);
+            FileIngestionMethod outputHashMode; Hash h;
+            i.second.parseHashInfo(outputHashMode, h);
 
-            if (!recursive) {
+            if (outputHashMode == FileIngestionMethod::Flat) {
                 /* The output path should be a regular file without execute permission. */
                 if (!S_ISREG(st.st_mode) || (st.st_mode & S_IXUSR) != 0)
                     throw BuildError(
@@ -3716,9 +3730,11 @@ void DerivationGoal::registerOutputs()
 
             /* Check the hash. In hash mode, move the path produced by
                the derivation to its content-addressed location. */
-            Hash h2 = recursive ? hashPath(h.type, actualPath).first : hashFile(h.type, actualPath);
+            Hash h2 = outputHashMode == FileIngestionMethod::Recursive
+                ? hashPath(h.type, actualPath).first
+                : hashFile(h.type, actualPath);
 
-            auto dest = worker.store.makeFixedOutputPath(recursive, h2, i.second.path.name());
+            auto dest = worker.store.makeFixedOutputPath(outputHashMode, h2, i.second.path.name());
 
             if (h != h2) {
 
@@ -3747,7 +3763,7 @@ void DerivationGoal::registerOutputs()
             else
                 assert(worker.store.parseStorePath(path) == dest);
 
-            ca = makeFixedOutputCA(recursive, h2);
+            ca = makeFixedOutputCA(outputHashMode, h2);
         }
 
         /* Get rid of all weird permissions.  This also checks that
@@ -3854,10 +3870,9 @@ void DerivationGoal::registerOutputs()
                 if (settings.enforceDeterminism)
                     throw NotDeterministic(hint);
 
-                logError(
-                    ErrorInfo {
-                        .name = "Output determinism error",
-                        .hint = hint
+                logError({
+                    .name = "Output determinism error",
+                    .hint = hint
                 });
 
 
@@ -3974,7 +3989,9 @@ void DerivationGoal::checkOutputs(const std::map<Path, ValidPathInfo> & outputs)
 
                 auto spec = parseReferenceSpecifiers(worker.store, *drv, *value);
 
-                auto used = recursive ? cloneStorePathSet(getClosure(info.path).first) : cloneStorePathSet(info.references);
+                auto used = recursive
+                    ? cloneStorePathSet(getClosure(info.path).first)
+                    : cloneStorePathSet(info.references);
 
                 if (recursive && checks.ignoreSelfRefs)
                     used.erase(info.path);
@@ -4122,12 +4139,11 @@ void DerivationGoal::handleChildOutput(int fd, const string & data)
     {
         logSize += data.size();
         if (settings.maxLogSize && logSize > settings.maxLogSize) {
-            logError(
-                ErrorInfo {
-                    .name = "Max log size exceeded",
-                    .hint = hintfmt(
-                        "%1% killed after writing more than %2% bytes of log output",
-                        getName(), settings.maxLogSize)
+            logError({
+                .name = "Max log size exceeded",
+                .hint = hintfmt(
+                    "%1% killed after writing more than %2% bytes of log output",
+                    getName(), settings.maxLogSize)
             });
             killChild();
             done(BuildResult::LogLimitExceeded);
@@ -4444,12 +4460,11 @@ void SubstitutionGoal::tryNext()
         && !sub->isTrusted
         && !info->checkSignatures(worker.store, worker.store.getPublicKeys()))
     {
-        logWarning(
-            ErrorInfo {
-                .name = "Invalid path signature",
-                .hint = hintfmt("substituter '%s' does not have a valid signature for path '%s'",
-                    sub->getUri(), worker.store.printStorePath(storePath))
-            });
+        logWarning({
+            .name = "Invalid path signature",
+            .hint = hintfmt("substituter '%s' does not have a valid signature for path '%s'",
+                sub->getUri(), worker.store.printStorePath(storePath))
+        });
         tryNext();
         return;
     }
@@ -4861,7 +4876,7 @@ void Worker::waitForInput()
     if (!waitingForAWhile.empty()) {
         useTimeout = true;
         if (lastWokenUp == steady_time_point::min())
-            printInfo("waiting for locks or build slots...");
+            printInfo("waiting for locks, build slots or build users...");
         if (lastWokenUp == steady_time_point::min() || lastWokenUp > before) lastWokenUp = before;
         timeout = std::max(1L,
             (long) std::chrono::duration_cast<std::chrono::seconds>(
@@ -4931,12 +4946,11 @@ void Worker::waitForInput()
             j->respectTimeouts &&
             after - j->lastOutput >= std::chrono::seconds(settings.maxSilentTime))
         {
-            logError(
-                ErrorInfo {
-                    .name = "Silent build timeout",
-                    .hint = hintfmt(
-                        "%1% timed out after %2% seconds of silence",
-                        goal->getName(), settings.maxSilentTime)
+            logError({
+                .name = "Silent build timeout",
+                .hint = hintfmt(
+                    "%1% timed out after %2% seconds of silence",
+                    goal->getName(), settings.maxSilentTime)
             });
             goal->timedOut();
         }
@@ -4946,12 +4960,11 @@ void Worker::waitForInput()
             j->respectTimeouts &&
             after - j->timeStarted >= std::chrono::seconds(settings.buildTimeout))
         {
-            logError(
-                ErrorInfo {
-                    .name = "Build timeout",
-                    .hint = hintfmt(
-                        "%1% timed out after %2% seconds",
-                        goal->getName(), settings.buildTimeout)
+            logError({
+                .name = "Build timeout",
+                .hint = hintfmt(
+                    "%1% timed out after %2% seconds",
+                    goal->getName(), settings.buildTimeout)
             });
             goal->timedOut();
         }
@@ -5012,10 +5025,9 @@ bool Worker::pathContentsGood(const StorePath & path)
     }
     pathContentsGoodCache.insert_or_assign(path.clone(), res);
     if (!res)
-        logError(
-            ErrorInfo {
-                .name = "Corrupted path",
-                .hint = hintfmt("path '%s' is corrupted or missing!", store.printStorePath(path))
+        logError({
+            .name = "Corrupted path",
+            .hint = hintfmt("path '%s' is corrupted or missing!", store.printStorePath(path))
         });
     return res;
 }

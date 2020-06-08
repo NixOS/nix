@@ -113,9 +113,12 @@ void BinaryCacheStore::writeNarInfo(ref<NarInfo> narInfo)
         diskCache->upsertNarInfo(getUri(), hashPart, std::shared_ptr<NarInfo>(narInfo));
 }
 
-void BinaryCacheStore::addToStore(const ValidPathInfo & info, const ref<std::string> & nar,
+void BinaryCacheStore::addToStore(const ValidPathInfo & info, Source & narSource,
     RepairFlag repair, CheckSigsFlag checkSigs, std::shared_ptr<FSAccessor> accessor)
 {
+    // FIXME: See if we can use the original source to reduce memory usage.
+    auto nar = make_ref<std::string>(narSource.drain());
+
     if (!repair && isValidPath(info.path)) return;
 
     /* Verify that all references are valid. This may do some .narinfo
@@ -327,7 +330,7 @@ void BinaryCacheStore::queryPathInfoUncached(const StorePath & storePath,
 }
 
 StorePath BinaryCacheStore::addToStore(const string & name, const Path & srcPath,
-    bool recursive, HashType hashAlgo, PathFilter & filter, RepairFlag repair)
+    FileIngestionMethod method, HashType hashAlgo, PathFilter & filter, RepairFlag repair)
 {
     // FIXME: some cut&paste from LocalStore::addToStore().
 
@@ -336,7 +339,7 @@ StorePath BinaryCacheStore::addToStore(const string & name, const Path & srcPath
        small files. */
     StringSink sink;
     Hash h;
-    if (recursive) {
+    if (method == FileIngestionMethod::Recursive) {
         dumpPath(srcPath, sink, filter);
         h = hashString(hashAlgo, *sink.s);
     } else {
@@ -345,9 +348,10 @@ StorePath BinaryCacheStore::addToStore(const string & name, const Path & srcPath
         h = hashString(hashAlgo, s);
     }
 
-    ValidPathInfo info(makeFixedOutputPath(recursive, h, name));
+    ValidPathInfo info(makeFixedOutputPath(method, h, name));
 
-    addToStore(info, sink.s, repair, CheckSigs, nullptr);
+    auto source = StringSource { *sink.s };
+    addToStore(info, source, repair, CheckSigs, nullptr);
 
     return std::move(info.path);
 }
@@ -361,7 +365,8 @@ StorePath BinaryCacheStore::addTextToStore(const string & name, const string & s
     if (repair || !isValidPath(info.path)) {
         StringSink sink;
         dumpString(s, sink);
-        addToStore(info, sink.s, repair, CheckSigs, nullptr);
+        auto source = StringSource { *sink.s };
+        addToStore(info, source, repair, CheckSigs, nullptr);
     }
 
     return std::move(info.path);

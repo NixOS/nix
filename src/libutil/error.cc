@@ -10,13 +10,16 @@ namespace nix {
 
 const std::string nativeSystem = SYSTEM;
 
-
+// addPrefix is used for show-trace.  Strings added with addPrefix
+// will print ahead of the error itself.
 BaseError & BaseError::addPrefix(const FormatOrString & fs)
 {
     prefix_ = fs.s + prefix_;
     return *this;
 }
 
+// c++ std::exception descendants must have a 'const char* what()' function.
+// This stringifies the error and caches it for use by what(), or similarly by msg().
 const string& BaseError::calcWhat() const
 {
     if (what_.has_value())
@@ -124,25 +127,25 @@ void getCodeLines(NixCode &nixCode)
     }
 }
 
-
+// if nixCode contains lines of code, print them to the ostream, indicating the error column.
 void printCodeLines(std::ostream &out, const string &prefix, const NixCode &nixCode)
 {
     // previous line of code.
     if (nixCode.prevLineOfCode.has_value()) {
-        out << fmt("%1% %|2$5d|| %3%",
-            prefix,
-            (nixCode.errPos.line - 1),
-            *nixCode.prevLineOfCode)
-            << std::endl;
+        out << std::endl 
+            << fmt("%1% %|2$5d|| %3%",
+                prefix,
+                (nixCode.errPos.line - 1),
+                *nixCode.prevLineOfCode);
     }
 
     if (nixCode.errLineOfCode.has_value()) {
         // line of code containing the error.
-        out << fmt("%1% %|2$5d|| %3%",
-            prefix,
-            (nixCode.errPos.line),
-            *nixCode.errLineOfCode)
-            << std::endl;
+        out << std::endl
+            << fmt("%1% %|2$5d|| %3%",
+                prefix,
+                (nixCode.errPos.line),
+                *nixCode.errLineOfCode);
         // error arrows for the column range.
         if (nixCode.errPos.column > 0) {
             int start = nixCode.errPos.column;
@@ -153,20 +156,21 @@ void printCodeLines(std::ostream &out, const string &prefix, const NixCode &nixC
 
             std::string arrows("^");
 
-            out << fmt("%1%      |%2%" ANSI_RED "%3%" ANSI_NORMAL,
-                prefix,
-                spaces,
-                arrows) << std::endl;
+            out << std::endl
+                << fmt("%1%      |%2%" ANSI_RED "%3%" ANSI_NORMAL,
+                    prefix,
+                    spaces,
+                    arrows);
         }
     }
 
     // next line of code.
     if (nixCode.nextLineOfCode.has_value()) {
-        out << fmt("%1% %|2$5d|| %3%",
-            prefix,
-            (nixCode.errPos.line + 1),
-            *nixCode.nextLineOfCode)
-            << std::endl;
+        out << std::endl
+            << fmt("%1% %|2$5d|| %3%",
+                prefix,
+                (nixCode.errPos.line + 1),
+                *nixCode.nextLineOfCode);
     }
 }
 
@@ -239,17 +243,15 @@ std::ostream& operator<<(std::ostream &out, const ErrorInfo &einfo)
             levelString,
             einfo.name,
             dashes,
-            einfo.programName.value_or(""))
-            << std::endl;
+            einfo.programName.value_or(""));
     else
         out << fmt("%1%%2%" ANSI_BLUE " -----%3% %4%" ANSI_NORMAL,
             prefix,
             levelString,
             dashes,
-            einfo.programName.value_or(""))
-            << std::endl;
+            einfo.programName.value_or(""));
 
-    // filename, line, column.
+    bool nl = false;  // intersperse newline between sections.
     if (einfo.nixCode.has_value()) {
         switch (einfo.nixCode->errPos.origin) {
             case foFile: {
@@ -273,14 +275,16 @@ std::ostream& operator<<(std::ostream &out, const ErrorInfo &einfo)
             default:
                 throw Error("invalid FileOrigin in errPos");
         }
+        nl = true;
     }
 
     // description
     if (einfo.description != "") {
-        out << prefix << einfo.description << std::endl;
-        out << prefix << std::endl;
+        if (nl)
+            out << std::endl << prefix;
+        out << std::endl << prefix << einfo.description;
+        nl = true;
     }
-
 
     if (einfo.nixCode.has_value()) {
         NixCode nixcode = *einfo.nixCode;
@@ -288,15 +292,19 @@ std::ostream& operator<<(std::ostream &out, const ErrorInfo &einfo)
       
         // lines of code.
         if (nixcode.errLineOfCode.has_value()) {
+            if (nl)
+                out << std::endl << prefix;
             printCodeLines(out, prefix, nixcode);
-            out << prefix << std::endl;
+            nl = true;
         }
     }
 
     // hint
     if (einfo.hint.has_value()) {
-        out << prefix << *einfo.hint << std::endl;
-        out << prefix << std::endl;
+        if (nl)
+            out << std::endl << prefix;
+        out << std::endl << prefix << *einfo.hint;
+        nl = true;
     }
 
     return out;

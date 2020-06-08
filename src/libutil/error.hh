@@ -22,6 +22,23 @@
 
 namespace nix {
 
+/* 
+
+This file defines two main structs/classes used in nix error handling.
+
+ErrorInfo provides a standard payload of error information, with conversion to string
+happening in the logger rather than at the call site.
+
+BaseError is the ancestor of nix specific exceptions (and Interrupted), and contains
+an ErrorInfo.
+
+ErrorInfo structs are sent to the logger as part of an exception, or directly with the
+logError or logWarning macros.
+
+See the error-demo.cc program for usage examples.
+
+*/
+
 typedef enum {
     lvlError = 0,
     lvlWarn,
@@ -38,7 +55,7 @@ typedef enum {
     foString
 } FileOrigin;
 
-
+// ErrPos indicates the location of an error in a nix file.
 struct ErrPos {
     int line = 0;
     int column = 0;
@@ -50,6 +67,7 @@ struct ErrPos {
         return line != 0;
     }
 
+    // convert from the Pos struct, found in libexpr.
     template <class P>
     ErrPos& operator=(const P &pos)
     {
@@ -74,8 +92,6 @@ struct NixCode {
     std::optional<string> nextLineOfCode;
 };
 
-// -------------------------------------------------
-// ErrorInfo.
 struct ErrorInfo {
     Verbosity level;
     string name;
@@ -164,7 +180,7 @@ public:
     {
         errNo = errno;
         auto hf = hintfmt(args...);
-        err.hint = hintfmt("%1% : %2%", normaltxt(hf.str()), strerror(errNo));
+        err.hint = hintfmt("%1%: %2%", normaltxt(hf.str()), strerror(errNo));
     }
 
     virtual const char* sname() const override { return "SysError"; }

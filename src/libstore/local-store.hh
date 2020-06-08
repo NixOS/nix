@@ -149,7 +149,7 @@ public:
         std::shared_ptr<FSAccessor> accessor) override;
 
     StorePath addToStore(const string & name, const Path & srcPath,
-        bool recursive, HashType hashAlgo,
+        FileIngestionMethod method, HashType hashAlgo,
         PathFilter & filter, RepairFlag repair) override;
 
     /* Like addToStore(), but the contents of the path are contained
@@ -157,7 +157,7 @@ public:
        true) or simply the contents of a regular file (if recursive ==
        false). */
     StorePath addToStoreFromDump(const string & dump, const string & name,
-        bool recursive = true, HashType hashAlgo = htSHA256, RepairFlag repair = NoRepair) override;
+        FileIngestionMethod method = FileIngestionMethod::Recursive, HashType hashAlgo = htSHA256, RepairFlag repair = NoRepair) override;
 
     StorePath addTextToStore(const string & name, const string & s,
         const StorePathSet & references, RepairFlag repair) override;
