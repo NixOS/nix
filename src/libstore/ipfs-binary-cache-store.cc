@@ -44,10 +44,10 @@ public:
       const Params & params, const Path & _cacheUri)
             : BinaryCacheStore(params)
             , cacheUri(_cacheUri)
-            , ipfsAPIHost(get(params, "host", "127.0.0.1"))
-            , ipfsAPIPort(std::stoi(get(params, "port", "5001")))
-            , useIpfsGateway(get(params, "use_gateway", "0") == "1")
-            , ipfsGatewayURL(get(params, "gateway", "https://ipfs.io"))
+            , ipfsAPIHost(get(params, "host").value_or("127.0.0.1"))
+            , ipfsAPIPort(std::stoi(get(params, "port").value_or("5001")))
+            , useIpfsGateway(get(params, "use_gateway").value_or("0") == "1")
+            , ipfsGatewayURL(get(params, "gateway").value_or("https://ipfs.io"))
     {
         if (cacheUri.back() == '/')
             cacheUri.pop_back();
@@ -66,13 +66,16 @@ public:
 
     void init() override
     {
-        if (!diskCache->cacheExists(cacheUri, wantMassQuery_, priority)) {
+        if (auto cacheInfo = diskCache->cacheExists(getUri())) {
+            wantMassQuery.setDefault(cacheInfo->wantMassQuery ? "true" : "false");
+            priority.setDefault(fmt("%d", cacheInfo->priority));
+        } else {
             try {
               BinaryCacheStore::init();
             } catch (UploadToIPFS &) {
               throw Error(format("‘%s’ does not appear to be a binary cache") % cacheUri);
             }
-            diskCache->createCache(cacheUri, storeDir, wantMassQuery_, priority);
+            diskCache->createCache(cacheUri, storeDir, wantMassQuery, priority);
         }
     }
 
@@ -108,8 +111,7 @@ protected:
     }
 
     void getFile(const std::string & path,
-        std::function<void(std::shared_ptr<std::string>)> success,
-        std::function<void(std::exception_ptr exc)> failure) override
+        Callback<std::shared_ptr<std::string>> callback) noexcept override
     {
         /*
          * TODO: Try local mount first, best to share code with
@@ -120,21 +122,21 @@ protected:
         //request.showProgress = DownloadRequest::no;
         request.tries = 8;
 
+        auto callbackPtr = std::make_shared<decltype(callback)>(std::move(callback));
+
         getDownloader()->enqueueDownload(request,
-            [success](const DownloadResult & result) {
-                success(result.data);
-            },
-            [success, failure](std::exception_ptr exc) {
+            {[callbackPtr](std::future<DownloadResult> result){
                 try {
-                    std::rethrow_exception(exc);
+                    (*callbackPtr)(result.get().data);
                 } catch (DownloadError & e) {
-                    if (e.error == Downloader::NotFound)
-                        return success(0);
-                    failure(exc);
+                    if (e.error == Downloader::NotFound || e.error == Downloader::Forbidden)
+                        return (*callbackPtr)(std::shared_ptr<std::string>());
+                    callbackPtr->rethrow();
                 } catch (...) {
-                    failure(exc);
+                    callbackPtr->rethrow();
                 }
-            });
+            }}
+        );
     }
 
 };
