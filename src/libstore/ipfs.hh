@@ -4,7 +4,7 @@
 #include <cstdint>
 
 #include "types.hh"
-#include "download.hh"
+#include "filetransfer.hh"
 
 namespace nix {
 namespace ipfs {
@@ -21,8 +21,8 @@ inline std::string buildAPIURL(const std::string & host,
 inline std::string buildQuery(const std::vector<std::pair<std::string, std::string>> & params = {}) {
     std::string query = "?stream-channels=true&json=true&encoding=json";
     for (auto& param : params) {
-      std::string key = getDownloader()->urlEncode(param.first);
-      std::string value = getDownloader()->urlEncode(param.second);
+      std::string key = getFileTransfer()->urlEncode(param.first);
+      std::string value = getFileTransfer()->urlEncode(param.second);
       query += "&" + key + "=" + value;
     }
     return query;

@@ -1,6 +1,6 @@
 #include "fetchers.hh"
 #include "cache.hh"
-#include "download.hh"
+#include "filetransfer.hh"
 #include "globals.hh"
 #include "store-api.hh"
 #include "archive.hh"
@@ -36,13 +36,13 @@ DownloadFileResult downloadFile(
     if (cached && !cached->expired)
         return useCached();
 
-    DownloadRequest request(url);
+    FileTransferRequest request(url);
     if (cached)
         request.expectedETag = getStrAttr(cached->infoAttrs, "etag");
-    DownloadResult res;
+    FileTransferResult res;
     try {
-        res = getDownloader()->download(request);
-    } catch (DownloadError & e) {
+        res = getFileTransfer()->download(request);
+    } catch (FileTransferError & e) {
         if (cached) {
             warn("%s; using cached version", e.msg());
             return useCached();
@@ -67,11 +67,12 @@ DownloadFileResult downloadFile(
         StringSink sink;
         dumpString(*res.data, sink);
         auto hash = hashString(htSHA256, *res.data);
-        ValidPathInfo info(store->makeFixedOutputPath(false, hash, name));
+        ValidPathInfo info(store->makeFixedOutputPath(FileIngestionMethod::Flat, hash, name));
         info.narHash = hashString(htSHA256, *sink.s);
         info.narSize = sink.s->size();
-        info.ca = makeFixedOutputCA(false, hash);
-        store->addToStore(info, sink.s, NoRepair, NoCheckSigs);
+        info.ca = makeFixedOutputCA(FileIngestionMethod::Flat, hash);
+        auto source = StringSource { *sink.s };
+        store->addToStore(info, source, NoRepair, NoCheckSigs);
         storePath = std::move(info.path);
     }
 
@@ -141,7 +142,7 @@ Tree downloadTarball(
             throw nix::Error("tarball '%s' contains an unexpected number of top-level files", url);
         auto topDir = tmpDir + "/" + members.begin()->name;
         lastModified = lstat(topDir).st_mtime;
-        unpackedStorePath = store->addToStore(name, topDir, true, htSHA256, defaultPathFilter, NoRepair);
+        unpackedStorePath = store->addToStore(name, topDir, FileIngestionMethod::Recursive, htSHA256, defaultPathFilter, NoRepair);
     }
 
     Attrs infoAttrs({

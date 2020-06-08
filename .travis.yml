@@ -1,8 +1,0 @@
-matrix:
-  include:
-    - language: osx
-      script: ./tests/install-darwin.sh
-    - language: nix
-      script: nix-build release.nix -A build.x86_64-linux
-notifications:
-  email: false

@@ -65,60 +65,63 @@ void Config::getSettings(std::map<std::string, SettingInfo> & res, bool override
             res.emplace(opt.first, SettingInfo{opt.second.setting->to_string(), opt.second.setting->description});
 }
 
+void AbstractConfig::applyConfig(const std::string & contents, const std::string & path) {
+    unsigned int pos = 0;
+
+    while (pos < contents.size()) {
+        string line;
+        while (pos < contents.size() && contents[pos] != '\n')
+            line += contents[pos++];
+        pos++;
+
+        string::size_type hash = line.find('#');
+        if (hash != string::npos)
+            line = string(line, 0, hash);
+
+        vector<string> tokens = tokenizeString<vector<string> >(line);
+        if (tokens.empty()) continue;
+
+        if (tokens.size() < 2)
+            throw UsageError("illegal configuration line '%1%' in '%2%'", line, path);
+
+        auto include = false;
+        auto ignoreMissing = false;
+        if (tokens[0] == "include")
+            include = true;
+        else if (tokens[0] == "!include") {
+            include = true;
+            ignoreMissing = true;
+        }
+
+        if (include) {
+            if (tokens.size() != 2)
+                throw UsageError("illegal configuration line '%1%' in '%2%'", line, path);
+            auto p = absPath(tokens[1], dirOf(path));
+            if (pathExists(p)) {
+                applyConfigFile(p);
+            } else if (!ignoreMissing) {
+                throw Error("file '%1%' included from '%2%' not found", p, path);
+            }
+            continue;
+        }
+
+        if (tokens[1] != "=")
+            throw UsageError("illegal configuration line '%1%' in '%2%'", line, path);
+
+        string name = tokens[0];
+
+        vector<string>::iterator i = tokens.begin();
+        advance(i, 2);
+
+        set(name, concatStringsSep(" ", Strings(i, tokens.end()))); // FIXME: slow
+    };
+}
+
 void AbstractConfig::applyConfigFile(const Path & path)
 {
     try {
         string contents = readFile(path);
-
-        unsigned int pos = 0;
-
-        while (pos < contents.size()) {
-            string line;
-            while (pos < contents.size() && contents[pos] != '\n')
-                line += contents[pos++];
-            pos++;
-
-            string::size_type hash = line.find('#');
-            if (hash != string::npos)
-                line = string(line, 0, hash);
-
-            vector<string> tokens = tokenizeString<vector<string> >(line);
-            if (tokens.empty()) continue;
-
-            if (tokens.size() < 2)
-                throw UsageError("illegal configuration line '%1%' in '%2%'", line, path);
-
-            auto include = false;
-            auto ignoreMissing = false;
-            if (tokens[0] == "include")
-                include = true;
-            else if (tokens[0] == "!include") {
-                include = true;
-                ignoreMissing = true;
-            }
-
-            if (include) {
-                if (tokens.size() != 2)
-                    throw UsageError("illegal configuration line '%1%' in '%2%'", line, path);
-                auto p = absPath(tokens[1], dirOf(path));
-                if (pathExists(p)) {
-                    applyConfigFile(p);
-                } else if (!ignoreMissing) {
-                    throw Error("file '%1%' included from '%2%' not found", p, path);
-                }
-                continue;
-            }
-
-            if (tokens[1] != "=")
-                throw UsageError("illegal configuration line '%1%' in '%2%'", line, path);
-
-            string name = tokens[0];
-
-            vector<string>::iterator i = tokens.begin();
-            advance(i, 2);
-
-            set(name, concatStringsSep(" ", Strings(i, tokens.end()))); // FIXME: slow
-        };
+        applyConfig(contents, path);
     } catch (SysError &) { }
 }
 
@@ -177,12 +180,13 @@ void BaseSetting<T>::toJSON(JSONPlaceholder & out)
 template<typename T>
 void BaseSetting<T>::convertToArg(Args & args, const std::string & category)
 {
-    args.mkFlag()
-        .longName(name)
-        .description(description)
-        .arity(1)
-        .handler([=](std::vector<std::string> ss) { overriden = true; set(ss[0]); })
-        .category(category);
+    args.addFlag({
+        .longName = name,
+        .description = description,
+        .category = category,
+        .labels = {"value"},
+        .handler = {[=](std::string s) { overriden = true; set(s); }},
+    });
 }
 
 template<> void BaseSetting<std::string>::set(const std::string & str)
@@ -227,16 +231,18 @@ template<> std::string BaseSetting<bool>::to_string() const
 
 template<> void BaseSetting<bool>::convertToArg(Args & args, const std::string & category)
 {
-    args.mkFlag()
-        .longName(name)
-        .description(description)
-        .handler([=](std::vector<std::string> ss) { override(true); })
-        .category(category);
-    args.mkFlag()
-        .longName("no-" + name)
-        .description(description)
-        .handler([=](std::vector<std::string> ss) { override(false); })
-        .category(category);
+    args.addFlag({
+        .longName = name,
+        .description = description,
+        .category = category,
+        .handler = {[=]() { override(true); }}
+    });
+    args.addFlag({
+        .longName = "no-" + name,
+        .description = description,
+        .category = category,
+        .handler = {[=]() { override(false); }}
+    });
 }
 
 template<> void BaseSetting<Strings>::set(const std::string & str)

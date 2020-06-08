@@ -195,7 +195,7 @@ struct LegacySSHStore : public Store
     { unsupported("queryPathFromHashPart"); }
 
     StorePath addToStore(const string & name, const Path & srcPath,
-        bool recursive, HashType hashAlgo,
+        FileIngestionMethod method, HashType hashAlgo,
         PathFilter & filter, RepairFlag repair) override
     { unsupported("addToStore"); }
 

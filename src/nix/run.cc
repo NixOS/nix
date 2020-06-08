@@ -57,22 +57,22 @@ struct RunCommon : virtual Command
     }
 };
 
-struct CmdRun : InstallablesCommand, RunCommon, MixEnvironment
+struct CmdShell : InstallablesCommand, RunCommon, MixEnvironment
 {
     std::vector<std::string> command = { getEnv("SHELL").value_or("bash") };
 
-    CmdRun()
+    CmdShell()
     {
-        mkFlag()
-            .longName("command")
-            .shortName('c')
-            .description("command and arguments to be executed; defaults to '$SHELL'")
-            .labels({"command", "args"})
-            .arity(ArityAny)
-            .handler([&](std::vector<std::string> ss) {
+        addFlag({
+            .longName = "command",
+            .shortName = 'c',
+            .description = "command and arguments to be executed; defaults to '$SHELL'",
+            .labels = {"command", "args"},
+            .handler = {[&](std::vector<std::string> ss) {
                 if (ss.empty()) throw UsageError("--command requires at least one argument");
                 command = ss;
-            });
+            }}
+        });
     }
 
     std::string description() override
@@ -85,19 +85,19 @@ struct CmdRun : InstallablesCommand, RunCommon, MixEnvironment
         return {
             Example{
                 "To start a shell providing GNU Hello from NixOS 17.03:",
-                "nix run -f channel:nixos-17.03 hello"
+                "nix shell -f channel:nixos-17.03 hello"
             },
             Example{
                 "To start a shell providing youtube-dl from your 'nixpkgs' channel:",
-                "nix run nixpkgs.youtube-dl"
+                "nix shell nixpkgs.youtube-dl"
             },
             Example{
                 "To run GNU Hello:",
-                "nix run nixpkgs.hello -c hello --greeting 'Hi everybody!'"
+                "nix shell nixpkgs.hello -c hello --greeting 'Hi everybody!'"
             },
             Example{
                 "To run GNU Hello in a chroot store:",
-                "nix run --store ~/my-nix nixpkgs.hello -c hello"
+                "nix shell --store ~/my-nix nixpkgs.hello -c hello"
             },
         };
     }
@@ -141,7 +141,7 @@ struct CmdRun : InstallablesCommand, RunCommon, MixEnvironment
     }
 };
 
-static auto r1 = registerCommand<CmdRun>("run");
+static auto r1 = registerCommand<CmdShell>("shell");
 
 void chrootHelper(int argc, char * * argv)
 {

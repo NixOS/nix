@@ -262,8 +262,9 @@ struct ExprWith : Expr
 
 struct ExprIf : Expr
 {
+    Pos pos;
     Expr * cond, * then, * else_;
-    ExprIf(Expr * cond, Expr * then, Expr * else_) : cond(cond), then(then), else_(else_) { };
+    ExprIf(const Pos & pos, Expr * cond, Expr * then, Expr * else_) : pos(pos), cond(cond), then(then), else_(else_) { };
     COMMON_METHODS
 };
 

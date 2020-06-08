@@ -35,16 +35,18 @@ StorePathsCommand::StorePathsCommand(bool recursive)
     : recursive(recursive)
 {
     if (recursive)
-        mkFlag()
-            .longName("no-recursive")
-            .description("apply operation to specified paths only")
-            .set(&this->recursive, false);
+        addFlag({
+            .longName = "no-recursive",
+            .description = "apply operation to specified paths only",
+            .handler = {&this->recursive, false},
+        });
     else
-        mkFlag()
-            .longName("recursive")
-            .shortName('r')
-            .description("apply operation to closure of the specified paths")
-            .set(&this->recursive, true);
+        addFlag({
+            .longName = "recursive",
+            .shortName = 'r',
+            .description = "apply operation to closure of the specified paths",
+            .handler = {&this->recursive, true},
+        });
 
     mkFlag(0, "all", "apply operation to the entire store", &all);
 }
@@ -101,11 +103,12 @@ Strings editorFor(const Pos & pos)
 
 MixProfile::MixProfile()
 {
-    mkFlag()
-        .longName("profile")
-        .description("profile to update")
-        .labels({"path"})
-        .dest(&profile);
+    addFlag({
+        .longName = "profile",
+        .description = "profile to update",
+        .labels = {"path"},
+        .handler = {&profile},
+    });
 }
 
 void MixProfile::updateProfile(const StorePath & storePath)
@@ -145,28 +148,30 @@ MixDefaultProfile::MixDefaultProfile()
     profile = getDefaultProfile();
 }
 
-MixEnvironment::MixEnvironment() : ignoreEnvironment(false) {
-    mkFlag()
-        .longName("ignore-environment")
-        .shortName('i')
-        .description("clear the entire environment (except those specified with --keep)")
-        .set(&ignoreEnvironment, true);
+MixEnvironment::MixEnvironment() : ignoreEnvironment(false)
+{
+    addFlag({
+        .longName = "ignore-environment",
+        .shortName = 'i',
+        .description = "clear the entire environment (except those specified with --keep)",
+        .handler = {&ignoreEnvironment, true},
+    });
 
-    mkFlag()
-        .longName("keep")
-        .shortName('k')
-        .description("keep specified environment variable")
-        .arity(1)
-        .labels({"name"})
-        .handler([&](std::vector<std::string> ss) { keep.insert(ss.front()); });
+    addFlag({
+        .longName = "keep",
+        .shortName = 'k',
+        .description = "keep specified environment variable",
+        .labels = {"name"},
+        .handler = {[&](std::string s) { keep.insert(s); }},
+    });
 
-    mkFlag()
-        .longName("unset")
-        .shortName('u')
-        .description("unset specified environment variable")
-        .arity(1)
-        .labels({"name"})
-        .handler([&](std::vector<std::string> ss) { unset.insert(ss.front()); });
+    addFlag({
+        .longName = "unset",
+        .shortName = 'u',
+        .description = "unset specified environment variable",
+        .labels = {"name"},
+        .handler = {[&](std::string s) { unset.insert(s); }},
+    });
 }
 
 void MixEnvironment::setEnviron() {

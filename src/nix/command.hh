@@ -10,6 +10,10 @@ namespace nix {
 
 extern std::string programPath;
 
+static constexpr Command::Category catSecondary = 100;
+static constexpr Command::Category catUtility = 101;
+static constexpr Command::Category catNixInstallation = 102;
+
 /* A command that requires a Nix store. */
 struct StoreCommand : virtual Command
 {
@@ -41,7 +45,7 @@ private:
 
     std::shared_ptr<EvalState> evalState;
 
-    Value * vSourceExpr = 0;
+    RootValue vSourceExpr;
 };
 
 enum RealiseMode { Build, NoBuild, DryRun };

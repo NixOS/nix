@@ -1,7 +1,7 @@
 #include <cstring>
 
 #include "binary-cache-store.hh"
-#include "download.hh"
+#include "filetransfer.hh"
 #include "nar-info-disk-cache.hh"
 #include "ipfs.hh"
 
@@ -91,15 +91,15 @@ protected:
         /* TODO: perform ipfs ls instead instead of trying to fetch it */
         auto uri = constructIPFSRequest(path);
         try {
-            DownloadRequest request(uri);
-            //request.showProgress = DownloadRequest::no;
+            FileTransferRequest request(uri);
+            //request.showProgress = FileTransferRequest::no;
             request.tries = 5;
             if (useIpfsGateway)
                 request.head = true;
-            getDownloader()->download(request);
+            getFileTransfer()->download(request);
             return true;
-        } catch (DownloadError & e) {
-            if (e.error == Downloader::NotFound)
+        } catch (FileTransferError & e) {
+            if (e.error == FileTransfer::NotFound)
                 return false;
             throw;
         }
@@ -118,18 +118,18 @@ protected:
          * LocalBinaryCacheStore
          */
         auto uri = constructIPFSRequest(path);
-        DownloadRequest request(uri);
-        //request.showProgress = DownloadRequest::no;
+        FileTransferRequest request(uri);
+        //request.showProgress = FileTransferRequest::no;
         request.tries = 8;
 
         auto callbackPtr = std::make_shared<decltype(callback)>(std::move(callback));
 
-        getDownloader()->enqueueDownload(request,
-            {[callbackPtr](std::future<DownloadResult> result){
+        getFileTransfer()->enqueueFileTransfer(request,
+            {[callbackPtr](std::future<FileTransferResult> result){
                 try {
                     (*callbackPtr)(result.get().data);
-                } catch (DownloadError & e) {
-                    if (e.error == Downloader::NotFound || e.error == Downloader::Forbidden)
+                } catch (FileTransferError & e) {
+                    if (e.error == FileTransfer::NotFound || e.error == FileTransfer::Forbidden)
                         return (*callbackPtr)(std::shared_ptr<std::string>());
                     callbackPtr->rethrow();
                 } catch (...) {

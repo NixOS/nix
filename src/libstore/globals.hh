@@ -53,8 +53,11 @@ public:
     /* The directory where state is stored. */
     Path nixStateDir;
 
-    /* The directory where configuration files are stored. */
+    /* The directory where system configuration files are stored. */
     Path nixConfDir;
+
+    /* A list of user configuration files to load. */
+    std::vector<Path> nixUserConfFiles;
 
     /* The directory where internal helper programs are stored. */
     Path nixLibexecDir;
@@ -377,6 +380,9 @@ extern Settings settings;
 void initPlugins();
 
 void loadConfFile();
+
+// Used by the Settings constructor
+std::vector<Path> getUserConfigFiles();
 
 extern const string nixVersion;
 

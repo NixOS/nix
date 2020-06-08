@@ -7,6 +7,7 @@
 #include <atomic>
 #include <map>
 #include <thread>
+#include <iostream>
 
 namespace nix {
 
@@ -153,7 +154,7 @@ public:
         state->activitiesByType[type].its.emplace(act, i);
 
         if (type == actBuild) {
-            auto name = storePathToName(getS(fields, 0));
+            std::string name(storePathToName(getS(fields, 0)));
             if (hasSuffix(name, ".drv"))
                 name = name.substr(0, name.size() - 4);
             i->s = fmt("building " ANSI_BOLD "%s" ANSI_NORMAL, name);
@@ -190,8 +191,8 @@ public:
             i->s = fmt("querying " ANSI_BOLD "%s" ANSI_NORMAL " on %s", name, getS(fields, 1));
         }
 
-        if ((type == actDownload && hasAncestor(*state, actCopyPath, parent))
-            || (type == actDownload && hasAncestor(*state, actQueryPathInfo, parent))
+        if ((type == actFileTransfer && hasAncestor(*state, actCopyPath, parent))
+            || (type == actFileTransfer && hasAncestor(*state, actQueryPathInfo, parent))
             || (type == actCopyPath && hasAncestor(*state, actSubstitute, parent)))
             i->visible = false;
 
@@ -416,7 +417,7 @@ public:
             if (!s2.empty()) { res += " ("; res += s2; res += ')'; }
         }
 
-        showActivity(actDownload, "%s MiB DL", "%.1f", MiB);
+        showActivity(actFileTransfer, "%s MiB DL", "%.1f", MiB);
 
         {
             auto s = renderActivity(actOptimiseStore, "%s paths optimised");
@@ -441,6 +442,18 @@ public:
         }
 
         return res;
+    }
+
+    void writeToStdout(std::string_view s) override
+    {
+        auto state(state_.lock());
+        if (state->active) {
+            std::cerr << "\r\e[K";
+            Logger::writeToStdout(s);
+            draw(*state);
+        } else {
+            Logger::writeToStdout(s);
+        }
     }
 };
 
