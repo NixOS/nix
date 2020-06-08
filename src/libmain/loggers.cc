@@ -1,5 +1,5 @@
 #include "loggers.hh"
-#include "../nix/progress-bar.hh"
+#include "progress-bar.hh"
 
 namespace nix {
 
