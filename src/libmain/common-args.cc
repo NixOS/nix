@@ -41,8 +41,8 @@ MixCommonArgs::MixCommonArgs(const string & programName)
 
     addFlag({
         .longName = "log-format",
-        .description = "Format of the logs. One of \"raw\", \"internal-json\", \"bar\" "
-                        "or \"bar-with-logs\".",
+        .description = "format of log output; \"raw\", \"internal-json\", \"bar\" "
+                        "or \"bar-with-logs\"",
         .labels = {"format"},
         .handler = {[](std::string format) { setLogFormat(format); }},
     });
