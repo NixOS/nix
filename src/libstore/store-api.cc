@@ -948,6 +948,10 @@ std::list<ref<Store>> getDefaultSubstituters()
         for (auto uri : settings.extraSubstituters.get())
             addStore(uri);
 
+        for (auto uri : settings.hashedMirrors.get()) {
+            addStore("hashed-mirror+" + uri);
+        }
+
         stores.sort([](ref<Store> & a, ref<Store> & b) {
             return a->priority < b->priority;
         });
