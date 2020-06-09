@@ -1,4 +1,5 @@
 #include <cstring>
+#include <nlohmann/json.hpp>
 
 #include "binary-cache-store.hh"
 #include "filetransfer.hh"
@@ -38,6 +39,15 @@ public:
         std::string ipfsAPIHost(get(params, "host").value_or("127.0.0.1"));
         std::string ipfsAPIPort(get(params, "port").value_or("5001"));
         daemonUri = "http://" + ipfsAPIHost + ":" + ipfsAPIPort;
+
+        // Check the IPFS daemon is running
+        FileTransferRequest request(daemonUri + "/api/v0/version");
+        request.post = true;
+        request.tries = 1;
+        auto res = getFileTransfer()->download(request);
+        auto versionInfo = nlohmann::json::parse(*res.data);
+        if (versionInfo.find("Version") == versionInfo.end())
+            throw Error("daemon for IPFS is not running properly");
     }
 
     std::string getUri() override
