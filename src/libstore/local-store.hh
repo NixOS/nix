@@ -119,15 +119,17 @@ public:
 
     std::string getUri() override;
 
-    bool isValidPathUncached(const StorePath & path) override;
+    bool isValidPathUncached(const StorePath & path, const std::string ca) override;
 
     StorePathSet queryValidPaths(const StorePathSet & paths,
-        SubstituteFlag maybeSubstitute = NoSubstitute) override;
+        SubstituteFlag maybeSubstitute = NoSubstitute,
+        std::map<std::string, std::string> pathsInfo = {}) override;
 
     StorePathSet queryAllValidPaths() override;
 
     void queryPathInfoUncached(const StorePath & path,
-        Callback<std::shared_ptr<const ValidPathInfo>> callback) noexcept override;
+        Callback<std::shared_ptr<const ValidPathInfo>> callback,
+        const std::string ca) noexcept override;
 
     void queryReferrers(const StorePath & path, StorePathSet & referrers) override;
 
@@ -142,7 +144,8 @@ public:
     StorePathSet querySubstitutablePaths(const StorePathSet & paths) override;
 
     void querySubstitutablePathInfos(const StorePathSet & paths,
-        SubstitutablePathInfos & infos) override;
+        SubstitutablePathInfos & infos,
+        std::map<std::string, Derivation> drvs = {}) override;
 
     void addToStore(const ValidPathInfo & info, Source & source,
         RepairFlag repair, CheckSigsFlag checkSigs,

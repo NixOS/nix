@@ -253,7 +253,7 @@ ConnectionHandle RemoteStore::getConnection()
 }
 
 
-bool RemoteStore::isValidPathUncached(const StorePath & path)
+bool RemoteStore::isValidPathUncached(const StorePath & path, const std::string ca)
 {
     auto conn(getConnection());
     conn->to << wopIsValidPath << printStorePath(path);
@@ -262,7 +262,7 @@ bool RemoteStore::isValidPathUncached(const StorePath & path)
 }
 
 
-StorePathSet RemoteStore::queryValidPaths(const StorePathSet & paths, SubstituteFlag maybeSubstitute)
+StorePathSet RemoteStore::queryValidPaths(const StorePathSet & paths, SubstituteFlag maybeSubstitute, std::map<std::string, std::string> pathsInfo)
 {
     auto conn(getConnection());
     if (GET_PROTOCOL_MINOR(conn->daemonVersion) < 12) {
@@ -309,7 +309,7 @@ StorePathSet RemoteStore::querySubstitutablePaths(const StorePathSet & paths)
 
 
 void RemoteStore::querySubstitutablePathInfos(const StorePathSet & paths,
-    SubstitutablePathInfos & infos)
+    SubstitutablePathInfos & infos, std::map<std::string, Derivation> drvs)
 {
     if (paths.empty()) return;
 
@@ -353,7 +353,8 @@ void RemoteStore::querySubstitutablePathInfos(const StorePathSet & paths,
 
 
 void RemoteStore::queryPathInfoUncached(const StorePath & path,
-    Callback<std::shared_ptr<const ValidPathInfo>> callback) noexcept
+    Callback<std::shared_ptr<const ValidPathInfo>> callback,
+    const std::string ca) noexcept
 {
     try {
         std::shared_ptr<ValidPathInfo> info;

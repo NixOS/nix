@@ -2703,7 +2703,7 @@ struct RestrictedStore : public LocalFSStore
     }
 
     void queryPathInfoUncached(const StorePath & path,
-        Callback<std::shared_ptr<const ValidPathInfo>> callback) noexcept override
+        Callback<std::shared_ptr<const ValidPathInfo>> callback, const std::string ca) noexcept override
     {
         if (goal.isAllowed(path)) {
             try {
@@ -2762,11 +2762,11 @@ struct RestrictedStore : public LocalFSStore
         return path;
     }
 
-    void narFromPath(const StorePath & path, Sink & sink) override
+    void narFromPath(const StorePath & path, Sink & sink, std::string ca) override
     {
         if (!goal.isAllowed(path))
             throw InvalidPath("cannot dump unknown path '%s' in recursive Nix", printStorePath(path));
-        LocalFSStore::narFromPath(path, sink);
+        LocalFSStore::narFromPath(path, sink, ca);
     }
 
     void ensurePath(const StorePath & path) override

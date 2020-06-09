@@ -66,10 +66,11 @@ private:
 
 public:
 
-    bool isValidPathUncached(const StorePath & path) override;
+    bool isValidPathUncached(const StorePath & path, const std::string ca) override;
 
     void queryPathInfoUncached(const StorePath & path,
-        Callback<std::shared_ptr<const ValidPathInfo>> callback) noexcept override;
+        Callback<std::shared_ptr<const ValidPathInfo>> callback,
+        const std::string ca) noexcept override;
 
     std::optional<StorePath> queryPathFromHashPart(const std::string & hashPart) override
     { unsupported("queryPathFromHashPart"); }
@@ -85,7 +86,7 @@ public:
     StorePath addTextToStore(const string & name, const string & s,
         const StorePathSet & references, RepairFlag repair) override;
 
-    void narFromPath(const StorePath & path, Sink & sink) override;
+    void narFromPath(const StorePath & path, Sink & sink, const std::string ca) override;
 
     BuildResult buildDerivation(const StorePath & drvPath, const BasicDerivation & drv,
         BuildMode buildMode) override

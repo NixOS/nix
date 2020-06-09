@@ -624,7 +624,7 @@ uint64_t LocalStore::addValidPath(State & state,
 
 
 void LocalStore::queryPathInfoUncached(const StorePath & path,
-    Callback<std::shared_ptr<const ValidPathInfo>> callback) noexcept
+    Callback<std::shared_ptr<const ValidPathInfo>> callback, const std::string ca) noexcept
 {
     try {
         auto info = std::make_shared<ValidPathInfo>(path.clone());
@@ -704,7 +704,7 @@ bool LocalStore::isValidPath_(State & state, const StorePath & path)
 }
 
 
-bool LocalStore::isValidPathUncached(const StorePath & path)
+bool LocalStore::isValidPathUncached(const StorePath & path, const std::string ca)
 {
     return retrySQLite<bool>([&]() {
         auto state(_state.lock());
@@ -713,7 +713,7 @@ bool LocalStore::isValidPathUncached(const StorePath & path)
 }
 
 
-StorePathSet LocalStore::queryValidPaths(const StorePathSet & paths, SubstituteFlag maybeSubstitute)
+StorePathSet LocalStore::queryValidPaths(const StorePathSet & paths, SubstituteFlag maybeSubstitute, std::map<std::string, std::string> pathsInfo)
 {
     StorePathSet res;
     for (auto & i : paths)
@@ -855,7 +855,7 @@ StorePathSet LocalStore::querySubstitutablePaths(const StorePathSet & paths)
 
 
 void LocalStore::querySubstitutablePathInfos(const StorePathSet & paths,
-    SubstitutablePathInfos & infos)
+    SubstitutablePathInfos & infos, std::map<std::string, Derivation> drvs)
 {
     if (!settings.useSubstitutes) return;
     for (auto & sub : getDefaultSubstituters()) {
@@ -864,7 +864,29 @@ void LocalStore::querySubstitutablePathInfos(const StorePathSet & paths,
             if (infos.count(path)) continue;
             debug("checking substituter '%s' for path '%s'", sub->getUri(), printStorePath(path));
             try {
-                auto info = sub->queryPathInfo(path);
+                std::string ca = "";
+
+                auto drv = drvs.find(printStorePath(path));
+                if (drv != drvs.end()) {
+                    auto env = drv->second.env;
+                    auto outputHashMode = env.find("outputHashMode");
+                    auto outputHashAlgo = env.find("outputHashAlgo");
+                    auto outputHash = env.find("outputHash");
+                    if (outputHashMode != env.end() && outputHashAlgo != env.end() && outputHash != env.end()) {
+                        auto ht = parseHashType(outputHashAlgo->second);
+                        auto h = Hash(outputHash->second, ht);
+                        FileIngestionMethod ingestionMethod;
+                        if (outputHashMode->second == "recursive")
+                            ingestionMethod = FileIngestionMethod::Recursive;
+                        else if (outputHashMode->second == "flat")
+                            ingestionMethod = FileIngestionMethod::Flat;
+                        else
+                            throw Error("unknown ingestion method: '%s'", outputHashMode->second);
+                        ca = makeFixedOutputCA(ingestionMethod, h);
+                    }
+                }
+
+                auto info = sub->queryPathInfo(path, ca);
                 auto narInfo = std::dynamic_pointer_cast<const NarInfo>(
                     std::shared_ptr<const ValidPathInfo>(info));
                 infos.insert_or_assign(path.clone(), SubstitutablePathInfo{

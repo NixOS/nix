@@ -379,18 +379,19 @@ public:
         const StorePathSet & references) const;
 
     /* Check whether a path is valid. */
-    bool isValidPath(const StorePath & path);
+    bool isValidPath(const StorePath & path, const std::string ca = "");
 
 protected:
 
-    virtual bool isValidPathUncached(const StorePath & path);
+    virtual bool isValidPathUncached(const StorePath & path, const std::string ca = "");
 
 public:
 
     /* Query which of the given paths is valid. Optionally, try to
        substitute missing paths. */
     virtual StorePathSet queryValidPaths(const StorePathSet & paths,
-        SubstituteFlag maybeSubstitute = NoSubstitute);
+        SubstituteFlag maybeSubstitute = NoSubstitute,
+        std::map<std::string, std::string> pathsInfo = {});
 
     /* Query the set of all valid paths. Note that for some store
        backends, the name part of store paths may be omitted
@@ -402,16 +403,16 @@ public:
 
     /* Query information about a valid path. It is permitted to omit
        the name part of the store path. */
-    ref<const ValidPathInfo> queryPathInfo(const StorePath & path);
+    ref<const ValidPathInfo> queryPathInfo(const StorePath & path, const std::string ca = "");
 
     /* Asynchronous version of queryPathInfo(). */
     void queryPathInfo(const StorePath & path,
-        Callback<ref<const ValidPathInfo>> callback) noexcept;
+        Callback<ref<const ValidPathInfo>> callback, const std::string ca = "") noexcept;
 
 protected:
 
     virtual void queryPathInfoUncached(const StorePath & path,
-        Callback<std::shared_ptr<const ValidPathInfo>> callback) noexcept = 0;
+        Callback<std::shared_ptr<const ValidPathInfo>> callback, const std::string ca = "") noexcept = 0;
 
 public:
 
@@ -445,7 +446,7 @@ public:
        sizes) of a set of paths.  If a path does not have substitute
        info, it's omitted from the resulting ‘infos’ map. */
     virtual void querySubstitutablePathInfos(const StorePathSet & paths,
-        SubstitutablePathInfos & infos) { return; };
+        SubstitutablePathInfos & infos, std::map<std::string, Derivation> drvs = {}) { return; };
 
     /* Import a path into the store. */
     virtual void addToStore(const ValidPathInfo & info, Source & narSource,
@@ -473,7 +474,7 @@ public:
         const StorePathSet & references, RepairFlag repair = NoRepair) = 0;
 
     /* Write a NAR dump of a store path. */
-    virtual void narFromPath(const StorePath & path, Sink & sink) = 0;
+    virtual void narFromPath(const StorePath & path, Sink & sink, std::string ca = "") = 0;
 
     /* For each path, if it's a derivation, build it.  Building a
        derivation means ensuring that the output paths are valid.  If
@@ -713,7 +714,7 @@ public:
 
     LocalFSStore(const Params & params);
 
-    void narFromPath(const StorePath & path, Sink & sink) override;
+    void narFromPath(const StorePath & path, Sink & sink, std::string ca) override;
     ref<FSAccessor> getFSAccessor() override;
 
     /* Register a permanent GC root. */

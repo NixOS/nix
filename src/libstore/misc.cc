@@ -159,7 +159,8 @@ void Store::queryMissing(const std::vector<StorePathWithOutputs> & targets,
         SubstitutablePathInfos infos;
         StorePathSet paths; // FIXME
         paths.insert(outPath.clone());
-        querySubstitutablePathInfos(paths, infos);
+
+        querySubstitutablePathInfos(paths, infos, { {outPathS, Derivation(*drv) } });
 
         if (infos.empty()) {
             drvState_->lock()->done = true;
