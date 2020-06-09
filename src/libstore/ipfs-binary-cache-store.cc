@@ -48,6 +48,10 @@ public:
         auto versionInfo = nlohmann::json::parse(*res.data);
         if (versionInfo.find("Version") == versionInfo.end())
             throw Error("daemon for IPFS is not running properly");
+
+        // root should already exist
+        if (!fileExists("") && hasPrefix(ipfsPath, "/ipfs/"))
+            throw Error("path '%s' is not found", ipfsPath);
     }
 
     std::string getUri() override
