@@ -3,7 +3,6 @@
 #include "binary-cache-store.hh"
 #include "filetransfer.hh"
 #include "nar-info-disk-cache.hh"
-#include "ipfs.hh"
 
 namespace nix {
 
@@ -15,28 +14,9 @@ class IPFSBinaryCacheStore : public BinaryCacheStore
 private:
 
     std::string cacheUri;
+    std::string daemonUri;
 
-    /* Host where a IPFS API can be reached (usually localhost) */
-    std::string ipfsAPIHost;
-    /* Port where a IPFS API can be reached (usually 5001) */
-    uint16_t    ipfsAPIPort;
-    /* Whether to use a IPFS Gateway instead of the API */
-    bool        useIpfsGateway;
-    /* Where to find a IPFS Gateway */
-    std::string ipfsGatewayURL;
-
-    std::string constructIPFSRequest(const std::string & path) {
-        std::string uri;
-        std::string ipfsPath = cacheUri + "/" + path;
-        if (useIpfsGateway == false) {
-          uri = ipfs::buildAPIURL(ipfsAPIHost, ipfsAPIPort) +
-                "/cat" +
-                ipfs::buildQuery({{"arg", ipfsPath}});
-        } else {
-          uri = ipfsGatewayURL + ipfsPath;
-        }
-        return uri;
-    }
+    std::string ipfsPath;
 
 public:
 
@@ -44,19 +24,20 @@ public:
       const Params & params, const Path & _cacheUri)
             : BinaryCacheStore(params)
             , cacheUri(_cacheUri)
-            , ipfsAPIHost(get(params, "host").value_or("127.0.0.1"))
-            , ipfsAPIPort(std::stoi(get(params, "port").value_or("5001")))
-            , useIpfsGateway(get(params, "use_gateway").value_or("0") == "1")
-            , ipfsGatewayURL(get(params, "gateway").value_or("https://ipfs.io"))
     {
         if (cacheUri.back() == '/')
             cacheUri.pop_back();
-        /*
-         * A cache is still useful since the IPFS API or
-         * gateway may have a higher latency when not running on
-         * localhost
-         */
-        diskCache = getNarInfoDiskCache();
+
+        if (hasPrefix(cacheUri, "ipfs://"))
+            ipfsPath = "/ipfs/" + std::string(cacheUri, 7);
+        else if (hasPrefix(cacheUri, "ipns://"))
+            ipfsPath = "/ipns/" + std::string(cacheUri, 7);
+        else
+            throw Error("unknown IPFS URI '%s'", cacheUri);
+
+        std::string ipfsAPIHost(get(params, "host").value_or("127.0.0.1"));
+        std::string ipfsAPIPort(get(params, "port").value_or("5001"));
+        daemonUri = "http://" + ipfsAPIHost + ":" + ipfsAPIPort;
     }
 
     std::string getUri() override
@@ -66,42 +47,28 @@ public:
 
     void init() override
     {
-        if (auto cacheInfo = diskCache->cacheExists(getUri())) {
-            wantMassQuery.setDefault(cacheInfo->wantMassQuery ? "true" : "false");
-            priority.setDefault(fmt("%d", cacheInfo->priority));
-        } else {
-            try {
-              BinaryCacheStore::init();
-            } catch (UploadToIPFS &) {
-              throw Error(format("‘%s’ does not appear to be a binary cache") % cacheUri);
-            }
-            diskCache->createCache(cacheUri, storeDir, wantMassQuery, priority);
         }
+        BinaryCacheStore::init();
     }
 
 protected:
 
     bool fileExists(const std::string & path) override
     {
-        /*
-         * TODO: Try a local mount first, best to share code with
-         * LocalBinaryCacheStore
-         */
+        auto uri = daemonUri + "/api/v0/object/stat?arg=" + getFileTransfer()->urlEncode(ipfsPath + "/" + path);
 
-        /* TODO: perform ipfs ls instead instead of trying to fetch it */
-        auto uri = constructIPFSRequest(path);
+        FileTransferRequest request(uri);
+        request.post = true;
+        request.tries = 1;
         try {
-            FileTransferRequest request(uri);
-            //request.showProgress = FileTransferRequest::no;
-            request.tries = 5;
-            if (useIpfsGateway)
-                request.head = true;
-            getFileTransfer()->download(request);
-            return true;
+            auto res = getFileTransfer()->download(request);
+            auto json = nlohmann::json::parse(*res.data);
+
+            return json.find("Hash") != json.end();
         } catch (FileTransferError & e) {
-            if (e.error == FileTransfer::NotFound)
-                return false;
-            throw;
+            // probably should verify this is a not found error but
+            // ipfs gives us a 500
+            return false;
         }
     }
 
@@ -113,14 +80,10 @@ protected:
     void getFile(const std::string & path,
         Callback<std::shared_ptr<std::string>> callback) noexcept override
     {
-        /*
-         * TODO: Try local mount first, best to share code with
-         * LocalBinaryCacheStore
-         */
-        auto uri = constructIPFSRequest(path);
+        auto uri = daemonUri + "/api/v0/cat?arg=" + getFileTransfer()->urlEncode(ipfsPath + "/" + path);
+
         FileTransferRequest request(uri);
-        //request.showProgress = FileTransferRequest::no;
-        request.tries = 8;
+        request.tries = 1;
 
         auto callbackPtr = std::make_shared<decltype(callback)>(std::move(callback));
 
@@ -145,12 +108,8 @@ static RegisterStoreImplementation regStore([](
     const std::string & uri, const Store::Params & params)
     -> std::shared_ptr<Store>
 {
-    /*
-     * TODO: maybe use ipfs:/ fs:/ipfs/
-     * https://github.com/ipfs/go-ipfs/issues/1678#issuecomment-157478515
-     */
-    if (uri.substr(0, strlen("/ipfs/")) != "/ipfs/" &&
-        uri.substr(0, strlen("/ipns/")) != "/ipns/")
+    if (uri.substr(0, strlen("ipfs://")) != "ipfs://" &&
+        uri.substr(0, strlen("ipns://")) != "ipns://")
         return 0;
     auto store = std::make_shared<IPFSBinaryCacheStore>(params, uri);
     store->init();
