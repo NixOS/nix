@@ -25,6 +25,7 @@ const int nixSchemaVersion = 10;
 
 struct Derivation;
 
+class HashedMirrorStore;
 
 struct OptimiseStats
 {

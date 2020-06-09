@@ -835,7 +835,7 @@ StorePathSet LocalStore::querySubstitutablePaths(const StorePathSet & paths)
 
     for (auto & sub : getDefaultSubstituters()) {
         if (remaining.empty()) break;
-        if (sub->storeDir != storeDir) continue;
+        if (sub->storeDir != storeDir && !sub->supportsOtherStoreDir()) continue;
         if (!sub->wantMassQuery) continue;
 
         auto valid = sub->queryValidPaths(remaining);
@@ -859,7 +859,7 @@ void LocalStore::querySubstitutablePathInfos(const StorePathSet & paths,
 {
     if (!settings.useSubstitutes) return;
     for (auto & sub : getDefaultSubstituters()) {
-        if (sub->storeDir != storeDir) continue;
+        if (sub->storeDir != storeDir && sub->supportsOtherStoreDir()) continue;
         for (auto & path : paths) {
             if (infos.count(path)) continue;
             debug("checking substituter '%s' for path '%s'", sub->getUri(), printStorePath(path));

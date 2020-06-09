@@ -298,6 +298,8 @@ public:
 
     virtual std::string getUri() = 0;
 
+    virtual bool supportsOtherStoreDir() { return false; };
+
     StorePath parseStorePath(std::string_view path) const;
 
     std::optional<StorePath> maybeParseStorePath(std::string_view path) const;

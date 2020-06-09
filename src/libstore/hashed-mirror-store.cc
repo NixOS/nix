@@ -182,6 +182,10 @@ public:
         }
     }
 
+    bool supportsOtherStoreDir() {
+        return true;
+    }
+
 };
 
 static RegisterStoreImplementation regStore([](
