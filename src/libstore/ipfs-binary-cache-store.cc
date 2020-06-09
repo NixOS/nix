@@ -88,7 +88,45 @@ protected:
 
     void upsertFile(const std::string & path, const std::string & data, const std::string & mimeType) override
     {
-        throw UploadToIPFS("uploading to an IPFS binary cache is not supported");
+        if (hasPrefix(ipfsPath, "/ipfs/"))
+            throw Error("%s is immutable, cannot modify", ipfsPath);
+
+        // TODO: use callbacks
+
+        auto req1 = FileTransferRequest(daemonUri + "/api/v0/add");
+        req1.data = std::make_shared<string>(data);
+        req1.post = true;
+        req1.tries = 1;
+        try {
+            auto res1 = getFileTransfer()->upload(req1);
+            auto json1 = nlohmann::json::parse(*res1.data);
+
+            auto addedPath = "/ipfs/" + (std::string) json1["Hash"];
+
+            auto uri1 = daemonUri + "/api/v0/object/patch/add-link?create=true";
+            uri1 += "&arg=" + getFileTransfer()->urlEncode(ipfsPath);
+            uri1 += "&arg=" + getFileTransfer()->urlEncode(path);
+            uri1 += "&arg=" + getFileTransfer()->urlEncode(addedPath);
+
+            auto req2 = FileTransferRequest(uri1);
+            req2.post = true;
+            req2.tries = 1;
+            auto res2 = getFileTransfer()->download(req2);
+            auto json2 = nlohmann::json::parse(*res2.data);
+
+            auto newRoot = json2["Hash"];
+
+            auto uri2 = daemonUri + "/api/v0/name/publish?arg=" + getFileTransfer()->urlEncode(newRoot);
+            uri2 += "&key=" + std::string(ipfsPath, 6);
+
+            // WARNING: this can be really slow
+            auto req3 = FileTransferRequest(uri2);
+            req3.post = true;
+            req3.tries = 1;
+            getFileTransfer()->download(req3);
+        } catch (FileTransferError & e) {
+            throw UploadToIPFS("while uploading to IPFS binary cache at '%s': %s", cacheUri, e.msg());
+        }
     }
 
     void getFile(const std::string & path,
