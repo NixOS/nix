@@ -56,6 +56,7 @@ struct curlFileTransfer : public FileTransfer
         Callback<FileTransferResult> callback;
         CURL * req = 0;
         bool active = false; // whether the handle has been added to the multi object
+        std::string statusMsg;
 
         unsigned int attempt = 0;
 
@@ -163,11 +164,13 @@ struct curlFileTransfer : public FileTransfer
             size_t realSize = size * nmemb;
             std::string line((char *) contents, realSize);
             printMsg(lvlVomit, format("got header for '%s': %s") % request.uri % trim(line));
-            if (line.compare(0, 5, "HTTP/") == 0) { // new response starts
+            static std::regex statusLine("HTTP/[^ ]+ +[0-9]+(.*)", std::regex::extended | std::regex::icase);
+            std::smatch match;
+            if (std::regex_match(line, match, statusLine)) {
                 result.etag = "";
-                auto ss = tokenizeString<vector<string>>(line, " ");
                 result.data = std::make_shared<std::string>();
                 result.bodySize = 0;
+                statusMsg = trim(match[1]);
                 acceptRanges = false;
                 encoding = "";
             } else {
@@ -404,8 +407,8 @@ struct curlFileTransfer : public FileTransfer
                     ? FileTransferError(Interrupted, fmt("%s of '%s' was interrupted", request.verb(), request.uri))
                     : httpStatus != 0
                     ? FileTransferError(err,
-                        fmt("unable to %s '%s': HTTP error %d",
-                            request.verb(), request.uri, httpStatus)
+                        fmt("unable to %s '%s': HTTP error %d ('%s')",
+                            request.verb(), request.uri, httpStatus, statusMsg)
                         + (code == CURLE_OK ? "" : fmt(" (curl error: %s)", curl_easy_strerror(code)))
                         )
                     : FileTransferError(err,
