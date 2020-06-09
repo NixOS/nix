@@ -286,10 +286,18 @@ struct curlFileTransfer : public FileTransfer
                 curl_easy_setopt(req, CURLOPT_POST, 1);
 
             if (request.data) {
-                curl_easy_setopt(req, CURLOPT_UPLOAD, 1L);
-                curl_easy_setopt(req, CURLOPT_READFUNCTION, readCallbackWrapper);
-                curl_easy_setopt(req, CURLOPT_READDATA, this);
-                curl_easy_setopt(req, CURLOPT_INFILESIZE_LARGE, (curl_off_t) request.data->length());
+                if (request.post) {
+                    // based off of https://curl.haxx.se/libcurl/c/postit2.html
+                    curl_mime *form = curl_mime_init(req);
+                    curl_mimepart *field = curl_mime_addpart(form);
+                    curl_mime_data(field, request.data->data(), request.data->length());
+                    curl_easy_setopt(req, CURLOPT_MIMEPOST, form);
+                } else {
+                    curl_easy_setopt(req, CURLOPT_UPLOAD, 1L);
+                    curl_easy_setopt(req, CURLOPT_READFUNCTION, readCallbackWrapper);
+                    curl_easy_setopt(req, CURLOPT_READDATA, this);
+                    curl_easy_setopt(req, CURLOPT_INFILESIZE_LARGE, (curl_off_t) request.data->length());
+                }
             }
 
             if (request.verifyTLS) {
