@@ -57,7 +57,7 @@ static std::tuple<fetchers::Tree, FlakeRef, FlakeRef> fetchOrSubstituteTree(
         }
         flakeCache.push_back({originalRef, fetched.value()});
     }
-    
+
     auto [tree, lockedRef] = fetched.value();
 
     debug("got tree '%s' from '%s'",

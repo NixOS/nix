@@ -91,6 +91,7 @@ bool Input::operator ==(const Input & other) const
 
 bool Input::contains(const Input & other) const
 {
+    if (*this == other) return true;
     auto other2(other);
     other2.attrs.erase("ref");
     other2.attrs.erase("rev");

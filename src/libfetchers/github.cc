@@ -59,7 +59,7 @@ struct GitArchiveInputScheme : InputScheme
         }
 
         if (ref && rev)
-            throw BadURL("URL '%s' contains both a commit hash and a branch/tag name", url.url);
+            throw BadURL("URL '%s' contains both a commit hash and a branch/tag name %s %s", url.url, *ref, rev->gitRev());
 
         Input input;
         input.attrs.insert_or_assign("type", type());
@@ -115,14 +115,16 @@ struct GitArchiveInputScheme : InputScheme
         std::optional<Hash> rev) override
     {
         auto input(_input);
+        if (rev && ref)
+            throw BadURL("cannot apply both a commit hash (%s) and a branch/tag name ('%s') to input '%s'",
+                rev->gitRev(), *ref, input.to_string());
         if (rev) {
             input.attrs.insert_or_assign("rev", rev->gitRev());
             input.attrs.erase("ref");
         }
         if (ref) {
-            if (input.getRev())
-                throw BadURL("input '%s' contains both a commit hash and a branch/tag name", input.to_string());
             input.attrs.insert_or_assign("ref", *ref);
+            input.attrs.erase("rev");
         }
         return input;
     }
