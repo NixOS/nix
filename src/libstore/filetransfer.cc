@@ -56,7 +56,6 @@ struct curlFileTransfer : public FileTransfer
         Callback<FileTransferResult> callback;
         CURL * req = 0;
         bool active = false; // whether the handle has been added to the multi object
-        std::string status;
 
         unsigned int attempt = 0;
 
@@ -167,7 +166,6 @@ struct curlFileTransfer : public FileTransfer
             if (line.compare(0, 5, "HTTP/") == 0) { // new response starts
                 result.etag = "";
                 auto ss = tokenizeString<vector<string>>(line, " ");
-                status = ss.size() >= 2 ? ss[1] : "";
                 result.data = std::make_shared<std::string>();
                 result.bodySize = 0;
                 acceptRanges = false;
@@ -183,7 +181,9 @@ struct curlFileTransfer : public FileTransfer
                            the expected ETag on a 200 response, then shut
                            down the connection because we already have the
                            data. */
-                        if (result.etag == request.expectedETag && status == "200") {
+                        long httpStatus = 0;
+                        curl_easy_getinfo(req, CURLINFO_RESPONSE_CODE, &httpStatus);
+                        if (result.etag == request.expectedETag && httpStatus == 200) {
                             debug(format("shutting down on 200 HTTP response with expected ETag"));
                             return 0;
                         }
