@@ -719,7 +719,13 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
             throw Error(format("multiple outputs are not supported in fixed-output derivations, at %1%") % posDrvName);
 
         HashType ht = outputHashAlgo.empty() ? htUnknown : parseHashType(outputHashAlgo);
-        Hash h(*outputHash, ht);
+
+        Hash h;
+        if (outputHash->empty()) {
+            h = Hash(ht);
+            printError("warning: found empty hash, assuming you wanted '%s'", h.to_string());
+        } else
+            h = Hash(*outputHash, ht);
 
         auto outPath = state.store->makeFixedOutputPath(ingestionMethod, h, drvName);
         if (!jsonObject) drv.env["out"] = state.store->printStorePath(outPath);
