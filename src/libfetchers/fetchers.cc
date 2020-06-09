@@ -34,9 +34,14 @@ std::unique_ptr<Input> inputFromAttrs(const Attrs & attrs)
     for (auto & inputScheme : *inputSchemes) {
         auto res = inputScheme->inputFromAttrs(attrs2);
         if (res) {
-            if (auto narHash = maybeGetStrAttr(attrs, "narHash"))
-                // FIXME: require SRI hash.
-                res->narHash = Hash(*narHash);
+            if (auto narHash = maybeGetStrAttr(attrs, "narHash")) {
+                if (narHash->empty()) {
+                    res->narHash = Hash(htUnknown);
+                    printError("warning: found empty hash, assuming you wanted '%s'", res->narHash->to_string());
+                } else
+                    // FIXME: require SRI hash.
+                    res->narHash = Hash(*narHash);
+            }
             return res;
         }
     }
