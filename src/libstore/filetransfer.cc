@@ -282,6 +282,8 @@ struct curlFileTransfer : public FileTransfer
 
             if (request.head)
                 curl_easy_setopt(req, CURLOPT_NOBODY, 1);
+            else if (request.post)
+                curl_easy_setopt(req, CURLOPT_POST, 1);
 
             if (request.data) {
                 curl_easy_setopt(req, CURLOPT_UPLOAD, 1L);
