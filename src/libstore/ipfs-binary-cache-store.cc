@@ -19,6 +19,12 @@ private:
 
     std::string ipfsPath;
 
+    struct State
+    {
+        bool inProgressUpsert = false;
+    };
+    Sync<State> _state;
+
 public:
 
     IPFSBinaryCacheStore(
@@ -106,6 +112,13 @@ protected:
 
             auto addedPath = "/ipfs/" + (std::string) json1["Hash"];
 
+            auto state(_state.lock());
+
+            if (state->inProgressUpsert)
+                throw Error("a modification to the IPNS is already in progress");
+
+            state->inProgressUpsert = true;
+
             auto uri1 = daemonUri + "/api/v0/object/patch/add-link?offline=true&create=true";
             uri1 += "&arg=" + getFileTransfer()->urlEncode(ipfsPath);
             uri1 += "&arg=" + getFileTransfer()->urlEncode(path);
@@ -126,6 +139,8 @@ protected:
             req3.post = true;
             req3.tries = 1;
             getFileTransfer()->download(req3);
+
+            state->inProgressUpsert = false;
         } catch (FileTransferError & e) {
             throw UploadToIPFS("while uploading to IPFS binary cache at '%s': %s", cacheUri, e.msg());
         }
