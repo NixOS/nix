@@ -138,6 +138,7 @@ protected:
         auto uri = daemonUri + "/api/v0/cat?arg=" + getFileTransfer()->urlEncode(ipfsPath + "/" + path);
 
         FileTransferRequest request(uri);
+        request.post = true;
         request.tries = 1;
 
         auto callbackPtr = std::make_shared<decltype(callback)>(std::move(callback));
