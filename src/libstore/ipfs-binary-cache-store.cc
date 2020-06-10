@@ -148,9 +148,7 @@ protected:
                 try {
                     (*callbackPtr)(result.get().data);
                 } catch (FileTransferError & e) {
-                    if (e.error == FileTransfer::NotFound || e.error == FileTransfer::Forbidden)
-                        return (*callbackPtr)(std::shared_ptr<std::string>());
-                    callbackPtr->rethrow();
+                    return (*callbackPtr)(std::shared_ptr<std::string>());
                 } catch (...) {
                     callbackPtr->rethrow();
                 }
