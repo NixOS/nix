@@ -104,8 +104,8 @@ struct CmdVerify : StorePathsCommand
                             .hint = hintfmt(
                                 "path '%s' was modified! expected hash '%s', got '%s'",
                                 store->printStorePath(info->path),
-                                info->narHash.to_string(Base32, true),
-                                hash.first.to_string(Base32, true))
+                                info->narHash.to_string(PrefixedBase32),
+                                hash.first.to_string(PrefixedBase32))
                         });
                     }
                 }

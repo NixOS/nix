@@ -584,7 +584,7 @@ uint64_t LocalStore::addValidPath(State & state,
 
     state.stmtRegisterValidPath.use()
         (printStorePath(info.path))
-        (info.narHash.to_string(Base16, true))
+        (info.narHash.to_string(PrefixedBase16))
         (info.registrationTime == 0 ? time(0) : info.registrationTime)
         (info.deriver ? printStorePath(*info.deriver) : "", (bool) info.deriver)
         (info.narSize, info.narSize != 0)
@@ -684,7 +684,7 @@ void LocalStore::updatePathInfo(State & state, const ValidPathInfo & info)
 {
     state.stmtUpdatePathInfo.use()
         (info.narSize, info.narSize != 0)
-        (info.narHash.to_string(Base16, true))
+        (info.narHash.to_string(PrefixedBase16))
         (info.ultimate ? 1 : 0, info.ultimate)
         (concatStringsSep(" ", info.sigs), !info.sigs.empty())
         (info.ca, !info.ca.empty())
@@ -1008,7 +1008,7 @@ void LocalStore::addToStore(const ValidPathInfo & info, Source & source,
 
             if (hashResult.first != info.narHash)
                 throw Error("hash mismatch importing path '%s';\n  wanted: %s\n  got:    %s",
-                    printStorePath(info.path), info.narHash.to_string(Base32, true), hashResult.first.to_string(Base32, true));
+                    printStorePath(info.path), info.narHash.to_string(PrefixedBase32), hashResult.first.to_string(PrefixedBase32));
 
             if (hashResult.second != info.narSize)
                 throw Error("size mismatch importing path '%s';\n  wanted: %s\n  got:   %s",
@@ -1141,7 +1141,7 @@ StorePath LocalStore::addTextToStore(const string & name, const string & s,
             info.narHash = narHash;
             info.narSize = sink.s->size();
             info.references = references;
-            info.ca = "text:" + hash.to_string(Base32, true);
+            info.ca = "text:" + hash.to_string(PrefixedBase32);
             registerValidPath(info);
         }
 
@@ -1221,7 +1221,7 @@ bool LocalStore::verifyStore(bool checkContents, RepairFlag repair)
         for (auto & link : readDirectory(linksDir)) {
             printMsg(lvlTalkative, "checking contents of '%s'", link.name);
             Path linkPath = linksDir + "/" + link.name;
-            string hash = hashPath(htSHA256, linkPath).first.to_string(Base32, false);
+            string hash = hashPath(htSHA256, linkPath).first.to_string(Base32);
             if (hash != link.name) {
                 logError({
                     .name = "Invalid hash",
@@ -1264,7 +1264,7 @@ bool LocalStore::verifyStore(bool checkContents, RepairFlag repair)
                     logError({
                         .name = "Invalid hash - path modified",
                         .hint = hintfmt("path '%s' was modified! expected hash '%s', got '%s'",
-                        printStorePath(i), info->narHash.to_string(Base32, true), current.first.to_string(Base32, true))
+                        printStorePath(i), info->narHash.to_string(PrefixedBase32), current.first.to_string(PrefixedBase32))
                     });
                     if (repair) repairPath(i); else errors = true;
                 } else {

@@ -143,7 +143,7 @@ StorePath Store::makeStorePath(const string & type,
     const Hash & hash, std::string_view name) const
 {
     /* e.g., "source:sha256:1abc...:/nix/store:foo.tar.gz" */
-    string s = type + ":" + hash.to_string(Base16, true) + ":" + storeDir + ":" + std::string(name);
+    string s = type + ":" + hash.to_string(PrefixedBase16) + ":" + storeDir + ":" + std::string(name);
     auto h = compressHash(hashString(htSHA256, s), 20);
     return StorePath(h, name);
 }
@@ -187,7 +187,7 @@ StorePath Store::makeFixedOutputPath(
             hashString(htSHA256,
                 "fixed:out:"
                 + (recursive == FileIngestionMethod::Recursive ? (string) "r:" : "")
-                + hash.to_string(Base16, true) + ":"),
+                + hash.to_string(PrefixedBase16) + ":"),
             name);
     }
 }
@@ -430,7 +430,7 @@ string Store::makeValidityRegistration(const StorePathSet & paths,
         auto info = queryPathInfo(i);
 
         if (showHash) {
-            s += info->narHash.to_string(Base16, false) + "\n";
+            s += info->narHash.to_string(Base16) + "\n";
             s += (format("%1%\n") % info->narSize).str();
         }
 
@@ -449,7 +449,7 @@ string Store::makeValidityRegistration(const StorePathSet & paths,
 
 void Store::pathInfoToJSON(JSONPlaceholder & jsonOut, const StorePathSet & storePaths,
     bool includeImpureInfo, bool showClosureSize,
-    Base hashBase,
+    HashEncoding encoding,
     AllowInvalidFlag allowInvalid)
 {
     auto jsonList = jsonOut.list();
@@ -462,7 +462,7 @@ void Store::pathInfoToJSON(JSONPlaceholder & jsonOut, const StorePathSet & store
             auto info = queryPathInfo(storePath);
 
             jsonPath
-                .attr("narHash", info->narHash.to_string(hashBase, true))
+                .attr("narHash", info->narHash.to_string(encoding))
                 .attr("narSize", info->narSize);
 
             {
@@ -505,7 +505,7 @@ void Store::pathInfoToJSON(JSONPlaceholder & jsonOut, const StorePathSet & store
                     if (!narInfo->url.empty())
                         jsonPath.attr("url", narInfo->url);
                     if (narInfo->fileHash)
-                        jsonPath.attr("downloadHash", narInfo->fileHash.to_string(Base32, true));
+                        jsonPath.attr("downloadHash", narInfo->fileHash.to_string(PrefixedBase32));
                     if (narInfo->fileSize)
                         jsonPath.attr("downloadSize", narInfo->fileSize);
                     if (showClosureSize)
@@ -746,7 +746,7 @@ std::string ValidPathInfo::fingerprint(const Store & store) const
             store.printStorePath(path));
     return
         "1;" + store.printStorePath(path) + ";"
-        + narHash.to_string(Base32, true) + ";"
+        + narHash.to_string(PrefixedBase32) + ";"
         + std::to_string(narSize) + ";"
         + concatStringsSep(",", store.printStorePathSet(references));
 }
@@ -826,7 +826,7 @@ std::string makeFixedOutputCA(FileIngestionMethod recursive, const Hash & hash)
 {
     return "fixed:"
         + (recursive == FileIngestionMethod::Recursive ? (std::string) "r:" : "")
-        + hash.to_string(Base32, true);
+        + hash.to_string(PrefixedBase32);
 }
 
 

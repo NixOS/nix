@@ -45,7 +45,7 @@ struct GitHubInput : Input
         auto path = owner + "/" + repo;
         assert(!(ref && rev));
         if (ref) path += "/" + *ref;
-        if (rev) path += "/" + rev->to_string(Base16, false);
+        if (rev) path += "/" + rev->to_string(Base16);
         return ParsedURL {
             .scheme = "github",
             .path = path,
@@ -106,7 +106,7 @@ struct GitHubInput : Input
         // might have stricter rate limits.
 
         auto url = fmt("https://api.github.com/repos/%s/%s/tarball/%s",
-            owner, repo, rev->to_string(Base16, false));
+            owner, repo, rev->to_string(Base16));
 
         std::string accessToken = settings.githubAccessToken.get();
         if (accessToken != "")

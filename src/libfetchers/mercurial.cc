@@ -174,7 +174,7 @@ struct MercurialInput : Input
             }
         }
 
-        Path cacheDir = fmt("%s/nix/hg/%s", getCacheDir(), hashString(htSHA256, actualUrl).to_string(Base32, false));
+        Path cacheDir = fmt("%s/nix/hg/%s", getCacheDir(), hashString(htSHA256, actualUrl).to_string(Base32));
 
         /* If this is a commit hash that we already have, we don't
            have to pull again. */

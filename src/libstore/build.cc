@@ -2511,7 +2511,7 @@ void DerivationGoal::initTmpDir() {
                 env[i.first] = i.second;
             } else {
                 auto hash = hashString(htSHA256, i.first);
-                string fn = ".attr-" + hash.to_string(Base32, false);
+                string fn = ".attr-" + hash.to_string(Base32);
                 Path p = tmpDir + "/" + fn;
                 writeFile(p, rewriteStrings(i.second, inputRewrites));
                 chownToBuilder(p);
@@ -3745,7 +3745,7 @@ void DerivationGoal::registerOutputs()
                 worker.hashMismatch = true;
                 delayedException = std::make_exception_ptr(
                     BuildError("hash mismatch in fixed-output derivation '%s':\n  wanted: %s\n  got:    %s",
-                        worker.store.printStorePath(dest), h.to_string(SRI, true), h2.to_string(SRI, true)));
+                        worker.store.printStorePath(dest), h.to_string(SRI), h2.to_string(SRI)));
 
                 Path actualDest = worker.store.Store::toRealPath(dest);
 

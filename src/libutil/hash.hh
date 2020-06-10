@@ -12,6 +12,18 @@ MakeError(BadHash, Error);
 
 enum HashType : char { htUnknown, htMD5, htSHA1, htSHA256, htSHA512 };
 
+enum HashEncoding : int {
+    // <hash>
+    Base16,
+    Base32,
+    Base64,
+    // sha256:<hash>
+    PrefixedBase16,
+    PrefixedBase32,
+    PrefixedBase64,
+    // sha256-<base64>
+    SRI
+};
 
 const int md5HashSize = 16;
 const int sha1HashSize = 20;
@@ -19,8 +31,6 @@ const int sha256HashSize = 32;
 const int sha512HashSize = 64;
 
 extern const string base32Chars;
-
-enum Base : int { Base64, Base32, Base16, SRI };
 
 
 struct Hash
@@ -79,18 +89,18 @@ struct Hash
     /* Return a string representation of the hash, in base-16, base-32
        or base-64. By default, this is prefixed by the hash type
        (e.g. "sha256:"). */
-    std::string to_string(Base base, bool includeType) const;
+    std::string to_string(HashEncoding encoding) const;
 
     std::string gitRev() const
     {
         assert(type == htSHA1);
-        return to_string(Base16, false);
+        return to_string(Base16);
     }
 
     std::string gitShortRev() const
     {
         assert(type == htSHA1);
-        return std::string(to_string(Base16, false), 0, 7);
+        return std::string(to_string(Base16), 0, 7);
     }
 };
 

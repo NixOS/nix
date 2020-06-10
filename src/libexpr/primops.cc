@@ -778,7 +778,7 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
             std::move(outPath),
             (ingestionMethod == FileIngestionMethod::Recursive ? "r:" : "")
                 + printHashType(h.type),
-            h.to_string(Base16, false),
+            h.to_string(Base16),
         });
     }
 
@@ -1008,7 +1008,7 @@ static void prim_hashFile(EvalState & state, const Pos & pos, Value * * args, Va
     PathSet context; // discarded
     Path p = state.coerceToPath(pos, *args[1], context);
 
-    mkString(v, hashFile(ht, state.checkSourcePath(p)).to_string(Base16, false), context);
+    mkString(v, hashFile(ht, state.checkSourcePath(p)).to_string(Base16), context);
 }
 
 /* Read a directory (without . or ..) */
@@ -1945,7 +1945,7 @@ static void prim_hashString(EvalState & state, const Pos & pos, Value * * args, 
     PathSet context; // discarded
     string s = state.forceString(*args[1], context, pos);
 
-    mkString(v, hashString(ht, s).to_string(Base16, false), context);
+    mkString(v, hashString(ht, s).to_string(Base16), context);
 }
 
 

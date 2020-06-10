@@ -98,24 +98,34 @@ static string printHash32(const Hash & hash)
 
 string printHash16or32(const Hash & hash)
 {
-    return hash.to_string(hash.type == htMD5 ? Base16 : Base32, false);
+    return hash.to_string(hash.type == htMD5 ? Base16 : Base32);
 }
 
 
-std::string Hash::to_string(Base base, bool includeType) const
+std::string Hash::to_string(HashEncoding encoding) const
 {
     std::string s;
-    if (base == SRI || includeType) {
-        s += printHashType(type);
-        s += base == SRI ? '-' : ':';
+    switch (encoding) {
+        case PrefixedBase16:
+        case PrefixedBase32:
+        case PrefixedBase64:
+            s += printHashType(type) + ':';
+            break;
+        case SRI:
+            s += printHashType(type) + '-';
+            break;
     }
-    switch (base) {
+
+    switch (encoding) {
+    case PrefixedBase16:
     case Base16:
         s += printHash16(*this);
         break;
+    case PrefixedBase32:
     case Base32:
         s += printHash32(*this);
         break;
+    case PrefixedBase64:
     case Base64:
     case SRI:
         s += base64Encode(std::string((const char *) hash, hashSize));
@@ -209,7 +219,7 @@ Hash newHashAllowEmpty(std::string hashStr, HashType ht)
 {
     if (hashStr.empty()) {
         Hash h(ht);
-        warn("found empty hash, assuming '%s'", h.to_string(SRI, true));
+        warn("found empty hash, assuming '%s'", h.to_string(SRI));
         return h;
     } else
         return Hash(hashStr, ht);

@@ -78,7 +78,7 @@ void LocalStore::syncWithGC()
 
 void LocalStore::addIndirectRoot(const Path & path)
 {
-    string hash = hashString(htSHA1, path).to_string(Base32, false);
+    string hash = hashString(htSHA1, path).to_string(Base32);
     Path realRoot = canonPath((format("%1%/%2%/auto/%3%")
         % stateDir % gcRootsDir % hash).str());
     makeSymlink(realRoot, path);

@@ -239,7 +239,7 @@ struct GitInput : Input
                 }
             }
 
-            Path cacheDir = getCacheDir() + "/nix/gitv3/" + hashString(htSHA256, actualUrl).to_string(Base32, false);
+            Path cacheDir = getCacheDir() + "/nix/gitv3/" + hashString(htSHA256, actualUrl).to_string(Base32);
             repoDir = cacheDir;
 
             if (!pathExists(cacheDir)) {

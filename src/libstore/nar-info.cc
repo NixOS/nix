@@ -87,10 +87,10 @@ std::string NarInfo::to_string(const Store & store) const
     assert(compression != "");
     res += "Compression: " + compression + "\n";
     assert(fileHash.type == htSHA256);
-    res += "FileHash: " + fileHash.to_string(Base32, true) + "\n";
+    res += "FileHash: " + fileHash.to_string(PrefixedBase32) + "\n";
     res += "FileSize: " + std::to_string(fileSize) + "\n";
     assert(narHash.type == htSHA256);
-    res += "NarHash: " + narHash.to_string(Base32, true) + "\n";
+    res += "NarHash: " + narHash.to_string(PrefixedBase32) + "\n";
     res += "NarSize: " + std::to_string(narSize) + "\n";
 
     res += "References: " + concatStringsSep(" ", shortRefs()) + "\n";

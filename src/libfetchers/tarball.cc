@@ -196,9 +196,9 @@ struct TarballInput : Input
         // NAR hashes are preferred over file hashes since tar/zip files
         // don't have a canonical representation.
         if (narHash)
-            url2.query.insert_or_assign("narHash", narHash->to_string(SRI, true));
+            url2.query.insert_or_assign("narHash", narHash->to_string(SRI));
         else if (hash)
-            url2.query.insert_or_assign("hash", hash->to_string(SRI, true));
+            url2.query.insert_or_assign("hash", hash->to_string(SRI));
         return url2;
     }
 
@@ -207,7 +207,7 @@ struct TarballInput : Input
         Attrs attrs;
         attrs.emplace("url", url.to_string());
         if (hash)
-            attrs.emplace("hash", hash->to_string(SRI, true));
+            attrs.emplace("hash", hash->to_string(SRI));
         return attrs;
     }
 

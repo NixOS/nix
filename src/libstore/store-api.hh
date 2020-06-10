@@ -553,7 +553,7 @@ public:
        each path is included. */
     void pathInfoToJSON(JSONPlaceholder & jsonOut, const StorePathSet & storePaths,
         bool includeImpureInfo, bool showClosureSize,
-        Base hashBase = Base32,
+        HashEncoding encoding = PrefixedBase32,
         AllowInvalidFlag allowInvalid = DisallowInvalid);
 
     /* Return the size of the closure of the specified path, that is,
