@@ -391,7 +391,8 @@ LockedFlake lockFlake(
                         // of a circular reference back to the root.
                         if (lockedNode)
                             fakeInputs.emplace(i.first, FlakeInput {
-                                .ref = lockedNode->originalRef
+                                .ref = lockedNode->originalRef,
+                                .isFlake = lockedNode->isFlake,
                             });
                         else {
                             InputPath path(inputPath);
