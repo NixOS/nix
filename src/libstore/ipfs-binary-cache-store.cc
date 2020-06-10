@@ -85,9 +85,8 @@ public:
     void init() override
     {
         std::string cacheInfoFile = "nix-cache-info";
-        if (!fileExists(cacheInfoFile)) {
+        if (!fileExists(cacheInfoFile))
             upsertFile(cacheInfoFile, "StoreDir: " + storeDir + "\n", "text/x-nix-cache-info");
-        }
         BinaryCacheStore::init();
     }
 
