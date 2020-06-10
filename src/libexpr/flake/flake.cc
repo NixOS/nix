@@ -498,9 +498,6 @@ LockedFlake lockFlake(
 
         auto diff = diffLockFiles(oldLockFile, newLockFile);
 
-        if (!(oldLockFile == LockFile()))
-            printInfo("inputs of flake '%s' changed:\n%s", topRef, chomp(diff));
-
         if (lockFlags.writeLockFile) {
             if (auto sourcePath = topRef.input.getSourcePath()) {
                 if (!newLockFile.isImmutable()) {
@@ -517,7 +514,7 @@ LockedFlake lockFlake(
                     bool lockFileExists = pathExists(path);
 
                     if (lockFileExists)
-                        warn("updating lock file '%s'", path);
+                        warn("updating lock file '%s':\n%s", path, chomp(diff));
                     else
                         warn("creating lock file '%s'", path);
 
@@ -553,7 +550,7 @@ LockedFlake lockFlake(
             } else
                 throw Error("cannot write modified lock file of flake '%s' (use '--no-write-lock-file' to ignore)", topRef);
         } else
-            warn("not writing modified lock file of flake '%s'", topRef);
+            warn("not writing modified lock file of flake '%s':\n%s", topRef, chomp(diff));
     }
 
     return LockedFlake { .flake = std::move(flake), .lockFile = std::move(newLockFile) };
