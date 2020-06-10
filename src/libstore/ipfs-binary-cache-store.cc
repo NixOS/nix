@@ -94,7 +94,7 @@ protected:
 
     bool fileExists(const std::string & path) override
     {
-        auto uri = daemonUri + "/api/v0/object/stat?offline=true&arg=" + getFileTransfer()->urlEncode(getIpfsPath());
+        auto uri = daemonUri + "/api/v0/object/stat?arg=" + getFileTransfer()->urlEncode(getIpfsPath() + "/" + path);
 
         FileTransferRequest request(uri);
         request.post = true;
