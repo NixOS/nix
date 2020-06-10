@@ -236,15 +236,15 @@ std::string diffLockFiles(const LockFile & oldLocks, const LockFile & newLocks)
 
     while (i != oldFlat.end() || j != newFlat.end()) {
         if (j != newFlat.end() && (i == oldFlat.end() || i->first > j->first)) {
-            res += fmt("* Added '%s': '%s'\n", concatStringsSep("/", j->first), j->second->lockedRef);
+            res += fmt("* Added '%s': '%s'\n", printInputPath(j->first), j->second->lockedRef);
             ++j;
         } else if (i != oldFlat.end() && (j == newFlat.end() || i->first < j->first)) {
-            res += fmt("* Removed '%s'\n", concatStringsSep("/", i->first));
+            res += fmt("* Removed '%s'\n", printInputPath(i->first));
             ++i;
         } else {
             if (!(i->second->lockedRef == j->second->lockedRef)) {
                 res += fmt("* Updated '%s': '%s' -> '%s'\n",
-                    concatStringsSep("/", i->first),
+                    printInputPath(i->first),
                     i->second->lockedRef,
                     j->second->lockedRef);
             }
@@ -254,6 +254,11 @@ std::string diffLockFiles(const LockFile & oldLocks, const LockFile & newLocks)
     }
 
     return res;
+}
+
+std::string printInputPath(const InputPath & path)
+{
+    return concatStringsSep("/", path);
 }
 
 }

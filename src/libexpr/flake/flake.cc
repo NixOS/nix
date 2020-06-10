@@ -291,7 +291,7 @@ LockedFlake lockFlake(
         const InputPath & inputPathPrefix,
         std::shared_ptr<const Node> oldNode)
     {
-        debug("computing lock file node '%s'", concatStringsSep("/", inputPathPrefix));
+        debug("computing lock file node '%s'", printInputPath(inputPathPrefix));
 
         /* Get the overrides (i.e. attributes of the form
            'inputs.nixops.inputs.nixpkgs.url = ...'). */
@@ -311,8 +311,8 @@ LockedFlake lockFlake(
         for (auto & [id, input2] : flakeInputs) {
             auto inputPath(inputPathPrefix);
             inputPath.push_back(id);
-            auto inputPathS = concatStringsSep("/", inputPath);
-            debug("computing input '%s'", concatStringsSep("/", inputPath));
+            auto inputPathS = printInputPath(inputPath);
+            debug("computing input '%s'", inputPathS);
 
             /* Do we have an override for this input from one of the
                ancestors? */
@@ -332,6 +332,7 @@ LockedFlake lockFlake(
                     /* Otherwise, it's relative to the current flake. */
                     InputPath path(inputPathPrefix);
                     for (auto & i : *input.follows) path.push_back(i);
+                    debug("input '%s' follows '%s'", inputPathS, printInputPath(path));
                     follows.insert_or_assign(inputPath, path);
                 }
                 continue;
@@ -405,6 +406,7 @@ LockedFlake lockFlake(
             } else {
                 /* We need to create a new lock file entry. So fetch
                    this input. */
+                debug("creating new input '%s'", inputPathS);
 
                 if (!lockFlags.allowMutable && !input.ref.input.isImmutable())
                     throw Error("cannot update flake input '%s' in pure mode", inputPathS);
@@ -460,8 +462,8 @@ LockedFlake lockFlake(
     /* Insert edges for 'follows' overrides. */
     for (auto & [from, to] : follows) {
         debug("adding 'follows' node from '%s' to '%s'",
-            concatStringsSep("/", from),
-            concatStringsSep("/", to));
+            printInputPath(from),
+            printInputPath(to));
 
         assert(!from.empty());
 
@@ -474,8 +476,8 @@ LockedFlake lockFlake(
         auto toNode = newLockFile.root->findInput(to);
         if (!toNode)
             throw Error("flake input '%s' follows non-existent flake input '%s'",
-                concatStringsSep("/", from),
-                concatStringsSep("/", to));
+                printInputPath(from),
+                printInputPath(to));
 
         fromParentNode->inputs.insert_or_assign(from.back(), toNode);
     }
@@ -483,11 +485,11 @@ LockedFlake lockFlake(
     for (auto & i : lockFlags.inputOverrides)
         if (!overridesUsed.count(i.first))
             warn("the flag '--override-input %s %s' does not match any input",
-                concatStringsSep("/", i.first), i.second);
+                printInputPath(i.first), i.second);
 
     for (auto & i : lockFlags.inputUpdates)
         if (!updatesUsed.count(i))
-            warn("the flag '--update-input %s' does not match any input", concatStringsSep("/", i));
+            warn("the flag '--update-input %s' does not match any input", printInputPath(i));
 
     debug("new lock file: %s", newLockFile);
 

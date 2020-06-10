@@ -69,6 +69,8 @@ std::ostream & operator <<(std::ostream & stream, const LockFile & lockFile);
 
 InputPath parseInputPath(std::string_view s);
 
+std::string printInputPath(const InputPath & path);
+
 std::string diffLockFiles(const LockFile & oldLocks, const LockFile & newLocks);
 
 }
