@@ -17,7 +17,20 @@ private:
     std::string cacheUri;
     std::string daemonUri;
 
-    std::string ipfsPath;
+    std::string ipfsHash;
+
+    enum struct AddrType { IPFS, IPNS } addrType;
+
+    std::string getIpfsPath() {
+        switch (addrType) {
+        case AddrType::IPFS: {
+            return "/ipfs/" + ipfsHash;
+        }
+        case AddrType::IPNS: {
+            return "/ipns/" + ipfsHash;
+        }
+        }
+    }
 
     struct State
     {
@@ -35,10 +48,14 @@ public:
         if (cacheUri.back() == '/')
             cacheUri.pop_back();
 
-        if (hasPrefix(cacheUri, "ipfs://"))
-            ipfsPath = "/ipfs/" + std::string(cacheUri, 7);
-        else if (hasPrefix(cacheUri, "ipns://"))
-            ipfsPath = "/ipns/" + std::string(cacheUri, 7);
+        if (hasPrefix(cacheUri, "ipfs://")) {
+            ipfsHash = std::string(cacheUri, 7);
+            addrType = AddrType::IPFS;
+        }
+        else if (hasPrefix(cacheUri, "ipns://")) {
+            ipfsHash = std::string(cacheUri, 7);
+            addrType = AddrType::IPNS;
+        }
         else
             throw Error("unknown IPFS URI '%s'", cacheUri);
 
@@ -56,8 +73,8 @@ public:
             throw Error("daemon for IPFS is not running properly");
 
         // root should already exist
-        if (!fileExists("") && hasPrefix(ipfsPath, "/ipfs/"))
-            throw Error("path '%s' is not found", ipfsPath);
+        if (!fileExists("") && addrType == AddrType::IPFS)
+            throw Error("path '%s' is not found", getIpfsPath());
     }
 
     std::string getUri() override
@@ -78,7 +95,7 @@ protected:
 
     bool fileExists(const std::string & path) override
     {
-        auto uri = daemonUri + "/api/v0/object/stat?offline=true&arg=" + getFileTransfer()->urlEncode(ipfsPath + "/" + path);
+        auto uri = daemonUri + "/api/v0/object/stat?offline=true&arg=" + getFileTransfer()->urlEncode(getIpfsPath());
 
         FileTransferRequest request(uri);
         request.post = true;
@@ -97,8 +114,8 @@ protected:
 
     void upsertFile(const std::string & path, const std::string & data, const std::string & mimeType) override
     {
-        if (hasPrefix(ipfsPath, "/ipfs/"))
-            throw Error("%s is immutable, cannot modify", ipfsPath);
+        if (addrType == AddrType::IPFS)
+            throw Error("%s is immutable, cannot modify", getIpfsPath());
 
         // TODO: use callbacks
 
@@ -120,7 +137,7 @@ protected:
             state->inProgressUpsert = true;
 
             auto uri1 = daemonUri + "/api/v0/object/patch/add-link?offline=true&create=true";
-            uri1 += "&arg=" + getFileTransfer()->urlEncode(ipfsPath);
+            uri1 += "&arg=" + getFileTransfer()->urlEncode(getIpfsPath());
             uri1 += "&arg=" + getFileTransfer()->urlEncode(path);
             uri1 += "&arg=" + getFileTransfer()->urlEncode(addedPath);
 
@@ -133,7 +150,7 @@ protected:
             auto newRoot = json2["Hash"];
 
             auto uri2 = daemonUri + "/api/v0/name/publish?offline=true&arg=" + getFileTransfer()->urlEncode(newRoot);
-            uri2 += "&key=" + std::string(ipfsPath, 6);
+            uri2 += "&key=" + std::string(getIpfsPath(), 6);
 
             auto req3 = FileTransferRequest(uri2);
             req3.post = true;
@@ -149,7 +166,7 @@ protected:
     void getFile(const std::string & path,
         Callback<std::shared_ptr<std::string>> callback) noexcept override
     {
-        auto uri = daemonUri + "/api/v0/cat?offline=true&arg=" + getFileTransfer()->urlEncode(ipfsPath + "/" + path);
+        auto uri = daemonUri + "/api/v0/cat?offline=true&arg=" + getFileTransfer()->urlEncode(getIpfsPath() + "/" + path);
 
         FileTransferRequest request(uri);
         request.post = true;
