@@ -72,7 +72,7 @@ protected:
 
     bool fileExists(const std::string & path) override
     {
-        auto uri = daemonUri + "/api/v0/object/stat?arg=" + getFileTransfer()->urlEncode(ipfsPath + "/" + path);
+        auto uri = daemonUri + "/api/v0/object/stat?offline=true&arg=" + getFileTransfer()->urlEncode(ipfsPath + "/" + path);
 
         FileTransferRequest request(uri);
         request.post = true;
@@ -106,7 +106,7 @@ protected:
 
             auto addedPath = "/ipfs/" + (std::string) json1["Hash"];
 
-            auto uri1 = daemonUri + "/api/v0/object/patch/add-link?create=true";
+            auto uri1 = daemonUri + "/api/v0/object/patch/add-link?offline=true&create=true";
             uri1 += "&arg=" + getFileTransfer()->urlEncode(ipfsPath);
             uri1 += "&arg=" + getFileTransfer()->urlEncode(path);
             uri1 += "&arg=" + getFileTransfer()->urlEncode(addedPath);
@@ -119,10 +119,9 @@ protected:
 
             auto newRoot = json2["Hash"];
 
-            auto uri2 = daemonUri + "/api/v0/name/publish?arg=" + getFileTransfer()->urlEncode(newRoot);
+            auto uri2 = daemonUri + "/api/v0/name/publish?offline=true&arg=" + getFileTransfer()->urlEncode(newRoot);
             uri2 += "&key=" + std::string(ipfsPath, 6);
 
-            // WARNING: this can be really slow
             auto req3 = FileTransferRequest(uri2);
             req3.post = true;
             req3.tries = 1;
@@ -135,7 +134,7 @@ protected:
     void getFile(const std::string & path,
         Callback<std::shared_ptr<std::string>> callback) noexcept override
     {
-        auto uri = daemonUri + "/api/v0/cat?arg=" + getFileTransfer()->urlEncode(ipfsPath + "/" + path);
+        auto uri = daemonUri + "/api/v0/cat?offline=true&arg=" + getFileTransfer()->urlEncode(ipfsPath + "/" + path);
 
         FileTransferRequest request(uri);
         request.post = true;
