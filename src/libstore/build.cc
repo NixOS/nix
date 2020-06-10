@@ -2750,8 +2750,8 @@ struct RestrictedStore : public LocalFSStore
     void queryReferrers(const StorePath & path, StorePathSet & referrers) override
     { }
 
-    StorePathSet queryDerivationOutputs(const StorePath & path) override
-    { throw Error("queryDerivationOutputs"); }
+    OutputPathMap queryDerivationOutputMap(const StorePath & path) override
+    { throw Error("queryDerivationOutputMap"); }
 
     std::optional<StorePath> queryPathFromHashPart(const std::string & hashPart) override
     { throw Error("queryPathFromHashPart"); }

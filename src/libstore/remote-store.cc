@@ -38,6 +38,32 @@ void writeStorePaths(const Store & store, Sink & out, const StorePathSet & paths
         out << store.printStorePath(i);
 }
 
+std::map<string, StorePath> readOutputPathMap(const Store & store, Source & from)
+{
+    std::map<string, StorePath> pathMap;
+    auto rawInput = readStrings<Strings>(from);
+    auto curInput = rawInput.begin();
+    while (curInput != rawInput.end()) {
+        string thisKey = *curInput;
+        curInput = std::next(curInput);
+        if (curInput == rawInput.end()) {
+            throw Error("Got an odd number of elements from the daemon when trying to read a map… that's odd");
+        }
+        string thisValue = *curInput;
+        curInput = std::next(curInput);
+        pathMap.emplace(thisKey, store.parseStorePath(thisValue));
+    }
+    return pathMap;
+}
+
+void writeOutputPathMap(const Store & store, Sink & out, const std::map<string, StorePath> & pathMap)
+{
+    out << 2*pathMap.size();
+    for (auto & i : pathMap) {
+        out << i.first;
+        out << store.printStorePath(i.second);
+    }
+}
 
 /* TODO: Separate these store impls into different files, give them better names */
 RemoteStore::RemoteStore(const Params & params)
@@ -412,11 +438,23 @@ StorePathSet RemoteStore::queryValidDerivers(const StorePath & path)
 StorePathSet RemoteStore::queryDerivationOutputs(const StorePath & path)
 {
     auto conn(getConnection());
+    if (GET_PROTOCOL_MINOR(conn->daemonVersion) >= 0x16) {
+        return Store::queryDerivationOutputs(path);
+    }
     conn->to << wopQueryDerivationOutputs << printStorePath(path);
     conn.processStderr();
     return readStorePaths<StorePathSet>(*this, conn->from);
 }
 
+
+OutputPathMap RemoteStore::queryDerivationOutputMap(const StorePath & path)
+{
+    auto conn(getConnection());
+    conn->to << wopQueryDerivationOutputMap << printStorePath(path);
+    conn.processStderr();
+    return readOutputPathMap(*this, conn->from);
+
+}
 
 std::optional<StorePath> RemoteStore::queryPathFromHashPart(const std::string & hashPart)
 {
