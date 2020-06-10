@@ -680,6 +680,10 @@ public:
     virtual void createUser(const std::string & userName, uid_t userId)
     { }
 
+    /* Sync writes to commits written data, usually a no-op. */
+    virtual void sync()
+    { };
+
 protected:
 
     Stats stats;
