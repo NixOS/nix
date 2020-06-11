@@ -17,24 +17,15 @@ private:
     std::string cacheUri;
     std::string daemonUri;
 
-    std::string ipfsHash;
-
-    enum struct AddrType { IPFS, IPNS } addrType;
-
     std::string getIpfsPath() {
-        switch (addrType) {
-        case AddrType::IPFS: {
-            return "/ipfs/" + ipfsHash;
-        }
-        case AddrType::IPNS: {
-            return "/ipns/" + ipfsHash;
-        }
-        }
+        auto state(_state.lock());
+        return state->ipfsPath;
     }
+    std::optional<string> optIpnsPath;
 
     struct State
     {
-        bool inProgressUpsert = false;
+        std::string ipfsPath;
     };
     Sync<State> _state;
 
@@ -45,19 +36,17 @@ public:
             : BinaryCacheStore(params)
             , cacheUri(_cacheUri)
     {
+        auto state(_state.lock());
+
         if (cacheUri.back() == '/')
             cacheUri.pop_back();
 
-        if (hasPrefix(cacheUri, "ipfs://")) {
-            ipfsHash = std::string(cacheUri, 7);
-            addrType = AddrType::IPFS;
-        }
-        else if (hasPrefix(cacheUri, "ipns://")) {
-            ipfsHash = std::string(cacheUri, 7);
-            addrType = AddrType::IPNS;
-        }
+        if (hasPrefix(cacheUri, "ipfs://"))
+            state->ipfsPath = "/ipfs/" + std::string(cacheUri, 7);
+        else if (hasPrefix(cacheUri, "ipns://"))
+            optIpnsPath = "/ipns/" + std::string(cacheUri, 7);
         else
-            throw Error("unknown IPFS URI '%s'", cacheUri);
+            throw Error("unknown IPNS URI '%s'", cacheUri);
 
         std::string ipfsAPIHost(get(params, "host").value_or("127.0.0.1"));
         std::string ipfsAPIPort(get(params, "port").value_or("5001"));
@@ -72,9 +61,20 @@ public:
         if (versionInfo.find("Version") == versionInfo.end())
             throw Error("daemon for IPFS is not running properly");
 
-        // root should already exist
-        if (!fileExists("") && addrType == AddrType::IPFS)
-            throw Error("path '%s' is not found", getIpfsPath());
+        // Resolve the IPNS name to an IPFS object
+        if (optIpnsPath) {
+            auto ipnsPath = *optIpnsPath;
+            debug("Resolving IPFS object of '%s', this could take a while.", ipnsPath);
+            auto uri = daemonUri + "/api/v0/name/resolve?offline=true&arg=" + getFileTransfer()->urlEncode(ipnsPath);
+            FileTransferRequest request(uri);
+            request.post = true;
+            request.tries = 1;
+            auto res = getFileTransfer()->download(request);
+            auto json = nlohmann::json::parse(*res.data);
+            if (json.find("Path") == json.end())
+                throw Error("daemon for IPFS is not running properly");
+            state->ipfsPath = json["Path"];
+        }
     }
 
     std::string getUri() override
@@ -85,9 +85,8 @@ public:
     void init() override
     {
         std::string cacheInfoFile = "nix-cache-info";
-        if (!fileExists(cacheInfoFile)) {
+        if (!fileExists(cacheInfoFile))
             upsertFile(cacheInfoFile, "StoreDir: " + storeDir + "\n", "text/x-nix-cache-info");
-        }
         BinaryCacheStore::init();
     }
 
@@ -95,7 +94,7 @@ protected:
 
     bool fileExists(const std::string & path) override
     {
-        auto uri = daemonUri + "/api/v0/object/stat?offline=true&arg=" + getFileTransfer()->urlEncode(getIpfsPath());
+        auto uri = daemonUri + "/api/v0/object/stat?arg=" + getFileTransfer()->urlEncode(getIpfsPath() + "/" + path);
 
         FileTransferRequest request(uri);
         request.post = true;
@@ -112,52 +111,56 @@ protected:
         }
     }
 
+    // IPNS publish can be slow, we try to do it rarely.
+    void sync() override
+    {
+        if (!optIpnsPath)
+            return;
+        auto ipnsPath = *optIpnsPath;
+
+        auto state(_state.lock());
+
+        debug("Publishing '%s' to '%s', this could take a while.", state->ipfsPath, ipnsPath);
+
+        auto uri = daemonUri + "/api/v0/name/publish?offline=true&arg=" + getFileTransfer()->urlEncode(state->ipfsPath);
+        uri += "&key=" + std::string(ipnsPath, 6);
+
+        auto req = FileTransferRequest(uri);
+        req.post = true;
+        req.tries = 1;
+        getFileTransfer()->download(req);
+    }
+
+    void addLink(std::string name, std::string ipfsObject)
+    {
+        auto state(_state.lock());
+
+        auto uri = daemonUri + "/api/v0/object/patch/add-link?create=true";
+        uri += "&arg=" + getFileTransfer()->urlEncode(state->ipfsPath);
+        uri += "&arg=" + getFileTransfer()->urlEncode(name);
+        uri += "&arg=" + getFileTransfer()->urlEncode(ipfsObject);
+
+        auto req = FileTransferRequest(uri);
+        req.post = true;
+        req.tries = 1;
+        auto res = getFileTransfer()->download(req);
+        auto json = nlohmann::json::parse(*res.data);
+
+        state->ipfsPath = "/ipfs/" + (std::string) json["Hash"];
+    }
+
     void upsertFile(const std::string & path, const std::string & data, const std::string & mimeType) override
     {
-        if (addrType == AddrType::IPFS)
-            throw Error("%s is immutable, cannot modify", getIpfsPath());
-
         // TODO: use callbacks
 
-        auto req1 = FileTransferRequest(daemonUri + "/api/v0/add");
-        req1.data = std::make_shared<string>(data);
-        req1.post = true;
-        req1.tries = 1;
+        auto req = FileTransferRequest(daemonUri + "/api/v0/add");
+        req.data = std::make_shared<string>(data);
+        req.post = true;
+        req.tries = 1;
         try {
-            auto res1 = getFileTransfer()->upload(req1);
-            auto json1 = nlohmann::json::parse(*res1.data);
-
-            auto addedPath = "/ipfs/" + (std::string) json1["Hash"];
-
-            auto state(_state.lock());
-
-            if (state->inProgressUpsert)
-                throw Error("a modification to the IPNS is already in progress");
-
-            state->inProgressUpsert = true;
-
-            auto uri1 = daemonUri + "/api/v0/object/patch/add-link?offline=true&create=true";
-            uri1 += "&arg=" + getFileTransfer()->urlEncode(getIpfsPath());
-            uri1 += "&arg=" + getFileTransfer()->urlEncode(path);
-            uri1 += "&arg=" + getFileTransfer()->urlEncode(addedPath);
-
-            auto req2 = FileTransferRequest(uri1);
-            req2.post = true;
-            req2.tries = 1;
-            auto res2 = getFileTransfer()->download(req2);
-            auto json2 = nlohmann::json::parse(*res2.data);
-
-            auto newRoot = json2["Hash"];
-
-            auto uri2 = daemonUri + "/api/v0/name/publish?offline=true&arg=" + getFileTransfer()->urlEncode(newRoot);
-            uri2 += "&key=" + std::string(getIpfsPath(), 6);
-
-            auto req3 = FileTransferRequest(uri2);
-            req3.post = true;
-            req3.tries = 1;
-            getFileTransfer()->download(req3);
-
-            state->inProgressUpsert = false;
+            auto res = getFileTransfer()->upload(req);
+            auto json = nlohmann::json::parse(*res.data);
+            addLink(path, "/ipfs/" + (std::string) json["Hash"]);
         } catch (FileTransferError & e) {
             throw UploadToIPFS("while uploading to IPFS binary cache at '%s': %s", cacheUri, e.msg());
         }
@@ -166,7 +169,7 @@ protected:
     void getFile(const std::string & path,
         Callback<std::shared_ptr<std::string>> callback) noexcept override
     {
-        auto uri = daemonUri + "/api/v0/cat?offline=true&arg=" + getFileTransfer()->urlEncode(getIpfsPath() + "/" + path);
+        auto uri = daemonUri + "/api/v0/cat?arg=" + getFileTransfer()->urlEncode(getIpfsPath() + "/" + path);
 
         FileTransferRequest request(uri);
         request.post = true;
