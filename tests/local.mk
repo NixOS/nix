@@ -1,5 +1,4 @@
-nix_tests = ipfs.sh \
-#   add.sh
+nix_tests = init.sh check.sh ipfs.sh
 
 # nix_tests = add.sh
 
