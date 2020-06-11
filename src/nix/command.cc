@@ -73,14 +73,13 @@ void StorePathsCommand::run(ref<Store> store)
             storePaths.push_back(p.clone());
 
         if (recursive) {
-            if (includeEvalDeps) {
+            if (includeEvalDeps)
                 for (auto & i : installables) {
                     auto state = getEvalState();
 
-                    for (auto & b : i->toBuildables()) {
+                    for (auto & b : i->toBuildables())
                         if (!b.drvPath)
                             throw UsageError("Cannot find eval references for '%s' without a derivation path", b.what());
-                    }
 
                     // force evaluation of package argument
                     i->toValue(*state);
@@ -88,17 +87,19 @@ void StorePathsCommand::run(ref<Store> store)
                     for (auto & d : (*state).importedDrvs)
                         storePaths.push_back(std::move(d.path));
                 }
-            }
 
-            if (includeBuildDeps) {
-                for (auto & i : installables) {
+            if (includeBuildDeps)
+                for (auto & i : installables)
                     for (auto & b : i->toBuildables()) {
-                        if (!b.drvPath) // Note we could lookup deriver from the DB to get drvPath
-                            throw UsageError("Cannot find build references for '%s' without a derivation path", b.what());
-                        storePaths.push_back(b.drvPath->clone());
+                        if (!b.drvPath) {
+                            auto info = store->queryPathInfo(b.outputs.at("out"));
+                            if (info->deriver)
+                                storePaths.push_back(info->deriver->clone());
+                            else
+                                throw UsageError("Cannot find build references for '%s' without a derivation path", b.what());
+                        } else
+                            storePaths.push_back(b.drvPath->clone());
                     }
-                }
-            }
 
             auto includeDerivers = includeBuildDeps || includeEvalDeps;
 
