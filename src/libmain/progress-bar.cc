@@ -461,7 +461,7 @@ public:
     }
 };
 
-Logger *makeProgressBar(bool printBuildLogs)
+Logger * makeProgressBar(bool printBuildLogs)
 {
     return new ProgressBar(
         printBuildLogs,

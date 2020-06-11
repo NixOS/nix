@@ -12,8 +12,8 @@ enum class LogFormat {
   barWithLogs,
 };
 
-void setLogFormat(const string &logFormatStr);
-void setLogFormat(const LogFormat &logFormat);
+void setLogFormat(const std::string & logFormatStr);
+void setLogFormat(const LogFormat & logFormat);
 
 void createDefaultLogger();
 
