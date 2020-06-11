@@ -106,7 +106,7 @@ public:
         updateThread.join();
     }
 
-    void stop()
+    void stop() override
     {
         auto state(state_.lock());
         if (!state->active) return;
@@ -117,6 +117,10 @@ public:
             writeToStderr("[" + status + "]\n");
         updateCV.notify_one();
         quitCV.notify_one();
+    }
+
+    bool isVerbose() override {
+        return printBuildLogs;
     }
 
     void log(Verbosity lvl, const FormatOrString & fs) override
@@ -457,11 +461,17 @@ public:
     }
 };
 
+Logger * makeProgressBar(bool printBuildLogs)
+{
+    return new ProgressBar(
+        printBuildLogs,
+        isatty(STDERR_FILENO) && getEnv("TERM").value_or("dumb") != "dumb"
+    );
+}
+
 void startProgressBar(bool printBuildLogs)
 {
-    logger = new ProgressBar(
-        printBuildLogs,
-        isatty(STDERR_FILENO) && getEnv("TERM").value_or("dumb") != "dumb");
+    logger = makeProgressBar(printBuildLogs);
 }
 
 void stopProgressBar()
