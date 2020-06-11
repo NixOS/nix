@@ -238,21 +238,29 @@ InputPath parseInputPath(std::string_view s)
     return path;
 }
 
-static void flattenLockFile(
-    std::shared_ptr<const Node> node,
-    const InputPath & prefix,
-    std::unordered_set<std::shared_ptr<const Node>> & done,
-    std::map<InputPath, Node::Edge> & res)
+std::map<InputPath, Node::Edge> LockFile::getAllInputs() const
 {
-    if (!done.insert(node).second) return;
+    std::unordered_set<std::shared_ptr<Node>> done;
+    std::map<InputPath, Node::Edge> res;
 
-    for (auto &[id, input] : node->inputs) {
-        auto inputPath(prefix);
-        inputPath.push_back(id);
-        res.emplace(inputPath, input);
-        if (auto child = std::get_if<0>(&input))
-            flattenLockFile(*child, inputPath, done, res);
-    }
+    std::function<void(const InputPath & prefix, std::shared_ptr<Node> node)> recurse;
+
+    recurse = [&](const InputPath & prefix, std::shared_ptr<Node> node)
+    {
+        if (!done.insert(node).second) return;
+
+        for (auto &[id, input] : node->inputs) {
+            auto inputPath(prefix);
+            inputPath.push_back(id);
+            res.emplace(inputPath, input);
+            if (auto child = std::get_if<0>(&input))
+                recurse(inputPath, *child);
+        }
+    };
+
+    recurse({}, root);
+
+    return res;
 }
 
 std::ostream & operator <<(std::ostream & stream, const Node::Edge & edge)
@@ -275,13 +283,10 @@ static bool equals(const Node::Edge & e1, const Node::Edge & e2)
     return false;
 }
 
-std::string diffLockFiles(const LockFile & oldLocks, const LockFile & newLocks)
+std::string LockFile::diff(const LockFile & oldLocks, const LockFile & newLocks)
 {
-    std::unordered_set<std::shared_ptr<const Node>> done;
-    std::map<InputPath, Node::Edge> oldFlat, newFlat;
-    flattenLockFile(oldLocks.root, {}, done, oldFlat);
-    done.clear();
-    flattenLockFile(newLocks.root, {}, done, newFlat);
+    auto oldFlat = oldLocks.getAllInputs();
+    auto newFlat = newLocks.getAllInputs();
 
     auto i = oldFlat.begin();
     auto j = newFlat.begin();
@@ -308,6 +313,22 @@ std::string diffLockFiles(const LockFile & oldLocks, const LockFile & newLocks)
 
     return res;
 }
+
+void LockFile::check()
+{
+    auto inputs = getAllInputs();
+
+    for (auto & [inputPath, input] : inputs) {
+        if (auto follows = std::get_if<1>(&input)) {
+            if (!follows->empty() && !get(inputs, *follows))
+                throw Error("input '%s' follows a non-existent input '%s'",
+                    printInputPath(inputPath),
+                    printInputPath(*follows));
+        }
+    }
+}
+
+void check();
 
 std::string printInputPath(const InputPath & path)
 {

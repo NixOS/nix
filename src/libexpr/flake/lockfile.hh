@@ -67,6 +67,13 @@ struct LockFile
     bool operator ==(const LockFile & other) const;
 
     std::shared_ptr<Node> findInput(const InputPath & path);
+
+    std::map<InputPath, Node::Edge> getAllInputs() const;
+
+    static std::string diff(const LockFile & oldLocks, const LockFile & newLocks);
+
+    /* Check that every 'follows' input target exists. */
+    void check();
 };
 
 std::ostream & operator <<(std::ostream & stream, const LockFile & lockFile);
@@ -74,7 +81,5 @@ std::ostream & operator <<(std::ostream & stream, const LockFile & lockFile);
 InputPath parseInputPath(std::string_view s);
 
 std::string printInputPath(const InputPath & path);
-
-std::string diffLockFiles(const LockFile & oldLocks, const LockFile & newLocks);
 
 }

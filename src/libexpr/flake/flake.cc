@@ -469,12 +469,15 @@ LockedFlake lockFlake(
         if (!updatesUsed.count(i))
             warn("the flag '--update-input %s' does not match any input", printInputPath(i));
 
+    /* Check 'follows' inputs. */
+    newLockFile.check();
+
     debug("new lock file: %s", newLockFile);
 
     /* Check whether we need to / can write the new lock file. */
     if (!(newLockFile == oldLockFile)) {
 
-        auto diff = diffLockFiles(oldLockFile, newLockFile);
+        auto diff = LockFile::diff(oldLockFile, newLockFile);
 
         if (lockFlags.writeLockFile) {
             if (auto sourcePath = topRef.input.getSourcePath()) {
