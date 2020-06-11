@@ -888,7 +888,7 @@ password <replaceable>my-password</replaceable>
   <varlistentry xml:id="conf-substituters"><term><literal>substituters</literal></term>
 
     <listitem><para>A list of URLs of substituters, separated by
-    whitespace.  The default is
+    whitespace.  The substituters are queried from left to right.  The default is
     <literal>https://cache.nixos.org</literal>.</para></listitem>
 
   </varlistentry>
