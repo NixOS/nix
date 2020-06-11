@@ -41,15 +41,22 @@ StorePath LockedNode::computeStorePath(Store & store) const
     return lockedRef.input.computeStorePath(store);
 }
 
-std::shared_ptr<Node> Node::findInput(const InputPath & path)
+std::shared_ptr<Node> LockFile::findInput(const InputPath & path)
 {
-    auto pos = shared_from_this();
+    auto pos = root;
+
+    if (!pos) return {};
 
     for (auto & elem : path) {
-        auto i = pos->inputs.find(elem);
-        if (i == pos->inputs.end())
+        if (auto i = get(pos->inputs, elem)) {
+            if (auto node = std::get_if<0>(&*i))
+                pos = *node;
+            else if (auto follows = std::get_if<1>(&*i)) {
+                pos = findInput(*follows);
+                if (!pos) return {};
+            }
+        } else
             return {};
-        pos = i->second;
     }
 
     return pos;
@@ -58,7 +65,7 @@ std::shared_ptr<Node> Node::findInput(const InputPath & path)
 LockFile::LockFile(const nlohmann::json & json, const Path & path)
 {
     auto version = json.value("version", 0);
-    if (version < 5 || version > 6)
+    if (version < 5 || version > 7)
         throw Error("lock file '%s' has unsupported version %d", path, version);
 
     std::unordered_map<std::string, std::shared_ptr<Node>> nodeMap;
@@ -69,21 +76,37 @@ LockFile::LockFile(const nlohmann::json & json, const Path & path)
     {
         if (jsonNode.find("inputs") == jsonNode.end()) return;
         for (auto & i : jsonNode["inputs"].items()) {
-            std::string inputKey = i.value();
-            auto k = nodeMap.find(inputKey);
-            if (k == nodeMap.end()) {
-                auto jsonNode2 = json["nodes"][inputKey];
-                auto input = std::make_shared<LockedNode>(jsonNode2);
-                k = nodeMap.insert_or_assign(inputKey, input).first;
-                getInputs(*input, jsonNode2);
+            if (i.value().is_array()) {
+                InputPath path;
+                for (auto & j : i.value())
+                    path.push_back(j);
+                node.inputs.insert_or_assign(i.key(), path);
+            } else {
+                std::string inputKey = i.value();
+                auto k = nodeMap.find(inputKey);
+                if (k == nodeMap.end()) {
+                    auto jsonNode2 = json["nodes"][inputKey];
+                    auto input = std::make_shared<LockedNode>(jsonNode2);
+                    k = nodeMap.insert_or_assign(inputKey, input).first;
+                    getInputs(*input, jsonNode2);
+                }
+                if (auto child = std::dynamic_pointer_cast<LockedNode>(k->second))
+                    node.inputs.insert_or_assign(i.key(), child);
+                else
+                    // FIXME: replace by follows node
+                    throw Error("lock file contains cycle to root node");
             }
-            node.inputs.insert_or_assign(i.key(), k->second);
         }
     };
 
     std::string rootKey = json["root"];
     nodeMap.insert_or_assign(rootKey, root);
     getInputs(*root, json["nodes"][rootKey]);
+
+    // FIXME: check that there are no cycles in version >= 7. Cycles
+    // between inputs are only possible using 'follows' indirections.
+    // Once we drop support for version <= 6, we can simplify the code
+    // a bit since we don't need to worry about cycles.
 }
 
 nlohmann::json LockFile::toJson() const
@@ -116,8 +139,16 @@ nlohmann::json LockFile::toJson() const
 
         if (!node->inputs.empty()) {
             auto inputs = nlohmann::json::object();
-            for (auto & i : node->inputs)
-                inputs[i.first] = dumpNode(i.first, i.second);
+            for (auto & i : node->inputs) {
+                if (auto child = std::get_if<0>(&i.second)) {
+                    inputs[i.first] = dumpNode(i.first, *child);
+                } else if (auto follows = std::get_if<1>(&i.second)) {
+                    auto arr = nlohmann::json::array();
+                    for (auto & x : *follows)
+                        arr.push_back(x);
+                    inputs[i.first] = std::move(arr);
+                }
+            }
             n["inputs"] = std::move(inputs);
         }
 
@@ -133,7 +164,7 @@ nlohmann::json LockFile::toJson() const
     };
 
     nlohmann::json json;
-    json["version"] = 6;
+    json["version"] = 7;
     json["root"] = dumpNode("root", root);
     json["nodes"] = std::move(nodes);
 
@@ -172,7 +203,9 @@ bool LockFile::isImmutable() const
     visit = [&](std::shared_ptr<const Node> node)
     {
         if (!nodes.insert(node).second) return;
-        for (auto & i : node->inputs) visit(i.second);
+        for (auto & i : node->inputs)
+            if (auto child = std::get_if<0>(&i.second))
+                visit(*child);
     };
 
     visit(root);
@@ -216,9 +249,11 @@ static void flattenLockFile(
     for (auto &[id, input] : node->inputs) {
         auto inputPath(prefix);
         inputPath.push_back(id);
-        if (auto lockedInput = std::dynamic_pointer_cast<const LockedNode>(input))
-            res.emplace(inputPath, lockedInput);
-        flattenLockFile(input, inputPath, done, res);
+        if (auto child = std::get_if<0>(&input)) {
+            if (auto lockedInput = std::dynamic_pointer_cast<const LockedNode>(*child))
+                res.emplace(inputPath, lockedInput);
+            flattenLockFile(*child, inputPath, done, res);
+        }
     }
 }
 

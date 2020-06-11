@@ -15,16 +15,18 @@ using namespace fetchers;
 
 typedef std::vector<FlakeId> InputPath;
 
+struct LockedNode;
+
 /* A node in the lock file. It has outgoing edges to other nodes (its
    inputs). Only the root node has this type; all other nodes have
    type LockedNode. */
 struct Node : std::enable_shared_from_this<Node>
 {
-    std::map<FlakeId, std::shared_ptr<Node>> inputs;
+    typedef std::variant<std::shared_ptr<LockedNode>, InputPath> Edge;
+
+    std::map<FlakeId, Edge> inputs;
 
     virtual ~Node() { }
-
-    std::shared_ptr<Node> findInput(const InputPath & path);
 };
 
 /* A non-root node in the lock file. */
@@ -63,6 +65,8 @@ struct LockFile
     bool isImmutable() const;
 
     bool operator ==(const LockFile & other) const;
+
+    std::shared_ptr<Node> findInput(const InputPath & path);
 };
 
 std::ostream & operator <<(std::ostream & stream, const LockFile & lockFile);

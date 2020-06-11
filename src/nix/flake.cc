@@ -169,15 +169,21 @@ struct CmdFlakeListInputs : FlakeCommand, MixJSON
             recurse = [&](const Node & node, const std::string & prefix)
             {
                 for (const auto & [i, input] : enumerate(node.inputs)) {
-                    bool firstVisit = visited.insert(input.second).second;
                     bool last = i + 1 == node.inputs.size();
-                    auto lockedNode = std::dynamic_pointer_cast<const LockedNode>(input.second);
 
-                    logger->stdout("%s" ANSI_BOLD "%s" ANSI_NORMAL ": %s",
-                        prefix + (last ? treeLast : treeConn), input.first,
-                        lockedNode ? lockedNode->lockedRef : flake.flake.lockedRef);
+                    if (auto lockedNode = std::get_if<0>(&input.second)) {
+                        logger->stdout("%s" ANSI_BOLD "%s" ANSI_NORMAL ": %s",
+                            prefix + (last ? treeLast : treeConn), input.first,
+                            *lockedNode ? (*lockedNode)->lockedRef : flake.flake.lockedRef);
 
-                    if (firstVisit) recurse(*input.second, prefix + (last ? treeNull : treeLine));
+                        bool firstVisit = visited.insert(*lockedNode).second;
+
+                        if (firstVisit) recurse(**lockedNode, prefix + (last ? treeNull : treeLine));
+                    } else if (auto follows = std::get_if<1>(&input.second)) {
+                        logger->stdout("%s" ANSI_BOLD "%s" ANSI_NORMAL " follows input '%s'",
+                            prefix + (last ? treeLast : treeConn), input.first,
+                            printInputPath(*follows));
+                    }
                 }
             };
 
@@ -723,18 +729,18 @@ struct CmdFlakeArchive : FlakeCommand, MixJSON, MixDryRun
         traverse = [&](const Node & node, std::optional<JSONObject> & jsonObj)
         {
             auto jsonObj2 = jsonObj ? jsonObj->object("inputs") : std::optional<JSONObject>();
-            for (auto & input : node.inputs) {
-                auto lockedInput = std::dynamic_pointer_cast<const LockedNode>(input.second);
-                assert(lockedInput);
-                auto jsonObj3 = jsonObj2 ? jsonObj2->object(input.first) : std::optional<JSONObject>();
-                auto storePath =
-                    dryRun
-                    ? lockedInput->lockedRef.input.computeStorePath(*store)
-                    : lockedInput->lockedRef.input.fetch(store).first.storePath;
-                if (jsonObj3)
-                    jsonObj3->attr("path", store->printStorePath(storePath));
-                sources.insert(std::move(storePath));
-                traverse(*lockedInput, jsonObj3);
+            for (auto & [inputName, input] : node.inputs) {
+                if (auto inputNode = std::get_if<0>(&input)) {
+                    auto jsonObj3 = jsonObj2 ? jsonObj2->object(inputName) : std::optional<JSONObject>();
+                    auto storePath =
+                        dryRun
+                        ? (*inputNode)->lockedRef.input.computeStorePath(*store)
+                        : (*inputNode)->lockedRef.input.fetch(store).first.storePath;
+                    if (jsonObj3)
+                        jsonObj3->attr("path", store->printStorePath(storePath));
+                    sources.insert(std::move(storePath));
+                    traverse(**inputNode, jsonObj3);
+                }
             }
         };
 

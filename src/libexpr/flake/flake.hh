@@ -19,9 +19,10 @@ typedef std::map<FlakeId, FlakeInput> FlakeInputs;
 
 struct FlakeInput
 {
-    FlakeRef ref;
+    std::optional<FlakeRef> ref;
     bool isFlake = true;
     std::optional<InputPath> follows;
+    bool absolute = false; // whether 'follows' is relative to the flake root
     FlakeInputs overrides;
 };
 

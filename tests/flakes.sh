@@ -551,7 +551,7 @@ cat > $flake3Dir/flake.nix <<EOF
 EOF
 
 nix flake update $flake3Dir
-[[ $(jq .nodes.root.inputs.foo $flake3Dir/flake.lock) = $(jq .nodes.root.inputs.bar $flake3Dir/flake.lock) ]]
+[[ $(jq -c .nodes.root.inputs.bar $flake3Dir/flake.lock) = '["foo"]' ]]
 
 cat > $flake3Dir/flake.nix <<EOF
 {
@@ -563,7 +563,7 @@ cat > $flake3Dir/flake.nix <<EOF
 EOF
 
 nix flake update $flake3Dir
-[[ $(jq .nodes.bar.locked.url $flake3Dir/flake.lock) =~ flake1 ]]
+[[ $(jq -c .nodes.root.inputs.bar $flake3Dir/flake.lock) = '["flake2","flake1"]' ]]
 
 cat > $flake3Dir/flake.nix <<EOF
 {
@@ -575,7 +575,7 @@ cat > $flake3Dir/flake.nix <<EOF
 EOF
 
 nix flake update $flake3Dir
-[[ $(jq .nodes.bar.locked.url $flake3Dir/flake.lock) =~ flake2 ]]
+[[ $(jq -c .nodes.root.inputs.bar $flake3Dir/flake.lock) = '["flake2"]' ]]
 
 # Test overriding inputs of inputs.
 cat > $flake3Dir/flake.nix <<EOF
@@ -604,7 +604,8 @@ cat > $flake3Dir/flake.nix <<EOF
 EOF
 
 nix flake update $flake3Dir --recreate-lock-file
-[[ $(jq .nodes.flake1.locked.url $flake3Dir/flake.lock) =~ flake7 ]]
+[[ $(jq -c .nodes.flake2.inputs.flake1 $flake3Dir/flake.lock) =~ '["foo"]' ]]
+[[ $(jq .nodes.foo.locked.url $flake3Dir/flake.lock) =~ flake7 ]]
 
 # Test Mercurial flakes.
 rm -rf $flake5Dir
