@@ -242,25 +242,43 @@ static void flattenLockFile(
     std::shared_ptr<const Node> node,
     const InputPath & prefix,
     std::unordered_set<std::shared_ptr<const Node>> & done,
-    std::map<InputPath, std::shared_ptr<const LockedNode>> & res)
+    std::map<InputPath, Node::Edge> & res)
 {
     if (!done.insert(node).second) return;
 
     for (auto &[id, input] : node->inputs) {
         auto inputPath(prefix);
         inputPath.push_back(id);
-        if (auto child = std::get_if<0>(&input)) {
-            if (auto lockedInput = std::dynamic_pointer_cast<const LockedNode>(*child))
-                res.emplace(inputPath, lockedInput);
+        res.emplace(inputPath, input);
+        if (auto child = std::get_if<0>(&input))
             flattenLockFile(*child, inputPath, done, res);
-        }
     }
+}
+
+std::ostream & operator <<(std::ostream & stream, const Node::Edge & edge)
+{
+    if (auto node = std::get_if<0>(&edge))
+        stream << "'" << (*node)->lockedRef << "'";
+    else if (auto follows = std::get_if<1>(&edge))
+        stream << fmt("follows '%s'", printInputPath(*follows));
+    return stream;
+}
+
+static bool equals(const Node::Edge & e1, const Node::Edge & e2)
+{
+    if (auto n1 = std::get_if<0>(&e1))
+        if (auto n2 = std::get_if<0>(&e2))
+            return (*n1)->lockedRef == (*n2)->lockedRef;
+    if (auto f1 = std::get_if<1>(&e1))
+        if (auto f2 = std::get_if<1>(&e2))
+            return *f1 == *f2;
+    return false;
 }
 
 std::string diffLockFiles(const LockFile & oldLocks, const LockFile & newLocks)
 {
     std::unordered_set<std::shared_ptr<const Node>> done;
-    std::map<InputPath, std::shared_ptr<const LockedNode>> oldFlat, newFlat;
+    std::map<InputPath, Node::Edge> oldFlat, newFlat;
     flattenLockFile(oldLocks.root, {}, done, oldFlat);
     done.clear();
     flattenLockFile(newLocks.root, {}, done, newFlat);
@@ -271,17 +289,17 @@ std::string diffLockFiles(const LockFile & oldLocks, const LockFile & newLocks)
 
     while (i != oldFlat.end() || j != newFlat.end()) {
         if (j != newFlat.end() && (i == oldFlat.end() || i->first > j->first)) {
-            res += fmt("* Added '%s': '%s'\n", printInputPath(j->first), j->second->lockedRef);
+            res += fmt("* Added '%s': %s\n", printInputPath(j->first), j->second);
             ++j;
         } else if (i != oldFlat.end() && (j == newFlat.end() || i->first < j->first)) {
             res += fmt("* Removed '%s'\n", printInputPath(i->first));
             ++i;
         } else {
-            if (!(i->second->lockedRef == j->second->lockedRef)) {
-                res += fmt("* Updated '%s': '%s' -> '%s'\n",
+            if (!equals(i->second, j->second)) {
+                res += fmt("* Updated '%s': %s -> %s\n",
                     printInputPath(i->first),
-                    i->second->lockedRef,
-                    j->second->lockedRef);
+                    i->second,
+                    j->second);
             }
             ++i;
             ++j;
