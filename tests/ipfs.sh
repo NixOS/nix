@@ -44,9 +44,11 @@ nix-store --generate-binary-cache-key $SIGNING_KEY_NAME $SIGNING_KEY_PRI_FILE $S
 ################################################################################
 
 mkdir -p $IPFS_SRC_STORE
-BUILD_COMMAND='nix-build "<nixpkgs>" -A hello.src'
+# BUILD_COMMAND="nix-build '<nixpkgs>' -A hello.src"
 
-nix copy --to file://$IPFS_SRC_STORE $($BUILD_COMMAND)
+nix copy --to file://$IPFS_SRC_STORE \
+    --experimental-features nix-command \
+    $(nix-build ./simple-derivation.nix)
 
 nix sign-paths --store file://$IPFS_SRC_STORE \
     -k ~/nix-cache-key.sec \
