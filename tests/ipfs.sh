@@ -5,16 +5,20 @@ export IMPURE_VAR1=foo
 export IMPURE_VAR2=bar
 
 ################################################################################
-## Check that the ipfs daemon is enabled in your environment
+## Check that the ipfs daemon is present and  enabled in your environment
 ################################################################################
+
+if [[ -z $(type -p ipfs) ]]; then
+    echo "Ipfs not installed; skipping ipfs tests"
+    exit 99
+fi
 
 # To see if ipfs is connected to the network, we check if we can see some peers
 # other than ourselves.
-NPEERS=$(ipfs swarm peers | wc -l)
-echo $NPEERS
-if (( $NPEERS < 2 )); then
-    echo "The ipfs daemon doesn't seem to be enabled (can't find peers)"
-    exit 1
+if (! (ipfs log ls));
+then
+  echo "Ipfs daemon not detected; initializing.."
+  ipfs daemon --offline &
 fi
 
 ################################################################################
@@ -97,7 +101,7 @@ DOWNLOAD_LOCATION=$(NIX_REMOTE=local $BUILD_COMMAND \
 ################################################################################
 
 # First I have to publish:
-IPNS_ID=$(ipfs name publish $IPFS_HASH | awk '{print substr($3,1,length($3)-1)}')
+IPNS_ID=$(ipfs name publish $IPFS_HASH --allow-offline | awk '{print substr($3,1,length($3)-1)}')
 
 mkdir $IPFS_DST_IPNS_STORE
 IPFS_IPNS_PREFIX='ipns://'
