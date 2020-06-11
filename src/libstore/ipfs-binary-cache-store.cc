@@ -21,7 +21,7 @@ private:
         auto state(_state.lock());
         return state->ipfsPath;
     }
-    std::optional<string> ipnsPath;
+    std::optional<string> optIpnsPath;
 
     struct State
     {
@@ -44,7 +44,7 @@ public:
         if (hasPrefix(cacheUri, "ipfs://"))
             state->ipfsPath = "/ipfs/" + std::string(cacheUri, 7);
         else if (hasPrefix(cacheUri, "ipns://"))
-            ipnsPath = "/ipns/" + std::string(cacheUri, 7);
+            optIpnsPath = "/ipns/" + std::string(cacheUri, 7);
         else
             throw Error("unknown IPNS URI '%s'", cacheUri);
 
@@ -62,9 +62,9 @@ public:
             throw Error("daemon for IPFS is not running properly");
 
         // Resolve the IPNS name to an IPFS object
-        if (ipnsPath) {
-            debug("Resolving IPFS object of '%s', this could take a while.", *ipnsPath);
-            auto uri = daemonUri + "/api/v0/name/resolve?offline=true&arg=" + getFileTransfer()->urlEncode(*ipnsPath);
+        if (optIpnsPath) {
+            debug("Resolving IPFS object of '%s', this could take a while.", *optIpnsPath);
+            auto uri = daemonUri + "/api/v0/name/resolve?offline=true&arg=" + getFileTransfer()->urlEncode(*optIpnsPath);
             FileTransferRequest request(uri);
             request.post = true;
             request.tries = 1;
@@ -113,15 +113,15 @@ protected:
     // IPNS publish can be slow, we try to do it rarely.
     void sync() override
     {
-        if (!ipnsPath)
+        if (!optIpnsPath)
             return;
 
         auto state(_state.lock());
 
-        debug("Publishing '%s' to '%s', this could take a while.", state->ipfsPath, *ipnsPath);
+        debug("Publishing '%s' to '%s', this could take a while.", state->ipfsPath, *optIpnsPath);
 
         auto uri = daemonUri + "/api/v0/name/publish?offline=true&arg=" + getFileTransfer()->urlEncode(state->ipfsPath);
-        uri += "&key=" + std::string(*ipnsPath, 6);
+        uri += "&key=" + std::string(*optIpnsPath, 6);
 
         auto req = FileTransferRequest(uri);
         req.post = true;
