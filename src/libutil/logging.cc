@@ -18,7 +18,7 @@ void setCurActivity(const ActivityId activityId)
     curActivity = activityId;
 }
 
-Logger * logger = makeDefaultLogger();
+Logger * logger = makeSimpleLogger(true);
 
 void Logger::warn(const std::string & msg)
 {
@@ -35,11 +35,17 @@ class SimpleLogger : public Logger
 public:
 
     bool systemd, tty;
+    bool printBuildLogs;
 
-    SimpleLogger()
+    SimpleLogger(bool printBuildLogs)
+        : printBuildLogs(printBuildLogs)
     {
         systemd = getEnv("IN_SYSTEMD") == "1";
         tty = isatty(STDERR_FILENO);
+    }
+
+    bool isVerbose() override {
+        return printBuildLogs;
     }
 
     void log(Verbosity lvl, const FormatOrString & fs) override
@@ -78,6 +84,18 @@ public:
         if (lvl <= verbosity && !s.empty())
             log(lvl, s + "...");
     }
+
+    void result(ActivityId act, ResultType type, const Fields & fields) override
+    {
+        if (type == resBuildLogLine && printBuildLogs) {
+            auto lastLine = fields[0].s;
+            printError(lastLine);
+        }
+        else if (type == resPostBuildLogLine && printBuildLogs) {
+            auto lastLine = fields[0].s;
+            printError("post-build-hook: " + lastLine);
+        }
+    }
 };
 
 Verbosity verbosity = lvlInfo;
@@ -102,9 +120,9 @@ void writeToStderr(const string & s)
     }
 }
 
-Logger * makeDefaultLogger()
+Logger * makeSimpleLogger(bool printBuildLogs)
 {
-    return new SimpleLogger();
+    return new SimpleLogger(printBuildLogs);
 }
 
 std::atomic<uint64_t> nextId{(uint64_t) getpid() << 32};
@@ -120,6 +138,10 @@ struct JSONLogger : Logger {
     Logger & prevLogger;
 
     JSONLogger(Logger & prevLogger) : prevLogger(prevLogger) { }
+
+    bool isVerbose() override {
+        return true;
+    }
 
     void addFields(nlohmann::json & json, const Fields & fields)
     {

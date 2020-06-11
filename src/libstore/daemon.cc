@@ -370,8 +370,10 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
         std::string s, baseName;
         FileIngestionMethod method;
         {
-            bool fixed, recursive;
+            bool fixed; uint8_t recursive;
             from >> baseName >> fixed /* obsolete */ >> recursive >> s;
+            if (recursive > (uint8_t) FileIngestionMethod::Recursive)
+                throw Error("unsupported FileIngestionMethod with value of %i; you may need to upgrade nix-daemon", recursive);
             method = FileIngestionMethod { recursive };
             /* Compatibility hack. */
             if (!fixed) {

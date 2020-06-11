@@ -477,6 +477,8 @@ static void _main(int argc, char * * argv)
 
         restoreSignals();
 
+        logger->stop();
+
         execvp(shell->c_str(), argPtrs.data());
 
         throw SysError("executing shell '%s'", *shell);
@@ -525,6 +527,8 @@ static void _main(int argc, char * * argv)
         for (auto & symlink : resultSymlinks)
             if (auto store2 = store.dynamic_pointer_cast<LocalFSStore>())
                 store2->addPermRoot(store->parseStorePath(symlink.second), absPath(symlink.first), true);
+
+        logger->stop();
 
         for (auto & path : outPaths)
             std::cout << path << '\n';

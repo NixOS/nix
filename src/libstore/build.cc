@@ -1660,7 +1660,7 @@ void DerivationGoal::buildDone()
                 worker.store.printStorePath(drvPath),
                 statusToString(status));
 
-            if (!settings.verboseBuild && !logTail.empty()) {
+            if (!logger->isVerbose() && !logTail.empty()) {
                 msg += (format("; last %d log lines:") % logTail.size()).str();
                 for (auto & line : logTail)
                     msg += "\n  " + line;
@@ -1709,11 +1709,7 @@ void DerivationGoal::buildDone()
                 }
 
                 void flushLine() {
-                    if (settings.verboseBuild) {
-                        printError("post-build-hook: " + currentLine);
-                    } else {
-                        act.result(resPostBuildLogLine, currentLine);
-                    }
+                    act.result(resPostBuildLogLine, currentLine);
                     currentLine.clear();
                 }
 
@@ -3743,7 +3739,7 @@ void DerivationGoal::registerOutputs()
                 worker.hashMismatch = true;
                 delayedException = std::make_exception_ptr(
                     BuildError("hash mismatch in fixed-output derivation '%s':\n  wanted: %s\n  got:    %s",
-                        worker.store.printStorePath(dest), h.to_string(SRI), h2.to_string(SRI)));
+                        worker.store.printStorePath(dest), h.to_string(SRI, true), h2.to_string(SRI, true)));
 
                 Path actualDest = worker.store.Store::toRealPath(dest);
 
@@ -4188,13 +4184,8 @@ void DerivationGoal::flushLine()
         ;
 
     else {
-        if (settings.verboseBuild &&
-            (settings.printRepeatedBuilds || curRound == 1))
-            printError(currentLogLine);
-        else {
-            logTail.push_back(currentLogLine);
-            if (logTail.size() > settings.logLines) logTail.pop_front();
-        }
+        logTail.push_back(currentLogLine);
+        if (logTail.size() > settings.logLines) logTail.pop_front();
 
         act->result(resBuildLogLine, currentLogLine);
     }

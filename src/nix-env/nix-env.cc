@@ -1457,6 +1457,8 @@ static int _main(int argc, char * * argv)
 
         globals.state->printStats();
 
+        logger->stop();
+
         return 0;
     }
 }

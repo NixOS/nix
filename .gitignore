@@ -49,6 +49,9 @@ perl/Makefile.config
 # /src/libstore/
 *.gen.*
 
+# /src/libutil/
+/src/libutil/tests/libutil-tests
+
 /src/nix/nix
 
 # /src/nix-env/
