@@ -86,7 +86,7 @@ void StorePathsCommand::run(ref<Store> store)
                     i->toValue(*state);
 
                     for (auto & d : (*state).importedDrvs)
-                        storePaths.push_back(store->parseStorePath(d.first));
+                        storePaths.push_back(std::move(d.path));
                 }
             }
 

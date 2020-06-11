@@ -19,6 +19,7 @@ namespace nix {
 class Store;
 class EvalState;
 struct StorePath;
+struct StorePathWithOutputs;
 enum RepairFlag : bool;
 
 
@@ -90,7 +91,7 @@ public:
     const ref<Store> store;
 
     /* List of derivations that got imported. */
-    std::list<std::pair<string, string>> importedDrvs;
+    std::vector<StorePathWithOutputs> importedDrvs;
 
 private:
     SrcToStore srcToStore;
