@@ -82,10 +82,10 @@ DOWNLOAD_LOCATION=$(NIX_REMOTE=local $BUILD_COMMAND \
 
 mkdir $IPFS_DST_IPFS_STORE
 
-IPFS_IPFS_PREFIX='/ipfs'
+IPFS_IPFS_PREFIX='ipfs://'
 
 DOWNLOAD_LOCATION=$(NIX_REMOTE=local $BUILD_COMMAND \
-  --option substituters $IPFS_IPFS_PREFIX/$IPFS_HASH \
+  --option substituters $IPFS_IPFS_PREFIX$IPFS_HASH \
   --store $IPFS_DST_IPFS_STORE \
   --no-out-link \
   -j0 \
@@ -100,10 +100,10 @@ DOWNLOAD_LOCATION=$(NIX_REMOTE=local $BUILD_COMMAND \
 IPNS_ID=$(ipfs name publish $IPFS_HASH | awk '{print substr($3,1,length($3)-1)}')
 
 mkdir $IPFS_DST_IPNS_STORE
-IPFS_IPNS_PREFIX='/ipns'
+IPFS_IPNS_PREFIX='ipns://'
 
 DOWNLOAD_LOCATION=$(NIX_REMOTE=local $BUILD_COMMAND \
-  --option substituters $IPFS_IPNS_PREFIX/$IPNS_ID \
+  --option substituters $IPFS_IPNS_PREFIX$IPNS_ID \
   --store $IPFS_DST_IPNS_STORE \
   --no-out-link \
   -j0 \
