@@ -63,8 +63,9 @@ public:
 
         // Resolve the IPNS name to an IPFS object
         if (optIpnsPath) {
-            debug("Resolving IPFS object of '%s', this could take a while.", *optIpnsPath);
-            auto uri = daemonUri + "/api/v0/name/resolve?offline=true&arg=" + getFileTransfer()->urlEncode(*optIpnsPath);
+            auto ipnsPath = *optIpnsPath;
+            debug("Resolving IPFS object of '%s', this could take a while.", ipnsPath);
+            auto uri = daemonUri + "/api/v0/name/resolve?offline=true&arg=" + getFileTransfer()->urlEncode(ipnsPath);
             FileTransferRequest request(uri);
             request.post = true;
             request.tries = 1;
@@ -115,13 +116,14 @@ protected:
     {
         if (!optIpnsPath)
             return;
+        auto ipnsPath = *optIpnsPath;
 
         auto state(_state.lock());
 
-        debug("Publishing '%s' to '%s', this could take a while.", state->ipfsPath, *optIpnsPath);
+        debug("Publishing '%s' to '%s', this could take a while.", state->ipfsPath, ipnsPath);
 
         auto uri = daemonUri + "/api/v0/name/publish?offline=true&arg=" + getFileTransfer()->urlEncode(state->ipfsPath);
-        uri += "&key=" + std::string(*optIpnsPath, 6);
+        uri += "&key=" + std::string(ipnsPath, 6);
 
         auto req = FileTransferRequest(uri);
         req.post = true;
