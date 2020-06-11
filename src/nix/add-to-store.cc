@@ -53,6 +53,7 @@ struct CmdAddToStore : MixDryRun, StoreCommand
         if (!dryRun) {
             auto source = StringSource { *sink.s };
             store->addToStore(info, source);
+            store->sync();
         }
 
         logger->stdout("%s", store->printStorePath(info.path));
