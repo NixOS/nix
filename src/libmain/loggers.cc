@@ -31,6 +31,8 @@ Logger * makeDefaultLogger() {
         return makeProgressBar();
     case LogFormat::barWithLogs:
         return makeProgressBar(true);
+    default:
+        abort();
     }
 }
 
