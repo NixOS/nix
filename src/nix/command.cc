@@ -84,8 +84,8 @@ void StorePathsCommand::run(ref<Store> store)
                     // force evaluation of package argument
                     i->toValue(*state);
 
-                    for (auto & d : state->importedDrvs)
-                        storePaths.push_back(std::move(d.path));
+                    for (auto & d : state->importedPaths)
+                        storePaths.push_back(d.clone());
                 }
 
             if (includeBuildDeps)
