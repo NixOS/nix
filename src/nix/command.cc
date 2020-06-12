@@ -84,7 +84,7 @@ void StorePathsCommand::run(ref<Store> store)
                     // force evaluation of package argument
                     i->toValue(*state);
 
-                    for (auto & d : state->importedPaths)
+                    for (auto & d : state->realisedPaths)
                         storePaths.push_back(d.clone());
                 }
 

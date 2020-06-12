@@ -54,7 +54,7 @@ void EvalState::realiseContext(const PathSet & context)
         auto ctx = store->parseStorePath(decoded.first);
         if (!store->isValidPath(ctx))
             throw InvalidPathError(store->printStorePath(ctx));
-        importedPaths.push_back(ctx.clone());
+        realisedPaths.push_back(ctx.clone());
         if (!decoded.second.empty() && ctx.isDerivation()) {
             drvs.push_back(StorePathWithOutputs{ctx.clone(), {decoded.second}});
 
