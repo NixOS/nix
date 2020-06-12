@@ -18,7 +18,10 @@ fi
 if (! (ipfs log ls));
 then
   echo "Ipfs daemon not detected; initializing.."
+  ipfs init
   ipfs daemon --offline &
+  pidIpfsDaemon=$!
+  trap "kill -9 $pidIpfsDaemon" EXIT
 fi
 
 ################################################################################
@@ -112,9 +115,3 @@ DOWNLOAD_LOCATION=$(NIX_REMOTE=local $BUILD_COMMAND \
   --no-out-link \
   -j0 \
   --option trusted-public-keys $(cat $SIGNING_KEY_PUB_FILE))
-
-################################################################################
-## Cleanup
-################################################################################
-
-# The cleanup is done automatically by nix/tests/init.sh
