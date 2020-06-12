@@ -191,6 +191,19 @@ StorePath Store::makeFixedOutputPath(
     }
 }
 
+StorePath Store::makeFixedOutputPathFromCA(std::string_view name, std::string ca,
+    const StorePathSet & references, bool hasSelfReference) const
+{
+    if (hasPrefix(ca, "fixed:")) {
+        FileIngestionMethod ingestionMethod { ca.compare(6, 2, "r:") == 0 };
+        Hash hash(std::string(ca, ingestionMethod == FileIngestionMethod::Recursive ? 8 : 6));
+        return makeFixedOutputPath(ingestionMethod, hash, name, references, hasSelfReference);
+    } else if (hasPrefix(ca, "text:")) {
+        Hash hash(std::string(ca, 5));
+        return makeTextPath(name, hash, references);
+    } else
+        throw Error("'%s' is not a valid ca", ca);
+}
 
 StorePath Store::makeTextPath(std::string_view name, const Hash & hash,
     const StorePathSet & references) const
@@ -583,9 +596,7 @@ void copyStorePath(ref<Store> srcStore, ref<Store> dstStore,
     // recompute store path on the chance dstStore does it differently
     if (info->isContentAddressed(*srcStore)) {
         auto info2 = make_ref<ValidPathInfo>(*info);
-        FileIngestionMethod ingestionMethod { info->ca.compare(6, 2, "r:") == 0 };
-        Hash hash(std::string(info->ca, ingestionMethod == FileIngestionMethod::Recursive ? 8 : 6));
-        info2->path = dstStore->makeFixedOutputPath(ingestionMethod, hash, storePath.name());
+        info2->path = dstStore->makeFixedOutputPathFromCA(info->path.name(), info->ca);
         info = info2;
     }
 
@@ -656,11 +667,8 @@ void copyPaths(ref<Store> srcStore, ref<Store> dstStore, const StorePathSet & st
 
             auto info = srcStore->queryPathInfo(storePath);
             auto storePathForDst = storePath.clone();
-            if (hasPrefix(info->ca, "fixed:"))
-            {
-                FileIngestionMethod ingestionMethod { info->ca.compare(6, 2, "r:") == 0 };
-                Hash hash(std::string(info->ca, ingestionMethod == FileIngestionMethod::Recursive ? 8 : 6));
-                storePathForDst = dstStore->makeFixedOutputPath(ingestionMethod, hash, storePath.name());
+            if (info->isContentAddressed(*srcStore)) {
+                storePathForDst = dstStore->makeFixedOutputPathFromCA(storePath.name(), info->ca);
                 if (storePathForDst != storePath)
                     debug("rewriting path '%s' to '%s' for substituter '%s'", srcStore->printStorePath(storePath), dstStore->printStorePath(storePathForDst), dstStore->getUri());
             }
@@ -684,11 +692,8 @@ void copyPaths(ref<Store> srcStore, ref<Store> dstStore, const StorePathSet & st
             auto info = srcStore->queryPathInfo(storePath);
 
             auto storePathForDst = storePath.clone();
-            if (hasPrefix(info->ca, "fixed:"))
-            {
-                FileIngestionMethod ingestionMethod { info->ca.compare(6, 2, "r:") == 0 };
-                Hash hash(std::string(info->ca, ingestionMethod == FileIngestionMethod::Recursive ? 8 : 6));
-                storePathForDst = dstStore->makeFixedOutputPath(ingestionMethod, hash, storePath.name());
+            if (info->isContentAddressed(*srcStore)) {
+                storePathForDst = dstStore->makeFixedOutputPathFromCA(storePath.name(), info->ca);
                 if (storePathForDst != storePath)
                     debug("rewriting path '%s' to '%s' for substituter '%s'", srcStore->printStorePath(storePath), dstStore->printStorePath(storePathForDst), dstStore->getUri());
             }

@@ -352,7 +352,11 @@ public:
         bool hasSelfReference = false) const;
 
     StorePath makeTextPath(std::string_view name, const Hash & hash,
-        const StorePathSet & references) const;
+        const StorePathSet & references = {}) const;
+
+    StorePath makeFixedOutputPathFromCA(std::string_view name, std::string ca,
+        const StorePathSet & references = {},
+        bool hasSelfReference = false) const;
 
     /* This is the preparatory part of addToStore(); it computes the
        store path to which srcPath is to be copied.  Returns the store
