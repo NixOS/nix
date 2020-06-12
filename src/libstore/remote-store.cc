@@ -418,15 +418,6 @@ StorePathSet RemoteStore::queryDerivationOutputs(const StorePath & path)
 }
 
 
-PathSet RemoteStore::queryDerivationOutputNames(const StorePath & path)
-{
-    auto conn(getConnection());
-    conn->to << wopQueryDerivationOutputNames << printStorePath(path);
-    conn.processStderr();
-    return readStrings<PathSet>(conn->from);
-}
-
-
 std::optional<StorePath> RemoteStore::queryPathFromHashPart(const std::string & hashPart)
 {
     auto conn(getConnection());

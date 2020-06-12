@@ -785,23 +785,6 @@ StorePathSet LocalStore::queryDerivationOutputs(const StorePath & path)
 }
 
 
-StringSet LocalStore::queryDerivationOutputNames(const StorePath & path)
-{
-    return retrySQLite<StringSet>([&]() {
-        auto state(_state.lock());
-
-        auto useQueryDerivationOutputs(state->stmtQueryDerivationOutputs.use()
-            (queryValidPathId(*state, path)));
-
-        StringSet outputNames;
-        while (useQueryDerivationOutputs.next())
-            outputNames.insert(useQueryDerivationOutputs.getStr(0));
-
-        return outputNames;
-    });
-}
-
-
 std::optional<StorePath> LocalStore::queryPathFromHashPart(const std::string & hashPart)
 {
     if (hashPart.size() != storePathHashLen) throw Error("invalid hash part");

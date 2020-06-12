@@ -410,6 +410,15 @@ StorePathSet BasicDerivation::outputPaths() const
 }
 
 
+StringSet BasicDerivation::outputNames() const
+{
+    StringSet names;
+    for (auto & i : outputs)
+        names.insert(i.first);
+    return names;
+}
+
+
 Source & readDerivation(Source & in, const Store & store, BasicDerivation & drv)
 {
     drv.outputs.clear();

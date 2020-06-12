@@ -2723,9 +2723,6 @@ struct RestrictedStore : public LocalFSStore
     StorePathSet queryDerivationOutputs(const StorePath & path) override
     { throw Error("queryDerivationOutputs"); }
 
-    StringSet queryDerivationOutputNames(const StorePath & path) override
-    { throw Error("queryDerivationOutputNames"); }
-
     std::optional<StorePath> queryPathFromHashPart(const std::string & hashPart) override
     { throw Error("queryPathFromHashPart"); }
 

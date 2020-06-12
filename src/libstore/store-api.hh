@@ -430,10 +430,6 @@ public:
     virtual StorePathSet queryDerivationOutputs(const StorePath & path)
     { unsupported("queryDerivationOutputs"); }
 
-    /* Query the output names of the derivation denoted by `path'. */
-    virtual StringSet queryDerivationOutputNames(const StorePath & path)
-    { unsupported("queryDerivationOutputNames"); }
-
     /* Query the full store path given the hash part of a valid store
        path, or empty if the path doesn't exist. */
     virtual std::optional<StorePath> queryPathFromHashPart(const std::string & hashPart) = 0;

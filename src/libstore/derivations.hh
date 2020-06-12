@@ -58,6 +58,8 @@ struct BasicDerivation
     /* Return the output paths of a derivation. */
     StorePathSet outputPaths() const;
 
+    /* Return the output names of a derivation. */
+    StringSet outputNames() const;
 };
 
 struct Derivation : BasicDerivation
