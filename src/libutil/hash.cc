@@ -125,7 +125,7 @@ std::string Hash::to_string(Base base, bool includeType) const
 }
 
 
-Hash::Hash(const std::string & s, HashType type)
+Hash::Hash(std::string_view s, HashType type)
     : type(type)
 {
     size_t pos = 0;
@@ -194,7 +194,7 @@ Hash::Hash(const std::string & s, HashType type)
     }
 
     else if (isSRI || size == base64Len()) {
-        auto d = base64Decode(std::string(s, pos));
+        auto d = base64Decode(s.substr(pos));
         if (d.size() != hashSize)
             throw BadHash("invalid %s hash '%s'", isSRI ? "SRI" : "base-64", s);
         assert(hashSize);
