@@ -76,7 +76,7 @@ mkdir $IPFS_DST_HTTP_LOCAL_STORE
 
 IPFS_HTTP_LOCAL_PREFIX='http://localhost:8080/ipfs'
 
-DOWNLOAD_LOCATION=$(NIX_REMOTE=local $BUILD_COMMAND \
+DOWNLOAD_LOCATION=$($BUILD_COMMAND \
   --option substituters $IPFS_HTTP_LOCAL_PREFIX/$IPFS_HASH \
   --store $IPFS_DST_HTTP_LOCAL_STORE \
   --no-out-link \
@@ -91,7 +91,7 @@ mkdir $IPFS_DST_IPFS_STORE
 
 IPFS_IPFS_PREFIX='ipfs://'
 
-DOWNLOAD_LOCATION=$(NIX_REMOTE=local $BUILD_COMMAND \
+DOWNLOAD_LOCATION=$($BUILD_COMMAND \
   --option substituters $IPFS_IPFS_PREFIX$IPFS_HASH \
   --store $IPFS_DST_IPFS_STORE \
   --no-out-link \
@@ -109,7 +109,7 @@ IPNS_ID=$(ipfs name publish $IPFS_HASH --allow-offline | awk '{print substr($3,1
 mkdir $IPFS_DST_IPNS_STORE
 IPFS_IPNS_PREFIX='ipns://'
 
-DOWNLOAD_LOCATION=$(NIX_REMOTE=local $BUILD_COMMAND \
+DOWNLOAD_LOCATION=$($BUILD_COMMAND \
   --option substituters $IPFS_IPNS_PREFIX$IPNS_ID \
   --store $IPFS_DST_IPNS_STORE \
   --no-out-link \
