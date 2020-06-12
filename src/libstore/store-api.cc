@@ -583,7 +583,9 @@ void copyStorePath(ref<Store> srcStore, ref<Store> dstStore,
     // recompute store path on the chance dstStore does it differently
     if (hasPrefix(info->ca, "fixed:") && info->references.empty()) {
         auto info2 = make_ref<ValidPathInfo>(*info);
-        info2->path = dstStore->makeStorePath("output:out", hashString(htSHA256, info->ca), storePath.name());
+        FileIngestionMethod ingestionMethod { info->ca.compare(6, 2, "r:") == 0 };
+        Hash hash(std::string(info->ca, ingestionMethod == FileIngestionMethod::Recursive ? 8 : 6));
+        info2->path = dstStore->makeFixedOutputPath(ingestionMethod, hash, storePath.name());
         info = info2;
     }
 
