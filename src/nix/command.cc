@@ -103,13 +103,11 @@ void StorePathsCommand::run(ref<Store> store)
                             storePaths.push_back(b.drvPath->clone());
                     }
 
-            auto includeDerivers = includeBuildDeps || includeEvalDeps;
-
             StorePathSet closure;
-            store->computeFSClosure(storePathsToSet(storePaths), closure, false, includeDerivers);
+            store->computeFSClosure(storePathsToSet(storePaths), closure, false, includeBuildDeps);
             storePaths.clear();
             for (auto & p : closure)
-                if (!(includeDerivers && p.isDerivation()))
+                if (!p.isDerivation())
                     storePaths.push_back(p.clone());
         }
     }
