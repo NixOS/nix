@@ -56,15 +56,12 @@ nix-store --generate-binary-cache-key $SIGNING_KEY_NAME $SIGNING_KEY_PRI_FILE $S
 ################################################################################
 
 mkdir -p $IPFS_SRC_STORE
-# BUILD_COMMAND="nix-build ./dependencies.nix -A input1_drv"
-BUILD_COMMAND="nix-build ./fixed.nix -A good"
+storePaths=$(nix-build ./fixed.nix -A good)
 
-nix copy --to file://$IPFS_SRC_STORE \
-    $($BUILD_COMMAND)
+nix copy --to file://$IPFS_SRC_STORE $storePaths
 
 nix sign-paths --store file://$IPFS_SRC_STORE \
-    -k $SIGNING_KEY_PRI_FILE \
-    $($BUILD_COMMAND) -r
+    -k $SIGNING_KEY_PRI_FILE  storePaths
 
 IPFS_HASH=$(ipfs add -r $IPFS_SRC_STORE 2>/dev/null | tail -n 1 | awk '{print $2}')
 
