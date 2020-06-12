@@ -9,6 +9,7 @@ struct CmdAddToStore : MixDryRun, StoreCommand
 {
     Path path;
     std::optional<std::string> namePart;
+    FileIngestionMethod ingestionMethod = FileIngestionMethod::Recursive;
 
     CmdAddToStore()
     {
@@ -20,6 +21,13 @@ struct CmdAddToStore : MixDryRun, StoreCommand
             .description = "name component of the store path",
             .labels = {"name"},
             .handler = {&namePart},
+        });
+
+        addFlag({
+            .longName = "flat",
+            .shortName = 0,
+            .description = "use flat file ingestion",
+            .handler = {&ingestionMethod, FileIngestionMethod::Flat},
         });
     }
 
@@ -45,10 +53,24 @@ struct CmdAddToStore : MixDryRun, StoreCommand
 
         auto narHash = hashString(htSHA256, *sink.s);
 
-        ValidPathInfo info(store->makeFixedOutputPath(FileIngestionMethod::Recursive, narHash, *namePart));
+        ValidPathInfo info(store->makeFixedOutputPath(ingestionMethod, narHash, *namePart));
         info.narHash = narHash;
         info.narSize = sink.s->size();
-        info.ca = makeFixedOutputCA(FileIngestionMethod::Recursive, info.narHash);
+
+        Hash hash;
+        switch (ingestionMethod) {
+        case FileIngestionMethod::Recursive: {
+            hash = info.narHash;
+            break;
+        }
+        case FileIngestionMethod::Flat: {
+            HashSink hsink(htSHA256);
+            readFile(path, hsink);
+            hash = hsink.finish().first;
+            break;
+        }
+        }
+        info.ca = makeFixedOutputCA(ingestionMethod, hash);
 
         if (!dryRun) {
             auto source = StringSource { *sink.s };
