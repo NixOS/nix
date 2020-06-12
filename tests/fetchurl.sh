@@ -42,7 +42,7 @@ outPath=$(nix-build '<nix/fetchurl.nix>' --argstr url file:///no-such-dir/fetchu
 
 # Test hashed mirrors with an SRI hash.
 nix-build '<nix/fetchurl.nix>' --argstr url file:///no-such-dir/fetchurl.sh --argstr hash $(nix to-sri --type sha256 $hash) \
-          --argstr name bla --no-out-link --substituters $other_store
+          --no-out-link --substituters $other_store
 
 # Test unpacking a NAR.
 rm -rf $TEST_ROOT/archive
