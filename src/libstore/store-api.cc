@@ -649,14 +649,23 @@ void copyPaths(ref<Store> srcStore, ref<Store> dstStore, const StorePathSet & st
     processGraph<Path>(pool,
         PathSet(missing.begin(), missing.end()),
 
-        [&](const Path & storePath) {
-            if (dstStore->isValidPath(dstStore->parseStorePath(storePath))) {
+        [&](const Path & storePathS) {
+            auto storePath = srcStore->parseStorePath(storePathS);
+
+            auto info = srcStore->queryPathInfo(storePath);
+            auto storePathForDst = storePath.clone();
+            if (hasPrefix(info->ca, "fixed:"))
+            {
+                FileIngestionMethod ingestionMethod { info->ca.compare(6, 2, "r:") == 0 };
+                Hash hash(std::string(info->ca, ingestionMethod == FileIngestionMethod::Recursive ? 8 : 6));
+                storePathForDst = dstStore->makeFixedOutputPath(ingestionMethod, hash, storePath.name());
+            }
+
+            if (dstStore->isValidPath(storePathForDst)) {
                 nrDone++;
                 showProgress();
                 return PathSet();
             }
-
-            auto info = srcStore->queryPathInfo(srcStore->parseStorePath(storePath));
 
             bytesExpected += info->narSize;
             act.setExpected(actCopyPath, bytesExpected);
@@ -667,9 +676,18 @@ void copyPaths(ref<Store> srcStore, ref<Store> dstStore, const StorePathSet & st
         [&](const Path & storePathS) {
             checkInterrupt();
 
-            auto storePath = dstStore->parseStorePath(storePathS);
+            auto storePath = srcStore->parseStorePath(storePathS);
+            auto info = srcStore->queryPathInfo(storePath);
 
-            if (!dstStore->isValidPath(storePath)) {
+            auto storePathForDst = storePath.clone();
+            if (hasPrefix(info->ca, "fixed:"))
+            {
+                FileIngestionMethod ingestionMethod { info->ca.compare(6, 2, "r:") == 0 };
+                Hash hash(std::string(info->ca, ingestionMethod == FileIngestionMethod::Recursive ? 8 : 6));
+                storePathForDst = dstStore->makeFixedOutputPath(ingestionMethod, hash, storePath.name());
+            }
+
+            if (!dstStore->isValidPath(storePathForDst)) {
                 MaintainCount<decltype(nrRunning)> mc(nrRunning);
                 showProgress();
                 try {
