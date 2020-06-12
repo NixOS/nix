@@ -73,7 +73,7 @@ rec {
       }))
     # TODO fix `nix copy` on darwin
     # ++ lib.optional (stdenv.isLinux || stdenv.isDarwin) ipfs;
-    # ++ lib.optional stdenv.isLinux ipfs;
+    ++ lib.optional stdenv.isLinux ipfs;
 
   propagatedDeps =
     [ (boehmgc.override { enableLargeConfig = true; })
