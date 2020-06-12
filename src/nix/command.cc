@@ -50,8 +50,8 @@ StorePathsCommand::StorePathsCommand(bool recursive)
     mkFlag(0, "all", "apply operation to the entire store", &all);
 
     // these options only make sense when recursing
-    mkFlag('b', "build", "include build dependencies of specified path", &includeBuildDeps);
-    mkFlag('e', "eval", "include eval dependencies of specified path", &includeEvalDeps);
+    mkFlag('e', "eval", "include evaltime dependencies of specified path", &includeEvalDeps);
+    mkFlag('b', "build", "include buildtime dependencies of specified path", &includeBuildDeps);
     mkFlag(0, "no-run", "don't include runtime dependencies of specified path", &includeRunDeps, false);
 }
 
@@ -69,6 +69,9 @@ void StorePathsCommand::run(ref<Store> store)
     else {
         if (!recursive && (includeBuildDeps || includeEvalDeps))
             throw UsageError("--build and --eval require --recursive");
+
+        if (includeBuildDeps && !includeRunDeps)
+            throw UsageError("--build and --no-run cannot be combined");
 
         if (includeRunDeps)
           for (auto & p : toStorePaths(store, realiseMode, installables))
