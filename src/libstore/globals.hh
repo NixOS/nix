@@ -339,9 +339,6 @@ public:
         "setuid/setgid bits or with file capabilities."};
 #endif
 
-    Setting<Strings> hashedMirrors{this, {"http://tarballs.nixos.org/"}, "hashed-mirrors",
-        "A list of servers used by builtins.fetchurl to fetch files by hash."};
-
     Setting<uint64_t> minFree{this, 0, "min-free",
         "Automatically run the garbage collector when free disk space drops below the specified amount."};
 
