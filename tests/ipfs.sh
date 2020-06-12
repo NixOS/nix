@@ -63,7 +63,7 @@ storePaths=$(nix-build ./fixed.nix -A good)
 nix copy --to file://$IPFS_SRC_STORE $storePaths
 
 nix sign-paths --store file://$IPFS_SRC_STORE \
-    -k $SIGNING_KEY_PRI_FILE  storePaths
+    -k $SIGNING_KEY_PRI_FILE $storePaths
 
 IPFS_HASH=$(ipfs add -r $IPFS_SRC_STORE 2>/dev/null | tail -n 1 | awk '{print $2}')
 
