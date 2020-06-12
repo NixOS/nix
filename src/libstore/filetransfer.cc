@@ -100,6 +100,9 @@ struct curlFileTransfer : public FileTransfer
                 requestHeaders = curl_slist_append(requestHeaders, ("If-None-Match: " + request.expectedETag).c_str());
             if (!request.mimeType.empty())
                 requestHeaders = curl_slist_append(requestHeaders, ("Content-Type: " + request.mimeType).c_str());
+            for (const auto & header: request.headers) {
+                requestHeaders = curl_slist_append(requestHeaders, (header.first + ": " + header.second).c_str());
+            }
         }
 
         ~TransferItem()

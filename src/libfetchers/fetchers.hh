@@ -119,12 +119,14 @@ struct DownloadFileResult
 DownloadFileResult downloadFile(
     ref<Store> store,
     const std::string & url,
+    const std::optional<std::map<std::string, std::string>> & headers,
     const std::string & name,
     bool immutable);
 
 std::pair<Tree, time_t> downloadTarball(
     ref<Store> store,
     const std::string & url,
+    const std::optional<std::map<std::string, std::string>> & headers,
     const std::string & name,
     bool immutable);
 

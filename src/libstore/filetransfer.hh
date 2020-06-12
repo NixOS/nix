@@ -37,6 +37,7 @@ struct FileTransferRequest
 {
     std::string uri;
     std::string expectedETag;
+    std::map<std::string, std::string> headers;
     bool verifyTLS = true;
     bool head = false;
     size_t tries = fileTransferSettings.tries;
@@ -49,6 +50,11 @@ struct FileTransferRequest
 
     FileTransferRequest(const std::string & uri)
         : uri(uri), parentAct(getCurActivity()) { }
+
+    FileTransferRequest(const std::string & uri, const std::optional<std::map<std::string, std::string>> & headers)
+        : uri(uri), parentAct(getCurActivity()) {
+            if (headers) this->headers = *headers;
+        }
 
     std::string verb()
     {
