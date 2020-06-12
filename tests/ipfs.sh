@@ -24,6 +24,8 @@ then
   trap "kill -9 $pidIpfsDaemon" EXIT
 fi
 
+clearStore
+
 ################################################################################
 ## Create the folders for the source and destination stores
 ################################################################################
