@@ -859,19 +859,28 @@ void LocalStore::querySubstitutablePathInfos(const StorePathSet & paths,
 {
     if (!settings.useSubstitutes) return;
     for (auto & sub : getDefaultSubstituters()) {
-        for (auto & path_ : paths) {
-            auto path(path_.clone());
-            debug("checking substituter '%s' for path '%s'", sub->getUri(), printStorePath(path));
-            try {
-                auto info = sub->queryPathInfo(path);
+        for (auto & path : paths) {
+            auto subPath(path.clone());
 
-                auto ca = pathsCA.find(printStorePath(path));
-                if (info->references.empty() && ca != pathsCA.end()) {
-                    if (!hasPrefix(ca->second, "fixed:"))
-                        continue;
-                    // recompute store path so that we can use a different store path
-                    path = sub->makeStorePath("output:out", hashString(htSHA256, ca->second), path.name());
-                } else if (sub->storeDir != storeDir) continue;
+            auto ca_ = pathsCA.find(printStorePath(path));
+            // recompute store path so that we can use a different store root
+            if (ca_ != pathsCA.end()) {
+                auto ca(ca_->second);
+                if (!hasPrefix(ca, "fixed:"))
+                    continue;
+                FileIngestionMethod ingestionMethod { ca.compare(6, 2, "r:") == 0 };
+                Hash hash(std::string(ca, ingestionMethod == FileIngestionMethod::Recursive ? 8 : 6));
+                subPath = makeFixedOutputPath(ingestionMethod, hash, path.name());
+                if (subPath != path)
+                    debug("replaced path '%s' with '%s' for substituter '%s'", printStorePath(path), sub->printStorePath(subPath), sub->getUri());
+            } else if (sub->storeDir != storeDir) continue;
+
+            debug("checking substituter '%s' for path '%s'", sub->getUri(), sub->printStorePath(subPath));
+            try {
+                auto info = sub->queryPathInfo(subPath);
+
+                if (sub->storeDir != storeDir && !info->isContentAddressed(*sub))
+                    continue;
 
                 auto narInfo = std::dynamic_pointer_cast<const NarInfo>(
                     std::shared_ptr<const ValidPathInfo>(info));
