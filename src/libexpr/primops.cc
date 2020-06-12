@@ -719,7 +719,8 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
             throw Error(format("multiple outputs are not supported in fixed-output derivations, at %1%") % posDrvName);
 
         HashType ht = outputHashAlgo.empty() ? htUnknown : parseHashType(outputHashAlgo);
-        Hash h(*outputHash, ht);
+
+        Hash h = newHashAllowEmpty(*outputHash, ht);
 
         auto outPath = state.store->makeFixedOutputPath(ingestionMethod, h, drvName);
         if (!jsonObject) drv.env["out"] = state.store->printStorePath(outPath);
@@ -1126,7 +1127,7 @@ static void prim_path(EvalState & state, const Pos & pos, Value * * args, Value 
         } else if (n == "recursive")
             method = FileIngestionMethod { state.forceBool(*attr.value, *attr.pos) };
         else if (n == "sha256")
-            expectedHash = Hash(state.forceStringNoCtx(*attr.value, *attr.pos), htSHA256);
+            expectedHash = newHashAllowEmpty(state.forceStringNoCtx(*attr.value, *attr.pos), htSHA256);
         else
             throw EvalError(format("unsupported argument '%1%' to 'addPath', at %2%") % attr.name % *attr.pos);
     }
