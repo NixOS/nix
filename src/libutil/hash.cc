@@ -205,6 +205,16 @@ Hash::Hash(const std::string & s, HashType type)
         throw BadHash("hash '%s' has wrong length for hash type '%s'", s, printHashType(type));
 }
 
+Hash newHashAllowEmpty(std::string hashStr, HashType ht)
+{
+    if (hashStr.empty())
+    {
+        Hash h(ht);
+        warn("found empty hash, assuming you wanted '%s'", h.to_string());
+    } else
+        return Hash(hashStr, ht);
+}
+
 
 union Ctx
 {

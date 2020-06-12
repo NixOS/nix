@@ -102,14 +102,9 @@ static void fetch(EvalState & state, const Pos & pos, Value * * args, Value & v,
             string n(attr.name);
             if (n == "url")
                 url = state.forceStringNoCtx(*attr.value, *attr.pos);
-            else if (n == "sha256") {
-                auto hashStr = state.forceStringNoCtx(*attr.value, *attr.pos);
-                if (hashStr == "") {
-                    expectedHash = Hash(htSHA256);
-                    printError("warning: found empty hash, assuming you wanted '%s'", expectedHash->to_string());
-                } else
-                    expectedHash = Hash(hashStr, htSHA256);
-            } else if (n == "name")
+            else if (n == "sha256")
+                expectedHash = newHashAllowEmpty(state.forceStringNoCtx(*attr.value, *attr.pos), htSHA256);
+            else if (n == "name")
                 name = state.forceStringNoCtx(*attr.value, *attr.pos);
             else
                 throw EvalError("unsupported argument '%s' to '%s', at %s",

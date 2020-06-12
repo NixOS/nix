@@ -720,12 +720,7 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
 
         HashType ht = outputHashAlgo.empty() ? htUnknown : parseHashType(outputHashAlgo);
 
-        Hash h;
-        if (outputHash->empty()) {
-            h = Hash(ht);
-            printError("warning: found empty hash, assuming you wanted '%s'", h.to_string());
-        } else
-            h = Hash(*outputHash, ht);
+        Hash h = newHashAllowEmpty(*outputHash, ht);
 
         auto outPath = state.store->makeFixedOutputPath(ingestionMethod, h, drvName);
         if (!jsonObject) drv.env["out"] = state.store->printStorePath(outPath);
@@ -1131,14 +1126,9 @@ static void prim_path(EvalState & state, const Pos & pos, Value * * args, Value 
             filterFun = attr.value;
         } else if (n == "recursive")
             method = FileIngestionMethod { state.forceBool(*attr.value, *attr.pos) };
-        else if (n == "sha256") {
-            auto hashStr = state.forceStringNoCtx(*attr.value, *attr.pos);
-            if (hashStr == "") {
-                expectedHash = Hash(htSHA256);
-                printError("warning: found empty hash, assuming you wanted '%s'", expectedHash.to_string());
-            } else
-                expectedHash = Hash(hashStr, htSHA256);
-        } else
+        else if (n == "sha256")
+            expectedHash = newHashAllowEmpty(state.forceStringNoCtx(*attr.value, *attr.pos), htSHA256);
+        else
             throw EvalError(format("unsupported argument '%1%' to 'addPath', at %2%") % attr.name % *attr.pos);
     }
     if (path.empty())

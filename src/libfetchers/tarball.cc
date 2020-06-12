@@ -263,14 +263,8 @@ struct TarballInputScheme : InputScheme
                 throw Error("unsupported tarball input attribute '%s'", name);
 
         auto input = std::make_unique<TarballInput>(parseURL(getStrAttr(attrs, "url")));
-        if (auto hash = maybeGetStrAttr(attrs, "hash")) {
-            if (hash->empty()) {
-                input->hash = Hash(htUnknown);
-                printError("warning: found empty hash, assuming you wanted '%s'", input->hash->to_string());
-            } else
-                // FIXME: require SRI hash.
-                input->hash = Hash(*hash);
-        }
+        if (auto hash = maybeGetStrAttr(attrs, "hash"))
+            input->hash = newHashAllowEmpty(*hash, htUnknown);
 
         return input;
     }
