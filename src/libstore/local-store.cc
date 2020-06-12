@@ -866,12 +866,12 @@ void LocalStore::querySubstitutablePathInfos(const StorePathSet & paths,
                 auto info = sub->queryPathInfo(path);
 
                 auto ca = pathsCA.find(printStorePath(path));
-                if (sub->storeDir != storeDir && info->references.empty() && ca != pathsCA.end()) {
+                if (info->references.empty() && ca != pathsCA.end()) {
                     if (!hasPrefix(ca->second, "fixed:"))
                         continue;
-                    // recompute store path so that we can use a fixed output ca
+                    // recompute store path so that we can use a different store path
                     path = sub->makeStorePath("output:out", hashString(htSHA256, ca->second), path.name());
-                } else continue;
+                } else if (sub->storeDir != storeDir) continue;
 
                 auto narInfo = std::dynamic_pointer_cast<const NarInfo>(
                     std::shared_ptr<const ValidPathInfo>(info));
