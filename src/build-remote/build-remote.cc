@@ -241,7 +241,7 @@ connected:
 
         uploadLock = -1;
 
-        BasicDerivation drv(readDerivation(*store, store->realStoreDir + "/" + std::string(drvPath->to_string())));
+        auto drv = store->readDerivation(*drvPath);
         drv.inputSrcs = store->parseStorePathSet(inputs);
 
         auto result = sshStore->buildDerivation(*drvPath, drv);

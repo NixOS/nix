@@ -329,7 +329,7 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
     case wopQueryDerivationOutputNames: {
         auto path = store->parseStorePath(readString(from));
         logger->startWork();
-        auto names = readDerivation(*store, store->toRealPath(path)).outputNames();
+        auto names = store->readDerivation(path).outputNames();
         logger->stopWork();
         to << names;
         break;

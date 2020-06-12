@@ -688,7 +688,7 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
             for (auto & j : refs) {
                 drv.inputSrcs.insert(j.clone());
                 if (j.isDerivation())
-                    drv.inputDrvs[j.clone()] = readDerivation(*state.store, state.store->toRealPath(j)).outputNames();
+                    drv.inputDrvs[j.clone()] = state.store->readDerivation(j).outputNames();
             }
         }
 

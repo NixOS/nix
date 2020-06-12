@@ -204,6 +204,12 @@ Derivation readDerivation(const Store & store, const Path & drvPath)
 Derivation Store::derivationFromPath(const StorePath & drvPath)
 {
     ensurePath(drvPath);
+    return readDerivation(drvPath);
+}
+
+
+Derivation Store::readDerivation(const StorePath & drvPath)
+{
     auto accessor = getFSAccessor();
     try {
         return parseDerivation(*this, accessor->readFile(printStorePath(drvPath)));
@@ -378,7 +384,7 @@ Hash hashDerivationModulo(Store & store, const Derivation & drv, bool maskOutput
         if (h == drvHashes.end()) {
             assert(store.isValidPath(i.first));
             h = drvHashes.insert_or_assign(i.first.clone(), hashDerivationModulo(store,
-                readDerivation(store, store.toRealPath(i.first)), false)).first;
+                store.readDerivation(i.first), false)).first;
         }
         inputs2.insert_or_assign(h->second.to_string(Base16, false), i.second);
     }

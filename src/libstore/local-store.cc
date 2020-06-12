@@ -595,7 +595,7 @@ uint64_t LocalStore::addValidPath(State & state,
        efficiently query whether a path is an output of some
        derivation. */
     if (info.path.isDerivation()) {
-        auto drv = readDerivation(*this, realStoreDir + "/" + std::string(info.path.to_string()));
+        auto drv = readDerivation(info.path);
 
         /* Verify that the output paths in the derivation are correct
            (i.e., follow the scheme for computing output paths from
@@ -911,8 +911,7 @@ void LocalStore::registerValidPaths(const ValidPathInfos & infos)
         for (auto & i : infos)
             if (i.path.isDerivation()) {
                 // FIXME: inefficient; we already loaded the derivation in addValidPath().
-                checkDerivationOutputs(i.path,
-                    readDerivation(*this, realStoreDir + "/" + std::string(i.path.to_string())));
+                checkDerivationOutputs(i.path, readDerivation(i.path));
             }
 
         /* Do a topological sort of the paths.  This will throw an
