@@ -52,6 +52,7 @@ StorePathsCommand::StorePathsCommand(bool recursive)
     // these options only make sense when recursing
     mkFlag('b', "build", "include build dependencies of specified path", &includeBuildDeps);
     mkFlag('e', "eval", "include eval dependencies of specified path", &includeEvalDeps);
+    mkFlag(0, "no-run", "don't include runtime dependencies of specified path", &includeRunDeps, false);
 }
 
 void StorePathsCommand::run(ref<Store> store)
@@ -69,8 +70,9 @@ void StorePathsCommand::run(ref<Store> store)
         if (!recursive && (includeBuildDeps || includeEvalDeps))
             throw UsageError("--build and --eval require --recursive");
 
-        for (auto & p : toStorePaths(store, realiseMode, installables))
-            storePaths.push_back(p.clone());
+        if (includeRunDeps)
+          for (auto & p : toStorePaths(store, realiseMode, installables))
+              storePaths.push_back(p.clone());
 
         if (recursive) {
             if (includeEvalDeps)
