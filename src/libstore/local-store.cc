@@ -855,16 +855,24 @@ StorePathSet LocalStore::querySubstitutablePaths(const StorePathSet & paths)
 
 
 void LocalStore::querySubstitutablePathInfos(const StorePathSet & paths,
-    SubstitutablePathInfos & infos)
+    SubstitutablePathInfos & infos, std::map<std::string, std::string> pathsCA)
 {
     if (!settings.useSubstitutes) return;
     for (auto & sub : getDefaultSubstituters()) {
-        if (sub->storeDir != storeDir) continue;
-        for (auto & path : paths) {
-            if (infos.count(path)) continue;
+        for (auto & path_ : paths) {
+            auto path(path_.clone());
             debug("checking substituter '%s' for path '%s'", sub->getUri(), printStorePath(path));
             try {
                 auto info = sub->queryPathInfo(path);
+
+                auto ca = pathsCA.find(printStorePath(path));
+                if (sub->storeDir != storeDir && info->references.empty() && ca != pathsCA.end()) {
+                    if (!hasPrefix(ca->second, "fixed:"))
+                        continue;
+                    // recompute store path so that we can use a fixed output ca
+                    path = sub->makeStorePath("output:out", hashString(htSHA256, ca->second), path.name());
+                } else continue;
+
                 auto narInfo = std::dynamic_pointer_cast<const NarInfo>(
                     std::shared_ptr<const ValidPathInfo>(info));
                 infos.insert_or_assign(path.clone(), SubstitutablePathInfo{

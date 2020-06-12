@@ -108,6 +108,27 @@ void Store::computeFSClosure(const StorePath & startPath,
 }
 
 
+static std::optional<std::string> getDerivationCA(ref<Derivation> drv)
+{
+    auto outputHashMode = drv->env.find("outputHashMode");
+    auto outputHashAlgo = drv->env.find("outputHashAlgo");
+    auto outputHash = drv->env.find("outputHash");
+    if (outputHashMode != drv->env.end() && outputHashAlgo != drv->env.end() && outputHash != drv->env.end()) {
+        auto ht = parseHashType(outputHashAlgo->second);
+        auto h = Hash(outputHash->second, ht);
+        FileIngestionMethod ingestionMethod;
+        if (outputHashMode->second == "recursive")
+            ingestionMethod = FileIngestionMethod::Recursive;
+        else if (outputHashMode->second == "flat")
+            ingestionMethod = FileIngestionMethod::Flat;
+        else
+            throw Error("unknown ingestion method: '%s'", outputHashMode->second);
+        return makeFixedOutputCA(ingestionMethod, h);
+    }
+
+    return std::nullopt;
+}
+
 void Store::queryMissing(const std::vector<StorePathWithOutputs> & targets,
     StorePathSet & willBuild_, StorePathSet & willSubstitute_, StorePathSet & unknown_,
     unsigned long long & downloadSize_, unsigned long long & narSize_)
@@ -159,7 +180,11 @@ void Store::queryMissing(const std::vector<StorePathWithOutputs> & targets,
         SubstitutablePathInfos infos;
         StorePathSet paths; // FIXME
         paths.insert(outPath.clone());
-        querySubstitutablePathInfos(paths, infos);
+
+        std::map<std::string, std::string> pathsCA = {};
+        if (auto ca = getDerivationCA(drv))
+            pathsCA.insert({outPathS, *ca});
+        querySubstitutablePathInfos(paths, infos, pathsCA);
 
         if (infos.empty()) {
             drvState_->lock()->done = true;

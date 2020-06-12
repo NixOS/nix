@@ -445,7 +445,7 @@ public:
        sizes) of a set of paths.  If a path does not have substitute
        info, it's omitted from the resulting ‘infos’ map. */
     virtual void querySubstitutablePathInfos(const StorePathSet & paths,
-        SubstitutablePathInfos & infos) { return; };
+        SubstitutablePathInfos & infos, std::map<std::string, std::string> pathsCA = {}) { return; };
 
     /* Import a path into the store. */
     virtual void addToStore(const ValidPathInfo & info, Source & narSource,

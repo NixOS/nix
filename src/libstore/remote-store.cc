@@ -309,7 +309,7 @@ StorePathSet RemoteStore::querySubstitutablePaths(const StorePathSet & paths)
 
 
 void RemoteStore::querySubstitutablePathInfos(const StorePathSet & paths,
-    SubstitutablePathInfos & infos)
+    SubstitutablePathInfos & infos, std::map<std::string, std::string> pathsCA)
 {
     if (paths.empty()) return;
 

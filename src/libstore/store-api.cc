@@ -580,6 +580,13 @@ void copyStorePath(ref<Store> srcStore, ref<Store> dstStore,
 
     uint64_t total = 0;
 
+    // recompute store path on the chance dstStore does it differently
+    if (hasPrefix(info->ca, "fixed:") && info->references.empty()) {
+        auto info2 = make_ref<ValidPathInfo>(*info);
+        info2->path = dstStore->makeStorePath("output:out", hashString(htSHA256, info->ca), storePath.name());
+        info = info2;
+    }
+
     if (!info->narHash) {
         StringSink sink;
         srcStore->narFromPath({storePath}, sink);
