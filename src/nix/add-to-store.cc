@@ -53,14 +53,10 @@ struct CmdAddToStore : MixDryRun, StoreCommand
 
         auto narHash = hashString(htSHA256, *sink.s);
 
-        ValidPathInfo info(store->makeFixedOutputPath(ingestionMethod, narHash, *namePart));
-        info.narHash = narHash;
-        info.narSize = sink.s->size();
-
         Hash hash;
         switch (ingestionMethod) {
         case FileIngestionMethod::Recursive: {
-            hash = info.narHash;
+            hash = narHash;
             break;
         }
         case FileIngestionMethod::Flat: {
@@ -70,6 +66,10 @@ struct CmdAddToStore : MixDryRun, StoreCommand
             break;
         }
         }
+
+        ValidPathInfo info(store->makeFixedOutputPath(ingestionMethod, hash, *namePart));
+        info.narHash = narHash;
+        info.narSize = sink.s->size();
         info.ca = makeFixedOutputCA(ingestionMethod, hash);
 
         if (!dryRun) {
