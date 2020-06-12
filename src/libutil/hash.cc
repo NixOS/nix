@@ -210,7 +210,7 @@ Hash newHashAllowEmpty(std::string hashStr, HashType ht)
     if (hashStr.empty())
     {
         Hash h(ht);
-        warn("found empty hash, assuming you wanted '%s'", h.to_string());
+        warn("found empty hash, assuming you wanted '%s'", h.to_string(SRI));
     } else
         return Hash(hashStr, ht);
 }
