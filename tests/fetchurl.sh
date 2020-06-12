@@ -35,12 +35,13 @@ clearStore
 other_store=file://$TEST_ROOT/other_store
 
 hash=$(nix hash-file --type sha256 --base16 ./fetchurl.sh)
-storePath=$(nix add-to-store --store $other_store ./fetchurl.sh)
 
-outPath=$(nix-build -vvvvvv '<nix/fetchurl.nix>' --argstr url file:///no-such-dir/fetchurl.sh --argstr sha256 $hash --no-out-link --substituters $other_store)
+storePath=$(nix --store $other_store add-to-store --flat ./fetchurl.sh)
+
+outPath=$(nix-build '<nix/fetchurl.nix>' --argstr url file:///no-such-dir/fetchurl.sh --argstr sha256 $hash --no-out-link --substituters $other_store)
 
 # Test hashed mirrors with an SRI hash.
-nix-build '<nix/fetchurl.nix>' --argstr url file:///no-such-dir/fetchurl.sh --argstr hash $(nix to-sri --type sha512 $hash) \
+nix-build '<nix/fetchurl.nix>' --argstr url file:///no-such-dir/fetchurl.sh --argstr hash $(nix to-sri --type sha256 $hash) \
           --argstr name bla --no-out-link --substituters $other_store
 
 # Test unpacking a NAR.

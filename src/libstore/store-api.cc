@@ -661,6 +661,8 @@ void copyPaths(ref<Store> srcStore, ref<Store> dstStore, const StorePathSet & st
                 FileIngestionMethod ingestionMethod { info->ca.compare(6, 2, "r:") == 0 };
                 Hash hash(std::string(info->ca, ingestionMethod == FileIngestionMethod::Recursive ? 8 : 6));
                 storePathForDst = dstStore->makeFixedOutputPath(ingestionMethod, hash, storePath.name());
+                if (storePathForDst != storePath)
+                    debug("rewriting path '%s' to '%s' for substituter '%s'", srcStore->printStorePath(storePath), dstStore->printStorePath(storePathForDst), dstStore->getUri());
             }
 
             if (dstStore->isValidPath(storePathForDst)) {
@@ -687,6 +689,8 @@ void copyPaths(ref<Store> srcStore, ref<Store> dstStore, const StorePathSet & st
                 FileIngestionMethod ingestionMethod { info->ca.compare(6, 2, "r:") == 0 };
                 Hash hash(std::string(info->ca, ingestionMethod == FileIngestionMethod::Recursive ? 8 : 6));
                 storePathForDst = dstStore->makeFixedOutputPath(ingestionMethod, hash, storePath.name());
+                if (storePathForDst != storePath)
+                    debug("rewriting path '%s' to '%s' for substituter '%s'", srcStore->printStorePath(storePath), dstStore->printStorePath(storePathForDst), dstStore->getUri());
             }
 
             if (!dstStore->isValidPath(storePathForDst)) {
