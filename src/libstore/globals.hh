@@ -357,6 +357,9 @@ public:
     Setting<std::string> githubAccessToken{this, "", "github-access-token",
         "GitHub access token to get access to GitHub data through the GitHub API for github:<..> flakes."};
 
+    Setting<std::string> giteaAccessToken{this, "", "gitea-access-token",
+        "Gitea access token to get access to Gitea data through the gitea API for gitea:<..> flakes."};
+
     Setting<Strings> experimentalFeatures{this, {}, "experimental-features",
         "Experimental Nix features to enable."};
 

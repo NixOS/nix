@@ -192,6 +192,11 @@ struct GitHubInputScheme : GitArchiveInputScheme
         auto host_url = maybeGetStrAttr(input.attrs, "instance").value_or("github.com");
         auto url = fmt("https://api.%s/repos/%s/%s/commits/%s", // FIXME: check
             host_url, getStrAttr(input.attrs, "owner"), getStrAttr(input.attrs, "repo"), *input.getRef());
+
+        std::string accessToken = settings.githubAccessToken.get();
+        if (accessToken != "")
+            url += "?access_token=" + accessToken;
+
         auto json = nlohmann::json::parse(
             readFile(
                 store->toRealPath(
@@ -272,7 +277,56 @@ struct GitLabInputScheme : GitArchiveInputScheme
     }
 };
 
+struct GiteaInputScheme : GitArchiveInputScheme
+{
+    std::string type() override { return "gitea"; }
+
+    Hash getRevFromRef(nix::ref<Store> store, const Input & input) const override
+    {
+        auto host_url = maybeGetStrAttr(input.attrs, "instance").value_or("try.gitea.io"); // FIXME: should this fail? try.gitea.io is not persisten
+        auto url = fmt("https://%s/api/v1/repos/%s/%s/branches/%s",
+            host_url, getStrAttr(input.attrs, "owner"), getStrAttr(input.attrs, "repo"), *input.getRef());
+
+        std::string accessToken = settings.giteaAccessToken.get();
+        if (accessToken != "")
+            url += "?access_token=" + accessToken;
+
+        auto json = nlohmann::json::parse(
+            readFile(
+                store->toRealPath(
+                    downloadFile(store, url, "source", false).storePath)));
+        auto rev = Hash(json["commit"]["id"], htSHA1);
+        debug("HEAD revision for '%s' is %s", url, rev.gitRev());
+        return rev;
+    }
+
+    std::string getDownloadUrl(const Input & input) const override
+    {
+        auto host_url = maybeGetStrAttr(input.attrs, "instance").value_or("try.gitea.io");
+        auto url = fmt("https://%s/api/v1/repos/%s/%s/archive/%s.tar.gz",
+            host_url, getStrAttr(input.attrs, "owner"), getStrAttr(input.attrs, "repo"),
+            input.getRev()->to_string(Base16, false));
+
+        std::string accessToken = settings.giteaAccessToken.get();
+        if (accessToken != "")
+            url += "?access_token=" + accessToken;
+
+        return url;
+    }
+
+    void clone(const Input & input, const Path & destDir) override
+    {
+        auto host_url = maybeGetStrAttr(input.attrs, "instance").value_or("try.gitea.io");
+        // FIXME: get username somewhere
+        Input::fromURL(fmt("git+ssh://git@%s/%s/%s.git",
+                host_url, getStrAttr(input.attrs, "owner"), getStrAttr(input.attrs, "repo")))
+            .applyOverrides(input.getRef().value_or("master"), input.getRev())
+            .clone(destDir);
+    }
+};
+
 static auto r1 = OnStartup([] { registerInputScheme(std::make_unique<GitHubInputScheme>()); });
 static auto r2 = OnStartup([] { registerInputScheme(std::make_unique<GitLabInputScheme>()); });
+static auto r3 = OnStartup([] { registerInputScheme(std::make_unique<GiteaInputScheme>());  });
 
 }
