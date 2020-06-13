@@ -161,11 +161,12 @@ main() {
                 echo "         is only encrypted at rest." >&2
                 echo "         See https://nixos.org/nix/manual/#sect-macos-installation" >&2
             else
-                echo "error: refusing to create Nix store volume because the boot volume is" >&2
-                echo "       FileVault encrypted, but encryption-at-rest is not available." >&2
-                echo "       Manually create a volume for the store and re-run this script." >&2
-                echo "       See https://nixos.org/nix/manual/#sect-macos-installation" >&2
-                exit 1
+                echo "warning: boot volume is FileVault-encrypted, but encryption-at-rest is not available." >&2
+                echo "         This means any software installed with nix will be stored unencrypted on your hard drive." >&2
+                echo "         After nix is installed, you can manually add encryption to the store volume using Finder (Right click -> Encrypt)." >&2
+                echo "         For alternative solutions, see https://nixos.org/nix/manual/#sect-macos-installation\n\n" >&2
+                echo "         Because the --darwin-use-unencrypted-nix-store-volume option is given, we asume you" >&2
+                echo "         are ok with using an unencrypted store volume and therefore proceeding." >&2
             fi
         fi
 
