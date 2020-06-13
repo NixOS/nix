@@ -14,8 +14,6 @@
 #include <unistd.h>
 #include <fcntl.h>
 
-#include <curl/curl.h>
-
 #include <algorithm>
 #include <cmath>
 #include <cstring>
@@ -339,6 +337,16 @@ struct curlFileTransfer : public FileTransfer
 
             if (writtenToSink)
                 curl_easy_setopt(req, CURLOPT_RESUME_FROM_LARGE, writtenToSink);
+
+            // run curl middlewares
+            if (RegisterCurlMiddleware::curlMiddleWares)
+            {
+                for (const auto &[middlewareName, middlewareImpl]: *RegisterCurlMiddleware::curlMiddleWares)
+                {
+                    debug("running curl middleware: '%s'", middlewareName);
+                    middlewareImpl(request.uri.c_str(), req);
+                }
+            }
 
             result.data = std::make_shared<std::string>();
             result.bodySize = 0;
@@ -868,5 +876,16 @@ bool isUri(const string & s)
     return scheme == "http" || scheme == "https" || scheme == "file" || scheme == "channel" || scheme == "git" || scheme == "s3" || scheme == "ssh";
 }
 
+/*************************************************************
+ * CurlMiddleWare registration
+ *************************************************************/
+
+ RegisterCurlMiddleware::CurlMiddleWares * RegisterCurlMiddleware::curlMiddleWares;
+
+ RegisterCurlMiddleware::RegisterCurlMiddleware(std::string name, CurlMiddleWareFun fun)
+ {
+     if (!curlMiddleWares) curlMiddleWares = new CurlMiddleWares;
+     curlMiddleWares->emplace_back(name, fun);
+ }
 
 }
