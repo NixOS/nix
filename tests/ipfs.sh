@@ -58,6 +58,7 @@ nix-store --generate-binary-cache-key $SIGNING_KEY_NAME $SIGNING_KEY_PRI_FILE $S
 ################################################################################
 
 mkdir -p $IPFS_SRC_STORE
+mkdir $IPFS_SRC_STORE/nar
 storePaths=$(nix-build ./fixed.nix -A good)
 
 nix copy --to file://$IPFS_SRC_STORE $storePaths
