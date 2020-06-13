@@ -305,7 +305,7 @@ public:
     GoalPtr makeDerivationGoal(const StorePath & drvPath, const StringSet & wantedOutputs, BuildMode buildMode = bmNormal);
     std::shared_ptr<DerivationGoal> makeBasicDerivationGoal(StorePath && drvPath,
         const BasicDerivation & drv, BuildMode buildMode = bmNormal);
-    GoalPtr makeSubstitutionGoal(const StorePath & storePath, RepairFlag repair = NoRepair);
+    GoalPtr makeSubstitutionGoal(const StorePath & storePath, RepairFlag repair = NoRepair, std::optional<std::string> ca = std::nullopt);
 
     /* Remove a dead goal. */
     void removeGoal(GoalPtr goal);
@@ -1195,7 +1195,7 @@ void DerivationGoal::haveDerivation()
        them. */
     if (settings.useSubstitutes && parsedDrv->substitutesAllowed())
         for (auto & i : invalidOutputs)
-            addWaitee(worker.makeSubstitutionGoal(i, buildMode == bmRepair ? Repair : NoRepair));
+            addWaitee(worker.makeSubstitutionGoal(i, buildMode == bmRepair ? Repair : NoRepair, getDerivationCA(*drv)));
 
     if (waitees.empty()) /* to prevent hang (no wake-up event) */
         outputsSubstituted();
@@ -4268,8 +4268,11 @@ private:
     typedef void (SubstitutionGoal::*GoalState)();
     GoalState state;
 
+    /* Content address for recomputing store path */
+    std::optional<std::string> ca;
+
 public:
-    SubstitutionGoal(StorePath && storePath, Worker & worker, RepairFlag repair = NoRepair);
+    SubstitutionGoal(StorePath && storePath, Worker & worker, RepairFlag repair = NoRepair, std::optional<std::string> ca = std::nullopt);
     ~SubstitutionGoal();
 
     void timedOut() override { abort(); };
@@ -4304,10 +4307,11 @@ public:
 };
 
 
-SubstitutionGoal::SubstitutionGoal(StorePath && storePath, Worker & worker, RepairFlag repair)
+SubstitutionGoal::SubstitutionGoal(StorePath && storePath, Worker & worker, RepairFlag repair, std::optional<std::string> ca)
     : Goal(worker)
     , storePath(std::move(storePath))
     , repair(repair)
+    , ca(ca)
 {
     state = &SubstitutionGoal::init;
     name = fmt("substitution of '%s'", worker.store.printStorePath(this->storePath));
@@ -4382,14 +4386,13 @@ void SubstitutionGoal::tryNext()
     sub = subs.front();
     subs.pop_front();
 
-    if (sub->storeDir != worker.store.storeDir) {
-        tryNext();
-        return;
-    }
+    auto subPath = storePath.clone();
+    if (ca && (hasPrefix(*ca, "fixed:") || hasPrefix(*ca, "text:")))
+        subPath = sub->makeFixedOutputPathFromCA(storePath.name(), *ca);
 
     try {
         // FIXME: make async
-        info = sub->queryPathInfo(storePath);
+        info = sub->queryPathInfo(subPath);
     } catch (InvalidPath &) {
         tryNext();
         return;
@@ -4406,6 +4409,19 @@ void SubstitutionGoal::tryNext()
             return;
         }
         throw;
+    }
+
+    if (info->path != storePath) {
+        if (info->isContentAddressed(*sub)) {
+            auto info2 = std::const_pointer_cast<ValidPathInfo>(std::shared_ptr<const ValidPathInfo>(info));
+            info2->path = storePath.clone();
+            info = info2;
+        } else {
+            printError("asked '%s' for '%s' but got '%s'",
+                sub->getUri(), worker.store.printStorePath(storePath), sub->printStorePath(info->path));
+            tryNext();
+            return;
+        }
     }
 
     /* Update the total expected download size. */
@@ -4493,8 +4509,12 @@ void SubstitutionGoal::tryToRun()
             Activity act(*logger, actSubstitute, Logger::Fields{worker.store.printStorePath(storePath), sub->getUri()});
             PushActivity pact(act.id);
 
+            auto subPath = storePath.clone();
+            if (ca && (hasPrefix(*ca, "fixed:") || hasPrefix(*ca, "text:")))
+                subPath = sub->makeFixedOutputPathFromCA(storePath.name(), *ca);
+
             copyStorePath(ref<Store>(sub), ref<Store>(worker.store.shared_from_this()),
-                storePath, repair, sub->isTrusted ? NoCheckSigs : CheckSigs);
+                subPath, repair, sub->isTrusted ? NoCheckSigs : CheckSigs);
 
             promise.set_value();
         } catch (...) {
@@ -4628,11 +4648,11 @@ std::shared_ptr<DerivationGoal> Worker::makeBasicDerivationGoal(StorePath && drv
 }
 
 
-GoalPtr Worker::makeSubstitutionGoal(const StorePath & path, RepairFlag repair)
+GoalPtr Worker::makeSubstitutionGoal(const StorePath & path, RepairFlag repair, std::optional<std::string> ca)
 {
     GoalPtr goal = substitutionGoals[path.clone()].lock(); // FIXME
     if (!goal) {
-        goal = std::make_shared<SubstitutionGoal>(path.clone(), *this, repair);
+        goal = std::make_shared<SubstitutionGoal>(path.clone(), *this, repair, ca);
         substitutionGoals.insert_or_assign(path.clone(), goal);
         wakeUp(goal);
     }

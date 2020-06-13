@@ -108,12 +108,12 @@ void Store::computeFSClosure(const StorePath & startPath,
 }
 
 
-static std::optional<std::string> getDerivationCA(ref<Derivation> drv)
+std::optional<std::string> getDerivationCA(const BasicDerivation & drv)
 {
-    auto outputHashMode = drv->env.find("outputHashMode");
-    auto outputHashAlgo = drv->env.find("outputHashAlgo");
-    auto outputHash = drv->env.find("outputHash");
-    if (outputHashMode != drv->env.end() && outputHashAlgo != drv->env.end() && outputHash != drv->env.end()) {
+    auto outputHashMode = drv.env.find("outputHashMode");
+    auto outputHashAlgo = drv.env.find("outputHashAlgo");
+    auto outputHash = drv.env.find("outputHash");
+    if (outputHashMode != drv.env.end() && outputHashAlgo != drv.env.end() && outputHash != drv.env.end()) {
         auto ht = parseHashType(outputHashAlgo->second);
         auto h = Hash(outputHash->second, ht);
         FileIngestionMethod ingestionMethod;
@@ -182,7 +182,7 @@ void Store::queryMissing(const std::vector<StorePathWithOutputs> & targets,
         paths.insert(outPath.clone());
 
         std::map<std::string, std::string> pathsCA = {};
-        if (auto ca = getDerivationCA(drv))
+        if (auto ca = getDerivationCA(*drv))
             pathsCA.insert({outPathS, *ca});
         querySubstitutablePathInfos(paths, infos, pathsCA);
 
