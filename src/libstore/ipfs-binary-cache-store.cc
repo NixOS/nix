@@ -145,7 +145,7 @@ protected:
 
         auto resolvedIpfsPath = resolveIPNSName(ipnsPath, false);
         if (resolvedIpfsPath != initialIpfsPath) {
-            throw Error("The ipns hash %s doesn't correspond to the initial ipfs hash;\n  wanted: %s\n  got %s",
+            throw Error("The IPNS hash or DNS link %s resolves now to something different from the value it had when Nix was started;\n  wanted: %s\n  got %s\nPerhaps something else updated it in the meantime?",
                 initialIpfsPath, resolvedIpfsPath);
         }
 
