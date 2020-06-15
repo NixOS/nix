@@ -124,7 +124,7 @@ static void opRealise(Strings opFlags, Strings opArgs)
         else if (i == "--repair") buildMode = bmRepair;
         else if (i == "--check") buildMode = bmCheck;
         else if (i == "--ignore-unknown") ignoreUnknown = true;
-        else throw UsageError(format("unknown flag '%1%'") % i);
+        else throw UsageError("unknown flag '%1%'", i);
 
     std::vector<StorePathWithOutputs> paths;
     for (auto & i : opArgs)
@@ -180,7 +180,7 @@ static void opAddFixed(Strings opFlags, Strings opArgs)
 
     for (auto & i : opFlags)
         if (i == "--recursive") recursive = FileIngestionMethod::Recursive;
-        else throw UsageError(format("unknown flag '%1%'") % i);
+        else throw UsageError("unknown flag '%1%'", i);
 
     if (opArgs.empty())
         throw UsageError("first argument must be hash algorithm");
@@ -202,10 +202,10 @@ static void opPrintFixedPath(Strings opFlags, Strings opArgs)
 
     for (auto i : opFlags)
         if (i == "--recursive") recursive = FileIngestionMethod::Recursive;
-        else throw UsageError(format("unknown flag '%1%'") % i);
+        else throw UsageError("unknown flag '%1%'", i);
 
     if (opArgs.size() != 3)
-        throw UsageError(format("'--print-fixed-path' requires three arguments"));
+        throw UsageError("'--print-fixed-path' requires three arguments");
 
     Strings::iterator i = opArgs.begin();
     HashType hashAlgo = parseHashType(*i++);
@@ -300,9 +300,9 @@ static void opQuery(Strings opFlags, Strings opArgs)
         else if (i == "--use-output" || i == "-u") useOutput = true;
         else if (i == "--force-realise" || i == "--force-realize" || i == "-f") forceRealise = true;
         else if (i == "--include-outputs") includeOutputs = true;
-        else throw UsageError(format("unknown flag '%1%'") % i);
+        else throw UsageError("unknown flag '%1%'", i);
         if (prev != qDefault && prev != query)
-            throw UsageError(format("query type '%1%' conflicts with earlier flag") % i);
+            throw UsageError("query type '%1%' conflicts with earlier flag", i);
     }
 
     if (query == qDefault) query = qOutputs;
@@ -377,7 +377,7 @@ static void opQuery(Strings opFlags, Strings opArgs)
                     auto info = store->queryPathInfo(j);
                     if (query == qHash) {
                         assert(info->narHash.type == htSHA256);
-                        cout << fmt("%s\n", info->narHash.to_string(Base32));
+                        cout << fmt("%s\n", info->narHash.to_string(Base32, true));
                     } else if (query == qSize)
                         cout << fmt("%d\n", info->narSize);
                 }
@@ -448,7 +448,7 @@ static void opPrintEnv(Strings opFlags, Strings opArgs)
     Derivation drv = store->derivationFromPath(store->parseStorePath(drvPath));
 
     /* Print each environment variable in the derivation in a format
-       that can be sourced by the shell. */
+     * that can be sourced by the shell. */
     for (auto & i : drv.env)
         cout << format("export %1%; %1%=%2%\n") % i.first % shellEscape(i.second);
 
@@ -535,7 +535,7 @@ static void opRegisterValidity(Strings opFlags, Strings opArgs)
     for (auto & i : opFlags)
         if (i == "--reregister") reregister = true;
         else if (i == "--hash-given") hashGiven = true;
-        else throw UsageError(format("unknown flag '%1%'") % i);
+        else throw UsageError("unknown flag '%1%'", i);
 
     if (!opArgs.empty()) throw UsageError("no arguments expected");
 
@@ -549,7 +549,7 @@ static void opCheckValidity(Strings opFlags, Strings opArgs)
 
     for (auto & i : opFlags)
         if (i == "--print-invalid") printInvalid = true;
-        else throw UsageError(format("unknown flag '%1%'") % i);
+        else throw UsageError("unknown flag '%1%'", i);
 
     for (auto & i : opArgs) {
         auto path = store->followLinksToStorePath(i);
@@ -580,7 +580,7 @@ static void opGC(Strings opFlags, Strings opArgs)
             long long maxFreed = getIntArg<long long>(*i, i, opFlags.end(), true);
             options.maxFreed = maxFreed >= 0 ? maxFreed : 0;
         }
-        else throw UsageError(format("bad sub-operation '%1%' in GC") % *i);
+        else throw UsageError("bad sub-operation '%1%' in GC", *i);
 
     if (!opArgs.empty()) throw UsageError("no arguments expected");
 
@@ -616,7 +616,7 @@ static void opDelete(Strings opFlags, Strings opArgs)
 
     for (auto & i : opFlags)
         if (i == "--ignore-liveness") options.ignoreLiveness = true;
-        else throw UsageError(format("unknown flag '%1%'") % i);
+        else throw UsageError("unknown flag '%1%'", i);
 
     for (auto & i : opArgs)
         options.pathsToDelete.insert(store->followLinksToStorePath(i));
@@ -654,7 +654,7 @@ static void opRestore(Strings opFlags, Strings opArgs)
 static void opExport(Strings opFlags, Strings opArgs)
 {
     for (auto & i : opFlags)
-        throw UsageError(format("unknown flag '%1%'") % i);
+        throw UsageError("unknown flag '%1%'", i);
 
     StorePathSet paths;
 
@@ -670,7 +670,7 @@ static void opExport(Strings opFlags, Strings opArgs)
 static void opImport(Strings opFlags, Strings opArgs)
 {
     for (auto & i : opFlags)
-        throw UsageError(format("unknown flag '%1%'") % i);
+        throw UsageError("unknown flag '%1%'", i);
 
     if (!opArgs.empty()) throw UsageError("no arguments expected");
 
@@ -705,10 +705,13 @@ static void opVerify(Strings opFlags, Strings opArgs)
     for (auto & i : opFlags)
         if (i == "--check-contents") checkContents = true;
         else if (i == "--repair") repair = Repair;
-        else throw UsageError(format("unknown flag '%1%'") % i);
+        else throw UsageError("unknown flag '%1%'", i);
 
     if (store->verifyStore(checkContents, repair)) {
-        printError("warning: not all errors were fixed");
+        logWarning({
+            .name = "Store consistency",
+            .description = "not all errors were fixed"
+            });
         throw Exit(1);
     }
 }
@@ -730,9 +733,14 @@ static void opVerifyPath(Strings opFlags, Strings opArgs)
         store->narFromPath(path, sink);
         auto current = sink.finish();
         if (current.first != info->narHash) {
-            printError(
-                "path '%s' was modified! expected hash '%s', got '%s'",
-                store->printStorePath(path), info->narHash.to_string(), current.first.to_string());
+            logError({
+                .name = "Hash mismatch",
+                .hint = hintfmt(
+                    "path '%s' was modified! expected hash '%s', got '%s'",
+                    store->printStorePath(path),
+                    info->narHash.to_string(Base32, true),
+                    current.first.to_string(Base32, true))
+            });
             status = 1;
         }
     }
@@ -768,7 +776,7 @@ static void opServe(Strings opFlags, Strings opArgs)
     bool writeAllowed = false;
     for (auto & i : opFlags)
         if (i == "--write") writeAllowed = true;
-        else throw UsageError(format("unknown flag '%1%'") % i);
+        else throw UsageError("unknown flag '%1%'", i);
 
     if (!opArgs.empty()) throw UsageError("no arguments expected");
 
@@ -839,7 +847,7 @@ static void opServe(Strings opFlags, Strings opArgs)
                             for (auto & p : willSubstitute) subs.emplace_back(p.clone());
                             store->buildPaths(subs);
                         } catch (Error & e) {
-                            printError(format("warning: %1%") % e.msg());
+                            logWarning(e.info());
                         }
                 }
 
@@ -860,7 +868,7 @@ static void opServe(Strings opFlags, Strings opArgs)
                         out << info->narSize // downloadSize
                             << info->narSize;
                         if (GET_PROTOCOL_MINOR(clientVersion) >= 4)
-                            out << (info->narHash ? info->narHash.to_string() : "") << info->ca << info->sigs;
+                            out << (info->narHash ? info->narHash.to_string(Base32, true) : "") << info->ca << info->sigs;
                     } catch (InvalidPath &) {
                     }
                 }
@@ -967,7 +975,7 @@ static void opServe(Strings opFlags, Strings opArgs)
             }
 
             default:
-                throw Error(format("unknown serve command %1%") % cmd);
+                throw Error("unknown serve command %1%", cmd);
         }
 
         out.flush();
@@ -978,7 +986,7 @@ static void opServe(Strings opFlags, Strings opArgs)
 static void opGenerateBinaryCacheKey(Strings opFlags, Strings opArgs)
 {
     for (auto & i : opFlags)
-        throw UsageError(format("unknown flag '%1%'") % i);
+        throw UsageError("unknown flag '%1%'", i);
 
     if (opArgs.size() != 3) throw UsageError("three arguments expected");
     auto i = opArgs.begin();
@@ -1102,6 +1110,8 @@ static int _main(int argc, char * * argv)
             store = openStore();
 
         op(opFlags, opArgs);
+
+        logger->stop();
 
         return 0;
     }

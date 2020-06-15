@@ -196,9 +196,9 @@ struct TarballInput : Input
         // NAR hashes are preferred over file hashes since tar/zip files
         // don't have a canonical representation.
         if (narHash)
-            url2.query.insert_or_assign("narHash", narHash->to_string(SRI));
+            url2.query.insert_or_assign("narHash", narHash->to_string(SRI, true));
         else if (hash)
-            url2.query.insert_or_assign("hash", hash->to_string(SRI));
+            url2.query.insert_or_assign("hash", hash->to_string(SRI, true));
         return url2;
     }
 
@@ -207,7 +207,7 @@ struct TarballInput : Input
         Attrs attrs;
         attrs.emplace("url", url.to_string());
         if (hash)
-            attrs.emplace("hash", hash->to_string(SRI));
+            attrs.emplace("hash", hash->to_string(SRI, true));
         return attrs;
     }
 
@@ -264,8 +264,7 @@ struct TarballInputScheme : InputScheme
 
         auto input = std::make_unique<TarballInput>(parseURL(getStrAttr(attrs, "url")));
         if (auto hash = maybeGetStrAttr(attrs, "hash"))
-            // FIXME: require SRI hash.
-            input->hash = Hash(*hash);
+            input->hash = newHashAllowEmpty(*hash, htUnknown);
 
         return input;
     }

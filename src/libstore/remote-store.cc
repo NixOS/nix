@@ -116,11 +116,11 @@ ref<RemoteStore::Connection> UDSRemoteStore::openConnection()
     struct sockaddr_un addr;
     addr.sun_family = AF_UNIX;
     if (socketPath.size() + 1 >= sizeof(addr.sun_path))
-        throw Error(format("socket path '%1%' is too long") % socketPath);
+        throw Error("socket path '%1%' is too long", socketPath);
     strcpy(addr.sun_path, socketPath.c_str());
 
     if (::connect(conn->fd.get(), (struct sockaddr *) &addr, sizeof(addr)) == -1)
-        throw SysError(format("cannot connect to daemon at '%1%'") % socketPath);
+        throw SysError("cannot connect to daemon at '%1%'", socketPath);
 
     conn->from.fd = conn->fd.get();
     conn->to.fd = conn->fd.get();
@@ -365,7 +365,7 @@ void RemoteStore::queryPathInfoUncached(const StorePath & path,
             } catch (Error & e) {
                 // Ugly backwards compatibility hack.
                 if (e.msg().find("is not valid") != std::string::npos)
-                    throw InvalidPath(e.what());
+                    throw InvalidPath(e.info());
                 throw;
             }
             if (GET_PROTOCOL_MINOR(conn->daemonVersion) >= 17) {
@@ -415,15 +415,6 @@ StorePathSet RemoteStore::queryDerivationOutputs(const StorePath & path)
     conn->to << wopQueryDerivationOutputs << printStorePath(path);
     conn.processStderr();
     return readStorePaths<StorePathSet>(*this, conn->from);
-}
-
-
-PathSet RemoteStore::queryDerivationOutputNames(const StorePath & path)
-{
-    auto conn(getConnection());
-    conn->to << wopQueryDerivationOutputNames << printStorePath(path);
-    conn.processStderr();
-    return readStrings<PathSet>(conn->from);
 }
 
 

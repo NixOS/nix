@@ -87,7 +87,7 @@ static void expect(std::istream & str, const string & s)
     char s2[s.size()];
     str.read(s2, s.size());
     if (string(s2, s.size()) != s)
-        throw FormatError(format("expected string '%1%'") % s);
+        throw FormatError("expected string '%1%'", s);
 }
 
 
@@ -114,7 +114,7 @@ static Path parsePath(std::istream & str)
 {
     string s = parseString(str);
     if (s.size() == 0 || s[0] != '/')
-        throw FormatError(format("bad path '%1%' in derivation") % s);
+        throw FormatError("bad path '%1%' in derivation", s);
     return s;
 }
 
@@ -196,7 +196,7 @@ Derivation readDerivation(const Store & store, const Path & drvPath)
     try {
         return parseDerivation(store, readFile(drvPath));
     } catch (FormatError & e) {
-        throw Error(format("error parsing derivation '%1%': %2%") % drvPath % e.msg());
+        throw Error("error parsing derivation '%1%': %2%", drvPath, e.msg());
     }
 }
 
@@ -204,6 +204,12 @@ Derivation readDerivation(const Store & store, const Path & drvPath)
 Derivation Store::derivationFromPath(const StorePath & drvPath)
 {
     ensurePath(drvPath);
+    return readDerivation(drvPath);
+}
+
+
+Derivation Store::readDerivation(const StorePath & drvPath)
+{
     auto accessor = getFSAccessor();
     try {
         return parseDerivation(*this, accessor->readFile(printStorePath(drvPath)));
@@ -378,7 +384,7 @@ Hash hashDerivationModulo(Store & store, const Derivation & drv, bool maskOutput
         if (h == drvHashes.end()) {
             assert(store.isValidPath(i.first));
             h = drvHashes.insert_or_assign(i.first.clone(), hashDerivationModulo(store,
-                readDerivation(store, store.toRealPath(i.first)), false)).first;
+                store.readDerivation(i.first), false)).first;
         }
         inputs2.insert_or_assign(h->second.to_string(Base16, false), i.second);
     }
@@ -407,6 +413,15 @@ StorePathSet BasicDerivation::outputPaths() const
     for (auto & i : outputs)
         paths.insert(i.second.path.clone());
     return paths;
+}
+
+
+StringSet BasicDerivation::outputNames() const
+{
+    StringSet names;
+    for (auto & i : outputs)
+        names.insert(i.first);
+    return names;
 }
 
 
