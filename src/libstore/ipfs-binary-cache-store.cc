@@ -86,6 +86,26 @@ public:
 
 private:
 
+    std::string putIpfsDag(std::string data)
+    {
+        auto req = FileTransferRequest(daemonUri + "/api/v0/dag/put");
+        req.data = std::make_shared<string>(data);
+        req.post = true;
+        req.tries = 1;
+        auto res = getFileTransfer()->upload(req);
+        auto json = nlohmann::json::parse(*res.data);
+        return json["Cid"]["/"];
+    }
+
+    std::string getIpfsDag(std::string objectPath)
+    {
+        auto req = FileTransferRequest(daemonUri + "/api/v0/dag/get?arg=" + objectPath);
+        req.post = true;
+        req.tries = 1;
+        auto res = getFileTransfer()->download(req);
+        return *res.data;
+    }
+
     // Given a ipns path, checks if it corresponds to a DNSLink path, and in
     // case returns the domain
     static std::optional<string> isDNSLinkPath(std::string path)
@@ -122,13 +142,13 @@ protected:
 
     bool fileExists(const std::string & path) override
     {
-        return ipfsObjectExists(getIpfsRootDir() + "/" + path);
+        return ipfsObjectExists(getIpfsPath() + "/" + path);
     }
 
 private:
 
     // Resolve the IPNS name to an IPFS object
-    static std::string resolveIPNSName(std::string ipnsPath, bool offline) {
+    std::string resolveIPNSName(std::string ipnsPath, bool offline) {
         debug("Resolving IPFS object of '%s', this could take a while.", ipnsPath);
         auto uri = daemonUri + "/api/v0/name/resolve?offline=" + (offline?"true":"false") + "&arg=" + getFileTransfer()->urlEncode(ipnsPath);
         FileTransferRequest request(uri);
