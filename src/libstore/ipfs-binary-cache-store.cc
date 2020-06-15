@@ -139,14 +139,20 @@ protected:
 
         auto ipnsPath = *optIpnsPath;
 
-        if (isDNSLinkPath(ipnsPath)) {
-            throw Error("The provided ipns path is a DNSLink, and syncing those is not supported.\n  ipns path: %s", ipnsPath);
-        }
-
         auto resolvedIpfsPath = resolveIPNSName(ipnsPath, false);
         if (resolvedIpfsPath != initialIpfsPath) {
             throw Error("The IPNS hash or DNS link %s resolves now to something different from the value it had when Nix was started;\n  wanted: %s\n  got %s\nPerhaps something else updated it in the meantime?",
                 initialIpfsPath, resolvedIpfsPath);
+        }
+
+        if resolvedIpfsPath == state->ipfsPath {
+            printMsg(lvlInfo, "The hash is already up to date, nothing to do");
+            return;
+        }
+
+        // Now, we know that paths are not up to date but also not changed due to updates in DNS or IPNS hash.
+        if (isDNSLinkPath(ipnsPath)) {
+            throw Error("The provided ipns path is a DNSLink, and syncing those is not supported.\n  ipns path: %s\nYou should update your DNS settings", ipnsPath);
         }
 
         debug("Publishing '%s' to '%s', this could take a while.", state->ipfsPath, ipnsPath);
