@@ -779,7 +779,7 @@ bool ValidPathInfo::isContentAddressed(const Store & store) const
     };
 
     if (hasPrefix(ca, "text:")) {
-        Hash hash(std::string(ca, 5));
+        Hash hash(ca.substr(5));
         if (store.makeTextPath(path.name(), hash, references) == path)
             return true;
         else
@@ -788,7 +788,7 @@ bool ValidPathInfo::isContentAddressed(const Store & store) const
 
     else if (hasPrefix(ca, "fixed:")) {
         FileIngestionMethod recursive { ca.compare(6, 2, "r:") == 0 };
-        Hash hash(std::string(ca, recursive == FileIngestionMethod::Recursive ? 8 : 6));
+        Hash hash(ca.substr(recursive == FileIngestionMethod::Recursive ? 8 : 6));
         auto refs = cloneStorePathSet(references);
         bool hasSelfReference = false;
         if (refs.count(path)) {

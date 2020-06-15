@@ -42,7 +42,7 @@ struct Hash
        Subresource Integrity hash expression). If the 'type' argument
        is htUnknown, then the hash type must be specified in the
        string. */
-    Hash(const std::string & s, HashType type = htUnknown);
+    Hash(std::string_view s, HashType type = htUnknown);
 
     void init();
 

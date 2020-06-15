@@ -1314,7 +1314,7 @@ bool statusOk(int status)
 }
 
 
-bool hasPrefix(const string & s, const string & prefix)
+bool hasPrefix(std::string_view s, std::string_view prefix)
 {
     return s.compare(0, prefix.size(), prefix) == 0;
 }
@@ -1408,7 +1408,7 @@ std::string filterANSIEscapes(const std::string & s, bool filterAll, unsigned in
 static char base64Chars[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
 
 
-string base64Encode(const string & s)
+string base64Encode(std::string_view s)
 {
     string res;
     int data = 0, nbits = 0;
@@ -1429,7 +1429,7 @@ string base64Encode(const string & s)
 }
 
 
-string base64Decode(const string & s)
+string base64Decode(std::string_view s)
 {
     bool init = false;
     char decode[256];
