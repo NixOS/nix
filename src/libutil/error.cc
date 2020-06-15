@@ -105,7 +105,7 @@ void printCodeLines(std::ostream &out, const string &prefix, const NixCode &nixC
 
 std::ostream& operator<<(std::ostream &out, const ErrorInfo &einfo)
 {
-    size_t errwidth = 80;
+    auto errwidth = std::max<size_t>(getWindowSize().second, 20);
     string prefix = "";
 
     string levelString;
