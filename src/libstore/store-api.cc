@@ -777,7 +777,7 @@ bool ValidPathInfo::isContentAddressed(const Store & store) const
     auto warn = [&]() {
         logWarning(
             ErrorInfo{
-                .name = "Path not content-addressed", 
+                .name = "Path not content-addressed",
                 .hint = hintfmt("path '%s' claims to be content-addressed but isn't", store.printStorePath(path))
             });
     };

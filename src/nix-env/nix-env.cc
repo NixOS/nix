@@ -123,7 +123,7 @@ static void getAllExprs(EvalState & state,
             if (hasSuffix(attrName, ".nix"))
                 attrName = string(attrName, 0, attrName.size() - 4);
             if (!attrs.insert(attrName).second) {
-                logError({ 
+                logError({
                     .name = "Name collision",
                     .hint = hintfmt("warning: name collision in input Nix expressions, skipping '%1%'", path2)
                 });
@@ -874,7 +874,7 @@ static void queryJSON(Globals & globals, vector<DrvInfo> & elems)
             auto placeholder = metaObj.placeholder(j);
             Value * v = i.queryMeta(j);
             if (!v) {
-                logError({ 
+                logError({
                     .name = "Invalid meta attribute",
                     .hint = hintfmt("derivation '%s' has invalid meta attribute '%s'",
                         i.queryName(), j)
@@ -1128,8 +1128,8 @@ static void opQuery(Globals & globals, Strings opFlags, Strings opArgs)
                             XMLAttrs attrs2;
                             attrs2["name"] = j;
                             Value * v = i.queryMeta(j);
-                            if (!v) 
-                                logError({ 
+                            if (!v)
+                                logError({
                                     .name = "Invalid meta attribute",
                                     .hint = hintfmt(
                                         "derivation '%s' has invalid meta attribute '%s'",

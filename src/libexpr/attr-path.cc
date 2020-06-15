@@ -62,7 +62,7 @@ std::pair<Value *, Pos> findAlongAttrPath(EvalState & state, const string & attr
                 throw TypeError(
                     "the expression selected by the selection path '%1%' should be a set but is %2%",
                     attrPath,
-                    showType(*v)); 
+                    showType(*v));
             if (attr.empty())
                 throw Error("empty attribute name in selection path '%1%'", attrPath);
 
@@ -79,7 +79,7 @@ std::pair<Value *, Pos> findAlongAttrPath(EvalState & state, const string & attr
                 throw TypeError(
                     "the expression selected by the selection path '%1%' should be a list but is %2%",
                     attrPath,
-                    showType(*v)); 
+                    showType(*v));
             if (attrIndex >= v->listSize())
                 throw AttrPathNotFound("list index %1% in selection path '%2%' is out of range", attrIndex, attrPath);
 

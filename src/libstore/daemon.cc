@@ -77,7 +77,7 @@ struct TunnelLogger : public Logger
     {
         if (ei.level > verbosity) return;
 
-        std::stringstream oss; 
+        std::stringstream oss;
         oss << ei;
 
         StringSink buf;

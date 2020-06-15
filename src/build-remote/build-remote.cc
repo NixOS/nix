@@ -200,7 +200,7 @@ static int _main(int argc, char * * argv)
 
                 } catch (std::exception & e) {
                     auto msg = chomp(drainFD(5, false));
-                    logError({ 
+                    logError({
                         .name = "Remote build",
                         .hint = hintfmt("cannot build on '%s': %s%s",
                             bestMachine->storeUri, e.what(),

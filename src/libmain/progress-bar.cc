@@ -133,7 +133,7 @@ public:
     {
         auto state(state_.lock());
 
-        std::stringstream oss; 
+        std::stringstream oss;
         oss << ei;
 
         log(*state, ei.level, oss.str());

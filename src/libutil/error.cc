@@ -61,7 +61,7 @@ void printCodeLines(std::ostream &out, const string &prefix, const NixCode &nixC
 {
     // previous line of code.
     if (nixCode.prevLineOfCode.has_value()) {
-        out << std::endl 
+        out << std::endl
             << fmt("%1% %|2$5d|| %3%",
                 prefix,
                 (nixCode.errPos.line - 1),
