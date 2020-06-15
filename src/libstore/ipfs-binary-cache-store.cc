@@ -84,7 +84,7 @@ public:
         BinaryCacheStore::init();
     }
 
-protected:
+private:
 
     // Given a ipns path, checks if it corresponds to a DNSLink path, and in
     // case returns the domain
@@ -97,6 +97,8 @@ protected:
         }
         return std::nullopt;
     }
+
+public:
 
     bool fileExists(const std::string & path) override
     {
@@ -173,6 +175,8 @@ protected:
         getFileTransfer()->download(req);
     }
 
+private:
+
     void addLink(std::string name, std::string ipfsObject)
     {
         auto state(_state.lock());
@@ -204,6 +208,8 @@ protected:
         return (std::string) json["Hash"];
     }
 
+public:
+
     void upsertFile(const std::string & path, const std::string & data, const std::string & mimeType) override
     {
         try {
@@ -218,6 +224,8 @@ protected:
     {
         getIpfsObject(getIpfsPath() + "/" + path, std::move(callback));
     }
+
+private:
 
     void getIpfsObject(const std::string & ipfsPath,
         Callback<std::shared_ptr<std::string>> callback) noexcept
