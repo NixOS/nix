@@ -23,7 +23,7 @@ std::string chrootHelperName = "__run_in_chroot";
 struct RunCommon : virtual Command
 {
     void runProgram(ref<Store> store,
-        const std::string & program,
+        std::string_view program,
         const Strings & args)
     {
         stopProgressBar();

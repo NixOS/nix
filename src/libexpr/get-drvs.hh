@@ -36,8 +36,8 @@ public:
     string attrPath; /* path towards the derivation */
 
     DrvInfo(EvalState & state) : state(&state) { };
-    DrvInfo(EvalState & state, const string & attrPath, Bindings * attrs);
-    DrvInfo(EvalState & state, ref<Store> store, const std::string & drvPathWithOutputs);
+    DrvInfo(EvalState & state, std::string_view attrPath, Bindings * attrs);
+    DrvInfo(EvalState & state, ref<Store> store, std::string_view drvPathWithOutputs);
 
     string queryName() const;
     string querySystem() const;
@@ -48,21 +48,21 @@ public:
     Outputs queryOutputs(bool onlyOutputsToInstall = false);
 
     StringSet queryMetaNames();
-    Value * queryMeta(const string & name);
-    string queryMetaString(const string & name);
-    NixInt queryMetaInt(const string & name, NixInt def);
-    NixFloat queryMetaFloat(const string & name, NixFloat def);
-    bool queryMetaBool(const string & name, bool def);
-    void setMeta(const string & name, Value * v);
+    Value * queryMeta(std::string_view name);
+    string queryMetaString(std::string_view name);
+    NixInt queryMetaInt(std::string_view name, NixInt def);
+    NixFloat queryMetaFloat(std::string_view name, NixFloat def);
+    bool queryMetaBool(std::string_view name, bool def);
+    void setMeta(std::string_view name, Value * v);
 
     /*
     MetaInfo queryMetaInfo(EvalState & state) const;
-    MetaValue queryMetaInfo(EvalState & state, const string & name) const;
+    MetaValue queryMetaInfo(EvalState & state, std::string_view name) const;
     */
 
-    void setName(const string & s) { name = s; }
-    void setDrvPath(const string & s) { drvPath = s; }
-    void setOutPath(const string & s) { outPath = s; }
+    void setName(std::string_view s) { name = s; }
+    void setDrvPath(std::string_view s) { drvPath = s; }
+    void setOutPath(std::string_view s) { outPath = s; }
 
     void setFailed() { failed = true; };
     bool hasFailed() { return failed; };
@@ -81,7 +81,7 @@ typedef list<DrvInfo> DrvInfos;
 std::optional<DrvInfo> getDerivation(EvalState & state,
     Value & v, bool ignoreAssertionFailures);
 
-void getDerivations(EvalState & state, Value & v, const string & pathPrefix,
+void getDerivations(EvalState & state, Value & v, std::string_view pathPrefix,
     Bindings & autoArgs, DrvInfos & drvs,
     bool ignoreAssertionFailures);
 

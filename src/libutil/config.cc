@@ -4,7 +4,7 @@
 
 namespace nix {
 
-bool Config::set(const std::string & name, const std::string & value)
+bool Config::set(std::string_view name, std::string_view value)
 {
     auto i = _settings.find(name);
     if (i == _settings.end()) return false;
@@ -65,7 +65,7 @@ void Config::getSettings(std::map<std::string, SettingInfo> & res, bool override
             res.emplace(opt.first, SettingInfo{opt.second.setting->to_string(), opt.second.setting->description});
 }
 
-void AbstractConfig::applyConfig(const std::string & contents, const std::string & path) {
+void AbstractConfig::applyConfig(std::string_view contents, std::string_view path) {
     unsigned int pos = 0;
 
     while (pos < contents.size()) {
@@ -117,7 +117,7 @@ void AbstractConfig::applyConfig(const std::string & contents, const std::string
     };
 }
 
-void AbstractConfig::applyConfigFile(const Path & path)
+void AbstractConfig::applyConfigFile(PathView path)
 {
     try {
         string contents = readFile(path);
@@ -136,13 +136,13 @@ void Config::toJSON(JSONObject & out)
     for (auto & s : _settings)
         if (!s.second.isAlias) {
             JSONObject out2(out.object(s.first));
-            out2.attr("description", s.second.setting->description);
+            out2.attr("description", std::string_view { s.second.setting->description });
             JSONPlaceholder out3(out2.placeholder("value"));
             s.second.setting->toJSON(out3);
         }
 }
 
-void Config::convertToArgs(Args & args, const std::string & category)
+void Config::convertToArgs(Args & args, std::string_view category)
 {
     for (auto & s : _settings)
         if (!s.second.isAlias)
@@ -150,24 +150,24 @@ void Config::convertToArgs(Args & args, const std::string & category)
 }
 
 AbstractSetting::AbstractSetting(
-    const std::string & name,
-    const std::string & description,
+    std::string_view name,
+    std::string_view description,
     const std::set<std::string> & aliases)
     : name(name), description(description), aliases(aliases)
 {
 }
 
-void AbstractSetting::setDefault(const std::string & str)
+void AbstractSetting::setDefault(std::string_view str)
 {
     if (!overriden) set(str);
 }
 
 void AbstractSetting::toJSON(JSONPlaceholder & out)
 {
-    out.write(to_string());
+    out.write(std::string_view { to_string() });
 }
 
-void AbstractSetting::convertToArg(Args & args, const std::string & category)
+void AbstractSetting::convertToArg(Args & args, std::string_view category)
 {
 }
 
@@ -177,30 +177,43 @@ void BaseSetting<T>::toJSON(JSONPlaceholder & out)
     out.write(value);
 }
 
-template<typename T>
-void BaseSetting<T>::convertToArg(Args & args, const std::string & category)
+void BaseSetting<std::string>::toJSON(JSONPlaceholder & out)
 {
-    args.addFlag({
-        .longName = name,
-        .description = description,
-        .category = category,
-        .labels = {"value"},
-        .handler = {[=](std::string s) { overriden = true; set(s); }},
-    });
+    out.write(std::string_view { value });
 }
 
-template<> void BaseSetting<std::string>::set(const std::string & str)
+#define MAKE_CONVERT_TO_ARG(args, category) \
+    args.addFlag({ \
+        .longName = name, \
+        .description = description, \
+        .category = std::string { category }, \
+        .labels = {"value"}, \
+        .handler = {[=](std::string s) { overriden = true; set(s); }}, \
+    })
+
+template<typename T>
+void BaseSetting<T>::convertToArg(Args & args, std::string_view category)
+{
+    MAKE_CONVERT_TO_ARG(args, category);
+}
+
+void BaseSetting<std::string>::convertToArg(Args & args, std::string_view category)
+{
+    MAKE_CONVERT_TO_ARG(args, category);
+}
+
+void BaseSetting<std::string>::set(std::string_view str)
 {
     value = str;
 }
 
-template<> std::string BaseSetting<std::string>::to_string() const
+std::string BaseSetting<std::string>::to_string() const
 {
     return value;
 }
 
 template<typename T>
-void BaseSetting<T>::set(const std::string & str)
+void BaseSetting<T>::set(std::string_view str)
 {
     static_assert(std::is_integral<T>::value, "Integer required.");
     if (!string2Int(str, value))
@@ -214,7 +227,7 @@ std::string BaseSetting<T>::to_string() const
     return std::to_string(value);
 }
 
-template<> void BaseSetting<bool>::set(const std::string & str)
+template<> void BaseSetting<bool>::set(std::string_view str)
 {
     if (str == "true" || str == "yes" || str == "1")
         value = true;
@@ -229,23 +242,23 @@ template<> std::string BaseSetting<bool>::to_string() const
     return value ? "true" : "false";
 }
 
-template<> void BaseSetting<bool>::convertToArg(Args & args, const std::string & category)
+template<> void BaseSetting<bool>::convertToArg(Args & args, std::string_view category)
 {
     args.addFlag({
         .longName = name,
         .description = description,
-        .category = category,
+        .category = std::string { category },
         .handler = {[=]() { override(true); }}
     });
     args.addFlag({
         .longName = "no-" + name,
         .description = description,
-        .category = category,
+        .category = std::string { category },
         .handler = {[=]() { override(false); }}
     });
 }
 
-template<> void BaseSetting<Strings>::set(const std::string & str)
+template<> void BaseSetting<Strings>::set(std::string_view str)
 {
     value = tokenizeString<Strings>(str);
 }
@@ -259,10 +272,10 @@ template<> void BaseSetting<Strings>::toJSON(JSONPlaceholder & out)
 {
     JSONList list(out.list());
     for (auto & s : value)
-        list.elem(s);
+        list.elem(std::string_view { s });
 }
 
-template<> void BaseSetting<StringSet>::set(const std::string & str)
+template<> void BaseSetting<StringSet>::set(std::string_view str)
 {
     value = tokenizeString<StringSet>(str);
 }
@@ -276,7 +289,7 @@ template<> void BaseSetting<StringSet>::toJSON(JSONPlaceholder & out)
 {
     JSONList list(out.list());
     for (auto & s : value)
-        list.elem(s);
+        list.elem(std::string_view { s });
 }
 
 template class BaseSetting<int>;
@@ -290,7 +303,7 @@ template class BaseSetting<std::string>;
 template class BaseSetting<Strings>;
 template class BaseSetting<StringSet>;
 
-void PathSetting::set(const std::string & str)
+void PathSetting::set(std::string_view str)
 {
     if (str == "") {
         if (allowEmpty)
@@ -301,7 +314,7 @@ void PathSetting::set(const std::string & str)
         value = canonPath(str);
 }
 
-bool GlobalConfig::set(const std::string & name, const std::string & value)
+bool GlobalConfig::set(std::string_view name, std::string_view value)
 {
     for (auto & config : *configRegistrations)
         if (config->set(name, value)) return true;
@@ -329,7 +342,7 @@ void GlobalConfig::toJSON(JSONObject & out)
         config->toJSON(out);
 }
 
-void GlobalConfig::convertToArgs(Args & args, const std::string & category)
+void GlobalConfig::convertToArgs(Args & args, std::string_view category)
 {
     for (auto & config : *configRegistrations)
         config->convertToArgs(args, category);

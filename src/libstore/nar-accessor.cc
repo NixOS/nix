@@ -43,11 +43,11 @@ struct NarAccessor : public FSAccessor
         std::string currentStart;
         bool isExec = false;
 
-        NarIndexer(NarAccessor & acc, const std::string & nar)
+        NarIndexer(NarAccessor & acc, std::string_view nar)
             : StringSource(nar), acc(acc)
         { }
 
-        void createMember(const Path & path, NarMember member) {
+        void createMember(PathView path, NarMember member) {
             size_t level = std::count(path.begin(), path.end(), '/');
             while (parents.size() > level) parents.pop();
 
@@ -62,12 +62,12 @@ struct NarAccessor : public FSAccessor
             }
         }
 
-        void createDirectory(const Path & path) override
+        void createDirectory(PathView path) override
         {
             createMember(path, {FSAccessor::Type::tDirectory, false, 0, 0});
         }
 
-        void createRegularFile(const Path & path) override
+        void createRegularFile(PathView path) override
         {
             createMember(path, {FSAccessor::Type::tRegular, false, 0, 0});
         }
@@ -94,7 +94,7 @@ struct NarAccessor : public FSAccessor
             }
         }
 
-        void createSymlink(const Path & path, const string & target) override
+        void createSymlink(PathView path, std::string_view target) override
         {
             createMember(path,
                 NarMember{FSAccessor::Type::tSymlink, false, 0, 0, target});
@@ -107,7 +107,7 @@ struct NarAccessor : public FSAccessor
         parseDump(indexer, indexer);
     }
 
-    NarAccessor(const std::string & listing, GetNarBytes getNarBytes)
+    NarAccessor(std::string_view listing, GetNarBytes getNarBytes)
         : getNarBytes(getNarBytes)
     {
         using json = nlohmann::json;
@@ -138,7 +138,7 @@ struct NarAccessor : public FSAccessor
         recurse(root, v);
     }
 
-    NarMember * find(const Path & path)
+    NarMember * find(PathView path)
     {
         Path canon = path == "" ? "" : canonPath(path);
         NarMember * current = &root;
@@ -164,14 +164,14 @@ struct NarAccessor : public FSAccessor
         return current;
     }
 
-    NarMember & get(const Path & path) {
+    NarMember & get(PathView path) {
         auto result = find(path);
         if (result == nullptr)
             throw Error("NAR file does not contain path '%1%'", path);
         return *result;
     }
 
-    Stat stat(const Path & path) override
+    Stat stat(PathView path) override
     {
         auto i = find(path);
         if (i == nullptr)
@@ -179,7 +179,7 @@ struct NarAccessor : public FSAccessor
         return {i->type, i->size, i->isExecutable, i->start};
     }
 
-    StringSet readDirectory(const Path & path) override
+    StringSet readDirectory(PathView path) override
     {
         auto i = get(path);
 
@@ -193,7 +193,7 @@ struct NarAccessor : public FSAccessor
         return res;
     }
 
-    std::string readFile(const Path & path) override
+    std::string readFile(PathView path) override
     {
         auto i = get(path);
         if (i.type != FSAccessor::Type::tRegular)
@@ -205,7 +205,7 @@ struct NarAccessor : public FSAccessor
         return std::string(*nar, i.start, i.size);
     }
 
-    std::string readLink(const Path & path) override
+    std::string readLink(PathView path) override
     {
         auto i = get(path);
         if (i.type != FSAccessor::Type::tSymlink)
@@ -219,14 +219,14 @@ ref<FSAccessor> makeNarAccessor(ref<const std::string> nar)
     return make_ref<NarAccessor>(nar);
 }
 
-ref<FSAccessor> makeLazyNarAccessor(const std::string & listing,
+ref<FSAccessor> makeLazyNarAccessor(std::string_view listing,
     GetNarBytes getNarBytes)
 {
     return make_ref<NarAccessor>(listing, getNarBytes);
 }
 
 void listNar(JSONPlaceholder & res, ref<FSAccessor> accessor,
-    const Path & path, bool recurse)
+    PathView path, bool recurse)
 {
     auto st = accessor->stat(path);
 

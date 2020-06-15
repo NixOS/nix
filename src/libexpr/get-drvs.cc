@@ -10,13 +10,13 @@
 namespace nix {
 
 
-DrvInfo::DrvInfo(EvalState & state, const string & attrPath, Bindings * attrs)
+DrvInfo::DrvInfo(EvalState & state, std::string_view attrPath, Bindings * attrs)
     : state(&state), attrs(attrs), attrPath(attrPath)
 {
 }
 
 
-DrvInfo::DrvInfo(EvalState & state, ref<Store> store, const std::string & drvPathWithOutputs)
+DrvInfo::DrvInfo(EvalState & state, ref<Store> store, std::string_view drvPathWithOutputs)
     : state(&state), attrs(nullptr), attrPath("")
 {
     auto [drvPath, selectedOutputs] = store->parsePathWithOutputs(drvPathWithOutputs);
@@ -183,7 +183,7 @@ bool DrvInfo::checkMeta(Value & v)
 }
 
 
-Value * DrvInfo::queryMeta(const string & name)
+Value * DrvInfo::queryMeta(std::string_view name)
 {
     if (!getMeta()) return 0;
     Bindings::iterator a = meta->find(state->symbols.create(name));
@@ -192,7 +192,7 @@ Value * DrvInfo::queryMeta(const string & name)
 }
 
 
-string DrvInfo::queryMetaString(const string & name)
+string DrvInfo::queryMetaString(std::string_view name)
 {
     Value * v = queryMeta(name);
     if (!v || v->type != tString) return "";
@@ -200,7 +200,7 @@ string DrvInfo::queryMetaString(const string & name)
 }
 
 
-NixInt DrvInfo::queryMetaInt(const string & name, NixInt def)
+NixInt DrvInfo::queryMetaInt(std::string_view name, NixInt def)
 {
     Value * v = queryMeta(name);
     if (!v) return def;
@@ -214,7 +214,7 @@ NixInt DrvInfo::queryMetaInt(const string & name, NixInt def)
     return def;
 }
 
-NixFloat DrvInfo::queryMetaFloat(const string & name, NixFloat def)
+NixFloat DrvInfo::queryMetaFloat(std::string_view name, NixFloat def)
 {
     Value * v = queryMeta(name);
     if (!v) return def;
@@ -229,7 +229,7 @@ NixFloat DrvInfo::queryMetaFloat(const string & name, NixFloat def)
 }
 
 
-bool DrvInfo::queryMetaBool(const string & name, bool def)
+bool DrvInfo::queryMetaBool(std::string_view name, bool def)
 {
     Value * v = queryMeta(name);
     if (!v) return def;
@@ -244,7 +244,7 @@ bool DrvInfo::queryMetaBool(const string & name, bool def)
 }
 
 
-void DrvInfo::setMeta(const string & name, Value * v)
+void DrvInfo::setMeta(std::string_view name, Value * v)
 {
     getMeta();
     Bindings * old = meta;
@@ -268,7 +268,7 @@ typedef set<Bindings *> Done;
    The result boolean indicates whether it makes sense
    for the caller to recursively search for derivations in `v'. */
 static bool getDerivation(EvalState & state, Value & v,
-    const string & attrPath, DrvInfos & drvs, Done & done,
+    std::string_view attrPath, DrvInfos & drvs, Done & done,
     bool ignoreAssertionFailures)
 {
     try {
@@ -305,7 +305,7 @@ std::optional<DrvInfo> getDerivation(EvalState & state, Value & v,
 }
 
 
-static string addToPath(const string & s1, const string & s2)
+static string addToPath(std::string_view s1, std::string_view s2)
 {
     return s1.empty() ? s2 : s1 + "." + s2;
 }
@@ -315,7 +315,7 @@ static std::regex attrRegex("[A-Za-z_][A-Za-z0-9-_+]*");
 
 
 static void getDerivations(EvalState & state, Value & vIn,
-    const string & pathPrefix, Bindings & autoArgs,
+    std::string_view pathPrefix, Bindings & autoArgs,
     DrvInfos & drvs, Done & done,
     bool ignoreAssertionFailures)
 {
@@ -368,7 +368,7 @@ static void getDerivations(EvalState & state, Value & vIn,
 }
 
 
-void getDerivations(EvalState & state, Value & v, const string & pathPrefix,
+void getDerivations(EvalState & state, Value & v, std::string_view pathPrefix,
     Bindings & autoArgs, DrvInfos & drvs, bool ignoreAssertionFailures)
 {
     Done done;

@@ -34,11 +34,11 @@ public:
 
     void close();
 
-    void openElement(const string & name,
+    void openElement(std::string_view name,
         const XMLAttrs & attrs = XMLAttrs());
     void closeElement();
 
-    void writeEmptyElement(const string & name,
+    void writeEmptyElement(std::string_view name,
         const XMLAttrs & attrs = XMLAttrs());
 
 private:
@@ -53,7 +53,7 @@ class XMLOpenElement
 private:
     XMLWriter & writer;
 public:
-    XMLOpenElement(XMLWriter & writer, const string & name,
+    XMLOpenElement(XMLWriter & writer, std::string_view name,
         const XMLAttrs & attrs = XMLAttrs())
         : writer(writer)
     {

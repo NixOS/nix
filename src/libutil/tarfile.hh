@@ -2,8 +2,8 @@
 
 namespace nix {
 
-void unpackTarfile(Source & source, const Path & destDir);
+void unpackTarfile(Source & source, PathView destDir);
 
-void unpackTarfile(const Path & tarFile, const Path & destDir);
+void unpackTarfile(PathView tarFile, PathView destDir);
 
 }

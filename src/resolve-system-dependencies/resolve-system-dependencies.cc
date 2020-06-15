@@ -23,12 +23,12 @@ Path resolveCacheFile(Path lib)
     return cacheDir + "/" + lib;
 }
 
-std::set<string> readCacheFile(const Path & file)
+std::set<string> readCacheFile(PathView file)
 {
     return tokenizeString<set<string>>(readFile(file), "\n");
 }
 
-std::set<std::string> runResolver(const Path & filename)
+std::set<std::string> runResolver(PathView filename)
 {
     AutoCloseFD fd = open(filename.c_str(), O_RDONLY);
     if (!fd)
@@ -109,7 +109,7 @@ std::set<std::string> runResolver(const Path & filename)
     return libs;
 }
 
-bool isSymlink(const Path & path)
+bool isSymlink(PathView path)
 {
     struct stat st;
     if (lstat(path.c_str(), &st) == -1)
@@ -118,7 +118,7 @@ bool isSymlink(const Path & path)
     return S_ISLNK(st.st_mode);
 }
 
-Path resolveSymlink(const Path & path)
+Path resolveSymlink(PathView path)
 {
     auto target = readLink(path);
     return hasPrefix(target, "/")
@@ -126,7 +126,7 @@ Path resolveSymlink(const Path & path)
         : dirOf(path) + "/" + target;
 }
 
-std::set<string> resolveTree(const Path & path, PathSet & deps)
+std::set<string> resolveTree(PathView path, PathSet & deps)
 {
     std::set<string> results;
     if (!deps.insert(path).second) return {};
@@ -139,7 +139,7 @@ std::set<string> resolveTree(const Path & path, PathSet & deps)
     return results;
 }
 
-std::set<string> getPath(const Path & path)
+std::set<string> getPath(PathView path)
 {
     if (hasPrefix(path, "/dev")) return {};
 

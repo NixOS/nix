@@ -261,7 +261,7 @@ void initGC()
 
 /* Very hacky way to parse $NIX_PATH, which is colon-separated, but
    can contain URLs (e.g. "nixpkgs=https://bla...:foo=https://"). */
-static Strings parseNixPath(const string & s)
+static Strings parseNixPath(std::string_view s)
 {
     Strings res;
 
@@ -373,7 +373,7 @@ EvalState::~EvalState()
 }
 
 
-Path EvalState::checkSourcePath(const Path & path_)
+Path EvalState::checkSourcePath(PathView path_)
 {
     if (!allowedPaths) return path_;
 
@@ -414,7 +414,7 @@ Path EvalState::checkSourcePath(const Path & path_)
 }
 
 
-void EvalState::checkURI(const std::string & uri)
+void EvalState::checkURI(std::string_view uri)
 {
     if (!evalSettings.restrictEval) return;
 
@@ -446,7 +446,7 @@ void EvalState::checkURI(const std::string & uri)
 }
 
 
-Path EvalState::toRealPath(const Path & path, const PathSet & context)
+Path EvalState::toRealPath(PathView path, const PathSet & context)
 {
     // FIXME: check whether 'path' is in 'context'.
     return
@@ -456,7 +456,7 @@ Path EvalState::toRealPath(const Path & path, const PathSet & context)
 }
 
 
-Value * EvalState::addConstant(const string & name, Value & v)
+Value * EvalState::addConstant(std::string_view name, Value & v)
 {
     Value * v2 = allocValue();
     *v2 = v;
@@ -468,7 +468,7 @@ Value * EvalState::addConstant(const string & name, Value & v)
 }
 
 
-Value * EvalState::addPrimOp(const string & name,
+Value * EvalState::addPrimOp(std::string_view name,
     size_t arity, PrimOpFun primOp)
 {
     if (arity == 0) {
@@ -488,7 +488,7 @@ Value * EvalState::addPrimOp(const string & name,
 }
 
 
-Value & EvalState::getBuiltin(const string & name)
+Value & EvalState::getBuiltin(std::string_view name)
 {
     return *baseEnv.values[0]->attrs->find(symbols.create(name))->value;
 }
@@ -499,12 +499,12 @@ Value & EvalState::getBuiltin(const string & name)
    evaluator.  So here are some helper functions for throwing
    exceptions. */
 
-LocalNoInlineNoReturn(void throwEvalError(const char * s, const string & s2))
+LocalNoInlineNoReturn(void throwEvalError(const char * s, std::string_view s2))
 {
     throw EvalError(s, s2);
 }
 
-LocalNoInlineNoReturn(void throwEvalError(const Pos & pos, const char * s, const string & s2))
+LocalNoInlineNoReturn(void throwEvalError(const Pos & pos, const char * s, std::string_view s2))
 {
     throw EvalError({
         .hint = hintfmt(s, s2),
@@ -512,12 +512,12 @@ LocalNoInlineNoReturn(void throwEvalError(const Pos & pos, const char * s, const
     });
 }
 
-LocalNoInlineNoReturn(void throwEvalError(const char * s, const string & s2, const string & s3))
+LocalNoInlineNoReturn(void throwEvalError(const char * s, std::string_view s2, std::string_view s3))
 {
     throw EvalError(s, s2, s3);
 }
 
-LocalNoInlineNoReturn(void throwEvalError(const Pos & pos, const char * s, const string & s2, const string & s3))
+LocalNoInlineNoReturn(void throwEvalError(const Pos & pos, const char * s, std::string_view s2, std::string_view s3))
 {
     throw EvalError({
         .hint = hintfmt(s, s2, s3),
@@ -542,7 +542,7 @@ LocalNoInlineNoReturn(void throwTypeError(const Pos & pos, const char * s))
     });
 }
 
-LocalNoInlineNoReturn(void throwTypeError(const char * s, const string & s1))
+LocalNoInlineNoReturn(void throwTypeError(const char * s, std::string_view s1))
 {
     throw TypeError(s, s1);
 }
@@ -555,7 +555,7 @@ LocalNoInlineNoReturn(void throwTypeError(const Pos & pos, const char * s, const
     });
 }
 
-LocalNoInlineNoReturn(void throwAssertionError(const Pos & pos, const char * s, const string & s1))
+LocalNoInlineNoReturn(void throwAssertionError(const Pos & pos, const char * s, std::string_view s1))
 {
     throw AssertionError({
         .hint = hintfmt(s, s1),
@@ -563,7 +563,7 @@ LocalNoInlineNoReturn(void throwAssertionError(const Pos & pos, const char * s, 
     });
 }
 
-LocalNoInlineNoReturn(void throwUndefinedVarError(const Pos & pos, const char * s, const string & s1))
+LocalNoInlineNoReturn(void throwUndefinedVarError(const Pos & pos, const char * s, std::string_view s1))
 {
     throw UndefinedVarError({
         .hint = hintfmt(s, s1),
@@ -571,7 +571,7 @@ LocalNoInlineNoReturn(void throwUndefinedVarError(const Pos & pos, const char * 
     });
 }
 
-LocalNoInline(void addErrorPrefix(Error & e, const char * s, const string & s2))
+LocalNoInline(void addErrorPrefix(Error & e, const char * s, std::string_view s2))
 {
     e.addPrefix(format(s) % s2);
 }
@@ -581,7 +581,7 @@ LocalNoInline(void addErrorPrefix(Error & e, const char * s, const ExprLambda & 
     e.addPrefix(format(s) % fun.showNamePos() % pos);
 }
 
-LocalNoInline(void addErrorPrefix(Error & e, const char * s, const string & s2, const Pos & pos))
+LocalNoInline(void addErrorPrefix(Error & e, const char * s, std::string_view s2, const Pos & pos))
 {
     e.addPrefix(format(s) % s2 % pos);
 }
@@ -766,7 +766,7 @@ Value * ExprPath::maybeThunk(EvalState & state, Env & env)
 }
 
 
-void EvalState::evalFile(const Path & path_, Value & v)
+void EvalState::evalFile(PathView path_, Value & v)
 {
     auto path = checkSourcePath(path_);
 
@@ -1679,7 +1679,7 @@ string EvalState::coerceToString(const Pos & pos, Value & v, PathSet & context,
 }
 
 
-string EvalState::copyPathToStore(PathSet & context, const Path & path)
+string EvalState::copyPathToStore(PathSet & context, PathView path)
 {
     if (nix::isDerivation(path))
         throwEvalError("file names are not allowed to end in '%1%'", drvExtension);
@@ -1878,11 +1878,11 @@ void EvalState::printStats()
                 for (auto & i : functionCalls) {
                     auto obj = list.object();
                     if (i.first->name.set())
-                        obj.attr("name", (const string &) i.first->name);
+                        obj.attr("name", (std::string_view) i.first->name);
                     else
                         obj.attr("name", nullptr);
                     if (i.first->pos) {
-                        obj.attr("file", (const string &) i.first->pos.file);
+                        obj.attr("file", (std::string_view) i.first->pos.file);
                         obj.attr("line", i.first->pos.line);
                         obj.attr("column", i.first->pos.column);
                     }
@@ -1894,7 +1894,7 @@ void EvalState::printStats()
                 for (auto & i : attrSelects) {
                     auto obj = list.object();
                     if (i.first) {
-                        obj.attr("file", (const string &) i.first.file);
+                        obj.attr("file", (std::string_view) i.first.file);
                         obj.attr("line", i.first.line);
                         obj.attr("column", i.first.column);
                     }
@@ -1905,7 +1905,7 @@ void EvalState::printStats()
 
         if (getEnv("NIX_SHOW_SYMBOLS").value_or("0") != "0") {
             auto list = topObj.list("symbols");
-            symbols.dump([&](const std::string & s) { list.elem(s); });
+            symbols.dump([&](std::string_view s) { list.elem(s); });
         }
     }
 }
@@ -1940,7 +1940,7 @@ EvalSettings::EvalSettings()
 Strings EvalSettings::getDefaultNixPath()
 {
     Strings res;
-    auto add = [&](const Path & p) { if (pathExists(p)) { res.push_back(p); } };
+    auto add = [&](PathView p) { if (pathExists(p)) { res.push_back(p); } };
     add(getHome() + "/.nix-defexpr/channels");
     add("nixpkgs=" + settings.nixStateDir + "/nix/profiles/per-user/root/channels/nixpkgs");
     add(settings.nixStateDir + "/nix/profiles/per-user/root/channels");

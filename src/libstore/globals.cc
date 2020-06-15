@@ -121,13 +121,13 @@ StringSet Settings::getDefaultSystemFeatures()
     return features;
 }
 
-bool Settings::isExperimentalFeatureEnabled(const std::string & name)
+bool Settings::isExperimentalFeatureEnabled(std::string_view name)
 {
     auto & f = experimentalFeatures.get();
     return std::find(f.begin(), f.end(), name) != f.end();
 }
 
-void Settings::requireExperimentalFeature(const std::string & name)
+void Settings::requireExperimentalFeature(std::string_view name)
 {
     if (!isExperimentalFeatureEnabled(name))
         throw Error("experimental Nix feature '%1%' is disabled; use '--experimental-features %1%' to override", name);
@@ -144,7 +144,7 @@ bool Settings::isWSL1()
 
 const string nixVersion = PACKAGE_VERSION;
 
-template<> void BaseSetting<SandboxMode>::set(const std::string & str)
+template<> void BaseSetting<SandboxMode>::set(std::string_view str)
 {
     if (str == "true") value = smEnabled;
     else if (str == "relaxed") value = smRelaxed;
@@ -165,7 +165,7 @@ template<> void BaseSetting<SandboxMode>::toJSON(JSONPlaceholder & out)
     AbstractSetting::toJSON(out);
 }
 
-template<> void BaseSetting<SandboxMode>::convertToArg(Args & args, const std::string & category)
+template<> void BaseSetting<SandboxMode>::convertToArg(Args & args, std::string_view category)
 {
     args.addFlag({
         .longName = name,
@@ -187,7 +187,7 @@ template<> void BaseSetting<SandboxMode>::convertToArg(Args & args, const std::s
     });
 }
 
-void MaxBuildJobsSetting::set(const std::string & str)
+void MaxBuildJobsSetting::set(std::string_view str)
 {
     if (str == "auto") value = std::max(1U, std::thread::hardware_concurrency());
     else if (!string2Int(str, value))

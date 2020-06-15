@@ -12,7 +12,7 @@ void processConnection(
     FdSink & to,
     TrustedFlag trusted,
     RecursiveFlag recursive,
-    const std::string & userName,
+    std::string_view userName,
     uid_t userId);
 
 }

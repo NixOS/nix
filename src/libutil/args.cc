@@ -57,7 +57,7 @@ void Args::parseCmdline(const Strings & _cmdline)
     processArgs(pendingArgs, true);
 }
 
-void Args::printHelp(const string & programName, std::ostream & out)
+void Args::printHelp(std::string_view programName, std::ostream & out)
 {
     std::cout << fmt(ANSI_BOLD "Usage:" ANSI_NORMAL " %s " ANSI_ITALIC "FLAGS..." ANSI_NORMAL, programName);
     for (auto & exp : expectedArgs) {
@@ -96,7 +96,7 @@ bool Args::processFlag(Strings::iterator & pos, Strings::iterator end)
 {
     assert(pos != end);
 
-    auto process = [&](const std::string & name, const Flag & flag) -> bool {
+    auto process = [&](std::string_view name, const Flag & flag) -> bool {
         ++pos;
         std::vector<std::string> args;
         for (size_t n = 0 ; n < flag.handler.arity; ++n) {
@@ -198,7 +198,7 @@ void printTable(std::ostream & out, const Table2 & table)
     }
 }
 
-void Command::printHelp(const string & programName, std::ostream & out)
+void Command::printHelp(std::string_view programName, std::ostream & out)
 {
     Args::printHelp(programName, out);
 
@@ -231,10 +231,10 @@ MultiCommand::MultiCommand(const Commands & commands)
     categories[Command::catDefault] = "Available commands";
 }
 
-void MultiCommand::printHelp(const string & programName, std::ostream & out)
+void MultiCommand::printHelp(std::string_view programName, std::ostream & out)
 {
     if (command) {
-        command->second->printHelp(programName + " " + command->first, out);
+        command->second->printHelp(std::string { programName } + " " + command->first, out);
         return;
     }
 

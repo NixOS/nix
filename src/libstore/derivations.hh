@@ -48,7 +48,7 @@ struct BasicDerivation
 
     /* Return the path corresponding to the output identifier `id' in
        the given derivation. */
-    const StorePath & findOutput(const std::string & id) const;
+    const StorePath & findOutput(std::string_view id) const;
 
     bool isBuiltin() const;
 
@@ -84,10 +84,10 @@ StorePath writeDerivation(ref<Store> store,
     const Derivation & drv, std::string_view name, RepairFlag repair = NoRepair);
 
 /* Read a derivation from a file. */
-Derivation readDerivation(const Store & store, const Path & drvPath);
+Derivation readDerivation(const Store & store, PathView drvPath);
 
 // FIXME: remove
-bool isDerivation(const string & fileName);
+bool isDerivation(std::string_view fileName);
 
 Hash hashDerivationModulo(Store & store, const Derivation & drv, bool maskOutputs);
 
@@ -96,7 +96,7 @@ typedef std::map<StorePath, Hash> DrvHashes;
 
 extern DrvHashes drvHashes; // FIXME: global, not thread-safe
 
-bool wantOutput(const string & output, const std::set<string> & wanted);
+bool wantOutput(std::string_view output, const std::set<string> & wanted);
 
 struct Source;
 struct Sink;
@@ -104,6 +104,6 @@ struct Sink;
 Source & readDerivation(Source & in, const Store & store, BasicDerivation & drv);
 void writeDerivation(Sink & out, const Store & store, const BasicDerivation & drv);
 
-std::string hashPlaceholder(const std::string & outputName);
+std::string hashPlaceholder(std::string_view outputName);
 
 }

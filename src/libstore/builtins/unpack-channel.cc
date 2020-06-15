@@ -5,7 +5,7 @@ namespace nix {
 
 void builtinUnpackChannel(const BasicDerivation & drv)
 {
-    auto getAttr = [&](const string & name) {
+    auto getAttr = [&](std::string_view name) {
         auto i = drv.env.find(name);
         if (i == drv.env.end()) throw Error("attribute '%s' missing", name);
         return i->second;

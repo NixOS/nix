@@ -24,26 +24,26 @@ void toJSON(std::ostream & str, const char * s)
     if (!s) str << "null"; else toJSON(str, s, s + strlen(s));
 }
 
-template<> void toJSON<int>(std::ostream & str, const int & n) { str << n; }
-template<> void toJSON<unsigned int>(std::ostream & str, const unsigned int & n) { str << n; }
-template<> void toJSON<long>(std::ostream & str, const long & n) { str << n; }
-template<> void toJSON<unsigned long>(std::ostream & str, const unsigned long & n) { str << n; }
-template<> void toJSON<long long>(std::ostream & str, const long long & n) { str << n; }
-template<> void toJSON<unsigned long long>(std::ostream & str, const unsigned long long & n) { str << n; }
-template<> void toJSON<float>(std::ostream & str, const float & n) { str << n; }
-template<> void toJSON<double>(std::ostream & str, const double & n) { str << n; }
+template<> void toJSON<int>(std::ostream & str, int n) { str << n; }
+template<> void toJSON<unsigned int>(std::ostream & str, unsigned int n) { str << n; }
+template<> void toJSON<long>(std::ostream & str, long n) { str << n; }
+template<> void toJSON<unsigned long>(std::ostream & str, unsigned long n) { str << n; }
+template<> void toJSON<long long>(std::ostream & str, long long n) { str << n; }
+template<> void toJSON<unsigned long long>(std::ostream & str, unsigned long long n) { str << n; }
+template<> void toJSON<float>(std::ostream & str, float n) { str << n; }
+template<> void toJSON<double>(std::ostream & str, double n) { str << n; }
 
-template<> void toJSON<std::string>(std::ostream & str, const std::string & s)
+template<> void toJSON<std::string_view>(std::ostream & str, std::string_view s)
 {
-    toJSON(str, s.c_str(), s.c_str() + s.size());
+    toJSON(str, s.data(), s.data() + s.size());
 }
 
-template<> void toJSON<bool>(std::ostream & str, const bool & b)
+template<> void toJSON<bool>(std::ostream & str, bool b)
 {
     str << (b ? "true" : "false");
 }
 
-template<> void toJSON<std::nullptr_t>(std::ostream & str, const std::nullptr_t & b)
+template<> void toJSON<std::nullptr_t>(std::ostream & str, const std::nullptr_t b)
 {
     str << "null";
 }
@@ -131,7 +131,7 @@ JSONObject::~JSONObject()
     }
 }
 
-void JSONObject::attr(const std::string & s)
+void JSONObject::attr(std::string_view s)
 {
     comma();
     toJSON(state->str, s);
@@ -139,19 +139,19 @@ void JSONObject::attr(const std::string & s)
     if (state->indent) state->str << ' ';
 }
 
-JSONList JSONObject::list(const std::string & name)
+JSONList JSONObject::list(std::string_view name)
 {
     attr(name);
     return JSONList(state);
 }
 
-JSONObject JSONObject::object(const std::string & name)
+JSONObject JSONObject::object(std::string_view name)
 {
     attr(name);
     return JSONObject(state);
 }
 
-JSONPlaceholder JSONObject::placeholder(const std::string & name)
+JSONPlaceholder JSONObject::placeholder(std::string_view name)
 {
     attr(name);
     return JSONPlaceholder(state);

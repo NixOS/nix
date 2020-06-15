@@ -24,7 +24,7 @@ struct BuildEnvironment
     std::string bashFunctions;
 };
 
-BuildEnvironment readEnvironment(const Path & path)
+BuildEnvironment readEnvironment(PathView path)
 {
     BuildEnvironment res;
 

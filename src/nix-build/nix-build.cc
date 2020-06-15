@@ -26,7 +26,7 @@ extern char * * environ;
 /* Recreate the effect of the perl shellwords function, breaking up a
  * string into arguments like a shell word, including escapes
  */
-std::vector<string> shellwords(const string & s)
+std::vector<string> shellwords(std::string_view s)
 {
     std::regex whitespace("^(\\s+).*");
     auto begin = s.cbegin();
@@ -380,7 +380,7 @@ static void _main(int argc, char * * argv)
         // Build or fetch all dependencies of the derivation.
         for (const auto & input : drv.inputDrvs)
             if (std::all_of(envExclude.cbegin(), envExclude.cend(),
-                    [&](const string & exclude) { return !std::regex_search(store->printStorePath(input.first), std::regex(exclude)); }))
+                    [&](std::string_view exclude) { return !std::regex_search(store->printStorePath(input.first), std::regex(exclude)); }))
                 pathsToBuild.emplace_back(input.first, input.second);
         for (const auto & src : drv.inputSrcs)
             pathsToBuild.emplace_back(src);

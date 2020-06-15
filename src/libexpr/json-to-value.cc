@@ -149,7 +149,7 @@ public:
     }
 };
 
-void parseJSON(EvalState & state, const string & s_, Value & v)
+void parseJSON(EvalState & state, std::string_view s_, Value & v)
 {
     JSONSax parser(state, v);
     bool res = json::sax_parse(s_, &parser);

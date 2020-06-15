@@ -43,7 +43,7 @@ Value * EvalState::allocAttr(Value & vAttrs, const Symbol & name)
 }
 
 
-Value * EvalState::allocAttr(Value & vAttrs, const std::string & name)
+Value * EvalState::allocAttr(Value & vAttrs, std::string_view name)
 {
     return allocAttr(vAttrs, symbols.create(name));
 }

@@ -24,9 +24,9 @@ struct MixLs : virtual Args, MixJSON
 
     void listText(ref<FSAccessor> accessor)
     {
-        std::function<void(const FSAccessor::Stat &, const Path &, const std::string &, bool)> doPath;
+        std::function<void(const FSAccessor::Stat &, PathView, std::string_view, bool)> doPath;
 
-        auto showFile = [&](const Path & curPath, const std::string & relPath) {
+        auto showFile = [&](PathView curPath, std::string_view relPath) {
             if (verbose) {
                 auto st = accessor->stat(curPath);
                 std::string tp =
@@ -50,8 +50,8 @@ struct MixLs : virtual Args, MixJSON
             }
         };
 
-        doPath = [&](const FSAccessor::Stat & st, const Path & curPath,
-            const std::string & relPath, bool showDirectory)
+        doPath = [&](const FSAccessor::Stat & st, PathView curPath,
+            std::string_view relPath, bool showDirectory)
         {
             if (st.type == FSAccessor::Type::tDirectory && !showDirectory) {
                 auto names = accessor->readDirectory(curPath);

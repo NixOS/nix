@@ -17,7 +17,7 @@ ref<FSAccessor> makeNarAccessor(ref<const std::string> nar);
 typedef std::function<std::string(uint64_t, uint64_t)> GetNarBytes;
 
 ref<FSAccessor> makeLazyNarAccessor(
-    const std::string & listing,
+    std::string_view listing,
     GetNarBytes getNarBytes);
 
 class JSONPlaceholder;
@@ -25,6 +25,6 @@ class JSONPlaceholder;
 /* Write a JSON representation of the contents of a NAR (except file
    contents). */
 void listNar(JSONPlaceholder & res, ref<FSAccessor> accessor,
-    const Path & path, bool recurse);
+    PathView path, bool recurse);
 
 }

@@ -38,7 +38,7 @@ nlohmann::json attrsToJson(const Attrs & attrs)
     return json;
 }
 
-std::optional<std::string> maybeGetStrAttr(const Attrs & attrs, const std::string & name)
+std::optional<std::string> maybeGetStrAttr(const Attrs & attrs, std::string_view name)
 {
     auto i = attrs.find(name);
     if (i == attrs.end()) return {};
@@ -47,7 +47,7 @@ std::optional<std::string> maybeGetStrAttr(const Attrs & attrs, const std::strin
     throw Error("input attribute '%s' is not a string %s", name, attrsToJson(attrs).dump());
 }
 
-std::string getStrAttr(const Attrs & attrs, const std::string & name)
+std::string getStrAttr(const Attrs & attrs, std::string_view name)
 {
     auto s = maybeGetStrAttr(attrs, name);
     if (!s)
@@ -55,7 +55,7 @@ std::string getStrAttr(const Attrs & attrs, const std::string & name)
     return *s;
 }
 
-std::optional<int64_t> maybeGetIntAttr(const Attrs & attrs, const std::string & name)
+std::optional<int64_t> maybeGetIntAttr(const Attrs & attrs, std::string_view name)
 {
     auto i = attrs.find(name);
     if (i == attrs.end()) return {};
@@ -64,7 +64,7 @@ std::optional<int64_t> maybeGetIntAttr(const Attrs & attrs, const std::string & 
     throw Error("input attribute '%s' is not an integer", name);
 }
 
-int64_t getIntAttr(const Attrs & attrs, const std::string & name)
+int64_t getIntAttr(const Attrs & attrs, std::string_view name)
 {
     auto s = maybeGetIntAttr(attrs, name);
     if (!s)
@@ -72,7 +72,7 @@ int64_t getIntAttr(const Attrs & attrs, const std::string & name)
     return *s;
 }
 
-std::optional<bool> maybeGetBoolAttr(const Attrs & attrs, const std::string & name)
+std::optional<bool> maybeGetBoolAttr(const Attrs & attrs, std::string_view name)
 {
     auto i = attrs.find(name);
     if (i == attrs.end()) return {};
@@ -81,7 +81,7 @@ std::optional<bool> maybeGetBoolAttr(const Attrs & attrs, const std::string & na
     throw Error("input attribute '%s' is not a Boolean", name);
 }
 
-bool getBoolAttr(const Attrs & attrs, const std::string & name)
+bool getBoolAttr(const Attrs & attrs, std::string_view name)
 {
     auto s = maybeGetBoolAttr(attrs, name);
     if (!s)

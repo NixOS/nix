@@ -260,7 +260,7 @@ struct BrotliDecompressionSink : ChunkedCompressionSink
     }
 };
 
-ref<std::string> decompress(const std::string & method, const std::string & in)
+ref<std::string> decompress(std::string_view method, std::string_view in)
 {
     StringSink ssink;
     auto sink = makeDecompressionSink(method, ssink);
@@ -269,7 +269,7 @@ ref<std::string> decompress(const std::string & method, const std::string & in)
     return ssink.s;
 }
 
-ref<CompressionSink> makeDecompressionSink(const std::string & method, Sink & nextSink)
+ref<CompressionSink> makeDecompressionSink(std::string_view method, Sink & nextSink)
 {
     if (method == "none" || method == "")
         return make_ref<NoneSink>(nextSink);
@@ -470,7 +470,7 @@ struct BrotliCompressionSink : ChunkedCompressionSink
     }
 };
 
-ref<CompressionSink> makeCompressionSink(const std::string & method, Sink & nextSink, const bool parallel)
+ref<CompressionSink> makeCompressionSink(std::string_view method, Sink & nextSink, const bool parallel)
 {
     if (method == "none")
         return make_ref<NoneSink>(nextSink);
@@ -484,7 +484,7 @@ ref<CompressionSink> makeCompressionSink(const std::string & method, Sink & next
         throw UnknownCompressionMethod("unknown compression method '%s'", method);
 }
 
-ref<std::string> compress(const std::string & method, const std::string & in, const bool parallel)
+ref<std::string> compress(std::string_view method, std::string_view in, const bool parallel)
 {
     StringSink ssink;
     auto sink = makeCompressionSink(method, ssink, parallel);

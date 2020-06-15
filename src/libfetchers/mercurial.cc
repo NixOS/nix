@@ -99,7 +99,7 @@ struct MercurialInput : Input
                 auto files = tokenizeString<std::set<std::string>>(
                     runProgram("hg", true, { "status", "-R", actualUrl, "--clean", "--modified", "--added", "--no-status", "--print0" }), "\0"s);
 
-                PathFilter filter = [&](const Path & p) -> bool {
+                PathFilter filter = [&](PathView p) -> bool {
                     assert(hasPrefix(p, actualUrl));
                     std::string file(p, actualUrl.size() + 1);
 

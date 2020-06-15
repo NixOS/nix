@@ -33,24 +33,24 @@ protected:
 
 public:
 
-    virtual bool fileExists(const std::string & path) = 0;
+    virtual bool fileExists(std::string_view path) = 0;
 
-    virtual void upsertFile(const std::string & path,
-        const std::string & data,
-        const std::string & mimeType) = 0;
+    virtual void upsertFile(std::string_view path,
+        std::string_view data,
+        std::string_view mimeType) = 0;
 
     /* Note: subclasses must implement at least one of the two
        following getFile() methods. */
 
     /* Dump the contents of the specified file to a sink. */
-    virtual void getFile(const std::string & path, Sink & sink);
+    virtual void getFile(std::string_view path, Sink & sink);
 
     /* Fetch the specified file and call the specified callback with
        the result. A subclass may implement this asynchronously. */
-    virtual void getFile(const std::string & path,
+    virtual void getFile(std::string_view path,
         Callback<std::shared_ptr<std::string>> callback) noexcept;
 
-    std::shared_ptr<std::string> getFile(const std::string & path);
+    std::shared_ptr<std::string> getFile(std::string_view path);
 
 public:
 
@@ -71,18 +71,18 @@ public:
     void queryPathInfoUncached(const StorePath & path,
         Callback<std::shared_ptr<const ValidPathInfo>> callback) noexcept override;
 
-    std::optional<StorePath> queryPathFromHashPart(const std::string & hashPart) override
+    std::optional<StorePath> queryPathFromHashPart(std::string_view hashPart) override
     { unsupported("queryPathFromHashPart"); }
 
     void addToStore(const ValidPathInfo & info, Source & narSource,
         RepairFlag repair, CheckSigsFlag checkSigs,
         std::shared_ptr<FSAccessor> accessor) override;
 
-    StorePath addToStore(const string & name, const Path & srcPath,
+    StorePath addToStore(std::string_view name, PathView srcPath,
         FileIngestionMethod method, HashType hashAlgo,
         PathFilter & filter, RepairFlag repair) override;
 
-    StorePath addTextToStore(const string & name, const string & s,
+    StorePath addTextToStore(std::string_view name, std::string_view s,
         const StorePathSet & references, RepairFlag repair) override;
 
     void narFromPath(const StorePath & path, Sink & sink) override;

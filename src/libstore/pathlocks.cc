@@ -14,7 +14,7 @@
 namespace nix {
 
 
-AutoCloseFD openLockFile(const Path & path, bool create)
+AutoCloseFD openLockFile(PathView path, bool create)
 {
     AutoCloseFD fd;
 
@@ -26,7 +26,7 @@ AutoCloseFD openLockFile(const Path & path, bool create)
 }
 
 
-void deleteLockFile(const Path & path, int fd)
+void deleteLockFile(PathView path, int fd)
 {
     /* Get rid of the lock file.  Have to be careful not to introduce
        races.  Write a (meaningless) token to the file to indicate to
@@ -74,7 +74,7 @@ PathLocks::PathLocks()
 }
 
 
-PathLocks::PathLocks(const PathSet & paths, const string & waitMsg)
+PathLocks::PathLocks(const PathSet & paths, std::string_view waitMsg)
     : deletePaths(false)
 {
     lockPaths(paths, waitMsg);
@@ -82,7 +82,7 @@ PathLocks::PathLocks(const PathSet & paths, const string & waitMsg)
 
 
 bool PathLocks::lockPaths(const PathSet & paths,
-    const string & waitMsg, bool wait)
+    std::string_view waitMsg, bool wait)
 {
     assert(fds.empty());
 

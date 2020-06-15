@@ -8,8 +8,8 @@
 
 using namespace nix;
 
-static std::string hilite(const std::string & s, size_t pos, size_t len,
-    const std::string & colour = ANSI_RED)
+static std::string hilite(std::string_view s, size_t pos, size_t len,
+    std::string_view colour = ANSI_RED)
 {
     return
         std::string(s, 0, pos)
@@ -19,7 +19,7 @@ static std::string hilite(const std::string & s, size_t pos, size_t len,
         + std::string(s, pos + len);
 }
 
-static std::string filterPrintable(const std::string & s)
+static std::string filterPrintable(std::string_view s)
 {
     std::string res;
     for (char c : s)
@@ -144,11 +144,11 @@ struct CmdWhyDepends : SourceExprCommand
            closure (i.e., that have a non-infinite distance to
            'dependency'). Print every edge on a path between `package`
            and `dependency`. */
-        std::function<void(Node &, const string &, const string &)> printNode;
+        std::function<void(Node &, std::string_view, std::string_view)> printNode;
 
         struct BailOut { };
 
-        printNode = [&](Node & node, const string & firstPad, const string & tailPad) {
+        printNode = [&](Node & node, std::string_view firstPad, std::string_view tailPad) {
             auto pathS = store->printStorePath(node.path);
 
             assert(node.dist != inf);
@@ -182,14 +182,14 @@ struct CmdWhyDepends : SourceExprCommand
                contain the reference. */
             std::map<std::string, Strings> hits;
 
-            std::function<void(const Path &)> visitPath;
+            std::function<void(PathView)> visitPath;
 
-            visitPath = [&](const Path & p) {
+            visitPath = [&](PathView p) {
                 auto st = accessor->stat(p);
 
                 auto p2 = p == pathS ? "/" : std::string(p, pathS.size() + 1);
 
-                auto getColour = [&](const std::string & hash) {
+                auto getColour = [&](std::string_view hash) {
                     return hash == dependencyPathHash ? ANSI_GREEN : ANSI_BLUE;
                 };
 

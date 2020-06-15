@@ -47,7 +47,7 @@ struct FileTransferRequest
     std::string mimeType;
     std::function<void(char *, size_t)> dataCallback;
 
-    FileTransferRequest(const std::string & uri)
+    FileTransferRequest(std::string_view uri)
         : uri(uri), parentAct(getCurActivity()) { }
 
     std::string verb()
@@ -109,9 +109,9 @@ public:
     { }
 };
 
-bool isUri(const string & s);
+bool isUri(std::string_view s);
 
 /* Resolve deprecated 'channel:<foo>' URLs. */
-std::string resolveUri(const std::string & uri);
+std::string resolveUri(std::string_view uri);
 
 }

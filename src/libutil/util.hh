@@ -4,6 +4,7 @@
 #include "error.hh"
 #include "logging.hh"
 #include "ansicolor.hh"
+#include "istringstream_nocopy.hh"
 
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -38,7 +39,7 @@ extern const std::string nativeSystem;
 
 
 /* Return an environment variable. */
-std::optional<std::string> getEnv(const std::string & key);
+std::optional<std::string> getEnv(std::string_view key);
 
 /* Get the entire environment. */
 std::map<std::string, std::string> getEnv();
@@ -55,35 +56,35 @@ Path absPath(Path path, std::optional<Path> dir = {});
    double or trailing slashes.  Optionally resolves all symlink
    components such that each component of the resulting path is *not*
    a symbolic link. */
-Path canonPath(const Path & path, bool resolveSymlinks = false);
+Path canonPath(PathView path, bool resolveSymlinks = false);
 
 /* Return the directory part of the given canonical path, i.e.,
    everything before the final `/'.  If the path is the root or an
    immediate child thereof (e.g., `/foo'), this means `/'
    is returned.*/
-Path dirOf(const Path & path);
+Path dirOf(PathView path);
 
 /* Return the base name of the given canonical path, i.e., everything
    following the final `/' (trailing slashes are removed). */
 std::string_view baseNameOf(std::string_view path);
 
 /* Check whether 'path' is a descendant of 'dir'. */
-bool isInDir(const Path & path, const Path & dir);
+bool isInDir(PathView path, PathView dir);
 
 /* Check whether 'path' is equal to 'dir' or a descendant of 'dir'. */
-bool isDirOrInDir(const Path & path, const Path & dir);
+bool isDirOrInDir(PathView path, PathView dir);
 
 /* Get status of `path'. */
-struct stat lstat(const Path & path);
+struct stat lstat(PathView path);
 
 /* Return true iff the given path exists. */
-bool pathExists(const Path & path);
+bool pathExists(PathView path);
 
 /* Read the contents (target) of a symbolic link.  The result is not
    in any way canonicalised. */
-Path readLink(const Path & path);
+Path readLink(PathView path);
 
-bool isLink(const Path & path);
+bool isLink(PathView path);
 
 /* Read the contents of a directory.  The entries `.' and `..' are
    removed. */
@@ -92,25 +93,25 @@ struct DirEntry
     string name;
     ino_t ino;
     unsigned char type; // one of DT_*
-    DirEntry(const string & name, ino_t ino, unsigned char type)
+    DirEntry(std::string_view name, ino_t ino, unsigned char type)
         : name(name), ino(ino), type(type) { }
 };
 
 typedef vector<DirEntry> DirEntries;
 
-DirEntries readDirectory(const Path & path);
+DirEntries readDirectory(PathView path);
 
-unsigned char getFileType(const Path & path);
+unsigned char getFileType(PathView path);
 
 /* Read the contents of a file into a string. */
 string readFile(int fd);
-string readFile(const Path & path);
-void readFile(const Path & path, Sink & sink);
+string readFile(PathView path);
+void readFile(PathView path, Sink & sink);
 
 /* Write a string to a file. */
-void writeFile(const Path & path, const string & s, mode_t mode = 0666);
+void writeFile(PathView path, std::string_view s, mode_t mode = 0666);
 
-void writeFile(const Path & path, Source & source, mode_t mode = 0666);
+void writeFile(PathView path, Source & source, mode_t mode = 0666);
 
 /* Read a line from a file descriptor. */
 string readLine(int fd);
@@ -121,9 +122,9 @@ void writeLine(int fd, string s);
 /* Delete a path; i.e., in the case of a directory, it is deleted
    recursively. It's not an error if the path does not exist. The
    second variant returns the number of bytes and blocks freed. */
-void deletePath(const Path & path);
+void deletePath(PathView path);
 
-void deletePath(const Path & path, unsigned long long & bytesFreed);
+void deletePath(PathView path, unsigned long long & bytesFreed);
 
 std::string getUserName();
 
@@ -144,20 +145,20 @@ Path getDataDir();
 
 /* Create a directory and all its parents, if necessary.  Returns the
    list of created directories, in order of creation. */
-Paths createDirs(const Path & path);
+Paths createDirs(PathView path);
 
 /* Create a symlink. */
-void createSymlink(const Path & target, const Path & link);
+void createSymlink(PathView target, PathView link);
 
 /* Atomically create or replace a symlink. */
-void replaceSymlink(const Path & target, const Path & link);
+void replaceSymlink(PathView target, PathView link);
 
 
 /* Wrappers arount read()/write() that read/write exactly the
    requested number of bytes. */
 void readFull(int fd, unsigned char * buf, size_t count);
 void writeFull(int fd, const unsigned char * buf, size_t count, bool allowInterrupts = true);
-void writeFull(int fd, const string & s, bool allowInterrupts = true);
+void writeFull(int fd, std::string_view s, bool allowInterrupts = true);
 
 MakeError(EndOfFile, Error);
 
@@ -178,10 +179,10 @@ class AutoDelete
     bool recursive;
 public:
     AutoDelete();
-    AutoDelete(const Path & p, bool recursive = true);
+    AutoDelete(PathView p, bool recursive = true);
     ~AutoDelete();
     void cancel();
-    void reset(const Path & p, bool recursive = true);
+    void reset(PathView p, bool recursive = true);
     operator Path() const { return path; }
 };
 
@@ -205,11 +206,11 @@ public:
 
 
 /* Create a temporary directory. */
-Path createTempDir(const Path & tmpRoot = "", const Path & prefix = "nix",
+Path createTempDir(PathView tmpRoot = "", PathView prefix = "nix",
     bool includePid = true, bool useGlobalCounter = true, mode_t mode = 0755);
 
 /* Create a temporary file, returning a file handle and its path. */
-std::pair<AutoCloseFD, Path> createTempFile(const Path & prefix = "nix");
+std::pair<AutoCloseFD, Path> createTempFile(PathView prefix = "nix");
 
 
 class Pipe
@@ -289,7 +290,7 @@ struct RunOptions
     bool mergeStderrToStdout = false;
     bool _killStderr = false;
 
-    RunOptions(const Path & program, const Strings & args)
+    RunOptions(PathView program, const Strings & args)
         : program(program), args(args) { };
 
     RunOptions & killStderr(bool v) { _killStderr = true; return *this; }
@@ -347,13 +348,13 @@ MakeError(FormatError, Error);
 
 
 /* String tokenizer. */
-template<class C> C tokenizeString(std::string_view s, const string & separators = " \t\n\r");
+template<class C> C tokenizeString(std::string_view s, std::string_view separators = " \t\n\r");
 
 
 /* Concatenate the given strings with a separator between the
    elements. */
 template<class C>
-string concatStringsSep(const string & sep, const C & ss)
+string concatStringsSep(std::string_view sep, const C & ss)
 {
     string s;
     for (auto & i : ss) {
@@ -375,19 +376,19 @@ template<class C> Strings quoteStrings(const C & c)
 
 
 /* Remove trailing whitespace from a string. */
-string chomp(const string & s);
+string chomp(std::string_view s);
 
 
 /* Remove whitespace from the start and end of a string. */
-string trim(const string & s, const string & whitespace = " \n\r\t");
+string trim(std::string_view s, std::string_view whitespace = " \n\r\t");
 
 
 /* Replace all occurrences of a string inside another string. */
-string replaceStrings(const std::string & s,
-    const std::string & from, const std::string & to);
+string replaceStrings(std::string_view s,
+    std::string_view from, std::string_view to);
 
 
-std::string rewriteStrings(const std::string & s, const StringMap & rewrites);
+std::string rewriteStrings(std::string_view s, const StringMap & rewrites);
 
 
 /* Convert the exit status of a child as returned by wait() into an
@@ -396,21 +397,22 @@ string statusToString(int status);
 
 bool statusOk(int status);
 
-
 /* Parse a string into an integer. */
-template<class N> bool string2Int(const string & s, N & n)
+template<class N> bool string2Int(std::string_view s, N & n)
 {
-    if (string(s, 0, 1) == "-" && !std::numeric_limits<N>::is_signed)
+	// TODO find a way to not allocate, problem is atoi/strtol relies on null
+	// termination, maybe non-standard srtntol or Boost.
+    if (s.substr(0, 1) == "-" && !std::numeric_limits<N>::is_signed)
         return false;
-    std::istringstream str(s);
+    istringstream_nocopy str(s);
     str >> n;
     return str && str.get() == EOF;
 }
 
 /* Parse a string into a float. */
-template<class N> bool string2Float(const string & s, N & n)
+template<class N> bool string2Float(std::string_view s, N & n)
 {
-    std::istringstream str(s);
+    istringstream_nocopy str(s);
     str >> n;
     return str && str.get() == EOF;
 }
@@ -425,12 +427,25 @@ bool hasSuffix(std::string_view s, std::string_view suffix);
 
 
 /* Convert a string to lower case. */
-std::string toLower(const std::string & s);
+std::string toLower(std::string_view s);
 
 
 /* Escape a string as a shell word. */
-std::string shellEscape(const std::string & s);
+std::string shellEscape(std::string_view s);
 
+// Workaround for no nice concatenation of string with string_view. According
+// to
+// https://stackoverflow.com/questions/44636549/why-is-there-no-support-for-concatenating-stdstring-and-stdstring-view
+// might be fixed in future C++ standard.
+inline std::string& operator<<(std::string& a, std::string_view b)
+{
+	return a += b;
+}
+inline std::string && operator<<(std::string && a, std::string_view b)
+{
+	a += b;
+	return std::move(a);
+}
 
 /* Exception handling in destructors: print an error message, then
    ignore the exception. */
@@ -450,7 +465,7 @@ constexpr char treeNull[] = "    ";
    some escape sequences (such as colour setting) are copied but not
    included in the character count. Also, tabs are expanded to
    spaces. */
-std::string filterANSIEscapes(const std::string & s,
+std::string filterANSIEscapes(std::string_view s,
     bool filterAll = false,
     unsigned int width = std::numeric_limits<unsigned int>::max());
 
@@ -561,13 +576,13 @@ std::pair<unsigned short, unsigned short> getWindowSize();
 
 
 /* Used in various places. */
-typedef std::function<bool(const Path & path)> PathFilter;
+typedef std::function<bool(PathView path)> PathFilter;
 
 extern PathFilter defaultPathFilter;
 
 
 /* Create a Unix domain socket in listen mode. */
-AutoCloseFD createUnixDomainSocket(const Path & path, mode_t mode);
+AutoCloseFD createUnixDomainSocket(PathView path, mode_t mode);
 
 
 // A Rust/Python-like enumerate() iterator adapter.

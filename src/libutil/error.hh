@@ -119,7 +119,7 @@ public:
     { }
 
     template<typename... Args>
-    BaseError(const std::string & fs, const Args & ... args)
+    BaseError(std::string_view fs, const Args & ... args)
         : err { .level = lvlError,
                 .hint = hintfmt(fs, args...)
               }
@@ -148,8 +148,8 @@ public:
     const char * what() const noexcept override { return calcWhat().c_str(); }
 #endif
 
-    const string & msg() const { return calcWhat(); }
-    const string & prefix() const { return prefix_; }
+    std::string_view msg() const { return calcWhat(); }
+    std::string_view prefix() const { return prefix_; }
     BaseError & addPrefix(const FormatOrString & fs);
 
     const ErrorInfo & info() { calcWhat(); return err; }

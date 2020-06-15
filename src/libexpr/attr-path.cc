@@ -6,7 +6,7 @@
 namespace nix {
 
 
-static Strings parseAttrPath(const string & s)
+static Strings parseAttrPath(std::string_view s)
 {
     Strings res;
     string cur;
@@ -32,7 +32,7 @@ static Strings parseAttrPath(const string & s)
 }
 
 
-std::pair<Value *, Pos> findAlongAttrPath(EvalState & state, const string & attrPath,
+std::pair<Value *, Pos> findAlongAttrPath(EvalState & state, std::string_view attrPath,
     Bindings & autoArgs, Value & vIn)
 {
     Strings tokens = parseAttrPath(attrPath);

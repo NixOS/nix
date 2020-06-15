@@ -14,13 +14,13 @@
 namespace nix {
 
 
-bool Store::isInStore(const Path & path) const
+bool Store::isInStore(PathView path) const
 {
     return isInDir(path, storeDir);
 }
 
 
-Path Store::toStorePath(const Path & path) const
+Path Store::toStorePath(PathView path) const
 {
     if (!isInStore(path))
         throw Error("path '%1%' is not in the Nix store", path);
@@ -59,7 +59,7 @@ StorePathWithOutputs Store::followLinksToStorePathWithOutputs(std::string_view p
 }
 
 
-string storePathToHash(const Path & path)
+string storePathToHash(PathView path)
 {
     auto base = baseNameOf(path);
     assert(base.size() >= storePathHashLen);
@@ -138,7 +138,7 @@ string storePathToHash(const Path & path)
 */
 
 
-StorePath Store::makeStorePath(const string & type,
+StorePath Store::makeStorePath(std::string_view type,
     const Hash & hash, std::string_view name) const
 {
     /* e.g., "source:sha256:1abc...:/nix/store:foo.tar.gz" */
@@ -148,7 +148,7 @@ StorePath Store::makeStorePath(const string & type,
 }
 
 
-StorePath Store::makeOutputPath(const string & id,
+StorePath Store::makeOutputPath(std::string_view id,
     const Hash & hash, std::string_view name) const
 {
     return makeStorePath("output:" + id, hash,
@@ -204,7 +204,7 @@ StorePath Store::makeTextPath(std::string_view name, const Hash & hash,
 
 
 std::pair<StorePath, Hash> Store::computeStorePathForPath(std::string_view name,
-    const Path & srcPath, FileIngestionMethod method, HashType hashAlgo, PathFilter & filter) const
+    PathView srcPath, FileIngestionMethod method, HashType hashAlgo, PathFilter & filter) const
 {
     Hash h = method == FileIngestionMethod::Recursive
         ? hashPath(hashAlgo, srcPath, filter).first
@@ -213,7 +213,7 @@ std::pair<StorePath, Hash> Store::computeStorePathForPath(std::string_view name,
 }
 
 
-StorePath Store::computeStorePathForText(const string & name, const string & s,
+StorePath Store::computeStorePathForText(std::string_view name, std::string_view s,
     const StorePathSet & references) const
 {
     return makeTextPath(name, hashString(htSHA256, s), references);
@@ -382,7 +382,7 @@ StorePathSet Store::queryValidPaths(const StorePathSet & paths, SubstituteFlag m
     std::condition_variable wakeup;
     ThreadPool pool;
 
-    auto doQuery = [&](const Path & path) {
+    auto doQuery = [&](PathView path) {
         checkInterrupt();
         queryPathInfo(parseStorePath(path), {[path, this, &state_, &wakeup](std::future<ref<const ValidPathInfo>> fut) {
             auto state(state_.lock());
@@ -642,7 +642,7 @@ void copyPaths(ref<Store> srcStore, ref<Store> dstStore, const StorePathSet & st
     processGraph<Path>(pool,
         PathSet(missing.begin(), missing.end()),
 
-        [&](const Path & storePath) {
+        [&](PathView storePath) {
             if (dstStore->isValidPath(dstStore->parseStorePath(storePath))) {
                 nrDone++;
                 showProgress();
@@ -657,7 +657,7 @@ void copyPaths(ref<Store> srcStore, ref<Store> dstStore, const StorePathSet & st
             return srcStore->printStorePathSet(info->references);
         },
 
-        [&](const Path & storePathS) {
+        [&](PathView storePathS) {
             checkInterrupt();
 
             auto storePath = dstStore->parseStorePath(storePathS);
@@ -821,7 +821,7 @@ size_t ValidPathInfo::checkSignatures(const Store & store, const PublicKeys & pu
 }
 
 
-bool ValidPathInfo::checkSignature(const Store & store, const PublicKeys & publicKeys, const std::string & sig) const
+bool ValidPathInfo::checkSignature(const Store & store, const PublicKeys & publicKeys, std::string_view sig) const
 {
     return verifyDetached(fingerprint(store), sig, publicKeys);
 }
@@ -857,7 +857,7 @@ namespace nix {
 RegisterStoreImplementation::Implementations * RegisterStoreImplementation::implementations = 0;
 
 /* Split URI into protocol+hierarchy part and its parameter set. */
-std::pair<std::string, Store::Params> splitUriAndParams(const std::string & uri_)
+std::pair<std::string, Store::Params> splitUriAndParams(std::string_view uri_)
 {
     auto uri(uri_);
     Store::Params params;
@@ -869,7 +869,7 @@ std::pair<std::string, Store::Params> splitUriAndParams(const std::string & uri_
     return {uri, params};
 }
 
-ref<Store> openStore(const std::string & uri_,
+ref<Store> openStore(std::string_view uri_,
     const Store::Params & extraParams)
 {
     auto [uri, uriParams] = splitUriAndParams(uri_);
@@ -888,7 +888,7 @@ ref<Store> openStore(const std::string & uri_,
 }
 
 
-StoreType getStoreType(const std::string & uri, const std::string & stateDir)
+StoreType getStoreType(std::string_view uri, std::string_view stateDir)
 {
     if (uri == "daemon") {
         return tDaemon;
@@ -908,7 +908,7 @@ StoreType getStoreType(const std::string & uri, const std::string & stateDir)
 
 
 static RegisterStoreImplementation regStore([](
-    const std::string & uri, const Store::Params & params)
+    std::string_view uri, const Store::Params & params)
     -> std::shared_ptr<Store>
 {
     switch (getStoreType(uri, get(params, "state").value_or(settings.nixStateDir))) {
@@ -933,7 +933,7 @@ std::list<ref<Store>> getDefaultSubstituters()
 
         StringSet done;
 
-        auto addStore = [&](const std::string & uri) {
+        auto addStore = [&](std::string_view uri) {
             if (!done.insert(uri).second) return;
             try {
                 stores.push_back(openStore(uri));

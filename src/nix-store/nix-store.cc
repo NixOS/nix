@@ -230,7 +230,7 @@ static StorePathSet maybeUseOutputs(const StorePath & storePath, bool useOutput,
    graph.  Topological sorting is used to keep the tree relatively
    flat. */
 static void printTree(const StorePath & path,
-    const string & firstPad, const string & tailPad, StorePathSet & done)
+    std::string_view firstPad, std::string_view tailPad, StorePathSet & done)
 {
     if (!done.insert(path.clone()).second) {
         cout << fmt("%s%s [...]\n", firstPad, store->printStorePath(path));

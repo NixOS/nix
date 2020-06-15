@@ -136,7 +136,7 @@ public:
         log(*state, ei.level, oss.str());
     }
 
-    void log(State & state, Verbosity lvl, const std::string & s)
+    void log(State & state, Verbosity lvl, std::string_view s)
     {
         if (state.active) {
             writeToStderr("\r\e[K" + filterANSIEscapes(s, !isTTY) + ANSI_NORMAL "\n");
@@ -149,7 +149,7 @@ public:
     }
 
     void startActivity(ActivityId act, Verbosity lvl, ActivityType type,
-        const std::string & s, const Fields & fields, ActivityId parent) override
+        std::string_view s, const Fields & fields, ActivityId parent) override
     {
         auto state(state_.lock());
 
@@ -371,7 +371,7 @@ public:
 
         std::string res;
 
-        auto renderActivity = [&](ActivityType type, const std::string & itemFmt, const std::string & numberFmt = "%d", double unit = 1) {
+        auto renderActivity = [&](ActivityType type, std::string_view itemFmt, std::string_view numberFmt = "%d", double unit = 1) {
             auto & act = state.activitiesByType[type];
             uint64_t done = act.done, expected = act.done, running = 0, failed = act.failed;
             for (auto & j : act.its) {
@@ -410,7 +410,7 @@ public:
             return s;
         };
 
-        auto showActivity = [&](ActivityType type, const std::string & itemFmt, const std::string & numberFmt = "%d", double unit = 1) {
+        auto showActivity = [&](ActivityType type, std::string_view itemFmt, std::string_view numberFmt = "%d", double unit = 1) {
             auto s = renderActivity(type, itemFmt, numberFmt, unit);
             if (s.empty()) return;
             if (!res.empty()) res += ", ";

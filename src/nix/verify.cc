@@ -73,7 +73,7 @@ struct CmdVerify : StorePathsCommand
 
         ThreadPool pool;
 
-        auto doPath = [&](const Path & storePath) {
+        auto doPath = [&](PathView storePath) {
             try {
                 checkInterrupt();
 

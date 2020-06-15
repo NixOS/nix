@@ -121,14 +121,14 @@ struct ExprString : Expr
 struct ExprIndStr : Expr
 {
     string s;
-    ExprIndStr(const string & s) : s(s) { };
+    ExprIndStr(std::string_view s) : s(s) { };
 };
 
 struct ExprPath : Expr
 {
     string s;
     Value v;
-    ExprPath(const string & s) : s(s) { mkPathNoCopy(v, this->s.c_str()); };
+    ExprPath(std::string_view s) : s(s) { mkPathNoCopy(v, this->s.c_str()); };
     COMMON_METHODS
     Value * maybeThunk(EvalState & state, Env & env);
 };

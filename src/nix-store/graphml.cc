@@ -19,7 +19,7 @@ static inline std::string_view xmlQuote(std::string_view s)
 }
 
 
-static string symbolicName(const std::string & p)
+static string symbolicName(std::string_view p)
 {
     return string(p, p.find('-') + 1);
 }

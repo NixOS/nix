@@ -32,7 +32,7 @@ namespace nix {
 
 /* Decode a context string ‘!<name>!<path>’ into a pair <path,
    name>. */
-std::pair<string, string> decodeContext(const string & s)
+std::pair<string, string> decodeContext(std::string_view s)
 {
     if (s.at(0) == '!') {
         size_t index = s.find("!", 1);
@@ -42,7 +42,7 @@ std::pair<string, string> decodeContext(const string & s)
 }
 
 
-InvalidPathError::InvalidPathError(const Path & path) :
+InvalidPathError::InvalidPathError(PathView path) :
     EvalError("path '%s' is not valid", path), path(path) {}
 
 void EvalState::realiseContext(const PathSet & context)
@@ -593,10 +593,10 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
 
     for (auto & i : args[0]->attrs->lexicographicOrder()) {
         if (i->name == state.sIgnoreNulls) continue;
-        const string & key = i->name;
+        std::string_view key = i->name;
         vomit("processing attribute '%1%'", key);
 
-        auto handleHashMode = [&](const std::string & s) {
+        auto handleHashMode = [&](std::string_view s) {
             if (s == "recursive") ingestionMethod = FileIngestionMethod::Recursive;
             else if (s == "flat") ingestionMethod = FileIngestionMethod::Flat;
             else
@@ -1114,13 +1114,13 @@ static void prim_toFile(EvalState & state, const Pos & pos, Value * * args, Valu
 }
 
 
-static void addPath(EvalState & state, const Pos & pos, const string & name, const Path & path_,
+static void addPath(EvalState & state, const Pos & pos, std::string_view name, PathView path_,
     Value * filterFun, FileIngestionMethod method, const Hash & expectedHash, Value & v)
 {
     const auto path = evalSettings.pureEval && expectedHash ?
         path_ :
         state.checkSourcePath(path_);
-    PathFilter filter = filterFun ? ([&](const Path & path) {
+    PathFilter filter = filterFun ? ([&](PathView path) {
         auto st = lstat(path);
 
         /* Call the filter function.  The first argument is the path,
@@ -1193,7 +1193,7 @@ static void prim_path(EvalState & state, const Pos & pos, Value * * args, Value 
     Hash expectedHash;
 
     for (auto & attr : *args[0]->attrs) {
-        const string & n(attr.name);
+        std::string_view n(attr.name);
         if (n == "path") {
             PathSet context;
             path = state.coerceToPath(*attr.pos, *attr.value, context);
@@ -2230,7 +2230,7 @@ void EvalState::createBaseEnv()
 
     auto vThrow = addPrimOp("throw", 1, prim_throw);
 
-    auto addPurityError = [&](const std::string & name) {
+    auto addPurityError = [&](std::string_view name) {
         Value * v2 = allocValue();
         mkString(*v2, fmt("'%s' is not allowed in pure evaluation mode", name));
         mkApp(v, *vThrow, *v2);

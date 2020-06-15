@@ -21,11 +21,11 @@ public:
         return structuredAttrs.get();
     }
 
-    std::optional<std::string> getStringAttr(const std::string & name) const;
+    std::optional<std::string> getStringAttr(std::string_view name) const;
 
-    bool getBoolAttr(const std::string & name, bool def = false) const;
+    bool getBoolAttr(std::string_view name, bool def = false) const;
 
-    std::optional<Strings> getStringsAttr(const std::string & name) const;
+    std::optional<Strings> getStringsAttr(std::string_view name) const;
 
     StringSet getRequiredSystemFeatures() const;
 

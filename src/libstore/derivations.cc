@@ -49,7 +49,7 @@ Derivation::Derivation(const Derivation & other)
 }
 
 
-const StorePath & BasicDerivation::findOutput(const string & id) const
+const StorePath & BasicDerivation::findOutput(std::string_view id) const
 {
     auto i = outputs.find(id);
     if (i == outputs.end())
@@ -82,7 +82,7 @@ StorePath writeDerivation(ref<Store> store,
 
 
 /* Read string `s' from stream `str'. */
-static void expect(std::istream & str, const string & s)
+static void expect(std::istream & str, std::string_view s)
 {
     char s2[s.size()];
     str.read(s2, s.size());
@@ -142,7 +142,7 @@ static StringSet parseStrings(std::istream & str, bool arePaths)
 }
 
 
-static Derivation parseDerivation(const Store & store, const string & s)
+static Derivation parseDerivation(const Store & store, std::string_view s)
 {
     Derivation drv;
     istringstream_nocopy str(s);
@@ -191,7 +191,7 @@ static Derivation parseDerivation(const Store & store, const string & s)
 }
 
 
-Derivation readDerivation(const Store & store, const Path & drvPath)
+Derivation readDerivation(const Store & store, PathView drvPath)
 {
     try {
         return parseDerivation(store, readFile(drvPath));
@@ -328,7 +328,7 @@ string Derivation::unparse(const Store & store, bool maskOutputs,
 
 
 // FIXME: remove
-bool isDerivation(const string & fileName)
+bool isDerivation(std::string_view fileName)
 {
     return hasSuffix(fileName, drvExtension);
 }
@@ -401,7 +401,7 @@ std::string StorePathWithOutputs::to_string(const Store & store) const
 }
 
 
-bool wantOutput(const string & output, const std::set<string> & wanted)
+bool wantOutput(std::string_view output, const std::set<string> & wanted)
 {
     return wanted.empty() || wanted.find(output) != wanted.end();
 }
@@ -465,7 +465,7 @@ void writeDerivation(Sink & out, const Store & store, const BasicDerivation & dr
 }
 
 
-std::string hashPlaceholder(const std::string & outputName)
+std::string hashPlaceholder(std::string_view outputName)
 {
     // FIXME: memoize?
     return "/" + hashString(htSHA256, "nix-output:" + outputName).to_string(Base32, false);

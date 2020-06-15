@@ -57,7 +57,7 @@ string showErrPos(const ErrPos &errPos)
 }
 
 // if nixCode contains lines of code, print them to the ostream, indicating the error column.
-void printCodeLines(std::ostream &out, const string &prefix, const NixCode &nixCode)
+void printCodeLines(std::ostream &out, std::string_view prefix, const NixCode &nixCode)
 {
     // previous line of code.
     if (nixCode.prevLineOfCode.has_value()) {

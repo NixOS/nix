@@ -24,7 +24,7 @@ private:
 public:
 
     HttpBinaryCacheStore(
-        const Params & params, const Path & _cacheUri)
+        const Params & params, PathView _cacheUri)
         : BinaryCacheStore(params)
         , cacheUri(_cacheUri)
     {
@@ -80,7 +80,7 @@ protected:
         throw SubstituterDisabled("substituter '%s' is disabled", getUri());
     }
 
-    bool fileExists(const std::string & path) override
+    bool fileExists(std::string_view path) override
     {
         checkEnabled();
 
@@ -99,9 +99,9 @@ protected:
         }
     }
 
-    void upsertFile(const std::string & path,
-        const std::string & data,
-        const std::string & mimeType) override
+    void upsertFile(std::string_view path,
+        std::string_view data,
+        std::string_view mimeType) override
     {
         auto req = FileTransferRequest(cacheUri + "/" + path);
         req.data = std::make_shared<string>(data); // FIXME: inefficient
@@ -113,13 +113,13 @@ protected:
         }
     }
 
-    FileTransferRequest makeRequest(const std::string & path)
+    FileTransferRequest makeRequest(std::string_view path)
     {
         FileTransferRequest request(cacheUri + "/" + path);
         return request;
     }
 
-    void getFile(const std::string & path, Sink & sink) override
+    void getFile(std::string_view path, Sink & sink) override
     {
         checkEnabled();
         auto request(makeRequest(path));
@@ -133,7 +133,7 @@ protected:
         }
     }
 
-    void getFile(const std::string & path,
+    void getFile(std::string_view path,
         Callback<std::shared_ptr<std::string>> callback) noexcept override
     {
         checkEnabled();
@@ -160,7 +160,7 @@ protected:
 };
 
 static RegisterStoreImplementation regStore([](
-    const std::string & uri, const Store::Params & params)
+    std::string_view uri, const Store::Params & params)
     -> std::shared_ptr<Store>
 {
     static bool forceHttp = getEnv("_NIX_FORCE_HTTP") == "1";

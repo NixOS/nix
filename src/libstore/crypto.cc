@@ -8,7 +8,7 @@
 
 namespace nix {
 
-static std::pair<std::string, std::string> split(const string & s)
+static std::pair<std::string, std::string> split(std::string_view s)
 {
     size_t colon = s.find(':');
     if (colon == std::string::npos || colon == 0)
@@ -16,7 +16,7 @@ static std::pair<std::string, std::string> split(const string & s)
     return {std::string(s, 0, colon), std::string(s, colon + 1)};
 }
 
-Key::Key(const string & s)
+Key::Key(std::string_view s)
 {
     auto ss = split(s);
 
@@ -29,7 +29,7 @@ Key::Key(const string & s)
     key = base64Decode(key);
 }
 
-SecretKey::SecretKey(const string & s)
+SecretKey::SecretKey(std::string_view s)
     : Key(s)
 {
 #if HAVE_SODIUM
@@ -45,7 +45,7 @@ SecretKey::SecretKey(const string & s)
 }
 #endif
 
-std::string SecretKey::signDetached(const std::string & data) const
+std::string SecretKey::signDetached(std::string_view data) const
 {
 #if HAVE_SODIUM
     unsigned char sig[crypto_sign_BYTES];
@@ -69,7 +69,7 @@ PublicKey SecretKey::toPublicKey() const
 #endif
 }
 
-PublicKey::PublicKey(const string & s)
+PublicKey::PublicKey(std::string_view s)
     : Key(s)
 {
 #if HAVE_SODIUM
@@ -78,7 +78,7 @@ PublicKey::PublicKey(const string & s)
 #endif
 }
 
-bool verifyDetached(const std::string & data, const std::string & sig,
+bool verifyDetached(std::string_view data, std::string_view sig,
     const PublicKeys & publicKeys)
 {
 #if HAVE_SODIUM

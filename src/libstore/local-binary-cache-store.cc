@@ -13,7 +13,7 @@ private:
 public:
 
     LocalBinaryCacheStore(
-        const Params & params, const Path & binaryCacheDir)
+        const Params & params, PathView binaryCacheDir)
         : BinaryCacheStore(params)
         , binaryCacheDir(binaryCacheDir)
     {
@@ -28,13 +28,13 @@ public:
 
 protected:
 
-    bool fileExists(const std::string & path) override;
+    bool fileExists(std::string_view path) override;
 
-    void upsertFile(const std::string & path,
-        const std::string & data,
-        const std::string & mimeType) override;
+    void upsertFile(std::string_view path,
+        std::string_view data,
+        std::string_view mimeType) override;
 
-    void getFile(const std::string & path, Sink & sink) override
+    void getFile(std::string_view path, Sink & sink) override
     {
         try {
             readFile(binaryCacheDir + "/" + path, sink);
@@ -68,7 +68,7 @@ void LocalBinaryCacheStore::init()
     BinaryCacheStore::init();
 }
 
-static void atomicWrite(const Path & path, const std::string & s)
+static void atomicWrite(PathView path, std::string_view s)
 {
     Path tmp = path + ".tmp." + std::to_string(getpid());
     AutoDelete del(tmp, false);
@@ -78,20 +78,20 @@ static void atomicWrite(const Path & path, const std::string & s)
     del.cancel();
 }
 
-bool LocalBinaryCacheStore::fileExists(const std::string & path)
+bool LocalBinaryCacheStore::fileExists(std::string_view path)
 {
     return pathExists(binaryCacheDir + "/" + path);
 }
 
-void LocalBinaryCacheStore::upsertFile(const std::string & path,
-    const std::string & data,
-    const std::string & mimeType)
+void LocalBinaryCacheStore::upsertFile(std::string_view path,
+    std::string_view data,
+    std::string_view mimeType)
 {
     atomicWrite(binaryCacheDir + "/" + path, data);
 }
 
 static RegisterStoreImplementation regStore([](
-    const std::string & uri, const Store::Params & params)
+    std::string_view uri, const Store::Params & params)
     -> std::shared_ptr<Store>
 {
     if (getEnv("_NIX_FORCE_HTTP_BINARY_CACHE_STORE") == "1" ||

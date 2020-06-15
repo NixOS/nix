@@ -37,7 +37,7 @@ struct LegacySSHStore : public Store
 
     SSHMaster master;
 
-    LegacySSHStore(const string & host, const Params & params)
+    LegacySSHStore(std::string_view host, const Params & params)
         : Store(params)
         , host(host)
         , connections(make_ref<Pool<Connection>>(
@@ -191,15 +191,15 @@ struct LegacySSHStore : public Store
         copyNAR(conn->from, sink);
     }
 
-    std::optional<StorePath> queryPathFromHashPart(const std::string & hashPart) override
+    std::optional<StorePath> queryPathFromHashPart(std::string_view hashPart) override
     { unsupported("queryPathFromHashPart"); }
 
-    StorePath addToStore(const string & name, const Path & srcPath,
+    StorePath addToStore(std::string_view name, PathView srcPath,
         FileIngestionMethod method, HashType hashAlgo,
         PathFilter & filter, RepairFlag repair) override
     { unsupported("addToStore"); }
 
-    StorePath addTextToStore(const string & name, const string & s,
+    StorePath addTextToStore(std::string_view name, std::string_view s,
         const StorePathSet & references, RepairFlag repair) override
     { unsupported("addTextToStore"); }
 
@@ -287,7 +287,7 @@ struct LegacySSHStore : public Store
 };
 
 static RegisterStoreImplementation regStore([](
-    const std::string & uri, const Store::Params & params)
+    std::string_view uri, const Store::Params & params)
     -> std::shared_ptr<Store>
 {
     if (std::string(uri, 0, uriScheme.size()) != uriScheme) return 0;

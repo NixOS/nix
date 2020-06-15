@@ -44,7 +44,7 @@ static void writeChannels()
 }
 
 // Adds a channel.
-static void addChannel(const string & url, const string & name)
+static void addChannel(std::string_view url, std::string_view name)
 {
     if (!regex_search(url, std::regex("^(file|http|https)://")))
         throw Error("invalid channel URL '%1%'", url);
@@ -58,7 +58,7 @@ static void addChannel(const string & url, const string & name)
 static Path profile;
 
 // Remove a channel.
-static void removeChannel(const string & name)
+static void removeChannel(std::string_view name)
 {
     readChannels();
     channels.erase(name);

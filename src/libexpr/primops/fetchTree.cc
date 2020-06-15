@@ -90,7 +90,7 @@ static void prim_fetchTree(EvalState & state, const Pos & pos, Value * * args, V
 static RegisterPrimOp r("fetchTree", 1, prim_fetchTree);
 
 static void fetch(EvalState & state, const Pos & pos, Value * * args, Value & v,
-    const string & who, bool unpack, std::string name)
+    std::string_view who, bool unpack, std::string name)
 {
     std::optional<std::string> url;
     std::optional<Hash> expectedHash;

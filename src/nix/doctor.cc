@@ -22,12 +22,12 @@ std::string formatProtocol(unsigned int proto)
     return "unknown";
 }
 
-bool checkPass(const std::string & msg) {
+bool checkPass(std::string_view msg) {
     logger->log(ANSI_GREEN "[PASS] " ANSI_NORMAL + msg);
     return true;
 }
 
-bool checkFail(const std::string & msg) {
+bool checkFail(std::string_view msg) {
     logger->log(ANSI_RED "[FAIL] " ANSI_NORMAL + msg);
     return false;
 }

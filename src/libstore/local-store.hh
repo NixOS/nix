@@ -135,7 +135,7 @@ public:
 
     StorePathSet queryDerivationOutputs(const StorePath & path) override;
 
-    std::optional<StorePath> queryPathFromHashPart(const std::string & hashPart) override;
+    std::optional<StorePath> queryPathFromHashPart(std::string_view hashPart) override;
 
     StorePathSet querySubstitutablePaths(const StorePathSet & paths) override;
 
@@ -146,7 +146,7 @@ public:
         RepairFlag repair, CheckSigsFlag checkSigs,
         std::shared_ptr<FSAccessor> accessor) override;
 
-    StorePath addToStore(const string & name, const Path & srcPath,
+    StorePath addToStore(std::string_view name, PathView srcPath,
         FileIngestionMethod method, HashType hashAlgo,
         PathFilter & filter, RepairFlag repair) override;
 
@@ -154,10 +154,10 @@ public:
        in `dump', which is either a NAR serialisation (if recursive ==
        true) or simply the contents of a regular file (if recursive ==
        false). */
-    StorePath addToStoreFromDump(const string & dump, const string & name,
+    StorePath addToStoreFromDump(std::string_view dump, std::string_view name,
         FileIngestionMethod method = FileIngestionMethod::Recursive, HashType hashAlgo = htSHA256, RepairFlag repair = NoRepair) override;
 
-    StorePath addTextToStore(const string & name, const string & s,
+    StorePath addTextToStore(std::string_view name, std::string_view s,
         const StorePathSet & references, RepairFlag repair) override;
 
     void buildPaths(
@@ -171,7 +171,7 @@ public:
 
     void addTempRoot(const StorePath & path) override;
 
-    void addIndirectRoot(const Path & path) override;
+    void addIndirectRoot(PathView path) override;
 
     void syncWithGC() override;
 
@@ -195,7 +195,7 @@ public:
     void optimiseStore() override;
 
     /* Optimise a single store path. */
-    void optimisePath(const Path & path);
+    void optimisePath(PathView path);
 
     bool verifyStore(bool checkContents, RepairFlag repair) override;
 
@@ -240,7 +240,7 @@ private:
     /* Delete a path from the Nix store. */
     void invalidatePathChecked(const StorePath & path);
 
-    void verifyPath(const Path & path, const StringSet & store,
+    void verifyPath(PathView path, const StringSet & store,
         PathSet & done, StorePathSet & validPaths, RepairFlag repair, bool & errors);
 
     void updatePathInfo(State & state, const ValidPathInfo & info);
@@ -248,24 +248,24 @@ private:
     void upgradeStore6();
     void upgradeStore7();
     PathSet queryValidPathsOld();
-    ValidPathInfo queryPathInfoOld(const Path & path);
+    ValidPathInfo queryPathInfoOld(PathView path);
 
     struct GCState;
 
-    void deleteGarbage(GCState & state, const Path & path);
+    void deleteGarbage(GCState & state, PathView path);
 
-    void tryToDelete(GCState & state, const Path & path);
+    void tryToDelete(GCState & state, PathView path);
 
     bool canReachRoot(GCState & state, StorePathSet & visited, const StorePath & path);
 
-    void deletePathRecursive(GCState & state, const Path & path);
+    void deletePathRecursive(GCState & state, PathView path);
 
     bool isActiveTempFile(const GCState & state,
-        const Path & path, const string & suffix);
+        PathView path, std::string_view suffix);
 
     AutoCloseFD openGCLock(LockType lockType);
 
-    void findRoots(const Path & path, unsigned char type, Roots & roots);
+    void findRoots(PathView path, unsigned char type, Roots & roots);
 
     void findRootsNoTemp(Roots & roots, bool censor);
 
@@ -280,8 +280,8 @@ private:
     typedef std::unordered_set<ino_t> InodeHash;
 
     InodeHash loadInodeHash();
-    Strings readDirectoryIgnoringInodes(const Path & path, const InodeHash & inodeHash);
-    void optimisePath_(Activity * act, OptimiseStats & stats, const Path & path, InodeHash & inodeHash);
+    Strings readDirectoryIgnoringInodes(PathView path, const InodeHash & inodeHash);
+    void optimisePath_(Activity * act, OptimiseStats & stats, PathView path, InodeHash & inodeHash);
 
     // Internal versions that are not wrapped in retry_sqlite.
     bool isValidPath_(State & state, const StorePath & path);
@@ -293,7 +293,7 @@ private:
 
     Path getRealStoreDir() override { return realStoreDir; }
 
-    void createUser(const std::string & userName, uid_t userId) override;
+    void createUser(std::string_view userName, uid_t userId) override;
 
     friend class DerivationGoal;
     friend class SubstitutionGoal;
@@ -312,10 +312,10 @@ typedef set<Inode> InodesSeen;
      without execute permission; setuid bits etc. are cleared)
    - the owner and group are set to the Nix user and group, if we're
      running as root. */
-void canonicalisePathMetaData(const Path & path, uid_t fromUid, InodesSeen & inodesSeen);
-void canonicalisePathMetaData(const Path & path, uid_t fromUid);
+void canonicalisePathMetaData(PathView path, uid_t fromUid, InodesSeen & inodesSeen);
+void canonicalisePathMetaData(PathView path, uid_t fromUid);
 
-void canonicaliseTimestampAndPermissions(const Path & path);
+void canonicaliseTimestampAndPermissions(PathView path);
 
 MakeError(PathInUse, Error);
 

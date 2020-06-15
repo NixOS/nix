@@ -233,7 +233,7 @@ void writeString(const unsigned char * buf, size_t len, Sink & sink)
 }
 
 
-Sink & operator << (Sink & sink, const string & s)
+Sink & operator << (Sink & sink, std::string_view s)
 {
     writeString((const unsigned char *) s.data(), s.size(), sink);
     return sink;

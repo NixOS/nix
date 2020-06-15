@@ -93,8 +93,7 @@ struct Slice
 
 struct StringSlice : Slice<char>
 {
-    StringSlice(const std::string & s): Slice(s.data(), s.size()) {}
-    explicit StringSlice(std::string_view s): Slice(s.data(), s.size()) {}
+    StringSlice(std::string_view s): Slice(s.data(), s.size()) {}
     StringSlice(const char * s): Slice(s, strlen(s)) {}
 
     operator std::string_view() const

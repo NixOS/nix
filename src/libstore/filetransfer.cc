@@ -31,7 +31,7 @@ FileTransferSettings fileTransferSettings;
 
 static GlobalConfig::Register r1(&fileTransferSettings);
 
-std::string resolveUri(const std::string & uri)
+std::string resolveUri(std::string_view uri)
 {
     if (uri.compare(0, 8, "channel:") == 0)
         return "https://nixos.org/channels/" + std::string(uri, 8) + "/nixexprs.tar.xz";
@@ -811,7 +811,7 @@ void FileTransfer::download(FileTransferRequest && request, Sink & sink)
     }
 }
 
-bool isUri(const string & s)
+bool isUri(std::string_view s)
 {
     if (s.compare(0, 8, "channel:") == 0) return true;
     size_t pos = s.find("://");

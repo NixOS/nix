@@ -45,7 +45,7 @@ struct TunnelLogger : public Logger
     TunnelLogger(FdSink & to, unsigned int clientVersion)
         : to(to), clientVersion(clientVersion) { }
 
-    void enqueueMsg(const std::string & s)
+    void enqueueMsg(std::string_view s)
     {
         auto state(state_.lock());
 
@@ -102,7 +102,7 @@ struct TunnelLogger : public Logger
 
     /* stopWork() means that we're done; stop sending stderr to the
        client. */
-    void stopWork(bool success = true, const string & msg = "", unsigned int status = 0)
+    void stopWork(bool success = true, std::string_view msg = "", unsigned int status = 0)
     {
         auto state(state_.lock());
 
@@ -117,7 +117,7 @@ struct TunnelLogger : public Logger
     }
 
     void startActivity(ActivityId act, Verbosity lvl, ActivityType type,
-        const std::string & s, const Fields & fields, ActivityId parent) override
+        std::string_view s, const Fields & fields, ActivityId parent) override
     {
         if (GET_PROTOCOL_MINOR(clientVersion) < 20) {
             if (!s.empty())
@@ -182,7 +182,7 @@ struct RetrieveRegularNARSink : ParseSink
 
     RetrieveRegularNARSink() : regular(true) { }
 
-    void createDirectory(const Path & path)
+    void createDirectory(PathView path)
     {
         regular = false;
     }
@@ -192,7 +192,7 @@ struct RetrieveRegularNARSink : ParseSink
         s.append((const char *) data, len);
     }
 
-    void createSymlink(const Path & path, const string & target)
+    void createSymlink(PathView path, std::string_view target)
     {
         regular = false;
     }
@@ -766,7 +766,7 @@ void processConnection(
     FdSink & to,
     TrustedFlag trusted,
     RecursiveFlag recursive,
-    const std::string & userName,
+    std::string_view userName,
     uid_t userId)
 {
     auto monitor = !recursive ? std::make_unique<MonitorFdHup>(from.fd) : nullptr;

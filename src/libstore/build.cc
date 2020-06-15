@@ -155,7 +155,7 @@ struct Goal : public std::enable_shared_from_this<Goal>
 
     virtual void waiteeDone(GoalPtr waitee, ExitCode result);
 
-    virtual void handleChildOutput(int fd, const string & data)
+    virtual void handleChildOutput(int fd, std::string_view data)
     {
         abort();
     }
@@ -473,13 +473,15 @@ static void commonChildInit(Pipe & logPipe)
 
 void handleDiffHook(
     uid_t uid, uid_t gid,
-    const Path & tryA, const Path & tryB,
-    const Path & drvPath, const Path & tmpDir)
+    PathView tryA, PathView tryB,
+    PathView drvPath, PathView tmpDir)
 {
     auto diffHook = settings.diffHook;
     if (diffHook != "" && settings.runDiffHook) {
         try {
-            RunOptions diffHookOptions(diffHook,{tryA, tryB, drvPath, tmpDir});
+            RunOptions diffHookOptions(diffHook, {
+                Path { tryA }, Path { tryB }, Path { drvPath }, Path { tmpDir }
+            });
             diffHookOptions.searchPath = true;
             diffHookOptions.uid = uid;
             diffHookOptions.gid = gid;
@@ -968,7 +970,7 @@ private:
     void addDependency(const StorePath & path);
 
     /* Make a file owned by the builder. */
-    void chownToBuilder(const Path & path);
+    void chownToBuilder(PathView path);
 
     /* Run the builder's process. */
     void runChild();
@@ -994,7 +996,7 @@ private:
     void deleteTmpDir(bool force);
 
     /* Callback used by the worker to write to the log. */
-    void handleChildOutput(int fd, const string & data) override;
+    void handleChildOutput(int fd, std::string_view data) override;
     void handleEOF(int fd) override;
     void flushLine();
 
@@ -1562,7 +1564,7 @@ void DerivationGoal::tryLocalBuild() {
 }
 
 
-void replaceValidPath(const Path & storePath, const Path tmpPath)
+void replaceValidPath(const Path & storePath, const Path & tmpPath)
 {
     /* We can't atomically replace storePath (the original) with
        tmpPath (the replacement), so we have to move it out of the
@@ -2632,7 +2634,7 @@ void DerivationGoal::writeStructuredAttrs()
 
     auto handleSimpleType = [](const nlohmann::json & value) -> std::optional<std::string> {
         if (value.is_string())
-            return shellEscape(value);
+            return shellEscape(value.get<std::string_view>());
 
         if (value.is_number()) {
             auto f = value.get<float>();
@@ -2747,10 +2749,10 @@ struct RestrictedStore : public LocalFSStore
     StorePathSet queryDerivationOutputs(const StorePath & path) override
     { throw Error("queryDerivationOutputs"); }
 
-    std::optional<StorePath> queryPathFromHashPart(const std::string & hashPart) override
+    std::optional<StorePath> queryPathFromHashPart(std::string_view hashPart) override
     { throw Error("queryPathFromHashPart"); }
 
-    StorePath addToStore(const string & name, const Path & srcPath,
+    StorePath addToStore(std::string_view name, PathView srcPath,
         FileIngestionMethod method = FileIngestionMethod::Recursive, HashType hashAlgo = htSHA256,
         PathFilter & filter = defaultPathFilter, RepairFlag repair = NoRepair) override
     { throw Error("addToStore"); }
@@ -2763,7 +2765,7 @@ struct RestrictedStore : public LocalFSStore
         goal.addDependency(info.path);
     }
 
-    StorePath addToStoreFromDump(const string & dump, const string & name,
+    StorePath addToStoreFromDump(std::string_view dump, std::string_view name,
         FileIngestionMethod method = FileIngestionMethod::Recursive, HashType hashAlgo = htSHA256, RepairFlag repair = NoRepair) override
     {
         auto path = next->addToStoreFromDump(dump, name, method, hashAlgo, repair);
@@ -2771,7 +2773,7 @@ struct RestrictedStore : public LocalFSStore
         return path;
     }
 
-    StorePath addTextToStore(const string & name, const string & s,
+    StorePath addTextToStore(std::string_view name, std::string_view s,
         const StorePathSet & references, RepairFlag repair = NoRepair) override
     {
         auto path = next->addTextToStore(name, s, references, repair);
@@ -2826,7 +2828,7 @@ struct RestrictedStore : public LocalFSStore
     void addTempRoot(const StorePath & path) override
     { }
 
-    void addIndirectRoot(const Path & path) override
+    void addIndirectRoot(PathView path) override
     { }
 
     Roots findRoots(bool censor) override
@@ -3002,10 +3004,10 @@ void DerivationGoal::addDependency(const StorePath & path)
 }
 
 
-void DerivationGoal::chownToBuilder(const Path & path)
+void DerivationGoal::chownToBuilder(PathView path)
 {
     if (!buildUser) return;
-    if (chown(path.c_str(), buildUser->getUID(), buildUser->getGID()) == -1)
+    if (chown(Path { path }.c_str(), buildUser->getUID(), buildUser->getGID()) == -1)
         throw SysError("cannot change ownership of '%1%'", path);
 }
 
@@ -4035,7 +4037,7 @@ void DerivationGoal::checkOutputs(const std::map<Path, ValidPathInfo> & outputs)
                     if (maxClosureSize != output->end())
                         checks.maxClosureSize = maxClosureSize->get<uint64_t>();
 
-                    auto get = [&](const std::string & name) -> std::optional<Strings> {
+                    auto get = [&](std::string_view name) -> std::optional<Strings> {
                         auto i = output->find(name);
                         if (i != output->end()) {
                             Strings res;
@@ -4127,7 +4129,7 @@ void DerivationGoal::deleteTmpDir(bool force)
 }
 
 
-void DerivationGoal::handleChildOutput(int fd, const string & data)
+void DerivationGoal::handleChildOutput(int fd, std::string_view data)
 {
     if ((hook && fd == hook->builderOut.readSide.get()) ||
         (!hook && fd == builderOut.readSide.get()))
@@ -4313,7 +4315,7 @@ public:
     void finished();
 
     /* Callback used by the worker to write to the log. */
-    void handleChildOutput(int fd, const string & data) override;
+    void handleChildOutput(int fd, std::string_view data) override;
     void handleEOF(int fd) override;
 
     StorePath getStorePath() { return storePath.clone(); }
@@ -4580,7 +4582,7 @@ void SubstitutionGoal::finished()
 }
 
 
-void SubstitutionGoal::handleChildOutput(int fd, const string & data)
+void SubstitutionGoal::handleChildOutput(int fd, std::string_view data)
 {
 }
 

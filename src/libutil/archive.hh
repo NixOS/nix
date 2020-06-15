@@ -45,22 +45,22 @@ namespace nix {
      `+' denotes string concatenation. */
 
 
-void dumpPath(const Path & path, Sink & sink,
+void dumpPath(PathView path, Sink & sink,
     PathFilter & filter = defaultPathFilter);
 
-void dumpString(const std::string & s, Sink & sink);
+void dumpString(std::string_view s, Sink & sink);
 
 /* FIXME: fix this API, it sucks. */
 struct ParseSink
 {
-    virtual void createDirectory(const Path & path) { };
+    virtual void createDirectory(PathView path) { };
 
-    virtual void createRegularFile(const Path & path) { };
+    virtual void createRegularFile(PathView path) { };
     virtual void isExecutable() { };
     virtual void preallocateContents(unsigned long long size) { };
     virtual void receiveContents(unsigned char * data, unsigned int len) { };
 
-    virtual void createSymlink(const Path & path, const string & target) { };
+    virtual void createSymlink(PathView path, std::string_view target) { };
 };
 
 struct TeeSink : ParseSink
@@ -72,12 +72,12 @@ struct TeeSink : ParseSink
 
 void parseDump(ParseSink & sink, Source & source);
 
-void restorePath(const Path & path, Source & source);
+void restorePath(PathView path, Source & source);
 
 /* Read a NAR from 'source' and write it to 'sink'. */
 void copyNAR(Source & source, Sink & sink);
 
-void copyPath(const Path & from, const Path & to);
+void copyPath(PathView from, PathView to);
 
 
 extern const std::string narVersionMagic1;

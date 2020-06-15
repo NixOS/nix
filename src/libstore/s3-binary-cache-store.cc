@@ -84,7 +84,7 @@ static void initAWS()
     });
 }
 
-S3Helper::S3Helper(const string & profile, const string & region, const string & scheme, const string & endpoint)
+S3Helper::S3Helper(std::string_view profile, std::string_view region, std::string_view scheme, std::string_view endpoint)
     : config(makeConfig(region, scheme, endpoint))
     , client(make_ref<Aws::S3::S3Client>(
             profile == ""
@@ -118,7 +118,7 @@ class RetryStrategy : public Aws::Client::DefaultRetryStrategy
     }
 };
 
-ref<Aws::Client::ClientConfiguration> S3Helper::makeConfig(const string & region, const string & scheme, const string & endpoint)
+ref<Aws::Client::ClientConfiguration> S3Helper::makeConfig(std::string_view region, std::string_view scheme, std::string_view endpoint)
 {
     initAWS();
     auto res = make_ref<Aws::Client::ClientConfiguration>();
@@ -137,7 +137,7 @@ ref<Aws::Client::ClientConfiguration> S3Helper::makeConfig(const string & region
 }
 
 S3Helper::FileTransferResult S3Helper::getObject(
-    const std::string & bucketName, const std::string & key)
+    std::string_view bucketName, std::string_view key)
 {
     debug("fetching 's3://%s/%s'...", bucketName, key);
 
@@ -194,7 +194,7 @@ struct S3BinaryCacheStoreImpl : public S3BinaryCacheStore
     S3Helper s3Helper;
 
     S3BinaryCacheStoreImpl(
-        const Params & params, const std::string & bucketName)
+        const Params & params, std::string_view bucketName)
         : S3BinaryCacheStore(params)
         , bucketName(bucketName)
         , s3Helper(profile, region, scheme, endpoint)
@@ -237,7 +237,7 @@ struct S3BinaryCacheStoreImpl : public S3BinaryCacheStore
         }
     }
 
-    bool fileExists(const std::string & path) override
+    bool fileExists(std::string_view path) override
     {
         stats.head++;
 
@@ -262,11 +262,11 @@ struct S3BinaryCacheStoreImpl : public S3BinaryCacheStore
     std::shared_ptr<TransferManager> transferManager;
     std::once_flag transferManagerCreated;
 
-    void uploadFile(const std::string & path, const std::string & data,
-        const std::string & mimeType,
-        const std::string & contentEncoding)
+    void uploadFile(std::string_view path, std::string_view data,
+        std::string_view mimeType,
+        std::string_view contentEncoding)
     {
-        auto stream = std::make_shared<istringstream_nocopy>(data);
+        auto stream = std::make_shared<istringstream_nocopy>(std::string { data });
 
         auto maxThreads = std::thread::hardware_concurrency();
 
@@ -355,8 +355,8 @@ struct S3BinaryCacheStoreImpl : public S3BinaryCacheStore
         stats.put++;
     }
 
-    void upsertFile(const std::string & path, const std::string & data,
-        const std::string & mimeType) override
+    void upsertFile(std::string_view path, std::string_view data,
+        std::string_view mimeType) override
     {
         if (narinfoCompression != "" && hasSuffix(path, ".narinfo"))
             uploadFile(path, *compress(narinfoCompression, data), mimeType, narinfoCompression);
@@ -368,7 +368,7 @@ struct S3BinaryCacheStoreImpl : public S3BinaryCacheStore
             uploadFile(path, data, mimeType, "");
     }
 
-    void getFile(const std::string & path, Sink & sink) override
+    void getFile(std::string_view path, Sink & sink) override
     {
         stats.get++;
 
@@ -422,7 +422,7 @@ struct S3BinaryCacheStoreImpl : public S3BinaryCacheStore
 };
 
 static RegisterStoreImplementation regStore([](
-    const std::string & uri, const Store::Params & params)
+    std::string_view uri, const Store::Params & params)
     -> std::shared_ptr<Store>
 {
     if (std::string(uri, 0, 5) != "s3://") return 0;

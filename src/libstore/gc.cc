@@ -53,7 +53,7 @@ AutoCloseFD LocalStore::openGCLock(LockType lockType)
 }
 
 
-static void makeSymlink(const Path & link, const Path & target)
+static void makeSymlink(PathView link, PathView target)
 {
     /* Create directories up to `gcRoot'. */
     createDirs(dirOf(link));
@@ -76,7 +76,7 @@ void LocalStore::syncWithGC()
 }
 
 
-void LocalStore::addIndirectRoot(const Path & path)
+void LocalStore::addIndirectRoot(PathView path)
 {
     string hash = hashString(htSHA1, path).to_string(Base32, false);
     Path realRoot = canonPath((format("%1%/%2%/auto/%3%")
@@ -86,7 +86,7 @@ void LocalStore::addIndirectRoot(const Path & path)
 
 
 Path LocalFSStore::addPermRoot(const StorePath & storePath,
-    const Path & _gcRoot, bool indirect, bool allowOutsideRootsDir)
+    PathView _gcRoot, bool indirect, bool allowOutsideRootsDir)
 {
     Path gcRoot(canonPath(_gcRoot));
 
@@ -259,9 +259,9 @@ void LocalStore::findTempRoots(FDs & fds, Roots & tempRoots, bool censor)
 }
 
 
-void LocalStore::findRoots(const Path & path, unsigned char type, Roots & roots)
+void LocalStore::findRoots(PathView path, unsigned char type, Roots & roots)
 {
-    auto foundRoot = [&](const Path & path, const Path & target) {
+    auto foundRoot = [&](PathView path, PathView target) {
         auto storePath = maybeParseStorePath(toStorePath(target));
         if (storePath && isValidPath(*storePath))
             roots[std::move(*storePath)].emplace(path);
@@ -345,7 +345,7 @@ Roots LocalStore::findRoots(bool censor)
 
 typedef std::unordered_map<Path, std::unordered_set<std::string>> UncheckedRoots;
 
-static void readProcLink(const string & file, UncheckedRoots & roots)
+static void readProcLink(std::string_view file, UncheckedRoots & roots)
 {
     /* 64 is the starting buffer size gnu readlink uses... */
     auto bufsiz = ssize_t{64};
@@ -368,7 +368,7 @@ try_again:
             .emplace(file);
 }
 
-static string quoteRegexChars(const string & raw)
+static string quoteRegexChars(std::string_view raw)
 {
     static auto specialRegex = std::regex(R"([.^$\\*+?()\[\]{}|])");
     return std::regex_replace(raw, specialRegex, R"(\$&)");
@@ -507,14 +507,14 @@ struct LocalStore::GCState
 
 
 bool LocalStore::isActiveTempFile(const GCState & state,
-    const Path & path, const string & suffix)
+    PathView path, std::string_view suffix)
 {
     return hasSuffix(path, suffix)
         && state.tempRoots.count(parseStorePath(string(path, 0, path.size() - suffix.size())));
 }
 
 
-void LocalStore::deleteGarbage(GCState & state, const Path & path)
+void LocalStore::deleteGarbage(GCState & state, PathView path)
 {
     unsigned long long bytesFreed;
     deletePath(path, bytesFreed);
@@ -522,7 +522,7 @@ void LocalStore::deleteGarbage(GCState & state, const Path & path)
 }
 
 
-void LocalStore::deletePathRecursive(GCState & state, const Path & path)
+void LocalStore::deletePathRecursive(GCState & state, PathView path)
 {
     checkInterrupt();
 
@@ -632,7 +632,7 @@ bool LocalStore::canReachRoot(GCState & state, StorePathSet & visited, const Sto
 }
 
 
-void LocalStore::tryToDelete(GCState & state, const Path & path)
+void LocalStore::tryToDelete(GCState & state, PathView path)
 {
     checkInterrupt();
 

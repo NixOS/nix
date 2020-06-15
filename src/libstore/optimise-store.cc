@@ -15,7 +15,7 @@
 namespace nix {
 
 
-static void makeWritable(const Path & path)
+static void makeWritable(PathView path)
 {
     struct stat st;
     if (lstat(path.c_str(), &st))
@@ -28,7 +28,7 @@ static void makeWritable(const Path & path)
 struct MakeReadOnly
 {
     Path path;
-    MakeReadOnly(const Path & path) : path(path) { }
+    MakeReadOnly(PathView path) : path(path) { }
     ~MakeReadOnly()
     {
         try {
@@ -63,7 +63,7 @@ LocalStore::InodeHash LocalStore::loadInodeHash()
 }
 
 
-Strings LocalStore::readDirectoryIgnoringInodes(const Path & path, const InodeHash & inodeHash)
+Strings LocalStore::readDirectoryIgnoringInodes(PathView path, const InodeHash & inodeHash)
 {
     Strings names;
 
@@ -90,7 +90,7 @@ Strings LocalStore::readDirectoryIgnoringInodes(const Path & path, const InodeHa
 
 
 void LocalStore::optimisePath_(Activity * act, OptimiseStats & stats,
-    const Path & path, InodeHash & inodeHash)
+    PathView path, InodeHash & inodeHash)
 {
     checkInterrupt();
 
@@ -299,7 +299,7 @@ void LocalStore::optimiseStore()
         % stats.filesLinked);
 }
 
-void LocalStore::optimisePath(const Path & path)
+void LocalStore::optimisePath(PathView path)
 {
     OptimiseStats stats;
     InodeHash inodeHash;

@@ -35,23 +35,23 @@ class LocalFSStore;
 
 Path createGeneration(ref<LocalFSStore> store, Path profile, Path outPath);
 
-void deleteGeneration(const Path & profile, unsigned int gen);
+void deleteGeneration(PathView profile, unsigned int gen);
 
-void deleteGenerations(const Path & profile, const std::set<unsigned int> & gensToDelete, bool dryRun);
+void deleteGenerations(PathView profile, const std::set<unsigned int> & gensToDelete, bool dryRun);
 
-void deleteGenerationsGreaterThan(const Path & profile, const int max, bool dryRun);
+void deleteGenerationsGreaterThan(PathView profile, const int max, bool dryRun);
 
-void deleteOldGenerations(const Path & profile, bool dryRun);
+void deleteOldGenerations(PathView profile, bool dryRun);
 
-void deleteGenerationsOlderThan(const Path & profile, time_t t, bool dryRun);
+void deleteGenerationsOlderThan(PathView profile, time_t t, bool dryRun);
 
-void deleteGenerationsOlderThan(const Path & profile, const string & timeSpec, bool dryRun);
+void deleteGenerationsOlderThan(PathView profile, std::string_view timeSpec, bool dryRun);
 
 void switchLink(Path link, Path target);
 
 /* Ensure exclusive access to a profile.  Any command that modifies
    the profile first acquires this lock. */
-void lockProfile(PathLocks & lock, const Path & profile);
+void lockProfile(PathLocks & lock, PathView profile);
 
 /* Optimistic locking is used by long-running operations like `nix-env
    -i'.  Instead of acquiring the exclusive lock for the entire
@@ -62,7 +62,7 @@ void lockProfile(PathLocks & lock, const Path & profile);
    generally cheap, since the build results are still in the Nix
    store.  Most of the time, only the user environment has to be
    rebuilt. */
-string optimisticLockProfile(const Path & profile);
+string optimisticLockProfile(PathView profile);
 
 /* Resolve ~/.nix-profile. If ~/.nix-profile doesn't exist yet, create
    it. */

@@ -16,7 +16,7 @@ std::ostream & operator << (std::ostream & str, const Expr & e)
     return str;
 }
 
-static void showString(std::ostream & str, const string & s)
+static void showString(std::ostream & str, std::string_view s)
 {
     str << '"';
     for (auto c : (string) s)
@@ -28,7 +28,7 @@ static void showString(std::ostream & str, const string & s)
     str << '"';
 }
 
-static void showId(std::ostream & str, const string & s)
+static void showId(std::ostream & str, std::string_view s)
 {
     if (s.empty())
         str << "\"\"";

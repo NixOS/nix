@@ -7,10 +7,10 @@ namespace nix {
 /* Open (possibly create) a lock file and return the file descriptor.
    -1 is returned if create is false and the lock could not be opened
    because it doesn't exist.  Any other error throws an exception. */
-AutoCloseFD openLockFile(const Path & path, bool create);
+AutoCloseFD openLockFile(PathView path, bool create);
 
 /* Delete an open lock file. */
-void deleteLockFile(const Path & path, int fd);
+void deleteLockFile(PathView path, int fd);
 
 enum LockType { ltRead, ltWrite, ltNone };
 
@@ -26,9 +26,9 @@ private:
 public:
     PathLocks();
     PathLocks(const PathSet & paths,
-        const string & waitMsg = "");
+        std::string_view waitMsg = "");
     bool lockPaths(const PathSet & _paths,
-        const string & waitMsg = "",
+        std::string_view waitMsg = "",
         bool wait = true);
     ~PathLocks();
     void unlock();

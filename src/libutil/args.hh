@@ -20,7 +20,7 @@ public:
        wrong. */
     void parseCmdline(const Strings & cmdline);
 
-    virtual void printHelp(const string & programName, std::ostream & out);
+    virtual void printHelp(std::string_view programName, std::ostream & out);
 
     virtual std::string description() { return ""; }
 
@@ -116,40 +116,42 @@ public:
     /* Helper functions for constructing flags / positional
        arguments. */
 
-    void mkFlag1(char shortName, const std::string & longName,
-        const std::string & label, const std::string & description,
+    // TODO move strings, not copy string views
+    void mkFlag1(char shortName, std::string_view longName,
+        std::string_view label, std::string_view description,
         std::function<void(std::string)> fun)
     {
         addFlag({
-            .longName = longName,
+            .longName = std::string { longName },
             .shortName = shortName,
-            .description = description,
-            .labels = {label},
+            .description = std::string { description },
+            .labels = { std::string { label } },
             .handler = {[=](std::string s) { fun(s); }}
         });
     }
 
-    void mkFlag(char shortName, const std::string & name,
-        const std::string & description, bool * dest)
+    void mkFlag(char shortName, std::string_view name,
+        std::string_view description, bool * dest)
     {
         mkFlag(shortName, name, description, dest, true);
     }
 
+    // TODO move strings, not copy string views, also move value
     template<class T>
-    void mkFlag(char shortName, const std::string & longName, const std::string & description,
+    void mkFlag(char shortName, std::string_view longName, std::string_view description,
         T * dest, const T & value)
     {
         addFlag({
-            .longName = longName,
+            .longName = std::string { longName },
             .shortName = shortName,
-            .description = description,
+            .description = std::string { description },
             .handler = {[=]() { *dest = value; }}
         });
     }
 
     template<class I>
-    void mkIntFlag(char shortName, const std::string & longName,
-        const std::string & description, I * dest)
+    void mkIntFlag(char shortName, std::string_view longName,
+        std::string_view description, I * dest)
     {
         mkFlag<I>(shortName, longName, description, [=](I n) {
             *dest = n;
@@ -157,13 +159,13 @@ public:
     }
 
     template<class I>
-    void mkFlag(char shortName, const std::string & longName,
-        const std::string & description, std::function<void(I)> fun)
+    void mkFlag(char shortName, std::string_view longName,
+        std::string_view description, std::function<void(I)> fun)
     {
         addFlag({
-            .longName = longName,
-            .shortName = shortName,
-            .description = description,
+            .longName = std::string { longName },
+            .shortName = std::string { shortName },
+            .description = std::string { description },
             .labels = {"N"},
             .handler = {[=](std::string s) {
                 I n;
@@ -175,17 +177,17 @@ public:
     }
 
     /* Expect a string argument. */
-    void expectArg(const std::string & label, string * dest, bool optional = false)
+    void expectArg(std::string_view label, string * dest, bool optional = false)
     {
-        expectedArgs.push_back(ExpectedArg{label, 1, optional, [=](std::vector<std::string> ss) {
+        expectedArgs.push_back(ExpectedArg{std::string { label }, 1, optional, [=](std::vector<std::string> ss) {
             *dest = ss[0];
         }});
     }
 
     /* Expect 0 or more arguments. */
-    void expectArgs(const std::string & label, std::vector<std::string> * dest)
+    void expectArgs(std::string_view label, std::vector<std::string> * dest)
     {
-        expectedArgs.push_back(ExpectedArg{label, 0, false, [=](std::vector<std::string> ss) {
+        expectedArgs.push_back(ExpectedArg{std::string { label }, 0, false, [=](std::vector<std::string> ss) {
             *dest = std::move(ss);
         }});
     }
@@ -220,7 +222,7 @@ struct Command : virtual Args
 
     virtual Category category() { return catDefault; }
 
-    void printHelp(const string & programName, std::ostream & out) override;
+    void printHelp(std::string_view programName, std::ostream & out) override;
 };
 
 typedef std::map<std::string, std::function<ref<Command>()>> Commands;
@@ -241,7 +243,7 @@ public:
 
     MultiCommand(const Commands & commands);
 
-    void printHelp(const string & programName, std::ostream & out) override;
+    void printHelp(std::string_view programName, std::ostream & out) override;
 
     bool processFlag(Strings::iterator & pos, Strings::iterator end) override;
 

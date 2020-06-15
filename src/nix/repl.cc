@@ -65,10 +65,10 @@ struct NixRepl : gc
     ~NixRepl();
     void mainLoop(const std::vector<std::string> & files);
     StringSet completePrefix(string prefix);
-    bool getLine(string & input, const std::string &prompt);
+    bool getLine(string & input, std::string_viewprompt);
     Path getDerivationPath(Value & v);
     bool processLine(string line);
-    void loadFile(const Path & path);
+    void loadFile(PathView path);
     void initEnv();
     void reloadFiles();
     void addAttrsToScope(Value & attrs);
@@ -234,7 +234,7 @@ void NixRepl::mainLoop(const std::vector<std::string> & files)
 }
 
 
-bool NixRepl::getLine(string & input, const std::string &prompt)
+bool NixRepl::getLine(string & input, std::string_viewprompt)
 {
     struct sigaction act, old;
     sigset_t savedSignalMask, set;
@@ -344,7 +344,7 @@ StringSet NixRepl::completePrefix(string prefix)
 }
 
 
-static int runProgram(const string & program, const Strings & args)
+static int runProgram(std::string_view program, const Strings & args)
 {
     Strings args2(args);
     args2.push_front(program);
@@ -362,7 +362,7 @@ static int runProgram(const string & program, const Strings & args)
 }
 
 
-bool isVarName(const string & s)
+bool isVarName(std::string_view s)
 {
     if (s.size() == 0) return false;
     char c = s[0];
@@ -539,7 +539,7 @@ bool NixRepl::processLine(string line)
 }
 
 
-void NixRepl::loadFile(const Path & path)
+void NixRepl::loadFile(PathView path)
 {
     loadedFiles.remove(path);
     loadedFiles.push_back(path);

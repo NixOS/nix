@@ -21,7 +21,7 @@ public:
     virtual ~Exit();
 };
 
-int handleExceptions(const string & programName, std::function<void()> fun);
+int handleExceptions(std::string_view programName, std::function<void()> fun);
 
 /* Don't forget to call initPlugins() after settings are initialized! */
 void initNix();
@@ -29,10 +29,10 @@ void initNix();
 void parseCmdLine(int argc, char * * argv,
     std::function<bool(Strings::iterator & arg, const Strings::iterator & end)> parseArg);
 
-void parseCmdLine(const string & programName, const Strings & args,
+void parseCmdLine(std::string_view programName, const Strings & args,
     std::function<bool(Strings::iterator & arg, const Strings::iterator & end)> parseArg);
 
-void printVersion(const string & programName);
+void printVersion(std::string_view programName);
 
 /* Ugh.  No better place to put this. */
 void printGCWarning();
@@ -49,10 +49,10 @@ void printMissing(ref<Store> store, const StorePathSet & willBuild,
     const StorePathSet & willSubstitute, const StorePathSet & unknown,
     unsigned long long downloadSize, unsigned long long narSize, Verbosity lvl = lvlInfo);
 
-string getArg(const string & opt,
+string getArg(std::string_view opt,
     Strings::iterator & i, const Strings::iterator & end);
 
-template<class N> N getIntArg(const string & opt,
+template<class N> N getIntArg(std::string_view opt,
     Strings::iterator & i, const Strings::iterator & end, bool allowUnit)
 {
     ++i;
@@ -81,7 +81,7 @@ struct LegacyArgs : public MixCommonArgs
 {
     std::function<bool(Strings::iterator & arg, const Strings::iterator & end)> parseArg;
 
-    LegacyArgs(const std::string & programName,
+    LegacyArgs(std::string_view programName,
         std::function<bool(Strings::iterator & arg, const Strings::iterator & end)> parseArg);
 
     bool processFlag(Strings::iterator & pos, Strings::iterator end) override;
@@ -91,7 +91,7 @@ struct LegacyArgs : public MixCommonArgs
 
 
 /* Show the manual page for the specified program. */
-void showManPage(const string & name);
+void showManPage(std::string_view name);
 
 /* The constructor of this class starts a pager if stdout is a
    terminal and $PAGER is set. Stdout is redirected to the pager. */

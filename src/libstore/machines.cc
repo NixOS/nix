@@ -35,7 +35,7 @@ Machine::Machine(decltype(storeUri) storeUri,
 
 bool Machine::allSupported(const std::set<string> & features) const {
     return std::all_of(features.begin(), features.end(),
-        [&](const string & feature) {
+        [&](std::string_view feature) {
             return supportedFeatures.count(feature) ||
                 mandatoryFeatures.count(feature);
         });
@@ -43,12 +43,12 @@ bool Machine::allSupported(const std::set<string> & features) const {
 
 bool Machine::mandatoryMet(const std::set<string> & features) const {
     return std::all_of(mandatoryFeatures.begin(), mandatoryFeatures.end(),
-        [&](const string & feature) {
+        [&](std::string_view feature) {
             return features.count(feature);
         });
 }
 
-void parseMachines(const std::string & s, Machines & machines)
+void parseMachines(std::string_view s, Machines & machines)
 {
     for (auto line : tokenizeString<std::vector<string>>(s, "\n;")) {
         trim(line);

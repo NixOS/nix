@@ -570,7 +570,7 @@ namespace nix {
 
 
 Expr * EvalState::parse(const char * text,
-    const Path & path, const Path & basePath, StaticEnv & staticEnv)
+    PathView path, PathView basePath, StaticEnv & staticEnv)
 {
     yyscan_t scanner;
     ParseData data(*this);
@@ -617,25 +617,25 @@ Path resolveExprPath(Path path)
 }
 
 
-Expr * EvalState::parseExprFromFile(const Path & path)
+Expr * EvalState::parseExprFromFile(PathView path)
 {
     return parseExprFromFile(path, staticBaseEnv);
 }
 
 
-Expr * EvalState::parseExprFromFile(const Path & path, StaticEnv & staticEnv)
+Expr * EvalState::parseExprFromFile(PathView path, StaticEnv & staticEnv)
 {
     return parse(readFile(path).c_str(), path, dirOf(path), staticEnv);
 }
 
 
-Expr * EvalState::parseExprFromString(std::string_view s, const Path & basePath, StaticEnv & staticEnv)
+Expr * EvalState::parseExprFromString(std::string_view s, PathView basePath, StaticEnv & staticEnv)
 {
     return parse(s.data(), "(string)", basePath, staticEnv);
 }
 
 
-Expr * EvalState::parseExprFromString(std::string_view s, const Path & basePath)
+Expr * EvalState::parseExprFromString(std::string_view s, PathView basePath)
 {
     return parseExprFromString(s, basePath, staticBaseEnv);
 }
@@ -648,7 +648,7 @@ Expr * EvalState::parseStdin()
 }
 
 
-void EvalState::addToSearchPath(const string & s)
+void EvalState::addToSearchPath(std::string_view s)
 {
     size_t pos = s.find('=');
     string prefix;
@@ -664,13 +664,13 @@ void EvalState::addToSearchPath(const string & s)
 }
 
 
-Path EvalState::findFile(const string & path)
+Path EvalState::findFile(std::string_view path)
 {
     return findFile(searchPath, path);
 }
 
 
-Path EvalState::findFile(SearchPath & searchPath, const string & path, const Pos & pos)
+Path EvalState::findFile(SearchPath & searchPath, std::string_view path, const Pos & pos)
 {
     for (auto & i : searchPath) {
         std::string suffix;

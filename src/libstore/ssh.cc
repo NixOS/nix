@@ -2,7 +2,7 @@
 
 namespace nix {
 
-SSHMaster::SSHMaster(const std::string & host, const std::string & keyFile, bool useMaster, bool compress, int logFD)
+SSHMaster::SSHMaster(std::string_view host, std::string_view keyFile, bool useMaster, bool compress, int logFD)
     : host(host)
     , fakeSSH(host == "localhost")
     , keyFile(keyFile)
@@ -24,7 +24,7 @@ void SSHMaster::addCommonSSHOpts(Strings & args)
         args.push_back("-C");
 }
 
-std::unique_ptr<SSHMaster::Connection> SSHMaster::startCommand(const std::string & command)
+std::unique_ptr<SSHMaster::Connection> SSHMaster::startCommand(std::string_view command)
 {
     Path socketPath = startMaster();
 

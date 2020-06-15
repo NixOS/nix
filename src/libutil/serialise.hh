@@ -16,7 +16,7 @@ struct Sink
     virtual void operator () (const unsigned char * data, size_t len) = 0;
     virtual bool good() { return true; }
 
-    void operator () (const std::string & s)
+    void operator () (std::string_view s)
     {
         (*this)((const unsigned char *) s.data(), s.size());
     }
@@ -34,7 +34,7 @@ struct BufferedSink : virtual Sink
 
     void operator () (const unsigned char * data, size_t len) override;
 
-    void operator () (const std::string & s)
+    void operator () (std::string_view s)
     {
         Sink::operator()(s);
     }
@@ -159,9 +159,9 @@ struct StringSink : Sink
 /* A source that reads data from a string. */
 struct StringSource : Source
 {
-    const string & s;
+    std::string_view s;
     size_t pos;
-    StringSource(const string & _s) : s(_s), pos(0) { }
+    StringSource(std::string_view _s) : s(_s), pos(0) { }
     size_t read(unsigned char * data, size_t len) override;
 };
 
@@ -271,7 +271,7 @@ inline Sink & operator << (Sink & sink, uint64_t n)
     return sink;
 }
 
-Sink & operator << (Sink & sink, const string & s);
+Sink & operator << (Sink & sink, std::string_view s);
 Sink & operator << (Sink & sink, const Strings & s);
 Sink & operator << (Sink & sink, const StringSet & s);
 

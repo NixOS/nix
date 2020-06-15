@@ -253,7 +253,7 @@ static void finish(HashType ht, Ctx & ctx, unsigned char * hash)
 }
 
 
-Hash hashString(HashType ht, const string & s)
+Hash hashString(HashType ht, std::string_view s)
 {
     Ctx ctx;
     Hash hash(ht);
@@ -264,7 +264,7 @@ Hash hashString(HashType ht, const string & s)
 }
 
 
-Hash hashFile(HashType ht, const Path & path)
+Hash hashFile(HashType ht, PathView path)
 {
     HashSink sink(ht);
     readFile(path, sink);
@@ -310,7 +310,7 @@ HashResult HashSink::currentHash()
 
 
 HashResult hashPath(
-    HashType ht, const Path & path, PathFilter & filter)
+    HashType ht, PathView path, PathFilter & filter)
 {
     HashSink sink(ht);
     dumpPath(path, sink, filter);
@@ -328,7 +328,7 @@ Hash compressHash(const Hash & hash, unsigned int newSize)
 }
 
 
-HashType parseHashType(const string & s)
+HashType parseHashType(std::string_view s)
 {
     if (s == "md5") return htMD5;
     else if (s == "sha1") return htSHA1;

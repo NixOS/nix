@@ -127,7 +127,7 @@ struct RegisterCommand
 {
     static Commands * commands;
 
-    RegisterCommand(const std::string & name,
+    RegisterCommand(std::string_view name,
         std::function<ref<Command>()> command)
     {
         if (!commands) commands = new Commands;
@@ -136,13 +136,13 @@ struct RegisterCommand
 };
 
 template<class T>
-static RegisterCommand registerCommand(const std::string & name)
+static RegisterCommand registerCommand(std::string_view name)
 {
     return RegisterCommand(name, [](){ return make_ref<T>(); });
 }
 
 std::shared_ptr<Installable> parseInstallable(
-    SourceExprCommand & cmd, ref<Store> store, const std::string & installable,
+    SourceExprCommand & cmd, ref<Store> store, std::string_view installable,
     bool useDefaultInstallables);
 
 Buildables build(ref<Store> store, RealiseMode mode,

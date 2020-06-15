@@ -21,11 +21,11 @@ void Store::computeFSClosure(const StorePathSet & startPaths,
 
     Sync<State> state_(State{0, paths_, 0});
 
-    std::function<void(const Path &)> enqueue;
+    std::function<void(PathView)> enqueue;
 
     std::condition_variable done;
 
-    enqueue = [&](const Path & path) -> void {
+    enqueue = [&](PathView path) -> void {
         {
             auto state(state_.lock());
             if (state->exc) return;
@@ -149,7 +149,7 @@ void Store::queryMissing(const std::vector<StorePathWithOutputs> & targets,
     };
 
     auto checkOutput = [&](
-        const Path & drvPathS, ref<Derivation> drv, const Path & outPathS, ref<Sync<DrvState>> drvState_)
+        PathView drvPathS, ref<Derivation> drv, PathView outPathS, ref<Sync<DrvState>> drvState_)
     {
         if (drvState_->lock()->done) return;
 

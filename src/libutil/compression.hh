@@ -13,13 +13,13 @@ struct CompressionSink : BufferedSink
     virtual void finish() = 0;
 };
 
-ref<std::string> decompress(const std::string & method, const std::string & in);
+ref<std::string> decompress(std::string_view method, std::string_view in);
 
-ref<CompressionSink> makeDecompressionSink(const std::string & method, Sink & nextSink);
+ref<CompressionSink> makeDecompressionSink(std::string_view method, Sink & nextSink);
 
-ref<std::string> compress(const std::string & method, const std::string & in, const bool parallel = false);
+ref<std::string> compress(std::string_view method, std::string_view in, const bool parallel = false);
 
-ref<CompressionSink> makeCompressionSink(const std::string & method, Sink & nextSink, const bool parallel = false);
+ref<CompressionSink> makeCompressionSink(std::string_view method, Sink & nextSink, const bool parallel = false);
 
 MakeError(UnknownCompressionMethod, Error);
 

@@ -5,7 +5,7 @@ namespace nix {
 
 LogFormat defaultLogFormat = LogFormat::raw;
 
-LogFormat parseLogFormat(const std::string & logFormatStr) {
+LogFormat parseLogFormat(std::string_view logFormatStr) {
     if (logFormatStr == "raw")
         return LogFormat::raw;
     else if (logFormatStr == "raw-with-logs")
@@ -36,7 +36,7 @@ Logger * makeDefaultLogger() {
     }
 }
 
-void setLogFormat(const std::string & logFormatStr) {
+void setLogFormat(std::string_view logFormatStr) {
     setLogFormat(parseLogFormat(logFormatStr));
 }
 

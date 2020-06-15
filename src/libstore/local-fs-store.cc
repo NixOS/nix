@@ -18,7 +18,7 @@ struct LocalStoreAccessor : public FSAccessor
 
     LocalStoreAccessor(ref<LocalFSStore> store) : store(store) { }
 
-    Path toRealPath(const Path & path)
+    Path toRealPath(PathView path)
     {
         Path storePath = store->toStorePath(path);
         if (!store->isValidPath(store->parseStorePath(storePath)))
@@ -26,7 +26,7 @@ struct LocalStoreAccessor : public FSAccessor
         return store->getRealStoreDir() + std::string(path, store->storeDir.size());
     }
 
-    FSAccessor::Stat stat(const Path & path) override
+    FSAccessor::Stat stat(PathView path) override
     {
         auto realPath = toRealPath(path);
 
@@ -47,7 +47,7 @@ struct LocalStoreAccessor : public FSAccessor
             S_ISREG(st.st_mode) && st.st_mode & S_IXUSR};
     }
 
-    StringSet readDirectory(const Path & path) override
+    StringSet readDirectory(PathView path) override
     {
         auto realPath = toRealPath(path);
 
@@ -60,12 +60,12 @@ struct LocalStoreAccessor : public FSAccessor
         return res;
     }
 
-    std::string readFile(const Path & path) override
+    std::string readFile(PathView path) override
     {
         return nix::readFile(toRealPath(path));
     }
 
-    std::string readLink(const Path & path) override
+    std::string readLink(PathView path) override
     {
         return nix::readLink(toRealPath(path));
     }

@@ -37,15 +37,16 @@ const std::string narVersionMagic1 = "nix-archive-1";
 
 static string caseHackSuffix = "~nix~case~hack~";
 
-PathFilter defaultPathFilter = [](const Path &) { return true; };
+PathFilter defaultPathFilter = [](PathView) { return true; };
 
 
-static void dumpContents(const Path & path, size_t size,
+static void dumpContents(PathView path, size_t size,
     Sink & sink)
 {
     sink << "contents" << size;
 
-    AutoCloseFD fd = open(path.c_str(), O_RDONLY | O_CLOEXEC);
+    // Fresh string for null termination
+    AutoCloseFD fd = open((std::string { path }).c_str(), O_RDONLY | O_CLOEXEC);
     if (!fd) throw SysError("opening file '%1%'", path);
 
     std::vector<unsigned char> buf(65536);
@@ -62,12 +63,12 @@ static void dumpContents(const Path & path, size_t size,
 }
 
 
-static void dump(const Path & path, Sink & sink, PathFilter & filter)
+static void dump(PathView path, Sink & sink, PathFilter & filter)
 {
     checkInterrupt();
 
     struct stat st;
-    if (lstat(path.c_str(), &st))
+    if (lstat((Path { path }).c_str(), &st))
         throw SysError("getting attributes of path '%1%'", path);
 
     sink << "(";
@@ -90,21 +91,21 @@ static void dump(const Path & path, Sink & sink, PathFilter & filter)
                 string name(i.name);
                 size_t pos = i.name.find(caseHackSuffix);
                 if (pos != string::npos) {
-                    debug(format("removing case hack suffix from '%1%'") % (path + "/" + i.name));
+                    debug(format("removing case hack suffix from '%1%'") % (std::string { path } << "/" << i.name));
                     name.erase(pos);
                 }
                 if (unhacked.find(name) != unhacked.end())
                     throw Error("file name collision in between '%1%' and '%2%'",
-                       (path + "/" + unhacked[name]),
-                       (path + "/" + i.name));
+                       (Path { path } << "/" << unhacked[name]),
+                       (Path { path } << "/" << i.name));
                 unhacked[name] = i.name;
             } else
                 unhacked[i.name] = i.name;
 
         for (auto & i : unhacked)
-            if (filter(path + "/" + i.first)) {
+            if (filter(Path { path } << "/" << i.first)) {
                 sink << "entry" << "(" << "name" << i.first << "node";
-                dump(path + "/" + i.second, sink, filter);
+                dump(Path { path } << "/" << i.second, sink, filter);
                 sink << ")";
             }
     }
@@ -118,14 +119,14 @@ static void dump(const Path & path, Sink & sink, PathFilter & filter)
 }
 
 
-void dumpPath(const Path & path, Sink & sink, PathFilter & filter)
+void dumpPath(PathView path, Sink & sink, PathFilter & filter)
 {
     sink << narVersionMagic1;
     dump(path, sink, filter);
 }
 
 
-void dumpString(const std::string & s, Sink & sink)
+void dumpString(std::string_view s, Sink & sink)
 {
     sink << narVersionMagic1 << "(" << "type" << "regular" << "contents" << s << ")";
 }
@@ -148,7 +149,7 @@ static void skipGeneric(Source & source)
 #endif
 
 
-static void parseContents(ParseSink & sink, Source & source, const Path & path)
+static void parseContents(ParseSink & sink, Source & source, PathView path)
 {
     unsigned long long size = readLongLong(source);
 
@@ -172,14 +173,15 @@ static void parseContents(ParseSink & sink, Source & source, const Path & path)
 
 struct CaseInsensitiveCompare
 {
-    bool operator() (const string & a, const string & b) const
+    // cannot use string_view because of null termination
+    bool operator() (const std::string & a, const std::string & b) const
     {
         return strcasecmp(a.c_str(), b.c_str()) < 0;
     }
 };
 
 
-static void parse(ParseSink & sink, Source & source, const Path & path)
+static void parse(ParseSink & sink, Source & source, PathView path)
 {
     string s;
 
@@ -263,7 +265,7 @@ static void parse(ParseSink & sink, Source & source, const Path & path)
                     }
                 } else if (s == "node") {
                     if (s.empty()) throw badArchive("entry name missing");
-                    parse(sink, source, path + "/" + name);
+                    parse(sink, source, std::string {} << path << "/" << name);
                 } else
                     throw badArchive("unknown field " + s);
             }
@@ -300,16 +302,16 @@ struct RestoreSink : ParseSink
     Path dstPath;
     AutoCloseFD fd;
 
-    void createDirectory(const Path & path)
+    void createDirectory(PathView path)
     {
-        Path p = dstPath + path;
+    	Path p = Path { dstPath } << path;
         if (mkdir(p.c_str(), 0777) == -1)
             throw SysError("creating directory '%1%'", p);
     };
 
-    void createRegularFile(const Path & path)
+    void createRegularFile(PathView path)
     {
-        Path p = dstPath + path;
+    	Path p = Path { dstPath } << path;
         fd = open(p.c_str(), O_CREAT | O_EXCL | O_WRONLY | O_CLOEXEC, 0666);
         if (!fd) throw SysError("creating file '%1%'", p);
     }
@@ -343,15 +345,17 @@ struct RestoreSink : ParseSink
         writeFull(fd.get(), data, len);
     }
 
-    void createSymlink(const Path & path, const string & target)
+    void createSymlink(PathView path, const std::string & target)
     {
-        Path p = dstPath + path;
+        Path p;
+        p += dstPath;
+        p += path;
         nix::createSymlink(target, p);
     }
 };
 
 
-void restorePath(const Path & path, Source & source)
+void restorePath(PathView path, Source & source)
 {
     RestoreSink sink;
     sink.dstPath = path;
@@ -376,7 +380,7 @@ void copyNAR(Source & source, Sink & sink)
 }
 
 
-void copyPath(const Path & from, const Path & to)
+void copyPath(PathView from, PathView to)
 {
     auto source = sinkToSource([&](Sink & sink) {
         dumpPath(from, sink);

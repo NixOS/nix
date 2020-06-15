@@ -80,7 +80,7 @@ namespace nix {
         class TestSetting : public AbstractSetting {
             public:
             TestSetting() : AbstractSetting("test", "test", {}) {}
-            void set(const std::string & value) {}
+            void set(std::string_view value) {}
             std::string to_string() const { return {}; }
         };
 

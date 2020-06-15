@@ -123,13 +123,13 @@ public:
     EvalState(const Strings & _searchPath, ref<Store> store);
     ~EvalState();
 
-    void addToSearchPath(const string & s);
+    void addToSearchPath(std::string_view s);
 
     SearchPath getSearchPath() { return searchPath; }
 
-    Path checkSourcePath(const Path & path);
+    Path checkSourcePath(PathView path);
 
-    void checkURI(const std::string & uri);
+    void checkURI(std::string_view uri);
 
     /* When using a diverted store and 'path' is in the Nix store, map
        'path' to the diverted location (e.g. /nix/store/foo is mapped
@@ -138,27 +138,27 @@ public:
        probably trying to read from the actual /nix/store. This is
        intended to distinguish between import-from-derivation and
        sources stored in the actual /nix/store. */
-    Path toRealPath(const Path & path, const PathSet & context);
+    Path toRealPath(PathView path, const PathSet & context);
 
     /* Parse a Nix expression from the specified file. */
-    Expr * parseExprFromFile(const Path & path);
-    Expr * parseExprFromFile(const Path & path, StaticEnv & staticEnv);
+    Expr * parseExprFromFile(PathView path);
+    Expr * parseExprFromFile(PathView path, StaticEnv & staticEnv);
 
     /* Parse a Nix expression from the specified string. */
-    Expr * parseExprFromString(std::string_view s, const Path & basePath, StaticEnv & staticEnv);
-    Expr * parseExprFromString(std::string_view s, const Path & basePath);
+    Expr * parseExprFromString(std::string_view s, PathView basePath, StaticEnv & staticEnv);
+    Expr * parseExprFromString(std::string_view s, PathView basePath);
 
     Expr * parseStdin();
 
     /* Evaluate an expression read from the given file to normal
        form. */
-    void evalFile(const Path & path, Value & v);
+    void evalFile(PathView path, Value & v);
 
     void resetFileCache();
 
     /* Look up a file in the search path. */
-    Path findFile(const string & path);
-    Path findFile(SearchPath & searchPath, const string & path, const Pos & pos = noPos);
+    Path findFile(std::string_view path);
+    Path findFile(SearchPath & searchPath, std::string_view path, const Pos & pos = noPos);
 
     /* If the specified search path element is a URI, download it. */
     std::pair<bool, std::string> resolveSearchPathElem(const SearchPathElem & elem);
@@ -210,7 +210,7 @@ public:
     string coerceToString(const Pos & pos, Value & v, PathSet & context,
         bool coerceMore = false, bool copyToStore = true);
 
-    string copyPathToStore(PathSet & context, const Path & path);
+    string copyPathToStore(PathSet & context, PathView path);
 
     /* Path coercion.  Converts strings, paths and derivations to a
        path.  The result is guaranteed to be a canonicalised, absolute
@@ -232,14 +232,14 @@ private:
 
     void createBaseEnv();
 
-    Value * addConstant(const string & name, Value & v);
+    Value * addConstant(std::string_view name, Value & v);
 
-    Value * addPrimOp(const string & name,
+    Value * addPrimOp(std::string_view name,
         size_t arity, PrimOpFun primOp);
 
 public:
 
-    Value & getBuiltin(const string & name);
+    Value & getBuiltin(std::string_view name);
 
 private:
 
@@ -249,8 +249,8 @@ private:
     friend struct ExprAttrs;
     friend struct ExprLet;
 
-    Expr * parse(const char * text, const Path & path,
-        const Path & basePath, StaticEnv & staticEnv);
+    Expr * parse(const char * text, PathView path,
+        PathView basePath, StaticEnv & staticEnv);
 
 public:
 
@@ -272,7 +272,7 @@ public:
     Env & allocEnv(size_t size);
 
     Value * allocAttr(Value & vAttrs, const Symbol & name);
-    Value * allocAttr(Value & vAttrs, const std::string & name);
+    Value * allocAttr(Value & vAttrs, std::string_view name);
 
     Bindings * allocBindings(size_t capacity);
 
@@ -328,7 +328,7 @@ string showType(const Value & v);
 
 /* Decode a context string ‘!<name>!<path>’ into a pair <path,
    name>. */
-std::pair<string, string> decodeContext(const string & s);
+std::pair<string, string> decodeContext(std::string_view s);
 
 /* If `path' refers to a directory, then append "/default.nix". */
 Path resolveExprPath(Path path);
@@ -336,7 +336,7 @@ Path resolveExprPath(Path path);
 struct InvalidPathError : EvalError
 {
     Path path;
-    InvalidPathError(const Path & path);
+    InvalidPathError(PathView path);
 #ifdef EXCEPTION_NEEDS_THROW_SPEC
     ~InvalidPathError() throw () { };
 #endif

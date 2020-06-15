@@ -19,7 +19,7 @@ std::string wrap(std::string prefix, std::string s)
     return prefix + s + ANSI_NORMAL;
 }
 
-std::string hilite(const std::string & s, const std::smatch & m, std::string postfix)
+std::string hilite(std::string_view s, const std::smatch & m, std::string postfix)
 {
     return
         m.empty()

@@ -17,15 +17,15 @@ struct MaxBuildJobsSetting : public BaseSetting<unsigned int>
 {
     MaxBuildJobsSetting(Config * options,
         unsigned int def,
-        const std::string & name,
-        const std::string & description,
+        std::string_view name,
+        std::string_view description,
         const std::set<std::string> & aliases = {})
         : BaseSetting<unsigned int>(def, name, description, aliases)
     {
         options->addSetting(this);
     }
 
-    void set(const std::string & str) override;
+    void set(std::string_view str) override;
 };
 
 class Settings : public Config {
@@ -360,9 +360,9 @@ public:
     Setting<Strings> experimentalFeatures{this, {}, "experimental-features",
         "Experimental Nix features to enable."};
 
-    bool isExperimentalFeatureEnabled(const std::string & name);
+    bool isExperimentalFeatureEnabled(std::string_view name);
 
-    void requireExperimentalFeature(const std::string & name);
+    void requireExperimentalFeature(std::string_view name);
 
     Setting<bool> allowDirty{this, true, "allow-dirty",
         "Whether to allow dirty Git/Mercurial trees."};

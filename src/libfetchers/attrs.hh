@@ -22,17 +22,17 @@ Attrs jsonToAttrs(const nlohmann::json & json);
 
 nlohmann::json attrsToJson(const Attrs & attrs);
 
-std::optional<std::string> maybeGetStrAttr(const Attrs & attrs, const std::string & name);
+std::optional<std::string> maybeGetStrAttr(const Attrs & attrs, std::string_view name);
 
-std::string getStrAttr(const Attrs & attrs, const std::string & name);
+std::string getStrAttr(const Attrs & attrs, std::string_view name);
 
-std::optional<int64_t> maybeGetIntAttr(const Attrs & attrs, const std::string & name);
+std::optional<int64_t> maybeGetIntAttr(const Attrs & attrs, std::string_view name);
 
-int64_t getIntAttr(const Attrs & attrs, const std::string & name);
+int64_t getIntAttr(const Attrs & attrs, std::string_view name);
 
-std::optional<bool> maybeGetBoolAttr(const Attrs & attrs, const std::string & name);
+std::optional<bool> maybeGetBoolAttr(const Attrs & attrs, std::string_view name);
 
-bool getBoolAttr(const Attrs & attrs, const std::string & name);
+bool getBoolAttr(const Attrs & attrs, std::string_view name);
 
 std::map<std::string, std::string> attrsToQuery(const Attrs & attrs);
 

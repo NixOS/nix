@@ -29,7 +29,7 @@ private:
 
 public:
 
-    SSHMaster(const std::string & host, const std::string & keyFile, bool useMaster, bool compress, int logFD = -1);
+    SSHMaster(std::string_view host, std::string_view keyFile, bool useMaster, bool compress, int logFD = -1);
 
     struct Connection
     {
@@ -37,7 +37,7 @@ public:
         AutoCloseFD out, in;
     };
 
-    std::unique_ptr<Connection> startCommand(const std::string & command);
+    std::unique_ptr<Connection> startCommand(std::string_view command);
 
     Path startMaster();
 };

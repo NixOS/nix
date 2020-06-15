@@ -20,7 +20,7 @@ ParsedDerivation::ParsedDerivation(StorePath && drvPath, BasicDerivation & drv)
 
 ParsedDerivation::~ParsedDerivation() { }
 
-std::optional<std::string> ParsedDerivation::getStringAttr(const std::string & name) const
+std::optional<std::string> ParsedDerivation::getStringAttr(std::string_view name) const
 {
     if (structuredAttrs) {
         auto i = structuredAttrs->find(name);
@@ -40,7 +40,7 @@ std::optional<std::string> ParsedDerivation::getStringAttr(const std::string & n
     }
 }
 
-bool ParsedDerivation::getBoolAttr(const std::string & name, bool def) const
+bool ParsedDerivation::getBoolAttr(std::string_view name, bool def) const
 {
     if (structuredAttrs) {
         auto i = structuredAttrs->find(name);
@@ -60,7 +60,7 @@ bool ParsedDerivation::getBoolAttr(const std::string & name, bool def) const
     }
 }
 
-std::optional<Strings> ParsedDerivation::getStringsAttr(const std::string & name) const
+std::optional<Strings> ParsedDerivation::getStringsAttr(std::string_view name) const
 {
     if (structuredAttrs) {
         auto i = structuredAttrs->find(name);

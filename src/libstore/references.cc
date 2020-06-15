@@ -79,7 +79,7 @@ void RefScanSink::operator () (const unsigned char * data, size_t len)
 }
 
 
-PathSet scanForReferences(const string & path,
+PathSet scanForReferences(std::string_view path,
     const PathSet & refs, HashResult & hash)
 {
     RefScanSink sink;
@@ -118,7 +118,7 @@ PathSet scanForReferences(const string & path,
 }
 
 
-RewritingSink::RewritingSink(const std::string & from, const std::string & to, Sink & nextSink)
+RewritingSink::RewritingSink(std::string_view from, std::string_view to, Sink & nextSink)
     : from(from), to(to), nextSink(nextSink)
 {
     assert(from.size() == to.size());
@@ -152,7 +152,7 @@ void RewritingSink::flush()
     prev.clear();
 }
 
-HashModuloSink::HashModuloSink(HashType ht, const std::string & modulus)
+HashModuloSink::HashModuloSink(HashType ht, std::string_view modulus)
     : hashSink(ht)
     , rewritingSink(modulus, std::string(modulus.size(), 0), hashSink)
 {

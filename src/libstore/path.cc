@@ -122,7 +122,7 @@ std::pair<std::string_view, StringSet> parsePathWithOutputs(std::string_view s)
             tokenizeString<std::set<string>>(((std::string_view) s).substr(n + 1), ","));
 }
 
-StorePathWithOutputs Store::parsePathWithOutputs(const std::string & s)
+StorePathWithOutputs Store::parsePathWithOutputs(std::string_view s)
 {
     auto [path, outputs] = nix::parsePathWithOutputs(s);
     return {parseStorePath(path), std::move(outputs)};

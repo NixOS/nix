@@ -10,7 +10,10 @@ void toJSON(std::ostream & str, const char * start, const char * end);
 void toJSON(std::ostream & str, const char * s);
 
 template<typename T>
-void toJSON(std::ostream & str, const T & n);
+void toJSON(std::ostream & str, T n);
+
+// Avoid unintentinoal copying
+template<> void toJSON<std::string>(std::ostream & str, std::string s) = delete;
 
 class JSONWriter
 {
@@ -78,7 +81,7 @@ public:
     ~JSONList();
 
     template<typename T>
-    JSONList & elem(const T & v)
+    JSONList & elem(const T v)
     {
         comma();
         toJSON(state->str, v);
@@ -107,7 +110,7 @@ private:
         open();
     }
 
-    void attr(const std::string & s);
+    void attr(std::string_view s);
 
 public:
 
@@ -128,18 +131,18 @@ public:
     ~JSONObject();
 
     template<typename T>
-    JSONObject & attr(const std::string & name, const T & v)
+    JSONObject & attr(std::string_view name, const T v)
     {
         attr(name);
         toJSON(state->str, v);
         return *this;
     }
 
-    JSONList list(const std::string & name);
+    JSONList list(std::string_view name);
 
-    JSONObject object(const std::string & name);
+    JSONObject object(std::string_view name);
 
-    JSONPlaceholder placeholder(const std::string & name);
+    JSONPlaceholder placeholder(std::string_view name);
 };
 
 class JSONPlaceholder : JSONWriter
@@ -171,7 +174,7 @@ public:
     ~JSONPlaceholder();
 
     template<typename T>
-    void write(const T & v)
+    void write(const T v)
     {
         assertValid();
         first = false;

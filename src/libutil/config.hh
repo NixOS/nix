@@ -59,7 +59,7 @@ public:
      * Sets the value referenced by `name` to `value`. Returns true if the
      * setting is known, false otherwise.
      */
-    virtual bool set(const std::string & name, const std::string & value) = 0;
+    virtual bool set(std::string_view name, std::string_view value) = 0;
 
     struct SettingInfo
     {
@@ -79,13 +79,13 @@ public:
      * - contents: configuration contents to be parsed and applied
      * - path: location of the configuration file
      */
-    void applyConfig(const std::string & contents, const std::string & path = "<unknown>");
+    void applyConfig(std::string_view contents, std::string_view path = "<unknown>");
 
     /**
      * Applies a nix configuration file
      * - path: the location of the config file to apply
      */
-    void applyConfigFile(const Path & path);
+    void applyConfigFile(PathView path);
 
     /**
      * Resets the `overridden` flag of all Settings
@@ -103,7 +103,7 @@ public:
      * - args: args to write to
      * - category: category of the settings
      */
-    virtual void convertToArgs(Args & args, const std::string & category) = 0;
+    virtual void convertToArgs(Args & args, std::string_view category) = 0;
 
     /**
      * Logs a warning for each unregistered setting
@@ -146,7 +146,7 @@ public:
         { }
     };
 
-    typedef std::map<std::string, SettingData> Settings;
+    typedef std::map<std::string, SettingData, std::less<>> Settings;
 
 private:
 
@@ -158,7 +158,7 @@ public:
         : AbstractConfig(initials)
     { }
 
-    bool set(const std::string & name, const std::string & value) override;
+    bool set(std::string_view name, std::string_view value) override;
 
     void addSetting(AbstractSetting * setting);
 
@@ -168,7 +168,7 @@ public:
 
     void toJSON(JSONObject & out) override;
 
-    void convertToArgs(Args & args, const std::string & category) override;
+    void convertToArgs(Args & args, std::string_view category) override;
 };
 
 class AbstractSetting
@@ -185,13 +185,13 @@ public:
 
     bool overriden = false;
 
-    void setDefault(const std::string & str);
+    void setDefault(std::string_view str);
 
 protected:
 
     AbstractSetting(
-        const std::string & name,
-        const std::string & description,
+        std::string_view name,
+        std::string_view description,
         const std::set<std::string> & aliases);
 
     virtual ~AbstractSetting()
@@ -201,56 +201,67 @@ protected:
         assert(created == 123);
     }
 
-    virtual void set(const std::string & value) = 0;
+    virtual void set(std::string_view value) = 0;
 
     virtual std::string to_string() const = 0;
 
     virtual void toJSON(JSONPlaceholder & out);
 
-    virtual void convertToArg(Args & args, const std::string & category);
+    virtual void convertToArg(Args & args, std::string_view category);
 
     bool isOverriden() const { return overriden; }
 };
+
+// To make class template specialization less annoying
+#define MAKE_BASE_SETTING(T) \
+protected: \
+\
+    T value; \
+\
+public: \
+\
+    BaseSetting(const T & def, \
+        std::string_view name, \
+        std::string_view description, \
+        const std::set<std::string> & aliases = {}) \
+        : AbstractSetting(name, description, aliases) \
+        , value(def) \
+    { } \
+\
+    operator const T &() const { return value; } \
+    operator T &() { return value; } \
+    const T & get() const { return value; } \
+    bool operator ==(const T & v2) const { return value == v2; } \
+    bool operator !=(const T & v2) const { return value != v2; } \
+    void operator =(const T & v) { assign(v); } \
+    virtual void assign(const T & v) { value = v; } \
+\
+    void set(std::string_view str) override; \
+\
+    virtual void override(const T & v) \
+    { \
+        overriden = true; \
+        value = v; \
+    } \
+\
+    std::string to_string() const override; \
+\
+    void convertToArg(Args & args, std::string_view category) override; \
+\
+    void toJSON(JSONPlaceholder & out) override;
 
 /* A setting of type T. */
 template<typename T>
 class BaseSetting : public AbstractSetting
 {
-protected:
+    MAKE_BASE_SETTING(T)
+};
 
-    T value;
-
-public:
-
-    BaseSetting(const T & def,
-        const std::string & name,
-        const std::string & description,
-        const std::set<std::string> & aliases = {})
-        : AbstractSetting(name, description, aliases)
-        , value(def)
-    { }
-
-    operator const T &() const { return value; }
-    operator T &() { return value; }
-    const T & get() const { return value; }
-    bool operator ==(const T & v2) const { return value == v2; }
-    bool operator !=(const T & v2) const { return value != v2; }
-    void operator =(const T & v) { assign(v); }
-    virtual void assign(const T & v) { value = v; }
-
-    void set(const std::string & str) override;
-
-    virtual void override(const T & v)
-    {
-        overriden = true;
-        value = v;
-    }
-
-    std::string to_string() const override;
-
-    void convertToArg(Args & args, const std::string & category) override;
-
-    void toJSON(JSONPlaceholder & out) override;
+template<>
+class BaseSetting<std::string> : public AbstractSetting
+{
+    MAKE_BASE_SETTING(std::string)
+    operator std::string_view () const { return std::string_view { value }; }
 };
 
 template<typename T>
@@ -269,8 +280,8 @@ class Setting : public BaseSetting<T>
 public:
     Setting(Config * options,
         const T & def,
-        const std::string & name,
-        const std::string & description,
+        std::string_view name,
+        std::string_view description,
         const std::set<std::string> & aliases = {})
         : BaseSetting<T>(def, name, description, aliases)
     {
@@ -290,21 +301,21 @@ public:
 
     PathSetting(Config * options,
         bool allowEmpty,
-        const Path & def,
-        const std::string & name,
-        const std::string & description,
+        PathView def,
+        std::string_view name,
+        std::string_view description,
         const std::set<std::string> & aliases = {})
-        : BaseSetting<Path>(def, name, description, aliases)
+        : BaseSetting<Path>(Path { def }, name, description, aliases)
         , allowEmpty(allowEmpty)
     {
         options->addSetting(this);
     }
 
-    void set(const std::string & str) override;
+    void set(std::string_view str) override;
 
     Path operator +(const char * p) const { return value + p; }
 
-    void operator =(const Path & v) { this->assign(v); }
+    void operator =(PathView v) { this->assign(Path { v }); }
 };
 
 struct GlobalConfig : public AbstractConfig
@@ -312,7 +323,7 @@ struct GlobalConfig : public AbstractConfig
     typedef std::vector<Config*> ConfigRegistrations;
     static ConfigRegistrations * configRegistrations;
 
-    bool set(const std::string & name, const std::string & value) override;
+    bool set(std::string_view name, std::string_view value) override;
 
     void getSettings(std::map<std::string, SettingInfo> & res, bool overridenOnly = false) override;
 
@@ -320,7 +331,7 @@ struct GlobalConfig : public AbstractConfig
 
     void toJSON(JSONObject & out) override;
 
-    void convertToArgs(Args & args, const std::string & category) override;
+    void convertToArgs(Args & args, std::string_view category) override;
 
     struct Register
     {

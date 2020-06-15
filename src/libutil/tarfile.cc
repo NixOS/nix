@@ -33,13 +33,14 @@ struct TarArchive {
             "failed to open archive: %s");
     }
 
-    TarArchive(const Path & path)
+    TarArchive(PathView path)
     {
         this->archive = archive_read_new();
 
         archive_read_support_filter_all(archive);
         archive_read_support_format_all(archive);
-        check(archive_read_open_filename(archive, path.c_str(), 16384), "failed to open archive: %s");
+        check(archive_read_open_filename(archive, Path { path }.c_str(), 16384),
+              "failed to open archive: %s");
     }
 
     TarArchive(const TarArchive &) = delete;
@@ -80,7 +81,7 @@ private:
     }
 };
 
-static void extract_archive(TarArchive & archive, const Path & destDir)
+static void extract_archive(TarArchive & archive, PathView destDir)
 {
     int flags = ARCHIVE_EXTRACT_FFLAGS
         | ARCHIVE_EXTRACT_PERM
@@ -98,7 +99,7 @@ static void extract_archive(TarArchive & archive, const Path & destDir)
             archive.check(r);
 
         archive_entry_set_pathname(entry,
-            (destDir + "/" + archive_entry_pathname(entry)).c_str());
+            (Path { destDir } << "/" << archive_entry_pathname(entry)).c_str());
 
         archive.check(archive_read_extract(archive.archive, entry, flags));
     }
@@ -106,7 +107,7 @@ static void extract_archive(TarArchive & archive, const Path & destDir)
     archive.close();
 }
 
-void unpackTarfile(Source & source, const Path & destDir)
+void unpackTarfile(Source & source, PathView destDir)
 {
     auto archive = TarArchive(source);
 
@@ -114,7 +115,7 @@ void unpackTarfile(Source & source, const Path & destDir)
     extract_archive(archive, destDir);
 }
 
-void unpackTarfile(const Path & tarFile, const Path & destDir)
+void unpackTarfile(PathView tarFile, PathView destDir)
 {
     auto archive = TarArchive(tarFile);
 

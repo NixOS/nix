@@ -72,7 +72,7 @@ void printMissing(ref<Store> store, const StorePathSet & willBuild,
 }
 
 
-string getArg(const string & opt,
+string getArg(std::string_view opt,
     Strings::iterator & i, const Strings::iterator & end)
 {
     ++i;
@@ -162,7 +162,7 @@ void initNix()
 }
 
 
-LegacyArgs::LegacyArgs(const std::string & programName,
+LegacyArgs::LegacyArgs(std::string_view programName,
     std::function<bool(Strings::iterator & arg, const Strings::iterator & end)> parseArg)
     : MixCommonArgs(programName), parseArg(parseArg)
 {
@@ -193,8 +193,8 @@ LegacyArgs::LegacyArgs(const std::string & programName,
         .handler = {&(bool&) settings.tryFallback, true},
     });
 
-    auto intSettingAlias = [&](char shortName, const std::string & longName,
-        const std::string & description, const std::string & dest) {
+    auto intSettingAlias = [&](char shortName, std::string_view longName,
+        std::string_view description, std::string_view dest) {
         mkFlag<unsigned int>(shortName, longName, description, [=](unsigned int n) {
             settings.set(dest, std::to_string(n));
         });
@@ -247,14 +247,14 @@ void parseCmdLine(int argc, char * * argv,
 }
 
 
-void parseCmdLine(const string & programName, const Strings & args,
+void parseCmdLine(std::string_view programName, const Strings & args,
     std::function<bool(Strings::iterator & arg, const Strings::iterator & end)> parseArg)
 {
     LegacyArgs(programName, parseArg).parseCmdline(args);
 }
 
 
-void printVersion(const string & programName)
+void printVersion(std::string_view programName)
 {
     std::cout << format("%1% (Nix) %2%") % programName % nixVersion << std::endl;
     if (verbosity > lvlInfo) {
@@ -277,7 +277,7 @@ void printVersion(const string & programName)
 }
 
 
-void showManPage(const string & name)
+void showManPage(std::string_view name)
 {
     restoreSignals();
     setenv("MANPATH", settings.nixManDir.c_str(), 1);
@@ -286,7 +286,7 @@ void showManPage(const string & name)
 }
 
 
-int handleExceptions(const string & programName, std::function<void()> fun)
+int handleExceptions(std::string_view programName, std::function<void()> fun)
 {
     ReceiveInterrupts receiveInterrupts; // FIXME: need better place for this
 

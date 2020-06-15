@@ -14,9 +14,9 @@ struct S3Helper
     ref<Aws::Client::ClientConfiguration> config;
     ref<Aws::S3::S3Client> client;
 
-    S3Helper(const std::string & profile, const std::string & region, const std::string & scheme, const std::string & endpoint);
+    S3Helper(std::string_view profile, std::string_view region, std::string_view scheme, std::string_view endpoint);
 
-    ref<Aws::Client::ClientConfiguration> makeConfig(const std::string & region, const std::string & scheme, const std::string & endpoint);
+    ref<Aws::Client::ClientConfiguration> makeConfig(std::string_view region, std::string_view scheme, std::string_view endpoint);
 
     struct FileTransferResult
     {
@@ -25,7 +25,7 @@ struct S3Helper
     };
 
     FileTransferResult getObject(
-        const std::string & bucketName, const std::string & key);
+        std::string_view bucketName, std::string_view key);
 };
 
 }

@@ -20,9 +20,9 @@ void setCurActivity(const ActivityId activityId)
 
 Logger * logger = makeSimpleLogger(true);
 
-void Logger::warn(const std::string & msg)
+void Logger::warn(std::string_view msg)
 {
-    log(lvlWarn, ANSI_YELLOW "warning:" ANSI_NORMAL " " + msg);
+    log(lvlWarn, std::string { ANSI_YELLOW "warning:" ANSI_NORMAL " " } << msg);
 }
 
 void Logger::writeToStdout(std::string_view s)
@@ -78,11 +78,11 @@ public:
     }
 
     void startActivity(ActivityId act, Verbosity lvl, ActivityType type,
-        const std::string & s, const Fields & fields, ActivityId parent)
+        std::string_view s, const Fields & fields, ActivityId parent)
     override
     {
         if (lvl <= verbosity && !s.empty())
-            log(lvl, s + "...");
+            log(lvl, std::string { s } << "...");
     }
 
     void result(ActivityId act, ResultType type, const Fields & fields) override
@@ -108,7 +108,7 @@ void warnOnce(bool & haveWarned, const FormatOrString & fs)
     }
 }
 
-void writeToStderr(const string & s)
+void writeToStderr(std::string_view s)
 {
     try {
         writeFull(STDERR_FILENO, s, false);
@@ -128,7 +128,7 @@ Logger * makeSimpleLogger(bool printBuildLogs)
 std::atomic<uint64_t> nextId{(uint64_t) getpid() << 32};
 
 Activity::Activity(Logger & logger, Verbosity lvl, ActivityType type,
-    const std::string & s, const Logger::Fields & fields, ActivityId parent)
+    std::string_view s, const Logger::Fields & fields, ActivityId parent)
     : logger(logger), id(nextId++)
 {
     logger.startActivity(id, lvl, type, s, fields, parent);
@@ -184,7 +184,7 @@ struct JSONLogger : Logger {
     }
 
     void startActivity(ActivityId act, Verbosity lvl, ActivityType type,
-        const std::string & s, const Fields & fields, ActivityId parent) override
+        std::string_view s, const Fields & fields, ActivityId parent) override
     {
         nlohmann::json json;
         json["action"] = "start";
@@ -234,13 +234,13 @@ static Logger::Fields getFields(nlohmann::json & json)
     return fields;
 }
 
-bool handleJSONLogMessage(const std::string & msg,
+bool handleJSONLogMessage(std::string_view msg,
     const Activity & act, std::map<ActivityId, Activity> & activities, bool trusted)
 {
     if (!hasPrefix(msg, "@nix ")) return false;
 
     try {
-        auto json = nlohmann::json::parse(std::string(msg, 5));
+        auto json = nlohmann::json::parse(msg.substr(5));
 
         std::string action = json["action"];
 
@@ -250,7 +250,7 @@ bool handleJSONLogMessage(const std::string & msg,
                 activities.emplace(std::piecewise_construct,
                     std::forward_as_tuple(json["id"]),
                     std::forward_as_tuple(*logger, (Verbosity) json["level"], type,
-                        json["text"], getFields(json["fields"]), act.id));
+                        json["text"].get<std::string_view>(), getFields(json["fields"]), act.id));
         }
 
         else if (action == "stop")

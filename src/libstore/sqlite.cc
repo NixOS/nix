@@ -25,7 +25,7 @@ namespace nix {
         throw SQLiteError("%s: %s (in '%s')", fs.s, sqlite3_errstr(exterr), path);
 }
 
-SQLite::SQLite(const Path & path, bool create)
+SQLite::SQLite(PathView path, bool create)
 {
     if (sqlite3_open_v2(path.c_str(), &db,
             SQLITE_OPEN_READWRITE | (create ? SQLITE_OPEN_CREATE : 0), 0) != SQLITE_OK)
@@ -53,7 +53,7 @@ void SQLite::isCache()
     exec("pragma main.journal_mode = truncate");
 }
 
-void SQLite::exec(const std::string & stmt)
+void SQLite::exec(std::string_view stmt)
 {
     retrySQLite<void>([&]() {
         if (sqlite3_exec(db, stmt.c_str(), 0, 0, 0) != SQLITE_OK)
@@ -61,7 +61,7 @@ void SQLite::exec(const std::string & stmt)
     });
 }
 
-void SQLiteStmt::create(sqlite3 * db, const string & sql)
+void SQLiteStmt::create(sqlite3 * db, std::string_view sql)
 {
     checkInterrupt();
     assert(!stmt);
@@ -95,7 +95,7 @@ SQLiteStmt::Use::~Use()
     sqlite3_reset(stmt);
 }
 
-SQLiteStmt::Use & SQLiteStmt::Use::operator () (const std::string & value, bool notNull)
+SQLiteStmt::Use & SQLiteStmt::Use::operator () (std::string_view value, bool notNull)
 {
     if (notNull) {
         if (sqlite3_bind_text(stmt, curArg++, value.c_str(), -1, SQLITE_TRANSIENT) != SQLITE_OK)

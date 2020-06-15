@@ -22,7 +22,7 @@ std::unique_ptr<Input> inputFromURL(const ParsedURL & url)
     throw Error("input '%s' is unsupported", url.url);
 }
 
-std::unique_ptr<Input> inputFromURL(const std::string & url)
+std::unique_ptr<Input> inputFromURL(std::string_view url)
 {
     return inputFromURL(parseURL(url));
 }

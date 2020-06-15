@@ -75,7 +75,7 @@ struct InputScheme
 
 std::unique_ptr<Input> inputFromURL(const ParsedURL & url);
 
-std::unique_ptr<Input> inputFromURL(const std::string & url);
+std::unique_ptr<Input> inputFromURL(std::string_view url);
 
 std::unique_ptr<Input> inputFromAttrs(const Attrs & attrs);
 
@@ -90,14 +90,14 @@ struct DownloadFileResult
 
 DownloadFileResult downloadFile(
     ref<Store> store,
-    const std::string & url,
-    const std::string & name,
+    std::string_view url,
+    std::string_view name,
     bool immutable);
 
 Tree downloadTarball(
     ref<Store> store,
-    const std::string & url,
-    const std::string & name,
+    std::string_view url,
+    std::string_view name,
     bool immutable);
 
 }

@@ -125,7 +125,7 @@ struct NixArgs : virtual MultiCommand, virtual MixCommonArgs
             "--help-config' for a list of configuration settings.\n";
     }
 
-    void printHelp(const string & programName, std::ostream & out) override
+    void printHelp(std::string_view programName, std::ostream & out) override
     {
         MultiCommand::printHelp(programName, out);
 

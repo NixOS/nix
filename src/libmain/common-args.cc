@@ -4,7 +4,7 @@
 
 namespace nix {
 
-MixCommonArgs::MixCommonArgs(const string & programName)
+MixCommonArgs::MixCommonArgs(std::string_view programName)
     : programName(programName)
 {
     addFlag({

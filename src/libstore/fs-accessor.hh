@@ -21,13 +21,13 @@ public:
 
     virtual ~FSAccessor() { }
 
-    virtual Stat stat(const Path & path) = 0;
+    virtual Stat stat(PathView path) = 0;
 
-    virtual StringSet readDirectory(const Path & path) = 0;
+    virtual StringSet readDirectory(PathView path) = 0;
 
-    virtual std::string readFile(const Path & path) = 0;
+    virtual std::string readFile(PathView path) = 0;
 
-    virtual std::string readLink(const Path & path) = 0;
+    virtual std::string readLink(PathView path) = 0;
 };
 
 }

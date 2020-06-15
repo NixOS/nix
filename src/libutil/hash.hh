@@ -101,15 +101,15 @@ Hash newHashAllowEmpty(std::string hashStr, HashType ht);
 string printHash16or32(const Hash & hash);
 
 /* Compute the hash of the given string. */
-Hash hashString(HashType ht, const string & s);
+Hash hashString(HashType ht, std::string_view s);
 
 /* Compute the hash of the given file. */
-Hash hashFile(HashType ht, const Path & path);
+Hash hashFile(HashType ht, PathView path);
 
 /* Compute the hash of the given path.  The hash is defined as
    (essentially) hashString(ht, dumpPath(path)). */
 typedef std::pair<Hash, unsigned long long> HashResult;
-HashResult hashPath(HashType ht, const Path & path,
+HashResult hashPath(HashType ht, PathView path,
     PathFilter & filter = defaultPathFilter);
 
 /* Compress a hash to the specified number of bytes by cyclically
@@ -117,7 +117,7 @@ HashResult hashPath(HashType ht, const Path & path,
 Hash compressHash(const Hash & hash, unsigned int newSize);
 
 /* Parse a string representing a hash type. */
-HashType parseHashType(const string & s);
+HashType parseHashType(std::string_view s);
 
 /* And the reverse. */
 string printHashType(HashType ht);

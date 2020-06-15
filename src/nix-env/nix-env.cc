@@ -67,7 +67,7 @@ typedef void (* Operation) (Globals & globals,
 
 
 static string needArg(Strings::iterator & i,
-    Strings & args, const string & arg)
+    Strings & args, std::string_view arg)
 {
     if (i == args.end()) throw UsageError("'%1%' requires an argument", arg);
     return *i++;
@@ -75,7 +75,7 @@ static string needArg(Strings::iterator & i,
 
 
 static bool parseInstallSourceOptions(Globals & globals,
-    Strings::iterator & i, Strings & args, const string & arg)
+    Strings::iterator & i, Strings & args, std::string_view arg)
 {
     if (arg == "--from-expression" || arg == "-E")
         globals.instSource.type = srcNixExprs;
@@ -90,14 +90,14 @@ static bool parseInstallSourceOptions(Globals & globals,
 }
 
 
-static bool isNixExpr(const Path & path, struct stat & st)
+static bool isNixExpr(PathView path, struct stat & st)
 {
     return S_ISREG(st.st_mode) || (S_ISDIR(st.st_mode) && pathExists(path + "/default.nix"));
 }
 
 
 static void getAllExprs(EvalState & state,
-    const Path & path, StringSet & attrs, Value & v)
+    PathView path, StringSet & attrs, Value & v)
 {
     StringSet namesSorted;
     for (auto & i : readDirectory(path)) namesSorted.insert(i.name);
@@ -146,7 +146,7 @@ static void getAllExprs(EvalState & state,
 
 
 
-static void loadSourceExpr(EvalState & state, const Path & path, Value & v)
+static void loadSourceExpr(EvalState & state, PathView path, Value & v)
 {
     struct stat st;
     if (stat(path.c_str(), &st) == -1)
@@ -175,7 +175,7 @@ static void loadSourceExpr(EvalState & state, const Path & path, Value & v)
 
 static void loadDerivations(EvalState & state, Path nixExprPath,
     string systemFilter, Bindings & autoArgs,
-    const string & pathPrefix, DrvInfos & elems)
+    std::string_view pathPrefix, DrvInfos & elems)
 {
     Value vRoot;
     loadSourceExpr(state, nixExprPath, vRoot);
@@ -313,7 +313,7 @@ static DrvInfos filterBySelector(EvalState & state, const DrvInfos & allElems,
 }
 
 
-static bool isPath(const string & s)
+static bool isPath(std::string_view s)
 {
     return s.find('/') != string::npos;
 }
@@ -441,7 +441,7 @@ static bool keep(DrvInfo & drv)
 
 
 static void installDerivations(Globals & globals,
-    const Strings & args, const Path & profile)
+    const Strings & args, PathView profile)
 {
     debug(format("installing derivations"));
 
@@ -628,7 +628,7 @@ static void opUpgrade(Globals & globals, Strings opFlags, Strings opArgs)
 
 
 static void setMetaFlag(EvalState & state, DrvInfo & drv,
-    const string & name, const string & value)
+    std::string_view name, std::string_view value)
 {
     Value * v = state.allocValue();
     mkString(*v, value.c_str());

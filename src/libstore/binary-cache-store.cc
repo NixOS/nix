@@ -24,7 +24,7 @@ BinaryCacheStore::BinaryCacheStore(const Params & params)
     : Store(params)
 {
     if (secretKeyFile != "")
-        secretKey = std::unique_ptr<SecretKey>(new SecretKey(readFile(secretKeyFile)));
+        secretKey = std::unique_ptr<SecretKey>(new SecretKey(readFile(PathView { secretKeyFile })));
 
     StringSink sink;
     sink << narVersionMagic1;
@@ -57,7 +57,7 @@ void BinaryCacheStore::init()
     }
 }
 
-void BinaryCacheStore::getFile(const std::string & path,
+void BinaryCacheStore::getFile(std::string_view path,
     Callback<std::shared_ptr<std::string>> callback) noexcept
 {
     try {
@@ -65,7 +65,7 @@ void BinaryCacheStore::getFile(const std::string & path,
     } catch (...) { callback.rethrow(); }
 }
 
-void BinaryCacheStore::getFile(const std::string & path, Sink & sink)
+void BinaryCacheStore::getFile(std::string_view path, Sink & sink)
 {
     std::promise<std::shared_ptr<std::string>> promise;
     getFile(path,
@@ -80,7 +80,7 @@ void BinaryCacheStore::getFile(const std::string & path, Sink & sink)
     sink((unsigned char *) data->data(), data->size());
 }
 
-std::shared_ptr<std::string> BinaryCacheStore::getFile(const std::string & path)
+std::shared_ptr<std::string> BinaryCacheStore::getFile(std::string_view path)
 {
     StringSink sink;
     try {
@@ -303,7 +303,7 @@ void BinaryCacheStore::queryPathInfoUncached(const StorePath & storePath,
     auto uri = getUri();
     auto storePathS = printStorePath(storePath);
     auto act = std::make_shared<Activity>(*logger, lvlTalkative, actQueryPathInfo,
-        fmt("querying info about '%s' on '%s'", storePathS, uri), Logger::Fields{storePathS, uri});
+        fmt("querying info about '%s' on '%s'", storePathS, uri), Logger::Fields{ storePathS, uri });
     PushActivity pact(act->id);
 
     auto narInfoFile = narInfoFileFor(storePath);
@@ -329,7 +329,7 @@ void BinaryCacheStore::queryPathInfoUncached(const StorePath & storePath,
         }});
 }
 
-StorePath BinaryCacheStore::addToStore(const string & name, const Path & srcPath,
+StorePath BinaryCacheStore::addToStore(std::string_view name, PathView srcPath,
     FileIngestionMethod method, HashType hashAlgo, PathFilter & filter, RepairFlag repair)
 {
     // FIXME: some cut&paste from LocalStore::addToStore().
@@ -356,7 +356,7 @@ StorePath BinaryCacheStore::addToStore(const string & name, const Path & srcPath
     return std::move(info.path);
 }
 
-StorePath BinaryCacheStore::addTextToStore(const string & name, const string & s,
+StorePath BinaryCacheStore::addTextToStore(std::string_view name, std::string_view s,
     const StorePathSet & references, RepairFlag repair)
 {
     ValidPathInfo info(computeStorePathForText(name, s, references));

@@ -185,7 +185,7 @@ struct ValidPathInfo
     size_t checkSignatures(const Store & store, const PublicKeys & publicKeys) const;
 
     /* Verify a single signature. */
-    bool checkSignature(const Store & store, const PublicKeys & publicKeys, const std::string & sig) const;
+    bool checkSignature(const Store & store, const PublicKeys & publicKeys, std::string_view sig) const;
 
     Strings shortRefs() const;
 
@@ -312,7 +312,7 @@ public:
     /* Split a string specifying a derivation and a set of outputs
        (/nix/store/hash-foo!out1,out2,...) into the derivation path
        and the outputs. */
-    StorePathWithOutputs parsePathWithOutputs(const string & s);
+    StorePathWithOutputs parsePathWithOutputs(std::string_view s);
 
     /* Display a set of paths in human-readable form (i.e., between quotes
        and separated by commas). */
@@ -320,7 +320,7 @@ public:
 
     /* Return true if ‘path’ is in the Nix store (but not the Nix
        store itself). */
-    bool isInStore(const Path & path) const;
+    bool isInStore(PathView path) const;
 
     /* Return true if ‘path’ is a store path, i.e. a direct child of
        the Nix store. */
@@ -328,7 +328,7 @@ public:
 
     /* Chop off the parts after the top-level store name, e.g.,
        /nix/store/abcd-foo/bar => /nix/store/abcd-foo. */
-    Path toStorePath(const Path & path) const;
+    Path toStorePath(PathView path) const;
 
     /* Follow symlinks until we end up with a path in the Nix store. */
     Path followLinksToStore(std::string_view path) const;
@@ -340,10 +340,10 @@ public:
     StorePathWithOutputs followLinksToStorePathWithOutputs(std::string_view path) const;
 
     /* Constructs a unique store path name. */
-    StorePath makeStorePath(const string & type,
+    StorePath makeStorePath(std::string_view type,
         const Hash & hash, std::string_view name) const;
 
-    StorePath makeOutputPath(const string & id,
+    StorePath makeOutputPath(std::string_view id,
         const Hash & hash, std::string_view name) const;
 
     StorePath makeFixedOutputPath(FileIngestionMethod method,
@@ -358,7 +358,7 @@ public:
        store path to which srcPath is to be copied.  Returns the store
        path and the cryptographic hash of the contents of srcPath. */
     std::pair<StorePath, Hash> computeStorePathForPath(std::string_view name,
-        const Path & srcPath, FileIngestionMethod method = FileIngestionMethod::Recursive,
+        PathView srcPath, FileIngestionMethod method = FileIngestionMethod::Recursive,
         HashType hashAlgo = htSHA256, PathFilter & filter = defaultPathFilter) const;
 
     /* Preparatory part of addTextToStore().
@@ -375,7 +375,7 @@ public:
        simply yield a different store path, so other users wouldn't be
        affected), but it has some backwards compatibility issues (the
        hashing scheme changes), so I'm not doing that for now. */
-    StorePath computeStorePathForText(const string & name, const string & s,
+    StorePath computeStorePathForText(std::string_view name, std::string_view s,
         const StorePathSet & references) const;
 
     /* Check whether a path is valid. */
@@ -432,7 +432,7 @@ public:
 
     /* Query the full store path given the hash part of a valid store
        path, or empty if the path doesn't exist. */
-    virtual std::optional<StorePath> queryPathFromHashPart(const std::string & hashPart) = 0;
+    virtual std::optional<StorePath> queryPathFromHashPart(std::string_view hashPart) = 0;
 
     /* Query which of the given paths have substitutes. */
     virtual StorePathSet querySubstitutablePaths(const StorePathSet & paths) { return {}; };
@@ -452,12 +452,12 @@ public:
        validity the resulting path.  The resulting path is returned.
        The function object `filter' can be used to exclude files (see
        libutil/archive.hh). */
-    virtual StorePath addToStore(const string & name, const Path & srcPath,
+    virtual StorePath addToStore(std::string_view name, PathView srcPath,
         FileIngestionMethod method = FileIngestionMethod::Recursive, HashType hashAlgo = htSHA256,
         PathFilter & filter = defaultPathFilter, RepairFlag repair = NoRepair) = 0;
 
     // FIXME: remove?
-    virtual StorePath addToStoreFromDump(const string & dump, const string & name,
+    virtual StorePath addToStoreFromDump(std::string_view dump, std::string_view name,
         FileIngestionMethod method = FileIngestionMethod::Recursive, HashType hashAlgo = htSHA256, RepairFlag repair = NoRepair)
     {
         throw Error("addToStoreFromDump() is not supported by this store");
@@ -465,7 +465,7 @@ public:
 
     /* Like addToStore, but the contents written to the output path is
        a regular file containing the given string. */
-    virtual StorePath addTextToStore(const string & name, const string & s,
+    virtual StorePath addTextToStore(std::string_view name, std::string_view s,
         const StorePathSet & references, RepairFlag repair = NoRepair) = 0;
 
     /* Write a NAR dump of a store path. */
@@ -504,7 +504,7 @@ public:
        to be a symlink to a store path.  The garbage collector will
        automatically remove the indirect root when it finds that
        `path' has disappeared. */
-    virtual void addIndirectRoot(const Path & path)
+    virtual void addIndirectRoot(PathView path)
     { unsupported("addIndirectRoot"); }
 
     /* Acquire the global GC lock, then immediately release it.  This
@@ -666,9 +666,9 @@ public:
         return 0;
     };
 
-    virtual Path toRealPath(const Path & storePath)
+    virtual Path toRealPath(PathView storePath)
     {
-        return storePath;
+        return Path { storePath };
     }
 
     Path toRealPath(const StorePath & storePath)
@@ -676,7 +676,7 @@ public:
         return toRealPath(printStorePath(storePath));
     }
 
-    virtual void createUser(const std::string & userName, uid_t userId)
+    virtual void createUser(std::string_view userName, uid_t userId)
     { }
 
 protected:
@@ -684,7 +684,7 @@ protected:
     Stats stats;
 
     /* Unsupported methods. */
-    [[noreturn]] void unsupported(const std::string & op)
+    [[noreturn]] void unsupported(std::string_view op)
     {
         throw Unsupported("operation '%s' is not supported by store '%s'", op, getUri());
     }
@@ -717,14 +717,14 @@ public:
 
     /* Register a permanent GC root. */
     Path addPermRoot(const StorePath & storePath,
-        const Path & gcRoot, bool indirect, bool allowOutsideRootsDir = false);
+        PathView gcRoot, bool indirect, bool allowOutsideRootsDir = false);
 
     virtual Path getRealStoreDir() { return storeDir; }
 
-    Path toRealPath(const Path & storePath) override
+    Path toRealPath(PathView storePath) override
     {
         assert(isInStore(storePath));
-        return getRealStoreDir() + "/" + std::string(storePath, storeDir.size() + 1);
+        return Path { getRealStoreDir() } << "/" << storePath.substr(storeDir.size() + 1);
     }
 
     std::shared_ptr<std::string> getBuildLog(const StorePath & path) override;
@@ -732,7 +732,7 @@ public:
 
 
 /* Extract the hash part of the given store path. */
-string storePathToHash(const Path & path);
+string storePathToHash(PathView path);
 
 
 /* Copy a path from one store to another. */
@@ -794,7 +794,7 @@ void removeTempRoots();
    You can pass parameters to the store implementation by appending
    ‘?key=value&key=value&...’ to the URI.
 */
-ref<Store> openStore(const std::string & uri = settings.storeUri.get(),
+ref<Store> openStore(std::string_view uri = settings.storeUri.get(),
     const Store::Params & extraParams = Store::Params());
 
 
@@ -805,8 +805,8 @@ enum StoreType {
 };
 
 
-StoreType getStoreType(const std::string & uri = settings.storeUri.get(),
-    const std::string & stateDir = settings.nixStateDir);
+StoreType getStoreType(std::string_view uri = settings.storeUri.get(),
+    std::string_view stateDir = settings.nixStateDir);
 
 /* Return the default substituter stores, defined by the
    ‘substituters’ option and various legacy options. */
@@ -815,7 +815,7 @@ std::list<ref<Store>> getDefaultSubstituters();
 
 /* Store implementation registration. */
 typedef std::function<std::shared_ptr<Store>(
-    const std::string & uri, const Store::Params & params)> OpenStore;
+    std::string_view uri, const Store::Params & params)> OpenStore;
 
 struct RegisterStoreImplementation
 {
@@ -848,6 +848,6 @@ std::string makeFixedOutputCA(FileIngestionMethod method, const Hash & hash);
 
 
 /* Split URI into protocol+hierarchy part and its parameter set. */
-std::pair<std::string, Store::Params> splitUriAndParams(const std::string & uri);
+std::pair<std::string, Store::Params> splitUriAndParams(std::string_view uri);
 
 }

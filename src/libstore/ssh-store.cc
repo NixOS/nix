@@ -19,7 +19,7 @@ public:
     const Setting<Path> remoteProgram{(Store*) this, "nix-daemon", "remote-program", "path to the nix-daemon executable on the remote system"};
     const Setting<std::string> remoteStore{(Store*) this, "", "remote-store", "URI of the store on the remote system"};
 
-    SSHStore(const std::string & host, const Params & params)
+    SSHStore(std::string_view host, const Params & params)
         : Store(params)
         , RemoteStore(params)
         , host(host)
@@ -94,7 +94,7 @@ ref<RemoteStore::Connection> SSHStore::openConnection()
 }
 
 static RegisterStoreImplementation regStore([](
-    const std::string & uri, const Store::Params & params)
+    std::string_view uri, const Store::Params & params)
     -> std::shared_ptr<Store>
 {
     if (std::string(uri, 0, uriScheme.size()) != uriScheme) return 0;

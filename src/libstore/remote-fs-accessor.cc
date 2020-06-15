@@ -8,7 +8,7 @@
 
 namespace nix {
 
-RemoteFSAccessor::RemoteFSAccessor(ref<Store> store, const Path & cacheDir)
+RemoteFSAccessor::RemoteFSAccessor(ref<Store> store, PathView cacheDir)
     : store(store)
     , cacheDir(cacheDir)
 {
@@ -16,13 +16,13 @@ RemoteFSAccessor::RemoteFSAccessor(ref<Store> store, const Path & cacheDir)
         createDirs(cacheDir);
 }
 
-Path RemoteFSAccessor::makeCacheFile(const Path & storePath, const std::string & ext)
+Path RemoteFSAccessor::makeCacheFile(PathView storePath, std::string_view ext)
 {
     assert(cacheDir != "");
     return fmt("%s/%s.%s", cacheDir, storePathToHash(storePath), ext);
 }
 
-void RemoteFSAccessor::addToCache(const Path & storePath, const std::string & nar,
+void RemoteFSAccessor::addToCache(PathView storePath, std::string_view nar,
     ref<FSAccessor> narAccessor)
 {
     nars.emplace(storePath, narAccessor);
@@ -43,7 +43,7 @@ void RemoteFSAccessor::addToCache(const Path & storePath, const std::string & na
     }
 }
 
-std::pair<ref<FSAccessor>, Path> RemoteFSAccessor::fetch(const Path & path_)
+std::pair<ref<FSAccessor>, Path> RemoteFSAccessor::fetch(PathView path_)
 {
     auto path = canonPath(path_);
 
@@ -102,25 +102,25 @@ std::pair<ref<FSAccessor>, Path> RemoteFSAccessor::fetch(const Path & path_)
     return {narAccessor, restPath};
 }
 
-FSAccessor::Stat RemoteFSAccessor::stat(const Path & path)
+FSAccessor::Stat RemoteFSAccessor::stat(PathView path)
 {
     auto res = fetch(path);
     return res.first->stat(res.second);
 }
 
-StringSet RemoteFSAccessor::readDirectory(const Path & path)
+StringSet RemoteFSAccessor::readDirectory(PathView path)
 {
     auto res = fetch(path);
     return res.first->readDirectory(res.second);
 }
 
-std::string RemoteFSAccessor::readFile(const Path & path)
+std::string RemoteFSAccessor::readFile(PathView path)
 {
     auto res = fetch(path);
     return res.first->readFile(res.second);
 }
 
-std::string RemoteFSAccessor::readLink(const Path & path)
+std::string RemoteFSAccessor::readLink(PathView path)
 {
     auto res = fetch(path);
     return res.first->readLink(res.second);

@@ -12,7 +12,7 @@ public:
 
     virtual ~NarInfoDiskCache() { }
 
-    virtual void createCache(const std::string & uri, const Path & storeDir,
+    virtual void createCache(std::string_view uri, PathView storeDir,
         bool wantMassQuery, int priority) = 0;
 
     struct CacheInfo
@@ -21,13 +21,13 @@ public:
         int priority;
     };
 
-    virtual std::optional<CacheInfo> cacheExists(const std::string & uri) = 0;
+    virtual std::optional<CacheInfo> cacheExists(std::string_view uri) = 0;
 
     virtual std::pair<Outcome, std::shared_ptr<NarInfo>> lookupNarInfo(
-        const std::string & uri, const std::string & hashPart) = 0;
+        std::string_view uri, std::string_view hashPart) = 0;
 
     virtual void upsertNarInfo(
-        const std::string & uri, const std::string & hashPart,
+        std::string_view uri, std::string_view hashPart,
         std::shared_ptr<const ValidPathInfo> info) = 0;
 };
 

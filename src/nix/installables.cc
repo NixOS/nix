@@ -47,7 +47,7 @@ Value * SourceExprCommand::getSourceExpr(EvalState & state)
 
         std::unordered_set<std::string> seen;
 
-        auto addEntry = [&](const std::string & name) {
+        auto addEntry = [&](std::string_view name) {
             if (name == "") return;
             if (!seen.insert(name).second) return;
             Value * v1 = state.allocValue();
@@ -94,7 +94,7 @@ struct InstallableStorePath : Installable
     ref<Store> store;
     StorePath storePath;
 
-    InstallableStorePath(ref<Store> store, const Path & storePath)
+    InstallableStorePath(ref<Store> store, PathView storePath)
         : store(store), storePath(store->parseStorePath(storePath)) { }
 
     std::string what() override { return store->printStorePath(storePath); }
@@ -171,7 +171,7 @@ struct InstallableExpr : InstallableValue
 {
     std::string text;
 
-    InstallableExpr(SourceExprCommand & cmd, const std::string & text)
+    InstallableExpr(SourceExprCommand & cmd, std::string_view text)
          : InstallableValue(cmd), text(text) { }
 
     std::string what() override { return text; }
@@ -188,7 +188,7 @@ struct InstallableAttrPath : InstallableValue
 {
     std::string attrPath;
 
-    InstallableAttrPath(SourceExprCommand & cmd, const std::string & attrPath)
+    InstallableAttrPath(SourceExprCommand & cmd, std::string_view attrPath)
         : InstallableValue(cmd), attrPath(attrPath)
     { }
 
@@ -246,7 +246,7 @@ static std::vector<std::shared_ptr<Installable>> parseInstallables(
 }
 
 std::shared_ptr<Installable> parseInstallable(
-    SourceExprCommand & cmd, ref<Store> store, const std::string & installable,
+    SourceExprCommand & cmd, ref<Store> store, std::string_view installable,
     bool useDefaultInstallables)
 {
     auto installables = parseInstallables(cmd, store, {installable}, false);

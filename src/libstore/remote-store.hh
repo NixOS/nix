@@ -51,7 +51,7 @@ public:
 
     StorePathSet queryDerivationOutputs(const StorePath & path) override;
 
-    std::optional<StorePath> queryPathFromHashPart(const std::string & hashPart) override;
+    std::optional<StorePath> queryPathFromHashPart(std::string_view hashPart) override;
 
     StorePathSet querySubstitutablePaths(const StorePathSet & paths) override;
 
@@ -62,11 +62,11 @@ public:
         RepairFlag repair, CheckSigsFlag checkSigs,
         std::shared_ptr<FSAccessor> accessor) override;
 
-    StorePath addToStore(const string & name, const Path & srcPath,
+    StorePath addToStore(std::string_view name, PathView srcPath,
         FileIngestionMethod method = FileIngestionMethod::Recursive, HashType hashAlgo = htSHA256,
         PathFilter & filter = defaultPathFilter, RepairFlag repair = NoRepair) override;
 
-    StorePath addTextToStore(const string & name, const string & s,
+    StorePath addTextToStore(std::string_view name, std::string_view s,
         const StorePathSet & references, RepairFlag repair) override;
 
     void buildPaths(const std::vector<StorePathWithOutputs> & paths, BuildMode buildMode) override;
@@ -78,7 +78,7 @@ public:
 
     void addTempRoot(const StorePath & path) override;
 
-    void addIndirectRoot(const Path & path) override;
+    void addIndirectRoot(PathView path) override;
 
     void syncWithGC() override;
 

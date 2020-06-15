@@ -32,7 +32,7 @@ struct Machine {
 
 typedef std::vector<Machine> Machines;
 
-void parseMachines(const std::string & s, Machines & machines);
+void parseMachines(std::string_view s, Machines & machines);
 
 Machines getMachines();
 

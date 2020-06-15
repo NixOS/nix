@@ -12,7 +12,7 @@
 namespace nix {
 
 
-DrvInfos queryInstalled(EvalState & state, const Path & userEnv)
+DrvInfos queryInstalled(EvalState & state, PathView userEnv)
 {
     DrvInfos elems;
     if (pathExists(userEnv + "/manifest.json"))
@@ -29,8 +29,8 @@ DrvInfos queryInstalled(EvalState & state, const Path & userEnv)
 
 
 bool createUserEnv(EvalState & state, DrvInfos & elems,
-    const Path & profile, bool keepDerivations,
-    const string & lockToken)
+    PathView profile, bool keepDerivations,
+    std::string_view lockToken)
 {
     /* Build the components in the user environment, if they don't
        exist already. */

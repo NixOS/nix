@@ -63,7 +63,7 @@ string nextComponent(string::const_iterator & p,
 }
 
 
-static bool componentsLT(const string & c1, const string & c2)
+static bool componentsLT(std::string_view c1, std::string_view c2)
 {
     int n1, n2;
     bool c1Num = string2Int(c1, n1), c2Num = string2Int(c2, n2);
@@ -79,7 +79,7 @@ static bool componentsLT(const string & c1, const string & c2)
 }
 
 
-int compareVersions(const string & v1, const string & v2)
+int compareVersions(std::string_view v1, std::string_view v2)
 {
     string::const_iterator p1 = v1.begin();
     string::const_iterator p2 = v2.begin();

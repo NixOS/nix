@@ -74,7 +74,7 @@ static void setSigChldAction(bool autoReap)
 }
 
 
-bool matchUser(const string & user, const string & group, const Strings & users)
+bool matchUser(std::string_view user, std::string_view group, const Strings & users)
 {
     if (find(users.begin(), users.end(), "*") != users.end())
         return true;

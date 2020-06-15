@@ -14,7 +14,7 @@ struct State
 };
 
 /* For each activated package, create symlinks */
-static void createLinks(State & state, const Path & srcDir, const Path & dstDir, int priority)
+static void createLinks(State & state, PathView srcDir, PathView dstDir, int priority)
 {
     DirEntries srcFiles;
 
@@ -118,13 +118,13 @@ static void createLinks(State & state, const Path & srcDir, const Path & dstDir,
     }
 }
 
-void buildProfile(const Path & out, Packages && pkgs)
+void buildProfile(PathView out, Packages && pkgs)
 {
     State state;
 
     std::set<Path> done, postponed;
 
-    auto addPkg = [&](const Path & pkgDir, int priority) {
+    auto addPkg = [&](PathView pkgDir, int priority) {
         if (!done.insert(pkgDir).second) return;
         createLinks(state, pkgDir, out, priority);
 
@@ -167,7 +167,7 @@ void buildProfile(const Path & out, Packages && pkgs)
 
 void builtinBuildenv(const BasicDerivation & drv)
 {
-    auto getAttr = [&](const string & name) {
+    auto getAttr = [&](std::string_view name) {
         auto i = drv.env.find(name);
         if (i == drv.env.end()) throw Error("attribute '%s' missing", name);
         return i->second;

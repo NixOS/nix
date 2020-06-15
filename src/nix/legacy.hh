@@ -13,7 +13,7 @@ struct RegisterLegacyCommand
     typedef std::map<std::string, MainFunction> Commands;
     static Commands * commands;
 
-    RegisterLegacyCommand(const std::string & name, MainFunction fun)
+    RegisterLegacyCommand(std::string_view name, MainFunction fun)
     {
         if (!commands) commands = new Commands;
         (*commands)[name] = fun;

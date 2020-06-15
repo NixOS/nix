@@ -380,7 +380,7 @@ void LocalStore::makeStoreWritable()
 const time_t mtimeStore = 1; /* 1 second into the epoch */
 
 
-static void canonicaliseTimestampAndPermissions(const Path & path, const struct stat & st)
+static void canonicaliseTimestampAndPermissions(PathView path, const struct stat & st)
 {
     if (!S_ISLNK(st.st_mode)) {
 
@@ -415,7 +415,7 @@ static void canonicaliseTimestampAndPermissions(const Path & path, const struct 
 }
 
 
-void canonicaliseTimestampAndPermissions(const Path & path)
+void canonicaliseTimestampAndPermissions(PathView path)
 {
     struct stat st;
     if (lstat(path.c_str(), &st))
@@ -424,7 +424,7 @@ void canonicaliseTimestampAndPermissions(const Path & path)
 }
 
 
-static void canonicalisePathMetaData_(const Path & path, uid_t fromUid, InodesSeen & inodesSeen)
+static void canonicalisePathMetaData_(PathView path, uid_t fromUid, InodesSeen & inodesSeen)
 {
     checkInterrupt();
 
@@ -514,7 +514,7 @@ static void canonicalisePathMetaData_(const Path & path, uid_t fromUid, InodesSe
 }
 
 
-void canonicalisePathMetaData(const Path & path, uid_t fromUid, InodesSeen & inodesSeen)
+void canonicalisePathMetaData(PathView path, uid_t fromUid, InodesSeen & inodesSeen)
 {
     canonicalisePathMetaData_(path, fromUid, inodesSeen);
 
@@ -531,7 +531,7 @@ void canonicalisePathMetaData(const Path & path, uid_t fromUid, InodesSeen & ino
 }
 
 
-void canonicalisePathMetaData(const Path & path, uid_t fromUid)
+void canonicalisePathMetaData(PathView path, uid_t fromUid)
 {
     InodesSeen inodesSeen;
     canonicalisePathMetaData(path, fromUid, inodesSeen);
@@ -544,7 +544,7 @@ void LocalStore::checkDerivationOutputs(const StorePath & drvPath, const Derivat
     std::string drvName(drvPath.name());
     drvName = string(drvName, 0, drvName.size() - drvExtension.size());
 
-    auto check = [&](const StorePath & expected, const StorePath & actual, const std::string & varName)
+    auto check = [&](const StorePath & expected, const StorePath & actual, std::string_view varName)
     {
         if (actual != expected)
             throw Error("derivation '%s' has incorrect output '%s', should be '%s'",
@@ -789,7 +789,7 @@ StorePathSet LocalStore::queryDerivationOutputs(const StorePath & path)
 }
 
 
-std::optional<StorePath> LocalStore::queryPathFromHashPart(const std::string & hashPart)
+std::optional<StorePath> LocalStore::queryPathFromHashPart(std::string_view hashPart)
 {
     if (hashPart.size() != storePathHashLen) throw Error("invalid hash part");
 
@@ -1028,7 +1028,7 @@ void LocalStore::addToStore(const ValidPathInfo & info, Source & source,
 }
 
 
-StorePath LocalStore::addToStoreFromDump(const string & dump, const string & name,
+StorePath LocalStore::addToStoreFromDump(std::string_view dump, std::string_view name,
     FileIngestionMethod method, HashType hashAlgo, RepairFlag repair)
 {
     Hash h = hashString(hashAlgo, dump);
@@ -1088,7 +1088,7 @@ StorePath LocalStore::addToStoreFromDump(const string & dump, const string & nam
 }
 
 
-StorePath LocalStore::addToStore(const string & name, const Path & _srcPath,
+StorePath LocalStore::addToStore(std::string_view name, PathView _srcPath,
     FileIngestionMethod method, HashType hashAlgo, PathFilter & filter, RepairFlag repair)
 {
     Path srcPath(absPath(_srcPath));
@@ -1106,7 +1106,7 @@ StorePath LocalStore::addToStore(const string & name, const Path & _srcPath,
 }
 
 
-StorePath LocalStore::addTextToStore(const string & name, const string & s,
+StorePath LocalStore::addTextToStore(std::string_view name, std::string_view s,
     const StorePathSet & references, RepairFlag repair)
 {
     auto hash = hashString(htSHA256, s);
@@ -1308,7 +1308,7 @@ bool LocalStore::verifyStore(bool checkContents, RepairFlag repair)
 }
 
 
-void LocalStore::verifyPath(const Path & pathS, const StringSet & store,
+void LocalStore::verifyPath(PathView pathS, const StringSet & store,
     PathSet & done, StorePathSet & validPaths, RepairFlag repair, bool & errors)
 {
     checkInterrupt();
@@ -1371,7 +1371,7 @@ unsigned int LocalStore::getProtocol()
 
 #if defined(FS_IOC_SETFLAGS) && defined(FS_IOC_GETFLAGS) && defined(FS_IMMUTABLE_FL)
 
-static void makeMutable(const Path & path)
+static void makeMutable(PathView path)
 {
     checkInterrupt();
 
@@ -1459,7 +1459,7 @@ void LocalStore::signPathInfo(ValidPathInfo & info)
 }
 
 
-void LocalStore::createUser(const std::string & userName, uid_t userId)
+void LocalStore::createUser(std::string_view userName, uid_t userId)
 {
     for (auto & dir : {
         fmt("%s/profiles/per-user/%s", stateDir, userName),

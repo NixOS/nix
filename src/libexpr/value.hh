@@ -234,7 +234,7 @@ static inline void mkStringNoCopy(Value & v, const char * s)
 
 static inline void mkString(Value & v, const Symbol & s)
 {
-    mkStringNoCopy(v, ((const string &) s).c_str());
+    mkStringNoCopy(v, ((std::string_view) s).c_str());
 }
 
 

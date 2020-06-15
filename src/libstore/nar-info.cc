@@ -3,14 +3,14 @@
 
 namespace nix {
 
-NarInfo::NarInfo(const Store & store, const std::string & s, const std::string & whence)
+NarInfo::NarInfo(const Store & store, std::string_view s, std::string_view whence)
     : ValidPathInfo(StorePath::dummy.clone()) // FIXME: hack
 {
     auto corrupt = [&]() {
         throw Error("NAR info file '%1%' is corrupt", whence);
     };
 
-    auto parseHashField = [&](const string & s) {
+    auto parseHashField = [&](std::string_view s) {
         try {
             return Hash(s);
         } catch (BadHash &) {

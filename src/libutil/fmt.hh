@@ -21,7 +21,9 @@ struct nop { template<typename... T> nop(T...) {} };
 struct FormatOrString
 {
     string s;
-    FormatOrString(const string & s) : s(s) { };
+    FormatOrString(std::string && s) : s(std::move(s)) { };
+    FormatOrString(std::string_view s) : s(s) { };
+    FormatOrString(const std::string & s) : s(s) { };
     template<class F>
     FormatOrString(const F & f) : s(f.str()) { };
     FormatOrString(const char * s) : s(s) { };
@@ -44,11 +46,6 @@ inline void formatHelper(F & f, const T & x, const Args & ... args)
     formatHelper(f % x, args...);
 }
 
-inline std::string fmt(const std::string & s)
-{
-    return s;
-}
-
 inline std::string fmt(const char * s)
 {
     return s;
@@ -60,9 +57,10 @@ inline std::string fmt(const FormatOrString & fs)
 }
 
 template<typename... Args>
-inline std::string fmt(const std::string & fs, const Args & ... args)
+inline std::string fmt(std::string_view fs, const Args & ... args)
 {
-    boost::format f(fs);
+    // TODO Boost should work with string_view
+    boost::format f { std::string { fs } };
     f.exceptions(boost::io::all_error_bits ^ boost::io::too_many_args_bit);
     formatHelper(f, args...);
     return f.str();
@@ -101,7 +99,8 @@ std::ostream& operator<<(std::ostream &out, const normaltxt<T> &y)
 class hintformat
 {
 public:
-    hintformat(const string &format) :fmt(format)
+    // TODO Boost should work with string_view
+    hintformat(std::string_view format) : fmt(std::string { format })
     {
         fmt.exceptions(boost::io::all_error_bits ^ boost::io::too_many_args_bit);
     }
@@ -129,7 +128,7 @@ private:
 std::ostream& operator<<(std::ostream &os, const hintformat &hf);
 
 template<typename... Args>
-inline hintformat hintfmt(const std::string & fs, const Args & ... args)
+inline hintformat hintfmt(std::string_view fs, const Args & ... args)
 {
     hintformat f(fs);
     formatHelper(f, args...);

@@ -20,7 +20,7 @@ static bool cmpGensByNumber(const Generation & a, const Generation & b)
 
 /* Parse a generation name of the format
    `<profilename>-<number>-link'. */
-static int parseName(const string & profileName, const string & name)
+static int parseName(std::string_view profileName, std::string_view name)
 {
     if (string(name, 0, profileName.size() + 1) != profileName + "-") return -1;
     string s = string(name, profileName.size() + 1);
@@ -66,7 +66,7 @@ Generations findGenerations(Path profile, int & curGen)
 }
 
 
-static void makeName(const Path & profile, unsigned int num,
+static void makeName(PathView profile, unsigned int num,
     Path & outLink)
 {
     Path prefix = (format("%1%-%2%") % profile % num).str();
@@ -114,14 +114,14 @@ Path createGeneration(ref<LocalFSStore> store, Path profile, Path outPath)
 }
 
 
-static void removeFile(const Path & path)
+static void removeFile(PathView path)
 {
     if (remove(path.c_str()) == -1)
         throw SysError("cannot unlink '%1%'", path);
 }
 
 
-void deleteGeneration(const Path & profile, unsigned int gen)
+void deleteGeneration(PathView profile, unsigned int gen)
 {
     Path generation;
     makeName(profile, gen, generation);
@@ -129,7 +129,7 @@ void deleteGeneration(const Path & profile, unsigned int gen)
 }
 
 
-static void deleteGeneration2(const Path & profile, unsigned int gen, bool dryRun)
+static void deleteGeneration2(PathView profile, unsigned int gen, bool dryRun)
 {
     if (dryRun)
         printInfo(format("would remove generation %1%") % gen);
@@ -140,7 +140,7 @@ static void deleteGeneration2(const Path & profile, unsigned int gen, bool dryRu
 }
 
 
-void deleteGenerations(const Path & profile, const std::set<unsigned int> & gensToDelete, bool dryRun)
+void deleteGenerations(PathView profile, const std::set<unsigned int> & gensToDelete, bool dryRun)
 {
     PathLocks lock;
     lockProfile(lock, profile);
@@ -157,7 +157,7 @@ void deleteGenerations(const Path & profile, const std::set<unsigned int> & gens
     }
 }
 
-void deleteGenerationsGreaterThan(const Path & profile, int max, bool dryRun)
+void deleteGenerationsGreaterThan(PathView profile, int max, bool dryRun)
 {
     PathLocks lock;
     lockProfile(lock, profile);
@@ -181,7 +181,7 @@ void deleteGenerationsGreaterThan(const Path & profile, int max, bool dryRun)
     }
 }
 
-void deleteOldGenerations(const Path & profile, bool dryRun)
+void deleteOldGenerations(PathView profile, bool dryRun)
 {
     PathLocks lock;
     lockProfile(lock, profile);
@@ -195,7 +195,7 @@ void deleteOldGenerations(const Path & profile, bool dryRun)
 }
 
 
-void deleteGenerationsOlderThan(const Path & profile, time_t t, bool dryRun)
+void deleteGenerationsOlderThan(PathView profile, time_t t, bool dryRun)
 {
     PathLocks lock;
     lockProfile(lock, profile);
@@ -219,7 +219,7 @@ void deleteGenerationsOlderThan(const Path & profile, time_t t, bool dryRun)
 }
 
 
-void deleteGenerationsOlderThan(const Path & profile, const string & timeSpec, bool dryRun)
+void deleteGenerationsOlderThan(PathView profile, std::string_view timeSpec, bool dryRun)
 {
     time_t curTime = time(0);
     string strDays = string(timeSpec, 0, timeSpec.size() - 1);
@@ -243,14 +243,14 @@ void switchLink(Path link, Path target)
 }
 
 
-void lockProfile(PathLocks & lock, const Path & profile)
+void lockProfile(PathLocks & lock, PathView profile)
 {
     lock.lockPaths({profile}, (format("waiting for lock on profile '%1%'") % profile).str());
     lock.setDeletion(true);
 }
 
 
-string optimisticLockProfile(const Path & profile)
+string optimisticLockProfile(PathView profile)
 {
     return pathExists(profile) ? readLink(profile) : "";
 }

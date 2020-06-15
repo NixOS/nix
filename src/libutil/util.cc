@@ -40,9 +40,9 @@ extern char * * environ;
 
 namespace nix {
 
-std::optional<std::string> getEnv(const std::string & key)
+std::optional<std::string> getEnv(std::string_view key)
 {
-    char * value = getenv(key.c_str());
+    char * value = getenv(std::string { key }.c_str());
     if (!value) return {};
     return std::string(value);
 }
@@ -104,7 +104,7 @@ Path absPath(Path path, std::optional<Path> dir)
 }
 
 
-Path canonPath(const Path & path, bool resolveSymlinks)
+Path canonPath(PathView path, bool resolveSymlinks)
 {
     assert(path != "");
 
@@ -113,7 +113,7 @@ Path canonPath(const Path & path, bool resolveSymlinks)
     if (path[0] != '/')
         throw Error("not an absolute path: '%1%'", path);
 
-    string::const_iterator i = path.begin(), end = path.end();
+	std::string_view::const_iterator i = path.begin(), end = path.end();
     string temp;
 
     /* Count the number of times we follow a symlink and stop at some
@@ -150,8 +150,8 @@ Path canonPath(const Path & path, bool resolveSymlinks)
                     throw Error("infinite symlink recursion in path '%1%'", path);
                 temp = absPath(readLink(s), dirOf(s))
                     + string(i, end);
-                i = temp.begin(); /* restart */
-                end = temp.end();
+                i = std::string_view { temp }.begin(); /* restart */
+                end = std::string_view { temp }.end();
                 s = "";
             }
         }
@@ -161,7 +161,7 @@ Path canonPath(const Path & path, bool resolveSymlinks)
 }
 
 
-Path dirOf(const Path & path)
+Path dirOf(PathView path)
 {
     Path::size_type pos = path.rfind('/');
     if (pos == string::npos)
@@ -189,7 +189,7 @@ std::string_view baseNameOf(std::string_view path)
 }
 
 
-bool isInDir(const Path & path, const Path & dir)
+bool isInDir(PathView path, PathView dir)
 {
     return path[0] == '/'
         && string(path, 0, dir.size()) == dir
@@ -198,26 +198,26 @@ bool isInDir(const Path & path, const Path & dir)
 }
 
 
-bool isDirOrInDir(const Path & path, const Path & dir)
+bool isDirOrInDir(PathView path, PathView dir)
 {
     return path == dir || isInDir(path, dir);
 }
 
 
-struct stat lstat(const Path & path)
+struct stat lstat(PathView path)
 {
     struct stat st;
-    if (lstat(path.c_str(), &st))
+    if (lstat(Path { path }.c_str(), &st))
         throw SysError("getting status of '%1%'", path);
     return st;
 }
 
 
-bool pathExists(const Path & path)
+bool pathExists(PathView path)
 {
     int res;
     struct stat st;
-    res = lstat(path.c_str(), &st);
+    res = lstat(Path { path }.c_str(), &st);
     if (!res) return true;
     if (errno != ENOENT && errno != ENOTDIR)
         throw SysError("getting status of %1%", path);
@@ -225,13 +225,13 @@ bool pathExists(const Path & path)
 }
 
 
-Path readLink(const Path & path)
+Path readLink(PathView path)
 {
     checkInterrupt();
     std::vector<char> buf;
     for (ssize_t bufSize = PATH_MAX/4; true; bufSize += bufSize/2) {
         buf.resize(bufSize);
-        ssize_t rlSize = readlink(path.c_str(), buf.data(), bufSize);
+        ssize_t rlSize = readlink(Path { path }.c_str(), buf.data(), bufSize);
         if (rlSize == -1)
             if (errno == EINVAL)
                 throw Error("'%1%' is not a symlink", path);
@@ -243,14 +243,14 @@ Path readLink(const Path & path)
 }
 
 
-bool isLink(const Path & path)
+bool isLink(PathView path)
 {
     struct stat st = lstat(path);
     return S_ISLNK(st.st_mode);
 }
 
 
-DirEntries readDirectory(DIR *dir, const Path & path)
+DirEntries readDirectory(DIR *dir, PathView path)
 {
     DirEntries entries;
     entries.reserve(64);
@@ -273,16 +273,16 @@ DirEntries readDirectory(DIR *dir, const Path & path)
     return entries;
 }
 
-DirEntries readDirectory(const Path & path)
+DirEntries readDirectory(PathView path)
 {
-    AutoCloseDir dir(opendir(path.c_str()));
+    AutoCloseDir dir(opendir(Path { path }.c_str()));
     if (!dir) throw SysError("opening directory '%1%'", path);
 
     return readDirectory(dir.get(), path);
 }
 
 
-unsigned char getFileType(const Path & path)
+unsigned char getFileType(PathView path)
 {
     struct stat st = lstat(path);
     if (S_ISDIR(st.st_mode)) return DT_DIR;
@@ -302,36 +302,36 @@ string readFile(int fd)
 }
 
 
-string readFile(const Path & path)
+string readFile(PathView path)
 {
-    AutoCloseFD fd = open(path.c_str(), O_RDONLY | O_CLOEXEC);
+    AutoCloseFD fd = open(Path { path }.c_str(), O_RDONLY | O_CLOEXEC);
     if (!fd)
         throw SysError("opening file '%1%'", path);
     return readFile(fd.get());
 }
 
 
-void readFile(const Path & path, Sink & sink)
+void readFile(PathView path, Sink & sink)
 {
-    AutoCloseFD fd = open(path.c_str(), O_RDONLY | O_CLOEXEC);
+    AutoCloseFD fd = open(Path { path }.c_str(), O_RDONLY | O_CLOEXEC);
     if (!fd)
         throw SysError("opening file '%s'", path);
     drainFD(fd.get(), sink);
 }
 
 
-void writeFile(const Path & path, const string & s, mode_t mode)
+void writeFile(PathView path, std::string_view s, mode_t mode)
 {
-    AutoCloseFD fd = open(path.c_str(), O_WRONLY | O_TRUNC | O_CREAT | O_CLOEXEC, mode);
+    AutoCloseFD fd = open(Path { path }.c_str(), O_WRONLY | O_TRUNC | O_CREAT | O_CLOEXEC, mode);
     if (!fd)
         throw SysError("opening file '%1%'", path);
     writeFull(fd.get(), s);
 }
 
 
-void writeFile(const Path & path, Source & source, mode_t mode)
+void writeFile(PathView path, Source & source, mode_t mode)
 {
-    AutoCloseFD fd = open(path.c_str(), O_WRONLY | O_TRUNC | O_CREAT | O_CLOEXEC, mode);
+    AutoCloseFD fd = open(Path { path }.c_str(), O_WRONLY | O_TRUNC | O_CREAT | O_CLOEXEC, mode);
     if (!fd)
         throw SysError("opening file '%1%'", path);
 
@@ -374,7 +374,7 @@ void writeLine(int fd, string s)
 }
 
 
-static void _deletePath(int parentfd, const Path & path, unsigned long long & bytesFreed)
+static void _deletePath(int parentfd, PathView path, unsigned long long & bytesFreed)
 {
     checkInterrupt();
 
@@ -397,14 +397,14 @@ static void _deletePath(int parentfd, const Path & path, unsigned long long & by
                 throw SysError("chmod '%1%'", path);
         }
 
-        int fd = openat(parentfd, path.c_str(), O_RDONLY);
+        int fd = openat(parentfd, Path { path }.c_str(), O_RDONLY);
         if (!fd)
             throw SysError("opening directory '%1%'", path);
         AutoCloseDir dir(fdopendir(fd));
         if (!dir)
             throw SysError("opening directory '%1%'", path);
         for (auto & i : readDirectory(dir.get(), path))
-            _deletePath(dirfd(dir.get()), path + "/" + i.name, bytesFreed);
+            _deletePath(dirfd(dir.get()), Path { path } + "/" + i.name, bytesFreed);
     }
 
     int flags = S_ISDIR(st.st_mode) ? AT_REMOVEDIR : 0;
@@ -414,7 +414,7 @@ static void _deletePath(int parentfd, const Path & path, unsigned long long & by
     }
 }
 
-static void _deletePath(const Path & path, unsigned long long & bytesFreed)
+static void _deletePath(PathView path, unsigned long long & bytesFreed)
 {
     Path dir = dirOf(path);
     if (dir == "")
@@ -433,14 +433,14 @@ static void _deletePath(const Path & path, unsigned long long & bytesFreed)
 }
 
 
-void deletePath(const Path & path)
+void deletePath(PathView path)
 {
     unsigned long long dummy;
     deletePath(path, dummy);
 }
 
 
-void deletePath(const Path & path, unsigned long long & bytesFreed)
+void deletePath(PathView path, unsigned long long & bytesFreed)
 {
     //Activity act(*logger, lvlDebug, format("recursively deleting path '%1%'") % path);
     bytesFreed = 0;
@@ -448,7 +448,7 @@ void deletePath(const Path & path, unsigned long long & bytesFreed)
 }
 
 
-static Path tempName(Path tmpRoot, const Path & prefix, bool includePid,
+static Path tempName(PathView tmpRoot, PathView prefix, bool includePid,
     int & counter)
 {
     tmpRoot = canonPath(tmpRoot.empty() ? getEnv("TMPDIR").value_or("/tmp") : tmpRoot, true);
@@ -459,7 +459,7 @@ static Path tempName(Path tmpRoot, const Path & prefix, bool includePid,
 }
 
 
-Path createTempDir(const Path & tmpRoot, const Path & prefix,
+Path createTempDir(PathView tmpRoot, PathView prefix,
     bool includePid, bool useGlobalCounter, mode_t mode)
 {
     static int globalCounter = 0;
@@ -490,9 +490,9 @@ Path createTempDir(const Path & tmpRoot, const Path & prefix,
 }
 
 
-std::pair<AutoCloseFD, Path> createTempFile(const Path & prefix)
+std::pair<AutoCloseFD, Path> createTempFile(PathView prefix)
 {
-    Path tmpl(getEnv("TMPDIR").value_or("/tmp") + "/" + prefix + ".XXXXXX");
+    Path tmpl(getEnv("TMPDIR").value_or("/tmp") << "/" << prefix << ".XXXXXX");
     // Strictly speaking, this is UB, but who cares...
     AutoCloseFD fd(mkstemp((char *) tmpl.c_str()));
     if (!fd)
@@ -558,21 +558,22 @@ Path getDataDir()
 }
 
 
-Paths createDirs(const Path & path)
+Paths createDirs(PathView path)
 {
     Paths created;
     if (path == "/") return created;
 
     struct stat st;
-    if (lstat(path.c_str(), &st) == -1) {
+    Path freshPath { path };
+    if (lstat(freshPath.c_str(), &st) == -1) {
         created = createDirs(dirOf(path));
-        if (mkdir(path.c_str(), 0777) == -1 && errno != EEXIST)
+        if (mkdir(freshPath.c_str(), 0777) == -1 && errno != EEXIST)
             throw SysError("creating directory '%1%'", path);
         st = lstat(path);
-        created.push_back(path);
+        created.push_back(freshPath);
     }
 
-    if (S_ISLNK(st.st_mode) && stat(path.c_str(), &st) == -1)
+    if (S_ISLNK(st.st_mode) && stat(freshPath.c_str(), &st) == -1)
         throw SysError("statting symlink '%1%'", path);
 
     if (!S_ISDIR(st.st_mode)) throw Error("'%1%' is not a directory", path);
@@ -581,14 +582,14 @@ Paths createDirs(const Path & path)
 }
 
 
-void createSymlink(const Path & target, const Path & link)
+void createSymlink(PathView target, PathView link)
 {
-    if (symlink(target.c_str(), link.c_str()))
+    if (symlink(Path { target }.c_str(), Path { link }.c_str()))
         throw SysError("creating symlink from '%1%' to '%2%'", link, target);
 }
 
 
-void replaceSymlink(const Path & target, const Path & link)
+void replaceSymlink(PathView target, PathView link)
 {
     for (unsigned int n = 0; true; n++) {
         Path tmp = canonPath(fmt("%s/.%d_%s", dirOf(link), n, baseNameOf(link)));
@@ -600,7 +601,7 @@ void replaceSymlink(const Path & target, const Path & link)
             throw;
         }
 
-        if (rename(tmp.c_str(), link.c_str()) != 0)
+        if (rename(tmp.c_str(), Path { link }.c_str()) != 0)
             throw SysError("renaming '%1%' to '%2%'", tmp, link);
 
         break;
@@ -639,7 +640,7 @@ void writeFull(int fd, const unsigned char * buf, size_t count, bool allowInterr
 }
 
 
-void writeFull(int fd, const string & s, bool allowInterrupts)
+void writeFull(int fd, std::string_view s, bool allowInterrupts)
 {
     writeFull(fd, (const unsigned char *) s.data(), s.size(), allowInterrupts);
 }
@@ -692,7 +693,7 @@ void drainFD(int fd, Sink & sink, bool block)
 
 AutoDelete::AutoDelete() : del{false} {}
 
-AutoDelete::AutoDelete(const string & p, bool recursive) : path(p)
+AutoDelete::AutoDelete(std::string_view p, bool recursive) : path(p)
 {
     del = true;
     this->recursive = recursive;
@@ -719,7 +720,7 @@ void AutoDelete::cancel()
     del = false;
 }
 
-void AutoDelete::reset(const Path & p, bool recursive) {
+void AutoDelete::reset(PathView p, bool recursive) {
     path = p;
     this->recursive = recursive;
     del = true;
@@ -1209,7 +1210,7 @@ void _interrupted()
 //////////////////////////////////////////////////////////////////////
 
 
-template<class C> C tokenizeString(std::string_view s, const string & separators)
+template<class C> C tokenizeString(std::string_view s, std::string_view separators)
 {
     C result;
     string::size_type pos = s.find_first_not_of(separators, 0);
@@ -1223,19 +1224,19 @@ template<class C> C tokenizeString(std::string_view s, const string & separators
     return result;
 }
 
-template Strings tokenizeString(std::string_view s, const string & separators);
-template StringSet tokenizeString(std::string_view s, const string & separators);
-template vector<string> tokenizeString(std::string_view s, const string & separators);
+template Strings tokenizeString(std::string_view s, std::string_view separators);
+template StringSet tokenizeString(std::string_view s, std::string_view separators);
+template vector<string> tokenizeString(std::string_view s, std::string_view separators);
 
 
-string chomp(const string & s)
+string chomp(std::string_view s)
 {
     size_t i = s.find_last_not_of(" \n\r\t");
     return i == string::npos ? "" : string(s, 0, i + 1);
 }
 
 
-string trim(const string & s, const string & whitespace)
+string trim(std::string_view s, std::string_view whitespace)
 {
     auto i = s.find_first_not_of(whitespace);
     if (i == string::npos) return "";
@@ -1244,11 +1245,11 @@ string trim(const string & s, const string & whitespace)
 }
 
 
-string replaceStrings(const std::string & s,
-    const std::string & from, const std::string & to)
+string replaceStrings(std::string_view s,
+    std::string_view from, std::string_view to)
 {
-    if (from.empty()) return s;
-    string res = s;
+    string res { s };
+    if (from.empty()) return res;
     size_t pos = 0;
     while ((pos = res.find(from, pos)) != std::string::npos) {
         res.replace(pos, from.size(), to);
@@ -1258,9 +1259,9 @@ string replaceStrings(const std::string & s,
 }
 
 
-std::string rewriteStrings(const std::string & _s, const StringMap & rewrites)
+std::string rewriteStrings(std::string_view _s, const StringMap & rewrites)
 {
-    auto s = _s;
+	std::string s{ _s };
     for (auto & i : rewrites) {
         if (i.first == i.second) continue;
         size_t j = 0;
@@ -1310,7 +1311,7 @@ bool hasSuffix(std::string_view s, std::string_view suffix)
 }
 
 
-std::string toLower(const std::string & s)
+std::string toLower(std::string_view s)
 {
     std::string r(s);
     for (auto & c : r)
@@ -1319,7 +1320,7 @@ std::string toLower(const std::string & s)
 }
 
 
-std::string shellEscape(const std::string & s)
+std::string shellEscape(std::string_view s)
 {
     std::string r = "'";
     for (auto & i : s)
@@ -1339,7 +1340,7 @@ void ignoreException()
 }
 
 
-std::string filterANSIEscapes(const std::string & s, bool filterAll, unsigned int width)
+std::string filterANSIEscapes(std::string_view s, bool filterAll, unsigned int width)
 {
     std::string t, e;
     size_t w = 0;
@@ -1551,7 +1552,7 @@ std::unique_ptr<InterruptCallback> createInterruptCallback(std::function<void()>
 }
 
 
-AutoCloseFD createUnixDomainSocket(const Path & path, mode_t mode)
+AutoCloseFD createUnixDomainSocket(PathView path, mode_t mode)
 {
     AutoCloseFD fdSocket = socket(PF_UNIX, SOCK_STREAM
         #ifdef SOCK_CLOEXEC
@@ -1567,14 +1568,15 @@ AutoCloseFD createUnixDomainSocket(const Path & path, mode_t mode)
     addr.sun_family = AF_UNIX;
     if (path.size() >= sizeof(addr.sun_path))
         throw Error("socket path '%1%' is too long", path);
-    strcpy(addr.sun_path, path.c_str());
+    Path freshPath { path };
+    strcpy(addr.sun_path, freshPath.c_str());
 
-    unlink(path.c_str());
+    unlink(freshPath.c_str());
 
     if (bind(fdSocket.get(), (struct sockaddr *) &addr, sizeof(addr)) == -1)
         throw SysError("cannot bind to socket '%1%'", path);
 
-    if (chmod(path.c_str(), mode) == -1)
+    if (chmod(freshPath.c_str(), mode) == -1)
         throw SysError("changing permissions on '%1%'", path);
 
     if (listen(fdSocket.get(), 5) == -1)

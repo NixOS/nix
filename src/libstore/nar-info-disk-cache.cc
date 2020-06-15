@@ -122,14 +122,14 @@ public:
         });
     }
 
-    Cache & getCache(State & state, const std::string & uri)
+    Cache & getCache(State & state, std::string_view uri)
     {
         auto i = state.caches.find(uri);
         if (i == state.caches.end()) abort();
         return i->second;
     }
 
-    void createCache(const std::string & uri, const Path & storeDir, bool wantMassQuery, int priority) override
+    void createCache(std::string_view uri, PathView storeDir, bool wantMassQuery, int priority) override
     {
         retrySQLite<void>([&]() {
             auto state(_state.lock());
@@ -142,7 +142,7 @@ public:
         });
     }
 
-    std::optional<CacheInfo> cacheExists(const std::string & uri) override
+    std::optional<CacheInfo> cacheExists(std::string_view uri) override
     {
         return retrySQLite<std::optional<CacheInfo>>([&]() -> std::optional<CacheInfo> {
             auto state(_state.lock());
@@ -166,7 +166,7 @@ public:
     }
 
     std::pair<Outcome, std::shared_ptr<NarInfo>> lookupNarInfo(
-        const std::string & uri, const std::string & hashPart) override
+        std::string_view uri, std::string_view hashPart) override
     {
         return retrySQLite<std::pair<Outcome, std::shared_ptr<NarInfo>>>(
             [&]() -> std::pair<Outcome, std::shared_ptr<NarInfo>> {
@@ -210,7 +210,7 @@ public:
     }
 
     void upsertNarInfo(
-        const std::string & uri, const std::string & hashPart,
+        std::string_view uri, std::string_view hashPart,
         std::shared_ptr<const ValidPathInfo> info) override
     {
         retrySQLite<void>([&]() {

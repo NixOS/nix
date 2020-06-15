@@ -46,6 +46,7 @@ public:
         enum { tInt = 0, tString = 1 } type;
         uint64_t i = 0;
         std::string s;
+        Field(std::string_view s) : type(tString), s(s) { }
         Field(const std::string & s) : type(tString), s(s) { }
         Field(const char * s) : type(tString), s(s) { }
         Field(const uint64_t & i) : type(tInt), i(i) { }
@@ -75,10 +76,10 @@ public:
         logEI(ei);
     }
 
-    virtual void warn(const std::string & msg);
+    virtual void warn(std::string_view msg);
 
     virtual void startActivity(ActivityId act, Verbosity lvl, ActivityType type,
-        const std::string & s, const Fields & fields, ActivityId parent) { };
+        std::string_view s, const Fields & fields, ActivityId parent) { };
 
     virtual void stopActivity(ActivityId act) { };
 
@@ -87,7 +88,7 @@ public:
     virtual void writeToStdout(std::string_view s);
 
     template<typename... Args>
-    inline void stdout(const std::string & fs, const Args & ... args)
+    inline void stdout(std::string_view fs, const Args & ... args)
     {
         boost::format f(fs);
         formatHelper(f, args...);
@@ -104,7 +105,7 @@ struct Activity
 
     const ActivityId id;
 
-    Activity(Logger & logger, Verbosity lvl, ActivityType type, const std::string & s = "",
+    Activity(Logger & logger, Verbosity lvl, ActivityType type, std::string_view s = "",
         const Logger::Fields & fields = {}, ActivityId parent = getCurActivity());
 
     Activity(Logger & logger, ActivityType type,
@@ -150,7 +151,7 @@ Logger * makeSimpleLogger(bool printBuildLogs = true);
 
 Logger * makeJSONLogger(Logger & prevLogger);
 
-bool handleJSONLogMessage(const std::string & msg,
+bool handleJSONLogMessage(std::string_view msg,
     const Activity & act, std::map<ActivityId, Activity> & activities,
     bool trusted);
 
@@ -188,15 +189,16 @@ extern Verbosity verbosity; /* suppress msgs > this */
 
 /* if verbosity >= lvlWarn, print a message with a yellow 'warning:' prefix. */
 template<typename... Args>
-inline void warn(const std::string & fs, const Args & ... args)
+inline void warn(std::string_view fs, const Args & ... args)
 {
-    boost::format f(fs);
+	// TODO Boost should work with string_view
+    boost::format f(std::string { fs });
     formatHelper(f, args...);
     logger->warn(f.str());
 }
 
 void warnOnce(bool & haveWarned, const FormatOrString & fs);
 
-void writeToStderr(const string & s);
+void writeToStderr(std::string_view s);
 
 }

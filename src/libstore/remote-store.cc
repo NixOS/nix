@@ -418,7 +418,7 @@ StorePathSet RemoteStore::queryDerivationOutputs(const StorePath & path)
 }
 
 
-std::optional<StorePath> RemoteStore::queryPathFromHashPart(const std::string & hashPart)
+std::optional<StorePath> RemoteStore::queryPathFromHashPart(std::string_view hashPart)
 {
     auto conn(getConnection());
     conn->to << wopQueryPathFromHashPart << hashPart;
@@ -474,7 +474,7 @@ void RemoteStore::addToStore(const ValidPathInfo & info, Source & source,
 }
 
 
-StorePath RemoteStore::addToStore(const string & name, const Path & _srcPath,
+StorePath RemoteStore::addToStore(std::string_view name, PathView _srcPath,
     FileIngestionMethod method, HashType hashAlgo, PathFilter & filter, RepairFlag repair)
 {
     if (repair) throw Error("repairing is not supported when building through the Nix daemon");
@@ -514,7 +514,7 @@ StorePath RemoteStore::addToStore(const string & name, const Path & _srcPath,
 }
 
 
-StorePath RemoteStore::addTextToStore(const string & name, const string & s,
+StorePath RemoteStore::addTextToStore(std::string_view name, std::string_view s,
     const StorePathSet & references, RepairFlag repair)
 {
     if (repair) throw Error("repairing is not supported when building through the Nix daemon");
@@ -583,7 +583,7 @@ void RemoteStore::addTempRoot(const StorePath & path)
 }
 
 
-void RemoteStore::addIndirectRoot(const Path & path)
+void RemoteStore::addIndirectRoot(PathView path)
 {
     auto conn(getConnection());
     conn->to << wopAddIndirectRoot << path;
@@ -810,7 +810,7 @@ std::exception_ptr RemoteStore::Connection::processStderr(Sink * sink, Source * 
 static std::string uriScheme = "unix://";
 
 static RegisterStoreImplementation regStore([](
-    const std::string & uri, const Store::Params & params)
+    std::string_view uri, const Store::Params & params)
     -> std::shared_ptr<Store>
 {
     if (std::string(uri, 0, uriScheme.size()) != uriScheme) return 0;

@@ -8,7 +8,7 @@ std::regex badGitRefRegex(badGitRefRegexS, std::regex::ECMAScript);
 std::regex revRegex(revRegexS, std::regex::ECMAScript);
 std::regex flakeIdRegex(flakeIdRegexS, std::regex::ECMAScript);
 
-ParsedURL parseURL(const std::string & url)
+ParsedURL parseURL(std::string_view url)
 {
     static std::regex uriRegex(
         "((" + schemeRegex + "):"
@@ -19,7 +19,11 @@ ParsedURL parseURL(const std::string & url)
 
     std::smatch match;
 
-    if (std::regex_match(url, match, uriRegex)) {
+	// Inferior until
+	// https://lists.isocpp.org/std-proposals/att-0008/Dxxxx_string_view_support_for_regex.pdf
+	std::string freshUrl { url };
+
+    if (std::regex_match(freshUrl, match, uriRegex)) {
         auto & base = match[1];
         std::string scheme = match[2];
         auto authority = match[3].matched
@@ -38,12 +42,12 @@ ParsedURL parseURL(const std::string & url)
             path = "/";
 
         return ParsedURL{
-            .url = url,
+            .url = std::string { url },
             .base = base,
             .scheme = scheme,
             .authority = authority,
             .path = path,
-            .query = decodeQuery(query),
+            .query = decodeQuery(std::string { query }), // another std::regex deficiency
             .fragment = percentDecode(std::string(fragment))
         };
     }
@@ -71,7 +75,7 @@ std::string percentDecode(std::string_view in)
     return decoded;
 }
 
-std::map<std::string, std::string> decodeQuery(const std::string & query)
+std::map<std::string, std::string> decodeQuery(std::string_view query)
 {
     std::map<std::string, std::string> result;
 

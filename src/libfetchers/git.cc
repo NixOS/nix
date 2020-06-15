@@ -10,12 +10,12 @@ using namespace std::string_literals;
 
 namespace nix::fetchers {
 
-static std::string readHead(const Path & path)
+static std::string readHead(PathView path)
 {
     return chomp(runProgram("git", true, { "-C", path, "rev-parse", "--abbrev-ref", "HEAD" }));
 }
 
-static bool isNotDotGitDirectory(const Path & path)
+static bool isNotDotGitDirectory(PathView path)
 {
     static const std::regex gitDirRegex("^(?:.*/)?\\.git$");
 
@@ -180,7 +180,7 @@ struct GitInput : Input
                 auto files = tokenizeString<std::set<std::string>>(
                     runProgram("git", true, gitOpts), "\0"s);
 
-                PathFilter filter = [&](const Path & p) -> bool {
+                PathFilter filter = [&](PathView p) -> bool {
                     assert(hasPrefix(p, actualUrl));
                     std::string file(p, actualUrl.size() + 1);
 

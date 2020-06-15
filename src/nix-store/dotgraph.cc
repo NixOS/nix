@@ -26,7 +26,7 @@ static string nextColour()
 }
 
 
-static string makeEdge(const string & src, const string & dst)
+static string makeEdge(std::string_view src, std::string_view dst)
 {
     format f = format("%1% -> %2% [color = %3%];\n")
         % dotQuote(src) % dotQuote(dst) % dotQuote(nextColour());
@@ -34,8 +34,8 @@ static string makeEdge(const string & src, const string & dst)
 }
 
 
-static string makeNode(const string & id, std::string_view label,
-    const string & colour)
+static string makeNode(std::string_view id, std::string_view label,
+    std::string_view colour)
 {
     format f = format("%1% [label = %2%, shape = box, "
         "style = filled, fillcolor = %3%];\n")

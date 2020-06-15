@@ -19,7 +19,7 @@ namespace nix {
     TEST(toJSON, quotesStdString) {
         std::string input = "test";
         std::stringstream out;
-        toJSON(out, input);
+        toJSON(out, std::string_view { input });
 
         ASSERT_EQ(out.str(), "\"test\"");
     }

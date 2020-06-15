@@ -14,13 +14,13 @@ class RemoteFSAccessor : public FSAccessor
 
     Path cacheDir;
 
-    std::pair<ref<FSAccessor>, Path> fetch(const Path & path_);
+    std::pair<ref<FSAccessor>, Path> fetch(PathView path_);
 
     friend class BinaryCacheStore;
 
-    Path makeCacheFile(const Path & storePath, const std::string & ext);
+    Path makeCacheFile(PathView storePath, std::string_view ext);
 
-    void addToCache(const Path & storePath, const std::string & nar,
+    void addToCache(PathView storePath, std::string_view nar,
         ref<FSAccessor> narAccessor);
 
 public:
@@ -28,13 +28,13 @@ public:
     RemoteFSAccessor(ref<Store> store,
         const /* FIXME: use std::optional */ Path & cacheDir = "");
 
-    Stat stat(const Path & path) override;
+    Stat stat(PathView path) override;
 
-    StringSet readDirectory(const Path & path) override;
+    StringSet readDirectory(PathView path) override;
 
-    std::string readFile(const Path & path) override;
+    std::string readFile(PathView path) override;
 
-    std::string readLink(const Path & path) override;
+    std::string readLink(PathView path) override;
 };
 
 }

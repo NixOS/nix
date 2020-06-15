@@ -10,8 +10,8 @@ namespace nix::fetchers {
 
 DownloadFileResult downloadFile(
     ref<Store> store,
-    const std::string & url,
-    const std::string & name,
+    std::string_view url,
+    std::string_view name,
     bool immutable)
 {
     // FIXME: check store
@@ -104,8 +104,8 @@ DownloadFileResult downloadFile(
 
 Tree downloadTarball(
     ref<Store> store,
-    const std::string & url,
-    const std::string & name,
+    std::string_view url,
+    std::string_view name,
     bool immutable)
 {
     Attrs inAttrs({
