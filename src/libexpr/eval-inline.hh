@@ -7,20 +7,28 @@
 
 namespace nix {
 
-LocalNoInlineNoReturn(void throwEvalError(const char * s, const Pos & pos))
+LocalNoInlineNoReturn(void throwEvalError(const Pos & pos, const char * s))
 {
-    throw EvalError(format(s) % pos);
+    throw EvalError(
+        ErrorInfo { 
+            .hint = hintfmt(s),
+            .nixCode = NixCode { .errPos = pos }
+        });
 }
 
 LocalNoInlineNoReturn(void throwTypeError(const char * s, const Value & v))
 {
-    throw TypeError(format(s) % showType(v));
+    throw TypeError(s, showType(v));
 }
 
 
-LocalNoInlineNoReturn(void throwTypeError(const char * s, const Value & v, const Pos & pos))
+LocalNoInlineNoReturn(void throwTypeError(const Pos & pos, const char * s, const Value & v))
 {
-    throw TypeError(format(s) % showType(v) % pos);
+    throw TypeError(
+        ErrorInfo { 
+            .hint = hintfmt(s, showType(v)),
+            .nixCode = NixCode { .errPos = pos }
+        });
 }
 
 
@@ -43,7 +51,7 @@ void EvalState::forceValue(Value & v, const Pos & pos)
     else if (v.type == tApp)
         callFunction(*v.app.left, *v.app.right, v, noPos);
     else if (v.type == tBlackhole)
-        throwEvalError("infinite recursion encountered, at %1%", pos);
+        throwEvalError(pos, "infinite recursion encountered");
 }
 
 
@@ -59,7 +67,7 @@ inline void EvalState::forceAttrs(Value & v, const Pos & pos)
 {
     forceValue(v, pos);
     if (v.type != tAttrs)
-        throwTypeError("value is %1% while a set was expected, at %2%", v, pos);
+        throwTypeError(pos, "value is %1% while a set was expected", v);
 }
 
 
@@ -75,7 +83,7 @@ inline void EvalState::forceList(Value & v, const Pos & pos)
 {
     forceValue(v, pos);
     if (!v.isList())
-        throwTypeError("value is %1% while a list was expected, at %2%", v, pos);
+        throwTypeError(pos, "value is %1% while a list was expected", v);
 }
 
 /* Note: Various places expect the allocated memory to be zeroed. */

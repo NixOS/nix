@@ -1,6 +1,7 @@
 #pragma once
 
 #include "types.hh"
+#include "error.hh"
 #include "logging.hh"
 #include "ansicolor.hh"
 

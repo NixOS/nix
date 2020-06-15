@@ -23,7 +23,7 @@ bool Store::isInStore(const Path & path) const
 Path Store::toStorePath(const Path & path) const
 {
     if (!isInStore(path))
-        throw Error(format("path '%1%' is not in the Nix store") % path);
+        throw Error("path '%1%' is not in the Nix store", path);
     Path::size_type slash = path.find('/', storeDir.size() + 1);
     if (slash == Path::npos)
         return path;
@@ -775,7 +775,11 @@ void ValidPathInfo::sign(const Store & store, const SecretKey & secretKey)
 bool ValidPathInfo::isContentAddressed(const Store & store) const
 {
     auto warn = [&]() {
-        printError("warning: path '%s' claims to be content-addressed but isn't", store.printStorePath(path));
+        logWarning(
+            ErrorInfo{
+                .name = "Path not content-addressed", 
+                .hint = hintfmt("path '%s' claims to be content-addressed but isn't", store.printStorePath(path))
+            });
     };
 
     if (hasPrefix(ca, "text:")) {
@@ -934,7 +938,7 @@ std::list<ref<Store>> getDefaultSubstituters()
             try {
                 stores.push_back(openStore(uri));
             } catch (Error & e) {
-                printError("warning: %s", e.what());
+                logWarning(e.info());
             }
         };
 

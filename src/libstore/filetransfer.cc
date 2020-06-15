@@ -112,7 +112,7 @@ struct curlFileTransfer : public FileTransfer
             if (requestHeaders) curl_slist_free_all(requestHeaders);
             try {
                 if (!done)
-                    fail(FileTransferError(Interrupted, format("download of '%s' was interrupted") % request.uri));
+                    fail(FileTransferError(Interrupted, "download of '%s' was interrupted", request.uri));
             } catch (...) {
                 ignoreException();
             }
@@ -517,7 +517,7 @@ struct curlFileTransfer : public FileTransfer
             int running;
             CURLMcode mc = curl_multi_perform(curlm, &running);
             if (mc != CURLM_OK)
-                throw nix::Error(format("unexpected error from curl_multi_perform(): %s") % curl_multi_strerror(mc));
+                throw nix::Error("unexpected error from curl_multi_perform(): %s", curl_multi_strerror(mc));
 
             /* Set the promises of any finished requests. */
             CURLMsg * msg;
@@ -547,7 +547,7 @@ struct curlFileTransfer : public FileTransfer
             vomit("download thread waiting for %d ms", sleepTimeMs);
             mc = curl_multi_wait(curlm, extraFDs, 1, sleepTimeMs, &numfds);
             if (mc != CURLM_OK)
-                throw nix::Error(format("unexpected error from curl_multi_wait(): %s") % curl_multi_strerror(mc));
+                throw nix::Error("unexpected error from curl_multi_wait(): %s", curl_multi_strerror(mc));
 
             nextWakeup = std::chrono::steady_clock::time_point();
 
@@ -599,7 +599,11 @@ struct curlFileTransfer : public FileTransfer
             workerThreadMain();
         } catch (nix::Interrupted & e) {
         } catch (std::exception & e) {
-            printError("unexpected error in download thread: %s", e.what());
+            logError({ 
+                .name = "File transfer",
+                .hint = hintfmt("unexpected error in download thread: %s", 
+                                e.what())
+            });
         }
 
         {

@@ -12,6 +12,17 @@ namespace nix {
 #if __linux__
 static bool didSaveAffinity = false;
 static cpu_set_t savedAffinity;
+
+std::ostream& operator<<(std::ostream &os, const cpu_set_t &cset)
+{
+    auto count = CPU_COUNT(&cset);
+    for (int i=0; i < count; ++i)
+    {
+        os << (CPU_ISSET(i,&cset) ? "1" : "0");
+    }
+
+    return os;
+}
 #endif
 
 
@@ -25,7 +36,7 @@ void setAffinityTo(int cpu)
     CPU_ZERO(&newAffinity);
     CPU_SET(cpu, &newAffinity);
     if (sched_setaffinity(0, sizeof(cpu_set_t), &newAffinity) == -1)
-        printError(format("failed to lock thread to CPU %1%") % cpu);
+        printError("failed to lock thread to CPU %1%", cpu);
 #endif
 }
 
@@ -47,7 +58,11 @@ void restoreAffinity()
 #if __linux__
     if (!didSaveAffinity) return;
     if (sched_setaffinity(0, sizeof(cpu_set_t), &savedAffinity) == -1)
-        printError("failed to restore affinity %1%");
+    {
+        std::ostringstream oss;
+        oss << savedAffinity;
+        printError("failed to restore CPU affinity %1%", oss.str());
+    }
 #endif
 }
 

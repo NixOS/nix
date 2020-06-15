@@ -200,9 +200,12 @@ static int _main(int argc, char * * argv)
 
                 } catch (std::exception & e) {
                     auto msg = chomp(drainFD(5, false));
-                    printError("cannot build on '%s': %s%s",
-                        bestMachine->storeUri, e.what(),
-                        (msg.empty() ? "" : ": " + msg));
+                    logError({ 
+                        .name = "Remote build",
+                        .hint = hintfmt("cannot build on '%s': %s%s",
+                            bestMachine->storeUri, e.what(),
+                            (msg.empty() ? "" : ": " + msg))
+                    });
                     bestMachine->enabled = false;
                     continue;
                 }

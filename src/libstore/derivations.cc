@@ -87,7 +87,7 @@ static void expect(std::istream & str, const string & s)
     char s2[s.size()];
     str.read(s2, s.size());
     if (string(s2, s.size()) != s)
-        throw FormatError(format("expected string '%1%'") % s);
+        throw FormatError("expected string '%1%'", s);
 }
 
 
@@ -114,7 +114,7 @@ static Path parsePath(std::istream & str)
 {
     string s = parseString(str);
     if (s.size() == 0 || s[0] != '/')
-        throw FormatError(format("bad path '%1%' in derivation") % s);
+        throw FormatError("bad path '%1%' in derivation", s);
     return s;
 }
 
@@ -196,7 +196,7 @@ Derivation readDerivation(const Store & store, const Path & drvPath)
     try {
         return parseDerivation(store, readFile(drvPath));
     } catch (FormatError & e) {
-        throw Error(format("error parsing derivation '%1%': %2%") % drvPath % e.msg());
+        throw Error("error parsing derivation '%1%': %2%", drvPath, e.msg());
     }
 }
 

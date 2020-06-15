@@ -7,7 +7,7 @@ NarInfo::NarInfo(const Store & store, const std::string & s, const std::string &
     : ValidPathInfo(StorePath::dummy.clone()) // FIXME: hack
 {
     auto corrupt = [&]() {
-        throw Error(format("NAR info file '%1%' is corrupt") % whence);
+        throw Error("NAR info file '%1%' is corrupt", whence);
     };
 
     auto parseHashField = [&](const string & s) {
