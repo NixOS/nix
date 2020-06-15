@@ -98,11 +98,9 @@ private:
         return std::nullopt;
     }
 
-public:
-
-    bool fileExists(const std::string & path) override
+    bool ipfsObjectExists(const std::string ipfsPath)
     {
-        auto uri = daemonUri + "/api/v0/object/stat?arg=" + getFileTransfer()->urlEncode(getIpfsPath() + "/" + path);
+        auto uri = daemonUri + "/api/v0/object/stat?arg=" + getFileTransfer()->urlEncode(ipfsPath);
 
         FileTransferRequest request(uri);
         request.post = true;
@@ -117,6 +115,13 @@ public:
             // ipfs gives us a 500
             return false;
         }
+    }
+
+public:
+
+    bool fileExists(const std::string & path) override
+    {
+        return ipfsObjectExists(getIpfsRootDir() + "/" + path);
     }
 
     // Resolve the IPNS name to an IPFS object
