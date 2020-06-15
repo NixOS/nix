@@ -191,7 +191,7 @@ protected:
         state->ipfsPath = "/ipfs/" + (std::string) json["Hash"];
     }
 
-    void upsertFile(const std::string & path, const std::string & data, const std::string & mimeType) override
+    std::string addFile(const std::string & data)
     {
         // TODO: use callbacks
 
@@ -199,10 +199,15 @@ protected:
         req.data = std::make_shared<string>(data);
         req.post = true;
         req.tries = 1;
+        auto res = getFileTransfer()->upload(req);
+        auto json = nlohmann::json::parse(*res.data);
+        return (std::string) json["Hash"];
+    }
+
+    void upsertFile(const std::string & path, const std::string & data, const std::string & mimeType) override
+    {
         try {
-            auto res = getFileTransfer()->upload(req);
-            auto json = nlohmann::json::parse(*res.data);
-            addLink(path, "/ipfs/" + (std::string) json["Hash"]);
+            addLink(path, "/ipfs/" + addFile(data));
         } catch (FileTransferError & e) {
             throw UploadToIPFS("while uploading to IPFS binary cache at '%s': %s", cacheUri, e.msg());
         }
@@ -211,7 +216,13 @@ protected:
     void getFile(const std::string & path,
         Callback<std::shared_ptr<std::string>> callback) noexcept override
     {
-        auto uri = daemonUri + "/api/v0/cat?arg=" + getFileTransfer()->urlEncode(getIpfsPath() + "/" + path);
+        getIpfsObject(getIpfsPath() + "/" + path, std::move(callback));
+    }
+
+    void getIpfsObject(const std::string & ipfsPath,
+        Callback<std::shared_ptr<std::string>> callback) noexcept
+    {
+        auto uri = daemonUri + "/api/v0/cat?arg=" + getFileTransfer()->urlEncode(ipfsPath);
 
         FileTransferRequest request(uri);
         request.post = true;
