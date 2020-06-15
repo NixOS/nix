@@ -104,12 +104,9 @@ typedef std::map<StorePath, WeakGoalPtr> WeakGoalMap;
 
 
 
-class Goal : public std::enable_shared_from_this<Goal>
+struct Goal : public std::enable_shared_from_this<Goal>
 {
-public:
     typedef enum {ecBusy, ecSuccess, ecFailed, ecNoSubstituters, ecIncompleteClosure} ExitCode;
-
-protected:
 
     /* Backlink to the worker. */
     Worker & worker;
@@ -138,6 +135,9 @@ protected:
     /* Whether the goal is finished. */
     ExitCode exitCode;
 
+    /* Exception containing an error message, if any. */
+    std::optional<Error> ex;
+
     Goal(Worker & worker) : worker(worker)
     {
         nrFailed = nrNoSubstituters = nrIncompleteClosure = 0;
@@ -149,7 +149,6 @@ protected:
         trace("goal destroyed");
     }
 
-public:
     virtual void work() = 0;
 
     void addWaitee(GoalPtr waitee);
@@ -173,21 +172,14 @@ public:
         return name;
     }
 
-    ExitCode getExitCode()
-    {
-        return exitCode;
-    }
-
     /* Callback in case of a timeout.  It should wake up its waiters,
        get rid of any running child processes that are being monitored
        by the worker (important!), etc. */
-    virtual void timedOut() = 0;
+    virtual void timedOut(Error && ex) = 0;
 
     virtual string key() = 0;
 
-protected:
-
-    void amDone(ExitCode result);
+    void amDone(ExitCode result, std::optional<Error> ex = {});
 };
 
 
@@ -392,8 +384,7 @@ void Goal::waiteeDone(GoalPtr waitee, ExitCode result)
     assert(waitees.find(waitee) != waitees.end());
     waitees.erase(waitee);
 
-    trace(format("waitee '%1%' done; %2% left") %
-        waitee->name % waitees.size());
+    trace(fmt("waitee '%s' done; %d left", waitee->name, waitees.size()));
 
     if (result == ecFailed || result == ecNoSubstituters || result == ecIncompleteClosure) ++nrFailed;
 
@@ -418,12 +409,20 @@ void Goal::waiteeDone(GoalPtr waitee, ExitCode result)
 }
 
 
-void Goal::amDone(ExitCode result)
+void Goal::amDone(ExitCode result, std::optional<Error> ex)
 {
     trace("done");
     assert(exitCode == ecBusy);
     assert(result == ecSuccess || result == ecFailed || result == ecNoSubstituters || result == ecIncompleteClosure);
     exitCode = result;
+
+    if (ex) {
+        if (!waiters.empty())
+            logError(ex->info());
+        else
+            this->ex = std::move(*ex);
+    }
+
     for (auto & i : waiters) {
         GoalPtr goal = i.lock();
         if (goal) goal->waiteeDone(shared_from_this(), result);
@@ -910,7 +909,7 @@ public:
     /* Whether we need to perform hash rewriting if there are valid output paths. */
     bool needsHashRewrite();
 
-    void timedOut() override;
+    void timedOut(Error && ex) override;
 
     string key() override
     {
@@ -1011,7 +1010,9 @@ private:
 
     void started();
 
-    void done(BuildResult::Status status, const string & msg = "");
+    void done(
+        BuildResult::Status status,
+        std::optional<Error> ex = {});
 
     StorePathSet exportReferences(const StorePathSet & storePaths);
 };
@@ -1105,10 +1106,10 @@ void DerivationGoal::killChild()
 }
 
 
-void DerivationGoal::timedOut()
+void DerivationGoal::timedOut(Error && ex)
 {
     killChild();
-    done(BuildResult::TimedOut);
+    done(BuildResult::TimedOut, ex);
 }
 
 
@@ -1156,11 +1157,7 @@ void DerivationGoal::loadDerivation()
     trace("loading derivation");
 
     if (nrFailed != 0) {
-        logError({
-            .name = "missing derivation during build",
-            .hint = hintfmt("cannot build missing derivation '%s'", worker.store.printStorePath(drvPath))
-        });
-        done(BuildResult::MiscFailure);
+        done(BuildResult::MiscFailure, Error("cannot build missing derivation '%s'", worker.store.printStorePath(drvPath)));
         return;
     }
 
@@ -1349,13 +1346,9 @@ void DerivationGoal::inputsRealised()
     if (nrFailed != 0) {
         if (!useDerivation)
             throw Error("some dependencies of '%s' are missing", worker.store.printStorePath(drvPath));
-        logError({
-            .name = "Dependencies could not be built",
-            .hint = hintfmt(
-                "cannot build derivation '%s': %s dependencies couldn't be built",
-                worker.store.printStorePath(drvPath), nrFailed)
-        });
-        done(BuildResult::DependencyFailed);
+        done(BuildResult::DependencyFailed, Error(
+                "%s dependencies of derivation '%s' failed to build",
+                nrFailed, worker.store.printStorePath(drvPath)));
         return;
     }
 
@@ -1554,11 +1547,10 @@ void DerivationGoal::tryLocalBuild() {
         startBuilder();
 
     } catch (BuildError & e) {
-        logError(e.info());
         outputLocks.unlock();
         buildUser.reset();
         worker.permanentFailure = true;
-        done(BuildResult::InputRejected, e.msg());
+        done(BuildResult::InputRejected, e);
         return;
     }
 
@@ -1670,7 +1662,7 @@ void DerivationGoal::buildDone()
                 }
 
             auto msg = fmt("builder for '%s' %s",
-                worker.store.printStorePath(drvPath),
+                yellowtxt(worker.store.printStorePath(drvPath)),
                 statusToString(status));
 
             if (!logger->isVerbose() && !logTail.empty()) {
@@ -1771,8 +1763,6 @@ void DerivationGoal::buildDone()
         outputLocks.unlock();
 
     } catch (BuildError & e) {
-        logError(e.info());
-
         outputLocks.unlock();
 
         BuildResult::Status st = BuildResult::MiscFailure;
@@ -1791,7 +1781,7 @@ void DerivationGoal::buildDone()
                 BuildResult::PermanentFailure;
         }
 
-        done(st, e.msg());
+        done(st, e);
         return;
     }
 
@@ -3881,7 +3871,6 @@ void DerivationGoal::registerOutputs()
                     .hint = hint
                 });
 
-
                 curRound = nrRounds; // we know enough, bail out early
             }
     }
@@ -4145,14 +4134,11 @@ void DerivationGoal::handleChildOutput(int fd, const string & data)
     {
         logSize += data.size();
         if (settings.maxLogSize && logSize > settings.maxLogSize) {
-            logError({
-                .name = "Max log size exceeded",
-                .hint = hintfmt(
-                    "%1% killed after writing more than %2% bytes of log output",
-                    getName(), settings.maxLogSize)
-            });
             killChild();
-            done(BuildResult::LogLimitExceeded);
+            done(
+                BuildResult::LogLimitExceeded,
+                Error("%s killed after writing more than %d bytes of log output",
+                    getName(), settings.maxLogSize));
             return;
         }
 
@@ -4233,11 +4219,12 @@ void DerivationGoal::addHashRewrite(const StorePath & path)
 }
 
 
-void DerivationGoal::done(BuildResult::Status status, const string & msg)
+void DerivationGoal::done(BuildResult::Status status, std::optional<Error> ex)
 {
     result.status = status;
-    result.errorMsg = msg;
-    amDone(result.success() ? ecSuccess : ecFailed);
+    if (ex)
+        result.errorMsg = ex->what();
+    amDone(result.success() ? ecSuccess : ecFailed, ex);
     if (result.status == BuildResult::TimedOut)
         worker.timedOut = true;
     if (result.status == BuildResult::PermanentFailure)
@@ -4306,7 +4293,7 @@ public:
     SubstitutionGoal(StorePath && storePath, Worker & worker, RepairFlag repair = NoRepair);
     ~SubstitutionGoal();
 
-    void timedOut() override { abort(); };
+    void timedOut(Error && ex) override { abort(); };
 
     string key() override
     {
@@ -4693,7 +4680,7 @@ void Worker::removeGoal(GoalPtr goal)
         topGoals.erase(goal);
         /* If a top-level goal failed, then kill all other goals
            (unless keepGoing was set). */
-        if (goal->getExitCode() == Goal::ecFailed && !settings.keepGoing)
+        if (goal->exitCode == Goal::ecFailed && !settings.keepGoing)
             topGoals.clear();
     }
 
@@ -4935,32 +4922,24 @@ void Worker::waitForInput()
             }
         }
 
-        if (goal->getExitCode() == Goal::ecBusy &&
+        if (goal->exitCode == Goal::ecBusy &&
             0 != settings.maxSilentTime &&
             j->respectTimeouts &&
             after - j->lastOutput >= std::chrono::seconds(settings.maxSilentTime))
         {
-            logError({
-                .name = "Silent build timeout",
-                .hint = hintfmt(
+            goal->timedOut(Error(
                     "%1% timed out after %2% seconds of silence",
-                    goal->getName(), settings.maxSilentTime)
-            });
-            goal->timedOut();
+                    goal->getName(), settings.maxSilentTime));
         }
 
-        else if (goal->getExitCode() == Goal::ecBusy &&
+        else if (goal->exitCode == Goal::ecBusy &&
             0 != settings.buildTimeout &&
             j->respectTimeouts &&
             after - j->timeStarted >= std::chrono::seconds(settings.buildTimeout))
         {
-            logError({
-                .name = "Build timeout",
-                .hint = hintfmt(
+            goal->timedOut(Error(
                     "%1% timed out after %2% seconds",
-                    goal->getName(), settings.buildTimeout)
-            });
-            goal->timedOut();
+                    goal->getName(), settings.buildTimeout));
         }
     }
 
@@ -5066,16 +5045,28 @@ void LocalStore::buildPaths(const std::vector<StorePathWithOutputs> & drvPaths, 
     worker.run(goals);
 
     StorePathSet failed;
+    std::optional<Error> ex;
     for (auto & i : goals) {
-        if (i->getExitCode() != Goal::ecSuccess) {
+        if (i->ex) {
+            if (ex)
+                logError(i->ex->info());
+            else
+                ex = i->ex;
+        }
+        if (i->exitCode != Goal::ecSuccess) {
             DerivationGoal * i2 = dynamic_cast<DerivationGoal *>(i.get());
             if (i2) failed.insert(i2->getDrvPath());
             else failed.insert(dynamic_cast<SubstitutionGoal *>(i.get())->getStorePath());
         }
     }
 
-    if (!failed.empty())
+    if (failed.size() == 1 && ex) {
+        ex->status = worker.exitStatus();
+        throw *ex;
+    } else if (!failed.empty()) {
+        if (ex) logError(ex->info());
         throw Error(worker.exitStatus(), "build of %s failed", showPaths(failed));
+    }
 }
 
 BuildResult LocalStore::buildDerivation(const StorePath & drvPath, const BasicDerivation & drv,
@@ -5111,8 +5102,13 @@ void LocalStore::ensurePath(const StorePath & path)
 
     worker.run(goals);
 
-    if (goal->getExitCode() != Goal::ecSuccess)
-        throw Error(worker.exitStatus(), "path '%s' does not exist and cannot be created", printStorePath(path));
+    if (goal->exitCode != Goal::ecSuccess) {
+        if (goal->ex) {
+            goal->ex->status = worker.exitStatus();
+            throw *goal->ex;
+        } else
+            throw Error(worker.exitStatus(), "path '%s' does not exist and cannot be created", printStorePath(path));
+    }
 }
 
 
@@ -5124,7 +5120,7 @@ void LocalStore::repairPath(const StorePath & path)
 
     worker.run(goals);
 
-    if (goal->getExitCode() != Goal::ecSuccess) {
+    if (goal->exitCode != Goal::ecSuccess) {
         /* Since substituting the path didn't work, if we have a valid
            deriver, then rebuild the deriver. */
         auto info = queryPathInfo(path);
