@@ -86,12 +86,16 @@ public:
 
 protected:
 
-    // Given a ipns path, checks if it corresponds to a DNSLink path.
-    bool isDNSLinkPath(std::string path) {
+    // Given a ipns path, checks if it corresponds to a DNSLink path, and in
+    // case returns the domain
+    std::optional<string> isDNSLinkPath(std::string path) {
         if (path.find("/ipns/") != 0)
             throw Error("The provided path is not a ipns path");
         auto subpath = std::string(path, 6);
-        return subpath.find(".") != std::string::npos;
+        if (subpath.find(".") != std::string::npos) {
+            return subpath;
+        }
+        return std::nullopt;
     }
 
     bool fileExists(const std::string & path) override
@@ -145,14 +149,17 @@ protected:
                 initialIpfsPath, resolvedIpfsPath);
         }
 
-        if resolvedIpfsPath == state->ipfsPath {
+        if (resolvedIpfsPath == state->ipfsPath) {
             printMsg(lvlInfo, "The hash is already up to date, nothing to do");
             return;
         }
 
         // Now, we know that paths are not up to date but also not changed due to updates in DNS or IPNS hash.
-        if (isDNSLinkPath(ipnsPath)) {
-            throw Error("The provided ipns path is a DNSLink, and syncing those is not supported.\n  ipns path: %s\nYou should update your DNS settings", ipnsPath);
+        auto optDomain = isDNSLinkPath(ipnsPath);
+        if (optDomain) {
+            auto domain = *optDomain;
+            throw Error("The provided ipns path is a DNSLink, and syncing those is not supported.\n  Current DNSLink: %s\nYou should update your DNS settings"
+                , domain);
         }
 
         debug("Publishing '%s' to '%s', this could take a while.", state->ipfsPath, ipnsPath);
