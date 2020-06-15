@@ -519,30 +519,27 @@ LocalNoInlineNoReturn(void throwEvalError(const char * s, const string & s2, con
 
 LocalNoInlineNoReturn(void throwEvalError(const Pos & pos, const char * s, const string & s2, const string & s3))
 {
-    throw EvalError(
-        ErrorInfo { 
-            .hint = hintfmt(s, s2, s3),
-            .nixCode = NixCode { .errPos = pos }
-        });
+    throw EvalError({
+        .hint = hintfmt(s, s2, s3),
+        .nixCode = NixCode { .errPos = pos }
+    });
 }
 
 LocalNoInlineNoReturn(void throwEvalError(const Pos & p1, const char * s, const Symbol & sym, const Pos & p2))
 {
     // p1 is where the error occurred; p2 is a position mentioned in the message.
-    throw EvalError(
-        ErrorInfo { 
-            .hint = hintfmt(s, sym, p2),
-            .nixCode = NixCode { .errPos = p1 }
-        });
+    throw EvalError({
+        .hint = hintfmt(s, sym, p2),
+        .nixCode = NixCode { .errPos = p1 }
+    });
 }
 
 LocalNoInlineNoReturn(void throwTypeError(const Pos & pos, const char * s))
 {
-    throw TypeError(
-        ErrorInfo { 
-            .hint = hintfmt(s),
-            .nixCode = NixCode { .errPos = pos }
-        });
+    throw TypeError({
+        .hint = hintfmt(s),
+        .nixCode = NixCode { .errPos = pos }
+    });
 }
 
 LocalNoInlineNoReturn(void throwTypeError(const char * s, const string & s1))
@@ -552,29 +549,26 @@ LocalNoInlineNoReturn(void throwTypeError(const char * s, const string & s1))
 
 LocalNoInlineNoReturn(void throwTypeError(const Pos & pos, const char * s, const ExprLambda & fun, const Symbol & s2))
 {
-    throw TypeError(
-        ErrorInfo { 
-            .hint = hintfmt(s, fun.showNamePos(), s2),
-            .nixCode = NixCode { .errPos = pos }
-        });
+    throw TypeError({
+        .hint = hintfmt(s, fun.showNamePos(), s2),
+        .nixCode = NixCode { .errPos = pos }
+    });
 }
 
 LocalNoInlineNoReturn(void throwAssertionError(const Pos & pos, const char * s, const string & s1))
 {
-    throw AssertionError(
-        ErrorInfo { 
-            .hint = hintfmt(s, s1),
-            .nixCode = NixCode { .errPos = pos }
-        });
+    throw AssertionError({
+        .hint = hintfmt(s, s1),
+        .nixCode = NixCode { .errPos = pos }
+    });
 }
 
 LocalNoInlineNoReturn(void throwUndefinedVarError(const Pos & pos, const char * s, const string & s1))
 {
-    throw UndefinedVarError(
-        ErrorInfo { 
-            .hint = hintfmt(s, s1),
-            .nixCode = NixCode { .errPos = pos }
-        });
+    throw UndefinedVarError({
+        .hint = hintfmt(s, s1),
+        .nixCode = NixCode { .errPos = pos }
+    });
 }
 
 LocalNoInline(void addErrorPrefix(Error & e, const char * s, const string & s2))
@@ -1593,7 +1587,7 @@ string EvalState::forceStringNoCtx(Value & v, const Pos & pos)
     string s = forceString(v, pos);
     if (v.string.context) {
         if (pos)
-            throwEvalError(pos, "the string '%1%' is not allowed to refer to a store path (such as '%2%')", 
+            throwEvalError(pos, "the string '%1%' is not allowed to refer to a store path (such as '%2%')",
                 v.string.s, v.string.context[0]);
         else
             throwEvalError("the string '%1%' is not allowed to refer to a store path (such as '%2%')",
@@ -1919,11 +1913,10 @@ void EvalState::printStats()
 
 string ExternalValueBase::coerceToString(const Pos & pos, PathSet & context, bool copyMore, bool copyToStore) const
 {
-    throw TypeError(
-        ErrorInfo { 
-            .hint = hintfmt("cannot coerce %1% to a string", showType()),
-            .nixCode = NixCode { .errPos = pos }
-        });
+    throw TypeError({
+        .hint = hintfmt("cannot coerce %1% to a string", showType()),
+        .nixCode = NixCode { .errPos = pos }
+    });
 }
 
 

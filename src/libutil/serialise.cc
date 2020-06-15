@@ -52,10 +52,10 @@ size_t threshold = 256 * 1024 * 1024;
 
 static void warnLargeDump()
 {
-    logWarning(ErrorInfo {
+    logWarning({
         .name = "Large path",
         .description = "dumping very large path (> 256 MiB); this may run out of memory"
-        });
+    });
 }
 
 

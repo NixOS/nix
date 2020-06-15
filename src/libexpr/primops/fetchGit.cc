@@ -35,19 +35,17 @@ static void prim_fetchGit(EvalState & state, const Pos & pos, Value * * args, Va
             else if (n == "submodules")
                 fetchSubmodules = state.forceBool(*attr.value, *attr.pos);
             else
-                throw EvalError(
-                    ErrorInfo { 
-                        .hint = hintfmt("unsupported argument '%s' to 'fetchGit'", attr.name),
-                        .nixCode = NixCode { .errPos = *attr.pos }
-                    });
+                throw EvalError({
+                    .hint = hintfmt("unsupported argument '%s' to 'fetchGit'", attr.name),
+                    .nixCode = NixCode { .errPos = *attr.pos }
+                });
         }
 
         if (url.empty())
-            throw EvalError(
-                ErrorInfo { 
-                    .hint = hintfmt("'url' argument required"),
-                    .nixCode = NixCode { .errPos = pos }
-                });
+            throw EvalError({
+                .hint = hintfmt("'url' argument required"),
+                .nixCode = NixCode { .errPos = pos }
+            });
 
     } else
         url = state.coerceToString(pos, *args[0], context, false, false);

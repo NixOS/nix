@@ -129,12 +129,11 @@ Path LocalFSStore::addPermRoot(const StorePath & storePath,
     if (settings.checkRootReachability) {
         auto roots = findRoots(false);
         if (roots[storePath.clone()].count(gcRoot) == 0)
-            logWarning(
-                ErrorInfo { 
-                    .name = "GC root",
-                    .hint = hintfmt("warning: '%1%' is not in a directory where the garbage collector looks for roots; "
-                "therefore, '%2%' might be removed by the garbage collector",
-                gcRoot, printStorePath(storePath))
+            logWarning({
+                .name = "GC root",
+                .hint = hintfmt("warning: '%1%' is not in a directory where the garbage collector looks for roots; "
+                    "therefore, '%2%' might be removed by the garbage collector",
+                    gcRoot, printStorePath(storePath))
             });
     }
 

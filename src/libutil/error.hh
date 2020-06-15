@@ -22,7 +22,7 @@
 
 namespace nix {
 
-/* 
+/*
 
 This file defines two main structs/classes used in nix error handling.
 
@@ -106,7 +106,7 @@ protected:
 
     mutable std::optional<string> what_;
     const string& calcWhat() const;
-    
+
 public:
     unsigned int status = 1; // exit status
 
@@ -119,9 +119,9 @@ public:
     { }
 
     template<typename... Args>
-    BaseError(const Args & ... args)
+    BaseError(const std::string & fs, const Args & ... args)
         : err { .level = lvlError,
-                .hint = hintfmt(args...)
+                .hint = hintfmt(fs, args...)
               }
     { }
 
@@ -131,7 +131,11 @@ public:
               }
     { }
 
-    BaseError(ErrorInfo e)
+    BaseError(ErrorInfo && e)
+        : err(std::move(e))
+    { }
+
+    BaseError(const ErrorInfo & e)
         : err(e)
     { }
 

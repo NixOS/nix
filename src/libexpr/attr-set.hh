@@ -76,11 +76,10 @@ public:
     {
         auto a = get(name);
         if (!a)
-            throw Error(
-                ErrorInfo { 
-                    .hint = hintfmt("attribute '%s' missing", name),
-                    .nixCode = NixCode { .errPos = pos }
-                });
+            throw Error({
+                .hint = hintfmt("attribute '%s' missing", name),
+                .nixCode = NixCode { .errPos = pos }
+            });
 
         return *a;
     }

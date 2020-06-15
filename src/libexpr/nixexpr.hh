@@ -236,11 +236,10 @@ struct ExprLambda : Expr
         : pos(pos), arg(arg), matchAttrs(matchAttrs), formals(formals), body(body)
     {
         if (!arg.empty() && formals && formals->argNames.find(arg) != formals->argNames.end())
-            throw ParseError(
-                ErrorInfo {
-                    .hint = hintfmt("duplicate formal function argument '%1%'", arg),
-                    .nixCode = NixCode { .errPos = pos }
-                });
+            throw ParseError({
+                .hint = hintfmt("duplicate formal function argument '%1%'", arg),
+                .nixCode = NixCode { .errPos = pos }
+            });
     };
     void setName(Symbol & name);
     string showNamePos() const;

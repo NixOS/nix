@@ -93,12 +93,10 @@ static void prim_scopedImport(EvalState & state, const Pos & pos, Value * * args
     try {
         state.realiseContext(context);
     } catch (InvalidPathError & e) {
-        throw EvalError(
-            ErrorInfo { 
-                .hint = hintfmt("cannot import '%1%', since path '%2%' is not valid",
-                        path, e.path),
-                .nixCode = NixCode { .errPos = pos }
-            });
+        throw EvalError({
+            .hint = hintfmt("cannot import '%1%', since path '%2%' is not valid", path, e.path),
+            .nixCode = NixCode { .errPos = pos }
+        });
     }
 
     Path realPath = state.checkSourcePath(state.toRealPath(path, context));
@@ -174,13 +172,12 @@ void prim_importNative(EvalState & state, const Pos & pos, Value * * args, Value
     try {
         state.realiseContext(context);
     } catch (InvalidPathError & e) {
-        throw EvalError(
-            ErrorInfo {
-                .hint = hintfmt(
-                    "cannot import '%1%', since path '%2%' is not valid",
-                    path, e.path),
-                .nixCode = NixCode { .errPos = pos }
-            });
+        throw EvalError({
+            .hint = hintfmt(
+                "cannot import '%1%', since path '%2%' is not valid",
+                path, e.path),
+            .nixCode = NixCode { .errPos = pos }
+        });
     }
 
     path = state.checkSourcePath(path);
@@ -215,11 +212,10 @@ void prim_exec(EvalState & state, const Pos & pos, Value * * args, Value & v)
     auto elems = args[0]->listElems();
     auto count = args[0]->listSize();
     if (count == 0) {
-        throw EvalError(
-            ErrorInfo {
-                .hint = hintfmt("at least one argument to 'exec' required"),
-                .nixCode = NixCode { .errPos = pos }
-            });
+        throw EvalError({
+            .hint = hintfmt("at least one argument to 'exec' required"),
+            .nixCode = NixCode { .errPos = pos }
+        });
     }
     PathSet context;
     auto program = state.coerceToString(pos, *elems[0], context, false, false);
@@ -230,12 +226,12 @@ void prim_exec(EvalState & state, const Pos & pos, Value * * args, Value & v)
     try {
         state.realiseContext(context);
     } catch (InvalidPathError & e) {
-        throw EvalError(
-            ErrorInfo {
-                .hint = hintfmt("cannot execute '%1%', since path '%2%' is not valid",
-                    program, e.path),
-                .nixCode = NixCode { .errPos = pos }
-            });}
+        throw EvalError({
+            .hint = hintfmt("cannot execute '%1%', since path '%2%' is not valid",
+                program, e.path),
+            .nixCode = NixCode { .errPos = pos }
+        });
+    }
 
     auto output = runProgram(program, true, commandArgs);
     Expr * parsed;
@@ -386,11 +382,10 @@ static void prim_genericClosure(EvalState & state, const Pos & pos, Value * * ar
     Bindings::iterator startSet =
         args[0]->attrs->find(state.symbols.create("startSet"));
     if (startSet == args[0]->attrs->end())
-        throw EvalError(
-            ErrorInfo {
-                .hint = hintfmt("attribute 'startSet' required"),
-                .nixCode = NixCode { .errPos = pos }
-            });
+        throw EvalError({
+            .hint = hintfmt("attribute 'startSet' required"),
+            .nixCode = NixCode { .errPos = pos }
+        });
     state.forceList(*startSet->value, pos);
 
     ValueList workSet;
@@ -401,11 +396,10 @@ static void prim_genericClosure(EvalState & state, const Pos & pos, Value * * ar
     Bindings::iterator op =
         args[0]->attrs->find(state.symbols.create("operator"));
     if (op == args[0]->attrs->end())
-        throw EvalError(
-            ErrorInfo {
-                .hint = hintfmt("attribute 'operator' required"),
-                .nixCode = NixCode { .errPos = pos }
-            });
+        throw EvalError({
+            .hint = hintfmt("attribute 'operator' required"),
+            .nixCode = NixCode { .errPos = pos }
+        });
     state.forceValue(*op->value, pos);
 
     /* Construct the closure by applying the operator to element of
@@ -424,11 +418,10 @@ static void prim_genericClosure(EvalState & state, const Pos & pos, Value * * ar
         Bindings::iterator key =
             e->attrs->find(state.symbols.create("key"));
         if (key == e->attrs->end())
-            throw EvalError(
-                ErrorInfo {
-                    .hint = hintfmt("attribute 'key' required"),
-                    .nixCode = NixCode { .errPos = pos }
-                });
+            throw EvalError({
+                .hint = hintfmt("attribute 'key' required"),
+                .nixCode = NixCode { .errPos = pos }
+            });
         state.forceValue(*key->value, pos);
 
         if (!doneKeys.insert(key->value).second) continue;
@@ -560,11 +553,10 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
     /* Figure out the name first (for stack backtraces). */
     Bindings::iterator attr = args[0]->attrs->find(state.sName);
     if (attr == args[0]->attrs->end())
-        throw EvalError(
-            ErrorInfo {
-                .hint = hintfmt("required attribute 'name' missing"),
-                .nixCode = NixCode { .errPos = pos }
-            });
+        throw EvalError({
+            .hint = hintfmt("required attribute 'name' missing"),
+            .nixCode = NixCode { .errPos = pos }
+        });
     string drvName;
     Pos & posDrvName(*attr->pos);
     try {
@@ -607,42 +599,38 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
         auto handleHashMode = [&](const std::string & s) {
             if (s == "recursive") ingestionMethod = FileIngestionMethod::Recursive;
             else if (s == "flat") ingestionMethod = FileIngestionMethod::Flat;
-            else 
-                throw EvalError(
-                    ErrorInfo { 
-                        .hint = hintfmt("invalid value '%s' for 'outputHashMode' attribute", s),
-                        .nixCode = NixCode { .errPos = posDrvName }
-                    });
+            else
+                throw EvalError({
+                    .hint = hintfmt("invalid value '%s' for 'outputHashMode' attribute", s),
+                    .nixCode = NixCode { .errPos = posDrvName }
+                });
         };
 
         auto handleOutputs = [&](const Strings & ss) {
             outputs.clear();
             for (auto & j : ss) {
                 if (outputs.find(j) != outputs.end())
-                    throw EvalError(
-                        ErrorInfo { 
-                            .hint = hintfmt("duplicate derivation output '%1%'", j),
-                            .nixCode = NixCode { .errPos = posDrvName }
-                        });
+                    throw EvalError({
+                        .hint = hintfmt("duplicate derivation output '%1%'", j),
+                        .nixCode = NixCode { .errPos = posDrvName }
+                    });
                 /* !!! Check whether j is a valid attribute
                    name. */
                 /* Derivations cannot be named ‘drv’, because
                    then we'd have an attribute ‘drvPath’ in
                    the resulting set. */
                 if (j == "drv")
-                    throw EvalError(
-                        ErrorInfo { 
-                            .hint = hintfmt("invalid derivation output name 'drv'" ),
-                            .nixCode = NixCode { .errPos = posDrvName }
-                        });
+                    throw EvalError({
+                        .hint = hintfmt("invalid derivation output name 'drv'" ),
+                        .nixCode = NixCode { .errPos = posDrvName }
+                    });
                 outputs.insert(j);
             }
             if (outputs.empty())
-                throw EvalError(
-                    ErrorInfo { 
-                        .hint = hintfmt("derivation cannot have an empty set of outputs"),
-                        .nixCode = NixCode { .errPos = posDrvName }
-                    });
+                throw EvalError({
+                    .hint = hintfmt("derivation cannot have an empty set of outputs"),
+                    .nixCode = NixCode { .errPos = posDrvName }
+                });
         };
 
         try {
@@ -754,35 +742,31 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
 
     /* Do we have all required attributes? */
     if (drv.builder == "")
-        throw EvalError(
-            ErrorInfo { 
-                .hint = hintfmt("required attribute 'builder' missing"),
-                .nixCode = NixCode { .errPos = posDrvName }
-            });
+        throw EvalError({
+            .hint = hintfmt("required attribute 'builder' missing"),
+            .nixCode = NixCode { .errPos = posDrvName }
+        });
 
     if (drv.platform == "")
-        throw EvalError(
-            ErrorInfo { 
-                .hint = hintfmt("required attribute 'system' missing"),
-                .nixCode = NixCode { .errPos = posDrvName }
-            });
+        throw EvalError({
+            .hint = hintfmt("required attribute 'system' missing"),
+            .nixCode = NixCode { .errPos = posDrvName }
+        });
 
     /* Check whether the derivation name is valid. */
     if (isDerivation(drvName))
-        throw EvalError(
-            ErrorInfo { 
-                .hint = hintfmt("derivation names are not allowed to end in '%s'", drvExtension),
-                .nixCode = NixCode { .errPos = posDrvName }
-            });
+        throw EvalError({
+            .hint = hintfmt("derivation names are not allowed to end in '%s'", drvExtension),
+            .nixCode = NixCode { .errPos = posDrvName }
+        });
 
     if (outputHash) {
         /* Handle fixed-output derivations. */
         if (outputs.size() != 1 || *(outputs.begin()) != "out")
-            throw Error(
-                ErrorInfo { 
-                    .hint = hintfmt("multiple outputs are not supported in fixed-output derivations"),
-                    .nixCode = NixCode { .errPos = posDrvName }
-                });
+            throw Error({
+                .hint = hintfmt("multiple outputs are not supported in fixed-output derivations"),
+                .nixCode = NixCode { .errPos = posDrvName }
+            });
 
         HashType ht = outputHashAlgo.empty() ? htUnknown : parseHashType(outputHashAlgo);
 
@@ -887,11 +871,10 @@ static void prim_storePath(EvalState & state, const Pos & pos, Value * * args, V
        e.g. nix-push does the right thing. */
     if (!state.store->isStorePath(path)) path = canonPath(path, true);
     if (!state.store->isInStore(path))
-        throw EvalError(
-            ErrorInfo {
-                .hint = hintfmt("path '%1%' is not in the Nix store", path),
-                .nixCode = NixCode { .errPos = pos }
-            });
+        throw EvalError({
+            .hint = hintfmt("path '%1%' is not in the Nix store", path),
+            .nixCode = NixCode { .errPos = pos }
+        });
     Path path2 = state.store->toStorePath(path);
     if (!settings.readOnlyMode)
         state.store->ensurePath(state.store->parseStorePath(path2));
@@ -907,13 +890,12 @@ static void prim_pathExists(EvalState & state, const Pos & pos, Value * * args, 
     try {
         state.realiseContext(context);
     } catch (InvalidPathError & e) {
-        throw EvalError(
-            ErrorInfo {
-                .hint = hintfmt(
-                    "cannot check the existence of '%1%', since path '%2%' is not valid", 
-                    path, e.path),
-                .nixCode = NixCode { .errPos = pos }
-            });
+        throw EvalError({
+            .hint = hintfmt(
+                "cannot check the existence of '%1%', since path '%2%' is not valid",
+                path, e.path),
+            .nixCode = NixCode { .errPos = pos }
+        });
     }
 
     try {
@@ -956,13 +938,11 @@ static void prim_readFile(EvalState & state, const Pos & pos, Value * * args, Va
     try {
         state.realiseContext(context);
     } catch (InvalidPathError & e) {
-        throw EvalError(
-            ErrorInfo {
-                .hint = hintfmt("cannot read '%1%', since path '%2%' is not valid"
-                     , path, e.path),
-                .nixCode = NixCode { .errPos = pos }
-            });
- }
+        throw EvalError({
+            .hint = hintfmt("cannot read '%1%', since path '%2%' is not valid", path, e.path),
+            .nixCode = NixCode { .errPos = pos }
+        });
+    }
     string s = readFile(state.checkSourcePath(state.toRealPath(path, context)));
     if (s.find((char) 0) != string::npos)
         throw Error("the contents of the file '%1%' cannot be represented as a Nix string", path);
@@ -989,11 +969,10 @@ static void prim_findFile(EvalState & state, const Pos & pos, Value * * args, Va
 
         i = v2.attrs->find(state.symbols.create("path"));
         if (i == v2.attrs->end())
-            throw EvalError(
-                ErrorInfo {
-                    .hint = hintfmt("attribute 'path' missing"),
-                    .nixCode = NixCode { .errPos = pos }
-                });
+            throw EvalError({
+                .hint = hintfmt("attribute 'path' missing"),
+                .nixCode = NixCode { .errPos = pos }
+            });
 
         PathSet context;
         string path = state.coerceToString(pos, *i->value, context, false, false);
@@ -1001,12 +980,10 @@ static void prim_findFile(EvalState & state, const Pos & pos, Value * * args, Va
         try {
             state.realiseContext(context);
         } catch (InvalidPathError & e) {
-            throw EvalError(
-                ErrorInfo {
-                    .hint = hintfmt("cannot find '%1%', since path '%2%' is not valid",
-                        path, e.path),
-                    .nixCode = NixCode { .errPos = pos }
-                });
+            throw EvalError({
+                .hint = hintfmt("cannot find '%1%', since path '%2%' is not valid", path, e.path),
+                .nixCode = NixCode { .errPos = pos }
+            });
         }
 
         searchPath.emplace_back(prefix, path);
@@ -1023,11 +1000,10 @@ static void prim_hashFile(EvalState & state, const Pos & pos, Value * * args, Va
     string type = state.forceStringNoCtx(*args[0], pos);
     HashType ht = parseHashType(type);
     if (ht == htUnknown)
-      throw Error(
-          ErrorInfo {
-              .hint = hintfmt("unknown hash type '%1%'", type),
-              .nixCode = NixCode { .errPos = pos }
-          });
+      throw Error({
+          .hint = hintfmt("unknown hash type '%1%'", type),
+          .nixCode = NixCode { .errPos = pos }
+      });
 
     PathSet context; // discarded
     Path p = state.coerceToPath(pos, *args[1], context);
@@ -1043,12 +1019,10 @@ static void prim_readDir(EvalState & state, const Pos & pos, Value * * args, Val
     try {
         state.realiseContext(ctx);
     } catch (InvalidPathError & e) {
-        throw EvalError(
-            ErrorInfo {
-                .hint = hintfmt("cannot read '%1%', since path '%2%' is not valid",
-                        path, e.path),
-                .nixCode = NixCode { .errPos = pos }
-            });
+        throw EvalError({
+            .hint = hintfmt("cannot read '%1%', since path '%2%' is not valid", path, e.path),
+            .nixCode = NixCode { .errPos = pos }
+        });
     }
 
     DirEntries entries = readDirectory(state.checkSourcePath(path));
@@ -1118,15 +1092,13 @@ static void prim_toFile(EvalState & state, const Pos & pos, Value * * args, Valu
 
     for (auto path : context) {
         if (path.at(0) != '/')
-            throw EvalError(
-                ErrorInfo { 
-                    .hint = hintfmt(
-                        "in 'toFile': the file named '%1%' must not contain a reference "
-                        "to a derivation but contains (%2%)",
-                        name,
-                        path),
-                    .nixCode = NixCode { .errPos = pos }
-                });
+            throw EvalError( {
+                .hint = hintfmt(
+                    "in 'toFile': the file named '%1%' must not contain a reference "
+                    "to a derivation but contains (%2%)",
+                    name, path),
+                .nixCode = NixCode { .errPos = pos }
+            });
         refs.insert(state.store->parseStorePath(path));
     }
 
@@ -1194,21 +1166,19 @@ static void prim_filterSource(EvalState & state, const Pos & pos, Value * * args
     PathSet context;
     Path path = state.coerceToPath(pos, *args[1], context);
     if (!context.empty())
-        throw EvalError(
-            ErrorInfo { 
-                .hint = hintfmt("string '%1%' cannot refer to other paths", path),
-                .nixCode = NixCode { .errPos = pos }
-            });
+        throw EvalError({
+            .hint = hintfmt("string '%1%' cannot refer to other paths", path),
+            .nixCode = NixCode { .errPos = pos }
+        });
 
     state.forceValue(*args[0], pos);
     if (args[0]->type != tLambda)
-        throw TypeError(
-            ErrorInfo { 
-                .hint = hintfmt(
-                    "first argument in call to 'filterSource' is not a function but %1%", 
-                    showType(*args[0])),
-                .nixCode = NixCode { .errPos = pos }
-            });
+        throw TypeError({
+            .hint = hintfmt(
+                "first argument in call to 'filterSource' is not a function but %1%",
+                showType(*args[0])),
+            .nixCode = NixCode { .errPos = pos }
+        });
 
     addPath(state, pos, std::string(baseNameOf(path)), path, args[0], FileIngestionMethod::Recursive, Hash(), v);
 }
@@ -1228,12 +1198,10 @@ static void prim_path(EvalState & state, const Pos & pos, Value * * args, Value 
             PathSet context;
             path = state.coerceToPath(*attr.pos, *attr.value, context);
             if (!context.empty())
-                throw EvalError(
-                    ErrorInfo { 
-                        .hint = hintfmt("string '%1%' cannot refer to other paths", 
-                            path),
-                        .nixCode = NixCode { .errPos = *attr.pos }
-                    });
+                throw EvalError({
+                    .hint = hintfmt("string '%1%' cannot refer to other paths", path),
+                    .nixCode = NixCode { .errPos = *attr.pos }
+                });
         } else if (attr.name == state.sName)
             name = state.forceStringNoCtx(*attr.value, *attr.pos);
         else if (n == "filter") {
@@ -1244,19 +1212,16 @@ static void prim_path(EvalState & state, const Pos & pos, Value * * args, Value 
         else if (n == "sha256")
             expectedHash = newHashAllowEmpty(state.forceStringNoCtx(*attr.value, *attr.pos), htSHA256);
         else
-            throw EvalError(
-                ErrorInfo { 
-                    .hint = hintfmt("unsupported argument '%1%' to 'addPath'",
-                        attr.name),
-                    .nixCode = NixCode { .errPos = *attr.pos }
-                });
+            throw EvalError({
+                .hint = hintfmt("unsupported argument '%1%' to 'addPath'", attr.name),
+                .nixCode = NixCode { .errPos = *attr.pos }
+            });
     }
     if (path.empty())
-        throw EvalError(
-            ErrorInfo { 
-                .hint = hintfmt("'path' required"),
-                .nixCode = NixCode { .errPos = pos }
-            });
+        throw EvalError({
+            .hint = hintfmt("'path' required"),
+            .nixCode = NixCode { .errPos = pos }
+        });
     if (name.empty())
         name = baseNameOf(path);
 
@@ -1314,11 +1279,10 @@ void prim_getAttr(EvalState & state, const Pos & pos, Value * * args, Value & v)
     // !!! Should we create a symbol here or just do a lookup?
     Bindings::iterator i = args[1]->attrs->find(state.symbols.create(attr));
     if (i == args[1]->attrs->end())
-        throw EvalError(
-            ErrorInfo { 
-                .hint = hintfmt("attribute '%1%' missing", attr),
-                .nixCode = NixCode { .errPos = pos }
-            });
+        throw EvalError({
+            .hint = hintfmt("attribute '%1%' missing", attr),
+            .nixCode = NixCode { .errPos = pos }
+        });
     // !!! add to stack trace?
     if (state.countCalls && i->pos) state.attrSelects[*i->pos]++;
     state.forceValue(*i->value, pos);
@@ -1398,22 +1362,20 @@ static void prim_listToAttrs(EvalState & state, const Pos & pos, Value * * args,
 
         Bindings::iterator j = v2.attrs->find(state.sName);
         if (j == v2.attrs->end())
-            throw TypeError(
-                ErrorInfo { 
-                    .hint = hintfmt("'name' attribute missing in a call to 'listToAttrs'"), 
-                    .nixCode = NixCode { .errPos = pos }
-                });
+            throw TypeError({
+                .hint = hintfmt("'name' attribute missing in a call to 'listToAttrs'"),
+                .nixCode = NixCode { .errPos = pos }
+            });
         string name = state.forceStringNoCtx(*j->value, pos);
 
         Symbol sym = state.symbols.create(name);
         if (seen.insert(sym).second) {
             Bindings::iterator j2 = v2.attrs->find(state.symbols.create(state.sValue));
             if (j2 == v2.attrs->end())
-                throw TypeError(
-                    ErrorInfo { 
-                        .hint = hintfmt("'value' attribute missing in a call to 'listToAttrs'"), 
-                        .nixCode = NixCode { .errPos = pos }
-                    });
+                throw TypeError({
+                    .hint = hintfmt("'value' attribute missing in a call to 'listToAttrs'"),
+                    .nixCode = NixCode { .errPos = pos }
+                });
             v.attrs->push_back(Attr(sym, j2->value, j2->pos));
         }
     }
@@ -1486,11 +1448,10 @@ static void prim_functionArgs(EvalState & state, const Pos & pos, Value * * args
 {
     state.forceValue(*args[0], pos);
     if (args[0]->type != tLambda)
-        throw TypeError(
-            ErrorInfo { 
-                .hint = hintfmt("'functionArgs' requires a function"), 
-                .nixCode = NixCode { .errPos = pos }
-            });
+        throw TypeError({
+            .hint = hintfmt("'functionArgs' requires a function"),
+            .nixCode = NixCode { .errPos = pos }
+        });
 
     if (!args[0]->lambda.fun->matchAttrs) {
         state.mkAttrs(v, 0);
@@ -1543,11 +1504,10 @@ static void elemAt(EvalState & state, const Pos & pos, Value & list, int n, Valu
 {
     state.forceList(list, pos);
     if (n < 0 || (unsigned int) n >= list.listSize())
-        throw Error(
-            ErrorInfo { 
-                .hint = hintfmt("list index %1% is out of bounds", n), 
-                .nixCode = NixCode { .errPos = pos }
-            });
+        throw Error({
+            .hint = hintfmt("list index %1% is out of bounds", n),
+            .nixCode = NixCode { .errPos = pos }
+        });
     state.forceValue(*list.listElems()[n], pos);
     v = *list.listElems()[n];
 }
@@ -1574,11 +1534,10 @@ static void prim_tail(EvalState & state, const Pos & pos, Value * * args, Value 
 {
     state.forceList(*args[0], pos);
     if (args[0]->listSize() == 0)
-        throw Error(
-            ErrorInfo { 
-                .hint = hintfmt("'tail' called on an empty list"), 
-                .nixCode = NixCode { .errPos = pos }
-            });
+        throw Error({
+            .hint = hintfmt("'tail' called on an empty list"),
+            .nixCode = NixCode { .errPos = pos }
+        });
 
     state.mkList(v, args[0]->listSize() - 1);
     for (unsigned int n = 0; n < v.listSize(); ++n)
@@ -1720,12 +1679,10 @@ static void prim_genList(EvalState & state, const Pos & pos, Value * * args, Val
     auto len = state.forceInt(*args[1], pos);
 
     if (len < 0)
-        throw EvalError(
-            ErrorInfo { 
-                .hint = hintfmt("cannot create list of size %1%", len), 
-                .nixCode = NixCode { .errPos = pos }
-            });
-
+        throw EvalError({
+            .hint = hintfmt("cannot create list of size %1%", len),
+            .nixCode = NixCode { .errPos = pos }
+        });
 
     state.mkList(v, len);
 
@@ -1883,12 +1840,11 @@ static void prim_div(EvalState & state, const Pos & pos, Value * * args, Value &
     state.forceValue(*args[1], pos);
 
     NixFloat f2 = state.forceFloat(*args[1], pos);
-    if (f2 == 0) 
-        throw EvalError(
-            ErrorInfo { 
-                .hint = hintfmt("division by zero"), 
-                .nixCode = NixCode { .errPos = pos }
-            });
+    if (f2 == 0)
+        throw EvalError({
+            .hint = hintfmt("division by zero"),
+            .nixCode = NixCode { .errPos = pos }
+        });
 
     if (args[0]->type == tFloat || args[1]->type == tFloat) {
         mkFloat(v, state.forceFloat(*args[0], pos) / state.forceFloat(*args[1], pos));
@@ -1897,11 +1853,10 @@ static void prim_div(EvalState & state, const Pos & pos, Value * * args, Value &
         NixInt i2 = state.forceInt(*args[1], pos);
         /* Avoid division overflow as it might raise SIGFPE. */
         if (i1 == std::numeric_limits<NixInt>::min() && i2 == -1)
-            throw EvalError(
-                ErrorInfo { 
-                    .hint = hintfmt("overflow in integer division"), 
-                    .nixCode = NixCode { .errPos = pos }
-                });
+            throw EvalError({
+                .hint = hintfmt("overflow in integer division"),
+                .nixCode = NixCode { .errPos = pos }
+            });
 
         mkInt(v, i1 / i2);
     }
@@ -1958,12 +1913,11 @@ static void prim_substring(EvalState & state, const Pos & pos, Value * * args, V
     PathSet context;
     string s = state.coerceToString(pos, *args[2], context);
 
-    if (start < 0) 
-        throw EvalError(
-            ErrorInfo { 
-                .hint = hintfmt("negative start position in 'substring'"), 
-                .nixCode = NixCode { .errPos = pos }
-            });
+    if (start < 0)
+        throw EvalError({
+            .hint = hintfmt("negative start position in 'substring'"),
+            .nixCode = NixCode { .errPos = pos }
+        });
 
     mkString(v, (unsigned int) start >= s.size() ? "" : string(s, start, len), context);
 }
@@ -1983,11 +1937,10 @@ static void prim_hashString(EvalState & state, const Pos & pos, Value * * args, 
     string type = state.forceStringNoCtx(*args[0], pos);
     HashType ht = parseHashType(type);
     if (ht == htUnknown)
-        throw Error(
-            ErrorInfo { 
-                .hint = hintfmt("unknown hash type '%1%'", type), 
-                .nixCode = NixCode { .errPos = pos }
-            });
+        throw Error({
+            .hint = hintfmt("unknown hash type '%1%'", type),
+            .nixCode = NixCode { .errPos = pos }
+        });
 
     PathSet context; // discarded
     string s = state.forceString(*args[1], context, pos);
@@ -2030,17 +1983,15 @@ void prim_match(EvalState & state, const Pos & pos, Value * * args, Value & v)
     } catch (std::regex_error &e) {
         if (e.code() == std::regex_constants::error_space) {
             // limit is _GLIBCXX_REGEX_STATE_LIMIT for libstdc++
-            throw EvalError(
-                ErrorInfo {
-                    .hint = hintfmt("memory limit exceeded by regular expression '%s'", re),
-                    .nixCode = NixCode { .errPos = pos }
-                });
+            throw EvalError({
+                .hint = hintfmt("memory limit exceeded by regular expression '%s'", re),
+                .nixCode = NixCode { .errPos = pos }
+            });
         } else {
-            throw EvalError(
-                ErrorInfo {
-                    .hint = hintfmt("invalid regular expression '%s'", re),
-                    .nixCode = NixCode { .errPos = pos }
-                });
+            throw EvalError({
+                .hint = hintfmt("invalid regular expression '%s'", re),
+                .nixCode = NixCode { .errPos = pos }
+            });
         }
     }
 }
@@ -2105,17 +2056,15 @@ static void prim_split(EvalState & state, const Pos & pos, Value * * args, Value
     } catch (std::regex_error &e) {
         if (e.code() == std::regex_constants::error_space) {
             // limit is _GLIBCXX_REGEX_STATE_LIMIT for libstdc++
-            throw EvalError(
-                ErrorInfo {
-                    .hint = hintfmt("memory limit exceeded by regular expression '%s'", re),
-                    .nixCode = NixCode { .errPos = pos }
-                });
+            throw EvalError({
+                .hint = hintfmt("memory limit exceeded by regular expression '%s'", re),
+                .nixCode = NixCode { .errPos = pos }
+            });
         } else {
-            throw EvalError(
-                ErrorInfo {
-                    .hint = hintfmt("invalid regular expression '%s'", re),
-                    .nixCode = NixCode { .errPos = pos }
-                });
+            throw EvalError({
+                .hint = hintfmt("invalid regular expression '%s'", re),
+                .nixCode = NixCode { .errPos = pos }
+            });
         }
     }
 }
@@ -2146,11 +2095,10 @@ static void prim_replaceStrings(EvalState & state, const Pos & pos, Value * * ar
     state.forceList(*args[0], pos);
     state.forceList(*args[1], pos);
     if (args[0]->listSize() != args[1]->listSize())
-        throw EvalError(
-            ErrorInfo { 
-                .hint = hintfmt("'from' and 'to' arguments to 'replaceStrings' have different lengths"), 
-                .nixCode = NixCode { .errPos = pos }
-            });
+        throw EvalError({
+            .hint = hintfmt("'from' and 'to' arguments to 'replaceStrings' have different lengths"),
+            .nixCode = NixCode { .errPos = pos }
+        });
 
     vector<string> from;
     from.reserve(args[0]->listSize());
