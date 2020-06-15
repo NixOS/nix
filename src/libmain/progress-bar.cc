@@ -156,7 +156,7 @@ public:
     {
         auto state(state_.lock());
 
-        if (lvl <= verbosity && !s.empty())
+        if (lvl <= verbosity && !s.empty() && type != actBuildWaiting)
             log(*state, lvl, s + "...");
 
         state->activities.emplace_back(ActInfo());

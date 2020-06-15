@@ -18,6 +18,7 @@ typedef enum {
     actSubstitute = 108,
     actQueryPathInfo = 109,
     actPostBuildHook = 110,
+    actBuildWaiting = 111,
 } ActivityType;
 
 typedef enum {

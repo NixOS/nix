@@ -869,6 +869,9 @@ private:
 
     std::unique_ptr<Activity> act;
 
+    /* Activity that denotes waiting for a lock. */
+    std::unique_ptr<Activity> actLock;
+
     std::map<ActivityId, Activity> builderActivities;
 
     /* The remote machine on which we're building. */
@@ -1439,9 +1442,14 @@ void DerivationGoal::tryToBuild()
         lockFiles.insert(worker.store.Store::toRealPath(outPath));
 
     if (!outputLocks.lockPaths(lockFiles, "", false)) {
+        if (!actLock)
+            actLock = std::make_unique<Activity>(*logger, lvlWarn, actBuildWaiting,
+                fmt("waiting for lock on %s", yellowtxt(showPaths(lockFiles))));
         worker.waitForAWhile(shared_from_this());
         return;
     }
+
+    actLock.reset();
 
     /* Now check again whether the outputs are valid.  This is because
        another process may have started building in parallel.  After
@@ -1481,6 +1489,7 @@ void DerivationGoal::tryToBuild()
             case rpAccept:
                 /* Yes, it has started doing so.  Wait until we get
                    EOF from the hook. */
+                actLock.reset();
                 result.startTime = time(0); // inexact
                 state = &DerivationGoal::buildDone;
                 started();
@@ -1488,6 +1497,9 @@ void DerivationGoal::tryToBuild()
             case rpPostpone:
                 /* Not now; wait until at least one child finishes or
                    the wake-up timeout expires. */
+                if (!actLock)
+                    actLock = std::make_unique<Activity>(*logger, lvlWarn, actBuildWaiting,
+                        fmt("waiting for a machine to build '%s'", yellowtxt(worker.store.printStorePath(drvPath))));
                 worker.waitForAWhile(shared_from_this());
                 outputLocks.unlock();
                 return;
@@ -1496,6 +1508,8 @@ void DerivationGoal::tryToBuild()
                 break;
         }
     }
+
+    actLock.reset();
 
     /* Make sure that we are allowed to start a build.  If this
        derivation prefers to be done locally, do it even if
@@ -1524,7 +1538,9 @@ void DerivationGoal::tryLocalBuild() {
                uid. */
             buildUser->kill();
         } else {
-            debug("waiting for build users");
+            if (!actLock)
+                actLock = std::make_unique<Activity>(*logger, lvlWarn, actBuildWaiting,
+                    fmt("waiting for UID to build '%s'", yellowtxt(worker.store.printStorePath(drvPath))));
             worker.waitForAWhile(shared_from_this());
             return;
         }
@@ -1534,6 +1550,8 @@ void DerivationGoal::tryLocalBuild() {
         throw Error("build users are not supported on this platform for security reasons");
 #endif
     }
+
+    actLock.reset();
 
     try {
 
@@ -4863,8 +4881,6 @@ void Worker::waitForInput()
        up after a few seconds at most. */
     if (!waitingForAWhile.empty()) {
         useTimeout = true;
-        if (lastWokenUp == steady_time_point::min())
-            printInfo("waiting for locks, build slots or build users...");
         if (lastWokenUp == steady_time_point::min() || lastWokenUp > before) lastWokenUp = before;
         timeout = std::max(1L,
             (long) std::chrono::duration_cast<std::chrono::seconds>(
