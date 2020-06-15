@@ -689,7 +689,10 @@ Path EvalState::findFile(SearchPath & searchPath, const string & path, const Pos
         if (pathExists(res)) return canonPath(res);
     }
     throw ThrownError({
-        .hint = hintfmt("file '%1%' was not found in the Nix search path (add it using $NIX_PATH or -I)", path),
+        .hint = hintfmt(evalSettings.pureEval
+            ? "cannot look up '<%s>' in pure evaluation mode (use '--impure' to override)"
+            : "file '%s' was not found in the Nix search path (add it using $NIX_PATH or -I)",
+            path),
         .nixCode = NixCode { .errPos = pos }
     });
 }
