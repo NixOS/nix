@@ -64,16 +64,7 @@ public:
         // Resolve the IPNS name to an IPFS object
         if (optIpnsPath) {
             auto ipnsPath = *optIpnsPath;
-            debug("Resolving IPFS object of '%s', this could take a while.", ipnsPath);
-            auto uri = daemonUri + "/api/v0/name/resolve?offline=true&arg=" + getFileTransfer()->urlEncode(ipnsPath);
-            FileTransferRequest request(uri);
-            request.post = true;
-            request.tries = 1;
-            auto res = getFileTransfer()->download(request);
-            auto json = nlohmann::json::parse(*res.data);
-            if (json.find("Path") == json.end())
-                throw Error("daemon for IPFS is not running properly");
-            state->ipfsPath = json["Path"];
+            state->ipfsPath = resolveIPNSName(ipnsPath, true);
         }
     }
 
@@ -111,6 +102,20 @@ protected:
         }
     }
 
+    // Resolve the IPNS name to an IPFS object
+    std::string resolveIPNSName(std::string ipnsPath, bool offline) {
+        debug("Resolving IPFS object of '%s', this could take a while.", ipnsPath);
+        auto uri = daemonUri + "/api/v0/name/resolve?offline=" + (offline?"true":"false") + "&arg=" + getFileTransfer()->urlEncode(ipnsPath);
+        FileTransferRequest request(uri);
+        request.post = true;
+        request.tries = 1;
+        auto res = getFileTransfer()->download(request);
+        auto json = nlohmann::json::parse(*res.data);
+        if (json.find("Path") == json.end())
+            throw Error("daemon for IPFS is not running properly");
+        return json["Path"];
+    }
+
     // IPNS publish can be slow, we try to do it rarely.
     void sync() override
     {
@@ -119,6 +124,12 @@ protected:
         auto ipnsPath = *optIpnsPath;
 
         auto state(_state.lock());
+
+        auto resolvedIpfsName = resolveIPNSName(ipnsPath, false);
+        if (resolvedIpfsName != state->ipfsPath) {
+            throw Error("The ipns hash %s doesn't correspond to the correct ipfs hash;\n  wanted: %s\n  got %s",
+                state->ipfsPath, resolvedIpfsName);
+        }
 
         debug("Publishing '%s' to '%s', this could take a while.", state->ipfsPath, ipnsPath);
 
