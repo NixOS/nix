@@ -88,7 +88,8 @@ private:
 
     // Given a ipns path, checks if it corresponds to a DNSLink path, and in
     // case returns the domain
-    std::optional<string> isDNSLinkPath(std::string path) {
+    static std::optional<string> isDNSLinkPath(std::string path)
+    {
         if (path.find("/ipns/") != 0)
             throw Error("The provided path is not a ipns path");
         auto subpath = std::string(path, 6);
@@ -117,15 +118,17 @@ private:
         }
     }
 
-public:
+protected:
 
     bool fileExists(const std::string & path) override
     {
         return ipfsObjectExists(getIpfsRootDir() + "/" + path);
     }
 
+private:
+
     // Resolve the IPNS name to an IPFS object
-    std::string resolveIPNSName(std::string ipnsPath, bool offline) {
+    static std::string resolveIPNSName(std::string ipnsPath, bool offline) {
         debug("Resolving IPFS object of '%s', this could take a while.", ipnsPath);
         auto uri = daemonUri + "/api/v0/name/resolve?offline=" + (offline?"true":"false") + "&arg=" + getFileTransfer()->urlEncode(ipnsPath);
         FileTransferRequest request(uri);
@@ -137,6 +140,8 @@ public:
             throw Error("daemon for IPFS is not running properly");
         return json["Path"];
     }
+
+public:
 
     // IPNS publish can be slow, we try to do it rarely.
     void sync() override
@@ -213,7 +218,7 @@ private:
         return (std::string) json["Hash"];
     }
 
-public:
+protected:
 
     void upsertFile(const std::string & path, const std::string & data, const std::string & mimeType) override
     {
