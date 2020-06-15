@@ -105,7 +105,7 @@ void printCodeLines(std::ostream &out, const string &prefix, const NixCode &nixC
 
 std::ostream& operator<<(std::ostream &out, const ErrorInfo &einfo)
 {
-    int errwidth = 80;
+    size_t errwidth = 80;
     string prefix = "";
 
     string levelString;
@@ -158,12 +158,10 @@ std::ostream& operator<<(std::ostream &out, const ErrorInfo &einfo)
         }
     }
 
-    int ndl = prefix.length() + levelString.length() + 3 + einfo.name.length() + einfo.programName.value_or("").length();
-    int dashwidth = ndl > (errwidth - 3) ? 3 : errwidth - ndl;
+    auto ndl = prefix.length() + levelString.length() + 3 + einfo.name.length() + einfo.programName.value_or("").length();
+    auto dashwidth = ndl > (errwidth - 3) ? 3 : errwidth - ndl;
 
-    string dashes;
-    for (int i = 0; i < dashwidth; ++i)
-        dashes.append("-");
+    std::string dashes(dashwidth, '-');
 
     // divider.
     if (einfo.name != "")
