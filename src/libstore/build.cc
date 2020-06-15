@@ -187,7 +187,7 @@ public:
 
 protected:
 
-    virtual void amDone(ExitCode result);
+    void amDone(ExitCode result);
 };
 
 
@@ -1008,11 +1008,6 @@ private:
     void addHashRewrite(const StorePath & path);
 
     void repairClosure();
-
-    void amDone(ExitCode result) override
-    {
-        Goal::amDone(result);
-    }
 
     void started();
 
@@ -4335,11 +4330,6 @@ public:
     void handleEOF(int fd) override;
 
     StorePath getStorePath() { return storePath.clone(); }
-
-    void amDone(ExitCode result) override
-    {
-        Goal::amDone(result);
-    }
 };
 
 
