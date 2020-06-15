@@ -88,13 +88,10 @@ protected:
 
     // Given a ipns path, checks if it corresponds to a DNSLink path.
     bool isDNSLinkPath(std::string path) {
-        if (path.find("/ipns/") != 0) {
-            auto subpath = std::string(path, 6);
-            if (subpath.find(".") == std::string::npos)
-                return false;
-            return true;
-        }
-        throw Error("The provided path is not a ipns path");
+        if (path.find("/ipns/") == 0)
+            throw Error("The provided path is not a ipns path");
+        auto subpath = std::string(path, 6);
+        return subpath.find(".") != std::string::npos;
     }
 
     bool fileExists(const std::string & path) override
