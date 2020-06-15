@@ -21,6 +21,7 @@ private:
         auto state(_state.lock());
         return state->ipfsPath;
     }
+    std::string initialIpfsPath;
     std::optional<string> optIpnsPath;
 
     struct State
@@ -41,9 +42,10 @@ public:
         if (cacheUri.back() == '/')
             cacheUri.pop_back();
 
-        if (hasPrefix(cacheUri, "ipfs://"))
-            state->ipfsPath = "/ipfs/" + std::string(cacheUri, 7);
-        else if (hasPrefix(cacheUri, "ipns://"))
+        if (hasPrefix(cacheUri, "ipfs://")) {
+            initialIpfsPath = "/ipfs/" + std::string(cacheUri, 7);
+            state->ipfsPath = initialIpfsPath;
+        } else if (hasPrefix(cacheUri, "ipns://"))
             optIpnsPath = "/ipns/" + std::string(cacheUri, 7);
         else
             throw Error("unknown IPNS URI '%s'", cacheUri);
@@ -64,7 +66,8 @@ public:
         // Resolve the IPNS name to an IPFS object
         if (optIpnsPath) {
             auto ipnsPath = *optIpnsPath;
-            state->ipfsPath = resolveIPNSName(ipnsPath, true);
+            initialIpfsPath = resolveIPNSName(ipnsPath, true);
+            state->ipfsPath = initialIpfsPath;
         }
     }
 
@@ -82,6 +85,17 @@ public:
     }
 
 protected:
+
+    // Given a ipns path, checks if it corresponds to a DNSLink path.
+    bool isDNSLinkPath(std::string path) {
+        if (path.find("/ipns/") != 0) {
+            auto subpath = std::string(path, 6);
+            if (subpath.find(".") == std::string::npos)
+                return false;
+            return true;
+        }
+        throw Error("The provided path is not a ipns path");
+    }
 
     bool fileExists(const std::string & path) override
     {
@@ -119,16 +133,23 @@ protected:
     // IPNS publish can be slow, we try to do it rarely.
     void sync() override
     {
-        if (!optIpnsPath)
-            return;
-        auto ipnsPath = *optIpnsPath;
-
         auto state(_state.lock());
 
-        auto resolvedIpfsName = resolveIPNSName(ipnsPath, false);
-        if (resolvedIpfsName != state->ipfsPath) {
-            throw Error("The ipns hash %s doesn't correspond to the correct ipfs hash;\n  wanted: %s\n  got %s",
-                state->ipfsPath, resolvedIpfsName);
+        if (!optIpnsPath) {
+            throw Error("We don't have an ipns path and the current ipfs address doesn't match the initial one.\n  current: %s\n  initial: %s",
+                state->ipfsPath, initialIpfsPath);
+        }
+
+        auto ipnsPath = *optIpnsPath;
+
+        if (isDNSLinkPath(ipnsPath)) {
+            throw Error("The provided ipns path is a DNSLink, and syncing those is not supported.\n  ipns path: %s", ipnsPath);
+        }
+
+        auto resolvedIpfsPath = resolveIPNSName(ipnsPath, false);
+        if (resolvedIpfsPath != initialIpfsPath) {
+            throw Error("The ipns hash %s doesn't correspond to the initial ipfs hash;\n  wanted: %s\n  got %s",
+                initialIpfsPath, resolvedIpfsPath);
         }
 
         debug("Publishing '%s' to '%s', this could take a while.", state->ipfsPath, ipnsPath);
