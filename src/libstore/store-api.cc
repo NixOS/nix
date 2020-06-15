@@ -23,7 +23,7 @@ bool Store::isInStore(const Path & path) const
 Path Store::toStorePath(const Path & path) const
 {
     if (!isInStore(path))
-        throw Error(format("path '%1%' is not in the Nix store") % path);
+        throw Error("path '%1%' is not in the Nix store", path);
     Path::size_type slash = path.find('/', storeDir.size() + 1);
     if (slash == Path::npos)
         return path;
@@ -142,7 +142,7 @@ StorePath Store::makeStorePath(const string & type,
     const Hash & hash, std::string_view name) const
 {
     /* e.g., "source:sha256:1abc...:/nix/store:foo.tar.gz" */
-    string s = type + ":" + hash.to_string(Base16) + ":" + storeDir + ":" + std::string(name);
+    string s = type + ":" + hash.to_string(Base16, true) + ":" + storeDir + ":" + std::string(name);
     auto h = compressHash(hashString(htSHA256, s), 20);
     return StorePath::make(h.hash, name);
 }
@@ -186,7 +186,7 @@ StorePath Store::makeFixedOutputPath(
             hashString(htSHA256,
                 "fixed:out:"
                 + (recursive == FileIngestionMethod::Recursive ? (string) "r:" : "")
-                + hash.to_string(Base16) + ":"),
+                + hash.to_string(Base16, true) + ":"),
             name);
     }
 }
@@ -461,7 +461,7 @@ void Store::pathInfoToJSON(JSONPlaceholder & jsonOut, const StorePathSet & store
             auto info = queryPathInfo(storePath);
 
             jsonPath
-                .attr("narHash", info->narHash.to_string(hashBase))
+                .attr("narHash", info->narHash.to_string(hashBase, true))
                 .attr("narSize", info->narSize);
 
             {
@@ -504,7 +504,7 @@ void Store::pathInfoToJSON(JSONPlaceholder & jsonOut, const StorePathSet & store
                     if (!narInfo->url.empty())
                         jsonPath.attr("url", narInfo->url);
                     if (narInfo->fileHash)
-                        jsonPath.attr("downloadHash", narInfo->fileHash.to_string());
+                        jsonPath.attr("downloadHash", narInfo->fileHash.to_string(Base32, true));
                     if (narInfo->fileSize)
                         jsonPath.attr("downloadSize", narInfo->fileSize);
                     if (showClosureSize)
@@ -760,7 +760,7 @@ std::string ValidPathInfo::fingerprint(const Store & store) const
             store.printStorePath(path));
     return
         "1;" + store.printStorePath(path) + ";"
-        + narHash.to_string(Base32) + ";"
+        + narHash.to_string(Base32, true) + ";"
         + std::to_string(narSize) + ";"
         + concatStringsSep(",", store.printStorePathSet(references));
 }
@@ -775,11 +775,15 @@ void ValidPathInfo::sign(const Store & store, const SecretKey & secretKey)
 bool ValidPathInfo::isContentAddressed(const Store & store) const
 {
     auto warn = [&]() {
-        printError("warning: path '%s' claims to be content-addressed but isn't", store.printStorePath(path));
+        logWarning(
+            ErrorInfo{
+                .name = "Path not content-addressed",
+                .hint = hintfmt("path '%s' claims to be content-addressed but isn't", store.printStorePath(path))
+            });
     };
 
     if (hasPrefix(ca, "text:")) {
-        Hash hash(std::string(ca, 5));
+        Hash hash(ca.substr(5));
         if (store.makeTextPath(path.name(), hash, references) == path)
             return true;
         else
@@ -788,7 +792,7 @@ bool ValidPathInfo::isContentAddressed(const Store & store) const
 
     else if (hasPrefix(ca, "fixed:")) {
         FileIngestionMethod recursive { ca.compare(6, 2, "r:") == 0 };
-        Hash hash(std::string(ca, recursive == FileIngestionMethod::Recursive ? 8 : 6));
+        Hash hash(ca.substr(recursive == FileIngestionMethod::Recursive ? 8 : 6));
         auto refs = cloneStorePathSet(references);
         bool hasSelfReference = false;
         if (refs.count(path)) {
@@ -836,7 +840,7 @@ std::string makeFixedOutputCA(FileIngestionMethod recursive, const Hash & hash)
 {
     return "fixed:"
         + (recursive == FileIngestionMethod::Recursive ? (std::string) "r:" : "")
-        + hash.to_string();
+        + hash.to_string(Base32, true);
 }
 
 
@@ -934,7 +938,7 @@ std::list<ref<Store>> getDefaultSubstituters()
             try {
                 stores.push_back(openStore(uri));
             } catch (Error & e) {
-                printError("warning: %s", e.what());
+                logWarning(e.info());
             }
         };
 

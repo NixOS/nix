@@ -73,7 +73,7 @@ public:
             try {
               BinaryCacheStore::init();
             } catch (UploadToIPFS &) {
-              throw Error(format("‘%s’ does not appear to be a binary cache") % cacheUri);
+              throw Error("‘%s’ does not appear to be a binary cache", cacheUri);
             }
             diskCache->createCache(cacheUri, storeDir, wantMassQuery, priority);
         }

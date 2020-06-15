@@ -36,7 +36,7 @@ using namespace nix::daemon;
 #define SPLICE_F_MOVE 0
 static ssize_t splice(int fd_in, void *off_in, int fd_out, void *off_out, size_t len, unsigned int flags)
 {
-    /* We ignore most parameters, we just have them for conformance with the linux syscall */
+    // We ignore most parameters, we just have them for conformance with the linux syscall
     std::vector<char> buf(8192);
     auto read_count = read(fd_in, buf.data(), buf.size());
     if (read_count == -1)
@@ -57,7 +57,7 @@ static void sigChldHandler(int sigNo)
 {
     // Ensure we don't modify errno of whatever we've interrupted
     auto saved_errno = errno;
-    /* Reap all dead children. */
+    //  Reap all dead children.
     while (waitpid(-1, 0, WNOHANG) > 0) ;
     errno = saved_errno;
 }
@@ -106,7 +106,7 @@ struct PeerInfo
 };
 
 
-/* Get the identity of the caller, if possible. */
+//  Get the identity of the caller, if possible.
 static PeerInfo getPeerInfo(int remote)
 {
     PeerInfo peer = { false, 0, false, 0, false, 0 };
@@ -154,13 +154,12 @@ static void daemonLoop(char * * argv)
     if (chdir("/") == -1)
         throw SysError("cannot change current directory");
 
-    /* Get rid of children automatically; don't let them become
-       zombies. */
+    //  Get rid of children automatically; don't let them become zombies.
     setSigChldAction(true);
 
     AutoCloseFD fdSocket;
 
-    /* Handle socket-based activation by systemd. */
+    //  Handle socket-based activation by systemd.
     auto listenFds = getEnv("LISTEN_FDS");
     if (listenFds) {
         if (getEnv("LISTEN_PID") != std::to_string(getpid()) || listenFds != "1")
@@ -169,17 +168,17 @@ static void daemonLoop(char * * argv)
         closeOnExec(fdSocket.get());
     }
 
-    /* Otherwise, create and bind to a Unix domain socket. */
+    //  Otherwise, create and bind to a Unix domain socket.
     else {
         createDirs(dirOf(settings.nixDaemonSocketFile));
         fdSocket = createUnixDomainSocket(settings.nixDaemonSocketFile, 0666);
     }
 
-    /* Loop accepting connections. */
+    //  Loop accepting connections.
     while (1) {
 
         try {
-            /* Accept a connection. */
+            //  Accept a connection.
             struct sockaddr_un remoteAddr;
             socklen_t remoteAddrLen = sizeof(remoteAddr);
 
@@ -209,13 +208,13 @@ static void daemonLoop(char * * argv)
                 trusted = Trusted;
 
             if ((!trusted && !matchUser(user, group, allowedUsers)) || group == settings.buildUsersGroup)
-                throw Error(format("user '%1%' is not allowed to connect to the Nix daemon") % user);
+                throw Error("user '%1%' is not allowed to connect to the Nix daemon", user);
 
             printInfo(format((string) "accepted connection from pid %1%, user %2%" + (trusted ? " (trusted)" : ""))
                 % (peer.pidKnown ? std::to_string(peer.pid) : "<unknown>")
                 % (peer.uidKnown ? user : "<unknown>"));
 
-            /* Fork a child to handle the connection. */
+            //  Fork a child to handle the connection.
             ProcessOptions options;
             options.errorPrefix = "unexpected Nix daemon error: ";
             options.dieWithParent = false;
@@ -224,20 +223,20 @@ static void daemonLoop(char * * argv)
             startProcess([&]() {
                 fdSocket = -1;
 
-                /* Background the daemon. */
+                //  Background the daemon.
                 if (setsid() == -1)
-                    throw SysError(format("creating a new session"));
+                    throw SysError("creating a new session");
 
-                /* Restore normal handling of SIGCHLD. */
+                //  Restore normal handling of SIGCHLD.
                 setSigChldAction(false);
 
-                /* For debugging, stuff the pid into argv[1]. */
+                //  For debugging, stuff the pid into argv[1].
                 if (peer.pidKnown && argv[1]) {
                     string processName = std::to_string(peer.pid);
                     strncpy(argv[1], processName.c_str(), strlen(argv[1]));
                 }
 
-                /* Handle the connection. */
+                //  Handle the connection.
                 FdSource from(remote.get());
                 FdSink to(remote.get());
                 processConnection(openUncachedStore(), from, to, trusted, NotRecursive, user, peer.uid);
@@ -247,8 +246,11 @@ static void daemonLoop(char * * argv)
 
         } catch (Interrupted & e) {
             return;
-        } catch (Error & e) {
-            printError(format("error processing connection: %1%") % e.msg());
+        } catch (Error & error) {
+            ErrorInfo ei = error.info();
+            ei.hint = std::optional(hintfmt("error processing connection: %1%",
+                (error.info().hint.has_value() ? error.info().hint->str() : "")));
+            logError(ei);
         }
     }
 }
@@ -261,7 +263,7 @@ static int _main(int argc, char * * argv)
 
         parseCmdLine(argc, argv, [&](Strings::iterator & arg, const Strings::iterator & end) {
             if (*arg == "--daemon")
-                ; /* ignored for backwards compatibility */
+                ; //  ignored for backwards compatibility
             else if (*arg == "--help")
                 showManPage("nix-daemon");
             else if (*arg == "--version")
@@ -276,7 +278,7 @@ static int _main(int argc, char * * argv)
 
         if (stdio) {
             if (getStoreType() == tDaemon) {
-                /* Forward on this connection to the real daemon */
+                //  Forward on this connection to the real daemon
                 auto socketPath = settings.nixDaemonSocketFile;
                 auto s = socket(PF_UNIX, SOCK_STREAM, 0);
                 if (s == -1)
@@ -284,17 +286,17 @@ static int _main(int argc, char * * argv)
 
                 auto socketDir = dirOf(socketPath);
                 if (chdir(socketDir.c_str()) == -1)
-                    throw SysError(format("changing to socket directory '%1%'") % socketDir);
+                    throw SysError("changing to socket directory '%1%'", socketDir);
 
                 auto socketName = std::string(baseNameOf(socketPath));
                 auto addr = sockaddr_un{};
                 addr.sun_family = AF_UNIX;
                 if (socketName.size() + 1 >= sizeof(addr.sun_path))
-                    throw Error(format("socket name %1% is too long") % socketName);
+                    throw Error("socket name %1% is too long", socketName);
                 strcpy(addr.sun_path, socketName.c_str());
 
                 if (connect(s, (struct sockaddr *) &addr, sizeof(addr)) == -1)
-                    throw SysError(format("cannot connect to daemon at %1%") % socketPath);
+                    throw SysError("cannot connect to daemon at %1%", socketPath);
 
                 auto nfds = (s > STDIN_FILENO ? s : STDIN_FILENO) + 1;
                 while (true) {
