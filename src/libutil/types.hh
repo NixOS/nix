@@ -1,6 +1,5 @@
 #pragma once
 
-
 #include "ref.hh"
 
 #include <list>
@@ -25,13 +24,11 @@ typedef string Path;
 typedef list<Path> Paths;
 typedef set<Path> PathSet;
 
-
 /* Helper class to run code at startup. */
 template<typename T>
 struct OnStartup
 {
     OnStartup(T && t) { t(); }
 };
-
 
 }

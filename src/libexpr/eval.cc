@@ -506,11 +506,10 @@ LocalNoInlineNoReturn(void throwEvalError(const char * s, const string & s2))
 
 LocalNoInlineNoReturn(void throwEvalError(const Pos & pos, const char * s, const string & s2))
 {
-    throw EvalError(
-        ErrorInfo { 
-            .hint = hintfmt(s, s2),
-            .nixCode = NixCode { .errPos = pos }
-        });
+    throw EvalError({
+        .hint = hintfmt(s, s2),
+        .nixCode = NixCode { .errPos = pos }
+    });
 }
 
 LocalNoInlineNoReturn(void throwEvalError(const char * s, const string & s2, const string & s3))
