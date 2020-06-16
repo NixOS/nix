@@ -89,9 +89,9 @@ bool getBoolAttr(const Attrs & attrs, std::string_view name)
     return *s;
 }
 
-std::map<std::string, std::string> attrsToQuery(const Attrs & attrs)
+std::map<std::string, std::string, std::less<>> attrsToQuery(const Attrs & attrs)
 {
-    std::map<std::string, std::string> query;
+    std::map<std::string, std::string, std::less<>> query;
     for (auto & attr : attrs) {
         if (auto v = std::get_if<int64_t>(&attr.second)) {
             query.insert_or_assign(attr.first, fmt("%d", *v));

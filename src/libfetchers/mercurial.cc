@@ -96,17 +96,17 @@ struct MercurialInput : Input
 
                 input->ref = chomp(runProgram("hg", true, { "branch", "-R", actualUrl }));
 
-                auto files = tokenizeString<std::set<std::string>>(
+                auto files = tokenizeString<std::set<std::string, std::less<>>>(
                     runProgram("hg", true, { "status", "-R", actualUrl, "--clean", "--modified", "--added", "--no-status", "--print0" }), "\0"s);
 
                 PathFilter filter = [&](PathView p) -> bool {
                     assert(hasPrefix(p, actualUrl));
-                    std::string file(p, actualUrl.size() + 1);
+                    std::string_view file = p.substr(actualUrl.size() + 1);
 
                     auto st = lstat(p);
 
                     if (S_ISDIR(st.st_mode)) {
-                        auto prefix = file + "/";
+                        auto prefix = Path { file } << "/";
                         auto i = files.lower_bound(prefix);
                         return i != files.end() && hasPrefix(*i, prefix);
                     }

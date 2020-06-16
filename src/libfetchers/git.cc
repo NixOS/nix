@@ -12,14 +12,14 @@ namespace nix::fetchers {
 
 static std::string readHead(PathView path)
 {
-    return chomp(runProgram("git", true, { "-C", path, "rev-parse", "--abbrev-ref", "HEAD" }));
+    return chomp(runProgram("git", true, { "-C", Path { path }, "rev-parse", "--abbrev-ref", "HEAD" }));
 }
 
 static bool isNotDotGitDirectory(PathView path)
 {
     static const std::regex gitDirRegex("^(?:.*/)?\\.git$");
 
-    return not std::regex_match(path, gitDirRegex);
+    return not std::regex_match(Path { path }, gitDirRegex);
 }
 
 struct GitInput : Input
@@ -177,17 +177,18 @@ struct GitInput : Input
                 if (submodules)
                     gitOpts.emplace_back("--recurse-submodules");
 
-                auto files = tokenizeString<std::set<std::string>>(
-                    runProgram("git", true, gitOpts), "\0"s);
+                auto files = tokenizeString<std::set<std::string, std::less<>>>(
+                    std::string_view { runProgram("git", true, gitOpts) },
+                    std::string_view { "\0" });
 
                 PathFilter filter = [&](PathView p) -> bool {
                     assert(hasPrefix(p, actualUrl));
-                    std::string file(p, actualUrl.size() + 1);
+                    std::string_view file = p.substr(actualUrl.size() + 1);
 
                     auto st = lstat(p);
 
                     if (S_ISDIR(st.st_mode)) {
-                        auto prefix = file + "/";
+                        auto prefix = Path { file } << "/";
                         auto i = files.lower_bound(prefix);
                         return i != files.end() && hasPrefix(*i, prefix);
                     }

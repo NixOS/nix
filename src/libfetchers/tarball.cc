@@ -18,8 +18,8 @@ DownloadFileResult downloadFile(
 
     Attrs inAttrs({
         {"type", "file"},
-        {"url", url},
-        {"name", name},
+        {"url", std::string { url }},
+        {"name", std::string { name }},
     });
 
     auto cached = getCache()->lookupExpired(store, inAttrs);
@@ -88,8 +88,8 @@ DownloadFileResult downloadFile(
             store,
             {
                 {"type", "file"},
-                {"url", res.effectiveUri},
-                {"name", name},
+                {"url", std::string { res.effectiveUri }},
+                {"name", std::string { name }},
             },
             infoAttrs,
             *storePath,
@@ -110,8 +110,8 @@ Tree downloadTarball(
 {
     Attrs inAttrs({
         {"type", "tarball"},
-        {"url", url},
-        {"name", name},
+        {"url", std::string { url }},
+        {"name", std::string { name }},
     });
 
     auto cached = getCache()->lookupExpired(store, inAttrs);

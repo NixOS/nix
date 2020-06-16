@@ -34,6 +34,6 @@ std::optional<bool> maybeGetBoolAttr(const Attrs & attrs, std::string_view name)
 
 bool getBoolAttr(const Attrs & attrs, std::string_view name);
 
-std::map<std::string, std::string> attrsToQuery(const Attrs & attrs);
+std::map<std::string, std::string, std::less<>> attrsToQuery(const Attrs & attrs);
 
 }
