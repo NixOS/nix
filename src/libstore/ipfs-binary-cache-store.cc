@@ -88,6 +88,22 @@ public:
             initialIpfsPath = resolveIPNSName(ipnsPath, true);
             state->ipfsPath = initialIpfsPath;
         }
+
+        auto json = getIpfsDag(state->ipfsPath);
+
+        // Verify StoreDir is correct
+        if (json.find("StoreDir") == json.end()) {
+            json["StoreDir"] = storeDir;
+            state->ipfsPath = putIpfsDag(json);
+        } else if (json["StoreDir"] != storeDir)
+            throw Error(format("binary cache '%s' is for Nix stores with prefix '%s', not '%s'")
+                % getUri() % json["StoreDir"] % storeDir);
+
+        if (json.find("WantMassQuery") != json.end())
+            wantMassQuery.setDefault(json["WantMassQuery"] ? "true" : "false");
+
+        if (json.find("Priority") != json.end())
+            priority.setDefault(fmt("%d", json["Priority"]));
     }
 
     std::string getUri() override
@@ -97,24 +113,27 @@ public:
 
 private:
 
-    std::string putIpfsDag(std::string data)
+    std::string putIpfsDag(nlohmann::json data)
     {
         auto req = FileTransferRequest(daemonUri + "/api/v0/dag/put");
-        req.data = std::make_shared<string>(data);
+        req.data = std::make_shared<string>(data.dump());
         req.post = true;
         req.tries = 1;
         auto res = getFileTransfer()->upload(req);
         auto json = nlohmann::json::parse(*res.data);
-        return json["Cid"]["/"];
+        return "/ipfs/" + (std::string) json["Cid"]["/"];
     }
 
-    std::string getIpfsDag(std::string objectPath)
+    nlohmann::json getIpfsDag(std::string objectPath)
     {
+        debug("get ipfs dag %s", objectPath);
+
         auto req = FileTransferRequest(daemonUri + "/api/v0/dag/get?arg=" + objectPath);
         req.post = true;
         req.tries = 1;
         auto res = getFileTransfer()->download(req);
-        return *res.data;
+        auto json = nlohmann::json::parse(*res.data);
+        return json;
     }
 
     // Given a ipns path, checks if it corresponds to a DNSLink path, and in
@@ -149,14 +168,10 @@ private:
         }
     }
 
-protected:
-
     bool fileExists(const std::string & path)
     {
         return ipfsObjectExists(getIpfsPath() + "/" + path);
     }
-
-private:
 
     // Resolve the IPNS name to an IPFS object
     std::string resolveIPNSName(std::string ipnsPath, bool offline) {
@@ -261,7 +276,10 @@ private:
     void getFile(const std::string & path,
         Callback<std::shared_ptr<std::string>> callback) noexcept
     {
-        getIpfsObject(getIpfsPath() + "/" + path, std::move(callback));
+        std::string path_(path);
+        if (hasPrefix(path, "ipfs://"))
+            path_ = "/ipfs/" + std::string(path, 7);
+        getIpfsObject(path_, std::move(callback));
     }
 
     void getFile(const std::string & path, Sink & sink)
@@ -314,21 +332,68 @@ private:
         );
     }
 
-    std::string narInfoFileFor(const StorePath & storePath)
-    {
-        return storePathToHash(printStorePath(storePath)) + ".narinfo";
-    }
-
     void writeNarInfo(ref<NarInfo> narInfo)
     {
-        auto narInfoFile = narInfoFileFor(narInfo->path);
+        auto json = nlohmann::json::object();
+        json["narHash"] = narInfo->narHash.to_string(Base32);
+        json["narSize"] = narInfo->narSize;
 
-        upsertFile(narInfoFile, narInfo->to_string(*this), "text/x-nix-narinfo");
+        auto narMap = getIpfsDag(getIpfsPath())["nar"];
 
-        auto hashPart = storePathToHash(printStorePath(narInfo->path));
+        json["references"] = nlohmann::json::array();
+        for (auto & ref : narInfo->references) {
+            if (ref == narInfo->path) {
+                json["references"].push_back(printStorePath(ref));
+            } else {
+                json["references"].push_back(narMap[printStorePath(ref)]);
+            }
+        }
+
+        if (narInfo->ca != "")
+            json["ca"] = narInfo->ca;
+
+        if (narInfo->deriver)
+            json["deriver"] = printStorePath(*narInfo->deriver);
+
+        if (narInfo->registrationTime)
+            json["registrationTime"] = narInfo->registrationTime;
+
+        if (narInfo->ultimate)
+            json["ultimate"] = narInfo->ultimate;
+
+        if (!narInfo->sigs.empty()) {
+            json["sigs"] = nlohmann::json::array();
+            for (auto & sig : narInfo->sigs)
+                json["sigs"].push_back(sig);
+        }
+
+        if (!narInfo->url.empty()) {
+            json["url"] = nlohmann::json::object();
+            json["url"]["/"] = std::string(narInfo->url, 7);
+        }
+        if (narInfo->fileHash)
+            json["downloadHash"] = narInfo->fileHash.to_string();
+        if (narInfo->fileSize)
+            json["downloadSize"] = narInfo->fileSize;
+
+        auto narObjectPath = putIpfsDag(json);
+
+        auto state(_state.lock());
+        json = getIpfsDag(state->ipfsPath);
+
+        if (json.find("nar") == json.end())
+            json["nar"] = nlohmann::json::object();
+
+        auto hashObject = nlohmann::json::object();
+        hashObject.emplace("/", std::string(narObjectPath, 6));
+
+        json["nar"].emplace(printStorePath(narInfo->path), hashObject);
+
+        state->ipfsPath = putIpfsDag(json);
 
         {
-            auto state_(state.lock());
+            auto hashPart = storePathToHash(printStorePath(narInfo->path));
+            auto state_(this->state.lock());
             state_->pathInfoCache.upsert(hashPart, PathInfoCacheValue { .value = std::shared_ptr<NarInfo>(narInfo) });
         }
     }
@@ -378,18 +443,9 @@ public:
             ((1.0 - (double) narCompressed->size() / nar->size()) * 100.0),
             duration);
 
-        narInfo->url = "nar/" + narInfo->fileHash.to_string(Base32, false) + ".nar"
-            + (compression == "xz" ? ".xz" :
-                compression == "bzip2" ? ".bz2" :
-                compression == "br" ? ".br" :
-                "");
-
         /* Atomically write the NAR file. */
-        if (repair || !fileExists(narInfo->url)) {
-            stats.narWrite++;
-            upsertFile(narInfo->url, *narCompressed, "application/x-nix-nar");
-        } else
-            stats.narWriteAverted++;
+        stats.narWrite++;
+        narInfo->url = "ipfs://" + addFile(*narCompressed);
 
         stats.narWriteBytes += nar->size();
         stats.narWriteCompressedBytes += narCompressed->size();
@@ -405,7 +461,10 @@ public:
 
     bool isValidPathUncached(const StorePath & storePath) override
     {
-        return fileExists(narInfoFileFor(storePath));
+        auto json = getIpfsDag(getIpfsPath());
+        if (!json.contains("nar"))
+            return false;
+        return json["nar"].contains(printStorePath(storePath));
     }
 
     void narFromPath(const StorePath & storePath, Sink & sink) override
@@ -437,33 +496,69 @@ public:
     void queryPathInfoUncached(const StorePath & storePath,
         Callback<std::shared_ptr<const ValidPathInfo>> callback) noexcept override
     {
+        // TODO: properly use callbacks
+
+        auto callbackPtr = std::make_shared<decltype(callback)>(std::move(callback));
+
         auto uri = getUri();
         auto storePathS = printStorePath(storePath);
         auto act = std::make_shared<Activity>(*logger, lvlTalkative, actQueryPathInfo,
             fmt("querying info about '%s' on '%s'", storePathS, uri), Logger::Fields{storePathS, uri});
         PushActivity pact(act->id);
 
-        auto narInfoFile = narInfoFileFor(storePath);
+        auto json = getIpfsDag(getIpfsPath());
 
-        auto callbackPtr = std::make_shared<decltype(callback)>(std::move(callback));
+        if (!json.contains("nar") || !json["nar"].contains(printStorePath(storePath)))
+            return (*callbackPtr)(nullptr);
 
-        getFile(narInfoFile,
-            {[=](std::future<std::shared_ptr<std::string>> fut) {
-                try {
-                    auto data = fut.get();
+        auto narObjectHash = (std::string) json["nar"][printStorePath(storePath)]["/"];
+        json = getIpfsDag("/ipfs/" + narObjectHash);
 
-                    if (!data) return (*callbackPtr)(nullptr);
+        NarInfo narInfo(storePath.clone());
+        narInfo.narHash = Hash((std::string) json["narHash"]);
+        narInfo.narSize = json["narSize"];
 
-                    stats.narInfoRead++;
-
-                    (*callbackPtr)((std::shared_ptr<ValidPathInfo>)
-                        std::make_shared<NarInfo>(*this, *data, narInfoFile));
-
-                    (void) act; // force Activity into this lambda to ensure it stays alive
-                } catch (...) {
-                    callbackPtr->rethrow();
+        auto narMap = getIpfsDag(getIpfsPath())["nar"];
+        for (auto & ref : json["references"]) {
+            if (ref.type() == nlohmann::json::value_t::object) {
+                for (auto & v : narMap.items()) {
+                    if (v.value() == ref) {
+                        narInfo.references.insert(parseStorePath(v.key()));
+                        break;
+                    }
                 }
-            }});
+            } else if (ref.type() == nlohmann::json::value_t::string)
+                narInfo.references.insert(parseStorePath((std::string) ref));
+        }
+
+        if (json.find("ca") != json.end())
+            narInfo.ca = json["ca"];
+
+        if (json.find("deriver") != json.end())
+            narInfo.deriver = parseStorePath((std::string) json["deriver"]);
+
+        if (json.find("registrationTime") != json.end())
+            narInfo.registrationTime = json["registrationTime"];
+
+        if (json.find("ultimate") != json.end())
+            narInfo.ultimate = json["ultimate"];
+
+        if (json.find("sigs") != json.end())
+            for (auto & sig : json["sigs"])
+                narInfo.sigs.insert((std::string) sig);
+
+        if (json.find("url") != json.end()) {
+            narInfo.url = "/ipfs/" + json["url"]["/"];
+        }
+
+        if (json.find("downloadHash") != json.end())
+            narInfo.fileHash = Hash((std::string) json["downloadHash"]);
+
+        if (json.find("downloadSize") != json.end())
+            narInfo.fileSize = json["downloadSize"];
+
+        (*callbackPtr)((std::shared_ptr<ValidPathInfo>)
+            std::make_shared<NarInfo>(narInfo));
     }
 
     StorePath addToStore(const string & name, const Path & srcPath,
@@ -520,32 +615,11 @@ public:
 
         narInfo->sigs.insert(sigs.begin(), sigs.end());
 
-        auto narInfoFile = narInfoFileFor(narInfo->path);
-
         writeNarInfo(narInfo);
     }
 
     std::shared_ptr<std::string> getBuildLog(const StorePath & path) override
-    {
-        auto drvPath = path.clone();
-
-        if (!path.isDerivation()) {
-            try {
-                auto info = queryPathInfo(path);
-                // FIXME: add a "Log" field to .narinfo
-                if (!info->deriver) return nullptr;
-                drvPath = info->deriver->clone();
-            } catch (InvalidPath &) {
-                return nullptr;
-            }
-        }
-
-        auto logPath = "log/" + std::string(baseNameOf(printStorePath(drvPath)));
-
-        debug("fetching build log from binary cache '%s/%s'", getUri(), logPath);
-
-        return getFile(logPath);
-    }
+    { unsupported("getBuildLog"); }
 
     BuildResult buildDerivation(const StorePath & drvPath, const BasicDerivation & drv,
         BuildMode buildMode) override
