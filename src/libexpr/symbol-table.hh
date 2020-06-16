@@ -43,7 +43,7 @@ public:
         return *s;
     }
 
-    operator const std::string_view () const
+    operator const std::string & () const
     {
         return *s;
     }
@@ -70,7 +70,7 @@ private:
 public:
     Symbol create(std::string_view s)
     {
-        std::pair<Symbols::iterator, bool> res = symbols.insert(s);
+        std::pair<Symbols::iterator, bool> res = symbols.insert(std::string { s });
         return Symbol(&*res.first);
     }
 

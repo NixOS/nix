@@ -10,7 +10,7 @@ static Strings parseAttrPath(std::string_view s)
 {
     Strings res;
     string cur;
-    string::const_iterator i = s.begin();
+	std::string_view::const_iterator i = s.begin();
     while (i != s.end()) {
         if (*i == '.') {
             res.push_back(cur);

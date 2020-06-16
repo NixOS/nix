@@ -375,9 +375,10 @@ EvalState::~EvalState()
 
 Path EvalState::checkSourcePath(PathView path_)
 {
-    if (!allowedPaths) return path_;
+    if (!allowedPaths) return Path { path_ };
 
-    auto i = resolvedPaths.find(path_);
+	// No smart lookup with std::unordered_map, sadly.
+    auto i = resolvedPaths.find(Path { path_ });
     if (i != resolvedPaths.end())
         return i->second;
 
@@ -405,7 +406,7 @@ Path EvalState::checkSourcePath(PathView path_)
 
     for (auto & i : *allowedPaths) {
         if (isDirOrInDir(path, i)) {
-            resolvedPaths[path_] = path;
+            resolvedPaths[Path { path_ }] = path;
             return path;
         }
     }
@@ -438,7 +439,7 @@ void EvalState::checkURI(std::string_view uri)
     }
 
     if (hasPrefix(uri, "file://")) {
-        checkSourcePath(std::string(uri, 7));
+        checkSourcePath(uri.substr(7));
         return;
     }
 
@@ -452,7 +453,7 @@ Path EvalState::toRealPath(PathView path, const PathSet & context)
     return
         !context.empty() && store->isInStore(path)
         ? store->toRealPath(path)
-        : path;
+        : Path { path };
 }
 
 
@@ -462,7 +463,7 @@ Value * EvalState::addConstant(std::string_view name, Value & v)
     *v2 = v;
     staticBaseEnv.vars[symbols.create(name)] = baseEnvDispl;
     baseEnv.values[baseEnvDispl++] = v2;
-    string name2 = string(name, 0, 2) == "__" ? string(name, 2) : name;
+	std::string_view name2 = name.substr(0, 2) == "__" ? name.substr(2) : name;
     baseEnv.values[0]->attrs->push_back(Attr(symbols.create(name2), v2));
     return v2;
 }
@@ -477,7 +478,7 @@ Value * EvalState::addPrimOp(std::string_view name,
         return addConstant(name, v);
     }
     Value * v = allocValue();
-    string name2 = string(name, 0, 2) == "__" ? string(name, 2) : name;
+	std::string_view name2 = name.substr(0, 2) == "__" ? name.substr(2) : name;
     Symbol sym = symbols.create(name2);
     v->type = tPrimOp;
     v->primOp = new PrimOp(primOp, arity, sym);
@@ -1693,7 +1694,7 @@ string EvalState::copyPathToStore(PathSet & context, PathView path)
             ? store->computeStorePathForPath(std::string(baseNameOf(path)), checkSourcePath(path)).first
             : store->addToStore(std::string(baseNameOf(path)), checkSourcePath(path), FileIngestionMethod::Recursive, htSHA256, defaultPathFilter, repair);
         dstPath = store->printStorePath(p);
-        srcToStore.insert_or_assign(path, std::move(p));
+        srcToStore.insert_or_assign(Path { path }, std::move(p));
         printMsg(lvlChatty, "copied source '%1%' -> '%2%'", path, dstPath);
     }
 
@@ -1940,7 +1941,7 @@ EvalSettings::EvalSettings()
 Strings EvalSettings::getDefaultNixPath()
 {
     Strings res;
-    auto add = [&](PathView p) { if (pathExists(p)) { res.push_back(p); } };
+    auto add = [&](PathView p) { if (pathExists(p)) { res.push_back(std::string { p }); } };
     add(getHome() + "/.nix-defexpr/channels");
     add("nixpkgs=" + settings.nixStateDir + "/nix/profiles/per-user/root/channels/nixpkgs");
     add(settings.nixStateDir + "/nix/profiles/per-user/root/channels");

@@ -82,7 +82,7 @@ static void prim_getContext(EvalState & state, const Pos & pos, Value * * args, 
             drv = string(p, 1);
             path = &drv;
         } else if (p.at(0) == '!') {
-            std::pair<string, string> ctx = decodeContext(p);
+            std::pair<std::string_view, std::string_view> ctx = decodeContext(p);
             drv = ctx.first;
             output = ctx.second;
             path = &drv;

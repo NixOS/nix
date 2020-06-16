@@ -652,15 +652,15 @@ void EvalState::addToSearchPath(std::string_view s)
 {
     size_t pos = s.find('=');
     string prefix;
-    Path path;
+    PathView path;
     if (pos == string::npos) {
         path = s;
     } else {
         prefix = string(s, 0, pos);
-        path = string(s, pos + 1);
+        path = s.substr(pos + 1);
     }
 
-    searchPath.emplace_back(prefix, path);
+    searchPath.emplace_back(prefix, Path { path });
 }
 
 
@@ -670,18 +670,18 @@ Path EvalState::findFile(std::string_view path)
 }
 
 
-Path EvalState::findFile(SearchPath & searchPath, std::string_view path, const Pos & pos)
+Path EvalState::findFile(SearchPath & searchPath, PathView path, const Pos & pos)
 {
     for (auto & i : searchPath) {
         std::string suffix;
         if (i.first.empty())
-            suffix = "/" + path;
+            suffix << "/" << path;
         else {
             auto s = i.first.size();
             if (path.compare(0, s, i.first) != 0 ||
                 (path.size() > s && path[s] != '/'))
                 continue;
-            suffix = path.size() == s ? "" : "/" + string(path, s);
+            suffix = path.size() == s ? "" : Path { "/" } << path.substr(s);
         }
         auto r = resolveSearchPathElem(i);
         if (!r.first) continue;
@@ -717,7 +717,7 @@ std::pair<bool, std::string> EvalState::resolveSearchPathElem(const SearchPathEl
             res = { false, "" };
         }
     } else {
-        auto path = absPath(elem.second);
+        auto path = absPath(Path { elem.second });
         if (pathExists(path))
             res = { true, path };
         else {

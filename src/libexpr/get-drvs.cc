@@ -307,7 +307,9 @@ std::optional<DrvInfo> getDerivation(EvalState & state, Value & v,
 
 static string addToPath(std::string_view s1, std::string_view s2)
 {
-    return s1.empty() ? s2 : s1 + "." + s2;
+    return s1.empty()
+    	? std::string { s2 }
+        : std::string { s1 } << "." << s2;
 }
 
 

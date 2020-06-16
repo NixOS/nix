@@ -32,7 +32,7 @@ void printValueAsJSON(EvalState & state, bool strict,
             break;
 
         case tPath:
-            out.write(state.copyPathToStore(context, v.path));
+            out.write(PathView { state.copyPathToStore(context, v.path) });
             break;
 
         case tNull:
@@ -42,7 +42,7 @@ void printValueAsJSON(EvalState & state, bool strict,
         case tAttrs: {
             auto maybeString = state.tryAttrsToString(noPos, v, context, false, false);
             if (maybeString) {
-                out.write(*maybeString);
+                out.write(std::string_view { *maybeString });
                 break;
             }
             auto i = v.attrs->find(state.sOutPath);

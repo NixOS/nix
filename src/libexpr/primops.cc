@@ -32,13 +32,13 @@ namespace nix {
 
 /* Decode a context string ‘!<name>!<path>’ into a pair <path,
    name>. */
-std::pair<string, string> decodeContext(std::string_view s)
+std::pair<std::string_view, std::string_view> decodeContext(std::string_view s)
 {
     if (s.at(0) == '!') {
         size_t index = s.find("!", 1);
-        return std::pair<string, string>(string(s, index + 1), string(s, 1, index - 1));
+        return std::pair<string, string>(s.substr(index + 1), s.substr(1, index - 1));
     } else
-        return std::pair<string, string>(s.at(0) == '/' ? s : string(s, 1), "");
+        return std::pair<string, string>(s.at(0) == '/' ? s : s.substr(1), "");
 }
 
 
@@ -50,12 +50,12 @@ void EvalState::realiseContext(const PathSet & context)
     std::vector<StorePathWithOutputs> drvs;
 
     for (auto & i : context) {
-        std::pair<string, string> decoded = decodeContext(i);
+        std::pair<std::string_view, std::string_view> decoded = decodeContext(i);
         auto ctx = store->parseStorePath(decoded.first);
         if (!store->isValidPath(ctx))
             throw InvalidPathError(store->printStorePath(ctx));
         if (!decoded.second.empty() && ctx.isDerivation()) {
-            drvs.push_back(StorePathWithOutputs{ctx.clone(), {decoded.second}});
+            drvs.push_back(StorePathWithOutputs{ctx.clone(), { std::string { decoded.second } }});
 
             /* Add the output of this derivation to the allowed
                paths. */
@@ -731,8 +731,8 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
 
         /* Handle derivation outputs of the form ‘!<name>!<path>’. */
         else if (path.at(0) == '!') {
-            std::pair<string, string> ctx = decodeContext(path);
-            drv.inputDrvs[state.store->parseStorePath(ctx.first)].insert(ctx.second);
+            std::pair<std::string_view, std::string_view> ctx = decodeContext(path);
+            drv.inputDrvs[state.store->parseStorePath(ctx.first)].insert(std::string { ctx.second });
         }
 
         /* Otherwise it's a source file. */
@@ -2175,7 +2175,8 @@ static void prim_compareVersions(EvalState & state, const Pos & pos, Value * * a
 
 static void prim_splitVersion(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
-    string version = state.forceStringNoCtx(*args[0], pos);
+    string _version = state.forceStringNoCtx(*args[0], pos);
+	std::string_view version { _version };
     auto iter = version.cbegin();
     Strings components;
     while (iter != version.cend()) {

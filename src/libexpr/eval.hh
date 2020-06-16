@@ -304,7 +304,7 @@ private:
 
     bool countCalls;
 
-    typedef std::map<Symbol, size_t, std::less> PrimOpCalls;
+    typedef std::map<Symbol, size_t, std::less<>> PrimOpCalls;
     PrimOpCalls primOpCalls;
 
     typedef std::map<ExprLambda *, size_t, std::less<>> FunctionCalls;
@@ -312,7 +312,7 @@ private:
 
     void incrFunctionCall(ExprLambda * fun);
 
-    typedef std::map<Pos, size_t, std::les<>> AttrSelects;
+    typedef std::map<Pos, size_t, std::less<>> AttrSelects;
     AttrSelects attrSelects;
 
     friend struct ExprOpUpdate;
@@ -328,7 +328,7 @@ string showType(const Value & v);
 
 /* Decode a context string ‘!<name>!<path>’ into a pair <path,
    name>. */
-std::pair<string, string> decodeContext(std::string_view s);
+std::pair<std::string_view, std::string_view> decodeContext(std::string_view s);
 
 /* If `path' refers to a directory, then append "/default.nix". */
 Path resolveExprPath(Path path);

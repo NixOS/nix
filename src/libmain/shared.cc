@@ -281,7 +281,7 @@ void showManPage(std::string_view name)
 {
     restoreSignals();
     setenv("MANPATH", settings.nixManDir.c_str(), 1);
-    execlp("man", "man", name.c_str(), nullptr);
+    execlp("man", "man", std::string { name }.c_str(), nullptr);
     throw SysError("command 'man %1%' failed", name.c_str());
 }
 

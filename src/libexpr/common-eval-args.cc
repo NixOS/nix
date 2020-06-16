@@ -48,17 +48,17 @@ Bindings * MixEvalArgs::getAutoArgs(EvalState & state)
     return res;
 }
 
-Path lookupFileArg(EvalState & state, string s)
+Path lookupFileArg(EvalState & state, std::string_view s)
 {
     if (isUri(s)) {
         return state.store->toRealPath(
             fetchers::downloadTarball(
                 state.store, resolveUri(s), "source", false).storePath);
     } else if (s.size() > 2 && s.at(0) == '<' && s.at(s.size() - 1) == '>') {
-        Path p = s.substr(1, s.size() - 2);
+        PathView p = s.substr(1, s.size() - 2);
         return state.findFile(p);
     } else
-        return absPath(s);
+        return absPath(Path { s });
 }
 
 }
