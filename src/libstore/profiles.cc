@@ -22,12 +22,13 @@ static bool cmpGensByNumber(const Generation & a, const Generation & b)
    `<profilename>-<number>-link'. */
 static int parseName(std::string_view profileName, std::string_view name)
 {
-    if (string(name, 0, profileName.size() + 1) != profileName + "-") return -1;
-    string s = string(name, profileName.size() + 1);
-    string::size_type p = s.find("-link");
-    if (p == string::npos) return -1;
+    if (name.substr(0, profileName.size()) != profileName) return -1;
+    if (name[profileName.size()] != '-') return -1;
+	std::string_view s = name.substr(profileName.size() + 1);
+	std::string_view::size_type p = s.find("-link");
+    if (p == std::string_view::npos) return -1;
     int n;
-    if (string2Int(string(s, 0, p), n) && n >= 0)
+    if (string2Int(s.substr(0, p), n) && n >= 0)
         return n;
     else
         return -1;
@@ -35,7 +36,7 @@ static int parseName(std::string_view profileName, std::string_view name)
 
 
 
-Generations findGenerations(Path profile, int & curGen)
+Generations findGenerations(PathView profile, int & curGen)
 {
     Generations gens;
 
@@ -116,7 +117,7 @@ Path createGeneration(ref<LocalFSStore> store, Path profile, Path outPath)
 
 static void removeFile(PathView path)
 {
-    if (remove(path.c_str()) == -1)
+    if (remove(Path { path }.c_str()) == -1)
         throw SysError("cannot unlink '%1%'", path);
 }
 
@@ -245,7 +246,7 @@ void switchLink(Path link, Path target)
 
 void lockProfile(PathLocks & lock, PathView profile)
 {
-    lock.lockPaths({profile}, (format("waiting for lock on profile '%1%'") % profile).str());
+    lock.lockPaths({ Path { profile } }, (format("waiting for lock on profile '%1%'") % profile).str());
     lock.setDeletion(true);
 }
 

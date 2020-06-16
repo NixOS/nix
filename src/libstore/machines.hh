@@ -11,14 +11,14 @@ struct Machine {
     const string sshKey;
     const unsigned int maxJobs;
     const unsigned int speedFactor;
-    const std::set<string> supportedFeatures;
-    const std::set<string> mandatoryFeatures;
+    const std::set<string, std::less<>> supportedFeatures;
+    const std::set<string, std::less<>> mandatoryFeatures;
     const std::string sshPublicHostKey;
     bool enabled = true;
 
-    bool allSupported(const std::set<string> & features) const;
+    bool allSupported(const std::set<string, std::less<>> & features) const;
 
-    bool mandatoryMet(const std::set<string> & features) const;
+    bool mandatoryMet(const std::set<string, std::less<>> & features) const;
 
     Machine(decltype(storeUri) storeUri,
         decltype(systemTypes) systemTypes,

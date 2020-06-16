@@ -8,6 +8,7 @@
 #include "archive.hh"
 #include "derivations.hh"
 #include "args.hh"
+#include "util.hh"
 
 namespace nix::daemon {
 
@@ -61,7 +62,7 @@ struct TunnelLogger : public Logger
                 throw;
             }
         } else
-            state->pendingMsgs.push_back(s);
+            state->pendingMsgs.push_back(std::string { s });
     }
 
     void log(Verbosity lvl, const FormatOrString & fs) override
@@ -120,8 +121,9 @@ struct TunnelLogger : public Logger
         std::string_view s, const Fields & fields, ActivityId parent) override
     {
         if (GET_PROTOCOL_MINOR(clientVersion) < 20) {
-            if (!s.empty())
-                log(lvl, s + "...");
+            if (!s.empty()){
+				log(lvl, std::string { s } + "...");
+			};
             return;
         }
 

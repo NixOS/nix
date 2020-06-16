@@ -96,7 +96,7 @@ void AbstractConfig::applyConfig(std::string_view contents, std::string_view pat
         if (include) {
             if (tokens.size() != 2)
                 throw UsageError("illegal configuration line '%1%' in '%2%'", line, path);
-            auto p = absPath(tokens[1], dirOf(path));
+            auto p = absPath(Path { tokens[1] }, dirOf(path));
             if (pathExists(p)) {
                 applyConfigFile(p);
             } else if (!ignoreMissing) {

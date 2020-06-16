@@ -33,7 +33,7 @@ Machine::Machine(decltype(storeUri) storeUri,
     sshPublicHostKey(sshPublicHostKey)
 {}
 
-bool Machine::allSupported(const std::set<string> & features) const {
+bool Machine::allSupported(const std::set<string, std::less<>> & features) const {
     return std::all_of(features.begin(), features.end(),
         [&](std::string_view feature) {
             return supportedFeatures.count(feature) ||
@@ -41,7 +41,7 @@ bool Machine::allSupported(const std::set<string> & features) const {
         });
 }
 
-bool Machine::mandatoryMet(const std::set<string> & features) const {
+bool Machine::mandatoryMet(const std::set<string, std::less<>> & features) const {
     return std::all_of(mandatoryFeatures.begin(), mandatoryFeatures.end(),
         [&](std::string_view feature) {
             return features.count(feature);
@@ -81,8 +81,8 @@ void parseMachines(std::string_view s, Machines & machines)
             isSet(2) ? tokens[2] : "",
             isSet(3) ? std::stoull(tokens[3]) : 1LL,
             isSet(4) ? std::stoull(tokens[4]) : 1LL,
-            isSet(5) ? tokenizeString<std::set<string>>(tokens[5], ",") : std::set<string>{},
-            isSet(6) ? tokenizeString<std::set<string>>(tokens[6], ",") : std::set<string>{},
+            isSet(5) ? tokenizeString<std::set<string, std::less<>>>(tokens[5], ",") : std::set<string, std::less<>>{},
+            isSet(6) ? tokenizeString<std::set<string, std::less<>>>(tokens[6], ",") : std::set<string, std::less<>>{},
             isSet(7) ? tokens[7] : "");
     }
 }

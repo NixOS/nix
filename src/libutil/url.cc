@@ -75,9 +75,9 @@ std::string percentDecode(std::string_view in)
     return decoded;
 }
 
-std::map<std::string, std::string> decodeQuery(std::string_view query)
+UrlQuery decodeQuery(std::string_view query)
 {
-    std::map<std::string, std::string> result;
+    UrlQuery result;
 
     for (auto s : tokenizeString<Strings>(query, "&")) {
         auto e = s.find('=');
@@ -104,7 +104,7 @@ std::string percentEncode(std::string_view s)
     return res;
 }
 
-std::string encodeQuery(const std::map<std::string, std::string> & ss)
+std::string encodeQuery(const UrlQuery & ss)
 {
     std::string res;
     bool first = true;

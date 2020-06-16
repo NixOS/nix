@@ -257,7 +257,7 @@ typedef std::vector<Value *, traceable_allocator<Value *> > ValueVector;
 typedef std::map<Symbol, Value *, std::less<Symbol>, traceable_allocator<std::pair<const Symbol, Value *> > > ValueMap;
 #else
 typedef std::vector<Value *> ValueVector;
-typedef std::map<Symbol, Value *> ValueMap;
+typedef std::map<Symbol, Value *, std::less<Symbol>> ValueMap;
 #endif
 
 

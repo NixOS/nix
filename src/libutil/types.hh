@@ -15,15 +15,15 @@ using std::vector;
 using std::string;
 
 typedef list<string> Strings;
-typedef set<string> StringSet;
-typedef std::map<string, string> StringMap;
+typedef set<string, std::less<>> StringSet;
+typedef std::map<string, string, std::less<>> StringMap;
 
 /* Paths are just strings. */
 
 typedef string Path;
 typedef std::string_view PathView;
 typedef list<Path> Paths;
-typedef set<Path> PathSet;
+typedef set<Path, std::less<>> PathSet;
 
 /* Helper class to run code at startup. */
 template<typename T>

@@ -68,13 +68,13 @@ private:
 template<typename T>
 void processGraph(
     ThreadPool & pool,
-    const std::set<T> & nodes,
-    std::function<std::set<T>(const T &)> getEdges,
+    const std::set<T, std::less<>> & nodes,
+    std::function<std::set<T, std::less<>>(const T &)> getEdges,
     std::function<void(const T &)> processNode)
 {
     struct Graph {
-        std::set<T> left;
-        std::map<T, std::set<T>> refs, rrefs;
+        std::set<T, std::less<>> left;
+        std::map<T, std::set<T, std::less<>>> refs, rrefs;
     };
 
     Sync<Graph> graph_(Graph{nodes, {}, {}});

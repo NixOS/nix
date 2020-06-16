@@ -64,7 +64,7 @@ static void makeSymlink(PathView link, PathView target)
     createSymlink(target, tempLink);
 
     /* Atomically replace the old one. */
-    if (rename(tempLink.c_str(), link.c_str()) == -1)
+    if (rename(Path { tempLink }.c_str(), Path { link }.c_str()) == -1)
         throw SysError("cannot rename '%1%' to '%2%'",
             tempLink , link);
 }
@@ -276,7 +276,7 @@ void LocalStore::findRoots(PathView path, unsigned char type, Roots & roots)
 
         if (type == DT_DIR) {
             for (auto & i : readDirectory(path))
-                findRoots(path + "/" + i.name, i.type, roots);
+                findRoots(Path { path } << "/" << i.name, i.type, roots);
         }
 
         else if (type == DT_LNK) {
@@ -286,11 +286,11 @@ void LocalStore::findRoots(PathView path, unsigned char type, Roots & roots)
 
             /* Handle indirect roots. */
             else {
-                target = absPath(target, dirOf(path));
+                target = absPath(Path { target }, dirOf(path));
                 if (!pathExists(target)) {
                     if (isInDir(path, stateDir + "/" + gcRootsDir + "/auto")) {
                         printInfo(format("removing stale link from '%1%' to '%2%'") % path % target);
-                        unlink(path.c_str());
+                        unlink(Path { path }.c_str());
                     }
                 } else {
                     struct stat st2 = lstat(target);
@@ -351,7 +351,7 @@ static void readProcLink(std::string_view file, UncheckedRoots & roots)
     auto bufsiz = ssize_t{64};
 try_again:
     char buf[bufsiz];
-    auto res = readlink(file.c_str(), buf, bufsiz);
+    auto res = readlink(Path { file }.c_str(), buf, bufsiz);
     if (res == -1) {
         if (errno == ENOENT || errno == EACCES || errno == ESRCH)
             return;
@@ -371,7 +371,7 @@ try_again:
 static string quoteRegexChars(std::string_view raw)
 {
     static auto specialRegex = std::regex(R"([.^$\\*+?()\[\]{}|])");
-    return std::regex_replace(raw, specialRegex, R"(\$&)");
+    return std::regex_replace(std::string { raw }, specialRegex, R"(\$&)");
 }
 
 static void readFileRoots(const char * path, UncheckedRoots & roots)
@@ -548,7 +548,7 @@ void LocalStore::deletePathRecursive(GCState & state, PathView path)
 
     printInfo(format("deleting '%1%'") % path);
 
-    state.results.paths.insert(path);
+    state.results.paths.insert(Path { path });
 
     /* If the path is not a regular file or symlink, move it to the
        trash directory.  The move is to ensure that later (when we're

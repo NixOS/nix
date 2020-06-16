@@ -25,13 +25,13 @@ struct DerivationOutput
     void parseHashInfo(FileIngestionMethod & recursive, Hash & hash) const;
 };
 
-typedef std::map<string, DerivationOutput> DerivationOutputs;
+typedef std::map<string, DerivationOutput, std::less<>> DerivationOutputs;
 
 /* For inputs that are sub-derivations, we specify exactly which
    output IDs we are interested in. */
-typedef std::map<StorePath, StringSet> DerivationInputs;
+typedef std::map<StorePath, StringSet, std::less<>> DerivationInputs;
 
-typedef std::map<string, string> StringPairs;
+typedef std::map<string, string, std::less<>> StringPairs;
 
 struct BasicDerivation
 {
@@ -68,7 +68,7 @@ struct Derivation : BasicDerivation
 
     /* Print a derivation. */
     std::string unparse(const Store & store, bool maskOutputs,
-        std::map<std::string, StringSet> * actualInputs = nullptr) const;
+        std::map<std::string, StringSet, std::less<>> * actualInputs = nullptr) const;
 
     Derivation() { }
     Derivation(Derivation && other) = default;
@@ -92,11 +92,11 @@ bool isDerivation(std::string_view fileName);
 Hash hashDerivationModulo(Store & store, const Derivation & drv, bool maskOutputs);
 
 /* Memoisation of hashDerivationModulo(). */
-typedef std::map<StorePath, Hash> DrvHashes;
+typedef std::map<StorePath, Hash, std::less<>> DrvHashes;
 
 extern DrvHashes drvHashes; // FIXME: global, not thread-safe
 
-bool wantOutput(std::string_view output, const std::set<string> & wanted);
+bool wantOutput(std::string_view output, const std::set<string, std::less<>> & wanted);
 
 struct Source;
 struct Sink;

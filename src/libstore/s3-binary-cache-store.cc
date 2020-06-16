@@ -91,7 +91,7 @@ S3Helper::S3Helper(std::string_view profile, std::string_view region, std::strin
             ? std::dynamic_pointer_cast<Aws::Auth::AWSCredentialsProvider>(
                 std::make_shared<Aws::Auth::DefaultAWSCredentialsProviderChain>())
             : std::dynamic_pointer_cast<Aws::Auth::AWSCredentialsProvider>(
-                std::make_shared<Aws::Auth::ProfileConfigFileAWSCredentialsProvider>(profile.c_str())),
+                std::make_shared<Aws::Auth::ProfileConfigFileAWSCredentialsProvider>(std::string { profile }.c_str())),
             *config,
             // FIXME: https://github.com/aws/aws-sdk-cpp/issues/759
 #if AWS_VERSION_MAJOR == 1 && AWS_VERSION_MINOR < 3
@@ -124,7 +124,7 @@ ref<Aws::Client::ClientConfiguration> S3Helper::makeConfig(std::string_view regi
     auto res = make_ref<Aws::Client::ClientConfiguration>();
     res->region = region;
     if (!scheme.empty()) {
-        res->scheme = Aws::Http::SchemeMapper::FromString(scheme.c_str());
+        res->scheme = Aws::Http::SchemeMapper::FromString(std::string { scheme }.c_str());
     }
     if (!endpoint.empty()) {
         res->endpointOverride = endpoint;
@@ -143,8 +143,8 @@ S3Helper::FileTransferResult S3Helper::getObject(
 
     auto request =
         Aws::S3::Model::GetObjectRequest()
-        .WithBucket(bucketName)
-        .WithKey(key);
+        .WithBucket(std::string { bucketName })
+        .WithKey(std::string { key });
 
     request.SetResponseStreamFactory([&]() {
         return Aws::New<std::stringstream>("STRINGSTREAM");
@@ -244,7 +244,7 @@ struct S3BinaryCacheStoreImpl : public S3BinaryCacheStore
         auto res = s3Helper.client->HeadObject(
             Aws::S3::Model::HeadObjectRequest()
             .WithBucket(bucketName)
-            .WithKey(path));
+            .WithKey(Path { path }));
 
         if (!res.IsSuccess()) {
             auto & error = res.GetError();
@@ -307,7 +307,7 @@ struct S3BinaryCacheStoreImpl : public S3BinaryCacheStore
 
             std::shared_ptr<TransferHandle> transferHandle =
                 transferManager->UploadFile(
-                    stream, bucketName, path, mimeType,
+                    stream, bucketName, Path { path }, std::string { mimeType },
                     Aws::Map<Aws::String, Aws::String>(),
                     nullptr /*, contentEncoding */);
 
@@ -326,12 +326,12 @@ struct S3BinaryCacheStoreImpl : public S3BinaryCacheStore
             auto request =
                 Aws::S3::Model::PutObjectRequest()
                 .WithBucket(bucketName)
-                .WithKey(path);
+                .WithKey(Path { path });
 
-            request.SetContentType(mimeType);
+            request.SetContentType(std::string { mimeType });
 
             if (contentEncoding != "")
-                request.SetContentEncoding(contentEncoding);
+                request.SetContentEncoding(std::string { contentEncoding });
 
             auto stream = std::make_shared<istringstream_nocopy>(data);
 
@@ -426,7 +426,7 @@ static RegisterStoreImplementation regStore([](
     -> std::shared_ptr<Store>
 {
     if (std::string(uri, 0, 5) != "s3://") return 0;
-    auto store = std::make_shared<S3BinaryCacheStoreImpl>(params, std::string(uri, 5));
+    auto store = std::make_shared<S3BinaryCacheStoreImpl>(params, uri.substr(5));
     store->init();
     return store;
 });

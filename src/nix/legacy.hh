@@ -10,7 +10,7 @@ typedef std::function<void(int, char * *)> MainFunction;
 
 struct RegisterLegacyCommand
 {
-    typedef std::map<std::string, MainFunction> Commands;
+    typedef std::map<std::string, MainFunction, std::less<>> Commands;
     static Commands * commands;
 
     RegisterLegacyCommand(std::string_view name, MainFunction fun)

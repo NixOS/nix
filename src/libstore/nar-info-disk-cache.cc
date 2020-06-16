@@ -64,7 +64,7 @@ public:
     {
         SQLite db;
         SQLiteStmt insertCache, queryCache, insertNAR, insertMissingNAR, queryNAR, purgeCache;
-        std::map<std::string, Cache> caches;
+        std::map<std::string, Cache, std::less<>> caches;
     };
 
     Sync<State> _state;
@@ -138,7 +138,12 @@ public:
 
             state->insertCache.use()(uri)(time(0))(storeDir)(wantMassQuery)(priority).exec();
             assert(sqlite3_changes(state->db) == 1);
-            state->caches[uri] = Cache{(int) sqlite3_last_insert_rowid(state->db), storeDir, wantMassQuery, priority};
+            state->caches[std::string { uri }] = Cache {
+              (int) sqlite3_last_insert_rowid(state->db),
+              std::string { storeDir },
+              wantMassQuery,
+              priority,
+            };
         });
     }
 
@@ -189,7 +194,7 @@ public:
                 return {oInvalid, 0};
 
             auto namePart = queryNAR.getStr(1);
-            auto narInfo = make_ref<NarInfo>(StorePath::fromBaseName(hashPart + "-" + namePart));
+            auto narInfo = make_ref<NarInfo>(StorePath::fromBaseName(std::string { hashPart } << "-" << namePart));
             narInfo->url = queryNAR.getStr(2);
             narInfo->compression = queryNAR.getStr(3);
             if (!queryNAR.isNull(4))

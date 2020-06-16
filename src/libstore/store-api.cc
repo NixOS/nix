@@ -26,9 +26,9 @@ Path Store::toStorePath(PathView path) const
         throw Error("path '%1%' is not in the Nix store", path);
     Path::size_type slash = path.find('/', storeDir.size() + 1);
     if (slash == Path::npos)
-        return path;
+        return Path { path };
     else
-        return Path(path, 0, slash);
+        return Path { path, 0, slash };
 }
 
 
@@ -38,7 +38,7 @@ Path Store::followLinksToStore(std::string_view _path) const
     while (!isInStore(path)) {
         if (!isLink(path)) break;
         string target = readLink(path);
-        path = absPath(target, dirOf(path));
+        path = absPath(Path { target }, dirOf(path));
     }
     if (!isInStore(path))
         throw NotInStore("path '%1%' is not in the Nix store", path);
@@ -142,7 +142,7 @@ StorePath Store::makeStorePath(std::string_view type,
     const Hash & hash, std::string_view name) const
 {
     /* e.g., "source:sha256:1abc...:/nix/store:foo.tar.gz" */
-    string s = type + ":" + hash.to_string(Base16, true) + ":" + storeDir + ":" + std::string(name);
+    string s = std::string { type } << ":" << hash.to_string(Base16, true) << ":" << storeDir << ":" << name;
     auto h = compressHash(hashString(htSHA256, s), 20);
     return StorePath::make(h.hash, name);
 }
@@ -151,8 +151,8 @@ StorePath Store::makeStorePath(std::string_view type,
 StorePath Store::makeOutputPath(std::string_view id,
     const Hash & hash, std::string_view name) const
 {
-    return makeStorePath("output:" + id, hash,
-        std::string(name) + (id == "out" ? "" : "-" + id));
+    return makeStorePath("output:" << id, hash,
+        std::string { name } << (id == "out" ? "" : "-" << id));
 }
 
 
@@ -455,23 +455,23 @@ void Store::pathInfoToJSON(JSONPlaceholder & jsonOut, const StorePathSet & store
 
     for (auto & storePath : storePaths) {
         auto jsonPath = jsonList.object();
-        jsonPath.attr("path", printStorePath(storePath));
+        jsonPath.attr("path", std::string_view { printStorePath(storePath) });
 
         try {
             auto info = queryPathInfo(storePath);
 
             jsonPath
-                .attr("narHash", info->narHash.to_string(hashBase, true))
+                .attr("narHash", std::string_view { info->narHash.to_string(hashBase, true) })
                 .attr("narSize", info->narSize);
 
             {
                 auto jsonRefs = jsonPath.list("references");
                 for (auto & ref : info->references)
-                    jsonRefs.elem(printStorePath(ref));
+                    jsonRefs.elem(std::string_view { printStorePath(ref) });
             }
 
             if (info->ca != "")
-                jsonPath.attr("ca", info->ca);
+                jsonPath.attr("ca", std::string_view { info->ca });
 
             std::pair<uint64_t, uint64_t> closureSizes;
 
@@ -483,7 +483,7 @@ void Store::pathInfoToJSON(JSONPlaceholder & jsonOut, const StorePathSet & store
             if (includeImpureInfo) {
 
                 if (info->deriver)
-                    jsonPath.attr("deriver", printStorePath(*info->deriver));
+                    jsonPath.attr("deriver", std::string_view { printStorePath(*info->deriver) });
 
                 if (info->registrationTime)
                     jsonPath.attr("registrationTime", info->registrationTime);
@@ -494,7 +494,7 @@ void Store::pathInfoToJSON(JSONPlaceholder & jsonOut, const StorePathSet & store
                 if (!info->sigs.empty()) {
                     auto jsonSigs = jsonPath.list("signatures");
                     for (auto & sig : info->sigs)
-                        jsonSigs.elem(sig);
+                        jsonSigs.elem(std::string_view { sig });
                 }
 
                 auto narInfo = std::dynamic_pointer_cast<const NarInfo>(
@@ -502,9 +502,9 @@ void Store::pathInfoToJSON(JSONPlaceholder & jsonOut, const StorePathSet & store
 
                 if (narInfo) {
                     if (!narInfo->url.empty())
-                        jsonPath.attr("url", narInfo->url);
+                        jsonPath.attr("url", std::string_view { narInfo->url });
                     if (narInfo->fileHash)
-                        jsonPath.attr("downloadHash", narInfo->fileHash.to_string(Base32, true));
+                        jsonPath.attr("downloadHash", std::string_view { narInfo->fileHash.to_string(Base32, true) });
                     if (narInfo->fileSize)
                         jsonPath.attr("downloadSize", narInfo->fileSize);
                     if (showClosureSize)
@@ -640,7 +640,7 @@ void copyPaths(ref<Store> srcStore, ref<Store> dstStore, const StorePathSet & st
     ThreadPool pool;
 
     processGraph<Path>(pool,
-        PathSet(missing.begin(), missing.end()),
+        PathSet { missing },
 
         [&](PathView storePath) {
             if (dstStore->isValidPath(dstStore->parseStorePath(storePath))) {
@@ -857,16 +857,15 @@ namespace nix {
 RegisterStoreImplementation::Implementations * RegisterStoreImplementation::implementations = 0;
 
 /* Split URI into protocol+hierarchy part and its parameter set. */
-std::pair<std::string, Store::Params> splitUriAndParams(std::string_view uri_)
+std::pair<std::string, Store::Params> splitUriAndParams(std::string_view uri)
 {
-    auto uri(uri_);
     Store::Params params;
     auto q = uri.find('?');
     if (q != std::string::npos) {
         params = decodeQuery(uri.substr(q + 1));
-        uri = uri_.substr(0, q);
+        uri = uri.substr(0, q);
     }
-    return {uri, params};
+    return {std::string { uri }, params};
 }
 
 ref<Store> openStore(std::string_view uri_,
@@ -895,7 +894,7 @@ StoreType getStoreType(std::string_view uri, std::string_view stateDir)
     } else if (uri == "local" || hasPrefix(uri, "/")) {
         return tLocal;
     } else if (uri == "" || uri == "auto") {
-        if (access(stateDir.c_str(), R_OK | W_OK) == 0)
+        if (access(Path { stateDir }.c_str(), R_OK | W_OK) == 0)
             return tLocal;
         else if (pathExists(settings.nixDaemonSocketFile))
             return tDaemon;
@@ -934,7 +933,7 @@ std::list<ref<Store>> getDefaultSubstituters()
         StringSet done;
 
         auto addStore = [&](std::string_view uri) {
-            if (!done.insert(uri).second) return;
+            if (!done.insert(std::string { uri }).second) return;
             try {
                 stores.push_back(openStore(uri));
             } catch (Error & e) {

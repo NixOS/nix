@@ -382,6 +382,7 @@ const time_t mtimeStore = 1; /* 1 second into the epoch */
 
 static void canonicaliseTimestampAndPermissions(PathView path, const struct stat & st)
 {
+	Path freshPath { path };
     if (!S_ISLNK(st.st_mode)) {
 
         /* Mask out all type related bits. */
@@ -391,7 +392,7 @@ static void canonicaliseTimestampAndPermissions(PathView path, const struct stat
             mode = (st.st_mode & S_IFMT)
                  | 0444
                  | (st.st_mode & S_IXUSR ? 0111 : 0);
-            if (chmod(path.c_str(), mode) == -1)
+            if (chmod(freshPath.c_str(), mode) == -1)
                 throw SysError("changing mode of '%1%' to %2$o", path, mode);
         }
 
@@ -404,11 +405,11 @@ static void canonicaliseTimestampAndPermissions(PathView path, const struct stat
         times[1].tv_sec = mtimeStore;
         times[1].tv_usec = 0;
 #if HAVE_LUTIMES
-        if (lutimes(path.c_str(), times) == -1)
+        if (lutimes(freshPath.c_str(), times) == -1)
             if (errno != ENOSYS ||
-                (!S_ISLNK(st.st_mode) && utimes(path.c_str(), times) == -1))
+                (!S_ISLNK(st.st_mode) && utimes(freshPath.c_str(), times) == -1))
 #else
-        if (!S_ISLNK(st.st_mode) && utimes(path.c_str(), times) == -1)
+        if (!S_ISLNK(st.st_mode) && utimes(freshPath.c_str(), times) == -1)
 #endif
             throw SysError("changing modification time of '%1%'", path);
     }
@@ -418,7 +419,7 @@ static void canonicaliseTimestampAndPermissions(PathView path, const struct stat
 void canonicaliseTimestampAndPermissions(PathView path)
 {
     struct stat st;
-    if (lstat(path.c_str(), &st))
+    if (lstat(Path { path }.c_str(), &st))
         throw SysError("getting attributes of path '%1%'", path);
     canonicaliseTimestampAndPermissions(path, st);
 }
@@ -428,18 +429,19 @@ static void canonicalisePathMetaData_(PathView path, uid_t fromUid, InodesSeen &
 {
     checkInterrupt();
 
+       Path freshPath { path };
 #if __APPLE__
     /* Remove flags, in particular UF_IMMUTABLE which would prevent
        the file from being garbage-collected. FIXME: Use
        setattrlist() to remove other attributes as well. */
-    if (lchflags(path.c_str(), 0)) {
+    if (lchflags(freshPath.c_str(), 0)) {
         if (errno != ENOTSUP)
             throw SysError("clearing flags of path '%1%'", path);
     }
 #endif
 
     struct stat st;
-    if (lstat(path.c_str(), &st))
+    if (lstat(freshPath.c_str(), &st))
         throw SysError("getting attributes of path '%1%'", path);
 
     /* Really make sure that the path is of a supported type. */
@@ -448,7 +450,7 @@ static void canonicalisePathMetaData_(PathView path, uid_t fromUid, InodesSeen &
 
 #if __linux__
     /* Remove extended attributes / ACLs. */
-    ssize_t eaSize = llistxattr(path.c_str(), nullptr, 0);
+    ssize_t eaSize = llistxattr(freshPath.c_str(), nullptr, 0);
 
     if (eaSize < 0) {
         if (errno != ENOTSUP && errno != ENODATA)
@@ -456,14 +458,14 @@ static void canonicalisePathMetaData_(PathView path, uid_t fromUid, InodesSeen &
     } else if (eaSize > 0) {
         std::vector<char> eaBuf(eaSize);
 
-        if ((eaSize = llistxattr(path.c_str(), eaBuf.data(), eaBuf.size())) < 0)
+        if ((eaSize = llistxattr(freshPath.c_str(), eaBuf.data(), eaBuf.size())) < 0)
             throw SysError("querying extended attributes of '%s'", path);
 
         for (auto & eaName: tokenizeString<Strings>(std::string(eaBuf.data(), eaSize), std::string("\000", 1))) {
             /* Ignore SELinux security labels since these cannot be
                removed even by root. */
             if (eaName == "security.selinux") continue;
-            if (lremovexattr(path.c_str(), eaName.c_str()) == -1)
+            if (lremovexattr(freshPath.c_str(), eaName.c_str()) == -1)
                 throw SysError("removing extended attribute '%s' from '%s'", eaName, path);
         }
      }
@@ -497,10 +499,10 @@ static void canonicalisePathMetaData_(PathView path, uid_t fromUid, InodesSeen &
        users group); we check for this case below. */
     if (st.st_uid != geteuid()) {
 #if HAVE_LCHOWN
-        if (lchown(path.c_str(), geteuid(), getegid()) == -1)
+        if (lchown(Path { path }.c_str(), geteuid(), getegid()) == -1)
 #else
         if (!S_ISLNK(st.st_mode) &&
-            chown(path.c_str(), geteuid(), getegid()) == -1)
+            chown(Path { Path }.c_str(), geteuid(), getegid()) == -1)
 #endif
             throw SysError("changing owner of '%1%' to %2%",
                 path, geteuid());
@@ -509,7 +511,7 @@ static void canonicalisePathMetaData_(PathView path, uid_t fromUid, InodesSeen &
     if (S_ISDIR(st.st_mode)) {
         DirEntries entries = readDirectory(path);
         for (auto & i : entries)
-            canonicalisePathMetaData_(path + "/" + i.name, fromUid, inodesSeen);
+            canonicalisePathMetaData_(Path { path } << "/" << i.name, fromUid, inodesSeen);
     }
 }
 
@@ -521,7 +523,7 @@ void canonicalisePathMetaData(PathView path, uid_t fromUid, InodesSeen & inodesS
     /* On platforms that don't have lchown(), the top-level path can't
        be a symlink, since we can't change its ownership. */
     struct stat st;
-    if (lstat(path.c_str(), &st))
+    if (lstat(Path { path }.c_str(), &st))
         throw SysError("getting attributes of path '%1%'", path);
 
     if (st.st_uid != geteuid()) {
@@ -793,7 +795,7 @@ std::optional<StorePath> LocalStore::queryPathFromHashPart(std::string_view hash
 {
     if (hashPart.size() != storePathHashLen) throw Error("invalid hash part");
 
-    Path prefix = storeDir + "/" + hashPart;
+    Path prefix = Path { storeDir } << "/" << hashPart;
 
     return retrySQLite<std::optional<StorePath>>([&]() -> std::optional<StorePath> {
         auto state(_state.lock());
@@ -1091,7 +1093,7 @@ StorePath LocalStore::addToStoreFromDump(std::string_view dump, std::string_view
 StorePath LocalStore::addToStore(std::string_view name, PathView _srcPath,
     FileIngestionMethod method, HashType hashAlgo, PathFilter & filter, RepairFlag repair)
 {
-    Path srcPath(absPath(_srcPath));
+    Path srcPath = absPath(Path { _srcPath });
 
     /* Read the whole path into memory. This is not a very scalable
        method for very large paths, but `copyPath' is mainly used for
@@ -1313,7 +1315,7 @@ void LocalStore::verifyPath(PathView pathS, const StringSet & store,
 {
     checkInterrupt();
 
-    if (!done.insert(pathS).second) return;
+    if (!done.insert(Path { pathS }).second) return;
 
     if (!isStorePath(pathS)) {
         logError({

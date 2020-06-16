@@ -18,7 +18,7 @@ AutoCloseFD openLockFile(PathView path, bool create)
 {
     AutoCloseFD fd;
 
-    fd = open(path.c_str(), O_CLOEXEC | O_RDWR | (create ? O_CREAT : 0), 0600);
+    fd = open(Path { path }.c_str(), O_CLOEXEC | O_RDWR | (create ? O_CREAT : 0), 0600);
     if (!fd && (create || errno != ENOENT))
         throw SysError("opening lock file '%1%'", path);
 
@@ -32,7 +32,7 @@ void deleteLockFile(PathView path, int fd)
        races.  Write a (meaningless) token to the file to indicate to
        other processes waiting on this lock that the lock is stale
        (deleted). */
-    unlink(path.c_str());
+    unlink(Path { path }.c_str());
     writeFull(fd, "d");
     /* Note that the result of unlink() is ignored; removing the lock
        file is an optimisation, not a necessity. */

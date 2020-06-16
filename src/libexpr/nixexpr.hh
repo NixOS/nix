@@ -187,7 +187,7 @@ struct ExprAttrs : Expr
             : inherited(inherited), e(e), pos(pos) { };
         AttrDef() { };
     };
-    typedef std::map<Symbol, AttrDef> AttrDefs;
+    typedef std::map<Symbol, AttrDef, std::less<>> AttrDefs;
     AttrDefs attrs;
     struct DynamicAttrDef {
         Expr * nameExpr, * valueExpr;
@@ -338,7 +338,7 @@ struct StaticEnv
 {
     bool isWith;
     const StaticEnv * up;
-    typedef std::map<Symbol, unsigned int> Vars;
+    typedef std::map<Symbol, unsigned int, std::less<>> Vars;
     Vars vars;
     StaticEnv(bool isWith, const StaticEnv * up) : isWith(isWith), up(up) { };
 };

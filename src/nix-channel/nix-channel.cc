@@ -11,7 +11,7 @@
 
 using namespace nix;
 
-typedef std::map<string,string> Channels;
+typedef std::map<string, string, std::less<>> Channels;
 
 static Channels channels;
 static Path channelsList;

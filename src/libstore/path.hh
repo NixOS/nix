@@ -59,7 +59,7 @@ struct StorePath : rust::Value<3 * sizeof(void *) + 24, ffi_StorePath_drop>
     static StorePath dummy;
 };
 
-typedef std::set<StorePath> StorePathSet;
+typedef std::set<StorePath, std::less<>> StorePathSet;
 typedef std::vector<StorePath> StorePaths;
 
 StorePathSet cloneStorePathSet(const StorePathSet & paths);
@@ -81,13 +81,13 @@ enum struct FileIngestionMethod : uint8_t {
 struct StorePathWithOutputs
 {
     StorePath path;
-    std::set<std::string> outputs;
+    std::set<std::string, std::less<>> outputs;
 
-    StorePathWithOutputs(const StorePath & path, const std::set<std::string> & outputs = {})
+    StorePathWithOutputs(const StorePath & path, const std::set<std::string, std::less<>> & outputs = {})
         : path(path.clone()), outputs(outputs)
     { }
 
-    StorePathWithOutputs(StorePath && path, std::set<std::string> && outputs)
+    StorePathWithOutputs(StorePath && path, std::set<std::string, std::less<>> && outputs)
         : path(std::move(path)), outputs(std::move(outputs))
     { }
 

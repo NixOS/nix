@@ -8,12 +8,12 @@
 
 namespace nix {
 
-static std::pair<std::string, std::string> split(std::string_view s)
+static std::pair<std::string_view, std::string_view> split(std::string_view s)
 {
     size_t colon = s.find(':');
     if (colon == std::string::npos || colon == 0)
         return {"", ""};
-    return {std::string(s, 0, colon), std::string(s, colon + 1)};
+    return {s.substr(0, colon), s.substr(colon + 1)};
 }
 
 Key::Key(std::string_view s)

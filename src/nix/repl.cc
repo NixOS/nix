@@ -682,7 +682,7 @@ std::ostream & NixRepl::printValue(std::ostream & str, Value & v, unsigned int m
         else if (maxDepth > 0) {
             str << "{ ";
 
-            typedef std::map<string, Value *> Sorted;
+            typedef std::map<string, Value *, std::less<>> Sorted;
             Sorted sorted;
             for (auto & i : *v.attrs)
                 sorted[i.name] = i.value;

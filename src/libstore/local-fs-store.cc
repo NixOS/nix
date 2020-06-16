@@ -23,7 +23,7 @@ struct LocalStoreAccessor : public FSAccessor
         Path storePath = store->toStorePath(path);
         if (!store->isValidPath(store->parseStorePath(storePath)))
             throw InvalidPath("path '%1%' is not a valid store path", storePath);
-        return store->getRealStoreDir() + std::string(path, store->storeDir.size());
+        return Path { store->getRealStoreDir() } << path.substr(store->storeDir.size());
     }
 
     FSAccessor::Stat stat(PathView path) override

@@ -27,7 +27,7 @@ namespace nix {
 
 SQLite::SQLite(PathView path, bool create)
 {
-    if (sqlite3_open_v2(path.c_str(), &db,
+    if (sqlite3_open_v2(Path { path }.c_str(), &db,
             SQLITE_OPEN_READWRITE | (create ? SQLITE_OPEN_CREATE : 0), 0) != SQLITE_OK)
         throw Error("cannot open SQLite database '%s'", path);
 
@@ -56,7 +56,7 @@ void SQLite::isCache()
 void SQLite::exec(std::string_view stmt)
 {
     retrySQLite<void>([&]() {
-        if (sqlite3_exec(db, stmt.c_str(), 0, 0, 0) != SQLITE_OK)
+        if (sqlite3_exec(db, Path { stmt }.c_str(), 0, 0, 0) != SQLITE_OK)
             throwSQLiteError(db, format("executing SQLite statement '%s'") % stmt);
     });
 }
@@ -65,7 +65,7 @@ void SQLiteStmt::create(sqlite3 * db, std::string_view sql)
 {
     checkInterrupt();
     assert(!stmt);
-    if (sqlite3_prepare_v2(db, sql.c_str(), -1, &stmt, 0) != SQLITE_OK)
+    if (sqlite3_prepare_v2(db, Path { sql }.c_str(), -1, &stmt, 0) != SQLITE_OK)
         throwSQLiteError(db, fmt("creating statement '%s'", sql));
     this->db = db;
     this->sql = sql;
@@ -98,7 +98,7 @@ SQLiteStmt::Use::~Use()
 SQLiteStmt::Use & SQLiteStmt::Use::operator () (std::string_view value, bool notNull)
 {
     if (notNull) {
-        if (sqlite3_bind_text(stmt, curArg++, value.c_str(), -1, SQLITE_TRANSIENT) != SQLITE_OK)
+        if (sqlite3_bind_text(stmt, curArg++, Path { value }.c_str(), -1, SQLITE_TRANSIENT) != SQLITE_OK)
             throwSQLiteError(stmt.db, "binding argument");
     } else
         bind();

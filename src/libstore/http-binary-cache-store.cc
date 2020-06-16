@@ -85,7 +85,7 @@ protected:
         checkEnabled();
 
         try {
-            FileTransferRequest request(cacheUri + "/" + path);
+            FileTransferRequest request(std::string { cacheUri } << "/" << path);
             request.head = true;
             getFileTransfer()->download(request);
             return true;
@@ -103,7 +103,7 @@ protected:
         std::string_view data,
         std::string_view mimeType) override
     {
-        auto req = FileTransferRequest(cacheUri + "/" + path);
+        auto req = FileTransferRequest(Path { cacheUri } << "/" << path);
         req.data = std::make_shared<string>(data); // FIXME: inefficient
         req.mimeType = mimeType;
         try {
@@ -115,7 +115,7 @@ protected:
 
     FileTransferRequest makeRequest(std::string_view path)
     {
-        FileTransferRequest request(cacheUri + "/" + path);
+        FileTransferRequest request(std::string { cacheUri } << "/" << path);
         return request;
     }
 

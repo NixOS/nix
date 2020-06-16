@@ -12,7 +12,7 @@ namespace nix {
 struct DrvInfo
 {
 public:
-    typedef std::map<string, Path> Outputs;
+    typedef std::map<string, Path, std::less<>> Outputs;
 
 private:
     EvalState * state;

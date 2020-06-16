@@ -34,9 +34,9 @@ static GlobalConfig::Register r1(&fileTransferSettings);
 std::string resolveUri(std::string_view uri)
 {
     if (uri.compare(0, 8, "channel:") == 0)
-        return "https://nixos.org/channels/" + std::string(uri, 8) + "/nixexprs.tar.xz";
+        return "https://nixos.org/channels/" << uri.substr(8) << "/nixexprs.tar.xz";
     else
-        return uri;
+        return std::string { uri };
 }
 
 struct curlFileTransfer : public FileTransfer

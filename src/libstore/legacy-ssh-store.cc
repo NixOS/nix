@@ -291,7 +291,7 @@ static RegisterStoreImplementation regStore([](
     -> std::shared_ptr<Store>
 {
     if (std::string(uri, 0, uriScheme.size()) != uriScheme) return 0;
-    return std::make_shared<LegacySSHStore>(std::string(uri, uriScheme.size()), params);
+    return std::make_shared<LegacySSHStore>(uri.substr(uriScheme.size()), params);
 });
 
 }

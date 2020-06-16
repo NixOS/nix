@@ -109,7 +109,7 @@ struct SubstitutablePathInfo
     unsigned long long narSize; /* 0 = unknown */
 };
 
-typedef std::map<StorePath, SubstitutablePathInfo> SubstitutablePathInfos;
+typedef std::map<StorePath, SubstitutablePathInfo, std::less<>> SubstitutablePathInfos;
 
 
 struct ValidPathInfo
@@ -246,7 +246,7 @@ class Store : public std::enable_shared_from_this<Store>, public Config
 {
 public:
 
-    typedef std::map<std::string, std::string> Params;
+    typedef std::map<std::string, std::string, std::less<>> Params;
 
     const PathSetting storeDir_{this, false, settings.nixStore,
         "store", "path to the Nix store"};

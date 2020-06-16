@@ -51,7 +51,7 @@ void copyContext(const Value & v, PathSet & context);
 
 /* Cache for calls to addToStore(); maps source paths to the store
    paths. */
-typedef std::map<Path, StorePath> SrcToStore;
+typedef std::map<Path, StorePath, std::less<>> SrcToStore;
 
 
 std::ostream & operator << (std::ostream & str, const Value & v);
@@ -96,7 +96,7 @@ private:
 #if HAVE_BOEHMGC
     typedef std::map<Path, Expr *, std::less<Path>, traceable_allocator<std::pair<const Path, Expr *> > > FileParseCache;
 #else
-    typedef std::map<Path, Expr *> FileParseCache;
+    typedef std::map<Path, Expr *, std::less<Path>> FileParseCache;
 #endif
     FileParseCache fileParseCache;
 
@@ -104,7 +104,7 @@ private:
 #if HAVE_BOEHMGC
     typedef std::map<Path, Value, std::less<Path>, traceable_allocator<std::pair<const Path, Value> > > FileEvalCache;
 #else
-    typedef std::map<Path, Value> FileEvalCache;
+    typedef std::map<Path, Value, std::less<Path>> FileEvalCache;
 #endif
     FileEvalCache fileEvalCache;
 
@@ -304,15 +304,15 @@ private:
 
     bool countCalls;
 
-    typedef std::map<Symbol, size_t> PrimOpCalls;
+    typedef std::map<Symbol, size_t, std::less> PrimOpCalls;
     PrimOpCalls primOpCalls;
 
-    typedef std::map<ExprLambda *, size_t> FunctionCalls;
+    typedef std::map<ExprLambda *, size_t, std::less<>> FunctionCalls;
     FunctionCalls functionCalls;
 
     void incrFunctionCall(ExprLambda * fun);
 
-    typedef std::map<Pos, size_t> AttrSelects;
+    typedef std::map<Pos, size_t, std::les<>> AttrSelects;
     AttrSelects attrSelects;
 
     friend struct ExprOpUpdate;

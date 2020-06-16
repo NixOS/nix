@@ -29,7 +29,7 @@ typedef list<Generation> Generations;
 
 /* Returns the list of currently present generations for the specified
    profile, sorted by generation number. */
-Generations findGenerations(Path profile, int & curGen);
+Generations findGenerations(PathView profile, int & curGen);
 
 class LocalFSStore;
 

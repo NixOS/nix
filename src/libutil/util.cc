@@ -79,7 +79,7 @@ void replaceEnv(std::map<std::string, std::string> newEnv)
 }
 
 
-Path absPath(Path path, std::optional<Path> dir)
+Path absPath(Path && path, std::optional<Path> dir)
 {
     if (path[0] != '/') {
         if (!dir) {
@@ -108,7 +108,7 @@ Path canonPath(PathView path, bool resolveSymlinks)
 {
     assert(path != "");
 
-    string s;
+    Path s;
 
     if (path[0] != '/')
         throw Error("not an absolute path: '%1%'", path);

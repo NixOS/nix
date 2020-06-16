@@ -16,7 +16,7 @@ struct Explicit {
 };
 
 typedef std::variant<std::string, int64_t, Explicit<bool>> Attr;
-typedef std::map<std::string, Attr> Attrs;
+typedef std::map<std::string, Attr, std::less<>> Attrs;
 
 Attrs jsonToAttrs(const nlohmann::json & json);
 

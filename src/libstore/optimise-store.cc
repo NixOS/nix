@@ -18,9 +18,10 @@ namespace nix {
 static void makeWritable(PathView path)
 {
     struct stat st;
-    if (lstat(path.c_str(), &st))
+    Path freshPath { path };
+    if (lstat(freshPath.c_str(), &st))
         throw SysError("getting attributes of path '%1%'", path);
-    if (chmod(path.c_str(), st.st_mode | S_IWUSR) == -1)
+    if (chmod(freshPath.c_str(), st.st_mode | S_IWUSR) == -1)
         throw SysError("changing writability of '%1%'", path);
 }
 
@@ -46,7 +47,7 @@ LocalStore::InodeHash LocalStore::loadInodeHash()
     debug("loading hash inodes in memory");
     InodeHash inodeHash;
 
-    AutoCloseDir dir(opendir(linksDir.c_str()));
+    AutoCloseDir dir(opendir(Path { linksDir }.c_str()));
     if (!dir) throw SysError("opening directory '%1%'", linksDir);
 
     struct dirent * dirent;
@@ -67,7 +68,7 @@ Strings LocalStore::readDirectoryIgnoringInodes(PathView path, const InodeHash &
 {
     Strings names;
 
-    AutoCloseDir dir(opendir(path.c_str()));
+    AutoCloseDir dir(opendir(Path { path }.c_str()));
     if (!dir) throw SysError("opening directory '%1%'", path);
 
     struct dirent * dirent;
@@ -95,7 +96,7 @@ void LocalStore::optimisePath_(Activity * act, OptimiseStats & stats,
     checkInterrupt();
 
     struct stat st;
-    if (lstat(path.c_str(), &st))
+    if (lstat(Path { path }.c_str(), &st))
         throw SysError("getting attributes of path '%1%'", path);
 
 #if __APPLE__
@@ -114,7 +115,7 @@ void LocalStore::optimisePath_(Activity * act, OptimiseStats & stats,
     if (S_ISDIR(st.st_mode)) {
         Strings names = readDirectoryIgnoringInodes(path, inodeHash);
         for (auto & i : names)
-            optimisePath_(act, stats, path + "/" + i, inodeHash);
+            optimisePath_(act, stats, Path { path } << "/" << i, inodeHash);
         return;
     }
 
@@ -161,14 +162,14 @@ void LocalStore::optimisePath_(Activity * act, OptimiseStats & stats,
  retry:
     if (!pathExists(linkPath)) {
         /* Nope, create a hard link in the links directory. */
-        if (link(path.c_str(), linkPath.c_str()) == 0) {
+        if (link(Path { path }.c_str(), Path { linkPath }.c_str()) == 0) {
             inodeHash.insert(st.st_ino);
             return;
         }
 
         switch (errno) {
         case EEXIST:
-            /* Fall through if another process created ‘linkPath’ before
+            /* Fall through if an }other process created ‘linkPath’ before
                we did. */
             break;
 
@@ -188,7 +189,7 @@ void LocalStore::optimisePath_(Activity * act, OptimiseStats & stats,
     /* Yes!  We've seen a file with the same contents.  Replace the
        current file with a hard link to that file. */
     struct stat stLink;
-    if (lstat(linkPath.c_str(), &stLink))
+    if (lstat(Path { linkPath }.c_str(), &stLink))
         throw SysError("getting attributes of path '%1%'", linkPath);
 
     if (st.st_ino == stLink.st_ino) {
@@ -201,7 +202,7 @@ void LocalStore::optimisePath_(Activity * act, OptimiseStats & stats,
             .name = "Corrupted link",
             .hint = hintfmt("removing corrupted link '%1%'", linkPath)
         });
-        unlink(linkPath.c_str());
+        unlink(Path { linkPath }.c_str());
         goto retry;
     }
 
@@ -233,7 +234,7 @@ void LocalStore::optimisePath_(Activity * act, OptimiseStats & stats,
     }
 
     /* Atomically replace the old file with the new hard link. */
-    if (rename(tempLink.c_str(), path.c_str()) == -1) {
+    if (rename(Path { tempLink }.c_str(), Path { path }.c_str()) == -1) {
         if (unlink(tempLink.c_str()) == -1)
             logError({
                 .name = "Unlink error",

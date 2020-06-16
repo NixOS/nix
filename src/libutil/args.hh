@@ -225,7 +225,7 @@ struct Command : virtual Args
     void printHelp(std::string_view programName, std::ostream & out) override;
 };
 
-typedef std::map<std::string, std::function<ref<Command>()>> Commands;
+typedef std::map<std::string, std::function<ref<Command>()>, std::less<>> Commands;
 
 /* An argument parser that supports multiple subcommands,
    i.e. ‘<command> <subcommand>’. */

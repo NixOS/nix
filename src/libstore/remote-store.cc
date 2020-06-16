@@ -78,11 +78,11 @@ UDSRemoteStore::UDSRemoteStore(const Params & params)
 }
 
 
-UDSRemoteStore::UDSRemoteStore(std::string socket_path, const Params & params)
+UDSRemoteStore::UDSRemoteStore(Path socket_path, const Params & params)
     : Store(params)
     , LocalFSStore(params)
     , RemoteStore(params)
-    , path(socket_path)
+    , path(std::move(socket_path))
 {
 }
 
@@ -481,7 +481,7 @@ StorePath RemoteStore::addToStore(std::string_view name, PathView _srcPath,
 
     auto conn(getConnection());
 
-    Path srcPath(absPath(_srcPath));
+    Path srcPath(absPath(Path { _srcPath }));
 
     conn->to
         << wopAddToStore
@@ -814,7 +814,7 @@ static RegisterStoreImplementation regStore([](
     -> std::shared_ptr<Store>
 {
     if (std::string(uri, 0, uriScheme.size()) != uriScheme) return 0;
-    return std::make_shared<UDSRemoteStore>(std::string(uri, uriScheme.size()), params);
+    return std::make_shared<UDSRemoteStore>(Path { uri.substr(uriScheme.size()) }, params);
 });
 
 }

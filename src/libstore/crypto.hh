@@ -42,7 +42,7 @@ private:
     friend struct SecretKey;
 };
 
-typedef std::map<std::string, PublicKey> PublicKeys;
+typedef std::map<std::string, PublicKey, std::less<>> PublicKeys;
 
 /* Return true iff ‘sig’ is a correct signature over ‘data’ using one
    of the given public keys. */

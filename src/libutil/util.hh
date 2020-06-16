@@ -50,7 +50,7 @@ void clearEnv();
 /* Return an absolutized path, resolving paths relative to the
    specified directory, or the current directory otherwise.  The path
    is also canonicalised. */
-Path absPath(Path path, std::optional<Path> dir = {});
+Path absPath(Path && path, std::optional<Path> dir = {});
 
 /* Canonicalise a path by removing all `.' or `..' components and
    double or trailing slashes.  Optionally resolves all symlink

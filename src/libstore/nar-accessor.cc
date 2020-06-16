@@ -97,7 +97,7 @@ struct NarAccessor : public FSAccessor
         void createSymlink(PathView path, std::string_view target) override
         {
             createMember(path,
-                NarMember{FSAccessor::Type::tSymlink, false, 0, 0, target});
+                NarMember{FSAccessor::Type::tSymlink, false, 0, 0, std::string { target }});
         }
     };
 
@@ -248,7 +248,7 @@ void listNar(JSONPlaceholder & res, ref<FSAccessor> accessor,
             for (auto & name : accessor->readDirectory(path)) {
                 if (recurse) {
                     auto res3 = res2.placeholder(name);
-                    listNar(res3, accessor, path + "/" + name, true);
+                    listNar(res3, accessor, Path { path } << "/" << name, true);
                 } else
                     res2.object(name);
             }
@@ -256,7 +256,7 @@ void listNar(JSONPlaceholder & res, ref<FSAccessor> accessor,
         break;
     case FSAccessor::Type::tSymlink:
         obj.attr("type", "symlink");
-        obj.attr("target", accessor->readLink(path));
+        obj.attr("target", std::string_view { accessor->readLink(path) });
         break;
     default:
         throw Error("path '%s' does not exist in NAR", path);

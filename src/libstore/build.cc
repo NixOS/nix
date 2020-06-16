@@ -100,7 +100,7 @@ typedef set<GoalPtr, CompareGoalPtrs> Goals;
 typedef list<WeakGoalPtr> WeakGoals;
 
 /* A map of paths to goals (and the other way around). */
-typedef std::map<StorePath, WeakGoalPtr> WeakGoalMap;
+typedef std::map<StorePath, WeakGoalPtr, std::less<>> WeakGoalMap;
 
 
 
@@ -859,7 +859,7 @@ private:
        building multiple times. Since this contains the hash, it
        allows us to compare whether two rounds produced the same
        result. */
-    std::map<Path, ValidPathInfo> prevInfos;
+    std::map<Path, ValidPathInfo, std::less<>> prevInfos;
 
     const uid_t sandboxUid = 1000;
     const gid_t sandboxGid = 100;
@@ -984,7 +984,7 @@ private:
     /* Check that an output meets the requirements specified by the
        'outputChecks' attribute (or the legacy
        '{allowed,disallowed}{References,Requisites}' attributes). */
-    void checkOutputs(const std::map<std::string, ValidPathInfo> & outputs);
+    void checkOutputs(const std::map<std::string, ValidPathInfo, std::less<>> & outputs);
 
     /* Open a log file and a pipe to it. */
     Path openLogFile();
@@ -1216,9 +1216,9 @@ void DerivationGoal::outputsSubstituted()
     trace("all outputs substituted (maybe)");
 
     if (nrFailed > 0 && nrFailed > nrNoSubstituters + nrIncompleteClosure && !settings.tryFallback) {
-        done(BuildResult::TransientFailure,
-            fmt("some substitutes for the outputs of derivation '%s' failed (usually happens due to networking issues); try '--fallback' to build derivation from source ",
-                worker.store.printStorePath(drvPath)));
+        done(BuildResult::TransientFailure,Error(
+            "some substitutes for the outputs of derivation '%s' failed (usually happens due to networking issues); try '--fallback' to build derivation from source ",
+            worker.store.printStorePath(drvPath)));
         return;
     }
 
@@ -3612,7 +3612,7 @@ void DerivationGoal::registerOutputs()
         if (allValid) return;
     }
 
-    std::map<std::string, ValidPathInfo> infos;
+    std::map<std::string, ValidPathInfo, std::less<>> infos;
 
     /* Set of inodes seen during calls to canonicalisePathMetaData()
        for this build's outputs.  This needs to be shared between
@@ -3919,9 +3919,9 @@ void DerivationGoal::registerOutputs()
 }
 
 
-void DerivationGoal::checkOutputs(const std::map<Path, ValidPathInfo> & outputs)
+void DerivationGoal::checkOutputs(const std::map<Path, ValidPathInfo, std::less<>> & outputs)
 {
-    std::map<Path, const ValidPathInfo &> outputsByPath;
+    std::map<Path, const ValidPathInfo &, std::less<>> outputsByPath;
     for (auto & output : outputs)
         outputsByPath.emplace(worker.store.printStorePath(output.second.path), output.second);
 

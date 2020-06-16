@@ -35,8 +35,8 @@ static void createLinks(State & state, PathView srcDir, PathView dstDir, int pri
         if (ent.name[0] == '.')
             /* not matched by glob */
             continue;
-        auto srcFile = srcDir + "/" + ent.name;
-        auto dstFile = dstDir + "/" + ent.name;
+        auto srcFile = Path { srcDir } << "/" << ent.name;
+        auto dstFile = Path { dstDir } << "/" << ent.name;
 
         struct stat srcSt;
         try {
@@ -125,12 +125,12 @@ void buildProfile(PathView out, Packages && pkgs)
     std::set<Path> done, postponed;
 
     auto addPkg = [&](PathView pkgDir, int priority) {
-        if (!done.insert(pkgDir).second) return;
+        if (!done.insert(Path { pkgDir }).second) return;
         createLinks(state, pkgDir, out, priority);
 
         try {
             for (const auto & p : tokenizeString<std::vector<string>>(
-                    readFile(pkgDir + "/nix-support/propagated-user-env-packages"), " \n"))
+                    readFile(Path { pkgDir } + "/nix-support/propagated-user-env-packages"), " \n"))
                 if (!done.count(p))
                     postponed.insert(p);
         } catch (SysError & e) {

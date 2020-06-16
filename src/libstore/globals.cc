@@ -170,19 +170,19 @@ template<> void BaseSetting<SandboxMode>::convertToArg(Args & args, std::string_
     args.addFlag({
         .longName = name,
         .description = "Enable sandboxing.",
-        .category = category,
+        .category = std::string { category },
         .handler = {[=]() { override(smEnabled); }}
     });
     args.addFlag({
         .longName = "no-" + name,
         .description = "Disable sandboxing.",
-        .category = category,
+        .category = std::string { category },
         .handler = {[=]() { override(smDisabled); }}
     });
     args.addFlag({
         .longName = "relaxed-" + name,
         .description = "Enable sandboxing, but allow builds to disable it.",
-        .category = category,
+        .category = std::string { category },
         .handler = {[=]() { override(smRelaxed); }}
     });
 }

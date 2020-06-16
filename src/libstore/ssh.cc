@@ -62,7 +62,7 @@ std::unique_ptr<SSHMaster::Connection> SSHMaster::startCommand(std::string_view 
                 args.push_back("-v");
         }
 
-        args.push_back(command);
+        args.push_back(std::string { command });
         execvp(args.begin()->c_str(), stringsToCharPtrs(args).data());
 
         // could not exec ssh/bash

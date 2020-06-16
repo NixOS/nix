@@ -6,6 +6,8 @@
 
 namespace nix {
 
+typedef std::map<std::string, std::string, std::less<>> UrlQuery;
+
 struct ParsedURL
 {
     std::string url;
@@ -13,7 +15,7 @@ struct ParsedURL
     std::string scheme;
     std::optional<std::string> authority;
     std::string path;
-    std::map<std::string, std::string> query;
+    UrlQuery query;
     std::string fragment;
 
     std::string to_string() const;
@@ -25,7 +27,7 @@ MakeError(BadURL, Error);
 
 std::string percentDecode(std::string_view in);
 
-std::map<std::string, std::string> decodeQuery(std::string_view query);
+UrlQuery decodeQuery(std::string_view query);
 
 ParsedURL parseURL(std::string_view url);
 

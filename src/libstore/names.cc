@@ -41,8 +41,8 @@ bool DrvName::matches(DrvName & n)
 }
 
 
-string nextComponent(string::const_iterator & p,
-    const string::const_iterator end)
+string nextComponent(std::string_view::const_iterator & p,
+    const std::string_view::const_iterator end)
 {
     /* Skip any dots and dashes (component separators). */
     while (p != end && (*p == '.' || *p == '-')) ++p;
@@ -81,8 +81,9 @@ static bool componentsLT(std::string_view c1, std::string_view c2)
 
 int compareVersions(std::string_view v1, std::string_view v2)
 {
-    string::const_iterator p1 = v1.begin();
-    string::const_iterator p2 = v2.begin();
+    std::string_view::const_iterator
+        p1 = v1.begin(),
+        p2 = v2.begin();
 
     while (p1 != v1.end() || p2 != v2.end()) {
         string c1 = nextComponent(p1, v1.end());

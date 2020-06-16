@@ -37,7 +37,7 @@ protected:
     void getFile(std::string_view path, Sink & sink) override
     {
         try {
-            readFile(binaryCacheDir + "/" + path, sink);
+            readFile(Path { binaryCacheDir } << "/" << path, sink);
         } catch (SysError & e) {
             if (e.errNo == ENOENT)
                 throw NoSuchBinaryCacheFile("file '%s' does not exist in binary cache", path);
@@ -70,24 +70,24 @@ void LocalBinaryCacheStore::init()
 
 static void atomicWrite(PathView path, std::string_view s)
 {
-    Path tmp = path + ".tmp." + std::to_string(getpid());
+    Path tmp = Path { path } << ".tmp." << std::to_string(getpid());
     AutoDelete del(tmp, false);
     writeFile(tmp, s);
-    if (rename(tmp.c_str(), path.c_str()))
+    if (rename(Path { tmp }.c_str(), Path { path }.c_str()))
         throw SysError("renaming '%1%' to '%2%'", tmp, path);
     del.cancel();
 }
 
 bool LocalBinaryCacheStore::fileExists(std::string_view path)
 {
-    return pathExists(binaryCacheDir + "/" + path);
+    return pathExists(Path { binaryCacheDir } << "/" << path);
 }
 
 void LocalBinaryCacheStore::upsertFile(std::string_view path,
     std::string_view data,
     std::string_view mimeType)
 {
-    atomicWrite(binaryCacheDir + "/" + path, data);
+    atomicWrite(Path { binaryCacheDir } << "/" << path, data);
 }
 
 static RegisterStoreImplementation regStore([](
@@ -97,7 +97,7 @@ static RegisterStoreImplementation regStore([](
     if (getEnv("_NIX_FORCE_HTTP_BINARY_CACHE_STORE") == "1" ||
         std::string(uri, 0, 7) != "file://")
         return 0;
-    auto store = std::make_shared<LocalBinaryCacheStore>(params, std::string(uri, 7));
+    auto store = std::make_shared<LocalBinaryCacheStore>(params, uri.substr(7));
     store->init();
     return store;
 });

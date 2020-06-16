@@ -270,7 +270,7 @@ static void printUnquotedStrings(string & res, ForwardIterator i, ForwardIterato
 
 
 string Derivation::unparse(const Store & store, bool maskOutputs,
-    std::map<std::string, StringSet> * actualInputs) const
+    std::map<std::string, StringSet, std::less<>> * actualInputs) const
 {
     string s;
     s.reserve(65536);
@@ -378,7 +378,7 @@ Hash hashDerivationModulo(Store & store, const Derivation & drv, bool maskOutput
 
     /* For other derivations, replace the inputs paths with recursive
        calls to this function.*/
-    std::map<std::string, StringSet> inputs2;
+    std::map<std::string, StringSet, std::less<>> inputs2;
     for (auto & i : drv.inputDrvs) {
         auto h = drvHashes.find(i.first);
         if (h == drvHashes.end()) {
@@ -401,7 +401,7 @@ std::string StorePathWithOutputs::to_string(const Store & store) const
 }
 
 
-bool wantOutput(std::string_view output, const std::set<string> & wanted)
+bool wantOutput(std::string_view output, const std::set<string, std::less<>> & wanted)
 {
     return wanted.empty() || wanted.find(output) != wanted.end();
 }
@@ -468,7 +468,7 @@ void writeDerivation(Sink & out, const Store & store, const BasicDerivation & dr
 std::string hashPlaceholder(std::string_view outputName)
 {
     // FIXME: memoize?
-    return "/" + hashString(htSHA256, "nix-output:" + outputName).to_string(Base32, false);
+    return "/" + hashString(htSHA256, "nix-output:" << outputName).to_string(Base32, false);
 }
 
 
