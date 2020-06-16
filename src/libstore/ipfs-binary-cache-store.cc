@@ -207,7 +207,7 @@ public:
 
         debug("Publishing '%s' to '%s', this could take a while.", state->ipfsPath, ipnsPath);
 
-        auto uri = daemonUri + "/api/v0/name/publish?offline=true&arg=" + getFileTransfer()->urlEncode(state->ipfsPath);
+        auto uri = daemonUri + "/api/v0/name/publish?arg=" + getFileTransfer()->urlEncode(state->ipfsPath);
         uri += "&key=" + std::string(ipnsPath, 6);
 
         auto req = FileTransferRequest(uri);
