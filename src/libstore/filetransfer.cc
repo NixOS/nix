@@ -122,7 +122,7 @@ struct curlFileTransfer : public FileTransfer
             if (requestHeaders) curl_slist_free_all(requestHeaders);
             try {
                 if (!done)
-                    fail(FileTransferError(Interrupted, "download of '%s' was interrupted", request.uri));
+                    fail(FileTransferError(Interrupted, nullptr, "download of '%s' was interrupted", request.uri));
             } catch (...) {
                 ignoreException();
             }
@@ -152,8 +152,18 @@ struct curlFileTransfer : public FileTransfer
                 size_t realSize = size * nmemb;
                 result.bodySize += realSize;
 
-                if (!decompressionSink)
+                if (!decompressionSink) {
                     decompressionSink = makeDecompressionSink(encoding, finalSink);
+                    if (! successfulStatuses.count(getHTTPStatus())) {
+                        // In this case we want to construct a TeeSink, to keep
+                        // the response around (which we figure won't be big
+                        // like an actual download should be) to improve error
+                        // messages.
+                        decompressionSink = std::make_shared<TeeSink<ref<CompressionSink>>>(
+                            ref<CompressionSink>{ decompressionSink }
+                        );
+                    }
+                }
 
                 (*decompressionSink)((unsigned char *) contents, realSize);
 
@@ -408,16 +418,20 @@ struct curlFileTransfer : public FileTransfer
 
                 attempt++;
 
+                std::shared_ptr<std::string> response;
+                if (decompressionSink)
+                    if (auto teeSink = std::dynamic_pointer_cast<TeeSink<std::shared_ptr<CompressionSink>>>(decompressionSink))
+                        response = teeSink->data;
                 auto exc =
                     code == CURLE_ABORTED_BY_CALLBACK && _isInterrupted
-                    ? FileTransferError(Interrupted, fmt("%s of '%s' was interrupted", request.verb(), request.uri))
+                    ? FileTransferError(Interrupted, response, fmt("%s of '%s' was interrupted", request.verb(), request.uri))
                     : httpStatus != 0
-                    ? FileTransferError(err,
+                    ? FileTransferError(err, response,
                         fmt("unable to %s '%s': HTTP error %d",
                             request.verb(), request.uri, httpStatus)
                         + (code == CURLE_OK ? "" : fmt(" (curl error: %s)", curl_easy_strerror(code)))
                         )
-                    : FileTransferError(err,
+                    : FileTransferError(err, response,
                         fmt("unable to %s '%s': %s (%d)",
                             request.verb(), request.uri, curl_easy_strerror(code), code));
 
@@ -675,7 +689,7 @@ struct curlFileTransfer : public FileTransfer
                 auto s3Res = s3Helper.getObject(bucketName, key);
                 FileTransferResult res;
                 if (!s3Res.data)
-                    throw FileTransferError(NotFound, fmt("S3 object '%s' does not exist", request.uri));
+                    throw FileTransferError(NotFound, nullptr, fmt("S3 object '%s' does not exist", request.uri));
                 res.data = s3Res.data;
                 callback(std::move(res));
 #else
