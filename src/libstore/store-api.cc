@@ -59,14 +59,6 @@ StorePathWithOutputs Store::followLinksToStorePathWithOutputs(std::string_view p
 }
 
 
-string storePathToHash(const Path & path)
-{
-    auto base = baseNameOf(path);
-    assert(base.size() >= storePathHashLen);
-    return string(base, 0, storePathHashLen);
-}
-
-
 /* Store paths have the following form:
 
    <store>/<h>-<name>
@@ -144,7 +136,7 @@ StorePath Store::makeStorePath(const string & type,
     /* e.g., "source:sha256:1abc...:/nix/store:foo.tar.gz" */
     string s = type + ":" + hash.to_string(Base16, true) + ":" + storeDir + ":" + std::string(name);
     auto h = compressHash(hashString(htSHA256, s), 20);
-    return StorePath::make(h.hash, name);
+    return StorePath(h, name);
 }
 
 
@@ -243,7 +235,7 @@ bool Store::PathInfoCacheValue::isKnownNow()
 
 bool Store::isValidPath(const StorePath & storePath)
 {
-    auto hashPart = storePathToHash(printStorePath(storePath));
+    std::string hashPart(storePath.hashPart());
 
     {
         auto state_(state.lock());
@@ -311,7 +303,7 @@ void Store::queryPathInfo(const StorePath & storePath,
     std::string hashPart;
 
     try {
-        hashPart = storePathToHash(printStorePath(storePath));
+        hashPart = storePath.hashPart();
 
         {
             auto res = state.lock()->pathInfoCache.get(hashPart);
