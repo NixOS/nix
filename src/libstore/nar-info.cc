@@ -56,11 +56,11 @@ NarInfo::NarInfo(const Store & store, const std::string & s, const std::string &
             auto refs = tokenizeString<Strings>(value, " ");
             if (!references.empty()) corrupt();
             for (auto & r : refs)
-                references.insert(StorePath::fromBaseName(r));
+                references.insert(StorePath(r));
         }
         else if (name == "Deriver") {
             if (value != "unknown-deriver")
-                deriver = StorePath::fromBaseName(value);
+                deriver = StorePath(value);
         }
         else if (name == "System")
             system = value;

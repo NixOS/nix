@@ -48,7 +48,7 @@ struct CmdMakeContentAddressable : StorePathsCommand, MixJSON
         for (auto & path : paths) {
             auto pathS = store->printStorePath(path);
             auto oldInfo = store->queryPathInfo(path);
-            auto oldHashPart = storePathToHash(pathS);
+            std::string oldHashPart(path.hashPart());
 
             StringSink sink;
             store->narFromPath(path, sink);
@@ -88,7 +88,7 @@ struct CmdMakeContentAddressable : StorePathsCommand, MixJSON
                 printInfo("rewrote '%s' to '%s'", pathS, store->printStorePath(info.path));
 
             auto source = sinkToSource([&](Sink & nextSink) {
-                RewritingSink rsink2(oldHashPart, storePathToHash(store->printStorePath(info.path)), nextSink);
+                RewritingSink rsink2(oldHashPart, std::string(info.path.hashPart()), nextSink);
                 rsink2((unsigned char *) sink.s->data(), sink.s->size());
                 rsink2.flush();
             });

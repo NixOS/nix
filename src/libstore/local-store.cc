@@ -619,7 +619,7 @@ uint64_t LocalStore::addValidPath(State & state,
 
     {
         auto state_(Store::state.lock());
-        state_->pathInfoCache.upsert(storePathToHash(printStorePath(info.path)),
+        state_->pathInfoCache.upsert(std::string(info.path.hashPart()),
             PathInfoCacheValue{ .value = std::make_shared<const ValidPathInfo>(info) });
     }
 
@@ -791,7 +791,7 @@ StorePathSet LocalStore::queryDerivationOutputs(const StorePath & path)
 
 std::optional<StorePath> LocalStore::queryPathFromHashPart(const std::string & hashPart)
 {
-    if (hashPart.size() != storePathHashLen) throw Error("invalid hash part");
+    if (hashPart.size() != StorePath::HashLen) throw Error("invalid hash part");
 
     Path prefix = storeDir + "/" + hashPart;
 
@@ -942,7 +942,7 @@ void LocalStore::invalidatePath(State & state, const StorePath & path)
 
     {
         auto state_(Store::state.lock());
-        state_->pathInfoCache.erase(storePathToHash(printStorePath(path)));
+        state_->pathInfoCache.erase(std::string(path.hashPart()));
     }
 }
 
@@ -994,7 +994,7 @@ void LocalStore::addToStore(const ValidPathInfo & info, Source & source,
             if (info.ca == "" || !info.references.count(info.path))
                 hashSink = std::make_unique<HashSink>(htSHA256);
             else
-                hashSink = std::make_unique<HashModuloSink>(htSHA256, storePathToHash(printStorePath(info.path)));
+                hashSink = std::make_unique<HashModuloSink>(htSHA256, std::string(info.path.hashPart()));
 
             LambdaSource wrapperSource([&](unsigned char * data, size_t len) -> size_t {
                 size_t n = source.read(data, len);
@@ -1255,7 +1255,7 @@ bool LocalStore::verifyStore(bool checkContents, RepairFlag repair)
                 if (info->ca == "" || !info->references.count(info->path))
                     hashSink = std::make_unique<HashSink>(info->narHash.type);
                 else
-                    hashSink = std::make_unique<HashModuloSink>(info->narHash.type, storePathToHash(printStorePath(info->path)));
+                    hashSink = std::make_unique<HashModuloSink>(info->narHash.type, std::string(info->path.hashPart()));
 
                 dumpPath(Store::toRealPath(i), *hashSink);
                 auto current = hashSink->finish();

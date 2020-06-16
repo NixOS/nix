@@ -1,3 +1,4 @@
+#if 0
 #include "logging.hh"
 #include "rust-ffi.hh"
 
@@ -20,3 +21,4 @@ std::ostream & operator << (std::ostream & str, const String & s)
 }
 
 }
+#endif

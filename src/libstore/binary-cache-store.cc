@@ -93,7 +93,7 @@ std::shared_ptr<std::string> BinaryCacheStore::getFile(const std::string & path)
 
 std::string BinaryCacheStore::narInfoFileFor(const StorePath & storePath)
 {
-    return storePathToHash(printStorePath(storePath)) + ".narinfo";
+    return std::string(storePath.hashPart()) + ".narinfo";
 }
 
 void BinaryCacheStore::writeNarInfo(ref<NarInfo> narInfo)
@@ -102,7 +102,7 @@ void BinaryCacheStore::writeNarInfo(ref<NarInfo> narInfo)
 
     upsertFile(narInfoFile, narInfo->to_string(*this), "text/x-nix-narinfo");
 
-    auto hashPart = storePathToHash(printStorePath(narInfo->path));
+    std::string hashPart(narInfo->path.hashPart());
 
     {
         auto state_(state.lock());
@@ -164,7 +164,7 @@ void BinaryCacheStore::addToStore(const ValidPathInfo & info, Source & narSource
             }
         }
 
-        upsertFile(storePathToHash(printStorePath(info.path)) + ".ls", jsonOut.str(), "application/json");
+        upsertFile(std::string(info.path.to_string()) + ".ls", jsonOut.str(), "application/json");
     }
 
     /* Compress the NAR. */
