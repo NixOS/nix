@@ -17,11 +17,6 @@ struct DerivationOutput
     StorePath path;
     std::string hashAlgo; /* hash used for expected hash computation */
     std::string hash; /* expected hash, may be null */
-    DerivationOutput(StorePath && path, std::string && hashAlgo, std::string && hash)
-        : path(std::move(path))
-        , hashAlgo(std::move(hashAlgo))
-        , hash(std::move(hash))
-    { }
     void parseHashInfo(FileIngestionMethod & recursive, Hash & hash) const;
 };
 
@@ -43,7 +38,6 @@ struct BasicDerivation
     StringPairs env;
 
     BasicDerivation() { }
-    explicit BasicDerivation(const BasicDerivation & other);
     virtual ~BasicDerivation() { };
 
     /* Return the path corresponding to the output identifier `id' in
@@ -71,8 +65,6 @@ struct Derivation : BasicDerivation
         std::map<std::string, StringSet> * actualInputs = nullptr) const;
 
     Derivation() { }
-    Derivation(Derivation && other) = default;
-    explicit Derivation(const Derivation & other);
 };
 
 

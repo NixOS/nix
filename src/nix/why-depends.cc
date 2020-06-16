@@ -106,16 +106,16 @@ struct CmdWhyDepends : SourceExprCommand
         std::map<StorePath, Node> graph;
 
         for (auto & path : closure)
-            graph.emplace(path.clone(), Node { .path = path.clone(), .refs = cloneStorePathSet(store->queryPathInfo(path)->references) });
+            graph.emplace(path, Node { .path = path, .refs = store->queryPathInfo(path)->references });
 
         // Transpose the graph.
         for (auto & node : graph)
             for (auto & ref : node.second.refs)
-                graph.find(ref)->second.rrefs.insert(node.first.clone());
+                graph.find(ref)->second.rrefs.insert(node.first);
 
         /* Run Dijkstra's shortest path algorithm to get the distance
            of every path in the closure to 'dependency'. */
-        graph.emplace(dependencyPath.clone(), Node { .path = dependencyPath.clone(), .dist = 0 });
+        graph.emplace(dependencyPath, Node { .path = dependencyPath, .dist = 0 });
 
         std::priority_queue<Node *> queue;
 

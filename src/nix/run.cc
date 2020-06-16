@@ -111,16 +111,16 @@ struct CmdShell : InstallablesCommand, RunCommon, MixEnvironment
 
         std::unordered_set<StorePath> done;
         std::queue<StorePath> todo;
-        for (auto & path : outPaths) todo.push(path.clone());
+        for (auto & path : outPaths) todo.push(path);
 
         setEnviron();
 
         auto unixPath = tokenizeString<Strings>(getEnv("PATH").value_or(""), ":");
 
         while (!todo.empty()) {
-            auto path = todo.front().clone();
+            auto path = todo.front();
             todo.pop();
-            if (!done.insert(path.clone()).second) continue;
+            if (!done.insert(path).second) continue;
 
             if (true)
                 unixPath.push_front(store->printStorePath(path) + "/bin");

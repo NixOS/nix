@@ -84,29 +84,6 @@ PathSet Store::printStorePathSet(const StorePathSet & paths) const
     return res;
 }
 
-StorePathSet cloneStorePathSet(const StorePathSet & paths)
-{
-    StorePathSet res;
-    for (auto & p : paths)
-        res.insert(p.clone());
-    return res;
-}
-
-StorePathSet storePathsToSet(const StorePaths & paths)
-{
-    StorePathSet res;
-    for (auto & p : paths)
-        res.insert(p.clone());
-    return res;
-}
-
-StorePathSet singleton(const StorePath & path)
-{
-    StorePathSet res;
-    res.insert(path.clone());
-    return res;
-}
-
 std::pair<std::string_view, StringSet> parsePathWithOutputs(std::string_view s)
 {
     size_t n = s.find("!");

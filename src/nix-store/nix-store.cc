@@ -49,11 +49,11 @@ ref<LocalStore> ensureLocalStore()
 
 static StorePath useDeriver(const StorePath & path)
 {
-    if (path.isDerivation()) return path.clone();
+    if (path.isDerivation()) return path;
     auto info = store->queryPathInfo(path);
     if (!info->deriver)
         throw Error("deriver of path '%s' is not known", store->printStorePath(path));
-    return info->deriver->clone();
+    return *info->deriver;
 }
 
 
@@ -214,15 +214,15 @@ static void opPrintFixedPath(Strings opFlags, Strings opArgs)
 
 static StorePathSet maybeUseOutputs(const StorePath & storePath, bool useOutput, bool forceRealise)
 {
-    if (forceRealise) realisePath(storePath);
+    if (forceRealise) realisePath({storePath});
     if (useOutput && storePath.isDerivation()) {
         auto drv = store->derivationFromPath(storePath);
         StorePathSet outputs;
         for (auto & i : drv.outputs)
-            outputs.insert(i.second.path.clone());
+            outputs.insert(i.second.path);
         return outputs;
     }
-    else return singleton(storePath.clone());
+    else return {storePath};
 }
 
 
@@ -232,7 +232,7 @@ static StorePathSet maybeUseOutputs(const StorePath & storePath, bool useOutput,
 static void printTree(const StorePath & path,
     const string & firstPad, const string & tailPad, StorePathSet & done)
 {
-    if (!done.insert(path.clone()).second) {
+    if (!done.insert(path).second) {
         cout << fmt("%s%s [...]\n", firstPad, store->printStorePath(path));
         return;
     }
@@ -310,7 +310,7 @@ static void opQuery(Strings opFlags, Strings opArgs)
         case qOutputs: {
             for (auto & i : opArgs) {
                 auto i2 = store->followLinksToStorePath(i);
-                if (forceRealise) realisePath(i2);
+                if (forceRealise) realisePath({i2});
                 Derivation drv = store->derivationFromPath(i2);
                 for (auto & j : drv.outputs)
                     cout << fmt("%1%\n", store->printStorePath(j.second.path));
@@ -329,13 +329,13 @@ static void opQuery(Strings opFlags, Strings opArgs)
                     if (query == qRequisites) store->computeFSClosure(j, paths, false, includeOutputs);
                     else if (query == qReferences) {
                         for (auto & p : store->queryPathInfo(j)->references)
-                            paths.insert(p.clone());
+                            paths.insert(p);
                     }
                     else if (query == qReferrers) {
                         StorePathSet tmp;
                         store->queryReferrers(j, tmp);
                         for (auto & i : tmp)
-                            paths.insert(i.clone());
+                            paths.insert(i);
                     }
                     else if (query == qReferrersClosure) store->computeFSClosure(j, paths, true);
                 }
@@ -391,7 +391,7 @@ static void opQuery(Strings opFlags, Strings opArgs)
             StorePathSet roots;
             for (auto & i : opArgs)
                 for (auto & j : maybeUseOutputs(store->followLinksToStorePath(i), useOutput, forceRealise))
-                    roots.insert(j.clone());
+                    roots.insert(j);
             printDotGraph(ref<Store>(store), std::move(roots));
             break;
         }
@@ -400,7 +400,7 @@ static void opQuery(Strings opFlags, Strings opArgs)
             StorePathSet roots;
             for (auto & i : opArgs)
                 for (auto & j : maybeUseOutputs(store->followLinksToStorePath(i), useOutput, forceRealise))
-                    roots.insert(j.clone());
+                    roots.insert(j);
             printGraphML(ref<Store>(store), std::move(roots));
             break;
         }
@@ -415,7 +415,7 @@ static void opQuery(Strings opFlags, Strings opArgs)
             StorePathSet args;
             for (auto & i : opArgs)
                 for (auto & p : maybeUseOutputs(store->followLinksToStorePath(i), useOutput, forceRealise))
-                    args.insert(p.clone());
+                    args.insert(p);
 
             StorePathSet referrers;
             store->computeFSClosure(
@@ -482,10 +482,10 @@ static void opDumpDB(Strings opFlags, Strings opArgs)
     if (!opFlags.empty()) throw UsageError("unknown flag");
     if (!opArgs.empty()) {
         for (auto & i : opArgs)
-            cout << store->makeValidityRegistration(singleton(store->followLinksToStorePath(i)), true, true);
+            cout << store->makeValidityRegistration({store->followLinksToStorePath(i)}, true, true);
     } else {
         for (auto & i : store->queryAllValidPaths())
-            cout << store->makeValidityRegistration(singleton(i), true, true);
+            cout << store->makeValidityRegistration({i}, true, true);
     }
 }
 
@@ -586,7 +586,7 @@ static void opGC(Strings opFlags, Strings opArgs)
         // Transpose and sort the roots.
         for (auto & [target, links] : roots)
             for (auto & link : links)
-                roots2.emplace(link, target.clone());
+                roots2.emplace(link, target);
         for (auto & [link, target] : roots2)
             std::cout << link << " -> " << store->printStorePath(target) << "\n";
     }
@@ -830,7 +830,7 @@ static void opServe(Strings opFlags, Strings opArgs)
                     std::vector<StorePathWithOutputs> paths2;
                     for (auto & path : paths)
                         if (!path.isDerivation())
-                            paths2.emplace_back(path.clone());
+                            paths2.push_back({path});
                     unsigned long long downloadSize, narSize;
                     StorePathSet willBuild, willSubstitute, unknown;
                     store->queryMissing(paths2,
@@ -840,7 +840,7 @@ static void opServe(Strings opFlags, Strings opArgs)
                     if (!willSubstitute.empty())
                         try {
                             std::vector<StorePathWithOutputs> subs;
-                            for (auto & p : willSubstitute) subs.emplace_back(p.clone());
+                            for (auto & p : willSubstitute) subs.push_back({p});
                             store->buildPaths(subs);
                         } catch (Error & e) {
                             logWarning(e.info());
@@ -895,7 +895,7 @@ static void opServe(Strings opFlags, Strings opArgs)
 
                 std::vector<StorePathWithOutputs> paths;
                 for (auto & s : readStrings<Strings>(in))
-                    paths.emplace_back(store->parsePathWithOutputs(s));
+                    paths.push_back(store->parsePathWithOutputs(s));
 
                 getBuildSettings();
 

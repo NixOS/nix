@@ -360,7 +360,7 @@ StorePath BinaryCacheStore::addTextToStore(const string & name, const string & s
     const StorePathSet & references, RepairFlag repair)
 {
     ValidPathInfo info(computeStorePathForText(name, s, references));
-    info.references = cloneStorePathSet(references);
+    info.references = references;
 
     if (repair || !isValidPath(info.path)) {
         StringSink sink;
@@ -395,14 +395,14 @@ void BinaryCacheStore::addSignatures(const StorePath & storePath, const StringSe
 
 std::shared_ptr<std::string> BinaryCacheStore::getBuildLog(const StorePath & path)
 {
-    auto drvPath = path.clone();
+    auto drvPath = path;
 
     if (!path.isDerivation()) {
         try {
             auto info = queryPathInfo(path);
             // FIXME: add a "Log" field to .narinfo
             if (!info->deriver) return nullptr;
-            drvPath = info->deriver->clone();
+            drvPath = *info->deriver;
         } catch (InvalidPath &) {
             return nullptr;
         }

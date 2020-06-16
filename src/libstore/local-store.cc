@@ -631,7 +631,7 @@ void LocalStore::queryPathInfoUncached(const StorePath & path,
     Callback<std::shared_ptr<const ValidPathInfo>> callback) noexcept
 {
     try {
-        auto info = std::make_shared<ValidPathInfo>(path.clone());
+        auto info = std::make_shared<ValidPathInfo>(path);
 
         callback(retrySQLite<std::shared_ptr<ValidPathInfo>>([&]() {
             auto state(_state.lock());
@@ -721,7 +721,7 @@ StorePathSet LocalStore::queryValidPaths(const StorePathSet & paths, SubstituteF
 {
     StorePathSet res;
     for (auto & i : paths)
-        if (isValidPath(i)) res.insert(i.clone());
+        if (isValidPath(i)) res.insert(i);
     return res;
 }
 
@@ -816,7 +816,7 @@ StorePathSet LocalStore::querySubstitutablePaths(const StorePathSet & paths)
 
     StorePathSet remaining;
     for (auto & i : paths)
-        remaining.insert(i.clone());
+        remaining.insert(i);
 
     StorePathSet res;
 
@@ -830,9 +830,9 @@ StorePathSet LocalStore::querySubstitutablePaths(const StorePathSet & paths)
         StorePathSet remaining2;
         for (auto & path : remaining)
             if (valid.count(path))
-                res.insert(path.clone());
+                res.insert(path);
             else
-                remaining2.insert(path.clone());
+                remaining2.insert(path);
 
         std::swap(remaining, remaining2);
     }
@@ -854,9 +854,9 @@ void LocalStore::querySubstitutablePathInfos(const StorePathSet & paths,
                 auto info = sub->queryPathInfo(path);
                 auto narInfo = std::dynamic_pointer_cast<const NarInfo>(
                     std::shared_ptr<const ValidPathInfo>(info));
-                infos.insert_or_assign(path.clone(), SubstitutablePathInfo{
-                    info->deriver ? info->deriver->clone() : std::optional<StorePath>(),
-                    cloneStorePathSet(info->references),
+                infos.insert_or_assign(path, SubstitutablePathInfo{
+                    info->deriver,
+                    info->references,
                     narInfo ? narInfo->fileSize : 0,
                     info->narSize});
             } catch (InvalidPath &) {
@@ -900,7 +900,7 @@ void LocalStore::registerValidPaths(const ValidPathInfos & infos)
                 updatePathInfo(*state, i);
             else
                 addValidPath(*state, i, false);
-            paths.insert(i.path.clone());
+            paths.insert(i.path);
         }
 
         for (auto & i : infos) {
@@ -1074,7 +1074,7 @@ StorePath LocalStore::addToStoreFromDump(const string & dump, const string & nam
 
             optimisePath(realPath); // FIXME: combine with hashPath()
 
-            ValidPathInfo info(dstPath.clone());
+            ValidPathInfo info(dstPath);
             info.narHash = hash.first;
             info.narSize = hash.second;
             info.ca = makeFixedOutputCA(method, h);
@@ -1137,10 +1137,10 @@ StorePath LocalStore::addTextToStore(const string & name, const string & s,
 
             optimisePath(realPath);
 
-            ValidPathInfo info(dstPath.clone());
+            ValidPathInfo info(dstPath);
             info.narHash = narHash;
             info.narSize = sink.s->size();
-            info.references = cloneStorePathSet(references);
+            info.references = references;
             info.ca = "text:" + hash.to_string(Base32, true);
             registerValidPath(info);
         }

@@ -105,7 +105,7 @@ StorePaths Store::importPaths(Source & source, std::shared_ptr<FSAccessor> acces
         auto source = StringSource { *tee.source.data };
         addToStore(info, source, NoRepair, checkSigs, accessor);
 
-        res.push_back(info.path.clone());
+        res.push_back(info.path);
     }
 
     return res;

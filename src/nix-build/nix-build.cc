@@ -363,7 +363,7 @@ static void _main(int argc, char * * argv)
                 if (!drv)
                     throw Error("the 'bashInteractive' attribute in <nixpkgs> did not evaluate to a derivation");
 
-                pathsToBuild.emplace_back(store->parseStorePath(drv->queryDrvPath()));
+                pathsToBuild.push_back({store->parseStorePath(drv->queryDrvPath())});
 
                 shell = drv->queryOutPath() + "/bin/bash";
 
@@ -381,9 +381,9 @@ static void _main(int argc, char * * argv)
         for (const auto & input : drv.inputDrvs)
             if (std::all_of(envExclude.cbegin(), envExclude.cend(),
                     [&](const string & exclude) { return !std::regex_search(store->printStorePath(input.first), std::regex(exclude)); }))
-                pathsToBuild.emplace_back(input.first, input.second);
+                pathsToBuild.push_back({input.first, input.second});
         for (const auto & src : drv.inputSrcs)
-            pathsToBuild.emplace_back(src);
+            pathsToBuild.push_back({src});
 
         buildPaths(pathsToBuild);
 
@@ -499,7 +499,7 @@ static void _main(int argc, char * * argv)
             if (outputName == "")
                 throw Error("derivation '%s' lacks an 'outputName' attribute", drvPath);
 
-            pathsToBuild.emplace_back(store->parseStorePath(drvPath), StringSet{outputName});
+            pathsToBuild.push_back({store->parseStorePath(drvPath), {outputName}});
 
             std::string drvPrefix;
             auto i = drvPrefixes.find(drvPath);
