@@ -4,6 +4,7 @@
 #include "ref.hh"
 #include "types.hh"
 
+#include <cstring>
 #include <list>
 #include <memory>
 #include <map>
