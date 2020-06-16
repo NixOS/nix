@@ -165,7 +165,27 @@ protected:
         debug("Publishing '%s' to '%s', this could take a while.", state->ipfsPath, ipnsPath);
 
         auto uri = daemonUri + "/api/v0/name/publish?offline=true&arg=" + getFileTransfer()->urlEncode(state->ipfsPath);
-        uri += "&key=" + std::string(ipnsPath, 6);
+
+        // Given the hash, we want to discover the corresponding name in the
+        // `ipfs key list` command, so that we publish to the right address in
+        // case the user has multiple ones available.
+
+        auto ipnsPathHash = std::string(ipnsPath, 6);
+        debug("Getting the name corresponding to hash %s", ipnsPathHash);
+
+        auto keyListRequest = FileTransferRequest(daemonUri + "/api/v0/key/list/");
+        keyListRequest.post = true;
+        keyListRequest.tries = 1;
+
+        auto keyListResponse = nlohmann::json::parse(*(getFileTransfer()->download(keyListRequest)).data);
+
+        std::string keyName;
+        for (nlohmann::json::iterator it = keyListResponse["Keys"].begin(); it != keyListResponse["Keys"].end(); ++it)
+            if ((*it)["Id"] == ipnsPathHash)
+                keyName = (*it)["Name"];
+
+        // Now we can append the keyname to our original request
+        uri += "&key=" + keyName;
 
         auto req = FileTransferRequest(uri);
         req.post = true;
