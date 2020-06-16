@@ -141,7 +141,7 @@ private:
     static std::optional<string> isDNSLinkPath(std::string path)
     {
         if (path.find("/ipns/") != 0)
-            throw Error("The provided path is not a ipns path");
+            throw Error("path '%s' is not an ipns path", path);
         auto subpath = std::string(path, 6);
         if (subpath.find(".") != std::string::npos) {
             return subpath;
