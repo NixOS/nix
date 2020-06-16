@@ -103,6 +103,10 @@ Path absPath(Path && path, std::optional<Path> dir)
     return canonPath(path);
 }
 
+Path absCWD() {
+	return absPath(Path { "." });
+}
+
 
 Path canonPath(PathView path, bool resolveSymlinks)
 {

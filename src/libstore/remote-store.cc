@@ -481,7 +481,7 @@ StorePath RemoteStore::addToStore(std::string_view name, PathView _srcPath,
 
     auto conn(getConnection());
 
-    Path srcPath(absPath(Path { _srcPath }));
+    Path srcPath(absPath(_srcPath));
 
     conn->to
         << wopAddToStore

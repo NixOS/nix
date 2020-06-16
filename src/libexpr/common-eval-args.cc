@@ -39,7 +39,7 @@ Bindings * MixEvalArgs::getAutoArgs(EvalState & state)
     for (auto & i : autoArgs) {
         Value * v = state.allocValue();
         if (i.second[0] == 'E')
-            state.mkThunk_(*v, state.parseExprFromString(string(i.second, 1), absPath(".")));
+            state.mkThunk_(*v, state.parseExprFromString(string(i.second, 1), absCWD()));
         else
             mkString(*v, string(i.second, 1));
         res->push_back(Attr(state.symbols.create(i.first), v));
@@ -58,7 +58,7 @@ Path lookupFileArg(EvalState & state, std::string_view s)
         PathView p = s.substr(1, s.size() - 2);
         return state.findFile(p);
     } else
-        return absPath(Path { s });
+        return absPath(s);
 }
 
 }

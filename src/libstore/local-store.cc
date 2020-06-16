@@ -1093,7 +1093,7 @@ StorePath LocalStore::addToStoreFromDump(std::string_view dump, std::string_view
 StorePath LocalStore::addToStore(std::string_view name, PathView _srcPath,
     FileIngestionMethod method, HashType hashAlgo, PathFilter & filter, RepairFlag repair)
 {
-    Path srcPath = absPath(Path { _srcPath });
+    Path srcPath = absPath(_srcPath);
 
     /* Read the whole path into memory. This is not a very scalable
        method for very large paths, but `copyPath' is mainly used for

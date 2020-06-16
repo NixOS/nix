@@ -142,7 +142,7 @@ public:
             writeToStderr("\r\e[K" + filterANSIEscapes(s, !isTTY) + ANSI_NORMAL "\n");
             draw(state);
         } else {
-            auto s2 = s + ANSI_NORMAL "\n";
+            auto s2 = std::string { s } << ANSI_NORMAL "\n";
             if (!isTTY) s2 = filterANSIEscapes(s2, true);
             writeToStderr(s2);
         }
@@ -154,7 +154,7 @@ public:
         auto state(state_.lock());
 
         if (lvl <= verbosity && !s.empty() && type != actBuildWaiting)
-            log(*state, lvl, s + "...");
+            log(*state, lvl, std::string { s } << "...");
 
         state->activities.emplace_back(ActInfo());
         auto i = std::prev(state->activities.end());
@@ -388,19 +388,19 @@ public:
             if (running || done || expected || failed) {
                 if (running)
                     if (expected != 0)
-                        s = fmt(ANSI_BLUE + numberFmt + ANSI_NORMAL "/" ANSI_GREEN + numberFmt + ANSI_NORMAL "/" + numberFmt,
+                        s = fmt(std::string { ANSI_BLUE } << numberFmt << ANSI_NORMAL "/" ANSI_GREEN << numberFmt << ANSI_NORMAL "/" << numberFmt,
                             running / unit, done / unit, expected / unit);
                     else
-                        s = fmt(ANSI_BLUE + numberFmt + ANSI_NORMAL "/" ANSI_GREEN + numberFmt + ANSI_NORMAL,
+                        s = fmt(std::string { ANSI_BLUE } << numberFmt << ANSI_NORMAL "/" ANSI_GREEN << numberFmt << ANSI_NORMAL,
                             running / unit, done / unit);
                 else if (expected != done)
                     if (expected != 0)
-                        s = fmt(ANSI_GREEN + numberFmt + ANSI_NORMAL "/" + numberFmt,
+                        s = fmt(std::string { ANSI_GREEN } << numberFmt << ANSI_NORMAL "/" << numberFmt,
                             done / unit, expected / unit);
                     else
-                        s = fmt(ANSI_GREEN + numberFmt + ANSI_NORMAL, done / unit);
+                        s = fmt(std::string { ANSI_GREEN } << numberFmt << ANSI_NORMAL, done / unit);
                 else
-                    s = fmt(done ? ANSI_GREEN + numberFmt + ANSI_NORMAL : numberFmt, done / unit);
+                    s = fmt(done ? std::string { ANSI_GREEN } << numberFmt << ANSI_NORMAL : numberFmt, done / unit);
                 s = fmt(itemFmt, s);
 
                 if (failed)

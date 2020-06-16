@@ -405,7 +405,7 @@ expr_simple
   | IND_STRING_OPEN ind_string_parts IND_STRING_CLOSE {
       $$ = stripIndentation(CUR_POS, data->symbols, *$2);
   }
-  | PATH { $$ = new ExprPath(absPath($1, data->basePath)); }
+  | PATH { $$ = new ExprPath(absPath(Path { $1 }, data->basePath)); }
   | HPATH { $$ = new ExprPath(getHome() + string{$1 + 1}); }
   | SPATH {
       string path($1 + 1, strlen($1) - 2);
@@ -644,7 +644,7 @@ Expr * EvalState::parseExprFromString(std::string_view s, PathView basePath)
 Expr * EvalState::parseStdin()
 {
     //Activity act(*logger, lvlTalkative, format("parsing standard input"));
-    return parseExprFromString(drainFD(0), absPath("."));
+    return parseExprFromString(drainFD(0), absCWD());
 }
 
 
@@ -717,7 +717,7 @@ std::pair<bool, std::string> EvalState::resolveSearchPathElem(const SearchPathEl
             res = { false, "" };
         }
     } else {
-        auto path = absPath(Path { elem.second });
+        auto path = absPath(elem.second);
         if (pathExists(path))
             res = { true, path };
         else {

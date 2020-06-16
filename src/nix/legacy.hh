@@ -16,7 +16,7 @@ struct RegisterLegacyCommand
     RegisterLegacyCommand(std::string_view name, MainFunction fun)
     {
         if (!commands) commands = new Commands;
-        (*commands)[name] = fun;
+        (*commands)[std::string { name }] = fun;
     }
 };
 

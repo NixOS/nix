@@ -286,7 +286,7 @@ void LocalStore::findRoots(PathView path, unsigned char type, Roots & roots)
 
             /* Handle indirect roots. */
             else {
-                target = absPath(Path { target }, dirOf(path));
+                target = absPath(target, dirOf(path));
                 if (!pathExists(target)) {
                     if (isInDir(path, stateDir + "/" + gcRootsDir + "/auto")) {
                         printInfo(format("removing stale link from '%1%' to '%2%'") % path % target);

@@ -38,7 +38,7 @@ Path Store::followLinksToStore(std::string_view _path) const
     while (!isInStore(path)) {
         if (!isLink(path)) break;
         string target = readLink(path);
-        path = absPath(Path { target }, dirOf(path));
+        path = absPath(target, dirOf(path));
     }
     if (!isInStore(path))
         throw NotInStore("path '%1%' is not in the Nix store", path);

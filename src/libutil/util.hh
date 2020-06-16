@@ -51,6 +51,10 @@ void clearEnv();
    specified directory, or the current directory otherwise.  The path
    is also canonicalised. */
 Path absPath(Path && path, std::optional<Path> dir = {});
+static inline Path absPath(PathView path, std::optional<Path> dir = {}) {
+    return absPath(Path { path }, dir);
+}
+Path absCWD();
 
 /* Canonicalise a path by removing all `.' or `..' components and
    double or trailing slashes.  Optionally resolves all symlink
@@ -184,6 +188,7 @@ public:
     void cancel();
     void reset(PathView p, bool recursive = true);
     operator Path() const { return path; }
+    operator PathView() const { return path; }
 };
 
 

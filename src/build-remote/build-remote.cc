@@ -38,7 +38,7 @@ static AutoCloseFD openSlotLock(const Machine & m, unsigned long long slot)
     return openLockFile(fmt("%s/%s-%d", currentLoad, escapeUri(m.storeUri), slot), true);
 }
 
-static bool allSupportedLocally(const std::set<std::string>& requiredFeatures) {
+static bool allSupportedLocally(const std::set<std::string, std::less<>>& requiredFeatures) {
     for (auto & feature : requiredFeatures)
         if (!settings.systemFeatures.get().count(feature)) return false;
     return true;
@@ -101,7 +101,7 @@ static int _main(int argc, char * * argv)
             auto amWilling = readInt(source);
             auto neededSystem = readString(source);
             drvPath = store->parseStorePath(readString(source));
-            auto requiredFeatures = readStrings<std::set<std::string>>(source);
+            auto requiredFeatures = readStrings<std::set<std::string, std::less<>>>(source);
 
              auto canBuildLocally = amWilling
                  &&  (  neededSystem == settings.thisSystem

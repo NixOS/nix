@@ -164,7 +164,7 @@ public:
     {
         addFlag({
             .longName = std::string { longName },
-            .shortName = std::string { shortName },
+            .shortName = shortName,
             .description = std::string { description },
             .labels = {"N"},
             .handler = {[=](std::string s) {
