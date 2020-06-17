@@ -126,8 +126,6 @@ private:
 
     nlohmann::json getIpfsDag(std::string objectPath)
     {
-        debug("get ipfs dag %s", objectPath);
-
         auto req = FileTransferRequest(daemonUri + "/api/v0/dag/get?arg=" + objectPath);
         req.post = true;
         req.tries = 1;
@@ -376,6 +374,9 @@ private:
         if (narInfo->fileSize)
             json["downloadSize"] = narInfo->fileSize;
 
+        json["compression"] = narInfo->compression;
+        json["system"] = narInfo->system;
+
         auto narObjectPath = putIpfsDag(json);
 
         auto state(_state.lock());
@@ -549,15 +550,20 @@ public:
             for (auto & sig : json["sigs"])
                 narInfo.sigs.insert((std::string) sig);
 
-        if (json.find("url") != json.end()) {
-            narInfo.url = "/ipfs/" + json["url"]["/"].get<std::string>();
-        }
+        if (json.find("url") != json.end())
+            narInfo.url = "ipfs://" + json["url"]["/"].get<std::string>();
 
         if (json.find("downloadHash") != json.end())
             narInfo.fileHash = Hash((std::string) json["downloadHash"]);
 
         if (json.find("downloadSize") != json.end())
             narInfo.fileSize = json["downloadSize"];
+
+        if (json.find("compression") != json.end())
+            narInfo.compression = json["compression"];
+
+        if (json.find("system") != json.end())
+            narInfo.system = json["system"];
 
         (*callbackPtr)((std::shared_ptr<ValidPathInfo>)
             std::make_shared<NarInfo>(narInfo));
