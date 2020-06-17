@@ -86,7 +86,7 @@ struct HookInstance;
 
 
 /* A pointer to a goal. */
-class Goal;
+struct Goal;
 class DerivationGoal;
 typedef std::shared_ptr<Goal> GoalPtr;
 typedef std::weak_ptr<Goal> WeakGoalPtr;
