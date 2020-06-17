@@ -13,6 +13,7 @@ MakeError(BadHash, Error);
 enum HashType : char { htUnknown, htMD5, htSHA1, htSHA256, htSHA512 };
 
 enum HashEncoding : int {
+    heUnknown,
     // <hash>
     Base16,
     Base32,
@@ -40,6 +41,7 @@ struct Hash
     unsigned char hash[maxHashSize] = {};
 
     HashType type = htUnknown;
+    HashEncoding encoding = heUnknown;
 
     /* Create an unset hash object. */
     Hash() { };

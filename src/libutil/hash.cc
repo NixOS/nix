@@ -117,6 +117,9 @@ std::string Hash::to_string(HashEncoding encoding) const
     }
 
     switch (encoding) {
+    case heUnknown:
+        throw("Unknown hash type");
+        break;
     case PrefixedBase16:
     case Base16:
         s += printHash16(*this);
@@ -140,13 +143,16 @@ Hash::Hash(std::string_view s, HashType type)
 {
     size_t pos = 0;
     bool isSRI = false;
+    bool hasPrefix = false;
 
     auto sep = s.find(':');
-    if (sep == string::npos) {
+    if (sep != string::npos) {
+        hasPrefix = true;
+    } else {
         sep = s.find('-');
-        if (sep != string::npos) {
+        if (sep != string::npos)
             isSRI = true;
-        } else if (type == htUnknown)
+        else if (type == htUnknown)
             throw BadHash("hash '%s' does not include a type", s);
     }
 
@@ -178,6 +184,11 @@ Hash::Hash(std::string_view s, HashType type)
                 parseHexDigit(s[pos + i * 2]) << 4
                 | parseHexDigit(s[pos + i * 2 + 1]);
         }
+
+        if (hasPrefix)
+            encoding = PrefixedBase16;
+        else
+            encoding = Base16;
     }
 
     else if (!isSRI && size == base32Len()) {
@@ -201,6 +212,11 @@ Hash::Hash(std::string_view s, HashType type)
                     throw BadHash("invalid base-32 hash '%s'", s);
             }
         }
+
+        if (hasPrefix)
+            encoding = PrefixedBase32;
+        else
+            encoding = Base32;
     }
 
     else if (isSRI || size == base64Len()) {
@@ -209,6 +225,14 @@ Hash::Hash(std::string_view s, HashType type)
             throw BadHash("invalid %s hash '%s'", isSRI ? "SRI" : "base-64", s);
         assert(hashSize);
         memcpy(hash, d.data(), hashSize);
+
+        if (isSRI)
+            encoding = SRI;
+        else if (hasPrefix)
+            encoding = PrefixedBase64;
+        else
+            encoding = Base64;
+
     }
 
     else
