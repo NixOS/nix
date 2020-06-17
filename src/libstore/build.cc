@@ -4437,8 +4437,8 @@ void SubstitutionGoal::tryNext()
     }
 
     if (info->path != storePath) {
-        if (info->isContentAddressed(*sub)) {
-            auto info2 = std::const_pointer_cast<ValidPathInfo>(std::shared_ptr<const ValidPathInfo>(info));
+        if (info->isContentAddressed(*sub) && info->references.empty()) {
+            auto info2 = std::make_shared<ValidPathInfo>(*info);
             info2->path = storePath;
             info = info2;
         } else {

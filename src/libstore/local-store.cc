@@ -863,7 +863,7 @@ void LocalStore::querySubstitutablePathInfos(const StorePathSet & paths,
             try {
                 auto info = sub->queryPathInfo(subPath);
 
-                if (sub->storeDir != storeDir && !info->isContentAddressed(*sub))
+                if (sub->storeDir != storeDir && !(info->isContentAddressed(*sub) && info->references.empty()))
                     continue;
 
                 auto narInfo = std::dynamic_pointer_cast<const NarInfo>(

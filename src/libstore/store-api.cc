@@ -595,7 +595,7 @@ void copyStorePath(ref<Store> srcStore, ref<Store> dstStore,
     uint64_t total = 0;
 
     // recompute store path on the chance dstStore does it differently
-    if (info->isContentAddressed(*srcStore)) {
+    if (info->isContentAddressed(*srcStore) && info->references.empty()) {
         auto info2 = make_ref<ValidPathInfo>(*info);
         info2->path = dstStore->makeFixedOutputPathFromCA(info->path.name(), info->ca);
         if (dstStore->storeDir == srcStore->storeDir)
@@ -670,7 +670,7 @@ void copyPaths(ref<Store> srcStore, ref<Store> dstStore, const StorePathSet & st
 
             auto info = srcStore->queryPathInfo(storePath);
             auto storePathForDst = storePath;
-            if (info->isContentAddressed(*srcStore)) {
+            if (info->isContentAddressed(*srcStore) && info->references.empty()) {
                 storePathForDst = dstStore->makeFixedOutputPathFromCA(storePath.name(), info->ca);
                 if (dstStore->storeDir == srcStore->storeDir)
                     assert(storePathForDst == storePath);
@@ -697,7 +697,7 @@ void copyPaths(ref<Store> srcStore, ref<Store> dstStore, const StorePathSet & st
             auto info = srcStore->queryPathInfo(storePath);
 
             auto storePathForDst = storePath;
-            if (info->isContentAddressed(*srcStore)) {
+            if (info->isContentAddressed(*srcStore) && info->references.empty()) {
                 storePathForDst = dstStore->makeFixedOutputPathFromCA(storePath.name(), info->ca);
                 if (dstStore->storeDir == srcStore->storeDir)
                     assert(storePathForDst == storePath);
