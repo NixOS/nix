@@ -42,7 +42,7 @@ struct Hash
        Subresource Integrity hash expression). If the 'type' argument
        is htUnknown, then the hash type must be specified in the
        string. */
-    Hash(const std::string & s, HashType type = htUnknown);
+    Hash(std::string_view s, HashType type = htUnknown);
 
     Hash(const Hash &) = default;
 
@@ -85,7 +85,7 @@ struct Hash
     /* Return a string representation of the hash, in base-16, base-32
        or base-64. By default, this is prefixed by the hash type
        (e.g. "sha256:"). */
-    std::string to_string(Base base = Base32, bool includeType = true) const;
+    std::string to_string(Base base, bool includeType) const;
 
     std::string gitRev() const
     {
@@ -100,6 +100,8 @@ struct Hash
     }
 };
 
+/* Helper that defaults empty hashes to the 0 hash. */
+Hash newHashAllowEmpty(std::string hashStr, HashType ht);
 
 /* Print a hash in base-16 if it's MD5, or base-32 otherwise. */
 string printHash16or32(const Hash & hash);

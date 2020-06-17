@@ -184,7 +184,7 @@ struct NarAccessor : public FSAccessor
         auto i = get(path);
 
         if (i.type != FSAccessor::Type::tDirectory)
-            throw Error(format("path '%1%' inside NAR file is not a directory") % path);
+            throw Error("path '%1%' inside NAR file is not a directory", path);
 
         StringSet res;
         for (auto & child : i.children)
@@ -197,7 +197,7 @@ struct NarAccessor : public FSAccessor
     {
         auto i = get(path);
         if (i.type != FSAccessor::Type::tRegular)
-            throw Error(format("path '%1%' inside NAR file is not a regular file") % path);
+            throw Error("path '%1%' inside NAR file is not a regular file", path);
 
         if (getNarBytes) return getNarBytes(i.start, i.size);
 
@@ -209,7 +209,7 @@ struct NarAccessor : public FSAccessor
     {
         auto i = get(path);
         if (i.type != FSAccessor::Type::tSymlink)
-            throw Error(format("path '%1%' inside NAR file is not a symlink") % path);
+            throw Error("path '%1%' inside NAR file is not a symlink", path);
         return i.target;
     }
 };
