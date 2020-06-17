@@ -143,7 +143,7 @@ protected:
 
         auto ipnsPath = *optIpnsPath;
 
-        auto resolvedIpfsPath = resolveIPNSName(ipnsPath, false);
+        auto resolvedIpfsPath = resolveIPNSName(ipnsPath, true);
         if (resolvedIpfsPath != initialIpfsPath) {
             throw Error("The IPNS hash or DNS link %s resolves now to something different from the value it had when Nix was started;\n  wanted: %s\n  got %s\nPerhaps something else updated it in the meantime?",
                 initialIpfsPath, resolvedIpfsPath);

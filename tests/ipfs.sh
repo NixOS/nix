@@ -58,7 +58,7 @@ nix-store --generate-binary-cache-key $SIGNING_KEY_NAME $SIGNING_KEY_PRI_FILE $S
 ################################################################################
 
 mkdir -p $IPFS_SRC_STORE
-storePaths=$(nix-build ./fixed.nix -A good | sort | uniq)
+storePaths=$(nix-build ./fixed.nix -A good)
 
 # Hack around https://github.com/NixOS/nix/issues/3695
 for path in $storePaths; do
@@ -90,6 +90,9 @@ DOWNLOAD_LOCATION=$(nix-build ./fixed.nix -A good \
 ## Create the ipfs store and download the derivation there
 ################################################################################
 
+# Check that we can upload the ipfs store directly
+nix copy --to ipfs://$IPFS_HASH $(nix-build ./fixed.nix -A good) --experimental-features nix-command
+
 mkdir $IPFS_DST_IPFS_STORE
 
 DOWNLOAD_LOCATION=$(nix-build ./fixed.nix -A good \
@@ -106,6 +109,9 @@ DOWNLOAD_LOCATION=$(nix-build ./fixed.nix -A good \
 
 # First I have to publish:
 IPNS_ID=$(ipfs name publish $IPFS_HASH --allow-offline | awk '{print substr($3,1,length($3)-1)}')
+
+# Check that we can upload the ipns store directly
+nix copy --to ipns://$IPNS_ID $(nix-build ./fixed.nix -A good) --experimental-features nix-command
 
 mkdir $IPFS_DST_IPNS_STORE
 
