@@ -5,7 +5,7 @@ namespace nix {
 
 /* ----------- tests for url.hh --------------------------------------------------*/
 
-    string print_map(std::map<string, string> m) {
+    string print_map(std::map<string, string, std::less<>> m) {
         std::map<string, string>::iterator it;
         string s = "{ ";
         for (it = m.begin(); it != m.end(); ++it) {

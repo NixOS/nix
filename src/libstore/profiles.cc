@@ -68,14 +68,14 @@ Generations findGenerations(PathView profile, int & curGen)
 
 
 static void makeName(PathView profile, unsigned int num,
-    Path & outLink)
+    PathView outLink)
 {
     Path prefix = (format("%1%-%2%") % profile % num).str();
     outLink = prefix + "-link";
 }
 
 
-Path createGeneration(ref<LocalFSStore> store, Path profile, Path outPath)
+Path createGeneration(ref<LocalFSStore> store, PathView profile, PathView outPath)
 {
     /* The new generation number should be higher than old the
        previous ones. */
@@ -235,7 +235,7 @@ void deleteGenerationsOlderThan(PathView profile, std::string_view timeSpec, boo
 }
 
 
-void switchLink(Path link, Path target)
+void switchLink(PathView link, PathView target)
 {
     /* Hacky. */
     if (dirOf(target) == dirOf(link)) target = baseNameOf(target);

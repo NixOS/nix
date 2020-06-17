@@ -148,13 +148,13 @@ std::shared_ptr<Installable> parseInstallable(
 Buildables build(ref<Store> store, RealiseMode mode,
     std::vector<std::shared_ptr<Installable>> installables);
 
-std::set<StorePath> toStorePaths(ref<Store> store, RealiseMode mode,
+std::set<StorePath, std::less<>> toStorePaths(ref<Store> store, RealiseMode mode,
     std::vector<std::shared_ptr<Installable>> installables);
 
 StorePath toStorePath(ref<Store> store, RealiseMode mode,
     std::shared_ptr<Installable> installable);
 
-std::set<StorePath> toDerivations(ref<Store> store,
+std::set<StorePath, std::less<>> toDerivations(ref<Store> store,
     std::vector<std::shared_ptr<Installable>> installables,
     bool useDeriver = false);
 

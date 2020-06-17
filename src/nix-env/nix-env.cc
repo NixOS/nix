@@ -92,7 +92,7 @@ static bool parseInstallSourceOptions(Globals & globals,
 
 static bool isNixExpr(PathView path, struct stat & st)
 {
-    return S_ISREG(st.st_mode) || (S_ISDIR(st.st_mode) && pathExists(path + "/default.nix"));
+    return S_ISREG(st.st_mode) || (S_ISDIR(st.st_mode) && pathExists(Path { path } << "/default.nix"));
 }
 
 
@@ -108,7 +108,7 @@ static void getAllExprs(EvalState & state,
            are implemented using profiles). */
         if (i == "manifest.nix") continue;
 
-        Path path2 = path + "/" + i;
+        Path path2 = Path { path } << "/" << i;
 
         struct stat st;
         if (stat(path2.c_str(), &st) == -1)
@@ -149,7 +149,7 @@ static void getAllExprs(EvalState & state,
 static void loadSourceExpr(EvalState & state, PathView path, Value & v)
 {
     struct stat st;
-    if (stat(path.c_str(), &st) == -1)
+    if (stat(Path { path }.c_str(), &st) == -1)
         throw SysError("getting information about '%1%'", path);
 
     if (isNixExpr(path, st))
@@ -358,7 +358,7 @@ static void queryInstSources(EvalState & state,
             loadSourceExpr(state, instSource.nixExprPath, vArg);
 
             for (auto & i : args) {
-                Expr * eFun = state.parseExprFromString(i, absPath("."));
+                Expr * eFun = state.parseExprFromString(i, absCWD());
                 Value vFun, vTmp;
                 state.eval(eFun, vFun);
                 mkApp(vTmp, vFun, vArg);
@@ -631,7 +631,7 @@ static void setMetaFlag(EvalState & state, DrvInfo & drv,
     std::string_view name, std::string_view value)
 {
     Value * v = state.allocValue();
-    mkString(*v, value.c_str());
+    mkString(*v, value);
     drv.setMeta(name, v);
 }
 
@@ -863,10 +863,10 @@ static void queryJSON(Globals & globals, vector<DrvInfo> & elems)
         JSONObject pkgObj = topObj.object(i.attrPath);
 
         auto drvName = DrvName(i.queryName());
-        pkgObj.attr("name", drvName.fullName);
-        pkgObj.attr("pname", drvName.name);
-        pkgObj.attr("version", drvName.version);
-        pkgObj.attr("system", i.querySystem());
+        pkgObj.attr("name", std::string_view { drvName.fullName });
+        pkgObj.attr("pname", std::string_view { drvName.name });
+        pkgObj.attr("version", std::string_view { drvName.version });
+        pkgObj.attr("system", std::string_view { i.querySystem() });
 
         JSONObject metaObj = pkgObj.object("meta");
         StringSet metaNames = i.queryMetaNames();

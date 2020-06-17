@@ -49,7 +49,7 @@ Value * SourceExprCommand::getSourceExpr(EvalState & state)
 
         auto addEntry = [&](std::string_view name) {
             if (name == "") return;
-            if (!seen.insert(name).second) return;
+            if (!seen.insert(std::string { name }).second) return;
             Value * v1 = state.allocValue();
             mkPrimOpApp(*v1, state.getBuiltin("findFile"), state.getBuiltin("nixPath"));
             Value * v2 = state.allocValue();
@@ -179,7 +179,7 @@ struct InstallableExpr : InstallableValue
     std::pair<Value *, Pos> toValue(EvalState & state) override
     {
         auto v = state.allocValue();
-        state.eval(state.parseExprFromString(text, absPath(".")), *v);
+        state.eval(state.parseExprFromString(text, absCWD()), *v);
         return {v, noPos};
     }
 };
@@ -249,7 +249,7 @@ std::shared_ptr<Installable> parseInstallable(
     SourceExprCommand & cmd, ref<Store> store, std::string_view installable,
     bool useDefaultInstallables)
 {
-    auto installables = parseInstallables(cmd, store, {installable}, false);
+    auto installables = parseInstallables(cmd, store, { std::string { installable } }, false);
     assert(installables.size() == 1);
     return installables.front();
 }

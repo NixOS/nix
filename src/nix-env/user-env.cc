@@ -15,9 +15,9 @@ namespace nix {
 DrvInfos queryInstalled(EvalState & state, PathView userEnv)
 {
     DrvInfos elems;
-    if (pathExists(userEnv + "/manifest.json"))
+    if (pathExists(Path { userEnv } << "/manifest.json"))
         throw Error("profile '%s' is incompatible with 'nix-env'; please use 'nix profile' instead", userEnv);
-    Path manifestFile = userEnv + "/manifest.nix";
+    Path manifestFile = Path { userEnv } << "/manifest.nix";
     if (pathExists(manifestFile)) {
         Value v;
         state.evalFile(manifestFile, v);

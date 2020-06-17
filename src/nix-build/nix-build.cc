@@ -290,7 +290,7 @@ static void _main(int argc, char * * argv)
     else
         for (auto i : left) {
             if (fromArgs)
-                exprs.push_back(state->parseExprFromString(i, absPath(".")));
+                exprs.push_back(state->parseExprFromString(i, absCWD()));
             else {
                 auto absolute = i;
                 try {
@@ -355,7 +355,7 @@ static void _main(int argc, char * * argv)
         if (!shell) {
 
             try {
-                auto expr = state->parseExprFromString("(import <nixpkgs> {}).bashInteractive", absPath("."));
+                auto expr = state->parseExprFromString("(import <nixpkgs> {}).bashInteractive", absCWD());
 
                 Value v;
                 state->eval(expr, v);
@@ -381,7 +381,9 @@ static void _main(int argc, char * * argv)
         // Build or fetch all dependencies of the derivation.
         for (const auto & input : drv.inputDrvs)
             if (std::all_of(envExclude.cbegin(), envExclude.cend(),
-                    [&](std::string_view exclude) { return !std::regex_search(store->printStorePath(input.first), std::regex(exclude)); }))
+                    [&](std::string_view exclude) {
+                        return !std::regex_search(store->printStorePath(input.first), std::regex(std::string { exclude }));
+                    }))
                 pathsToBuild.emplace_back(input.first, input.second);
         for (const auto & src : drv.inputSrcs)
             pathsToBuild.emplace_back(src);

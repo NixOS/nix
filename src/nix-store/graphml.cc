@@ -19,9 +19,9 @@ static inline std::string_view xmlQuote(std::string_view s)
 }
 
 
-static string symbolicName(std::string_view p)
+static std::string_view symbolicName(std::string_view p)
 {
-    return string(p, p.find('-') + 1);
+    return p.substr(p.find('-') + 1);
 }
 
 

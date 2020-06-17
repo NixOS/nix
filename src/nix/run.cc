@@ -43,7 +43,7 @@ struct RunCommon : virtual Command
         auto store2 = store.dynamic_pointer_cast<LocalStore>();
 
         if (store2 && store->storeDir != store2->realStoreDir) {
-            Strings helperArgs = { chrootHelperName, store->storeDir, store2->realStoreDir, program };
+            Strings helperArgs = { chrootHelperName, store->storeDir, store2->realStoreDir, std::string { program } };
             for (auto & arg : args) helperArgs.push_back(arg);
 
             execv(readLink("/proc/self/exe").c_str(), stringsToCharPtrs(helperArgs).data());
@@ -51,7 +51,7 @@ struct RunCommon : virtual Command
             throw SysError("could not execute chroot helper");
         }
 
-        execvp(program.c_str(), stringsToCharPtrs(args).data());
+        execvp(std::string { program }.c_str(), stringsToCharPtrs(args).data());
 
         throw SysError("unable to execute '%s'", program);
     }

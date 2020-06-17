@@ -96,7 +96,7 @@ struct CmdMakeContentAddressable : StorePathsCommand, MixJSON
             store->addToStore(info, *source);
 
             if (json)
-                jsonRewrites->attr(store->printStorePath(path), store->printStorePath(info.path));
+                jsonRewrites->attr(store->printStorePath(path), std::string_view { store->printStorePath(info.path) });
 
             remappings.insert_or_assign(std::move(path), std::move(info.path));
         }

@@ -12,11 +12,11 @@ static std::string hilite(std::string_view s, size_t pos, size_t len,
     std::string_view colour = ANSI_RED)
 {
     return
-        std::string(s, 0, pos)
-        + colour
-        + std::string(s, pos, len)
-        + ANSI_NORMAL
-        + std::string(s, pos + len);
+        std::string { s.substr(0, pos) }
+        << colour
+        << s.substr(pos, len)
+        << ANSI_NORMAL
+        << s.substr(pos + len);
 }
 
 static std::string filterPrintable(std::string_view s)
@@ -187,7 +187,7 @@ struct CmdWhyDepends : SourceExprCommand
             visitPath = [&](PathView p) {
                 auto st = accessor->stat(p);
 
-                auto p2 = p == pathS ? "/" : std::string(p, pathS.size() + 1);
+                auto p2 = p == pathS ? "/" : p.substr(pathS.size() + 1);
 
                 auto getColour = [&](std::string_view hash) {
                     return hash == dependencyPathHash ? ANSI_GREEN : ANSI_BLUE;
@@ -196,7 +196,7 @@ struct CmdWhyDepends : SourceExprCommand
                 if (st.type == FSAccessor::Type::tDirectory) {
                     auto names = accessor->readDirectory(p);
                     for (auto & name : names)
-                        visitPath(p + "/" + name);
+                        visitPath(Path { p } << "/" + name);
                 }
 
                 else if (st.type == FSAccessor::Type::tRegular) {
@@ -248,8 +248,8 @@ struct CmdWhyDepends : SourceExprCommand
                 }
 
                 printNode(*ref.second,
-                    tailPad + (last ? treeNull : treeLine),
-                    tailPad + (last ? treeNull : treeLine));
+                    std::string { tailPad } + (last ? treeNull : treeLine),
+                    std::string { tailPad } + (last ? treeNull : treeLine));
             }
         };
 

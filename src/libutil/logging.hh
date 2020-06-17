@@ -90,7 +90,7 @@ public:
     template<typename... Args>
     inline void stdout(std::string_view fs, const Args & ... args)
     {
-        boost::format f(fs);
+        boost::format f(std::string { fs }); // c'mon, Boost
         formatHelper(f, args...);
         writeToStdout(f.str());
     }

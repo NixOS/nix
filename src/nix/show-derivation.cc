@@ -69,10 +69,10 @@ struct CmdShowDerivation : InstallablesCommand
                 auto outputsObj(drvObj.object("outputs"));
                 for (auto & output : drv.outputs) {
                     auto outputObj(outputsObj.object(output.first));
-                    outputObj.attr("path", store->printStorePath(output.second.path));
+                    outputObj.attr("path", std::string_view { store->printStorePath(output.second.path) });
                     if (output.second.hash != "") {
-                        outputObj.attr("hashAlgo", output.second.hashAlgo);
-                        outputObj.attr("hash", output.second.hash);
+                        outputObj.attr("hashAlgo", std::string_view { output.second.hashAlgo });
+                        outputObj.attr("hash", std::string_view { output.second.hash });
                     }
                 }
             }
@@ -80,7 +80,7 @@ struct CmdShowDerivation : InstallablesCommand
             {
                 auto inputsList(drvObj.list("inputSrcs"));
                 for (auto & input : drv.inputSrcs)
-                    inputsList.elem(store->printStorePath(input));
+                    inputsList.elem(std::string_view { store->printStorePath(input) });
             }
 
             {
@@ -88,23 +88,23 @@ struct CmdShowDerivation : InstallablesCommand
                 for (auto & input : drv.inputDrvs) {
                     auto inputList(inputDrvsObj.list(store->printStorePath(input.first)));
                     for (auto & outputId : input.second)
-                        inputList.elem(outputId);
+                        inputList.elem(std::string_view { outputId });
                 }
             }
 
-            drvObj.attr("platform", drv.platform);
-            drvObj.attr("builder", drv.builder);
+            drvObj.attr("platform", std::string_view { drv.platform });
+            drvObj.attr("builder", std::string_view { drv.builder });
 
             {
                 auto argsList(drvObj.list("args"));
                 for (auto & arg : drv.args)
-                    argsList.elem(arg);
+                    argsList.elem(std::string_view { arg });
             }
 
             {
                 auto envObj(drvObj.object("env"));
                 for (auto & var : drv.env)
-                    envObj.attr(var.first, var.second);
+                    envObj.attr(var.first, std::string_view { var.second });
             }
         }
 

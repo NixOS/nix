@@ -33,7 +33,7 @@ Generations findGenerations(PathView profile, int & curGen);
 
 class LocalFSStore;
 
-Path createGeneration(ref<LocalFSStore> store, Path profile, Path outPath);
+Path createGeneration(ref<LocalFSStore> store, PathView profile, PathView outPath);
 
 void deleteGeneration(PathView profile, unsigned int gen);
 
@@ -47,7 +47,7 @@ void deleteGenerationsOlderThan(PathView profile, time_t t, bool dryRun);
 
 void deleteGenerationsOlderThan(PathView profile, std::string_view timeSpec, bool dryRun);
 
-void switchLink(Path link, Path target);
+void switchLink(PathView link, PathView target);
 
 /* Ensure exclusive access to a profile.  Any command that modifies
    the profile first acquires this lock. */

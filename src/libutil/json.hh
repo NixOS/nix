@@ -88,6 +88,8 @@ public:
         return *this;
     }
 
+    JSONList & elem(const std::string v) = delete;
+
     JSONList list();
 
     JSONObject object();
@@ -137,6 +139,12 @@ public:
         toJSON(state->str, v);
         return *this;
     }
+
+    JSONObject & attr(std::string_view name, std::string v) = delete;
+
+    JSONObject & attr(std::string_view name, const std::string & v) {
+        return attr(name, std::string_view { v });
+    };
 
     JSONList list(std::string_view name);
 

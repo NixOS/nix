@@ -46,12 +46,12 @@ static void writeChannels()
 // Adds a channel.
 static void addChannel(std::string_view url, std::string_view name)
 {
-    if (!regex_search(url, std::regex("^(file|http|https)://")))
+    if (!regex_search(std::string { url }, std::regex("^(file|http|https)://")))
         throw Error("invalid channel URL '%1%'", url);
-    if (!regex_search(name, std::regex("^[a-zA-Z0-9_][a-zA-Z0-9_\\.-]*$")))
+    if (!regex_search(std::string { name }, std::regex("^[a-zA-Z0-9_][a-zA-Z0-9_\\.-]*$")))
         throw Error("invalid channel identifier '%1%'", name);
     readChannels();
-    channels[name] = url;
+    channels[std::string { name }] = url;
     writeChannels();
 }
 
@@ -61,10 +61,11 @@ static Path profile;
 static void removeChannel(std::string_view name)
 {
     readChannels();
-    channels.erase(name);
+    // Erase unfortunately needs original key type.
+    channels.erase(std::string { name });
     writeChannels();
 
-    runProgram(settings.nixBinDir + "/nix-env", true, { "--profile", profile, "--uninstall", name });
+    runProgram(settings.nixBinDir + "/nix-env", true, { "--profile", profile, "--uninstall", std::string { name } });
 }
 
 static Path nixDefExpr;

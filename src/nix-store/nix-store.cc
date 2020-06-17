@@ -251,8 +251,8 @@ static void printTree(const StorePath & path,
     for (const auto &[n, i] : enumerate(sorted)) {
         bool last = n + 1 == sorted.size();
         printTree(i,
-            tailPad + (last ? treeLast : treeConn),
-            tailPad + (last ? treeNull : treeLine),
+            std::string { tailPad } + (last ? treeLast : treeConn),
+            std::string { tailPad } + (last ? treeNull : treeLine),
             done);
     }
 }

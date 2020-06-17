@@ -12,7 +12,7 @@ namespace nix {
      * --------------------------------------------------------------------------*/
 
     TEST(absPath, doesntChangeRoot) {
-        auto p = absPath("/");
+        auto p = absPath(Path { "/" });
 
         ASSERT_EQ(p, "/");
     }
@@ -22,7 +22,7 @@ namespace nix {
 
     TEST(absPath, turnsEmptyPathIntoCWD) {
         char cwd[PATH_MAX+1];
-        auto p = absPath("");
+        auto p = absPath(Path { "" });
 
         ASSERT_EQ(p, getcwd((char*)&cwd, PATH_MAX));
     }
@@ -31,7 +31,7 @@ namespace nix {
         char _cwd[PATH_MAX+1];
         char* cwd = getcwd((char*)&_cwd, PATH_MAX);
 
-        auto p = absPath("", cwd);
+        auto p = absPath(Path { "" }, cwd);
 
         ASSERT_EQ(p, cwd);
     }
@@ -39,7 +39,7 @@ namespace nix {
     TEST(absPath, isIdempotent) {
         char _cwd[PATH_MAX+1];
         char* cwd = getcwd((char*)&_cwd, PATH_MAX);
-        auto p1 = absPath(cwd);
+        auto p1 = absPath(Path { cwd });
         auto p2 = absPath(p1);
 
         ASSERT_EQ(p1, p2);
@@ -48,7 +48,7 @@ namespace nix {
 
     TEST(absPath, pathIsCanonicalised) {
         auto path = "/some/path/with/trailing/dot/.";
-        auto p1 = absPath(path);
+        auto p1 = absPath(Path { path });
         auto p2 = absPath(p1);
 
         ASSERT_EQ(p1, "/some/path/with/trailing/dot");

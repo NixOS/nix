@@ -23,7 +23,7 @@ std::string hilite(std::string_view s, const std::smatch & m, std::string postfi
 {
     return
         m.empty()
-        ? s
+        ? std::string { s }
         : std::string(m.prefix())
           + ANSI_RED + std::string(m.str()) + postfix
           + std::string(m.suffix());
@@ -161,9 +161,9 @@ struct CmdSearch : SourceExprCommand, MixJSON
 
                             auto jsonElem = jsonOut->object(attrPath);
 
-                            jsonElem.attr("pkgName", parsed.name);
-                            jsonElem.attr("version", parsed.version);
-                            jsonElem.attr("description", description);
+                            jsonElem.attr("pkgName", std::string_view { parsed.name });
+                            jsonElem.attr("version", std::string_view { parsed.version });
+                            jsonElem.attr("description", std::string_view { description });
 
                         } else {
                             auto name = hilite(parsed.name, nameMatch, "\e[0;2m")
@@ -178,11 +178,11 @@ struct CmdSearch : SourceExprCommand, MixJSON
 
                     if (cache) {
                         cache->attr("type", "derivation");
-                        cache->attr("name", drv.queryName());
-                        cache->attr("system", drv.querySystem());
+                        cache->attr("name", std::string_view { drv.queryName() });
+                        cache->attr("system", std::string_view { drv.querySystem() });
                         if (description != "") {
                             auto meta(cache->object("meta"));
-                            meta.attr("description", description);
+                            meta.attr("description", std::string_view { description });
                         }
                     }
                 }

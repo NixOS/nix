@@ -65,7 +65,7 @@ struct NixRepl : gc
     ~NixRepl();
     void mainLoop(const std::vector<std::string> & files);
     StringSet completePrefix(string prefix);
-    bool getLine(string & input, std::string_viewprompt);
+    bool getLine(string & input, std::string_view prompt);
     Path getDerivationPath(Value & v);
     bool processLine(string line);
     void loadFile(PathView path);
@@ -96,7 +96,7 @@ NixRepl::NixRepl(const Strings & searchPath, nix::ref<Store> store)
     , staticEnv(false, &state->staticBaseEnv)
     , historyFile(getDataDir() + "/nix/repl-history")
 {
-    curDir = absPath(".");
+    curDir = absCWD();
 }
 
 
@@ -234,7 +234,7 @@ void NixRepl::mainLoop(const std::vector<std::string> & files)
 }
 
 
-bool NixRepl::getLine(string & input, std::string_viewprompt)
+bool NixRepl::getLine(string & input, std::string_view prompt)
 {
     struct sigaction act, old;
     sigset_t savedSignalMask, set;
@@ -260,7 +260,7 @@ bool NixRepl::getLine(string & input, std::string_viewprompt)
     };
 
     setupSignals();
-    char * s = readline(prompt.c_str());
+    char * s = readline(std::string { prompt }.c_str());
     Finally doFree([&]() { free(s); });
     restoreSignals();
 
@@ -347,14 +347,14 @@ StringSet NixRepl::completePrefix(string prefix)
 static int runProgram(std::string_view program, const Strings & args)
 {
     Strings args2(args);
-    args2.push_front(program);
+    args2.push_front(std::string { program });
 
     Pid pid;
     pid = fork();
     if (pid == -1) throw SysError("forking");
     if (pid == 0) {
         restoreAffinity();
-        execvp(program.c_str(), stringsToCharPtrs(args2).data());
+        execvp(Path { program }.c_str(), stringsToCharPtrs(args2).data());
         _exit(1);
     }
 
@@ -541,8 +541,8 @@ bool NixRepl::processLine(string line)
 
 void NixRepl::loadFile(PathView path)
 {
-    loadedFiles.remove(path);
-    loadedFiles.push_back(path);
+    loadedFiles.remove(Path { path });
+    loadedFiles.push_back(Path { path });
     Value v, v2;
     state->evalFile(lookupFileArg(*state, path), v);
     state->autoCallFunction(*autoArgs, v, v2);
