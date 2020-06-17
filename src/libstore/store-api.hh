@@ -189,8 +189,9 @@ struct ValidPathInfo
 
     Strings shortRefs() const;
 
+    ValidPathInfo(const StorePath & path) : path(path) { }
+
     ValidPathInfo(StorePath && path) : path(std::move(path)) { }
-    explicit ValidPathInfo(const ValidPathInfo & other);
 
     virtual ~ValidPathInfo() { }
 };
@@ -434,10 +435,6 @@ public:
     virtual StorePathSet queryDerivationOutputs(const StorePath & path)
     { unsupported("queryDerivationOutputs"); }
 
-    /* Query the output names of the derivation denoted by `path'. */
-    virtual StringSet queryDerivationOutputNames(const StorePath & path)
-    { unsupported("queryDerivationOutputNames"); }
-
     /* Query the full store path given the hash part of a valid store
        path, or empty if the path doesn't exist. */
     virtual std::optional<StorePath> queryPathFromHashPart(const std::string & hashPart) = 0;
@@ -591,6 +588,9 @@ public:
        ensurePath(). */
     Derivation derivationFromPath(const StorePath & drvPath);
 
+    /* Read a derivation (which must already be valid). */
+    Derivation readDerivation(const StorePath & drvPath);
+
     /* Place in `out' the set of all store paths in the file system
        closure of `storePath'; that is, all paths than can be directly
        or indirectly reached from it.  `out' is not cleared.  If
@@ -734,10 +734,6 @@ public:
 
     std::shared_ptr<std::string> getBuildLog(const StorePath & path) override;
 };
-
-
-/* Extract the hash part of the given store path. */
-string storePathToHash(const Path & path);
 
 
 /* Copy a path from one store to another. */

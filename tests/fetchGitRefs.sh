@@ -56,7 +56,7 @@ invalid_ref() {
     else
         (! git check-ref-format --branch "$1" >/dev/null 2>&1)
     fi
-    nix --debug eval --raw "(builtins.fetchGit { url = $repo; ref = ''$1''; }).outPath" 2>&1 | grep 'error: invalid Git branch/tag name' >/dev/null
+    nix --debug eval --raw "(builtins.fetchGit { url = $repo; ref = ''$1''; }).outPath" 2>&1 | grep 'invalid Git branch/tag name' >/dev/null
 }
 
 

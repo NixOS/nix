@@ -8,4 +8,4 @@ libfetchers_SOURCES := $(wildcard $(d)/*.cc)
 
 libfetchers_CXXFLAGS += -I src/libutil -I src/libstore
 
-libfetchers_LIBS = libutil libstore libnixrust
+libfetchers_LIBS = libutil libstore

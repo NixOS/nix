@@ -1,4 +1,5 @@
 #pragma once
+#if 0
 
 #include "serialise.hh"
 
@@ -185,3 +186,4 @@ struct Result
 };
 
 }
+#endif
