@@ -90,7 +90,7 @@ struct CmdVerify : StorePathsCommand
                     if (info->ca == "")
                         hashSink = std::make_unique<HashSink>(info->narHash.type);
                     else
-                        hashSink = std::make_unique<HashModuloSink>(info->narHash.type, storePathToHash(store->printStorePath(info->path)));
+                        hashSink = std::make_unique<HashModuloSink>(info->narHash.type, std::string(info->path.hashPart()));
 
                     store->narFromPath(info->path, *hashSink);
 
