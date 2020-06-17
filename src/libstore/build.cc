@@ -1195,6 +1195,12 @@ void DerivationGoal::haveDerivation()
 
     parsedDrv = std::make_unique<ParsedDerivation>(drvPath, *drv);
 
+    if (parsedDrv->contentAddressed()) {
+        settings.requireExperimentalFeature("content-addressed-paths");
+        throw Error("content-addressed-paths isn't implemented yet");
+    }
+
+
     /* We are first going to try to create the invalid output paths
        through substitutes.  If that doesn't work, we'll build
        them. */
