@@ -125,7 +125,7 @@ std::string Hash::to_string(Base base, bool includeType) const
 }
 
 
-Hash::Hash(const std::string & s, HashType type)
+Hash::Hash(std::string_view s, HashType type)
     : type(type)
 {
     size_t pos = 0;
@@ -194,7 +194,7 @@ Hash::Hash(const std::string & s, HashType type)
     }
 
     else if (isSRI || size == base64Len()) {
-        auto d = base64Decode(std::string(s, pos));
+        auto d = base64Decode(s.substr(pos));
         if (d.size() != hashSize)
             throw BadHash("invalid %s hash '%s'", isSRI ? "SRI" : "base-64", s);
         assert(hashSize);
@@ -203,6 +203,16 @@ Hash::Hash(const std::string & s, HashType type)
 
     else
         throw BadHash("hash '%s' has wrong length for hash type '%s'", s, printHashType(type));
+}
+
+Hash newHashAllowEmpty(std::string hashStr, HashType ht)
+{
+    if (hashStr.empty()) {
+        Hash h(ht);
+        warn("found empty hash, assuming '%s'", h.to_string(SRI, true));
+        return h;
+    } else
+        return Hash(hashStr, ht);
 }
 
 

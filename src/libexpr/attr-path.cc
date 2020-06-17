@@ -19,7 +19,7 @@ static Strings parseAttrPath(const string & s)
             ++i;
             while (1) {
                 if (i == s.end())
-                    throw Error(format("missing closing quote in selection path '%1%'") % s);
+                    throw Error("missing closing quote in selection path '%1%'", s);
                 if (*i == '"') break;
                 cur.push_back(*i++);
             }
@@ -36,9 +36,6 @@ std::pair<Value *, Pos> findAlongAttrPath(EvalState & state, const string & attr
     Bindings & autoArgs, Value & vIn)
 {
     Strings tokens = parseAttrPath(attrPath);
-
-    Error attrError =
-        Error(format("attribute selection path '%1%' does not match expression") % attrPath);
 
     Value * v = &vIn;
     Pos pos = noPos;
@@ -63,11 +60,11 @@ std::pair<Value *, Pos> findAlongAttrPath(EvalState & state, const string & attr
 
             if (v->type != tAttrs)
                 throw TypeError(
-                    format("the expression selected by the selection path '%1%' should be a set but is %2%")
-                    % attrPath % showType(*v));
-
+                    "the expression selected by the selection path '%1%' should be a set but is %2%",
+                    attrPath,
+                    showType(*v));
             if (attr.empty())
-                throw Error(format("empty attribute name in selection path '%1%'") % attrPath);
+                throw Error("empty attribute name in selection path '%1%'", attrPath);
 
             Bindings::iterator a = v->attrs->find(state.symbols.create(attr));
             if (a == v->attrs->end())
@@ -80,9 +77,9 @@ std::pair<Value *, Pos> findAlongAttrPath(EvalState & state, const string & attr
 
             if (!v->isList())
                 throw TypeError(
-                    format("the expression selected by the selection path '%1%' should be a list but is %2%")
-                    % attrPath % showType(*v));
-
+                    "the expression selected by the selection path '%1%' should be a list but is %2%",
+                    attrPath,
+                    showType(*v));
             if (attrIndex >= v->listSize())
                 throw AttrPathNotFound("list index %1% in selection path '%2%' is out of range", attrIndex, attrPath);
 

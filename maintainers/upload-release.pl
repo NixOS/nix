@@ -1,5 +1,5 @@
 #! /usr/bin/env nix-shell
-#! nix-shell -i perl -p perl perlPackages.LWPUserAgent perlPackages.LWPProtocolHttps perlPackages.FileSlurp gnupg1
+#! nix-shell -i perl -p perl perlPackages.LWPUserAgent perlPackages.LWPProtocolHttps perlPackages.FileSlurp perlPackages.NetAmazonS3 gnupg1
 
 use strict;
 use Data::Dumper;
@@ -9,11 +9,15 @@ use File::Slurp;
 use File::Copy;
 use JSON::PP;
 use LWP::UserAgent;
+use Net::Amazon::S3;
 
 my $evalId = $ARGV[0] or die "Usage: $0 EVAL-ID\n";
 
-my $releasesDir = "/home/eelco/mnt/releases";
+my $releasesBucketName = "nix-releases";
+my $channelsBucketName = "nix-channels";
 my $nixpkgsDir = "/home/eelco/Dev/nixpkgs-pristine";
+
+my $TMPDIR = $ENV{'TMPDIR'} // "/tmp";
 
 # FIXME: cut&paste from nixos-channel-scripts.
 sub fetch {
@@ -42,13 +46,31 @@ my $version = $1;
 
 print STDERR "Nix revision is $nixRev, version is $version\n";
 
-File::Path::make_path($releasesDir);
-if (system("mountpoint -q $releasesDir") != 0) {
-    system("sshfs hydra-mirror\@nixos.org:/releases $releasesDir") == 0 or die;
-}
+my $releaseDir = "nix/$releaseName";
 
-my $releaseDir = "$releasesDir/nix/$releaseName";
-File::Path::make_path($releaseDir);
+my $tmpDir = "$TMPDIR/nix-release/$releaseName";
+File::Path::make_path($tmpDir);
+
+# S3 setup.
+my $aws_access_key_id = $ENV{'AWS_ACCESS_KEY_ID'} or die "No AWS_ACCESS_KEY_ID given.";
+my $aws_secret_access_key = $ENV{'AWS_SECRET_ACCESS_KEY'} or die "No AWS_SECRET_ACCESS_KEY given.";
+
+my $s3 = Net::Amazon::S3->new(
+    { aws_access_key_id     => $aws_access_key_id,
+      aws_secret_access_key => $aws_secret_access_key,
+      retry                 => 1,
+      host                  => "s3-eu-west-1.amazonaws.com",
+    });
+
+my $releasesBucket = $s3->bucket($releasesBucketName) or die;
+
+my $s3_us = Net::Amazon::S3->new(
+    { aws_access_key_id     => $aws_access_key_id,
+      aws_secret_access_key => $aws_secret_access_key,
+      retry                 => 1,
+    });
+
+my $channelsBucket = $s3_us->bucket($channelsBucketName) or die;
 
 sub downloadFile {
     my ($jobName, $productNr, $dstName) = @_;
@@ -57,39 +79,48 @@ sub downloadFile {
 
     my $srcFile = $buildInfo->{buildproducts}->{$productNr}->{path} or die "job '$jobName' lacks product $productNr\n";
     $dstName //= basename($srcFile);
-    my $dstFile = "$releaseDir/" . $dstName;
+    my $tmpFile = "$tmpDir/$dstName";
 
-    if (! -e $dstFile) {
-        print STDERR "downloading $srcFile to $dstFile...\n";
-        system("NIX_REMOTE=https://cache.nixos.org/ nix cat-store '$srcFile' > '$dstFile.tmp'") == 0
+    if (!-e $tmpFile) {
+        print STDERR "downloading $srcFile to $tmpFile...\n";
+        system("NIX_REMOTE=https://cache.nixos.org/ nix cat-store '$srcFile' > '$tmpFile'") == 0
             or die "unable to fetch $srcFile\n";
-        rename("$dstFile.tmp", $dstFile) or die;
     }
 
     my $sha256_expected = $buildInfo->{buildproducts}->{$productNr}->{sha256hash} or die;
-    my $sha256_actual = `nix hash-file --base16 --type sha256 '$dstFile'`;
+    my $sha256_actual = `nix hash-file --base16 --type sha256 '$tmpFile'`;
     chomp $sha256_actual;
     if ($sha256_expected ne $sha256_actual) {
-        print STDERR "file $dstFile is corrupt, got $sha256_actual, expected $sha256_expected\n";
+        print STDERR "file $tmpFile is corrupt, got $sha256_actual, expected $sha256_expected\n";
         exit 1;
     }
 
-    write_file("$dstFile.sha256", $sha256_expected);
+    write_file("$tmpFile.sha256", $sha256_expected);
 
-    if (! -e "$dstFile.asc") {
-        system("gpg2 --detach-sign --armor $dstFile") == 0 or die "unable to sign $dstFile\n";
+    if (! -e "$tmpFile.asc") {
+        system("gpg2 --detach-sign --armor $tmpFile") == 0 or die "unable to sign $tmpFile\n";
     }
 
-    return ($dstFile, $sha256_expected);
+    return $sha256_expected;
 }
 
 downloadFile("tarball", "2"); # .tar.bz2
-my ($tarball, $tarballHash) = downloadFile("tarball", "3"); # .tar.xz
+my $tarballHash = downloadFile("tarball", "3"); # .tar.xz
 downloadFile("binaryTarball.i686-linux", "1");
 downloadFile("binaryTarball.x86_64-linux", "1");
 downloadFile("binaryTarball.aarch64-linux", "1");
 downloadFile("binaryTarball.x86_64-darwin", "1");
 downloadFile("installerScript", "1");
+
+for my $fn (glob "$tmpDir/*") {
+    my $name = basename($fn);
+    my $dstKey = "$releaseDir/" . $name;
+    unless (defined $releasesBucket->head_key($dstKey)) {
+        print STDERR "uploading $fn to s3://$releasesBucketName/$dstKey...\n";
+        $releasesBucket->add_key_filename($dstKey, $fn)
+            or die $releasesBucket->err . ": " . $releasesBucket->errstr;
+    }
+}
 
 exit if $version =~ /pre/;
 
@@ -111,8 +142,12 @@ $oldName =~ s/"//g;
 sub getStorePath {
     my ($jobName) = @_;
     my $buildInfo = decode_json(fetch("$evalUrl/job/$jobName", 'application/json'));
-    die unless $buildInfo->{buildproducts}->{1}->{type} eq "nix-build";
-    return $buildInfo->{buildproducts}->{1}->{path};
+    for my $product (values %{$buildInfo->{buildproducts}}) {
+        next unless $product->{type} eq "nix-build";
+        next if $product->{path} =~ /[a-z]+$/;
+        return $product->{path};
+    }
+    die;
 }
 
 write_file("$nixpkgsDir/nixos/modules/installer/tools/nix-fallback-paths.nix",
@@ -125,18 +160,11 @@ write_file("$nixpkgsDir/nixos/modules/installer/tools/nix-fallback-paths.nix",
 
 system("cd $nixpkgsDir && git commit -a -m 'nix: $oldName -> $version'") == 0 or die;
 
-# Extract the HTML manual.
-File::Path::make_path("$releaseDir/manual");
-
-system("tar xvf $tarball --strip-components=3 -C $releaseDir/manual --wildcards '*/doc/manual/*.html' '*/doc/manual/*.css' '*/doc/manual/*.gif' '*/doc/manual/*.png'") == 0 or die;
-
-if (! -e "$releaseDir/manual/index.html") {
-    symlink("manual.html", "$releaseDir/manual/index.html") or die;
-}
-
 # Update the "latest" symlink.
-symlink("$releaseName", "$releasesDir/nix/latest-tmp") or die;
-rename("$releasesDir/nix/latest-tmp", "$releasesDir/nix/latest") or die;
+$channelsBucket->add_key(
+    "nix-latest/install", "",
+    { "x-amz-website-redirect-location" => "https://releases.nixos.org/$releaseDir/install" })
+    or die $channelsBucket->err . ": " . $channelsBucket->errstr;
 
 # Tag the release in Git.
 chdir("/home/eelco/Dev/nix-pristine") or die;

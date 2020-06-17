@@ -5,7 +5,7 @@
 #include "derivations.hh"
 #include "globals.hh"
 #include "eval-inline.hh"
-#include "download.hh"
+#include "filetransfer.hh"
 #include "json.hh"
 #include "function-trace.hh"
 
@@ -21,6 +21,8 @@
 #include <sys/resource.h>
 
 #if HAVE_BOEHMGC
+
+#define GC_INCLUDE_NEW
 
 #include <gc/gc.h>
 #include <gc/gc_cpp.h>
@@ -53,6 +55,12 @@ static char * dupStringWithLen(const char * s, size_t size)
 #endif
     if (!t) throw std::bad_alloc();
     return t;
+}
+
+
+RootValue allocRootValue(Value * v)
+{
+    return std::allocate_shared<Value *>(traceable_allocator<Value *>(), v);
 }
 
 
@@ -493,52 +501,74 @@ Value & EvalState::getBuiltin(const string & name)
 
 LocalNoInlineNoReturn(void throwEvalError(const char * s, const string & s2))
 {
-    throw EvalError(format(s) % s2);
+    throw EvalError(s, s2);
 }
 
-LocalNoInlineNoReturn(void throwEvalError(const char * s, const string & s2, const Pos & pos))
+LocalNoInlineNoReturn(void throwEvalError(const Pos & pos, const char * s, const string & s2))
 {
-    throw EvalError(format(s) % s2 % pos);
+    throw EvalError({
+        .hint = hintfmt(s, s2),
+        .nixCode = NixCode { .errPos = pos }
+    });
 }
 
 LocalNoInlineNoReturn(void throwEvalError(const char * s, const string & s2, const string & s3))
 {
-    throw EvalError(format(s) % s2 % s3);
+    throw EvalError(s, s2, s3);
 }
 
-LocalNoInlineNoReturn(void throwEvalError(const char * s, const string & s2, const string & s3, const Pos & pos))
+LocalNoInlineNoReturn(void throwEvalError(const Pos & pos, const char * s, const string & s2, const string & s3))
 {
-    throw EvalError(format(s) % s2 % s3 % pos);
+    throw EvalError({
+        .hint = hintfmt(s, s2, s3),
+        .nixCode = NixCode { .errPos = pos }
+    });
 }
 
-LocalNoInlineNoReturn(void throwEvalError(const char * s, const Symbol & sym, const Pos & p1, const Pos & p2))
+LocalNoInlineNoReturn(void throwEvalError(const Pos & p1, const char * s, const Symbol & sym, const Pos & p2))
 {
-    throw EvalError(format(s) % sym % p1 % p2);
+    // p1 is where the error occurred; p2 is a position mentioned in the message.
+    throw EvalError({
+        .hint = hintfmt(s, sym, p2),
+        .nixCode = NixCode { .errPos = p1 }
+    });
 }
 
-LocalNoInlineNoReturn(void throwTypeError(const char * s, const Pos & pos))
+LocalNoInlineNoReturn(void throwTypeError(const Pos & pos, const char * s))
 {
-    throw TypeError(format(s) % pos);
+    throw TypeError({
+        .hint = hintfmt(s),
+        .nixCode = NixCode { .errPos = pos }
+    });
 }
 
 LocalNoInlineNoReturn(void throwTypeError(const char * s, const string & s1))
 {
-    throw TypeError(format(s) % s1);
+    throw TypeError(s, s1);
 }
 
-LocalNoInlineNoReturn(void throwTypeError(const char * s, const ExprLambda & fun, const Symbol & s2, const Pos & pos))
+LocalNoInlineNoReturn(void throwTypeError(const Pos & pos, const char * s, const ExprLambda & fun, const Symbol & s2))
 {
-    throw TypeError(format(s) % fun.showNamePos() % s2 % pos);
+    throw TypeError({
+        .hint = hintfmt(s, fun.showNamePos(), s2),
+        .nixCode = NixCode { .errPos = pos }
+    });
 }
 
-LocalNoInlineNoReturn(void throwAssertionError(const char * s, const string & s1, const Pos & pos))
+LocalNoInlineNoReturn(void throwAssertionError(const Pos & pos, const char * s, const string & s1))
 {
-    throw AssertionError(format(s) % s1 % pos);
+    throw AssertionError({
+        .hint = hintfmt(s, s1),
+        .nixCode = NixCode { .errPos = pos }
+    });
 }
 
-LocalNoInlineNoReturn(void throwUndefinedVarError(const char * s, const string & s1, const Pos & pos))
+LocalNoInlineNoReturn(void throwUndefinedVarError(const Pos & pos, const char * s, const string & s1))
 {
-    throw UndefinedVarError(format(s) % s1 % pos);
+    throw UndefinedVarError({
+        .hint = hintfmt(s, s1),
+        .nixCode = NixCode { .errPos = pos }
+    });
 }
 
 LocalNoInline(void addErrorPrefix(Error & e, const char * s, const string & s2))
@@ -606,7 +636,7 @@ inline Value * EvalState::lookupVar(Env * env, const ExprVar & var, bool noEval)
             return j->value;
         }
         if (!env->prevWith)
-            throwUndefinedVarError("undefined variable '%1%' at %2%", var.name, var.pos);
+            throwUndefinedVarError(var.pos, "undefined variable '%1%'", var.name);
         for (size_t l = env->prevWith; l; --l, env = env->up) ;
     }
 }
@@ -804,7 +834,7 @@ inline bool EvalState::evalBool(Env & env, Expr * e, const Pos & pos)
     Value v;
     e->eval(*this, env, v);
     if (v.type != tBool)
-        throwTypeError("value is %1% while a Boolean was expected, at %2%", v, pos);
+        throwTypeError(pos, "value is %1% while a Boolean was expected", v);
     return v.boolean;
 }
 
@@ -918,7 +948,7 @@ void ExprAttrs::eval(EvalState & state, Env & env, Value & v)
         Symbol nameSym = state.symbols.create(nameVal.string.s);
         Bindings::iterator j = v.attrs->find(nameSym);
         if (j != v.attrs->end())
-            throwEvalError("dynamic attribute '%1%' at %2% already defined at %3%", nameSym, i.pos, *j->pos);
+            throwEvalError(i.pos, "dynamic attribute '%1%' already defined at %2%", nameSym, *j->pos);
 
         i.valueExpr->setName(nameSym);
         /* Keep sorted order so find can catch duplicates */
@@ -1006,7 +1036,7 @@ void ExprSelect::eval(EvalState & state, Env & env, Value & v)
             } else {
                 state.forceAttrs(*vAttrs, pos);
                 if ((j = vAttrs->attrs->find(name)) == vAttrs->attrs->end())
-                    throwEvalError("attribute '%1%' missing, at %2%", name, pos);
+                    throwEvalError(pos, "attribute '%1%' missing", name);
             }
             vAttrs = j->value;
             pos2 = j->pos;
@@ -1132,7 +1162,7 @@ void EvalState::callFunction(Value & fun, Value & arg, Value & v, const Pos & po
     }
 
     if (fun.type != tLambda)
-        throwTypeError("attempt to call something which is not a function but %1%, at %2%", fun, pos);
+        throwTypeError(pos, "attempt to call something which is not a function but %1%", fun);
 
     ExprLambda & lambda(*fun.lambda.fun);
 
@@ -1160,8 +1190,8 @@ void EvalState::callFunction(Value & fun, Value & arg, Value & v, const Pos & po
         for (auto & i : lambda.formals->formals) {
             Bindings::iterator j = arg.attrs->find(i.name);
             if (j == arg.attrs->end()) {
-                if (!i.def) throwTypeError("%1% called without required argument '%2%', at %3%",
-                    lambda, i.name, pos);
+                if (!i.def) throwTypeError(pos, "%1% called without required argument '%2%'",
+                    lambda, i.name);
                 env2.values[displ++] = i.def->maybeThunk(*this, env2);
             } else {
                 attrsUsed++;
@@ -1176,7 +1206,7 @@ void EvalState::callFunction(Value & fun, Value & arg, Value & v, const Pos & po
                user. */
             for (auto & i : *arg.attrs)
                 if (lambda.formals->argNames.find(i.name) == lambda.formals->argNames.end())
-                    throwTypeError("%1% called with unexpected argument '%2%', at %3%", lambda, i.name, pos);
+                    throwTypeError(pos, "%1% called with unexpected argument '%2%'", lambda, i.name);
             abort(); // can't happen
         }
     }
@@ -1256,7 +1286,7 @@ void ExprWith::eval(EvalState & state, Env & env, Value & v)
 
 void ExprIf::eval(EvalState & state, Env & env, Value & v)
 {
-    (state.evalBool(env, cond) ? then : else_)->eval(state, env, v);
+    (state.evalBool(env, cond, pos) ? then : else_)->eval(state, env, v);
 }
 
 
@@ -1265,7 +1295,7 @@ void ExprAssert::eval(EvalState & state, Env & env, Value & v)
     if (!state.evalBool(env, cond, pos)) {
         std::ostringstream out;
         cond->show(out);
-        throwAssertionError("assertion '%1%' failed at %2%", out.str(), pos);
+        throwAssertionError(pos, "assertion '%1%' failed at %2%", out.str());
     }
     body->eval(state, env, v);
 }
@@ -1417,14 +1447,14 @@ void ExprConcatStrings::eval(EvalState & state, Env & env, Value & v)
                 nf = n;
                 nf += vTmp.fpoint;
             } else
-                throwEvalError("cannot add %1% to an integer, at %2%", showType(vTmp), pos);
+                throwEvalError(pos, "cannot add %1% to an integer", showType(vTmp));
         } else if (firstType == tFloat) {
             if (vTmp.type == tInt) {
                 nf += vTmp.integer;
             } else if (vTmp.type == tFloat) {
                 nf += vTmp.fpoint;
             } else
-                throwEvalError("cannot add %1% to a float, at %2%", showType(vTmp), pos);
+                throwEvalError(pos, "cannot add %1% to a float", showType(vTmp));
         } else
             s << state.coerceToString(pos, vTmp, context, false, firstType == tString);
     }
@@ -1435,7 +1465,7 @@ void ExprConcatStrings::eval(EvalState & state, Env & env, Value & v)
         mkFloat(v, nf);
     else if (firstType == tPath) {
         if (!context.empty())
-            throwEvalError("a string that refers to a store path cannot be appended to a path, at %1%", pos);
+            throwEvalError(pos, "a string that refers to a store path cannot be appended to a path");
         auto path = canonPath(s.str());
         mkPath(v, path.c_str());
     } else
@@ -1484,7 +1514,7 @@ NixInt EvalState::forceInt(Value & v, const Pos & pos)
 {
     forceValue(v, pos);
     if (v.type != tInt)
-        throwTypeError("value is %1% while an integer was expected, at %2%", v, pos);
+        throwTypeError(pos, "value is %1% while an integer was expected", v);
     return v.integer;
 }
 
@@ -1495,16 +1525,16 @@ NixFloat EvalState::forceFloat(Value & v, const Pos & pos)
     if (v.type == tInt)
         return v.integer;
     else if (v.type != tFloat)
-        throwTypeError("value is %1% while a float was expected, at %2%", v, pos);
+        throwTypeError(pos, "value is %1% while a float was expected", v);
     return v.fpoint;
 }
 
 
 bool EvalState::forceBool(Value & v, const Pos & pos)
 {
-    forceValue(v);
+    forceValue(v, pos);
     if (v.type != tBool)
-        throwTypeError("value is %1% while a Boolean was expected, at %2%", v, pos);
+        throwTypeError(pos, "value is %1% while a Boolean was expected", v);
     return v.boolean;
 }
 
@@ -1517,9 +1547,9 @@ bool EvalState::isFunctor(Value & fun)
 
 void EvalState::forceFunction(Value & v, const Pos & pos)
 {
-    forceValue(v);
+    forceValue(v, pos);
     if (v.type != tLambda && v.type != tPrimOp && v.type != tPrimOpApp && !isFunctor(v))
-        throwTypeError("value is %1% while a function was expected, at %2%", v, pos);
+        throwTypeError(pos, "value is %1% while a function was expected", v);
 }
 
 
@@ -1528,7 +1558,7 @@ string EvalState::forceString(Value & v, const Pos & pos)
     forceValue(v, pos);
     if (v.type != tString) {
         if (pos)
-            throwTypeError("value is %1% while a string was expected, at %2%", v, pos);
+            throwTypeError(pos, "value is %1% while a string was expected", v);
         else
             throwTypeError("value is %1% while a string was expected", v);
     }
@@ -1557,8 +1587,8 @@ string EvalState::forceStringNoCtx(Value & v, const Pos & pos)
     string s = forceString(v, pos);
     if (v.string.context) {
         if (pos)
-            throwEvalError("the string '%1%' is not allowed to refer to a store path (such as '%2%'), at %3%",
-                v.string.s, v.string.context[0], pos);
+            throwEvalError(pos, "the string '%1%' is not allowed to refer to a store path (such as '%2%')",
+                v.string.s, v.string.context[0]);
         else
             throwEvalError("the string '%1%' is not allowed to refer to a store path (such as '%2%')",
                 v.string.s, v.string.context[0]);
@@ -1594,7 +1624,7 @@ std::optional<string> EvalState::tryAttrsToString(const Pos & pos, Value & v,
 string EvalState::coerceToString(const Pos & pos, Value & v, PathSet & context,
     bool coerceMore, bool copyToStore)
 {
-    forceValue(v);
+    forceValue(v, pos);
 
     string s;
 
@@ -1614,7 +1644,7 @@ string EvalState::coerceToString(const Pos & pos, Value & v, PathSet & context,
             return *maybeString;
         }
         auto i = v.attrs->find(sOutPath);
-        if (i == v.attrs->end()) throwTypeError("cannot coerce a set to a string, at %1%", pos);
+        if (i == v.attrs->end()) throwTypeError(pos, "cannot coerce a set to a string");
         return coerceToString(pos, *i->value, context, coerceMore, copyToStore);
     }
 
@@ -1645,7 +1675,7 @@ string EvalState::coerceToString(const Pos & pos, Value & v, PathSet & context,
         }
     }
 
-    throwTypeError("cannot coerce %1% to a string, at %2%", v, pos);
+    throwTypeError(pos, "cannot coerce %1% to a string", v);
 }
 
 
@@ -1661,7 +1691,7 @@ string EvalState::copyPathToStore(PathSet & context, const Path & path)
     else {
         auto p = settings.readOnlyMode
             ? store->computeStorePathForPath(std::string(baseNameOf(path)), checkSourcePath(path)).first
-            : store->addToStore(std::string(baseNameOf(path)), checkSourcePath(path), true, htSHA256, defaultPathFilter, repair);
+            : store->addToStore(std::string(baseNameOf(path)), checkSourcePath(path), FileIngestionMethod::Recursive, htSHA256, defaultPathFilter, repair);
         dstPath = store->printStorePath(p);
         srcToStore.insert_or_assign(path, std::move(p));
         printMsg(lvlChatty, "copied source '%1%' -> '%2%'", path, dstPath);
@@ -1676,7 +1706,7 @@ Path EvalState::coerceToPath(const Pos & pos, Value & v, PathSet & context)
 {
     string path = coerceToString(pos, v, context, false, false);
     if (path == "" || path[0] != '/')
-        throwEvalError("string '%1%' doesn't represent an absolute path, at %2%", path, pos);
+        throwEvalError(pos, "string '%1%' doesn't represent an absolute path", path);
     return path;
 }
 
@@ -1883,8 +1913,10 @@ void EvalState::printStats()
 
 string ExternalValueBase::coerceToString(const Pos & pos, PathSet & context, bool copyMore, bool copyToStore) const
 {
-    throw TypeError(format("cannot coerce %1% to a string, at %2%") %
-        showType() % pos);
+    throw TypeError({
+        .hint = hintfmt("cannot coerce %1% to a string", showType()),
+        .nixCode = NixCode { .errPos = pos }
+    });
 }
 
 

@@ -74,7 +74,7 @@ static void atomicWrite(const Path & path, const std::string & s)
     AutoDelete del(tmp, false);
     writeFile(tmp, s);
     if (rename(tmp.c_str(), path.c_str()))
-        throw SysError(format("renaming '%1%' to '%2%'") % tmp % path);
+        throw SysError("renaming '%1%' to '%2%'", tmp, path);
     del.cancel();
 }
 

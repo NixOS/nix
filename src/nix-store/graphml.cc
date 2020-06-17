@@ -65,7 +65,7 @@ void printGraphML(ref<Store> store, StorePathSet && roots)
     while (!workList.empty()) {
         auto path = std::move(workList.extract(workList.begin()).value());
 
-        ret = doneSet.insert(path.clone());
+        ret = doneSet.insert(path);
         if (ret.second == false) continue;
 
         auto info = store->queryPathInfo(path);
@@ -73,7 +73,7 @@ void printGraphML(ref<Store> store, StorePathSet && roots)
 
         for (auto & p : info->references) {
             if (p != path) {
-                workList.insert(p.clone());
+                workList.insert(p);
                 cout << makeEdge(path.to_string(), p.to_string());
             }
         }

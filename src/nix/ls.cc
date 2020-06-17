@@ -34,16 +34,14 @@ struct MixLs : virtual Args, MixJSON
                         (st.isExecutable ? "-r-xr-xr-x" : "-r--r--r--") :
                     st.type == FSAccessor::Type::tSymlink ? "lrwxrwxrwx" :
                     "dr-xr-xr-x";
-                std::cout <<
-                    (format("%s %20d %s") % tp % st.fileSize % relPath);
+                auto line = fmt("%s %20d %s", tp, st.fileSize, relPath);
                 if (st.type == FSAccessor::Type::tSymlink)
-                    std::cout << " -> " << accessor->readLink(curPath)
-                    ;
-                std::cout << "\n";
+                    line += " -> " + accessor->readLink(curPath);
+                logger->stdout(line);
                 if (recursive && st.type == FSAccessor::Type::tDirectory)
                     doPath(st, curPath, relPath, false);
             } else {
-                std::cout << relPath << "\n";
+                logger->stdout(relPath);
                 if (recursive) {
                     auto st = accessor->stat(curPath);
                     if (st.type == FSAccessor::Type::tDirectory)
@@ -65,7 +63,7 @@ struct MixLs : virtual Args, MixJSON
 
         auto st = accessor->stat(path);
         if (st.type == FSAccessor::Type::tMissing)
-            throw Error(format("path '%1%' does not exist") % path);
+            throw Error("path '%1%' does not exist", path);
         doPath(st, path,
             st.type == FSAccessor::Type::tDirectory ? "." : std::string(baseNameOf(path)),
             showDirectory);
@@ -102,8 +100,10 @@ struct CmdLsStore : StoreCommand, MixLs
 
     std::string description() override
     {
-        return "show information about a store path";
+        return "show information about a path in the Nix store";
     }
+
+    Category category() override { return catUtility; }
 
     void run(ref<Store> store) override
     {
@@ -133,12 +133,14 @@ struct CmdLsNar : Command, MixLs
 
     std::string description() override
     {
-        return "show information about the contents of a NAR file";
+        return "show information about a path inside a NAR file";
     }
+
+    Category category() override { return catUtility; }
 
     void run() override
     {
-        list(makeNarAccessor(make_ref<std::string>(readFile(narPath, true))));
+        list(makeNarAccessor(make_ref<std::string>(readFile(narPath))));
     }
 };
 

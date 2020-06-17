@@ -40,24 +40,6 @@ extern char * * environ;
 
 namespace nix {
 
-
-const std::string nativeSystem = SYSTEM;
-
-
-BaseError & BaseError::addPrefix(const FormatOrString & fs)
-{
-    prefix_ = fs.s + prefix_;
-    return *this;
-}
-
-
-std::string SysError::addErrno(const std::string & s)
-{
-    errNo = errno;
-    return s + ": " + strerror(errNo);
-}
-
-
 std::optional<std::string> getEnv(const std::string & key)
 {
     char * value = getenv(key.c_str());
@@ -129,7 +111,7 @@ Path canonPath(const Path & path, bool resolveSymlinks)
     string s;
 
     if (path[0] != '/')
-        throw Error(format("not an absolute path: '%1%'") % path);
+        throw Error("not an absolute path: '%1%'", path);
 
     string::const_iterator i = path.begin(), end = path.end();
     string temp;
@@ -165,7 +147,7 @@ Path canonPath(const Path & path, bool resolveSymlinks)
                the symlink target might contain new symlinks). */
             if (resolveSymlinks && isLink(s)) {
                 if (++followCount >= maxFollow)
-                    throw Error(format("infinite symlink recursion in path '%1%'") % path);
+                    throw Error("infinite symlink recursion in path '%1%'", path);
                 temp = absPath(readLink(s), dirOf(s))
                     + string(i, end);
                 i = temp.begin(); /* restart */
@@ -226,7 +208,7 @@ struct stat lstat(const Path & path)
 {
     struct stat st;
     if (lstat(path.c_str(), &st))
-        throw SysError(format("getting status of '%1%'") % path);
+        throw SysError("getting status of '%1%'", path);
     return st;
 }
 
@@ -238,7 +220,7 @@ bool pathExists(const Path & path)
     res = lstat(path.c_str(), &st);
     if (!res) return true;
     if (errno != ENOENT && errno != ENOTDIR)
-        throw SysError(format("getting status of %1%") % path);
+        throw SysError("getting status of %1%", path);
     return false;
 }
 
@@ -268,16 +250,13 @@ bool isLink(const Path & path)
 }
 
 
-DirEntries readDirectory(const Path & path)
+DirEntries readDirectory(DIR *dir, const Path & path)
 {
     DirEntries entries;
     entries.reserve(64);
 
-    AutoCloseDir dir(opendir(path.c_str()));
-    if (!dir) throw SysError(format("opening directory '%1%'") % path);
-
     struct dirent * dirent;
-    while (errno = 0, dirent = readdir(dir.get())) { /* sic */
+    while (errno = 0, dirent = readdir(dir)) { /* sic */
         checkInterrupt();
         string name = dirent->d_name;
         if (name == "." || name == "..") continue;
@@ -289,9 +268,17 @@ DirEntries readDirectory(const Path & path)
 #endif
         );
     }
-    if (errno) throw SysError(format("reading directory '%1%'") % path);
+    if (errno) throw SysError("reading directory '%1%'", path);
 
     return entries;
+}
+
+DirEntries readDirectory(const Path & path)
+{
+    AutoCloseDir dir(opendir(path.c_str()));
+    if (!dir) throw SysError("opening directory '%1%'", path);
+
+    return readDirectory(dir.get(), path);
 }
 
 
@@ -311,26 +298,24 @@ string readFile(int fd)
     if (fstat(fd, &st) == -1)
         throw SysError("statting file");
 
-    std::vector<unsigned char> buf(st.st_size);
-    readFull(fd, buf.data(), st.st_size);
-
-    return string((char *) buf.data(), st.st_size);
+    return drainFD(fd, true, st.st_size);
 }
 
 
-string readFile(const Path & path, bool drain)
+string readFile(const Path & path)
 {
     AutoCloseFD fd = open(path.c_str(), O_RDONLY | O_CLOEXEC);
     if (!fd)
-        throw SysError(format("opening file '%1%'") % path);
-    return drain ? drainFD(fd.get()) : readFile(fd.get());
+        throw SysError("opening file '%1%'", path);
+    return readFile(fd.get());
 }
 
 
 void readFile(const Path & path, Sink & sink)
 {
     AutoCloseFD fd = open(path.c_str(), O_RDONLY | O_CLOEXEC);
-    if (!fd) throw SysError("opening file '%s'", path);
+    if (!fd)
+        throw SysError("opening file '%s'", path);
     drainFD(fd.get(), sink);
 }
 
@@ -339,7 +324,7 @@ void writeFile(const Path & path, const string & s, mode_t mode)
 {
     AutoCloseFD fd = open(path.c_str(), O_WRONLY | O_TRUNC | O_CREAT | O_CLOEXEC, mode);
     if (!fd)
-        throw SysError(format("opening file '%1%'") % path);
+        throw SysError("opening file '%1%'", path);
     writeFull(fd.get(), s);
 }
 
@@ -348,7 +333,7 @@ void writeFile(const Path & path, Source & source, mode_t mode)
 {
     AutoCloseFD fd = open(path.c_str(), O_WRONLY | O_TRUNC | O_CREAT | O_CLOEXEC, mode);
     if (!fd)
-        throw SysError(format("opening file '%1%'") % path);
+        throw SysError("opening file '%1%'", path);
 
     std::vector<unsigned char> buf(64 * 1024);
 
@@ -389,14 +374,16 @@ void writeLine(int fd, string s)
 }
 
 
-static void _deletePath(const Path & path, unsigned long long & bytesFreed)
+static void _deletePath(int parentfd, const Path & path, unsigned long long & bytesFreed)
 {
     checkInterrupt();
 
+    string name(baseNameOf(path));
+
     struct stat st;
-    if (lstat(path.c_str(), &st) == -1) {
+    if (fstatat(parentfd, name.c_str(), &st, AT_SYMLINK_NOFOLLOW) == -1) {
         if (errno == ENOENT) return;
-        throw SysError(format("getting status of '%1%'") % path);
+        throw SysError("getting status of '%1%'", path);
     }
 
     if (!S_ISDIR(st.st_mode) && st.st_nlink == 1)
@@ -406,18 +393,43 @@ static void _deletePath(const Path & path, unsigned long long & bytesFreed)
         /* Make the directory accessible. */
         const auto PERM_MASK = S_IRUSR | S_IWUSR | S_IXUSR;
         if ((st.st_mode & PERM_MASK) != PERM_MASK) {
-            if (chmod(path.c_str(), st.st_mode | PERM_MASK) == -1)
-                throw SysError(format("chmod '%1%'") % path);
+            if (fchmodat(parentfd, name.c_str(), st.st_mode | PERM_MASK, 0) == -1)
+                throw SysError("chmod '%1%'", path);
         }
 
-        for (auto & i : readDirectory(path))
-            _deletePath(path + "/" + i.name, bytesFreed);
+        int fd = openat(parentfd, path.c_str(), O_RDONLY);
+        if (!fd)
+            throw SysError("opening directory '%1%'", path);
+        AutoCloseDir dir(fdopendir(fd));
+        if (!dir)
+            throw SysError("opening directory '%1%'", path);
+        for (auto & i : readDirectory(dir.get(), path))
+            _deletePath(dirfd(dir.get()), path + "/" + i.name, bytesFreed);
     }
 
-    if (remove(path.c_str()) == -1) {
+    int flags = S_ISDIR(st.st_mode) ? AT_REMOVEDIR : 0;
+    if (unlinkat(parentfd, name.c_str(), flags) == -1) {
         if (errno == ENOENT) return;
-        throw SysError(format("cannot unlink '%1%'") % path);
+        throw SysError("cannot unlink '%1%'", path);
     }
+}
+
+static void _deletePath(const Path & path, unsigned long long & bytesFreed)
+{
+    Path dir = dirOf(path);
+    if (dir == "")
+        dir = "/";
+
+    AutoCloseFD dirfd(open(dir.c_str(), O_RDONLY));
+    if (!dirfd) {
+        // This really shouldn't fail silently, but it's left this way
+        // for backwards compatibility.
+        if (errno == ENOENT) return;
+
+        throw SysError("opening directory '%1%'", path);
+    }
+
+    _deletePath(dirfd.get(), path, bytesFreed);
 }
 
 
@@ -468,13 +480,24 @@ Path createTempDir(const Path & tmpRoot, const Path & prefix,
                "wheel", then "tar" will fail to unpack archives that
                have the setgid bit set on directories. */
             if (chown(tmpDir.c_str(), (uid_t) -1, getegid()) != 0)
-                throw SysError(format("setting group of directory '%1%'") % tmpDir);
+                throw SysError("setting group of directory '%1%'", tmpDir);
 #endif
             return tmpDir;
         }
         if (errno != EEXIST)
-            throw SysError(format("creating directory '%1%'") % tmpDir);
+            throw SysError("creating directory '%1%'", tmpDir);
     }
+}
+
+
+std::pair<AutoCloseFD, Path> createTempFile(const Path & prefix)
+{
+    Path tmpl(getEnv("TMPDIR").value_or("/tmp") + "/" + prefix + ".XXXXXX");
+    // Strictly speaking, this is UB, but who cares...
+    AutoCloseFD fd(mkstemp((char *) tmpl.c_str()));
+    if (!fd)
+        throw SysError("creating temporary file '%s'", tmpl);
+    return {std::move(fd), tmpl};
 }
 
 
@@ -544,15 +567,15 @@ Paths createDirs(const Path & path)
     if (lstat(path.c_str(), &st) == -1) {
         created = createDirs(dirOf(path));
         if (mkdir(path.c_str(), 0777) == -1 && errno != EEXIST)
-            throw SysError(format("creating directory '%1%'") % path);
+            throw SysError("creating directory '%1%'", path);
         st = lstat(path);
         created.push_back(path);
     }
 
     if (S_ISLNK(st.st_mode) && stat(path.c_str(), &st) == -1)
-        throw SysError(format("statting symlink '%1%'") % path);
+        throw SysError("statting symlink '%1%'", path);
 
-    if (!S_ISDIR(st.st_mode)) throw Error(format("'%1%' is not a directory") % path);
+    if (!S_ISDIR(st.st_mode)) throw Error("'%1%' is not a directory", path);
 
     return created;
 }
@@ -561,7 +584,7 @@ Paths createDirs(const Path & path)
 void createSymlink(const Path & target, const Path & link)
 {
     if (symlink(target.c_str(), link.c_str()))
-        throw SysError(format("creating symlink from '%1%' to '%2%'") % link % target);
+        throw SysError("creating symlink from '%1%' to '%2%'", link, target);
 }
 
 
@@ -578,7 +601,7 @@ void replaceSymlink(const Path & target, const Path & link)
         }
 
         if (rename(tmp.c_str(), link.c_str()) != 0)
-            throw SysError(format("renaming '%1%' to '%2%'") % tmp % link);
+            throw SysError("renaming '%1%' to '%2%'", tmp, link);
 
         break;
     }
@@ -622,9 +645,9 @@ void writeFull(int fd, const string & s, bool allowInterrupts)
 }
 
 
-string drainFD(int fd, bool block)
+string drainFD(int fd, bool block, const size_t reserveSize)
 {
-    StringSink sink;
+    StringSink sink(reserveSize);
     drainFD(fd, sink, block);
     return std::move(*sink.s);
 }
@@ -683,7 +706,7 @@ AutoDelete::~AutoDelete()
                 deletePath(path);
             else {
                 if (remove(path.c_str()) == -1)
-                    throw SysError(format("cannot unlink '%1%'") % path);
+                    throw SysError("cannot unlink '%1%'", path);
             }
         }
     } catch (...) {
@@ -749,7 +772,7 @@ void AutoCloseFD::close()
     if (fd != -1) {
         if (::close(fd) == -1)
             /* This should never happen. */
-            throw SysError(format("closing file descriptor %1%") % fd);
+            throw SysError("closing file descriptor %1%", fd);
     }
 }
 
@@ -822,7 +845,7 @@ int Pid::kill()
 {
     assert(pid != -1);
 
-    debug(format("killing process %1%") % pid);
+    debug("killing process %1%", pid);
 
     /* Send the requested signal to the child.  If it has its own
        process group, send the signal to every process in the child
@@ -834,7 +857,7 @@ int Pid::kill()
 #if __FreeBSD__ || __APPLE__
         if (errno != EPERM || ::kill(pid, 0) != 0)
 #endif
-            printError((SysError("killing process %d", pid).msg()));
+            logError(SysError("killing process %d", pid).info());
     }
 
     return wait();
@@ -880,7 +903,7 @@ pid_t Pid::release()
 
 void killUser(uid_t uid)
 {
-    debug(format("killing all processes running under uid '%1%'") % uid);
+    debug("killing all processes running under uid '%1%'", uid);
 
     assert(uid != 0); /* just to be safe... */
 
@@ -909,7 +932,7 @@ void killUser(uid_t uid)
 #endif
             if (errno == ESRCH) break; /* no more processes */
             if (errno != EINTR)
-                throw SysError(format("cannot kill processes for uid '%1%'") % uid);
+                throw SysError("cannot kill processes for uid '%1%'", uid);
         }
 
         _exit(0);
@@ -917,7 +940,7 @@ void killUser(uid_t uid)
 
     int status = pid.wait();
     if (status != 0)
-        throw Error(format("cannot kill processes for uid '%1%': %2%") % uid % statusToString(status));
+        throw Error("cannot kill processes for uid '%1%': %2%", uid, statusToString(status));
 
     /* !!! We should really do some check to make sure that there are
        no processes left running under `uid', but there is no portable
@@ -949,7 +972,7 @@ pid_t startProcess(std::function<void()> fun, const ProcessOptions & options)
 {
     auto wrapper = [&]() {
         if (!options.allowVfork)
-            logger = makeDefaultLogger();
+            logger = makeSimpleLogger();
         try {
 #if __linux__
             if (options.dieWithParent && prctl(PR_SET_PDEATHSIG, SIGKILL) == -1)
@@ -1274,7 +1297,7 @@ bool statusOk(int status)
 }
 
 
-bool hasPrefix(const string & s, const string & prefix)
+bool hasPrefix(std::string_view s, std::string_view prefix)
 {
     return s.compare(0, prefix.size(), prefix) == 0;
 }
@@ -1311,7 +1334,7 @@ void ignoreException()
     try {
         throw;
     } catch (std::exception & e) {
-        printError(format("error (ignored): %1%") % e.what());
+        printError("error (ignored): %1%", e.what());
     }
 }
 
@@ -1368,7 +1391,7 @@ std::string filterANSIEscapes(const std::string & s, bool filterAll, unsigned in
 static char base64Chars[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
 
 
-string base64Encode(const string & s)
+string base64Encode(std::string_view s)
 {
     string res;
     int data = 0, nbits = 0;
@@ -1389,7 +1412,7 @@ string base64Encode(const string & s)
 }
 
 
-string base64Decode(const string & s)
+string base64Decode(std::string_view s)
 {
     bool init = false;
     char decode[256];
@@ -1421,17 +1444,6 @@ string base64Decode(const string & s)
     }
 
     return res;
-}
-
-
-void callFailure(const std::function<void(std::exception_ptr exc)> & failure, std::exception_ptr exc)
-{
-    try {
-        failure(exc);
-    } catch (std::exception & e) {
-        printError(format("uncaught exception: %s") % e.what());
-        abort();
-    }
 }
 
 

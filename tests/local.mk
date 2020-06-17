@@ -1,5 +1,6 @@
 nix_tests = \
   init.sh hash.sh lang.sh add.sh simple.sh dependencies.sh \
+  config.sh \
   gc.sh \
   gc-concurrent.sh \
   gc-auto.sh \
@@ -17,9 +18,11 @@ nix_tests = \
   nar-access.sh \
   structured-attrs.sh \
   fetchGit.sh \
+  fetchGitRefs.sh \
+  fetchGitSubmodules.sh \
   fetchMercurial.sh \
   signing.sh \
-  run.sh \
+  shell.sh \
   brotli.sh \
   pure-eval.sh \
   check.sh \

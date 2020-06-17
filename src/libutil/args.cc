@@ -3,16 +3,14 @@
 
 namespace nix {
 
-Args::FlagMaker Args::mkFlag()
+void Args::addFlag(Flag && flag_)
 {
-    return FlagMaker(*this);
-}
-
-Args::FlagMaker::~FlagMaker()
-{
+    auto flag = std::make_shared<Flag>(std::move(flag_));
+    if (flag->handler.arity != ArityAny)
+        assert(flag->handler.arity == flag->labels.size());
     assert(flag->longName != "");
-    args.longFlags[flag->longName] = flag;
-    if (flag->shortName) args.shortFlags[flag->shortName] = flag;
+    longFlags[flag->longName] = flag;
+    if (flag->shortName) shortFlags[flag->shortName] = flag;
 }
 
 void Args::parseCmdline(const Strings & _cmdline)
@@ -47,7 +45,7 @@ void Args::parseCmdline(const Strings & _cmdline)
         }
         else if (!dashDash && std::string(arg, 0, 1) == "-") {
             if (!processFlag(pos, cmdline.end()))
-                throw UsageError(format("unrecognised flag '%1%'") % arg);
+                throw UsageError("unrecognised flag '%1%'", arg);
         }
         else {
             pendingArgs.push_back(*pos++);
@@ -61,7 +59,7 @@ void Args::parseCmdline(const Strings & _cmdline)
 
 void Args::printHelp(const string & programName, std::ostream & out)
 {
-    std::cout << "Usage: " << programName << " <FLAGS>...";
+    std::cout << fmt(ANSI_BOLD "Usage:" ANSI_NORMAL " %s " ANSI_ITALIC "FLAGS..." ANSI_NORMAL, programName);
     for (auto & exp : expectedArgs) {
         std::cout << renderLabels({exp.label});
         // FIXME: handle arity > 1
@@ -72,11 +70,11 @@ void Args::printHelp(const string & programName, std::ostream & out)
 
     auto s = description();
     if (s != "")
-        std::cout << "\nSummary: " << s << ".\n";
+        std::cout << "\n" ANSI_BOLD "Summary:" ANSI_NORMAL " " << s << ".\n";
 
     if (longFlags.size()) {
         std::cout << "\n";
-        std::cout << "Flags:\n";
+        std::cout << ANSI_BOLD "Flags:" ANSI_NORMAL "\n";
         printFlags(out);
     }
 }
@@ -101,15 +99,14 @@ bool Args::processFlag(Strings::iterator & pos, Strings::iterator end)
     auto process = [&](const std::string & name, const Flag & flag) -> bool {
         ++pos;
         std::vector<std::string> args;
-        for (size_t n = 0 ; n < flag.arity; ++n) {
+        for (size_t n = 0 ; n < flag.handler.arity; ++n) {
             if (pos == end) {
-                if (flag.arity == ArityAny) break;
-                throw UsageError(format("flag '%1%' requires %2% argument(s)")
-                    % name % flag.arity);
+                if (flag.handler.arity == ArityAny) break;
+                throw UsageError("flag '%s' requires %d argument(s)", name, flag.handler.arity);
             }
             args.push_back(*pos++);
         }
-        flag.handler(std::move(args));
+        flag.handler.fun(std::move(args));
         return true;
     };
 
@@ -133,7 +130,7 @@ bool Args::processArgs(const Strings & args, bool finish)
 {
     if (expectedArgs.empty()) {
         if (!args.empty())
-            throw UsageError(format("unexpected argument '%1%'") % args.front());
+            throw UsageError("unexpected argument '%1%'", args.front());
         return true;
     }
 
@@ -157,17 +154,18 @@ bool Args::processArgs(const Strings & args, bool finish)
     return res;
 }
 
-Args::FlagMaker & Args::FlagMaker::mkHashTypeFlag(HashType * ht)
+Args::Flag Args::Flag::mkHashTypeFlag(std::string && longName, HashType * ht)
 {
-    arity(1);
-    label("type");
-    description("hash algorithm ('md5', 'sha1', 'sha256', or 'sha512')");
-    handler([ht](std::string s) {
-        *ht = parseHashType(s);
-        if (*ht == htUnknown)
-            throw UsageError("unknown hash type '%1%'", s);
-    });
-    return *this;
+    return Flag {
+        .longName = std::move(longName),
+        .description = "hash algorithm ('md5', 'sha1', 'sha256', or 'sha512')",
+        .labels = {"hash-algo"},
+        .handler = {[ht](std::string s) {
+            *ht = parseHashType(s);
+            if (*ht == htUnknown)
+                throw UsageError("unknown hash type '%1%'", s);
+        }}
+    };
 }
 
 Strings argvToStrings(int argc, char * * argv)
@@ -183,7 +181,7 @@ std::string renderLabels(const Strings & labels)
     std::string res;
     for (auto label : labels) {
         for (auto & c : label) c = std::toupper(c);
-        res += " <" + label + ">";
+        res += " " ANSI_ITALIC + label + ANSI_NORMAL;
     }
     return res;
 }
@@ -192,10 +190,10 @@ void printTable(std::ostream & out, const Table2 & table)
 {
     size_t max = 0;
     for (auto & row : table)
-        max = std::max(max, row.first.size());
+        max = std::max(max, filterANSIEscapes(row.first, true).size());
     for (auto & row : table) {
         out << "  " << row.first
-            << std::string(max - row.first.size() + 2, ' ')
+            << std::string(max - filterANSIEscapes(row.first, true).size() + 2, ' ')
             << row.second << "\n";
     }
 }
@@ -206,8 +204,7 @@ void Command::printHelp(const string & programName, std::ostream & out)
 
     auto exs = examples();
     if (!exs.empty()) {
-        out << "\n";
-        out << "Examples:\n";
+        out << "\n" ANSI_BOLD "Examples:" ANSI_NORMAL "\n";
         for (auto & ex : exs)
             out << "\n"
                 << "  " << ex.description << "\n" // FIXME: wrap
@@ -220,52 +217,63 @@ MultiCommand::MultiCommand(const Commands & commands)
 {
     expectedArgs.push_back(ExpectedArg{"command", 1, true, [=](std::vector<std::string> ss) {
         assert(!command);
-        auto i = commands.find(ss[0]);
+        auto cmd = ss[0];
+        if (auto alias = get(deprecatedAliases, cmd)) {
+            warn("'%s' is a deprecated alias for '%s'", cmd, *alias);
+            cmd = *alias;
+        }
+        auto i = commands.find(cmd);
         if (i == commands.end())
-            throw UsageError("'%s' is not a recognised command", ss[0]);
-        command = i->second();
-        command->_name = ss[0];
+            throw UsageError("'%s' is not a recognised command", cmd);
+        command = {cmd, i->second()};
     }});
+
+    categories[Command::catDefault] = "Available commands";
 }
 
 void MultiCommand::printHelp(const string & programName, std::ostream & out)
 {
     if (command) {
-        command->printHelp(programName + " " + command->name(), out);
+        command->second->printHelp(programName + " " + command->first, out);
         return;
     }
 
-    out << "Usage: " << programName << " <COMMAND> <FLAGS>... <ARGS>...\n";
+    out << fmt(ANSI_BOLD "Usage:" ANSI_NORMAL " %s " ANSI_ITALIC "COMMAND FLAGS... ARGS..." ANSI_NORMAL "\n", programName);
 
-    out << "\n";
-    out << "Common flags:\n";
+    out << "\n" ANSI_BOLD "Common flags:" ANSI_NORMAL "\n";
     printFlags(out);
 
-    out << "\n";
-    out << "Available commands:\n";
+    std::map<Command::Category, std::map<std::string, ref<Command>>> commandsByCategory;
 
-    Table2 table;
-    for (auto & i : commands) {
-        auto command = i.second();
-        command->_name = i.first;
-        auto descr = command->description();
-        if (!descr.empty())
-            table.push_back(std::make_pair(command->name(), descr));
+    for (auto & [name, commandFun] : commands) {
+        auto command = commandFun();
+        commandsByCategory[command->category()].insert_or_assign(name, command);
     }
-    printTable(out, table);
+
+    for (auto & [category, commands] : commandsByCategory) {
+        out << fmt("\n" ANSI_BOLD "%s:" ANSI_NORMAL "\n", categories[category]);
+
+        Table2 table;
+        for (auto & [name, command] : commands) {
+            auto descr = command->description();
+            if (!descr.empty())
+                table.push_back(std::make_pair(name, descr));
+        }
+        printTable(out, table);
+    }
 }
 
 bool MultiCommand::processFlag(Strings::iterator & pos, Strings::iterator end)
 {
     if (Args::processFlag(pos, end)) return true;
-    if (command && command->processFlag(pos, end)) return true;
+    if (command && command->second->processFlag(pos, end)) return true;
     return false;
 }
 
 bool MultiCommand::processArgs(const Strings & args, bool finish)
 {
     if (command)
-        return command->processArgs(args, finish);
+        return command->second->processArgs(args, finish);
     else
         return Args::processArgs(args, finish);
 }

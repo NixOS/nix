@@ -6,7 +6,7 @@
 #include "nar-info-disk-cache.hh"
 #include "globals.hh"
 #include "compression.hh"
-#include "download.hh"
+#include "filetransfer.hh"
 #include "istringstream_nocopy.hh"
 
 #include <aws/core/Aws.h>
@@ -32,8 +32,10 @@ namespace nix {
 struct S3Error : public Error
 {
     Aws::S3::S3Errors err;
-    S3Error(Aws::S3::S3Errors err, const FormatOrString & fs)
-        : Error(fs), err(err) { };
+
+    template<typename... Args>
+    S3Error(Aws::S3::S3Errors err, const Args & ... args)
+        : Error(args...), err(err) { };
 };
 
 /* Helper: given an Outcome<R, E>, return R in case of success, or
@@ -109,7 +111,9 @@ class RetryStrategy : public Aws::Client::DefaultRetryStrategy
         auto retry = Aws::Client::DefaultRetryStrategy::ShouldRetry(error, attemptedRetries);
         if (retry)
             printError("AWS error '%s' (%s), will retry in %d ms",
-                error.GetExceptionName(), error.GetMessage(), CalculateDelayBeforeNextRetry(error, attemptedRetries));
+                error.GetExceptionName(),
+                error.GetMessage(),
+                CalculateDelayBeforeNextRetry(error, attemptedRetries));
         return retry;
     }
 };
@@ -132,7 +136,7 @@ ref<Aws::Client::ClientConfiguration> S3Helper::makeConfig(const string & region
     return res;
 }
 
-S3Helper::DownloadResult S3Helper::getObject(
+S3Helper::FileTransferResult S3Helper::getObject(
     const std::string & bucketName, const std::string & key)
 {
     debug("fetching 's3://%s/%s'...", bucketName, key);
@@ -146,7 +150,7 @@ S3Helper::DownloadResult S3Helper::getObject(
         return Aws::New<std::stringstream>("STRINGSTREAM");
     });
 
-    DownloadResult res;
+    FileTransferResult res;
 
     auto now1 = std::chrono::steady_clock::now();
 
@@ -249,7 +253,7 @@ struct S3BinaryCacheStoreImpl : public S3BinaryCacheStore
                 // If bucket listing is disabled, 404s turn into 403s
                 || error.GetErrorType() == Aws::S3::S3Errors::ACCESS_DENIED)
                 return false;
-            throw Error(format("AWS error fetching '%s': %s") % path % error.GetMessage());
+            throw Error("AWS error fetching '%s': %s", path, error.GetMessage());
         }
 
         return true;

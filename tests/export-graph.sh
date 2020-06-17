@@ -11,7 +11,7 @@ checkRef() {
 
 outPath=$(nix-build ./export-graph.nix -A 'foo."bar.runtimeGraph"' -o $TEST_ROOT/result)
 
-test $(nix-store -q --references $TEST_ROOT/result | wc -l) = 2 || fail "bad nr of references"
+test $(nix-store -q --references $TEST_ROOT/result | wc -l) = 3 || fail "bad nr of references"
 
 checkRef input-2
 for i in $(cat $outPath); do checkRef $i; done

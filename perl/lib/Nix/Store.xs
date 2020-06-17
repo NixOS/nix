@@ -80,7 +80,7 @@ SV * queryReferences(char * path)
 SV * queryPathHash(char * path)
     PPCODE:
         try {
-            auto s = store()->queryPathInfo(store()->parseStorePath(path))->narHash.to_string();
+            auto s = store()->queryPathInfo(store()->parseStorePath(path))->narHash.to_string(Base32, true);
             XPUSHs(sv_2mortal(newSVpv(s.c_str(), 0)));
         } catch (Error & e) {
             croak("%s", e.what());
@@ -106,7 +106,7 @@ SV * queryPathInfo(char * path, int base32)
                 XPUSHs(&PL_sv_undef);
             else
                 XPUSHs(sv_2mortal(newSVpv(store()->printStorePath(*info->deriver).c_str(), 0)));
-            auto s = info->narHash.to_string(base32 ? Base32 : Base16);
+            auto s = info->narHash.to_string(base32 ? Base32 : Base16, true);
             XPUSHs(sv_2mortal(newSVpv(s.c_str(), 0)));
             mXPUSHi(info->registrationTime);
             mXPUSHi(info->narSize);
@@ -274,7 +274,8 @@ int checkSignature(SV * publicKey_, SV * sig_, char * msg)
 SV * addToStore(char * srcPath, int recursive, char * algo)
     PPCODE:
         try {
-            auto path = store()->addToStore(std::string(baseNameOf(srcPath)), srcPath, recursive, parseHashType(algo));
+            auto method = recursive ? FileIngestionMethod::Recursive : FileIngestionMethod::Flat;
+            auto path = store()->addToStore(std::string(baseNameOf(srcPath)), srcPath, method, parseHashType(algo));
             XPUSHs(sv_2mortal(newSVpv(store()->printStorePath(path).c_str(), 0)));
         } catch (Error & e) {
             croak("%s", e.what());
@@ -285,7 +286,8 @@ SV * makeFixedOutputPath(int recursive, char * algo, char * hash, char * name)
     PPCODE:
         try {
             Hash h(hash, parseHashType(algo));
-            auto path = store()->makeFixedOutputPath(recursive, h, name);
+            auto method = recursive ? FileIngestionMethod::Recursive : FileIngestionMethod::Flat;
+            auto path = store()->makeFixedOutputPath(method, h, name);
             XPUSHs(sv_2mortal(newSVpv(store()->printStorePath(path).c_str(), 0)));
         } catch (Error & e) {
             croak("%s", e.what());

@@ -15,11 +15,12 @@ struct CmdShowDerivation : InstallablesCommand
 
     CmdShowDerivation()
     {
-        mkFlag()
-            .longName("recursive")
-            .shortName('r')
-            .description("include the dependencies of the specified derivations")
-            .set(&recursive, true);
+        addFlag({
+            .longName = "recursive",
+            .shortName = 'r',
+            .description = "include the dependencies of the specified derivations",
+            .handler = {&recursive, true}
+        });
     }
 
     std::string description() override
@@ -41,6 +42,8 @@ struct CmdShowDerivation : InstallablesCommand
         };
     }
 
+    Category category() override { return catUtility; }
+
     void run(ref<Store> store) override
     {
         auto drvPaths = toDerivations(store, installables, true);
@@ -58,11 +61,9 @@ struct CmdShowDerivation : InstallablesCommand
         for (auto & drvPath : drvPaths) {
             if (!drvPath.isDerivation()) continue;
 
-            auto drvPathS = store->printStorePath(drvPath);
+            auto drvObj(jsonRoot.object(store->printStorePath(drvPath)));
 
-            auto drvObj(jsonRoot.object(drvPathS));
-
-            auto drv = readDerivation(*store, drvPathS);
+            auto drv = store->readDerivation(drvPath);
 
             {
                 auto outputsObj(drvObj.object("outputs"));
