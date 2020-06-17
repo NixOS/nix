@@ -79,7 +79,7 @@ void printValueAsJSON(EvalState & state, bool strict,
             break;
 
         default:
-            throw TypeError(format("cannot convert %1% to JSON") % showType(v));
+            throw TypeError("cannot convert %1% to JSON", showType(v));
     }
 }
 
@@ -93,7 +93,7 @@ void printValueAsJSON(EvalState & state, bool strict,
 void ExternalValueBase::printValueAsJSON(EvalState & state, bool strict,
     JSONPlaceholder & out, PathSet & context) const
 {
-    throw TypeError(format("cannot convert %1% to JSON") % showType());
+    throw TypeError("cannot convert %1% to JSON", showType());
 }
 
 

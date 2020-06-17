@@ -20,5 +20,5 @@ cat $outPath/foobar | grep FOOBAR
 
 # Ensure that input1 was built on store1 due to the required feature.
 p=$(readlink -f $outPath/input-2)
-(! nix path-info --store $TEST_ROOT/store0 --all | grep dependencies.builder1.sh)
-nix path-info --store $TEST_ROOT/store1 --all | grep dependencies.builder1.sh
+(! nix path-info --store $TEST_ROOT/store0 --all | grep builder-build-hook-input-1.sh)
+nix path-info --store $TEST_ROOT/store1 --all | grep builder-build-hook-input-1.sh

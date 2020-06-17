@@ -1,9 +1,10 @@
 makefiles = \
   mk/precompiled-headers.mk \
   local.mk \
-  nix-rust/local.mk \
   src/libutil/local.mk \
+  src/libutil/tests/local.mk \
   src/libstore/local.mk \
+  src/libfetchers/local.mk \
   src/libmain/local.mk \
   src/libexpr/local.mk \
   src/nix/local.mk \

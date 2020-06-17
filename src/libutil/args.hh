@@ -32,13 +32,59 @@ protected:
     struct Flag
     {
         typedef std::shared_ptr<Flag> ptr;
+
+        struct Handler
+        {
+            std::function<void(std::vector<std::string>)> fun;
+            size_t arity;
+
+            Handler() {}
+
+            Handler(std::function<void(std::vector<std::string>)> && fun)
+                : fun(std::move(fun))
+                , arity(ArityAny)
+            { }
+
+            Handler(std::function<void()> && handler)
+                : fun([handler{std::move(handler)}](std::vector<std::string>) { handler(); })
+                , arity(0)
+            { }
+
+            Handler(std::function<void(std::string)> && handler)
+                : fun([handler{std::move(handler)}](std::vector<std::string> ss) {
+                    handler(std::move(ss[0]));
+                  })
+                , arity(1)
+            { }
+
+            Handler(std::function<void(std::string, std::string)> && handler)
+                : fun([handler{std::move(handler)}](std::vector<std::string> ss) {
+                    handler(std::move(ss[0]), std::move(ss[1]));
+                  })
+                , arity(2)
+            { }
+
+            template<class T>
+            Handler(T * dest)
+                : fun([=](std::vector<std::string> ss) { *dest = ss[0]; })
+                , arity(1)
+            { }
+
+            template<class T>
+            Handler(T * dest, const T & val)
+                : fun([=](std::vector<std::string> ss) { *dest = val; })
+                , arity(0)
+            { }
+        };
+
         std::string longName;
         char shortName = 0;
         std::string description;
-        Strings labels;
-        size_t arity = 0;
-        std::function<void(std::vector<std::string>)> handler;
         std::string category;
+        Strings labels;
+        Handler handler;
+
+        static Flag mkHashTypeFlag(std::string && longName, HashType * ht);
     };
 
     std::map<std::string, Flag::ptr> longFlags;
@@ -65,49 +111,7 @@ protected:
 
 public:
 
-    class FlagMaker
-    {
-        Args & args;
-        Flag::ptr flag;
-        friend class Args;
-        FlagMaker(Args & args) : args(args), flag(std::make_shared<Flag>()) { }
-    public:
-        ~FlagMaker();
-        FlagMaker & longName(const std::string & s) { flag->longName = s; return *this; }
-        FlagMaker & shortName(char s) { flag->shortName = s; return *this; }
-        FlagMaker & description(const std::string & s) { flag->description = s; return *this; }
-        FlagMaker & label(const std::string & l) { flag->arity = 1; flag->labels = {l}; return *this; }
-        FlagMaker & labels(const Strings & ls) { flag->arity = ls.size(); flag->labels = ls; return *this; }
-        FlagMaker & arity(size_t arity) { flag->arity = arity; return *this; }
-        FlagMaker & handler(std::function<void(std::vector<std::string>)> handler) { flag->handler = handler; return *this; }
-        FlagMaker & handler(std::function<void()> handler) { flag->handler = [handler](std::vector<std::string>) { handler(); }; return *this; }
-        FlagMaker & handler(std::function<void(std::string)> handler) {
-            flag->arity = 1;
-            flag->handler = [handler](std::vector<std::string> ss) { handler(std::move(ss[0])); };
-            return *this;
-        }
-        FlagMaker & category(const std::string & s) { flag->category = s; return *this; }
-
-        template<class T>
-        FlagMaker & dest(T * dest)
-        {
-            flag->arity = 1;
-            flag->handler = [=](std::vector<std::string> ss) { *dest = ss[0]; };
-            return *this;
-        }
-
-        template<class T>
-        FlagMaker & set(T * dest, const T & val)
-        {
-            flag->arity = 0;
-            flag->handler = [=](std::vector<std::string> ss) { *dest = val; };
-            return *this;
-        }
-
-        FlagMaker & mkHashTypeFlag(HashType * ht);
-    };
-
-    FlagMaker mkFlag();
+    void addFlag(Flag && flag);
 
     /* Helper functions for constructing flags / positional
        arguments. */
@@ -116,13 +120,13 @@ public:
         const std::string & label, const std::string & description,
         std::function<void(std::string)> fun)
     {
-        mkFlag()
-            .shortName(shortName)
-            .longName(longName)
-            .labels({label})
-            .description(description)
-            .arity(1)
-            .handler([=](std::vector<std::string> ss) { fun(ss[0]); });
+        addFlag({
+            .longName = longName,
+            .shortName = shortName,
+            .description = description,
+            .labels = {label},
+            .handler = {[=](std::string s) { fun(s); }}
+        });
     }
 
     void mkFlag(char shortName, const std::string & name,
@@ -135,11 +139,12 @@ public:
     void mkFlag(char shortName, const std::string & longName, const std::string & description,
         T * dest, const T & value)
     {
-        mkFlag()
-            .shortName(shortName)
-            .longName(longName)
-            .description(description)
-            .handler([=](std::vector<std::string> ss) { *dest = value; });
+        addFlag({
+            .longName = longName,
+            .shortName = shortName,
+            .description = description,
+            .handler = {[=]() { *dest = value; }}
+        });
     }
 
     template<class I>
@@ -155,18 +160,18 @@ public:
     void mkFlag(char shortName, const std::string & longName,
         const std::string & description, std::function<void(I)> fun)
     {
-        mkFlag()
-            .shortName(shortName)
-            .longName(longName)
-            .labels({"N"})
-            .description(description)
-            .arity(1)
-            .handler([=](std::vector<std::string> ss) {
+        addFlag({
+            .longName = longName,
+            .shortName = shortName,
+            .description = description,
+            .labels = {"N"},
+            .handler = {[=](std::string s) {
                 I n;
-                if (!string2Int(ss[0], n))
+                if (!string2Int(s, n))
                     throw UsageError("flag '--%s' requires a integer argument", longName);
                 fun(n);
-            });
+            }}
+        });
     }
 
     /* Expect a string argument. */
@@ -192,16 +197,9 @@ public:
    run() method. */
 struct Command : virtual Args
 {
-private:
-    std::string _name;
-
     friend class MultiCommand;
 
-public:
-
     virtual ~Command() { }
-
-    std::string name() { return _name; }
 
     virtual void prepare() { };
     virtual void run() = 0;
@@ -216,6 +214,12 @@ public:
 
     virtual Examples examples() { return Examples(); }
 
+    typedef int Category;
+
+    static constexpr Category catDefault = 0;
+
+    virtual Category category() { return catDefault; }
+
     void printHelp(const string & programName, std::ostream & out) override;
 };
 
@@ -228,7 +232,12 @@ class MultiCommand : virtual Args
 public:
     Commands commands;
 
-    std::shared_ptr<Command> command;
+    std::map<Command::Category, std::string> categories;
+
+    std::map<std::string, std::string> deprecatedAliases;
+
+    // Selected command, if any.
+    std::optional<std::pair<std::string, ref<Command>>> command;
 
     MultiCommand(const Commands & commands);
 

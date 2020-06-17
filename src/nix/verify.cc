@@ -20,13 +20,13 @@ struct CmdVerify : StorePathsCommand
     {
         mkFlag(0, "no-contents", "do not verify the contents of each store path", &noContents);
         mkFlag(0, "no-trust", "do not verify whether each store path is trusted", &noTrust);
-        mkFlag()
-            .longName("substituter")
-            .shortName('s')
-            .labels({"store-uri"})
-            .description("use signatures from specified store")
-            .arity(1)
-            .handler([&](std::vector<std::string> ss) { substituterUris.push_back(ss[0]); });
+        addFlag({
+            .longName = "substituter",
+            .shortName = 's',
+            .description = "use signatures from specified store",
+            .labels = {"store-uri"},
+            .handler = {[&](std::string s) { substituterUris.push_back(s); }}
+        });
         mkIntFlag('n', "sigs-needed", "require that each path has at least N valid signatures", &sigsNeeded);
     }
 
@@ -48,6 +48,8 @@ struct CmdVerify : StorePathsCommand
             },
         };
     }
+
+    Category category() override { return catSecondary; }
 
     void run(ref<Store> store, StorePaths storePaths) override
     {
@@ -88,7 +90,7 @@ struct CmdVerify : StorePathsCommand
                     if (info->ca == "")
                         hashSink = std::make_unique<HashSink>(info->narHash.type);
                     else
-                        hashSink = std::make_unique<HashModuloSink>(info->narHash.type, storePathToHash(store->printStorePath(info->path)));
+                        hashSink = std::make_unique<HashModuloSink>(info->narHash.type, std::string(info->path.hashPart()));
 
                     store->narFromPath(info->path, *hashSink);
 
@@ -97,11 +99,15 @@ struct CmdVerify : StorePathsCommand
                     if (hash.first != info->narHash) {
                         corrupted++;
                         act2.result(resCorruptedPath, store->printStorePath(info->path));
-                        printError(
-                            "path '%s' was modified! expected hash '%s', got '%s'",
-                            store->printStorePath(info->path), info->narHash.to_string(), hash.first.to_string());
+                        logError({
+                            .name = "Hash error - path modified",
+                            .hint = hintfmt(
+                                "path '%s' was modified! expected hash '%s', got '%s'",
+                                store->printStorePath(info->path),
+                                info->narHash.to_string(Base32, true),
+                                hash.first.to_string(Base32, true))
+                        });
                     }
-
                 }
 
                 if (!noTrust) {
@@ -137,7 +143,7 @@ struct CmdVerify : StorePathsCommand
                                 doSigs(info2->sigs);
                             } catch (InvalidPath &) {
                             } catch (Error & e) {
-                                printError(format(ANSI_RED "error:" ANSI_NORMAL " %s") % e.what());
+                                logError(e.info());
                             }
                         }
 
@@ -148,7 +154,12 @@ struct CmdVerify : StorePathsCommand
                     if (!good) {
                         untrusted++;
                         act2.result(resUntrustedPath, store->printStorePath(info->path));
-                        printError("path '%s' is untrusted", store->printStorePath(info->path));
+                        logError({
+                            .name = "Untrusted path",
+                            .hint = hintfmt("path '%s' is untrusted",
+                                store->printStorePath(info->path))
+                        });
+
                     }
 
                 }
@@ -156,7 +167,7 @@ struct CmdVerify : StorePathsCommand
                 done++;
 
             } catch (Error & e) {
-                printError(format(ANSI_RED "error:" ANSI_NORMAL " %s") % e.what());
+                logError(e.info());
                 failed++;
             }
 

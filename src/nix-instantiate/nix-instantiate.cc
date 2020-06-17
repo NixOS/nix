@@ -9,7 +9,7 @@
 #include "util.hh"
 #include "store-api.hh"
 #include "common-eval-args.hh"
-#include "legacy.hh"
+#include "../nix/legacy.hh"
 
 #include <map>
 #include <iostream>
@@ -39,7 +39,7 @@ void processExpr(EvalState & state, const Strings & attrPaths,
     state.eval(e, vRoot);
 
     for (auto & i : attrPaths) {
-        Value & v(*findAlongAttrPath(state, i, autoArgs, vRoot));
+        Value & v(*findAlongAttrPath(state, i, autoArgs, vRoot).first);
         state.forceValue(v);
 
         PathSet context;
@@ -66,7 +66,7 @@ void processExpr(EvalState & state, const Strings & attrPaths,
                 /* What output do we want? */
                 string outputName = i.queryOutputName();
                 if (outputName == "")
-                    throw Error(format("derivation '%1%' lacks an 'outputName' attribute ") % drvPath);
+                    throw Error("derivation '%1%' lacks an 'outputName' attribute ", drvPath);
 
                 if (gcRoot == "")
                     printGCWarning();
@@ -166,7 +166,7 @@ static int _main(int argc, char * * argv)
         if (findFile) {
             for (auto & i : files) {
                 Path p = state->findFile(i);
-                if (p == "") throw Error(format("unable to find '%1%'") % i);
+                if (p == "") throw Error("unable to find '%1%'", i);
                 std::cout << p << std::endl;
             }
             return 0;

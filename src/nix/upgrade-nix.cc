@@ -1,7 +1,7 @@
 #include "command.hh"
 #include "common-args.hh"
 #include "store-api.hh"
-#include "download.hh"
+#include "filetransfer.hh"
 #include "eval.hh"
 #include "attr-path.hh"
 #include "names.hh"
@@ -16,18 +16,20 @@ struct CmdUpgradeNix : MixDryRun, StoreCommand
 
     CmdUpgradeNix()
     {
-        mkFlag()
-            .longName("profile")
-            .shortName('p')
-            .labels({"profile-dir"})
-            .description("the Nix profile to upgrade")
-            .dest(&profileDir);
+        addFlag({
+            .longName = "profile",
+            .shortName = 'p',
+            .description = "the Nix profile to upgrade",
+            .labels = {"profile-dir"},
+            .handler = {&profileDir}
+        });
 
-        mkFlag()
-            .longName("nix-store-paths-url")
-            .labels({"url"})
-            .description("URL of the file that contains the store paths of the latest Nix release")
-            .dest(&storePathsUrl);
+        addFlag({
+            .longName = "nix-store-paths-url",
+            .description = "URL of the file that contains the store paths of the latest Nix release",
+            .labels = {"url"},
+            .handler = {&storePathsUrl}
+        });
     }
 
     std::string description() override
@@ -49,6 +51,8 @@ struct CmdUpgradeNix : MixDryRun, StoreCommand
         };
     }
 
+    Category category() override { return catNixInstallation; }
+
     void run(ref<Store> store) override
     {
         evalSettings.pureEval = true;
@@ -64,7 +68,10 @@ struct CmdUpgradeNix : MixDryRun, StoreCommand
 
         if (dryRun) {
             stopProgressBar();
-            printError("would upgrade to version %s", version);
+            logWarning({
+                .name = "Version update",
+                .hint = hintfmt("would upgrade to version %s", version)
+            });
             return;
         }
 
@@ -90,7 +97,7 @@ struct CmdUpgradeNix : MixDryRun, StoreCommand
                 {"--profile", profileDir, "-i", store->printStorePath(storePath), "--no-sandbox"});
         }
 
-        printError(ANSI_GREEN "upgrade to version %s done" ANSI_NORMAL, version);
+        printInfo(ANSI_GREEN "upgrade to version %s done" ANSI_NORMAL, version);
     }
 
     /* Return the profile in which Nix is installed. */
@@ -138,14 +145,14 @@ struct CmdUpgradeNix : MixDryRun, StoreCommand
         Activity act(*logger, lvlInfo, actUnknown, "querying latest Nix version");
 
         // FIXME: use nixos.org?
-        auto req = DownloadRequest(storePathsUrl);
-        auto res = getDownloader()->download(req);
+        auto req = FileTransferRequest(storePathsUrl);
+        auto res = getFileTransfer()->download(req);
 
         auto state = std::make_unique<EvalState>(Strings(), store);
         auto v = state->allocValue();
         state->eval(state->parseExprFromString(*res.data, "/no-such-path"), *v);
         Bindings & bindings(*state->allocBindings(0));
-        auto v2 = findAlongAttrPath(*state, settings.thisSystem, bindings, *v);
+        auto v2 = findAlongAttrPath(*state, settings.thisSystem, bindings, *v).first;
 
         return store->parseStorePath(state->forceString(*v2));
     }

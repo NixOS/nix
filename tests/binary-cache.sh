@@ -48,7 +48,7 @@ basicTests
 
 
 # Test HttpBinaryCacheStore.
-export _NIX_FORCE_HTTP_BINARY_CACHE_STORE=1
+export _NIX_FORCE_HTTP=1
 basicTests
 
 
@@ -105,10 +105,24 @@ mv $cacheDir/nar2 $cacheDir/nar
 # incomplete closure.
 clearStore
 
-rm $(grep -l "StorePath:.*dependencies-input-2" $cacheDir/*.narinfo)
+rm -v $(grep -l "StorePath:.*dependencies-input-2" $cacheDir/*.narinfo)
 
 nix-build --substituters "file://$cacheDir" --no-require-sigs dependencies.nix -o $TEST_ROOT/result 2>&1 | tee $TEST_ROOT/log
-grep -q "copying path" $TEST_ROOT/log
+grep -q "copying path.*input-0" $TEST_ROOT/log
+grep -q "copying path.*input-2" $TEST_ROOT/log
+grep -q "copying path.*top" $TEST_ROOT/log
+
+
+# Idem, but without cached .narinfo.
+clearStore
+clearCacheCache
+
+nix-build --substituters "file://$cacheDir" --no-require-sigs dependencies.nix -o $TEST_ROOT/result 2>&1 | tee $TEST_ROOT/log
+grep -q "don't know how to build" $TEST_ROOT/log
+grep -q "building.*input-1" $TEST_ROOT/log
+grep -q "building.*input-2" $TEST_ROOT/log
+grep -q "copying path.*input-0" $TEST_ROOT/log
+grep -q "copying path.*top" $TEST_ROOT/log
 
 
 if [ -n "$HAVE_SODIUM" ]; then
@@ -126,7 +140,7 @@ badKey="$(cat $TEST_ROOT/pk2)"
 res=($(nix-store --generate-binary-cache-key foo.nixos.org-1 $TEST_ROOT/sk3 $TEST_ROOT/pk3))
 otherKey="$(cat $TEST_ROOT/pk3)"
 
-_NIX_FORCE_HTTP_BINARY_CACHE_STORE= nix copy --to file://$cacheDir?secret-key=$TEST_ROOT/sk1 $outPath
+_NIX_FORCE_HTTP= nix copy --to file://$cacheDir?secret-key=$TEST_ROOT/sk1 $outPath
 
 
 # Downloading should fail if we don't provide a key.

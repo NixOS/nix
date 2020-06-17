@@ -3,10 +3,10 @@
 #include <functional>
 #include <string>
 
-#include "types.hh"
+#include "error.hh"
 
-class sqlite3;
-class sqlite3_stmt;
+struct sqlite3;
+struct sqlite3_stmt;
 
 namespace nix {
 
@@ -15,12 +15,15 @@ struct SQLite
 {
     sqlite3 * db = 0;
     SQLite() { }
-    SQLite(const Path & path);
+    SQLite(const Path & path, bool create = true);
     SQLite(const SQLite & from) = delete;
     SQLite& operator = (const SQLite & from) = delete;
     SQLite& operator = (SQLite && from) { db = from.db; from.db = 0; return *this; }
     ~SQLite();
     operator sqlite3 * () { return db; }
+
+    /* Disable synchronous mode, set truncate journal mode. */
+    void isCache();
 
     void exec(const std::string & stmt);
 };
@@ -52,6 +55,7 @@ struct SQLiteStmt
 
         /* Bind the next parameter. */
         Use & operator () (const std::string & value, bool notNull = true);
+        Use & operator () (const unsigned char * data, size_t len, bool notNull = true);
         Use & operator () (int64_t value, bool notNull = true);
         Use & bind(); // null
 

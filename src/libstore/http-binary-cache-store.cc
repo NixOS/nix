@@ -1,5 +1,5 @@
 #include "binary-cache-store.hh"
-#include "download.hh"
+#include "filetransfer.hh"
 #include "globals.hh"
 #include "nar-info-disk-cache.hh"
 
@@ -85,14 +85,14 @@ protected:
         checkEnabled();
 
         try {
-            DownloadRequest request(cacheUri + "/" + path);
+            FileTransferRequest request(cacheUri + "/" + path);
             request.head = true;
-            getDownloader()->download(request);
+            getFileTransfer()->download(request);
             return true;
-        } catch (DownloadError & e) {
+        } catch (FileTransferError & e) {
             /* S3 buckets return 403 if a file doesn't exist and the
                bucket is unlistable, so treat 403 as 404. */
-            if (e.error == Downloader::NotFound || e.error == Downloader::Forbidden)
+            if (e.error == FileTransfer::NotFound || e.error == FileTransfer::Forbidden)
                 return false;
             maybeDisable();
             throw;
@@ -103,19 +103,19 @@ protected:
         const std::string & data,
         const std::string & mimeType) override
     {
-        auto req = DownloadRequest(cacheUri + "/" + path);
+        auto req = FileTransferRequest(cacheUri + "/" + path);
         req.data = std::make_shared<string>(data); // FIXME: inefficient
         req.mimeType = mimeType;
         try {
-            getDownloader()->download(req);
-        } catch (DownloadError & e) {
+            getFileTransfer()->upload(req);
+        } catch (FileTransferError & e) {
             throw UploadToHTTP("while uploading to HTTP binary cache at '%s': %s", cacheUri, e.msg());
         }
     }
 
-    DownloadRequest makeRequest(const std::string & path)
+    FileTransferRequest makeRequest(const std::string & path)
     {
-        DownloadRequest request(cacheUri + "/" + path);
+        FileTransferRequest request(cacheUri + "/" + path);
         return request;
     }
 
@@ -124,9 +124,9 @@ protected:
         checkEnabled();
         auto request(makeRequest(path));
         try {
-            getDownloader()->download(std::move(request), sink);
-        } catch (DownloadError & e) {
-            if (e.error == Downloader::NotFound || e.error == Downloader::Forbidden)
+            getFileTransfer()->download(std::move(request), sink);
+        } catch (FileTransferError & e) {
+            if (e.error == FileTransfer::NotFound || e.error == FileTransfer::Forbidden)
                 throw NoSuchBinaryCacheFile("file '%s' does not exist in binary cache '%s'", path, getUri());
             maybeDisable();
             throw;
@@ -142,12 +142,12 @@ protected:
 
         auto callbackPtr = std::make_shared<decltype(callback)>(std::move(callback));
 
-        getDownloader()->enqueueDownload(request,
-            {[callbackPtr, this](std::future<DownloadResult> result) {
+        getFileTransfer()->enqueueFileTransfer(request,
+            {[callbackPtr, this](std::future<FileTransferResult> result) {
                 try {
                     (*callbackPtr)(result.get().data);
-                } catch (DownloadError & e) {
-                    if (e.error == Downloader::NotFound || e.error == Downloader::Forbidden)
+                } catch (FileTransferError & e) {
+                    if (e.error == FileTransfer::NotFound || e.error == FileTransfer::Forbidden)
                         return (*callbackPtr)(std::shared_ptr<std::string>());
                     maybeDisable();
                     callbackPtr->rethrow();
@@ -163,14 +163,14 @@ static RegisterStoreImplementation regStore([](
     const std::string & uri, const Store::Params & params)
     -> std::shared_ptr<Store>
 {
+    static bool forceHttp = getEnv("_NIX_FORCE_HTTP") == "1";
     if (std::string(uri, 0, 7) != "http://" &&
         std::string(uri, 0, 8) != "https://" &&
-        (getEnv("_NIX_FORCE_HTTP_BINARY_CACHE_STORE") != "1" || std::string(uri, 0, 7) != "file://")
-        ) return 0;
+        (!forceHttp || std::string(uri, 0, 7) != "file://"))
+        return 0;
     auto store = std::make_shared<HttpBinaryCacheStore>(params, uri);
     store->init();
     return store;
 });
 
 }
-

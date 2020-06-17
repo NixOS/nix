@@ -116,11 +116,11 @@ ref<RemoteStore::Connection> UDSRemoteStore::openConnection()
     struct sockaddr_un addr;
     addr.sun_family = AF_UNIX;
     if (socketPath.size() + 1 >= sizeof(addr.sun_path))
-        throw Error(format("socket path '%1%' is too long") % socketPath);
+        throw Error("socket path '%1%' is too long", socketPath);
     strcpy(addr.sun_path, socketPath.c_str());
 
     if (::connect(conn->fd.get(), (struct sockaddr *) &addr, sizeof(addr)) == -1)
-        throw SysError(format("cannot connect to daemon at '%1%'") % socketPath);
+        throw SysError("cannot connect to daemon at '%1%'", socketPath);
 
     conn->from.fd = conn->fd.get();
     conn->to.fd = conn->fd.get();
@@ -268,7 +268,7 @@ StorePathSet RemoteStore::queryValidPaths(const StorePathSet & paths, Substitute
     if (GET_PROTOCOL_MINOR(conn->daemonVersion) < 12) {
         StorePathSet res;
         for (auto & i : paths)
-            if (isValidPath(i)) res.insert(i.clone());
+            if (isValidPath(i)) res.insert(i);
         return res;
     } else {
         conn->to << wopQueryValidPaths;
@@ -296,7 +296,7 @@ StorePathSet RemoteStore::querySubstitutablePaths(const StorePathSet & paths)
         for (auto & i : paths) {
             conn->to << wopHasSubstitutes << printStorePath(i);
             conn.processStderr();
-            if (readInt(conn->from)) res.insert(i.clone());
+            if (readInt(conn->from)) res.insert(i);
         }
         return res;
     } else {
@@ -329,7 +329,7 @@ void RemoteStore::querySubstitutablePathInfos(const StorePathSet & paths,
             info.references = readStorePaths<StorePathSet>(*this, conn->from);
             info.downloadSize = readLongLong(conn->from);
             info.narSize = readLongLong(conn->from);
-            infos.insert_or_assign(i.clone(), std::move(info));
+            infos.insert_or_assign(i, std::move(info));
         }
 
     } else {
@@ -365,14 +365,14 @@ void RemoteStore::queryPathInfoUncached(const StorePath & path,
             } catch (Error & e) {
                 // Ugly backwards compatibility hack.
                 if (e.msg().find("is not valid") != std::string::npos)
-                    throw InvalidPath(e.what());
+                    throw InvalidPath(e.info());
                 throw;
             }
             if (GET_PROTOCOL_MINOR(conn->daemonVersion) >= 17) {
                 bool valid; conn->from >> valid;
                 if (!valid) throw InvalidPath("path '%s' is not valid", printStorePath(path));
             }
-            info = std::make_shared<ValidPathInfo>(path.clone());
+            info = std::make_shared<ValidPathInfo>(StorePath(path));
             auto deriver = readString(conn->from);
             if (deriver != "") info->deriver = parseStorePath(deriver);
             info->narHash = Hash(readString(conn->from), htSHA256);
@@ -396,7 +396,7 @@ void RemoteStore::queryReferrers(const StorePath & path,
     conn->to << wopQueryReferrers << printStorePath(path);
     conn.processStderr();
     for (auto & i : readStorePaths<StorePathSet>(*this, conn->from))
-        referrers.insert(i.clone());
+        referrers.insert(i);
 }
 
 
@@ -415,15 +415,6 @@ StorePathSet RemoteStore::queryDerivationOutputs(const StorePath & path)
     conn->to << wopQueryDerivationOutputs << printStorePath(path);
     conn.processStderr();
     return readStorePaths<StorePathSet>(*this, conn->from);
-}
-
-
-PathSet RemoteStore::queryDerivationOutputNames(const StorePath & path)
-{
-    auto conn(getConnection());
-    conn->to << wopQueryDerivationOutputNames << printStorePath(path);
-    conn.processStderr();
-    return readStrings<PathSet>(conn->from);
 }
 
 
@@ -484,7 +475,7 @@ void RemoteStore::addToStore(const ValidPathInfo & info, Source & source,
 
 
 StorePath RemoteStore::addToStore(const string & name, const Path & _srcPath,
-    bool recursive, HashType hashAlgo, PathFilter & filter, RepairFlag repair)
+    FileIngestionMethod method, HashType hashAlgo, PathFilter & filter, RepairFlag repair)
 {
     if (repair) throw Error("repairing is not supported when building through the Nix daemon");
 
@@ -492,10 +483,12 @@ StorePath RemoteStore::addToStore(const string & name, const Path & _srcPath,
 
     Path srcPath(absPath(_srcPath));
 
-    conn->to << wopAddToStore << name
-       << ((hashAlgo == htSHA256 && recursive) ? 0 : 1) /* backwards compatibility hack */
-       << (recursive ? 1 : 0)
-       << printHashType(hashAlgo);
+    conn->to
+        << wopAddToStore
+        << name
+        << ((hashAlgo == htSHA256 && method == FileIngestionMethod::Recursive) ? 0 : 1) /* backwards compatibility hack */
+        << (method == FileIngestionMethod::Recursive ? 1 : 0)
+        << printHashType(hashAlgo);
 
     try {
         conn->to.written = 0;

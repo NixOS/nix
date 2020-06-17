@@ -9,23 +9,20 @@ using namespace nix;
 
 struct CmdHash : Command
 {
-    enum Mode { mFile, mPath };
-    Mode mode;
+    FileIngestionMethod mode;
     Base base = SRI;
     bool truncate = false;
     HashType ht = htSHA256;
     std::vector<std::string> paths;
     std::optional<std::string> modulus;
 
-    CmdHash(Mode mode) : mode(mode)
+    CmdHash(FileIngestionMethod mode) : mode(mode)
     {
         mkFlag(0, "sri", "print hash in SRI format", &base, SRI);
         mkFlag(0, "base64", "print hash in base-64", &base, Base64);
         mkFlag(0, "base32", "print hash in base-32 (Nix-specific)", &base, Base32);
         mkFlag(0, "base16", "print hash in base-16", &base, Base16);
-        mkFlag()
-            .longName("type")
-            .mkHashTypeFlag(&ht);
+        addFlag(Flag::mkHashTypeFlag("type", &ht));
         #if 0
         mkFlag()
             .longName("modulo")
@@ -38,10 +35,17 @@ struct CmdHash : Command
 
     std::string description() override
     {
-        return mode == mFile
-            ? "print cryptographic hash of a regular file"
-            : "print cryptographic hash of the NAR serialisation of a path";
+        const char* d;
+        switch (mode) {
+        case FileIngestionMethod::Flat:
+            d = "print cryptographic hash of a regular file";
+        case FileIngestionMethod::Recursive:
+            d = "print cryptographic hash of the NAR serialisation of a path";
+        };
+        return d;
     }
+
+    Category category() override { return catUtility; }
 
     void run() override
     {
@@ -53,21 +57,24 @@ struct CmdHash : Command
             else
                 hashSink = std::make_unique<HashSink>(ht);
 
-            if (mode == mFile)
+            switch (mode) {
+            case FileIngestionMethod::Flat:
                 readFile(path, *hashSink);
-            else
+                break;
+            case FileIngestionMethod::Recursive:
                 dumpPath(path, *hashSink);
+                break;
+            }
 
             Hash h = hashSink->finish().first;
             if (truncate && h.hashSize > 20) h = compressHash(h, 20);
-            std::cout << format("%1%\n") %
-                h.to_string(base, base == SRI);
+            logger->stdout(h.to_string(base, base == SRI));
         }
     }
 };
 
-static RegisterCommand r1("hash-file", [](){ return make_ref<CmdHash>(CmdHash::mFile); });
-static RegisterCommand r2("hash-path", [](){ return make_ref<CmdHash>(CmdHash::mPath); });
+static RegisterCommand r1("hash-file", [](){ return make_ref<CmdHash>(FileIngestionMethod::Flat); });
+static RegisterCommand r2("hash-path", [](){ return make_ref<CmdHash>(FileIngestionMethod::Recursive); });
 
 struct CmdToBase : Command
 {
@@ -77,9 +84,7 @@ struct CmdToBase : Command
 
     CmdToBase(Base base) : base(base)
     {
-        mkFlag()
-            .longName("type")
-            .mkHashTypeFlag(&ht);
+        addFlag(Flag::mkHashTypeFlag("type", &ht));
         expectArgs("strings", &args);
     }
 
@@ -92,10 +97,12 @@ struct CmdToBase : Command
             "SRI");
     }
 
+    Category category() override { return catUtility; }
+
     void run() override
     {
         for (auto s : args)
-            std::cout << fmt("%s\n", Hash(s, ht).to_string(base, base == SRI));
+            logger->stdout(Hash(s, ht).to_string(base, base == SRI));
     }
 };
 
@@ -126,7 +133,7 @@ static int compatNixHash(int argc, char * * argv)
             string s = getArg(*arg, arg, end);
             ht = parseHashType(s);
             if (ht == htUnknown)
-                throw UsageError(format("unknown hash type '%1%'") % s);
+                throw UsageError("unknown hash type '%1%'", s);
         }
         else if (*arg == "--to-base16") op = opTo16;
         else if (*arg == "--to-base32") op = opTo32;
@@ -138,7 +145,7 @@ static int compatNixHash(int argc, char * * argv)
     });
 
     if (op == opHash) {
-        CmdHash cmd(flat ? CmdHash::mFile : CmdHash::mPath);
+        CmdHash cmd(flat ? FileIngestionMethod::Flat : FileIngestionMethod::Recursive);
         cmd.ht = ht;
         cmd.base = base32 ? Base32 : Base16;
         cmd.truncate = truncate;

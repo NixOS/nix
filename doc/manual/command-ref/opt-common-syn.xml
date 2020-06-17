@@ -1,5 +1,5 @@
 <nop xmlns="http://docbook.org/ns/docbook">
-  
+
 <arg><option>--help</option></arg>
 <arg><option>--version</option></arg>
 <arg rep='repeat'>
@@ -10,6 +10,10 @@
 </arg>
 <arg>
   <arg choice='plain'><option>--quiet</option></arg>
+</arg>
+<arg>
+  <option>--log-format</option>
+  <replaceable>format</replaceable>
 </arg>
 <arg>
   <group choice='plain'>

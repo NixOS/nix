@@ -360,7 +360,6 @@ EOF
     <arg choice='plain'><option>--print-roots</option></arg>
     <arg choice='plain'><option>--print-live</option></arg>
     <arg choice='plain'><option>--print-dead</option></arg>
-    <arg choice='plain'><option>--delete</option></arg>
   </group>
   <arg><option>--max-freed</option> <replaceable>bytes</replaceable></arg>
 </cmdsynopsis>
@@ -407,14 +406,6 @@ the Nix store not reachable via file system references from a set of
 
   </varlistentry>
 
-  <varlistentry><term><option>--delete</option></term>
-
-    <listitem><para>This operation performs an actual garbage
-    collection.  All dead paths are removed from the
-    store.  This is the default.</para></listitem>
-
-  </varlistentry>
-
 </variablelist>
 
 <para>By default, all unreachable paths are deleted.  The following
@@ -444,10 +435,10 @@ and <link
 linkend="conf-keep-derivations"><literal>keep-derivations</literal></link>
 variables in the Nix configuration file.</para>
 
-<para>With <option>--delete</option>, the collector prints the total
-number of freed bytes when it finishes (or when it is interrupted).
-With <option>--print-dead</option>, it prints the number of bytes that
-would be freed.</para>
+<para>By default, the collector prints the total number of freed bytes
+when it finishes (or when it is interrupted). With
+<option>--print-dead</option>, it prints the number of bytes that would
+be freed.</para>
 
 </refsection>
 
@@ -945,7 +936,7 @@ $ nix-store --add ./foo.c
 
 <para>The operation <option>--add-fixed</option> adds the specified paths to
 the Nix store.  Unlike <option>--add</option> paths are registered using the
-specified hashing algorithm, resulting in the same output path as a fixed output
+specified hashing algorithm, resulting in the same output path as a fixed-output
 derivation.  This can be used for sources that are not available from a public
 url or broke since the download expression was written.
 </para>
@@ -1148,7 +1139,7 @@ the information that Nix considers important.  For instance,
 timestamps are elided because all files in the Nix store have their
 timestamp set to 0 anyway.  Likewise, all permissions are left out
 except for the execute bit, because all files in the Nix store have
-644 or 755 permission.</para>
+444 or 555 permission.</para>
 
 <para>Also, a NAR archive is <emphasis>canonical</emphasis>, meaning
 that “equal” paths always produce the same NAR archive.  For instance,

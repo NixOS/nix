@@ -18,12 +18,7 @@ struct DerivationOutput
     StorePath path;
     std::string hashAlgo; /* hash used for expected hash computation */
     std::string hash; /* expected hash, may be null */
-    DerivationOutput(StorePath && path, std::string && hashAlgo, std::string && hash)
-        : path(std::move(path))
-        , hashAlgo(std::move(hashAlgo))
-        , hash(std::move(hash))
-    { }
-    void parseHashInfo(bool & recursive, Hash & hash) const;
+    void parseHashInfo(FileIngestionMethod & recursive, Hash & hash) const;
 };
 
 typedef std::map<string, DerivationOutput> DerivationOutputs;
@@ -44,7 +39,6 @@ struct BasicDerivation
     StringPairs env;
 
     BasicDerivation() { }
-    explicit BasicDerivation(const BasicDerivation & other);
     virtual ~BasicDerivation() { };
 
     /* Return the path corresponding to the output identifier `id' in
@@ -59,6 +53,8 @@ struct BasicDerivation
     /* Return the output paths of a derivation. */
     StorePathSet outputPaths() const;
 
+    /* Return the output names of a derivation. */
+    StringSet outputNames() const;
 };
 
 struct Derivation : BasicDerivation
@@ -70,8 +66,6 @@ struct Derivation : BasicDerivation
         std::map<std::string, StringSet> * actualInputs = nullptr) const;
 
     Derivation() { }
-    Derivation(Derivation && other) = default;
-    explicit Derivation(const Derivation & other);
 };
 
 
@@ -80,7 +74,7 @@ class Store;
 
 /* Write a derivation to the Nix store, and return its path. */
 StorePath writeDerivation(ref<Store> store,
-    const Derivation & drv, const string & name, RepairFlag repair = NoRepair);
+    const Derivation & drv, std::string_view name, RepairFlag repair = NoRepair);
 
 /* Read a derivation from a file. */
 Derivation readDerivation(const Store & store, const Path & drvPath);

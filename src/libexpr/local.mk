@@ -6,7 +6,9 @@ libexpr_DIR := $(d)
 
 libexpr_SOURCES := $(wildcard $(d)/*.cc) $(wildcard $(d)/primops/*.cc) $(d)/lexer-tab.cc $(d)/parser-tab.cc
 
-libexpr_LIBS = libutil libstore libnixrust
+libexpr_CXXFLAGS += -I src/libutil -I src/libstore -I src/libfetchers -I src/libmain -I src/libexpr
+
+libexpr_LIBS = libutil libstore libfetchers
 
 libexpr_LDFLAGS =
 ifneq ($(OS), FreeBSD)

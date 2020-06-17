@@ -1,6 +1,6 @@
 #include "derivations.hh"
 
-#include <nlohmann/json.hpp>
+#include <nlohmann/json_fwd.hpp>
 
 namespace nix {
 
@@ -8,15 +8,17 @@ class ParsedDerivation
 {
     StorePath drvPath;
     BasicDerivation & drv;
-    std::optional<nlohmann::json> structuredAttrs;
+    std::unique_ptr<nlohmann::json> structuredAttrs;
 
 public:
 
-    ParsedDerivation(StorePath && drvPath, BasicDerivation & drv);
+    ParsedDerivation(const StorePath & drvPath, BasicDerivation & drv);
 
-    const std::optional<nlohmann::json> & getStructuredAttrs() const
+    ~ParsedDerivation();
+
+    const nlohmann::json * getStructuredAttrs() const
     {
-        return structuredAttrs;
+        return structuredAttrs.get();
     }
 
     std::optional<std::string> getStringAttr(const std::string & name) const;

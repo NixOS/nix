@@ -1,20 +1,24 @@
 #include "parsed-derivations.hh"
 
+#include <nlohmann/json.hpp>
+
 namespace nix {
 
-ParsedDerivation::ParsedDerivation(StorePath && drvPath, BasicDerivation & drv)
-    : drvPath(std::move(drvPath)), drv(drv)
+ParsedDerivation::ParsedDerivation(const StorePath & drvPath, BasicDerivation & drv)
+    : drvPath(drvPath), drv(drv)
 {
     /* Parse the __json attribute, if any. */
     auto jsonAttr = drv.env.find("__json");
     if (jsonAttr != drv.env.end()) {
         try {
-            structuredAttrs = nlohmann::json::parse(jsonAttr->second);
+            structuredAttrs = std::make_unique<nlohmann::json>(nlohmann::json::parse(jsonAttr->second));
         } catch (std::exception & e) {
             throw Error("cannot process __json attribute of '%s': %s", drvPath.to_string(), e.what());
         }
     }
 }
+
+ParsedDerivation::~ParsedDerivation() { }
 
 std::optional<std::string> ParsedDerivation::getStringAttr(const std::string & name) const
 {

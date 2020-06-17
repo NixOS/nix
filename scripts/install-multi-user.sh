@@ -13,22 +13,25 @@ set -o pipefail
 # however tracking which bits came from which would be impossible.
 
 readonly ESC='\033[0m'
-readonly BOLD='\033[38;1m'
-readonly BLUE='\033[38;34m'
-readonly BLUE_UL='\033[38;4;34m'
-readonly GREEN='\033[38;32m'
-readonly GREEN_UL='\033[38;4;32m'
-readonly RED='\033[38;31m'
+readonly BOLD='\033[1m'
+readonly BLUE='\033[34m'
+readonly BLUE_UL='\033[4;34m'
+readonly GREEN='\033[32m'
+readonly GREEN_UL='\033[4;32m'
+readonly RED='\033[31m'
 
-readonly NIX_USER_COUNT="32"
+# installer allows overriding build user count to speed up installation
+# as creating each user takes non-trivial amount of time on macos
+readonly NIX_USER_COUNT=${NIX_USER_COUNT:-32}
 readonly NIX_BUILD_GROUP_ID="30000"
 readonly NIX_BUILD_GROUP_NAME="nixbld"
 readonly NIX_FIRST_BUILD_UID="30001"
 # Please don't change this. We don't support it, because the
 # default shell profile that comes with Nix doesn't support it.
 readonly NIX_ROOT="/nix"
+readonly NIX_EXTRA_CONF=${NIX_EXTRA_CONF:-}
 
-readonly PROFILE_TARGETS=("/etc/bashrc" "/etc/profile.d/nix.sh" "/etc/zshrc")
+readonly PROFILE_TARGETS=("/etc/bashrc" "/etc/profile.d/nix.sh" "/etc/zshenv")
 readonly PROFILE_BACKUP_SUFFIX=".backup-before-nix"
 readonly PROFILE_NIX_FILE="$NIX_ROOT/var/nix/profiles/default/etc/profile.d/nix-daemon.sh"
 
@@ -450,9 +453,11 @@ create_directories() {
 }
 
 place_channel_configuration() {
-    echo "https://nixos.org/channels/nixpkgs-unstable nixpkgs" > "$SCRATCH/.nix-channels"
-    _sudo "to set up the default system channel (part 1)" \
-          install -m 0664 "$SCRATCH/.nix-channels" "$ROOT_HOME/.nix-channels"
+    if [ -z "${NIX_INSTALLER_NO_CHANNEL_ADD:-}" ]; then
+        echo "https://nixos.org/channels/nixpkgs-unstable nixpkgs" > "$SCRATCH/.nix-channels"
+        _sudo "to set up the default system channel (part 1)" \
+            install -m 0664 "$SCRATCH/.nix-channels" "$ROOT_HOME/.nix-channels"
+    fi
 }
 
 welcome_to_nix() {
@@ -567,7 +572,7 @@ install_from_extracted_nix() {
         cd "$EXTRACTED_NIX_PATH"
 
         _sudo "to copy the basic Nix files to the new store at $NIX_ROOT/store" \
-              rsync -rlpt ./store/* "$NIX_ROOT/store/"
+              rsync -rlpt --chmod=-w ./store/* "$NIX_ROOT/store/"
 
         if [ -d "$NIX_INSTALLED_NIX" ]; then
             echo "      Alright! We have our first nix at $NIX_INSTALLED_NIX"
@@ -634,18 +639,20 @@ setup_default_profile() {
         export NIX_SSL_CERT_FILE=/nix/var/nix/profiles/default/etc/ssl/certs/ca-bundle.crt
     fi
 
-    # Have to explicitly pass NIX_SSL_CERT_FILE as part of the sudo call,
-    # otherwise it will be lost in environments where sudo doesn't pass
-    # all the environment variables by default.
-    _sudo "to update the default channel in the default profile" \
-          HOME="$ROOT_HOME" NIX_SSL_CERT_FILE="$NIX_SSL_CERT_FILE" "$NIX_INSTALLED_NIX/bin/nix-channel" --update nixpkgs \
-          || channel_update_failed=1
-
+    if [ -z "${NIX_INSTALLER_NO_CHANNEL_ADD:-}" ]; then
+        # Have to explicitly pass NIX_SSL_CERT_FILE as part of the sudo call,
+        # otherwise it will be lost in environments where sudo doesn't pass
+        # all the environment variables by default.
+        _sudo "to update the default channel in the default profile" \
+            HOME="$ROOT_HOME" NIX_SSL_CERT_FILE="$NIX_SSL_CERT_FILE" "$NIX_INSTALLED_NIX/bin/nix-channel" --update nixpkgs \
+            || channel_update_failed=1
+    fi
 }
 
 
 place_nix_configuration() {
     cat <<EOF > "$SCRATCH/nix.conf"
+$NIX_EXTRA_CONF
 build-users-group = $NIX_BUILD_GROUP_NAME
 EOF
     _sudo "to place the default nix daemon configuration (part 2)" \

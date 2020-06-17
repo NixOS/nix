@@ -40,14 +40,14 @@ void BinaryCacheStore::init()
         upsertFile(cacheInfoFile, "StoreDir: " + storeDir + "\n", "text/x-nix-cache-info");
     } else {
         for (auto & line : tokenizeString<Strings>(*cacheInfo, "\n")) {
-            size_t colon = line.find(':');
-            if (colon == std::string::npos) continue;
+            size_t colon= line.find(':');
+            if (colon ==std::string::npos) continue;
             auto name = line.substr(0, colon);
             auto value = trim(line.substr(colon + 1, std::string::npos));
             if (name == "StoreDir") {
                 if (value != storeDir)
-                    throw Error(format("binary cache '%s' is for Nix stores with prefix '%s', not '%s'")
-                        % getUri() % value % storeDir);
+                    throw Error("binary cache '%s' is for Nix stores with prefix '%s', not '%s'",
+                        getUri(), value, storeDir);
             } else if (name == "WantMassQuery") {
                 wantMassQuery.setDefault(value == "1" ? "true" : "false");
             } else if (name == "Priority") {
@@ -93,7 +93,7 @@ std::shared_ptr<std::string> BinaryCacheStore::getFile(const std::string & path)
 
 std::string BinaryCacheStore::narInfoFileFor(const StorePath & storePath)
 {
-    return storePathToHash(printStorePath(storePath)) + ".narinfo";
+    return std::string(storePath.hashPart()) + ".narinfo";
 }
 
 void BinaryCacheStore::writeNarInfo(ref<NarInfo> narInfo)
@@ -102,7 +102,7 @@ void BinaryCacheStore::writeNarInfo(ref<NarInfo> narInfo)
 
     upsertFile(narInfoFile, narInfo->to_string(*this), "text/x-nix-narinfo");
 
-    auto hashPart = storePathToHash(printStorePath(narInfo->path));
+    std::string hashPart(narInfo->path.hashPart());
 
     {
         auto state_(state.lock());
@@ -113,9 +113,12 @@ void BinaryCacheStore::writeNarInfo(ref<NarInfo> narInfo)
         diskCache->upsertNarInfo(getUri(), hashPart, std::shared_ptr<NarInfo>(narInfo));
 }
 
-void BinaryCacheStore::addToStore(const ValidPathInfo & info, const ref<std::string> & nar,
+void BinaryCacheStore::addToStore(const ValidPathInfo & info, Source & narSource,
     RepairFlag repair, CheckSigsFlag checkSigs, std::shared_ptr<FSAccessor> accessor)
 {
+    // FIXME: See if we can use the original source to reduce memory usage.
+    auto nar = make_ref<std::string>(narSource.drain());
+
     if (!repair && isValidPath(info.path)) return;
 
     /* Verify that all references are valid. This may do some .narinfo
@@ -161,7 +164,7 @@ void BinaryCacheStore::addToStore(const ValidPathInfo & info, const ref<std::str
             }
         }
 
-        upsertFile(storePathToHash(printStorePath(info.path)) + ".ls", jsonOut.str(), "application/json");
+        upsertFile(std::string(info.path.to_string()) + ".ls", jsonOut.str(), "application/json");
     }
 
     /* Compress the NAR. */
@@ -284,7 +287,7 @@ void BinaryCacheStore::narFromPath(const StorePath & storePath, Sink & sink)
     try {
         getFile(info->url, *decompressor);
     } catch (NoSuchBinaryCacheFile & e) {
-        throw SubstituteGone(e.what());
+        throw SubstituteGone(e.info());
     }
 
     decompressor->finish();
@@ -327,7 +330,7 @@ void BinaryCacheStore::queryPathInfoUncached(const StorePath & storePath,
 }
 
 StorePath BinaryCacheStore::addToStore(const string & name, const Path & srcPath,
-    bool recursive, HashType hashAlgo, PathFilter & filter, RepairFlag repair)
+    FileIngestionMethod method, HashType hashAlgo, PathFilter & filter, RepairFlag repair)
 {
     // FIXME: some cut&paste from LocalStore::addToStore().
 
@@ -336,7 +339,7 @@ StorePath BinaryCacheStore::addToStore(const string & name, const Path & srcPath
        small files. */
     StringSink sink;
     Hash h;
-    if (recursive) {
+    if (method == FileIngestionMethod::Recursive) {
         dumpPath(srcPath, sink, filter);
         h = hashString(hashAlgo, *sink.s);
     } else {
@@ -345,9 +348,10 @@ StorePath BinaryCacheStore::addToStore(const string & name, const Path & srcPath
         h = hashString(hashAlgo, s);
     }
 
-    ValidPathInfo info(makeFixedOutputPath(recursive, h, name));
+    ValidPathInfo info(makeFixedOutputPath(method, h, name));
 
-    addToStore(info, sink.s, repair, CheckSigs, nullptr);
+    auto source = StringSource { *sink.s };
+    addToStore(info, source, repair, CheckSigs, nullptr);
 
     return std::move(info.path);
 }
@@ -356,12 +360,13 @@ StorePath BinaryCacheStore::addTextToStore(const string & name, const string & s
     const StorePathSet & references, RepairFlag repair)
 {
     ValidPathInfo info(computeStorePathForText(name, s, references));
-    info.references = cloneStorePathSet(references);
+    info.references = references;
 
     if (repair || !isValidPath(info.path)) {
         StringSink sink;
         dumpString(s, sink);
-        addToStore(info, sink.s, repair, CheckSigs, nullptr);
+        auto source = StringSource { *sink.s };
+        addToStore(info, source, repair, CheckSigs, nullptr);
     }
 
     return std::move(info.path);
@@ -390,14 +395,14 @@ void BinaryCacheStore::addSignatures(const StorePath & storePath, const StringSe
 
 std::shared_ptr<std::string> BinaryCacheStore::getBuildLog(const StorePath & path)
 {
-    auto drvPath = path.clone();
+    auto drvPath = path;
 
     if (!path.isDerivation()) {
         try {
             auto info = queryPathInfo(path);
             // FIXME: add a "Log" field to .narinfo
             if (!info->deriver) return nullptr;
-            drvPath = info->deriver->clone();
+            drvPath = *info->deriver;
         } catch (InvalidPath &) {
             return nullptr;
         }

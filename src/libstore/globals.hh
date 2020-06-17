@@ -53,8 +53,11 @@ public:
     /* The directory where state is stored. */
     Path nixStateDir;
 
-    /* The directory where configuration files are stored. */
+    /* The directory where system configuration files are stored. */
     Path nixConfDir;
+
+    /* A list of user configuration files to load. */
+    std::vector<Path> nixUserConfFiles;
 
     /* The directory where internal helper programs are stored. */
     Path nixLibexecDir;
@@ -268,7 +271,7 @@ public:
         "listed in 'trusted-public-keys'."};
 
     Setting<StringSet> extraPlatforms{this,
-        std::string{SYSTEM} == "x86_64-linux" ? StringSet{"i686-linux"} : StringSet{},
+        std::string{SYSTEM} == "x86_64-linux" && !isWSL1() ? StringSet{"i686-linux"} : StringSet{},
         "extra-platforms",
         "Additional platforms that can be built on the local system. "
         "These may be supported natively (e.g. armv7 on some aarch64 CPUs "
@@ -311,12 +314,7 @@ public:
     Setting<bool> printMissing{this, true, "print-missing",
         "Whether to print what paths need to be built or downloaded."};
 
-    Setting<std::string> preBuildHook{this,
-#if __APPLE__
-        nixLibexecDir + "/nix/resolve-system-dependencies",
-#else
-        "",
-#endif
+    Setting<std::string> preBuildHook{this, "",
         "pre-build-hook",
         "A program to run just before a build to set derivation-specific build settings."};
 
@@ -356,12 +354,21 @@ public:
     Setting<Paths> pluginFiles{this, {}, "plugin-files",
         "Plugins to dynamically load at nix initialization time."};
 
+    Setting<std::string> githubAccessToken{this, "", "github-access-token",
+        "GitHub access token to get access to GitHub data through the GitHub API for github:<..> flakes."};
+
     Setting<Strings> experimentalFeatures{this, {}, "experimental-features",
         "Experimental Nix features to enable."};
 
     bool isExperimentalFeatureEnabled(const std::string & name);
 
     void requireExperimentalFeature(const std::string & name);
+
+    Setting<bool> allowDirty{this, true, "allow-dirty",
+        "Whether to allow dirty Git/Mercurial trees."};
+
+    Setting<bool> warnDirty{this, true, "warn-dirty",
+        "Whether to warn about dirty Git/Mercurial trees."};
 };
 
 
@@ -373,6 +380,9 @@ extern Settings settings;
 void initPlugins();
 
 void loadConfFile();
+
+// Used by the Settings constructor
+std::vector<Path> getUserConfigFiles();
 
 extern const string nixVersion;
 

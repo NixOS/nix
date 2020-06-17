@@ -45,6 +45,8 @@ struct CmdEval : MixJSON, InstallableCommand
         };
     }
 
+    Category category() override { return catSecondary; }
+
     void run(ref<Store> store) override
     {
         if (raw && json)
@@ -52,19 +54,18 @@ struct CmdEval : MixJSON, InstallableCommand
 
         auto state = getEvalState();
 
-        auto v = installable->toValue(*state);
+        auto v = installable->toValue(*state).first;
         PathSet context;
 
-        stopProgressBar();
-
         if (raw) {
+            stopProgressBar();
             std::cout << state->coerceToString(noPos, *v, context);
         } else if (json) {
             JSONPlaceholder jsonOut(std::cout);
             printValueAsJSON(*state, true, *v, jsonOut, context);
         } else {
             state->forceValueDeep(*v);
-            std::cout << *v << "\n";
+            logger->stdout("%s", *v);
         }
     }
 };

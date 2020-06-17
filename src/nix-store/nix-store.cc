@@ -9,7 +9,7 @@
 #include "util.hh"
 #include "worker-protocol.hh"
 #include "graphml.hh"
-#include "legacy.hh"
+#include "../nix/legacy.hh"
 
 #include <iostream>
 #include <algorithm>
@@ -49,11 +49,11 @@ ref<LocalStore> ensureLocalStore()
 
 static StorePath useDeriver(const StorePath & path)
 {
-    if (path.isDerivation()) return path.clone();
+    if (path.isDerivation()) return path;
     auto info = store->queryPathInfo(path);
     if (!info->deriver)
         throw Error("deriver of path '%s' is not known", store->printStorePath(path));
-    return info->deriver->clone();
+    return *info->deriver;
 }
 
 
@@ -124,7 +124,7 @@ static void opRealise(Strings opFlags, Strings opArgs)
         else if (i == "--repair") buildMode = bmRepair;
         else if (i == "--check") buildMode = bmCheck;
         else if (i == "--ignore-unknown") ignoreUnknown = true;
-        else throw UsageError(format("unknown flag '%1%'") % i);
+        else throw UsageError("unknown flag '%1%'", i);
 
     std::vector<StorePathWithOutputs> paths;
     for (auto & i : opArgs)
@@ -174,11 +174,11 @@ static void opAdd(Strings opFlags, Strings opArgs)
    store. */
 static void opAddFixed(Strings opFlags, Strings opArgs)
 {
-    bool recursive = false;
+    auto recursive = FileIngestionMethod::Flat;
 
     for (auto & i : opFlags)
-        if (i == "--recursive") recursive = true;
-        else throw UsageError(format("unknown flag '%1%'") % i);
+        if (i == "--recursive") recursive = FileIngestionMethod::Recursive;
+        else throw UsageError("unknown flag '%1%'", i);
 
     if (opArgs.empty())
         throw UsageError("first argument must be hash algorithm");
@@ -194,14 +194,14 @@ static void opAddFixed(Strings opFlags, Strings opArgs)
 /* Hack to support caching in `nix-prefetch-url'. */
 static void opPrintFixedPath(Strings opFlags, Strings opArgs)
 {
-    bool recursive = false;
+    auto recursive = FileIngestionMethod::Flat;
 
     for (auto i : opFlags)
-        if (i == "--recursive") recursive = true;
-        else throw UsageError(format("unknown flag '%1%'") % i);
+        if (i == "--recursive") recursive = FileIngestionMethod::Recursive;
+        else throw UsageError("unknown flag '%1%'", i);
 
     if (opArgs.size() != 3)
-        throw UsageError(format("'--print-fixed-path' requires three arguments"));
+        throw UsageError("'--print-fixed-path' requires three arguments");
 
     Strings::iterator i = opArgs.begin();
     HashType hashAlgo = parseHashType(*i++);
@@ -214,31 +214,25 @@ static void opPrintFixedPath(Strings opFlags, Strings opArgs)
 
 static StorePathSet maybeUseOutputs(const StorePath & storePath, bool useOutput, bool forceRealise)
 {
-    if (forceRealise) realisePath(storePath);
+    if (forceRealise) realisePath({storePath});
     if (useOutput && storePath.isDerivation()) {
         auto drv = store->derivationFromPath(storePath);
         StorePathSet outputs;
         for (auto & i : drv.outputs)
-            outputs.insert(i.second.path.clone());
+            outputs.insert(i.second.path);
         return outputs;
     }
-    else return singleton(storePath.clone());
+    else return {storePath};
 }
 
 
 /* Some code to print a tree representation of a derivation dependency
    graph.  Topological sorting is used to keep the tree relatively
    flat. */
-
-const string treeConn = "+---";
-const string treeLine = "|   ";
-const string treeNull = "    ";
-
-
 static void printTree(const StorePath & path,
     const string & firstPad, const string & tailPad, StorePathSet & done)
 {
-    if (!done.insert(path.clone()).second) {
+    if (!done.insert(path).second) {
         cout << fmt("%s%s [...]\n", firstPad, store->printStorePath(path));
         return;
     }
@@ -254,10 +248,11 @@ static void printTree(const StorePath & path,
     auto sorted = store->topoSortPaths(info->references);
     reverse(sorted.begin(), sorted.end());
 
-    for (auto i = sorted.begin(); i != sorted.end(); ++i) {
-        auto j = i; ++j;
-        printTree(*i, tailPad + treeConn,
-            j == sorted.end() ? tailPad + treeNull : tailPad + treeLine,
+    for (const auto &[n, i] : enumerate(sorted)) {
+        bool last = n + 1 == sorted.size();
+        printTree(i,
+            tailPad + (last ? treeLast : treeConn),
+            tailPad + (last ? treeNull : treeLine),
             done);
     }
 }
@@ -301,9 +296,9 @@ static void opQuery(Strings opFlags, Strings opArgs)
         else if (i == "--use-output" || i == "-u") useOutput = true;
         else if (i == "--force-realise" || i == "--force-realize" || i == "-f") forceRealise = true;
         else if (i == "--include-outputs") includeOutputs = true;
-        else throw UsageError(format("unknown flag '%1%'") % i);
+        else throw UsageError("unknown flag '%1%'", i);
         if (prev != qDefault && prev != query)
-            throw UsageError(format("query type '%1%' conflicts with earlier flag") % i);
+            throw UsageError("query type '%1%' conflicts with earlier flag", i);
     }
 
     if (query == qDefault) query = qOutputs;
@@ -315,7 +310,7 @@ static void opQuery(Strings opFlags, Strings opArgs)
         case qOutputs: {
             for (auto & i : opArgs) {
                 auto i2 = store->followLinksToStorePath(i);
-                if (forceRealise) realisePath(i2);
+                if (forceRealise) realisePath({i2});
                 Derivation drv = store->derivationFromPath(i2);
                 for (auto & j : drv.outputs)
                     cout << fmt("%1%\n", store->printStorePath(j.second.path));
@@ -334,13 +329,13 @@ static void opQuery(Strings opFlags, Strings opArgs)
                     if (query == qRequisites) store->computeFSClosure(j, paths, false, includeOutputs);
                     else if (query == qReferences) {
                         for (auto & p : store->queryPathInfo(j)->references)
-                            paths.insert(p.clone());
+                            paths.insert(p);
                     }
                     else if (query == qReferrers) {
                         StorePathSet tmp;
                         store->queryReferrers(j, tmp);
                         for (auto & i : tmp)
-                            paths.insert(i.clone());
+                            paths.insert(i);
                     }
                     else if (query == qReferrersClosure) store->computeFSClosure(j, paths, true);
                 }
@@ -378,7 +373,7 @@ static void opQuery(Strings opFlags, Strings opArgs)
                     auto info = store->queryPathInfo(j);
                     if (query == qHash) {
                         assert(info->narHash.type == htSHA256);
-                        cout << fmt("%s\n", info->narHash.to_string(Base32));
+                        cout << fmt("%s\n", info->narHash.to_string(Base32, true));
                     } else if (query == qSize)
                         cout << fmt("%d\n", info->narSize);
                 }
@@ -396,7 +391,7 @@ static void opQuery(Strings opFlags, Strings opArgs)
             StorePathSet roots;
             for (auto & i : opArgs)
                 for (auto & j : maybeUseOutputs(store->followLinksToStorePath(i), useOutput, forceRealise))
-                    roots.insert(j.clone());
+                    roots.insert(j);
             printDotGraph(ref<Store>(store), std::move(roots));
             break;
         }
@@ -405,7 +400,7 @@ static void opQuery(Strings opFlags, Strings opArgs)
             StorePathSet roots;
             for (auto & i : opArgs)
                 for (auto & j : maybeUseOutputs(store->followLinksToStorePath(i), useOutput, forceRealise))
-                    roots.insert(j.clone());
+                    roots.insert(j);
             printGraphML(ref<Store>(store), std::move(roots));
             break;
         }
@@ -420,7 +415,7 @@ static void opQuery(Strings opFlags, Strings opArgs)
             StorePathSet args;
             for (auto & i : opArgs)
                 for (auto & p : maybeUseOutputs(store->followLinksToStorePath(i), useOutput, forceRealise))
-                    args.insert(p.clone());
+                    args.insert(p);
 
             StorePathSet referrers;
             store->computeFSClosure(
@@ -449,7 +444,7 @@ static void opPrintEnv(Strings opFlags, Strings opArgs)
     Derivation drv = store->derivationFromPath(store->parseStorePath(drvPath));
 
     /* Print each environment variable in the derivation in a format
-       that can be sourced by the shell. */
+     * that can be sourced by the shell. */
     for (auto & i : drv.env)
         cout << format("export %1%; %1%=%2%\n") % i.first % shellEscape(i.second);
 
@@ -487,10 +482,10 @@ static void opDumpDB(Strings opFlags, Strings opArgs)
     if (!opFlags.empty()) throw UsageError("unknown flag");
     if (!opArgs.empty()) {
         for (auto & i : opArgs)
-            cout << store->makeValidityRegistration(singleton(store->followLinksToStorePath(i)), true, true);
+            cout << store->makeValidityRegistration({store->followLinksToStorePath(i)}, true, true);
     } else {
         for (auto & i : store->queryAllValidPaths())
-            cout << store->makeValidityRegistration(singleton(i), true, true);
+            cout << store->makeValidityRegistration({i}, true, true);
     }
 }
 
@@ -536,7 +531,7 @@ static void opRegisterValidity(Strings opFlags, Strings opArgs)
     for (auto & i : opFlags)
         if (i == "--reregister") reregister = true;
         else if (i == "--hash-given") hashGiven = true;
-        else throw UsageError(format("unknown flag '%1%'") % i);
+        else throw UsageError("unknown flag '%1%'", i);
 
     if (!opArgs.empty()) throw UsageError("no arguments expected");
 
@@ -550,7 +545,7 @@ static void opCheckValidity(Strings opFlags, Strings opArgs)
 
     for (auto & i : opFlags)
         if (i == "--print-invalid") printInvalid = true;
-        else throw UsageError(format("unknown flag '%1%'") % i);
+        else throw UsageError("unknown flag '%1%'", i);
 
     for (auto & i : opArgs) {
         auto path = store->followLinksToStorePath(i);
@@ -577,12 +572,11 @@ static void opGC(Strings opFlags, Strings opArgs)
         if (*i == "--print-roots") printRoots = true;
         else if (*i == "--print-live") options.action = GCOptions::gcReturnLive;
         else if (*i == "--print-dead") options.action = GCOptions::gcReturnDead;
-        else if (*i == "--delete") options.action = GCOptions::gcDeleteDead;
         else if (*i == "--max-freed") {
             long long maxFreed = getIntArg<long long>(*i, i, opFlags.end(), true);
             options.maxFreed = maxFreed >= 0 ? maxFreed : 0;
         }
-        else throw UsageError(format("bad sub-operation '%1%' in GC") % *i);
+        else throw UsageError("bad sub-operation '%1%' in GC", *i);
 
     if (!opArgs.empty()) throw UsageError("no arguments expected");
 
@@ -592,7 +586,7 @@ static void opGC(Strings opFlags, Strings opArgs)
         // Transpose and sort the roots.
         for (auto & [target, links] : roots)
             for (auto & link : links)
-                roots2.emplace(link, target.clone());
+                roots2.emplace(link, target);
         for (auto & [link, target] : roots2)
             std::cout << link << " -> " << store->printStorePath(target) << "\n";
     }
@@ -618,7 +612,7 @@ static void opDelete(Strings opFlags, Strings opArgs)
 
     for (auto & i : opFlags)
         if (i == "--ignore-liveness") options.ignoreLiveness = true;
-        else throw UsageError(format("unknown flag '%1%'") % i);
+        else throw UsageError("unknown flag '%1%'", i);
 
     for (auto & i : opArgs)
         options.pathsToDelete.insert(store->followLinksToStorePath(i));
@@ -656,7 +650,7 @@ static void opRestore(Strings opFlags, Strings opArgs)
 static void opExport(Strings opFlags, Strings opArgs)
 {
     for (auto & i : opFlags)
-        throw UsageError(format("unknown flag '%1%'") % i);
+        throw UsageError("unknown flag '%1%'", i);
 
     StorePathSet paths;
 
@@ -672,7 +666,7 @@ static void opExport(Strings opFlags, Strings opArgs)
 static void opImport(Strings opFlags, Strings opArgs)
 {
     for (auto & i : opFlags)
-        throw UsageError(format("unknown flag '%1%'") % i);
+        throw UsageError("unknown flag '%1%'", i);
 
     if (!opArgs.empty()) throw UsageError("no arguments expected");
 
@@ -707,10 +701,13 @@ static void opVerify(Strings opFlags, Strings opArgs)
     for (auto & i : opFlags)
         if (i == "--check-contents") checkContents = true;
         else if (i == "--repair") repair = Repair;
-        else throw UsageError(format("unknown flag '%1%'") % i);
+        else throw UsageError("unknown flag '%1%'", i);
 
     if (store->verifyStore(checkContents, repair)) {
-        printError("warning: not all errors were fixed");
+        logWarning({
+            .name = "Store consistency",
+            .description = "not all errors were fixed"
+            });
         throw Exit(1);
     }
 }
@@ -732,9 +729,14 @@ static void opVerifyPath(Strings opFlags, Strings opArgs)
         store->narFromPath(path, sink);
         auto current = sink.finish();
         if (current.first != info->narHash) {
-            printError(
-                "path '%s' was modified! expected hash '%s', got '%s'",
-                store->printStorePath(path), info->narHash.to_string(), current.first.to_string());
+            logError({
+                .name = "Hash mismatch",
+                .hint = hintfmt(
+                    "path '%s' was modified! expected hash '%s', got '%s'",
+                    store->printStorePath(path),
+                    info->narHash.to_string(Base32, true),
+                    current.first.to_string(Base32, true))
+            });
             status = 1;
         }
     }
@@ -770,7 +772,7 @@ static void opServe(Strings opFlags, Strings opArgs)
     bool writeAllowed = false;
     for (auto & i : opFlags)
         if (i == "--write") writeAllowed = true;
-        else throw UsageError(format("unknown flag '%1%'") % i);
+        else throw UsageError("unknown flag '%1%'", i);
 
     if (!opArgs.empty()) throw UsageError("no arguments expected");
 
@@ -828,7 +830,7 @@ static void opServe(Strings opFlags, Strings opArgs)
                     std::vector<StorePathWithOutputs> paths2;
                     for (auto & path : paths)
                         if (!path.isDerivation())
-                            paths2.emplace_back(path.clone());
+                            paths2.push_back({path});
                     unsigned long long downloadSize, narSize;
                     StorePathSet willBuild, willSubstitute, unknown;
                     store->queryMissing(paths2,
@@ -838,10 +840,10 @@ static void opServe(Strings opFlags, Strings opArgs)
                     if (!willSubstitute.empty())
                         try {
                             std::vector<StorePathWithOutputs> subs;
-                            for (auto & p : willSubstitute) subs.emplace_back(p.clone());
+                            for (auto & p : willSubstitute) subs.push_back({p});
                             store->buildPaths(subs);
                         } catch (Error & e) {
-                            printError(format("warning: %1%") % e.msg());
+                            logWarning(e.info());
                         }
                 }
 
@@ -862,7 +864,7 @@ static void opServe(Strings opFlags, Strings opArgs)
                         out << info->narSize // downloadSize
                             << info->narSize;
                         if (GET_PROTOCOL_MINOR(clientVersion) >= 4)
-                            out << (info->narHash ? info->narHash.to_string() : "") << info->ca << info->sigs;
+                            out << (info->narHash ? info->narHash.to_string(Base32, true) : "") << info->ca << info->sigs;
                     } catch (InvalidPath &) {
                     }
                 }
@@ -893,7 +895,7 @@ static void opServe(Strings opFlags, Strings opArgs)
 
                 std::vector<StorePathWithOutputs> paths;
                 for (auto & s : readStrings<Strings>(in))
-                    paths.emplace_back(store->parsePathWithOutputs(s));
+                    paths.push_back(store->parsePathWithOutputs(s));
 
                 getBuildSettings();
 
@@ -968,7 +970,7 @@ static void opServe(Strings opFlags, Strings opArgs)
             }
 
             default:
-                throw Error(format("unknown serve command %1%") % cmd);
+                throw Error("unknown serve command %1%", cmd);
         }
 
         out.flush();
@@ -979,7 +981,7 @@ static void opServe(Strings opFlags, Strings opArgs)
 static void opGenerateBinaryCacheKey(Strings opFlags, Strings opArgs)
 {
     for (auto & i : opFlags)
-        throw UsageError(format("unknown flag '%1%'") % i);
+        throw UsageError("unknown flag '%1%'", i);
 
     if (opArgs.size() != 3) throw UsageError("three arguments expected");
     auto i = opArgs.begin();
@@ -1103,6 +1105,8 @@ static int _main(int argc, char * * argv)
             store = openStore();
 
         op(opFlags, opArgs);
+
+        logger->stop();
 
         return 0;
     }

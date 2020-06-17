@@ -1,13 +1,13 @@
 #include "hash.hh"
 #include "shared.hh"
-#include "download.hh"
+#include "filetransfer.hh"
 #include "store-api.hh"
 #include "eval.hh"
 #include "eval-inline.hh"
 #include "common-eval-args.hh"
 #include "attr-path.hh"
-#include "legacy.hh"
 #include "finally.hh"
+#include "../nix/legacy.hh"
 #include "progress-bar.hh"
 #include "tarfile.hh"
 
@@ -37,11 +37,11 @@ string resolveMirrorUri(EvalState & state, string uri)
 
     auto mirrorList = vMirrors.attrs->find(state.symbols.create(mirrorName));
     if (mirrorList == vMirrors.attrs->end())
-        throw Error(format("unknown mirror name '%1%'") % mirrorName);
+        throw Error("unknown mirror name '%1%'", mirrorName);
     state.forceList(*mirrorList->value);
 
     if (mirrorList->value->listSize() < 1)
-        throw Error(format("mirror URI '%1%' did not expand to anything") % uri);
+        throw Error("mirror URI '%1%' did not expand to anything", uri);
 
     string mirror = state.forceString(*mirrorList->value->listElems()[0]);
     return mirror + (hasSuffix(mirror, "/") ? "" : "/") + string(s, p + 1);
@@ -73,7 +73,7 @@ static int _main(int argc, char * * argv)
                 string s = getArg(*arg, arg, end);
                 ht = parseHashType(s);
                 if (ht == htUnknown)
-                    throw UsageError(format("unknown hash type '%1%'") % s);
+                    throw UsageError("unknown hash type '%1%'", s);
             }
             else if (*arg == "--print-path")
                 printPath = true;
@@ -120,7 +120,7 @@ static int _main(int argc, char * * argv)
             Path path = resolveExprPath(lookupFileArg(*state, args.empty() ? "." : args[0]));
             Value vRoot;
             state->evalFile(path, vRoot);
-            Value & v(*findAlongAttrPath(*state, attrPath, autoArgs, vRoot));
+            Value & v(*findAlongAttrPath(*state, attrPath, autoArgs, vRoot).first);
             state->forceAttrs(v);
 
             /* Extract the URI. */
@@ -151,7 +151,7 @@ static int _main(int argc, char * * argv)
         if (name.empty())
             name = baseNameOf(uri);
         if (name.empty())
-            throw Error(format("cannot figure out file name for '%1%'") % uri);
+            throw Error("cannot figure out file name for '%1%'", uri);
 
         /* If an expected hash is given, the file may already exist in
            the store. */
@@ -159,7 +159,8 @@ static int _main(int argc, char * * argv)
         std::optional<StorePath> storePath;
         if (args.size() == 2) {
             expectedHash = Hash(args[1], ht);
-            storePath = store->makeFixedOutputPath(unpack, expectedHash, name);
+            const auto recursive = unpack ? FileIngestionMethod::Recursive : FileIngestionMethod::Flat;
+            storePath = store->makeFixedOutputPath(recursive, expectedHash, name);
             if (store->isValidPath(*storePath))
                 hash = expectedHash;
             else
@@ -180,9 +181,9 @@ static int _main(int argc, char * * argv)
 
                 FdSink sink(fd.get());
 
-                DownloadRequest req(actualUri);
+                FileTransferRequest req(actualUri);
                 req.decompress = false;
-                getDownloader()->download(std::move(req), sink);
+                getFileTransfer()->download(std::move(req), sink);
             }
 
             /* Optionally unpack the file. */
@@ -206,15 +207,17 @@ static int _main(int argc, char * * argv)
             hash = unpack ? hashPath(ht, tmpFile).first : hashFile(ht, tmpFile);
 
             if (expectedHash != Hash(ht) && expectedHash != hash)
-                throw Error(format("hash mismatch for '%1%'") % uri);
+                throw Error("hash mismatch for '%1%'", uri);
+
+            const auto recursive = unpack ? FileIngestionMethod::Recursive : FileIngestionMethod::Flat;
 
             /* Copy the file to the Nix store. FIXME: if RemoteStore
                implemented addToStoreFromDump() and downloadFile()
                supported a sink, we could stream the download directly
                into the Nix store. */
-            storePath = store->addToStore(name, tmpFile, unpack, ht);
+            storePath = store->addToStore(name, tmpFile, recursive, ht);
 
-            assert(*storePath == store->makeFixedOutputPath(unpack, hash, name));
+            assert(*storePath == store->makeFixedOutputPath(recursive, hash, name));
         }
 
         stopProgressBar();

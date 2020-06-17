@@ -195,7 +195,7 @@ struct LegacySSHStore : public Store
     { unsupported("queryPathFromHashPart"); }
 
     StorePath addToStore(const string & name, const Path & srcPath,
-        bool recursive, HashType hashAlgo,
+        FileIngestionMethod method, HashType hashAlgo,
         PathFilter & filter, RepairFlag repair) override
     { unsupported("addToStore"); }
 
@@ -256,7 +256,7 @@ struct LegacySSHStore : public Store
         conn->to.flush();
 
         for (auto & i : readStorePaths<StorePathSet>(*this, conn->from))
-            out.insert(i.clone());
+            out.insert(i);
     }
 
     StorePathSet queryValidPaths(const StorePathSet & paths,

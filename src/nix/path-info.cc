@@ -29,6 +29,8 @@ struct CmdPathInfo : StorePathsCommand, MixJSON
         return "query information about store paths";
     }
 
+    Category category() override { return catSecondary; }
+
     Examples examples() override
     {
         return {
@@ -88,8 +90,8 @@ struct CmdPathInfo : StorePathsCommand, MixJSON
             JSONPlaceholder jsonRoot(std::cout);
             store->pathInfoToJSON(jsonRoot,
                 // FIXME: preserve order?
-                storePathsToSet(storePaths),
-                true, showClosureSize, AllowInvalid);
+                StorePathSet(storePaths.begin(), storePaths.end()),
+                true, showClosureSize, SRI, AllowInvalid);
         }
 
         else {

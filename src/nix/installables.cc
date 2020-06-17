@@ -12,26 +12,28 @@
 
 namespace nix {
 
+
 SourceExprCommand::SourceExprCommand()
 {
-    mkFlag()
-        .shortName('f')
-        .longName("file")
-        .label("file")
-        .description("evaluate FILE rather than the default")
-        .dest(&file);
+    addFlag({
+        .longName = "file",
+        .shortName = 'f',
+        .description = "evaluate FILE rather than the default",
+        .labels = {"file"},
+        .handler = {&file}
+    });
 }
 
 Value * SourceExprCommand::getSourceExpr(EvalState & state)
 {
-    if (vSourceExpr) return vSourceExpr;
+    if (vSourceExpr) return *vSourceExpr;
 
     auto sToplevel = state.symbols.create("_toplevel");
 
-    vSourceExpr = state.allocValue();
+    vSourceExpr = allocRootValue(state.allocValue());
 
     if (file != "")
-        state.evalFile(lookupFileArg(state, file), *vSourceExpr);
+        state.evalFile(lookupFileArg(state, file), **vSourceExpr);
 
     else {
 
@@ -39,9 +41,9 @@ Value * SourceExprCommand::getSourceExpr(EvalState & state)
 
         auto searchPath = state.getSearchPath();
 
-        state.mkAttrs(*vSourceExpr, 1024);
+        state.mkAttrs(**vSourceExpr, 1024);
 
-        mkBool(*state.allocAttr(*vSourceExpr, sToplevel), true);
+        mkBool(*state.allocAttr(**vSourceExpr, sToplevel), true);
 
         std::unordered_set<std::string> seen;
 
@@ -52,7 +54,7 @@ Value * SourceExprCommand::getSourceExpr(EvalState & state)
             mkPrimOpApp(*v1, state.getBuiltin("findFile"), state.getBuiltin("nixPath"));
             Value * v2 = state.allocValue();
             mkApp(*v2, *v1, mkString(*state.allocValue(), name));
-            mkApp(*state.allocAttr(*vSourceExpr, state.symbols.create(name)),
+            mkApp(*state.allocAttr(**vSourceExpr, state.symbols.create(name)),
                 state.getBuiltin("import"), *v2);
         };
 
@@ -66,10 +68,10 @@ Value * SourceExprCommand::getSourceExpr(EvalState & state)
             } else
                 addEntry(i.first);
 
-        vSourceExpr->attrs->sort();
+        (*vSourceExpr)->attrs->sort();
     }
 
-    return vSourceExpr;
+    return *vSourceExpr;
 }
 
 ref<EvalState> SourceExprCommand::getEvalState()
@@ -100,14 +102,19 @@ struct InstallableStorePath : Installable
     Buildables toBuildables() override
     {
         std::map<std::string, StorePath> outputs;
-        outputs.insert_or_assign("out", storePath.clone());
+        outputs.insert_or_assign("out", storePath);
         Buildable b{
-            .drvPath = storePath.isDerivation() ? storePath.clone() : std::optional<StorePath>(),
+            .drvPath = storePath.isDerivation() ? storePath : std::optional<StorePath>(),
             .outputs = std::move(outputs)
         };
         Buildables bs;
         bs.push_back(std::move(b));
         return bs;
+    }
+
+    std::optional<StorePath> getStorePath() override
+    {
+        return storePath;
     }
 };
 
@@ -121,7 +128,7 @@ struct InstallableValue : Installable
     {
         auto state = cmd.getEvalState();
 
-        auto v = toValue(*state);
+        auto v = toValue(*state).first;
 
         Bindings & autoArgs = *cmd.getAutoArgs(*state);
 
@@ -134,7 +141,7 @@ struct InstallableValue : Installable
 
         for (auto & drv : drvs) {
             Buildable b{.drvPath = state->store->parseStorePath(drv.queryDrvPath())};
-            drvPaths.insert(b.drvPath->clone());
+            drvPaths.insert(*b.drvPath);
 
             auto outputName = drv.queryOutputName();
             if (outputName == "")
@@ -148,10 +155,10 @@ struct InstallableValue : Installable
         // Hack to recognize .all: if all drvs have the same drvPath,
         // merge the buildables.
         if (drvPaths.size() == 1) {
-            Buildable b{.drvPath = drvPaths.begin()->clone()};
+            Buildable b{.drvPath = *drvPaths.begin()};
             for (auto & b2 : res)
                 for (auto & output : b2.outputs)
-                    b.outputs.insert_or_assign(output.first, output.second.clone());
+                    b.outputs.insert_or_assign(output.first, output.second);
             Buildables bs;
             bs.push_back(std::move(b));
             return bs;
@@ -169,11 +176,11 @@ struct InstallableExpr : InstallableValue
 
     std::string what() override { return text; }
 
-    Value * toValue(EvalState & state) override
+    std::pair<Value *, Pos> toValue(EvalState & state) override
     {
         auto v = state.allocValue();
         state.eval(state.parseExprFromString(text, absPath(".")), *v);
-        return v;
+        return {v, noPos};
     }
 };
 
@@ -187,16 +194,16 @@ struct InstallableAttrPath : InstallableValue
 
     std::string what() override { return attrPath; }
 
-    Value * toValue(EvalState & state) override
+    std::pair<Value *, Pos> toValue(EvalState & state) override
     {
         auto source = cmd.getSourceExpr(state);
 
         Bindings & autoArgs = *cmd.getAutoArgs(state);
 
-        Value * v = findAlongAttrPath(state, attrPath, autoArgs, *source);
+        auto v = findAlongAttrPath(state, attrPath, autoArgs, *source).first;
         state.forceValue(*v);
 
-        return v;
+        return {v, noPos};
     }
 };
 
@@ -266,7 +273,7 @@ Buildables build(ref<Store> store, RealiseMode mode,
                 pathsToBuild.push_back({*b.drvPath, outputNames});
             } else
                 for (auto & output : b.outputs)
-                    pathsToBuild.push_back({output.second.clone()});
+                    pathsToBuild.push_back({output.second});
             buildables.push_back(std::move(b));
         }
     }
@@ -286,7 +293,7 @@ StorePathSet toStorePaths(ref<Store> store, RealiseMode mode,
 
     for (auto & b : build(store, mode, installables))
         for (auto & output : b.outputs)
-            outPaths.insert(output.second.clone());
+            outPaths.insert(output.second);
 
     return outPaths;
 }
@@ -299,7 +306,7 @@ StorePath toStorePath(ref<Store> store, RealiseMode mode,
     if (paths.size() != 1)
             throw Error("argument '%s' should evaluate to one store path", installable->what());
 
-    return paths.begin()->clone();
+    return *paths.begin();
 }
 
 StorePathSet toDerivations(ref<Store> store,
@@ -317,10 +324,10 @@ StorePathSet toDerivations(ref<Store> store,
                     if (derivers.empty())
                         throw Error("'%s' does not have a known deriver", i->what());
                     // FIXME: use all derivers?
-                    drvPaths.insert(derivers.begin()->clone());
+                    drvPaths.insert(*derivers.begin());
                 }
             } else
-                drvPaths.insert(b.drvPath->clone());
+                drvPaths.insert(*b.drvPath);
         }
 
     return drvPaths;
