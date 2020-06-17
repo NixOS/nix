@@ -72,6 +72,8 @@ struct curlFileTransfer : public FileTransfer
 
         curl_off_t writtenToSink = 0;
 
+        inline static const std::set<long> successfulStatuses;
+
         /* Get the HTTP status code, or 0 for other protocols. */
         long getHTTPStatus()
         {
@@ -98,7 +100,7 @@ struct curlFileTransfer : public FileTransfer
 
                     /* Only write data to the sink if this is a
                        successful response. */
-                    if (httpStatus == 0 || httpStatus == 200 || httpStatus == 201 || httpStatus == 206) {
+                    if (successfulStatuses.find(httpStatus) != successfulStatuses.end()) {
                         writtenToSink += len;
                         this->request.dataCallback((char *) data, len);
                     }
@@ -352,8 +354,7 @@ struct curlFileTransfer : public FileTransfer
             if (writeException)
                 failEx(writeException);
 
-            else if (code == CURLE_OK &&
-                (httpStatus == 200 || httpStatus == 201 || httpStatus == 204 || httpStatus == 206 || httpStatus == 304 || httpStatus == 0 /* other protocol */))
+            else if (code == CURLE_OK && successfulStatuses.find(httpStatus) != successfulStatuses.end())
             {
                 result.cached = httpStatus == 304;
                 act.progress(result.bodySize, result.bodySize);
