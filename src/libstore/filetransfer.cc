@@ -22,6 +22,7 @@
 #include <queue>
 #include <random>
 #include <thread>
+#include <regex>
 
 using namespace std::string_literals;
 
