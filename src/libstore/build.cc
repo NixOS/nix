@@ -295,7 +295,7 @@ public:
 
     /* Make a goal (with caching). */
     GoalPtr makeDerivationGoal(const StorePath & drvPath, const StringSet & wantedOutputs, BuildMode buildMode = bmNormal);
-    std::shared_ptr<DerivationGoal> makeBasicDerivationGoal(StorePath && drvPath,
+    std::shared_ptr<DerivationGoal> makeBasicDerivationGoal(const StorePath & drvPath,
         const BasicDerivation & drv, BuildMode buildMode = bmNormal);
     GoalPtr makeSubstitutionGoal(const StorePath & storePath, RepairFlag repair = NoRepair);
 
@@ -347,7 +347,7 @@ public:
        contents. */
     bool pathContentsGood(const StorePath & path);
 
-    void markContentsGood(StorePath && path);
+    void markContentsGood(const StorePath & path);
 
     void updateProgress()
     {
@@ -900,9 +900,9 @@ private:
     friend struct RestrictedStore;
 
 public:
-    DerivationGoal(StorePath && drvPath, const StringSet & wantedOutputs,
+    DerivationGoal(const StorePath & drvPath, const StringSet & wantedOutputs,
         Worker & worker, BuildMode buildMode = bmNormal);
-    DerivationGoal(StorePath && drvPath, const BasicDerivation & drv,
+    DerivationGoal(const StorePath & drvPath, const BasicDerivation & drv,
         Worker & worker, BuildMode buildMode = bmNormal);
     ~DerivationGoal();
 
@@ -924,7 +924,7 @@ public:
 
     StorePath getDrvPath()
     {
-        return drvPath.clone();
+        return drvPath;
     }
 
     /* Add wanted outputs to an already existing derivation goal. */
@@ -1021,11 +1021,11 @@ private:
 const Path DerivationGoal::homeDir = "/homeless-shelter";
 
 
-DerivationGoal::DerivationGoal(StorePath && drvPath, const StringSet & wantedOutputs,
+DerivationGoal::DerivationGoal(const StorePath & drvPath, const StringSet & wantedOutputs,
     Worker & worker, BuildMode buildMode)
     : Goal(worker)
     , useDerivation(true)
-    , drvPath(std::move(drvPath))
+    , drvPath(drvPath)
     , wantedOutputs(wantedOutputs)
     , buildMode(buildMode)
 {
@@ -1038,11 +1038,11 @@ DerivationGoal::DerivationGoal(StorePath && drvPath, const StringSet & wantedOut
 }
 
 
-DerivationGoal::DerivationGoal(StorePath && drvPath, const BasicDerivation & drv,
+DerivationGoal::DerivationGoal(const StorePath & drvPath, const BasicDerivation & drv,
     Worker & worker, BuildMode buildMode)
     : Goal(worker)
     , useDerivation(false)
-    , drvPath(std::move(drvPath))
+    , drvPath(drvPath)
     , buildMode(buildMode)
 {
     this->drv = std::make_unique<BasicDerivation>(BasicDerivation(drv));
@@ -1193,7 +1193,7 @@ void DerivationGoal::haveDerivation()
         return;
     }
 
-    parsedDrv = std::make_unique<ParsedDerivation>(drvPath.clone(), *drv);
+    parsedDrv = std::make_unique<ParsedDerivation>(drvPath, *drv);
 
     /* We are first going to try to create the invalid output paths
        through substitutes.  If that doesn't work, we'll build
@@ -1301,7 +1301,7 @@ void DerivationGoal::repairClosure()
         if (i.isDerivation()) {
             Derivation drv = worker.store.derivationFromPath(i);
             for (auto & j : drv.outputs)
-                outputsToDrv.insert_or_assign(j.second.path.clone(), i.clone());
+                outputsToDrv.insert_or_assign(j.second.path, i);
         }
 
     /* Check each path (slow!). */
@@ -1454,7 +1454,7 @@ void DerivationGoal::tryToBuild()
         return;
     }
 
-    missingPaths = cloneStorePathSet(drv->outputPaths());
+    missingPaths = drv->outputPaths();
     if (buildMode != bmCheck)
         for (auto & i : validPaths) missingPaths.erase(i);
 
@@ -1901,14 +1901,14 @@ StorePathSet DerivationGoal::exportReferences(const StorePathSet & storePaths)
         if (!inputPaths.count(storePath))
             throw BuildError("cannot export references of path '%s' because it is not in the input closure of the derivation", worker.store.printStorePath(storePath));
 
-        worker.store.computeFSClosure(singleton(storePath), paths);
+        worker.store.computeFSClosure({storePath}, paths);
     }
 
     /* If there are derivations in the graph, then include their
        outputs as well.  This is useful if you want to do things
        like passing all build-time dependencies of some path to a
        derivation that builds a NixOS DVD image. */
-    auto paths2 = cloneStorePathSet(paths);
+    auto paths2 = paths;
 
     for (auto & j : paths2) {
         if (j.isDerivation()) {
@@ -2037,7 +2037,7 @@ void DerivationGoal::startBuilder()
             /* Write closure info to <fileName>. */
             writeFile(tmpDir + "/" + fileName,
                 worker.store.makeValidityRegistration(
-                    exportReferences(singleton(storePath)), false, false));
+                    exportReferences({storePath}), false, false));
         }
     }
 
@@ -2222,7 +2222,7 @@ void DerivationGoal::startBuilder()
             for (auto & i : missingPaths)
                 if (worker.store.isValidPath(i) && pathExists(worker.store.printStorePath(i))) {
                     addHashRewrite(i);
-                    redirectedBadOutputs.insert(i.clone());
+                    redirectedBadOutputs.insert(i);
                 }
     }
 
@@ -2717,8 +2717,8 @@ struct RestrictedStore : public LocalFSStore
     StorePathSet queryAllValidPaths() override
     {
         StorePathSet paths;
-        for (auto & p : goal.inputPaths) paths.insert(p.clone());
-        for (auto & p : goal.addedPaths) paths.insert(p.clone());
+        for (auto & p : goal.inputPaths) paths.insert(p);
+        for (auto & p : goal.addedPaths) paths.insert(p);
         return paths;
     }
 
@@ -2806,7 +2806,7 @@ struct RestrictedStore : public LocalFSStore
                 auto drv = derivationFromPath(path.path);
                 for (auto & output : drv.outputs)
                     if (wantOutput(output.first, path.outputs))
-                        newPaths.insert(output.second.path.clone());
+                        newPaths.insert(output.second.path);
             } else if (!goal.isAllowed(path.path))
                 throw InvalidPath("cannot build unknown path '%s' in recursive Nix", printStorePath(path.path));
         }
@@ -2851,7 +2851,7 @@ struct RestrictedStore : public LocalFSStore
             if (goal.isAllowed(path.path))
                 allowed.emplace_back(path);
             else
-                unknown.insert(path.path.clone());
+                unknown.insert(path.path);
         }
 
         next->queryMissing(allowed, willBuild, willSubstitute,
@@ -2946,7 +2946,7 @@ void DerivationGoal::addDependency(const StorePath & path)
 {
     if (isAllowed(path)) return;
 
-    addedPaths.insert(path.clone());
+    addedPaths.insert(path);
 
     /* If we're doing a sandbox build, then we have to make the path
        appear in the sandbox. */
@@ -3568,7 +3568,7 @@ StorePathSet parseReferenceSpecifiers(Store & store, const BasicDerivation & drv
         if (store.isStorePath(i))
             result.insert(store.parseStorePath(i));
         else if (drv.outputs.count(i))
-            result.insert(drv.outputs.find(i)->second.path.clone());
+            result.insert(drv.outputs.find(i)->second.path);
         else throw BuildError("derivation contains an illegal reference specifier '%s'", i);
     }
     return result;
@@ -3626,9 +3626,9 @@ void DerivationGoal::registerOutputs()
        output paths, and any paths that have been built via recursive
        Nix calls. */
     StorePathSet referenceablePaths;
-    for (auto & p : inputPaths) referenceablePaths.insert(p.clone());
-    for (auto & i : drv->outputs) referenceablePaths.insert(i.second.path.clone());
-    for (auto & p : addedPaths) referenceablePaths.insert(p.clone());
+    for (auto & p : inputPaths) referenceablePaths.insert(p);
+    for (auto & i : drv->outputs) referenceablePaths.insert(i.second.path);
+    for (auto & p : addedPaths) referenceablePaths.insert(p);
 
     /* Check whether the output paths were created, and grep each
        output path to determine what other paths it references.  Also make all
@@ -3827,7 +3827,7 @@ void DerivationGoal::registerOutputs()
         info.narHash = hash.first;
         info.narSize = hash.second;
         info.references = std::move(references);
-        info.deriver = drvPath.clone();
+        info.deriver = drvPath;
         info.ultimate = true;
         info.ca = ca;
         worker.store.signPathInfo(info);
@@ -3942,23 +3942,23 @@ void DerivationGoal::checkOutputs(const std::map<Path, ValidPathInfo> & outputs)
             uint64_t closureSize = 0;
             StorePathSet pathsDone;
             std::queue<StorePath> pathsLeft;
-            pathsLeft.push(path.clone());
+            pathsLeft.push(path);
 
             while (!pathsLeft.empty()) {
-                auto path = pathsLeft.front().clone();
+                auto path = pathsLeft.front();
                 pathsLeft.pop();
-                if (!pathsDone.insert(path.clone()).second) continue;
+                if (!pathsDone.insert(path).second) continue;
 
                 auto i = outputsByPath.find(worker.store.printStorePath(path));
                 if (i != outputsByPath.end()) {
                     closureSize += i->second.narSize;
                     for (auto & ref : i->second.references)
-                        pathsLeft.push(ref.clone());
+                        pathsLeft.push(ref);
                 } else {
                     auto info = worker.store.queryPathInfo(path);
                     closureSize += info->narSize;
                     for (auto & ref : info->references)
-                        pathsLeft.push(ref.clone());
+                        pathsLeft.push(ref);
                 }
             }
 
@@ -3985,8 +3985,8 @@ void DerivationGoal::checkOutputs(const std::map<Path, ValidPathInfo> & outputs)
                 auto spec = parseReferenceSpecifiers(worker.store, *drv, *value);
 
                 auto used = recursive
-                    ? cloneStorePathSet(getClosure(info.path).first)
-                    : cloneStorePathSet(info.references);
+                    ? getClosure(info.path).first
+                    : info.references;
 
                 if (recursive && checks.ignoreSelfRefs)
                     used.erase(info.path);
@@ -3996,10 +3996,10 @@ void DerivationGoal::checkOutputs(const std::map<Path, ValidPathInfo> & outputs)
                 for (auto & i : used)
                     if (allowed) {
                         if (!spec.count(i))
-                            badPaths.insert(i.clone());
+                            badPaths.insert(i);
                     } else {
                         if (spec.count(i))
-                            badPaths.insert(i.clone());
+                            badPaths.insert(i);
                     }
 
                 if (!badPaths.empty()) {
@@ -4199,7 +4199,7 @@ StorePathSet DerivationGoal::checkPathValidity(bool returnValid, bool checkHash)
         bool good =
             worker.store.isValidPath(i.second.path) &&
             (!checkHash || worker.pathContentsGood(i.second.path));
-        if (good == returnValid) result.insert(i.second.path.clone());
+        if (good == returnValid) result.insert(i.second.path);
     }
     return result;
 }
@@ -4215,7 +4215,7 @@ void DerivationGoal::addHashRewrite(const StorePath & path)
     deletePath(worker.store.printStorePath(p));
     inputRewrites[h1] = h2;
     outputRewrites[h2] = h1;
-    redirectedOutputs.insert_or_assign(path.clone(), std::move(p));
+    redirectedOutputs.insert_or_assign(path, std::move(p));
 }
 
 
@@ -4290,7 +4290,7 @@ private:
     GoalState state;
 
 public:
-    SubstitutionGoal(StorePath && storePath, Worker & worker, RepairFlag repair = NoRepair);
+    SubstitutionGoal(const StorePath & storePath, Worker & worker, RepairFlag repair = NoRepair);
     ~SubstitutionGoal();
 
     void timedOut(Error && ex) override { abort(); };
@@ -4316,13 +4316,13 @@ public:
     void handleChildOutput(int fd, const string & data) override;
     void handleEOF(int fd) override;
 
-    StorePath getStorePath() { return storePath.clone(); }
+    StorePath getStorePath() { return storePath; }
 };
 
 
-SubstitutionGoal::SubstitutionGoal(StorePath && storePath, Worker & worker, RepairFlag repair)
+SubstitutionGoal::SubstitutionGoal(const StorePath & storePath, Worker & worker, RepairFlag repair)
     : Goal(worker)
-    , storePath(std::move(storePath))
+    , storePath(storePath)
     , repair(repair)
 {
     state = &SubstitutionGoal::init;
@@ -4556,7 +4556,7 @@ void SubstitutionGoal::finished()
         return;
     }
 
-    worker.markContentsGood(storePath.clone());
+    worker.markContentsGood(storePath);
 
     printMsg(lvlChatty, "substitution of path '%s' succeeded", worker.store.printStorePath(storePath));
 
@@ -4626,10 +4626,10 @@ Worker::~Worker()
 GoalPtr Worker::makeDerivationGoal(const StorePath & path,
     const StringSet & wantedOutputs, BuildMode buildMode)
 {
-    GoalPtr goal = derivationGoals[path.clone()].lock(); // FIXME
+    GoalPtr goal = derivationGoals[path].lock(); // FIXME
     if (!goal) {
-        goal = std::make_shared<DerivationGoal>(path.clone(), wantedOutputs, *this, buildMode);
-        derivationGoals.insert_or_assign(path.clone(), goal);
+        goal = std::make_shared<DerivationGoal>(path, wantedOutputs, *this, buildMode);
+        derivationGoals.insert_or_assign(path, goal);
         wakeUp(goal);
     } else
         (dynamic_cast<DerivationGoal *>(goal.get()))->addWantedOutputs(wantedOutputs);
@@ -4637,10 +4637,10 @@ GoalPtr Worker::makeDerivationGoal(const StorePath & path,
 }
 
 
-std::shared_ptr<DerivationGoal> Worker::makeBasicDerivationGoal(StorePath && drvPath,
+std::shared_ptr<DerivationGoal> Worker::makeBasicDerivationGoal(const StorePath & drvPath,
     const BasicDerivation & drv, BuildMode buildMode)
 {
-    auto goal = std::make_shared<DerivationGoal>(std::move(drvPath), drv, *this, buildMode);
+    auto goal = std::make_shared<DerivationGoal>(drvPath, drv, *this, buildMode);
     wakeUp(goal);
     return goal;
 }
@@ -4648,10 +4648,10 @@ std::shared_ptr<DerivationGoal> Worker::makeBasicDerivationGoal(StorePath && drv
 
 GoalPtr Worker::makeSubstitutionGoal(const StorePath & path, RepairFlag repair)
 {
-    GoalPtr goal = substitutionGoals[path.clone()].lock(); // FIXME
+    GoalPtr goal = substitutionGoals[path].lock(); // FIXME
     if (!goal) {
-        goal = std::make_shared<SubstitutionGoal>(path.clone(), *this, repair);
-        substitutionGoals.insert_or_assign(path.clone(), goal);
+        goal = std::make_shared<SubstitutionGoal>(path, *this, repair);
+        substitutionGoals.insert_or_assign(path, goal);
         wakeUp(goal);
     }
     return goal;
@@ -4996,7 +4996,7 @@ bool Worker::pathContentsGood(const StorePath & path)
         Hash nullHash(htSHA256);
         res = info->narHash == nullHash || info->narHash == current.first;
     }
-    pathContentsGoodCache.insert_or_assign(path.clone(), res);
+    pathContentsGoodCache.insert_or_assign(path, res);
     if (!res)
         logError({
             .name = "Corrupted path",
@@ -5006,9 +5006,9 @@ bool Worker::pathContentsGood(const StorePath & path)
 }
 
 
-void Worker::markContentsGood(StorePath && path)
+void Worker::markContentsGood(const StorePath & path)
 {
-    pathContentsGoodCache.insert_or_assign(std::move(path), true);
+    pathContentsGoodCache.insert_or_assign(path, true);
 }
 
 
@@ -5073,7 +5073,7 @@ BuildResult LocalStore::buildDerivation(const StorePath & drvPath, const BasicDe
     BuildMode buildMode)
 {
     Worker worker(*this);
-    auto goal = worker.makeBasicDerivationGoal(drvPath.clone(), drv, buildMode);
+    auto goal = worker.makeBasicDerivationGoal(drvPath, drv, buildMode);
 
     BuildResult result;
 
@@ -5094,7 +5094,7 @@ void LocalStore::ensurePath(const StorePath & path)
     /* If the path is already valid, we're done. */
     if (isValidPath(path)) return;
 
-    primeCache(*this, {StorePathWithOutputs(path)});
+    primeCache(*this, {{path}});
 
     Worker worker(*this);
     GoalPtr goal = worker.makeSubstitutionGoal(path);

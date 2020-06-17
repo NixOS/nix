@@ -50,7 +50,6 @@ rec {
       libarchive
       boost
       nlohmann_json
-      rustc cargo
 
       # Tests
       git

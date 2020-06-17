@@ -90,13 +90,13 @@ const string LocalFSStore::drvsLogDir = "drvs";
 
 std::shared_ptr<std::string> LocalFSStore::getBuildLog(const StorePath & path_)
 {
-    auto path = path_.clone();
+    auto path = path_;
 
     if (!path.isDerivation()) {
         try {
             auto info = queryPathInfo(path);
             if (!info->deriver) return nullptr;
-            path = info->deriver->clone();
+            path = *info->deriver;
         } catch (InvalidPath &) {
             return nullptr;
         }

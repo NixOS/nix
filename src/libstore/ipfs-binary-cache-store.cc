@@ -392,9 +392,11 @@ private:
         state->ipfsPath = putIpfsDag(json);
 
         {
-            auto hashPart = storePathToHash(printStorePath(narInfo->path));
+            auto hashPart = narInfo->path.hashPart();
             auto state_(this->state.lock());
-            state_->pathInfoCache.upsert(hashPart, PathInfoCacheValue { .value = std::shared_ptr<NarInfo>(narInfo) });
+            state_->pathInfoCache.upsert(
+                std::string { hashPart },
+                PathInfoCacheValue { .value = std::shared_ptr<NarInfo>(narInfo) });
         }
     }
 
@@ -514,7 +516,7 @@ public:
         auto narObjectHash = (std::string) json["nar"][printStorePath(storePath)]["/"];
         json = getIpfsDag("/ipfs/" + narObjectHash);
 
-        NarInfo narInfo(storePath.clone());
+        NarInfo narInfo { storePath };
         narInfo.narHash = Hash((std::string) json["narHash"]);
         narInfo.narSize = json["narSize"];
 
@@ -592,7 +594,7 @@ public:
         const StorePathSet & references, RepairFlag repair) override
     {
         ValidPathInfo info(computeStorePathForText(name, s, references));
-        info.references = cloneStorePathSet(references);
+        info.references = references;
 
         if (repair || !isValidPath(info.path)) {
             StringSink sink;
