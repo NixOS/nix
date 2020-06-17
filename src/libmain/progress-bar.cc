@@ -106,23 +106,34 @@ public:
         updateThread.join();
     }
 
-    void stop()
+    void stop() override
     {
         auto state(state_.lock());
         if (!state->active) return;
         state->active = false;
-        std::string status = getStatus(*state);
         writeToStderr("\r\e[K");
-        if (status != "")
-            writeToStderr("[" + status + "]\n");
         updateCV.notify_one();
         quitCV.notify_one();
+    }
+
+    bool isVerbose() override {
+        return printBuildLogs;
     }
 
     void log(Verbosity lvl, const FormatOrString & fs) override
     {
         auto state(state_.lock());
         log(*state, lvl, fs.s);
+    }
+
+    void logEI(const ErrorInfo &ei) override
+    {
+        auto state(state_.lock());
+
+        std::stringstream oss;
+        oss << ei;
+
+        log(*state, ei.level, oss.str());
     }
 
     void log(State & state, Verbosity lvl, const std::string & s)
@@ -142,7 +153,7 @@ public:
     {
         auto state(state_.lock());
 
-        if (lvl <= verbosity && !s.empty())
+        if (lvl <= verbosity && !s.empty() && type != actBuildWaiting)
             log(*state, lvl, s + "...");
 
         state->activities.emplace_back(ActInfo());
@@ -154,7 +165,7 @@ public:
         state->activitiesByType[type].its.emplace(act, i);
 
         if (type == actBuild) {
-            auto name = storePathToName(getS(fields, 0));
+            std::string name(storePathToName(getS(fields, 0)));
             if (hasSuffix(name, ".drv"))
                 name = name.substr(0, name.size() - 4);
             i->s = fmt("building " ANSI_BOLD "%s" ANSI_NORMAL, name);
@@ -457,11 +468,17 @@ public:
     }
 };
 
+Logger * makeProgressBar(bool printBuildLogs)
+{
+    return new ProgressBar(
+        printBuildLogs,
+        isatty(STDERR_FILENO) && getEnv("TERM").value_or("dumb") != "dumb"
+    );
+}
+
 void startProgressBar(bool printBuildLogs)
 {
-    logger = new ProgressBar(
-        printBuildLogs,
-        isatty(STDERR_FILENO) && getEnv("TERM").value_or("dumb") != "dumb");
+    logger = makeProgressBar(printBuildLogs);
 }
 
 void stopProgressBar()

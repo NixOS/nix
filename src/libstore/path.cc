@@ -2,38 +2,38 @@
 
 namespace nix {
 
-extern "C" {
-    rust::Result<StorePath> ffi_StorePath_new(rust::StringSlice path, rust::StringSlice storeDir);
-    rust::Result<StorePath> ffi_StorePath_new2(unsigned char hash[20], rust::StringSlice storeDir);
-    rust::Result<StorePath> ffi_StorePath_fromBaseName(rust::StringSlice baseName);
-    rust::String ffi_StorePath_to_string(const StorePath & _this);
-    StorePath ffi_StorePath_clone(const StorePath & _this);
-    rust::StringSlice ffi_StorePath_name(const StorePath & _this);
+MakeError(BadStorePath, Error);
+
+static void checkName(std::string_view path, std::string_view name)
+{
+    if (name.empty())
+        throw BadStorePath("store path '%s' has an empty name", path);
+    if (name.size() > 211)
+        throw BadStorePath("store path '%s' has a name longer than 211 characters", path);
+    for (auto c : name)
+        if (!((c >= '0' && c <= '9')
+                || (c >= 'a' && c <= 'z')
+                || (c >= 'A' && c <= 'Z')
+                || c == '+' || c == '-' || c == '.' || c == '_' || c == '?' || c == '='))
+            throw BadStorePath("store path '%s' contains illegal character '%s'", path, c);
 }
 
-StorePath StorePath::make(std::string_view path, std::string_view storeDir)
+StorePath::StorePath(std::string_view _baseName)
+    : baseName(_baseName)
 {
-    return ffi_StorePath_new((rust::StringSlice) path, (rust::StringSlice) storeDir).unwrap();
+    if (baseName.size() < HashLen + 1)
+        throw BadStorePath("'%s' is too short to be a valid store path", baseName);
+    for (auto c : hashPart())
+        if (c == 'e' || c == 'o' || c == 'u' || c == 't'
+            || !((c >= '0' && c <= '9') || (c >= 'a' && c <= 'z')))
+            throw BadStorePath("store path '%s' contains illegal base-32 character '%s'", baseName, c);
+    checkName(baseName, name());
 }
 
-StorePath StorePath::make(unsigned char hash[20], std::string_view name)
+StorePath::StorePath(const Hash & hash, std::string_view _name)
+    : baseName((hash.to_string(Base32, false) + "-").append(std::string(_name)))
 {
-    return ffi_StorePath_new2(hash, (rust::StringSlice) name).unwrap();
-}
-
-StorePath StorePath::fromBaseName(std::string_view baseName)
-{
-    return ffi_StorePath_fromBaseName((rust::StringSlice) baseName).unwrap();
-}
-
-rust::String StorePath::to_string() const
-{
-    return ffi_StorePath_to_string(*this);
-}
-
-StorePath StorePath::clone() const
-{
-    return ffi_StorePath_clone(*this);
+    checkName(baseName, name());
 }
 
 bool StorePath::isDerivation() const
@@ -41,18 +41,14 @@ bool StorePath::isDerivation() const
     return hasSuffix(name(), drvExtension);
 }
 
-std::string_view StorePath::name() const
-{
-    return ffi_StorePath_name(*this);
-}
-
-StorePath StorePath::dummy(
-    StorePath::make(
-        (unsigned char *) "xxxxxxxxxxxxxxxxxxxx", "x"));
+StorePath StorePath::dummy("ffffffffffffffffffffffffffffffff-x");
 
 StorePath Store::parseStorePath(std::string_view path) const
 {
-    return StorePath::make(path, storeDir);
+    auto p = canonPath(std::string(path));
+    if (dirOf(p) != storeDir)
+        throw BadStorePath("path '%s' is not in the Nix store", p);
+    return StorePath(baseNameOf(p));
 }
 
 std::optional<StorePath> Store::maybeParseStorePath(std::string_view path) const
@@ -78,38 +74,13 @@ StorePathSet Store::parseStorePathSet(const PathSet & paths) const
 
 std::string Store::printStorePath(const StorePath & path) const
 {
-    auto s = storeDir + "/";
-    s += (std::string_view) path.to_string();
-    return s;
+    return (storeDir + "/").append(path.to_string());
 }
 
 PathSet Store::printStorePathSet(const StorePathSet & paths) const
 {
     PathSet res;
     for (auto & i : paths) res.insert(printStorePath(i));
-    return res;
-}
-
-StorePathSet cloneStorePathSet(const StorePathSet & paths)
-{
-    StorePathSet res;
-    for (auto & p : paths)
-        res.insert(p.clone());
-    return res;
-}
-
-StorePathSet storePathsToSet(const StorePaths & paths)
-{
-    StorePathSet res;
-    for (auto & p : paths)
-        res.insert(p.clone());
-    return res;
-}
-
-StorePathSet singleton(const StorePath & path)
-{
-    StorePathSet res;
-    res.insert(path.clone());
     return res;
 }
 
