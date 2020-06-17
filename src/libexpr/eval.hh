@@ -18,7 +18,7 @@ namespace nix {
 
 class Store;
 class EvalState;
-struct StorePath;
+class StorePath;
 enum RepairFlag : bool;
 
 
