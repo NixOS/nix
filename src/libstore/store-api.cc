@@ -1,11 +1,11 @@
 #include "crypto.hh"
+#include "fs-accessor.hh"
 #include "globals.hh"
 #include "store-api.hh"
 #include "util.hh"
 #include "nar-info-disk-cache.hh"
 #include "thread-pool.hh"
 #include "json.hh"
-#include "derivations.hh"
 #include "url.hh"
 
 #include <future>
@@ -818,6 +818,24 @@ std::string makeFixedOutputCA(FileIngestionMethod recursive, const Hash & hash)
     return "fixed:"
         + (recursive == FileIngestionMethod::Recursive ? (std::string) "r:" : "")
         + hash.to_string(Base32, true);
+}
+
+
+Derivation Store::derivationFromPath(const StorePath & drvPath)
+{
+    ensurePath(drvPath);
+    return readDerivation(drvPath);
+}
+
+
+Derivation Store::readDerivation(const StorePath & drvPath)
+{
+    auto accessor = getFSAccessor();
+    try {
+        return parseDerivation(*this, accessor->readFile(printStorePath(drvPath)));
+    } catch (FormatError & e) {
+        throw Error("error parsing derivation '%s': %s", printStorePath(drvPath), e.msg());
+    }
 }
 
 

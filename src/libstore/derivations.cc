@@ -3,7 +3,6 @@
 #include "globals.hh"
 #include "util.hh"
 #include "worker-protocol.hh"
-#include "fs-accessor.hh"
 #include "istringstream_nocopy.hh"
 
 namespace nix {
@@ -120,7 +119,7 @@ static StringSet parseStrings(std::istream & str, bool arePaths)
 }
 
 
-static Derivation parseDerivation(const Store & store, const string & s)
+Derivation parseDerivation(const Store & store, const string & s)
 {
     Derivation drv;
     istringstream_nocopy str(s);
@@ -170,34 +169,6 @@ static Derivation parseDerivation(const Store & store, const string & s)
 
     expect(str, ")");
     return drv;
-}
-
-
-Derivation readDerivation(const Store & store, const Path & drvPath)
-{
-    try {
-        return parseDerivation(store, readFile(drvPath));
-    } catch (FormatError & e) {
-        throw Error("error parsing derivation '%1%': %2%", drvPath, e.msg());
-    }
-}
-
-
-Derivation Store::derivationFromPath(const StorePath & drvPath)
-{
-    ensurePath(drvPath);
-    return readDerivation(drvPath);
-}
-
-
-Derivation Store::readDerivation(const StorePath & drvPath)
-{
-    auto accessor = getFSAccessor();
-    try {
-        return parseDerivation(*this, accessor->readFile(printStorePath(drvPath)));
-    } catch (FormatError & e) {
-        throw Error("error parsing derivation '%s': %s", printStorePath(drvPath), e.msg());
-    }
 }
 
 

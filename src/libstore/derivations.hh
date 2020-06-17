@@ -77,7 +77,7 @@ StorePath writeDerivation(ref<Store> store,
     const Derivation & drv, std::string_view name, RepairFlag repair = NoRepair);
 
 /* Read a derivation from a file. */
-Derivation readDerivation(const Store & store, const Path & drvPath);
+Derivation parseDerivation(const Store & store, const string & s);
 
 // FIXME: remove
 bool isDerivation(const string & fileName);

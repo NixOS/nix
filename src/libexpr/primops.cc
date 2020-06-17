@@ -103,7 +103,7 @@ static void prim_scopedImport(EvalState & state, const Pos & pos, Value * * args
 
     // FIXME
     if (state.store->isStorePath(path) && state.store->isValidPath(state.store->parseStorePath(path)) && isDerivation(path)) {
-        Derivation drv = readDerivation(*state.store, realPath);
+        Derivation drv = state.store->readDerivation(state.store->parseStorePath(path));
         Value & w = *state.allocValue();
         state.mkAttrs(w, 3 + drv.outputs.size());
         Value * v2 = state.allocAttr(w, state.sDrvPath);
