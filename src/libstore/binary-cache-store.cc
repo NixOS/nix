@@ -40,14 +40,14 @@ void BinaryCacheStore::init()
         upsertFile(cacheInfoFile, "StoreDir: " + storeDir + "\n", "text/x-nix-cache-info");
     } else {
         for (auto & line : tokenizeString<Strings>(*cacheInfo, "\n")) {
-            size_t colon = line.find(':');
-            if (colon == std::string::npos) continue;
+            size_t colon= line.find(':');
+            if (colon ==std::string::npos) continue;
             auto name = line.substr(0, colon);
             auto value = trim(line.substr(colon + 1, std::string::npos));
             if (name == "StoreDir") {
                 if (value != storeDir)
-                    throw Error(format("binary cache '%s' is for Nix stores with prefix '%s', not '%s'")
-                        % getUri() % value % storeDir);
+                    throw Error("binary cache '%s' is for Nix stores with prefix '%s', not '%s'",
+                        getUri(), value, storeDir);
             } else if (name == "WantMassQuery") {
                 wantMassQuery.setDefault(value == "1" ? "true" : "false");
             } else if (name == "Priority") {
@@ -287,7 +287,7 @@ void BinaryCacheStore::narFromPath(const StorePath & storePath, Sink & sink)
     try {
         getFile(info->url, *decompressor);
     } catch (NoSuchBinaryCacheFile & e) {
-        throw SubstituteGone(e.what());
+        throw SubstituteGone(e.info());
     }
 
     decompressor->finish();

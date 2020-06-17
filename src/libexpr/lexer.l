@@ -127,14 +127,14 @@ or          { return OR_KW; }
               try {
                   yylval->n = boost::lexical_cast<int64_t>(yytext);
               } catch (const boost::bad_lexical_cast &) {
-                  throw ParseError(format("invalid integer '%1%'") % yytext);
+                  throw ParseError("invalid integer '%1%'", yytext);
               }
               return INT;
             }
 {FLOAT}     { errno = 0;
               yylval->nf = strtod(yytext, 0);
               if (errno != 0)
-                  throw ParseError(format("invalid float '%1%'") % yytext);
+                  throw ParseError("invalid float '%1%'", yytext);
               return FLOAT;
             }
 
@@ -219,4 +219,3 @@ or          { return OR_KW; }
             }
 
 %%
-

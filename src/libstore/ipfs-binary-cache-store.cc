@@ -96,8 +96,8 @@ public:
             json["StoreDir"] = storeDir;
             state->ipfsPath = putIpfsDag(json);
         } else if (json["StoreDir"] != storeDir)
-            throw Error(format("binary cache '%s' is for Nix stores with prefix '%s', not '%s'")
-                % getUri() % json["StoreDir"] % storeDir);
+            throw Error("binary cache '%s' is for Nix stores with prefix '%s', not '%s'",
+                getUri(), json["StoreDir"], storeDir);
 
         if (json.find("WantMassQuery") != json.end())
             wantMassQuery.setDefault(json["WantMassQuery"] ? "true" : "false");
@@ -335,7 +335,7 @@ private:
     void writeNarInfo(ref<NarInfo> narInfo)
     {
         auto json = nlohmann::json::object();
-        json["narHash"] = narInfo->narHash.to_string(Base32);
+        json["narHash"] = narInfo->narHash.to_string(Base32, true);
         json["narSize"] = narInfo->narSize;
 
         auto narMap = getIpfsDag(getIpfsPath())["nar"];
@@ -372,7 +372,7 @@ private:
             json["url"]["/"] = std::string(narInfo->url, 7);
         }
         if (narInfo->fileHash)
-            json["downloadHash"] = narInfo->fileHash.to_string();
+            json["downloadHash"] = narInfo->fileHash.to_string(Base32, true);
         if (narInfo->fileSize)
             json["downloadSize"] = narInfo->fileSize;
 
@@ -548,7 +548,7 @@ public:
                 narInfo.sigs.insert((std::string) sig);
 
         if (json.find("url") != json.end()) {
-            narInfo.url = "/ipfs/" + json["url"]["/"];
+            narInfo.url = "/ipfs/" + json["url"]["/"].get<std::string>();
         }
 
         if (json.find("downloadHash") != json.end())

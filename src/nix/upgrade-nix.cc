@@ -68,7 +68,10 @@ struct CmdUpgradeNix : MixDryRun, StoreCommand
 
         if (dryRun) {
             stopProgressBar();
-            printError("would upgrade to version %s", version);
+            logWarning({
+                .name = "Version update",
+                .hint = hintfmt("would upgrade to version %s", version)
+            });
             return;
         }
 
@@ -94,7 +97,7 @@ struct CmdUpgradeNix : MixDryRun, StoreCommand
                 {"--profile", profileDir, "-i", store->printStorePath(storePath), "--no-sandbox"});
         }
 
-        printError(ANSI_GREEN "upgrade to version %s done" ANSI_NORMAL, version);
+        printInfo(ANSI_GREEN "upgrade to version %s done" ANSI_NORMAL, version);
     }
 
     /* Return the profile in which Nix is installed. */

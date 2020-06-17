@@ -73,6 +73,18 @@ struct TunnelLogger : public Logger
         enqueueMsg(*buf.s);
     }
 
+    void logEI(const ErrorInfo & ei) override
+    {
+        if (ei.level > verbosity) return;
+
+        std::stringstream oss;
+        oss << ei;
+
+        StringSink buf;
+        buf << STDERR_NEXT << oss.str() << "\n"; // (fs.s + "\n");
+        enqueueMsg(*buf.s);
+    }
+
     /* startWork() means that we're starting an operation for which we
       want to send out stderr to the client. */
     void startWork()
@@ -329,8 +341,7 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
     case wopQueryDerivationOutputNames: {
         auto path = store->parseStorePath(readString(from));
         logger->startWork();
-        StringSet names;
-        names = store->queryDerivationOutputNames(path);
+        auto names = store->readDerivation(path).outputNames();
         logger->stopWork();
         to << names;
         break;
@@ -745,7 +756,7 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
     }
 
     default:
-        throw Error(format("invalid operation %1%") % op);
+        throw Error("invalid operation %1%", op);
     }
 }
 
