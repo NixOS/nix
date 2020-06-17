@@ -119,7 +119,7 @@ DOWNLOAD_LOCATION=$(nix-build ./fixed.nix -A good \
 ################################################################################
 
 # First I have to publish:
-IPNS_ID=$(ipfs name publish $IPFS_HASH --allow-offline | awk '{print substr($3,1,length($3)-1)}')
+IPNS_ID=$(ipfs name publish $EMPTY_DIR_HASH --allow-offline | awk '{print substr($3,1,length($3)-1)}')
 
 # Check that we can upload the ipns store directly
 nix copy --to ipns://$IPNS_ID $(nix-build ./fixed.nix -A good) --experimental-features nix-command
