@@ -27,28 +27,6 @@ void DerivationOutput::parseHashInfo(FileIngestionMethod & recursive, Hash & has
 }
 
 
-BasicDerivation::BasicDerivation(const BasicDerivation & other)
-    : platform(other.platform)
-    , builder(other.builder)
-    , args(other.args)
-    , env(other.env)
-{
-    for (auto & i : other.outputs)
-        outputs.insert_or_assign(i.first,
-            DerivationOutput(i.second.path.clone(), std::string(i.second.hashAlgo), std::string(i.second.hash)));
-    for (auto & i : other.inputSrcs)
-        inputSrcs.insert(i.clone());
-}
-
-
-Derivation::Derivation(const Derivation & other)
-    : BasicDerivation(other)
-{
-    for (auto & i : other.inputDrvs)
-        inputDrvs.insert_or_assign(i.first.clone(), i.second);
-}
-
-
 const StorePath & BasicDerivation::findOutput(std::string_view id) const
 {
     auto i = outputs.find(id);
@@ -67,9 +45,9 @@ bool BasicDerivation::isBuiltin() const
 StorePath writeDerivation(ref<Store> store,
     const Derivation & drv, std::string_view name, RepairFlag repair)
 {
-    auto references = cloneStorePathSet(drv.inputSrcs);
+    auto references = drv.inputSrcs;
     for (auto & i : drv.inputDrvs)
-        references.insert(i.first.clone());
+        references.insert(i.first);
     /* Note that the outputs of a derivation are *not* references
        (that can be missing (of course) and should not necessarily be
        held during a garbage collection). */
@@ -155,7 +133,11 @@ static Derivation parseDerivation(const Store & store, std::string_view s)
         expect(str, ","); auto hashAlgo = parseString(str);
         expect(str, ","); auto hash = parseString(str);
         expect(str, ")");
-        drv.outputs.emplace(id, DerivationOutput(std::move(path), std::move(hashAlgo), std::move(hash)));
+        drv.outputs.emplace(id, DerivationOutput {
+            .path = std::move(path),
+            .hashAlgo = std::move(hashAlgo),
+            .hash = std::move(hash)
+        });
     }
 
     /* Parse the list of input derivations. */
@@ -383,7 +365,7 @@ Hash hashDerivationModulo(Store & store, const Derivation & drv, bool maskOutput
         auto h = drvHashes.find(i.first);
         if (h == drvHashes.end()) {
             assert(store.isValidPath(i.first));
-            h = drvHashes.insert_or_assign(i.first.clone(), hashDerivationModulo(store,
+            h = drvHashes.insert_or_assign(i.first, hashDerivationModulo(store,
                 store.readDerivation(i.first), false)).first;
         }
         inputs2.insert_or_assign(h->second.to_string(Base16, false), i.second);
@@ -411,7 +393,7 @@ StorePathSet BasicDerivation::outputPaths() const
 {
     StorePathSet paths;
     for (auto & i : outputs)
-        paths.insert(i.second.path.clone());
+        paths.insert(i.second.path);
     return paths;
 }
 
@@ -434,7 +416,11 @@ Source & readDerivation(Source & in, const Store & store, BasicDerivation & drv)
         auto path = store.parseStorePath(readString(in));
         auto hashAlgo = readString(in);
         auto hash = readString(in);
-        drv.outputs.emplace(name, DerivationOutput(std::move(path), std::move(hashAlgo), std::move(hash)));
+        drv.outputs.emplace(name, DerivationOutput {
+            .path = std::move(path),
+            .hashAlgo = std::move(hashAlgo),
+            .hash = std::move(hash)
+        });
     }
 
     drv.inputSrcs = readStorePaths<StorePathSet>(store, in);

@@ -55,7 +55,7 @@ void EvalState::realiseContext(const PathSet & context)
         if (!store->isValidPath(ctx))
             throw InvalidPathError(store->printStorePath(ctx));
         if (!decoded.second.empty() && ctx.isDerivation()) {
-            drvs.push_back(StorePathWithOutputs{ctx.clone(), { std::string { decoded.second } }});
+            drvs.push_back(StorePathWithOutputs{ctx, { std::string { decoded.second } }});
 
             /* Add the output of this derivation to the allowed
                paths. */
@@ -723,9 +723,9 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
             StorePathSet refs;
             state.store->computeFSClosure(state.store->parseStorePath(std::string_view(path).substr(1)), refs);
             for (auto & j : refs) {
-                drv.inputSrcs.insert(j.clone());
+                drv.inputSrcs.insert(j);
                 if (j.isDerivation())
-                    drv.inputDrvs[j.clone()] = state.store->readDerivation(j).outputNames();
+                    drv.inputDrvs[j] = state.store->readDerivation(j).outputNames();
             }
         }
 
@@ -792,7 +792,7 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
         for (auto & i : outputs) {
             if (!jsonObject) drv.env[i] = "";
             drv.outputs.insert_or_assign(i,
-                DerivationOutput(StorePath::dummy.clone(), "", ""));
+                DerivationOutput { StorePath::dummy, "", "" });
         }
 
         Hash h = hashDerivationModulo(*state.store, Derivation(drv), true);
@@ -801,7 +801,7 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
             auto outPath = state.store->makeOutputPath(i, h, drvName);
             if (!jsonObject) drv.env[i] = state.store->printStorePath(outPath);
             drv.outputs.insert_or_assign(i,
-                DerivationOutput(std::move(outPath), "", ""));
+                DerivationOutput { std::move(outPath), "", "" });
         }
     }
 
@@ -814,7 +814,7 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
     /* Optimisation, but required in read-only mode! because in that
        case we don't actually write store derivations, so we can't
        read them later. */
-    drvHashes.insert_or_assign(drvPath.clone(),
+    drvHashes.insert_or_assign(drvPath,
         hashDerivationModulo(*state.store, Derivation(drv), false));
 
     state.mkAttrs(v, 1 + drv.outputs.size());

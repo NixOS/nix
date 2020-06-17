@@ -4,7 +4,7 @@
 namespace nix {
 
 NarInfo::NarInfo(const Store & store, std::string_view s, std::string_view whence)
-    : ValidPathInfo(StorePath::dummy.clone()) // FIXME: hack
+    : ValidPathInfo(StorePath(StorePath::dummy)) // FIXME: hack
 {
     auto corrupt = [&]() {
         throw Error("NAR info file '%1%' is corrupt", whence);
@@ -56,11 +56,11 @@ NarInfo::NarInfo(const Store & store, std::string_view s, std::string_view whenc
             auto refs = tokenizeString<Strings>(value, " ");
             if (!references.empty()) corrupt();
             for (auto & r : refs)
-                references.insert(StorePath::fromBaseName(r));
+                references.insert(StorePath(r));
         }
         else if (name == "Deriver") {
             if (value != "unknown-deriver")
-                deriver = StorePath::fromBaseName(value);
+                deriver = StorePath(value);
         }
         else if (name == "System")
             system = value;

@@ -12,7 +12,7 @@ class ParsedDerivation
 
 public:
 
-    ParsedDerivation(StorePath && drvPath, BasicDerivation & drv);
+    ParsedDerivation(const StorePath & drvPath, BasicDerivation & drv);
 
     ~ParsedDerivation();
 

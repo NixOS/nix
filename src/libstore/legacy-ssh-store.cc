@@ -256,7 +256,7 @@ struct LegacySSHStore : public Store
         conn->to.flush();
 
         for (auto & i : readStorePaths<StorePathSet>(*this, conn->from))
-            out.insert(i.clone());
+            out.insert(i);
     }
 
     StorePathSet queryValidPaths(const StorePathSet & paths,

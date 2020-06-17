@@ -212,9 +212,7 @@ static bool isPrebuilt(EvalState & state, DrvInfo & elem)
 {
     auto path = state.store->parseStorePath(elem.queryOutPath());
     if (state.store->isValidPath(path)) return true;
-    StorePathSet paths;
-    paths.insert(path.clone()); // FIXME: why doesn't StorePathSet{path.clone()} work?
-    return state.store->querySubstitutablePaths(paths).count(path);
+    return state.store->querySubstitutablePaths({path}).count(path);
 }
 
 
@@ -425,9 +423,9 @@ static void printMissing(EvalState & state, DrvInfos & elems)
     for (auto & i : elems) {
         Path drvPath = i.queryDrvPath();
         if (drvPath != "")
-            targets.emplace_back(state.store->parseStorePath(drvPath));
+            targets.push_back({state.store->parseStorePath(drvPath)});
         else
-            targets.emplace_back(state.store->parseStorePath(i.queryOutPath()));
+            targets.push_back({state.store->parseStorePath(i.queryOutPath())});
     }
 
     printMissing(state.store, targets);
@@ -697,13 +695,13 @@ static void opSet(Globals & globals, Strings opFlags, Strings opArgs)
         drv.setName(globals.forceName);
 
     if (drv.queryDrvPath() != "") {
-        std::vector<StorePathWithOutputs> paths{globals.state->store->parseStorePath(drv.queryDrvPath())};
+        std::vector<StorePathWithOutputs> paths{{globals.state->store->parseStorePath(drv.queryDrvPath())}};
         printMissing(globals.state->store, paths);
         if (globals.dryRun) return;
         globals.state->store->buildPaths(paths, globals.state->repair ? bmRepair : bmNormal);
     } else {
         printMissing(globals.state->store,
-            {globals.state->store->parseStorePath(drv.queryOutPath())});
+            {{globals.state->store->parseStorePath(drv.queryOutPath())}});
         if (globals.dryRun) return;
         globals.state->store->ensurePath(globals.state->store->parseStorePath(drv.queryOutPath()));
     }

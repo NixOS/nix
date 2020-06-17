@@ -189,8 +189,9 @@ struct ValidPathInfo
 
     Strings shortRefs() const;
 
+    ValidPathInfo(const StorePath & path) : path(path) { }
+
     ValidPathInfo(StorePath && path) : path(std::move(path)) { }
-    explicit ValidPathInfo(const ValidPathInfo & other);
 
     virtual ~ValidPathInfo() { }
 };
@@ -729,10 +730,6 @@ public:
 
     std::shared_ptr<std::string> getBuildLog(const StorePath & path) override;
 };
-
-
-/* Extract the hash part of the given store path. */
-string storePathToHash(PathView path);
 
 
 /* Copy a path from one store to another. */

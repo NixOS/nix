@@ -621,7 +621,7 @@ uint64_t LocalStore::addValidPath(State & state,
 
     {
         auto state_(Store::state.lock());
-        state_->pathInfoCache.upsert(storePathToHash(printStorePath(info.path)),
+        state_->pathInfoCache.upsert(std::string(info.path.hashPart()),
             PathInfoCacheValue{ .value = std::make_shared<const ValidPathInfo>(info) });
     }
 
@@ -633,7 +633,7 @@ void LocalStore::queryPathInfoUncached(const StorePath & path,
     Callback<std::shared_ptr<const ValidPathInfo>> callback) noexcept
 {
     try {
-        auto info = std::make_shared<ValidPathInfo>(path.clone());
+        auto info = std::make_shared<ValidPathInfo>(path);
 
         callback(retrySQLite<std::shared_ptr<ValidPathInfo>>([&]() {
             auto state(_state.lock());
@@ -723,7 +723,7 @@ StorePathSet LocalStore::queryValidPaths(const StorePathSet & paths, SubstituteF
 {
     StorePathSet res;
     for (auto & i : paths)
-        if (isValidPath(i)) res.insert(i.clone());
+        if (isValidPath(i)) res.insert(i);
     return res;
 }
 
@@ -793,7 +793,7 @@ StorePathSet LocalStore::queryDerivationOutputs(const StorePath & path)
 
 std::optional<StorePath> LocalStore::queryPathFromHashPart(std::string_view hashPart)
 {
-    if (hashPart.size() != storePathHashLen) throw Error("invalid hash part");
+    if (hashPart.size() != StorePath::HashLen) throw Error("invalid hash part");
 
     Path prefix = Path { storeDir } << "/" << hashPart;
 
@@ -818,7 +818,7 @@ StorePathSet LocalStore::querySubstitutablePaths(const StorePathSet & paths)
 
     StorePathSet remaining;
     for (auto & i : paths)
-        remaining.insert(i.clone());
+        remaining.insert(i);
 
     StorePathSet res;
 
@@ -832,9 +832,9 @@ StorePathSet LocalStore::querySubstitutablePaths(const StorePathSet & paths)
         StorePathSet remaining2;
         for (auto & path : remaining)
             if (valid.count(path))
-                res.insert(path.clone());
+                res.insert(path);
             else
-                remaining2.insert(path.clone());
+                remaining2.insert(path);
 
         std::swap(remaining, remaining2);
     }
@@ -856,9 +856,9 @@ void LocalStore::querySubstitutablePathInfos(const StorePathSet & paths,
                 auto info = sub->queryPathInfo(path);
                 auto narInfo = std::dynamic_pointer_cast<const NarInfo>(
                     std::shared_ptr<const ValidPathInfo>(info));
-                infos.insert_or_assign(path.clone(), SubstitutablePathInfo{
-                    info->deriver ? info->deriver->clone() : std::optional<StorePath>(),
-                    cloneStorePathSet(info->references),
+                infos.insert_or_assign(path, SubstitutablePathInfo{
+                    info->deriver,
+                    info->references,
                     narInfo ? narInfo->fileSize : 0,
                     info->narSize});
             } catch (InvalidPath &) {
@@ -902,7 +902,7 @@ void LocalStore::registerValidPaths(const ValidPathInfos & infos)
                 updatePathInfo(*state, i);
             else
                 addValidPath(*state, i, false);
-            paths.insert(i.path.clone());
+            paths.insert(i.path);
         }
 
         for (auto & i : infos) {
@@ -944,7 +944,7 @@ void LocalStore::invalidatePath(State & state, const StorePath & path)
 
     {
         auto state_(Store::state.lock());
-        state_->pathInfoCache.erase(storePathToHash(printStorePath(path)));
+        state_->pathInfoCache.erase(std::string(path.hashPart()));
     }
 }
 
@@ -996,7 +996,7 @@ void LocalStore::addToStore(const ValidPathInfo & info, Source & source,
             if (info.ca == "" || !info.references.count(info.path))
                 hashSink = std::make_unique<HashSink>(htSHA256);
             else
-                hashSink = std::make_unique<HashModuloSink>(htSHA256, storePathToHash(printStorePath(info.path)));
+                hashSink = std::make_unique<HashModuloSink>(htSHA256, std::string(info.path.hashPart()));
 
             LambdaSource wrapperSource([&](unsigned char * data, size_t len) -> size_t {
                 size_t n = source.read(data, len);
@@ -1076,7 +1076,7 @@ StorePath LocalStore::addToStoreFromDump(std::string_view dump, std::string_view
 
             optimisePath(realPath); // FIXME: combine with hashPath()
 
-            ValidPathInfo info(dstPath.clone());
+            ValidPathInfo info(dstPath);
             info.narHash = hash.first;
             info.narSize = hash.second;
             info.ca = makeFixedOutputCA(method, h);
@@ -1139,10 +1139,10 @@ StorePath LocalStore::addTextToStore(std::string_view name, std::string_view s,
 
             optimisePath(realPath);
 
-            ValidPathInfo info(dstPath.clone());
+            ValidPathInfo info(dstPath);
             info.narHash = narHash;
             info.narSize = sink.s->size();
-            info.references = cloneStorePathSet(references);
+            info.references = references;
             info.ca = "text:" + hash.to_string(Base32, true);
             registerValidPath(info);
         }
@@ -1257,7 +1257,7 @@ bool LocalStore::verifyStore(bool checkContents, RepairFlag repair)
                 if (info->ca == "" || !info->references.count(info->path))
                     hashSink = std::make_unique<HashSink>(info->narHash.type);
                 else
-                    hashSink = std::make_unique<HashModuloSink>(info->narHash.type, storePathToHash(printStorePath(info->path)));
+                    hashSink = std::make_unique<HashModuloSink>(info->narHash.type, std::string(info->path.hashPart()));
 
                 dumpPath(Store::toRealPath(i), *hashSink);
                 auto current = hashSink->finish();

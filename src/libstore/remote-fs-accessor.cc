@@ -19,7 +19,7 @@ RemoteFSAccessor::RemoteFSAccessor(ref<Store> store, PathView cacheDir)
 Path RemoteFSAccessor::makeCacheFile(PathView storePath, std::string_view ext)
 {
     assert(cacheDir != "");
-    return fmt("%s/%s.%s", cacheDir, storePathToHash(storePath), ext);
+    return fmt("%s/%s.%s", cacheDir, store->parseStorePath(storePath).hashPart(), ext);
 }
 
 void RemoteFSAccessor::addToCache(PathView storePath, std::string_view nar,

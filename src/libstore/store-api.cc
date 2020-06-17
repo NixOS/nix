@@ -55,15 +55,7 @@ StorePath Store::followLinksToStorePath(std::string_view path) const
 StorePathWithOutputs Store::followLinksToStorePathWithOutputs(std::string_view path) const
 {
     auto [path2, outputs] = nix::parsePathWithOutputs(path);
-    return StorePathWithOutputs(followLinksToStorePath(path2), std::move(outputs));
-}
-
-
-string storePathToHash(PathView path)
-{
-    auto base = baseNameOf(path);
-    assert(base.size() >= storePathHashLen);
-    return string(base, 0, storePathHashLen);
+    return StorePathWithOutputs { followLinksToStorePath(path2), std::move(outputs) };
 }
 
 
@@ -144,7 +136,7 @@ StorePath Store::makeStorePath(std::string_view type,
     /* e.g., "source:sha256:1abc...:/nix/store:foo.tar.gz" */
     string s = std::string { type } << ":" << hash.to_string(Base16, true) << ":" << storeDir << ":" << name;
     auto h = compressHash(hashString(htSHA256, s), 20);
-    return StorePath::make(h.hash, name);
+    return StorePath(h, name);
 }
 
 
@@ -243,7 +235,7 @@ bool Store::PathInfoCacheValue::isKnownNow()
 
 bool Store::isValidPath(const StorePath & storePath)
 {
-    auto hashPart = storePathToHash(printStorePath(storePath));
+    std::string hashPart(storePath.hashPart());
 
     {
         auto state_(state.lock());
@@ -311,7 +303,7 @@ void Store::queryPathInfo(const StorePath & storePath,
     std::string hashPart;
 
     try {
-        hashPart = storePathToHash(printStorePath(storePath));
+        hashPart = storePath.hashPart();
 
         {
             auto res = state.lock()->pathInfoCache.get(hashPart);
@@ -553,7 +545,7 @@ void Store::buildPaths(const std::vector<StorePathWithOutputs> & paths, BuildMod
     for (auto & path : paths) {
         if (path.path.isDerivation())
             unsupported("buildPaths");
-        paths2.insert(path.path.clone());
+        paths2.insert(path.path);
     }
 
     if (queryValidPaths(paths2).size() != paths2.size())
@@ -693,21 +685,6 @@ void copyClosure(ref<Store> srcStore, ref<Store> dstStore,
 }
 
 
-ValidPathInfo::ValidPathInfo(const ValidPathInfo & other)
-    : path(other.path.clone())
-    , deriver(other.deriver ? other.deriver->clone(): std::optional<StorePath>{})
-    , narHash(other.narHash)
-    , references(cloneStorePathSet(other.references))
-    , registrationTime(other.registrationTime)
-    , narSize(other.narSize)
-    , id(other.id)
-    , ultimate(other.ultimate)
-    , sigs(other.sigs)
-    , ca(other.ca)
-{
-}
-
-
 std::optional<ValidPathInfo> decodeValidPathInfo(const Store & store, std::istream & str, bool hashGiven)
 {
     std::string path;
@@ -793,7 +770,7 @@ bool ValidPathInfo::isContentAddressed(const Store & store) const
     else if (hasPrefix(ca, "fixed:")) {
         FileIngestionMethod recursive { ca.compare(6, 2, "r:") == 0 };
         Hash hash(ca.substr(recursive == FileIngestionMethod::Recursive ? 8 : 6));
-        auto refs = cloneStorePathSet(references);
+        auto refs = references;
         bool hasSelfReference = false;
         if (refs.count(path)) {
             hasSelfReference = true;

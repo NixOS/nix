@@ -128,7 +128,7 @@ Path LocalFSStore::addPermRoot(const StorePath & storePath,
        gcroots directory. */
     if (settings.checkRootReachability) {
         auto roots = findRoots(false);
-        if (roots[storePath.clone()].count(gcRoot) == 0)
+        if (roots[storePath].count(gcRoot) == 0)
             logWarning({
                 .name = "GC root",
                 .hint = hintfmt("warning: '%1%' is not in a directory where the garbage collector looks for roots; "
@@ -478,9 +478,9 @@ void LocalStore::findRuntimeRoots(Roots & roots, bool censor)
         if (!isValidPath(path)) continue;
         debug("got additional root '%1%'", pathS);
         if (censor)
-            roots[path.clone()].insert(censored);
+            roots[path].insert(censored);
         else
-            roots[path.clone()].insert(links.begin(), links.end());
+            roots[path].insert(links.begin(), links.end());
     }
 }
 
@@ -592,11 +592,11 @@ bool LocalStore::canReachRoot(GCState & state, StorePathSet & visited, const Sto
 
     if (state.roots.count(path)) {
         debug("cannot delete '%1%' because it's a root", printStorePath(path));
-        state.alive.insert(path.clone());
+        state.alive.insert(path);
         return true;
     }
 
-    visited.insert(path.clone());
+    visited.insert(path);
 
     if (!isValidPath(path)) return false;
 
@@ -610,7 +610,7 @@ bool LocalStore::canReachRoot(GCState & state, StorePathSet & visited, const Sto
     if (state.gcKeepDerivations && path.isDerivation()) {
         for (auto & i : queryDerivationOutputs(path))
             if (isValidPath(i) && queryPathInfo(i)->deriver == path)
-                incoming.insert(i.clone());
+                incoming.insert(i);
     }
 
     /* If keep-outputs is set, then don't delete this path if there
@@ -618,13 +618,13 @@ bool LocalStore::canReachRoot(GCState & state, StorePathSet & visited, const Sto
     if (state.gcKeepOutputs) {
         auto derivers = queryValidDerivers(path);
         for (auto & i : derivers)
-            incoming.insert(i.clone());
+            incoming.insert(i);
     }
 
     for (auto & i : incoming)
         if (i != path)
             if (canReachRoot(state, visited, i)) {
-                state.alive.insert(path.clone());
+                state.alive.insert(path);
                 return true;
             }
 
@@ -668,7 +668,7 @@ void LocalStore::tryToDelete(GCState & state, PathView path)
            ‘nix-store --delete’ doesn't have the unexpected effect of
            recursing into derivations and outputs. */
         for (auto & i : visited)
-            state.dead.insert(i.clone());
+            state.dead.insert(i);
         if (state.shouldDelete)
             deletePathRecursive(state, path);
     }
@@ -754,7 +754,7 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
     if (!options.ignoreLiveness)
         findRootsNoTemp(rootMap, true);
 
-    for (auto & i : rootMap) state.roots.insert(i.first.clone());
+    for (auto & i : rootMap) state.roots.insert(i.first);
 
     /* Read the temporary roots.  This acquires read locks on all
        per-process temporary root files.  So after this point no paths
@@ -763,8 +763,8 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
     Roots tempRoots;
     findTempRoots(fds, tempRoots, true);
     for (auto & root : tempRoots) {
-        state.tempRoots.insert(root.first.clone());
-        state.roots.insert(root.first.clone());
+        state.tempRoots.insert(root.first);
+        state.roots.insert(root.first);
     }
 
     /* After this point the set of roots or temporary roots cannot
