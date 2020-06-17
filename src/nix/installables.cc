@@ -440,6 +440,16 @@ ref<eval_cache::EvalCache> openEvalCache(
         }));
 }
 
+static std::string showAttrPaths(const std::vector<std::string> & paths)
+{
+    std::string s;
+    for (const auto & [n, i] : enumerate(paths)) {
+        if (n > 0) s += n + 1 == paths.size() ? " or " : ", ";
+        s += '\''; s += i; s += '\'';
+    }
+    return s;
+}
+
 std::tuple<std::string, FlakeRef, InstallableValue::DerivationInfo> InstallableFlake::toDerivation()
 {
 
@@ -477,7 +487,7 @@ std::tuple<std::string, FlakeRef, InstallableValue::DerivationInfo> InstallableF
     }
 
     throw Error("flake '%s' does not provide attribute %s",
-        flakeRef, concatStringsSep(", ", quoteStrings(attrPaths)));
+        flakeRef, showAttrPaths(getActualAttrPaths()));
 }
 
 std::vector<InstallableValue::DerivationInfo> InstallableFlake::toDerivations()
@@ -505,7 +515,7 @@ std::pair<Value *, Pos> InstallableFlake::toValue(EvalState & state)
     }
 
     throw Error("flake '%s' does not provide attribute %s",
-        flakeRef, concatStringsSep(", ", quoteStrings(attrPaths)));
+        flakeRef, showAttrPaths(getActualAttrPaths()));
 }
 
 std::vector<std::pair<std::shared_ptr<eval_cache::AttrCursor>, std::string>>
