@@ -308,18 +308,17 @@ StorePathSet RemoteStore::querySubstitutablePaths(const StorePathSet & paths)
 }
 
 
-void RemoteStore::querySubstitutablePathInfos(const StorePathSet & paths,
-    SubstitutablePathInfos & infos, std::map<std::string, std::string> pathsCA)
+void RemoteStore::querySubstitutablePathInfos(const StorePathCAMap & pathsMap, SubstitutablePathInfos & infos)
 {
-    if (paths.empty()) return;
+    if (pathsMap.empty()) return;
 
     auto conn(getConnection());
 
     if (GET_PROTOCOL_MINOR(conn->daemonVersion) < 12) {
 
-        for (auto & i : paths) {
+        for (auto & i : pathsMap) {
             SubstitutablePathInfo info;
-            conn->to << wopQuerySubstitutablePathInfo << printStorePath(i);
+            conn->to << wopQuerySubstitutablePathInfo << printStorePath(i.first);
             conn.processStderr();
             unsigned int reply = readInt(conn->from);
             if (reply == 0) continue;
@@ -329,12 +328,15 @@ void RemoteStore::querySubstitutablePathInfos(const StorePathSet & paths,
             info.references = readStorePaths<StorePathSet>(*this, conn->from);
             info.downloadSize = readLongLong(conn->from);
             info.narSize = readLongLong(conn->from);
-            infos.insert_or_assign(i, std::move(info));
+            infos.insert_or_assign(i.first, std::move(info));
         }
 
     } else {
 
         conn->to << wopQuerySubstitutablePathInfos;
+        StorePathSet paths;
+        for (auto & path : pathsMap)
+            paths.insert(path.first);
         writeStorePaths(*this, conn->to, paths);
         conn.processStderr();
         size_t count = readNum<size_t>(conn->from);

@@ -178,10 +178,7 @@ void Store::queryMissing(const std::vector<StorePathWithOutputs> & targets,
         auto outPath = parseStorePath(outPathS);
 
         SubstitutablePathInfos infos;
-        std::map<std::string, std::string> pathsCA = {};
-        if (auto ca = getDerivationCA(*drv))
-            pathsCA.insert({outPathS, *ca});
-        querySubstitutablePathInfos({outPath}, infos, pathsCA);
+        querySubstitutablePathInfos({{outPath, getDerivationCA(*drv)}}, infos);
 
         if (infos.empty()) {
             drvState_->lock()->done = true;
@@ -238,7 +235,7 @@ void Store::queryMissing(const std::vector<StorePathWithOutputs> & targets,
             if (isValidPath(path.path)) return;
 
             SubstitutablePathInfos infos;
-            querySubstitutablePathInfos({path.path}, infos);
+            querySubstitutablePathInfos({{path.path, std::nullopt}}, infos);
 
             if (infos.empty()) {
                 auto state(state_.lock());

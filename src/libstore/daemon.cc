@@ -593,7 +593,7 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
         auto path = store->parseStorePath(readString(from));
         logger->startWork();
         SubstitutablePathInfos infos;
-        store->querySubstitutablePathInfos({path}, infos);
+        store->querySubstitutablePathInfos({{path, std::nullopt}}, infos);
         logger->stopWork();
         auto i = infos.find(path);
         if (i == infos.end())
@@ -612,7 +612,10 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
         auto paths = readStorePaths<StorePathSet>(*store, from);
         logger->startWork();
         SubstitutablePathInfos infos;
-        store->querySubstitutablePathInfos(paths, infos);
+        StorePathCAMap pathsMap = {};
+        for (auto & path : paths)
+            pathsMap.emplace(path, std::nullopt);
+        store->querySubstitutablePathInfos(pathsMap, infos);
         logger->stopWork();
         to << infos.size();
         for (auto & i : infos) {

@@ -841,22 +841,20 @@ StorePathSet LocalStore::querySubstitutablePaths(const StorePathSet & paths)
 }
 
 
-void LocalStore::querySubstitutablePathInfos(const StorePathSet & paths,
-    SubstitutablePathInfos & infos, std::map<std::string, std::string> pathsCA)
+void LocalStore::querySubstitutablePathInfos(const StorePathCAMap & paths, SubstitutablePathInfos & infos)
 {
     if (!settings.useSubstitutes) return;
     for (auto & sub : getDefaultSubstituters()) {
         for (auto & path : paths) {
-            auto subPath(path);
+            auto subPath(path.first);
 
-            auto ca = pathsCA.find(printStorePath(path));
             // recompute store path so that we can use a different store root
-            if (ca != pathsCA.end() && (hasPrefix(ca->second, "fixed:") || hasPrefix(ca->second, "text:"))) {
-                subPath = makeFixedOutputPathFromCA(path.name(), ca->second);
+            if (path.second && (hasPrefix(*path.second, "fixed:") || hasPrefix(*path.second, "text:"))) {
+                subPath = makeFixedOutputPathFromCA(path.first.name(), *path.second);
                 if (sub->storeDir == storeDir)
-                    assert(subPath == path);
-                if (subPath != path)
-                    debug("replaced path '%s' with '%s' for substituter '%s'", printStorePath(path), sub->printStorePath(subPath), sub->getUri());
+                    assert(subPath == path.first);
+                if (subPath != path.first)
+                    debug("replaced path '%s' with '%s' for substituter '%s'", printStorePath(path.first), sub->printStorePath(subPath), sub->getUri());
             } else if (sub->storeDir != storeDir) continue;
 
             debug("checking substituter '%s' for path '%s'", sub->getUri(), sub->printStorePath(subPath));
@@ -868,7 +866,7 @@ void LocalStore::querySubstitutablePathInfos(const StorePathSet & paths,
 
                 auto narInfo = std::dynamic_pointer_cast<const NarInfo>(
                     std::shared_ptr<const ValidPathInfo>(info));
-                infos.insert_or_assign(path, SubstitutablePathInfo{
+                infos.insert_or_assign(path.first, SubstitutablePathInfo{
                     info->deriver,
                     info->references,
                     narInfo ? narInfo->fileSize : 0,

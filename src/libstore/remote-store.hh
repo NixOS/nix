@@ -55,8 +55,8 @@ public:
 
     StorePathSet querySubstitutablePaths(const StorePathSet & paths) override;
 
-    void querySubstitutablePathInfos(const StorePathSet & paths,
-        SubstitutablePathInfos & infos, std::map<std::string, std::string> pathsCA = {}) override;
+    void querySubstitutablePathInfos(const StorePathCAMap & paths,
+        SubstitutablePathInfos & infos) override;
 
     void addToStore(const ValidPathInfo & info, Source & nar,
         RepairFlag repair, CheckSigsFlag checkSigs,
