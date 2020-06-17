@@ -324,6 +324,8 @@ struct curlFileTransfer : public FileTransfer
             curl_easy_setopt(req, CURLOPT_LOW_SPEED_LIMIT, 1L);
             curl_easy_setopt(req, CURLOPT_LOW_SPEED_TIME, fileTransferSettings.stalledDownloadTimeout.get());
 
+            curl_easy_setopt(req, CURLOPT_EXPECT_100_TIMEOUT_MS, 300000);
+
             /* If no file exist in the specified path, curl continues to work
                anyway as if netrc support was disabled. */
             curl_easy_setopt(req, CURLOPT_NETRC_FILE, settings.netrcFile.get().c_str());

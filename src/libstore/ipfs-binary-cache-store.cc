@@ -85,7 +85,7 @@ public:
         // Resolve the IPNS name to an IPFS object
         if (optIpnsPath) {
             auto ipnsPath = *optIpnsPath;
-            initialIpfsPath = resolveIPNSName(ipnsPath, true);
+            initialIpfsPath = resolveIPNSName(ipnsPath);
             state->ipfsPath = initialIpfsPath;
         }
 
@@ -172,9 +172,9 @@ private:
     }
 
     // Resolve the IPNS name to an IPFS object
-    std::string resolveIPNSName(std::string ipnsPath, bool offline) {
+    std::string resolveIPNSName(std::string ipnsPath) {
         debug("Resolving IPFS object of '%s', this could take a while.", ipnsPath);
-        auto uri = daemonUri + "/api/v0/name/resolve?offline=" + (offline?"true":"false") + "&arg=" + getFileTransfer()->urlEncode(ipnsPath);
+        auto uri = daemonUri + "/api/v0/name/resolve?arg=" + getFileTransfer()->urlEncode(ipnsPath);
         FileTransferRequest request(uri);
         request.post = true;
         request.tries = 1;
@@ -199,7 +199,7 @@ public:
 
         auto ipnsPath = *optIpnsPath;
 
-        auto resolvedIpfsPath = resolveIPNSName(ipnsPath, false);
+        auto resolvedIpfsPath = resolveIPNSName(ipnsPath);
         if (resolvedIpfsPath != initialIpfsPath) {
             throw Error("The IPNS hash or DNS link %s resolves now to something different from the value it had when Nix was started;\n  wanted: %s\n  got %s\nPerhaps something else updated it in the meantime?",
                 initialIpfsPath, resolvedIpfsPath);
