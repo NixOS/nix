@@ -26,7 +26,7 @@ struct CmdAddToStore : MixDryRun, StoreCommand
         addFlag({
             .longName = "flat",
             .shortName = 0,
-            .description = "use flat file ingestion",
+            .description = "add flat file to the Nix store",
             .handler = {&ingestionMethod, FileIngestionMethod::Flat},
         });
     }
