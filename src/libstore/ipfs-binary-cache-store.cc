@@ -179,10 +179,13 @@ protected:
 
         auto keyListResponse = nlohmann::json::parse(*(getFileTransfer()->download(keyListRequest)).data);
 
-        std::string keyName;
+        std::string keyName {""};
         for (nlohmann::json::iterator it = keyListResponse["Keys"].begin(); it != keyListResponse["Keys"].end(); ++it)
             if ((*it)["Id"] == ipnsPathHash)
                 keyName = (*it)["Name"];
+        if (keyName == "") {
+            throw Error("We couldn't find a name corresponding to the provided ipns hash:\n  hash: %s", ipnsPathHash);
+        }
 
         // Now we can append the keyname to our original request
         uri += "&key=" + keyName;
