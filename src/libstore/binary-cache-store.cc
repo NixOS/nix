@@ -93,7 +93,7 @@ std::shared_ptr<std::string> BinaryCacheStore::getFile(const std::string & path)
 
 std::string BinaryCacheStore::narInfoFileFor(const StorePath & storePath)
 {
-    return storePathToHash(printStorePath(storePath)) + ".narinfo";
+    return std::string(storePath.hashPart()) + ".narinfo";
 }
 
 void BinaryCacheStore::writeNarInfo(ref<NarInfo> narInfo)
@@ -102,7 +102,7 @@ void BinaryCacheStore::writeNarInfo(ref<NarInfo> narInfo)
 
     upsertFile(narInfoFile, narInfo->to_string(*this), "text/x-nix-narinfo");
 
-    auto hashPart = storePathToHash(printStorePath(narInfo->path));
+    std::string hashPart(narInfo->path.hashPart());
 
     {
         auto state_(state.lock());
@@ -164,7 +164,7 @@ void BinaryCacheStore::addToStore(const ValidPathInfo & info, Source & narSource
             }
         }
 
-        upsertFile(storePathToHash(printStorePath(info.path)) + ".ls", jsonOut.str(), "application/json");
+        upsertFile(std::string(info.path.to_string()) + ".ls", jsonOut.str(), "application/json");
     }
 
     /* Compress the NAR. */
@@ -360,7 +360,7 @@ StorePath BinaryCacheStore::addTextToStore(const string & name, const string & s
     const StorePathSet & references, RepairFlag repair)
 {
     ValidPathInfo info(computeStorePathForText(name, s, references));
-    info.references = cloneStorePathSet(references);
+    info.references = references;
 
     if (repair || !isValidPath(info.path)) {
         StringSink sink;
@@ -395,14 +395,14 @@ void BinaryCacheStore::addSignatures(const StorePath & storePath, const StringSe
 
 std::shared_ptr<std::string> BinaryCacheStore::getBuildLog(const StorePath & path)
 {
-    auto drvPath = path.clone();
+    auto drvPath = path;
 
     if (!path.isDerivation()) {
         try {
             auto info = queryPathInfo(path);
             // FIXME: add a "Log" field to .narinfo
             if (!info->deriver) return nullptr;
-            drvPath = info->deriver->clone();
+            drvPath = *info->deriver;
         } catch (InvalidPath &) {
             return nullptr;
         }

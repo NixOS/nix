@@ -189,7 +189,7 @@ public:
                 return {oInvalid, 0};
 
             auto namePart = queryNAR.getStr(1);
-            auto narInfo = make_ref<NarInfo>(StorePath::fromBaseName(hashPart + "-" + namePart));
+            auto narInfo = make_ref<NarInfo>(StorePath(hashPart + "-" + namePart));
             narInfo->url = queryNAR.getStr(2);
             narInfo->compression = queryNAR.getStr(3);
             if (!queryNAR.isNull(4))
@@ -198,9 +198,9 @@ public:
             narInfo->narHash = Hash(queryNAR.getStr(6));
             narInfo->narSize = queryNAR.getInt(7);
             for (auto & r : tokenizeString<Strings>(queryNAR.getStr(8), " "))
-                narInfo->references.insert(StorePath::fromBaseName(r));
+                narInfo->references.insert(StorePath(r));
             if (!queryNAR.isNull(9))
-                narInfo->deriver = StorePath::fromBaseName(queryNAR.getStr(9));
+                narInfo->deriver = StorePath(queryNAR.getStr(9));
             for (auto & sig : tokenizeString<Strings>(queryNAR.getStr(10), " "))
                 narInfo->sigs.insert(sig);
             narInfo->ca = queryNAR.getStr(11);
