@@ -588,7 +588,7 @@ static void prim_getFlake(EvalState & state, const Pos & pos, Value * * args, Va
         v);
 }
 
-static RegisterPrimOp r2("getFlake", 1, prim_getFlake, "flakes");
+static RegisterPrimOp r2("__getFlake", 1, prim_getFlake, "flakes");
 
 }
 
