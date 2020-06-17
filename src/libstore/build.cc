@@ -809,9 +809,6 @@ private:
     /* Whether this is a fixed-output derivation. */
     bool fixedOutput;
 
-    /* Whether this is a content adressed derivation */
-    bool contentAddressed = false;
-
     /* Whether to run the build in a private network namespace. */
     bool privateNetwork = false;
 
@@ -1198,9 +1195,7 @@ void DerivationGoal::haveDerivation()
 
     parsedDrv = std::make_unique<ParsedDerivation>(drvPath, *drv);
 
-    contentAddressed = parsedDrv->contentAddressed();
-
-    if (this->contentAddressed) {
+    if (parsedDrv->contentAddressed()) {
         settings.requireExperimentalFeature("content-addressed-paths");
         throw Error("content-addressed-paths isn't implemented yet");
     }
