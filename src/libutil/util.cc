@@ -104,7 +104,7 @@ Path absPath(Path && path, std::optional<Path> dir)
 }
 
 Path absCWD() {
-	return absPath(Path { "." });
+    return absPath(Path { "." });
 }
 
 
@@ -117,7 +117,7 @@ Path canonPath(PathView path, bool resolveSymlinks)
     if (path[0] != '/')
         throw Error("not an absolute path: '%1%'", path);
 
-	std::string_view::const_iterator i = path.begin(), end = path.end();
+    std::string_view::const_iterator i = path.begin(), end = path.end();
     string temp;
 
     /* Count the number of times we follow a symlink and stop at some
@@ -1265,7 +1265,7 @@ string replaceStrings(std::string_view s,
 
 std::string rewriteStrings(std::string_view _s, const StringMap & rewrites)
 {
-	std::string s{ _s };
+    std::string s{ _s };
     for (auto & i : rewrites) {
         if (i.first == i.second) continue;
         size_t j = 0;

@@ -191,7 +191,7 @@ extern Verbosity verbosity; /* suppress msgs > this */
 template<typename... Args>
 inline void warn(std::string_view fs, const Args & ... args)
 {
-	// TODO Boost should work with string_view
+    // TODO Boost should work with string_view
     boost::format f(std::string { fs });
     formatHelper(f, args...);
     logger->warn(f.str());

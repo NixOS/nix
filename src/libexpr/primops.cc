@@ -2176,7 +2176,7 @@ static void prim_compareVersions(EvalState & state, const Pos & pos, Value * * a
 static void prim_splitVersion(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
     string _version = state.forceStringNoCtx(*args[0], pos);
-	std::string_view version { _version };
+    std::string_view version { _version };
     auto iter = version.cbegin();
     Strings components;
     while (iter != version.cend()) {

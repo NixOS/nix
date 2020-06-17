@@ -405,8 +405,8 @@ bool statusOk(int status);
 /* Parse a string into an integer. */
 template<class N> bool string2Int(std::string_view s, N & n)
 {
-	// TODO find a way to not allocate, problem is atoi/strtol relies on null
-	// termination, maybe non-standard srtntol or Boost.
+    // TODO find a way to not allocate, problem is atoi/strtol relies on null
+    // termination, maybe non-standard srtntol or Boost.
     if (s.substr(0, 1) == "-" && !std::numeric_limits<N>::is_signed)
         return false;
     istringstream_nocopy str(s);
@@ -444,12 +444,12 @@ std::string shellEscape(std::string_view s);
 // might be fixed in future C++ standard.
 inline std::string& operator<<(std::string& a, std::string_view b)
 {
-	return a += b;
+    return a += b;
 }
 inline std::string && operator<<(std::string && a, std::string_view b)
 {
-	a += b;
-	return std::move(a);
+    a += b;
+    return std::move(a);
 }
 
 /* Exception handling in destructors: print an error message, then

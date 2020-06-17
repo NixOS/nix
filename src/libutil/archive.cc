@@ -304,14 +304,14 @@ struct RestoreSink : ParseSink
 
     void createDirectory(PathView path)
     {
-    	Path p = Path { dstPath } << path;
+        Path p = Path { dstPath } << path;
         if (mkdir(p.c_str(), 0777) == -1)
             throw SysError("creating directory '%1%'", p);
     };
 
     void createRegularFile(PathView path)
     {
-    	Path p = Path { dstPath } << path;
+        Path p = Path { dstPath } << path;
         fd = open(p.c_str(), O_CREAT | O_EXCL | O_WRONLY | O_CLOEXEC, 0666);
         if (!fd) throw SysError("creating file '%1%'", p);
     }

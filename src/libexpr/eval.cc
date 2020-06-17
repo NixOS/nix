@@ -377,7 +377,7 @@ Path EvalState::checkSourcePath(PathView path_)
 {
     if (!allowedPaths) return Path { path_ };
 
-	// No smart lookup with std::unordered_map, sadly.
+    // No smart lookup with std::unordered_map, sadly.
     auto i = resolvedPaths.find(Path { path_ });
     if (i != resolvedPaths.end())
         return i->second;
@@ -463,7 +463,7 @@ Value * EvalState::addConstant(std::string_view name, Value & v)
     *v2 = v;
     staticBaseEnv.vars[symbols.create(name)] = baseEnvDispl;
     baseEnv.values[baseEnvDispl++] = v2;
-	std::string_view name2 = name.substr(0, 2) == "__" ? name.substr(2) : name;
+    std::string_view name2 = name.substr(0, 2) == "__" ? name.substr(2) : name;
     baseEnv.values[0]->attrs->push_back(Attr(symbols.create(name2), v2));
     return v2;
 }
@@ -478,7 +478,7 @@ Value * EvalState::addPrimOp(std::string_view name,
         return addConstant(name, v);
     }
     Value * v = allocValue();
-	std::string_view name2 = name.substr(0, 2) == "__" ? name.substr(2) : name;
+    std::string_view name2 = name.substr(0, 2) == "__" ? name.substr(2) : name;
     Symbol sym = symbols.create(name2);
     v->type = tPrimOp;
     v->primOp = new PrimOp(primOp, arity, sym);

@@ -29,7 +29,7 @@ extern char * * environ;
 std::vector<string> shellwords(std::string_view _s)
 {
     std::regex whitespace("^(\\s+).*");
-	std::string s { _s }; // until std::regex understand string_view
+    std::string s { _s }; // until std::regex understand string_view
     auto begin = s.cbegin();
     std::vector<string> res;
     std::string cur;

@@ -382,7 +382,7 @@ const time_t mtimeStore = 1; /* 1 second into the epoch */
 
 static void canonicaliseTimestampAndPermissions(PathView path, const struct stat & st)
 {
-	Path freshPath { path };
+    Path freshPath { path };
     if (!S_ISLNK(st.st_mode)) {
 
         /* Mask out all type related bits. */

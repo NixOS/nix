@@ -24,8 +24,8 @@ static int parseName(std::string_view profileName, std::string_view name)
 {
     if (name.substr(0, profileName.size()) != profileName) return -1;
     if (name[profileName.size()] != '-') return -1;
-	std::string_view s = name.substr(profileName.size() + 1);
-	std::string_view::size_type p = s.find("-link");
+    std::string_view s = name.substr(profileName.size() + 1);
+    std::string_view::size_type p = s.find("-link");
     if (p == std::string_view::npos) return -1;
     int n;
     if (string2Int(s.substr(0, p), n) && n >= 0)

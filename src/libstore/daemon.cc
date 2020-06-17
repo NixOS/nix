@@ -122,8 +122,8 @@ struct TunnelLogger : public Logger
     {
         if (GET_PROTOCOL_MINOR(clientVersion) < 20) {
             if (!s.empty()){
-				log(lvl, std::string { s } + "...");
-			};
+                log(lvl, std::string { s } + "...");
+            };
             return;
         }
 

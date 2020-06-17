@@ -57,7 +57,7 @@ struct MixLs : virtual Args, MixJSON
                 auto names = accessor->readDirectory(curPath);
                 for (auto & name : names)
                     showFile(Path { curPath } << "/" << name,
-                    		Path { relPath } << "/" << name);
+                            Path { relPath } << "/" << name);
             } else
                 showFile(curPath, relPath);
         };

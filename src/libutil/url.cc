@@ -19,9 +19,9 @@ ParsedURL parseURL(std::string_view url)
 
     std::smatch match;
 
-	// Inferior until
-	// https://lists.isocpp.org/std-proposals/att-0008/Dxxxx_string_view_support_for_regex.pdf
-	std::string freshUrl { url };
+    // Inferior until
+    // https://lists.isocpp.org/std-proposals/att-0008/Dxxxx_string_view_support_for_regex.pdf
+    std::string freshUrl { url };
 
     if (std::regex_match(freshUrl, match, uriRegex)) {
         auto & base = match[1];
