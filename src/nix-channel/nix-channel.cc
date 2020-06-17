@@ -38,7 +38,7 @@ static void writeChannels()
 {
     auto channelsFD = AutoCloseFD{open(channelsList.c_str(), O_WRONLY | O_CLOEXEC | O_CREAT | O_TRUNC, 0644)};
     if (!channelsFD)
-        throw SysError(format("opening '%1%' for writing") % channelsList);
+        throw SysError("opening '%1%' for writing", channelsList);
     for (const auto & channel : channels)
         writeFull(channelsFD.get(), channel.second + " " + channel.first + "\n");
 }
@@ -47,9 +47,9 @@ static void writeChannels()
 static void addChannel(const string & url, const string & name)
 {
     if (!regex_search(url, std::regex("^(file|http|https)://")))
-        throw Error(format("invalid channel URL '%1%'") % url);
+        throw Error("invalid channel URL '%1%'", url);
     if (!regex_search(name, std::regex("^[a-zA-Z0-9_][a-zA-Z0-9_\\.-]*$")))
-        throw Error(format("invalid channel identifier '%1%'") % name);
+        throw Error("invalid channel identifier '%1%'", name);
     readChannels();
     channels[name] = url;
     writeChannels();
@@ -137,9 +137,9 @@ static void update(const StringSet & channelNames)
         if (S_ISLNK(st.st_mode))
             // old-skool ~/.nix-defexpr
             if (unlink(nixDefExpr.c_str()) == -1)
-                throw SysError(format("unlinking %1%") % nixDefExpr);
+                throw SysError("unlinking %1%", nixDefExpr);
     } else if (errno != ENOENT) {
-        throw SysError(format("getting status of %1%") % nixDefExpr);
+        throw SysError("getting status of %1%", nixDefExpr);
     }
     createDirs(nixDefExpr);
     auto channelLink = nixDefExpr + "/channels";

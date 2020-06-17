@@ -73,6 +73,18 @@ struct TunnelLogger : public Logger
         enqueueMsg(*buf.s);
     }
 
+    void logEI(const ErrorInfo & ei) override
+    {
+        if (ei.level > verbosity) return;
+
+        std::stringstream oss;
+        oss << ei;
+
+        StringSink buf;
+        buf << STDERR_NEXT << oss.str() << "\n"; // (fs.s + "\n");
+        enqueueMsg(*buf.s);
+    }
+
     /* startWork() means that we're starting an operation for which we
       want to send out stderr to the client. */
     void startWork()
@@ -281,7 +293,7 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
         auto path = store->parseStorePath(readString(from));
         logger->startWork();
         StorePathSet paths; // FIXME
-        paths.insert(path.clone());
+        paths.insert(path);
         auto res = store->querySubstitutablePaths(paths);
         logger->stopWork();
         to << (res.count(path) != 0);
@@ -315,7 +327,7 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
         StorePathSet paths;
         if (op == wopQueryReferences)
             for (auto & i : store->queryPathInfo(path)->references)
-                paths.insert(i.clone());
+                paths.insert(i);
         else if (op == wopQueryReferrers)
             store->queryReferrers(path, paths);
         else if (op == wopQueryValidDerivers)
@@ -329,8 +341,7 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
     case wopQueryDerivationOutputNames: {
         auto path = store->parseStorePath(readString(from));
         logger->startWork();
-        StringSet names;
-        names = store->queryDerivationOutputNames(path);
+        auto names = store->readDerivation(path).outputNames();
         logger->stopWork();
         to << names;
         break;
@@ -582,9 +593,7 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
         auto path = store->parseStorePath(readString(from));
         logger->startWork();
         SubstitutablePathInfos infos;
-        StorePathSet paths;
-        paths.insert(path.clone()); // FIXME
-        store->querySubstitutablePathInfos(paths, infos);
+        store->querySubstitutablePathInfos({path}, infos);
         logger->stopWork();
         auto i = infos.find(path);
         if (i == infos.end())
@@ -745,7 +754,7 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
     }
 
     default:
-        throw Error(format("invalid operation %1%") % op);
+        throw Error("invalid operation %1%", op);
     }
 }
 
