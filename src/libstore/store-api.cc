@@ -598,6 +598,8 @@ void copyStorePath(ref<Store> srcStore, ref<Store> dstStore,
     if (info->isContentAddressed(*srcStore)) {
         auto info2 = make_ref<ValidPathInfo>(*info);
         info2->path = dstStore->makeFixedOutputPathFromCA(info->path.name(), info->ca);
+        if (dstStore->storeDir == srcStore->storeDir)
+            assert(info->path == info2->path);
         info = info2;
     }
 
@@ -670,6 +672,8 @@ void copyPaths(ref<Store> srcStore, ref<Store> dstStore, const StorePathSet & st
             auto storePathForDst = storePath;
             if (info->isContentAddressed(*srcStore)) {
                 storePathForDst = dstStore->makeFixedOutputPathFromCA(storePath.name(), info->ca);
+                if (dstStore->storeDir == srcStore->storeDir)
+                    assert(storePathForDst == storePath);
                 if (storePathForDst != storePath)
                     debug("replaced path '%s' to '%s' for substituter '%s'", srcStore->printStorePath(storePath), dstStore->printStorePath(storePathForDst), dstStore->getUri());
             }
@@ -695,6 +699,8 @@ void copyPaths(ref<Store> srcStore, ref<Store> dstStore, const StorePathSet & st
             auto storePathForDst = storePath;
             if (info->isContentAddressed(*srcStore)) {
                 storePathForDst = dstStore->makeFixedOutputPathFromCA(storePath.name(), info->ca);
+                if (dstStore->storeDir == srcStore->storeDir)
+                    assert(storePathForDst == storePath);
                 if (storePathForDst != storePath)
                     debug("replaced path '%s' to '%s' for substituter '%s'", srcStore->printStorePath(storePath), dstStore->printStorePath(storePathForDst), dstStore->getUri());
             }

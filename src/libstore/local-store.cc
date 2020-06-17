@@ -853,6 +853,8 @@ void LocalStore::querySubstitutablePathInfos(const StorePathSet & paths,
             // recompute store path so that we can use a different store root
             if (ca != pathsCA.end() && (hasPrefix(ca->second, "fixed:") || hasPrefix(ca->second, "text:"))) {
                 subPath = makeFixedOutputPathFromCA(path.name(), ca->second);
+                if (sub->storeDir == storeDir)
+                    assert(subPath == path);
                 if (subPath != path)
                     debug("replaced path '%s' with '%s' for substituter '%s'", printStorePath(path), sub->printStorePath(subPath), sub->getUri());
             } else if (sub->storeDir != storeDir) continue;

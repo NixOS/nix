@@ -4409,8 +4409,11 @@ void SubstitutionGoal::tryNext()
     subs.pop_front();
 
     auto subPath = storePath;
-    if (ca && (hasPrefix(*ca, "fixed:") || hasPrefix(*ca, "text:")))
+    if (ca && (hasPrefix(*ca, "fixed:") || hasPrefix(*ca, "text:"))) {
         subPath = sub->makeFixedOutputPathFromCA(storePath.name(), *ca);
+        if (sub->storeDir == worker.store.storeDir)
+            assert(subPath == storePath);
+    }
 
     try {
         // FIXME: make async
@@ -4535,8 +4538,11 @@ void SubstitutionGoal::tryToRun()
             PushActivity pact(act.id);
 
             auto subPath = storePath;
-            if (ca && (hasPrefix(*ca, "fixed:") || hasPrefix(*ca, "text:")))
+            if (ca && (hasPrefix(*ca, "fixed:") || hasPrefix(*ca, "text:"))) {
                 subPath = sub->makeFixedOutputPathFromCA(storePath.name(), *ca);
+                if (sub->storeDir == worker.store.storeDir)
+                    assert(subPath == storePath);
+            }
 
             copyStorePath(ref<Store>(sub), ref<Store>(worker.store.shared_from_this()),
                 subPath, repair, sub->isTrusted ? NoCheckSigs : CheckSigs);
