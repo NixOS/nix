@@ -1,6 +1,7 @@
 #pragma once
 
 #include "types.hh"
+#include "error.hh"
 #include "logging.hh"
 #include "ansicolor.hh"
 
@@ -459,8 +460,8 @@ std::string filterANSIEscapes(const std::string & s,
 
 
 /* Base64 encoding/decoding. */
-string base64Encode(const string & s);
-string base64Decode(const string & s);
+string base64Encode(std::string_view s);
+string base64Decode(std::string_view s);
 
 
 /* Get a value for the specified key from an associate container. */

@@ -17,7 +17,6 @@ struct Tree
     Path actualPath;
     StorePath storePath;
     Tree(Path && actualPath, StorePath && storePath) : actualPath(actualPath), storePath(std::move(storePath)) {}
-    Tree (const Tree & rhs) : actualPath(rhs.actualPath), storePath(rhs.storePath.clone()) {}
 };
 
 struct InputScheme;

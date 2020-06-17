@@ -13,7 +13,7 @@ libexpr_SOURCES := \
 
 libexpr_CXXFLAGS += -I src/libutil -I src/libstore -I src/libfetchers -I src/libmain -I src/libexpr
 
-libexpr_LIBS = libutil libstore libfetchers libnixrust
+libexpr_LIBS = libutil libstore libfetchers
 
 libexpr_LDFLAGS =
 ifneq ($(OS), FreeBSD)

@@ -202,10 +202,10 @@ struct TarballInputScheme : InputScheme
         // NAR hashes are preferred over file hashes since tar/zip files
         // don't have a canonical representation.
         if (auto narHash = input.getNarHash())
-            url.query.insert_or_assign("narHash", narHash->to_string(SRI));
+            url.query.insert_or_assign("narHash", narHash->to_string(SRI, true));
         /*
         else if (auto hash = maybeGetStrAttr(input.attrs, "hash"))
-            url.query.insert_or_assign("hash", Hash(*hash).to_string(SRI));
+            url.query.insert_or_assign("hash", Hash(*hash).to_string(SRI, true));
         */
         return url;
     }

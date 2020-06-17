@@ -135,12 +135,12 @@ StorePath getDerivationEnvironment(ref<Store> store, const StorePath & drvPath)
     drv.inputSrcs.insert(std::move(getEnvShPath));
     Hash h = hashDerivationModulo(*store, drv, true);
     auto shellOutPath = store->makeOutputPath("out", h, drvName);
-    drv.outputs.insert_or_assign("out", DerivationOutput(shellOutPath.clone(), "", ""));
+    drv.outputs.insert_or_assign("out", DerivationOutput { shellOutPath, "", "" });
     drv.env["out"] = store->printStorePath(shellOutPath);
     auto shellDrvPath2 = writeDerivation(store, drv, drvName);
 
     /* Build the derivation. */
-    store->buildPaths({shellDrvPath2});
+    store->buildPaths({{shellDrvPath2}});
 
     assert(store->isValidPath(shellOutPath));
 
@@ -210,7 +210,7 @@ struct Common : InstallableCommand, MixProfile
     {
         auto path = installable->getStorePath();
         if (path && hasSuffix(path->to_string(), "-env"))
-            return path->clone();
+            return *path;
         else {
             auto drvs = toDerivations(store, {installable});
 

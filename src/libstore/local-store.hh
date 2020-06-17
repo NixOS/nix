@@ -135,8 +135,6 @@ public:
 
     StorePathSet queryDerivationOutputs(const StorePath & path) override;
 
-    StringSet queryDerivationOutputNames(const StorePath & path) override;
-
     std::optional<StorePath> queryPathFromHashPart(const std::string & hashPart) override;
 
     StorePathSet querySubstitutablePaths(const StorePathSet & paths) override;

@@ -19,9 +19,9 @@ static void makeWritable(const Path & path)
 {
     struct stat st;
     if (lstat(path.c_str(), &st))
-        throw SysError(format("getting attributes of path '%1%'") % path);
+        throw SysError("getting attributes of path '%1%'", path);
     if (chmod(path.c_str(), st.st_mode | S_IWUSR) == -1)
-        throw SysError(format("changing writability of '%1%'") % path);
+        throw SysError("changing writability of '%1%'", path);
 }
 
 
@@ -47,7 +47,7 @@ LocalStore::InodeHash LocalStore::loadInodeHash()
     InodeHash inodeHash;
 
     AutoCloseDir dir(opendir(linksDir.c_str()));
-    if (!dir) throw SysError(format("opening directory '%1%'") % linksDir);
+    if (!dir) throw SysError("opening directory '%1%'", linksDir);
 
     struct dirent * dirent;
     while (errno = 0, dirent = readdir(dir.get())) { /* sic */
@@ -55,7 +55,7 @@ LocalStore::InodeHash LocalStore::loadInodeHash()
         // We don't care if we hit non-hash files, anything goes
         inodeHash.insert(dirent->d_ino);
     }
-    if (errno) throw SysError(format("reading directory '%1%'") % linksDir);
+    if (errno) throw SysError("reading directory '%1%'", linksDir);
 
     printMsg(lvlTalkative, format("loaded %1% hash inodes") % inodeHash.size());
 
@@ -68,7 +68,7 @@ Strings LocalStore::readDirectoryIgnoringInodes(const Path & path, const InodeHa
     Strings names;
 
     AutoCloseDir dir(opendir(path.c_str()));
-    if (!dir) throw SysError(format("opening directory '%1%'") % path);
+    if (!dir) throw SysError("opening directory '%1%'", path);
 
     struct dirent * dirent;
     while (errno = 0, dirent = readdir(dir.get())) { /* sic */
@@ -83,7 +83,7 @@ Strings LocalStore::readDirectoryIgnoringInodes(const Path & path, const InodeHa
         if (name == "." || name == "..") continue;
         names.push_back(name);
     }
-    if (errno) throw SysError(format("reading directory '%1%'") % path);
+    if (errno) throw SysError("reading directory '%1%'", path);
 
     return names;
 }
@@ -96,7 +96,7 @@ void LocalStore::optimisePath_(Activity * act, OptimiseStats & stats,
 
     struct stat st;
     if (lstat(path.c_str(), &st))
-        throw SysError(format("getting attributes of path '%1%'") % path);
+        throw SysError("getting attributes of path '%1%'", path);
 
 #if __APPLE__
     /* HFS/macOS has some undocumented security feature disabling hardlinking for
@@ -130,7 +130,10 @@ void LocalStore::optimisePath_(Activity * act, OptimiseStats & stats,
        NixOS (example: $fontconfig/var/cache being modified).  Skip
        those files.  FIXME: check the modification time. */
     if (S_ISREG(st.st_mode) && (st.st_mode & S_IWUSR)) {
-        printError(format("skipping suspicious writable file '%1%'") % path);
+        logWarning({
+            .name = "Suspicious file",
+            .hint = hintfmt("skipping suspicious writable file '%1%'", path)
+        });
         return;
     }
 
@@ -150,7 +153,7 @@ void LocalStore::optimisePath_(Activity * act, OptimiseStats & stats,
        contents of the symlink (i.e. the result of readlink()), not
        the contents of the target (which may not even exist). */
     Hash hash = hashPath(htSHA256, path).first;
-    debug(format("'%1%' has hash '%2%'") % path % hash.to_string());
+    debug(format("'%1%' has hash '%2%'") % path % hash.to_string(Base32, true));
 
     /* Check if this is a known hash. */
     Path linkPath = linksDir + "/" + hash.to_string(Base32, false);
@@ -186,7 +189,7 @@ void LocalStore::optimisePath_(Activity * act, OptimiseStats & stats,
        current file with a hard link to that file. */
     struct stat stLink;
     if (lstat(linkPath.c_str(), &stLink))
-        throw SysError(format("getting attributes of path '%1%'") % linkPath);
+        throw SysError("getting attributes of path '%1%'", linkPath);
 
     if (st.st_ino == stLink.st_ino) {
         debug(format("'%1%' is already linked to '%2%'") % path % linkPath);
@@ -194,7 +197,10 @@ void LocalStore::optimisePath_(Activity * act, OptimiseStats & stats,
     }
 
     if (st.st_size != stLink.st_size) {
-        printError(format("removing corrupted link '%1%'") % linkPath);
+        logWarning({
+            .name = "Corrupted link",
+            .hint = hintfmt("removing corrupted link '%1%'", linkPath)
+        });
         unlink(linkPath.c_str());
         goto retry;
     }
@@ -229,7 +235,10 @@ void LocalStore::optimisePath_(Activity * act, OptimiseStats & stats,
     /* Atomically replace the old file with the new hard link. */
     if (rename(tempLink.c_str(), path.c_str()) == -1) {
         if (unlink(tempLink.c_str()) == -1)
-            printError(format("unable to unlink '%1%'") % tempLink);
+            logError({
+                .name = "Unlink error",
+                .hint = hintfmt("unable to unlink '%1%'", tempLink)
+            });
         if (errno == EMLINK) {
             /* Some filesystems generate too many links on the rename,
                rather than on the original link.  (Probably it
@@ -238,7 +247,7 @@ void LocalStore::optimisePath_(Activity * act, OptimiseStats & stats,
             debug("'%s' has reached maximum number of links", linkPath);
             return;
         }
-        throw SysError(format("cannot rename '%1%' to '%2%'") % tempLink % path);
+        throw SysError("cannot rename '%1%' to '%2%'", tempLink, path);
     }
 
     stats.filesLinked++;

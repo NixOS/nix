@@ -29,7 +29,7 @@ void emitTreeAttrs(
     auto narHash = input.getNarHash();
     assert(narHash);
     mkString(*state.allocAttr(v, state.symbols.create("narHash")),
-        narHash->to_string(SRI));
+        narHash->to_string(SRI, true));
 
     if (auto rev = input.getRev()) {
         mkString(*state.allocAttr(v, state.symbols.create("rev")), rev->gitRev());
@@ -76,7 +76,10 @@ static void prim_fetchTree(EvalState & state, const Pos & pos, Value * * args, V
         }
 
         if (!attrs.count("type"))
-            throw Error("attribute 'type' is missing in call to 'fetchTree', at %s", pos);
+            throw Error({
+                .hint = hintfmt("attribute 'type' is missing in call to 'fetchTree'"),
+                .nixCode = NixCode { .errPos = pos }
+            });
 
         input = fetchers::Input::fromAttrs(std::move(attrs));
     } else
@@ -115,17 +118,21 @@ static void fetch(EvalState & state, const Pos & pos, Value * * args, Value & v,
             if (n == "url")
                 url = state.forceStringNoCtx(*attr.value, *attr.pos);
             else if (n == "sha256")
-                expectedHash = Hash(state.forceStringNoCtx(*attr.value, *attr.pos), htSHA256);
+                expectedHash = newHashAllowEmpty(state.forceStringNoCtx(*attr.value, *attr.pos), htSHA256);
             else if (n == "name")
                 name = state.forceStringNoCtx(*attr.value, *attr.pos);
             else
-                throw EvalError("unsupported argument '%s' to '%s', at %s",
-                    attr.name, who, *attr.pos);
-        }
+                throw EvalError({
+                    .hint = hintfmt("unsupported argument '%s' to '%s'", attr.name, who),
+                    .nixCode = NixCode { .errPos = *attr.pos }
+                });
+            }
 
         if (!url)
-            throw EvalError("'url' argument required, at %s", pos);
-
+            throw EvalError({
+                .hint = hintfmt("'url' argument required"),
+                .nixCode = NixCode { .errPos = pos }
+            });
     } else
         url = state.forceStringNoCtx(*args[0], pos);
 
@@ -152,7 +159,7 @@ static void fetch(EvalState & state, const Pos & pos, Value * * args, Value & v,
             : hashFile(htSHA256, path);
         if (hash != *expectedHash)
             throw Error((unsigned int) 102, "hash mismatch in file downloaded from '%s':\n  wanted: %s\n  got:    %s",
-                *url, expectedHash->to_string(), hash.to_string());
+                *url, expectedHash->to_string(Base32, true), hash.to_string(Base32, true));
     }
 
     if (state.allowedPaths)

@@ -74,7 +74,7 @@ struct ProfileManifest
 
             for (auto & drvInfo : drvInfos) {
                 ProfileElement element;
-                element.storePaths = singleton(state.store->parseStorePath(drvInfo.queryOutPath()));
+                element.storePaths = {state.store->parseStorePath(drvInfo.queryOutPath())};
                 elements.emplace_back(std::move(element));
             }
         }
@@ -114,7 +114,7 @@ struct ProfileManifest
             for (auto & path : element.storePaths) {
                 if (element.active)
                     pkgs.emplace_back(store->printStorePath(path), true, 5);
-                references.insert(path.clone());
+                references.insert(path);
             }
         }
 
@@ -177,14 +177,14 @@ struct CmdProfileInstall : InstallablesCommand, MixDefaultProfile
                 auto [attrPath, resolvedRef, drv] = installable2->toDerivation();
 
                 ProfileElement element;
-                element.storePaths = singleton(drv.outPath.clone()); // FIXME
+                element.storePaths = {drv.outPath}; // FIXME
                 element.source = ProfileElementSource{
                     installable2->flakeRef,
                     resolvedRef,
                     attrPath,
                 };
 
-                pathsToBuild.emplace_back(drv.drvPath.clone(), StringSet{"out"}); // FIXME
+                pathsToBuild.push_back({drv.drvPath, StringSet{"out"}}); // FIXME
 
                 manifest.elements.emplace_back(std::move(element));
             } else
@@ -346,14 +346,14 @@ struct CmdProfileUpgrade : virtual SourceExprCommand, MixDefaultProfile, MixProf
                 printInfo("upgrading '%s' from flake '%s' to '%s'",
                     element.source->attrPath, element.source->resolvedRef, resolvedRef);
 
-                element.storePaths = singleton(drv.outPath.clone()); // FIXME
+                element.storePaths = {drv.outPath}; // FIXME
                 element.source = ProfileElementSource{
                     installable.flakeRef,
                     resolvedRef,
                     attrPath,
                 };
 
-                pathsToBuild.emplace_back(drv.drvPath, StringSet{"out"}); // FIXME
+                pathsToBuild.push_back({drv.drvPath, StringSet{"out"}}); // FIXME
             }
         }
 

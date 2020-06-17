@@ -248,7 +248,7 @@ struct CmdFlakeCheck : FlakeCommand
                     auto [drvPathS, outputName] = decodeContext(i);
                     auto drvPath = store->parseStorePath(drvPathS);
                     if (!outputName.empty() && drvPath.isDerivation())
-                        drvPaths.emplace_back(drvPath);
+                        drvPaths.push_back({drvPath});
                 }
             } catch (Error & e) {
                 e.addPrefix(fmt("while checking the app definition '" ANSI_BOLD "%s" ANSI_NORMAL "' at %s:\n", attrPath, pos));
@@ -392,7 +392,7 @@ struct CmdFlakeCheck : FlakeCommand
                                         fmt("%s.%s.%s", name, attr.name, attr2.name),
                                         *attr2.value, *attr2.pos);
                                     if ((std::string) attr.name == settings.thisSystem.get())
-                                        drvPaths.emplace_back(drvPath);
+                                        drvPaths.push_back({drvPath});
                                 }
                             }
                         }
@@ -720,7 +720,7 @@ struct CmdFlakeArchive : FlakeCommand, MixJSON, MixDryRun
 
         StorePathSet sources;
 
-        sources.insert(flake.flake.sourceInfo->storePath.clone());
+        sources.insert(flake.flake.sourceInfo->storePath);
         if (jsonRoot)
             jsonRoot->attr("path", store->printStorePath(flake.flake.sourceInfo->storePath));
 

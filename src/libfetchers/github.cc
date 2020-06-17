@@ -191,7 +191,7 @@ struct GitHubInputScheme : GitArchiveInputScheme
             readFile(
                 store->toRealPath(
                     downloadFile(store, url, "source", false).storePath)));
-        auto rev = Hash(json["sha"], htSHA1);
+        auto rev = Hash(std::string { json["sha"] }, htSHA1);
         debug("HEAD revision for '%s' is %s", url, rev.gitRev());
         return rev;
     }
@@ -235,7 +235,7 @@ struct GitLabInputScheme : GitArchiveInputScheme
             readFile(
                 store->toRealPath(
                     downloadFile(store, url, "source", false).storePath)));
-        auto rev = Hash(json["commit"]["id"], htSHA1);
+        auto rev = Hash(std::string(json["commit"]["id"]), htSHA1);
         debug("HEAD revision for '%s' is %s", url, rev.gitRev());
         return rev;
     }
