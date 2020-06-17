@@ -2202,10 +2202,11 @@ static void prim_splitVersion(EvalState & state, const Pos & pos, Value * * args
 RegisterPrimOp::PrimOps * RegisterPrimOp::primOps;
 
 
-RegisterPrimOp::RegisterPrimOp(std::string name, size_t arity, PrimOpFun fun)
+RegisterPrimOp::RegisterPrimOp(std::string name, size_t arity, PrimOpFun fun,
+    std::optional<std::string> requiredFeature)
 {
     if (!primOps) primOps = new PrimOps;
-    primOps->emplace_back(name, arity, fun);
+    primOps->push_back({name, arity, fun, requiredFeature});
 }
 
 
@@ -2397,7 +2398,8 @@ void EvalState::createBaseEnv()
 
     if (RegisterPrimOp::primOps)
         for (auto & primOp : *RegisterPrimOp::primOps)
-            addPrimOp(std::get<0>(primOp), std::get<1>(primOp), std::get<2>(primOp));
+            if (!primOp.requiredFeature || settings.isExperimentalFeatureEnabled(*primOp.requiredFeature))
+                addPrimOp(primOp.name, primOp.arity, primOp.primOp);
 
     /* Now that we've added all primops, sort the `builtins' set,
        because attribute lookups expect it to be sorted. */
