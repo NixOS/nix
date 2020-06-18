@@ -197,7 +197,7 @@ struct MercurialInput : Input
                         runProgram("hg", true, { "recover", "-R", cacheDir });
                         runProgram("hg", true, { "pull", "-R", cacheDir, "--", actualUrl });
                     } else {
-                        throw ExecError(e.status, fmt("'hg pull' %s", statusToString(e.status)));
+                        throw ExecError(e.status, "'hg pull' %s", statusToString(e.status));
                     }
                 }
             } else {

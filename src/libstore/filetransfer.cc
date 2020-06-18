@@ -410,16 +410,13 @@ struct curlFileTransfer : public FileTransfer
 
                 auto exc =
                     code == CURLE_ABORTED_BY_CALLBACK && _isInterrupted
-                    ? FileTransferError(Interrupted, fmt("%s of '%s' was interrupted", request.verb(), request.uri))
+                    ? FileTransferError(Interrupted, "%s of '%s' was interrupted", request.verb(), request.uri)
                     : httpStatus != 0
-                    ? FileTransferError(err,
-                        fmt("unable to %s '%s': HTTP error %d",
-                            request.verb(), request.uri, httpStatus)
-                        + (code == CURLE_OK ? "" : fmt(" (curl error: %s)", curl_easy_strerror(code)))
-                        )
-                    : FileTransferError(err,
-                        fmt("unable to %s '%s': %s (%d)",
-                            request.verb(), request.uri, curl_easy_strerror(code), code));
+                    ? FileTransferError(err, "unable to %s '%s': HTTP error %d%s",
+                        request.verb(), request.uri, httpStatus,
+                        code == CURLE_OK ? "" : fmt(" (curl error: %s)", curl_easy_strerror(code)))
+                    : FileTransferError(err, "unable to %s '%s': %s (%d)",
+                        request.verb(), request.uri, curl_easy_strerror(code), code);
 
                 /* If this is a transient error, then maybe retry the
                    download after a while. If we're writing to a
@@ -675,7 +672,7 @@ struct curlFileTransfer : public FileTransfer
                 auto s3Res = s3Helper.getObject(bucketName, key);
                 FileTransferResult res;
                 if (!s3Res.data)
-                    throw FileTransferError(NotFound, fmt("S3 object '%s' does not exist", request.uri));
+                    throw FileTransferError(NotFound, "S3 object '%s' does not exist", request.uri);
                 res.data = s3Res.data;
                 callback(std::move(res));
 #else
