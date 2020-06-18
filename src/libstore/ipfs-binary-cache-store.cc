@@ -227,7 +227,7 @@ protected:
             auto json = nlohmann::json::parse(*res.data);
             addLink(path, "/ipfs/" + (std::string) json["Hash"]);
         } catch (FileTransferError & e) {
-            throw UploadToIPFS("while uploading to IPFS binary cache at '%s': %s", cacheUri, e.msg());
+            throw UploadToIPFS("while uploading to IPFS binary cache at '%s': %s", cacheUri, e.info());
         }
     }
 
