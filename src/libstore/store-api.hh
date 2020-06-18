@@ -673,6 +673,14 @@ public:
     virtual void createUser(const std::string & userName, uid_t userId)
     { }
 
+    /* Create a new path similar to the one referred to by `info`, but that's
+     * content-addressed.
+     *
+     * This doesn't alter the original path
+     */
+    ValidPathInfo makeContentAddressed(const ValidPathInfo & info, const StringMap & extraRewrites = {});
+
+
 protected:
 
     Stats stats;

@@ -48,7 +48,6 @@ struct CmdMakeContentAddressable : StorePathsCommand, MixJSON
         for (auto & path : paths) {
             auto pathS = store->printStorePath(path);
             auto oldInfo = store->queryPathInfo(path);
-            std::string oldHashPart(path.hashPart());
 
             StringSink sink;
             store->narFromPath(path, sink);
@@ -56,11 +55,8 @@ struct CmdMakeContentAddressable : StorePathsCommand, MixJSON
             StringMap rewrites;
 
             StorePathSet references;
-            bool hasSelfReference = false;
             for (auto & ref : oldInfo->references) {
-                if (ref == path)
-                    hasSelfReference = true;
-                else {
+                if (ref != path) {
                     auto i = remappings.find(ref);
                     auto replacement = i != remappings.end() ? i->second : ref;
                     // FIXME: warn about unremapped paths?
@@ -70,33 +66,10 @@ struct CmdMakeContentAddressable : StorePathsCommand, MixJSON
                 }
             }
 
-            *sink.s = rewriteStrings(*sink.s, rewrites);
-
-            HashModuloSink hashModuloSink(htSHA256, oldHashPart);
-            hashModuloSink((unsigned char *) sink.s->data(), sink.s->size());
-
-            auto narHash = hashModuloSink.finish().first;
-
-            ValidPathInfo info(store->makeFixedOutputPath(FileIngestionMethod::Recursive, narHash, path.name(), references, hasSelfReference));
-            info.references = std::move(references);
-            if (hasSelfReference) info.references.insert(info.path);
-            info.narHash = narHash;
-            info.narSize = sink.s->size();
-            info.ca = FixedOutputHash {
-                .method = FileIngestionMethod::Recursive,
-                .hash = info.narHash,
-            };
+            auto info = store->makeContentAddressed(*oldInfo, rewrites);
 
             if (!json)
                 printInfo("rewrote '%s' to '%s'", pathS, store->printStorePath(info.path));
-
-            auto source = sinkToSource([&](Sink & nextSink) {
-                RewritingSink rsink2(oldHashPart, std::string(info.path.hashPart()), nextSink);
-                rsink2((unsigned char *) sink.s->data(), sink.s->size());
-                rsink2.flush();
-            });
-
-            store->addToStore(info, *source);
 
             if (json)
                 jsonRewrites->attr(store->printStorePath(path), store->printStorePath(info.path));

@@ -7,6 +7,7 @@
 #include "json.hh"
 #include "derivations.hh"
 #include "url.hh"
+#include "references.hh"
 
 #include <future>
 
@@ -742,6 +743,39 @@ std::string Store::showPaths(const StorePathSet & paths)
     return s;
 }
 
+ValidPathInfo Store::makeContentAddressed(
+        const ValidPathInfo & info,
+        const StringMap & extraRewrites
+    )
+{
+    bool hasSelfReference = info.references.find(info.path) != info.references.end();
+    std::string oldHashPart(info.path.hashPart());
+
+    StringSink sink;
+    narFromPath(info.path, sink);
+    *sink.s = rewriteStrings(*sink.s, extraRewrites);
+    HashModuloSink hashModuloSink(htSHA256, oldHashPart);
+    hashModuloSink((unsigned char *) sink.s->data(), sink.s->size());
+    auto narHash = hashModuloSink.finish().first;
+    ValidPathInfo newInfo(makeFixedOutputPath(FileIngestionMethod::Recursive, narHash, info.path.name(), info.references, hasSelfReference));
+    newInfo.references = info.references;
+    if (hasSelfReference) newInfo.references.insert(newInfo.path);
+    newInfo.narHash = narHash;
+    newInfo.narSize = sink.s->size();
+    newInfo.ca = FixedOutputHash {
+        .method = FileIngestionMethod::Recursive,
+        .hash = newInfo.narHash,
+    };
+    auto source = sinkToSource([&](Sink & nextSink) {
+        RewritingSink rsink2(oldHashPart, std::string(info.path.hashPart()), nextSink);
+        rsink2((unsigned char *) sink.s->data(), sink.s->size());
+        rsink2.flush();
+    });
+
+    addToStore(newInfo, *source);
+    return newInfo;
+}
+
 
 string showPaths(const PathSet & paths)
 {
@@ -797,7 +831,6 @@ bool ValidPathInfo::isContentAddressed(const Store & store) const
 
     return res;
 }
-
 
 size_t ValidPathInfo::checkSignatures(const Store & store, const PublicKeys & publicKeys) const
 {
