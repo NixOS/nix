@@ -137,7 +137,7 @@ struct GitArchiveInputScheme : InputScheme
     {
         Input input(_input);
 
-        if (!maybeGetStrAttr(input.attrs, "ref")) input.attrs.insert_or_assign("ref", "master");
+        if (!maybeGetStrAttr(input.attrs, "ref")) input.attrs.insert_or_assign("ref", "HEAD");
 
         auto rev = input.getRev();
         if (!rev) rev = getRevFromRef(store, input);
@@ -217,7 +217,7 @@ struct GitHubInputScheme : GitArchiveInputScheme
         auto host_url = maybeGetStrAttr(input.attrs, "url").value_or("github.com");
         Input::fromURL(fmt("git+ssh://git@%s/%s/%s.git",
                 host_url, getStrAttr(input.attrs, "owner"), getStrAttr(input.attrs, "repo")))
-            .applyOverrides(input.getRef().value_or("master"), input.getRev())
+            .applyOverrides(input.getRef().value_or("HEAD"), input.getRev())
             .clone(destDir);
     }
 };
@@ -262,7 +262,7 @@ struct GitLabInputScheme : GitArchiveInputScheme
         // FIXME: get username somewhere
         Input::fromURL(fmt("git+ssh://git@%s/%s/%s.git",
                 host_url, getStrAttr(input.attrs, "owner"), getStrAttr(input.attrs, "repo")))
-            .applyOverrides(input.getRef().value_or("master"), input.getRev())
+            .applyOverrides(input.getRef().value_or("HEAD"), input.getRev())
             .clone(destDir);
     }
 };

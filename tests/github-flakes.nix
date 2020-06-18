@@ -56,7 +56,7 @@ let
       tar cfz $out/tarball/${nixpkgs.rev} $dir --hard-dereference
 
       mkdir -p $out/commits
-      echo '{"sha": "${nixpkgs.rev}"}' > $out/commits/master
+      echo '{"sha": "${nixpkgs.rev}"}' > $out/commits/HEAD
     '';
 
 in
