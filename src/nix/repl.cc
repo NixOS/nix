@@ -119,7 +119,7 @@ std::string runNix(Path program, const Strings & args,
     });
 
     if (!statusOk(res.first))
-        throw ExecError(res.first, fmt("program '%1%' %2%", program, statusToString(res.first)));
+        throw ExecError(res.first, "program '%1%' %2%", program, statusToString(res.first));
 
     return res.second;
 }

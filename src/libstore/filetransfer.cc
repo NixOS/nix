@@ -443,14 +443,13 @@ struct curlFileTransfer : public FileTransfer
                     : httpStatus != 0
                     ? FileTransferError(err,
                         std::move(response),
-                        fmt("unable to %s '%s': HTTP error %d ('%s')",
-                            request.verb(), request.uri, httpStatus, statusMsg)
-                        + (code == CURLE_OK ? "" : fmt(" (curl error: %s)", curl_easy_strerror(code)))
-                        )
+                        "unable to %s '%s': HTTP error %d%s",
+                        request.verb(), request.uri, httpStatus,
+                        code == CURLE_OK ? "" : fmt(" (curl error: %s)", curl_easy_strerror(code)))
                     : FileTransferError(err,
                         std::move(response),
-                        fmt("unable to %s '%s': %s (%d)",
-                            request.verb(), request.uri, curl_easy_strerror(code), code));
+                        "unable to %s '%s': %s (%d)",
+                        request.verb(), request.uri, curl_easy_strerror(code), code);
 
                 /* If this is a transient error, then maybe retry the
                    download after a while. If we're writing to a
@@ -704,7 +703,7 @@ struct curlFileTransfer : public FileTransfer
                 auto s3Res = s3Helper.getObject(bucketName, key);
                 FileTransferResult res;
                 if (!s3Res.data)
-                    throw FileTransferError(NotFound, {}, "S3 object '%s' does not exist", request.uri);
+                    throw FileTransferError(NotFound, "S3 object '%s' does not exist", request.uri);
                 res.data = std::move(*s3Res.data);
                 callback(std::move(res));
 #else
