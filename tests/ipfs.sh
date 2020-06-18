@@ -113,3 +113,11 @@ DOWNLOAD_LOCATION=$(nix-build ./fixed.nix -A good \
   --no-out-link \
   -j0 \
   --option trusted-public-keys $(cat $SIGNING_KEY_PUB_FILE))
+
+# Verify we can copy something with dependencies
+outPath=$(nix-build dependencies.nix --no-out-link)
+
+nix copy $outPath --to ipns://$IPNS_ID --experimental-features nix-command
+
+# and copy back
+nix copy $outPath --store file://$IPFS_DST_IPNS_STORE --from ipns://$IPNS_ID --experimental-features nix-command
