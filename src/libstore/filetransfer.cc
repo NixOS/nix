@@ -58,7 +58,6 @@ struct curlFileTransfer : public FileTransfer
         Callback<FileTransferResult> callback;
         CURL * req = 0;
         bool active = false; // whether the handle has been added to the multi object
-        std::string status;
 
         unsigned int attempt = 0;
 
@@ -125,7 +124,7 @@ struct curlFileTransfer : public FileTransfer
             if (requestHeaders) curl_slist_free_all(requestHeaders);
             try {
                 if (!done)
-                    fail(FileTransferError(Interrupted, "download of '%s' was interrupted", request.uri));
+                    fail(FileTransferError(Interrupted, nullptr, "download of '%s' was interrupted", request.uri));
             } catch (...) {
                 ignoreException();
             }
@@ -155,8 +154,18 @@ struct curlFileTransfer : public FileTransfer
                 size_t realSize = size * nmemb;
                 result.bodySize += realSize;
 
-                if (!decompressionSink)
+                if (!decompressionSink) {
                     decompressionSink = makeDecompressionSink(encoding, finalSink);
+                    if (! successfulStatuses.count(getHTTPStatus())) {
+                        // In this case we want to construct a TeeSink, to keep
+                        // the response around (which we figure won't be big
+                        // like an actual download should be) to improve error
+                        // messages.
+                        decompressionSink = std::make_shared<TeeSink<ref<CompressionSink>>>(
+                            ref<CompressionSink>{ decompressionSink }
+                        );
+                    }
+                }
 
                 (*decompressionSink)((unsigned char *) contents, realSize);
 
@@ -177,6 +186,7 @@ struct curlFileTransfer : public FileTransfer
             size_t realSize = size * nmemb;
             std::string line((char *) contents, realSize);
             printMsg(lvlVomit, format("got header for '%s': %s") % request.uri % trim(line));
+            std::string status;
             if (line.compare(0, 5, "HTTP/") == 0) { // new response starts
                 result.etag = "";
                 auto ss = tokenizeString<vector<string>>(line, " ");
@@ -428,14 +438,18 @@ struct curlFileTransfer : public FileTransfer
 
                 attempt++;
 
+                std::shared_ptr<std::string> response;
+                if (decompressionSink)
+                    if (auto teeSink = std::dynamic_pointer_cast<TeeSink<std::shared_ptr<CompressionSink>>>(decompressionSink))
+                        response = teeSink->data;
                 auto exc =
                     code == CURLE_ABORTED_BY_CALLBACK && _isInterrupted
-                    ? FileTransferError(Interrupted, "%s of '%s' was interrupted", request.verb(), request.uri)
+                    ? FileTransferError(Interrupted, response, "%s of '%s' was interrupted", request.verb(), request.uri)
                     : httpStatus != 0
-                    ? FileTransferError(err, "unable to %s '%s': HTTP error %d%s",
+                    ? FileTransferError(err, response, "unable to %s '%s': HTTP error %d%s",
                         request.verb(), request.uri, httpStatus,
                         code == CURLE_OK ? "" : fmt(" (curl error: %s)", curl_easy_strerror(code)))
-                    : FileTransferError(err, "unable to %s '%s': %s (%d)",
+                    : FileTransferError(err, response, "unable to %s '%s': %s (%d)",
                         request.verb(), request.uri, curl_easy_strerror(code), code);
 
                 /* If this is a transient error, then maybe retry the
@@ -692,7 +706,7 @@ struct curlFileTransfer : public FileTransfer
                 auto s3Res = s3Helper.getObject(bucketName, key);
                 FileTransferResult res;
                 if (!s3Res.data)
-                    throw FileTransferError(NotFound, "S3 object '%s' does not exist", request.uri);
+                    throw FileTransferError(NotFound, nullptr, "S3 object '%s' does not exist", request.uri);
                 res.data = s3Res.data;
                 callback(std::move(res));
 #else
@@ -855,6 +869,18 @@ void FileTransfer::download(FileTransferRequest && request, Sink & sink)
 
 std::string FileTransfer::urlEncode(const std::string & param) {
     throw URLEncodeError("not implemented");
+}
+
+template<typename... Args>
+FileTransferError::FileTransferError(FileTransfer::Error error, std::shared_ptr<string> response, const Args & ... args)
+    : Error(args...), error(error), response(response)
+{
+    const auto hf = hintfmt(args...);
+    if (response) {
+        err.hint = hintfmt("%1%\n\nresponse body:\n\n%2%", normaltxt(hf.str()), response);
+    } else {
+        err.hint = hf;
+    }
 }
 
 bool isUri(const string & s)

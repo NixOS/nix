@@ -173,9 +173,8 @@ public:
 
     template<typename... Args>
     SysError(const Args & ... args)
-      :Error("")
+        : Error(""), errNo(errno)
     {
-        errNo = errno;
         auto hf = hintfmt(args...);
         err.hint = hintfmt("%1%: %2%", normaltxt(hf.str()), strerror(errNo));
     }
