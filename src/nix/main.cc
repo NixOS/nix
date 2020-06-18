@@ -10,6 +10,7 @@
 #include "progress-bar.hh"
 #include "filetransfer.hh"
 #include "finally.hh"
+#include "loggers.hh"
 
 #include <sys/types.h>
 #include <sys/socket.h>
@@ -90,7 +91,7 @@ struct NixArgs : virtual MultiCommand, virtual MixCommonArgs
             .longName = "print-build-logs",
             .shortName = 'L',
             .description = "print full build logs on stderr",
-            .handler = {&printBuildLogs, true},
+            .handler = {[&]() {setLogFormat(LogFormat::barWithLogs); }},
         });
 
         addFlag({
@@ -162,8 +163,12 @@ void mainWrapped(int argc, char * * argv)
         if (legacy) return legacy(argc, argv);
     }
 
-    verbosity = Verbosity::Warn;
+    verbosity = lvlWarn;
     settings.verboseBuild = false;
+
+    setLogFormat("bar");
+
+    Finally f([] { logger->stop(); });
 
     NixArgs args;
 
@@ -177,10 +182,6 @@ void mainWrapped(int argc, char * * argv)
         && args.command->first != "doctor"
         && args.command->first != "upgrade-nix")
         settings.requireExperimentalFeature("nix-command");
-
-    Finally f([]() { stopProgressBar(); });
-
-    startProgressBar(args.printBuildLogs);
 
     if (args.useNet && !haveInternet()) {
         warn("you don't have Internet access; disabling some network-dependent features");

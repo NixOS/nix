@@ -66,9 +66,9 @@ DownloadFileResult downloadFile(
     } else {
         StringSink sink;
         dumpString(*res.data, sink);
-        auto hash = hashString(HashType::SHA256, *res.data);
+        auto hash = hashString(htSHA256, *res.data);
         ValidPathInfo info(store->makeFixedOutputPath(FileIngestionMethod::Flat, hash, name));
-        info.narHash = hashString(HashType::SHA256, *sink.s);
+        info.narHash = hashString(htSHA256, *sink.s);
         info.narSize = sink.s->size();
         info.ca = FileSystemHash {
             FileIngestionMethod::Flat,
@@ -145,7 +145,7 @@ Tree downloadTarball(
             throw nix::Error("tarball '%s' contains an unexpected number of top-level files", url);
         auto topDir = tmpDir + "/" + members.begin()->name;
         lastModified = lstat(topDir).st_mtime;
-        unpackedStorePath = store->addToStore(name, topDir, FileIngestionMethod::Recursive, HashType::SHA256, defaultPathFilter, NoRepair);
+        unpackedStorePath = store->addToStore(name, topDir, FileIngestionMethod::Recursive, htSHA256, defaultPathFilter, NoRepair);
     }
 
     Attrs infoAttrs({
@@ -199,9 +199,9 @@ struct TarballInput : Input
         // NAR hashes are preferred over file hashes since tar/zip files
         // don't have a canonical representation.
         if (narHash)
-            url2.query.insert_or_assign("narHash", narHash->to_string(Base::SRI));
+            url2.query.insert_or_assign("narHash", narHash->to_string(SRI, true));
         else if (hash)
-            url2.query.insert_or_assign("hash", hash->to_string(Base::SRI));
+            url2.query.insert_or_assign("hash", hash->to_string(SRI, true));
         return url2;
     }
 
@@ -210,7 +210,7 @@ struct TarballInput : Input
         Attrs attrs;
         attrs.emplace("url", url.to_string());
         if (hash)
-            attrs.emplace("hash", hash->to_string(Base::SRI));
+            attrs.emplace("hash", hash->to_string(SRI, true));
         return attrs;
     }
 
@@ -267,8 +267,7 @@ struct TarballInputScheme : InputScheme
 
         auto input = std::make_unique<TarballInput>(parseURL(getStrAttr(attrs, "url")));
         if (auto hash = maybeGetStrAttr(attrs, "hash"))
-            // FIXME: require SRI hash.
-            input->hash = Hash(*hash);
+            input->hash = newHashAllowEmpty(*hash, {});
 
         return input;
     }

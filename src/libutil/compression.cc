@@ -314,7 +314,7 @@ struct XzCompressionSink : CompressionSink
             ret = lzma_stream_encoder_mt(&strm, &mt_options);
             done = true;
 #else
-            printMsg(Verbosity::Error, "warning: parallel XZ compression requested but not supported, falling back to single-threaded compression");
+            printMsg(lvlError, "warning: parallel XZ compression requested but not supported, falling back to single-threaded compression");
 #endif
         }
 
@@ -481,7 +481,7 @@ ref<CompressionSink> makeCompressionSink(const std::string & method, Sink & next
     else if (method == "br")
         return make_ref<BrotliCompressionSink>(nextSink);
     else
-        throw UnknownCompressionMethod(format("unknown compression method '%s'") % method);
+        throw UnknownCompressionMethod("unknown compression method '%s'", method);
 }
 
 ref<std::string> compress(const std::string & method, const std::string & in, const bool parallel)

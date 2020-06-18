@@ -72,23 +72,34 @@ struct curlFileTransfer : public FileTransfer
 
         curl_off_t writtenToSink = 0;
 
+        inline static const std::set<long> successfulStatuses {200, 201, 204, 206, 304, 0 /* other protocol */};
+        /* Get the HTTP status code, or 0 for other protocols. */
+        long getHTTPStatus()
+        {
+            long httpStatus = 0;
+            long protocol = 0;
+            curl_easy_getinfo(req, CURLINFO_PROTOCOL, &protocol);
+            if (protocol == CURLPROTO_HTTP || protocol == CURLPROTO_HTTPS)
+                curl_easy_getinfo(req, CURLINFO_RESPONSE_CODE, &httpStatus);
+            return httpStatus;
+        }
+
         TransferItem(curlFileTransfer & fileTransfer,
             const FileTransferRequest & request,
             Callback<FileTransferResult> && callback)
             : fileTransfer(fileTransfer)
             , request(request)
-            , act(*logger, Verbosity::Talkative, ActivityType::Download,
+            , act(*logger, lvlTalkative, actFileTransfer,
                 fmt(request.data ? "uploading '%s'" : "downloading '%s'", request.uri),
                 {request.uri}, request.parentAct)
             , callback(std::move(callback))
             , finalSink([this](const unsigned char * data, size_t len) {
                 if (this->request.dataCallback) {
-                    long httpStatus = 0;
-                    curl_easy_getinfo(req, CURLINFO_RESPONSE_CODE, &httpStatus);
+                    auto httpStatus = getHTTPStatus();
 
                     /* Only write data to the sink if this is a
                        successful response. */
-                    if (httpStatus == 0 || httpStatus == 200 || httpStatus == 201 || httpStatus == 206) {
+                    if (successfulStatuses.count(httpStatus)) {
                         writtenToSink += len;
                         this->request.dataCallback((char *) data, len);
                     }
@@ -112,7 +123,7 @@ struct curlFileTransfer : public FileTransfer
             if (requestHeaders) curl_slist_free_all(requestHeaders);
             try {
                 if (!done)
-                    fail(FileTransferError(Interrupted, format("download of '%s' was interrupted") % request.uri));
+                    fail(FileTransferError(Interrupted, "download of '%s' was interrupted", request.uri));
             } catch (...) {
                 ignoreException();
             }
@@ -163,7 +174,7 @@ struct curlFileTransfer : public FileTransfer
         {
             size_t realSize = size * nmemb;
             std::string line((char *) contents, realSize);
-            printMsg(Verbosity::Vomit, format("got header for '%s': %s") % request.uri % trim(line));
+            printMsg(lvlVomit, format("got header for '%s': %s") % request.uri % trim(line));
             if (line.compare(0, 5, "HTTP/") == 0) { // new response starts
                 result.etag = "";
                 auto ss = tokenizeString<vector<string>>(line, " ");
@@ -246,7 +257,7 @@ struct curlFileTransfer : public FileTransfer
 
             curl_easy_reset(req);
 
-            if (verbosity >= Verbosity::Vomit) {
+            if (verbosity >= lvlVomit) {
                 curl_easy_setopt(req, CURLOPT_VERBOSE, 1);
                 curl_easy_setopt(req, CURLOPT_DEBUGFUNCTION, TransferItem::debugCallback);
             }
@@ -316,8 +327,7 @@ struct curlFileTransfer : public FileTransfer
 
         void finish(CURLcode code)
         {
-            long httpStatus = 0;
-            curl_easy_getinfo(req, CURLINFO_RESPONSE_CODE, &httpStatus);
+            auto httpStatus = getHTTPStatus();
 
             char * effectiveUriCStr;
             curl_easy_getinfo(req, CURLINFO_EFFECTIVE_URL, &effectiveUriCStr);
@@ -343,8 +353,7 @@ struct curlFileTransfer : public FileTransfer
             if (writeException)
                 failEx(writeException);
 
-            else if (code == CURLE_OK &&
-                (httpStatus == 200 || httpStatus == 201 || httpStatus == 204 || httpStatus == 206 || httpStatus == 304 || httpStatus == 226 /* FTP */ || httpStatus == 0 /* other protocol */))
+            else if (code == CURLE_OK && successfulStatuses.count(httpStatus))
             {
                 result.cached = httpStatus == 304;
                 act.progress(result.bodySize, result.bodySize);
@@ -517,7 +526,7 @@ struct curlFileTransfer : public FileTransfer
             int running;
             CURLMcode mc = curl_multi_perform(curlm, &running);
             if (mc != CURLM_OK)
-                throw nix::Error(format("unexpected error from curl_multi_perform(): %s") % curl_multi_strerror(mc));
+                throw nix::Error("unexpected error from curl_multi_perform(): %s", curl_multi_strerror(mc));
 
             /* Set the promises of any finished requests. */
             CURLMsg * msg;
@@ -547,7 +556,7 @@ struct curlFileTransfer : public FileTransfer
             vomit("download thread waiting for %d ms", sleepTimeMs);
             mc = curl_multi_wait(curlm, extraFDs, 1, sleepTimeMs, &numfds);
             if (mc != CURLM_OK)
-                throw nix::Error(format("unexpected error from curl_multi_wait(): %s") % curl_multi_strerror(mc));
+                throw nix::Error("unexpected error from curl_multi_wait(): %s", curl_multi_strerror(mc));
 
             nextWakeup = std::chrono::steady_clock::time_point();
 
@@ -599,7 +608,11 @@ struct curlFileTransfer : public FileTransfer
             workerThreadMain();
         } catch (nix::Interrupted & e) {
         } catch (std::exception & e) {
-            printError("unexpected error in download thread: %s", e.what());
+            logError({
+                .name = "File transfer",
+                .hint = hintfmt("unexpected error in download thread: %s",
+                                e.what())
+            });
         }
 
         {

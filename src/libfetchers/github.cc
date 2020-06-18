@@ -45,7 +45,7 @@ struct GitHubInput : Input
         auto path = owner + "/" + repo;
         assert(!(ref && rev));
         if (ref) path += "/" + *ref;
-        if (rev) path += "/" + rev->to_string(Base::Base16, false);
+        if (rev) path += "/" + rev->to_string(Base16, false);
         return ParsedURL {
             .scheme = "github",
             .path = path,
@@ -76,7 +76,7 @@ struct GitHubInput : Input
                 readFile(
                     store->toRealPath(
                         downloadFile(store, url, "source", false).storePath)));
-            rev = Hash(json["sha"], HashType::SHA1);
+            rev = Hash(std::string { json["sha"] }, htSHA1);
             debug("HEAD revision for '%s' is %s", url, rev->gitRev());
         }
 
@@ -106,7 +106,7 @@ struct GitHubInput : Input
         // might have stricter rate limits.
 
         auto url = fmt("https://api.github.com/repos/%s/%s/tarball/%s",
-            owner, repo, rev->to_string(Base::Base16, false));
+            owner, repo, rev->to_string(Base16, false));
 
         std::string accessToken = settings.githubAccessToken.get();
         if (accessToken != "")
@@ -140,7 +140,7 @@ struct GitHubInputScheme : InputScheme
         if (path.size() == 2) {
         } else if (path.size() == 3) {
             if (std::regex_match(path[2], revRegex))
-                input->rev = Hash(path[2], HashType::SHA1);
+                input->rev = Hash(path[2], htSHA1);
             else if (std::regex_match(path[2], refRegex))
                 input->ref = path[2];
             else
@@ -152,7 +152,7 @@ struct GitHubInputScheme : InputScheme
             if (name == "rev") {
                 if (input->rev)
                     throw BadURL("GitHub URL '%s' contains multiple commit hashes", url.url);
-                input->rev = Hash(value, HashType::SHA1);
+                input->rev = Hash(value, htSHA1);
             }
             else if (name == "ref") {
                 if (!std::regex_match(value, refRegex))
@@ -185,7 +185,7 @@ struct GitHubInputScheme : InputScheme
         input->repo = getStrAttr(attrs, "repo");
         input->ref = maybeGetStrAttr(attrs, "ref");
         if (auto rev = maybeGetStrAttr(attrs, "rev"))
-            input->rev = Hash(*rev, HashType::SHA1);
+            input->rev = Hash(*rev, htSHA1);
         return input;
     }
 };

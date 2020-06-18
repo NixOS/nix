@@ -134,7 +134,7 @@ bool createUserEnv(EvalState & state, DrvInfos & elems,
     /* Realise the resulting store expression. */
     debug("building user environment");
     std::vector<StorePathWithOutputs> topLevelDrvs;
-    topLevelDrvs.push_back(StorePathWithOutputs{topLevelDrv.clone()});
+    topLevelDrvs.push_back({topLevelDrv});
     state.store->buildPaths(topLevelDrvs, state.repair ? bmRepair : bmNormal);
 
     /* Switch the current user environment to the output path. */
@@ -146,7 +146,7 @@ bool createUserEnv(EvalState & state, DrvInfos & elems,
 
         Path lockTokenCur = optimisticLockProfile(profile);
         if (lockToken != lockTokenCur) {
-            printError(format("profile '%1%' changed while we were busy; restarting") % profile);
+            printInfo("profile '%1%' changed while we were busy; restarting", profile);
             return false;
         }
 

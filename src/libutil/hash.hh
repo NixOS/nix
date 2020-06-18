@@ -10,12 +10,7 @@ namespace nix {
 MakeError(BadHash, Error);
 
 
-enum struct HashType : char {
-    MD5,
-    SHA1,
-    SHA256,
-    SHA512,
-};
+enum HashType : char { htMD5, htSHA1, htSHA256, htSHA512 };
 
 
 const int md5HashSize = 16;
@@ -25,12 +20,7 @@ const int sha512HashSize = 64;
 
 extern const string base32Chars;
 
-enum struct Base : int {
-    Base64,
-    Base32,
-    Base16,
-    SRI,
-};
+enum Base : int { Base64, Base32, Base16, SRI };
 
 
 struct Hash
@@ -52,11 +42,11 @@ struct Hash
        Subresource Integrity hash expression). If the 'type' argument
        is not present, then the hash type must be specified in the
        string. */
-    Hash(const std::string & s, std::optional<HashType> type);
+    Hash(std::string_view s, std::optional<HashType> type);
     // type must be provided
-    Hash(const std::string & s, HashType type);
+    Hash(std::string_view s, HashType type);
     // hash type must be part of string
-    Hash(const std::string & s);
+    Hash(std::string_view s);
 
     Hash(const Hash &) = default;
 
@@ -99,21 +89,23 @@ struct Hash
     /* Return a string representation of the hash, in base-16, base-32
        or base-64. By default, this is prefixed by the hash type
        (e.g. "sha256:"). */
-    std::string to_string(Base base = Base::Base32, bool includeType = true) const;
+    std::string to_string(Base base, bool includeType) const;
 
     std::string gitRev() const
     {
-        assert(type == HashType::SHA1);
-        return to_string(Base::Base16, false);
+        assert(type == htSHA1);
+        return to_string(Base16, false);
     }
 
     std::string gitShortRev() const
     {
-        assert(type == HashType::SHA1);
-        return std::string(to_string(Base::Base16, false), 0, 7);
+        assert(type == htSHA1);
+        return std::string(to_string(Base16, false), 0, 7);
     }
 };
 
+/* Helper that defaults empty hashes to the 0 hash. */
+Hash newHashAllowEmpty(std::string hashStr, std::optional<HashType> ht);
 
 /* Print a hash in base-16 if it's MD5, or base-32 otherwise. */
 string printHash16or32(const Hash & hash);

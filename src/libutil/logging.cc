@@ -18,11 +18,11 @@ void setCurActivity(const ActivityId activityId)
     curActivity = activityId;
 }
 
-Logger * logger = makeDefaultLogger();
+Logger * logger = makeSimpleLogger(true);
 
 void Logger::warn(const std::string & msg)
 {
-    log(Verbosity::Warn, ANSI_YELLOW "warning:" ANSI_NORMAL " " + msg);
+    log(lvlWarn, ANSI_YELLOW "warning:" ANSI_NORMAL " " + msg);
 }
 
 void Logger::writeToStdout(std::string_view s)
@@ -35,11 +35,17 @@ class SimpleLogger : public Logger
 public:
 
     bool systemd, tty;
+    bool printBuildLogs;
 
-    SimpleLogger()
+    SimpleLogger(bool printBuildLogs)
+        : printBuildLogs(printBuildLogs)
     {
         systemd = getEnv("IN_SYSTEMD") == "1";
         tty = isatty(STDERR_FILENO);
+    }
+
+    bool isVerbose() override {
+        return printBuildLogs;
     }
 
     void log(Verbosity lvl, const FormatOrString & fs) override
@@ -51,10 +57,10 @@ public:
         if (systemd) {
             char c;
             switch (lvl) {
-            case Verbosity::Error: c = '3'; break;
-            case Verbosity::Warn: c = '4'; break;
-            case Verbosity::Info: c = '5'; break;
-            case Verbosity::Talkative: case Verbosity::Chatty: c = '6'; break;
+            case lvlError: c = '3'; break;
+            case lvlWarn: c = '4'; break;
+            case lvlInfo: c = '5'; break;
+            case lvlTalkative: case lvlChatty: c = '6'; break;
             default: c = '7';
             }
             prefix = std::string("<") + c + ">";
@@ -63,16 +69,36 @@ public:
         writeToStderr(prefix + filterANSIEscapes(fs.s, !tty) + "\n");
     }
 
+    void logEI(const ErrorInfo & ei) override
+    {
+        std::stringstream oss;
+        oss << ei;
+
+        log(ei.level, oss.str());
+    }
+
     void startActivity(ActivityId act, Verbosity lvl, ActivityType type,
         const std::string & s, const Fields & fields, ActivityId parent)
-        override
+    override
     {
         if (lvl <= verbosity && !s.empty())
             log(lvl, s + "...");
     }
+
+    void result(ActivityId act, ResultType type, const Fields & fields) override
+    {
+        if (type == resBuildLogLine && printBuildLogs) {
+            auto lastLine = fields[0].s;
+            printError(lastLine);
+        }
+        else if (type == resPostBuildLogLine && printBuildLogs) {
+            auto lastLine = fields[0].s;
+            printError("post-build-hook: " + lastLine);
+        }
+    }
 };
 
-Verbosity verbosity = Verbosity::Info;
+Verbosity verbosity = lvlInfo;
 
 void warnOnce(bool & haveWarned, const FormatOrString & fs)
 {
@@ -94,9 +120,9 @@ void writeToStderr(const string & s)
     }
 }
 
-Logger * makeDefaultLogger()
+Logger * makeSimpleLogger(bool printBuildLogs)
 {
-    return new SimpleLogger();
+    return new SimpleLogger(printBuildLogs);
 }
 
 std::atomic<uint64_t> nextId{(uint64_t) getpid() << 32};
@@ -108,11 +134,14 @@ Activity::Activity(Logger & logger, Verbosity lvl, ActivityType type,
     logger.startActivity(id, lvl, type, s, fields, parent);
 }
 
-struct JSONLogger : Logger
-{
+struct JSONLogger : Logger {
     Logger & prevLogger;
 
     JSONLogger(Logger & prevLogger) : prevLogger(prevLogger) { }
+
+    bool isVerbose() override {
+        return true;
+    }
 
     void addFields(nlohmann::json & json, const Fields & fields)
     {
@@ -129,7 +158,7 @@ struct JSONLogger : Logger
 
     void write(const nlohmann::json & json)
     {
-        prevLogger.log(Verbosity::Error, "@nix " + json.dump());
+        prevLogger.log(lvlError, "@nix " + json.dump());
     }
 
     void log(Verbosity lvl, const FormatOrString & fs) override
@@ -138,6 +167,19 @@ struct JSONLogger : Logger
         json["action"] = "msg";
         json["level"] = lvl;
         json["msg"] = fs.s;
+        write(json);
+    }
+
+    void logEI(const ErrorInfo & ei) override
+    {
+        std::ostringstream oss;
+        oss << ei;
+
+        nlohmann::json json;
+        json["action"] = "msg";
+        json["level"] = ei.level;
+        json["msg"] = oss.str();
+
         write(json);
     }
 
@@ -204,7 +246,7 @@ bool handleJSONLogMessage(const std::string & msg,
 
         if (action == "start") {
             auto type = (ActivityType) json["type"];
-            if (trusted || type == ActivityType::Download)
+            if (trusted || type == actFileTransfer)
                 activities.emplace(std::piecewise_construct,
                     std::forward_as_tuple(json["id"]),
                     std::forward_as_tuple(*logger, (Verbosity) json["level"], type,
@@ -222,7 +264,7 @@ bool handleJSONLogMessage(const std::string & msg,
 
         else if (action == "setPhase") {
             std::string phase = json["phase"];
-            act.result(ResultType::SetPhase, phase);
+            act.result(resSetPhase, phase);
         }
 
         else if (action == "msg") {
@@ -231,13 +273,17 @@ bool handleJSONLogMessage(const std::string & msg,
         }
 
     } catch (std::exception & e) {
-        printError("bad log message from builder: %s", e.what());
+        logError({
+            .name = "Json log message",
+            .hint = hintfmt("bad log message from builder: %s", e.what())
+        });
     }
 
     return true;
 }
 
-Activity::~Activity() {
+Activity::~Activity()
+{
     try {
         logger.stopActivity(id);
     } catch (...) {

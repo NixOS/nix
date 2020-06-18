@@ -70,7 +70,7 @@ path just built.</para>
 
   <screen>
 $ nix-build ./deterministic.nix -A stable
-these derivations will be built:
+this derivation will be built:
   /nix/store/z98fasz2jqy9gs0xbvdj939p27jwda38-stable.drv
 building '/nix/store/z98fasz2jqy9gs0xbvdj939p27jwda38-stable.drv'...
 /nix/store/yyxlzw3vqaas7wfp04g0b1xg51f2czgq-stable
@@ -85,7 +85,7 @@ checking outputs of '/nix/store/z98fasz2jqy9gs0xbvdj939p27jwda38-stable.drv'...
 
   <screen>
 $ nix-build ./deterministic.nix -A unstable
-these derivations will be built:
+this derivation will be built:
   /nix/store/cgl13lbj1w368r5z8gywipl1ifli7dhk-unstable.drv
 building '/nix/store/cgl13lbj1w368r5z8gywipl1ifli7dhk-unstable.drv'...
 /nix/store/krpqk0l9ib0ibi1d2w52z293zw455cap-unstable
@@ -193,7 +193,7 @@ repeat = 1
     An example output of this configuration:
     <screen>
 $ nix-build ./test.nix -A unstable
-these derivations will be built:
+this derivation will be built:
   /nix/store/ch6llwpr2h8c3jmnf3f2ghkhx59aa97f-unstable.drv
 building '/nix/store/ch6llwpr2h8c3jmnf3f2ghkhx59aa97f-unstable.drv' (round 1/2)...
 building '/nix/store/ch6llwpr2h8c3jmnf3f2ghkhx59aa97f-unstable.drv' (round 2/2)...

@@ -21,7 +21,7 @@ std::string makeFixedOutputCA(FileIngestionMethod method, const Hash & hash)
 {
     return "fixed:"
         + makeFileIngestionPrefix(method)
-        + hash.to_string();
+        + hash.to_string(Base32, true);
 }
 
 // FIXME Put this somewhere?
@@ -31,7 +31,7 @@ template<class... Ts> overloaded(Ts...) -> overloaded<Ts...>;
 std::string renderContentAddress(ContentAddress ca) {
     return std::visit(overloaded {
         [](TextHash th) {
-            return "text:" + th.hash.to_string();
+            return "text:" + th.hash.to_string(Base::Base32, true);
         },
         [](FileSystemHash fsh) {
             return makeFixedOutputCA(fsh.method, fsh.hash);
@@ -46,7 +46,7 @@ ContentAddress parseContentAddress(std::string_view rawCa) {
         if (prefix == "text") {
             auto hashTypeAndHash = rawCa.substr(prefixSeparator+1, string::npos);
             Hash hash = Hash(string(hashTypeAndHash));
-            if (*hash.type != HashType::SHA256) {
+            if (*hash.type != htSHA256) {
                 throw Error("parseContentAddress: the text hash should have type SHA256");
             }
             return TextHash { hash };

@@ -8,28 +8,6 @@
 
 namespace nix {
 
-BasicDerivation::BasicDerivation(const BasicDerivation & other)
-    : platform(other.platform)
-    , builder(other.builder)
-    , args(other.args)
-    , env(other.env)
-{
-    for (auto & i : other.outputs)
-        outputs.insert_or_assign(i.first,
-            DerivationOutput(i.second.path.clone(), std::optional<FileSystemHash>(i.second.hash)));
-    for (auto & i : other.inputSrcs)
-        inputSrcs.insert(i.clone());
-}
-
-
-Derivation::Derivation(const Derivation & other)
-    : BasicDerivation(other)
-{
-    for (auto & i : other.inputDrvs)
-        inputDrvs.insert_or_assign(i.first.clone(), i.second);
-}
-
-
 const StorePath & BasicDerivation::findOutput(const string & id) const
 {
     auto i = outputs.find(id);
@@ -48,9 +26,9 @@ bool BasicDerivation::isBuiltin() const
 StorePath writeDerivation(ref<Store> store,
     const Derivation & drv, std::string_view name, RepairFlag repair)
 {
-    auto references = cloneStorePathSet(drv.inputSrcs);
+    auto references = drv.inputSrcs;
     for (auto & i : drv.inputDrvs)
-        references.insert(i.first.clone());
+        references.insert(i.first);
     /* Note that the outputs of a derivation are *not* references
        (that can be missing (of course) and should not necessarily be
        held during a garbage collection). */
@@ -68,7 +46,7 @@ static void expect(std::istream & str, const string & s)
     char s2[s.size()];
     str.read(s2, s.size());
     if (string(s2, s.size()) != s)
-        throw FormatError(format("expected string '%1%'") % s);
+        throw FormatError("expected string '%1%'", s);
 }
 
 
@@ -95,7 +73,7 @@ static Path parsePath(std::istream & str)
 {
     string s = parseString(str);
     if (s.size() == 0 || s[0] != '/')
-        throw FormatError(format("bad path '%1%' in derivation") % s);
+        throw FormatError("bad path '%1%' in derivation", s);
     return s;
 }
 
@@ -130,9 +108,9 @@ static DerivationOutput parseDerivationOutput(const Store & store, istringstream
     expect(str, ","); const auto hash = parseString(str);
     expect(str, ")");
 
-    auto method = FileIngestionMethod::Flat;
     std::optional<FileSystemHash> fsh;
     if (hashAlgo != "") {
+        auto method = FileIngestionMethod::Flat;
         if (string(hashAlgo, 0, 2) == "r:") {
             method = FileIngestionMethod::Recursive;
             hashAlgo = string(hashAlgo, 2);
@@ -144,7 +122,10 @@ static DerivationOutput parseDerivationOutput(const Store & store, istringstream
         };
     }
 
-    return DerivationOutput(std::move(path), std::move(fsh));
+    return DerivationOutput {
+        .path = std::move(path),
+        .hash = std::move(fsh),
+    };
 }
 
 
@@ -157,7 +138,8 @@ static Derivation parseDerivation(const Store & store, const string & s)
     /* Parse the list of outputs. */
     while (!endOfList(str)) {
         expect(str, "("); std::string id = parseString(str);
-        drv.outputs.emplace(id, parseDerivationOutput(store, str));
+        auto output = parseDerivationOutput(store, str);
+        drv.outputs.emplace(std::move(id), std::move(output));
     }
 
     /* Parse the list of input derivations. */
@@ -198,7 +180,7 @@ Derivation readDerivation(const Store & store, const Path & drvPath)
     try {
         return parseDerivation(store, readFile(drvPath));
     } catch (FormatError & e) {
-        throw Error(format("error parsing derivation '%1%': %2%") % drvPath % e.msg());
+        throw Error("error parsing derivation '%1%': %2%", drvPath, e.msg());
     }
 }
 
@@ -206,6 +188,12 @@ Derivation readDerivation(const Store & store, const Path & drvPath)
 Derivation Store::derivationFromPath(const StorePath & drvPath)
 {
     ensurePath(drvPath);
+    return readDerivation(drvPath);
+}
+
+
+Derivation Store::readDerivation(const StorePath & drvPath)
+{
     auto accessor = getFSAccessor();
     try {
         return parseDerivation(*this, accessor->readFile(printStorePath(drvPath)));
@@ -367,9 +355,9 @@ Hash hashDerivationModulo(Store & store, const Derivation & drv, bool maskOutput
     /* Return a fixed hash for fixed-output derivations. */
     if (drv.isFixedOutput()) {
         DerivationOutputs::const_iterator i = drv.outputs.begin();
-        return hashString(HashType::SHA256, "fixed:out:"
+        return hashString(htSHA256, "fixed:out:"
             + i->second.hash->printMethodAlgo() + ":"
-            + i->second.hash->hash.to_string(Base::Base16, false) + ":"
+            + i->second.hash->hash.to_string(Base16, false) + ":"
             + store.printStorePath(i->second.path));
     }
 
@@ -380,13 +368,13 @@ Hash hashDerivationModulo(Store & store, const Derivation & drv, bool maskOutput
         auto h = drvHashes.find(i.first);
         if (h == drvHashes.end()) {
             assert(store.isValidPath(i.first));
-            h = drvHashes.insert_or_assign(i.first.clone(), hashDerivationModulo(store,
-                readDerivation(store, store.toRealPath(i.first)), false)).first;
+            h = drvHashes.insert_or_assign(i.first, hashDerivationModulo(store,
+                store.readDerivation(i.first), false)).first;
         }
-        inputs2.insert_or_assign(h->second.to_string(Base::Base16, false), i.second);
+        inputs2.insert_or_assign(h->second.to_string(Base16, false), i.second);
     }
 
-    return hashString(HashType::SHA256, drv.unparse(store, maskOutputs, &inputs2));
+    return hashString(htSHA256, drv.unparse(store, maskOutputs, &inputs2));
 }
 
 
@@ -408,7 +396,7 @@ StorePathSet BasicDerivation::outputPaths() const
 {
     StorePathSet paths;
     for (auto & i : outputs)
-        paths.insert(i.second.path.clone());
+        paths.insert(i.second.path);
     return paths;
 }
 
@@ -418,22 +406,34 @@ static DerivationOutput readDerivationOutput(Source & in, const Store & store)
     auto hashAlgo = readString(in);
     const auto hash = readString(in);
 
-    auto method = FileIngestionMethod::Flat;
     std::optional<FileSystemHash> fsh;
     if (hashAlgo != "") {
+        auto method = FileIngestionMethod::Flat;
         if (string(hashAlgo, 0, 2) == "r:") {
             method = FileIngestionMethod::Recursive;
             hashAlgo = string(hashAlgo, 2);
         }
-        HashType hashType = parseHashType(hashAlgo);
+        const HashType hashType = parseHashType(hashAlgo);
         fsh = FileSystemHash {
             std::move(method),
             Hash(hash, hashType),
         };
     }
 
-    return DerivationOutput(std::move(path), std::move(fsh));
+    return DerivationOutput {
+        .path = std::move(path),
+        .hash = std::move(fsh),
+    };
 }
+
+StringSet BasicDerivation::outputNames() const
+{
+    StringSet names;
+    for (auto & i : outputs)
+        names.insert(i.first);
+    return names;
+}
+
 
 Source & readDerivation(Source & in, const Store & store, BasicDerivation & drv)
 {
@@ -442,7 +442,7 @@ Source & readDerivation(Source & in, const Store & store, BasicDerivation & drv)
     for (size_t n = 0; n < nr; n++) {
         auto name = readString(in);
         auto output = readDerivationOutput(in, store);
-        drv.outputs.emplace(name, output);
+        drv.outputs.emplace(std::move(name), std::move(output));
     }
 
     drv.inputSrcs = readStorePaths<StorePathSet>(store, in);
@@ -479,7 +479,7 @@ void writeDerivation(Sink & out, const Store & store, const BasicDerivation & dr
 std::string hashPlaceholder(const std::string & outputName)
 {
     // FIXME: memoize?
-    return "/" + hashString(HashType::SHA256, "nix-output:" + outputName).to_string(Base::Base32, false);
+    return "/" + hashString(htSHA256, "nix-output:" + outputName).to_string(Base32, false);
 }
 
 

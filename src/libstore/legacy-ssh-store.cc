@@ -139,7 +139,7 @@ struct LegacySSHStore : public Store
                 << cmdAddToStoreNar
                 << printStorePath(info.path)
                 << (info.deriver ? printStorePath(*info.deriver) : "")
-                << info.narHash.to_string(Base::Base16, false);
+                << info.narHash.to_string(Base16, false);
             writeStorePaths(*this, conn->to, info.references);
             conn->to
                 << info.registrationTime
@@ -256,7 +256,7 @@ struct LegacySSHStore : public Store
         conn->to.flush();
 
         for (auto & i : readStorePaths<StorePathSet>(*this, conn->from))
-            out.insert(i.clone());
+            out.insert(i);
     }
 
     StorePathSet queryValidPaths(const StorePathSet & paths,

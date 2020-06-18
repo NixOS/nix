@@ -29,17 +29,23 @@ static void prim_fetchGit(EvalState & state, const Pos & pos, Value * * args, Va
             else if (n == "ref")
                 ref = state.forceStringNoCtx(*attr.value, *attr.pos);
             else if (n == "rev")
-                rev = Hash(state.forceStringNoCtx(*attr.value, *attr.pos), HashType::SHA1);
+                rev = Hash(state.forceStringNoCtx(*attr.value, *attr.pos), htSHA1);
             else if (n == "name")
                 name = state.forceStringNoCtx(*attr.value, *attr.pos);
             else if (n == "submodules")
                 fetchSubmodules = state.forceBool(*attr.value, *attr.pos);
             else
-                throw EvalError("unsupported argument '%s' to 'fetchGit', at %s", attr.name, *attr.pos);
+                throw EvalError({
+                    .hint = hintfmt("unsupported argument '%s' to 'fetchGit'", attr.name),
+                    .nixCode = NixCode { .errPos = *attr.pos }
+                });
         }
 
         if (url.empty())
-            throw EvalError(format("'url' argument required, at %1%") % pos);
+            throw EvalError({
+                .hint = hintfmt("'url' argument required"),
+                .nixCode = NixCode { .errPos = pos }
+            });
 
     } else
         url = state.coerceToString(pos, *args[0], context, false, false);
@@ -67,7 +73,7 @@ static void prim_fetchGit(EvalState & state, const Pos & pos, Value * * args, Va
     mkString(*state.allocAttr(v, state.sOutPath), storePath, PathSet({storePath}));
     // Backward compatibility: set 'rev' to
     // 0000000000000000000000000000000000000000 for a dirty tree.
-    auto rev2 = input2->getRev().value_or(Hash(HashType::SHA1));
+    auto rev2 = input2->getRev().value_or(Hash(htSHA1));
     mkString(*state.allocAttr(v, state.symbols.create("rev")), rev2.gitRev());
     mkString(*state.allocAttr(v, state.symbols.create("shortRev")), rev2.gitShortRev());
     // Backward compatibility: set 'revCount' to 0 for a dirty tree.

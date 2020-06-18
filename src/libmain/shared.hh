@@ -43,11 +43,11 @@ struct StorePathWithOutputs;
 void printMissing(
     ref<Store> store,
     const std::vector<StorePathWithOutputs> & paths,
-    Verbosity lvl = Verbosity::Info);
+    Verbosity lvl = lvlInfo);
 
 void printMissing(ref<Store> store, const StorePathSet & willBuild,
     const StorePathSet & willSubstitute, const StorePathSet & unknown,
-    unsigned long long downloadSize, unsigned long long narSize, Verbosity lvl = Verbosity::Info);
+    unsigned long long downloadSize, unsigned long long narSize, Verbosity lvl = lvlInfo);
 
 string getArg(const string & opt,
     Strings::iterator & i, const Strings::iterator & end);
@@ -56,7 +56,7 @@ template<class N> N getIntArg(const string & opt,
     Strings::iterator & i, const Strings::iterator & end, bool allowUnit)
 {
     ++i;
-    if (i == end) throw UsageError(format("'%1%' requires an argument") % opt);
+    if (i == end) throw UsageError("'%1%' requires an argument", opt);
     string s = *i;
     N multiplier = 1;
     if (allowUnit && !s.empty()) {
@@ -66,13 +66,13 @@ template<class N> N getIntArg(const string & opt,
             else if (u == 'M') multiplier = 1ULL << 20;
             else if (u == 'G') multiplier = 1ULL << 30;
             else if (u == 'T') multiplier = 1ULL << 40;
-            else throw UsageError(format("invalid unit specifier '%1%'") % u);
+            else throw UsageError("invalid unit specifier '%1%'", u);
             s.resize(s.size() - 1);
         }
     }
     N n;
     if (!string2Int(s, n))
-        throw UsageError(format("'%1%' requires an integer argument") % opt);
+        throw UsageError("'%1%' requires an integer argument", opt);
     return n * multiplier;
 }
 

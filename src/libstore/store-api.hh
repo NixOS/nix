@@ -178,9 +178,10 @@ struct ValidPathInfo
 
     Strings shortRefs() const;
 
+    ValidPathInfo(const ValidPathInfo & other) = default;
+
     ValidPathInfo(StorePath && path) : path(std::move(path)) { };
     ValidPathInfo(const StorePath & path) : path(path) { };
-    ValidPathInfo(const ValidPathInfo & other) = default;
 
     virtual ~ValidPathInfo() { }
 };
@@ -349,7 +350,7 @@ public:
        path and the cryptographic hash of the contents of srcPath. */
     std::pair<StorePath, Hash> computeStorePathForPath(std::string_view name,
         const Path & srcPath, FileIngestionMethod method = FileIngestionMethod::Recursive,
-        HashType hashAlgo = HashType::SHA256, PathFilter & filter = defaultPathFilter) const;
+        HashType hashAlgo = htSHA256, PathFilter & filter = defaultPathFilter) const;
 
     /* Preparatory part of addTextToStore().
 
@@ -420,10 +421,6 @@ public:
     virtual StorePathSet queryDerivationOutputs(const StorePath & path)
     { unsupported("queryDerivationOutputs"); }
 
-    /* Query the output names of the derivation denoted by `path'. */
-    virtual StringSet queryDerivationOutputNames(const StorePath & path)
-    { unsupported("queryDerivationOutputNames"); }
-
     /* Query the full store path given the hash part of a valid store
        path, or empty if the path doesn't exist. */
     virtual std::optional<StorePath> queryPathFromHashPart(const std::string & hashPart) = 0;
@@ -447,12 +444,12 @@ public:
        The function object `filter' can be used to exclude files (see
        libutil/archive.hh). */
     virtual StorePath addToStore(const string & name, const Path & srcPath,
-        FileIngestionMethod method = FileIngestionMethod::Recursive, HashType hashAlgo = HashType::SHA256,
+        FileIngestionMethod method = FileIngestionMethod::Recursive, HashType hashAlgo = htSHA256,
         PathFilter & filter = defaultPathFilter, RepairFlag repair = NoRepair) = 0;
 
     // FIXME: remove?
     virtual StorePath addToStoreFromDump(const string & dump, const string & name,
-        FileIngestionMethod method = FileIngestionMethod::Recursive, HashType hashAlgo = HashType::SHA256, RepairFlag repair = NoRepair)
+        FileIngestionMethod method = FileIngestionMethod::Recursive, HashType hashAlgo = htSHA256, RepairFlag repair = NoRepair)
     {
         throw Error("addToStoreFromDump() is not supported by this store");
     }
@@ -546,7 +543,7 @@ public:
        each path is included. */
     void pathInfoToJSON(JSONPlaceholder & jsonOut, const StorePathSet & storePaths,
         bool includeImpureInfo, bool showClosureSize,
-        Base hashBase = Base::Base32,
+        Base hashBase = Base32,
         AllowInvalidFlag allowInvalid = DisallowInvalid);
 
     /* Return the size of the closure of the specified path, that is,
@@ -576,6 +573,9 @@ public:
     /* Read a derivation, after ensuring its existence through
        ensurePath(). */
     Derivation derivationFromPath(const StorePath & drvPath);
+
+    /* Read a derivation (which must already be valid). */
+    Derivation readDerivation(const StorePath & drvPath);
 
     /* Place in `out' the set of all store paths in the file system
        closure of `storePath'; that is, all paths than can be directly
@@ -720,10 +720,6 @@ public:
 
     std::shared_ptr<std::string> getBuildLog(const StorePath & path) override;
 };
-
-
-/* Extract the hash part of the given store path. */
-string storePathToHash(const Path & path);
 
 
 /* Copy a path from one store to another. */

@@ -122,7 +122,7 @@ post-build-hook = /etc/nix/upload-to-cache.sh
 
   <screen>
 $ nix-build -E '(import &lt;nixpkgs&gt; {}).writeText "example" (builtins.toString builtins.currentTime)'
-these derivations will be built:
+this derivation will be built:
   /nix/store/s4pnfbkalzy5qz57qs6yybna8wylkig6-example.drv
 building '/nix/store/s4pnfbkalzy5qz57qs6yybna8wylkig6-example.drv'...
 running post-build-hook '/home/grahamc/projects/github.com/NixOS/nix/post-hook.sh'...

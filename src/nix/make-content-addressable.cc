@@ -36,7 +36,7 @@ struct CmdMakeContentAddressable : StorePathsCommand, MixJSON
 
     void run(ref<Store> store, StorePaths storePaths) override
     {
-        auto paths = store->topoSortPaths(storePathsToSet(storePaths));
+        auto paths = store->topoSortPaths(StorePathSet(storePaths.begin(), storePaths.end()));
 
         std::reverse(paths.begin(), paths.end());
 
@@ -48,7 +48,7 @@ struct CmdMakeContentAddressable : StorePathsCommand, MixJSON
         for (auto & path : paths) {
             auto pathS = store->printStorePath(path);
             auto oldInfo = store->queryPathInfo(path);
-            auto oldHashPart = storePathToHash(pathS);
+            std::string oldHashPart(path.hashPart());
 
             StringSink sink;
             store->narFromPath(path, sink);
@@ -62,7 +62,7 @@ struct CmdMakeContentAddressable : StorePathsCommand, MixJSON
                     hasSelfReference = true;
                 else {
                     auto i = remappings.find(ref);
-                    auto replacement = i != remappings.end() ? i->second.clone() : ref.clone();
+                    auto replacement = i != remappings.end() ? i->second : ref;
                     // FIXME: warn about unremapped paths?
                     if (replacement != ref)
                         rewrites.insert_or_assign(store->printStorePath(ref), store->printStorePath(replacement));
@@ -72,14 +72,14 @@ struct CmdMakeContentAddressable : StorePathsCommand, MixJSON
 
             *sink.s = rewriteStrings(*sink.s, rewrites);
 
-            HashModuloSink hashModuloSink(HashType::SHA256, oldHashPart);
+            HashModuloSink hashModuloSink(htSHA256, oldHashPart);
             hashModuloSink((unsigned char *) sink.s->data(), sink.s->size());
 
             auto narHash = hashModuloSink.finish().first;
 
             ValidPathInfo info(store->makeFixedOutputPath(FileIngestionMethod::Recursive, narHash, path.name(), references, hasSelfReference));
             info.references = std::move(references);
-            if (hasSelfReference) info.references.insert(info.path.clone());
+            if (hasSelfReference) info.references.insert(info.path);
             info.narHash = narHash;
             info.narSize = sink.s->size();
             info.ca = FileSystemHash {
@@ -88,10 +88,10 @@ struct CmdMakeContentAddressable : StorePathsCommand, MixJSON
             };
 
             if (!json)
-                printError("rewrote '%s' to '%s'", pathS, store->printStorePath(info.path));
+                printInfo("rewrote '%s' to '%s'", pathS, store->printStorePath(info.path));
 
             auto source = sinkToSource([&](Sink & nextSink) {
-                RewritingSink rsink2(oldHashPart, storePathToHash(store->printStorePath(info.path)), nextSink);
+                RewritingSink rsink2(oldHashPart, std::string(info.path.hashPart()), nextSink);
                 rsink2((unsigned char *) sink.s->data(), sink.s->size());
                 rsink2.flush();
             });

@@ -18,7 +18,7 @@ void builtinFetchurl(const BasicDerivation & drv, const std::string & netrcData)
 
     auto getAttr = [&](const string & name) {
         auto i = drv.env.find(name);
-        if (i == drv.env.end()) throw Error(format("attribute '%s' missing") % name);
+        if (i == drv.env.end()) throw Error("attribute '%s' missing", name);
         return i->second;
     };
 
@@ -54,7 +54,7 @@ void builtinFetchurl(const BasicDerivation & drv, const std::string & netrcData)
         auto executable = drv.env.find("executable");
         if (executable != drv.env.end() && executable->second == "1") {
             if (chmod(storePath.c_str(), 0755) == -1)
-                throw SysError(format("making '%1%' executable") % storePath);
+                throw SysError("making '%1%' executable", storePath);
         }
     };
 
@@ -65,7 +65,7 @@ void builtinFetchurl(const BasicDerivation & drv, const std::string & netrcData)
                 if (!hasSuffix(hashedMirror, "/")) hashedMirror += '/';
                 auto ht = parseHashTypeOpt(getAttr("outputHashAlgo"));
                 auto h = Hash(getAttr("outputHash"), ht);
-                fetch(hashedMirror + printHashType(*h.type) + "/" + h.to_string(Base::Base16, false));
+                fetch(hashedMirror + printHashType(*h.type) + "/" + h.to_string(Base16, false));
                 return;
             } catch (Error & e) {
                 debug(e.what());

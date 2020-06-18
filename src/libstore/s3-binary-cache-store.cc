@@ -32,8 +32,10 @@ namespace nix {
 struct S3Error : public Error
 {
     Aws::S3::S3Errors err;
-    S3Error(Aws::S3::S3Errors err, const FormatOrString & fs)
-        : Error(fs), err(err) { };
+
+    template<typename... Args>
+    S3Error(Aws::S3::S3Errors err, const Args & ... args)
+        : Error(args...), err(err) { };
 };
 
 /* Helper: given an Outcome<R, E>, return R in case of success, or
@@ -68,9 +70,9 @@ static void initAWS()
            shared.cc), so don't let aws-sdk-cpp override it. */
         options.cryptoOptions.initAndCleanupOpenSSL = false;
 
-        if (verbosity >= Verbosity::Debug) {
+        if (verbosity >= lvlDebug) {
             options.loggingOptions.logLevel =
-                verbosity == Verbosity::Debug
+                verbosity == lvlDebug
                 ? Aws::Utils::Logging::LogLevel::Debug
                 : Aws::Utils::Logging::LogLevel::Trace;
             options.loggingOptions.logger_create_fn = [options]() {
@@ -109,7 +111,9 @@ class RetryStrategy : public Aws::Client::DefaultRetryStrategy
         auto retry = Aws::Client::DefaultRetryStrategy::ShouldRetry(error, attemptedRetries);
         if (retry)
             printError("AWS error '%s' (%s), will retry in %d ms",
-                error.GetExceptionName(), error.GetMessage(), CalculateDelayBeforeNextRetry(error, attemptedRetries));
+                error.GetExceptionName(),
+                error.GetMessage(),
+                CalculateDelayBeforeNextRetry(error, attemptedRetries));
         return retry;
     }
 };
@@ -249,7 +253,7 @@ struct S3BinaryCacheStoreImpl : public S3BinaryCacheStore
                 // If bucket listing is disabled, 404s turn into 403s
                 || error.GetErrorType() == Aws::S3::S3Errors::ACCESS_DENIED)
                 return false;
-            throw Error(format("AWS error fetching '%s': %s") % path % error.GetMessage());
+            throw Error("AWS error fetching '%s': %s", path, error.GetMessage());
         }
 
         return true;
