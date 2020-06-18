@@ -184,9 +184,9 @@ protected:
         auto keyListResponse = nlohmann::json::parse(*(getFileTransfer()->download(keyListRequest)).data);
 
         std::string keyName {""};
-        for (nlohmann::json::iterator it = keyListResponse["Keys"].begin(); it != keyListResponse["Keys"].end(); ++it)
-            if ((*it)["Id"] == ipnsPathHash)
-                keyName = (*it)["Name"];
+        for (auto & key : keyListResponse["Keys"])
+            if (key["Id"] == ipnsPathHash)
+                keyName = key["Name"];
         if (keyName == "") {
             throw Error("We couldn't find a name corresponding to the provided ipns hash:\n  hash: %s", ipnsPathHash);
         }
