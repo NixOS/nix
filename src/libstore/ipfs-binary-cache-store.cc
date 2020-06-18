@@ -6,6 +6,7 @@
 #include "nar-info-disk-cache.hh"
 #include "archive.hh"
 #include "compression.hh"
+#include "versions.hh"
 
 namespace nix {
 
@@ -81,6 +82,9 @@ public:
         auto versionInfo = nlohmann::json::parse(*res.data);
         if (versionInfo.find("Version") == versionInfo.end())
             throw Error("daemon for IPFS is not running properly");
+
+        if (compareVersions(versionInfo["Version"], "0.4.0") < 0)
+            throw Error("daemon for IPFS is %s, when a minimum of 0.4.0 is required", versionInfo["Version"]);
 
         // Resolve the IPNS name to an IPFS object
         if (optIpnsPath) {
