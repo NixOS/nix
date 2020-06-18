@@ -164,7 +164,7 @@ protected:
 
         debug("Publishing '%s' to '%s', this could take a while.", state->ipfsPath, ipnsPath);
 
-        auto uri = daemonUri + "/api/v0/name/publish?offline=true&arg=" + getFileTransfer()->urlEncode(state->ipfsPath);
+        auto uri = daemonUri + "/api/v0/name/publish?offline=true&allow-offline=true&arg=" + getFileTransfer()->urlEncode(state->ipfsPath);
 
         // Given the hash, we want to discover the corresponding name in the
         // `ipfs key list` command, so that we publish to the right address in
