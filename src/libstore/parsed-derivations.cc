@@ -4,8 +4,8 @@
 
 namespace nix {
 
-ParsedDerivation::ParsedDerivation(StorePath && drvPath, BasicDerivation & drv)
-    : drvPath(std::move(drvPath)), drv(drv)
+ParsedDerivation::ParsedDerivation(const StorePath & drvPath, BasicDerivation & drv)
+    : drvPath(drvPath), drv(drv)
 {
     /* Parse the __json attribute, if any. */
     auto jsonAttr = drv.env.find("__json");
@@ -115,6 +115,11 @@ bool ParsedDerivation::willBuildLocally() const
 bool ParsedDerivation::substitutesAllowed() const
 {
     return getBoolAttr("allowSubstitutes", true);
+}
+
+bool ParsedDerivation::contentAddressed() const
+{
+    return getBoolAttr("__contentAddressed", false);
 }
 
 }

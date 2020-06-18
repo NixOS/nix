@@ -46,7 +46,7 @@ static void dumpContents(const Path & path, size_t size,
     sink << "contents" << size;
 
     AutoCloseFD fd = open(path.c_str(), O_RDONLY | O_CLOEXEC);
-    if (!fd) throw SysError(format("opening file '%1%'") % path);
+    if (!fd) throw SysError("opening file '%1%'", path);
 
     std::vector<unsigned char> buf(65536);
     size_t left = size;
@@ -68,7 +68,7 @@ static void dump(const Path & path, Sink & sink, PathFilter & filter)
 
     struct stat st;
     if (lstat(path.c_str(), &st))
-        throw SysError(format("getting attributes of path '%1%'") % path);
+        throw SysError("getting attributes of path '%1%'", path);
 
     sink << "(";
 
@@ -94,8 +94,9 @@ static void dump(const Path & path, Sink & sink, PathFilter & filter)
                     name.erase(pos);
                 }
                 if (unhacked.find(name) != unhacked.end())
-                    throw Error(format("file name collision in between '%1%' and '%2%'")
-                        % (path + "/" + unhacked[name]) % (path + "/" + i.name));
+                    throw Error("file name collision in between '%1%' and '%2%'",
+                       (path + "/" + unhacked[name]),
+                       (path + "/" + i.name));
                 unhacked[name] = i.name;
             } else
                 unhacked[i.name] = i.name;
@@ -111,7 +112,7 @@ static void dump(const Path & path, Sink & sink, PathFilter & filter)
     else if (S_ISLNK(st.st_mode))
         sink << "type" << "symlink" << "target" << readLink(path);
 
-    else throw Error(format("file '%1%' has an unsupported type") % path);
+    else throw Error("file '%1%' has an unsupported type", path);
 
     sink << ")";
 }
@@ -247,7 +248,7 @@ static void parse(ParseSink & sink, Source & source, const Path & path)
                 } else if (s == "name") {
                     name = readString(source);
                     if (name.empty() || name == "." || name == ".." || name.find('/') != string::npos || name.find((char) 0) != string::npos)
-                        throw Error(format("NAR contains invalid file name '%1%'") % name);
+                        throw Error("NAR contains invalid file name '%1%'", name);
                     if (name <= prevName)
                         throw Error("NAR directory is not sorted");
                     prevName = name;
@@ -292,7 +293,6 @@ void parseDump(ParseSink & sink, Source & source)
         throw badArchive("input doesn't look like a Nix archive");
     parse(sink, source, "");
 }
-
 
 
 void restorePath(const Path & path, Source & source)

@@ -102,9 +102,9 @@ struct InstallableStorePath : Installable
     Buildables toBuildables() override
     {
         std::map<std::string, StorePath> outputs;
-        outputs.insert_or_assign("out", storePath.clone());
+        outputs.insert_or_assign("out", storePath);
         Buildable b{
-            .drvPath = storePath.isDerivation() ? storePath.clone() : std::optional<StorePath>(),
+            .drvPath = storePath.isDerivation() ? storePath : std::optional<StorePath>(),
             .outputs = std::move(outputs)
         };
         Buildables bs;
@@ -114,7 +114,7 @@ struct InstallableStorePath : Installable
 
     std::optional<StorePath> getStorePath() override
     {
-        return storePath.clone();
+        return storePath;
     }
 };
 
@@ -141,7 +141,7 @@ struct InstallableValue : Installable
 
         for (auto & drv : drvs) {
             Buildable b{.drvPath = state->store->parseStorePath(drv.queryDrvPath())};
-            drvPaths.insert(b.drvPath->clone());
+            drvPaths.insert(*b.drvPath);
 
             auto outputName = drv.queryOutputName();
             if (outputName == "")
@@ -155,10 +155,10 @@ struct InstallableValue : Installable
         // Hack to recognize .all: if all drvs have the same drvPath,
         // merge the buildables.
         if (drvPaths.size() == 1) {
-            Buildable b{.drvPath = drvPaths.begin()->clone()};
+            Buildable b{.drvPath = *drvPaths.begin()};
             for (auto & b2 : res)
                 for (auto & output : b2.outputs)
-                    b.outputs.insert_or_assign(output.first, output.second.clone());
+                    b.outputs.insert_or_assign(output.first, output.second);
             Buildables bs;
             bs.push_back(std::move(b));
             return bs;
@@ -273,13 +273,13 @@ Buildables build(ref<Store> store, RealiseMode mode,
                 pathsToBuild.push_back({*b.drvPath, outputNames});
             } else
                 for (auto & output : b.outputs)
-                    pathsToBuild.push_back({output.second.clone()});
+                    pathsToBuild.push_back({output.second});
             buildables.push_back(std::move(b));
         }
     }
 
     if (mode == DryRun)
-        printMissing(store, pathsToBuild, Verbosity::Error);
+        printMissing(store, pathsToBuild, lvlError);
     else if (mode == Build)
         store->buildPaths(pathsToBuild);
 
@@ -293,7 +293,7 @@ StorePathSet toStorePaths(ref<Store> store, RealiseMode mode,
 
     for (auto & b : build(store, mode, installables))
         for (auto & output : b.outputs)
-            outPaths.insert(output.second.clone());
+            outPaths.insert(output.second);
 
     return outPaths;
 }
@@ -306,7 +306,7 @@ StorePath toStorePath(ref<Store> store, RealiseMode mode,
     if (paths.size() != 1)
             throw Error("argument '%s' should evaluate to one store path", installable->what());
 
-    return paths.begin()->clone();
+    return *paths.begin();
 }
 
 StorePathSet toDerivations(ref<Store> store,
@@ -324,10 +324,10 @@ StorePathSet toDerivations(ref<Store> store,
                     if (derivers.empty())
                         throw Error("'%s' does not have a known deriver", i->what());
                     // FIXME: use all derivers?
-                    drvPaths.insert(derivers.begin()->clone());
+                    drvPaths.insert(*derivers.begin());
                 }
             } else
-                drvPaths.insert(b.drvPath->clone());
+                drvPaths.insert(*b.drvPath);
         }
 
     return drvPaths;

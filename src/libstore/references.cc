@@ -54,7 +54,7 @@ struct RefScanSink : Sink
 
     string tail;
 
-    RefScanSink() : hashSink(HashType::SHA256) { }
+    RefScanSink() : hashSink(htSHA256) { }
 
     void operator () (const unsigned char * data, size_t len);
 };
@@ -92,11 +92,11 @@ PathSet scanForReferences(const string & path,
         auto baseName = std::string(baseNameOf(i));
         string::size_type pos = baseName.find('-');
         if (pos == string::npos)
-            throw Error(format("bad reference '%1%'") % i);
+            throw Error("bad reference '%1%'", i);
         string s = string(baseName, 0, pos);
         assert(s.size() == refLength);
         assert(backMap.find(s) == backMap.end());
-        // parseHash(HashType::SHA256, s);
+        // parseHash(htSHA256, s);
         sink.hashes.insert(s);
         backMap[s] = i;
     }

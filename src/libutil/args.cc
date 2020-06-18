@@ -45,7 +45,7 @@ void Args::parseCmdline(const Strings & _cmdline)
         }
         else if (!dashDash && std::string(arg, 0, 1) == "-") {
             if (!processFlag(pos, cmdline.end()))
-                throw UsageError(format("unrecognised flag '%1%'") % arg);
+                throw UsageError("unrecognised flag '%1%'", arg);
         }
         else {
             pendingArgs.push_back(*pos++);
@@ -130,7 +130,7 @@ bool Args::processArgs(const Strings & args, bool finish)
 {
     if (expectedArgs.empty()) {
         if (!args.empty())
-            throw UsageError(format("unexpected argument '%1%'") % args.front());
+            throw UsageError("unexpected argument '%1%'", args.front());
         return true;
     }
 

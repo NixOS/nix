@@ -142,8 +142,12 @@ $oldName =~ s/"//g;
 sub getStorePath {
     my ($jobName) = @_;
     my $buildInfo = decode_json(fetch("$evalUrl/job/$jobName", 'application/json'));
-    die unless $buildInfo->{buildproducts}->{1}->{type} eq "nix-build";
-    return $buildInfo->{buildproducts}->{1}->{path};
+    for my $product (values %{$buildInfo->{buildproducts}}) {
+        next unless $product->{type} eq "nix-build";
+        next if $product->{path} =~ /[a-z]+$/;
+        return $product->{path};
+    }
+    die;
 }
 
 write_file("$nixpkgsDir/nixos/modules/installer/tools/nix-fallback-paths.nix",

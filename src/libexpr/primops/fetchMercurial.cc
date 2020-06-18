@@ -31,18 +31,24 @@ static void prim_fetchMercurial(EvalState & state, const Pos & pos, Value * * ar
                 // be both a revision or a branch/tag name.
                 auto value = state.forceStringNoCtx(*attr.value, *attr.pos);
                 if (std::regex_match(value, revRegex))
-                    rev = Hash(value, HashType::SHA1);
+                    rev = Hash(value, htSHA1);
                 else
                     ref = value;
             }
             else if (n == "name")
                 name = state.forceStringNoCtx(*attr.value, *attr.pos);
             else
-                throw EvalError("unsupported argument '%s' to 'fetchMercurial', at %s", attr.name, *attr.pos);
+                throw EvalError({
+                    .hint = hintfmt("unsupported argument '%s' to 'fetchMercurial'", attr.name),
+                    .nixCode = NixCode { .errPos = *attr.pos }
+                });
         }
 
         if (url.empty())
-            throw EvalError(format("'url' argument required, at %1%") % pos);
+            throw EvalError({
+                .hint = hintfmt("'url' argument required"),
+                .nixCode = NixCode { .errPos = pos }
+            });
 
     } else
         url = state.coerceToString(pos, *args[0], context, false, false);
@@ -71,7 +77,7 @@ static void prim_fetchMercurial(EvalState & state, const Pos & pos, Value * * ar
         mkString(*state.allocAttr(v, state.symbols.create("branch")), *input2->getRef());
     // Backward compatibility: set 'rev' to
     // 0000000000000000000000000000000000000000 for a dirty tree.
-    auto rev2 = input2->getRev().value_or(Hash(HashType::SHA1));
+    auto rev2 = input2->getRev().value_or(Hash(htSHA1));
     mkString(*state.allocAttr(v, state.symbols.create("rev")), rev2.gitRev());
     mkString(*state.allocAttr(v, state.symbols.create("shortRev")), std::string(rev2.gitRev(), 0, 12));
     if (tree.info.revCount)

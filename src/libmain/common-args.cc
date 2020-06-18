@@ -1,5 +1,6 @@
 #include "common-args.hh"
 #include "globals.hh"
+#include "loggers.hh"
 
 namespace nix {
 
@@ -10,21 +11,19 @@ MixCommonArgs::MixCommonArgs(const string & programName)
         .longName = "verbose",
         .shortName = 'v',
         .description = "increase verbosity level",
-        .handler = {[]() { verbosity = (Verbosity) ((uint64_t) verbosity + 1); }},
+        .handler = {[]() { verbosity = (Verbosity) (verbosity + 1); }},
     });
 
     addFlag({
         .longName = "quiet",
         .description = "decrease verbosity level",
-        .handler = {[]() { verbosity = verbosity > Verbosity::Error
-            ? (Verbosity) ((uint64_t) verbosity - 1)
-            : Verbosity::Error; }},
+        .handler = {[]() { verbosity = verbosity > lvlError ? (Verbosity) (verbosity - 1) : lvlError; }},
     });
 
     addFlag({
         .longName = "debug",
         .description = "enable debug output",
-        .handler = {[]() { verbosity = Verbosity::Debug; }},
+        .handler = {[]() { verbosity = lvlDebug; }},
     });
 
     addFlag({
@@ -38,6 +37,14 @@ MixCommonArgs::MixCommonArgs(const string & programName)
                 warn(e.what());
             }
         }},
+    });
+
+    addFlag({
+        .longName = "log-format",
+        .description = "format of log output; \"raw\", \"internal-json\", \"bar\" "
+                        "or \"bar-with-logs\"",
+        .labels = {"format"},
+        .handler = {[](std::string format) { setLogFormat(format); }},
     });
 
     addFlag({

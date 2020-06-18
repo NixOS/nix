@@ -90,8 +90,8 @@ struct CmdPathInfo : StorePathsCommand, MixJSON
             JSONPlaceholder jsonRoot(std::cout);
             store->pathInfoToJSON(jsonRoot,
                 // FIXME: preserve order?
-                storePathsToSet(storePaths),
-                true, showClosureSize, Base::SRI, AllowInvalid);
+                StorePathSet(storePaths.begin(), storePaths.end()),
+                true, showClosureSize, SRI, AllowInvalid);
         }
 
         else {

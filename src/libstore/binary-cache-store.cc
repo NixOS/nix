@@ -40,14 +40,14 @@ void BinaryCacheStore::init()
         upsertFile(cacheInfoFile, "StoreDir: " + storeDir + "\n", "text/x-nix-cache-info");
     } else {
         for (auto & line : tokenizeString<Strings>(*cacheInfo, "\n")) {
-            size_t colon = line.find(':');
-            if (colon == std::string::npos) continue;
+            size_t colon= line.find(':');
+            if (colon ==std::string::npos) continue;
             auto name = line.substr(0, colon);
             auto value = trim(line.substr(colon + 1, std::string::npos));
             if (name == "StoreDir") {
                 if (value != storeDir)
-                    throw Error(format("binary cache '%s' is for Nix stores with prefix '%s', not '%s'")
-                        % getUri() % value % storeDir);
+                    throw Error("binary cache '%s' is for Nix stores with prefix '%s', not '%s'",
+                        getUri(), value, storeDir);
             } else if (name == "WantMassQuery") {
                 wantMassQuery.setDefault(value == "1" ? "true" : "false");
             } else if (name == "Priority") {
@@ -93,7 +93,7 @@ std::shared_ptr<std::string> BinaryCacheStore::getFile(const std::string & path)
 
 std::string BinaryCacheStore::narInfoFileFor(const StorePath & storePath)
 {
-    return storePathToHash(printStorePath(storePath)) + ".narinfo";
+    return std::string(storePath.hashPart()) + ".narinfo";
 }
 
 void BinaryCacheStore::writeNarInfo(ref<NarInfo> narInfo)
@@ -102,7 +102,7 @@ void BinaryCacheStore::writeNarInfo(ref<NarInfo> narInfo)
 
     upsertFile(narInfoFile, narInfo->to_string(*this), "text/x-nix-narinfo");
 
-    auto hashPart = storePathToHash(printStorePath(narInfo->path));
+    std::string hashPart(narInfo->path.hashPart());
 
     {
         auto state_(state.lock());
@@ -137,7 +137,7 @@ void BinaryCacheStore::addToStore(const ValidPathInfo & info, Source & narSource
     auto narInfo = make_ref<NarInfo>(info);
 
     narInfo->narSize = nar->size();
-    narInfo->narHash = hashString(HashType::SHA256, *nar);
+    narInfo->narHash = hashString(htSHA256, *nar);
 
     if (info.narHash && info.narHash != narInfo->narHash)
         throw Error("refusing to copy corrupted path '%1%' to binary cache", printStorePath(info.path));
@@ -164,7 +164,7 @@ void BinaryCacheStore::addToStore(const ValidPathInfo & info, Source & narSource
             }
         }
 
-        upsertFile(storePathToHash(printStorePath(info.path)) + ".ls", jsonOut.str(), "application/json");
+        upsertFile(std::string(info.path.to_string()) + ".ls", jsonOut.str(), "application/json");
     }
 
     /* Compress the NAR. */
@@ -172,16 +172,16 @@ void BinaryCacheStore::addToStore(const ValidPathInfo & info, Source & narSource
     auto now1 = std::chrono::steady_clock::now();
     auto narCompressed = compress(compression, *nar, parallelCompression);
     auto now2 = std::chrono::steady_clock::now();
-    narInfo->fileHash = hashString(HashType::SHA256, *narCompressed);
+    narInfo->fileHash = hashString(htSHA256, *narCompressed);
     narInfo->fileSize = narCompressed->size();
 
     auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(now2 - now1).count();
-    printMsg(Verbosity::Talkative, "copying path '%1%' (%2% bytes, compressed %3$.1f%% in %4% ms) to binary cache",
+    printMsg(lvlTalkative, "copying path '%1%' (%2% bytes, compressed %3$.1f%% in %4% ms) to binary cache",
         printStorePath(narInfo->path), narInfo->narSize,
         ((1.0 - (double) narCompressed->size() / nar->size()) * 100.0),
         duration);
 
-    narInfo->url = "nar/" + narInfo->fileHash.to_string(Base::Base32, false) + ".nar"
+    narInfo->url = "nar/" + narInfo->fileHash.to_string(Base32, false) + ".nar"
         + (compression == "xz" ? ".xz" :
            compression == "bzip2" ? ".bz2" :
            compression == "br" ? ".br" :
@@ -209,7 +209,7 @@ void BinaryCacheStore::addToStore(const ValidPathInfo & info, Source & narSource
                 // to a GC'ed file, so overwriting might be useful...
                 if (fileExists(key)) return;
 
-                printMsg(Verbosity::Talkative, "creating debuginfo link from '%s' to '%s'", key, target);
+                printMsg(lvlTalkative, "creating debuginfo link from '%s' to '%s'", key, target);
 
                 upsertFile(key, json.dump(), "application/json");
             };
@@ -287,7 +287,7 @@ void BinaryCacheStore::narFromPath(const StorePath & storePath, Sink & sink)
     try {
         getFile(info->url, *decompressor);
     } catch (NoSuchBinaryCacheFile & e) {
-        throw SubstituteGone(e.what());
+        throw SubstituteGone(e.info());
     }
 
     decompressor->finish();
@@ -302,7 +302,7 @@ void BinaryCacheStore::queryPathInfoUncached(const StorePath & storePath,
 {
     auto uri = getUri();
     auto storePathS = printStorePath(storePath);
-    auto act = std::make_shared<Activity>(*logger, Verbosity::Talkative, ActivityType::QueryPathInfo,
+    auto act = std::make_shared<Activity>(*logger, lvlTalkative, actQueryPathInfo,
         fmt("querying info about '%s' on '%s'", storePathS, uri), Logger::Fields{storePathS, uri});
     PushActivity pact(act->id);
 
@@ -366,7 +366,7 @@ StorePath BinaryCacheStore::addTextToStore(const string & name, const string & s
     const StorePathSet & references, RepairFlag repair)
 {
     ValidPathInfo info(computeStorePathForText(name, s, references));
-    info.references = cloneStorePathSet(references);
+    info.references = references;
 
     if (repair || !isValidPath(info.path)) {
         StringSink sink;
@@ -394,21 +394,19 @@ void BinaryCacheStore::addSignatures(const StorePath & storePath, const StringSe
 
     narInfo->sigs.insert(sigs.begin(), sigs.end());
 
-    auto narInfoFile = narInfoFileFor(narInfo->path);
-
     writeNarInfo(narInfo);
 }
 
 std::shared_ptr<std::string> BinaryCacheStore::getBuildLog(const StorePath & path)
 {
-    auto drvPath = path.clone();
+    auto drvPath = path;
 
     if (!path.isDerivation()) {
         try {
             auto info = queryPathInfo(path);
             // FIXME: add a "Log" field to .narinfo
             if (!info->deriver) return nullptr;
-            drvPath = info->deriver->clone();
+            drvPath = *info->deriver;
         } catch (InvalidPath &) {
             return nullptr;
         }

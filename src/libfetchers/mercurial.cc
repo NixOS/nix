@@ -114,7 +114,7 @@ struct MercurialInput : Input
                     return files.count(file);
                 };
 
-                auto storePath = store->addToStore("source", actualUrl, FileIngestionMethod::Recursive, HashType::SHA256, filter);
+                auto storePath = store->addToStore("source", actualUrl, FileIngestionMethod::Recursive, htSHA256, filter);
 
                 return {Tree {
                     .actualPath = store->printStorePath(storePath),
@@ -167,14 +167,14 @@ struct MercurialInput : Input
         });
 
         if (auto res = getCache()->lookup(store, mutableAttrs)) {
-            auto rev2 = Hash(getStrAttr(res->first, "rev"), HashType::SHA1);
+            auto rev2 = Hash(getStrAttr(res->first, "rev"), htSHA1);
             if (!rev || rev == rev2) {
                 input->rev = rev2;
                 return makeResult(res->first, std::move(res->second));
             }
         }
 
-        Path cacheDir = fmt("%s/nix/hg/%s", getCacheDir(), hashString(HashType::SHA256, actualUrl).to_string(Base::Base32, false));
+        Path cacheDir = fmt("%s/nix/hg/%s", getCacheDir(), hashString(htSHA256, actualUrl).to_string(Base32, false));
 
         /* If this is a commit hash that we already have, we don't
            have to pull again. */
@@ -184,7 +184,7 @@ struct MercurialInput : Input
                     RunOptions("hg", { "log", "-R", cacheDir, "-r", input->rev->gitRev(), "--template", "1" })
                     .killStderr(true)).second == "1"))
         {
-            Activity act(*logger, Verbosity::Talkative, ActivityType::Unknown, fmt("fetching Mercurial repository '%s'", actualUrl));
+            Activity act(*logger, lvlTalkative, actUnknown, fmt("fetching Mercurial repository '%s'", actualUrl));
 
             if (pathExists(cacheDir)) {
                 try {
@@ -210,7 +210,7 @@ struct MercurialInput : Input
             runProgram("hg", true, { "log", "-R", cacheDir, "-r", revOrRef, "--template", "{node} {rev} {branch}" }));
         assert(tokens.size() == 3);
 
-        input->rev = Hash(tokens[0], HashType::SHA1);
+        input->rev = Hash(tokens[0], htSHA1);
         auto revCount = std::stoull(tokens[1]);
         input->ref = tokens[2];
 
@@ -293,7 +293,7 @@ struct MercurialInputScheme : InputScheme
             input->ref = *ref;
         }
         if (auto rev = maybeGetStrAttr(attrs, "rev"))
-            input->rev = Hash(*rev, HashType::SHA1);
+            input->rev = Hash(*rev, htSHA1);
         return input;
     }
 };

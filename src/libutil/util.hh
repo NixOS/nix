@@ -1,6 +1,7 @@
 #pragma once
 
 #include "types.hh"
+#include "error.hh"
 #include "logging.hh"
 #include "ansicolor.hh"
 
@@ -416,7 +417,7 @@ template<class N> bool string2Float(const string & s, N & n)
 
 
 /* Return true iff `s' starts with `prefix'. */
-bool hasPrefix(const string & s, const string & prefix);
+bool hasPrefix(std::string_view s, std::string_view prefix);
 
 
 /* Return true iff `s' ends in `suffix'. */
@@ -454,9 +455,9 @@ std::string filterANSIEscapes(const std::string & s,
     unsigned int width = std::numeric_limits<unsigned int>::max());
 
 
-/* Base::Base64 encoding/decoding. */
-string base64Encode(const string & s);
-string base64Decode(const string & s);
+/* Base64 encoding/decoding. */
+string base64Encode(std::string_view s);
+string base64Decode(std::string_view s);
 
 
 /* Get a value for the specified key from an associate container. */

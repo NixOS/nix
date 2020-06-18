@@ -103,7 +103,7 @@ void Store::computeFSClosure(const StorePath & startPath,
     StorePathSet & paths_, bool flipDirection, bool includeOutputs, bool includeDerivers)
 {
     StorePathSet paths;
-    paths.insert(startPath.clone());
+    paths.insert(startPath);
     computeFSClosure(paths, paths_, flipDirection, includeOutputs, includeDerivers);
 }
 
@@ -112,7 +112,7 @@ void Store::queryMissing(const std::vector<StorePathWithOutputs> & targets,
     StorePathSet & willBuild_, StorePathSet & willSubstitute_, StorePathSet & unknown_,
     unsigned long long & downloadSize_, unsigned long long & narSize_)
 {
-    Activity act(*logger, Verbosity::Debug, ActivityType::Unknown, "querying info about missing paths");
+    Activity act(*logger, lvlDebug, actUnknown, "querying info about missing paths");
 
     downloadSize_ = narSize_ = 0;
 
@@ -141,11 +141,11 @@ void Store::queryMissing(const std::vector<StorePathWithOutputs> & targets,
     auto mustBuildDrv = [&](const StorePath & drvPath, const Derivation & drv) {
         {
             auto state(state_.lock());
-            state->willBuild.insert(drvPath.clone());
+            state->willBuild.insert(drvPath);
         }
 
         for (auto & i : drv.inputDrvs)
-            pool.enqueue(std::bind(doPath, StorePathWithOutputs(i.first, i.second)));
+            pool.enqueue(std::bind(doPath, StorePathWithOutputs { i.first, i.second }));
     };
 
     auto checkOutput = [&](
@@ -157,9 +157,7 @@ void Store::queryMissing(const std::vector<StorePathWithOutputs> & targets,
         auto outPath = parseStorePath(outPathS);
 
         SubstitutablePathInfos infos;
-        StorePathSet paths; // FIXME
-        paths.insert(outPath.clone());
-        querySubstitutablePathInfos(paths, infos);
+        querySubstitutablePathInfos({outPath}, infos);
 
         if (infos.empty()) {
             drvState_->lock()->done = true;
@@ -170,10 +168,10 @@ void Store::queryMissing(const std::vector<StorePathWithOutputs> & targets,
                 if (drvState->done) return;
                 assert(drvState->left);
                 drvState->left--;
-                drvState->outPaths.insert(outPath.clone());
+                drvState->outPaths.insert(outPath);
                 if (!drvState->left) {
                     for (auto & path : drvState->outPaths)
-                        pool.enqueue(std::bind(doPath, StorePathWithOutputs(path.clone())));
+                        pool.enqueue(std::bind(doPath, StorePathWithOutputs { path } ));
                 }
             }
         }
@@ -190,12 +188,12 @@ void Store::queryMissing(const std::vector<StorePathWithOutputs> & targets,
             if (!isValidPath(path.path)) {
                 // FIXME: we could try to substitute the derivation.
                 auto state(state_.lock());
-                state->unknown.insert(path.path.clone());
+                state->unknown.insert(path.path);
                 return;
             }
 
             auto drv = make_ref<Derivation>(derivationFromPath(path.path));
-            ParsedDerivation parsedDrv(path.path.clone(), *drv);
+            ParsedDerivation parsedDrv(StorePath(path.path), *drv);
 
             PathSet invalid;
             for (auto & j : drv->outputs)
@@ -216,13 +214,11 @@ void Store::queryMissing(const std::vector<StorePathWithOutputs> & targets,
             if (isValidPath(path.path)) return;
 
             SubstitutablePathInfos infos;
-            StorePathSet paths; // FIXME
-            paths.insert(path.path.clone());
-            querySubstitutablePathInfos(paths, infos);
+            querySubstitutablePathInfos({path.path}, infos);
 
             if (infos.empty()) {
                 auto state(state_.lock());
-                state->unknown.insert(path.path.clone());
+                state->unknown.insert(path.path);
                 return;
             }
 
@@ -231,13 +227,13 @@ void Store::queryMissing(const std::vector<StorePathWithOutputs> & targets,
 
             {
                 auto state(state_.lock());
-                state->willSubstitute.insert(path.path.clone());
+                state->willSubstitute.insert(path.path);
                 state->downloadSize += info->second.downloadSize;
                 state->narSize += info->second.narSize;
             }
 
             for (auto & ref : info->second.references)
-                pool.enqueue(std::bind(doPath, StorePathWithOutputs(ref)));
+                pool.enqueue(std::bind(doPath, StorePathWithOutputs { ref }));
         }
     };
 
@@ -260,12 +256,12 @@ StorePaths Store::topoSortPaths(const StorePathSet & paths)
             throw BuildError("cycle detected in the references of '%s' from '%s'",
                 printStorePath(path), printStorePath(*parent));
 
-        if (!visited.insert(path.clone()).second) return;
-        parents.insert(path.clone());
+        if (!visited.insert(path).second) return;
+        parents.insert(path);
 
         StorePathSet references;
         try {
-            references = cloneStorePathSet(queryPathInfo(path)->references);
+            references = queryPathInfo(path)->references;
         } catch (InvalidPath &) {
         }
 
@@ -275,7 +271,7 @@ StorePaths Store::topoSortPaths(const StorePathSet & paths)
             if (i != path && paths.count(i))
                 dfsVisit(i, &path);
 
-        sorted.push_back(path.clone());
+        sorted.push_back(path);
         parents.erase(path);
     };
 

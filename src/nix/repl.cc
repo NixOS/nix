@@ -19,6 +19,7 @@ extern "C" {
 }
 #endif
 
+#include "ansicolor.hh"
 #include "shared.hh"
 #include "eval.hh"
 #include "eval-inline.hh"
@@ -36,14 +37,6 @@ extern "C" {
 #include <gc/gc_cpp.h>
 
 namespace nix {
-
-#define ESC_RED "\033[31m"
-#define ESC_GRE "\033[32m"
-#define ESC_YEL "\033[33m"
-#define ESC_BLU "\033[34;1m"
-#define ESC_MAG "\033[35m"
-#define ESC_CYA "\033[36m"
-#define ESC_END "\033[0m"
 
 struct NixRepl : gc
 {
@@ -218,12 +211,12 @@ void NixRepl::mainLoop(const std::vector<std::string> & files)
                 // input without clearing the input so far.
                 continue;
             } else {
-              printMsg(Verbosity::Error, format(error + "%1%%2%") % (settings.showTrace ? e.prefix() : "") % e.msg());
+              printMsg(lvlError, error + "%1%%2%", (settings.showTrace ? e.prefix() : ""), e.msg());
             }
         } catch (Error & e) {
-            printMsg(Verbosity::Error, format(error + "%1%%2%") % (settings.showTrace ? e.prefix() : "") % e.msg());
+            printMsg(lvlError, error + "%1%%2%", (settings.showTrace ? e.prefix() : ""), e.msg());
         } catch (Interrupted & e) {
-            printMsg(Verbosity::Error, format(error + "%1%%2%") % (settings.showTrace ? e.prefix() : "") % e.msg());
+            printMsg(lvlError, error + "%1%%2%", (settings.showTrace ? e.prefix() : ""), e.msg());
         }
 
         // We handled the current input fully, so we should clear it
@@ -512,7 +505,7 @@ bool NixRepl::processLine(string line)
         return false;
 
     else if (command != "")
-        throw Error(format("unknown command '%1%'") % command);
+        throw Error("unknown command '%1%'", command);
 
     else {
         size_t p = line.find('=');
@@ -645,25 +638,25 @@ std::ostream & NixRepl::printValue(std::ostream & str, Value & v, unsigned int m
     switch (v.type) {
 
     case tInt:
-        str << ESC_CYA << v.integer << ESC_END;
+        str << ANSI_CYAN << v.integer << ANSI_NORMAL;
         break;
 
     case tBool:
-        str << ESC_CYA << (v.boolean ? "true" : "false") << ESC_END;
+        str << ANSI_CYAN << (v.boolean ? "true" : "false") << ANSI_NORMAL;
         break;
 
     case tString:
-        str << ESC_YEL;
+        str << ANSI_YELLOW;
         printStringValue(str, v.string.s);
-        str << ESC_END;
+        str << ANSI_NORMAL;
         break;
 
     case tPath:
-        str << ESC_GRE << v.path << ESC_END; // !!! escaping?
+        str << ANSI_GREEN << v.path << ANSI_NORMAL; // !!! escaping?
         break;
 
     case tNull:
-        str << ESC_CYA "null" ESC_END;
+        str << ANSI_CYAN "null" ANSI_NORMAL;
         break;
 
     case tAttrs: {
@@ -699,7 +692,7 @@ std::ostream & NixRepl::printValue(std::ostream & str, Value & v, unsigned int m
                     try {
                         printValue(str, *i.second, maxDepth - 1, seen);
                     } catch (AssertionError & e) {
-                        str << ESC_RED "«error: " << e.msg() << "»" ESC_END;
+                        str << ANSI_RED "«error: " << e.msg() << "»" ANSI_NORMAL;
                     }
                 str << "; ";
             }
@@ -725,7 +718,7 @@ std::ostream & NixRepl::printValue(std::ostream & str, Value & v, unsigned int m
                     try {
                         printValue(str, *v.listElems()[n], maxDepth - 1, seen);
                     } catch (AssertionError & e) {
-                        str << ESC_RED "«error: " << e.msg() << "»" ESC_END;
+                        str << ANSI_RED "«error: " << e.msg() << "»" ANSI_NORMAL;
                     }
                 str << " ";
             }
@@ -737,16 +730,16 @@ std::ostream & NixRepl::printValue(std::ostream & str, Value & v, unsigned int m
     case tLambda: {
         std::ostringstream s;
         s << v.lambda.fun->pos;
-        str << ESC_BLU "«lambda @ " << filterANSIEscapes(s.str()) << "»" ESC_END;
+        str << ANSI_BLUE "«lambda @ " << filterANSIEscapes(s.str()) << "»" ANSI_NORMAL;
         break;
     }
 
     case tPrimOp:
-        str << ESC_MAG "«primop»" ESC_END;
+        str << ANSI_MAGENTA "«primop»" ANSI_NORMAL;
         break;
 
     case tPrimOpApp:
-        str << ESC_BLU "«primop-app»" ESC_END;
+        str << ANSI_BLUE "«primop-app»" ANSI_NORMAL;
         break;
 
     case tFloat:
@@ -754,7 +747,7 @@ std::ostream & NixRepl::printValue(std::ostream & str, Value & v, unsigned int m
         break;
 
     default:
-        str << ESC_RED "«unknown»" ESC_END;
+        str << ANSI_RED "«unknown»" ANSI_NORMAL;
         break;
     }
 

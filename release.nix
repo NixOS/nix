@@ -13,63 +13,7 @@ let
     builtins.readFile ./.version
     + (if officialRelease then "" else "pre${toString nix.revCount}_${nix.shortRev}");
 
-  # Create a "vendor" directory that contains the crates listed in
-  # Cargo.lock. This allows Nix to be built without network access.
-  vendoredCrates' =
-    let
-      lockFile = builtins.fromTOML (builtins.readFile nix-rust/Cargo.lock);
-
-      files = map (pkg: import <nix/fetchurl.nix> {
-        url = "https://crates.io/api/v1/crates/${pkg.name}/${pkg.version}/download";
-        sha256 = lockFile.metadata."checksum ${pkg.name} ${pkg.version} (registry+https://github.com/rust-lang/crates.io-index)";
-      }) (builtins.filter (pkg: pkg.source or "" == "registry+https://github.com/rust-lang/crates.io-index") lockFile.package);
-
-    in pkgs.runCommand "cargo-vendor-dir" {}
-      ''
-        mkdir -p $out/vendor
-
-        cat > $out/vendor/config <<EOF
-        [source.crates-io]
-        replace-with = "vendored-sources"
-
-        [source.vendored-sources]
-        directory = "vendor"
-        EOF
-
-        ${toString (builtins.map (file: ''
-          mkdir $out/vendor/tmp
-          tar xvf ${file} -C $out/vendor/tmp
-          dir=$(echo $out/vendor/tmp/*)
-
-          # Add just enough metadata to keep Cargo happy.
-          printf '{"files":{},"package":"${file.outputHash}"}' > "$dir/.cargo-checksum.json"
-
-          # Clean up some cruft from the winapi crates. FIXME: find
-          # a way to remove winapi* from our dependencies.
-          if [[ $dir =~ /winapi ]]; then
-            find $dir -name "*.a" -print0 | xargs -0 rm -f --
-          fi
-
-          mv "$dir" $out/vendor/
-
-          rm -rf $out/vendor/tmp
-        '') files)}
-      '';
-
   jobs = rec {
-
-    vendoredCrates =
-      with pkgs;
-      runCommand "vendored-crates" {}
-        ''
-          mkdir -p $out/nix-support
-          name=nix-vendored-crates-${version}
-          fn=$out/$name.tar.xz
-            tar cvfJ $fn -C ${vendoredCrates'} vendor \
-              --owner=0 --group=0 --mode=u+rw,uga+r \
-              --transform "s,vendor,$name,"
-            echo "file crates-tarball $fn" >> $out/nix-support/hydra-build-products
-        '';
 
     build = pkgs.lib.genAttrs systems (system:
 
@@ -101,8 +45,6 @@ let
               chmod u+w $out/lib/*.so.*
               patchelf --set-rpath $out/lib:${stdenv.cc.cc.lib}/lib $out/lib/libboost_thread.so.*
             ''}
-
-            ln -sfn ${vendoredCrates'}/vendor/ nix-rust/vendor
 
             (cd perl; autoreconf --install --force --verbose)
           '';
@@ -247,11 +189,6 @@ let
         name = "nix-coverage-${version}";
 
         src = nix;
-
-        preConfigure =
-          ''
-            ln -sfn ${vendoredCrates'}/vendor/ nix-rust/vendor
-          '';
 
         enableParallelBuilding = true;
 

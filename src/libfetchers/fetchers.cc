@@ -36,7 +36,7 @@ std::unique_ptr<Input> inputFromAttrs(const Attrs & attrs)
         if (res) {
             if (auto narHash = maybeGetStrAttr(attrs, "narHash"))
                 // FIXME: require SRI hash.
-                res->narHash = Hash(*narHash);
+                res->narHash = newHashAllowEmpty(*narHash, {});
             return res;
         }
     }
@@ -47,7 +47,7 @@ Attrs Input::toAttrs() const
 {
     auto attrs = toAttrsInternal();
     if (narHash)
-        attrs.emplace("narHash", narHash->to_string(Base::SRI));
+        attrs.emplace("narHash", narHash->to_string(SRI, true));
     attrs.emplace("type", type());
     return attrs;
 }
@@ -67,7 +67,7 @@ std::pair<Tree, std::shared_ptr<const Input>> Input::fetchTree(ref<Store> store)
 
     if (narHash && narHash != input->narHash)
         throw Error("NAR hash mismatch in input '%s' (%s), expected '%s', got '%s'",
-            to_string(), tree.actualPath, narHash->to_string(Base::SRI), input->narHash->to_string(Base::SRI));
+            to_string(), tree.actualPath, narHash->to_string(SRI, true), input->narHash->to_string(SRI, true));
 
     return {std::move(tree), input};
 }

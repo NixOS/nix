@@ -58,8 +58,8 @@ static string getString(Source & source, int n)
 // Unfortunately, no access to libstore headers here.
 static string getStoreEntry(const Path & storeDir, Hash hash, string name)
 {
-    Hash hash1 = hashString(HashType::SHA256, "fixed:out:git:" + hash.to_string(Base::Base16) + ":");
-    Hash hash2 = hashString(HashType::SHA256, "output:out:" + hash1.to_string(Base::Base16) + ":" + storeDir + ":" + name);
+    Hash hash1 = hashString(htSHA256, "fixed:out:git:" + hash.to_string(Base::Base16, true) + ":");
+    Hash hash2 = hashString(htSHA256, "output:out:" + hash1.to_string(Base::Base16, true) + ":" + storeDir + ":" + name);
     Hash hash3 = compressHash(hash2, 20);
 
     return hash3.to_string(Base::Base32, false) + "-" + name;
@@ -100,7 +100,7 @@ static void parse(ParseSink & sink, Source & source, const Path & path, const Pa
 
             int perm = std::stoi(perms);
             if (perm != 100644 && perm != 100755 && perm != 644 && perm != 755 && perm != 40000)
-              throw Error(format("Unknown Git permission: %d") % perm);
+              throw Error("Unknown Git permission: %d", perm);
 
             string name = getStringUntil(source, 0);
             left -= name.size();
@@ -109,7 +109,7 @@ static void parse(ParseSink & sink, Source & source, const Path & path, const Pa
             string hashs = getString(source, 20);
             left -= 20;
 
-            Hash hash(HashType::SHA1);
+            Hash hash(htSHA1);
             std::copy(hashs.begin(), hashs.end(), hash.hash);
 
             string entryName = getStoreEntry(storeDir, hash, "git");
@@ -117,11 +117,11 @@ static void parse(ParseSink & sink, Source & source, const Path & path, const Pa
 
             struct stat st;
             if (lstat(entry.c_str(), &st))
-                throw SysError(format("getting attributes of path '%1%'") % entry);
+                throw SysError("getting attributes of path '%1%'", entry);
 
             if (S_ISREG(st.st_mode)) {
                 if (perm == 40000)
-                    throw SysError(format("file is a file but expected to be a directory '%1%'") % entry);
+                    throw SysError("file is a file but expected to be a directory '%1%'", entry);
 
                 if (perm == 100755 || perm == 755)
                     sink.createExecutableFile(path + "/" + name);
@@ -131,10 +131,10 @@ static void parse(ParseSink & sink, Source & source, const Path & path, const Pa
                 sink.copyFile(entry);
             } else if (S_ISDIR(st.st_mode)) {
                 if (perm != 40000)
-                    throw SysError(format("file is a directory but expected to be a file '%1%'") % entry);
+                    throw SysError("file is a directory but expected to be a file '%1%'", entry);
 
                 sink.copyDirectory(realStoreDir + "/" + entryName, path + "/" + name);
-            } else throw Error(format("file '%1%' has an unsupported type") % entry);
+            } else throw Error("file '%1%' has an unsupported type", entry);
         }
     } else throw Error("input doesn't look like a Git object");
 }
@@ -142,7 +142,7 @@ static void parse(ParseSink & sink, Source & source, const Path & path, const Pa
 // TODO stream file into sink, rather than reading into vector
 GitMode dumpGitBlob(const Path & path, const struct stat st, Sink & sink)
 {
-    auto s = (format("blob %d\0%s"s) % std::to_string(st.st_size) % readFile(path)).str();
+    auto s = fmt("blob %d\0%s"s, std::to_string(st.st_size), readFile(path));
 
     vector<uint8_t> v;
     std::copy(s.begin(), s.end(), std::back_inserter(v));
@@ -166,14 +166,14 @@ GitMode dumpGitTree(const GitTree & entries, Sink & sink)
         auto name = i.first;
         if (i.second.first == GitMode::Directory)
             name.pop_back();
-        auto s1 = (format("%d %s") % mode % name).str();
+        auto s1 = fmt("%d %s", mode, name);
         std::copy(s1.begin(), s1.end(), std::back_inserter(v1));
         v1.push_back(0);
         std::copy(i.second.second.hash, i.second.second.hash + 20, std::back_inserter(v1));
     }
 
     vector<uint8_t> v2;
-    auto s2 = (format("tree %d"s) % v1.size()).str();
+    auto s2 = fmt("tree %d"s, v1.size());
     std::copy(s2.begin(), s2.end(), std::back_inserter(v2));
     v2.push_back(0);
     std::copy(v1.begin(), v1.end(), std::back_inserter(v2));
@@ -190,7 +190,7 @@ static GitMode dumpGitInternal(HashType ht, const Path & path, Sink & sink, Path
     struct stat st;
     GitMode perm;
     if (lstat(path.c_str(), &st))
-        throw SysError(format("getting attributes of path '%1%'") % path);
+        throw SysError("getting attributes of path '%1%'", path);
 
     if (S_ISREG(st.st_mode))
         perm = dumpGitBlob(path, st, sink);
@@ -209,7 +209,7 @@ static GitMode dumpGitInternal(HashType ht, const Path & path, Sink & sink, Path
                 entries[name] = result;
             }
         perm = dumpGitTree(entries, sink);
-    } else throw Error(format("file '%1%' has an unsupported type") % path);
+    } else throw Error("file '%1%' has an unsupported type", path);
 
     return perm;
 }

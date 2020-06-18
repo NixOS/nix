@@ -33,21 +33,21 @@ struct RestoreSink : ParseSink
     {
         Path p = dstPath + path;
         if (mkdir(p.c_str(), 0777) == -1)
-            throw SysError(format("creating directory '%1%'") % p);
+            throw SysError("creating directory '%1%'", p);
     };
 
     void createRegularFile(const Path & path)
     {
         Path p = dstPath + path;
         fd = open(p.c_str(), O_CREAT | O_EXCL | O_WRONLY | O_CLOEXEC, 0666);
-        if (!fd) throw SysError(format("creating file '%1%'") % p);
+        if (!fd) throw SysError("creating file '%1%'", p);
     }
 
     void createExecutableFile(const Path & path)
     {
         Path p = dstPath + path;
         fd = open(p.c_str(), O_CREAT | O_EXCL | O_WRONLY | O_CLOEXEC, 0777);
-        if (!fd) throw SysError(format("creating file '%1%'") % p);
+        if (!fd) throw SysError("creating file '%1%'", p);
     }
 
     void isExecutable()
@@ -69,7 +69,7 @@ struct RestoreSink : ParseSink
                OpenSolaris).  Since preallocation is just an
                optimisation, ignore it. */
             if (errno && errno != EINVAL && errno != EOPNOTSUPP && errno != ENOSYS)
-                throw SysError(format("preallocating file of %1% bytes") % len);
+                throw SysError("preallocating file of %1% bytes", len);
         }
 #endif
     }
@@ -99,7 +99,7 @@ struct RestoreSink : ParseSink
             struct stat st;
             Path entry = source + "/" + i.name;
             if (lstat(entry.c_str(), &st))
-                throw SysError(format("getting attributes of path '%1%'") % entry);
+                throw SysError("getting attributes of path '%1%'", entry);
             if (S_ISREG(st.st_mode)) {
                 if (st.st_mode & S_IXUSR)
                     createExecutableFile(destination + "/" + i.name);
@@ -109,7 +109,7 @@ struct RestoreSink : ParseSink
             } else if (S_ISDIR(st.st_mode))
                 copyDirectory(entry, destination + "/" + i.name);
             else
-                throw Error(format("Unknown file: %s") % entry);
+                throw Error("Unknown file: %s", entry);
         }
     }
 };

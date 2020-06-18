@@ -39,7 +39,7 @@ private:
     struct ActInfo
     {
         std::string s, lastLine, phase;
-        ActivityType type = ActivityType::Unknown;
+        ActivityType type = actUnknown;
         uint64_t done = 0;
         uint64_t expected = 0;
         uint64_t running = 0;
@@ -106,23 +106,34 @@ public:
         updateThread.join();
     }
 
-    void stop()
+    void stop() override
     {
         auto state(state_.lock());
         if (!state->active) return;
         state->active = false;
-        std::string status = getStatus(*state);
         writeToStderr("\r\e[K");
-        if (status != "")
-            writeToStderr("[" + status + "]\n");
         updateCV.notify_one();
         quitCV.notify_one();
+    }
+
+    bool isVerbose() override {
+        return printBuildLogs;
     }
 
     void log(Verbosity lvl, const FormatOrString & fs) override
     {
         auto state(state_.lock());
         log(*state, lvl, fs.s);
+    }
+
+    void logEI(const ErrorInfo &ei) override
+    {
+        auto state(state_.lock());
+
+        std::stringstream oss;
+        oss << ei;
+
+        log(*state, ei.level, oss.str());
     }
 
     void log(State & state, Verbosity lvl, const std::string & s)
@@ -142,7 +153,7 @@ public:
     {
         auto state(state_.lock());
 
-        if (lvl <= verbosity && !s.empty())
+        if (lvl <= verbosity && !s.empty() && type != actBuildWaiting)
             log(*state, lvl, s + "...");
 
         state->activities.emplace_back(ActInfo());
@@ -153,8 +164,8 @@ public:
         state->its.emplace(act, i);
         state->activitiesByType[type].its.emplace(act, i);
 
-        if (type == ActivityType::Build) {
-            auto name = storePathToName(getS(fields, 0));
+        if (type == actBuild) {
+            std::string name(storePathToName(getS(fields, 0)));
             if (hasSuffix(name, ".drv"))
                 name = name.substr(0, name.size() - 4);
             i->s = fmt("building " ANSI_BOLD "%s" ANSI_NORMAL, name);
@@ -168,7 +179,7 @@ public:
             i->name = DrvName(name).name;
         }
 
-        if (type == ActivityType::Substitute) {
+        if (type == actSubstitute) {
             auto name = storePathToName(getS(fields, 0));
             auto sub = getS(fields, 1);
             i->s = fmt(
@@ -178,7 +189,7 @@ public:
                 name, sub);
         }
 
-        if (type == ActivityType::PostBuildHook) {
+        if (type == actPostBuildHook) {
             auto name = storePathToName(getS(fields, 0));
             if (hasSuffix(name, ".drv"))
                 name = name.substr(0, name.size() - 4);
@@ -186,14 +197,14 @@ public:
             i->name = DrvName(name).name;
         }
 
-        if (type == ActivityType::QueryPathInfo) {
+        if (type == actQueryPathInfo) {
             auto name = storePathToName(getS(fields, 0));
             i->s = fmt("querying " ANSI_BOLD "%s" ANSI_NORMAL " on %s", name, getS(fields, 1));
         }
 
-        if ((type == ActivityType::Download && hasAncestor(*state, ActivityType::CopyPath, parent))
-            || (type == ActivityType::Download && hasAncestor(*state, ActivityType::QueryPathInfo, parent))
-            || (type == ActivityType::CopyPath && hasAncestor(*state, ActivityType::Substitute, parent)))
+        if ((type == actFileTransfer && hasAncestor(*state, actCopyPath, parent))
+            || (type == actFileTransfer && hasAncestor(*state, actQueryPathInfo, parent))
+            || (type == actCopyPath && hasAncestor(*state, actSubstitute, parent)))
             i->visible = false;
 
         update(*state);
@@ -238,13 +249,13 @@ public:
     {
         auto state(state_.lock());
 
-        if (type == ResultType::FileLinked) {
+        if (type == resFileLinked) {
             state->filesLinked++;
             state->bytesLinked += getI(fields, 0);
             update(*state);
         }
 
-        else if (type == ResultType::BuildLogLine || type == ResultType::PostBuildLogLine) {
+        else if (type == resBuildLogLine || type == resPostBuildLogLine) {
             auto lastLine = trim(getS(fields, 0));
             if (!lastLine.empty()) {
                 auto i = state->its.find(act);
@@ -252,10 +263,10 @@ public:
                 ActInfo info = *i->second;
                 if (printBuildLogs) {
                     auto suffix = "> ";
-                    if (type == ResultType::PostBuildLogLine) {
+                    if (type == resPostBuildLogLine) {
                         suffix = " (post)> ";
                     }
-                    log(*state, Verbosity::Info, ANSI_FAINT + info.name.value_or("unnamed") + suffix + ANSI_NORMAL + lastLine);
+                    log(*state, lvlInfo, ANSI_FAINT + info.name.value_or("unnamed") + suffix + ANSI_NORMAL + lastLine);
                 } else {
                     state->activities.erase(i->second);
                     info.lastLine = lastLine;
@@ -266,24 +277,24 @@ public:
             }
         }
 
-        else if (type == ResultType::UntrustedPath) {
+        else if (type == resUntrustedPath) {
             state->untrustedPaths++;
             update(*state);
         }
 
-        else if (type == ResultType::CorruptedPath) {
+        else if (type == resCorruptedPath) {
             state->corruptedPaths++;
             update(*state);
         }
 
-        else if (type == ResultType::SetPhase) {
+        else if (type == resSetPhase) {
             auto i = state->its.find(act);
             assert(i != state->its.end());
             i->second->phase = getS(fields, 0);
             update(*state);
         }
 
-        else if (type == ResultType::Progress) {
+        else if (type == resProgress) {
             auto i = state->its.find(act);
             assert(i != state->its.end());
             ActInfo & actInfo = *i->second;
@@ -294,7 +305,7 @@ public:
             update(*state);
         }
 
-        else if (type == ResultType::SetExpected) {
+        else if (type == resSetExpected) {
             auto i = state->its.find(act);
             assert(i != state->its.end());
             ActInfo & actInfo = *i->second;
@@ -406,10 +417,10 @@ public:
             res += s;
         };
 
-        showActivity(ActivityType::Builds, "%s built");
+        showActivity(actBuilds, "%s built");
 
-        auto s1 = renderActivity(ActivityType::CopyPaths, "%s copied");
-        auto s2 = renderActivity(ActivityType::CopyPath, "%s MiB", "%.1f", MiB);
+        auto s1 = renderActivity(actCopyPaths, "%s copied");
+        auto s2 = renderActivity(actCopyPath, "%s MiB", "%.1f", MiB);
 
         if (!s1.empty() || !s2.empty()) {
             if (!res.empty()) res += ", ";
@@ -417,10 +428,10 @@ public:
             if (!s2.empty()) { res += " ("; res += s2; res += ')'; }
         }
 
-        showActivity(ActivityType::Download, "%s MiB DL", "%.1f", MiB);
+        showActivity(actFileTransfer, "%s MiB DL", "%.1f", MiB);
 
         {
-            auto s = renderActivity(ActivityType::OptimiseStore, "%s paths optimised");
+            auto s = renderActivity(actOptimiseStore, "%s paths optimised");
             if (s != "") {
                 s += fmt(", %.1f MiB / %d inodes freed", state.bytesLinked / MiB, state.filesLinked);
                 if (!res.empty()) res += ", ";
@@ -429,7 +440,7 @@ public:
         }
 
         // FIXME: don't show "done" paths in green.
-        showActivity(ActivityType::VerifyPaths, "%s paths verified");
+        showActivity(actVerifyPaths, "%s paths verified");
 
         if (state.corruptedPaths) {
             if (!res.empty()) res += ", ";
@@ -457,11 +468,17 @@ public:
     }
 };
 
+Logger * makeProgressBar(bool printBuildLogs)
+{
+    return new ProgressBar(
+        printBuildLogs,
+        isatty(STDERR_FILENO) && getEnv("TERM").value_or("dumb") != "dumb"
+    );
+}
+
 void startProgressBar(bool printBuildLogs)
 {
-    logger = new ProgressBar(
-        printBuildLogs,
-        isatty(STDERR_FILENO) && getEnv("TERM").value_or("dumb") != "dumb");
+    logger = makeProgressBar(printBuildLogs);
 }
 
 void stopProgressBar()

@@ -74,6 +74,18 @@ struct TunnelLogger : public Logger
         enqueueMsg(*buf.s);
     }
 
+    void logEI(const ErrorInfo & ei) override
+    {
+        if (ei.level > verbosity) return;
+
+        std::stringstream oss;
+        oss << ei;
+
+        StringSink buf;
+        buf << STDERR_NEXT << oss.str() << "\n"; // (fs.s + "\n");
+        enqueueMsg(*buf.s);
+    }
+
     /* startWork() means that we're starting an operation for which we
       want to send out stderr to the client. */
     void startWork()
@@ -115,13 +127,7 @@ struct TunnelLogger : public Logger
         }
 
         StringSink buf;
-        buf << STDERR_START_ACTIVITY 
-            << act
-            << (uint64_t) lvl
-            << (uint64_t) type
-            << s
-            << fields
-            << parent;
+        buf << STDERR_START_ACTIVITY << act << lvl << type << s << fields << parent;
         enqueueMsg(*buf.s);
     }
 
@@ -137,10 +143,7 @@ struct TunnelLogger : public Logger
     {
         if (GET_PROTOCOL_MINOR(clientVersion) < 20) return;
         StringSink buf;
-        buf << STDERR_RESULT
-            << act
-            << (uint64_t) type
-            << fields;
+        buf << STDERR_RESULT << act << type << fields;
         enqueueMsg(*buf.s);
     }
 };
@@ -291,7 +294,7 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
         auto path = store->parseStorePath(readString(from));
         logger->startWork();
         StorePathSet paths; // FIXME
-        paths.insert(path.clone());
+        paths.insert(path);
         auto res = store->querySubstitutablePaths(paths);
         logger->stopWork();
         to << (res.count(path) != 0);
@@ -312,7 +315,7 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
         logger->startWork();
         auto hash = store->queryPathInfo(path)->narHash;
         logger->stopWork();
-        to << hash.to_string(Base::Base16, false);
+        to << hash.to_string(Base16, false);
         break;
     }
 
@@ -325,7 +328,7 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
         StorePathSet paths;
         if (op == wopQueryReferences)
             for (auto & i : store->queryPathInfo(path)->references)
-                paths.insert(i.clone());
+                paths.insert(i);
         else if (op == wopQueryReferrers)
             store->queryReferrers(path, paths);
         else if (op == wopQueryValidDerivers)
@@ -339,8 +342,7 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
     case wopQueryDerivationOutputNames: {
         auto path = store->parseStorePath(readString(from));
         logger->startWork();
-        StringSet names;
-        names = store->queryDerivationOutputNames(path);
+        auto names = store->readDerivation(path).outputNames();
         logger->stopWork();
         to << names;
         break;
@@ -369,8 +371,10 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
         FileIngestionMethod method;
         {
             bool fixed;
-            unsigned char recursive;
+            uint8_t recursive;
             from >> baseName >> fixed /* obsolete */ >> recursive >> s;
+            if (recursive > (uint8_t) FileIngestionMethod::Recursive)
+                throw Error("unsupported FileIngestionMethod with value of %i; you may need to upgrade nix-daemon", recursive);
             method = FileIngestionMethod { recursive };
             /* Compatibility hack. */
             if (!fixed) {
@@ -572,7 +576,7 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
         clientSettings.maxBuildJobs = readInt(from);
         clientSettings.maxSilentTime = readInt(from);
         readInt(from); // obsolete useBuildHook
-        clientSettings.verboseBuild = Verbosity::Error == (Verbosity) readInt(from);
+        clientSettings.verboseBuild = lvlError == (Verbosity) readInt(from);
         readInt(from); // obsolete logType
         readInt(from); // obsolete printBuildTrace
         clientSettings.buildCores = readInt(from);
@@ -602,9 +606,7 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
         auto path = store->parseStorePath(readString(from));
         logger->startWork();
         SubstitutablePathInfos infos;
-        StorePathSet paths;
-        paths.insert(path.clone()); // FIXME
-        store->querySubstitutablePathInfos(paths, infos);
+        store->querySubstitutablePathInfos({path}, infos);
         logger->stopWork();
         auto i = infos.find(path);
         if (i == infos.end())
@@ -657,7 +659,7 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
             if (GET_PROTOCOL_MINOR(clientVersion) >= 17)
                 to << 1;
             to << (info->deriver ? store->printStorePath(*info->deriver) : "")
-               << info->narHash.to_string(Base::Base16, false);
+               << info->narHash.to_string(Base16, false);
             writeStorePaths(*store, to, info->references);
             to << info->registrationTime << info->narSize;
             if (GET_PROTOCOL_MINOR(clientVersion) >= 16) {
@@ -717,7 +719,7 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
         auto deriver = readString(from);
         if (deriver != "")
             info.deriver = store->parseStorePath(deriver);
-        info.narHash = Hash(readString(from), HashType::SHA256);
+        info.narHash = Hash(readString(from), htSHA256);
         info.references = readStorePaths<StorePathSet>(*store, from);
         from >> info.registrationTime >> info.narSize >> info.ultimate;
         info.sigs = readStrings<StringSet>(from);
@@ -765,7 +767,7 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
     }
 
     default:
-        throw Error(format("invalid operation %1%") % op);
+        throw Error("invalid operation %1%", op);
     }
 }
 
@@ -800,7 +802,7 @@ void processConnection(
 
     Finally finally([&]() {
         _isInterrupted = false;
-        prevLogger->log(Verbosity::Debug, fmt("%d operations", opCount));
+        prevLogger->log(lvlDebug, fmt("%d operations", opCount));
     });
 
     if (GET_PROTOCOL_MINOR(clientVersion) >= 14 && readInt(from)) {
