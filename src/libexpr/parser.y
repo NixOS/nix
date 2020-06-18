@@ -65,23 +65,20 @@ namespace nix {
 
 static void dupAttr(const AttrPath & attrPath, const Pos & pos, const Pos & prevPos)
 {
-    throw ParseError(
-        ErrorInfo {
-            .hint = hintfmt("attribute '%1%' already defined at %2%",
-                showAttrPath(attrPath), prevPos),
-            .nixCode = NixCode { .errPos = pos },
-        });
+    throw ParseError({
+        .hint = hintfmt("attribute '%1%' already defined at %2%",
+            showAttrPath(attrPath), prevPos),
+        .nixCode = NixCode { .errPos = pos },
+    });
 }
 
 
 static void dupAttr(Symbol attr, const Pos & pos, const Pos & prevPos)
 {
-    throw ParseError(
-        ErrorInfo {
-            .hint = hintfmt("attribute '%1%' already defined at %2%",
-                attr, prevPos),
-            .nixCode = NixCode { .errPos = pos },
-        });
+    throw ParseError({
+        .hint = hintfmt("attribute '%1%' already defined at %2%", attr, prevPos),
+        .nixCode = NixCode { .errPos = pos },
+    });
 }
 
 
@@ -149,12 +146,11 @@ static void addAttr(ExprAttrs * attrs, AttrPath & attrPath,
 static void addFormal(const Pos & pos, Formals * formals, const Formal & formal)
 {
     if (!formals->argNames.insert(formal.name).second)
-        throw ParseError(
-            ErrorInfo {
-                .hint = hintfmt("duplicate formal function argument '%1%'",
-                    formal.name),
-                .nixCode = NixCode { .errPos = pos },
-            });
+        throw ParseError({
+            .hint = hintfmt("duplicate formal function argument '%1%'",
+                formal.name),
+            .nixCode = NixCode { .errPos = pos },
+        });
     formals->formals.push_front(formal);
 }
 
@@ -262,10 +258,10 @@ static inline Pos makeCurPos(const YYLTYPE & loc, ParseData * data)
 
 void yyerror(YYLTYPE * loc, yyscan_t scanner, ParseData * data, const char * error)
 {
-    data->error = ErrorInfo { 
+    data->error = {
         .hint = hintfmt(error),
         .nixCode = NixCode { .errPos = makeCurPos(*loc, data) }
-        };
+    };
 }
 
 
@@ -342,11 +338,10 @@ expr_function
     { $$ = new ExprWith(CUR_POS, $2, $4); }
   | LET binds IN expr_function
     { if (!$2->dynamicAttrs.empty())
-        throw ParseError(
-            ErrorInfo {
-                .hint = hintfmt("dynamic attributes not allowed in let"),
-                .nixCode = NixCode { .errPos = CUR_POS },
-            });
+        throw ParseError({
+            .hint = hintfmt("dynamic attributes not allowed in let"),
+            .nixCode = NixCode { .errPos = CUR_POS },
+        });
       $$ = new ExprLet($2, $4);
     }
   | expr_if
@@ -423,11 +418,10 @@ expr_simple
   | URI {
       static bool noURLLiterals = settings.isExperimentalFeatureEnabled("no-url-literals");
       if (noURLLiterals)
-          throw ParseError(
-              ErrorInfo { 
-                  .hint = hintfmt("URL literals are disabled"),
-                  .nixCode = NixCode { .errPos = CUR_POS }
-              });
+          throw ParseError({
+              .hint = hintfmt("URL literals are disabled"),
+              .nixCode = NixCode { .errPos = CUR_POS }
+          });
       $$ = new ExprString(data->symbols.create($1));
   }
   | '(' expr ')' { $$ = $2; }
@@ -497,11 +491,10 @@ attrs
           $$->push_back(AttrName(str->s));
           delete str;
       } else
-          throw ParseError(
-              ErrorInfo {
-                  .hint = hintfmt("dynamic attributes not allowed in inherit"),
-                  .nixCode = NixCode { .errPos = makeCurPos(@2, data) },
-              });
+          throw ParseError({
+              .hint = hintfmt("dynamic attributes not allowed in inherit"),
+              .nixCode = NixCode { .errPos = makeCurPos(@2, data) },
+          });
     }
   | { $$ = new AttrPath; }
   ;
@@ -707,11 +700,13 @@ Path EvalState::findFile(SearchPath & searchPath, const string & path, const Pos
         Path res = r.second + suffix;
         if (pathExists(res)) return canonPath(res);
     }
-    throw ThrownError(
-        ErrorInfo { 
-            .hint = hintfmt("file '%1%' was not found in the Nix search path (add it using $NIX_PATH or -I)", path),
-            .nixCode = NixCode { .errPos = pos }
-        });
+    throw ThrownError({
+        .hint = hintfmt(evalSettings.pureEval
+            ? "cannot look up '<%s>' in pure evaluation mode (use '--impure' to override)"
+            : "file '%s' was not found in the Nix search path (add it using $NIX_PATH or -I)",
+            path),
+        .nixCode = NixCode { .errPos = pos }
+    });
 }
 
 
@@ -727,10 +722,9 @@ std::pair<bool, std::string> EvalState::resolveSearchPathElem(const SearchPathEl
             res = { true, store->toRealPath(fetchers::downloadTarball(
                         store, resolveUri(elem.second), "source", false).storePath) };
         } catch (FileTransferError & e) {
-            logWarning(
-                ErrorInfo { 
-                    .name = "Entry download",
-                    .hint = hintfmt("Nix search path entry '%1%' cannot be downloaded, ignoring", elem.second)
+            logWarning({
+                .name = "Entry download",
+                .hint = hintfmt("Nix search path entry '%1%' cannot be downloaded, ignoring", elem.second)
             });
             res = { false, "" };
         }
@@ -739,10 +733,9 @@ std::pair<bool, std::string> EvalState::resolveSearchPathElem(const SearchPathEl
         if (pathExists(path))
             res = { true, path };
         else {
-            logWarning(
-                ErrorInfo { 
-                    .name = "Entry not found",
-                    .hint = hintfmt("warning: Nix search path entry '%1%' does not exist, ignoring", elem.second)
+            logWarning({
+                .name = "Entry not found",
+                .hint = hintfmt("warning: Nix search path entry '%1%' does not exist, ignoring", elem.second)
             });
             res = { false, "" };
         }

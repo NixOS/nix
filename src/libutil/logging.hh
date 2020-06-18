@@ -18,6 +18,7 @@ typedef enum {
     actSubstitute = 108,
     actQueryPathInfo = 109,
     actPostBuildHook = 110,
+    actBuildWaiting = 111,
 } ActivityType;
 
 typedef enum {
@@ -53,6 +54,11 @@ public:
     typedef std::vector<Field> Fields;
 
     virtual ~Logger() { }
+
+    virtual void stop() { };
+
+    // Whether the logger prints the whole build log
+    virtual bool isVerbose() { return false; }
 
     virtual void log(Verbosity lvl, const FormatOrString & fs) = 0;
 
@@ -140,7 +146,7 @@ struct PushActivity
 
 extern Logger * logger;
 
-Logger * makeDefaultLogger();
+Logger * makeSimpleLogger(bool printBuildLogs = true);
 
 Logger * makeJSONLogger(Logger & prevLogger);
 

@@ -200,7 +200,7 @@ static int _main(int argc, char * * argv)
 
                 } catch (std::exception & e) {
                     auto msg = chomp(drainFD(5, false));
-                    logError({ 
+                    logError({
                         .name = "Remote build",
                         .hint = hintfmt("cannot build on '%s': %s%s",
                             bestMachine->storeUri, e.what(),
@@ -244,7 +244,7 @@ connected:
 
         uploadLock = -1;
 
-        BasicDerivation drv(readDerivation(*store, store->realStoreDir + "/" + std::string(drvPath->to_string())));
+        auto drv = store->readDerivation(*drvPath);
         drv.inputSrcs = store->parseStorePathSet(inputs);
 
         auto result = sshStore->buildDerivation(*drvPath, drv);

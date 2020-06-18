@@ -22,7 +22,7 @@ namespace nix {
             logger->logEI(e.info());
             auto str = testing::internal::GetCapturedStderr();
 
-            ASSERT_STREQ(str.c_str(),"\x1B[31;1merror:\x1B[0m\x1B[34;1m --- TestError ------------------------------------ error-unit-test\x1B[0m\nan error for testing purposes\n");
+            ASSERT_STREQ(str.c_str(),"\x1B[31;1merror:\x1B[0m\x1B[34;1m --- TestError --- error-unit-test\x1B[0m\nan error for testing purposes\n");
         }
     }
 
@@ -42,7 +42,7 @@ namespace nix {
             logger->logEI(ei);
             auto str = testing::internal::GetCapturedStderr();
 
-            ASSERT_STREQ(str.c_str(), "\x1B[31;1merror:\x1B[0m\x1B[34;1m --- TestError ------------------------------------ error-unit-test\x1B[0m\n\x1B[33;1m\x1B[0minitial error\x1B[0m; subsequent error message.\n");
+            ASSERT_STREQ(str.c_str(), "\x1B[31;1merror:\x1B[0m\x1B[34;1m --- TestError --- error-unit-test\x1B[0m\n\x1B[33;1m\x1B[0minitial error\x1B[0m; subsequent error message.\n");
         }
 
     }
@@ -60,7 +60,7 @@ namespace nix {
             logError(e.info());
             auto str = testing::internal::GetCapturedStderr();
 
-            ASSERT_STREQ(str.c_str(), "\x1B[31;1merror:\x1B[0m\x1B[34;1m --- SysError ------------------------------------- error-unit-test\x1B[0m\n\x1B[33;1m\x1B[0mstatting file\x1B[0m: \x1B[33;1mBad file descriptor\x1B[0m\n");
+            ASSERT_STREQ(str.c_str(), "\x1B[31;1merror:\x1B[0m\x1B[34;1m --- SysError --- error-unit-test\x1B[0m\n\x1B[33;1m\x1B[0mstatting file\x1B[0m: \x1B[33;1mBad file descriptor\x1B[0m\n");
 
         }
     }
@@ -74,7 +74,7 @@ namespace nix {
                 });
 
         auto str = testing::internal::GetCapturedStderr();
-        ASSERT_STREQ(str.c_str(), "\x1B[32;1minfo:\x1B[0m\x1B[34;1m --- Info name ------------------------------------- error-unit-test\x1B[0m\nInfo description\n");
+        ASSERT_STREQ(str.c_str(), "\x1B[32;1minfo:\x1B[0m\x1B[34;1m --- Info name --- error-unit-test\x1B[0m\nInfo description\n");
     }
 
     TEST(logEI, loggingErrorOnTalkativeLevel) {
@@ -88,7 +88,7 @@ namespace nix {
                         });
 
         auto str = testing::internal::GetCapturedStderr();
-        ASSERT_STREQ(str.c_str(), "\x1B[32;1mtalk:\x1B[0m\x1B[34;1m --- Talkative name -------------------------------- error-unit-test\x1B[0m\nTalkative description\n");
+        ASSERT_STREQ(str.c_str(), "\x1B[32;1mtalk:\x1B[0m\x1B[34;1m --- Talkative name --- error-unit-test\x1B[0m\nTalkative description\n");
     }
 
     TEST(logEI, loggingErrorOnChattyLevel) {
@@ -102,7 +102,7 @@ namespace nix {
                         });
 
         auto str = testing::internal::GetCapturedStderr();
-        ASSERT_STREQ(str.c_str(), "\x1B[32;1mchat:\x1B[0m\x1B[34;1m --- Chatty name ----------------------------------- error-unit-test\x1B[0m\nTalkative description\n");
+        ASSERT_STREQ(str.c_str(), "\x1B[32;1mchat:\x1B[0m\x1B[34;1m --- Chatty name --- error-unit-test\x1B[0m\nTalkative description\n");
     }
 
     TEST(logEI, loggingErrorOnDebugLevel) {
@@ -116,7 +116,7 @@ namespace nix {
                         });
 
         auto str = testing::internal::GetCapturedStderr();
-        ASSERT_STREQ(str.c_str(), "\x1B[33;1mdebug:\x1B[0m\x1B[34;1m --- Debug name ----------------------------------- error-unit-test\x1B[0m\nDebug description\n");
+        ASSERT_STREQ(str.c_str(), "\x1B[33;1mdebug:\x1B[0m\x1B[34;1m --- Debug name --- error-unit-test\x1B[0m\nDebug description\n");
     }
 
     TEST(logEI, loggingErrorOnVomitLevel) {
@@ -130,7 +130,7 @@ namespace nix {
                         });
 
         auto str = testing::internal::GetCapturedStderr();
-        ASSERT_STREQ(str.c_str(), "\x1B[32;1mvomit:\x1B[0m\x1B[34;1m --- Vomit name ----------------------------------- error-unit-test\x1B[0m\nVomit description\n");
+        ASSERT_STREQ(str.c_str(), "\x1B[32;1mvomit:\x1B[0m\x1B[34;1m --- Vomit name --- error-unit-test\x1B[0m\nVomit description\n");
     }
 
     /* ----------------------------------------------------------------------------
@@ -147,7 +147,7 @@ namespace nix {
                 });
 
         auto str = testing::internal::GetCapturedStderr();
-        ASSERT_STREQ(str.c_str(), "\x1B[31;1merror:\x1B[0m\x1B[34;1m --- name ----------------------------------------- error-unit-test\x1B[0m\nerror description\n");
+        ASSERT_STREQ(str.c_str(), "\x1B[31;1merror:\x1B[0m\x1B[34;1m --- name --- error-unit-test\x1B[0m\nerror description\n");
     }
 
     TEST(logError, logErrorWithPreviousAndNextLinesOfCode) {
@@ -171,7 +171,7 @@ namespace nix {
 
 
         auto str = testing::internal::GetCapturedStderr();
-        ASSERT_STREQ(str.c_str(), "\x1B[31;1merror:\x1B[0m\x1B[34;1m --- error name ----------------------------------- error-unit-test\x1B[0m\nin file: \x1B[34;1mmyfile.nix (40:13)\x1B[0m\n\nerror with code lines\n\n    39| previous line of code\n    40| this is the problem line of code\n      |             \x1B[31;1m^\x1B[0m\n    41| next line of code\n\nthis hint has \x1B[33;1myellow\x1B[0m templated \x1B[33;1mvalues\x1B[0m!!\n");
+        ASSERT_STREQ(str.c_str(), "\x1B[31;1merror:\x1B[0m\x1B[34;1m --- error name --- error-unit-test\x1B[0m\nin file: \x1B[34;1mmyfile.nix (40:13)\x1B[0m\n\nerror with code lines\n\n    39| previous line of code\n    40| this is the problem line of code\n      |             \x1B[31;1m^\x1B[0m\n    41| next line of code\n\nthis hint has \x1B[33;1myellow\x1B[0m templated \x1B[33;1mvalues\x1B[0m!!\n");
     }
 
     TEST(logError, logErrorWithoutLinesOfCode) {
@@ -190,7 +190,7 @@ namespace nix {
                 }});
 
         auto str = testing::internal::GetCapturedStderr();
-        ASSERT_STREQ(str.c_str(), "\x1B[31;1merror:\x1B[0m\x1B[34;1m --- error name ----------------------------------- error-unit-test\x1B[0m\nin file: \x1B[34;1mmyfile.nix (40:13)\x1B[0m\n\nerror without any code lines.\n\nthis hint has \x1B[33;1myellow\x1B[0m templated \x1B[33;1mvalues\x1B[0m!!\n");
+        ASSERT_STREQ(str.c_str(), "\x1B[31;1merror:\x1B[0m\x1B[34;1m --- error name --- error-unit-test\x1B[0m\nin file: \x1B[34;1mmyfile.nix (40:13)\x1B[0m\n\nerror without any code lines.\n\nthis hint has \x1B[33;1myellow\x1B[0m templated \x1B[33;1mvalues\x1B[0m!!\n");
     }
 
     TEST(logError, logErrorWithOnlyHintAndName) {
@@ -206,7 +206,7 @@ namespace nix {
                 }});
 
         auto str = testing::internal::GetCapturedStderr();
-        ASSERT_STREQ(str.c_str(), "\x1B[31;1merror:\x1B[0m\x1B[34;1m --- error name ----------------------------------- error-unit-test\x1B[0m\nin file: \x1B[34;1mmyfile.nix (40:13)\x1B[0m\n\nhint \x1B[33;1monly\x1B[0m\n");
+        ASSERT_STREQ(str.c_str(), "\x1B[31;1merror:\x1B[0m\x1B[34;1m --- error name --- error-unit-test\x1B[0m\nin file: \x1B[34;1mmyfile.nix (40:13)\x1B[0m\n\nhint \x1B[33;1monly\x1B[0m\n");
 
     }
 
@@ -224,7 +224,7 @@ namespace nix {
         });
 
         auto str = testing::internal::GetCapturedStderr();
-        ASSERT_STREQ(str.c_str(), "\x1B[33;1mwarning:\x1B[0m\x1B[34;1m --- name --------------------------------------- error-unit-test\x1B[0m\nerror description\n\nthere was a \x1B[33;1mwarning\x1B[0m\n");
+        ASSERT_STREQ(str.c_str(), "\x1B[33;1mwarning:\x1B[0m\x1B[34;1m --- name --- error-unit-test\x1B[0m\nerror description\n\nthere was a \x1B[33;1mwarning\x1B[0m\n");
     }
 
     TEST(logWarning, logWarningWithFileLineNumAndCode) {
@@ -249,7 +249,7 @@ namespace nix {
 
 
         auto str = testing::internal::GetCapturedStderr();
-        ASSERT_STREQ(str.c_str(), "\x1B[33;1mwarning:\x1B[0m\x1B[34;1m --- warning name ------------------------------- error-unit-test\x1B[0m\nin file: \x1B[34;1mmyfile.nix (40:13)\x1B[0m\n\nwarning description\n\n    40| this is the problem line of code\n      |             \x1B[31;1m^\x1B[0m\n\nthis hint has \x1B[33;1myellow\x1B[0m templated \x1B[33;1mvalues\x1B[0m!!\n");
+        ASSERT_STREQ(str.c_str(), "\x1B[33;1mwarning:\x1B[0m\x1B[34;1m --- warning name --- error-unit-test\x1B[0m\nin file: \x1B[34;1mmyfile.nix (40:13)\x1B[0m\n\nwarning description\n\n    40| this is the problem line of code\n      |             \x1B[31;1m^\x1B[0m\n\nthis hint has \x1B[33;1myellow\x1B[0m templated \x1B[33;1mvalues\x1B[0m!!\n");
     }
 
 }

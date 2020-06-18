@@ -204,10 +204,10 @@ void handleSQLiteBusy(const SQLiteBusy & e)
 
     if (now > lastWarned + 10) {
         lastWarned = now;
-        logWarning(
-            ErrorInfo { .name = "Sqlite busy",
-                        .hint = hintfmt(e.what())
-            });
+        logWarning({
+            .name = "Sqlite busy",
+            .hint = hintfmt(e.what())
+        });
     }
 
     /* Sleep for a while since retrying the transaction right away

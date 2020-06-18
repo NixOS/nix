@@ -282,12 +282,11 @@ void ExprVar::bindVars(const StaticEnv & env)
     /* Otherwise, the variable must be obtained from the nearest
        enclosing `with'.  If there is no `with', then we can issue an
        "undefined variable" error now. */
-    if (withLevel == -1) 
-        throw UndefinedVarError(
-            ErrorInfo {
-                .hint = hintfmt("undefined variable '%1%'", name),
-                .nixCode = NixCode { .errPos = pos }
-            });
+    if (withLevel == -1)
+        throw UndefinedVarError({
+            .hint = hintfmt("undefined variable '%1%'", name),
+            .nixCode = NixCode { .errPos = pos }
+        });
     fromWith = true;
     this->level = withLevel;
 }

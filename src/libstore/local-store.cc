@@ -87,7 +87,7 @@ LocalStore::LocalStore(const Params & params)
 
         struct group * gr = getgrnam(settings.buildUsersGroup.get().c_str());
         if (!gr)
-            logError({ 
+            logError({
                 .name = "'build-users-group' not found",
                 .hint = hintfmt(
                     "warning: the group '%1%' specified in 'build-users-group' does not exist",
@@ -584,7 +584,7 @@ uint64_t LocalStore::addValidPath(State & state,
 
     state.stmtRegisterValidPath.use()
         (printStorePath(info.path))
-        (info.narHash.to_string(Base16))
+        (info.narHash.to_string(Base16, true))
         (info.registrationTime == 0 ? time(0) : info.registrationTime)
         (info.deriver ? printStorePath(*info.deriver) : "", (bool) info.deriver)
         (info.narSize, info.narSize != 0)
@@ -599,7 +599,7 @@ uint64_t LocalStore::addValidPath(State & state,
        efficiently query whether a path is an output of some
        derivation. */
     if (info.path.isDerivation()) {
-        auto drv = readDerivation(*this, realStoreDir + "/" + std::string(info.path.to_string()));
+        auto drv = readDerivation(info.path);
 
         /* Verify that the output paths in the derivation are correct
            (i.e., follow the scheme for computing output paths from
@@ -619,7 +619,7 @@ uint64_t LocalStore::addValidPath(State & state,
 
     {
         auto state_(Store::state.lock());
-        state_->pathInfoCache.upsert(storePathToHash(printStorePath(info.path)),
+        state_->pathInfoCache.upsert(std::string(info.path.hashPart()),
             PathInfoCacheValue{ .value = std::make_shared<const ValidPathInfo>(info) });
     }
 
@@ -631,7 +631,7 @@ void LocalStore::queryPathInfoUncached(const StorePath & path,
     Callback<std::shared_ptr<const ValidPathInfo>> callback) noexcept
 {
     try {
-        auto info = std::make_shared<ValidPathInfo>(path.clone());
+        auto info = std::make_shared<ValidPathInfo>(path);
 
         callback(retrySQLite<std::shared_ptr<ValidPathInfo>>([&]() {
             auto state(_state.lock());
@@ -684,7 +684,7 @@ void LocalStore::updatePathInfo(State & state, const ValidPathInfo & info)
 {
     state.stmtUpdatePathInfo.use()
         (info.narSize, info.narSize != 0)
-        (info.narHash.to_string(Base16))
+        (info.narHash.to_string(Base16, true))
         (info.ultimate ? 1 : 0, info.ultimate)
         (concatStringsSep(" ", info.sigs), !info.sigs.empty())
         (info.ca, !info.ca.empty())
@@ -721,7 +721,7 @@ StorePathSet LocalStore::queryValidPaths(const StorePathSet & paths, SubstituteF
 {
     StorePathSet res;
     for (auto & i : paths)
-        if (isValidPath(i)) res.insert(i.clone());
+        if (isValidPath(i)) res.insert(i);
     return res;
 }
 
@@ -789,26 +789,9 @@ StorePathSet LocalStore::queryDerivationOutputs(const StorePath & path)
 }
 
 
-StringSet LocalStore::queryDerivationOutputNames(const StorePath & path)
-{
-    return retrySQLite<StringSet>([&]() {
-        auto state(_state.lock());
-
-        auto useQueryDerivationOutputs(state->stmtQueryDerivationOutputs.use()
-            (queryValidPathId(*state, path)));
-
-        StringSet outputNames;
-        while (useQueryDerivationOutputs.next())
-            outputNames.insert(useQueryDerivationOutputs.getStr(0));
-
-        return outputNames;
-    });
-}
-
-
 std::optional<StorePath> LocalStore::queryPathFromHashPart(const std::string & hashPart)
 {
-    if (hashPart.size() != storePathHashLen) throw Error("invalid hash part");
+    if (hashPart.size() != StorePath::HashLen) throw Error("invalid hash part");
 
     Path prefix = storeDir + "/" + hashPart;
 
@@ -833,7 +816,7 @@ StorePathSet LocalStore::querySubstitutablePaths(const StorePathSet & paths)
 
     StorePathSet remaining;
     for (auto & i : paths)
-        remaining.insert(i.clone());
+        remaining.insert(i);
 
     StorePathSet res;
 
@@ -847,9 +830,9 @@ StorePathSet LocalStore::querySubstitutablePaths(const StorePathSet & paths)
         StorePathSet remaining2;
         for (auto & path : remaining)
             if (valid.count(path))
-                res.insert(path.clone());
+                res.insert(path);
             else
-                remaining2.insert(path.clone());
+                remaining2.insert(path);
 
         std::swap(remaining, remaining2);
     }
@@ -871,9 +854,9 @@ void LocalStore::querySubstitutablePathInfos(const StorePathSet & paths,
                 auto info = sub->queryPathInfo(path);
                 auto narInfo = std::dynamic_pointer_cast<const NarInfo>(
                     std::shared_ptr<const ValidPathInfo>(info));
-                infos.insert_or_assign(path.clone(), SubstitutablePathInfo{
-                    info->deriver ? info->deriver->clone() : std::optional<StorePath>(),
-                    cloneStorePathSet(info->references),
+                infos.insert_or_assign(path, SubstitutablePathInfo{
+                    info->deriver,
+                    info->references,
                     narInfo ? narInfo->fileSize : 0,
                     info->narSize});
             } catch (InvalidPath &) {
@@ -917,7 +900,7 @@ void LocalStore::registerValidPaths(const ValidPathInfos & infos)
                 updatePathInfo(*state, i);
             else
                 addValidPath(*state, i, false);
-            paths.insert(i.path.clone());
+            paths.insert(i.path);
         }
 
         for (auto & i : infos) {
@@ -932,8 +915,7 @@ void LocalStore::registerValidPaths(const ValidPathInfos & infos)
         for (auto & i : infos)
             if (i.path.isDerivation()) {
                 // FIXME: inefficient; we already loaded the derivation in addValidPath().
-                checkDerivationOutputs(i.path,
-                    readDerivation(*this, realStoreDir + "/" + std::string(i.path.to_string())));
+                checkDerivationOutputs(i.path, readDerivation(i.path));
             }
 
         /* Do a topological sort of the paths.  This will throw an
@@ -960,7 +942,7 @@ void LocalStore::invalidatePath(State & state, const StorePath & path)
 
     {
         auto state_(Store::state.lock());
-        state_->pathInfoCache.erase(storePathToHash(printStorePath(path)));
+        state_->pathInfoCache.erase(std::string(path.hashPart()));
     }
 }
 
@@ -1012,7 +994,7 @@ void LocalStore::addToStore(const ValidPathInfo & info, Source & source,
             if (info.ca == "" || !info.references.count(info.path))
                 hashSink = std::make_unique<HashSink>(htSHA256);
             else
-                hashSink = std::make_unique<HashModuloSink>(htSHA256, storePathToHash(printStorePath(info.path)));
+                hashSink = std::make_unique<HashModuloSink>(htSHA256, std::string(info.path.hashPart()));
 
             LambdaSource wrapperSource([&](unsigned char * data, size_t len) -> size_t {
                 size_t n = source.read(data, len);
@@ -1026,7 +1008,7 @@ void LocalStore::addToStore(const ValidPathInfo & info, Source & source,
 
             if (hashResult.first != info.narHash)
                 throw Error("hash mismatch importing path '%s';\n  wanted: %s\n  got:    %s",
-                    printStorePath(info.path), info.narHash.to_string(), hashResult.first.to_string());
+                    printStorePath(info.path), info.narHash.to_string(Base32, true), hashResult.first.to_string(Base32, true));
 
             if (hashResult.second != info.narSize)
                 throw Error("size mismatch importing path '%s';\n  wanted: %s\n  got:   %s",
@@ -1092,7 +1074,7 @@ StorePath LocalStore::addToStoreFromDump(const string & dump, const string & nam
 
             optimisePath(realPath); // FIXME: combine with hashPath()
 
-            ValidPathInfo info(dstPath.clone());
+            ValidPathInfo info(dstPath);
             info.narHash = hash.first;
             info.narSize = hash.second;
             info.ca = makeFixedOutputCA(method, h);
@@ -1155,11 +1137,11 @@ StorePath LocalStore::addTextToStore(const string & name, const string & s,
 
             optimisePath(realPath);
 
-            ValidPathInfo info(dstPath.clone());
+            ValidPathInfo info(dstPath);
             info.narHash = narHash;
             info.narSize = sink.s->size();
-            info.references = cloneStorePathSet(references);
-            info.ca = "text:" + hash.to_string();
+            info.references = references;
+            info.ca = "text:" + hash.to_string(Base32, true);
             registerValidPath(info);
         }
 
@@ -1241,7 +1223,7 @@ bool LocalStore::verifyStore(bool checkContents, RepairFlag repair)
             Path linkPath = linksDir + "/" + link.name;
             string hash = hashPath(htSHA256, linkPath).first.to_string(Base32, false);
             if (hash != link.name) {
-                logError({ 
+                logError({
                     .name = "Invalid hash",
                     .hint = hintfmt(
                         "link '%s' was modified! expected hash '%s', got '%s'",
@@ -1273,16 +1255,16 @@ bool LocalStore::verifyStore(bool checkContents, RepairFlag repair)
                 if (info->ca == "" || !info->references.count(info->path))
                     hashSink = std::make_unique<HashSink>(info->narHash.type);
                 else
-                    hashSink = std::make_unique<HashModuloSink>(info->narHash.type, storePathToHash(printStorePath(info->path)));
+                    hashSink = std::make_unique<HashModuloSink>(info->narHash.type, std::string(info->path.hashPart()));
 
                 dumpPath(Store::toRealPath(i), *hashSink);
                 auto current = hashSink->finish();
 
                 if (info->narHash != nullHash && info->narHash != current.first) {
-                    logError({ 
+                    logError({
                         .name = "Invalid hash - path modified",
                         .hint = hintfmt("path '%s' was modified! expected hash '%s', got '%s'",
-                        printStorePath(i), info->narHash.to_string(), current.first.to_string())
+                        printStorePath(i), info->narHash.to_string(Base32, true), current.first.to_string(Base32, true))
                     });
                     if (repair) repairPath(i); else errors = true;
                 } else {
@@ -1334,7 +1316,7 @@ void LocalStore::verifyPath(const Path & pathS, const StringSet & store,
     if (!done.insert(pathS).second) return;
 
     if (!isStorePath(pathS)) {
-        logError({ 
+        logError({
             .name = "Nix path not found",
             .hint = hintfmt("path '%s' is not in the Nix store", pathS)
         });
@@ -1360,7 +1342,7 @@ void LocalStore::verifyPath(const Path & pathS, const StringSet & store,
             auto state(_state.lock());
             invalidatePath(*state, path);
         } else {
-            logError({ 
+            logError({
                 .name = "Missing path with referrers",
                 .hint = hintfmt("path '%s' disappeared, but it still has valid referrers!", pathS)
             });

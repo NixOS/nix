@@ -90,7 +90,7 @@ struct CmdVerify : StorePathsCommand
                     if (info->ca == "")
                         hashSink = std::make_unique<HashSink>(info->narHash.type);
                     else
-                        hashSink = std::make_unique<HashModuloSink>(info->narHash.type, storePathToHash(store->printStorePath(info->path)));
+                        hashSink = std::make_unique<HashModuloSink>(info->narHash.type, std::string(info->path.hashPart()));
 
                     store->narFromPath(info->path, *hashSink);
 
@@ -99,16 +99,15 @@ struct CmdVerify : StorePathsCommand
                     if (hash.first != info->narHash) {
                         corrupted++;
                         act2.result(resCorruptedPath, store->printStorePath(info->path));
-                        logError({ 
+                        logError({
                             .name = "Hash error - path modified",
                             .hint = hintfmt(
                                 "path '%s' was modified! expected hash '%s', got '%s'",
                                 store->printStorePath(info->path),
-                                info->narHash.to_string(),
-                                hash.first.to_string())
+                                info->narHash.to_string(Base32, true),
+                                hash.first.to_string(Base32, true))
                         });
                     }
-
                 }
 
                 if (!noTrust) {
@@ -155,7 +154,7 @@ struct CmdVerify : StorePathsCommand
                     if (!good) {
                         untrusted++;
                         act2.result(resUntrustedPath, store->printStorePath(info->path));
-                        logError({ 
+                        logError({
                             .name = "Untrusted path",
                             .hint = hintfmt("path '%s' is untrusted",
                                 store->printStorePath(info->path))

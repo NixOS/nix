@@ -39,7 +39,7 @@ std::set<std::string> runResolver(const Path & filename)
         throw SysError("statting '%s'", filename);
 
     if (!S_ISREG(st.st_mode)) {
-        logError({ 
+        logError({
             .name = "Regular MACH file",
             .hint = hintfmt("file '%s' is not a regular file", filename)
         });
@@ -47,7 +47,7 @@ std::set<std::string> runResolver(const Path & filename)
     }
 
     if (st.st_size < sizeof(mach_header_64)) {
-        logError({ 
+        logError({
             .name = "File too short",
             .hint = hintfmt("file '%s' is too short for a MACH binary", filename)
         });
@@ -72,7 +72,7 @@ std::set<std::string> runResolver(const Path & filename)
             }
         }
         if (mach64_offset == 0) {
-            logError({ 
+            logError({
                 .name = "No mach64 blobs",
                 .hint = hintfmt("Could not find any mach64 blobs in file '%1%', continuing...", filename)
             });
@@ -81,7 +81,7 @@ std::set<std::string> runResolver(const Path & filename)
     } else if (magic == MH_MAGIC_64 || magic == MH_CIGAM_64) {
         mach64_offset = 0;
     } else {
-        logError({ 
+        logError({
             .name = "Magic number",
             .hint = hintfmt("Object file has unknown magic number '%1%', skipping it...", magic)
         });

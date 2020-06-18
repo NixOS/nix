@@ -72,6 +72,18 @@ struct curlFileTransfer : public FileTransfer
 
         curl_off_t writtenToSink = 0;
 
+        inline static const std::set<long> successfulStatuses {200, 201, 204, 206, 304, 0 /* other protocol */};
+        /* Get the HTTP status code, or 0 for other protocols. */
+        long getHTTPStatus()
+        {
+            long httpStatus = 0;
+            long protocol = 0;
+            curl_easy_getinfo(req, CURLINFO_PROTOCOL, &protocol);
+            if (protocol == CURLPROTO_HTTP || protocol == CURLPROTO_HTTPS)
+                curl_easy_getinfo(req, CURLINFO_RESPONSE_CODE, &httpStatus);
+            return httpStatus;
+        }
+
         TransferItem(curlFileTransfer & fileTransfer,
             const FileTransferRequest & request,
             Callback<FileTransferResult> && callback)
@@ -83,12 +95,11 @@ struct curlFileTransfer : public FileTransfer
             , callback(std::move(callback))
             , finalSink([this](const unsigned char * data, size_t len) {
                 if (this->request.dataCallback) {
-                    long httpStatus = 0;
-                    curl_easy_getinfo(req, CURLINFO_RESPONSE_CODE, &httpStatus);
+                    auto httpStatus = getHTTPStatus();
 
                     /* Only write data to the sink if this is a
                        successful response. */
-                    if (httpStatus == 0 || httpStatus == 200 || httpStatus == 201 || httpStatus == 206) {
+                    if (successfulStatuses.count(httpStatus)) {
                         writtenToSink += len;
                         this->request.dataCallback((char *) data, len);
                     }
@@ -316,8 +327,7 @@ struct curlFileTransfer : public FileTransfer
 
         void finish(CURLcode code)
         {
-            long httpStatus = 0;
-            curl_easy_getinfo(req, CURLINFO_RESPONSE_CODE, &httpStatus);
+            auto httpStatus = getHTTPStatus();
 
             char * effectiveUriCStr;
             curl_easy_getinfo(req, CURLINFO_EFFECTIVE_URL, &effectiveUriCStr);
@@ -343,8 +353,7 @@ struct curlFileTransfer : public FileTransfer
             if (writeException)
                 failEx(writeException);
 
-            else if (code == CURLE_OK &&
-                (httpStatus == 200 || httpStatus == 201 || httpStatus == 204 || httpStatus == 206 || httpStatus == 304 || httpStatus == 226 /* FTP */ || httpStatus == 0 /* other protocol */))
+            else if (code == CURLE_OK && successfulStatuses.count(httpStatus))
             {
                 result.cached = httpStatus == 304;
                 act.progress(result.bodySize, result.bodySize);
@@ -599,9 +608,9 @@ struct curlFileTransfer : public FileTransfer
             workerThreadMain();
         } catch (nix::Interrupted & e) {
         } catch (std::exception & e) {
-            logError({ 
+            logError({
                 .name = "File transfer",
-                .hint = hintfmt("unexpected error in download thread: %s", 
+                .hint = hintfmt("unexpected error in download thread: %s",
                                 e.what())
             });
         }

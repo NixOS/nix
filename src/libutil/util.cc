@@ -35,7 +35,7 @@
 #endif
 
 
-extern char * * environ;
+extern char * * environ __attribute__((weak));
 
 
 namespace nix {
@@ -314,7 +314,7 @@ string readFile(const Path & path)
 void readFile(const Path & path, Sink & sink)
 {
     AutoCloseFD fd = open(path.c_str(), O_RDONLY | O_CLOEXEC);
-    if (!fd)  
+    if (!fd)
         throw SysError("opening file '%s'", path);
     drainFD(fd.get(), sink);
 }
@@ -972,7 +972,7 @@ pid_t startProcess(std::function<void()> fun, const ProcessOptions & options)
 {
     auto wrapper = [&]() {
         if (!options.allowVfork)
-            logger = makeDefaultLogger();
+            logger = makeSimpleLogger();
         try {
 #if __linux__
             if (options.dieWithParent && prctl(PR_SET_PDEATHSIG, SIGKILL) == -1)
@@ -1199,7 +1199,7 @@ void _interrupted()
     /* Block user interrupts while an exception is being handled.
        Throwing an exception while another exception is being handled
        kills the program! */
-    if (!interruptThrown && !std::uncaught_exception()) {
+    if (!interruptThrown && !std::uncaught_exceptions()) {
         interruptThrown = true;
         throw Interrupted("interrupted by the user");
     }
@@ -1297,7 +1297,7 @@ bool statusOk(int status)
 }
 
 
-bool hasPrefix(const string & s, const string & prefix)
+bool hasPrefix(std::string_view s, std::string_view prefix)
 {
     return s.compare(0, prefix.size(), prefix) == 0;
 }
@@ -1391,7 +1391,7 @@ std::string filterANSIEscapes(const std::string & s, bool filterAll, unsigned in
 static char base64Chars[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
 
 
-string base64Encode(const string & s)
+string base64Encode(std::string_view s)
 {
     string res;
     int data = 0, nbits = 0;
@@ -1412,7 +1412,7 @@ string base64Encode(const string & s)
 }
 
 
-string base64Decode(const string & s)
+string base64Decode(std::string_view s)
 {
     bool init = false;
     char decode[256];

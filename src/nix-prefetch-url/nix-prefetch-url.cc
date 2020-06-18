@@ -8,7 +8,7 @@
 #include "attr-path.hh"
 #include "finally.hh"
 #include "../nix/legacy.hh"
-#include "../nix/progress-bar.hh"
+#include "progress-bar.hh"
 #include "tarfile.hh"
 
 #include <iostream>

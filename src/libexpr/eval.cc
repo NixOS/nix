@@ -161,12 +161,12 @@ const Value *getPrimOp(const Value &v) {
 }
 
 
-string showType(const Value & v)
+string showType(ValueType type)
 {
-    switch (v.type) {
+    switch (type) {
         case tInt: return "an integer";
-        case tBool: return "a boolean";
-        case tString: return v.string.context ? "a string with context" : "a string";
+        case tBool: return "a Boolean";
+        case tString: return "a string";
         case tPath: return "a path";
         case tNull: return "null";
         case tAttrs: return "a set";
@@ -175,14 +175,27 @@ string showType(const Value & v)
         case tApp: return "a function application";
         case tLambda: return "a function";
         case tBlackhole: return "a black hole";
+        case tPrimOp: return "a built-in function";
+        case tPrimOpApp: return "a partially applied built-in function";
+        case tExternal: return "an external value";
+        case tFloat: return "a float";
+    }
+    abort();
+}
+
+
+string showType(const Value & v)
+{
+    switch (v.type) {
+        case tString: return v.string.context ? "a string with context" : "a string";
         case tPrimOp:
             return fmt("the built-in function '%s'", string(v.primOp->name));
         case tPrimOpApp:
             return fmt("the partially applied built-in function '%s'", string(getPrimOp(v)->primOp->name));
         case tExternal: return v.external->showType();
-        case tFloat: return "a float";
+    default:
+        return showType(v.type);
     }
-    abort();
 }
 
 
@@ -323,6 +336,7 @@ EvalState::EvalState(const Strings & _searchPath, ref<Store> store)
     , sOutputHash(symbols.create("outputHash"))
     , sOutputHashAlgo(symbols.create("outputHashAlgo"))
     , sOutputHashMode(symbols.create("outputHashMode"))
+    , sRecurseForDerivations(symbols.create("recurseForDerivations"))
     , repair(NoRepair)
     , store(store)
     , baseEnv(allocEnv(128))
@@ -471,14 +485,21 @@ Value * EvalState::addConstant(const string & name, Value & v)
 Value * EvalState::addPrimOp(const string & name,
     size_t arity, PrimOpFun primOp)
 {
+    auto name2 = string(name, 0, 2) == "__" ? string(name, 2) : name;
+    Symbol sym = symbols.create(name2);
+
+    /* Hack to make constants lazy: turn them into a application of
+       the primop to a dummy value. */
     if (arity == 0) {
+        auto vPrimOp = allocValue();
+        vPrimOp->type = tPrimOp;
+        vPrimOp->primOp = new PrimOp(primOp, 1, sym);
         Value v;
-        primOp(*this, noPos, nullptr, v);
+        mkApp(v, *vPrimOp, *vPrimOp);
         return addConstant(name, v);
     }
+
     Value * v = allocValue();
-    string name2 = string(name, 0, 2) == "__" ? string(name, 2) : name;
-    Symbol sym = symbols.create(name2);
     v->type = tPrimOp;
     v->primOp = new PrimOp(primOp, arity, sym);
     staticBaseEnv.vars[symbols.create(name)] = baseEnvDispl;
@@ -506,11 +527,10 @@ LocalNoInlineNoReturn(void throwEvalError(const char * s, const string & s2))
 
 LocalNoInlineNoReturn(void throwEvalError(const Pos & pos, const char * s, const string & s2))
 {
-    throw EvalError(
-        ErrorInfo { 
-            .hint = hintfmt(s, s2),
-            .nixCode = NixCode { .errPos = pos }
-        });
+    throw EvalError({
+        .hint = hintfmt(s, s2),
+        .nixCode = NixCode { .errPos = pos }
+    });
 }
 
 LocalNoInlineNoReturn(void throwEvalError(const char * s, const string & s2, const string & s3))
@@ -520,30 +540,27 @@ LocalNoInlineNoReturn(void throwEvalError(const char * s, const string & s2, con
 
 LocalNoInlineNoReturn(void throwEvalError(const Pos & pos, const char * s, const string & s2, const string & s3))
 {
-    throw EvalError(
-        ErrorInfo { 
-            .hint = hintfmt(s, s2, s3),
-            .nixCode = NixCode { .errPos = pos }
-        });
+    throw EvalError({
+        .hint = hintfmt(s, s2, s3),
+        .nixCode = NixCode { .errPos = pos }
+    });
 }
 
 LocalNoInlineNoReturn(void throwEvalError(const Pos & p1, const char * s, const Symbol & sym, const Pos & p2))
 {
     // p1 is where the error occurred; p2 is a position mentioned in the message.
-    throw EvalError(
-        ErrorInfo { 
-            .hint = hintfmt(s, sym, p2),
-            .nixCode = NixCode { .errPos = p1 }
-        });
+    throw EvalError({
+        .hint = hintfmt(s, sym, p2),
+        .nixCode = NixCode { .errPos = p1 }
+    });
 }
 
 LocalNoInlineNoReturn(void throwTypeError(const Pos & pos, const char * s))
 {
-    throw TypeError(
-        ErrorInfo { 
-            .hint = hintfmt(s),
-            .nixCode = NixCode { .errPos = pos }
-        });
+    throw TypeError({
+        .hint = hintfmt(s),
+        .nixCode = NixCode { .errPos = pos }
+    });
 }
 
 LocalNoInlineNoReturn(void throwTypeError(const char * s, const string & s1))
@@ -553,29 +570,26 @@ LocalNoInlineNoReturn(void throwTypeError(const char * s, const string & s1))
 
 LocalNoInlineNoReturn(void throwTypeError(const Pos & pos, const char * s, const ExprLambda & fun, const Symbol & s2))
 {
-    throw TypeError(
-        ErrorInfo { 
-            .hint = hintfmt(s, fun.showNamePos(), s2),
-            .nixCode = NixCode { .errPos = pos }
-        });
+    throw TypeError({
+        .hint = hintfmt(s, fun.showNamePos(), s2),
+        .nixCode = NixCode { .errPos = pos }
+    });
 }
 
 LocalNoInlineNoReturn(void throwAssertionError(const Pos & pos, const char * s, const string & s1))
 {
-    throw AssertionError(
-        ErrorInfo { 
-            .hint = hintfmt(s, s1),
-            .nixCode = NixCode { .errPos = pos }
-        });
+    throw AssertionError({
+        .hint = hintfmt(s, s1),
+        .nixCode = NixCode { .errPos = pos }
+    });
 }
 
 LocalNoInlineNoReturn(void throwUndefinedVarError(const Pos & pos, const char * s, const string & s1))
 {
-    throw UndefinedVarError(
-        ErrorInfo { 
-            .hint = hintfmt(s, s1),
-            .nixCode = NixCode { .errPos = pos }
-        });
+    throw UndefinedVarError({
+        .hint = hintfmt(s, s1),
+        .nixCode = NixCode { .errPos = pos }
+    });
 }
 
 LocalNoInline(void addErrorPrefix(Error & e, const char * s, const string & s2))
@@ -1594,7 +1608,7 @@ string EvalState::forceStringNoCtx(Value & v, const Pos & pos)
     string s = forceString(v, pos);
     if (v.string.context) {
         if (pos)
-            throwEvalError(pos, "the string '%1%' is not allowed to refer to a store path (such as '%2%')", 
+            throwEvalError(pos, "the string '%1%' is not allowed to refer to a store path (such as '%2%')",
                 v.string.s, v.string.context[0]);
         else
             throwEvalError("the string '%1%' is not allowed to refer to a store path (such as '%2%')",
@@ -1920,11 +1934,10 @@ void EvalState::printStats()
 
 string ExternalValueBase::coerceToString(const Pos & pos, PathSet & context, bool copyMore, bool copyToStore) const
 {
-    throw TypeError(
-        ErrorInfo { 
-            .hint = hintfmt("cannot coerce %1% to a string", showType()),
-            .nixCode = NixCode { .errPos = pos }
-        });
+    throw TypeError({
+        .hint = hintfmt("cannot coerce %1% to a string", showType()),
+        .nixCode = NixCode { .errPos = pos }
+    });
 }
 
 

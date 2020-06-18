@@ -130,7 +130,7 @@ void LocalStore::optimisePath_(Activity * act, OptimiseStats & stats,
        NixOS (example: $fontconfig/var/cache being modified).  Skip
        those files.  FIXME: check the modification time. */
     if (S_ISREG(st.st_mode) && (st.st_mode & S_IWUSR)) {
-        logWarning({ 
+        logWarning({
             .name = "Suspicious file",
             .hint = hintfmt("skipping suspicious writable file '%1%'", path)
         });
@@ -153,7 +153,7 @@ void LocalStore::optimisePath_(Activity * act, OptimiseStats & stats,
        contents of the symlink (i.e. the result of readlink()), not
        the contents of the target (which may not even exist). */
     Hash hash = hashPath(htSHA256, path).first;
-    debug(format("'%1%' has hash '%2%'") % path % hash.to_string());
+    debug(format("'%1%' has hash '%2%'") % path % hash.to_string(Base32, true));
 
     /* Check if this is a known hash. */
     Path linkPath = linksDir + "/" + hash.to_string(Base32, false);
@@ -197,7 +197,7 @@ void LocalStore::optimisePath_(Activity * act, OptimiseStats & stats,
     }
 
     if (st.st_size != stLink.st_size) {
-        logWarning({ 
+        logWarning({
             .name = "Corrupted link",
             .hint = hintfmt("removing corrupted link '%1%'", linkPath)
         });
@@ -235,7 +235,7 @@ void LocalStore::optimisePath_(Activity * act, OptimiseStats & stats,
     /* Atomically replace the old file with the new hard link. */
     if (rename(tempLink.c_str(), path.c_str()) == -1) {
         if (unlink(tempLink.c_str()) == -1)
-            logError({ 
+            logError({
                 .name = "Unlink error",
                 .hint = hintfmt("unable to unlink '%1%'", tempLink)
             });
