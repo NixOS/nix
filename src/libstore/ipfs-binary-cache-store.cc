@@ -4,7 +4,7 @@
 #include "binary-cache-store.hh"
 #include "filetransfer.hh"
 #include "nar-info-disk-cache.hh"
-#include "versions.hh"
+#include "names.hh"
 
 namespace nix {
 
