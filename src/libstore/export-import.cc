@@ -57,7 +57,7 @@ void Store::exportPath(const StorePath & path, Sink & sink)
     Hash hash = hashAndWriteSink.currentHash();
     if (hash != info->narHash && info->narHash != Hash(*info->narHash.type))
         throw Error("hash of path '%s' has changed from '%s' to '%s'!",
-            printStorePath(path), info->narHash.to_string(), hash.to_string());
+            printStorePath(path), info->narHash.to_string(Base::Base32, true), hash.to_string(Base::Base32, true));
 
     hashAndWriteSink
         << exportMagic
@@ -105,7 +105,7 @@ StorePaths Store::importPaths(Source & source, std::shared_ptr<FSAccessor> acces
         auto source = StringSource { *tee.source.data };
         addToStore(info, source, NoRepair, checkSigs, accessor);
 
-        res.push_back(info.path.clone());
+        res.push_back(info.path);
     }
 
     return res;

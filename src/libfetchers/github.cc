@@ -76,7 +76,7 @@ struct GitHubInput : Input
                 readFile(
                     store->toRealPath(
                         downloadFile(store, url, "source", false).storePath)));
-            rev = Hash(json["sha"], HashType::SHA1);
+            rev = Hash(std::string { json["sha"] }, HashType::SHA1);
             debug("HEAD revision for '%s' is %s", url, rev->gitRev());
         }
 

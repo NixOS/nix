@@ -92,7 +92,7 @@ PathSet scanForReferences(const string & path,
         auto baseName = std::string(baseNameOf(i));
         string::size_type pos = baseName.find('-');
         if (pos == string::npos)
-            throw Error(format("bad reference '%1%'") % i);
+            throw Error("bad reference '%1%'", i);
         string s = string(baseName, 0, pos);
         assert(s.size() == refLength);
         assert(backMap.find(s) == backMap.end());

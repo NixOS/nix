@@ -134,10 +134,10 @@ std::string Hash::to_string(Base base, bool includeType) const
     return s;
 }
 
-Hash::Hash(const std::string & s, HashType type) : Hash(s, std::optional { type }) { }
-Hash::Hash(const std::string & s) : Hash(s, std::optional<HashType>{}) { }
+Hash::Hash(std::string_view s, HashType type) : Hash(s, std::optional { type }) { }
+Hash::Hash(std::string_view s) : Hash(s, std::optional<HashType>{}) { }
 
-Hash::Hash(const std::string & s, std::optional<HashType> type)
+Hash::Hash(std::string_view s, std::optional<HashType> type)
     : type(type)
 {
     size_t pos = 0;
@@ -206,7 +206,7 @@ Hash::Hash(const std::string & s, std::optional<HashType> type)
     }
 
     else if (isSRI || size == base64Len()) {
-        auto d = base64Decode(std::string(s, pos));
+        auto d = base64Decode(s.substr(pos));
         if (d.size() != hashSize)
             throw BadHash("invalid %s hash '%s'", isSRI ? "SRI" : "base-64", s);
         assert(hashSize);
@@ -215,6 +215,18 @@ Hash::Hash(const std::string & s, std::optional<HashType> type)
 
     else
         throw BadHash("hash '%s' has wrong length for hash type '%s'", s, printHashType(*type));
+}
+
+Hash newHashAllowEmpty(std::string hashStr, std::optional<HashType> ht)
+{
+    if (hashStr.empty()) {
+        if (!ht)
+            throw BadHash("empty hash requires explicit hash type");
+        Hash h(*ht);
+        warn("found empty hash, assuming '%s'", h.to_string(Base::SRI, true));
+        return h;
+    } else
+        return Hash(hashStr, ht);
 }
 
 

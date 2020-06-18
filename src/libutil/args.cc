@@ -45,7 +45,7 @@ void Args::parseCmdline(const Strings & _cmdline)
         }
         else if (!dashDash && std::string(arg, 0, 1) == "-") {
             if (!processFlag(pos, cmdline.end()))
-                throw UsageError(format("unrecognised flag '%1%'") % arg);
+                throw UsageError("unrecognised flag '%1%'", arg);
         }
         else {
             pendingArgs.push_back(*pos++);
@@ -130,7 +130,7 @@ bool Args::processArgs(const Strings & args, bool finish)
 {
     if (expectedArgs.empty()) {
         if (!args.empty())
-            throw UsageError(format("unexpected argument '%1%'") % args.front());
+            throw UsageError("unexpected argument '%1%'", args.front());
         return true;
     }
 
@@ -227,10 +227,15 @@ MultiCommand::MultiCommand(const Commands & commands)
 {
     expectedArgs.push_back(ExpectedArg{"command", 1, true, [=](std::vector<std::string> ss) {
         assert(!command);
-        auto i = commands.find(ss[0]);
+        auto cmd = ss[0];
+        if (auto alias = get(deprecatedAliases, cmd)) {
+            warn("'%s' is a deprecated alias for '%s'", cmd, *alias);
+            cmd = *alias;
+        }
+        auto i = commands.find(cmd);
         if (i == commands.end())
-            throw UsageError("'%s' is not a recognised command", ss[0]);
-        command = {ss[0], i->second()};
+            throw UsageError("'%s' is not a recognised command", cmd);
+        command = {cmd, i->second()};
     }});
 
     categories[Command::catDefault] = "Available commands";

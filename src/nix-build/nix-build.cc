@@ -21,7 +21,7 @@
 using namespace nix;
 using namespace std::string_literals;
 
-extern char * * environ;
+extern char * * environ __attribute__((weak));
 
 /* Recreate the effect of the perl shellwords function, breaking up a
  * string into arguments like a shell word, including escapes
@@ -363,12 +363,16 @@ static void _main(int argc, char * * argv)
                 if (!drv)
                     throw Error("the 'bashInteractive' attribute in <nixpkgs> did not evaluate to a derivation");
 
-                pathsToBuild.emplace_back(store->parseStorePath(drv->queryDrvPath()));
+                pathsToBuild.push_back({store->parseStorePath(drv->queryDrvPath())});
 
                 shell = drv->queryOutPath() + "/bin/bash";
 
             } catch (Error & e) {
-                printError("warning: %s; will use bash from your environment", e.what());
+                logWarning({
+                    .name = "bashInteractive",
+                    .hint = hintfmt("%s; will use bash from your environment",
+                        (e.info().hint ? e.info().hint->str() : ""))
+                });
                 shell = "bash";
             }
         }
@@ -377,9 +381,9 @@ static void _main(int argc, char * * argv)
         for (const auto & input : drv.inputDrvs)
             if (std::all_of(envExclude.cbegin(), envExclude.cend(),
                     [&](const string & exclude) { return !std::regex_search(store->printStorePath(input.first), std::regex(exclude)); }))
-                pathsToBuild.emplace_back(input.first, input.second);
+                pathsToBuild.push_back({input.first, input.second});
         for (const auto & src : drv.inputSrcs)
-            pathsToBuild.emplace_back(src);
+            pathsToBuild.push_back({src});
 
         buildPaths(pathsToBuild);
 
@@ -472,6 +476,8 @@ static void _main(int argc, char * * argv)
 
         restoreSignals();
 
+        logger->stop();
+
         execvp(shell->c_str(), argPtrs.data());
 
         throw SysError("executing shell '%s'", *shell);
@@ -493,7 +499,7 @@ static void _main(int argc, char * * argv)
             if (outputName == "")
                 throw Error("derivation '%s' lacks an 'outputName' attribute", drvPath);
 
-            pathsToBuild.emplace_back(store->parseStorePath(drvPath), StringSet{outputName});
+            pathsToBuild.push_back({store->parseStorePath(drvPath), {outputName}});
 
             std::string drvPrefix;
             auto i = drvPrefixes.find(drvPath);
@@ -520,6 +526,8 @@ static void _main(int argc, char * * argv)
         for (auto & symlink : resultSymlinks)
             if (auto store2 = store.dynamic_pointer_cast<LocalFSStore>())
                 store2->addPermRoot(store->parseStorePath(symlink.second), absPath(symlink.first), true);
+
+        logger->stop();
 
         for (auto & path : outPaths)
             std::cout << path << '\n';

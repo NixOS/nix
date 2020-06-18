@@ -25,7 +25,7 @@ const int sha512HashSize = 64;
 
 extern const string base32Chars;
 
-enum struct Base : int {
+enum struct Base {
     Base64,
     Base32,
     Base16,
@@ -52,11 +52,11 @@ struct Hash
        Subresource Integrity hash expression). If the 'type' argument
        is not present, then the hash type must be specified in the
        string. */
-    Hash(const std::string & s, std::optional<HashType> type);
+    Hash(std::string_view s, std::optional<HashType> type);
     // type must be provided
-    Hash(const std::string & s, HashType type);
+    Hash(std::string_view s, HashType type);
     // hash type must be part of string
-    Hash(const std::string & s);
+    Hash(std::string_view s);
 
     void init();
 
@@ -93,7 +93,7 @@ struct Hash
     /* Return a string representation of the hash, in base-16, base-32
        or base-64. By default, this is prefixed by the hash type
        (e.g. "sha256:"). */
-    std::string to_string(Base base = Base::Base32, bool includeType = true) const;
+    std::string to_string(Base base, bool includeType) const;
 
     std::string gitRev() const
     {
@@ -108,6 +108,8 @@ struct Hash
     }
 };
 
+/* Helper that defaults empty hashes to the 0 hash. */
+Hash newHashAllowEmpty(std::string hashStr, std::optional<HashType> ht);
 
 /* Print a hash in base-16 if it's MD5, or base-32 otherwise. */
 string printHash16or32(const Hash & hash);
