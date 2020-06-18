@@ -335,6 +335,14 @@ struct curlFileTransfer : public FileTransfer
             curl_easy_setopt(req, CURLOPT_LOW_SPEED_LIMIT, 1L);
             curl_easy_setopt(req, CURLOPT_LOW_SPEED_TIME, fileTransferSettings.stalledDownloadTimeout.get());
 
+            /* FIXME: We hit a weird issue when 1 second goes by
+             * without Expect: 100-continue. curl_multi_perform
+             * appears to block indefinitely. To workaround this, we
+             * just set the timeout to a really big value unlikely to
+             * be hit in any server without Expect: 100-continue. This
+             * may specifically be a bug in the IPFS API. */
+            curl_easy_setopt(req, CURLOPT_EXPECT_100_TIMEOUT_MS, 300000);
+
             /* If no file exist in the specified path, curl continues to work
                anyway as if netrc support was disabled. */
             curl_easy_setopt(req, CURLOPT_NETRC_FILE, settings.netrcFile.get().c_str());

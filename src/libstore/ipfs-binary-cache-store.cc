@@ -4,16 +4,28 @@
 #include "binary-cache-store.hh"
 #include "filetransfer.hh"
 #include "nar-info-disk-cache.hh"
+#include "archive.hh"
+#include "compression.hh"
 #include "names.hh"
 
 namespace nix {
 
 MakeError(UploadToIPFS, Error);
 
-class IPFSBinaryCacheStore : public BinaryCacheStore
+class IPFSBinaryCacheStore : public Store
 {
 
+public:
+
+    const Setting<std::string> compression{this, "xz", "compression", "NAR compression method ('xz', 'bzip2', or 'none')"};
+    const Setting<Path> secretKeyFile{this, "", "secret-key", "path to secret key used to sign the binary cache"};
+    const Setting<bool> parallelCompression{this, false, "parallel-compression",
+        "enable multi-threading compression, available for xz only currently"};
+
 private:
+
+    std::unique_ptr<SecretKey> secretKey;
+    std::string narMagic;
 
     std::string cacheUri;
     std::string daemonUri;
@@ -35,10 +47,17 @@ public:
 
     IPFSBinaryCacheStore(
       const Params & params, const Path & _cacheUri)
-            : BinaryCacheStore(params)
+            : Store(params)
             , cacheUri(_cacheUri)
     {
         auto state(_state.lock());
+
+        if (secretKeyFile != "")
+            secretKey = std::unique_ptr<SecretKey>(new SecretKey(readFile(secretKeyFile)));
+
+        StringSink sink;
+        sink << narVersionMagic1;
+        narMagic = *sink.s;
 
         if (cacheUri.back() == '/')
             cacheUri.pop_back();
@@ -70,9 +89,25 @@ public:
         // Resolve the IPNS name to an IPFS object
         if (optIpnsPath) {
             auto ipnsPath = *optIpnsPath;
-            initialIpfsPath = resolveIPNSName(ipnsPath, true);
+            initialIpfsPath = resolveIPNSName(ipnsPath);
             state->ipfsPath = initialIpfsPath;
         }
+
+        auto json = getIpfsDag(state->ipfsPath);
+
+        // Verify StoreDir is correct
+        if (json.find("StoreDir") == json.end()) {
+            json["StoreDir"] = storeDir;
+            state->ipfsPath = putIpfsDag(json);
+        } else if (json["StoreDir"] != storeDir)
+            throw Error("binary cache '%s' is for Nix stores with prefix '%s', not '%s'",
+                getUri(), json["StoreDir"], storeDir);
+
+        if (json.find("WantMassQuery") != json.end())
+            wantMassQuery.setDefault(json["WantMassQuery"] ? "true" : "false");
+
+        if (json.find("Priority") != json.end())
+            priority.setDefault(fmt("%d", json["Priority"]));
     }
 
     std::string getUri() override
@@ -80,21 +115,35 @@ public:
         return cacheUri;
     }
 
-    void init() override
+private:
+
+    std::string putIpfsDag(nlohmann::json data)
     {
-        std::string cacheInfoFile = "nix-cache-info";
-        if (!fileExists(cacheInfoFile))
-            upsertFile(cacheInfoFile, "StoreDir: " + storeDir + "\n", "text/x-nix-cache-info");
-        BinaryCacheStore::init();
+        auto req = FileTransferRequest(daemonUri + "/api/v0/dag/put");
+        req.data = std::make_shared<string>(data.dump());
+        req.post = true;
+        req.tries = 1;
+        auto res = getFileTransfer()->upload(req);
+        auto json = nlohmann::json::parse(*res.data);
+        return "/ipfs/" + (std::string) json["Cid"]["/"];
     }
 
-protected:
+    nlohmann::json getIpfsDag(std::string objectPath)
+    {
+        auto req = FileTransferRequest(daemonUri + "/api/v0/dag/get?arg=" + objectPath);
+        req.post = true;
+        req.tries = 1;
+        auto res = getFileTransfer()->download(req);
+        auto json = nlohmann::json::parse(*res.data);
+        return json;
+    }
 
     // Given a ipns path, checks if it corresponds to a DNSLink path, and in
     // case returns the domain
-    std::optional<string> isDNSLinkPath(std::string path) {
+    static std::optional<string> isDNSLinkPath(std::string path)
+    {
         if (path.find("/ipns/") != 0)
-            throw Error("The provided path is not a ipns path");
+            throw Error("path '%s' is not an ipns path", path);
         auto subpath = std::string(path, 6);
         if (subpath.find(".") != std::string::npos) {
             return subpath;
@@ -102,9 +151,9 @@ protected:
         return std::nullopt;
     }
 
-    bool fileExists(const std::string & path) override
+    bool ipfsObjectExists(const std::string ipfsPath)
     {
-        auto uri = daemonUri + "/api/v0/object/stat?arg=" + getFileTransfer()->urlEncode(getIpfsPath() + "/" + path);
+        auto uri = daemonUri + "/api/v0/object/stat?arg=" + getFileTransfer()->urlEncode(ipfsPath);
 
         FileTransferRequest request(uri);
         request.post = true;
@@ -121,10 +170,15 @@ protected:
         }
     }
 
+    bool fileExists(const std::string & path)
+    {
+        return ipfsObjectExists(getIpfsPath() + "/" + path);
+    }
+
     // Resolve the IPNS name to an IPFS object
-    std::string resolveIPNSName(std::string ipnsPath, bool offline) {
+    std::string resolveIPNSName(std::string ipnsPath) {
         debug("Resolving IPFS object of '%s', this could take a while.", ipnsPath);
-        auto uri = daemonUri + "/api/v0/name/resolve?offline=" + (offline?"true":"false") + "&arg=" + getFileTransfer()->urlEncode(ipnsPath);
+        auto uri = daemonUri + "/api/v0/name/resolve?arg=" + getFileTransfer()->urlEncode(ipnsPath);
         FileTransferRequest request(uri);
         request.post = true;
         request.tries = 1;
@@ -134,6 +188,8 @@ protected:
             throw Error("daemon for IPFS is not running properly");
         return json["Path"];
     }
+
+public:
 
     // IPNS publish can be slow, we try to do it rarely.
     void sync() override
@@ -147,7 +203,7 @@ protected:
 
         auto ipnsPath = *optIpnsPath;
 
-        auto resolvedIpfsPath = resolveIPNSName(ipnsPath, true);
+        auto resolvedIpfsPath = resolveIPNSName(ipnsPath);
         if (resolvedIpfsPath != initialIpfsPath) {
             throw Error("The IPNS hash or DNS link %s resolves now to something different from the value it had when Nix was started;\n  wanted: %s\n  got %s\nPerhaps something else updated it in the meantime?",
                 ipnsPath, initialIpfsPath, resolvedIpfsPath);
@@ -168,11 +224,15 @@ protected:
 
         debug("Publishing '%s' to '%s', this could take a while.", state->ipfsPath, ipnsPath);
 
-        auto uri = daemonUri + "/api/v0/name/publish?offline=true&allow-offline=true&arg=" + getFileTransfer()->urlEncode(state->ipfsPath);
+        auto uri = daemonUri + "/api/v0/name/publish?allow-offline=true";
+        uri += "&arg=" + getFileTransfer()->urlEncode(state->ipfsPath);
 
         // Given the hash, we want to discover the corresponding name in the
         // `ipfs key list` command, so that we publish to the right address in
         // case the user has multiple ones available.
+
+        // NOTE: this is needed for ipfs < 0.5.0 because key must be a
+        // name, not an address.
 
         auto ipnsPathHash = std::string(ipnsPath, 6);
         debug("Getting the name corresponding to hash %s", ipnsPathHash);
@@ -200,6 +260,8 @@ protected:
         getFileTransfer()->download(req);
     }
 
+private:
+
     void addLink(std::string name, std::string ipfsObject)
     {
         auto state(_state.lock());
@@ -218,7 +280,7 @@ protected:
         state->ipfsPath = "/ipfs/" + (std::string) json["Hash"];
     }
 
-    void upsertFile(const std::string & path, const std::string & data, const std::string & mimeType) override
+    std::string addFile(const std::string & data)
     {
         // TODO: use callbacks
 
@@ -226,19 +288,59 @@ protected:
         req.data = std::make_shared<string>(data);
         req.post = true;
         req.tries = 1;
+        auto res = getFileTransfer()->upload(req);
+        auto json = nlohmann::json::parse(*res.data);
+        return (std::string) json["Hash"];
+    }
+
+    void upsertFile(const std::string & path, const std::string & data, const std::string & mimeType)
+    {
         try {
-            auto res = getFileTransfer()->upload(req);
-            auto json = nlohmann::json::parse(*res.data);
-            addLink(path, "/ipfs/" + (std::string) json["Hash"]);
+            addLink(path, "/ipfs/" + addFile(data));
         } catch (FileTransferError & e) {
             throw UploadToIPFS("while uploading to IPFS binary cache at '%s': %s", cacheUri, e.info());
         }
     }
 
     void getFile(const std::string & path,
-        Callback<std::shared_ptr<std::string>> callback) noexcept override
+        Callback<std::shared_ptr<std::string>> callback) noexcept
     {
-        auto uri = daemonUri + "/api/v0/cat?arg=" + getFileTransfer()->urlEncode(getIpfsPath() + "/" + path);
+        std::string path_(path);
+        if (hasPrefix(path, "ipfs://"))
+            path_ = "/ipfs/" + std::string(path, 7);
+        getIpfsObject(path_, std::move(callback));
+    }
+
+    void getFile(const std::string & path, Sink & sink)
+    {
+        std::promise<std::shared_ptr<std::string>> promise;
+        getFile(path,
+            {[&](std::future<std::shared_ptr<std::string>> result) {
+                try {
+                    promise.set_value(result.get());
+                } catch (...) {
+                    promise.set_exception(std::current_exception());
+                }
+            }});
+        auto data = promise.get_future().get();
+        sink((unsigned char *) data->data(), data->size());
+    }
+
+    std::shared_ptr<std::string> getFile(const std::string & path)
+    {
+        StringSink sink;
+        try {
+            getFile(path, sink);
+        } catch (NoSuchBinaryCacheFile &) {
+            return nullptr;
+        }
+        return sink.s;
+    }
+
+    void getIpfsObject(const std::string & ipfsPath,
+        Callback<std::shared_ptr<std::string>> callback) noexcept
+    {
+        auto uri = daemonUri + "/api/v0/cat?arg=" + getFileTransfer()->urlEncode(ipfsPath);
 
         FileTransferRequest request(uri);
         request.post = true;
@@ -259,6 +361,315 @@ protected:
         );
     }
 
+    void writeNarInfo(ref<NarInfo> narInfo)
+    {
+        auto json = nlohmann::json::object();
+        json["narHash"] = narInfo->narHash.to_string(Base32, true);
+        json["narSize"] = narInfo->narSize;
+
+        auto narMap = getIpfsDag(getIpfsPath())["nar"];
+
+        json["references"] = nlohmann::json::array();
+        for (auto & ref : narInfo->references) {
+            if (ref == narInfo->path) {
+                json["references"].push_back(printStorePath(ref));
+            } else {
+                json["references"].push_back(narMap[printStorePath(ref)]);
+            }
+        }
+
+        if (narInfo->ca != "")
+            json["ca"] = narInfo->ca;
+
+        if (narInfo->deriver)
+            json["deriver"] = printStorePath(*narInfo->deriver);
+
+        if (narInfo->registrationTime)
+            json["registrationTime"] = narInfo->registrationTime;
+
+        if (narInfo->ultimate)
+            json["ultimate"] = narInfo->ultimate;
+
+        if (!narInfo->sigs.empty()) {
+            json["sigs"] = nlohmann::json::array();
+            for (auto & sig : narInfo->sigs)
+                json["sigs"].push_back(sig);
+        }
+
+        if (!narInfo->url.empty()) {
+            json["url"] = nlohmann::json::object();
+            json["url"]["/"] = std::string(narInfo->url, 7);
+        }
+        if (narInfo->fileHash)
+            json["downloadHash"] = narInfo->fileHash.to_string(Base32, true);
+        if (narInfo->fileSize)
+            json["downloadSize"] = narInfo->fileSize;
+
+        json["compression"] = narInfo->compression;
+        json["system"] = narInfo->system;
+
+        auto narObjectPath = putIpfsDag(json);
+
+        auto state(_state.lock());
+        json = getIpfsDag(state->ipfsPath);
+
+        if (json.find("nar") == json.end())
+            json["nar"] = nlohmann::json::object();
+
+        auto hashObject = nlohmann::json::object();
+        hashObject.emplace("/", std::string(narObjectPath, 6));
+
+        json["nar"].emplace(printStorePath(narInfo->path), hashObject);
+
+        state->ipfsPath = putIpfsDag(json);
+
+        {
+            auto hashPart = narInfo->path.hashPart();
+            auto state_(this->state.lock());
+            state_->pathInfoCache.upsert(
+                std::string { hashPart },
+                PathInfoCacheValue { .value = std::shared_ptr<NarInfo>(narInfo) });
+        }
+    }
+
+public:
+
+    void addToStore(const ValidPathInfo & info, Source & narSource,
+        RepairFlag repair, CheckSigsFlag checkSigs, std::shared_ptr<FSAccessor> accessor) override
+    {
+        // FIXME: See if we can use the original source to reduce memory usage.
+        auto nar = make_ref<std::string>(narSource.drain());
+
+        if (!repair && isValidPath(info.path)) return;
+
+        /* Verify that all references are valid. This may do some .narinfo
+           reads, but typically they'll already be cached. */
+        for (auto & ref : info.references)
+            try {
+                if (ref != info.path)
+                    queryPathInfo(ref);
+            } catch (InvalidPath &) {
+                throw Error("cannot add '%s' to the binary cache because the reference '%s' is not valid",
+                    printStorePath(info.path), printStorePath(ref));
+            }
+
+        assert(nar->compare(0, narMagic.size(), narMagic) == 0);
+
+        auto narInfo = make_ref<NarInfo>(info);
+
+        narInfo->narSize = nar->size();
+        narInfo->narHash = hashString(htSHA256, *nar);
+
+        if (info.narHash && info.narHash != narInfo->narHash)
+            throw Error("refusing to copy corrupted path '%1%' to binary cache", printStorePath(info.path));
+
+        /* Compress the NAR. */
+        narInfo->compression = compression;
+        auto now1 = std::chrono::steady_clock::now();
+        auto narCompressed = compress(compression, *nar, parallelCompression);
+        auto now2 = std::chrono::steady_clock::now();
+        narInfo->fileHash = hashString(htSHA256, *narCompressed);
+        narInfo->fileSize = narCompressed->size();
+
+        auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(now2 - now1).count();
+        printMsg(lvlTalkative, "copying path '%1%' (%2% bytes, compressed %3$.1f%% in %4% ms) to binary cache",
+            printStorePath(narInfo->path), narInfo->narSize,
+            ((1.0 - (double) narCompressed->size() / nar->size()) * 100.0),
+            duration);
+
+        /* Atomically write the NAR file. */
+        stats.narWrite++;
+        narInfo->url = "ipfs://" + addFile(*narCompressed);
+
+        stats.narWriteBytes += nar->size();
+        stats.narWriteCompressedBytes += narCompressed->size();
+        stats.narWriteCompressionTimeMs += duration;
+
+        /* Atomically write the NAR info file.*/
+        if (secretKey) narInfo->sign(*this, *secretKey);
+
+        writeNarInfo(narInfo);
+
+        stats.narInfoWrite++;
+    }
+
+    bool isValidPathUncached(const StorePath & storePath) override
+    {
+        auto json = getIpfsDag(getIpfsPath());
+        if (!json.contains("nar"))
+            return false;
+        return json["nar"].contains(printStorePath(storePath));
+    }
+
+    void narFromPath(const StorePath & storePath, Sink & sink) override
+    {
+        auto info = queryPathInfo(storePath).cast<const NarInfo>();
+
+        uint64_t narSize = 0;
+
+        LambdaSink wrapperSink([&](const unsigned char * data, size_t len) {
+            sink(data, len);
+            narSize += len;
+        });
+
+        auto decompressor = makeDecompressionSink(info->compression, wrapperSink);
+
+        try {
+            getFile(info->url, *decompressor);
+        } catch (NoSuchBinaryCacheFile & e) {
+            throw SubstituteGone(e.what());
+        }
+
+        decompressor->finish();
+
+        stats.narRead++;
+        //stats.narReadCompressedBytes += nar->size(); // FIXME
+        stats.narReadBytes += narSize;
+    }
+
+    void queryPathInfoUncached(const StorePath & storePath,
+        Callback<std::shared_ptr<const ValidPathInfo>> callback) noexcept override
+    {
+        // TODO: properly use callbacks
+
+        auto callbackPtr = std::make_shared<decltype(callback)>(std::move(callback));
+
+        auto uri = getUri();
+        auto storePathS = printStorePath(storePath);
+        auto act = std::make_shared<Activity>(*logger, lvlTalkative, actQueryPathInfo,
+            fmt("querying info about '%s' on '%s'", storePathS, uri), Logger::Fields{storePathS, uri});
+        PushActivity pact(act->id);
+
+        auto json = getIpfsDag(getIpfsPath());
+
+        if (!json.contains("nar") || !json["nar"].contains(printStorePath(storePath)))
+            return (*callbackPtr)(nullptr);
+
+        auto narObjectHash = (std::string) json["nar"][printStorePath(storePath)]["/"];
+        json = getIpfsDag("/ipfs/" + narObjectHash);
+
+        NarInfo narInfo { storePath };
+        narInfo.narHash = Hash((std::string) json["narHash"]);
+        narInfo.narSize = json["narSize"];
+
+        auto narMap = getIpfsDag(getIpfsPath())["nar"];
+        for (auto & ref : json["references"]) {
+            if (ref.type() == nlohmann::json::value_t::object) {
+                for (auto & v : narMap.items()) {
+                    if (v.value() == ref) {
+                        narInfo.references.insert(parseStorePath(v.key()));
+                        break;
+                    }
+                }
+            } else if (ref.type() == nlohmann::json::value_t::string)
+                narInfo.references.insert(parseStorePath((std::string) ref));
+        }
+
+        if (json.find("ca") != json.end())
+            narInfo.ca = json["ca"];
+
+        if (json.find("deriver") != json.end())
+            narInfo.deriver = parseStorePath((std::string) json["deriver"]);
+
+        if (json.find("registrationTime") != json.end())
+            narInfo.registrationTime = json["registrationTime"];
+
+        if (json.find("ultimate") != json.end())
+            narInfo.ultimate = json["ultimate"];
+
+        if (json.find("sigs") != json.end())
+            for (auto & sig : json["sigs"])
+                narInfo.sigs.insert((std::string) sig);
+
+        if (json.find("url") != json.end())
+            narInfo.url = "ipfs://" + json["url"]["/"].get<std::string>();
+
+        if (json.find("downloadHash") != json.end())
+            narInfo.fileHash = Hash((std::string) json["downloadHash"]);
+
+        if (json.find("downloadSize") != json.end())
+            narInfo.fileSize = json["downloadSize"];
+
+        if (json.find("compression") != json.end())
+            narInfo.compression = json["compression"];
+
+        if (json.find("system") != json.end())
+            narInfo.system = json["system"];
+
+        (*callbackPtr)((std::shared_ptr<ValidPathInfo>)
+            std::make_shared<NarInfo>(narInfo));
+    }
+
+    StorePath addToStore(const string & name, const Path & srcPath,
+        FileIngestionMethod method, HashType hashAlgo, PathFilter & filter, RepairFlag repair) override
+    {
+        // FIXME: some cut&paste from LocalStore::addToStore().
+
+        /* Read the whole path into memory. This is not a very scalable
+           method for very large paths, but `copyPath' is mainly used for
+           small files. */
+        StringSink sink;
+        Hash h;
+        if (method == FileIngestionMethod::Recursive) {
+            dumpPath(srcPath, sink, filter);
+            h = hashString(hashAlgo, *sink.s);
+        } else {
+            auto s = readFile(srcPath);
+            dumpString(s, sink);
+            h = hashString(hashAlgo, s);
+        }
+
+        ValidPathInfo info(makeFixedOutputPath(method, h, name));
+
+        auto source = StringSource { *sink.s };
+        addToStore(info, source, repair, CheckSigs, nullptr);
+
+        return std::move(info.path);
+    }
+
+    StorePath addTextToStore(const string & name, const string & s,
+        const StorePathSet & references, RepairFlag repair) override
+    {
+        ValidPathInfo info(computeStorePathForText(name, s, references));
+        info.references = references;
+
+        if (repair || !isValidPath(info.path)) {
+            StringSink sink;
+            dumpString(s, sink);
+            auto source = StringSource { *sink.s };
+            addToStore(info, source, repair, CheckSigs, nullptr);
+        }
+
+        return std::move(info.path);
+    }
+
+    void addSignatures(const StorePath & storePath, const StringSet & sigs) override
+    {
+        /* Note: this is inherently racy since there is no locking on
+           binary caches. In particular, with S3 this unreliable, even
+           when addSignatures() is called sequentially on a path, because
+           S3 might return an outdated cached version. */
+
+        auto narInfo = make_ref<NarInfo>((NarInfo &) *queryPathInfo(storePath));
+
+        narInfo->sigs.insert(sigs.begin(), sigs.end());
+
+        writeNarInfo(narInfo);
+    }
+
+    std::shared_ptr<std::string> getBuildLog(const StorePath & path) override
+    { unsupported("getBuildLog"); }
+
+    BuildResult buildDerivation(const StorePath & drvPath, const BasicDerivation & drv,
+        BuildMode buildMode) override
+    { unsupported("buildDerivation"); }
+
+    void ensurePath(const StorePath & path) override
+    { unsupported("ensurePath"); }
+
+    std::optional<StorePath> queryPathFromHashPart(const std::string & hashPart) override
+    { unsupported("queryPathFromHashPart"); }
+
 };
 
 static RegisterStoreImplementation regStore([](
@@ -269,7 +680,6 @@ static RegisterStoreImplementation regStore([](
         uri.substr(0, strlen("ipns://")) != "ipns://")
         return 0;
     auto store = std::make_shared<IPFSBinaryCacheStore>(params, uri);
-    store->init();
     return store;
 });
 

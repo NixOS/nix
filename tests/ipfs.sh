@@ -43,8 +43,6 @@ IPFS_DST_HTTP_LOCAL_STORE=$IPFS_TESTS/ipfs_dest_http_local_store
 IPFS_DST_IPFS_STORE=$IPFS_TESTS/ipfs_dest_ipfs_store
 IPFS_DST_IPNS_STORE=$IPFS_TESTS/ipfs_dest_ipns_store
 
-EMPTY_DIR_HASH=QmUNLLsPACCz1vLxQVkXqqLX5R1X345qqfHbsf67hvA3Nn
-
 ################################################################################
 ## Generate the keys to sign the store
 ################################################################################
@@ -84,34 +82,36 @@ mkdir $IPFS_DST_HTTP_LOCAL_STORE
 
 IPFS_HTTP_LOCAL_PREFIX='http://localhost:8080/ipfs'
 
-DOWNLOAD_LOCATION=$(nix-build ./fixed.nix -A good \
+nix-build ./fixed.nix -A good \
   --option substituters $IPFS_HTTP_LOCAL_PREFIX/$MANUAL_IPFS_HASH \
   --store $IPFS_DST_HTTP_LOCAL_STORE \
   --no-out-link \
   -j0 \
-  --option trusted-public-keys $(cat $SIGNING_KEY_PUB_FILE))
+  --option trusted-public-keys $(cat $SIGNING_KEY_PUB_FILE)
 
 ################################################################################
 ## Create the ipfs store and download the derivation there
 ################################################################################
 
+EMPTY_HASH=$(echo {} | ipfs dag put)
+
 # Try to upload the content to the empty directory, fail but grab the right hash
 IPFS_HASH=$(set -e; \
   set -o pipefail; \
-  ! nix copy --to ipfs://$EMPTY_DIR_HASH $(nix-build ./fixed.nix -A good) --experimental-features nix-command \
+  ! nix copy --to ipfs://$EMPTY_HASH $(nix-build ./fixed.nix -A good) --experimental-features nix-command \
     |& grep current: | awk '{print substr($2, 7, length($2))}')
 
-# Upload the content with the right hash
+# Verify that new path is valid.
 nix copy --to ipfs://$IPFS_HASH $(nix-build ./fixed.nix -A good) --experimental-features nix-command
 
 mkdir $IPFS_DST_IPFS_STORE
 
-DOWNLOAD_LOCATION=$(nix-build ./fixed.nix -A good \
+nix-build ./fixed.nix -A good \
   --option substituters 'ipfs://'$IPFS_HASH \
   --store $IPFS_DST_IPFS_STORE \
   --no-out-link \
   -j0 \
-  --option trusted-public-keys $(cat $SIGNING_KEY_PUB_FILE))
+  --option trusted-public-keys $(cat $SIGNING_KEY_PUB_FILE)
 
 
 ################################################################################
@@ -119,16 +119,24 @@ DOWNLOAD_LOCATION=$(nix-build ./fixed.nix -A good \
 ################################################################################
 
 # First I have to publish:
-IPNS_ID=$(ipfs name publish $EMPTY_DIR_HASH --allow-offline | awk '{print substr($3,1,length($3)-1)}')
+IPNS_ID=$(ipfs name publish $EMPTY_HASH --allow-offline | awk '{print substr($3,1,length($3)-1)}')
 
 # Check that we can upload the ipns store directly
 nix copy --to ipns://$IPNS_ID $(nix-build ./fixed.nix -A good) --experimental-features nix-command
 
 mkdir $IPFS_DST_IPNS_STORE
 
-DOWNLOAD_LOCATION=$(nix-build ./fixed.nix -A good \
+nix-build ./fixed.nix -A good \
   --option substituters 'ipns://'$IPNS_ID \
   --store $IPFS_DST_IPNS_STORE \
   --no-out-link \
   -j0 \
-  --option trusted-public-keys $(cat $SIGNING_KEY_PUB_FILE))
+  --option trusted-public-keys $(cat $SIGNING_KEY_PUB_FILE)
+
+# Verify we can copy something with dependencies
+outPath=$(nix-build dependencies.nix --no-out-link)
+
+nix copy $outPath --to ipns://$IPNS_ID --experimental-features nix-command
+
+# and copy back
+nix copy $outPath --store file://$IPFS_DST_IPNS_STORE --from ipns://$IPNS_ID --experimental-features nix-command
