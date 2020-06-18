@@ -74,6 +74,7 @@ struct curlFileTransfer : public FileTransfer
 
         curl_off_t writtenToSink = 0;
 
+        inline static const std::set<long> successfulStatuses {200, 201, 204, 206, 304, 0 /* other protocol */};
         /* Get the HTTP status code, or 0 for other protocols. */
         long getHTTPStatus()
         {
@@ -100,7 +101,7 @@ struct curlFileTransfer : public FileTransfer
 
                     /* Only write data to the sink if this is a
                        successful response. */
-                    if (httpStatus == 0 || httpStatus == 200 || httpStatus == 201 || httpStatus == 206) {
+                    if (successfulStatuses.count(httpStatus)) {
                         writtenToSink += len;
                         this->request.dataCallback((char *) data, len);
                     }
@@ -366,8 +367,7 @@ struct curlFileTransfer : public FileTransfer
             if (writeException)
                 failEx(writeException);
 
-            else if (code == CURLE_OK &&
-                (httpStatus == 200 || httpStatus == 201 || httpStatus == 204 || httpStatus == 206 || httpStatus == 304 || httpStatus == 0 /* other protocol */))
+            else if (code == CURLE_OK && successfulStatuses.count(httpStatus))
             {
                 result.cached = httpStatus == 304;
                 act.progress(result.bodySize, result.bodySize);
@@ -424,16 +424,13 @@ struct curlFileTransfer : public FileTransfer
 
                 auto exc =
                     code == CURLE_ABORTED_BY_CALLBACK && _isInterrupted
-                    ? FileTransferError(Interrupted, fmt("%s of '%s' was interrupted", request.verb(), request.uri))
+                    ? FileTransferError(Interrupted, "%s of '%s' was interrupted", request.verb(), request.uri)
                     : httpStatus != 0
-                    ? FileTransferError(err,
-                        fmt("unable to %s '%s': HTTP error %d",
-                            request.verb(), request.uri, httpStatus)
-                        + (code == CURLE_OK ? "" : fmt(" (curl error: %s)", curl_easy_strerror(code)))
-                        )
-                    : FileTransferError(err,
-                        fmt("unable to %s '%s': %s (%d)",
-                            request.verb(), request.uri, curl_easy_strerror(code), code));
+                    ? FileTransferError(err, "unable to %s '%s': HTTP error %d%s",
+                        request.verb(), request.uri, httpStatus,
+                        code == CURLE_OK ? "" : fmt(" (curl error: %s)", curl_easy_strerror(code)))
+                    : FileTransferError(err, "unable to %s '%s': %s (%d)",
+                        request.verb(), request.uri, curl_easy_strerror(code), code);
 
                 /* If this is a transient error, then maybe retry the
                    download after a while. If we're writing to a
@@ -689,7 +686,7 @@ struct curlFileTransfer : public FileTransfer
                 auto s3Res = s3Helper.getObject(bucketName, key);
                 FileTransferResult res;
                 if (!s3Res.data)
-                    throw FileTransferError(NotFound, fmt("S3 object '%s' does not exist", request.uri));
+                    throw FileTransferError(NotFound, "S3 object '%s' does not exist", request.uri);
                 res.data = s3Res.data;
                 callback(std::move(res));
 #else

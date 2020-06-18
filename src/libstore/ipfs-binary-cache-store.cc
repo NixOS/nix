@@ -202,7 +202,7 @@ public:
         auto resolvedIpfsPath = resolveIPNSName(ipnsPath);
         if (resolvedIpfsPath != initialIpfsPath) {
             throw Error("The IPNS hash or DNS link %s resolves now to something different from the value it had when Nix was started;\n  wanted: %s\n  got %s\nPerhaps something else updated it in the meantime?",
-                initialIpfsPath, resolvedIpfsPath);
+                ipnsPath, initialIpfsPath, resolvedIpfsPath);
         }
 
         if (resolvedIpfsPath == state->ipfsPath) {
@@ -222,7 +222,30 @@ public:
 
         auto uri = daemonUri + "/api/v0/name/publish?allow-offline=true";
         uri += "&arg=" + getFileTransfer()->urlEncode(state->ipfsPath);
-        uri += "&key=" + std::string(ipnsPath, 6);
+
+        // Given the hash, we want to discover the corresponding name in the
+        // `ipfs key list` command, so that we publish to the right address in
+        // case the user has multiple ones available.
+
+        auto ipnsPathHash = std::string(ipnsPath, 6);
+        debug("Getting the name corresponding to hash %s", ipnsPathHash);
+
+        auto keyListRequest = FileTransferRequest(daemonUri + "/api/v0/key/list/");
+        keyListRequest.post = true;
+        keyListRequest.tries = 1;
+
+        auto keyListResponse = nlohmann::json::parse(*(getFileTransfer()->download(keyListRequest)).data);
+
+        std::string keyName {""};
+        for (nlohmann::json::iterator it = keyListResponse["Keys"].begin(); it != keyListResponse["Keys"].end(); ++it)
+            if ((*it)["Id"] == ipnsPathHash)
+                keyName = (*it)["Name"];
+        if (keyName == "") {
+            throw Error("We couldn't find a name corresponding to the provided ipns hash:\n  hash: %s", ipnsPathHash);
+        }
+
+        // Now we can append the keyname to our original request
+        uri += "&key=" + keyName;
 
         auto req = FileTransferRequest(uri);
         req.post = true;
@@ -268,7 +291,7 @@ private:
         try {
             addLink(path, "/ipfs/" + addFile(data));
         } catch (FileTransferError & e) {
-            throw UploadToIPFS("while uploading to IPFS binary cache at '%s': %s", cacheUri, e.msg());
+            throw UploadToIPFS("while uploading to IPFS binary cache at '%s': %s", cacheUri, e.info());
         }
     }
 

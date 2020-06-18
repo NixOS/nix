@@ -38,8 +38,6 @@ mkdir $IPFS_TESTS
 # method)
 IPFS_SRC_STORE=$IPFS_TESTS/ipfs_source_store
 
-IPFS_DST_HTTP_STORE=$IPFS_TESTS/ipfs_dest_http_store
-IPFS_DST_HTTP_LOCAL_STORE=$IPFS_TESTS/ipfs_dest_http_local_store
 IPFS_DST_IPFS_STORE=$IPFS_TESTS/ipfs_dest_ipfs_store
 IPFS_DST_IPNS_STORE=$IPFS_TESTS/ipfs_dest_ipns_store
 
@@ -54,11 +52,17 @@ SIGNING_KEY_PUB_FILE=$IPFS_TESTS/nix-cache-key.pub
 nix-store --generate-binary-cache-key $SIGNING_KEY_NAME $SIGNING_KEY_PRI_FILE $SIGNING_KEY_PUB_FILE
 
 ################################################################################
-## Create, sign and upload the source store
+## Create and sign the source store
 ################################################################################
 
 mkdir -p $IPFS_SRC_STORE
-storePaths=$(nix-build ./fixed.nix -A good | sort | uniq)
+storePaths=$(nix-build ./fixed.nix -A good)
+
+nix sign-paths -k $SIGNING_KEY_PRI_FILE $storePaths
+
+################################################################################
+## Manually upload the source store
+################################################################################
 
 # Hack around https://github.com/NixOS/nix/issues/3695
 for path in $storePaths; do
@@ -66,29 +70,20 @@ for path in $storePaths; do
 done
 unset path
 
-nix sign-paths --store file://$IPFS_SRC_STORE \
-    -k $SIGNING_KEY_PRI_FILE $storePaths
-
-IPFS_HASH=$(ipfs add -r $IPFS_SRC_STORE 2>/dev/null | tail -n 1 | awk '{print $2}')
-
-################################################################################
-## Create the local http store and download the derivation there
-################################################################################
-
-mkdir $IPFS_DST_HTTP_LOCAL_STORE
-
-IPFS_HTTP_LOCAL_PREFIX='http://localhost:8080/ipfs'
-
-DOWNLOAD_LOCATION=$(nix-build ./fixed.nix -A good \
-  --option substituters $IPFS_HTTP_LOCAL_PREFIX/$IPFS_HASH \
-  --store $IPFS_DST_HTTP_LOCAL_STORE \
-  --no-out-link \
-  -j0 \
-  --option trusted-public-keys $(cat $SIGNING_KEY_PUB_FILE))
-
 ################################################################################
 ## Create the ipfs store and download the derivation there
 ################################################################################
+
+EMPTY_HASH=$(echo {} | ipfs dag put)
+
+# Try to upload the content to the empty directory, fail but grab the right hash
+IPFS_HASH=$(set -e; \
+  set -o pipefail; \
+  ! nix copy --to ipfs://$EMPTY_HASH $(nix-build ./fixed.nix -A good) --experimental-features nix-command \
+    |& grep current: | awk '{print substr($2, 7, length($2))}')
+
+# Verify that new path is valid.
+nix copy --to ipfs://$IPFS_HASH $(nix-build ./fixed.nix -A good) --experimental-features nix-command
 
 mkdir $IPFS_DST_IPFS_STORE
 
@@ -105,7 +100,10 @@ DOWNLOAD_LOCATION=$(nix-build ./fixed.nix -A good \
 ################################################################################
 
 # First I have to publish:
-IPNS_ID=$(ipfs name publish $IPFS_HASH --allow-offline | awk '{print substr($3,1,length($3)-1)}')
+IPNS_ID=$(ipfs name publish $EMPTY_HASH --allow-offline | awk '{print substr($3,1,length($3)-1)}')
+
+# Check that we can upload the ipns store directly
+nix copy --to ipns://$IPNS_ID $(nix-build ./fixed.nix -A good) --experimental-features nix-command
 
 mkdir $IPFS_DST_IPNS_STORE
 
