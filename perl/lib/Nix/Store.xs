@@ -80,7 +80,7 @@ SV * queryReferences(char * path)
 SV * queryPathHash(char * path)
     PPCODE:
         try {
-            auto s = store()->queryPathInfo(store()->parseStorePath(path))->narHash.to_string(Base32, true);
+            auto s = store()->queryPathInfo(store()->parseStorePath(path))->narHash.to_string(Base::Base32, true);
             XPUSHs(sv_2mortal(newSVpv(s.c_str(), 0)));
         } catch (Error & e) {
             croak("%s", e.what());
