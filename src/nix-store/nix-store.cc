@@ -372,8 +372,8 @@ static void opQuery(Strings opFlags, Strings opArgs)
                 for (auto & j : maybeUseOutputs(store->followLinksToStorePath(i), useOutput, forceRealise)) {
                     auto info = store->queryPathInfo(j);
                     if (query == qHash) {
-                        assert(info->narHash.type == HashType::SHA256);
-                        cout << fmt("%s\n", info->narHash.to_string(Base::Base32, true));
+                        assert(info->narHash.type == htSHA256);
+                        cout << fmt("%s\n", info->narHash.to_string(Base32, true));
                     } else if (query == qSize)
                         cout << fmt("%d\n", info->narSize);
                 }
@@ -502,7 +502,7 @@ static void registerValidity(bool reregister, bool hashGiven, bool canonicalise)
             if (canonicalise)
                 canonicalisePathMetaData(store->printStorePath(info->path), -1);
             if (!hashGiven) {
-                HashResult hash = hashPath(HashType::SHA256, store->printStorePath(info->path));
+                HashResult hash = hashPath(htSHA256, store->printStorePath(info->path));
                 info->narHash = hash.first;
                 info->narSize = hash.second;
             }
@@ -723,7 +723,7 @@ static void opVerifyPath(Strings opFlags, Strings opArgs)
 
     for (auto & i : opArgs) {
         auto path = store->followLinksToStorePath(i);
-        printMsg(Verbosity::Talkative, "checking path '%s'...", store->printStorePath(path));
+        printMsg(lvlTalkative, "checking path '%s'...", store->printStorePath(path));
         auto info = store->queryPathInfo(path);
         HashSink sink(*info->narHash.type);
         store->narFromPath(path, sink);
@@ -734,8 +734,8 @@ static void opVerifyPath(Strings opFlags, Strings opArgs)
                 .hint = hintfmt(
                     "path '%s' was modified! expected hash '%s', got '%s'",
                     store->printStorePath(path),
-                    info->narHash.to_string(Base::Base32, true),
-                    current.first.to_string(Base::Base32, true))
+                    info->narHash.to_string(Base32, true),
+                    current.first.to_string(Base32, true))
             });
             status = 1;
         }
@@ -789,7 +789,7 @@ static void opServe(Strings opFlags, Strings opArgs)
     auto getBuildSettings = [&]() {
         // FIXME: changing options here doesn't work if we're
         // building through the daemon.
-        verbosity = Verbosity::Error;
+        verbosity = lvlError;
         settings.keepLog = false;
         settings.useSubstitutes = false;
         settings.maxSilentTime = readInt(in);
@@ -864,7 +864,7 @@ static void opServe(Strings opFlags, Strings opArgs)
                         out << info->narSize // downloadSize
                             << info->narSize;
                         if (GET_PROTOCOL_MINOR(clientVersion) >= 4)
-                            out << (info->narHash ? info->narHash.to_string(Base::Base32, true) : "") << info->ca << info->sigs;
+                            out << (info->narHash ? info->narHash.to_string(Base32, true) : "") << info->ca << info->sigs;
                     } catch (InvalidPath &) {
                     }
                 }
@@ -948,7 +948,7 @@ static void opServe(Strings opFlags, Strings opArgs)
                 auto deriver = readString(in);
                 if (deriver != "")
                     info.deriver = store->parseStorePath(deriver);
-                info.narHash = Hash(readString(in), HashType::SHA256);
+                info.narHash = Hash(readString(in), htSHA256);
                 info.references = readStorePaths<StorePathSet>(*store, in);
                 in >> info.registrationTime >> info.narSize >> info.ultimate;
                 info.sigs = readStrings<StringSet>(in);

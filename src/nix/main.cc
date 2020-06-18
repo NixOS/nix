@@ -163,7 +163,7 @@ void mainWrapped(int argc, char * * argv)
         if (legacy) return legacy(argc, argv);
     }
 
-    verbosity = Verbosity::Warn;
+    verbosity = lvlWarn;
     settings.verboseBuild = false;
 
     setLogFormat("bar");

@@ -143,8 +143,8 @@ StorePath Store::makeStorePath(const string & type,
     const Hash & hash, std::string_view name) const
 {
     /* e.g., "source:sha256:1abc...:/nix/store:foo.tar.gz" */
-    string s = type + ":" + hash.to_string(Base::Base16, true) + ":" + storeDir + ":" + std::string(name);
-    auto h = compressHash(hashString(HashType::SHA256, s), 20);
+    string s = type + ":" + hash.to_string(Base16, true) + ":" + storeDir + ":" + std::string(name);
+    auto h = compressHash(hashString(htSHA256, s), 20);
     return StorePath(h, name);
 }
 
@@ -179,15 +179,15 @@ StorePath Store::makeFixedOutputPath(
     const StorePathSet & references,
     bool hasSelfReference) const
 {
-    if (hash.type == HashType::SHA256 && recursive == FileIngestionMethod::Recursive) {
+    if (hash.type == htSHA256 && recursive == FileIngestionMethod::Recursive) {
         return makeStorePath(makeType(*this, "source", references, hasSelfReference), hash, name);
     } else {
         assert(references.empty());
         return makeStorePath("output:out",
-            hashString(HashType::SHA256,
+            hashString(htSHA256,
                 "fixed:out:"
                 + (recursive == FileIngestionMethod::Recursive ? (string) "r:" : "")
-                + hash.to_string(Base::Base16, true) + ":"),
+                + hash.to_string(Base16, true) + ":"),
             name);
     }
 }
@@ -196,7 +196,7 @@ StorePath Store::makeFixedOutputPath(
 StorePath Store::makeTextPath(std::string_view name, const Hash & hash,
     const StorePathSet & references) const
 {
-    assert(hash.type == HashType::SHA256);
+    assert(hash.type == htSHA256);
     /* Stuff the references (if any) into the type.  This is a bit
        hacky, but we can't put them in `s' since that would be
        ambiguous. */
@@ -217,7 +217,7 @@ std::pair<StorePath, Hash> Store::computeStorePathForPath(std::string_view name,
 StorePath Store::computeStorePathForText(const string & name, const string & s,
     const StorePathSet & references) const
 {
-    return makeTextPath(name, hashString(HashType::SHA256, s), references);
+    return makeTextPath(name, hashString(htSHA256, s), references);
 }
 
 
@@ -430,7 +430,7 @@ string Store::makeValidityRegistration(const StorePathSet & paths,
         auto info = queryPathInfo(i);
 
         if (showHash) {
-            s += info->narHash.to_string(Base::Base16, false) + "\n";
+            s += info->narHash.to_string(Base16, false) + "\n";
             s += (format("%1%\n") % info->narSize).str();
         }
 
@@ -505,7 +505,7 @@ void Store::pathInfoToJSON(JSONPlaceholder & jsonOut, const StorePathSet & store
                     if (!narInfo->url.empty())
                         jsonPath.attr("url", narInfo->url);
                     if (narInfo->fileHash)
-                        jsonPath.attr("downloadHash", narInfo->fileHash.to_string(Base::Base32, true));
+                        jsonPath.attr("downloadHash", narInfo->fileHash.to_string(Base32, true));
                     if (narInfo->fileSize)
                         jsonPath.attr("downloadSize", narInfo->fileSize);
                     if (showClosureSize)
@@ -568,7 +568,7 @@ void copyStorePath(ref<Store> srcStore, ref<Store> dstStore,
     auto srcUri = srcStore->getUri();
     auto dstUri = dstStore->getUri();
 
-    Activity act(*logger, Verbosity::Info, ActivityType::CopyPath,
+    Activity act(*logger, lvlInfo, actCopyPath,
         srcUri == "local" || srcUri == "daemon"
         ? fmt("copying path '%s' to '%s'", srcStore->printStorePath(storePath), dstUri)
           : dstUri == "local" || dstUri == "daemon"
@@ -585,7 +585,7 @@ void copyStorePath(ref<Store> srcStore, ref<Store> dstStore,
         StringSink sink;
         srcStore->narFromPath({storePath}, sink);
         auto info2 = make_ref<ValidPathInfo>(*info);
-        info2->narHash = hashString(HashType::SHA256, *sink.s);
+        info2->narHash = hashString(htSHA256, *sink.s);
         if (!info->narSize) info2->narSize = sink.s->size();
         if (info->ultimate) info2->ultimate = false;
         info = info2;
@@ -627,7 +627,7 @@ void copyPaths(ref<Store> srcStore, ref<Store> dstStore, const StorePathSet & st
 
     if (missing.empty()) return;
 
-    Activity act(*logger, Verbosity::Info, ActivityType::CopyPaths, fmt("copying %d paths", missing.size()));
+    Activity act(*logger, lvlInfo, actCopyPaths, fmt("copying %d paths", missing.size()));
 
     std::atomic<size_t> nrDone{0};
     std::atomic<size_t> nrFailed{0};
@@ -653,7 +653,7 @@ void copyPaths(ref<Store> srcStore, ref<Store> dstStore, const StorePathSet & st
             auto info = srcStore->queryPathInfo(srcStore->parseStorePath(storePath));
 
             bytesExpected += info->narSize;
-            act.setExpected(ActivityType::CopyPath, bytesExpected);
+            act.setExpected(actCopyPath, bytesExpected);
 
             return srcStore->printStorePathSet(info->references);
         },
@@ -672,7 +672,7 @@ void copyPaths(ref<Store> srcStore, ref<Store> dstStore, const StorePathSet & st
                     nrFailed++;
                     if (!settings.keepGoing)
                         throw e;
-                    logger->log(Verbosity::Error, fmt("could not copy %s: %s", storePathS, e.what()));
+                    logger->log(lvlError, fmt("could not copy %s: %s", storePathS, e.what()));
                     showProgress();
                     return;
                 }
@@ -703,7 +703,7 @@ std::optional<ValidPathInfo> decodeValidPathInfo(const Store & store, std::istre
     if (hashGiven) {
         string s;
         getline(str, s);
-        info.narHash = Hash(s, HashType::SHA256);
+        info.narHash = Hash(s, htSHA256);
         getline(str, s);
         if (!string2Int(s, info.narSize)) throw Error("number expected");
     }
@@ -746,7 +746,7 @@ std::string ValidPathInfo::fingerprint(const Store & store) const
             store.printStorePath(path));
     return
         "1;" + store.printStorePath(path) + ";"
-        + narHash.to_string(Base::Base32, true) + ";"
+        + narHash.to_string(Base32, true) + ";"
         + std::to_string(narSize) + ";"
         + concatStringsSep(",", store.printStorePathSet(references));
 }
@@ -826,7 +826,7 @@ std::string makeFixedOutputCA(FileIngestionMethod recursive, const Hash & hash)
 {
     return "fixed:"
         + (recursive == FileIngestionMethod::Recursive ? (std::string) "r:" : "")
-        + hash.to_string(Base::Base32, true);
+        + hash.to_string(Base32, true);
 }
 
 

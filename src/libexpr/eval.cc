@@ -1712,10 +1712,10 @@ string EvalState::copyPathToStore(PathSet & context, const Path & path)
     else {
         auto p = settings.readOnlyMode
             ? store->computeStorePathForPath(std::string(baseNameOf(path)), checkSourcePath(path)).first
-            : store->addToStore(std::string(baseNameOf(path)), checkSourcePath(path), FileIngestionMethod::Recursive, HashType::SHA256, defaultPathFilter, repair);
+            : store->addToStore(std::string(baseNameOf(path)), checkSourcePath(path), FileIngestionMethod::Recursive, htSHA256, defaultPathFilter, repair);
         dstPath = store->printStorePath(p);
         srcToStore.insert_or_assign(path, std::move(p));
-        printMsg(Verbosity::Chatty, "copied source '%1%' -> '%2%'", path, dstPath);
+        printMsg(lvlChatty, "copied source '%1%' -> '%2%'", path, dstPath);
     }
 
     context.insert(dstPath);

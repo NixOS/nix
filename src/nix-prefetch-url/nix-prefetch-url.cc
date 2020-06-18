@@ -51,7 +51,7 @@ string resolveMirrorUri(EvalState & state, string uri)
 static int _main(int argc, char * * argv)
 {
     {
-        HashType ht = HashType::SHA256;
+        HashType ht = htSHA256;
         std::vector<string> args;
         bool printPath = getEnv("PRINT_PATH") == "1";
         bool fromExpr = false;

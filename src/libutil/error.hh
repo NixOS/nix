@@ -40,15 +40,15 @@ See the error-demo.cc program for usage examples.
 
 */
 
-enum struct Verbosity {
-    Error = 0,
-    Warn,
-    Info,
-    Talkative,
-    Chatty,
-    Debug,
-    Vomit,
-};
+typedef enum {
+    lvlError = 0,
+    lvlWarn,
+    lvlInfo,
+    lvlTalkative,
+    lvlChatty,
+    lvlDebug,
+    lvlVomit
+} Verbosity;
 
 // ErrPos indicates the location of an error in a nix file.
 struct ErrPos {
@@ -113,7 +113,7 @@ public:
 
     template<typename... Args>
     BaseError(unsigned int status, const Args & ... args)
-        : err { .level = Verbosity::Error,
+        : err { .level = lvlError,
                 .hint = hintfmt(args...)
               }
         , status(status)
@@ -121,13 +121,13 @@ public:
 
     template<typename... Args>
     BaseError(const std::string & fs, const Args & ... args)
-        : err { .level = Verbosity::Error,
+        : err { .level = lvlError,
                 .hint = hintfmt(fs, args...)
               }
     { }
 
     BaseError(hintformat hint)
-        : err { .level = Verbosity::Error,
+        : err { .level = lvlError,
                 .hint = hint
               }
     { }

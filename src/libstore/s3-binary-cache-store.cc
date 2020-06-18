@@ -70,9 +70,9 @@ static void initAWS()
            shared.cc), so don't let aws-sdk-cpp override it. */
         options.cryptoOptions.initAndCleanupOpenSSL = false;
 
-        if (verbosity >= Verbosity::Debug) {
+        if (verbosity >= lvlDebug) {
             options.loggingOptions.logLevel =
-                verbosity == Verbosity::Debug
+                verbosity == lvlDebug
                 ? Aws::Utils::Logging::LogLevel::Debug
                 : Aws::Utils::Logging::LogLevel::Trace;
             options.loggingOptions.logger_create_fn = [options]() {

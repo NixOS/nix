@@ -110,50 +110,50 @@ std::ostream& operator<<(std::ostream &out, const ErrorInfo &einfo)
 
     string levelString;
     switch (einfo.level) {
-        case Verbosity::Error: {
+        case Verbosity::lvlError: {
             levelString = ANSI_RED;
             levelString += "error:";
             levelString += ANSI_NORMAL;
             break;
         }
-        case Verbosity::Warn: {
+        case Verbosity::lvlWarn: {
             levelString = ANSI_YELLOW;
             levelString += "warning:";
             levelString += ANSI_NORMAL;
             break;
         }
-        case Verbosity::Info: {
+        case Verbosity::lvlInfo: {
             levelString = ANSI_GREEN;
             levelString += "info:";
             levelString += ANSI_NORMAL;
             break;
         }
-        case Verbosity::Talkative: {
+        case Verbosity::lvlTalkative: {
             levelString = ANSI_GREEN;
             levelString += "talk:";
             levelString += ANSI_NORMAL;
             break;
         }
-        case Verbosity::Chatty: {
+        case Verbosity::lvlChatty: {
             levelString = ANSI_GREEN;
             levelString += "chat:";
             levelString += ANSI_NORMAL;
             break;
         }
-        case Verbosity::Vomit: {
+        case Verbosity::lvlVomit: {
             levelString = ANSI_GREEN;
             levelString += "vomit:";
             levelString += ANSI_NORMAL;
             break;
         }
-        case Verbosity::Debug: {
+        case Verbosity::lvlDebug: {
             levelString = ANSI_YELLOW;
             levelString += "debug:";
             levelString += ANSI_NORMAL;
             break;
         }
         default: {
-            levelString = fmt("invalid error level: %d", (uint8_t)einfo.level);
+            levelString = fmt("invalid error level: %1%", einfo.level);
             break;
         }
     }

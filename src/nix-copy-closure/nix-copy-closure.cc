@@ -22,7 +22,7 @@ static int _main(int argc, char ** argv)
                 printVersion("nix-copy-closure");
             else if (*arg == "--gzip" || *arg == "--bzip2" || *arg == "--xz") {
                 if (*arg != "--gzip")
-                    printMsg(Verbosity::Error, format("Warning: '%1%' is not implemented, falling back to gzip") % *arg);
+                    printMsg(lvlError, format("Warning: '%1%' is not implemented, falling back to gzip") % *arg);
                 gzip = true;
             } else if (*arg == "--from")
                 toMode = false;
@@ -31,7 +31,7 @@ static int _main(int argc, char ** argv)
             else if (*arg == "--include-outputs")
                 includeOutputs = true;
             else if (*arg == "--show-progress")
-                printMsg(Verbosity::Error, "Warning: '--show-progress' is not implemented");
+                printMsg(lvlError, "Warning: '--show-progress' is not implemented");
             else if (*arg == "--dry-run")
                 dryRun = true;
             else if (*arg == "--use-substitutes" || *arg == "-s")

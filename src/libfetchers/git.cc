@@ -95,7 +95,7 @@ struct GitInput : Input
 
         auto input = std::make_shared<GitInput>(*this);
 
-        assert(!rev || rev->type == HashType::SHA1);
+        assert(!rev || rev->type == htSHA1);
 
         std::string cacheType = "git";
         if (shallow) cacheType += "-shallow";
@@ -195,7 +195,7 @@ struct GitInput : Input
                     return files.count(file);
                 };
 
-                auto storePath = store->addToStore("source", actualUrl, FileIngestionMethod::Recursive, HashType::SHA256, filter);
+                auto storePath = store->addToStore("source", actualUrl, FileIngestionMethod::Recursive, htSHA256, filter);
 
                 auto tree = Tree {
                     .actualPath = store->printStorePath(storePath),
@@ -225,21 +225,21 @@ struct GitInput : Input
         if (isLocal) {
 
             if (!input->rev)
-                input->rev = Hash(chomp(runProgram("git", true, { "-C", actualUrl, "rev-parse", *input->ref })), HashType::SHA1);
+                input->rev = Hash(chomp(runProgram("git", true, { "-C", actualUrl, "rev-parse", *input->ref })), htSHA1);
 
             repoDir = actualUrl;
 
         } else {
 
             if (auto res = getCache()->lookup(store, mutableAttrs)) {
-                auto rev2 = Hash(getStrAttr(res->first, "rev"), HashType::SHA1);
+                auto rev2 = Hash(getStrAttr(res->first, "rev"), htSHA1);
                 if (!rev || rev == rev2) {
                     input->rev = rev2;
                     return makeResult(res->first, std::move(res->second));
                 }
             }
 
-            Path cacheDir = getCacheDir() + "/nix/gitv3/" + hashString(HashType::SHA256, actualUrl).to_string(Base::Base32, false);
+            Path cacheDir = getCacheDir() + "/nix/gitv3/" + hashString(htSHA256, actualUrl).to_string(Base32, false);
             repoDir = cacheDir;
 
             if (!pathExists(cacheDir)) {
@@ -277,7 +277,7 @@ struct GitInput : Input
             }
 
             if (doFetch) {
-                Activity act(*logger, Verbosity::Talkative, ActivityType::Unknown, fmt("fetching Git repository '%s'", actualUrl));
+                Activity act(*logger, lvlTalkative, actUnknown, fmt("fetching Git repository '%s'", actualUrl));
 
                 // FIXME: git stderr messes up our progress indicator, so
                 // we're using --quiet for now. Should process its stderr.
@@ -301,7 +301,7 @@ struct GitInput : Input
             }
 
             if (!input->rev)
-                input->rev = Hash(chomp(readFile(localRefFile)), HashType::SHA1);
+                input->rev = Hash(chomp(readFile(localRefFile)), htSHA1);
         }
 
         bool isShallow = chomp(runProgram("git", true, { "-C", repoDir, "rev-parse", "--is-shallow-repository" })) == "true";
@@ -350,7 +350,7 @@ struct GitInput : Input
             unpackTarfile(*source, tmpDir);
         }
 
-        auto storePath = store->addToStore(name, tmpDir, FileIngestionMethod::Recursive, HashType::SHA256, filter);
+        auto storePath = store->addToStore(name, tmpDir, FileIngestionMethod::Recursive, htSHA256, filter);
 
         auto lastModified = std::stoull(runProgram("git", true, { "-C", repoDir, "log", "-1", "--format=%ct", input->rev->gitRev() }));
 
@@ -426,7 +426,7 @@ struct GitInputScheme : InputScheme
             input->ref = *ref;
         }
         if (auto rev = maybeGetStrAttr(attrs, "rev"))
-            input->rev = Hash(*rev, HashType::SHA1);
+            input->rev = Hash(*rev, htSHA1);
 
         input->shallow = maybeGetBoolAttr(attrs, "shallow").value_or(false);
 

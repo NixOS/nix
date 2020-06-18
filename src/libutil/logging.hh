@@ -5,32 +5,32 @@
 
 namespace nix {
 
-enum struct ActivityType {
-    Unknown = 0,
-    CopyPath = 100,
-    Download = 101,
-    Realise = 102,
-    CopyPaths = 103,
-    Builds = 104,
-    Build = 105,
-    OptimiseStore = 106,
-    VerifyPaths = 107,
-    Substitute = 108,
-    QueryPathInfo = 109,
-    PostBuildHook = 110,
-    BuildWaiting = 111,
-};
+typedef enum {
+    actUnknown = 0,
+    actCopyPath = 100,
+    actFileTransfer = 101,
+    actRealise = 102,
+    actCopyPaths = 103,
+    actBuilds = 104,
+    actBuild = 105,
+    actOptimiseStore = 106,
+    actVerifyPaths = 107,
+    actSubstitute = 108,
+    actQueryPathInfo = 109,
+    actPostBuildHook = 110,
+    actBuildWaiting = 111,
+} ActivityType;
 
-enum struct ResultType {
-    FileLinked = 100,
-    BuildLogLine = 101,
-    UntrustedPath = 102,
-    CorruptedPath = 103,
-    SetPhase = 104,
-    Progress = 105,
-    SetExpected = 106,
-    PostBuildLogLine = 107,
-};
+typedef enum {
+    resFileLinked = 100,
+    resBuildLogLine = 101,
+    resUntrustedPath = 102,
+    resCorruptedPath = 103,
+    resSetPhase = 104,
+    resProgress = 105,
+    resSetExpected = 106,
+    resPostBuildLogLine = 107,
+} ResultType;
 
 typedef uint64_t ActivityId;
 
@@ -64,7 +64,7 @@ public:
 
     void log(const FormatOrString & fs)
     {
-        log(Verbosity::Info, fs);
+        log(lvlInfo, fs);
     }
 
     virtual void logEI(const ErrorInfo &ei) = 0;
@@ -109,17 +109,17 @@ struct Activity
 
     Activity(Logger & logger, ActivityType type,
         const Logger::Fields & fields = {}, ActivityId parent = getCurActivity())
-        : Activity(logger, Verbosity::Error, type, "", fields, parent) { };
+        : Activity(logger, lvlError, type, "", fields, parent) { };
 
     Activity(const Activity & act) = delete;
 
     ~Activity();
 
     void progress(uint64_t done = 0, uint64_t expected = 0, uint64_t running = 0, uint64_t failed = 0) const
-    { result(ResultType::Progress, done, expected, running, failed); }
+    { result(resProgress, done, expected, running, failed); }
 
     void setExpected(ActivityType type2, uint64_t expected) const
-    { result(ResultType::SetExpected, (uint64_t)type2, expected); }
+    { result(resSetExpected, type2, expected); }
 
     template<typename... Args>
     void result(ResultType type, const Args & ... args) const
@@ -167,8 +167,8 @@ extern Verbosity verbosity; /* suppress msgs > this */
         } \
     } while (0)
 
-#define logError(errorInfo...) logErrorInfo(Verbosity::Error, errorInfo)
-#define logWarning(errorInfo...) logErrorInfo(Verbosity::Warn, errorInfo)
+#define logError(errorInfo...) logErrorInfo(lvlError, errorInfo)
+#define logWarning(errorInfo...) logErrorInfo(lvlWarn, errorInfo)
 
 /* Print a string message if the current log level is at least the specified
    level. Note that this has to be implemented as a macro to ensure that the
@@ -180,13 +180,13 @@ extern Verbosity verbosity; /* suppress msgs > this */
         } \
     } while (0)
 
-#define printError(args...) printMsg(Verbosity::Error, args)
-#define printInfo(args...) printMsg(Verbosity::Info, args)
-#define printTalkative(args...) printMsg(Verbosity::Talkative, args)
-#define debug(args...) printMsg(Verbosity::Debug, args)
-#define vomit(args...) printMsg(Verbosity::Vomit, args)
+#define printError(args...) printMsg(lvlError, args)
+#define printInfo(args...) printMsg(lvlInfo, args)
+#define printTalkative(args...) printMsg(lvlTalkative, args)
+#define debug(args...) printMsg(lvlDebug, args)
+#define vomit(args...) printMsg(lvlVomit, args)
 
-/* if verbosity >= Verbosity::Warn, print a message with a yellow 'warning:' prefix. */
+/* if verbosity >= lvlWarn, print a message with a yellow 'warning:' prefix. */
 template<typename... Args>
 inline void warn(const std::string & fs, const Args & ... args)
 {

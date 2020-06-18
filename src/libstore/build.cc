@@ -106,13 +106,7 @@ typedef std::map<StorePath, WeakGoalPtr> WeakGoalMap;
 
 struct Goal : public std::enable_shared_from_this<Goal>
 {
-    enum struct ExitCode {
-        Busy,
-        Success,
-        Failed,
-        NoSubstituters,
-        IncompleteClosure,
-    };
+    typedef enum {ecBusy, ecSuccess, ecFailed, ecNoSubstituters, ecIncompleteClosure} ExitCode;
 
     /* Backlink to the worker. */
     Worker & worker;
@@ -147,7 +141,7 @@ struct Goal : public std::enable_shared_from_this<Goal>
     Goal(Worker & worker) : worker(worker)
     {
         nrFailed = nrNoSubstituters = nrIncompleteClosure = 0;
-        exitCode = ExitCode::Busy;
+        exitCode = ecBusy;
     }
 
     virtual ~Goal()
@@ -359,8 +353,8 @@ public:
     {
         actDerivations.progress(doneBuilds, expectedBuilds + doneBuilds, runningBuilds, failedBuilds);
         actSubstitutions.progress(doneSubstitutions, expectedSubstitutions + doneSubstitutions, runningSubstitutions, failedSubstitutions);
-        act.setExpected(ActivityType::Download, expectedDownloadSize + doneDownloadSize);
-        act.setExpected(ActivityType::CopyPath, expectedNarSize + doneNarSize);
+        act.setExpected(actFileTransfer, expectedDownloadSize + doneDownloadSize);
+        act.setExpected(actCopyPath, expectedNarSize + doneNarSize);
     }
 };
 
@@ -392,13 +386,13 @@ void Goal::waiteeDone(GoalPtr waitee, ExitCode result)
 
     trace(fmt("waitee '%s' done; %d left", waitee->name, waitees.size()));
 
-    if (result == ExitCode::Failed || result == ExitCode::NoSubstituters || result == ExitCode::IncompleteClosure) ++nrFailed;
+    if (result == ecFailed || result == ecNoSubstituters || result == ecIncompleteClosure) ++nrFailed;
 
-    if (result == ExitCode::NoSubstituters) ++nrNoSubstituters;
+    if (result == ecNoSubstituters) ++nrNoSubstituters;
 
-    if (result == ExitCode::IncompleteClosure) ++nrIncompleteClosure;
+    if (result == ecIncompleteClosure) ++nrIncompleteClosure;
 
-    if (waitees.empty() || (result == ExitCode::Failed && !settings.keepGoing)) {
+    if (waitees.empty() || (result == ecFailed && !settings.keepGoing)) {
 
         /* If we failed and keepGoing is not set, we remove all
            remaining waitees. */
@@ -418,8 +412,8 @@ void Goal::waiteeDone(GoalPtr waitee, ExitCode result)
 void Goal::amDone(ExitCode result, std::optional<Error> ex)
 {
     trace("done");
-    assert(exitCode == ExitCode::Busy);
-    assert(result == ExitCode::Success || result == ExitCode::Failed || result == ExitCode::NoSubstituters || result == ExitCode::IncompleteClosure);
+    assert(exitCode == ecBusy);
+    assert(result == ecSuccess || result == ecFailed || result == ecNoSubstituters || result == ecIncompleteClosure);
     exitCode = result;
 
     if (ex) {
@@ -684,7 +678,7 @@ HookInstance::HookInstance()
 
         Strings args = {
             std::string(baseNameOf(settings.buildHook.get())),
-            std::to_string((uint64_t)verbosity),
+            std::to_string(verbosity),
         };
 
         execv(settings.buildHook.get().c_str(), stringsToCharPtrs(args).data());
@@ -1422,7 +1416,7 @@ void DerivationGoal::started() {
         "building '%s'", worker.store.printStorePath(drvPath), curRound, nrRounds);
     fmt("building '%s'", worker.store.printStorePath(drvPath));
     if (hook) msg += fmt(" on '%s'", machineName);
-    act = std::make_unique<Activity>(*logger, Verbosity::Info, ActivityType::Build, msg,
+    act = std::make_unique<Activity>(*logger, lvlInfo, actBuild, msg,
         Logger::Fields{worker.store.printStorePath(drvPath), hook ? machineName : "", curRound, nrRounds});
     mcRunningBuilds = std::make_unique<MaintainCount<uint64_t>>(worker.runningBuilds);
     worker.updateProgress();
@@ -1443,7 +1437,7 @@ void DerivationGoal::tryToBuild()
 
     if (!outputLocks.lockPaths(lockFiles, "", false)) {
         if (!actLock)
-            actLock = std::make_unique<Activity>(*logger, Verbosity::Warn, ActivityType::BuildWaiting,
+            actLock = std::make_unique<Activity>(*logger, lvlWarn, actBuildWaiting,
                 fmt("waiting for lock on %s", yellowtxt(showPaths(lockFiles))));
         worker.waitForAWhile(shared_from_this());
         return;
@@ -1483,20 +1477,6 @@ void DerivationGoal::tryToBuild()
        supported for local builds. */
     bool buildLocally = buildMode != bmNormal || parsedDrv->willBuildLocally();
 
-    auto started = [&]() {
-        auto msg = fmt(
-            buildMode == bmRepair ? "repairing outputs of '%s'" :
-            buildMode == bmCheck ? "checking outputs of '%s'" :
-            nrRounds > 1 ? "building '%s' (round %d/%d)" :
-            "building '%s'", worker.store.printStorePath(drvPath), curRound, nrRounds);
-        fmt("building '%s'", worker.store.printStorePath(drvPath));
-        if (hook) msg += fmt(" on '%s'", machineName);
-        act = std::make_unique<Activity>(*logger, Verbosity::Info, ActivityType::Build, msg,
-            Logger::Fields{worker.store.printStorePath(drvPath), hook ? machineName : "", curRound, nrRounds});
-        mcRunningBuilds = std::make_unique<MaintainCount<uint64_t>>(worker.runningBuilds);
-        worker.updateProgress();
-    };
-
     /* Is the build hook willing to accept this job? */
     if (!buildLocally) {
         switch (tryBuildHook()) {
@@ -1512,7 +1492,7 @@ void DerivationGoal::tryToBuild()
                 /* Not now; wait until at least one child finishes or
                    the wake-up timeout expires. */
                 if (!actLock)
-                    actLock = std::make_unique<Activity>(*logger, Verbosity::Warn, ActivityType::BuildWaiting,
+                    actLock = std::make_unique<Activity>(*logger, lvlWarn, actBuildWaiting,
                         fmt("waiting for a machine to build '%s'", yellowtxt(worker.store.printStorePath(drvPath))));
                 worker.waitForAWhile(shared_from_this());
                 outputLocks.unlock();
@@ -1553,7 +1533,7 @@ void DerivationGoal::tryLocalBuild() {
             buildUser->kill();
         } else {
             if (!actLock)
-                actLock = std::make_unique<Activity>(*logger, Verbosity::Warn, ActivityType::BuildWaiting,
+                actLock = std::make_unique<Activity>(*logger, lvlWarn, actBuildWaiting,
                     fmt("waiting for UID to build '%s'", yellowtxt(worker.store.printStorePath(drvPath))));
             worker.waitForAWhile(shared_from_this());
             return;
@@ -1708,7 +1688,7 @@ void DerivationGoal::buildDone()
         registerOutputs();
 
         if (settings.postBuildHook != "") {
-            Activity act(*logger, Verbosity::Info, ActivityType::PostBuildHook,
+            Activity act(*logger, lvlInfo, actPostBuildHook,
                 fmt("running post-build-hook '%s'", settings.postBuildHook),
                 Logger::Fields{worker.store.printStorePath(drvPath)});
             PushActivity pact(act.id);
@@ -1740,7 +1720,7 @@ void DerivationGoal::buildDone()
                 }
 
                 void flushLine() {
-                    act.result(ResultType::PostBuildLogLine, currentLine);
+                    act.result(resPostBuildLogLine, currentLine);
                     currentLine.clear();
                 }
 
@@ -2144,7 +2124,7 @@ void DerivationGoal::startBuilder()
         /* Clean up the chroot directory automatically. */
         autoDelChroot = std::make_shared<AutoDelete>(chrootRootDir);
 
-        printMsg(Verbosity::Chatty, format("setting up chroot environment in '%1%'") % chrootRootDir);
+        printMsg(lvlChatty, format("setting up chroot environment in '%1%'") % chrootRootDir);
 
         if (mkdir(chrootRootDir.c_str(), 0750) == -1)
             throw SysError("cannot create '%1%'", chrootRootDir);
@@ -2253,7 +2233,7 @@ void DerivationGoal::startBuilder()
     }
 
     if (useChroot && settings.preBuildHook != "" && dynamic_cast<Derivation *>(drv.get())) {
-        printMsg(Verbosity::Chatty, format("executing pre-build hook '%1%'")
+        printMsg(lvlChatty, format("executing pre-build hook '%1%'")
             % settings.preBuildHook);
         auto args = useChroot ? Strings({worker.store.printStorePath(drvPath), chrootRootDir}) :
             Strings({ worker.store.printStorePath(drvPath) });
@@ -2294,7 +2274,7 @@ void DerivationGoal::startBuilder()
         startDaemon();
 
     /* Run the builder. */
-    printMsg(Verbosity::Chatty, "executing builder '%1%'", drv->builder);
+    printMsg(lvlChatty, "executing builder '%1%'", drv->builder);
 
     /* Create the log file. */
     Path logFile = openLogFile();
@@ -2530,8 +2510,8 @@ void DerivationGoal::initTmpDir() {
             if (passAsFile.find(i.first) == passAsFile.end()) {
                 env[i.first] = i.second;
             } else {
-                auto hash = hashString(HashType::SHA256, i.first);
-                string fn = ".attr-" + hash.to_string(Base::Base32, false);
+                auto hash = hashString(htSHA256, i.first);
+                string fn = ".attr-" + hash.to_string(Base32, false);
                 Path p = tmpDir + "/" + fn;
                 writeFile(p, rewriteStrings(i.second, inputRewrites));
                 chownToBuilder(p);
@@ -2777,7 +2757,7 @@ struct RestrictedStore : public LocalFSStore
     { throw Error("queryPathFromHashPart"); }
 
     StorePath addToStore(const string & name, const Path & srcPath,
-        FileIngestionMethod method = FileIngestionMethod::Recursive, HashType hashAlgo = HashType::SHA256,
+        FileIngestionMethod method = FileIngestionMethod::Recursive, HashType hashAlgo = htSHA256,
         PathFilter & filter = defaultPathFilter, RepairFlag repair = NoRepair) override
     { throw Error("addToStore"); }
 
@@ -2790,7 +2770,7 @@ struct RestrictedStore : public LocalFSStore
     }
 
     StorePath addToStoreFromDump(const string & dump, const string & name,
-        FileIngestionMethod method = FileIngestionMethod::Recursive, HashType hashAlgo = HashType::SHA256, RepairFlag repair = NoRepair) override
+        FileIngestionMethod method = FileIngestionMethod::Recursive, HashType hashAlgo = htSHA256, RepairFlag repair = NoRepair) override
     {
         auto path = next->addToStoreFromDump(dump, name, method, hashAlgo, repair);
         goal.addDependency(path);
@@ -3765,7 +3745,7 @@ void DerivationGoal::registerOutputs()
                 worker.hashMismatch = true;
                 delayedException = std::make_exception_ptr(
                     BuildError("hash mismatch in fixed-output derivation '%s':\n  wanted: %s\n  got:    %s",
-                        worker.store.printStorePath(dest), h.to_string(Base::SRI, true), h2.to_string(Base::SRI, true)));
+                        worker.store.printStorePath(dest), h.to_string(SRI, true), h2.to_string(SRI, true)));
 
                 Path actualDest = worker.store.Store::toRealPath(dest);
 
@@ -4209,7 +4189,7 @@ void DerivationGoal::flushLine()
         logTail.push_back(currentLogLine);
         if (logTail.size() > settings.logLines) logTail.pop_front();
 
-        act->result(ResultType::BuildLogLine, currentLogLine);
+        act->result(resBuildLogLine, currentLogLine);
     }
 
     currentLogLine = "";
@@ -4236,7 +4216,7 @@ void DerivationGoal::addHashRewrite(const StorePath & path)
     auto h1 = std::string(((std::string_view) path.to_string()).substr(0, 32));
     auto p = worker.store.makeStorePath(
         "rewrite:" + std::string(drvPath.to_string()) + ":" + std::string(path.to_string()),
-        Hash(HashType::SHA256), path.name());
+        Hash(htSHA256), path.name());
     auto h2 = std::string(((std::string_view) p.to_string()).substr(0, 32));
     deletePath(worker.store.printStorePath(p));
     inputRewrites[h1] = h2;
@@ -4250,7 +4230,7 @@ void DerivationGoal::done(BuildResult::Status status, std::optional<Error> ex)
     result.status = status;
     if (ex)
         result.errorMsg = ex->what();
-    amDone(result.success() ? ExitCode::Success : ExitCode::Failed, ex);
+    amDone(result.success() ? ecSuccess : ecFailed, ex);
     if (result.status == BuildResult::TimedOut)
         worker.timedOut = true;
     if (result.status == BuildResult::PermanentFailure)
@@ -4386,7 +4366,7 @@ void SubstitutionGoal::init()
 
     /* If the path already exists we're done. */
     if (!repair && worker.store.isValidPath(storePath)) {
-        amDone(ExitCode::Success);
+        amDone(ecSuccess);
         return;
     }
 
@@ -4411,7 +4391,7 @@ void SubstitutionGoal::tryNext()
         /* Hack: don't indicate failure if there were no substituters.
            In that case the calling derivation should just do a
            build. */
-        amDone(substituterFailed ? ExitCode::Failed : ExitCode::NoSubstituters);
+        amDone(substituterFailed ? ecFailed : ecNoSubstituters);
 
         if (substituterFailed) {
             worker.failedSubstitutions++;
@@ -4497,7 +4477,7 @@ void SubstitutionGoal::referencesValid()
 
     if (nrFailed > 0) {
         debug("some references of path '%s' could not be realised", worker.store.printStorePath(storePath));
-        amDone(nrNoSubstituters > 0 || nrIncompleteClosure > 0 ? ExitCode::IncompleteClosure : ExitCode::Failed);
+        amDone(nrNoSubstituters > 0 || nrIncompleteClosure > 0 ? ecIncompleteClosure : ecFailed);
         return;
     }
 
@@ -4535,7 +4515,7 @@ void SubstitutionGoal::tryToRun()
             /* Wake up the worker loop when we're done. */
             Finally updateStats([this]() { outPipe.writeSide = -1; });
 
-            Activity act(*logger, ActivityType::Substitute, Logger::Fields{worker.store.printStorePath(storePath), sub->getUri()});
+            Activity act(*logger, actSubstitute, Logger::Fields{worker.store.printStorePath(storePath), sub->getUri()});
             PushActivity pact(act.id);
 
             copyStorePath(ref<Store>(sub), ref<Store>(worker.store.shared_from_this()),
@@ -4584,7 +4564,7 @@ void SubstitutionGoal::finished()
 
     worker.markContentsGood(storePath);
 
-    printMsg(Verbosity::Chatty, "substitution of path '%s' succeeded", worker.store.printStorePath(storePath));
+    printMsg(lvlChatty, "substitution of path '%s' succeeded", worker.store.printStorePath(storePath));
 
     maintainRunningSubstitutions.reset();
 
@@ -4602,7 +4582,7 @@ void SubstitutionGoal::finished()
 
     worker.updateProgress();
 
-    amDone(ExitCode::Success);
+    amDone(ecSuccess);
 }
 
 
@@ -4620,9 +4600,9 @@ void SubstitutionGoal::handleEOF(int fd)
 
 
 Worker::Worker(LocalStore & store)
-    : act(*logger, ActivityType::Realise)
-    , actDerivations(*logger, ActivityType::Builds)
-    , actSubstitutions(*logger, ActivityType::CopyPaths)
+    : act(*logger, actRealise)
+    , actDerivations(*logger, actBuilds)
+    , actSubstitutions(*logger, actCopyPaths)
     , store(store)
 {
     /* Debugging: prevent recursive workers. */
@@ -4706,7 +4686,7 @@ void Worker::removeGoal(GoalPtr goal)
         topGoals.erase(goal);
         /* If a top-level goal failed, then kill all other goals
            (unless keepGoing was set). */
-        if (goal->exitCode == Goal::ExitCode::Failed && !settings.keepGoing)
+        if (goal->exitCode == Goal::ecFailed && !settings.keepGoing)
             topGoals.clear();
     }
 
@@ -4849,7 +4829,7 @@ void Worker::run(const Goals & _topGoals)
 
 void Worker::waitForInput()
 {
-    printMsg(Verbosity::Vomit, "waiting for children");
+    printMsg(lvlVomit, "waiting for children");
 
     /* Process output from the file descriptors attached to the
        children, namely log output and output path creation commands.
@@ -4939,7 +4919,7 @@ void Worker::waitForInput()
                     if (errno != EINTR)
                         throw SysError("%s: read failed", goal->getName());
                 } else {
-                    printMsg(Verbosity::Vomit, "%1%: read %2% bytes",
+                    printMsg(lvlVomit, "%1%: read %2% bytes",
                         goal->getName(), rd);
                     string data((char *) buffer.data(), rd);
                     j->lastOutput = after;
@@ -4948,7 +4928,7 @@ void Worker::waitForInput()
             }
         }
 
-        if (goal->exitCode == Goal::ExitCode::Busy &&
+        if (goal->exitCode == Goal::ecBusy &&
             0 != settings.maxSilentTime &&
             j->respectTimeouts &&
             after - j->lastOutput >= std::chrono::seconds(settings.maxSilentTime))
@@ -4958,7 +4938,7 @@ void Worker::waitForInput()
                     goal->getName(), settings.maxSilentTime));
         }
 
-        else if (goal->exitCode == Goal::ExitCode::Busy &&
+        else if (goal->exitCode == Goal::ecBusy &&
             0 != settings.buildTimeout &&
             j->respectTimeouts &&
             after - j->timeStarted >= std::chrono::seconds(settings.buildTimeout))
@@ -5019,7 +4999,7 @@ bool Worker::pathContentsGood(const StorePath & path)
         res = false;
     else {
         HashResult current = hashPath(*info->narHash.type, store.printStorePath(path));
-        Hash nullHash(HashType::SHA256);
+        Hash nullHash(htSHA256);
         res = info->narHash == nullHash || info->narHash == current.first;
     }
     pathContentsGoodCache.insert_or_assign(path, res);
@@ -5079,7 +5059,7 @@ void LocalStore::buildPaths(const std::vector<StorePathWithOutputs> & drvPaths, 
             else
                 ex = i->ex;
         }
-        if (i->exitCode != Goal::ExitCode::Success) {
+        if (i->exitCode != Goal::ecSuccess) {
             DerivationGoal * i2 = dynamic_cast<DerivationGoal *>(i.get());
             if (i2) failed.insert(i2->getDrvPath());
             else failed.insert(dynamic_cast<SubstitutionGoal *>(i.get())->getStorePath());
@@ -5128,7 +5108,7 @@ void LocalStore::ensurePath(const StorePath & path)
 
     worker.run(goals);
 
-    if (goal->exitCode != Goal::ExitCode::Success) {
+    if (goal->exitCode != Goal::ecSuccess) {
         if (goal->ex) {
             goal->ex->status = worker.exitStatus();
             throw *goal->ex;
@@ -5146,7 +5126,7 @@ void LocalStore::repairPath(const StorePath & path)
 
     worker.run(goals);
 
-    if (goal->exitCode != Goal::ExitCode::Success) {
+    if (goal->exitCode != Goal::ecSuccess) {
         /* Since substituting the path didn't work, if we have a valid
            deriver, then rebuild the deriver. */
         auto info = queryPathInfo(path);

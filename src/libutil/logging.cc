@@ -22,7 +22,7 @@ Logger * logger = makeSimpleLogger(true);
 
 void Logger::warn(const std::string & msg)
 {
-    log(Verbosity::Warn, ANSI_YELLOW "warning:" ANSI_NORMAL " " + msg);
+    log(lvlWarn, ANSI_YELLOW "warning:" ANSI_NORMAL " " + msg);
 }
 
 void Logger::writeToStdout(std::string_view s)
@@ -57,10 +57,10 @@ public:
         if (systemd) {
             char c;
             switch (lvl) {
-            case Verbosity::Error: c = '3'; break;
-            case Verbosity::Warn: c = '4'; break;
-            case Verbosity::Info: c = '5'; break;
-            case Verbosity::Talkative: case Verbosity::Chatty: c = '6'; break;
+            case lvlError: c = '3'; break;
+            case lvlWarn: c = '4'; break;
+            case lvlInfo: c = '5'; break;
+            case lvlTalkative: case lvlChatty: c = '6'; break;
             default: c = '7';
             }
             prefix = std::string("<") + c + ">";
@@ -87,18 +87,18 @@ public:
 
     void result(ActivityId act, ResultType type, const Fields & fields) override
     {
-        if (type == ResultType::BuildLogLine && printBuildLogs) {
+        if (type == resBuildLogLine && printBuildLogs) {
             auto lastLine = fields[0].s;
             printError(lastLine);
         }
-        else if (type == ResultType::PostBuildLogLine && printBuildLogs) {
+        else if (type == resPostBuildLogLine && printBuildLogs) {
             auto lastLine = fields[0].s;
             printError("post-build-hook: " + lastLine);
         }
     }
 };
 
-Verbosity verbosity = Verbosity::Info;
+Verbosity verbosity = lvlInfo;
 
 void warnOnce(bool & haveWarned, const FormatOrString & fs)
 {
@@ -158,7 +158,7 @@ struct JSONLogger : Logger {
 
     void write(const nlohmann::json & json)
     {
-        prevLogger.log(Verbosity::Error, "@nix " + json.dump());
+        prevLogger.log(lvlError, "@nix " + json.dump());
     }
 
     void log(Verbosity lvl, const FormatOrString & fs) override
@@ -246,7 +246,7 @@ bool handleJSONLogMessage(const std::string & msg,
 
         if (action == "start") {
             auto type = (ActivityType) json["type"];
-            if (trusted || type == ActivityType::Download)
+            if (trusted || type == actFileTransfer)
                 activities.emplace(std::piecewise_construct,
                     std::forward_as_tuple(json["id"]),
                     std::forward_as_tuple(*logger, (Verbosity) json["level"], type,
@@ -264,7 +264,7 @@ bool handleJSONLogMessage(const std::string & msg,
 
         else if (action == "setPhase") {
             std::string phase = json["phase"];
-            act.result(ResultType::SetPhase, phase);
+            act.result(resSetPhase, phase);
         }
 
         else if (action == "msg") {

@@ -10,12 +10,7 @@ namespace nix {
 MakeError(BadHash, Error);
 
 
-enum struct HashType : char {
-    MD5,
-    SHA1,
-    SHA256,
-    SHA512,
-};
+enum HashType : char { htMD5, htSHA1, htSHA256, htSHA512 };
 
 
 const int md5HashSize = 16;
@@ -25,12 +20,7 @@ const int sha512HashSize = 64;
 
 extern const string base32Chars;
 
-enum struct Base {
-    Base64,
-    Base32,
-    Base16,
-    SRI,
-};
+enum Base : int { Base64, Base32, Base16, SRI };
 
 
 struct Hash
@@ -97,14 +87,14 @@ struct Hash
 
     std::string gitRev() const
     {
-        assert(type == HashType::SHA1);
-        return to_string(Base::Base16, false);
+        assert(type == htSHA1);
+        return to_string(Base16, false);
     }
 
     std::string gitShortRev() const
     {
-        assert(type == HashType::SHA1);
-        return std::string(to_string(Base::Base16, false), 0, 7);
+        assert(type == htSHA1);
+        return std::string(to_string(Base16, false), 0, 7);
     }
 };
 

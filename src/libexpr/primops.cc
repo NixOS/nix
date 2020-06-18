@@ -778,7 +778,7 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
             std::move(outPath),
             (ingestionMethod == FileIngestionMethod::Recursive ? "r:" : "")
                 + printHashType(*h.type),
-            h.to_string(Base::Base16, false),
+            h.to_string(Base16, false),
         });
     }
 
@@ -809,7 +809,7 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
     auto drvPath = writeDerivation(state.store, drv, drvName, state.repair);
     auto drvPathS = state.store->printStorePath(drvPath);
 
-    printMsg(Verbosity::Chatty, "instantiated '%1%' -> '%2%'", drvName, drvPathS);
+    printMsg(lvlChatty, "instantiated '%1%' -> '%2%'", drvName, drvPathS);
 
     /* Optimisation, but required in read-only mode! because in that
        case we don't actually write store derivations, so we can't
@@ -1008,7 +1008,7 @@ static void prim_hashFile(EvalState & state, const Pos & pos, Value * * args, Va
     PathSet context; // discarded
     Path p = state.coerceToPath(pos, *args[1], context);
 
-    mkString(v, hashFile(*ht, state.checkSourcePath(p)).to_string(Base::Base16, false), context);
+    mkString(v, hashFile(*ht, state.checkSourcePath(p)).to_string(Base16, false), context);
 }
 
 /* Read a directory (without . or ..) */
@@ -1150,8 +1150,8 @@ static void addPath(EvalState & state, const Pos & pos, const string & name, con
     Path dstPath;
     if (!expectedHash || !state.store->isValidPath(*expectedStorePath)) {
         dstPath = state.store->printStorePath(settings.readOnlyMode
-            ? state.store->computeStorePathForPath(name, path, method, HashType::SHA256, filter).first
-            : state.store->addToStore(name, path, method, HashType::SHA256, filter, state.repair));
+            ? state.store->computeStorePathForPath(name, path, method, htSHA256, filter).first
+            : state.store->addToStore(name, path, method, htSHA256, filter, state.repair));
         if (expectedHash && expectedStorePath != state.store->parseStorePath(dstPath))
             throw Error("store path mismatch in (possibly filtered) path added from '%s'", path);
     } else
@@ -1210,7 +1210,7 @@ static void prim_path(EvalState & state, const Pos & pos, Value * * args, Value 
         } else if (n == "recursive")
             method = FileIngestionMethod { state.forceBool(*attr.value, *attr.pos) };
         else if (n == "sha256")
-            expectedHash = newHashAllowEmpty(state.forceStringNoCtx(*attr.value, *attr.pos), HashType::SHA256);
+            expectedHash = newHashAllowEmpty(state.forceStringNoCtx(*attr.value, *attr.pos), htSHA256);
         else
             throw EvalError({
                 .hint = hintfmt("unsupported argument '%1%' to 'addPath'", attr.name),
@@ -1945,7 +1945,7 @@ static void prim_hashString(EvalState & state, const Pos & pos, Value * * args, 
     PathSet context; // discarded
     string s = state.forceString(*args[1], context, pos);
 
-    mkString(v, hashString(*ht, s).to_string(Base::Base16, false), context);
+    mkString(v, hashString(*ht, s).to_string(Base16, false), context);
 }
 
 

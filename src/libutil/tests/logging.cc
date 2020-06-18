@@ -68,7 +68,7 @@ namespace nix {
     TEST(logEI, loggingErrorOnInfoLevel) {
         testing::internal::CaptureStderr();
 
-        logger->logEI({ .level = Verbosity::Info,
+        logger->logEI({ .level = lvlInfo,
                 .name = "Info name",
                 .description = "Info description",
                 });
@@ -78,11 +78,11 @@ namespace nix {
     }
 
     TEST(logEI, loggingErrorOnTalkativeLevel) {
-        verbosity = Verbosity::Talkative;
+        verbosity = lvlTalkative;
 
         testing::internal::CaptureStderr();
 
-        logger->logEI({ .level = Verbosity::Talkative,
+        logger->logEI({ .level = lvlTalkative,
                         .name = "Talkative name",
                         .description = "Talkative description",
                         });
@@ -92,11 +92,11 @@ namespace nix {
     }
 
     TEST(logEI, loggingErrorOnChattyLevel) {
-        verbosity = Verbosity::Chatty;
+        verbosity = lvlChatty;
 
         testing::internal::CaptureStderr();
 
-        logger->logEI({ .level = Verbosity::Chatty,
+        logger->logEI({ .level = lvlChatty,
                         .name = "Chatty name",
                         .description = "Talkative description",
                         });
@@ -106,11 +106,11 @@ namespace nix {
     }
 
     TEST(logEI, loggingErrorOnDebugLevel) {
-        verbosity = Verbosity::Debug;
+        verbosity = lvlDebug;
 
         testing::internal::CaptureStderr();
 
-        logger->logEI({ .level = Verbosity::Debug,
+        logger->logEI({ .level = lvlDebug,
                         .name = "Debug name",
                         .description = "Debug description",
                         });
@@ -120,11 +120,11 @@ namespace nix {
     }
 
     TEST(logEI, loggingErrorOnVomitLevel) {
-        verbosity = Verbosity::Vomit;
+        verbosity = lvlVomit;
 
         testing::internal::CaptureStderr();
 
-        logger->logEI({ .level = Verbosity::Vomit,
+        logger->logEI({ .level = lvlVomit,
                         .name = "Vomit name",
                         .description = "Vomit description",
                         });
