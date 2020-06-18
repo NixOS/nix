@@ -834,6 +834,18 @@ void FileTransfer::download(FileTransferRequest && request, Sink & sink)
     }
 }
 
+template<typename... Args>
+FileTransferError::FileTransferError(FileTransfer::Error error, std::shared_ptr<string> response, const Args & ... args)
+    : Error(args...), error(error), response(response)
+{
+    const auto hf = hintfmt(args...);
+    if (response) {
+        err.hint = hintfmt("%1%\n\nresponse body:\n\n%2%", normaltxt(hf.str()), response);
+    } else {
+        err.hint = hf;
+    }
+}
+
 bool isUri(const string & s)
 {
     if (s.compare(0, 8, "channel:") == 0) return true;
