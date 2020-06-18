@@ -1196,8 +1196,8 @@ void DerivationGoal::haveDerivation()
     parsedDrv = std::make_unique<ParsedDerivation>(drvPath, *drv);
 
     if (parsedDrv->contentAddressed()) {
-        settings.requireExperimentalFeature("content-addressed-paths");
-        throw Error("content-addressed-paths isn't implemented yet");
+        settings.requireExperimentalFeature("ca-derivations");
+        throw Error("ca-derivations isn't implemented yet");
     }
 
 
