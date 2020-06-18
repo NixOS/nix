@@ -38,6 +38,8 @@ mkdir $IPFS_TESTS
 # method)
 IPFS_SRC_STORE=$IPFS_TESTS/ipfs_source_store
 
+IPFS_DST_HTTP_STORE=$IPFS_TESTS/ipfs_dest_http_store
+IPFS_DST_HTTP_LOCAL_STORE=$IPFS_TESTS/ipfs_dest_http_local_store
 IPFS_DST_IPFS_STORE=$IPFS_TESTS/ipfs_dest_ipfs_store
 IPFS_DST_IPNS_STORE=$IPFS_TESTS/ipfs_dest_ipns_store
 
@@ -70,6 +72,23 @@ for path in $storePaths; do
 done
 unset path
 
+MANUAL_IPFS_HASH=$(ipfs add -r $IPFS_SRC_STORE 2>/dev/null | tail -n 1 | awk '{print $2}')
+
+################################################################################
+## Create the local http store and download the derivation there
+################################################################################
+
+mkdir $IPFS_DST_HTTP_LOCAL_STORE
+
+IPFS_HTTP_LOCAL_PREFIX='http://localhost:8080/ipfs'
+
+nix-build ./fixed.nix -A good \
+  --option substituters $IPFS_HTTP_LOCAL_PREFIX/$MANUAL_IPFS_HASH \
+  --store $IPFS_DST_HTTP_LOCAL_STORE \
+  --no-out-link \
+  -j0 \
+  --option trusted-public-keys $(cat $SIGNING_KEY_PUB_FILE)
+
 ################################################################################
 ## Create the ipfs store and download the derivation there
 ################################################################################
@@ -87,12 +106,12 @@ nix copy --to ipfs://$IPFS_HASH $(nix-build ./fixed.nix -A good) --experimental-
 
 mkdir $IPFS_DST_IPFS_STORE
 
-DOWNLOAD_LOCATION=$(nix-build ./fixed.nix -A good \
+nix-build ./fixed.nix -A good \
   --option substituters 'ipfs://'$IPFS_HASH \
   --store $IPFS_DST_IPFS_STORE \
   --no-out-link \
   -j0 \
-  --option trusted-public-keys $(cat $SIGNING_KEY_PUB_FILE))
+  --option trusted-public-keys $(cat $SIGNING_KEY_PUB_FILE)
 
 
 ################################################################################
@@ -107,12 +126,12 @@ nix copy --to ipns://$IPNS_ID $(nix-build ./fixed.nix -A good) --experimental-fe
 
 mkdir $IPFS_DST_IPNS_STORE
 
-DOWNLOAD_LOCATION=$(nix-build ./fixed.nix -A good \
+nix-build ./fixed.nix -A good \
   --option substituters 'ipns://'$IPNS_ID \
   --store $IPFS_DST_IPNS_STORE \
   --no-out-link \
   -j0 \
-  --option trusted-public-keys $(cat $SIGNING_KEY_PUB_FILE))
+  --option trusted-public-keys $(cat $SIGNING_KEY_PUB_FILE)
 
 # Verify we can copy something with dependencies
 outPath=$(nix-build dependencies.nix --no-out-link)
