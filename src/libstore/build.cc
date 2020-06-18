@@ -86,7 +86,7 @@ struct HookInstance;
 
 
 /* A pointer to a goal. */
-class Goal;
+struct Goal;
 class DerivationGoal;
 typedef std::shared_ptr<Goal> GoalPtr;
 typedef std::weak_ptr<Goal> WeakGoalPtr;
@@ -1196,8 +1196,8 @@ void DerivationGoal::haveDerivation()
     parsedDrv = std::make_unique<ParsedDerivation>(drvPath, *drv);
 
     if (parsedDrv->contentAddressed()) {
-        settings.requireExperimentalFeature("content-addressed-paths");
-        throw Error("content-addressed-paths isn't implemented yet");
+        settings.requireExperimentalFeature("ca-derivations");
+        throw Error("ca-derivations isn't implemented yet");
     }
 
 
