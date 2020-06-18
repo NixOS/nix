@@ -12,7 +12,7 @@
 </para>
 
 <screen>
-  $ sh &lt;(curl https://nixos.org/nix/install)
+  $ sh &lt;(curl -L https://nixos.org/nix/install)
 </screen>
 
 <para>
@@ -39,7 +39,7 @@
     To explicitly select a single-user installation on your system:
 
     <screen>
-  sh &lt;(curl https://nixos.org/nix/install) --no-daemon
+  sh &lt;(curl -L https://nixos.org/nix/install) --no-daemon
 </screen>
   </para>
 
