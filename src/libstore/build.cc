@@ -86,7 +86,7 @@ struct HookInstance;
 
 
 /* A pointer to a goal. */
-class Goal;
+struct Goal;
 class DerivationGoal;
 typedef std::shared_ptr<Goal> GoalPtr;
 typedef std::weak_ptr<Goal> WeakGoalPtr;
@@ -1194,6 +1194,12 @@ void DerivationGoal::haveDerivation()
     }
 
     parsedDrv = std::make_unique<ParsedDerivation>(drvPath, *drv);
+
+    if (parsedDrv->contentAddressed()) {
+        settings.requireExperimentalFeature("ca-derivations");
+        throw Error("ca-derivations isn't implemented yet");
+    }
+
 
     /* We are first going to try to create the invalid output paths
        through substitutes.  If that doesn't work, we'll build
