@@ -1,20 +1,11 @@
 #pragma once
 
 #include "types.hh"
+#include "error.hh"
 
 namespace nix {
 
-enum struct Verbosity : uint64_t {
-    Error = 0,
-    Warn,
-    Info,
-    Talkative,
-    Chatty,
-    Debug,
-    Vomit,
-};
-
-enum struct ActivityType : uint64_t {
+enum struct ActivityType {
     Unknown = 0,
     CopyPath = 100,
     Download = 101,
@@ -27,9 +18,10 @@ enum struct ActivityType : uint64_t {
     Substitute = 108,
     QueryPathInfo = 109,
     PostBuildHook = 110,
+    BuildWaiting = 111,
 };
 
-enum struct ResultType : uint64_t {
+enum struct ResultType {
     FileLinked = 100,
     BuildLogLine = 101,
     UntrustedPath = 102,
@@ -63,11 +55,24 @@ public:
 
     virtual ~Logger() { }
 
+    virtual void stop() { };
+
+    // Whether the logger prints the whole build log
+    virtual bool isVerbose() { return false; }
+
     virtual void log(Verbosity lvl, const FormatOrString & fs) = 0;
 
     void log(const FormatOrString & fs)
     {
         log(Verbosity::Info, fs);
+    }
+
+    virtual void logEI(const ErrorInfo &ei) = 0;
+
+    void logEI(Verbosity lvl, ErrorInfo ei)
+    {
+        ei.level = lvl;
+        logEI(ei);
     }
 
     virtual void warn(const std::string & msg);
@@ -141,7 +146,7 @@ struct PushActivity
 
 extern Logger * logger;
 
-Logger * makeDefaultLogger();
+Logger * makeSimpleLogger(bool printBuildLogs = true);
 
 Logger * makeJSONLogger(Logger & prevLogger);
 
@@ -151,9 +156,23 @@ bool handleJSONLogMessage(const std::string & msg,
 
 extern Verbosity verbosity; /* suppress msgs > this */
 
-/* Print a message if the current log level is at least the specified
-   level. Note that this has to be implemented as a macro to ensure
-   that the arguments are evaluated lazily. */
+/* Print a message with the standard ErrorInfo format.
+   In general, use these 'log' macros for reporting problems that may require user
+   intervention or that need more explanation.  Use the 'print' macros for more
+   lightweight status messages. */
+#define logErrorInfo(level, errorInfo...) \
+    do { \
+        if (level <= nix::verbosity) { \
+            logger->logEI(level, errorInfo); \
+        } \
+    } while (0)
+
+#define logError(errorInfo...) logErrorInfo(Verbosity::Error, errorInfo)
+#define logWarning(errorInfo...) logErrorInfo(Verbosity::Warn, errorInfo)
+
+/* Print a string message if the current log level is at least the specified
+   level. Note that this has to be implemented as a macro to ensure that the
+   arguments are evaluated lazily. */
 #define printMsg(level, args...) \
     do { \
         if (level <= nix::verbosity) { \
@@ -167,6 +186,7 @@ extern Verbosity verbosity; /* suppress msgs > this */
 #define debug(args...) printMsg(Verbosity::Debug, args)
 #define vomit(args...) printMsg(Verbosity::Vomit, args)
 
+/* if verbosity >= Verbosity::Warn, print a message with a yellow 'warning:' prefix. */
 template<typename... Args>
 inline void warn(const std::string & fs, const Args & ... args)
 {

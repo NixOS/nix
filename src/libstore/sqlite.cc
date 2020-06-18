@@ -29,7 +29,7 @@ SQLite::SQLite(const Path & path, bool create)
 {
     if (sqlite3_open_v2(path.c_str(), &db,
             SQLITE_OPEN_READWRITE | (create ? SQLITE_OPEN_CREATE : 0), 0) != SQLITE_OK)
-        throw Error(format("cannot open SQLite database '%s'") % path);
+        throw Error("cannot open SQLite database '%s'", path);
 
     if (sqlite3_busy_timeout(db, 60 * 60 * 1000) != SQLITE_OK)
         throwSQLiteError(db, "setting timeout");
@@ -204,7 +204,10 @@ void handleSQLiteBusy(const SQLiteBusy & e)
 
     if (now > lastWarned + 10) {
         lastWarned = now;
-        printError("warning: %s", e.what());
+        logWarning({
+            .name = "Sqlite busy",
+            .hint = hintfmt(e.what())
+        });
     }
 
     /* Sleep for a while since retrying the transaction right away

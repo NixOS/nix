@@ -50,8 +50,10 @@ struct CmdAddToStore : MixDryRun, StoreCommand
         info.narSize = sink.s->size();
         info.ca = makeFixedOutputCA(FileIngestionMethod::Recursive, info.narHash);
 
-        if (!dryRun)
-            store->addToStore(info, sink.s);
+        if (!dryRun) {
+            auto source = StringSource { *sink.s };
+            store->addToStore(info, source);
+        }
 
         logger->stdout("%s", store->printStorePath(info.path));
     }
