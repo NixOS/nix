@@ -9,9 +9,8 @@
 namespace nix {
 
 std::string FileSystemHash::printMethodAlgo() const {
-    return makeFileIngestionPrefix(method) + printHashType(hash.type);
+    return makeFileIngestionPrefix(method) + printHashType(*hash.type);
 }
-
 
 const StorePath & BasicDerivation::findOutput(const string & id) const
 {
@@ -121,8 +120,6 @@ static DerivationOutput parseDerivationOutput(const Store & store, istringstream
             hashAlgo = string(hashAlgo, 2);
         }
         const HashType hashType = parseHashType(hashAlgo);
-        if (hashType == htUnknown)
-            throw Error("unknown hash hashAlgorithm '%s'", hashAlgo);
         fsh = FileSystemHash {
             std::move(method),
             Hash(hash, hashType),
@@ -421,8 +418,6 @@ static DerivationOutput readDerivationOutput(Source & in, const Store & store)
             hashAlgo = string(hashAlgo, 2);
         }
         const HashType hashType = parseHashType(hashAlgo);
-        if (hashType == htUnknown)
-            throw Error("unknown hash hashAlgorithm '%s'", hashAlgo);
         fsh = FileSystemHash {
             std::move(method),
             Hash(hash, hashType),

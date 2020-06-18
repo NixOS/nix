@@ -86,7 +86,7 @@ struct HookInstance;
 
 
 /* A pointer to a goal. */
-class Goal;
+struct Goal;
 class DerivationGoal;
 typedef std::shared_ptr<Goal> GoalPtr;
 typedef std::weak_ptr<Goal> WeakGoalPtr;
@@ -1194,6 +1194,12 @@ void DerivationGoal::haveDerivation()
     }
 
     parsedDrv = std::make_unique<ParsedDerivation>(drvPath, *drv);
+
+    if (parsedDrv->contentAddressed()) {
+        settings.requireExperimentalFeature("ca-derivations");
+        throw Error("ca-derivations isn't implemented yet");
+    }
+
 
     /* We are first going to try to create the invalid output paths
        through substitutes.  If that doesn't work, we'll build
@@ -3724,8 +3730,8 @@ void DerivationGoal::registerOutputs()
             /* Check the hash. In hash mode, move the path produced by
                the derivation to its content-addressed location. */
             Hash h2 = i.second.hash->method == FileIngestionMethod::Recursive
-                ? hashPath(i.second.hash->hash.type, actualPath).first
-                : hashFile(i.second.hash->hash.type, actualPath);
+                ? hashPath(*i.second.hash->hash.type, actualPath).first
+                : hashFile(*i.second.hash->hash.type, actualPath);
 
             auto dest = worker.store.makeFixedOutputPath(i.second.hash->method, h2, i.second.path.name());
 
@@ -4991,7 +4997,7 @@ bool Worker::pathContentsGood(const StorePath & path)
     if (!pathExists(store.printStorePath(path)))
         res = false;
     else {
-        HashResult current = hashPath(info->narHash.type, store.printStorePath(path));
+        HashResult current = hashPath(*info->narHash.type, store.printStorePath(path));
         Hash nullHash(htSHA256);
         res = info->narHash == nullHash || info->narHash == current.first;
     }
