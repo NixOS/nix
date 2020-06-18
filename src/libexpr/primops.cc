@@ -50,20 +50,20 @@ void EvalState::realiseContext(const PathSet & context)
     std::vector<StorePathWithOutputs> drvs;
 
     for (auto & i : context) {
-        std::pair<string, string> decoded = decodeContext(i);
-        auto ctx = store->parseStorePath(decoded.first);
+        auto [ctxS, outputName] = decodeContext(i);
+        auto ctx = store->parseStorePath(ctxS);
         if (!store->isValidPath(ctx))
             throw InvalidPathError(store->printStorePath(ctx));
-        if (!decoded.second.empty() && ctx.isDerivation()) {
-            drvs.push_back(StorePathWithOutputs{ctx, {decoded.second}});
+        if (!outputName.empty() && ctx.isDerivation()) {
+            drvs.push_back(StorePathWithOutputs{ctx, {outputName}});
 
             /* Add the output of this derivation to the allowed
                paths. */
             if (allowedPaths) {
-                auto drv = store->derivationFromPath(store->parseStorePath(decoded.first));
-                DerivationOutputs::iterator i = drv.outputs.find(decoded.second);
+                auto drv = store->derivationFromPath(ctx);
+                DerivationOutputs::iterator i = drv.outputs.find(outputName);
                 if (i == drv.outputs.end())
-                    throw Error("derivation '%s' does not have an output named '%s'", decoded.first, decoded.second);
+                    throw Error("derivation '%s' does not have an output named '%s'", ctxS, outputName);
                 allowedPaths->insert(store->printStorePath(i->second.path));
             }
         }
@@ -79,6 +79,7 @@ void EvalState::realiseContext(const PathSet & context)
     StorePathSet willBuild, willSubstitute, unknown;
     unsigned long long downloadSize, narSize;
     store->queryMissing(drvs, willBuild, willSubstitute, unknown, downloadSize, narSize);
+
     store->buildPaths(drvs);
 }
 
