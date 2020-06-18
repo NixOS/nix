@@ -227,6 +227,9 @@ public:
         // `ipfs key list` command, so that we publish to the right address in
         // case the user has multiple ones available.
 
+        // NOTE: this is needed for ipfs < 0.5.0 because key must be a
+        // name, not an address.
+
         auto ipnsPathHash = std::string(ipnsPath, 6);
         debug("Getting the name corresponding to hash %s", ipnsPathHash);
 
