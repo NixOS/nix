@@ -239,13 +239,13 @@ void prim_exec(EvalState & state, const Pos & pos, Value * * args, Value & v)
     try {
         parsed = state.parseExprFromString(output, pos.file);
     } catch (Error & e) {
-        e.addPrefix(fmt("While parsing the output from '%1%', at %2%\n", program, pos));
+        e.addTrace(pos, hintfmt("While parsing the output from '%1%'", program));
         throw;
     }
     try {
         state.eval(parsed, v);
     } catch (Error & e) {
-        e.addPrefix(fmt("While evaluating the output from '%1%', at %2%\n", program, pos));
+        e.addTrace(pos, hintfmt("While evaluating the output from '%1%'", program));
         throw;
     }
 }

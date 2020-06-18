@@ -18,6 +18,14 @@ BaseError & BaseError::addPrefix(const FormatOrString & fs)
     return *this;
 }
 
+// addPrefix is used for show-trace.  Strings added with addPrefix
+// will print ahead of the error itself.
+BaseError & BaseError::addTrace(hintformat hint, ErrPos e)
+{
+    err.traces.push_front(Trace { .pos = e, .hint = hint});
+    return *this;
+}
+
 // c++ std::exception descendants must have a 'const char* what()' function.
 // This stringifies the error and caches it for use by what(), or similarly by msg().
 const string& BaseError::calcWhat() const
@@ -58,7 +66,7 @@ string showErrPos(const ErrPos &errPos)
 
 void getCodeLines(NixCode &nixCode)
 {
-    if (nixCode.errPos.line <= 0) 
+    if (nixCode.errPos.line <= 0)
         return;
 
     if (nixCode.errPos.origin == foFile) {
@@ -72,13 +80,13 @@ void getCodeLines(NixCode &nixCode)
                 int count = 0;
                 string line;
                 int pl = nixCode.errPos.line - 1;
-                do 
+                do
                 {
                     line = readLine(fd.get());
                     ++count;
-                    if (count < pl) 
+                    if (count < pl)
                     {
-                      ;
+                        ;
                     }
                     else if (count == pl) {
                         nixCode.prevLineOfCode = line;
@@ -89,7 +97,7 @@ void getCodeLines(NixCode &nixCode)
                         break;
                     }
                 } while (true);
-             }
+            }
         }
         catch (EndOfFile &eof) {
             ;
@@ -97,20 +105,20 @@ void getCodeLines(NixCode &nixCode)
         catch (std::exception &e) {
             printError("error reading nix file: %s\n%s", nixCode.errPos.file, e.what());
         }
-    } else { 
+    } else {
         std::istringstream iss(nixCode.errPos.file);
         // count the newlines.
         int count = 0;
         string line;
         int pl = nixCode.errPos.line - 1;
 
-        do 
+        do
         {
             std::getline(iss, line);
             ++count;
-            if (count < pl) 
+            if (count < pl)
             {
-              ;
+                ;
             }
             else if (count == pl) {
                 nixCode.prevLineOfCode = line;
@@ -134,18 +142,18 @@ void printCodeLines(std::ostream &out, const string &prefix, const NixCode &nixC
     if (nixCode.prevLineOfCode.has_value()) {
         out << std::endl
             << fmt("%1% %|2$5d|| %3%",
-                prefix,
-                (nixCode.errPos.line - 1),
-                *nixCode.prevLineOfCode);
+            prefix,
+            (nixCode.errPos.line - 1),
+            *nixCode.prevLineOfCode);
     }
 
     if (nixCode.errLineOfCode.has_value()) {
         // line of code containing the error.
         out << std::endl
             << fmt("%1% %|2$5d|| %3%",
-                prefix,
-                (nixCode.errPos.line),
-                *nixCode.errLineOfCode);
+            prefix,
+            (nixCode.errPos.line),
+            *nixCode.errLineOfCode);
         // error arrows for the column range.
         if (nixCode.errPos.column > 0) {
             int start = nixCode.errPos.column;
@@ -158,9 +166,9 @@ void printCodeLines(std::ostream &out, const string &prefix, const NixCode &nixC
 
             out << std::endl
                 << fmt("%1%      |%2%" ANSI_RED "%3%" ANSI_NORMAL,
-                    prefix,
-                    spaces,
-                    arrows);
+                prefix,
+                spaces,
+                arrows);
         }
     }
 
@@ -168,9 +176,9 @@ void printCodeLines(std::ostream &out, const string &prefix, const NixCode &nixC
     if (nixCode.nextLineOfCode.has_value()) {
         out << std::endl
             << fmt("%1% %|2$5d|| %3%",
-                prefix,
-                (nixCode.errPos.line + 1),
-                *nixCode.nextLineOfCode);
+            prefix,
+            (nixCode.errPos.line + 1),
+            *nixCode.nextLineOfCode);
     }
 }
 
@@ -287,7 +295,7 @@ std::ostream& operator<<(std::ostream &out, const ErrorInfo &einfo)
     if (einfo.nixCode.has_value()) {
         NixCode nixcode = *einfo.nixCode;
         getCodeLines(nixcode);
-      
+
         // lines of code.
         if (nixcode.errLineOfCode.has_value()) {
             if (nl)
