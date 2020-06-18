@@ -25,4 +25,16 @@ MakeError(UnknownCompressionMethod, Error);
 
 MakeError(CompressionError, Error);
 
+template<>
+struct TeeSink<ref<CompressionSink>> : CompressionSink
+{
+    MAKE_TEE_SINK(ref<CompressionSink>);
+    void finish() override {
+        orig->finish();
+    }
+    void write(const unsigned char * data, size_t len) override {
+        return orig->write(data, len);
+    }
+};
+
 }
