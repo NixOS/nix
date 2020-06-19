@@ -72,4 +72,29 @@ std::pair<Tree, std::shared_ptr<const Input>> Input::fetchTree(ref<Store> store)
     return {std::move(tree), input};
 }
 
+std::optional<StorePath> trySubstitute(ref<Store> store, bool unpack, Hash hash, std::string_view name)
+{
+    auto substitutablePath = store->makeFixedOutputPath(
+        unpack ? FileIngestionMethod::Recursive : FileIngestionMethod::Flat,
+        hash, name);
+
+    debug("trying to substitute '%s'", store->printStorePath(substitutablePath));
+
+    if (store->isValidPath(substitutablePath))
+        return substitutablePath;
+
+    std::vector<StorePathWithOutputs> wantSubstitute({{substitutablePath, {"out"}}});
+
+    StorePathSet willBuild, willSubstitute, unknown;
+    unsigned long long downloadSize, narSize;
+    store->queryMissing(wantSubstitute, willBuild, willSubstitute, unknown, downloadSize, narSize);
+
+    if (willSubstitute == std::set({substitutablePath})) {
+        store->buildPaths(wantSubstitute);
+        return substitutablePath;
+    }
+
+    return std::nullopt;
+}
+
 }
