@@ -46,9 +46,9 @@ struct CmdAddToStore : MixDryRun, StoreCommand
         auto narHash = hashString(htSHA256, *sink.s);
 
         ValidPathInfo info(store->makeFixedOutputPath(FileIngestionMethod::Recursive, narHash, *namePart));
-        info.narHash = narHash;
+        *info.narHash = narHash;
         info.narSize = sink.s->size();
-        info.ca = makeFixedOutputCA(FileIngestionMethod::Recursive, info.narHash);
+        info.ca = makeFixedOutputCA(FileIngestionMethod::Recursive, *info.narHash);
 
         if (!dryRun) {
             auto source = StringSource { *sink.s };

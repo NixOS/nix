@@ -7,15 +7,14 @@ NarInfo::NarInfo(const Store & store, const std::string & s, const std::string &
     : ValidPathInfo(StorePath(StorePath::dummy)) // FIXME: hack
 {
     auto corrupt = [&]() {
-        throw Error("NAR info file '%1%' is corrupt", whence);
+        return Error("NAR info file '%1%' is corrupt", whence);
     };
 
     auto parseHashField = [&](const string & s) {
         try {
             return Hash(s);
         } catch (BadHash &) {
-            corrupt();
-            return Hash(); // never reached
+            throw corrupt();
         }
     };
 
@@ -25,12 +24,12 @@ NarInfo::NarInfo(const Store & store, const std::string & s, const std::string &
     while (pos < s.size()) {
 
         size_t colon = s.find(':', pos);
-        if (colon == std::string::npos) corrupt();
+        if (colon == std::string::npos) throw corrupt();
 
         std::string name(s, pos, colon - pos);
 
         size_t eol = s.find('\n', colon + 2);
-        if (eol == std::string::npos) corrupt();
+        if (eol == std::string::npos) throw corrupt();
 
         std::string value(s, colon + 2, eol - colon - 2);
 
@@ -45,16 +44,16 @@ NarInfo::NarInfo(const Store & store, const std::string & s, const std::string &
         else if (name == "FileHash")
             fileHash = parseHashField(value);
         else if (name == "FileSize") {
-            if (!string2Int(value, fileSize)) corrupt();
+            if (!string2Int(value, fileSize)) throw corrupt();
         }
         else if (name == "NarHash")
             narHash = parseHashField(value);
         else if (name == "NarSize") {
-            if (!string2Int(value, narSize)) corrupt();
+            if (!string2Int(value, narSize)) throw corrupt();
         }
         else if (name == "References") {
             auto refs = tokenizeString<Strings>(value, " ");
-            if (!references.empty()) corrupt();
+            if (!references.empty()) throw corrupt();
             for (auto & r : refs)
                 references.insert(StorePath(r));
         }
@@ -67,7 +66,7 @@ NarInfo::NarInfo(const Store & store, const std::string & s, const std::string &
         else if (name == "Sig")
             sigs.insert(value);
         else if (name == "CA") {
-            if (!ca.empty()) corrupt();
+            if (!ca.empty()) throw corrupt();
             ca = value;
         }
 
@@ -76,7 +75,7 @@ NarInfo::NarInfo(const Store & store, const std::string & s, const std::string &
 
     if (compression == "") compression = "bzip2";
 
-    if (!havePath || url.empty() || narSize == 0 || !narHash) corrupt();
+    if (!havePath || url.empty() || narSize == 0 || !narHash) throw corrupt();
 }
 
 std::string NarInfo::to_string(const Store & store) const
@@ -86,11 +85,11 @@ std::string NarInfo::to_string(const Store & store) const
     res += "URL: " + url + "\n";
     assert(compression != "");
     res += "Compression: " + compression + "\n";
-    assert(fileHash.type == htSHA256);
-    res += "FileHash: " + fileHash.to_string(Base32, true) + "\n";
+    assert(fileHash && fileHash->type == htSHA256);
+    res += "FileHash: " + fileHash->to_string(Base32, true) + "\n";
     res += "FileSize: " + std::to_string(fileSize) + "\n";
-    assert(narHash.type == htSHA256);
-    res += "NarHash: " + narHash.to_string(Base32, true) + "\n";
+    assert(narHash && narHash->type == htSHA256);
+    res += "NarHash: " + narHash->to_string(Base32, true) + "\n";
     res += "NarSize: " + std::to_string(narSize) + "\n";
 
     res += "References: " + concatStringsSep(" ", shortRefs()) + "\n";

@@ -9,7 +9,7 @@
 namespace nix {
 
 std::string DerivationOutputHash::printMethodAlgo() const {
-    return makeFileIngestionPrefix(method) + printHashType(*hash.type);
+    return makeFileIngestionPrefix(method) + printHashType(hash.type);
 }
 
 
