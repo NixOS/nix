@@ -44,12 +44,6 @@ struct Hash
        string. */
     Hash(std::string_view s, HashType type = htUnknown);
 
-    Hash(const Hash &) = default;
-
-    Hash(Hash &&) = default;
-
-    Hash & operator = (const Hash &) = default;
-
     void init();
 
     /* Check whether a hash is set. */
