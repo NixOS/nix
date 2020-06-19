@@ -1005,10 +1005,7 @@ void LocalStore::addToStore(const ValidPathInfo & info, Source & source,
                 return n;
             });
 
-            if (hasPrefix(info.ca, "fixed:git:"))
-                restoreGit(realPath, wrapperSource, realStoreDir, storeDir);
-            else
-                restorePath(realPath, wrapperSource);
+            restorePath(realPath, wrapperSource);
 
             auto hashResult = hashSink->finish();
 
