@@ -161,12 +161,12 @@ const Value *getPrimOp(const Value &v) {
 }
 
 
-string showType(const Value & v)
+string showType(ValueType type)
 {
-    switch (v.type) {
+    switch (type) {
         case tInt: return "an integer";
-        case tBool: return "a boolean";
-        case tString: return v.string.context ? "a string with context" : "a string";
+        case tBool: return "a Boolean";
+        case tString: return "a string";
         case tPath: return "a path";
         case tNull: return "null";
         case tAttrs: return "a set";
@@ -175,14 +175,27 @@ string showType(const Value & v)
         case tApp: return "a function application";
         case tLambda: return "a function";
         case tBlackhole: return "a black hole";
+        case tPrimOp: return "a built-in function";
+        case tPrimOpApp: return "a partially applied built-in function";
+        case tExternal: return "an external value";
+        case tFloat: return "a float";
+    }
+    abort();
+}
+
+
+string showType(const Value & v)
+{
+    switch (v.type) {
+        case tString: return v.string.context ? "a string with context" : "a string";
         case tPrimOp:
             return fmt("the built-in function '%s'", string(v.primOp->name));
         case tPrimOpApp:
             return fmt("the partially applied built-in function '%s'", string(getPrimOp(v)->primOp->name));
         case tExternal: return v.external->showType();
-        case tFloat: return "a float";
+    default:
+        return showType(v.type);
     }
-    abort();
 }
 
 
@@ -323,6 +336,7 @@ EvalState::EvalState(const Strings & _searchPath, ref<Store> store)
     , sOutputHash(symbols.create("outputHash"))
     , sOutputHashAlgo(symbols.create("outputHashAlgo"))
     , sOutputHashMode(symbols.create("outputHashMode"))
+    , sRecurseForDerivations(symbols.create("recurseForDerivations"))
     , repair(NoRepair)
     , store(store)
     , baseEnv(allocEnv(128))
@@ -471,14 +485,21 @@ Value * EvalState::addConstant(const string & name, Value & v)
 Value * EvalState::addPrimOp(const string & name,
     size_t arity, PrimOpFun primOp)
 {
+    auto name2 = string(name, 0, 2) == "__" ? string(name, 2) : name;
+    Symbol sym = symbols.create(name2);
+
+    /* Hack to make constants lazy: turn them into a application of
+       the primop to a dummy value. */
     if (arity == 0) {
+        auto vPrimOp = allocValue();
+        vPrimOp->type = tPrimOp;
+        vPrimOp->primOp = new PrimOp(primOp, 1, sym);
         Value v;
-        primOp(*this, noPos, nullptr, v);
+        mkApp(v, *vPrimOp, *vPrimOp);
         return addConstant(name, v);
     }
+
     Value * v = allocValue();
-    string name2 = string(name, 0, 2) == "__" ? string(name, 2) : name;
-    Symbol sym = symbols.create(name2);
     v->type = tPrimOp;
     v->primOp = new PrimOp(primOp, arity, sym);
     staticBaseEnv.vars[symbols.create(name)] = baseEnvDispl;
