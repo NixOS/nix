@@ -260,17 +260,18 @@ namespace nix {
     TEST(hintfmt, percentStringWithoutArgs) {
 
         const char *teststr = "this is 100%s correct!";
-        auto hint = hintfmt(teststr);
 
-        ASSERT_STREQ(hint.str().c_str(), teststr);
+        ASSERT_STREQ(
+            hintfmt(teststr).str().c_str(),
+            teststr);
 
     }
 
     TEST(hintfmt, fmtToHintfmt) {
 
-        auto hint = hintfmt(fmt("the color of this this text is %1%", "not yellow"));
-
-        ASSERT_STREQ(hint.str().c_str(), "the color of this this text is not yellow");
+        ASSERT_STREQ(
+            hintfmt(fmt("the color of this this text is %1%", "not yellow")).str().c_str(),
+            "the color of this this text is not yellow");
 
     }
 
