@@ -378,33 +378,27 @@ private:
                 json["references"].emplace(ref.to_string(), narMap[(std::string) ref.to_string()]);
         }
 
-        if (narInfo->ca != "")
-            json["ca"] = narInfo->ca;
+        json["ca"] = narInfo->ca;
 
         if (narInfo->deriver)
             json["deriver"] = printStorePath(*narInfo->deriver);
 
-        if (narInfo->registrationTime)
-            json["registrationTime"] = narInfo->registrationTime;
+        json["registrationTime"] = narInfo->registrationTime;
+        json["ultimate"] = narInfo->ultimate;
 
-        if (narInfo->ultimate)
-            json["ultimate"] = narInfo->ultimate;
-
-        if (!narInfo->sigs.empty()) {
-            json["sigs"] = nlohmann::json::array();
-            for (auto & sig : narInfo->sigs)
-                json["sigs"].push_back(sig);
-        }
+        json["sigs"] = nlohmann::json::array();
+        for (auto & sig : narInfo->sigs)
+            json["sigs"].push_back(sig);
 
         if (!narInfo->url.empty()) {
             json["ipfsCid"] = nlohmann::json::object();
             json["ipfsCid"]["/"] = std::string(narInfo->url, 7);
         }
+
         if (narInfo->fileHash)
             json["downloadHash"] = narInfo->fileHash.to_string(Base32, true);
-        if (narInfo->fileSize)
-            json["downloadSize"] = narInfo->fileSize;
 
+        json["downloadSize"] = narInfo->fileSize;
         json["compression"] = narInfo->compression;
         json["system"] = narInfo->system;
 
