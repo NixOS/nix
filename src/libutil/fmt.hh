@@ -144,7 +144,6 @@ inline hintformat hintfmt(std::string fs)
     // we won't be receiving any args in this case, so escape all percents.
     boost::replace_all(fs, "%", "%%");
     hintformat f(fs);
-    formatHelper(f);
     return f;
 }
 }
