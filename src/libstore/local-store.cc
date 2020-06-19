@@ -1079,7 +1079,7 @@ StorePath LocalStore::addToStoreFromDump(const string & dump, const string & nam
             ValidPathInfo info(dstPath);
             info.narHash = hash.first;
             info.narSize = hash.second;
-            info.ca = FileSystemHash { method, h };
+            info.ca = FixedOutputHash { method, h };
             registerValidPath(info);
         }
 

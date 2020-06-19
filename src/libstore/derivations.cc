@@ -108,7 +108,7 @@ static DerivationOutput parseDerivationOutput(const Store & store, istringstream
     expect(str, ","); const auto hash = parseString(str);
     expect(str, ")");
 
-    std::optional<FileSystemHash> fsh;
+    std::optional<FixedOutputHash> fsh;
     if (hashAlgo != "") {
         auto method = FileIngestionMethod::Flat;
         if (string(hashAlgo, 0, 2) == "r:") {
@@ -116,9 +116,9 @@ static DerivationOutput parseDerivationOutput(const Store & store, istringstream
             hashAlgo = string(hashAlgo, 2);
         }
         const HashType hashType = parseHashType(hashAlgo);
-        fsh = FileSystemHash {
-            std::move(method),
-            Hash(hash, hashType),
+        fsh = FixedOutputHash {
+            .method = std::move(method),
+            .hash = Hash(hash, hashType),
         };
     }
 
@@ -406,7 +406,7 @@ static DerivationOutput readDerivationOutput(Source & in, const Store & store)
     auto hashAlgo = readString(in);
     const auto hash = readString(in);
 
-    std::optional<FileSystemHash> fsh;
+    std::optional<FixedOutputHash> fsh;
     if (hashAlgo != "") {
         auto method = FileIngestionMethod::Flat;
         if (string(hashAlgo, 0, 2) == "r:") {
@@ -414,9 +414,9 @@ static DerivationOutput readDerivationOutput(Source & in, const Store & store)
             hashAlgo = string(hashAlgo, 2);
         }
         const HashType hashType = parseHashType(hashAlgo);
-        fsh = FileSystemHash {
-            std::move(method),
-            Hash(hash, hashType),
+        fsh = FixedOutputHash {
+            .method = std::move(method),
+            .hash = Hash(hash, hashType),
         };
     }
 

@@ -16,7 +16,7 @@ namespace nix {
 struct DerivationOutput
 {
     StorePath path;
-    std::optional<FileSystemHash> hash; /* hash used for expected hash computation */
+    std::optional<FixedOutputHash> hash; /* hash used for expected hash computation */
 };
 
 typedef std::map<string, DerivationOutput> DerivationOutputs;

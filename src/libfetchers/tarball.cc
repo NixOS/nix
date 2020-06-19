@@ -70,7 +70,7 @@ DownloadFileResult downloadFile(
         ValidPathInfo info(store->makeFixedOutputPath(FileIngestionMethod::Flat, hash, name));
         info.narHash = hashString(htSHA256, *sink.s);
         info.narSize = sink.s->size();
-        info.ca = FileSystemHash {
+        info.ca = FixedOutputHash {
             FileIngestionMethod::Flat,
             hash,
         };

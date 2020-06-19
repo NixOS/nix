@@ -2,7 +2,7 @@
 
 namespace nix {
 
-std::string FileSystemHash::printMethodAlgo() const {
+std::string FixedOutputHash::printMethodAlgo() const {
     return makeFileIngestionPrefix(method) + printHashType(*hash.type);
 }
 
@@ -33,7 +33,7 @@ std::string renderContentAddress(ContentAddress ca) {
         [](TextHash th) {
             return "text:" + th.hash.to_string(Base32, true);
         },
-        [](FileSystemHash fsh) {
+        [](FixedOutputHash fsh) {
             return makeFixedOutputCA(fsh.method, fsh.hash);
         }
     }, ca);
@@ -55,10 +55,10 @@ ContentAddress parseContentAddress(std::string_view rawCa) {
             auto methodAndHash = rawCa.substr(prefixSeparator+1, string::npos);
             if (methodAndHash.substr(0,2) == "r:") {
                 std::string_view hashRaw = methodAndHash.substr(2,string::npos);
-                return FileSystemHash { FileIngestionMethod::Recursive, Hash(string(hashRaw)) };
+                return FixedOutputHash { FileIngestionMethod::Recursive, Hash(string(hashRaw)) };
             } else {
                 std::string_view hashRaw = methodAndHash;
-                return FileSystemHash { FileIngestionMethod::Flat, Hash(string(hashRaw)) };
+                return FixedOutputHash { FileIngestionMethod::Flat, Hash(string(hashRaw)) };
             }
         } else {
             throw Error("parseContentAddress: format not recognized; has to be text or fixed");

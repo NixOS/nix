@@ -769,7 +769,7 @@ bool ValidPathInfo::isContentAddressed(const Store & store) const
         [&](TextHash th) {
             return store.makeTextPath(path.name(), th.hash, references);
         },
-        [&](FileSystemHash fsh) {
+        [&](FixedOutputHash fsh) {
             auto refs = references;
             bool hasSelfReference = false;
             if (refs.count(path)) {

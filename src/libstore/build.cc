@@ -3764,7 +3764,7 @@ void DerivationGoal::registerOutputs()
             else
                 assert(worker.store.parseStorePath(path) == dest);
 
-            ca = FileSystemHash { i.second.hash->method, h2 };
+            ca = FixedOutputHash { i.second.hash->method, h2 };
         }
 
         /* Get rid of all weird permissions.  This also checks that

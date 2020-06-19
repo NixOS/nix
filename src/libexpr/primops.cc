@@ -776,7 +776,10 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
         if (!jsonObject) drv.env["out"] = state.store->printStorePath(outPath);
         drv.outputs.insert_or_assign("out", DerivationOutput {
             .path = std::move(outPath),
-            .hash = FileSystemHash { ingestionMethod, std::move(h) },
+            .hash = FixedOutputHash {
+                .method = ingestionMethod,
+                .hash = std::move(h),
+            },
         });
     }
 
@@ -792,7 +795,7 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
             drv.outputs.insert_or_assign(i,
                 DerivationOutput {
                     .path = StorePath::dummy,
-                    .hash = std::optional<FileSystemHash> {},
+                    .hash = std::optional<FixedOutputHash> {},
                 });
         }
 
@@ -804,7 +807,7 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
             drv.outputs.insert_or_assign(i,
                 DerivationOutput {
                     .path = std::move(outPath),
-                    .hash = std::optional<FileSystemHash>(),
+                    .hash = std::optional<FixedOutputHash>(),
                 });
         }
     }
