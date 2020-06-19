@@ -38,6 +38,27 @@ void writeStorePaths(const Store & store, Sink & out, const StorePathSet & paths
         out << store.printStorePath(i);
 }
 
+std::map<StorePath, std::optional<std::string>> readStorePathCAMap(const Store & store, Source & from)
+{
+    StorePathCAMap paths;
+    auto count = readNum<size_t>(from);
+    while (count--) {
+        auto path = readString(from);
+        auto ca = readString(from);
+        paths.insert_or_assign(store.parseStorePath(path), !ca.empty() ? std::optional(ca) : std::nullopt);
+    }
+    return paths;
+}
+
+void writeStorePathCAMap(const Store & store, Sink & out, const StorePathCAMap & paths)
+{
+    out << paths.size();
+    for (auto & i : paths) {
+        out << store.printStorePath(i.first);
+        out << (i.second ? *i.second : "");
+    }
+}
+
 
 /* TODO: Separate these store impls into different files, give them better names */
 RemoteStore::RemoteStore(const Params & params)
@@ -334,10 +355,13 @@ void RemoteStore::querySubstitutablePathInfos(const StorePathCAMap & pathsMap, S
     } else {
 
         conn->to << wopQuerySubstitutablePathInfos;
-        StorePathSet paths;
-        for (auto & path : pathsMap)
-            paths.insert(path.first);
-        writeStorePaths(*this, conn->to, paths);
+        if (GET_PROTOCOL_MINOR(conn->daemonVersion) < 22) {
+            StorePathSet paths;
+            for (auto & path : pathsMap)
+                paths.insert(path.first);
+            writeStorePaths(*this, conn->to, paths);
+        } else
+            writeStorePathCAMap(*this, conn->to, pathsMap);
         conn.processStderr();
         size_t count = readNum<size_t>(conn->from);
         for (size_t n = 0; n < count; n++) {

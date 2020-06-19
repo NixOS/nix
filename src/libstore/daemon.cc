@@ -609,12 +609,15 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
     }
 
     case wopQuerySubstitutablePathInfos: {
-        auto paths = readStorePaths<StorePathSet>(*store, from);
-        logger->startWork();
         SubstitutablePathInfos infos;
         StorePathCAMap pathsMap = {};
-        for (auto & path : paths)
-            pathsMap.emplace(path, std::nullopt);
+        if (GET_PROTOCOL_MINOR(clientVersion) < 22) {
+            auto paths = readStorePaths<StorePathSet>(*store, from);
+            for (auto & path : paths)
+                pathsMap.emplace(path, std::nullopt);
+        } else
+            pathsMap = readStorePathCAMap(*store, from);
+        logger->startWork();
         store->querySubstitutablePathInfos(pathsMap, infos);
         logger->stopWork();
         to << infos.size();
