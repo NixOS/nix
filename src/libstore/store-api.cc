@@ -189,7 +189,7 @@ StorePath Store::makeFixedOutputPath(
         return makeStorePath("output:out",
             hashString(htSHA256,
                 "fixed:out:"
-                + ingestionMethodPrefix(method)
+                + makeFileIngestionPrefix(method)
                 + hash.to_string(Base16, true) + ":"),
             name);
     }
@@ -797,7 +797,7 @@ bool ValidPathInfo::isContentAddressed(const Store & store) const
             method = FileIngestionMethod::Recursive;
         else if (ca.compare(6, 4, "git:") == 0)
             method = FileIngestionMethod::Git;
-        Hash hash(std::string(ca, 6 + ingestionMethodPrefix(method).length()));
+        Hash hash(std::string(ca, 6 + makeFileIngestionPrefix(method).length()));
         auto refs = references;
         bool hasSelfReference = false;
         if (refs.count(path)) {
@@ -841,13 +841,25 @@ Strings ValidPathInfo::shortRefs() const
 }
 
 
+std::string makeFileIngestionPrefix(FileIngestionMethod method) {
+    switch (method) {
+    case FileIngestionMethod::Flat:
+        return "";
+    case FileIngestionMethod::Recursive:
+        return "r:";
+    case FileIngestionMethod::Git:
+        return "git:";
+    }
+    abort();
+}
+
 std::string makeFixedOutputCA(FileIngestionMethod method, const Hash & hash)
 {
     if (method == FileIngestionMethod::Git && hash.type != htSHA1)
         throw Error("git file ingestion must use sha1 hashes");
     return "fixed:"
-    	+ ingestionMethodPrefix(method)
-    	+ hash.to_string(Base32, true);
+        + makeFileIngestionPrefix(method)
+        + hash.to_string(Base32, true);
 }
 
 

@@ -71,18 +71,6 @@ enum struct FileIngestionMethod : uint8_t {
     Git,
 };
 
-inline std::string ingestionMethodPrefix(FileIngestionMethod method) {
-    switch (method) {
-    case FileIngestionMethod::Flat:
-        return "";
-    case FileIngestionMethod::Recursive:
-        return "r:";
-    case FileIngestionMethod::Git:
-        return "git:";
-    }
-    throw;
-}
-
 struct StorePathWithOutputs
 {
     StorePath path;
