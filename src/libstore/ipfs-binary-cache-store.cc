@@ -369,13 +369,13 @@ private:
 
         auto narMap = getIpfsDag(getIpfsPath())["nar"];
 
-        json["references"] = nlohmann::json::array();
+        json["references"] = nlohmann::json::object();
+        json["hasSelfReference"] = false;
         for (auto & ref : narInfo->references) {
-            if (ref == narInfo->path) {
-                json["references"].push_back(printStorePath(ref));
-            } else {
-                json["references"].push_back(narMap[printStorePath(ref)]);
-            }
+            if (ref == narInfo->path)
+                json["hasSelfReference"] = true;
+            else
+                json["references"].emplace(ref.to_string(), narMap[(std::string) ref.to_string()]);
         }
 
         if (narInfo->ca != "")
@@ -397,8 +397,8 @@ private:
         }
 
         if (!narInfo->url.empty()) {
-            json["url"] = nlohmann::json::object();
-            json["url"]["/"] = std::string(narInfo->url, 7);
+            json["ipfsCid"] = nlohmann::json::object();
+            json["ipfsCid"]["/"] = std::string(narInfo->url, 7);
         }
         if (narInfo->fileHash)
             json["downloadHash"] = narInfo->fileHash.to_string(Base32, true);
@@ -419,7 +419,7 @@ private:
         auto hashObject = nlohmann::json::object();
         hashObject.emplace("/", std::string(narObjectPath, 6));
 
-        json["nar"].emplace(printStorePath(narInfo->path), hashObject);
+        json["nar"].emplace(narInfo->path.to_string(), hashObject);
 
         state->ipfsPath = putIpfsDag(json);
 
@@ -498,7 +498,7 @@ public:
         auto json = getIpfsDag(getIpfsPath());
         if (!json.contains("nar"))
             return false;
-        return json["nar"].contains(printStorePath(storePath));
+        return json["nar"].contains(storePath.to_string());
     }
 
     void narFromPath(const StorePath & storePath, Sink & sink) override
@@ -542,28 +542,21 @@ public:
 
         auto json = getIpfsDag(getIpfsPath());
 
-        if (!json.contains("nar") || !json["nar"].contains(printStorePath(storePath)))
+        if (!json.contains("nar") || !json["nar"].contains(storePath.to_string()))
             return (*callbackPtr)(nullptr);
 
-        auto narObjectHash = (std::string) json["nar"][printStorePath(storePath)]["/"];
+        auto narObjectHash = (std::string) json["nar"][(std::string) storePath.to_string()]["/"];
         json = getIpfsDag("/ipfs/" + narObjectHash);
 
         NarInfo narInfo { storePath };
         narInfo.narHash = Hash((std::string) json["narHash"]);
         narInfo.narSize = json["narSize"];
 
-        auto narMap = getIpfsDag(getIpfsPath())["nar"];
-        for (auto & ref : json["references"]) {
-            if (ref.type() == nlohmann::json::value_t::object) {
-                for (auto & v : narMap.items()) {
-                    if (v.value() == ref) {
-                        narInfo.references.insert(parseStorePath(v.key()));
-                        break;
-                    }
-                }
-            } else if (ref.type() == nlohmann::json::value_t::string)
-                narInfo.references.insert(parseStorePath((std::string) ref));
-        }
+        for (auto & ref : json["references"].items())
+            narInfo.references.insert(StorePath(ref.key()));
+
+        if (json["hasSelfReference"])
+            narInfo.references.insert(storePath);
 
         if (json.find("ca") != json.end())
             narInfo.ca = json["ca"];
@@ -581,8 +574,8 @@ public:
             for (auto & sig : json["sigs"])
                 narInfo.sigs.insert((std::string) sig);
 
-        if (json.find("url") != json.end())
-            narInfo.url = "ipfs://" + json["url"]["/"].get<std::string>();
+        if (json.find("ipfsCid") != json.end())
+            narInfo.url = "ipfs://" + json["ipfsCid"]["/"].get<std::string>();
 
         if (json.find("downloadHash") != json.end())
             narInfo.fileHash = Hash((std::string) json["downloadHash"]);
