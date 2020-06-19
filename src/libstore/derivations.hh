@@ -13,23 +13,23 @@ namespace nix {
 /* Abstract syntax of derivations. */
 
 /// Pair of a hash, and how the file system was ingested
-struct FileSystemHash {
+struct DerivationOutputHash {
     FileIngestionMethod method;
     Hash hash;
-    FileSystemHash(FileIngestionMethod method, Hash hash)
+    DerivationOutputHash(FileIngestionMethod method, Hash hash)
         : method(std::move(method))
         , hash(std::move(hash))
     { }
-    FileSystemHash(const FileSystemHash &) = default;
-    FileSystemHash(FileSystemHash &&) = default;
-    FileSystemHash & operator = (const FileSystemHash &) = default;
+    DerivationOutputHash(const DerivationOutputHash &) = default;
+    DerivationOutputHash(DerivationOutputHash &&) = default;
+    DerivationOutputHash & operator = (const DerivationOutputHash &) = default;
     std::string printMethodAlgo() const;
 };
 
 struct DerivationOutput
 {
     StorePath path;
-    std::optional<FileSystemHash> hash; /* hash used for expected hash computation */
+    std::optional<DerivationOutputHash> hash; /* hash used for expected hash computation */
     void parseHashInfo(FileIngestionMethod & recursive, Hash & hash) const;
 };
 

@@ -8,7 +8,7 @@
 
 namespace nix {
 
-std::string FileSystemHash::printMethodAlgo() const {
+std::string DerivationOutputHash::printMethodAlgo() const {
     return makeFileIngestionPrefix(method) + printHashType(hash.type);
 }
 
@@ -113,7 +113,7 @@ static DerivationOutput parseDerivationOutput(const Store & store, istringstream
     expect(str, ","); const auto hash = parseString(str);
     expect(str, ")");
 
-    std::optional<FileSystemHash> fsh;
+    std::optional<DerivationOutputHash> fsh;
     if (hashAlgo != "") {
         auto method = FileIngestionMethod::Flat;
         if (string(hashAlgo, 0, 2) == "r:") {
@@ -123,7 +123,7 @@ static DerivationOutput parseDerivationOutput(const Store & store, istringstream
         const HashType hashType = parseHashType(hashAlgo);
         if (hashType == htUnknown)
             throw Error("unknown hash hashAlgorithm '%s'", hashAlgo);
-        fsh = FileSystemHash {
+        fsh = DerivationOutputHash {
             std::move(method),
             Hash(hash, hashType),
         };
@@ -413,7 +413,7 @@ static DerivationOutput readDerivationOutput(Source & in, const Store & store)
     auto hashAlgo = readString(in);
     const auto hash = readString(in);
 
-    std::optional<FileSystemHash> fsh;
+    std::optional<DerivationOutputHash> fsh;
     if (hashAlgo != "") {
         auto method = FileIngestionMethod::Flat;
         if (string(hashAlgo, 0, 2) == "r:") {
@@ -423,7 +423,7 @@ static DerivationOutput readDerivationOutput(Source & in, const Store & store)
         const HashType hashType = parseHashType(hashAlgo);
         if (hashType == htUnknown)
             throw Error("unknown hash hashAlgorithm '%s'", hashAlgo);
-        fsh = FileSystemHash {
+        fsh = DerivationOutputHash {
             std::move(method),
             Hash(hash, hashType),
         };
