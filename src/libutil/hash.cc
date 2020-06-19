@@ -368,8 +368,8 @@ string printHashType(HashType ht)
     case htSHA256: return "sha256"; break;
     case htSHA512: return "sha512"; break;
     }
-	// illegal hash type enum value internally, as opposed to external input
-	// which should be validated with nice error message.
+    // illegal hash type enum value internally, as opposed to external input
+    // which should be validated with nice error message.
     abort();
 }
 
