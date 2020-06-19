@@ -126,7 +126,7 @@ std::optional<std::string> getDerivationCA(const BasicDerivation & drv)
         else if (outputHashMode->second == "flat")
             ingestionMethod = FileIngestionMethod::Flat;
         else
-            throw Error("unknown ingestion method: '%s'", outputHashMode->second);
+            throw Error("unknown outputHashMode: '%s'", outputHashMode->second);
         return makeFixedOutputCA(ingestionMethod, h);
     }
 
