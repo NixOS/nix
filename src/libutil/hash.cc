@@ -16,16 +16,19 @@
 
 namespace nix {
 
+static size_t regularHashSize(HashType type) {
+    switch (type) {
+    case htMD5: return md5HashSize;
+    case htSHA1: return sha1HashSize;
+    case htSHA256: return sha256HashSize;
+    case htSHA512: return sha512HashSize;
+    }
+    abort();
+}
 
 void Hash::init()
 {
-    if (!type) abort();
-    switch (*type) {
-    case htMD5: hashSize = md5HashSize; break;
-    case htSHA1: hashSize = sha1HashSize; break;
-    case htSHA256: hashSize = sha256HashSize; break;
-    case htSHA512: hashSize = sha512HashSize; break;
-    }
+    hashSize = regularHashSize(type);
     assert(hashSize <= maxHashSize);
     memset(hash, 0, maxHashSize);
 }
@@ -105,18 +108,11 @@ string printHash16or32(const Hash & hash)
 }
 
 
-HashType assertInitHashType(const Hash & h) {
-    if (h.type)
-        return *h.type;
-    else
-        abort();
-}
-
 std::string Hash::to_string(Base base, bool includeType) const
 {
     std::string s;
     if (base == SRI || includeType) {
-        s += printHashType(assertInitHashType(*this));
+        s += printHashType(type);
         s += base == SRI ? '-' : ':';
     }
     switch (base) {
@@ -137,29 +133,36 @@ std::string Hash::to_string(Base base, bool includeType) const
 Hash::Hash(std::string_view s, HashType type) : Hash(s, std::optional { type }) { }
 Hash::Hash(std::string_view s) : Hash(s, std::optional<HashType>{}) { }
 
-Hash::Hash(std::string_view s, std::optional<HashType> type)
-    : type(type)
+Hash::Hash(std::string_view s, std::optional<HashType> optType)
 {
     size_t pos = 0;
     bool isSRI = false;
 
+    // Find the : or - separater, and set `isSRI` to the correct value
     auto sep = s.find(':');
     if (sep == string::npos) {
         sep = s.find('-');
-        if (sep != string::npos) {
+        if (sep != string::npos)
             isSRI = true;
-        } else if (! type)
-            throw BadHash("hash '%s' does not include a type", s);
     }
 
+    // Parse the has type before the separater, if there was one.
+    std::optional<HashType> optParsedType;
     if (sep != string::npos) {
-        string hts = string(s, 0, sep);
-        this->type = parseHashType(hts);
-        if (!this->type)
+        auto hts = s.substr(0, sep);
+        auto optParsedType = parseHashType(hts);
+        if (!optParsedType)
             throw BadHash("unknown hash type '%s'", hts);
-        if (type && type != this->type)
-            throw BadHash("hash '%s' should have type '%s'", s, printHashType(*type));
-        pos = sep + 1;
+    }
+
+    // Either the string or user must provide the type, if they both do they
+    // must agree.
+    if (!optParsedType && !optType) {
+        throw BadHash("hash '%s' does not include a type, nor is the type otherwise known from context.", s);
+    } else {
+        this->type = optParsedType ? *optParsedType : *optType;
+        if (optParsedType && optType && *optParsedType != *optType)
+            throw BadHash("hash '%s' should have type '%s'", s, printHashType(*optType));
     }
 
     init();
@@ -214,7 +217,7 @@ Hash::Hash(std::string_view s, std::optional<HashType> type)
     }
 
     else
-        throw BadHash("hash '%s' has wrong length for hash type '%s'", s, printHashType(*type));
+        throw BadHash("hash '%s' has wrong length for hash type '%s'", s, printHashType(type));
 }
 
 Hash newHashAllowEmpty(std::string hashStr, std::optional<HashType> ht)
@@ -267,7 +270,7 @@ static void finish(HashType ht, Ctx & ctx, unsigned char * hash)
 }
 
 
-Hash hashString(HashType ht, const string & s)
+Hash hashString(HashType ht, std::string_view s)
 {
     Ctx ctx;
     Hash hash(ht);
@@ -334,7 +337,7 @@ HashResult hashPath(
 
 Hash compressHash(const Hash & hash, unsigned int newSize)
 {
-    Hash h;
+    Hash h(hash.type);
     h.hashSize = newSize;
     for (unsigned int i = 0; i < hash.hashSize; ++i)
         h.hash[i % newSize] ^= hash.hash[i];
@@ -342,7 +345,7 @@ Hash compressHash(const Hash & hash, unsigned int newSize)
 }
 
 
-std::optional<HashType> parseHashTypeOpt(const string & s)
+std::optional<HashType> parseHashTypeOpt(std::string_view s)
 {
     if (s == "md5") return htMD5;
     else if (s == "sha1") return htSHA1;
@@ -351,7 +354,7 @@ std::optional<HashType> parseHashTypeOpt(const string & s)
     else return std::optional<HashType> {};
 }
 
-HashType parseHashType(const string & s)
+HashType parseHashType(std::string_view s)
 {
     auto opt_h = parseHashTypeOpt(s);
     if (opt_h)
