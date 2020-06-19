@@ -1,6 +1,7 @@
 #include "logging.hh"
 #include "nixexpr.hh"
 #include "util.hh"
+#include <fstream>
 
 #include <gtest/gtest.h>
 
@@ -251,5 +252,22 @@ namespace nix {
         auto str = testing::internal::GetCapturedStderr();
         ASSERT_STREQ(str.c_str(), "\x1B[33;1mwarning:\x1B[0m\x1B[34;1m --- warning name --- error-unit-test\x1B[0m\nin file: \x1B[34;1mmyfile.nix (40:13)\x1B[0m\n\nwarning description\n\n    40| this is the problem line of code\n      |             \x1B[31;1m^\x1B[0m\n\nthis hint has \x1B[33;1myellow\x1B[0m templated \x1B[33;1mvalues\x1B[0m!!\n");
     }
+
+    /* ----------------------------------------------------------------------------
+     * hintfmt
+     * --------------------------------------------------------------------------*/
+
+   TEST(hintfmt, withstandsPercentString) {
+
+     const char *teststr = "this is 100%s correct!";
+     auto hint = hintfmt(teststr);
+
+     std::ofstream meh("meh.txt");
+     meh << hint.str() << std::endl;
+
+     ASSERT_STREQ(hint.str().c_str(), teststr);
+   }
+
+     
 
 }
