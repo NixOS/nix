@@ -16,10 +16,6 @@ namespace nix {
 struct DerivationOutputHash {
     FileIngestionMethod method;
     Hash hash;
-    DerivationOutputHash(FileIngestionMethod method, Hash hash)
-        : method(std::move(method))
-        , hash(std::move(hash))
-    { }
     std::string printMethodAlgo() const;
 };
 
