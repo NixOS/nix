@@ -124,8 +124,8 @@ static DerivationOutput parseDerivationOutput(const Store & store, istringstream
         if (hashType == htUnknown)
             throw Error("unknown hash hashAlgorithm '%s'", hashAlgo);
         fsh = DerivationOutputHash {
-            std::move(method),
-            Hash(hash, hashType),
+            .method = std::move(method),
+            .hash = Hash(hash, hashType),
         };
     }
 
@@ -424,8 +424,8 @@ static DerivationOutput readDerivationOutput(Source & in, const Store & store)
         if (hashType == htUnknown)
             throw Error("unknown hash hashAlgorithm '%s'", hashAlgo);
         fsh = DerivationOutputHash {
-            std::move(method),
-            Hash(hash, hashType),
+            .method = std::move(method),
+            .hash = Hash(hash, hashType),
         };
     }
 

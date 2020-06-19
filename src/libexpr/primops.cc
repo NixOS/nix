@@ -776,7 +776,10 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
         if (!jsonObject) drv.env["out"] = state.store->printStorePath(outPath);
         drv.outputs.insert_or_assign("out", DerivationOutput {
             .path = std::move(outPath),
-            .hash = DerivationOutputHash { ingestionMethod, std::move(h) },
+            .hash = DerivationOutputHash {
+                .method = ingestionMethod,
+                .hash = std::move(h),
+            },
         });
     }
 

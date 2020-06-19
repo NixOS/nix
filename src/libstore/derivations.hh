@@ -20,9 +20,6 @@ struct DerivationOutputHash {
         : method(std::move(method))
         , hash(std::move(hash))
     { }
-    DerivationOutputHash(const DerivationOutputHash &) = default;
-    DerivationOutputHash(DerivationOutputHash &&) = default;
-    DerivationOutputHash & operator = (const DerivationOutputHash &) = default;
     std::string printMethodAlgo() const;
 };
 
