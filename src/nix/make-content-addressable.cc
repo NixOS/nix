@@ -83,8 +83,8 @@ struct CmdMakeContentAddressable : StorePathsCommand, MixJSON
             info.narHash = narHash;
             info.narSize = sink.s->size();
             info.ca = FixedOutputHash {
-                FileIngestionMethod::Recursive,
-                info.narHash,
+                .method = FileIngestionMethod::Recursive,
+                .hash = info.narHash,
             };
 
             if (!json)
