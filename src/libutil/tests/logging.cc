@@ -266,6 +266,14 @@ namespace nix {
 
     }
 
+    TEST(hintfmt, fmtToHintfmt) {
+
+        auto hint = hintfmt(fmt("the color of this this text is %1%", "not yellow"));
+
+        ASSERT_STREQ(hint.str().c_str(), "the color of this this text is not yellow");
+
+    }
+
     TEST(hintfmt, tooFewArguments) {
 
         ASSERT_STREQ(
