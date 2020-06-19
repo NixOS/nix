@@ -592,19 +592,19 @@ LocalNoInlineNoReturn(void throwUndefinedVarError(const Pos & pos, const char * 
     });
 }
 
-LocalNoInline(void addErrorPrefix(Error & e, const char * s, const string & s2))
+LocalNoInline(void addErrorTrace(Error & e, const char * s, const string & s2))
 {
-    e.addPrefix(format(s) % s2);
+    e.addTrace(std::nullopt, hintfmt(s) % s2);
 }
 
-LocalNoInline(void addErrorPrefix(Error & e, const char * s, const ExprLambda & fun, const Pos & pos))
+LocalNoInline(void addErrorTrace(Error & e, const Pos & pos, const char * s, const ExprLambda & fun))
 {
-    e.addPrefix(format(s) % fun.showNamePos() % pos);
+    e.addTrace(pos, hintfmt(s) % fun.showNamePos());
 }
 
-LocalNoInline(void addErrorPrefix(Error & e, const char * s, const string & s2, const Pos & pos))
+LocalNoInline(void addErrorTrace(Error & e, const Pos & pos, const char * s, const string & s2))
 {
-    e.addPrefix(format(s) % s2 % pos);
+    e.addTrace(pos, hintfmt(s) % s2);
 }
 
 
@@ -818,7 +818,7 @@ void EvalState::evalFile(const Path & path_, Value & v)
     try {
         eval(e, v);
     } catch (Error & e) {
-        addErrorPrefix(e, "while evaluating the file '%1%':\n", path2);
+        addErrorTrace(e, "while evaluating the file '%1%':", path2);
         throw;
     }
 
@@ -1068,8 +1068,8 @@ void ExprSelect::eval(EvalState & state, Env & env, Value & v)
 
     } catch (Error & e) {
         if (pos2 && pos2->file != state.sDerivationNix)
-            addErrorPrefix(e, "while evaluating the attribute '%1%' at %2%:\n",
-                showAttrPath(state, env, attrPath), *pos2);
+            addErrorTrace(e, *pos2, "while evaluating the attribute '%1%'",
+                showAttrPath(state, env, attrPath));
         throw;
     }
 
@@ -1241,7 +1241,9 @@ void EvalState::callFunction(Value & fun, Value & arg, Value & v, const Pos & po
         try {
             lambda.body->eval(*this, env2, v);
         } catch (Error & e) {
-            addErrorPrefix(e, "while evaluating %1%, called from %2%:\n", lambda, pos);
+            // TODO something different for 'called from' than usual addTrace?
+            // addErrorTrace(e, pos, "while evaluating %1%, called from %2%:", lambda);
+            addErrorTrace(e, pos, "while evaluating %1%:", lambda);
             throw;
         }
     else
@@ -1516,7 +1518,7 @@ void EvalState::forceValueDeep(Value & v)
                 try {
                     recurse(*i.value);
                 } catch (Error & e) {
-                    addErrorPrefix(e, "while evaluating the attribute '%1%' at %2%:\n", i.name, *i.pos);
+                    addErrorTrace(e, *i.pos, "while evaluating the attribute '%1%'", i.name);
                     throw;
                 }
         }

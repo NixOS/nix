@@ -94,7 +94,7 @@ struct NixCode {
 };
 
 struct Trace {
-    ErrPos pos;
+    std::optional<ErrPos> pos;
     hintformat hint;
 };
 
@@ -116,8 +116,11 @@ std::ostream& operator<<(std::ostream &out, const ErrorInfo &einfo);
 class BaseError : public std::exception
 {
 protected:
-    string prefix_; // used for location traces etc.
+    // string prefix_; // used for location traces etc.
     mutable ErrorInfo err;
+
+    // mutable std::optional<string> trace_;
+    // const string& calcTrace() const;
 
     mutable std::optional<string> what_;
     const string& calcWhat() const;
@@ -164,9 +167,9 @@ public:
 #endif
 
     const string & msg() const { return calcWhat(); }
-    const string & prefix() const { return prefix_; }
-    BaseError & addPrefix(const FormatOrString & fs);
-    BaseError & addTrace(ErrPos e, hintformat hint);
+    // const string & trace() const { return calcTrace(); }
+    // BaseError & addPrefix(const FormatOrString & fs);
+    BaseError & addTrace(std::optional<ErrPos> e, hintformat hint);
 
     const ErrorInfo & info() { calcWhat(); return err; }
 };

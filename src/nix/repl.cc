@@ -101,74 +101,74 @@ NixRepl::~NixRepl()
 static NixRepl * curRepl; // ugly
 
 static char * completionCallback(char * s, int *match) {
-  auto possible = curRepl->completePrefix(s);
-  if (possible.size() == 1) {
-    *match = 1;
-    auto *res = strdup(possible.begin()->c_str() + strlen(s));
-    if (!res) throw Error("allocation failure");
-    return res;
-  } else if (possible.size() > 1) {
-    auto checkAllHaveSameAt = [&](size_t pos) {
-      auto &first = *possible.begin();
-      for (auto &p : possible) {
-        if (p.size() <= pos || p[pos] != first[pos])
-          return false;
-      }
-      return true;
-    };
-    size_t start = strlen(s);
-    size_t len = 0;
-    while (checkAllHaveSameAt(start + len)) ++len;
-    if (len > 0) {
-      *match = 1;
-      auto *res = strdup(std::string(*possible.begin(), start, len).c_str());
-      if (!res) throw Error("allocation failure");
-      return res;
+    auto possible = curRepl->completePrefix(s);
+    if (possible.size() == 1) {
+        *match = 1;
+        auto *res = strdup(possible.begin()->c_str() + strlen(s));
+        if (!res) throw Error("allocation failure");
+        return res;
+    } else if (possible.size() > 1) {
+        auto checkAllHaveSameAt = [&](size_t pos) {
+                auto &first = *possible.begin();
+                for (auto &p : possible) {
+                    if (p.size() <= pos || p[pos] != first[pos])
+                        return false;
+                }
+                return true;
+            };
+        size_t start = strlen(s);
+        size_t len = 0;
+        while (checkAllHaveSameAt(start + len)) ++len;
+        if (len > 0) {
+            *match = 1;
+            auto *res = strdup(std::string(*possible.begin(), start, len).c_str());
+            if (!res) throw Error("allocation failure");
+            return res;
+        }
     }
-  }
 
-  *match = 0;
-  return nullptr;
+    *match = 0;
+    return nullptr;
 }
 
 static int listPossibleCallback(char *s, char ***avp) {
-  auto possible = curRepl->completePrefix(s);
+    auto possible = curRepl->completePrefix(s);
 
-  if (possible.size() > (INT_MAX / sizeof(char*)))
-    throw Error("too many completions");
+    if (possible.size() > (INT_MAX / sizeof(char*)))
+        throw Error("too many completions");
 
-  int ac = 0;
-  char **vp = nullptr;
+    int ac = 0;
+    char **vp = nullptr;
 
-  auto check = [&](auto *p) {
-    if (!p) {
-      if (vp) {
-        while (--ac >= 0)
-          free(vp[ac]);
-        free(vp);
-      }
-      throw Error("allocation failure");
-    }
-    return p;
-  };
+    auto check = [&](auto *p) {
+            if (!p) {
+                if (vp) {
+                    while (--ac >= 0)
+                        free(vp[ac]);
+                    free(vp);
+                }
+                throw Error("allocation failure");
+            }
+            return p;
+        };
 
-  vp = check((char **)malloc(possible.size() * sizeof(char*)));
+    vp = check((char **)malloc(possible.size() * sizeof(char*)));
 
-  for (auto & p : possible)
-    vp[ac++] = check(strdup(p.c_str()));
+    for (auto & p : possible)
+        vp[ac++] = check(strdup(p.c_str()));
 
-  *avp = vp;
+    *avp = vp;
 
-  return ac;
+    return ac;
 }
 
 namespace {
-    // Used to communicate to NixRepl::getLine whether a signal occurred in ::readline.
-    volatile sig_atomic_t g_signal_received = 0;
+// Used to communicate to NixRepl::getLine whether a signal occurred in ::readline.
+volatile sig_atomic_t g_signal_received = 0;
 
-    void sigintHandler(int signo) {
-        g_signal_received = signo;
-    }
+void sigintHandler(int signo) {
+    g_signal_received = signo;
+}
 }
 
 void NixRepl::mainLoop(const std::vector<std::string> & files)
@@ -211,12 +211,14 @@ void NixRepl::mainLoop(const std::vector<std::string> & files)
                 // input without clearing the input so far.
                 continue;
             } else {
-              printMsg(lvlError, error + "%1%%2%", (settings.showTrace ? e.prefix() : ""), e.msg());
+                printMsg(lvlError, e.msg());
             }
         } catch (Error & e) {
-            printMsg(lvlError, error + "%1%%2%", (settings.showTrace ? e.prefix() : ""), e.msg());
+            // printMsg(lvlError, error + "%1%%2%", (settings.showTrace ? e.prefix() : ""), e.msg());
+            printMsg(lvlError, e.msg());
         } catch (Interrupted & e) {
-            printMsg(lvlError, error + "%1%%2%", (settings.showTrace ? e.prefix() : ""), e.msg());
+            // printMsg(lvlError, error + "%1%%2%", (settings.showTrace ? e.prefix() : ""), e.msg());
+            printMsg(lvlError, e.msg());
         }
 
         // We handled the current input fully, so we should clear it
@@ -233,24 +235,24 @@ bool NixRepl::getLine(string & input, const std::string &prompt)
     sigset_t savedSignalMask, set;
 
     auto setupSignals = [&]() {
-        act.sa_handler = sigintHandler;
-        sigfillset(&act.sa_mask);
-        act.sa_flags = 0;
-        if (sigaction(SIGINT, &act, &old))
-            throw SysError("installing handler for SIGINT");
+            act.sa_handler = sigintHandler;
+            sigfillset(&act.sa_mask);
+            act.sa_flags = 0;
+            if (sigaction(SIGINT, &act, &old))
+                throw SysError("installing handler for SIGINT");
 
-        sigemptyset(&set);
-        sigaddset(&set, SIGINT);
-        if (sigprocmask(SIG_UNBLOCK, &set, &savedSignalMask))
-            throw SysError("unblocking SIGINT");
-    };
+            sigemptyset(&set);
+            sigaddset(&set, SIGINT);
+            if (sigprocmask(SIG_UNBLOCK, &set, &savedSignalMask))
+                throw SysError("unblocking SIGINT");
+        };
     auto restoreSignals = [&]() {
-        if (sigprocmask(SIG_SETMASK, &savedSignalMask, nullptr))
-            throw SysError("restoring signals");
+            if (sigprocmask(SIG_SETMASK, &savedSignalMask, nullptr))
+                throw SysError("restoring signals");
 
-        if (sigaction(SIGINT, &old, 0))
-            throw SysError("restoring handler for SIGINT");
-    };
+            if (sigaction(SIGINT, &old, 0))
+                throw SysError("restoring handler for SIGINT");
+        };
 
     setupSignals();
     char * s = readline(prompt.c_str());
@@ -264,7 +266,7 @@ bool NixRepl::getLine(string & input, const std::string &prompt)
     }
 
     if (!s)
-      return false;
+        return false;
     input += s;
     input += '\n';
     return true;
@@ -397,21 +399,21 @@ bool NixRepl::processLine(string line)
 
     if (command == ":?" || command == ":help") {
         std::cout
-             << "The following commands are available:\n"
-             << "\n"
-             << "  <expr>        Evaluate and print expression\n"
-             << "  <x> = <expr>  Bind expression to variable\n"
-             << "  :a <expr>     Add attributes from resulting set to scope\n"
-             << "  :b <expr>     Build derivation\n"
-             << "  :e <expr>     Open the derivation in $EDITOR\n"
-             << "  :i <expr>     Build derivation, then install result into current profile\n"
-             << "  :l <path>     Load Nix expression and add it to scope\n"
-             << "  :p <expr>     Evaluate and print expression recursively\n"
-             << "  :q            Exit nix-repl\n"
-             << "  :r            Reload all files\n"
-             << "  :s <expr>     Build dependencies of derivation, then start nix-shell\n"
-             << "  :t <expr>     Describe result of evaluation\n"
-             << "  :u <expr>     Build derivation, then start nix-shell\n";
+            << "The following commands are available:\n"
+            << "\n"
+            << "  <expr>        Evaluate and print expression\n"
+            << "  <x> = <expr>  Bind expression to variable\n"
+            << "  :a <expr>     Add attributes from resulting set to scope\n"
+            << "  :b <expr>     Build derivation\n"
+            << "  :e <expr>     Open the derivation in $EDITOR\n"
+            << "  :i <expr>     Build derivation, then install result into current profile\n"
+            << "  :l <path>     Load Nix expression and add it to scope\n"
+            << "  :p <expr>     Evaluate and print expression recursively\n"
+            << "  :q            Exit nix-repl\n"
+            << "  :r            Reload all files\n"
+            << "  :s <expr>     Build dependencies of derivation, then start nix-shell\n"
+            << "  :t <expr>     Describe result of evaluation\n"
+            << "  :u <expr>     Build derivation, then start nix-shell\n";
     }
 
     else if (command == ":a" || command == ":add") {
@@ -637,118 +639,118 @@ std::ostream & NixRepl::printValue(std::ostream & str, Value & v, unsigned int m
 
     switch (v.type) {
 
-    case tInt:
-        str << ANSI_CYAN << v.integer << ANSI_NORMAL;
-        break;
+        case tInt:
+            str << ANSI_CYAN << v.integer << ANSI_NORMAL;
+            break;
 
-    case tBool:
-        str << ANSI_CYAN << (v.boolean ? "true" : "false") << ANSI_NORMAL;
-        break;
+        case tBool:
+            str << ANSI_CYAN << (v.boolean ? "true" : "false") << ANSI_NORMAL;
+            break;
 
-    case tString:
-        str << ANSI_YELLOW;
-        printStringValue(str, v.string.s);
-        str << ANSI_NORMAL;
-        break;
+        case tString:
+            str << ANSI_YELLOW;
+            printStringValue(str, v.string.s);
+            str << ANSI_NORMAL;
+            break;
 
-    case tPath:
-        str << ANSI_GREEN << v.path << ANSI_NORMAL; // !!! escaping?
-        break;
+        case tPath:
+            str << ANSI_GREEN << v.path << ANSI_NORMAL; // !!! escaping?
+            break;
 
-    case tNull:
-        str << ANSI_CYAN "null" ANSI_NORMAL;
-        break;
+        case tNull:
+            str << ANSI_CYAN "null" ANSI_NORMAL;
+            break;
 
-    case tAttrs: {
-        seen.insert(&v);
+        case tAttrs: {
+            seen.insert(&v);
 
-        bool isDrv = state->isDerivation(v);
+            bool isDrv = state->isDerivation(v);
 
-        if (isDrv) {
-            str << "«derivation ";
-            Bindings::iterator i = v.attrs->find(state->sDrvPath);
-            PathSet context;
-            Path drvPath = i != v.attrs->end() ? state->coerceToPath(*i->pos, *i->value, context) : "???";
-            str << drvPath << "»";
+            if (isDrv) {
+                str << "«derivation ";
+                Bindings::iterator i = v.attrs->find(state->sDrvPath);
+                PathSet context;
+                Path drvPath = i != v.attrs->end() ? state->coerceToPath(*i->pos, *i->value, context) : "???";
+                str << drvPath << "»";
+            }
+
+            else if (maxDepth > 0) {
+                str << "{ ";
+
+                typedef std::map<string, Value *> Sorted;
+                Sorted sorted;
+                for (auto & i : *v.attrs)
+                    sorted[i.name] = i.value;
+
+                for (auto & i : sorted) {
+                    if (isVarName(i.first))
+                        str << i.first;
+                    else
+                        printStringValue(str, i.first.c_str());
+                    str << " = ";
+                    if (seen.find(i.second) != seen.end())
+                        str << "«repeated»";
+                    else
+                        try {
+                            printValue(str, *i.second, maxDepth - 1, seen);
+                        } catch (AssertionError & e) {
+                            str << ANSI_RED "«error: " << e.msg() << "»" ANSI_NORMAL;
+                        }
+                    str << "; ";
+                }
+
+                str << "}";
+            } else
+                str << "{ ... }";
+
+            break;
         }
 
-        else if (maxDepth > 0) {
-            str << "{ ";
+        case tList1:
+        case tList2:
+        case tListN:
+            seen.insert(&v);
 
-            typedef std::map<string, Value *> Sorted;
-            Sorted sorted;
-            for (auto & i : *v.attrs)
-                sorted[i.name] = i.value;
+            str << "[ ";
+            if (maxDepth > 0)
+                for (unsigned int n = 0; n < v.listSize(); ++n) {
+                    if (seen.find(v.listElems()[n]) != seen.end())
+                        str << "«repeated»";
+                    else
+                        try {
+                            printValue(str, *v.listElems()[n], maxDepth - 1, seen);
+                        } catch (AssertionError & e) {
+                            str << ANSI_RED "«error: " << e.msg() << "»" ANSI_NORMAL;
+                        }
+                    str << " ";
+                }
+            else
+                str << "... ";
+            str << "]";
+            break;
 
-            for (auto & i : sorted) {
-                if (isVarName(i.first))
-                    str << i.first;
-                else
-                    printStringValue(str, i.first.c_str());
-                str << " = ";
-                if (seen.find(i.second) != seen.end())
-                    str << "«repeated»";
-                else
-                    try {
-                        printValue(str, *i.second, maxDepth - 1, seen);
-                    } catch (AssertionError & e) {
-                        str << ANSI_RED "«error: " << e.msg() << "»" ANSI_NORMAL;
-                    }
-                str << "; ";
-            }
+        case tLambda: {
+            std::ostringstream s;
+            s << v.lambda.fun->pos;
+            str << ANSI_BLUE "«lambda @ " << filterANSIEscapes(s.str()) << "»" ANSI_NORMAL;
+            break;
+        }
 
-            str << "}";
-        } else
-            str << "{ ... }";
+        case tPrimOp:
+            str << ANSI_MAGENTA "«primop»" ANSI_NORMAL;
+            break;
 
-        break;
-    }
+        case tPrimOpApp:
+            str << ANSI_BLUE "«primop-app»" ANSI_NORMAL;
+            break;
 
-    case tList1:
-    case tList2:
-    case tListN:
-        seen.insert(&v);
+        case tFloat:
+            str << v.fpoint;
+            break;
 
-        str << "[ ";
-        if (maxDepth > 0)
-            for (unsigned int n = 0; n < v.listSize(); ++n) {
-                if (seen.find(v.listElems()[n]) != seen.end())
-                    str << "«repeated»";
-                else
-                    try {
-                        printValue(str, *v.listElems()[n], maxDepth - 1, seen);
-                    } catch (AssertionError & e) {
-                        str << ANSI_RED "«error: " << e.msg() << "»" ANSI_NORMAL;
-                    }
-                str << " ";
-            }
-        else
-            str << "... ";
-        str << "]";
-        break;
-
-    case tLambda: {
-        std::ostringstream s;
-        s << v.lambda.fun->pos;
-        str << ANSI_BLUE "«lambda @ " << filterANSIEscapes(s.str()) << "»" ANSI_NORMAL;
-        break;
-    }
-
-    case tPrimOp:
-        str << ANSI_MAGENTA "«primop»" ANSI_NORMAL;
-        break;
-
-    case tPrimOpApp:
-        str << ANSI_BLUE "«primop-app»" ANSI_NORMAL;
-        break;
-
-    case tFloat:
-        str << v.fpoint;
-        break;
-
-    default:
-        str << ANSI_RED "«unknown»" ANSI_NORMAL;
-        break;
+        default:
+            str << ANSI_RED "«unknown»" ANSI_NORMAL;
+            break;
     }
 
     return str;
@@ -771,10 +773,10 @@ struct CmdRepl : StoreCommand, MixEvalArgs
     Examples examples() override
     {
         return {
-          Example{
-            "Display all special commands within the REPL:",
-              "nix repl\n  nix-repl> :?"
-          }
+            Example{
+                "Display all special commands within the REPL:",
+                "nix repl\n  nix-repl> :?"
+            }
         };
     }
 

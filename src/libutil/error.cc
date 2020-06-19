@@ -12,19 +12,42 @@ const std::string nativeSystem = SYSTEM;
 
 // addPrefix is used for show-trace.  Strings added with addPrefix
 // will print ahead of the error itself.
-BaseError & BaseError::addPrefix(const FormatOrString & fs)
-{
-    prefix_ = fs.s + prefix_;
-    return *this;
-}
+// BaseError & BaseError::addPrefix(const FormatOrString & fs)
+// {
+//     prefix_ = fs.s + prefix_;
+//     return *this;
+// }
+
+// const string & prefix() const
+// {
+//   // build prefix string on demand??
+
+// }
+// ; //  { return prefix_; }
+
 
 // addPrefix is used for show-trace.  Strings added with addPrefix
 // will print ahead of the error itself.
-BaseError & BaseError::addTrace(hintformat hint, ErrPos e)
+BaseError & BaseError::addTrace(std::optional<ErrPos> e, hintformat hint)
 {
     err.traces.push_front(Trace { .pos = e, .hint = hint});
     return *this;
 }
+
+// const string& BaseError::calcTrace() const
+// {
+//     if (trace_.has_value())
+//         return *trace_;
+//     else {
+//         err.name = sname();
+
+//         std::ostringstream oss;
+//         oss << err;
+//         trace_ = oss.str();
+
+//         return *trace_;
+//     }
+// }
 
 // c++ std::exception descendants must have a 'const char* what()' function.
 // This stringifies the error and caches it for use by what(), or similarly by msg().
@@ -282,6 +305,22 @@ std::ostream& operator<<(std::ostream &out, const ErrorInfo &einfo)
                 throw Error("invalid FileOrigin in errPos");
         }
         nl = true;
+    }
+
+    // traces
+    for (auto iter = einfo.traces.begin(); iter != einfo.traces.end(); ++iter)
+    {
+
+        try {
+            auto pos = *iter->pos;
+            out << iter->hint.str() << showErrPos(pos) << std::endl;
+            NixCode nc { .errPos = pos };
+            getCodeLines(nc);
+            printCodeLines(out, prefix, nc);
+        } catch(const std::bad_optional_access& e) {
+            out << iter->hint.str() << std::endl;
+        }
+
     }
 
     // description

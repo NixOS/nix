@@ -471,7 +471,8 @@ static void prim_addErrorContext(EvalState & state, const Pos & pos, Value * * a
         v = *args[1];
     } catch (Error & e) {
         PathSet context;
-        e.addPrefix(format("%1%\n") % state.coerceToString(pos, *args[0], context));
+        // TODO: is this right, include this pos??  Test it.  esp with LOC.
+        e.addTrace(pos, hintfmt("%1%") % state.coerceToString(pos, *args[0], context));
         throw;
     }
 }
@@ -563,7 +564,7 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
     try {
         drvName = state.forceStringNoCtx(*attr->value, pos);
     } catch (Error & e) {
-        e.addPrefix(fmt("while evaluating the derivation attribute 'name' at %1%:\n", posDrvName));
+        e.addTrace(posDrvName, hintfmt("while evaluating the derivation attribute 'name'"));
         throw;
     }
 
@@ -696,8 +697,9 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
             }
 
         } catch (Error & e) {
-            e.addPrefix(format("while evaluating the attribute '%1%' of the derivation '%2%' at %3%:\n")
-                % key % drvName % posDrvName);
+            e.addTrace(posDrvName, 
+                hintfmt("while evaluating the attribute '%1%' of the derivation '%2%'",
+                    key, drvName));
             throw;
         }
     }
