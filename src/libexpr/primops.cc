@@ -769,8 +769,7 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
                 .nixCode = NixCode { .errPos = posDrvName }
             });
 
-        HashType ht = outputHashAlgo.empty() ? htUnknown : parseHashType(outputHashAlgo);
-
+        std::optional<HashType> ht = parseHashTypeOpt(outputHashAlgo);
         Hash h = newHashAllowEmpty(*outputHash, ht);
 
         auto outPath = state.store->makeFixedOutputPath(ingestionMethod, h, drvName);
@@ -1006,8 +1005,8 @@ static void prim_findFile(EvalState & state, const Pos & pos, Value * * args, Va
 static void prim_hashFile(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
     string type = state.forceStringNoCtx(*args[0], pos);
-    HashType ht = parseHashType(type);
-    if (ht == htUnknown)
+    std::optional<HashType> ht = parseHashType(type);
+    if (!ht)
       throw Error({
           .hint = hintfmt("unknown hash type '%1%'", type),
           .nixCode = NixCode { .errPos = pos }
@@ -1016,7 +1015,7 @@ static void prim_hashFile(EvalState & state, const Pos & pos, Value * * args, Va
     PathSet context; // discarded
     Path p = state.coerceToPath(pos, *args[1], context);
 
-    mkString(v, hashFile(ht, state.checkSourcePath(p)).to_string(Base16, false), context);
+    mkString(v, hashFile(*ht, state.checkSourcePath(p)).to_string(Base16, false), context);
 }
 
 /* Read a directory (without . or ..) */
@@ -1943,8 +1942,8 @@ static void prim_stringLength(EvalState & state, const Pos & pos, Value * * args
 static void prim_hashString(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
     string type = state.forceStringNoCtx(*args[0], pos);
-    HashType ht = parseHashType(type);
-    if (ht == htUnknown)
+    std::optional<HashType> ht = parseHashType(type);
+    if (!ht)
         throw Error({
             .hint = hintfmt("unknown hash type '%1%'", type),
             .nixCode = NixCode { .errPos = pos }
@@ -1953,7 +1952,7 @@ static void prim_hashString(EvalState & state, const Pos & pos, Value * * args, 
     PathSet context; // discarded
     string s = state.forceString(*args[1], context, pos);
 
-    mkString(v, hashString(ht, s).to_string(Base16, false), context);
+    mkString(v, hashString(*ht, s).to_string(Base16, false), context);
 }
 
 
