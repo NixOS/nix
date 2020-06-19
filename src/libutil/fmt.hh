@@ -1,6 +1,7 @@
 #pragma once
 
 #include <boost/format.hpp>
+#include <boost/algorithm/string/replace.hpp>
 #include <string>
 #include "ansicolor.hh"
 
@@ -103,7 +104,9 @@ class hintformat
 public:
     hintformat(const string &format) :fmt(format)
     {
-        fmt.exceptions(boost::io::all_error_bits ^ boost::io::too_many_args_bit);
+        fmt.exceptions(boost::io::all_error_bits ^ 
+                       boost::io::too_many_args_bit ^
+                       boost::io::too_few_args_bit);
     }
 
     hintformat(const hintformat &hf)
@@ -136,4 +139,12 @@ inline hintformat hintfmt(const std::string & fs, const Args & ... args)
     return f;
 }
 
+inline hintformat hintfmt(std::string fs)
+{
+    // we won't be receiving any args in this case, so escape all percents.
+    boost::replace_all(fs, "%", "%%");
+    hintformat f(fs);
+    formatHelper(f);
+    return f;
+}
 }
