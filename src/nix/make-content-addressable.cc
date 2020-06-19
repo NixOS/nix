@@ -82,7 +82,7 @@ struct CmdMakeContentAddressable : StorePathsCommand, MixJSON
             if (hasSelfReference) info.references.insert(info.path);
             info.narHash = narHash;
             info.narSize = sink.s->size();
-            info.ca = makeFixedOutputCA(FileIngestionMethod::Recursive, info.narHash);
+            info.ca = makeFixedOutputCA(FileIngestionMethod::Recursive, *info.narHash);
 
             if (!json)
                 printInfo("rewrote '%s' to '%s'", pathS, store->printStorePath(info.path));
