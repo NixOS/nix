@@ -3730,8 +3730,8 @@ void DerivationGoal::registerOutputs()
             /* Check the hash. In hash mode, move the path produced by
                the derivation to its content-addressed location. */
             Hash h2 = i.second.hash->method == FileIngestionMethod::Recursive
-                ? hashPath(i.second.hash->hash.type, actualPath).first
-                : hashFile(i.second.hash->hash.type, actualPath);
+                ? hashPath(*i.second.hash->hash.type, actualPath).first
+                : hashFile(*i.second.hash->hash.type, actualPath);
 
             auto dest = worker.store.makeFixedOutputPath(i.second.hash->method, h2, i.second.path.name());
 
@@ -5023,7 +5023,7 @@ bool Worker::pathContentsGood(const StorePath & path)
     if (!pathExists(store.printStorePath(path)))
         res = false;
     else {
-        HashResult current = hashPath(info->narHash.type, store.printStorePath(path));
+        HashResult current = hashPath(*info->narHash.type, store.printStorePath(path));
         Hash nullHash(htSHA256);
         res = info->narHash == nullHash || info->narHash == current.first;
     }

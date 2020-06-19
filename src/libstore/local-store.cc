@@ -1267,9 +1267,9 @@ bool LocalStore::verifyStore(bool checkContents, RepairFlag repair)
 
                 std::unique_ptr<AbstractHashSink> hashSink;
                 if (info->ca == "" || !info->references.count(info->path))
-                    hashSink = std::make_unique<HashSink>(info->narHash.type);
+                    hashSink = std::make_unique<HashSink>(*info->narHash.type);
                 else
-                    hashSink = std::make_unique<HashModuloSink>(info->narHash.type, std::string(info->path.hashPart()));
+                    hashSink = std::make_unique<HashModuloSink>(*info->narHash.type, std::string(info->path.hashPart()));
 
                 dumpPath(Store::toRealPath(i), *hashSink);
                 auto current = hashSink->finish();

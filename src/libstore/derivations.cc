@@ -9,7 +9,7 @@
 namespace nix {
 
 std::string DerivationOutputHash::printMethodAlgo() const {
-    return makeFileIngestionPrefix(method) + printHashType(hash.type);
+    return makeFileIngestionPrefix(method) + printHashType(*hash.type);
 }
 
 
@@ -121,8 +121,6 @@ static DerivationOutput parseDerivationOutput(const Store & store, istringstream
             hashAlgo = string(hashAlgo, 2);
         }
         const HashType hashType = parseHashType(hashAlgo);
-        if (hashType == htUnknown)
-            throw Error("unknown hash hashAlgorithm '%s'", hashAlgo);
         fsh = DerivationOutputHash {
             .method = std::move(method),
             .hash = Hash(hash, hashType),
@@ -421,8 +419,6 @@ static DerivationOutput readDerivationOutput(Source & in, const Store & store)
             hashAlgo = string(hashAlgo, 2);
         }
         const HashType hashType = parseHashType(hashAlgo);
-        if (hashType == htUnknown)
-            throw Error("unknown hash hashAlgorithm '%s'", hashAlgo);
         fsh = DerivationOutputHash {
             .method = std::move(method),
             .hash = Hash(hash, hashType),

@@ -111,10 +111,14 @@ void Store::computeFSClosure(const StorePath & startPath,
 std::optional<std::string> getDerivationCA(const BasicDerivation & drv)
 {
     auto outputHashMode = drv.env.find("outputHashMode");
-    auto outputHashAlgo = drv.env.find("outputHashAlgo");
     auto outputHash = drv.env.find("outputHash");
-    if (outputHashMode != drv.env.end() && outputHashAlgo != drv.env.end() && outputHash != drv.env.end()) {
-        auto ht = parseHashType(outputHashAlgo->second);
+
+    std::optional<HashType> ht = std::nullopt;
+    auto outputHashAlgo = drv.env.find("outputHashAlgo");
+    if (outputHashAlgo != drv.env.end())
+        ht = parseHashTypeOpt(outputHashAlgo->second);
+
+    if (outputHashMode != drv.env.end() && outputHash != drv.env.end()) {
         auto h = Hash(outputHash->second, ht);
         FileIngestionMethod ingestionMethod;
         if (outputHashMode->second == "recursive")
