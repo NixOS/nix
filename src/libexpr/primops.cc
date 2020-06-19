@@ -775,10 +775,11 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
         auto outPath = state.store->makeFixedOutputPath(ingestionMethod, h, drvName);
         if (!jsonObject) drv.env["out"] = state.store->printStorePath(outPath);
         drv.outputs.insert_or_assign("out", DerivationOutput {
-            std::move(outPath),
-            (ingestionMethod == FileIngestionMethod::Recursive ? "r:" : "")
-                + printHashType(*h.type),
-            h.to_string(Base16, false),
+            .path = std::move(outPath),
+            .hash = DerivationOutputHash {
+                .method = ingestionMethod,
+                .hash = std::move(h),
+            },
         });
     }
 
@@ -792,7 +793,10 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
         for (auto & i : outputs) {
             if (!jsonObject) drv.env[i] = "";
             drv.outputs.insert_or_assign(i,
-                DerivationOutput { StorePath::dummy, "", "" });
+                DerivationOutput {
+                    .path = StorePath::dummy,
+                    .hash = std::optional<DerivationOutputHash> {},
+                });
         }
 
         Hash h = hashDerivationModulo(*state.store, Derivation(drv), true);
@@ -801,7 +805,10 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
             auto outPath = state.store->makeOutputPath(i, h, drvName);
             if (!jsonObject) drv.env[i] = state.store->printStorePath(outPath);
             drv.outputs.insert_or_assign(i,
-                DerivationOutput { std::move(outPath), "", "" });
+                DerivationOutput {
+                    .path = std::move(outPath),
+                    .hash = std::optional<DerivationOutputHash>(),
+                });
         }
     }
 
