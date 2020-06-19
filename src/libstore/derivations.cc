@@ -267,7 +267,7 @@ string Derivation::unparse(const Store & store, bool maskOutputs,
         s += ','; printUnquotedString(s, maskOutputs ? "" : store.printStorePath(i.second.path));
         s += ','; printUnquotedString(s, i.second.hash ? i.second.hash->printMethodAlgo() : "");
         s += ','; printUnquotedString(s,
-            i.second.hash ? i.second.hash->hash.to_string(Base::Base16, false) : "");
+            i.second.hash ? i.second.hash->hash.to_string(Base16, false) : "");
         s += ')';
     }
 
@@ -467,7 +467,7 @@ void writeDerivation(Sink & out, const Store & store, const BasicDerivation & dr
         out << i.first
             << store.printStorePath(i.second.path)
             << i.second.hash->printMethodAlgo()
-            << i.second.hash->hash.to_string(Base::Base16, false);
+            << i.second.hash->hash.to_string(Base16, false);
     writeStorePaths(store, out, drv.inputSrcs);
     out << drv.platform << drv.builder << drv.args;
     out << drv.env.size();

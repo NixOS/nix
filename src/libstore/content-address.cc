@@ -31,7 +31,7 @@ template<class... Ts> overloaded(Ts...) -> overloaded<Ts...>;
 std::string renderContentAddress(ContentAddress ca) {
     return std::visit(overloaded {
         [](TextHash th) {
-            return "text:" + th.hash.to_string(Base::Base32, true);
+            return "text:" + th.hash.to_string(Base32, true);
         },
         [](FileSystemHash fsh) {
             return makeFixedOutputCA(fsh.method, fsh.hash);

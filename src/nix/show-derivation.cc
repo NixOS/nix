@@ -72,7 +72,7 @@ struct CmdShowDerivation : InstallablesCommand
                     outputObj.attr("path", store->printStorePath(output.second.path));
                     if (output.second.hash) {
                         outputObj.attr("hashAlgo", output.second.hash->printMethodAlgo());
-                        outputObj.attr("hash", output.second.hash->hash.to_string(Base::Base16, false));
+                        outputObj.attr("hash", output.second.hash->hash.to_string(Base16, false));
                     }
                 }
             }
