@@ -241,13 +241,13 @@ struct CmdFlakeCheck : FlakeCommand
 
         std::vector<StorePathWithOutputs> drvPaths;
 
-        auto checkApp = [&](const std::string & attrPath, Value & v, const Pos & pos) {
+        auto checkApp = [&](const std::string & attrPath, Value & v, const Pos & pos, const std::string & system) {
             try {
                 auto app = App(*state, v);
                 for (auto & i : app.context) {
                     auto [drvPathS, outputName] = decodeContext(i);
                     auto drvPath = store->parseStorePath(drvPathS);
-                    if (!outputName.empty() && drvPath.isDerivation())
+                    if (!outputName.empty() && drvPath.isDerivation() && system == settings.thisSystem.get())
                         drvPaths.push_back({drvPath});
                 }
             } catch (Error & e) {
@@ -417,7 +417,7 @@ struct CmdFlakeCheck : FlakeCommand
                                 for (auto & attr2 : *attr.value->attrs)
                                     checkApp(
                                         fmt("%s.%s.%s", name, attr.name, attr2.name),
-                                        *attr2.value, *attr2.pos);
+                                        *attr2.value, *attr2.pos, attr.name);
                             }
                         }
 
@@ -437,7 +437,7 @@ struct CmdFlakeCheck : FlakeCommand
                                 checkSystemName(attr.name, *attr.pos);
                                 checkApp(
                                     fmt("%s.%s", name, attr.name),
-                                    *attr.value, *attr.pos);
+                                    *attr.value, *attr.pos, attr.name);
                             }
                         }
 
