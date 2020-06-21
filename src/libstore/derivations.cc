@@ -404,7 +404,7 @@ DrvHashModulo hashDerivationModulo(Store & store, const Derivation & drv, bool m
             },
             // CA derivation's output hashes
             [&](CaOutputHashes outputHashes) {
-                std::set justOut = { std::string("out") };
+                std::set<std::string> justOut = { "out" };
                 for (auto & output : i.second) {
                     /* Put each one in with a single "out" output.. */
                     const auto h = outputHashes.at(output);
