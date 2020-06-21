@@ -13,17 +13,18 @@ namespace nix {
 
 /* Abstract syntax of derivations. */
 
+/// Pair of a hash, and how the file system was ingested
+struct DerivationOutputHash {
+    FileIngestionMethod method;
+    Hash hash;
+    std::string printMethodAlgo() const;
+};
+
 template<typename Path>
 struct DerivationOutputT
 {
     Path path;
-    std::string hashAlgo; /* hash used for expected hash computation */
-    std::string hash; /* expected hash, may be null */
-    DerivationOutputT(Path && path, std::string && hashAlgo, std::string && hash)
-        : path(std::move(path))
-        , hashAlgo(std::move(hashAlgo))
-        , hash(std::move(hash))
-    { }
+    std::optional<DerivationOutputHash> hash; /* hash used for expected hash computation */
     void parseHashInfo(FileIngestionMethod & recursive, Hash & hash) const;
 };
 
@@ -49,7 +50,6 @@ struct BasicDerivationT
     StringPairs env;
 
     BasicDerivationT() { }
-    explicit BasicDerivationT(const BasicDerivationT<OutputPath> & other);
     virtual ~BasicDerivationT() { };
 
     /* Return the path corresponding to the output identifier `id' in
@@ -61,6 +61,8 @@ struct BasicDerivationT
     /* Return true iff this is a fixed-output derivation. */
     bool isFixedOutput() const;
 
+    /* Return the output names of a derivation. */
+    StringSet outputNames() const;
 };
 
 typedef BasicDerivationT<StorePath> BasicDerivation;
@@ -68,11 +70,7 @@ typedef BasicDerivationT<StorePath> BasicDerivation;
 /* Return the output paths of a derivation. */
 std::set<StorePath> outputPaths(const BasicDerivation &);
 
-struct NoPath: std::monostate {
-    constexpr NoPath clone() const {
-        return *this;
-    };
-};
+struct NoPath : std::monostate {};
 
 /* For inputs that are sub-derivations, we specify exactly which
    output IDs we are interested in. */
@@ -91,8 +89,6 @@ struct DerivationT : BasicDerivationT<OutputPath>
         std::map<std::string, StringSet> * actualInputs = nullptr) const;
 
     DerivationT() { }
-    DerivationT(DerivationT<InputDrvPath, OutputPath> && other) = default;
-    explicit DerivationT(const DerivationT<InputDrvPath, OutputPath> & other);
 };
 
 typedef DerivationT<StorePath, StorePath> Derivation;

@@ -92,6 +92,37 @@
 </varlistentry>
 
 
+<varlistentry xml:id="opt-log-format"><term><option>--log-format</option> <replaceable>format</replaceable></term>
+
+  <listitem>
+
+  <para>This option can be used to change the output of the log format, with
+  <replaceable>format</replaceable> being one of:</para>
+
+  <variablelist>
+
+    <varlistentry><term>raw</term>
+    <listitem><para>This is the raw format, as outputted by nix-build.</para></listitem>
+    </varlistentry>
+
+    <varlistentry><term>internal-json</term>
+    <listitem><para>Outputs the logs in a structured manner. NOTE: the json schema is not guarantees to be stable between releases.</para></listitem>
+    </varlistentry>
+
+    <varlistentry><term>bar</term>
+    <listitem><para>Only display a progress bar during the builds.</para></listitem>
+    </varlistentry>
+
+    <varlistentry><term>bar-with-logs</term>
+    <listitem><para>Display the raw logs, with the progress bar at the bottom.</para></listitem>
+    </varlistentry>
+
+  </variablelist>
+
+  </listitem>
+
+</varlistentry>
+
 <varlistentry><term><option>--no-build-output</option> / <option>-Q</option></term>
 
   <listitem><para>By default, output written by builders to standard

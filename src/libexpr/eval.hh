@@ -18,7 +18,7 @@ namespace nix {
 
 class Store;
 class EvalState;
-struct StorePath;
+class StorePath;
 enum RepairFlag : bool;
 
 
@@ -74,7 +74,8 @@ public:
         sSystem, sOverrides, sOutputs, sOutputName, sIgnoreNulls,
         sFile, sLine, sColumn, sFunctor, sToString,
         sRight, sWrong, sStructuredAttrs, sBuilder, sArgs,
-        sOutputHash, sOutputHashAlgo, sOutputHashMode;
+        sOutputHash, sOutputHashAlgo, sOutputHashMode,
+        sRecurseForDerivations;
     Symbol sDerivationNix;
 
     /* If set, force copying files to the Nix store even if they
@@ -324,6 +325,7 @@ private:
 
 
 /* Return a string representing the type of the value `v'. */
+string showType(ValueType type);
 string showType(const Value & v);
 
 /* Decode a context string ‘!<name>!<path>’ into a pair <path,

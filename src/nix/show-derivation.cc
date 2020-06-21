@@ -61,20 +61,18 @@ struct CmdShowDerivation : InstallablesCommand
         for (auto & drvPath : drvPaths) {
             if (!drvPath.isDerivation()) continue;
 
-            auto drvPathS = store->printStorePath(drvPath);
+            auto drvObj(jsonRoot.object(store->printStorePath(drvPath)));
 
-            auto drvObj(jsonRoot.object(drvPathS));
-
-            auto drv = readDerivation(*store, drvPathS);
+            auto drv = store->readDerivation(drvPath);
 
             {
                 auto outputsObj(drvObj.object("outputs"));
                 for (auto & output : drv.outputs) {
                     auto outputObj(outputsObj.object(output.first));
                     outputObj.attr("path", store->printStorePath(output.second.path));
-                    if (output.second.hash != "") {
-                        outputObj.attr("hashAlgo", output.second.hashAlgo);
-                        outputObj.attr("hash", output.second.hash);
+                    if (output.second.hash) {
+                        outputObj.attr("hashAlgo", output.second.hash->printMethodAlgo());
+                        outputObj.attr("hash", output.second.hash->hash.to_string(Base16, false));
                     }
                 }
             }
