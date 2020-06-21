@@ -388,8 +388,6 @@ void BinaryCacheStore::addSignatures(const StorePath & storePath, const StringSe
 
     narInfo->sigs.insert(sigs.begin(), sigs.end());
 
-    auto narInfoFile = narInfoFileFor(narInfo->path);
-
     writeNarInfo(narInfo);
 }
 

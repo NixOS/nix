@@ -50,20 +50,20 @@ void EvalState::realiseContext(const PathSet & context)
     std::vector<StorePathWithOutputs> drvs;
 
     for (auto & i : context) {
-        std::pair<string, string> decoded = decodeContext(i);
-        auto ctx = store->parseStorePath(decoded.first);
+        auto [ctxS, outputName] = decodeContext(i);
+        auto ctx = store->parseStorePath(ctxS);
         if (!store->isValidPath(ctx))
             throw InvalidPathError(store->printStorePath(ctx));
-        if (!decoded.second.empty() && ctx.isDerivation()) {
-            drvs.push_back(StorePathWithOutputs{ctx, {decoded.second}});
+        if (!outputName.empty() && ctx.isDerivation()) {
+            drvs.push_back(StorePathWithOutputs{ctx, {outputName}});
 
             /* Add the output of this derivation to the allowed
                paths. */
             if (allowedPaths) {
-                auto drv = store->derivationFromPath(store->parseStorePath(decoded.first));
-                DerivationOutputs::iterator i = drv.outputs.find(decoded.second);
+                auto drv = store->derivationFromPath(ctx);
+                DerivationOutputs::iterator i = drv.outputs.find(outputName);
                 if (i == drv.outputs.end())
-                    throw Error("derivation '%s' does not have an output named '%s'", decoded.first, decoded.second);
+                    throw Error("derivation '%s' does not have an output named '%s'", ctxS, outputName);
                 allowedPaths->insert(store->printStorePath(i->second.path));
             }
         }
@@ -79,6 +79,7 @@ void EvalState::realiseContext(const PathSet & context)
     StorePathSet willBuild, willSubstitute, unknown;
     unsigned long long downloadSize, narSize;
     store->queryMissing(drvs, willBuild, willSubstitute, unknown, downloadSize, narSize);
+
     store->buildPaths(drvs);
 }
 
@@ -768,17 +769,17 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
                 .nixCode = NixCode { .errPos = posDrvName }
             });
 
-        HashType ht = outputHashAlgo.empty() ? htUnknown : parseHashType(outputHashAlgo);
-
+        std::optional<HashType> ht = parseHashTypeOpt(outputHashAlgo);
         Hash h = newHashAllowEmpty(*outputHash, ht);
 
         auto outPath = state.store->makeFixedOutputPath(ingestionMethod, h, drvName);
         if (!jsonObject) drv.env["out"] = state.store->printStorePath(outPath);
         drv.outputs.insert_or_assign("out", DerivationOutput {
-            std::move(outPath),
-            (ingestionMethod == FileIngestionMethod::Recursive ? "r:" : "")
-                + printHashType(h.type),
-            h.to_string(Base16, false),
+            .path = std::move(outPath),
+            .hash = DerivationOutputHash {
+                .method = ingestionMethod,
+                .hash = std::move(h),
+            },
         });
     }
 
@@ -792,7 +793,10 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
         for (auto & i : outputs) {
             if (!jsonObject) drv.env[i] = "";
             drv.outputs.insert_or_assign(i,
-                DerivationOutput { StorePath::dummy, "", "" });
+                DerivationOutput {
+                    .path = StorePath::dummy,
+                    .hash = std::optional<DerivationOutputHash> {},
+                });
         }
 
         Hash h = hashDerivationModulo(*state.store, Derivation(drv), true);
@@ -801,7 +805,10 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
             auto outPath = state.store->makeOutputPath(i, h, drvName);
             if (!jsonObject) drv.env[i] = state.store->printStorePath(outPath);
             drv.outputs.insert_or_assign(i,
-                DerivationOutput { std::move(outPath), "", "" });
+                DerivationOutput {
+                    .path = std::move(outPath),
+                    .hash = std::optional<DerivationOutputHash>(),
+                });
         }
     }
 
@@ -998,8 +1005,8 @@ static void prim_findFile(EvalState & state, const Pos & pos, Value * * args, Va
 static void prim_hashFile(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
     string type = state.forceStringNoCtx(*args[0], pos);
-    HashType ht = parseHashType(type);
-    if (ht == htUnknown)
+    std::optional<HashType> ht = parseHashType(type);
+    if (!ht)
       throw Error({
           .hint = hintfmt("unknown hash type '%1%'", type),
           .nixCode = NixCode { .errPos = pos }
@@ -1008,7 +1015,7 @@ static void prim_hashFile(EvalState & state, const Pos & pos, Value * * args, Va
     PathSet context; // discarded
     Path p = state.coerceToPath(pos, *args[1], context);
 
-    mkString(v, hashFile(ht, state.checkSourcePath(p)).to_string(Base16, false), context);
+    mkString(v, hashFile(*ht, state.checkSourcePath(p)).to_string(Base16, false), context);
 }
 
 /* Read a directory (without . or ..) */
@@ -1935,8 +1942,8 @@ static void prim_stringLength(EvalState & state, const Pos & pos, Value * * args
 static void prim_hashString(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
     string type = state.forceStringNoCtx(*args[0], pos);
-    HashType ht = parseHashType(type);
-    if (ht == htUnknown)
+    std::optional<HashType> ht = parseHashType(type);
+    if (!ht)
         throw Error({
             .hint = hintfmt("unknown hash type '%1%'", type),
             .nixCode = NixCode { .errPos = pos }
@@ -1945,7 +1952,7 @@ static void prim_hashString(EvalState & state, const Pos & pos, Value * * args, 
     PathSet context; // discarded
     string s = state.forceString(*args[1], context, pos);
 
-    mkString(v, hashString(ht, s).to_string(Base16, false), context);
+    mkString(v, hashString(*ht, s).to_string(Base16, false), context);
 }
 
 
@@ -2201,10 +2208,11 @@ static void prim_splitVersion(EvalState & state, const Pos & pos, Value * * args
 RegisterPrimOp::PrimOps * RegisterPrimOp::primOps;
 
 
-RegisterPrimOp::RegisterPrimOp(std::string name, size_t arity, PrimOpFun fun)
+RegisterPrimOp::RegisterPrimOp(std::string name, size_t arity, PrimOpFun fun,
+    std::optional<std::string> requiredFeature)
 {
     if (!primOps) primOps = new PrimOps;
-    primOps->emplace_back(name, arity, fun);
+    primOps->push_back({name, arity, fun, requiredFeature});
 }
 
 
@@ -2396,7 +2404,8 @@ void EvalState::createBaseEnv()
 
     if (RegisterPrimOp::primOps)
         for (auto & primOp : *RegisterPrimOp::primOps)
-            addPrimOp(std::get<0>(primOp), std::get<1>(primOp), std::get<2>(primOp));
+            if (!primOp.requiredFeature || settings.isExperimentalFeatureEnabled(*primOp.requiredFeature))
+                addPrimOp(primOp.name, primOp.arity, primOp.primOp);
 
     /* Now that we've added all primops, sort the `builtins' set,
        because attribute lookups expect it to be sorted. */

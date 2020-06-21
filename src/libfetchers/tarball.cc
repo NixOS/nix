@@ -264,7 +264,7 @@ struct TarballInputScheme : InputScheme
 
         auto input = std::make_unique<TarballInput>(parseURL(getStrAttr(attrs, "url")));
         if (auto hash = maybeGetStrAttr(attrs, "hash"))
-            input->hash = newHashAllowEmpty(*hash, htUnknown);
+            input->hash = newHashAllowEmpty(*hash, {});
 
         return input;
     }
