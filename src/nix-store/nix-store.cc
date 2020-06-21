@@ -725,7 +725,7 @@ static void opVerifyPath(Strings opFlags, Strings opArgs)
         auto path = store->followLinksToStorePath(i);
         printMsg(lvlTalkative, "checking path '%s'...", store->printStorePath(path));
         auto info = store->queryPathInfo(path);
-        HashSink sink(info->narHash.type);
+        HashSink sink(*info->narHash.type);
         store->narFromPath(path, sink);
         auto current = sink.finish();
         if (current.first != info->narHash) {

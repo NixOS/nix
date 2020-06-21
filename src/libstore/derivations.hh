@@ -13,11 +13,17 @@ namespace nix {
 
 /* Abstract syntax of derivations. */
 
+/// Pair of a hash, and how the file system was ingested
+struct DerivationOutputHash {
+    FileIngestionMethod method;
+    Hash hash;
+    std::string printMethodAlgo() const;
+};
+
 struct DerivationOutput
 {
     StorePath path;
-    std::string hashAlgo; /* hash used for expected hash computation */
-    std::string hash; /* expected hash, may be null */
+    std::optional<DerivationOutputHash> hash; /* hash used for expected hash computation */
     void parseHashInfo(FileIngestionMethod & recursive, Hash & hash) const;
 };
 
@@ -82,9 +88,13 @@ Derivation readDerivation(const Store & store, const Path & drvPath);
 // FIXME: remove
 bool isDerivation(const string & fileName);
 
+// known CA drv's output hashes, current just for fixed-output derivations
+// whose output hashes are always known since they are fixed up-front.
+typedef std::map<std::string, Hash> CaOutputHashes;
+
 typedef std::variant<
     Hash, // regular DRV normalized hash
-    std::map<std::string, Hash> // known CA drv's output hashes
+    CaOutputHashes
 > DrvHashModulo;
 
 /* Returns hashes with the details of fixed-output subderivations
