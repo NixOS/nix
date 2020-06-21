@@ -561,10 +561,12 @@ void LocalStore::checkDerivationOutputs(const StorePath & drvPath, const Derivat
         if (out == drv.outputs.end())
             throw Error("derivation '%s' does not have an output named 'out'", printStorePath(drvPath));
 
-        FileIngestionMethod method; Hash h;
-        out->second.parseHashInfo(method, h);
-
-        check(makeFixedOutputPath(method, h, drvName), out->second.path, "out");
+        check(
+            makeFixedOutputPath(
+                out->second.hash->method,
+                out->second.hash->hash,
+                drvName),
+            out->second.path, "out");
     }
 
     else {
@@ -1253,9 +1255,9 @@ bool LocalStore::verifyStore(bool checkContents, RepairFlag repair)
 
                 std::unique_ptr<AbstractHashSink> hashSink;
                 if (info->ca == "" || !info->references.count(info->path))
-                    hashSink = std::make_unique<HashSink>(info->narHash.type);
+                    hashSink = std::make_unique<HashSink>(*info->narHash.type);
                 else
-                    hashSink = std::make_unique<HashModuloSink>(info->narHash.type, std::string(info->path.hashPart()));
+                    hashSink = std::make_unique<HashModuloSink>(*info->narHash.type, std::string(info->path.hashPart()));
 
                 dumpPath(Store::toRealPath(i), *hashSink);
                 auto current = hashSink->finish();
