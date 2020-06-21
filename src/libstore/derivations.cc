@@ -359,21 +359,9 @@ DerivationType BasicDerivation::type() const
         outputs.begin()->second.hash != "")
     {
         return DerivationType::CAFixed;
+    } else {
+        return DerivationType::Regular;
     }
-
-    auto const algo = outputs.begin()->second.hashAlgo;
-    if (algo != "") {
-        throw Error("Invalid mix of CA and regular outputs");
-    }
-    for (auto & i : outputs) {
-        if (i.second.hash != "") {
-            throw Error("Non-fixed-output derivation has fixed output");
-        }
-        if (i.second.hashAlgo != "") {
-            throw Error("Invalid mix of CA and regular outputs");
-        }
-    }
-    return DerivationType::Regular;
 }
 
 
