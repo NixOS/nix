@@ -4,7 +4,7 @@
 #include "nixexpr.hh"
 #include "profiles.hh"
 
-extern char * * environ;
+extern char * * environ __attribute__((weak));
 
 namespace nix {
 
@@ -59,19 +59,19 @@ void StorePathsCommand::run(ref<Store> store)
         if (installables.size())
             throw UsageError("'--all' does not expect arguments");
         for (auto & p : store->queryAllValidPaths())
-            storePaths.push_back(p.clone());
+            storePaths.push_back(p);
     }
 
     else {
         for (auto & p : toStorePaths(store, realiseMode, installables))
-            storePaths.push_back(p.clone());
+            storePaths.push_back(p);
 
         if (recursive) {
             StorePathSet closure;
-            store->computeFSClosure(storePathsToSet(storePaths), closure, false, false);
+            store->computeFSClosure(StorePathSet(storePaths.begin(), storePaths.end()), closure, false, false);
             storePaths.clear();
             for (auto & p : closure)
-                storePaths.push_back(p.clone());
+                storePaths.push_back(p);
         }
     }
 
@@ -133,7 +133,7 @@ void MixProfile::updateProfile(const Buildables & buildables)
         for (auto & output : buildable.outputs) {
             if (result)
                 throw Error("'--profile' requires that the arguments produce a single store path, but there are multiple");
-            result = output.second.clone();
+            result = output.second;
         }
     }
 

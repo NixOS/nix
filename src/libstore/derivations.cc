@@ -8,39 +8,15 @@
 
 namespace nix {
 
-std::string FileSystemHash::printMethodAlgo() const {
-    return makeFileIngestionPrefix(method) + printHashType(hash.type);
+std::string DerivationOutputHash::printMethodAlgo() const {
+    return makeFileIngestionPrefix(method) + printHashType(*hash.type);
 }
-
-template<typename Path>
-BasicDerivationT<Path>::BasicDerivationT(const BasicDerivationT<Path> & other)
-    : platform(other.platform)
-    , builder(other.builder)
-    , args(other.args)
-    , env(other.env)
-{
-    for (auto & i : other.outputs)
-        outputs.insert_or_assign(i.first,
-            DerivationOutputT(i.second.path.clone(), std::optional<FileSystemHash>(i.second.hash)));
-    for (auto & i : other.inputSrcs)
-        inputSrcs.insert(i.clone());
-}
-
 
 template<typename InputDrvPath, typename OutputPath>
 DerivationT<InputDrvPath, OutputPath>::DerivationT(const BasicDerivationT<OutputPath> & other)
     : BasicDerivationT<OutputPath>(other)
 {
 }
-
-template<typename InputDrvPath, typename OutputPath>
-DerivationT<InputDrvPath, OutputPath>::DerivationT(const DerivationT<InputDrvPath, OutputPath> & other)
-    : BasicDerivationT<OutputPath>(other)
-{
-    for (auto & i : other.inputDrvs)
-        inputDrvs.insert_or_assign(i.first.clone(), i.second);
-}
-
 
 template<typename Path>
 const Path & BasicDerivationT<Path>::findOutput(const string & id) const
@@ -62,9 +38,9 @@ bool BasicDerivationT<Path>::isBuiltin() const
 StorePath writeDerivation(ref<Store> store,
     const Derivation & drv, std::string_view name, RepairFlag repair)
 {
-    auto references = cloneStorePathSet(drv.inputSrcs);
+    auto references = drv.inputSrcs;
     for (auto & i : drv.inputDrvs)
-        references.insert(i.first.clone());
+        references.insert(i.first);
     /* Note that the outputs of a derivation are *not* references
        (that can be missing (of course) and should not necessarily be
        held during a garbage collection). */
@@ -82,7 +58,7 @@ static void expect(std::istream & str, const string & s)
     char s2[s.size()];
     str.read(s2, s.size());
     if (string(s2, s.size()) != s)
-        throw FormatError(format("expected string '%1%'") % s);
+        throw FormatError("expected string '%1%'", s);
 }
 
 
@@ -109,7 +85,7 @@ static Path parsePath(std::istream & str)
 {
     string s = parseString(str);
     if (s.size() == 0 || s[0] != '/')
-        throw FormatError(format("bad path '%1%' in derivation") % s);
+        throw FormatError("bad path '%1%' in derivation", s);
     return s;
 }
 
@@ -144,23 +120,24 @@ static DerivationOutput parseDerivationOutput(const Store & store, istringstream
     expect(str, ","); const auto hash = parseString(str);
     expect(str, ")");
 
-    auto method = FileIngestionMethod::Flat;
-    std::optional<FileSystemHash> fsh;
+    std::optional<DerivationOutputHash> fsh;
     if (hashAlgo != "") {
+        auto method = FileIngestionMethod::Flat;
         if (string(hashAlgo, 0, 2) == "r:") {
             method = FileIngestionMethod::Recursive;
             hashAlgo = string(hashAlgo, 2);
         }
         const HashType hashType = parseHashType(hashAlgo);
-        if (hashType == htUnknown)
-            throw Error("unknown hash hashAlgorithm '%s'", hashAlgo);
-        fsh = FileSystemHash {
-            std::move(method),
-            Hash(hash, hashType),
+        fsh = DerivationOutputHash {
+            .method = std::move(method),
+            .hash = Hash(hash, hashType),
         };
     }
 
-    return DerivationOutput(std::move(path), std::move(fsh));
+    return DerivationOutput {
+        .path = std::move(path),
+        .hash = std::move(fsh),
+    };
 }
 
 
@@ -173,7 +150,8 @@ static Derivation parseDerivation(const Store & store, const string & s)
     /* Parse the list of outputs. */
     while (!endOfList(str)) {
         expect(str, "("); std::string id = parseString(str);
-        drv.outputs.emplace(id, parseDerivationOutput(store, str));
+        auto output = parseDerivationOutput(store, str);
+        drv.outputs.emplace(std::move(id), std::move(output));
     }
 
     /* Parse the list of input derivations. */
@@ -214,7 +192,7 @@ Derivation readDerivation(const Store & store, const Path & drvPath)
     try {
         return parseDerivation(store, readFile(drvPath));
     } catch (FormatError & e) {
-        throw Error(format("error parsing derivation '%1%': %2%") % drvPath % e.msg());
+        throw Error("error parsing derivation '%1%': %2%", drvPath, e.msg());
     }
 }
 
@@ -222,6 +200,12 @@ Derivation readDerivation(const Store & store, const Path & drvPath)
 Derivation Store::derivationFromPath(const StorePath & drvPath)
 {
     ensurePath(drvPath);
+    return readDerivation(drvPath);
+}
+
+
+Derivation Store::readDerivation(const StorePath & drvPath)
+{
     auto accessor = getFSAccessor();
     try {
         return parseDerivation(*this, accessor->readFile(printStorePath(drvPath)));
@@ -415,7 +399,7 @@ static const Hash & pathDerivationModulo(Store & store, const StorePath & drvPat
                     store,
                     store.toRealPath(store.printStorePath(drvPath))));
         const auto hash = hashDerivationOrPseudo(store, std::move(drvOrPseudo));
-        h = drvHashes.insert_or_assign(drvPath.clone(), std::move(hash)).first;
+        h = drvHashes.insert_or_assign(drvPath, std::move(hash)).first;
     }
     // Cache it
     return h->second;
@@ -440,7 +424,7 @@ DerivationT<Hash, OutPath> derivationModulo(
     Store & store,
     const DerivationT<StorePath, OutPath> & drv)
 {
-    DerivationT<Hash, OutPath> drvNorm((BasicDerivationT<OutPath>)drv);
+    DerivationT<Hash, OutPath> drvNorm { (const BasicDerivationT<OutPath> &)drv };
     for (auto & i : drv.inputDrvs) {
         const auto h = pathDerivationModulo(store, i.first);
         drvNorm.inputDrvs.insert_or_assign(h, i.second);
@@ -518,9 +502,7 @@ DerivationT<InputDrvPath, StorePath> bakeDerivationPaths(
     const std::string & drvName)
 {
     DerivationT<InputDrvPath, StorePath> drvFinal;
-    //drvFinal.inputSrcs = drv.inputSrcs;
-    for (auto & i : drv.inputSrcs)
-        drvFinal.inputSrcs.insert(i.clone());
+    drvFinal.inputSrcs = drv.inputSrcs;
     drvFinal.platform = drv.platform;
     drvFinal.builder = drv.builder;
     drvFinal.args = drv.args;
@@ -531,8 +513,8 @@ DerivationT<InputDrvPath, StorePath> bakeDerivationPaths(
         for (const auto i : drv.outputs) {
             auto outPath = store.makeOutputPath(i.first, hash, drvName);
             drvFinal.outputs.insert_or_assign(i.first, DerivationOutput {
-                std::move(outPath),
-                std::optional<FileSystemHash> {},
+                .path = std::move(outPath),
+                .hash = std::optional<DerivationOutputHash> {},
             });
         }
     } else if (std::get_if<1>(&drvOrPseudo)) {
@@ -543,8 +525,8 @@ DerivationT<InputDrvPath, StorePath> bakeDerivationPaths(
         assert(output.hash);
         auto outPath = store.makeFixedOutputPath(output.hash->method, output.hash->hash, drvName);
         drvFinal.outputs.insert_or_assign("out", DerivationOutput {
-            std::move(outPath),
-            std::optional { output.hash },
+            .path = std::move(outPath),
+            .hash = std::optional { output.hash },
         });
     }
     return drvFinal;
@@ -556,17 +538,15 @@ DerivationT<InputDrvPath, NoPath> stripDerivationPaths(
     const DerivationT<InputDrvPath, StorePath> & drv)
 {
     DerivationT<InputDrvPath, NoPath> drvInitial;
-    //drvInitial.inputSrcs = drv.inputSrcs;
-    for (auto & i : drv.inputSrcs)
-        drvInitial.inputSrcs.insert(i.clone());
+    drvInitial.inputSrcs = drv.inputSrcs;
     drvInitial.platform = drv.platform;
     drvInitial.builder = drv.builder;
     drvInitial.args = drv.args;
     drvInitial.env = drv.env;
     for (const auto & i : drv.outputs) {
-        drvInitial.outputs.insert_or_assign(i.first, DerivationOutputT {
-            NoPath {},
-            std::optional { i.second.hash },
+        drvInitial.outputs.insert_or_assign(i.first, DerivationOutputT<NoPath> {
+			.path = NoPath {},
+            .hash = i.second.hash,
         });
     }
     return drvInitial;
@@ -590,7 +570,7 @@ std::set<StorePath> outputPaths(const BasicDerivation & drv)
 {
     StorePathSet paths;
     for (auto & i : drv.outputs)
-        paths.insert(i.second.path.clone());
+        paths.insert(i.second.path);
     return paths;
 }
 
@@ -600,24 +580,35 @@ static DerivationOutput readDerivationOutput(Source & in, const Store & store)
     auto hashAlgo = readString(in);
     const auto hash = readString(in);
 
-    auto method = FileIngestionMethod::Flat;
-    std::optional<FileSystemHash> fsh;
+    std::optional<DerivationOutputHash> fsh;
     if (hashAlgo != "") {
+        auto method = FileIngestionMethod::Flat;
         if (string(hashAlgo, 0, 2) == "r:") {
             method = FileIngestionMethod::Recursive;
             hashAlgo = string(hashAlgo, 2);
         }
-        HashType hashType = parseHashType(hashAlgo);
-        if (hashType == htUnknown)
-            throw Error("unknown hash hashAlgorithm '%s'", hashAlgo);
-        fsh = FileSystemHash {
-            std::move(method),
-            Hash(hash, hashType),
+        const HashType hashType = parseHashType(hashAlgo);
+        fsh = DerivationOutputHash {
+            .method = std::move(method),
+            .hash = Hash(hash, hashType),
         };
     }
 
-    return DerivationOutput(std::move(path), std::move(fsh));
+    return DerivationOutput {
+        .path = std::move(path),
+        .hash = std::move(fsh),
+    };
 }
+
+template<typename Path>
+StringSet BasicDerivationT<Path>::outputNames() const
+{
+    StringSet names;
+    for (auto & i : outputs)
+        names.insert(i.first);
+    return names;
+}
+
 
 Source & readDerivation(Source & in, const Store & store, BasicDerivation & drv)
 {
@@ -626,7 +617,7 @@ Source & readDerivation(Source & in, const Store & store, BasicDerivation & drv)
     for (size_t n = 0; n < nr; n++) {
         auto name = readString(in);
         auto output = readDerivationOutput(in, store);
-        drv.outputs.emplace(name, output);
+        drv.outputs.emplace(std::move(name), std::move(output));
     }
 
     drv.inputSrcs = readStorePaths<StorePathSet>(store, in);

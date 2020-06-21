@@ -187,9 +187,10 @@ struct ValidPathInfo
 
     Strings shortRefs() const;
 
+    ValidPathInfo(const ValidPathInfo & other) = default;
+
     ValidPathInfo(StorePath && path) : path(std::move(path)) { };
     ValidPathInfo(const StorePath & path) : path(path) { };
-    ValidPathInfo(const ValidPathInfo & other) = default;
 
     virtual ~ValidPathInfo() { }
 };
@@ -429,10 +430,6 @@ public:
     virtual StorePathSet queryDerivationOutputs(const StorePath & path)
     { unsupported("queryDerivationOutputs"); }
 
-    /* Query the output names of the derivation denoted by `path'. */
-    virtual StringSet queryDerivationOutputNames(const StorePath & path)
-    { unsupported("queryDerivationOutputNames"); }
-
     /* Query the full store path given the hash part of a valid store
        path, or empty if the path doesn't exist. */
     virtual std::optional<StorePath> queryPathFromHashPart(const std::string & hashPart) = 0;
@@ -449,12 +446,7 @@ public:
     /* Import a path into the store. */
     virtual void addToStore(const ValidPathInfo & info, Source & narSource,
         RepairFlag repair = NoRepair, CheckSigsFlag checkSigs = CheckSigs,
-        std::shared_ptr<FSAccessor> accessor = 0);
-
-    // FIXME: remove
-    virtual void addToStore(const ValidPathInfo & info, const ref<std::string> & nar,
-        RepairFlag repair = NoRepair, CheckSigsFlag checkSigs = CheckSigs,
-        std::shared_ptr<FSAccessor> accessor = 0);
+        std::shared_ptr<FSAccessor> accessor = 0) = 0;
 
     /* Copy the contents of a path to the store and register the
        validity the resulting path.  The resulting path is returned.
@@ -590,6 +582,9 @@ public:
     /* Read a derivation, after ensuring its existence through
        ensurePath(). */
     Derivation derivationFromPath(const StorePath & drvPath);
+
+    /* Read a derivation (which must already be valid). */
+    Derivation readDerivation(const StorePath & drvPath);
 
     /* Place in `out' the set of all store paths in the file system
        closure of `storePath'; that is, all paths than can be directly
@@ -734,10 +729,6 @@ public:
 
     std::shared_ptr<std::string> getBuildLog(const StorePath & path) override;
 };
-
-
-/* Extract the hash part of the given store path. */
-string storePathToHash(const Path & path);
 
 
 /* Copy a path from one store to another. */
