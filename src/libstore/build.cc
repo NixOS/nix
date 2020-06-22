@@ -3714,7 +3714,7 @@ void DerivationGoal::registerOutputs()
         /* Check that fixed-output derivations produced the right
            outputs (i.e., the content hash should match the specified
            hash). */
-        std::string ca;
+        std::optional<ContentAddress> ca;
 
         if (fixedOutput) {
 
@@ -3764,7 +3764,10 @@ void DerivationGoal::registerOutputs()
             else
                 assert(worker.store.parseStorePath(path) == dest);
 
-            ca = makeFixedOutputCA(i.second.hash->method, h2);
+            ca = FixedOutputHash {
+                .method = i.second.hash->method,
+                .hash = h2,
+            };
         }
 
         /* Get rid of all weird permissions.  This also checks that
@@ -3837,7 +3840,10 @@ void DerivationGoal::registerOutputs()
         info.ca = ca;
         worker.store.signPathInfo(info);
 
-        if (!info.references.empty()) info.ca.clear();
+        if (!info.references.empty()) {
+            // FIXME don't we have an experimental feature for fixed output with references?
+            info.ca = {};
+        }
 
         infos.emplace(i.first, std::move(info));
     }

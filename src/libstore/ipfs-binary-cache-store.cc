@@ -378,7 +378,7 @@ private:
                 json["references"].emplace(ref.to_string(), narMap[(std::string) ref.to_string()]);
         }
 
-        json["ca"] = narInfo->ca;
+        json["ca"] = renderContentAddress(narInfo->ca);
 
         if (narInfo->deriver)
             json["deriver"] = printStorePath(*narInfo->deriver);
@@ -553,7 +553,7 @@ public:
             narInfo.references.insert(storePath);
 
         if (json.find("ca") != json.end())
-            narInfo.ca = json["ca"];
+            narInfo.ca = parseContentAddress(json["ca"].get<std::string_view>());
 
         if (json.find("deriver") != json.end())
             narInfo.deriver = parseStorePath((std::string) json["deriver"]);
