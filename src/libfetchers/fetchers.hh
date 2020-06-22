@@ -100,4 +100,7 @@ Tree downloadTarball(
     const std::string & name,
     bool immutable);
 
+std::optional<StorePath> trySubstitute(ref<Store> store, FileIngestionMethod ingestionMethod,
+    Hash hash, std::string_view name);
+
 }
