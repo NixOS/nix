@@ -91,6 +91,7 @@ let
             pkgconfig
             pkgs.perl
             boost
+            nlohmann_json
           ]
           ++ lib.optional (stdenv.isLinux || stdenv.isDarwin) libsodium;
 
