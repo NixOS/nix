@@ -192,18 +192,22 @@ StorePath Store::makeFixedOutputPath(
     }
 }
 
-StorePath Store::makeFixedOutputPathFromCA(std::string_view name, std::string ca,
+// FIXME Put this somewhere?
+template<class... Ts> struct overloaded : Ts... { using Ts::operator()...; };
+template<class... Ts> overloaded(Ts...) -> overloaded<Ts...>;
+
+StorePath Store::makeFixedOutputPathFromCA(std::string_view name, ContentAddress ca,
     const StorePathSet & references, bool hasSelfReference) const
 {
-    if (hasPrefix(ca, "fixed:")) {
-        FileIngestionMethod ingestionMethod { ca.compare(6, 2, "r:") == 0 };
-        Hash hash(std::string(ca, ingestionMethod == FileIngestionMethod::Recursive ? 8 : 6));
-        return makeFixedOutputPath(ingestionMethod, hash, name, references, hasSelfReference);
-    } else if (hasPrefix(ca, "text:")) {
-        Hash hash(std::string(ca, 5));
-        return makeTextPath(name, hash, references);
-    } else
-        throw Error("'%s' is not a valid ca", ca);
+    // New template
+    return std::visit(overloaded {
+        [&](TextHash th) {
+            return makeTextPath(name, th.hash, references);
+        },
+        [&](FixedOutputHash fsh) {
+            return makeFixedOutputPath(fsh.method, fsh.hash, name, references, hasSelfReference);
+        }
+    }, ca);
 }
 
 StorePath Store::makeTextPath(std::string_view name, const Hash & hash,
@@ -484,8 +488,8 @@ void Store::pathInfoToJSON(JSONPlaceholder & jsonOut, const StorePathSet & store
                     jsonRefs.elem(printStorePath(ref));
             }
 
-            if (info->ca != "")
-                jsonPath.attr("ca", info->ca);
+            if (info->ca)
+                jsonPath.attr("ca", renderContentAddress(info->ca));
 
             std::pair<uint64_t, uint64_t> closureSizes;
 
@@ -595,9 +599,9 @@ void copyStorePath(ref<Store> srcStore, ref<Store> dstStore,
     uint64_t total = 0;
 
     // recompute store path on the chance dstStore does it differently
-    if (info->isContentAddressed(*srcStore) && info->references.empty()) {
+    if (info->ca && info->references.empty()) {
         auto info2 = make_ref<ValidPathInfo>(*info);
-        info2->path = dstStore->makeFixedOutputPathFromCA(info->path.name(), info->ca);
+        info2->path = dstStore->makeFixedOutputPathFromCA(info->path.name(), *info->ca);
         if (dstStore->storeDir == srcStore->storeDir)
             assert(info->path == info2->path);
         info = info2;
@@ -674,8 +678,8 @@ std::map<StorePath, StorePath> copyPaths(ref<Store> srcStore, ref<Store> dstStor
 
             auto info = srcStore->queryPathInfo(storePath);
             auto storePathForDst = storePath;
-            if (info->isContentAddressed(*srcStore) && info->references.empty()) {
-                storePathForDst = dstStore->makeFixedOutputPathFromCA(storePath.name(), info->ca);
+            if (info->ca && info->references.empty()) {
+                storePathForDst = dstStore->makeFixedOutputPathFromCA(storePath.name(), *info->ca);
                 if (dstStore->storeDir == srcStore->storeDir)
                     assert(storePathForDst == storePath);
                 if (storePathForDst != storePath)
@@ -702,8 +706,8 @@ std::map<StorePath, StorePath> copyPaths(ref<Store> srcStore, ref<Store> dstStor
             auto info = srcStore->queryPathInfo(storePath);
 
             auto storePathForDst = storePath;
-            if (info->isContentAddressed(*srcStore) && info->references.empty()) {
-                storePathForDst = dstStore->makeFixedOutputPathFromCA(storePath.name(), info->ca);
+            if (info->ca && info->references.empty()) {
+                storePathForDst = dstStore->makeFixedOutputPathFromCA(storePath.name(), *info->ca);
                 if (dstStore->storeDir == srcStore->storeDir)
                     assert(storePathForDst == storePath);
                 if (storePathForDst != storePath)
@@ -807,41 +811,31 @@ void ValidPathInfo::sign(const Store & store, const SecretKey & secretKey)
     sigs.insert(secretKey.signDetached(fingerprint(store)));
 }
 
-
 bool ValidPathInfo::isContentAddressed(const Store & store) const
 {
-    auto warn = [&]() {
-        logWarning(
-            ErrorInfo{
-                .name = "Path not content-addressed",
-                .hint = hintfmt("path '%s' claims to be content-addressed but isn't", store.printStorePath(path))
-            });
-    };
+    if (! ca) return false;
 
-    if (hasPrefix(ca, "text:")) {
-        Hash hash(ca.substr(5));
-        if (store.makeTextPath(path.name(), hash, references) == path)
-            return true;
-        else
-            warn();
-    }
-
-    else if (hasPrefix(ca, "fixed:")) {
-        FileIngestionMethod recursive { ca.compare(6, 2, "r:") == 0 };
-        Hash hash(ca.substr(recursive == FileIngestionMethod::Recursive ? 8 : 6));
-        auto refs = references;
-        bool hasSelfReference = false;
-        if (refs.count(path)) {
-            hasSelfReference = true;
-            refs.erase(path);
+    auto caPath = std::visit(overloaded {
+        [&](TextHash th) {
+            return store.makeTextPath(path.name(), th.hash, references);
+        },
+        [&](FixedOutputHash fsh) {
+            auto refs = references;
+            bool hasSelfReference = false;
+            if (refs.count(path)) {
+                hasSelfReference = true;
+                refs.erase(path);
+            }
+            return store.makeFixedOutputPath(fsh.method, fsh.hash, path.name(), refs, hasSelfReference);
         }
-        if (store.makeFixedOutputPath(recursive, hash, path.name(), refs, hasSelfReference) == path)
-            return true;
-        else
-            warn();
-    }
+    }, *ca);
 
-    return false;
+    bool res = caPath == path;
+
+    if (!res)
+        printError("warning: path '%s' claims to be content-addressed but isn't", store.printStorePath(path));
+
+    return res;
 }
 
 
@@ -869,25 +863,6 @@ Strings ValidPathInfo::shortRefs() const
     for (auto & r : references)
         refs.push_back(std::string(r.to_string()));
     return refs;
-}
-
-
-std::string makeFileIngestionPrefix(const FileIngestionMethod m) {
-    switch (m) {
-    case FileIngestionMethod::Flat:
-        return "";
-    case FileIngestionMethod::Recursive:
-        return "r:";
-    default:
-        throw Error("impossible, caught both cases");
-    }
-}
-
-std::string makeFixedOutputCA(FileIngestionMethod method, const Hash & hash)
-{
-    return "fixed:"
-        + makeFileIngestionPrefix(method)
-        + hash.to_string(Base32, true);
 }
 
 

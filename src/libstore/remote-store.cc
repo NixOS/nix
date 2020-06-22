@@ -38,15 +38,12 @@ void writeStorePaths(const Store & store, Sink & out, const StorePathSet & paths
         out << store.printStorePath(i);
 }
 
-std::map<StorePath, std::optional<std::string>> readStorePathCAMap(const Store & store, Source & from)
+StorePathCAMap readStorePathCAMap(const Store & store, Source & from)
 {
     StorePathCAMap paths;
     auto count = readNum<size_t>(from);
-    while (count--) {
-        auto path = readString(from);
-        auto ca = readString(from);
-        paths.insert_or_assign(store.parseStorePath(path), !ca.empty() ? std::optional(ca) : std::nullopt);
-    }
+    while (count--)
+        paths.insert_or_assign(store.parseStorePath(readString(from)), parseContentAddressOpt(readString(from)));
     return paths;
 }
 
@@ -55,7 +52,7 @@ void writeStorePathCAMap(const Store & store, Sink & out, const StorePathCAMap &
     out << paths.size();
     for (auto & i : paths) {
         out << store.printStorePath(i.first);
-        out << (i.second ? *i.second : "");
+        out << renderContentAddress(i.second);
     }
 }
 
@@ -407,7 +404,7 @@ void RemoteStore::queryPathInfoUncached(const StorePath & path,
             if (GET_PROTOCOL_MINOR(conn->daemonVersion) >= 16) {
                 conn->from >> info->ultimate;
                 info->sigs = readStrings<StringSet>(conn->from);
-                conn->from >> info->ca;
+                info->ca = parseContentAddressOpt(readString(conn->from));
             }
         }
         callback(std::move(info));
@@ -491,7 +488,7 @@ void RemoteStore::addToStore(const ValidPathInfo & info, Source & source,
                  << info.narHash.to_string(Base16, false);
         writeStorePaths(*this, conn->to, info.references);
         conn->to << info.registrationTime << info.narSize
-                 << info.ultimate << info.sigs << info.ca
+                 << info.ultimate << info.sigs << renderContentAddress(info.ca)
                  << repair << !checkSigs;
         bool tunnel = GET_PROTOCOL_MINOR(conn->daemonVersion) >= 21;
         if (!tunnel) copyNAR(source, conn->to);

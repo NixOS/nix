@@ -297,7 +297,7 @@ public:
     GoalPtr makeDerivationGoal(const StorePath & drvPath, const StringSet & wantedOutputs, BuildMode buildMode = bmNormal);
     std::shared_ptr<DerivationGoal> makeBasicDerivationGoal(const StorePath & drvPath,
         const BasicDerivation & drv, BuildMode buildMode = bmNormal);
-    GoalPtr makeSubstitutionGoal(const StorePath & storePath, RepairFlag repair = NoRepair, std::optional<std::string> ca = std::nullopt);
+    GoalPtr makeSubstitutionGoal(const StorePath & storePath, RepairFlag repair = NoRepair, std::optional<ContentAddress> ca = std::nullopt);
 
     /* Remove a dead goal. */
     void removeGoal(GoalPtr goal);
@@ -3714,7 +3714,7 @@ void DerivationGoal::registerOutputs()
         /* Check that fixed-output derivations produced the right
            outputs (i.e., the content hash should match the specified
            hash). */
-        std::string ca;
+        std::optional<ContentAddress> ca;
 
         if (fixedOutput) {
 
@@ -3764,7 +3764,10 @@ void DerivationGoal::registerOutputs()
             else
                 assert(worker.store.parseStorePath(path) == dest);
 
-            ca = makeFixedOutputCA(i.second.hash->method, h2);
+            ca = FixedOutputHash {
+                .method = i.second.hash->method,
+                .hash = h2,
+            };
         }
 
         /* Get rid of all weird permissions.  This also checks that
@@ -3837,7 +3840,10 @@ void DerivationGoal::registerOutputs()
         info.ca = ca;
         worker.store.signPathInfo(info);
 
-        if (!info.references.empty()) info.ca.clear();
+        if (!info.references.empty()) {
+            // FIXME don't we have an experimental feature for fixed output with references?
+            info.ca = {};
+        }
 
         infos.emplace(i.first, std::move(info));
     }
@@ -4295,10 +4301,10 @@ private:
     GoalState state;
 
     /* Content address for recomputing store path */
-    std::optional<std::string> ca;
+    std::optional<ContentAddress> ca;
 
 public:
-    SubstitutionGoal(const StorePath & storePath, Worker & worker, RepairFlag repair = NoRepair, std::optional<std::string> ca = std::nullopt);
+    SubstitutionGoal(const StorePath & storePath, Worker & worker, RepairFlag repair = NoRepair, std::optional<ContentAddress> ca = std::nullopt);
     ~SubstitutionGoal();
 
     void timedOut(Error && ex) override { abort(); };
@@ -4328,7 +4334,7 @@ public:
 };
 
 
-SubstitutionGoal::SubstitutionGoal(const StorePath & storePath, Worker & worker, RepairFlag repair, std::optional<std::string> ca)
+SubstitutionGoal::SubstitutionGoal(const StorePath & storePath, Worker & worker, RepairFlag repair, std::optional<ContentAddress> ca)
     : Goal(worker)
     , storePath(storePath)
     , repair(repair)
@@ -4408,7 +4414,7 @@ void SubstitutionGoal::tryNext()
     subs.pop_front();
 
     auto subPath = storePath;
-    if (ca && (hasPrefix(*ca, "fixed:") || hasPrefix(*ca, "text:"))) {
+    if (ca) {
         subPath = sub->makeFixedOutputPathFromCA(storePath.name(), *ca);
         if (sub->storeDir == worker.store.storeDir)
             assert(subPath == storePath);
@@ -4537,7 +4543,7 @@ void SubstitutionGoal::tryToRun()
             PushActivity pact(act.id);
 
             auto subPath = storePath;
-            if (ca && (hasPrefix(*ca, "fixed:") || hasPrefix(*ca, "text:"))) {
+            if (ca) {
                 subPath = sub->makeFixedOutputPathFromCA(storePath.name(), *ca);
                 if (sub->storeDir == worker.store.storeDir)
                     assert(subPath == storePath);
@@ -4677,7 +4683,7 @@ std::shared_ptr<DerivationGoal> Worker::makeBasicDerivationGoal(const StorePath 
 }
 
 
-GoalPtr Worker::makeSubstitutionGoal(const StorePath & path, RepairFlag repair, std::optional<std::string> ca)
+GoalPtr Worker::makeSubstitutionGoal(const StorePath & path, RepairFlag repair, std::optional<ContentAddress> ca)
 {
     GoalPtr goal = substitutionGoals[path].lock(); // FIXME
     if (!goal) {

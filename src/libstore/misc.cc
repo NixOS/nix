@@ -108,28 +108,11 @@ void Store::computeFSClosure(const StorePath & startPath,
 }
 
 
-std::optional<std::string> getDerivationCA(const BasicDerivation & drv)
+std::optional<ContentAddress> getDerivationCA(const BasicDerivation & drv)
 {
-    auto outputHashMode = drv.env.find("outputHashMode");
-    auto outputHash = drv.env.find("outputHash");
-
-    std::optional<HashType> ht = std::nullopt;
-    auto outputHashAlgo = drv.env.find("outputHashAlgo");
-    if (outputHashAlgo != drv.env.end())
-        ht = parseHashTypeOpt(outputHashAlgo->second);
-
-    if (outputHashMode != drv.env.end() && outputHash != drv.env.end()) {
-        auto h = Hash(outputHash->second, ht);
-        FileIngestionMethod ingestionMethod;
-        if (outputHashMode->second == "recursive")
-            ingestionMethod = FileIngestionMethod::Recursive;
-        else if (outputHashMode->second == "flat")
-            ingestionMethod = FileIngestionMethod::Flat;
-        else
-            throw Error("unknown outputHashMode: '%s'", outputHashMode->second);
-        return makeFixedOutputCA(ingestionMethod, h);
-    }
-
+    auto out = drv.outputs.find("out");
+    if (out != drv.outputs.end())
+        return out->second.hash;
     return std::nullopt;
 }
 

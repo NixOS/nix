@@ -69,7 +69,7 @@ template<class T> T readStorePaths(const Store & store, Source & from);
 
 void writeStorePaths(const Store & store, Sink & out, const StorePathSet & paths);
 
-std::map<StorePath, std::optional<std::string>> readStorePathCAMap(const Store & store, Source & from);
+StorePathCAMap readStorePathCAMap(const Store & store, Source & from);
 
 void writeStorePathCAMap(const Store & store, Sink & out, const StorePathCAMap & paths);
 
