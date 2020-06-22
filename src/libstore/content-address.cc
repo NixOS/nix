@@ -115,10 +115,10 @@ void from_json(const nlohmann::json& j, ContentAddress & ca) {
         auto method = methodRaw == "flat" ? FileIngestionMethod::Flat
             : methodRaw == "recursive" ? FileIngestionMethod::Recursive
             : throw Error("invalid file ingestion method: %s", methodRaw);
-        auto algo = parseHashType(j.at("algo").get<std::string>());
+        auto hashAlgo = parseHashType(j.at("algo").get<std::string>());
         ca = FixedOutputHash {
             .method = method,
-            .hash = Hash { j.at("hash").get<std::string_view>(), algo },
+            .hash = Hash { j.at("hash").get<std::string_view>(), hashAlgo },
         };
     } else
         throw Error("invalid type: %s", type);
