@@ -1,6 +1,8 @@
 #pragma once
 
+#include <nlohmann/json.hpp>
 #include <variant>
+
 #include "hash.hh"
 
 namespace nix {
@@ -53,4 +55,11 @@ ContentAddress parseContentAddress(std::string_view rawCa);
 
 std::optional<ContentAddress> parseContentAddressOpt(std::string_view rawCaOpt);
 
+void to_json(nlohmann::json& j, const ContentAddress & c);
+void from_json(const nlohmann::json& j, ContentAddress & c);
+
+// Needed until https://github.com/nlohmann/json/pull/211
+
+void to_json(nlohmann::json& j, const std::optional<ContentAddress> & c);
+void from_json(const nlohmann::json& j, std::optional<ContentAddress> & c);
 }
