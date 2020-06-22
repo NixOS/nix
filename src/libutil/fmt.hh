@@ -139,11 +139,9 @@ inline hintformat hintfmt(const std::string & fs, const Args & ... args)
     return f;
 }
 
-inline hintformat hintfmt(std::string fs)
+inline hintformat hintfmt(std::string plain_string)
 {
-    // we won't be receiving any args in this case, so escape all percents.
-    boost::replace_all(fs, "%", "%%");
-    hintformat f(fs);
-    return f;
+    // we won't be receiving any args in this case, so just print the original string
+    return hintfmt("%s", plain_string);
 }
 }
