@@ -440,7 +440,7 @@ struct curlFileTransfer : public FileTransfer
 
                 std::shared_ptr<std::string> response;
                 if (decompressionSink)
-                    if (auto teeSink = std::dynamic_pointer_cast<TeeSink<std::shared_ptr<CompressionSink>>>(decompressionSink))
+                    if (auto teeSink = std::dynamic_pointer_cast<TeeSink<ref<CompressionSink>>>(decompressionSink))
                         response = teeSink->data;
                 auto exc =
                     code == CURLE_ABORTED_BY_CALLBACK && _isInterrupted
@@ -877,7 +877,7 @@ FileTransferError::FileTransferError(FileTransfer::Error error, std::shared_ptr<
 {
     const auto hf = hintfmt(args...);
     if (response) {
-        err.hint = hintfmt("%1%\n\nresponse body:\n\n%2%", normaltxt(hf.str()), response);
+        err.hint = hintfmt("%1%\n\nresponse body:\n\n%2%", normaltxt(hf.str()), *response);
     } else {
         err.hint = hf;
     }
