@@ -112,7 +112,7 @@ std::pair<PathSet, HashResult> scanForReferences(const string & path,
         found.insert(j->second);
     }
 
-    hash = sink.hashSink.finish();
+    auto hash = sink.hashSink.finish();
 
     return std::pair<PathSet, HashResult>(found, hash);
 }

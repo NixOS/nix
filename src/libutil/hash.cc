@@ -140,19 +140,20 @@ Hash::Hash(std::string_view s, std::optional<HashType> optType)
 
     // Find the : or - separater, and set `isSRI` to the correct value
     auto sep = s.find(':');
-    if (sep == string::npos) {
+    if (sep == std::string_view::npos) {
         sep = s.find('-');
-        if (sep != string::npos)
+        if (sep != std::string_view::npos)
             isSRI = true;
     }
 
     // Parse the has type before the separater, if there was one.
     std::optional<HashType> optParsedType;
-    if (sep != string::npos) {
+    if (sep != std::string_view::npos) {
         auto hts = s.substr(0, sep);
-        auto optParsedType = parseHashType(hts);
+        auto optParsedType = parseHashTypeOpt(hts);
         if (!optParsedType)
             throw BadHash("unknown hash type '%s'", hts);
+        pos = sep + 1;
     }
 
     // Either the string or user must provide the type, if they both do they
