@@ -553,7 +553,7 @@ public:
             narInfo.references.insert(storePath);
 
         if (json.find("ca") != json.end())
-            narInfo.ca = parseContentAddress(json["ca"].get<std::string_view>());
+            narInfo.ca = parseContentAddressOpt(json["ca"].get<std::string_view>());
 
         if (json.find("deriver") != json.end())
             narInfo.deriver = parseStorePath((std::string) json["deriver"]);
