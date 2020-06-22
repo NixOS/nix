@@ -342,7 +342,7 @@ Hash compressHash(const Hash & hash, unsigned int newSize)
 }
 
 
-std::optional<HashType> parseHashTypeOpt(const string & s)
+std::optional<HashType> parseHashTypeOpt(std::string_view s)
 {
     if (s == "md5") return htMD5;
     else if (s == "sha1") return htSHA1;
@@ -351,7 +351,7 @@ std::optional<HashType> parseHashTypeOpt(const string & s)
     else return std::optional<HashType> {};
 }
 
-HashType parseHashType(const string & s)
+HashType parseHashType(std::string_view s)
 {
     auto opt_h = parseHashTypeOpt(s);
     if (opt_h)

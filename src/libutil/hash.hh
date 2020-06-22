@@ -121,9 +121,9 @@ HashResult hashPath(HashType ht, const Path & path,
 Hash compressHash(const Hash & hash, unsigned int newSize);
 
 /* Parse a string representing a hash type. */
-HashType parseHashType(const string & s);
+HashType parseHashType(std::string_view s);
 /* Will return nothing on parse error */
-std::optional<HashType> parseHashTypeOpt(const string & s);
+std::optional<HashType> parseHashTypeOpt(std::string_view s);
 
 /* And the reverse. */
 string printHashType(HashType ht);

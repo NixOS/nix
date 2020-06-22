@@ -1,3 +1,4 @@
+#include "args.hh"
 #include "content-address.hh"
 
 namespace nix {
@@ -40,38 +41,52 @@ std::string renderContentAddress(ContentAddress ca) {
 }
 
 ContentAddress parseContentAddress(std::string_view rawCa) {
-    auto prefixSeparator = rawCa.find(':');
-    if (prefixSeparator != string::npos) {
-        auto prefix = string(rawCa, 0, prefixSeparator);
-        if (prefix == "text") {
-            auto hashTypeAndHash = rawCa.substr(prefixSeparator+1, string::npos);
-            Hash hash = Hash(string(hashTypeAndHash));
-            if (*hash.type != htSHA256) {
-                throw Error("parseContentAddress: the text hash should have type SHA256");
-            }
-            return TextHash { hash };
-        } else if (prefix == "fixed") {
-            // This has to be an inverse of makeFixedOutputCA
-            auto methodAndHash = rawCa.substr(prefixSeparator+1, string::npos);
-            if (methodAndHash.substr(0,2) == "r:") {
-                std::string_view hashRaw = methodAndHash.substr(2,string::npos);
-                return FixedOutputHash {
-                    .method = FileIngestionMethod::Recursive,
-                    .hash = Hash(string(hashRaw)),
-                };
-            } else {
-                std::string_view hashRaw = methodAndHash;
-                return FixedOutputHash {
-                    .method = FileIngestionMethod::Flat,
-                    .hash = Hash(string(hashRaw)),
-                };
-            }
-        } else {
-            throw Error("parseContentAddress: format not recognized; has to be text or fixed");
+    auto rest = rawCa;
+
+    // Ensure prefix
+    const auto prefixSeparator = rawCa.find(':');
+    if (prefixSeparator == string::npos)
+        throw UsageError("not a content address because it is not in the form \"<prefix>:<rest>\": %s", rawCa);
+    auto prefix = rest.substr(0, prefixSeparator);
+    rest = rest.substr(prefixSeparator + 1);
+
+    auto parseHashType_ = [&](){
+        // Parse hash type
+        auto algoSeparator = rest.find(':');
+        HashType hashType;
+        if (algoSeparator == string::npos)
+            throw UsageError("content address hash must be in form \"<algo>:<hash>\", but found: %s", rest);
+        hashType = parseHashType(rest.substr(0, algoSeparator));
+
+        rest = rest.substr(algoSeparator + 1);
+
+        return std::move(hashType);
+    };
+
+    // Switch on prefix
+    if (prefix == "text") {
+        // No parsing of the method, "text" only support flat.
+        HashType hashType = parseHashType_();
+        if (hashType != htSHA256)
+            throw Error("text content address hash should use %s, but instead uses %s",
+                printHashType(htSHA256), printHashType(hashType));
+        return TextHash {
+            .hash = Hash { rest, std::move(hashType) },
+        };
+    } else if (prefix == "fixed") {
+        // Parse method
+        auto method = FileIngestionMethod::Flat;
+        if (rest.substr(0, 2) == "r:") {
+            method = FileIngestionMethod::Recursive;
+            rest = rest.substr(2);
         }
-    } else {
-        throw Error("Not a content address because it lacks an appropriate prefix");
-    }
+        HashType hashType = parseHashType_();
+        return FixedOutputHash {
+            .method = method,
+            .hash = Hash { rest, std::move(hashType) },
+        };
+    } else
+        throw UsageError("content address prefix \"%s\" is unrecognized. Recogonized prefixes are \"text\" or \"fixed\"", prefix);
 };
 
 std::optional<ContentAddress> parseContentAddressOpt(std::string_view rawCaOpt) {
