@@ -137,7 +137,7 @@ StorePath getDerivationEnvironment(ref<Store> store, const StorePath & drvPath)
     auto shellOutPath = store->makeOutputPath("out", h, drvName);
     drv.outputs.insert_or_assign("out", DerivationOutput {
         .path = shellOutPath,
-        .hash = DerivationOutputHash {
+        .hash = FixedOutputHash {
             .method = FileIngestionMethod::Flat,
             .hash = Hash { },
         },
