@@ -43,7 +43,7 @@ namespace nix {
             logger->logEI(ei);
             auto str = testing::internal::GetCapturedStderr();
 
-            ASSERT_STREQ(str.c_str(), "\x1B[31;1merror:\x1B[0m\x1B[34;1m --- TestError --- error-unit-test\x1B[0m\n\x1B[33;1m\x1B[0minitial error\x1B[0m; subsequent error message.\n");
+            ASSERT_STREQ(str.c_str(), "\x1B[31;1merror:\x1B[0m\x1B[34;1m --- TestError --- error-unit-test\x1B[0m\ninitial error; subsequent error message.\n");
         }
 
     }
@@ -61,8 +61,7 @@ namespace nix {
             logError(e.info());
             auto str = testing::internal::GetCapturedStderr();
 
-            ASSERT_STREQ(str.c_str(), "\x1B[31;1merror:\x1B[0m\x1B[34;1m --- SysError --- error-unit-test\x1B[0m\n\x1B[33;1m\x1B[0mstatting file\x1B[0m: \x1B[33;1mBad file descriptor\x1B[0m\n");
-
+            ASSERT_STREQ(str.c_str(), "\x1B[31;1merror:\x1B[0m\x1B[34;1m --- SysError --- error-unit-test\x1B[0m\nstatting file: \x1B[33;1mBad file descriptor\x1B[0m\n");
         }
     }
 

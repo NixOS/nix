@@ -120,6 +120,13 @@ public:
         return *this;
     }
 
+    template<class T>
+    hintformat& operator%(const normaltxt<T> &value)
+    {
+        fmt % value.value;
+        return *this;
+    }
+
     std::string str() const
     {
         return fmt.str();
@@ -142,6 +149,6 @@ inline hintformat hintfmt(const std::string & fs, const Args & ... args)
 inline hintformat hintfmt(std::string plain_string)
 {
     // we won't be receiving any args in this case, so just print the original string
-    return hintfmt("%s", plain_string);
+    return hintfmt("%s", normaltxt(plain_string));
 }
 }
