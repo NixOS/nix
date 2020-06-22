@@ -246,9 +246,7 @@ struct CmdFlakeCheck : FlakeCommand
                 auto app = App(*state, v);
                 for (auto & i : app.context) {
                     auto [drvPathS, outputName] = decodeContext(i);
-                    auto drvPath = store->parseStorePath(drvPathS);
-                    if (!outputName.empty() && drvPath.isDerivation())
-                        drvPaths.push_back({drvPath});
+                    store->parseStorePath(drvPathS);
                 }
             } catch (Error & e) {
                 e.addPrefix(fmt("while checking the app definition '" ANSI_BOLD "%s" ANSI_NORMAL "' at %s:\n", attrPath, pos));
