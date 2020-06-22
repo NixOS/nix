@@ -382,7 +382,7 @@ void RemoteStore::queryPathInfoUncached(const StorePath & path,
             if (GET_PROTOCOL_MINOR(conn->daemonVersion) >= 16) {
                 conn->from >> info->ultimate;
                 info->sigs = readStrings<StringSet>(conn->from);
-                conn->from >> info->ca;
+                info->ca = parseContentAddressOpt(readString(conn->from));
             }
         }
         callback(std::move(info));
@@ -466,7 +466,7 @@ void RemoteStore::addToStore(const ValidPathInfo & info, Source & source,
                  << info.narHash.to_string(Base16, false);
         writeStorePaths(*this, conn->to, info.references);
         conn->to << info.registrationTime << info.narSize
-                 << info.ultimate << info.sigs << info.ca
+                 << info.ultimate << info.sigs << renderContentAddress(info.ca)
                  << repair << !checkSigs;
         bool tunnel = GET_PROTOCOL_MINOR(conn->daemonVersion) >= 21;
         if (!tunnel) copyNAR(source, conn->to);

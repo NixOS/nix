@@ -224,7 +224,7 @@ Hash newHashAllowEmpty(std::string hashStr, std::optional<HashType> ht)
         if (!ht)
             throw BadHash("empty hash requires explicit hash type");
         Hash h(*ht);
-        warn("found empty hash, assuming '%s'", h.to_string(Base::SRI, true));
+        warn("found empty hash, assuming '%s'", h.to_string(SRI, true));
         return h;
     } else
         return Hash(hashStr, ht);

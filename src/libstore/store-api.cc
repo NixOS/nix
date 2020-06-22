@@ -486,8 +486,8 @@ void Store::pathInfoToJSON(JSONPlaceholder & jsonOut, const StorePathSet & store
                     jsonRefs.elem(printStorePath(ref));
             }
 
-            if (info->ca != "")
-                jsonPath.attr("ca", info->ca);
+            if (info->ca)
+                jsonPath.attr("ca", renderContentAddress(info->ca));
 
             std::pair<uint64_t, uint64_t> closureSizes;
 
@@ -772,45 +772,35 @@ void ValidPathInfo::sign(const Store & store, const SecretKey & secretKey)
     sigs.insert(secretKey.signDetached(fingerprint(store)));
 }
 
+// FIXME Put this somewhere?
+template<class... Ts> struct overloaded : Ts... { using Ts::operator()...; };
+template<class... Ts> overloaded(Ts...) -> overloaded<Ts...>;
 
 bool ValidPathInfo::isContentAddressed(const Store & store) const
 {
-    auto warn = [&]() {
-        logWarning(
-            ErrorInfo{
-                .name = "Path not content-addressed",
-                .hint = hintfmt("path '%s' claims to be content-addressed but isn't", store.printStorePath(path))
-            });
-    };
+    if (! ca) return false;
 
-    if (hasPrefix(ca, "text:")) {
-        Hash hash(ca.substr(5));
-        if (store.makeTextPath(path.name(), hash, references) == path)
-            return true;
-        else
-            warn();
-    }
-
-    else if (hasPrefix(ca, "fixed:")) {
-        FileIngestionMethod method = FileIngestionMethod::Flat;
-        if (ca.compare(6, 2, "r:") == 0)
-            method = FileIngestionMethod::Recursive;
-        else if (ca.compare(6, 4, "git:") == 0)
-            method = FileIngestionMethod::Git;
-        Hash hash(std::string(ca, 6 + makeFileIngestionPrefix(method).length()));
-        auto refs = references;
-        bool hasSelfReference = false;
-        if (refs.count(path)) {
-            hasSelfReference = true;
-            refs.erase(path);
+    auto caPath = std::visit(overloaded {
+        [&](TextHash th) {
+            return store.makeTextPath(path.name(), th.hash, references);
+        },
+        [&](FixedOutputHash fsh) {
+            auto refs = references;
+            bool hasSelfReference = false;
+            if (refs.count(path)) {
+                hasSelfReference = true;
+                refs.erase(path);
+            }
+            return store.makeFixedOutputPath(fsh.method, fsh.hash, path.name(), refs, hasSelfReference);
         }
-        if (store.makeFixedOutputPath(method, hash, path.name(), refs, hasSelfReference) == path)
-            return true;
-        else
-            warn();
-    }
+    }, *ca);
 
-    return false;
+    bool res = caPath == path;
+
+    if (!res)
+        printError("warning: path '%s' claims to be content-addressed but isn't", store.printStorePath(path));
+
+    return res;
 }
 
 
@@ -838,28 +828,6 @@ Strings ValidPathInfo::shortRefs() const
     for (auto & r : references)
         refs.push_back(std::string(r.to_string()));
     return refs;
-}
-
-
-std::string makeFileIngestionPrefix(FileIngestionMethod method) {
-    switch (method) {
-    case FileIngestionMethod::Flat:
-        return "";
-    case FileIngestionMethod::Recursive:
-        return "r:";
-    case FileIngestionMethod::Git:
-        return "git:";
-    }
-    abort();
-}
-
-std::string makeFixedOutputCA(FileIngestionMethod method, const Hash & hash)
-{
-    if (method == FileIngestionMethod::Git && hash.type != htSHA1)
-        throw Error("git file ingestion must use sha1 hashes");
-    return "fixed:"
-        + makeFileIngestionPrefix(method)
-        + hash.to_string(Base32, true);
 }
 
 
