@@ -644,6 +644,19 @@ public:
         writeNarInfo(narInfo);
     }
 
+    virtual void addTempRoot(const StorePath & path) override
+    {
+        // TODO make temporary pin/addToStore, see
+        // https://github.com/ipfs/go-ipfs/issues/4559 and
+        // https://github.com/ipfs/go-ipfs/issues/4328 for some ideas.
+        auto uri = daemonUri + "/api/v0/pin/add?arg=" + getIpfsPath() + "/" + string { path.to_string() };
+
+        FileTransferRequest request(uri);
+        request.post = true;
+        request.tries = 1;
+        getFileTransfer()->upload(request);
+    }
+
     std::shared_ptr<std::string> getBuildLog(const StorePath & path) override
     { unsupported("getBuildLog"); }
 
