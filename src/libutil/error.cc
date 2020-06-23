@@ -284,43 +284,26 @@ std::ostream& operator<<(std::ostream &out, const ErrorInfo &einfo)
     if (einfo.nixCode.has_value()) {
         switch (einfo.nixCode->errPos.origin) {
             case foFile: {
-                out << fmt("%1%in file: " ANSI_BLUE "%2% %3%" ANSI_NORMAL,
-                    prefix,
-                    einfo.nixCode->errPos.file,
-                    showErrPos(einfo.nixCode->errPos)) << std::endl;
                 out << prefix << std::endl;
+                auto &pos = einfo.nixCode->errPos;
+                out << ANSI_BLUE << "at: " << ANSI_YELLOW << showErrPos(pos) << 
+                  ANSI_BLUE << " in file: " << ANSI_NORMAL << pos.file  << std::endl;
                 break;
             }
             case foString: {
-                out << fmt("%1%from command line argument %2%", prefix, showErrPos(einfo.nixCode->errPos)) << std::endl;
                 out << prefix << std::endl;
+                out << fmt("%1%from command line argument %2%", prefix, showErrPos(einfo.nixCode->errPos)) << std::endl;
                 break;
             }
             case foStdin: {
-                out << fmt("%1%from stdin %2%", prefix, showErrPos(einfo.nixCode->errPos)) << std::endl;
                 out << prefix << std::endl;
+                out << fmt("%1%from stdin %2%", prefix, showErrPos(einfo.nixCode->errPos)) << std::endl;
                 break;
             }
             default:
                 throw Error("invalid FileOrigin in errPos");
         }
         nl = true;
-    }
-
-    // traces
-    for (auto iter = einfo.traces.begin(); iter != einfo.traces.end(); ++iter)
-    {
-
-        try {
-            auto pos = *iter->pos;
-            out << iter->hint.str() << showErrPos(pos) << std::endl;
-            NixCode nc { .errPos = pos };
-            getCodeLines(nc);
-            printCodeLines(out, prefix, nc);
-        } catch(const std::bad_optional_access& e) {
-            out << iter->hint.str() << std::endl;
-        }
-
     }
 
     // description
@@ -350,6 +333,26 @@ std::ostream& operator<<(std::ostream &out, const ErrorInfo &einfo)
             out << std::endl << prefix;
         out << std::endl << prefix << *einfo.hint;
         nl = true;
+    }
+
+    // traces
+    for (auto iter = einfo.traces.rbegin(); iter != einfo.traces.rend(); ++iter)
+    {
+        try {
+            auto pos = *iter->pos;
+            if (nl)
+                out << std::endl << prefix;
+            out << std::endl << prefix;
+            out << iter->hint.str() <<  std::endl;
+            out << ANSI_BLUE << "at: " << ANSI_YELLOW << showErrPos(pos) << 
+              ANSI_BLUE << " in file: " << ANSI_NORMAL << pos.file  << std::endl;
+            nl = true;
+            NixCode nc { .errPos = pos };
+            getCodeLines(nc);
+            printCodeLines(out, prefix, nc);
+        } catch(const std::bad_optional_access& e) {
+            out << iter->hint.str() << std::endl;
+        }
     }
 
     return out;
