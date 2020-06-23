@@ -163,7 +163,7 @@ namespace nix {
                     "yellow",
                     "values"),
                 .nixCode = NixCode {
-                    .errPos = Pos(problem_file, 40, 13),
+                    .errPos = Pos(foFile, problem_file, 40, 13),
                     .prevLineOfCode = "previous line of code",
                     .errLineOfCode = "this is the problem line of code",
                     .nextLineOfCode = "next line of code",
@@ -186,7 +186,7 @@ namespace nix {
                     "yellow",
                     "values"),
                 .nixCode = NixCode {
-                    .errPos = Pos(problem_file, 40, 13)
+                    .errPos = Pos(foFile, problem_file, 40, 13)
                 }});
 
         auto str = testing::internal::GetCapturedStderr();
@@ -202,7 +202,7 @@ namespace nix {
                 .name = "error name",
                 .hint = hintfmt("hint %1%", "only"),
                 .nixCode = NixCode {
-                    .errPos = Pos(problem_file, 40, 13)
+                    .errPos = Pos(foFile, problem_file, 40, 13)
                 }});
 
         auto str = testing::internal::GetCapturedStderr();
@@ -241,7 +241,7 @@ namespace nix {
                     "yellow",
                     "values"),
                 .nixCode = NixCode {
-                    .errPos = Pos(problem_file, 40, 13),
+                    .errPos = Pos(foFile, problem_file, 40, 13),
                     .prevLineOfCode = std::nullopt,
                     .errLineOfCode = "this is the problem line of code",
                     .nextLineOfCode = std::nullopt
