@@ -97,7 +97,7 @@ $ rm -rf /nix
     installation on your system:
   </para>
 
-  <screen>sh &lt;(curl https://nixos.org/nix/install) --daemon</screen>
+  <screen>sh &lt;(curl -L https://nixos.org/nix/install) --daemon</screen>
 
   <para>
     The multi-user installation of Nix will create build users between
@@ -178,7 +178,7 @@ sudo rm /Library/LaunchDaemons/org.nixos.nix-daemon.plist
     is a bit of a misnomer). To use this approach, just install Nix with:
   </para>
 
-  <screen>$ sh &lt;(curl https://nixos.org/nix/install) --darwin-use-unencrypted-nix-store-volume</screen>
+  <screen>$ sh &lt;(curl -L https://nixos.org/nix/install) --darwin-use-unencrypted-nix-store-volume</screen>
 
   <para>
     If you don't like the sound of this, you'll want to weigh the
@@ -429,7 +429,7 @@ LABEL=Nix\040Store /nix apfs rw,nobrowse
   NixOS.org installation script:
 
   <screen>
-  sh &lt;(curl https://nixos.org/nix/install)
+  sh &lt;(curl -L https://nixos.org/nix/install)
 </screen>
   </para>
 
