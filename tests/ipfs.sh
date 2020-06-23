@@ -96,18 +96,18 @@ nix-build ./fixed.nix -A good \
 EMPTY_HASH=$(echo {} | ipfs dag put)
 
 # Try to upload the content to the empty directory, fail but grab the right hash
-IPFS_HASH=$(set -e; \
+IPFS_ADDRESS=$(set -e; \
   set -o pipefail; \
   ! nix copy --to ipfs://$EMPTY_HASH $(nix-build ./fixed.nix -A good) --experimental-features nix-command \
-    |& grep current: | awk '{print substr($2, 8, length($2))}')
+    |& grep current: | awk '{print $2}')
 
 # Verify that new path is valid.
-nix copy --to ipfs://$IPFS_HASH $(nix-build ./fixed.nix -A good) --experimental-features nix-command
+nix copy --to $IPFS_ADDRESS $(nix-build ./fixed.nix -A good) --experimental-features nix-command
 
 mkdir $IPFS_DST_IPFS_STORE
 
 nix-build ./fixed.nix -A good \
-  --option substituters 'ipfs://'$IPFS_HASH \
+  --option substituters $IPFS_ADDRESS \
   --store $IPFS_DST_IPFS_STORE \
   --no-out-link \
   -j0 \
