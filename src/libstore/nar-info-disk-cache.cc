@@ -203,7 +203,7 @@ public:
                 narInfo->deriver = StorePath(queryNAR.getStr(9));
             for (auto & sig : tokenizeString<Strings>(queryNAR.getStr(10), " "))
                 narInfo->sigs.insert(sig);
-            narInfo->ca = queryNAR.getStr(11);
+            narInfo->ca = parseContentAddressOpt(queryNAR.getStr(11));
 
             return {oValid, narInfo};
         });
@@ -237,7 +237,7 @@ public:
                     (concatStringsSep(" ", info->shortRefs()))
                     (info->deriver ? std::string(info->deriver->to_string()) : "", (bool) info->deriver)
                     (concatStringsSep(" ", info->sigs))
-                    (info->ca)
+                    (renderContentAddress(info->ca))
                     (time(0)).exec();
 
             } else {
