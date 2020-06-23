@@ -173,20 +173,20 @@ static std::string makeType(
 
 
 StorePath Store::makeFixedOutputPath(
-    FileIngestionMethod recursive,
+    FileIngestionMethod method,
     const Hash & hash,
     std::string_view name,
     const StorePathSet & references,
     bool hasSelfReference) const
 {
-    if (hash.type == htSHA256 && recursive == FileIngestionMethod::Recursive) {
+    if (hash.type == htSHA256 && method == FileIngestionMethod::Recursive) {
         return makeStorePath(makeType(*this, "source", references, hasSelfReference), hash, name);
     } else {
         assert(references.empty());
         return makeStorePath("output:out",
             hashString(htSHA256,
                 "fixed:out:"
-                + (recursive == FileIngestionMethod::Recursive ? (string) "r:" : "")
+                + makeFileIngestionPrefix(method)
                 + hash.to_string(Base16, true) + ":"),
             name);
     }
@@ -471,8 +471,8 @@ void Store::pathInfoToJSON(JSONPlaceholder & jsonOut, const StorePathSet & store
                     jsonRefs.elem(printStorePath(ref));
             }
 
-            if (info->ca != "")
-                jsonPath.attr("ca", info->ca);
+            if (info->ca)
+                jsonPath.attr("ca", renderContentAddress(info->ca));
 
             std::pair<uint64_t, uint64_t> closureSizes;
 
@@ -757,41 +757,35 @@ void ValidPathInfo::sign(const Store & store, const SecretKey & secretKey)
     sigs.insert(secretKey.signDetached(fingerprint(store)));
 }
 
+// FIXME Put this somewhere?
+template<class... Ts> struct overloaded : Ts... { using Ts::operator()...; };
+template<class... Ts> overloaded(Ts...) -> overloaded<Ts...>;
 
 bool ValidPathInfo::isContentAddressed(const Store & store) const
 {
-    auto warn = [&]() {
-        logWarning(
-            ErrorInfo{
-                .name = "Path not content-addressed",
-                .hint = hintfmt("path '%s' claims to be content-addressed but isn't", store.printStorePath(path))
-            });
-    };
+    if (! ca) return false;
 
-    if (hasPrefix(ca, "text:")) {
-        Hash hash(ca.substr(5));
-        if (store.makeTextPath(path.name(), hash, references) == path)
-            return true;
-        else
-            warn();
-    }
-
-    else if (hasPrefix(ca, "fixed:")) {
-        FileIngestionMethod recursive { ca.compare(6, 2, "r:") == 0 };
-        Hash hash(ca.substr(recursive == FileIngestionMethod::Recursive ? 8 : 6));
-        auto refs = references;
-        bool hasSelfReference = false;
-        if (refs.count(path)) {
-            hasSelfReference = true;
-            refs.erase(path);
+    auto caPath = std::visit(overloaded {
+        [&](TextHash th) {
+            return store.makeTextPath(path.name(), th.hash, references);
+        },
+        [&](FixedOutputHash fsh) {
+            auto refs = references;
+            bool hasSelfReference = false;
+            if (refs.count(path)) {
+                hasSelfReference = true;
+                refs.erase(path);
+            }
+            return store.makeFixedOutputPath(fsh.method, fsh.hash, path.name(), refs, hasSelfReference);
         }
-        if (store.makeFixedOutputPath(recursive, hash, path.name(), refs, hasSelfReference) == path)
-            return true;
-        else
-            warn();
-    }
+    }, *ca);
 
-    return false;
+    bool res = caPath == path;
+
+    if (!res)
+        printError("warning: path '%s' claims to be content-addressed but isn't", store.printStorePath(path));
+
+    return res;
 }
 
 
@@ -819,14 +813,6 @@ Strings ValidPathInfo::shortRefs() const
     for (auto & r : references)
         refs.push_back(std::string(r.to_string()));
     return refs;
-}
-
-
-std::string makeFixedOutputCA(FileIngestionMethod recursive, const Hash & hash)
-{
-    return "fixed:"
-        + (recursive == FileIngestionMethod::Recursive ? (std::string) "r:" : "")
-        + hash.to_string(Base32, true);
 }
 
 

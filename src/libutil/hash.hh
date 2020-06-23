@@ -10,7 +10,7 @@ namespace nix {
 MakeError(BadHash, Error);
 
 
-enum HashType : char { htUnknown, htMD5, htSHA1, htSHA256, htSHA512 };
+enum HashType : char { htMD5, htSHA1, htSHA256, htSHA512 };
 
 
 const int md5HashSize = 16;
@@ -29,7 +29,7 @@ struct Hash
     unsigned int hashSize = 0;
     unsigned char hash[maxHashSize] = {};
 
-    HashType type = htUnknown;
+    std::optional<HashType> type = {};
 
     /* Create an unset hash object. */
     Hash() { };
@@ -40,14 +40,18 @@ struct Hash
     /* Initialize the hash from a string representation, in the format
        "[<type>:]<base16|base32|base64>" or "<type>-<base64>" (a
        Subresource Integrity hash expression). If the 'type' argument
-       is htUnknown, then the hash type must be specified in the
+       is not present, then the hash type must be specified in the
        string. */
-    Hash(std::string_view s, HashType type = htUnknown);
+    Hash(std::string_view s, std::optional<HashType> type);
+    // type must be provided
+    Hash(std::string_view s, HashType type);
+    // hash type must be part of string
+    Hash(std::string_view s);
 
     void init();
 
     /* Check whether a hash is set. */
-    operator bool () const { return type != htUnknown; }
+    operator bool () const { return (bool) type; }
 
     /* Check whether two hash are equal. */
     bool operator == (const Hash & h2) const;
@@ -95,7 +99,7 @@ struct Hash
 };
 
 /* Helper that defaults empty hashes to the 0 hash. */
-Hash newHashAllowEmpty(std::string hashStr, HashType ht);
+Hash newHashAllowEmpty(std::string hashStr, std::optional<HashType> ht);
 
 /* Print a hash in base-16 if it's MD5, or base-32 otherwise. */
 string printHash16or32(const Hash & hash);
@@ -118,6 +122,8 @@ Hash compressHash(const Hash & hash, unsigned int newSize);
 
 /* Parse a string representing a hash type. */
 HashType parseHashType(const string & s);
+/* Will return nothing on parse error */
+std::optional<HashType> parseHashTypeOpt(const string & s);
 
 /* And the reverse. */
 string printHashType(HashType ht);
