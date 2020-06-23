@@ -10,44 +10,13 @@ namespace nix {
 
 const std::string nativeSystem = SYSTEM;
 
-// addPrefix is used for show-trace.  Strings added with addPrefix
-// will print ahead of the error itself.
-// BaseError & BaseError::addPrefix(const FormatOrString & fs)
-// {
-//     prefix_ = fs.s + prefix_;
-//     return *this;
-// }
-
-// const string & prefix() const
-// {
-//   // build prefix string on demand??
-
-// }
-// ; //  { return prefix_; }
-
-
-// addPrefix is used for show-trace.  Strings added with addPrefix
-// will print ahead of the error itself.
+// Traces show the chain of calls in nix code.  If an ErrPos is included the surrounding
+// lines of code will print. 
 BaseError & BaseError::addTrace(std::optional<ErrPos> e, hintformat hint)
 {
     err.traces.push_front(Trace { .pos = e, .hint = hint});
     return *this;
 }
-
-// const string& BaseError::calcTrace() const
-// {
-//     if (trace_.has_value())
-//         return *trace_;
-//     else {
-//         err.name = sname();
-
-//         std::ostringstream oss;
-//         oss << err;
-//         trace_ = oss.str();
-
-//         return *trace_;
-//     }
-// }
 
 // c++ std::exception descendants must have a 'const char* what()' function.
 // This stringifies the error and caches it for use by what(), or similarly by msg().
@@ -281,23 +250,25 @@ std::ostream& operator<<(std::ostream &out, const ErrorInfo &einfo)
             einfo.programName.value_or(""));
 
     bool nl = false;  // intersperse newline between sections.
-    if (einfo.nixCode.has_value()) {
-        switch (einfo.nixCode->errPos.origin) {
+    if (einfo.errPos.has_value()) {
+        switch (einfo.errPos->origin) {
             case foFile: {
                 out << prefix << std::endl;
-                auto &pos = einfo.nixCode->errPos;
-                out << ANSI_BLUE << "at: " << ANSI_YELLOW << showErrPos(pos) << 
-                  ANSI_BLUE << " in file: " << ANSI_NORMAL << pos.file  << std::endl;
+                auto &pos = *einfo.errPos;
+                out << prefix << ANSI_BLUE << "at: " << ANSI_YELLOW << showErrPos(pos) << 
+                  ANSI_BLUE << " in file: " << ANSI_NORMAL << pos.file;
                 break;
             }
             case foString: {
                 out << prefix << std::endl;
-                out << fmt("%1%from command line argument %2%", prefix, showErrPos(einfo.nixCode->errPos)) << std::endl;
+                out << prefix << ANSI_BLUE << "at: " << ANSI_YELLOW << showErrPos(*einfo.errPos) << 
+                  ANSI_BLUE << " from command line argument" << ANSI_NORMAL;
                 break;
             }
             case foStdin: {
                 out << prefix << std::endl;
-                out << fmt("%1%from stdin %2%", prefix, showErrPos(einfo.nixCode->errPos)) << std::endl;
+                out << prefix << ANSI_BLUE << "at: " << ANSI_YELLOW << showErrPos(*einfo.errPos) << 
+                  ANSI_BLUE << " from stdin" << ANSI_NORMAL;
                 break;
             }
             default:
@@ -314,8 +285,8 @@ std::ostream& operator<<(std::ostream &out, const ErrorInfo &einfo)
         nl = true;
     }
 
-    if (einfo.nixCode.has_value()) {
-        NixCode nixcode = *einfo.nixCode;
+    if (einfo.errPos.has_value()) {
+        NixCode nixcode { .errPos = *einfo.errPos }; 
         getCodeLines(nixcode);
 
         // lines of code.

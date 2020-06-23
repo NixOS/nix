@@ -103,7 +103,7 @@ struct ErrorInfo {
     string name;
     string description;
     std::optional<hintformat> hint;
-    std::optional<NixCode> nixCode;
+    std::optional<ErrPos> errPos;
     std::list<Trace> traces;
 
     static std::optional<string> programName;

@@ -285,7 +285,7 @@ void ExprVar::bindVars(const StaticEnv & env)
     if (withLevel == -1)
         throw UndefinedVarError({
             .hint = hintfmt("undefined variable '%1%'", name),
-            .nixCode = NixCode { .errPos = pos }
+            .errPos = pos
         });
     fromWith = true;
     this->level = withLevel;

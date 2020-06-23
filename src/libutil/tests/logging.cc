@@ -11,6 +11,13 @@ namespace nix {
      * logEI
      * --------------------------------------------------------------------------*/
 
+    const char *test_file = 
+        "previous line of code\n"
+        "this is the problem line of code\n"
+        "next line of code\n";
+    const char *one_liner = 
+        "this is the problem line of code";
+
     TEST(logEI, catpuresBasicProperties) {
 
         MakeError(TestError, Error);
@@ -152,7 +159,7 @@ namespace nix {
 
     TEST(logError, logErrorWithPreviousAndNextLinesOfCode) {
         SymbolTable testTable;
-        auto problem_file = testTable.create("myfile.nix");
+        auto problem_file = testTable.create(test_file);
 
         testing::internal::CaptureStderr();
 
@@ -162,21 +169,16 @@ namespace nix {
                 .hint = hintfmt("this hint has %1% templated %2%!!",
                     "yellow",
                     "values"),
-                .nixCode = NixCode {
-                    .errPos = Pos(foFile, problem_file, 40, 13),
-                    .prevLineOfCode = "previous line of code",
-                    .errLineOfCode = "this is the problem line of code",
-                    .nextLineOfCode = "next line of code",
-                }});
-
+                .errPos = Pos(foString, problem_file, 02, 13),
+            });
 
         auto str = testing::internal::GetCapturedStderr();
-        ASSERT_STREQ(str.c_str(), "\x1B[31;1merror:\x1B[0m\x1B[34;1m --- error name --- error-unit-test\x1B[0m\nin file: \x1B[34;1mmyfile.nix (40:13)\x1B[0m\n\nerror with code lines\n\n    39| previous line of code\n    40| this is the problem line of code\n      |             \x1B[31;1m^\x1B[0m\n    41| next line of code\n\nthis hint has \x1B[33;1myellow\x1B[0m templated \x1B[33;1mvalues\x1B[0m!!\n");
+        ASSERT_STREQ(str.c_str(), "\x1B[31;1merror:\x1B[0m\x1B[34;1m --- error name --- error-unit-test\x1B[0m\n\x1B[34;1mat: \x1B[33;1m(2:13)\x1B[34;1m from command line argument\x1B[0m\n\nerror with code lines\n\n     1| previous line of code\n     2| this is the problem line of code\n      |             \x1B[31;1m^\x1B[0m\n     3| next line of code\n\nthis hint has \x1B[33;1myellow\x1B[0m templated \x1B[33;1mvalues\x1B[0m!!\n");
     }
 
-    TEST(logError, logErrorWithoutLinesOfCode) {
+    TEST(logError, logErrorWithInvalidFile) {
         SymbolTable testTable;
-        auto problem_file = testTable.create("myfile.nix");
+        auto problem_file = testTable.create("invalid filename");
         testing::internal::CaptureStderr();
 
         logError({
@@ -185,28 +187,23 @@ namespace nix {
                 .hint = hintfmt("this hint has %1% templated %2%!!",
                     "yellow",
                     "values"),
-                .nixCode = NixCode {
-                    .errPos = Pos(foFile, problem_file, 40, 13)
-                }});
+                .errPos = Pos(foFile, problem_file, 02, 13)
+            });
 
         auto str = testing::internal::GetCapturedStderr();
-        ASSERT_STREQ(str.c_str(), "\x1B[31;1merror:\x1B[0m\x1B[34;1m --- error name --- error-unit-test\x1B[0m\nin file: \x1B[34;1mmyfile.nix (40:13)\x1B[0m\n\nerror without any code lines.\n\nthis hint has \x1B[33;1myellow\x1B[0m templated \x1B[33;1mvalues\x1B[0m!!\n");
+        ASSERT_STREQ(str.c_str(), "\x1B[31;1merror:\x1B[0m\x1B[34;1m --- SysError --- error-unit-test\x1B[0m\nopening file '\x1B[33;1minvalid filename\x1B[0m': \x1B[33;1mNo such file or directory\x1B[0m\n\x1B[31;1merror:\x1B[0m\x1B[34;1m --- error name --- error-unit-test\x1B[0m\n\x1B[34;1mat: \x1B[33;1m(2:13)\x1B[34;1m in file: \x1B[0minvalid filename\n\nerror without any code lines.\n\nthis hint has \x1B[33;1myellow\x1B[0m templated \x1B[33;1mvalues\x1B[0m!!\n");
     }
 
     TEST(logError, logErrorWithOnlyHintAndName) {
-        SymbolTable testTable;
-        auto problem_file = testTable.create("myfile.nix");
         testing::internal::CaptureStderr();
 
         logError({
                 .name = "error name",
                 .hint = hintfmt("hint %1%", "only"),
-                .nixCode = NixCode {
-                    .errPos = Pos(foFile, problem_file, 40, 13)
-                }});
+            });
 
         auto str = testing::internal::GetCapturedStderr();
-        ASSERT_STREQ(str.c_str(), "\x1B[31;1merror:\x1B[0m\x1B[34;1m --- error name --- error-unit-test\x1B[0m\nin file: \x1B[34;1mmyfile.nix (40:13)\x1B[0m\n\nhint \x1B[33;1monly\x1B[0m\n");
+        ASSERT_STREQ(str.c_str(), "\x1B[31;1merror:\x1B[0m\x1B[34;1m --- error name --- error-unit-test\x1B[0m\nhint \x1B[33;1monly\x1B[0m\n");
 
     }
 
@@ -219,18 +216,18 @@ namespace nix {
 
         logWarning({
                 .name = "name",
-                .description = "error description",
+                .description = "warning description",
                 .hint = hintfmt("there was a %1%", "warning"),
             });
 
         auto str = testing::internal::GetCapturedStderr();
-        ASSERT_STREQ(str.c_str(), "\x1B[33;1mwarning:\x1B[0m\x1B[34;1m --- name --- error-unit-test\x1B[0m\nerror description\n\nthere was a \x1B[33;1mwarning\x1B[0m\n");
+        ASSERT_STREQ(str.c_str(), "\x1B[33;1mwarning:\x1B[0m\x1B[34;1m --- name --- error-unit-test\x1B[0m\nwarning description\n\nthere was a \x1B[33;1mwarning\x1B[0m\n");
     }
 
     TEST(logWarning, logWarningWithFileLineNumAndCode) {
 
         SymbolTable testTable;
-        auto problem_file = testTable.create("myfile.nix");
+        auto problem_file = testTable.create(test_file);
 
         testing::internal::CaptureStderr();
 
@@ -240,16 +237,12 @@ namespace nix {
                 .hint = hintfmt("this hint has %1% templated %2%!!",
                     "yellow",
                     "values"),
-                .nixCode = NixCode {
-                    .errPos = Pos(foFile, problem_file, 40, 13),
-                    .prevLineOfCode = std::nullopt,
-                    .errLineOfCode = "this is the problem line of code",
-                    .nextLineOfCode = std::nullopt
-                }});
+                .errPos = Pos(foStdin, problem_file, 2, 13),
+            });
 
 
         auto str = testing::internal::GetCapturedStderr();
-        ASSERT_STREQ(str.c_str(), "\x1B[33;1mwarning:\x1B[0m\x1B[34;1m --- warning name --- error-unit-test\x1B[0m\nin file: \x1B[34;1mmyfile.nix (40:13)\x1B[0m\n\nwarning description\n\n    40| this is the problem line of code\n      |             \x1B[31;1m^\x1B[0m\n\nthis hint has \x1B[33;1myellow\x1B[0m templated \x1B[33;1mvalues\x1B[0m!!\n");
+        ASSERT_STREQ(str.c_str(), "\x1B[33;1mwarning:\x1B[0m\x1B[34;1m --- warning name --- error-unit-test\x1B[0m\n\x1B[34;1mat: \x1B[33;1m(2:13)\x1B[34;1m from stdin\x1B[0m\n\nwarning description\n\n     1| previous line of code\n     2| this is the problem line of code\n      |             \x1B[31;1m^\x1B[0m\n     3| next line of code\n\nthis hint has \x1B[33;1myellow\x1B[0m templated \x1B[33;1mvalues\x1B[0m!!\n");
     }
 
     /* ----------------------------------------------------------------------------

@@ -529,7 +529,7 @@ LocalNoInlineNoReturn(void throwEvalError(const Pos & pos, const char * s, const
 {
     throw EvalError({
         .hint = hintfmt(s, s2),
-        .nixCode = NixCode { .errPos = pos }
+        .errPos = pos
     });
 }
 
@@ -542,7 +542,7 @@ LocalNoInlineNoReturn(void throwEvalError(const Pos & pos, const char * s, const
 {
     throw EvalError({
         .hint = hintfmt(s, s2, s3),
-        .nixCode = NixCode { .errPos = pos }
+        .errPos = pos
     });
 }
 
@@ -551,7 +551,7 @@ LocalNoInlineNoReturn(void throwEvalError(const Pos & p1, const char * s, const 
     // p1 is where the error occurred; p2 is a position mentioned in the message.
     throw EvalError({
         .hint = hintfmt(s, sym, p2),
-        .nixCode = NixCode { .errPos = p1 }
+        .errPos = p1
     });
 }
 
@@ -559,7 +559,7 @@ LocalNoInlineNoReturn(void throwTypeError(const Pos & pos, const char * s))
 {
     throw TypeError({
         .hint = hintfmt(s),
-        .nixCode = NixCode { .errPos = pos }
+        .errPos = pos
     });
 }
 
@@ -572,7 +572,7 @@ LocalNoInlineNoReturn(void throwTypeError(const Pos & pos, const char * s, const
 {
     throw TypeError({
         .hint = hintfmt(s, fun.showNamePos(), s2),
-        .nixCode = NixCode { .errPos = pos }
+        .errPos = pos
     });
 }
 
@@ -580,7 +580,7 @@ LocalNoInlineNoReturn(void throwAssertionError(const Pos & pos, const char * s, 
 {
     throw AssertionError({
         .hint = hintfmt(s, s1),
-        .nixCode = NixCode { .errPos = pos }
+        .errPos = pos
     });
 }
 
@@ -588,7 +588,7 @@ LocalNoInlineNoReturn(void throwUndefinedVarError(const Pos & pos, const char * 
 {
     throw UndefinedVarError({
         .hint = hintfmt(s, s1),
-        .nixCode = NixCode { .errPos = pos }
+        .errPos = pos
     });
 }
 
@@ -1938,7 +1938,7 @@ string ExternalValueBase::coerceToString(const Pos & pos, PathSet & context, boo
 {
     throw TypeError({
         .hint = hintfmt("cannot coerce %1% to a string", showType()),
-        .nixCode = NixCode { .errPos = pos }
+        .errPos = pos
     });
 }
 
