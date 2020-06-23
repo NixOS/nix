@@ -99,7 +99,7 @@ EMPTY_HASH=$(echo {} | ipfs dag put)
 IPFS_HASH=$(set -e; \
   set -o pipefail; \
   ! nix copy --to ipfs://$EMPTY_HASH $(nix-build ./fixed.nix -A good) --experimental-features nix-command \
-    |& grep current: | awk '{print substr($2, 7, length($2))}')
+    |& grep current: | awk '{print substr($2, 8, length($2))}')
 
 # Verify that new path is valid.
 nix copy --to ipfs://$IPFS_HASH $(nix-build ./fixed.nix -A good) --experimental-features nix-command
