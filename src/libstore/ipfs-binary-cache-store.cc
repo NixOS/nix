@@ -656,7 +656,7 @@ public:
         // TODO make temporary pin/addToStore, see
         // https://github.com/ipfs/go-ipfs/issues/4559 and
         // https://github.com/ipfs/go-ipfs/issues/4328 for some ideas.
-        auto uri = daemonUri + "/api/v0/pin/add?arg=" + getIpfsPath() + "/" + string { path.to_string() };
+        auto uri = daemonUri + "/api/v0/pin/add?arg=" + getIpfsPath() + "/nar/" + string { path.to_string() };
 
         FileTransferRequest request(uri);
         request.post = true;
