@@ -106,6 +106,24 @@ struct GitInput : Input
 
         auto ingestionMethod = treeHash ? FileIngestionMethod::Git : FileIngestionMethod::Recursive;
 
+        // try to substitute
+        if (settings.useSubstitutes && treeHash && !submodules) {
+            auto storePath = fetchers::trySubstitute(store, ingestionMethod, *treeHash, name);
+            if (storePath) {
+                return {
+                    Tree {
+                        .actualPath = store->toRealPath(*storePath),
+                        .storePath = std::move(*storePath),
+                        .info = TreeInfo {
+                            .revCount = std::nullopt,
+                            .lastModified = 0,
+                        },
+                    },
+                    input
+                };
+            }
+        }
+
         std::string cacheType = "git";
         if (shallow) cacheType += "-shallow";
         if (submodules) cacheType += "-submodules";
@@ -385,7 +403,7 @@ struct GitInput : Input
             unpackTarfile(*source, tmpDir);
         }
 
-        auto storePath = store->addToStore(name, tmpDir, FileIngestionMethod::Recursive, ingestionMethod == FileIngestionMethod::Git ? htSHA1 : htSHA256, filter);
+        auto storePath = store->addToStore(name, tmpDir, ingestionMethod, ingestionMethod == FileIngestionMethod::Git ? htSHA1 : htSHA256, filter);
 
         // verify treeHash is what we actually obtained in the nix store
         if (input->treeHash) {

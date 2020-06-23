@@ -1,6 +1,7 @@
 source common.sh
 
 clearStore
+clearCache
 
 try () {
     hash=$(nix hash-git --base16 --type sha1 $TEST_ROOT/hash-path)
@@ -40,8 +41,6 @@ test "$hash3" = "sha256:1i2x80840igikhbyy7nqf08ymx3a6n83x1fzyrxvddf0sdl5nqvp"
 if [[ -n $(type -p git) ]]; then
     repo=$TEST_ROOT/git
 
-    export _NIX_FORCE_HTTP=1
-
     rm -rf $repo $TEST_HOME/.cache/nix
 
     git init $repo
@@ -64,6 +63,12 @@ if [[ -n $(type -p git) ]]; then
 
     # Submodules cause error.
     (! nix eval --raw "(builtins.fetchTree { type = \"git\"; url = file://$repo; treeHash = \"$treeHash\"; submodules = true; }).outPath")
+
+    # Check that we can substitute it from other places.
+    nix copy --to file://$cacheDir $path
+    nix-store --delete $path
+    path2=$(nix eval --raw "(builtins.fetchTree { type = \"git\"; url = file:///no-such-repo; treeHash = \"$treeHash\"; }).outPath" --substituters file://$cacheDir --option substitute true)
+    [ $path2 = $path ]
 else
     echo "Git not installed; skipping Git tests"
 fi

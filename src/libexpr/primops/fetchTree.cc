@@ -134,6 +134,20 @@ static void fetch(EvalState & state, const Pos & pos, Value * * args, Value & v,
     if (evalSettings.pureEval && !expectedHash)
         throw Error("in pure evaluation mode, '%s' requires a 'sha256' argument", who);
 
+    // try to substitute if we can
+    if (settings.useSubstitutes && expectedHash) {
+        auto substitutableStorePath = fetchers::trySubstitute(state.store,
+            unpack ? FileIngestionMethod::Recursive : FileIngestionMethod::Flat, *expectedHash, name);
+        if (substitutableStorePath) {
+            auto substitutablePath = state.store->toRealPath(*substitutableStorePath);
+            if (state.allowedPaths)
+                state.allowedPaths->insert(substitutablePath);
+
+            mkString(v, substitutablePath, PathSet({substitutablePath}));
+            return;
+        }
+    }
+
     auto storePath =
         unpack
         ? fetchers::downloadTarball(state.store, *url, name, (bool) expectedHash).storePath
