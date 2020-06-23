@@ -190,6 +190,13 @@ private:
     }
 
 public:
+    Path formatPathAsProtocol(Path path) {
+        if (hasPrefix(path, "/ipfs/"))
+            return "ipfs://" + path.substr(strlen("/ipfs/"), string::npos);
+        else if (hasPrefix(path, "/ipns/"))
+            return "ipns://" + path.substr(strlen("/ipfs/"), string::npos);
+        else return path;
+    }
 
     // IPNS publish can be slow, we try to do it rarely.
     void sync() override
@@ -197,8 +204,8 @@ public:
         auto state(_state.lock());
 
         if (!optIpnsPath) {
-            throw Error("We don't have an ipns path and the current ipfs address doesn't match the initial one.\n  current: %s\n  initial: %s",
-                state->ipfsPath, initialIpfsPath);
+            throw Error("The current IPFS address doesn't match the configured one. \n  initial: %s\n  current: %s",
+                formatPathAsProtocol(initialIpfsPath), formatPathAsProtocol(state->ipfsPath));
         }
 
         auto ipnsPath = *optIpnsPath;
