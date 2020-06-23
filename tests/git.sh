@@ -67,7 +67,7 @@ if [[ -n $(type -p git) ]]; then
     # Check that we can substitute it from other places.
     nix copy --to file://$cacheDir $path
     nix-store --delete $path
-    path2=$(nix eval --raw "(builtins.fetchTree { type = \"git\"; url = file:///no-such-repo; treeHash = \"$treeHash\"; }).outPath" --substituters file://$cacheDir)
+    path2=$(nix eval --raw "(builtins.fetchTree { type = \"git\"; url = file:///no-such-repo; treeHash = \"$treeHash\"; }).outPath" --substituters file://$cacheDir --option substitute true)
     [ $path2 = $path ]
 else
     echo "Git not installed; skipping Git tests"
