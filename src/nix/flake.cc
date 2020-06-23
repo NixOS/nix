@@ -589,7 +589,7 @@ struct CmdFlakeInitCommon : virtual Args, EvalCommand
         copyDir(templateDir, flakeDir);
 
         if (pathExists(flakeDir + "/.git")) {
-            Strings args = { "-C", flakeDir, "add", "--intent-to-add", "--" };
+            Strings args = { "-C", flakeDir, "add", "--intent-to-add", "--force", "--" };
             for (auto & s : files) args.push_back(s);
             runProgram("git", true, args);
         }
