@@ -10,8 +10,6 @@ namespace nix {
 
 const std::string nativeSystem = SYSTEM;
 
-// Traces show the chain of calls in nix code.  If an ErrPos is included the surrounding
-// lines of code will print.
 BaseError & BaseError::addTrace(std::optional<ErrPos> e, hintformat hint)
 {
     err.traces.push_front(Trace { .pos = e, .hint = hint});

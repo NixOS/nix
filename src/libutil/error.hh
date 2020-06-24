@@ -119,9 +119,6 @@ protected:
     // string prefix_; // used for location traces etc.
     mutable ErrorInfo err;
 
-    // mutable std::optional<string> trace_;
-    // const string& calcTrace() const;
-
     mutable std::optional<string> what_;
     const string& calcWhat() const;
 
@@ -167,11 +164,9 @@ public:
 #endif
 
     const string & msg() const { return calcWhat(); }
-    // const string & trace() const { return calcTrace(); }
-    // BaseError & addPrefix(const FormatOrString & fs);
-    BaseError & addTrace(std::optional<ErrPos> e, hintformat hint);
-
     const ErrorInfo & info() { calcWhat(); return err; }
+
+    BaseError & addTrace(std::optional<ErrPos> e, hintformat hint);
 };
 
 #define MakeError(newClass, superClass) \
