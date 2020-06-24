@@ -56,6 +56,13 @@ typedef enum {
     foString
 } FileOrigin;
 
+// the lines of code surrounding an error.
+struct LinesOfCode {
+    std::optional<string> prevLineOfCode;
+    std::optional<string> errLineOfCode;
+    std::optional<string> nextLineOfCode;
+};
+
 // ErrPos indicates the location of an error in a nix file.
 struct ErrPos {
     int line = 0;
@@ -84,13 +91,6 @@ struct ErrPos {
     {
         *this = p;
     }
-};
-
-struct NixCode {
-    ErrPos errPos;
-    std::optional<string> prevLineOfCode;
-    std::optional<string> errLineOfCode;
-    std::optional<string> nextLineOfCode;
 };
 
 struct Trace {
