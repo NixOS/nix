@@ -3733,7 +3733,10 @@ void DerivationGoal::registerOutputs()
                 ? hashPath(*i.second.hash->hash.type, actualPath).first
                 : hashFile(*i.second.hash->hash.type, actualPath);
 
-            auto dest = worker.store.makeFixedOutputPath(i.second.hash->method, h2, i.second.path.name());
+            auto dest = worker.store.makeFixedOutputPath(i.second.path.name(), FixedOutputHash {
+                .method = i.second.hash->method,
+                .hash = h2,
+            });
 
             if (i.second.hash->hash != h2) {
 

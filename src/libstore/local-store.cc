@@ -562,10 +562,7 @@ void LocalStore::checkDerivationOutputs(const StorePath & drvPath, const Derivat
             throw Error("derivation '%s' does not have an output named 'out'", printStorePath(drvPath));
 
         check(
-            makeFixedOutputPath(
-                out->second.hash->method,
-                out->second.hash->hash,
-                drvName),
+            makeFixedOutputPath(drvName, *out->second.hash),
             out->second.path, "out");
     }
 
@@ -1050,7 +1047,10 @@ StorePath LocalStore::addToStoreFromDump(const string & dump, const string & nam
 {
     Hash h = hashString(hashAlgo, dump);
 
-    auto dstPath = makeFixedOutputPath(method, h, name);
+    auto dstPath = makeFixedOutputPath(name, FixedOutputHash {
+        .method = method,
+        .hash = h,
+    });
 
     addTempRoot(dstPath);
 

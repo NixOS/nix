@@ -77,7 +77,10 @@ struct CmdMakeContentAddressable : StorePathsCommand, MixJSON
 
             auto narHash = hashModuloSink.finish().first;
 
-            ValidPathInfo info(store->makeFixedOutputPath(FileIngestionMethod::Recursive, narHash, path.name(), references, hasSelfReference));
+            ValidPathInfo info(store->makeFixedOutputPath(path.name(), FixedOutputHash {
+                .method = FileIngestionMethod::Recursive,
+                .hash = narHash,
+            }, references, hasSelfReference));
             info.references = std::move(references);
             info.hasSelfReference = std::move(hasSelfReference);
             info.narHash = narHash;

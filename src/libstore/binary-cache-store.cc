@@ -347,7 +347,10 @@ StorePath BinaryCacheStore::addToStore(const string & name, const Path & srcPath
         h = hashString(hashAlgo, s);
     }
 
-    ValidPathInfo info(makeFixedOutputPath(method, h, name));
+    ValidPathInfo info(makeFixedOutputPath(name, FixedOutputHash {
+        .method = method,
+        .hash = h,
+    }));
 
     auto source = StringSource { *sink.s };
     addToStore(info, source, repair, CheckSigs, nullptr);

@@ -8,7 +8,10 @@ namespace nix::fetchers {
 StorePath TreeInfo::computeStorePath(Store & store) const
 {
     assert(narHash);
-    return store.makeFixedOutputPath(FileIngestionMethod::Recursive, narHash, "source");
+    return store.makeFixedOutputPath("source", FixedOutputHash {
+        .method = FileIngestionMethod::Recursive,
+        .hash = narHash,
+    });
 }
 
 }

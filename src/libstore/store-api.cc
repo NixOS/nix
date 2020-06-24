@@ -173,21 +173,20 @@ static std::string makeType(
 
 
 StorePath Store::makeFixedOutputPath(
-    FileIngestionMethod method,
-    const Hash & hash,
     std::string_view name,
+    const FixedOutputHash & foh,
     const StorePathSet & references,
     bool hasSelfReference) const
 {
-    if (hash.type == htSHA256 && method == FileIngestionMethod::Recursive) {
-        return makeStorePath(makeType(*this, "source", references, hasSelfReference), hash, name);
+    if (*foh.hash.type == htSHA256 && foh.method == FileIngestionMethod::Recursive) {
+        return makeStorePath(makeType(*this, "source", references, hasSelfReference), foh.hash, name);
     } else {
         assert(references.empty());
         return makeStorePath("output:out",
             hashString(htSHA256,
                 "fixed:out:"
-                + makeFileIngestionPrefix(method)
-                + hash.to_string(Base16, true) + ":"),
+                + makeFileIngestionPrefix(foh.method)
+                + foh.hash.to_string(Base16, true) + ":"),
             name);
     }
 }
@@ -205,7 +204,7 @@ StorePath Store::makeFixedOutputPathFromCA(std::string_view name, ContentAddress
             return makeTextPath(name, th.hash, references);
         },
         [&](FixedOutputHash fsh) {
-            return makeFixedOutputPath(fsh.method, fsh.hash, name, references, hasSelfReference);
+            return makeFixedOutputPath(name, fsh, references, hasSelfReference);
         }
     }, ca);
 }
@@ -227,7 +226,10 @@ std::pair<StorePath, Hash> Store::computeStorePathForPath(std::string_view name,
     Hash h = method == FileIngestionMethod::Recursive
         ? hashPath(hashAlgo, srcPath, filter).first
         : hashFile(hashAlgo, srcPath);
-    return std::make_pair(makeFixedOutputPath(method, h, name), h);
+    return std::make_pair(makeFixedOutputPath(name, FixedOutputHash {
+        .method = method,
+        .hash = h,
+    }), h);
 }
 
 
@@ -835,7 +837,7 @@ bool ValidPathInfo::isContentAddressed(const Store & store) const
             return store.makeTextPath(path.name(), th.hash, references);
         },
         [&](FixedOutputHash fsh) {
-            return store.makeFixedOutputPath(fsh.method, fsh.hash, path.name(), references, hasSelfReference);
+            return store.makeFixedOutputPath(path.name(), fsh, references, hasSelfReference);
         }
     }, *ca);
 

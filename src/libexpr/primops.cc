@@ -772,7 +772,10 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
         std::optional<HashType> ht = parseHashTypeOpt(outputHashAlgo);
         Hash h = newHashAllowEmpty(*outputHash, ht);
 
-        auto outPath = state.store->makeFixedOutputPath(ingestionMethod, h, drvName);
+        auto outPath = state.store->makeFixedOutputPath(drvName, FixedOutputHash {
+            .method = ingestionMethod,
+            .hash = h
+        });
         if (!jsonObject) drv.env["out"] = state.store->printStorePath(outPath);
         drv.outputs.insert_or_assign("out", DerivationOutput {
             .path = std::move(outPath),
@@ -1153,7 +1156,10 @@ static void addPath(EvalState & state, const Pos & pos, const string & name, con
 
     std::optional<StorePath> expectedStorePath;
     if (expectedHash)
-        expectedStorePath = state.store->makeFixedOutputPath(method, expectedHash, name);
+        expectedStorePath = state.store->makeFixedOutputPath(name, FixedOutputHash {
+            .method = method,
+            .hash = expectedHash,
+        });
     Path dstPath;
     if (!expectedHash || !state.store->isValidPath(*expectedStorePath)) {
         dstPath = state.store->printStorePath(settings.readOnlyMode

@@ -41,10 +41,6 @@ typedef std::variant<
    ingested. */
 std::string makeFileIngestionPrefix(const FileIngestionMethod m);
 
-/* Compute the content-addressability assertion (ValidPathInfo::ca)
-   for paths created by makeFixedOutputPath() / addToStore(). */
-std::string makeFixedOutputCA(FileIngestionMethod method, const Hash & hash);
-
 std::string renderContentAddress(ContentAddress ca);
 
 std::string renderContentAddress(std::optional<ContentAddress> ca);

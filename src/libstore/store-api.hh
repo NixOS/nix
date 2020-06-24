@@ -250,15 +250,20 @@ public:
     StorePath makeOutputPath(const string & id,
         const Hash & hash, std::string_view name) const;
 
-    StorePath makeFixedOutputPath(FileIngestionMethod method,
-        const Hash & hash, std::string_view name,
+    StorePath makeFixedOutputPath(
+        std::string_view name,
+        const FixedOutputHash & hash,
         const StorePathSet & references = {},
         bool hasSelfReference = false) const;
 
-    StorePath makeTextPath(std::string_view name, const Hash & hash,
+    StorePath makeTextPath(
+        std::string_view name,
+        const Hash & hash,
         const StorePathSet & references = {}) const;
 
-    StorePath makeFixedOutputPathFromCA(std::string_view name, ContentAddress ca,
+    StorePath makeFixedOutputPathFromCA(
+        std::string_view name,
+        ContentAddress ca,
         const StorePathSet & references = {},
         bool hasSelfReference = false) const;
 
