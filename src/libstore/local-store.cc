@@ -576,6 +576,18 @@ void LocalStore::checkDerivationOutputs(const StorePath & drvPath, const Derivat
     }
 }
 
+void LocalStore::linkDeriverToPath(State & state, const ValidPathInfo & info) {
+    if (info.deriver && info.outputname) {
+        debug("Updating the output path of the deriver");
+        /* debug(queryValidPathId(state, info.deriver.value())); */
+        state.stmtAddDerivationOutput.use()
+            (queryValidPathId(state, info.deriver.value()))
+            (info.outputname.value())
+            (printStorePath(info.path))
+            .exec();
+    }
+
+}
 
 uint64_t LocalStore::addValidPath(State & state,
     const ValidPathInfo & info, bool checkOutputs)
@@ -618,6 +630,8 @@ uint64_t LocalStore::addValidPath(State & state,
                 .exec();
         }
     }
+
+    linkDeriverToPath(state, info);
 
     {
         auto state_(Store::state.lock());
@@ -692,6 +706,8 @@ void LocalStore::updatePathInfo(State & state, const ValidPathInfo & info)
         (renderContentAddress(info.ca), (bool) info.ca)
         (printStorePath(info.path))
         .exec();
+
+    linkDeriverToPath(state, info);
 }
 
 

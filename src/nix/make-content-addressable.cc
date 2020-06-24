@@ -49,9 +49,6 @@ struct CmdMakeContentAddressable : StorePathsCommand, MixJSON
             auto pathS = store->printStorePath(path);
             auto oldInfo = store->queryPathInfo(path);
 
-            StringSink sink;
-            store->narFromPath(path, sink);
-
             StringMap rewrites;
 
             StorePathSet references;

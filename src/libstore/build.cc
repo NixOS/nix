@@ -1197,7 +1197,6 @@ void DerivationGoal::haveDerivation()
 
     if (parsedDrv->contentAddressed()) {
         settings.requireExperimentalFeature("ca-derivations");
-        throw Error("ca-derivations isn't implemented yet");
     }
 
 
@@ -3835,18 +3834,25 @@ void DerivationGoal::registerOutputs()
         }
 
         ValidPathInfo info(worker.store.parseStorePath(path));
-        info.narHash = hash.first;
-        info.narSize = hash.second;
         info.references = std::move(references);
+
+        if (parsedDrv->contentAddressed()) {
+            info = worker.store.makeContentAddressed(info);
+            deletePath(path);
+        } else {
+            info.narHash = hash.first;
+            info.narSize = hash.second;
+            info.ca = ca;
+            if (!info.references.empty()) {
+                // FIXME don't we have an experimental feature for fixed output with references?
+                info.ca = {};
+            }
+        }
+
+        info.outputname = i.first;
         info.deriver = drvPath;
         info.ultimate = true;
-        info.ca = ca;
         worker.store.signPathInfo(info);
-
-        if (!info.references.empty()) {
-            // FIXME don't we have an experimental feature for fixed output with references?
-            info.ca = {};
-        }
 
         infos.emplace(i.first, std::move(info));
     }

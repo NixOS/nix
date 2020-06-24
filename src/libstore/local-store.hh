@@ -291,6 +291,11 @@ private:
        specified by the ‘secret-key-files’ option. */
     void signPathInfo(ValidPathInfo & info);
 
+    /* Add a mapping from the deriver of the path info (if specified) to its
+     * out path
+     */
+    void linkDeriverToPath(State & state, const ValidPathInfo & info);
+
     Path getRealStoreDir() override { return realStoreDir; }
 
     void createUser(const std::string & userName, uid_t userId) override;

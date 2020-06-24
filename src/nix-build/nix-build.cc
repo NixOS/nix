@@ -493,13 +493,25 @@ static void _main(int argc, char * * argv)
 
         for (auto & drvInfo : drvs) {
             auto drvPath = drvInfo.queryDrvPath();
-            auto outPath = drvInfo.queryOutPath();
 
             auto outputName = drvInfo.queryOutputName();
             if (outputName == "")
                 throw Error("derivation '%s' lacks an 'outputName' attribute", drvPath);
 
             pathsToBuild.push_back({store->parseStorePath(drvPath), {outputName}});
+
+        }
+
+        buildPaths(pathsToBuild);
+
+        for (auto & drvInfo : drvs) {
+            auto outputName = drvInfo.queryOutputName();
+            auto drvPath = drvInfo.queryDrvPath();
+
+            auto outPath =
+                store->queryDerivationOutputMap(store->parseStorePath(drvPath))
+                     .at(outputName);
+            string rawOutPath = store->printStorePath(outPath);
 
             std::string drvPrefix;
             auto i = drvPrefixes.find(drvPath);
@@ -515,11 +527,9 @@ static void _main(int argc, char * * argv)
             std::string symlink = drvPrefix;
             if (outputName != "out") symlink += "-" + outputName;
 
-            resultSymlinks[symlink] = outPath;
-            outPaths.push_back(outPath);
+            resultSymlinks[symlink] = rawOutPath;
+            outPaths.push_back(rawOutPath);
         }
-
-        buildPaths(pathsToBuild);
 
         if (dryRun) return;
 
