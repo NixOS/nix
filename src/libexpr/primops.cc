@@ -239,13 +239,13 @@ void prim_exec(EvalState & state, const Pos & pos, Value * * args, Value & v)
     try {
         parsed = state.parseExprFromString(output, pos.file);
     } catch (Error & e) {
-        e.addTrace(pos, hintfmt("While parsing the output from '%1%'", program));
+        e.addTrace(pos, "While parsing the output from '%1%'", program);
         throw;
     }
     try {
         state.eval(parsed, v);
     } catch (Error & e) {
-        e.addTrace(pos, hintfmt("While evaluating the output from '%1%'", program));
+        e.addTrace(pos, "While evaluating the output from '%1%'", program);
         throw;
     }
 }
@@ -472,7 +472,7 @@ static void prim_addErrorContext(EvalState & state, const Pos & pos, Value * * a
     } catch (Error & e) {
         PathSet context;
         // TODO: is this right, include this pos??  Test it.  esp with LOC.
-        e.addTrace(pos, hintfmt("%1%") % state.coerceToString(pos, *args[0], context));
+        e.addTrace(pos, "%1%", state.coerceToString(pos, *args[0], context));
         throw;
     }
 }
@@ -564,7 +564,7 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
     try {
         drvName = state.forceStringNoCtx(*attr->value, pos);
     } catch (Error & e) {
-        e.addTrace(posDrvName, hintfmt("while evaluating the derivation attribute 'name'"));
+        e.addTrace(posDrvName, "while evaluating the derivation attribute 'name'");
         throw;
     }
 
@@ -698,8 +698,8 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
 
         } catch (Error & e) {
             e.addTrace(posDrvName, 
-                hintfmt("while evaluating the attribute '%1%' of the derivation '%2%'",
-                    key, drvName));
+                "while evaluating the attribute '%1%' of the derivation '%2%'",
+                key, drvName);
             throw;
         }
     }

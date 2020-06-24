@@ -166,6 +166,12 @@ public:
     const string & msg() const { return calcWhat(); }
     const ErrorInfo & info() { calcWhat(); return err; }
 
+    template<typename... Args>
+    BaseError & addTrace(std::optional<ErrPos> e, const string &fs, const Args & ... args)
+    {
+        return addTrace(e, hintfmt(fs, args...));
+    }
+
     BaseError & addTrace(std::optional<ErrPos> e, hintformat hint);
 };
 

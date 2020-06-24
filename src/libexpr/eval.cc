@@ -594,17 +594,17 @@ LocalNoInlineNoReturn(void throwUndefinedVarError(const Pos & pos, const char * 
 
 LocalNoInline(void addErrorTrace(Error & e, const char * s, const string & s2))
 {
-    e.addTrace(std::nullopt, hintfmt(s) % s2);
+    e.addTrace(std::nullopt, s, s2);
 }
 
 LocalNoInline(void addErrorTrace(Error & e, const Pos & pos, const char * s, const ExprLambda & fun))
 {
-    e.addTrace(pos, hintfmt(s) % fun.showNamePos());
+    e.addTrace(pos, s, fun.showNamePos());
 }
 
 LocalNoInline(void addErrorTrace(Error & e, const Pos & pos, const char * s, const string & s2))
 {
-    e.addTrace(pos, hintfmt(s) % s2);
+    e.addTrace(pos, s, s2);
 }
 
 
