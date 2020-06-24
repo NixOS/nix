@@ -48,9 +48,9 @@ following new features:</para>
     truly deterministic.  For example:
 
 <screen>
-$ nix-build '&lt;nixpkgs>' -A patchelf
+<prompt>$ </prompt>nix-build '&lt;nixpkgs>' -A patchelf
 <replaceable>…</replaceable>
-$ nix-build '&lt;nixpkgs>' -A patchelf --check
+<prompt>$ </prompt>nix-build '&lt;nixpkgs>' -A patchelf --check
 <replaceable>…</replaceable>
 error: derivation `/nix/store/1ipvxs…-patchelf-0.6' may not be deterministic:
   hash mismatch in output `/nix/store/4pc1dm…-patchelf-0.6.drv'
@@ -88,7 +88,7 @@ error: derivation `/nix/store/1ipvxs…-patchelf-0.6' may not be deterministic:
         the command
 
 <screen>
-$ nix-shell -p sqlite xorg.libX11 hello
+<prompt>$ </prompt>nix-shell -p sqlite xorg.libX11 hello
 </screen>
 
         will start a shell in which the given packages are
@@ -157,7 +157,7 @@ $ nix-shell -p sqlite xorg.libX11 hello
     dots in them, e.g.
 
 <screen>
-$ nix-instantiate --eval '&lt;nixos>' -A 'config.systemd.units."nscd.service".text'
+<prompt>$ </prompt>nix-instantiate --eval '&lt;nixos>' -A 'config.systemd.units."nscd.service".text'
 </screen>
 
     </para>
@@ -198,7 +198,7 @@ $ nix-instantiate --eval '&lt;nixos>' -A 'config.systemd.units."nscd.service".te
     information in error messages, e.g.
 
 <screen>
-$ nix-build '&lt;nixpkgs>' -A libreoffice --argstr system x86_64-darwin
+<prompt>$ </prompt>nix-build '&lt;nixpkgs>' -A libreoffice --argstr system x86_64-darwin
 error: the package ‘libreoffice-4.0.5.2’ in ‘.../applications/office/libreoffice/default.nix:263’
   is not supported on ‘x86_64-darwin’
 </screen>
@@ -216,7 +216,7 @@ error: the package ‘libreoffice-4.0.5.2’ in ‘.../applications/office/libre
     install Nix by running:
 
 <screen>
-$ bash &lt;(curl https://nixos.org/nix/install)
+<prompt>$ </prompt>bash &lt;(curl https://nixos.org/nix/install)
 </screen>
 
     </para>

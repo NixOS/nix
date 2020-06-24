@@ -54,7 +54,7 @@ that were active at that point in time).
 current generations of each profile, do
 
 <screen>
-$ nix-collect-garbage -d</screen>
+<prompt>$ </prompt>nix-collect-garbage -d</screen>
 
 </para>
 

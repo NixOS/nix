@@ -42,8 +42,8 @@ be members of any other group. On Linux, you can create the group and
 users as follows:
 
 <screen>
-$ groupadd -r nixbld
-$ for n in $(seq 1 10); do useradd -c "Nix build user $n" \
+<prompt>$ </prompt>groupadd -r nixbld
+<prompt>$ </prompt>for n in $(seq 1 10); do useradd -c "Nix build user $n" \
     -d /var/empty -g nixbld -G nixbld -M -N -r -s "$(which nologin)" \
     nixbld$n; done
 </screen>
@@ -63,7 +63,7 @@ you expect to do many builds at the same time.</para>
 started as follows (as <literal>root</literal>):
 
 <screen>
-$ nix-daemon</screen>
+<prompt>$ </prompt>nix-daemon</screen>
 
 You’ll want to put that line somewhere in your system’s boot
 scripts.</para>
@@ -92,8 +92,8 @@ want to restrict the use of Nix to the members of a group called
 <literal>nix-users</literal>, do
 
 <screen>
-$ chgrp nix-users /nix/var/nix/daemon-socket
-$ chmod ug=rwx,o= /nix/var/nix/daemon-socket
+<prompt>$ </prompt>chgrp nix-users /nix/var/nix/daemon-socket
+<prompt>$ </prompt>chmod ug=rwx,o= /nix/var/nix/daemon-socket
 </screen>
 
 This way, users who are not in the <literal>nix-users</literal> group

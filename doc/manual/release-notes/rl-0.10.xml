@@ -12,7 +12,7 @@ to use old versions of Nix that still use Berkeley DB 4.3.  In
 particular, if you use a Nix installed through Nix, you should run
 
 <screen>
-$ nix-store --clear-substitutes</screen>
+<prompt>$ </prompt>nix-store --clear-substitutes</screen>
 
 first.</para></note>
 

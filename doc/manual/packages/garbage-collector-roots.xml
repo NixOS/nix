@@ -13,7 +13,7 @@ For instance, the following command makes the path
 <filename>/nix/store/d718ef...-foo</filename> a root of the collector:
 
 <screen>
-$ ln -s /nix/store/d718ef...-foo /nix/var/nix/gcroots/bar</screen>
+<prompt>$ </prompt>ln -s /nix/store/d718ef...-foo /nix/var/nix/gcroots/bar</screen>
 	
 That is, after this command, the garbage collector will not remove
 <filename>/nix/store/d718ef...-foo</filename> or any of its

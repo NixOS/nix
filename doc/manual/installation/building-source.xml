@@ -10,9 +10,9 @@
 following commands:
 
 <screen>
-$ ./configure <replaceable>options...</replaceable>
-$ make
-$ make install</screen>
+<prompt>$ </prompt>./configure <replaceable>options...</replaceable>
+<prompt>$ </prompt>make
+<prompt>$ </prompt>make install</screen>
 
 Nix requires GNU Make so you may need to invoke
 <command>gmake</command> instead.</para>
@@ -21,7 +21,7 @@ Nix requires GNU Make so you may need to invoke
 by the command:
 
 <screen>
-$ ./bootstrap.sh</screen>
+<prompt>$ </prompt>./bootstrap.sh</screen>
 
 </para>
 

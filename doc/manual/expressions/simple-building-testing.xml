@@ -14,17 +14,17 @@ which builds a Nix expression and creates a symlink named
 <filename>result</filename> in the current directory:
 
 <screen>
-$ nix-build -A hello
+<prompt>$ </prompt>nix-build -A hello
 building path `/nix/store/632d2b22514d...-hello-2.1.1'
 hello-2.1.1/
 hello-2.1.1/intl/
 hello-2.1.1/intl/ChangeLog
 <replaceable>...</replaceable>
 
-$ ls -l result
+<prompt>$ </prompt>ls -l result
 lrwxrwxrwx ... 2006-09-29 10:43 result -> /nix/store/632d2b22514d...-hello-2.1.1
 
-$ ./result/bin/hello
+<prompt>$ </prompt>./result/bin/hello
 Hello, world!</screen>
 
 The <link linkend='opt-attr'><option>-A</option></link> option selects
@@ -67,7 +67,7 @@ block (or perform other derivations if available) until the build
 finishes:
 
 <screen>
-$ nix-build -A hello
+<prompt>$ </prompt>nix-build -A hello
 waiting for lock on `/nix/store/0h5b7hp8d4hqfrw8igvx97x1xawrjnac-hello-2.1.1x'</screen>
 
 So it is always safe to run multiple instances of Nix in parallel

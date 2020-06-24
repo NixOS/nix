@@ -99,8 +99,8 @@ there after an upgrade.  This means that you can <emphasis>roll
 back</emphasis> to the old version:</para>
 
 <screen>
-$ nix-env --upgrade <replaceable>some-packages</replaceable>
-$ nix-env --rollback
+<prompt>$ </prompt>nix-env --upgrade <replaceable>some-packages</replaceable>
+<prompt>$ </prompt>nix-env --rollback
 </screen>
 
 </simplesect>
@@ -111,7 +111,7 @@ $ nix-env --rollback
 <para>When you uninstall a package like this…
 
 <screen>
-$ nix-env --uninstall firefox
+<prompt>$ </prompt>nix-env --uninstall firefox
 </screen>
 
 the package isn’t deleted from the system right away (after all, you
@@ -120,7 +120,7 @@ users).  Instead, unused packages can be deleted safely by running the
 <emphasis>garbage collector</emphasis>:
 
 <screen>
-$ nix-collect-garbage
+<prompt>$ </prompt>nix-collect-garbage
 </screen>
 
 This deletes all packages that aren’t in use by any user profile or by
@@ -154,7 +154,7 @@ each other in the Nix store.</para>
 source, so an installation action like
 
 <screen>
-$ nix-env --install firefox
+<prompt>$ </prompt>nix-env --install firefox
 </screen>
 
 <emphasis>could</emphasis> cause quite a bit of build activity, as not
@@ -212,18 +212,18 @@ xlink:href="https://github.com/NixOS/nixpkgs/blob/master/pkgs/applications/netwo
 Nix expression</link>:</para>
 
 <screen>
-$ nix-shell '&lt;nixpkgs>' -A pan
+<prompt>$ </prompt>nix-shell '&lt;nixpkgs>' -A pan
 </screen>
 
 <para>You’re then dropped into a shell where you can edit, build and test
 the package:</para>
 
 <screen>
-[nix-shell]$ tar xf $src
-[nix-shell]$ cd pan-*
-[nix-shell]$ ./configure
-[nix-shell]$ make
-[nix-shell]$ ./pan/gui/pan
+<prompt>[nix-shell]$ </prompt>tar xf $src
+<prompt>[nix-shell]$ </prompt>cd pan-*
+<prompt>[nix-shell]$ </prompt>./configure
+<prompt>[nix-shell]$ </prompt>make
+<prompt>[nix-shell]$ </prompt>./pan/gui/pan
 </screen>
 
 <!--

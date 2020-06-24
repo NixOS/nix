@@ -7,14 +7,14 @@
 <para>This section provides some notes on how to hack on Nix.  To get
 the latest version of Nix from GitHub:
 <screen>
-$ git clone git://github.com/NixOS/nix.git
-$ cd nix
+<prompt>$ </prompt>git clone git://github.com/NixOS/nix.git
+<prompt>$ </prompt>cd nix
 </screen>
 </para>
 
 <para>To build it and its dependencies:
 <screen>
-$ nix-build release.nix -A build.x86_64-linux
+<prompt>$ </prompt>nix-build release.nix -A build.x86_64-linux
 </screen>
 </para>
 
@@ -22,18 +22,18 @@ $ nix-build release.nix -A build.x86_64-linux
 environment variables are set up so that those dependencies can be
 found:
 <screen>
-$ nix-shell
+<prompt>$ </prompt>nix-shell
 </screen>
 To build Nix itself in this shell:
 <screen>
-[nix-shell]$ ./bootstrap.sh
-[nix-shell]$ configurePhase
-[nix-shell]$ make
+<prompt>[nix-shell]$ </prompt>./bootstrap.sh
+<prompt>[nix-shell]$ </prompt>configurePhase
+<prompt>[nix-shell]$ </prompt>make
 </screen>
 To install it in <literal>$(pwd)/inst</literal> and test it:
 <screen>
-[nix-shell]$ make install
-[nix-shell]$ make installcheck
+<prompt>[nix-shell]$ </prompt>make install
+<prompt>[nix-shell]$ </prompt>make installcheck
 </screen>
 
 </para>

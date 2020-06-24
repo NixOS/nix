@@ -53,8 +53,8 @@ have <command>sudo</command>, you should manually create
 <filename>/nix</filename> first as root, e.g.:
 
 <screen>
-$ mkdir /nix
-$ chown alice /nix
+<prompt>$ </prompt>mkdir /nix
+<prompt>$ </prompt>chown alice /nix
 </screen>
 
 The install script will modify the first writable file from amongst
@@ -70,7 +70,7 @@ behaviour.
 <para>You can uninstall Nix simply by running:
 
 <screen>
-$ rm -rf /nix
+<prompt>$ </prompt>rm -rf /nix
 </screen>
 
 </para>
@@ -178,7 +178,7 @@ sudo rm /Library/LaunchDaemons/org.nixos.nix-daemon.plist
     is a bit of a misnomer). To use this approach, just install Nix with:
   </para>
 
-  <screen>$ sh &lt;(curl -L https://nixos.org/nix/install) --darwin-use-unencrypted-nix-store-volume</screen>
+  <screen><prompt>$ </prompt>sh &lt;(curl -L https://nixos.org/nix/install) --darwin-use-unencrypted-nix-store-volume</screen>
 
   <para>
     If you don't like the sound of this, you'll want to weigh the
@@ -316,7 +316,7 @@ sudo rm /Library/LaunchDaemons/org.nixos.nix-daemon.plist
     a little that it can mislead here, especially as it gets
     copied around minus doc context...?
     -->
-    <screen>alice$ diskutil apfs enableFileVault /nix -user disk</screen>
+    <screen><prompt>alice$ </prompt>diskutil apfs enableFileVault /nix -user disk</screen>
 
     <!-- TODO: and then go into detail on the mount/decrypt approaches? -->
   </section>
@@ -378,7 +378,7 @@ sudo rm /Library/LaunchDaemons/org.nixos.nix-daemon.plist
           of new entries without a reboot:
         </para>
 
-        <screen>alice$ /System/Library/Filesystems/apfs.fs/Contents/Resources/apfs.util -B</screen>
+        <screen><prompt>alice$ </prompt>/System/Library/Filesystems/apfs.fs/Contents/Resources/apfs.util -B</screen>
       </listitem>
 
       <listitem>
@@ -386,7 +386,7 @@ sudo rm /Library/LaunchDaemons/org.nixos.nix-daemon.plist
           Create the new APFS volume with diskutil:
         </para>
 
-        <screen>alice$ sudo diskutil apfs addVolume diskX APFS 'Nix Store' -mountpoint /nix</screen>
+        <screen><prompt>alice$ </prompt>sudo diskutil apfs addVolume diskX APFS 'Nix Store' -mountpoint /nix</screen>
       </listitem>
 
       <listitem>
@@ -452,10 +452,10 @@ LABEL=Nix\040Store /nix apfs rw,nobrowse
 
 
 <screen>
-alice$ cd /tmp
-alice$ tar xfj nix-1.8-x86_64-darwin.tar.bz2
-alice$ cd nix-1.8-x86_64-darwin
-alice$ ./install
+<prompt>alice$ </prompt>cd /tmp
+<prompt>alice$ </prompt>tar xfj nix-1.8-x86_64-darwin.tar.bz2
+<prompt>alice$ </prompt>cd nix-1.8-x86_64-darwin
+<prompt>alice$ </prompt>./install
 </screen>
   </para>
 

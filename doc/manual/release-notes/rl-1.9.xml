@@ -45,7 +45,7 @@ binary-cache-public-keys = cache.nixos.org-1:6NCHdD59X431o0gWypbMrAURkbJ16ZPMQFG
       <listitem><para>In <command>nix-env</command>:
 
 <screen>
-$ nix-env -f https://github.com/NixOS/nixpkgs-channels/archive/nixos-14.12.tar.gz -iA firefox
+<prompt>$ </prompt>nix-env -f https://github.com/NixOS/nixpkgs-channels/archive/nixos-14.12.tar.gz -iA firefox
 </screen>
 
       This installs Firefox from the latest tested and built revision
@@ -55,7 +55,7 @@ $ nix-env -f https://github.com/NixOS/nixpkgs-channels/archive/nixos-14.12.tar.g
       <command>nix-shell</command>:
 
 <screen>
-$ nix-build https://github.com/NixOS/nixpkgs/archive/master.tar.gz -A hello
+<prompt>$ </prompt>nix-build https://github.com/NixOS/nixpkgs/archive/master.tar.gz -A hello
 </screen>
 
       This builds GNU Hello from the latest revision of the Nixpkgs
@@ -67,7 +67,7 @@ $ nix-build https://github.com/NixOS/nixpkgs/archive/master.tar.gz -A hello
       of Nixpkgs:
 
 <screen>
-$ nix-shell -p pan -I nixpkgs=https://github.com/NixOS/nixpkgs-channels/archive/8a3eea054838b55aca962c3fbde9c83c102b8bf2.tar.gz
+<prompt>$ </prompt>nix-shell -p pan -I nixpkgs=https://github.com/NixOS/nixpkgs-channels/archive/8a3eea054838b55aca962c3fbde9c83c102b8bf2.tar.gz
 </screen>
 
       </para></listitem>
@@ -75,7 +75,7 @@ $ nix-shell -p pan -I nixpkgs=https://github.com/NixOS/nixpkgs-channels/archive/
       <listitem><para>In <command>nixos-rebuild</command> (on NixOS):
 
 <screen>
-$ nixos-rebuild test -I nixpkgs=https://github.com/NixOS/nixpkgs-channels/archive/nixos-unstable.tar.gz
+<prompt>$ </prompt>nixos-rebuild test -I nixpkgs=https://github.com/NixOS/nixpkgs-channels/archive/nixos-unstable.tar.gz
 </screen>
 
       </para></listitem>

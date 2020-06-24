@@ -15,7 +15,7 @@ to subsequent chapters.</para>
 <step><para>Install single-user Nix by running the following:
 
 <screen>
-$ bash &lt;(curl -L https://nixos.org/nix/install)
+<prompt>$ </prompt>bash &lt;(curl -L https://nixos.org/nix/install)
 </screen>
 
 This will install Nix in <filename>/nix</filename>. The install script
@@ -27,7 +27,7 @@ methods, see <xref linkend="chap-installation"/>.)</para></step>
 in the channel:
 
 <screen>
-$ nix-env -qa
+<prompt>$ </prompt>nix-env -qa
 docbook-xml-4.3
 docbook-xml-4.5
 firefox-33.0.2
@@ -40,7 +40,7 @@ libxslt-1.1.28
 <step><para>Install some packages from the channel:
 
 <screen>
-$ nix-env -i hello</screen>
+<prompt>$ </prompt>nix-env -i hello</screen>
 
 This should download pre-built packages; it should not build them
 locally (if it does, something went wrong).</para></step>
@@ -48,9 +48,9 @@ locally (if it does, something went wrong).</para></step>
 <step><para>Test that they work:
 
 <screen>
-$ which hello
+<prompt>$ </prompt>which hello
 /home/eelco/.nix-profile/bin/hello
-$ hello
+<prompt>$ </prompt>hello
 Hello, world!
 </screen>
 
@@ -59,14 +59,14 @@ Hello, world!
 <step><para>Uninstall a package:
 
 <screen>
-$ nix-env -e hello</screen>
+<prompt>$ </prompt>nix-env -e hello</screen>
 
 </para></step>
 
 <step><para>You can also test a package without installing it:
 
 <screen>
-$ nix-shell -p hello
+<prompt>$ </prompt>nix-shell -p hello
 </screen>
 
 This builds or downloads GNU Hello and its dependencies, then drops
@@ -74,12 +74,12 @@ you into a Bash shell where the <command>hello</command> command is
 present, all without affecting your normal environment:
 
 <screen>
-[nix-shell:~]$ hello
+<prompt>[nix-shell:~]$ </prompt>hello
 Hello, world!
 
-[nix-shell:~]$ exit
+<prompt>[nix-shell:~]$ </prompt>exit
 
-$ hello
+<prompt>$ </prompt>hello
 hello: command not found
 </screen>
 
@@ -88,8 +88,8 @@ hello: command not found
 <step><para>To keep up-to-date with the channel, do:
 
 <screen>
-$ nix-channel --update nixpkgs
-$ nix-env -u '*'</screen>
+<prompt>$ </prompt>nix-channel --update nixpkgs
+<prompt>$ </prompt>nix-env -u '*'</screen>
 
 The latter command will upgrade each installed package for which there
 is a “newer” version (as determined by comparing the version
@@ -100,7 +100,7 @@ numbers).</para></step>
 out not to work properly), you can go back:
 
 <screen>
-$ nix-env --rollback</screen>
+<prompt>$ </prompt>nix-env --rollback</screen>
 
 </para></step>
 
@@ -109,7 +109,7 @@ to get rid of unused packages, since uninstalls or upgrades don't
 actually delete them:
 
 <screen>
-$ nix-collect-garbage -d</screen>
+<prompt>$ </prompt>nix-collect-garbage -d</screen>
 
 <!--
 The first command deletes old “generations” of your profile (making

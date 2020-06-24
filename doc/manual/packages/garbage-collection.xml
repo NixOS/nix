@@ -29,20 +29,20 @@ roll back.</para>
 profile:
 
 <screen>
-$ nix-env --delete-generations old</screen>
+<prompt>$ </prompt>nix-env --delete-generations old</screen>
 
 Instead of <literal>old</literal> you can also specify a list of
 generations, e.g.,
 
 <screen>
-$ nix-env --delete-generations 10 11 14</screen>
+<prompt>$ </prompt>nix-env --delete-generations 10 11 14</screen>
 
 To delete all generations older than a specified number of days
 (except the current generation), use the <literal>d</literal>
 suffix. For example,
 
 <screen>
-$ nix-env --delete-generations 14d</screen>
+<prompt>$ </prompt>nix-env --delete-generations 14d</screen>
 
 deletes all generations older than two weeks.</para>
 
@@ -50,7 +50,7 @@ deletes all generations older than two weeks.</para>
 garbage collector as follows:
 
 <screen>
-$ nix-store --gc</screen>
+<prompt>$ </prompt>nix-store --gc</screen>
 
 The behaviour of the gargage collector is affected by the 
 <literal>keep-derivations</literal> (default: true) and <literal>keep-outputs</literal>
@@ -65,7 +65,7 @@ If you are feeling uncertain, you can also first view what files would
 be deleted:
 
 <screen>
-$ nix-store --gc --print-dead</screen>
+<prompt>$ </prompt>nix-store --gc --print-dead</screen>
 
 Likewise, the option <option>--print-live</option> will show the paths
 that <emphasis>won’t</emphasis> be deleted.</para>
@@ -77,7 +77,7 @@ old generations of all profiles in
 <filename>/nix/var/nix/profiles</filename>.  So
 
 <screen>
-$ nix-collect-garbage -d</screen>
+<prompt>$ </prompt>nix-collect-garbage -d</screen>
 
 is a quick and easy way to clean up your system.</para>
 

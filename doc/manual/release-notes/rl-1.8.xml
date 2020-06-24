@@ -21,7 +21,7 @@
   expressions. For instance, you can do
 
 <screen>
-$ nix-env -qa '.*zip.*'
+<prompt>$ </prompt>nix-env -qa '.*zip.*'
 </screen>
 
   to query all packages with a name containing
@@ -42,7 +42,7 @@ then it will try to get logs from
 store path</replaceable></literal>. This allows you to do things like:
 
 <screen>
-$ nix-store -l $(which xterm)
+<prompt>$ </prompt>nix-store -l $(which xterm)
 </screen>
 
   and get a log even if <command>xterm</command> wasn't built

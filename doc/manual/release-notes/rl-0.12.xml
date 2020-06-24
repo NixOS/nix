@@ -27,8 +27,8 @@
     delete the old Berkeley DB files:
 
     <screen>
-$ cd /nix/var/nix/db
-$ rm __db* log.* derivers references referrers reserved validpaths DB_CONFIG</screen>
+<prompt>$ </prompt>cd /nix/var/nix/db
+<prompt>$ </prompt>rm __db* log.* derivers references referrers reserved validpaths DB_CONFIG</screen>
 
     The new metadata is stored in the directories
     <filename>/nix/var/nix/db/info</filename> and
@@ -73,8 +73,8 @@ $ rm __db* log.* derivers references referrers reserved validpaths DB_CONFIG</sc
   specifies an upper limit to the last accessed time of paths that may
   be deleted.  For instance,
 
-    <screen>
-    $ nix-store --gc -v --max-atime $(date +%s -d "2 months ago")</screen>
+  <screen>
+<prompt>$ </prompt>nix-store --gc -v --max-atime $(date +%s -d "2 months ago")</screen>
 
   deletes everything that hasn’t been accessed in two months.</para></listitem>
 

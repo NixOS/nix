@@ -25,7 +25,7 @@ xlink:href="https://nixos.org/channels" />.</para>
 <command>nix-channel --add</command>, e.g.,
 
 <screen>
-$ nix-channel --add https://nixos.org/channels/nixpkgs-unstable</screen>
+<prompt>$ </prompt>nix-channel --add https://nixos.org/channels/nixpkgs-unstable</screen>
 
 subscribes you to a channel that always contains that latest version
 of the Nix Packages collection.  (Subscribing really just means that
@@ -35,14 +35,14 @@ where it is read by subsequent calls to <command>nix-channel
 --remove</command>:
 
 <screen>
-$ nix-channel --remove nixpkgs
+<prompt>$ </prompt>nix-channel --remove nixpkgs
 </screen>
 </para>
 
 <para>To obtain the latest Nix expressions available in a channel, do
 
 <screen>
-$ nix-channel --update</screen>
+<prompt>$ </prompt>nix-channel --update</screen>
 
 This downloads and unpacks the Nix expressions in every channel
 (downloaded from <literal><replaceable>url</replaceable>/nixexprs.tar.bz2</literal>).
@@ -52,7 +52,7 @@ default to <command>nix-env</command> operations (via the symlink
 then say
 
 <screen>
-$ nix-env -u</screen>
+<prompt>$ </prompt>nix-env -u</screen>
 
 to upgrade all packages in your profile to the latest versions
 available in the subscribed channels.</para>

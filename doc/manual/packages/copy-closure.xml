@@ -14,7 +14,7 @@ present on the target machine.  For example, the following command
 copies Firefox with all its dependencies:
 
 <screen>
-$ nix-copy-closure --to alice@itchy.example.org $(type -p firefox)</screen>
+<prompt>$ </prompt>nix-copy-closure --to alice@itchy.example.org $(type -p firefox)</screen>
 
 See <xref linkend='sec-nix-copy-closure' /> for details.</para>
 
@@ -26,13 +26,13 @@ dependencies) to a file, and then unpack that file into another Nix
 store.  For example,
 
 <screen>
-$ nix-store --export $(nix-store -qR $(type -p firefox)) > firefox.closure</screen>
+<prompt>$ </prompt>nix-store --export $(nix-store -qR $(type -p firefox)) > firefox.closure</screen>
 
 writes the closure of Firefox to a file.  You can then copy this file
 to another machine and install the closure:
 
 <screen>
-$ nix-store --import &lt; firefox.closure</screen>
+<prompt>$ </prompt>nix-store --import &lt; firefox.closure</screen>
 
 Any store paths in the closure that are already present in the target
 store are ignored.  It is also possible to pipe the export into
@@ -40,7 +40,7 @@ another command, e.g. to copy and install a closure directly to/on
 another machine:
 
 <screen>
-$ nix-store --export $(nix-store -qR $(type -p firefox)) | bzip2 | \
+<prompt>$ </prompt>nix-store --export $(nix-store -qR $(type -p firefox)) | bzip2 | \
     ssh alice@itchy.example.org "bunzip2 | nix-store --import"</screen>
 
 However, <command>nix-copy-closure</command> is generally more

@@ -47,8 +47,8 @@
   the authenticity of the paths.</para>
 
   <screen>
-# nix-store --generate-binary-cache-key example-nix-cache-1 /etc/nix/key.private /etc/nix/key.public
-# cat /etc/nix/key.public
+<prompt># </prompt>nix-store --generate-binary-cache-key example-nix-cache-1 /etc/nix/key.private /etc/nix/key.public
+<prompt># </prompt>cat /etc/nix/key.public
 example-nix-cache-1:1/cKDz3QCCOmwcztD2eV6Coggp6rqc9DGjWv7C0G+rM=
 </screen>
 
@@ -98,7 +98,7 @@ exec nix copy --to 's3://example-nix-cache' $OUT_PATHS
   <para>
     Then make sure the hook program is executable by the <literal>root</literal> user:
     <screen>
-# chmod +x /etc/nix/upload-to-cache.sh
+<prompt># </prompt>chmod +x /etc/nix/upload-to-cache.sh
 </screen></para>
 </section>
 
@@ -121,7 +121,7 @@ post-build-hook = /etc/nix/upload-to-cache.sh
   <para>Build any derivation, for example:</para>
 
   <screen>
-$ nix-build -E '(import &lt;nixpkgs&gt; {}).writeText "example" (builtins.toString builtins.currentTime)'
+<prompt>$ </prompt>nix-build -E '(import &lt;nixpkgs&gt; {}).writeText "example" (builtins.toString builtins.currentTime)'
 this derivation will be built:
   /nix/store/s4pnfbkalzy5qz57qs6yybna8wylkig6-example.drv
 building '/nix/store/s4pnfbkalzy5qz57qs6yybna8wylkig6-example.drv'...
@@ -133,13 +133,13 @@ post-build-hook: Uploading paths /nix/store/ibcyipq5gf91838ldx40mjsp0b8w9n18-exa
 
   <para>Then delete the path from the store, and try substituting it from the binary cache:</para>
   <screen>
-$ rm ./result
-$ nix-store --delete /nix/store/ibcyipq5gf91838ldx40mjsp0b8w9n18-example
+<prompt>$ </prompt>rm ./result
+<prompt>$ </prompt>nix-store --delete /nix/store/ibcyipq5gf91838ldx40mjsp0b8w9n18-example
 </screen>
 
 <para>Now, copy the path back from the cache:</para>
 <screen>
-$ nix-store --realise /nix/store/ibcyipq5gf91838ldx40mjsp0b8w9n18-example
+<prompt>$ </prompt>nix-store --realise /nix/store/ibcyipq5gf91838ldx40mjsp0b8w9n18-example
 copying path '/nix/store/m8bmqwrch6l3h8s0k3d673xpmipcdpsa-example from 's3://example-nix-cache'...
 warning: you did not specify '--add-root'; the result might be removed by the garbage collector
 /nix/store/m8bmqwrch6l3h8s0k3d673xpmipcdpsa-example

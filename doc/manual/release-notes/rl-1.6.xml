@@ -63,7 +63,7 @@ with import &lt;nixpkgs> {};
     then after any change to this file, you can run:
 
 <screen>
-$ nix-env -f my-packages.nix -ir
+<prompt>$ </prompt>nix-env -f my-packages.nix -ir
 </screen>
 
     to update your profile to match the specification.</para>

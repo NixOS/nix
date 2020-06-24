@@ -91,8 +91,8 @@ nixpkgs=https://github.com/NixOS/nixpkgs/archive/nixos-15.09.tar.gz</screen>
   you’re better off using <literal>bind</literal> mount points, e.g.,
 
   <screen>
-$ mkdir /nix
-$ mount -o bind /mnt/otherdisk/nix /nix</screen>
+<prompt>$ </prompt>mkdir /nix
+<prompt>$ </prompt>mount -o bind /mnt/otherdisk/nix /nix</screen>
 
   Consult the <citerefentry><refentrytitle>mount</refentrytitle>
   <manvolnum>8</manvolnum></citerefentry> manual page for details.</para>

@@ -38,8 +38,8 @@ bundle.</para>
 <procedure>
   <step><para>Set the environment variable and install Nix</para>
     <screen>
-$ export NIX_SSL_CERT_FILE=/etc/ssl/my-certificate-bundle.crt
-$ sh &lt;(curl -L https://nixos.org/nix/install)
+<prompt>$ </prompt>export NIX_SSL_CERT_FILE=/etc/ssl/my-certificate-bundle.crt
+<prompt>$ </prompt>sh &lt;(curl -L https://nixos.org/nix/install)
 </screen></step>
 
   <step><para>In the shell profile and rc files (for example,
@@ -62,8 +62,8 @@ abort.</para></note>
 daemon service, then restart it:</para>
 
 <screen>
-$ sudo launchctl setenv NIX_SSL_CERT_FILE /etc/ssl/my-certificate-bundle.crt
-$ sudo launchctl kickstart -k system/org.nixos.nix-daemon
+<prompt>$ </prompt>sudo launchctl setenv NIX_SSL_CERT_FILE /etc/ssl/my-certificate-bundle.crt
+<prompt>$ </prompt>sudo launchctl kickstart -k system/org.nixos.nix-daemon
 </screen>
 </section>
 

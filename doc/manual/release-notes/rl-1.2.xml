@@ -19,7 +19,7 @@
     configuration setting <option>binary-caches</option> contains a
     list of URLs of binary caches.  For instance, doing
 <screen>
-$ nix-env -i thunderbird --option binary-caches http://cache.nixos.org
+<prompt>$ </prompt>nix-env -i thunderbird --option binary-caches http://cache.nixos.org
 </screen>
     will install Thunderbird and its dependencies, using the available
     pre-built binaries in <uri>http://cache.nixos.org</uri>.
@@ -90,8 +90,8 @@ buildInputs = [ pkg.lib pkg.headers ];
     bind mount, like this:
 
 <screen>
-$ mount --bind /nix/store /nix/store
-$ mount -o remount,ro,bind /nix/store
+<prompt>$ </prompt>mount --bind /nix/store /nix/store
+<prompt>$ </prompt>mount -o remount,ro,bind /nix/store
 </screen>
 
     Nix will automatically make <filename>/nix/store</filename>

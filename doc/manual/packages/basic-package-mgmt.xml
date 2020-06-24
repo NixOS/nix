@@ -41,8 +41,8 @@ Nix. If this is not the case for some reason, you can add it as
 follows:
 
 <screen>
-$ nix-channel --add https://nixos.org/channels/nixpkgs-unstable
-$ nix-channel --update
+<prompt>$ </prompt>nix-channel --add https://nixos.org/channels/nixpkgs-unstable
+<prompt>$ </prompt>nix-channel --update
 </screen>
 
 </para>
@@ -57,7 +57,7 @@ succeed.</para></note>
 <para>You can view the set of available packages in Nixpkgs:
 
 <screen>
-$ nix-env -qa
+<prompt>$ </prompt>nix-env -qa
 aterm-2.2
 bash-3.0
 binutils-2.15
@@ -74,7 +74,7 @@ then you need to pass the path to your Nixpkgs tree using the
 <option>-f</option> flag:
 
 <screen>
-$ nix-env -qaf <replaceable>/path/to/nixpkgs</replaceable>
+<prompt>$ </prompt>nix-env -qaf <replaceable>/path/to/nixpkgs</replaceable>
 </screen>
 
 where <replaceable>/path/to/nixpkgs</replaceable> is where you’ve
@@ -83,7 +83,7 @@ unpacked or checked out Nixpkgs.</para>
 <para>You can select specific packages by name:
 
 <screen>
-$ nix-env -qa firefox
+<prompt>$ </prompt>nix-env -qa firefox
 firefox-34.0.5
 firefox-with-plugins-34.0.5
 </screen>
@@ -91,7 +91,7 @@ firefox-with-plugins-34.0.5
 and using regular expressions:
 
 <screen>
-$ nix-env -qa 'firefox.*'
+<prompt>$ </prompt>nix-env -qa 'firefox.*'
 </screen>
 
 </para>
@@ -101,7 +101,7 @@ available packages, i.e., whether they are installed into the user
 environment and/or present in the system:
 
 <screen>
-$ nix-env -qas
+<prompt>$ </prompt>nix-env -qas
 …
 -PS bash-3.0
 --S binutils-2.15
@@ -123,7 +123,7 @@ locally.</para>
 For instance,
 
 <screen>
-$ nix-env -i subversion</screen>
+<prompt>$ </prompt>nix-env -i subversion</screen>
 
 will install the package called <literal>subversion</literal> (which
 is, of course, the <link
@@ -150,7 +150,7 @@ Nixpkgs tree), you will get binaries for most packages.</para></note>
 <para>Naturally, packages can also be uninstalled:
 
 <screen>
-$ nix-env -e subversion</screen>
+<prompt>$ </prompt>nix-env -e subversion</screen>
 
 </para>
 
@@ -158,7 +158,7 @@ $ nix-env -e subversion</screen>
 release of Nix Packages, you can do:
 
 <screen>
-$ nix-env -u subversion</screen>
+<prompt>$ </prompt>nix-env -u subversion</screen>
 
 This will <emphasis>only</emphasis> upgrade Subversion if there is a
 “newer” version in the new set of Nix expressions, as
@@ -173,7 +173,7 @@ whatever version is already installed.</para>
 versions:
 
 <screen>
-$ nix-env -u</screen>
+<prompt>$ </prompt>nix-env -u</screen>
 
 </para>
 
@@ -183,7 +183,7 @@ instance, to find out what packages would be upgraded by
 <literal>nix-env -u</literal>, you can do
 
 <screen>
-$ nix-env -u --dry-run
+<prompt>$ </prompt>nix-env -u --dry-run
 (dry run; not doing anything)
 upgrading `libxslt-1.1.0' to `libxslt-1.1.10'
 upgrading `graphviz-1.10' to `graphviz-1.12'

@@ -21,7 +21,7 @@ installed. You can test whether connecting to the remote Nix instance
 works, e.g.
 
 <screen>
-$ nix ping-store --store ssh://mac
+<prompt>$ </prompt>nix ping-store --store ssh://mac
 </screen>
 
 will try to connect to the machine named <literal>mac</literal>. It is
@@ -29,7 +29,7 @@ possible to specify an SSH identity file as part of the remote store
 URI, e.g.
 
 <screen>
-$ nix ping-store --store ssh://mac?ssh-key=/home/alice/my-key
+<prompt>$ </prompt>nix ping-store --store ssh://mac?ssh-key=/home/alice/my-key
 </screen>
 
 Since builds should be non-interactive, the key should not have a
@@ -59,15 +59,15 @@ testing. For example, the following command allows you to build a
 derivation for <literal>x86_64-darwin</literal> on a Linux machine:
 
 <screen>
-$ uname
+<prompt>$ </prompt>uname
 Linux
 
-$ nix build \
+<prompt>$ </prompt>nix build \
   '(with import &lt;nixpkgs> { system = "x86_64-darwin"; }; runCommand "foo" {} "uname > $out")' \
   --builders 'ssh://mac x86_64-darwin'
 [1/0/1 built, 0.0 MiB DL] building foo on ssh://mac
 
-$ cat ./result
+<prompt>$ </prompt>cat ./result
 Darwin
 </screen>
 
