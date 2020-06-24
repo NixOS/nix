@@ -103,28 +103,28 @@ static NixRepl * curRepl; // ugly
 static char * completionCallback(char * s, int *match) {
   auto possible = curRepl->completePrefix(s);
   if (possible.size() == 1) {
+    *match = 1;
+    auto *res = strdup(possible.begin()->c_str() + strlen(s));
+    if (!res) throw Error("allocation failure");
+    return res;
+  } else if (possible.size() > 1) {
+    auto checkAllHaveSameAt = [&](size_t pos) {
+      auto &first = *possible.begin();
+      for (auto &p : possible) {
+        if (p.size() <= pos || p[pos] != first[pos])
+          return false;
+      }
+      return true;
+    };
+    size_t start = strlen(s);
+    size_t len = 0;
+    while (checkAllHaveSameAt(start + len)) ++len;
+    if (len > 0) {
       *match = 1;
-      auto *res = strdup(possible.begin()->c_str() + strlen(s));
+      auto *res = strdup(std::string(*possible.begin(), start, len).c_str());
       if (!res) throw Error("allocation failure");
       return res;
-  } else if (possible.size() > 1) {
-      auto checkAllHaveSameAt = [&](size_t pos) {
-          auto &first = *possible.begin();
-          for (auto &p : possible) {
-            if (p.size() <= pos || p[pos] != first[pos])
-              return false;
-          }
-          return true;
-        };
-      size_t start = strlen(s);
-      size_t len = 0;
-      while (checkAllHaveSameAt(start + len)) ++len;
-      if (len > 0) {
-        *match = 1;
-        auto *res = strdup(std::string(*possible.begin(), start, len).c_str());
-        if (!res) throw Error("allocation failure");
-        return res;
-      }
+    }
   }
 
   *match = 0;
@@ -155,7 +155,7 @@ static int listPossibleCallback(char *s, char ***avp) {
   vp = check((char **)malloc(possible.size() * sizeof(char*)));
 
   for (auto & p : possible)
-      vp[ac++] = check(strdup(p.c_str()));
+    vp[ac++] = check(strdup(p.c_str()));
 
   *avp = vp;
 
@@ -211,14 +211,12 @@ void NixRepl::mainLoop(const std::vector<std::string> & files)
                 // input without clearing the input so far.
                 continue;
             } else {
-                printMsg(lvlError, e.msg());
+              printMsg(lvlError, e.msg());
             }
         } catch (Error & e) {
-            // printMsg(lvlError, error + "%1%%2%", (settings.showTrace ? e.prefix() : ""), e.msg());
-            printMsg(lvlError, e.msg());
+          printMsg(lvlError, e.msg());
         } catch (Interrupted & e) {
-            // printMsg(lvlError, error + "%1%%2%", (settings.showTrace ? e.prefix() : ""), e.msg());
-            printMsg(lvlError, e.msg());
+          printMsg(lvlError, e.msg());
         }
 
         // We handled the current input fully, so we should clear it
@@ -399,21 +397,21 @@ bool NixRepl::processLine(string line)
 
     if (command == ":?" || command == ":help") {
         std::cout
-           << "The following commands are available:\n"
-           << "\n"
-           << "  <expr>        Evaluate and print expression\n"
-           << "  <x> = <expr>  Bind expression to variable\n"
-           << "  :a <expr>     Add attributes from resulting set to scope\n"
-           << "  :b <expr>     Build derivation\n"
-           << "  :e <expr>     Open the derivation in $EDITOR\n"
-           << "  :i <expr>     Build derivation, then install result into current profile\n"
-           << "  :l <path>     Load Nix expression and add it to scope\n"
-           << "  :p <expr>     Evaluate and print expression recursively\n"
-           << "  :q            Exit nix-repl\n"
-           << "  :r            Reload all files\n"
-           << "  :s <expr>     Build dependencies of derivation, then start nix-shell\n"
-           << "  :t <expr>     Describe result of evaluation\n"
-           << "  :u <expr>     Build derivation, then start nix-shell\n";
+             << "The following commands are available:\n"
+             << "\n"
+             << "  <expr>        Evaluate and print expression\n"
+             << "  <x> = <expr>  Bind expression to variable\n"
+             << "  :a <expr>     Add attributes from resulting set to scope\n"
+             << "  :b <expr>     Build derivation\n"
+             << "  :e <expr>     Open the derivation in $EDITOR\n"
+             << "  :i <expr>     Build derivation, then install result into current profile\n"
+             << "  :l <path>     Load Nix expression and add it to scope\n"
+             << "  :p <expr>     Evaluate and print expression recursively\n"
+             << "  :q            Exit nix-repl\n"
+             << "  :r            Reload all files\n"
+             << "  :s <expr>     Build dependencies of derivation, then start nix-shell\n"
+             << "  :t <expr>     Describe result of evaluation\n"
+             << "  :u <expr>     Build derivation, then start nix-shell\n";
     }
 
     else if (command == ":a" || command == ":add") {
