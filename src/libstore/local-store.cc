@@ -671,8 +671,10 @@ void LocalStore::queryPathInfoUncached(const StorePath & path,
             /* Get the references. */
             auto useQueryReferences(state->stmtQueryReferences.use()(info->id));
 
-            while (useQueryReferences.next())
-                info->references.insert(parseStorePath(useQueryReferences.getStr(0)));
+            while (useQueryReferences.next()) {
+                info->insertReferencePossiblyToSelf(
+                    parseStorePath(useQueryReferences.getStr(0)));
+            }
 
             return info;
         }));
@@ -856,11 +858,13 @@ void LocalStore::querySubstitutablePathInfos(const StorePathSet & paths,
                 auto info = sub->queryPathInfo(path);
                 auto narInfo = std::dynamic_pointer_cast<const NarInfo>(
                     std::shared_ptr<const ValidPathInfo>(info));
-                infos.insert_or_assign(path, SubstitutablePathInfo{
-                    info->deriver,
+                infos.insert_or_assign(path, SubstitutablePathInfo {
                     info->references,
+                    info->hasSelfReference,
+                    info->deriver,
                     narInfo ? narInfo->fileSize : 0,
-                    info->narSize});
+                    info->narSize,
+                });
             } catch (InvalidPath &) {
             } catch (SubstituterDisabled &) {
             } catch (Error & e) {
@@ -907,7 +911,7 @@ void LocalStore::registerValidPaths(const ValidPathInfos & infos)
 
         for (auto & i : infos) {
             auto referrer = queryValidPathId(*state, i.path);
-            for (auto & j : i.references)
+            for (auto & j : i.referencesPossiblyToSelf())
                 state->stmtAddReference.use()(referrer)(queryValidPathId(*state, j)).exec();
         }
 
@@ -986,14 +990,13 @@ void LocalStore::addToStore(const ValidPathInfo & info, Source & source,
             deletePath(realPath);
 
             // text hashing has long been allowed to have non-self-references because it is used for drv files.
-            bool refersToSelf = info.references.count(info.path) > 0;
-            if (info.ca.has_value() && !info.references.empty() && !(std::holds_alternative<TextHash>(*info.ca) && !refersToSelf))
+            if (info.ca.has_value() && !info.references.empty() && !(std::holds_alternative<TextHash>(*info.ca) && info.hasSelfReference))
                 settings.requireExperimentalFeature("ca-references");
 
             /* While restoring the path from the NAR, compute the hash
                of the NAR. */
             std::unique_ptr<AbstractHashSink> hashSink;
-            if (!info.ca.has_value() || !info.references.count(info.path))
+            if (!info.ca.has_value() || !info.hasSelfReference)
                 hashSink = std::make_unique<HashSink>(htSHA256);
             else
                 hashSink = std::make_unique<HashModuloSink>(htSHA256, std::string(info.path.hashPart()));
@@ -1254,7 +1257,7 @@ bool LocalStore::verifyStore(bool checkContents, RepairFlag repair)
                 printMsg(lvlTalkative, "checking contents of '%s'", printStorePath(i));
 
                 std::unique_ptr<AbstractHashSink> hashSink;
-                if (!info->ca || !info->references.count(info->path))
+                if (!info->ca || !info->hasSelfReference)
                     hashSink = std::make_unique<HashSink>(*info->narHash.type);
                 else
                     hashSink = std::make_unique<HashModuloSink>(*info->narHash.type, std::string(info->path.hashPart()));

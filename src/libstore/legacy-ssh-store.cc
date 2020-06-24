@@ -103,11 +103,10 @@ struct LegacySSHStore : public Store
             auto info = std::make_shared<ValidPathInfo>(parseStorePath(p));
             assert(path == info->path);
 
-            PathSet references;
             auto deriver = readString(conn->from);
             if (deriver != "")
                 info->deriver = parseStorePath(deriver);
-            info->references = readStorePaths<StorePathSet>(*this, conn->from);
+            info->setReferencesPossiblyToSelf(readStorePaths<StorePathSet>(*this, conn->from));
             readLongLong(conn->from); // download size
             info->narSize = readLongLong(conn->from);
 
@@ -140,7 +139,7 @@ struct LegacySSHStore : public Store
                 << printStorePath(info.path)
                 << (info.deriver ? printStorePath(*info.deriver) : "")
                 << info.narHash.to_string(Base16, false);
-            writeStorePaths(*this, conn->to, info.references);
+            writeStorePaths(*this, conn->to, info.referencesPossiblyToSelf());
             conn->to
                 << info.registrationTime
                 << info.narSize
@@ -169,7 +168,7 @@ struct LegacySSHStore : public Store
             conn->to
                 << exportMagic
                 << printStorePath(info.path);
-            writeStorePaths(*this, conn->to, info.references);
+            writeStorePaths(*this, conn->to, info.referencesPossiblyToSelf());
             conn->to
                 << (info.deriver ? printStorePath(*info.deriver) : "")
                 << 0

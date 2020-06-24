@@ -24,7 +24,42 @@ template<typename Ref>
 struct PathReferences
 {
     std::set<Ref> references;
+    bool hasSelfReference = false;
+
+	/* Functions to view references + hasSelfReference as one set, mainly for
+	   compatibility's sake. */
+	StorePathSet referencesPossiblyToSelf(const Ref & self) const;
+    void insertReferencePossiblyToSelf(const Ref & self, Ref && ref);
+    void setReferencesPossiblyToSelf(const Ref & self, std::set<Ref> && refs);
 };
+
+template<typename Ref>
+StorePathSet PathReferences<Ref>::referencesPossiblyToSelf(const Ref & self) const
+{
+    StorePathSet references { references };
+    if (hasSelfReference)
+        references.insert(self);
+    return references;
+}
+
+template<typename Ref>
+void PathReferences<Ref>::insertReferencePossiblyToSelf(const Ref & self, Ref && ref)
+{
+    if (ref == self)
+        hasSelfReference = true;
+    else
+        references.insert(std::move(ref));
+}
+
+template<typename Ref>
+void PathReferences<Ref>::setReferencesPossiblyToSelf(const Ref & self, std::set<Ref> && refs)
+{
+    if (refs.count(self))
+        hasSelfReference = true;
+        refs.erase(self);
+
+    references = refs;
+}
 
 struct ValidPathInfo : PathReferences<StorePath>
 {
@@ -64,6 +99,7 @@ struct ValidPathInfo : PathReferences<StorePath>
         return
             path == i.path
             && narHash == i.narHash
+            && hasSelfReference == i.hasSelfReference
             && references == i.references;
     }
 
@@ -79,6 +115,12 @@ struct ValidPathInfo : PathReferences<StorePath>
 
     /* Return true iff the path is verifiably content-addressed. */
     bool isContentAddressed(const Store & store) const;
+
+	/* Functions to view references + hasSelfReference as one set, mainly for
+	   compatibility's sake. */
+	StorePathSet referencesPossiblyToSelf() const;
+    void insertReferencePossiblyToSelf(StorePath && ref);
+    void setReferencesPossiblyToSelf(StorePathSet && refs);
 
     static const size_t maxSigs = std::numeric_limits<size_t>::max();
 
@@ -101,4 +143,14 @@ struct ValidPathInfo : PathReferences<StorePath>
 };
 
 typedef list<ValidPathInfo> ValidPathInfos;
+
+
+struct SubstitutablePathInfo : PathReferences<StorePath>
+{
+    std::optional<StorePath> deriver;
+    unsigned long long downloadSize; /* 0 = unknown or inapplicable */
+    unsigned long long narSize; /* 0 = unknown */
+};
+
+typedef std::map<StorePath, SubstitutablePathInfo> SubstitutablePathInfos;
 }

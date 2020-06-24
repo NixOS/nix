@@ -125,8 +125,7 @@ void BinaryCacheStore::addToStore(const ValidPathInfo & info, Source & narSource
        reads, but typically they'll already be cached. */
     for (auto & ref : info.references)
         try {
-            if (ref != info.path)
-                queryPathInfo(ref);
+            queryPathInfo(ref);
         } catch (InvalidPath &) {
             throw Error("cannot add '%s' to the binary cache because the reference '%s' is not valid",
                 printStorePath(info.path), printStorePath(ref));

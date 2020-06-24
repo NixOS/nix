@@ -62,7 +62,7 @@ void Store::exportPath(const StorePath & path, Sink & sink)
     hashAndWriteSink
         << exportMagic
         << printStorePath(path);
-    writeStorePaths(*this, hashAndWriteSink, info->references);
+    writeStorePaths(*this, hashAndWriteSink, info->referencesPossiblyToSelf());
     hashAndWriteSink
         << (info->deriver ? printStorePath(*info->deriver) : "")
         << 0;
@@ -88,7 +88,7 @@ StorePaths Store::importPaths(Source & source, std::shared_ptr<FSAccessor> acces
 
         //Activity act(*logger, lvlInfo, format("importing path '%s'") % info.path);
 
-        info.references = readStorePaths<StorePathSet>(*this, source);
+        info.setReferencesPossiblyToSelf(readStorePaths<StorePathSet>(*this, source));
 
         auto deriver = readString(source);
         if (deriver != "")

@@ -102,17 +102,6 @@ struct GCResults
 };
 
 
-struct SubstitutablePathInfo
-{
-    std::optional<StorePath> deriver;
-    StorePathSet references;
-    unsigned long long downloadSize; /* 0 = unknown or inapplicable */
-    unsigned long long narSize; /* 0 = unknown */
-};
-
-typedef std::map<StorePath, SubstitutablePathInfo> SubstitutablePathInfos;
-
-
 enum BuildMode { bmNormal, bmRepair, bmCheck };
 
 

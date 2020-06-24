@@ -3834,7 +3834,7 @@ void DerivationGoal::registerOutputs()
         ValidPathInfo info(worker.store.parseStorePath(path));
         info.narHash = hash.first;
         info.narSize = hash.second;
-        info.references = std::move(references);
+        info.setReferencesPossiblyToSelf(std::move(references));
         info.deriver = drvPath;
         info.ultimate = true;
         info.ca = ca;
@@ -3963,12 +3963,12 @@ void DerivationGoal::checkOutputs(const std::map<Path, ValidPathInfo> & outputs)
                 auto i = outputsByPath.find(worker.store.printStorePath(path));
                 if (i != outputsByPath.end()) {
                     closureSize += i->second.narSize;
-                    for (auto & ref : i->second.references)
+                    for (auto & ref : i->second.referencesPossiblyToSelf())
                         pathsLeft.push(ref);
                 } else {
                     auto info = worker.store.queryPathInfo(path);
                     closureSize += info->narSize;
-                    for (auto & ref : info->references)
+                    for (auto & ref : info->referencesPossiblyToSelf())
                         pathsLeft.push(ref);
                 }
             }
@@ -3997,7 +3997,7 @@ void DerivationGoal::checkOutputs(const std::map<Path, ValidPathInfo> & outputs)
 
                 auto used = recursive
                     ? getClosure(info.path).first
-                    : info.references;
+                    : info.referencesPossiblyToSelf();
 
                 if (recursive && checks.ignoreSelfRefs)
                     used.erase(info.path);
@@ -4466,8 +4466,7 @@ void SubstitutionGoal::tryNext()
     /* To maintain the closure invariant, we first have to realise the
        paths referenced by this one. */
     for (auto & i : info->references)
-        if (i != storePath) /* ignore self-references */
-            addWaitee(worker.makeSubstitutionGoal(i));
+        addWaitee(worker.makeSubstitutionGoal(i));
 
     if (waitees.empty()) /* to prevent hang (no wake-up event) */
         referencesValid();
@@ -4487,8 +4486,7 @@ void SubstitutionGoal::referencesValid()
     }
 
     for (auto & i : info->references)
-        if (i != storePath) /* ignore self-references */
-            assert(worker.store.isValidPath(i));
+        assert(worker.store.isValidPath(i));
 
     state = &SubstitutionGoal::tryToRun;
     worker.wakeUp(shared_from_this());

@@ -715,7 +715,7 @@ std::optional<ValidPathInfo> decodeValidPathInfo(const Store & store, std::istre
     if (!string2Int(s, n)) throw Error("number expected");
     while (n--) {
         getline(str, s);
-        info.references.insert(store.parseStorePath(s));
+        info.insertReferencePossiblyToSelf(store.parseStorePath(s));
     }
     if (!str || str.eof()) throw Error("missing input");
     return std::optional<ValidPathInfo>(std::move(info));
@@ -738,6 +738,20 @@ string showPaths(const PathSet & paths)
     return concatStringsSep(", ", quoteStrings(paths));
 }
 
+StorePathSet ValidPathInfo::referencesPossiblyToSelf() const
+{
+	return PathReferences<StorePath>::referencesPossiblyToSelf(path);
+}
+
+void ValidPathInfo::insertReferencePossiblyToSelf(StorePath && ref)
+{
+	return PathReferences<StorePath>::insertReferencePossiblyToSelf(path, std::move(ref));
+}
+
+void ValidPathInfo::setReferencesPossiblyToSelf(StorePathSet && refs)
+{
+	return PathReferences<StorePath>::setReferencesPossiblyToSelf(path, std::move(refs));
+}
 
 std::string ValidPathInfo::fingerprint(const Store & store) const
 {
@@ -748,7 +762,7 @@ std::string ValidPathInfo::fingerprint(const Store & store) const
         "1;" + store.printStorePath(path) + ";"
         + narHash.to_string(Base32, true) + ";"
         + std::to_string(narSize) + ";"
-        + concatStringsSep(",", store.printStorePathSet(references));
+        + concatStringsSep(",", store.printStorePathSet(referencesPossiblyToSelf()));
 }
 
 
@@ -767,16 +781,11 @@ bool ValidPathInfo::isContentAddressed(const Store & store) const
 
     auto caPath = std::visit(overloaded {
         [&](TextHash th) {
+            assert(!hasSelfReference);
             return store.makeTextPath(path.name(), th.hash, references);
         },
         [&](FixedOutputHash fsh) {
-            auto refs = references;
-            bool hasSelfReference = false;
-            if (refs.count(path)) {
-                hasSelfReference = true;
-                refs.erase(path);
-            }
-            return store.makeFixedOutputPath(fsh.method, fsh.hash, path.name(), refs, hasSelfReference);
+            return store.makeFixedOutputPath(fsh.method, fsh.hash, path.name(), references, hasSelfReference);
         }
     }, *ca);
 
@@ -810,7 +819,7 @@ bool ValidPathInfo::checkSignature(const Store & store, const PublicKeys & publi
 Strings ValidPathInfo::shortRefs() const
 {
     Strings refs;
-    for (auto & r : references)
+    for (auto & r : referencesPossiblyToSelf())
         refs.push_back(std::string(r.to_string()));
     return refs;
 }

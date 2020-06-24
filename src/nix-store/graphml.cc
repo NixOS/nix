@@ -71,7 +71,7 @@ void printGraphML(ref<Store> store, StorePathSet && roots)
         auto info = store->queryPathInfo(path);
         cout << makeNode(*info);
 
-        for (auto & p : info->references) {
+        for (auto & p : info->referencesPossiblyToSelf()) {
             if (p != path) {
                 workList.insert(p);
                 cout << makeEdge(path.to_string(), p.to_string());
