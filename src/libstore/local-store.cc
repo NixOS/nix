@@ -577,9 +577,20 @@ void LocalStore::checkDerivationOutputs(const StorePath & drvPath, const Derivat
 }
 
 void LocalStore::linkDeriverToPath(State & state, const ValidPathInfo & info) {
-    if (info.deriver && info.outputname) {
-        debug("Updating the output path of the deriver");
-        /* debug(queryValidPathId(state, info.deriver.value())); */
+    /*
+     * If the path doesn't have a specified deriver/outputName or the deriver
+     * isn't in store (as it happens for example with remote builds), don't
+     * do anything
+     */
+    if (info.deriver && info.outputname && isValidPath(info.deriver.value())) {
+        debug(
+            "Setting the output path of %s to %s",
+            StorePathWithOutputs{
+                .path = *info.deriver,
+                .outputs = {info.outputname.value()},
+            }.to_string(*this),
+            printStorePath(info.path)
+        );
         state.stmtAddDerivationOutput.use()
             (queryValidPathId(state, info.deriver.value()))
             (info.outputname.value())
