@@ -76,6 +76,7 @@ DownloadFileResult downloadFile(
         };
         auto source = StringSource { *sink.s };
         store->addToStore(info, source, NoRepair, NoCheckSigs);
+        store->sync();
         storePath = std::move(info.path);
     }
 
@@ -146,6 +147,7 @@ Tree downloadTarball(
         auto topDir = tmpDir + "/" + members.begin()->name;
         lastModified = lstat(topDir).st_mtime;
         unpackedStorePath = store->addToStore(name, topDir, FileIngestionMethod::Recursive, htSHA256, defaultPathFilter, NoRepair);
+        store->sync();
     }
 
     Attrs infoAttrs({

@@ -204,8 +204,11 @@ public:
         auto state(_state.lock());
 
         if (!optIpnsPath) {
-            throw Error("The current IPFS address doesn't match the configured one. \n  initial: %s\n  current: %s",
-                formatPathAsProtocol(initialIpfsPath), formatPathAsProtocol(state->ipfsPath));
+            if (initialIpfsPath != state->ipfsPath)
+                throw Error("The current IPFS address doesn't match the configured one. \n  initial: %s\n  current: %s",
+                    formatPathAsProtocol(initialIpfsPath), formatPathAsProtocol(state->ipfsPath));
+            else
+                return;
         }
 
         auto ipnsPath = *optIpnsPath;
