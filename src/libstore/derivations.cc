@@ -8,11 +8,6 @@
 
 namespace nix {
 
-std::string DerivationOutputHash::printMethodAlgo() const {
-    return makeFileIngestionPrefix(method) + printHashType(*hash.type);
-}
-
-
 bool derivationIsCA(DerivationType dt) {
     switch (dt) {
     case DerivationType::Regular: return false;
@@ -139,7 +134,7 @@ static DerivationOutput parseDerivationOutput(const Store & store, istringstream
     expect(str, ","); const auto hash = parseString(str);
     expect(str, ")");
 
-    std::optional<DerivationOutputHash> fsh;
+    std::optional<FixedOutputHash> fsh;
     if (hashAlgo != "") {
         auto method = FileIngestionMethod::Flat;
         if (string(hashAlgo, 0, 2) == "r:") {
@@ -147,7 +142,7 @@ static DerivationOutput parseDerivationOutput(const Store & store, istringstream
             hashAlgo = string(hashAlgo, 2);
         }
         const HashType hashType = parseHashType(hashAlgo);
-        fsh = DerivationOutputHash {
+        fsh = FixedOutputHash {
             .method = std::move(method),
             .hash = Hash(hash, hashType),
         };
@@ -446,7 +441,7 @@ static DerivationOutput readDerivationOutput(Source & in, const Store & store)
     auto hashAlgo = readString(in);
     const auto hash = readString(in);
 
-    std::optional<DerivationOutputHash> fsh;
+    std::optional<FixedOutputHash> fsh;
     if (hashAlgo != "") {
         auto method = FileIngestionMethod::Flat;
         if (string(hashAlgo, 0, 2) == "r:") {
@@ -454,7 +449,7 @@ static DerivationOutput readDerivationOutput(Source & in, const Store & store)
             hashAlgo = string(hashAlgo, 2);
         }
         const HashType hashType = parseHashType(hashAlgo);
-        fsh = DerivationOutputHash {
+        fsh = FixedOutputHash {
             .method = std::move(method),
             .hash = Hash(hash, hashType),
         };
