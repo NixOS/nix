@@ -328,8 +328,8 @@ int handleExceptions(const string & programName, std::function<void()> fun)
         //     printError(e.prefix());
         logError(e.info());
         // TODO fix to detect non-empty trace here.
-        // if (e.prefix() != "" && !settings.showTrace)
-        //     printError("(use '--show-trace' to show detailed location information)");
+        if (e.hasTrace() && !settings.showTrace)
+            printError("(use '--show-trace' to show detailed location information)");
         return e.status;
     } catch (std::bad_alloc & e) {
         printError(error + "out of memory");
