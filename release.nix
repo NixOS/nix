@@ -12,63 +12,72 @@ let
     builtins.readFile ./.version
     + (if officialRelease then "" else "pre${toString nix.revCount}_${nix.shortRev}");
 
+  buildFun = pkgs: enableStatic:
+  with pkgs; with import ./release-common.nix { inherit pkgs enableStatic; };
+  stdenv.mkDerivation {
+    name = "nix-${version}";
+
+    src = nix;
+
+    outputs = [ "out" "dev" "doc" ];
+
+    buildInputs = buildDeps;
+
+    nativeBuildInputs = nativeBuildDeps;
+
+    propagatedBuildInputs = propagatedDeps;
+
+    preConfigure =
+      lib.optionalString (!enableStatic) ''
+        # Copy libboost_context so we don't get all of Boost in our closure.
+        # https://github.com/NixOS/nixpkgs/issues/45462
+        mkdir -p $out/lib
+        cp -pd ${boost}/lib/{libboost_context*,libboost_thread*,libboost_system*} $out/lib
+        rm -f $out/lib/*.a
+        ${lib.optionalString stdenv.isLinux ''
+          chmod u+w $out/lib/*.so.*
+          patchelf --set-rpath $out/lib:${stdenv.cc.cc.lib}/lib $out/lib/libboost_thread.so.*
+        ''}
+
+        (cd perl; autoreconf --install --force --verbose)
+      '';
+
+    configureFlags = configureFlags ++
+      [ "--sysconfdir=/etc" ];
+
+    dontUpdateAutotoolsGnuConfigScripts = true;
+
+    enableParallelBuilding = true;
+
+    makeFlags = [ "profiledir=$(out)/etc/profile.d" "PRECOMPILE_HEADERS=0" ];
+
+    installFlags = "sysconfdir=$(out)/etc";
+
+    postInstall = ''
+      mkdir -p $doc/nix-support
+      echo "doc manual $doc/share/doc/nix/manual" >> $doc/nix-support/hydra-build-products
+    '';
+
+    doCheck = true;
+
+    doInstallCheck = true;
+    installCheckFlags = "sysconfdir=$(out)/etc";
+
+    separateDebugInfo = !enableStatic;
+
+    stripAllList = ["bin"];
+  };
+
+
   jobs = rec {
 
+
+    build-static = pkgs.lib.genAttrs systems (system:
+      buildFun (import nixpkgs { inherit system; }).pkgsStatic true);
+
+
     build = pkgs.lib.genAttrs systems (system:
-
-      let pkgs = import nixpkgs { inherit system; }; in
-
-      with pkgs;
-
-      with import ./release-common.nix { inherit pkgs; };
-
-      stdenv.mkDerivation {
-        name = "nix-${version}";
-
-        src = nix;
-
-        outputs = [ "out" "dev" "doc" ];
-
-        buildInputs = buildDeps;
-
-        propagatedBuildInputs = propagatedDeps;
-
-        preConfigure =
-          ''
-            # Copy libboost_context so we don't get all of Boost in our closure.
-            # https://github.com/NixOS/nixpkgs/issues/45462
-            mkdir -p $out/lib
-            cp -pd ${boost}/lib/{libboost_context*,libboost_thread*,libboost_system*} $out/lib
-            rm -f $out/lib/*.a
-            ${lib.optionalString stdenv.isLinux ''
-              chmod u+w $out/lib/*.so.*
-              patchelf --set-rpath $out/lib:${stdenv.cc.cc.lib}/lib $out/lib/libboost_thread.so.*
-            ''}
-
-            (cd perl; autoreconf --install --force --verbose)
-          '';
-
-        configureFlags = configureFlags ++
-          [ "--sysconfdir=/etc" ];
-
-        enableParallelBuilding = true;
-
-        makeFlags = "profiledir=$(out)/etc/profile.d";
-
-        installFlags = "sysconfdir=$(out)/etc";
-
-        postInstall = ''
-          mkdir -p $doc/nix-support
-          echo "doc manual $doc/share/doc/nix/manual" >> $doc/nix-support/hydra-build-products
-        '';
-
-        doCheck = true;
-
-        doInstallCheck = true;
-        installCheckFlags = "sysconfdir=$(out)/etc";
-
-        separateDebugInfo = true;
-      });
+      buildFun (import nixpkgs { inherit system; }) false);
 
 
     perlBindings = pkgs.lib.genAttrs systems (system:

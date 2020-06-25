@@ -1,4 +1,4 @@
-{ pkgs }:
+{ pkgs, enableStatic }:
 
 with pkgs;
 
@@ -30,35 +30,42 @@ rec {
   });
 
   configureFlags =
-    lib.optionals stdenv.isLinux [
+    lib.optionals (!enableStatic && stdenv.isLinux) [
       "--with-sandbox-shell=${sh}/bin/busybox"
     ];
 
+  nativeBuildDeps =
+    [
+      buildPackages.bison
+      buildPackages.flex
+      buildPackages.libxml2
+      buildPackages.libxslt
+      buildPackages.docbook5
+      buildPackages.docbook_xsl_ns
+      buildPackages.autoreconfHook
+      buildPackages.pkgconfig
+
+      # Tests
+      buildPackages.git
+      buildPackages.mercurial
+      buildPackages.ipfs
+    ];
+
   buildDeps =
-    [ bison
-      flex
-      libxml2
-      libxslt
-      docbook5
-      docbook_xsl_ns
+    [ autoreconfHook
       autoconf-archive
-      autoreconfHook
 
       curl
       bzip2 xz brotli zlib editline
-      openssl pkgconfig sqlite
+      openssl sqlite
       libarchive
       boost
       nlohmann_json
-
-      # Tests
-      git
-      mercurial
       gmock
     ]
     ++ lib.optionals stdenv.isLinux [libseccomp utillinuxMinimal]
     ++ lib.optional (stdenv.isLinux || stdenv.isDarwin) libsodium
-    ++ lib.optional (stdenv.isLinux || stdenv.isDarwin)
+    ++ lib.optional (!enableStatic && (stdenv.isLinux || stdenv.isDarwin))
       ((aws-sdk-cpp.override {
         apis = ["s3" "transfer"];
         customMemoryManagement = false;
