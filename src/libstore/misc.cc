@@ -61,8 +61,7 @@ void Store::computeFSClosure(const StorePathSet & startPaths,
                 } else {
 
                     for (auto & ref : info->references)
-                        if (ref != path)
-                            enqueue(printStorePath(ref));
+                        enqueue(printStorePath(ref));
 
                     if (includeOutputs && path.isDerivation())
                         for (auto & i : queryDerivationOutputs(path))
@@ -276,7 +275,7 @@ StorePaths Store::topoSortPaths(const StorePathSet & paths)
         for (auto & i : references)
             /* Don't traverse into paths that don't exist.  That can
                happen due to substitutes for non-existent paths. */
-            if (i != path && paths.count(i))
+            if (paths.count(i))
                 dfsVisit(i, &path);
 
         sorted.push_back(path);

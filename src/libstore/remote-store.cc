@@ -343,7 +343,7 @@ void RemoteStore::querySubstitutablePathInfos(const StorePathCAMap & pathsMap, S
             auto deriver = readString(conn->from);
             if (deriver != "")
                 info.deriver = parseStorePath(deriver);
-            info.references = readStorePaths<StorePathSet>(*this, conn->from);
+            info.setReferencesPossiblyToSelf(i.first, readStorePaths<StorePathSet>(*this, conn->from));
             info.downloadSize = readLongLong(conn->from);
             info.narSize = readLongLong(conn->from);
             infos.insert_or_assign(i.first, std::move(info));
@@ -362,11 +362,12 @@ void RemoteStore::querySubstitutablePathInfos(const StorePathCAMap & pathsMap, S
         conn.processStderr();
         size_t count = readNum<size_t>(conn->from);
         for (size_t n = 0; n < count; n++) {
-            SubstitutablePathInfo & info(infos[parseStorePath(readString(conn->from))]);
+        	auto path = parseStorePath(readString(conn->from));
+            SubstitutablePathInfo & info { infos[path] };
             auto deriver = readString(conn->from);
             if (deriver != "")
                 info.deriver = parseStorePath(deriver);
-            info.references = readStorePaths<StorePathSet>(*this, conn->from);
+            info.setReferencesPossiblyToSelf(path, readStorePaths<StorePathSet>(*this, conn->from));
             info.downloadSize = readLongLong(conn->from);
             info.narSize = readLongLong(conn->from);
         }
@@ -399,7 +400,7 @@ void RemoteStore::queryPathInfoUncached(const StorePath & path,
             auto deriver = readString(conn->from);
             if (deriver != "") info->deriver = parseStorePath(deriver);
             info->narHash = Hash(readString(conn->from), htSHA256);
-            info->references = readStorePaths<StorePathSet>(*this, conn->from);
+            info->setReferencesPossiblyToSelf(readStorePaths<StorePathSet>(*this, conn->from));
             conn->from >> info->registrationTime >> info->narSize;
             if (GET_PROTOCOL_MINOR(conn->daemonVersion) >= 16) {
                 conn->from >> info->ultimate;
@@ -478,7 +479,7 @@ void RemoteStore::addToStore(const ValidPathInfo & info, Source & source,
         conn.processStderr(0, source2.get());
 
         auto importedPaths = readStorePaths<StorePathSet>(*this, conn->from);
-        assert(importedPaths.size() <= 1);
+        assert(importedPaths.empty() == 0); // doesn't include possible self reference
     }
 
     else {
