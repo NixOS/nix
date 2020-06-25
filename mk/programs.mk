@@ -32,7 +32,7 @@ define build-program
   $$(eval $$(call create-dir, $$(_d)))
 
   $$($(1)_PATH): $$($(1)_OBJS) $$(_libs) | $$(_d)/
-	$$(trace-ld) $(CXX) -o $$@ $$(LDFLAGS) $$(GLOBAL_LDFLAGS) $$($(1)_OBJS) $$($(1)_LDFLAGS) $$(foreach lib, $$($(1)_LIBS), $$($$(lib)_LDFLAGS_USE))
+	$$(trace-ld) $(CXX) -o $$@ $$(LDFLAGS) $$(GLOBAL_LDFLAGS) $$($(1)_OBJS) $$($(1)_LDFLAGS) $$(foreach lib, $$($(1)_LIBS), $$($$(lib)_LDFLAGS_USE)) -lz
 
   $(1)_INSTALL_DIR ?= $$(bindir)
 
