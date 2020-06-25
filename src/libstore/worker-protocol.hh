@@ -69,9 +69,9 @@ template<class T> T readStorePaths(const Store & store, Source & from);
 
 void writeStorePaths(const Store & store, Sink & out, const StorePathSet & paths);
 
-StorePathCAMap readStorePathCAMap(const Store & store, Source & from);
+std::set<FullContentAddress> readFullCaSet(const Store & store, Source & from);
 
-void writeStorePathCAMap(const Store & store, Sink & out, const StorePathCAMap & paths);
+void writeFullCaSet(const Store & store, Sink & out, const std::set<FullContentAddress> & paths);
 
 
 }

@@ -20,47 +20,6 @@ namespace nix {
 
 class Store;
 
-template<typename Ref>
-struct PathReferences
-{
-    std::set<Ref> references;
-    bool hasSelfReference = false;
-
-    /* Functions to view references + hasSelfReference as one set, mainly for
-       compatibility's sake. */
-    StorePathSet referencesPossiblyToSelf(const Ref & self) const;
-    void insertReferencePossiblyToSelf(const Ref & self, Ref && ref);
-    void setReferencesPossiblyToSelf(const Ref & self, std::set<Ref> && refs);
-};
-
-template<typename Ref>
-StorePathSet PathReferences<Ref>::referencesPossiblyToSelf(const Ref & self) const
-{
-    StorePathSet references { references };
-    if (hasSelfReference)
-        references.insert(self);
-    return references;
-}
-
-template<typename Ref>
-void PathReferences<Ref>::insertReferencePossiblyToSelf(const Ref & self, Ref && ref)
-{
-    if (ref == self)
-        hasSelfReference = true;
-    else
-        references.insert(std::move(ref));
-}
-
-template<typename Ref>
-void PathReferences<Ref>::setReferencesPossiblyToSelf(const Ref & self, std::set<Ref> && refs)
-{
-    if (refs.count(self))
-        hasSelfReference = true;
-        refs.erase(self);
-
-    references = refs;
-}
-
 struct ValidPathInfo : PathReferences<StorePath>
 {
     StorePath path;
@@ -92,7 +51,7 @@ struct ValidPathInfo : PathReferences<StorePath>
        and the store path would be computed from the name component, ‘narHash’
        and ‘references’. However, we support many types of content addresses.
     */
-    std::optional<ContentAddress> ca;
+    std::optional<MiniContentAddress> ca;
 
     bool operator == (const ValidPathInfo & i) const
     {
@@ -112,6 +71,8 @@ struct ValidPathInfo : PathReferences<StorePath>
     std::string fingerprint(const Store & store) const;
 
     void sign(const Store & store, const SecretKey & secretKey);
+
+    std::optional<FullContentAddress> fullContentAddressOpt() const;
 
     /* Return true iff the path is verifiably content-addressed. */
     bool isContentAddressed(const Store & store) const;
@@ -140,8 +101,7 @@ struct ValidPathInfo : PathReferences<StorePath>
     ValidPathInfo(const StorePath & path) : path(path) { };
 
     ValidPathInfo(const Store & store,
-        std::string_view name,
-        ContentAddress && ca, PathReferences<StorePath> && refs);
+        FullContentAddress && ca);
 
     virtual ~ValidPathInfo() { }
 };

@@ -21,7 +21,7 @@ std::string makeFileIngestionPrefix(const FileIngestionMethod m) {
 template<class... Ts> struct overloaded : Ts... { using Ts::operator()...; };
 template<class... Ts> overloaded(Ts...) -> overloaded<Ts...>;
 
-std::string renderContentAddress(ContentAddress ca) {
+std::string renderMiniContentAddress(MiniContentAddress ca) {
     return std::visit(overloaded {
         [](TextHash th) {
             return "text:"
@@ -35,7 +35,7 @@ std::string renderContentAddress(ContentAddress ca) {
     }, ca);
 }
 
-ContentAddress parseContentAddress(std::string_view rawCa) {
+MiniContentAddress parseMiniContentAddress(std::string_view rawCa) {
     auto prefixSeparator = rawCa.find(':');
     if (prefixSeparator != string::npos) {
         auto prefix = string(rawCa, 0, prefixSeparator);
@@ -43,7 +43,7 @@ ContentAddress parseContentAddress(std::string_view rawCa) {
             auto hashTypeAndHash = rawCa.substr(prefixSeparator+1, string::npos);
             Hash hash = Hash(string(hashTypeAndHash));
             if (*hash.type != htSHA256) {
-                throw Error("parseContentAddress: the text hash should have type SHA256");
+                throw Error("parseMiniContentAddress: the text hash should have type SHA256");
             }
             return TextHash { hash };
         } else if (prefix == "fixed") {
@@ -62,19 +62,19 @@ ContentAddress parseContentAddress(std::string_view rawCa) {
                 };
             }
         } else {
-            throw Error("parseContentAddress: format not recognized; has to be text or fixed");
+            throw Error("parseMiniContentAddress: format not recognized; has to be text or fixed");
         }
     } else {
         throw Error("Not a content address because it lacks an appropriate prefix");
     }
 };
 
-std::optional<ContentAddress> parseContentAddressOpt(std::string_view rawCaOpt) {
-    return rawCaOpt == "" ? std::optional<ContentAddress> {} : parseContentAddress(rawCaOpt);
+std::optional<MiniContentAddress> parseMiniContentAddressOpt(std::string_view rawCaOpt) {
+    return rawCaOpt == "" ? std::optional<MiniContentAddress> {} : parseMiniContentAddress(rawCaOpt);
 };
 
-std::string renderContentAddress(std::optional<ContentAddress> ca) {
-    return ca ? renderContentAddress(*ca) : "";
+std::string renderMiniContentAddress(std::optional<MiniContentAddress> ca) {
+    return ca ? renderMiniContentAddress(*ca) : "";
 }
 
 }

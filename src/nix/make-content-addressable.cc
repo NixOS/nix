@@ -6,9 +6,9 @@
 
 using namespace nix;
 
-struct CmdMakeContentAddressable : StorePathsCommand, MixJSON
+struct CmdMakeMiniContentAddressable : StorePathsCommand, MixJSON
 {
-    CmdMakeContentAddressable()
+    CmdMakeMiniContentAddressable()
     {
         realiseMode = Build;
     }
@@ -75,12 +75,14 @@ struct CmdMakeContentAddressable : StorePathsCommand, MixJSON
 
             ValidPathInfo info {
                 *store,
-                path.name(),
-                FixedOutputHash {
-                    .method = FileIngestionMethod::Recursive,
-                    .hash = narHash,
+                FullContentAddress {
+                    .name = std::string { path.name() },
+                    .info = FixedOutputInfo {
+                        FileIngestionMethod::Recursive,
+                        narHash,
+                        std::move(refs),
+                    },
                 },
-                std::move(refs),
             };
             info.narHash = narHash;
             info.narSize = sink.s->size();
@@ -104,4 +106,4 @@ struct CmdMakeContentAddressable : StorePathsCommand, MixJSON
     }
 };
 
-static auto r1 = registerCommand<CmdMakeContentAddressable>("make-content-addressable");
+static auto r1 = registerCommand<CmdMakeMiniContentAddressable>("make-content-addressable");

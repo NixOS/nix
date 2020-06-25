@@ -158,9 +158,10 @@ static int _main(int argc, char * * argv)
         if (args.size() == 2) {
             expectedHash = Hash(args[1], ht);
             const auto method = unpack ? FileIngestionMethod::Recursive : FileIngestionMethod::Flat;
-            storePath = store->makeFixedOutputPath(name, FixedOutputHash {
-                .method = method,
-                .hash = expectedHash,
+            storePath = store->makeFixedOutputPath(name, FixedOutputInfo {
+                method,
+                expectedHash,
+                {},
             });
             if (store->isValidPath(*storePath))
                 hash = expectedHash;
@@ -218,9 +219,10 @@ static int _main(int argc, char * * argv)
                into the Nix store. */
             storePath = store->addToStore(name, tmpFile, method, ht);
 
-            assert(*storePath == store->makeFixedOutputPath(name, FixedOutputHash {
-                .method = method,
-                .hash = expectedHash,
+            assert(*storePath == store->makeFixedOutputPath(name, FixedOutputInfo {
+                method,
+                expectedHash,
+                {}
             }));
         }
 

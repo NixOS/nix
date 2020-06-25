@@ -107,11 +107,15 @@ void Store::computeFSClosure(const StorePath & startPath,
 }
 
 
-std::optional<ContentAddress> getDerivationCA(const BasicDerivation & drv)
+std::optional<FullContentAddress> getDerivationCA(const BasicDerivation & drv)
 {
     auto out = drv.outputs.find("out");
-    if (out != drv.outputs.end())
-        return out->second.hash;
+    if (out != drv.outputs.end() && out->second.hash) {
+        return FullContentAddress {
+            .name = std::string { out->second.path.name() },
+            .info = FixedOutputInfo { *out->second.hash, {} },
+        };
+    }
     return std::nullopt;
 }
 
@@ -164,7 +168,11 @@ void Store::queryMissing(const std::vector<StorePathWithOutputs> & targets,
         auto outPath = parseStorePath(outPathS);
 
         SubstitutablePathInfos infos;
-        querySubstitutablePathInfos({{outPath, getDerivationCA(*drv)}}, infos);
+        auto caOpt = getDerivationCA(*drv);
+        if (caOpt)
+            querySubstitutablePathInfos({}, { *std::move(caOpt) }, infos);
+        else
+            querySubstitutablePathInfos({outPath}, {}, infos);
 
         if (infos.empty()) {
             drvState_->lock()->done = true;
@@ -221,7 +229,7 @@ void Store::queryMissing(const std::vector<StorePathWithOutputs> & targets,
             if (isValidPath(path.path)) return;
 
             SubstitutablePathInfos infos;
-            querySubstitutablePathInfos({{path.path, std::nullopt}}, infos);
+            querySubstitutablePathInfos({path.path}, {}, infos);
 
             if (infos.empty()) {
                 auto state(state_.lock());

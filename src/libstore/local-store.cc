@@ -562,7 +562,10 @@ void LocalStore::checkDerivationOutputs(const StorePath & drvPath, const Derivat
             throw Error("derivation '%s' does not have an output named 'out'", printStorePath(drvPath));
 
         check(
-            makeFixedOutputPath(drvName, *out->second.hash),
+            makeFixedOutputPath(drvName, FixedOutputInfo {
+                *out->second.hash,
+                {},
+            }),
             out->second.path, "out");
     }
 
@@ -589,7 +592,7 @@ uint64_t LocalStore::addValidPath(State & state,
         (info.narSize, info.narSize != 0)
         (info.ultimate ? 1 : 0, info.ultimate)
         (concatStringsSep(" ", info.sigs), !info.sigs.empty())
-        (renderContentAddress(info.ca), (bool) info.ca)
+        (renderMiniContentAddress(info.ca), (bool) info.ca)
         .exec();
     uint64_t id = sqlite3_last_insert_rowid(state.db);
 
@@ -663,7 +666,7 @@ void LocalStore::queryPathInfoUncached(const StorePath & path,
             if (s) info->sigs = tokenizeString<StringSet>(s, " ");
 
             s = (const char *) sqlite3_column_text(state->stmtQueryPathInfo, 7);
-            if (s) info->ca = parseContentAddressOpt(s);
+            if (s) info->ca = parseMiniContentAddressOpt(s);
 
             /* Get the references. */
             auto useQueryReferences(state->stmtQueryReferences.use()(info->id));
@@ -688,7 +691,7 @@ void LocalStore::updatePathInfo(State & state, const ValidPathInfo & info)
         (info.narHash.to_string(Base16, true))
         (info.ultimate ? 1 : 0, info.ultimate)
         (concatStringsSep(" ", info.sigs), !info.sigs.empty())
-        (renderContentAddress(info.ca), (bool) info.ca)
+        (renderMiniContentAddress(info.ca), (bool) info.ca)
         (printStorePath(info.path))
         .exec();
 }
@@ -842,46 +845,53 @@ StorePathSet LocalStore::querySubstitutablePaths(const StorePathSet & paths)
 }
 
 
-void LocalStore::querySubstitutablePathInfos(const StorePathCAMap & paths, SubstitutablePathInfos & infos)
+void LocalStore::querySubstitutablePathInfos(const StorePathSet & paths, const std::set<FullContentAddress> & caPaths, SubstitutablePathInfos & infos)
 {
     if (!settings.useSubstitutes) return;
+
+    auto query = [&](auto & sub, const StorePath & localPath, const StorePath & subPath) {
+        debug("checking substituter '%s' for path '%s'", sub->getUri(), sub->printStorePath(subPath));
+        try {
+            auto info = sub->queryPathInfo(subPath);
+
+            if (sub->storeDir != storeDir && !(info->isContentAddressed(*sub) && info->references.empty()))
+                return;
+
+            auto narInfo = std::dynamic_pointer_cast<const NarInfo>(
+                std::shared_ptr<const ValidPathInfo>(info));
+            infos.insert_or_assign(localPath, SubstitutablePathInfo {
+                info->references,
+                info->hasSelfReference,
+                info->deriver,
+                narInfo ? narInfo->fileSize : 0,
+                info->narSize,
+            });
+        } catch (InvalidPath &) {
+        } catch (SubstituterDisabled &) {
+        } catch (Error & e) {
+            if (settings.tryFallback)
+                logError(e.info());
+            else
+                throw;
+        }
+    };
+
     for (auto & sub : getDefaultSubstituters()) {
         for (auto & path : paths) {
-            auto subPath(path.first);
-
-            // recompute store path so that we can use a different store root
-            if (path.second) {
-                subPath = makeFixedOutputPathFromCA(path.first.name(), *path.second);
-                if (sub->storeDir == storeDir)
-                    assert(subPath == path.first);
-                if (subPath != path.first)
-                    debug("replaced path '%s' with '%s' for substituter '%s'", printStorePath(path.first), sub->printStorePath(subPath), sub->getUri());
-            } else if (sub->storeDir != storeDir) continue;
-
-            debug("checking substituter '%s' for path '%s'", sub->getUri(), sub->printStorePath(subPath));
-            try {
-                auto info = sub->queryPathInfo(subPath);
-
-                if (sub->storeDir != storeDir && !(info->isContentAddressed(*sub) && info->references.empty()))
-                    continue;
-
-                auto narInfo = std::dynamic_pointer_cast<const NarInfo>(
-                    std::shared_ptr<const ValidPathInfo>(info));
-                infos.insert_or_assign(path.first, SubstitutablePathInfo {
-                    info->references,
-                    info->hasSelfReference,
-                    info->deriver,
-                    narInfo ? narInfo->fileSize : 0,
-                    info->narSize,
-                });
-            } catch (InvalidPath &) {
-            } catch (SubstituterDisabled &) {
-            } catch (Error & e) {
-                if (settings.tryFallback)
-                    logError(e.info());
-                else
-                    throw;
-            }
+            if (sub->storeDir != storeDir) continue;
+            query(sub, path, path);
+        }
+        for (auto & ca : caPaths) {
+            // TODO Deal with references: either disallow, or require the
+            // store path lengths be the same and rewrite strings.
+            auto localPath = makeFixedOutputPathFromCA(ca);
+            auto subPath = sub->makeFixedOutputPathFromCA(ca);
+            if (sub->storeDir == storeDir)
+                assert(localPath == subPath);
+            if (localPath != subPath)
+                // TODO print CA too
+                debug("replaced path '%s' with '%s' for substituter '%s'", printStorePath(localPath), sub->printStorePath(subPath), sub->getUri());
+            query(sub, localPath, subPath);
         }
     }
 }
@@ -1047,9 +1057,10 @@ StorePath LocalStore::addToStoreFromDump(const string & dump, const string & nam
 {
     Hash h = hashString(hashAlgo, dump);
 
-    auto dstPath = makeFixedOutputPath(name, FixedOutputHash {
-        .method = method,
-        .hash = h,
+    auto dstPath = makeFixedOutputPath(name, FixedOutputInfo {
+        method,
+        h,
+        {},
     });
 
     addTempRoot(dstPath);
@@ -1127,7 +1138,7 @@ StorePath LocalStore::addTextToStore(const string & name, const string & s,
     const StorePathSet & references, RepairFlag repair)
 {
     auto hash = hashString(htSHA256, s);
-    auto dstPath = makeTextPath(name, hash, references);
+    auto dstPath = makeTextPath(name, TextInfo { hash, references });
 
     addTempRoot(dstPath);
 

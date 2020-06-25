@@ -250,20 +250,11 @@ public:
     StorePath makeOutputPath(const string & id,
         const Hash & hash, std::string_view name) const;
 
-    StorePath makeFixedOutputPath(
-        std::string_view name,
-        const FixedOutputHash & hash,
-        const PathReferences<StorePath> & references = {}) const;
+    StorePath makeFixedOutputPath(std::string_view name, const FixedOutputInfo & info) const;
 
-    StorePath makeTextPath(
-        std::string_view name,
-        const Hash & hash,
-        const StorePathSet & references = {}) const;
+    StorePath makeTextPath(std::string_view name, const TextInfo & info) const;
 
-    StorePath makeFixedOutputPathFromCA(
-        std::string_view name,
-        ContentAddress ca,
-        const PathReferences<StorePath> & references = {}) const;
+    StorePath makeFixedOutputPathFromCA(const FullContentAddress & info) const;
 
     /* This is the preparatory part of addToStore(); it computes the
        store path to which srcPath is to be copied.  Returns the store
@@ -352,7 +343,8 @@ public:
        sizes) of a map of paths to their optional ca values. If a path
        does not have substitute info, it's omitted from the resulting
        ‘infos’ map. */
-    virtual void querySubstitutablePathInfos(const StorePathCAMap & paths,
+    virtual void querySubstitutablePathInfos(const StorePathSet & paths,
+        const std::set<FullContentAddress> & caPaths,
         SubstitutablePathInfos & infos) { return; };
 
     /* Import a path into the store. */
@@ -754,6 +746,6 @@ std::optional<ValidPathInfo> decodeValidPathInfo(
 /* Split URI into protocol+hierarchy part and its parameter set. */
 std::pair<std::string, Store::Params> splitUriAndParams(const std::string & uri);
 
-std::optional<ContentAddress> getDerivationCA(const BasicDerivation & drv);
+std::optional<FullContentAddress> getDerivationCA(const BasicDerivation & drv);
 
 }

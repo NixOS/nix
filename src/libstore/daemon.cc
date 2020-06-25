@@ -593,7 +593,7 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
         auto path = store->parseStorePath(readString(from));
         logger->startWork();
         SubstitutablePathInfos infos;
-        store->querySubstitutablePathInfos({{path, std::nullopt}}, infos);
+        store->querySubstitutablePathInfos({path}, {}, infos);
         logger->stopWork();
         auto i = infos.find(path);
         if (i == infos.end())
@@ -610,15 +610,12 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
 
     case wopQuerySubstitutablePathInfos: {
         SubstitutablePathInfos infos;
-        StorePathCAMap pathsMap = {};
-        if (GET_PROTOCOL_MINOR(clientVersion) < 22) {
-            auto paths = readStorePaths<StorePathSet>(*store, from);
-            for (auto & path : paths)
-                pathsMap.emplace(path, std::nullopt);
-        } else
-            pathsMap = readStorePathCAMap(*store, from);
+        auto paths = readStorePaths<StorePathSet>(*store, from);
+        std::set<FullContentAddress> caPaths;
+        if (GET_PROTOCOL_MINOR(clientVersion) > 22) {
+            caPaths = readFullCaSet(*store, from);
         logger->startWork();
-        store->querySubstitutablePathInfos(pathsMap, infos);
+        store->querySubstitutablePathInfos(paths, caPaths, infos);
         logger->stopWork();
         to << infos.size();
         for (auto & i : infos) {
@@ -658,7 +655,7 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
             if (GET_PROTOCOL_MINOR(clientVersion) >= 16) {
                 to << info->ultimate
                    << info->sigs
-                   << renderContentAddress(info->ca);
+                   << renderMiniContentAddress(info->ca);
             }
         } else {
             assert(GET_PROTOCOL_MINOR(clientVersion) >= 17);
@@ -716,7 +713,7 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
         info.setReferencesPossiblyToSelf(readStorePaths<StorePathSet>(*store, from));
         from >> info.registrationTime >> info.narSize >> info.ultimate;
         info.sigs = readStrings<StringSet>(from);
-        info.ca = parseContentAddressOpt(readString(from));
+        info.ca = parseMiniContentAddressOpt(readString(from));
         from >> repair >> dontCheckSigs;
         if (!trusted && dontCheckSigs)
             dontCheckSigs = false;

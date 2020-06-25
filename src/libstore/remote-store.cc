@@ -38,22 +38,24 @@ void writeStorePaths(const Store & store, Sink & out, const StorePathSet & paths
         out << store.printStorePath(i);
 }
 
-StorePathCAMap readStorePathCAMap(const Store & store, Source & from)
+std::set<FullContentAddress> readFullCaSet(const Store & store, Source & from)
 {
-    StorePathCAMap paths;
-    auto count = readNum<size_t>(from);
-    while (count--)
-        paths.insert_or_assign(store.parseStorePath(readString(from)), parseContentAddressOpt(readString(from)));
+    std::set<FullContentAddress> paths;
+    // TODO
+    // auto count = readNum<size_t>(from);
+    // while (count--)
+    //     paths.insert_or_assign(store.parseStorePath(readString(from)), parseMiniContentAddressOpt(readString(from)));
     return paths;
 }
 
-void writeStorePathCAMap(const Store & store, Sink & out, const StorePathCAMap & paths)
+void writeFullCaSet(const Store & store, Sink & out, const std::set<FullContentAddress> & paths)
 {
-    out << paths.size();
-    for (auto & i : paths) {
-        out << store.printStorePath(i.first);
-        out << renderContentAddress(i.second);
-    }
+    // TODO
+    //out << paths.size();
+    //for (auto & i : paths) {
+    //    out << store.printStorePath(i.first);
+    //    out << renderMiniContentAddress(i.second);
+    //}
 }
 
 
@@ -326,43 +328,48 @@ StorePathSet RemoteStore::querySubstitutablePaths(const StorePathSet & paths)
 }
 
 
-void RemoteStore::querySubstitutablePathInfos(const StorePathCAMap & pathsMap, SubstitutablePathInfos & infos)
+void RemoteStore::querySubstitutablePathInfos(const StorePathSet & paths, const std::set<FullContentAddress> & caPaths, SubstitutablePathInfos & infos)
 {
-    if (pathsMap.empty()) return;
+    if (paths.empty() && caPaths.empty()) return;
 
     auto conn(getConnection());
 
-    if (GET_PROTOCOL_MINOR(conn->daemonVersion) < 12) {
+    auto combine = [&]() {
+        std::set<StorePath> combined { paths };
+        for (auto & ca : caPaths)
+            combined.insert(makeFixedOutputPathFromCA(ca));
+        return combined;
+    };
 
-        for (auto & i : pathsMap) {
+    if (GET_PROTOCOL_MINOR(conn->daemonVersion) < 12) {
+        for (auto & path : combine()) {
             SubstitutablePathInfo info;
-            conn->to << wopQuerySubstitutablePathInfo << printStorePath(i.first);
+            conn->to << wopQuerySubstitutablePathInfo << printStorePath(path);
             conn.processStderr();
             unsigned int reply = readInt(conn->from);
             if (reply == 0) continue;
             auto deriver = readString(conn->from);
             if (deriver != "")
                 info.deriver = parseStorePath(deriver);
-            info.setReferencesPossiblyToSelf(i.first, readStorePaths<StorePathSet>(*this, conn->from));
+            info.setReferencesPossiblyToSelf(path, readStorePaths<StorePathSet>(*this, conn->from));
             info.downloadSize = readLongLong(conn->from);
             info.narSize = readLongLong(conn->from);
-            infos.insert_or_assign(i.first, std::move(info));
+            infos.insert_or_assign(path, std::move(info));
         }
 
     } else {
 
         conn->to << wopQuerySubstitutablePathInfos;
         if (GET_PROTOCOL_MINOR(conn->daemonVersion) < 22) {
-            StorePathSet paths;
-            for (auto & path : pathsMap)
-                paths.insert(path.first);
+            writeStorePaths(*this, conn->to, combine());
+        } else {
             writeStorePaths(*this, conn->to, paths);
-        } else
-            writeStorePathCAMap(*this, conn->to, pathsMap);
+            writeFullCaSet(*this, conn->to, caPaths);
+        }
         conn.processStderr();
         size_t count = readNum<size_t>(conn->from);
         for (size_t n = 0; n < count; n++) {
-        	auto path = parseStorePath(readString(conn->from));
+            auto path = parseStorePath(readString(conn->from));
             SubstitutablePathInfo & info { infos[path] };
             auto deriver = readString(conn->from);
             if (deriver != "")
@@ -405,7 +412,7 @@ void RemoteStore::queryPathInfoUncached(const StorePath & path,
             if (GET_PROTOCOL_MINOR(conn->daemonVersion) >= 16) {
                 conn->from >> info->ultimate;
                 info->sigs = readStrings<StringSet>(conn->from);
-                info->ca = parseContentAddressOpt(readString(conn->from));
+                info->ca = parseMiniContentAddressOpt(readString(conn->from));
             }
         }
         callback(std::move(info));
@@ -489,7 +496,7 @@ void RemoteStore::addToStore(const ValidPathInfo & info, Source & source,
                  << info.narHash.to_string(Base16, false);
         writeStorePaths(*this, conn->to, info.references);
         conn->to << info.registrationTime << info.narSize
-                 << info.ultimate << info.sigs << renderContentAddress(info.ca)
+                 << info.ultimate << info.sigs << renderMiniContentAddress(info.ca)
                  << repair << !checkSigs;
         bool tunnel = GET_PROTOCOL_MINOR(conn->daemonVersion) >= 21;
         if (!tunnel) copyNAR(source, conn->to);

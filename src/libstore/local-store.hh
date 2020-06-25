@@ -139,7 +139,8 @@ public:
 
     StorePathSet querySubstitutablePaths(const StorePathSet & paths) override;
 
-    void querySubstitutablePathInfos(const StorePathCAMap & paths,
+    void querySubstitutablePathInfos(const StorePathSet & paths,
+        const std::set<FullContentAddress> & caPaths,
         SubstitutablePathInfos & infos) override;
 
     void addToStore(const ValidPathInfo & info, Source & source,

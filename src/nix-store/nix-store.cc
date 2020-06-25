@@ -208,9 +208,10 @@ static void opPrintFixedPath(Strings opFlags, Strings opArgs)
     string hash = *i++;
     string name = *i++;
 
-    cout << fmt("%s\n", store->printStorePath(store->makeFixedOutputPath(name, FixedOutputHash {
-        .method = recursive,
-        .hash = Hash { hash, hashAlgo },
+    cout << fmt("%s\n", store->printStorePath(store->makeFixedOutputPath(name, FixedOutputInfo {
+        recursive,
+        Hash { hash, hashAlgo },
+        {},
     })));
 }
 
@@ -867,7 +868,7 @@ static void opServe(Strings opFlags, Strings opArgs)
                         out << info->narSize // downloadSize
                             << info->narSize;
                         if (GET_PROTOCOL_MINOR(clientVersion) >= 4)
-                            out << (info->narHash ? info->narHash.to_string(Base32, true) : "") << renderContentAddress(info->ca) << info->sigs;
+                            out << (info->narHash ? info->narHash.to_string(Base32, true) : "") << renderMiniContentAddress(info->ca) << info->sigs;
                     } catch (InvalidPath &) {
                     }
                 }
@@ -955,7 +956,7 @@ static void opServe(Strings opFlags, Strings opArgs)
                 info.setReferencesPossiblyToSelf(readStorePaths<StorePathSet>(*store, in));
                 in >> info.registrationTime >> info.narSize >> info.ultimate;
                 info.sigs = readStrings<StringSet>(in);
-                info.ca = parseContentAddressOpt(readString(in));
+                info.ca = parseMiniContentAddressOpt(readString(in));
 
                 if (info.narSize == 0)
                     throw Error("narInfo is too old and missing the narSize field");
