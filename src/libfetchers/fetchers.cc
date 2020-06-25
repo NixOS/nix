@@ -1,5 +1,6 @@
 #include "fetchers.hh"
 #include "store-api.hh"
+#include "archive.hh"
 
 #include <nlohmann/json.hpp>
 
@@ -60,7 +61,13 @@ std::pair<Tree, std::shared_ptr<const Input>> Input::fetchTree(ref<Store> store)
         tree.actualPath = store->toRealPath(tree.storePath);
 
     if (!tree.info.narHash)
-        tree.info.narHash = store->queryPathInfo(tree.storePath)->narHash;
+        tree.info.narHash = store->queryPathInfo(tree.storePath, tree.info.ca)->narHash;
+
+    if (!tree.info.narHash) {
+        HashSink hashSink(htSHA256);
+        dumpPath(tree.actualPath, hashSink);
+        tree.info.narHash = hashSink.finish().first;
+    }
 
     if (input->narHash)
         assert(input->narHash == tree.info.narHash);

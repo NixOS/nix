@@ -106,6 +106,13 @@ struct GitInput : Input
 
         auto ingestionMethod = treeHash ? FileIngestionMethod::Git : FileIngestionMethod::Recursive;
 
+        std::optional<ContentAddress> ca;
+        if (treeHash)
+            ca = FixedOutputHash {
+                .method = ingestionMethod,
+                .hash = *treeHash,
+            };
+
         // try to substitute
         if (settings.useSubstitutes && treeHash && !submodules) {
             auto storePath = fetchers::trySubstitute(store, ingestionMethod, *treeHash, name);
@@ -115,6 +122,7 @@ struct GitInput : Input
                         .actualPath = store->toRealPath(*storePath),
                         .storePath = std::move(*storePath),
                         .info = TreeInfo {
+                            .ca = ca,
                             .revCount = std::nullopt,
                             .lastModified = 0,
                         },
@@ -152,6 +160,7 @@ struct GitInput : Input
                     .actualPath = store->toRealPath(storePath),
                     .storePath = std::move(storePath),
                     .info = TreeInfo {
+                        .ca = ca,
                         .revCount = shallow ? std::nullopt : std::optional(getIntAttr(infoAttrs, "revCount")),
                         .lastModified = getIntAttr(infoAttrs, "lastModified"),
                     },
@@ -233,6 +242,7 @@ struct GitInput : Input
                     .actualPath = store->printStorePath(storePath),
                     .storePath = std::move(storePath),
                     .info = TreeInfo {
+                        .ca = ca,
                         // FIXME: maybe we should use the timestamp of the last
                         // modified dirty file?
                         .lastModified = haveCommits ? std::stoull(runProgram("git", true, { "-C", actualUrl, "log", "-1", "--format=%ct", "HEAD" })) : 0,
