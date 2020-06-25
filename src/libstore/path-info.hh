@@ -20,12 +20,17 @@ namespace nix {
 
 class Store;
 
-struct ValidPathInfo
+template<typename Ref>
+struct PathReferences
+{
+    std::set<Ref> references;
+};
+
+struct ValidPathInfo : PathReferences<StorePath>
 {
     StorePath path;
     std::optional<StorePath> deriver;
     Hash narHash;
-    StorePathSet references;
     time_t registrationTime = 0;
     uint64_t narSize = 0; // 0 = unknown
     uint64_t id; // internal use only
