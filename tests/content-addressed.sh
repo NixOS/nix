@@ -7,7 +7,13 @@ clearCache
 
 export REMOTE_STORE=file://$cacheDir
 
-out1=$(nix-build ./content-addressed.nix --arg seed 1)
-out2=$(nix-build ./content-addressed.nix --arg seed 2)
+testDerivation () {
+    derivationPath=$1
+    out1=$(nix-build ./content-addressed.nix -A $derivationPath --arg seed 1 -vvvv)
+    out2=$(nix-build ./content-addressed.nix -A $derivationPath --arg seed 2 -vvvv)
+    test $out1 == $out2
+}
 
-test $out1 == $out2
+testDerivation contentAddressed
+testDerivation dependent
+testDerivation transitivelyDependent

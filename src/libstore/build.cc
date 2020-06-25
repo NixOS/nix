@@ -16,6 +16,7 @@
 #include "machines.hh"
 #include "daemon.hh"
 #include "worker-protocol.hh"
+#include "rewrite-derivation.hh"
 
 #include <algorithm>
 #include <iostream>
@@ -1187,10 +1188,9 @@ void DerivationGoal::haveDerivation()
 
     retrySubstitution = false;
 
-    for (auto & i : drv->outputs) {
+    for (auto & i : drv->outputs)
         worker.store.addTempRoot(i.second.path);
-        actualOutputs.emplace(i.first, i.second.path);
-    }
+
 
     /* Check what outputs paths are not already valid. */
     auto invalidOutputs = checkPathValidity(false, buildMode == bmRepair);
@@ -1355,6 +1355,18 @@ void DerivationGoal::closureRepaired()
 void DerivationGoal::inputsRealised()
 {
     trace("all inputs realised");
+
+    if (useDerivation) {
+        bool isModified = resolveDerivation(worker.store, *(dynamic_cast<Derivation *>(drv.get())));
+        // Define the actual outputs of the build
+        for (auto & i: drv->outputs)
+            actualOutputs.emplace(i.first, i.second.path);
+        if (isModified) {
+            debug("Trying the substitution again");
+            haveDerivation();
+            return;
+        }
+    }
 
     if (nrFailed != 0) {
         if (!useDerivation)
