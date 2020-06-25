@@ -191,7 +191,7 @@ let
     coverage =
       with pkgs;
 
-      with import ./release-common.nix { inherit pkgs; };
+      with import ./release-common.nix { inherit pkgs; enableStatic = false; };
 
       releaseTools.coverageAnalysis {
         name = "nix-coverage-${version}";
