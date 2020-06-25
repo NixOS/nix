@@ -173,6 +173,8 @@ public:
     }
 
     BaseError & addTrace(std::optional<ErrPos> e, hintformat hint);
+
+    bool hasTrace() const { return !err.traces.empty(); }
 };
 
 #define MakeError(newClass, superClass) \

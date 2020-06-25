@@ -185,6 +185,31 @@ void printCodeLines(std::ostream &out,
     }
 }
 
+void printAtPos(const string &prefix, const ErrPos &pos, std::ostream &out)
+{
+    {
+        switch (pos.origin) {
+            case foFile: {
+                out << prefix << ANSI_BLUE << "at: " << ANSI_YELLOW << showErrPos(pos) <<
+                    ANSI_BLUE << " in file: " << ANSI_NORMAL << pos.file;
+                break;
+            }
+            case foString: {
+                out << prefix << ANSI_BLUE << "at: " << ANSI_YELLOW << showErrPos(pos) <<
+                    ANSI_BLUE << " from command line argument" << ANSI_NORMAL;
+                break;
+            }
+            case foStdin: {
+                out << prefix << ANSI_BLUE << "at: " << ANSI_YELLOW << showErrPos(pos) <<
+                    ANSI_BLUE << " from stdin" << ANSI_NORMAL;
+                break;
+            }
+            default:
+                throw Error("invalid FileOrigin in errPos");
+        }
+    }
+}
+
 std::ostream& operator<<(std::ostream &out, const ErrorInfo &einfo)
 {
     auto errwidth = std::max<size_t>(getWindowSize().second, 20);
@@ -240,8 +265,12 @@ std::ostream& operator<<(std::ostream &out, const ErrorInfo &einfo)
         }
     }
 
-    auto ndl = prefix.length() + levelString.length() + 3 + einfo.name.length() + einfo.programName.value_or("").length();
-    auto dashwidth = ndl > (errwidth - 3) ? 3 : errwidth - ndl;
+    auto ndl = prefix.length()
+        + filterANSIEscapes(levelString, true).length()
+        + 7
+        + einfo.name.length()
+        + einfo.programName.value_or("").length();
+    auto dashwidth = std::max<int>(errwidth - ndl, 3);
 
     std::string dashes(dashwidth, '-');
 
@@ -262,29 +291,8 @@ std::ostream& operator<<(std::ostream &out, const ErrorInfo &einfo)
 
     bool nl = false;  // intersperse newline between sections.
     if (einfo.errPos.has_value()) {
-        switch (einfo.errPos->origin) {
-            case foFile: {
-                out << prefix << std::endl;
-                auto &pos = *einfo.errPos;
-                out << prefix << ANSI_BLUE << "at: " << ANSI_YELLOW << showErrPos(pos) <<
-                    ANSI_BLUE << " in file: " << ANSI_NORMAL << pos.file;
-                break;
-            }
-            case foString: {
-                out << prefix << std::endl;
-                out << prefix << ANSI_BLUE << "at: " << ANSI_YELLOW << showErrPos(*einfo.errPos) <<
-                    ANSI_BLUE << " from command line argument" << ANSI_NORMAL;
-                break;
-            }
-            case foStdin: {
-                out << prefix << std::endl;
-                out << prefix << ANSI_BLUE << "at: " << ANSI_YELLOW << showErrPos(*einfo.errPos) <<
-                    ANSI_BLUE << " from stdin" << ANSI_NORMAL;
-                break;
-            }
-            default:
-                throw Error("invalid FileOrigin in errPos");
-        }
+        out << prefix << std::endl;
+        printAtPos(prefix, *einfo.errPos, out);
         nl = true;
     }
 
@@ -320,13 +328,33 @@ std::ostream& operator<<(std::ostream &out, const ErrorInfo &einfo)
     for (auto iter = einfo.traces.rbegin(); iter != einfo.traces.rend(); ++iter)
     {
         try {
-            auto pos = *iter->pos;
             if (nl)
                 out << std::endl << prefix;
-            out << std::endl << prefix;
+
+            const string tracetitle(" show-trace output ");
+
+            int fill = errwidth - tracetitle.length();
+            int lw = 0;
+            int rw = 0;
+            const int min_dashes = 3;
+            if (fill > min_dashes * 2) {
+                if (fill % 2 != 0) {
+                    lw = fill / 2;
+                    rw = lw + 1;
+                }
+                else
+                {
+                    lw = rw = fill / 2;
+                }
+            }
+            else
+                lw = rw = min_dashes;
+
+            out << ANSI_BLUE << std::string(lw, '-') << tracetitle << std::string(rw, '-') << std::endl << prefix;
             out << iter->hint.str() <<  std::endl;
-            out << ANSI_BLUE << "at: " << ANSI_YELLOW << showErrPos(pos) <<
-                ANSI_BLUE << " in file: " << ANSI_NORMAL << pos.file  << std::endl;
+
+            auto pos = *iter->pos;
+            printAtPos(prefix, pos, out);
             nl = true;
             auto loc = getCodeLines(pos);
             if (loc.has_value())
