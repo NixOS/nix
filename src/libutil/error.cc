@@ -197,7 +197,7 @@ void printAtPos(const string &prefix, const ErrPos &pos, std::ostream &out)
             }
             case foString: {
                 out << prefix << ANSI_BLUE << "at: " << ANSI_YELLOW << showErrPos(pos) <<
-                    ANSI_BLUE << " from command line argument" << ANSI_NORMAL;
+                    ANSI_BLUE << " from string" << ANSI_NORMAL;
                 break;
             }
             case foStdin: {
