@@ -839,6 +839,10 @@ private:
     typedef map<StorePath, StorePath> RedirectedOutputs;
     RedirectedOutputs redirectedOutputs;
 
+    /* The `actual` outputs of the build (which might differ from the one
+     * stored in the drv in case of ca derivations) */
+    OutputPathMap actualOutputs;
+
     BuildMode buildMode;
 
     /* If we're repairing without a chroot, there may be outputs that
@@ -1005,6 +1009,8 @@ private:
     void killChild();
 
     void addHashRewrite(const StorePath & path);
+
+    void registerOutputMappings();
 
     void repairClosure();
 
@@ -1181,8 +1187,10 @@ void DerivationGoal::haveDerivation()
 
     retrySubstitution = false;
 
-    for (auto & i : drv->outputs)
+    for (auto & i : drv->outputs) {
         worker.store.addTempRoot(i.second.path);
+        actualOutputs.emplace(i.first, i.second.path);
+    }
 
     /* Check what outputs paths are not already valid. */
     auto invalidOutputs = checkPathValidity(false, buildMode == bmRepair);
@@ -3839,6 +3847,11 @@ void DerivationGoal::registerOutputs()
         if (parsedDrv->contentAddressed()) {
             info = worker.store.makeContentAddressed(info);
             deletePath(path);
+
+            // Replace the output path by the new CA one
+            // FIXME: Why can't this be done in one step?
+            actualOutputs.erase(i.first);
+            actualOutputs.emplace(i.first, info.path);
         } else {
             info.narHash = hash.first;
             info.narSize = hash.second;
@@ -3849,7 +3862,6 @@ void DerivationGoal::registerOutputs()
             }
         }
 
-        info.outputname = i.first;
         info.deriver = drvPath;
         info.ultimate = true;
         worker.store.signPathInfo(info);
@@ -4239,6 +4251,14 @@ void DerivationGoal::addHashRewrite(const StorePath & path)
 }
 
 
+void DerivationGoal::registerOutputMappings() {
+
+    for (auto & output : actualOutputs) {
+        debug("Path for %s: %s", output.first, worker.store.printStorePath(output.second));
+        worker.store.linkDeriverToPath(drvPath, output.first, output.second);
+    }
+}
+
 void DerivationGoal::done(BuildResult::Status status, std::optional<Error> ex)
 {
     result.status = status;
@@ -4254,6 +4274,7 @@ void DerivationGoal::done(BuildResult::Status status, std::optional<Error> ex)
     mcRunningBuilds.reset();
 
     if (result.success()) {
+        registerOutputMappings();
         if (status == BuildResult::Built)
             worker.doneBuilds++;
     } else {

@@ -294,7 +294,7 @@ private:
     /* Add a mapping from the deriver of the path info (if specified) to its
      * out path
      */
-    void linkDeriverToPath(State & state, const ValidPathInfo & info);
+    void linkDeriverToPath(const StorePath deriver, const string outputName, const StorePath output);
 
     Path getRealStoreDir() override { return realStoreDir; }
 

@@ -576,28 +576,16 @@ void LocalStore::checkDerivationOutputs(const StorePath & drvPath, const Derivat
     }
 }
 
-void LocalStore::linkDeriverToPath(State & state, const ValidPathInfo & info) {
-    /*
-     * If the path doesn't have a specified deriver/outputName or the deriver
-     * isn't in store (as it happens for example with remote builds), don't
-     * do anything
-     */
-    if (info.deriver && info.outputname && isValidPath(info.deriver.value())) {
-        debug(
-            "Setting the output path of %s to %s",
-            StorePathWithOutputs{
-                .path = *info.deriver,
-                .outputs = {info.outputname.value()},
-            }.to_string(*this),
-            printStorePath(info.path)
-        );
-        state.stmtAddDerivationOutput.use()
-            (queryValidPathId(state, info.deriver.value()))
-            (info.outputname.value())
-            (printStorePath(info.path))
+void LocalStore::linkDeriverToPath(const StorePath deriver, const string outputName, const StorePath output)
+{
+    retrySQLite<void>([&]() {
+        auto state(_state.lock());
+        state->stmtAddDerivationOutput.use()
+            (queryValidPathId(*state, deriver))
+            (outputName)
+            (printStorePath(output))
             .exec();
-    }
-
+    });
 }
 
 uint64_t LocalStore::addValidPath(State & state,
@@ -641,8 +629,6 @@ uint64_t LocalStore::addValidPath(State & state,
                 .exec();
         }
     }
-
-    linkDeriverToPath(state, info);
 
     {
         auto state_(Store::state.lock());
@@ -717,8 +703,6 @@ void LocalStore::updatePathInfo(State & state, const ValidPathInfo & info)
         (renderContentAddress(info.ca), (bool) info.ca)
         (printStorePath(info.path))
         .exec();
-
-    linkDeriverToPath(state, info);
 }
 
 
