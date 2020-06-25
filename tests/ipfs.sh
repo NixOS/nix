@@ -43,6 +43,29 @@ IPFS_DST_HTTP_LOCAL_STORE=$IPFS_TESTS/ipfs_dest_http_local_store
 IPFS_DST_IPFS_STORE=$IPFS_TESTS/ipfs_dest_ipfs_store
 IPFS_DST_IPNS_STORE=$IPFS_TESTS/ipfs_dest_ipns_store
 
+EMPTY_HASH=$(echo {} | ipfs dag put)
+
+################################################################################
+## Check that fetchurl works directly with the ipfs store
+################################################################################
+
+TEST_FILE=test-file.txt
+touch $TEST_FILE
+
+# We try to do the evaluation with a known wrong hash to get the suggestion for
+# the correct one
+! CORRECT_ADDRESS=$(nix eval '(builtins.fetchurl 'file://$PWD/$TEST_FILE')' --store ipfs://$EMPTY_HASH |& \
+    grep 'current:' | awk '{print $2}')
+
+# Then we eval and get back the hash-name part of the store path
+RESULT=$(nix eval '(builtins.fetchurl 'file://$PWD/$TEST_FILE')' --store $CORRECT_ADDRESS --json \
+    | jq -r | awk -F/ '{print $NF}')
+
+# Finally, we ask back the info from IPFS (formatting the address the right way
+# beforehand)
+ADDRESS_IPFS_FORMATTED=$(echo $CORRECT_ADDRESS | awk -F/ '{print $3}')
+ipfs dag get /ipfs/$ADDRESS_IPFS_FORMATTED/nar/$RESULT
+
 ################################################################################
 ## Generate the keys to sign the store
 ################################################################################
@@ -92,8 +115,6 @@ nix-build ./fixed.nix -A good \
 ################################################################################
 ## Create the ipfs store and download the derivation there
 ################################################################################
-
-EMPTY_HASH=$(echo {} | ipfs dag put)
 
 # Try to upload the content to the empty directory, fail but grab the right hash
 IPFS_ADDRESS=$(set -e; \
