@@ -303,6 +303,7 @@ int handleExceptions(const string & programName, std::function<void()> fun)
     ReceiveInterrupts receiveInterrupts; // FIXME: need better place for this
 
     ErrorInfo::programName = baseNameOf(programName);
+    ErrorInfo::showTrace = settings.showTrace;
 
     string error = ANSI_RED "error:" ANSI_NORMAL " ";
     try {
@@ -323,9 +324,6 @@ int handleExceptions(const string & programName, std::function<void()> fun)
         printError("Try '%1% --help' for more information.", programName);
         return 1;
     } catch (BaseError & e) {
-        // TODO showTrace as argument, or have calcWhat check settings?
-        // if (settings.showTrace && e.prefix() != "")
-        //     printError(e.prefix());
         logError(e.info());
         // TODO fix to detect non-empty trace here.
         if (e.hasTrace() && !settings.showTrace)

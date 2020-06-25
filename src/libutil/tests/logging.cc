@@ -251,6 +251,7 @@ namespace nix {
 
     TEST(addTrace, showTracesWithShowTrace) {
         SymbolTable testTable;
+        ErrorInfo::showTrace = true;
         auto problem_file = testTable.create(test_file);
 
         auto oneliner_file = testTable.create(one_liner);
@@ -270,6 +271,30 @@ namespace nix {
 
         auto str = testing::internal::GetCapturedStderr();
         ASSERT_STREQ(str.c_str(), "\x1B[31;1merror:\x1B[0m\x1B[34;1m --- AssertionError --- error-unit-test\x1B[0m\n\x1B[34;1mat: \x1B[33;1m(2:13)\x1B[34;1m from command line argument\x1B[0m\n\na well-known problem occurred\n\n     1| previous line of code\n     2| this is the problem line of code\n      |             \x1B[31;1m^\x1B[0m\n     3| next line of code\n\nit has been \x1B[33;1mzero\x1B[0m days since our last error\n\x1B[34;1m--- show-trace output ---\nwhile trying to compute \x1B[33;1m42\x1B[0m\n\x1B[34;1mat: \x1B[33;1m(1:19)\x1B[34;1m from stdin\x1B[0m\n     1| this is the other problem line of code\n      |                   \x1B[31;1m^\x1B[0m\n");
+    }
+
+    TEST(addTrace, hideTracesWithoutShowTrace) {
+        SymbolTable testTable;
+        ErrorInfo::showTrace = false;
+        auto problem_file = testTable.create(test_file);
+
+        auto oneliner_file = testTable.create(one_liner);
+
+        auto e = AssertionError(ErrorInfo {
+                .name = "wat",
+                .description = "a well-known problem occurred",
+                .hint = hintfmt("it has been %1% days since our last error", "zero"),
+                .errPos = Pos(foString, problem_file, 2, 13),
+            });
+
+        e.addTrace(Pos(foStdin, oneliner_file, 1, 19), "while trying to compute %1%", 42);
+
+        testing::internal::CaptureStderr();
+
+        logError(e.info());
+
+        auto str = testing::internal::GetCapturedStderr();
+        ASSERT_STREQ(str.c_str(), "\x1B[31;1merror:\x1B[0m\x1B[34;1m --- AssertionError --- error-unit-test\x1B[0m\n\x1B[34;1mat: \x1B[33;1m(2:13)\x1B[34;1m from command line argument\x1B[0m\n\na well-known problem occurred\n\n     1| previous line of code\n     2| this is the problem line of code\n      |             \x1B[31;1m^\x1B[0m\n     3| next line of code\n\nit has been \x1B[33;1mzero\x1B[0m days since our last error\n");
     }
 
     /* ----------------------------------------------------------------------------

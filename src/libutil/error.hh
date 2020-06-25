@@ -107,6 +107,7 @@ struct ErrorInfo {
     std::list<Trace> traces;
 
     static std::optional<string> programName;
+    static bool showTrace;
 };
 
 std::ostream& operator<<(std::ostream &out, const ErrorInfo &einfo);

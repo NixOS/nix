@@ -34,6 +34,7 @@ const string& BaseError::calcWhat() const
 }
 
 std::optional<string> ErrorInfo::programName = std::nullopt;
+bool ErrorInfo::showTrace = false;
 
 std::ostream& operator<<(std::ostream &os, const hintformat &hf)
 {
@@ -325,42 +326,44 @@ std::ostream& operator<<(std::ostream &out, const ErrorInfo &einfo)
     }
 
     // traces
-    for (auto iter = einfo.traces.rbegin(); iter != einfo.traces.rend(); ++iter)
-    {
-        try {
-            if (nl)
-                out << std::endl << prefix;
+    if (ErrorInfo::showTrace) {
+        for (auto iter = einfo.traces.rbegin(); iter != einfo.traces.rend(); ++iter)
+        {
+            try {
+                if (nl)
+                    out << std::endl << prefix;
 
-            const string tracetitle(" show-trace output ");
+                const string tracetitle(" show-trace output ");
 
-            int fill = errwidth - tracetitle.length();
-            int lw = 0;
-            int rw = 0;
-            const int min_dashes = 3;
-            if (fill > min_dashes * 2) {
-                if (fill % 2 != 0) {
-                    lw = fill / 2;
-                    rw = lw + 1;
+                int fill = errwidth - tracetitle.length();
+                int lw = 0;
+                int rw = 0;
+                const int min_dashes = 3;
+                if (fill > min_dashes * 2) {
+                    if (fill % 2 != 0) {
+                        lw = fill / 2;
+                        rw = lw + 1;
+                    }
+                    else
+                    {
+                        lw = rw = fill / 2;
+                    }
                 }
                 else
-                {
-                    lw = rw = fill / 2;
-                }
+                    lw = rw = min_dashes;
+
+                out << ANSI_BLUE << std::string(lw, '-') << tracetitle << std::string(rw, '-') << std::endl << prefix;
+                out << iter->hint.str() <<  std::endl;
+
+                auto pos = *iter->pos;
+                printAtPos(prefix, pos, out);
+                nl = true;
+                auto loc = getCodeLines(pos);
+                if (loc.has_value())
+                    printCodeLines(out, prefix, pos, *loc);
+            } catch(const std::bad_optional_access& e) {
+                out << iter->hint.str() << std::endl;
             }
-            else
-                lw = rw = min_dashes;
-
-            out << ANSI_BLUE << std::string(lw, '-') << tracetitle << std::string(rw, '-') << std::endl << prefix;
-            out << iter->hint.str() <<  std::endl;
-
-            auto pos = *iter->pos;
-            printAtPos(prefix, pos, out);
-            nl = true;
-            auto loc = getCodeLines(pos);
-            if (loc.has_value())
-                printCodeLines(out, prefix, pos, *loc);
-        } catch(const std::bad_optional_access& e) {
-            out << iter->hint.str() << std::endl;
         }
     }
 
