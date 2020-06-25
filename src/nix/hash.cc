@@ -69,7 +69,7 @@ struct CmdHash : Command
 
             Hash h = hashSink->finish().first;
             if (truncate && h.hashSize > 20) h = compressHash(h, 20);
-            logger->stdout(h.to_string(base, base == SRI));
+            logger->stdout_(h.to_string(base, base == SRI));
         }
     }
 };
@@ -103,7 +103,7 @@ struct CmdToBase : Command
     void run() override
     {
         for (auto s : args)
-            logger->stdout(Hash(s, ht).to_string(base, base == SRI));
+            logger->stdout_(Hash(s, ht).to_string(base, base == SRI));
     }
 };
 
