@@ -200,6 +200,7 @@ let
 
         enableParallelBuilding = true;
 
+        nativeBuildInputs = nativeBuildDeps;
         buildInputs = buildDeps ++ propagatedDeps;
 
         dontInstall = false;
