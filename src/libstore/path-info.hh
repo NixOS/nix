@@ -26,9 +26,9 @@ struct PathReferences
     std::set<Ref> references;
     bool hasSelfReference = false;
 
-	/* Functions to view references + hasSelfReference as one set, mainly for
-	   compatibility's sake. */
-	StorePathSet referencesPossiblyToSelf(const Ref & self) const;
+    /* Functions to view references + hasSelfReference as one set, mainly for
+       compatibility's sake. */
+    StorePathSet referencesPossiblyToSelf(const Ref & self) const;
     void insertReferencePossiblyToSelf(const Ref & self, Ref && ref);
     void setReferencesPossiblyToSelf(const Ref & self, std::set<Ref> && refs);
 };
@@ -116,9 +116,9 @@ struct ValidPathInfo : PathReferences<StorePath>
     /* Return true iff the path is verifiably content-addressed. */
     bool isContentAddressed(const Store & store) const;
 
-	/* Functions to view references + hasSelfReference as one set, mainly for
-	   compatibility's sake. */
-	StorePathSet referencesPossiblyToSelf() const;
+    /* Functions to view references + hasSelfReference as one set, mainly for
+       compatibility's sake. */
+    StorePathSet referencesPossiblyToSelf() const;
     void insertReferencePossiblyToSelf(StorePath && ref);
     void setReferencesPossiblyToSelf(StorePathSet && refs);
 
@@ -138,6 +138,10 @@ struct ValidPathInfo : PathReferences<StorePath>
 
     ValidPathInfo(StorePath && path) : path(std::move(path)) { };
     ValidPathInfo(const StorePath & path) : path(path) { };
+
+    ValidPathInfo(const Store & store,
+        std::string_view name,
+        ContentAddress && ca, PathReferences<StorePath> && refs);
 
     virtual ~ValidPathInfo() { }
 };

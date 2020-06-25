@@ -160,14 +160,13 @@ StorePath Store::makeOutputPath(const string & id,
 static std::string makeType(
     const Store & store,
     string && type,
-    const StorePathSet & references,
-    bool hasSelfReference = false)
+    const PathReferences<StorePath> & references)
 {
-    for (auto & i : references) {
+    for (auto & i : references.references) {
         type += ":";
         type += store.printStorePath(i);
     }
-    if (hasSelfReference) type += ":self";
+    if (references.hasSelfReference) type += ":self";
     return std::move(type);
 }
 
@@ -175,13 +174,13 @@ static std::string makeType(
 StorePath Store::makeFixedOutputPath(
     std::string_view name,
     const FixedOutputHash & foh,
-    const StorePathSet & references,
-    bool hasSelfReference) const
+    const PathReferences<StorePath> & references) const
 {
     if (*foh.hash.type == htSHA256 && foh.method == FileIngestionMethod::Recursive) {
-        return makeStorePath(makeType(*this, "source", references, hasSelfReference), foh.hash, name);
+        return makeStorePath(makeType(*this, "source", references), foh.hash, name);
     } else {
-        assert(references.empty());
+        assert(references.references.empty());
+        assert(!references.hasSelfReference);
         return makeStorePath("output:out",
             hashString(htSHA256,
                 "fixed:out:"
@@ -196,15 +195,16 @@ template<class... Ts> struct overloaded : Ts... { using Ts::operator()...; };
 template<class... Ts> overloaded(Ts...) -> overloaded<Ts...>;
 
 StorePath Store::makeFixedOutputPathFromCA(std::string_view name, ContentAddress ca,
-    const StorePathSet & references, bool hasSelfReference) const
+    const PathReferences<StorePath> & references) const
 {
     // New template
     return std::visit(overloaded {
         [&](TextHash th) {
-            return makeTextPath(name, th.hash, references);
+            assert(!references.hasSelfReference);
+            return makeTextPath(name, th.hash, references.references);
         },
         [&](FixedOutputHash fsh) {
-            return makeFixedOutputPath(name, fsh, references, hasSelfReference);
+            return makeFixedOutputPath(name, fsh, references);
         }
     }, ca);
 }
@@ -216,7 +216,7 @@ StorePath Store::makeTextPath(std::string_view name, const Hash & hash,
     /* Stuff the references (if any) into the type.  This is a bit
        hacky, but we can't put them in `s' since that would be
        ambiguous. */
-    return makeStorePath(makeType(*this, "text", references), hash, name);
+    return makeStorePath(makeType(*this, "text", PathReferences<StorePath> { references }), hash, name);
 }
 
 
@@ -796,17 +796,17 @@ string showPaths(const PathSet & paths)
 
 StorePathSet ValidPathInfo::referencesPossiblyToSelf() const
 {
-	return PathReferences<StorePath>::referencesPossiblyToSelf(path);
+    return PathReferences<StorePath>::referencesPossiblyToSelf(path);
 }
 
 void ValidPathInfo::insertReferencePossiblyToSelf(StorePath && ref)
 {
-	return PathReferences<StorePath>::insertReferencePossiblyToSelf(path, std::move(ref));
+    return PathReferences<StorePath>::insertReferencePossiblyToSelf(path, std::move(ref));
 }
 
 void ValidPathInfo::setReferencesPossiblyToSelf(StorePathSet && refs)
 {
-	return PathReferences<StorePath>::setReferencesPossiblyToSelf(path, std::move(refs));
+    return PathReferences<StorePath>::setReferencesPossiblyToSelf(path, std::move(refs));
 }
 
 std::string ValidPathInfo::fingerprint(const Store & store) const
@@ -837,7 +837,7 @@ bool ValidPathInfo::isContentAddressed(const Store & store) const
             return store.makeTextPath(path.name(), th.hash, references);
         },
         [&](FixedOutputHash fsh) {
-            return store.makeFixedOutputPath(path.name(), fsh, references, hasSelfReference);
+            return store.makeFixedOutputPath(path.name(), fsh, *this);
         }
     }, *ca);
 
@@ -876,6 +876,17 @@ Strings ValidPathInfo::shortRefs() const
     return refs;
 }
 
+
+ValidPathInfo::ValidPathInfo(
+    const Store & store,
+    std::string_view name,
+    ContentAddress && ca,
+    PathReferences<StorePath> && refs)
+      : PathReferences<StorePath>(std::move(refs))
+      , path(store.makeFixedOutputPathFromCA(name, ca, *this))
+      , ca(std::move(ca))
+{
+}
 
 }
 

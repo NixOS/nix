@@ -55,19 +55,15 @@ struct CmdMakeContentAddressable : StorePathsCommand, MixJSON
 
             StringMap rewrites;
 
-            StorePathSet references;
-            bool hasSelfReference = false;
+            PathReferences<StorePath> refs;
+            refs.hasSelfReference = oldInfo->hasSelfReference;
             for (auto & ref : oldInfo->references) {
-                if (ref == path)
-                    hasSelfReference = true;
-                else {
-                    auto i = remappings.find(ref);
-                    auto replacement = i != remappings.end() ? i->second : ref;
-                    // FIXME: warn about unremapped paths?
-                    if (replacement != ref)
-                        rewrites.insert_or_assign(store->printStorePath(ref), store->printStorePath(replacement));
-                    references.insert(std::move(replacement));
-                }
+                auto i = remappings.find(ref);
+                auto replacement = i != remappings.end() ? i->second : ref;
+                // FIXME: warn about unremapped paths?
+                if (replacement != ref)
+                    rewrites.insert_or_assign(store->printStorePath(ref), store->printStorePath(replacement));
+                refs.references.insert(std::move(replacement));
             }
 
             *sink.s = rewriteStrings(*sink.s, rewrites);
@@ -77,18 +73,17 @@ struct CmdMakeContentAddressable : StorePathsCommand, MixJSON
 
             auto narHash = hashModuloSink.finish().first;
 
-            ValidPathInfo info(store->makeFixedOutputPath(path.name(), FixedOutputHash {
-                .method = FileIngestionMethod::Recursive,
-                .hash = narHash,
-            }, references, hasSelfReference));
-            info.references = std::move(references);
-            info.hasSelfReference = std::move(hasSelfReference);
+            ValidPathInfo info {
+                *store,
+                path.name(),
+                FixedOutputHash {
+                    .method = FileIngestionMethod::Recursive,
+                    .hash = narHash,
+                },
+                std::move(refs),
+            };
             info.narHash = narHash;
             info.narSize = sink.s->size();
-            info.ca = FixedOutputHash {
-                .method = FileIngestionMethod::Recursive,
-                .hash = info.narHash,
-            };
 
             if (!json)
                 printInfo("rewrote '%s' to '%s'", pathS, store->printStorePath(info.path));
