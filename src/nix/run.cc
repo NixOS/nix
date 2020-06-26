@@ -57,22 +57,22 @@ struct RunCommon : virtual Command
     }
 };
 
-struct CmdRun : InstallablesCommand, RunCommon, MixEnvironment
+struct CmdShell : InstallablesCommand, RunCommon, MixEnvironment
 {
     std::vector<std::string> command = { getEnv("SHELL").value_or("bash") };
 
-    CmdRun()
+    CmdShell()
     {
-        mkFlag()
-            .longName("command")
-            .shortName('c')
-            .description("command and arguments to be executed; defaults to '$SHELL'")
-            .labels({"command", "args"})
-            .arity(ArityAny)
-            .handler([&](std::vector<std::string> ss) {
+        addFlag({
+            .longName = "command",
+            .shortName = 'c',
+            .description = "command and arguments to be executed; defaults to '$SHELL'",
+            .labels = {"command", "args"},
+            .handler = {[&](std::vector<std::string> ss) {
                 if (ss.empty()) throw UsageError("--command requires at least one argument");
                 command = ss;
-            });
+            }}
+        });
     }
 
     std::string description() override
@@ -85,19 +85,19 @@ struct CmdRun : InstallablesCommand, RunCommon, MixEnvironment
         return {
             Example{
                 "To start a shell providing GNU Hello from NixOS 17.03:",
-                "nix run -f channel:nixos-17.03 hello"
+                "nix shell -f channel:nixos-17.03 hello"
             },
             Example{
                 "To start a shell providing youtube-dl from your 'nixpkgs' channel:",
-                "nix run nixpkgs.youtube-dl"
+                "nix shell nixpkgs.youtube-dl"
             },
             Example{
                 "To run GNU Hello:",
-                "nix run nixpkgs.hello -c hello --greeting 'Hi everybody!'"
+                "nix shell nixpkgs.hello -c hello --greeting 'Hi everybody!'"
             },
             Example{
                 "To run GNU Hello in a chroot store:",
-                "nix run --store ~/my-nix nixpkgs.hello -c hello"
+                "nix shell --store ~/my-nix nixpkgs.hello -c hello"
             },
         };
     }
@@ -111,16 +111,16 @@ struct CmdRun : InstallablesCommand, RunCommon, MixEnvironment
 
         std::unordered_set<StorePath> done;
         std::queue<StorePath> todo;
-        for (auto & path : outPaths) todo.push(path.clone());
+        for (auto & path : outPaths) todo.push(path);
 
         setEnviron();
 
         auto unixPath = tokenizeString<Strings>(getEnv("PATH").value_or(""), ":");
 
         while (!todo.empty()) {
-            auto path = todo.front().clone();
+            auto path = todo.front();
             todo.pop();
-            if (!done.insert(path.clone()).second) continue;
+            if (!done.insert(path).second) continue;
 
             if (true)
                 unixPath.push_front(store->printStorePath(path) + "/bin");
@@ -141,7 +141,7 @@ struct CmdRun : InstallablesCommand, RunCommon, MixEnvironment
     }
 };
 
-static auto r1 = registerCommand<CmdRun>("run");
+static auto r1 = registerCommand<CmdShell>("shell");
 
 void chrootHelper(int argc, char * * argv)
 {
@@ -197,10 +197,10 @@ void chrootHelper(int argc, char * * argv)
         Finally freeCwd([&]() { free(cwd); });
 
         if (chroot(tmpDir.c_str()) == -1)
-            throw SysError(format("chrooting into '%s'") % tmpDir);
+            throw SysError("chrooting into '%s'", tmpDir);
 
         if (chdir(cwd) == -1)
-            throw SysError(format("chdir to '%s' in chroot") % cwd);
+            throw SysError("chdir to '%s' in chroot", cwd);
     } else
         if (mount(realStoreDir.c_str(), storeDir.c_str(), "", MS_BIND, 0) == -1)
             throw SysError("mounting '%s' on '%s'", realStoreDir, storeDir);

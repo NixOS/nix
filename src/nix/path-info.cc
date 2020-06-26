@@ -29,6 +29,8 @@ struct CmdPathInfo : StorePathsCommand, MixJSON
         return "query information about store paths";
     }
 
+    Category category() override { return catSecondary; }
+
     Examples examples() override
     {
         return {
@@ -88,7 +90,7 @@ struct CmdPathInfo : StorePathsCommand, MixJSON
             JSONPlaceholder jsonRoot(std::cout);
             store->pathInfoToJSON(jsonRoot,
                 // FIXME: preserve order?
-                storePathsToSet(storePaths),
+                StorePathSet(storePaths.begin(), storePaths.end()),
                 true, showClosureSize, SRI, AllowInvalid);
         }
 
@@ -113,7 +115,7 @@ struct CmdPathInfo : StorePathsCommand, MixJSON
                     std::cout << '\t';
                     Strings ss;
                     if (info->ultimate) ss.push_back("ultimate");
-                    if (info->ca != "") ss.push_back("ca:" + info->ca);
+                    if (info->ca) ss.push_back("ca:" + renderContentAddress(*info->ca));
                     for (auto & sig : info->sigs) ss.push_back(sig);
                     std::cout << concatStringsSep(" ", ss);
                 }

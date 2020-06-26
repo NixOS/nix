@@ -16,18 +16,20 @@ struct CmdUpgradeNix : MixDryRun, StoreCommand
 
     CmdUpgradeNix()
     {
-        mkFlag()
-            .longName("profile")
-            .shortName('p')
-            .labels({"profile-dir"})
-            .description("the Nix profile to upgrade")
-            .dest(&profileDir);
+        addFlag({
+            .longName = "profile",
+            .shortName = 'p',
+            .description = "the Nix profile to upgrade",
+            .labels = {"profile-dir"},
+            .handler = {&profileDir}
+        });
 
-        mkFlag()
-            .longName("nix-store-paths-url")
-            .labels({"url"})
-            .description("URL of the file that contains the store paths of the latest Nix release")
-            .dest(&storePathsUrl);
+        addFlag({
+            .longName = "nix-store-paths-url",
+            .description = "URL of the file that contains the store paths of the latest Nix release",
+            .labels = {"url"},
+            .handler = {&storePathsUrl}
+        });
     }
 
     std::string description() override
@@ -49,6 +51,8 @@ struct CmdUpgradeNix : MixDryRun, StoreCommand
         };
     }
 
+    Category category() override { return catNixInstallation; }
+
     void run(ref<Store> store) override
     {
         evalSettings.pureEval = true;
@@ -64,7 +68,10 @@ struct CmdUpgradeNix : MixDryRun, StoreCommand
 
         if (dryRun) {
             stopProgressBar();
-            printError("would upgrade to version %s", version);
+            logWarning({
+                .name = "Version update",
+                .hint = hintfmt("would upgrade to version %s", version)
+            });
             return;
         }
 
@@ -90,7 +97,7 @@ struct CmdUpgradeNix : MixDryRun, StoreCommand
                 {"--profile", profileDir, "-i", store->printStorePath(storePath), "--no-sandbox"});
         }
 
-        printError(ANSI_GREEN "upgrade to version %s done" ANSI_NORMAL, version);
+        printInfo(ANSI_GREEN "upgrade to version %s done" ANSI_NORMAL, version);
     }
 
     /* Return the profile in which Nix is installed. */

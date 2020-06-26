@@ -1,6 +1,7 @@
 #pragma once
 
 #include "types.hh"
+#include "error.hh"
 #include "logging.hh"
 #include "ansicolor.hh"
 
@@ -58,12 +59,12 @@ Path canonPath(const Path & path, bool resolveSymlinks = false);
 
 /* Return the directory part of the given canonical path, i.e.,
    everything before the final `/'.  If the path is the root or an
-   immediate child thereof (e.g., `/foo'), this means an empty string
-   is returned. */
+   immediate child thereof (e.g., `/foo'), this means `/'
+   is returned.*/
 Path dirOf(const Path & path);
 
 /* Return the base name of the given canonical path, i.e., everything
-   following the final `/'. */
+   following the final `/' (trailing slashes are removed). */
 std::string_view baseNameOf(std::string_view path);
 
 /* Check whether 'path' is a descendant of 'dir'. */
@@ -103,7 +104,7 @@ unsigned char getFileType(const Path & path);
 
 /* Read the contents of a file into a string. */
 string readFile(int fd);
-string readFile(const Path & path, bool drain = false);
+string readFile(const Path & path);
 void readFile(const Path & path, Sink & sink);
 
 /* Write a string to a file. */
@@ -162,7 +163,7 @@ MakeError(EndOfFile, Error);
 
 
 /* Read a file descriptor until EOF occurs. */
-string drainFD(int fd, bool block = true);
+string drainFD(int fd, bool block = true, const size_t reserveSize=0);
 
 void drainFD(int fd, Sink & sink, bool block = true);
 
@@ -389,17 +390,6 @@ string replaceStrings(const std::string & s,
 std::string rewriteStrings(const std::string & s, const StringMap & rewrites);
 
 
-/* If a set contains 'from', remove it and insert 'to'. */
-template<typename T>
-void replaceInSet(std::set<T> & set, const T & from, const T & to)
-{
-    auto i = set.find(from);
-    if (i == set.end()) return;
-    set.erase(i);
-    set.insert(to);
-}
-
-
 /* Convert the exit status of a child as returned by wait() into an
    error string. */
 string statusToString(int status);
@@ -427,7 +417,7 @@ template<class N> bool string2Float(const string & s, N & n)
 
 
 /* Return true iff `s' starts with `prefix'. */
-bool hasPrefix(const string & s, const string & prefix);
+bool hasPrefix(std::string_view s, std::string_view prefix);
 
 
 /* Return true iff `s' ends in `suffix'. */
@@ -466,12 +456,11 @@ std::string filterANSIEscapes(const std::string & s,
 
 
 /* Base64 encoding/decoding. */
-string base64Encode(const string & s);
-string base64Decode(const string & s);
+string base64Encode(std::string_view s);
+string base64Decode(std::string_view s);
 
 
-/* Get a value for the specified key from an associate container, or a
-   default value if the key doesn't exist. */
+/* Get a value for the specified key from an associate container. */
 template <class T>
 std::optional<typename T::mapped_type> get(const T & map, const typename T::key_type & key)
 {

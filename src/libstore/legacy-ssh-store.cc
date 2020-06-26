@@ -114,7 +114,7 @@ struct LegacySSHStore : public Store
             if (GET_PROTOCOL_MINOR(conn->remoteVersion) >= 4) {
                 auto s = readString(conn->from);
                 info->narHash = s.empty() ? Hash() : Hash(s);
-                conn->from >> info->ca;
+                info->ca = parseContentAddressOpt(readString(conn->from));
                 info->sigs = readStrings<StringSet>(conn->from);
             }
 
@@ -146,7 +146,7 @@ struct LegacySSHStore : public Store
                 << info.narSize
                 << info.ultimate
                 << info.sigs
-                << info.ca;
+                << renderContentAddress(info.ca);
             try {
                 copyNAR(source, conn->to);
             } catch (...) {
@@ -195,7 +195,7 @@ struct LegacySSHStore : public Store
     { unsupported("queryPathFromHashPart"); }
 
     StorePath addToStore(const string & name, const Path & srcPath,
-        bool recursive, HashType hashAlgo,
+        FileIngestionMethod method, HashType hashAlgo,
         PathFilter & filter, RepairFlag repair) override
     { unsupported("addToStore"); }
 
@@ -256,7 +256,7 @@ struct LegacySSHStore : public Store
         conn->to.flush();
 
         for (auto & i : readStorePaths<StorePathSet>(*this, conn->from))
-            out.insert(i.clone());
+            out.insert(i);
     }
 
     StorePathSet queryValidPaths(const StorePathSet & paths,

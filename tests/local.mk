@@ -18,10 +18,11 @@ nix_tests = \
   nar-access.sh \
   structured-attrs.sh \
   fetchGit.sh \
+  fetchGitRefs.sh \
   fetchGitSubmodules.sh \
   fetchMercurial.sh \
   signing.sh \
-  run.sh \
+  shell.sh \
   brotli.sh \
   pure-eval.sh \
   check.sh \

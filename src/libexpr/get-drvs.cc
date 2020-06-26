@@ -1,7 +1,7 @@
 #include "get-drvs.hh"
 #include "util.hh"
 #include "eval-inline.hh"
-#include "derivations.hh"
+#include "store-api.hh"
 
 #include <cstring>
 #include <regex>
@@ -348,7 +348,7 @@ static void getDerivations(EvalState & state, Value & vIn,
                    should we recurse into it?  => Only if it has a
                    `recurseForDerivations = true' attribute. */
                 if (i->value->type == tAttrs) {
-                    Bindings::iterator j = i->value->attrs->find(state.symbols.create("recurseForDerivations"));
+                    Bindings::iterator j = i->value->attrs->find(state.sRecurseForDerivations);
                     if (j != i->value->attrs->end() && state.forceBool(*j->value, *j->pos))
                         getDerivations(state, *i->value, pathPrefix2, autoArgs, drvs, done, ignoreAssertionFailures);
                 }

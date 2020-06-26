@@ -45,6 +45,8 @@ struct CmdEval : MixJSON, InstallableCommand
         };
     }
 
+    Category category() override { return catSecondary; }
+
     void run(ref<Store> store) override
     {
         if (raw && json)

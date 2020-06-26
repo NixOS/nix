@@ -23,7 +23,7 @@ bool Store::isInStore(const Path & path) const
 Path Store::toStorePath(const Path & path) const
 {
     if (!isInStore(path))
-        throw Error(format("path '%1%' is not in the Nix store") % path);
+        throw Error("path '%1%' is not in the Nix store", path);
     Path::size_type slash = path.find('/', storeDir.size() + 1);
     if (slash == Path::npos)
         return path;
@@ -55,21 +55,13 @@ StorePath Store::followLinksToStorePath(std::string_view path) const
 StorePathWithOutputs Store::followLinksToStorePathWithOutputs(std::string_view path) const
 {
     auto [path2, outputs] = nix::parsePathWithOutputs(path);
-    return StorePathWithOutputs(followLinksToStorePath(path2), std::move(outputs));
-}
-
-
-string storePathToHash(const Path & path)
-{
-    auto base = baseNameOf(path);
-    assert(base.size() >= storePathHashLen);
-    return string(base, 0, storePathHashLen);
+    return StorePathWithOutputs { followLinksToStorePath(path2), std::move(outputs) };
 }
 
 
 /* Store paths have the following form:
 
-   <store>/<h>-<name>
+   <realized-path> = <store>/<h>-<name>
 
    where
 
@@ -93,11 +85,14 @@ string storePathToHash(const Path & path)
    <type> = one of:
      "text:<r1>:<r2>:...<rN>"
        for plain text files written to the store using
-       addTextToStore(); <r1> ... <rN> are the references of the
-       path.
-     "source"
+       addTextToStore(); <r1> ... <rN> are the store paths referenced
+       by this path, in the form described by <realized-path>
+     "source:<r1>:<r2>:...:<rN>:self"
        for paths copied to the store using addToStore() when recursive
-       = true and hashAlgo = "sha256"
+       = true and hashAlgo = "sha256". Just like in the text case, we
+       can have the store paths referenced by the path.
+       Additionally, we can have an optional :self label to denote self
+       reference.
      "output:<id>"
        for either the outputs created by derivations, OR paths copied
        to the store using addToStore() with recursive != true or
@@ -125,6 +120,12 @@ string storePathToHash(const Path & path)
              the contents of the path (or expected contents of the
              path for fixed-output derivations)
 
+   Note that since an output derivation has always type output, while
+   something added by addToStore can have type output or source depending
+   on the hash, this means that the same input can be hashed differently
+   if added to the store via addToStore or via a derivation, in the sha256
+   recursive case.
+
    It would have been nicer to handle fixed-output derivations under
    "source", e.g. have something like "source:<rec><algo>", but we're
    stuck with this for now...
@@ -142,9 +143,9 @@ StorePath Store::makeStorePath(const string & type,
     const Hash & hash, std::string_view name) const
 {
     /* e.g., "source:sha256:1abc...:/nix/store:foo.tar.gz" */
-    string s = type + ":" + hash.to_string(Base16) + ":" + storeDir + ":" + std::string(name);
+    string s = type + ":" + hash.to_string(Base16, true) + ":" + storeDir + ":" + std::string(name);
     auto h = compressHash(hashString(htSHA256, s), 20);
-    return StorePath::make(h.hash, name);
+    return StorePath(h, name);
 }
 
 
@@ -172,19 +173,22 @@ static std::string makeType(
 
 
 StorePath Store::makeFixedOutputPath(
-    bool recursive,
+    FileIngestionMethod method,
     const Hash & hash,
     std::string_view name,
     const StorePathSet & references,
     bool hasSelfReference) const
 {
-    if (hash.type == htSHA256 && recursive) {
+    if (hash.type == htSHA256 && method == FileIngestionMethod::Recursive) {
         return makeStorePath(makeType(*this, "source", references, hasSelfReference), hash, name);
     } else {
         assert(references.empty());
-        return makeStorePath("output:out", hashString(htSHA256,
-                "fixed:out:" + (recursive ? (string) "r:" : "") +
-                hash.to_string(Base16) + ":"), name);
+        return makeStorePath("output:out",
+            hashString(htSHA256,
+                "fixed:out:"
+                + makeFileIngestionPrefix(method)
+                + hash.to_string(Base16, true) + ":"),
+            name);
     }
 }
 
@@ -201,10 +205,12 @@ StorePath Store::makeTextPath(std::string_view name, const Hash & hash,
 
 
 std::pair<StorePath, Hash> Store::computeStorePathForPath(std::string_view name,
-    const Path & srcPath, bool recursive, HashType hashAlgo, PathFilter & filter) const
+    const Path & srcPath, FileIngestionMethod method, HashType hashAlgo, PathFilter & filter) const
 {
-    Hash h = recursive ? hashPath(hashAlgo, srcPath, filter).first : hashFile(hashAlgo, srcPath);
-    return std::make_pair(makeFixedOutputPath(recursive, h, name), h);
+    Hash h = method == FileIngestionMethod::Recursive
+        ? hashPath(hashAlgo, srcPath, filter).first
+        : hashFile(hashAlgo, srcPath);
+    return std::make_pair(makeFixedOutputPath(method, h, name), h);
 }
 
 
@@ -238,7 +244,7 @@ bool Store::PathInfoCacheValue::isKnownNow()
 
 bool Store::isValidPath(const StorePath & storePath)
 {
-    auto hashPart = storePathToHash(printStorePath(storePath));
+    std::string hashPart(storePath.hashPart());
 
     {
         auto state_(state.lock());
@@ -306,7 +312,7 @@ void Store::queryPathInfo(const StorePath & storePath,
     std::string hashPart;
 
     try {
-        hashPart = storePathToHash(printStorePath(storePath));
+        hashPart = storePath.hashPart();
 
         {
             auto res = state.lock()->pathInfoCache.get(hashPart);
@@ -456,7 +462,7 @@ void Store::pathInfoToJSON(JSONPlaceholder & jsonOut, const StorePathSet & store
             auto info = queryPathInfo(storePath);
 
             jsonPath
-                .attr("narHash", info->narHash.to_string(hashBase))
+                .attr("narHash", info->narHash.to_string(hashBase, true))
                 .attr("narSize", info->narSize);
 
             {
@@ -465,8 +471,8 @@ void Store::pathInfoToJSON(JSONPlaceholder & jsonOut, const StorePathSet & store
                     jsonRefs.elem(printStorePath(ref));
             }
 
-            if (info->ca != "")
-                jsonPath.attr("ca", info->ca);
+            if (info->ca)
+                jsonPath.attr("ca", renderContentAddress(info->ca));
 
             std::pair<uint64_t, uint64_t> closureSizes;
 
@@ -499,7 +505,7 @@ void Store::pathInfoToJSON(JSONPlaceholder & jsonOut, const StorePathSet & store
                     if (!narInfo->url.empty())
                         jsonPath.attr("url", narInfo->url);
                     if (narInfo->fileHash)
-                        jsonPath.attr("downloadHash", narInfo->fileHash.to_string());
+                        jsonPath.attr("downloadHash", narInfo->fileHash.to_string(Base32, true));
                     if (narInfo->fileSize)
                         jsonPath.attr("downloadSize", narInfo->fileSize);
                     if (showClosureSize)
@@ -548,7 +554,7 @@ void Store::buildPaths(const std::vector<StorePathWithOutputs> & paths, BuildMod
     for (auto & path : paths) {
         if (path.path.isDerivation())
             unsupported("buildPaths");
-        paths2.insert(path.path.clone());
+        paths2.insert(path.path);
     }
 
     if (queryValidPaths(paths2).size() != paths2.size())
@@ -688,21 +694,6 @@ void copyClosure(ref<Store> srcStore, ref<Store> dstStore,
 }
 
 
-ValidPathInfo::ValidPathInfo(const ValidPathInfo & other)
-    : path(other.path.clone())
-    , deriver(other.deriver ? other.deriver->clone(): std::optional<StorePath>{})
-    , narHash(other.narHash)
-    , references(cloneStorePathSet(other.references))
-    , registrationTime(other.registrationTime)
-    , narSize(other.narSize)
-    , id(other.id)
-    , ultimate(other.ultimate)
-    , sigs(other.sigs)
-    , ca(other.ca)
-{
-}
-
-
 std::optional<ValidPathInfo> decodeValidPathInfo(const Store & store, std::istream & str, bool hashGiven)
 {
     std::string path;
@@ -755,7 +746,7 @@ std::string ValidPathInfo::fingerprint(const Store & store) const
             store.printStorePath(path));
     return
         "1;" + store.printStorePath(path) + ";"
-        + narHash.to_string(Base32) + ";"
+        + narHash.to_string(Base32, true) + ";"
         + std::to_string(narSize) + ";"
         + concatStringsSep(",", store.printStorePathSet(references));
 }
@@ -766,37 +757,35 @@ void ValidPathInfo::sign(const Store & store, const SecretKey & secretKey)
     sigs.insert(secretKey.signDetached(fingerprint(store)));
 }
 
+// FIXME Put this somewhere?
+template<class... Ts> struct overloaded : Ts... { using Ts::operator()...; };
+template<class... Ts> overloaded(Ts...) -> overloaded<Ts...>;
 
 bool ValidPathInfo::isContentAddressed(const Store & store) const
 {
-    auto warn = [&]() {
-        printError("warning: path '%s' claims to be content-addressed but isn't", store.printStorePath(path));
-    };
+    if (! ca) return false;
 
-    if (hasPrefix(ca, "text:")) {
-        Hash hash(std::string(ca, 5));
-        if (store.makeTextPath(path.name(), hash, references) == path)
-            return true;
-        else
-            warn();
-    }
-
-    else if (hasPrefix(ca, "fixed:")) {
-        bool recursive = ca.compare(6, 2, "r:") == 0;
-        Hash hash(std::string(ca, recursive ? 8 : 6));
-        auto refs = cloneStorePathSet(references);
-        bool hasSelfReference = false;
-        if (refs.count(path)) {
-            hasSelfReference = true;
-            refs.erase(path);
+    auto caPath = std::visit(overloaded {
+        [&](TextHash th) {
+            return store.makeTextPath(path.name(), th.hash, references);
+        },
+        [&](FixedOutputHash fsh) {
+            auto refs = references;
+            bool hasSelfReference = false;
+            if (refs.count(path)) {
+                hasSelfReference = true;
+                refs.erase(path);
+            }
+            return store.makeFixedOutputPath(fsh.method, fsh.hash, path.name(), refs, hasSelfReference);
         }
-        if (store.makeFixedOutputPath(recursive, hash, path.name(), refs, hasSelfReference) == path)
-            return true;
-        else
-            warn();
-    }
+    }, *ca);
 
-    return false;
+    bool res = caPath == path;
+
+    if (!res)
+        printError("warning: path '%s' claims to be content-addressed but isn't", store.printStorePath(path));
+
+    return res;
 }
 
 
@@ -826,27 +815,6 @@ Strings ValidPathInfo::shortRefs() const
     return refs;
 }
 
-
-std::string makeFixedOutputCA(bool recursive, const Hash & hash)
-{
-    return "fixed:" + (recursive ? (std::string) "r:" : "") + hash.to_string();
-}
-
-
-void Store::addToStore(const ValidPathInfo & info, Source & narSource,
-    RepairFlag repair, CheckSigsFlag checkSigs,
-    std::shared_ptr<FSAccessor> accessor)
-{
-    addToStore(info, make_ref<std::string>(narSource.drain()), repair, checkSigs, accessor);
-}
-
-void Store::addToStore(const ValidPathInfo & info, const ref<std::string> & nar,
-    RepairFlag repair, CheckSigsFlag checkSigs,
-    std::shared_ptr<FSAccessor> accessor)
-{
-    StringSource source(*nar);
-    addToStore(info, source, repair, checkSigs, accessor);
-}
 
 }
 
@@ -942,7 +910,7 @@ std::list<ref<Store>> getDefaultSubstituters()
             try {
                 stores.push_back(openStore(uri));
             } catch (Error & e) {
-                printError("warning: %s", e.what());
+                logWarning(e.info());
             }
         };
 

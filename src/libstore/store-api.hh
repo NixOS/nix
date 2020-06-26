@@ -2,12 +2,14 @@
 
 #include "path.hh"
 #include "hash.hh"
+#include "content-address.hh"
 #include "serialise.hh"
 #include "crypto.hh"
 #include "lru-cache.hh"
 #include "sync.hh"
 #include "globals.hh"
 #include "config.hh"
+#include "derivations.hh"
 
 #include <atomic>
 #include <limits>
@@ -17,6 +19,7 @@
 #include <memory>
 #include <string>
 #include <chrono>
+#include <variant>
 
 
 namespace nix {
@@ -31,19 +34,15 @@ MakeError(SubstituterDisabled, Error);
 MakeError(NotInStore, Error);
 
 
-struct BasicDerivation;
-struct Derivation;
 class FSAccessor;
 class NarInfoDiskCache;
 class Store;
 class JSONPlaceholder;
 
 
-enum RepairFlag : bool { NoRepair = false, Repair = true };
 enum CheckSigsFlag : bool { NoCheckSigs = false, CheckSigs = true };
 enum SubstituteFlag : bool { NoSubstitute = false, Substitute = true };
 enum AllowInvalidFlag : bool { DisallowInvalid = false, AllowInvalid = true };
-
 
 /* Magic header of exportPath() output (obsolete). */
 const uint32_t exportMagic = 0x4558494e;
@@ -112,7 +111,6 @@ struct SubstitutablePathInfo
 
 typedef std::map<StorePath, SubstitutablePathInfo> SubstitutablePathInfos;
 
-
 struct ValidPathInfo
 {
     StorePath path;
@@ -141,21 +139,11 @@ struct ValidPathInfo
        that a particular output path was produced by a derivation; the
        path then implies the contents.)
 
-       Ideally, the content-addressability assertion would just be a
-       Boolean, and the store path would be computed from
-       the name component, ‘narHash’ and ‘references’. However,
-       1) we've accumulated several types of content-addressed paths
-       over the years; and 2) fixed-output derivations support
-       multiple hash algorithms and serialisation methods (flat file
-       vs NAR). Thus, ‘ca’ has one of the following forms:
-
-       * ‘text:sha256:<sha256 hash of file contents>’: For paths
-         computed by makeTextPath() / addTextToStore().
-
-       * ‘fixed:<r?>:<ht>:<h>’: For paths computed by
-         makeFixedOutputPath() / addToStore().
+       Ideally, the content-addressability assertion would just be a Boolean,
+       and the store path would be computed from the name component, ‘narHash’
+       and ‘references’. However, we support many types of content addresses.
     */
-    std::string ca;
+    std::optional<ContentAddress> ca;
 
     bool operator == (const ValidPathInfo & i) const
     {
@@ -190,8 +178,10 @@ struct ValidPathInfo
 
     Strings shortRefs() const;
 
-    ValidPathInfo(StorePath && path) : path(std::move(path)) { }
-    explicit ValidPathInfo(const ValidPathInfo & other);
+    ValidPathInfo(const ValidPathInfo & other) = default;
+
+    ValidPathInfo(StorePath && path) : path(std::move(path)) { };
+    ValidPathInfo(const StorePath & path) : path(path) { };
 
     virtual ~ValidPathInfo() { }
 };
@@ -347,7 +337,7 @@ public:
     StorePath makeOutputPath(const string & id,
         const Hash & hash, std::string_view name) const;
 
-    StorePath makeFixedOutputPath(bool recursive,
+    StorePath makeFixedOutputPath(FileIngestionMethod method,
         const Hash & hash, std::string_view name,
         const StorePathSet & references = {},
         bool hasSelfReference = false) const;
@@ -359,7 +349,7 @@ public:
        store path to which srcPath is to be copied.  Returns the store
        path and the cryptographic hash of the contents of srcPath. */
     std::pair<StorePath, Hash> computeStorePathForPath(std::string_view name,
-        const Path & srcPath, bool recursive = true,
+        const Path & srcPath, FileIngestionMethod method = FileIngestionMethod::Recursive,
         HashType hashAlgo = htSHA256, PathFilter & filter = defaultPathFilter) const;
 
     /* Preparatory part of addTextToStore().
@@ -431,10 +421,6 @@ public:
     virtual StorePathSet queryDerivationOutputs(const StorePath & path)
     { unsupported("queryDerivationOutputs"); }
 
-    /* Query the output names of the derivation denoted by `path'. */
-    virtual StringSet queryDerivationOutputNames(const StorePath & path)
-    { unsupported("queryDerivationOutputNames"); }
-
     /* Query the full store path given the hash part of a valid store
        path, or empty if the path doesn't exist. */
     virtual std::optional<StorePath> queryPathFromHashPart(const std::string & hashPart) = 0;
@@ -451,24 +437,19 @@ public:
     /* Import a path into the store. */
     virtual void addToStore(const ValidPathInfo & info, Source & narSource,
         RepairFlag repair = NoRepair, CheckSigsFlag checkSigs = CheckSigs,
-        std::shared_ptr<FSAccessor> accessor = 0);
-
-    // FIXME: remove
-    virtual void addToStore(const ValidPathInfo & info, const ref<std::string> & nar,
-        RepairFlag repair = NoRepair, CheckSigsFlag checkSigs = CheckSigs,
-        std::shared_ptr<FSAccessor> accessor = 0);
+        std::shared_ptr<FSAccessor> accessor = 0) = 0;
 
     /* Copy the contents of a path to the store and register the
        validity the resulting path.  The resulting path is returned.
        The function object `filter' can be used to exclude files (see
        libutil/archive.hh). */
     virtual StorePath addToStore(const string & name, const Path & srcPath,
-        bool recursive = true, HashType hashAlgo = htSHA256,
+        FileIngestionMethod method = FileIngestionMethod::Recursive, HashType hashAlgo = htSHA256,
         PathFilter & filter = defaultPathFilter, RepairFlag repair = NoRepair) = 0;
 
     // FIXME: remove?
     virtual StorePath addToStoreFromDump(const string & dump, const string & name,
-        bool recursive = true, HashType hashAlgo = htSHA256, RepairFlag repair = NoRepair)
+        FileIngestionMethod method = FileIngestionMethod::Recursive, HashType hashAlgo = htSHA256, RepairFlag repair = NoRepair)
     {
         throw Error("addToStoreFromDump() is not supported by this store");
     }
@@ -592,6 +573,9 @@ public:
     /* Read a derivation, after ensuring its existence through
        ensurePath(). */
     Derivation derivationFromPath(const StorePath & drvPath);
+
+    /* Read a derivation (which must already be valid). */
+    Derivation readDerivation(const StorePath & drvPath);
 
     /* Place in `out' the set of all store paths in the file system
        closure of `storePath'; that is, all paths than can be directly
@@ -738,10 +722,6 @@ public:
 };
 
 
-/* Extract the hash part of the given store path. */
-string storePathToHash(const Path & path);
-
-
 /* Copy a path from one store to another. */
 void copyStorePath(ref<Store> srcStore, ref<Store> dstStore,
     const StorePath & storePath, RepairFlag repair = NoRepair, CheckSigsFlag checkSigs = CheckSigs);
@@ -847,12 +827,6 @@ std::optional<ValidPathInfo> decodeValidPathInfo(
     const Store & store,
     std::istream & str,
     bool hashGiven = false);
-
-
-/* Compute the content-addressability assertion (ValidPathInfo::ca)
-   for paths created by makeFixedOutputPath() / addToStore(). */
-std::string makeFixedOutputCA(bool recursive, const Hash & hash);
-
 
 /* Split URI into protocol+hierarchy part and its parameter set. */
 std::pair<std::string, Store::Params> splitUriAndParams(const std::string & uri);
