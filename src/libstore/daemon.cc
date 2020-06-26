@@ -612,7 +612,7 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
         SubstitutablePathInfos infos;
         auto paths = readStorePaths<StorePathSet>(*store, from);
         std::set<FullContentAddress> caPaths;
-        if (GET_PROTOCOL_MINOR(clientVersion) > 22) {
+        if (GET_PROTOCOL_MINOR(clientVersion) > 22)
             caPaths = readFullCaSet(*store, from);
         logger->startWork();
         store->querySubstitutablePathInfos(paths, caPaths, infos);
