@@ -54,7 +54,6 @@ void EvalState::realiseContext(const PathSet & context)
         auto ctx = store->parseStorePath(ctxS);
         if (!store->isValidPath(ctx))
             throw InvalidPathError(store->printStorePath(ctx));
-        realisedPaths.push_back(ctx);
         if (!outputName.empty() && ctx.isDerivation()) {
             drvs.push_back(StorePathWithOutputs{ctx, {outputName}});
 

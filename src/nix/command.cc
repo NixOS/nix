@@ -51,10 +51,7 @@ StorePathsCommand::StorePathsCommand(bool recursive)
 
     mkFlag(0, "all", "apply operation to the entire store", &all);
 
-    // these options only make sense when recursing
-    mkFlag('e', "eval", "include evaltime dependencies of specified path", &includeEvalDeps);
     mkFlag('b', "build", "include buildtime dependencies of specified path", &includeBuildDeps);
-    mkFlag(0, "no-run", "don't include runtime dependencies of specified path", &includeRunDeps, false);
 }
 
 void StorePathsCommand::run(ref<Store> store)
@@ -69,32 +66,13 @@ void StorePathsCommand::run(ref<Store> store)
     }
 
     else {
-        if (!recursive && (includeBuildDeps || includeEvalDeps))
-            throw UsageError("--build and --eval require --recursive");
+        if (!recursive && includeBuildDeps)
+            throw UsageError("--build requires --recursive");
 
-        if (includeBuildDeps && !includeRunDeps)
-            throw UsageError("--build and --no-run cannot be combined");
-
-        if (includeRunDeps)
-          for (auto & p : toStorePaths(store, realiseMode, installables))
-              storePaths.push_back(p);
+        for (auto & p : toStorePaths(store, realiseMode, installables))
+            storePaths.push_back(p);
 
         if (recursive) {
-            if (includeEvalDeps)
-                for (auto & i : installables) {
-                    auto state = getEvalState();
-
-                    for (auto & b : i->toBuildables())
-                        if (!b.drvPath)
-                            throw UsageError("Cannot find eval references for '%s' without a derivation path", b.what());
-
-                    // force evaluation of package argument
-                    i->toValue(*state);
-
-                    for (auto & d : state->realisedPaths)
-                        storePaths.push_back(d);
-                }
-
             if (includeBuildDeps)
                 for (auto & i : installables)
                     for (auto & b : i->toBuildables()) {
