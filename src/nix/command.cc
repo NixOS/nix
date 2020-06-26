@@ -4,7 +4,7 @@
 #include "nixexpr.hh"
 #include "profiles.hh"
 
-extern char * * environ;
+extern char * * environ __attribute__((weak));
 
 namespace nix {
 

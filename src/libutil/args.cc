@@ -201,6 +201,13 @@ bool Args::processArgs(const Strings & args, bool finish)
     return res;
 }
 
+static void hashTypeCompleter(size_t index, std::string_view prefix) 
+{
+    for (auto & type : hashTypes)
+        if (hasPrefix(type, prefix))
+            completions->insert(type);
+}
+
 Args::Flag Args::Flag::mkHashTypeFlag(std::string && longName, HashType * ht)
 {
     return Flag {
@@ -209,14 +216,21 @@ Args::Flag Args::Flag::mkHashTypeFlag(std::string && longName, HashType * ht)
         .labels = {"hash-algo"},
         .handler = {[ht](std::string s) {
             *ht = parseHashType(s);
-            if (*ht == htUnknown)
-                throw UsageError("unknown hash type '%1%'", s);
         }},
-        .completer = [](size_t index, std::string_view prefix) {
-            for (auto & type : hashTypes)
-                if (hasPrefix(type, prefix))
-                    completions->insert(type);
-        }
+        .completer = hashTypeCompleter
+    };
+}
+
+Args::Flag Args::Flag::mkHashTypeOptFlag(std::string && longName, std::optional<HashType> * oht)
+{
+    return Flag {
+        .longName = std::move(longName),
+        .description = "hash algorithm ('md5', 'sha1', 'sha256', or 'sha512'). Optional as can also be gotten from SRI hash itself.",
+        .labels = {"hash-algo"},
+        .handler = {[oht](std::string s) {
+            *oht = std::optional<HashType> { parseHashType(s) };
+        }},
+        .completer = hashTypeCompleter
     };
 }
 

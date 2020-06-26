@@ -35,6 +35,7 @@ export xmllint="@xmllint@"
 export SHELL="@bash@"
 export PAGER=cat
 export HAVE_SODIUM="@HAVE_SODIUM@"
+export busybox="@sandbox_shell@"
 
 export version=@PACKAGE_VERSION@
 export system=@system@

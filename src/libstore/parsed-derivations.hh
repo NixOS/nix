@@ -1,4 +1,4 @@
-#include "derivations.hh"
+#include "store-api.hh"
 
 #include <nlohmann/json_fwd.hpp>
 
@@ -34,6 +34,8 @@ public:
     bool willBuildLocally() const;
 
     bool substitutesAllowed() const;
+
+    bool contentAddressed() const;
 };
 
 }

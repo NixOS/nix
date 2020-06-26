@@ -89,6 +89,7 @@ protected:
         std::function<void(size_t, std::string_view)> completer;
 
         static Flag mkHashTypeFlag(std::string && longName, HashType * ht);
+        static Flag mkHashTypeOptFlag(std::string && longName, std::optional<HashType> * oht);
     };
 
     std::map<std::string, Flag::ptr> longFlags;
