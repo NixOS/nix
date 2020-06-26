@@ -122,6 +122,12 @@ struct FullContentAddress {
         TextInfo,
         FixedOutputInfo
     > info;
+
+    bool operator < (const FullContentAddress & other) const
+    {
+        return name < other.name;
+    }
+
 };
 
 }
