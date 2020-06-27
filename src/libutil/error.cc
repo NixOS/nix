@@ -34,7 +34,7 @@ const string& BaseError::calcWhat() const
 }
 
 std::optional<string> ErrorInfo::programName = std::nullopt;
-bool ErrorInfo::showTrace = false;
+// bool ErrorInfo::showTrace = false;
 
 std::ostream& operator<<(std::ostream &os, const hintformat &hf)
 {
@@ -211,7 +211,8 @@ void printAtPos(const string &prefix, const ErrPos &pos, std::ostream &out)
     }
 }
 
-std::ostream& operator<<(std::ostream &out, const ErrorInfo &einfo)
+// std::ostream& operator<<(std::ostream &out, const ErrorInfo &einfo)
+std::ostream& showErrorInfo(std::ostream &out, const ErrorInfo &einfo, bool showTrace)
 {
     auto errwidth = std::max<size_t>(getWindowSize().second, 20);
     string prefix = "";
@@ -326,7 +327,7 @@ std::ostream& operator<<(std::ostream &out, const ErrorInfo &einfo)
     }
 
     // traces
-    if (ErrorInfo::showTrace) {
+    if (showTrace) {
         for (auto iter = einfo.traces.rbegin(); iter != einfo.traces.rend(); ++iter)
         {
             try {

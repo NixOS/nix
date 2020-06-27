@@ -107,10 +107,11 @@ struct ErrorInfo {
     std::list<Trace> traces;
 
     static std::optional<string> programName;
-    static bool showTrace;
+    // static bool showTrace;
 };
 
-std::ostream& operator<<(std::ostream &out, const ErrorInfo &einfo);
+// std::ostream& operator<<(std::ostream &out, const ErrorInfo &einfo);
+std::ostream& showErrorInfo(std::ostream &out, const ErrorInfo &einfo, bool showTrace);
 
 /* BaseError should generally not be caught, as it has Interrupted as
    a subclass. Catch Error instead. */
