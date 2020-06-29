@@ -36,10 +36,10 @@ struct PathReferences
 template<typename Ref>
 StorePathSet PathReferences<Ref>::referencesPossiblyToSelf(const Ref & self) const
 {
-    StorePathSet references { references };
+    StorePathSet refs { references };
     if (hasSelfReference)
-        references.insert(self);
-    return references;
+        refs.insert(self);
+    return refs;
 }
 
 template<typename Ref>
