@@ -13,7 +13,6 @@ struct CmdCopy : StorePathsCommand
     std::string srcUri, dstUri;
 
     CheckSigsFlag checkSigs = CheckSigs;
-
     SubstituteFlag substitute = NoSubstitute;
 
     CmdCopy()
@@ -46,7 +45,11 @@ struct CmdCopy : StorePathsCommand
             .handler = {&substitute, Substitute},
         });
 
-        realiseMode = Build;
+        addFlag({
+            .longName = "build",
+            .description = "Whether to build derivations",
+            .handler = {&realiseMode, Build},
+        });
     }
 
     std::string description() override
