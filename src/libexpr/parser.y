@@ -688,12 +688,13 @@ Path EvalState::findFile(SearchPath & searchPath, const string & path, const Pos
         Path res = r.second + suffix;
         if (pathExists(res)) return canonPath(res);
     }
+    auto nixCode = pos ? std::optional<NixCode>{NixCode { .errPos = pos }} : std::nullopt;
     throw ThrownError({
         .hint = hintfmt(evalSettings.pureEval
             ? "cannot look up '<%s>' in pure evaluation mode (use '--impure' to override)"
             : "file '%s' was not found in the Nix search path (add it using $NIX_PATH or -I)",
             path),
-        .nixCode = NixCode { .errPos = pos }
+        .nixCode = nixCode
     });
 }
 

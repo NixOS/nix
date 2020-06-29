@@ -19,3 +19,7 @@ nix-env -q --foo 2>&1 | grep "unknown flag"
 eval_res=$(nix-instantiate --eval -E 'let a = {} // a; in a.foo' 2>&1 || true)
 echo $eval_res | grep "(string) (1:15)"
 echo $eval_res | grep "infinite recursion encountered"
+
+# Invalid search-paths don't segfault
+nix-build '<foo/bar>' -I foo=$(mktemp -d) 2>&1 || status=$?
+[[ "$status" = "1" ]]
