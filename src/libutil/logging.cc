@@ -18,7 +18,7 @@ void setCurActivity(const ActivityId activityId)
     curActivity = activityId;
 }
 
-Logger * logger = makeSimpleLogger(true);
+Logger * logger = makeSimpleLogger(true, false);
 
 void Logger::warn(const std::string & msg)
 {
@@ -36,9 +36,10 @@ public:
 
     bool systemd, tty;
     bool printBuildLogs;
+    bool showTrace;
 
-    SimpleLogger(bool printBuildLogs)
-        : printBuildLogs(printBuildLogs)
+    SimpleLogger(bool printBuildLogs, bool showTrace)
+        : printBuildLogs(printBuildLogs), showTrace(showTrace)
     {
         systemd = getEnv("IN_SYSTEMD") == "1";
         tty = isatty(STDERR_FILENO);
@@ -46,6 +47,13 @@ public:
 
     bool isVerbose() override {
         return printBuildLogs;
+    }
+
+    bool getShowTrace() const override {
+        return showTrace;
+    }
+    void setShowTrace(bool showTrace) override {
+        this->showTrace = showTrace;
     }
 
     void log(Verbosity lvl, const FormatOrString & fs) override
@@ -72,7 +80,8 @@ public:
     void logEI(const ErrorInfo & ei) override
     {
         std::stringstream oss;
-        oss << ei;
+        showErrorInfo(oss, ei, showTrace);
+        // oss << ei;
 
         log(ei.level, oss.str());
     }
@@ -120,9 +129,9 @@ void writeToStderr(const string & s)
     }
 }
 
-Logger * makeSimpleLogger(bool printBuildLogs)
+Logger * makeSimpleLogger(bool printBuildLogs, bool showTrace)
 {
-    return new SimpleLogger(printBuildLogs);
+    return new SimpleLogger(printBuildLogs, showTrace);
 }
 
 std::atomic<uint64_t> nextId{(uint64_t) getpid() << 32};
@@ -143,6 +152,13 @@ struct JSONLogger : Logger {
         return true;
     }
 
+    bool getShowTrace() const override {
+        return prevLogger.getShowTrace();
+    }
+    void setShowTrace(bool showTrace) override {
+        prevLogger.setShowTrace(showTrace);
+    }
+ 
     void addFields(nlohmann::json & json, const Fields & fields)
     {
         if (fields.empty()) return;
@@ -173,7 +189,8 @@ struct JSONLogger : Logger {
     void logEI(const ErrorInfo & ei) override
     {
         std::ostringstream oss;
-        oss << ei;
+        showErrorInfo(oss, ei, getShowTrace());
+        // oss << ei;
 
         nlohmann::json json;
         json["action"] = "msg";

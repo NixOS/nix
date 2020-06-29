@@ -26,7 +26,8 @@ const string& BaseError::calcWhat() const
         err.name = sname();
 
         std::ostringstream oss;
-        oss << err;
+        showErrorInfo(oss, err, false);
+        // oss << err;
         what_ = oss.str();
 
         return *what_;

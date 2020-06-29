@@ -75,6 +75,9 @@ public:
         logEI(ei);
     }
 
+    virtual bool getShowTrace() const = 0;
+    virtual void setShowTrace(bool showTrace) = 0;
+
     virtual void warn(const std::string & msg);
 
     virtual void startActivity(ActivityId act, Verbosity lvl, ActivityType type,
@@ -146,7 +149,8 @@ struct PushActivity
 
 extern Logger * logger;
 
-Logger * makeSimpleLogger(bool printBuildLogs = true);
+Logger * makeSimpleLogger(bool printBuildLogs, bool showTrace);
+// Logger * makeSimpleLogger(bool printBuildLogs = true, bool showTrace);
 
 Logger * makeJSONLogger(Logger & prevLogger);
 

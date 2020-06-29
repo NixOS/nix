@@ -251,7 +251,7 @@ namespace nix {
 
     TEST(addTrace, showTracesWithShowTrace) {
         SymbolTable testTable;
-        ErrorInfo::showTrace = true;
+        // ErrorInfo::showTrace = true;
         auto problem_file = testTable.create(test_file);
 
         auto oneliner_file = testTable.create(one_liner);
@@ -275,7 +275,7 @@ namespace nix {
 
     TEST(addTrace, hideTracesWithoutShowTrace) {
         SymbolTable testTable;
-        ErrorInfo::showTrace = false;
+        // ErrorInfo::showTrace = false;
         auto problem_file = testTable.create(test_file);
 
         auto oneliner_file = testTable.create(one_liner);

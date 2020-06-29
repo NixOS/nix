@@ -212,7 +212,7 @@ std::string attrRegex = R"([A-Za-z_][A-Za-z0-9-_+]*)";
 static std::regex attrPathRegex(fmt(R"(%1%(\.%1%)*)", attrRegex));
 
 static std::vector<std::shared_ptr<Installable>> parseInstallables(
-    SourceExprCommand & cmd, ref<Store> store, std::vector<std::string> ss, bool useDefaultInstallables)
+    SourceExprCommand & cmd, ref<Store> store, std::vetor<std::string> ss, bool useDefaultInstallables)
 {
     std::vector<std::shared_ptr<Installable>> result;
 
