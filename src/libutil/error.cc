@@ -328,41 +328,48 @@ std::ostream& showErrorInfo(std::ostream &out, const ErrorInfo &einfo, bool show
     }
 
     // traces
-    if (showTrace) {
+    if (showTrace && !einfo.traces.empty())
+    {
+        const string tracetitle(" show-trace output ");
+
+        int fill = errwidth - tracetitle.length();
+        int lw = 0;
+        int rw = 0;
+        const int min_dashes = 3;
+        if (fill > min_dashes * 2) {
+            if (fill % 2 != 0) {
+                lw = fill / 2;
+                rw = lw + 1;
+            }
+            else
+            {
+                lw = rw = fill / 2;
+            }
+        }
+        else
+            lw = rw = min_dashes;
+
+        if (nl)
+            out << std::endl << prefix;
+
+        out << ANSI_BLUE << std::string(lw, '-') << tracetitle << std::string(rw, '-') << ANSI_NORMAL;
+
         for (auto iter = einfo.traces.rbegin(); iter != einfo.traces.rend(); ++iter)
         {
             try {
-                if (nl)
-                    out << std::endl << prefix;
-
-                const string tracetitle(" show-trace output ");
-
-                int fill = errwidth - tracetitle.length();
-                int lw = 0;
-                int rw = 0;
-                const int min_dashes = 3;
-                if (fill > min_dashes * 2) {
-                    if (fill % 2 != 0) {
-                        lw = fill / 2;
-                        rw = lw + 1;
-                    }
-                    else
-                    {
-                        lw = rw = fill / 2;
-                    }
-                }
-                else
-                    lw = rw = min_dashes;
-
-                out << ANSI_BLUE << std::string(lw, '-') << tracetitle << std::string(rw, '-') << std::endl << prefix;
-                out << iter->hint.str() <<  std::endl;
+                out << std::endl << prefix;
+                out << ANSI_BLUE << "trace: " << ANSI_NORMAL << iter->hint.str() <<  std::endl;
 
                 auto pos = *iter->pos;
                 printAtPos(prefix, pos, out);
                 nl = true;
                 auto loc = getCodeLines(pos);
                 if (loc.has_value())
+                {
+                    out << std::endl;
                     printCodeLines(out, prefix, pos, *loc);
+                    out << std::endl;
+                }
             } catch(const std::bad_optional_access& e) {
                 out << iter->hint.str() << std::endl;
             }
