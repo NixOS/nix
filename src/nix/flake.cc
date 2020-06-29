@@ -243,11 +243,14 @@ struct CmdFlakeCheck : FlakeCommand
 
         auto checkApp = [&](const std::string & attrPath, Value & v, const Pos & pos) {
             try {
+                #if 0
+                // FIXME
                 auto app = App(*state, v);
                 for (auto & i : app.context) {
                     auto [drvPathS, outputName] = decodeContext(i);
                     store->parseStorePath(drvPathS);
                 }
+                #endif
             } catch (Error & e) {
                 e.addPrefix(fmt("while checking the app definition '" ANSI_BOLD "%s" ANSI_NORMAL "' at %s:\n", attrPath, pos));
                 throw;
@@ -544,9 +547,9 @@ struct CmdFlakeInitCommon : virtual Args, EvalCommand
             Strings{templateName == "" ? "defaultTemplate" : templateName},
             Strings(attrsPathPrefixes), lockFlags);
 
-        auto cursor = installable.getCursor(*evalState, true);
+        auto [cursor, attrPath] = installable.getCursor(*evalState, true);
 
-        auto templateDir = cursor.first->getAttr("path")->getString();
+        auto templateDir = cursor->getAttr("path")->getString();
 
         assert(store->isInStore(templateDir));
 

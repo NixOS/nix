@@ -24,11 +24,9 @@ typedef std::vector<Buildable> Buildables;
 
 struct App
 {
-    PathSet context;
+    std::vector<StorePathWithOutputs> context;
     Path program;
     // FIXME: add args, sandbox settings, metadata, ...
-
-    App(EvalState & state, Value & vApp);
 };
 
 struct Installable

@@ -172,12 +172,18 @@ struct CmdRun : InstallableCommand, RunCommon
 
     Strings getDefaultFlakeAttrPaths() override
     {
-        return {"defaultApp." + settings.thisSystem.get()};
+        Strings res{"defaultApp." + settings.thisSystem.get()};
+        for (auto & s : SourceExprCommand::getDefaultFlakeAttrPaths())
+            res.push_back(s);
+        return res;
     }
 
     Strings getDefaultFlakeAttrPathPrefixes() override
     {
-        return {"apps." + settings.thisSystem.get() + "."};
+        Strings res{"apps." + settings.thisSystem.get() + ".", "packages"};
+        for (auto & s : SourceExprCommand::getDefaultFlakeAttrPathPrefixes())
+            res.push_back(s);
+        return res;
     }
 
     void run(ref<Store> store) override
@@ -186,7 +192,7 @@ struct CmdRun : InstallableCommand, RunCommon
 
         auto app = installable->toApp(*state);
 
-        state->realiseContext(app.context);
+        state->store->buildPaths(app.context);
 
         Strings allArgs{app.program};
         for (auto & i : args) allArgs.push_back(i);
