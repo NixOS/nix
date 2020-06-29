@@ -139,7 +139,7 @@ StorePath getDerivationEnvironment(ref<Store> store, const StorePath & drvPath)
         .path = shellOutPath,
         .hash = FixedOutputHash {
             .method = FileIngestionMethod::Flat,
-            .hash = Hash { },
+            .hash = Hash { htSHA256 },
         },
     });
     drv.env["out"] = store->printStorePath(shellOutPath);

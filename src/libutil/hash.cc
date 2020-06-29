@@ -16,16 +16,19 @@
 
 namespace nix {
 
+static size_t regularHashSize(HashType type) {
+    switch (type) {
+    case htMD5: return md5HashSize;
+    case htSHA1: return sha1HashSize;
+    case htSHA256: return sha256HashSize;
+    case htSHA512: return sha512HashSize;
+    }
+    abort();
+}
 
 void Hash::init()
 {
-    if (!type) abort();
-    switch (*type) {
-    case htMD5: hashSize = md5HashSize; break;
-    case htSHA1: hashSize = sha1HashSize; break;
-    case htSHA256: hashSize = sha256HashSize; break;
-    case htSHA512: hashSize = sha512HashSize; break;
-    }
+    hashSize = regularHashSize(type);
     assert(hashSize <= maxHashSize);
     memset(hash, 0, maxHashSize);
 }
@@ -101,22 +104,16 @@ static string printHash32(const Hash & hash)
 
 string printHash16or32(const Hash & hash)
 {
+    assert(hash.type);
     return hash.to_string(hash.type == htMD5 ? Base16 : Base32, false);
 }
 
-
-HashType assertInitHashType(const Hash & h) {
-    if (h.type)
-        return *h.type;
-    else
-        abort();
-}
 
 std::string Hash::to_string(Base base, bool includeType) const
 {
     std::string s;
     if (base == SRI || includeType) {
-        s += printHashType(assertInitHashType(*this));
+        s += printHashType(type);
         s += base == SRI ? '-' : ':';
     }
     switch (base) {
@@ -137,60 +134,66 @@ std::string Hash::to_string(Base base, bool includeType) const
 Hash::Hash(std::string_view s, HashType type) : Hash(s, std::optional { type }) { }
 Hash::Hash(std::string_view s) : Hash(s, std::optional<HashType>{}) { }
 
-Hash::Hash(std::string_view s, std::optional<HashType> type)
-    : type(type)
+Hash::Hash(std::string_view original, std::optional<HashType> optType)
 {
+    auto rest = original;
+
     size_t pos = 0;
     bool isSRI = false;
 
-    auto sep = s.find(':');
-    if (sep == string::npos) {
-        sep = s.find('-');
-        if (sep != string::npos) {
-            isSRI = true;
-        } else if (! type)
-            throw BadHash("hash '%s' does not include a type", s);
+    // Parse the has type before the separater, if there was one.
+    std::optional<HashType> optParsedType;
+    {
+        auto sep = rest.find(':');
+        if (sep == std::string_view::npos) {
+            sep = rest.find('-');
+            if (sep != std::string_view::npos)
+                isSRI = true;
+        }
+        if (sep != std::string_view::npos) {
+            auto hashRaw = rest.substr(0, sep);
+            optParsedType = parseHashType(hashRaw);
+            rest = rest.substr(sep + 1);
+        }
     }
 
-    if (sep != string::npos) {
-        string hts = string(s, 0, sep);
-        this->type = parseHashType(hts);
-        if (!this->type)
-            throw BadHash("unknown hash type '%s'", hts);
-        if (type && type != this->type)
-            throw BadHash("hash '%s' should have type '%s'", s, printHashType(*type));
-        pos = sep + 1;
+    // Either the string or user must provide the type, if they both do they
+    // must agree.
+    if (!optParsedType && !optType) {
+        throw BadHash("hash '%s' does not include a type, nor is the type otherwise known from context.", rest);
+    } else {
+        this->type = optParsedType ? *optParsedType : *optType;
+        if (optParsedType && optType && *optParsedType != *optType)
+            throw BadHash("hash '%s' should have type '%s'", original, printHashType(*optType));
     }
 
     init();
 
-    size_t size = s.size() - pos;
-
-    if (!isSRI && size == base16Len()) {
+    if (!isSRI && rest.size() == base16Len()) {
 
         auto parseHexDigit = [&](char c) {
             if (c >= '0' && c <= '9') return c - '0';
             if (c >= 'A' && c <= 'F') return c - 'A' + 10;
             if (c >= 'a' && c <= 'f') return c - 'a' + 10;
-            throw BadHash("invalid base-16 hash '%s'", s);
+            throw BadHash("invalid base-16 hash '%s'", original);
         };
 
         for (unsigned int i = 0; i < hashSize; i++) {
             hash[i] =
-                parseHexDigit(s[pos + i * 2]) << 4
-                | parseHexDigit(s[pos + i * 2 + 1]);
+                parseHexDigit(rest[pos + i * 2]) << 4
+                | parseHexDigit(rest[pos + i * 2 + 1]);
         }
     }
 
-    else if (!isSRI && size == base32Len()) {
+    else if (!isSRI && rest.size() == base32Len()) {
 
-        for (unsigned int n = 0; n < size; ++n) {
-            char c = s[pos + size - n - 1];
+        for (unsigned int n = 0; n < rest.size(); ++n) {
+            char c = rest[rest.size() - n - 1];
             unsigned char digit;
             for (digit = 0; digit < base32Chars.size(); ++digit) /* !!! slow */
                 if (base32Chars[digit] == c) break;
             if (digit >= 32)
-                throw BadHash("invalid base-32 hash '%s'", s);
+                throw BadHash("invalid base-32 hash '%s'", original);
             unsigned int b = n * 5;
             unsigned int i = b / 8;
             unsigned int j = b % 8;
@@ -200,21 +203,21 @@ Hash::Hash(std::string_view s, std::optional<HashType> type)
                 hash[i + 1] |= digit >> (8 - j);
             } else {
                 if (digit >> (8 - j))
-                    throw BadHash("invalid base-32 hash '%s'", s);
+                    throw BadHash("invalid base-32 hash '%s'", original);
             }
         }
     }
 
-    else if (isSRI || size == base64Len()) {
-        auto d = base64Decode(s.substr(pos));
+    else if (isSRI || rest.size() == base64Len()) {
+        auto d = base64Decode(rest);
         if (d.size() != hashSize)
-            throw BadHash("invalid %s hash '%s'", isSRI ? "SRI" : "base-64", s);
+            throw BadHash("invalid %s hash '%s'", isSRI ? "SRI" : "base-64", original);
         assert(hashSize);
         memcpy(hash, d.data(), hashSize);
     }
 
     else
-        throw BadHash("hash '%s' has wrong length for hash type '%s'", s, printHashType(*type));
+        throw BadHash("hash '%s' has wrong length for hash type '%s'", rest, printHashType(this->type));
 }
 
 Hash newHashAllowEmpty(std::string hashStr, std::optional<HashType> ht)
@@ -267,7 +270,7 @@ static void finish(HashType ht, Ctx & ctx, unsigned char * hash)
 }
 
 
-Hash hashString(HashType ht, const string & s)
+Hash hashString(HashType ht, std::string_view s)
 {
     Ctx ctx;
     Hash hash(ht);
@@ -334,7 +337,7 @@ HashResult hashPath(
 
 Hash compressHash(const Hash & hash, unsigned int newSize)
 {
-    Hash h;
+    Hash h(hash.type);
     h.hashSize = newSize;
     for (unsigned int i = 0; i < hash.hashSize; ++i)
         h.hash[i % newSize] ^= hash.hash[i];
@@ -363,14 +366,15 @@ HashType parseHashType(std::string_view s)
 string printHashType(HashType ht)
 {
     switch (ht) {
-    case htMD5: return "md5"; break;
-    case htSHA1: return "sha1"; break;
-    case htSHA256: return "sha256"; break;
-    case htSHA512: return "sha512"; break;
+    case htMD5: return "md5";
+    case htSHA1: return "sha1";
+    case htSHA256: return "sha256";
+    case htSHA512: return "sha512";
+    default:
+        // illegal hash type enum value internally, as opposed to external input
+        // which should be validated with nice error message.
+        abort();
     }
-    // illegal hash type enum value internally, as opposed to external input
-    // which should be validated with nice error message.
-    abort();
 }
 
 }

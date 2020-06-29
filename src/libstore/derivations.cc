@@ -404,7 +404,7 @@ static DerivationOutput readDerivationOutput(Source & in, const Store & store)
 {
     auto path = store.parseStorePath(readString(in));
     auto hashAlgo = readString(in);
-    const auto hash = readString(in);
+    auto hash = readString(in);
 
     std::optional<FixedOutputHash> fsh;
     if (hashAlgo != "") {
@@ -413,7 +413,7 @@ static DerivationOutput readDerivationOutput(Source & in, const Store & store)
             method = FileIngestionMethod::Recursive;
             hashAlgo = string(hashAlgo, 2);
         }
-        const HashType hashType = parseHashType(hashAlgo);
+        auto hashType = parseHashType(hashAlgo);
         fsh = FixedOutputHash {
             .method = std::move(method),
             .hash = Hash(hash, hashType),
@@ -463,11 +463,16 @@ Source & readDerivation(Source & in, const Store & store, BasicDerivation & drv)
 void writeDerivation(Sink & out, const Store & store, const BasicDerivation & drv)
 {
     out << drv.outputs.size();
-    for (auto & i : drv.outputs)
+    for (auto & i : drv.outputs) {
         out << i.first
-            << store.printStorePath(i.second.path)
-            << i.second.hash->printMethodAlgo()
-            << i.second.hash->hash.to_string(Base16, false);
+            << store.printStorePath(i.second.path);
+        if (i.second.hash) {
+            out << i.second.hash->printMethodAlgo()
+                << i.second.hash->hash.to_string(Base16, false);
+        } else {
+            out << "" << "";
+        }
+    }
     writeStorePaths(store, out, drv.inputSrcs);
     out << drv.platform << drv.builder << drv.args;
     out << drv.env.size();

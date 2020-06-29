@@ -4,7 +4,7 @@
 namespace nix {
 
 std::string FixedOutputHash::printMethodAlgo() const {
-    return makeFileIngestionPrefix(method) + printHashType(*hash.type);
+    return makeFileIngestionPrefix(method) + printHashType(hash.type);
 }
 
 std::string makeFileIngestionPrefix(const FileIngestionMethod m) {
