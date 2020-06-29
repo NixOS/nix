@@ -171,6 +171,8 @@ struct Value
        computation. In particular, function applications are
        non-trivial. */
     bool isTrivial() const;
+
+    std::vector<std::pair<Path, std::string>> getContext();
 };
 
 

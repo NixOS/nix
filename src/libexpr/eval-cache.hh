@@ -50,7 +50,17 @@ struct misc_t {};
 struct failed_t {};
 typedef uint64_t AttrId;
 typedef std::pair<AttrId, Symbol> AttrKey;
-typedef std::variant<std::vector<Symbol>, std::string, placeholder_t, missing_t, misc_t, failed_t, bool> AttrValue;
+typedef std::pair<std::string, std::vector<std::pair<Path, std::string>>> string_t;
+
+typedef std::variant<
+    std::vector<Symbol>,
+    string_t,
+    placeholder_t,
+    missing_t,
+    misc_t,
+    failed_t,
+    bool
+    > AttrValue;
 
 class AttrCursor : public std::enable_shared_from_this<AttrCursor>
 {
@@ -93,6 +103,8 @@ public:
     std::shared_ptr<AttrCursor> findAlongAttrPath(const std::vector<Symbol> & attrPath);
 
     std::string getString();
+
+    string_t getStringWithContext();
 
     bool getBool();
 

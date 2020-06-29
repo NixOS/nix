@@ -30,18 +30,6 @@ namespace nix {
  *************************************************************/
 
 
-/* Decode a context string ‘!<name>!<path>’ into a pair <path,
-   name>. */
-std::pair<string, string> decodeContext(const string & s)
-{
-    if (s.at(0) == '!') {
-        size_t index = s.find("!", 1);
-        return std::pair<string, string>(string(s, index + 1), string(s, 1, index - 1));
-    } else
-        return std::pair<string, string>(s.at(0) == '/' ? s : string(s, 1), "");
-}
-
-
 InvalidPathError::InvalidPathError(const Path & path) :
     EvalError("path '%s' is not valid", path), path(path) {}
 

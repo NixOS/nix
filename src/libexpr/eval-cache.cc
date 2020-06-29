@@ -12,6 +12,7 @@ create table if not exists Attributes (
     name        text,
     type        integer not null,
     value       text,
+    context     text,
     primary key (parent, name)
 );
 )sql";
@@ -22,6 +23,7 @@ struct AttrDb
     {
         SQLite db;
         SQLiteStmt insertAttribute;
+        SQLiteStmt insertAttributeWithContext;
         SQLiteStmt queryAttribute;
         SQLiteStmt queryAttributes;
         std::unique_ptr<SQLiteTxn> txn;
@@ -34,7 +36,7 @@ struct AttrDb
     {
         auto state(_state->lock());
 
-        Path cacheDir = getCacheDir() + "/nix/eval-cache-v1";
+        Path cacheDir = getCacheDir() + "/nix/eval-cache-v2";
         createDirs(cacheDir);
 
         Path dbPath = cacheDir + "/" + fingerprint.to_string(Base16, false) + ".sqlite";
@@ -46,8 +48,11 @@ struct AttrDb
         state->insertAttribute.create(state->db,
             "insert or replace into Attributes(parent, name, type, value) values (?, ?, ?, ?)");
 
+        state->insertAttributeWithContext.create(state->db,
+            "insert or replace into Attributes(parent, name, type, value, context) values (?, ?, ?, ?, ?)");
+
         state->queryAttribute.create(state->db,
-            "select rowid, type, value from Attributes where parent = ? and name = ?");
+            "select rowid, type, value, context from Attributes where parent = ? and name = ?");
 
         state->queryAttributes.create(state->db,
             "select name from Attributes where parent = ?");
@@ -93,15 +98,30 @@ struct AttrDb
 
     AttrId setString(
         AttrKey key,
-        std::string_view s)
+        std::string_view s,
+        const char * * context = nullptr)
     {
         auto state(_state->lock());
 
-        state->insertAttribute.use()
-            (key.first)
-            (key.second)
-            (AttrType::String)
-            (s).exec();
+        if (context) {
+            std::string ctx;
+            for (const char * * p = context; *p; ++p) {
+                if (p != context) ctx.push_back(' ');
+                ctx.append(*p);
+            }
+            state->insertAttributeWithContext.use()
+                (key.first)
+                (key.second)
+                (AttrType::String)
+                (s)
+                (ctx).exec();
+        } else {
+            state->insertAttribute.use()
+                (key.first)
+                (key.second)
+                (AttrType::String)
+                (s).exec();
+        }
 
         return state->db.getLastInsertedRowId();
     }
@@ -196,8 +216,13 @@ struct AttrDb
                     attrs.push_back(symbols.create(queryAttributes.getStr(0)));
                 return {{rowId, attrs}};
             }
-            case AttrType::String:
-                return {{rowId, queryAttribute.getStr(2)}};
+            case AttrType::String: {
+                std::vector<std::pair<Path, std::string>> context;
+                if (!queryAttribute.isNull(3))
+                    for (auto & s : tokenizeString<std::vector<std::string>>(queryAttribute.getStr(3), ";"))
+                        context.push_back(decodeContext(s));
+                return {{rowId, string_t{queryAttribute.getStr(2), context}}};
+            }
             case AttrType::Bool:
                 return {{rowId, queryAttribute.getInt(2) != 0}};
             case AttrType::Missing:
@@ -320,7 +345,7 @@ Value & AttrCursor::forceValue()
 
     if (root->db && (!cachedValue || std::get_if<placeholder_t>(&cachedValue->second))) {
         if (v.type == tString)
-            cachedValue = {root->db->setString(getKey(), v.string.s), v.string.s};
+            cachedValue = {root->db->setString(getKey(), v.string.s, v.string.context), v.string.s};
         else if (v.type == tPath)
             cachedValue = {root->db->setString(getKey(), v.path), v.path};
         else if (v.type == tBool)
@@ -427,9 +452,9 @@ std::string AttrCursor::getString()
         if (!cachedValue)
             cachedValue = root->db->getAttr(getKey(), root->state.symbols);
         if (cachedValue && !std::get_if<placeholder_t>(&cachedValue->second)) {
-            if (auto s = std::get_if<std::string>(&cachedValue->second)) {
+            if (auto s = std::get_if<string_t>(&cachedValue->second)) {
                 debug("using cached string attribute '%s'", getAttrPathStr());
-                return *s;
+                return s->first;
             } else
                 throw TypeError("'%s' is not a string", getAttrPathStr());
         }
@@ -441,6 +466,30 @@ std::string AttrCursor::getString()
         throw TypeError("'%s' is not a string but %s", getAttrPathStr(), showType(v.type));
 
     return v.type == tString ? v.string.s : v.path;
+}
+
+string_t AttrCursor::getStringWithContext()
+{
+    if (root->db) {
+        if (!cachedValue)
+            cachedValue = root->db->getAttr(getKey(), root->state.symbols);
+        if (cachedValue && !std::get_if<placeholder_t>(&cachedValue->second)) {
+            if (auto s = std::get_if<string_t>(&cachedValue->second)) {
+                debug("using cached string attribute '%s'", getAttrPathStr());
+                return *s;
+            } else
+                throw TypeError("'%s' is not a string", getAttrPathStr());
+        }
+    }
+
+    auto & v = forceValue();
+
+    if (v.type == tString)
+        return {v.string.s, v.getContext()};
+    else if (v.type == tPath)
+        return {v.path, {}};
+    else
+        throw TypeError("'%s' is not a string but %s", getAttrPathStr(), showType(v.type));
 }
 
 bool AttrCursor::getBool()
