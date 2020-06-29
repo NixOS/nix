@@ -10,7 +10,7 @@ namespace nix {
 MakeError(BadHash, Error);
 
 
-enum HashType : char { htMD5, htSHA1, htSHA256, htSHA512 };
+enum HashType : char { htMD5 = 42, htSHA1, htSHA256, htSHA512 };
 
 
 const int md5HashSize = 16;
