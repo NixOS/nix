@@ -1,8 +1,8 @@
-{ useClang ? false }:
+{ useClang ? false, enableStatic ? false }:
 
 with import (builtins.fetchTarball https://github.com/NixOS/nixpkgs/archive/nixos-20.03-small.tar.gz) {};
 
-with import ./release-common.nix { inherit pkgs; };
+with import ./release-common.nix { inherit pkgs enableStatic; };
 
 (if useClang then clangStdenv else stdenv).mkDerivation {
   name = "nix";
