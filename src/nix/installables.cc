@@ -444,17 +444,7 @@ std::tuple<std::string, FlakeRef, InstallableValue::DerivationInfo> InstallableF
         if (!attr->isDerivation())
             throw Error("flake output attribute '%s' is not a derivation", attrPath);
 
-        auto aDrvPath = attr->getAttr(state->sDrvPath);
-        auto drvPath = state->store->parseStorePath(aDrvPath->getString());
-        if (!state->store->isValidPath(drvPath) && !settings.readOnlyMode) {
-            /* The eval cache contains 'drvPath', but the actual path
-               has been garbage-collected. So force it to be
-               regenerated. */
-            aDrvPath->forceValue();
-            if (!state->store->isValidPath(drvPath))
-                throw Error("don't know how to recreate store derivation '%s'!",
-                    state->store->printStorePath(drvPath));
-        }
+        auto drvPath = attr->forceDerivation();
 
         auto drvInfo = DerivationInfo{
             std::move(drvPath),

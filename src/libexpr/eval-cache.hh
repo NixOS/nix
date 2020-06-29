@@ -101,6 +101,9 @@ public:
     bool isDerivation();
 
     Value & forceValue();
+
+    /* Force creation of the .drv file in the Nix store. */
+    StorePath forceDerivation();
 };
 
 }
