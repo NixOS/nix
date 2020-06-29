@@ -68,6 +68,7 @@ struct NixArgs : virtual MultiCommand, virtual MixCommonArgs
 
         addFlag({
             .longName = "help",
+            .shortName = 'h',
             .description = "show usage information",
             .handler = {[&]() { if (!completions) showHelpAndExit(); }},
         });
