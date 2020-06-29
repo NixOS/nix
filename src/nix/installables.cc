@@ -241,27 +241,6 @@ Buildable Installable::toBuildable()
     return std::move(buildables[0]);
 }
 
-App::App(EvalState & state, Value & vApp)
-{
-    state.forceAttrs(vApp);
-
-    auto aType = vApp.attrs->need(state.sType);
-    if (state.forceStringNoCtx(*aType.value, *aType.pos) != "app")
-        throw Error("value does not have type 'app', at %s", *aType.pos);
-
-    auto aProgram = vApp.attrs->need(state.symbols.create("program"));
-    program = state.forceString(*aProgram.value, context, *aProgram.pos);
-
-    // FIXME: check that 'program' is in the closure of 'context'.
-    if (!state.store->isInStore(program))
-        throw Error("app program '%s' is not in the Nix store", program);
-}
-
-App Installable::toApp(EvalState & state)
-{
-    return App(state, *toValue(state).first);
-}
-
 std::vector<std::pair<std::shared_ptr<eval_cache::AttrCursor>, std::string>>
 Installable::getCursors(EvalState & state, bool useEvalCache)
 {
