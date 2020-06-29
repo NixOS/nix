@@ -7,7 +7,6 @@
 #include "legacy.hh"
 #include "shared.hh"
 #include "store-api.hh"
-#include "progress-bar.hh"
 #include "filetransfer.hh"
 #include "finally.hh"
 #include "loggers.hh"
