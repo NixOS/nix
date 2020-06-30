@@ -289,4 +289,22 @@ namespace nix {
             "what about this " ANSI_YELLOW "%3%" ANSI_NORMAL " " ANSI_YELLOW "one" ANSI_NORMAL);
 
     }
+
+    /* ----------------------------------------------------------------------------
+     * ErrPos
+     * --------------------------------------------------------------------------*/
+
+    TEST(errpos, invalidPos) {
+
+      // contains an invalid symbol, which we should not dereference!
+      Pos invalid;
+
+      // constructing without access violation.
+      ErrPos ep(invalid);
+    
+      // assignment without access violation.
+      ep = invalid;
+
+    }
+
 }
