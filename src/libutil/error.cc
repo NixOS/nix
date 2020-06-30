@@ -27,7 +27,6 @@ const string& BaseError::calcWhat() const
 
         std::ostringstream oss;
         showErrorInfo(oss, err, false);
-        // oss << err;
         what_ = oss.str();
 
         return *what_;
@@ -35,7 +34,6 @@ const string& BaseError::calcWhat() const
 }
 
 std::optional<string> ErrorInfo::programName = std::nullopt;
-// bool ErrorInfo::showTrace = false;
 
 std::ostream& operator<<(std::ostream &os, const hintformat &hf)
 {
@@ -212,7 +210,6 @@ void printAtPos(const string &prefix, const ErrPos &pos, std::ostream &out)
     }
 }
 
-// std::ostream& operator<<(std::ostream &out, const ErrorInfo &einfo)
 std::ostream& showErrorInfo(std::ostream &out, const ErrorInfo &einfo, bool showTrace)
 {
     auto errwidth = std::max<size_t>(getWindowSize().second, 20);

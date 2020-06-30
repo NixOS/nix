@@ -80,10 +80,9 @@ struct TunnelLogger : public Logger
 
         std::stringstream oss;
         showErrorInfo(oss, ei, false);
-        // oss << ei;
 
         StringSink buf;
-        buf << STDERR_NEXT << oss.str() << "\n"; // (fs.s + "\n");
+        buf << STDERR_NEXT << oss.str() << "\n";
         enqueueMsg(*buf.s);
     }
 

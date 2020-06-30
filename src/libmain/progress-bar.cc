@@ -134,7 +134,6 @@ public:
 
         std::stringstream oss;
         showErrorInfo(oss, ei, showTrace);
-        // oss << ei;
 
         log(*state, ei.level, oss.str());
     }

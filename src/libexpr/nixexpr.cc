@@ -197,11 +197,11 @@ std::ostream & operator << (std::ostream & str, const Pos & pos)
     if (!pos)
         str << "undefined position";
     else
-    { 
+    {
         auto f = format(ANSI_BOLD "%1%" ANSI_NORMAL ":%2%:%3%");
-        switch (pos.origin) { 
+        switch (pos.origin) {
             case foFile:
-                f % (string) pos.file; 
+                f % (string) pos.file;
                 break;
             case foStdin:
             case foString:

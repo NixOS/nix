@@ -149,8 +149,7 @@ struct PushActivity
 
 extern Logger * logger;
 
-Logger * makeSimpleLogger(bool printBuildLogs, bool showTrace);
-// Logger * makeSimpleLogger(bool printBuildLogs = true, bool showTrace);
+Logger * makeSimpleLogger(bool printBuildLogs = true, bool showTrace = false);
 
 Logger * makeJSONLogger(Logger & prevLogger);
 

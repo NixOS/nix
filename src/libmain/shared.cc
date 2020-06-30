@@ -325,7 +325,6 @@ int handleExceptions(const string & programName, std::function<void()> fun)
     } catch (BaseError & e) {
         logger->setShowTrace(settings.showTrace);
         logError(e.info());
-        // TODO fix to detect non-empty trace here.
         if (e.hasTrace() && !settings.showTrace)
             printError("(use '--show-trace' to show detailed location information)");
         return e.status;

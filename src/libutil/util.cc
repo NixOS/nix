@@ -972,7 +972,7 @@ pid_t startProcess(std::function<void()> fun, const ProcessOptions & options)
 {
     auto wrapper = [&]() {
         if (!options.allowVfork)
-            logger = makeSimpleLogger(true, false);  // TODO remove args.
+            logger = makeSimpleLogger();
         try {
 #if __linux__
             if (options.dieWithParent && prctl(PR_SET_PDEATHSIG, SIGKILL) == -1)

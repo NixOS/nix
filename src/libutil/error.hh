@@ -111,10 +111,8 @@ struct ErrorInfo {
     std::list<Trace> traces;
 
     static std::optional<string> programName;
-    // static bool showTrace;
 };
 
-// std::ostream& operator<<(std::ostream &out, const ErrorInfo &einfo);
 std::ostream& showErrorInfo(std::ostream &out, const ErrorInfo &einfo, bool showTrace);
 
 /* BaseError should generally not be caught, as it has Interrupted as
@@ -122,7 +120,6 @@ std::ostream& showErrorInfo(std::ostream &out, const ErrorInfo &einfo, bool show
 class BaseError : public std::exception
 {
 protected:
-    // string prefix_; // used for location traces etc.
     mutable ErrorInfo err;
 
     mutable std::optional<string> what_;

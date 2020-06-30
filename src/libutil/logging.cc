@@ -81,7 +81,6 @@ public:
     {
         std::stringstream oss;
         showErrorInfo(oss, ei, showTrace);
-        // oss << ei;
 
         log(ei.level, oss.str());
     }
@@ -158,7 +157,7 @@ struct JSONLogger : Logger {
     void setShowTrace(bool showTrace) override {
         prevLogger.setShowTrace(showTrace);
     }
- 
+
     void addFields(nlohmann::json & json, const Fields & fields)
     {
         if (fields.empty()) return;
@@ -190,7 +189,6 @@ struct JSONLogger : Logger {
     {
         std::ostringstream oss;
         showErrorInfo(oss, ei, getShowTrace());
-        // oss << ei;
 
         nlohmann::json json;
         json["action"] = "msg";
