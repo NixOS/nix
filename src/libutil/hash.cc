@@ -7,6 +7,7 @@
 #include "args.hh"
 #include "hash.hh"
 #include "archive.hh"
+#include "parser.hh"
 #include "util.hh"
 #include "istringstream_nocopy.hh"
 
@@ -144,17 +145,15 @@ Hash::Hash(std::string_view original, std::optional<HashType> optType)
     // Parse the has type before the separater, if there was one.
     std::optional<HashType> optParsedType;
     {
-        auto sep = rest.find(':');
-        if (sep == std::string_view::npos) {
-            sep = rest.find('-');
-            if (sep != std::string_view::npos)
+        auto hashRaw = splitPrefix(rest, ':');
+
+        if (!hashRaw) {
+            hashRaw = splitPrefix(rest, '-');
+            if (hashRaw)
                 isSRI = true;
         }
-        if (sep != std::string_view::npos) {
-            auto hashRaw = rest.substr(0, sep);
-            optParsedType = parseHashType(hashRaw);
-            rest = rest.substr(sep + 1);
-        }
+        if (hashRaw)
+            optParsedType = parseHashType(*hashRaw);
     }
 
     // Either the string or user must provide the type, if they both do they
