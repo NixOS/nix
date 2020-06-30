@@ -597,11 +597,6 @@ LocalNoInline(void addErrorTrace(Error & e, const char * s, const string & s2))
     e.addTrace(std::nullopt, s, s2);
 }
 
-LocalNoInline(void addErrorTrace(Error & e, const Pos & pos, const char * s, const ExprLambda & fun))
-{
-    e.addTrace(pos, s, fun.showNamePos());
-}
-
 LocalNoInline(void addErrorTrace(Error & e, const Pos & pos, const char * s, const string & s2))
 {
     e.addTrace(pos, s, s2);
@@ -1241,9 +1236,11 @@ void EvalState::callFunction(Value & fun, Value & arg, Value & v, const Pos & po
         try {
             lambda.body->eval(*this, env2, v);
         } catch (Error & e) {
-            // TODO something different for 'called from' than usual addTrace?
-            // addErrorTrace(e, pos, "while evaluating %1%, called from %2%:", lambda);
-            addErrorTrace(e, pos, "while evaluating %1%:", lambda);
+            addErrorTrace(e, lambda.pos, "while evaluating %s", 
+              (lambda.name.set() 
+                  ? "'" + (string) lambda.name + "'" 
+                  : "anonymous lambdaction"));
+            addErrorTrace(e, pos, "from call site%s", "");
             throw;
         }
     else

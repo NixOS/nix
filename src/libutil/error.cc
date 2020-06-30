@@ -330,7 +330,7 @@ std::ostream& showErrorInfo(std::ostream &out, const ErrorInfo &einfo, bool show
     // traces
     if (showTrace && !einfo.traces.empty())
     {
-        const string tracetitle(" show-trace output ");
+        const string tracetitle(" show-trace ");
 
         int fill = errwidth - tracetitle.length();
         int lw = 0;
