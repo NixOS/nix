@@ -1,5 +1,6 @@
 #include "args.hh"
 #include "content-address.hh"
+#include "parser.hh"
 
 namespace nix {
 
@@ -43,23 +44,19 @@ std::string renderContentAddress(ContentAddress ca) {
 ContentAddress parseContentAddress(std::string_view rawCa) {
     auto rest = rawCa;
 
-    // Ensure prefix
-    const auto prefixSeparator = rawCa.find(':');
-    if (prefixSeparator == string::npos)
-        throw UsageError("not a content address because it is not in the form \"<prefix>:<rest>\": %s", rawCa);
-    auto prefix = rest.substr(0, prefixSeparator);
-    rest = rest.substr(prefixSeparator + 1);
+    std::string_view prefix;
+    {
+        auto optPrefix = splitPrefix(rest, ':');
+        if (!optPrefix)
+            throw UsageError("not a content address because it is not in the form \"<prefix>:<rest>\": %s", rawCa);
+        prefix = *optPrefix;
+    }
 
     auto parseHashType_ = [&](){
-        // Parse hash type
-        auto algoSeparator = rest.find(':');
-        HashType hashType;
-        if (algoSeparator == string::npos)
-            throw UsageError("content address hash must be in form \"<algo>:<hash>\", but found: %s", rest);
-        hashType = parseHashType(rest.substr(0, algoSeparator));
-
-        rest = rest.substr(algoSeparator + 1);
-
+        auto hashTypeRaw = splitPrefix(rest, ':');
+        if (!hashTypeRaw)
+            throw UsageError("content address hash must be in form \"<algo>:<hash>\", but found: %s", rawCa);
+        HashType hashType = parseHashType(*hashTypeRaw);
         return std::move(hashType);
     };
 
