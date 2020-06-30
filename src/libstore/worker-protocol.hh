@@ -49,6 +49,7 @@ typedef enum {
     wopNarFromPath = 38,
     wopAddToStoreNar = 39,
     wopQueryMissing = 40,
+    wopSync = 41,
 } WorkerOp;
 
 

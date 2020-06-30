@@ -755,6 +755,14 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
         break;
     }
 
+    case wopSync: {
+        logger->startWork();
+        store->sync();
+        logger->stopWork();
+        to << 1;
+        break;
+    }
+
     default:
         throw Error("invalid operation %1%", op);
     }
