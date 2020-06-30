@@ -169,6 +169,7 @@ static int _main(int argc, char * * argv)
                 if (p == "") throw Error("unable to find '%1%'", i);
                 std::cout << p << std::endl;
             }
+            store->sync();
             return 0;
         }
 
@@ -188,6 +189,8 @@ static int _main(int argc, char * * argv)
         }
 
         state->printStats();
+
+        store->sync();
 
         return 0;
     }

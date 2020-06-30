@@ -88,6 +88,7 @@ static int _main(int argc, char * * argv)
             GCResults results;
             PrintFreed freed(true, results);
             store->collectGarbage(options, results);
+            store->sync();
         }
 
         return 0;

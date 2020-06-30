@@ -103,8 +103,6 @@ struct CmdMakeContentAddressable : StorePathsCommand, MixJSON
 
             remappings.insert_or_assign(std::move(path), std::move(info.path));
         }
-
-        store->sync();
     }
 };
 

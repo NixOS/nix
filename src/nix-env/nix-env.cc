@@ -1455,6 +1455,8 @@ static int _main(int argc, char * * argv)
 
         globals.state->printStats();
 
+        store->sync();
+
         logger->stop();
 
         return 0;

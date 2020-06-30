@@ -28,7 +28,9 @@ ref<Store> StoreCommand::createStore()
 
 void StoreCommand::run()
 {
-    run(getStore());
+    auto store = getStore();
+    run(store);
+    store->sync();
 }
 
 StorePathsCommand::StorePathsCommand(bool recursive)
