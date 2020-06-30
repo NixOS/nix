@@ -7,6 +7,8 @@ with import ./release-common.nix { inherit pkgs enableStatic; };
 (if useClang then clangStdenv else stdenv).mkDerivation {
   name = "nix";
 
+  nativeBuildInputs = nativeBuildDeps;
+
   buildInputs = buildDeps ++ propagatedDeps ++ perlDeps;
 
   inherit configureFlags;
