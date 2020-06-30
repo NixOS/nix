@@ -100,6 +100,8 @@ public:
 
     unsigned int getProtocol() override;
 
+    void sync() override;
+
     void flushBadConnections();
 
 protected:
