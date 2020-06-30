@@ -126,3 +126,4 @@ GSYMS
 GTAGS
 
 nix-rust/target
+result*/
