@@ -40,13 +40,16 @@ struct Hash
        is not present, then the hash type must be specified in the
        string. */
     Hash(std::string_view s, std::optional<HashType> type);
-    // type must be provided
-    Hash(std::string_view s, HashType type);
     // hash type must be part of string
     Hash(std::string_view s);
 
+private:
+    // type must be provided, s must not include <type> prefix
+    Hash(std::string_view s, HashType type);
+
     void init();
 
+public:
     /* Check whether a hash is set. */
     operator bool () const { return (bool) type; }
 

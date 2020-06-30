@@ -1,6 +1,7 @@
 #pragma once
 
 #include <optional>
+#include <string_view>
 
 namespace nix {
 
@@ -8,9 +9,7 @@ namespace nix {
 // separator, and modify the string argument to contain only the part after the
 // separator. Otherwise, wer return `std::nullopt`, and we leave the argument
 // string alone.
-std::optional<std::string_view> splitPrefix(std::string_view & string, char separator);
-
-std::optional<std::string_view> splitPrefix(std::string_view & string, char separator) {
+static inline std::optional<std::string_view> splitPrefix(std::string_view & string, char separator) {
     auto sepInstance = string.find(separator);
 
     if (sepInstance != std::string_view::npos) {

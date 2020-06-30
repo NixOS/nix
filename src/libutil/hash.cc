@@ -132,10 +132,13 @@ std::string Hash::to_string(Base base, bool includeType) const
     return s;
 }
 
-Hash::Hash(std::string_view s, HashType type) : Hash(s, std::optional { type }) { }
-Hash::Hash(std::string_view s) : Hash(s, std::optional<HashType>{}) { }
+Hash fromSRI(std::string_view original) {
 
-Hash::Hash(std::string_view original, std::optional<HashType> optType)
+}
+
+Hash::Hash(std::string_view s) : Hash(s, std::nullopt) { }
+
+static HashType newFunction(std::string_view & rest, std::optional<HashType> optType)
 {
     auto rest = original;
 
@@ -161,13 +164,17 @@ Hash::Hash(std::string_view original, std::optional<HashType> optType)
     if (!optParsedType && !optType) {
         throw BadHash("hash '%s' does not include a type, nor is the type otherwise known from context.", rest);
     } else {
-        this->type = optParsedType ? *optParsedType : *optType;
         if (optParsedType && optType && *optParsedType != *optType)
             throw BadHash("hash '%s' should have type '%s'", original, printHashType(*optType));
+        return optParsedType ? *optParsedType : *optType;
     }
+}
 
-    init();
+// mutates the string_view
+Hash::Hash(std::string_view original, std::optional<HashType> optType)
+    : Hash(original, newFunction(original, optType))
 
+Hash::Hash(std::string_view original, HashType type) : Hash(type) {
     if (!isSRI && rest.size() == base16Len()) {
 
         auto parseHexDigit = [&](char c) {
