@@ -527,6 +527,8 @@ static void _main(int argc, char * * argv)
             if (auto store2 = store.dynamic_pointer_cast<LocalFSStore>())
                 store2->addPermRoot(store->parseStorePath(symlink.second), absPath(symlink.first), true);
 
+        store->sync();
+
         logger->stop();
 
         for (auto & path : outPaths)

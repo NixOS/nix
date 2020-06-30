@@ -61,6 +61,9 @@ static int _main(int argc, char ** argv)
 
         copyPaths(from, to, closure, NoRepair, NoCheckSigs, useSubstitutes);
 
+        from->sync();
+        to->sync();
+
         return 0;
     }
 }
