@@ -471,8 +471,7 @@ static void prim_addErrorContext(EvalState & state, const Pos & pos, Value * * a
         v = *args[1];
     } catch (Error & e) {
         PathSet context;
-        // TODO: is this right, include this pos??  Test it.  esp with LOC.
-        e.addTrace(pos, "%1%", state.coerceToString(pos, *args[0], context));
+        e.addTrace(std::nullopt, state.coerceToString(pos, *args[0], context));
         throw;
     }
 }

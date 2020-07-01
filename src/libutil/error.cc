@@ -305,7 +305,7 @@ std::ostream& showErrorInfo(std::ostream &out, const ErrorInfo &einfo, bool show
         nl = true;
     }
 
-    if (einfo.errPos.has_value()) {
+    if (einfo.errPos.has_value() && (*einfo.errPos)) {
         auto loc = getCodeLines(*einfo.errPos);
 
         // lines of code.
@@ -359,9 +359,10 @@ std::ostream& showErrorInfo(std::ostream &out, const ErrorInfo &einfo, bool show
                 out << ANSI_BLUE << "trace: " << ANSI_NORMAL << iter->hint.str();
 
                 nl = true;
-                auto pos = *iter->pos;
-                if (pos) {
+                if (*iter->pos) {
+                    auto pos = iter->pos.value();
                     out << std::endl << prefix;
+
                     printAtPos(prefix, pos, out);
                     auto loc = getCodeLines(pos);
                     if (loc.has_value())
