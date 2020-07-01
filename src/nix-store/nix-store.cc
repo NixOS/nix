@@ -209,8 +209,10 @@ static void opPrintFixedPath(Strings opFlags, Strings opArgs)
     string name = *i++;
 
     cout << fmt("%s\n", store->printStorePath(store->makeFixedOutputPath(name, FixedOutputInfo {
-        recursive,
-        Hash { hash, hashAlgo },
+        {
+            .method = recursive,
+            .hash = Hash { hash, hashAlgo },
+        },
         {},
     })));
 }

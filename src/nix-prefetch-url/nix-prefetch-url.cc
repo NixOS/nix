@@ -159,8 +159,10 @@ static int _main(int argc, char * * argv)
             expectedHash = Hash(args[1], ht);
             const auto method = unpack ? FileIngestionMethod::Recursive : FileIngestionMethod::Flat;
             storePath = store->makeFixedOutputPath(name, FixedOutputInfo {
-                method,
-                expectedHash,
+                {
+                    .method = method,
+                    .hash = expectedHash,
+                },
                 {},
             });
             if (store->isValidPath(*storePath))
@@ -220,8 +222,10 @@ static int _main(int argc, char * * argv)
             storePath = store->addToStore(name, tmpFile, method, ht);
 
             assert(*storePath == store->makeFixedOutputPath(name, FixedOutputInfo {
-                method,
-                expectedHash,
+                {
+                    .method = method,
+                    .hash = expectedHash,
+                },
                 {}
             }));
         }

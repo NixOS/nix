@@ -288,8 +288,10 @@ SV * makeFixedOutputPath(int recursive, char * algo, char * hash, char * name)
             Hash h(hash, parseHashType(algo));
             auto method = recursive ? FileIngestionMethod::Recursive : FileIngestionMethod::Flat;
             auto path = store()->makeFixedOutputPath(name, FixedOutputInfo {
-                method,
-                h,
+                {
+                    .method = method,
+                    .hash = h,
+                },
                 {},
             });
             XPUSHs(sv_2mortal(newSVpv(store()->printStorePath(path).c_str(), 0)));

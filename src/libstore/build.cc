@@ -3737,8 +3737,10 @@ void DerivationGoal::registerOutputs()
                 : hashFile(*i.second.hash->hash.type, actualPath);
 
             auto dest = worker.store.makeFixedOutputPath(i.second.path.name(), FixedOutputInfo {
-                i.second.hash->method,
-                h2,
+                {
+                    .method = i.second.hash->method,
+                    .hash = h2,
+                },
                 {}, // TODO references
             });
 
@@ -3774,8 +3776,10 @@ void DerivationGoal::registerOutputs()
             ca = FullContentAddress {
                 .name = std::string { i.second.path.name() },
                 .info = FixedOutputInfo {
-                    i.second.hash->method,
-                    h2,
+                    {
+                        .method = i.second.hash->method,
+                        .hash = h2,
+                    },
                     {},
                 },
             };

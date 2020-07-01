@@ -72,8 +72,10 @@ DownloadFileResult downloadFile(
             FullContentAddress {
                 .name = name,
                 .info = FixedOutputInfo {
-                    FileIngestionMethod::Flat,
-                    hash,
+                    {
+                        .method = FileIngestionMethod::Flat,
+                        .hash = hash,
+                    },
                     {},
                 },
             },

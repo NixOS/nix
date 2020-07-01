@@ -9,8 +9,10 @@ StorePath TreeInfo::computeStorePath(Store & store) const
 {
     assert(narHash);
     return store.makeFixedOutputPath("source", FixedOutputInfo {
-        FileIngestionMethod::Recursive,
-        narHash,
+        {
+            .method = FileIngestionMethod::Recursive,
+            .hash = narHash,
+        },
         {},
     });
 }

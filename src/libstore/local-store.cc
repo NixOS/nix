@@ -1058,8 +1058,10 @@ StorePath LocalStore::addToStoreFromDump(const string & dump, const string & nam
     Hash h = hashString(hashAlgo, dump);
 
     auto dstPath = makeFixedOutputPath(name, FixedOutputInfo {
-        method,
-        h,
+        {
+            .method = method,
+            .hash = h,
+        },
         {},
     });
 

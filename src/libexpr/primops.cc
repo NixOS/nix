@@ -773,8 +773,10 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
         Hash h = newHashAllowEmpty(*outputHash, ht);
 
         auto outPath = state.store->makeFixedOutputPath(drvName, FixedOutputInfo {
-            ingestionMethod,
-            h,
+            {
+                .method = ingestionMethod,
+                .hash = h,
+            },
             {},
         });
         if (!jsonObject) drv.env["out"] = state.store->printStorePath(outPath);
@@ -1158,8 +1160,10 @@ static void addPath(EvalState & state, const Pos & pos, const string & name, con
     std::optional<StorePath> expectedStorePath;
     if (expectedHash)
         expectedStorePath = state.store->makeFixedOutputPath(name, FixedOutputInfo {
-            method,
-            expectedHash,
+            {
+                .method = method,
+                .hash = expectedHash,
+            },
             {},
         });
     Path dstPath;
