@@ -94,8 +94,10 @@ std::optional<LinesOfCode> getCodeLines(const ErrPos &errPos)
             }
         }
         catch (EndOfFile &eof) {
-            // TODO: return maybe partial loc?
-            return std::nullopt;
+            if (loc.errLineOfCode.has_value())
+                return loc;
+            else
+                return std::nullopt;
         }
         catch (std::exception &e) {
             printError("error reading nix file: %s\n%s", errPos.file, e.what());
