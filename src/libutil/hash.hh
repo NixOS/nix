@@ -32,7 +32,7 @@ struct Hash
     HashType type;
 
     /* Create a zero-filled hash object. */
-    Hash(HashType type) : type(type) { init(); };
+    Hash(HashType type);
 
     /* Initialize the hash from a string representation, in the format
        "[<type>:]<base16|base32|base64>" or "<type>-<base64>" (a
@@ -48,8 +48,6 @@ struct Hash
 private:
     // type must be provided, s must not include <type> prefix
     Hash(std::string_view s, std::pair<HashType, bool> typeAndSRI);
-
-    void init();
 
 public:
     /* Check whether a hash is set. */

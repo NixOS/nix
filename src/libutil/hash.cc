@@ -27,7 +27,7 @@ static size_t regularHashSize(HashType type) {
     abort();
 }
 
-void Hash::init()
+Hash::Hash(HashType type) : type(type)
 {
     hashSize = regularHashSize(type);
     assert(hashSize <= maxHashSize);
