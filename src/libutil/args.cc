@@ -123,17 +123,21 @@ bool Args::processFlag(Strings::iterator & pos, Strings::iterator end)
     auto process = [&](const std::string & name, const Flag & flag) -> bool {
         ++pos;
         std::vector<std::string> args;
+        bool anyCompleted = false;
         for (size_t n = 0 ; n < flag.handler.arity; ++n) {
             if (pos == end) {
                 if (flag.handler.arity == ArityAny) break;
                 throw UsageError("flag '%s' requires %d argument(s)", name, flag.handler.arity);
             }
             if (flag.completer)
-                if (auto prefix = needsCompletion(*pos))
+                if (auto prefix = needsCompletion(*pos)) {
+                    anyCompleted = true;
                     flag.completer(n, *prefix);
+                }
             args.push_back(*pos++);
         }
-        flag.handler.fun(std::move(args));
+        if (!anyCompleted)
+            flag.handler.fun(std::move(args));
         return true;
     };
 
