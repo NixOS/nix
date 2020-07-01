@@ -39,9 +39,11 @@ struct Hash
        Subresource Integrity hash expression). If the 'type' argument
        is not present, then the hash type must be specified in the
        string. */
-    Hash(std::string_view s, std::optional<HashType> type);
+    static Hash parseAny(std::string_view s, std::optional<HashType> type);
     // hash type must be part of string
-    Hash(std::string_view s);
+    static Hash parseAnyPrefixed(std::string_view s);
+    // prefix parsed separately; non SRI hash
+    static Hash parseAnyUnprefixed(std::string_view s, HashType type);
 
     static Hash fromSRI(std::string_view original);
 

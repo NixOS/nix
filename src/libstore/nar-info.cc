@@ -12,7 +12,7 @@ NarInfo::NarInfo(const Store & store, const std::string & s, const std::string &
 
     auto parseHashField = [&](const string & s) {
         try {
-            return Hash(s);
+            return Hash::parseAnyPrefixed(s);
         } catch (BadHash &) {
             throw corrupt();
         }

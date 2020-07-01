@@ -144,7 +144,10 @@ Hash Hash::fromSRI(std::string_view original) {
     return Hash(rest, std::make_pair(parsedType, true));
 }
 
-Hash::Hash(std::string_view s) : Hash(s, std::nullopt) {}
+Hash Hash::parseAnyPrefixed(std::string_view s)
+{
+    return parseAny(s, std::nullopt);
+}
 
 static std::pair<HashType, bool> newFunction(std::string_view & original, std::optional<HashType> optType)
 {
@@ -181,8 +184,11 @@ static std::pair<HashType, bool> newFunction(std::string_view & original, std::o
 }
 
 // mutates the string_view
-Hash::Hash(std::string_view original, std::optional<HashType> optType)
-    : Hash(original, newFunction(original, optType)) {}
+Hash Hash::parseAny(std::string_view original, std::optional<HashType> optType)
+{
+    auto typeAndSRI = newFunction(original, optType);
+    return Hash(original, typeAndSRI);
+}
 
 Hash::Hash(std::string_view rest, std::pair<HashType, bool> typeAndSRI)
     : Hash(typeAndSRI.first)
@@ -249,7 +255,7 @@ Hash newHashAllowEmpty(std::string hashStr, std::optional<HashType> ht)
         warn("found empty hash, assuming '%s'", h.to_string(SRI, true));
         return h;
     } else
-        return Hash(hashStr, ht);
+        return Hash::parseAny(hashStr, ht);
 }
 
 

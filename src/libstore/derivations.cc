@@ -118,7 +118,7 @@ static DerivationOutput parseDerivationOutput(const Store & store, istringstream
         const HashType hashType = parseHashType(hashAlgo);
         fsh = FixedOutputHash {
             .method = std::move(method),
-            .hash = Hash(hash, hashType),
+            .hash = Hash::parseAny(hash, hashType),
         };
     }
 
@@ -416,7 +416,7 @@ static DerivationOutput readDerivationOutput(Source & in, const Store & store)
         auto hashType = parseHashType(hashAlgo);
         fsh = FixedOutputHash {
             .method = std::move(method),
-            .hash = Hash(hash, hashType),
+            .hash = Hash::parseAny(hash, hashType),
         };
     }
 

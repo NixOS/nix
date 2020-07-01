@@ -156,7 +156,7 @@ static int _main(int argc, char * * argv)
         Hash hash(ht), expectedHash(ht);
         std::optional<StorePath> storePath;
         if (args.size() == 2) {
-            expectedHash = Hash(args[1], ht);
+            expectedHash = Hash::parseAny(args[1], ht);
             const auto recursive = unpack ? FileIngestionMethod::Recursive : FileIngestionMethod::Flat;
             storePath = store->makeFixedOutputPath(recursive, expectedHash, name);
             if (store->isValidPath(*storePath))
