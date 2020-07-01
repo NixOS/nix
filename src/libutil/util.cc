@@ -1,6 +1,5 @@
 #include "lazy.hh"
 #include "util.hh"
-#include "hash.hh"
 #include "affinity.hh"
 #include "sync.hh"
 #include "finally.hh"
