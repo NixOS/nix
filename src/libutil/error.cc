@@ -187,6 +187,7 @@ void printCodeLines(std::ostream &out,
 
 void printAtPos(const string &prefix, const ErrPos &pos, std::ostream &out)
 {
+    if (pos)
     {
         switch (pos.origin) {
             case foFile: {
@@ -290,7 +291,7 @@ std::ostream& showErrorInfo(std::ostream &out, const ErrorInfo &einfo, bool show
             einfo.programName.value_or(""));
 
     bool nl = false;  // intersperse newline between sections.
-    if (einfo.errPos.has_value()) {
+    if (einfo.errPos.has_value() && (*einfo.errPos)) {
         out << prefix << std::endl;
         printAtPos(prefix, *einfo.errPos, out);
         nl = true;
@@ -355,17 +356,20 @@ std::ostream& showErrorInfo(std::ostream &out, const ErrorInfo &einfo, bool show
         {
             try {
                 out << std::endl << prefix;
-                out << ANSI_BLUE << "trace: " << ANSI_NORMAL << iter->hint.str() <<  std::endl;
+                out << ANSI_BLUE << "trace: " << ANSI_NORMAL << iter->hint.str();
 
-                auto pos = *iter->pos;
-                printAtPos(prefix, pos, out);
                 nl = true;
-                auto loc = getCodeLines(pos);
-                if (loc.has_value())
-                {
-                    out << std::endl;
-                    printCodeLines(out, prefix, pos, *loc);
-                    out << std::endl;
+                auto pos = *iter->pos;
+                if (pos) {
+                    out << std::endl << prefix;
+                    printAtPos(prefix, pos, out);
+                    auto loc = getCodeLines(pos);
+                    if (loc.has_value())
+                    {
+                        out << std::endl << prefix;
+                        printCodeLines(out, prefix, pos, *loc);
+                        out << std::endl << prefix;
+                    }
                 }
             } catch(const std::bad_optional_access& e) {
                 out << iter->hint.str() << std::endl;

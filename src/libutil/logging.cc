@@ -84,6 +84,7 @@ public:
 
         log(ei.level, oss.str());
     }
+    
 
     void startActivity(ActivityId act, Verbosity lvl, ActivityType type,
         const std::string & s, const Fields & fields, ActivityId parent)
