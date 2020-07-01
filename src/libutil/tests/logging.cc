@@ -144,7 +144,6 @@ namespace nix {
      * logError
      * --------------------------------------------------------------------------*/
 
-
     TEST(logError, logErrorWithoutHintOrCode) {
         testing::internal::CaptureStderr();
 
