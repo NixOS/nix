@@ -6,9 +6,9 @@
 
 using namespace nix;
 
-struct CmdMakeMiniContentAddressable : StorePathsCommand, MixJSON
+struct CmdMakeContentAddressable : StorePathsCommand, MixJSON
 {
-    CmdMakeMiniContentAddressable()
+    CmdMakeContentAddressable()
     {
         realiseMode = Build;
     }
@@ -75,7 +75,7 @@ struct CmdMakeMiniContentAddressable : StorePathsCommand, MixJSON
 
             ValidPathInfo info {
                 *store,
-                FullContentAddress {
+                ContentAddress {
                     .name = std::string { path.name() },
                     .info = FixedOutputInfo {
                         {
@@ -108,4 +108,4 @@ struct CmdMakeMiniContentAddressable : StorePathsCommand, MixJSON
     }
 };
 
-static auto r1 = registerCommand<CmdMakeMiniContentAddressable>("make-content-addressable");
+static auto r1 = registerCommand<CmdMakeContentAddressable>("make-content-addressable");

@@ -205,7 +205,7 @@ StorePath Store::makeTextPath(std::string_view name, const TextInfo & info) cons
 template<class... Ts> struct overloaded : Ts... { using Ts::operator()...; };
 template<class... Ts> overloaded(Ts...) -> overloaded<Ts...>;
 
-StorePath Store::makeFixedOutputPathFromCA(const FullContentAddress & info) const
+StorePath Store::makeFixedOutputPathFromCA(const ContentAddress & info) const
 {
     // New template
     return std::visit(overloaded {
@@ -497,7 +497,7 @@ void Store::pathInfoToJSON(JSONPlaceholder & jsonOut, const StorePathSet & store
             }
 
             if (info->ca)
-                jsonPath.attr("ca", renderMiniContentAddress(info->ca));
+                jsonPath.attr("ca", renderLegacyContentAddress(info->ca));
 
             std::pair<uint64_t, uint64_t> closureSizes;
 
@@ -833,12 +833,12 @@ void ValidPathInfo::sign(const Store & store, const SecretKey & secretKey)
     sigs.insert(secretKey.signDetached(fingerprint(store)));
 }
 
-std::optional<FullContentAddress> ValidPathInfo::fullContentAddressOpt() const
+std::optional<ContentAddress> ValidPathInfo::fullContentAddressOpt() const
 {
     if (! ca)
         return std::nullopt;
 
-    return FullContentAddress {
+    return ContentAddress {
         .name = std::string { path.name() },
         .info = std::visit(overloaded {
             [&](TextHash th) {
@@ -903,7 +903,7 @@ Strings ValidPathInfo::shortRefs() const
 
 ValidPathInfo::ValidPathInfo(
     const Store & store,
-    FullContentAddress && info)
+    ContentAddress && info)
       : path(store.makeFixedOutputPathFromCA(info))
 {
     std::visit(overloaded {

@@ -69,7 +69,7 @@ DownloadFileResult downloadFile(
         auto hash = hashString(htSHA256, *res.data);
         ValidPathInfo info {
             *store,
-            FullContentAddress {
+            ContentAddress {
                 .name = name,
                 .info = FixedOutputInfo {
                     {
