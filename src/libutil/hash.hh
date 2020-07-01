@@ -43,7 +43,7 @@ struct Hash
     // hash type must be part of string
     Hash(std::string_view s);
 
-    Hash fromSRI(std::string_view original);
+    static Hash fromSRI(std::string_view original);
 
 private:
     // type must be provided, s must not include <type> prefix
