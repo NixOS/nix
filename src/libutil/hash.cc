@@ -184,36 +184,36 @@ static std::pair<HashType, bool> newFunction(std::string_view & original, std::o
 Hash::Hash(std::string_view original, std::optional<HashType> optType)
     : Hash(original, newFunction(original, optType)) {}
 
-Hash::Hash(std::string_view original, std::pair<HashType, bool> typeAndSRI)
+Hash::Hash(std::string_view rest, std::pair<HashType, bool> typeAndSRI)
     : Hash(typeAndSRI.first)
 {
     auto [type, isSRI] = std::move(typeAndSRI);
 
-    if (!isSRI && original.size() == base16Len()) {
+    if (!isSRI && rest.size() == base16Len()) {
 
         auto parseHexDigit = [&](char c) {
             if (c >= '0' && c <= '9') return c - '0';
             if (c >= 'A' && c <= 'F') return c - 'A' + 10;
             if (c >= 'a' && c <= 'f') return c - 'a' + 10;
-            throw BadHash("invalid base-16 hash '%s'", original);
+            throw BadHash("invalid base-16 hash '%s'", rest);
         };
 
         for (unsigned int i = 0; i < hashSize; i++) {
             hash[i] =
-                parseHexDigit(original[i * 2]) << 4
-                | parseHexDigit(original[i * 2 + 1]);
+                parseHexDigit(rest[i * 2]) << 4
+                | parseHexDigit(rest[i * 2 + 1]);
         }
     }
 
-    else if (!isSRI && original.size() == base32Len()) {
+    else if (!isSRI && rest.size() == base32Len()) {
 
-        for (unsigned int n = 0; n < original.size(); ++n) {
-            char c = original[original.size() - n - 1];
+        for (unsigned int n = 0; n < rest.size(); ++n) {
+            char c = rest[rest.size() - n - 1];
             unsigned char digit;
             for (digit = 0; digit < base32Chars.size(); ++digit) /* !!! slow */
                 if (base32Chars[digit] == c) break;
             if (digit >= 32)
-                throw BadHash("invalid base-32 hash '%s'", original);
+                throw BadHash("invalid base-32 hash '%s'", rest);
             unsigned int b = n * 5;
             unsigned int i = b / 8;
             unsigned int j = b % 8;
@@ -223,21 +223,21 @@ Hash::Hash(std::string_view original, std::pair<HashType, bool> typeAndSRI)
                 hash[i + 1] |= digit >> (8 - j);
             } else {
                 if (digit >> (8 - j))
-                    throw BadHash("invalid base-32 hash '%s'", original);
+                    throw BadHash("invalid base-32 hash '%s'", rest);
             }
         }
     }
 
-    else if (isSRI || original.size() == base64Len()) {
-        auto d = base64Decode(original);
+    else if (isSRI || rest.size() == base64Len()) {
+        auto d = base64Decode(rest);
         if (d.size() != hashSize)
-            throw BadHash("invalid %s hash '%s'", isSRI ? "SRI" : "base-64", original);
+            throw BadHash("invalid %s hash '%s'", isSRI ? "SRI" : "base-64", rest);
         assert(hashSize);
         memcpy(hash, d.data(), hashSize);
     }
 
     else
-        throw BadHash("hash '%s' has wrong length for hash type '%s'", original, printHashType(this->type));
+        throw BadHash("hash '%s' has wrong length for hash type '%s'", rest, printHashType(this->type));
 }
 
 Hash newHashAllowEmpty(std::string hashStr, std::optional<HashType> ht)
