@@ -135,7 +135,7 @@ std::optional<LinesOfCode> getCodeLines(const ErrPos &errPos)
     }
 }
 
-// if nixCode contains lines of code, print them to the ostream, indicating the error column.
+// print lines of code to the ostream, indicating the error column.
 void printCodeLines(std::ostream &out,
     const string &prefix,
     const ErrPos &errPos,
