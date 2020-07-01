@@ -84,6 +84,31 @@ MixFlakeOptions::MixFlakeOptions()
                 parseFlakeRef(flakeRef, absPath(".")));
         }}
     });
+
+    addFlag({
+        .longName = "inputs-from",
+        .description = "use the inputs of the specified flake as registry entries",
+        .labels = {"flake-url"},
+        .handler = {[&](std::string flakeRef) {
+            auto evalState = getEvalState();
+            auto flake = flake::lockFlake(
+                *evalState,
+                parseFlakeRef(flakeRef, absPath(".")),
+                { .writeLockFile = false });
+            for (auto & [inputName, input] : flake.lockFile.root->inputs) {
+                auto input2 = flake.lockFile.findInput({inputName}); // resolve 'follows' nodes
+                if (auto input3 = std::dynamic_pointer_cast<const flake::LockedNode>(input2)) {
+                    overrideRegistry(
+                        fetchers::Input::fromAttrs({{"type","indirect"}, {"id", inputName}}),
+                        input3->lockedRef.input,
+                        {});
+                }
+            }
+        }},
+        .completer = {[&](size_t, std::string_view prefix) {
+            completeFlakeRef(getEvalState()->store, prefix);
+        }}
+    });
 }
 
 SourceExprCommand::SourceExprCommand()

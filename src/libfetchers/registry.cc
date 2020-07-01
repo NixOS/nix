@@ -204,6 +204,8 @@ std::pair<Input, Attrs> lookupInRegistries(
     if (!input.isDirect())
         throw Error("cannot find flake '%s' in the flake registries", input.to_string());
 
+    debug("looked up '%s' -> '%s'", _input.to_string(), input.to_string());
+
     return {input, extraAttrs};
 }
 
