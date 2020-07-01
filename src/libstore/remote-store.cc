@@ -42,15 +42,12 @@ std::map<string, StorePath> readOutputPathMap(const Store & store, Source & from
 {
     std::map<string, StorePath> pathMap;
     auto rawInput = readStrings<Strings>(from);
+    if (rawInput.size() % 2)
+        throw Error("got an odd number of elements from the daemon when trying to read a output path map");
     auto curInput = rawInput.begin();
     while (curInput != rawInput.end()) {
-        string thisKey = *curInput;
-        curInput = std::next(curInput);
-        if (curInput == rawInput.end()) {
-            throw Error("Got an odd number of elements from the daemon when trying to read a map… that's odd");
-        }
-        string thisValue = *curInput;
-        curInput = std::next(curInput);
+        auto thisKey = *curInput++;
+        auto thisValue = *curInput++;
         pathMap.emplace(thisKey, store.parseStorePath(thisValue));
     }
     return pathMap;
