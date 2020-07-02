@@ -1,6 +1,6 @@
 set -e
 
-export TEST_ROOT=$(realpath ${TMPDIR:-/tmp}/nix-test)
+export TEST_ROOT=$(realpath ${TMPDIR:-/tmp}/nix-test)/${TEST_NAME:-default}
 export NIX_STORE_DIR
 if ! NIX_STORE_DIR=$(readlink -f $TEST_ROOT/store 2> /dev/null); then
     # Maybe the build directory is symlinked.
@@ -35,6 +35,7 @@ export xmllint="@xmllint@"
 export SHELL="@bash@"
 export PAGER=cat
 export HAVE_SODIUM="@HAVE_SODIUM@"
+export busybox="@sandbox_shell@"
 
 export version=@PACKAGE_VERSION@
 export system=@system@

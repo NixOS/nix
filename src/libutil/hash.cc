@@ -20,7 +20,7 @@ namespace nix {
 
 void Hash::init()
 {
-    if (!type) abort();
+    assert(type);
     switch (*type) {
     case htMD5: hashSize = md5HashSize; break;
     case htSHA1: hashSize = sha1HashSize; break;
@@ -102,15 +102,15 @@ static string printHash32(const Hash & hash)
 
 string printHash16or32(const Hash & hash)
 {
+    assert(hash.type);
     return hash.to_string(hash.type == htMD5 ? Base16 : Base32, false);
 }
 
 
-HashType assertInitHashType(const Hash & h) {
-    if (h.type)
-        return *h.type;
-    else
-        abort();
+HashType assertInitHashType(const Hash & h)
+{
+    assert(h.type);
+    return *h.type;
 }
 
 std::string Hash::to_string(Base base, bool includeType) const
@@ -371,14 +371,15 @@ HashType parseHashType(const string & s)
 string printHashType(HashType ht)
 {
     switch (ht) {
-    case htMD5: return "md5"; break;
-    case htSHA1: return "sha1"; break;
-    case htSHA256: return "sha256"; break;
-    case htSHA512: return "sha512"; break;
+    case htMD5: return "md5";
+    case htSHA1: return "sha1";
+    case htSHA256: return "sha256";
+    case htSHA512: return "sha512";
+    default:
+        // illegal hash type enum value internally, as opposed to external input
+        // which should be validated with nice error message.
+        assert(false);
     }
-    // illegal hash type enum value internally, as opposed to external input
-    // which should be validated with nice error message.
-    abort();
 }
 
 }

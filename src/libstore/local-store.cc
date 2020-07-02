@@ -775,17 +775,20 @@ StorePathSet LocalStore::queryValidDerivers(const StorePath & path)
 }
 
 
-StorePathSet LocalStore::queryDerivationOutputs(const StorePath & path)
+OutputPathMap LocalStore::queryDerivationOutputMap(const StorePath & path)
 {
-    return retrySQLite<StorePathSet>([&]() {
+    return retrySQLite<OutputPathMap>([&]() {
         auto state(_state.lock());
 
         auto useQueryDerivationOutputs(state->stmtQueryDerivationOutputs.use()
             (queryValidPathId(*state, path)));
 
-        StorePathSet outputs;
+        OutputPathMap outputs;
         while (useQueryDerivationOutputs.next())
-            outputs.insert(parseStorePath(useQueryDerivationOutputs.getStr(1)));
+            outputs.emplace(
+                useQueryDerivationOutputs.getStr(0),
+                parseStorePath(useQueryDerivationOutputs.getStr(1))
+            );
 
         return outputs;
     });

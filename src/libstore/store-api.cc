@@ -257,6 +257,16 @@ bool Store::PathInfoCacheValue::isKnownNow()
     return std::chrono::steady_clock::now() < time_point + ttl;
 }
 
+StorePathSet Store::queryDerivationOutputs(const StorePath & path)
+{
+    auto outputMap = this->queryDerivationOutputMap(path);
+    StorePathSet outputPaths;
+    for (auto & i: outputMap) {
+        outputPaths.emplace(std::move(i.second));
+    }
+    return outputPaths;
+}
+
 bool Store::isValidPath(const StorePath & storePath)
 {
     std::string hashPart(storePath.hashPart());
