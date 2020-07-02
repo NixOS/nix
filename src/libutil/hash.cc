@@ -149,11 +149,12 @@ Hash Hash::parseAnyPrefixed(std::string_view s)
     return parseAny(s, std::nullopt);
 }
 
-static std::pair<HashType, bool> newFunction(std::string_view & rest, std::optional<HashType> optType)
+Hash Hash::parseAny(std::string_view original, std::optional<HashType> optType)
 {
-    auto original = rest;
+    auto rest = original;
 
     bool isSRI = false;
+    HashType hashType;
 
     // Parse the has type before the separater, if there was one.
     std::optional<HashType> optParsedType;
@@ -171,23 +172,13 @@ static std::pair<HashType, bool> newFunction(std::string_view & rest, std::optio
 
     // Either the string or user must provide the type, if they both do they
     // must agree.
-    if (!optParsedType && !optType) {
+    if (!optParsedType && !optType)
         throw BadHash("hash '%s' does not include a type, nor is the type otherwise known from context.", rest);
-    } else {
-        if (optParsedType && optType && *optParsedType != *optType)
-            throw BadHash("hash '%s' should have type '%s'", original, printHashType(*optType));
-        return {
-            optParsedType ? *optParsedType : *optType,
-            isSRI,
-        };
-    }
-}
+    else if (optParsedType && optType && *optParsedType != *optType)
+        throw BadHash("hash '%s' should have type '%s'", original, printHashType(*optType));
 
-// mutates the string_view
-Hash Hash::parseAny(std::string_view original, std::optional<HashType> optType)
-{
-    auto typeAndSRI = newFunction(original, optType);
-    return Hash(original, typeAndSRI);
+    hashType = optParsedType ? *optParsedType : *optType;
+    return Hash(rest, std::make_pair(hashType, isSRI));
 }
 
 Hash::Hash(std::string_view rest, std::pair<HashType, bool> typeAndSRI)
