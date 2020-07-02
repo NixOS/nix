@@ -173,6 +173,11 @@ Hash Hash::parseAny(std::string_view original, std::optional<HashType> optType)
     return Hash(rest, hashType, isSRI);
 }
 
+Hash Hash::parseNonSRIUnprefixed(std::string_view s, HashType type)
+{
+    return Hash(s, type, false);
+}
+
 Hash::Hash(std::string_view rest, HashType type, bool isSRI)
     : Hash(type)
 {

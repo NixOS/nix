@@ -43,7 +43,7 @@ struct Hash
     // hash type must be part of string
     static Hash parseAnyPrefixed(std::string_view s);
     // prefix parsed separately; non SRI hash
-    static Hash parseAnyUnprefixed(std::string_view s, HashType type);
+    static Hash parseNonSRIUnprefixed(std::string_view s, HashType type);
 
     static Hash parseSRI(std::string_view original);
 
