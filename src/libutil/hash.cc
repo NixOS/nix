@@ -147,22 +147,7 @@ Hash Hash::parseSRI(std::string_view original) {
 Hash Hash::parseAnyPrefixed(std::string_view original)
 {
     auto rest = original;
-
-    bool isSRI = false;
-
-    // Parse the has type before the separater, if there was one.
-    std::optional<HashType> optParsedType;
-    {
-        auto hashRaw = splitPrefix(rest, ':');
-
-        if (!hashRaw) {
-            hashRaw = splitPrefix(rest, '-');
-            if (hashRaw)
-                isSRI = true;
-        }
-        if (hashRaw)
-            optParsedType = parseHashType(*hashRaw);
-    }
+    auto [optParsedType, isSRI] = getParsedTypeAndSRI(rest);
 
     // Either the string or user must provide the type, if they both do they
     // must agree.
@@ -175,23 +160,7 @@ Hash Hash::parseAnyPrefixed(std::string_view original)
 Hash Hash::parseAny(std::string_view original, std::optional<HashType> optType)
 {
     auto rest = original;
-
-    bool isSRI = false;
-    HashType hashType;
-
-    // Parse the has type before the separater, if there was one.
-    std::optional<HashType> optParsedType;
-    {
-        auto hashRaw = splitPrefix(rest, ':');
-
-        if (!hashRaw) {
-            hashRaw = splitPrefix(rest, '-');
-            if (hashRaw)
-                isSRI = true;
-        }
-        if (hashRaw)
-            optParsedType = parseHashType(*hashRaw);
-    }
+    auto [optParsedType, isSRI] = getParsedTypeAndSRI(rest);
 
     // Either the string or user must provide the type, if they both do they
     // must agree.
@@ -200,7 +169,7 @@ Hash Hash::parseAny(std::string_view original, std::optional<HashType> optType)
     else if (optParsedType && optType && *optParsedType != *optType)
         throw BadHash("hash '%s' should have type '%s'", original, printHashType(*optType));
 
-    hashType = optParsedType ? *optParsedType : *optType;
+    HashType hashType = optParsedType ? *optParsedType : *optType;
     return Hash(rest, hashType, isSRI);
 }
 
