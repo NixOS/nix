@@ -18,6 +18,7 @@ build-users-group =
 keep-derivations = false
 sandbox = false
 experimental-features = nix-command flakes
+gc-reserved-space = 0
 include nix.conf.extra
 EOF
 

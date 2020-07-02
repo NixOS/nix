@@ -6,7 +6,7 @@ namespace nix {
 #define WORKER_MAGIC_1 0x6e697863
 #define WORKER_MAGIC_2 0x6478696f
 
-#define PROTOCOL_VERSION 0x115
+#define PROTOCOL_VERSION 0x116
 #define GET_PROTOCOL_MAJOR(x) ((x) & 0xff00)
 #define GET_PROTOCOL_MINOR(x) ((x) & 0x00ff)
 
@@ -30,7 +30,7 @@ typedef enum {
     wopSetOptions = 19,
     wopCollectGarbage = 20,
     wopQuerySubstitutablePathInfo = 21,
-    wopQueryDerivationOutputs = 22,
+    wopQueryDerivationOutputs = 22, // obsolete
     wopQueryAllValidPaths = 23,
     wopQueryFailedPaths = 24,
     wopClearFailedPaths = 25,
@@ -49,7 +49,8 @@ typedef enum {
     wopNarFromPath = 38,
     wopAddToStoreNar = 39,
     wopQueryMissing = 40,
-    wopSync = 41,
+    wopQueryDerivationOutputMap = 41,
+    wopSync = 42,
 } WorkerOp;
 
 
@@ -70,5 +71,6 @@ template<class T> T readStorePaths(const Store & store, Source & from);
 
 void writeStorePaths(const Store & store, Sink & out, const StorePathSet & paths);
 
+void writeOutputPathMap(const Store & store, Sink & out, const OutputPathMap & paths);
 
 }

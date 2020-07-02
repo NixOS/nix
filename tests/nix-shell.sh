@@ -55,3 +55,10 @@ chmod a+rx $TEST_ROOT/shell.shebang.rb
 
 output=$($TEST_ROOT/shell.shebang.rb abc ruby)
 [ "$output" = '-e load("'"$TEST_ROOT"'/shell.shebang.rb") -- abc ruby' ]
+
+# Test 'nix develop'.
+nix develop -f shell.nix shellDrv -c sh -c '[[ -n $stdenv ]]'
+
+# Test 'nix print-dev-env'.
+source <(nix print-dev-env -f shell.nix shellDrv)
+[[ -n $stdenv ]]
