@@ -46,14 +46,14 @@ ContentAddress parseContentAddress(std::string_view rawCa) {
 
     std::string_view prefix;
     {
-        auto optPrefix = splitPrefix(rest, ':');
+        auto optPrefix = splitPrefixTo(rest, ':');
         if (!optPrefix)
             throw UsageError("not a content address because it is not in the form \"<prefix>:<rest>\": %s", rawCa);
         prefix = *optPrefix;
     }
 
     auto parseHashType_ = [&](){
-        auto hashTypeRaw = splitPrefix(rest, ':');
+        auto hashTypeRaw = splitPrefixTo(rest, ':');
         if (!hashTypeRaw)
             throw UsageError("content address hash must be in form \"<algo>:<hash>\", but found: %s", rawCa);
         HashType hashType = parseHashType(*hashTypeRaw);
@@ -73,10 +73,8 @@ ContentAddress parseContentAddress(std::string_view rawCa) {
     } else if (prefix == "fixed") {
         // Parse method
         auto method = FileIngestionMethod::Flat;
-        if (rest.substr(0, 2) == "r:") {
+        if (splitPrefix(rest, "r:"))
             method = FileIngestionMethod::Recursive;
-            rest = rest.substr(2);
-        }
         HashType hashType = parseHashType_();
         return FixedOutputHash {
             .method = method,
