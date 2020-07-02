@@ -144,9 +144,32 @@ Hash Hash::parseSRI(std::string_view original) {
     return Hash(rest, parsedType, true);
 }
 
-Hash Hash::parseAnyPrefixed(std::string_view s)
+Hash Hash::parseAnyPrefixed(std::string_view original)
 {
-    return parseAny(s, std::nullopt);
+    auto rest = original;
+
+    bool isSRI = false;
+
+    // Parse the has type before the separater, if there was one.
+    std::optional<HashType> optParsedType;
+    {
+        auto hashRaw = splitPrefix(rest, ':');
+
+        if (!hashRaw) {
+            hashRaw = splitPrefix(rest, '-');
+            if (hashRaw)
+                isSRI = true;
+        }
+        if (hashRaw)
+            optParsedType = parseHashType(*hashRaw);
+    }
+
+    // Either the string or user must provide the type, if they both do they
+    // must agree.
+    if (!optParsedType)
+        throw BadHash("hash '%s' does not include a type.", rest);
+
+    return Hash(rest, *optParsedType, isSRI);
 }
 
 Hash Hash::parseAny(std::string_view original, std::optional<HashType> optType)
