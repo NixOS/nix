@@ -45,7 +45,7 @@ struct Hash
     // prefix parsed separately; non SRI hash
     static Hash parseAnyUnprefixed(std::string_view s, HashType type);
 
-    static Hash fromSRI(std::string_view original);
+    static Hash parseSRI(std::string_view original);
 
 private:
     // type must be provided, s must not include <type> prefix

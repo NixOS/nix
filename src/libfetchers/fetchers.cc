@@ -35,7 +35,7 @@ std::unique_ptr<Input> inputFromAttrs(const Attrs & attrs)
         auto res = inputScheme->inputFromAttrs(attrs2);
         if (res) {
             if (auto narHash = maybeGetStrAttr(attrs, "narHash"))
-                res->narHash = Hash::fromSRI(*narHash);
+                res->narHash = Hash::parseSRI(*narHash);
             return res;
         }
     }

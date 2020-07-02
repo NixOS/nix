@@ -242,13 +242,13 @@ struct TarballInputScheme : InputScheme
 
         auto hash = input->url.query.find("hash");
         if (hash != input->url.query.end()) {
-            input->hash = Hash::fromSRI(hash->second);
+            input->hash = Hash::parseSRI(hash->second);
             input->url.query.erase(hash);
         }
 
         auto narHash = input->url.query.find("narHash");
         if (narHash != input->url.query.end()) {
-            input->narHash = Hash::fromSRI(narHash->second);
+            input->narHash = Hash::parseSRI(narHash->second);
             input->url.query.erase(narHash);
         }
 

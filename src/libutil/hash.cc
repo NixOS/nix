@@ -132,7 +132,7 @@ std::string Hash::to_string(Base base, bool includeType) const
     return s;
 }
 
-Hash Hash::fromSRI(std::string_view original) {
+Hash Hash::parseSRI(std::string_view original) {
     auto rest = original;
 
     // Parse the has type before the separater, if there was one.
