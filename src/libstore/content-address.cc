@@ -68,7 +68,7 @@ ContentAddress parseContentAddress(std::string_view rawCa) {
             throw Error("text content address hash should use %s, but instead uses %s",
                 printHashType(htSHA256), printHashType(hashType));
         return TextHash {
-            .hash = Hash::parseAny(rest, std::move(hashType)),
+            .hash = Hash::parseNonSRIUnprefixed(rest, std::move(hashType)),
         };
     } else if (prefix == "fixed") {
         // Parse method
@@ -80,7 +80,7 @@ ContentAddress parseContentAddress(std::string_view rawCa) {
         HashType hashType = parseHashType_();
         return FixedOutputHash {
             .method = method,
-            .hash = Hash::parseAny(rest, std::move(hashType)),
+            .hash = Hash::parseNonSRIUnprefixed(rest, std::move(hashType)),
         };
     } else
         throw UsageError("content address prefix \"%s\" is unrecognized. Recogonized prefixes are \"text\" or \"fixed\"", prefix);
