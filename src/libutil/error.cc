@@ -7,7 +7,6 @@
 
 namespace nix {
 
-
 const std::string nativeSystem = SYSTEM;
 
 BaseError & BaseError::addTrace(std::optional<ErrPos> e, hintformat hint)
