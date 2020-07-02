@@ -4421,6 +4421,9 @@ void SubstitutionGoal::tryNext()
         subPath = sub->makeFixedOutputPathFromCA(storePath.name(), *ca);
         if (sub->storeDir == worker.store.storeDir)
             assert(subPath == storePath);
+    } else if (sub->storeDir != worker.store.storeDir) {
+        tryNext();
+        return;
     }
 
     try {
