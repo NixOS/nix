@@ -370,7 +370,7 @@ string printHashType(HashType ht)
     default:
         // illegal hash type enum value internally, as opposed to external input
         // which should be validated with nice error message.
-        abort();
+        assert(false);
     }
 }
 
