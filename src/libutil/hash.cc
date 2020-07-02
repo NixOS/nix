@@ -141,7 +141,7 @@ Hash Hash::fromSRI(std::string_view original) {
         throw BadHash("hash '%s' is not SRI", original);
     HashType parsedType = parseHashType(*hashRaw);
 
-    return Hash(rest, std::make_pair(parsedType, true));
+    return Hash(rest, parsedType, true);
 }
 
 Hash Hash::parseAnyPrefixed(std::string_view s)
@@ -178,14 +178,12 @@ Hash Hash::parseAny(std::string_view original, std::optional<HashType> optType)
         throw BadHash("hash '%s' should have type '%s'", original, printHashType(*optType));
 
     hashType = optParsedType ? *optParsedType : *optType;
-    return Hash(rest, std::make_pair(hashType, isSRI));
+    return Hash(rest, hashType, isSRI);
 }
 
-Hash::Hash(std::string_view rest, std::pair<HashType, bool> typeAndSRI)
-    : Hash(typeAndSRI.first)
+Hash::Hash(std::string_view rest, HashType type, bool isSRI)
+    : Hash(type)
 {
-    auto [type, isSRI] = std::move(typeAndSRI);
-
     if (!isSRI && rest.size() == base16Len()) {
 
         auto parseHexDigit = [&](char c) {

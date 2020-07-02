@@ -49,7 +49,7 @@ struct Hash
 
 private:
     // type must be provided, s must not include <type> prefix
-    Hash(std::string_view s, std::pair<HashType, bool> typeAndSRI);
+    Hash(std::string_view s, HashType type, bool isSRI);
 
 public:
     /* Check whether a hash is set. */
