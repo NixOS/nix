@@ -584,7 +584,7 @@ Expr * EvalState::parse(const char * text, FileOrigin origin,
             data.file = data.symbols.create(text);
             break;
         default:
-            throw Error("invalid FileOrigin in parse");
+            assert(false);
     }
     data.basePath = basePath;
 
