@@ -323,9 +323,8 @@ int handleExceptions(const string & programName, std::function<void()> fun)
         printError("Try '%1% --help' for more information.", programName);
         return 1;
     } catch (BaseError & e) {
-        logger->setShowTrace(settings.showTrace);
         logError(e.info());
-        if (e.hasTrace() && !settings.showTrace)
+        if (e.hasTrace() && !loggerSettings.showTrace.get())
             printError("(use '--show-trace' to show detailed location information)");
         return e.status;
     } catch (std::bad_alloc & e) {

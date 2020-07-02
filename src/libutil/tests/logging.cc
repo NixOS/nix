@@ -266,7 +266,7 @@ namespace nix {
 
         testing::internal::CaptureStderr();
 
-        logger->setShowTrace(true);
+        loggerSettings.showTrace.assign(true);
 
         logError(e.info());
 
@@ -292,7 +292,7 @@ namespace nix {
 
         testing::internal::CaptureStderr();
 
-        logger->setShowTrace(false);
+        loggerSettings.showTrace.assign(false);
 
         logError(e.info());
 

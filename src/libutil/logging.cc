@@ -1,11 +1,16 @@
 #include "logging.hh"
 #include "util.hh"
+#include "config.hh"
 
 #include <atomic>
 #include <nlohmann/json.hpp>
 #include <iostream>
 
 namespace nix {
+
+LoggerSettings loggerSettings;
+
+static GlobalConfig::Register r1(&loggerSettings);
 
 static thread_local ActivityId curActivity = 0;
 
@@ -18,7 +23,7 @@ void setCurActivity(const ActivityId activityId)
     curActivity = activityId;
 }
 
-Logger * logger = makeSimpleLogger(true, false);
+Logger * logger = makeSimpleLogger(true);
 
 void Logger::warn(const std::string & msg)
 {
@@ -36,10 +41,9 @@ public:
 
     bool systemd, tty;
     bool printBuildLogs;
-    bool showTrace;
 
-    SimpleLogger(bool printBuildLogs, bool showTrace)
-        : printBuildLogs(printBuildLogs), showTrace(showTrace)
+    SimpleLogger(bool printBuildLogs)
+        : printBuildLogs(printBuildLogs)
     {
         systemd = getEnv("IN_SYSTEMD") == "1";
         tty = isatty(STDERR_FILENO);
@@ -47,13 +51,6 @@ public:
 
     bool isVerbose() override {
         return printBuildLogs;
-    }
-
-    bool getShowTrace() const override {
-        return showTrace;
-    }
-    void setShowTrace(bool showTrace) override {
-        this->showTrace = showTrace;
     }
 
     void log(Verbosity lvl, const FormatOrString & fs) override
@@ -80,7 +77,7 @@ public:
     void logEI(const ErrorInfo & ei) override
     {
         std::stringstream oss;
-        showErrorInfo(oss, ei, showTrace);
+        showErrorInfo(oss, ei, loggerSettings.showTrace.get());
 
         log(ei.level, oss.str());
     }
@@ -129,9 +126,9 @@ void writeToStderr(const string & s)
     }
 }
 
-Logger * makeSimpleLogger(bool printBuildLogs, bool showTrace)
+Logger * makeSimpleLogger(bool printBuildLogs)
 {
-    return new SimpleLogger(printBuildLogs, showTrace);
+    return new SimpleLogger(printBuildLogs);
 }
 
 std::atomic<uint64_t> nextId{(uint64_t) getpid() << 32};
@@ -150,13 +147,6 @@ struct JSONLogger : Logger {
 
     bool isVerbose() override {
         return true;
-    }
-
-    bool getShowTrace() const override {
-        return prevLogger.getShowTrace();
-    }
-    void setShowTrace(bool showTrace) override {
-        prevLogger.setShowTrace(showTrace);
     }
 
     void addFields(nlohmann::json & json, const Fields & fields)
@@ -189,7 +179,7 @@ struct JSONLogger : Logger {
     void logEI(const ErrorInfo & ei) override
     {
         std::ostringstream oss;
-        showErrorInfo(oss, ei, getShowTrace());
+        showErrorInfo(oss, ei, loggerSettings.showTrace.get());
 
         nlohmann::json json;
         json["action"] = "msg";

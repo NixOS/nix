@@ -22,11 +22,11 @@ LogFormat parseLogFormat(const std::string & logFormatStr) {
 Logger * makeDefaultLogger() {
     switch (defaultLogFormat) {
     case LogFormat::raw:
-        return makeSimpleLogger(false, false);
+        return makeSimpleLogger(false);
     case LogFormat::rawWithLogs:
-        return makeSimpleLogger(true, false);
+        return makeSimpleLogger(true);
     case LogFormat::internalJson:
-        return makeJSONLogger(*makeSimpleLogger(true, false));
+        return makeJSONLogger(*makeSimpleLogger(true));
     case LogFormat::bar:
         return makeProgressBar();
     case LogFormat::barWithLogs:

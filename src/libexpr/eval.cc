@@ -1232,7 +1232,7 @@ void EvalState::callFunction(Value & fun, Value & arg, Value & v, const Pos & po
 
     /* Evaluate the body.  This is conditional on showTrace, because
        catching exceptions makes this function not tail-recursive. */
-    if (settings.showTrace)
+    if (loggerSettings.showTrace.get())
         try {
             lambda.body->eval(*this, env2, v);
         } catch (Error & e) {

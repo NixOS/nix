@@ -2,6 +2,7 @@
 
 #include "types.hh"
 #include "error.hh"
+#include "config.hh"
 
 namespace nix {
 
@@ -33,6 +34,16 @@ typedef enum {
 } ResultType;
 
 typedef uint64_t ActivityId;
+
+struct LoggerSettings : Config
+{
+    Setting<bool> showTrace{this,
+        false,
+        "show-trace",
+        "Whether to show a stack trace on evaluation errors."};
+};
+
+extern LoggerSettings loggerSettings;
 
 class Logger
 {
@@ -74,9 +85,6 @@ public:
         ei.level = lvl;
         logEI(ei);
     }
-
-    virtual bool getShowTrace() const = 0;
-    virtual void setShowTrace(bool showTrace) = 0;
 
     virtual void warn(const std::string & msg);
 
@@ -149,7 +157,7 @@ struct PushActivity
 
 extern Logger * logger;
 
-Logger * makeSimpleLogger(bool printBuildLogs = true, bool showTrace = false);
+Logger * makeSimpleLogger(bool printBuildLogs = true);
 
 Logger * makeJSONLogger(Logger & prevLogger);
 

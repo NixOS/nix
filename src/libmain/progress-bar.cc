@@ -81,14 +81,12 @@ private:
 
     bool printBuildLogs;
     bool isTTY;
-    bool showTrace;
 
 public:
 
     ProgressBar(bool printBuildLogs, bool isTTY)
         : printBuildLogs(printBuildLogs)
         , isTTY(isTTY)
-        , showTrace(false)
     {
         state_.lock()->active = isTTY;
         updateThread = std::thread([&]() {
@@ -133,15 +131,9 @@ public:
         auto state(state_.lock());
 
         std::stringstream oss;
-        showErrorInfo(oss, ei, showTrace);
+        showErrorInfo(oss, ei, loggerSettings.showTrace.get());
 
         log(*state, ei.level, oss.str());
-    }
-    bool getShowTrace() const override {
-        return showTrace;
-    }
-    void setShowTrace(bool showTrace) override {
-        this->showTrace = showTrace;
     }
 
     void log(State & state, Verbosity lvl, const std::string & s)

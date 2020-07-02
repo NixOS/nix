@@ -41,10 +41,9 @@ struct TunnelLogger : public Logger
     Sync<State> state_;
 
     unsigned int clientVersion;
-    bool showTrace;
 
     TunnelLogger(FdSink & to, unsigned int clientVersion)
-        : to(to), clientVersion(clientVersion), showTrace(false) { }
+        : to(to), clientVersion(clientVersion) { }
 
     void enqueueMsg(const std::string & s)
     {
@@ -84,13 +83,6 @@ struct TunnelLogger : public Logger
         StringSink buf;
         buf << STDERR_NEXT << oss.str() << "\n";
         enqueueMsg(*buf.s);
-    }
-
-    bool getShowTrace() const override {
-        return showTrace;
-    }
-    void setShowTrace(bool showTrace) override {
-        this->showTrace = showTrace;
     }
 
     /* startWork() means that we're starting an operation for which we
