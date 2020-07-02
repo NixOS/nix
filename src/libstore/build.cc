@@ -4270,6 +4270,10 @@ private:
     /* The store path that should be realised through a substitute. */
     StorePath storePath;
 
+    /* The path the substituter refers to the path as. This will be
+     * different when the stores have different names. */
+    std::optional<StorePath> subPath;
+
     /* The remaining substituters. */
     std::list<ref<Store>> subs;
 
@@ -4416,7 +4420,6 @@ void SubstitutionGoal::tryNext()
     sub = subs.front();
     subs.pop_front();
 
-    auto subPath = storePath;
     if (ca) {
         subPath = sub->makeFixedOutputPathFromCA(storePath.name(), *ca);
         if (sub->storeDir == worker.store.storeDir)
@@ -4428,7 +4431,7 @@ void SubstitutionGoal::tryNext()
 
     try {
         // FIXME: make async
-        info = sub->queryPathInfo(subPath);
+        info = sub->queryPathInfo(subPath ? *subPath : storePath);
     } catch (InvalidPath &) {
         tryNext();
         return;
@@ -4548,15 +4551,8 @@ void SubstitutionGoal::tryToRun()
             Activity act(*logger, actSubstitute, Logger::Fields{worker.store.printStorePath(storePath), sub->getUri()});
             PushActivity pact(act.id);
 
-            auto subPath = storePath;
-            if (ca) {
-                subPath = sub->makeFixedOutputPathFromCA(storePath.name(), *ca);
-                if (sub->storeDir == worker.store.storeDir)
-                    assert(subPath == storePath);
-            }
-
             copyStorePath(ref<Store>(sub), ref<Store>(worker.store.shared_from_this()),
-                subPath, repair, sub->isTrusted ? NoCheckSigs : CheckSigs);
+                subPath ? *subPath : storePath, repair, sub->isTrusted ? NoCheckSigs : CheckSigs);
 
             promise.set_value();
         } catch (...) {
