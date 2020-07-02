@@ -149,9 +149,9 @@ Hash Hash::parseAnyPrefixed(std::string_view s)
     return parseAny(s, std::nullopt);
 }
 
-static std::pair<HashType, bool> newFunction(std::string_view & original, std::optional<HashType> optType)
+static std::pair<HashType, bool> newFunction(std::string_view & rest, std::optional<HashType> optType)
 {
-    auto rest = original;
+    auto original = rest;
 
     bool isSRI = false;
 
