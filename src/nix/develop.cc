@@ -50,7 +50,7 @@ BuildEnvironment readEnvironment(const Path & path)
         R"re((?:\$?'(?:[^'\\]|\\[abeEfnrtv\\'"?])*'))re";
 
     static std::string indexedArrayRegex =
-        R"re((?:\(( *\[[0-9]+]="(?:[^"\\]|\\.)*")**\)))re";
+        R"re((?:\(( *\[[0-9]+\]="(?:[^"\\]|\\.)*")*\)))re";
 
     static std::regex varRegex(
         "^(" + varNameRegex + ")=(" + simpleStringRegex + "|" + quotedStringRegex + "|" + indexedArrayRegex + ")\n");
