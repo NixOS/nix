@@ -41,4 +41,4 @@ tests-environment = NIX_REMOTE= $(bash) -e
 
 clean-files += $(d)/common.sh
 
-installcheck: $(d)/common.sh $(d)/config.nix $(d)/plugins/libplugintest.$(SO_EXT)
+test-deps += tests/common.sh tests/config.nix tests/plugins/libplugintest.$(SO_EXT)
