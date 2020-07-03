@@ -81,7 +81,7 @@ nix-store --generate-binary-cache-key $SIGNING_KEY_NAME $SIGNING_KEY_PRI_FILE $S
 ################################################################################
 
 mkdir -p $IPFS_SRC_STORE
-storePaths=$(nix-build ./fixed.nix -A good)
+storePaths=$(nix-build ./fixed.nix -A good --no-out-link)
 
 nix sign-paths -k $SIGNING_KEY_PRI_FILE $storePaths
 
@@ -119,11 +119,11 @@ nix-build ./fixed.nix -A good \
 # Try to upload the content to the empty directory, fail but grab the right hash
 IPFS_ADDRESS=$(set -e; \
   set -o pipefail; \
-  ! nix copy --to ipfs://$EMPTY_HASH $(nix-build ./fixed.nix -A good) --experimental-features nix-command \
+  ! nix copy --to ipfs://$EMPTY_HASH $(nix-build ./fixed.nix -A good --no-out-link) --experimental-features nix-command \
     |& grep current: | awk '{print $2}')
 
 # Verify that new path is valid.
-nix copy --to $IPFS_ADDRESS $(nix-build ./fixed.nix -A good) --experimental-features nix-command
+nix copy --to $IPFS_ADDRESS $(nix-build ./fixed.nix -A good --no-out-link) --experimental-features nix-command
 
 mkdir $IPFS_DST_IPFS_STORE
 
@@ -143,7 +143,7 @@ nix-build ./fixed.nix -A good \
 IPNS_ID=$(ipfs name publish $EMPTY_HASH --allow-offline | awk '{print substr($3,1,length($3)-1)}')
 
 # Check that we can upload the ipns store directly
-nix copy --to ipns://$IPNS_ID $(nix-build ./fixed.nix -A good) --experimental-features nix-command
+nix copy --to ipns://$IPNS_ID $(nix-build ./fixed.nix -A good --no-out-link) --experimental-features nix-command
 
 mkdir $IPFS_DST_IPNS_STORE
 
