@@ -30,7 +30,8 @@ namespace nix {
         SymbolTable & symbols;
         Expr * result;
         Path basePath;
-        Symbol path;
+        Symbol file;
+        FileOrigin origin;
         ErrorInfo error;
         Symbol sLetBody;
         ParseData(EvalState & state)
@@ -65,18 +66,17 @@ namespace nix {
 static void dupAttr(const AttrPath & attrPath, const Pos & pos, const Pos & prevPos)
 {
     throw ParseError({
-        .hint = hintfmt("attribute '%1%' already defined at %2%",
+         .hint = hintfmt("attribute '%1%' already defined at %2%",
             showAttrPath(attrPath), prevPos),
-        .nixCode = NixCode { .errPos = pos },
+         .errPos = pos
     });
 }
-
 
 static void dupAttr(Symbol attr, const Pos & pos, const Pos & prevPos)
 {
     throw ParseError({
         .hint = hintfmt("attribute '%1%' already defined at %2%", attr, prevPos),
-        .nixCode = NixCode { .errPos = pos },
+        .errPos = pos
     });
 }
 
@@ -148,7 +148,7 @@ static void addFormal(const Pos & pos, Formals * formals, const Formal & formal)
         throw ParseError({
             .hint = hintfmt("duplicate formal function argument '%1%'",
                 formal.name),
-            .nixCode = NixCode { .errPos = pos },
+            .errPos = pos
         });
     formals->formals.push_front(formal);
 }
@@ -246,7 +246,7 @@ static Expr * stripIndentation(const Pos & pos, SymbolTable & symbols, vector<Ex
 
 static inline Pos makeCurPos(const YYLTYPE & loc, ParseData * data)
 {
-    return Pos(data->path, loc.first_line, loc.first_column);
+    return Pos(data->origin, data->file, loc.first_line, loc.first_column);
 }
 
 #define CUR_POS makeCurPos(*yylocp, data)
@@ -259,7 +259,7 @@ void yyerror(YYLTYPE * loc, yyscan_t scanner, ParseData * data, const char * err
 {
     data->error = {
         .hint = hintfmt(error),
-        .nixCode = NixCode { .errPos = makeCurPos(*loc, data) }
+        .errPos = makeCurPos(*loc, data)
     };
 }
 
@@ -339,7 +339,7 @@ expr_function
     { if (!$2->dynamicAttrs.empty())
         throw ParseError({
             .hint = hintfmt("dynamic attributes not allowed in let"),
-            .nixCode = NixCode { .errPos = CUR_POS },
+            .errPos = CUR_POS
         });
       $$ = new ExprLet($2, $4);
     }
@@ -419,7 +419,7 @@ expr_simple
       if (noURLLiterals)
           throw ParseError({
               .hint = hintfmt("URL literals are disabled"),
-              .nixCode = NixCode { .errPos = CUR_POS }
+              .errPos = CUR_POS
           });
       $$ = new ExprString(data->symbols.create($1));
   }
@@ -492,7 +492,7 @@ attrs
       } else
           throw ParseError({
               .hint = hintfmt("dynamic attributes not allowed in inherit"),
-              .nixCode = NixCode { .errPos = makeCurPos(@2, data) },
+              .errPos = makeCurPos(@2, data)
           });
     }
   | { $$ = new AttrPath; }
@@ -569,13 +569,24 @@ formal
 namespace nix {
 
 
-Expr * EvalState::parse(const char * text,
+Expr * EvalState::parse(const char * text, FileOrigin origin,
     const Path & path, const Path & basePath, StaticEnv & staticEnv)
 {
     yyscan_t scanner;
     ParseData data(*this);
+    data.origin = origin;
+    switch (origin) {
+        case foFile: 
+            data.file = data.symbols.create(path);
+            break;
+        case foStdin:
+        case foString:
+            data.file = data.symbols.create(text);
+            break;
+        default:
+            assert(false);
+    }
     data.basePath = basePath;
-    data.path = data.symbols.create(path);
 
     yylex_init(&scanner);
     yy_scan_string(text, scanner);
@@ -625,13 +636,13 @@ Expr * EvalState::parseExprFromFile(const Path & path)
 
 Expr * EvalState::parseExprFromFile(const Path & path, StaticEnv & staticEnv)
 {
-    return parse(readFile(path).c_str(), path, dirOf(path), staticEnv);
+    return parse(readFile(path).c_str(), foFile, path, dirOf(path), staticEnv);
 }
 
 
 Expr * EvalState::parseExprFromString(std::string_view s, const Path & basePath, StaticEnv & staticEnv)
 {
-    return parse(s.data(), "(string)", basePath, staticEnv);
+    return parse(s.data(), foString, "", basePath, staticEnv);
 }
 
 
@@ -644,7 +655,7 @@ Expr * EvalState::parseExprFromString(std::string_view s, const Path & basePath)
 Expr * EvalState::parseStdin()
 {
     //Activity act(*logger, lvlTalkative, format("parsing standard input"));
-    return parseExprFromString(drainFD(0), absPath("."));
+    return parse(drainFD(0).data(), foStdin, "", absPath("."), staticBaseEnv);
 }
 
 
@@ -693,7 +704,7 @@ Path EvalState::findFile(SearchPath & searchPath, const string & path, const Pos
             ? "cannot look up '<%s>' in pure evaluation mode (use '--impure' to override)"
             : "file '%s' was not found in the Nix search path (add it using $NIX_PATH or -I)",
             path),
-        .nixCode = NixCode { .errPos = pos }
+        .errPos = pos
     });
 }
 

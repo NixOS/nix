@@ -37,14 +37,14 @@ static void prim_fetchGit(EvalState & state, const Pos & pos, Value * * args, Va
             else
                 throw EvalError({
                     .hint = hintfmt("unsupported argument '%s' to 'fetchGit'", attr.name),
-                    .nixCode = NixCode { .errPos = *attr.pos }
+                    .errPos = *attr.pos
                 });
         }
 
         if (url.empty())
             throw EvalError({
                 .hint = hintfmt("'url' argument required"),
-                .nixCode = NixCode { .errPos = pos }
+                .errPos = pos
             });
 
     } else

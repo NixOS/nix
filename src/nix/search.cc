@@ -216,7 +216,7 @@ struct CmdSearch : SourceExprCommand, MixJSON
             } catch (AssertionError & e) {
             } catch (Error & e) {
                 if (!toplevel) {
-                    e.addPrefix(fmt("While evaluating the attribute '%s':\n", attrPath));
+                    e.addTrace(std::nullopt, "While evaluating the attribute '%s'", attrPath);
                     throw;
                 }
             }
