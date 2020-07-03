@@ -35,7 +35,7 @@ Settings::Settings()
     , nixLibexecDir(canonPath(getEnv("NIX_LIBEXEC_DIR").value_or(NIX_LIBEXEC_DIR)))
     , nixBinDir(canonPath(getEnv("NIX_BIN_DIR").value_or(NIX_BIN_DIR)))
     , nixManDir(canonPath(NIX_MAN_DIR))
-    , nixDaemonSocketFile(canonPath(nixStateDir + DEFAULT_SOCKET_PATH))
+    , nixDaemonSocketFile(canonPath(getEnv("NIX_DAEMON_SOCKET_PATH").value_or(nixStateDir + DEFAULT_SOCKET_PATH)))
 {
     buildUsersGroup = getuid() == 0 ? "nixbld" : "";
     lockCPU = getEnv("NIX_AFFINITY_HACK") == "1";
