@@ -128,6 +128,7 @@ StorePath getDerivationEnvironment(ref<Store> store, const StorePath & drvPath)
     assert(hasSuffix(drvName, ".drv"));
     drvName.resize(drvName.size() - 4);
     drvName += "-env";
+    drv.env["name"] = drvName;
     for (auto & output : drv.outputs)
         drv.env.erase(output.first);
     drv.env["out"] = "";
