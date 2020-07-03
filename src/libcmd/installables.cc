@@ -716,7 +716,7 @@ Buildables build(ref<Store> store, Realise mode,
         }
     }
 
-    if (mode == Realise::Nothing)
+    if (mode == Realise::Nothing || mode == Realise::Derivation)
         printMissing(store, pathsToBuild, lvlError);
     else if (mode == Realise::Outputs)
         store->buildPaths(pathsToBuild, bMode);

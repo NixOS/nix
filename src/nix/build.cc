@@ -52,7 +52,7 @@ struct CmdBuild : InstallablesCommand, MixDryRun, MixJSON, MixProfile
 
     void run(ref<Store> store) override
     {
-        auto buildables = build(store, dryRun ? Realise::Nothing : Realise::Outputs, installables, buildMode);
+        auto buildables = build(store, dryRun ? Realise::Derivation : Realise::Outputs, installables, buildMode);
 
         if (dryRun) return;
 
