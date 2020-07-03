@@ -8,15 +8,10 @@
 
 namespace nix {
 
-std::string DerivationOutputHash::printMethodAlgo() const {
-    return makeFileIngestionPrefix(method) + printHashType(*hash.type);
-}
-
 template<typename InputDrvPath, typename OutputPath>
 DerivationT<InputDrvPath, OutputPath>::DerivationT(const BasicDerivationT<OutputPath> & other)
     : BasicDerivationT<OutputPath>(other)
-{
-}
+{ }
 
 template<typename Path>
 const Path & BasicDerivationT<Path>::findOutput(const string & id) const
@@ -120,7 +115,7 @@ static DerivationOutput parseDerivationOutput(const Store & store, istringstream
     expect(str, ","); const auto hash = parseString(str);
     expect(str, ")");
 
-    std::optional<DerivationOutputHash> fsh;
+    std::optional<FixedOutputHash> fsh;
     if (hashAlgo != "") {
         auto method = FileIngestionMethod::Flat;
         if (string(hashAlgo, 0, 2) == "r:") {
@@ -128,7 +123,7 @@ static DerivationOutput parseDerivationOutput(const Store & store, istringstream
             hashAlgo = string(hashAlgo, 2);
         }
         const HashType hashType = parseHashType(hashAlgo);
-        fsh = DerivationOutputHash {
+        fsh = FixedOutputHash {
             .method = std::move(method),
             .hash = Hash(hash, hashType),
         };
@@ -514,7 +509,7 @@ DerivationT<InputDrvPath, StorePath> bakeDerivationPaths(
             auto outPath = store.makeOutputPath(i.first, hash, drvName);
             drvFinal.outputs.insert_or_assign(i.first, DerivationOutput {
                 .path = std::move(outPath),
-                .hash = std::optional<DerivationOutputHash> {},
+                .hash = std::optional<FixedOutputHash> {},
             });
         }
     } else if (std::get_if<1>(&drvOrPseudo)) {
@@ -578,17 +573,17 @@ static DerivationOutput readDerivationOutput(Source & in, const Store & store)
 {
     auto path = store.parseStorePath(readString(in));
     auto hashAlgo = readString(in);
-    const auto hash = readString(in);
+    auto hash = readString(in);
 
-    std::optional<DerivationOutputHash> fsh;
+    std::optional<FixedOutputHash> fsh;
     if (hashAlgo != "") {
         auto method = FileIngestionMethod::Flat;
         if (string(hashAlgo, 0, 2) == "r:") {
             method = FileIngestionMethod::Recursive;
             hashAlgo = string(hashAlgo, 2);
         }
-        const HashType hashType = parseHashType(hashAlgo);
-        fsh = DerivationOutputHash {
+        auto hashType = parseHashType(hashAlgo);
+        fsh = FixedOutputHash {
             .method = std::move(method),
             .hash = Hash(hash, hashType),
         };
@@ -638,11 +633,16 @@ Source & readDerivation(Source & in, const Store & store, BasicDerivation & drv)
 void writeDerivation(Sink & out, const Store & store, const BasicDerivation & drv)
 {
     out << drv.outputs.size();
-    for (auto & i : drv.outputs)
+    for (auto & i : drv.outputs) {
         out << i.first
-            << store.printStorePath(i.second.path)
-            << i.second.hash->printMethodAlgo()
-            << i.second.hash->hash.to_string(Base16, false);
+            << store.printStorePath(i.second.path);
+        if (i.second.hash) {
+            out << i.second.hash->printMethodAlgo()
+                << i.second.hash->hash.to_string(Base16, false);
+        } else {
+            out << "" << "";
+        }
+    }
     writeStorePaths(store, out, drv.inputSrcs);
     out << drv.platform << drv.builder << drv.args;
     out << drv.env.size();

@@ -50,7 +50,7 @@ BuildEnvironment readEnvironment(const Path & path)
         R"re((?:\$?'(?:[^'\\]|\\[abeEfnrtv\\'"?])*'))re";
 
     static std::string indexedArrayRegex =
-        R"re((?:\(( *\[[0-9]+]="(?:[^"\\]|\\.)*")**\)))re";
+        R"re((?:\(( *\[[0-9]+\]="(?:[^"\\]|\\.)*")*\)))re";
 
     static std::regex varRegex(
         "^(" + varNameRegex + ")=(" + simpleStringRegex + "|" + quotedStringRegex + "|" + indexedArrayRegex + ")\n");
@@ -140,13 +140,7 @@ StorePath getDerivationEnvironment(ref<Store> store, const StorePath & drvPath)
     drv.env["out"] = "";
     drv.env["outputs"] = "out";
     drv.inputSrcs.insert(std::move(getEnvShPath));
-    drv.outputs.insert_or_assign("out", DerivationOutputT<NoPath> {
-        .path = NoPath {},
-        .hash = DerivationOutputHash {
-            .method = FileIngestionMethod::Flat,
-            .hash = Hash { },
-        },
-    });
+    drv.outputs.insert_or_assign("out", DerivationOutputT<NoPath> {});
     Derivation drvFinal = bakeDerivationPaths(*store, drv, drvName);
     drv.env.insert_or_assign("out", store->printStorePath(drvFinal.outputs.at("out").path));
     auto shellDrvPath2 = writeDerivation(store, drvFinal, drvName);

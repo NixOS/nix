@@ -5,6 +5,8 @@ if [[ $(uname) != Linux ]]; then exit; fi
 
 clearStore
 
+rm -f $TEST_ROOT/result
+
 export unreachable=$(nix add-to-store ./recursive.sh)
 
 nix --experimental-features 'nix-command recursive-nix' build -o $TEST_ROOT/result -L '(

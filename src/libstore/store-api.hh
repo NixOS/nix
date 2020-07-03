@@ -2,6 +2,7 @@
 
 #include "path.hh"
 #include "hash.hh"
+#include "content-address.hh"
 #include "serialise.hh"
 #include "crypto.hh"
 #include "lru-cache.hh"
@@ -18,6 +19,7 @@
 #include <memory>
 #include <string>
 #include <chrono>
+#include <variant>
 
 
 namespace nix {
@@ -109,7 +111,6 @@ struct SubstitutablePathInfo
 
 typedef std::map<StorePath, SubstitutablePathInfo> SubstitutablePathInfos;
 
-
 struct ValidPathInfo
 {
     StorePath path;
@@ -138,21 +139,11 @@ struct ValidPathInfo
        that a particular output path was produced by a derivation; the
        path then implies the contents.)
 
-       Ideally, the content-addressability assertion would just be a
-       Boolean, and the store path would be computed from
-       the name component, ‘narHash’ and ‘references’. However,
-       1) we've accumulated several types of content-addressed paths
-       over the years; and 2) fixed-output derivations support
-       multiple hash algorithms and serialisation methods (flat file
-       vs NAR). Thus, ‘ca’ has one of the following forms:
-
-       * ‘text:sha256:<sha256 hash of file contents>’: For paths
-         computed by makeTextPath() / addTextToStore().
-
-       * ‘fixed:<r?>:<ht>:<h>’: For paths computed by
-         makeFixedOutputPath() / addToStore().
+       Ideally, the content-addressability assertion would just be a Boolean,
+       and the store path would be computed from the name component, ‘narHash’
+       and ‘references’. However, we support many types of content addresses.
     */
-    std::string ca;
+    std::optional<ContentAddress> ca;
 
     bool operator == (const ValidPathInfo & i) const
     {
@@ -427,8 +418,11 @@ public:
     virtual StorePathSet queryValidDerivers(const StorePath & path) { return {}; };
 
     /* Query the outputs of the derivation denoted by `path'. */
-    virtual StorePathSet queryDerivationOutputs(const StorePath & path)
-    { unsupported("queryDerivationOutputs"); }
+    virtual StorePathSet queryDerivationOutputs(const StorePath & path);
+
+    /* Query the mapping outputName=>outputPath for the given derivation */
+    virtual OutputPathMap queryDerivationOutputMap(const StorePath & path)
+    { unsupported("queryDerivationOutputMap"); }
 
     /* Query the full store path given the hash part of a valid store
        path, or empty if the path doesn't exist. */
@@ -836,15 +830,6 @@ std::optional<ValidPathInfo> decodeValidPathInfo(
     const Store & store,
     std::istream & str,
     bool hashGiven = false);
-
-/* Compute the prefix to the hash algorithm which indicates how the files were
-   ingested. */
-std::string makeFileIngestionPrefix(const FileIngestionMethod m);
-
-/* Compute the content-addressability assertion (ValidPathInfo::ca)
-   for paths created by makeFixedOutputPath() / addToStore(). */
-std::string makeFixedOutputCA(FileIngestionMethod method, const Hash & hash);
-
 
 /* Split URI into protocol+hierarchy part and its parameter set. */
 std::pair<std::string, Store::Params> splitUriAndParams(const std::string & uri);
