@@ -6,6 +6,8 @@ namespace nix::fetchers {
 
 struct Cache
 {
+    virtual ~Cache() { }
+
     virtual void add(
         ref<Store> store,
         const Attrs & inAttrs,
