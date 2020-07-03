@@ -264,7 +264,7 @@ static void parse(ParseSink & sink, Source & source, PathView path)
                             names[name] = 0;
                     }
                 } else if (s == "node") {
-                    if (s.empty()) throw badArchive("entry name missing");
+                    if (name.empty()) throw badArchive("entry name missing");
                     parse(sink, source, std::string {} << path << "/" << name);
                 } else
                     throw badArchive("unknown field " + s);

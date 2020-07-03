@@ -2,6 +2,8 @@ source common.sh
 
 clearStore
 
+rm -f $TEST_ROOT/result
+
 export REMOTE_STORE=$TEST_ROOT/remote_store
 
 # Build the dependencies and push them to the remote store

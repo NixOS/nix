@@ -72,9 +72,4 @@ namespace nix {
                 "7299aeadb6889018501d289e4900f7e4331b99dec4b5433a"
                 "c7d329eeb6dd26545e96e55b874be909");
     }
-
-    TEST(hashString, hashingWithUnknownAlgoExits) {
-        auto s = "unknown";
-        ASSERT_DEATH(hashString(HashType::htUnknown, s), "");
-    }
 }

@@ -113,7 +113,7 @@ if [ "$(uname -s)" = "Darwin" ]; then
         (
             echo ""
             echo "Installing on macOS >=10.15 requires relocating the store to an apfs volume."
-            echo "Use sh <(curl https://nixos.org/nix/install) --darwin-use-unencrypted-nix-store-volume or run the preparation steps manually."
+            echo "Use sh <(curl -L https://nixos.org/nix/install) --darwin-use-unencrypted-nix-store-volume or run the preparation steps manually."
             echo "See https://nixos.org/nix/manual/#sect-macos-installation"
             echo ""
         ) >&2

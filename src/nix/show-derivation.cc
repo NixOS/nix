@@ -70,9 +70,9 @@ struct CmdShowDerivation : InstallablesCommand
                 for (auto & output : drv.outputs) {
                     auto outputObj(outputsObj.object(output.first));
                     outputObj.attr("path", std::string_view { store->printStorePath(output.second.path) });
-                    if (output.second.hash != "") {
-                        outputObj.attr("hashAlgo", std::string_view { output.second.hashAlgo });
-                        outputObj.attr("hash", std::string_view { output.second.hash });
+                    if (output.second.hash) {
+                        outputObj.attr("hashAlgo", std::string_view { output.second.hash->printMethodAlgo() });
+                        outputObj.attr("hash", std::string_view { output.second.hash->hash.to_string(Base16, false) });
                     }
                 }
             }

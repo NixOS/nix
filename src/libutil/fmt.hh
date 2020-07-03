@@ -1,6 +1,7 @@
 #pragma once
 
 #include <boost/format.hpp>
+#include <boost/algorithm/string/replace.hpp>
 #include <string>
 #include "ansicolor.hh"
 
@@ -102,7 +103,9 @@ public:
     // TODO Boost should work with string_view
     hintformat(std::string_view format) : fmt(std::string { format })
     {
-        fmt.exceptions(boost::io::all_error_bits ^ boost::io::too_many_args_bit);
+        fmt.exceptions(boost::io::all_error_bits ^ 
+                       boost::io::too_many_args_bit ^
+                       boost::io::too_few_args_bit);
     }
 
     hintformat(const hintformat &hf)
@@ -113,6 +116,13 @@ public:
     hintformat& operator%(const T &value)
     {
         fmt % yellowtxt(value);
+        return *this;
+    }
+
+    template<class T>
+    hintformat& operator%(const normaltxt<T> &value)
+    {
+        fmt % value.value;
         return *this;
     }
 
@@ -135,4 +145,9 @@ inline hintformat hintfmt(std::string_view fs, const Args & ... args)
     return f;
 }
 
+inline hintformat hintfmt(std::string plain_string)
+{
+    // we won't be receiving any args in this case, so just print the original string
+    return hintfmt("%s", normaltxt(plain_string));
+}
 }

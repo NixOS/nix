@@ -48,7 +48,10 @@ void printMissing(ref<Store> store, const StorePathSet & willBuild,
     unsigned long long downloadSize, unsigned long long narSize, Verbosity lvl)
 {
     if (!willBuild.empty()) {
-        printMsg(lvl, "these derivations will be built:");
+        if (willBuild.size() == 1)
+            printMsg(lvl, fmt("this derivation will be built:"));
+        else
+            printMsg(lvl, fmt("these %d derivations will be built:", willBuild.size()));
         auto sorted = store->topoSortPaths(willBuild);
         reverse(sorted.begin(), sorted.end());
         for (auto & i : sorted)
@@ -56,9 +59,18 @@ void printMissing(ref<Store> store, const StorePathSet & willBuild,
     }
 
     if (!willSubstitute.empty()) {
-        printMsg(lvl, fmt("these paths will be fetched (%.2f MiB download, %.2f MiB unpacked):",
-                downloadSize / (1024.0 * 1024.0),
-                narSize / (1024.0 * 1024.0)));
+        const float downloadSizeMiB = downloadSize / (1024.f * 1024.f);
+        const float narSizeMiB = narSize / (1024.f * 1024.f);
+        if (willSubstitute.size() == 1) {
+            printMsg(lvl, fmt("this path will be fetched (%.2f MiB download, %.2f MiB unpacked):",
+                downloadSizeMiB,
+                narSizeMiB));
+        } else {
+            printMsg(lvl, fmt("these %d paths will be fetched (%.2f MiB download, %.2f MiB unpacked):",
+                willSubstitute.size(),
+                downloadSizeMiB,
+                narSizeMiB));
+        }
         for (auto & i : willSubstitute)
             printMsg(lvl, fmt("  %s", store->printStorePath(i)));
     }
