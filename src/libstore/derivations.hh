@@ -1,8 +1,9 @@
 #pragma once
 
+#include "path.hh"
 #include "types.hh"
 #include "hash.hh"
-#include "store-api.hh"
+#include "content-address.hh"
 
 #include <map>
 
@@ -15,9 +16,7 @@ namespace nix {
 struct DerivationOutput
 {
     StorePath path;
-    std::string hashAlgo; /* hash used for expected hash computation */
-    std::string hash; /* expected hash, may be null */
-    void parseHashInfo(FileIngestionMethod & recursive, Hash & hash) const;
+    std::optional<FixedOutputHash> hash; /* hash used for expected hash computation */
 };
 
 typedef std::map<string, DerivationOutput> DerivationOutputs;
@@ -70,6 +69,7 @@ struct Derivation : BasicDerivation
 
 class Store;
 
+enum RepairFlag : bool { NoRepair = false, Repair = true };
 
 /* Write a derivation to the Nix store, and return its path. */
 StorePath writeDerivation(ref<Store> store,

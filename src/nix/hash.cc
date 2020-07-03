@@ -1,5 +1,6 @@
 #include "command.hh"
 #include "hash.hh"
+#include "content-address.hh"
 #include "legacy.hh"
 #include "shared.hh"
 #include "references.hh"
@@ -79,12 +80,12 @@ static RegisterCommand r2("hash-path", [](){ return make_ref<CmdHash>(FileIngest
 struct CmdToBase : Command
 {
     Base base;
-    HashType ht = htUnknown;
+    std::optional<HashType> ht;
     std::vector<std::string> args;
 
     CmdToBase(Base base) : base(base)
     {
-        addFlag(Flag::mkHashTypeFlag("type", &ht));
+        addFlag(Flag::mkHashTypeOptFlag("type", &ht));
         expectArgs("strings", &args);
     }
 
@@ -132,8 +133,6 @@ static int compatNixHash(int argc, char * * argv)
         else if (*arg == "--type") {
             string s = getArg(*arg, arg, end);
             ht = parseHashType(s);
-            if (ht == htUnknown)
-                throw UsageError("unknown hash type '%1%'", s);
         }
         else if (*arg == "--to-base16") op = opTo16;
         else if (*arg == "--to-base32") op = opTo32;

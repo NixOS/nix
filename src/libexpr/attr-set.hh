@@ -78,7 +78,7 @@ public:
         if (!a)
             throw Error({
                 .hint = hintfmt("attribute '%s' missing", name),
-                .nixCode = NixCode { .errPos = pos }
+                .errPos = pos
             });
 
         return *a;

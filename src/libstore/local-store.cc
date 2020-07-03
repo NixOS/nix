@@ -561,10 +561,12 @@ void LocalStore::checkDerivationOutputs(const StorePath & drvPath, const Derivat
         if (out == drv.outputs.end())
             throw Error("derivation '%s' does not have an output named 'out'", printStorePath(drvPath));
 
-        FileIngestionMethod method; Hash h;
-        out->second.parseHashInfo(method, h);
-
-        check(makeFixedOutputPath(method, h, drvName), out->second.path, "out");
+        check(
+            makeFixedOutputPath(
+                out->second.hash->method,
+                out->second.hash->hash,
+                drvName),
+            out->second.path, "out");
     }
 
     else {
@@ -578,7 +580,7 @@ void LocalStore::checkDerivationOutputs(const StorePath & drvPath, const Derivat
 uint64_t LocalStore::addValidPath(State & state,
     const ValidPathInfo & info, bool checkOutputs)
 {
-    if (info.ca != "" && !info.isContentAddressed(*this))
+    if (info.ca.has_value() && !info.isContentAddressed(*this))
         throw Error("cannot add path '%s' to the Nix store because it claims to be content-addressed but isn't",
             printStorePath(info.path));
 
@@ -590,7 +592,7 @@ uint64_t LocalStore::addValidPath(State & state,
         (info.narSize, info.narSize != 0)
         (info.ultimate ? 1 : 0, info.ultimate)
         (concatStringsSep(" ", info.sigs), !info.sigs.empty())
-        (info.ca, !info.ca.empty())
+        (renderContentAddress(info.ca), (bool) info.ca)
         .exec();
     uint64_t id = sqlite3_last_insert_rowid(state.db);
 
@@ -664,7 +666,7 @@ void LocalStore::queryPathInfoUncached(const StorePath & path,
             if (s) info->sigs = tokenizeString<StringSet>(s, " ");
 
             s = (const char *) sqlite3_column_text(state->stmtQueryPathInfo, 7);
-            if (s) info->ca = s;
+            if (s) info->ca = parseContentAddressOpt(s);
 
             /* Get the references. */
             auto useQueryReferences(state->stmtQueryReferences.use()(info->id));
@@ -687,7 +689,7 @@ void LocalStore::updatePathInfo(State & state, const ValidPathInfo & info)
         (info.narHash.to_string(Base16, true))
         (info.ultimate ? 1 : 0, info.ultimate)
         (concatStringsSep(" ", info.sigs), !info.sigs.empty())
-        (info.ca, !info.ca.empty())
+        (renderContentAddress(info.ca), (bool) info.ca)
         (printStorePath(info.path))
         .exec();
 }
@@ -772,17 +774,20 @@ StorePathSet LocalStore::queryValidDerivers(const StorePath & path)
 }
 
 
-StorePathSet LocalStore::queryDerivationOutputs(const StorePath & path)
+OutputPathMap LocalStore::queryDerivationOutputMap(const StorePath & path)
 {
-    return retrySQLite<StorePathSet>([&]() {
+    return retrySQLite<OutputPathMap>([&]() {
         auto state(_state.lock());
 
         auto useQueryDerivationOutputs(state->stmtQueryDerivationOutputs.use()
             (queryValidPathId(*state, path)));
 
-        StorePathSet outputs;
+        OutputPathMap outputs;
         while (useQueryDerivationOutputs.next())
-            outputs.insert(parseStorePath(useQueryDerivationOutputs.getStr(1)));
+            outputs.emplace(
+                useQueryDerivationOutputs.getStr(0),
+                parseStorePath(useQueryDerivationOutputs.getStr(1))
+            );
 
         return outputs;
     });
@@ -983,15 +988,15 @@ void LocalStore::addToStore(const ValidPathInfo & info, Source & source,
 
             deletePath(realPath);
 
-            if (info.ca != "" &&
-                !((hasPrefix(info.ca, "text:") && !info.references.count(info.path))
-                    || info.references.empty()))
+            // text hashing has long been allowed to have non-self-references because it is used for drv files.
+            bool refersToSelf = info.references.count(info.path) > 0;
+            if (info.ca.has_value() && !info.references.empty() && !(std::holds_alternative<TextHash>(*info.ca) && !refersToSelf))
                 settings.requireExperimentalFeature("ca-references");
 
             /* While restoring the path from the NAR, compute the hash
                of the NAR. */
             std::unique_ptr<AbstractHashSink> hashSink;
-            if (info.ca == "" || !info.references.count(info.path))
+            if (!info.ca.has_value() || !info.references.count(info.path))
                 hashSink = std::make_unique<HashSink>(htSHA256);
             else
                 hashSink = std::make_unique<HashModuloSink>(htSHA256, std::string(info.path.hashPart()));
@@ -1077,7 +1082,7 @@ StorePath LocalStore::addToStoreFromDump(const string & dump, const string & nam
             ValidPathInfo info(dstPath);
             info.narHash = hash.first;
             info.narSize = hash.second;
-            info.ca = makeFixedOutputCA(method, h);
+            info.ca = FixedOutputHash { .method = method, .hash = h };
             registerValidPath(info);
         }
 
@@ -1141,7 +1146,7 @@ StorePath LocalStore::addTextToStore(const string & name, const string & s,
             info.narHash = narHash;
             info.narSize = sink.s->size();
             info.references = references;
-            info.ca = "text:" + hash.to_string(Base32, true);
+            info.ca = TextHash { .hash = hash };
             registerValidPath(info);
         }
 
@@ -1252,10 +1257,10 @@ bool LocalStore::verifyStore(bool checkContents, RepairFlag repair)
                 printMsg(lvlTalkative, "checking contents of '%s'", printStorePath(i));
 
                 std::unique_ptr<AbstractHashSink> hashSink;
-                if (info->ca == "" || !info->references.count(info->path))
-                    hashSink = std::make_unique<HashSink>(info->narHash.type);
+                if (!info->ca || !info->references.count(info->path))
+                    hashSink = std::make_unique<HashSink>(*info->narHash.type);
                 else
-                    hashSink = std::make_unique<HashModuloSink>(info->narHash.type, std::string(info->path.hashPart()));
+                    hashSink = std::make_unique<HashModuloSink>(*info->narHash.type, std::string(info->path.hashPart()));
 
                 dumpPath(Store::toRealPath(i), *hashSink);
                 auto current = hashSink->finish();

@@ -1950,8 +1950,11 @@ void linkOrCopy(const Path & from, const Path & to)
         /* Hard-linking fails if we exceed the maximum link count on a
            file (e.g. 32000 of ext3), which is quite possible after a
            'nix-store --optimise'. FIXME: actually, why don't we just
-           bind-mount in this case? */
-        if (errno != EMLINK)
+           bind-mount in this case?
+           
+           It can also fail with EPERM in BeegFS v7 and earlier versions
+           which don't allow hard-links to other directories */
+        if (errno != EMLINK && errno != EPERM)
             throw SysError("linking '%s' to '%s'", to, from);
         copyPath(from, to);
     }
@@ -2750,8 +2753,8 @@ struct RestrictedStore : public LocalFSStore
     void queryReferrers(const StorePath & path, StorePathSet & referrers) override
     { }
 
-    StorePathSet queryDerivationOutputs(const StorePath & path) override
-    { throw Error("queryDerivationOutputs"); }
+    OutputPathMap queryDerivationOutputMap(const StorePath & path) override
+    { throw Error("queryDerivationOutputMap"); }
 
     std::optional<StorePath> queryPathFromHashPart(const std::string & hashPart) override
     { throw Error("queryPathFromHashPart"); }
@@ -3714,14 +3717,11 @@ void DerivationGoal::registerOutputs()
         /* Check that fixed-output derivations produced the right
            outputs (i.e., the content hash should match the specified
            hash). */
-        std::string ca;
+        std::optional<ContentAddress> ca;
 
         if (fixedOutput) {
 
-            FileIngestionMethod outputHashMode; Hash h;
-            i.second.parseHashInfo(outputHashMode, h);
-
-            if (outputHashMode == FileIngestionMethod::Flat) {
+            if (i.second.hash->method == FileIngestionMethod::Flat) {
                 /* The output path should be a regular file without execute permission. */
                 if (!S_ISREG(st.st_mode) || (st.st_mode & S_IXUSR) != 0)
                     throw BuildError(
@@ -3732,20 +3732,22 @@ void DerivationGoal::registerOutputs()
 
             /* Check the hash. In hash mode, move the path produced by
                the derivation to its content-addressed location. */
-            Hash h2 = outputHashMode == FileIngestionMethod::Recursive
-                ? hashPath(h.type, actualPath).first
-                : hashFile(h.type, actualPath);
+            Hash h2 = i.second.hash->method == FileIngestionMethod::Recursive
+                ? hashPath(*i.second.hash->hash.type, actualPath).first
+                : hashFile(*i.second.hash->hash.type, actualPath);
 
-            auto dest = worker.store.makeFixedOutputPath(outputHashMode, h2, i.second.path.name());
+            auto dest = worker.store.makeFixedOutputPath(i.second.hash->method, h2, i.second.path.name());
 
-            if (h != h2) {
+            if (i.second.hash->hash != h2) {
 
                 /* Throw an error after registering the path as
                    valid. */
                 worker.hashMismatch = true;
                 delayedException = std::make_exception_ptr(
                     BuildError("hash mismatch in fixed-output derivation '%s':\n  wanted: %s\n  got:    %s",
-                        worker.store.printStorePath(dest), h.to_string(SRI, true), h2.to_string(SRI, true)));
+                        worker.store.printStorePath(dest),
+                        i.second.hash->hash.to_string(SRI, true),
+                        h2.to_string(SRI, true)));
 
                 Path actualDest = worker.store.Store::toRealPath(dest);
 
@@ -3765,7 +3767,10 @@ void DerivationGoal::registerOutputs()
             else
                 assert(worker.store.parseStorePath(path) == dest);
 
-            ca = makeFixedOutputCA(outputHashMode, h2);
+            ca = FixedOutputHash {
+                .method = i.second.hash->method,
+                .hash = h2,
+            };
         }
 
         /* Get rid of all weird permissions.  This also checks that
@@ -3838,7 +3843,10 @@ void DerivationGoal::registerOutputs()
         info.ca = ca;
         worker.store.signPathInfo(info);
 
-        if (!info.references.empty()) info.ca.clear();
+        if (!info.references.empty()) {
+            // FIXME don't we have an experimental feature for fixed output with references?
+            info.ca = {};
+        }
 
         infos.emplace(i.first, std::move(info));
     }
@@ -4998,7 +5006,7 @@ bool Worker::pathContentsGood(const StorePath & path)
     if (!pathExists(store.printStorePath(path)))
         res = false;
     else {
-        HashResult current = hashPath(info->narHash.type, store.printStorePath(path));
+        HashResult current = hashPath(*info->narHash.type, store.printStorePath(path));
         Hash nullHash(htSHA256);
         res = info->narHash == nullHash || info->narHash == current.first;
     }
