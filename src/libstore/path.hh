@@ -1,5 +1,6 @@
 #pragma once
 
+#include "content-address.hh"
 #include "types.hh"
 
 namespace nix {
@@ -61,14 +62,10 @@ public:
 
 typedef std::set<StorePath> StorePathSet;
 typedef std::vector<StorePath> StorePaths;
+typedef std::map<string, StorePath> OutputPathMap;
 
 /* Extension of derivations in the Nix store. */
 const std::string drvExtension = ".drv";
-
-enum struct FileIngestionMethod : uint8_t {
-    Flat = false,
-    Recursive = true
-};
 
 struct StorePathWithOutputs
 {

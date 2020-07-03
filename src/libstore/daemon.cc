@@ -347,6 +347,15 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
         break;
     }
 
+    case wopQueryDerivationOutputMap: {
+        auto path = store->parseStorePath(readString(from));
+        logger->startWork();
+        OutputPathMap outputs = store->queryDerivationOutputMap(path);
+        logger->stopWork();
+        writeOutputPathMap(*store, to, outputs);
+        break;
+    }
+
     case wopQueryDeriver: {
         auto path = store->parseStorePath(readString(from));
         logger->startWork();
@@ -652,7 +661,7 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
             if (GET_PROTOCOL_MINOR(clientVersion) >= 16) {
                 to << info->ultimate
                    << info->sigs
-                   << info->ca;
+                   << renderContentAddress(info->ca);
             }
         } else {
             assert(GET_PROTOCOL_MINOR(clientVersion) >= 17);
@@ -710,7 +719,8 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
         info.references = readStorePaths<StorePathSet>(*store, from);
         from >> info.registrationTime >> info.narSize >> info.ultimate;
         info.sigs = readStrings<StringSet>(from);
-        from >> info.ca >> repair >> dontCheckSigs;
+        info.ca = parseContentAddressOpt(readString(from));
+        from >> repair >> dontCheckSigs;
         if (!trusted && dontCheckSigs)
             dontCheckSigs = false;
         if (!trusted)
