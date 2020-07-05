@@ -13,24 +13,32 @@ fake_free=$TEST_ROOT/fake-free
 export _NIX_TEST_FREE_SPACE_FILE=$fake_free
 echo 1100 > $fake_free
 
+fifoLock=$TEST_ROOT/fifoLock
+mkfifo "$fifoLock"
+
 expr=$(cat <<EOF
 with import ./config.nix; mkDerivation {
   name = "gc-A";
   buildCommand = ''
     set -x
     [[ \$(ls \$NIX_STORE/*-garbage? | wc -l) = 3 ]]
+
     mkdir \$out
     echo foo > \$out/bar
-    echo 1...
-    sleep 2
-    echo 200 > ${fake_free}.tmp1
+
+    # Pretend that we run out of space
+    echo 100 > ${fake_free}.tmp1
     mv ${fake_free}.tmp1 $fake_free
-    echo 2...
-    sleep 2
-    echo 3...
-    sleep 2
-    echo 4...
-    [[ \$(ls \$NIX_STORE/*-garbage? | wc -l) = 1 ]]
+
+    # Wait for the GC to run
+    for i in {1..20}; do
+        echo ''\${i}...
+        if [[ \$(ls \$NIX_STORE/*-garbage? | wc -l) = 1 ]]; then
+            exit 0
+        fi
+        sleep 1
+    done
+    exit 1
   '';
 }
 EOF
@@ -43,15 +51,9 @@ with import ./config.nix; mkDerivation {
     set -x
     mkdir \$out
     echo foo > \$out/bar
-    echo 1...
-    sleep 2
-    echo 200 > ${fake_free}.tmp2
-    mv ${fake_free}.tmp2 $fake_free
-    echo 2...
-    sleep 2
-    echo 3...
-    sleep 2
-    echo 4...
+
+    # Wait for the first build to finish
+    cat "$fifoLock"
   '';
 }
 EOF
@@ -59,12 +61,19 @@ EOF
 
 nix build -v -o $TEST_ROOT/result-A -L "($expr)" \
     --min-free 1000 --max-free 2000 --min-free-check-interval 1 &
-pid=$!
+pid1=$!
 
 nix build -v -o $TEST_ROOT/result-B -L "($expr2)" \
-    --min-free 1000 --max-free 2000 --min-free-check-interval 1
+    --min-free 1000 --max-free 2000 --min-free-check-interval 1 &
+pid2=$!
 
-wait "$pid"
+# Once the first build is done, unblock the second one.
+# If the first build fails, we need to postpone the failure to still allow
+# the second one to finish
+wait "$pid1" || FIRSTBUILDSTATUS=$?
+echo "unlock" > $fifoLock
+( exit ${FIRSTBUILDSTATUS:-0} )
+wait "$pid2"
 
 [[ foo = $(cat $TEST_ROOT/result-A/bar) ]]
 [[ foo = $(cat $TEST_ROOT/result-B/bar) ]]

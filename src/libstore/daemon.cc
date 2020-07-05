@@ -78,10 +78,10 @@ struct TunnelLogger : public Logger
         if (ei.level > verbosity) return;
 
         std::stringstream oss;
-        oss << ei;
+        showErrorInfo(oss, ei, false);
 
         StringSink buf;
-        buf << STDERR_NEXT << oss.str() << "\n"; // (fs.s + "\n");
+        buf << STDERR_NEXT << oss.str() << "\n";
         enqueueMsg(*buf.s);
     }
 
@@ -344,6 +344,15 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
         auto names = store->readDerivation(path).outputNames();
         logger->stopWork();
         to << names;
+        break;
+    }
+
+    case wopQueryDerivationOutputMap: {
+        auto path = store->parseStorePath(readString(from));
+        logger->startWork();
+        OutputPathMap outputs = store->queryDerivationOutputMap(path);
+        logger->stopWork();
+        writeOutputPathMap(*store, to, outputs);
         break;
     }
 
@@ -652,7 +661,7 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
             if (GET_PROTOCOL_MINOR(clientVersion) >= 16) {
                 to << info->ultimate
                    << info->sigs
-                   << info->ca;
+                   << renderContentAddress(info->ca);
             }
         } else {
             assert(GET_PROTOCOL_MINOR(clientVersion) >= 17);
@@ -710,7 +719,8 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
         info.references = readStorePaths<StorePathSet>(*store, from);
         from >> info.registrationTime >> info.narSize >> info.ultimate;
         info.sigs = readStrings<StringSet>(from);
-        from >> info.ca >> repair >> dontCheckSigs;
+        info.ca = parseContentAddressOpt(readString(from));
+        from >> repair >> dontCheckSigs;
         if (!trusted && dontCheckSigs)
             dontCheckSigs = false;
         if (!trusted)

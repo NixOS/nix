@@ -3,6 +3,7 @@
 #include "path.hh"
 #include "types.hh"
 #include "hash.hh"
+#include "content-address.hh"
 
 #include <map>
 
@@ -12,18 +13,10 @@ namespace nix {
 
 /* Abstract syntax of derivations. */
 
-/// Pair of a hash, and how the file system was ingested
-struct DerivationOutputHash {
-    FileIngestionMethod method;
-    Hash hash;
-    std::string printMethodAlgo() const;
-};
-
 struct DerivationOutput
 {
     StorePath path;
-    std::optional<DerivationOutputHash> hash; /* hash used for expected hash computation */
-    void parseHashInfo(FileIngestionMethod & recursive, Hash & hash) const;
+    std::optional<FixedOutputHash> hash; /* hash used for expected hash computation */
 };
 
 typedef std::map<string, DerivationOutput> DerivationOutputs;

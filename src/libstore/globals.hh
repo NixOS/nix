@@ -196,10 +196,6 @@ public:
     /* Whether to lock the Nix client and worker to the same CPU. */
     bool lockCPU;
 
-    /* Whether to show a stack trace if Nix evaluation fails. */
-    Setting<bool> showTrace{this, false, "show-trace",
-        "Whether to show a stack trace on evaluation errors."};
-
     Setting<SandboxMode> sandboxMode{this,
         #if __linux__
           smEnabled
