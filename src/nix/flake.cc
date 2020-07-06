@@ -234,7 +234,7 @@ struct CmdFlakeCheck : FlakeCommand
                 // FIXME: check meta attributes
                 return store->parseStorePath(drvInfo->queryDrvPath());
             } catch (Error & e) {
-                e.addPrefix(fmt("while checking the derivation '" ANSI_BOLD "%s" ANSI_NORMAL "' at %s:\n", attrPath, pos));
+                e.addTrace(pos, hintfmt("while checking the derivation '%s'", attrPath));
                 throw;
             }
         };
@@ -252,7 +252,7 @@ struct CmdFlakeCheck : FlakeCommand
                 }
                 #endif
             } catch (Error & e) {
-                e.addPrefix(fmt("while checking the app definition '" ANSI_BOLD "%s" ANSI_NORMAL "' at %s:\n", attrPath, pos));
+                e.addTrace(pos, hintfmt("while checking the app definition '%s'", attrPath));
                 throw;
             }
         };
@@ -268,7 +268,7 @@ struct CmdFlakeCheck : FlakeCommand
                 // FIXME: if we have a 'nixpkgs' input, use it to
                 // evaluate the overlay.
             } catch (Error & e) {
-                e.addPrefix(fmt("while checking the overlay '" ANSI_BOLD "%s" ANSI_NORMAL "' at %s:\n", attrPath, pos));
+                e.addTrace(pos, hintfmt("while checking the overlay '%s'", attrPath));
                 throw;
             }
         };
@@ -284,7 +284,7 @@ struct CmdFlakeCheck : FlakeCommand
                         try {
                             state->forceValue(*attr.value, *attr.pos);
                         } catch (Error & e) {
-                            e.addPrefix(fmt("while evaluating the option '" ANSI_BOLD "%s" ANSI_NORMAL "' at %s:\n", attr.name, *attr.pos));
+                            e.addTrace(*attr.pos, hintfmt("while evaluating the option '%s'", attr.name));
                             throw;
                         }
                 } else
@@ -292,7 +292,7 @@ struct CmdFlakeCheck : FlakeCommand
                 // FIXME: if we have a 'nixpkgs' input, use it to
                 // check the module.
             } catch (Error & e) {
-                e.addPrefix(fmt("while checking the NixOS module '" ANSI_BOLD "%s" ANSI_NORMAL "' at %s:\n", attrPath, pos));
+                e.addTrace(pos, hintfmt("while checking the NixOS module '%s'", attrPath));
                 throw;
             }
         };
@@ -314,7 +314,7 @@ struct CmdFlakeCheck : FlakeCommand
                 }
 
             } catch (Error & e) {
-                e.addPrefix(fmt("while checking the Hydra jobset '" ANSI_BOLD "%s" ANSI_NORMAL "' at %s:\n", attrPath, pos));
+                e.addTrace(pos, hintfmt("while checking the Hydra jobset '%s'", attrPath));
                 throw;
             }
         };
@@ -329,7 +329,7 @@ struct CmdFlakeCheck : FlakeCommand
                 if (!state->isDerivation(*vToplevel))
                     throw Error("attribute 'config.system.build.toplevel' is not a derivation");
             } catch (Error & e) {
-                e.addPrefix(fmt("while checking the NixOS configuration '" ANSI_BOLD "%s" ANSI_NORMAL "' at %s:\n", attrPath, pos));
+                e.addTrace(pos, hintfmt("while checking the NixOS configuration '%s'", attrPath));
                 throw;
             }
         };
@@ -363,7 +363,7 @@ struct CmdFlakeCheck : FlakeCommand
                         throw Error("template '%s' has unsupported attribute '%s'", attrPath, name);
                 }
             } catch (Error & e) {
-                e.addPrefix(fmt("while checking the template '" ANSI_BOLD "%s" ANSI_NORMAL "' at %s:\n", attrPath, pos));
+                e.addTrace(pos, hintfmt("while checking the template '%s'", attrPath));
                 throw;
             }
         };
@@ -494,7 +494,7 @@ struct CmdFlakeCheck : FlakeCommand
                             warn("unknown flake output '%s'", name);
 
                     } catch (Error & e) {
-                        e.addPrefix(fmt("while checking flake output '" ANSI_BOLD "%s" ANSI_NORMAL "':\n", name));
+                        e.addTrace(pos, hintfmt("while checking flake output '%s'", name));
                         throw;
                     }
                 });

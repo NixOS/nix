@@ -78,10 +78,10 @@ struct TunnelLogger : public Logger
         if (ei.level > verbosity) return;
 
         std::stringstream oss;
-        oss << ei;
+        showErrorInfo(oss, ei, false);
 
         StringSink buf;
-        buf << STDERR_NEXT << oss.str() << "\n"; // (fs.s + "\n");
+        buf << STDERR_NEXT << oss.str() << "\n";
         enqueueMsg(*buf.s);
     }
 
@@ -344,6 +344,15 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
         auto names = store->readDerivation(path).outputNames();
         logger->stopWork();
         to << names;
+        break;
+    }
+
+    case wopQueryDerivationOutputMap: {
+        auto path = store->parseStorePath(readString(from));
+        logger->startWork();
+        OutputPathMap outputs = store->queryDerivationOutputMap(path);
+        logger->stopWork();
+        writeOutputPathMap(*store, to, outputs);
         break;
     }
 

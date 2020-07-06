@@ -25,20 +25,20 @@ namespace nix {
 
 /*
 
-This file defines two main structs/classes used in nix error handling.
+   This file defines two main structs/classes used in nix error handling.
 
-ErrorInfo provides a standard payload of error information, with conversion to string
-happening in the logger rather than at the call site.
+   ErrorInfo provides a standard payload of error information, with conversion to string
+   happening in the logger rather than at the call site.
 
-BaseError is the ancestor of nix specific exceptions (and Interrupted), and contains
-an ErrorInfo.
+   BaseError is the ancestor of nix specific exceptions (and Interrupted), and contains
+   an ErrorInfo.
 
-ErrorInfo structs are sent to the logger as part of an exception, or directly with the
-logError or logWarning macros.
+   ErrorInfo structs are sent to the logger as part of an exception, or directly with the
+   logError or logWarning macros.
 
-See the error-demo.cc program for usage examples.
+   See the error-demo.cc program for usage examples.
 
-*/
+ */
 
 typedef enum {
     lvlError = 0,
@@ -50,11 +50,25 @@ typedef enum {
     lvlVomit
 } Verbosity;
 
+typedef enum {
+    foFile,
+    foStdin,
+    foString
+} FileOrigin;
+
+// the lines of code surrounding an error.
+struct LinesOfCode {
+    std::optional<string> prevLineOfCode;
+    std::optional<string> errLineOfCode;
+    std::optional<string> nextLineOfCode;
+};
+
 // ErrPos indicates the location of an error in a nix file.
 struct ErrPos {
     int line = 0;
     int column = 0;
     string file;
+    FileOrigin origin;
 
     operator bool() const
     {
@@ -65,9 +79,14 @@ struct ErrPos {
     template <class P>
     ErrPos& operator=(const P &pos)
     {
+        origin = pos.origin;
         line = pos.line;
         column = pos.column;
-        file = pos.file;
+        // is file symbol null?
+        if (pos.file.set())
+            file = pos.file;
+        else
+            file = "";
         return *this;
     }
 
@@ -78,11 +97,9 @@ struct ErrPos {
     }
 };
 
-struct NixCode {
-    ErrPos errPos;
-    std::optional<string> prevLineOfCode;
-    std::optional<string> errLineOfCode;
-    std::optional<string> nextLineOfCode;
+struct Trace {
+    std::optional<ErrPos> pos;
+    hintformat hint;
 };
 
 struct ErrorInfo {
@@ -90,19 +107,19 @@ struct ErrorInfo {
     string name;
     string description;
     std::optional<hintformat> hint;
-    std::optional<NixCode> nixCode;
+    std::optional<ErrPos> errPos;
+    std::list<Trace> traces;
 
     static std::optional<string> programName;
 };
 
-std::ostream& operator<<(std::ostream &out, const ErrorInfo &einfo);
+std::ostream& showErrorInfo(std::ostream &out, const ErrorInfo &einfo, bool showTrace);
 
 /* BaseError should generally not be caught, as it has Interrupted as
    a subclass. Catch Error instead. */
 class BaseError : public std::exception
 {
 protected:
-    string prefix_; // used for location traces etc.
     mutable ErrorInfo err;
 
     mutable std::optional<string> what_;
@@ -113,23 +130,23 @@ public:
 
     template<typename... Args>
     BaseError(unsigned int status, const Args & ... args)
-        : err { .level = lvlError,
-                .hint = hintfmt(args...)
-              }
+        : err {.level = lvlError,
+            .hint = hintfmt(args...)
+            }
         , status(status)
     { }
 
     template<typename... Args>
     BaseError(const std::string & fs, const Args & ... args)
-        : err { .level = lvlError,
-                .hint = hintfmt(fs, args...)
-              }
+        : err {.level = lvlError,
+            .hint = hintfmt(fs, args...)
+            }
     { }
 
     BaseError(hintformat hint)
-        : err { .level = lvlError,
-                .hint = hint
-              }
+        : err {.level = lvlError,
+            .hint = hint
+            }
     { }
 
     BaseError(ErrorInfo && e)
@@ -150,10 +167,17 @@ public:
 #endif
 
     const string & msg() const { return calcWhat(); }
-    const string & prefix() const { return prefix_; }
-    BaseError & addPrefix(const FormatOrString & fs);
-
     const ErrorInfo & info() { calcWhat(); return err; }
+
+    template<typename... Args>
+    BaseError & addTrace(std::optional<ErrPos> e, const string &fs, const Args & ... args)
+    {
+        return addTrace(e, hintfmt(fs, args...));
+    }
+
+    BaseError & addTrace(std::optional<ErrPos> e, hintformat hint);
+
+    bool hasTrace() const { return !err.traces.empty(); }
 };
 
 #define MakeError(newClass, superClass) \
@@ -174,7 +198,7 @@ public:
 
     template<typename... Args>
     SysError(const Args & ... args)
-      :Error("")
+        : Error("")
     {
         errNo = errno;
         auto hf = hintfmt(args...);

@@ -123,7 +123,7 @@ static FlakeInput parseFlakeInput(EvalState & state,
                         attr.name, showType(*attr.value));
             }
         } catch (Error & e) {
-            e.addPrefix(fmt("in flake attribute '%s' at '%s':\n", attr.name, *attr.pos));
+            e.addTrace(*attr.pos, hintfmt("in flake attribute '%s'", attr.name));
             throw;
         }
     }
@@ -132,7 +132,7 @@ static FlakeInput parseFlakeInput(EvalState & state,
         try {
             input.ref = FlakeRef::fromAttrs(attrs);
         } catch (Error & e) {
-            e.addPrefix(fmt("in flake input at '%s':\n", pos));
+            e.addTrace(pos, hintfmt("in flake input"));
             throw;
         }
     else {
@@ -195,7 +195,7 @@ static Flake getFlake(
     Value vInfo;
     state.evalFile(flakeFile, vInfo, true); // FIXME: symlink attack
 
-    expectType(state, tAttrs, vInfo, Pos(state.symbols.create(flakeFile), 0, 0));
+    expectType(state, tAttrs, vInfo, Pos(foFile, state.symbols.create(flakeFile), 0, 0));
 
     auto sEdition = state.symbols.create("edition"); // FIXME: remove soon
 

@@ -40,14 +40,14 @@ static void prim_fetchMercurial(EvalState & state, const Pos & pos, Value * * ar
             else
                 throw EvalError({
                     .hint = hintfmt("unsupported argument '%s' to 'fetchMercurial'", attr.name),
-                    .nixCode = NixCode { .errPos = *attr.pos }
+                    .errPos = *attr.pos
                 });
         }
 
         if (url.empty())
             throw EvalError({
                 .hint = hintfmt("'url' argument required"),
-                .nixCode = NixCode { .errPos = pos }
+                .errPos = pos
             });
 
     } else
