@@ -26,7 +26,7 @@ Logger * makeDefaultLogger() {
     case LogFormat::rawWithLogs:
         return makeSimpleLogger(true);
     case LogFormat::internalJson:
-        return makeJSONLogger(*makeSimpleLogger());
+        return makeJSONLogger(*makeSimpleLogger(true));
     case LogFormat::bar:
         return makeProgressBar();
     case LogFormat::barWithLogs:
