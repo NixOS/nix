@@ -110,6 +110,7 @@ std::optional<LinesOfCode> getCodeLines(const ErrPos &errPos)
         int pl = errPos.line - 1;
 
         LinesOfCode loc;
+
         do
         {
             std::getline(iss, line);
