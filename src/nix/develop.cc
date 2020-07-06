@@ -307,9 +307,23 @@ struct CmdDevelop : Common, MixEnvironment
         // prevent garbage collection until shell exits
         setenv("NIX_GCROOT", gcroot.data(), 1);
 
-        auto state = getEvalState(); 
-        auto bashInstallable = std::make_shared<InstallableFlake>(state, std::move(installable->nixpkgsFlakeRef()), Strings{"bashInteractive"}, Strings{"legacyPackages." + settings.thisSystem.get() + "."}, lockFlags);
-        auto shell = state->store->printStorePath(toStorePath(state->store, Build, bashInstallable)) + "/bin/bash";
+        Path shell = "bash";
+
+        try {
+            auto state = getEvalState();
+
+            auto bashInstallable = std::make_shared<InstallableFlake>(
+                state,
+                std::move(installable->nixpkgsFlakeRef()),
+                Strings{"bashInteractive"},
+                Strings{"legacyPackages." + settings.thisSystem.get() + "."},
+                lockFlags);
+
+            shell = state->store->printStorePath(toStorePath(state->store, Build, bashInstallable)) + "/bin/bash";
+        } catch (Error &) {
+            ignoreException();
+        }
+
         auto args = Strings{std::string(baseNameOf(shell)), "--rcfile", rcFilePath};
 
         restoreAffinity();
