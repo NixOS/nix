@@ -251,18 +251,19 @@ namespace nix {
     TEST(addTrace, showTracesWithShowTrace) {
         SymbolTable testTable;
         auto problem_file = testTable.create(test_file);
-
         auto oneliner_file = testTable.create(one_liner);
+        auto invalidfilename = testTable.create("invalid filename");
 
         auto e = AssertionError(ErrorInfo {
                 .name = "wat",
-                .description = "a well-known problem occurred",
+                .description = "show-traces",
                 .hint = hintfmt("it has been %1% days since our last error", "zero"),
                 .errPos = Pos(foString, problem_file, 2, 13),
             });
 
         e.addTrace(Pos(foStdin, oneliner_file, 1, 19), "while trying to compute %1%", 42);
         e.addTrace(std::nullopt, "while doing something without a %1%", "pos");
+        e.addTrace(Pos(foFile, invalidfilename, 100, 1), "missing %s", "nix file");
 
         testing::internal::CaptureStderr();
 
@@ -271,24 +272,25 @@ namespace nix {
         logError(e.info());
 
         auto str = testing::internal::GetCapturedStderr();
-        ASSERT_STREQ(str.c_str(), "\x1B[31;1merror:\x1B[0m\x1B[34;1m --- AssertionError --- error-unit-test\x1B[0m\n\x1B[34;1mat: \x1B[33;1m(2:13)\x1B[34;1m from string\x1B[0m\n\na well-known problem occurred\n\n     1| previous line of code\n     2| this is the problem line of code\n      |             \x1B[31;1m^\x1B[0m\n     3| next line of code\n\nit has been \x1B[33;1mzero\x1B[0m days since our last error\n\x1B[34;1m---- show-trace ----\x1B[0m\n\x1B[34;1mtrace: \x1B[0mwhile trying to compute \x1B[33;1m42\x1B[0m\n\x1B[34;1mat: \x1B[33;1m(1:19)\x1B[34;1m from stdin\x1B[0m\n\n     1| this is the other problem line of code\n      |                   \x1B[31;1m^\x1B[0m\n\n\x1B[34;1mtrace: \x1B[0mwhile doing something without a \x1B[33;1mpos\x1B[0m\n");
+        ASSERT_STREQ(str.c_str(), "\x1B[31;1merror:\x1B[0m\x1B[34;1m --- SysError --- error-unit-test\x1B[0m\nopening file '\x1B[33;1minvalid filename\x1B[0m': \x1B[33;1mNo such file or directory\x1B[0m\n\x1B[31;1merror:\x1B[0m\x1B[34;1m --- AssertionError --- error-unit-test\x1B[0m\n\x1B[34;1mat: \x1B[33;1m(2:13)\x1B[34;1m from string\x1B[0m\n\nshow-traces\n\n     1| previous line of code\n     2| this is the problem line of code\n      |             \x1B[31;1m^\x1B[0m\n     3| next line of code\n\nit has been \x1B[33;1mzero\x1B[0m days since our last error\n\x1B[34;1m---- show-trace ----\x1B[0m\n\x1B[34;1mtrace: \x1B[0mwhile trying to compute \x1B[33;1m42\x1B[0m\n\x1B[34;1mat: \x1B[33;1m(1:19)\x1B[34;1m from stdin\x1B[0m\n\n     1| this is the other problem line of code\n      |                   \x1B[31;1m^\x1B[0m\n\n\x1B[34;1mtrace: \x1B[0mwhile doing something without a \x1B[33;1mpos\x1B[0m\n\x1B[34;1mtrace: \x1B[0mmissing \x1B[33;1mnix file\x1B[0m\n\x1B[34;1mat: \x1B[33;1m(100:1)\x1B[34;1m in file: \x1B[0minvalid filename\n");
     }
 
     TEST(addTrace, hideTracesWithoutShowTrace) {
         SymbolTable testTable;
         auto problem_file = testTable.create(test_file);
-
         auto oneliner_file = testTable.create(one_liner);
+        auto invalidfilename = testTable.create("invalid filename");
 
         auto e = AssertionError(ErrorInfo {
                 .name = "wat",
-                .description = "a well-known problem occurred",
+                .description = "hide traces",
                 .hint = hintfmt("it has been %1% days since our last error", "zero"),
                 .errPos = Pos(foString, problem_file, 2, 13),
             });
 
         e.addTrace(Pos(foStdin, oneliner_file, 1, 19), "while trying to compute %1%", 42);
         e.addTrace(std::nullopt, "while doing something without a %1%", "pos");
+        e.addTrace(Pos(foFile, invalidfilename, 100, 1), "missing %s", "nix file");
 
         testing::internal::CaptureStderr();
 
@@ -297,8 +299,9 @@ namespace nix {
         logError(e.info());
 
         auto str = testing::internal::GetCapturedStderr();
-        ASSERT_STREQ(str.c_str(), "\x1B[31;1merror:\x1B[0m\x1B[34;1m --- AssertionError --- error-unit-test\x1B[0m\n\x1B[34;1mat: \x1B[33;1m(2:13)\x1B[34;1m from string\x1B[0m\n\na well-known problem occurred\n\n     1| previous line of code\n     2| this is the problem line of code\n      |             \x1B[31;1m^\x1B[0m\n     3| next line of code\n\nit has been \x1B[33;1mzero\x1B[0m days since our last error\n");
+        ASSERT_STREQ(str.c_str(), "\x1B[31;1merror:\x1B[0m\x1B[34;1m --- AssertionError --- error-unit-test\x1B[0m\n\x1B[34;1mat: \x1B[33;1m(2:13)\x1B[34;1m from string\x1B[0m\n\nhide traces\n\n     1| previous line of code\n     2| this is the problem line of code\n      |             \x1B[31;1m^\x1B[0m\n     3| next line of code\n\nit has been \x1B[33;1mzero\x1B[0m days since our last error\n");
     }
+
 
     /* ----------------------------------------------------------------------------
      * hintfmt
