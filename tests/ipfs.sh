@@ -55,7 +55,7 @@ touch $TEST_FILE
 # We try to do the evaluation with a known wrong hash to get the suggestion for
 # the correct one
 ! CORRECT_ADDRESS=$(nix eval '(builtins.fetchurl 'file://$PWD/$TEST_FILE')' --store ipfs://$EMPTY_HASH |& \
-    grep 'current:' | awk '{print $2}')
+    grep 'modified:' | awk '{print $2}')
 
 # Then we eval and get back the hash-name part of the store path
 RESULT=$(nix eval '(builtins.fetchurl 'file://$PWD/$TEST_FILE')' --store $CORRECT_ADDRESS --json \
@@ -120,7 +120,7 @@ nix-build ./fixed.nix -A good \
 IPFS_ADDRESS=$(set -e; \
   set -o pipefail; \
   ! nix copy --to ipfs://$EMPTY_HASH $(nix-build ./fixed.nix -A good --no-out-link) --experimental-features nix-command \
-    |& grep current: | awk '{print $2}')
+    |& grep modified: | awk '{print $2}')
 
 # Verify that new path is valid.
 nix copy --to $IPFS_ADDRESS $(nix-build ./fixed.nix -A good --no-out-link) --experimental-features nix-command

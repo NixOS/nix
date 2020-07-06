@@ -205,7 +205,14 @@ public:
 
         if (!optIpnsPath) {
             if (initialIpfsPath != state->ipfsPath)
-                throw Error("The current IPFS address doesn't match the configured one. \n  initial: %s\n  current: %s",
+                throw Error(
+                    "You performed store-modifying actions, creating a new store whose IPFS address doesn't match the configured one:\n"
+                    "  configured: %s\n"
+                    "  modified: %s\n"
+                    "\n"
+                    "This happens when one has configured nix to use a store via an IPFS hash. Since the store is immutable a new one is made (functional update) and the \"modified\" is its hash. Nix isn't going to statefully switch to using that hash, however, because that would be in violation of the configuration Nix has been given.\n"
+                    "\n"
+                    "You can change you configuration to use this hash, and run the command again in which case it will succeed with a no-opt. But if you are going to modify the store on a regular basis you should use DNS-link or IPNS instead so you have a properly mutable store, and avoid getting this message again.",
                     formatPathAsProtocol(initialIpfsPath), formatPathAsProtocol(state->ipfsPath));
             else
                 return;
@@ -215,7 +222,12 @@ public:
 
         auto resolvedIpfsPath = resolveIPNSName(ipnsPath);
         if (resolvedIpfsPath != initialIpfsPath) {
-            throw Error("The IPNS hash or DNS link %s resolves now to something different from the value it had when Nix was started;\n  wanted: %s\n  got %s\nPerhaps something else updated it in the meantime?",
+            throw Error(
+                "The IPNS hash or DNS link %s resolves now to something different from the value it had when Nix was started:\n"
+                "  expected: %s\n"
+                "  got %s\n"
+                "\n"
+                "Perhaps something else updated it in the meantime?",
                 ipnsPath, initialIpfsPath, resolvedIpfsPath);
         }
 
