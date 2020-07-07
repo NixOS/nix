@@ -122,15 +122,9 @@ if [ "$(uname -s)" = "Darwin" ]; then
 fi
 
 if [ "$INSTALL_MODE" = "daemon" ]; then
-    if [ -e /run/systemd/system ]; then
-        printf '\e[1;31mSwitching to the Systemd Daemon-based Installer\e[0m\n'
-        exec "$self/install-multi-user"
-        exit 0
-    else
-        printf '\e[1;31mSwitching to the Non-Systemd Daemon-based Installer\e[0m\n'
-        exec "$self/install-generic-multi-user"
-        exit 0
-    fi
+    printf '\e[1;31mSwitching to the Multi-user Installer\e[0m\n'
+    exec "$self/install-multi-user"
+    exit 0
 fi
 
 if [ "$(id -u)" -eq 0 ]; then
