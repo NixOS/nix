@@ -3861,8 +3861,7 @@ void DerivationGoal::registerOutputs()
 
             // Replace the output path by the new CA one
             // FIXME: Why can't this be done in one step?
-            actualOutputs.erase(i.first);
-            actualOutputs.emplace(i.first, info.path);
+            actualOutputs.insert_or_assign(i.first, info.path);
         } else {
             info.narHash = hash.first;
             info.narSize = hash.second;
