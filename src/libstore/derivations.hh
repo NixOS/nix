@@ -53,6 +53,15 @@ struct BasicDerivation
 
     /* Return the output names of a derivation. */
     StringSet outputNames() const;
+
+    /**
+    * Replace all the input derivations of the derivation by their output path
+    * (as given by `queryDerivationOutputMap`)
+    * **if this one differs from the one written in the derivation**
+    *
+    * Return `true` iff the derivation has been modified
+    */
+    virtual bool resolve(Store & store);
 };
 
 struct Derivation : BasicDerivation
@@ -62,6 +71,8 @@ struct Derivation : BasicDerivation
     /* Print a derivation. */
     std::string unparse(const Store & store, bool maskOutputs,
         std::map<std::string, StringSet> * actualInputs = nullptr) const;
+
+    bool resolve(Store & store) override;
 
     Derivation() { }
 };

@@ -16,7 +16,6 @@
 #include "machines.hh"
 #include "daemon.hh"
 #include "worker-protocol.hh"
-#include "rewrite-derivation.hh"
 
 #include <algorithm>
 #include <iostream>
@@ -1357,7 +1356,7 @@ void DerivationGoal::inputsRealised()
     trace("all inputs realised");
 
     if (useDerivation) {
-        bool isModified = resolveDerivation(worker.store, *(dynamic_cast<Derivation *>(drv.get())));
+        bool isModified = drv->resolve(worker.store);
         // Define the actual outputs of the build
         for (auto & i: drv->outputs)
             actualOutputs.emplace(i.first, i.second.path);

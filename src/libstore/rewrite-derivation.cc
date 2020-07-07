@@ -1,4 +1,4 @@
-#include "rewrite-derivation.hh"
+#include "derivations.hh"
 #include "parsed-derivations.hh"
 #include "util.hh"
 
@@ -65,13 +65,17 @@ void rewriteDerivation(Store & store, Derivation & drv, const StringMap & rewrit
     }
 }
 
-bool resolveDerivation(Store & store, Derivation & drv) {
+bool BasicDerivation::resolve(Store & store) {
+    return false;
+}
+
+bool Derivation::resolve(Store & store) {
     // Input paths that we'll want to rewrite in the derivation
     std::map<Path, Path> inputRewrites;
 
     DerivationInputs newInputs;
 
-    for (auto & input : drv.inputDrvs) {
+    for (auto & input : inputDrvs) {
         auto inputDrv = store.readDerivation(input.first);
         auto inputDrvOutputs = store.queryDerivationOutputMap(input.first);
         StringSet newOutputNames;
@@ -82,7 +86,7 @@ bool resolveDerivation(Store & store, Derivation & drv) {
                         store.printStorePath(inputDrv.outputs.at(outputName).path),
                         store.printStorePath(actualPath)
                 );
-                drv.inputSrcs.emplace(std::move(actualPath));
+                inputSrcs.emplace(std::move(actualPath));
             } else {
                 newOutputNames.emplace(outputName);
             }
@@ -91,8 +95,10 @@ bool resolveDerivation(Store & store, Derivation & drv) {
             newInputs.emplace(input.first, newOutputNames);
         }
     }
-    drv.inputDrvs = std::move(newInputs);
-    rewriteDerivation(store, drv, inputRewrites);
+    inputDrvs = std::move(newInputs);
+    if (!inputRewrites.empty()) {
+        rewriteDerivation(store, *this, inputRewrites);
+    }
 
     return (! inputRewrites.empty());
 }
