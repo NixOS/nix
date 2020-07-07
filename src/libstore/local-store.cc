@@ -576,7 +576,7 @@ void LocalStore::checkDerivationOutputs(const StorePath & drvPath, const Derivat
     }
 }
 
-void LocalStore::linkDeriverToPath(const StorePath deriver, const string outputName, const StorePath output)
+void LocalStore::linkDeriverToPath(const StorePath & deriver, const string & outputName, const StorePath & output)
 {
     retrySQLite<void>([&]() {
         auto state(_state.lock());
