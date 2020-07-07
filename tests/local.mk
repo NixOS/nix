@@ -31,6 +31,7 @@ nix_tests = \
   nix-copy-ssh.sh \
   post-hook.sh \
   function-trace.sh \
+  content-addressed.sh \
   recursive.sh
   # parallel.sh
 
