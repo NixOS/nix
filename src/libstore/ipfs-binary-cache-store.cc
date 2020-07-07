@@ -1,13 +1,12 @@
 #include <cstring>
 #include <nlohmann/json.hpp>
 
-#include "binary-cache-store.hh"
+#include "ipfs-binary-cache-store.hh"
 #include "filetransfer.hh"
 #include "nar-info-disk-cache.hh"
 #include "archive.hh"
 #include "compression.hh"
 #include "names.hh"
-#include "ipfs-binary-cache-store.hh"
 
 namespace nix {
 

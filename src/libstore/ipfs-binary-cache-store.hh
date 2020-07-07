@@ -1,5 +1,7 @@
 #pragma once
 
+#include "binary-cache-store.hh"
+
 namespace nix {
 
 MakeError(UploadToIPFS, Error);
