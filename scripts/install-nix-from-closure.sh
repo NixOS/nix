@@ -35,7 +35,7 @@ fi
 # Determine if we could use the multi-user installer or not
 if [ "$(uname -s)" = "Darwin" ]; then
     echo "Note: a multi-user installation is possible. See https://nixos.org/nix/manual/#sect-multi-user-installation" >&2
-elif [ "$(uname -s)" = "Linux" ] && [ -e /run/systemd/system ]; then
+elif [ "$(uname -s)" = "Linux" ]; then
     echo "Note: a multi-user installation is possible. See https://nixos.org/nix/manual/#sect-multi-user-installation" >&2
 fi
 
@@ -122,9 +122,15 @@ if [ "$(uname -s)" = "Darwin" ]; then
 fi
 
 if [ "$INSTALL_MODE" = "daemon" ]; then
-    printf '\e[1;31mSwitching to the Daemon-based Installer\e[0m\n'
-    exec "$self/install-multi-user"
-    exit 0
+    if [ -e /run/systemd/system ]; then
+        printf '\e[1;31mSwitching to the Systemd Daemon-based Installer\e[0m\n'
+        exec "$self/install-multi-user"
+        exit 0
+    else
+        printf '\e[1;31mSwitching to the Non-Systemd Daemon-based Installer\e[0m\n'
+        exec "$self/install-generic-multi-user"
+        exit 0
+    fi
 fi
 
 if [ "$(id -u)" -eq 0 ]; then
