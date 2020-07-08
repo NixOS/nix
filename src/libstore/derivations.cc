@@ -129,9 +129,11 @@ static DerivationOutput parseDerivationOutput(const Store & store, istringstream
 }
 
 
-static Derivation parseDerivation(const Store & store, const string & s)
+static Derivation parseDerivation(const Store & store, const string & s, string name)
 {
     Derivation drv;
+    drv.name = name;
+
     istringstream_nocopy str(s);
     expect(str, "Derive([");
 
@@ -175,10 +177,10 @@ static Derivation parseDerivation(const Store & store, const string & s)
 }
 
 
-Derivation readDerivation(const Store & store, const Path & drvPath)
+Derivation readDerivation(const Store & store, const Path & drvPath, std::string name)
 {
     try {
-        return parseDerivation(store, readFile(drvPath));
+        return parseDerivation(store, readFile(drvPath), name);
     } catch (FormatError & e) {
         throw Error("error parsing derivation '%1%': %2%", drvPath, e.msg());
     }
@@ -196,7 +198,7 @@ Derivation Store::readDerivation(const StorePath & drvPath)
 {
     auto accessor = getFSAccessor();
     try {
-        return parseDerivation(*this, accessor->readFile(printStorePath(drvPath)));
+        return parseDerivation(*this, accessor->readFile(printStorePath(drvPath)), std::string(drvPath.name()));
     } catch (FormatError & e) {
         throw Error("error parsing derivation '%s': %s", printStorePath(drvPath), e.msg());
     }
@@ -369,7 +371,7 @@ Hash hashDerivationModulo(Store & store, const Derivation & drv, bool maskOutput
         if (h == drvHashes.end()) {
             assert(store.isValidPath(i.first));
             h = drvHashes.insert_or_assign(i.first, hashDerivationModulo(store,
-                store.readDerivation(i.first), false)).first;
+                    store.readDerivation(i.first), false)).first;
         }
         inputs2.insert_or_assign(h->second.to_string(Base16, false), i.second);
     }
@@ -435,8 +437,10 @@ StringSet BasicDerivation::outputNames() const
 }
 
 
-Source & readDerivation(Source & in, const Store & store, BasicDerivation & drv)
+Source & readDerivation(Source & in, const Store & store, BasicDerivation & drv, string name)
 {
+    drv.name = name;
+
     drv.outputs.clear();
     auto nr = readNum<size_t>(in);
     for (size_t n = 0; n < nr; n++) {

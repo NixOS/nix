@@ -914,9 +914,9 @@ static void opServe(Strings opFlags, Strings opArgs)
 
                 if (!writeAllowed) throw Error("building paths is not allowed");
 
-                auto drvPath = store->parseStorePath(readString(in)); // informational only
+                auto drvPath = store->parseStorePath(readString(in));
                 BasicDerivation drv;
-                readDerivation(in, *store, drv);
+                readDerivation(in, *store, drv, std::string(drvPath.name()));
 
                 getBuildSettings();
 

@@ -35,6 +35,7 @@ struct BasicDerivation
     Path builder;
     Strings args;
     StringPairs env;
+    string name;
 
     BasicDerivation() { }
     virtual ~BasicDerivation() { };
@@ -76,7 +77,7 @@ StorePath writeDerivation(ref<Store> store,
     const Derivation & drv, std::string_view name, RepairFlag repair = NoRepair);
 
 /* Read a derivation from a file. */
-Derivation readDerivation(const Store & store, const Path & drvPath);
+Derivation readDerivation(const Store & store, const Path & drvPath, string name);
 
 // FIXME: remove
 bool isDerivation(const string & fileName);
@@ -93,7 +94,7 @@ bool wantOutput(const string & output, const std::set<string> & wanted);
 struct Source;
 struct Sink;
 
-Source & readDerivation(Source & in, const Store & store, BasicDerivation & drv);
+Source & readDerivation(Source & in, const Store & store, BasicDerivation & drv, string name);
 void writeDerivation(Sink & out, const Store & store, const BasicDerivation & drv);
 
 std::string hashPlaceholder(const std::string & outputName);
