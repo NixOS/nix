@@ -2200,7 +2200,7 @@ void DerivationGoal::startBuilder()
            (typically the dependencies of /bin/sh).  Throw them
            out. */
         for (auto & i : drv->outputs)
-            dirsInChroot.erase(worker.store.printStorePath(i.second.path(drv->name)));
+            dirsInChroot.erase(worker.store.printStorePath(i.second.path(worker.store, drv->name)));
 
 #elif __APPLE__
         /* We don't really have any parent prep work to do (yet?)
