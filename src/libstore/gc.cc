@@ -876,7 +876,7 @@ void LocalStore::autoGC(bool sync)
         if (statvfs(realStoreDir.c_str(), &st))
             throw SysError("getting filesystem info about '%s'", realStoreDir);
 
-        return (uint64_t) st.f_bavail * st.f_bsize;
+        return (uint64_t) st.f_bavail * st.f_frsize;
     };
 
     std::shared_future<void> future;
