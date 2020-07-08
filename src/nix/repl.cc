@@ -486,7 +486,7 @@ bool NixRepl::processLine(string line)
                 auto drv = readDerivation(*state->store, drvPath, std::string(state->store->parseStorePath(drvPath).name()));
                 std::cout << std::endl << "this derivation produced the following outputs:" << std::endl;
                 for (auto & i : drv.outputs)
-                    std::cout << fmt("  %s -> %s\n", i.first, state->store->printStorePath(i.second.path));
+                    std::cout << fmt("  %s -> %s\n", i.first, state->store->printStorePath(i.second.path(*state->store, drv.name)));
             }
         } else if (command == ":i") {
             runProgram(settings.nixBinDir + "/nix-env", Strings{"-i", drvPath});

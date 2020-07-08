@@ -77,7 +77,7 @@ static PathSet realisePath(StorePathWithOutputs path, bool build = true)
             if (i == drv.outputs.end())
                 throw Error("derivation '%s' does not have an output named '%s'",
                     store2->printStorePath(path.path), j);
-            auto outPath = store2->printStorePath(i->second.path);
+            auto outPath = store2->printStorePath(i->second.path(*store, drv.name));
             if (store2) {
                 if (gcRoot == "")
                     printGCWarning();
@@ -219,7 +219,7 @@ static StorePathSet maybeUseOutputs(const StorePath & storePath, bool useOutput,
         auto drv = store->derivationFromPath(storePath);
         StorePathSet outputs;
         for (auto & i : drv.outputs)
-            outputs.insert(i.second.path);
+            outputs.insert(i.second.path(*store, drv.name));
         return outputs;
     }
     else return {storePath};
@@ -313,7 +313,7 @@ static void opQuery(Strings opFlags, Strings opArgs)
                 if (forceRealise) realisePath({i2});
                 Derivation drv = store->derivationFromPath(i2);
                 for (auto & j : drv.outputs)
-                    cout << fmt("%1%\n", store->printStorePath(j.second.path));
+                    cout << fmt("%1%\n", store->printStorePath(j.second.path(*store, drv.name)));
             }
             break;
         }

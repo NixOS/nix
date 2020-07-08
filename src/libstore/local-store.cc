@@ -560,19 +560,12 @@ void LocalStore::checkDerivationOutputs(const StorePath & drvPath, const Derivat
         DerivationOutputs::const_iterator out = drv.outputs.find("out");
         if (out == drv.outputs.end())
             throw Error("derivation '%s' does not have an output named 'out'", printStorePath(drvPath));
-
-        check(
-            makeFixedOutputPath(
-                out->second.hash->method,
-                out->second.hash->hash,
-                drvName),
-            out->second.path, "out");
     }
 
     else {
         Hash h = hashDerivationModulo(*this, drv, true);
         for (auto & i : drv.outputs)
-            check(makeOutputPath(i.first, h, drvName), i.second.path, i.first);
+            check(makeOutputPath(i.first, h, drvName), i.second.path(*this, drv.name), i.first);
     }
 }
 
@@ -614,7 +607,7 @@ uint64_t LocalStore::addValidPath(State & state,
             state.stmtAddDerivationOutput.use()
                 (id)
                 (i.first)
-                (printStorePath(i.second.path))
+                (printStorePath(i.second.path(*this, drv.name)))
                 .exec();
         }
     }

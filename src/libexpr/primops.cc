@@ -64,7 +64,7 @@ void EvalState::realiseContext(const PathSet & context)
                 DerivationOutputs::iterator i = drv.outputs.find(outputName);
                 if (i == drv.outputs.end())
                     throw Error("derivation '%s' does not have an output named '%s'", ctxS, outputName);
-                allowedPaths->insert(store->printStorePath(i->second.path));
+                allowedPaths->insert(store->printStorePath(i->second.path(*store, drv.name)));
             }
         }
     }
@@ -120,7 +120,7 @@ static void prim_scopedImport(EvalState & state, const Pos & pos, Value * * args
 
         for (const auto & o : drv.outputs) {
             v2 = state.allocAttr(w, state.symbols.create(o.first));
-            mkString(*v2, state.store->printStorePath(o.second.path), {"!" + o.first + "!" + path});
+            mkString(*v2, state.store->printStorePath(o.second.path(*state.store, drv.name)), {"!" + o.first + "!" + path});
             outputsVal->listElems()[outputs_index] = state.allocValue();
             mkString(*(outputsVal->listElems()[outputs_index++]), o.first);
         }
@@ -778,11 +778,12 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
         auto outPath = state.store->makeFixedOutputPath(ingestionMethod, h, drvName);
         if (!jsonObject) drv.env["out"] = state.store->printStorePath(outPath);
         drv.outputs.insert_or_assign("out", DerivationOutput {
-            .path = std::move(outPath),
-            .hash = FixedOutputHash {
-                .method = ingestionMethod,
-                .hash = std::move(h),
-            },
+                .output = DerivationOutputFixed {
+                    .hash = FixedOutputHash {
+                        .method = ingestionMethod,
+                        .hash = std::move(h),
+                    },
+                },
         });
     }
 
@@ -797,8 +798,9 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
             if (!jsonObject) drv.env[i] = "";
             drv.outputs.insert_or_assign(i,
                 DerivationOutput {
-                    .path = StorePath::dummy,
-                    .hash = std::optional<FixedOutputHash> {},
+                    .output = DerivationOutputIntensional {
+                        .path = StorePath::dummy,
+                    },
                 });
         }
 
@@ -809,8 +811,9 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
             if (!jsonObject) drv.env[i] = state.store->printStorePath(outPath);
             drv.outputs.insert_or_assign(i,
                 DerivationOutput {
-                    .path = std::move(outPath),
-                    .hash = std::optional<FixedOutputHash>(),
+                    .output = DerivationOutputIntensional {
+                        .path = std::move(outPath),
+                    },
                 });
         }
     }
@@ -831,7 +834,7 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
     mkString(*state.allocAttr(v, state.sDrvPath), drvPathS, {"=" + drvPathS});
     for (auto & i : drv.outputs) {
         mkString(*state.allocAttr(v, state.symbols.create(i.first)),
-            state.store->printStorePath(i.second.path), {"!" + i.first + "!" + drvPathS});
+            state.store->printStorePath(i.second.path(*state.store, drv.name)), {"!" + i.first + "!" + drvPathS});
     }
     v.attrs->sort();
 }

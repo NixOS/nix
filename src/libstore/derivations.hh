@@ -13,10 +13,20 @@ namespace nix {
 
 /* Abstract syntax of derivations. */
 
-struct DerivationOutput
+struct DerivationOutputIntensional
 {
     StorePath path;
-    std::optional<FixedOutputHash> hash; /* hash used for expected hash computation */
+};
+
+struct DerivationOutputFixed
+{
+    FixedOutputHash hash; /* hash used for expected hash computation */
+};
+
+struct DerivationOutput
+{
+    std::variant<DerivationOutputIntensional, DerivationOutputFixed> output;
+    StorePath path(const Store & store, string drvName) const;
 };
 
 typedef std::map<string, DerivationOutput> DerivationOutputs;
@@ -42,7 +52,7 @@ struct BasicDerivation
 
     /* Return the path corresponding to the output identifier `id' in
        the given derivation. */
-    const StorePath & findOutput(const std::string & id) const;
+    const StorePath & findOutput(const Store & store, const std::string & id) const;
 
     bool isBuiltin() const;
 
@@ -50,7 +60,7 @@ struct BasicDerivation
     bool isFixedOutput() const;
 
     /* Return the output paths of a derivation. */
-    StorePathSet outputPaths() const;
+    StorePathSet outputPaths(const Store & store) const;
 
     /* Return the output names of a derivation. */
     StringSet outputNames() const;
