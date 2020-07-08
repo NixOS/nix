@@ -839,9 +839,10 @@ private:
     typedef map<StorePath, StorePath> RedirectedOutputs;
     RedirectedOutputs redirectedOutputs;
 
-    /* The `actual` outputs of the build (which might differ from the one
-     * stored in the drv in case of ca derivations) */
-    OutputPathMap actualOutputs;
+    /* The final outputs of the build in case the derivation is
+     * content-addressed
+     */
+    OutputPathMap caOutputs;
 
     BuildMode buildMode;
 
@@ -1357,9 +1358,6 @@ void DerivationGoal::inputsRealised()
 
     if (useDerivation) {
         bool isModified = drv->resolve(worker.store);
-        // Define the actual outputs of the build
-        for (auto & i: drv->outputs)
-            actualOutputs.emplace(i.first, i.second.path);
         if (isModified) {
             debug("Trying the substitution again");
             haveDerivation();
@@ -1969,7 +1967,7 @@ void linkOrCopy(const Path & from, const Path & to)
            file (e.g. 32000 of ext3), which is quite possible after a
            'nix-store --optimise'. FIXME: actually, why don't we just
            bind-mount in this case?
-           
+
            It can also fail with EPERM in BeegFS v7 and earlier versions
            which don't allow hard-links to other directories */
         if (errno != EMLINK && errno != EPERM)
@@ -3859,9 +3857,7 @@ void DerivationGoal::registerOutputs()
             info = worker.store.makeContentAddressed(info);
             deletePath(path);
 
-            // Replace the output path by the new CA one
-            // FIXME: Why can't this be done in one step?
-            actualOutputs.insert_or_assign(i.first, info.path);
+            caOutputs.emplace(i.first, info.path);
         } else {
             info.narHash = hash.first;
             info.narSize = hash.second;
@@ -4263,9 +4259,14 @@ void DerivationGoal::addHashRewrite(const StorePath & path)
 
 void DerivationGoal::registerOutputMappings() {
 
-    for (auto & output : actualOutputs) {
-        debug("Path for %s: %s", output.first, worker.store.printStorePath(output.second));
-        worker.store.linkDeriverToPath(drvPath, output.first, output.second);
+    if (useDerivation) {
+        for (auto & output : drv->outputs) {
+            auto outputName = output.first;
+            StorePath outputPath = caOutputs.count(outputName) ? caOutputs.at(outputName) : output.second.path;
+            debug("Path for %s: %s", outputName, worker.store.printStorePath(outputPath));
+            worker.store.linkDeriverToPath(drvPath, outputName, outputPath);
+
+        }
     }
 }
 
