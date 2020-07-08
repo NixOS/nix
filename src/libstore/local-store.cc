@@ -976,7 +976,7 @@ void LocalStore::addToStore(const ValidPathInfo & info, Source & source,
 
         PathLocks outputLock;
 
-        Path realPath = realStoreDir + "/" + std::string(info.path.to_string());
+        auto realPath = Store::toRealPath(info.path);
 
         /* Lock the output path.  But don't lock if we're being called
            from a build hook (whose parent process already acquired a
@@ -1047,8 +1047,7 @@ StorePath LocalStore::addToStoreFromDump(const string & dump, const string & nam
         /* The first check above is an optimisation to prevent
            unnecessary lock acquisition. */
 
-        Path realPath = realStoreDir + "/";
-        realPath += dstPath.to_string();
+        auto realPath = Store::toRealPath(dstPath);
 
         PathLocks outputLock({realPath});
 
@@ -1167,7 +1166,7 @@ StorePath LocalStore::addToStore(const string & name, const Path & _srcPath,
 
     Hash hash = hashSink ? hashSink->finish().first : sha256.first;
 
-    Path dstPath = makeFixedOutputPath(method, hash, name);
+    auto dstPath = makeFixedOutputPath(method, hash, name);
 
     addTempRoot(dstPath);
 
@@ -1176,7 +1175,7 @@ StorePath LocalStore::addToStore(const string & name, const Path & _srcPath,
         /* The first check above is an optimisation to prevent
            unnecessary lock acquisition. */
 
-        Path realPath = realStoreDir + "/" + baseNameOf(dstPath);
+        auto realPath = Store::toRealPath(dstPath);
 
         PathLocks outputLock({realPath});
 
@@ -1224,8 +1223,7 @@ StorePath LocalStore::addTextToStore(const string & name, const string & s,
 
     if (repair || !isValidPath(dstPath)) {
 
-        Path realPath = realStoreDir + "/";
-        realPath += dstPath.to_string();
+        auto realPath = Store::toRealPath(dstPath);
 
         PathLocks outputLock({realPath});
 
