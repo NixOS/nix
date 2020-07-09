@@ -3854,7 +3854,26 @@ void DerivationGoal::registerOutputs()
         info.references = std::move(references);
 
         if (parsedDrv->contentAddressed()) {
-            info = worker.store.makeContentAddressed(info);
+            // Make the path content-addressed.
+            StringSink originalPathContent;
+            dumpPath(
+                    worker.store.getRealStoreDir() + std::string(worker.store.printStorePath(info.path), worker.store.storeDir.size())
+                    , originalPathContent
+            );
+            // TODO: Rewrite as a generic `sinkToSource`
+            StringSource narSource(*originalPathContent.s);
+
+            StringSink finalPathContent;
+
+            auto newInfo = worker.store.makeContentAddressedNar(
+                    info,
+                    narSource,
+                    finalPathContent
+            );
+
+            StringSource finalPathSource(*finalPathContent.s);
+            worker.store.addToStore(newInfo, finalPathSource);
+            info = newInfo;
             deletePath(path);
 
             caOutputs.emplace(i.first, info.path);

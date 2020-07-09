@@ -677,10 +677,23 @@ public:
     /* Create a new path similar to the one referred to by `info`, but that's
      * content-addressed.
      *
-     * This doesn't alter the original path
+     * This doesn't alter the original path.
      */
     ValidPathInfo makeContentAddressed(const ValidPathInfo & info, const StringMap & extraRewrites = {});
 
+    /*
+     * Convert the given store path (in Nar format) to its content-addressed
+     * version.
+     *
+     * Write the new content-addressed path in to `dest` and return the
+     * `ValidPathInfo` corresponding to it.
+     */
+    ValidPathInfo makeContentAddressedNar(
+            const ValidPathInfo & info,
+            const StringSource & source,
+            StringSink & dest,
+            const StringMap & extraRewrites = {}
+    );
 
 protected:
 

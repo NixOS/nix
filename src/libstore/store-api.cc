@@ -743,36 +743,50 @@ std::string Store::showPaths(const StorePathSet & paths)
     return s;
 }
 
-ValidPathInfo Store::makeContentAddressed(
+ValidPathInfo Store::makeContentAddressedNar(
         const ValidPathInfo & info,
+        const StringSource & source,
+        StringSink & dest,
         const StringMap & extraRewrites
-    )
+)
 {
     bool hasSelfReference = info.references.find(info.path) != info.references.end();
-    std::string oldHashPart(info.path.hashPart());
 
-    StringSink sink;
-    narFromPath(info.path, sink);
-    *sink.s = rewriteStrings(*sink.s, extraRewrites);
+    std::string oldHashPart(info.path.hashPart());
+    *dest.s = rewriteStrings(source.s, extraRewrites);
     HashModuloSink hashModuloSink(htSHA256, oldHashPart);
-    hashModuloSink((unsigned char *) sink.s->data(), sink.s->size());
+    hashModuloSink((unsigned char *) dest.s->data(), dest.s->size());
     auto narHash = hashModuloSink.finish().first;
     ValidPathInfo newInfo(makeFixedOutputPath(FileIngestionMethod::Recursive, narHash, info.path.name(), info.references, hasSelfReference));
     newInfo.references = info.references;
     if (hasSelfReference) newInfo.references.insert(newInfo.path);
     newInfo.narHash = narHash;
-    newInfo.narSize = sink.s->size();
+    newInfo.narSize = dest.s->size();
     newInfo.ca = FixedOutputHash {
         .method = FileIngestionMethod::Recursive,
         .hash = newInfo.narHash,
     };
-    auto source = sinkToSource([&](Sink & nextSink) {
-        RewritingSink rsink2(oldHashPart, std::string(info.path.hashPart()), nextSink);
-        rsink2((unsigned char *) sink.s->data(), sink.s->size());
-        rsink2.flush();
-    });
+    return newInfo;
+}
 
-    addToStore(newInfo, *source);
+ValidPathInfo Store::makeContentAddressed(
+        const ValidPathInfo & info,
+        const StringMap & extraRewrites
+    )
+{
+
+    StringSink originalPathContent;
+    narFromPath(info.path, originalPathContent);
+    // TODO: Rewrite as a generic `sinkToSource`
+    StringSource narSource(*originalPathContent.s);
+
+    StringSink finalPathContent;
+
+    auto newInfo = makeContentAddressedNar(info, narSource, finalPathContent, extraRewrites);
+
+    StringSource finalPathSource(*finalPathContent.s);
+    addToStore(newInfo, finalPathSource);
+
     return newInfo;
 }
 
