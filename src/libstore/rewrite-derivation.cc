@@ -26,9 +26,6 @@ void recomputeOutputs(Store & store, Derivation & drv) {
     string name = ParsedDerivation(StorePath::dummy, drv).getStringAttr("name").value_or("");
 
     for (auto & i : drv.outputs) {
-        // XXX: There's certainly a better and less error-prone way
-        // of getting the name than to look it up in the drv environment
-        string name = ParsedDerivation(StorePath::dummy, drv).getStringAttr("name").value_or("");
         StorePath outPath = store.makeOutputPath(i.first, h, name);
         auto outputEnvVar = drv.env.find(i.first);
         if (outputEnvVar != drv.env.end())
