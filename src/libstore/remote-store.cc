@@ -9,6 +9,7 @@
 #include "pool.hh"
 #include "finally.hh"
 #include "git.hh"
+#include "logging.hh"
 
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -221,7 +222,7 @@ void RemoteStore::setOptions(Connection & conn)
         overrides.erase(settings.maxSilentTime.name);
         overrides.erase(settings.buildCores.name);
         overrides.erase(settings.useSubstitutes.name);
-        overrides.erase(settings.showTrace.name);
+        overrides.erase(loggerSettings.showTrace.name);
         conn.to << overrides.size();
         for (auto & i : overrides)
             conn.to << i.first << i.second.value;
