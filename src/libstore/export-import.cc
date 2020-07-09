@@ -49,8 +49,6 @@ void Store::exportPath(const StorePath & path, Sink & sink)
 
     HashAndWriteSink hashAndWriteSink(sink);
 
-    if (!isValidPath(path))
-        throw Error("path '%s' is not valid", printStorePath(path));
     narFromPath(path, hashAndWriteSink);
 
     /* Refuse to export paths that have changed.  This prevents
