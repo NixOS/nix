@@ -13,7 +13,7 @@ namespace nix {
 
 /* Abstract syntax of derivations. */
 
-struct DerivationOutputIntensional
+struct DerivationOutputExtensional
 {
     StorePath path;
 };
@@ -25,7 +25,7 @@ struct DerivationOutputFixed
 
 struct DerivationOutput
 {
-    std::variant<DerivationOutputIntensional, DerivationOutputFixed> output;
+    std::variant<DerivationOutputExtensional, DerivationOutputFixed> output;
     StorePath path(const Store & store, string drvName) const;
 };
 

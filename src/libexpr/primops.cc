@@ -798,7 +798,7 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
             if (!jsonObject) drv.env[i] = "";
             drv.outputs.insert_or_assign(i,
                 DerivationOutput {
-                    .output = DerivationOutputIntensional {
+                    .output = DerivationOutputExtensional {
                         .path = StorePath::dummy,
                     },
                 });
@@ -811,7 +811,7 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
             if (!jsonObject) drv.env[i] = state.store->printStorePath(outPath);
             drv.outputs.insert_or_assign(i,
                 DerivationOutput {
-                    .output = DerivationOutputIntensional {
+                    .output = DerivationOutputExtensional {
                         .path = std::move(outPath),
                     },
                 });

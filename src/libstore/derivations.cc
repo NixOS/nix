@@ -15,7 +15,7 @@ template<class... Ts> overloaded(Ts...) -> overloaded<Ts...>;
 StorePath DerivationOutput::path(const Store & store, string drvName) const
 {
     return std::visit(overloaded {
-        [](DerivationOutputIntensional doi) {
+        [](DerivationOutputExtensional doi) {
             return doi.path;
         },
         [&](DerivationOutputFixed dof) {
@@ -142,7 +142,7 @@ static DerivationOutput parseDerivationOutput(const Store & store, istringstream
         };
     } else
         return DerivationOutput {
-            .output = DerivationOutputIntensional {
+            .output = DerivationOutputExtensional {
                 .path = std::move(path),
             }
         };
@@ -450,7 +450,7 @@ static DerivationOutput readDerivationOutput(Source & in, const Store & store)
         };
     } else
         return DerivationOutput {
-            .output = DerivationOutputIntensional {
+            .output = DerivationOutputExtensional {
                 .path = std::move(path),
             }
         };
