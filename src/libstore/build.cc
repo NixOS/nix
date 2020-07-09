@@ -2041,7 +2041,10 @@ void DerivationGoal::startBuilder()
             if (!std::regex_match(fileName, regex))
                 throw Error("invalid file name '%s' in 'exportReferencesGraph'", fileName);
 
-            auto storePath = worker.store.parseStorePath(*i++);
+            auto storePathS = *i++;
+            if (!worker.store.isInStore(storePathS))
+                throw BuildError("'exportReferencesGraph' contains a non-store path '%1%'", storePathS);
+            auto storePath = worker.store.parseStorePath(worker.store.toStorePath(storePathS));
 
             /* Write closure info to <fileName>. */
             writeFile(tmpDir + "/" + fileName,

@@ -81,7 +81,7 @@ struct TunnelLogger : public Logger
         showErrorInfo(oss, ei, false);
 
         StringSink buf;
-        buf << STDERR_NEXT << oss.str() << "\n";
+        buf << STDERR_NEXT << oss.str();
         enqueueMsg(*buf.s);
     }
 
