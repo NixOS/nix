@@ -30,9 +30,9 @@ void recomputeOutputs(Store & store, Derivation & drv) {
         auto outputEnvVar = drv.env.find(i.first);
         if (outputEnvVar != drv.env.end())
             outputEnvVar->second = store.printStorePath(outPath);
-        debug(format("Rewrote output %1% to %2%")
-            % store.printStorePath(drv.outputs.at(i.first).path)
-            % store.printStorePath(outPath));
+        debug("Rewrote output %s to %s"
+            , store.printStorePath(drv.outputs.at(i.first).path)
+            , store.printStorePath(outPath));
         i.second = DerivationOutput {
             .path = outPath,
             .hash = std::optional<FixedOutputHash> {},
