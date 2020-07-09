@@ -21,6 +21,10 @@ void recomputeOutputs(Store & store, Derivation & drv) {
     /* Use the masked derivation expression to compute the output path. */
     Hash h = hashDerivationModulo(store, drv, true);
 
+    // XXX: There's certainly a better and less error-prone way
+    // of getting the name than to look it up in the drv environment
+    string name = ParsedDerivation(StorePath::dummy, drv).getStringAttr("name").value_or("");
+
     for (auto & i : drv.outputs) {
         // XXX: There's certainly a better and less error-prone way
         // of getting the name than to look it up in the drv environment
