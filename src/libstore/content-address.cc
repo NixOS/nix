@@ -82,4 +82,16 @@ std::string renderContentAddress(std::optional<ContentAddress> ca) {
     return ca ? renderContentAddress(*ca) : "";
 }
 
+Hash getContentAddressHash(const ContentAddress & ca)
+{
+    return std::visit(overloaded {
+        [](TextHash th) {
+            return th.hash;
+        },
+        [](FixedOutputHash fsh) {
+            return fsh.hash;
+        }
+    }, ca);
+}
+
 }

@@ -148,7 +148,7 @@ static void prim_appendContext(EvalState & state, const Pos & pos, Value * * arg
         if (!state.store->isStorePath(i.name))
             throw EvalError({
                 .hint = hintfmt("Context key '%s' is not a store path", i.name),
-                .nixCode = NixCode { .errPos = *i.pos }
+                .errPos = *i.pos
             });
         if (!settings.readOnlyMode)
             state.store->ensurePath(state.store->parseStorePath(i.name));
@@ -165,7 +165,7 @@ static void prim_appendContext(EvalState & state, const Pos & pos, Value * * arg
                 if (!isDerivation(i.name)) {
                     throw EvalError({
                         .hint = hintfmt("Tried to add all-outputs context of %s, which is not a derivation, to a string", i.name),
-                        .nixCode = NixCode { .errPos = *i.pos }
+                        .errPos = *i.pos
                     });
                 }
                 context.insert("=" + string(i.name));
@@ -178,7 +178,7 @@ static void prim_appendContext(EvalState & state, const Pos & pos, Value * * arg
             if (iter->value->listSize() && !isDerivation(i.name)) {
                 throw EvalError({
                     .hint = hintfmt("Tried to add derivation output context of %s, which is not a derivation, to a string", i.name),
-                    .nixCode = NixCode { .errPos = *i.pos }
+                    .errPos = *i.pos
                 });
             }
             for (unsigned int n = 0; n < iter->value->listSize(); ++n) {

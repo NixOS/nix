@@ -170,15 +170,5 @@ $channelsBucket->add_key(
 chdir("/home/eelco/Dev/nix-pristine") or die;
 system("git remote update origin") == 0 or die;
 system("git tag --force --sign $version $nixRev -m 'Tagging release $version'") == 0 or die;
-
-# Update the website.
-my $siteDir = "/home/eelco/Dev/nixos-homepage-pristine";
-
-system("cd $siteDir && git pull") == 0 or die;
-
-write_file("$siteDir/nix-release.tt",
-           "[%-\n" .
-           "latestNixVersion = \"$version\"\n" .
-           "-%]\n");
-
-system("cd $siteDir && git commit -a -m 'Nix $version released'") == 0 or die;
+system("git push --tags") == 0 or die;
+system("git push --force-with-lease origin $nixRev:refs/heads/latest-release") == 0 or die;
