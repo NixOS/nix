@@ -166,6 +166,19 @@ struct StringSource : Source
 };
 
 
+/* A sink that writes all incoming data to two other sinks. */
+struct TeeSink : Sink
+{
+    Sink & sink1, & sink2;
+    TeeSink(Sink & sink1, Sink & sink2) : sink1(sink1), sink2(sink2) { }
+    virtual void operator () (const unsigned char * data, size_t len)
+    {
+        sink1(data, len);
+        sink2(data, len);
+    }
+};
+
+
 /* Adapter class of a Source that saves all data read to `s'. */
 struct TeeSource : Source
 {

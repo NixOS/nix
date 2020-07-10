@@ -355,9 +355,10 @@ struct S3BinaryCacheStoreImpl : public S3BinaryCacheStore
         stats.put++;
     }
 
-    void upsertFile(const std::string & path, const std::string & data,
+    void upsertFile(const std::string & path, Source & source,
         const std::string & mimeType) override
     {
+        auto data = source.drain();
         if (narinfoCompression != "" && hasSuffix(path, ".narinfo"))
             uploadFile(path, *compress(narinfoCompression, data), mimeType, narinfoCompression);
         else if (lsCompression != "" && hasSuffix(path, ".ls"))

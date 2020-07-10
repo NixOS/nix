@@ -63,11 +63,11 @@ struct ParseSink
     virtual void createSymlink(const Path & path, const string & target) { };
 };
 
-struct TeeSink : ParseSink
+struct TeeParseSink : ParseSink
 {
     TeeSource source;
 
-    TeeSink(Source & source) : source(source) { }
+    TeeParseSink(Source & source) : source(source) { }
 };
 
 void parseDump(ParseSink & sink, Source & source);

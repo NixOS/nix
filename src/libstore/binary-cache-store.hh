@@ -36,8 +36,12 @@ public:
     virtual bool fileExists(const std::string & path) = 0;
 
     virtual void upsertFile(const std::string & path,
-        const std::string & data,
+        Source & source,
         const std::string & mimeType) = 0;
+
+    void upsertFile(const std::string & path,
+        const std::string & data,
+        const std::string & mimeType);
 
     /* Note: subclasses must implement at least one of the two
        following getFile() methods. */

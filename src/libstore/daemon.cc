@@ -731,7 +731,7 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
         if (GET_PROTOCOL_MINOR(clientVersion) >= 21)
             source = std::make_unique<TunnelSource>(from, to);
         else {
-            TeeSink tee(from);
+            TeeParseSink tee(from);
             parseDump(tee, tee.source);
             saved = std::move(*tee.source.data);
             source = std::make_unique<StringSource>(saved);
