@@ -229,14 +229,17 @@ ValidPathInfo Store::addToStoreSlow(std::string_view name, const Path & srcPath,
     /* FIXME: inefficient: we're reading/hashing 'tmpFile' three
        times. */
 
+    auto [narHash, narSize] = hashPath(htSHA256, srcPath);
+
     auto hash = method == FileIngestionMethod::Recursive
-        ? hashPath(hashAlgo, srcPath).first
+        ? hashAlgo == htSHA256
+          ? narHash
+          : hashPath(hashAlgo, srcPath).first
         : hashFile(hashAlgo, srcPath);
 
     if (expectedCAHash && expectedCAHash != hash)
         throw Error("hash mismatch for '%s'", srcPath);
 
-    auto [narHash, narSize] = hashPath(htSHA256, srcPath);
     ValidPathInfo info(makeFixedOutputPath(method, hash, name));
     info.narHash = narHash;
     info.narSize = narSize;
