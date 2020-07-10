@@ -7,6 +7,7 @@
 #include "json.hh"
 #include "derivations.hh"
 #include "url.hh"
+#include "archive.hh"
 
 #include <future>
 
@@ -218,6 +219,37 @@ StorePath Store::computeStorePathForText(const string & name, const string & s,
     const StorePathSet & references) const
 {
     return makeTextPath(name, hashString(htSHA256, s), references);
+}
+
+
+ValidPathInfo Store::addToStoreSlow(std::string_view name, const Path & srcPath,
+    FileIngestionMethod method, HashType hashAlgo,
+    std::optional<Hash> expectedCAHash)
+{
+    /* FIXME: inefficient: we're reading/hashing 'tmpFile' three
+       times. */
+
+    auto hash = method == FileIngestionMethod::Recursive
+        ? hashPath(hashAlgo, srcPath).first
+        : hashFile(hashAlgo, srcPath);
+
+    if (expectedCAHash && expectedCAHash != hash)
+        throw Error("hash mismatch for '%s'", srcPath);
+
+    auto [narHash, narSize] = hashPath(htSHA256, srcPath);
+    ValidPathInfo info(makeFixedOutputPath(method, hash, name));
+    info.narHash = narHash;
+    info.narSize = narSize;
+    info.ca = FixedOutputHash { .method = method, .hash = hash };
+
+    if (!isValidPath(info.path)) {
+        auto source = sinkToSource([&](Sink & sink) {
+            dumpPath(srcPath, sink);
+        });
+        addToStore(info, *source);
+    }
+
+    return info;
 }
 
 

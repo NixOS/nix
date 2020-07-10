@@ -186,23 +186,8 @@ static void opAddFixed(Strings opFlags, Strings opArgs)
     HashType hashAlgo = parseHashType(opArgs.front());
     opArgs.pop_front();
 
-    for (auto & i : opArgs) {
-        auto hash = method == FileIngestionMethod::Recursive
-            ? hashPath(hashAlgo, i).first
-            : hashFile(hashAlgo, i);
-        auto [narHash, narSize] = hashPath(htSHA256, i);
-        ValidPathInfo info(store->makeFixedOutputPath(method, hash, baseNameOf(i)));
-        info.narHash = narHash;
-        info.narSize = narSize;
-        info.ca = FixedOutputHash { .method = method, .hash = hash };
-
-        auto source = sinkToSource([&](Sink & sink) {
-            dumpPath(i, sink);
-        });
-        store->addToStore(info, *source);
-
-        std::cout << fmt("%s\n", store->printStorePath(info.path));
-    }
+    for (auto & i : opArgs)
+        std::cout << fmt("%s\n", store->printStorePath(store->addToStoreSlow(baseNameOf(i), i, method, hashAlgo).path));
 }
 
 

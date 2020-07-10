@@ -10,7 +10,6 @@
 #include "../nix/legacy.hh"
 #include "progress-bar.hh"
 #include "tarfile.hh"
-#include "archive.hh"
 
 #include <iostream>
 
@@ -154,14 +153,15 @@ static int _main(int argc, char * * argv)
 
         /* If an expected hash is given, the file may already exist in
            the store. */
-        Hash hash, expectedHash(ht);
+        std::optional<Hash> expectedHash;
+        Hash hash;
         std::optional<StorePath> storePath;
         if (args.size() == 2) {
             expectedHash = Hash(args[1], ht);
             const auto recursive = unpack ? FileIngestionMethod::Recursive : FileIngestionMethod::Flat;
-            storePath = store->makeFixedOutputPath(recursive, expectedHash, name);
+            storePath = store->makeFixedOutputPath(recursive, *expectedHash, name);
             if (store->isValidPath(*storePath))
-                hash = expectedHash;
+                hash = *expectedHash;
             else
                 storePath.reset();
         }
@@ -201,28 +201,12 @@ static int _main(int argc, char * * argv)
                     tmpFile = unpacked;
             }
 
-            /* FIXME: inefficient: we're reading/hashing 'tmpFile'
-               three times. */
-            auto [narHash, narSize] = hashPath(htSHA256, tmpFile);
+            const auto method = unpack ? FileIngestionMethod::Recursive : FileIngestionMethod::Flat;
 
-            hash = unpack ? hashPath(ht, tmpFile).first : hashFile(ht, tmpFile);
-
-            if (expectedHash != Hash(ht) && expectedHash != hash)
-                throw Error("hash mismatch for '%1%'", uri);
-
-            const auto recursive = unpack ? FileIngestionMethod::Recursive : FileIngestionMethod::Flat;
-
-            storePath = store->makeFixedOutputPath(recursive, hash, name);
-
-            /* Copy the file to the Nix store. */
-            ValidPathInfo info(*storePath);
-            info.narHash = narHash;
-            info.narSize = narSize;
-            info.ca = FixedOutputHash { .method = recursive, .hash = hash };
-            auto source = sinkToSource([&](Sink & sink) {
-                dumpPath(tmpFile, sink);
-            });
-            store->addToStore(info, *source);
+            auto info = store->addToStoreSlow(name, tmpFile, method, ht, expectedHash);
+            storePath = info.path;
+            assert(info.ca);
+            hash = getContentAddressHash(*info.ca);
         }
 
         stopProgressBar();
