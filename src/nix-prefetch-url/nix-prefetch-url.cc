@@ -10,6 +10,7 @@
 #include "../nix/legacy.hh"
 #include "progress-bar.hh"
 #include "tarfile.hh"
+#include "archive.hh"
 
 #include <iostream>
 
@@ -200,8 +201,10 @@ static int _main(int argc, char * * argv)
                     tmpFile = unpacked;
             }
 
-            /* FIXME: inefficient; addToStore() will also hash
-               this. */
+            /* FIXME: inefficient: we're reading/hashing 'tmpFile'
+               three times. */
+            auto [narHash, narSize] = hashPath(htSHA256, tmpFile);
+
             hash = unpack ? hashPath(ht, tmpFile).first : hashFile(ht, tmpFile);
 
             if (expectedHash != Hash(ht) && expectedHash != hash)
@@ -209,13 +212,17 @@ static int _main(int argc, char * * argv)
 
             const auto recursive = unpack ? FileIngestionMethod::Recursive : FileIngestionMethod::Flat;
 
-            /* Copy the file to the Nix store. FIXME: if RemoteStore
-               implemented addToStoreFromDump() and downloadFile()
-               supported a sink, we could stream the download directly
-               into the Nix store. */
-            storePath = store->addToStore(name, tmpFile, recursive, ht);
+            storePath = store->makeFixedOutputPath(recursive, hash, name);
 
-            assert(*storePath == store->makeFixedOutputPath(recursive, hash, name));
+            /* Copy the file to the Nix store. */
+            ValidPathInfo info(*storePath);
+            info.narHash = narHash;
+            info.narSize = narSize;
+            info.ca = FixedOutputHash { .method = recursive, .hash = hash };
+            auto source = sinkToSource([&](Sink & sink) {
+                dumpPath(tmpFile, sink);
+            });
+            store->addToStore(info, *source);
         }
 
         stopProgressBar();
