@@ -16,7 +16,13 @@ public:
     const Setting<bool> parallelCompression{this, false, "parallel-compression",
         "enable multi-threading compression, available for xz only currently"};
 
+    // FIXME: merge with allowModify bool
+    const Setting<bool> _allowModify{this, false, "allow-modify",
+        "allow Nix to update IPFS/IPNS address when appropriate"};
+
 private:
+
+    bool allowModify;
 
     std::unique_ptr<SecretKey> secretKey;
     std::string narMagic;
@@ -29,7 +35,7 @@ private:
         return state->ipfsPath;
     }
     std::string initialIpfsPath;
-    std::optional<string> optIpnsPath;
+    std::optional<string> ipnsPath;
 
     struct State
     {

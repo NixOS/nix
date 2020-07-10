@@ -54,11 +54,11 @@ touch $TEST_FILE
 
 # We try to do the evaluation with a known wrong hash to get the suggestion for
 # the correct one
-! CORRECT_ADDRESS=$(nix eval '(builtins.fetchurl 'file://$PWD/$TEST_FILE')' --store ipfs://$EMPTY_HASH |& \
-    grep 'modified:' | awk '{print $2}')
+CORRECT_ADDRESS=$(nix eval --raw '(builtins.fetchurl 'file://$PWD/$TEST_FILE')' --store ipfs://$EMPTY_HASH?allow-modify=true |& \
+                  grep '^warning: created new store' | sed "s/^warning: created new store at '\(.*\)', .*$/\1/")
 
 # Then we eval and get back the hash-name part of the store path
-RESULT=$(nix eval '(builtins.fetchurl 'file://$PWD/$TEST_FILE')' --store $CORRECT_ADDRESS --json \
+RESULT=$(nix eval --raw '(builtins.fetchurl 'file://$PWD/$TEST_FILE')' --store $CORRECT_ADDRESS --json \
     | jq -r | awk -F/ '{print $NF}')
 
 # Finally, we ask back the info from IPFS (formatting the address the right way
@@ -117,10 +117,8 @@ nix-build ./fixed.nix -A good \
 ################################################################################
 
 # Try to upload the content to the empty directory, fail but grab the right hash
-IPFS_ADDRESS=$(set -e; \
-  set -o pipefail; \
-  ! nix copy --to ipfs://$EMPTY_HASH $(nix-build ./fixed.nix -A good --no-out-link) --experimental-features nix-command \
-    |& grep modified: | awk '{print $2}')
+IPFS_ADDRESS=$(nix copy --to ipfs://$EMPTY_HASH?allow-modify=true $(nix-build ./fixed.nix -A good --no-out-link) --experimental-features nix-command |& \
+               grep '^warning: created new store' | sed "s/^warning: created new store at '\(.*\)', .*$/\1/")
 
 # Verify that new path is valid.
 nix copy --to $IPFS_ADDRESS $(nix-build ./fixed.nix -A good --no-out-link) --experimental-features nix-command

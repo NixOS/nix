@@ -28,11 +28,20 @@ IPFSBinaryCacheStore::IPFSBinaryCacheStore(
         cacheUri.pop_back();
 
     if (hasPrefix(cacheUri, "ipfs://")) {
-        initialIpfsPath = "/ipfs/" + std::string(cacheUri, 7);
-        state->ipfsPath = initialIpfsPath;
-    } else if (hasPrefix(cacheUri, "ipns://"))
-        optIpnsPath = "/ipns/" + std::string(cacheUri, 7);
-    else
+        if (cacheUri == "ipfs://") {
+            allowModify = true;
+        } else {
+            initialIpfsPath = "/ipfs/" + std::string(cacheUri, 7);
+            state->ipfsPath = initialIpfsPath;
+            allowModify = get(params, "allow-modify").value_or("") == "true";
+        }
+    } else if (hasPrefix(cacheUri, "ipns://")) {
+        ipnsPath = "/ipns/" + std::string(cacheUri, 7);
+
+        // TODO: we should try to determine if we are able to modify
+        // this ipns
+        allowModify = true;
+    } else
         throw Error("unknown IPNS URI '%s'", cacheUri);
 
     std::string ipfsAPIHost(get(params, "host").value_or("127.0.0.1"));
@@ -52,9 +61,8 @@ IPFSBinaryCacheStore::IPFSBinaryCacheStore(
         throw Error("daemon for IPFS is %s, when a minimum of 0.4.0 is required", versionInfo["Version"]);
 
     // Resolve the IPNS name to an IPFS object
-    if (optIpnsPath) {
-        auto ipnsPath = *optIpnsPath;
-        initialIpfsPath = resolveIPNSName(ipnsPath);
+    if (ipnsPath) {
+        initialIpfsPath = resolveIPNSName(*ipnsPath);
         state->ipfsPath = initialIpfsPath;
     }
 
@@ -152,32 +160,26 @@ void IPFSBinaryCacheStore::sync()
 {
     auto state(_state.lock());
 
-    if (!optIpnsPath) {
-        if (initialIpfsPath != state->ipfsPath)
-            throw Error(
-                "You performed store-modifying actions, creating a new store whose IPFS address doesn't match the configured one:\n"
-                "  configured: %s\n"
-                "  modified: %s\n"
-                "\n"
-                "This happens when one has configured nix to use a store via an IPFS hash. Since the store is immutable a new one is made (functional update) and the \"modified\" is its hash. Nix isn't going to statefully switch to using that hash, however, because that would be in violation of the configuration Nix has been given.\n"
-                "\n"
-                "You can change you configuration to use this hash, and run the command again in which case it will succeed with a no-opt. But if you are going to modify the store on a regular basis you should use DNS-link or IPNS instead so you have a properly mutable store, and avoid getting this message again.",
-                formatPathAsProtocol(initialIpfsPath), formatPathAsProtocol(state->ipfsPath));
-        else
-            return;
+    if (state->ipfsPath == initialIpfsPath)
+        return;
+
+    if (!allowModify)
+        throw Error("can't update '%s' to '%s'", cacheUri, state->ipfsPath);
+
+    if (!ipnsPath) {
+        warn("created new store at '%s', but can't update store at '%s'", "ipfs://" + std::string(state->ipfsPath, 6), cacheUri);
+        return;
     }
 
-    auto ipnsPath = *optIpnsPath;
-
-    auto resolvedIpfsPath = resolveIPNSName(ipnsPath);
+    auto resolvedIpfsPath = resolveIPNSName(*ipnsPath);
     if (resolvedIpfsPath != initialIpfsPath) {
         throw Error(
-            "The IPNS hash or DNS link %s resolves now to something different from the value it had when Nix was started:\n"
+            "The IPNS hash or DNS link %s resolves to something different from the value it had when Nix was started:\n"
             "  expected: %s\n"
             "  got %s\n"
             "\n"
             "Perhaps something else updated it in the meantime?",
-            ipnsPath, initialIpfsPath, resolvedIpfsPath);
+            *ipnsPath, initialIpfsPath, resolvedIpfsPath);
     }
 
     if (resolvedIpfsPath == state->ipfsPath) {
@@ -186,14 +188,14 @@ void IPFSBinaryCacheStore::sync()
     }
 
     // Now, we know that paths are not up to date but also not changed due to updates in DNS or IPNS hash.
-    auto optDomain = isDNSLinkPath(ipnsPath);
+    auto optDomain = isDNSLinkPath(*ipnsPath);
     if (optDomain) {
         auto domain = *optDomain;
         throw Error("The provided ipns path is a DNSLink, and syncing those is not supported.\n  Current DNSLink: %s\nYou should update your DNS settings"
             , domain);
     }
 
-    debug("Publishing '%s' to '%s', this could take a while.", state->ipfsPath, ipnsPath);
+    debug("Publishing '%s' to '%s', this could take a while.", state->ipfsPath, *ipnsPath);
 
     auto uri = daemonUri + "/api/v0/name/publish?allow-offline=true";
     uri += "&arg=" + getFileTransfer()->urlEncode(state->ipfsPath);
@@ -205,7 +207,7 @@ void IPFSBinaryCacheStore::sync()
     // NOTE: this is needed for ipfs < 0.5.0 because key must be a
     // name, not an address.
 
-    auto ipnsPathHash = std::string(ipnsPath, 6);
+    auto ipnsPathHash = std::string(*ipnsPath, 6);
     debug("Getting the name corresponding to hash %s", ipnsPathHash);
 
     auto keyListRequest = FileTransferRequest(daemonUri + "/api/v0/key/list/");
@@ -404,6 +406,9 @@ void IPFSBinaryCacheStore::addToStore(const ValidPathInfo & info, Source & narSo
 
     if (!repair && isValidPath(info.path)) return;
 
+    if (!allowModify)
+        throw Error("can't update '%s'", cacheUri);
+
     /* Verify that all references are valid. This may do some .narinfo
        reads, but typically they'll already be cached. */
     for (auto & ref : info.references)
@@ -600,6 +605,9 @@ StorePath IPFSBinaryCacheStore::addTextToStore(const string & name, const string
 
 void IPFSBinaryCacheStore::addSignatures(const StorePath & storePath, const StringSet & sigs)
 {
+    if (!allowModify)
+        throw Error("can't update '%s'", cacheUri);
+
     /* Note: this is inherently racy since there is no locking on
        binary caches. In particular, with S3 this unreliable, even
        when addSignatures() is called sequentially on a path, because
