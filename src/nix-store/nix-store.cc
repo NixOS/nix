@@ -174,10 +174,10 @@ static void opAdd(Strings opFlags, Strings opArgs)
    store. */
 static void opAddFixed(Strings opFlags, Strings opArgs)
 {
-    auto recursive = FileIngestionMethod::Flat;
+    auto method = FileIngestionMethod::Flat;
 
     for (auto & i : opFlags)
-        if (i == "--recursive") recursive = FileIngestionMethod::Recursive;
+        if (i == "--recursive") method = FileIngestionMethod::Recursive;
         else throw UsageError("unknown flag '%1%'", i);
 
     if (opArgs.empty())
@@ -186,8 +186,23 @@ static void opAddFixed(Strings opFlags, Strings opArgs)
     HashType hashAlgo = parseHashType(opArgs.front());
     opArgs.pop_front();
 
-    for (auto & i : opArgs)
-        cout << fmt("%s\n", store->printStorePath(store->addToStore(std::string(baseNameOf(i)), i, recursive, hashAlgo)));
+    for (auto & i : opArgs) {
+        auto hash = method == FileIngestionMethod::Recursive
+            ? hashPath(hashAlgo, i).first
+            : hashFile(hashAlgo, i);
+        auto [narHash, narSize] = hashPath(htSHA256, i);
+        ValidPathInfo info(store->makeFixedOutputPath(method, hash, baseNameOf(i)));
+        info.narHash = narHash;
+        info.narSize = narSize;
+        info.ca = FixedOutputHash { .method = method, .hash = hash };
+
+        auto source = sinkToSource([&](Sink & sink) {
+            dumpPath(i, sink);
+        });
+        store->addToStore(info, *source);
+
+        std::cout << fmt("%s\n", store->printStorePath(info.path));
+    }
 }
 
 
