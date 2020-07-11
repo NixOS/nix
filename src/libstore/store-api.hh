@@ -450,6 +450,13 @@ public:
         FileIngestionMethod method = FileIngestionMethod::Recursive, HashType hashAlgo = htSHA256,
         PathFilter & filter = defaultPathFilter, RepairFlag repair = NoRepair) = 0;
 
+    /* Copy the contents of a path to the store and register the
+       validity the resulting path, using a constant amount of
+       memory. */
+    ValidPathInfo addToStoreSlow(std::string_view name, const Path & srcPath,
+        FileIngestionMethod method = FileIngestionMethod::Recursive, HashType hashAlgo = htSHA256,
+        std::optional<Hash> expectedCAHash = {});
+
     // FIXME: remove?
     virtual StorePath addToStoreFromDump(const string & dump, const string & name,
         FileIngestionMethod method = FileIngestionMethod::Recursive, HashType hashAlgo = htSHA256, RepairFlag repair = NoRepair)
