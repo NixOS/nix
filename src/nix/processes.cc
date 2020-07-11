@@ -44,33 +44,47 @@ struct CmdProcesses : StoreCommand
         return std::nullopt;
     }
 
-    // fuser just checks /proc on Linux, so we could just do that instead of calling an external program
-    // TODO: do this in C++ on Linux
     static int fuser(Path path)
     {
-        int fds[2];
-        if (pipe(fds) == -1)
-            throw Error("failed to make fuser pipe");
+        if (pathExists("/proc")) {
+            for (auto & entry : readDirectory("/proc")) {
+                if (entry.name[0] < '0' || entry.name[0] > '9')
+                    continue;
+                int pid = std::stoi(entry.name);
+                if (pathExists(fmt("/proc/%d/fd", pid))) {
+                    for (auto & fd : readDirectory(fmt("/proc/%d/fd", pid))) {
+                        auto path2 = readLink(fmt("/proc/%d/fd/%s", pid, fd.name));
+                        if (path == path2)
+                            return pid;
+                    }
+                }
+            }
+            return -1;
+        } else {
+            int fds[2];
+            if (pipe(fds) == -1)
+                throw Error("failed to make fuser pipe");
 
-        pid_t pid = fork();
-        if (pid < 0)
-            throw Error("failed to fork for fuser");
+            pid_t pid = fork();
+            if (pid < 0)
+                throw Error("failed to fork for fuser");
 
-        if (pid == 0) {
-            dup2(fds[1], fileno(stdout));
-            dup2(open("/dev/null", 0), fileno(stderr));
-            close(fds[0]); close(fds[1]);
-            if (!execlp("fuser", "fuser", path.c_str(), NULL))
-                throw Error("failed to execute program fuser");
+            if (pid == 0) {
+                dup2(fds[1], fileno(stdout));
+                dup2(open("/dev/null", 0), fileno(stderr));
+                close(fds[0]); close(fds[1]);
+                if (!execlp("fuser", "fuser", path.c_str(), NULL))
+                    throw Error("failed to execute program fuser");
+            }
+
+            int status;
+            waitpid(pid, &status, 0);
+            if (!WIFEXITED(status) || WEXITSTATUS(status) != 0)
+                throw Error("failed to execute fuser with status '%d'", status);
+            char buffer[4096];
+            ssize_t size = read(fds[0], &buffer, sizeof(buffer));
+            return std::stoi(std::string(buffer, size));
         }
-
-        int status;
-        waitpid(pid, &status, 0);
-        if (!WIFEXITED(status) || WEXITSTATUS(status) != 0)
-            throw Error("failed to execute fuser with status '%d'", status);
-        char buffer[4096];
-        ssize_t size = read(fds[0], &buffer, sizeof(buffer));
-        return std::stoi(std::string(buffer, size));
     }
 
     void run(ref<Store> store) override
@@ -97,6 +111,9 @@ struct CmdProcesses : StoreCommand
                 close(fd);
 
                 int pid = fuser(uidPath);
+
+                if (pid == -1)
+                    continue;
 
                 if (i != dirs.begin())
                     std::cout << std::endl;
