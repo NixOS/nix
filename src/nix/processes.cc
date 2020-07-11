@@ -132,8 +132,9 @@ struct CmdProcesses : StoreCommand
                 numChildren++;
                 bool hasChildren = printChildren(childPid) > 0;
                 if (!hasChildren) {
-                    if (auto cmdline = getCmdline(childPid))
-                        std::cout << fmt("Child Process: %s (%d)", *cmdline, childPid) << std::endl;
+                    auto cmdline = getCmdline(childPid);
+                    if (cmdline && !cmdline->empty())
+                        std::cout << fmt("Child Process: %s", *cmdline) << std::endl;
                     else
                         std::cout << fmt("Child Process: %d", childPid) << std::endl;
                 }
@@ -181,10 +182,10 @@ struct CmdProcesses : StoreCommand
                 struct passwd * pw = getpwuid(uid);
                 if (!pw)
                     throw Error("can't find uid for '%d'", uid);
-                std::cout << fmt("Build User: %s (%d)", pw->pw_name, uid) << std::endl;
+                std::cout << fmt("Build User: %s", pw->pw_name) << std::endl;
 
                 if (auto cmdline = getCmdline(pid))
-                    std::cout << fmt("Build Process: %s (%d)", *cmdline, pid) << std::endl;
+                    std::cout << fmt("Build Process: %s", *cmdline) << std::endl;
                 else
                     std::cout << fmt("Build Process: %d", pid) << std::endl;
 
