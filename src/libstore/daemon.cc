@@ -369,29 +369,51 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
             hashAlgo = parseHashType(hashAlgoRaw);
         }
 
-        StringSink saved;
-        TeeSource savedNARSource(from, saved);
-        RetrieveRegularNARSink savedRegular { saved };
+        auto dump = [&](Source & dumpSource) -> StorePath {
+            return store->addToStoreFromDump(dumpSource, baseName, method, hashAlgo);
+        };
 
-        if (method == FileIngestionMethod::Recursive) {
-            /* Get the entire NAR dump from the client and save it to
-               a string so that we can pass it to
-               addToStoreFromDump(). */
-            ParseSink sink; /* null sink; just parse the NAR */
-            parseDump(sink, savedNARSource);
-        } else
-            parseDump(savedRegular, from);
+        switch (method) {
+        case FileIngestionMethod::Recursive: {
+            /* We do all this rather than simplfy `dump(from)` to not
+               give `addToStoreFromDump` anything past the end of the
+               NAR. */
+            auto cutOffFrom = sinkToSource([&](Sink & sink) {
+                ParseSink forget;
+                LambdaSource demux([&](unsigned char * buf, size_t len) -> size_t {
+                    size_t n = from.read(buf, len);
+                    sink(buf, n);
+                    return n;
+                });
+                parseDump(forget, demux);
+            });
 
-        logger->startWork();
-        if (!savedRegular.regular) throw Error("regular file expected");
+            logger->startWork();
+            auto path = dump(*cutOffFrom);
+            logger->stopWork();
 
-        // FIXME: try to stream directly from `from`.
-        StringSource dumpSource { *saved.s };
-        auto path = store->addToStoreFromDump(dumpSource, baseName, method, hashAlgo);
-        logger->stopWork();
+            to << store->printStorePath(path);
+            break;
+        }
+        case FileIngestionMethod::Flat: {
+            LambdaSink dummy { [&](const unsigned char * data, size_t len){} };
+            RetrieveRegularNARSink savedRegular {
+                .sink = dummy,
+            };
+            auto dumpSource = sinkToSource([&](Sink & sink) {
+                savedRegular.sink = sink;
+                parseDump(savedRegular, from);
+            });
 
-        to << store->printStorePath(path);
-        break;
+            logger->startWork();
+            auto path = dump(*dumpSource);
+            if (!savedRegular.regular) throw Error("regular file expected");
+            logger->stopWork();
+
+            to << store->printStorePath(path);
+            break;
+        }
+        };
     }
 
     case wopAddTextToStore: {
