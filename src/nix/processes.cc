@@ -158,11 +158,11 @@ struct CmdProcesses : StoreCommand
             if (st.st_uid != geteuid() && geteuid() != 0)
                 throw Error("you don't have permissions to see the userpool locks");
 
-            auto dirs = readDirectory(userPoolDir);
-            for (auto i = dirs.begin(); i != dirs.end(); i++) {
+            bool isFirst = true;
+            for (auto & dir : readDirectory(userPoolDir)) {
                 int uid;
                 try {
-                    uid = std::stoi(i->name);
+                    uid = std::stoi(dir.name);
                 } catch (const std::invalid_argument& e) {
                     continue;
                 }
@@ -181,8 +181,10 @@ struct CmdProcesses : StoreCommand
                 if (pid == -1)
                     continue;
 
-                if (i != dirs.begin())
+                if (!isFirst)
                     std::cout << std::endl;
+                else
+                    isFirst = false;
 
                 struct passwd * pw = getpwuid(uid);
                 if (!pw)
