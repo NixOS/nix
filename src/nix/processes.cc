@@ -2,6 +2,7 @@
 #include "store-api.hh"
 #include "pathlocks.hh"
 
+#include <fstream>
 #include <fcntl.h>
 
 using namespace nix;
@@ -96,6 +97,51 @@ struct CmdProcesses : StoreCommand
         }
     }
 
+    static int getPpid(int pid) {
+        if (!pathExists(fmt("/proc/%d/status", pid)))
+            return -1;
+        std::fstream fs;
+        fs.open(fmt("/proc/%d/status", pid), std::fstream::in);
+        string line;
+        while (std::getline(fs, line)) {
+            if (hasPrefix(line, "PPid:\t")) {
+                fs.close();
+                try {
+                    return std::stoi(line.substr(6));
+                } catch (const std::invalid_argument& e) {
+                    return -1;
+                }
+            }
+        }
+        fs.close();
+        return -1;
+    }
+
+    static int printChildren(int pid) {
+        int numChildren = 0;
+        for (auto & entry : readDirectory("/proc")) {
+            if (entry.name[0] < '0' || entry.name[0] > '9')
+                continue;
+            int childPid;
+            try {
+                childPid = std::stoi(entry.name);
+            } catch (const std::invalid_argument& e) {
+                continue;
+            }
+            if (getPpid(childPid) == pid) {
+                numChildren++;
+                bool hasChildren = printChildren(childPid) > 0;
+                if (!hasChildren) {
+                    if (auto cmdline = getCmdline(childPid))
+                        std::cout << fmt("Child Process: %s (%d)", *cmdline, childPid) << std::endl;
+                    else
+                        std::cout << fmt("Child Process: %d", childPid) << std::endl;
+                }
+            }
+        }
+        return numChildren;
+    }
+
     void run(ref<Store> store) override
     {
         if (auto store2 = store.dynamic_pointer_cast<LocalFSStore>()) {
@@ -142,9 +188,7 @@ struct CmdProcesses : StoreCommand
                 else
                     std::cout << fmt("Build Process: %d", pid) << std::endl;
 
-                // TODO: print leaves of child process by searching for ppid in /proc
-                // if (pathExists(fmt("/proc/%d/task", pid)))
-                //     printLeafProcesses(pid);
+                printChildren(pid);
 
                 auto openFds = fmt("/proc/%d/fd", pid);
                 if (pathExists(openFds))
