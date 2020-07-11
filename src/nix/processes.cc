@@ -45,7 +45,45 @@ struct CmdProcesses : StoreCommand
         return std::nullopt;
     }
 
-    static int fuser(Path path)
+    static std::vector<int> findChildren(int pid) {
+        std::vector<int> children;
+        for (auto & entry : readDirectory("/proc")) {
+            if (entry.name[0] < '0' || entry.name[0] > '9')
+                continue;
+            int childPid;
+            try {
+                childPid = std::stoi(entry.name);
+            } catch (const std::invalid_argument& e) {
+                continue;
+            }
+            if (getPpid(childPid) == pid)
+                children.push_back(childPid);
+        }
+        return children;
+    }
+
+    static int getProcessUid(int pid) {
+        if (!pathExists(fmt("/proc/%d/status", pid)))
+            return -1;
+        std::fstream fs;
+        fs.open(fmt("/proc/%d/status", pid), std::fstream::in);
+        string line;
+        while (std::getline(fs, line)) {
+            if (hasPrefix(line, "Uid:\t")) {
+                fs.close();
+                auto pos = line.substr(5).find("\t");
+                try {
+                    return std::stoi(line.substr(5, pos));
+                } catch (const std::invalid_argument& e) {
+                    return -1;
+                }
+            }
+        }
+        fs.close();
+        return -1;
+    }
+
+    static int findUserProcess(Path path, int uid)
     {
         if (pathExists("/proc")) {
             for (auto & entry : readDirectory("/proc")) {
@@ -65,8 +103,15 @@ struct CmdProcesses : StoreCommand
                         } catch (const Error & e) {
                             continue;
                         }
-                        if (path == path2)
-                            return pid;
+                        if (path == path2) {
+                            if (getProcessUid(pid) == uid)
+                                return pid;
+                            for (auto & child : findChildren(pid)) {
+                                if (getProcessUid(child) == uid)
+                                    return child;
+                            }
+                            return -1;
+                        }
                     }
                 }
             }
@@ -123,29 +168,18 @@ struct CmdProcesses : StoreCommand
     }
 
     static int printChildren(int pid) {
-        int numChildren = 0;
-        for (auto & entry : readDirectory("/proc")) {
-            if (entry.name[0] < '0' || entry.name[0] > '9')
-                continue;
-            int childPid;
-            try {
-                childPid = std::stoi(entry.name);
-            } catch (const std::invalid_argument& e) {
-                continue;
-            }
-            if (getPpid(childPid) == pid) {
-                numChildren++;
-                bool hasChildren = printChildren(childPid) > 0;
-                if (!hasChildren) {
-                    auto cmdline = getCmdline(childPid);
-                    if (cmdline && !cmdline->empty())
-                        std::cout << fmt("Child Process: %s", *cmdline) << std::endl;
-                    else
-                        std::cout << fmt("Child Process: %d", childPid) << std::endl;
-                }
+        std::vector<int> children = findChildren(pid);
+        for (auto & childPid : children) {
+            bool hasChildren = printChildren(childPid) > 0;
+            if (!hasChildren) {
+                auto cmdline = getCmdline(childPid);
+                if (cmdline && !cmdline->empty())
+                    std::cout << fmt("Child Process: %s", *cmdline) << std::endl;
+                else
+                    std::cout << fmt("Child Process: %d", childPid) << std::endl;
             }
         }
-        return numChildren;
+        return children.size();
     }
 
     void run(ref<Store> store) override
@@ -176,7 +210,7 @@ struct CmdProcesses : StoreCommand
                 }
                 close(fd);
 
-                int pid = fuser(uidPath);
+                int pid = findUserProcess(uidPath, uid);
 
                 if (pid == -1)
                     continue;
@@ -192,7 +226,7 @@ struct CmdProcesses : StoreCommand
                 std::cout << fmt("Build User: %s", pw->pw_name) << std::endl;
 
                 if (auto cmdline = getCmdline(pid))
-                    std::cout << fmt("Build Process: %s", *cmdline) << std::endl;
+                    std::cout << fmt("Build Process: %s (%d)", *cmdline, pid) << std::endl;
                 else
                     std::cout << fmt("Build Process: %d", pid) << std::endl;
 
