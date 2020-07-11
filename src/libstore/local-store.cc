@@ -1036,11 +1036,13 @@ void LocalStore::addToStore(const ValidPathInfo & info, Source & source,
 StorePath LocalStore::addToStoreFromDump(Source & dump, const string & name,
     FileIngestionMethod method, HashType hashAlgo, RepairFlag repair)
 {
-    return addToStoreCommon(name, method, hashAlgo, repair, [&](auto & sink) {
+    return addToStoreCommon(name, method, hashAlgo, repair, [&](auto & sink, size_t & wanted) {
         while (1) {
-            uint8_t buf[1];
-            auto n = dump.read(buf, 1);
+            constexpr size_t bufSize = 1024;
+            uint8_t buf[bufSize];
+            auto n = dump.read(buf, std::min(wanted, bufSize));
             sink(buf, n);
+            // when control is yielded back to us wanted will be updated.
         }
     });
 }
@@ -1051,7 +1053,7 @@ StorePath LocalStore::addToStore(const string & name, const Path & _srcPath,
 {
     Path srcPath(absPath(_srcPath));
 
-    return addToStoreCommon(name, method, hashAlgo, repair, [&](auto & sink) {
+    return addToStoreCommon(name, method, hashAlgo, repair, [&](auto & sink, size_t & _) {
         if (method == FileIngestionMethod::Recursive)
             dumpPath(srcPath, sink, filter);
         else
@@ -1062,7 +1064,7 @@ StorePath LocalStore::addToStore(const string & name, const Path & _srcPath,
 
 StorePath LocalStore::addToStoreCommon(
     const string & name, FileIngestionMethod method, HashType hashAlgo, RepairFlag repair,
-    std::function<void(Sink &)> demux)
+    std::function<void(Sink &, size_t &)> demux)
 {
     /* For computing the NAR hash. */
     auto sha256Sink = std::make_unique<HashSink>(htSHA256);
@@ -1083,7 +1085,7 @@ StorePath LocalStore::addToStoreCommon(
     bool inMemory = true;
     std::string nar;
 
-    auto source = sinkToSource([&](Sink & sink) {
+    auto source = sinkToSource([&](Sink & sink, size_t & wanted) {
         LambdaSink sink2([&](const unsigned char * buf, size_t len) {
             (*sha256Sink)(buf, len);
             if (hashSink) (*hashSink)(buf, len);
@@ -1101,7 +1103,7 @@ StorePath LocalStore::addToStoreCommon(
 
             if (!inMemory) sink(buf, len);
         });
-        demux(sink2);
+        demux(sink2, wanted);
     });
 
     std::unique_ptr<AutoDelete> delTempDir;

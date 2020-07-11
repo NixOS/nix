@@ -165,35 +165,43 @@ size_t StringSource::read(unsigned char * data, size_t len)
 #endif
 
 std::unique_ptr<Source> sinkToSource(
-    std::function<void(Sink &)> fun,
+    std::function<void(Sink &, size_t &)> fun,
     std::function<void()> eof)
 {
     struct SinkToSource : Source
     {
-        typedef boost::coroutines2::coroutine<std::string> coro_t;
+        typedef boost::coroutines2::coroutine<std::basic_string<uint8_t>> coro_t;
 
-        std::function<void(Sink &)> fun;
+        std::function<void(Sink &, size_t &)> fun;
         std::function<void()> eof;
         std::optional<coro_t::pull_type> coro;
         bool started = false;
 
-        SinkToSource(std::function<void(Sink &)> fun, std::function<void()> eof)
+        /* It would be nicer to have the co-routines have both args and a
+           return value, but unfortunately that was removed from Boost's
+           implementation for some reason, so we use some extra state instead.
+           */
+       size_t wanted = 0;
+
+        SinkToSource(std::function<void(Sink &, size_t &)> fun, std::function<void()> eof)
             : fun(fun), eof(eof)
         {
         }
 
-        std::string cur;
+        std::basic_string<uint8_t> cur;
         size_t pos = 0;
 
         size_t read(unsigned char * data, size_t len) override
         {
-            if (!coro)
+            wanted = len < cur.size() ? 0 : len - cur.size();
+            if (!coro) {
                 coro = coro_t::pull_type([&](coro_t::push_type & yield) {
-                    LambdaSink sink([&](const unsigned char * data, size_t len) {
-                            if (len) yield(std::string((const char *) data, len));
+                    LambdaSink sink([&](const uint8_t * data, size_t len) {
+                            if (len) yield(std::basic_string<uint8_t> { data, len });
                         });
-                    fun(sink);
+                    fun(sink, wanted);
                 });
+            }
 
             if (!*coro) { eof(); abort(); }
 
@@ -203,11 +211,10 @@ std::unique_ptr<Source> sinkToSource(
                 pos = 0;
             }
 
-            auto n = std::min(cur.size() - pos, len);
-            memcpy(data, (unsigned char *) cur.data() + pos, n);
-            pos += n;
+            auto numCopied = cur.copy(data, len, pos);
+            pos += numCopied;
 
-            return n;
+            return numCopied;
         }
     };
 

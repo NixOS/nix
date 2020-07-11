@@ -292,7 +292,7 @@ private:
 
     StorePath addToStoreCommon(
         const string & name, FileIngestionMethod method, HashType hashAlgo, RepairFlag repair,
-        std::function<void(Sink &)> demux);
+        std::function<void(Sink &, size_t &)> demux);
 
     Path getRealStoreDir() override { return realStoreDir; }
 
