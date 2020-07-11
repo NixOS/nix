@@ -50,7 +50,12 @@ struct CmdProcesses : StoreCommand
             for (auto & entry : readDirectory("/proc")) {
                 if (entry.name[0] < '0' || entry.name[0] > '9')
                     continue;
-                int pid = std::stoi(entry.name);
+                int pid;
+                try {
+                    pid = std::stoi(entry.name);
+                } catch (const std::invalid_argument& e) {
+                    continue;
+                }
                 if (pathExists(fmt("/proc/%d/fd", pid))) {
                     for (auto & fd : readDirectory(fmt("/proc/%d/fd", pid))) {
                         auto path2 = readLink(fmt("/proc/%d/fd/%s", pid, fd.name));
@@ -83,7 +88,11 @@ struct CmdProcesses : StoreCommand
                 throw Error("failed to execute fuser with status '%d'", status);
             char buffer[4096];
             ssize_t size = read(fds[0], &buffer, sizeof(buffer));
-            return std::stoi(std::string(buffer, size));
+            try {
+                return std::stoi(std::string(buffer, size));
+            } catch (const std::invalid_argument& e) {
+                return -1;
+            }
         }
     }
 
@@ -99,8 +108,13 @@ struct CmdProcesses : StoreCommand
 
             auto dirs = readDirectory(userPoolDir);
             for (auto i = dirs.begin(); i != dirs.end(); i++) {
-                auto uid = i->name;
-                auto uidPath = userPoolDir + "/" + uid;
+                int uid;
+                try {
+                    uid = std::stoi(i->name);
+                } catch (const std::invalid_argument& e) {
+                    continue;
+                }
+                auto uidPath = fmt("%s/%d", userPoolDir, uid);
 
                 // try to lock it ourselves
                 int fd = open(uidPath.c_str(), O_CLOEXEC | O_RDWR, 0600);
@@ -118,9 +132,9 @@ struct CmdProcesses : StoreCommand
                 if (i != dirs.begin())
                     std::cout << std::endl;
 
-                struct passwd * pw = getpwuid(std::stoi(uid));
+                struct passwd * pw = getpwuid(uid);
                 if (!pw)
-                    throw Error("can't find uid for '%s'", uid);
+                    throw Error("can't find uid for '%d'", uid);
                 std::cout << fmt("Build User: %s (%d)", pw->pw_name, uid) << std::endl;
 
                 if (auto cmdline = getCmdline(pid))
