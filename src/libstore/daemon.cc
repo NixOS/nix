@@ -410,8 +410,11 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
         logger->startWork();
         if (!savedRegular.regular) throw Error("regular file expected");
 
+        StringSource dumpSource {
+            method == FileIngestionMethod::Recursive ? *savedNAR.s : savedRegular.s
+        };
         auto path = store->addToStoreFromDump(
-            method == FileIngestionMethod::Recursive ? *savedNAR.s : savedRegular.s,
+            dumpSource,
             baseName,
             method,
             hashAlgo);

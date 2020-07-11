@@ -1033,9 +1033,12 @@ void LocalStore::addToStore(const ValidPathInfo & info, Source & source,
 }
 
 
-StorePath LocalStore::addToStoreFromDump(const string & dump, const string & name,
+StorePath LocalStore::addToStoreFromDump(Source & dumpSource, const string & name,
     FileIngestionMethod method, HashType hashAlgo, RepairFlag repair)
 {
+    // FIXME: See if we can use the original source to reduce memory usage.
+    auto dump = dumpSource.drain();
+
     Hash h = hashString(hashAlgo, dump);
 
     auto dstPath = makeFixedOutputPath(method, h, name);
