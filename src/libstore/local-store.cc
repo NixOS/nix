@@ -1033,65 +1033,16 @@ void LocalStore::addToStore(const ValidPathInfo & info, Source & source,
 }
 
 
-StorePath LocalStore::addToStoreFromDump(Source & dumpSource, const string & name,
+StorePath LocalStore::addToStoreFromDump(Source & dump, const string & name,
     FileIngestionMethod method, HashType hashAlgo, RepairFlag repair)
 {
-    // FIXME: See if we can use the original source to reduce memory usage.
-    auto dump = dumpSource.drain();
-
-    Hash h = hashString(hashAlgo, dump);
-
-    auto dstPath = makeFixedOutputPath(method, h, name);
-
-    addTempRoot(dstPath);
-
-    if (repair || !isValidPath(dstPath)) {
-
-        /* The first check above is an optimisation to prevent
-           unnecessary lock acquisition. */
-
-        auto realPath = Store::toRealPath(dstPath);
-
-        PathLocks outputLock({realPath});
-
-        if (repair || !isValidPath(dstPath)) {
-
-            deletePath(realPath);
-
-            autoGC();
-
-            if (method == FileIngestionMethod::Recursive) {
-                StringSource source(dump);
-                restorePath(realPath, source);
-            } else
-                writeFile(realPath, dump);
-
-            canonicalisePathMetaData(realPath, -1);
-
-            /* Register the SHA-256 hash of the NAR serialisation of
-               the path in the database.  We may just have computed it
-               above (if called with recursive == true and hashAlgo ==
-               sha256); otherwise, compute it here. */
-            HashResult hash;
-            if (method == FileIngestionMethod::Recursive) {
-                hash.first = hashAlgo == htSHA256 ? h : hashString(htSHA256, dump);
-                hash.second = dump.size();
-            } else
-                hash = hashPath(htSHA256, realPath);
-
-            optimisePath(realPath); // FIXME: combine with hashPath()
-
-            ValidPathInfo info(dstPath);
-            info.narHash = hash.first;
-            info.narSize = hash.second;
-            info.ca = FixedOutputHash { .method = method, .hash = h };
-            registerValidPath(info);
+    return addToStoreCommon(name, method, hashAlgo, repair, [&](auto & sink) {
+        while (1) {
+            uint8_t buf[1];
+            auto n = dump.read(buf, 1);
+            sink(buf, n);
         }
-
-        outputLock.setDeletion(true);
-    }
-
-    return dstPath;
+    });
 }
 
 
@@ -1100,6 +1051,19 @@ StorePath LocalStore::addToStore(const string & name, const Path & _srcPath,
 {
     Path srcPath(absPath(_srcPath));
 
+    return addToStoreCommon(name, method, hashAlgo, repair, [&](auto & sink) {
+        if (method == FileIngestionMethod::Recursive)
+            dumpPath(srcPath, sink, filter);
+        else
+            readFile(srcPath, sink);
+    });
+}
+
+
+StorePath LocalStore::addToStoreCommon(
+    const string & name, FileIngestionMethod method, HashType hashAlgo, RepairFlag repair,
+    std::function<void(Sink &)> demux)
+{
     /* For computing the NAR hash. */
     auto sha256Sink = std::make_unique<HashSink>(htSHA256);
 
@@ -1120,7 +1084,6 @@ StorePath LocalStore::addToStore(const string & name, const Path & _srcPath,
     std::string nar;
 
     auto source = sinkToSource([&](Sink & sink) {
-
         LambdaSink sink2([&](const unsigned char * buf, size_t len) {
             (*sha256Sink)(buf, len);
             if (hashSink) (*hashSink)(buf, len);
@@ -1138,11 +1101,7 @@ StorePath LocalStore::addToStore(const string & name, const Path & _srcPath,
 
             if (!inMemory) sink(buf, len);
         });
-
-        if (method == FileIngestionMethod::Recursive)
-            dumpPath(srcPath, sink2, filter);
-        else
-            readFile(srcPath, sink2);
+        demux(sink2);
     });
 
     std::unique_ptr<AutoDelete> delTempDir;
