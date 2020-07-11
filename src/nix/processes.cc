@@ -59,7 +59,12 @@ struct CmdProcesses : StoreCommand
                 }
                 if (pathExists(fmt("/proc/%d/fd", pid))) {
                     for (auto & fd : readDirectory(fmt("/proc/%d/fd", pid))) {
-                        auto path2 = readLink(fmt("/proc/%d/fd/%s", pid, fd.name));
+                        Path path2;
+                        try {
+                            path2 = readLink(fmt("/proc/%d/fd/%s", pid, fd.name));;
+                        } catch (const Error & e) {
+                            continue;
+                        }
                         if (path == path2)
                             return pid;
                     }
@@ -194,7 +199,12 @@ struct CmdProcesses : StoreCommand
                 auto openFds = fmt("/proc/%d/fd", pid);
                 if (pathExists(openFds))
                     for (auto & entry : readDirectory(openFds)) {
-                        auto path = readLink(fmt("/proc/%d/fd/%s", pid, entry.name));
+                        Path path;
+                        try {
+                            path = readLink(fmt("/proc/%d/fd/%s", pid, entry.name));
+                        } catch (const Error & e) {
+                            continue;
+                        }
                         if (hasSuffix(path, ".lock"))
                             std::cout << fmt("File Lock: %s", path) << std::endl;
                     }
