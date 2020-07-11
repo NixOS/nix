@@ -155,7 +155,7 @@ struct CmdProcesses : StoreCommand
 
             struct stat st;
             stat(userPoolDir.c_str(), &st);
-            if (st.st_uid != geteuid())
+            if (st.st_uid != geteuid() && geteuid() != 0)
                 throw Error("you don't have permissions to see the userpool locks");
 
             auto dirs = readDirectory(userPoolDir);
