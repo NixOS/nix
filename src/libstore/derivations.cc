@@ -8,10 +8,6 @@
 
 namespace nix {
 
-// FIXME Put this somewhere?
-template<class... Ts> struct overloaded : Ts... { using Ts::operator()...; };
-template<class... Ts> overloaded(Ts...) -> overloaded<Ts...>;
-
 StorePath DerivationOutput::path(const Store & store, std::string_view drvName) const
 {
     return std::visit(overloaded {
