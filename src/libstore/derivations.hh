@@ -15,6 +15,8 @@ namespace nix {
 
 struct DerivationOutputInputAddressed
 {
+    /* Will need to become `std::optional<StorePath>` once input-addressed
+       derivations are allowed to depend on cont-addressed derivations */
     StorePath path;
 };
 
@@ -23,13 +25,28 @@ struct DerivationOutputFixed
     FixedOutputHash hash; /* hash used for expected hash computation */
 };
 
+struct DerivationOutputFloating
+{
+    /* information used for expected hash computation */
+    FileIngestionMethod method;
+    HashType hashType;
+};
+
 struct DerivationOutput
 {
     std::variant<
         DerivationOutputInputAddressed,
-        DerivationOutputFixed
+        DerivationOutputFixed,
+        DerivationOutputFloating
     > output;
-    StorePath path(const Store & store, std::string_view drvName) const;
+    std::optional<HashType> hashAlgoOpt(const Store & store) const;
+    std::optional<StorePath> pathOpt(const Store & store, std::string_view drvName) const;
+    /* DEPRECATED: Remove after CA drvs are fully implemented */
+    StorePath path(const Store & store, std::string_view drvName) const {
+        auto p = pathOpt(store, drvName);
+        if (!p) throw Error("floating content-addressed derivations are not yet implemented");
+        return *p;
+    }
 };
 
 typedef std::map<string, DerivationOutput> DerivationOutputs;

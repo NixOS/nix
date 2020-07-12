@@ -8,15 +8,20 @@
 
 namespace nix {
 
-StorePath DerivationOutput::path(const Store & store, std::string_view drvName) const
+std::optional<StorePath> DerivationOutput::pathOpt(const Store & store, std::string_view drvName) const
 {
     return std::visit(overloaded {
-        [](DerivationOutputInputAddressed doi) {
-            return doi.path;
+        [](DerivationOutputInputAddressed doi) -> std::optional<StorePath> {
+            return { doi.path };
         },
-        [&](DerivationOutputFixed dof) {
-            return store.makeFixedOutputPath(dof.hash.method, dof.hash.hash, drvName);
-        }
+        [&](DerivationOutputFixed dof) -> std::optional<StorePath> {
+            return {
+                store.makeFixedOutputPath(dof.hash.method, dof.hash.hash, drvName)
+            };
+        },
+        [](DerivationOutputFloating dof) -> std::optional<StorePath> {
+            return std::nullopt;
+        },
     }, output);
 }
 
@@ -128,14 +133,21 @@ static DerivationOutput parseDerivationOutput(const Store & store, istringstream
         }
         const HashType hashType = parseHashType(hashAlgo);
 
-        return DerivationOutput {
-            .output = DerivationOutputFixed {
-                .hash = FixedOutputHash {
-                    .method = std::move(method),
-                    .hash = Hash(hash, hashType),
-                },
-            }
-        };
+        return hash != ""
+            ? DerivationOutput {
+                  .output = DerivationOutputFixed {
+                      .hash = FixedOutputHash {
+                          .method = std::move(method),
+                          .hash = Hash(hash, hashType),
+                      },
+                  }
+               }
+            : DerivationOutput {
+                  .output = DerivationOutputFloating {
+                      .method = std::move(method),
+                      .hashType = std::move(hashType),
+                  },
+              };
     } else
         return DerivationOutput {
             .output = DerivationOutputInputAddressed {
@@ -292,6 +304,10 @@ string Derivation::unparse(const Store & store, bool maskOutputs,
                 s += ','; printUnquotedString(s, dof.hash.printMethodAlgo());
                 s += ','; printUnquotedString(s, dof.hash.hash.to_string(Base16, false));
             },
+            [&](DerivationOutputFloating dof) {
+                s += ','; printUnquotedString(s, makeFileIngestionPrefix(dof.method) + printHashType(dof.hashType));
+                s += ','; printUnquotedString(s, "");
+            },
         }, i.second.output);
         s += ')';
     }
@@ -439,14 +455,21 @@ static DerivationOutput readDerivationOutput(Source & in, const Store & store)
             hashAlgo = string(hashAlgo, 2);
         }
         auto hashType = parseHashType(hashAlgo);
-        return DerivationOutput {
-            .output = DerivationOutputFixed {
-                .hash = FixedOutputHash {
-                    .method = std::move(method),
-                    .hash = Hash(hash, hashType),
-                },
-            }
-        };
+        return hash != ""
+            ? DerivationOutput {
+                  .output = DerivationOutputFixed {
+                      .hash = FixedOutputHash {
+                          .method = std::move(method),
+                          .hash = Hash(hash, hashType),
+                      },
+                  }
+               }
+            : DerivationOutput {
+                  .output = DerivationOutputFloating {
+                      .method = std::move(method),
+                      .hashType = std::move(hashType),
+                  },
+              };
     } else
         return DerivationOutput {
             .output = DerivationOutputInputAddressed {
@@ -513,6 +536,10 @@ void writeDerivation(Sink & out, const Store & store, const BasicDerivation & dr
             [&](DerivationOutputFixed dof) {
                 out << dof.hash.printMethodAlgo()
                     << dof.hash.hash.to_string(Base16, false);
+            },
+            [&](DerivationOutputFloating dof) {
+                out << (makeFileIngestionPrefix(dof.method) + printHashType(dof.hashType))
+                    << "";
             },
         }, i.second.output);
     }
