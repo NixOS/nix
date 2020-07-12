@@ -102,10 +102,17 @@ static void prim_scopedImport(EvalState & state, const Pos & pos, Value * * args
 
     Path realPath = state.checkSourcePath(state.toRealPath(path, context));
 
-    StorePath storePath = state.store->parseStorePath(path);
-
     // FIXME
-    if (state.store->isStorePath(path) && state.store->isValidPath(storePath) && isDerivation(path)) {
+    auto isValidDerivationInStore = [&]() -> std::optional<StorePath> {
+        if (!state.store->isStorePath(path))
+            return std::nullopt;
+        auto storePath = state.store->parseStorePath(path);
+        if (!(state.store->isValidPath(storePath) && isDerivation(path)))
+            return std::nullopt;
+        return storePath;
+    };
+    if (auto optStorePath = isValidDerivationInStore()) {
+        auto storePath = *optStorePath;
         Derivation drv = readDerivation(*state.store, realPath, std::string(storePath.name()));
         Value & w = *state.allocValue();
         state.mkAttrs(w, 3 + drv.outputs.size());
