@@ -24,7 +24,7 @@ StorePath DerivationOutput::path(const Store & store, string drvName) const
     }, output);
 }
 
-const StorePath & BasicDerivation::findOutput(const Store & store, const string & id) const
+const StorePath BasicDerivation::findOutput(const Store & store, const string & id) const
 {
     auto i = outputs.find(id);
     if (i == outputs.end())

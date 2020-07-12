@@ -52,7 +52,7 @@ struct BasicDerivation
 
     /* Return the path corresponding to the output identifier `id' in
        the given derivation. */
-    const StorePath & findOutput(const Store & store, const std::string & id) const;
+    const StorePath findOutput(const Store & store, const std::string & id) const;
 
     bool isBuiltin() const;
 
