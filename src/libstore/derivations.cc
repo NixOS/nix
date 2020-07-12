@@ -283,13 +283,16 @@ string Derivation::unparse(const Store & store, bool maskOutputs,
         if (first) first = false; else s += ',';
         s += '('; printUnquotedString(s, i.first);
         s += ','; printUnquotedString(s, maskOutputs ? "" : store.printStorePath(i.second.path(store, name)));
-        if (auto hash = std::get_if<DerivationOutputFixed>(&i.second.output)) {
-            s += ','; printUnquotedString(s, hash->hash.printMethodAlgo());
-            s += ','; printUnquotedString(s, hash->hash.hash.to_string(Base16, false));
-        } else {
-            s += ','; printUnquotedString(s, "");
-            s += ','; printUnquotedString(s, "");
-        }
+        std::visit(overloaded {
+            [&](DerivationOutputInputAddressed doi) {
+                s += ','; printUnquotedString(s, "");
+                s += ','; printUnquotedString(s, "");
+            },
+            [&](DerivationOutputFixed dof) {
+                s += ','; printUnquotedString(s, dof.hash.printMethodAlgo());
+                s += ','; printUnquotedString(s, dof.hash.hash.to_string(Base16, false));
+            },
+        }, i.second.output);
         s += ')';
     }
 
@@ -503,12 +506,15 @@ void writeDerivation(Sink & out, const Store & store, const BasicDerivation & dr
     for (auto & i : drv.outputs) {
         out << i.first
             << store.printStorePath(i.second.path(store, drv.name));
-        if (auto hash = std::get_if<DerivationOutputFixed>(&i.second.output)) {
-            out << hash->hash.printMethodAlgo()
-                << hash->hash.hash.to_string(Base16, false);
-        } else {
-            out << "" << "";
-        }
+        std::visit(overloaded {
+            [&](DerivationOutputInputAddressed doi) {
+                out << "" << "";
+            },
+            [&](DerivationOutputFixed dof) {
+                out << dof.hash.printMethodAlgo()
+                    << dof.hash.hash.to_string(Base16, false);
+            },
+        }, i.second.output);
     }
     writeStorePaths(store, out, drv.inputSrcs);
     out << drv.platform << drv.builder << drv.args;

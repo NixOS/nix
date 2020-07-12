@@ -25,7 +25,10 @@ struct DerivationOutputFixed
 
 struct DerivationOutput
 {
-    std::variant<DerivationOutputInputAddressed, DerivationOutputFixed> output;
+    std::variant<
+        DerivationOutputInputAddressed,
+        DerivationOutputFixed
+    > output;
     StorePath path(const Store & store, std::string_view drvName) const;
 };
 
