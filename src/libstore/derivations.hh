@@ -26,7 +26,7 @@ struct DerivationOutputFixed
 struct DerivationOutput
 {
     std::variant<DerivationOutputExtensional, DerivationOutputFixed> output;
-    StorePath path(const Store & store, string drvName) const;
+    StorePath path(const Store & store, std::string_view drvName) const;
 };
 
 typedef std::map<string, DerivationOutput> DerivationOutputs;
@@ -45,7 +45,7 @@ struct BasicDerivation
     Path builder;
     Strings args;
     StringPairs env;
-    string name;
+    std::string name;
 
     BasicDerivation() { }
     virtual ~BasicDerivation() { };
@@ -87,7 +87,7 @@ StorePath writeDerivation(ref<Store> store,
     const Derivation & drv, std::string_view name, RepairFlag repair = NoRepair);
 
 /* Read a derivation from a file. */
-Derivation readDerivation(const Store & store, const Path & drvPath, string name);
+Derivation readDerivation(const Store & store, const Path & drvPath, std::string_view name);
 
 // FIXME: remove
 bool isDerivation(const string & fileName);
@@ -104,7 +104,7 @@ bool wantOutput(const string & output, const std::set<string> & wanted);
 struct Source;
 struct Sink;
 
-Source & readDerivation(Source & in, const Store & store, BasicDerivation & drv, string name);
+Source & readDerivation(Source & in, const Store & store, BasicDerivation & drv, std::string_view name);
 void writeDerivation(Sink & out, const Store & store, const BasicDerivation & drv);
 
 std::string hashPlaceholder(const std::string & outputName);

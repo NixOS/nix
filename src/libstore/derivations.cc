@@ -12,7 +12,7 @@ namespace nix {
 template<class... Ts> struct overloaded : Ts... { using Ts::operator()...; };
 template<class... Ts> overloaded(Ts...) -> overloaded<Ts...>;
 
-StorePath DerivationOutput::path(const Store & store, string drvName) const
+StorePath DerivationOutput::path(const Store & store, std::string_view drvName) const
 {
     return std::visit(overloaded {
         [](DerivationOutputExtensional doi) {
@@ -149,7 +149,7 @@ static DerivationOutput parseDerivationOutput(const Store & store, istringstream
 }
 
 
-static Derivation parseDerivation(const Store & store, const string & s, string name)
+static Derivation parseDerivation(const Store & store, const string & s, std::string_view name)
 {
     Derivation drv;
     drv.name = name;
@@ -197,7 +197,7 @@ static Derivation parseDerivation(const Store & store, const string & s, string 
 }
 
 
-Derivation readDerivation(const Store & store, const Path & drvPath, std::string name)
+Derivation readDerivation(const Store & store, const Path & drvPath, std::string_view name)
 {
     try {
         return parseDerivation(store, readFile(drvPath), name);
@@ -465,7 +465,7 @@ StringSet BasicDerivation::outputNames() const
 }
 
 
-Source & readDerivation(Source & in, const Store & store, BasicDerivation & drv, string name)
+Source & readDerivation(Source & in, const Store & store, BasicDerivation & drv, std::string_view name)
 {
     drv.name = name;
 
