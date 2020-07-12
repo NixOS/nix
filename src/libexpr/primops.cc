@@ -591,6 +591,7 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
 
     /* Build the derivation expression by processing the attributes. */
     Derivation drv;
+    drv.name = drvName;
 
     PathSet context;
 
