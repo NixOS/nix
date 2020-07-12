@@ -64,6 +64,8 @@ struct BasicDerivation
 
     /* Return the output names of a derivation. */
     StringSet outputNames() const;
+
+    static std::string_view nameFromPath(const StorePath & storePath);
 };
 
 struct Derivation : BasicDerivation

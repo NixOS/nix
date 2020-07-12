@@ -474,7 +474,7 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
     case wopBuildDerivation: {
         auto drvPath = store->parseStorePath(readString(from));
         BasicDerivation drv;
-        readDerivation(from, *store, drv, std::string(drvPath.name()));
+        readDerivation(from, *store, drv, Derivation::nameFromPath(drvPath));
         BuildMode buildMode = (BuildMode) readInt(from);
         logger->startWork();
         if (!trusted)

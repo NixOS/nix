@@ -218,7 +218,7 @@ Derivation Store::readDerivation(const StorePath & drvPath)
 {
     auto accessor = getFSAccessor();
     try {
-        return parseDerivation(*this, accessor->readFile(printStorePath(drvPath)), std::string(drvPath.name()));
+        return parseDerivation(*this, accessor->readFile(printStorePath(drvPath)), Derivation::nameFromPath(drvPath));
     } catch (FormatError & e) {
         throw Error("error parsing derivation '%s': %s", printStorePath(drvPath), e.msg());
     }
@@ -462,6 +462,15 @@ StringSet BasicDerivation::outputNames() const
     for (auto & i : outputs)
         names.insert(i.first);
     return names;
+}
+
+
+std::string_view BasicDerivation::nameFromPath(const StorePath & drvPath) {
+    auto nameWithSuffix = drvPath.name();
+    constexpr std::string_view extension = ".drv";
+    assert(hasSuffix(nameWithSuffix, extension));
+    nameWithSuffix.remove_suffix(extension.size());
+    return nameWithSuffix;
 }
 
 

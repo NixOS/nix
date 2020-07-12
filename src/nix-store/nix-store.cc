@@ -916,7 +916,7 @@ static void opServe(Strings opFlags, Strings opArgs)
 
                 auto drvPath = store->parseStorePath(readString(in));
                 BasicDerivation drv;
-                readDerivation(in, *store, drv, std::string(drvPath.name()));
+                readDerivation(in, *store, drv, Derivation::nameFromPath(drvPath));
 
                 getBuildSettings();
 
