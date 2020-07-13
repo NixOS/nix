@@ -197,7 +197,22 @@ std::ostream & operator << (std::ostream & str, const Pos & pos)
     if (!pos)
         str << "undefined position";
     else
-        str << (format(ANSI_BOLD "%1%" ANSI_NORMAL ":%2%:%3%") % (string) pos.file % pos.line % pos.column).str();
+    {
+        auto f = format(ANSI_BOLD "%1%" ANSI_NORMAL ":%2%:%3%");
+        switch (pos.origin) {
+            case foFile:
+                f % (string) pos.file;
+                break;
+            case foStdin:
+            case foString:
+                f % "(string)";
+                break;
+            default:
+                throw Error("unhandled Pos origin!");
+        }
+        str << (f % pos.line % pos.column).str();
+    }
+
     return str;
 }
 
@@ -270,7 +285,7 @@ void ExprVar::bindVars(const StaticEnv & env)
     if (withLevel == -1)
         throw UndefinedVarError({
             .hint = hintfmt("undefined variable '%1%'", name),
-            .nixCode = NixCode { .errPos = pos }
+            .errPos = pos
         });
     fromWith = true;
     this->level = withLevel;

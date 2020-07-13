@@ -130,7 +130,7 @@ Pos findDerivationFilename(EvalState & state, Value & v, std::string what)
 
     Symbol file = state.symbols.create(filename);
 
-    return { file, lineno, 0 };
+    return { foFile, file, lineno, 0 };
 }
 
 
