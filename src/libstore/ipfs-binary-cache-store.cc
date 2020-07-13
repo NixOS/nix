@@ -163,11 +163,14 @@ void IPFSBinaryCacheStore::sync()
     if (state->ipfsPath == initialIpfsPath)
         return;
 
-    if (!allowModify)
-        throw Error("can't update '%s' to '%s'", cacheUri, state->ipfsPath);
+    // If we aren't in trustless mode (handled above) and we don't allow
+    // modifications, state->ipfsPath should never be changed from the initial
+    // one,
+    assert(allowModify);
 
     if (!ipnsPath) {
-        warn("created new store at '%s', but can't update store at '%s'", "ipfs://" + std::string(state->ipfsPath, 6), cacheUri);
+        warn("created new store at '%s'. The old store at %s is immutable, so we can't update it",
+            "ipfs://" + std::string(state->ipfsPath, 6), cacheUri);
         return;
     }
 

@@ -55,10 +55,10 @@ touch $TEST_FILE
 # We try to do the evaluation with a known wrong hash to get the suggestion for
 # the correct one
 CORRECT_ADDRESS=$(nix eval --raw '(builtins.fetchurl 'file://$PWD/$TEST_FILE')' --store ipfs://$EMPTY_HASH?allow-modify=true |& \
-                  grep '^warning: created new store' | sed "s/^warning: created new store at '\(.*\)', .*$/\1/")
+                  grep '^warning: created new store' | sed "s/^warning: created new store at '\(.*\)'\. .*$/\1/")
 
 # Then we eval and get back the hash-name part of the store path
-RESULT=$(nix eval --raw '(builtins.fetchurl 'file://$PWD/$TEST_FILE')' --store $CORRECT_ADDRESS --json \
+RESULT=$(nix eval '(builtins.fetchurl 'file://$PWD/$TEST_FILE')' --store $CORRECT_ADDRESS --json \
     | jq -r | awk -F/ '{print $NF}')
 
 # Finally, we ask back the info from IPFS (formatting the address the right way
@@ -117,8 +117,14 @@ nix-build ./fixed.nix -A good \
 ################################################################################
 
 # Try to upload the content to the empty directory, fail but grab the right hash
+# HERE do the same thing but expect failure
 IPFS_ADDRESS=$(nix copy --to ipfs://$EMPTY_HASH?allow-modify=true $(nix-build ./fixed.nix -A good --no-out-link) --experimental-features nix-command |& \
-               grep '^warning: created new store' | sed "s/^warning: created new store at '\(.*\)', .*$/\1/")
+               grep '^warning: created new store' | sed "s/^warning: created new store at '\(.*\)'\. .*$/\1/")
+
+# We want to check that the `allow-modify` flag is required for the command to
+# succeed. This is an invocation of the same command without that flag that we
+# expect to fail
+! nix copy --to ipfs://$EMPTY_HASH $(nix-build ./fixed.nix -A good --no-out-link) --experimental-features nix-command
 
 # Verify that new path is valid.
 nix copy --to $IPFS_ADDRESS $(nix-build ./fixed.nix -A good --no-out-link) --experimental-features nix-command
