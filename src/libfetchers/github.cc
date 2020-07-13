@@ -229,13 +229,13 @@ struct GitLabInputScheme : GitArchiveInputScheme
     Hash getRevFromRef(nix::ref<Store> store, const Input & input) const override
     {
         auto host_url = maybeGetStrAttr(input.attrs, "url").value_or("gitlab.com");
-        auto url = fmt("https://%s/api/v4/projects/%s%%2F%s/repository/branches/%s",
+        auto url = fmt("https://%s/api/v4/projects/%s%%2F%s/repository/commits?ref_name=%s",
             host_url, getStrAttr(input.attrs, "owner"), getStrAttr(input.attrs, "repo"), *input.getRef());
         auto json = nlohmann::json::parse(
             readFile(
                 store->toRealPath(
                     downloadFile(store, url, "source", false).storePath)));
-        auto rev = Hash(std::string(json["commit"]["id"]), htSHA1);
+        auto rev = Hash(std::string(json[0]["id"]), htSHA1);
         debug("HEAD revision for '%s' is %s", url, rev.gitRev());
         return rev;
     }
