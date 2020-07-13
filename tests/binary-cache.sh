@@ -182,3 +182,22 @@ clearCacheCache
 nix-store -r $outPath --substituters "file://$cacheDir2 file://$cacheDir" --trusted-public-keys "$publicKey"
 
 fi # HAVE_LIBSODIUM
+
+
+unset _NIX_FORCE_HTTP
+
+
+# Test NAR listing generation.
+clearCache
+
+outPath=$(nix-build --no-out-link -E '
+  with import ./config.nix;
+  mkDerivation {
+    name = "nar-listing";
+    buildCommand = "mkdir $out; echo foo > $out/bar; ln -s xyzzy $out/link";
+  }
+')
+
+nix copy --to file://$cacheDir?write-nar-listing=1 $outPath
+
+[[ $(cat $cacheDir/$(basename $outPath).ls) = '{"version":1,"root":{"type":"directory","entries":{"bar":{"type":"regular","size":4,"narOffset":232},"link":{"type":"symlink","target":"xyzzy"}}}}' ]]
