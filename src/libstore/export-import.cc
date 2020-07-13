@@ -51,7 +51,7 @@ void Store::exportPath(const StorePath & path, Sink & sink)
         << 0;
 }
 
-StorePaths Store::importPaths(Source & source, std::shared_ptr<FSAccessor> accessor, CheckSigsFlag checkSigs)
+StorePaths Store::importPaths(Source & source, CheckSigsFlag checkSigs)
 {
     StorePaths res;
     while (true) {
@@ -86,7 +86,7 @@ StorePaths Store::importPaths(Source & source, std::shared_ptr<FSAccessor> acces
 
         // Can't use underlying source, which would have been exhausted
         auto source = StringSource { *tee.saved.s };
-        addToStore(info, source, NoRepair, checkSigs, accessor);
+        addToStore(info, source, NoRepair, checkSigs);
 
         res.push_back(info.path);
     }

@@ -141,7 +141,7 @@ struct FileSource : FdSource
 };
 
 void BinaryCacheStore::addToStore(const ValidPathInfo & info, Source & narSource,
-    RepairFlag repair, CheckSigsFlag checkSigs, std::shared_ptr<FSAccessor> accessor)
+    RepairFlag repair, CheckSigsFlag checkSigs)
 {
     assert(info.narHash && info.narSize);
 
@@ -200,13 +200,6 @@ void BinaryCacheStore::addToStore(const ValidPathInfo & info, Source & narSource
             throw Error("cannot add '%s' to the binary cache because the reference '%s' is not valid",
                 printStorePath(info.path), printStorePath(ref));
         }
-
-    #if 0
-    auto accessor_ = std::dynamic_pointer_cast<RemoteFSAccessor>(accessor);
-
-    if (accessor_)
-        accessor_->addToCache(printStorePath(info.path), *nar, narAccessor);
-    #endif
 
     /* Optionally write a JSON file containing a listing of the
        contents of the NAR. */
@@ -391,7 +384,7 @@ StorePath BinaryCacheStore::addToStore(const string & name, const Path & srcPath
     ValidPathInfo info(makeFixedOutputPath(method, h, name));
 
     auto source = StringSource { *sink.s };
-    addToStore(info, source, repair, CheckSigs, nullptr);
+    addToStore(info, source, repair, CheckSigs);
 
     return std::move(info.path);
 }
@@ -406,7 +399,7 @@ StorePath BinaryCacheStore::addTextToStore(const string & name, const string & s
         StringSink sink;
         dumpString(s, sink);
         auto source = StringSource { *sink.s };
-        addToStore(info, source, repair, CheckSigs, nullptr);
+        addToStore(info, source, repair, CheckSigs);
     }
 
     return std::move(info.path);

@@ -2768,10 +2768,9 @@ struct RestrictedStore : public LocalFSStore
     { throw Error("addToStore"); }
 
     void addToStore(const ValidPathInfo & info, Source & narSource,
-        RepairFlag repair = NoRepair, CheckSigsFlag checkSigs = CheckSigs,
-        std::shared_ptr<FSAccessor> accessor = 0) override
+        RepairFlag repair = NoRepair, CheckSigsFlag checkSigs = CheckSigs) override
     {
-        next->addToStore(info, narSource, repair, checkSigs, accessor);
+        next->addToStore(info, narSource, repair, checkSigs);
         goal.addDependency(info.path);
     }
 

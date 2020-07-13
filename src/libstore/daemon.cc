@@ -443,7 +443,7 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
     case wopImportPaths: {
         logger->startWork();
         TunnelSource source(from, to);
-        auto paths = store->importPaths(source, nullptr,
+        auto paths = store->importPaths(source,
             trusted ? NoCheckSigs : CheckSigs);
         logger->stopWork();
         Strings paths2;
@@ -742,7 +742,7 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
 
         // FIXME: race if addToStore doesn't read source?
         store->addToStore(info, *source, (RepairFlag) repair,
-            dontCheckSigs ? NoCheckSigs : CheckSigs, nullptr);
+            dontCheckSigs ? NoCheckSigs : CheckSigs);
 
         logger->stopWork();
         break;

@@ -442,8 +442,7 @@ public:
 
     /* Import a path into the store. */
     virtual void addToStore(const ValidPathInfo & info, Source & narSource,
-        RepairFlag repair = NoRepair, CheckSigsFlag checkSigs = CheckSigs,
-        std::shared_ptr<FSAccessor> accessor = 0) = 0;
+        RepairFlag repair = NoRepair, CheckSigsFlag checkSigs = CheckSigs) = 0;
 
     /* Copy the contents of a path to the store and register the
        validity the resulting path.  The resulting path is returned.
@@ -626,8 +625,7 @@ public:
        the Nix store. Optionally, the contents of the NARs are
        preloaded into the specified FS accessor to speed up subsequent
        access. */
-    StorePaths importPaths(Source & source, std::shared_ptr<FSAccessor> accessor,
-        CheckSigsFlag checkSigs = CheckSigs);
+    StorePaths importPaths(Source & source, CheckSigsFlag checkSigs = CheckSigs);
 
     struct Stats
     {
