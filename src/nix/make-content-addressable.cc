@@ -75,7 +75,7 @@ struct CmdMakeContentAddressable : StorePathsCommand, MixJSON
 
             ValidPathInfo info {
                 *store,
-                ContentAddress {
+                StorePathDescriptor {
                     .name = std::string { path.name() },
                     .info = FixedOutputInfo {
                         {

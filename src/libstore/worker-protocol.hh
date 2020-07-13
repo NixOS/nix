@@ -70,9 +70,9 @@ template<class T> T readStorePaths(const Store & store, Source & from);
 
 void writeStorePaths(const Store & store, Sink & out, const StorePathSet & paths);
 
-std::set<ContentAddress> readContentAddressSet(const Store & store, Source & from);
+std::set<StorePathDescriptor> readContentAddressSet(const Store & store, Source & from);
 
-void writeContentAddressSet(const Store & store, Sink & out, const std::set<ContentAddress> & paths);
+void writeContentAddressSet(const Store & store, Sink & out, const std::set<StorePathDescriptor> & paths);
 
 void writeOutputPathMap(const Store & store, Sink & out, const OutputPathMap & paths);
 

@@ -69,7 +69,7 @@ struct CmdAddToStore : MixDryRun, StoreCommand
 
         ValidPathInfo info {
             *store,
-            ContentAddress {
+            StorePathDescriptor {
                 .name = *namePart,
                 .info = FixedOutputInfo {
                     {

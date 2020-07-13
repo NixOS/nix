@@ -72,7 +72,7 @@ struct ValidPathInfo : PathReferences<StorePath>
 
     void sign(const Store & store, const SecretKey & secretKey);
 
-    std::optional<ContentAddress> fullContentAddressOpt() const;
+    std::optional<StorePathDescriptor> fullContentAddressOpt() const;
 
     /* Return true iff the path is verifiably content-addressed. */
     bool isContentAddressed(const Store & store) const;
@@ -101,7 +101,7 @@ struct ValidPathInfo : PathReferences<StorePath>
     ValidPathInfo(const StorePath & path) : path(path) { };
 
     ValidPathInfo(const Store & store,
-        ContentAddress && ca);
+        StorePathDescriptor && ca);
 
     virtual ~ValidPathInfo() { }
 };
