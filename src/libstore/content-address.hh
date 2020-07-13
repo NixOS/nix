@@ -116,14 +116,14 @@ struct FixedOutputInfo : FixedOutputHash {
     PathReferences<StorePath> references;
 };
 
-struct ContentAddress {
+struct StorePathDescriptor {
     std::string name;
     std::variant<
         TextInfo,
         FixedOutputInfo
     > info;
 
-    bool operator < (const ContentAddress & other) const
+    bool operator < (const StorePathDescriptor & other) const
     {
         return name < other.name;
     }

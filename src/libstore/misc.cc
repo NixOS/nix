@@ -107,11 +107,11 @@ void Store::computeFSClosure(const StorePath & startPath,
 }
 
 
-std::optional<ContentAddress> getDerivationCA(const BasicDerivation & drv)
+std::optional<StorePathDescriptor> getDerivationCA(const BasicDerivation & drv)
 {
     auto out = drv.outputs.find("out");
     if (out != drv.outputs.end() && out->second.hash) {
-        return ContentAddress {
+        return StorePathDescriptor {
             .name = std::string { out->second.path.name() },
             .info = FixedOutputInfo { *out->second.hash, {} },
         };

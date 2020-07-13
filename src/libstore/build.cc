@@ -297,7 +297,7 @@ public:
     GoalPtr makeDerivationGoal(const StorePath & drvPath, const StringSet & wantedOutputs, BuildMode buildMode = bmNormal);
     std::shared_ptr<DerivationGoal> makeBasicDerivationGoal(const StorePath & drvPath,
         const BasicDerivation & drv, BuildMode buildMode = bmNormal);
-    GoalPtr makeSubstitutionGoal(const StorePath & storePath, RepairFlag repair = NoRepair, std::optional<ContentAddress> ca = std::nullopt);
+    GoalPtr makeSubstitutionGoal(const StorePath & storePath, RepairFlag repair = NoRepair, std::optional<StorePathDescriptor> ca = std::nullopt);
 
     /* Remove a dead goal. */
     void removeGoal(GoalPtr goal);
@@ -3717,7 +3717,7 @@ void DerivationGoal::registerOutputs()
         /* Check that fixed-output derivations produced the right
            outputs (i.e., the content hash should match the specified
            hash). */
-        std::optional<ContentAddress> ca;
+        std::optional<StorePathDescriptor> ca;
 
         if (fixedOutput) {
 
@@ -3773,7 +3773,7 @@ void DerivationGoal::registerOutputs()
             else
                 assert(worker.store.parseStorePath(path) == dest);
 
-            ca = ContentAddress {
+            ca = StorePathDescriptor {
                 .name = std::string { i.second.path.name() },
                 .info = FixedOutputInfo {
                     {
@@ -3847,7 +3847,7 @@ void DerivationGoal::registerOutputs()
         }
 
         auto info = ca
-            ? ValidPathInfo { worker.store, ContentAddress { *ca } }
+            ? ValidPathInfo { worker.store, StorePathDescriptor { *ca } }
             : ValidPathInfo { worker.store.parseStorePath(path) };
         info.narHash = hash.first;
         info.narSize = hash.second;
@@ -4281,7 +4281,7 @@ class SubstitutionGoal : public Goal
 
 private:
     /* The store path that should be realised through a substitute. */
-    // TODO std::variant<StorePath, ContentAddress> storePath;
+    // TODO std::variant<StorePath, StorePathDescriptor> storePath;
     StorePath storePath;
 
     /* The remaining substituters. */
@@ -4319,10 +4319,10 @@ private:
 
     /* Content address for recomputing store path */
     // TODO delete once `storePath` is variant.
-    std::optional<ContentAddress> ca;
+    std::optional<StorePathDescriptor> ca;
 
 public:
-    SubstitutionGoal(const StorePath & storePath, Worker & worker, RepairFlag repair = NoRepair, std::optional<ContentAddress> ca = std::nullopt);
+    SubstitutionGoal(const StorePath & storePath, Worker & worker, RepairFlag repair = NoRepair, std::optional<StorePathDescriptor> ca = std::nullopt);
     ~SubstitutionGoal();
 
     void timedOut(Error && ex) override { abort(); };
@@ -4352,7 +4352,7 @@ public:
 };
 
 
-SubstitutionGoal::SubstitutionGoal(const StorePath & storePath, Worker & worker, RepairFlag repair, std::optional<ContentAddress> ca)
+SubstitutionGoal::SubstitutionGoal(const StorePath & storePath, Worker & worker, RepairFlag repair, std::optional<StorePathDescriptor> ca)
     : Goal(worker)
     , storePath(storePath)
     , repair(repair)
@@ -4699,7 +4699,7 @@ std::shared_ptr<DerivationGoal> Worker::makeBasicDerivationGoal(const StorePath 
 }
 
 
-GoalPtr Worker::makeSubstitutionGoal(const StorePath & path, RepairFlag repair, std::optional<ContentAddress> ca)
+GoalPtr Worker::makeSubstitutionGoal(const StorePath & path, RepairFlag repair, std::optional<StorePathDescriptor> ca)
 {
     GoalPtr goal = substitutionGoals[path].lock(); // FIXME
     if (!goal) {

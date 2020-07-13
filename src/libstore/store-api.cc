@@ -205,7 +205,7 @@ StorePath Store::makeTextPath(std::string_view name, const TextInfo & info) cons
 template<class... Ts> struct overloaded : Ts... { using Ts::operator()...; };
 template<class... Ts> overloaded(Ts...) -> overloaded<Ts...>;
 
-StorePath Store::makeFixedOutputPathFromCA(const ContentAddress & info) const
+StorePath Store::makeFixedOutputPathFromCA(const StorePathDescriptor & info) const
 {
     // New template
     return std::visit(overloaded {
@@ -843,12 +843,12 @@ void ValidPathInfo::sign(const Store & store, const SecretKey & secretKey)
     sigs.insert(secretKey.signDetached(fingerprint(store)));
 }
 
-std::optional<ContentAddress> ValidPathInfo::fullContentAddressOpt() const
+std::optional<StorePathDescriptor> ValidPathInfo::fullContentAddressOpt() const
 {
     if (! ca)
         return std::nullopt;
 
-    return ContentAddress {
+    return StorePathDescriptor {
         .name = std::string { path.name() },
         .info = std::visit(overloaded {
             [&](TextHash th) {
@@ -913,7 +913,7 @@ Strings ValidPathInfo::shortRefs() const
 
 ValidPathInfo::ValidPathInfo(
     const Store & store,
-    ContentAddress && info)
+    StorePathDescriptor && info)
       : path(store.makeFixedOutputPathFromCA(info))
 {
     std::visit(overloaded {

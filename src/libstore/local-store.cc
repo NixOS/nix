@@ -848,7 +848,7 @@ StorePathSet LocalStore::querySubstitutablePaths(const StorePathSet & paths)
 }
 
 
-void LocalStore::querySubstitutablePathInfos(const StorePathSet & paths, const std::set<ContentAddress> & caPaths, SubstitutablePathInfos & infos)
+void LocalStore::querySubstitutablePathInfos(const StorePathSet & paths, const std::set<StorePathDescriptor> & caPaths, SubstitutablePathInfos & infos)
 {
     if (!settings.useSubstitutes) return;
 
