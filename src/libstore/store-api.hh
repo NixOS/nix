@@ -31,7 +31,7 @@ MakeError(InvalidPath, Error);
 MakeError(Unsupported, Error);
 MakeError(SubstituteGone, Error);
 MakeError(SubstituterDisabled, Error);
-MakeError(NotInStore, Error);
+MakeError(BadStorePath, Error);
 
 
 class FSAccessor;
@@ -317,9 +317,9 @@ public:
        the Nix store. */
     bool isStorePath(std::string_view path) const;
 
-    /* Chop off the parts after the top-level store name, e.g.,
-       /nix/store/abcd-foo/bar => /nix/store/abcd-foo. */
-    Path toStorePath(const Path & path) const;
+    /* Split a path like /nix/store/<hash>-<name>/<bla> into
+       /nix/store/<hash>-<name> and /<bla>. */
+    std::pair<StorePath, Path> toStorePath(const Path & path) const;
 
     /* Follow symlinks until we end up with a path in the Nix store. */
     Path followLinksToStore(std::string_view path) const;

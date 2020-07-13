@@ -21,15 +21,15 @@ bool Store::isInStore(const Path & path) const
 }
 
 
-Path Store::toStorePath(const Path & path) const
+std::pair<StorePath, Path> Store::toStorePath(const Path & path) const
 {
     if (!isInStore(path))
         throw Error("path '%1%' is not in the Nix store", path);
     Path::size_type slash = path.find('/', storeDir.size() + 1);
     if (slash == Path::npos)
-        return path;
+        return {parseStorePath(path), ""};
     else
-        return Path(path, 0, slash);
+        return {parseStorePath(std::string_view(path).substr(0, slash)), path.substr(slash)};
 }
 
 
@@ -42,14 +42,14 @@ Path Store::followLinksToStore(std::string_view _path) const
         path = absPath(target, dirOf(path));
     }
     if (!isInStore(path))
-        throw NotInStore("path '%1%' is not in the Nix store", path);
+        throw BadStorePath("path '%1%' is not in the Nix store", path);
     return path;
 }
 
 
 StorePath Store::followLinksToStorePath(std::string_view path) const
 {
-    return parseStorePath(toStorePath(followLinksToStore(path)));
+    return toStorePath(followLinksToStore(path)).first;
 }
 
 
