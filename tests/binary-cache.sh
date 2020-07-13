@@ -191,6 +191,20 @@ unset _NIX_FORCE_HTTP
 nix verify -vvvvv --all --store file://$cacheDir --no-trust
 
 
+# Test local NAR caching.
+narCache=$TEST_ROOT/nar-cache
+rm -rf $narCache
+mkdir $narCache
+
+[[ $(nix cat-store --store "file://$cacheDir?local-nar-cache=$narCache" $outPath/foobar) = FOOBAR ]]
+
+rm -rfv "$cacheDir/nar"
+
+[[ $(nix cat-store --store "file://$cacheDir?local-nar-cache=$narCache" $outPath/foobar) = FOOBAR ]]
+
+(! nix cat-store --store file://$cacheDir $outPath/foobar)
+
+
 # Test NAR listing generation.
 clearCache
 
