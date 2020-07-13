@@ -7,7 +7,6 @@
 #include "globals.hh"
 #include "compression.hh"
 #include "filetransfer.hh"
-#include "istringstream_nocopy.hh"
 
 #include <aws/core/Aws.h>
 #include <aws/core/VersionConfig.h>
@@ -266,7 +265,7 @@ struct S3BinaryCacheStoreImpl : public S3BinaryCacheStore
         const std::string & mimeType,
         const std::string & contentEncoding)
     {
-        auto stream = std::make_shared<istringstream_nocopy>(data);
+        auto stream = std::make_shared<std::stringstream>(data);
 
         auto maxThreads = std::thread::hardware_concurrency();
 
@@ -333,7 +332,7 @@ struct S3BinaryCacheStoreImpl : public S3BinaryCacheStore
             if (contentEncoding != "")
                 request.SetContentEncoding(contentEncoding);
 
-            auto stream = std::make_shared<istringstream_nocopy>(data);
+            auto stream = std::make_shared<std::stringstream>(data);
 
             request.SetBody(stream);
 
