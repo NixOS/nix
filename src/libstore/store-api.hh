@@ -384,12 +384,15 @@ public:
         SubstituteFlag maybeSubstitute = NoSubstitute);
 
     /* Query the set of all valid paths. Note that for some store
-       backends, the name part of store paths may be omitted
-       (i.e. you'll get /nix/store/<hash> rather than
+       backends, the name part of store paths may be replaced by 'x'
+       (i.e. you'll get /nix/store/<hash>-x rather than
        /nix/store/<hash>-<name>). Use queryPathInfo() to obtain the
-       full store path. */
+       full store path. FIXME: should return a set of
+       std::variant<StorePath, HashPart> to get rid of this hack. */
     virtual StorePathSet queryAllValidPaths()
     { unsupported("queryAllValidPaths"); }
+
+    constexpr static const char * MissingName = "x";
 
     /* Query information about a valid path. It is permitted to omit
        the name part of the store path. */

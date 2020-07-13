@@ -52,7 +52,9 @@ protected:
             if (entry.name.size() != 40 ||
                 !hasSuffix(entry.name, ".narinfo"))
                 continue;
-            paths.insert(parseStorePath(storeDir + "/" + entry.name.substr(0, entry.name.size() - 8)));
+            paths.insert(parseStorePath(
+                    storeDir + "/" + entry.name.substr(0, entry.name.size() - 8)
+                    + "-" + MissingName));
         }
 
         return paths;

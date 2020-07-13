@@ -187,6 +187,10 @@ fi # HAVE_LIBSODIUM
 unset _NIX_FORCE_HTTP
 
 
+# Test 'nix verify --all' on a binary cache.
+nix verify -vvvvv --all --store file://$cacheDir --no-trust
+
+
 # Test NAR listing generation.
 clearCache
 

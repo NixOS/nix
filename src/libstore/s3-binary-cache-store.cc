@@ -410,7 +410,7 @@ struct S3BinaryCacheStoreImpl : public S3BinaryCacheStore
             for (auto object : contents) {
                 auto & key = object.GetKey();
                 if (key.size() != 40 || !hasSuffix(key, ".narinfo")) continue;
-                paths.insert(parseStorePath(storeDir + "/" + key.substr(0, key.size() - 8) + "-unknown"));
+                paths.insert(parseStorePath(storeDir + "/" + key.substr(0, key.size() - 8) + "-" + MissingName));
             }
 
             marker = res.GetNextMarker();
