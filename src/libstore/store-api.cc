@@ -351,6 +351,14 @@ ref<const ValidPathInfo> Store::queryPathInfo(const StorePath & storePath)
 }
 
 
+static bool goodStorePath(const StorePath & expected, const StorePath & actual)
+{
+    return
+        expected.hashPart() == actual.hashPart()
+        && (expected.name() == Store::MissingName || expected.name() == actual.name());
+}
+
+
 void Store::queryPathInfo(const StorePath & storePath,
     Callback<ref<const ValidPathInfo>> callback) noexcept
 {
@@ -378,7 +386,7 @@ void Store::queryPathInfo(const StorePath & storePath,
                     state_->pathInfoCache.upsert(hashPart,
                         res.first == NarInfoDiskCache::oInvalid ? PathInfoCacheValue{} : PathInfoCacheValue{ .value = res.second });
                     if (res.first == NarInfoDiskCache::oInvalid ||
-                        res.second->path != storePath)
+                        !goodStorePath(storePath, res.second->path))
                         throw InvalidPath("path '%s' is not valid", printStorePath(storePath));
                 }
                 return callback(ref<const ValidPathInfo>(res.second));
@@ -405,11 +413,7 @@ void Store::queryPathInfo(const StorePath & storePath,
 
                 auto storePath = parseStorePath(storePathS);
 
-                if (!info
-                    || info->path.hashPart() != storePath.hashPart()
-                    || (storePath.name() != MissingName && info->path.name() != storePath.name())
-                    )
-                {
+                if (!info || !goodStorePath(storePath, info->path)); {
                     stats.narInfoMissing++;
                     throw InvalidPath("path '%s' is not valid", storePathS);
                 }
