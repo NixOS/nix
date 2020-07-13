@@ -77,15 +77,15 @@ StorePaths Store::importPaths(Source & source, std::shared_ptr<FSAccessor> acces
         if (deriver != "")
             info.deriver = parseStorePath(deriver);
 
-        info.narHash = hashString(htSHA256, *tee.source.data);
-        info.narSize = tee.source.data->size();
+        info.narHash = hashString(htSHA256, *tee.saved.s);
+        info.narSize = tee.saved.s->size();
 
         // Ignore optional legacy signature.
         if (readInt(source) == 1)
             readString(source);
 
         // Can't use underlying source, which would have been exhausted
-        auto source = StringSource { *tee.source.data };
+        auto source = StringSource { *tee.saved.s };
         addToStore(info, source, NoRepair, checkSigs, accessor);
 
         res.push_back(info.path);

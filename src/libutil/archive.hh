@@ -65,9 +65,10 @@ struct ParseSink
 
 struct TeeParseSink : ParseSink
 {
+    StringSink saved;
     TeeSource source;
 
-    TeeParseSink(Source & source) : source(source) { }
+    TeeParseSink(Source & source) : source(source, saved) { }
 };
 
 void parseDump(ParseSink & sink, Source & source);

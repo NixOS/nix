@@ -155,13 +155,17 @@ void BinaryCacheStore::addToStore(const ValidPathInfo & info, Source & narSource
 
     auto now1 = std::chrono::steady_clock::now();
 
+    /* Read the NAR simultaneously into a CompressionSink+FileSink (to
+       write the compressed NAR to disk), into a HashSink (to get the
+       NAR hash), and into a NarAccessor (to get the NAR listing). */
     HashSink fileHashSink(htSHA256);
-
+    std::shared_ptr<FSAccessor> narAccessor;
     {
     FdSink fileSink(fdTemp.get());
     TeeSink teeSink(fileSink, fileHashSink);
     auto compressionSink = makeCompressionSink(compression, teeSink);
-    copyNAR(narSource, *compressionSink);
+    TeeSource teeSource(narSource, *compressionSink);
+    narAccessor = makeNarAccessor(teeSource);
     compressionSink->finish();
     }
 
@@ -200,10 +204,9 @@ void BinaryCacheStore::addToStore(const ValidPathInfo & info, Source & narSource
     #if 0
     auto accessor_ = std::dynamic_pointer_cast<RemoteFSAccessor>(accessor);
 
-    auto narAccessor = makeNarAccessor(nar);
-
     if (accessor_)
         accessor_->addToCache(printStorePath(info.path), *nar, narAccessor);
+    #endif
 
     /* Optionally write a JSON file containing a listing of the
        contents of the NAR. */
@@ -216,15 +219,13 @@ void BinaryCacheStore::addToStore(const ValidPathInfo & info, Source & narSource
 
             {
                 auto res = jsonRoot.placeholder("root");
-                listNar(res, narAccessor, "", true);
+                listNar(res, ref<FSAccessor>(narAccessor), "", true);
             }
         }
 
         upsertFile(std::string(info.path.to_string()) + ".ls", jsonOut.str(), "application/json");
     }
-    #endif
 
-    #if 0
     /* Optionally maintain an index of DWARF debug info files
        consisting of JSON files named 'debuginfo/<build-id>' that
        specify the NAR file and member containing the debug info. */
@@ -281,7 +282,6 @@ void BinaryCacheStore::addToStore(const ValidPathInfo & info, Source & narSource
             threadPool.process();
         }
     }
-    #endif
 
     /* Atomically write the NAR file. */
     if (repair || !fileExists(narInfo->url)) {

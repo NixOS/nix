@@ -391,7 +391,8 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
         }
         HashType hashAlgo = parseHashType(s);
 
-        TeeSource savedNAR(from);
+        StringSink savedNAR;
+        TeeSource savedNARSource(from, savedNAR);
         RetrieveRegularNARSink savedRegular;
 
         if (method == FileIngestionMethod::Recursive) {
@@ -399,7 +400,7 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
                a string so that we can pass it to
                addToStoreFromDump(). */
             ParseSink sink; /* null sink; just parse the NAR */
-            parseDump(sink, savedNAR);
+            parseDump(sink, savedNARSource);
         } else
             parseDump(savedRegular, from);
 
@@ -407,7 +408,7 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
         if (!savedRegular.regular) throw Error("regular file expected");
 
         auto path = store->addToStoreFromDump(
-            method == FileIngestionMethod::Recursive ? *savedNAR.data : savedRegular.s,
+            method == FileIngestionMethod::Recursive ? *savedNAR.s : savedRegular.s,
             baseName,
             method,
             hashAlgo);
@@ -733,7 +734,7 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
         else {
             TeeParseSink tee(from);
             parseDump(tee, tee.source);
-            saved = std::move(*tee.source.data);
+            saved = std::move(*tee.saved.s);
             source = std::make_unique<StringSource>(saved);
         }
 

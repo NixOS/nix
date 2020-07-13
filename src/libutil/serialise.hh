@@ -179,17 +179,17 @@ struct TeeSink : Sink
 };
 
 
-/* Adapter class of a Source that saves all data read to `s'. */
+/* Adapter class of a Source that saves all data read to a sink. */
 struct TeeSource : Source
 {
     Source & orig;
-    ref<std::string> data;
-    TeeSource(Source & orig)
-        : orig(orig), data(make_ref<std::string>()) { }
+    Sink & sink;
+    TeeSource(Source & orig, Sink & sink)
+        : orig(orig), sink(sink) { }
     size_t read(unsigned char * data, size_t len)
     {
         size_t n = orig.read(data, len);
-        this->data->append((const char *) data, n);
+        sink(data, len);
         return n;
     }
 };
