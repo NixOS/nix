@@ -100,11 +100,11 @@ protected:
     }
 
     void upsertFile(const std::string & path,
-        Source & source,
+        std::shared_ptr<std::basic_iostream<char>> istream,
         const std::string & mimeType) override
     {
         auto req = FileTransferRequest(cacheUri + "/" + path);
-        req.data = std::make_shared<string>(source.drain());
+        req.data = std::make_shared<string>(StreamToSourceAdapter(istream).drain());
         req.mimeType = mimeType;
         try {
             getFileTransfer()->upload(req);

@@ -31,12 +31,13 @@ protected:
     bool fileExists(const std::string & path) override;
 
     void upsertFile(const std::string & path,
-        Source & source,
-        const std::string & mimeType)
+        std::shared_ptr<std::basic_iostream<char>> istream,
+        const std::string & mimeType) override
     {
         auto path2 = binaryCacheDir + "/" + path;
         Path tmp = path2 + ".tmp." + std::to_string(getpid());
         AutoDelete del(tmp, false);
+        StreamToSourceAdapter source(istream);
         writeFile(tmp, source);
         if (rename(tmp.c_str(), path2.c_str()))
             throw SysError("renaming '%1%' to '%2%'", tmp, path2);

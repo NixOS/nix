@@ -261,12 +261,11 @@ struct S3BinaryCacheStoreImpl : public S3BinaryCacheStore
     std::shared_ptr<TransferManager> transferManager;
     std::once_flag transferManagerCreated;
 
-    void uploadFile(const std::string & path, const std::string & data,
+    void uploadFile(const std::string & path,
+        std::shared_ptr<std::basic_iostream<char>> istream,
         const std::string & mimeType,
         const std::string & contentEncoding)
     {
-        auto stream = std::make_shared<std::stringstream>(data);
-
         auto maxThreads = std::thread::hardware_concurrency();
 
         static std::shared_ptr<Aws::Utils::Threading::PooledThreadExecutor>
@@ -306,7 +305,7 @@ struct S3BinaryCacheStoreImpl : public S3BinaryCacheStore
 
             std::shared_ptr<TransferHandle> transferHandle =
                 transferManager->UploadFile(
-                    stream, bucketName, path, mimeType,
+                    istream, bucketName, path, mimeType,
                     Aws::Map<Aws::String, Aws::String>(),
                     nullptr /*, contentEncoding */);
 
@@ -332,9 +331,7 @@ struct S3BinaryCacheStoreImpl : public S3BinaryCacheStore
             if (contentEncoding != "")
                 request.SetContentEncoding(contentEncoding);
 
-            auto stream = std::make_shared<std::stringstream>(data);
-
-            request.SetBody(stream);
+            request.SetBody(istream);
 
             auto result = checkAws(fmt("AWS error uploading '%s'", path),
                 s3Helper.client->PutObject(request));
@@ -346,26 +343,34 @@ struct S3BinaryCacheStoreImpl : public S3BinaryCacheStore
             std::chrono::duration_cast<std::chrono::milliseconds>(now2 - now1)
                 .count();
 
-        printInfo(format("uploaded 's3://%1%/%2%' (%3% bytes) in %4% ms") %
-                  bucketName % path % data.size() % duration);
+        auto size = istream->tellg();
+
+        printInfo("uploaded 's3://%s/%s' (%d bytes) in %d ms",
+            bucketName, path, size, duration);
 
         stats.putTimeMs += duration;
-        stats.putBytes += data.size();
+        stats.putBytes += size;
         stats.put++;
     }
 
-    void upsertFile(const std::string & path, Source & source,
+    void upsertFile(const std::string & path,
+        std::shared_ptr<std::basic_iostream<char>> istream,
         const std::string & mimeType) override
     {
-        auto data = source.drain();
+        auto compress = [&](std::string compression)
+        {
+            auto compressed = nix::compress(compression, StreamToSourceAdapter(istream).drain());
+            return std::make_shared<std::stringstream>(std::move(*compressed));
+        };
+
         if (narinfoCompression != "" && hasSuffix(path, ".narinfo"))
-            uploadFile(path, *compress(narinfoCompression, data), mimeType, narinfoCompression);
+            uploadFile(path, compress(narinfoCompression), mimeType, narinfoCompression);
         else if (lsCompression != "" && hasSuffix(path, ".ls"))
-            uploadFile(path, *compress(lsCompression, data), mimeType, lsCompression);
+            uploadFile(path, compress(lsCompression), mimeType, lsCompression);
         else if (logCompression != "" && hasPrefix(path, "log/"))
-            uploadFile(path, *compress(logCompression, data), mimeType, logCompression);
+            uploadFile(path, compress(logCompression), mimeType, logCompression);
         else
-            uploadFile(path, data, mimeType, "");
+            uploadFile(path, istream, mimeType, "");
     }
 
     void getFile(const std::string & path, Sink & sink) override

@@ -349,4 +349,27 @@ Source & operator >> (Source & in, bool & b)
 }
 
 
+/* An adapter that converts a std::basic_istream into a source. */
+struct StreamToSourceAdapter : Source
+{
+    std::shared_ptr<std::basic_istream<char>> istream;
+
+    StreamToSourceAdapter(std::shared_ptr<std::basic_istream<char>> istream)
+        : istream(istream)
+    { }
+
+    size_t read(unsigned char * data, size_t len) override
+    {
+        if (!istream->read((char *) data, len)) {
+            if (istream->eof()) {
+                if (istream->gcount() == 0)
+                    throw EndOfFile("end of file");
+            } else
+                throw Error("I/O error in StreamToSourceAdapter");
+        }
+        return istream->gcount();
+    }
+};
+
+
 }

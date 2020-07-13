@@ -36,11 +36,11 @@ public:
     virtual bool fileExists(const std::string & path) = 0;
 
     virtual void upsertFile(const std::string & path,
-        Source & source,
+        std::shared_ptr<std::basic_iostream<char>> istream,
         const std::string & mimeType) = 0;
 
     void upsertFile(const std::string & path,
-        const std::string & data,
+        std::string && data,
         const std::string & mimeType);
 
     /* Note: subclasses must implement at least one of the two

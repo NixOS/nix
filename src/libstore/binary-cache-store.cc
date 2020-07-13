@@ -15,6 +15,7 @@
 #include <chrono>
 #include <future>
 #include <regex>
+#include <fstream>
 
 #include <nlohmann/json.hpp>
 
@@ -58,11 +59,10 @@ void BinaryCacheStore::init()
 }
 
 void BinaryCacheStore::upsertFile(const std::string & path,
-    const std::string & data,
+    std::string && data,
     const std::string & mimeType)
 {
-    StringSource source(data);
-    upsertFile(path, source, mimeType);
+    upsertFile(path, std::make_shared<std::stringstream>(std::move(data)), mimeType);
 }
 
 void BinaryCacheStore::getFile(const std::string & path,
@@ -279,8 +279,9 @@ void BinaryCacheStore::addToStore(const ValidPathInfo & info, Source & narSource
     /* Atomically write the NAR file. */
     if (repair || !fileExists(narInfo->url)) {
         stats.narWrite++;
-        FileSource source(fnTemp);
-        upsertFile(narInfo->url, source, "application/x-nix-nar");
+        upsertFile(narInfo->url,
+            std::make_shared<std::fstream>(fnTemp, std::ios_base::in),
+            "application/x-nix-nar");
     } else
         stats.narWriteAverted++;
 
