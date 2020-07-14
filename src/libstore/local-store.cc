@@ -1111,15 +1111,8 @@ StorePath LocalStore::addToStore(const string & name, const Path & _srcPath,
 {
     Path srcPath(absPath(_srcPath));
 
-    /* For computing the NAR hash. */
-    auto sha256Sink = std::make_unique<HashSink>(htSHA256);
-
-    /* For computing the store path. In recursive SHA-256 mode, this
-       is the same as the NAR hash, so no need to do it again. */
-    std::unique_ptr<HashSink> hashSink =
-        method == FileIngestionMethod::Recursive && hashAlgo == htSHA256
-        ? nullptr
-        : std::make_unique<HashSink>(hashAlgo);
+    /* For computing the store path. */
+    auto hashSink = std::make_unique<HashSink>(hashAlgo);
 
     /* Read the source path into memory, but only if it's up to
        narBufferSize bytes. If it's larger, write it to a temporary
@@ -1128,13 +1121,12 @@ StorePath LocalStore::addToStore(const string & name, const Path & _srcPath,
        temporary path. Otherwise, we move it to the destination store
        path. */
     bool inMemory = true;
-    std::string nar;
+    std::string nar; // TODO rename from "nar" to "dump"
 
     auto source = sinkToSource([&](Sink & sink) {
 
         LambdaSink sink2([&](const unsigned char * buf, size_t len) {
-            (*sha256Sink)(buf, len);
-            if (hashSink) (*hashSink)(buf, len);
+            (*hashSink)(buf, len);
 
             if (inMemory) {
                 if (nar.size() + len > settings.narBufferSize) {
@@ -1204,9 +1196,7 @@ StorePath LocalStore::addToStore(const string & name, const Path & _srcPath,
         /* The NAR fits in memory, so we didn't do restorePath(). */
     }
 
-    auto sha256 = sha256Sink->finish();
-
-    Hash hash = hashSink ? hashSink->finish().first : sha256.first;
+    auto [hash, size] = hashSink->finish();
 
     auto dstPath = makeFixedOutputPath(method, hash, name);
 
@@ -1249,13 +1239,22 @@ StorePath LocalStore::addToStore(const string & name, const Path & _srcPath,
                     throw Error("renaming '%s' to '%s'", tempPath, realPath);
             }
 
+            /* For computing the nar hash. In recursive SHA-256 mode, this
+               is the same as the store hash, so no need to do it again. */
+            auto narHash = std::pair { hash, size };
+            if (method != FileIngestionMethod::Recursive || hashAlgo != htSHA256) {
+                HashSink narSink { htSHA256 };
+                dumpPath(realPath, narSink);
+                narHash = narSink.finish();
+            }
+
             canonicalisePathMetaData(realPath, -1); // FIXME: merge into restorePath
 
             optimisePath(realPath);
 
             ValidPathInfo info(dstPath);
-            info.narHash = sha256.first;
-            info.narSize = sha256.second;
+            info.narHash = narHash.first;
+            info.narSize = narHash.second;
             info.ca = FixedOutputHash { .method = method, .hash = hash };
             registerValidPath(info);
         }
