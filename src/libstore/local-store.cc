@@ -1107,7 +1107,7 @@ StorePath LocalStore::addToStore(const string & name, const Path & _srcPath,
        temporary path. Otherwise, we move it to the destination store
        path. */
     bool inMemory = true;
-    std::string nar; // TODO rename from "nar" to "dump"
+    std::string dump;
 
     auto source = sinkToSource([&](Sink & sink) {
 
@@ -1115,13 +1115,13 @@ StorePath LocalStore::addToStore(const string & name, const Path & _srcPath,
             (*hashSink)(buf, len);
 
             if (inMemory) {
-                if (nar.size() + len > settings.narBufferSize) {
+                if (dump.size() + len > settings.narBufferSize) {
                     inMemory = false;
                     sink << 1;
-                    sink((const unsigned char *) nar.data(), nar.size());
-                    nar.clear();
+                    sink((const unsigned char *) dump.data(), dump.size());
+                    dump.clear();
                 } else {
-                    nar.append((const char *) buf, len);
+                    dump.append((const char *) buf, len);
                 }
             }
 
@@ -1180,7 +1180,7 @@ StorePath LocalStore::addToStore(const string & name, const Path & _srcPath,
 
             if (inMemory) {
                 /* Restore from the NAR in memory. */
-                StringSource source(nar);
+                StringSource source(dump);
                 if (method == FileIngestionMethod::Recursive)
                     restorePath(realPath, source);
                 else
