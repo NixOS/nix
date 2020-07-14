@@ -413,7 +413,7 @@ void Store::queryPathInfo(const StorePath & storePath,
 
                 auto storePath = parseStorePath(storePathS);
 
-                if (!info || !goodStorePath(storePath, info->path)); {
+                if (!info || !goodStorePath(storePath, info->path)) {
                     stats.narInfoMissing++;
                     throw InvalidPath("path '%s' is not valid", storePathS);
                 }
