@@ -166,17 +166,30 @@ struct StringSource : Source
 };
 
 
-/* Adapter class of a Source that saves all data read to `s'. */
+/* A sink that writes all incoming data to two other sinks. */
+struct TeeSink : Sink
+{
+    Sink & sink1, & sink2;
+    TeeSink(Sink & sink1, Sink & sink2) : sink1(sink1), sink2(sink2) { }
+    virtual void operator () (const unsigned char * data, size_t len)
+    {
+        sink1(data, len);
+        sink2(data, len);
+    }
+};
+
+
+/* Adapter class of a Source that saves all data read to a sink. */
 struct TeeSource : Source
 {
     Source & orig;
-    ref<std::string> data;
-    TeeSource(Source & orig)
-        : orig(orig), data(make_ref<std::string>()) { }
+    Sink & sink;
+    TeeSource(Source & orig, Sink & sink)
+        : orig(orig), sink(sink) { }
     size_t read(unsigned char * data, size_t len)
     {
         size_t n = orig.read(data, len);
-        this->data->append((const char *) data, n);
+        sink(data, len);
         return n;
     }
 };
@@ -334,6 +347,29 @@ Source & operator >> (Source & in, bool & b)
     b = readNum<uint64_t>(in);
     return in;
 }
+
+
+/* An adapter that converts a std::basic_istream into a source. */
+struct StreamToSourceAdapter : Source
+{
+    std::shared_ptr<std::basic_istream<char>> istream;
+
+    StreamToSourceAdapter(std::shared_ptr<std::basic_istream<char>> istream)
+        : istream(istream)
+    { }
+
+    size_t read(unsigned char * data, size_t len) override
+    {
+        if (!istream->read((char *) data, len)) {
+            if (istream->eof()) {
+                if (istream->gcount() == 0)
+                    throw EndOfFile("end of file");
+            } else
+                throw Error("I/O error in StreamToSourceAdapter");
+        }
+        return istream->gcount();
+    }
+};
 
 
 }

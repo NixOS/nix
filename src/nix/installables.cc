@@ -289,8 +289,8 @@ struct InstallableStorePath : Installable
     ref<Store> store;
     StorePath storePath;
 
-    InstallableStorePath(ref<Store> store, const Path & storePath)
-        : store(store), storePath(store->parseStorePath(storePath)) { }
+    InstallableStorePath(ref<Store> store, StorePath && storePath)
+        : store(store), storePath(std::move(storePath)) { }
 
     std::string what() override { return store->printStorePath(storePath); }
 
@@ -595,9 +595,9 @@ std::vector<std::shared_ptr<Installable>> SourceExprCommand::parseInstallables(
 
             if (s.find('/') != std::string::npos) {
                 try {
-                    result.push_back(std::make_shared<InstallableStorePath>(store, store->printStorePath(store->followLinksToStorePath(s))));
+                    result.push_back(std::make_shared<InstallableStorePath>(store, store->followLinksToStorePath(s)));
                     continue;
-                } catch (NotInStore &) {
+                } catch (BadStorePath &) {
                 } catch (...) {
                     if (!ex)
                         ex = std::current_exception();

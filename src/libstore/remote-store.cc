@@ -466,7 +466,7 @@ std::optional<StorePath> RemoteStore::queryPathFromHashPart(const std::string & 
 
 
 void RemoteStore::addToStore(const ValidPathInfo & info, Source & source,
-    RepairFlag repair, CheckSigsFlag checkSigs, std::shared_ptr<FSAccessor> accessor)
+    RepairFlag repair, CheckSigsFlag checkSigs)
 {
     auto conn(getConnection());
 

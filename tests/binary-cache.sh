@@ -182,3 +182,56 @@ clearCacheCache
 nix-store -r $outPath --substituters "file://$cacheDir2 file://$cacheDir" --trusted-public-keys "$publicKey"
 
 fi # HAVE_LIBSODIUM
+
+
+unset _NIX_FORCE_HTTP
+
+
+# Test 'nix verify --all' on a binary cache.
+nix verify -vvvvv --all --store file://$cacheDir --no-trust
+
+
+# Test local NAR caching.
+narCache=$TEST_ROOT/nar-cache
+rm -rf $narCache
+mkdir $narCache
+
+[[ $(nix cat-store --store "file://$cacheDir?local-nar-cache=$narCache" $outPath/foobar) = FOOBAR ]]
+
+rm -rfv "$cacheDir/nar"
+
+[[ $(nix cat-store --store "file://$cacheDir?local-nar-cache=$narCache" $outPath/foobar) = FOOBAR ]]
+
+(! nix cat-store --store file://$cacheDir $outPath/foobar)
+
+
+# Test NAR listing generation.
+clearCache
+
+outPath=$(nix-build --no-out-link -E '
+  with import ./config.nix;
+  mkDerivation {
+    name = "nar-listing";
+    buildCommand = "mkdir $out; echo foo > $out/bar; ln -s xyzzy $out/link";
+  }
+')
+
+nix copy --to file://$cacheDir?write-nar-listing=1 $outPath
+
+[[ $(cat $cacheDir/$(basename $outPath).ls) = '{"version":1,"root":{"type":"directory","entries":{"bar":{"type":"regular","size":4,"narOffset":232},"link":{"type":"symlink","target":"xyzzy"}}}}' ]]
+
+
+# Test debug info index generation.
+clearCache
+
+outPath=$(nix-build --no-out-link -E '
+  with import ./config.nix;
+  mkDerivation {
+    name = "debug-info";
+    buildCommand = "mkdir -p $out/lib/debug/.build-id/02; echo foo > $out/lib/debug/.build-id/02/623eda209c26a59b1a8638ff7752f6b945c26b.debug";
+  }
+')
+
+nix copy --to "file://$cacheDir?index-debug-info=1&compression=none" $outPath
+
+[[ $(cat $cacheDir/debuginfo/02623eda209c26a59b1a8638ff7752f6b945c26b.debug) = '{"archive":"../nar/100vxs724qr46phz8m24iswmg9p3785hsyagz0kchf6q6gf06sw6.nar","member":"lib/debug/.build-id/02/623eda209c26a59b1a8638ff7752f6b945c26b.debug"}' ]]
