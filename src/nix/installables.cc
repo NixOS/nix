@@ -94,8 +94,8 @@ struct InstallableStorePath : Installable
     ref<Store> store;
     StorePath storePath;
 
-    InstallableStorePath(ref<Store> store, const Path & storePath)
-        : store(store), storePath(store->parseStorePath(storePath)) { }
+    InstallableStorePath(ref<Store> store, StorePath && storePath)
+        : store(store), storePath(std::move(storePath)) { }
 
     std::string what() override { return store->printStorePath(storePath); }
 
@@ -228,11 +228,11 @@ static std::vector<std::shared_ptr<Installable>> parseInstallables(
             result.push_back(std::make_shared<InstallableExpr>(cmd, s));
 
         else if (s.find("/") != std::string::npos) {
-
-            auto path = store->toStorePath(store->followLinksToStore(s));
-
-            if (store->isStorePath(path))
-                result.push_back(std::make_shared<InstallableStorePath>(store, path));
+            try {
+                result.push_back(std::make_shared<InstallableStorePath>(
+                        store,
+                        store->toStorePath(store->followLinksToStore(s)).first));
+            } catch (BadStorePath &) { }
         }
 
         else if (s == "" || std::regex_match(s, attrPathRegex))

@@ -393,7 +393,8 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
         }
         HashType hashAlgo = parseHashType(s);
 
-        TeeSource savedNAR(from);
+        StringSink savedNAR;
+        TeeSource savedNARSource(from, savedNAR);
         RetrieveRegularNARSink savedRegular;
 
         switch (method) {
@@ -402,12 +403,12 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
                a string so that we can pass it to
                addToStoreFromDump(). */
             ParseSink sink; /* null sink; just parse the NAR */
-            parseDump(sink, savedNAR);
+            parseDump(sink, savedNARSource);
             break;
         }
         case FileIngestionMethod::Git: {
             ParseSink sink;
-            parseGit(sink, savedNAR, store->storeDir, store->storeDir);
+            parseGit(sink, savedNARSource, store->storeDir, store->storeDir);
             break;
         }
         case FileIngestionMethod::Flat: {
@@ -420,7 +421,7 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
         if (!savedRegular.regular) throw Error("regular file expected");
 
         auto path = store->addToStoreFromDump(
-            method == FileIngestionMethod::Flat ? savedRegular.s : *savedNAR.data,
+            method == FileIngestionMethod::Flat ? savedRegular.s : *savedNAR.s,
             baseName,
             method,
             hashAlgo);
@@ -455,7 +456,7 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
     case wopImportPaths: {
         logger->startWork();
         TunnelSource source(from, to);
-        auto paths = store->importPaths(source, nullptr,
+        auto paths = store->importPaths(source,
             trusted ? NoCheckSigs : CheckSigs);
         logger->stopWork();
         Strings paths2;
@@ -744,9 +745,9 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
         if (GET_PROTOCOL_MINOR(clientVersion) >= 21)
             source = std::make_unique<TunnelSource>(from, to);
         else {
-            TeeSink tee(from);
+            TeeParseSink tee(from);
             parseDump(tee, tee.source);
-            saved = std::move(*tee.source.data);
+            saved = std::move(*tee.saved.s);
             source = std::make_unique<StringSource>(saved);
         }
 
@@ -754,7 +755,7 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
 
         // FIXME: race if addToStore doesn't read source?
         store->addToStore(info, *source, (RepairFlag) repair,
-            dontCheckSigs ? NoCheckSigs : CheckSigs, nullptr);
+            dontCheckSigs ? NoCheckSigs : CheckSigs);
 
         logger->stopWork();
         break;
