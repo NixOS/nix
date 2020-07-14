@@ -392,6 +392,28 @@ struct GitInputScheme : InputScheme
         AutoDelete delTmpDir(tmpDir, true);
         PathFilter filter = defaultPathFilter;
 
+        RunOptions checkCommitOpts(
+            "git",
+            { "-C", repoDir, "cat-file", "commit", input.getRev()->gitRev() }
+        );
+        checkCommitOpts.searchPath = true;
+        checkCommitOpts.mergeStderrToStdout = true;
+
+        auto result = runProgram(checkCommitOpts);
+        if (WEXITSTATUS(result.first) == 128
+            && result.second.find("bad file") != std::string::npos
+        ) {
+            throw Error(
+                "Cannot find Git revision '%s' in ref '%s' of repository '%s'! "
+                    "Please make sure that the " ANSI_BOLD "rev" ANSI_NORMAL " exists on the "
+                    ANSI_BOLD "ref" ANSI_NORMAL " you've specified or add " ANSI_BOLD
+                    "allRefs = true;" ANSI_NORMAL " to " ANSI_BOLD "fetchGit" ANSI_NORMAL ".",
+                input.getRev()->gitRev(),
+                *input.getRef(),
+                actualUrl
+            );
+        }
+
         if (submodules) {
             Path tmpGitDir = createTempDir();
             AutoDelete delTmpGitDir(tmpGitDir, true);
