@@ -38,7 +38,7 @@ void writeStorePaths(const Store & store, Sink & out, const StorePathSet & paths
         out << store.printStorePath(i);
 }
 
-std::set<StorePathDescriptor> readContentAddressSet(const Store & store, Source & from)
+std::set<StorePathDescriptor> readStorePathDescriptorSet(const Store & store, Source & from)
 {
     std::set<StorePathDescriptor> paths;
     // TODO
@@ -48,7 +48,7 @@ std::set<StorePathDescriptor> readContentAddressSet(const Store & store, Source 
     return paths;
 }
 
-void writeContentAddressSet(const Store & store, Sink & out, const std::set<StorePathDescriptor> & paths)
+void writeStorePathDescriptorSet(const Store & store, Sink & out, const std::set<StorePathDescriptor> & paths)
 {
     // TODO
     //out << paths.size();
@@ -387,7 +387,7 @@ void RemoteStore::querySubstitutablePathInfos(const StorePathSet & paths, const 
             writeStorePaths(*this, conn->to, combine());
         } else {
             writeStorePaths(*this, conn->to, paths);
-            writeContentAddressSet(*this, conn->to, caPaths);
+            writeStorePathDescriptorSet(*this, conn->to, caPaths);
         }
         conn.processStderr();
         size_t count = readNum<size_t>(conn->from);

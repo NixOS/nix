@@ -619,7 +619,7 @@ void copyStorePath(ref<Store> srcStore, ref<Store> dstStore,
     // recompute store path on the chance dstStore does it differently
     if (info->ca && info->references.empty()) {
         auto info2 = make_ref<ValidPathInfo>(*info);
-        info2->path = dstStore->makeFixedOutputPathFromCA(*info->fullContentAddressOpt());
+        info2->path = dstStore->makeFixedOutputPathFromCA(*info->fullStorePathDescriptorOpt());
         if (dstStore->storeDir == srcStore->storeDir)
             assert(info->path == info2->path);
         info = info2;
@@ -697,7 +697,7 @@ std::map<StorePath, StorePath> copyPaths(ref<Store> srcStore, ref<Store> dstStor
             auto info = srcStore->queryPathInfo(storePath);
             auto storePathForDst = storePath;
             if (info->ca && info->references.empty() && !info->hasSelfReference) {
-                storePathForDst = dstStore->makeFixedOutputPathFromCA(*info->fullContentAddressOpt());
+                storePathForDst = dstStore->makeFixedOutputPathFromCA(*info->fullStorePathDescriptorOpt());
                 if (dstStore->storeDir == srcStore->storeDir)
                     assert(storePathForDst == storePath);
                 if (storePathForDst != storePath)
@@ -725,7 +725,7 @@ std::map<StorePath, StorePath> copyPaths(ref<Store> srcStore, ref<Store> dstStor
 
             auto storePathForDst = storePath;
             if (info->ca && info->references.empty() && !info->hasSelfReference) {
-                storePathForDst = dstStore->makeFixedOutputPathFromCA(*info->fullContentAddressOpt());
+                storePathForDst = dstStore->makeFixedOutputPathFromCA(*info->fullStorePathDescriptorOpt());
                 if (dstStore->storeDir == srcStore->storeDir)
                     assert(storePathForDst == storePath);
                 if (storePathForDst != storePath)
@@ -843,7 +843,7 @@ void ValidPathInfo::sign(const Store & store, const SecretKey & secretKey)
     sigs.insert(secretKey.signDetached(fingerprint(store)));
 }
 
-std::optional<StorePathDescriptor> ValidPathInfo::fullContentAddressOpt() const
+std::optional<StorePathDescriptor> ValidPathInfo::fullStorePathDescriptorOpt() const
 {
     if (! ca)
         return std::nullopt;
@@ -868,7 +868,7 @@ std::optional<StorePathDescriptor> ValidPathInfo::fullContentAddressOpt() const
 
 bool ValidPathInfo::isContentAddressed(const Store & store) const
 {
-    auto fullCaOpt = fullContentAddressOpt();
+    auto fullCaOpt = fullStorePathDescriptorOpt();
 
     if (! fullCaOpt)
         return false;
