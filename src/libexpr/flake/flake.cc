@@ -63,7 +63,6 @@ static std::tuple<fetchers::Tree, FlakeRef, FlakeRef> fetchOrSubstituteTree(
     debug("got tree '%s' from '%s'",
         state.store->printStorePath(tree.storePath), lockedRef);
 
-
     if (state.allowedPaths)
         state.allowedPaths->insert(tree.actualPath);
 

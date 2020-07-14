@@ -19,6 +19,8 @@ create table if not exists Attributes (
 
 struct AttrDb
 {
+    std::atomic_bool failed{false};
+
     struct State
     {
         SQLite db;
@@ -64,10 +66,24 @@ struct AttrDb
     {
         try {
             auto state(_state->lock());
-            state->txn->commit();
+            if (!failed)
+                state->txn->commit();
             state->txn.reset();
         } catch (...) {
             ignoreException();
+        }
+    }
+
+    template<typename F>
+    AttrId doSQLite(F && fun)
+    {
+        if (failed) return 0;
+        try {
+            return fun();
+        } catch (SQLiteError &) {
+            ignoreException();
+            failed = true;
+            return 0;
         }
     }
 
@@ -75,25 +91,28 @@ struct AttrDb
         AttrKey key,
         const std::vector<Symbol> & attrs)
     {
-        auto state(_state->lock());
+        return doSQLite([&]()
+        {
+            auto state(_state->lock());
 
-        state->insertAttribute.use()
-            (key.first)
-            (key.second)
-            (AttrType::FullAttrs)
-            (0, false).exec();
-
-        AttrId rowId = state->db.getLastInsertedRowId();
-        assert(rowId);
-
-        for (auto & attr : attrs)
             state->insertAttribute.use()
-                (rowId)
-                (attr)
-                (AttrType::Placeholder)
+                (key.first)
+                (key.second)
+                (AttrType::FullAttrs)
                 (0, false).exec();
 
-        return rowId;
+            AttrId rowId = state->db.getLastInsertedRowId();
+            assert(rowId);
+
+            for (auto & attr : attrs)
+                state->insertAttribute.use()
+                    (rowId)
+                    (attr)
+                    (AttrType::Placeholder)
+                    (0, false).exec();
+
+            return rowId;
+        });
     }
 
     AttrId setString(
@@ -101,96 +120,114 @@ struct AttrDb
         std::string_view s,
         const char * * context = nullptr)
     {
-        auto state(_state->lock());
+        return doSQLite([&]()
+        {
+            auto state(_state->lock());
 
-        if (context) {
-            std::string ctx;
-            for (const char * * p = context; *p; ++p) {
-                if (p != context) ctx.push_back(' ');
-                ctx.append(*p);
-            }
-            state->insertAttributeWithContext.use()
-                (key.first)
-                (key.second)
-                (AttrType::String)
-                (s)
-                (ctx).exec();
-        } else {
-            state->insertAttribute.use()
-                (key.first)
-                (key.second)
-                (AttrType::String)
+            if (context) {
+                std::string ctx;
+                for (const char * * p = context; *p; ++p) {
+                    if (p != context) ctx.push_back(' ');
+                    ctx.append(*p);
+                }
+                state->insertAttributeWithContext.use()
+                    (key.first)
+                    (key.second)
+                    (AttrType::String)
+                    (s)
+                    (ctx).exec();
+            } else {
+                state->insertAttribute.use()
+                    (key.first)
+                    (key.second)
+                    (AttrType::String)
                 (s).exec();
-        }
+            }
 
-        return state->db.getLastInsertedRowId();
+            return state->db.getLastInsertedRowId();
+        });
     }
 
     AttrId setBool(
         AttrKey key,
         bool b)
     {
-        auto state(_state->lock());
+        return doSQLite([&]()
+        {
+            auto state(_state->lock());
 
-        state->insertAttribute.use()
-            (key.first)
-            (key.second)
-            (AttrType::Bool)
-            (b ? 1 : 0).exec();
+            state->insertAttribute.use()
+                (key.first)
+                (key.second)
+                (AttrType::Bool)
+                (b ? 1 : 0).exec();
 
-        return state->db.getLastInsertedRowId();
+            return state->db.getLastInsertedRowId();
+        });
     }
 
     AttrId setPlaceholder(AttrKey key)
     {
-        auto state(_state->lock());
+        return doSQLite([&]()
+        {
+            auto state(_state->lock());
 
-        state->insertAttribute.use()
-            (key.first)
-            (key.second)
-            (AttrType::Placeholder)
-            (0, false).exec();
+            state->insertAttribute.use()
+                (key.first)
+                (key.second)
+                (AttrType::Placeholder)
+                (0, false).exec();
 
-        return state->db.getLastInsertedRowId();
+            return state->db.getLastInsertedRowId();
+        });
     }
 
     AttrId setMissing(AttrKey key)
     {
-        auto state(_state->lock());
+        return doSQLite([&]()
+        {
+            auto state(_state->lock());
 
-        state->insertAttribute.use()
-            (key.first)
-            (key.second)
-            (AttrType::Missing)
-            (0, false).exec();
+            state->insertAttribute.use()
+                (key.first)
+                (key.second)
+                (AttrType::Missing)
+                (0, false).exec();
 
-        return state->db.getLastInsertedRowId();
+            return state->db.getLastInsertedRowId();
+        });
     }
 
     AttrId setMisc(AttrKey key)
     {
-        auto state(_state->lock());
+        return doSQLite([&]()
+        {
+            auto state(_state->lock());
 
-        state->insertAttribute.use()
-            (key.first)
-            (key.second)
-            (AttrType::Misc)
-            (0, false).exec();
+            state->insertAttribute.use()
+                (key.first)
+                (key.second)
+                (AttrType::Misc)
+                (0, false).exec();
 
-        return state->db.getLastInsertedRowId();
+            return state->db.getLastInsertedRowId();
+        });
     }
 
     AttrId setFailed(AttrKey key)
     {
-        auto state(_state->lock());
+        return doSQLite([&]()
+        {
+            auto state(_state->lock());
 
-        state->insertAttribute.use()
-            (key.first)
-            (key.second)
-            (AttrType::Failed)
-            (0, false).exec();
+            state->insertAttribute.use()
+                (key.first)
+                (key.second)
+                (AttrType::Failed)
+                (0, false).exec();
 
-        return state->db.getLastInsertedRowId();
+            return state->db.getLastInsertedRowId();
+        });
     }
 
     std::optional<std::pair<AttrId, AttrValue>> getAttr(
@@ -237,12 +274,22 @@ struct AttrDb
     }
 };
 
+static std::shared_ptr<AttrDb> makeAttrDb(const Hash & fingerprint)
+{
+    try {
+        return std::make_shared<AttrDb>(fingerprint);
+    } catch (SQLiteError &) {
+        ignoreException();
+        return nullptr;
+    }
+}
+
 EvalCache::EvalCache(
     bool useCache,
     const Hash & fingerprint,
     EvalState & state,
     RootLoader rootLoader)
-    : db(useCache ? std::make_shared<AttrDb>(fingerprint) : nullptr)
+    : db(useCache ? makeAttrDb(fingerprint) : nullptr)
     , state(state)
     , rootLoader(rootLoader)
 {
