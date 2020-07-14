@@ -40,19 +40,19 @@ struct FixedOutputHash {
 typedef std::variant<
     TextHash, // for paths computed by makeTextPath() / addTextToStore
     FixedOutputHash // for path computed by makeFixedOutputPath
-> LegacyContentAddress;
+> ContentAddress;
 
 /* Compute the prefix to the hash algorithm which indicates how the files were
    ingested. */
 std::string makeFileIngestionPrefix(const FileIngestionMethod m);
 
-std::string renderLegacyContentAddress(LegacyContentAddress ca);
+std::string renderContentAddress(ContentAddress ca);
 
-std::string renderLegacyContentAddress(std::optional<LegacyContentAddress> ca);
+std::string renderContentAddress(std::optional<ContentAddress> ca);
 
-LegacyContentAddress parseLegacyContentAddress(std::string_view rawCa);
+ContentAddress parseContentAddress(std::string_view rawCa);
 
-std::optional<LegacyContentAddress> parseLegacyContentAddressOpt(std::string_view rawCaOpt);
+std::optional<ContentAddress> parseContentAddressOpt(std::string_view rawCaOpt);
 
 /*
  * References set
