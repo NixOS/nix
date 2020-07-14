@@ -963,7 +963,7 @@ const PublicKeys & LocalStore::getPublicKeys()
 
 
 void LocalStore::addToStore(const ValidPathInfo & info, Source & source,
-    RepairFlag repair, CheckSigsFlag checkSigs, std::shared_ptr<FSAccessor> accessor)
+    RepairFlag repair, CheckSigsFlag checkSigs)
 {
     if (!info.narHash)
         throw Error("cannot add path '%s' because it lacks a hash", printStorePath(info.path));
@@ -977,7 +977,7 @@ void LocalStore::addToStore(const ValidPathInfo & info, Source & source,
 
         PathLocks outputLock;
 
-        Path realPath = realStoreDir + "/" + std::string(info.path.to_string());
+        auto realPath = Store::toRealPath(info.path);
 
         /* Lock the output path.  But don't lock if we're being called
            from a build hook (whose parent process already acquired a
@@ -1051,8 +1051,7 @@ StorePath LocalStore::addToStoreFromDump(const string & dump, const string & nam
         /* The first check above is an optimisation to prevent
            unnecessary lock acquisition. */
 
-        Path realPath = realStoreDir + "/";
-        realPath += dstPath.to_string();
+        auto realPath = Store::toRealPath(dstPath);
 
         PathLocks outputLock({realPath});
 
@@ -1112,37 +1111,158 @@ StorePath LocalStore::addToStore(const string & name, const Path & _srcPath,
 {
     Path srcPath(absPath(_srcPath));
 
-    if (method == FileIngestionMethod::Git && hashAlgo != htSHA1)
-        throw Error("git ingestion must use sha1 hash");
+    /* For computing the store path. */
+    auto hashSink = std::make_unique<HashSink>(hashAlgo);
 
-    /* Read the whole path into memory. This is not a very scalable
-       method for very large paths, but `copyPath' is mainly used for
-       small files. */
-    StringSink sink;
-    switch (method) {
-    case FileIngestionMethod::Recursive: {
-        dumpPath(srcPath, sink, filter);
-        break;
-    }
-    case FileIngestionMethod::Git: {
-        // recursively add to store if path is a directory
-        struct stat st;
-        if (lstat(srcPath.c_str(), &st))
-            throw SysError("getting attributes of path '%1%'", srcPath);
-        if (S_ISDIR(st.st_mode))
-            for (auto & i : readDirectory(srcPath))
-                addToStore("git", srcPath + "/" + i.name, method, hashAlgo, filter, repair);
+    /* Read the source path into memory, but only if it's up to
+       narBufferSize bytes. If it's larger, write it to a temporary
+       location in the Nix store. If the subsequently computed
+       destination store path is already valid, we just delete the
+       temporary path. Otherwise, we move it to the destination store
+       path. */
+    bool inMemory = true;
+    std::string nar; // TODO rename from "nar" to "dump"
 
-        dumpGit(hashAlgo, srcPath, sink, filter);
-        break;
-    }
-    case FileIngestionMethod::Flat: {
-        sink.s = make_ref<std::string>(readFile(srcPath));
-        break;
-    }
+    auto source = sinkToSource([&](Sink & sink) {
+
+        LambdaSink sink2([&](const unsigned char * buf, size_t len) {
+            (*hashSink)(buf, len);
+
+            if (inMemory) {
+                if (nar.size() + len > settings.narBufferSize) {
+                    inMemory = false;
+                    sink << 1;
+                    sink((const unsigned char *) nar.data(), nar.size());
+                    nar.clear();
+                } else {
+                    nar.append((const char *) buf, len);
+                }
+            }
+
+            if (!inMemory) sink(buf, len);
+        });
+
+        switch (method) {
+        case FileIngestionMethod::Recursive: {
+            dumpPath(srcPath, sink2, filter);
+            break;
+        }
+        case FileIngestionMethod::Git: {
+            // recursively add to store if path is a directory
+            struct stat st;
+            if (lstat(srcPath.c_str(), &st))
+                throw SysError("getting attributes of path '%1%'", srcPath);
+            if (S_ISDIR(st.st_mode))
+                for (auto & i : readDirectory(srcPath))
+                    addToStore("git", srcPath + "/" + i.name, method, hashAlgo, filter, repair);
+
+            dumpGit(hashAlgo, srcPath, sink2, filter);
+            break;
+        }
+        case FileIngestionMethod::Flat: {
+            readFile(srcPath, sink2);
+            break;
+        }
+        }
+    });
+
+    std::unique_ptr<AutoDelete> delTempDir;
+    Path tempPath;
+
+    try {
+        /* Wait for the source coroutine to give us some dummy
+           data. This is so that we don't create the temporary
+           directory if the NAR fits in memory. */
+        readInt(*source);
+
+        auto tempDir = createTempDir(realStoreDir, "add");
+        delTempDir = std::make_unique<AutoDelete>(tempDir);
+        tempPath = tempDir + "/x";
+
+        switch (method) {
+        case FileIngestionMethod::Flat:
+            writeFile(tempPath, *source);
+            break;
+        case FileIngestionMethod::Recursive:
+            restorePath(tempPath, *source);
+            break;
+        case FileIngestionMethod::Git:
+            restoreGit(tempPath, *source, realStoreDir, storeDir);
+            break;
+        }
+
+    } catch (EndOfFile &) {
+        if (!inMemory) throw;
+        /* The NAR fits in memory, so we didn't do restorePath(). */
     }
 
-    return addToStoreFromDump(*sink.s, name, method, hashAlgo, repair);
+    auto [hash, size] = hashSink->finish();
+
+    auto dstPath = makeFixedOutputPath(method, hash, name);
+
+    addTempRoot(dstPath);
+
+    if (repair || !isValidPath(dstPath)) {
+
+        /* The first check above is an optimisation to prevent
+           unnecessary lock acquisition. */
+
+        auto realPath = Store::toRealPath(dstPath);
+
+        PathLocks outputLock({realPath});
+
+        if (repair || !isValidPath(dstPath)) {
+
+            deletePath(realPath);
+
+            autoGC();
+
+            if (inMemory) {
+                /* Restore from the NAR in memory. */
+                StringSource source(nar);
+                switch (method) {
+                case FileIngestionMethod::Flat:
+                    writeFile(realPath, source);
+                    break;
+                case FileIngestionMethod::Recursive: {
+                    restorePath(realPath, source);
+                    break;
+                }
+                case FileIngestionMethod::Git: {
+                    restoreGit(realPath, source, realStoreDir, storeDir);
+                    break;
+                }
+                }
+            } else {
+                /* Move the temporary path we restored above. */
+                if (rename(tempPath.c_str(), realPath.c_str()))
+                    throw Error("renaming '%s' to '%s'", tempPath, realPath);
+            }
+
+            /* For computing the nar hash. In recursive SHA-256 mode, this
+               is the same as the store hash, so no need to do it again. */
+            auto narHash = std::pair { hash, size };
+            if (method != FileIngestionMethod::Recursive || hashAlgo != htSHA256) {
+                HashSink narSink { htSHA256 };
+                dumpPath(realPath, narSink);
+                narHash = narSink.finish();
+            }
+
+            canonicalisePathMetaData(realPath, -1); // FIXME: merge into restorePath
+
+            optimisePath(realPath);
+
+            ValidPathInfo info(dstPath);
+            info.narHash = narHash.first;
+            info.narSize = narHash.second;
+            info.ca = FixedOutputHash { .method = method, .hash = hash };
+            registerValidPath(info);
+        }
+
+        outputLock.setDeletion(true);
+    }
+
+    return dstPath;
 }
 
 
@@ -1156,8 +1276,7 @@ StorePath LocalStore::addTextToStore(const string & name, const string & s,
 
     if (repair || !isValidPath(dstPath)) {
 
-        Path realPath = realStoreDir + "/";
-        realPath += dstPath.to_string();
+        auto realPath = Store::toRealPath(dstPath);
 
         PathLocks outputLock({realPath});
 

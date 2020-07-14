@@ -9,7 +9,6 @@
 #include "archive.hh"
 #include "git.hh"
 #include "util.hh"
-#include "istringstream_nocopy.hh"
 
 #include <sys/types.h>
 #include <sys/stat.h>
