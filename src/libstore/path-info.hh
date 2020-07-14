@@ -51,7 +51,7 @@ struct ValidPathInfo : PathReferences<StorePath>
        and the store path would be computed from the name component, ‘narHash’
        and ‘references’. However, we support many types of content addresses.
     */
-    std::optional<LegacyContentAddress> ca;
+    std::optional<ContentAddress> ca;
 
     bool operator == (const ValidPathInfo & i) const
     {

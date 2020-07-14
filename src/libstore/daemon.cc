@@ -664,7 +664,7 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
             if (GET_PROTOCOL_MINOR(clientVersion) >= 16) {
                 to << info->ultimate
                    << info->sigs
-                   << renderLegacyContentAddress(info->ca);
+                   << renderContentAddress(info->ca);
             }
         } else {
             assert(GET_PROTOCOL_MINOR(clientVersion) >= 17);
@@ -722,7 +722,7 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
         info.setReferencesPossiblyToSelf(readStorePaths<StorePathSet>(*store, from));
         from >> info.registrationTime >> info.narSize >> info.ultimate;
         info.sigs = readStrings<StringSet>(from);
-        info.ca = parseLegacyContentAddressOpt(readString(from));
+        info.ca = parseContentAddressOpt(readString(from));
         from >> repair >> dontCheckSigs;
         if (!trusted && dontCheckSigs)
             dontCheckSigs = false;

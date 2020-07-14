@@ -45,7 +45,7 @@ std::set<StorePathDescriptor> readStorePathDescriptorSet(const Store & store, So
     // TODO
     // auto count = readNum<size_t>(from);
     // while (count--)
-    //     paths.insert_or_assign(store.parseStorePath(readString(from)), parseLegacyContentAddressOpt(readString(from)));
+    //     paths.insert_or_assign(store.parseStorePath(readString(from)), parseContentAddressOpt(readString(from)));
     return paths;
 }
 
@@ -55,7 +55,7 @@ void writeStorePathDescriptorSet(const Store & store, Sink & out, const std::set
     //out << paths.size();
     //for (auto & i : paths) {
     //    out << store.printStorePath(i.first);
-    //    out << renderLegacyContentAddress(i.second);
+    //    out << renderContentAddress(i.second);
     //}
 }
 
@@ -436,7 +436,7 @@ void RemoteStore::queryPathInfoUncached(const StorePath & path,
             if (GET_PROTOCOL_MINOR(conn->daemonVersion) >= 16) {
                 conn->from >> info->ultimate;
                 info->sigs = readStrings<StringSet>(conn->from);
-                info->ca = parseLegacyContentAddressOpt(readString(conn->from));
+                info->ca = parseContentAddressOpt(readString(conn->from));
             }
         }
         callback(std::move(info));
@@ -532,7 +532,7 @@ void RemoteStore::addToStore(const ValidPathInfo & info, Source & source,
                  << info.narHash.to_string(Base16, false);
         writeStorePaths(*this, conn->to, info.referencesPossiblyToSelf());
         conn->to << info.registrationTime << info.narSize
-                 << info.ultimate << info.sigs << renderLegacyContentAddress(info.ca)
+                 << info.ultimate << info.sigs << renderContentAddress(info.ca)
                  << repair << !checkSigs;
         bool tunnel = GET_PROTOCOL_MINOR(conn->daemonVersion) >= 21;
         if (!tunnel) copyNAR(source, conn->to);
