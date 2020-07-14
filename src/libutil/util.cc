@@ -1017,7 +1017,7 @@ string runProgram(Path program, bool searchPath, const Strings & args,
     auto res = runProgram(opts);
 
     if (!statusOk(res.first))
-        throw ExecError(res.first, fmt("program '%1%' %2%", program, statusToString(res.first)));
+        throw ExecError(res.first, "program '%1%' %2%", program, statusToString(res.first));
 
     return res.second;
 }
@@ -1144,7 +1144,7 @@ void runProgram2(const RunOptions & options)
     if (source) promise.get_future().get();
 
     if (status)
-        throw ExecError(status, fmt("program '%1%' %2%", options.program, statusToString(status)));
+        throw ExecError(status, "program '%1%' %2%", options.program, statusToString(status));
 }
 
 

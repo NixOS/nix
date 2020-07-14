@@ -7,22 +7,35 @@
 
 namespace nix {
 
-[[noreturn]] void throwSQLiteError(sqlite3 * db, const FormatOrString & fs)
+template<typename... Args>
+SQLiteError::SQLiteError(const char *path, int errNo, int extendedErrNo, const Args & ... args)
+  : Error(""), path(path), errNo(errNo), extendedErrNo(extendedErrNo)
+{
+    auto hf = hintfmt(args...);
+    err.hint = hintfmt("%s: %s (in '%s')",
+        normaltxt(hf.str()),
+        sqlite3_errstr(extendedErrNo),
+        path ? path : "(in-memory)");
+}
+
+template<typename... Args>
+[[noreturn]] void SQLiteError::throw_(sqlite3 * db, const std::string & fs, const Args & ... args)
 {
     int err = sqlite3_errcode(db);
     int exterr = sqlite3_extended_errcode(db);
 
     auto path = sqlite3_db_filename(db, nullptr);
-    if (!path) path = "(in-memory)";
 
     if (err == SQLITE_BUSY || err == SQLITE_PROTOCOL) {
-        throw SQLiteBusy(
+        auto exp = SQLiteBusy(path, err, exterr, fs, args...);
+        exp.err.hint = hintfmt(
             err == SQLITE_PROTOCOL
-            ? fmt("SQLite database '%s' is busy (SQLITE_PROTOCOL)", path)
-            : fmt("SQLite database '%s' is busy", path));
-    }
-    else
-        throw SQLiteError("%s: %s (in '%s')", fs.s, sqlite3_errstr(exterr), path);
+                ? "SQLite database '%s' is busy (SQLITE_PROTOCOL)"
+                : "SQLite database '%s' is busy",
+            path ? path : "(in-memory)");
+        throw exp;
+	} else
+        throw SQLiteError(path, err, exterr, fs, args...);
 }
 
 SQLite::SQLite(const Path & path, bool create)
@@ -32,7 +45,7 @@ SQLite::SQLite(const Path & path, bool create)
         throw Error("cannot open SQLite database '%s'", path);
 
     if (sqlite3_busy_timeout(db, 60 * 60 * 1000) != SQLITE_OK)
-        throwSQLiteError(db, "setting timeout");
+        SQLiteError::throw_(db, "setting timeout");
 
     exec("pragma foreign_keys = 1");
 }
@@ -41,7 +54,7 @@ SQLite::~SQLite()
 {
     try {
         if (db && sqlite3_close(db) != SQLITE_OK)
-            throwSQLiteError(db, "closing database");
+            SQLiteError::throw_(db, "closing database");
     } catch (...) {
         ignoreException();
     }
@@ -57,7 +70,7 @@ void SQLite::exec(const std::string & stmt)
 {
     retrySQLite<void>([&]() {
         if (sqlite3_exec(db, stmt.c_str(), 0, 0, 0) != SQLITE_OK)
-            throwSQLiteError(db, format("executing SQLite statement '%s'") % stmt);
+            SQLiteError::throw_(db, "executing SQLite statement '%s'", stmt);
     });
 }
 
@@ -66,7 +79,7 @@ void SQLiteStmt::create(sqlite3 * db, const string & sql)
     checkInterrupt();
     assert(!stmt);
     if (sqlite3_prepare_v2(db, sql.c_str(), -1, &stmt, 0) != SQLITE_OK)
-        throwSQLiteError(db, fmt("creating statement '%s'", sql));
+        SQLiteError::throw_(db, "creating statement '%s'", sql);
     this->db = db;
     this->sql = sql;
 }
@@ -75,7 +88,7 @@ SQLiteStmt::~SQLiteStmt()
 {
     try {
         if (stmt && sqlite3_finalize(stmt) != SQLITE_OK)
-            throwSQLiteError(db, fmt("finalizing statement '%s'", sql));
+            SQLiteError::throw_(db, "finalizing statement '%s'", sql);
     } catch (...) {
         ignoreException();
     }
@@ -99,7 +112,7 @@ SQLiteStmt::Use & SQLiteStmt::Use::operator () (const std::string & value, bool 
 {
     if (notNull) {
         if (sqlite3_bind_text(stmt, curArg++, value.c_str(), -1, SQLITE_TRANSIENT) != SQLITE_OK)
-            throwSQLiteError(stmt.db, "binding argument");
+            SQLiteError::throw_(stmt.db, "binding argument");
     } else
         bind();
     return *this;
@@ -109,7 +122,7 @@ SQLiteStmt::Use & SQLiteStmt::Use::operator () (const unsigned char * data, size
 {
     if (notNull) {
         if (sqlite3_bind_blob(stmt, curArg++, data, len, SQLITE_TRANSIENT) != SQLITE_OK)
-            throwSQLiteError(stmt.db, "binding argument");
+            SQLiteError::throw_(stmt.db, "binding argument");
     } else
         bind();
     return *this;
@@ -119,7 +132,7 @@ SQLiteStmt::Use & SQLiteStmt::Use::operator () (int64_t value, bool notNull)
 {
     if (notNull) {
         if (sqlite3_bind_int64(stmt, curArg++, value) != SQLITE_OK)
-            throwSQLiteError(stmt.db, "binding argument");
+            SQLiteError::throw_(stmt.db, "binding argument");
     } else
         bind();
     return *this;
@@ -128,7 +141,7 @@ SQLiteStmt::Use & SQLiteStmt::Use::operator () (int64_t value, bool notNull)
 SQLiteStmt::Use & SQLiteStmt::Use::bind()
 {
     if (sqlite3_bind_null(stmt, curArg++) != SQLITE_OK)
-        throwSQLiteError(stmt.db, "binding argument");
+        SQLiteError::throw_(stmt.db, "binding argument");
     return *this;
 }
 
@@ -142,14 +155,14 @@ void SQLiteStmt::Use::exec()
     int r = step();
     assert(r != SQLITE_ROW);
     if (r != SQLITE_DONE)
-        throwSQLiteError(stmt.db, fmt("executing SQLite statement '%s'", stmt.sql));
+        SQLiteError::throw_(stmt.db, "executing SQLite statement '%s'", stmt.sql);
 }
 
 bool SQLiteStmt::Use::next()
 {
     int r = step();
     if (r != SQLITE_DONE && r != SQLITE_ROW)
-        throwSQLiteError(stmt.db, fmt("executing SQLite query '%s'", stmt.sql));
+        SQLiteError::throw_(stmt.db, "executing SQLite query '%s'", stmt.sql);
     return r == SQLITE_ROW;
 }
 
@@ -175,14 +188,14 @@ SQLiteTxn::SQLiteTxn(sqlite3 * db)
 {
     this->db = db;
     if (sqlite3_exec(db, "begin;", 0, 0, 0) != SQLITE_OK)
-        throwSQLiteError(db, "starting transaction");
+        SQLiteError::throw_(db, "starting transaction");
     active = true;
 }
 
 void SQLiteTxn::commit()
 {
     if (sqlite3_exec(db, "commit;", 0, 0, 0) != SQLITE_OK)
-        throwSQLiteError(db, "committing transaction");
+        SQLiteError::throw_(db, "committing transaction");
     active = false;
 }
 
@@ -190,7 +203,7 @@ SQLiteTxn::~SQLiteTxn()
 {
     try {
         if (active && sqlite3_exec(db, "rollback;", 0, 0, 0) != SQLITE_OK)
-            throwSQLiteError(db, "aborting transaction");
+            SQLiteError::throw_(db, "aborting transaction");
     } catch (...) {
         ignoreException();
     }
