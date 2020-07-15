@@ -635,10 +635,10 @@ std::shared_ptr<Installable> SourceExprCommand::parseInstallable(
     return installables.front();
 }
 
-Buildables build(ref<Store> store, RealiseMode mode,
+Buildables build(ref<Store> store, Realise mode,
     std::vector<std::shared_ptr<Installable>> installables)
 {
-    if (mode != Build)
+    if (mode == Realise::Nothing)
         settings.readOnlyMode = true;
 
     Buildables buildables;
@@ -659,15 +659,15 @@ Buildables build(ref<Store> store, RealiseMode mode,
         }
     }
 
-    if (mode == DryRun)
+    if (mode == Realise::Nothing)
         printMissing(store, pathsToBuild, lvlError);
-    else if (mode == Build)
+    else if (mode == Realise::Outputs)
         store->buildPaths(pathsToBuild);
 
     return buildables;
 }
 
-StorePathSet toStorePaths(ref<Store> store, RealiseMode mode,
+StorePathSet toStorePaths(ref<Store> store, Realise mode,
     std::vector<std::shared_ptr<Installable>> installables)
 {
     StorePathSet outPaths;
@@ -679,7 +679,7 @@ StorePathSet toStorePaths(ref<Store> store, RealiseMode mode,
     return outPaths;
 }
 
-StorePath toStorePath(ref<Store> store, RealiseMode mode,
+StorePath toStorePath(ref<Store> store, Realise mode,
     std::shared_ptr<Installable> installable)
 {
     auto paths = toStorePaths(store, mode, {installable});

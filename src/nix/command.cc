@@ -80,7 +80,7 @@ void StorePathsCommand::run(ref<Store> store)
 
 void StorePathCommand::run(ref<Store> store)
 {
-    auto storePaths = toStorePaths(store, NoBuild, installables);
+    auto storePaths = toStorePaths(store, Realise::Nothing, installables);
 
     if (storePaths.size() != 1)
         throw UsageError("this command requires exactly one store path");

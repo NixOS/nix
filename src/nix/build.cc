@@ -53,7 +53,7 @@ struct CmdBuild : InstallablesCommand, MixDryRun, MixProfile
 
     void run(ref<Store> store) override
     {
-        auto buildables = build(store, dryRun ? DryRun : Build, installables);
+        auto buildables = build(store, dryRun ? Realise::Nothing : Realise::Outputs, installables);
 
         if (dryRun) return;
 

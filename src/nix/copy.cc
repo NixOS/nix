@@ -46,7 +46,7 @@ struct CmdCopy : StorePathsCommand
             .handler = {&substitute, Substitute},
         });
 
-        realiseMode = Build;
+        realiseMode = Realise::Outputs;
     }
 
     std::string description() override

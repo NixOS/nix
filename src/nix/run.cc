@@ -104,7 +104,7 @@ struct CmdShell : InstallablesCommand, RunCommon, MixEnvironment
 
     void run(ref<Store> store) override
     {
-        auto outPaths = toStorePaths(store, Build, installables);
+        auto outPaths = toStorePaths(store, Realise::Outputs, installables);
 
         auto accessor = store->getFSAccessor();
 

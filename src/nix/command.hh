@@ -70,7 +70,16 @@ struct SourceExprCommand : virtual Args, MixFlakeOptions
     void completeInstallable(std::string_view prefix);
 };
 
-enum RealiseMode { Build, NoBuild, DryRun };
+enum class Realise {
+    /* Build the derivation. Postcondition: the
+       derivation outputs exist. */
+    Outputs,
+    /* Don't build the derivation. Postcondition: the store derivation
+       exists. */
+    Derivation,
+    /* Evaluate in dry-run mode. Postcondition: nothing. */
+    Nothing
+};
 
 /* A command that operates on a list of "installables", which can be
    store paths, attribute paths, Nix expressions, etc. */
@@ -120,7 +129,7 @@ private:
 
 protected:
 
-    RealiseMode realiseMode = NoBuild;
+    Realise realiseMode = Realise::Derivation;
 
 public:
 
@@ -164,13 +173,13 @@ static RegisterCommand registerCommand(const std::string & name)
     return RegisterCommand(name, [](){ return make_ref<T>(); });
 }
 
-Buildables build(ref<Store> store, RealiseMode mode,
+Buildables build(ref<Store> store, Realise mode,
     std::vector<std::shared_ptr<Installable>> installables);
 
-std::set<StorePath> toStorePaths(ref<Store> store, RealiseMode mode,
+std::set<StorePath> toStorePaths(ref<Store> store, Realise mode,
     std::vector<std::shared_ptr<Installable>> installables);
 
-StorePath toStorePath(ref<Store> store, RealiseMode mode,
+StorePath toStorePath(ref<Store> store, Realise mode,
     std::shared_ptr<Installable> installable);
 
 std::set<StorePath> toDerivations(ref<Store> store,

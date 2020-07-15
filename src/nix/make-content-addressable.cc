@@ -10,7 +10,7 @@ struct CmdMakeContentAddressable : StorePathsCommand, MixJSON
 {
     CmdMakeContentAddressable()
     {
-        realiseMode = Build;
+        realiseMode = Realise::Outputs;
     }
 
     std::string description() override
