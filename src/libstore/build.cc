@@ -2044,7 +2044,7 @@ void DerivationGoal::startBuilder()
             auto storePathS = *i++;
             if (!worker.store.isInStore(storePathS))
                 throw BuildError("'exportReferencesGraph' contains a non-store path '%1%'", storePathS);
-            auto storePath = worker.store.parseStorePath(worker.store.toStorePath(storePathS));
+            auto storePath = worker.store.toStorePath(storePathS).first;
 
             /* Write closure info to <fileName>. */
             writeFile(tmpDir + "/" + fileName,
@@ -2083,7 +2083,7 @@ void DerivationGoal::startBuilder()
         for (auto & i : dirsInChroot)
             try {
                 if (worker.store.isInStore(i.second.source))
-                    worker.store.computeFSClosure(worker.store.parseStorePath(worker.store.toStorePath(i.second.source)), closure);
+                    worker.store.computeFSClosure(worker.store.toStorePath(i.second.source).first, closure);
             } catch (InvalidPath & e) {
             } catch (Error & e) {
                 throw Error("while processing 'sandbox-paths': %s", e.what());
@@ -2768,10 +2768,9 @@ struct RestrictedStore : public LocalFSStore
     { throw Error("addToStore"); }
 
     void addToStore(const ValidPathInfo & info, Source & narSource,
-        RepairFlag repair = NoRepair, CheckSigsFlag checkSigs = CheckSigs,
-        std::shared_ptr<FSAccessor> accessor = 0) override
+        RepairFlag repair = NoRepair, CheckSigsFlag checkSigs = CheckSigs) override
     {
-        next->addToStore(info, narSource, repair, checkSigs, accessor);
+        next->addToStore(info, narSource, repair, checkSigs);
         goal.addDependency(info.path);
     }
 
