@@ -72,11 +72,11 @@ struct CmdCopy : StorePathsCommand
 #ifdef ENABLE_S3
             Example{
                 "To copy Hello to an S3 binary cache:",
-                "nix copy --to s3://my-bucket?region=eu-west-1 nixpkgs.hello"
+                "nix copy --to s3://my-bucket?region=eu-west-1 nixpkgs#hello"
             },
             Example{
                 "To copy Hello to an S3-compatible binary cache:",
-                "nix copy --to s3://my-bucket?region=eu-west-1&endpoint=example.com nixpkgs.hello"
+                "nix copy --to s3://my-bucket?region=eu-west-1&endpoint=example.com nixpkgs#hello"
             },
 #endif
         };
