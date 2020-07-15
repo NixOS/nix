@@ -73,9 +73,9 @@ struct CmdWhyDepends : SourceExprCommand
     void run(ref<Store> store) override
     {
         auto package = parseInstallable(store, _package);
-        auto packagePath = toStorePath(store, Realise::Outputs, package);
+        auto packagePath = toStorePath(store, Realise::Outputs, operateOn, package);
         auto dependency = parseInstallable(store, _dependency);
-        auto dependencyPath = toStorePath(store, Realise::Derivation, dependency);
+        auto dependencyPath = toStorePath(store, Realise::Derivation, operateOn, dependency);
         auto dependencyPathHash = dependencyPath.hashPart();
 
         StorePathSet closure;

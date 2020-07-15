@@ -321,7 +321,8 @@ struct CmdDevelop : Common, MixEnvironment
                 Strings{"legacyPackages." + settings.thisSystem.get() + "."},
                 lockFlags);
 
-            shell = state->store->printStorePath(toStorePath(state->store, Realise::Outputs, bashInstallable)) + "/bin/bash";
+            shell = state->store->printStorePath(
+                toStorePath(state->store, Realise::Outputs, OperateOn::Output, bashInstallable)) + "/bin/bash";
         } catch (Error &) {
             ignoreException();
         }

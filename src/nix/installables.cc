@@ -128,6 +128,12 @@ SourceExprCommand::SourceExprCommand()
         .labels = {"expr"},
         .handler = {&expr}
     });
+
+    addFlag({
+        .longName ="derivation",
+        .description = "operate on the store derivation rather than its outputs",
+        .handler = {&operateOn, OperateOn::Derivation},
+    });
 }
 
 Strings SourceExprCommand::getDefaultFlakeAttrPaths()
@@ -667,22 +673,34 @@ Buildables build(ref<Store> store, Realise mode,
     return buildables;
 }
 
-StorePathSet toStorePaths(ref<Store> store, Realise mode,
+StorePathSet toStorePaths(ref<Store> store,
+    Realise mode, OperateOn operateOn,
     std::vector<std::shared_ptr<Installable>> installables)
 {
     StorePathSet outPaths;
 
-    for (auto & b : build(store, mode, installables))
-        for (auto & output : b.outputs)
-            outPaths.insert(output.second);
+    if (operateOn == OperateOn::Output) {
+        for (auto & b : build(store, mode, installables))
+            for (auto & output : b.outputs)
+                outPaths.insert(output.second);
+    } else {
+        if (mode == Realise::Nothing)
+            settings.readOnlyMode = true;
+
+        for (auto & i : installables)
+            for (auto & b : i->toBuildables())
+                if (b.drvPath)
+                    outPaths.insert(*b.drvPath);
+    }
 
     return outPaths;
 }
 
-StorePath toStorePath(ref<Store> store, Realise mode,
+StorePath toStorePath(ref<Store> store,
+    Realise mode, OperateOn operateOn,
     std::shared_ptr<Installable> installable)
 {
-    auto paths = toStorePaths(store, mode, {installable});
+    auto paths = toStorePaths(store, mode, operateOn, {installable});
 
     if (paths.size() != 1)
         throw Error("argument '%s' should evaluate to one store path", installable->what());

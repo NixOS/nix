@@ -50,10 +50,21 @@ struct MixFlakeOptions : virtual Args, EvalCommand
     { return {}; }
 };
 
+/* How to handle derivations in commands that operate on store paths. */
+enum class OperateOn {
+    /* Operate on the output path. */
+    Output,
+    /* Operate on the .drv path. */
+    Derivation
+};
+
 struct SourceExprCommand : virtual Args, MixFlakeOptions
 {
     std::optional<Path> file;
     std::optional<std::string> expr;
+
+    // FIXME: move this; not all commands (e.g. 'nix run') use it.
+    OperateOn operateOn = OperateOn::Output;
 
     SourceExprCommand();
 
@@ -176,10 +187,12 @@ static RegisterCommand registerCommand(const std::string & name)
 Buildables build(ref<Store> store, Realise mode,
     std::vector<std::shared_ptr<Installable>> installables);
 
-std::set<StorePath> toStorePaths(ref<Store> store, Realise mode,
+std::set<StorePath> toStorePaths(ref<Store> store,
+    Realise mode, OperateOn operateOn,
     std::vector<std::shared_ptr<Installable>> installables);
 
-StorePath toStorePath(ref<Store> store, Realise mode,
+StorePath toStorePath(ref<Store> store,
+    Realise mode, OperateOn operateOn,
     std::shared_ptr<Installable> installable);
 
 std::set<StorePath> toDerivations(ref<Store> store,
