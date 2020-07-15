@@ -63,6 +63,14 @@ struct ParseSink
     virtual void createSymlink(const Path & path, const string & target) { };
 };
 
+struct TeeParseSink : ParseSink
+{
+    StringSink saved;
+    TeeSource source;
+
+    TeeParseSink(Source & source) : source(source, saved) { }
+};
+
 void parseDump(ParseSink & sink, Source & source);
 
 void restorePath(const Path & path, Source & source);
