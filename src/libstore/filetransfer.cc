@@ -145,6 +145,7 @@ struct curlFileTransfer : public FileTransfer
 
         LambdaSink finalSink;
         std::shared_ptr<CompressionSink> decompressionSink;
+        std::optional<StringSink> errorSink;
 
         std::exception_ptr writeException;
 
@@ -161,12 +162,12 @@ struct curlFileTransfer : public FileTransfer
                         // the response around (which we figure won't be big
                         // like an actual download should be) to improve error
                         // messages.
-                        decompressionSink = std::make_shared<TeeSink<ref<CompressionSink>>>(
-                            ref<CompressionSink>{ decompressionSink }
-                        );
+                        errorSink = StringSink { };
                     }
                 }
 
+                if (errorSink)
+                    (*errorSink)((unsigned char *) contents, realSize);
                 (*decompressionSink)((unsigned char *) contents, realSize);
 
                 return realSize;
@@ -439,9 +440,8 @@ struct curlFileTransfer : public FileTransfer
                 attempt++;
 
                 std::shared_ptr<std::string> response;
-                if (decompressionSink)
-                    if (auto teeSink = std::dynamic_pointer_cast<TeeSink<ref<CompressionSink>>>(decompressionSink))
-                        response = teeSink->data;
+                if (errorSink)
+                    response = errorSink->s;
                 auto exc =
                     code == CURLE_ABORTED_BY_CALLBACK && _isInterrupted
                     ? FileTransferError(Interrupted, response, "%s of '%s' was interrupted", request.verb(), request.uri)

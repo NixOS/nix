@@ -11,7 +11,7 @@ LocalNoInlineNoReturn(void throwEvalError(const Pos & pos, const char * s))
 {
     throw EvalError({
         .hint = hintfmt(s),
-        .nixCode = NixCode { .errPos = pos }
+        .errPos = pos
     });
 }
 
@@ -25,7 +25,7 @@ LocalNoInlineNoReturn(void throwTypeError(const Pos & pos, const char * s, const
 {
     throw TypeError({
         .hint = hintfmt(s, showType(v)),
-        .nixCode = NixCode { .errPos = pos }
+        .errPos = pos
     });
 }
 

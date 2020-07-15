@@ -84,7 +84,6 @@ std::string renderContentAddress(std::optional<ContentAddress> ca) {
     return ca ? renderContentAddress(*ca) : "";
 }
 
-
 void to_json(nlohmann::json& j, const ContentAddress & ca) {
     j = std::visit(overloaded {
         [](TextHash th) {
@@ -138,6 +137,18 @@ void from_json(const nlohmann::json& j, std::optional<ContentAddress> & c) {
         c = std::nullopt;
     else
         c = j.get<ContentAddress>();
+}
+
+Hash getContentAddressHash(const ContentAddress & ca)
+{
+    return std::visit(overloaded {
+        [](TextHash th) {
+            return th.hash;
+        },
+        [](FixedOutputHash fsh) {
+            return fsh.hash;
+        }
+    }, ca);
 }
 
 }

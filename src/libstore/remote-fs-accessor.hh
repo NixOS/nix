@@ -10,7 +10,7 @@ class RemoteFSAccessor : public FSAccessor
 {
     ref<Store> store;
 
-    std::map<Path, ref<FSAccessor>> nars;
+    std::map<std::string, ref<FSAccessor>> nars;
 
     Path cacheDir;
 
@@ -18,9 +18,9 @@ class RemoteFSAccessor : public FSAccessor
 
     friend class BinaryCacheStore;
 
-    Path makeCacheFile(const Path & storePath, const std::string & ext);
+    Path makeCacheFile(std::string_view hashPart, const std::string & ext);
 
-    void addToCache(const Path & storePath, const std::string & nar,
+    void addToCache(std::string_view hashPart, const std::string & nar,
         ref<FSAccessor> narAccessor);
 
 public:

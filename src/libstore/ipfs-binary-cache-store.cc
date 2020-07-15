@@ -267,7 +267,8 @@ void IPFSBinaryCacheStore::upsertFile(const std::string & path, const std::strin
     try {
         addLink(path, "/ipfs/" + addFile(data));
     } catch (FileTransferError & e) {
-        throw UploadToIPFS("while uploading to IPFS binary cache at '%s': %s", cacheUri, e.info());
+        // TODO: may wrap the inner error in a better way.
+        throw UploadToIPFS("while uploading to IPFS binary cache at '%s': %s", cacheUri, e.msg());
     }
 }
 
@@ -396,7 +397,7 @@ void IPFSBinaryCacheStore::writeNarInfo(ref<NarInfo> narInfo)
 }
 
 void IPFSBinaryCacheStore::addToStore(const ValidPathInfo & info, Source & narSource,
-    RepairFlag repair, CheckSigsFlag checkSigs, std::shared_ptr<FSAccessor> accessor)
+    RepairFlag repair, CheckSigsFlag checkSigs)
 {
     // FIXME: See if we can use the original source to reduce memory usage.
     auto nar = make_ref<std::string>(narSource.drain());
@@ -576,7 +577,7 @@ StorePath IPFSBinaryCacheStore::addToStore(const string & name, const Path & src
     ValidPathInfo info(makeFixedOutputPath(method, h, name));
 
     auto source = StringSource { *sink.s };
-    addToStore(info, source, repair, CheckSigs, nullptr);
+    addToStore(info, source, repair, CheckSigs);
 
     return std::move(info.path);
 }
@@ -591,7 +592,7 @@ StorePath IPFSBinaryCacheStore::addTextToStore(const string & name, const string
         StringSink sink;
         dumpString(s, sink);
         auto source = StringSource { *sink.s };
-        addToStore(info, source, repair, CheckSigs, nullptr);
+        addToStore(info, source, repair, CheckSigs);
     }
 
     return std::move(info.path);

@@ -131,7 +131,7 @@ public:
         auto state(state_.lock());
 
         std::stringstream oss;
-        oss << ei;
+        showErrorInfo(oss, ei, loggerSettings.showTrace.get());
 
         log(*state, ei.level, oss.str());
     }
