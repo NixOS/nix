@@ -36,8 +36,12 @@ public:
     virtual bool fileExists(const std::string & path) = 0;
 
     virtual void upsertFile(const std::string & path,
-        const std::string & data,
+        std::shared_ptr<std::basic_iostream<char>> istream,
         const std::string & mimeType) = 0;
+
+    void upsertFile(const std::string & path,
+        std::string && data,
+        const std::string & mimeType);
 
     /* Note: subclasses must implement at least one of the two
        following getFile() methods. */
@@ -75,8 +79,7 @@ public:
     { unsupported("queryPathFromHashPart"); }
 
     void addToStore(const ValidPathInfo & info, Source & narSource,
-        RepairFlag repair, CheckSigsFlag checkSigs,
-        std::shared_ptr<FSAccessor> accessor) override;
+        RepairFlag repair, CheckSigsFlag checkSigs) override;
 
     StorePath addToStore(const string & name, const Path & srcPath,
         FileIngestionMethod method, HashType hashAlgo,

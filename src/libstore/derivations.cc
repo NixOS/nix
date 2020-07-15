@@ -3,7 +3,7 @@
 #include "globals.hh"
 #include "util.hh"
 #include "worker-protocol.hh"
-#include "istringstream_nocopy.hh"
+#include "fs-accessor.hh"
 
 namespace nix {
 
@@ -100,7 +100,7 @@ static StringSet parseStrings(std::istream & str, bool arePaths)
 }
 
 
-static DerivationOutput parseDerivationOutput(const Store & store, istringstream_nocopy & str)
+static DerivationOutput parseDerivationOutput(const Store & store, std::istringstream & str)
 {
     expect(str, ","); auto path = store.parseStorePath(parsePath(str));
     expect(str, ","); auto hashAlgo = parseString(str);
@@ -128,10 +128,10 @@ static DerivationOutput parseDerivationOutput(const Store & store, istringstream
 }
 
 
-Derivation parseDerivation(const Store & store, const string & s)
+Derivation parseDerivation(const Store & store, std::string && s)
 {
     Derivation drv;
-    istringstream_nocopy str(s);
+    std::istringstream str(std::move(s));
     expect(str, "Derive([");
 
     /* Parse the list of outputs. */

@@ -365,6 +365,9 @@ public:
 
     Setting<bool> warnDirty{this, true, "warn-dirty",
         "Whether to warn about dirty Git/Mercurial trees."};
+
+    Setting<size_t> narBufferSize{this, 32 * 1024 * 1024, "nar-buffer-size",
+        "Maximum size of NARs before spilling them to disk."};
 };
 
 

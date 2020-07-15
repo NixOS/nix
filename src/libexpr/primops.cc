@@ -883,10 +883,10 @@ static void prim_storePath(EvalState & state, const Pos & pos, Value * * args, V
             .hint = hintfmt("path '%1%' is not in the Nix store", path),
             .errPos = pos
         });
-    Path path2 = state.store->toStorePath(path);
+    auto path2 = state.store->toStorePath(path).first;
     if (!settings.readOnlyMode)
-        state.store->ensurePath(state.store->parseStorePath(path2));
-    context.insert(path2);
+        state.store->ensurePath(path2);
+    context.insert(state.store->printStorePath(path2));
     mkString(v, path, context);
 }
 
