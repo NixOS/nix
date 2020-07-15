@@ -296,15 +296,24 @@ struct InstallableStorePath : Installable
 
     Buildables toBuildables() override
     {
-        std::map<std::string, StorePath> outputs;
-        outputs.insert_or_assign("out", storePath);
-        Buildable b{
-            .drvPath = storePath.isDerivation() ? storePath : std::optional<StorePath>(),
-            .outputs = std::move(outputs)
-        };
-        Buildables bs;
-        bs.push_back(std::move(b));
-        return bs;
+        if (storePath.isDerivation()) {
+            std::map<std::string, StorePath> outputs;
+            for (auto & [name, output] : store->readDerivation(storePath).outputs)
+                outputs.emplace(name, output.path);
+            return {
+                Buildable {
+                    .drvPath = storePath,
+                    .outputs = std::move(outputs)
+                }
+            };
+        } else {
+            return {
+                Buildable {
+                    .drvPath = {},
+                    .outputs = {{"out", storePath}}
+                }
+            };
+        }
     }
 
     std::optional<StorePath> getStorePath() override
