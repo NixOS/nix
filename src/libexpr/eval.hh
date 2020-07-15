@@ -250,7 +250,7 @@ private:
     friend struct ExprAttrs;
     friend struct ExprLet;
 
-    Expr * parse(const char * text, const Path & path,
+    Expr * parse(const char * text, FileOrigin origin, const Path & path,
         const Path & basePath, StaticEnv & staticEnv);
 
 public:

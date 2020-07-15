@@ -262,11 +262,13 @@ void LocalStore::findTempRoots(FDs & fds, Roots & tempRoots, bool censor)
 void LocalStore::findRoots(const Path & path, unsigned char type, Roots & roots)
 {
     auto foundRoot = [&](const Path & path, const Path & target) {
-        auto storePath = maybeParseStorePath(toStorePath(target));
-        if (storePath && isValidPath(*storePath))
-            roots[std::move(*storePath)].emplace(path);
-        else
-            printInfo("skipping invalid root from '%1%' to '%2%'", path, target);
+        try {
+            auto storePath = toStorePath(target).first;
+            if (isValidPath(storePath))
+                roots[std::move(storePath)].emplace(path);
+            else
+                printInfo("skipping invalid root from '%1%' to '%2%'", path, target);
+        } catch (BadStorePath &) { }
     };
 
     try {
@@ -472,15 +474,15 @@ void LocalStore::findRuntimeRoots(Roots & roots, bool censor)
 
     for (auto & [target, links] : unchecked) {
         if (!isInStore(target)) continue;
-        Path pathS = toStorePath(target);
-        if (!isStorePath(pathS)) continue;
-        auto path = parseStorePath(pathS);
-        if (!isValidPath(path)) continue;
-        debug("got additional root '%1%'", pathS);
-        if (censor)
-            roots[path].insert(censored);
-        else
-            roots[path].insert(links.begin(), links.end());
+        try {
+            auto path = toStorePath(target).first;
+            if (!isValidPath(path)) continue;
+            debug("got additional root '%1%'", printStorePath(path));
+            if (censor)
+                roots[path].insert(censored);
+            else
+                roots[path].insert(links.begin(), links.end());
+        } catch (BadStorePath &) { }
     }
 }
 

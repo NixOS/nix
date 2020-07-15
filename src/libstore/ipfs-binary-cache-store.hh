@@ -95,7 +95,7 @@ private:
 public:
 
     void addToStore(const ValidPathInfo & info, Source & narSource,
-        RepairFlag repair, CheckSigsFlag checkSigs, std::shared_ptr<FSAccessor> accessor) override;
+        RepairFlag repair, CheckSigsFlag checkSigs) override;
 
     bool isValidPathUncached(const StorePath & storePath) override;
 

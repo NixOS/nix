@@ -62,4 +62,5 @@ void from_json(const nlohmann::json& j, ContentAddress & c);
 
 void to_json(nlohmann::json& j, const std::optional<ContentAddress> & c);
 void from_json(const nlohmann::json& j, std::optional<ContentAddress> & c);
+Hash getContentAddressHash(const ContentAddress & ca);
 }

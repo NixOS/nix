@@ -366,7 +366,7 @@ EvalState::EvalState(const Strings & _searchPath, ref<Store> store)
 
             if (store->isInStore(r.second)) {
                 StorePathSet closure;
-                store->computeFSClosure(store->parseStorePath(store->toStorePath(r.second)), closure);
+                store->computeFSClosure(store->toStorePath(r.second).first, closure);
                 for (auto & path : closure)
                     allowedPaths->insert(store->printStorePath(path));
             } else
@@ -529,7 +529,7 @@ LocalNoInlineNoReturn(void throwEvalError(const Pos & pos, const char * s, const
 {
     throw EvalError({
         .hint = hintfmt(s, s2),
-        .nixCode = NixCode { .errPos = pos }
+        .errPos = pos
     });
 }
 
@@ -542,7 +542,7 @@ LocalNoInlineNoReturn(void throwEvalError(const Pos & pos, const char * s, const
 {
     throw EvalError({
         .hint = hintfmt(s, s2, s3),
-        .nixCode = NixCode { .errPos = pos }
+        .errPos = pos
     });
 }
 
@@ -551,7 +551,7 @@ LocalNoInlineNoReturn(void throwEvalError(const Pos & p1, const char * s, const 
     // p1 is where the error occurred; p2 is a position mentioned in the message.
     throw EvalError({
         .hint = hintfmt(s, sym, p2),
-        .nixCode = NixCode { .errPos = p1 }
+        .errPos = p1
     });
 }
 
@@ -559,7 +559,7 @@ LocalNoInlineNoReturn(void throwTypeError(const Pos & pos, const char * s))
 {
     throw TypeError({
         .hint = hintfmt(s),
-        .nixCode = NixCode { .errPos = pos }
+        .errPos = pos
     });
 }
 
@@ -572,7 +572,7 @@ LocalNoInlineNoReturn(void throwTypeError(const Pos & pos, const char * s, const
 {
     throw TypeError({
         .hint = hintfmt(s, fun.showNamePos(), s2),
-        .nixCode = NixCode { .errPos = pos }
+        .errPos = pos
     });
 }
 
@@ -580,7 +580,7 @@ LocalNoInlineNoReturn(void throwAssertionError(const Pos & pos, const char * s, 
 {
     throw AssertionError({
         .hint = hintfmt(s, s1),
-        .nixCode = NixCode { .errPos = pos }
+        .errPos = pos
     });
 }
 
@@ -588,23 +588,18 @@ LocalNoInlineNoReturn(void throwUndefinedVarError(const Pos & pos, const char * 
 {
     throw UndefinedVarError({
         .hint = hintfmt(s, s1),
-        .nixCode = NixCode { .errPos = pos }
+        .errPos = pos
     });
 }
 
-LocalNoInline(void addErrorPrefix(Error & e, const char * s, const string & s2))
+LocalNoInline(void addErrorTrace(Error & e, const char * s, const string & s2))
 {
-    e.addPrefix(format(s) % s2);
+    e.addTrace(std::nullopt, s, s2);
 }
 
-LocalNoInline(void addErrorPrefix(Error & e, const char * s, const ExprLambda & fun, const Pos & pos))
+LocalNoInline(void addErrorTrace(Error & e, const Pos & pos, const char * s, const string & s2))
 {
-    e.addPrefix(format(s) % fun.showNamePos() % pos);
-}
-
-LocalNoInline(void addErrorPrefix(Error & e, const char * s, const string & s2, const Pos & pos))
-{
-    e.addPrefix(format(s) % s2 % pos);
+    e.addTrace(pos, s, s2);
 }
 
 
@@ -818,7 +813,7 @@ void EvalState::evalFile(const Path & path_, Value & v)
     try {
         eval(e, v);
     } catch (Error & e) {
-        addErrorPrefix(e, "while evaluating the file '%1%':\n", path2);
+        addErrorTrace(e, "while evaluating the file '%1%':", path2);
         throw;
     }
 
@@ -1068,8 +1063,8 @@ void ExprSelect::eval(EvalState & state, Env & env, Value & v)
 
     } catch (Error & e) {
         if (pos2 && pos2->file != state.sDerivationNix)
-            addErrorPrefix(e, "while evaluating the attribute '%1%' at %2%:\n",
-                showAttrPath(state, env, attrPath), *pos2);
+            addErrorTrace(e, *pos2, "while evaluating the attribute '%1%'",
+                showAttrPath(state, env, attrPath));
         throw;
     }
 
@@ -1237,11 +1232,15 @@ void EvalState::callFunction(Value & fun, Value & arg, Value & v, const Pos & po
 
     /* Evaluate the body.  This is conditional on showTrace, because
        catching exceptions makes this function not tail-recursive. */
-    if (settings.showTrace)
+    if (loggerSettings.showTrace.get())
         try {
             lambda.body->eval(*this, env2, v);
         } catch (Error & e) {
-            addErrorPrefix(e, "while evaluating %1%, called from %2%:\n", lambda, pos);
+            addErrorTrace(e, lambda.pos, "while evaluating %s", 
+              (lambda.name.set() 
+                  ? "'" + (string) lambda.name + "'" 
+                  : "anonymous lambdaction"));
+            addErrorTrace(e, pos, "from call site%s", "");
             throw;
         }
     else
@@ -1516,7 +1515,7 @@ void EvalState::forceValueDeep(Value & v)
                 try {
                     recurse(*i.value);
                 } catch (Error & e) {
-                    addErrorPrefix(e, "while evaluating the attribute '%1%' at %2%:\n", i.name, *i.pos);
+                    addErrorTrace(e, *i.pos, "while evaluating the attribute '%1%'", i.name);
                     throw;
                 }
         }
@@ -1936,7 +1935,7 @@ string ExternalValueBase::coerceToString(const Pos & pos, PathSet & context, boo
 {
     throw TypeError({
         .hint = hintfmt("cannot coerce %1% to a string", showType()),
-        .nixCode = NixCode { .errPos = pos }
+        .errPos = pos
     });
 }
 

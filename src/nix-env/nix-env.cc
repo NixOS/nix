@@ -593,7 +593,7 @@ static void upgradeDerivations(Globals & globals,
                 } else newElems.push_back(i);
 
             } catch (Error & e) {
-                e.addPrefix(fmt("while trying to find an upgrade for '%s':\n", i.queryName()));
+                e.addTrace(std::nullopt, "while trying to find an upgrade for '%s'", i.queryName());
                 throw;
             }
         }
@@ -1185,7 +1185,7 @@ static void opQuery(Globals & globals, Strings opFlags, Strings opArgs)
         } catch (AssertionError & e) {
             printMsg(lvlTalkative, "skipping derivation named '%1%' which gives an assertion failure", i.queryName());
         } catch (Error & e) {
-            e.addPrefix(fmt("while querying the derivation named '%1%':\n", i.queryName()));
+            e.addTrace(std::nullopt, "while querying the derivation named '%1%'", i.queryName());
             throw;
         }
     }

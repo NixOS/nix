@@ -18,7 +18,7 @@ struct NarMember
 
     /* If this is a regular file, position of the contents of this
        file in the NAR. */
-    size_t start = 0, size = 0;
+    uint64_t start = 0, size = 0;
 
     std::string target;
 
@@ -34,17 +34,19 @@ struct NarAccessor : public FSAccessor
 
     NarMember root;
 
-    struct NarIndexer : ParseSink, StringSource
+    struct NarIndexer : ParseSink, Source
     {
         NarAccessor & acc;
+        Source & source;
 
         std::stack<NarMember *> parents;
 
-        std::string currentStart;
         bool isExec = false;
 
-        NarIndexer(NarAccessor & acc, const std::string & nar)
-            : StringSource(nar), acc(acc)
+        uint64_t pos = 0;
+
+        NarIndexer(NarAccessor & acc, Source & source)
+            : acc(acc), source(source)
         { }
 
         void createMember(const Path & path, NarMember member) {
@@ -79,31 +81,38 @@ struct NarAccessor : public FSAccessor
 
         void preallocateContents(unsigned long long size) override
         {
-            currentStart = string(s, pos, 16);
-            assert(size <= std::numeric_limits<size_t>::max());
-            parents.top()->size = (size_t)size;
+            assert(size <= std::numeric_limits<uint64_t>::max());
+            parents.top()->size = (uint64_t) size;
             parents.top()->start = pos;
         }
 
         void receiveContents(unsigned char * data, unsigned int len) override
-        {
-            // Sanity check
-            if (!currentStart.empty()) {
-                assert(len < 16 || currentStart == string((char *) data, 16));
-                currentStart.clear();
-            }
-        }
+        { }
 
         void createSymlink(const Path & path, const string & target) override
         {
             createMember(path,
                 NarMember{FSAccessor::Type::tSymlink, false, 0, 0, target});
         }
+
+        size_t read(unsigned char * data, size_t len) override
+        {
+            auto n = source.read(data, len);
+            pos += n;
+            return n;
+        }
     };
 
     NarAccessor(ref<const std::string> nar) : nar(nar)
     {
-        NarIndexer indexer(*this, *nar);
+        StringSource source(*nar);
+        NarIndexer indexer(*this, source);
+        parseDump(indexer, indexer);
+    }
+
+    NarAccessor(Source & source)
+    {
+        NarIndexer indexer(*this, source);
         parseDump(indexer, indexer);
     }
 
@@ -217,6 +226,11 @@ struct NarAccessor : public FSAccessor
 ref<FSAccessor> makeNarAccessor(ref<const std::string> nar)
 {
     return make_ref<NarAccessor>(nar);
+}
+
+ref<FSAccessor> makeNarAccessor(Source & source)
+{
+    return make_ref<NarAccessor>(source);
 }
 
 ref<FSAccessor> makeLazyNarAccessor(const std::string & listing,
