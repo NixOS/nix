@@ -290,10 +290,6 @@ private:
        specified by the ‘secret-key-files’ option. */
     void signPathInfo(ValidPathInfo & info);
 
-    StorePath addToStoreCommon(
-        const string & name, FileIngestionMethod method, HashType hashAlgo, RepairFlag repair,
-        std::function<void(Sink &, size_t &)> demux);
-
     Path getRealStoreDir() override { return realStoreDir; }
 
     void createUser(const std::string & userName, uid_t userId) override;

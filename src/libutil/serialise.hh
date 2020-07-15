@@ -256,6 +256,19 @@ struct LambdaSource : Source
     }
 };
 
+/* Chain two sources together so after the first is exhausted, the second is
+   used */
+struct ChainSource : Source
+{
+    Source & source1, & source2;
+    bool useSecond = false;
+    ChainSource(Source & s1, Source & s2)
+        : source1(s1), source2(s2)
+    { }
+
+    size_t read(unsigned char * data, size_t len) override;
+};
+
 
 /* Convert a function that feeds data into a Sink into a Source. The
    Source executes the function as a coroutine. */
@@ -271,7 +284,7 @@ static inline std::unique_ptr<Source> sinkToSource(
         throw EndOfFile("coroutine has finished");
     })
 {
-	return sinkToSource([fun](Sink & s, size_t & _) { fun(s); }, eof);
+    return sinkToSource([fun](Sink & s, size_t & _) { fun(s); }, eof);
 }
 
 
