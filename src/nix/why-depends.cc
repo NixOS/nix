@@ -82,7 +82,9 @@ struct CmdWhyDepends : SourceExprCommand
         store->computeFSClosure({packagePath}, closure, false, false);
 
         if (!closure.count(dependencyPath)) {
-            printError("'%s' does not depend on '%s'", package->what(), dependency->what());
+            printError("'%s' does not depend on '%s'",
+                store->printStorePath(packagePath),
+                store->printStorePath(dependencyPath));
             return;
         }
 
