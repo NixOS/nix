@@ -7,6 +7,7 @@
 #include "builtins/buildenv.hh"
 #include "flake/flakeref.hh"
 #include "../nix-env/user-env.hh"
+#include "profiles.hh"
 
 #include <nlohmann/json.hpp>
 #include <regex>
@@ -394,6 +395,46 @@ struct CmdProfileInfo : virtual EvalCommand, virtual StoreCommand, MixDefaultPro
     }
 };
 
+struct CmdProfileDiffClosures : virtual EvalCommand, virtual StoreCommand, MixDefaultProfile
+{
+    std::string description() override
+    {
+        return "show the closure difference between each generation of a profile";
+    }
+
+    Examples examples() override
+    {
+        return {
+            Example{
+                "To show what changed between each generation of the NixOS system profile:",
+                "nix profile diff-closure --profile /nix/var/nix/profiles/system"
+            },
+        };
+    }
+
+    void run(ref<Store> store) override
+    {
+        auto [gens, curGen] = findGenerations(*profile);
+
+        std::optional<Generation> prevGen;
+        bool first = true;
+
+        for (auto & gen : gens) {
+            if (prevGen) {
+                if (!first) std::cout << "\n";
+                first = false;
+                std::cout << fmt("Generation %d -> %d:\n", prevGen->number, gen.number);
+                printClosureDiff(store,
+                    store->followLinksToStorePath(prevGen->path),
+                    store->followLinksToStorePath(gen.path),
+                    "  ");
+            }
+
+            prevGen = gen;
+        }
+    }
+};
+
 struct CmdProfile : virtual MultiCommand, virtual Command
 {
     CmdProfile()
@@ -402,6 +443,7 @@ struct CmdProfile : virtual MultiCommand, virtual Command
               {"remove", []() { return make_ref<CmdProfileRemove>(); }},
               {"upgrade", []() { return make_ref<CmdProfileUpgrade>(); }},
               {"info", []() { return make_ref<CmdProfileInfo>(); }},
+              {"diff-closures", []() { return make_ref<CmdProfileDiffClosures>(); }},
           })
     { }
 
@@ -425,4 +467,3 @@ struct CmdProfile : virtual MultiCommand, virtual Command
 };
 
 static auto r1 = registerCommand<CmdProfile>("profile");
-

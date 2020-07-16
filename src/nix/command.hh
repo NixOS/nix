@@ -244,4 +244,10 @@ void completeFlakeRefWithFragment(
     const Strings & defaultFlakeAttrPaths,
     std::string_view prefix);
 
+void printClosureDiff(
+    ref<Store> store,
+    const StorePath & beforePath,
+    const StorePath & afterPath,
+    std::string_view indent);
+
 }
