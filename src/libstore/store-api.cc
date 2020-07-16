@@ -226,16 +226,37 @@ ValidPathInfo Store::addToStoreSlow(std::string_view name, const Path & srcPath,
     FileIngestionMethod method, HashType hashAlgo,
     std::optional<Hash> expectedCAHash)
 {
-    /* FIXME: inefficient: we're reading/hashing 'tmpFile' three
+    /* FIXME: inefficient: we're reading/hashing 'tmpFile' two
        times. */
+    HashSink narHashSink { htSHA256 };
+    HashSink caHashSink { hashAlgo };
+    RetrieveRegularNARSink fileSink { caHashSink };
 
-    auto [narHash, narSize] = hashPath(htSHA256, srcPath);
+    TeeSink sinkIfNar { narHashSink, caHashSink };
 
-    auto hash = method == FileIngestionMethod::Recursive
-        ? hashAlgo == htSHA256
-          ? narHash
-          : hashPath(hashAlgo, srcPath).first
-        : hashFile(hashAlgo, srcPath);
+    /* We use the tee sink if we need to hash he nar twice */
+    auto & sink = method == FileIngestionMethod::Recursive && hashAlgo != htSHA256
+        ? static_cast<Sink &>(sinkIfNar)
+        : narHashSink;
+
+    auto fileSource = sinkToSource([&](Sink & sink) {
+        dumpPath(srcPath, sink);
+    });
+
+    TeeSource tapped { *fileSource, sink };
+
+    ParseSink blank;
+    auto & parseSink = method == FileIngestionMethod::Flat
+        ? fileSink
+        : blank;
+
+    parseDump(parseSink, tapped);
+
+    auto [narHash, narSize] = narHashSink.finish();
+
+    auto hash = method == FileIngestionMethod::Recursive && hashAlgo == htSHA256
+        ? narHash
+        : caHashSink.finish().first;
 
     if (expectedCAHash && expectedCAHash != hash)
         throw Error("hash mismatch for '%s'", srcPath);
