@@ -1,8 +1,8 @@
 #pragma once
 
-
 #include "ref.hh"
 #include "types.hh"
+#include "fmt.hh"
 
 #include <cstring>
 #include <list>
@@ -10,7 +10,9 @@
 #include <map>
 #include <optional>
 
-#include "fmt.hh"
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
 
 /* Before 4.7, gcc's std::exception uses empty throw() specifiers for
  * its (virtual) destructor and what() in c++11 mode, in violation of spec
@@ -189,6 +191,7 @@ public:
     }
 
 MakeError(Error, BaseError);
+MakeError(UsageError, Error);
 
 class SysError : public Error
 {

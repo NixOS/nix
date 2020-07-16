@@ -20,7 +20,7 @@ struct CmdEdit : InstallableCommand
         return {
             Example{
                 "To open the Nix expression of the GNU Hello package:",
-                "nix edit nixpkgs.hello"
+                "nix edit nixpkgs#hello"
             },
         };
     }

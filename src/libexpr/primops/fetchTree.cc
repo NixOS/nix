@@ -3,6 +3,7 @@
 #include "store-api.hh"
 #include "fetchers.hh"
 #include "filetransfer.hh"
+#include "registry.hh"
 
 #include <ctime>
 #include <iomanip>
@@ -12,30 +13,37 @@ namespace nix {
 void emitTreeAttrs(
     EvalState & state,
     const fetchers::Tree & tree,
-    std::shared_ptr<const fetchers::Input> input,
+    const fetchers::Input & input,
     Value & v)
 {
+    assert(input.isImmutable());
+
     state.mkAttrs(v, 8);
 
     auto storePath = state.store->printStorePath(tree.storePath);
 
     mkString(*state.allocAttr(v, state.sOutPath), storePath, PathSet({storePath}));
 
-    assert(tree.info.narHash);
-    mkString(*state.allocAttr(v, state.symbols.create("narHash")),
-        tree.info.narHash.to_string(SRI, true));
+    // FIXME: support arbitrary input attributes.
 
-    if (input->getRev()) {
-        mkString(*state.allocAttr(v, state.symbols.create("rev")), input->getRev()->gitRev());
-        mkString(*state.allocAttr(v, state.symbols.create("shortRev")), input->getRev()->gitShortRev());
+    auto narHash = input.getNarHash();
+    assert(narHash);
+    mkString(*state.allocAttr(v, state.symbols.create("narHash")),
+        narHash->to_string(SRI, true));
+
+    if (auto rev = input.getRev()) {
+        mkString(*state.allocAttr(v, state.symbols.create("rev")), rev->gitRev());
+        mkString(*state.allocAttr(v, state.symbols.create("shortRev")), rev->gitShortRev());
     }
 
-    if (tree.info.revCount)
-        mkInt(*state.allocAttr(v, state.symbols.create("revCount")), *tree.info.revCount);
+    if (auto revCount = input.getRevCount())
+        mkInt(*state.allocAttr(v, state.symbols.create("revCount")), *revCount);
 
-    if (tree.info.lastModified)
-        mkString(*state.allocAttr(v, state.symbols.create("lastModified")),
-            fmt("%s", std::put_time(std::gmtime(&*tree.info.lastModified), "%Y%m%d%H%M%S")));
+    if (auto lastModified = input.getLastModified()) {
+        mkInt(*state.allocAttr(v, state.symbols.create("lastModified")), *lastModified);
+        mkString(*state.allocAttr(v, state.symbols.create("lastModifiedDate")),
+            fmt("%s", std::put_time(std::gmtime(&*lastModified), "%Y%m%d%H%M%S")));
+    }
 
     v.attrs->sort();
 }
@@ -44,7 +52,7 @@ static void prim_fetchTree(EvalState & state, const Pos & pos, Value * * args, V
 {
     settings.requireExperimentalFeature("flakes");
 
-    std::shared_ptr<const fetchers::Input> input;
+    fetchers::Input input;
     PathSet context;
 
     state.forceValue(*args[0]);
@@ -59,9 +67,11 @@ static void prim_fetchTree(EvalState & state, const Pos & pos, Value * * args, V
             if (attr.value->type == tString)
                 attrs.emplace(attr.name, attr.value->string.s);
             else if (attr.value->type == tBool)
-                attrs.emplace(attr.name, attr.value->boolean);
+                attrs.emplace(attr.name, fetchers::Explicit<bool>{attr.value->boolean});
+            else if (attr.value->type == tInt)
+                attrs.emplace(attr.name, attr.value->integer);
             else
-                throw TypeError("fetchTree argument '%s' is %s while a string or Boolean is expected",
+                throw TypeError("fetchTree argument '%s' is %s while a string, Boolean or integer is expected",
                     attr.name, showType(*attr.value));
         }
 
@@ -71,15 +81,17 @@ static void prim_fetchTree(EvalState & state, const Pos & pos, Value * * args, V
                 .errPos = pos
             });
 
-        input = fetchers::inputFromAttrs(attrs);
+        input = fetchers::Input::fromAttrs(std::move(attrs));
     } else
-        input = fetchers::inputFromURL(state.coerceToString(pos, *args[0], context, false, false));
+        input = fetchers::Input::fromURL(state.coerceToString(pos, *args[0], context, false, false));
 
-    if (evalSettings.pureEval && !input->isImmutable())
-        throw Error("in pure evaluation mode, 'fetchTree' requires an immutable input");
+    if (!evalSettings.pureEval && !input.isDirect())
+        input = lookupInRegistries(state.store, input).first;
 
-    // FIXME: use fetchOrSubstituteTree
-    auto [tree, input2] = input->fetchTree(state.store);
+    if (evalSettings.pureEval && !input.isImmutable())
+        throw Error("in pure evaluation mode, 'fetchTree' requires an immutable input, at %s", pos);
+
+    auto [tree, input2] = input.fetch(state.store);
 
     if (state.allowedPaths)
         state.allowedPaths->insert(tree.actualPath);
@@ -136,7 +148,7 @@ static void fetch(EvalState & state, const Pos & pos, Value * * args, Value & v,
 
     auto storePath =
         unpack
-        ? fetchers::downloadTarball(state.store, *url, name, (bool) expectedHash).storePath
+        ? fetchers::downloadTarball(state.store, *url, name, (bool) expectedHash).first.storePath
         : fetchers::downloadFile(state.store, *url, name, (bool) expectedHash).storePath;
 
     auto path = state.store->toRealPath(storePath);

@@ -4,7 +4,12 @@ libexpr_NAME = libnixexpr
 
 libexpr_DIR := $(d)
 
-libexpr_SOURCES := $(wildcard $(d)/*.cc) $(wildcard $(d)/primops/*.cc) $(d)/lexer-tab.cc $(d)/parser-tab.cc
+libexpr_SOURCES := \
+  $(wildcard $(d)/*.cc) \
+  $(wildcard $(d)/primops/*.cc) \
+  $(wildcard $(d)/flake/*.cc) \
+  $(d)/lexer-tab.cc \
+  $(d)/parser-tab.cc
 
 libexpr_CXXFLAGS += -I src/libutil -I src/libstore -I src/libfetchers -I src/libmain -I src/libexpr
 
@@ -34,4 +39,9 @@ dist-files += $(d)/parser-tab.cc $(d)/parser-tab.hh $(d)/lexer-tab.cc $(d)/lexer
 
 $(eval $(call install-file-in, $(d)/nix-expr.pc, $(prefix)/lib/pkgconfig, 0644))
 
+$(foreach i, $(wildcard src/libexpr/flake/*.hh), \
+  $(eval $(call install-file-in, $(i), $(includedir)/nix/flake, 0644)))
+
 $(d)/primops.cc: $(d)/imported-drv-to-derivation.nix.gen.hh
+
+$(d)/flake/flake.cc: $(d)/flake/call-flake.nix.gen.hh
