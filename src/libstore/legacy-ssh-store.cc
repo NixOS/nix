@@ -126,8 +126,7 @@ struct LegacySSHStore : public Store
     }
 
     void addToStore(const ValidPathInfo & info, Source & source,
-        RepairFlag repair, CheckSigsFlag checkSigs,
-        std::shared_ptr<FSAccessor> accessor) override
+        RepairFlag repair, CheckSigsFlag checkSigs) override
     {
         debug("adding path '%s' to remote host '%s'", printStorePath(info.path), host);
 

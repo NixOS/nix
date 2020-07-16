@@ -62,23 +62,23 @@ static void prim_fetchGit(EvalState & state, const Pos & pos, Value * * args, Va
     attrs.insert_or_assign("url", url.find("://") != std::string::npos ? url : "file://" + url);
     if (ref) attrs.insert_or_assign("ref", *ref);
     if (rev) attrs.insert_or_assign("rev", rev->gitRev());
-    if (fetchSubmodules) attrs.insert_or_assign("submodules", true);
-    auto input = fetchers::inputFromAttrs(attrs);
+    if (fetchSubmodules) attrs.insert_or_assign("submodules", fetchers::Explicit<bool>{true});
+    auto input = fetchers::Input::fromAttrs(std::move(attrs));
 
     // FIXME: use name?
-    auto [tree, input2] = input->fetchTree(state.store);
+    auto [tree, input2] = input.fetch(state.store);
 
     state.mkAttrs(v, 8);
     auto storePath = state.store->printStorePath(tree.storePath);
     mkString(*state.allocAttr(v, state.sOutPath), storePath, PathSet({storePath}));
     // Backward compatibility: set 'rev' to
     // 0000000000000000000000000000000000000000 for a dirty tree.
-    auto rev2 = input2->getRev().value_or(Hash(htSHA1));
+    auto rev2 = input2.getRev().value_or(Hash(htSHA1));
     mkString(*state.allocAttr(v, state.symbols.create("rev")), rev2.gitRev());
     mkString(*state.allocAttr(v, state.symbols.create("shortRev")), rev2.gitShortRev());
     // Backward compatibility: set 'revCount' to 0 for a dirty tree.
     mkInt(*state.allocAttr(v, state.symbols.create("revCount")),
-        tree.info.revCount.value_or(0));
+        input2.getRevCount().value_or(0));
     mkBool(*state.allocAttr(v, state.symbols.create("submodules")), fetchSubmodules);
     v.attrs->sort();
 
