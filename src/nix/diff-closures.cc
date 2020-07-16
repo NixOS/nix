@@ -81,10 +81,10 @@ struct CmdDiffClosures : SourceExprCommand
 
     void run(ref<Store> store) override
     {
-        auto before = parseInstallable(*this, store, _before, false);
-        auto beforePath = toStorePath(store, Build, before);
-        auto after = parseInstallable(*this, store, _after, false);
-        auto afterPath = toStorePath(store, NoBuild, after);
+        auto before = parseInstallable(store, _before);
+        auto beforePath = toStorePath(store, Realise::Outputs, operateOn, before);
+        auto after = parseInstallable(store, _after);
+        auto afterPath = toStorePath(store, Realise::Outputs, operateOn, after);
 
         auto beforeClosure = getClosureInfo(store, beforePath);
         auto afterClosure = getClosureInfo(store, afterPath);
