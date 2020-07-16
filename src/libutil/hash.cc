@@ -9,13 +9,13 @@
 #include "archive.hh"
 #include "parser.hh"
 #include "util.hh"
-#include "istringstream_nocopy.hh"
 
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
 
 namespace nix {
+
 
 static size_t regularHashSize(HashType type) {
     switch (type) {
@@ -26,6 +26,10 @@ static size_t regularHashSize(HashType type) {
     }
     abort();
 }
+
+
+std::set<std::string> hashTypes = { "md5", "sha1", "sha256", "sha512" };
+
 
 Hash::Hash(HashType type) : type(type)
 {

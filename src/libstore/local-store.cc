@@ -594,7 +594,7 @@ uint64_t LocalStore::addValidPath(State & state,
         (concatStringsSep(" ", info.sigs), !info.sigs.empty())
         (renderContentAddress(info.ca), (bool) info.ca)
         .exec();
-    uint64_t id = sqlite3_last_insert_rowid(state.db);
+    uint64_t id = state.db.getLastInsertedRowId();
 
     /* If this is a derivation, then store the derivation outputs in
        the database.  This is useful for the garbage collector: it can
@@ -962,7 +962,7 @@ const PublicKeys & LocalStore::getPublicKeys()
 
 
 void LocalStore::addToStore(const ValidPathInfo & info, Source & source,
-    RepairFlag repair, CheckSigsFlag checkSigs, std::shared_ptr<FSAccessor> accessor)
+    RepairFlag repair, CheckSigsFlag checkSigs)
 {
     if (!info.narHash)
         throw Error("cannot add path '%s' because it lacks a hash", printStorePath(info.path));
@@ -1097,13 +1097,16 @@ StorePath LocalStore::addToStore(const string & name, const Path & _srcPath,
 {
     Path srcPath(absPath(_srcPath));
 
+    if (method != FileIngestionMethod::Recursive)
+        return addToStoreFromDump(readFile(srcPath), name, method, hashAlgo, repair);
+
     /* For computing the NAR hash. */
     auto sha256Sink = std::make_unique<HashSink>(htSHA256);
 
     /* For computing the store path. In recursive SHA-256 mode, this
        is the same as the NAR hash, so no need to do it again. */
     std::unique_ptr<HashSink> hashSink =
-        method == FileIngestionMethod::Recursive && hashAlgo == htSHA256
+        hashAlgo == htSHA256
         ? nullptr
         : std::make_unique<HashSink>(hashAlgo);
 
@@ -1136,10 +1139,7 @@ StorePath LocalStore::addToStore(const string & name, const Path & _srcPath,
             if (!inMemory) sink(buf, len);
         });
 
-        if (method == FileIngestionMethod::Recursive)
-            dumpPath(srcPath, sink2, filter);
-        else
-            readFile(srcPath, sink2);
+        dumpPath(srcPath, sink2, filter);
     });
 
     std::unique_ptr<AutoDelete> delTempDir;
@@ -1155,10 +1155,7 @@ StorePath LocalStore::addToStore(const string & name, const Path & _srcPath,
         delTempDir = std::make_unique<AutoDelete>(tempDir);
         tempPath = tempDir + "/x";
 
-        if (method == FileIngestionMethod::Recursive)
-            restorePath(tempPath, *source);
-        else
-            writeFile(tempPath, *source);
+        restorePath(tempPath, *source);
 
     } catch (EndOfFile &) {
         if (!inMemory) throw;
@@ -1191,10 +1188,7 @@ StorePath LocalStore::addToStore(const string & name, const Path & _srcPath,
             if (inMemory) {
                 /* Restore from the NAR in memory. */
                 StringSource source(nar);
-                if (method == FileIngestionMethod::Recursive)
-                    restorePath(realPath, source);
-                else
-                    writeFile(realPath, source);
+                restorePath(realPath, source);
             } else {
                 /* Move the temporary path we restored above. */
                 if (rename(tempPath.c_str(), realPath.c_str()))

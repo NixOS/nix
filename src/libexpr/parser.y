@@ -719,7 +719,7 @@ std::pair<bool, std::string> EvalState::resolveSearchPathElem(const SearchPathEl
     if (isUri(elem.second)) {
         try {
             res = { true, store->toRealPath(fetchers::downloadTarball(
-                        store, resolveUri(elem.second), "source", false).storePath) };
+                        store, resolveUri(elem.second), "source", false).first.storePath) };
         } catch (FileTransferError & e) {
             logWarning({
                 .name = "Entry download",

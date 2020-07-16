@@ -23,6 +23,7 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <sys/wait.h>
+#include <sys/time.h>
 #include <sys/un.h>
 #include <unistd.h>
 
@@ -79,7 +80,7 @@ void replaceEnv(std::map<std::string, std::string> newEnv)
 }
 
 
-Path absPath(Path path, std::optional<Path> dir)
+Path absPath(Path path, std::optional<Path> dir, bool resolveSymlinks)
 {
     if (path[0] != '/') {
         if (!dir) {
@@ -100,7 +101,7 @@ Path absPath(Path path, std::optional<Path> dir)
         }
         path = *dir + "/" + path;
     }
-    return canonPath(path);
+    return canonPath(path, resolveSymlinks);
 }
 
 
@@ -345,7 +346,6 @@ void writeFile(const Path & path, Source & source, mode_t mode)
     }
 }
 
-
 string readLine(int fd)
 {
     string s;
@@ -581,20 +581,31 @@ Paths createDirs(const Path & path)
 }
 
 
-void createSymlink(const Path & target, const Path & link)
+void createSymlink(const Path & target, const Path & link,
+    std::optional<time_t> mtime)
 {
     if (symlink(target.c_str(), link.c_str()))
         throw SysError("creating symlink from '%1%' to '%2%'", link, target);
+    if (mtime) {
+        struct timeval times[2];
+        times[0].tv_sec = *mtime;
+        times[0].tv_usec = 0;
+        times[1].tv_sec = *mtime;
+        times[1].tv_usec = 0;
+        if (lutimes(link.c_str(), times))
+            throw SysError("setting time of symlink '%s'", link);
+    }
 }
 
 
-void replaceSymlink(const Path & target, const Path & link)
+void replaceSymlink(const Path & target, const Path & link,
+    std::optional<time_t> mtime)
 {
     for (unsigned int n = 0; true; n++) {
         Path tmp = canonPath(fmt("%s/.%d_%s", dirOf(link), n, baseNameOf(link)));
 
         try {
-            createSymlink(target, tmp);
+            createSymlink(target, tmp, mtime);
         } catch (SysError & e) {
             if (e.errNo == EEXIST) continue;
             throw;
@@ -1006,12 +1017,14 @@ std::vector<char *> stringsToCharPtrs(const Strings & ss)
     return res;
 }
 
-
+// Output = "standard out" output stream
 string runProgram(Path program, bool searchPath, const Strings & args,
     const std::optional<std::string> & input)
 {
     RunOptions opts(program, args);
     opts.searchPath = searchPath;
+    // This allows you to refer to a program with a pathname relative to the
+    // PATH variable.
     opts.input = input;
 
     auto res = runProgram(opts);
@@ -1022,6 +1035,7 @@ string runProgram(Path program, bool searchPath, const Strings & args,
     return res.second;
 }
 
+// Output = error code + "standard out" output stream
 std::pair<int, std::string> runProgram(const RunOptions & options_)
 {
     RunOptions options(options_);
@@ -1094,6 +1108,8 @@ void runProgram2(const RunOptions & options)
 
         if (options.searchPath)
             execvp(options.program.c_str(), stringsToCharPtrs(args_).data());
+            // This allows you to refer to a program with a pathname relative
+            // to the PATH variable.
         else
             execv(options.program.c_str(), stringsToCharPtrs(args_).data());
 
