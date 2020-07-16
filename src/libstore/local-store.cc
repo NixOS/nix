@@ -594,7 +594,7 @@ uint64_t LocalStore::addValidPath(State & state,
         (concatStringsSep(" ", info.sigs), !info.sigs.empty())
         (renderContentAddress(info.ca), (bool) info.ca)
         .exec();
-    uint64_t id = sqlite3_last_insert_rowid(state.db);
+    uint64_t id = state.db.getLastInsertedRowId();
 
     /* If this is a derivation, then store the derivation outputs in
        the database.  This is useful for the garbage collector: it can

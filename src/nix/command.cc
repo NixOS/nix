@@ -63,7 +63,7 @@ void StorePathsCommand::run(ref<Store> store)
     }
 
     else {
-        for (auto & p : toStorePaths(store, realiseMode, installables))
+        for (auto & p : toStorePaths(store, realiseMode, operateOn, installables))
             storePaths.push_back(p);
 
         if (recursive) {
@@ -80,7 +80,7 @@ void StorePathsCommand::run(ref<Store> store)
 
 void StorePathCommand::run(ref<Store> store)
 {
-    auto storePaths = toStorePaths(store, NoBuild, installables);
+    auto storePaths = toStorePaths(store, Realise::Nothing, operateOn, installables);
 
     if (storePaths.size() != 1)
         throw UsageError("this command requires exactly one store path");
@@ -108,6 +108,7 @@ MixProfile::MixProfile()
         .description = "profile to update",
         .labels = {"path"},
         .handler = {&profile},
+        .completer = completePath
     });
 }
 
