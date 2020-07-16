@@ -189,7 +189,7 @@ struct TeeSource : Source
     size_t read(unsigned char * data, size_t len)
     {
         size_t n = orig.read(data, len);
-        sink(data, len);
+        sink(data, n);
         return n;
     }
 };

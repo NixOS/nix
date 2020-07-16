@@ -1047,11 +1047,12 @@ StorePath LocalStore::addToStore(const string & name, const Path & _srcPath,
 }
 
 
-StorePath LocalStore::addToStoreFromDump(Source & source, const string & name,
+StorePath LocalStore::addToStoreFromDump(Source & source0, const string & name,
     FileIngestionMethod method, HashType hashAlgo, RepairFlag repair)
 {
     /* For computing the store path. */
     auto hashSink = std::make_unique<HashSink>(hashAlgo);
+    TeeSource source { source0, *hashSink };
 
     /* Read the source path into memory, but only if it's up to
        narBufferSize bytes. If it's larger, write it to a temporary
@@ -1078,8 +1079,6 @@ StorePath LocalStore::addToStoreFromDump(Source & source, const string & name,
             inMemory = true;
             break;
         }
-        /* Start hashing as we get data */
-        (*hashSink)((const uint8_t *) dump.data() + oldSize, got);
         dump.resize(oldSize + got);
     }
 
@@ -1087,14 +1086,9 @@ StorePath LocalStore::addToStoreFromDump(Source & source, const string & name,
     Path tempPath;
 
     if (!inMemory) {
+        /* Drain what we pulled so far, and then keep on pulling */
         StringSource dumpSource { dump };
-        TeeSource rest { source, *hashSink };
-        ChainSource bothSource {
-            .source1 = dumpSource,
-            /* Continue hashing what's left, but don't rehash what we
-               already did. */
-            .source2 = rest,
-        };
+        ChainSource bothSource { dumpSource, source };
 
         auto tempDir = createTempDir(realStoreDir, "add");
         delTempDir = std::make_unique<AutoDelete>(tempDir);
