@@ -10,7 +10,7 @@ struct CmdMakeContentAddressable : StorePathsCommand, MixJSON
 {
     CmdMakeContentAddressable()
     {
-        realiseMode = Build;
+        realiseMode = Realise::Outputs;
     }
 
     std::string description() override
@@ -23,7 +23,7 @@ struct CmdMakeContentAddressable : StorePathsCommand, MixJSON
         return {
             Example{
                 "To create a content-addressable representation of GNU Hello (but not its dependencies):",
-                "nix make-content-addressable nixpkgs.hello"
+                "nix make-content-addressable nixpkgs#hello"
             },
             Example{
                 "To compute a content-addressable representation of the current NixOS system closure:",

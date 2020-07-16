@@ -25,6 +25,9 @@ static size_t regularHashSize(HashType type) {
     abort();
 }
 
+std::set<std::string> hashTypes = { "md5", "sha1", "sha256", "sha512" };
+
+
 void Hash::init()
 {
     hashSize = regularHashSize(type);
