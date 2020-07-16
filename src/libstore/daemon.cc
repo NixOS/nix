@@ -376,22 +376,24 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
     }
 
     case wopAddToStore: {
-        std::string s, baseName;
+        HashType hashAlgo;
+        std::string baseName;
         FileIngestionMethod method;
         {
             bool fixed;
             uint8_t recursive;
-            from >> baseName >> fixed /* obsolete */ >> recursive >> s;
+            std::string hashAlgoRaw;
+            from >> baseName >> fixed /* obsolete */ >> recursive >> hashAlgoRaw;
             if (recursive > (uint8_t) FileIngestionMethod::Recursive)
                 throw Error("unsupported FileIngestionMethod with value of %i; you may need to upgrade nix-daemon", recursive);
             method = FileIngestionMethod { recursive };
             /* Compatibility hack. */
             if (!fixed) {
-                s = "sha256";
+                hashAlgoRaw = "sha256";
                 method = FileIngestionMethod::Recursive;
             }
+            hashAlgo = parseHashType(hashAlgoRaw);
         }
-        HashType hashAlgo = parseHashType(s);
 
         StringSink savedNAR;
         TeeSource savedNARSource(from, savedNAR);
@@ -420,8 +422,11 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
         logger->startWork();
         if (!savedRegular.regular) throw Error("regular file expected");
 
+        StringSource dumpSource {
+            method == FileIngestionMethod::Recursive ? *savedNAR.s : savedRegular.s
+        };
         auto path = store->addToStoreFromDump(
-            method == FileIngestionMethod::Flat ? savedRegular.s : *savedNAR.s,
+            dumpSource,
             baseName,
             method,
             hashAlgo);
