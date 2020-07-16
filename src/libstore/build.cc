@@ -16,6 +16,7 @@
 #include "machines.hh"
 #include "daemon.hh"
 #include "worker-protocol.hh"
+#include "user-lock.hh"
 
 #include <algorithm>
 #include <iostream>
@@ -503,118 +504,6 @@ void handleDiffHook(
     }
 }
 
-//////////////////////////////////////////////////////////////////////
-
-
-class UserLock
-{
-private:
-    Path fnUserLock;
-    AutoCloseFD fdUserLock;
-
-    bool isEnabled = false;
-    string user;
-    uid_t uid = 0;
-    gid_t gid = 0;
-    std::vector<gid_t> supplementaryGIDs;
-
-public:
-    UserLock();
-
-    void kill();
-
-    string getUser() { return user; }
-    uid_t getUID() { assert(uid); return uid; }
-    uid_t getGID() { assert(gid); return gid; }
-    std::vector<gid_t> getSupplementaryGIDs() { return supplementaryGIDs; }
-
-    bool findFreeUser();
-
-    bool enabled() { return isEnabled; }
-
-};
-
-
-UserLock::UserLock()
-{
-    assert(settings.buildUsersGroup != "");
-    createDirs(settings.nixStateDir + "/userpool");
-}
-
-bool UserLock::findFreeUser() {
-    if (enabled()) return true;
-
-    /* Get the members of the build-users-group. */
-    struct group * gr = getgrnam(settings.buildUsersGroup.get().c_str());
-    if (!gr)
-        throw Error("the group '%1%' specified in 'build-users-group' does not exist",
-            settings.buildUsersGroup);
-    gid = gr->gr_gid;
-
-    /* Copy the result of getgrnam. */
-    Strings users;
-    for (char * * p = gr->gr_mem; *p; ++p) {
-        debug("found build user '%1%'", *p);
-        users.push_back(*p);
-    }
-
-    if (users.empty())
-        throw Error("the build users group '%1%' has no members",
-            settings.buildUsersGroup);
-
-    /* Find a user account that isn't currently in use for another
-       build. */
-    for (auto & i : users) {
-        debug("trying user '%1%'", i);
-
-        struct passwd * pw = getpwnam(i.c_str());
-        if (!pw)
-            throw Error("the user '%1%' in the group '%2%' does not exist",
-                i, settings.buildUsersGroup);
-
-
-        fnUserLock = (format("%1%/userpool/%2%") % settings.nixStateDir % pw->pw_uid).str();
-
-        AutoCloseFD fd = open(fnUserLock.c_str(), O_RDWR | O_CREAT | O_CLOEXEC, 0600);
-        if (!fd)
-            throw SysError("opening user lock '%1%'", fnUserLock);
-
-        if (lockFile(fd.get(), ltWrite, false)) {
-            fdUserLock = std::move(fd);
-            user = i;
-            uid = pw->pw_uid;
-
-            /* Sanity check... */
-            if (uid == getuid() || uid == geteuid())
-                throw Error("the Nix user should not be a member of '%1%'",
-                    settings.buildUsersGroup);
-
-#if __linux__
-            /* Get the list of supplementary groups of this build user.  This
-               is usually either empty or contains a group such as "kvm".  */
-            supplementaryGIDs.resize(10);
-            int ngroups = supplementaryGIDs.size();
-            int err = getgrouplist(pw->pw_name, pw->pw_gid,
-                supplementaryGIDs.data(), &ngroups);
-            if (err == -1)
-                throw Error("failed to get list of supplementary groups for '%1%'", pw->pw_name);
-
-            supplementaryGIDs.resize(ngroups);
-#endif
-
-            isEnabled = true;
-            return true;
-        }
-    }
-
-    return false;
-}
-
-void UserLock::kill()
-{
-    killUser(uid);
-}
-
 
 //////////////////////////////////////////////////////////////////////
 
@@ -803,6 +692,13 @@ private:
 
     Path chrootRootDir;
 
+    /* Whether to give the build more than 1 UID. */
+    bool useUidRange = false;
+
+    /* Whether to make the 'systemd' cgroup controller available to
+       the build. */
+    bool useSystemdCgroup = false;
+
     /* RAII object to delete the chroot directory. */
     std::shared_ptr<AutoDelete> autoDelChroot;
 
@@ -859,8 +755,8 @@ private:
        result. */
     std::map<Path, ValidPathInfo> prevInfos;
 
-    const uid_t sandboxUid = 1000;
-    const gid_t sandboxGid = 100;
+    uid_t sandboxUid = -1;
+    gid_t sandboxGid = -1;
 
     const static Path homeDir;
 
@@ -1408,6 +1304,7 @@ void DerivationGoal::inputsRealised()
     result = BuildResult();
 }
 
+
 void DerivationGoal::started() {
     auto msg = fmt(
         buildMode == bmRepair ? "repairing outputs of '%s'" :
@@ -1421,6 +1318,7 @@ void DerivationGoal::started() {
     mcRunningBuilds = std::make_unique<MaintainCount<uint64_t>>(worker.runningBuilds);
     worker.updateProgress();
 }
+
 
 void DerivationGoal::tryToBuild()
 {
@@ -1519,30 +1417,24 @@ void DerivationGoal::tryToBuild()
     worker.wakeUp(shared_from_this());
 }
 
+
 void DerivationGoal::tryLocalBuild() {
 
-    /* If `build-users-group' is not empty, then we have to build as
-       one of the members of that group. */
-    if (settings.buildUsersGroup != "" && getuid() == 0) {
-#if defined(__linux__) || defined(__APPLE__)
-        if (!buildUser) buildUser = std::make_unique<UserLock>();
+    if (useBuildUsers()) {
+        if (!buildUser)
+            buildUser = acquireUserLock();
 
-        if (buildUser->findFreeUser()) {
-            /* Make sure that no other processes are executing under this
-               uid. */
-            buildUser->kill();
-        } else {
+        if (!buildUser) {
             if (!actLock)
                 actLock = std::make_unique<Activity>(*logger, lvlWarn, actBuildWaiting,
                     fmt("waiting for UID to build '%s'", yellowtxt(worker.store.printStorePath(drvPath))));
             worker.waitForAWhile(shared_from_this());
             return;
         }
-#else
-        /* Don't know how to block the creation of setuid/setgid
-           binaries on this platform. */
-        throw Error("build users are not supported on this platform for security reasons");
-#endif
+
+        /* Make sure that no other processes are executing under this
+           uid. */
+        buildUser->kill();
     }
 
     actLock.reset();
@@ -2053,6 +1945,9 @@ void DerivationGoal::startBuilder()
         }
     }
 
+    useUidRange = parsedDrv->getRequiredSystemFeatures().count("uid-range");
+    useSystemdCgroup = parsedDrv->getRequiredSystemFeatures().count("systemd-cgroup");
+
     if (useChroot) {
 
         /* Allow a user-configurable set of directories from the
@@ -2132,10 +2027,11 @@ void DerivationGoal::startBuilder()
 
         printMsg(lvlChatty, format("setting up chroot environment in '%1%'") % chrootRootDir);
 
-        if (mkdir(chrootRootDir.c_str(), 0750) == -1)
+        if (mkdir(chrootRootDir.c_str(), useUidRange ? 0755 : 0750) == -1)
             throw SysError("cannot create '%1%'", chrootRootDir);
 
-        if (buildUser && chown(chrootRootDir.c_str(), 0, buildUser->getGID()) == -1)
+        // FIXME: only make root writable for user namespace builds.
+        if (buildUser && chown(chrootRootDir.c_str(), buildUser->getUID(), buildUser->getGID()) == -1)
             throw SysError("cannot change ownership of '%1%'", chrootRootDir);
 
         /* Create a writable /tmp in the chroot.  Many builders need
@@ -2149,6 +2045,13 @@ void DerivationGoal::startBuilder()
            nobody account.  The latter is kind of a hack to support
            Samba-in-QEMU. */
         createDirs(chrootRootDir + "/etc");
+        chownToBuilder(chrootRootDir + "/etc");
+
+        if (useUidRange && (!buildUser || buildUser->getUIDCount() < 65536))
+            throw Error("feature 'uid-range' requires '%s' to be enabled", settings.autoAllocateUids.name);
+
+        sandboxUid = useUidRange ? 0 : 1000;
+        sandboxGid = useUidRange ? 0 : 100;
 
         writeFile(chrootRootDir + "/etc/passwd", fmt(
                 "root:x:0:0:Nix build user:%3%:/noshell\n"
@@ -2202,12 +2105,32 @@ void DerivationGoal::startBuilder()
         for (auto & i : drv->outputs)
             dirsInChroot.erase(worker.store.printStorePath(i.second.path));
 
-#elif __APPLE__
-        /* We don't really have any parent prep work to do (yet?)
-           All work happens in the child, instead. */
+        if (useSystemdCgroup) {
+            settings.requireExperimentalFeature("systemd-cgroup");
+            std::optional<Path> cgroup;
+            if (!buildUser || !(cgroup = buildUser->getCgroup()))
+                throw Error("feature 'systemd-cgroup' requires 'auto-allocate-uids = true' in nix.conf");
+            chownToBuilder(*cgroup);
+            chownToBuilder(*cgroup + "/cgroup.procs");
+        }
+
 #else
-        throw Error("sandboxing builds is not supported on this platform");
+        if (useUidRange)
+            throw Error("feature 'uid-range' is not supported on this platform");
+        if (useSystemdCgroup)
+            throw Error("feature 'systemd-cgroup' is not supported on this platform");
+        #if __APPLE__
+            /* We don't really have any parent prep work to do (yet?)
+               All work happens in the child, instead. */
+        #else
+            throw Error("sandboxing builds is not supported on this platform");
+        #endif
 #endif
+    } else {
+        if (useUidRange)
+            throw Error("feature 'uid-range' is only supported in sandboxed builds");
+        if (useSystemdCgroup)
+            throw Error("feature 'systemd-cgroup' is only supported in sandboxed builds");
     }
 
     if (needsHashRewrite()) {
@@ -2447,20 +2370,28 @@ void DerivationGoal::startBuilder()
            the calling user (if build users are disabled). */
         uid_t hostUid = buildUser ? buildUser->getUID() : getuid();
         uid_t hostGid = buildUser ? buildUser->getGID() : getgid();
+        uint32_t nrIds = buildUser && useUidRange ? buildUser->getUIDCount() : 1;
 
         writeFile("/proc/" + std::to_string(pid) + "/uid_map",
-            (format("%d %d 1") % sandboxUid % hostUid).str());
+            fmt("%d %d %d", sandboxUid, hostUid, nrIds));
 
-        writeFile("/proc/" + std::to_string(pid) + "/setgroups", "deny");
+        if (!useUidRange)
+            writeFile("/proc/" + std::to_string(pid) + "/setgroups", "deny");
 
         writeFile("/proc/" + std::to_string(pid) + "/gid_map",
-            (format("%d %d 1") % sandboxGid % hostGid).str());
+            fmt("%d %d %d", sandboxGid, hostGid, nrIds));
 
         /* Save the mount namespace of the child. We have to do this
            *before* the child does a chroot. */
         sandboxMountNamespace = open(fmt("/proc/%d/ns/mnt", (pid_t) pid).c_str(), O_RDONLY);
         if (sandboxMountNamespace.get() == -1)
             throw SysError("getting sandbox mount namespace");
+
+        /* Move the child into its own cgroup. */
+        if (buildUser) {
+            if (auto cgroup = buildUser->getCgroup())
+                writeFile(*cgroup + "/cgroup.procs", fmt("%d", (pid_t) pid));
+        }
 
         /* Signal the builder that we've updated its user namespace. */
         writeFull(userNamespaceSync.writeSide.get(), "1");
@@ -3244,6 +3175,13 @@ void DerivationGoal::runChild()
             if (mount("none", (chrootRootDir + "/proc").c_str(), "proc", 0, 0) == -1)
                 throw SysError("mounting /proc");
 
+            /* Mount sysfs on /sys. */
+            if (useUidRange) {
+                createDirs(chrootRootDir + "/sys");
+                if (mount("none", (chrootRootDir + "/sys").c_str(), "sysfs", 0, 0) == -1)
+                    throw SysError("mounting /sys");
+            }
+
             /* Mount a new tmpfs on /dev/shm to ensure that whatever
                the builder puts in /dev/shm is cleaned up automatically. */
             if (pathExists("/dev/shm") && mount("none", (chrootRootDir + "/dev/shm").c_str(), "tmpfs", 0,
@@ -3285,6 +3223,12 @@ void DerivationGoal::runChild()
                make paths appear in the sandbox. */
             if (unshare(CLONE_NEWNS) == -1)
                 throw SysError("unsharing mount namespace");
+
+            /* Unshare the cgroup namespace. This means
+               /proc/self/cgroup will show the child's cgroup as '/'
+               rather than whatever it is in the parent. */
+            if (useSystemdCgroup && unshare(CLONE_NEWCGROUP) == -1)
+                throw SysError("unsharing cgroup namespace");
 
             /* Do the chroot(). */
             if (chdir(chrootRootDir.c_str()) == -1)
@@ -3703,7 +3647,10 @@ void DerivationGoal::registerOutputs()
             /* Canonicalise first.  This ensures that the path we're
                rewriting doesn't contain a hard link to /etc/shadow or
                something like that. */
-            canonicalisePathMetaData(actualPath, buildUser ? buildUser->getUID() : -1, inodesSeen);
+            canonicalisePathMetaData(
+                actualPath,
+                buildUser ? std::optional(buildUser->getUIDRange()) : std::nullopt,
+                inodesSeen);
 
             /* FIXME: this is in-memory. */
             StringSink sink;
@@ -3778,7 +3725,10 @@ void DerivationGoal::registerOutputs()
         /* Get rid of all weird permissions.  This also checks that
            all files are owned by the build user, if applicable. */
         canonicalisePathMetaData(actualPath,
-            buildUser && !rewritten ? buildUser->getUID() : -1, inodesSeen);
+            buildUser && !rewritten
+            ? std::optional(buildUser->getUIDRange())
+            : std::nullopt,
+            inodesSeen);
 
         /* For this output path, find the references to other paths
            contained in it.  Compute the SHA-256 NAR hash at the same
