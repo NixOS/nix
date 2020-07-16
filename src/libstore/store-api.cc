@@ -21,15 +21,15 @@ bool Store::isInStore(const Path & path) const
 }
 
 
-Path Store::toStorePath(const Path & path) const
+std::pair<StorePath, Path> Store::toStorePath(const Path & path) const
 {
     if (!isInStore(path))
         throw Error("path '%1%' is not in the Nix store", path);
     Path::size_type slash = path.find('/', storeDir.size() + 1);
     if (slash == Path::npos)
-        return path;
+        return {parseStorePath(path), ""};
     else
-        return Path(path, 0, slash);
+        return {parseStorePath(std::string_view(path).substr(0, slash)), path.substr(slash)};
 }
 
 
@@ -42,14 +42,14 @@ Path Store::followLinksToStore(std::string_view _path) const
         path = absPath(target, dirOf(path));
     }
     if (!isInStore(path))
-        throw NotInStore("path '%1%' is not in the Nix store", path);
+        throw BadStorePath("path '%1%' is not in the Nix store", path);
     return path;
 }
 
 
 StorePath Store::followLinksToStorePath(std::string_view path) const
 {
-    return parseStorePath(toStorePath(followLinksToStore(path)));
+    return toStorePath(followLinksToStore(path)).first;
 }
 
 
@@ -351,6 +351,14 @@ ref<const ValidPathInfo> Store::queryPathInfo(const StorePath & storePath)
 }
 
 
+static bool goodStorePath(const StorePath & expected, const StorePath & actual)
+{
+    return
+        expected.hashPart() == actual.hashPart()
+        && (expected.name() == Store::MissingName || expected.name() == actual.name());
+}
+
+
 void Store::queryPathInfo(const StorePath & storePath,
     Callback<ref<const ValidPathInfo>> callback) noexcept
 {
@@ -378,7 +386,7 @@ void Store::queryPathInfo(const StorePath & storePath,
                     state_->pathInfoCache.upsert(hashPart,
                         res.first == NarInfoDiskCache::oInvalid ? PathInfoCacheValue{} : PathInfoCacheValue{ .value = res.second });
                     if (res.first == NarInfoDiskCache::oInvalid ||
-                        res.second->path != storePath)
+                        !goodStorePath(storePath, res.second->path))
                         throw InvalidPath("path '%s' is not valid", printStorePath(storePath));
                 }
                 return callback(ref<const ValidPathInfo>(res.second));
@@ -390,7 +398,7 @@ void Store::queryPathInfo(const StorePath & storePath,
     auto callbackPtr = std::make_shared<decltype(callback)>(std::move(callback));
 
     queryPathInfoUncached(storePath,
-        {[this, storePath{printStorePath(storePath)}, hashPart, callbackPtr](std::future<std::shared_ptr<const ValidPathInfo>> fut) {
+        {[this, storePathS{printStorePath(storePath)}, hashPart, callbackPtr](std::future<std::shared_ptr<const ValidPathInfo>> fut) {
 
             try {
                 auto info = fut.get();
@@ -403,9 +411,11 @@ void Store::queryPathInfo(const StorePath & storePath,
                     state_->pathInfoCache.upsert(hashPart, PathInfoCacheValue { .value = info });
                 }
 
-                if (!info || info->path != parseStorePath(storePath)) {
+                auto storePath = parseStorePath(storePathS);
+
+                if (!info || !goodStorePath(storePath, info->path)) {
                     stats.narInfoMissing++;
-                    throw InvalidPath("path '%s' is not valid", storePath);
+                    throw InvalidPath("path '%s' is not valid", storePathS);
                 }
 
                 (*callbackPtr)(ref<const ValidPathInfo>(info));
@@ -550,7 +560,7 @@ void Store::pathInfoToJSON(JSONPlaceholder & jsonOut, const StorePathSet & store
                     if (!narInfo->url.empty())
                         jsonPath.attr("url", narInfo->url);
                     if (narInfo->fileHash)
-                        jsonPath.attr("downloadHash", narInfo->fileHash.to_string(Base32, true));
+                        jsonPath.attr("downloadHash", narInfo->fileHash.to_string(hashBase, true));
                     if (narInfo->fileSize)
                         jsonPath.attr("downloadSize", narInfo->fileSize);
                     if (showClosureSize)

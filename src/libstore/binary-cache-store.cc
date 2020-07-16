@@ -15,6 +15,7 @@
 #include <chrono>
 #include <future>
 #include <regex>
+#include <fstream>
 
 #include <nlohmann/json.hpp>
 
@@ -55,6 +56,13 @@ void BinaryCacheStore::init()
             }
         }
     }
+}
+
+void BinaryCacheStore::upsertFile(const std::string & path,
+    std::string && data,
+    const std::string & mimeType)
+{
+    upsertFile(path, std::make_shared<std::stringstream>(std::move(data)), mimeType);
 }
 
 void BinaryCacheStore::getFile(const std::string & path,
@@ -113,13 +121,74 @@ void BinaryCacheStore::writeNarInfo(ref<NarInfo> narInfo)
         diskCache->upsertNarInfo(getUri(), hashPart, std::shared_ptr<NarInfo>(narInfo));
 }
 
-void BinaryCacheStore::addToStore(const ValidPathInfo & info, Source & narSource,
-    RepairFlag repair, CheckSigsFlag checkSigs, std::shared_ptr<FSAccessor> accessor)
+AutoCloseFD openFile(const Path & path)
 {
-    // FIXME: See if we can use the original source to reduce memory usage.
-    auto nar = make_ref<std::string>(narSource.drain());
+    auto fd = open(path.c_str(), O_RDONLY | O_CLOEXEC);
+    if (!fd)
+        throw SysError("opening file '%1%'", path);
+    return fd;
+}
 
-    if (!repair && isValidPath(info.path)) return;
+struct FileSource : FdSource
+{
+    AutoCloseFD fd2;
+
+    FileSource(const Path & path)
+        : fd2(openFile(path))
+    {
+        fd = fd2.get();
+    }
+};
+
+void BinaryCacheStore::addToStore(const ValidPathInfo & info, Source & narSource,
+    RepairFlag repair, CheckSigsFlag checkSigs)
+{
+    assert(info.narHash && info.narSize);
+
+    if (!repair && isValidPath(info.path)) {
+        // FIXME: copyNAR -> null sink
+        narSource.drain();
+        return;
+    }
+
+    auto [fdTemp, fnTemp] = createTempFile();
+
+    auto now1 = std::chrono::steady_clock::now();
+
+    /* Read the NAR simultaneously into a CompressionSink+FileSink (to
+       write the compressed NAR to disk), into a HashSink (to get the
+       NAR hash), and into a NarAccessor (to get the NAR listing). */
+    HashSink fileHashSink(htSHA256);
+    std::shared_ptr<FSAccessor> narAccessor;
+    {
+    FdSink fileSink(fdTemp.get());
+    TeeSink teeSink(fileSink, fileHashSink);
+    auto compressionSink = makeCompressionSink(compression, teeSink);
+    TeeSource teeSource(narSource, *compressionSink);
+    narAccessor = makeNarAccessor(teeSource);
+    compressionSink->finish();
+    }
+
+    auto now2 = std::chrono::steady_clock::now();
+
+    auto narInfo = make_ref<NarInfo>(info);
+    narInfo->narSize = info.narSize;
+    narInfo->narHash = info.narHash;
+    narInfo->compression = compression;
+    auto [fileHash, fileSize] = fileHashSink.finish();
+    narInfo->fileHash = fileHash;
+    narInfo->fileSize = fileSize;
+    narInfo->url = "nar/" + narInfo->fileHash.to_string(Base32, false) + ".nar"
+        + (compression == "xz" ? ".xz" :
+           compression == "bzip2" ? ".bz2" :
+           compression == "br" ? ".br" :
+           "");
+
+    auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(now2 - now1).count();
+    printMsg(lvlTalkative, "copying path '%1%' (%2% bytes, compressed %3$.1f%% in %4% ms) to binary cache",
+        printStorePath(narInfo->path), info.narSize,
+        ((1.0 - (double) fileSize / info.narSize) * 100.0),
+        duration);
 
     /* Verify that all references are valid. This may do some .narinfo
        reads, but typically they'll already be cached. */
@@ -132,23 +201,6 @@ void BinaryCacheStore::addToStore(const ValidPathInfo & info, Source & narSource
                 printStorePath(info.path), printStorePath(ref));
         }
 
-    assert(nar->compare(0, narMagic.size(), narMagic) == 0);
-
-    auto narInfo = make_ref<NarInfo>(info);
-
-    narInfo->narSize = nar->size();
-    narInfo->narHash = hashString(htSHA256, *nar);
-
-    if (info.narHash && info.narHash != narInfo->narHash)
-        throw Error("refusing to copy corrupted path '%1%' to binary cache", printStorePath(info.path));
-
-    auto accessor_ = std::dynamic_pointer_cast<RemoteFSAccessor>(accessor);
-
-    auto narAccessor = makeNarAccessor(nar);
-
-    if (accessor_)
-        accessor_->addToCache(printStorePath(info.path), *nar, narAccessor);
-
     /* Optionally write a JSON file containing a listing of the
        contents of the NAR. */
     if (writeNARListing) {
@@ -160,32 +212,12 @@ void BinaryCacheStore::addToStore(const ValidPathInfo & info, Source & narSource
 
             {
                 auto res = jsonRoot.placeholder("root");
-                listNar(res, narAccessor, "", true);
+                listNar(res, ref<FSAccessor>(narAccessor), "", true);
             }
         }
 
         upsertFile(std::string(info.path.to_string()) + ".ls", jsonOut.str(), "application/json");
     }
-
-    /* Compress the NAR. */
-    narInfo->compression = compression;
-    auto now1 = std::chrono::steady_clock::now();
-    auto narCompressed = compress(compression, *nar, parallelCompression);
-    auto now2 = std::chrono::steady_clock::now();
-    narInfo->fileHash = hashString(htSHA256, *narCompressed);
-    narInfo->fileSize = narCompressed->size();
-
-    auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(now2 - now1).count();
-    printMsg(lvlTalkative, "copying path '%1%' (%2% bytes, compressed %3$.1f%% in %4% ms) to binary cache",
-        printStorePath(narInfo->path), narInfo->narSize,
-        ((1.0 - (double) narCompressed->size() / nar->size()) * 100.0),
-        duration);
-
-    narInfo->url = "nar/" + narInfo->fileHash.to_string(Base32, false) + ".nar"
-        + (compression == "xz" ? ".xz" :
-           compression == "bzip2" ? ".bz2" :
-           compression == "br" ? ".br" :
-           "");
 
     /* Optionally maintain an index of DWARF debug info files
        consisting of JSON files named 'debuginfo/<build-id>' that
@@ -247,12 +279,14 @@ void BinaryCacheStore::addToStore(const ValidPathInfo & info, Source & narSource
     /* Atomically write the NAR file. */
     if (repair || !fileExists(narInfo->url)) {
         stats.narWrite++;
-        upsertFile(narInfo->url, *narCompressed, "application/x-nix-nar");
+        upsertFile(narInfo->url,
+            std::make_shared<std::fstream>(fnTemp, std::ios_base::in),
+            "application/x-nix-nar");
     } else
         stats.narWriteAverted++;
 
-    stats.narWriteBytes += nar->size();
-    stats.narWriteCompressedBytes += narCompressed->size();
+    stats.narWriteBytes += info.narSize;
+    stats.narWriteCompressedBytes += fileSize;
     stats.narWriteCompressionTimeMs += duration;
 
     /* Atomically write the NAR info file.*/
@@ -351,7 +385,7 @@ StorePath BinaryCacheStore::addToStore(const string & name, const Path & srcPath
     ValidPathInfo info(makeFixedOutputPath(method, h, name));
 
     auto source = StringSource { *sink.s };
-    addToStore(info, source, repair, CheckSigs, nullptr);
+    addToStore(info, source, repair, CheckSigs);
 
     return std::move(info.path);
 }
@@ -366,7 +400,7 @@ StorePath BinaryCacheStore::addTextToStore(const string & name, const string & s
         StringSink sink;
         dumpString(s, sink);
         auto source = StringSource { *sink.s };
-        addToStore(info, source, repair, CheckSigs, nullptr);
+        addToStore(info, source, repair, CheckSigs);
     }
 
     return std::move(info.path);

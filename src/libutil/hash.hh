@@ -18,6 +18,8 @@ const int sha1HashSize = 20;
 const int sha256HashSize = 32;
 const int sha512HashSize = 64;
 
+extern std::set<std::string> hashTypes;
+
 extern const string base32Chars;
 
 enum Base : int { Base64, Base32, Base16, SRI };
@@ -122,6 +124,7 @@ Hash compressHash(const Hash & hash, unsigned int newSize);
 
 /* Parse a string representing a hash type. */
 HashType parseHashType(const string & s);
+
 /* Will return nothing on parse error */
 std::optional<HashType> parseHashTypeOpt(const string & s);
 

@@ -40,7 +40,7 @@ struct CmdPathInfo : StorePathsCommand, MixJSON
             },
             Example{
                 "To show a package's closure size and all its dependencies with human readable sizes:",
-                "nix path-info -rsSh nixpkgs.rust"
+                "nix path-info -rsSh nixpkgs#rust"
             },
             Example{
                 "To check the existence of a path in a binary cache:",
