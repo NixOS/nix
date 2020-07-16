@@ -27,7 +27,7 @@ nlohmann::json attrsToJson(const Attrs & attrs)
 {
     nlohmann::json json;
     for (auto & attr : attrs) {
-        if (auto v = std::get_if<int64_t>(&attr.second)) {
+        if (auto v = std::get_if<uint64_t>(&attr.second)) {
             json[attr.first] = *v;
         } else if (auto v = std::get_if<std::string>(&attr.second)) {
             json[attr.first] = *v;
@@ -55,16 +55,16 @@ std::string getStrAttr(const Attrs & attrs, const std::string & name)
     return *s;
 }
 
-std::optional<int64_t> maybeGetIntAttr(const Attrs & attrs, const std::string & name)
+std::optional<uint64_t> maybeGetIntAttr(const Attrs & attrs, const std::string & name)
 {
     auto i = attrs.find(name);
     if (i == attrs.end()) return {};
-    if (auto v = std::get_if<int64_t>(&i->second))
+    if (auto v = std::get_if<uint64_t>(&i->second))
         return *v;
     throw Error("input attribute '%s' is not an integer", name);
 }
 
-int64_t getIntAttr(const Attrs & attrs, const std::string & name)
+uint64_t getIntAttr(const Attrs & attrs, const std::string & name)
 {
     auto s = maybeGetIntAttr(attrs, name);
     if (!s)
@@ -76,8 +76,8 @@ std::optional<bool> maybeGetBoolAttr(const Attrs & attrs, const std::string & na
 {
     auto i = attrs.find(name);
     if (i == attrs.end()) return {};
-    if (auto v = std::get_if<int64_t>(&i->second))
-        return *v;
+    if (auto v = std::get_if<Explicit<bool>>(&i->second))
+        return v->t;
     throw Error("input attribute '%s' is not a Boolean", name);
 }
 
@@ -93,7 +93,7 @@ std::map<std::string, std::string> attrsToQuery(const Attrs & attrs)
 {
     std::map<std::string, std::string> query;
     for (auto & attr : attrs) {
-        if (auto v = std::get_if<int64_t>(&attr.second)) {
+        if (auto v = std::get_if<uint64_t>(&attr.second)) {
             query.insert_or_assign(attr.first, fmt("%d", *v));
         } else if (auto v = std::get_if<std::string>(&attr.second)) {
             query.insert_or_assign(attr.first, *v);

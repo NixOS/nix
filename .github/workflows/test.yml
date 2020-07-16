@@ -10,15 +10,8 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
     - uses: actions/checkout@v2
+      with:
+        fetch-depth: 0
     - uses: cachix/install-nix-action@v10
-    - run: nix-build release.nix --arg nix '{ outPath = ./.; revCount = 123; shortRev = "abcdefgh"; }' --arg systems '[ builtins.currentSystem ]' -A installerScript -A perlBindings
-  macos_perf_test:
-    runs-on: macos-latest
-    steps:
-    - name: Disable syspolicy assessments
-      run: |
-        spctl --status
-        sudo spctl --master-disable
-    - uses: actions/checkout@v2
-    - uses: cachix/install-nix-action@v10
-    - run: nix-build release.nix --arg nix '{ outPath = ./.; revCount = 123; shortRev = "abcdefgh"; }' --arg systems '[ builtins.currentSystem ]' -A installerScript -A perlBindings
+    #- run: nix flake check
+    - run: nix-build -A checks.$(if [[ `uname` = Linux ]]; then echo x86_64-linux; else echo x86_64-darwin; fi)

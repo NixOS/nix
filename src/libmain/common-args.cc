@@ -34,9 +34,19 @@ MixCommonArgs::MixCommonArgs(const string & programName)
             try {
                 globalConfig.set(name, value);
             } catch (UsageError & e) {
-                warn(e.what());
+                if (!completions)
+                    warn(e.what());
             }
         }},
+        .completer = [](size_t index, std::string_view prefix) {
+            if (index == 0) {
+                std::map<std::string, Config::SettingInfo> settings;
+                globalConfig.getSettings(settings);
+                for (auto & s : settings)
+                    if (hasPrefix(s.first, prefix))
+                        completions->insert(s.first);
+            }
+        }
     });
 
     addFlag({

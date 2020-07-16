@@ -4,13 +4,13 @@
 #include "value.hh"
 #include "nixexpr.hh"
 #include "symbol-table.hh"
-#include "hash.hh"
 #include "config.hh"
 
 #include <regex>
 #include <map>
 #include <optional>
 #include <unordered_map>
+#include <mutex>
 
 
 namespace nix {
@@ -75,7 +75,8 @@ public:
         sFile, sLine, sColumn, sFunctor, sToString,
         sRight, sWrong, sStructuredAttrs, sBuilder, sArgs,
         sOutputHash, sOutputHashAlgo, sOutputHashMode,
-        sRecurseForDerivations;
+        sRecurseForDerivations,
+        sDescription, sSelf, sEpsilon;
     Symbol sDerivationNix;
 
     /* If set, force copying files to the Nix store even if they
@@ -89,6 +90,7 @@ public:
     Value vEmptySet;
 
     const ref<Store> store;
+
 
 private:
     SrcToStore srcToStore;
@@ -152,8 +154,9 @@ public:
     Expr * parseStdin();
 
     /* Evaluate an expression read from the given file to normal
-       form. */
-    void evalFile(const Path & path, Value & v);
+       form. Optionally enforce that the top-level expression is
+       trivial (i.e. doesn't require arbitrary computation). */
+    void evalFile(const Path & path, Value & v, bool mustBeTrivial = false);
 
     void resetFileCache();
 
@@ -330,7 +333,7 @@ string showType(const Value & v);
 
 /* Decode a context string ‘!<name>!<path>’ into a pair <path,
    name>. */
-std::pair<string, string> decodeContext(const string & s);
+std::pair<string, string> decodeContext(std::string_view s);
 
 /* If `path' refers to a directory, then append "/default.nix". */
 Path resolveExprPath(Path path);
