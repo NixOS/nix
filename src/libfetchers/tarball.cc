@@ -105,7 +105,7 @@ DownloadFileResult downloadFile(
     };
 }
 
-Tree downloadTarball(
+std::pair<Tree, time_t> downloadTarball(
     ref<Store> store,
     const std::string & url,
     const std::string & name,
@@ -120,12 +120,9 @@ Tree downloadTarball(
     auto cached = getCache()->lookupExpired(store, inAttrs);
 
     if (cached && !cached->expired)
-        return Tree {
-            .actualPath = store->toRealPath(cached->storePath),
-            .storePath = std::move(cached->storePath),
-            .info = TreeInfo {
-                .lastModified = getIntAttr(cached->infoAttrs, "lastModified"),
-            },
+        return {
+            Tree(store->toRealPath(cached->storePath), std::move(cached->storePath)),
+            getIntAttr(cached->infoAttrs, "lastModified")
         };
 
     auto res = downloadFile(store, url, name, immutable);
@@ -160,116 +157,71 @@ Tree downloadTarball(
         *unpackedStorePath,
         immutable);
 
-    return Tree {
-        .actualPath = store->toRealPath(*unpackedStorePath),
-        .storePath = std::move(*unpackedStorePath),
-        .info = TreeInfo {
-            .lastModified = lastModified,
-        },
+    return {
+        Tree(store->toRealPath(*unpackedStorePath), std::move(*unpackedStorePath)),
+        lastModified,
     };
 }
 
-struct TarballInput : Input
-{
-    ParsedURL url;
-    std::optional<Hash> hash;
-
-    TarballInput(const ParsedURL & url) : url(url)
-    { }
-
-    std::string type() const override { return "tarball"; }
-
-    bool operator ==(const Input & other) const override
-    {
-        auto other2 = dynamic_cast<const TarballInput *>(&other);
-        return
-            other2
-            && to_string() == other2->to_string()
-            && hash == other2->hash;
-    }
-
-    bool isImmutable() const override
-    {
-        return hash || narHash;
-    }
-
-    ParsedURL toURL() const override
-    {
-        auto url2(url);
-        // NAR hashes are preferred over file hashes since tar/zip files
-        // don't have a canonical representation.
-        if (narHash)
-            url2.query.insert_or_assign("narHash", narHash->to_string(SRI, true));
-        else if (hash)
-            url2.query.insert_or_assign("hash", hash->to_string(SRI, true));
-        return url2;
-    }
-
-    Attrs toAttrsInternal() const override
-    {
-        Attrs attrs;
-        attrs.emplace("url", url.to_string());
-        if (hash)
-            attrs.emplace("hash", hash->to_string(SRI, true));
-        return attrs;
-    }
-
-    std::pair<Tree, std::shared_ptr<const Input>> fetchTreeInternal(nix::ref<Store> store) const override
-    {
-        auto tree = downloadTarball(store, url.to_string(), "source", false);
-
-        auto input = std::make_shared<TarballInput>(*this);
-        input->narHash = store->queryPathInfo(tree.storePath)->narHash;
-
-        return {std::move(tree), input};
-    }
-};
-
 struct TarballInputScheme : InputScheme
 {
-    std::unique_ptr<Input> inputFromURL(const ParsedURL & url) override
+    std::optional<Input> inputFromURL(const ParsedURL & url) override
     {
-        if (url.scheme != "file" && url.scheme != "http" && url.scheme != "https") return nullptr;
+        if (url.scheme != "file" && url.scheme != "http" && url.scheme != "https") return {};
 
         if (!hasSuffix(url.path, ".zip")
             && !hasSuffix(url.path, ".tar")
             && !hasSuffix(url.path, ".tar.gz")
             && !hasSuffix(url.path, ".tar.xz")
             && !hasSuffix(url.path, ".tar.bz2"))
-            return nullptr;
+            return {};
 
-        auto input = std::make_unique<TarballInput>(url);
-
-        auto hash = input->url.query.find("hash");
-        if (hash != input->url.query.end()) {
-            // FIXME: require SRI hash.
-            input->hash = Hash(hash->second);
-            input->url.query.erase(hash);
-        }
-
-        auto narHash = input->url.query.find("narHash");
-        if (narHash != input->url.query.end()) {
-            // FIXME: require SRI hash.
-            input->narHash = Hash(narHash->second);
-            input->url.query.erase(narHash);
-        }
-
+        Input input;
+        input.attrs.insert_or_assign("type", "tarball");
+        input.attrs.insert_or_assign("url", url.to_string());
+        auto narHash = url.query.find("narHash");
+        if (narHash != url.query.end())
+            input.attrs.insert_or_assign("narHash", narHash->second);
         return input;
     }
 
-    std::unique_ptr<Input> inputFromAttrs(const Attrs & attrs) override
+    std::optional<Input> inputFromAttrs(const Attrs & attrs) override
     {
         if (maybeGetStrAttr(attrs, "type") != "tarball") return {};
 
         for (auto & [name, value] : attrs)
-            if (name != "type" && name != "url" && name != "hash")
+            if (name != "type" && name != "url" && /* name != "hash" && */ name != "narHash")
                 throw Error("unsupported tarball input attribute '%s'", name);
 
-        auto input = std::make_unique<TarballInput>(parseURL(getStrAttr(attrs, "url")));
-        if (auto hash = maybeGetStrAttr(attrs, "hash"))
-            input->hash = newHashAllowEmpty(*hash, {});
-
+        Input input;
+        input.attrs = attrs;
+        //input.immutable = (bool) maybeGetStrAttr(input.attrs, "hash");
         return input;
+    }
+
+    ParsedURL toURL(const Input & input) override
+    {
+        auto url = parseURL(getStrAttr(input.attrs, "url"));
+        // NAR hashes are preferred over file hashes since tar/zip files
+        // don't have a canonical representation.
+        if (auto narHash = input.getNarHash())
+            url.query.insert_or_assign("narHash", narHash->to_string(SRI, true));
+        /*
+        else if (auto hash = maybeGetStrAttr(input.attrs, "hash"))
+            url.query.insert_or_assign("hash", Hash(*hash).to_string(SRI, true));
+        */
+        return url;
+    }
+
+    bool hasAllInfo(const Input & input) override
+    {
+        return true;
+    }
+
+    std::pair<Tree, Input> fetch(ref<Store> store, const Input & input) override
+    {
+        auto tree = downloadTarball(store, getStrAttr(input.attrs, "url"), "source", false).first;
+        return {std::move(tree), input};
     }
 };
 

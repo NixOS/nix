@@ -8,6 +8,7 @@
 #include "derivations.hh"
 #include "pool.hh"
 #include "finally.hh"
+#include "logging.hh"
 
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -38,6 +39,29 @@ void writeStorePaths(const Store & store, Sink & out, const StorePathSet & paths
         out << store.printStorePath(i);
 }
 
+std::map<string, StorePath> readOutputPathMap(const Store & store, Source & from)
+{
+    std::map<string, StorePath> pathMap;
+    auto rawInput = readStrings<Strings>(from);
+    if (rawInput.size() % 2)
+        throw Error("got an odd number of elements from the daemon when trying to read a output path map");
+    auto curInput = rawInput.begin();
+    while (curInput != rawInput.end()) {
+        auto thisKey = *curInput++;
+        auto thisValue = *curInput++;
+        pathMap.emplace(thisKey, store.parseStorePath(thisValue));
+    }
+    return pathMap;
+}
+
+void writeOutputPathMap(const Store & store, Sink & out, const std::map<string, StorePath> & pathMap)
+{
+    out << 2*pathMap.size();
+    for (auto & i : pathMap) {
+        out << i.first;
+        out << store.printStorePath(i.second);
+    }
+}
 
 /* TODO: Separate these store impls into different files, give them better names */
 RemoteStore::RemoteStore(const Params & params)
@@ -197,7 +221,7 @@ void RemoteStore::setOptions(Connection & conn)
         overrides.erase(settings.maxSilentTime.name);
         overrides.erase(settings.buildCores.name);
         overrides.erase(settings.useSubstitutes.name);
-        overrides.erase(settings.showTrace.name);
+        overrides.erase(loggerSettings.showTrace.name);
         conn.to << overrides.size();
         for (auto & i : overrides)
             conn.to << i.first << i.second.value;
@@ -412,11 +436,23 @@ StorePathSet RemoteStore::queryValidDerivers(const StorePath & path)
 StorePathSet RemoteStore::queryDerivationOutputs(const StorePath & path)
 {
     auto conn(getConnection());
+    if (GET_PROTOCOL_MINOR(conn->daemonVersion) >= 0x16) {
+        return Store::queryDerivationOutputs(path);
+    }
     conn->to << wopQueryDerivationOutputs << printStorePath(path);
     conn.processStderr();
     return readStorePaths<StorePathSet>(*this, conn->from);
 }
 
+
+OutputPathMap RemoteStore::queryDerivationOutputMap(const StorePath & path)
+{
+    auto conn(getConnection());
+    conn->to << wopQueryDerivationOutputMap << printStorePath(path);
+    conn.processStderr();
+    return readOutputPathMap(*this, conn->from);
+
+}
 
 std::optional<StorePath> RemoteStore::queryPathFromHashPart(const std::string & hashPart)
 {
@@ -430,7 +466,7 @@ std::optional<StorePath> RemoteStore::queryPathFromHashPart(const std::string & 
 
 
 void RemoteStore::addToStore(const ValidPathInfo & info, Source & source,
-    RepairFlag repair, CheckSigsFlag checkSigs, std::shared_ptr<FSAccessor> accessor)
+    RepairFlag repair, CheckSigsFlag checkSigs)
 {
     auto conn(getConnection());
 

@@ -49,7 +49,9 @@ void clearEnv();
 /* Return an absolutized path, resolving paths relative to the
    specified directory, or the current directory otherwise.  The path
    is also canonicalised. */
-Path absPath(Path path, std::optional<Path> dir = {});
+Path absPath(Path path,
+    std::optional<Path> dir = {},
+    bool resolveSymlinks = false);
 
 /* Canonicalise a path by removing all `.' or `..' components and
    double or trailing slashes.  Optionally resolves all symlink
@@ -147,10 +149,12 @@ Path getDataDir();
 Paths createDirs(const Path & path);
 
 /* Create a symlink. */
-void createSymlink(const Path & target, const Path & link);
+void createSymlink(const Path & target, const Path & link,
+    std::optional<time_t> mtime = {});
 
 /* Atomically create or replace a symlink. */
-void replaceSymlink(const Path & target, const Path & link);
+void replaceSymlink(const Path & target, const Path & link,
+    std::optional<time_t> mtime = {});
 
 
 /* Wrappers arount read()/write() that read/write exactly the

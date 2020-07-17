@@ -78,10 +78,10 @@ struct TunnelLogger : public Logger
         if (ei.level > verbosity) return;
 
         std::stringstream oss;
-        oss << ei;
+        showErrorInfo(oss, ei, false);
 
         StringSink buf;
-        buf << STDERR_NEXT << oss.str() << "\n"; // (fs.s + "\n");
+        buf << STDERR_NEXT << oss.str();
         enqueueMsg(*buf.s);
     }
 
@@ -347,6 +347,15 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
         break;
     }
 
+    case wopQueryDerivationOutputMap: {
+        auto path = store->parseStorePath(readString(from));
+        logger->startWork();
+        OutputPathMap outputs = store->queryDerivationOutputMap(path);
+        logger->stopWork();
+        writeOutputPathMap(*store, to, outputs);
+        break;
+    }
+
     case wopQueryDeriver: {
         auto path = store->parseStorePath(readString(from));
         logger->startWork();
@@ -382,7 +391,8 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
         }
         HashType hashAlgo = parseHashType(s);
 
-        TeeSource savedNAR(from);
+        StringSink savedNAR;
+        TeeSource savedNARSource(from, savedNAR);
         RetrieveRegularNARSink savedRegular;
 
         if (method == FileIngestionMethod::Recursive) {
@@ -390,7 +400,7 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
                a string so that we can pass it to
                addToStoreFromDump(). */
             ParseSink sink; /* null sink; just parse the NAR */
-            parseDump(sink, savedNAR);
+            parseDump(sink, savedNARSource);
         } else
             parseDump(savedRegular, from);
 
@@ -398,7 +408,7 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
         if (!savedRegular.regular) throw Error("regular file expected");
 
         auto path = store->addToStoreFromDump(
-            method == FileIngestionMethod::Recursive ? *savedNAR.data : savedRegular.s,
+            method == FileIngestionMethod::Recursive ? *savedNAR.s : savedRegular.s,
             baseName,
             method,
             hashAlgo);
@@ -433,7 +443,7 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
     case wopImportPaths: {
         logger->startWork();
         TunnelSource source(from, to);
-        auto paths = store->importPaths(source, nullptr,
+        auto paths = store->importPaths(source,
             trusted ? NoCheckSigs : CheckSigs);
         logger->stopWork();
         Strings paths2;
@@ -722,9 +732,9 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
         if (GET_PROTOCOL_MINOR(clientVersion) >= 21)
             source = std::make_unique<TunnelSource>(from, to);
         else {
-            TeeSink tee(from);
+            TeeParseSink tee(from);
             parseDump(tee, tee.source);
-            saved = std::move(*tee.source.data);
+            saved = std::move(*tee.saved.s);
             source = std::make_unique<StringSource>(saved);
         }
 
@@ -732,7 +742,7 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
 
         // FIXME: race if addToStore doesn't read source?
         store->addToStore(info, *source, (RepairFlag) repair,
-            dontCheckSigs ? NoCheckSigs : CheckSigs, nullptr);
+            dontCheckSigs ? NoCheckSigs : CheckSigs);
 
         logger->stopWork();
         break;

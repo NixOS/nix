@@ -33,7 +33,7 @@ struct CmdShowDerivation : InstallablesCommand
         return {
             Example{
                 "To show the store derivation that results from evaluating the Hello package:",
-                "nix show-derivation nixpkgs.hello"
+                "nix show-derivation nixpkgs#hello"
             },
             Example{
                 "To show the full derivation graph (if available) that produced your NixOS system:",

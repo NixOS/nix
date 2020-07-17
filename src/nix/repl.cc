@@ -211,12 +211,12 @@ void NixRepl::mainLoop(const std::vector<std::string> & files)
                 // input without clearing the input so far.
                 continue;
             } else {
-              printMsg(lvlError, error + "%1%%2%", (settings.showTrace ? e.prefix() : ""), e.msg());
+              printMsg(lvlError, e.msg());
             }
         } catch (Error & e) {
-            printMsg(lvlError, error + "%1%%2%", (settings.showTrace ? e.prefix() : ""), e.msg());
+          printMsg(lvlError, e.msg());
         } catch (Interrupted & e) {
-            printMsg(lvlError, error + "%1%%2%", (settings.showTrace ? e.prefix() : ""), e.msg());
+          printMsg(lvlError, e.msg());
         }
 
         // We handled the current input fully, so we should clear it
@@ -760,7 +760,11 @@ struct CmdRepl : StoreCommand, MixEvalArgs
 
     CmdRepl()
     {
-        expectArgs("files", &files);
+        expectArgs({
+            .label = "files",
+            .handler = {&files},
+            .completer = completePath
+        });
     }
 
     std::string description() override
@@ -780,6 +784,7 @@ struct CmdRepl : StoreCommand, MixEvalArgs
 
     void run(ref<Store> store) override
     {
+        evalSettings.pureEval = false;
         auto repl = std::make_unique<NixRepl>(searchPath, openStore());
         repl->autoArgs = getAutoArgs(*repl->state);
         repl->mainLoop(files);

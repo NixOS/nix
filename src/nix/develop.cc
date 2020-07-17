@@ -50,7 +50,7 @@ BuildEnvironment readEnvironment(const Path & path)
         R"re((?:\$?'(?:[^'\\]|\\[abeEfnrtv\\'"?])*'))re";
 
     static std::string indexedArrayRegex =
-        R"re((?:\(( *\[[0-9]+]="(?:[^"\\]|\\.)*")**\)))re";
+        R"re((?:\(( *\[[0-9]+\]="(?:[^"\\]|\\.)*")*\)))re";
 
     static std::regex varRegex(
         "^(" + varNameRegex + ")=(" + simpleStringRegex + "|" + quotedStringRegex + "|" + indexedArrayRegex + ")\n");
@@ -130,18 +130,14 @@ StorePath getDerivationEnvironment(ref<Store> store, const StorePath & drvPath)
     drvName += "-env";
     for (auto & output : drv.outputs)
         drv.env.erase(output.first);
+    drv.outputs = {{"out", DerivationOutput { .path = StorePath::dummy }}};
     drv.env["out"] = "";
+    drv.env["_outputs_saved"] = drv.env["outputs"];
     drv.env["outputs"] = "out";
     drv.inputSrcs.insert(std::move(getEnvShPath));
     Hash h = hashDerivationModulo(*store, drv, true);
     auto shellOutPath = store->makeOutputPath("out", h, drvName);
-    drv.outputs.insert_or_assign("out", DerivationOutput {
-        .path = shellOutPath,
-        .hash = FixedOutputHash {
-            .method = FileIngestionMethod::Flat,
-            .hash = Hash { },
-        },
-    });
+    drv.outputs.insert_or_assign("out", DerivationOutput { .path = shellOutPath });
     drv.env["out"] = store->printStorePath(shellOutPath);
     auto shellDrvPath2 = writeDerivation(store, drv, drvName);
 
@@ -207,6 +203,11 @@ struct Common : InstallableCommand, MixProfile
         out << "eval \"$shellHook\"\n";
     }
 
+    Strings getDefaultFlakeAttrPaths() override
+    {
+        return {"devShell." + settings.thisSystem.get(), "defaultPackage." + settings.thisSystem.get()};
+    }
+
     StorePath getShellOutPath(ref<Store> store)
     {
         auto path = installable->getStorePath();
@@ -265,11 +266,15 @@ struct CmdDevelop : Common, MixEnvironment
         return {
             Example{
                 "To get the build environment of GNU hello:",
-                "nix develop nixpkgs.hello"
+                "nix develop nixpkgs#hello"
+            },
+            Example{
+                "To get the build environment of the default package of flake in the current directory:",
+                "nix develop"
             },
             Example{
                 "To store the build environment in a profile:",
-                "nix develop --profile /tmp/my-shell nixpkgs.hello"
+                "nix develop --profile /tmp/my-shell nixpkgs#hello"
             },
             Example{
                 "To use a build environment previously recorded in a profile:",
@@ -300,11 +305,27 @@ struct CmdDevelop : Common, MixEnvironment
 
         stopProgressBar();
 
-        auto shell = getEnv("SHELL").value_or("bash");
-
         setEnviron();
         // prevent garbage collection until shell exits
         setenv("NIX_GCROOT", gcroot.data(), 1);
+
+        Path shell = "bash";
+
+        try {
+            auto state = getEvalState();
+
+            auto bashInstallable = std::make_shared<InstallableFlake>(
+                state,
+                std::move(installable->nixpkgsFlakeRef()),
+                Strings{"bashInteractive"},
+                Strings{"legacyPackages." + settings.thisSystem.get() + "."},
+                lockFlags);
+
+            shell = state->store->printStorePath(
+                toStorePath(state->store, Realise::Outputs, OperateOn::Output, bashInstallable)) + "/bin/bash";
+        } catch (Error &) {
+            ignoreException();
+        }
 
         auto args = Strings{std::string(baseNameOf(shell)), "--rcfile", rcFilePath};
 
@@ -329,7 +350,7 @@ struct CmdPrintDevEnv : Common
         return {
             Example{
                 "To apply the build environment of GNU hello to the current shell:",
-                ". <(nix print-dev-env nixpkgs.hello)"
+                ". <(nix print-dev-env nixpkgs#hello)"
             },
         };
     }

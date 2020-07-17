@@ -1950,8 +1950,11 @@ void linkOrCopy(const Path & from, const Path & to)
         /* Hard-linking fails if we exceed the maximum link count on a
            file (e.g. 32000 of ext3), which is quite possible after a
            'nix-store --optimise'. FIXME: actually, why don't we just
-           bind-mount in this case? */
-        if (errno != EMLINK)
+           bind-mount in this case?
+           
+           It can also fail with EPERM in BeegFS v7 and earlier versions
+           which don't allow hard-links to other directories */
+        if (errno != EMLINK && errno != EPERM)
             throw SysError("linking '%s' to '%s'", to, from);
         copyPath(from, to);
     }
@@ -2038,7 +2041,10 @@ void DerivationGoal::startBuilder()
             if (!std::regex_match(fileName, regex))
                 throw Error("invalid file name '%s' in 'exportReferencesGraph'", fileName);
 
-            auto storePath = worker.store.parseStorePath(*i++);
+            auto storePathS = *i++;
+            if (!worker.store.isInStore(storePathS))
+                throw BuildError("'exportReferencesGraph' contains a non-store path '%1%'", storePathS);
+            auto storePath = worker.store.toStorePath(storePathS).first;
 
             /* Write closure info to <fileName>. */
             writeFile(tmpDir + "/" + fileName,
@@ -2077,7 +2083,7 @@ void DerivationGoal::startBuilder()
         for (auto & i : dirsInChroot)
             try {
                 if (worker.store.isInStore(i.second.source))
-                    worker.store.computeFSClosure(worker.store.parseStorePath(worker.store.toStorePath(i.second.source)), closure);
+                    worker.store.computeFSClosure(worker.store.toStorePath(i.second.source).first, closure);
             } catch (InvalidPath & e) {
             } catch (Error & e) {
                 throw Error("while processing 'sandbox-paths': %s", e.what());
@@ -2750,8 +2756,8 @@ struct RestrictedStore : public LocalFSStore
     void queryReferrers(const StorePath & path, StorePathSet & referrers) override
     { }
 
-    StorePathSet queryDerivationOutputs(const StorePath & path) override
-    { throw Error("queryDerivationOutputs"); }
+    OutputPathMap queryDerivationOutputMap(const StorePath & path) override
+    { throw Error("queryDerivationOutputMap"); }
 
     std::optional<StorePath> queryPathFromHashPart(const std::string & hashPart) override
     { throw Error("queryPathFromHashPart"); }
@@ -2762,10 +2768,9 @@ struct RestrictedStore : public LocalFSStore
     { throw Error("addToStore"); }
 
     void addToStore(const ValidPathInfo & info, Source & narSource,
-        RepairFlag repair = NoRepair, CheckSigsFlag checkSigs = CheckSigs,
-        std::shared_ptr<FSAccessor> accessor = 0) override
+        RepairFlag repair = NoRepair, CheckSigsFlag checkSigs = CheckSigs) override
     {
-        next->addToStore(info, narSource, repair, checkSigs, accessor);
+        next->addToStore(info, narSource, repair, checkSigs);
         goal.addDependency(info.path);
     }
 

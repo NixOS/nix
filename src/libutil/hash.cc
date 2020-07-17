@@ -8,13 +8,15 @@
 #include "hash.hh"
 #include "archive.hh"
 #include "util.hh"
-#include "istringstream_nocopy.hh"
 
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
 
 namespace nix {
+
+
+std::set<std::string> hashTypes = { "md5", "sha1", "sha256", "sha512" };
 
 
 void Hash::init()
@@ -370,7 +372,7 @@ string printHashType(HashType ht)
     default:
         // illegal hash type enum value internally, as opposed to external input
         // which should be validated with nice error message.
-        abort();
+        assert(false);
     }
 }
 
