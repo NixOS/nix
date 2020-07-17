@@ -28,6 +28,7 @@ bool derivationIsCA(DerivationType dt) {
     switch (dt) {
     case DerivationType::Regular: return false;
     case DerivationType::CAFixed: return true;
+    case DerivationType::CAFloating: return true;
     };
     // Since enums can have non-variant values, but making a `default:` would
     // disable exhaustiveness warnings.
@@ -38,6 +39,7 @@ bool derivationIsFixed(DerivationType dt) {
     switch (dt) {
     case DerivationType::Regular: return false;
     case DerivationType::CAFixed: return true;
+    case DerivationType::CAFloating: return false;
     };
     abort();
 }
@@ -46,6 +48,7 @@ bool derivationIsImpure(DerivationType dt) {
     switch (dt) {
     case DerivationType::Regular: return false;
     case DerivationType::CAFixed: return true;
+    case DerivationType::CAFloating: return false;
     };
     abort();
 }
@@ -387,7 +390,8 @@ bool isDerivation(const string & fileName)
 
 DerivationType BasicDerivation::type() const
 {
-    std::set<std::string_view> inputAddressedOutputs, fixedCAOutputs;
+    std::set<std::string_view> inputAddressedOutputs, fixedCAOutputs, floatingCAOutputs;
+    std::optional<HashType> floatingHashType;
     for (auto & i : outputs) {
         std::visit(overloaded {
             [&](DerivationOutputInputAddressed _) {
@@ -396,23 +400,31 @@ DerivationType BasicDerivation::type() const
             [&](DerivationOutputFixed _) {
                 fixedCAOutputs.insert(i.first);
             },
-            [&](DerivationOutputFloating _) {
-                throw Error("Floating CA output derivations are not yet implemented");
+            [&](DerivationOutputFloating dof) {
+                floatingCAOutputs.insert(i.first);
+                if (!floatingHashType) {
+                    floatingHashType = dof.hashType;
+                } else {
+                    if (*floatingHashType != dof.hashType)
+                        throw Error("All floating outputs must use the same hash type");
+                }
             },
         }, i.second.output);
     }
 
-    if (inputAddressedOutputs.empty() && fixedCAOutputs.empty()) {
+    if (inputAddressedOutputs.empty() && fixedCAOutputs.empty() && floatingCAOutputs.empty()) {
         throw Error("Must have at least one output");
-    } else if (! inputAddressedOutputs.empty() && fixedCAOutputs.empty()) {
+    } else if (! inputAddressedOutputs.empty() && fixedCAOutputs.empty() && floatingCAOutputs.empty()) {
         return DerivationType::Regular;
-    } else if (inputAddressedOutputs.empty() && ! fixedCAOutputs.empty()) {
+    } else if (inputAddressedOutputs.empty() && ! fixedCAOutputs.empty() && floatingCAOutputs.empty()) {
         if (fixedCAOutputs.size() > 1)
             // FIXME: Experimental feature?
             throw Error("Only one fixed output is allowed for now");
         if (*fixedCAOutputs.begin() != "out")
             throw Error("Single fixed output must be named \"out\"");
         return DerivationType::CAFixed;
+    } else if (inputAddressedOutputs.empty() && fixedCAOutputs.empty() && ! floatingCAOutputs.empty()) {
+        return DerivationType::CAFloating;
     } else {
         throw Error("Can't mix derivation output types");
     }
@@ -464,6 +476,8 @@ DrvHashModulo hashDerivationModulo(Store & store, const Derivation & drv, bool m
 {
     /* Return a fixed hash for fixed-output derivations. */
     switch (drv.type()) {
+    case DerivationType::CAFloating:
+        throw Error("Regular input-addressed derivations are not yet allowed to depend on CA derivations");
     case DerivationType::CAFixed: {
         std::map<std::string, Hash> outputHashes;
         for (const auto & i : drv.outputs) {
@@ -476,7 +490,7 @@ DrvHashModulo hashDerivationModulo(Store & store, const Derivation & drv, bool m
         }
         return outputHashes;
     }
-    default:
+    case DerivationType::Regular:
         break;
     }
 

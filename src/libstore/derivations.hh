@@ -61,6 +61,7 @@ typedef std::map<string, string> StringPairs;
 enum struct DerivationType : uint8_t {
     Regular,
     CAFixed,
+    CAFloating,
 };
 
 /* Do the outputs of the derivation have paths calculated from their content,
