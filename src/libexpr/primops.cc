@@ -18,7 +18,7 @@
 
 #include <algorithm>
 #include <cstring>
-#include <regex>
+#include <boost/regex.hpp>
 #include <dlfcn.h>
 
 
@@ -1955,13 +1955,13 @@ void prim_match(EvalState & state, const Pos & pos, Value * * args, Value & v)
 
         auto regex = state.regexCache.find(re);
         if (regex == state.regexCache.end())
-            regex = state.regexCache.emplace(re, std::regex(re, std::regex::extended)).first;
+            regex = state.regexCache.emplace(re, boost::regex(re, boost::regex::extended)).first;
 
         PathSet context;
         const std::string str = state.forceString(*args[1], context, pos);
 
-        std::smatch match;
-        if (!std::regex_match(str, match, regex->second)) {
+        boost::smatch match;
+        if (!boost::regex_match(str, match, regex->second)) {
             mkNull(v);
             return;
         }
@@ -1976,8 +1976,8 @@ void prim_match(EvalState & state, const Pos & pos, Value * * args, Value & v)
                 mkString(*(v.listElems()[i] = state.allocValue()), match[i + 1].str().c_str());
         }
 
-    } catch (std::regex_error &e) {
-        if (e.code() == std::regex_constants::error_space) {
+    } catch (boost::regex_error &e) {
+        if (e.code() == boost::regex_constants::error_space) {
             // limit is _GLIBCXX_REGEX_STATE_LIMIT for libstdc++
             throw EvalError({
                 .hint = hintfmt("memory limit exceeded by regular expression '%s'", re),
@@ -2001,13 +2001,13 @@ static void prim_split(EvalState & state, const Pos & pos, Value * * args, Value
 
     try {
 
-        std::regex regex(re, std::regex::extended);
+        boost::regex regex(re, boost::regex::extended);
 
         PathSet context;
         const std::string str = state.forceString(*args[1], context, pos);
 
-        auto begin = std::sregex_iterator(str.begin(), str.end(), regex);
-        auto end = std::sregex_iterator();
+        auto begin = boost::sregex_iterator(str.begin(), str.end(), regex);
+        auto end = boost::sregex_iterator();
 
         // Any matches results are surrounded by non-matching results.
         const size_t len = std::distance(begin, end);
@@ -2020,9 +2020,9 @@ static void prim_split(EvalState & state, const Pos & pos, Value * * args, Value
             return;
         }
 
-        for (std::sregex_iterator i = begin; i != end; ++i) {
+        for (boost::sregex_iterator i = begin; i != end; ++i) {
             assert(idx <= 2 * len + 1 - 3);
-            std::smatch match = *i;
+            boost::smatch match = *i;
 
             // Add a string for non-matched characters.
             elem = v.listElems()[idx++] = state.allocValue();
@@ -2049,8 +2049,8 @@ static void prim_split(EvalState & state, const Pos & pos, Value * * args, Value
         }
         assert(idx == 2 * len + 1);
 
-    } catch (std::regex_error &e) {
-        if (e.code() == std::regex_constants::error_space) {
+    } catch (boost::regex_error &e) {
+        if (e.code() == boost::regex_constants::error_space) {
             // limit is _GLIBCXX_REGEX_STATE_LIMIT for libstdc++
             throw EvalError({
                 .hint = hintfmt("memory limit exceeded by regular expression '%s'", re),

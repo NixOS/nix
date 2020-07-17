@@ -11,6 +11,7 @@
 #include <optional>
 #include <unordered_map>
 #include <mutex>
+#include <boost/regex.hpp>
 
 
 namespace nix {
@@ -119,7 +120,7 @@ private:
     std::unordered_map<Path, Path> resolvedPaths;
 
     /* Cache used by prim_match(). */
-    std::unordered_map<std::string, std::regex> regexCache;
+    std::unordered_map<std::string, boost::regex> regexCache;
 
 public:
 
