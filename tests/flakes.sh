@@ -18,7 +18,6 @@ registry=$TEST_ROOT/registry.json
 flake1Dir=$TEST_ROOT/flake1
 flake2Dir=$TEST_ROOT/flake2
 flake3Dir=$TEST_ROOT/flake3
-flake4Dir=$TEST_ROOT/flake4
 flake5Dir=$TEST_ROOT/flake5
 flake6Dir=$TEST_ROOT/flake6
 flake7Dir=$TEST_ROOT/flake7
@@ -390,14 +389,12 @@ cat > $flake3Dir/flake.nix <<EOF
   };
 }
 EOF
-git -C $flake3Dir add flake.nix
+nix flake update $flake3Dir
+git -C $flake3Dir add flake.nix flake.lock
 git -C $flake3Dir commit -m 'Remove packages.xyzzy'
 git -C $flake3Dir checkout master
 
-# Test whether fuzzy-matching works for IsAlias
-(! nix build -o $TEST_ROOT/result flake4/removeXyzzy#xyzzy)
-
-# Test whether fuzzy-matching works for IsGit
+# Test whether fuzzy-matching works for registry entries.
 (! nix build -o $TEST_ROOT/result flake4/removeXyzzy#xyzzy)
 nix build -o $TEST_ROOT/result flake4/removeXyzzy#sth
 
