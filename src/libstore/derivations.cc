@@ -24,6 +24,32 @@ std::optional<StorePath> DerivationOutput::pathOpt(const Store & store, std::str
     }, output);
 }
 
+bool derivationIsCA(DerivationType dt) {
+    switch (dt) {
+    case DerivationType::Regular: return false;
+    case DerivationType::CAFixed: return true;
+    };
+    // Since enums can have non-variant values, but making a `default:` would
+    // disable exhaustiveness warnings.
+    abort();
+}
+
+bool derivationIsFixed(DerivationType dt) {
+    switch (dt) {
+    case DerivationType::Regular: return false;
+    case DerivationType::CAFixed: return true;
+    };
+    abort();
+}
+
+bool derivationIsImpure(DerivationType dt) {
+    switch (dt) {
+    case DerivationType::Regular: return false;
+    case DerivationType::CAFixed: return true;
+    };
+    abort();
+}
+
 const StorePath BasicDerivation::findOutput(const Store & store, const string & id) const
 {
     auto i = outputs.find(id);
@@ -359,11 +385,16 @@ bool isDerivation(const string & fileName)
 }
 
 
-bool BasicDerivation::isFixedOutput() const
+DerivationType BasicDerivation::type() const
 {
-    return outputs.size() == 1 &&
+    if (outputs.size() == 1 &&
         outputs.begin()->first == "out" &&
-        std::holds_alternative<DerivationOutputFixed>(outputs.begin()->second.output);
+        std::holds_alternative<DerivationOutputFixed>(outputs.begin()->second.output))
+    {
+        return DerivationType::CAFixed;
+    } else {
+        return DerivationType::Regular;
+    }
 }
 
 
@@ -411,7 +442,8 @@ static const DrvHashModulo & pathDerivationModulo(Store & store, const StorePath
 DrvHashModulo hashDerivationModulo(Store & store, const Derivation & drv, bool maskOutputs)
 {
     /* Return a fixed hash for fixed-output derivations. */
-    if (drv.isFixedOutput()) {
+    switch (drv.type()) {
+    case DerivationType::CAFixed: {
         std::map<std::string, Hash> outputHashes;
         for (const auto & i : drv.outputs) {
             auto & dof = std::get<DerivationOutputFixed>(i.second.output);
@@ -422,6 +454,9 @@ DrvHashModulo hashDerivationModulo(Store & store, const Derivation & drv, bool m
             outputHashes.insert_or_assign(i.first, std::move(hash));
         }
         return outputHashes;
+    }
+    default:
+        break;
     }
 
     /* For other derivations, replace the inputs paths with recursive
