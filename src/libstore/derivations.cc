@@ -387,13 +387,34 @@ bool isDerivation(const string & fileName)
 
 DerivationType BasicDerivation::type() const
 {
-    if (outputs.size() == 1 &&
-        outputs.begin()->first == "out" &&
-        std::holds_alternative<DerivationOutputFixed>(outputs.begin()->second.output))
-    {
+    std::set<std::string_view> inputAddressedOutputs, fixedCAOutputs;
+    for (auto & i : outputs) {
+        std::visit(overloaded {
+            [&](DerivationOutputInputAddressed _) {
+               inputAddressedOutputs.insert(i.first);
+            },
+            [&](DerivationOutputFixed _) {
+                fixedCAOutputs.insert(i.first);
+            },
+            [&](DerivationOutputFloating _) {
+                throw Error("Floating CA output derivations are not yet implemented");
+            },
+        }, i.second.output);
+    }
+
+    if (inputAddressedOutputs.empty() && fixedCAOutputs.empty()) {
+        throw Error("Must have at least one output");
+    } else if (! inputAddressedOutputs.empty() && fixedCAOutputs.empty()) {
+        return DerivationType::Regular;
+    } else if (inputAddressedOutputs.empty() && ! fixedCAOutputs.empty()) {
+        if (fixedCAOutputs.size() > 1)
+            // FIXME: Experimental feature?
+            throw Error("Only one fixed output is allowed for now");
+        if (*fixedCAOutputs.begin() != "out")
+            throw Error("Single fixed output must be named \"out\"");
         return DerivationType::CAFixed;
     } else {
-        return DerivationType::Regular;
+        throw Error("Can't mix derivation output types");
     }
 }
 
