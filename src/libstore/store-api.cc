@@ -915,44 +915,23 @@ ref<Store> openStore(const std::string & uri_,
 }
 
 
-StoreType getStoreType(const std::string & uri, const std::string & stateDir)
-{
-    if (uri == "daemon") {
-        return tDaemon;
-    } else if (uri == "local" || hasPrefix(uri, "/") || hasPrefix(uri, "./")) {
-        return tLocal;
-    } else if (uri == "" || uri == "auto") {
-        if (access(stateDir.c_str(), R_OK | W_OK) == 0)
-            return tLocal;
-        else if (pathExists(settings.nixDaemonSocketFile))
-            return tDaemon;
-        else
-            return tLocal;
-    } else {
-        return tOther;
-    }
-}
-
-
+// Specific prefixes are handled by the specific types of store, while here we
+// handle the general cases not covered by the other ones.
 static RegisterStoreImplementation regStore([](
     const std::string & uri, const Store::Params & params)
     -> std::shared_ptr<Store>
 {
-    switch (getStoreType(uri, get(params, "state").value_or(settings.nixStateDir))) {
-        case tDaemon:
-            return std::shared_ptr<Store>(std::make_shared<UDSRemoteStore>(params));
-        case tLocal: {
-            Store::Params params2 = params;
-            if (hasPrefix(uri, "/")) {
-                params2["root"] = uri;
-            } else if (hasPrefix(uri, "./")) {
-                params2["root"] = absPath(uri);
-            }
-            return std::shared_ptr<Store>(std::make_shared<LocalStore>(params2));
-        }
-        default:
-            return nullptr;
-    }
+     auto stateDir = get(params, "state").value_or(settings.nixStateDir);
+     if (uri == "" || uri == "auto") {
+        if (access(stateDir.c_str(), R_OK | W_OK) == 0)
+            return std::make_shared<LocalStore>(params);
+        else if (pathExists(settings.nixDaemonSocketFile))
+            return std::make_shared<UDSRemoteStore>(params);
+        else
+            return std::make_shared<LocalStore>(params);
+     } else {
+         return nullptr;
+     }
 });
 
 

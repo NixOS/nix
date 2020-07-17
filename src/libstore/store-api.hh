@@ -796,16 +796,6 @@ ref<Store> openStore(const std::string & uri = settings.storeUri.get(),
     const Store::Params & extraParams = Store::Params());
 
 
-enum StoreType {
-    tDaemon,
-    tLocal,
-    tOther
-};
-
-
-StoreType getStoreType(const std::string & uri = settings.storeUri.get(),
-    const std::string & stateDir = settings.nixStateDir);
-
 /* Return the default substituter stores, defined by the
    ‘substituters’ option and various legacy options. */
 std::list<ref<Store>> getDefaultSubstituters();

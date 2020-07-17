@@ -1,5 +1,6 @@
 #include "shared.hh"
 #include "local-store.hh"
+#include "remote-store.hh"
 #include "util.hh"
 #include "serialise.hh"
 #include "archive.hh"
@@ -277,7 +278,9 @@ static int _main(int argc, char * * argv)
         initPlugins();
 
         if (stdio) {
-            if (getStoreType() == tDaemon) {
+            if (openUncachedStore().dynamic_pointer_cast<UDSRemoteStore>()) {
+                // FIXME Use the connection the UDSRemoteStore opened
+
                 //  Forward on this connection to the real daemon
                 auto socketPath = settings.nixDaemonSocketFile;
                 auto s = socket(PF_UNIX, SOCK_STREAM, 0);

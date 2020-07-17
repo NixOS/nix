@@ -1580,4 +1580,20 @@ void LocalStore::createUser(const std::string & userName, uid_t userId)
 }
 
 
+static RegisterStoreImplementation regStore([](
+    const std::string & uri, const Store::Params & params)
+    -> std::shared_ptr<Store>
+{
+    Store::Params params2 = params;
+    if (uri == "local") {
+    } else if (hasPrefix(uri, "/")) {
+        params2["root"] = uri;
+    } else if (hasPrefix(uri, "./")) {
+        params2["root"] = absPath(uri);
+    } else {
+        return nullptr;
+    }
+    return std::shared_ptr<Store>(std::make_shared<LocalStore>(params2));
+});
+
 }
