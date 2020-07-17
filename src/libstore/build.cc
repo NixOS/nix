@@ -3721,9 +3721,22 @@ void DerivationGoal::registerOutputs()
            hash). */
         std::optional<ContentAddress> ca;
 
-        if (derivationIsFixed(derivationType)) {
-
-            FixedOutputHash outputHash = std::get<DerivationOutputFixed>(i.second.output).hash;
+        if (! std::holds_alternative<DerivationOutputInputAddressed>(i.second.output)) {
+            DerivationOutputFloating outputHash;
+            std::visit(overloaded {
+                [&](DerivationOutputInputAddressed doi) {
+                    throw Error("No.");
+                },
+                [&](DerivationOutputFixed dof) {
+                    outputHash = DerivationOutputFloating {
+                        .method = dof.hash.method,
+                        .hashType = *dof.hash.hash.type,
+                    };
+                },
+                [&](DerivationOutputFloating dof) {
+                    outputHash = dof;
+                },
+            }, i.second.output);
 
             if (outputHash.method == FileIngestionMethod::Flat) {
                 /* The output path should be a regular file without execute permission. */
@@ -3737,12 +3750,17 @@ void DerivationGoal::registerOutputs()
             /* Check the hash. In hash mode, move the path produced by
                the derivation to its content-addressed location. */
             Hash h2 = outputHash.method == FileIngestionMethod::Recursive
-                ? hashPath(*outputHash.hash.type, actualPath).first
-                : hashFile(*outputHash.hash.type, actualPath);
+                ? hashPath(outputHash.hashType, actualPath).first
+                : hashFile(outputHash.hashType, actualPath);
 
             auto dest = worker.store.makeFixedOutputPath(outputHash.method, h2, i.second.path(worker.store, drv->name).name());
 
-            if (outputHash.hash != h2) {
+            // true if either floating CA, or incorrect fixed hash.
+            bool needsMove = true;
+
+            if (auto p = std::get_if<DerivationOutputFixed>(& i.second.output)) {
+              Hash & h = p->hash.hash;
+              if (h != h2) {
 
                 /* Throw an error after registering the path as
                    valid. */
@@ -3750,9 +3768,15 @@ void DerivationGoal::registerOutputs()
                 delayedException = std::make_exception_ptr(
                     BuildError("hash mismatch in fixed-output derivation '%s':\n  wanted: %s\n  got:    %s",
                         worker.store.printStorePath(dest),
-                        outputHash.hash.to_string(SRI, true),
+                        h.to_string(SRI, true),
                         h2.to_string(SRI, true)));
+              } else {
+                  // matched the fixed hash, so no move needed.
+                  needsMove = false;
+              }
+            }
 
+            if (needsMove) {
                 Path actualDest = worker.store.Store::toRealPath(dest);
 
                 if (worker.store.isValidPath(dest))
