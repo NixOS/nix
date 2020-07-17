@@ -135,7 +135,7 @@ StorePath getDerivationEnvironment(ref<Store> store, const StorePath & drvPath)
     drv.env["_outputs_saved"] = drv.env["outputs"];
     drv.env["outputs"] = "out";
     drv.inputSrcs.insert(std::move(getEnvShPath));
-    Hash h = hashDerivationModulo(*store, drv, true);
+    Hash h = std::get<0>(hashDerivationModulo(*store, drv, true));
     auto shellOutPath = store->makeOutputPath("out", h, drvName);
     drv.outputs.insert_or_assign("out", DerivationOutput { .output = DerivationOutputInputAddressed {
                 .path = shellOutPath
