@@ -414,7 +414,7 @@
 
       defaultPackage = forAllSystems (system: self.packages.${system}.nix);
 
-      devShell = forAllSystems (system:
+      developmentEnv = forAllSystems (system:
         with nixpkgsFor.${system};
         with commonDeps pkgs;
 

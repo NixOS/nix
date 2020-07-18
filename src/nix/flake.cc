@@ -422,7 +422,11 @@ struct CmdFlakeCheck : FlakeCommand
                             }
                         }
 
-                        else if (name == "defaultPackage" || name == "devShell") {
+                        else if (name == "defaultPackage" || name == "developmentEnv" || name == "devShell") {
+                            if (name == "devShell") {
+                                warn("flake output 'devShell' was replaced by 'developmentEnv'");
+                            }
+
                             state->forceAttrs(vOutput, pos);
                             for (auto & attr : *vOutput.attrs) {
                                 checkSystemName(attr.name, *attr.pos);
@@ -821,7 +825,7 @@ struct CmdFlakeShow : FlakeCommand
 
                     logger->stdout("%s: %s '%s'",
                         headerPrefix,
-                        attrPath.size() == 2 && attrPath[0] == "devShell" ? "development environment" :
+                        attrPath.size() == 2 && (attrPath[0] == "developmentEnv" && attrPath[0] == "devShell") ? "development environment" :
                         attrPath.size() == 3 && attrPath[0] == "checks" ? "derivation" :
                         attrPath.size() >= 1 && attrPath[0] == "hydraJobs" ? "derivation" :
                         "package",
@@ -831,6 +835,7 @@ struct CmdFlakeShow : FlakeCommand
                 if (attrPath.size() == 0
                     || (attrPath.size() == 1 && (
                             attrPath[0] == "defaultPackage"
+                            || attrPath[0] == "developmentEnv"
                             || attrPath[0] == "devShell"
                             || attrPath[0] == "nixosConfigurations"
                             || attrPath[0] == "nixosModules"
@@ -846,7 +851,7 @@ struct CmdFlakeShow : FlakeCommand
                 }
 
                 else if (
-                    (attrPath.size() == 2 && (attrPath[0] == "defaultPackage" || attrPath[0] == "devShell"))
+                    (attrPath.size() == 2 && (attrPath[0] == "defaultPackage" || attrPath[0] == "developmentEnv" || attrPath[0] == "devShell"))
                     || (attrPath.size() == 3 && (attrPath[0] == "checks" || attrPath[0] == "packages"))
                     )
                 {
