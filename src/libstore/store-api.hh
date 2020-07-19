@@ -329,8 +329,11 @@ public:
     virtual StorePathSet queryValidDerivers(const StorePath & path) { return {}; };
 
     /* Query the outputs of the derivation denoted by `path'. */
-    virtual StorePathSet queryDerivationOutputs(const StorePath & path)
-    { unsupported("queryDerivationOutputs"); }
+    virtual StorePathSet queryDerivationOutputs(const StorePath & path);
+
+    /* Query the mapping outputName=>outputPath for the given derivation */
+    virtual OutputPathMap queryDerivationOutputMap(const StorePath & path)
+    { unsupported("queryDerivationOutputMap"); }
 
     /* Query the full store path given the hash part of a valid store
        path, or empty if the path doesn't exist. */
