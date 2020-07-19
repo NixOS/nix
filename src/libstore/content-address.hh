@@ -54,6 +54,8 @@ ContentAddress parseContentAddress(std::string_view rawCa);
 
 std::optional<ContentAddress> parseContentAddressOpt(std::string_view rawCaOpt);
 
+Hash getContentAddressHash(const ContentAddress & ca);
+
 /*
  * References set
  */

@@ -153,7 +153,8 @@ static int _main(int argc, char * * argv)
 
         /* If an expected hash is given, the file may already exist in
            the store. */
-        Hash hash, expectedHash(ht);
+        std::optional<Hash> expectedHash;
+        Hash hash;
         std::optional<StorePath> storePath;
         if (args.size() == 2) {
             expectedHash = Hash(args[1], ht);
@@ -161,12 +162,12 @@ static int _main(int argc, char * * argv)
             storePath = store->makeFixedOutputPath(name, FixedOutputInfo {
                 {
                     .method = method,
-                    .hash = expectedHash,
+                    .hash = *expectedHash,
                 },
                 {},
             });
             if (store->isValidPath(*storePath))
-                hash = expectedHash;
+                hash = *expectedHash;
             else
                 storePath.reset();
         }
@@ -206,28 +207,12 @@ static int _main(int argc, char * * argv)
                     tmpFile = unpacked;
             }
 
-            /* FIXME: inefficient; addToStore() will also hash
-               this. */
-            hash = unpack ? hashPath(ht, tmpFile).first : hashFile(ht, tmpFile);
-
-            if (expectedHash != Hash(ht) && expectedHash != hash)
-                throw Error("hash mismatch for '%1%'", uri);
-
             const auto method = unpack ? FileIngestionMethod::Recursive : FileIngestionMethod::Flat;
 
-            /* Copy the file to the Nix store. FIXME: if RemoteStore
-               implemented addToStoreFromDump() and downloadFile()
-               supported a sink, we could stream the download directly
-               into the Nix store. */
-            storePath = store->addToStore(name, tmpFile, method, ht);
-
-            assert(*storePath == store->makeFixedOutputPath(name, FixedOutputInfo {
-                {
-                    .method = method,
-                    .hash = expectedHash,
-                },
-                {}
-            }));
+            auto info = store->addToStoreSlow(name, tmpFile, method, ht, expectedHash);
+            storePath = info.path;
+            assert(info.ca);
+            hash = getContentAddressHash(*info.ca);
         }
 
         stopProgressBar();
