@@ -1197,7 +1197,7 @@ void DerivationGoal::haveDerivation()
 
     if (parsedDrv->contentAddressed()) {
         settings.requireExperimentalFeature("ca-derivations");
-        throw Error("ca-derivations isn't implemented yet");
+        throw UnimplementedError("ca-derivations isn't implemented yet");
     }
 
 
