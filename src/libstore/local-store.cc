@@ -578,7 +578,7 @@ void LocalStore::checkDerivationOutputs(const StorePath & drvPath, const Derivat
                 envHasRightPath(path, i.first);
             },
             [&](DerivationOutputFloating _) {
-                throw Error("Floating CA output derivations are not yet implemented");
+                throw UnimplementedError("Floating CA output derivations are not yet implemented");
             },
         }, i.second.output);
     }
