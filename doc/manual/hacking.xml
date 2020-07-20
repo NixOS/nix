@@ -12,7 +12,7 @@ $ cd nix
 </screen>
 </para>
 
-<para>To build Nix for the current operating system/architecture use</para>
+<para>To build Nix for the current operating system/architecture use
 
 <screen>
 $ nix-build
