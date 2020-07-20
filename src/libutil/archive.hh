@@ -63,12 +63,29 @@ struct ParseSink
     virtual void createSymlink(const Path & path, const string & target) { };
 };
 
-struct TeeParseSink : ParseSink
+/* If the NAR archive contains a single file at top-level, then save
+   the contents of the file to `s'.  Otherwise barf. */
+struct RetrieveRegularNARSink : ParseSink
 {
-    StringSink saved;
-    TeeSource source;
+    bool regular = true;
+    Sink & sink;
 
-    TeeParseSink(Source & source) : source(source, saved) { }
+    RetrieveRegularNARSink(Sink & sink) : sink(sink) { }
+
+    void createDirectory(const Path & path)
+    {
+        regular = false;
+    }
+
+    void receiveContents(unsigned char * data, unsigned int len)
+    {
+        sink(data, len);
+    }
+
+    void createSymlink(const Path & path, const string & target)
+    {
+        regular = false;
+    }
 };
 
 void parseDump(ParseSink & sink, Source & source);
