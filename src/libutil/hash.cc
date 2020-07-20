@@ -7,7 +7,7 @@
 #include "args.hh"
 #include "hash.hh"
 #include "archive.hh"
-#include "parser.hh"
+#include "split.hh"
 #include "util.hh"
 
 #include <sys/types.h>
