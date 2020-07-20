@@ -177,7 +177,7 @@ Hash Hash::parseAnyPrefixed(std::string_view original)
     // Either the string or user must provide the type, if they both do they
     // must agree.
     if (!optParsedType)
-        throw BadHash("hash '%s' does not include a type.", rest);
+        throw BadHash("hash '%s' does not include a type", rest);
 
     return Hash(rest, *optParsedType, isSRI);
 }
