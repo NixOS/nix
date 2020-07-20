@@ -234,7 +234,7 @@ ValidPathInfo Store::addToStoreSlow(std::string_view name, const Path & srcPath,
 
     TeeSink sinkIfNar { narHashSink, caHashSink };
 
-    /* We use the tee sink if we need to hash he nar twice */
+    /* We use the tee sink if we need to hash the nar twice */
     auto & sink = method == FileIngestionMethod::Recursive && hashAlgo != htSHA256
         ? static_cast<Sink &>(sinkIfNar)
         : narHashSink;
@@ -250,7 +250,11 @@ ValidPathInfo Store::addToStoreSlow(std::string_view name, const Path & srcPath,
         ? fileSink
         : blank;
 
-    parseDump(parseSink, tapped);
+    parseDump(
+        parseSink,
+        method == FileIngestionMethod::Recursive && hashAlgo == htSHA256
+            ? *fileSource // don't need to hash twice if we just can use the `narHash` twice
+            : tapped);
 
     auto [narHash, narSize] = narHashSink.finish();
 
