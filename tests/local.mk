@@ -31,13 +31,14 @@ nix_tests = \
   nix-copy-ssh.sh \
   post-hook.sh \
   function-trace.sh \
-  recursive.sh
+  recursive.sh \
+  flakes.sh
   # parallel.sh
 
 install-tests += $(foreach x, $(nix_tests), tests/$(x))
 
 tests-environment = NIX_REMOTE= $(bash) -e
 
-clean-files += $(d)/common.sh
+clean-files += $(d)/common.sh $(d)/config.nix
 
 test-deps += tests/common.sh tests/config.nix tests/plugins/libplugintest.$(SO_EXT)

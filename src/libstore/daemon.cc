@@ -173,31 +173,6 @@ struct TunnelSource : BufferedSource
     }
 };
 
-/* If the NAR archive contains a single file at top-level, then save
-   the contents of the file to `s'.  Otherwise barf. */
-struct RetrieveRegularNARSink : ParseSink
-{
-    bool regular;
-    string s;
-
-    RetrieveRegularNARSink() : regular(true) { }
-
-    void createDirectory(const Path & path)
-    {
-        regular = false;
-    }
-
-    void receiveContents(unsigned char * data, unsigned int len)
-    {
-        s.append((const char *) data, len);
-    }
-
-    void createSymlink(const Path & path, const string & target)
-    {
-        regular = false;
-    }
-};
-
 struct ClientSettings
 {
     bool keepFailed;
@@ -394,9 +369,9 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
             hashAlgo = parseHashType(hashAlgoRaw);
         }
 
-        StringSink savedNAR;
-        TeeSource savedNARSource(from, savedNAR);
-        RetrieveRegularNARSink savedRegular;
+        StringSink saved;
+        TeeSource savedNARSource(from, saved);
+        RetrieveRegularNARSink savedRegular { saved };
 
         if (method == FileIngestionMethod::Recursive) {
             /* Get the entire NAR dump from the client and save it to
@@ -410,14 +385,9 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
         logger->startWork();
         if (!savedRegular.regular) throw Error("regular file expected");
 
-        StringSource dumpSource {
-            method == FileIngestionMethod::Recursive ? *savedNAR.s : savedRegular.s
-        };
-        auto path = store->addToStoreFromDump(
-            dumpSource,
-            baseName,
-            method,
-            hashAlgo);
+        // FIXME: try to stream directly from `from`.
+        StringSource dumpSource { *saved.s };
+        auto path = store->addToStoreFromDump(dumpSource, baseName, method, hashAlgo);
         logger->stopWork();
 
         to << store->printStorePath(path);
@@ -733,15 +703,15 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
         if (!trusted)
             info.ultimate = false;
 
-        std::string saved;
         std::unique_ptr<Source> source;
         if (GET_PROTOCOL_MINOR(clientVersion) >= 21)
             source = std::make_unique<TunnelSource>(from, to);
         else {
-            TeeParseSink tee(from);
-            parseDump(tee, tee.source);
-            saved = std::move(*tee.saved.s);
-            source = std::make_unique<StringSource>(saved);
+            StringSink saved;
+            TeeSource tee { from, saved };
+            ParseSink ether;
+            parseDump(ether, tee);
+            source = std::make_unique<StringSource>(std::move(*saved.s));
         }
 
         logger->startWork();

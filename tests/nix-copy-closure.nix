@@ -1,8 +1,11 @@
 # Test ‘nix-copy-closure’.
 
-{ nixpkgs, system, nix }:
+{ nixpkgs, system, overlay }:
 
-with import (nixpkgs + "/nixos/lib/testing.nix") { inherit system; };
+with import (nixpkgs + "/nixos/lib/testing.nix") {
+  inherit system;
+  extraConfigurations = [ { nixpkgs.overlays = [ overlay ]; } ];
+};
 
 makeTest (let pkgA = pkgs.cowsay; pkgB = pkgs.wget; pkgC = pkgs.hello; in {
 
@@ -11,7 +14,6 @@ makeTest (let pkgA = pkgs.cowsay; pkgB = pkgs.wget; pkgC = pkgs.hello; in {
         { config, lib, pkgs, ... }:
         { virtualisation.writableStore = true;
           virtualisation.pathsInNixDB = [ pkgA ];
-          nix.package = nix;
           nix.binaryCaches = lib.mkForce [ ];
         };
 
@@ -20,7 +22,6 @@ makeTest (let pkgA = pkgs.cowsay; pkgB = pkgs.wget; pkgC = pkgs.hello; in {
         { services.openssh.enable = true;
           virtualisation.writableStore = true;
           virtualisation.pathsInNixDB = [ pkgB pkgC ];
-          nix.package = nix;
         };
     };
 
