@@ -460,7 +460,7 @@ public:
         std::optional<Hash> expectedCAHash = {});
 
     // FIXME: remove?
-    virtual StorePath addToStoreFromDump(const string & dump, const string & name,
+    virtual StorePath addToStoreFromDump(Source & dump, const string & name,
         FileIngestionMethod method = FileIngestionMethod::Recursive, HashType hashAlgo = htSHA256, RepairFlag repair = NoRepair)
     {
         throw Error("addToStoreFromDump() is not supported by this store");

@@ -54,11 +54,13 @@ touch $TEST_FILE
 
 # We try to do the evaluation with a known wrong hash to get the suggestion for
 # the correct one
-CORRECT_ADDRESS=$(nix eval --raw '(builtins.fetchurl 'file://$PWD/$TEST_FILE')' --store ipfs://$EMPTY_HASH?allow-modify=true |& \
-                  grep '^warning: created new store' | sed "s/^warning: created new store at '\(.*\)'\. .*$/\1/")
+CORRECT_ADDRESS=$( \
+    nix eval --raw --expr "builtins.fetchurl \"file://$PWD/$TEST_FILE\"" --store ipfs://$EMPTY_HASH?allow-modify=true --impure \
+    |& grep '^warning: created new store' \
+    | sed "s/^warning: created new store at '\(.*\)'\. .*$/\1/")
 
 # Then we eval and get back the hash-name part of the store path
-RESULT=$(nix eval '(builtins.fetchurl 'file://$PWD/$TEST_FILE')' --store $CORRECT_ADDRESS --json \
+RESULT=$(nix eval '(builtins.fetchurl 'file://$PWD/$TEST_FILE')' --store "$CORRECT_ADDRESS" --json \
     | jq -r | awk -F/ '{print $NF}')
 
 # Finally, we ask back the info from IPFS (formatting the address the right way

@@ -22,6 +22,7 @@
 #include <queue>
 #include <random>
 #include <thread>
+#include <regex>
 
 using namespace std::string_literals;
 
@@ -58,6 +59,7 @@ struct curlFileTransfer : public FileTransfer
         Callback<FileTransferResult> callback;
         CURL * req = 0;
         bool active = false; // whether the handle has been added to the multi object
+        std::string statusMsg;
 
         unsigned int attempt = 0;
 
@@ -187,13 +189,13 @@ struct curlFileTransfer : public FileTransfer
             size_t realSize = size * nmemb;
             std::string line((char *) contents, realSize);
             printMsg(lvlVomit, format("got header for '%s': %s") % request.uri % trim(line));
-            std::string status;
-            if (line.compare(0, 5, "HTTP/") == 0) { // new response starts
+            static std::regex statusLine("HTTP/[^ ]+ +[0-9]+(.*)", std::regex::extended | std::regex::icase);
+            std::smatch match;
+            if (std::regex_match(line, match, statusLine)) {
                 result.etag = "";
-                auto ss = tokenizeString<vector<string>>(line, " ");
-                status = ss.size() >= 2 ? ss[1] : "";
                 result.data = std::make_shared<std::string>();
                 result.bodySize = 0;
+                statusMsg = trim(match[1]);
                 acceptRanges = false;
                 encoding = "";
             } else {
@@ -207,7 +209,9 @@ struct curlFileTransfer : public FileTransfer
                            the expected ETag on a 200 response, then shut
                            down the connection because we already have the
                            data. */
-                        if (result.etag == request.expectedETag && status == "200") {
+                        long httpStatus = 0;
+                        curl_easy_getinfo(req, CURLINFO_RESPONSE_CODE, &httpStatus);
+                        if (result.etag == request.expectedETag && httpStatus == 200) {
                             debug(format("shutting down on 200 HTTP response with expected ETag"));
                             return 0;
                         }
@@ -446,11 +450,16 @@ struct curlFileTransfer : public FileTransfer
                     code == CURLE_ABORTED_BY_CALLBACK && _isInterrupted
                     ? FileTransferError(Interrupted, response, "%s of '%s' was interrupted", request.verb(), request.uri)
                     : httpStatus != 0
-                    ? FileTransferError(err, response, "unable to %s '%s': HTTP error %d%s",
-                        request.verb(), request.uri, httpStatus,
-                        code == CURLE_OK ? "" : fmt(" (curl error: %s)", curl_easy_strerror(code)))
-                    : FileTransferError(err, response, "unable to %s '%s': %s (%d)",
-                        request.verb(), request.uri, curl_easy_strerror(code), code);
+                    ? FileTransferError(err,
+                        response,
+                        fmt("unable to %s '%s': HTTP error %d ('%s')",
+                            request.verb(), request.uri, httpStatus, statusMsg)
+                        + (code == CURLE_OK ? "" : fmt(" (curl error: %s)", curl_easy_strerror(code)))
+                        )
+                    : FileTransferError(err,
+                        response,
+                        fmt("unable to %s '%s': %s (%d)",
+                            request.verb(), request.uri, curl_easy_strerror(code), code));
 
                 /* If this is a transient error, then maybe retry the
                    download after a while. If we're writing to a
@@ -876,8 +885,11 @@ FileTransferError::FileTransferError(FileTransfer::Error error, std::shared_ptr<
     : Error(args...), error(error), response(response)
 {
     const auto hf = hintfmt(args...);
-    if (response) {
-        err.hint = hintfmt("%1%\n\nresponse body:\n\n%2%", normaltxt(hf.str()), *response);
+    // FIXME: Due to https://github.com/NixOS/nix/issues/3841 we don't know how
+    // to print different messages for different verbosity levels. For now
+    // we add some heuristics for detecting when we want to show the response.
+    if (response && (response->size() < 1024 || response->find("<html>") != string::npos)) {
+            err.hint = hintfmt("%1%\n\nresponse body:\n\n%2%", normaltxt(hf.str()), *response);
     } else {
         err.hint = hf;
     }

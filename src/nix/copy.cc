@@ -45,6 +45,8 @@ struct CmdCopy : StorePathsCommand
             .description = "whether to try substitutes on the destination store (only supported by SSH)",
             .handler = {&substitute, Substitute},
         });
+
+        realiseMode = Realise::Outputs;
     }
 
     std::string description() override
@@ -70,11 +72,11 @@ struct CmdCopy : StorePathsCommand
 #ifdef ENABLE_S3
             Example{
                 "To copy Hello to an S3 binary cache:",
-                "nix copy --to s3://my-bucket?region=eu-west-1 nixpkgs.hello"
+                "nix copy --to s3://my-bucket?region=eu-west-1 nixpkgs#hello"
             },
             Example{
                 "To copy Hello to an S3-compatible binary cache:",
-                "nix copy --to s3://my-bucket?region=eu-west-1&endpoint=example.com nixpkgs.hello"
+                "nix copy --to s3://my-bucket?region=eu-west-1&endpoint=example.com nixpkgs#hello"
             },
 #endif
         };
@@ -87,11 +89,16 @@ struct CmdCopy : StorePathsCommand
         return srcUri.empty() ? StoreCommand::createStore() : openStore(srcUri);
     }
 
-    void run(ref<Store> srcStore, StorePaths storePaths) override
+    void run(ref<Store> store) override
     {
         if (srcUri.empty() && dstUri.empty())
             throw UsageError("you must pass '--from' and/or '--to'");
 
+        StorePathsCommand::run(store);
+    }
+
+    void run(ref<Store> srcStore, StorePaths storePaths) override
+    {
         ref<Store> dstStore = dstUri.empty() ? openStore() : openStore(dstUri);
 
         copyPaths(srcStore, dstStore, StorePathSet(storePaths.begin(), storePaths.end()),
