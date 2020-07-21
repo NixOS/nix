@@ -222,40 +222,68 @@ StorePath Store::computeStorePathForText(const string & name, const string & s,
 }
 
 
+/*
+The aim of this function is to compute in one pass the correct ValidPathInfo for
+the files that we are trying to add to the store. To accomplish that in one
+pass, given the different kind of inputs that we can take (normal nar archives,
+nar archives with non SHA-256 hashes, and flat files), we set up a net of sinks
+and aliases. Also, since the dataflow is obfuscated by this, we include here a
+graphviz diagram:
+
+digraph graphname {
+    node [shape=box]
+    fileSource -> narSink
+    narSink [style=dashed]
+    narSink -> unsualHashTee [style = dashed, label = "Recursive && !SHA-256"]
+    narSink -> narHashSink [style = dashed, label = "else"]
+    unsualHashTee -> narHashSink
+    unsualHashTee -> caHashSink
+    fileSource -> parseSink
+    parseSink [style=dashed]
+    parseSink-> fileSink [style = dashed, label = "Flat"]
+    parseSink -> blank [style = dashed, label = "Recursive"]
+    fileSink -> caHashSink
+}
+*/
 ValidPathInfo Store::addToStoreSlow(std::string_view name, const Path & srcPath,
     FileIngestionMethod method, HashType hashAlgo,
     std::optional<Hash> expectedCAHash)
 {
-    /* FIXME: inefficient: we're reading/hashing 'tmpFile' two
-       times. */
     HashSink narHashSink { htSHA256 };
     HashSink caHashSink { hashAlgo };
+
+    /* Note that fileSink and unusualHashTee must be mutually exclusive, since
+       they both write to caHashSink. Note that that requisite is currently true
+       because the former is only used in the flat case. */
     RetrieveRegularNARSink fileSink { caHashSink };
+    TeeSink unusualHashTee { narHashSink, caHashSink };
 
-    TeeSink sinkIfNar { narHashSink, caHashSink };
-
-    /* We use the tee sink if we need to hash the nar twice */
-    auto & sink = method == FileIngestionMethod::Recursive && hashAlgo != htSHA256
-        ? static_cast<Sink &>(sinkIfNar)
+    auto & narSink = method == FileIngestionMethod::Recursive && hashAlgo != htSHA256
+        ? static_cast<Sink &>(unusualHashTee)
         : narHashSink;
 
-    auto fileSource = sinkToSource([&](Sink & sink) {
-        dumpPath(srcPath, sink);
+    /* Functionally, this means that fileSource will yield the content of
+       srcPath. The fact that we use scratchpadSink as a temporary buffer here
+       is an implementation detail. */
+    auto fileSource = sinkToSource([&](Sink & scratchpadSink) {
+        dumpPath(srcPath, scratchpadSink);
     });
 
-    TeeSource tapped { *fileSource, sink };
+    /* tapped provides the same data as fileSource, but we also write all the
+       information to narSink. */
+    TeeSource tapped { *fileSource, narSink };
 
     ParseSink blank;
     auto & parseSink = method == FileIngestionMethod::Flat
         ? fileSink
         : blank;
 
-    parseDump(
-        parseSink,
-        method == FileIngestionMethod::Recursive && hashAlgo == htSHA256
-            ? *fileSource // don't need to hash twice if we just can use the `narHash` twice
-            : tapped);
+    /* The information that flows from tapped (besides being replicated in
+       narSink), is now put in parseSink. */
+    parseDump(parseSink, tapped);
 
+    /* We extract the result of the computation from the sink by calling
+       finish. */
     auto [narHash, narSize] = narHashSink.finish();
 
     auto hash = method == FileIngestionMethod::Recursive && hashAlgo == htSHA256
@@ -271,8 +299,8 @@ ValidPathInfo Store::addToStoreSlow(std::string_view name, const Path & srcPath,
     info.ca = FixedOutputHash { .method = method, .hash = hash };
 
     if (!isValidPath(info.path)) {
-        auto source = sinkToSource([&](Sink & sink) {
-            dumpPath(srcPath, sink);
+        auto source = sinkToSource([&](Sink & scratchpadSink) {
+            dumpPath(srcPath, scratchpadSink);
         });
         addToStore(info, *source);
     }
