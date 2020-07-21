@@ -59,11 +59,11 @@ with import ./config.nix; mkDerivation {
 EOF
 )
 
-nix build -v -o $TEST_ROOT/result-A -L "($expr)" \
+nix build --impure -v -o $TEST_ROOT/result-A -L --expr "$expr" \
     --min-free 1000 --max-free 2000 --min-free-check-interval 1 &
 pid1=$!
 
-nix build -v -o $TEST_ROOT/result-B -L "($expr2)" \
+nix build --impure -v -o $TEST_ROOT/result-B -L --expr "$expr2" \
     --min-free 1000 --max-free 2000 --min-free-check-interval 1 &
 pid2=$!
 

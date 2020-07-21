@@ -16,6 +16,7 @@
 
 namespace nix {
 
+
 static size_t regularHashSize(HashType type) {
     switch (type) {
     case htMD5: return md5HashSize;
@@ -25,6 +26,10 @@ static size_t regularHashSize(HashType type) {
     }
     abort();
 }
+
+
+std::set<std::string> hashTypes = { "md5", "sha1", "sha256", "sha512" };
+
 
 Hash::Hash(HashType type) : type(type)
 {

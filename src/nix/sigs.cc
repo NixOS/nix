@@ -106,7 +106,8 @@ struct CmdSignPaths : StorePathsCommand
             .shortName = 'k',
             .description = "file containing the secret signing key",
             .labels = {"file"},
-            .handler = {&secretKeyFile}
+            .handler = {&secretKeyFile},
+            .completer = completePath
         });
     }
 
