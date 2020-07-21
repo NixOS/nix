@@ -1579,6 +1579,14 @@ void LocalStore::createUser(const std::string & userName, uid_t userId)
     }
 }
 
+static bool isNonUriPath(const std::string & spec) {
+    return
+        // is not a URL
+        spec.find("://") == std::string::npos
+        // Has at least one path separator, and so isn't a single word that
+        // might be special like "auto"
+        && spec.find("/") != std::string::npos;
+}
 
 static RegisterStoreImplementation regStore([](
     const std::string & uri, const Store::Params & params)
@@ -1586,9 +1594,7 @@ static RegisterStoreImplementation regStore([](
 {
     Store::Params params2 = params;
     if (uri == "local") {
-    } else if (hasPrefix(uri, "/")) {
-        params2["root"] = uri;
-    } else if (hasPrefix(uri, "./")) {
+    } else if (isNonUriPath(uri)) {
         params2["root"] = absPath(uri);
     } else {
         return nullptr;
