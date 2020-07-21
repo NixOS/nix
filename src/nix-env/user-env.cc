@@ -80,7 +80,8 @@ bool createUserEnv(EvalState & state, DrvInfos & elems,
             /* This is only necessary when installing store paths, e.g.,
                `nix-env -i /nix/store/abcd...-foo'. */
             state.store->addTempRoot(state.store->parseStorePath(j.second));
-            state.store->ensurePath(state.store->parseStorePath(j.second));
+            auto path = state.store->parseStorePath(j.second);
+            state.store->ensurePath(path);
 
             references.insert(state.store->parseStorePath(j.second));
         }

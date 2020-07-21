@@ -194,10 +194,10 @@ static void opAddFixed(Strings opFlags, Strings opArgs)
 /* Hack to support caching in `nix-prefetch-url'. */
 static void opPrintFixedPath(Strings opFlags, Strings opArgs)
 {
-    auto recursive = FileIngestionMethod::Flat;
+    auto method = FileIngestionMethod::Flat;
 
     for (auto i : opFlags)
-        if (i == "--recursive") recursive = FileIngestionMethod::Recursive;
+        if (i == "--recursive") method = FileIngestionMethod::Recursive;
         else throw UsageError("unknown flag '%1%'", i);
 
     if (opArgs.size() != 3)
@@ -210,7 +210,7 @@ static void opPrintFixedPath(Strings opFlags, Strings opArgs)
 
     cout << fmt("%s\n", store->printStorePath(store->makeFixedOutputPath(name, FixedOutputInfo {
         {
-            .method = recursive,
+            .method = method,
             .hash = Hash::parseAny(hash, hashAlgo),
         },
         {},
@@ -355,7 +355,8 @@ static void opQuery(Strings opFlags, Strings opArgs)
 
         case qDeriver:
             for (auto & i : opArgs) {
-                auto info = store->queryPathInfo(store->followLinksToStorePath(i));
+                auto path = store->followLinksToStorePath(i);
+                auto info = store->queryPathInfo(path);
                 cout << fmt("%s\n", info->deriver ? store->printStorePath(*info->deriver) : "unknown-deriver");
             }
             break;
@@ -880,9 +881,11 @@ static void opServe(Strings opFlags, Strings opArgs)
                 break;
             }
 
-            case cmdDumpStorePath:
-                store->narFromPath(store->parseStorePath(readString(in)), out);
+            case cmdDumpStorePath: {
+                auto path = store->parseStorePath(readString(in));
+                store->narFromPath(path, out);
                 break;
+            }
 
             case cmdImportPaths: {
                 if (!writeAllowed) throw Error("importing paths is not allowed");

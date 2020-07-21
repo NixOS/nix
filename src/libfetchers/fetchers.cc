@@ -1,5 +1,6 @@
 #include "fetchers.hh"
 #include "store-api.hh"
+#include "archive.hh"
 
 #include <nlohmann/json.hpp>
 
@@ -58,8 +59,21 @@ std::pair<Tree, std::shared_ptr<const Input>> Input::fetchTree(ref<Store> store)
     if (tree.actualPath == "")
         tree.actualPath = store->toRealPath(tree.storePath);
 
+
     if (!tree.info.narHash)
-        tree.info.narHash = store->queryPathInfo(tree.storePath)->narHash;
+    {
+        auto pathOrCa = tree.info.ca
+            ? StorePathOrDesc {*tree.info.ca}
+            : StorePathOrDesc {tree.storePath};
+        tree.info.narHash = store->queryPathInfo(pathOrCa)->narHash;
+    }
+
+
+    if (!tree.info.narHash) {
+        HashSink hashSink(htSHA256);
+        store->narFromPath(tree.storePath, hashSink);
+        tree.info.narHash = hashSink.finish().first;
+    }
 
     if (input->narHash)
         assert(input->narHash == tree.info.narHash);
@@ -69,6 +83,32 @@ std::pair<Tree, std::shared_ptr<const Input>> Input::fetchTree(ref<Store> store)
             to_string(), tree.actualPath, narHash->to_string(SRI, true), input->narHash->to_string(SRI, true));
 
     return {std::move(tree), input};
+}
+
+std::optional<StorePath> trySubstitute(ref<Store> store, FileIngestionMethod ingestionMethod,
+    Hash hash, std::string_view name)
+{
+    auto ca = StorePathDescriptor {
+        .name = std::string { name },
+        .info = FixedOutputInfo {
+            ingestionMethod,
+            hash,
+            {}
+        },
+    };
+    auto substitutablePath = store->makeFixedOutputPathFromCA(ca);
+
+    try {
+        store->ensurePath(ca);
+
+        debug("using substituted path '%s'", store->printStorePath(substitutablePath));
+
+        return substitutablePath;
+    } catch (Error & e) {
+        debug("substitution of path '%s' failed: %s", store->printStorePath(substitutablePath), e.what());
+    }
+
+    return std::nullopt;
 }
 
 }

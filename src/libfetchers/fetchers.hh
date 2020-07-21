@@ -6,6 +6,7 @@
 #include "tree-info.hh"
 #include "attrs.hh"
 #include "url.hh"
+#include "content-address.hh"
 
 #include <memory>
 
@@ -99,5 +100,8 @@ Tree downloadTarball(
     const std::string & url,
     const std::string & name,
     bool immutable);
+
+std::optional<StorePath> trySubstitute(ref<Store> store, FileIngestionMethod ingestionMethod,
+    Hash hash, std::string_view name);
 
 }

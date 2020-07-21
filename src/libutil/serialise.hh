@@ -54,6 +54,7 @@ struct Source
        It blocks until all the requested data is available, or throws
        an error if it is not going to be available.   */
     void operator () (unsigned char * data, size_t len);
+    void operator () (std::basic_string_view<unsigned char> & data);
 
     /* Store up to ‘len’ in the buffer pointed to by ‘data’, and
        return the number of bytes stored.  It blocks until at least
@@ -189,10 +190,11 @@ struct TeeSource : Source
     size_t read(unsigned char * data, size_t len)
     {
         size_t n = orig.read(data, len);
-        sink(data, len);
+        sink(data, n);
         return n;
     }
 };
+
 
 /* A reader that consumes the original Source until 'size'. */
 struct SizedSource : Source
@@ -254,6 +256,19 @@ struct LambdaSource : Source
     {
         return lambda(data, len);
     }
+};
+
+/* Chain two sources together so after the first is exhausted, the second is
+   used */
+struct ChainSource : Source
+{
+    Source & source1, & source2;
+    bool useSecond = false;
+    ChainSource(Source & s1, Source & s2)
+        : source1(s1), source2(s2)
+    { }
+
+    size_t read(unsigned char * data, size_t len) override;
 };
 
 

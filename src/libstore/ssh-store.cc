@@ -40,7 +40,7 @@ public:
     bool sameMachine() override
     { return false; }
 
-    void narFromPath(const StorePath & path, Sink & sink) override;
+    void narFromPath(StorePathOrDesc pathOrDesc, Sink & sink) override;
 
     ref<FSAccessor> getFSAccessor() override;
 
@@ -68,8 +68,9 @@ private:
     };
 };
 
-void SSHStore::narFromPath(const StorePath & path, Sink & sink)
+void SSHStore::narFromPath(StorePathOrDesc pathOrDesc, Sink & sink)
 {
+    auto path = bakeCaIfNeeded(pathOrDesc);
     auto conn(connections->get());
     conn->to << wopNarFromPath << printStorePath(path);
     conn->processStderr();
