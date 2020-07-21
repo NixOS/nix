@@ -29,7 +29,7 @@ static void prim_fetchGit(EvalState & state, const Pos & pos, Value * * args, Va
             else if (n == "ref")
                 ref = state.forceStringNoCtx(*attr.value, *attr.pos);
             else if (n == "rev")
-                rev = Hash(state.forceStringNoCtx(*attr.value, *attr.pos), htSHA1);
+                rev = Hash::parseAny(state.forceStringNoCtx(*attr.value, *attr.pos), htSHA1);
             else if (n == "name")
                 name = state.forceStringNoCtx(*attr.value, *attr.pos);
             else if (n == "submodules")

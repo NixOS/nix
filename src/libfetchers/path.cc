@@ -101,7 +101,7 @@ struct PathInputScheme : InputScheme
 
         for (auto & [name, value] : url.query)
             if (name == "rev")
-                input->rev = Hash(value, htSHA1);
+                input->rev = Hash::parseAny(value, htSHA1);
             else if (name == "revCount") {
                 uint64_t revCount;
                 if (!string2Int(value, revCount))
@@ -129,7 +129,7 @@ struct PathInputScheme : InputScheme
 
         for (auto & [name, value] : attrs)
             if (name == "rev")
-                input->rev = Hash(getStrAttr(attrs, "rev"), htSHA1);
+                input->rev = Hash::parseAny(getStrAttr(attrs, "rev"), htSHA1);
             else if (name == "revCount")
                 input->revCount = getIntAttr(attrs, "revCount");
             else if (name == "lastModified")

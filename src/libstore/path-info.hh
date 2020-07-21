@@ -24,7 +24,8 @@ struct ValidPathInfo : PathReferences<StorePath>
 {
     StorePath path;
     std::optional<StorePath> deriver;
-    Hash narHash;
+    // TODO document this
+    std::optional<Hash> narHash;
     time_t registrationTime = 0;
     uint64_t narSize = 0; // 0 = unknown
     uint64_t id; // internal use only

@@ -3735,8 +3735,8 @@ void DerivationGoal::registerOutputs()
             /* Check the hash. In hash mode, move the path produced by
                the derivation to its content-addressed location. */
             Hash h2 = i.second.hash->method == FileIngestionMethod::Recursive
-                ? hashPath(*i.second.hash->hash.type, actualPath).first
-                : hashFile(*i.second.hash->hash.type, actualPath);
+                ? hashPath(i.second.hash->hash.type, actualPath).first
+                : hashFile(i.second.hash->hash.type, actualPath);
 
             auto dest = worker.store.makeFixedOutputPath(i.second.path.name(), FixedOutputInfo {
                 {
@@ -3797,8 +3797,10 @@ void DerivationGoal::registerOutputs()
            time.  The hash is stored in the database so that we can
            verify later on whether nobody has messed with the store. */
         debug("scanning for references inside '%1%'", path);
-        HashResult hash;
-        auto references = worker.store.parseStorePathSet(scanForReferences(actualPath, worker.store.printStorePathSet(referenceablePaths), hash));
+        // HashResult hash;
+        auto pathSetAndHash = scanForReferences(actualPath, worker.store.printStorePathSet(referenceablePaths));
+        auto references = worker.store.parseStorePathSet(pathSetAndHash.first);
+        HashResult hash = pathSetAndHash.second;
 
         if (buildMode == bmCheck) {
             if (!worker.store.isValidPath(worker.store.parseStorePath(path))) continue;
@@ -5047,7 +5049,7 @@ bool Worker::pathContentsGood(const StorePath & path)
     if (!pathExists(store.printStorePath(path)))
         res = false;
     else {
-        HashResult current = hashPath(*info->narHash.type, store.printStorePath(path));
+        HashResult current = hashPath(info->narHash->type, store.printStorePath(path));
         Hash nullHash(htSHA256);
         res = info->narHash == nullHash || info->narHash == current.first;
     }

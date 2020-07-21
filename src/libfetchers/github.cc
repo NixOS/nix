@@ -76,7 +76,7 @@ struct GitHubInput : Input
                 readFile(
                     store->toRealPath(
                         downloadFile(store, url, "source", false).storePath)));
-            rev = Hash(std::string { json["sha"] }, htSHA1);
+            rev = Hash::parseAny(std::string { json["sha"] }, htSHA1);
             debug("HEAD revision for '%s' is %s", url, rev->gitRev());
         }
 
@@ -140,7 +140,7 @@ struct GitHubInputScheme : InputScheme
         if (path.size() == 2) {
         } else if (path.size() == 3) {
             if (std::regex_match(path[2], revRegex))
-                input->rev = Hash(path[2], htSHA1);
+                input->rev = Hash::parseAny(path[2], htSHA1);
             else if (std::regex_match(path[2], refRegex))
                 input->ref = path[2];
             else
@@ -152,7 +152,7 @@ struct GitHubInputScheme : InputScheme
             if (name == "rev") {
                 if (input->rev)
                     throw BadURL("GitHub URL '%s' contains multiple commit hashes", url.url);
-                input->rev = Hash(value, htSHA1);
+                input->rev = Hash::parseAny(value, htSHA1);
             }
             else if (name == "ref") {
                 if (!std::regex_match(value, refRegex))
@@ -185,7 +185,7 @@ struct GitHubInputScheme : InputScheme
         input->repo = getStrAttr(attrs, "repo");
         input->ref = maybeGetStrAttr(attrs, "ref");
         if (auto rev = maybeGetStrAttr(attrs, "rev"))
-            input->rev = Hash(*rev, htSHA1);
+            input->rev = Hash::parseAny(*rev, htSHA1);
         return input;
     }
 };

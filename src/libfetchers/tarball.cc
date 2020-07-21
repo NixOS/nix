@@ -250,15 +250,13 @@ struct TarballInputScheme : InputScheme
 
         auto hash = input->url.query.find("hash");
         if (hash != input->url.query.end()) {
-            // FIXME: require SRI hash.
-            input->hash = Hash(hash->second);
+            input->hash = Hash::parseSRI(hash->second);
             input->url.query.erase(hash);
         }
 
         auto narHash = input->url.query.find("narHash");
         if (narHash != input->url.query.end()) {
-            // FIXME: require SRI hash.
-            input->narHash = Hash(narHash->second);
+            input->narHash = Hash::parseSRI(narHash->second);
             input->url.query.erase(narHash);
         }
 

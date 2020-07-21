@@ -35,8 +35,7 @@ std::unique_ptr<Input> inputFromAttrs(const Attrs & attrs)
         auto res = inputScheme->inputFromAttrs(attrs2);
         if (res) {
             if (auto narHash = maybeGetStrAttr(attrs, "narHash"))
-                // FIXME: require SRI hash.
-                res->narHash = newHashAllowEmpty(*narHash, {});
+                res->narHash = Hash::parseSRI(*narHash);
             return res;
         }
     }

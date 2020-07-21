@@ -11,7 +11,7 @@ StorePath TreeInfo::computeStorePath(Store & store) const
     return store.makeFixedOutputPath("source", FixedOutputInfo {
         {
             .method = FileIngestionMethod::Recursive,
-            .hash = narHash,
+            .hash = *narHash,
         },
         {},
     });

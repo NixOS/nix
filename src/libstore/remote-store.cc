@@ -430,7 +430,7 @@ void RemoteStore::queryPathInfoUncached(const StorePath & path,
             info = std::make_shared<ValidPathInfo>(StorePath(path));
             auto deriver = readString(conn->from);
             if (deriver != "") info->deriver = parseStorePath(deriver);
-            info->narHash = Hash(readString(conn->from), htSHA256);
+            info->narHash = Hash::parseAny(readString(conn->from), htSHA256);
             info->setReferencesPossiblyToSelf(readStorePaths<StorePathSet>(*this, conn->from));
             conn->from >> info->registrationTime >> info->narSize;
             if (GET_PROTOCOL_MINOR(conn->daemonVersion) >= 16) {
@@ -529,7 +529,7 @@ void RemoteStore::addToStore(const ValidPathInfo & info, Source & source,
         conn->to << wopAddToStoreNar
                  << printStorePath(info.path)
                  << (info.deriver ? printStorePath(*info.deriver) : "")
-                 << info.narHash.to_string(Base16, false);
+                 << info.narHash->to_string(Base16, false);
         writeStorePaths(*this, conn->to, info.referencesPossiblyToSelf());
         conn->to << info.registrationTime << info.narSize
                  << info.ultimate << info.sigs << renderContentAddress(info.ca)

@@ -225,14 +225,14 @@ struct GitInput : Input
         if (isLocal) {
 
             if (!input->rev)
-                input->rev = Hash(chomp(runProgram("git", true, { "-C", actualUrl, "rev-parse", *input->ref })), htSHA1);
+                input->rev = Hash::parseAny(chomp(runProgram("git", true, { "-C", actualUrl, "rev-parse", *input->ref })), htSHA1);
 
             repoDir = actualUrl;
 
         } else {
 
             if (auto res = getCache()->lookup(store, mutableAttrs)) {
-                auto rev2 = Hash(getStrAttr(res->first, "rev"), htSHA1);
+                auto rev2 = Hash::parseAny(getStrAttr(res->first, "rev"), htSHA1);
                 if (!rev || rev == rev2) {
                     input->rev = rev2;
                     return makeResult(res->first, std::move(res->second));
@@ -301,7 +301,7 @@ struct GitInput : Input
             }
 
             if (!input->rev)
-                input->rev = Hash(chomp(readFile(localRefFile)), htSHA1);
+                input->rev = Hash::parseAny(chomp(readFile(localRefFile)), htSHA1);
         }
 
         bool isShallow = chomp(runProgram("git", true, { "-C", repoDir, "rev-parse", "--is-shallow-repository" })) == "true";
@@ -426,7 +426,7 @@ struct GitInputScheme : InputScheme
             input->ref = *ref;
         }
         if (auto rev = maybeGetStrAttr(attrs, "rev"))
-            input->rev = Hash(*rev, htSHA1);
+            input->rev = Hash::parseAny(*rev, htSHA1);
 
         input->shallow = maybeGetBoolAttr(attrs, "shallow").value_or(false);
 
