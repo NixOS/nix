@@ -15,8 +15,6 @@ std::string makeFileIngestionPrefix(const FileIngestionMethod m) {
         return "";
     case FileIngestionMethod::Recursive:
         return "r:";
-    default:
-        throw Error("impossible, caught both cases");
     }
     abort();
 }
@@ -78,7 +76,7 @@ ContentAddress parseContentAddress(std::string_view rawCa) {
             .hash = Hash::parseNonSRIUnprefixed(rest, std::move(hashType)),
         };
     } else
-        throw UsageError("path-info content address prefix \"%s\" is unrecognized. Recogonized prefixes are \"text\", \"fixed\", or \"ipfs\"", prefix);
+        throw UsageError("path-info content address prefix \"%s\" is unrecognized. Recogonized prefixes are \"text\" or \"fixed\"", prefix);
 };
 
 std::optional<ContentAddress> parseContentAddressOpt(std::string_view rawCaOpt) {
@@ -93,7 +91,8 @@ std::string renderContentAddress(std::optional<ContentAddress> ca) {
 // FIXME Deduplicate with store-api.cc path computation
 std::string renderStorePathDescriptor(StorePathDescriptor ca)
 {
-    std::string result = ca.name;
+    std::string result { ca.name };
+    result += ":";
 
     auto dumpRefs = [&](auto references, bool hasSelfReference) {
         result += "refs:";
@@ -103,23 +102,20 @@ std::string renderStorePathDescriptor(StorePathDescriptor ca)
             result += i.to_string();
         }
         if (hasSelfReference) result += ":self";
+        result += ":";
     };
 
     std::visit(overloaded {
         [&](TextInfo th) {
             result += "text:";
             dumpRefs(th.references, false);
-            result += ":" + renderContentAddress(ContentAddress {TextHash {
-                .hash = th.hash,
-            }});
+            result += th.hash.to_string(Base32, true);
         },
         [&](FixedOutputInfo fsh) {
             result += "fixed:";
             dumpRefs(fsh.references.references, fsh.references.hasSelfReference);
-            result += ":" + renderContentAddress(ContentAddress {FixedOutputHash {
-                .method = fsh.method,
-                .hash = fsh.hash
-            }});
+            result += makeFileIngestionPrefix(fsh.method);
+            result += fsh.hash.to_string(Base32, true);
         },
     }, ca.info);
 
@@ -129,6 +125,7 @@ std::string renderStorePathDescriptor(StorePathDescriptor ca)
 
 StorePathDescriptor parseStorePathDescriptor(std::string_view rawCa)
 {
+    warn("%s", rawCa);
     auto rest = rawCa;
 
     std::string_view name;
@@ -143,7 +140,7 @@ StorePathDescriptor parseStorePathDescriptor(std::string_view rawCa)
     }
 
     auto parseRefs = [&]() -> PathReferences<StorePath> {
-        if (!splitPrefix(rest, "refs,"))
+        if (!splitPrefix(rest, "refs:"))
             throw Error("Invalid CA \"%s\", \"%s\" should begin with \"refs:\"", rawCa, rest);
         PathReferences<StorePath> ret;
         size_t numReferences = 0;
@@ -194,7 +191,7 @@ StorePathDescriptor parseStorePathDescriptor(std::string_view rawCa)
             refs,
         };
     } else
-        throw UsageError("content address tag \"%s\" is unrecognized. Recogonized tages are \"text\", \"fixed\", or \"ipfs\"", tag);
+        throw UsageError("content address tag \"%s\" is unrecognized. Recogonized tages are \"text\" or \"fixed\"", tag);
 
     return StorePathDescriptor {
         .name = std::string { name },

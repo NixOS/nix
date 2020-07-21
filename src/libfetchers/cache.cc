@@ -51,13 +51,14 @@ struct CacheImpl : Cache
         ref<Store> store,
         const Attrs & inAttrs,
         const Attrs & infoAttrs,
-        const StorePathDescriptor & storePath,
+        const StorePathDescriptor & storePathDesc,
         bool immutable) override
     {
         _state.lock()->add.use()
             (attrsToJson(inAttrs).dump())
             (attrsToJson(infoAttrs).dump())
-            (store->printStorePath(store->makeFixedOutputPathFromCA(storePath)))
+            // FIXME should use JSON for store path descriptor
+            (renderStorePathDescriptor(storePathDesc))
             (immutable)
             (time(0)).exec();
     }
