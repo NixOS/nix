@@ -3725,7 +3725,7 @@ void DerivationGoal::registerOutputs()
             DerivationOutputFloating outputHash;
             std::visit(overloaded {
                 [&](DerivationOutputInputAddressed doi) {
-                    throw Error("No.");
+                    assert(false); // Enclosing `if` handles this case in other branch
                 },
                 [&](DerivationOutputFixed dof) {
                     outputHash = DerivationOutputFloating {
