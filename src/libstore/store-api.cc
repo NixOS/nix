@@ -914,12 +914,20 @@ ref<Store> openStore(const std::string & uri_,
     throw Error("don't know how to open Nix store '%s'", uri);
 }
 
+static bool isNonUriPath(const std::string & spec) {
+    return
+        // is not a URL
+        spec.find("://") == std::string::npos
+        // Has at least one path separator, and so isn't a single word that
+        // might be special like "auto"
+        && spec.find("/") != std::string::npos;
+}
 
 StoreType getStoreType(const std::string & uri, const std::string & stateDir)
 {
     if (uri == "daemon") {
         return tDaemon;
-    } else if (uri == "local" || hasPrefix(uri, "/") || hasPrefix(uri, "./")) {
+    } else if (uri == "local" || isNonUriPath(uri)) {
         return tLocal;
     } else if (uri == "" || uri == "auto") {
         if (access(stateDir.c_str(), R_OK | W_OK) == 0)
@@ -943,9 +951,7 @@ static RegisterStoreImplementation regStore([](
             return std::shared_ptr<Store>(std::make_shared<UDSRemoteStore>(params));
         case tLocal: {
             Store::Params params2 = params;
-            if (hasPrefix(uri, "/")) {
-                params2["root"] = uri;
-            } else if (hasPrefix(uri, "./")) {
+            if (isNonUriPath(uri)) {
                 params2["root"] = absPath(uri);
             }
             return std::shared_ptr<Store>(std::make_shared<LocalStore>(params2));
