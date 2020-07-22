@@ -1092,7 +1092,7 @@ StorePath LocalStore::addToStoreFromDump(Source & source0, const string & name,
        or the original source is empty */
     while (dump.size() < settings.narBufferSize) {
         auto oldSize = dump.size();
-        constexpr size_t chunkSize = 1024;
+        constexpr size_t chunkSize = 65536;
         auto want = std::min(chunkSize, settings.narBufferSize - oldSize);
         dump.resize(oldSize + want);
         auto got = 0;
