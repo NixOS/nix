@@ -25,8 +25,6 @@ clean-files += $(d)/*.1 $(d)/*.5 $(d)/*.8
 dist-files += $(man-pages)
 
 $(d)/nix-copy-closure.1: $(d)/src/command-ref/nix-copy-closure.md
-
-%.1: %.md
 	$(trace-gen) lowdown -sT man $^ -o $@
 
 # Generate the HTML manual.
