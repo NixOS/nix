@@ -5,10 +5,7 @@
       version="5.0"
       >
 
-<title>Verifying Build Reproducibility with <option linkend="conf-diff-hook">diff-hook</option></title>
-
-<subtitle>Check build reproducibility by running builds multiple times
-and comparing their results.</subtitle>
+<title>Verifying Build Reproducibility</title>
 
 <para>Specify a program with Nix's <xref linkend="conf-diff-hook" /> to
 compare build results when two builds produce different results. Note:

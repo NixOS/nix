@@ -6,8 +6,6 @@
       >
 
 <title>Using the <option linkend="conf-post-build-hook">post-build-hook</option></title>
-<subtitle>Uploading to an S3-compatible binary cache after each build</subtitle>
-
 
 <section xml:id="chap-post-build-hook-caveats">
   <title>Implementation Caveats</title>
