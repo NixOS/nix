@@ -1195,7 +1195,7 @@ void DerivationGoal::haveDerivation()
 
     parsedDrv = std::make_unique<ParsedDerivation>(drvPath, *drv);
 
-    if (parsedDrv->contentAddressed()) {
+    if (drv->type() == DerivationType::CAFloating) {
         settings.requireExperimentalFeature("ca-derivations");
         throw UnimplementedError("ca-derivations isn't implemented yet");
     }

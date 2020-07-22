@@ -583,6 +583,7 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
 
     PathSet context;
 
+    bool contentAddressed = false;
     std::optional<std::string> outputHash;
     std::string outputHashAlgo;
     auto ingestionMethod = FileIngestionMethod::Flat;
@@ -639,6 +640,9 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
                 if (i->value->type == tNull) continue;
             }
 
+            if (i->name == state.sContentAddressed)
+                contentAddressed = state.forceBool(*i->value, pos);
+
             /* The `args' attribute is special: it supplies the
                command-line arguments to the builder. */
             if (i->name == state.sArgs) {
@@ -694,7 +698,7 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
             }
 
         } catch (Error & e) {
-            e.addTrace(posDrvName, 
+            e.addTrace(posDrvName,
                 "while evaluating the attribute '%1%' of the derivation '%2%'",
                 key, drvName);
             throw;
@@ -761,7 +765,10 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
         });
 
     if (outputHash) {
-        /* Handle fixed-output derivations. */
+        /* Handle fixed-output derivations.
+
+           Ignore `__contentAddressed` because fixed output derivations are
+           already content addressed. */
         if (outputs.size() != 1 || *(outputs.begin()) != "out")
             throw Error({
                 .hint = hintfmt("multiple outputs are not supported in fixed-output derivations"),
@@ -781,6 +788,19 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
                     },
                 },
         });
+    }
+
+    else if (contentAddressed) {
+        HashType ht = parseHashType(outputHashAlgo);
+        for (auto & i : outputs) {
+            if (!jsonObject) drv.env[i] = hashPlaceholder(i);
+            drv.outputs.insert_or_assign(i, DerivationOutput {
+                .output = DerivationOutputFloating {
+                    .method = ingestionMethod,
+                    .hashType = std::move(ht),
+                },
+            });
+        }
     }
 
     else {
