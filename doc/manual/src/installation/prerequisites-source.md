@@ -54,15 +54,6 @@
     obtained from the its repository
     <https://github.com/troglobit/editline>.
 
-  - The `xmllint` and `xsltproc` programs to build this manual and the
-    man-pages. These are part of the `libxml2` and `libxslt` packages,
-    respectively. You also need the [DocBook XSL
-    stylesheets](http://docbook.sourceforge.net/projects/xsl/) and
-    optionally the [DocBook 5.0 RELAX NG
-    schemas](http://www.docbook.org/schemas/5x). Note that these are
-    only required if you modify the manual sources or when you are
-    building from the Git repository.
-
   - Recent versions of Bison and Flex to build the parser. (This is
     because Nix needs GLR support in Bison and reentrancy support in
     Flex.) For Bison, you need version 2.6, which can be obtained from
