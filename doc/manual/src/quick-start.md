@@ -11,7 +11,7 @@ to subsequent chapters.
    This will install Nix in `/nix`. The install script will create
    `/nix` using `sudo`, so make sure you have sufficient rights.  (For
    other installation methods, see
-   [here](../installation/installation.md).)
+   [here](installation/installation.md).)
 
 1. See what installable packages are currently available in the
    channel:
