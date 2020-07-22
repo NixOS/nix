@@ -92,6 +92,10 @@ void Source::operator () (unsigned char * data, size_t len)
     }
 }
 
+void Source::operator () (std::basic_string_view<unsigned char> & data)
+{
+    (*this)((unsigned char *) data.data(), data.size());
+}
 
 std::string Source::drain()
 {
@@ -322,5 +326,18 @@ void StringSink::operator () (const unsigned char * data, size_t len)
     s->append((const char *) data, len);
 }
 
+size_t ChainSource::read(unsigned char * data, size_t len)
+{
+    if (useSecond) {
+        return source2.read(data, len);
+    } else {
+        try {
+            return source1.read(data, len);
+        } catch (EndOfFile &) {
+            useSecond = true;
+            return this->read(data, len);
+        }
+    }
+}
 
 }

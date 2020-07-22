@@ -4,6 +4,7 @@
 
 #include <list>
 #include <set>
+#include <string>
 #include <map>
 #include <vector>
 

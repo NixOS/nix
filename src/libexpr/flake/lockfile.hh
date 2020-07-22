@@ -1,6 +1,7 @@
 #pragma once
 
 #include "flakeref.hh"
+#include "content-address.hh"
 
 #include <nlohmann/json_fwd.hpp>
 
@@ -44,7 +45,7 @@ struct LockedNode : Node
 
     LockedNode(const nlohmann::json & json);
 
-    StorePath computeStorePath(Store & store) const;
+    StorePathDescriptor computeStorePath(Store & store) const;
 };
 
 struct LockFile

@@ -11,9 +11,10 @@ namespace nix {
  */
 
 enum struct FileIngestionMethod : uint8_t {
-    Flat = false,
-    Recursive = true
+    Flat,
+    Recursive,
 };
+
 
 struct TextHash {
     Hash hash;
@@ -65,6 +66,12 @@ struct PathReferences
 {
     std::set<Ref> references;
     bool hasSelfReference = false;
+
+    bool operator == (const PathReferences<Ref> & other) const
+    {
+        return references == other.references
+            && hasSelfReference == other.hasSelfReference;
+    }
 
     /* Functions to view references + hasSelfReference as one set, mainly for
        compatibility's sake. */
@@ -118,18 +125,30 @@ struct FixedOutputInfo : FixedOutputHash {
     PathReferences<StorePath> references;
 };
 
+typedef std::variant<
+    TextInfo,
+    FixedOutputInfo
+> ContentAddressWithReferences;
+
 struct StorePathDescriptor {
     std::string name;
-    std::variant<
-        TextInfo,
-        FixedOutputInfo
-    > info;
+    ContentAddressWithReferences info;
+
+    bool operator == (const StorePathDescriptor & other) const
+    {
+        return name == other.name;
+        // FIXME second field
+    }
 
     bool operator < (const StorePathDescriptor & other) const
     {
         return name < other.name;
+        // FIXME second field
     }
-
 };
+
+std::string renderStorePathDescriptor(StorePathDescriptor ca);
+
+StorePathDescriptor parseStorePathDescriptor(std::string_view rawCa);
 
 }

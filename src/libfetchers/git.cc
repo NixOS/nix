@@ -182,7 +182,7 @@ struct GitInputScheme : InputScheme
             });
         };
 
-        auto makeResult = [&](const Attrs & infoAttrs, StorePath && storePath)
+        auto makeResult = [&](const Attrs & infoAttrs, StorePathDescriptor && storePathDesc)
             -> std::pair<Tree, Input>
         {
             assert(input.getRev());
@@ -191,7 +191,10 @@ struct GitInputScheme : InputScheme
                 input.attrs.insert_or_assign("revCount", getIntAttr(infoAttrs, "revCount"));
             input.attrs.insert_or_assign("lastModified", getIntAttr(infoAttrs, "lastModified"));
             return {
-                Tree(store->toRealPath(storePath), std::move(storePath)),
+                Tree {
+                    store->toRealPath(store->makeFixedOutputPathFromCA(storePathDesc)),
+                    std::move(storePathDesc),
+                },
                 input
             };
         };
@@ -264,6 +267,9 @@ struct GitInputScheme : InputScheme
                 };
 
                 auto storePath = store->addToStore("source", actualUrl, FileIngestionMethod::Recursive, htSHA256, filter);
+                // FIXME: just have Store::addToStore return a StorePathDescriptor, as
+                // it has the underlying information.
+                auto storePathDesc = store->queryPathInfo(storePath)->fullStorePathDescriptorOpt().value();
 
                 // FIXME: maybe we should use the timestamp of the last
                 // modified dirty file?
@@ -272,7 +278,10 @@ struct GitInputScheme : InputScheme
                     haveCommits ? std::stoull(runProgram("git", true, { "-C", actualUrl, "log", "-1", "--format=%ct", "HEAD" })) : 0);
 
                 return {
-                    Tree(store->printStorePath(storePath), std::move(storePath)),
+                    Tree {
+                        store->printStorePath(storePath),
+                        std::move(storePathDesc),
+                    },
                     input
                 };
             }
@@ -293,14 +302,14 @@ struct GitInputScheme : InputScheme
 
             if (!input.getRev())
                 input.attrs.insert_or_assign("rev",
-                    Hash(chomp(runProgram("git", true, { "-C", actualUrl, "rev-parse", *input.getRef() })), htSHA1).gitRev());
+                    Hash::parseAny(chomp(runProgram("git", true, { "-C", actualUrl, "rev-parse", *input.getRef() })), htSHA1).gitRev());
 
             repoDir = actualUrl;
 
         } else {
 
             if (auto res = getCache()->lookup(store, mutableAttrs)) {
-                auto rev2 = Hash(getStrAttr(res->first, "rev"), htSHA1);
+                auto rev2 = Hash::parseAny(getStrAttr(res->first, "rev"), htSHA1);
                 if (!input.getRev() || input.getRev() == rev2) {
                     input.attrs.insert_or_assign("rev", rev2.gitRev());
                     return makeResult(res->first, std::move(res->second));
@@ -370,7 +379,7 @@ struct GitInputScheme : InputScheme
             }
 
             if (!input.getRev())
-                input.attrs.insert_or_assign("rev", Hash(chomp(readFile(localRefFile)), htSHA1).gitRev());
+                input.attrs.insert_or_assign("rev", Hash::parseAny(chomp(readFile(localRefFile)), htSHA1).gitRev());
         }
 
         bool isShallow = chomp(runProgram("git", true, { "-C", repoDir, "rev-parse", "--is-shallow-repository" })) == "true";
@@ -420,6 +429,9 @@ struct GitInputScheme : InputScheme
         }
 
         auto storePath = store->addToStore(name, tmpDir, FileIngestionMethod::Recursive, htSHA256, filter);
+        // FIXME: just have Store::addToStore return a StorePathDescriptor, as
+        // it has the underlying information.
+        auto storePathDesc = store->queryPathInfo(storePath)->fullStorePathDescriptorOpt().value();
 
         auto lastModified = std::stoull(runProgram("git", true, { "-C", repoDir, "log", "-1", "--format=%ct", input.getRev()->gitRev() }));
 
@@ -437,17 +449,17 @@ struct GitInputScheme : InputScheme
                 store,
                 mutableAttrs,
                 infoAttrs,
-                storePath,
+                storePathDesc,
                 false);
 
         getCache()->add(
             store,
             getImmutableAttrs(),
             infoAttrs,
-            storePath,
+            storePathDesc,
             true);
 
-        return makeResult(infoAttrs, std::move(storePath));
+        return makeResult(infoAttrs, std::move(storePathDesc));
     }
 };
 

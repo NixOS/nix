@@ -150,8 +150,10 @@ static void prim_appendContext(EvalState & state, const Pos & pos, Value * * arg
                 .hint = hintfmt("Context key '%s' is not a store path", i.name),
                 .errPos = *i.pos
             });
-        if (!settings.readOnlyMode)
-            state.store->ensurePath(state.store->parseStorePath(i.name));
+        if (!settings.readOnlyMode) {
+            auto path = state.store->parseStorePath(i.name);
+            state.store->ensurePath(path);
+        }
         state.forceAttrs(*i.value, *i.pos);
         auto iter = i.value->attrs->find(sPath);
         if (iter != i.value->attrs->end()) {

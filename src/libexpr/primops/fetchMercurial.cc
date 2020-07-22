@@ -31,7 +31,7 @@ static void prim_fetchMercurial(EvalState & state, const Pos & pos, Value * * ar
                 // be both a revision or a branch/tag name.
                 auto value = state.forceStringNoCtx(*attr.value, *attr.pos);
                 if (std::regex_match(value, revRegex))
-                    rev = Hash(value, htSHA1);
+                    rev = Hash::parseAny(value, htSHA1);
                 else
                     ref = value;
             }
@@ -71,7 +71,8 @@ static void prim_fetchMercurial(EvalState & state, const Pos & pos, Value * * ar
     auto [tree, input2] = input.fetch(state.store);
 
     state.mkAttrs(v, 8);
-    auto storePath = state.store->printStorePath(tree.storePath);
+    auto storePath = state.store->printStorePath(
+        state.store->makeFixedOutputPathFromCA(tree.storePath));
     mkString(*state.allocAttr(v, state.sOutPath), storePath, PathSet({storePath}));
     if (input2.getRef())
         mkString(*state.allocAttr(v, state.symbols.create("branch")), *input2.getRef());

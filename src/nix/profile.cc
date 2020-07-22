@@ -135,7 +135,7 @@ struct ProfileManifest
                 FixedOutputInfo {
                     {
                         .method = FileIngestionMethod::Recursive,
-                        .hash = info.narHash,
+                        .hash = *info.narHash,
                     },
                     { references },
                 },

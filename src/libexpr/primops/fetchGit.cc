@@ -29,7 +29,7 @@ static void prim_fetchGit(EvalState & state, const Pos & pos, Value * * args, Va
             else if (n == "ref")
                 ref = state.forceStringNoCtx(*attr.value, *attr.pos);
             else if (n == "rev")
-                rev = Hash(state.forceStringNoCtx(*attr.value, *attr.pos), htSHA1);
+                rev = Hash::parseAny(state.forceStringNoCtx(*attr.value, *attr.pos), htSHA1);
             else if (n == "name")
                 name = state.forceStringNoCtx(*attr.value, *attr.pos);
             else if (n == "submodules")
@@ -69,7 +69,8 @@ static void prim_fetchGit(EvalState & state, const Pos & pos, Value * * args, Va
     auto [tree, input2] = input.fetch(state.store);
 
     state.mkAttrs(v, 8);
-    auto storePath = state.store->printStorePath(tree.storePath);
+    auto storePath = state.store->printStorePath(
+        state.store->makeFixedOutputPathFromCA(tree.storePath));
     mkString(*state.allocAttr(v, state.sOutPath), storePath, PathSet({storePath}));
     // Backward compatibility: set 'rev' to
     // 0000000000000000000000000000000000000000 for a dirty tree.

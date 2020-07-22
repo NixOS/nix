@@ -48,7 +48,7 @@ struct LockedFlake
     Flake flake;
     LockFile lockFile;
 
-    Fingerprint getFingerprint() const;
+    Fingerprint getFingerprint(const Store & store) const;
 };
 
 struct LockFlags

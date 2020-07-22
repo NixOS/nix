@@ -77,11 +77,12 @@ ref<FSAccessor> LocalFSStore::getFSAccessor()
             std::dynamic_pointer_cast<LocalFSStore>(shared_from_this())));
 }
 
-void LocalFSStore::narFromPath(const StorePath & path, Sink & sink)
+void LocalFSStore::narFromPath(const StorePathOrDesc pathOrDesc, Sink & sink)
 {
-    if (!isValidPath(path))
-        throw Error("path '%s' is not valid", printStorePath(path));
-    dumpPath(getRealStoreDir() + std::string(printStorePath(path), storeDir.size()), sink);
+    auto p = this->bakeCaIfNeeded(pathOrDesc);
+    if (!isValidPath(pathOrDesc))
+        throw Error("path '%s' is not valid", printStorePath(p));
+    dumpPath(getRealStoreDir() + std::string(printStorePath(p), storeDir.size()), sink);
 }
 
 const string LocalFSStore::drvsLogDir = "drvs";

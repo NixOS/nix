@@ -79,8 +79,8 @@ void RefScanSink::operator () (const unsigned char * data, size_t len)
 }
 
 
-PathSet scanForReferences(const string & path,
-    const PathSet & refs, HashResult & hash)
+std::pair<PathSet, HashResult> scanForReferences(const string & path,
+    const PathSet & refs)
 {
     RefScanSink sink;
     std::map<string, Path> backMap;
@@ -112,9 +112,9 @@ PathSet scanForReferences(const string & path,
         found.insert(j->second);
     }
 
-    hash = sink.hashSink.finish();
+    auto hash = sink.hashSink.finish();
 
-    return found;
+    return std::pair<PathSet, HashResult>(found, hash);
 }
 
 

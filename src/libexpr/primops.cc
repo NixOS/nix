@@ -91,7 +91,13 @@ static void prim_scopedImport(EvalState & state, const Pos & pos, Value * * args
     Path realPath = state.checkSourcePath(state.toRealPath(path, context));
 
     // FIXME
-    if (state.store->isStorePath(path) && state.store->isValidPath(state.store->parseStorePath(path)) && isDerivation(path)) {
+    auto complicatedCondition = [&]() -> bool {
+        if (!state.store->isStorePath(path))
+            return false;
+        auto path2 = state.store->parseStorePath(path);
+        return state.store->isValidPath(path2) && isDerivation(path);
+    };
+    if (complicatedCondition()) {
         Derivation drv = readDerivation(*state.store, realPath);
         Value & w = *state.allocValue();
         state.mkAttrs(w, 3 + drv.outputs.size());
@@ -1117,7 +1123,7 @@ static void prim_toFile(EvalState & state, const Pos & pos, Value * * args, Valu
 
 
 static void addPath(EvalState & state, const Pos & pos, const string & name, const Path & path_,
-    Value * filterFun, FileIngestionMethod method, const Hash & expectedHash, Value & v)
+    Value * filterFun, FileIngestionMethod method, const std::optional<Hash> expectedHash, Value & v)
 {
     const auto path = evalSettings.pureEval && expectedHash ?
         path_ :
@@ -1151,7 +1157,7 @@ static void addPath(EvalState & state, const Pos & pos, const string & name, con
         expectedStorePath = state.store->makeFixedOutputPath(name, FixedOutputInfo {
             {
                 .method = method,
-                .hash = expectedHash,
+                .hash = *expectedHash,
             },
             {},
         });
@@ -1188,7 +1194,7 @@ static void prim_filterSource(EvalState & state, const Pos & pos, Value * * args
             .errPos = pos
         });
 
-    addPath(state, pos, std::string(baseNameOf(path)), path, args[0], FileIngestionMethod::Recursive, Hash(), v);
+    addPath(state, pos, std::string(baseNameOf(path)), path, args[0], FileIngestionMethod::Recursive, std::nullopt, v);
 }
 
 static void prim_path(EvalState & state, const Pos & pos, Value * * args, Value & v)
@@ -1198,7 +1204,7 @@ static void prim_path(EvalState & state, const Pos & pos, Value * * args, Value 
     string name;
     Value * filterFun = nullptr;
     auto method = FileIngestionMethod::Recursive;
-    Hash expectedHash;
+    Hash expectedHash(htSHA256);
 
     for (auto & attr : *args[0]->attrs) {
         const string & n(attr.name);
