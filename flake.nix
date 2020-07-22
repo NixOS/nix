@@ -66,6 +66,7 @@
             libxslt
             docbook5
             docbook_xsl_ns
+            lowdown
             autoconf-archive
             autoreconfHook
 
@@ -185,6 +186,26 @@
             postUnpack = "sourceRoot=$sourceRoot/perl";
           };
 
+        };
+
+        lowdown = with final; stdenv.mkDerivation {
+          name = "lowdown-0.7.1";
+
+          src = fetchurl {
+            url = https://kristaps.bsd.lv/lowdown/snapshots/lowdown-0.7.1.tar.gz;
+            hash = "sha512-1daoAQfYD0LdhK6aFhrSQvadjc5GsSPBZw0fJDb+BEHYMBLjqiUl2A7H8N+l0W4YfGKqbsPYSrCy4vct+7U6FQ==";
+          };
+
+          outputs = [ "out" "dev" ];
+
+          buildInputs = [ which ];
+
+          configurePhase =
+            ''
+              ./configure \
+                PREFIX=${placeholder "dev"} \
+                BINDIR=${placeholder "out"}/bin
+            '';
         };
 
       };
