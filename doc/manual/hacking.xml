@@ -32,7 +32,7 @@ i686-linux, x86_64-darwin, x86_64-linux.
 i.e.
 
 <screen>
-nix-build -A defaultPackage.x86_64-linux
+$ nix-build -A defaultPackage.x86_64-linux
 </screen>
 
 </para>
