@@ -62,10 +62,7 @@
         buildDeps =
           [ bison
             flex
-            libxml2
-            libxslt
-            docbook5
-            docbook_xsl_ns
+            mdbook
             lowdown
             autoconf-archive
             autoreconfHook

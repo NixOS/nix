@@ -1,4 +1,4 @@
-# About Nix
+# Introduction
 
 Nix is a _purely functional package manager_.  This means that it
 treats packages like values in purely functional programming languages
