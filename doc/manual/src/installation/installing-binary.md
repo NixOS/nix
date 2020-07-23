@@ -34,8 +34,8 @@ manually create `/nix` first as root, e.g.:
 The install script will modify the first writable file from amongst
 `.bash_profile`, `.bash_login` and `.profile` to source
 `~/.nix-profile/etc/profile.d/nix.sh`. You can set the
-NIX\_INSTALLER\_NO\_MODIFY\_PROFILE environment variable before
-executing the install script to disable this behaviour.
+`NIX_INSTALLER_NO_MODIFY_PROFILE` environment variable before executing
+the install script to disable this behaviour.
 
 You can uninstall Nix simply by running:
 

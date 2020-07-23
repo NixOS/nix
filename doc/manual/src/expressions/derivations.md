@@ -83,32 +83,32 @@ as a command-line argument. See the Nixpkgs manual for details.
 The builder is executed as follows:
 
   - A temporary directory is created under the directory specified by
-    TMPDIR (default `/tmp`) where the build will take place. The current
-    directory is changed to this directory.
+    `TMPDIR` (default `/tmp`) where the build will take place. The
+    current directory is changed to this directory.
 
   - The environment is cleared and set to the derivation attributes, as
     specified above.
 
   - In addition, the following variables are set:
     
-      - NIX\_BUILD\_TOP contains the path of the temporary directory for
+      - `NIX_BUILD_TOP` contains the path of the temporary directory for
         this build.
     
-      - Also, TMPDIR, TEMPDIR, TMP, TEMP are set to point to the
+      - Also, `TMPDIR`, `TEMPDIR`, `TMP`, `TEMP` are set to point to the
         temporary directory. This is to prevent the builder from
         accidentally writing temporary files anywhere else. Doing so
         might cause interference by other processes.
     
-      - PATH is set to `/path-not-set` to prevent shells from
+      - `PATH` is set to `/path-not-set` to prevent shells from
         initialising it to their built-in default value.
     
-      - HOME is set to `/homeless-shelter` to prevent programs from
+      - `HOME` is set to `/homeless-shelter` to prevent programs from
         using `/etc/passwd` or the like to find the user's home
-        directory, which could cause impurity. Usually, when HOME is
+        directory, which could cause impurity. Usually, when `HOME` is
         set, it is used as the location of the home directory, even if
         it points to a non-existent path.
     
-      - NIX\_STORE is set to the path of the top-level Nix store
+      - `NIX_STORE` is set to the path of the top-level Nix store
         directory (typically, `/nix/store`).
     
       - For each output declared in `outputs`, the corresponding

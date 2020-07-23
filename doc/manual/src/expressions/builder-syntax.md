@@ -19,29 +19,29 @@ what a builder does. It performs the following steps:
 
   - When Nix runs a builder, it initially completely clears the
     environment (except for the attributes declared in the derivation).
-    For instance, the PATH variable is empty\[1\]. This is done to
+    For instance, the `PATH` variable is empty\[1\]. This is done to
     prevent undeclared inputs from being used in the build process. If
-    for example the PATH contained `/usr/bin`, then you might
+    for example the `PATH` contained `/usr/bin`, then you might
     accidentally use `/usr/bin/gcc`.
     
     So the first step is to set up the environment. This is done by
     calling the `setup` script of the standard environment. The
-    environment variable stdenv points to the location of the standard
+    environment variable `stdenv` points to the location of the standard
     environment being used. (It wasn't specified explicitly as an
     attribute in [???](#ex-hello-nix), but `mkDerivation` adds it
     automatically.)
 
   - Since Hello needs Perl, we have to make sure that Perl is in the
-    PATH. The perl environment variable points to the location of the
-    Perl package (since it was passed in as an attribute to the
+    `PATH`. The `perl` environment variable points to the location of
+    the Perl package (since it was passed in as an attribute to the
     derivation), so `$perl/bin` is the directory containing the Perl
     interpreter.
 
   - Now we have to unpack the sources. The `src` attribute was bound to
     the result of fetching the Hello source tarball from the network, so
-    the src environment variable points to the location in the Nix store
-    to which the tarball was downloaded. After unpacking, we `cd` to the
-    resulting source directory.
+    the `src` environment variable points to the location in the Nix
+    store to which the tarball was downloaded. After unpacking, we `cd`
+    to the resulting source directory.
     
     The whole build is performed in a temporary directory created in
     `/tmp`, by the way. This directory is removed after the builder
@@ -55,13 +55,13 @@ what a builder does. It performs the following steps:
     separate location in the Nix store, for instance
     `/nix/store/9a54ba97fb71b65fda531012d0443ce2-hello-2.1.1`. Nix
     computes this path by cryptographically hashing all attributes of
-    the derivation. The path is passed to the builder through the out
+    the derivation. The path is passed to the builder through the `out`
     environment variable. So here we give `configure` the parameter
     `--prefix=$out` to cause Hello to be installed in the expected
     location.
 
   - Finally we build Hello (`make`) and install it into the location
-    specified by out (`make install`).
+    specified by `out` (`make install`).
 
 If you are wondering about the absence of error checking on the result
 of various commands called in the builder: this is because the shell

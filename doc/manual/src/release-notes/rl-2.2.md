@@ -69,7 +69,7 @@ This is primarily a bug fix release. It also has the following changes:
   - Integers are now 64 bits on all platforms.
 
   - The evaluator now prints profiling statistics (enabled via the
-    NIX\_SHOW\_STATS and NIX\_COUNT\_CALLS environment variables) in
+    `NIX_SHOW_STATS` and `NIX_COUNT_CALLS` environment variables) in
     JSON format.
 
   - The option `--xml` in `nix-store

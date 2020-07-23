@@ -87,7 +87,7 @@ Derivations can declare some infrequently used optional attributes.
         impureEnvVars = [ "http_proxy" "https_proxy" ... ];
     
     to make it use the proxy server configuration specified by the user
-    in the environment variables http\_proxy and friends.
+    in the environment variables `http_proxy` and friends.
     
     This attribute is only allowed in [fixed-output
     derivations](#fixed-output-drvs), where impurities such as these are
@@ -201,15 +201,15 @@ Derivations can declare some infrequently used optional attributes.
         
     ```
     
-    then when the builder runs, the environment variable bigPath will
+    then when the builder runs, the environment variable `bigPath` will
     contain the absolute path to a temporary file containing `a very
     long
                     string`. That is, for any attribute x listed in `passAsFile`, Nix
-    will pass an environment variable xPath holding the path of the file
-    containing the value of attribute x. This is useful when you need to
-    pass large strings to a builder, since most operating systems impose
-    a limit on the size of the environment (typically, a few hundred
-    kilobyte).
+    will pass an environment variable `xPath` holding the path of the
+    file containing the value of attribute x. This is useful when you
+    need to pass large strings to a builder, since most operating
+    systems impose a limit on the size of the environment (typically, a
+    few hundred kilobyte).
 
   - `preferLocalBuild`  
     If this attribute is set to `true` and [distributed building is

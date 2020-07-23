@@ -45,6 +45,8 @@
   - [Verifying Build Reproducibility](advanced-topics/diff-hook.md)
   - [Using the `post-build-hook`](advanced-topics/post-build-hook.md)
 - [Command Reference](command-ref/command-ref.md)
+  - [Common Options](command-ref/opt-common.md)
+  - [Common Environment Variables](command-ref/env-common.md)
   - [Utilities](command-ref/utilities.md)
     - [nix-copy-closure](command-ref/nix-copy-closure.md)
 - [Glossary](glossary.md)

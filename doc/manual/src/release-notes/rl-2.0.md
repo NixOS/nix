@@ -18,7 +18,7 @@ The following incompatible changes have been made:
       - `bspatch`
 
   - The “copy from other stores” substituter mechanism
-    (`copy-from-other-stores` and the NIX\_OTHER\_STORES environment
+    (`copy-from-other-stores` and the `NIX_OTHER_STORES` environment
     variable) has been removed. It was primarily used by the NixOS
     installer to copy available paths from the installation medium. The
     replacement is to use a chroot store as a substituter (e.g.
@@ -233,7 +233,7 @@ This release has the following new features:
         store, the latter via the Nix daemon. You can use `auto` or the
         empty string to auto-select a local or daemon store depending on
         whether you have write permission to the Nix store. It is no
-        longer necessary to set the NIX\_REMOTE environment variable to
+        longer necessary to set the `NIX_REMOTE` environment variable to
         use the Nix daemon.
         
         As noted above, `LocalStore` now supports chroot builds,
@@ -296,7 +296,7 @@ This release has the following new features:
         [now](https://github.com/NixOS/nix/commit/eba840c8a13b465ace90172ff76a0db2899ab11b)
         use `/build` instead of `/tmp` as the temporary build directory.
         This fixes potential security problems when a build accidentally
-        stores its TMPDIR in some security-sensitive place, such as an
+        stores its `TMPDIR` in some security-sensitive place, such as an
         RPATH.
 
   - *Pure evaluation mode*. With the `--pure-eval` flag, Nix enables a
@@ -334,8 +334,8 @@ This release has the following new features:
     using the Nix daemon, you can now just specify a remote build
     machine on the command line, e.g. `--option builders
                     'ssh://my-mac x86_64-darwin'`. The environment variable
-    NIX\_BUILD\_HOOK has been removed and is no longer needed. The
-    environment variable NIX\_REMOTE\_SYSTEMS is still supported for
+    `NIX_BUILD_HOOK` has been removed and is no longer needed. The
+    environment variable `NIX_REMOTE_SYSTEMS` is still supported for
     compatibility, but it is also possible to specify builders in
     `nix.conf` by setting the option `builders =
                     @path`.
@@ -353,7 +353,7 @@ This release has the following new features:
     Nixpkgs provides `lib.inNixShell` to check this variable during
     evaluation.
 
-  - NIX\_PATH is now lazy, so URIs in the path are only downloaded if
+  - `NIX_PATH` is now lazy, so URIs in the path are only downloaded if
     they are needed for evaluation.
 
   - You can now use <channel:> as a short-hand for
@@ -406,7 +406,7 @@ This release has the following new features:
     non-standard base-32.
 
   - `nix-shell` now uses `bashInteractive` from Nixpkgs, rather than the
-    `bash` command that happens to be in the caller’s PATH. This is
+    `bash` command that happens to be in the caller’s `PATH`. This is
     especially important on macOS where the `bash` provided by the
     system is seriously outdated and cannot execute `stdenv`’s setup
     script.
@@ -433,7 +433,7 @@ The Nix language has the following new features:
     
         configureFlags = "--prefix=${placeholder "out"} --includedir=${placeholder "dev"}";
     
-    will cause the configureFlags environment variable to contain the
+    will cause the `configureFlags` environment variable to contain the
     actual store paths corresponding to the `out` and `dev` outputs.
 
 The following builtin functions are new or extended:
@@ -481,23 +481,23 @@ The Nix build environment has the following changes:
     be passed to builders in a non-lossy way. If the special attribute
     `__structuredAttrs` is set to `true`, the other derivation
     attributes are serialised in JSON format and made available to the
-    builder via the file .attrs.json in the builder’s temporary
+    builder via the file `.attrs.json` in the builder’s temporary
     directory. This obviates the need for `passAsFile` since JSON files
     have no size restrictions, unlike process environments.
     
     [As a convenience to Bash
     builders](https://github.com/NixOS/nix/commit/2d5b1b24bf70a498e4c0b378704cfdb6471cc699),
-    Nix writes a script named .attrs.sh to the builder’s directory that
-    initialises shell variables corresponding to all attributes that are
-    representable in Bash. This includes non-nested (associative)
-    arrays. For example, the attribute `hardening.format =
+    Nix writes a script named `.attrs.sh` to the builder’s directory
+    that initialises shell variables corresponding to all attributes
+    that are representable in Bash. This includes non-nested
+    (associative) arrays. For example, the attribute `hardening.format =
                     true` ends up as the Bash associative array element
     `${hardening[format]}`.
 
   - Builders can
     [now](https://github.com/NixOS/nix/commit/88e6bb76de5564b3217be9688677d1c89101b2a3)
     communicate what build phase they are in by writing messages to the
-    file descriptor specified in NIX\_LOG\_FD. The current phase is
+    file descriptor specified in `NIX_LOG_FD`. The current phase is
     shown by the `nix` progress indicator.
 
   - In Linux sandbox builds, we

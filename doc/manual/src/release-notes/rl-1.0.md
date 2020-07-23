@@ -14,7 +14,7 @@ release. Here are the most significant:
     significant speedup.
 
   - Nix now has an search path for expressions. The search path is set
-    using the environment variable NIX\_PATH and the `-I` command line
+    using the environment variable `NIX_PATH` and the `-I` command line
     option. In Nix expressions, paths between angle brackets are used to
     specify files that must be looked up in the search path. For
     instance, the expression `<nixpkgs/default.nix>` looks for a file

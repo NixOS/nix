@@ -8,10 +8,10 @@ In Nix, different users can have different “views” on the set of
 installed applications. That is, there might be lots of applications
 present on the system (possibly in many different versions), but users
 can have a specific selection of those active — where “active” just
-means that it appears in a directory in the user’s PATH. Such a view on
-the set of installed applications is called a *user environment*, which
-is just a directory tree consisting of symlinks to the files of the
-active applications.
+means that it appears in a directory in the user’s `PATH`. Such a view
+on the set of installed applications is called a *user environment*,
+which is just a directory tree consisting of symlinks to the files of
+the active applications.
 
 Components are installed from a set of *Nix expressions* that tell Nix
 how to build those packages, including, if necessary, their

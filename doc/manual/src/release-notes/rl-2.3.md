@@ -25,7 +25,7 @@ It also has the following changes:
     line in the progress bar. To distinguish between concurrent builds,
     log lines are prefixed by the name of the package.
 
-  - Builds are now executed in a pseudo-terminal, and the TERM
+  - Builds are now executed in a pseudo-terminal, and the `TERM`
     environment variable is set to `xterm-256color`. This allows many
     programs (e.g. `gcc`, `clang`, `cmake`) to print colorized log
     output.

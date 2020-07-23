@@ -22,9 +22,9 @@ build facilities in shown in [example\_title](#ex-hello-builder2).
     
     genericBuild 
 
-  - The buildInputs variable tells `setup` to use the indicated packages
-    as “inputs”. This means that if a package provides a `bin`
-    subdirectory, it's added to PATH; if it has a `include`
+  - The `buildInputs` variable tells `setup` to use the indicated
+    packages as “inputs”. This means that if a package provides a `bin`
+    subdirectory, it's added to `PATH`; if it has a `include`
     subdirectory, it's added to GCC's header search path; and so
     on.\[1\]
 
@@ -37,7 +37,7 @@ build facilities in shown in [example\_title](#ex-hello-builder2).
     It can be customised in many ways; see the Nixpkgs manual for
     details.
 
-Discerning readers will note that the buildInputs could just as well
+Discerning readers will note that the `buildInputs` could just as well
 have been set in the Nix expression, like this:
 
 ``` 
@@ -57,5 +57,6 @@ entirely.
 1.  How does it work? `setup` tries to source the file
     `pkg/nix-support/setup-hook` of all dependencies. These “setup
     hooks” can then set up whatever environment variables they want;
-    for instance, the setup hook for Perl sets the PERL5LIB environment
-    variable to contain the `lib/site_perl` directories of all inputs.
+    for instance, the setup hook for Perl sets the `PERL5LIB`
+    environment variable to contain the `lib/site_perl` directories of
+    all inputs.

@@ -32,7 +32,7 @@ of the build will be safely kept on your system. You can use
 
 Nix has transactional semantics. Once a build finishes successfully, Nix
 makes a note of this in its database: it registers that the path denoted
-by out is now “valid”. If you try to build the derivation again, Nix
+by `out` is now “valid”. If you try to build the derivation again, Nix
 will see that the path is already valid and finish immediately. If a
 build fails, either because it returns a non-zero exit code, because Nix
 or the builder are killed, or because the machine crashes, then the

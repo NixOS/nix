@@ -124,8 +124,8 @@
             URL` allows a package to be installed directly from the given URL.
 
   - Nix now works behind an HTTP proxy server; just set the standard
-    environment variables http\_proxy, https\_proxy, ftp\_proxy or
-    all\_proxy appropriately. Functions such as `fetchurl` in Nixpkgs
+    environment variables `http_proxy`, `https_proxy`, `ftp_proxy` or
+    `all_proxy` appropriately. Functions such as `fetchurl` in Nixpkgs
     also respect these variables.
 
   - `nix-build -o

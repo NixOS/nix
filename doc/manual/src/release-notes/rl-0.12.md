@@ -33,7 +33,7 @@
     (remote) Nix stores mounted somewhere in the filesystem. For
     instance, you can speed up an installation by mounting some remote
     Nix store that already has the packages in question via NFS or
-    `sshfs`. The environment variable NIX\_OTHER\_STORES specifies the
+    `sshfs`. The environment variable `NIX_OTHER_STORES` specifies the
     locations of the remote Nix directories, e.g. `/mnt/remote-fs/nix`.
 
   - New `nix-store` operations `--dump-db` and `--load-db` to dump and
@@ -111,7 +111,7 @@
         (integer multiplication), `builtins.div` (integer division).
 
   - `nix-prefetch-url` now supports `mirror://` URLs, provided that the
-    environment variable NIXPKGS\_ALL points at a Nixpkgs tree.
+    environment variable `NIXPKGS_ALL` points at a Nixpkgs tree.
 
   - Removed the commands `nix-pack-closure` and `nix-unpack-closure`.
     You can do almost the same thing but much more efficiently by doing

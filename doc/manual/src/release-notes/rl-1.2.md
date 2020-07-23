@@ -77,7 +77,7 @@ This release has the following improvements and changes:
     about twice as fast.
 
   - Basic Nix expression evaluation profiling: setting the environment
-    variable NIX\_COUNT\_CALLS to `1` will cause Nix to print how many
+    variable `NIX_COUNT_CALLS` to `1` will cause Nix to print how many
     times each primop or function was executed.
 
   - New primops: `concatLists`, `elem`, `elemAt` and `filter`.

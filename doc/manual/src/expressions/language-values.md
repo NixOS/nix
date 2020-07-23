@@ -120,8 +120,8 @@ Nix has the following basic data types:
     
     Paths can also be specified between angle brackets, e.g.
     `<nixpkgs>`. This means that the directories listed in the
-    environment variable NIX\_PATH will be searched for the given file
-    or directory name.
+    environment variable NIX\_PATH\</literal\> will be searched for the
+    given file or directory name.
 
   - *Booleans* with values `true` and `false`.
 

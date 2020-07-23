@@ -16,18 +16,18 @@ configuration trade-offs.
     -j`.
 
 The [???](#conf-cores) setting determines the value of
-NIX\_BUILD\_CORES. NIX\_BUILD\_CORES is equal to [???](#conf-cores),
-unless [???](#conf-cores) equals `0`, in which case NIX\_BUILD\_CORES
+`NIX_BUILD_CORES`. `NIX_BUILD_CORES` is equal to [???](#conf-cores),
+unless [???](#conf-cores) equals `0`, in which case `NIX_BUILD_CORES`
 will be the total number of cores in the system.
 
 The maximum number of consumed cores is a simple multiplication,
-[???](#conf-max-jobs) \* NIX\_BUILD\_CORES.
+[???](#conf-max-jobs) \* `NIX_BUILD_CORES`.
 
 The balance on how to set these two independent variables depends upon
 each builder's workload and hardware. Here are a few example scenarios
 on a machine with 24 cores:
 
-| [???](#conf-max-jobs) | [???](#conf-cores) | NIX\_BUILD\_CORES | Maximum Processes | Result                                                                                                                                                                                                                                                                                 |
+| [???](#conf-max-jobs) | [???](#conf-cores) | `NIX_BUILD_CORES` | Maximum Processes | Result                                                                                                                                                                                                                                                                                 |
 | --------------------- | ------------------ | ----------------- | ----------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | 1                     | 24                 | 24                | 24                | One derivation will be built at a time, each one can use 24 cores. Undersold if a job can’t use 24 cores.                                                                                                                                                                              |
 | 4                     | 6                  | 6                 | 24                | Four derivations will be built at once, each given access to six cores.                                                                                                                                                                                                                |
@@ -38,5 +38,5 @@ on a machine with 24 cores:
 Balancing 24 Build Cores
 
 It is up to the derivations' build script to respect host's requested
-cores-per-build by following the value of the NIX\_BUILD\_CORES
+cores-per-build by following the value of the `NIX_BUILD_CORES`
 environment variable.

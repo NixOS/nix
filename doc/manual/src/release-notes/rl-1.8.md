@@ -76,7 +76,7 @@
     them anyway.
 
   - Various commands now automatically pipe their output into the pager
-    as specified by the PAGER environment variable.
+    as specified by the `PAGER` environment variable.
 
   - Several improvements to reduce memory consumption in the evaluator.
 

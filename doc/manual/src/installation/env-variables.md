@@ -1,7 +1,7 @@
 # Environment Variables
 
 To use Nix, some environment variables should be set. In particular,
-PATH should contain the directories `prefix/bin` and
+`PATH` should contain the directories `prefix/bin` and
 `~/.nix-profile/bin`. The first directory contains the Nix tools
 themselves, while `~/.nix-profile` is a symbolic link to the current
 *user environment* (an automatically generated package consisting of
@@ -12,13 +12,13 @@ this:
 
     source prefix/etc/profile.d/nix.sh
 
-# NIX\_SSL\_CERT\_FILE
+# `NIX_SSL_CERT_FILE`
 
 If you need to specify a custom certificate bundle to account for an
 HTTPS-intercepting man in the middle proxy, you must specify the path to
-the certificate bundle in the environment variable NIX\_SSL\_CERT\_FILE.
+the certificate bundle in the environment variable `NIX_SSL_CERT_FILE`.
 
-If you don't specify a NIX\_SSL\_CERT\_FILE manually, Nix will install
+If you don't specify a `NIX_SSL_CERT_FILE` manually, Nix will install
 and use its own certificate bundle.
 
 Set the environment variable and install Nix
@@ -36,7 +36,7 @@ In the shell profile and rc files (for example, `/etc/bashrc`,
 > You must not add the export and then do the install, as the Nix
 > installer will detect the presense of Nix configuration, and abort.
 
-## NIX\_SSL\_CERT\_FILE with macOS and the Nix daemon
+## `NIX_SSL_CERT_FILE` with macOS and the Nix daemon
 
 On macOS you must specify the environment variable for the Nix daemon
 service, then restart it:

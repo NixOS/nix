@@ -27,7 +27,7 @@ If you get the error
     bash: nix-store: command not found
     error: cannot connect to 'mac'
 
-then you need to ensure that the PATH of non-interactive login shells
+then you need to ensure that the `PATH` of non-interactive login shells
 contains Nix.
 
 > **Warning**

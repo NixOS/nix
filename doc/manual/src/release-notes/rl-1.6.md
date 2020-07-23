@@ -13,7 +13,7 @@ features:
     get an environment that more closely corresponds to the “real” Nix
     build.
 
-  - `nix-shell` now sets the shell prompt (PS1) to ensure that Nix
+  - `nix-shell` now sets the shell prompt (`PS1`) to ensure that Nix
     shells are distinguishable from your regular shells.
 
   - `nix-env` no longer requires a `*` argument to match all packages,

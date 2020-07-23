@@ -39,8 +39,8 @@ features:
         This builds GNU Hello from the latest revision of the Nixpkgs
         master branch.
     
-      - In the Nix search path (as specified via NIX\_PATH or `-I`). For
-        example, to start a shell containing the Pan package from a
+      - In the Nix search path (as specified via `NIX_PATH` or `-I`).
+        For example, to start a shell containing the Pan package from a
         specific version of Nixpkgs:
         
             $ nix-shell -p pan -I nixpkgs=https://github.com/NixOS/nixpkgs-channels/archive/8a3eea054838b55aca962c3fbde9c83c102b8bf2.tar.gz
@@ -124,8 +124,8 @@ features:
   - `nix-env` now only creates a new “generation” symlink in
     `/nix/var/nix/profiles` if something actually changed.
 
-  - The environment variable NIX\_PAGER can now be set to override
-    PAGER. You can set it to `cat` to disable paging for Nix commands
+  - The environment variable `NIX_PAGER` can now be set to override
+    `PAGER`. You can set it to `cat` to disable paging for Nix commands
     only.
 
   - Failing `<...>` lookups now show position information.
