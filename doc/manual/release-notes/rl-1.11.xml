@@ -62,8 +62,8 @@ $ nix-prefetch-url -A nix-repl.src
   <listitem>
     <para>
       The new flag <option>--option build-repeat
-      <replaceable>N</replaceable></option> will cause every build to
-      be executed <replaceable>N</replaceable>+1 times. If the build
+      <emphasis>N</emphasis></option> will cause every build to
+      be executed <emphasis>N</emphasis>+1 times. If the build
       output differs between any round, the build is rejected, and the
       output paths are not registered as valid. This is primarily
       useful to verify build determinism. (We already had a
@@ -78,11 +78,11 @@ $ nix-prefetch-url -A nix-repl.src
   <listitem>
     <para>
       The options <option>--check</option> and <option>--option
-      build-repeat <replaceable>N</replaceable></option>, if they
+      build-repeat <emphasis>N</emphasis></option>, if they
       detect a difference between two runs of the same derivation and
       <option>-K</option> is given, will make the output of the other
       run available under
-      <filename><replaceable>store-path</replaceable>-check</filename>. This
+      <filename><emphasis>store-path</emphasis>-check</filename>. This
       makes it easier to investigate the non-determinism using tools
       like <command>diffoscope</command>, e.g.,
 

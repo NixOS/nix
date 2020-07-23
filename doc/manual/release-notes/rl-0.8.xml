@@ -33,7 +33,7 @@ is too old (i.e., for Nix &lt;= 0.7)</screen>
 
 then you should unsubscribe from the offending channel
 (<command>nix-channel --remove
-<replaceable>URL</replaceable></command>; leave out
+<emphasis>URL</emphasis></command>; leave out
 <literal>/MANIFEST</literal>), and subscribe to the same URL, with
 <literal>channels</literal> replaced by <literal>channels-v3</literal>
 (e.g., <link
@@ -118,7 +118,7 @@ $ nix-store -q --referrers-closure \
   subscribing to a channel.</para></listitem>
 
   <listitem><para><command>nix-store -r
-  <replaceable>PATHS</replaceable></command> now builds all the
+  <emphasis>PATHS</emphasis></command> now builds all the
   derivations PATHS in parallel.  Previously it did them sequentially
   (though exploiting possible parallelism between subderivations).
   This is nice for build farms.</para></listitem>

@@ -95,9 +95,9 @@ features:</para>
 
   <listitem>
     <para>The scoping rules for <literal>inherit
-    (<replaceable>e</replaceable>) ...</literal> in recursive
+    (<emphasis>e</emphasis>) ...</literal> in recursive
     attribute sets have changed.  The expression
-    <replaceable>e</replaceable> can now refer to the attributes
+    <emphasis>e</emphasis> can now refer to the attributes
     defined in the containing set.</para>
   </listitem>
 

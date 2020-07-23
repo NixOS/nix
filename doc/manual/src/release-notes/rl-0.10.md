@@ -34,7 +34,7 @@
     
       - `nix-env -i
                                                         pkgname` will now install the highest available version of
-        pkgname, rather than installing all available versions (which
+        *pkgname*, rather than installing all available versions (which
         would probably give collisions) (`NIX-31`).
     
       - `nix-env (-i|-u) --dry-run` now shows exactly which missing

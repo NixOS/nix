@@ -33,7 +33,7 @@ elements (referenced from the figure by number):
     
     Nix functions generally have the form `{ x, y, ...,
                     z }: e` where `x`, `y`, etc. are the names of the expected
-    arguments, and where e is the body of the function. So here, the
+    arguments, and where *e* is the body of the function. So here, the
     entire remainder of the file is the body of the function; when given
     the required arguments, the body should describe how to build an
     instance of the Hello package.

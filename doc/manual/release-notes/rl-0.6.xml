@@ -91,10 +91,10 @@
     <itemizedlist>
 
       <listitem><para>New language construct: <literal>with
-      <replaceable>E1</replaceable>;
-      <replaceable>E2</replaceable></literal> brings all attributes
-      defined in the attribute set <replaceable>E1</replaceable> in
-      scope in <replaceable>E2</replaceable>.</para></listitem>
+      <emphasis>E1</emphasis>;
+      <emphasis>E2</emphasis></literal> brings all attributes
+      defined in the attribute set <emphasis>E1</emphasis> in
+      scope in <emphasis>E2</emphasis>.</para></listitem>
 
       <listitem><para>Added a <function>map</function>
       function.</para></listitem>

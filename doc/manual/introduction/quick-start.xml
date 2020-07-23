@@ -33,7 +33,7 @@ docbook-xml-4.5
 firefox-33.0.2
 hello-2.9
 libxslt-1.1.28
-<replaceable>...</replaceable></screen>
+<emphasis>...</emphasis></screen>
 
 </para></step>
 

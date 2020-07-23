@@ -59,17 +59,17 @@ $ rm __db* log.* derivers references referrers reserved validpaths DB_CONFIG</sc
 
   <listitem><para>The garbage collector has a number of new options to
   allow only some of the garbage to be deleted.  The option
-  <option>--max-freed <replaceable>N</replaceable></option> tells the
-  collector to stop after at least <replaceable>N</replaceable> bytes
+  <option>--max-freed <emphasis>N</emphasis></option> tells the
+  collector to stop after at least <emphasis>N</emphasis> bytes
   have been deleted.  The option <option>--max-links
-  <replaceable>N</replaceable></option> tells it to stop after the
+  <emphasis>N</emphasis></option> tells it to stop after the
   link count on <filename>/nix/store</filename> has dropped below
-  <replaceable>N</replaceable>.  This is useful for very large Nix
+  <emphasis>N</emphasis>.  This is useful for very large Nix
   stores on filesystems with a 32000 subdirectories limit (like
   <literal>ext3</literal>).  The option <option>--use-atime</option>
   causes store paths to be deleted in order of ascending last access
   time.  This allows non-recently used stuff to be deleted.  The
-  option <option>--max-atime <replaceable>time</replaceable></option>
+  option <option>--max-atime <emphasis>time</emphasis></option>
   specifies an upper limit to the last accessed time of paths that may
   be deleted.  For instance,
 
@@ -119,7 +119,7 @@ the following paths will be downloaded/copied (30.02 MiB):
       <listitem><para>@-patterns as in Haskell.  For instance, in a
       function definition
 
-      <programlisting>f = args @ {x, y, z}: <replaceable>...</replaceable>;</programlisting>
+      <programlisting>f = args @ {x, y, z}: <emphasis>...</emphasis>;</programlisting>
 
       <varname>args</varname> refers to the argument as a whole, which
       is further pattern-matched against the attribute set pattern
@@ -131,7 +131,7 @@ the following paths will be downloaded/copied (30.02 MiB):
       takes <emphasis>at least</emphasis> the listed attributes, while
       ignoring additional attributes.  For instance,
 
-      <programlisting>{stdenv, fetchurl, fuse, ...}: <replaceable>...</replaceable></programlisting>
+      <programlisting>{stdenv, fetchurl, fuse, ...}: <emphasis>...</emphasis></programlisting>
 
       defines a function that accepts any attribute set that includes
       at least the three listed attributes.</para></listitem>
@@ -163,7 +163,7 @@ the following paths will be downloaded/copied (30.02 MiB):
   <command>nix-pack-closure</command> and
   <command>nix-unpack-closure</command>.   You can do almost the same
   thing but much more efficiently by doing <literal>nix-store --export
-  $(nix-store -qR <replaceable>paths</replaceable>) > closure</literal> and
+  $(nix-store -qR <emphasis>paths</emphasis>) > closure</literal> and
   <literal>nix-store --import &lt;
   closure</literal>.</para></listitem>
 

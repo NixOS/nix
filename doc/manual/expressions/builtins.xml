@@ -22,34 +22,34 @@ available as <function>builtins.derivation</function>.</para>
 
 
   <varlistentry xml:id='builtin-abort'>
-    <term><function>abort</function> <replaceable>s</replaceable></term>
-    <term><function>builtins.abort</function> <replaceable>s</replaceable></term>
+    <term><function>abort</function> <emphasis>s</emphasis></term>
+    <term><function>builtins.abort</function> <emphasis>s</emphasis></term>
 
     <listitem><para>Abort Nix expression evaluation, print error
-    message <replaceable>s</replaceable>.</para></listitem>
+    message <emphasis>s</emphasis>.</para></listitem>
 
   </varlistentry>
 
 
   <varlistentry xml:id='builtin-add'>
     <term><function>builtins.add</function>
-    <replaceable>e1</replaceable> <replaceable>e2</replaceable>
+    <emphasis>e1</emphasis> <emphasis>e2</emphasis>
     </term>
 
     <listitem><para>Return the sum of the numbers
-    <replaceable>e1</replaceable> and
-    <replaceable>e2</replaceable>.</para></listitem>
+    <emphasis>e1</emphasis> and
+    <emphasis>e2</emphasis>.</para></listitem>
 
   </varlistentry>
 
 
   <varlistentry xml:id='builtin-all'>
     <term><function>builtins.all</function>
-    <replaceable>pred</replaceable> <replaceable>list</replaceable></term>
+    <emphasis>pred</emphasis> <emphasis>list</emphasis></term>
 
     <listitem><para>Return <literal>true</literal> if the function
-    <replaceable>pred</replaceable> returns <literal>true</literal>
-    for all elements of <replaceable>list</replaceable>,
+    <emphasis>pred</emphasis> returns <literal>true</literal>
+    for all elements of <emphasis>list</emphasis>,
     and <literal>false</literal> otherwise.</para></listitem>
 
   </varlistentry>
@@ -57,11 +57,11 @@ available as <function>builtins.derivation</function>.</para>
 
   <varlistentry xml:id='builtin-any'>
     <term><function>builtins.any</function>
-    <replaceable>pred</replaceable> <replaceable>list</replaceable></term>
+    <emphasis>pred</emphasis> <emphasis>list</emphasis></term>
 
     <listitem><para>Return <literal>true</literal> if the function
-    <replaceable>pred</replaceable> returns <literal>true</literal>
-    for at least one element of <replaceable>list</replaceable>,
+    <emphasis>pred</emphasis> returns <literal>true</literal>
+    for at least one element of <emphasis>list</emphasis>,
     and <literal>false</literal> otherwise.</para></listitem>
 
   </varlistentry>
@@ -69,10 +69,10 @@ available as <function>builtins.derivation</function>.</para>
 
   <varlistentry xml:id='builtin-attrNames'>
     <term><function>builtins.attrNames</function>
-    <replaceable>set</replaceable></term>
+    <emphasis>set</emphasis></term>
 
     <listitem><para>Return the names of the attributes in the set
-    <replaceable>set</replaceable> in an alphabetically sorted list.  For instance,
+    <emphasis>set</emphasis> in an alphabetically sorted list.  For instance,
     <literal>builtins.attrNames { y = 1; x = "foo"; }</literal>
     evaluates to <literal>[ "x" "y" ]</literal>.</para></listitem>
 
@@ -81,20 +81,20 @@ available as <function>builtins.derivation</function>.</para>
 
   <varlistentry xml:id='builtin-attrValues'>
     <term><function>builtins.attrValues</function>
-    <replaceable>set</replaceable></term>
+    <emphasis>set</emphasis></term>
 
     <listitem><para>Return the values of the attributes in the set
-    <replaceable>set</replaceable> in the order corresponding to the
+    <emphasis>set</emphasis> in the order corresponding to the
     sorted attribute names.</para></listitem>
 
   </varlistentry>
 
 
   <varlistentry xml:id='builtin-baseNameOf'>
-    <term><function>baseNameOf</function> <replaceable>s</replaceable></term>
+    <term><function>baseNameOf</function> <emphasis>s</emphasis></term>
 
     <listitem><para>Return the <emphasis>base name</emphasis> of the
-    string <replaceable>s</replaceable>, that is, everything following
+    string <emphasis>s</emphasis>, that is, everything following
     the final slash in the string.  This is similar to the GNU
     <command>basename</command> command.</para></listitem>
 
@@ -103,33 +103,33 @@ available as <function>builtins.derivation</function>.</para>
 
   <varlistentry xml:id='builtin-bitAnd'>
     <term><function>builtins.bitAnd</function>
-    <replaceable>e1</replaceable> <replaceable>e2</replaceable></term>
+    <emphasis>e1</emphasis> <emphasis>e2</emphasis></term>
 
     <listitem><para>Return the bitwise AND of the integers
-    <replaceable>e1</replaceable> and
-    <replaceable>e2</replaceable>.</para></listitem>
+    <emphasis>e1</emphasis> and
+    <emphasis>e2</emphasis>.</para></listitem>
 
   </varlistentry>
 
 
   <varlistentry xml:id='builtin-bitOr'>
     <term><function>builtins.bitOr</function>
-    <replaceable>e1</replaceable> <replaceable>e2</replaceable></term>
+    <emphasis>e1</emphasis> <emphasis>e2</emphasis></term>
 
     <listitem><para>Return the bitwise OR of the integers
-    <replaceable>e1</replaceable> and
-    <replaceable>e2</replaceable>.</para></listitem>
+    <emphasis>e1</emphasis> and
+    <emphasis>e2</emphasis>.</para></listitem>
 
   </varlistentry>
 
 
   <varlistentry xml:id='builtin-bitXor'>
     <term><function>builtins.bitXor</function>
-    <replaceable>e1</replaceable> <replaceable>e2</replaceable></term>
+    <emphasis>e1</emphasis> <emphasis>e2</emphasis></term>
 
     <listitem><para>Return the bitwise XOR of the integers
-    <replaceable>e1</replaceable> and
-    <replaceable>e2</replaceable>.</para></listitem>
+    <emphasis>e1</emphasis> and
+    <emphasis>e2</emphasis>.</para></listitem>
 
   </varlistentry>
 
@@ -154,15 +154,15 @@ if builtins ? getEnv then builtins.getEnv "PATH" else ""</programlisting>
 
   <varlistentry xml:id='builtin-compareVersions'>
     <term><function>builtins.compareVersions</function>
-    <replaceable>s1</replaceable> <replaceable>s2</replaceable></term>
+    <emphasis>s1</emphasis> <emphasis>s2</emphasis></term>
 
     <listitem><para>Compare two strings representing versions and
     return <literal>-1</literal> if version
-    <replaceable>s1</replaceable> is older than version
-    <replaceable>s2</replaceable>, <literal>0</literal> if they are
+    <emphasis>s1</emphasis> is older than version
+    <emphasis>s2</emphasis>, <literal>0</literal> if they are
     the same, and <literal>1</literal> if
-    <replaceable>s1</replaceable> is newer than
-    <replaceable>s2</replaceable>.  The version comparison algorithm
+    <emphasis>s1</emphasis> is newer than
+    <emphasis>s2</emphasis>.  The version comparison algorithm
     is the same as the one used by <link
     linkend="ssec-version-comparisons"><command>nix-env
     -u</command></link>.</para></listitem>
@@ -172,7 +172,7 @@ if builtins ? getEnv then builtins.getEnv "PATH" else ""</programlisting>
 
   <varlistentry xml:id='builtin-concatLists'>
     <term><function>builtins.concatLists</function>
-    <replaceable>lists</replaceable></term>
+    <emphasis>lists</emphasis></term>
 
     <listitem><para>Concatenate a list of lists into a single
     list.</para></listitem>
@@ -181,7 +181,7 @@ if builtins ? getEnv then builtins.getEnv "PATH" else ""</programlisting>
 
   <varlistentry xml:id='builtin-concatStringsSep'>
     <term><function>builtins.concatStringsSep</function>
-    <replaceable>separator</replaceable> <replaceable>list</replaceable></term>
+    <emphasis>separator</emphasis> <emphasis>list</emphasis></term>
 
     <listitem><para>Concatenate a list of strings with a separator
     between each element, e.g. <literal>concatStringsSep "/"
@@ -225,12 +225,12 @@ if builtins ? getEnv then builtins.getEnv "PATH" else ""</programlisting>
 
   <varlistentry xml:id='builtin-deepSeq'>
     <term><function>builtins.deepSeq</function>
-    <replaceable>e1</replaceable> <replaceable>e2</replaceable></term>
+    <emphasis>e1</emphasis> <emphasis>e2</emphasis></term>
 
     <listitem><para>This is like <literal>seq
-    <replaceable>e1</replaceable>
-    <replaceable>e2</replaceable></literal>, except that
-    <replaceable>e1</replaceable> is evaluated
+    <emphasis>e1</emphasis>
+    <emphasis>e2</emphasis></literal>, except that
+    <emphasis>e1</emphasis> is evaluated
     <emphasis>deeply</emphasis>: if it’s a list or set, its elements
     or attributes are also evaluated recursively.</para></listitem>
 
@@ -239,9 +239,9 @@ if builtins ? getEnv then builtins.getEnv "PATH" else ""</programlisting>
 
   <varlistentry xml:id='builtin-derivation'>
     <term><function>derivation</function>
-    <replaceable>attrs</replaceable></term>
+    <emphasis>attrs</emphasis></term>
     <term><function>builtins.derivation</function>
-    <replaceable>attrs</replaceable></term>
+    <emphasis>attrs</emphasis></term>
 
     <listitem><para><function>derivation</function> is described in
     <xref linkend='ssec-derivation' />.</para></listitem>
@@ -250,11 +250,11 @@ if builtins ? getEnv then builtins.getEnv "PATH" else ""</programlisting>
 
 
   <varlistentry xml:id='builtin-dirOf'>
-    <term><function>dirOf</function> <replaceable>s</replaceable></term>
-    <term><function>builtins.dirOf</function> <replaceable>s</replaceable></term>
+    <term><function>dirOf</function> <emphasis>s</emphasis></term>
+    <term><function>builtins.dirOf</function> <emphasis>s</emphasis></term>
 
     <listitem><para>Return the directory part of the string
-    <replaceable>s</replaceable>, that is, everything before the final
+    <emphasis>s</emphasis>, that is, everything before the final
     slash in the string.  This is similar to the GNU
     <command>dirname</command> command.</para></listitem>
 
@@ -263,21 +263,21 @@ if builtins ? getEnv then builtins.getEnv "PATH" else ""</programlisting>
 
   <varlistentry xml:id='builtin-div'>
     <term><function>builtins.div</function>
-    <replaceable>e1</replaceable> <replaceable>e2</replaceable></term>
+    <emphasis>e1</emphasis> <emphasis>e2</emphasis></term>
 
     <listitem><para>Return the quotient of the numbers
-    <replaceable>e1</replaceable> and
-    <replaceable>e2</replaceable>.</para></listitem>
+    <emphasis>e1</emphasis> and
+    <emphasis>e2</emphasis>.</para></listitem>
 
   </varlistentry>
 
   <varlistentry xml:id='builtin-elem'>
     <term><function>builtins.elem</function>
-    <replaceable>x</replaceable> <replaceable>xs</replaceable></term>
+    <emphasis>x</emphasis> <emphasis>xs</emphasis></term>
 
     <listitem><para>Return <literal>true</literal> if a value equal to
-    <replaceable>x</replaceable> occurs in the list
-    <replaceable>xs</replaceable>, and <literal>false</literal>
+    <emphasis>x</emphasis> occurs in the list
+    <emphasis>xs</emphasis>, and <literal>false</literal>
     otherwise.</para></listitem>
 
   </varlistentry>
@@ -285,10 +285,10 @@ if builtins ? getEnv then builtins.getEnv "PATH" else ""</programlisting>
 
   <varlistentry xml:id='builtin-elemAt'>
     <term><function>builtins.elemAt</function>
-    <replaceable>xs</replaceable> <replaceable>n</replaceable></term>
+    <emphasis>xs</emphasis> <emphasis>n</emphasis></term>
 
-    <listitem><para>Return element <replaceable>n</replaceable> from
-    the list <replaceable>xs</replaceable>.  Elements are counted
+    <listitem><para>Return element <emphasis>n</emphasis> from
+    the list <emphasis>xs</emphasis>.  Elements are counted
     starting from 0.  A fatal error occurs if the index is out of
     bounds.</para></listitem>
 
@@ -297,7 +297,7 @@ if builtins ? getEnv then builtins.getEnv "PATH" else ""</programlisting>
 
   <varlistentry xml:id='builtin-fetchurl'>
     <term><function>builtins.fetchurl</function>
-    <replaceable>url</replaceable></term>
+    <emphasis>url</emphasis></term>
 
     <listitem><para>Download the specified URL and return the path of
     the downloaded file. This function is not available if <link
@@ -309,9 +309,9 @@ if builtins ? getEnv then builtins.getEnv "PATH" else ""</programlisting>
 
   <varlistentry xml:id='builtin-fetchTarball'>
     <term><function>fetchTarball</function>
-    <replaceable>url</replaceable></term>
+    <emphasis>url</emphasis></term>
     <term><function>builtins.fetchTarball</function>
-    <replaceable>url</replaceable></term>
+    <emphasis>url</emphasis></term>
 
     <listitem><para>Download the specified URL, unpack it and return
     the path of the unpacked tree. The file must be a tape archive
@@ -333,9 +333,9 @@ stdenv.mkDerivation { … }
     <para>The fetched tarball is cached for a certain amount of time
     (1 hour by default) in <filename>~/.cache/nix/tarballs/</filename>.
     You can change the cache timeout either on the command line with
-    <option>--option tarball-ttl <replaceable>number of seconds</replaceable></option> or
+    <option>--option tarball-ttl <emphasis>number of seconds</emphasis></option> or
     in the Nix configuration file with this option:
-    <literal><xref linkend="conf-tarball-ttl" /> <replaceable>number of seconds to cache</replaceable></literal>.
+    <literal><xref linkend="conf-tarball-ttl" /> <emphasis>number of seconds to cache</emphasis></literal>.
     </para>
 
     <para>Note that when obtaining the hash with <varname>nix-prefetch-url
@@ -367,12 +367,12 @@ stdenv.mkDerivation { … }
   <varlistentry xml:id='builtin-fetchGit'>
     <term>
       <function>builtins.fetchGit</function>
-      <replaceable>args</replaceable>
+      <emphasis>args</emphasis>
     </term>
 
     <listitem>
       <para>
-        Fetch a path from git. <replaceable>args</replaceable> can be
+        Fetch a path from git. <emphasis>args</emphasis> can be
         a URL, in which case the HEAD of the repo at that URL is
         fetched. Otherwise, it can be an attribute with the following
         attributes (all except <varname>url</varname> optional):
@@ -526,11 +526,11 @@ stdenv.mkDerivation { … }
 
 
   <varlistentry><term><function>builtins.filter</function>
-  <replaceable>f</replaceable> <replaceable>xs</replaceable></term>
+  <emphasis>f</emphasis> <emphasis>xs</emphasis></term>
 
     <listitem><para>Return a list consisting of the elements of
-    <replaceable>xs</replaceable> for which the function
-    <replaceable>f</replaceable> returns
+    <emphasis>xs</emphasis> for which the function
+    <emphasis>f</emphasis> returns
     <literal>true</literal>.</para></listitem>
 
   </varlistentry>
@@ -538,7 +538,7 @@ stdenv.mkDerivation { … }
 
   <varlistentry xml:id='builtin-filterSource'>
     <term><function>builtins.filterSource</function>
-    <replaceable>e1</replaceable> <replaceable>e2</replaceable></term>
+    <emphasis>e1</emphasis> <emphasis>e2</emphasis></term>
 
     <listitem>
 
@@ -569,10 +569,10 @@ stdenv.mkDerivation {
 
       </para>
 
-      <para>Thus, the first argument <replaceable>e1</replaceable>
+      <para>Thus, the first argument <emphasis>e1</emphasis>
       must be a predicate function that is called for each regular
       file, directory or symlink in the source tree
-      <replaceable>e2</replaceable>.  If the function returns
+      <emphasis>e2</emphasis>.  If the function returns
       <literal>true</literal>, the file is copied to the Nix store,
       otherwise it is omitted.  The function is called with two
       arguments.  The first is the full path of the file.  The second
@@ -584,7 +584,7 @@ stdenv.mkDerivation {
       the Nix store, so if the predicate returns
       <literal>true</literal> for them, the copy will fail). If you
       exclude a directory, the entire corresponding subtree of
-      <replaceable>e2</replaceable> will be excluded.</para>
+      <emphasis>e2</emphasis> will be excluded.</para>
 
     </listitem>
 
@@ -593,7 +593,7 @@ stdenv.mkDerivation {
 
   <varlistentry xml:id='builtin-foldl-prime'>
     <term><function>builtins.foldl’</function>
-    <replaceable>op</replaceable> <replaceable>nul</replaceable> <replaceable>list</replaceable></term>
+    <emphasis>op</emphasis> <emphasis>nul</emphasis> <emphasis>list</emphasis></term>
 
     <listitem><para>Reduce a list by applying a binary operator, from
     left to right, e.g. <literal>foldl’ op nul [x0 x1 x2 ...] = op (op
@@ -607,11 +607,11 @@ stdenv.mkDerivation {
 
   <varlistentry xml:id='builtin-functionArgs'>
     <term><function>builtins.functionArgs</function>
-    <replaceable>f</replaceable></term>
+    <emphasis>f</emphasis></term>
 
     <listitem><para>
     Return a set containing the names of the formal arguments expected
-    by the function <replaceable>f</replaceable>.
+    by the function <emphasis>f</emphasis>.
     The value of each attribute is a Boolean denoting whether the corresponding
     argument has a default value.  For instance,
     <literal>functionArgs ({ x, y ? 123}: ...)  =  { x = false; y = true; }</literal>.
@@ -625,7 +625,7 @@ stdenv.mkDerivation {
 
 
   <varlistentry xml:id='builtin-fromJSON'>
-    <term><function>builtins.fromJSON</function> <replaceable>e</replaceable></term>
+    <term><function>builtins.fromJSON</function> <emphasis>e</emphasis></term>
 
     <listitem><para>Convert a JSON string to a Nix
     value. For example,
@@ -642,12 +642,12 @@ builtins.fromJSON ''{"x": [1, 2, 3], "y": null}''
 
   <varlistentry xml:id='builtin-genList'>
     <term><function>builtins.genList</function>
-    <replaceable>generator</replaceable> <replaceable>length</replaceable></term>
+    <emphasis>generator</emphasis> <emphasis>length</emphasis></term>
 
     <listitem><para>Generate list of size
-    <replaceable>length</replaceable>, with each element
-    <replaceable>i</replaceable> equal to the value returned by
-    <replaceable>generator</replaceable> <literal>i</literal>. For
+    <emphasis>length</emphasis>, with each element
+    <emphasis>i</emphasis> equal to the value returned by
+    <emphasis>generator</emphasis> <literal>i</literal>. For
     example,
 
 <programlisting>
@@ -661,13 +661,13 @@ builtins.genList (x: x * x) 5
 
   <varlistentry xml:id='builtin-getAttr'>
     <term><function>builtins.getAttr</function>
-    <replaceable>s</replaceable> <replaceable>set</replaceable></term>
+    <emphasis>s</emphasis> <emphasis>set</emphasis></term>
 
     <listitem><para><function>getAttr</function> returns the attribute
-    named <replaceable>s</replaceable> from
-    <replaceable>set</replaceable>.  Evaluation aborts if the
+    named <emphasis>s</emphasis> from
+    <emphasis>set</emphasis>.  Evaluation aborts if the
     attribute doesn’t exist.  This is a dynamic version of the
-    <literal>.</literal> operator, since <replaceable>s</replaceable>
+    <literal>.</literal> operator, since <emphasis>s</emphasis>
     is an expression rather than an identifier.</para></listitem>
 
   </varlistentry>
@@ -675,10 +675,10 @@ builtins.genList (x: x * x) 5
 
   <varlistentry xml:id='builtin-getEnv'>
     <term><function>builtins.getEnv</function>
-    <replaceable>s</replaceable></term>
+    <emphasis>s</emphasis></term>
 
     <listitem><para><function>getEnv</function> returns the value of
-    the environment variable <replaceable>s</replaceable>, or an empty
+    the environment variable <emphasis>s</emphasis>, or an empty
     string if the variable doesn’t exist.  This function should be
     used with care, as it can introduce all sorts of nasty environment
     dependencies in your Nix expression.</para>
@@ -694,14 +694,14 @@ builtins.genList (x: x * x) 5
 
   <varlistentry xml:id='builtin-hasAttr'>
     <term><function>builtins.hasAttr</function>
-    <replaceable>s</replaceable> <replaceable>set</replaceable></term>
+    <emphasis>s</emphasis> <emphasis>set</emphasis></term>
 
     <listitem><para><function>hasAttr</function> returns
-    <literal>true</literal> if <replaceable>set</replaceable> has an
-    attribute named <replaceable>s</replaceable>, and
+    <literal>true</literal> if <emphasis>set</emphasis> has an
+    attribute named <emphasis>s</emphasis>, and
     <literal>false</literal> otherwise.  This is a dynamic version of
     the <literal>?</literal>  operator, since
-    <replaceable>s</replaceable> is an expression rather than an
+    <emphasis>s</emphasis> is an expression rather than an
     identifier.</para></listitem>
 
   </varlistentry>
@@ -709,11 +709,11 @@ builtins.genList (x: x * x) 5
 
   <varlistentry xml:id='builtin-hashString'>
     <term><function>builtins.hashString</function>
-    <replaceable>type</replaceable> <replaceable>s</replaceable></term>
+    <emphasis>type</emphasis> <emphasis>s</emphasis></term>
 
     <listitem><para>Return a base-16 representation of the
-    cryptographic hash of string <replaceable>s</replaceable>.  The
-    hash algorithm specified by <replaceable>type</replaceable> must
+    cryptographic hash of string <emphasis>s</emphasis>.  The
+    hash algorithm specified by <emphasis>type</emphasis> must
     be one of <literal>"md5"</literal>, <literal>"sha1"</literal>,
     <literal>"sha256"</literal> or <literal>"sha512"</literal>.</para></listitem>
 
@@ -722,11 +722,11 @@ builtins.genList (x: x * x) 5
 
   <varlistentry xml:id='builtin-hashFile'>
     <term><function>builtins.hashFile</function>
-    <replaceable>type</replaceable> <replaceable>p</replaceable></term>
+    <emphasis>type</emphasis> <emphasis>p</emphasis></term>
 
     <listitem><para>Return a base-16 representation of the
-    cryptographic hash of the file at path <replaceable>p</replaceable>.  The
-    hash algorithm specified by <replaceable>type</replaceable> must
+    cryptographic hash of the file at path <emphasis>p</emphasis>.  The
+    hash algorithm specified by <emphasis>type</emphasis> must
     be one of <literal>"md5"</literal>, <literal>"sha1"</literal>,
     <literal>"sha256"</literal> or <literal>"sha512"</literal>.</para></listitem>
 
@@ -735,7 +735,7 @@ builtins.genList (x: x * x) 5
 
   <varlistentry xml:id='builtin-head'>
     <term><function>builtins.head</function>
-    <replaceable>list</replaceable></term>
+    <emphasis>list</emphasis></term>
 
     <listitem><para>Return the first element of a list; abort
     evaluation if the argument isn’t a list or is an empty list.  You
@@ -747,13 +747,13 @@ builtins.genList (x: x * x) 5
 
   <varlistentry xml:id='builtin-import'>
     <term><function>import</function>
-    <replaceable>path</replaceable></term>
+    <emphasis>path</emphasis></term>
     <term><function>builtins.import</function>
-    <replaceable>path</replaceable></term>
+    <emphasis>path</emphasis></term>
 
     <listitem><para>Load, parse and return the Nix expression in the
-    file <replaceable>path</replaceable>.  If <replaceable>path
-    </replaceable> is a directory, the file <filename>default.nix
+    file <emphasis>path</emphasis>.  If <emphasis>path
+    </emphasis> is a directory, the file <filename>default.nix
     </filename> in that directory is loaded.  Evaluation aborts if the
     file doesn’t exist or contains an incorrect Nix expression.
     <function>import</function> implements Nix’s module system: you
@@ -763,7 +763,7 @@ builtins.genList (x: x * x) 5
 
     <note><para>Unlike some languages, <function>import</function> is a regular
     function in Nix. Paths using the angle bracket syntax (e.g., <function>
-    import</function> <replaceable>&lt;foo&gt;</replaceable>) are normal path
+    import</function> <emphasis>&lt;foo&gt;</emphasis>) are normal path
     values (see <xref linkend='ssec-values' />).</para></note>
 
     <para>A Nix expression loaded by <function>import</function> must
@@ -810,21 +810,21 @@ x: x + 456</programlisting>
 
   <varlistentry xml:id='builtin-intersectAttrs'>
     <term><function>builtins.intersectAttrs</function>
-    <replaceable>e1</replaceable> <replaceable>e2</replaceable></term>
+    <emphasis>e1</emphasis> <emphasis>e2</emphasis></term>
 
     <listitem><para>Return a set consisting of the attributes in the
-    set <replaceable>e2</replaceable> that also exist in the set
-    <replaceable>e1</replaceable>.</para></listitem>
+    set <emphasis>e2</emphasis> that also exist in the set
+    <emphasis>e1</emphasis>.</para></listitem>
 
   </varlistentry>
 
 
   <varlistentry xml:id='builtin-isAttrs'>
     <term><function>builtins.isAttrs</function>
-    <replaceable>e</replaceable></term>
+    <emphasis>e</emphasis></term>
 
     <listitem><para>Return <literal>true</literal> if
-    <replaceable>e</replaceable> evaluates to a set, and
+    <emphasis>e</emphasis> evaluates to a set, and
     <literal>false</literal> otherwise.</para></listitem>
 
   </varlistentry>
@@ -832,20 +832,20 @@ x: x + 456</programlisting>
 
   <varlistentry xml:id='builtin-isList'>
     <term><function>builtins.isList</function>
-    <replaceable>e</replaceable></term>
+    <emphasis>e</emphasis></term>
 
     <listitem><para>Return <literal>true</literal> if
-    <replaceable>e</replaceable> evaluates to a list, and
+    <emphasis>e</emphasis> evaluates to a list, and
     <literal>false</literal> otherwise.</para></listitem>
 
   </varlistentry>
 
 
   <varlistentry xml:id='builtin-isFunction'><term><function>builtins.isFunction</function>
-  <replaceable>e</replaceable></term>
+  <emphasis>e</emphasis></term>
 
     <listitem><para>Return <literal>true</literal> if
-    <replaceable>e</replaceable> evaluates to a function, and
+    <emphasis>e</emphasis> evaluates to a function, and
     <literal>false</literal> otherwise.</para></listitem>
 
   </varlistentry>
@@ -853,10 +853,10 @@ x: x + 456</programlisting>
 
   <varlistentry xml:id='builtin-isString'>
     <term><function>builtins.isString</function>
-    <replaceable>e</replaceable></term>
+    <emphasis>e</emphasis></term>
 
     <listitem><para>Return <literal>true</literal> if
-    <replaceable>e</replaceable> evaluates to a string, and
+    <emphasis>e</emphasis> evaluates to a string, and
     <literal>false</literal> otherwise.</para></listitem>
 
   </varlistentry>
@@ -864,10 +864,10 @@ x: x + 456</programlisting>
 
   <varlistentry xml:id='builtin-isInt'>
     <term><function>builtins.isInt</function>
-    <replaceable>e</replaceable></term>
+    <emphasis>e</emphasis></term>
 
     <listitem><para>Return <literal>true</literal> if
-    <replaceable>e</replaceable> evaluates to an int, and
+    <emphasis>e</emphasis> evaluates to an int, and
     <literal>false</literal> otherwise.</para></listitem>
 
   </varlistentry>
@@ -875,10 +875,10 @@ x: x + 456</programlisting>
 
   <varlistentry xml:id='builtin-isFloat'>
     <term><function>builtins.isFloat</function>
-    <replaceable>e</replaceable></term>
+    <emphasis>e</emphasis></term>
 
     <listitem><para>Return <literal>true</literal> if
-    <replaceable>e</replaceable> evaluates to a float, and
+    <emphasis>e</emphasis> evaluates to a float, and
     <literal>false</literal> otherwise.</para></listitem>
 
   </varlistentry>
@@ -886,31 +886,31 @@ x: x + 456</programlisting>
 
   <varlistentry xml:id='builtin-isBool'>
     <term><function>builtins.isBool</function>
-    <replaceable>e</replaceable></term>
+    <emphasis>e</emphasis></term>
 
     <listitem><para>Return <literal>true</literal> if
-    <replaceable>e</replaceable> evaluates to a bool, and
+    <emphasis>e</emphasis> evaluates to a bool, and
     <literal>false</literal> otherwise.</para></listitem>
 
   </varlistentry>
 
   <varlistentry><term><function>builtins.isPath</function>
-  <replaceable>e</replaceable></term>
+  <emphasis>e</emphasis></term>
 
     <listitem><para>Return <literal>true</literal> if
-    <replaceable>e</replaceable> evaluates to a path, and
+    <emphasis>e</emphasis> evaluates to a path, and
     <literal>false</literal> otherwise.</para></listitem>
 
   </varlistentry>
 
   <varlistentry xml:id='builtin-isNull'>
     <term><function>isNull</function>
-    <replaceable>e</replaceable></term>
+    <emphasis>e</emphasis></term>
     <term><function>builtins.isNull</function>
-    <replaceable>e</replaceable></term>
+    <emphasis>e</emphasis></term>
 
     <listitem><para>Return <literal>true</literal> if
-    <replaceable>e</replaceable> evaluates to <literal>null</literal>,
+    <emphasis>e</emphasis> evaluates to <literal>null</literal>,
     and <literal>false</literal> otherwise.</para>
 
     <warning><para>This function is <emphasis>deprecated</emphasis>;
@@ -923,23 +923,23 @@ x: x + 456</programlisting>
 
   <varlistentry xml:id='builtin-length'>
     <term><function>builtins.length</function>
-    <replaceable>e</replaceable></term>
+    <emphasis>e</emphasis></term>
 
     <listitem><para>Return the length of the list
-    <replaceable>e</replaceable>.</para></listitem>
+    <emphasis>e</emphasis>.</para></listitem>
 
   </varlistentry>
 
 
   <varlistentry xml:id='builtin-lessThan'>
     <term><function>builtins.lessThan</function>
-    <replaceable>e1</replaceable> <replaceable>e2</replaceable></term>
+    <emphasis>e1</emphasis> <emphasis>e2</emphasis></term>
 
     <listitem><para>Return <literal>true</literal> if the number
-    <replaceable>e1</replaceable> is less than the number
-    <replaceable>e2</replaceable>, and <literal>false</literal>
+    <emphasis>e1</emphasis> is less than the number
+    <emphasis>e2</emphasis>, and <literal>false</literal>
     otherwise.  Evaluation aborts if either
-    <replaceable>e1</replaceable> or <replaceable>e2</replaceable>
+    <emphasis>e1</emphasis> or <emphasis>e2</emphasis>
     does not evaluate to a number.</para></listitem>
 
   </varlistentry>
@@ -947,7 +947,7 @@ x: x + 456</programlisting>
 
   <varlistentry xml:id='builtin-listToAttrs'>
     <term><function>builtins.listToAttrs</function>
-    <replaceable>e</replaceable></term>
+    <emphasis>e</emphasis></term>
 
     <listitem><para>Construct a set from a list specifying the names
     and values of each attribute.  Each element of the list should be
@@ -975,12 +975,12 @@ builtins.listToAttrs
 
   <varlistentry xml:id='builtin-map'>
     <term><function>map</function>
-    <replaceable>f</replaceable> <replaceable>list</replaceable></term>
+    <emphasis>f</emphasis> <emphasis>list</emphasis></term>
     <term><function>builtins.map</function>
-    <replaceable>f</replaceable> <replaceable>list</replaceable></term>
+    <emphasis>f</emphasis> <emphasis>list</emphasis></term>
 
-    <listitem><para>Apply the function <replaceable>f</replaceable> to
-    each element in the list <replaceable>list</replaceable>.  For
+    <listitem><para>Apply the function <emphasis>f</emphasis> to
+    each element in the list <emphasis>list</emphasis>.  For
     example,
 
 <programlisting>
@@ -994,12 +994,12 @@ map (x: "foo" + x) [ "bar" "bla" "abc" ]</programlisting>
 
   <varlistentry xml:id='builtin-match'>
     <term><function>builtins.match</function>
-    <replaceable>regex</replaceable> <replaceable>str</replaceable></term>
+    <emphasis>regex</emphasis> <emphasis>str</emphasis></term>
 
     <listitem><para>Returns a list if the <link
     xlink:href="http://pubs.opengroup.org/onlinepubs/9699919799/basedefs/V1_chap09.html#tag_09_04">extended
-    POSIX regular expression</link> <replaceable>regex</replaceable>
-    matches <replaceable>str</replaceable> precisely, otherwise returns
+    POSIX regular expression</link> <emphasis>regex</emphasis>
+    matches <emphasis>str</emphasis> precisely, otherwise returns
     <literal>null</literal>.  Each item in the list is a regex group.
 
 <programlisting>
@@ -1031,20 +1031,20 @@ Evaluates to <literal>[ "foo" ]</literal>.
 
   <varlistentry xml:id='builtin-mul'>
     <term><function>builtins.mul</function>
-    <replaceable>e1</replaceable> <replaceable>e2</replaceable></term>
+    <emphasis>e1</emphasis> <emphasis>e2</emphasis></term>
 
     <listitem><para>Return the product of the numbers
-    <replaceable>e1</replaceable> and
-    <replaceable>e2</replaceable>.</para></listitem>
+    <emphasis>e1</emphasis> and
+    <emphasis>e2</emphasis>.</para></listitem>
 
   </varlistentry>
 
 
   <varlistentry xml:id='builtin-parseDrvName'>
     <term><function>builtins.parseDrvName</function>
-    <replaceable>s</replaceable></term>
+    <emphasis>s</emphasis></term>
 
-    <listitem><para>Split the string <replaceable>s</replaceable> into
+    <listitem><para>Split the string <emphasis>s</emphasis> into
     a package name and version.  The package name is everything up to
     but not including the first dash followed by a digit, and the
     version is everything following that dash.  The result is returned
@@ -1058,13 +1058,13 @@ Evaluates to <literal>[ "foo" ]</literal>.
   <varlistentry xml:id='builtin-path'>
     <term>
       <function>builtins.path</function>
-      <replaceable>args</replaceable>
+      <emphasis>args</emphasis>
     </term>
 
     <listitem>
       <para>
         An enrichment of the built-in path type, based on the attributes
-        present in <replaceable>args</replaceable>. All are optional
+        present in <emphasis>args</emphasis>. All are optional
         except <varname>path</varname>:
       </para>
 
@@ -1127,20 +1127,20 @@ Evaluates to <literal>[ "foo" ]</literal>.
 
   <varlistentry xml:id='builtin-pathExists'>
     <term><function>builtins.pathExists</function>
-    <replaceable>path</replaceable></term>
+    <emphasis>path</emphasis></term>
 
     <listitem><para>Return <literal>true</literal> if the path
-    <replaceable>path</replaceable> exists at evaluation time, and
+    <emphasis>path</emphasis> exists at evaluation time, and
     <literal>false</literal> otherwise.</para></listitem>
 
   </varlistentry>
 
   <varlistentry xml:id='builtin-placeholder'>
     <term><function>builtins.placeholder</function>
-    <replaceable>output</replaceable></term>
+    <emphasis>output</emphasis></term>
 
     <listitem><para>Return a placeholder string for the specified
-    <replaceable>output</replaceable> that will be substituted by the
+    <emphasis>output</emphasis> that will be substituted by the
     corresponding output path at build time. Typical outputs would be
     <literal>"out"</literal>, <literal>"bin"</literal> or
     <literal>"dev"</literal>.</para></listitem>
@@ -1148,10 +1148,10 @@ Evaluates to <literal>[ "foo" ]</literal>.
 
   <varlistentry xml:id='builtin-readDir'>
     <term><function>builtins.readDir</function>
-    <replaceable>path</replaceable></term>
+    <emphasis>path</emphasis></term>
 
     <listitem><para>Return the contents of the directory
-    <replaceable>path</replaceable> as a set mapping directory entries
+    <emphasis>path</emphasis> as a set mapping directory entries
     to the corresponding file type. For instance, if directory
     <filename>A</filename> contains a regular file
     <filename>B</filename> and another directory
@@ -1171,24 +1171,24 @@ Evaluates to <literal>[ "foo" ]</literal>.
 
   <varlistentry xml:id='builtin-readFile'>
     <term><function>builtins.readFile</function>
-    <replaceable>path</replaceable></term>
+    <emphasis>path</emphasis></term>
 
     <listitem><para>Return the contents of the file
-    <replaceable>path</replaceable> as a string.</para></listitem>
+    <emphasis>path</emphasis> as a string.</para></listitem>
 
   </varlistentry>
 
 
   <varlistentry xml:id='builtin-removeAttrs'>
     <term><function>removeAttrs</function>
-    <replaceable>set</replaceable> <replaceable>list</replaceable></term>
+    <emphasis>set</emphasis> <emphasis>list</emphasis></term>
     <term><function>builtins.removeAttrs</function>
-    <replaceable>set</replaceable> <replaceable>list</replaceable></term>
+    <emphasis>set</emphasis> <emphasis>list</emphasis></term>
 
     <listitem><para>Remove the attributes listed in
-    <replaceable>list</replaceable> from
-    <replaceable>set</replaceable>.  The attributes don’t have to
-    exist in <replaceable>set</replaceable>. For instance,
+    <emphasis>list</emphasis> from
+    <emphasis>set</emphasis>.  The attributes don’t have to
+    exist in <emphasis>set</emphasis>. For instance,
 
 <programlisting>
 removeAttrs { x = 1; y = 2; z = 3; } [ "a" "x" "z" ]</programlisting>
@@ -1200,12 +1200,12 @@ removeAttrs { x = 1; y = 2; z = 3; } [ "a" "x" "z" ]</programlisting>
 
   <varlistentry xml:id='builtin-replaceStrings'>
     <term><function>builtins.replaceStrings</function>
-    <replaceable>from</replaceable> <replaceable>to</replaceable> <replaceable>s</replaceable></term>
+    <emphasis>from</emphasis> <emphasis>to</emphasis> <emphasis>s</emphasis></term>
 
-    <listitem><para>Given string <replaceable>s</replaceable>, replace
-    every occurrence of the strings in <replaceable>from</replaceable>
+    <listitem><para>Given string <emphasis>s</emphasis>, replace
+    every occurrence of the strings in <emphasis>from</emphasis>
     with the corresponding string in
-    <replaceable>to</replaceable>. For example,
+    <emphasis>to</emphasis>. For example,
 
 <programlisting>
 builtins.replaceStrings ["oo" "a"] ["a" "i"] "foobar"
@@ -1218,23 +1218,23 @@ builtins.replaceStrings ["oo" "a"] ["a" "i"] "foobar"
 
   <varlistentry xml:id='builtin-seq'>
     <term><function>builtins.seq</function>
-    <replaceable>e1</replaceable> <replaceable>e2</replaceable></term>
+    <emphasis>e1</emphasis> <emphasis>e2</emphasis></term>
 
-    <listitem><para>Evaluate <replaceable>e1</replaceable>, then
-    evaluate and return <replaceable>e2</replaceable>. This ensures
+    <listitem><para>Evaluate <emphasis>e1</emphasis>, then
+    evaluate and return <emphasis>e2</emphasis>. This ensures
     that a computation is strict in the value of
-    <replaceable>e1</replaceable>.</para></listitem>
+    <emphasis>e1</emphasis>.</para></listitem>
 
   </varlistentry>
 
 
   <varlistentry xml:id='builtin-sort'>
     <term><function>builtins.sort</function>
-    <replaceable>comparator</replaceable> <replaceable>list</replaceable></term>
+    <emphasis>comparator</emphasis> <emphasis>list</emphasis></term>
 
-    <listitem><para>Return <replaceable>list</replaceable> in sorted
+    <listitem><para>Return <emphasis>list</emphasis> in sorted
     order. It repeatedly calls the function
-    <replaceable>comparator</replaceable> with two elements. The
+    <emphasis>comparator</emphasis> with two elements. The
     comparator should return <literal>true</literal> if the first
     element is less than the second, and <literal>false</literal>
     otherwise. For example,
@@ -1254,13 +1254,13 @@ builtins.sort builtins.lessThan [ 483 249 526 147 42 77 ]
 
   <varlistentry xml:id='builtin-split'>
     <term><function>builtins.split</function>
-    <replaceable>regex</replaceable> <replaceable>str</replaceable></term>
+    <emphasis>regex</emphasis> <emphasis>str</emphasis></term>
 
     <listitem><para>Returns a list composed of non matched strings interleaved
     with the lists of the <link
     xlink:href="http://pubs.opengroup.org/onlinepubs/9699919799/basedefs/V1_chap09.html#tag_09_04">extended
-    POSIX regular expression</link> <replaceable>regex</replaceable> matches
-    of <replaceable>str</replaceable>. Each item in the lists of matched
+    POSIX regular expression</link> <emphasis>regex</emphasis> matches
+    of <emphasis>str</emphasis>. Each item in the lists of matched
     sequences is a regex group.
 
 <programlisting>
@@ -1293,7 +1293,7 @@ Evaluates to <literal>[ "  " [ "FOO" ] "   " ]</literal>.
 
   <varlistentry xml:id='builtin-splitVersion'>
     <term><function>builtins.splitVersion</function>
-    <replaceable>s</replaceable></term>
+    <emphasis>s</emphasis></term>
 
     <listitem><para>Split a string representing a version into its
     components, by the same version splitting logic underlying the
@@ -1305,10 +1305,10 @@ Evaluates to <literal>[ "  " [ "FOO" ] "   " ]</literal>.
 
   <varlistentry xml:id='builtin-stringLength'>
     <term><function>builtins.stringLength</function>
-    <replaceable>e</replaceable></term>
+    <emphasis>e</emphasis></term>
 
     <listitem><para>Return the length of the string
-    <replaceable>e</replaceable>.  If <replaceable>e</replaceable> is
+    <emphasis>e</emphasis>.  If <emphasis>e</emphasis> is
     not a string, evaluation is aborted.</para></listitem>
 
   </varlistentry>
@@ -1316,29 +1316,29 @@ Evaluates to <literal>[ "  " [ "FOO" ] "   " ]</literal>.
 
   <varlistentry xml:id='builtin-sub'>
     <term><function>builtins.sub</function>
-    <replaceable>e1</replaceable> <replaceable>e2</replaceable></term>
+    <emphasis>e1</emphasis> <emphasis>e2</emphasis></term>
 
     <listitem><para>Return the difference between the numbers
-    <replaceable>e1</replaceable> and
-    <replaceable>e2</replaceable>.</para></listitem>
+    <emphasis>e1</emphasis> and
+    <emphasis>e2</emphasis>.</para></listitem>
 
   </varlistentry>
 
 
   <varlistentry xml:id='builtin-substring'>
     <term><function>builtins.substring</function>
-    <replaceable>start</replaceable> <replaceable>len</replaceable>
-    <replaceable>s</replaceable></term>
+    <emphasis>start</emphasis> <emphasis>len</emphasis>
+    <emphasis>s</emphasis></term>
 
     <listitem><para>Return the substring of
-    <replaceable>s</replaceable> from character position
-    <replaceable>start</replaceable> (zero-based) up to but not
-    including <replaceable>start + len</replaceable>.  If
-    <replaceable>start</replaceable> is greater than the length of the
-    string, an empty string is returned, and if <replaceable>start +
-    len</replaceable> lies beyond the end of the string, only the
+    <emphasis>s</emphasis> from character position
+    <emphasis>start</emphasis> (zero-based) up to but not
+    including <emphasis>start + len</emphasis>.  If
+    <emphasis>start</emphasis> is greater than the length of the
+    string, an empty string is returned, and if <emphasis>start +
+    len</emphasis> lies beyond the end of the string, only the
     substring up to the end of the string is returned.
-    <replaceable>start</replaceable> must be
+    <emphasis>start</emphasis> must be
     non-negative. For example,
 
 <programlisting>
@@ -1353,7 +1353,7 @@ builtins.substring 0 3 "nixos"
 
   <varlistentry xml:id='builtin-tail'>
     <term><function>builtins.tail</function>
-    <replaceable>list</replaceable></term>
+    <emphasis>list</emphasis></term>
 
     <listitem><para>Return the second to last elements of a list;
     abort evaluation if the argument isn’t a list or is an empty
@@ -1364,12 +1364,12 @@ builtins.substring 0 3 "nixos"
 
   <varlistentry xml:id='builtin-throw'>
     <term><function>throw</function>
-    <replaceable>s</replaceable></term>
+    <emphasis>s</emphasis></term>
     <term><function>builtins.throw</function>
-    <replaceable>s</replaceable></term>
+    <emphasis>s</emphasis></term>
 
     <listitem><para>Throw an error message
-    <replaceable>s</replaceable>.  This usually aborts Nix expression
+    <emphasis>s</emphasis>.  This usually aborts Nix expression
     evaluation, but in <command>nix-env -qa</command> and other
     commands that try to evaluate a set of derivations to get
     information about those derivations, a derivation that throws an
@@ -1381,12 +1381,12 @@ builtins.substring 0 3 "nixos"
 
   <varlistentry xml:id='builtin-toFile'>
     <term><function>builtins.toFile</function>
-    <replaceable>name</replaceable>
-    <replaceable>s</replaceable></term>
+    <emphasis>name</emphasis>
+    <emphasis>s</emphasis></term>
 
-    <listitem><para>Store the string <replaceable>s</replaceable> in a
+    <listitem><para>Store the string <emphasis>s</emphasis> in a
     file in the Nix store and return its path.  The file has suffix
-    <replaceable>name</replaceable>.  This file can be used as an
+    <emphasis>name</emphasis>.  This file can be used as an
     input to derivations.  One application is to write builders
     “inline”.  For instance, the following Nix expression combines
     <xref linkend='ex-hello-nix' /> and <xref
@@ -1425,11 +1425,11 @@ stdenv.mkDerivation {
   builder = let
     configFile = builtins.toFile "foo.conf" "
       # This is some dummy configuration file.
-      <replaceable>...</replaceable>
+      <emphasis>...</emphasis>
     ";
   in builtins.toFile "builder.sh" "
     source $stdenv/setup
-    <replaceable>...</replaceable>
+    <emphasis>...</emphasis>
     cp ${configFile} $out/etc/foo.conf
   ";</programlisting>
 
@@ -1459,10 +1459,10 @@ in foo</programlisting>
 
 
   <varlistentry xml:id='builtin-toJSON'>
-    <term><function>builtins.toJSON</function> <replaceable>e</replaceable></term>
+    <term><function>builtins.toJSON</function> <emphasis>e</emphasis></term>
 
     <listitem><para>Return a string containing a JSON representation
-    of <replaceable>e</replaceable>.  Strings, integers, floats, booleans,
+    of <emphasis>e</emphasis>.  Strings, integers, floats, booleans,
     nulls and lists are mapped to their JSON equivalents.  Sets
     (except derivations) are represented as objects.  Derivations are
     translated to a JSON string containing the derivation’s output
@@ -1473,7 +1473,7 @@ in foo</programlisting>
 
 
   <varlistentry xml:id='builtin-toPath'>
-    <term><function>builtins.toPath</function> <replaceable>s</replaceable></term>
+    <term><function>builtins.toPath</function> <emphasis>s</emphasis></term>
 
     <listitem><para> DEPRECATED. Use <literal>/. + "/path"</literal>
     to convert a string into an absolute path. For relative paths,
@@ -1484,12 +1484,12 @@ in foo</programlisting>
 
 
   <varlistentry xml:id='builtin-toString'>
-    <term><function>toString</function> <replaceable>e</replaceable></term>
-    <term><function>builtins.toString</function> <replaceable>e</replaceable></term>
+    <term><function>toString</function> <emphasis>e</emphasis></term>
+    <term><function>builtins.toString</function> <emphasis>e</emphasis></term>
 
     <listitem><para>Convert the expression
-    <replaceable>e</replaceable> to a string.
-    <replaceable>e</replaceable> can be:</para>
+    <emphasis>e</emphasis> to a string.
+    <emphasis>e</emphasis> can be:</para>
     <itemizedlist>
       <listitem><para>A string (in which case the string is returned unmodified).</para></listitem>
       <listitem><para>A path (e.g., <literal>toString /foo/bar</literal> yields <literal>"/foo/bar"</literal>.</para></listitem>
@@ -1505,10 +1505,10 @@ in foo</programlisting>
 
 
   <varlistentry xml:id='builtin-toXML'>
-    <term><function>builtins.toXML</function> <replaceable>e</replaceable></term>
+    <term><function>builtins.toXML</function> <emphasis>e</emphasis></term>
 
     <listitem><para>Return a string containing an XML representation
-    of <replaceable>e</replaceable>.  The main application for
+    of <emphasis>e</emphasis>.  The main application for
     <function>toXML</function> is to communicate information with the
     builder in a more structured format than plain environment
     variables.</para>
@@ -1612,26 +1612,26 @@ stdenv.mkDerivation (rec {
 
   <varlistentry xml:id='builtin-trace'>
     <term><function>builtins.trace</function>
-    <replaceable>e1</replaceable> <replaceable>e2</replaceable></term>
+    <emphasis>e1</emphasis> <emphasis>e2</emphasis></term>
 
-    <listitem><para>Evaluate <replaceable>e1</replaceable> and print its
+    <listitem><para>Evaluate <emphasis>e1</emphasis> and print its
     abstract syntax representation on standard error.  Then return
-    <replaceable>e2</replaceable>.  This function is useful for
+    <emphasis>e2</emphasis>.  This function is useful for
     debugging.</para></listitem>
 
   </varlistentry>
 
   <varlistentry xml:id='builtin-tryEval'>
     <term><function>builtins.tryEval</function>
-    <replaceable>e</replaceable></term>
+    <emphasis>e</emphasis></term>
 
-    <listitem><para>Try to shallowly evaluate <replaceable>e</replaceable>.
+    <listitem><para>Try to shallowly evaluate <emphasis>e</emphasis>.
     Return a set containing the attributes <literal>success</literal>
-    (<literal>true</literal> if <replaceable>e</replaceable> evaluated
+    (<literal>true</literal> if <emphasis>e</emphasis> evaluated
     successfully, <literal>false</literal> if an error was thrown) and
-    <literal>value</literal>, equalling <replaceable>e</replaceable>
+    <literal>value</literal>, equalling <emphasis>e</emphasis>
     if successful and <literal>false</literal> otherwise. Note that this
-    doesn't evaluate <replaceable>e</replaceable> deeply, so
+    doesn't evaluate <emphasis>e</emphasis> deeply, so
     <literal>let e = { x = throw ""; }; in (builtins.tryEval e).success
     </literal> will be <literal>true</literal>. Using <literal>builtins.deepSeq
     </literal> one can get the expected result: <literal>let e = { x = throw "";
@@ -1644,10 +1644,10 @@ stdenv.mkDerivation (rec {
 
   <varlistentry xml:id='builtin-typeOf'>
     <term><function>builtins.typeOf</function>
-    <replaceable>e</replaceable></term>
+    <emphasis>e</emphasis></term>
 
     <listitem><para>Return a string representing the type of the value
-    <replaceable>e</replaceable>, namely <literal>"int"</literal>,
+    <emphasis>e</emphasis>, namely <literal>"int"</literal>,
     <literal>"bool"</literal>, <literal>"string"</literal>,
     <literal>"path"</literal>, <literal>"null"</literal>,
     <literal>"set"</literal>, <literal>"list"</literal>,

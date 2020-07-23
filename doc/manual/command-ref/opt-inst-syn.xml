@@ -17,6 +17,6 @@
   <arg><option>--from-expression</option></arg>
   <arg><option>-E</option></arg>
     
-  <arg><option>--from-profile</option> <replaceable>path</replaceable></arg>
+  <arg><option>--from-profile</option> <emphasis>path</emphasis></arg>
 
 </nop>

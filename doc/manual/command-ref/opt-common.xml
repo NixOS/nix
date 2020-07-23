@@ -92,12 +92,12 @@
 </varlistentry>
 
 
-<varlistentry xml:id="opt-log-format"><term><option>--log-format</option> <replaceable>format</replaceable></term>
+<varlistentry xml:id="opt-log-format"><term><option>--log-format</option> <emphasis>format</emphasis></term>
 
   <listitem>
 
   <para>This option can be used to change the output of the log format, with
-  <replaceable>format</replaceable> being one of:</para>
+  <emphasis>format</emphasis> being one of:</para>
 
   <variablelist>
 
@@ -130,13 +130,13 @@
   error.  This option suppresses this behaviour.  Note that the
   builder's standard output and error are always written to a log file
   in
-  <filename><replaceable>prefix</replaceable>/nix/var/log/nix</filename>.</para></listitem>
+  <filename><emphasis>prefix</emphasis>/nix/var/log/nix</filename>.</para></listitem>
 
 </varlistentry>
 
 
 <varlistentry xml:id="opt-max-jobs"><term><option>--max-jobs</option> / <option>-j</option>
-<replaceable>number</replaceable></term>
+<emphasis>number</emphasis></term>
 
   <listitem>
 
@@ -166,7 +166,7 @@
   of parallelism.  For instance, in Nixpkgs, if the derivation
   attribute <varname>enableParallelBuilding</varname> is set to
   <literal>true</literal>, the builder passes the
-  <option>-j<replaceable>N</replaceable></option> flag to GNU Make.
+  <option>-j<emphasis>N</emphasis></option> flag to GNU Make.
   It defaults to the value of the <link
   linkend='conf-cores'><literal>cores</literal></link>
   configuration setting, if set, or <literal>1</literal> otherwise.
@@ -271,7 +271,7 @@
 </varlistentry>
 
 
-<varlistentry><term><option>--arg</option> <replaceable>name</replaceable> <replaceable>value</replaceable></term>
+<varlistentry><term><option>--arg</option> <emphasis>name</emphasis> <emphasis>value</emphasis></term>
 
   <listitem><para>This option is accepted by
   <command>nix-env</command>, <command>nix-instantiate</command>,
@@ -280,14 +280,14 @@
   automatically try to call functions that
   it encounters.  It can automatically call functions for which every
   argument has a <link linkend='ss-functions'>default value</link>
-  (e.g., <literal>{ <replaceable>argName</replaceable> ?
-  <replaceable>defaultValue</replaceable> }:
-  <replaceable>...</replaceable></literal>).  With
+  (e.g., <literal>{ <emphasis>argName</emphasis> ?
+  <emphasis>defaultValue</emphasis> }:
+  <emphasis>...</emphasis></literal>).  With
   <option>--arg</option>, you can also call functions that have
   arguments without a default value (or override a default value).
   That is, if the evaluator encounters a function with an argument
-  named <replaceable>name</replaceable>, it will call it with value
-  <replaceable>value</replaceable>.</para>
+  named <emphasis>name</emphasis>, it will call it with value
+  <emphasis>value</emphasis>.</para>
 
   <para>For instance, the top-level <literal>default.nix</literal> in
   Nixpkgs is actually a function:
@@ -295,23 +295,23 @@
 <programlisting>
 { # The system (e.g., `i686-linux') for which to build the packages.
   system ? builtins.currentSystem
-  <replaceable>...</replaceable>
-}: <replaceable>...</replaceable></programlisting>
+  <emphasis>...</emphasis>
+}: <emphasis>...</emphasis></programlisting>
 
   So if you call this Nix expression (e.g., when you do
-  <literal>nix-env -i <replaceable>pkgname</replaceable></literal>),
+  <literal>nix-env -i <emphasis>pkgname</emphasis></literal>),
   the function will be called automatically using the value <link
   linkend='builtin-currentSystem'><literal>builtins.currentSystem</literal></link>
   for the <literal>system</literal> argument.  You can override this
   using <option>--arg</option>, e.g., <literal>nix-env -i
-  <replaceable>pkgname</replaceable> --arg system
+  <emphasis>pkgname</emphasis> --arg system
   \"i686-freebsd\"</literal>.  (Note that since the argument is a Nix
   string literal, you have to escape the quotes.)</para></listitem>
 
 </varlistentry>
 
 
-<varlistentry><term><option>--argstr</option> <replaceable>name</replaceable> <replaceable>value</replaceable></term>
+<varlistentry><term><option>--argstr</option> <emphasis>name</emphasis> <emphasis>value</emphasis></term>
 
   <listitem><para>This option is like <option>--arg</option>, only the
   value is not a Nix expression but a string.  So instead of
@@ -323,17 +323,17 @@
 
 
 <varlistentry xml:id="opt-attr"><term><option>--attr</option> / <option>-A</option>
-<replaceable>attrPath</replaceable></term>
+<emphasis>attrPath</emphasis></term>
 
   <listitem><para>Select an attribute from the top-level Nix
   expression being evaluated.  (<command>nix-env</command>,
   <command>nix-instantiate</command>, <command>nix-build</command> and
   <command>nix-shell</command> only.)  The <emphasis>attribute
-  path</emphasis> <replaceable>attrPath</replaceable> is a sequence of
+  path</emphasis> <emphasis>attrPath</emphasis> is a sequence of
   attribute names separated by dots.  For instance, given a top-level
-  Nix expression <replaceable>e</replaceable>, the attribute path
+  Nix expression <emphasis>e</emphasis>, the attribute path
   <literal>xorg.xorgserver</literal> would cause the expression
-  <literal><replaceable>e</replaceable>.xorg.xorgserver</literal> to
+  <literal><emphasis>e</emphasis>.xorg.xorgserver</literal> to
   be used.  See <link
   linkend='refsec-nix-env-install-examples'><command>nix-env
   --install</command></link> for some concrete examples.</para>
@@ -366,7 +366,7 @@
 </varlistentry>
 
 
-<varlistentry xml:id="opt-I"><term><option>-I</option> <replaceable>path</replaceable></term>
+<varlistentry xml:id="opt-I"><term><option>-I</option> <emphasis>path</emphasis></term>
 
   <listitem><para>Add a path to the Nix expression search path.  This
   option may be given multiple times.  See the <envar
@@ -378,10 +378,10 @@
 </varlistentry>
 
 
-<varlistentry><term><option>--option</option> <replaceable>name</replaceable> <replaceable>value</replaceable></term>
+<varlistentry><term><option>--option</option> <emphasis>name</emphasis> <emphasis>value</emphasis></term>
 
   <listitem><para>Set the Nix configuration option
-  <replaceable>name</replaceable> to <replaceable>value</replaceable>.
+  <emphasis>name</emphasis> to <emphasis>value</emphasis>.
   This overrides settings in the Nix configuration file (see
   <citerefentry><refentrytitle>nix.conf</refentrytitle><manvolnum>5</manvolnum></citerefentry>).</para></listitem>
 

@@ -27,14 +27,14 @@
       2</command>), but this was not desirable because the number of
       actions to be performed in parallel was not configurable.  Nix
       now has an option <option>--cores
-      <replaceable>N</replaceable></option> as well as a configuration
+      <emphasis>N</emphasis></option> as well as a configuration
       setting <varname>build-cores =
-      <replaceable>N</replaceable></varname> that causes the
+      <emphasis>N</emphasis></varname> that causes the
       environment variable <literal>NIX_BUILD_CORES</literal> to be set to
-      <replaceable>N</replaceable> when the builder is invoked.  The
+      <emphasis>N</emphasis> when the builder is invoked.  The
       builder can use this at its discretion to perform a parallel
       build, e.g., by calling <command>make -j
-      <replaceable>N</replaceable></command>.  In Nixpkgs, this can be
+      <emphasis>N</emphasis></command>.  In Nixpkgs, this can be
       enabled on a per-package basis by setting the derivation
       attribute <varname>enableParallelBuilding</varname> to
       <literal>true</literal>.

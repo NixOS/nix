@@ -51,5 +51,5 @@ This is primarily a bug fix release. It has some new features:
     option is used.
 
   - The scoping rules for `inherit
-                    (e) ...` in recursive attribute sets have changed. The expression e
-    can now refer to the attributes defined in the containing set.
+                    (e) ...` in recursive attribute sets have changed. The expression
+    *e* can now refer to the attributes defined in the containing set.

@@ -50,7 +50,7 @@ the single Nix expression in that directory
     <para>Nix functions generally have the form <literal>{ x, y, ...,
     z }: e</literal> where <varname>x</varname>, <varname>y</varname>,
     etc. are the names of the expected arguments, and where
-    <replaceable>e</replaceable> is the body of the function.  So
+    <emphasis>e</emphasis> is the body of the function.  So
     here, the entire remainder of the file is the body of the
     function; when given the required arguments, the body should
     describe how to build an instance of the Hello package.</para>
@@ -69,10 +69,10 @@ the single Nix expression in that directory
     <emphasis>attributes</emphasis>.  A set is just a list of
     key/value pairs where each key is a string and each value is an
     arbitrary Nix expression.  They take the general form <literal>{
-    <replaceable>name1</replaceable> =
-    <replaceable>expr1</replaceable>; <replaceable>...</replaceable>
-    <replaceable>nameN</replaceable> =
-    <replaceable>exprN</replaceable>; }</literal>.</para>
+    <emphasis>name1</emphasis> =
+    <emphasis>expr1</emphasis>; <emphasis>...</emphasis>
+    <emphasis>nameN</emphasis> =
+    <emphasis>exprN</emphasis>; }</literal>.</para>
 
   </listitem>
 

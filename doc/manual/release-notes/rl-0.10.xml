@@ -46,9 +46,9 @@ irreversible.</para></warning>
       <literal>\*</literal>.</para></listitem>
 
       <listitem><para><literal>nix-env -i
-      <replaceable>pkgname</replaceable></literal> will now install
+      <emphasis>pkgname</emphasis></literal> will now install
       the highest available version of
-      <replaceable>pkgname</replaceable>, rather than installing all
+      <emphasis>pkgname</emphasis>, rather than installing all
       available versions (which would probably give collisions)
       (<literal>NIX-31</literal>).</para></listitem>
 
@@ -85,7 +85,7 @@ irreversible.</para></warning>
 "--with-freetype2-library=${freetype}/lib"</programlisting>
 
       You can write arbitrary expressions within
-      <literal>${<replaceable>...</replaceable>}</literal>, not just
+      <literal>${<emphasis>...</emphasis>}</literal>, not just
       identifiers.</para></listitem>
 
       <listitem><para>Multi-line string literals.</para></listitem>
@@ -163,7 +163,7 @@ irreversible.</para></warning>
   attribute set are unique.)  For instance, a quick way to perform a
   test build of a package in Nixpkgs is <literal>nix-build
   pkgs/top-level/all-packages.nix -A
-  <replaceable>foo</replaceable></literal>.  <literal>nix-env -q
+  <emphasis>foo</emphasis></literal>.  <literal>nix-env -q
   --attr</literal> shows the attribute names corresponding to each
   derivation.</para></listitem>
 
@@ -173,13 +173,13 @@ irreversible.</para></warning>
   <command>nix-build</command> evaluates to a function whose arguments
   all have default values, the function will be called automatically.
   Also, the new command-line switch <option>--arg
-  <replaceable>name</replaceable>
-  <replaceable>value</replaceable></option> can be used to specify
+  <emphasis>name</emphasis>
+  <emphasis>value</emphasis></option> can be used to specify
   function arguments on the command line.</para></listitem>
 
 
   <listitem><para><literal>nix-install-package --url
-  <replaceable>URL</replaceable></literal> allows a package to be
+  <emphasis>URL</emphasis></literal> allows a package to be
   installed directly from the given URL.</para></listitem>
 
 
@@ -192,7 +192,7 @@ irreversible.</para></warning>
 
 
   <listitem><para><literal>nix-build -o
-  <replaceable>symlink</replaceable></literal> allows the symlink to
+  <emphasis>symlink</emphasis></literal> allows the symlink to
   the build result to be named something other than
   <literal>result</literal>.</para></listitem>
 

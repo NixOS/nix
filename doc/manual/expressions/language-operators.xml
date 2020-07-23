@@ -25,48 +25,48 @@ weakest binding).</para>
     <tbody>
       <row>
         <entry>Select</entry>
-        <entry><replaceable>e</replaceable> <literal>.</literal>
-        <replaceable>attrpath</replaceable>
-        [ <literal>or</literal> <replaceable>def</replaceable> ]
+        <entry><emphasis>e</emphasis> <literal>.</literal>
+        <emphasis>attrpath</emphasis>
+        [ <literal>or</literal> <emphasis>def</emphasis> ]
         </entry>
         <entry>none</entry>
         <entry>Select attribute denoted by the attribute path
-        <replaceable>attrpath</replaceable> from set
-        <replaceable>e</replaceable>.  (An attribute path is a
+        <emphasis>attrpath</emphasis> from set
+        <emphasis>e</emphasis>.  (An attribute path is a
         dot-separated list of attribute names.)  If the attribute
-        doesn’t exist, return <replaceable>def</replaceable> if
+        doesn’t exist, return <emphasis>def</emphasis> if
         provided, otherwise abort evaluation.</entry>
         <entry>1</entry>
       </row>
       <row>
         <entry>Application</entry>
-        <entry><replaceable>e1</replaceable> <replaceable>e2</replaceable></entry>
+        <entry><emphasis>e1</emphasis> <emphasis>e2</emphasis></entry>
         <entry>left</entry>
-        <entry>Call function <replaceable>e1</replaceable> with
-        argument <replaceable>e2</replaceable>.</entry>
+        <entry>Call function <emphasis>e1</emphasis> with
+        argument <emphasis>e2</emphasis>.</entry>
         <entry>2</entry>
       </row>
       <row>
         <entry>Arithmetic Negation</entry>
-        <entry><literal>-</literal> <replaceable>e</replaceable></entry>
+        <entry><literal>-</literal> <emphasis>e</emphasis></entry>
         <entry>none</entry>
         <entry>Arithmetic negation.</entry>
         <entry>3</entry>
       </row>
       <row>
         <entry>Has Attribute</entry>
-        <entry><replaceable>e</replaceable> <literal>?</literal>
-        <replaceable>attrpath</replaceable></entry>
+        <entry><emphasis>e</emphasis> <literal>?</literal>
+        <emphasis>attrpath</emphasis></entry>
         <entry>none</entry>
-        <entry>Test whether set <replaceable>e</replaceable> contains
-        the attribute denoted by <replaceable>attrpath</replaceable>;
+        <entry>Test whether set <emphasis>e</emphasis> contains
+        the attribute denoted by <emphasis>attrpath</emphasis>;
         return <literal>true</literal> or
         <literal>false</literal>.</entry>
         <entry>4</entry>
       </row>
       <row>
         <entry>List Concatenation</entry>
-        <entry><replaceable>e1</replaceable> <literal>++</literal> <replaceable>e2</replaceable></entry>
+        <entry><emphasis>e1</emphasis> <literal>++</literal> <emphasis>e2</emphasis></entry>
         <entry>right</entry>
         <entry>List concatenation.</entry>
         <entry>5</entry>
@@ -74,7 +74,7 @@ weakest binding).</para>
       <row>
         <entry>Multiplication</entry>
         <entry>
-          <replaceable>e1</replaceable> <literal>*</literal> <replaceable>e2</replaceable>,
+          <emphasis>e1</emphasis> <literal>*</literal> <emphasis>e2</emphasis>,
         </entry>
         <entry>left</entry>
         <entry>Arithmetic multiplication.</entry>
@@ -83,7 +83,7 @@ weakest binding).</para>
       <row>
         <entry>Division</entry>
         <entry>
-          <replaceable>e1</replaceable> <literal>/</literal> <replaceable>e2</replaceable>
+          <emphasis>e1</emphasis> <literal>/</literal> <emphasis>e2</emphasis>
         </entry>
         <entry>left</entry>
         <entry>Arithmetic division.</entry>
@@ -92,7 +92,7 @@ weakest binding).</para>
       <row>
         <entry>Addition</entry>
         <entry>
-          <replaceable>e1</replaceable> <literal>+</literal> <replaceable>e2</replaceable>
+          <emphasis>e1</emphasis> <literal>+</literal> <emphasis>e2</emphasis>
         </entry>
         <entry>left</entry>
         <entry>Arithmetic addition.</entry>
@@ -101,7 +101,7 @@ weakest binding).</para>
       <row>
         <entry>Subtraction</entry>
         <entry>
-          <replaceable>e1</replaceable> <literal>-</literal> <replaceable>e2</replaceable>
+          <emphasis>e1</emphasis> <literal>-</literal> <emphasis>e2</emphasis>
         </entry>
         <entry>left</entry>
         <entry>Arithmetic subtraction.</entry>
@@ -110,7 +110,7 @@ weakest binding).</para>
       <row>
         <entry>String Concatenation</entry>
         <entry>
-          <replaceable>string1</replaceable> <literal>+</literal> <replaceable>string2</replaceable>
+          <emphasis>string1</emphasis> <literal>+</literal> <emphasis>string2</emphasis>
         </entry>
         <entry>left</entry>
         <entry>String concatenation.</entry>
@@ -118,19 +118,19 @@ weakest binding).</para>
       </row>
       <row>
         <entry>Not</entry>
-        <entry><literal>!</literal> <replaceable>e</replaceable></entry>
+        <entry><literal>!</literal> <emphasis>e</emphasis></entry>
         <entry>none</entry>
         <entry>Boolean negation.</entry>
         <entry>8</entry>
       </row>
       <row>
         <entry>Update</entry>
-        <entry><replaceable>e1</replaceable> <literal>//</literal>
-        <replaceable>e2</replaceable></entry>
+        <entry><emphasis>e1</emphasis> <literal>//</literal>
+        <emphasis>e2</emphasis></entry>
         <entry>right</entry>
         <entry>Return a set consisting of the attributes in
-        <replaceable>e1</replaceable> and
-        <replaceable>e2</replaceable> (with the latter taking
+        <emphasis>e1</emphasis> and
+        <emphasis>e2</emphasis> (with the latter taking
         precedence over the former in case of equally named
         attributes).</entry>
         <entry>9</entry>
@@ -138,7 +138,7 @@ weakest binding).</para>
       <row>
         <entry>Less Than</entry>
         <entry>
-          <replaceable>e1</replaceable> <literal>&lt;</literal> <replaceable>e2</replaceable>,
+          <emphasis>e1</emphasis> <literal>&lt;</literal> <emphasis>e2</emphasis>,
         </entry>
         <entry>none</entry>
         <entry>Arithmetic comparison.</entry>
@@ -147,7 +147,7 @@ weakest binding).</para>
       <row>
         <entry>Less Than or Equal To</entry>
         <entry>
-          <replaceable>e1</replaceable> <literal>&lt;=</literal> <replaceable>e2</replaceable>
+          <emphasis>e1</emphasis> <literal>&lt;=</literal> <emphasis>e2</emphasis>
         </entry>
         <entry>none</entry>
         <entry>Arithmetic comparison.</entry>
@@ -156,7 +156,7 @@ weakest binding).</para>
       <row>
         <entry>Greater Than</entry>
         <entry>
-          <replaceable>e1</replaceable> <literal>&gt;</literal> <replaceable>e2</replaceable>
+          <emphasis>e1</emphasis> <literal>&gt;</literal> <emphasis>e2</emphasis>
         </entry>
         <entry>none</entry>
         <entry>Arithmetic comparison.</entry>
@@ -165,7 +165,7 @@ weakest binding).</para>
       <row>
         <entry>Greater Than or Equal To</entry>
         <entry>
-          <replaceable>e1</replaceable> <literal>&gt;=</literal> <replaceable>e2</replaceable>
+          <emphasis>e1</emphasis> <literal>&gt;=</literal> <emphasis>e2</emphasis>
         </entry>
         <entry>none</entry>
         <entry>Arithmetic comparison.</entry>
@@ -174,7 +174,7 @@ weakest binding).</para>
       <row>
         <entry>Equality</entry>
         <entry>
-          <replaceable>e1</replaceable> <literal>==</literal> <replaceable>e2</replaceable>
+          <emphasis>e1</emphasis> <literal>==</literal> <emphasis>e2</emphasis>
         </entry>
         <entry>none</entry>
         <entry>Equality.</entry>
@@ -183,7 +183,7 @@ weakest binding).</para>
       <row>
         <entry>Inequality</entry>
         <entry>
-          <replaceable>e1</replaceable> <literal>!=</literal> <replaceable>e2</replaceable>
+          <emphasis>e1</emphasis> <literal>!=</literal> <emphasis>e2</emphasis>
         </entry>
         <entry>none</entry>
         <entry>Inequality.</entry>
@@ -191,28 +191,28 @@ weakest binding).</para>
       </row>
       <row>
         <entry>Logical AND</entry>
-        <entry><replaceable>e1</replaceable> <literal>&amp;&amp;</literal>
-        <replaceable>e2</replaceable></entry>
+        <entry><emphasis>e1</emphasis> <literal>&amp;&amp;</literal>
+        <emphasis>e2</emphasis></entry>
         <entry>left</entry>
         <entry>Logical AND.</entry>
         <entry>12</entry>
       </row>
       <row>
         <entry>Logical OR</entry>
-        <entry><replaceable>e1</replaceable> <literal>||</literal>
-        <replaceable>e2</replaceable></entry>
+        <entry><emphasis>e1</emphasis> <literal>||</literal>
+        <emphasis>e2</emphasis></entry>
         <entry>left</entry>
         <entry>Logical OR.</entry>
         <entry>13</entry>
       </row>
       <row>
         <entry>Logical Implication</entry>
-        <entry><replaceable>e1</replaceable> <literal>-></literal>
-        <replaceable>e2</replaceable></entry>
+        <entry><emphasis>e1</emphasis> <literal>-></literal>
+        <emphasis>e2</emphasis></entry>
         <entry>none</entry>
         <entry>Logical implication (equivalent to
-        <literal>!<replaceable>e1</replaceable> ||
-        <replaceable>e2</replaceable></literal>).</entry>
+        <literal>!<emphasis>e1</emphasis> ||
+        <emphasis>e2</emphasis></literal>).</entry>
         <entry>14</entry>
       </row>
     </tbody>

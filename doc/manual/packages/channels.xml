@@ -45,7 +45,7 @@ $ nix-channel --remove nixpkgs
 $ nix-channel --update</screen>
 
 This downloads and unpacks the Nix expressions in every channel
-(downloaded from <literal><replaceable>url</replaceable>/nixexprs.tar.bz2</literal>).
+(downloaded from <literal><emphasis>url</emphasis>/nixexprs.tar.bz2</literal>).
 It also makes the union of each channel’s Nix expressions available by
 default to <command>nix-env</command> operations (via the symlink
 <filename>~/.nix-defexpr/channels</filename>).  Consequently, you can

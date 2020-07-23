@@ -20,24 +20,24 @@
   <cmdsynopsis>
     <command>nix-prefetch-url</command>
     <arg><option>--version</option></arg>
-    <arg><option>--type</option> <replaceable>hashAlgo</replaceable></arg>
+    <arg><option>--type</option> <emphasis>hashAlgo</emphasis></arg>
     <arg><option>--print-path</option></arg>
     <arg><option>--unpack</option></arg>
-    <arg><option>--name</option> <replaceable>name</replaceable></arg>
-    <arg choice='plain'><replaceable>url</replaceable></arg>
-    <arg><replaceable>hash</replaceable></arg>
+    <arg><option>--name</option> <emphasis>name</emphasis></arg>
+    <arg choice='plain'><emphasis>url</emphasis></arg>
+    <arg><emphasis>hash</emphasis></arg>
   </cmdsynopsis>
 </refsynopsisdiv>
 
 <refsection><title>Description</title>
 
 <para>The command <command>nix-prefetch-url</command> downloads the
-file referenced by the URL <replaceable>url</replaceable>, prints its
+file referenced by the URL <emphasis>url</emphasis>, prints its
 cryptographic hash, and copies it into the Nix store.  The file name
 in the store is
-<filename><replaceable>hash</replaceable>-<replaceable>baseName</replaceable></filename>,
-where <replaceable>baseName</replaceable> is everything following the
-final slash in <replaceable>url</replaceable>.</para>
+<filename><emphasis>hash</emphasis>-<emphasis>baseName</emphasis></filename>,
+where <emphasis>baseName</emphasis> is everything following the
+final slash in <emphasis>url</emphasis>.</para>
 
 <para>This command is just a convenience for Nix expression writers.
 Often a Nix expression fetches some source distribution from the
@@ -50,7 +50,7 @@ download it again when you build your Nix expression.  Since
 as <command>nix-prefetch-url</command>, the redundant download can be
 avoided.</para>
 
-<para>If <replaceable>hash</replaceable> is specified, then a download
+<para>If <emphasis>hash</emphasis> is specified, then a download
 is not performed if the Nix store already contains a file with the
 same hash and base name.  Otherwise, the file is downloaded, and an
 error is signaled if the actual hash of the file does not match the
@@ -67,7 +67,7 @@ downloaded file in the Nix store is also printed.</para>
 
 <variablelist>
 
-  <varlistentry><term><option>--type</option> <replaceable>hashAlgo</replaceable></term>
+  <varlistentry><term><option>--type</option> <emphasis>hashAlgo</emphasis></term>
 
     <listitem><para>Use the specified cryptographic hash algorithm,
     which can be one of <literal>md5</literal>,
@@ -93,14 +93,14 @@ downloaded file in the Nix store is also printed.</para>
 
   </varlistentry>
 
-  <varlistentry><term><option>--name</option> <replaceable>name</replaceable></term>
+  <varlistentry><term><option>--name</option> <emphasis>name</emphasis></term>
 
     <listitem><para>Override the name of the file in the Nix store. By
     default, this is
-    <literal><replaceable>hash</replaceable>-<replaceable>basename</replaceable></literal>,
-    where <replaceable>basename</replaceable> is the last component of
-    <replaceable>url</replaceable>. Overriding the name is necessary
-    when <replaceable>basename</replaceable> contains characters that
+    <literal><emphasis>hash</emphasis>-<emphasis>basename</emphasis></literal>,
+    where <emphasis>basename</emphasis> is the last component of
+    <emphasis>url</emphasis>. Overriding the name is necessary
+    when <emphasis>basename</emphasis> contains characters that
     are not allowed in Nix store paths.</para></listitem>
 
   </varlistentry>

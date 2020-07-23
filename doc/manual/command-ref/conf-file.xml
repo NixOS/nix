@@ -26,7 +26,7 @@
   <listitem>
     <para>
       The system-wide configuration file
-      <filename><replaceable>sysconfdir</replaceable>/nix/nix.conf</filename>
+      <filename><emphasis>sysconfdir</emphasis>/nix/nix.conf</filename>
       (i.e. <filename>/etc/nix/nix.conf</filename> on most systems),
       or <filename>$NIX_CONF_DIR/nix.conf</filename> if
       <literal>NIX_CONF_DIR</literal> is set. Values loaded in this
@@ -52,11 +52,11 @@
 </itemizedlist>
 
 <para>The configuration files consist of
-<literal><replaceable>name</replaceable> =
-<replaceable>value</replaceable></literal> pairs, one per line. Other
+<literal><emphasis>name</emphasis> =
+<emphasis>value</emphasis></literal> pairs, one per line. Other
 files can be included with a line like <literal>include
-<replaceable>path</replaceable></literal>, where
-<replaceable>path</replaceable> is interpreted relative to the current
+<emphasis>path</emphasis></literal>, where
+<emphasis>path</emphasis> is interpreted relative to the current
 conf file and a missing file is an error unless
 <literal>!include</literal> is used instead.
 Comments start with a <literal>#</literal> character.  Here is an
@@ -244,7 +244,7 @@ false</literal>.</para>
     instance, in Nixpkgs, if the derivation attribute
     <varname>enableParallelBuilding</varname> is set to
     <literal>true</literal>, the builder passes the
-    <option>-j<replaceable>N</replaceable></option> flag to GNU Make.
+    <option>-j<emphasis>N</emphasis></option> flag to GNU Make.
     It can be overridden using the <option
     linkend='opt-cores'>--cores</option> command line switch and
     defaults to <literal>1</literal>.  The value <literal>0</literal>
@@ -383,10 +383,10 @@ false</literal>.</para>
     <function>builtins.fetchurl</function> to obtain files by
     hash. The default is
     <literal>http://tarballs.nixos.org/</literal>. Given a hash type
-    <replaceable>ht</replaceable> and a base-16 hash
-    <replaceable>h</replaceable>, Nix will try to download the file
+    <emphasis>ht</emphasis> and a base-16 hash
+    <emphasis>h</emphasis>, Nix will try to download the file
     from
-    <literal>hashed-mirror/<replaceable>ht</replaceable>/<replaceable>h</replaceable></literal>.
+    <literal>hashed-mirror/<emphasis>ht</emphasis>/<emphasis>h</emphasis></literal>.
     This allows files to be downloaded even if they have disappeared
     from their original URI. For example, given the default mirror
     <literal>http://tarballs.nixos.org/</literal>, when building the derivation
@@ -421,7 +421,7 @@ builtins.fetchurl {
     output and error of its builder) to the directory
     <filename>/nix/var/log/nix/drvs</filename>.  The build log can be
     retrieved using the command <command>nix-store -l
-    <replaceable>path</replaceable></command>.</para></listitem>
+    <emphasis>path</emphasis></command>.</para></listitem>
 
   </varlistentry>
 
@@ -592,9 +592,9 @@ builtins.fetchurl {
     accounts in the following format:
 
 <screen>
-machine <replaceable>my-machine</replaceable>
-login <replaceable>my-username</replaceable>
-password <replaceable>my-password</replaceable>
+machine <emphasis>my-machine</emphasis>
+login <emphasis>my-username</emphasis>
+password <emphasis>my-password</emphasis>
 </screen>
 
     For the exact syntax, see <link
@@ -837,13 +837,13 @@ password <replaceable>my-password</replaceable>
 
     <listitem><para>A list of paths bind-mounted into Nix sandbox
     environments. You can use the syntax
-    <literal><replaceable>target</replaceable>=<replaceable>source</replaceable></literal>
+    <literal><emphasis>target</emphasis>=<emphasis>source</emphasis></literal>
     to mount a path in a different location in the sandbox; for
     instance, <literal>/bin=/nix-bin</literal> will mount the path
     <literal>/nix-bin</literal> as <literal>/bin</literal> inside the
-    sandbox. If <replaceable>source</replaceable> is followed by
+    sandbox. If <emphasis>source</emphasis> is followed by
     <literal>?</literal>, then it is not an error if
-    <replaceable>source</replaceable> does not exist; for example,
+    <emphasis>source</emphasis> does not exist; for example,
     <literal>/dev/nvidiactl?</literal> specifies that
     <filename>/dev/nvidiactl</filename> will only be mounted in the
     sandbox if it exists in the host filesystem.</para>
@@ -1035,7 +1035,7 @@ function-trace exited /nix/store/.../example.nix:226:41 at 1565795253249941684
     <listitem><para>A list of URLs of substituters, separated by
     whitespace.  These are not used by default, but can be enabled by
     users of the Nix daemon by specifying <literal>--option
-    substituters <replaceable>urls</replaceable></literal> on the
+    substituters <emphasis>urls</emphasis></literal> on the
     command line.  Unprivileged users are only allowed to pass a
     subset of the URLs listed in <literal>substituters</literal> and
     <literal>trusted-substituters</literal>.</para></listitem>

@@ -20,8 +20,8 @@ xlink:href="https://github.com/NixOS/nix/commit/5526a282b5b44e9296e61e07d7d2626a
   <function>builtins.hashString</function>.</para></listitem>
 
   <listitem><para>Build logs are now stored in
-  <filename>/nix/var/log/nix/drvs/<replaceable>XX</replaceable>/</filename>,
-  where <replaceable>XX</replaceable> is the first two characters of
+  <filename>/nix/var/log/nix/drvs/<emphasis>XX</emphasis>/</filename>,
+  where <emphasis>XX</emphasis> is the first two characters of
   the derivation.  This is useful on machines that keep a lot of build
   logs (such as Hydra servers).</para></listitem>
 

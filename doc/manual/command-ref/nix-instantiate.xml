@@ -29,26 +29,26 @@
       </arg>
     </group>
     <arg><option>--read-write-mode</option></arg>
-    <arg><option>--arg</option> <replaceable>name</replaceable> <replaceable>value</replaceable></arg>
+    <arg><option>--arg</option> <emphasis>name</emphasis> <emphasis>value</emphasis></arg>
     <arg>
       <group choice='req'>
         <arg choice='plain'><option>--attr</option></arg>
         <arg choice='plain'><option>-A</option></arg>
       </group>
-      <replaceable>attrPath</replaceable>
+      <emphasis>attrPath</emphasis>
     </arg>
-    <arg><option>--add-root</option> <replaceable>path</replaceable></arg>
+    <arg><option>--add-root</option> <emphasis>path</emphasis></arg>
     <arg><option>--indirect</option></arg>
     <group>
       <arg choice='plain'><option>--expr</option></arg>
       <arg choice='plain'><option>-E</option></arg>
     </group>
-    <arg choice='plain' rep='repeat'><replaceable>files</replaceable></arg>
+    <arg choice='plain' rep='repeat'><emphasis>files</emphasis></arg>
   </cmdsynopsis>
   <cmdsynopsis>
     <command>nix-instantiate</command>
     <arg choice='plain'><option>--find-file</option></arg>
-    <arg choice='plain' rep='repeat'><replaceable>files</replaceable></arg>
+    <arg choice='plain' rep='repeat'><emphasis>files</emphasis></arg>
   </cmdsynopsis>
 </refsynopsisdiv>
 
@@ -58,13 +58,13 @@
 <para>The command <command>nix-instantiate</command> generates <link
 linkend="gloss-derivation">store derivations</link> from (high-level)
 Nix expressions.  It evaluates the Nix expressions in each of
-<replaceable>files</replaceable> (which defaults to
-<replaceable>./default.nix</replaceable>).  Each top-level expression
+<emphasis>files</emphasis> (which defaults to
+<emphasis>./default.nix</emphasis>).  Each top-level expression
 should evaluate to a derivation, a list of derivations, or a set of
 derivations.  The paths of the resulting store derivations are printed
 on standard output.</para>
 
-<para>If <replaceable>files</replaceable> is the character
+<para>If <emphasis>files</emphasis> is the character
 <literal>-</literal>, then a Nix expression will be read from standard
 input.</para>
 
@@ -79,7 +79,7 @@ input.</para>
 <variablelist>
 
   <varlistentry>
-    <term><option>--add-root</option> <replaceable>path</replaceable></term>
+    <term><option>--add-root</option> <emphasis>path</emphasis></term>
     <term><option>--indirect</option></term>
 
     <listitem><para>See the <link linkend="opt-add-root">corresponding
@@ -181,7 +181,7 @@ $ nix-instantiate test.nix <lineannotation>(instantiate)</lineannotation>
 /nix/store/cigxbmvy6dzix98dxxh9b6shg7ar5bvs-perl-BerkeleyDB-0.26.drv
 
 $ nix-store -r $(nix-instantiate test.nix) <lineannotation>(build)</lineannotation>
-<replaceable>...</replaceable>
+<emphasis>...</emphasis>
 /nix/store/qhqk4n8ci095g3sdp93x7rgwyh9rdvgk-perl-BerkeleyDB-0.26 <lineannotation>(output path)</lineannotation>
 
 $ ls -l /nix/store/qhqk4n8ci095g3sdp93x7rgwyh9rdvgk-perl-BerkeleyDB-0.26
@@ -226,28 +226,28 @@ $ nix-instantiate --eval --xml -E '1 + 2'
 
 <screen>
 $ nix-instantiate --eval --xml -E 'rec { x = "foo"; y = x; }'
-<replaceable>...</replaceable><![CDATA[
+<emphasis>...</emphasis><![CDATA[
   <attr name="x">
     <string value="foo" />
   </attr>
   <attr name="y">
     <unevaluated />
   </attr>]]>
-<replaceable>...</replaceable></screen>
+<emphasis>...</emphasis></screen>
 
 Note that <varname>y</varname> is left unevaluated (the XML
 representation doesn’t attempt to show non-normal forms).
 
 <screen>
 $ nix-instantiate --eval --xml --strict -E 'rec { x = "foo"; y = x; }'
-<replaceable>...</replaceable><![CDATA[
+<emphasis>...</emphasis><![CDATA[
   <attr name="x">
     <string value="foo" />
   </attr>
   <attr name="y">
     <string value="foo" />
   </attr>]]>
-<replaceable>...</replaceable></screen>
+<emphasis>...</emphasis></screen>
 
 </para>
 

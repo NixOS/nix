@@ -91,12 +91,12 @@ disallowedRequisites = [ foobar ];
     references graph of their inputs.  The attribute is a list of
     inputs in the Nix store whose references graph the builder needs
     to know.  The value of this attribute should be a list of pairs
-    <literal>[ <replaceable>name1</replaceable>
-    <replaceable>path1</replaceable> <replaceable>name2</replaceable>
-    <replaceable>path2</replaceable> <replaceable>...</replaceable>
+    <literal>[ <emphasis>name1</emphasis>
+    <emphasis>path1</emphasis> <emphasis>name2</emphasis>
+    <emphasis>path2</emphasis> <emphasis>...</emphasis>
     ]</literal>.  The references graph of each
-    <replaceable>pathN</replaceable> will be stored in a text file
-    <replaceable>nameN</replaceable> in the temporary build directory.
+    <emphasis>pathN</emphasis> will be stored in a text file
+    <emphasis>nameN</emphasis> in the temporary build directory.
     The text files have the format used by <command>nix-store
     --register-validity</command> (with the deriver fields left
     empty).  For example, when the following derivation is built:
@@ -135,7 +135,7 @@ derivation {
     Nixpkgs has the line
 
 <programlisting>
-impureEnvVars = [ "http_proxy" "https_proxy" <replaceable>...</replaceable> ];
+impureEnvVars = [ "http_proxy" "https_proxy" <emphasis>...</emphasis> ];
 </programlisting>
 
     to make it use the proxy server configuration specified by the
@@ -297,11 +297,11 @@ big = "a very long string";
     <literal>bigPath</literal> will contain the absolute path to a
     temporary file containing <literal>a very long
     string</literal>. That is, for any attribute
-    <replaceable>x</replaceable> listed in
+    <emphasis>x</emphasis> listed in
     <varname>passAsFile</varname>, Nix will pass an environment
-    variable <literal><replaceable>x</replaceable>Path</literal> holding
+    variable <literal><emphasis>x</emphasis>Path</literal> holding
     the path of the file containing the value of attribute
-    <replaceable>x</replaceable>. This is useful when you need to pass
+    <emphasis>x</emphasis>. This is useful when you need to pass
     large strings to a builder, since most operating systems impose a
     limit on the size of the environment (typically, a few hundred
     kilobyte).</para></listitem>

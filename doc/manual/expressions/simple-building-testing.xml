@@ -19,7 +19,7 @@ building path `/nix/store/632d2b22514d...-hello-2.1.1'
 hello-2.1.1/
 hello-2.1.1/intl/
 hello-2.1.1/intl/ChangeLog
-<replaceable>...</replaceable>
+<emphasis>...</emphasis>
 
 $ ls -l result
 lrwxrwxrwx ... 2006-09-29 10:43 result -> /nix/store/632d2b22514d...-hello-2.1.1

@@ -56,7 +56,7 @@ outputs = [ "lib" "headers" "doc" ];
     <literal>lib</literal>, <literal>headers</literal> and
     <literal>doc</literal>.  Other packages can refer to a specific
     output by referring to
-    <literal><replaceable>pkg</replaceable>.<replaceable>output</replaceable></literal>,
+    <literal><emphasis>pkg</emphasis>.<emphasis>output</emphasis></literal>,
     e.g.
 <programlisting>
 buildInputs = [ pkg.lib pkg.headers ];

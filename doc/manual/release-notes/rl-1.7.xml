@@ -34,7 +34,7 @@ following new features:</para>
     <command>download-via-ssh</command>, that fetches binaries from
     remote machines via SSH.  Specifying the flags <literal>--option
     use-ssh-substituter true --option ssh-substituter-hosts
-    <replaceable>user@hostname</replaceable></literal> will cause Nix
+    <emphasis>user@hostname</emphasis></literal> will cause Nix
     to download binaries from the specified machine, if it has
     them.</para>
   </listitem>
@@ -49,9 +49,9 @@ following new features:</para>
 
 <screen>
 $ nix-build '&lt;nixpkgs>' -A patchelf
-<replaceable>…</replaceable>
+<emphasis>…</emphasis>
 $ nix-build '&lt;nixpkgs>' -A patchelf --check
-<replaceable>…</replaceable>
+<emphasis>…</emphasis>
 error: derivation `/nix/store/1ipvxs…-patchelf-0.6' may not be deterministic:
   hash mismatch in output `/nix/store/4pc1dm…-patchelf-0.6.drv'
 </screen>
@@ -173,11 +173,11 @@ $ nix-instantiate --eval '&lt;nixos>' -A 'config.systemd.units."nscd.service".te
   <listitem>
     <para><command>nix-collect-garbage</command> has a new flag
     <option>--delete-older-than</option>
-    <replaceable>N</replaceable><literal>d</literal>, which deletes
+    <emphasis>N</emphasis><literal>d</literal>, which deletes
     all user environment generations older than
-    <replaceable>N</replaceable> days.  Likewise, <command>nix-env
+    <emphasis>N</emphasis> days.  Likewise, <command>nix-env
     --delete-generations</command> accepts a
-    <replaceable>N</replaceable><literal>d</literal> age limit.</para>
+    <emphasis>N</emphasis><literal>d</literal> age limit.</para>
   </listitem>
 
   <listitem>

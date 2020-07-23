@@ -8,7 +8,7 @@
 
 <para>The roots of the garbage collector are all store paths to which
 there are symlinks in the directory
-<filename><replaceable>prefix</replaceable>/nix/var/nix/gcroots</filename>.
+<filename><emphasis>prefix</emphasis>/nix/var/nix/gcroots</filename>.
 For instance, the following command makes the path
 <filename>/nix/store/d718ef...-foo</filename> a root of the collector:
 
@@ -20,7 +20,7 @@ That is, after this command, the garbage collector will not remove
 dependencies.</para>
 
 <para>Subdirectories of
-<filename><replaceable>prefix</replaceable>/nix/var/nix/gcroots</filename>
+<filename><emphasis>prefix</emphasis>/nix/var/nix/gcroots</filename>
 are also searched for symlinks.  Symlinks to non-store paths are
 followed and searched for roots, but symlinks to non-store paths
 <emphasis>inside</emphasis> the paths reached in that way are not

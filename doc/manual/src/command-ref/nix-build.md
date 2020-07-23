@@ -43,16 +43,16 @@ paths
 # Description
 
 The `nix-build` command builds the derivations described by the Nix
-expressions in paths. If the build succeeds, it places a symlink to the
-result in the current directory. The symlink is called `result`. If
+expressions in *paths*. If the build succeeds, it places a symlink to
+the result in the current directory. The symlink is called `result`. If
 there are multiple Nix expressions, or the Nix expressions evaluate to
 multiple derivations, multiple sequentially numbered symlinks are
 created (`result`, `result-2`, and so on).
 
-If no paths are specified, then `nix-build` will use `default.nix` in
+If no *paths* are specified, then `nix-build` will use `default.nix` in
 the current directory, if it exists.
 
-If an element of paths starts with `http://` or `https://`, it is
+If an element of *paths* starts with `http://` or `https://`, it is
 interpreted as the URL of a tarball that will be downloaded and unpacked
 to a temporary location. The tarball must include a single top-level
 directory containing at least a file named `default.nix`.
@@ -83,9 +83,9 @@ All options not listed here are passed to `nix-store
   - `--dry-run`  
     Show what store paths would be built or downloaded.
 
-  - `--out-link` / `-o` outlink  
+  - `--out-link` / `-o` *outlink*  
     Change the name of the symlink to the output path created from
-    `result` to outlink.
+    `result` to *outlink*.
 
 The following common options are supported:
 

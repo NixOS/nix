@@ -17,7 +17,7 @@ command:
 The installation path can be specified by passing the `--prefix=prefix`
 to `configure`. The default installation directory is `/usr/local`. You
 can change this to any location you like. You must have write permission
-to the prefix path.
+to the *prefix* path.
 
 Nix keeps its *store* (the place where packages are stored) in
 `/nix/store` by default. This can be changed using

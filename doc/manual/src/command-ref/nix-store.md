@@ -37,10 +37,10 @@ options are allowed for every subcommand, though they may not always
 have an effect. See also [???](#sec-common-options) for a list of common
 options.
 
-  - `--add-root` path  
+  - `--add-root` *path*  
     Causes the result of a realisation (`--realise` and
     `--force-realise`) to be registered as a root of the garbage
-    collector(see [???](#ssec-gc-roots)). The root is stored in path,
+    collector(see [???](#ssec-gc-roots)). The root is stored in *path*,
     which must be inside a directory that is scanned for roots by the
     garbage collector (i.e., typically in a subdirectory of
     `/nix/var/nix/gcroots/`) *unless* the `--indirect` flag is used.
@@ -56,8 +56,8 @@ options.
     result in the current directory; such a build result should not be
     garbage-collected unless the symlink is removed.
     
-    The `--indirect` flag causes a uniquely named symlink to path to be
-    stored in `/nix/var/nix/gcroots/auto/`. For instance,
+    The `--indirect` flag causes a uniquely named symlink to *path* to
+    be stored in `/nix/var/nix/gcroots/auto/`. For instance,
     
         $ nix-store --add-root /home/eelco/bla/result --indirect -r ...
         
@@ -262,10 +262,11 @@ The following suboperations may be specified:
 By default, all unreachable paths are deleted. The following options
 control what gets deleted and in what order:
 
-  - `--max-freed` bytes  
-    Keep deleting paths until at least bytes bytes have been deleted,
-    then stop. The argument bytes can be followed by the multiplicative
-    suffix `K`, `M`, `G` or `T`, denoting KiB, MiB, GiB or TiB units.
+  - `--max-freed` *bytes*  
+    Keep deleting paths until at least *bytes* bytes have been deleted,
+    then stop. The argument *bytes* can be followed by the
+    multiplicative suffix `K`, `M`, `G` or `T`, denoting KiB, MiB, GiB
+    or TiB units.
 
 The behaviour of the collector is also influenced by the
 [`keep-outputs`](#conf-keep-outputs) and
@@ -303,7 +304,7 @@ paths
 
 ## Description
 
-The operation `--delete` deletes the store paths paths from the Nix
+The operation `--delete` deletes the store paths *paths* from the Nix
 store, but only if it is safe to do so; that is, when the path is not
 reachable from a root of the garbage collector. This means that you can
 only delete paths that would also be deleted by `nix-store --gc`. Thus,
@@ -379,7 +380,7 @@ The operation `--query` displays various bits of information about the
 store paths . The queries are described below. At most one query can be
 specified. The default query is `--outputs`.
 
-The paths paths may also be symlinks from outside of the Nix store, to
+The paths *paths* may also be symlinks from outside of the Nix store, to
 the Nix store. In that case, the query is applied to the target of the
 symlink.
 
@@ -397,11 +398,11 @@ symlink.
 
   - `--outputs`  
     Prints out the [output paths](#gloss-output-path) of the store
-    derivations paths. These are the paths that will be produced when
+    derivations *paths*. These are the paths that will be produced when
     the derivation is built.
 
   - `--requisites`; `-R`  
-    Prints out the [closure](#gloss-closure) of the store path paths.
+    Prints out the [closure](#gloss-closure) of the store path *paths*.
     
     This query has one option:
     
@@ -419,29 +420,30 @@ symlink.
 
   - `--references`  
     Prints the set of [references](#gloss-reference) of the store paths
-    paths, that is, their immediate dependencies. (For *all*
+    *paths*, that is, their immediate dependencies. (For *all*
     dependencies, use `--requisites`.)
 
   - `--referrers`  
-    Prints the set of *referrers* of the store paths paths, that is, the
-    store paths currently existing in the Nix store that refer to one of
-    paths. Note that contrary to the references, the set of referrers is
-    not constant; it can change as store paths are added or removed.
+    Prints the set of *referrers* of the store paths *paths*, that is,
+    the store paths currently existing in the Nix store that refer to
+    one of *paths*. Note that contrary to the references, the set of
+    referrers is not constant; it can change as store paths are added or
+    removed.
 
   - `--referrers-closure`  
-    Prints the closure of the set of store paths paths under the
+    Prints the closure of the set of store paths *paths* under the
     referrers relation; that is, all store paths that directly or
-    indirectly refer to one of paths. These are all the path currently
-    in the Nix store that are dependent on paths.
+    indirectly refer to one of *paths*. These are all the path currently
+    in the Nix store that are dependent on *paths*.
 
   - `--deriver`; `-d`  
-    Prints the [deriver](#gloss-deriver) of the store paths paths. If
+    Prints the [deriver](#gloss-deriver) of the store paths *paths*. If
     the path has no deriver (e.g., if it is a source file), or if the
     deriver is not known (e.g., in the case of a binary-only
     deployment), the string `unknown-deriver` is printed.
 
   - `--graph`  
-    Prints the references graph of the store paths paths in the format
+    Prints the references graph of the store paths *paths* in the format
     of the `dot` tool of AT\&T's [Graphviz
     package](http://www.graphviz.org/). This can be used to visualise
     dependency graphs. To obtain a build-time dependency graph, apply
@@ -449,40 +451,40 @@ symlink.
     apply it to an output path.
 
   - `--tree`  
-    Prints the references graph of the store paths paths as a nested
+    Prints the references graph of the store paths *paths* as a nested
     ASCII tree. References are ordered by descending closure size; this
     tends to flatten the tree, making it more readable. The query only
     recurses into a store path when it is first encountered; this
     prevents a blowup of the tree representation of the graph.
 
   - `--graphml`  
-    Prints the references graph of the store paths paths in the
+    Prints the references graph of the store paths *paths* in the
     [GraphML](http://graphml.graphdrawing.org/) file format. This can be
     used to visualise dependency graphs. To obtain a build-time
     dependency graph, apply this to a store derivation. To obtain a
     runtime dependency graph, apply it to an output path.
 
-  - `--binding` name; `-b` name  
-    Prints the value of the attribute name (i.e., environment variable)
-    of the store derivations paths. It is an error for a derivation to
-    not have the specified attribute.
+  - `--binding` *name*; `-b` *name*  
+    Prints the value of the attribute *name* (i.e., environment
+    variable) of the store derivations *paths*. It is an error for a
+    derivation to not have the specified attribute.
 
   - `--hash`  
-    Prints the SHA-256 hash of the contents of the store paths paths
+    Prints the SHA-256 hash of the contents of the store paths *paths*
     (that is, the hash of the output of `nix-store --dump` on the given
     paths). Since the hash is stored in the Nix database, this is a fast
     operation.
 
   - `--size`  
-    Prints the size in bytes of the contents of the store paths paths —
-    to be precise, the size of the output of `nix-store --dump` on the
-    given paths. Note that the actual disk space required by the store
-    paths may be higher, especially on filesystems with large cluster
-    sizes.
+    Prints the size in bytes of the contents of the store paths *paths*
+    — to be precise, the size of the output of `nix-store --dump` on
+    the given paths. Note that the actual disk space required by the
+    store paths may be higher, especially on filesystems with large
+    cluster sizes.
 
   - `--roots`  
     Prints the garbage collector roots that point, directly or
-    indirectly, at the store paths paths.
+    indirectly, at the store paths *paths*.
 
 ## Examples
 
@@ -708,8 +710,8 @@ path
 ## Description
 
 The operation `--dump` produces a NAR (Nix ARchive) file containing the
-contents of the file system tree rooted at path. The archive is written
-to standard output.
+contents of the file system tree rooted at *path*. The archive is
+written to standard output.
 
 A NAR archive is like a TAR or Zip archive, but it contains only the
 information that Nix considers important. For instance, timestamps are
@@ -745,8 +747,8 @@ path
 
 ## Description
 
-The operation `--restore` unpacks a NAR archive to path, which must not
-already exist. The archive is read from standard input.
+The operation `--restore` unpacks a NAR archive to *path*, which must
+not already exist. The archive is read from standard input.
 
 # Operation `--export`
 

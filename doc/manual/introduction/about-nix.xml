@@ -99,7 +99,7 @@ there after an upgrade.  This means that you can <emphasis>roll
 back</emphasis> to the old version:</para>
 
 <screen>
-$ nix-env --upgrade <replaceable>some-packages</replaceable>
+$ nix-env --upgrade <emphasis>some-packages</emphasis>
 $ nix-env --rollback
 </screen>
 

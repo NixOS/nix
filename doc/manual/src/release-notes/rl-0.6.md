@@ -49,8 +49,8 @@
     
       - New language construct: `with
                                                         E1;
-                                                        E2` brings all attributes defined in the attribute set E1 in
-        scope in E2.
+                                                        E2` brings all attributes defined in the attribute set *E1* in
+        scope in *E2*.
     
       - Added a `map` function.
     

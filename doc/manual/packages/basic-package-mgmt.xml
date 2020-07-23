@@ -74,10 +74,10 @@ then you need to pass the path to your Nixpkgs tree using the
 <option>-f</option> flag:
 
 <screen>
-$ nix-env -qaf <replaceable>/path/to/nixpkgs</replaceable>
+$ nix-env -qaf <emphasis>/path/to/nixpkgs</emphasis>
 </screen>
 
-where <replaceable>/path/to/nixpkgs</replaceable> is where you’ve
+where <emphasis>/path/to/nixpkgs</emphasis> is where you’ve
 unpacked or checked out Nixpkgs.</para>
 
 <para>You can select specific packages by name:

@@ -9,42 +9,42 @@ scope. Instead, you can access them through the `builtins` built-in
 value, which is a set that contains all built-in functions and values.
 For instance, `derivation` is also available as `builtins.derivation`.
 
-  - `abort` s; `builtins.abort` s  
-    Abort Nix expression evaluation, print error message s.
+  - `abort` *s*; `builtins.abort` *s*  
+    Abort Nix expression evaluation, print error message *s*.
 
-  - `builtins.add` e1 e2  
-    Return the sum of the numbers e1 and e2.
+  - `builtins.add` *e1* *e2*  
+    Return the sum of the numbers *e1* and *e2*.
 
-  - `builtins.all` pred list  
-    Return `true` if the function pred returns `true` for all elements
-    of list, and `false` otherwise.
+  - `builtins.all` *pred* *list*  
+    Return `true` if the function *pred* returns `true` for all elements
+    of *list*, and `false` otherwise.
 
-  - `builtins.any` pred list  
-    Return `true` if the function pred returns `true` for at least one
-    element of list, and `false` otherwise.
+  - `builtins.any` *pred* *list*  
+    Return `true` if the function *pred* returns `true` for at least one
+    element of *list*, and `false` otherwise.
 
-  - `builtins.attrNames` set  
-    Return the names of the attributes in the set set in an
+  - `builtins.attrNames` *set*  
+    Return the names of the attributes in the set *set* in an
     alphabetically sorted list. For instance, `builtins.attrNames { y
     = 1; x = "foo"; }` evaluates to `[ "x" "y" ]`.
 
-  - `builtins.attrValues` set  
-    Return the values of the attributes in the set set in the order
+  - `builtins.attrValues` *set*  
+    Return the values of the attributes in the set *set* in the order
     corresponding to the sorted attribute names.
 
-  - `baseNameOf` s  
-    Return the *base name* of the string s, that is, everything
+  - `baseNameOf` *s*  
+    Return the *base name* of the string *s*, that is, everything
     following the final slash in the string. This is similar to the GNU
     `basename` command.
 
-  - `builtins.bitAnd` e1 e2  
-    Return the bitwise AND of the integers e1 and e2.
+  - `builtins.bitAnd` *e1* *e2*  
+    Return the bitwise AND of the integers *e1* and *e2*.
 
-  - `builtins.bitOr` e1 e2  
-    Return the bitwise OR of the integers e1 and e2.
+  - `builtins.bitOr` *e1* *e2*  
+    Return the bitwise OR of the integers *e1* and *e2*.
 
-  - `builtins.bitXor` e1 e2  
-    Return the bitwise XOR of the integers e1 and e2.
+  - `builtins.bitXor` *e1* *e2*  
+    Return the bitwise XOR of the integers *e1* and *e2*.
 
   - `builtins`  
     The set `builtins` contains all the built-in functions and values.
@@ -56,17 +56,17 @@ For instance, `derivation` is also available as `builtins.derivation`.
     This allows a Nix expression to fall back gracefully on older Nix
     installations that don’t have the desired built-in function.
 
-  - `builtins.compareVersions` s1 s2  
+  - `builtins.compareVersions` *s1* *s2*  
     Compare two strings representing versions and return `-1` if version
-    s1 is older than version s2, `0` if they are the same, and `1` if s1
-    is newer than s2. The version comparison algorithm is the same as
-    the one used by [`nix-env
+    *s1* is older than version *s2*, `0` if they are the same, and `1`
+    if *s1* is newer than *s2*. The version comparison algorithm is the
+    same as the one used by [`nix-env
                     -u`](#ssec-version-comparisons).
 
-  - `builtins.concatLists` lists  
+  - `builtins.concatLists` *lists*  
     Concatenate a list of lists into a single list.
 
-  - `builtins.concatStringsSep` separator list  
+  - `builtins.concatStringsSep` *separator* *list*  
     Concatenate a list of strings with a separator between each element,
     e.g. `concatStringsSep "/"
                     ["usr" "local" "bin"] == "usr/local/bin"`
@@ -76,37 +76,37 @@ For instance, `derivation` is also available as `builtins.derivation`.
     identifier for the Nix installation on which the expression is being
     evaluated, such as `"i686-linux"` or `"x86_64-darwin"`.
 
-  - `builtins.deepSeq` e1 e2  
+  - `builtins.deepSeq` *e1* *e2*  
     This is like `seq
                     e1
-                    e2`, except that e1 is evaluated *deeply*: if it’s a list or set,
+                    e2`, except that *e1* is evaluated *deeply*: if it’s a list or set,
     its elements or attributes are also evaluated recursively.
 
-  - `derivation` attrs; `builtins.derivation` attrs  
+  - `derivation` *attrs*; `builtins.derivation` *attrs*  
     `derivation` is described in [???](#ssec-derivation).
 
-  - `dirOf` s; `builtins.dirOf` s  
-    Return the directory part of the string s, that is, everything
+  - `dirOf` *s*; `builtins.dirOf` *s*  
+    Return the directory part of the string *s*, that is, everything
     before the final slash in the string. This is similar to the GNU
     `dirname` command.
 
-  - `builtins.div` e1 e2  
-    Return the quotient of the numbers e1 and e2.
+  - `builtins.div` *e1* *e2*  
+    Return the quotient of the numbers *e1* and *e2*.
 
-  - `builtins.elem` x xs  
-    Return `true` if a value equal to x occurs in the list xs, and
+  - `builtins.elem` *x* *xs*  
+    Return `true` if a value equal to *x* occurs in the list *xs*, and
     `false` otherwise.
 
-  - `builtins.elemAt` xs n  
-    Return element n from the list xs. Elements are counted starting
+  - `builtins.elemAt` *xs* *n*  
+    Return element *n* from the list *xs*. Elements are counted starting
     from 0. A fatal error occurs if the index is out of bounds.
 
-  - `builtins.fetchurl` url  
+  - `builtins.fetchurl` *url*  
     Download the specified URL and return the path of the downloaded
     file. This function is not available if [restricted evaluation
     mode](#conf-restrict-eval) is enabled.
 
-  - `fetchTarball` url; `builtins.fetchTarball` url  
+  - `fetchTarball` *url*; `builtins.fetchTarball` *url*  
     Download the specified URL, unpack it and return the path of the
     unpacked tree. The file must be a tape archive (`.tar`) compressed
     with `gzip`, `bzip2` or `xz`. The top-level path component of the
@@ -142,10 +142,10 @@ For instance, `derivation` is also available as `builtins.derivation`.
     This function is not available if [restricted evaluation
     mode](#conf-restrict-eval) is enabled.
 
-  - `builtins.fetchGit` args  
-    Fetch a path from git. args can be a URL, in which case the HEAD of
-    the repo at that URL is fetched. Otherwise, it can be an attribute
-    with the following attributes (all except `url` optional):
+  - `builtins.fetchGit` *args*  
+    Fetch a path from git. *args* can be a URL, in which case the HEAD
+    of the repo at that URL is fetched. Otherwise, it can be an
+    attribute with the following attributes (all except `url` optional):
     
       - url  
         The URL of the repo.
@@ -240,11 +240,11 @@ For instance, `derivation` is also available as `builtins.derivation`.
         > 
         > This behavior is disabled in *Pure evaluation mode*.
 
-  - `builtins.filter` f xs  
-    Return a list consisting of the elements of xs for which the
-    function f returns `true`.
+  - `builtins.filter` *f* *xs*  
+    Return a list consisting of the elements of *xs* for which the
+    function *f* returns `true`.
 
-  - `builtins.filterSource` e1 e2  
+  - `builtins.filterSource` *e1* *e2*  
     This function allows you to copy sources into the Nix store while
     filtering certain files. For instance, suppose that you want to use
     the directory `source-dir` as an input to a Nix expression, e.g.
@@ -266,9 +266,9 @@ For instance, `derivation` is also available as `builtins.derivation`.
         ./source-dir;
     ```
     
-    Thus, the first argument e1 must be a predicate function that is
+    Thus, the first argument *e1* must be a predicate function that is
     called for each regular file, directory or symlink in the source
-    tree e2. If the function returns `true`, the file is copied to the
+    tree *e2*. If the function returns `true`, the file is copied to the
     Nix store, otherwise it is omitted. The function is called with two
     arguments. The first is the full path of the file. The second is a
     string that identifies the type of the file, which is either
@@ -276,19 +276,19 @@ For instance, `derivation` is also available as `builtins.derivation`.
     kinds of files such as device nodes or fifos — but note that those
     cannot be copied to the Nix store, so if the predicate returns
     `true` for them, the copy will fail). If you exclude a directory,
-    the entire corresponding subtree of e2 will be excluded.
+    the entire corresponding subtree of *e2* will be excluded.
 
-  - `builtins.foldl’` op nul list  
+  - `builtins.foldl’` *op* *nul* *list*  
     Reduce a list by applying a binary operator, from left to right,
     e.g. `foldl’ op nul [x0 x1 x2 ...] = op (op
                     (op nul x0) x1) x2) ...`. The operator is applied strictly, i.e.,
     its arguments are evaluated first. For example, `foldl’ (x: y: x +
     y) 0 [1 2 3]` evaluates to 6.
 
-  - `builtins.functionArgs` f  
+  - `builtins.functionArgs` *f*  
     Return a set containing the names of the formal arguments expected
-    by the function f. The value of each attribute is a Boolean denoting
-    whether the corresponding argument has a default value. For
+    by the function *f*. The value of each attribute is a Boolean
+    denoting whether the corresponding argument has a default value. For
     instance, `functionArgs ({ x, y ? 123}: ...) = { x = false; y =
     true; }`.
     
@@ -296,7 +296,7 @@ For instance, `derivation` is also available as `builtins.derivation`.
     the function. Plain lambdas are not included, e.g. `functionArgs (x:
     ...) = { }`.
 
-  - `builtins.fromJSON` e  
+  - `builtins.fromJSON` *e*  
     Convert a JSON string to a Nix value. For example,
     
         builtins.fromJSON ''{"x": [1, 2, 3], "y": null}''
@@ -304,21 +304,22 @@ For instance, `derivation` is also available as `builtins.derivation`.
     returns the value `{ x = [ 1 2 3 ]; y = null;
                     }`.
 
-  - `builtins.genList` generator length  
-    Generate list of size length, with each element i equal to the value
-    returned by generator `i`. For example,
+  - `builtins.genList` *generator* *length*  
+    Generate list of size *length*, with each element *i* equal to the
+    value returned by *generator* `i`. For example,
     
         builtins.genList (x: x * x) 5
     
     returns the list `[ 0 1 4 9 16 ]`.
 
-  - `builtins.getAttr` s set  
-    `getAttr` returns the attribute named s from set. Evaluation aborts
-    if the attribute doesn’t exist. This is a dynamic version of the `.`
-    operator, since s is an expression rather than an identifier.
+  - `builtins.getAttr` *s* *set*  
+    `getAttr` returns the attribute named *s* from *set*. Evaluation
+    aborts if the attribute doesn’t exist. This is a dynamic version of
+    the `.` operator, since *s* is an expression rather than an
+    identifier.
 
-  - `builtins.getEnv` s  
-    `getEnv` returns the value of the environment variable s, or an
+  - `builtins.getEnv` *s*  
+    `getEnv` returns the value of the environment variable *s*, or an
     empty string if the variable doesn’t exist. This function should be
     used with care, as it can introduce all sorts of nasty environment
     dependencies in your Nix expression.
@@ -328,29 +329,29 @@ For instance, `derivation` is also available as `builtins.derivation`.
     Packages. (That is, it does a `getEnv "HOME"` to locate the user’s
     home directory.)
 
-  - `builtins.hasAttr` s set  
-    `hasAttr` returns `true` if set has an attribute named s, and
+  - `builtins.hasAttr` *s* *set*  
+    `hasAttr` returns `true` if *set* has an attribute named *s*, and
     `false` otherwise. This is a dynamic version of the `?` operator,
-    since s is an expression rather than an identifier.
+    since *s* is an expression rather than an identifier.
 
-  - `builtins.hashString` type s  
+  - `builtins.hashString` *type* *s*  
     Return a base-16 representation of the cryptographic hash of string
-    s. The hash algorithm specified by type must be one of `"md5"`,
+    *s*. The hash algorithm specified by *type* must be one of `"md5"`,
     `"sha1"`, `"sha256"` or `"sha512"`.
 
-  - `builtins.hashFile` type p  
+  - `builtins.hashFile` *type* *p*  
     Return a base-16 representation of the cryptographic hash of the
-    file at path p. The hash algorithm specified by type must be one of
-    `"md5"`, `"sha1"`, `"sha256"` or `"sha512"`.
+    file at path *p*. The hash algorithm specified by *type* must be one
+    of `"md5"`, `"sha1"`, `"sha256"` or `"sha512"`.
 
-  - `builtins.head` list  
+  - `builtins.head` *list*  
     Return the first element of a list; abort evaluation if the argument
     isn’t a list or is an empty list. You can test whether a list is
     empty by comparing it with `[]`.
 
-  - `import` path; `builtins.import` path  
-    Load, parse and return the Nix expression in the file path. If path
-    is a directory, the file ` default.nix
+  - `import` *path*; `builtins.import` *path*  
+    Load, parse and return the Nix expression in the file *path*. If
+    *path* is a directory, the file ` default.nix
                      ` in that directory is loaded. Evaluation aborts if the file
     doesn’t exist or contains an incorrect Nix expression. `import`
     implements Nix’s module system: you can put any Nix expression (such
@@ -361,7 +362,8 @@ For instance, `derivation` is also available as `builtins.derivation`.
     > 
     > Unlike some languages, `import` is a regular function in Nix.
     > Paths using the angle bracket syntax (e.g., `
-    >     >     >     >     > import` \<foo\>) are normal path values (see [???](#ssec-values)).
+    >     >     >     >     > import` *\<foo\>*) are normal path values (see
+    > [???](#ssec-values)).
     
     A Nix expression loaded by `import` must not contain any *free
     variables* (identifiers that are not defined in the Nix expression
@@ -393,50 +395,50 @@ For instance, `derivation` is also available as `builtins.derivation`.
     (The function argument doesn’t have to be called `x` in `foo.nix`;
     any name would work.)
 
-  - `builtins.intersectAttrs` e1 e2  
-    Return a set consisting of the attributes in the set e2 that also
-    exist in the set e1.
+  - `builtins.intersectAttrs` *e1* *e2*  
+    Return a set consisting of the attributes in the set *e2* that also
+    exist in the set *e1*.
 
-  - `builtins.isAttrs` e  
-    Return `true` if e evaluates to a set, and `false` otherwise.
+  - `builtins.isAttrs` *e*  
+    Return `true` if *e* evaluates to a set, and `false` otherwise.
 
-  - `builtins.isList` e  
-    Return `true` if e evaluates to a list, and `false` otherwise.
+  - `builtins.isList` *e*  
+    Return `true` if *e* evaluates to a list, and `false` otherwise.
 
-  - `builtins.isFunction` e  
-    Return `true` if e evaluates to a function, and `false` otherwise.
+  - `builtins.isFunction` *e*  
+    Return `true` if *e* evaluates to a function, and `false` otherwise.
 
-  - `builtins.isString` e  
-    Return `true` if e evaluates to a string, and `false` otherwise.
+  - `builtins.isString` *e*  
+    Return `true` if *e* evaluates to a string, and `false` otherwise.
 
-  - `builtins.isInt` e  
-    Return `true` if e evaluates to an int, and `false` otherwise.
+  - `builtins.isInt` *e*  
+    Return `true` if *e* evaluates to an int, and `false` otherwise.
 
-  - `builtins.isFloat` e  
-    Return `true` if e evaluates to a float, and `false` otherwise.
+  - `builtins.isFloat` *e*  
+    Return `true` if *e* evaluates to a float, and `false` otherwise.
 
-  - `builtins.isBool` e  
-    Return `true` if e evaluates to a bool, and `false` otherwise.
+  - `builtins.isBool` *e*  
+    Return `true` if *e* evaluates to a bool, and `false` otherwise.
 
-  - `builtins.isPath` e  
-    Return `true` if e evaluates to a path, and `false` otherwise.
+  - `builtins.isPath` *e*  
+    Return `true` if *e* evaluates to a path, and `false` otherwise.
 
-  - `isNull` e; `builtins.isNull` e  
-    Return `true` if e evaluates to `null`, and `false` otherwise.
+  - `isNull` *e*; `builtins.isNull` *e*  
+    Return `true` if *e* evaluates to `null`, and `false` otherwise.
     
     > **Warning**
     > 
     > This function is *deprecated*; just write `e == null` instead.
 
-  - `builtins.length` e  
-    Return the length of the list e.
+  - `builtins.length` *e*  
+    Return the length of the list *e*.
 
-  - `builtins.lessThan` e1 e2  
-    Return `true` if the number e1 is less than the number e2, and
-    `false` otherwise. Evaluation aborts if either e1 or e2 does not
+  - `builtins.lessThan` *e1* *e2*  
+    Return `true` if the number *e1* is less than the number *e2*, and
+    `false` otherwise. Evaluation aborts if either *e1* or *e2* does not
     evaluate to a number.
 
-  - `builtins.listToAttrs` e  
+  - `builtins.listToAttrs` *e*  
     Construct a set from a list specifying the names and values of each
     attribute. Each element of the list should be a set consisting of a
     string-valued attribute `name` specifying the name of the attribute,
@@ -451,19 +453,20 @@ For instance, `derivation` is also available as `builtins.derivation`.
     
         { foo = 123; bar = 456; }
 
-  - `map` f list; `builtins.map` f list  
-    Apply the function f to each element in the list list. For example,
+  - `map` *f* *list*; `builtins.map` *f* *list*  
+    Apply the function *f* to each element in the list *list*. For
+    example,
     
         map (x: "foo" + x) [ "bar" "bla" "abc" ]
     
     evaluates to `[ "foobar" "foobla" "fooabc"
                     ]`.
 
-  - `builtins.match` regex str  
+  - `builtins.match` *regex* *str*  
     Returns a list if the [extended POSIX regular
     expression](http://pubs.opengroup.org/onlinepubs/9699919799/basedefs/V1_chap09.html#tag_09_04)
-    regex matches str precisely, otherwise returns `null`. Each item in
-    the list is a regex group.
+    *regex* matches *str* precisely, otherwise returns `null`. Each item
+    in the list is a regex group.
     
         builtins.match "ab" "abc"
     
@@ -481,21 +484,21 @@ For instance, `derivation` is also available as `builtins.derivation`.
     
     Evaluates to `[ "foo" ]`.
 
-  - `builtins.mul` e1 e2  
-    Return the product of the numbers e1 and e2.
+  - `builtins.mul` *e1* *e2*  
+    Return the product of the numbers *e1* and *e2*.
 
-  - `builtins.parseDrvName` s  
-    Split the string s into a package name and version. The package name
-    is everything up to but not including the first dash followed by a
-    digit, and the version is everything following that dash. The result
-    is returned in a set `{ name, version }`. Thus,
+  - `builtins.parseDrvName` *s*  
+    Split the string *s* into a package name and version. The package
+    name is everything up to but not including the first dash followed
+    by a digit, and the version is everything following that dash. The
+    result is returned in a set `{ name, version }`. Thus,
     `builtins.parseDrvName "nix-0.12pre12876"` returns `{ name = "nix";
     version = "0.12pre12876";
                     }`.
 
-  - `builtins.path` args  
+  - `builtins.path` *args*  
     An enrichment of the built-in path type, based on the attributes
-    present in args. All are optional except `path`:
+    present in *args*. All are optional except `path`:
     
       - path  
         The underlying path.
@@ -523,20 +526,20 @@ For instance, `derivation` is also available as `builtins.derivation`.
         providing a hash allows `builtins.path` to be used even when the
         `pure-eval` nix config option is on.
 
-  - `builtins.pathExists` path  
-    Return `true` if the path path exists at evaluation time, and
+  - `builtins.pathExists` *path*  
+    Return `true` if the path *path* exists at evaluation time, and
     `false` otherwise.
 
-  - `builtins.placeholder` output  
-    Return a placeholder string for the specified output that will be
+  - `builtins.placeholder` *output*  
+    Return a placeholder string for the specified *output* that will be
     substituted by the corresponding output path at build time. Typical
     outputs would be `"out"`, `"bin"` or `"dev"`.
 
-  - `builtins.readDir` path  
-    Return the contents of the directory path as a set mapping directory
-    entries to the corresponding file type. For instance, if directory
-    `A` contains a regular file `B` and another directory `C`, then
-    `builtins.readDir
+  - `builtins.readDir` *path*  
+    Return the contents of the directory *path* as a set mapping
+    directory entries to the corresponding file type. For instance, if
+    directory `A` contains a regular file `B` and another directory `C`,
+    then `builtins.readDir
                     ./A` will return the set
     
         { B = "regular"; C = "directory"; }
@@ -544,33 +547,33 @@ For instance, `derivation` is also available as `builtins.derivation`.
     The possible values for the file type are `"regular"`,
     `"directory"`, `"symlink"` and `"unknown"`.
 
-  - `builtins.readFile` path  
-    Return the contents of the file path as a string.
+  - `builtins.readFile` *path*  
+    Return the contents of the file *path* as a string.
 
-  - `removeAttrs` set list; `builtins.removeAttrs` set list  
-    Remove the attributes listed in list from set. The attributes don’t
-    have to exist in set. For instance,
+  - `removeAttrs` *set* *list*; `builtins.removeAttrs` *set* *list*  
+    Remove the attributes listed in *list* from *set*. The attributes
+    don’t have to exist in *set*. For instance,
     
         removeAttrs { x = 1; y = 2; z = 3; } [ "a" "x" "z" ]
     
     evaluates to `{ y = 2; }`.
 
-  - `builtins.replaceStrings` from to s  
-    Given string s, replace every occurrence of the strings in from with
-    the corresponding string in to. For example,
+  - `builtins.replaceStrings` *from* *to* *s*  
+    Given string *s*, replace every occurrence of the strings in *from*
+    with the corresponding string in *to*. For example,
     
         builtins.replaceStrings ["oo" "a"] ["a" "i"] "foobar"
     
     evaluates to `"fabir"`.
 
-  - `builtins.seq` e1 e2  
-    Evaluate e1, then evaluate and return e2. This ensures that a
-    computation is strict in the value of e1.
+  - `builtins.seq` *e1* *e2*  
+    Evaluate *e1*, then evaluate and return *e2*. This ensures that a
+    computation is strict in the value of *e1*.
 
-  - `builtins.sort` comparator list  
-    Return list in sorted order. It repeatedly calls the function
-    comparator with two elements. The comparator should return `true` if
-    the first element is less than the second, and `false` otherwise.
+  - `builtins.sort` *comparator* *list*  
+    Return *list* in sorted order. It repeatedly calls the function
+    *comparator* with two elements. The comparator should return `true`
+    if the first element is less than the second, and `false` otherwise.
     For example,
     
         builtins.sort builtins.lessThan [ 483 249 526 147 42 77 ]
@@ -581,12 +584,12 @@ For instance, `derivation` is also available as `builtins.derivation`.
     This is a stable sort: it preserves the relative order of elements
     deemed equal by the comparator.
 
-  - `builtins.split` regex str  
+  - `builtins.split` *regex* *str*  
     Returns a list composed of non matched strings interleaved with the
     lists of the [extended POSIX regular
     expression](http://pubs.opengroup.org/onlinepubs/9699919799/basedefs/V1_chap09.html#tag_09_04)
-    regex matches of str. Each item in the lists of matched sequences is
-    a regex group.
+    *regex* matches of *str*. Each item in the lists of matched
+    sequences is a regex group.
     
         builtins.split "(a)b" "abc"
     
@@ -604,44 +607,44 @@ For instance, `derivation` is also available as `builtins.derivation`.
     
     Evaluates to `[ " " [ "FOO" ] " " ]`.
 
-  - `builtins.splitVersion` s  
+  - `builtins.splitVersion` *s*  
     Split a string representing a version into its components, by the
     same version splitting logic underlying the version comparison in
     [`nix-env -u`](#ssec-version-comparisons).
 
-  - `builtins.stringLength` e  
-    Return the length of the string e. If e is not a string, evaluation
-    is aborted.
+  - `builtins.stringLength` *e*  
+    Return the length of the string *e*. If *e* is not a string,
+    evaluation is aborted.
 
-  - `builtins.sub` e1 e2  
-    Return the difference between the numbers e1 and e2.
+  - `builtins.sub` *e1* *e2*  
+    Return the difference between the numbers *e1* and *e2*.
 
-  - `builtins.substring` start len s  
-    Return the substring of s from character position start (zero-based)
-    up to but not including start + len. If start is greater than the
-    length of the string, an empty string is returned, and if start +
-    len lies beyond the end of the string, only the substring up to the
-    end of the string is returned. start must be non-negative. For
-    example,
+  - `builtins.substring` *start* *len* *s*  
+    Return the substring of *s* from character position *start*
+    (zero-based) up to but not including *start + len*. If *start* is
+    greater than the length of the string, an empty string is returned,
+    and if *start + len* lies beyond the end of the string, only the
+    substring up to the end of the string is returned. *start* must be
+    non-negative. For example,
     
         builtins.substring 0 3 "nixos"
     
     evaluates to `"nix"`.
 
-  - `builtins.tail` list  
+  - `builtins.tail` *list*  
     Return the second to last elements of a list; abort evaluation if
     the argument isn’t a list or is an empty list.
 
-  - `throw` s; `builtins.throw` s  
-    Throw an error message s. This usually aborts Nix expression
+  - `throw` *s*; `builtins.throw` *s*  
+    Throw an error message *s*. This usually aborts Nix expression
     evaluation, but in `nix-env -qa` and other commands that try to
     evaluate a set of derivations to get information about those
     derivations, a derivation that throws an error is silently skipped
     (which is not the case for `abort`).
 
-  - `builtins.toFile` name s  
-    Store the string s in a file in the Nix store and return its path.
-    The file has suffix name. This file can be used as an input to
+  - `builtins.toFile` *name* *s*  
+    Store the string *s* in a file in the Nix store and return its path.
+    The file has suffix *name*. This file can be used as an input to
     derivations. One application is to write builders “inline”. For
     instance, the following Nix expression combines [???](#ex-hello-nix)
     and [???](#ex-hello-builder) into one file:
@@ -705,20 +708,20 @@ For instance, `derivation` is also available as `builtins.derivation`.
     you are using Nixpkgs, the `writeTextFile` function is able to do
     that.
 
-  - `builtins.toJSON` e  
-    Return a string containing a JSON representation of e. Strings,
+  - `builtins.toJSON` *e*  
+    Return a string containing a JSON representation of *e*. Strings,
     integers, floats, booleans, nulls and lists are mapped to their JSON
     equivalents. Sets (except derivations) are represented as objects.
     Derivations are translated to a JSON string containing the
     derivation’s output path. Paths are copied to the store and
     represented as a JSON string of the resulting store path.
 
-  - `builtins.toPath` s  
+  - `builtins.toPath` *s*  
     DEPRECATED. Use `/. + "/path"` to convert a string into an absolute
     path. For relative paths, use `./. + "/path"`.
 
-  - `toString` e; `builtins.toString` e  
-    Convert the expression e to a string. e can be:
+  - `toString` *e*; `builtins.toString` *e*  
+    Convert the expression *e* to a string. *e* can be:
     
       - A string (in which case the string is returned unmodified).
     
@@ -735,8 +738,8 @@ For instance, `derivation` is also available as `builtins.derivation`.
     
       - `null`, which yields the empty string.
 
-  - `builtins.toXML` e  
-    Return a string containing an XML representation of e. The main
+  - `builtins.toXML` *e*  
+    Return a string containing an XML representation of *e*. The main
     application for `toXML` is to communicate information with the
     builder in a more structured format than plain environment
     variables.
@@ -822,22 +825,23 @@ For instance, `derivation` is also available as `builtins.derivation`.
     of the stylesheet is spliced into the builder using the syntax
     `xsltproc ${stylesheet}`.
 
-  - `builtins.trace` e1 e2  
-    Evaluate e1 and print its abstract syntax representation on standard
-    error. Then return e2. This function is useful for debugging.
+  - `builtins.trace` *e1* *e2*  
+    Evaluate *e1* and print its abstract syntax representation on
+    standard error. Then return *e2*. This function is useful for
+    debugging.
 
-  - `builtins.tryEval` e  
-    Try to shallowly evaluate e. Return a set containing the attributes
-    `success` (`true` if e evaluated successfully, `false` if an error
-    was thrown) and `value`, equalling e if successful and `false`
-    otherwise. Note that this doesn't evaluate e deeply, so ` let e = {
-    x = throw ""; }; in (builtins.tryEval e).success
+  - `builtins.tryEval` *e*  
+    Try to shallowly evaluate *e*. Return a set containing the
+    attributes `success` (`true` if *e* evaluated successfully, `false`
+    if an error was thrown) and `value`, equalling *e* if successful and
+    `false` otherwise. Note that this doesn't evaluate *e* deeply, so
+    ` let e = { x = throw ""; }; in (builtins.tryEval e).success
                      ` will be `true`. Using ` builtins.deepSeq
                      ` one can get the expected result: `let e = { x = throw "";
                     }; in (builtins.tryEval (builtins.deepSeq e e)).success` will be
     `false`.
 
-  - `builtins.typeOf` e  
-    Return a string representing the type of the value e, namely
+  - `builtins.typeOf` *e*  
+    Return a string representing the type of the value *e*, namely
     `"int"`, `"bool"`, `"string"`, `"path"`, `"null"`, `"set"`,
     `"list"`, `"lambda"` or `"float"`.

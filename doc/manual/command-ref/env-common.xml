@@ -25,7 +25,7 @@
 
     <para>A colon-separated list of directories used to look up Nix
     expressions enclosed in angle brackets (i.e.,
-    <literal>&lt;<replaceable>path</replaceable>></literal>).  For
+    <literal>&lt;<emphasis>path</emphasis>></literal>).  For
     instance, the value
 
     <screen>
@@ -40,10 +40,10 @@
 nixpkgs=/home/eelco/Dev/nixpkgs-branch:/etc/nixos</screen>
 
     will cause Nix to search for
-    <literal>&lt;nixpkgs/<replaceable>path</replaceable>></literal> in
-    <filename>/home/eelco/Dev/nixpkgs-branch/<replaceable>path</replaceable></filename>
+    <literal>&lt;nixpkgs/<emphasis>path</emphasis>></literal> in
+    <filename>/home/eelco/Dev/nixpkgs-branch/<emphasis>path</emphasis></filename>
     and
-    <filename>/etc/nixos/nixpkgs/<replaceable>path</replaceable></filename>.</para>
+    <filename>/etc/nixos/nixpkgs/<emphasis>path</emphasis></filename>.</para>
 
     <para>If a path in the Nix search path starts with
     <literal>http://</literal> or <literal>https://</literal>, it is
@@ -105,7 +105,7 @@ $ mount -o bind /mnt/otherdisk/nix /nix</screen>
 <varlistentry><term><literal>NIX_STORE_DIR</literal></term>
 
   <listitem><para>Overrides the location of the Nix store (default
-  <filename><replaceable>prefix</replaceable>/store</filename>).</para></listitem>
+  <filename><emphasis>prefix</emphasis>/store</filename>).</para></listitem>
 
 </varlistentry>
 
@@ -114,7 +114,7 @@ $ mount -o bind /mnt/otherdisk/nix /nix</screen>
 
   <listitem><para>Overrides the location of the Nix static data
   directory (default
-  <filename><replaceable>prefix</replaceable>/share</filename>).</para></listitem>
+  <filename><emphasis>prefix</emphasis>/share</filename>).</para></listitem>
 
 </varlistentry>
 
@@ -122,7 +122,7 @@ $ mount -o bind /mnt/otherdisk/nix /nix</screen>
 <varlistentry><term><literal>NIX_LOG_DIR</literal></term>
 
   <listitem><para>Overrides the location of the Nix log directory
-  (default <filename><replaceable>prefix</replaceable>/var/log/nix</filename>).</para></listitem>
+  (default <filename><emphasis>prefix</emphasis>/var/log/nix</filename>).</para></listitem>
 
 </varlistentry>
 
@@ -130,7 +130,7 @@ $ mount -o bind /mnt/otherdisk/nix /nix</screen>
 <varlistentry><term><literal>NIX_STATE_DIR</literal></term>
 
   <listitem><para>Overrides the location of the Nix state directory
-  (default <filename><replaceable>prefix</replaceable>/var/nix</filename>).</para></listitem>
+  (default <filename><emphasis>prefix</emphasis>/var/nix</filename>).</para></listitem>
 
 </varlistentry>
 
@@ -139,7 +139,7 @@ $ mount -o bind /mnt/otherdisk/nix /nix</screen>
 
   <listitem><para>Overrides the location of the system Nix configuration
   directory (default
-  <filename><replaceable>prefix</replaceable>/etc/nix</filename>).</para></listitem>
+  <filename><emphasis>prefix</emphasis>/etc/nix</filename>).</para></listitem>
 
 </varlistentry>
 

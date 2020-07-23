@@ -61,14 +61,14 @@ path
 The command `nix-shell` will build the dependencies of the specified
 derivation, but not the derivation itself. It will then start an
 interactive shell in which all environment variables defined by the
-derivation path have been set to their corresponding values, and the
+derivation *path* have been set to their corresponding values, and the
 script `$stdenv/setup` has been sourced. This is useful for reproducing
 the environment of a derivation for development.
 
-If path is not given, `nix-shell` defaults to `shell.nix` if it exists,
-and `default.nix` otherwise.
+If *path* is not given, `nix-shell` defaults to `shell.nix` if it
+exists, and `default.nix` otherwise.
 
-If path starts with `http://` or `https://`, it is interpreted as the
+If *path* starts with `http://` or `https://`, it is interpreted as the
 URL of a tarball that will be downloaded and unpacked to a temporary
 location. The tarball must include a single top-level directory
 containing at least a file named `default.nix`.
@@ -91,8 +91,8 @@ All options not listed here are passed to `nix-store
 --realise`, except for `--arg` and `--attr` / `-A` which are passed to
 `nix-instantiate`. See also [???](#sec-common-options).
 
-  - `--command` cmd  
-    In the environment of the derivation, run the shell command cmd.
+  - `--command` *cmd*  
+    In the environment of the derivation, run the shell command *cmd*.
     This command is executed in an interactive shell. (Use `--run` to
     use a non-interactive shell instead.) However, a call to `exit` is
     implicitly added to the command, so the shell will exit after
@@ -102,14 +102,14 @@ All options not listed here are passed to `nix-store
     interactive shell. This can be useful for doing any additional
     initialisation.
 
-  - `--run` cmd  
+  - `--run` *cmd*  
     Like `--command`, but executes the command in a non-interactive
     shell. This means (among other things) that if you hit Ctrl-C while
     the command is running, the shell exits.
 
-  - `--exclude` regexp  
+  - `--exclude` *regexp*  
     Do not build any dependencies whose store path matches the regular
-    expression regexp. This option may be specified multiple times.
+    expression *regexp*. This option may be specified multiple times.
 
   - `--pure`  
     If this flag is specified, the environment is almost entirely
@@ -120,19 +120,19 @@ All options not listed here are passed to `nix-store
     installation) `/etc/bashrc` are still sourced, so any variables set
     there will affect the interactive shell.
 
-  - `--packages` / `-p` packages…  
+  - `--packages` / `-p` *packages*…  
     Set up an environment in which the specified packages are present.
     The command line arguments are interpreted as attribute names inside
     the Nix Packages collection. Thus, `nix-shell -p libjpeg openjdk`
     will start a shell in which the packages denoted by the attribute
     names `libjpeg` and `openjdk` are present.
 
-  - `-i` interpreter  
+  - `-i` *interpreter*  
     The chained script interpreter to be invoked by `nix-shell`. Only
     applicable in `#!`-scripts (described
     [below](#ssec-nix-shell-shebang)).
 
-  - `--keep` name  
+  - `--keep` *name*  
     When a `--pure` shell is started, keep the listed environment
     variables.
 
@@ -199,10 +199,10 @@ done by starting the script with the following lines:
     #! /usr/bin/env nix-shell
     #! nix-shell -i real-interpreter -p packages
 
-where real-interpreter is the “real” script interpreter that will be
+where *real-interpreter* is the “real” script interpreter that will be
 invoked by `nix-shell` after it has obtained the dependencies and
-initialised the environment, and packages are the attribute names of the
-dependencies in Nixpkgs.
+initialised the environment, and *packages* are the attribute names of
+the dependencies in Nixpkgs.
 
 The lines starting with `#! nix-shell` specify `nix-shell` options (see
 above). Note that you cannot write `#! /usr/bin/env nix-shell -i ...`

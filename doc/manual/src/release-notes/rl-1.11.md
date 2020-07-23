@@ -35,7 +35,7 @@ features:
     derivations, and in `builtins.hashString`.
 
   - The new flag `--option build-repeat
-                            N` will cause every build to be executed N+1 times. If the build
+                            N` will cause every build to be executed *N*+1 times. If the build
     output differs between any round, the build is rejected, and the
     output paths are not registered as valid. This is primarily useful
     to verify build determinism. (We already had a `--check` option to

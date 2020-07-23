@@ -13,7 +13,7 @@
 </arg>
 <arg>
   <option>--log-format</option>
-  <replaceable>format</replaceable>
+  <emphasis>format</emphasis>
 </arg>
 <arg>
   <group choice='plain'>
@@ -26,19 +26,19 @@
     <arg choice='plain'><option>--max-jobs</option></arg>
     <arg choice='plain'><option>-j</option></arg>
   </group>
-  <replaceable>number</replaceable>
+  <emphasis>number</emphasis>
 </arg>
 <arg>
   <option>--cores</option>
-  <replaceable>number</replaceable>
+  <emphasis>number</emphasis>
 </arg>
 <arg>
   <option>--max-silent-time</option>
-  <replaceable>number</replaceable>
+  <emphasis>number</emphasis>
 </arg>
 <arg>
   <option>--timeout</option>
-  <replaceable>number</replaceable>
+  <emphasis>number</emphasis>
 </arg>
 <arg>
   <group choice='plain'>
@@ -56,12 +56,12 @@
 <arg><option>--readonly-mode</option></arg>
 <arg>
   <option>-I</option>
-  <replaceable>path</replaceable>
+  <emphasis>path</emphasis>
 </arg>
 <arg>
   <option>--option</option>
-  <replaceable>name</replaceable>
-  <replaceable>value</replaceable>
+  <emphasis>name</emphasis>
+  <emphasis>value</emphasis>
 </arg>
 <sbr />
 

@@ -22,18 +22,18 @@
     <arg><option>--flat</option></arg>
     <arg><option>--base32</option></arg>
     <arg><option>--truncate</option></arg>
-    <arg><option>--type</option> <replaceable>hashAlgo</replaceable></arg>
-    <arg choice='plain' rep='repeat'><replaceable>path</replaceable></arg>
+    <arg><option>--type</option> <emphasis>hashAlgo</emphasis></arg>
+    <arg choice='plain' rep='repeat'><emphasis>path</emphasis></arg>
   </cmdsynopsis>
   <cmdsynopsis>
     <command>nix-hash</command>
     <arg choice='plain'><option>--to-base16</option></arg>
-    <arg choice='plain' rep='repeat'><replaceable>hash</replaceable></arg>
+    <arg choice='plain' rep='repeat'><emphasis>hash</emphasis></arg>
   </cmdsynopsis>
   <cmdsynopsis>
     <command>nix-hash</command>
     <arg choice='plain'><option>--to-base32</option></arg>
-    <arg choice='plain' rep='repeat'><replaceable>hash</replaceable></arg>
+    <arg choice='plain' rep='repeat'><emphasis>hash</emphasis></arg>
   </cmdsynopsis>
 </refsynopsisdiv>
 
@@ -42,7 +42,7 @@
 
 <para>The command <command>nix-hash</command> computes the
 cryptographic hash of the contents of each
-<replaceable>path</replaceable> and prints it on standard output.  By
+<emphasis>path</emphasis> and prints it on standard output.  By
 default, it computes an MD5 hash, but other hash algorithms are
 available as well.  The hash is printed in hexadecimal.  To generate
 the same hash as <command>nix-prefetch-url</command> you have to
@@ -54,9 +54,9 @@ allows directories and symlinks to be hashed as well as regular files.
 The dump is in the <emphasis>NAR format</emphasis> produced by <link
 linkend="refsec-nix-store-dump"><command>nix-store</command>
 <option>--dump</option></link>.  Thus, <literal>nix-hash
-<replaceable>path</replaceable></literal> yields the same
+<emphasis>path</emphasis></literal> yields the same
 cryptographic hash as <literal>nix-store --dump
-<replaceable>path</replaceable> | md5sum</literal>.</para>
+<emphasis>path</emphasis> | md5sum</literal>.</para>
 
 </refsection>
 
@@ -68,9 +68,9 @@ cryptographic hash as <literal>nix-store --dump
   <varlistentry><term><option>--flat</option></term>
 
     <listitem><para>Print the cryptographic hash of the contents of
-    each regular file <replaceable>path</replaceable>.  That is, do
+    each regular file <emphasis>path</emphasis>.  That is, do
     not compute the hash over the dump of
-    <replaceable>path</replaceable>.  The result is identical to that
+    <emphasis>path</emphasis>.  The result is identical to that
     produced by the GNU commands <command>md5sum</command> and
     <command>sha1sum</command>.</para></listitem>
 
@@ -92,7 +92,7 @@ cryptographic hash as <literal>nix-store --dump
 
   </varlistentry>
 
-  <varlistentry><term><option>--type</option> <replaceable>hashAlgo</replaceable></term>
+  <varlistentry><term><option>--type</option> <emphasis>hashAlgo</emphasis></term>
 
     <listitem><para>Use the specified cryptographic hash algorithm,
     which can be one of <literal>md5</literal>,
@@ -104,7 +104,7 @@ cryptographic hash as <literal>nix-store --dump
   <varlistentry><term><option>--to-base16</option></term>
 
     <listitem><para>Don’t hash anything, but convert the base-32 hash
-    representation <replaceable>hash</replaceable> to
+    representation <emphasis>hash</emphasis> to
     hexadecimal.</para></listitem>
 
   </varlistentry>
@@ -112,7 +112,7 @@ cryptographic hash as <literal>nix-store --dump
   <varlistentry><term><option>--to-base32</option></term>
 
     <listitem><para>Don’t hash anything, but convert the hexadecimal
-    hash representation <replaceable>hash</replaceable> to
+    hash representation <emphasis>hash</emphasis> to
     base-32.</para></listitem>
 
   </varlistentry>

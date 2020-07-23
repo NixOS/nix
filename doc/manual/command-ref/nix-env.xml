@@ -20,30 +20,30 @@
   <cmdsynopsis>
     <command>nix-env</command>
     <xi:include href="opt-common-syn.xml#xmlns(db=http://docbook.org/ns/docbook)xpointer(/db:nop/*)" />
-    <arg><option>--arg</option> <replaceable>name</replaceable> <replaceable>value</replaceable></arg>
-    <arg><option>--argstr</option> <replaceable>name</replaceable> <replaceable>value</replaceable></arg>
+    <arg><option>--arg</option> <emphasis>name</emphasis> <emphasis>value</emphasis></arg>
+    <arg><option>--argstr</option> <emphasis>name</emphasis> <emphasis>value</emphasis></arg>
     <arg>
       <group choice='req'>
         <arg choice='plain'><option>--file</option></arg>
         <arg choice='plain'><option>-f</option></arg>
       </group>
-      <replaceable>path</replaceable>
+      <emphasis>path</emphasis>
     </arg>
     <arg>
       <group choice='req'>
         <arg choice='plain'><option>--profile</option></arg>
         <arg choice='plain'><option>-p</option></arg>
       </group>
-      <replaceable>path</replaceable>
+      <emphasis>path</emphasis>
     </arg>
     <arg>
       <arg choice='plain'><option>--system-filter</option></arg>
-      <replaceable>system</replaceable>
+      <emphasis>system</emphasis>
     </arg>
     <arg><option>--dry-run</option></arg>
-    <arg choice='plain'><replaceable>operation</replaceable></arg>
-    <arg rep='repeat'><replaceable>options</replaceable></arg>
-    <arg rep='repeat'><replaceable>arguments</replaceable></arg>
+    <arg choice='plain'><emphasis>operation</emphasis></arg>
+    <arg rep='repeat'><emphasis>options</emphasis></arg>
+    <arg rep='repeat'><emphasis>arguments</emphasis></arg>
   </cmdsynopsis>
 </refsynopsisdiv>
 
@@ -146,7 +146,7 @@ also <xref linkend="sec-common-options" />.</phrase></para>
 
 <variablelist>
 
-  <varlistentry><term><option>--file</option> / <option>-f</option> <replaceable>path</replaceable></term>
+  <varlistentry><term><option>--file</option> / <option>-f</option> <emphasis>path</emphasis></term>
 
     <listitem><para>Specifies the Nix expression (designated below as
     the <emphasis>active Nix expression</emphasis>) used by the
@@ -165,7 +165,7 @@ also <xref linkend="sec-common-options" />.</phrase></para>
 
   </varlistentry>
 
-  <varlistentry><term><option>--profile</option> / <option>-p</option> <replaceable>path</replaceable></term>
+  <varlistentry><term><option>--profile</option> / <option>-p</option> <emphasis>path</emphasis></term>
 
     <listitem><para>Specifies the profile to be used by those
     operations that operate on a profile (designated below as the
@@ -194,12 +194,12 @@ also <xref linkend="sec-common-options" />.</phrase></para>
 
   </varlistentry>
 
-  <varlistentry><term><option>--system-filter</option> <replaceable>system</replaceable></term>
+  <varlistentry><term><option>--system-filter</option> <emphasis>system</emphasis></term>
 
     <listitem><para>By default, operations such as <option>--query
     --available</option> show derivations matching any platform.  This
     option allows you to use derivations for the specified platform
-    <replaceable>system</replaceable>.</para></listitem>
+    <emphasis>system</emphasis>.</para></listitem>
 
   </varlistentry>
 
@@ -276,7 +276,7 @@ also <xref linkend="sec-common-options" />.</phrase></para>
 
     <listitem><para>A symbolic link to the user's current profile.  By
     default, this symlink points to
-    <filename><replaceable>prefix</replaceable>/var/nix/profiles/default</filename>.
+    <filename><emphasis>prefix</emphasis>/var/nix/profiles/default</filename>.
     The <literal>PATH</literal> environment variable should include
     <filename>~/.nix-profile/bin</filename> for the user environment
     to be visible to the user.</para></listitem>
@@ -310,7 +310,7 @@ also <xref linkend="sec-common-options" />.</phrase></para>
     <arg choice='plain'><option>--remove-all</option></arg>
     <arg choice='plain'><option>-r</option></arg>
   </group>
-  <arg choice='plain' rep='repeat'><replaceable>args</replaceable></arg>
+  <arg choice='plain' rep='repeat'><emphasis>args</emphasis></arg>
 </cmdsynopsis>
 
 </refsection>
@@ -320,13 +320,13 @@ also <xref linkend="sec-common-options" />.</phrase></para>
 
 <para>The install operation creates a new user environment, based on
 the current generation of the active profile, to which a set of store
-paths described by <replaceable>args</replaceable> is added.  The
-arguments <replaceable>args</replaceable> map to store paths in a
+paths described by <emphasis>args</emphasis> is added.  The
+arguments <emphasis>args</emphasis> map to store paths in a
 number of possible ways:
 
 <itemizedlist>
 
-  <listitem><para>By default, <replaceable>args</replaceable> is a set
+  <listitem><para>By default, <emphasis>args</emphasis> is a set
   of derivation names denoting derivations in the active Nix
   expression.  These are realised, and the resulting output paths are
   installed.  Currently installed derivations with a name equal to the
@@ -335,7 +335,7 @@ number of possible ways:
   specified.</para>
 
   <para>If there are multiple derivations matching a name in
-  <replaceable>args</replaceable> that have the same name (e.g.,
+  <emphasis>args</emphasis> that have the same name (e.g.,
   <literal>gcc-3.3.6</literal> and <literal>gcc-4.1.1</literal>), then
   the derivation with the highest <emphasis>priority</emphasis> is
   used.  A derivation can define a priority by declaring the
@@ -362,14 +362,14 @@ number of possible ways:
   packages, use <literal>nix-env -qaP</literal>.</para></listitem>
 
   <listitem><para>If <option>--from-profile</option>
-  <replaceable>path</replaceable> is given,
-  <replaceable>args</replaceable> is a set of names denoting installed
-  store paths in the profile <replaceable>path</replaceable>.  This is
+  <emphasis>path</emphasis> is given,
+  <emphasis>args</emphasis> is a set of names denoting installed
+  store paths in the profile <emphasis>path</emphasis>.  This is
   an easy way to copy user environment elements from one profile to
   another.</para></listitem>
 
   <listitem><para>If <option>--from-expression</option> is given,
-  <replaceable>args</replaceable> are Nix <link
+  <emphasis>args</emphasis> are Nix <link
   linkend="ss-functions">functions</link> that are called with the
   active Nix expression as their single argument.  The derivations
   returned by those function calls are installed.  This allows
@@ -377,12 +377,12 @@ number of possible ways:
   if there are multiple derivations with the same
   name.</para></listitem>
 
-  <listitem><para>If <replaceable>args</replaceable> are store
+  <listitem><para>If <emphasis>args</emphasis> are store
   derivations, then these are <link
   linkend="rsec-nix-store-realise">realised</link>, and the resulting
   output paths are installed.</para></listitem>
 
-  <listitem><para>If <replaceable>args</replaceable> are store paths
+  <listitem><para>If <emphasis>args</emphasis> are store paths
   that are not store derivations, then these are <link
   linkend="rsec-nix-store-realise">realised</link> and
   installed.</para></listitem>
@@ -518,7 +518,7 @@ $ nix-env -f '&lt;nixpkgs>' -iA hello --dry-run
 installing ‘hello-2.10’
 this path will be fetched (0.04 MiB download, 0.19 MiB unpacked):
   /nix/store/wkhdf9jinag5750mqlax6z2zbwhqb76n-hello-2.10
-  <replaceable>...</replaceable></screen>
+  <emphasis>...</emphasis></screen>
 
 </para>
 
@@ -556,7 +556,7 @@ $ nix-env -f https://github.com/NixOS/nixpkgs/archive/nixos-14.12.tar.gz -iA fir
     <arg choice='plain'><option>--eq</option></arg>
     <arg choice='plain'><option>--always</option></arg>
   </group>
-  <arg choice='plain' rep='repeat'><replaceable>args</replaceable></arg>
+  <arg choice='plain' rep='repeat'><emphasis>args</emphasis></arg>
 </cmdsynopsis>
 
 </refsection>
@@ -566,15 +566,15 @@ $ nix-env -f https://github.com/NixOS/nixpkgs/archive/nixos-14.12.tar.gz -iA fir
 <para>The upgrade operation creates a new user environment, based on
 the current generation of the active profile, in which all store paths
 are replaced for which there are newer versions in the set of paths
-described by <replaceable>args</replaceable>.  Paths for which there
+described by <emphasis>args</emphasis>.  Paths for which there
 are no newer versions are left untouched; this is not an error.  It is
-also not an error if an element of <replaceable>args</replaceable>
+also not an error if an element of <emphasis>args</emphasis>
 matches no installed derivations.</para>
 
-<para>For a description of how <replaceable>args</replaceable> is
+<para>For a description of how <emphasis>args</emphasis> is
 mapped to a set of store paths, see <link
 linkend="rsec-nix-env-install"><option>--install</option></link>.  If
-<replaceable>args</replaceable> describes multiple store paths with
+<emphasis>args</emphasis> describes multiple store paths with
 the same symbolic name, only the one with the highest version is
 installed.</para>
 
@@ -711,7 +711,7 @@ lexicographically (i.e., using case-sensitive string comparison).</para>
     <arg choice='plain'><option>--uninstall</option></arg>
     <arg choice='plain'><option>-e</option></arg>
   </group>
-  <arg choice='plain' rep='repeat'><replaceable>drvnames</replaceable></arg>
+  <arg choice='plain' rep='repeat'><emphasis>drvnames</emphasis></arg>
 </cmdsynopsis>
 </refsection>
 
@@ -720,7 +720,7 @@ lexicographically (i.e., using case-sensitive string comparison).</para>
 <para>The uninstall operation creates a new user environment, based on
 the current generation of the active profile, from which the store
 paths designated by the symbolic names
-<replaceable>names</replaceable> are removed.</para>
+<emphasis>names</emphasis> are removed.</para>
 
 </refsection>
 
@@ -745,7 +745,7 @@ $ nix-env -e '.*' <lineannotation>(remove everything)</lineannotation></screen>
 <cmdsynopsis>
   <command>nix-env</command>
   <arg choice='plain'><option>--set</option></arg>
-  <arg choice='plain'><replaceable>drvname</replaceable></arg>
+  <arg choice='plain'><emphasis>drvname</emphasis></arg>
 </cmdsynopsis>
 </refsection>
 
@@ -783,9 +783,9 @@ $ nix-env -p /nix/var/nix/profiles/browser --set firefox</screen>
 <cmdsynopsis>
   <command>nix-env</command>
   <arg choice='plain'><option>--set-flag</option></arg>
-  <arg choice='plain'><replaceable>name</replaceable></arg>
-  <arg choice='plain'><replaceable>value</replaceable></arg>
-  <arg choice='plain' rep='repeat'><replaceable>drvnames</replaceable></arg>
+  <arg choice='plain'><emphasis>name</emphasis></arg>
+  <arg choice='plain'><emphasis>value</emphasis></arg>
+  <arg choice='plain' rep='repeat'><emphasis>drvnames</emphasis></arg>
 </cmdsynopsis>
 </refsection>
 
@@ -848,8 +848,8 @@ firefox-2.0.0.9 <lineannotation>(the current one)</lineannotation>
 $ nix-env --preserve-installed -i firefox-2.0.0.11
 installing `firefox-2.0.0.11'
 building path(s) `/nix/store/myy0y59q3ig70dgq37jqwg1j0rsapzsl-user-environment'
-collision between `/nix/store/<replaceable>...</replaceable>-firefox-2.0.0.11/bin/firefox'
-  and `/nix/store/<replaceable>...</replaceable>-firefox-2.0.0.9/bin/firefox'.
+collision between `/nix/store/<emphasis>...</emphasis>-firefox-2.0.0.11/bin/firefox'
+  and `/nix/store/<emphasis>...</emphasis>-firefox-2.0.0.9/bin/firefox'.
 <lineannotation>(i.e., can’t have two active at the same time)</lineannotation>
 
 $ nix-env --set-flag active false firefox
@@ -940,12 +940,12 @@ $ nix-env --set-flag priority 10 gcc</screen>
       <arg choice='plain'><option>--attr</option></arg>
       <arg choice='plain'><option>-A</option></arg>
     </group>
-    <replaceable>attribute-path</replaceable>
+    <emphasis>attribute-path</emphasis>
   </arg>
 
   <sbr />
 
-  <arg choice='plain' rep='repeat'><replaceable>names</replaceable></arg>
+  <arg choice='plain' rep='repeat'><emphasis>names</emphasis></arg>
 </cmdsynopsis>
 
 </refsection>
@@ -959,7 +959,7 @@ profile (<option>--installed</option>), or the derivations that are
 available for installation in the active Nix expression
 (<option>--available</option>).  It only prints information about
 derivations whose symbolic name matches one of
-<replaceable>names</replaceable>.</para>
+<emphasis>names</emphasis>.</para>
 
 <para>The derivations are sorted by their <literal>name</literal>
 attributes.</para>
@@ -1086,21 +1086,21 @@ user environment elements, etc. -->
 
     <variablelist>
 
-      <varlistentry><term><literal>&lt;</literal> <replaceable>version</replaceable></term>
+      <varlistentry><term><literal>&lt;</literal> <emphasis>version</emphasis></term>
 
         <listitem><para>A newer version of the package is available
         or installed.</para></listitem>
 
       </varlistentry>
 
-      <varlistentry><term><literal>=</literal> <replaceable>version</replaceable></term>
+      <varlistentry><term><literal>=</literal> <emphasis>version</emphasis></term>
 
         <listitem><para>At most the same version of the package is
         available or installed.</para></listitem>
 
       </varlistentry>
 
-      <varlistentry><term><literal>></literal> <replaceable>version</replaceable></term>
+      <varlistentry><term><literal>></literal> <emphasis>version</emphasis></term>
 
         <listitem><para>Only older versions of the package are
         available or installed.</para></listitem>
@@ -1174,7 +1174,7 @@ docbook-xml-4.2
 firefox-1.0.4
 MPlayer-1.0pre7
 ORBit2-2.8.3
-<replaceable>…</replaceable>
+<emphasis>…</emphasis>
 </screen>
 
 </para>
@@ -1187,7 +1187,7 @@ firefox-1.0.7
 GConf-2.4.0.1
 MPlayer-1.0pre7
 ORBit2-2.8.3
-<replaceable>…</replaceable>
+<emphasis>…</emphasis>
 </screen>
 
 </para>
@@ -1200,7 +1200,7 @@ $ nix-env -qas
 --S GConf-2.4.0.1   <lineannotation>(not present, but there is a substitute for fast installation)</lineannotation>
 --S MPlayer-1.0pre3 <lineannotation>(i.e., this is not the installed MPlayer, even though the version is the same!)</lineannotation>
 IP- ORBit2-2.8.3    <lineannotation>(installed and by definition present)</lineannotation>
-<replaceable>…</replaceable>
+<emphasis>…</emphasis>
 </screen>
 
 </para>
@@ -1218,11 +1218,11 @@ foo-1.2.3
 
 <screen>
 $ nix-env -qc
-<replaceable>...</replaceable>
+<emphasis>...</emphasis>
 acrobat-reader-7.0 - ?      <lineannotation>(package is not available at all)</lineannotation>
 autoconf-2.59      = 2.59   <lineannotation>(same version)</lineannotation>
 firefox-1.0.4      &lt; 1.0.7  <lineannotation>(a more recent version is available)</lineannotation>
-<replaceable>...</replaceable>
+<emphasis>...</emphasis>
 </screen>
 
 </para>
@@ -1234,7 +1234,7 @@ $ nix-env -qa '.*zip.*'
 bzip2-1.0.6
 gzip-1.6
 zip-3.0
-<replaceable>…</replaceable>
+<emphasis>…</emphasis>
 </screen>
 
 </para>
@@ -1248,7 +1248,7 @@ chromium-37.0.2062.94
 chromium-beta-38.0.2125.24
 firefox-32.0.3
 firefox-with-plugins-13.0.1
-<replaceable>…</replaceable>
+<emphasis>…</emphasis>
 </screen>
 
 </para>
@@ -1280,7 +1280,7 @@ $ nix-env -f https://github.com/NixOS/nixpkgs/archive/master.tar.gz -qa
     <arg choice='plain'><option>--switch-profile</option></arg>
     <arg choice='plain'><option>-S</option></arg>
   </group>
-  <arg choice='req'><replaceable>path</replaceable></arg>
+  <arg choice='req'><emphasis>path</emphasis></arg>
 </cmdsynopsis>
 
 </refsection>
@@ -1288,10 +1288,10 @@ $ nix-env -f https://github.com/NixOS/nixpkgs/archive/master.tar.gz -qa
 
 <refsection><title>Description</title>
 
-<para>This operation makes <replaceable>path</replaceable> the current
+<para>This operation makes <emphasis>path</emphasis> the current
 profile for the user.  That is, the symlink
 <filename>~/.nix-profile</filename> is made to point to
-<replaceable>path</replaceable>.</para>
+<emphasis>path</emphasis>.</para>
 
 </refsection>
 
@@ -1355,7 +1355,7 @@ $ nix-env --list-generations
 <cmdsynopsis>
   <command>nix-env</command>
   <arg choice='plain'><option>--delete-generations</option></arg>
-  <arg choice='plain' rep='repeat'><replaceable>generations</replaceable></arg>
+  <arg choice='plain' rep='repeat'><emphasis>generations</emphasis></arg>
 </cmdsynopsis>
 
 </refsection>
@@ -1407,7 +1407,7 @@ $ nix-env -p other_profile --delete-generations old</screen>
     <arg choice='plain'><option>--switch-generation</option></arg>
     <arg choice='plain'><option>-G</option></arg>
   </group>
-  <arg choice='req'><replaceable>generation</replaceable></arg>
+  <arg choice='req'><emphasis>generation</emphasis></arg>
 </cmdsynopsis>
 
 </refsection>
@@ -1416,13 +1416,13 @@ $ nix-env -p other_profile --delete-generations old</screen>
 <refsection><title>Description</title>
 
 <para>This operation makes generation number
-<replaceable>generation</replaceable> the current generation of the
+<emphasis>generation</emphasis> the current generation of the
 active profile.  That is, if the
-<filename><replaceable>profile</replaceable></filename> is the path to
+<filename><emphasis>profile</emphasis></filename> is the path to
 the active profile, then the symlink
-<filename><replaceable>profile</replaceable></filename> is made to
+<filename><emphasis>profile</emphasis></filename> is made to
 point to
-<filename><replaceable>profile</replaceable>-<replaceable>generation</replaceable>-link</filename>,
+<filename><emphasis>profile</emphasis>-<emphasis>generation</emphasis>-link</filename>,
 which is in turn a symlink to the actual user environment in the Nix
 store.</para>
 

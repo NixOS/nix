@@ -20,11 +20,11 @@
   <cmdsynopsis>
     <command>nix-channel</command>
     <group choice='req'>
-      <arg choice='plain'><option>--add</option> <replaceable>url</replaceable> <arg choice='opt'><replaceable>name</replaceable></arg></arg>
-      <arg choice='plain'><option>--remove</option> <replaceable>name</replaceable></arg>
+      <arg choice='plain'><option>--add</option> <emphasis>url</emphasis> <arg choice='opt'><emphasis>name</emphasis></arg></arg>
+      <arg choice='plain'><option>--remove</option> <emphasis>name</emphasis></arg>
       <arg choice='plain'><option>--list</option></arg>
-      <arg choice='plain'><option>--update</option> <arg rep='repeat'><replaceable>names</replaceable></arg></arg>
-      <arg choice='plain'><option>--rollback</option> <arg choice='opt'><replaceable>generation</replaceable></arg></arg>
+      <arg choice='plain'><option>--update</option> <arg rep='repeat'><emphasis>names</emphasis></arg></arg>
+      <arg choice='plain'><option>--rollback</option> <arg choice='opt'><emphasis>generation</emphasis></arg></arg>
     </group>
   </cmdsynopsis>
 </refsynopsisdiv>
@@ -44,22 +44,22 @@ xlink:href="https://nixos.org/channels" />.</para>
 
 <variablelist>
 
-  <varlistentry><term><option>--add</option> <replaceable>url</replaceable> [<replaceable>name</replaceable>]</term>
+  <varlistentry><term><option>--add</option> <emphasis>url</emphasis> [<emphasis>name</emphasis>]</term>
 
     <listitem><para>Adds a channel named
-    <replaceable>name</replaceable> with URL
-    <replaceable>url</replaceable> to the list of subscribed channels.
-    If <replaceable>name</replaceable> is omitted, it defaults to the
-    last component of <replaceable>url</replaceable>, with the
+    <emphasis>name</emphasis> with URL
+    <emphasis>url</emphasis> to the list of subscribed channels.
+    If <emphasis>name</emphasis> is omitted, it defaults to the
+    last component of <emphasis>url</emphasis>, with the
     suffixes <literal>-stable</literal> or
     <literal>-unstable</literal> removed.</para></listitem>
 
   </varlistentry>
 
-  <varlistentry><term><option>--remove</option> <replaceable>name</replaceable></term>
+  <varlistentry><term><option>--remove</option> <emphasis>name</emphasis></term>
 
     <listitem><para>Removes the channel named
-    <replaceable>name</replaceable> from the list of subscribed
+    <emphasis>name</emphasis> from the list of subscribed
     channels.</para></listitem>
 
   </varlistentry>
@@ -71,18 +71,18 @@ xlink:href="https://nixos.org/channels" />.</para>
 
   </varlistentry>
 
-  <varlistentry><term><option>--update</option> [<replaceable>names</replaceable>…]</term>
+  <varlistentry><term><option>--update</option> [<emphasis>names</emphasis>…]</term>
 
     <listitem><para>Downloads the Nix expressions of all subscribed
     channels (or only those included in
-    <replaceable>names</replaceable> if specified) and makes them the
+    <emphasis>names</emphasis> if specified) and makes them the
     default for <command>nix-env</command> operations (by symlinking
     them from the directory
     <filename>~/.nix-defexpr</filename>).</para></listitem>
 
   </varlistentry>
 
-  <varlistentry><term><option>--rollback</option> [<replaceable>generation</replaceable>]</term>
+  <varlistentry><term><option>--rollback</option> [<emphasis>generation</emphasis>]</term>
 
     <listitem><para>Reverts the previous call to <command>nix-channel
     --update</command>. Optionally, you can specify a specific channel
@@ -130,7 +130,7 @@ $ nix-instantiate --eval -E '(import &lt;nixpkgs> {}).lib.version'
 
 <variablelist>
 
-  <varlistentry><term><filename>/nix/var/nix/profiles/per-user/<replaceable>username</replaceable>/channels</filename></term>
+  <varlistentry><term><filename>/nix/var/nix/profiles/per-user/<emphasis>username</emphasis>/channels</filename></term>
 
     <listitem><para><command>nix-channel</command> uses a
     <command>nix-env</command> profile to keep track of previous
@@ -145,7 +145,7 @@ $ nix-instantiate --eval -E '(import &lt;nixpkgs> {}).lib.version'
   <varlistentry><term><filename>~/.nix-defexpr/channels</filename></term>
 
     <listitem><para>This is a symlink to
-    <filename>/nix/var/nix/profiles/per-user/<replaceable>username</replaceable>/channels</filename>. It
+    <filename>/nix/var/nix/profiles/per-user/<emphasis>username</emphasis>/channels</filename>. It
     ensures that <command>nix-env</command> can find your channels. In
     a multi-user installation, you may also have
     <filename>~/.nix-defexpr/channels_root</filename>, which links to

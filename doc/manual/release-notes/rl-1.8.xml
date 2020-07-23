@@ -38,8 +38,8 @@ log-servers = http://hydra.nixos.org/log
 </programlisting>
 
 then it will try to get logs from
-<literal>http://hydra.nixos.org/log/<replaceable>base name of the
-store path</replaceable></literal>. This allows you to do things like:
+<literal>http://hydra.nixos.org/log/<emphasis>base name of the
+store path</emphasis></literal>. This allows you to do things like:
 
 <screen>
 $ nix-store -l $(which xterm)

@@ -41,10 +41,10 @@
 
   - The garbage collector has a number of new options to allow only some
     of the garbage to be deleted. The option `--max-freed N` tells the
-    collector to stop after at least N bytes have been deleted. The
+    collector to stop after at least *N* bytes have been deleted. The
     option `--max-links
             N` tells it to stop after the link count on `/nix/store` has dropped
-    below N. This is useful for very large Nix stores on filesystems
+    below *N*. This is useful for very large Nix stores on filesystems
     with a 32000 subdirectories limit (like `ext3`). The option
     `--use-atime` causes store paths to be deleted in order of ascending
     last access time. This allows non-recently used stuff to be deleted.

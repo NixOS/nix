@@ -42,7 +42,7 @@
     <para>The command <command>nix-push</command> has been removed as
     part of the effort to eliminate Nix's dependency on Perl. You can
     use <command>nix copy</command> instead, e.g. <literal>nix copy
-    --to file:///tmp/my-binary-cache <replaceable>paths…</replaceable></literal></para>
+    --to file:///tmp/my-binary-cache <emphasis>paths…</emphasis></literal></para>
   </listitem>
 
   <listitem>
@@ -136,8 +136,8 @@
         http-connections 100</literal> you can write
         <literal>--http-connections 100</literal>. Boolean options can
         be written as
-        <literal>--<replaceable>foo</replaceable></literal> or
-        <literal>--no-<replaceable>foo</replaceable></literal>
+        <literal>--<emphasis>foo</emphasis></literal> or
+        <literal>--no-<emphasis>foo</emphasis></literal>
         (e.g. <option>--no-auto-optimise-store</option>).</para>
       </listitem>
 
@@ -551,7 +551,7 @@
     is still supported for compatibility, but it is also possible to
     specify builders in <command>nix.conf</command> by setting the
     option <literal>builders =
-    @<replaceable>path</replaceable></literal>.</para>
+    @<emphasis>path</emphasis></literal>.</para>
   </listitem>
 
   <listitem>
@@ -580,9 +580,9 @@
 
   <listitem>
     <para>You can now use
-    <uri>channel:<replaceable>channel-name</replaceable></uri> as a
+    <uri>channel:<emphasis>channel-name</emphasis></uri> as a
     short-hand for
-    <uri>https://nixos.org/channels/<replaceable>channel-name</replaceable>/nixexprs.tar.xz</uri>. For
+    <uri>https://nixos.org/channels/<emphasis>channel-name</emphasis>/nixexprs.tar.xz</uri>. For
     example, <literal>nix-build channel:nixos-15.09 -A hello</literal>
     will build the GNU Hello package from the
     <literal>nixos-15.09</literal> channel. In the future, this may

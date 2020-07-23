@@ -33,7 +33,7 @@ additional options: `-d` (`--delete-old`), which deletes all old
 generations of all profiles in `/nix/var/nix/profiles` by invoking
 `nix-env --delete-generations old` on all profiles (of course, this
 makes rollbacks to previous configurations impossible); and
-`--delete-older-than` period, where period is a value such as `30d`,
+`--delete-older-than` *period*, where period is a value such as `30d`,
 which deletes all generations older than the specified number of days in
 all profiles in `/nix/var/nix/profiles` (except for the generations that
 were active at that point in time).

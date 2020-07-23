@@ -421,7 +421,7 @@ LABEL=Nix\040Store /nix apfs rw,nobrowse
   <para>
     NixOS.org hosts version-specific installation URLs for all Nix
     versions since 1.11.16, at
-    <literal>https://releases.nixos.org/nix/nix-<replaceable>version</replaceable>/install</literal>.
+    <literal>https://releases.nixos.org/nix/nix-<emphasis>version</emphasis>/install</literal>.
   </para>
 
   <para>

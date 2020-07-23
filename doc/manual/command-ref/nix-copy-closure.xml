@@ -33,9 +33,9 @@
     </group>
     <arg><option>-v</option></arg>
     <arg choice='plain'>
-      <replaceable>user@</replaceable><replaceable>machine</replaceable>
+      <emphasis>user@</emphasis><emphasis>machine</emphasis>
     </arg>
-    <arg choice='plain'><replaceable>paths</replaceable></arg>
+    <arg choice='plain'><emphasis>paths</emphasis></arg>
   </cmdsynopsis>
 </refsynopsisdiv>
 
@@ -44,13 +44,13 @@
 
 <para><command>nix-copy-closure</command> gives you an easy and
 efficient way to exchange software between machines.  Given one or
-more Nix store <replaceable>paths</replaceable> on the local
+more Nix store <emphasis>paths</emphasis> on the local
 machine, <command>nix-copy-closure</command> computes the closure of
 those paths (i.e. all their dependencies in the Nix store), and copies
 all paths in the closure to the remote machine via the
 <command>ssh</command> (Secure Shell) command.  With the
 <option>--from</option>, the direction is reversed:
-the closure of <replaceable>paths</replaceable> on a remote machine is
+the closure of <emphasis>paths</emphasis> on a remote machine is
 copied to the Nix store on the local machine.</para>
 
 <para>This command is efficient because it only sends the store paths
@@ -73,8 +73,8 @@ those paths.  If this bothers you, use
   <varlistentry><term><option>--to</option></term>
 
     <listitem><para>Copy the closure of
-    <replaceable>paths</replaceable> from the local Nix store to the
-    Nix store on <replaceable>machine</replaceable>.  This is the
+    <emphasis>paths</emphasis> from the local Nix store to the
+    Nix store on <emphasis>machine</emphasis>.  This is the
     default.</para></listitem>
 
   </varlistentry>
@@ -82,8 +82,8 @@ those paths.  If this bothers you, use
   <varlistentry><term><option>--from</option></term>
 
     <listitem><para>Copy the closure of
-    <replaceable>paths</replaceable> from the Nix store on
-    <replaceable>machine</replaceable> to the local Nix
+    <emphasis>paths</emphasis> from the Nix store on
+    <emphasis>machine</emphasis> to the local Nix
     store.</para></listitem>
 
   </varlistentry>

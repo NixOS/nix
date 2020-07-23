@@ -42,25 +42,26 @@ To see the list of official NixOS channels, visit
 
 This command has the following operations:
 
-  - `--add` url \[name\]  
-    Adds a channel named name with URL url to the list of subscribed
-    channels. If name is omitted, it defaults to the last component of
-    url, with the suffixes `-stable` or `-unstable` removed.
+  - `--add` *url* \[*name*\]  
+    Adds a channel named *name* with URL *url* to the list of subscribed
+    channels. If *name* is omitted, it defaults to the last component of
+    *url*, with the suffixes `-stable` or `-unstable` removed.
 
-  - `--remove` name  
-    Removes the channel named name from the list of subscribed channels.
+  - `--remove` *name*  
+    Removes the channel named *name* from the list of subscribed
+    channels.
 
   - `--list`  
     Prints the names and URLs of all subscribed channels on standard
     output.
 
-  - `--update` \[names…\]  
+  - `--update` \[*names*…\]  
     Downloads the Nix expressions of all subscribed channels (or only
-    those included in names if specified) and makes them the default for
-    `nix-env` operations (by symlinking them from the directory
+    those included in *names* if specified) and makes them the default
+    for `nix-env` operations (by symlinking them from the directory
     `~/.nix-defexpr`).
 
-  - `--rollback` \[generation\]  
+  - `--rollback` \[*generation*\]  
     Reverts the previous call to `nix-channel
                     --update`. Optionally, you can specify a specific channel generation
     number to restore.

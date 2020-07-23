@@ -147,7 +147,7 @@ three kinds of patterns:
     It is possible to provide *default values* for attributes, in which
     case they are allowed to be missing. A default value is specified by
     writing `name ?
-            e`, where e is an arbitrary expression. For example,
+            e`, where *e* is an arbitrary expression. For example,
     
         { x, y ? "foo", z ? "bar" }: z + y + x
     
@@ -201,7 +201,7 @@ Conditionals look like this:
 
     if e1 then e2 else e3
 
-where e1 is an expression that should evaluate to a Boolean value
+where *e1* is an expression that should evaluate to a Boolean value
 (`true` or `false`).
 
 ## Assertions
@@ -211,9 +211,9 @@ between features and dependencies hold. They look like this:
 
     assert e1; e2
 
-where e1 is an expression that should evaluate to a Boolean value. If it
-evaluates to `true`, e2 is returned; otherwise expression evaluation is
-aborted and a backtrace is printed.
+where *e1* is an expression that should evaluate to a Boolean value. If
+it evaluates to `true`, *e2* is returned; otherwise expression
+evaluation is aborted and a backtrace is printed.
 
 Here is a Nix expression for the Subversion package that shows how
 assertions can be used:.
@@ -275,8 +275,8 @@ A *with-expression*,
 
     with e1; e2
 
-introduces the set e1 into the lexical scope of the expression e2. For
-instance,
+introduces the set *e1* into the lexical scope of the expression *e2*.
+For instance,
 
     let as = { x = "foo"; y = "bar"; };
     in with as; x + y

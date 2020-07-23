@@ -89,10 +89,10 @@ features:
     specifier. For example, `nix-store --gc --max-freed
                     1G` will free up to 1 gigabyte of disk space.
 
-  - `nix-collect-garbage` has a new flag `--delete-older-than` N`d`,
-    which deletes all user environment generations older than N days.
+  - `nix-collect-garbage` has a new flag `--delete-older-than` *N*`d`,
+    which deletes all user environment generations older than *N* days.
     Likewise, `nix-env
-                    --delete-generations` accepts a N`d` age limit.
+                    --delete-generations` accepts a *N*`d` age limit.
 
   - Nix now heuristically detects whether a build failure was due to a
     disk-full condition. In that case, the build is not flagged as

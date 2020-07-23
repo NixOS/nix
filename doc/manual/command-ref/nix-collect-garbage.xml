@@ -21,8 +21,8 @@
     <command>nix-collect-garbage</command>
     <arg><option>--delete-old</option></arg>
     <arg><option>-d</option></arg>
-    <arg><option>--delete-older-than</option> <replaceable>period</replaceable></arg>
-    <arg><option>--max-freed</option> <replaceable>bytes</replaceable></arg>
+    <arg><option>--delete-older-than</option> <emphasis>period</emphasis></arg>
+    <arg><option>--max-freed</option> <emphasis>bytes</emphasis></arg>
     <arg><option>--dry-run</option></arg>
   </cmdsynopsis>
 </refsynopsisdiv>
@@ -39,7 +39,7 @@ which deletes all old generations of all profiles in
 <literal>nix-env --delete-generations old</literal> on all profiles
 (of course, this makes rollbacks to previous configurations
 impossible); and
-<option>--delete-older-than</option> <replaceable>period</replaceable>,
+<option>--delete-older-than</option> <emphasis>period</emphasis>,
 where period is a value such as <literal>30d</literal>, which deletes
 all generations older than the specified number of days in all profiles
 in <filename>/nix/var/nix/profiles</filename> (except for the generations

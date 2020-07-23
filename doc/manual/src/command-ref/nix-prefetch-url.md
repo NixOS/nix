@@ -31,9 +31,9 @@ hash
 # Description
 
 The command `nix-prefetch-url` downloads the file referenced by the URL
-url, prints its cryptographic hash, and copies it into the Nix store.
-The file name in the store is `hash-baseName`, where baseName is
-everything following the final slash in url.
+*url*, prints its cryptographic hash, and copies it into the Nix store.
+The file name in the store is `hash-baseName`, where *baseName* is
+everything following the final slash in *url*.
 
 This command is just a convenience for Nix expression writers. Often a
 Nix expression fetches some source distribution from the network using
@@ -44,10 +44,10 @@ again when you build your Nix expression. Since `fetchurl` uses the same
 name for the downloaded file as `nix-prefetch-url`, the redundant
 download can be avoided.
 
-If hash is specified, then a download is not performed if the Nix store
-already contains a file with the same hash and base name. Otherwise, the
-file is downloaded, and an error is signaled if the actual hash of the
-file does not match the specified hash.
+If *hash* is specified, then a download is not performed if the Nix
+store already contains a file with the same hash and base name.
+Otherwise, the file is downloaded, and an error is signaled if the
+actual hash of the file does not match the specified hash.
 
 This command prints the hash on standard output. Additionally, if the
 option `--print-path` is used, the path of the downloaded file in the
@@ -55,7 +55,7 @@ Nix store is also printed.
 
 # Options
 
-  - `--type` hashAlgo  
+  - `--type` *hashAlgo*  
     Use the specified cryptographic hash algorithm, which can be one of
     `md5`, `sha1`, and `sha256`.
 
@@ -67,10 +67,10 @@ Nix store is also printed.
     result to the Nix store. The resulting hash can be used with
     functions such as Nixpkgs’s `fetchzip` or `fetchFromGitHub`.
 
-  - `--name` name  
+  - `--name` *name*  
     Override the name of the file in the Nix store. By default, this is
-    `hash-basename`, where basename is the last component of url.
-    Overriding the name is necessary when basename contains characters
+    `hash-basename`, where *basename* is the last component of *url*.
+    Overriding the name is necessary when *basename* contains characters
     that are not allowed in Nix store paths.
 
 # Examples

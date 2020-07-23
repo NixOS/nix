@@ -118,7 +118,7 @@ can also see all available generations:
 $ nix-env --list-generations</screen></para>
 
 <para>You generally wouldn’t have
-<filename>/nix/var/nix/profiles/<replaceable>some-profile</replaceable>/bin</filename>
+<filename>/nix/var/nix/profiles/<emphasis>some-profile</emphasis>/bin</filename>
 in your <literal>PATH</literal>.  Rather, there is a symlink
 <filename>~/.nix-profile</filename> that points to your current
 profile.  This means that you should put

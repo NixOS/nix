@@ -44,9 +44,9 @@ Most Nix commands accept the following command-line options:
     This option may be specified repeatedly. See the previous verbosity
     levels list.
 
-  - `--log-format` format  
+  - `--log-format` *format*  
     This option can be used to change the output of the log format, with
-    format being one of:
+    *format* being one of:
     
       - raw  
         This is the raw format, as outputted by nix-build.
@@ -68,7 +68,7 @@ Most Nix commands accept the following command-line options:
     output and error are always written to a log file in
     `prefix/nix/var/log/nix`.
 
-  - `--max-jobs` / `-j` number  
+  - `--max-jobs` / `-j` *number*  
     Sets the maximum number of build jobs that Nix will perform in
     parallel to the specified number. Specify `auto` to use the number
     of CPUs in the system. The default is specified by the
@@ -144,7 +144,7 @@ Most Nix commands accept the following command-line options:
     database. Most Nix operations do need database access, so those
     operations will fail.
 
-  - `--arg` name value  
+  - `--arg` *name* *value*  
     This option is accepted by `nix-env`, `nix-instantiate`, `nix-shell`
     and `nix-build`. When evaluating Nix expressions, the expression
     evaluator will automatically try to call functions that it
@@ -153,8 +153,8 @@ Most Nix commands accept the following command-line options:
             defaultValue }:
             ...`). With `--arg`, you can also call functions that have arguments
     without a default value (or override a default value). That is, if
-    the evaluator encounters a function with an argument named name, it
-    will call it with value value.
+    the evaluator encounters a function with an argument named *name*,
+    it will call it with value *value*.
     
     For instance, the top-level `default.nix` in Nixpkgs is actually a
     function:
@@ -172,18 +172,18 @@ Most Nix commands accept the following command-line options:
             \"i686-freebsd\"`. (Note that since the argument is a Nix string
     literal, you have to escape the quotes.)
 
-  - `--argstr` name value  
+  - `--argstr` *name* *value*  
     This option is like `--arg`, only the value is not a Nix expression
     but a string. So instead of `--arg system \"i686-linux\"` (the outer
     quotes are to keep the shell happy) you can say `--argstr system
             i686-linux`.
 
-  - `--attr` / `-A` attrPath  
+  - `--attr` / `-A` *attrPath*  
     Select an attribute from the top-level Nix expression being
     evaluated. (`nix-env`, `nix-instantiate`, `nix-build` and
-    `nix-shell` only.) The *attribute path* attrPath is a sequence of
+    `nix-shell` only.) The *attribute path* *attrPath* is a sequence of
     attribute names separated by dots. For instance, given a top-level
-    Nix expression e, the attribute path `xorg.xorgserver` would cause
+    Nix expression *e*, the attribute path `xorg.xorgserver` would cause
     the expression `e.xorg.xorgserver` to be used. See [`nix-env
             --install`](#refsec-nix-env-install-examples) for some concrete
     examples.
@@ -204,14 +204,14 @@ Most Nix commands accept the following command-line options:
     use, give your expression to the `nix-shell -p` convenience flag
     instead.
 
-  - `-I` path  
+  - `-I` *path*  
     Add a path to the Nix expression search path. This option may be
     given multiple times. See the NIX\_PATH\</literal\> environment
     variable for information on the semantics of the Nix search path.
     Paths added through `-I` take precedence over `NIX_PATH`.
 
-  - `--option` name value  
-    Set the Nix configuration option name to value. This overrides
+  - `--option` *name* *value*  
+    Set the Nix configuration option *name* to *value*. This overrides
     settings in the Nix configuration file (see nix.conf5).
 
   - `--repair`  

@@ -19,15 +19,15 @@ are:</para>
 
   <listitem>
     <para>Previously, Nix optimised expressions such as
-    <literal>"${<replaceable>expr</replaceable>}"</literal> to
-    <replaceable>expr</replaceable>.  Thus it neither checked whether
-    <replaceable>expr</replaceable> could be coerced to a string, nor
+    <literal>"${<emphasis>expr</emphasis>}"</literal> to
+    <emphasis>expr</emphasis>.  Thus it neither checked whether
+    <emphasis>expr</emphasis> could be coerced to a string, nor
     applied such coercions.  This meant that
     <literal>"${123}"</literal> evaluatued to <literal>123</literal>,
     and <literal>"${./foo}"</literal> evaluated to
     <literal>./foo</literal> (even though
     <literal>"${./foo} "</literal> evaluates to
-    <literal>"/nix/store/<replaceable>hash</replaceable>-foo "</literal>).
+    <literal>"/nix/store/<emphasis>hash</emphasis>-foo "</literal>).
     Nix now checks the type of antiquoted expressions and
     applies coercions.</para>
   </listitem>

@@ -10,7 +10,7 @@ There are also the following improvements:
 
   - New built-in function: `builtins.hashString`.
 
-  - Build logs are now stored in `/nix/var/log/nix/drvs/XX/`, where XX
+  - Build logs are now stored in `/nix/var/log/nix/drvs/XX/`, where *XX*
     is the first two characters of the derivation. This is useful on
     machines that keep a lot of build logs (such as Hydra servers).
 

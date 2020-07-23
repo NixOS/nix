@@ -56,19 +56,19 @@ files
 
 The command `nix-instantiate` generates [store
 derivations](#gloss-derivation) from (high-level) Nix expressions. It
-evaluates the Nix expressions in each of files (which defaults to
-./default.nix). Each top-level expression should evaluate to a
+evaluates the Nix expressions in each of *files* (which defaults to
+*./default.nix*). Each top-level expression should evaluate to a
 derivation, a list of derivations, or a set of derivations. The paths of
 the resulting store derivations are printed on standard output.
 
-If files is the character `-`, then a Nix expression will be read from
+If *files* is the character `-`, then a Nix expression will be read from
 standard input.
 
 See also [???](#sec-common-options) for a list of common options.
 
 # Options
 
-  - `--add-root` path; `--indirect`  
+  - `--add-root` *path*; `--indirect`  
     See the [corresponding options](#opt-add-root) in `nix-store`.
 
   - `--parse`  

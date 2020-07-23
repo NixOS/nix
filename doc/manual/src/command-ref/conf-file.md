@@ -28,8 +28,8 @@ By default Nix reads settings from the following places:
 The configuration files consist of `name =
 value` pairs, one per line. Other files can be included with a line like
 `include
-path`, where path is interpreted relative to the current conf file and a
-missing file is an error unless `!include` is used instead. Comments
+path`, where *path* is interpreted relative to the current conf file and
+a missing file is an error unless `!include` is used instead. Comments
 start with a `#` character. Here is an example configuration file:
 
     keep-outputs = true       # Nice for developers
@@ -216,7 +216,7 @@ The following settings are currently available:
   - `hashed-mirrors`  
     A list of web servers used by `builtins.fetchurl` to obtain files by
     hash. The default is `http://tarballs.nixos.org/`. Given a hash type
-    ht and a base-16 hash h, Nix will try to download the file from
+    *ht* and a base-16 hash *h*, Nix will try to download the file from
     `hashed-mirror/ht/h`. This allows files to be downloaded even if
     they have disappeared from their original URI. For example, given
     the default mirror `http://tarballs.nixos.org/`, when building the
@@ -504,8 +504,8 @@ The following settings are currently available:
     A list of paths bind-mounted into Nix sandbox environments. You can
     use the syntax `target=source` to mount a path in a different
     location in the sandbox; for instance, `/bin=/nix-bin` will mount
-    the path `/nix-bin` as `/bin` inside the sandbox. If source is
-    followed by `?`, then it is not an error if source does not exist;
+    the path `/nix-bin` as `/bin` inside the sandbox. If *source* is
+    followed by `?`, then it is not an error if *source* does not exist;
     for example, `/dev/nvidiactl?` specifies that `/dev/nvidiactl` will
     only be mounted in the sandbox if it exists in the host filesystem.
     

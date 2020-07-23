@@ -60,7 +60,8 @@ Nixpkgs tree using the `-f` flag:
 
     $ nix-env -qaf /path/to/nixpkgs
 
-where /path/to/nixpkgs is where you’ve unpacked or checked out Nixpkgs.
+where */path/to/nixpkgs* is where you’ve unpacked or checked out
+Nixpkgs.
 
 You can select specific packages by name:
 

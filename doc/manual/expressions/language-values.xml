@@ -30,7 +30,7 @@
 
     <para>You can include the result of an expression into a string by
     enclosing it in
-    <literal>${<replaceable>...</replaceable>}</literal>, a feature
+    <literal>${<emphasis>...</emphasis>}</literal>, a feature
     known as <emphasis>antiquotation</emphasis>.  The enclosed
     expression must evaluate to something that can be coerced into a
     string (meaning that it must be a string, a path, or a
@@ -93,7 +93,7 @@ configureFlags = "
     text on the initial line.</para>
 
     <para>Antiquotation
-    (<literal>${<replaceable>expr</replaceable>}</literal>) is
+    (<literal>${<emphasis>expr</emphasis>}</literal>) is
     supported in indented strings.</para>
 
     <para>Since <literal>${</literal> and <literal>''</literal> have
@@ -119,7 +119,7 @@ configureFlags = "
 
 <programlisting>
 stdenv.mkDerivation {
-  <replaceable>...</replaceable>
+  <emphasis>...</emphasis>
   postInstall =
     ''
       mkdir $out/bin $out/etc
@@ -127,7 +127,7 @@ stdenv.mkDerivation {
       echo "Hello World" > $out/etc/foo.conf
       ${if enableBar then "cp bar $out/bin" else ""}
     '';
-  <replaceable>...</replaceable>
+  <emphasis>...</emphasis>
 }
 </programlisting>
 

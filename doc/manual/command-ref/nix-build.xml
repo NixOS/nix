@@ -20,14 +20,14 @@
   <cmdsynopsis>
     <command>nix-build</command>
     <xi:include xmlns:xi="http://www.w3.org/2001/XInclude" href="opt-common-syn.xml#xmlns(db=http://docbook.org/ns/docbook)xpointer(/db:nop/*)" />
-    <arg><option>--arg</option> <replaceable>name</replaceable> <replaceable>value</replaceable></arg>
-    <arg><option>--argstr</option> <replaceable>name</replaceable> <replaceable>value</replaceable></arg>
+    <arg><option>--arg</option> <emphasis>name</emphasis> <emphasis>value</emphasis></arg>
+    <arg><option>--argstr</option> <emphasis>name</emphasis> <emphasis>value</emphasis></arg>
     <arg>
       <group choice='req'>
         <arg choice='plain'><option>--attr</option></arg>
         <arg choice='plain'><option>-A</option></arg>
       </group>
-      <replaceable>attrPath</replaceable>
+      <emphasis>attrPath</emphasis>
     </arg>
     <arg><option>--no-out-link</option></arg>
     <arg><option>--dry-run</option></arg>
@@ -36,16 +36,16 @@
         <arg choice='plain'><option>--out-link</option></arg>
         <arg choice='plain'><option>-o</option></arg>
       </group>
-      <replaceable>outlink</replaceable>
+      <emphasis>outlink</emphasis>
     </arg>
-    <arg choice='plain' rep='repeat'><replaceable>paths</replaceable></arg>
+    <arg choice='plain' rep='repeat'><emphasis>paths</emphasis></arg>
   </cmdsynopsis>
 </refsynopsisdiv>
 
 <refsection><title>Description</title>
 
 <para>The <command>nix-build</command> command builds the derivations
-described by the Nix expressions in <replaceable>paths</replaceable>.
+described by the Nix expressions in <emphasis>paths</emphasis>.
 If the build succeeds, it places a symlink to the result in the
 current directory.  The symlink is called <filename>result</filename>.
 If there are multiple Nix expressions, or the Nix expressions evaluate
@@ -53,11 +53,11 @@ to multiple derivations, multiple sequentially numbered symlinks are
 created (<filename>result</filename>, <filename>result-2</filename>,
 and so on).</para>
 
-<para>If no <replaceable>paths</replaceable> are specified, then
+<para>If no <emphasis>paths</emphasis> are specified, then
 <command>nix-build</command> will use <filename>default.nix</filename>
 in the current directory, if it exists.</para>
 
-<para>If an element of <replaceable>paths</replaceable> starts with
+<para>If an element of <emphasis>paths</emphasis> starts with
 <literal>http://</literal> or <literal>https://</literal>, it is
 interpreted as the URL of a tarball that will be downloaded and
 unpacked to a temporary location. The tarball must include a single
@@ -104,11 +104,11 @@ also <xref linkend="sec-common-options" />.</phrase></para>
   </varlistentry>
 
   <varlistentry xml:id='opt-out-link'><term><option>--out-link</option> /
-  <option>-o</option> <replaceable>outlink</replaceable></term>
+  <option>-o</option> <emphasis>outlink</emphasis></term>
 
     <listitem><para>Change the name of the symlink to the output path
     created from <filename>result</filename> to
-    <replaceable>outlink</replaceable>.</para></listitem>
+    <emphasis>outlink</emphasis>.</para></listitem>
 
   </varlistentry>
 
@@ -131,7 +131,7 @@ store derivation is /nix/store/qybprl8sz2lc...-firefox-1.5.0.7.drv
 /nix/store/d18hyl92g30l...-firefox-1.5.0.7
 
 $ ls -l result
-lrwxrwxrwx  <replaceable>...</replaceable>  result -> /nix/store/d18hyl92g30l...-firefox-1.5.0.7
+lrwxrwxrwx  <emphasis>...</emphasis>  result -> /nix/store/d18hyl92g30l...-firefox-1.5.0.7
 
 $ ls ./result/bin/
 firefox  firefox-config</screen>
@@ -143,7 +143,7 @@ You can also build all outputs:
 $ nix-build '&lt;nixpkgs>' -A openssl.all
 </screen>
 This will create a symlink for each output named
-<filename>result-<replaceable>outputname</replaceable></filename>.
+<filename>result-<emphasis>outputname</emphasis></filename>.
 The suffix is omitted if the output name is <literal>out</literal>.
 So if <literal>openssl</literal> has outputs <literal>out</literal>,
 <literal>bin</literal> and <literal>man</literal>,

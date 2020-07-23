@@ -137,7 +137,7 @@ while defining a set.</para>
 <para>Functions have the following form:
 
 <programlisting>
-<replaceable>pattern</replaceable>: <replaceable>body</replaceable></programlisting>
+<emphasis>pattern</emphasis>: <emphasis>body</emphasis></programlisting>
 
 The pattern specifies what the argument of the function must look
 like, and binds variables in the body to (parts of) the
@@ -190,9 +190,9 @@ map (concat "foo") [ "bar" "bla" "abc" ]</programlisting>
   <para>It is possible to provide <emphasis>default values</emphasis>
   for attributes, in which case they are allowed to be missing.  A
   default value is specified by writing
-  <literal><replaceable>name</replaceable> ?
-  <replaceable>e</replaceable></literal>, where
-  <replaceable>e</replaceable> is an arbitrary expression.  For example,
+  <literal><emphasis>name</emphasis> ?
+  <emphasis>e</emphasis></literal>, where
+  <emphasis>e</emphasis> is an arbitrary expression.  For example,
 
 <programlisting>
 { x, y ? "foo", z ? "bar" }: z + y + x</programlisting>
@@ -256,9 +256,9 @@ in concat { x = "foo"; y = "bar"; }</programlisting>
 <para>Conditionals look like this:
 
 <programlisting>
-if <replaceable>e1</replaceable> then <replaceable>e2</replaceable> else <replaceable>e3</replaceable></programlisting>
+if <emphasis>e1</emphasis> then <emphasis>e2</emphasis> else <emphasis>e3</emphasis></programlisting>
 
-where <replaceable>e1</replaceable> is an expression that should
+where <emphasis>e1</emphasis> is an expression that should
 evaluate to a Boolean value (<literal>true</literal> or
 <literal>false</literal>).</para>
 
@@ -271,11 +271,11 @@ evaluate to a Boolean value (<literal>true</literal> or
 on or between features and dependencies hold.  They look like this:
 
 <programlisting>
-assert <replaceable>e1</replaceable>; <replaceable>e2</replaceable></programlisting>
+assert <emphasis>e1</emphasis>; <emphasis>e2</emphasis></programlisting>
 
-where <replaceable>e1</replaceable> is an expression that should
+where <emphasis>e1</emphasis> is an expression that should
 evaluate to a Boolean value.  If it evaluates to
-<literal>true</literal>, <replaceable>e2</replaceable> is returned;
+<literal>true</literal>, <emphasis>e2</emphasis> is returned;
 otherwise expression evaluation is aborted and a backtrace is printed.</para>
 
 <para>Here is a Nix expression for the Subversion package that shows
@@ -358,10 +358,10 @@ stdenv.mkDerivation {
 <para>A <emphasis>with-expression</emphasis>,
 
 <programlisting>
-with <replaceable>e1</replaceable>; <replaceable>e2</replaceable></programlisting>
+with <emphasis>e1</emphasis>; <emphasis>e2</emphasis></programlisting>
 
-introduces the set <replaceable>e1</replaceable> into the lexical
-scope of the expression <replaceable>e2</replaceable>.  For instance,
+introduces the set <emphasis>e1</emphasis> into the lexical
+scope of the expression <emphasis>e2</emphasis>.  For instance,
 
 <programlisting>
 let as = { x = "foo"; y = "bar"; };

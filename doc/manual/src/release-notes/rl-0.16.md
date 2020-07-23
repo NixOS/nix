@@ -15,7 +15,7 @@ This release has the following improvements:
     `--cores
                             N` as well as a configuration setting `build-cores =
                             N` that causes the environment variable `NIX_BUILD_CORES` to be set
-    to N when the builder is invoked. The builder can use this at its
+    to *N* when the builder is invoked. The builder can use this at its
     discretion to perform a parallel build, e.g., by calling `make -j
                             N`. In Nixpkgs, this can be enabled on a per-package basis by
     setting the derivation attribute `enableParallelBuilding` to `true`.

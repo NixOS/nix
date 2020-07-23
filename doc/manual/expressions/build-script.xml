@@ -58,7 +58,7 @@ steps:</para>
     the <literal>PATH</literal>.  The <literal>perl</literal> environment
     variable points to the location of the Perl package (since it
     was passed in as an attribute to the derivation), so
-    <filename><replaceable>$perl</replaceable>/bin</filename> is the
+    <filename><emphasis>$perl</emphasis>/bin</filename> is the
     directory containing the Perl interpreter.</para>
 
   </listitem>

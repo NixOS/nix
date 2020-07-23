@@ -20,11 +20,11 @@
   <cmdsynopsis>
     <command>nix-store</command>
     <xi:include xmlns:xi="http://www.w3.org/2001/XInclude" href="opt-common-syn.xml#xmlns(db=http://docbook.org/ns/docbook)xpointer(/db:nop/*)" />
-    <arg><option>--add-root</option> <replaceable>path</replaceable></arg>
+    <arg><option>--add-root</option> <emphasis>path</emphasis></arg>
     <arg><option>--indirect</option></arg>
-    <arg choice='plain'><replaceable>operation</replaceable></arg>
-    <arg rep='repeat'><replaceable>options</replaceable></arg>
-    <arg rep='repeat'><replaceable>arguments</replaceable></arg>
+    <arg choice='plain'><emphasis>operation</emphasis></arg>
+    <arg rep='repeat'><emphasis>options</emphasis></arg>
+    <arg rep='repeat'><emphasis>arguments</emphasis></arg>
   </cmdsynopsis>
 </refsynopsisdiv>
 
@@ -55,14 +55,14 @@ options.</phrase></para>
 
 <variablelist>
 
-  <varlistentry xml:id="opt-add-root"><term><option>--add-root</option> <replaceable>path</replaceable></term>
+  <varlistentry xml:id="opt-add-root"><term><option>--add-root</option> <emphasis>path</emphasis></term>
 
     <listitem><para>Causes the result of a realisation
     (<option>--realise</option> and <option>--force-realise</option>)
     to be registered as a root of the garbage collector<phrase
     condition="manual"> (see <xref linkend="ssec-gc-roots"
     />)</phrase>.  The root is stored in
-    <replaceable>path</replaceable>, which must be inside a directory
+    <emphasis>path</emphasis>, which must be inside a directory
     that is scanned for roots by the garbage collector (i.e.,
     typically in a subdirectory of
     <filename>/nix/var/nix/gcroots/</filename>)
@@ -88,11 +88,11 @@ options.</phrase></para>
     garbage-collected unless the symlink is removed.</para>
 
     <para>The <option>--indirect</option> flag causes a uniquely named
-    symlink to <replaceable>path</replaceable> to be stored in
+    symlink to <emphasis>path</emphasis> to be stored in
     <filename>/nix/var/nix/gcroots/auto/</filename>.  For instance,
 
     <screen>
-$ nix-store --add-root /home/eelco/bla/result --indirect -r <replaceable>...</replaceable>
+$ nix-store --add-root /home/eelco/bla/result --indirect -r <emphasis>...</emphasis>
 
 $ ls -l /nix/var/nix/gcroots/auto
 lrwxrwxrwx    1 ... 2005-03-13 21:10 dn54lcypm8f8... -> /home/eelco/bla/result
@@ -135,7 +135,7 @@ lrwxrwxrwx    1 ... 2005-03-13 21:10 /home/eelco/bla/result -> /nix/store/1r1134
     <arg choice='plain'><option>--realise</option></arg>
     <arg choice='plain'><option>-r</option></arg>
   </group>
-  <arg choice='plain' rep='repeat'><replaceable>paths</replaceable></arg>
+  <arg choice='plain' rep='repeat'><emphasis>paths</emphasis></arg>
   <arg><option>--dry-run</option></arg>
 </cmdsynopsis>
 
@@ -204,7 +204,7 @@ printed.)</para>
     with <option>-K</option>, if an output path is not identical to
     the corresponding output from the previous build, the new output
     path is left in
-    <filename>/nix/store/<replaceable>name</replaceable>.check.</filename></para>
+    <filename>/nix/store/<emphasis>name</emphasis>.check.</filename></para>
 
     <para>See also the <option>build-repeat</option> configuration
     option, which repeats a derivation a number of times and prevents
@@ -361,7 +361,7 @@ EOF
     <arg choice='plain'><option>--print-live</option></arg>
     <arg choice='plain'><option>--print-dead</option></arg>
   </group>
-  <arg><option>--max-freed</option> <replaceable>bytes</replaceable></arg>
+  <arg><option>--max-freed</option> <emphasis>bytes</emphasis></arg>
 </cmdsynopsis>
 
 </refsection>
@@ -413,11 +413,11 @@ options control what gets deleted and in what order:
 
 <variablelist>
 
-  <varlistentry><term><option>--max-freed</option> <replaceable>bytes</replaceable></term>
+  <varlistentry><term><option>--max-freed</option> <emphasis>bytes</emphasis></term>
 
     <listitem><para>Keep deleting paths until at least
-    <replaceable>bytes</replaceable> bytes have been deleted, then
-    stop.  The argument <replaceable>bytes</replaceable> can be
+    <emphasis>bytes</emphasis> bytes have been deleted, then
+    stop.  The argument <emphasis>bytes</emphasis> can be
     followed by the multiplicative suffix <literal>K</literal>,
     <literal>M</literal>, <literal>G</literal> or
     <literal>T</literal>, denoting KiB, MiB, GiB or TiB
@@ -450,7 +450,7 @@ be freed.</para>
 <screen>
 $ nix-store --gc
 deleting `/nix/store/kq82idx6g0nyzsp2s14gfsc38npai7lf-cairo-1.0.4.tar.gz.drv'
-<replaceable>...</replaceable>
+<emphasis>...</emphasis>
 8825586 bytes freed (8.42 MiB)</screen>
 
 </para>
@@ -479,7 +479,7 @@ $ nix-store --gc --max-freed $((100 * 1024 * 1024))</screen>
   <command>nix-store</command>
   <arg choice='plain'><option>--delete</option></arg>
   <arg><option>--ignore-liveness</option></arg>
-  <arg choice='plain' rep='repeat'><replaceable>paths</replaceable></arg>
+  <arg choice='plain' rep='repeat'><emphasis>paths</emphasis></arg>
 </cmdsynopsis>
 
 </refsection>
@@ -487,7 +487,7 @@ $ nix-store --gc --max-freed $((100 * 1024 * 1024))</screen>
 <refsection><title>Description</title>
 
 <para>The operation <option>--delete</option> deletes the store paths
-<replaceable>paths</replaceable> from the Nix store, but only if it is
+<emphasis>paths</emphasis> from the Nix store, but only if it is
 safe to do so; that is, when the path is not reachable from a root of
 the garbage collector.  This means that you can only delete paths that
 would also be deleted by <literal>nix-store --gc</literal>.  Thus,
@@ -537,8 +537,8 @@ error: cannot delete path `/nix/store/zq0h41l75vlb4z45kzgjjmsjxvcv1qk7-mesa-6.4'
     <arg choice='plain'><option>-d</option></arg>
     <arg choice='plain'><option>--graph</option></arg>
     <arg choice='plain'><option>--tree</option></arg>
-    <arg choice='plain'><option>--binding</option> <replaceable>name</replaceable></arg>
-    <arg choice='plain'><option>-b</option> <replaceable>name</replaceable></arg>
+    <arg choice='plain'><option>--binding</option> <emphasis>name</emphasis></arg>
+    <arg choice='plain'><option>-b</option> <emphasis>name</emphasis></arg>
     <arg choice='plain'><option>--hash</option></arg>
     <arg choice='plain'><option>--size</option></arg>
     <arg choice='plain'><option>--roots</option></arg>
@@ -547,7 +547,7 @@ error: cannot delete path `/nix/store/zq0h41l75vlb4z45kzgjjmsjxvcv1qk7-mesa-6.4'
   <arg><option>-u</option></arg>
   <arg><option>--force-realise</option></arg>
   <arg><option>-f</option></arg>
-  <arg choice='plain' rep='repeat'><replaceable>paths</replaceable></arg>
+  <arg choice='plain' rep='repeat'><emphasis>paths</emphasis></arg>
 </cmdsynopsis>
 
 </refsection>
@@ -560,7 +560,7 @@ information about the store paths .  The queries are described below.  At
 most one query can be specified.  The default query is
 <option>--outputs</option>.</para>
 
-<para>The paths <replaceable>paths</replaceable> may also be symlinks
+<para>The paths <emphasis>paths</emphasis> may also be symlinks
 from outside of the Nix store, to the Nix store.  In that case, the
 query is applied to the target of the symlink.</para>
 
@@ -603,7 +603,7 @@ query is applied to the target of the symlink.</para>
 
     <listitem><para>Prints out the <link
     linkend="gloss-output-path">output paths</link> of the store
-    derivations <replaceable>paths</replaceable>.  These are the paths
+    derivations <emphasis>paths</emphasis>.  These are the paths
     that will be produced when the derivation is
     built.</para></listitem>
 
@@ -614,7 +614,7 @@ query is applied to the target of the symlink.</para>
 
     <listitem><para>Prints out the <link
     linkend="gloss-closure">closure</link> of the store path
-    <replaceable>paths</replaceable>.</para>
+    <emphasis>paths</emphasis>.</para>
 
     <para>This query has one option:</para>
 
@@ -647,7 +647,7 @@ query is applied to the target of the symlink.</para>
 
     <listitem><para>Prints the set of <link
     linkend="gloss-reference">references</link> of the store paths
-    <replaceable>paths</replaceable>, that is, their immediate
+    <emphasis>paths</emphasis>, that is, their immediate
     dependencies.  (For <emphasis>all</emphasis> dependencies, use
     <option>--requisites</option>.)</para></listitem>
 
@@ -656,9 +656,9 @@ query is applied to the target of the symlink.</para>
   <varlistentry><term><option>--referrers</option></term>
 
     <listitem><para>Prints the set of <emphasis>referrers</emphasis> of
-    the store paths <replaceable>paths</replaceable>, that is, the
+    the store paths <emphasis>paths</emphasis>, that is, the
     store paths currently existing in the Nix store that refer to one
-    of <replaceable>paths</replaceable>.  Note that contrary to the
+    of <emphasis>paths</emphasis>.  Note that contrary to the
     references, the set of referrers is not constant; it can change as
     store paths are added or removed.</para></listitem>
 
@@ -667,11 +667,11 @@ query is applied to the target of the symlink.</para>
   <varlistentry><term><option>--referrers-closure</option></term>
 
     <listitem><para>Prints the closure of the set of store paths
-    <replaceable>paths</replaceable> under the referrers relation; that
+    <emphasis>paths</emphasis> under the referrers relation; that
     is, all store paths that directly or indirectly refer to one of
-    <replaceable>paths</replaceable>.  These are all the path currently
+    <emphasis>paths</emphasis>.  These are all the path currently
     in the Nix store that are dependent on
-    <replaceable>paths</replaceable>.</para></listitem>
+    <emphasis>paths</emphasis>.</para></listitem>
 
   </varlistentry>
 
@@ -680,7 +680,7 @@ query is applied to the target of the symlink.</para>
 
     <listitem><para>Prints the <link
     linkend="gloss-deriver">deriver</link> of the store paths
-    <replaceable>paths</replaceable>.  If the path has no deriver
+    <emphasis>paths</emphasis>.  If the path has no deriver
     (e.g., if it is a source file), or if the deriver is not known
     (e.g., in the case of a binary-only deployment), the string
     <literal>unknown-deriver</literal> is printed.</para></listitem>
@@ -690,7 +690,7 @@ query is applied to the target of the symlink.</para>
   <varlistentry><term><option>--graph</option></term>
 
     <listitem><para>Prints the references graph of the store paths
-    <replaceable>paths</replaceable> in the format of the
+    <emphasis>paths</emphasis> in the format of the
     <command>dot</command> tool of AT&amp;T's <link
     xlink:href="http://www.graphviz.org/">Graphviz package</link>.
     This can be used to visualise dependency graphs.  To obtain a
@@ -703,7 +703,7 @@ query is applied to the target of the symlink.</para>
   <varlistentry><term><option>--tree</option></term>
 
     <listitem><para>Prints the references graph of the store paths
-    <replaceable>paths</replaceable> as a nested ASCII tree.
+    <emphasis>paths</emphasis> as a nested ASCII tree.
     References are ordered by descending closure size; this tends to
     flatten the tree, making it more readable.  The query only
     recurses into a store path when it is first encountered; this
@@ -715,7 +715,7 @@ query is applied to the target of the symlink.</para>
   <varlistentry><term><option>--graphml</option></term>
 
     <listitem><para>Prints the references graph of the store paths
-    <replaceable>paths</replaceable> in the <link
+    <emphasis>paths</emphasis> in the <link
     xlink:href="http://graphml.graphdrawing.org/">GraphML</link> file format.
     This can be used to visualise dependency graphs. To obtain a
     build-time dependency graph, apply this to a store derivation. To
@@ -724,12 +724,12 @@ query is applied to the target of the symlink.</para>
 
   </varlistentry>
 
-  <varlistentry><term><option>--binding</option> <replaceable>name</replaceable></term>
-    <term><option>-b</option> <replaceable>name</replaceable></term>
+  <varlistentry><term><option>--binding</option> <emphasis>name</emphasis></term>
+    <term><option>-b</option> <emphasis>name</emphasis></term>
 
     <listitem><para>Prints the value of the attribute
-    <replaceable>name</replaceable> (i.e., environment variable) of
-    the store derivations <replaceable>paths</replaceable>.  It is an
+    <emphasis>name</emphasis> (i.e., environment variable) of
+    the store derivations <emphasis>paths</emphasis>.  It is an
     error for a derivation to not have the specified
     attribute.</para></listitem>
 
@@ -738,7 +738,7 @@ query is applied to the target of the symlink.</para>
   <varlistentry><term><option>--hash</option></term>
 
     <listitem><para>Prints the SHA-256 hash of the contents of the
-    store paths <replaceable>paths</replaceable> (that is, the hash of
+    store paths <emphasis>paths</emphasis> (that is, the hash of
     the output of <command>nix-store --dump</command> on the given
     paths).  Since the hash is stored in the Nix database, this is a
     fast operation.</para></listitem>
@@ -748,7 +748,7 @@ query is applied to the target of the symlink.</para>
   <varlistentry><term><option>--size</option></term>
 
     <listitem><para>Prints the size in bytes of the contents of the
-    store paths <replaceable>paths</replaceable> — to be precise, the
+    store paths <emphasis>paths</emphasis> — to be precise, the
     size of the output of <command>nix-store --dump</command> on the
     given paths.  Note that the actual disk space required by the
     store paths may be higher, especially on filesystems with large
@@ -760,7 +760,7 @@ query is applied to the target of the symlink.</para>
 
     <listitem><para>Prints the garbage collector roots that point,
     directly or indirectly, at the store paths
-    <replaceable>paths</replaceable>.</para></listitem>
+    <emphasis>paths</emphasis>.</para></listitem>
 
   </varlistentry>
 
@@ -778,7 +778,7 @@ query is applied to the target of the symlink.</para>
 $ nix-store -qR $(which svn)
 /nix/store/5mbglq5ldqld8sj57273aljwkfvj22mc-subversion-1.1.4
 /nix/store/9lz9yc6zgmc0vlqmn2ipcpkjlmbi51vv-glibc-2.3.4
-<replaceable>...</replaceable></screen>
+<emphasis>...</emphasis></screen>
 
 </para>
 
@@ -789,7 +789,7 @@ $ nix-store -qR $(nix-store -qd $(which svn))
 /nix/store/02iizgn86m42q905rddvg4ja975bk2i4-grep-2.5.1.tar.bz2.drv
 /nix/store/07a2bzxmzwz5hp58nf03pahrv2ygwgs3-gcc-wrapper.sh
 /nix/store/0ma7c9wsbaxahwwl04gbw3fcd806ski4-glibc-2.3.4.drv
-<replaceable>... lots of other paths ...</replaceable></screen>
+<emphasis>... lots of other paths ...</emphasis></screen>
 
 The difference with the previous example is that we ask the closure of
 the derivation (<option>-qd</option>), not the closure of the output
@@ -804,7 +804,7 @@ $ nix-store -q --tree $(nix-store -qd $(which svn))
 +---/nix/store/fmzxmpjx2lh849ph0l36snfj9zdibw67-bash-3.0.drv
 |   +---/nix/store/570hmhmx3v57605cqg9yfvvyh0nnb8k8-bash
 |   +---/nix/store/p3srsbd8dx44v2pg6nbnszab5mcwx03v-builder.sh
-<replaceable>...</replaceable></screen>
+<emphasis>...</emphasis></screen>
 
 </para>
 
@@ -827,7 +827,7 @@ $ nix-store -q --referrers $(nix-store -q --binding openssl $(nix-store -qd $(wh
 $ nix-store -q --referrers-closure $(ldd $(which svn) | grep /libc.so | awk '{print $3}')
 /nix/store/034a6h4vpz9kds5r6kzb9lhh81mscw43-libgnomeprintui-2.8.2
 /nix/store/15l3yi0d45prm7a82pcrknxdh6nzmxza-gawk-3.1.4
-<replaceable>...</replaceable></screen>
+<emphasis>...</emphasis></screen>
 
 Note that <command>ldd</command> is a command that prints out the
 dynamic libraries used by an ELF executable.</para>
@@ -893,7 +893,7 @@ $ nix-store -q --roots $(which svn)
 <cmdsynopsis>
   <command>nix-store</command>
   <arg choice='plain'><option>--add</option></arg>
-  <arg choice='plain' rep='repeat'><replaceable>paths</replaceable></arg>
+  <arg choice='plain' rep='repeat'><emphasis>paths</emphasis></arg>
 </cmdsynopsis>
 
 </refsection>
@@ -926,8 +926,8 @@ $ nix-store --add ./foo.c
   <command>nix-store</command>
   <arg><option>--recursive</option></arg>
   <arg choice='plain'><option>--add-fixed</option></arg>
-  <arg choice='plain'><replaceable>algorithm</replaceable></arg>
-  <arg choice='plain' rep='repeat'><replaceable>paths</replaceable></arg>
+  <arg choice='plain'><emphasis>algorithm</emphasis></arg>
+  <arg choice='plain' rep='repeat'><emphasis>paths</emphasis></arg>
 </cmdsynopsis>
 
 </refsection>
@@ -1039,7 +1039,7 @@ in Nix itself.</para>
   <cmdsynopsis>
     <command>nix-store</command>
     <arg choice='plain'><option>--verify-path</option></arg>
-    <arg choice='plain' rep='repeat'><replaceable>paths</replaceable></arg>
+    <arg choice='plain' rep='repeat'><emphasis>paths</emphasis></arg>
   </cmdsynopsis>
 </refsection>
 
@@ -1077,7 +1077,7 @@ $ nix-store --verify-path $(nix-store -qR $(which svn))
   <cmdsynopsis>
     <command>nix-store</command>
     <arg choice='plain'><option>--repair-path</option></arg>
-    <arg choice='plain' rep='repeat'><replaceable>paths</replaceable></arg>
+    <arg choice='plain' rep='repeat'><emphasis>paths</emphasis></arg>
   </cmdsynopsis>
 </refsection>
 
@@ -1123,7 +1123,7 @@ fetching path `/nix/store/d7a81wsm1ijwwpkks3725661h3263p5-glibc-2.13'...
   <cmdsynopsis>
     <command>nix-store</command>
     <arg choice='plain'><option>--dump</option></arg>
-    <arg choice='plain'><replaceable>path</replaceable></arg>
+    <arg choice='plain'><emphasis>path</emphasis></arg>
   </cmdsynopsis>
 </refsection>
 
@@ -1131,7 +1131,7 @@ fetching path `/nix/store/d7a81wsm1ijwwpkks3725661h3263p5-glibc-2.13'...
 
 <para>The operation <option>--dump</option> produces a NAR (Nix
 ARchive) file containing the contents of the file system tree rooted
-at <replaceable>path</replaceable>.  The archive is written to
+at <emphasis>path</emphasis>.  The archive is written to
 standard output.</para>
 
 <para>A NAR archive is like a TAR or Zip archive, but it contains only
@@ -1173,14 +1173,14 @@ links, but not other types of files (such as device nodes).</para>
   <cmdsynopsis>
     <command>nix-store</command>
     <arg choice='plain'><option>--restore</option></arg>
-    <arg choice='plain'><replaceable>path</replaceable></arg>
+    <arg choice='plain'><emphasis>path</emphasis></arg>
   </cmdsynopsis>
 </refsection>
 
 <refsection><title>Description</title>
 
 <para>The operation <option>--restore</option> unpacks a NAR archive
-to <replaceable>path</replaceable>, which must not already exist.  The
+to <emphasis>path</emphasis>, which must not already exist.  The
 archive is read from standard input.</para>
 
 </refsection>
@@ -1198,7 +1198,7 @@ archive is read from standard input.</para>
   <cmdsynopsis>
     <command>nix-store</command>
     <arg choice='plain'><option>--export</option></arg>
-    <arg choice='plain' rep='repeat'><replaceable>paths</replaceable></arg>
+    <arg choice='plain' rep='repeat'><emphasis>paths</emphasis></arg>
   </cmdsynopsis>
 </refsection>
 
@@ -1220,7 +1220,7 @@ that are missing in the target Nix store, the import will fail.  To
 copy a whole closure, do something like:
 
 <screen>
-$ nix-store --export $(nix-store -qR <replaceable>paths</replaceable>) > out</screen>
+$ nix-store --export $(nix-store -qR <emphasis>paths</emphasis>) > out</screen>
 
 To import the whole closure again, run:
 
@@ -1299,7 +1299,7 @@ progress indication.</para>
 <screen>
 $ nix-store --optimise
 hashing files in `/nix/store/qhqx7l2f1kmwihc9bnxs7rc159hsxnf3-gcc-4.1.1'
-<replaceable>...</replaceable>
+<emphasis>...</emphasis>
 541838819 bytes (516.74 MiB) freed by hard-linking 54143 files;
 there are 114486 files with equal contents out of 215894 files in total
 </screen>
@@ -1322,7 +1322,7 @@ there are 114486 files with equal contents out of 215894 files in total
       <arg choice='plain'><option>--read-log</option></arg>
       <arg choice='plain'><option>-l</option></arg>
     </group>
-    <arg choice='plain' rep='repeat'><replaceable>paths</replaceable></arg>
+    <arg choice='plain' rep='repeat'><emphasis>paths</emphasis></arg>
   </cmdsynopsis>
 </refsection>
 
@@ -1351,7 +1351,7 @@ unpacking sources
 unpacking source archive /nix/store/p8n1jpqs27mgkjw07pb5269717nzf5f8-ktorrent-2.2.1.tar.gz
 ktorrent-2.2.1/
 ktorrent-2.2.1/NEWS
-<replaceable>...</replaceable>
+<emphasis>...</emphasis>
 </screen>
 
 </refsection>
@@ -1369,7 +1369,7 @@ ktorrent-2.2.1/NEWS
   <cmdsynopsis>
     <command>nix-store</command>
     <arg choice='plain'><option>--dump-db</option></arg>
-    <arg rep='repeat'><replaceable>paths</replaceable></arg>
+    <arg rep='repeat'><emphasis>paths</emphasis></arg>
   </cmdsynopsis>
 </refsection>
 
@@ -1424,7 +1424,7 @@ loads it into the Nix database.</para>
   <cmdsynopsis>
     <command>nix-store</command>
     <arg choice='plain'><option>--print-env</option></arg>
-    <arg choice='plain'><replaceable>drvpath</replaceable></arg>
+    <arg choice='plain'><emphasis>drvpath</emphasis></arg>
   </cmdsynopsis>
 </refsection>
 
@@ -1441,7 +1441,7 @@ variable <literal>_args</literal>.</para>
 
 <screen>
 $ nix-store --print-env $(nix-instantiate '&lt;nixpkgs>' -A firefox)
-<replaceable>…</replaceable>
+<emphasis>…</emphasis>
 export src; src='/nix/store/plpj7qrwcz94z2psh6fchsi7s8yihc7k-firefox-12.0.source.tar.bz2'
 export stdenv; stdenv='/nix/store/7c8asx3yfrg5dg1gzhzyq2236zfgibnn-stdenv'
 export system; system='x86_64-linux'

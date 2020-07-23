@@ -98,7 +98,7 @@ This section lists the options that are common to all operations. These
 options are allowed for every subcommand, though they may not always
 have an effect. See also [???](#sec-common-options).
 
-  - `--file` / `-f` path  
+  - `--file` / `-f` *path*  
     Specifies the Nix expression (designated below as the *active Nix
     expression*) used by the `--install`, `--upgrade`, and `--query
     --available` operations to obtain derivations. The default is
@@ -109,7 +109,7 @@ have an effect. See also [???](#sec-common-options).
     unpacked to a temporary location. The tarball must include a single
     top-level directory containing at least a file named `default.nix`.
 
-  - `--profile` / `-p` path  
+  - `--profile` / `-p` *path*  
     Specifies the profile to be used by those operations that operate on
     a profile (designated below as the *active profile*). A profile is a
     sequence of user environments called *generations*, one of which is
@@ -125,10 +125,10 @@ have an effect. See also [???](#sec-common-options).
     [substituted](#gloss-substitute) (i.e., downloaded) and which paths
     will be built from source (because no substitute is available).
 
-  - `--system-filter` system  
+  - `--system-filter` *system*  
     By default, operations such as `--query
                     --available` show derivations matching any platform. This option
-    allows you to use derivations for the specified platform system.
+    allows you to use derivations for the specified platform *system*.
 
 <!-- end list -->
 
@@ -200,17 +200,17 @@ args
 
 The install operation creates a new user environment, based on the
 current generation of the active profile, to which a set of store paths
-described by args is added. The arguments args map to store paths in a
-number of possible ways:
+described by *args* is added. The arguments *args* map to store paths in
+a number of possible ways:
 
-  - By default, args is a set of derivation names denoting derivations
+  - By default, *args* is a set of derivation names denoting derivations
     in the active Nix expression. These are realised, and the resulting
     output paths are installed. Currently installed derivations with a
     name equal to the name of a derivation being added are removed
     unless the option `--preserve-installed` is specified.
     
-    If there are multiple derivations matching a name in args that have
-    the same name (e.g., `gcc-3.3.6` and `gcc-4.1.1`), then the
+    If there are multiple derivations matching a name in *args* that
+    have the same name (e.g., `gcc-3.3.6` and `gcc-4.1.1`), then the
     derivation with the highest *priority* is used. A derivation can
     define a priority by declaring the `meta.priority` attribute. This
     attribute should be a number, with a higher value denoting a lower
@@ -230,22 +230,23 @@ number of possible ways:
     unambiguous. To find out the attribute paths of available packages,
     use `nix-env -qaP`.
 
-  - If `--from-profile` path is given, args is a set of names denoting
-    installed store paths in the profile path. This is an easy way to
-    copy user environment elements from one profile to another.
+  - If `--from-profile` *path* is given, *args* is a set of names
+    denoting installed store paths in the profile *path*. This is an
+    easy way to copy user environment elements from one profile to
+    another.
 
-  - If `--from-expression` is given, args are Nix
+  - If `--from-expression` is given, *args* are Nix
     [functions](#ss-functions) that are called with the active Nix
     expression as their single argument. The derivations returned by
     those function calls are installed. This allows derivations to be
     specified in an unambiguous way, which is necessary if there are
     multiple derivations with the same name.
 
-  - If args are store derivations, then these are
+  - If *args* are store derivations, then these are
     [realised](#rsec-nix-store-realise), and the resulting output paths
     are installed.
 
-  - If args are store paths that are not store derivations, then these
+  - If *args* are store paths that are not store derivations, then these
     are [realised](#rsec-nix-store-realise) and installed.
 
   - By default all outputs are installed for each derivation. That can
@@ -359,12 +360,12 @@ args
 The upgrade operation creates a new user environment, based on the
 current generation of the active profile, in which all store paths are
 replaced for which there are newer versions in the set of paths
-described by args. Paths for which there are no newer versions are left
-untouched; this is not an error. It is also not an error if an element
-of args matches no installed derivations.
+described by *args*. Paths for which there are no newer versions are
+left untouched; this is not an error. It is also not an error if an
+element of *args* matches no installed derivations.
 
-For a description of how args is mapped to a set of store paths, see
-[`--install`](#rsec-nix-env-install). If args describes multiple store
+For a description of how *args* is mapped to a set of store paths, see
+[`--install`](#rsec-nix-env-install). If *args* describes multiple store
 paths with the same symbolic name, only the one with the highest version
 is installed.
 
@@ -462,7 +463,7 @@ drvnames
 
 The uninstall operation creates a new user environment, based on the
 current generation of the active profile, from which the store paths
-designated by the symbolic names names are removed.
+designated by the symbolic names *names* are removed.
 
 ## Examples
 
@@ -629,7 +630,7 @@ The query operation displays information about either the store paths
 that are installed in the current generation of the active profile
 (`--installed`), or the derivations that are available for installation
 in the active Nix expression (`--available`). It only prints information
-about derivations whose symbolic name matches one of names.
+about derivations whose symbolic name matches one of *names*.
 
 The derivations are sorted by their `name` attributes.
 
@@ -696,14 +697,14 @@ derivation is shown unless `--no-name` is specified.
     upgrades for installed packages are available in a Nix expression. A
     column is added with the following meaning:
     
-      - `<` version  
+      - `<` *version*  
         A newer version of the package is available or installed.
     
-      - `=` version  
+      - `=` *version*  
         At most the same version of the package is available or
         installed.
     
-      - `>` version  
+      - `>` *version*  
         Only older versions of the package are available or installed.
     
       - `- ?`  
@@ -806,8 +807,8 @@ path
 
 ## Description
 
-This operation makes path the current profile for the user. That is, the
-symlink `~/.nix-profile` is made to point to path.
+This operation makes *path* the current profile for the user. That is,
+the symlink `~/.nix-profile` is made to point to *path*.
 
 ## Examples
 
@@ -882,9 +883,9 @@ generation
 
 ## Description
 
-This operation makes generation number generation the current generation
-of the active profile. That is, if the `profile` is the path to the
-active profile, then the symlink `profile` is made to point to
+This operation makes generation number *generation* the current
+generation of the active profile. That is, if the `profile` is the path
+to the active profile, then the symlink `profile` is made to point to
 `profile-generation-link`, which is in turn a symlink to the actual user
 environment in the Nix store.
 

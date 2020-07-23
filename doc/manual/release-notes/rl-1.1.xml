@@ -72,8 +72,8 @@
     to get rid of the bootstrap binaries in the Nixpkgs source tree
     and download them instead.  You can use it by doing
     <literal>import &lt;nix/fetchurl.nix> { url =
-    <replaceable>url</replaceable>; sha256 =
-    "<replaceable>hash</replaceable>"; }</literal>. (Shea Levy)</para>
+    <emphasis>url</emphasis>; sha256 =
+    "<emphasis>hash</emphasis>"; }</literal>. (Shea Levy)</para>
   </listitem>
 
   <listitem>

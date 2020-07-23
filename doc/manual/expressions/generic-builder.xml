@@ -44,7 +44,7 @@ genericBuild ③</programlisting>
     subdirectory, it's added to GCC's header search path; and so
     on.<footnote><para>How does it work? <filename>setup</filename>
     tries to source the file
-    <filename><replaceable>pkg</replaceable>/nix-support/setup-hook</filename>
+    <filename><emphasis>pkg</emphasis>/nix-support/setup-hook</filename>
     of all dependencies.  These “setup hooks” can then set up whatever
     environment variables they want; for instance, the setup hook for
     Perl sets the <literal>PERL5LIB</literal> environment variable to

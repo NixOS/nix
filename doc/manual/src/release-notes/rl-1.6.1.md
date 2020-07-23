@@ -6,8 +6,8 @@ This is primarily a bug fix release. Changes of interest are:
     strings, such as `"${/foo}/bar"`. This release reverts to the Nix
     1.5.3 behaviour.
 
-  - Previously, Nix optimised expressions such as `"${expr}"` to expr.
-    Thus it neither checked whether expr could be coerced to a string,
+  - Previously, Nix optimised expressions such as `"${expr}"` to *expr*.
+    Thus it neither checked whether *expr* could be coerced to a string,
     nor applied such coercions. This meant that `"${123}"` evaluatued to
     `123`, and `"${./foo}"` evaluated to `./foo` (even though `"${./foo}
     "` evaluates to `"/nix/store/hash-foo "`). Nix now checks the type

@@ -86,7 +86,7 @@ To leave a field at its default, set it to <literal>-</literal>.
 <orderedlist>
 
   <listitem><para>The URI of the remote store in the format
-  <literal>ssh://[<replaceable>username</replaceable>@]<replaceable>hostname</replaceable></literal>,
+  <literal>ssh://[<emphasis>username</emphasis>@]<emphasis>hostname</emphasis></literal>,
   e.g. <literal>ssh://nix@mac</literal> or
   <literal>ssh://mac</literal>. For backward compatibility,
   <literal>ssh://</literal> may be omitted. The hostname may be an
@@ -171,7 +171,7 @@ builders = ssh://mac x86_64-darwin ; ssh://beastie x86_64-freebsd
 
 Finally, remote builders can be configured in a separate configuration
 file included in <option>builders</option> via the syntax
-<literal>@<replaceable>file</replaceable></literal>. For example,
+<literal>@<emphasis>file</emphasis></literal>. For example,
 
 <programlisting>
 builders = @/etc/nix/machines
