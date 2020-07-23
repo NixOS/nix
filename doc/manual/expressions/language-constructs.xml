@@ -6,7 +6,7 @@
 
 <title>Language Constructs</title>
 
-<simplesect><title>Recursive sets</title>
+<section><title>Recursive sets</title>
 
 <para>Recursive sets are just normal sets, but the attributes can
 refer to each other.  For example,
@@ -38,10 +38,10 @@ does not terminate<footnote><para>Actually, Nix detects infinite
 recursion in this case and aborts (<quote>infinite recursion
 encountered</quote>).</para></footnote>.</para>
 
-</simplesect>
+</section>
 
 
-<simplesect xml:id="sect-let-expressions"><title>Let-expressions</title>
+<section xml:id="sect-let-expressions"><title>Let-expressions</title>
 
 <para>A let-expression allows you to define local variables for an
 expression.  For instance,
@@ -56,10 +56,10 @@ evaluates to <literal>"foobar"</literal>.
 
 </para>
 
-</simplesect>
+</section>
 
 
-<simplesect><title>Inheriting attributes</title>
+<section><title>Inheriting attributes</title>
 
 <para>When defining a set or in a let-expression it is often convenient to copy variables
 from the surrounding lexical scope (e.g., when you want to propagate
@@ -129,10 +129,10 @@ a = src-set.a; b = src-set.b; c = src-set.c;
 when used while defining local variables in a let-expression or
 while defining a set.</para>
 
-</simplesect>
+</section>
 
 
-<simplesect xml:id="ss-functions"><title>Functions</title>
+<section xml:id="ss-functions"><title>Functions</title>
 
 <para>Functions have the following form:
 
@@ -248,10 +248,10 @@ in concat { x = "foo"; y = "bar"; }</programlisting>
 
 </para>
 
-</simplesect>
+</section>
 
 
-<simplesect><title>Conditionals</title>
+<section><title>Conditionals</title>
 
 <para>Conditionals look like this:
 
@@ -262,10 +262,10 @@ where <replaceable>e1</replaceable> is an expression that should
 evaluate to a Boolean value (<literal>true</literal> or
 <literal>false</literal>).</para>
 
-</simplesect>
+</section>
 
 
-<simplesect><title>Assertions</title>
+<section><title>Assertions</title>
 
 <para>Assertions are generally used to check that certain requirements
 on or between features and dependencies hold.  They look like this:
@@ -349,11 +349,11 @@ stdenv.mkDerivation {
 
 </orderedlist>
 
-</simplesect>
+</section>
 
 
 
-<simplesect><title>With-expressions</title>
+<section><title>With-expressions</title>
 
 <para>A <emphasis>with-expression</emphasis>,
 
@@ -394,16 +394,16 @@ let a = 1; in let a = 2; in let a = 3; in let a = 4; in ...</programlisting>
 
 </para>
 
-</simplesect>
+</section>
 
 
-<simplesect><title>Comments</title>
+<section><title>Comments</title>
 
 <para>Comments can be single-line, started with a <literal>#</literal>
 character, or inline/multi-line, enclosed within <literal>/*
 ... */</literal>.</para>
 
-</simplesect>
+</section>
 
 
 </section>

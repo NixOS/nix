@@ -7,7 +7,7 @@
 <title>Values</title>
 
 
-<simplesect><title>Simple Values</title>
+<section><title>Simple Values</title>
 
 <para>Nix has the following basic data types:
 
@@ -193,10 +193,10 @@ stdenv.mkDerivation {
 
 </para>
 
-</simplesect>
+</section>
 
 
-<simplesect><title>Lists</title>
+<section><title>Lists</title>
 
 <para>Lists are formed by enclosing a whitespace-separated list of
 values between square brackets.  For example,
@@ -217,10 +217,10 @@ function and the fifth being a set.</para>
 <para>Note that lists are only lazy in values, and they are strict in length.
 </para>
 
-</simplesect>
+</section>
 
 
-<simplesect><title>Sets</title>
+<section><title>Sets</title>
 
 <para>Sets are really the core of the language, since ultimately the
 Nix language is all about creating derivations, which are really just
@@ -307,7 +307,7 @@ a form of object-oriented programming, for example.
 
 </para>
 
-</simplesect>
+</section>
 
 
 </section>

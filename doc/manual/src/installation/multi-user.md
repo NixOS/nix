@@ -20,6 +20,8 @@ Nix store/database that performs the operation.
 > caches. So while unprivileged users may install packages from
 > arbitrary Nix expressions, they may not get pre-built binaries.
 
+## Setting up the build users
+
 The *build users* are the special UIDs under which builds are performed.
 They should all be members of the *build users group* `nixbld`. This
 group should have no other members. The build users should not be
@@ -35,6 +37,8 @@ This creates 10 build users. There can never be more concurrent builds
 than the number of build users, so you may want to increase this if you
 expect to do many builds at the same time.
 
+## Running the daemon
+
 The [Nix daemon](#sec-nix-daemon) should be started as follows (as
 `root`):
 
@@ -49,6 +53,8 @@ should put a line like
     export NIX_REMOTE=daemon
 
 into the users’ login scripts.
+
+## Restricting access
 
 To limit which users can perform Nix operations, you can use the
 permissions on the directory `/nix/var/nix/daemon-socket`. For instance,

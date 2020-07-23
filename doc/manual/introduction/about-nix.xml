@@ -25,7 +25,7 @@ of the package’s build dependency graph).  This enables many powerful
 features.</para>
 
 
-<simplesect><title>Multiple versions</title>
+<section><title>Multiple versions</title>
 
 <para>You can have multiple versions or variants of a package
 installed at the same time.  This is especially important when
@@ -39,10 +39,10 @@ uninstalling an application cannot break other applications, since
 these operations never “destructively” update or delete files that are
 used by other packages.</para>
 
-</simplesect>
+</section>
 
 
-<simplesect><title>Complete dependencies</title>
+<section><title>Complete dependencies</title>
 
 <para>Nix helps you make sure that package dependency specifications
 are complete.  In general, when you’re making a package for a package
@@ -68,10 +68,10 @@ scanning binaries for the hash parts of Nix store paths (such as
 <literal>r8vvq9kq…</literal>).  This sounds risky, but it works
 extremely well.</para>
 
-</simplesect>
+</section>
 
 
-<simplesect><title>Multi-user support</title>
+<section><title>Multi-user support</title>
 
 <para>Nix has multi-user support.  This means that non-privileged
 users can securely install software.  Each user can have a different
@@ -82,10 +82,10 @@ package won’t be built or downloaded a second time.  At the same time,
 it is not possible for one user to inject a Trojan horse into a
 package that might be used by another user.</para>
 
-</simplesect>
+</section>
 
 
-<simplesect><title>Atomic upgrades and rollbacks</title>
+<section><title>Atomic upgrades and rollbacks</title>
 
 <para>Since package management operations never overwrite packages in
 the Nix store but just add new versions in different paths, they are
@@ -103,10 +103,10 @@ $ nix-env --upgrade <replaceable>some-packages</replaceable>
 $ nix-env --rollback
 </screen>
 
-</simplesect>
+</section>
 
 
-<simplesect><title>Garbage collection</title>
+<section><title>Garbage collection</title>
 
 <para>When you uninstall a package like this…
 
@@ -126,10 +126,10 @@ $ nix-collect-garbage
 This deletes all packages that aren’t in use by any user profile or by
 a currently running program.</para>
 
-</simplesect>
+</section>
 
 
-<simplesect><title>Functional package language</title>
+<section><title>Functional package language</title>
 
 <para>Packages are built from <emphasis>Nix expressions</emphasis>,
 which is a simple functional language.  A Nix expression describes
@@ -145,10 +145,10 @@ function and call it any number of times with the appropriate
 arguments.  Due to the hashing scheme, variants don’t conflict with
 each other in the Nix store.</para>
 
-</simplesect>
+</section>
 
 
-<simplesect><title>Transparent source/binary deployment</title>
+<section><title>Transparent source/binary deployment</title>
 
 <para>Nix expressions generally describe how to build a package from
 source, so an installation action like
@@ -172,31 +172,31 @@ Nix would first check if the file
 if so, fetch the pre-built binary referenced from there; otherwise, it
 would fall back to building from source.</para>
 
-</simplesect>
+</section>
 
 
 <!--
-<simplesect><title>Binary patching</title>
+<section><title>Binary patching</title>
 
 <para>In addition to downloading binaries automatically if they’re
 available, Nix can download binary deltas that patch an existing
 package in the Nix store into a new version.  This speeds up
 upgrades.</para>
 
-</simplesect>
+</section>
 -->
 
 
-<simplesect><title>Nix Packages collection</title>
+<section><title>Nix Packages collection</title>
 
 <para>We provide a large set of Nix expressions containing hundreds of
 existing Unix packages, the <emphasis>Nix Packages
 collection</emphasis> (Nixpkgs).</para>
 
-</simplesect>
+</section>
 
 
-<simplesect><title>Managing build environments</title>
+<section><title>Managing build environments</title>
 
 <para>Nix is extremely useful for developers as it makes it easy to
 automatically set up the build environment for a package. Given a
@@ -232,17 +232,17 @@ specifications, Nix makes an excellent basis for <a
 href="[%root%]hydra">a continuous build system</a>.</para>
 -->
 
-</simplesect>
+</section>
 
 
-<simplesect><title>Portability</title>
+<section><title>Portability</title>
 
 <para>Nix runs on Linux and macOS.</para>
 
-</simplesect>
+</section>
 
 
-<simplesect><title>NixOS</title>
+<section><title>NixOS</title>
 
 <para>NixOS is a Linux distribution based on Nix.  It uses Nix not
 just for package management but also to manage the system
@@ -253,16 +253,16 @@ earlier state.  Also, users can install software without root
 privileges.  For more information and downloads, see the <link
 xlink:href="http://nixos.org/">NixOS homepage</link>.</para>
 
-</simplesect>
+</section>
 
 
-<simplesect><title>License</title>
+<section><title>License</title>
 
 <para>Nix is released under the terms of the <link
 xlink:href="http://www.gnu.org/licenses/old-licenses/lgpl-2.1.html">GNU
 LGPLv2.1 or (at your option) any later version</link>.</para>
 
-</simplesect>
+</section>
 
 
 </chapter>

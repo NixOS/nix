@@ -30,7 +30,7 @@ arbitrary Nix expressions, they may not get pre-built
 binaries.</para></note>
 
 
-<simplesect>
+<section>
 
 <title>Setting up the build users</title>
 
@@ -52,10 +52,10 @@ This creates 10 build users. There can never be more concurrent builds
 than the number of build users, so you may want to increase this if
 you expect to do many builds at the same time.</para>
 
-</simplesect>
+</section>
 
 
-<simplesect>
+<section>
 
 <title>Running the daemon</title>
 
@@ -78,10 +78,10 @@ export NIX_REMOTE=daemon</programlisting>
 
 into the users’ login scripts.</para>
 
-</simplesect>
+</section>
 
 
-<simplesect>
+<section>
 
 <title>Restricting access</title>
 
@@ -101,7 +101,7 @@ cannot connect to the Unix domain socket
 <filename>/nix/var/nix/daemon-socket/socket</filename>, so they cannot
 perform Nix operations.</para>
 
-</simplesect>
+</section>
 
 
 </section>

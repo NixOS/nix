@@ -1,5 +1,7 @@
 # Language Constructs
 
+## Recursive sets
+
 Recursive sets are just normal sets, but the attributes can refer to
 each other. For example,
 
@@ -24,6 +26,8 @@ example,
 
 does not terminate\[1\].
 
+## Let-expressions
+
 A let-expression allows you to define local variables for an expression.
 For instance,
 
@@ -33,6 +37,8 @@ For instance,
     in x + y
 
 evaluates to `"foobar"`.
+
+## Inheriting attributes
 
 When defining a set or in a let-expression it is often convenient to
 copy variables from the surrounding lexical scope (e.g., when you want
@@ -94,6 +100,8 @@ is equivalent to
 
 when used while defining local variables in a let-expression or while
 defining a set.
+
+## Functions
 
 Functions have the following form:
 
@@ -187,12 +195,16 @@ you can bind them to an attribute, e.g.,
     let concat = { x, y }: x + y;
     in concat { x = "foo"; y = "bar"; }
 
+## Conditionals
+
 Conditionals look like this:
 
     if e1 then e2 else e3
 
 where e1 is an expression that should evaluate to a Boolean value
 (`true` or `false`).
+
+## Assertions
 
 Assertions are generally used to check that certain requirements on or
 between features and dependencies hold. They look like this:
@@ -257,6 +269,8 @@ The points of interest are:
     non-`null` value was passed. This prevents an unnecessary rebuild of
     Subversion if OpenSSL changes.
 
+## With-expressions
+
 A *with-expression*,
 
     with e1; e2
@@ -284,6 +298,8 @@ other means, e.g.
 establishes the same scope as
 
     let a = 1; in let a = 2; in let a = 3; in let a = 4; in ...
+
+## Comments
 
 Comments can be single-line, started with a `#` character, or
 inline/multi-line, enclosed within `/*

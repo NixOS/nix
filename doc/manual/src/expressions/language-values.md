@@ -1,5 +1,7 @@
 # Values
 
+## Simple Values
+
 Nix has the following basic data types:
 
   - *Strings* can be written in three ways.
@@ -127,6 +129,8 @@ Nix has the following basic data types:
 
   - The null value, denoted as `null`.
 
+## Lists
+
 Lists are formed by enclosing a whitespace-separated list of values
 between square brackets. For example,
 
@@ -142,6 +146,8 @@ the result would be a list of five elements, the fourth one being a
 function and the fifth being a set.
 
 Note that lists are only lazy in values, and they are strict in length.
+
+## Sets
 
 Sets are really the core of the language, since ultimately the Nix
 language is all about creating derivations, which are really just sets
