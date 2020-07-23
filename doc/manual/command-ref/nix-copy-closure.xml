@@ -129,7 +129,7 @@ those paths.  If this bothers you, use
 
 <variablelist>
 
-  <varlistentry><term><envar>NIX_SSHOPTS</envar></term>
+  <varlistentry><term><literal>NIX_SSHOPTS</literal></term>
 
     <listitem><para>Additional options to be passed to
     <command>ssh</command> on the command line.</para></listitem>

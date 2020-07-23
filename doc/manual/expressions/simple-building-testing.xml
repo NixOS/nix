@@ -45,7 +45,7 @@ name.</para>
 
 <para>Nix has transactional semantics.  Once a build finishes
 successfully, Nix makes a note of this in its database: it registers
-that the path denoted by <envar>out</envar> is now
+that the path denoted by <literal>out</literal> is now
 <quote>valid</quote>.  If you try to build the derivation again, Nix
 will see that the path is already valid and finish immediately.  If a
 build fails, either because it returns a non-zero exit code, because

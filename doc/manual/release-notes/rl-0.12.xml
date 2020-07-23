@@ -49,7 +49,7 @@ $ rm __db* log.* derivers references referrers reserved validpaths DB_CONFIG</sc
   filesystem.  For instance, you can speed up an installation by
   mounting some remote Nix store that already has the packages in
   question via NFS or <literal>sshfs</literal>.  The environment
-  variable <envar>NIX_OTHER_STORES</envar> specifies the locations of
+  variable <literal>NIX_OTHER_STORES</literal> specifies the locations of
   the remote Nix directories,
   e.g. <literal>/mnt/remote-fs/nix</literal>.</para></listitem>
 
@@ -156,7 +156,7 @@ the following paths will be downloaded/copied (30.02 MiB):
 
   <listitem><para><command>nix-prefetch-url</command> now supports
   <literal>mirror://</literal> URLs, provided that the environment
-  variable <envar>NIXPKGS_ALL</envar> points at a Nixpkgs
+  variable <literal>NIXPKGS_ALL</literal> points at a Nixpkgs
   tree.</para></listitem>
 
   <listitem><para>Removed the commands

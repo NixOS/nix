@@ -25,20 +25,20 @@
 <filename><replaceable>sysconfdir</replaceable>/nix/nix.conf</filename>
 (i.e. <filename>/etc/nix/nix.conf</filename> on most systems), or
 <filename>$NIX_CONF_DIR/nix.conf</filename> if
-<envar>NIX_CONF_DIR</envar> is set. Values loaded in this file are not forwarded to the Nix daemon. The
+<literal>NIX_CONF_DIR</literal> is set. Values loaded in this file are not forwarded to the Nix daemon. The
 client assumes that the daemon has already loaded them.
 </para>
 
 <para>User-specific configuration files:</para>
 
 <para>
-  If <envar>NIX_USER_CONF_FILES</envar> is set, then each path separated by
+  If <literal>NIX_USER_CONF_FILES</literal> is set, then each path separated by
   <literal>:</literal> will be loaded in reverse order.
 </para>
 
 <para>
   Otherwise it will look for <filename>nix/nix.conf</filename> files in
-  <envar>XDG_CONFIG_DIRS</envar> and <envar>XDG_CONFIG_HOME</envar>.
+  <literal>XDG_CONFIG_DIRS</literal> and <literal>XDG_CONFIG_HOME</literal>.
 
   The default location is <filename>$HOME/.config/nix.conf</filename> if
   those environment variables are unset.
@@ -195,8 +195,8 @@ false</literal>.</para>
 
     <para>If the build users group is empty, builds will be performed
     under the uid of the Nix process (that is, the uid of the caller
-    if <envar>NIX_REMOTE</envar> is empty, the uid under which the Nix
-    daemon runs if <envar>NIX_REMOTE</envar> is
+    if <literal>NIX_REMOTE</literal> is empty, the uid under which the Nix
+    daemon runs if <literal>NIX_REMOTE</literal> is
     <literal>daemon</literal>).  Obviously, this should not be used in
     multi-user settings with untrusted users.</para>
 
@@ -231,7 +231,7 @@ false</literal>.</para>
   <varlistentry xml:id="conf-cores"><term><literal>cores</literal></term>
 
     <listitem><para>Sets the value of the
-    <envar>NIX_BUILD_CORES</envar> environment variable in the
+    <literal>NIX_BUILD_CORES</literal> environment variable in the
     invocation of builders.  Builders can use this variable at their
     discretion to control the maximum amount of parallelism.  For
     instance, in Nixpkgs, if the derivation attribute
@@ -694,7 +694,7 @@ password <replaceable>my-password</replaceable>
 
       <variablelist>
         <varlistentry>
-          <term><envar>DRV_PATH</envar></term>
+          <term><literal>DRV_PATH</literal></term>
           <listitem>
             <para>The derivation for the built paths.</para>
             <para>Example:
@@ -704,7 +704,7 @@ password <replaceable>my-password</replaceable>
         </varlistentry>
 
         <varlistentry>
-          <term><envar>OUT_PATHS</envar></term>
+          <term><literal>OUT_PATHS</literal></term>
           <listitem>
             <para>Output paths of the built derivation, separated by a space character.</para>
             <para>Example:
@@ -754,7 +754,7 @@ password <replaceable>my-password</replaceable>
 
       <para>If set to <literal>true</literal>, the Nix evaluator will
       not allow access to any files outside of the Nix search path (as
-      set via the <envar>NIX_PATH</envar> environment variable or the
+      set via the <literal>NIX_PATH</literal> environment variable or the
       <option>-I</option> option), or to URIs outside of
       <option>allowed-uri</option>. The default is
       <literal>false</literal>.</para>
@@ -958,7 +958,7 @@ requiredSystemFeatures = [ "kvm" ];
       <para>Nix caches tarballs in
       <filename>$XDG_CACHE_HOME/nix/tarballs</filename>.</para>
 
-      <para>Files fetched via <envar>NIX_PATH</envar>,
+      <para>Files fetched via <literal>NIX_PATH</literal>,
       <function>fetchGit</function>, <function>fetchMercurial</function>,
       <function>fetchTarball</function>, and <function>fetchurl</function>
       respect this TTL.

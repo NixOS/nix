@@ -105,7 +105,7 @@ $ nix-store -l $(which xterm)
   some terminals show them anyway.</para></listitem>
 
   <listitem><para>Various commands now automatically pipe their output
-  into the pager as specified by the <envar>PAGER</envar> environment
+  into the pager as specified by the <literal>PAGER</literal> environment
   variable.</para></listitem>
 
   <listitem><para>Several improvements to reduce memory consumption in

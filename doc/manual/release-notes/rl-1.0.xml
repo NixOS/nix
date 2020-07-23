@@ -29,7 +29,7 @@ previous release.  Here are the most significant:</para>
 
   <listitem>
     <para>Nix now has an search path for expressions.  The search path
-    is set using the environment variable <envar>NIX_PATH</envar> and
+    is set using the environment variable <literal>NIX_PATH</literal> and
     the <option>-I</option> command line option.  In Nix expressions,
     paths between angle brackets are used to specify files that must
     be looked up in the search path.  For instance, the expression

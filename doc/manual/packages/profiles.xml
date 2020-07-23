@@ -41,9 +41,9 @@ store.</para>
 $ /nix/store/dpmvp969yhdq...-subversion-1.1.3/bin/svn</screen>
 
 every time you want to run Subversion.  Of course we could set up the
-<envar>PATH</envar> environment variable to include the
+<literal>PATH</literal> environment variable to include the
 <filename>bin</filename> directory of every package we want to use,
-but this is not very convenient since changing <envar>PATH</envar>
+but this is not very convenient since changing <literal>PATH</literal>
 doesn’t take effect for already existing processes.  The solution Nix
 uses is to create directory trees of symlinks to
 <emphasis>activated</emphasis> packages.  These are called
@@ -122,10 +122,10 @@ $ nix-env --list-generations</screen></para>
 
 <para>You generally wouldn’t have
 <filename>/nix/var/nix/profiles/<replaceable>some-profile</replaceable>/bin</filename>
-in your <envar>PATH</envar>.  Rather, there is a symlink
+in your <literal>PATH</literal>.  Rather, there is a symlink
 <filename>~/.nix-profile</filename> that points to your current
 profile.  This means that you should put
-<filename>~/.nix-profile/bin</filename> in your <envar>PATH</envar>
+<filename>~/.nix-profile/bin</filename> in your <literal>PATH</literal>
 (and indeed, that’s what the initialisation script
 <filename>/nix/etc/profile.d/nix.sh</filename> does).  This makes it
 easier to switch to a different profile.  You can do that using the

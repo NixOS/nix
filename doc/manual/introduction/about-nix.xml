@@ -76,7 +76,7 @@ extremely well.</para>
 <para>Nix has multi-user support.  This means that non-privileged
 users can securely install software.  Each user can have a different
 <emphasis>profile</emphasis>, a set of packages in the Nix store that
-appear in the user’s <envar>PATH</envar>.  If a user installs a
+appear in the user’s <literal>PATH</literal>.  If a user installs a
 package that another user has already installed previously, the
 package won’t be built or downloaded a second time.  At the same time,
 it is not possible for one user to inject a Trojan horse into a

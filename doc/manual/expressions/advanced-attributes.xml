@@ -139,7 +139,7 @@ impureEnvVars = [ "http_proxy" "https_proxy" <replaceable>...</replaceable> ];
 </programlisting>
 
     to make it use the proxy server configuration specified by the
-    user in the environment variables <envar>http_proxy</envar> and
+    user in the environment variables <literal>http_proxy</literal> and
     friends.</para>
 
     <para>This attribute is only allowed in <link
@@ -294,12 +294,12 @@ big = "a very long string";
     </programlisting>
 
     then when the builder runs, the environment variable
-    <envar>bigPath</envar> will contain the absolute path to a
+    <literal>bigPath</literal> will contain the absolute path to a
     temporary file containing <literal>a very long
     string</literal>. That is, for any attribute
     <replaceable>x</replaceable> listed in
     <varname>passAsFile</varname>, Nix will pass an environment
-    variable <envar><replaceable>x</replaceable>Path</envar> holding
+    variable <literal><replaceable>x</replaceable>Path</literal> holding
     the path of the file containing the value of attribute
     <replaceable>x</replaceable>. This is useful when you need to pass
     large strings to a builder, since most operating systems impose a

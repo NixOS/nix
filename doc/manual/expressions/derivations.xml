@@ -122,7 +122,7 @@ the Nixpkgs manual for details.</para>
 <itemizedlist>
 
   <listitem><para>A temporary directory is created under the directory
-  specified by <envar>TMPDIR</envar> (default
+  specified by <literal>TMPDIR</literal> (default
   <filename>/tmp</filename>) where the build will take place.  The
   current directory is changed to this directory.</para></listitem>
 
@@ -133,29 +133,29 @@ the Nixpkgs manual for details.</para>
 
   <itemizedlist>
 
-    <listitem><para><envar>NIX_BUILD_TOP</envar> contains the path of
+    <listitem><para><literal>NIX_BUILD_TOP</literal> contains the path of
     the temporary directory for this build.</para></listitem>
 
-    <listitem><para>Also, <envar>TMPDIR</envar>,
-    <envar>TEMPDIR</envar>, <envar>TMP</envar>, <envar>TEMP</envar>
+    <listitem><para>Also, <literal>TMPDIR</literal>,
+    <literal>TEMPDIR</literal>, <literal>TMP</literal>, <literal>TEMP</literal>
     are set to point to the temporary directory.  This is to prevent
     the builder from accidentally writing temporary files anywhere
     else.  Doing so might cause interference by other
     processes.</para></listitem>
 
-    <listitem><para><envar>PATH</envar> is set to
+    <listitem><para><literal>PATH</literal> is set to
     <filename>/path-not-set</filename> to prevent shells from
     initialising it to their built-in default value.</para></listitem>
 
-    <listitem><para><envar>HOME</envar> is set to
+    <listitem><para><literal>HOME</literal> is set to
     <filename>/homeless-shelter</filename> to prevent programs from
     using <filename>/etc/passwd</filename> or the like to find the
     user's home directory, which could cause impurity.  Usually, when
-    <envar>HOME</envar> is set, it is used as the location of the home
+    <literal>HOME</literal> is set, it is used as the location of the home
     directory, even if it points to a non-existent
     path.</para></listitem>
 
-    <listitem><para><envar>NIX_STORE</envar> is set to the path of the
+    <listitem><para><literal>NIX_STORE</literal> is set to the path of the
     top-level Nix store directory (typically,
     <filename>/nix/store</filename>).</para></listitem>
 

@@ -141,8 +141,8 @@ also <xref linkend="sec-common-options" />.</phrase></para>
     almost entirely cleared before the interactive shell is started,
     so you get an environment that more closely corresponds to the
     “real” Nix build.  A few variables, in particular
-    <envar>HOME</envar>, <envar>USER</envar> and
-    <envar>DISPLAY</envar>, are retained.  Note that
+    <literal>HOME</literal>, <literal>USER</literal> and
+    <literal>DISPLAY</literal>, are retained.  Note that
     <filename>~/.bashrc</filename> and (depending on your Bash
     installation) <filename>/etc/bashrc</filename> are still sourced,
     so any variables set there will affect the interactive
@@ -193,10 +193,10 @@ also <xref linkend="sec-common-options" />.</phrase></para>
 
 <variablelist>
 
-  <varlistentry><term><envar>NIX_BUILD_SHELL</envar></term>
+  <varlistentry><term><literal>NIX_BUILD_SHELL</literal></term>
 
     <listitem><para>Shell used to start the interactive environment.
-    Defaults to the <command>bash</command> found in <envar>PATH</envar>.</para></listitem>
+    Defaults to the <command>bash</command> found in <literal>PATH</literal>.</para></listitem>
 
   </varlistentry>
 
@@ -254,7 +254,7 @@ $ nix-shell -p sqlite 'git.override { withManual = false; }'
 
 The <command>-p</command> flag looks up Nixpkgs in the Nix search
 path. You can override it by passing <option>-I</option> or setting
-<envar>NIX_PATH</envar>. For example, the following gives you a shell
+<literal>NIX_PATH</literal>. For example, the following gives you a shell
 containing the Pan package from a specific revision of Nixpkgs:
 
 <screen>

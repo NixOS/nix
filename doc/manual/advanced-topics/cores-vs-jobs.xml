@@ -31,13 +31,13 @@ they are, how they interact, and their configuration trade-offs.</para>
 </variablelist>
 
 <para>The <xref linkend="conf-cores" /> setting determines the value of
-<envar>NIX_BUILD_CORES</envar>. <envar>NIX_BUILD_CORES</envar> is equal
+<literal>NIX_BUILD_CORES</literal>. <literal>NIX_BUILD_CORES</literal> is equal
 to <xref linkend="conf-cores" />, unless <xref linkend="conf-cores" />
-equals <literal>0</literal>, in which case <envar>NIX_BUILD_CORES</envar>
+equals <literal>0</literal>, in which case <literal>NIX_BUILD_CORES</literal>
 will be the total number of cores in the system.</para>
 
 <para>The maximum number of consumed cores is a simple multiplication,
-<xref linkend="conf-max-jobs" /> * <envar>NIX_BUILD_CORES</envar>.</para>
+<xref linkend="conf-max-jobs" /> * <literal>NIX_BUILD_CORES</literal>.</para>
 
 <para>The balance on how to set these two independent variables depends
 upon each builder's workload and hardware. Here are a few example
@@ -49,7 +49,7 @@ scenarios on a machine with 24 cores:</para>
     <tr>
       <th><xref linkend="conf-max-jobs" /></th>
       <th><xref linkend="conf-cores" /></th>
-      <th><envar>NIX_BUILD_CORES</envar></th>
+      <th><literal>NIX_BUILD_CORES</literal></th>
       <th>Maximum Processes</th>
       <th>Result</th>
     </tr>
@@ -116,6 +116,6 @@ scenarios on a machine with 24 cores:</para>
 
 <para>It is up to the derivations' build script to respect
 host's requested cores-per-build by following the value of the
-<envar>NIX_BUILD_CORES</envar> environment variable.</para>
+<literal>NIX_BUILD_CORES</literal> environment variable.</para>
 
 </chapter>

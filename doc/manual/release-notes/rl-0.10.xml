@@ -184,9 +184,9 @@ irreversible.</para></warning>
 
 
   <listitem><para>Nix now works behind an HTTP proxy server; just set
-  the standard environment variables <envar>http_proxy</envar>,
-  <envar>https_proxy</envar>, <envar>ftp_proxy</envar> or
-  <envar>all_proxy</envar> appropriately.  Functions such as
+  the standard environment variables <literal>http_proxy</literal>,
+  <literal>https_proxy</literal>, <literal>ftp_proxy</literal> or
+  <literal>all_proxy</literal> appropriately.  Functions such as
   <function>fetchurl</function> in Nixpkgs also respect these
   variables.</para></listitem>
 

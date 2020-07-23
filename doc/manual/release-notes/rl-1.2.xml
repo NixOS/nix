@@ -116,7 +116,7 @@ $ mount -o remount,ro,bind /nix/store
 
   <listitem>
     <para>Basic Nix expression evaluation profiling: setting the
-    environment variable <envar>NIX_COUNT_CALLS</envar> to
+    environment variable <literal>NIX_COUNT_CALLS</literal> to
     <literal>1</literal> will cause Nix to print how many times each
     primop or function was executed.</para>
   </listitem>

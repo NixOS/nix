@@ -176,7 +176,7 @@ stdenv.mkDerivation {
   <para>Paths can also be specified between angle brackets, e.g.
   <literal>&lt;nixpkgs&gt;</literal>. This means that the directories
   listed in the environment variable
-  <envar linkend="env-NIX_PATH">NIX_PATH</envar> will be searched
+  <envar linkend="env-NIX_PATH">NIX_PATH</literal> will be searched
   for the given file or directory name.
   </para>
 

@@ -38,18 +38,18 @@ genericBuild <co xml:id='ex-hello-builder2-co-3' /></programlisting>
 
   <callout arearefs='ex-hello-builder2-co-1'>
 
-    <para>The <envar>buildInputs</envar> variable tells
+    <para>The <literal>buildInputs</literal> variable tells
     <filename>setup</filename> to use the indicated packages as
     <quote>inputs</quote>.  This means that if a package provides a
     <filename>bin</filename> subdirectory, it's added to
-    <envar>PATH</envar>; if it has a <filename>include</filename>
+    <literal>PATH</literal>; if it has a <filename>include</filename>
     subdirectory, it's added to GCC's header search path; and so
     on.<footnote><para>How does it work? <filename>setup</filename>
     tries to source the file
     <filename><replaceable>pkg</replaceable>/nix-support/setup-hook</filename>
     of all dependencies.  These “setup hooks” can then set up whatever
     environment variables they want; for instance, the setup hook for
-    Perl sets the <envar>PERL5LIB</envar> environment variable to
+    Perl sets the <literal>PERL5LIB</literal> environment variable to
     contain the <filename>lib/site_perl</filename> directories of all
     inputs.</para></footnote>
     </para>
@@ -78,7 +78,7 @@ genericBuild <co xml:id='ex-hello-builder2-co-3' /></programlisting>
 </calloutlist>
 
 <para>Discerning readers will note that the
-<envar>buildInputs</envar> could just as well have been set in the Nix
+<literal>buildInputs</literal> could just as well have been set in the Nix
 expression, like this:
 
 <programlisting>

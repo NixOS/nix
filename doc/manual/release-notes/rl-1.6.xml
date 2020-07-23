@@ -33,7 +33,7 @@ features:</para>
 
   <listitem>
     <para><command>nix-shell</command> now sets the shell prompt
-    (<envar>PS1</envar>) to ensure that Nix shells are distinguishable
+    (<literal>PS1</literal>) to ensure that Nix shells are distinguishable
     from your regular shells.</para>
   </listitem>
 

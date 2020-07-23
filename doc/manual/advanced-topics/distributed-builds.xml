@@ -43,7 +43,7 @@ bash: nix-store: command not found
 error: cannot connect to 'mac'
 </screen>
 
-then you need to ensure that the <envar>PATH</envar> of
+then you need to ensure that the <literal>PATH</literal> of
 non-interactive login shells contains Nix.</para>
 
 <warning><para>If you are building via the Nix daemon, it is the Nix

@@ -7,7 +7,7 @@
 <title>Environment Variables</title>
 
 <para>To use Nix, some environment variables should be set.  In
-particular, <envar>PATH</envar> should contain the directories
+particular, <literal>PATH</literal> should contain the directories
 <filename><replaceable>prefix</replaceable>/bin</filename> and
 <filename>~/.nix-profile/bin</filename>.  The first directory contains
 the Nix tools themselves, while <filename>~/.nix-profile</filename> is
@@ -23,15 +23,15 @@ source <replaceable>prefix</replaceable>/etc/profile.d/nix.sh</screen>
 
 <section xml:id="sec-nix-ssl-cert-file">
 
-<title><envar>NIX_SSL_CERT_FILE</envar></title>
+<title><literal>NIX_SSL_CERT_FILE</literal></title>
 
 <para>If you need to specify a custom certificate bundle to account
 for an HTTPS-intercepting man in the middle proxy, you must specify
 the path to the certificate bundle in the environment variable
-<envar>NIX_SSL_CERT_FILE</envar>.</para>
+<literal>NIX_SSL_CERT_FILE</literal>.</para>
 
 
-<para>If you don't specify a <envar>NIX_SSL_CERT_FILE</envar>
+<para>If you don't specify a <literal>NIX_SSL_CERT_FILE</literal>
 manually, Nix will install and use its own certificate
 bundle.</para>
 
@@ -56,7 +56,7 @@ the Nix installer will detect the presense of Nix configuration, and
 abort.</para></note>
 
 <section xml:id="sec-nix-ssl-cert-file-with-nix-daemon-and-macos">
-<title><envar>NIX_SSL_CERT_FILE</envar> with macOS and the Nix daemon</title>
+<title><literal>NIX_SSL_CERT_FILE</literal> with macOS and the Nix daemon</title>
 
 <para>On macOS you must specify the environment variable for the Nix
 daemon service, then restart it:</para>

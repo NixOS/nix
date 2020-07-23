@@ -114,8 +114,8 @@ import &lt;nix/fetchurl.nix> {
 
   <listitem>
     <para>The evaluator now prints profiling statistics (enabled via
-    the <envar>NIX_SHOW_STATS</envar> and
-    <envar>NIX_COUNT_CALLS</envar> environment variables) in JSON
+    the <literal>NIX_SHOW_STATS</literal> and
+    <literal>NIX_COUNT_CALLS</literal> environment variables) in JSON
     format.</para>
   </listitem>
 

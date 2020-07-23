@@ -30,7 +30,7 @@
       <replaceable>N</replaceable></option> as well as a configuration
       setting <varname>build-cores =
       <replaceable>N</replaceable></varname> that causes the
-      environment variable <envar>NIX_BUILD_CORES</envar> to be set to
+      environment variable <literal>NIX_BUILD_CORES</literal> to be set to
       <replaceable>N</replaceable> when the builder is invoked.  The
       builder can use this at its discretion to perform a parallel
       build, e.g., by calling <command>make -j

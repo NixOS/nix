@@ -160,7 +160,7 @@
 
 <varlistentry xml:id="opt-cores"><term><option>--cores</option></term>
 
-  <listitem><para>Sets the value of the <envar>NIX_BUILD_CORES</envar>
+  <listitem><para>Sets the value of the <literal>NIX_BUILD_CORES</literal>
   environment variable in the invocation of builders.  Builders can
   use this variable at their discretion to control the maximum amount
   of parallelism.  For instance, in Nixpkgs, if the derivation
@@ -370,10 +370,10 @@
 
   <listitem><para>Add a path to the Nix expression search path.  This
   option may be given multiple times.  See the <envar
-  linkend="env-NIX_PATH">NIX_PATH</envar> environment variable for
+  linkend="env-NIX_PATH">NIX_PATH</literal> environment variable for
   information on the semantics of the Nix search path.  Paths added
   through <option>-I</option> take precedence over
-  <envar>NIX_PATH</envar>.</para></listitem>
+  <literal>NIX_PATH</literal>.</para></listitem>
 
 </varlistentry>
 

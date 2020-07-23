@@ -69,7 +69,7 @@ You’ll want to put that line somewhere in your system’s boot
 scripts.</para>
 
 <para>To let unprivileged users use the daemon, they should set the
-<link linkend="envar-remote"><envar>NIX_REMOTE</envar> environment
+<link linkend="envar-remote"><literal>NIX_REMOTE</literal> environment
 variable</link> to <literal>daemon</literal>.  So you should put a
 line like
 

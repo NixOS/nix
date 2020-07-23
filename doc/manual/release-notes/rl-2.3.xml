@@ -60,7 +60,7 @@ incompatible changes:</para>
 
   <listitem>
     <para>Builds are now executed in a pseudo-terminal, and the
-    <envar>TERM</envar> environment variable is set to
+    <literal>TERM</literal> environment variable is set to
     <literal>xterm-256color</literal>. This allows many programs
     (e.g. <command>gcc</command>, <command>clang</command>,
     <command>cmake</command>) to print colorized log output.</para>

@@ -1433,7 +1433,7 @@ loads it into the Nix database.</para>
 <para>The operation <option>--print-env</option> prints out the
 environment of a derivation in a format that can be evaluated by a
 shell.  The command line arguments of the builder are placed in the
-variable <envar>_args</envar>.</para>
+variable <literal>_args</literal>.</para>
 
 </refsection>
 

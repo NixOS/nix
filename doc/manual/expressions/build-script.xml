@@ -35,19 +35,19 @@ steps:</para>
 
     <para>When Nix runs a builder, it initially completely clears the
     environment (except for the attributes declared in the
-    derivation).  For instance, the <envar>PATH</envar> variable is
+    derivation).  For instance, the <literal>PATH</literal> variable is
     empty<footnote><para>Actually, it's initialised to
     <filename>/path-not-set</filename> to prevent Bash from setting it
     to a default value.</para></footnote>.  This is done to prevent
     undeclared inputs from being used in the build process.  If for
-    example the <envar>PATH</envar> contained
+    example the <literal>PATH</literal> contained
     <filename>/usr/bin</filename>, then you might accidentally use
     <filename>/usr/bin/gcc</filename>.</para>
 
     <para>So the first step is to set up the environment.  This is
     done by calling the <filename>setup</filename> script of the
     standard environment.  The environment variable
-    <envar>stdenv</envar> points to the location of the standard
+    <literal>stdenv</literal> points to the location of the standard
     environment being used.  (It wasn't specified explicitly as an
     attribute in <xref linkend='ex-hello-nix' />, but
     <varname>mkDerivation</varname> adds it automatically.)</para>
@@ -57,7 +57,7 @@ steps:</para>
   <callout arearefs='ex-hello-builder-co-2'>
 
     <para>Since Hello needs Perl, we have to make sure that Perl is in
-    the <envar>PATH</envar>.  The <envar>perl</envar> environment
+    the <literal>PATH</literal>.  The <literal>perl</literal> environment
     variable points to the location of the Perl package (since it
     was passed in as an attribute to the derivation), so
     <filename><replaceable>$perl</replaceable>/bin</filename> is the
@@ -70,7 +70,7 @@ steps:</para>
     <para>Now we have to unpack the sources.  The
     <varname>src</varname> attribute was bound to the result of
     fetching the Hello source tarball from the network, so the
-    <envar>src</envar> environment variable points to the location in
+    <literal>src</literal> environment variable points to the location in
     the Nix store to which the tarball was downloaded.  After
     unpacking, we <command>cd</command> to the resulting source
     directory.</para>
@@ -93,7 +93,7 @@ steps:</para>
     <filename>/nix/store/9a54ba97fb71b65fda531012d0443ce2-hello-2.1.1</filename>.
     Nix computes this path by cryptographically hashing all attributes
     of the derivation.  The path is passed to the builder through the
-    <envar>out</envar> environment variable.  So here we give
+    <literal>out</literal> environment variable.  So here we give
     <filename>configure</filename> the parameter
     <literal>--prefix=$out</literal> to cause Hello to be installed in
     the expected location.</para>
@@ -103,7 +103,7 @@ steps:</para>
   <callout arearefs='ex-hello-builder-co-5'>
 
     <para>Finally we build Hello (<literal>make</literal>) and install
-    it into the location specified by <envar>out</envar>
+    it into the location specified by <literal>out</literal>
     (<literal>make install</literal>).</para>
 
   </callout>

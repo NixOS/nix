@@ -62,7 +62,7 @@ $ nix-build https://github.com/NixOS/nixpkgs/archive/master.tar.gz -A hello
       master branch.</para></listitem>
 
       <listitem><para>In the Nix search path (as specified via
-      <envar>NIX_PATH</envar> or <option>-I</option>). For example, to
+      <literal>NIX_PATH</literal> or <option>-I</option>). For example, to
       start a shell containing the Pan package from a specific version
       of Nixpkgs:
 
@@ -190,8 +190,8 @@ main = do
   “generation” symlink in <filename>/nix/var/nix/profiles</filename>
   if something actually changed.</para></listitem>
 
-  <listitem><para>The environment variable <envar>NIX_PAGER</envar>
-  can now be set to override <envar>PAGER</envar>. You can set it to
+  <listitem><para>The environment variable <literal>NIX_PAGER</literal>
+  can now be set to override <literal>PAGER</literal>. You can set it to
   <literal>cat</literal> to disable paging for Nix commands
   only.</para></listitem>
 

@@ -11,7 +11,7 @@
 
 <variablelist xml:id="env-common">
 
-<varlistentry><term><envar>IN_NIX_SHELL</envar></term>
+<varlistentry><term><literal>IN_NIX_SHELL</literal></term>
 
   <listitem><para>Indicator that tells if the current environment was set up by
   <command>nix-shell</command>.  Since Nix 2.0 the values are
@@ -19,7 +19,7 @@
 
 </varlistentry>
 
-<varlistentry xml:id="env-NIX_PATH"><term><envar>NIX_PATH</envar></term>
+<varlistentry xml:id="env-NIX_PATH"><term><literal>NIX_PATH</literal></term>
 
   <listitem>
 
@@ -50,7 +50,7 @@ nixpkgs=/home/eelco/Dev/nixpkgs-branch:/etc/nixos</screen>
     interpreted as the URL of a tarball that will be downloaded and
     unpacked to a temporary location. The tarball must consist of a
     single top-level directory. For example, setting
-    <envar>NIX_PATH</envar> to
+    <literal>NIX_PATH</literal> to
 
     <screen>
 nixpkgs=https://github.com/NixOS/nixpkgs/archive/nixos-15.09.tar.gz</screen>
@@ -65,12 +65,12 @@ nixpkgs=https://github.com/NixOS/nixpkgs/archive/nixos-15.09.tar.gz</screen>
 
     <para>The search path can be extended using the <option
     linkend="opt-I">-I</option> option, which takes precedence over
-    <envar>NIX_PATH</envar>.</para></listitem>
+    <literal>NIX_PATH</literal>.</para></listitem>
 
 </varlistentry>
 
 
-<varlistentry><term><envar>NIX_IGNORE_SYMLINK_STORE</envar></term>
+<varlistentry><term><literal>NIX_IGNORE_SYMLINK_STORE</literal></term>
 
   <listitem>
 
@@ -84,7 +84,7 @@ nixpkgs=https://github.com/NixOS/nixpkgs/archive/nixos-15.09.tar.gz</screen>
   except when builds are deployed to machines where
   <filename>/nix/store</filename> resolves differently.  If you are
   sure that you’re not going to do that, you can set
-  <envar>NIX_IGNORE_SYMLINK_STORE</envar> to <envar>1</envar>.</para>
+  <literal>NIX_IGNORE_SYMLINK_STORE</literal> to <literal>1</literal>.</para>
 
   <para>Note that if you’re symlinking the Nix store so that you can
   put it on another file system than the root file system, on Linux
@@ -102,7 +102,7 @@ $ mount -o bind /mnt/otherdisk/nix /nix</screen>
 </varlistentry>
 
 
-<varlistentry><term><envar>NIX_STORE_DIR</envar></term>
+<varlistentry><term><literal>NIX_STORE_DIR</literal></term>
 
   <listitem><para>Overrides the location of the Nix store (default
   <filename><replaceable>prefix</replaceable>/store</filename>).</para></listitem>
@@ -110,7 +110,7 @@ $ mount -o bind /mnt/otherdisk/nix /nix</screen>
 </varlistentry>
 
 
-<varlistentry><term><envar>NIX_DATA_DIR</envar></term>
+<varlistentry><term><literal>NIX_DATA_DIR</literal></term>
 
   <listitem><para>Overrides the location of the Nix static data
   directory (default
@@ -119,7 +119,7 @@ $ mount -o bind /mnt/otherdisk/nix /nix</screen>
 </varlistentry>
 
 
-<varlistentry><term><envar>NIX_LOG_DIR</envar></term>
+<varlistentry><term><literal>NIX_LOG_DIR</literal></term>
 
   <listitem><para>Overrides the location of the Nix log directory
   (default <filename><replaceable>prefix</replaceable>/var/log/nix</filename>).</para></listitem>
@@ -127,7 +127,7 @@ $ mount -o bind /mnt/otherdisk/nix /nix</screen>
 </varlistentry>
 
 
-<varlistentry><term><envar>NIX_STATE_DIR</envar></term>
+<varlistentry><term><literal>NIX_STATE_DIR</literal></term>
 
   <listitem><para>Overrides the location of the Nix state directory
   (default <filename><replaceable>prefix</replaceable>/var/nix</filename>).</para></listitem>
@@ -135,7 +135,7 @@ $ mount -o bind /mnt/otherdisk/nix /nix</screen>
 </varlistentry>
 
 
-<varlistentry><term><envar>NIX_CONF_DIR</envar></term>
+<varlistentry><term><literal>NIX_CONF_DIR</literal></term>
 
   <listitem><para>Overrides the location of the system Nix configuration
   directory (default
@@ -143,7 +143,7 @@ $ mount -o bind /mnt/otherdisk/nix /nix</screen>
 
 </varlistentry>
 
-<varlistentry><term><envar>NIX_USER_CONF_FILES</envar></term>
+<varlistentry><term><literal>NIX_USER_CONF_FILES</literal></term>
 
   <listitem><para>Overrides the location of the user Nix configuration files
   to load from (defaults to the XDG spec locations). The variable is treated
@@ -151,7 +151,7 @@ $ mount -o bind /mnt/otherdisk/nix /nix</screen>
 
 </varlistentry>
 
-<varlistentry><term><envar>TMPDIR</envar></term>
+<varlistentry><term><literal>TMPDIR</literal></term>
 
   <listitem><para>Use the specified directory to store temporary
   files.  In particular, this includes temporary build directories;
@@ -161,7 +161,7 @@ $ mount -o bind /mnt/otherdisk/nix /nix</screen>
 </varlistentry>
 
 
-<varlistentry xml:id="envar-remote"><term><envar>NIX_REMOTE</envar></term>
+<varlistentry xml:id="envar-remote"><term><literal>NIX_REMOTE</literal></term>
 
   <listitem><para>This variable should be set to
   <literal>daemon</literal> if you want to use the Nix daemon to
@@ -174,7 +174,7 @@ $ mount -o bind /mnt/otherdisk/nix /nix</screen>
 </varlistentry>
 
 
-<varlistentry><term><envar>NIX_SHOW_STATS</envar></term>
+<varlistentry><term><literal>NIX_SHOW_STATS</literal></term>
 
   <listitem><para>If set to <literal>1</literal>, Nix will print some
   evaluation statistics, such as the number of values
@@ -183,7 +183,7 @@ $ mount -o bind /mnt/otherdisk/nix /nix</screen>
 </varlistentry>
 
 
-<varlistentry><term><envar>NIX_COUNT_CALLS</envar></term>
+<varlistentry><term><literal>NIX_COUNT_CALLS</literal></term>
 
   <listitem><para>If set to <literal>1</literal>, Nix will print how
   often functions were called during Nix expression evaluation.  This
@@ -192,7 +192,7 @@ $ mount -o bind /mnt/otherdisk/nix /nix</screen>
 </varlistentry>
 
 
-<varlistentry><term><envar>GC_INITIAL_HEAP_SIZE</envar></term>
+<varlistentry><term><literal>GC_INITIAL_HEAP_SIZE</literal></term>
 
   <listitem><para>If Nix has been configured to use the Boehm garbage
   collector, this variable sets the initial size of the heap in bytes.
