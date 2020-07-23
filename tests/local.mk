@@ -6,7 +6,7 @@ nix_tests = \
   gc-auto.sh \
   referrers.sh user-envs.sh logging.sh nix-build.sh misc.sh fixed.sh \
   gc-runtime.sh check-refs.sh filter-source.sh \
-  remote-store.sh export.sh export-graph.sh \
+  local-store.sh remote-store.sh export.sh export-graph.sh \
   timeout.sh secure-drv-outputs.sh nix-channel.sh \
   multiple-outputs.sh import-derivation.sh fetchurl.sh optimise-store.sh \
   binary-cache.sh nix-profile.sh repair.sh dump-db.sh case-hack.sh \
