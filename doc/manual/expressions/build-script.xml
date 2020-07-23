@@ -6,32 +6,30 @@
 
 <title>Build Script</title>
 
-<example xml:id='ex-hello-builder'><title>Build script for GNU Hello
-(<filename>builder.sh</filename>)</title>
-<programlisting>
-source $stdenv/setup <co xml:id='ex-hello-builder-co-1' />
-
-PATH=$perl/bin:$PATH <co xml:id='ex-hello-builder-co-2' />
-
-tar xvfz $src <co xml:id='ex-hello-builder-co-3' />
-cd hello-*
-./configure --prefix=$out <co xml:id='ex-hello-builder-co-4' />
-make <co xml:id='ex-hello-builder-co-5' />
-make install</programlisting>
-</example>
-
-<para><xref linkend='ex-hello-builder' /> shows the builder referenced
+<para>Here is the builder referenced
 from Hello's Nix expression (stored in
-<filename>pkgs/applications/misc/hello/ex-1/builder.sh</filename>).
-The builder can actually be made a lot shorter by using the
+<filename>pkgs/applications/misc/hello/ex-1/builder.sh</filename>):</para>
+
+<programlisting>
+source $stdenv/setup ①
+
+PATH=$perl/bin:$PATH ②
+
+tar xvfz $src ③
+cd hello-*
+./configure --prefix=$out ④
+make ⑤
+make install</programlisting>
+
+<para>The builder can actually be made a lot shorter by using the
 <emphasis>generic builder</emphasis> functions provided by
 <varname>stdenv</varname>, but here we write out the build steps to
 elucidate what a builder does.  It performs the following
 steps:</para>
 
-<calloutlist>
+<orderedlist>
 
-  <callout arearefs='ex-hello-builder-co-1'>
+  <listitem>
 
     <para>When Nix runs a builder, it initially completely clears the
     environment (except for the attributes declared in the
@@ -52,9 +50,9 @@ steps:</para>
     attribute in <xref linkend='ex-hello-nix' />, but
     <varname>mkDerivation</varname> adds it automatically.)</para>
 
-  </callout>
+  </listitem>
 
-  <callout arearefs='ex-hello-builder-co-2'>
+  <listitem>
 
     <para>Since Hello needs Perl, we have to make sure that Perl is in
     the <literal>PATH</literal>.  The <literal>perl</literal> environment
@@ -63,9 +61,9 @@ steps:</para>
     <filename><replaceable>$perl</replaceable>/bin</filename> is the
     directory containing the Perl interpreter.</para>
 
-  </callout>
+  </listitem>
 
-  <callout arearefs='ex-hello-builder-co-3'>
+  <listitem>
 
     <para>Now we have to unpack the sources.  The
     <varname>src</varname> attribute was bound to the result of
@@ -82,9 +80,9 @@ steps:</para>
     always newly created, so you don't have to worry about files from
     previous builds interfering with the current build.</para>
 
-  </callout>
+  </listitem>
 
-  <callout arearefs='ex-hello-builder-co-4'>
+  <listitem>
 
     <para>GNU Hello is a typical Autoconf-based package, so we first
     have to run its <filename>configure</filename> script.  In Nix
@@ -98,17 +96,17 @@ steps:</para>
     <literal>--prefix=$out</literal> to cause Hello to be installed in
     the expected location.</para>
 
-  </callout>
+  </listitem>
 
-  <callout arearefs='ex-hello-builder-co-5'>
+  <listitem>
 
     <para>Finally we build Hello (<literal>make</literal>) and install
     it into the location specified by <literal>out</literal>
     (<literal>make install</literal>).</para>
 
-  </callout>
+  </listitem>
 
-</calloutlist>
+</orderedlist>
 
 <para>If you are wondering about the absence of error checking on the
 result of various commands called in the builder: this is because the

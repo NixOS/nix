@@ -735,31 +735,7 @@ For instance, `derivation` is also available as `builtins.derivation`.
     builder in a more structured format than plain environment
     variables.
     
-    [example\_title](#ex-toxml) shows an example where this is the case.
-    The builder is supposed to generate the configuration file for a
-    [Jetty servlet container](http://jetty.mortbay.org/). A servlet
-    container contains a number of servlets (`*.war` files) each
-    exported under a specific URI prefix. So the servlet configuration
-    is a list of sets containing the `path` and `war` of the servlet
-    ([co\_title](#ex-toxml-co-servlets)). This kind of information is
-    difficult to communicate with the normal method of passing
-    information through an environment variable, which just concatenates
-    everything together into a string (which might just work in this
-    case, but wouldn’t work if fields are optional or contain lists
-    themselves). Instead the Nix expression is converted to an XML
-    representation with `toXML`, which is unambiguous and can easily be
-    processed with the appropriate tools. For instance, in the example
-    an XSLT stylesheet ([co\_title](#ex-toxml-co-stylesheet)) is applied
-    to it ([co\_title](#ex-toxml-co-apply)) to generate the XML
-    configuration file for the Jetty server. The XML representation
-    produced from [co\_title](#ex-toxml-co-servlets) by `toXML` is shown
-    in [example\_title](#ex-toxml-result).
-    
-    Note that [example\_title](#ex-toxml) uses the `toFile` built-in to
-    write the builder and the stylesheet “inline” in the Nix expression.
-    The path of the stylesheet is spliced into the builder at `xsltproc
-    ${stylesheet}
-                    ...`.
+    Here is an example where this is the case:
     
         { stdenv, fetchurl, libxslt, jira, uberwiki }:
         
@@ -771,10 +747,10 @@ For instance, `derivation` is also available as `builtins.derivation`.
           builder = builtins.toFile "builder.sh" "
             source $stdenv/setup
             mkdir $out
-            echo "$servlets" | xsltproc ${stylesheet} - > $out/server-conf.xml  
+            echo "$servlets" | xsltproc ${stylesheet} - > $out/server-conf.xml ① 
           ";
         
-          stylesheet = builtins.toFile "stylesheet.xsl"  
+          stylesheet = builtins.toFile "stylesheet.xsl" ② 
            "<?xml version='1.0' encoding='UTF-8'?>
             <xsl:stylesheet xmlns:xsl='http://www.w3.org/1999/XSL/Transform' version='1.0'>
               <xsl:template match='/'>
@@ -790,11 +766,28 @@ For instance, `derivation` is also available as `builtins.derivation`.
             </xsl:stylesheet>
           ";
         
-          servlets = builtins.toXML [  
+          servlets = builtins.toXML [ ③ 
             { path = "/bugtracker"; war = jira + "/lib/atlassian-jira.war"; }
             { path = "/wiki"; war = uberwiki + "/uberwiki.war"; }
           ];
         })
+    
+    The builder is supposed to generate the configuration file for a
+    [Jetty servlet container](http://jetty.mortbay.org/). A servlet
+    container contains a number of servlets (`*.war` files) each
+    exported under a specific URI prefix. So the servlet configuration
+    is a list of sets containing the `path` and `war` of the servlet
+    ([???](#ex-toxml-co-servlets)). This kind of information is
+    difficult to communicate with the normal method of passing
+    information through an environment variable, which just concatenates
+    everything together into a string (which might just work in this
+    case, but wouldn’t work if fields are optional or contain lists
+    themselves). Instead the Nix expression is converted to an XML
+    representation with `toXML`, which is unambiguous and can easily be
+    processed with the appropriate tools. For instance, in the example
+    an XSLT stylesheet (at point ②) is applied to it (at point ①) to
+    generate the XML configuration file for the Jetty server. The XML
+    representation produced at point ③ by `toXML` is as follows:
     
         <?xml version='1.0' encoding='utf-8'?>
         <expr>
@@ -817,6 +810,11 @@ For instance, `derivation` is also available as `builtins.derivation`.
             </attrs>
           </list>
         </expr>
+    
+    Note that [???](#ex-toxml) uses the `toFile` built-in to write the
+    builder and the stylesheet “inline” in the Nix expression. The path
+    of the stylesheet is spliced into the builder using the syntax
+    `xsltproc ${stylesheet}`.
 
   - `builtins.trace` e1 e2  
     Evaluate e1 and print its abstract syntax representation on standard

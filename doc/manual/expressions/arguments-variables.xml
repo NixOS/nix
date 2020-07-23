@@ -6,20 +6,25 @@
 
 <title>Arguments and Variables</title>
 
-<example xml:id='ex-hello-composition'>
+<para>The Nix expression in <xref linkend='ex-hello-nix' /> is a
+function; it is missing some arguments that have to be filled in
+somewhere.  In the Nix Packages collection this is done in the file
+<filename>pkgs/top-level/all-packages.nix</filename>, where all Nix
+expressions for packages are imported and called with the appropriate
+arguments. Here are some fragments of
+<filename>all-packages.nix</filename>, with annotations of what they
+mean:</para>
 
-<title>Composing GNU Hello
-(<filename>all-packages.nix</filename>)</title>
 <programlisting>
 ...
 
-rec { <co xml:id='ex-hello-composition-co-1' />
+rec { ①
 
-  hello = import ../applications/misc/hello/ex-1 <co xml:id='ex-hello-composition-co-2' /> { <co xml:id='ex-hello-composition-co-3' />
+  hello = import ../applications/misc/hello/ex-1 ② { ③
     inherit fetchurl stdenv perl;
   };
 
-  perl = import ../development/interpreters/perl { <co xml:id='ex-hello-composition-co-4' />
+  perl = import ../development/interpreters/perl { ④
     inherit fetchurl stdenv;
   };
 
@@ -31,31 +36,19 @@ rec { <co xml:id='ex-hello-composition-co-1' />
 
 }
 </programlisting>
-</example>
 
-<para>The Nix expression in <xref linkend='ex-hello-nix' /> is a
-function; it is missing some arguments that have to be filled in
-somewhere.  In the Nix Packages collection this is done in the file
-<filename>pkgs/top-level/all-packages.nix</filename>, where all
-Nix expressions for packages are imported and called with the
-appropriate arguments.  <xref linkend='ex-hello-composition' /> shows
-some fragments of
-<filename>all-packages.nix</filename>.</para>
+<orderedlist>
 
-<calloutlist>
-
-  <callout arearefs='ex-hello-composition-co-1'>
-
+  <listitem>
     <para>This file defines a set of attributes, all of which are
     concrete derivations (i.e., not functions).  In fact, we define a
     <emphasis>mutually recursive</emphasis> set of attributes.  That
     is, the attributes can refer to each other.  This is precisely
     what we want since we want to <quote>plug</quote> the
     various packages into each other.</para>
+  </listitem>
 
-  </callout>
-
-  <callout arearefs='ex-hello-composition-co-2'>
+  <listitem>
 
     <para>Here we <emphasis>import</emphasis> the Nix expression for
     GNU Hello.  The import operation just loads and returns the
@@ -71,9 +64,9 @@ some fragments of
     When you try to import a directory, Nix automatically appends
     <filename>/default.nix</filename> to the file name.</para>
 
-  </callout>
+  </listitem>
 
-  <callout arearefs='ex-hello-composition-co-3'>
+  <listitem>
 
     <para>This is where the actual composition takes place.  Here we
     <emphasis>call</emphasis> the function imported from
@@ -107,15 +100,15 @@ hello = callPackage ../applications/misc/hello/ex-1 { stdenv = myStdenv; };
 
     </para></note>
 
-  </callout>
+  </listitem>
 
-  <callout arearefs='ex-hello-composition-co-4'>
+  <listitem>
 
     <para>Likewise, we have to instantiate Perl,
     <varname>fetchurl</varname>, and the standard environment.</para>
 
-  </callout>
+  </listitem>
 
-</calloutlist>
+</orderedlist>
 
 </section>

@@ -20,23 +20,21 @@ make install</programlisting>
 The builders for almost all Unix packages look like this — set up some
 environment variables, unpack the sources, configure, build, and
 install.  For this reason the standard environment provides some Bash
-functions that automate the build process.  A builder using the
-generic build facilities in shown in <xref linkend='ex-hello-builder2'
-/>.</para>
+functions that automate the build process.  Here is what a builder
+using the generic build facilities looks like:</para>
 
-<example xml:id='ex-hello-builder2'><title>Build script using the generic
-build functions</title>
 <programlisting>
-buildInputs="$perl" <co xml:id='ex-hello-builder2-co-1' />
+buildInputs="$perl" ①
 
-source $stdenv/setup <co xml:id='ex-hello-builder2-co-2' />
+source $stdenv/setup ②
 
-genericBuild <co xml:id='ex-hello-builder2-co-3' /></programlisting>
-</example>
+genericBuild ③</programlisting>
 
-<calloutlist>
+<para>Here is what each line means:
 
-  <callout arearefs='ex-hello-builder2-co-1'>
+<orderedlist>
+
+  <listitem>
 
     <para>The <literal>buildInputs</literal> variable tells
     <filename>setup</filename> to use the indicated packages as
@@ -54,16 +52,16 @@ genericBuild <co xml:id='ex-hello-builder2-co-3' /></programlisting>
     inputs.</para></footnote>
     </para>
 
-  </callout>
+  </listitem>
 
-  <callout arearefs='ex-hello-builder2-co-2'>
+  <listitem arearefs='ex-hello-builder2-co-2'>
 
     <para>The function <function>genericBuild</function> is defined in
     the file <literal>$stdenv/setup</literal>.</para>
 
-  </callout>
+  </listitem>
 
-  <callout arearefs='ex-hello-builder2-co-3'>
+  <listitem arearefs='ex-hello-builder2-co-3'>
 
     <para>The final step calls the shell function
     <function>genericBuild</function>, which performs the steps that
@@ -73,9 +71,11 @@ genericBuild <co xml:id='ex-hello-builder2-co-3' /></programlisting>
     <command>bzip2</command>, etc.  It can be customised in many ways;
     see the Nixpkgs manual for details.</para>
 
-  </callout>
+  </listitem>
 
-</calloutlist>
+</orderedlist>
+
+</para>
 
 <para>Discerning readers will note that the
 <literal>buildInputs</literal> could just as well have been set in the Nix

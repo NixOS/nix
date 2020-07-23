@@ -1511,39 +1511,9 @@ in foo</programlisting>
     <!-- TODO: more formally describe the schema of the XML
     representation -->
 
-    <para><xref linkend='ex-toxml' /> shows an example where this is
-    the case.  The builder is supposed to generate the configuration
-    file for a <link xlink:href='http://jetty.mortbay.org/'>Jetty
-    servlet container</link>.  A servlet container contains a number
-    of servlets (<filename>*.war</filename> files) each exported under
-    a specific URI prefix.  So the servlet configuration is a list of
-    sets containing the <varname>path</varname> and
-    <varname>war</varname> of the servlet (<xref
-    linkend='ex-toxml-co-servlets' />).  This kind of information is
-    difficult to communicate with the normal method of passing
-    information through an environment variable, which just
-    concatenates everything together into a string (which might just
-    work in this case, but wouldn’t work if fields are optional or
-    contain lists themselves).  Instead the Nix expression is
-    converted to an XML representation with
-    <function>toXML</function>, which is unambiguous and can easily be
-    processed with the appropriate tools.  For instance, in the
-    example an XSLT stylesheet (<xref linkend='ex-toxml-co-stylesheet'
-    />) is applied to it (<xref linkend='ex-toxml-co-apply' />) to
-    generate the XML configuration file for the Jetty server.  The XML
-    representation produced from <xref linkend='ex-toxml-co-servlets'
-    /> by <function>toXML</function> is shown in <xref
-    linkend='ex-toxml-result' />.</para>
-
-    <para>Note that <xref linkend='ex-toxml' /> uses the <function
-    linkend='builtin-toFile'>toFile</function> built-in to write the
-    builder and the stylesheet “inline” in the Nix expression.  The
-    path of the stylesheet is spliced into the builder at
-    <literal>xsltproc ${stylesheet}
-    <replaceable>...</replaceable></literal>.</para>
-
-    <example xml:id='ex-toxml'><title>Passing information to a builder
-    using <function>toXML</function></title>
+    <para>Here is an example where this is
+    the case:
+    </para>
 
 <programlisting><![CDATA[
 { stdenv, fetchurl, libxslt, jira, uberwiki }:
@@ -1556,10 +1526,10 @@ stdenv.mkDerivation (rec {
   builder = builtins.toFile "builder.sh" "
     source $stdenv/setup
     mkdir $out
-    echo "$servlets" | xsltproc ${stylesheet} - > $out/server-conf.xml]]> <co xml:id='ex-toxml-co-apply' /> <![CDATA[
+    echo "$servlets" | xsltproc ${stylesheet} - > $out/server-conf.xml]]> ① <![CDATA[
   ";
 
-  stylesheet = builtins.toFile "stylesheet.xsl"]]> <co xml:id='ex-toxml-co-stylesheet' /> <![CDATA[
+  stylesheet = builtins.toFile "stylesheet.xsl"]]> ② <![CDATA[
    "<?xml version='1.0' encoding='UTF-8'?>
     <xsl:stylesheet xmlns:xsl='http://www.w3.org/1999/XSL/Transform' version='1.0'>
       <xsl:template match='/'>
@@ -1575,16 +1545,32 @@ stdenv.mkDerivation (rec {
     </xsl:stylesheet>
   ";
 
-  servlets = builtins.toXML []]> <co xml:id='ex-toxml-co-servlets' /> <![CDATA[
+  servlets = builtins.toXML []]> ③ <![CDATA[
     { path = "/bugtracker"; war = jira + "/lib/atlassian-jira.war"; }
     { path = "/wiki"; war = uberwiki + "/uberwiki.war"; }
   ];
 })]]></programlisting>
 
-    </example>
-
-    <example xml:id='ex-toxml-result'><title>XML representation produced by
-    <function>toXML</function></title>
+    <para>The builder is supposed to generate the configuration file
+    for a <link xlink:href='http://jetty.mortbay.org/'>Jetty servlet
+    container</link>.  A servlet container contains a number of
+    servlets (<filename>*.war</filename> files) each exported under a
+    specific URI prefix.  So the servlet configuration is a list of
+    sets containing the <varname>path</varname> and
+    <varname>war</varname> of the servlet (<xref
+    linkend='ex-toxml-co-servlets' />).  This kind of information is
+    difficult to communicate with the normal method of passing
+    information through an environment variable, which just
+    concatenates everything together into a string (which might just
+    work in this case, but wouldn’t work if fields are optional or
+    contain lists themselves).  Instead the Nix expression is
+    converted to an XML representation with
+    <function>toXML</function>, which is unambiguous and can easily be
+    processed with the appropriate tools.  For instance, in the
+    example an XSLT stylesheet (at point ②) is applied to it (at point
+    ①) to generate the XML configuration file for the Jetty server.
+    The XML representation produced at point ③ by
+    <function>toXML</function> is as follows:</para>
 
 <programlisting><![CDATA[<?xml version='1.0' encoding='utf-8'?>
 <expr>
@@ -1608,7 +1594,11 @@ stdenv.mkDerivation (rec {
   </list>
 </expr>]]></programlisting>
 
-    </example>
+    <para>Note that <xref linkend='ex-toxml' /> uses the <function
+    linkend='builtin-toFile'>toFile</function> built-in to write the
+    builder and the stylesheet “inline” in the Nix expression.  The
+    path of the stylesheet is spliced into the builder using the
+    syntax <literal>xsltproc ${stylesheet}</literal>.</para>
 
     </listitem>
 

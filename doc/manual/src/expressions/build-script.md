@@ -1,23 +1,23 @@
 # Build Script
 
-    source $stdenv/setup 
+Here is the builder referenced from Hello's Nix expression (stored in
+`pkgs/applications/misc/hello/ex-1/builder.sh`):
+
+    source $stdenv/setup ①
     
-    PATH=$perl/bin:$PATH 
+    PATH=$perl/bin:$PATH ②
     
-    tar xvfz $src 
+    tar xvfz $src ③
     cd hello-*
-    ./configure --prefix=$out 
-    make 
+    ./configure --prefix=$out ④
+    make ⑤
     make install
 
-[example\_title](#ex-hello-builder) shows the builder referenced from
-Hello's Nix expression (stored in
-`pkgs/applications/misc/hello/ex-1/builder.sh`). The builder can
-actually be made a lot shorter by using the *generic builder* functions
-provided by `stdenv`, but here we write out the build steps to elucidate
-what a builder does. It performs the following steps:
+The builder can actually be made a lot shorter by using the *generic
+builder* functions provided by `stdenv`, but here we write out the build
+steps to elucidate what a builder does. It performs the following steps:
 
-  - When Nix runs a builder, it initially completely clears the
+1.  When Nix runs a builder, it initially completely clears the
     environment (except for the attributes declared in the derivation).
     For instance, the `PATH` variable is empty\[1\]. This is done to
     prevent undeclared inputs from being used in the build process. If
@@ -31,13 +31,13 @@ what a builder does. It performs the following steps:
     attribute in [???](#ex-hello-nix), but `mkDerivation` adds it
     automatically.)
 
-  - Since Hello needs Perl, we have to make sure that Perl is in the
+2.  Since Hello needs Perl, we have to make sure that Perl is in the
     `PATH`. The `perl` environment variable points to the location of
     the Perl package (since it was passed in as an attribute to the
     derivation), so `$perl/bin` is the directory containing the Perl
     interpreter.
 
-  - Now we have to unpack the sources. The `src` attribute was bound to
+3.  Now we have to unpack the sources. The `src` attribute was bound to
     the result of fetching the Hello source tarball from the network, so
     the `src` environment variable points to the location in the Nix
     store to which the tarball was downloaded. After unpacking, we `cd`
@@ -50,7 +50,7 @@ what a builder does. It performs the following steps:
     have to worry about files from previous builds interfering with the
     current build.
 
-  - GNU Hello is a typical Autoconf-based package, so we first have to
+4.  GNU Hello is a typical Autoconf-based package, so we first have to
     run its `configure` script. In Nix every package is stored in a
     separate location in the Nix store, for instance
     `/nix/store/9a54ba97fb71b65fda531012d0443ce2-hello-2.1.1`. Nix
@@ -60,7 +60,7 @@ what a builder does. It performs the following steps:
     `--prefix=$out` to cause Hello to be installed in the expected
     location.
 
-  - Finally we build Hello (`make`) and install it into the location
+5.  Finally we build Hello (`make`) and install it into the location
     specified by `out` (`make install`).
 
 If you are wondering about the absence of error checking on the result

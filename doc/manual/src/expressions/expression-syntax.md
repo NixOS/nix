@@ -1,25 +1,26 @@
 # Expression Syntax
 
-    { stdenv, fetchurl, perl }: 
+Here is a Nix expression for GNU Hello:
+
+    { stdenv, fetchurl, perl }: ①
     
-    stdenv.mkDerivation { 
-      name = "hello-2.1.1"; 
-      builder = ./builder.sh; 
-      src = fetchurl { 
+    stdenv.mkDerivation { ②
+      name = "hello-2.1.1"; ③
+      builder = ./builder.sh; ④
+      src = fetchurl { ⑤
         url = "ftp://ftp.nluug.nl/pub/gnu/hello/hello-2.1.1.tar.gz";
         sha256 = "1md7jsfd8pa45z73bz1kszpp01yw6x5ljkjk2hx7wl800any6465";
       };
-      inherit perl; 
+      inherit perl; ⑥
     }
 
-[example\_title](#ex-hello-nix) shows a Nix expression for GNU Hello.
-It's actually already in the Nix Packages collection in
+This file is actually already in the Nix Packages collection in
 `pkgs/applications/misc/hello/ex-1/default.nix`. It is customary to
 place each package in a separate directory and call the single Nix
 expression in that directory `default.nix`. The file has the following
 elements (referenced from the figure by number):
 
-  - This states that the expression is a *function* that expects to be
+1.  This states that the expression is a *function* that expects to be
     called with three arguments: `stdenv`, `fetchurl`, and `perl`. They
     are needed to build Hello, but we don't know how to build them here;
     that's why they are function arguments. `stdenv` is a package that
@@ -37,7 +38,7 @@ elements (referenced from the figure by number):
     the required arguments, the body should describe how to build an
     instance of the Hello package.
 
-  - So we have to build a package. Building something from other stuff
+2.  So we have to build a package. Building something from other stuff
     is called a *derivation* in Nix (as opposed to sources, which are
     built by humans instead of computers). We perform a derivation by
     calling `stdenv.mkDerivation`. `mkDerivation` is a function provided
@@ -50,13 +51,13 @@ elements (referenced from the figure by number):
                     nameN =
                     exprN; }`.
 
-  - The attribute `name` specifies the symbolic name and version of the
+3.  The attribute `name` specifies the symbolic name and version of the
     package. Nix doesn't really care about these things, but they are
     used by for instance `nix-env
                     -q` to show a “human-readable” name for packages. This attribute is
     required by `mkDerivation`.
 
-  - The attribute `builder` specifies the builder. This attribute can
+4.  The attribute `builder` specifies the builder. This attribute can
     sometimes be omitted, in which case `mkDerivation` will fill in a
     default builder (which does a `configure; make; make install`, in
     essence). Hello is sufficiently simple that the default builder
@@ -64,7 +65,7 @@ elements (referenced from the figure by number):
     educational purposes. The value `./builder.sh` refers to the shell
     script shown in [???](#ex-hello-builder), discussed below.
 
-  - The builder has to know what the sources of the package are. Here,
+5.  The builder has to know what the sources of the package are. Here,
     the attribute `src` is bound to the result of a call to the
     `fetchurl` function. Given a URL and a SHA-256 hash of the expected
     contents of the file at that URL, this function builds a derivation
@@ -77,7 +78,7 @@ elements (referenced from the figure by number):
     However, `src` is customary, and it's also expected by the default
     builder (which we don't use in this example).
 
-  - Since the derivation requires Perl, we have to pass the value of the
+6.  Since the derivation requires Perl, we have to pass the value of the
     `perl` function argument to the builder. All attributes in the set
     are actually passed as environment variables to the builder, so
     declaring an attribute

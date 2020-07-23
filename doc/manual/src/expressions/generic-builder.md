@@ -13,24 +13,26 @@ like this:
 The builders for almost all Unix packages look like this — set up some
 environment variables, unpack the sources, configure, build, and
 install. For this reason the standard environment provides some Bash
-functions that automate the build process. A builder using the generic
-build facilities in shown in [example\_title](#ex-hello-builder2).
+functions that automate the build process. Here is what a builder using
+the generic build facilities looks like:
 
-    buildInputs="$perl" 
+    buildInputs="$perl" ①
     
-    source $stdenv/setup 
+    source $stdenv/setup ②
     
-    genericBuild 
+    genericBuild ③
 
-  - The `buildInputs` variable tells `setup` to use the indicated
+Here is what each line means:
+
+1.  The `buildInputs` variable tells `setup` to use the indicated
     packages as “inputs”. This means that if a package provides a `bin`
     subdirectory, it's added to `PATH`; if it has a `include`
     subdirectory, it's added to GCC's header search path; and so
     on.\[1\]
 
-  - The function `genericBuild` is defined in the file `$stdenv/setup`.
+2.  The function `genericBuild` is defined in the file `$stdenv/setup`.
 
-  - The final step calls the shell function `genericBuild`, which
+3.  The final step calls the shell function `genericBuild`, which
     performs the steps that were done explicitly in
     [???](#ex-hello-builder). The generic builder is smart enough to
     figure out whether to unpack the sources using `gzip`, `bzip2`, etc.

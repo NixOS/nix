@@ -203,6 +203,9 @@ where e1 is an expression that should evaluate to a Boolean value. If it
 evaluates to `true`, e2 is returned; otherwise expression evaluation is
 aborted and a backtrace is printed.
 
+Here is a Nix expression for the Subversion package that shows how
+assertions can be used:.
+
     { localServer ? false
     , httpServer ? false
     , sslSupport ? false
@@ -213,9 +216,9 @@ aborted and a backtrace is printed.
     , openssl ? null, httpd ? null, db4 ? null, expat, swig ? null, j2sdk ? null
     }:
     
-    assert localServer -> db4 != null; 
-    assert httpServer -> httpd != null && httpd.expat == expat; 
-    assert sslSupport -> openssl != null && (httpServer -> httpd.openssl == openssl); 
+    assert localServer -> db4 != null; ①
+    assert httpServer -> httpd != null && httpd.expat == expat; ②
+    assert sslSupport -> openssl != null && (httpServer -> httpd.openssl == openssl); ③
     assert pythonBindings -> swig != null && swig.pythonSupport;
     assert javaSwigBindings -> swig != null && swig.javaSupport;
     assert javahlBindings -> j2sdk != null;
@@ -223,33 +226,32 @@ aborted and a backtrace is printed.
     stdenv.mkDerivation {
       name = "subversion-1.1.1";
       ...
-      openssl = if sslSupport then openssl else null; 
+      openssl = if sslSupport then openssl else null; ④
       ...
     }
 
-[example\_title](#ex-subversion-nix) show how assertions are used in the
-Nix expression for Subversion.
+The points of interest are:
 
-  - This assertion states that if Subversion is to have support for
+1.  This assertion states that if Subversion is to have support for
     local repositories, then Berkeley DB is needed. So if the Subversion
     function is called with the `localServer` argument set to `true` but
     the `db4` argument set to `null`, then the evaluation fails.
 
-  - This is a more subtle condition: if Subversion is built with Apache
+2.  This is a more subtle condition: if Subversion is built with Apache
     (`httpServer`) support, then the Expat library (an XML library) used
     by Subversion should be same as the one used by Apache. This is
     because in this configuration Subversion code ends up being linked
     with Apache code, and if the Expat libraries do not match, a build-
     or runtime link error or incompatibility might occur.
 
-  - This assertion says that in order for Subversion to have SSL support
+3.  This assertion says that in order for Subversion to have SSL support
     (so that it can access `https` URLs), an OpenSSL library must be
     passed. Additionally, it says that *if* Apache support is enabled,
     then Apache's OpenSSL should match Subversion's. (Note that if
     Apache support is not enabled, we don't care about Apache's
     OpenSSL.)
 
-  - The conditional here is not really related to assertions, but is
+4.  The conditional here is not really related to assertions, but is
     worth pointing out: it ensures that if SSL support is disabled, then
     the Subversion derivation is not dependent on OpenSSL, even if a
     non-`null` value was passed. This prevents an unnecessary rebuild of
