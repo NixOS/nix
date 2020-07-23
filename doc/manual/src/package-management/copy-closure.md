@@ -1,4 +1,4 @@
-# Copying Closures Via SSH
+# Copying Closures via SSH
 
 The command `nix-copy-closure` copies a Nix store path along with all
 its dependencies to or from another machine via the SSH protocol. It

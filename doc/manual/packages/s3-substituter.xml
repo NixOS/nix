@@ -5,10 +5,10 @@
          version="5.0"
          xml:id="ssec-s3-substituter">
 
-<title>Serving a Nix store via AWS S3 or S3-compatible Service</title>
+<title>Serving a Nix store via S3</title>
 
 <para>Nix has built-in support for storing and fetching store paths
-from Amazon S3 and S3 compatible services. This uses the same
+from Amazon S3 and S3-compatible services. This uses the same
 <emphasis>binary</emphasis> cache mechanism that Nix usually uses to
 fetch prebuilt binaries from <uri>cache.nixos.org</uri>.</para>
 
@@ -170,13 +170,22 @@ the S3 URL:</para>
 }
 ]]></programlisting>
 
-
-  <example><title>Uploading with a specific credential profile for Amazon S3</title>
-    <para><command>nix copy --to 's3://example-nix-cache?profile=cache-upload&amp;region=eu-west-2' nixpkgs.hello</command></para>
-  </example>
-
-  <example><title>Uploading to an S3-Compatible Binary Cache</title>
-    <para><command>nix copy --to 's3://example-nix-cache?profile=cache-upload&amp;scheme=https&amp;endpoint=minio.example.com' nixpkgs.hello</command></para>
-  </example>
 </section>
+
+<section><title>Examples</title>
+
+<para>To upload with a specific credential profile for Amazon S3:</para>
+
+<screen>
+nix copy --to 's3://example-nix-cache?profile=cache-upload&amp;region=eu-west-2' nixpkgs.hello
+</screen>
+
+<para>To upload to an S3-compatible binary cache:</para>
+
+<screen>
+nix copy --to 's3://example-nix-cache?profile=cache-upload&amp;scheme=https&amp;endpoint=minio.example.com' nixpkgs.hello
+</screen>
+
+</section>
+
 </section>

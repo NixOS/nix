@@ -169,70 +169,76 @@ For instance, `derivation` is also available as `builtins.derivation`.
         A Boolean parameter that specifies whether submodules should be
         checked out. Defaults to `false`.
     
-    <!-- end list -->
+    Here are some examples of how to use `fetchGit`.
     
-        builtins.fetchGit {
-          url = "git@github.com:my-secret/repository.git";
-          ref = "master";
-          rev = "adab8b916a45068c044658c4158d81878f9ed1c3";
-        }
+      - To fetch a private repository over SSH:
+        
+            builtins.fetchGit {
+              url = "git@github.com:my-secret/repository.git";
+              ref = "master";
+              rev = "adab8b916a45068c044658c4158d81878f9ed1c3";
+            }
     
-        builtins.fetchGit {
-          url = "https://github.com/NixOS/nix.git";
-          ref = "refs/heads/0.5-release";
-        }
+      - To fetch an arbitrary reference:
+        
+            builtins.fetchGit {
+              url = "https://github.com/NixOS/nix.git";
+              ref = "refs/heads/0.5-release";
+            }
     
-    If the revision you're looking for is in the default branch of the
-    git repository you don't strictly need to specify the branch name in
-    the `ref` attribute.
+      - If the revision you're looking for is in the default branch of
+        the git repository you don't strictly need to specify the branch
+        name in the `ref` attribute.
+        
+        However, if the revision you're looking for is in a future
+        branch for the non-default branch you will need to specify the
+        the `ref` attribute as well.
+        
+            builtins.fetchGit {
+              url = "https://github.com/nixos/nix.git";
+              rev = "841fcbd04755c7a2865c51c1e2d3b045976b7452";
+              ref = "1.11-maintenance";
+            }
+        
+        > **Note**
+        > 
+        > It is nice to always specify the branch which a revision
+        > belongs to. Without the branch being specified, the fetcher
+        > might fail if the default branch changes. Additionally, it can
+        > be confusing to try a commit from a non-default branch and see
+        > the fetch fail. If the branch is specified the fault is much
+        > more obvious.
     
-    However, if the revision you're looking for is in a future branch
-    for the non-default branch you will need to specify the the `ref`
-    attribute as well.
+      - If the revision you're looking for is in the default branch of
+        the git repository you may omit the `ref` attribute.
+        
+            builtins.fetchGit {
+              url = "https://github.com/nixos/nix.git";
+              rev = "841fcbd04755c7a2865c51c1e2d3b045976b7452";
+            }
     
-        builtins.fetchGit {
-          url = "https://github.com/nixos/nix.git";
-          rev = "841fcbd04755c7a2865c51c1e2d3b045976b7452";
-          ref = "1.11-maintenance";
-        }
+      - To fetch a specific tag:
+        
+            builtins.fetchGit {
+              url = "https://github.com/nixos/nix.git";
+              ref = "refs/tags/1.9";
+            }
     
-    > **Note**
-    > 
-    > It is nice to always specify the branch which a revision belongs
-    > to. Without the branch being specified, the fetcher might fail if
-    > the default branch changes. Additionally, it can be confusing to
-    > try a commit from a non-default branch and see the fetch fail. If
-    > the branch is specified the fault is much more obvious.
-    
-    If the revision you're looking for is in the default branch of the
-    git repository you may omit the `ref` attribute.
-    
-        builtins.fetchGit {
-          url = "https://github.com/nixos/nix.git";
-          rev = "841fcbd04755c7a2865c51c1e2d3b045976b7452";
-        }
-    
-        builtins.fetchGit {
-          url = "https://github.com/nixos/nix.git";
-          ref = "refs/tags/1.9";
-        }
-    
-    `builtins.fetchGit` can behave impurely fetch the latest version of
-    a remote branch.
-    
-    > **Note**
-    > 
-    > Nix will refetch the branch in accordance to
-    > [???](#conf-tarball-ttl).
-    
-    > **Note**
-    > 
-    > This behavior is disabled in *Pure evaluation mode*.
-    
-        builtins.fetchGit {
-          url = "ssh://git@github.com/nixos/nix.git";
-          ref = "master";
-        }
+      - To fetch the latest version of a remote branch:
+        
+            builtins.fetchGit {
+              url = "ssh://git@github.com/nixos/nix.git";
+              ref = "master";
+            }
+        
+        > **Note**
+        > 
+        > Nix will refetch the branch in accordance to
+        > [???](#conf-tarball-ttl).
+        
+        > **Note**
+        > 
+        > This behavior is disabled in *Pure evaluation mode*.
 
   - `builtins.filter` f xs  
     Return a list consisting of the elements of xs for which the

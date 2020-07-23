@@ -1,7 +1,7 @@
-# Serving a Nix store via AWS S3 or S3-compatible Service
+# Serving a Nix store via S3
 
 Nix has built-in support for storing and fetching store paths from
-Amazon S3 and S3 compatible services. This uses the same *binary* cache
+Amazon S3 and S3-compatible services. This uses the same *binary* cache
 mechanism that Nix usually uses to fetch prebuilt binaries from
 [cache.nixos.org](cache.nixos.org).
 
@@ -124,10 +124,12 @@ Your account will need the following IAM policy to upload to the cache:
       ]
     }
 
-`nix copy --to
-'s3://example-nix-cache?profile=cache-upload&region=eu-west-2'
-nixpkgs.hello`
+## Examples
 
-`nix copy --to
-'s3://example-nix-cache?profile=cache-upload&scheme=https&endpoint=minio.example.com'
-nixpkgs.hello`
+To upload with a specific credential profile for Amazon S3:
+
+    nix copy --to 's3://example-nix-cache?profile=cache-upload&region=eu-west-2' nixpkgs.hello
+
+To upload to an S3-compatible binary cache:
+
+    nix copy --to 's3://example-nix-cache?profile=cache-upload&scheme=https&endpoint=minio.example.com' nixpkgs.hello
