@@ -144,11 +144,6 @@
 
           installFlags = "sysconfdir=$(out)/etc";
 
-          postInstall = ''
-            mkdir -p $doc/nix-support
-            echo "doc manual $doc/share/doc/nix/manual" >> $doc/nix-support/hydra-build-products
-          '';
-
           doInstallCheck = true;
           installCheckFlags = "sysconfdir=$(out)/etc";
 
@@ -214,6 +209,25 @@
 
         # Perl bindings for various platforms.
         perlBindings = nixpkgs.lib.genAttrs systems (system: nixpkgsFor.${system}.nix.perl-bindings);
+
+        # Separate build for just the manual.
+        manual =
+          with nixpkgsFor.x86_64-linux;
+          stdenv.mkDerivation {
+            name = "nix-manual-${version}";
+            src = self;
+            buildInputs = [ mdbook ];
+            configurePhase = ":";
+            buildPhase = ":";
+            installPhase =
+              ''
+                touch Makefile.config
+                docdir=$out/share/doc/nix
+                make docdir=$docdir doc_generate=yes $docdir/manual/index.html
+                mkdir -p $out/nix-support
+                echo "doc manual $docdir/manual" >> $out/nix-support/hydra-build-products
+              '';
+          };
 
         # Binary tarball for various platforms, containing a Nix store
         # with the closure of 'nix' package, and the second half of
