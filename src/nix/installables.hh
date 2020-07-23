@@ -14,11 +14,19 @@ struct SourceExprCommand;
 
 namespace eval_cache { class EvalCache; class AttrCursor; }
 
-struct Buildable
-{
-    std::optional<StorePath> drvPath;
+struct BuildableOpaque {
+    StorePath path;
+};
+
+struct BuildableFromDrv {
+    StorePath drvPath;
     std::map<std::string, StorePath> outputs;
 };
+
+typedef std::variant<
+    BuildableOpaque,
+    BuildableFromDrv
+> Buildable;
 
 typedef std::vector<Buildable> Buildables;
 
