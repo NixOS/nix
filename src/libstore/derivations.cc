@@ -7,14 +7,6 @@
 
 namespace nix {
 
-const StorePath & BasicDerivation::findOutput(const string & id) const
-{
-    auto i = outputs.find(id);
-    if (i == outputs.end())
-        throw Error("derivation has no output '%s'", id);
-    return i->second.path;
-}
-
 
 bool BasicDerivation::isBuiltin() const
 {
