@@ -49,6 +49,8 @@
   - [Common Environment Variables](command-ref/env-common.md)
   - [Utilities](command-ref/utilities.md)
     - [nix-copy-closure](command-ref/nix-copy-closure.md)
+  - [Files](command-ref/files.md)
+    - [nix.conf](command-ref/conf-file.md)
 - [Glossary](glossary.md)
 - [Hacking](hacking.md)
 - [Release Notes](release-notes/release-notes.md)

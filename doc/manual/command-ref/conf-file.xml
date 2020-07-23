@@ -21,28 +21,35 @@
 
 <para>By default Nix reads settings from the following places:</para>
 
-<para>The system-wide configuration file
-<filename><replaceable>sysconfdir</replaceable>/nix/nix.conf</filename>
-(i.e. <filename>/etc/nix/nix.conf</filename> on most systems), or
-<filename>$NIX_CONF_DIR/nix.conf</filename> if
-<literal>NIX_CONF_DIR</literal> is set. Values loaded in this file are not forwarded to the Nix daemon. The
-client assumes that the daemon has already loaded them.
-</para>
+<itemizedlist>
 
-<para>User-specific configuration files:</para>
+  <listitem>
+    <para>
+      The system-wide configuration file
+      <filename><replaceable>sysconfdir</replaceable>/nix/nix.conf</filename>
+      (i.e. <filename>/etc/nix/nix.conf</filename> on most systems),
+      or <filename>$NIX_CONF_DIR/nix.conf</filename> if
+      <literal>NIX_CONF_DIR</literal> is set. Values loaded in this
+      file are not forwarded to the Nix daemon. The client assumes
+      that the daemon has already loaded them.
+    </para>
+  </listitem>
 
-<para>
-  If <literal>NIX_USER_CONF_FILES</literal> is set, then each path separated by
-  <literal>:</literal> will be loaded in reverse order.
-</para>
+  <listitem>
+    <para>
+      If <literal>NIX_USER_CONF_FILES</literal> is set, then each path separated by
+      <literal>:</literal> will be loaded in reverse order.
+    </para>
 
-<para>
-  Otherwise it will look for <filename>nix/nix.conf</filename> files in
-  <literal>XDG_CONFIG_DIRS</literal> and <literal>XDG_CONFIG_HOME</literal>.
+    <para>
+      Otherwise it will look for <filename>nix/nix.conf</filename>
+      files in <literal>XDG_CONFIG_DIRS</literal> and
+      <literal>XDG_CONFIG_HOME</literal>.  If these are unset, it will
+      look in <filename>$HOME/.config/nix.conf</filename>.
+    </para>
+  </listitem>
 
-  The default location is <filename>$HOME/.config/nix.conf</filename> if
-  those environment variables are unset.
-</para>
+</itemizedlist>
 
 <para>The configuration files consist of
 <literal><replaceable>name</replaceable> =
