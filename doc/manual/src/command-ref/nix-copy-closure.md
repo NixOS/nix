@@ -37,37 +37,37 @@ and second to send the dump of those paths.  If this bothers you, use
 
 # Options
 
-*`--to`*
-: Copy the closure of _paths_ from the local Nix store to the Nix
-  store on _machine_. This is the default.
+  - `--to`  
+    Copy the closure of _paths_ from the local Nix store to the Nix
+    store on _machine_. This is the default.
 
-*`--from`*
-: Copy the closure of _paths_ from the Nix store on _machine_ to the
-  local Nix store.
+  - `--from`  
+    Copy the closure of _paths_ from the Nix store on _machine_ to the
+    local Nix store.
 
-*`--gzip`*
-: Enable compression of the SSH connection.
+  - `--gzip`  
+    Enable compression of the SSH connection.
 
-*`--include-outputs`*
-: Also copy the outputs of store derivations included in the closure.
+  - `--include-outputs`  
+    Also copy the outputs of store derivations included in the closure.
 
-*`--use-substitutes` / `-s`*
-: Attempt to download missing paths on the target machine using Nix’s
-  substitute mechanism.  Any paths that cannot be substituted on the
-  target are still copied normally from the source.  This is useful,
-  for instance, if the connection between the source and target
-  machine is slow, but the connection between the target machine and
-  `nixos.org` (the default binary cache server) is
-  fast.
+  - `--use-substitutes` / `-s`  
+    Attempt to download missing paths on the target machine using Nix’s
+    substitute mechanism.  Any paths that cannot be substituted on the
+    target are still copied normally from the source.  This is useful,
+    for instance, if the connection between the source and target
+    machine is slow, but the connection between the target machine and
+    `nixos.org` (the default binary cache server) is
+    fast.
 
-*`-v`*
-: Show verbose output.
+  - `-v`  
+    Show verbose output.
 
 # Environment variables
 
-*`NIX_SSHOPTS`*
-: Additional options to be passed to `ssh` on the command
-  line.
+  - `NIX_SSHOPTS`  
+    Additional options to be passed to `ssh` on the command
+    line.
 
 # Examples
 
