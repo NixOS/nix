@@ -125,6 +125,7 @@ struct NixArgs : virtual MultiCommand, virtual MixCommonArgs
         {"ls-store", {"store", "ls"}},
         {"cat-nar", {"nar", "cat"}},
         {"cat-store", {"store", "cat"}},
+        {"dump-path", {"store", "dump-path"}},
     };
 
     bool aliasUsed = false;
