@@ -21,11 +21,11 @@ Title: nix-instantiate
 # Description
 
 The command `nix-instantiate` generates [store
-derivations](#gloss-derivation) from (high-level) Nix expressions. It
+derivations](../glossary.md) from (high-level) Nix expressions. It
 evaluates the Nix expressions in each of *files* (which defaults to
 *./default.nix*). Each top-level expression should evaluate to a
-derivation, a list of derivations, or a set of derivations. The paths of
-the resulting store derivations are printed on standard output.
+derivation, a list of derivations, or a set of derivations. The paths
+of the resulting store derivations are printed on standard output.
 
 If *files* is the character `-`, then a Nix expression will be read from
 standard input.
@@ -33,7 +33,7 @@ standard input.
 # Options
 
   - `--add-root` *path*; `--indirect`  
-    See the [corresponding options](#opt-add-root) in `nix-store`.
+    See the [corresponding options](nix-store.md) in `nix-store`.
 
   - `--parse`  
     Just parse the input files, and print their abstract syntax trees on
@@ -69,7 +69,7 @@ standard input.
     When used with `--eval`, print the resulting value as an XML
     representation of the abstract syntax tree rather than as an ATerm.
     The schema is the same as that used by the [`toXML`
-    built-in](#builtin-toXML).
+    built-in](../expressions/builtins.md).
 
   - `--read-write-mode`  
     When used with `--eval`, perform evaluation in read/write mode so

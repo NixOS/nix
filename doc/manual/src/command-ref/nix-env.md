@@ -92,7 +92,7 @@ have an effect.
     done if this flag had not been specified, without actually doing it.
 
     `--dry-run` also prints out which paths will be
-    [substituted](#gloss-substitute) (i.e., downloaded) and which paths
+    [substituted](../glossary.md) (i.e., downloaded) and which paths
     will be built from source (because no substitute is available).
 
   - `--system-filter` *system*  
@@ -186,11 +186,11 @@ a number of possible ways:
     gcc-3.3.6 gcc-4.1.1` will install both version of GCC (and will
     probably cause a user environment conflict\!).
 
-  - If [`--attr`](#opt-attr) (`-A`) is specified, the arguments are
-    *attribute paths* that select attributes from the top-level Nix
+  - If `--attr` (`-A`) is specified, the arguments are *attribute
+    paths* that select attributes from the top-level Nix
     expression. This is faster than using derivation names and
-    unambiguous. To find out the attribute paths of available packages,
-    use `nix-env -qaP`.
+    unambiguous. To find out the attribute paths of available
+    packages, use `nix-env -qaP`.
 
   - If `--from-profile` *path* is given, *args* is a set of names
     denoting installed store paths in the profile *path*. This is an
@@ -198,18 +198,19 @@ a number of possible ways:
     another.
 
   - If `--from-expression` is given, *args* are Nix
-    [functions](#ss-functions) that are called with the active Nix
-    expression as their single argument. The derivations returned by
-    those function calls are installed. This allows derivations to be
-    specified in an unambiguous way, which is necessary if there are
-    multiple derivations with the same name.
+    [functions](../expressions/language-constructs.md#functions)
+    that are called with the active Nix expression as their single
+    argument. The derivations returned by those function calls are
+    installed. This allows derivations to be specified in an
+    unambiguous way, which is necessary if there are multiple
+    derivations with the same name.
 
   - If *args* are store derivations, then these are
-    [realised](#rsec-nix-store-realise), and the resulting output paths
+    [realised](nix-store.md#operation---realise), and the resulting output paths
     are installed.
 
   - If *args* are store paths that are not store derivations, then these
-    are [realised](#rsec-nix-store-realise) and installed.
+    are [realised](nix-store.md#operation---realise) and installed.
 
   - By default all outputs are installed for each derivation. That can
     be reduced by setting `meta.outputsToInstall`.
@@ -319,9 +320,9 @@ left untouched; this is not an error. It is also not an error if an
 element of *args* matches no installed derivations.
 
 For a description of how *args* is mapped to a set of store paths, see
-[`--install`](#rsec-nix-env-install). If *args* describes multiple store
-paths with the same symbolic name, only the one with the highest version
-is installed.
+[`--install`](#operation---install). If *args* describes multiple
+store paths with the same symbolic name, only the one with the highest
+version is installed.
 
 ## Flags
 
@@ -584,9 +585,9 @@ derivation is shown unless `--no-name` is specified.
 
   - `--attr-path`; `-P`  
     Print the *attribute path* of the derivation, which can be used to
-    unambiguously select it using the [`--attr` option](#opt-attr)
-    available in commands that install derivations like `nix-env
-    --install`. This option only works together with `--available`
+    unambiguously select it using the `--attr` option available in
+    commands that install derivations like `nix-env --install`. This
+    option only works together with `--available`
 
   - `--no-name`  
     Suppress printing of the `name` attribute of each derivation.

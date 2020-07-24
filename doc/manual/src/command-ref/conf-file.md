@@ -141,10 +141,10 @@ The following settings are currently available:
     the builder should use all available CPU cores in the system.
 
   - `diff-hook`  
-    Absolute path to an executable capable of diffing build results. The
-    hook executes if [varlistentry\_title](#conf-run-diff-hook) is true,
-    and the output of a build is known to not be the same. This program
-    is not executed to determine if two results are the same.
+    Absolute path to an executable capable of diffing build
+    results. The hook is executed if `run-diff-hook` is true, and the
+    output of a build is known to not be the same. This program is not
+    executed to determine if two results are the same.
     
     The diff hook is executed by the same user and group who ran the
     build. However, the diff hook does not have write access to the
@@ -169,7 +169,7 @@ The following settings are currently available:
     configuration file, and cannot be passed at the command line.
 
   - `enforce-determinism`  
-    See [varlistentry\_title](#conf-repeat).
+    See `repeat`.
 
   - `extra-sandbox-paths`  
     A list of additional paths appended to `sandbox-paths`. Useful if
@@ -343,7 +343,7 @@ The following settings are currently available:
         password my-password
     
     For the exact syntax, see [the `curl`
-    documentation.](https://ec.haxx.se/usingcurl-netrc.html)
+    documentation](https://ec.haxx.se/usingcurl-netrc.html).
     
     > **Note**
     > 
@@ -434,9 +434,9 @@ The following settings are currently available:
     deterministic. The default value is 0. If the value is non-zero,
     every build is repeated the specified number of times. If the
     contents of any of the runs differs from the previous ones and
-    [varlistentry\_title](#conf-enforce-determinism) is true, the build
-    is rejected and the resulting store paths are not registered as
-    “valid” in Nix’s database.
+    `enforce-determinism` is true, the build is rejected and the
+    resulting store paths are not registered as “valid” in Nix’s
+    database.
 
   - `require-sigs`  
     If set to `true` (the default), any non-content-addressed path added
@@ -461,20 +461,21 @@ The following settings are currently available:
   - `sandbox`  
     If set to `true`, builds will be performed in a *sandboxed
     environment*, i.e., they’re isolated from the normal file system
-    hierarchy and will only see their dependencies in the Nix store, the
-    temporary build directory, private versions of `/proc`, `/dev`,
-    `/dev/shm` and `/dev/pts` (on Linux), and the paths configured with
-    the [`sandbox-paths` option](#conf-sandbox-paths). This is useful to
+    hierarchy and will only see their dependencies in the Nix store,
+    the temporary build directory, private versions of `/proc`,
+    `/dev`, `/dev/shm` and `/dev/pts` (on Linux), and the paths
+    configured with the `sandbox-paths` option. This is useful to
     prevent undeclared dependencies on files in directories such as
-    `/usr/bin`. In addition, on Linux, builds run in private PID, mount,
-    network, IPC and UTS namespaces to isolate them from other processes
-    in the system (except that fixed-output derivations do not run in
-    private network namespace to ensure they can access the network).
+    `/usr/bin`. In addition, on Linux, builds run in private PID,
+    mount, network, IPC and UTS namespaces to isolate them from other
+    processes in the system (except that fixed-output derivations do
+    not run in private network namespace to ensure they can access the
+    network).
     
     Currently, sandboxing only work on Linux and macOS. The use of a
     sandbox requires that Nix is run as root (so you should use the
-    [“build users” feature](#conf-build-users-group) to perform the
-    actual builds under different users than root).
+    “build users” feature to perform the actual builds under different
+    users than root).
     
     If this option is set to `relaxed`, then fixed-output derivations
     and derivations that have the `__noChroot` attribute set to `true`
@@ -631,81 +632,61 @@ The following settings are currently available:
 ## Deprecated Settings
 
   - `binary-caches`  
-    *Deprecated:* `binary-caches` is now an alias to
-    [varlistentry\_title](#conf-substituters).
+    *Deprecated:* `binary-caches` is now an alias to `substituters`.
 
   - `binary-cache-public-keys`  
-    *Deprecated:* `binary-cache-public-keys` is now an alias to
-    [varlistentry\_title](#conf-trusted-public-keys).
+    *Deprecated:* `binary-cache-public-keys` is now an alias `trusted-public-keys`.
 
   - `build-compress-log`  
-    *Deprecated:* `build-compress-log` is now an alias to
-    [varlistentry\_title](#conf-compress-build-log).
+    *Deprecated:* `build-compress-log` is now an alias to `compress-build-log`.
 
   - `build-cores`  
-    *Deprecated:* `build-cores` is now an alias to
-    [varlistentry\_title](#conf-cores).
+    *Deprecated:* `build-cores` is now an alias to `cores`.
 
   - `build-extra-chroot-dirs`  
-    *Deprecated:* `build-extra-chroot-dirs` is now an alias to
-    [varlistentry\_title](#conf-extra-sandbox-paths).
+    *Deprecated:* `build-extra-chroot-dirs` is now an alias to `extra-sandbox-paths`.
 
   - `build-extra-sandbox-paths`  
-    *Deprecated:* `build-extra-sandbox-paths` is now an alias to
-    [varlistentry\_title](#conf-extra-sandbox-paths).
+    *Deprecated:* `build-extra-sandbox-paths` is now an alias to `extra-sandbox-paths`.
 
   - `build-fallback`  
-    *Deprecated:* `build-fallback` is now an alias to
-    [varlistentry\_title](#conf-fallback).
+    *Deprecated:* `build-fallback` is now an alias to `fallback`.
 
   - `build-max-jobs`  
-    *Deprecated:* `build-max-jobs` is now an alias to
-    [varlistentry\_title](#conf-max-jobs).
+    *Deprecated:* `build-max-jobs` is now an alias to `max-jobs`.
 
   - `build-max-log-size`  
-    *Deprecated:* `build-max-log-size` is now an alias to
-    [varlistentry\_title](#conf-max-build-log-size).
+    *Deprecated:* `build-max-log-size` is now an alias to `max-build-log-size`.
 
   - `build-max-silent-time`  
-    *Deprecated:* `build-max-silent-time` is now an alias to
-    [varlistentry\_title](#conf-max-silent-time).
+    *Deprecated:* `build-max-silent-time` is now an alias to `max-silent-time`.
 
   - `build-repeat`  
-    *Deprecated:* `build-repeat` is now an alias to
-    [varlistentry\_title](#conf-repeat).
+    *Deprecated:* `build-repeat` is now an alias to `repeat`.
 
   - `build-timeout`  
-    *Deprecated:* `build-timeout` is now an alias to
-    [varlistentry\_title](#conf-timeout).
+    *Deprecated:* `build-timeout` is now an alias to `timeout`.
 
   - `build-use-chroot`  
-    *Deprecated:* `build-use-chroot` is now an alias to
-    [varlistentry\_title](#conf-sandbox).
+    *Deprecated:* `build-use-chroot` is now an alias to `sandbox`.
 
   - `build-use-sandbox`  
-    *Deprecated:* `build-use-sandbox` is now an alias to
-    [varlistentry\_title](#conf-sandbox).
+    *Deprecated:* `build-use-sandbox` is now an alias to `sandbox`.
 
   - `build-use-substitutes`  
-    *Deprecated:* `build-use-substitutes` is now an alias to
-    [varlistentry\_title](#conf-substitute).
+    *Deprecated:* `build-use-substitutes` is now an alias to `substitute`.
 
   - `gc-keep-derivations`  
-    *Deprecated:* `gc-keep-derivations` is now an alias to
-    [varlistentry\_title](#conf-keep-derivations).
+    *Deprecated:* `gc-keep-derivations` is now an alias to `keep-derivations`.
 
   - `gc-keep-outputs`  
-    *Deprecated:* `gc-keep-outputs` is now an alias to
-    [varlistentry\_title](#conf-keep-outputs).
+    *Deprecated:* `gc-keep-outputs` is now an alias to `keep-outputs`.
 
   - `env-keep-derivations`  
-    *Deprecated:* `env-keep-derivations` is now an alias to
-    [varlistentry\_title](#conf-keep-env-derivations).
+    *Deprecated:* `env-keep-derivations` is now an alias to `keep-env-derivations`.
 
   - `extra-binary-caches`  
-    *Deprecated:* `extra-binary-caches` is now an alias to
-    [varlistentry\_title](#conf-extra-substituters).
+    *Deprecated:* `extra-binary-caches` is now an alias to `extra-substituters`.
 
   - `trusted-binary-caches`  
-    *Deprecated:* `trusted-binary-caches` is now an alias to
-    [varlistentry\_title](#conf-trusted-substituters).
+    *Deprecated:* `trusted-binary-caches` is now an alias to `trusted-substituters`.

@@ -7,8 +7,8 @@ better way: *Nix channels*.
 
 A Nix channel is just a URL that points to a place that contains a set
 of Nix expressions and a manifest. Using the command
-[`nix-channel`](#sec-nix-channel) you can automatically stay up to date
-with whatever is available at that URL.
+[`nix-channel`](../command-ref/nix-channel.md) you can automatically
+stay up to date with whatever is available at that URL.
 
 To see the list of official NixOS channels, visit
 <https://nixos.org/channels>.

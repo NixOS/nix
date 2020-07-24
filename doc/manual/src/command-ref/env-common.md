@@ -92,9 +92,10 @@ Most Nix commands interpret the following environment variables:
   - `NIX_REMOTE`  
     This variable should be set to `daemon` if you want to use the Nix
     daemon to execute Nix operations. This is necessary in [multi-user
-    Nix installations](#ssec-multi-user). If the Nix daemon's Unix
-    socket is at some non-standard path, this variable should be set to
-    `unix://path/to/socket`. Otherwise, it should be left unset.
+    Nix installations](../installation/multi-user.md). If the Nix
+    daemon's Unix socket is at some non-standard path, this variable
+    should be set to `unix://path/to/socket`. Otherwise, it should be
+    left unset.
 
   - `NIX_SHOW_STATS`  
     If set to `1`, Nix will print some evaluation statistics, such as

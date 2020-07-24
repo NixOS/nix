@@ -134,8 +134,7 @@ causes the list of machines in `/etc/nix/machines` to be included. (This
 is the default.)
 
 If you want the builders to use caches, you likely want to set the
-option [`builders-use-substitutes`](#conf-builders-use-substitutes) in
-your local `nix.conf`.
+option `builders-use-substitutes` in your local `nix.conf`.
 
 To build only on remote builders and disable building on the local
 machine, you can use the option `--max-jobs 0`.

@@ -1,9 +1,9 @@
 # Serving a Nix store via S3
 
 Nix has built-in support for storing and fetching store paths from
-Amazon S3 and S3-compatible services. This uses the same *binary* cache
-mechanism that Nix usually uses to fetch prebuilt binaries from
-[cache.nixos.org](cache.nixos.org).
+Amazon S3 and S3-compatible services. This uses the same *binary*
+cache mechanism that Nix usually uses to fetch prebuilt binaries from
+[cache.nixos.org](https://cache.nixos.org/).
 
 The following options can be specified as URL parameters to the S3 URL:
 
@@ -85,8 +85,8 @@ caches.
 
 Your bucket will need a bucket policy allowing the desired users to
 perform the `s3:GetObject` and `s3:GetBucketLocation` action on all
-objects in the bucket. The anonymous policy in [Anonymous Reads to your
-S3-compatible binary cache](#ssec-s3-substituter-anonymous-reads) can be
+objects in the bucket. The [anonymous policy given
+above](#anonymous-reads-to-your-s3-compatible-binary-cache) can be
 updated to have a restricted `Principal` to support this.
 
 ## Authenticated Writes to your S3-compatible binary cache

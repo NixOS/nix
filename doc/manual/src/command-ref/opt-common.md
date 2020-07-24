@@ -71,35 +71,34 @@ Most Nix commands accept the following command-line options:
   - `--max-jobs` / `-j` *number*  
     Sets the maximum number of build jobs that Nix will perform in
     parallel to the specified number. Specify `auto` to use the number
-    of CPUs in the system. The default is specified by the
-    [`max-jobs`](#conf-max-jobs) configuration setting, which itself
-    defaults to `1`. A higher value is useful on SMP systems or to
-    exploit I/O latency.
+    of CPUs in the system. The default is specified by the `max-jobs`
+    configuration setting, which itself defaults to `1`. A higher
+    value is useful on SMP systems or to exploit I/O latency.
     
     Setting it to `0` disallows building on the local machine, which is
     useful when you want builds to happen only on remote builders.
 
   - `--cores`  
-    Sets the value of the `NIX_BUILD_CORES` environment variable in the
-    invocation of builders. Builders can use this variable at their
-    discretion to control the maximum amount of parallelism. For
+    Sets the value of the `NIX_BUILD_CORES` environment variable in
+    the invocation of builders. Builders can use this variable at
+    their discretion to control the maximum amount of parallelism. For
     instance, in Nixpkgs, if the derivation attribute
     `enableParallelBuilding` is set to `true`, the builder passes the
-    `-jN` flag to GNU Make. It defaults to the value of the
-    [`cores`](#conf-cores) configuration setting, if set, or `1`
-    otherwise. The value `0` means that the builder should use all
-    available CPU cores in the system.
+    `-jN` flag to GNU Make. It defaults to the value of the `cores`
+    configuration setting, if set, or `1` otherwise. The value `0`
+    means that the builder should use all available CPU cores in the
+    system.
 
   - `--max-silent-time`  
     Sets the maximum number of seconds that a builder can go without
-    producing any data on standard output or standard error. The default
-    is specified by the [`max-silent-time`](#conf-max-silent-time)
-    configuration setting. `0` means no time-out.
+    producing any data on standard output or standard error. The
+    default is specified by the `max-silent-time` configuration
+    setting. `0` means no time-out.
 
   - `--timeout`  
     Sets the maximum number of seconds that a builder can run. The
-    default is specified by the [`timeout`](#conf-timeout) configuration
-    setting. `0` means no timeout.
+    default is specified by the `timeout` configuration setting. `0`
+    means no timeout.
 
   - `--keep-going` / `-k`  
     Keep going in case of failed builds, to the greatest extent
@@ -145,16 +144,17 @@ Most Nix commands accept the following command-line options:
     operations will fail.
 
   - `--arg` *name* *value*  
-    This option is accepted by `nix-env`, `nix-instantiate`, `nix-shell`
-    and `nix-build`. When evaluating Nix expressions, the expression
-    evaluator will automatically try to call functions that it
-    encounters. It can automatically call functions for which every
-    argument has a [default value](#ss-functions) (e.g., `{ argName ?
-            defaultValue }:
-            ...`). With `--arg`, you can also call functions that have arguments
-    without a default value (or override a default value). That is, if
-    the evaluator encounters a function with an argument named *name*,
-    it will call it with value *value*.
+    This option is accepted by `nix-env`, `nix-instantiate`,
+    `nix-shell` and `nix-build`. When evaluating Nix expressions, the
+    expression evaluator will automatically try to call functions that
+    it encounters. It can automatically call functions for which every
+    argument has a [default
+    value](../expressions/language-constructs.md#functions) (e.g.,
+    `{ argName ?  defaultValue }: ...`). With `--arg`, you can also
+    call functions that have arguments without a default value (or
+    override a default value). That is, if the evaluator encounters a
+    function with an argument named *name*, it will call it with value
+    *value*.
     
     For instance, the top-level `default.nix` in Nixpkgs is actually a
     function:
@@ -165,28 +165,28 @@ Most Nix commands accept the following command-line options:
         }: ...
     
     So if you call this Nix expression (e.g., when you do `nix-env -i
-    pkgname`), the function will be called automatically using the value
-    [`builtins.currentSystem`](#builtin-currentSystem) for the `system`
-    argument. You can override this using `--arg`, e.g., `nix-env -i
-            pkgname --arg system
-            \"i686-freebsd\"`. (Note that since the argument is a Nix string
-    literal, you have to escape the quotes.)
+    pkgname`), the function will be called automatically using the
+    value [`builtins.currentSystem`](../expressions/builtins.md) for
+    the `system` argument. You can override this using `--arg`, e.g.,
+    `nix-env -i pkgname --arg system \"i686-freebsd\"`. (Note that
+    since the argument is a Nix string literal, you have to escape the
+    quotes.)
 
   - `--argstr` *name* *value*  
-    This option is like `--arg`, only the value is not a Nix expression
-    but a string. So instead of `--arg system \"i686-linux\"` (the outer
-    quotes are to keep the shell happy) you can say `--argstr system
-            i686-linux`.
+    This option is like `--arg`, only the value is not a Nix
+    expression but a string. So instead of `--arg system
+    \"i686-linux\"` (the outer quotes are to keep the shell happy) you
+    can say `--argstr system i686-linux`.
 
   - `--attr` / `-A` *attrPath*  
     Select an attribute from the top-level Nix expression being
     evaluated. (`nix-env`, `nix-instantiate`, `nix-build` and
-    `nix-shell` only.) The *attribute path* *attrPath* is a sequence of
-    attribute names separated by dots. For instance, given a top-level
-    Nix expression *e*, the attribute path `xorg.xorgserver` would cause
-    the expression `e.xorg.xorgserver` to be used. See [`nix-env
-            --install`](#refsec-nix-env-install-examples) for some concrete
-    examples.
+    `nix-shell` only.) The *attribute path* *attrPath* is a sequence
+    of attribute names separated by dots. For instance, given a
+    top-level Nix expression *e*, the attribute path `xorg.xorgserver`
+    would cause the expression `e.xorg.xorgserver` to be used. See
+    [`nix-env --install`](nix-env.md#operation---install) for some
+    concrete examples.
     
     In addition to attribute names, you can also specify array indices.
     For instance, the attribute path `foo.3.bar` selects the `bar`

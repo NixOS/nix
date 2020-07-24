@@ -39,16 +39,16 @@ expect to do many builds at the same time.
 
 ## Running the daemon
 
-The [Nix daemon](#sec-nix-daemon) should be started as follows (as
-`root`):
+The [Nix daemon](../command-ref/nix-daemon.md) should be started as
+follows (as `root`):
 
     $ nix-daemon
 
 You’ll want to put that line somewhere in your system’s boot scripts.
 
 To let unprivileged users use the daemon, they should set the
-[`NIX_REMOTE` environment variable](#envar-remote) to `daemon`. So you
-should put a line like
+[`NIX_REMOTE` environment variable](../command-ref/env-common.md) to
+`daemon`. So you should put a line like
 
     export NIX_REMOTE=daemon
 

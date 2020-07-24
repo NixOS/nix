@@ -21,13 +21,13 @@ is printed in hexadecimal. To generate the same hash as
 `nix-prefetch-url` you have to specify multiple arguments, see below for
 an example.
 
-The hash is computed over a *serialisation* of each path: a dump of the
-file system tree rooted at the path. This allows directories and
-symlinks to be hashed as well as regular files. The dump is in the *NAR
-format* produced by [`nix-store` `--dump`](#refsec-nix-store-dump).
-Thus, `nix-hash
-path` yields the same cryptographic hash as `nix-store --dump
-path | md5sum`.
+The hash is computed over a *serialisation* of each path: a dump of
+the file system tree rooted at the path. This allows directories and
+symlinks to be hashed as well as regular files. The dump is in the
+*NAR format* produced by [`nix-store
+--dump`](nix-store.md#operation---dump).  Thus, `nix-hash path`
+yields the same cryptographic hash as `nix-store --dump path |
+md5sum`.
 
 # Options
 

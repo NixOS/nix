@@ -1,8 +1,9 @@
 # Basic Package Management
 
-The main command for package management is [`nix-env`](#sec-nix-env).
-You can use it to install, upgrade, and erase packages, and to query
-what packages are installed or are available for installation.
+The main command for package management is
+[`nix-env`](../command-ref/nix-env.md).  You can use it to install,
+upgrade, and erase packages, and to query what packages are installed
+or are available for installation.
 
 In Nix, different users can have different “views” on the set of
 installed applications. That is, there might be lots of applications

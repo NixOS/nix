@@ -57,19 +57,19 @@ For instance, `derivation` is also available as `builtins.derivation`.
     installations that don’t have the desired built-in function.
 
   - `builtins.compareVersions` *s1* *s2*  
-    Compare two strings representing versions and return `-1` if version
-    *s1* is older than version *s2*, `0` if they are the same, and `1`
-    if *s1* is newer than *s2*. The version comparison algorithm is the
-    same as the one used by [`nix-env
-                    -u`](#ssec-version-comparisons).
+    Compare two strings representing versions and return `-1` if
+    version *s1* is older than version *s2*, `0` if they are the same,
+    and `1` if *s1* is newer than *s2*. The version comparison
+    algorithm is the same as the one used by [`nix-env
+    -u`](../command-ref/nix-env.md#operation---upgrade).
 
   - `builtins.concatLists` *lists*  
     Concatenate a list of lists into a single list.
 
   - `builtins.concatStringsSep` *separator* *list*  
-    Concatenate a list of strings with a separator between each element,
-    e.g. `concatStringsSep "/"
-                    ["usr" "local" "bin"] == "usr/local/bin"`
+    Concatenate a list of strings with a separator between each
+    element, e.g. `concatStringsSep "/" ["usr" "local" "bin"] ==
+    "usr/local/bin"`
 
   - `builtins.currentSystem`  
     The built-in value `currentSystem` evaluates to the Nix platform
@@ -77,10 +77,9 @@ For instance, `derivation` is also available as `builtins.derivation`.
     evaluated, such as `"i686-linux"` or `"x86_64-darwin"`.
 
   - `builtins.deepSeq` *e1* *e2*  
-    This is like `seq
-                    e1
-                    e2`, except that *e1* is evaluated *deeply*: if it’s a list or set,
-    its elements or attributes are also evaluated recursively.
+    This is like `seq e1 e2`, except that *e1* is evaluated *deeply*:
+    if it’s a list or set, its elements or attributes are also
+    evaluated recursively.
 
   - `derivation` *attrs*; `builtins.derivation` *attrs*  
     `derivation` is described in [its own section](derivations.md).
@@ -104,7 +103,7 @@ For instance, `derivation` is also available as `builtins.derivation`.
   - `builtins.fetchurl` *url*  
     Download the specified URL and return the path of the downloaded
     file. This function is not available if [restricted evaluation
-    mode](#conf-restrict-eval) is enabled.
+    mode](../command-ref/conf-file.md) is enabled.
 
   - `fetchTarball` *url*; `builtins.fetchTarball` *url*  
     Download the specified URL, unpack it and return the path of the
@@ -140,7 +139,7 @@ For instance, `derivation` is also available as `builtins.derivation`.
         stdenv.mkDerivation { … }
     
     This function is not available if [restricted evaluation
-    mode](#conf-restrict-eval) is enabled.
+    mode](../command-ref/conf-file.md) is enabled.
 
   - `builtins.fetchGit` *args*  
     Fetch a path from git. *args* can be a URL, in which case the HEAD
@@ -491,9 +490,8 @@ For instance, `derivation` is also available as `builtins.derivation`.
     name is everything up to but not including the first dash followed
     by a digit, and the version is everything following that dash. The
     result is returned in a set `{ name, version }`. Thus,
-    `builtins.parseDrvName "nix-0.12pre12876"` returns `{ name = "nix";
-    version = "0.12pre12876";
-                    }`.
+    `builtins.parseDrvName "nix-0.12pre12876"` returns `{ name =
+    "nix"; version = "0.12pre12876"; }`.
 
   - `builtins.path` *args*  
     An enrichment of the built-in path type, based on the attributes
@@ -508,9 +506,8 @@ For instance, `derivation` is also available as `builtins.derivation`.
         like `@`.
     
       - filter  
-        A function of the type expected by
-        [builtins.filterSource](#builtin-filterSource), with the same
-        semantics.
+        A function of the type expected by `builtins.filterSource`,
+        with the same semantics.
     
       - recursive  
         When `false`, when `path` is added to the store it is with a
@@ -609,7 +606,7 @@ For instance, `derivation` is also available as `builtins.derivation`.
   - `builtins.splitVersion` *s*  
     Split a string representing a version into its components, by the
     same version splitting logic underlying the version comparison in
-    [`nix-env -u`](#ssec-version-comparisons).
+    [`nix-env -u`](../command-ref/nix-env.md#operation---upgrade).
 
   - `builtins.stringLength` *e*  
     Return the length of the string *e*. If *e* is not a string,

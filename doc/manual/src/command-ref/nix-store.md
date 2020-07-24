@@ -79,13 +79,14 @@ The operation `--realise` essentially “builds” the specified store
 paths. Realisation is a somewhat overloaded term:
 
   - If the store path is a *derivation*, realisation ensures that the
-    output paths of the derivation are [valid](#gloss-validity) (i.e.,
-    the output path and its closure exist in the file system). This can
-    be done in several ways. First, it is possible that the outputs are
-    already valid, in which case we are done immediately. Otherwise,
-    there may be [substitutes](#gloss-substitute) that produce the
-    outputs (e.g., by downloading them). Finally, the outputs can be
-    produced by performing the build action described by the derivation.
+    output paths of the derivation are [valid](../glossary.md) (i.e.,
+    the output path and its closure exist in the file system). This
+    can be done in several ways. First, it is possible that the
+    outputs are already valid, in which case we are done
+    immediately. Otherwise, there may be [substitutes](../glossary.md)
+    that produce the outputs (e.g., by downloading them). Finally, the
+    outputs can be produced by performing the build action described
+    by the derivation.
 
   - If the store path is not a derivation, realisation ensures that the
     specified path is valid (i.e., it and its closure exist in the file
@@ -129,11 +130,12 @@ Special exit codes:
 
   - `101`  
     Build timeout, the build was aborted because it did not complete
-    within the specified [`timeout`](#conf-timeout).
+    within the specified `timeout`.
 
   - `102`  
     Hash mismatch, the build output was rejected because it does not
-    match the specified [`outputHash`](#fixed-output-drvs).
+    match the [`outputHash` attribute of the
+    derivation](../expressions/advanced-attributes.md).
 
   - `104`  
     Not deterministic, the build succeeded in check mode but the
@@ -153,12 +155,12 @@ or.
 ## Examples
 
 This operation is typically used to build store derivations produced by
-[`nix-instantiate`](#sec-nix-instantiate):
+[`nix-instantiate`](nix-instantiate.md):
 
     $ nix-store -r $(nix-instantiate ./test.nix)
     /nix/store/31axcgrlbfsxzmfff1gyj1bf62hvkby2-aterm-2.3.1
 
-This is essentially what [`nix-build`](#sec-nix-build) does.
+This is essentially what [`nix-build`](nix-build.md) does.
 
 To test whether a previously-built derivation is deterministic:
 
@@ -232,8 +234,7 @@ control what gets deleted and in what order:
     or TiB units.
 
 The behaviour of the collector is also influenced by the
-[`keep-outputs`](#conf-keep-outputs) and
-[`keep-derivations`](#conf-keep-derivations) variables in the Nix
+`keep-outputs` and `keep-derivations` variables in the Nix
 configuration file.
 
 By default, the collector prints the total number of freed bytes when it
@@ -307,17 +308,17 @@ symlink.
 
   - `--force-realise`; `-f`  
     Realise each argument to the query first (see [`nix-store
-                    --realise`](#rsec-nix-store-realise)).
+    --realise`](#operation---realise)).
 
 ## Queries
 
   - `--outputs`  
-    Prints out the [output paths](#gloss-output-path) of the store
+    Prints out the [output paths](../glossary.md) of the store
     derivations *paths*. These are the paths that will be produced when
     the derivation is built.
 
   - `--requisites`; `-R`  
-    Prints out the [closure](#gloss-closure) of the store path *paths*.
+    Prints out the [closure](../glossary.md) of the store path *paths*.
 
     This query has one option:
 
@@ -334,7 +335,7 @@ symlink.
     derivation and specifying the option `--include-outputs`.
 
   - `--references`  
-    Prints the set of [references](#gloss-reference) of the store paths
+    Prints the set of [references](../glossary.md) of the store paths
     *paths*, that is, their immediate dependencies. (For *all*
     dependencies, use `--requisites`.)
 
@@ -352,7 +353,7 @@ symlink.
     in the Nix store that are dependent on *paths*.
 
   - `--deriver`; `-d`  
-    Prints the [deriver](#gloss-deriver) of the store paths *paths*. If
+    Prints the [deriver](../glossary.md) of the store paths *paths*. If
     the path has no deriver (e.g., if it is a source file), or if the
     deriver is not known (e.g., in the case of a binary-only
     deployment), the string `unknown-deriver` is printed.
@@ -605,13 +606,12 @@ anyway. Likewise, all permissions are left out except for the execute
 bit, because all files in the Nix store have 444 or 555 permission.
 
 Also, a NAR archive is *canonical*, meaning that “equal” paths always
-produce the same NAR archive. For instance, directory entries are always
-sorted so that the actual on-disk order doesn’t influence the result.
-This means that the cryptographic hash of a NAR dump of a path is usable
-as a fingerprint of the contents of the path. Indeed, the hashes of
-store paths stored in Nix’s database (see [`nix-store -q
---hash`](#refsec-nix-store-query)) are SHA-256 hashes of the NAR dump of
-each store path.
+produce the same NAR archive. For instance, directory entries are
+always sorted so that the actual on-disk order doesn’t influence the
+result.  This means that the cryptographic hash of a NAR dump of a
+path is usable as a fingerprint of the contents of the path. Indeed,
+the hashes of store paths stored in Nix’s database (see `nix-store -q
+--hash`) are SHA-256 hashes of the NAR dump of each store path.
 
 NAR archives support filenames of unlimited length and 64-bit file
 sizes. They can contain regular files, directories, and symbolic links,

@@ -108,5 +108,4 @@ We now have a Nix installation configured to automatically sign and
 upload every local build to a remote binary cache.
 
 Before deploying this to production, be sure to consider the
-implementation caveats in [Implementation
-Caveats](#chap-post-build-hook-caveats).
+[implementation caveats](#implementation-caveats).

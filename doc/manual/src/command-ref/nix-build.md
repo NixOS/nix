@@ -32,9 +32,10 @@ to a temporary location. The tarball must include a single top-level
 directory containing at least a file named `default.nix`.
 
 `nix-build` is essentially a wrapper around
-[`nix-instantiate`](#sec-nix-instantiate) (to translate a high-level Nix
+[`nix-instantiate`](nix-instantiate.md) (to translate a high-level Nix
 expression to a low-level store derivation) and [`nix-store
---realise`](#rsec-nix-store-realise) (to build the store derivation).
+--realise`](nix-store.md#operation---realise) (to build the store
+derivation).
 
 > **Warning**
 >

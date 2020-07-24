@@ -19,11 +19,11 @@ yet. The best way to test the package is by using the command
     $ ./result/bin/hello
     Hello, world!
 
-The [`-A`](#opt-attr) option selects the `hello` attribute. This is
-faster than using the symbolic package name specified by the `name`
-attribute (which also happens to be `hello`) and is unambiguous (there
-can be multiple packages with the symbolic name `hello`, but there can
-be only one attribute in a set named `hello`).
+The `-A` option selects the `hello` attribute. This is faster than
+using the symbolic package name specified by the `name` attribute
+(which also happens to be `hello`) and is unambiguous (there can be
+multiple packages with the symbolic name `hello`, but there can be
+only one attribute in a set named `hello`).
 
 `nix-build` registers the `./result` symlink as a garbage collection
 root, so unless and until you delete the `./result` symlink, the output

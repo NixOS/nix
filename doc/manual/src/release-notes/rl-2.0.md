@@ -148,11 +148,11 @@ This release has the following new features:
         `nix-store
                                                                         --verify-path`.
     
-      - `nix log` shows the build log of a package or path. If the build
-        log is not available locally, it will try to obtain it from the
-        configured substituters (such as
-        [cache.nixos.org](cache.nixos.org), which now provides build
-        logs).
+      - `nix log` shows the build log of a package or path. If the
+        build log is not available locally, it will try to obtain it
+        from the configured substituters (such as
+        [cache.nixos.org](https://cache.nixos.org/), which now
+        provides build logs).
     
       - `nix edit` opens the source code of a package in your editor.
     
@@ -213,16 +213,17 @@ This release has the following new features:
         current values.
 
   - The store abstraction that Nix has had for a long time to support
-    store access via the Nix daemon has been extended significantly. In
-    particular, substituters (which used to be external programs such as
-    `download-from-binary-cache`) are now subclasses of the abstract
-    `Store` class. This allows many Nix commands to operate on such
-    store types. For example, `nix path-info` shows information about
-    paths in your local Nix store, while `nix path-info --store
-                    https://cache.nixos.org/` shows information about paths in the
-    specified binary cache. Similarly, `nix-copy-closure`, `nix-push`
-    and substitution are all instances of the general notion of copying
-    paths between different kinds of Nix stores.
+    store access via the Nix daemon has been extended
+    significantly. In particular, substituters (which used to be
+    external programs such as `download-from-binary-cache`) are now
+    subclasses of the abstract `Store` class. This allows many Nix
+    commands to operate on such store types. For example, `nix
+    path-info` shows information about paths in your local Nix store,
+    while `nix path-info --store https://cache.nixos.org/` shows
+    information about paths in the specified binary cache. Similarly,
+    `nix-copy-closure`, `nix-push` and substitution are all instances
+    of the general notion of copying paths between different kinds of
+    Nix stores.
     
     Stores are specified using an URI-like syntax, e.g.
     <https://cache.nixos.org/> or <ssh://machine>. The following store
@@ -241,7 +242,7 @@ This release has the following new features:
         `/home/alice/nix/store`) to differ from its “logical” location
         (typically `/nix/store`). This allows non-root users to use Nix
         while still getting the benefits from prebuilt binaries from
-        [cache.nixos.org](cache.nixos.org).
+        [cache.nixos.org](https://cache.nixos.org/).
     
       - `BinaryCacheStore` is the abstract superclass of all binary
         cache stores. It supports writing build logs and NAR content
@@ -356,11 +357,11 @@ This release has the following new features:
   - `NIX_PATH` is now lazy, so URIs in the path are only downloaded if
     they are needed for evaluation.
 
-  - You can now use <channel:> as a short-hand for
+  - You can now use `channel:` as a short-hand for
     <https://nixos.org/channels//nixexprs.tar.xz>. For example,
     `nix-build channel:nixos-15.09 -A hello` will build the GNU Hello
-    package from the `nixos-15.09` channel. In the future, this may use
-    Git to fetch updates more efficiently.
+    package from the `nixos-15.09` channel. In the future, this may
+    use Git to fetch updates more efficiently.
 
   - When `--no-build-output` is given, the last 10 lines of the build
     log will be shown if a build fails.
@@ -382,7 +383,7 @@ This release has the following new features:
         in all places where Nix allows URIs.
     
       - Brotli compression is now supported. In particular,
-        [cache.nixos.org](cache.nixos.org) build logs are now compressed
+        [cache.nixos.org](https://cache.nixos.org/) build logs are now compressed
         using Brotli.
 
   - `nix-env`

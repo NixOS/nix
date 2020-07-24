@@ -89,10 +89,10 @@ Derivations can declare some infrequently used optional attributes.
     to make it use the proxy server configuration specified by the user
     in the environment variables `http_proxy` and friends.
     
-    This attribute is only allowed in [fixed-output
-    derivations](#fixed-output-drvs), where impurities such as these are
-    okay since (the hash of) the output is known in advance. It is
-    ignored for all other derivations.
+    This attribute is only allowed in *fixed-output derivations* (see
+    below), where impurities such as these are okay since (the hash
+    of) the output is known in advance. It is ignored for all other
+    derivations.
     
     > **Warning**
     > 
@@ -183,13 +183,14 @@ Derivations can declare some infrequently used optional attributes.
       - `"recursive"`  
         The hash is computed over the NAR archive dump of the output
         (i.e., the result of [`nix-store
-                                                                        --dump`](#refsec-nix-store-dump)). In this case, the output can
-        be anything, including a directory tree.
+        --dump`](../command-ref/nix-store.md#operation---dump)). In
+        this case, the output can be anything, including a directory
+        tree.
     
-    The `outputHash` attribute, finally, must be a string containing the
-    hash in either hexadecimal or base-32 notation. (See the [`nix-hash`
-    command](#sec-nix-hash) for information about converting to and from
-    base-32 notation.)
+    The `outputHash` attribute, finally, must be a string containing
+    the hash in either hexadecimal or base-32 notation. (See the
+    [`nix-hash` command](../command-ref/nix-hash.md) for information
+    about converting to and from base-32 notation.)
 
   - `passAsFile`  
     A list of names of attributes that should be passed via files rather
@@ -213,10 +214,11 @@ Derivations can declare some infrequently used optional attributes.
 
   - `preferLocalBuild`  
     If this attribute is set to `true` and [distributed building is
-    enabled](#chap-distributed-builds), then, if possible, the derivaton
-    will be built locally instead of forwarded to a remote machine. This
-    is appropriate for trivial builders where the cost of doing a
-    download or remote build would exceed the cost of building locally.
+    enabled](../advanced-topics/distributed-builds.md), then, if
+    possible, the derivaton will be built locally instead of forwarded
+    to a remote machine. This is appropriate for trivial builders
+    where the cost of doing a download or remote build would exceed
+    the cost of building locally.
 
   - `allowSubstitutes`  
     If this attribute is set to `false`, then Nix will always build this

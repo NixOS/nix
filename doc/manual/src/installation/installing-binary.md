@@ -8,7 +8,7 @@ easiest way to install Nix is to run the following command:
 ```
 
 If you're using macOS 10.15 (Catalina) or newer, consult [the macOS
-installation instructions](#sect-macos-installation) before installing.
+installation instructions](#macos-installation) before installing.
 
 As of Nix 2.1.0, the Nix installer will always default to creating a
 single-user installation, however opting in to the multi-user
@@ -64,7 +64,7 @@ will invoke `sudo` as needed.
 > 
 > If you need Nix to use a different group ID or user ID set, you will
 > have to download the tarball manually and [edit the install
-> script](#sect-nix-install-binary-tarball).
+> script](#installing-from-a-binary-tarball).
 
 The installer will modify `/etc/bashrc`, and `/etc/zshrc` if they exist.
 The installer will first back up these files with a `.backup-before-nix`
