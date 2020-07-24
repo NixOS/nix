@@ -43,8 +43,6 @@ struct CmdAddToStore : MixDryRun, StoreCommand
           ;
     }
 
-    Category category() override { return catUtility; }
-
     void run(ref<Store> store) override
     {
         if (!namePart) namePart = baseNameOf(path);
@@ -80,4 +78,4 @@ struct CmdAddToStore : MixDryRun, StoreCommand
     }
 };
 
-static auto rCmdAddToStore = registerCommand<CmdAddToStore>("add-to-store");
+static auto rCmdAddToStore = registerCommand2<CmdAddToStore>({"store", "add-path"});

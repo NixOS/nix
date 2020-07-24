@@ -7,7 +7,7 @@ clearStore
 
 rm -f $TEST_ROOT/result
 
-export unreachable=$(nix add-to-store ./recursive.sh)
+export unreachable=$(nix store add-path ./recursive.sh)
 
 NIX_BIN_DIR=$(dirname $(type -p nix)) nix --experimental-features 'nix-command recursive-nix' build -o $TEST_ROOT/result -L --impure --expr '
   with import ./config.nix;
@@ -38,7 +38,7 @@ NIX_BIN_DIR=$(dirname $(type -p nix)) nix --experimental-features 'nix-command r
 
       # Add something to the store.
       echo foobar > foobar
-      foobar=$(nix $opts add-to-store ./foobar)
+      foobar=$(nix $opts store add-path ./foobar)
 
       nix $opts path-info $foobar
       nix $opts build $foobar

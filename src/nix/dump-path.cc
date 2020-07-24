@@ -16,12 +16,10 @@ struct CmdDumpPath : StorePathCommand
         return {
             Example{
                 "To get a NAR from the binary cache https://cache.nixos.org/:",
-                "nix dump-path --store https://cache.nixos.org/ /nix/store/7crrmih8c52r8fbnqb933dxrsp44md93-glibc-2.25"
+                "nix store dump-path --store https://cache.nixos.org/ /nix/store/7crrmih8c52r8fbnqb933dxrsp44md93-glibc-2.25"
             },
         };
     }
-
-    Category category() override { return catUtility; }
 
     void run(ref<Store> store, const StorePath & storePath) override
     {
@@ -30,7 +28,6 @@ struct CmdDumpPath : StorePathCommand
         sink.flush();
     }
 };
-
 
 static auto rDumpPath = registerCommand2<CmdDumpPath>({"store", "dump-path"});
 

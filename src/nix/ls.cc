@@ -97,7 +97,7 @@ struct CmdLsStore : StoreCommand, MixLs
         return {
             Example{
                 "To list the contents of a store path in a binary cache:",
-                "nix ls-store --store https://cache.nixos.org/ -lR /nix/store/0i2jd68mp5g6h2sa5k9c85rb80sn8hi9-hello-2.10"
+                "nix store ls --store https://cache.nixos.org/ -lR /nix/store/0i2jd68mp5g6h2sa5k9c85rb80sn8hi9-hello-2.10"
             },
         };
     }
@@ -106,8 +106,6 @@ struct CmdLsStore : StoreCommand, MixLs
     {
         return "show information about a path in the Nix store";
     }
-
-    Category category() override { return catUtility; }
 
     void run(ref<Store> store) override
     {

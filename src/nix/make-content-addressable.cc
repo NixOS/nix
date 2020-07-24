@@ -23,16 +23,14 @@ struct CmdMakeContentAddressable : StorePathsCommand, MixJSON
         return {
             Example{
                 "To create a content-addressable representation of GNU Hello (but not its dependencies):",
-                "nix make-content-addressable nixpkgs#hello"
+                "nix store make-content-addressable nixpkgs#hello"
             },
             Example{
                 "To compute a content-addressable representation of the current NixOS system closure:",
-                "nix make-content-addressable -r /run/current-system"
+                "nix store make-content-addressable -r /run/current-system"
             },
         };
     }
-
-    Category category() override { return catUtility; }
 
     void run(ref<Store> store, StorePaths storePaths) override
     {
@@ -108,4 +106,4 @@ struct CmdMakeContentAddressable : StorePathsCommand, MixJSON
     }
 };
 
-static auto rCmdMakeContentAddressable = registerCommand<CmdMakeContentAddressable>("make-content-addressable");
+static auto rCmdMakeContentAddressable = registerCommand2<CmdMakeContentAddressable>({"store", "make-content-addressable"});

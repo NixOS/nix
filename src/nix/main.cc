@@ -115,17 +115,25 @@ struct NixArgs : virtual MultiCommand, virtual MixCommonArgs
     }
 
     std::map<std::string, std::vector<std::string>> aliases = {
+        {"add-to-store", {"store", "add-path"}},
+        {"cat-nar", {"nar", "cat"}},
+        {"cat-store", {"store", "cat"}},
+        {"copy-sigs", {"store", "copy-sigs"}},
         {"dev-shell", {"develop"}},
+        {"diff-closures", {"store", "diff-closures"}},
+        {"dump-path", {"store", "dump-path"}},
         {"hash-file", {"hash", "file"}},
         {"hash-path", {"hash", "path"}},
+        {"ls-nar", {"nar", "ls"}},
+        {"ls-store", {"store", "ls"}},
+        {"make-content-addressable", {"store", "make-content-addressable"}},
+        {"optimise-store", {"store", "optimise"}},
+        {"ping-store", {"store", "ping"}},
+        {"sign-paths", {"store", "sign-paths"}},
         {"to-base16", {"hash", "to-base16"}},
         {"to-base32", {"hash", "to-base32"}},
         {"to-base64", {"hash", "to-base64"}},
-        {"ls-nar", {"nar", "ls"}},
-        {"ls-store", {"store", "ls"}},
-        {"cat-nar", {"nar", "cat"}},
-        {"cat-store", {"store", "cat"}},
-        {"dump-path", {"store", "dump-path"}},
+        {"verify", {"store", "verify"}},
     };
 
     bool aliasUsed = false;
