@@ -330,9 +330,20 @@ bool Store::PathInfoCacheValue::isKnownNow()
     return std::chrono::steady_clock::now() < time_point + ttl;
 }
 
+OutputPathMap Store::queryDerivationOutputMapAssumeTotal(const StorePath & path) {
+	auto resp = queryDerivationOutputMap(path);
+	OutputPathMap result;
+	for (auto & [outName, optOutPath] : resp) {
+		if (!optOutPath)
+			throw Error("output '%s' has no store path mapped to it", outName);
+		result.insert_or_assign(outName, *optOutPath);
+	}
+	return result;
+}
+
 StorePathSet Store::queryDerivationOutputs(const StorePath & path)
 {
-    auto outputMap = this->queryDerivationOutputMap(path);
+    auto outputMap = this->queryDerivationOutputMapAssumeTotal(path);
     StorePathSet outputPaths;
     for (auto & i: outputMap) {
         outputPaths.emplace(std::move(i.second));

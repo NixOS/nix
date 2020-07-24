@@ -70,6 +70,56 @@ template<class T> T readStorePaths(const Store & store, Source & from);
 
 void writeStorePaths(const Store & store, Sink & out, const StorePathSet & paths);
 
-void writeOutputPathMap(const Store & store, Sink & out, const OutputPathMap & paths);
+/* To guide overloading */
+template<typename T>
+struct Proxy {};
+
+template<typename T>
+std::map<std::string, T> read(const Store & store, Source & from, Proxy<std::map<std::string, T>> _)
+{
+    std::map<string, T> resMap;
+    auto size = (size_t)readInt(from);
+    while (size--) {
+        auto thisKey = readString(from);
+        resMap.insert_or_assign(std::move(thisKey), read(store, from, Proxy<T> {}));
+    }
+    return resMap;
+}
+
+template<typename T>
+void write(const Store & store, Sink & out, const std::map<string, T> & resMap)
+{
+    out << resMap.size();
+    for (auto & i : resMap) {
+        out << i.first;
+        write(store, out, i.second);
+    }
+}
+
+template<typename T>
+std::optional<T> read(const Store & store, Source & from, Proxy<std::optional<T>> _)
+{
+    auto tag = readNum<uint8_t>(from);
+    switch (tag) {
+    case 0:
+        return std::nullopt;
+    case 1:
+        return read(store, from, Proxy<T> {});
+    default:
+        throw Error("got an invalid tag bit for std::optional: %#04x", tag);
+    }
+}
+
+template<typename T>
+void write(const Store & store, Sink & out, const std::optional<T> & optVal)
+{
+    out << (optVal ? 1 : 0);
+    if (optVal)
+        write(store, out, *optVal);
+}
+
+StorePath read(const Store & store, Source & from, Proxy<StorePath> _);
+
+void write(const Store & store, Sink & out, const StorePath & storePath);
 
 }
