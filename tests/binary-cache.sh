@@ -196,13 +196,13 @@ narCache=$TEST_ROOT/nar-cache
 rm -rf $narCache
 mkdir $narCache
 
-[[ $(nix cat-store --store "file://$cacheDir?local-nar-cache=$narCache" $outPath/foobar) = FOOBAR ]]
+[[ $(nix store cat --store "file://$cacheDir?local-nar-cache=$narCache" $outPath/foobar) = FOOBAR ]]
 
 rm -rfv "$cacheDir/nar"
 
-[[ $(nix cat-store --store "file://$cacheDir?local-nar-cache=$narCache" $outPath/foobar) = FOOBAR ]]
+[[ $(nix store cat --store "file://$cacheDir?local-nar-cache=$narCache" $outPath/foobar) = FOOBAR ]]
 
-(! nix cat-store --store file://$cacheDir $outPath/foobar)
+(! nix store cat --store file://$cacheDir $outPath/foobar)
 
 
 # Test NAR listing generation.

@@ -134,7 +134,7 @@ struct CmdLsNar : Command, MixLs
         return {
             Example{
                 "To list a specific file in a NAR:",
-                "nix ls-nar -l hello.nar /bin/hello"
+                "nix nar ls -l hello.nar /bin/hello"
             },
         };
     }
@@ -144,13 +144,11 @@ struct CmdLsNar : Command, MixLs
         return "show information about a path inside a NAR file";
     }
 
-    Category category() override { return catUtility; }
-
     void run() override
     {
         list(makeNarAccessor(make_ref<std::string>(readFile(narPath))));
     }
 };
 
-static auto rCmdLsStore = registerCommand<CmdLsStore>("ls-store");
-static auto rCmdLsNar = registerCommand<CmdLsNar>("ls-nar");
+static auto rCmdLsStore = registerCommand2<CmdLsStore>({"store", "ls"});
+static auto rCmdLsNar = registerCommand2<CmdLsNar>({"nar", "ls"});
