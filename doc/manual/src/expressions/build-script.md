@@ -19,10 +19,9 @@ steps to elucidate what a builder does. It performs the following steps:
 
 1.  When Nix runs a builder, it initially completely clears the
     environment (except for the attributes declared in the derivation).
-    For instance, the `PATH` variable is empty\[1\]. This is done to
-    prevent undeclared inputs from being used in the build process. If
-    for example the `PATH` contained `/usr/bin`, then you might
-    accidentally use `/usr/bin/gcc`.
+    This is done to prevent undeclared inputs from being used in the
+    build process. If for example the `PATH` contained `/usr/bin`, then
+    you might accidentally use `/usr/bin/gcc`.
     
     So the first step is to set up the environment. This is done by
     calling the `setup` script of the standard environment. The
@@ -67,6 +66,3 @@ If you are wondering about the absence of error checking on the result
 of various commands called in the builder: this is because the shell
 script is evaluated with Bash's `-e` option, which causes the script to
 be aborted if any command fails without an error check.
-
-1.  Actually, it's initialised to `/path-not-set` to prevent Bash from
-    setting it to a default value.

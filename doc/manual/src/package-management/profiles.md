@@ -10,12 +10,13 @@ in a directory
 `/nix/store/dpmvp969yhdqs7lm2r1a3gng7pyq6vy4-subversion-1.1.3/`, while
 another version might be stored in
 `/nix/store/5mq2jcn36ldlmh93yj1n8s9c95pj7c5s-subversion-1.1.2`. The long
-strings prefixed to the directory names are cryptographic hashes\[1\] of
-*all* inputs involved in building the package — sources, dependencies,
-compiler flags, and so on. So if two packages differ in any way, they
-end up in different locations in the file system, so they don’t
-interfere with each other. Here is what a part of a typical Nix store
-looks like:
+strings prefixed to the directory names are cryptographic hashes (to be
+precise, 160-bit truncations of SHA-256 hashes encoded in a base-32
+notation) of *all* inputs involved in building the package — sources,
+dependencies, compiler flags, and so on. So if two packages differ in
+any way, they end up in different locations in the file system, so they
+don’t interfere with each other. Here is what a part of a typical Nix
+store looks like:
 
 ![](../figures/user-environments.png)
 
@@ -113,6 +114,3 @@ All `nix-env` operations work on the profile pointed to by
     $ nix-env -p /nix/var/nix/profiles/other-profile -i subversion
 
 This will *not* change the `~/.nix-profile` symlink.
-
-1.  160-bit truncations of SHA-256 hashes encoded in a base-32 notation,
-    to be precise.

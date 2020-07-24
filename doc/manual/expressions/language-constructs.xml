@@ -26,7 +26,7 @@ is, in a normal (non-recursive) set, attributes are not added to the
 lexical scope; in a recursive set, they are.</para>
 
 <para>Recursive sets of course introduce the danger of infinite
-recursion.  For example,
+recursion.  For example, the expression
 
 <programlisting>
 rec {
@@ -34,9 +34,8 @@ rec {
   y = x;
 }.x</programlisting>
 
-does not terminate<footnote><para>Actually, Nix detects infinite
-recursion in this case and aborts (<quote>infinite recursion
-encountered</quote>).</para></footnote>.</para>
+will crash with an <literal>infinite recursion encountered</literal>
+error message.</para>
 
 </section>
 

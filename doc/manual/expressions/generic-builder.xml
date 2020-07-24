@@ -42,14 +42,14 @@ genericBuild ③</programlisting>
     <filename>bin</filename> subdirectory, it's added to
     <literal>PATH</literal>; if it has a <filename>include</filename>
     subdirectory, it's added to GCC's header search path; and so
-    on.<footnote><para>How does it work? <filename>setup</filename>
-    tries to source the file
+    on. (This is implemented in a modular way:
+    <filename>setup</filename> tries to source the file
     <filename><emphasis>pkg</emphasis>/nix-support/setup-hook</filename>
     of all dependencies.  These “setup hooks” can then set up whatever
     environment variables they want; for instance, the setup hook for
     Perl sets the <literal>PERL5LIB</literal> environment variable to
     contain the <filename>lib/site_perl</filename> directories of all
-    inputs.</para></footnote>
+    inputs.)
     </para>
 
   </listitem>

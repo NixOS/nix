@@ -154,11 +154,10 @@ stdenv.mkDerivation {
 
   <listitem><para><emphasis>Paths</emphasis>, e.g.,
   <filename>/bin/sh</filename> or <filename>./builder.sh</filename>.
-  A path must contain at least one slash to be recognised as such; for
-  instance, <filename>builder.sh</filename> is not a
-  path<footnote><para>It's parsed as an expression that selects the
-  attribute <varname>sh</varname> from the variable
-  <varname>builder</varname>.</para></footnote>.  If the file name is
+  A path must contain at least one slash to be recognised as such. For
+  instance, <filename>builder.sh</filename> is not a path: it's parsed
+  as an expression that selects the attribute <varname>sh</varname>
+  from the variable <varname>builder</varname>. If the file name is
   relative, i.e., if it does not begin with a slash, it is made
   absolute at parse time relative to the directory of the Nix
   expression that contained it.  For instance, if a Nix expression in
@@ -176,7 +175,7 @@ stdenv.mkDerivation {
   <para>Paths can also be specified between angle brackets, e.g.
   <literal>&lt;nixpkgs&gt;</literal>. This means that the directories
   listed in the environment variable
-  <envar linkend="env-NIX_PATH">NIX_PATH</literal> will be searched
+  <literal linkend="env-NIX_PATH">NIX_PATH</literal> will be searched
   for the given file or directory name.
   </para>
 

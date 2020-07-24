@@ -206,9 +206,9 @@ Most Nix commands accept the following command-line options:
 
   - `-I` *path*  
     Add a path to the Nix expression search path. This option may be
-    given multiple times. See the NIX\_PATH\</literal\> environment
-    variable for information on the semantics of the Nix search path.
-    Paths added through `-I` take precedence over `NIX_PATH`.
+    given multiple times. See the `NIX_PATH` environment variable for
+    information on the semantics of the Nix search path. Paths added
+    through `-I` take precedence over `NIX_PATH`.
 
   - `--option` *name* *value*  
     Set the Nix configuration option *name* to *value*. This overrides

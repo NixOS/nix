@@ -82,11 +82,10 @@ See also [???](#sec-common-options) for a list of common options.
 
   - `--find-file`  
     Look up the given files in Nix’s search path (as specified by the
-    NIX\_PATH\</literal\> environment variable). If found, print the
-    corresponding absolute paths on standard output. For instance, if
-    `NIX_PATH` is `nixpkgs=/home/alice/nixpkgs`, then `nix-instantiate
-    --find-file nixpkgs/default.nix` will print
-    `/home/alice/nixpkgs/default.nix`.
+    `NIX_PATH` environment variable). If found, print the corresponding
+    absolute paths on standard output. For instance, if `NIX_PATH` is
+    `nixpkgs=/home/alice/nixpkgs`, then `nix-instantiate --find-file
+    nixpkgs/default.nix` will print `/home/alice/nixpkgs/default.nix`.
 
   - `--strict`  
     When used with `--eval`, recursively evaluate list elements and

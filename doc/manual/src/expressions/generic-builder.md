@@ -27,8 +27,12 @@ Here is what each line means:
 1.  The `buildInputs` variable tells `setup` to use the indicated
     packages as “inputs”. This means that if a package provides a `bin`
     subdirectory, it's added to `PATH`; if it has a `include`
-    subdirectory, it's added to GCC's header search path; and so
-    on.\[1\]
+    subdirectory, it's added to GCC's header search path; and so on.
+    (This is implemented in a modular way: `setup` tries to source the
+    file `pkg/nix-support/setup-hook` of all dependencies. These “setup
+    hooks” can then set up whatever environment variables they want; for
+    instance, the setup hook for Perl sets the `PERL5LIB` environment
+    variable to contain the `lib/site_perl` directories of all inputs.)
 
 2.  The function `genericBuild` is defined in the file `$stdenv/setup`.
 
@@ -55,10 +59,3 @@ shorter:
 In fact, `mkDerivation` provides a default builder that looks exactly
 like that, so it is actually possible to omit the builder for Hello
 entirely.
-
-1.  How does it work? `setup` tries to source the file
-    `pkg/nix-support/setup-hook` of all dependencies. These “setup
-    hooks” can then set up whatever environment variables they want;
-    for instance, the setup hook for Perl sets the `PERL5LIB`
-    environment variable to contain the `lib/site_perl` directories of
-    all inputs.

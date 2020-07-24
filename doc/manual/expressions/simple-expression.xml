@@ -21,10 +21,9 @@ need to do three things:
   such as dependencies, sources, and so on.</para></listitem>
 
   <listitem><para>Write a <emphasis>builder</emphasis>.  This is a
-  shell script<footnote><para>In fact, it can be written in any
-  language, but typically it's a <command>bash</command> shell
-  script.</para></footnote> that actually builds the package from
-  the inputs.</para></listitem>
+  shell script that builds the package from the inputs. (In fact, it
+  can be written in any language, but typically it's a
+  <command>bash</command> shell script.)</para></listitem>
 
   <listitem><para>Add the package to the file
   <filename>pkgs/top-level/all-packages.nix</filename>.  The Nix

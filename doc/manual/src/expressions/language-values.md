@@ -108,12 +108,14 @@ Nix has the following basic data types:
     floating point number will have a floating point number as a result.
 
   - *Paths*, e.g., `/bin/sh` or `./builder.sh`. A path must contain at
-    least one slash to be recognised as such; for instance, `builder.sh`
-    is not a path\[1\]. If the file name is relative, i.e., if it does
-    not begin with a slash, it is made absolute at parse time relative
-    to the directory of the Nix expression that contained it. For
-    instance, if a Nix expression in `/foo/bar/bla.nix` refers to
-    `../xyzzy/fnord.nix`, the absolute path is `/foo/xyzzy/fnord.nix`.
+    least one slash to be recognised as such. For instance, `builder.sh`
+    is not a path: it's parsed as an expression that selects the
+    attribute `sh` from the variable `builder`. If the file name is
+    relative, i.e., if it does not begin with a slash, it is made
+    absolute at parse time relative to the directory of the Nix
+    expression that contained it. For instance, if a Nix expression in
+    `/foo/bar/bla.nix` refers to `../xyzzy/fnord.nix`, the absolute path
+    is `/foo/xyzzy/fnord.nix`.
     
     If the first component of a path is a `~`, it is interpreted as if
     the rest of the path were relative to the user's home directory.
@@ -122,8 +124,8 @@ Nix has the following basic data types:
     
     Paths can also be specified between angle brackets, e.g.
     `<nixpkgs>`. This means that the directories listed in the
-    environment variable NIX\_PATH\</literal\> will be searched for the
-    given file or directory name.
+    environment variable `NIX_PATH` will be searched for the given file
+    or directory name.
 
   - *Booleans* with values `true` and `false`.
 
@@ -210,6 +212,3 @@ passed in first , e.g.,
 evaluates to `2`. This can be used to attach metadata to a function
 without the caller needing to treat it specially, or to implement a form
 of object-oriented programming, for example.
-
-1.  It's parsed as an expression that selects the attribute `sh` from
-    the variable `builder`.

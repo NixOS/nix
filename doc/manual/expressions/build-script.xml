@@ -33,13 +33,10 @@ steps:</para>
 
     <para>When Nix runs a builder, it initially completely clears the
     environment (except for the attributes declared in the
-    derivation).  For instance, the <literal>PATH</literal> variable is
-    empty<footnote><para>Actually, it's initialised to
-    <filename>/path-not-set</filename> to prevent Bash from setting it
-    to a default value.</para></footnote>.  This is done to prevent
-    undeclared inputs from being used in the build process.  If for
-    example the <literal>PATH</literal> contained
-    <filename>/usr/bin</filename>, then you might accidentally use
+    derivation).  This is done to prevent undeclared inputs from being
+    used in the build process. If for example the
+    <literal>PATH</literal> contained <filename>/usr/bin</filename>,
+    then you might accidentally use
     <filename>/usr/bin/gcc</filename>.</para>
 
     <para>So the first step is to set up the environment.  This is

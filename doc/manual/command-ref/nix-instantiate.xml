@@ -106,7 +106,7 @@ input.</para>
   <varlistentry><term><option>--find-file</option></term>
 
     <listitem><para>Look up the given files in Nix’s search path (as
-    specified by the <envar linkend="env-NIX_PATH">NIX_PATH</literal>
+    specified by the <literal linkend="env-NIX_PATH">NIX_PATH</literal>
     environment variable).  If found, print the corresponding absolute
     paths on standard output.  For instance, if
     <literal>NIX_PATH</literal> is

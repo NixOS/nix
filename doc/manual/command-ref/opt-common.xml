@@ -369,7 +369,7 @@
 <varlistentry xml:id="opt-I"><term><option>-I</option> <emphasis>path</emphasis></term>
 
   <listitem><para>Add a path to the Nix expression search path.  This
-  option may be given multiple times.  See the <envar
+  option may be given multiple times.  See the <literal
   linkend="env-NIX_PATH">NIX_PATH</literal> environment variable for
   information on the semantics of the Nix search path.  Paths added
   through <option>-I</option> take precedence over

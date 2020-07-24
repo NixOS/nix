@@ -17,14 +17,14 @@ would be invalid if no such variable exists. That is, in a normal
 recursive set, they are.
 
 Recursive sets of course introduce the danger of infinite recursion. For
-example,
+example, the expression
 
     rec {
       x = y;
       y = x;
     }.x
 
-does not terminate\[1\].
+will crash with an `infinite recursion encountered` error message.
 
 ## Let-expressions
 
@@ -304,6 +304,3 @@ establishes the same scope as
 Comments can be single-line, started with a `#` character, or
 inline/multi-line, enclosed within `/*
 ... */`.
-
-1.  Actually, Nix detects infinite recursion in this case and aborts
-    (“infinite recursion encountered”).

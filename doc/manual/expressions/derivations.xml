@@ -13,16 +13,15 @@ of which specify the inputs of the build.</para>
 
 <itemizedlist>
 
-  <listitem xml:id="attr-system"><para>There must be an attribute named
-  <varname>system</varname> whose value must be a string specifying a
-  Nix platform identifier, such as <literal>"i686-linux"</literal> or
-  <literal>"x86_64-darwin"</literal><footnote><para>To figure out
-  your platform identifier, look at the line <quote>Checking for the
-  canonical Nix system name</quote> in the output of Nix's
-  <filename>configure</filename> script.</para></footnote> The build
-  can only be performed on a machine and operating system matching the
-  platform identifier.  (Nix can automatically forward builds for
-  other platforms by forwarding them to other machines; see <xref
+  <listitem xml:id="attr-system"><para>There must be an attribute
+  named <varname>system</varname> whose value must be a string
+  specifying a Nix system type, such as
+  <literal>"i686-linux"</literal> or
+  <literal>"x86_64-darwin"</literal>. (To figure out your system type,
+  run <literal>nix -vv --version</literal>.) The build can only be
+  performed on a machine and operating system matching the system
+  type.  (Nix can automatically forward builds for other platforms by
+  forwarding them to other machines; see <xref
   linkend='chap-distributed-builds' />.)</para></listitem>
 
   <listitem><para>There must be an attribute named
