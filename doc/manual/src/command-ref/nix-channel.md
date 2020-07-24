@@ -1,34 +1,12 @@
-nix-channel
+Title: nix-channel
 
-1
+# Name
 
-Nix
+`nix-channel` - manage Nix channels
 
-nix-channel
+# Synopsis
 
-manage Nix channels
-
-nix-channel
-
-\--add
-
-url
-
-name
-
-\--remove
-
-name
-
-\--list
-
-\--update
-
-names
-
-\--rollback
-
-generation
+`nix-channel` {`--add` url [*name*] | `--remove` *name* | `--list` | `--update` [*names…*] | `--rollback` [*generation*] }
 
 # Description
 
@@ -82,10 +60,10 @@ You can revert channel updates using `--rollback`:
 
     $ nix-instantiate --eval -E '(import <nixpkgs> {}).lib.version'
     "14.04.527.0e935f1"
-    
+
     $ nix-channel --rollback
     switching from generation 483 to 482
-    
+
     $ nix-instantiate --eval -E '(import <nixpkgs> {}).lib.version'
     "14.04.526.dbadfad"
 

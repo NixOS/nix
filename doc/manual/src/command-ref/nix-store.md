@@ -1,26 +1,15 @@
-nix-store
+Title: nix-store
 
-1
+# Name
 
-Nix
+`nix-store` - manipulate or query the Nix store
 
-nix-store
+# Synopsis
 
-manipulate or query the Nix store
-
-nix-store
-
-\--add-root
-
-path
-
-\--indirect
-
-operation
-
-options
-
-arguments
+`nix-store` *operation* [*options…*] [*arguments…*]
+  [`--option` *name* *value*]
+  [`--add-root` *path*]
+  [`--indirect`]
 
 # Description
 
@@ -44,7 +33,7 @@ options.
     which must be inside a directory that is scanned for roots by the
     garbage collector (i.e., typically in a subdirectory of
     `/nix/var/nix/gcroots/`) *unless* the `--indirect` flag is used.
-    
+
     If there are multiple results, then multiple symlinks will be
     created by sequentially numbering symlinks beyond the first one
     (e.g., `foo`, `foo-2`, `foo-3`, and so on).
@@ -55,24 +44,24 @@ options.
     commands such as `nix-build` that place a symlink to the build
     result in the current directory; such a build result should not be
     garbage-collected unless the symlink is removed.
-    
+
     The `--indirect` flag causes a uniquely named symlink to *path* to
     be stored in `/nix/var/nix/gcroots/auto/`. For instance,
-    
+
         $ nix-store --add-root /home/eelco/bla/result --indirect -r ...
-        
+
         $ ls -l /nix/var/nix/gcroots/auto
         lrwxrwxrwx    1 ... 2005-03-13 21:10 dn54lcypm8f8... -> /home/eelco/bla/result
-        
+
         $ ls -l /home/eelco/bla/result
         lrwxrwxrwx    1 ... 2005-03-13 21:10 /home/eelco/bla/result -> /nix/store/1r11343n6qd4...-f-spot-0.0.10
-    
+
     Thus, when `/home/eelco/bla/result` is removed, the GC root in the
     `auto` directory becomes a dangling symlink and will be ignored by
     the collector.
-    
+
     > **Warning**
-    > 
+    >
     > Note that it is not possible to move or rename indirect GC roots,
     > since the symlink in the `auto` directory will still point to the
     > old location.
@@ -83,15 +72,7 @@ options.
 
 ## Synopsis
 
-nix-store
-
-\--realise
-
-\-r
-
-paths
-
-\--dry-run
+`nix-store` {`--realise` | `-r`} *paths…* [`--dry-run`]
 
 ## Description
 
@@ -136,7 +117,7 @@ The following flags are available:
     output path is not identical to the corresponding output from the
     previous build, the new output path is left in
     `/nix/store/name.check.`
-    
+
     See also the `build-repeat` configuration option, which repeats a
     derivation a number of times and prevents its outputs from being
     registered as “valid” in the Nix store unless they are identical.
@@ -188,11 +169,7 @@ To test whether a previously-built derivation is deterministic:
 
 ## Synopsis
 
-nix-store
-
-\--serve
-
-\--write
+`nix-store` `--serve` [`--write`]
 
 ## Description
 
@@ -220,19 +197,7 @@ used to provide build access to a given SSH public key:
 
 ## Synopsis
 
-nix-store
-
-\--gc
-
-\--print-roots
-
-\--print-live
-
-\--print-dead
-
-\--max-freed
-
-bytes
+`nix-store` `--gc` [`--print-roots` | `--print-live` | `--print-dead`] [`--max-freed` *bytes*]
 
 ## Description
 
@@ -294,13 +259,7 @@ To delete at least 100 MiBs of unreachable paths:
 
 ## Synopsis
 
-nix-store
-
-\--delete
-
-\--ignore-liveness
-
-paths
+`nix-store` `--delete` [`--ignore-liveness`] *paths…*
 
 ## Description
 
@@ -324,55 +283,13 @@ paths in the store that refer to it (i.e., depend on it).
 
 ## Synopsis
 
-nix-store
-
-\--query
-
-\-q
-
-\--outputs
-
-\--requisites
-
-\-R
-
-\--references
-
-\--referrers
-
-\--referrers-closure
-
-\--deriver
-
-\-d
-
-\--graph
-
-\--tree
-
-\--binding
-
-name
-
-\-b
-
-name
-
-\--hash
-
-\--size
-
-\--roots
-
-\--use-output
-
-\-u
-
-\--force-realise
-
-\-f
-
-paths
+`nix-store` {`--query` | `-q`}
+  {`--outputs` | `--requisites` | `-R` | `--references` |
+  `--referrers` | `--referrers-closure` | `--deriver` | `-d` |
+  `--graph` | `--tree` | `--binding` *name* | `-b` *name* | `--hash` |
+  `--size` | `--roots`}
+  [`--use-output`] [`-u`] [`--force-realise`] [`-f`]
+  *paths…*
 
 ## Description
 
@@ -403,13 +320,13 @@ symlink.
 
   - `--requisites`; `-R`  
     Prints out the [closure](#gloss-closure) of the store path *paths*.
-    
+
     This query has one option:
-    
-      - `--include-outputs`  
+
+      - `--include-outputs`
         Also include the output path of store derivations, and their
         closures.
-    
+
     This query can be used to implement various kinds of deployment. A
     *source deployment* is obtained by distributing the closure of a
     store derivation. A *binary deployment* is obtained by distributing
@@ -555,11 +472,7 @@ depends on `svn`:
 
 ## Synopsis
 
-nix-store
-
-\--add
-
-paths
+`nix-store` `--add` *paths…*
 
 ## Description
 
@@ -575,15 +488,7 @@ prints the resulting paths in the Nix store on standard output.
 
 ## Synopsis
 
-nix-store
-
-\--recursive
-
-\--add-fixed
-
-algorithm
-
-paths
+`nix-store` `--add-fixed` [`--recursive`] *algorithm* *paths…*
 
 ## Description
 
@@ -608,13 +513,7 @@ This operation has the following options:
 
 ## Synopsis
 
-nix-store
-
-\--verify
-
-\--check-contents
-
-\--repair
+`nix-store` `--verify` [`--check-contents`] [`--repair`]
 
 ## Description
 
@@ -643,11 +542,7 @@ This operation has the following options:
 
 ## Synopsis
 
-nix-store
-
-\--verify-path
-
-paths
+`nix-store` `--verify-path` *paths…*
 
 ## Description
 
@@ -666,11 +561,7 @@ To verify the integrity of the `svn` command and all its dependencies:
 
 ## Synopsis
 
-nix-store
-
-\--repair-path
-
-paths
+`nix-store` `--repair-path` *paths…*
 
 ## Description
 
@@ -679,7 +570,7 @@ by redownloading them using the available substituters. If no
 substitutes are available, then repair is not possible.
 
 > **Warning**
-> 
+>
 > During repair, there is a very small time window during which the old
 > path (if it exists) is moved out of the way and replaced with the new
 > path. If repair is interrupted in between, then the system may be left
@@ -692,7 +583,7 @@ substitutes are available, then repair is not possible.
     path `/nix/store/dj7a81wsm1ijwwpkks3725661h3263p5-glibc-2.13' was modified!
       expected hash `2db57715ae90b7e31ff1f2ecb8c12ec1cc43da920efcbe3b22763f36a1861588',
       got `481c5aa5483ebc97c20457bb8bca24deea56550d3985cda0027f67fe54b808e4'
-    
+
     $ nix-store --repair-path /nix/store/dj7a81wsm1ijwwpkks3725661h3263p5-glibc-2.13
     fetching path `/nix/store/d7a81wsm1ijwwpkks3725661h3263p5-glibc-2.13'...
     …
@@ -701,11 +592,7 @@ substitutes are available, then repair is not possible.
 
 ## Synopsis
 
-nix-store
-
-\--dump
-
-path
+`nix-store` `--dump` *path*
 
 ## Description
 
@@ -739,11 +626,7 @@ A Nix archive can be unpacked using `nix-store
 
 ## Synopsis
 
-nix-store
-
-\--restore
-
-path
+`nix-store` `--restore` *path*
 
 ## Description
 
@@ -754,11 +637,7 @@ not already exist. The archive is read from standard input.
 
 ## Synopsis
 
-nix-store
-
-\--export
-
-paths
+`nix-store` `--export` *paths…*
 
 ## Description
 
@@ -784,9 +663,7 @@ To import the whole closure again, run:
 
 ## Synopsis
 
-nix-store
-
-\--import
+`nix-store` `--import`
 
 ## Description
 
@@ -800,9 +677,7 @@ Nix store, the import fails.
 
 ## Synopsis
 
-nix-store
-
-\--optimise
+`nix-store` `--optimise`
 
 ## Description
 
@@ -832,13 +707,7 @@ Use `-vv` or `-vvv` to get some progress indication.
 
 ## Synopsis
 
-nix-store
-
-\--read-log
-
-\-l
-
-paths
+`nix-store` {`--read-log` | `-l`} *paths…*
 
 ## Description
 
@@ -866,11 +735,7 @@ substitute, then the log is unavailable.
 
 ## Synopsis
 
-nix-store
-
-\--dump-db
-
-paths
+`nix-store` `--dump-db` [*paths…*]
 
 ## Description
 
@@ -889,9 +754,7 @@ example.
 
 ## Synopsis
 
-nix-store
-
-\--load-db
+`nix-store` `--load-db`
 
 ## Description
 
@@ -902,11 +765,7 @@ The operation `--load-db` reads a dump of the Nix database created by
 
 ## Synopsis
 
-nix-store
-
-\--print-env
-
-drvpath
+`nix-store` `--print-env` *drvpath*
 
 ## Description
 
@@ -927,15 +786,7 @@ of the builder are placed in the variable `_args`.
 
 ## Synopsis
 
-nix-store
-
-\--generate-binary-cache-key
-
-key-name
-
-secret-key-file
-
-public-key-file
+`nix-store` `--generate-binary-cache-key` *key-name* *secret-key-file* *public-key-file*
 
 ## Description
 
@@ -952,5 +803,3 @@ mandatory parameters:
 2.  The file name where the secret key is to be stored.
 
 3.  The file name where the public key is to be stored.
-
-# Environment variables

@@ -1,32 +1,16 @@
-nix-prefetch-url
+Title: nix-prefetch-url
 
-1
+# Name
 
-Nix
+`nix-prefetch-url` - copy a file from a URL into the store and print its hash
 
-nix-prefetch-url
+# Synopsis
 
-copy a file from a URL into the store and print its hash
-
-nix-prefetch-url
-
-\--version
-
-\--type
-
-hashAlgo
-
-\--print-path
-
-\--unpack
-
-\--name
-
-name
-
-url
-
-hash
+`nix-prefetch-url` *url* [*hash*]
+  [`--type` *hashAlgo*]
+  [`--print-path`]
+  [`--unpack`]
+  [`--name` *name*]
 
 # Description
 
@@ -77,11 +61,11 @@ Nix store is also printed.
 
     $ nix-prefetch-url ftp://ftp.gnu.org/pub/gnu/hello/hello-2.10.tar.gz
     0ssi1wpaf7plaswqqjwigppsg5fyh99vdlb9kzl7c9lng89ndq1i
-    
+
     $ nix-prefetch-url --print-path mirror://gnu/hello/hello-2.10.tar.gz
     0ssi1wpaf7plaswqqjwigppsg5fyh99vdlb9kzl7c9lng89ndq1i
     /nix/store/3x7dwzq014bblazs7kq20p9hyzz0qh8g-hello-2.10.tar.gz
-    
+
     $ nix-prefetch-url --unpack --print-path https://github.com/NixOS/patchelf/archive/0.8.tar.gz
     079agjlv0hrv7fxnx9ngipx14gyncbkllxrp9cccnh3a50fxcmy7
     /nix/store/19zrmhm3m40xxaw81c8cqm6aljgrnwj2-0.8.tar.gz

@@ -1,56 +1,22 @@
-nix-instantiate
+Title: nix-instantiate
 
-1
+# Name
 
-Nix
+`nix-instantiate` - instantiate store derivations from Nix expressions
 
-nix-instantiate
+# Synopsis
 
-instantiate store derivations from Nix expressions
+`nix-instantiate`
+  [`--parse` | `--eval` [`--strict`] [`--json`] [`--xml`] ]
+  [`--read-write-mode`]
+  [`--arg` *name* *value*]
+  [{`--attr`| `-A`} *attrPath*]
+  [`--add-root` *path*]
+  [`--indirect`]
+  [`--expr` | `-E`]
+  *files…*
 
-nix-instantiate
-
-\--parse
-
-\--eval
-
-\--strict
-
-\--json
-
-\--xml
-
-\--read-write-mode
-
-\--arg
-
-name
-
-value
-
-\--attr
-
-\-A
-
-attrPath
-
-\--add-root
-
-path
-
-\--indirect
-
-\--expr
-
-\-E
-
-files
-
-nix-instantiate
-
-\--find-file
-
-files
+`nix-instantiate` `--find-file` *files…*
 
 # Description
 
@@ -91,9 +57,9 @@ See also [???](#sec-common-options) for a list of common options.
     When used with `--eval`, recursively evaluate list elements and
     attributes. Normally, such sub-expressions are left unevaluated
     (since the Nix expression language is lazy).
-    
+
     > **Warning**
-    > 
+    >
     > This option can cause non-termination, because lazy data
     > structures can be infinitely large.
 
@@ -123,11 +89,11 @@ using `nix-store`:
 
     $ nix-instantiate test.nix (instantiate)
     /nix/store/cigxbmvy6dzix98dxxh9b6shg7ar5bvs-perl-BerkeleyDB-0.26.drv
-    
+
     $ nix-store -r $(nix-instantiate test.nix) (build)
     ...
     /nix/store/qhqk4n8ci095g3sdp93x7rgwyh9rdvgk-perl-BerkeleyDB-0.26 (output path)
-    
+
     $ ls -l /nix/store/qhqk4n8ci095g3sdp93x7rgwyh9rdvgk-perl-BerkeleyDB-0.26
     dr-xr-xr-x    2 eelco    users        4096 1970-01-01 01:00 lib
     ...
@@ -145,10 +111,10 @@ Parsing and evaluating Nix expressions:
 
     $ nix-instantiate --parse -E '1 + 2'
     1 + 2
-    
+
     $ nix-instantiate --eval -E '1 + 2'
     3
-    
+
     $ nix-instantiate --eval --xml -E '1 + 2'
     <?xml version='1.0' encoding='utf-8'?>
     <expr>
@@ -179,5 +145,3 @@ attempt to show non-normal forms).
         <string value="foo" />
       </attr>
     ...
-
-# Environment variables

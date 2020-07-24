@@ -6,7 +6,13 @@ Title: nix-copy-closure
 
 # Synopsis
 
-`nix-copy-closure` [`--to` | `--from`] [`--gzip`] [`--include-outputs`] [`--use-substitutes` | `-s`] [`-v`] _user@machine_ _paths_
+`nix-copy-closure`
+  [`--to` | `--from`]
+  [`--gzip`]
+  [`--include-outputs`]
+  [`--use-substitutes` | `-s`]
+  [`-v`]
+  _user@machine_ _paths_
 
 # Description
 
@@ -75,4 +81,3 @@ environment:
     $ nix-copy-closure --from alice@itchy.labs \
         /nix/store/0dj0503hjxy5mbwlafv1rsbdiyx1gkdy-subversion-1.4.4
     $ nix-env -i /nix/store/0dj0503hjxy5mbwlafv1rsbdiyx1gkdy-subversion-1.4.4
-

@@ -1,60 +1,21 @@
-nix-shell
+Title: nix-shell
 
-1
+# Name
 
-Nix
+`nix-shell` - start an interactive shell based on a Nix expression
 
-nix-shell
+# Synopsis
 
-start an interactive shell based on a Nix expression
-
-nix-shell
-
-\--arg
-
-name
-
-value
-
-\--argstr
-
-name
-
-value
-
-\--attr
-
-\-A
-
-attrPath
-
-\--command
-
-cmd
-
-\--run
-
-cmd
-
-\--exclude
-
-regexp
-
-\--pure
-
-\--keep
-
-name
-
-\--packages
-
-\-p
-
-packages
-
-expressions
-
-path
+`nix-shell`
+  [`--arg` *name* *value*]
+  [`--argstr` *name* *value*]
+  [{`--attr` | `-A`} *attrPath*]
+  [`--command` *cmd*]
+  [`--run` *cmd*]
+  [`--exclude` *regexp*]
+  [--pure]
+  [--keep *name*]
+  {{`--packages` | `-p`} {*packages* | *expressions*} … | [*path*]}
 
 # Description
 
@@ -96,11 +57,10 @@ All options not listed here are passed to `nix-store
     This command is executed in an interactive shell. (Use `--run` to
     use a non-interactive shell instead.) However, a call to `exit` is
     implicitly added to the command, so the shell will exit after
-    running the command. To prevent this, add `return` at the end; e.g.
-    `--command
-                    "echo Hello; return"` will print `Hello` and then drop you into the
-    interactive shell. This can be useful for doing any additional
-    initialisation.
+    running the command. To prevent this, add `return` at the end;
+    e.g.  `--command "echo Hello; return"` will print `Hello` and then
+    drop you into the interactive shell. This can be useful for doing
+    any additional initialisation.
 
   - `--run` *cmd*  
     Like `--command`, but executes the command in a non-interactive
@@ -129,8 +89,7 @@ All options not listed here are passed to `nix-store
 
   - `-i` *interpreter*  
     The chained script interpreter to be invoked by `nix-shell`. Only
-    applicable in `#!`-scripts (described
-    [below](#ssec-nix-shell-shebang)).
+    applicable in `#!`-scripts (described below).
 
   - `--keep` *name*  
     When a `--pure` shell is started, keep the listed environment
@@ -186,7 +145,7 @@ gives you a shell containing the Pan package from a specific revision of
 Nixpkgs:
 
     $ nix-shell -p pan -I nixpkgs=https://github.com/NixOS/nixpkgs/archive/8a3eea054838b55aca962c3fbde9c83c102b8bf2.tar.gz
-    
+
     [nix-shell:~]$ pan --version
     Pan 0.139
 
@@ -213,9 +172,9 @@ For example, here is a Python script that depends on Python and the
 
     #! /usr/bin/env nix-shell
     #! nix-shell -i python -p python pythonPackages.prettytable
-    
+
     import prettytable
-    
+
     # Print a simple table.
     t = prettytable.PrettyTable(["N", "N^2"])
     for n in range(1, 10): t.add_row([n, n * n])
@@ -226,12 +185,12 @@ requires Perl and the `HTML::TokeParser::Simple` and `LWP` packages:
 
     #! /usr/bin/env nix-shell
     #! nix-shell -i perl -p perl perlPackages.HTMLTokeParserSimple perlPackages.LWP
-    
+
     use HTML::TokeParser::Simple;
-    
+
     # Fetch nixos.org and print all hrefs.
     my $p = HTML::TokeParser::Simple->new(url => 'http://nixos.org/');
-    
+
     while (my $token = $p->get_tag("a")) {
         my $href = $token->get_attr("href");
         print "$href\n" if $href;
@@ -242,11 +201,11 @@ package like Terraform:
 
     #! /usr/bin/env nix-shell
     #! nix-shell -i bash -p "terraform.withPlugins (plugins: [ plugins.openstack ])"
-    
+
     terraform apply
 
 > **Note**
-> 
+>
 > You must use double quotes (`"`) when passing a simple Nix expression
 > in a nix-shell shebang.
 
@@ -257,10 +216,10 @@ branch):
     #! /usr/bin/env nix-shell
     #! nix-shell -i runghc -p "haskellPackages.ghcWithPackages (ps: [ps.HTTP ps.tagsoup])"
     #! nix-shell -I nixpkgs=https://github.com/NixOS/nixpkgs/archive/nixos-18.03.tar.gz
-    
+
     import Network.HTTP
     import Text.HTML.TagSoup
-    
+
     -- Fetch nixos.org and print all hrefs.
     main = do
       resp <- Network.HTTP.simpleHTTP (getRequest "http://nixos.org/")
@@ -285,7 +244,5 @@ where the file `deps.nix` in the same directory as the `#!`-script
 contains:
 
     with import <nixpkgs> {};
-    
-    runCommand "dummy" { buildInputs = [ python pythonPackages.prettytable ]; } ""
 
-# Environment variables
+    runCommand "dummy" { buildInputs = [ python pythonPackages.prettytable ]; } ""

@@ -1,12 +1,8 @@
-nix.conf
+Title: nix.conf
 
-5
+# Name
 
-Nix
-
-nix.conf
-
-Nix configuration file
+`nix.conf` - Nix configuration file
 
 # Description
 
@@ -20,7 +16,7 @@ By default Nix reads settings from the following places:
 
   - If `NIX_USER_CONF_FILES` is set, then each path separated by `:`
     will be loaded in reverse order.
-    
+
     Otherwise it will look for `nix/nix.conf` files in `XDG_CONFIG_DIRS`
     and `XDG_CONFIG_HOME`. If these are unset, it will look in
     `$HOME/.config/nix.conf`.

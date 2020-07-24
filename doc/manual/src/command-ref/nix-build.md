@@ -1,44 +1,18 @@
-nix-build
+Title: nix-build
 
-1
+# Name
 
-Nix
+`nix-build` - build a Nix expression
 
-nix-build
+# Synopsis
 
-build a Nix expression
-
-nix-build
-
-\--arg
-
-name
-
-value
-
-\--argstr
-
-name
-
-value
-
-\--attr
-
-\-A
-
-attrPath
-
-\--no-out-link
-
-\--dry-run
-
-\--out-link
-
-\-o
-
-outlink
-
-paths
+`nix-build` [*paths…*]
+  [`--arg` *name* *value*]
+  [`--argstr` *name* *value*]
+  [{`--attr` | `-A`} *attrPath*]
+  [`--no-out-link`]
+  [`--dry-run`]
+  [{`--out-link` | `-o`} *outlink*]
 
 # Description
 
@@ -63,7 +37,7 @@ expression to a low-level store derivation) and [`nix-store
 --realise`](#rsec-nix-store-realise) (to build the store derivation).
 
 > **Warning**
-> 
+>
 > The result of the build is automatically registered as a root of the
 > Nix garbage collector. This root disappears automatically when the
 > `result` symlink is deleted or renamed. So don’t rename the symlink.
@@ -94,10 +68,10 @@ The following common options are supported:
     $ nix-build '<nixpkgs>' -A firefox
     store derivation is /nix/store/qybprl8sz2lc...-firefox-1.5.0.7.drv
     /nix/store/d18hyl92g30l...-firefox-1.5.0.7
-    
+
     $ ls -l result
     lrwxrwxrwx  ...  result -> /nix/store/d18hyl92g30l...-firefox-1.5.0.7
-    
+
     $ ls ./result/bin/
     firefox  firefox-config
 

@@ -1,50 +1,20 @@
-nix-env
+Title: nix-env
 
-1
+# Name
 
-Nix
+`nix-env` - manipulate or query Nix user environments
 
-nix-env
+# Synopsis
 
-manipulate or query Nix user environments
-
-nix-env
-
-\--arg
-
-name
-
-value
-
-\--argstr
-
-name
-
-value
-
-\--file
-
-\-f
-
-path
-
-\--profile
-
-\-p
-
-path
-
-\--system-filter
-
-system
-
-\--dry-run
-
-operation
-
-options
-
-arguments
+`nix-env`
+  [`--option` *name* *value*]
+  [`--arg` *name* *value*]
+  [`--argstr` *name* *value*]
+  [{`--file` | `-f`} *path*]
+  [{`--profile` | `-p`} *path(]
+  [`--system-filter` *system*]
+  [`--dry-run`]
+  *operation* [*options…*] [*arguments…*]
 
 # Description
 
@@ -103,7 +73,7 @@ have an effect. See also [???](#sec-common-options).
     expression*) used by the `--install`, `--upgrade`, and `--query
     --available` operations to obtain derivations. The default is
     `~/.nix-defexpr`.
-    
+
     If the argument starts with `http://` or `https://`, it is
     interpreted as the URL of a tarball that will be downloaded and
     unpacked to a temporary location. The tarball must include a single
@@ -120,7 +90,7 @@ have an effect. See also [???](#sec-common-options).
     `--switch-generation`, `--delete-generations` and `--rollback`
     operations, this flag will cause `nix-env` to print what *would* be
     done if this flag had not been specified, without actually doing it.
-    
+
     `--dry-run` also prints out which paths will be
     [substituted](#gloss-substitute) (i.e., downloaded) and which paths
     will be built from source (because no substitute is available).
@@ -135,38 +105,38 @@ have an effect. See also [???](#sec-common-options).
 # Files
 
   - `~/.nix-defexpr`  
-    The source for the default Nix expressions used by the `--install`,
-    `--upgrade`, and `--query
-                    --available` operations to obtain derivations. The `--file` option
-    may be used to override this default.
-    
+    The source for the default Nix expressions used by the
+    `--install`, `--upgrade`, and `--query --available` operations to
+    obtain derivations. The `--file` option may be used to override
+    this default.
+
     If `~/.nix-defexpr` is a file, it is loaded as a Nix expression. If
     the expression is a set, it is used as the default Nix expression.
     If the expression is a function, an empty set is passed as argument
     and the return value is used as the default Nix expression.
-    
+
     If `~/.nix-defexpr` is a directory containing a `default.nix` file,
     that file is loaded as in the above paragraph.
-    
+
     If `~/.nix-defexpr` is a directory without a `default.nix` file,
     then its contents (both files and subdirectories) are loaded as Nix
     expressions. The expressions are combined into a single set, each
     expression under an attribute with the same name as the original
     file or subdirectory.
-    
+
     For example, if `~/.nix-defexpr` contains two files, `foo.nix` and
     `bar.nix`, then the default Nix expression will essentially be
-    
+
         {
           foo = import ~/.nix-defexpr/foo.nix;
           bar = import ~/.nix-defexpr/bar.nix;
         }
-    
+
     The file `manifest.nix` is always ignored. Subdirectories without a
     `default.nix` file are traversed recursively in search of more Nix
     expressions, but the names of these intermediate directories are not
     added to the attribute paths of the default Nix expression.
-    
+
     The command `nix-channel` places symlinks to the downloaded Nix
     expressions from each subscribed channel in this directory.
 
@@ -180,21 +150,13 @@ have an effect. See also [???](#sec-common-options).
 
 ## Synopsis
 
-nix-env
-
-\--install
-
-\-i
-
-\--preserve-installed
-
-\-P
-
-\--remove-all
-
-\-r
-
-args
+`nix-env` {`--install` | `-i`} *args…*
+  [{`--prebuilt-only` | `-b`}]
+  [{`--attr` | `-A`}]
+  [`--from-expression`] [`-E`]
+  [`--from-profile` *path*]
+  [`--preserve-installed` | `-P`]
+  [`--remove-all` | `-r`]
 
 ## Description
 
@@ -208,17 +170,17 @@ a number of possible ways:
     output paths are installed. Currently installed derivations with a
     name equal to the name of a derivation being added are removed
     unless the option `--preserve-installed` is specified.
-    
+
     If there are multiple derivations matching a name in *args* that
     have the same name (e.g., `gcc-3.3.6` and `gcc-4.1.1`), then the
     derivation with the highest *priority* is used. A derivation can
     define a priority by declaring the `meta.priority` attribute. This
     attribute should be a number, with a higher value denoting a lower
     priority. The default priority is `0`.
-    
+
     If there are multiple matching derivations with the same priority,
     then the derivation with the highest version will be installed.
-    
+
     You can force the installation of multiple derivations with the same
     name by being specific about the versions. For instance, `nix-env -i
     gcc-3.3.6 gcc-4.1.1` will install both version of GCC (and will
@@ -339,21 +301,13 @@ channel:
 
 ## Synopsis
 
-nix-env
-
-\--upgrade
-
-\-u
-
-\--lt
-
-\--leq
-
-\--eq
-
-\--always
-
-args
+`nix-env` {`--upgrade` | `-u`} *args*
+  [`--lt` | `--leq` | `--eq` | `--always`]
+  [{`--prebuilt-only` | `-b`}]
+  [{`--attr` | `-A`}]
+  [`--from-expression`] [`-E`]
+  [`--from-profile` *path*]
+  [`--preserve-installed` | `-P`]
 
 ## Description
 
@@ -400,13 +354,13 @@ For the other flags, see `--install`.
 
     $ nix-env --upgrade gcc
     upgrading `gcc-3.3.1' to `gcc-3.4'
-    
+
     $ nix-env -u gcc-3.3.2 --always (switch to a specific version)
     upgrading `gcc-3.4' to `gcc-3.3.2'
-    
+
     $ nix-env --upgrade pan
     (no upgrades available, so nothing happens)
-    
+
     $ nix-env -u (try to upgrade everything)
     upgrading `hello-2.1.2' to `hello-2.1.3'
     upgrading `mozilla-1.2' to `mozilla-1.4'
@@ -451,19 +405,13 @@ This is illustrated by the following examples:
 
 ## Synopsis
 
-nix-env
-
-\--uninstall
-
-\-e
-
-drvnames
+`nix-env` {`--uninstall` | `-e`} *drvnames…*
 
 ## Description
 
 The uninstall operation creates a new user environment, based on the
 current generation of the active profile, from which the store paths
-designated by the symbolic names *names* are removed.
+designated by the symbolic names *drvnames* are removed.
 
 ## Examples
 
@@ -474,11 +422,7 @@ designated by the symbolic names *names* are removed.
 
 ## Synopsis
 
-nix-env
-
-\--set
-
-drvname
+`nix-env` `--set` *drvname*
 
 ## Description
 
@@ -496,15 +440,7 @@ contain just Firefox:
 
 ## Synopsis
 
-nix-env
-
-\--set-flag
-
-name
-
-value
-
-drvnames
+`nix-env` `--set-flag` *name* *value* *drvnames*
 
 ## Description
 
@@ -545,20 +481,20 @@ while the old remains part of the profile:
 
     $ nix-env -q
     firefox-2.0.0.9 (the current one)
-    
+
     $ nix-env --preserve-installed -i firefox-2.0.0.11
     installing `firefox-2.0.0.11'
     building path(s) `/nix/store/myy0y59q3ig70dgq37jqwg1j0rsapzsl-user-environment'
     collision between `/nix/store/...-firefox-2.0.0.11/bin/firefox'
       and `/nix/store/...-firefox-2.0.0.9/bin/firefox'.
     (i.e., can’t have two active at the same time)
-    
+
     $ nix-env --set-flag active false firefox
     setting flag on `firefox-2.0.0.9'
-    
+
     $ nix-env --preserve-installed -i firefox-2.0.0.11
     installing `firefox-2.0.0.11'
-    
+
     $ nix-env -q
     firefox-2.0.0.11 (the enabled one)
     firefox-2.0.0.9 (the disabled one)
@@ -572,57 +508,21 @@ To make files from `binutils` take precedence over files from `gcc`:
 
 ## Synopsis
 
-nix-env
-
-\--query
-
-\-q
-
-\--installed
-
-\--available
-
-\-a
-
-\--status
-
-\-s
-
-\--attr-path
-
-\-P
-
-\--no-name
-
-\--compare-versions
-
-\-c
-
-\--system
-
-\--drv-path
-
-\--out-path
-
-\--description
-
-\--meta
-
-\--xml
-
-\--json
-
-\--prebuilt-only
-
-\-b
-
-\--attr
-
-\-A
-
-attribute-path
-
-names
+`nix-env` {`--query` | `-q`} *names…*
+  [`--installed` | `--available` | `-a`]
+  [{`--status` | `-s`}]
+  [{`--attr-path` | `-P`}]
+  [`--no-name`]
+  [{`--compare-versions` | `-c`}]
+  [`--system`]
+  [`--drv-path`]
+  [`--out-path`]
+  [`--description`]
+  [`--meta`]
+  [`--xml`]
+  [`--json`]
+  [{`--prebuilt-only` | `-b`}]
+  [{`--attr` | `-A`} *attribute-path*]
 
 ## Description
 
@@ -696,17 +596,17 @@ derivation is shown unless `--no-name` is specified.
     `--available` is given). This is useful for quickly seeing whether
     upgrades for installed packages are available in a Nix expression. A
     column is added with the following meaning:
-    
+
       - `<` *version*  
         A newer version of the package is available or installed.
-    
+
       - `=` *version*  
         At most the same version of the package is available or
         installed.
-    
+
       - `>` *version*  
         Only older versions of the package are available or installed.
-    
+
       - `- ?`  
         No version of the package is available or installed.
 
@@ -797,13 +697,7 @@ To show all packages in the latest revision of the Nixpkgs repository:
 
 ## Synopsis
 
-nix-env
-
-\--switch-profile
-
-\-S
-
-path
+`nix-env` {`--switch-profile` | `-S`} *path*
 
 ## Description
 
@@ -818,9 +712,7 @@ the symlink `~/.nix-profile` is made to point to *path*.
 
 ## Synopsis
 
-nix-env
-
-\--list-generations
+`nix-env` `--list-generations`
 
 ## Description
 
@@ -841,11 +733,7 @@ generation, and indicates the current generation.
 
 ## Synopsis
 
-nix-env
-
-\--delete-generations
-
-generations
+`nix-env` `--delete-generations` *generations*
 
 ## Description
 
@@ -862,24 +750,18 @@ generations is important to make garbage collection effective.
 ## Examples
 
     $ nix-env --delete-generations 3 4 8
-    
+
     $ nix-env --delete-generations +5
-    
+
     $ nix-env --delete-generations 30d
-    
+
     $ nix-env -p other_profile --delete-generations old
 
 # Operation `--switch-generation`
 
 ## Synopsis
 
-nix-env
-
-\--switch-generation
-
-\-G
-
-generation
+`nix-env` {`--switch-generation` | `-G`} *generation*
 
 ## Description
 
@@ -900,9 +782,7 @@ Switching will fail if the specified generation does not exist.
 
 ## Synopsis
 
-nix-env
-
-\--rollback
+`nix-env` `--rollback`
 
 ## Description
 
@@ -915,7 +795,7 @@ generation, if it exists. It is just a convenience wrapper around
 
     $ nix-env --rollback
     switching from generation 92 to 91
-    
+
     $ nix-env --rollback
     error: no generation older than the current (91) exists
 

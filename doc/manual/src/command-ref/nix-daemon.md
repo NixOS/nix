@@ -1,14 +1,12 @@
-nix-daemon
+Title: nix-daemon
 
-8
+# Name
 
-Nix
+`nix-daemon` - Nix multi-user support daemon
 
-nix-daemon
+# Synopsis
 
-Nix multi-user support daemon
-
-nix-daemon
+`nix-daemon`
 
 # Description
 

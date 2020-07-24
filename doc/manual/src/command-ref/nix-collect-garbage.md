@@ -1,28 +1,12 @@
-nix-collect-garbage
+Title: nix-collect-garbage
 
-1
+# Name
 
-Nix
+`nix-collect-garbage` - delete unreachable store paths
 
-nix-collect-garbage
+# Synopsis
 
-delete unreachable store paths
-
-nix-collect-garbage
-
-\--delete-old
-
-\-d
-
-\--delete-older-than
-
-period
-
-\--max-freed
-
-bytes
-
-\--dry-run
+`nix-collect-garbage` [`--delete-old`] [`-d`] [`--delete-older-than` *period*] [`--max-freed` *bytes*] [`--dry-run`]
 
 # Description
 
