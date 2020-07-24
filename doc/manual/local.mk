@@ -2,14 +2,6 @@ ifeq ($(doc_generate),yes)
 
 MANUAL_SRCS := $(call rwildcard, $(d)/src, *.md)
 
-#$(d)/version.txt:
-#	$(trace-gen) echo -n $(PACKAGE_VERSION) > $@
-
-clean-files += $(d)/version.txt
-
-dist-files += $(d)/version.txt
-
-
 # Generate man pages.
 man-pages := $(foreach n, \
   nix-env.1 nix-build.1 nix-shell.1 nix-store.1 nix-instantiate.1 \
@@ -37,6 +29,5 @@ install: $(docdir)/manual/index.html
 
 $(docdir)/manual/index.html: $(MANUAL_SRCS)
 	$(trace-gen) mdbook build doc/manual -d $(docdir)/manual
-
 
 endif
