@@ -277,6 +277,8 @@ void printVersion(const string & programName)
 #if HAVE_SODIUM
         cfg.push_back("signed-caches");
 #endif
+        std::cout << "System type: " << settings.thisSystem << "\n";
+        std::cout << "Additional system types: " << concatStringsSep(", ", settings.extraPlatforms.get()) << "\n";
         std::cout << "Features: " << concatStringsSep(", ", cfg) << "\n";
         std::cout << "System configuration file: " << settings.nixConfDir + "/nix.conf" << "\n";
         std::cout << "User configuration files: " <<
