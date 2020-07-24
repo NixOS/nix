@@ -1,8 +1,7 @@
 # Operators
 
-[table\_title](#table-operators) lists the operators in the Nix
-expression language, in order of precedence (from strongest to weakest
-binding).
+The table below lists the operators in the Nix expression language, in
+order of precedence (from strongest to weakest binding).
 
 | Name                     | Syntax                              | Associativity | Description                                                                                                                                                                                                                   | Precedence |
 | ------------------------ | ----------------------------------- | ------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------- |
@@ -28,5 +27,3 @@ binding).
 | Logical OR               | *e1* `\|\|` *e2*                    | left          | Logical OR.                                                                                                                                                                                                                   | 13         |
 | Logical Implication      | *e1* `->` *e2*                      | none          | Logical implication (equivalent to `!e1 \|\|
         e2`).                                                                                                                                                                    | 14         |
-
-Operators

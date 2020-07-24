@@ -1,11 +1,12 @@
 # Arguments and Variables
 
-The Nix expression in [???](#ex-hello-nix) is a function; it is missing
-some arguments that have to be filled in somewhere. In the Nix Packages
-collection this is done in the file `pkgs/top-level/all-packages.nix`,
-where all Nix expressions for packages are imported and called with the
-appropriate arguments. Here are some fragments of `all-packages.nix`,
-with annotations of what they mean:
+The [Nix expression for GNU Hello](expression-syntax.md) is a
+function; it is missing some arguments that have to be filled in
+somewhere. In the Nix Packages collection this is done in the file
+`pkgs/top-level/all-packages.nix`, where all Nix expressions for
+packages are imported and called with the appropriate arguments. Here
+are some fragments of `all-packages.nix`, with annotations of what
+they mean:
 
     ...
     
@@ -35,9 +36,10 @@ with annotations of what they mean:
 
 2.  Here we *import* the Nix expression for GNU Hello. The import
     operation just loads and returns the specified Nix expression. In
-    fact, we could just have put the contents of [???](#ex-hello-nix) in
-    `all-packages.nix` at this point. That would be completely
-    equivalent, but it would make the file rather bulky.
+    fact, we could just have put the contents of the Nix expression
+    for GNU Hello in `all-packages.nix` at this point. That would be
+    completely equivalent, but it would make `all-packages.nix` rather
+    bulky.
     
     Note that we refer to `../applications/misc/hello/ex-1`, not
     `../applications/misc/hello/ex-1/default.nix`. When you try to
@@ -54,7 +56,7 @@ with annotations of what they mean:
     The result of this function call is an actual derivation that can be
     built by Nix (since when we fill in the arguments of the function,
     what we get is its body, which is the call to `stdenv.mkDerivation`
-    in [???](#ex-hello-nix)).
+    in the [Nix expression for GNU Hello](expression-syntax.md)).
     
     > **Note**
     > 

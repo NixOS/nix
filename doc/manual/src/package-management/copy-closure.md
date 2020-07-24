@@ -8,7 +8,7 @@ dependencies:
 
     $ nix-copy-closure --to alice@itchy.example.org $(type -p firefox)
 
-See [???](#sec-nix-copy-closure) for details.
+See the [manpage for `nix-copy-closure`](../command-ref/nix-copy-closure.md) for details.
 
 With `nix-store
 --export` and `nix-store --import` you can write the closure of a store

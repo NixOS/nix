@@ -30,8 +30,6 @@ the resulting store derivations are printed on standard output.
 If *files* is the character `-`, then a Nix expression will be read from
 standard input.
 
-See also [???](#sec-common-options) for a list of common options.
-
 # Options
 
   - `--add-root` *path*; `--indirect`  

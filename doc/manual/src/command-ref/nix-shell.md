@@ -50,7 +50,7 @@ will cause `nix-shell` to print `Hello shell`.
 
 All options not listed here are passed to `nix-store
 --realise`, except for `--arg` and `--attr` / `-A` which are passed to
-`nix-instantiate`. See also [???](#sec-common-options).
+`nix-instantiate`.
 
   - `--command` *cmd*  
     In the environment of the derivation, run the shell command *cmd*.

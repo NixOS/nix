@@ -9,8 +9,9 @@ the attributes of which specify the inputs of the build.
     `"x86_64-darwin"`. (To figure out your system type, run `nix -vv
     --version`.) The build can only be performed on a machine and
     operating system matching the system type. (Nix can automatically
-    forward builds for other platforms by forwarding them to other
-    machines; see [???](#chap-distributed-builds).)
+    [forward builds for other
+    platforms](../advanced-topics/distributed-builds.md) by forwarding
+    them to other machines.)
 
   - There must be an attribute named `name` whose value must be a
     string. This is used as a symbolic name for the package by

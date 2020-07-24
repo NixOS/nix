@@ -77,8 +77,7 @@ The following settings are currently available:
                     --optimise` to get rid of duplicate files.
 
   - `builders`  
-    A list of machines on which to perform builds. See
-    [???](#chap-distributed-builds) for details.
+    A list of machines on which to perform builds.
 
   - `builders-use-substitutes`  
     If set to `true`, Nix will instruct remote build machines to use
@@ -140,8 +139,6 @@ The following settings are currently available:
     `-jN` flag to GNU Make. It can be overridden using the `--cores`
     command line switch and defaults to `1`. The value `0` means that
     the builder should use all available CPU cores in the system.
-    
-    See also [???](#chap-tuning-cores-and-jobs).
 
   - `diff-hook`  
     Absolute path to an executable capable of diffing build results. The
@@ -298,8 +295,6 @@ The following settings are currently available:
     `preferLocalBuild` derivation attribute which executes locally
     regardless). It can be overridden using the `--max-jobs` (`-j`)
     command line switch.
-    
-    See also [???](#chap-tuning-cores-and-jobs).
 
   - `max-silent-time`  
     This option defines the maximum number of seconds that a builder can
@@ -429,12 +424,10 @@ The following settings are currently available:
         
         Example:
         `/nix/store/zf5lbh336mnzf1nlswdn11g4n2m8zh3g-bash-4.4-p23-dev
-                                                                                                        /nix/store/rjxwxwv1fpn9wa2x5ssk5phzwlcv4mna-bash-4.4-p23-doc
-                                                                                                        /nix/store/6bqvbzjkcp9695dq0dpl5y43nvy37pq1-bash-4.4-p23-info
-                                                                                                        /nix/store/r7fng3kk3vlpdlh2idnrbn37vh4imlj2-bash-4.4-p23-man
-                                                                                                        /nix/store/xfghy8ixrhz3kyy6p724iv3cxji088dx-bash-4.4-p23`.
-    
-    See [???](#chap-post-build-hook) for an example implementation.
+        /nix/store/rjxwxwv1fpn9wa2x5ssk5phzwlcv4mna-bash-4.4-p23-doc
+        /nix/store/6bqvbzjkcp9695dq0dpl5y43nvy37pq1-bash-4.4-p23-info
+        /nix/store/r7fng3kk3vlpdlh2idnrbn37vh4imlj2-bash-4.4-p23-man
+        /nix/store/xfghy8ixrhz3kyy6p724iv3cxji088dx-bash-4.4-p23`.
 
   - `repeat`  
     How many times to repeat builds to check whether they are
@@ -459,8 +452,7 @@ The following settings are currently available:
     `allowed-uri`. The default is `false`.
 
   - `run-diff-hook`  
-    If true, enable the execution of
-    [varlistentry\_title](#conf-diff-hook).
+    If true, enable the execution of the `diff-hook` program.
     
     When using the Nix daemon, `run-diff-hook` must be set in the
     `nix.conf` configuration file, and cannot be passed at the command
@@ -595,14 +587,10 @@ The following settings are currently available:
     Nix will print a log message at the "vomit" level for every function
     entrance and function exit.
     
-    <div class="informalexample">
-    
         function-trace entered undefined position at 1565795816999559622
         function-trace exited undefined position at 1565795816999581277
         function-trace entered /nix/store/.../example.nix:226:41 at 1565795253249935150
         function-trace exited /nix/store/.../example.nix:226:41 at 1565795253249941684
-    
-    </div>
     
     The `undefined position` means the function call is a builtin.
     

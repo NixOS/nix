@@ -17,9 +17,8 @@ the build loop.
 
 # Prerequisites
 
-This tutorial assumes you have configured an S3-compatible binary cache
-according to the instructions at
-[???](#ssec-s3-substituter-authenticated-writes), and that the `root`
+This tutorial assumes you have [configured an S3-compatible binary
+cache](../package-management/s3-substituter.md), and that the `root`
 user's default AWS profile can upload to the bucket.
 
 # Set up a Signing Key
@@ -33,7 +32,7 @@ distribute the public key for verifying the authenticity of the paths.
     example-nix-cache-1:1/cKDz3QCCOmwcztD2eV6Coggp6rqc9DGjWv7C0G+rM=
 
 Then, add the public key and the cache URL to your `nix.conf`'s
-[???](#conf-trusted-public-keys) and [???](#conf-substituters) like:
+`trusted-public-keys` and `substituters` options:
 
     substituters = https://cache.nixos.org/ s3://example-nix-cache
     trusted-public-keys = cache.nixos.org-1:6NCHdD59X431o0gWypbMrAURkbJ16ZPMQFGspcDShjY= example-nix-cache-1:1/cKDz3QCCOmwcztD2eV6Coggp6rqc9DGjWv7C0G+rM=

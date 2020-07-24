@@ -25,10 +25,10 @@ steps to elucidate what a builder does. It performs the following steps:
     
     So the first step is to set up the environment. This is done by
     calling the `setup` script of the standard environment. The
-    environment variable `stdenv` points to the location of the standard
-    environment being used. (It wasn't specified explicitly as an
-    attribute in [???](#ex-hello-nix), but `mkDerivation` adds it
-    automatically.)
+    environment variable `stdenv` points to the location of the
+    standard environment being used. (It wasn't specified explicitly
+    as an attribute in Hello's Nix expression, but `mkDerivation` adds
+    it automatically.)
 
 2.  Since Hello needs Perl, we have to make sure that Perl is in the
     `PATH`. The `perl` environment variable points to the location of

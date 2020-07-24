@@ -83,7 +83,7 @@ For instance, `derivation` is also available as `builtins.derivation`.
     its elements or attributes are also evaluated recursively.
 
   - `derivation` *attrs*; `builtins.derivation` *attrs*  
-    `derivation` is described in [???](#ssec-derivation).
+    `derivation` is described in [its own section](derivations.md).
 
   - `dirOf` *s*; `builtins.dirOf` *s*  
     Return the directory part of the string *s*, that is, everything
@@ -233,8 +233,8 @@ For instance, `derivation` is also available as `builtins.derivation`.
         
         > **Note**
         > 
-        > Nix will refetch the branch in accordance to
-        > [???](#conf-tarball-ttl).
+        > Nix will refetch the branch in accordance with
+        > the option `tarball-ttl`.
         
         > **Note**
         > 
@@ -351,19 +351,18 @@ For instance, `derivation` is also available as `builtins.derivation`.
 
   - `import` *path*; `builtins.import` *path*  
     Load, parse and return the Nix expression in the file *path*. If
-    *path* is a directory, the file ` default.nix
-                     ` in that directory is loaded. Evaluation aborts if the file
-    doesn’t exist or contains an incorrect Nix expression. `import`
-    implements Nix’s module system: you can put any Nix expression (such
-    as a set or a function) in a separate file, and use it from Nix
-    expressions in other files.
+    *path* is a directory, the file ` default.nix ` in that directory
+    is loaded. Evaluation aborts if the file doesn’t exist or contains
+    an incorrect Nix expression. `import` implements Nix’s module
+    system: you can put any Nix expression (such as a set or a
+    function) in a separate file, and use it from Nix expressions in
+    other files.
     
     > **Note**
     > 
     > Unlike some languages, `import` is a regular function in Nix.
-    > Paths using the angle bracket syntax (e.g., `
-    >     >     >     >     > import` *\<foo\>*) are normal path values (see
-    > [???](#ssec-values)).
+    > Paths using the angle bracket syntax (e.g., `import` *\<foo\>*)
+    > are [normal path values](language-values.md).
     
     A Nix expression loaded by `import` must not contain any *free
     variables* (identifiers that are not defined in the Nix expression
@@ -643,11 +642,12 @@ For instance, `derivation` is also available as `builtins.derivation`.
     (which is not the case for `abort`).
 
   - `builtins.toFile` *name* *s*  
-    Store the string *s* in a file in the Nix store and return its path.
-    The file has suffix *name*. This file can be used as an input to
-    derivations. One application is to write builders “inline”. For
-    instance, the following Nix expression combines [???](#ex-hello-nix)
-    and [???](#ex-hello-builder) into one file:
+    Store the string *s* in a file in the Nix store and return its
+    path.  The file has suffix *name*. This file can be used as an
+    input to derivations. One application is to write builders
+    “inline”. For instance, the following Nix expression combines the
+    [Nix expression for GNU Hello](expression-syntax.md) and its
+    [build script](build-script.md) into one file:
     
         { stdenv, fetchurl, perl }:
         
@@ -688,8 +688,9 @@ For instance, `derivation` is also available as `builtins.derivation`.
       ";
     ```
     
-    Note that `${configFile}` is an antiquotation (see
-    [???](#ssec-values)), so the result of the expression `configFile`
+    Note that `${configFile}` is an
+    [antiquotation](language-values.md), so the result of the
+    expression `configFile`
     (i.e., a path like `/nix/store/m7p7jfny445k...-foo.conf`) will be
     spliced into the resulting string.
     
@@ -786,17 +787,17 @@ For instance, `derivation` is also available as `builtins.derivation`.
     container contains a number of servlets (`*.war` files) each
     exported under a specific URI prefix. So the servlet configuration
     is a list of sets containing the `path` and `war` of the servlet
-    ([???](#ex-toxml-co-servlets)). This kind of information is
-    difficult to communicate with the normal method of passing
-    information through an environment variable, which just concatenates
-    everything together into a string (which might just work in this
-    case, but wouldn’t work if fields are optional or contain lists
-    themselves). Instead the Nix expression is converted to an XML
-    representation with `toXML`, which is unambiguous and can easily be
-    processed with the appropriate tools. For instance, in the example
-    an XSLT stylesheet (at point ②) is applied to it (at point ①) to
-    generate the XML configuration file for the Jetty server. The XML
-    representation produced at point ③ by `toXML` is as follows:
+    (①). This kind of information is difficult to communicate with the
+    normal method of passing information through an environment
+    variable, which just concatenates everything together into a
+    string (which might just work in this case, but wouldn’t work if
+    fields are optional or contain lists themselves). Instead the Nix
+    expression is converted to an XML representation with `toXML`,
+    which is unambiguous and can easily be processed with the
+    appropriate tools. For instance, in the example an XSLT stylesheet
+    (at point ②) is applied to it (at point ①) to generate the XML
+    configuration file for the Jetty server. The XML representation
+    produced at point ③ by `toXML` is as follows:
     
         <?xml version='1.0' encoding='utf-8'?>
         <expr>
@@ -820,10 +821,10 @@ For instance, `derivation` is also available as `builtins.derivation`.
           </list>
         </expr>
     
-    Note that [???](#ex-toxml) uses the `toFile` built-in to write the
-    builder and the stylesheet “inline” in the Nix expression. The path
-    of the stylesheet is spliced into the builder using the syntax
-    `xsltproc ${stylesheet}`.
+    Note that we used the `toFile` built-in to write the builder and
+    the stylesheet “inline” in the Nix expression. The path of the
+    stylesheet is spliced into the builder using the syntax `xsltproc
+    ${stylesheet}`.
 
   - `builtins.trace` *e1* *e2*  
     Evaluate *e1* and print its abstract syntax representation on

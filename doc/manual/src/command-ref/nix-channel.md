@@ -13,7 +13,6 @@ Title: nix-channel
 A Nix channel is a mechanism that allows you to automatically stay
 up-to-date with a set of pre-built Nix expressions. A Nix channel is
 just a URL that points to a place containing a set of Nix expressions.
-See also [???](#sec-channels).
 
 To see the list of official NixOS channels, visit
 <https://nixos.org/channels>.

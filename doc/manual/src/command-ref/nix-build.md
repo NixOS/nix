@@ -46,7 +46,7 @@ expression to a low-level store derivation) and [`nix-store
 
 All options not listed here are passed to `nix-store
 --realise`, except for `--arg` and `--attr` / `-A` which are passed to
-`nix-instantiate`. See also [???](#sec-common-options).
+`nix-instantiate`.
 
   - `--no-out-link`  
     Do not create a symlink to the output path. Note that as a result

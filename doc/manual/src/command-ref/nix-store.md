@@ -23,16 +23,15 @@ subcommand to be performed. These are documented below.
 
 This section lists the options that are common to all operations. These
 options are allowed for every subcommand, though they may not always
-have an effect. See also [???](#sec-common-options) for a list of common
-options.
+have an effect.
 
   - `--add-root` *path*  
     Causes the result of a realisation (`--realise` and
     `--force-realise`) to be registered as a root of the garbage
-    collector(see [???](#ssec-gc-roots)). The root is stored in *path*,
-    which must be inside a directory that is scanned for roots by the
-    garbage collector (i.e., typically in a subdirectory of
-    `/nix/var/nix/gcroots/`) *unless* the `--indirect` flag is used.
+    collector. The root is stored in *path*, which must be inside a
+    directory that is scanned for roots by the garbage collector
+    (i.e., typically in a subdirectory of `/nix/var/nix/gcroots/`)
+    *unless* the `--indirect` flag is used.
 
     If there are multiple results, then multiple symlinks will be
     created by sequentially numbering symlinks beyond the first one
@@ -209,8 +208,7 @@ The following suboperations may be specified:
 
   - `--print-roots`  
     This operation prints on standard output the set of roots used by
-    the garbage collector. What constitutes a root is described in
-    [???](#ssec-gc-roots).
+    the garbage collector.
 
   - `--print-live`  
     This operation prints on standard output the set of “live” store

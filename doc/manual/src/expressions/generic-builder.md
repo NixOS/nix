@@ -1,7 +1,7 @@
 # Generic Builder Syntax
 
-Recall from [???](#ex-hello-builder) that the builder looked something
-like this:
+Recall that the [build script for GNU Hello](build-script.md) looked
+something like this:
 
     PATH=$perl/bin:$PATH
     tar xvfz $src
@@ -37,11 +37,10 @@ Here is what each line means:
 2.  The function `genericBuild` is defined in the file `$stdenv/setup`.
 
 3.  The final step calls the shell function `genericBuild`, which
-    performs the steps that were done explicitly in
-    [???](#ex-hello-builder). The generic builder is smart enough to
-    figure out whether to unpack the sources using `gzip`, `bzip2`, etc.
-    It can be customised in many ways; see the Nixpkgs manual for
-    details.
+    performs the steps that were done explicitly in the previous build
+    script. The generic builder is smart enough to figure out whether
+    to unpack the sources using `gzip`, `bzip2`, etc.  It can be
+    customised in many ways; see the Nixpkgs manual for details.
 
 Discerning readers will note that the `buildInputs` could just as well
 have been set in the Nix expression, like this:

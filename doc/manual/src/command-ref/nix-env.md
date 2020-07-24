@@ -66,7 +66,7 @@ match. Here are some examples:
 
 This section lists the options that are common to all operations. These
 options are allowed for every subcommand, though they may not always
-have an effect. See also [???](#sec-common-options).
+have an effect.
 
   - `--file` / `-f` *path*  
     Specifies the Nix expression (designated below as the *active Nix

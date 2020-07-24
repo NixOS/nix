@@ -24,11 +24,11 @@ or completely new ones.)
 
 You can manually download the latest version of Nixpkgs from
 <http://nixos.org/nixpkgs/download.html>. However, it’s much more
-convenient to use the Nixpkgs *channel*, since it makes it easy to stay
-up to date with new versions of Nixpkgs. (Channels are described in more
-detail in [???](#sec-channels).) Nixpkgs is automatically added to your
-list of “subscribed” channels when you install Nix. If this is not the
-case for some reason, you can add it as follows:
+convenient to use the Nixpkgs [*channel*](channels.md), since it makes
+it easy to stay up to date with new versions of Nixpkgs. Nixpkgs is
+automatically added to your list of “subscribed” channels when you
+install Nix. If this is not the case for some reason, you can add it
+as follows:
 
     $ nix-channel --add https://nixos.org/channels/nixpkgs-unstable
     $ nix-channel --update

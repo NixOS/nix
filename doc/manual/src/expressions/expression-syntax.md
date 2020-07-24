@@ -61,9 +61,10 @@ elements (referenced from the figure by number):
     sometimes be omitted, in which case `mkDerivation` will fill in a
     default builder (which does a `configure; make; make install`, in
     essence). Hello is sufficiently simple that the default builder
-    would suffice, but in this case, we will show an actual builder for
-    educational purposes. The value `./builder.sh` refers to the shell
-    script shown in [???](#ex-hello-builder), discussed below.
+    would suffice, but in this case, we will show an actual builder
+    for educational purposes. The value `./builder.sh` refers to the
+    shell script shown in the [next section](build-script.md),
+    discussed below.
 
 5.  The builder has to know what the sources of the package are. Here,
     the attribute `src` is bound to the result of a call to the

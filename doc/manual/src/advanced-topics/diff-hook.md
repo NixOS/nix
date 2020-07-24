@@ -1,9 +1,8 @@
 # Verifying Build Reproducibility
 
-Specify a program with Nix's [???](#conf-diff-hook) to compare build
-results when two builds produce different results. Note: this hook is
-only executed if the results are not the same, this hook is not used for
-determining if the results are the same.
+You can use Nix's `diff-hook` setting to compare build results. Note
+that this hook is only executed if the results differ; it is not used
+for determining if the results are the same.
 
 For purposes of demonstration, we'll use the following Nix file,
 `deterministic.nix` for testing:
@@ -93,7 +92,7 @@ has copied the build results to that directory where you can examine it.
 > path will be deleted on the next garbage collection.
 > 
 > The path is guaranteed to be alive for the duration of
-> [???](#conf-diff-hook)'s execution, but may be deleted any time after.
+> the `diff-hook`'s execution, but may be deleted any time after.
 > 
 > If the comparison is performed as part of automated tooling, please
 > use the diff-hook or author your tooling to handle the case where the
@@ -112,9 +111,8 @@ Run the build without `--check`, and then try with `--check` again.
 Automatically verify every build at build time by executing the build
 multiple times.
 
-Setting [???](#conf-repeat) and [???](#conf-enforce-determinism) in your
-`nix.conf` permits the automated verification of every build Nix
-performs.
+Setting `repeat` and `enforce-determinism` in your `nix.conf` permits
+the automated verification of every build Nix performs.
 
 The following configuration will run each build three times, and will
 require the build to be deterministic:
@@ -122,9 +120,9 @@ require the build to be deterministic:
     enforce-determinism = true
     repeat = 2
 
-Setting [???](#conf-enforce-determinism) to false as in the following
-configuration will run the build multiple times, execute the build hook,
-but will allow the build to succeed even if it does not build
+Setting `enforce-determinism` to false as in the following
+configuration will run the build multiple times, execute the build
+hook, but will allow the build to succeed even if it does not build
 reproducibly:
 
     enforce-determinism = false
