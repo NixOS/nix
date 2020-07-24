@@ -967,7 +967,7 @@ static void daemonLoop(char * * argv)
 
         struct sockaddr_un addr;
         addr.sun_family = AF_UNIX;
-        if (socketPathRel.size() >= sizeof(addr.sun_path))
+        if (socketPathRel.size() + 1 >= sizeof(addr.sun_path))
             throw Error(format("socket path '%1%' is too long") % socketPathRel);
         strcpy(addr.sun_path, socketPathRel.c_str());
 
