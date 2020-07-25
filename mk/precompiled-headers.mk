@@ -21,13 +21,13 @@ clean-files += $(GCH) $(PCH)
 
 ifeq ($(PRECOMPILE_HEADERS), 1)
 
-  ifeq ($(CXX), g++)
+  ifeq ($(findstring g++,$(CXX)), g++)
 
     GLOBAL_CXXFLAGS_PCH += -include $(buildprefix)precompiled-headers.h -Winvalid-pch
 
     GLOBAL_ORDER_AFTER += $(GCH)
 
-  else ifeq ($(CXX), clang++)
+  else ifeq ($(findstring clang++,$(CXX)), clang++)
 
     GLOBAL_CXXFLAGS_PCH += -include-pch $(PCH) -Winvalid-pch
 
