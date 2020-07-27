@@ -1581,7 +1581,7 @@ AutoCloseFD createUnixDomainSocket(const Path & path, mode_t mode)
 
     struct sockaddr_un addr;
     addr.sun_family = AF_UNIX;
-    if (path.size() >= sizeof(addr.sun_path))
+    if (path.size() + 1 >= sizeof(addr.sun_path))
         throw Error("socket path '%1%' is too long", path);
     strcpy(addr.sun_path, path.c_str());
 
