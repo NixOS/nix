@@ -68,7 +68,7 @@ void builtinFetchurl(const BasicDerivation & drv, const std::string & netrcData)
             for (auto hashedMirror : settings.hashedMirrors.get()) {
                 try {
                     if (!hasSuffix(hashedMirror, "/")) hashedMirror += '/';
-                    fetch(hashedMirror + printHashType(*hash->hash.hash.type) + "/" + hash->hash.hash.to_string(Base16, false));
+                    fetch(hashedMirror + printHashType(hash->hash.hash.type) + "/" + hash->hash.hash.to_string(Base16, false));
                     return;
                 } catch (Error & e) {
                     debug(e.what());

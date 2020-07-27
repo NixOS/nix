@@ -285,11 +285,10 @@ static std::shared_ptr<AttrDb> makeAttrDb(const Hash & fingerprint)
 }
 
 EvalCache::EvalCache(
-    bool useCache,
-    const Hash & fingerprint,
+    std::optional<std::reference_wrapper<const Hash>> useCache,
     EvalState & state,
     RootLoader rootLoader)
-    : db(useCache ? makeAttrDb(fingerprint) : nullptr)
+    : db(useCache ? makeAttrDb(*useCache) : nullptr)
     , state(state)
     , rootLoader(rootLoader)
 {

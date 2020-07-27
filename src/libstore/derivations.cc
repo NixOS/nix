@@ -24,6 +24,7 @@ std::optional<StorePath> DerivationOutput::pathOpt(const Store & store, std::str
     }, output);
 }
 
+
 bool derivationIsCA(DerivationType dt) {
     switch (dt) {
     case DerivationType::Regular: return false;
