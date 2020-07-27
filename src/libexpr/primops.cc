@@ -640,8 +640,10 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
                 if (i->value->type == tNull) continue;
             }
 
-            if (i->name == state.sContentAddressed)
+            if (i->name == state.sContentAddressed) {
+                settings.requireExperimentalFeature("ca-derivations");
                 contentAddressed = state.forceBool(*i->value, pos);
+            }
 
             /* The `args' attribute is special: it supplies the
                command-line arguments to the builder. */

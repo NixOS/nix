@@ -163,12 +163,13 @@ static DerivationOutput parseDerivationOutput(const Store & store, std::istrings
                       },
                   }
                }
-            : DerivationOutput {
-                  .output = DerivationOutputFloating {
+            : (settings.requireExperimentalFeature("ca-derivations"),
+              DerivationOutput {
+                  .output =  DerivationOutputFloating {
                       .method = std::move(method),
                       .hashType = std::move(hashType),
                   },
-              };
+              });
     } else
         return DerivationOutput {
             .output = DerivationOutputInputAddressed {
@@ -559,12 +560,13 @@ static DerivationOutput readDerivationOutput(Source & in, const Store & store)
                       },
                   }
                }
-            : DerivationOutput {
+            : (settings.requireExperimentalFeature("ca-derivations"),
+              DerivationOutput {
                   .output = DerivationOutputFloating {
                       .method = std::move(method),
                       .hashType = std::move(hashType),
                   },
-              };
+              });
     } else
         return DerivationOutput {
             .output = DerivationOutputInputAddressed {
