@@ -581,6 +581,27 @@ StringSet BasicDerivation::outputNames() const
     return names;
 }
 
+DerivationOutputsAndPaths BasicDerivation::outputsAndPaths(const Store & store) const {
+    DerivationOutputsAndPaths outsAndPaths;
+    for (auto output : outputs)
+        outsAndPaths.insert(std::make_pair(
+            output.first,
+            std::make_pair(output.second, output.second.path(store, name))
+            )
+        );
+    return outsAndPaths;
+}
+
+DerivationOutputsAndOptPaths BasicDerivation::outputsAndOptPaths(const Store & store) const {
+    DerivationOutputsAndOptPaths outsAndOptPaths;
+    for (auto output : outputs)
+        outsAndOptPaths.insert(std::make_pair(
+            output.first,
+            std::make_pair(output.second, output.second.pathOpt(store, output.first))
+            )
+        );
+    return outsAndOptPaths;
+}
 
 std::string_view BasicDerivation::nameFromPath(const StorePath & drvPath) {
     auto nameWithSuffix = drvPath.name();
