@@ -276,7 +276,7 @@ std::vector<std::pair<std::shared_ptr<eval_cache::AttrCursor>, std::string>>
 Installable::getCursors(EvalState & state, bool useEvalCache)
 {
     auto evalCache =
-        std::make_shared<nix::eval_cache::EvalCache>(false, Hash(), state,
+        std::make_shared<nix::eval_cache::EvalCache>(std::nullopt, state,
             [&]() { return toValue(state).first; });
     return {{evalCache->getRoot(), ""}};
 }
@@ -437,9 +437,11 @@ ref<eval_cache::EvalCache> openEvalCache(
     std::shared_ptr<flake::LockedFlake> lockedFlake,
     bool useEvalCache)
 {
-    return ref(std::make_shared<nix::eval_cache::EvalCache>(
-        useEvalCache && evalSettings.pureEval,
-        lockedFlake->getFingerprint(),
+	auto fingerprint = lockedFlake->getFingerprint();
+    return make_ref<nix::eval_cache::EvalCache>(
+        useEvalCache && evalSettings.pureEval
+            ? std::optional { std::cref(fingerprint) }
+            : std::nullopt,
         state,
         [&state, lockedFlake]()
         {
@@ -457,7 +459,7 @@ ref<eval_cache::EvalCache> openEvalCache(
             assert(aOutputs);
 
             return aOutputs->value;
-        }));
+        });
 }
 
 static std::string showAttrPaths(const std::vector<std::string> & paths)
