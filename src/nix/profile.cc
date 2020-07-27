@@ -395,7 +395,7 @@ struct CmdProfileInfo : virtual EvalCommand, virtual StoreCommand, MixDefaultPro
     }
 };
 
-struct CmdProfileDiffClosures : virtual EvalCommand, virtual StoreCommand, MixDefaultProfile
+struct CmdProfileDiffClosures : virtual StoreCommand, MixDefaultProfile
 {
     std::string description() override
     {

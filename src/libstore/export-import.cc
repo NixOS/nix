@@ -60,8 +60,10 @@ StorePaths Store::importPaths(Source & source, CheckSigsFlag checkSigs)
         if (n != 1) throw Error("input doesn't look like something created by 'nix-store --export'");
 
         /* Extract the NAR from the source. */
-        TeeParseSink tee(source);
-        parseDump(tee, tee.source);
+        StringSink saved;
+        TeeSource tee { source, saved };
+        ParseSink ether;
+        parseDump(ether, tee);
 
         uint32_t magic = readInt(source);
         if (magic != exportMagic)
@@ -77,15 +79,15 @@ StorePaths Store::importPaths(Source & source, CheckSigsFlag checkSigs)
         if (deriver != "")
             info.deriver = parseStorePath(deriver);
 
-        info.narHash = hashString(htSHA256, *tee.saved.s);
-        info.narSize = tee.saved.s->size();
+        info.narHash = hashString(htSHA256, *saved.s);
+        info.narSize = saved.s->size();
 
         // Ignore optional legacy signature.
         if (readInt(source) == 1)
             readString(source);
 
         // Can't use underlying source, which would have been exhausted
-        auto source = StringSource { *tee.saved.s };
+        auto source = StringSource { *saved.s };
         addToStore(info, source, NoRepair, checkSigs);
 
         res.push_back(info.path);
