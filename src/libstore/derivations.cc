@@ -24,14 +24,6 @@ std::optional<StorePath> DerivationOutput::pathOpt(const Store & store, std::str
     }, output);
 }
 
-const StorePath BasicDerivation::findOutput(const Store & store, const string & id) const
-{
-    auto i = outputs.find(id);
-    if (i == outputs.end())
-        throw Error("derivation has no output '%s'", id);
-    return i->second.path(store, name);
-}
-
 
 bool BasicDerivation::isBuiltin() const
 {
