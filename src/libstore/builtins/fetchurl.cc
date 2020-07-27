@@ -63,16 +63,19 @@ void builtinFetchurl(const BasicDerivation & drv, const std::string & netrcData)
     auto & output = drv.outputs.begin()->second;
 
     /* Try the hashed mirrors first. */
-    if (output.hash && output.hash->method == FileIngestionMethod::Flat)
-        for (auto hashedMirror : settings.hashedMirrors.get())
-            try {
-                if (!hasSuffix(hashedMirror, "/")) hashedMirror += '/';
-                auto & h = output.hash->hash;
-                fetch(hashedMirror + printHashType(*h.type) + "/" + h.to_string(Base16, false));
-                return;
-            } catch (Error & e) {
-                debug(e.what());
+    if (auto hash = std::get_if<DerivationOutputFixed>(&output.output)) {
+        if (hash->hash.method == FileIngestionMethod::Flat) {
+            for (auto hashedMirror : settings.hashedMirrors.get()) {
+                try {
+                    if (!hasSuffix(hashedMirror, "/")) hashedMirror += '/';
+                    fetch(hashedMirror + printHashType(*hash->hash.hash.type) + "/" + hash->hash.hash.to_string(Base16, false));
+                    return;
+                } catch (Error & e) {
+                    debug(e.what());
+                }
             }
+        }
+    }
 
     /* Otherwise try the specified URL. */
     fetch(mainUrl);

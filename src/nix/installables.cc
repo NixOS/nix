@@ -304,8 +304,9 @@ struct InstallableStorePath : Installable
     {
         if (storePath.isDerivation()) {
             std::map<std::string, StorePath> outputs;
-            for (auto & [name, output] : store->readDerivation(storePath).outputs)
-                outputs.emplace(name, output.path);
+            auto drv = store->readDerivation(storePath);
+            for (auto & [name, output] : drv.outputs)
+                outputs.emplace(name, output.path(*store, drv.name));
             return {
                 Buildable {
                     .drvPath = storePath,
