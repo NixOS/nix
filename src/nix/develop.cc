@@ -130,14 +130,16 @@ StorePath getDerivationEnvironment(ref<Store> store, const StorePath & drvPath)
     drvName += "-env";
     for (auto & output : drv.outputs)
         drv.env.erase(output.first);
-    drv.outputs = {{"out", DerivationOutput { .path = StorePath::dummy }}};
+    drv.outputs = {{"out", DerivationOutput { .output = DerivationOutputInputAddressed { .path = StorePath::dummy }}}};
     drv.env["out"] = "";
     drv.env["_outputs_saved"] = drv.env["outputs"];
     drv.env["outputs"] = "out";
     drv.inputSrcs.insert(std::move(getEnvShPath));
     Hash h = hashDerivationModulo(*store, drv, true);
     auto shellOutPath = store->makeOutputPath("out", h, drvName);
-    drv.outputs.insert_or_assign("out", DerivationOutput { .path = shellOutPath });
+    drv.outputs.insert_or_assign("out", DerivationOutput { .output = DerivationOutputInputAddressed {
+                .path = shellOutPath
+            } });
     drv.env["out"] = store->printStorePath(shellOutPath);
     auto shellDrvPath2 = writeDerivation(store, drv, drvName);
 

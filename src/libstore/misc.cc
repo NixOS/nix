@@ -198,8 +198,8 @@ void Store::queryMissing(const std::vector<StorePathWithOutputs> & targets,
             PathSet invalid;
             for (auto & j : drv->outputs)
                 if (wantOutput(j.first, path.outputs)
-                    && !isValidPath(j.second.path))
-                    invalid.insert(printStorePath(j.second.path));
+                    && !isValidPath(j.second.path(*this, drv->name)))
+                    invalid.insert(printStorePath(j.second.path(*this, drv->name)));
             if (invalid.empty()) return;
 
             if (settings.useSubstitutes && parsedDrv.substitutesAllowed()) {
