@@ -4,6 +4,7 @@
 #include "hash.hh"
 #include "eval.hh"
 
+#include <functional>
 #include <variant>
 
 namespace nix::eval_cache {
@@ -26,8 +27,7 @@ class EvalCache : public std::enable_shared_from_this<EvalCache>
 public:
 
     EvalCache(
-        bool useCache,
-        const Hash & fingerprint,
+        std::optional<std::reference_wrapper<const Hash>> useCache,
         EvalState & state,
         RootLoader rootLoader);
 
