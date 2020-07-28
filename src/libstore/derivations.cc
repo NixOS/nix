@@ -14,7 +14,7 @@ bool derivationIsCA(DerivationType dt) {
     };
     // Since enums can have non-variant values, but making a `default:` would
     // disable exhaustiveness warnings.
-    abort();
+    assert(false);
 }
 
 bool derivationIsFixed(DerivationType dt) {
@@ -22,7 +22,7 @@ bool derivationIsFixed(DerivationType dt) {
     case DerivationType::Regular: return false;
     case DerivationType::CAFixed: return true;
     };
-    abort();
+    assert(false);
 }
 
 bool derivationIsImpure(DerivationType dt) {
@@ -30,7 +30,7 @@ bool derivationIsImpure(DerivationType dt) {
     case DerivationType::Regular: return false;
     case DerivationType::CAFixed: return true;
     };
-    abort();
+    assert(false);
 }
 
 // FIXME Put this somewhere?
