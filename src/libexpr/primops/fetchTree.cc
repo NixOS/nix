@@ -14,7 +14,8 @@ void emitTreeAttrs(
     EvalState & state,
     const fetchers::Tree & tree,
     const fetchers::Input & input,
-    Value & v)
+    Value & v,
+    bool emptyRevFallback)
 {
     assert(input.isImmutable());
 
@@ -34,6 +35,11 @@ void emitTreeAttrs(
     if (auto rev = input.getRev()) {
         mkString(*state.allocAttr(v, state.symbols.create("rev")), rev->gitRev());
         mkString(*state.allocAttr(v, state.symbols.create("shortRev")), rev->gitShortRev());
+    } else if (emptyRevFallback) {
+        // Backwards compat for `builtins.fetchGit`: dirty repos return an empty sha1 as rev
+        auto emptyHash = Hash(htSHA1);
+        mkString(*state.allocAttr(v, state.symbols.create("rev")), emptyHash.gitRev());
+        mkString(*state.allocAttr(v, state.symbols.create("shortRev")), emptyHash.gitRev());
     }
 
     if (input.getType() == "git")
@@ -41,6 +47,8 @@ void emitTreeAttrs(
 
     if (auto revCount = input.getRevCount())
         mkInt(*state.allocAttr(v, state.symbols.create("revCount")), *revCount);
+    else if (emptyRevFallback)
+        mkInt(*state.allocAttr(v, state.symbols.create("revCount")), 0);
 
     if (auto lastModified = input.getLastModified()) {
         mkInt(*state.allocAttr(v, state.symbols.create("lastModified")), *lastModified);
@@ -68,7 +76,8 @@ static void fetchTree(
     const Pos &pos,
     Value **args,
     Value &v,
-    const std::optional<std::string> type
+    const std::optional<std::string> type,
+    bool emptyRevFallback = false
 ) {
     fetchers::Input input;
     PathSet context;
@@ -134,7 +143,7 @@ static void fetchTree(
     if (state.allowedPaths)
         state.allowedPaths->insert(tree.actualPath);
 
-    emitTreeAttrs(state, tree, input2, v);
+    emitTreeAttrs(state, tree, input2, v, emptyRevFallback);
 }
 
 static void prim_fetchTree(EvalState & state, const Pos & pos, Value * * args, Value & v)
@@ -224,7 +233,7 @@ static void prim_fetchTarball(EvalState & state, const Pos & pos, Value * * args
 
 static void prim_fetchGit(EvalState &state, const Pos &pos, Value **args, Value &v)
 {
-    fetchTree(state, pos, args, v, "git");
+    fetchTree(state, pos, args, v, "git", true);
 }
 
 static RegisterPrimOp r2("__fetchurl", 1, prim_fetchurl);

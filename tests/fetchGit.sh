@@ -89,6 +89,8 @@ path2=$(nix eval --impure --raw --expr "(builtins.fetchGit $repo).outPath")
 [ ! -e $path2/.git ]
 [[ $(cat $path2/dir1/foo) = foo ]]
 
+[[ $(nix eval --impure --raw --expr "(builtins.fetchGit $repo).rev") = 0000000000000000000000000000000000000000 ]]
+
 # ... unless we're using an explicit ref or rev.
 path3=$(nix eval --impure --raw --expr "(builtins.fetchGit { url = $repo; ref = \"master\"; }).outPath")
 [[ $path = $path3 ]]
@@ -129,7 +131,7 @@ path2=$(nix eval --impure --raw --expr "(builtins.fetchGit file://$repo).outPath
 # Using local path with branch other than 'master' should work when clean or dirty
 path3=$(nix eval --impure --raw --expr "(builtins.fetchGit $repo).outPath")
 # (check dirty-tree handling was used)
-[[ $(nix eval --impure --expr "(builtins.fetchGit $repo).rev or null") = null ]]
+[[ $(nix eval --impure --raw --expr "(builtins.fetchGit $repo).rev") = 0000000000000000000000000000000000000000 ]]
 
 # Committing shouldn't change store path, or switch to using 'master'
 git -C $repo commit -m 'Bla5' -a
