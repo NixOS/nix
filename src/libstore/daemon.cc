@@ -86,7 +86,7 @@ struct TunnelLogger : public Logger
     }
 
     /* startWork() means that we're starting an operation for which we
-      want to send out stderr to the client. */
+       want to send out stderr to the client. */
     void startWork()
     {
         auto state(state_.lock());
@@ -703,24 +703,84 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
         if (!trusted)
             info.ultimate = false;
 
-        std::unique_ptr<Source> source;
-        if (GET_PROTOCOL_MINOR(clientVersion) >= 21)
-            source = std::make_unique<TunnelSource>(from, to);
-        else {
-            StringSink saved;
-            TeeSource tee { from, saved };
-            ParseSink ether;
-            parseDump(ether, tee);
-            source = std::make_unique<StringSource>(std::move(*saved.s));
+        if (GET_PROTOCOL_MINOR(clientVersion) >= 23) {
+
+            struct FramedSource : Source
+            {
+                Source & from;
+                bool eof = false;
+                std::vector<unsigned char> pending;
+                size_t pos = 0;
+
+                FramedSource(Source & from) : from(from)
+                { }
+
+                ~FramedSource()
+                {
+                    if (!eof) {
+                        while (true) {
+                            auto n = readInt(from);
+                            if (!n) break;
+                            std::vector<unsigned char> data(n);
+                            from(data.data(), n);
+                        }
+                    }
+                }
+
+                size_t read(unsigned char * data, size_t len) override
+                {
+                    if (eof) throw EndOfFile("reached end of FramedSource");
+
+                    if (pos >= pending.size()) {
+                        size_t len = readInt(from);
+                        if (!len) {
+                            eof = true;
+                            return 0;
+                        }
+                        pending = std::vector<unsigned char>(len);
+                        pos = 0;
+                        from(pending.data(), len);
+                    }
+
+                    auto n = std::min(len, pending.size() - pos);
+                    memcpy(data, pending.data() + pos, n);
+                    pos += n;
+                    return n;
+                }
+            };
+
+            logger->startWork();
+
+            {
+                FramedSource source(from);
+                store->addToStore(info, source, (RepairFlag) repair,
+                    dontCheckSigs ? NoCheckSigs : CheckSigs);
+            }
+
+            logger->stopWork();
         }
 
-        logger->startWork();
+        else {
+            std::unique_ptr<Source> source;
+            if (GET_PROTOCOL_MINOR(clientVersion) >= 21)
+                source = std::make_unique<TunnelSource>(from, to);
+            else {
+                StringSink saved;
+                TeeSource tee { from, saved };
+                ParseSink ether;
+                parseDump(ether, tee);
+                source = std::make_unique<StringSource>(std::move(*saved.s));
+            }
 
-        // FIXME: race if addToStore doesn't read source?
-        store->addToStore(info, *source, (RepairFlag) repair,
-            dontCheckSigs ? NoCheckSigs : CheckSigs);
+            logger->startWork();
 
-        logger->stopWork();
+            // FIXME: race if addToStore doesn't read source?
+            store->addToStore(info, *source, (RepairFlag) repair,
+                dontCheckSigs ? NoCheckSigs : CheckSigs);
+
+            logger->stopWork();
+        }
+
         break;
     }
 
