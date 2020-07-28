@@ -113,9 +113,9 @@ static void prim_scopedImport(EvalState & state, const Pos & pos, Value * * args
         state.mkList(*outputsVal, drv.outputs.size());
         unsigned int outputs_index = 0;
 
-        for (const auto & o : drv.outputs) {
+        for (const auto & o : drv.outputsAndPaths(*state.store)) {
             v2 = state.allocAttr(w, state.symbols.create(o.first));
-            mkString(*v2, state.store->printStorePath(o.second.path(*state.store, drv.name)), {"!" + o.first + "!" + path});
+            mkString(*v2, state.store->printStorePath(o.second.second), {"!" + o.first + "!" + path});
             outputsVal->listElems()[outputs_index] = state.allocValue();
             mkString(*(outputsVal->listElems()[outputs_index++]), o.first);
         }
@@ -830,9 +830,9 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
 
     state.mkAttrs(v, 1 + drv.outputs.size());
     mkString(*state.allocAttr(v, state.sDrvPath), drvPathS, {"=" + drvPathS});
-    for (auto & i : drv.outputs) {
+    for (auto & i : drv.outputsAndPaths(*state.store)) {
         mkString(*state.allocAttr(v, state.symbols.create(i.first)),
-            state.store->printStorePath(i.second.path(*state.store, drv.name)), {"!" + i.first + "!" + drvPathS});
+            state.store->printStorePath(i.second.second), {"!" + i.first + "!" + drvPathS});
     }
     v.attrs->sort();
 }

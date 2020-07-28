@@ -473,12 +473,12 @@ DrvHashModulo hashDerivationModulo(Store & store, const Derivation & drv, bool m
         throw Error("Regular input-addressed derivations are not yet allowed to depend on CA derivations");
     case DerivationType::CAFixed: {
         std::map<std::string, Hash> outputHashes;
-        for (const auto & i : drv.outputs) {
-            auto & dof = std::get<DerivationOutputFixed>(i.second.output);
+        for (const auto & i : drv.outputsAndPaths(store)) {
+            auto & dof = std::get<DerivationOutputFixed>(i.second.first.output);
             auto hash = hashString(htSHA256, "fixed:out:"
                 + dof.hash.printMethodAlgo() + ":"
                 + dof.hash.hash.to_string(Base16, false) + ":"
-                + store.printStorePath(i.second.path(store, drv.name)));
+                + store.printStorePath(i.second.second));
             outputHashes.insert_or_assign(i.first, std::move(hash));
         }
         return outputHashes;
@@ -532,8 +532,8 @@ bool wantOutput(const string & output, const std::set<string> & wanted)
 StorePathSet BasicDerivation::outputPaths(const Store & store) const
 {
     StorePathSet paths;
-    for (auto & i : outputs)
-        paths.insert(i.second.path(store, name));
+    for (auto & i : outputsAndPaths(store))
+        paths.insert(i.second.second);
     return paths;
 }
 
@@ -642,9 +642,9 @@ Source & readDerivation(Source & in, const Store & store, BasicDerivation & drv,
 void writeDerivation(Sink & out, const Store & store, const BasicDerivation & drv)
 {
     out << drv.outputs.size();
-    for (auto & i : drv.outputs) {
+    for (auto & i : drv.outputsAndPaths(store)) {
         out << i.first
-            << store.printStorePath(i.second.path(store, drv.name));
+            << store.printStorePath(i.second.second);
         std::visit(overloaded {
             [&](DerivationOutputInputAddressed doi) {
                 out << "" << "";
@@ -657,7 +657,7 @@ void writeDerivation(Sink & out, const Store & store, const BasicDerivation & dr
                 out << (makeFileIngestionPrefix(dof.method) + printHashType(dof.hashType))
                     << "";
             },
-        }, i.second.output);
+        }, i.second.first.output);
     }
     writeStorePaths(store, out, drv.inputSrcs);
     out << drv.platform << drv.builder << drv.args;

@@ -218,8 +218,8 @@ static StorePathSet maybeUseOutputs(const StorePath & storePath, bool useOutput,
     if (useOutput && storePath.isDerivation()) {
         auto drv = store->derivationFromPath(storePath);
         StorePathSet outputs;
-        for (auto & i : drv.outputs)
-            outputs.insert(i.second.path(*store, drv.name));
+        for (auto & i : drv.outputsAndPaths(*store))
+            outputs.insert(i.second.second);
         return outputs;
     }
     else return {storePath};
@@ -312,8 +312,8 @@ static void opQuery(Strings opFlags, Strings opArgs)
                 auto i2 = store->followLinksToStorePath(i);
                 if (forceRealise) realisePath({i2});
                 Derivation drv = store->derivationFromPath(i2);
-                for (auto & j : drv.outputs)
-                    cout << fmt("%1%\n", store->printStorePath(j.second.path(*store, drv.name)));
+                for (auto & j : drv.outputsAndPaths(*store))
+                    cout << fmt("%1%\n", store->printStorePath(j.second.second));
             }
             break;
         }
