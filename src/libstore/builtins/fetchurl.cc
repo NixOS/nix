@@ -58,18 +58,24 @@ void builtinFetchurl(const BasicDerivation & drv, const std::string & netrcData)
         }
     };
 
+    /* We always have one output, and if it's a fixed-output derivation (as
+       checked below) it must be the only output */
+    auto & output = drv.outputs.begin()->second;
+
     /* Try the hashed mirrors first. */
-    if (getAttr("outputHashMode") == "flat")
-        for (auto hashedMirror : settings.hashedMirrors.get())
-            try {
-                if (!hasSuffix(hashedMirror, "/")) hashedMirror += '/';
-                auto ht = parseHashTypeOpt(getAttr("outputHashAlgo"));
-                auto h = Hash(getAttr("outputHash"), ht);
-                fetch(hashedMirror + printHashType(*h.type) + "/" + h.to_string(Base16, false));
-                return;
-            } catch (Error & e) {
-                debug(e.what());
+    if (auto hash = std::get_if<DerivationOutputFixed>(&output.output)) {
+        if (hash->hash.method == FileIngestionMethod::Flat) {
+            for (auto hashedMirror : settings.hashedMirrors.get()) {
+                try {
+                    if (!hasSuffix(hashedMirror, "/")) hashedMirror += '/';
+                    fetch(hashedMirror + printHashType(hash->hash.hash.type) + "/" + hash->hash.hash.to_string(Base16, false));
+                    return;
+                } catch (Error & e) {
+                    debug(e.what());
+                }
             }
+        }
+    }
 
     /* Otherwise try the specified URL. */
     fetch(mainUrl);

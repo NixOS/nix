@@ -10,13 +10,15 @@ namespace nix {
 MakeError(BadHash, Error);
 
 
-enum HashType : char { htMD5, htSHA1, htSHA256, htSHA512 };
+enum HashType : char { htMD5 = 42, htSHA1, htSHA256, htSHA512 };
 
 
 const int md5HashSize = 16;
 const int sha1HashSize = 20;
 const int sha256HashSize = 32;
 const int sha512HashSize = 64;
+
+extern std::set<std::string> hashTypes;
 
 extern const string base32Chars;
 
@@ -25,14 +27,11 @@ enum Base : int { Base64, Base32, Base16, SRI };
 
 struct Hash
 {
-    static const unsigned int maxHashSize = 64;
-    unsigned int hashSize = 0;
-    unsigned char hash[maxHashSize] = {};
+    constexpr static size_t maxHashSize = 64;
+    size_t hashSize = 0;
+    uint8_t hash[maxHashSize] = {};
 
-    std::optional<HashType> type = {};
-
-    /* Create an unset hash object. */
-    Hash() { };
+    HashType type;
 
     /* Create a zero-filled hash object. */
     Hash(HashType type) : type(type) { init(); };
@@ -105,7 +104,7 @@ Hash newHashAllowEmpty(std::string hashStr, std::optional<HashType> ht);
 string printHash16or32(const Hash & hash);
 
 /* Compute the hash of the given string. */
-Hash hashString(HashType ht, const string & s);
+Hash hashString(HashType ht, std::string_view s);
 
 /* Compute the hash of the given file. */
 Hash hashFile(HashType ht, const Path & path);
@@ -121,9 +120,10 @@ HashResult hashPath(HashType ht, const Path & path,
 Hash compressHash(const Hash & hash, unsigned int newSize);
 
 /* Parse a string representing a hash type. */
-HashType parseHashType(const string & s);
+HashType parseHashType(std::string_view s);
+
 /* Will return nothing on parse error */
-std::optional<HashType> parseHashTypeOpt(const string & s);
+std::optional<HashType> parseHashTypeOpt(std::string_view s);
 
 /* And the reverse. */
 string printHashType(HashType ht);

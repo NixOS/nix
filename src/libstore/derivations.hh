@@ -13,10 +13,20 @@ namespace nix {
 
 /* Abstract syntax of derivations. */
 
-struct DerivationOutput
+struct DerivationOutputInputAddressed
 {
     StorePath path;
-    std::optional<FixedOutputHash> hash; /* hash used for expected hash computation */
+};
+
+struct DerivationOutputFixed
+{
+    FixedOutputHash hash; /* hash used for expected hash computation */
+};
+
+struct DerivationOutput
+{
+    std::variant<DerivationOutputInputAddressed, DerivationOutputFixed> output;
+    StorePath path(const Store & store, std::string_view drvName) const;
 };
 
 typedef std::map<string, DerivationOutput> DerivationOutputs;
@@ -53,13 +63,10 @@ struct BasicDerivation
     Path builder;
     Strings args;
     StringPairs env;
+    std::string name;
 
     BasicDerivation() { }
     virtual ~BasicDerivation() { };
-
-    /* Return the path corresponding to the output identifier `id' in
-       the given derivation. */
-    const StorePath & findOutput(const std::string & id) const;
 
     bool isBuiltin() const;
 
@@ -67,10 +74,12 @@ struct BasicDerivation
     DerivationType type() const;
 
     /* Return the output paths of a derivation. */
-    StorePathSet outputPaths() const;
+    StorePathSet outputPaths(const Store & store) const;
 
     /* Return the output names of a derivation. */
     StringSet outputNames() const;
+
+    static std::string_view nameFromPath(const StorePath & storePath);
 };
 
 struct Derivation : BasicDerivation
@@ -94,7 +103,7 @@ StorePath writeDerivation(ref<Store> store,
     const Derivation & drv, std::string_view name, RepairFlag repair = NoRepair);
 
 /* Read a derivation from a file. */
-Derivation readDerivation(const Store & store, const Path & drvPath);
+Derivation readDerivation(const Store & store, const Path & drvPath, std::string_view name);
 
 // FIXME: remove
 bool isDerivation(const string & fileName);
@@ -111,7 +120,7 @@ bool wantOutput(const string & output, const std::set<string> & wanted);
 struct Source;
 struct Sink;
 
-Source & readDerivation(Source & in, const Store & store, BasicDerivation & drv);
+Source & readDerivation(Source & in, const Store & store, BasicDerivation & drv, std::string_view name);
 void writeDerivation(Sink & out, const Store & store, const BasicDerivation & drv);
 
 std::string hashPlaceholder(const std::string & outputName);

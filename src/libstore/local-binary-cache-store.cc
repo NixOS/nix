@@ -31,8 +31,18 @@ protected:
     bool fileExists(const std::string & path) override;
 
     void upsertFile(const std::string & path,
-        const std::string & data,
-        const std::string & mimeType) override;
+        std::shared_ptr<std::basic_iostream<char>> istream,
+        const std::string & mimeType) override
+    {
+        auto path2 = binaryCacheDir + "/" + path;
+        Path tmp = path2 + ".tmp." + std::to_string(getpid());
+        AutoDelete del(tmp, false);
+        StreamToSourceAdapter source(istream);
+        writeFile(tmp, source);
+        if (rename(tmp.c_str(), path2.c_str()))
+            throw SysError("renaming '%1%' to '%2%'", tmp, path2);
+        del.cancel();
+    }
 
     void getFile(const std::string & path, Sink & sink) override
     {
@@ -52,7 +62,9 @@ protected:
             if (entry.name.size() != 40 ||
                 !hasSuffix(entry.name, ".narinfo"))
                 continue;
-            paths.insert(parseStorePath(storeDir + "/" + entry.name.substr(0, entry.name.size() - 8)));
+            paths.insert(parseStorePath(
+                    storeDir + "/" + entry.name.substr(0, entry.name.size() - 8)
+                    + "-" + MissingName));
         }
 
         return paths;
@@ -68,26 +80,9 @@ void LocalBinaryCacheStore::init()
     BinaryCacheStore::init();
 }
 
-static void atomicWrite(const Path & path, const std::string & s)
-{
-    Path tmp = path + ".tmp." + std::to_string(getpid());
-    AutoDelete del(tmp, false);
-    writeFile(tmp, s);
-    if (rename(tmp.c_str(), path.c_str()))
-        throw SysError("renaming '%1%' to '%2%'", tmp, path);
-    del.cancel();
-}
-
 bool LocalBinaryCacheStore::fileExists(const std::string & path)
 {
     return pathExists(binaryCacheDir + "/" + path);
-}
-
-void LocalBinaryCacheStore::upsertFile(const std::string & path,
-    const std::string & data,
-    const std::string & mimeType)
-{
-    atomicWrite(binaryCacheDir + "/" + path, data);
 }
 
 static RegisterStoreImplementation regStore([](

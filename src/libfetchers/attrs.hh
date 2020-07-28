@@ -13,9 +13,14 @@ namespace nix::fetchers {
 template<typename T>
 struct Explicit {
     T t;
+
+    bool operator ==(const Explicit<T> & other) const
+    {
+        return t == other.t;
+    }
 };
 
-typedef std::variant<std::string, int64_t, Explicit<bool>> Attr;
+typedef std::variant<std::string, uint64_t, Explicit<bool>> Attr;
 typedef std::map<std::string, Attr> Attrs;
 
 Attrs jsonToAttrs(const nlohmann::json & json);
@@ -26,9 +31,9 @@ std::optional<std::string> maybeGetStrAttr(const Attrs & attrs, const std::strin
 
 std::string getStrAttr(const Attrs & attrs, const std::string & name);
 
-std::optional<int64_t> maybeGetIntAttr(const Attrs & attrs, const std::string & name);
+std::optional<uint64_t> maybeGetIntAttr(const Attrs & attrs, const std::string & name);
 
-int64_t getIntAttr(const Attrs & attrs, const std::string & name);
+uint64_t getIntAttr(const Attrs & attrs, const std::string & name);
 
 std::optional<bool> maybeGetBoolAttr(const Attrs & attrs, const std::string & name);
 

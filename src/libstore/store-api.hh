@@ -31,7 +31,7 @@ MakeError(InvalidPath, Error);
 MakeError(Unsupported, Error);
 MakeError(SubstituteGone, Error);
 MakeError(SubstituterDisabled, Error);
-MakeError(NotInStore, Error);
+MakeError(BadStorePath, Error);
 
 
 class FSAccessor;
@@ -115,7 +115,8 @@ struct ValidPathInfo
 {
     StorePath path;
     std::optional<StorePath> deriver;
-    Hash narHash;
+    // TODO document this
+    std::optional<Hash> narHash;
     StorePathSet references;
     time_t registrationTime = 0;
     uint64_t narSize = 0; // 0 = unknown
@@ -317,9 +318,9 @@ public:
        the Nix store. */
     bool isStorePath(std::string_view path) const;
 
-    /* Chop off the parts after the top-level store name, e.g.,
-       /nix/store/abcd-foo/bar => /nix/store/abcd-foo. */
-    Path toStorePath(const Path & path) const;
+    /* Split a path like /nix/store/<hash>-<name>/<bla> into
+       /nix/store/<hash>-<name> and /<bla>. */
+    std::pair<StorePath, Path> toStorePath(const Path & path) const;
 
     /* Follow symlinks until we end up with a path in the Nix store. */
     Path followLinksToStore(std::string_view path) const;
@@ -384,12 +385,15 @@ public:
         SubstituteFlag maybeSubstitute = NoSubstitute);
 
     /* Query the set of all valid paths. Note that for some store
-       backends, the name part of store paths may be omitted
-       (i.e. you'll get /nix/store/<hash> rather than
+       backends, the name part of store paths may be replaced by 'x'
+       (i.e. you'll get /nix/store/<hash>-x rather than
        /nix/store/<hash>-<name>). Use queryPathInfo() to obtain the
-       full store path. */
+       full store path. FIXME: should return a set of
+       std::variant<StorePath, HashPart> to get rid of this hack. */
     virtual StorePathSet queryAllValidPaths()
     { unsupported("queryAllValidPaths"); }
+
+    constexpr static const char * MissingName = "x";
 
     /* Query information about a valid path. It is permitted to omit
        the name part of the store path. */
@@ -418,8 +422,11 @@ public:
     virtual StorePathSet queryValidDerivers(const StorePath & path) { return {}; };
 
     /* Query the outputs of the derivation denoted by `path'. */
-    virtual StorePathSet queryDerivationOutputs(const StorePath & path)
-    { unsupported("queryDerivationOutputs"); }
+    virtual StorePathSet queryDerivationOutputs(const StorePath & path);
+
+    /* Query the mapping outputName=>outputPath for the given derivation */
+    virtual OutputPathMap queryDerivationOutputMap(const StorePath & path)
+    { unsupported("queryDerivationOutputMap"); }
 
     /* Query the full store path given the hash part of a valid store
        path, or empty if the path doesn't exist. */
@@ -436,8 +443,7 @@ public:
 
     /* Import a path into the store. */
     virtual void addToStore(const ValidPathInfo & info, Source & narSource,
-        RepairFlag repair = NoRepair, CheckSigsFlag checkSigs = CheckSigs,
-        std::shared_ptr<FSAccessor> accessor = 0) = 0;
+        RepairFlag repair = NoRepair, CheckSigsFlag checkSigs = CheckSigs) = 0;
 
     /* Copy the contents of a path to the store and register the
        validity the resulting path.  The resulting path is returned.
@@ -447,8 +453,15 @@ public:
         FileIngestionMethod method = FileIngestionMethod::Recursive, HashType hashAlgo = htSHA256,
         PathFilter & filter = defaultPathFilter, RepairFlag repair = NoRepair) = 0;
 
+    /* Copy the contents of a path to the store and register the
+       validity the resulting path, using a constant amount of
+       memory. */
+    ValidPathInfo addToStoreSlow(std::string_view name, const Path & srcPath,
+        FileIngestionMethod method = FileIngestionMethod::Recursive, HashType hashAlgo = htSHA256,
+        std::optional<Hash> expectedCAHash = {});
+
     // FIXME: remove?
-    virtual StorePath addToStoreFromDump(const string & dump, const string & name,
+    virtual StorePath addToStoreFromDump(Source & dump, const string & name,
         FileIngestionMethod method = FileIngestionMethod::Recursive, HashType hashAlgo = htSHA256, RepairFlag repair = NoRepair)
     {
         throw Error("addToStoreFromDump() is not supported by this store");
@@ -613,8 +626,7 @@ public:
        the Nix store. Optionally, the contents of the NARs are
        preloaded into the specified FS accessor to speed up subsequent
        access. */
-    StorePaths importPaths(Source & source, std::shared_ptr<FSAccessor> accessor,
-        CheckSigsFlag checkSigs = CheckSigs);
+    StorePaths importPaths(Source & source, CheckSigsFlag checkSigs = CheckSigs);
 
     struct Stats
     {

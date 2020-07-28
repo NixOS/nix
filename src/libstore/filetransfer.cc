@@ -22,6 +22,7 @@
 #include <queue>
 #include <random>
 #include <thread>
+#include <regex>
 
 using namespace std::string_literals;
 
@@ -56,7 +57,7 @@ struct curlFileTransfer : public FileTransfer
         Callback<FileTransferResult> callback;
         CURL * req = 0;
         bool active = false; // whether the handle has been added to the multi object
-        std::string status;
+        std::string statusMsg;
 
         unsigned int attempt = 0;
 
@@ -123,7 +124,7 @@ struct curlFileTransfer : public FileTransfer
             if (requestHeaders) curl_slist_free_all(requestHeaders);
             try {
                 if (!done)
-                    fail(FileTransferError(Interrupted, "download of '%s' was interrupted", request.uri));
+                    fail(FileTransferError(Interrupted, nullptr, "download of '%s' was interrupted", request.uri));
             } catch (...) {
                 ignoreException();
             }
@@ -144,6 +145,7 @@ struct curlFileTransfer : public FileTransfer
 
         LambdaSink finalSink;
         std::shared_ptr<CompressionSink> decompressionSink;
+        std::optional<StringSink> errorSink;
 
         std::exception_ptr writeException;
 
@@ -153,9 +155,19 @@ struct curlFileTransfer : public FileTransfer
                 size_t realSize = size * nmemb;
                 result.bodySize += realSize;
 
-                if (!decompressionSink)
+                if (!decompressionSink) {
                     decompressionSink = makeDecompressionSink(encoding, finalSink);
+                    if (! successfulStatuses.count(getHTTPStatus())) {
+                        // In this case we want to construct a TeeSink, to keep
+                        // the response around (which we figure won't be big
+                        // like an actual download should be) to improve error
+                        // messages.
+                        errorSink = StringSink { };
+                    }
+                }
 
+                if (errorSink)
+                    (*errorSink)((unsigned char *) contents, realSize);
                 (*decompressionSink)((unsigned char *) contents, realSize);
 
                 return realSize;
@@ -175,12 +187,13 @@ struct curlFileTransfer : public FileTransfer
             size_t realSize = size * nmemb;
             std::string line((char *) contents, realSize);
             printMsg(lvlVomit, format("got header for '%s': %s") % request.uri % trim(line));
-            if (line.compare(0, 5, "HTTP/") == 0) { // new response starts
+            static std::regex statusLine("HTTP/[^ ]+ +[0-9]+(.*)", std::regex::extended | std::regex::icase);
+            std::smatch match;
+            if (std::regex_match(line, match, statusLine)) {
                 result.etag = "";
-                auto ss = tokenizeString<vector<string>>(line, " ");
-                status = ss.size() >= 2 ? ss[1] : "";
                 result.data = std::make_shared<std::string>();
                 result.bodySize = 0;
+                statusMsg = trim(match[1]);
                 acceptRanges = false;
                 encoding = "";
             } else {
@@ -194,7 +207,9 @@ struct curlFileTransfer : public FileTransfer
                            the expected ETag on a 200 response, then shut
                            down the connection because we already have the
                            data. */
-                        if (result.etag == request.expectedETag && status == "200") {
+                        long httpStatus = 0;
+                        curl_easy_getinfo(req, CURLINFO_RESPONSE_CODE, &httpStatus);
+                        if (result.etag == request.expectedETag && httpStatus == 200) {
                             debug(format("shutting down on 200 HTTP response with expected ETag"));
                             return 0;
                         }
@@ -408,16 +423,21 @@ struct curlFileTransfer : public FileTransfer
 
                 attempt++;
 
+                std::shared_ptr<std::string> response;
+                if (errorSink)
+                    response = errorSink->s;
                 auto exc =
                     code == CURLE_ABORTED_BY_CALLBACK && _isInterrupted
-                    ? FileTransferError(Interrupted, fmt("%s of '%s' was interrupted", request.verb(), request.uri))
+                    ? FileTransferError(Interrupted, response, "%s of '%s' was interrupted", request.verb(), request.uri)
                     : httpStatus != 0
                     ? FileTransferError(err,
-                        fmt("unable to %s '%s': HTTP error %d",
-                            request.verb(), request.uri, httpStatus)
+                        response,
+                        fmt("unable to %s '%s': HTTP error %d ('%s')",
+                            request.verb(), request.uri, httpStatus, statusMsg)
                         + (code == CURLE_OK ? "" : fmt(" (curl error: %s)", curl_easy_strerror(code)))
                         )
                     : FileTransferError(err,
+                        response,
                         fmt("unable to %s '%s': %s (%d)",
                             request.verb(), request.uri, curl_easy_strerror(code), code));
 
@@ -675,7 +695,7 @@ struct curlFileTransfer : public FileTransfer
                 auto s3Res = s3Helper.getObject(bucketName, key);
                 FileTransferResult res;
                 if (!s3Res.data)
-                    throw FileTransferError(NotFound, fmt("S3 object '%s' does not exist", request.uri));
+                    throw FileTransferError(NotFound, nullptr, "S3 object '%s' does not exist", request.uri);
                 res.data = s3Res.data;
                 callback(std::move(res));
 #else
@@ -817,6 +837,21 @@ void FileTransfer::download(FileTransferRequest && request, Sink & sink)
            lock while doing this to prevent blocking the download
            thread if sink() takes a long time. */
         sink((unsigned char *) chunk.data(), chunk.size());
+    }
+}
+
+template<typename... Args>
+FileTransferError::FileTransferError(FileTransfer::Error error, std::shared_ptr<string> response, const Args & ... args)
+    : Error(args...), error(error), response(response)
+{
+    const auto hf = hintfmt(args...);
+    // FIXME: Due to https://github.com/NixOS/nix/issues/3841 we don't know how
+    // to print different messages for different verbosity levels. For now
+    // we add some heuristics for detecting when we want to show the response.
+    if (response && (response->size() < 1024 || response->find("<html>") != string::npos)) {
+            err.hint = hintfmt("%1%\n\nresponse body:\n\n%2%", normaltxt(hf.str()), *response);
+    } else {
+        err.hint = hf;
     }
 }
 
