@@ -729,9 +729,9 @@ void copyPaths(ref<Store> srcStore, ref<Store> dstStore, const StorePathSet & st
 {
     auto valid = dstStore->queryValidPaths(storePaths, substitute);
 
-    PathSet missing;
+    StorePathSet missing;
     for (auto & path : storePaths)
-        if (!valid.count(path)) missing.insert(srcStore->printStorePath(path));
+        if (!valid.count(path)) missing.insert(path);
 
     if (missing.empty()) return;
 
@@ -748,28 +748,26 @@ void copyPaths(ref<Store> srcStore, ref<Store> dstStore, const StorePathSet & st
 
     ThreadPool pool;
 
-    processGraph<Path>(pool,
-        PathSet(missing.begin(), missing.end()),
+    processGraph<StorePath>(pool,
+        StorePathSet(missing.begin(), missing.end()),
 
-        [&](const Path & storePath) {
-            if (dstStore->isValidPath(dstStore->parseStorePath(storePath))) {
+        [&](const StorePath & storePath) {
+            if (dstStore->isValidPath(storePath)) {
                 nrDone++;
                 showProgress();
-                return PathSet();
+                return StorePathSet();
             }
 
-            auto info = srcStore->queryPathInfo(srcStore->parseStorePath(storePath));
+            auto info = srcStore->queryPathInfo(storePath);
 
             bytesExpected += info->narSize;
             act.setExpected(actCopyPath, bytesExpected);
 
-            return srcStore->printStorePathSet(info->references);
+            return info->references;
         },
 
-        [&](const Path & storePathS) {
+        [&](const StorePath & storePath) {
             checkInterrupt();
-
-            auto storePath = dstStore->parseStorePath(storePathS);
 
             if (!dstStore->isValidPath(storePath)) {
                 MaintainCount<decltype(nrRunning)> mc(nrRunning);
@@ -780,7 +778,7 @@ void copyPaths(ref<Store> srcStore, ref<Store> dstStore, const StorePathSet & st
                     nrFailed++;
                     if (!settings.keepGoing)
                         throw e;
-                    logger->log(lvlError, fmt("could not copy %s: %s", storePathS, e.what()));
+                    logger->log(lvlError, fmt("could not copy %s: %s", dstStore->printStorePath(storePath), e.what()));
                     showProgress();
                     return;
                 }
