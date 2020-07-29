@@ -27,10 +27,13 @@ test_tarball() {
 
     nix-build -o $TEST_ROOT/result -E "import (fetchTarball file://$tarball)"
 
-    nix-build --experimental-features flakes -o $TEST_ROOT/result -E "import (fetchTree file://$tarball)"
-    nix-build --experimental-features flakes -o $TEST_ROOT/result -E "import (fetchTree { type = \"tarball\"; url = file://$tarball; })"
-    nix-build --experimental-features flakes -o $TEST_ROOT/result -E "import (fetchTree { type = \"tarball\"; url = file://$tarball; narHash = \"$hash\"; })"
-    nix-build --experimental-features flakes -o $TEST_ROOT/result -E "import (fetchTree { type = \"tarball\"; url = file://$tarball; narHash = \"sha256-xdKv2pq/IiwLSnBBJXW8hNowI4MrdZfW+SYqDQs7Tzc=\"; })" 2>&1 | grep 'NAR hash mismatch in input'
+    nix-build  -o $TEST_ROOT/result -E "import (fetchTree file://$tarball)"
+    nix-build  -o $TEST_ROOT/result -E "import (fetchTree { type = \"tarball\"; url = file://$tarball; })"
+    nix-build  -o $TEST_ROOT/result -E "import (fetchTree { type = \"tarball\"; url = file://$tarball; narHash = \"$hash\"; })"
+    nix-build  -o $TEST_ROOT/result -E "import (fetchTree { type = \"tarball\"; url = file://$tarball; narHash = \"sha256-xdKv2pq/IiwLSnBBJXW8hNowI4MrdZfW+SYqDQs7Tzc=\"; })" 2>&1 | grep 'NAR hash mismatch in input'
+
+    nix-instantiate --strict --eval -E "!((import (fetchTree { type = \"tarball\"; url = file://$tarball; narHash = \"$hash\"; })) ? submodules)" >&2
+    nix-instantiate --strict --eval -E "!((import (fetchTree { type = \"tarball\"; url = file://$tarball; narHash = \"$hash\"; })) ? submodules)" 2>&1 | grep 'true'
 
     nix-instantiate --eval -E '1 + 2' -I fnord=file://no-such-tarball.tar$ext
     nix-instantiate --eval -E 'with <fnord/xyzzy>; 1 + 2' -I fnord=file://no-such-tarball$ext
