@@ -538,7 +538,7 @@ string Store::makeValidityRegistration(const StorePathSet & paths,
         auto info = queryPathInfo(i);
 
         if (showHash) {
-            s += info->narHash.to_string(Base16, false) + "\n";
+            s += info->narHash->to_string(Base16, false) + "\n";
             s += (format("%1%\n") % info->narSize).str();
         }
 
@@ -570,7 +570,7 @@ void Store::pathInfoToJSON(JSONPlaceholder & jsonOut, const StorePathSet & store
             auto info = queryPathInfo(storePath);
 
             jsonPath
-                .attr("narHash", info->narHash.to_string(hashBase, true))
+                .attr("narHash", info->narHash->to_string(hashBase, true))
                 .attr("narSize", info->narSize);
 
             {
@@ -613,7 +613,7 @@ void Store::pathInfoToJSON(JSONPlaceholder & jsonOut, const StorePathSet & store
                     if (!narInfo->url.empty())
                         jsonPath.attr("url", narInfo->url);
                     if (narInfo->fileHash)
-                        jsonPath.attr("downloadHash", narInfo->fileHash.to_string(hashBase, true));
+                        jsonPath.attr("downloadHash", narInfo->fileHash->to_string(hashBase, true));
                     if (narInfo->fileSize)
                         jsonPath.attr("downloadSize", narInfo->fileSize);
                     if (showClosureSize)
@@ -729,9 +729,9 @@ void copyPaths(ref<Store> srcStore, ref<Store> dstStore, const StorePathSet & st
 {
     auto valid = dstStore->queryValidPaths(storePaths, substitute);
 
-    PathSet missing;
+    StorePathSet missing;
     for (auto & path : storePaths)
-        if (!valid.count(path)) missing.insert(srcStore->printStorePath(path));
+        if (!valid.count(path)) missing.insert(path);
 
     if (missing.empty()) return;
 
@@ -748,28 +748,26 @@ void copyPaths(ref<Store> srcStore, ref<Store> dstStore, const StorePathSet & st
 
     ThreadPool pool;
 
-    processGraph<Path>(pool,
-        PathSet(missing.begin(), missing.end()),
+    processGraph<StorePath>(pool,
+        StorePathSet(missing.begin(), missing.end()),
 
-        [&](const Path & storePath) {
-            if (dstStore->isValidPath(dstStore->parseStorePath(storePath))) {
+        [&](const StorePath & storePath) {
+            if (dstStore->isValidPath(storePath)) {
                 nrDone++;
                 showProgress();
-                return PathSet();
+                return StorePathSet();
             }
 
-            auto info = srcStore->queryPathInfo(srcStore->parseStorePath(storePath));
+            auto info = srcStore->queryPathInfo(storePath);
 
             bytesExpected += info->narSize;
             act.setExpected(actCopyPath, bytesExpected);
 
-            return srcStore->printStorePathSet(info->references);
+            return info->references;
         },
 
-        [&](const Path & storePathS) {
+        [&](const StorePath & storePath) {
             checkInterrupt();
-
-            auto storePath = dstStore->parseStorePath(storePathS);
 
             if (!dstStore->isValidPath(storePath)) {
                 MaintainCount<decltype(nrRunning)> mc(nrRunning);
@@ -780,7 +778,7 @@ void copyPaths(ref<Store> srcStore, ref<Store> dstStore, const StorePathSet & st
                     nrFailed++;
                     if (!settings.keepGoing)
                         throw e;
-                    logger->log(lvlError, fmt("could not copy %s: %s", storePathS, e.what()));
+                    logger->log(lvlError, fmt("could not copy %s: %s", dstStore->printStorePath(storePath), e.what()));
                     showProgress();
                     return;
                 }
@@ -854,7 +852,7 @@ std::string ValidPathInfo::fingerprint(const Store & store) const
             store.printStorePath(path));
     return
         "1;" + store.printStorePath(path) + ";"
-        + narHash.to_string(Base32, true) + ";"
+        + narHash->to_string(Base32, true) + ";"
         + std::to_string(narSize) + ";"
         + concatStringsSep(",", store.printStorePathSet(references));
 }
