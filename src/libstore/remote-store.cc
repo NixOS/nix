@@ -545,7 +545,7 @@ void RemoteStore::addToStore(const ValidPathInfo & info, Source & source,
             std::thread stderrThread([&]()
             {
                 try {
-                    conn.processStderr(0, nullptr);
+                    conn.processStderr();
                 } catch (...) {
                     ex = std::current_exception();
                 }
