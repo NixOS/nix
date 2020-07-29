@@ -68,22 +68,22 @@ BuildEnvironment readEnvironment(const Path & path)
 
         std::smatch match;
 
-        if (std::regex_search(pos, file.cend(), match, declareRegex)) {
+        if (std::regex_search(pos, file.cend(), match, declareRegex, std::regex_constants::match_continuous)) {
             pos = match[0].second;
             exported.insert(match[1]);
         }
 
-        else if (std::regex_search(pos, file.cend(), match, varRegex)) {
+        else if (std::regex_search(pos, file.cend(), match, varRegex, std::regex_constants::match_continuous)) {
             pos = match[0].second;
             res.env.insert({match[1], Var { .exported = exported.count(match[1]) > 0, .value = match[2] }});
         }
 
-        else if (std::regex_search(pos, file.cend(), match, assocArrayRegex)) {
+        else if (std::regex_search(pos, file.cend(), match, assocArrayRegex, std::regex_constants::match_continuous)) {
             pos = match[0].second;
             res.env.insert({match[1], Var { .associative = true, .value = match[2] }});
         }
 
-        else if (std::regex_search(pos, file.cend(), match, functionRegex)) {
+        else if (std::regex_search(pos, file.cend(), match, functionRegex, std::regex_constants::match_continuous)) {
             res.bashFunctions = std::string(pos, file.cend());
             break;
         }
