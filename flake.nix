@@ -74,6 +74,7 @@
             # Tests
             buildPackages.git
             buildPackages.mercurial
+            buildPackages.jq
           ];
 
         buildDeps =
