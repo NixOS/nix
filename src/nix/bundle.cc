@@ -9,7 +9,7 @@ using namespace nix;
 struct CmdBundle : InstallableCommand
 {
     std::string bundler = "github:matthewbauer/nix-bundle";
-    Path outLink;
+    std::optional<Path> outLink;
 
     CmdBundle()
     {
@@ -92,18 +92,18 @@ struct CmdBundle : InstallableCommand
         if (!evalState->isDerivation(*vRes))
             throw Error("the bundler '%s' does not produce a derivation", bundler.what());
 
-        Bindings::iterator i = vRes->attrs->find(evalState->sDrvPath);
-        if (i == vRes->attrs->end())
-            throw Error("the bundler '%s' does not produce a bderivation", bundler.what());
-
-        PathSet context2;
-        StorePath drvPath = store->parseStorePath(evalState->coerceToPath(*i->pos, *i->value, context2));
-
-        i = vRes->attrs->find(evalState->sOutPath);
-        if (i == vRes->attrs->end())
+        auto attr1 = vRes->attrs->find(evalState->sDrvPath);
+        if (!attr1)
             throw Error("the bundler '%s' does not produce a derivation", bundler.what());
 
-        StorePath outPath = store->parseStorePath(evalState->coerceToPath(*i->pos, *i->value, context2));
+        PathSet context2;
+        StorePath drvPath = store->parseStorePath(evalState->coerceToPath(*attr1->pos, *attr1->value, context2));
+
+        auto attr2 = vRes->attrs->find(evalState->sOutPath);
+        if (!attr2)
+            throw Error("the bundler '%s' does not produce a derivation", bundler.what());
+
+        StorePath outPath = store->parseStorePath(evalState->coerceToPath(*attr2->pos, *attr2->value, context2));
 
         store->buildPaths({{drvPath}});
 
@@ -113,10 +113,10 @@ struct CmdBundle : InstallableCommand
         if (!info->references.empty())
             throw Error("'%s' has references; a bundler must not leave any references", outPathS);
 
-        if (outLink == "")
+        if (!outLink)
             outLink = baseNameOf(app.program);
 
-        store.dynamic_pointer_cast<LocalFSStore>()->addPermRoot(outPath, absPath(outLink), true);
+        store.dynamic_pointer_cast<LocalFSStore>()->addPermRoot(outPath, absPath(*outLink), true);
     }
 };
 
