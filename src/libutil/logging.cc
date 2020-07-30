@@ -1,11 +1,16 @@
 #include "logging.hh"
 #include "util.hh"
+#include "config.hh"
 
 #include <atomic>
 #include <nlohmann/json.hpp>
 #include <iostream>
 
 namespace nix {
+
+LoggerSettings loggerSettings;
+
+static GlobalConfig::Register r1(&loggerSettings);
 
 static thread_local ActivityId curActivity = 0;
 
@@ -72,7 +77,7 @@ public:
     void logEI(const ErrorInfo & ei) override
     {
         std::stringstream oss;
-        oss << ei;
+        showErrorInfo(oss, ei, loggerSettings.showTrace.get());
 
         log(ei.level, oss.str());
     }
@@ -173,7 +178,7 @@ struct JSONLogger : Logger {
     void logEI(const ErrorInfo & ei) override
     {
         std::ostringstream oss;
-        oss << ei;
+        showErrorInfo(oss, ei, loggerSettings.showTrace.get());
 
         nlohmann::json json;
         json["action"] = "msg";

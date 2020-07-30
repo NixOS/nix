@@ -1,7 +1,10 @@
+echo "Build started" > "$lockFifo"
+
 mkdir $out
 echo $(cat $input1/foo)$(cat $input2/bar) > $out/foobar
 
-sleep 10
+# Wait for someone to write on the fifo
+cat "$lockFifo"
 
 # $out should not have been GC'ed while we were sleeping, but just in
 # case...

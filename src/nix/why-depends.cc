@@ -55,15 +55,15 @@ struct CmdWhyDepends : SourceExprCommand
         return {
             Example{
                 "To show one path through the dependency graph leading from Hello to Glibc:",
-                "nix why-depends nixpkgs.hello nixpkgs.glibc"
+                "nix why-depends nixpkgs#hello nixpkgs#glibc"
             },
             Example{
                 "To show all files and paths in the dependency graph leading from Thunderbird to libX11:",
-                "nix why-depends --all nixpkgs.thunderbird nixpkgs.xorg.libX11"
+                "nix why-depends --all nixpkgs#thunderbird nixpkgs#xorg.libX11"
             },
             Example{
                 "To show why Glibc depends on itself:",
-                "nix why-depends nixpkgs.glibc nixpkgs.glibc"
+                "nix why-depends nixpkgs#glibc nixpkgs#glibc"
             },
         };
     }
@@ -72,17 +72,19 @@ struct CmdWhyDepends : SourceExprCommand
 
     void run(ref<Store> store) override
     {
-        auto package = parseInstallable(*this, store, _package, false);
-        auto packagePath = toStorePath(store, Build, package);
-        auto dependency = parseInstallable(*this, store, _dependency, false);
-        auto dependencyPath = toStorePath(store, NoBuild, dependency);
+        auto package = parseInstallable(store, _package);
+        auto packagePath = toStorePath(store, Realise::Outputs, operateOn, package);
+        auto dependency = parseInstallable(store, _dependency);
+        auto dependencyPath = toStorePath(store, Realise::Derivation, operateOn, dependency);
         auto dependencyPathHash = dependencyPath.hashPart();
 
         StorePathSet closure;
         store->computeFSClosure({packagePath}, closure, false, false);
 
         if (!closure.count(dependencyPath)) {
-            printError("'%s' does not depend on '%s'", package->what(), dependency->what());
+            printError("'%s' does not depend on '%s'",
+                store->printStorePath(packagePath),
+                store->printStorePath(dependencyPath));
             return;
         }
 
@@ -106,7 +108,11 @@ struct CmdWhyDepends : SourceExprCommand
         std::map<StorePath, Node> graph;
 
         for (auto & path : closure)
-            graph.emplace(path, Node { .path = path, .refs = store->queryPathInfo(path)->references });
+            graph.emplace(path, Node {
+                .path = path,
+                .refs = store->queryPathInfo(path)->references,
+                .dist = path == dependencyPath ? 0 : inf
+            });
 
         // Transpose the graph.
         for (auto & node : graph)
@@ -115,8 +121,6 @@ struct CmdWhyDepends : SourceExprCommand
 
         /* Run Dijkstra's shortest path algorithm to get the distance
            of every path in the closure to 'dependency'. */
-        graph.emplace(dependencyPath, Node { .path = dependencyPath, .dist = 0 });
-
         std::priority_queue<Node *> queue;
 
         queue.push(&graph.at(dependencyPath));

@@ -51,6 +51,7 @@ public:
 
     StorePathSet queryDerivationOutputs(const StorePath & path) override;
 
+    OutputPathMap queryDerivationOutputMap(const StorePath & path) override;
     std::optional<StorePath> queryPathFromHashPart(const std::string & hashPart) override;
 
     StorePathSet querySubstitutablePaths(const StorePathSet & paths) override;
@@ -59,8 +60,7 @@ public:
         SubstitutablePathInfos & infos) override;
 
     void addToStore(const ValidPathInfo & info, Source & nar,
-        RepairFlag repair, CheckSigsFlag checkSigs,
-        std::shared_ptr<FSAccessor> accessor) override;
+        RepairFlag repair, CheckSigsFlag checkSigs) override;
 
     StorePath addToStore(const string & name, const Path & srcPath,
         FileIngestionMethod method = FileIngestionMethod::Recursive, HashType hashAlgo = htSHA256,
@@ -94,7 +94,7 @@ public:
 
     void queryMissing(const std::vector<StorePathWithOutputs> & targets,
         StorePathSet & willBuild, StorePathSet & willSubstitute, StorePathSet & unknown,
-        unsigned long long & downloadSize, unsigned long long & narSize) override;
+        uint64_t & downloadSize, uint64_t & narSize) override;
 
     void connect() override;
 

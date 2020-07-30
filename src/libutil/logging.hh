@@ -2,6 +2,7 @@
 
 #include "types.hh"
 #include "error.hh"
+#include "config.hh"
 
 namespace nix {
 
@@ -33,6 +34,16 @@ typedef enum {
 } ResultType;
 
 typedef uint64_t ActivityId;
+
+struct LoggerSettings : Config
+{
+    Setting<bool> showTrace{this,
+        false,
+        "show-trace",
+        "Whether to show a stack trace on evaluation errors."};
+};
+
+extern LoggerSettings loggerSettings;
 
 class Logger
 {

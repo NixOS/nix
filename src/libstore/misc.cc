@@ -110,7 +110,7 @@ void Store::computeFSClosure(const StorePath & startPath,
 
 void Store::queryMissing(const std::vector<StorePathWithOutputs> & targets,
     StorePathSet & willBuild_, StorePathSet & willSubstitute_, StorePathSet & unknown_,
-    unsigned long long & downloadSize_, unsigned long long & narSize_)
+    uint64_t & downloadSize_, uint64_t & narSize_)
 {
     Activity act(*logger, lvlDebug, actUnknown, "querying info about missing paths");
 
@@ -122,8 +122,8 @@ void Store::queryMissing(const std::vector<StorePathWithOutputs> & targets,
     {
         std::unordered_set<std::string> done;
         StorePathSet & unknown, & willSubstitute, & willBuild;
-        unsigned long long & downloadSize;
-        unsigned long long & narSize;
+        uint64_t & downloadSize;
+        uint64_t & narSize;
     };
 
     struct DrvState
@@ -198,8 +198,8 @@ void Store::queryMissing(const std::vector<StorePathWithOutputs> & targets,
             PathSet invalid;
             for (auto & j : drv->outputs)
                 if (wantOutput(j.first, path.outputs)
-                    && !isValidPath(j.second.path))
-                    invalid.insert(printStorePath(j.second.path));
+                    && !isValidPath(j.second.path(*this, drv->name)))
+                    invalid.insert(printStorePath(j.second.path(*this, drv->name)));
             if (invalid.empty()) return;
 
             if (settings.useSubstitutes && parsedDrv.substitutesAllowed()) {

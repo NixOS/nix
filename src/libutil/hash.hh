@@ -18,6 +18,8 @@ const int sha1HashSize = 20;
 const int sha256HashSize = 32;
 const int sha512HashSize = 64;
 
+extern std::set<std::string> hashTypes;
+
 extern const string base32Chars;
 
 enum Base : int { Base64, Base32, Base16, SRI };
@@ -25,14 +27,11 @@ enum Base : int { Base64, Base32, Base16, SRI };
 
 struct Hash
 {
-    static const unsigned int maxHashSize = 64;
-    unsigned int hashSize = 0;
-    unsigned char hash[maxHashSize] = {};
+    constexpr static size_t maxHashSize = 64;
+    size_t hashSize = 0;
+    uint8_t hash[maxHashSize] = {};
 
-    std::optional<HashType> type = {};
-
-    /* Create an unset hash object. */
-    Hash() { };
+    HashType type;
 
     /* Create a zero-filled hash object. */
     Hash(HashType type) : type(type) { init(); };
@@ -105,14 +104,14 @@ Hash newHashAllowEmpty(std::string hashStr, std::optional<HashType> ht);
 string printHash16or32(const Hash & hash);
 
 /* Compute the hash of the given string. */
-Hash hashString(HashType ht, const string & s);
+Hash hashString(HashType ht, std::string_view s);
 
 /* Compute the hash of the given file. */
 Hash hashFile(HashType ht, const Path & path);
 
 /* Compute the hash of the given path.  The hash is defined as
    (essentially) hashString(ht, dumpPath(path)). */
-typedef std::pair<Hash, unsigned long long> HashResult;
+typedef std::pair<Hash, uint64_t> HashResult;
 HashResult hashPath(HashType ht, const Path & path,
     PathFilter & filter = defaultPathFilter);
 
@@ -121,9 +120,10 @@ HashResult hashPath(HashType ht, const Path & path,
 Hash compressHash(const Hash & hash, unsigned int newSize);
 
 /* Parse a string representing a hash type. */
-HashType parseHashType(const string & s);
+HashType parseHashType(std::string_view s);
+
 /* Will return nothing on parse error */
-std::optional<HashType> parseHashTypeOpt(const string & s);
+std::optional<HashType> parseHashTypeOpt(std::string_view s);
 
 /* And the reverse. */
 string printHashType(HashType ht);
@@ -141,7 +141,7 @@ class HashSink : public BufferedSink, public AbstractHashSink
 private:
     HashType ht;
     Ctx * ctx;
-    unsigned long long bytes;
+    uint64_t bytes;
 
 public:
     HashSink(HashType ht);
