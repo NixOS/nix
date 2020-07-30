@@ -368,6 +368,21 @@ struct CmdFlakeCheck : FlakeCommand
             }
         };
 
+        auto checkExporter = [&](const std::string & attrPath, Value & v, const Pos & pos) {
+            try {
+                state->forceValue(v, pos);
+                if (v.type != tLambda)
+                    throw Error("exporter must be a function");
+                if (!v.lambda.fun->formals ||
+                    v.lambda.fun->formals->argNames.find(state->symbols.create("program")) == v.lambda.fun->formals->argNames.end() ||
+                    v.lambda.fun->formals->argNames.find(state->symbols.create("args")) == v.lambda.fun->formals->argNames.end())
+                    throw Error("exporter must take formal arguments 'program' and 'args'");
+            } catch (Error & e) {
+                e.addTrace(pos, hintfmt("while checking the template '%s'", attrPath));
+                throw;
+            }
+        };
+
         {
             Activity act(*logger, lvlInfo, actUnknown, "evaluating flake");
 
@@ -487,6 +502,16 @@ struct CmdFlakeCheck : FlakeCommand
                             state->forceAttrs(vOutput, pos);
                             for (auto & attr : *vOutput.attrs)
                                 checkTemplate(fmt("%s.%s", name, attr.name),
+                                    *attr.value, *attr.pos);
+                        }
+
+                        else if (name == "defaultExporter")
+                            checkExporter(name, vOutput, pos);
+
+                        else if (name == "exporters") {
+                            state->forceAttrs(vOutput, pos);
+                            for (auto & attr : *vOutput.attrs)
+                                checkExporter(fmt("%s.%s", name, attr.name),
                                     *attr.value, *attr.pos);
                         }
 
