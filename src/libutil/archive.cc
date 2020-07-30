@@ -338,7 +338,7 @@ struct RestoreSink : ParseSink
 #endif
     }
 
-    void receiveContents(unsigned char * data, unsigned int len)
+    void receiveContents(unsigned char * data, size_t len)
     {
         writeFull(fd.get(), data, len);
     }
