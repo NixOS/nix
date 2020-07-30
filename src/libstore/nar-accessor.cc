@@ -79,7 +79,7 @@ struct NarAccessor : public FSAccessor
             parents.top()->isExecutable = true;
         }
 
-        void preallocateContents(unsigned long long size) override
+        void preallocateContents(uint64_t size) override
         {
             assert(size <= std::numeric_limits<uint64_t>::max());
             parents.top()->size = (uint64_t) size;

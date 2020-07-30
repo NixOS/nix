@@ -790,7 +790,7 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
             targets.push_back(store->parsePathWithOutputs(s));
         logger->startWork();
         StorePathSet willBuild, willSubstitute, unknown;
-        unsigned long long downloadSize, narSize;
+        uint64_t downloadSize, narSize;
         store->queryMissing(targets, willBuild, willSubstitute, unknown, downloadSize, narSize);
         logger->stopWork();
         writeStorePaths(*store, to, willBuild);

@@ -782,7 +782,7 @@ void RemoteStore::addSignatures(const StorePath & storePath, const StringSet & s
 
 void RemoteStore::queryMissing(const std::vector<StorePathWithOutputs> & targets,
     StorePathSet & willBuild, StorePathSet & willSubstitute, StorePathSet & unknown,
-    unsigned long long & downloadSize, unsigned long long & narSize)
+    uint64_t & downloadSize, uint64_t & narSize)
 {
     {
         auto conn(getConnection());

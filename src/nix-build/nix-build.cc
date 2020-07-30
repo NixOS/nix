@@ -325,7 +325,7 @@ static void _main(int argc, char * * argv)
     auto buildPaths = [&](const std::vector<StorePathWithOutputs> & paths) {
         /* Note: we do this even when !printMissing to efficiently
            fetch binary cache data. */
-        unsigned long long downloadSize, narSize;
+        uint64_t downloadSize, narSize;
         StorePathSet willBuild, willSubstitute, unknown;
         store->queryMissing(paths,
             willBuild, willSubstitute, unknown, downloadSize, narSize);

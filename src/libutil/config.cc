@@ -284,7 +284,7 @@ template class BaseSetting<unsigned int>;
 template class BaseSetting<long>;
 template class BaseSetting<unsigned long>;
 template class BaseSetting<long long>;
-template class BaseSetting<unsigned long long>;
+template class BaseSetting<uint64_t>;
 template class BaseSetting<bool>;
 template class BaseSetting<std::string>;
 template class BaseSetting<Strings>;

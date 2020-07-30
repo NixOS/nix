@@ -1646,13 +1646,13 @@ void DerivationGoal::buildDone()
                So instead, check if the disk is (nearly) full now.  If
                so, we don't mark this build as a permanent failure. */
 #if HAVE_STATVFS
-            unsigned long long required = 8ULL * 1024 * 1024; // FIXME: make configurable
+            uint64_t required = 8ULL * 1024 * 1024; // FIXME: make configurable
             struct statvfs st;
             if (statvfs(worker.store.realStoreDir.c_str(), &st) == 0 &&
-                (unsigned long long) st.f_bavail * st.f_bsize < required)
+                (uint64_t) st.f_bavail * st.f_bsize < required)
                 diskFull = true;
             if (statvfs(tmpDir.c_str(), &st) == 0 &&
-                (unsigned long long) st.f_bavail * st.f_bsize < required)
+                (uint64_t) st.f_bavail * st.f_bsize < required)
                 diskFull = true;
 #endif
 
@@ -2851,7 +2851,7 @@ struct RestrictedStore : public LocalFSStore
 
     void queryMissing(const std::vector<StorePathWithOutputs> & targets,
         StorePathSet & willBuild, StorePathSet & willSubstitute, StorePathSet & unknown,
-        unsigned long long & downloadSize, unsigned long long & narSize) override
+        uint64_t & downloadSize, uint64_t & narSize) override
     {
         /* This is slightly impure since it leaks information to the
            client about what paths will be built/substituted or are
@@ -5038,7 +5038,7 @@ void Worker::markContentsGood(const StorePath & path)
 static void primeCache(Store & store, const std::vector<StorePathWithOutputs> & paths)
 {
     StorePathSet willBuild, willSubstitute, unknown;
-    unsigned long long downloadSize, narSize;
+    uint64_t downloadSize, narSize;
     store.queryMissing(paths, willBuild, willSubstitute, unknown, downloadSize, narSize);
 
     if (!willBuild.empty() && 0 == settings.maxBuildJobs && getMachines().empty())

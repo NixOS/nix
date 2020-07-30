@@ -57,7 +57,7 @@ struct ParseSink
 
     virtual void createRegularFile(const Path & path) { };
     virtual void isExecutable() { };
-    virtual void preallocateContents(unsigned long long size) { };
+    virtual void preallocateContents(uint64_t size) { };
     virtual void receiveContents(unsigned char * data, size_t len) { };
 
     virtual void createSymlink(const Path & path, const string & target) { };

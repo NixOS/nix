@@ -85,7 +85,7 @@ struct GCOptions
     StorePathSet pathsToDelete;
 
     /* Stop after at least `maxFreed' bytes have been freed. */
-    unsigned long long maxFreed{std::numeric_limits<unsigned long long>::max()};
+    uint64_t maxFreed{std::numeric_limits<uint64_t>::max()};
 };
 
 
@@ -97,7 +97,7 @@ struct GCResults
 
     /* For `gcReturnDead', `gcDeleteDead' and `gcDeleteSpecific', the
        number of bytes that would be or was freed. */
-    unsigned long long bytesFreed = 0;
+    uint64_t bytesFreed = 0;
 };
 
 
@@ -105,8 +105,8 @@ struct SubstitutablePathInfo
 {
     std::optional<StorePath> deriver;
     StorePathSet references;
-    unsigned long long downloadSize; /* 0 = unknown or inapplicable */
-    unsigned long long narSize; /* 0 = unknown */
+    uint64_t downloadSize; /* 0 = unknown or inapplicable */
+    uint64_t narSize; /* 0 = unknown */
 };
 
 typedef std::map<StorePath, SubstitutablePathInfo> SubstitutablePathInfos;
@@ -610,7 +610,7 @@ public:
        that will be substituted. */
     virtual void queryMissing(const std::vector<StorePathWithOutputs> & targets,
         StorePathSet & willBuild, StorePathSet & willSubstitute, StorePathSet & unknown,
-        unsigned long long & downloadSize, unsigned long long & narSize);
+        uint64_t & downloadSize, uint64_t & narSize);
 
     /* Sort a set of paths topologically under the references
        relation.  If p refers to q, then p precedes q in this list. */
