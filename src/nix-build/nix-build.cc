@@ -192,7 +192,7 @@ static void _main(int argc, char * * argv)
         else if (*arg == "--pure") pure = true;
         else if (*arg == "--impure") pure = false;
 
-        else if (*arg == "--packages" || *arg == "-p")
+        else if (runEnv && (*arg == "--packages" || *arg == "-p"))
             packages = true;
 
         else if (inShebang && *arg == "-i") {
