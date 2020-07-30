@@ -107,10 +107,7 @@ struct CmdBundle : InstallableCommand
 
         store->buildPaths({{drvPath}});
 
-        auto accessor = store->getFSAccessor();
         auto outPathS = store->printStorePath(outPath);
-        if (accessor->stat(outPathS).type != FSAccessor::tRegular)
-            throw Error("'%s' is not a file; a bundler must only create a single file", outPathS);
 
         auto info = store->queryPathInfo(outPath);
         if (!info->references.empty())
