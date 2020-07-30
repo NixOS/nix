@@ -75,17 +75,21 @@ struct CmdBundle : InstallableCommand
         const flake::LockFlags lockFlags{ .writeLockFile = false };
         auto bundler = InstallableFlake(
             evalState, std::move(bundlerFlakeRef),
-            Strings{bundlerName == "" ? ("defaultBundler." + settings.thisSystem.get()) : bundlerName},
-            Strings({"bundlers." + settings.thisSystem.get() + "."}), lockFlags);
+            Strings{bundlerName == "" ? "defaultBundler" : bundlerName},
+            Strings({"bundlers."}), lockFlags);
 
         Value * arg = evalState->allocValue();
-        evalState->mkAttrs(*arg, 1);
+        evalState->mkAttrs(*arg, 2);
 
         PathSet context;
         for (auto & i : app.context)
             context.insert("=" + store->printStorePath(i.path));
         mkString(*evalState->allocAttr(*arg, evalState->symbols.create("program")), app.program, context);
 
+        mkString(*evalState->allocAttr(*arg, evalState->symbols.create("system")), settings.thisSystem.get());
+
+        arg->attrs->sort();
+ 
         auto vRes = evalState->allocValue();
         evalState->callFunction(*bundler.toValue(*evalState).first, *arg, *vRes, noPos);
 
