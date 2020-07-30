@@ -15,7 +15,8 @@
 
       officialRelease = false;
 
-      systems = [ "x86_64-linux" "i686-linux" "x86_64-darwin" "aarch64-linux" ];
+      linuxSystems = [ "x86_64-linux" "i686-linux" "aarch64-linux" ];
+      systems = linuxSystems ++ [ "x86_64-darwin" ];
 
       forAllSystems = f: nixpkgs.lib.genAttrs systems (system: f system);
 
@@ -209,7 +210,7 @@
         # Binary package for various platforms.
         build = nixpkgs.lib.genAttrs systems (system: self.packages.${system}.nix);
 
-        build-static = nixpkgs.lib.genAttrs systems (system: self.packages.${system}.nix-static);
+        build-static = nixpkgs.lib.genAttrs linuxSystems (system: self.packages.${system}.nix-static);
 
         # Perl bindings for various platforms.
         perlBindings = nixpkgs.lib.genAttrs systems (system: self.packages.${system}.nix.perl-bindings);
@@ -423,13 +424,14 @@
 
       checks = forAllSystems (system: {
         binaryTarball = self.hydraJobs.binaryTarball.${system};
-        build-static = self.hydraJobs.build-static.${system};
         perlBindings = self.hydraJobs.perlBindings.${system};
+      } // nixpkgs.lib.optionalAttrs (builtins.elem system linuxSystems) {
+        build-static = self.hydraJobs.build-static.${system};
       });
 
       packages = forAllSystems (system: {
         inherit (nixpkgsFor.${system}) nix;
-
+      } // nixpkgs.lib.optionalAttrs (builtins.elem system linuxSystems) {
         nix-static = let
           nixpkgs = nixpkgsFor.${system}.pkgsStatic;
         in with commonDeps nixpkgs; nixpkgs.stdenv.mkDerivation {
