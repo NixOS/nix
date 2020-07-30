@@ -344,7 +344,11 @@ public:
         bool hasSelfReference = false) const;
 
     StorePath makeTextPath(std::string_view name, const Hash & hash,
-        const StorePathSet & references) const;
+        const StorePathSet & references = {}) const;
+
+    StorePath makeFixedOutputPathFromCA(std::string_view name, ContentAddress ca,
+        const StorePathSet & references = {},
+        bool hasSelfReference = false) const;
 
     /* This is the preparatory part of addToStore(); it computes the
        store path to which srcPath is to be copied.  Returns the store
@@ -436,9 +440,10 @@ public:
     virtual StorePathSet querySubstitutablePaths(const StorePathSet & paths) { return {}; };
 
     /* Query substitute info (i.e. references, derivers and download
-       sizes) of a set of paths.  If a path does not have substitute
-       info, it's omitted from the resulting ‘infos’ map. */
-    virtual void querySubstitutablePathInfos(const StorePathSet & paths,
+       sizes) of a map of paths to their optional ca values. If a path
+       does not have substitute info, it's omitted from the resulting
+       ‘infos’ map. */
+    virtual void querySubstitutablePathInfos(const StorePathCAMap & paths,
         SubstitutablePathInfos & infos) { return; };
 
     /* Import a path into the store. */
@@ -740,11 +745,13 @@ void copyStorePath(ref<Store> srcStore, ref<Store> dstStore,
 
 
 /* Copy store paths from one store to another. The paths may be copied
-   in parallel. They are copied in a topologically sorted order
-   (i.e. if A is a reference of B, then A is copied before B), but
-   the set of store paths is not automatically closed; use
-   copyClosure() for that. */
-void copyPaths(ref<Store> srcStore, ref<Store> dstStore, const StorePathSet & storePaths,
+   in parallel. They are copied in a topologically sorted order (i.e.
+   if A is a reference of B, then A is copied before B), but the set
+   of store paths is not automatically closed; use copyClosure() for
+   that. Returns a map of what each path was copied to the dstStore
+   as. */
+std::map<StorePath, StorePath> copyPaths(ref<Store> srcStore, ref<Store> dstStore,
+    const StorePathSet & storePaths,
     RepairFlag repair = NoRepair,
     CheckSigsFlag checkSigs = CheckSigs,
     SubstituteFlag substitute = NoSubstitute);
@@ -842,5 +849,7 @@ std::optional<ValidPathInfo> decodeValidPathInfo(
 
 /* Split URI into protocol+hierarchy part and its parameter set. */
 std::pair<std::string, Store::Params> splitUriAndParams(const std::string & uri);
+
+std::optional<ContentAddress> getDerivationCA(const BasicDerivation & drv);
 
 }

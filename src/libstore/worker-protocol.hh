@@ -70,6 +70,10 @@ template<class T> T readStorePaths(const Store & store, Source & from);
 
 void writeStorePaths(const Store & store, Sink & out, const StorePathSet & paths);
 
+StorePathCAMap readStorePathCAMap(const Store & store, Source & from);
+
+void writeStorePathCAMap(const Store & store, Sink & out, const StorePathCAMap & paths);
+
 void writeOutputPathMap(const Store & store, Sink & out, const OutputPathMap & paths);
 
 }

@@ -56,7 +56,7 @@ public:
 
     StorePathSet querySubstitutablePaths(const StorePathSet & paths) override;
 
-    void querySubstitutablePathInfos(const StorePathSet & paths,
+    void querySubstitutablePathInfos(const StorePathCAMap & paths,
         SubstitutablePathInfos & infos) override;
 
     void addToStore(const ValidPathInfo & info, Source & nar,
