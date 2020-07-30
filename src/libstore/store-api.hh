@@ -31,7 +31,7 @@ MakeError(InvalidPath, Error);
 MakeError(Unsupported, Error);
 MakeError(SubstituteGone, Error);
 MakeError(SubstituterDisabled, Error);
-MakeError(NotInStore, Error);
+MakeError(BadStorePath, Error);
 
 
 class FSAccessor;
@@ -85,7 +85,7 @@ struct GCOptions
     StorePathSet pathsToDelete;
 
     /* Stop after at least `maxFreed' bytes have been freed. */
-    unsigned long long maxFreed{std::numeric_limits<unsigned long long>::max()};
+    uint64_t maxFreed{std::numeric_limits<uint64_t>::max()};
 };
 
 
@@ -97,7 +97,7 @@ struct GCResults
 
     /* For `gcReturnDead', `gcDeleteDead' and `gcDeleteSpecific', the
        number of bytes that would be or was freed. */
-    unsigned long long bytesFreed = 0;
+    uint64_t bytesFreed = 0;
 };
 
 
@@ -105,8 +105,8 @@ struct SubstitutablePathInfo
 {
     std::optional<StorePath> deriver;
     StorePathSet references;
-    unsigned long long downloadSize; /* 0 = unknown or inapplicable */
-    unsigned long long narSize; /* 0 = unknown */
+    uint64_t downloadSize; /* 0 = unknown or inapplicable */
+    uint64_t narSize; /* 0 = unknown */
 };
 
 typedef std::map<StorePath, SubstitutablePathInfo> SubstitutablePathInfos;
@@ -115,7 +115,8 @@ struct ValidPathInfo
 {
     StorePath path;
     std::optional<StorePath> deriver;
-    Hash narHash;
+    // TODO document this
+    std::optional<Hash> narHash;
     StorePathSet references;
     time_t registrationTime = 0;
     uint64_t narSize = 0; // 0 = unknown
@@ -317,9 +318,9 @@ public:
        the Nix store. */
     bool isStorePath(std::string_view path) const;
 
-    /* Chop off the parts after the top-level store name, e.g.,
-       /nix/store/abcd-foo/bar => /nix/store/abcd-foo. */
-    Path toStorePath(const Path & path) const;
+    /* Split a path like /nix/store/<hash>-<name>/<bla> into
+       /nix/store/<hash>-<name> and /<bla>. */
+    std::pair<StorePath, Path> toStorePath(const Path & path) const;
 
     /* Follow symlinks until we end up with a path in the Nix store. */
     Path followLinksToStore(std::string_view path) const;
@@ -388,12 +389,15 @@ public:
         SubstituteFlag maybeSubstitute = NoSubstitute);
 
     /* Query the set of all valid paths. Note that for some store
-       backends, the name part of store paths may be omitted
-       (i.e. you'll get /nix/store/<hash> rather than
+       backends, the name part of store paths may be replaced by 'x'
+       (i.e. you'll get /nix/store/<hash>-x rather than
        /nix/store/<hash>-<name>). Use queryPathInfo() to obtain the
-       full store path. */
+       full store path. FIXME: should return a set of
+       std::variant<StorePath, HashPart> to get rid of this hack. */
     virtual StorePathSet queryAllValidPaths()
     { unsupported("queryAllValidPaths"); }
+
+    constexpr static const char * MissingName = "x";
 
     /* Query information about a valid path. It is permitted to omit
        the name part of the store path. */
@@ -444,8 +448,7 @@ public:
 
     /* Import a path into the store. */
     virtual void addToStore(const ValidPathInfo & info, Source & narSource,
-        RepairFlag repair = NoRepair, CheckSigsFlag checkSigs = CheckSigs,
-        std::shared_ptr<FSAccessor> accessor = 0) = 0;
+        RepairFlag repair = NoRepair, CheckSigsFlag checkSigs = CheckSigs) = 0;
 
     /* Copy the contents of a path to the store and register the
        validity the resulting path.  The resulting path is returned.
@@ -463,7 +466,7 @@ public:
         std::optional<Hash> expectedCAHash = {});
 
     // FIXME: remove?
-    virtual StorePath addToStoreFromDump(const string & dump, const string & name,
+    virtual StorePath addToStoreFromDump(Source & dump, const string & name,
         FileIngestionMethod method = FileIngestionMethod::Recursive, HashType hashAlgo = htSHA256, RepairFlag repair = NoRepair)
     {
         throw Error("addToStoreFromDump() is not supported by this store");
@@ -612,7 +615,7 @@ public:
        that will be substituted. */
     virtual void queryMissing(const std::vector<StorePathWithOutputs> & targets,
         StorePathSet & willBuild, StorePathSet & willSubstitute, StorePathSet & unknown,
-        unsigned long long & downloadSize, unsigned long long & narSize);
+        uint64_t & downloadSize, uint64_t & narSize);
 
     /* Sort a set of paths topologically under the references
        relation.  If p refers to q, then p precedes q in this list. */
@@ -628,8 +631,7 @@ public:
        the Nix store. Optionally, the contents of the NARs are
        preloaded into the specified FS accessor to speed up subsequent
        access. */
-    StorePaths importPaths(Source & source, std::shared_ptr<FSAccessor> accessor,
-        CheckSigsFlag checkSigs = CheckSigs);
+    StorePaths importPaths(Source & source, CheckSigsFlag checkSigs = CheckSigs);
 
     struct Stats
     {

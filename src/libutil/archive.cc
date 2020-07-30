@@ -150,17 +150,17 @@ static void skipGeneric(Source & source)
 
 static void parseContents(ParseSink & sink, Source & source, const Path & path)
 {
-    unsigned long long size = readLongLong(source);
+    uint64_t size = readLongLong(source);
 
     sink.preallocateContents(size);
 
-    unsigned long long left = size;
+    uint64_t left = size;
     std::vector<unsigned char> buf(65536);
 
     while (left) {
         checkInterrupt();
         auto n = buf.size();
-        if ((unsigned long long)n > left) n = left;
+        if ((uint64_t)n > left) n = left;
         source(buf.data(), n);
         sink.receiveContents(buf.data(), n);
         left -= n;
@@ -323,7 +323,7 @@ struct RestoreSink : ParseSink
             throw SysError("fchmod");
     }
 
-    void preallocateContents(unsigned long long len)
+    void preallocateContents(uint64_t len)
     {
 #if HAVE_POSIX_FALLOCATE
         if (len) {
@@ -338,7 +338,7 @@ struct RestoreSink : ParseSink
 #endif
     }
 
-    void receiveContents(unsigned char * data, unsigned int len)
+    void receiveContents(unsigned char * data, size_t len)
     {
         writeFull(fd.get(), data, len);
     }

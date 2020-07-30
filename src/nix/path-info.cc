@@ -40,7 +40,7 @@ struct CmdPathInfo : StorePathsCommand, MixJSON
             },
             Example{
                 "To show a package's closure size and all its dependencies with human readable sizes:",
-                "nix path-info -rsSh nixpkgs.rust"
+                "nix path-info -rsSh nixpkgs#rust"
             },
             Example{
                 "To check the existence of a path in a binary cache:",
@@ -61,7 +61,7 @@ struct CmdPathInfo : StorePathsCommand, MixJSON
         };
     }
 
-    void printSize(unsigned long long value)
+    void printSize(uint64_t value)
     {
         if (!humanReadable) {
             std::cout << fmt("\t%11d", value);

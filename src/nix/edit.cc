@@ -20,7 +20,7 @@ struct CmdEdit : InstallableCommand
         return {
             Example{
                 "To open the Nix expression of the GNU Hello package:",
-                "nix edit nixpkgs.hello"
+                "nix edit nixpkgs#hello"
             },
         };
     }
@@ -45,6 +45,7 @@ struct CmdEdit : InstallableCommand
 
         auto args = editorFor(pos);
 
+        restoreSignals();
         execvp(args.front().c_str(), stringsToCharPtrs(args).data());
 
         std::string command;

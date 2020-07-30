@@ -18,7 +18,7 @@ struct CmdLog : InstallableCommand
         return {
             Example{
                 "To get the build log of GNU Hello:",
-                "nix log nixpkgs.hello"
+                "nix log nixpkgs#hello"
             },
             Example{
                 "To get the build log of a specific path:",
@@ -26,7 +26,7 @@ struct CmdLog : InstallableCommand
             },
             Example{
                 "To get a build log from a specific binary cache:",
-                "nix log --store https://cache.nixos.org nixpkgs.hello"
+                "nix log --store https://cache.nixos.org nixpkgs#hello"
             },
         };
     }

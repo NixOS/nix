@@ -560,19 +560,12 @@ void LocalStore::checkDerivationOutputs(const StorePath & drvPath, const Derivat
         DerivationOutputs::const_iterator out = drv.outputs.find("out");
         if (out == drv.outputs.end())
             throw Error("derivation '%s' does not have an output named 'out'", printStorePath(drvPath));
-
-        check(
-            makeFixedOutputPath(
-                out->second.hash->method,
-                out->second.hash->hash,
-                drvName),
-            out->second.path, "out");
     }
 
     else {
         Hash h = hashDerivationModulo(*this, drv, true);
         for (auto & i : drv.outputs)
-            check(makeOutputPath(i.first, h, drvName), i.second.path, i.first);
+            check(makeOutputPath(i.first, h, drvName), i.second.path(*this, drv.name), i.first);
     }
 }
 
@@ -586,7 +579,7 @@ uint64_t LocalStore::addValidPath(State & state,
 
     state.stmtRegisterValidPath.use()
         (printStorePath(info.path))
-        (info.narHash.to_string(Base16, true))
+        (info.narHash->to_string(Base16, true))
         (info.registrationTime == 0 ? time(0) : info.registrationTime)
         (info.deriver ? printStorePath(*info.deriver) : "", (bool) info.deriver)
         (info.narSize, info.narSize != 0)
@@ -594,7 +587,7 @@ uint64_t LocalStore::addValidPath(State & state,
         (concatStringsSep(" ", info.sigs), !info.sigs.empty())
         (renderContentAddress(info.ca), (bool) info.ca)
         .exec();
-    uint64_t id = sqlite3_last_insert_rowid(state.db);
+    uint64_t id = state.db.getLastInsertedRowId();
 
     /* If this is a derivation, then store the derivation outputs in
        the database.  This is useful for the garbage collector: it can
@@ -614,7 +607,7 @@ uint64_t LocalStore::addValidPath(State & state,
             state.stmtAddDerivationOutput.use()
                 (id)
                 (i.first)
-                (printStorePath(i.second.path))
+                (printStorePath(i.second.path(*this, drv.name)))
                 .exec();
         }
     }
@@ -686,7 +679,7 @@ void LocalStore::updatePathInfo(State & state, const ValidPathInfo & info)
 {
     state.stmtUpdatePathInfo.use()
         (info.narSize, info.narSize != 0)
-        (info.narHash.to_string(Base16, true))
+        (info.narHash->to_string(Base16, true))
         (info.ultimate ? 1 : 0, info.ultimate)
         (concatStringsSep(" ", info.sigs), !info.sigs.empty())
         (renderContentAddress(info.ca), (bool) info.ca)
@@ -912,7 +905,7 @@ void LocalStore::registerValidPaths(const ValidPathInfos & infos)
         StorePathSet paths;
 
         for (auto & i : infos) {
-            assert(i.narHash.type == htSHA256);
+            assert(i.narHash && i.narHash->type == htSHA256);
             if (isValidPath_(*state, i.path))
                 updatePathInfo(*state, i);
             else
@@ -974,7 +967,7 @@ const PublicKeys & LocalStore::getPublicKeys()
 
 
 void LocalStore::addToStore(const ValidPathInfo & info, Source & source,
-    RepairFlag repair, CheckSigsFlag checkSigs, std::shared_ptr<FSAccessor> accessor)
+    RepairFlag repair, CheckSigsFlag checkSigs)
 {
     if (!info.narHash)
         throw Error("cannot add path '%s' because it lacks a hash", printStorePath(info.path));
@@ -1025,7 +1018,7 @@ void LocalStore::addToStore(const ValidPathInfo & info, Source & source,
 
             if (hashResult.first != info.narHash)
                 throw Error("hash mismatch importing path '%s';\n  wanted: %s\n  got:    %s",
-                    printStorePath(info.path), info.narHash.to_string(Base32, true), hashResult.first.to_string(Base32, true));
+                    printStorePath(info.path), info.narHash->to_string(Base32, true), hashResult.first.to_string(Base32, true));
 
             if (hashResult.second != info.narSize)
                 throw Error("size mismatch importing path '%s';\n  wanted: %s\n  got:   %s",
@@ -1045,79 +1038,26 @@ void LocalStore::addToStore(const ValidPathInfo & info, Source & source,
 }
 
 
-StorePath LocalStore::addToStoreFromDump(const string & dump, const string & name,
-    FileIngestionMethod method, HashType hashAlgo, RepairFlag repair)
-{
-    Hash h = hashString(hashAlgo, dump);
-
-    auto dstPath = makeFixedOutputPath(method, h, name);
-
-    addTempRoot(dstPath);
-
-    if (repair || !isValidPath(dstPath)) {
-
-        /* The first check above is an optimisation to prevent
-           unnecessary lock acquisition. */
-
-        auto realPath = Store::toRealPath(dstPath);
-
-        PathLocks outputLock({realPath});
-
-        if (repair || !isValidPath(dstPath)) {
-
-            deletePath(realPath);
-
-            autoGC();
-
-            if (method == FileIngestionMethod::Recursive) {
-                StringSource source(dump);
-                restorePath(realPath, source);
-            } else
-                writeFile(realPath, dump);
-
-            canonicalisePathMetaData(realPath, -1);
-
-            /* Register the SHA-256 hash of the NAR serialisation of
-               the path in the database.  We may just have computed it
-               above (if called with recursive == true and hashAlgo ==
-               sha256); otherwise, compute it here. */
-            HashResult hash;
-            if (method == FileIngestionMethod::Recursive) {
-                hash.first = hashAlgo == htSHA256 ? h : hashString(htSHA256, dump);
-                hash.second = dump.size();
-            } else
-                hash = hashPath(htSHA256, realPath);
-
-            optimisePath(realPath); // FIXME: combine with hashPath()
-
-            ValidPathInfo info(dstPath);
-            info.narHash = hash.first;
-            info.narSize = hash.second;
-            info.ca = FixedOutputHash { .method = method, .hash = h };
-            registerValidPath(info);
-        }
-
-        outputLock.setDeletion(true);
-    }
-
-    return dstPath;
-}
-
-
 StorePath LocalStore::addToStore(const string & name, const Path & _srcPath,
     FileIngestionMethod method, HashType hashAlgo, PathFilter & filter, RepairFlag repair)
 {
     Path srcPath(absPath(_srcPath));
+    auto source = sinkToSource([&](Sink & sink) {
+        if (method == FileIngestionMethod::Recursive)
+            dumpPath(srcPath, sink, filter);
+        else
+            readFile(srcPath, sink);
+    });
+    return addToStoreFromDump(*source, name, method, hashAlgo, repair);
+}
 
-    /* For computing the NAR hash. */
-    auto sha256Sink = std::make_unique<HashSink>(htSHA256);
 
-    /* For computing the store path. In recursive SHA-256 mode, this
-       is the same as the NAR hash, so no need to do it again. */
-    std::unique_ptr<HashSink> hashSink =
-        method == FileIngestionMethod::Recursive && hashAlgo == htSHA256
-        ? nullptr
-        : std::make_unique<HashSink>(hashAlgo);
+StorePath LocalStore::addToStoreFromDump(Source & source0, const string & name,
+    FileIngestionMethod method, HashType hashAlgo, RepairFlag repair)
+{
+    /* For computing the store path. */
+    auto hashSink = std::make_unique<HashSink>(hashAlgo);
+    TeeSource source { source0, *hashSink };
 
     /* Read the source path into memory, but only if it's up to
        narBufferSize bytes. If it's larger, write it to a temporary
@@ -1125,61 +1065,49 @@ StorePath LocalStore::addToStore(const string & name, const Path & _srcPath,
        destination store path is already valid, we just delete the
        temporary path. Otherwise, we move it to the destination store
        path. */
-    bool inMemory = true;
-    std::string nar;
+    bool inMemory = false;
 
-    auto source = sinkToSource([&](Sink & sink) {
+    std::string dump;
 
-        LambdaSink sink2([&](const unsigned char * buf, size_t len) {
-            (*sha256Sink)(buf, len);
-            if (hashSink) (*hashSink)(buf, len);
-
-            if (inMemory) {
-                if (nar.size() + len > settings.narBufferSize) {
-                    inMemory = false;
-                    sink << 1;
-                    sink((const unsigned char *) nar.data(), nar.size());
-                    nar.clear();
-                } else {
-                    nar.append((const char *) buf, len);
-                }
-            }
-
-            if (!inMemory) sink(buf, len);
-        });
-
-        if (method == FileIngestionMethod::Recursive)
-            dumpPath(srcPath, sink2, filter);
-        else
-            readFile(srcPath, sink2);
-    });
+    /* Fill out buffer, and decide whether we are working strictly in
+       memory based on whether we break out because the buffer is full
+       or the original source is empty */
+    while (dump.size() < settings.narBufferSize) {
+        auto oldSize = dump.size();
+        constexpr size_t chunkSize = 65536;
+        auto want = std::min(chunkSize, settings.narBufferSize - oldSize);
+        dump.resize(oldSize + want);
+        auto got = 0;
+        try {
+            got = source.read((uint8_t *) dump.data() + oldSize, want);
+        } catch (EndOfFile &) {
+            inMemory = true;
+            break;
+        }
+        dump.resize(oldSize + got);
+    }
 
     std::unique_ptr<AutoDelete> delTempDir;
     Path tempPath;
 
-    try {
-        /* Wait for the source coroutine to give us some dummy
-           data. This is so that we don't create the temporary
-           directory if the NAR fits in memory. */
-        readInt(*source);
+    if (!inMemory) {
+        /* Drain what we pulled so far, and then keep on pulling */
+        StringSource dumpSource { dump };
+        ChainSource bothSource { dumpSource, source };
 
         auto tempDir = createTempDir(realStoreDir, "add");
         delTempDir = std::make_unique<AutoDelete>(tempDir);
         tempPath = tempDir + "/x";
 
         if (method == FileIngestionMethod::Recursive)
-            restorePath(tempPath, *source);
+            restorePath(tempPath, bothSource);
         else
-            writeFile(tempPath, *source);
+            writeFile(tempPath, bothSource);
 
-    } catch (EndOfFile &) {
-        if (!inMemory) throw;
-        /* The NAR fits in memory, so we didn't do restorePath(). */
+        dump.clear();
     }
 
-    auto sha256 = sha256Sink->finish();
-
-    Hash hash = hashSink ? hashSink->finish().first : sha256.first;
+    auto [hash, size] = hashSink->finish();
 
     auto dstPath = makeFixedOutputPath(method, hash, name);
 
@@ -1201,16 +1129,25 @@ StorePath LocalStore::addToStore(const string & name, const Path & _srcPath,
             autoGC();
 
             if (inMemory) {
+                 StringSource dumpSource { dump };
                 /* Restore from the NAR in memory. */
-                StringSource source(nar);
                 if (method == FileIngestionMethod::Recursive)
-                    restorePath(realPath, source);
+                    restorePath(realPath, dumpSource);
                 else
-                    writeFile(realPath, source);
+                    writeFile(realPath, dumpSource);
             } else {
                 /* Move the temporary path we restored above. */
                 if (rename(tempPath.c_str(), realPath.c_str()))
                     throw Error("renaming '%s' to '%s'", tempPath, realPath);
+            }
+
+            /* For computing the nar hash. In recursive SHA-256 mode, this
+               is the same as the store hash, so no need to do it again. */
+            auto narHash = std::pair { hash, size };
+            if (method != FileIngestionMethod::Recursive || hashAlgo != htSHA256) {
+                HashSink narSink { htSHA256 };
+                dumpPath(realPath, narSink);
+                narHash = narSink.finish();
             }
 
             canonicalisePathMetaData(realPath, -1); // FIXME: merge into restorePath
@@ -1218,8 +1155,8 @@ StorePath LocalStore::addToStore(const string & name, const Path & _srcPath,
             optimisePath(realPath);
 
             ValidPathInfo info(dstPath);
-            info.narHash = sha256.first;
-            info.narSize = sha256.second;
+            info.narHash = narHash.first;
+            info.narSize = narHash.second;
             info.ca = FixedOutputHash { .method = method, .hash = hash };
             registerValidPath(info);
         }
@@ -1377,9 +1314,9 @@ bool LocalStore::verifyStore(bool checkContents, RepairFlag repair)
 
                 std::unique_ptr<AbstractHashSink> hashSink;
                 if (!info->ca || !info->references.count(info->path))
-                    hashSink = std::make_unique<HashSink>(*info->narHash.type);
+                    hashSink = std::make_unique<HashSink>(info->narHash->type);
                 else
-                    hashSink = std::make_unique<HashModuloSink>(*info->narHash.type, std::string(info->path.hashPart()));
+                    hashSink = std::make_unique<HashModuloSink>(info->narHash->type, std::string(info->path.hashPart()));
 
                 dumpPath(Store::toRealPath(i), *hashSink);
                 auto current = hashSink->finish();
@@ -1388,7 +1325,7 @@ bool LocalStore::verifyStore(bool checkContents, RepairFlag repair)
                     logError({
                         .name = "Invalid hash - path modified",
                         .hint = hintfmt("path '%s' was modified! expected hash '%s', got '%s'",
-                        printStorePath(i), info->narHash.to_string(Base32, true), current.first.to_string(Base32, true))
+                        printStorePath(i), info->narHash->to_string(Base32, true), current.first.to_string(Base32, true))
                     });
                     if (repair) repairPath(i); else errors = true;
                 } else {
