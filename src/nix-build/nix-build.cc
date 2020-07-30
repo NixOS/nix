@@ -174,7 +174,7 @@ static void _main(int argc, char * * argv)
         else if (*arg == "--run-env") // obsolete
             runEnv = true;
 
-        else if (*arg == "--command" || *arg == "--run") {
+        else if (runEnv && (*arg == "--command" || *arg == "--run")) {
             if (*arg == "--run")
                 interactive = false;
             envCommand = getArg(*arg, arg, end) + "\nexit";
@@ -192,7 +192,7 @@ static void _main(int argc, char * * argv)
         else if (*arg == "--pure") pure = true;
         else if (*arg == "--impure") pure = false;
 
-        else if (*arg == "--packages" || *arg == "-p")
+        else if (runEnv && (*arg == "--packages" || *arg == "-p"))
             packages = true;
 
         else if (inShebang && *arg == "-i") {
