@@ -130,7 +130,7 @@ static void opRealise(Strings opFlags, Strings opArgs)
     for (auto & i : opArgs)
         paths.push_back(store->followLinksToStorePathWithOutputs(i));
 
-    unsigned long long downloadSize, narSize;
+    uint64_t downloadSize, narSize;
     StorePathSet willBuild, willSubstitute, unknown;
     store->queryMissing(paths, willBuild, willSubstitute, unknown, downloadSize, narSize);
 
@@ -572,10 +572,8 @@ static void opGC(Strings opFlags, Strings opArgs)
         if (*i == "--print-roots") printRoots = true;
         else if (*i == "--print-live") options.action = GCOptions::gcReturnLive;
         else if (*i == "--print-dead") options.action = GCOptions::gcReturnDead;
-        else if (*i == "--max-freed") {
-            long long maxFreed = getIntArg<long long>(*i, i, opFlags.end(), true);
-            options.maxFreed = maxFreed >= 0 ? maxFreed : 0;
-        }
+        else if (*i == "--max-freed")
+            options.maxFreed = std::max(getIntArg<int64_t>(*i, i, opFlags.end(), true), (int64_t) 0);
         else throw UsageError("bad sub-operation '%1%' in GC", *i);
 
     if (!opArgs.empty()) throw UsageError("no arguments expected");
@@ -831,7 +829,7 @@ static void opServe(Strings opFlags, Strings opArgs)
                     for (auto & path : paths)
                         if (!path.isDerivation())
                             paths2.push_back({path});
-                    unsigned long long downloadSize, narSize;
+                    uint64_t downloadSize, narSize;
                     StorePathSet willBuild, willSubstitute, unknown;
                     store->queryMissing(paths2,
                         willBuild, willSubstitute, unknown, downloadSize, narSize);

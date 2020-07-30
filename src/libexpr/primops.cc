@@ -65,7 +65,7 @@ void EvalState::realiseContext(const PathSet & context)
 
     /* For performance, prefetch all substitute info. */
     StorePathSet willBuild, willSubstitute, unknown;
-    unsigned long long downloadSize, narSize;
+    uint64_t downloadSize, narSize;
     store->queryMissing(drvs, willBuild, willSubstitute, unknown, downloadSize, narSize);
 
     store->buildPaths(drvs);

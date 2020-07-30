@@ -374,7 +374,7 @@ void writeLine(int fd, string s)
 }
 
 
-static void _deletePath(int parentfd, const Path & path, unsigned long long & bytesFreed)
+static void _deletePath(int parentfd, const Path & path, uint64_t & bytesFreed)
 {
     checkInterrupt();
 
@@ -414,7 +414,7 @@ static void _deletePath(int parentfd, const Path & path, unsigned long long & by
     }
 }
 
-static void _deletePath(const Path & path, unsigned long long & bytesFreed)
+static void _deletePath(const Path & path, uint64_t & bytesFreed)
 {
     Path dir = dirOf(path);
     if (dir == "")
@@ -435,12 +435,12 @@ static void _deletePath(const Path & path, unsigned long long & bytesFreed)
 
 void deletePath(const Path & path)
 {
-    unsigned long long dummy;
+    uint64_t dummy;
     deletePath(path, dummy);
 }
 
 
-void deletePath(const Path & path, unsigned long long & bytesFreed)
+void deletePath(const Path & path, uint64_t & bytesFreed)
 {
     //Activity act(*logger, lvlDebug, format("recursively deleting path '%1%'") % path);
     bytesFreed = 0;
