@@ -368,14 +368,14 @@ struct CmdFlakeCheck : FlakeCommand
             }
         };
 
-        auto checkExporter = [&](const std::string & attrPath, Value & v, const Pos & pos) {
+        auto checkBundler = [&](const std::string & attrPath, Value & v, const Pos & pos) {
             try {
                 state->forceValue(v, pos);
                 if (v.type != tLambda)
-                    throw Error("exporter must be a function");
+                    throw Error("bundler must be a function");
                 if (!v.lambda.fun->formals ||
                     v.lambda.fun->formals->argNames.find(state->symbols.create("program")) == v.lambda.fun->formals->argNames.end())
-                    throw Error("exporter must take formal argument 'program'");
+                    throw Error("bundler must take formal argument 'program'");
             } catch (Error & e) {
                 e.addTrace(pos, hintfmt("while checking the template '%s'", attrPath));
                 throw;
@@ -504,19 +504,19 @@ struct CmdFlakeCheck : FlakeCommand
                                     *attr.value, *attr.pos);
                         }
 
-                        else if (name == "defaultExporter")
+                        else if (name == "defaultBundler")
                             for (auto & attr : *vOutput.attrs) {
                                 checkSystemName(attr.name, *attr.pos);
-                                checkExporter(fmt("%s.%s", name, attr.name), *attr.value, *attr.pos);
+                                checkBundler(fmt("%s.%s", name, attr.name), *attr.value, *attr.pos);
                             }
 
-                        else if (name == "exporters") {
+                        else if (name == "bundlers") {
                             state->forceAttrs(vOutput, pos);
                             for (auto & attr : *vOutput.attrs) {
                                 checkSystemName(attr.name, *attr.pos);
                                 state->forceAttrs(*attr.value, *attr.pos);
                                 for (auto & attr2 : *attr.value->attrs)
-                                    checkExporter(
+                                    checkBundler(
                                         fmt("%s.%s.%s", name, attr.name, attr2.name),
                                         *attr2.value, *attr2.pos);
                             }

@@ -6,18 +6,18 @@
 
 using namespace nix;
 
-struct CmdExport : InstallableCommand
+struct CmdBundle : InstallableCommand
 {
-    std::string exporter = "github:matthewbauer/nix-bundle";
+    std::string bundler = "github:matthewbauer/nix-bundle";
     Path outLink;
 
-    CmdExport()
+    CmdBundle()
     {
         addFlag({
-            .longName = "exporter",
-            .description = "use custom exporter",
+            .longName = "bundler",
+            .description = "use custom bundler",
             .labels = {"flake-url"},
-            .handler = {&exporter},
+            .handler = {&bundler},
             .completer = {[&](size_t, std::string_view prefix) {
                 completeFlakeRef(getStore(), prefix);
             }}
@@ -35,15 +35,15 @@ struct CmdExport : InstallableCommand
 
     std::string description() override
     {
-        return "export an application out of the Nix store";
+        return "bundle an application so that it works outside of the Nix store";
     }
 
     Examples examples() override
     {
         return {
             Example{
-                "To export Hello:",
-                "nix export hello"
+                "To bundle Hello:",
+                "nix bundle hello"
             },
         };
     }
@@ -71,12 +71,12 @@ struct CmdExport : InstallableCommand
         auto app = installable->toApp(*evalState);
         store->buildPaths(app.context);
 
-        auto [exporterFlakeRef, exporterName] = parseFlakeRefWithFragment(exporter, absPath("."));
+        auto [bundlerFlakeRef, bundlerName] = parseFlakeRefWithFragment(bundler, absPath("."));
         const flake::LockFlags lockFlags{ .writeLockFile = false };
-        auto exporter = InstallableFlake(
-            evalState, std::move(exporterFlakeRef),
-            Strings{exporterName == "" ? ("defaultExporter." + settings.thisSystem.get()) : exporterName},
-            Strings({"exporters." + settings.thisSystem.get() + "."}), lockFlags);
+        auto bundler = InstallableFlake(
+            evalState, std::move(bundlerFlakeRef),
+            Strings{bundlerName == "" ? ("defaultBundler." + settings.thisSystem.get()) : bundlerName},
+            Strings({"bundlers." + settings.thisSystem.get() + "."}), lockFlags);
 
         Value * arg = evalState->allocValue();
         evalState->mkAttrs(*arg, 1);
@@ -87,21 +87,21 @@ struct CmdExport : InstallableCommand
         mkString(*evalState->allocAttr(*arg, evalState->symbols.create("program")), app.program, context);
 
         auto vRes = evalState->allocValue();
-        evalState->callFunction(*exporter.toValue(*evalState).first, *arg, *vRes, noPos);
+        evalState->callFunction(*bundler.toValue(*evalState).first, *arg, *vRes, noPos);
 
         if (!evalState->isDerivation(*vRes))
-            throw Error("the exporter '%s' does not produce a derivation", exporter.what());
+            throw Error("the bundler '%s' does not produce a derivation", bundler.what());
 
         Bindings::iterator i = vRes->attrs->find(evalState->sDrvPath);
         if (i == vRes->attrs->end())
-            throw Error("the exporter '%s' does not produce a derivation", exporter.what());
+            throw Error("the bundler '%s' does not produce a bderivation", bundler.what());
 
         PathSet context2;
         StorePath drvPath = store->parseStorePath(evalState->coerceToPath(*i->pos, *i->value, context2));
 
         i = vRes->attrs->find(evalState->sOutPath);
         if (i == vRes->attrs->end())
-            throw Error("the exporter '%s' does not produce a derivation", exporter.what());
+            throw Error("the bundler '%s' does not produce a derivation", bundler.what());
 
         StorePath outPath = store->parseStorePath(evalState->coerceToPath(*i->pos, *i->value, context2));
 
@@ -110,11 +110,11 @@ struct CmdExport : InstallableCommand
         auto accessor = store->getFSAccessor();
         auto outPathS = store->printStorePath(outPath);
         if (accessor->stat(outPathS).type != FSAccessor::tRegular)
-            throw Error("'%s' is not a file; an exporter must only create a single file", outPathS);
+            throw Error("'%s' is not a file; a bundler must only create a single file", outPathS);
 
         auto info = store->queryPathInfo(outPath);
         if (!info->references.empty())
-            throw Error("'%s' has references; an exporter must not leave any references", outPathS);
+            throw Error("'%s' has references; a bundler must not leave any references", outPathS);
 
         if (outLink == "")
             outLink = baseNameOf(app.program);
@@ -123,4 +123,4 @@ struct CmdExport : InstallableCommand
     }
 };
 
-static auto r2 = registerCommand<CmdExport>("export");
+static auto r2 = registerCommand<CmdBundle>("bundle");
