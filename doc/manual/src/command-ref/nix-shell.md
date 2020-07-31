@@ -110,7 +110,7 @@ The following common options are supported:
 To build the dependencies of the package Pan, and start an interactive
 shell in which to build it:
 
-```shell
+```console
 $ nix-shell '<nixpkgs>' -A pan
 [nix-shell]$ unpackPhase
 [nix-shell]$ cd pan-*
@@ -122,7 +122,7 @@ $ nix-shell '<nixpkgs>' -A pan
 To clear the environment first, and do some additional automatic
 initialisation of the interactive shell:
 
-```shell
+```console
 $ nix-shell '<nixpkgs>' -A pan --pure \
     --command 'export NIX_DEBUG=1; export NIX_CORES=8; return'
 ```
@@ -131,13 +131,13 @@ Nix expressions can also be given on the command line using the `-E` and
 `-p` flags. For instance, the following starts a shell containing the
 packages `sqlite` and `libX11`:
 
-```shell
+```console
 $ nix-shell -E 'with import <nixpkgs> { }; runCommand "dummy" { buildInputs = [ sqlite xorg.libX11 ]; } ""'
 ```
 
 A shorter way to do the same is:
 
-```shell
+```console
 $ nix-shell -p sqlite xorg.libX11
 [nix-shell]$ echo $NIX_LDFLAGS
 … -L/nix/store/j1zg5v…-sqlite-3.8.0.2/lib -L/nix/store/0gmcz9…-libX11-1.6.1/lib …
@@ -147,7 +147,7 @@ Note that `-p` accepts multiple full nix expressions that are valid in
 the `buildInputs = [ ... ]` shown above, not only package names. So the
 following is also legal:
 
-```shell
+```console
 $ nix-shell -p sqlite 'git.override { withManual = false; }'
 ```
 
@@ -156,7 +156,7 @@ it by passing `-I` or setting `NIX_PATH`. For example, the following
 gives you a shell containing the Pan package from a specific revision of
 Nixpkgs:
 
-```shell
+```console
 $ nix-shell -p pan -I nixpkgs=https://github.com/NixOS/nixpkgs/archive/8a3eea054838b55aca962c3fbde9c83c102b8bf2.tar.gz
 
 [nix-shell:~]$ pan --version
