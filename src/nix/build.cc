@@ -30,7 +30,7 @@ struct CmdBuild : InstallablesCommand, MixDryRun, MixProfile
 
         addFlag({
             .longName = "rebuild",
-            .description = "Rebuild an already built package locally and compare the result to the existing store-paths.",
+            .description = "rebuild an already built package and compare the result to the existing store paths",
             .handler = {&buildMode, bmCheck},
         });
     }
