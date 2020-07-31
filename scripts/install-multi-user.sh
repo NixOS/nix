@@ -37,6 +37,8 @@ readonly PROFILE_NIX_FILE="$NIX_ROOT/var/nix/profiles/default/etc/profile.d/nix-
 
 readonly NIX_INSTALLED_NIX="@nix@"
 readonly NIX_INSTALLED_CACERT="@cacert@"
+#readonly NIX_INSTALLED_NIX="/nix/store/j8dbv5w6jl34caywh2ygdy88knx1mdf7-nix-2.3.6"
+#readonly NIX_INSTALLED_CACERT="/nix/store/7dxhzymvy330i28ii676fl1pqwcahv2f-nss-cacert-3.49.2"
 readonly EXTRACTED_NIX_PATH="$(dirname "$0")"
 
 readonly ROOT_HOME=$(echo ~root)
@@ -69,9 +71,11 @@ uninstall_directions() {
     subheader "Uninstalling nix:"
     local step=0
 
-    if poly_service_installed_check; then
+    if [ -e /run/systemd/system ] && poly_service_installed_check; then
         step=$((step + 1))
         poly_service_uninstall_directions "$step"
+    else
+        step=$((step + 1))
     fi
 
     for profile_target in "${PROFILE_TARGETS[@]}"; do
@@ -250,7 +254,9 @@ function finish_success {
         echo "But fetching the nixpkgs channel failed. (Are you offline?)"
         echo "To try again later, run \"sudo -i nix-channel --update nixpkgs\"."
     fi
-    cat <<EOF
+
+    if [ -e /run/systemd/system ]; then
+        cat <<EOF
 
 Before Nix will work in your existing shells, you'll need to close
 them and open them again. Other than that, you should be ready to go.
@@ -264,6 +270,26 @@ hesitate:
 
 $(contactme)
 EOF
+    else
+        cat <<EOF
+
+Before Nix will work in your existing shells, you'll need to close
+them and open them again. Other than that, you should be ready to go.
+
+Try it! Open a new terminal, and type:
+
+  $ sudo nix-daemon
+  $ nix-shell -p nix-info --run "nix-info -m"
+
+Additionally, you may want to add nix-daemon to your init-system.
+
+Thank you for using this installer. If you have any feedback, don't
+hesitate:
+
+$(contactme)
+EOF
+   fi
+
 }
 
 
@@ -664,12 +690,8 @@ main() {
         # shellcheck source=./install-darwin-multi-user.sh
         . "$EXTRACTED_NIX_PATH/install-darwin-multi-user.sh"
     elif [ "$(uname -s)" = "Linux" ]; then
-        if [ -e /run/systemd/system ]; then
-            # shellcheck source=./install-systemd-multi-user.sh
-            . "$EXTRACTED_NIX_PATH/install-systemd-multi-user.sh"
-        else
-            failure "Sorry, the multi-user installation requires systemd on Linux (detected using /run/systemd/system)"
-        fi
+        # shellcheck source=./install-systemd-multi-user.sh
+        . "$EXTRACTED_NIX_PATH/install-systemd-multi-user.sh" # most of this works on non-systemd distros also
     else
         failure "Sorry, I don't know what to do on $(uname)"
     fi
@@ -702,7 +724,10 @@ main() {
 
     setup_default_profile
     place_nix_configuration
-    poly_configure_nix_daemon_service
+
+    if [ -e /run/systemd/system ]; then
+        poly_configure_nix_daemon_service
+    fi
 
     trap finish_success EXIT
 }
