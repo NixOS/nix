@@ -6,7 +6,9 @@ Derivations can declare some infrequently used optional attributes.
     The optional attribute `allowedReferences` specifies a list of legal
     references (dependencies) of the output of the builder. For example,
     
-        allowedReferences = [];
+    ```nix
+    allowedReferences = [];
+    ```
     
     enforces that the output of a derivation cannot have any runtime
     dependencies on its inputs. To allow an output to have a runtime
@@ -20,7 +22,9 @@ Derivations can declare some infrequently used optional attributes.
     the legal requisites of the whole closure, so all the dependencies
     recursively. For example,
     
-        allowedRequisites = [ foobar ];
+    ```nix
+    allowedRequisites = [ foobar ];
+    ```
     
     enforces that the output of a derivation cannot have any other
     runtime dependency than `foobar`, and in addition it enforces that
@@ -31,7 +35,9 @@ Derivations can declare some infrequently used optional attributes.
     illegal references (dependencies) of the output of the builder. For
     example,
     
-        disallowedReferences = [ foo ];
+    ```nix
+    disallowedReferences = [ foo ];
+    ```
     
     enforces that the output of a derivation cannot have a direct
     runtime dependencies on the derivation `foo`.
@@ -41,7 +47,9 @@ Derivations can declare some infrequently used optional attributes.
     specifies illegal requisites for the whole closure, so all the
     dependencies recursively. For example,
     
-        disallowedRequisites = [ foobar ];
+    ```nix
+    disallowedRequisites = [ foobar ];
+    ```
     
     enforces that the output of a derivation cannot have any runtime
     dependency on `foobar` or any other derivation depending recursively
@@ -50,20 +58,20 @@ Derivations can declare some infrequently used optional attributes.
   - `exportReferencesGraph`  
     This attribute allows builders access to the references graph of
     their inputs. The attribute is a list of inputs in the Nix store
-    whose references graph the builder needs to know. The value of this
-    attribute should be a list of pairs `[ name1
-                    path1 name2
-                    path2 ...
-                    ]`. The references graph of each *pathN* will be stored in a text
-    file *nameN* in the temporary build directory. The text files have
-    the format used by `nix-store
-                    --register-validity` (with the deriver fields left empty). For
-    example, when the following derivation is built:
+    whose references graph the builder needs to know. The value of
+    this attribute should be a list of pairs `[ name1 path1 name2
+    path2 ...  ]`. The references graph of each *pathN* will be stored
+    in a text file *nameN* in the temporary build directory. The text
+    files have the format used by `nix-store --register-validity`
+    (with the deriver fields left empty). For example, when the
+    following derivation is built:
     
-        derivation {
-          ...
-          exportReferencesGraph = [ "libfoo-graph" libfoo ];
-        };
+    ```nix
+    derivation {
+      ...
+      exportReferencesGraph = [ "libfoo-graph" libfoo ];
+    };
+    ```
     
     the references graph of `libfoo` is placed in the file
     `libfoo-graph` in the temporary build directory.
@@ -84,7 +92,9 @@ Derivations can declare some infrequently used optional attributes.
     environment variables to be passed unmodified. For example,
     `fetchurl` in Nixpkgs has the line
     
-        impureEnvVars = [ "http_proxy" "https_proxy" ... ];
+    ```nix
+    impureEnvVars = [ "http_proxy" "https_proxy" ... ];
+    ```
     
     to make it use the proxy server configuration specified by the user
     in the environment variables `http_proxy` and friends.
@@ -116,19 +126,23 @@ Derivations can declare some infrequently used optional attributes.
     been modified, the caller must also specify a cryptographic hash of
     the file. For example,
     
-        fetchurl {
-          url = "http://ftp.gnu.org/pub/gnu/hello/hello-2.1.1.tar.gz";
-          sha256 = "1md7jsfd8pa45z73bz1kszpp01yw6x5ljkjk2hx7wl800any6465";
-        }
+    ```nix
+    fetchurl {
+      url = "http://ftp.gnu.org/pub/gnu/hello/hello-2.1.1.tar.gz";
+      sha256 = "1md7jsfd8pa45z73bz1kszpp01yw6x5ljkjk2hx7wl800any6465";
+    }
+    ```
     
     It sometimes happens that the URL of the file changes, e.g., because
     servers are reorganised or no longer available. We then must update
     the call to `fetchurl`, e.g.,
     
-        fetchurl {
-          url = "ftp://ftp.nluug.nl/pub/gnu/hello/hello-2.1.1.tar.gz";
-          sha256 = "1md7jsfd8pa45z73bz1kszpp01yw6x5ljkjk2hx7wl800any6465";
-        }
+    ```nix
+    fetchurl {
+      url = "ftp://ftp.nluug.nl/pub/gnu/hello/hello-2.1.1.tar.gz";
+      sha256 = "1md7jsfd8pa45z73bz1kszpp01yw6x5ljkjk2hx7wl800any6465";
+    }
+    ```
     
     If a `fetchurl` derivation was treated like a normal derivation, the
     output paths of the derivation and *all derivations depending on it*
@@ -147,23 +161,25 @@ Derivations can declare some infrequently used optional attributes.
     As an example, here is the (simplified) Nix expression for
     `fetchurl`:
     
-        { stdenv, curl }: # The curl program is used for downloading.
-        
-        { url, sha256 }:
-        
-        stdenv.mkDerivation {
-          name = baseNameOf (toString url);
-          builder = ./builder.sh;
-          buildInputs = [ curl ];
-        
-          # This is a fixed-output derivation; the output must be a regular
-          # file with SHA256 hash sha256.
-          outputHashMode = "flat";
-          outputHashAlgo = "sha256";
-          outputHash = sha256;
-        
-          inherit url;
-        }
+    ```nix
+    { stdenv, curl }: # The curl program is used for downloading.
+
+    { url, sha256 }:
+
+    stdenv.mkDerivation {
+      name = baseNameOf (toString url);
+      builder = ./builder.sh;
+      buildInputs = [ curl ];
+
+      # This is a fixed-output derivation; the output must be a regular
+      # file with SHA256 hash sha256.
+      outputHashMode = "flat";
+      outputHashAlgo = "sha256";
+      outputHash = sha256;
+
+      inherit url;
+    }
+    ```
     
     The `outputHashAlgo` attribute specifies the hash algorithm used to
     compute the hash. It can currently be `"sha1"`, `"sha256"` or
@@ -196,21 +212,19 @@ Derivations can declare some infrequently used optional attributes.
     A list of names of attributes that should be passed via files rather
     than environment variables. For example, if you have
     
-    ``` 
+    ```nix
     passAsFile = ["big"];
     big = "a very long string";
-        
     ```
     
-    then when the builder runs, the environment variable `bigPath` will
-    contain the absolute path to a temporary file containing `a very
-    long
-                    string`. That is, for any attribute *x* listed in `passAsFile`, Nix
-    will pass an environment variable `xPath` holding the path of the
-    file containing the value of attribute *x*. This is useful when you
-    need to pass large strings to a builder, since most operating
-    systems impose a limit on the size of the environment (typically, a
-    few hundred kilobyte).
+    then when the builder runs, the environment variable `bigPath`
+    will contain the absolute path to a temporary file containing `a
+    very long string`. That is, for any attribute *x* listed in
+    `passAsFile`, Nix will pass an environment variable `xPath`
+    holding the path of the file containing the value of attribute
+    *x*. This is useful when you need to pass large strings to a
+    builder, since most operating systems impose a limit on the size
+    of the environment (typically, a few hundred kilobyte).
 
   - `preferLocalBuild`  
     If this attribute is set to `true` and [distributed building is

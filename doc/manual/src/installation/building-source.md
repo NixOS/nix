@@ -3,16 +3,20 @@
 After unpacking or checking out the Nix sources, issue the following
 commands:
 
-    $ ./configure options...
-    $ make
-    $ make install
+```console
+$ ./configure options...
+$ make
+$ make install
+```
 
 Nix requires GNU Make so you may need to invoke `gmake` instead.
 
 When building from the Git repository, these should be preceded by the
 command:
 
-    $ ./bootstrap.sh
+```console
+$ ./bootstrap.sh
+```
 
 The installation path can be specified by passing the `--prefix=prefix`
 to `configure`. The default installation directory is `/usr/local`. You

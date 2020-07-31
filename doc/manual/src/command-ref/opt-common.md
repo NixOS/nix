@@ -158,11 +158,13 @@ Most Nix commands accept the following command-line options:
     
     For instance, the top-level `default.nix` in Nixpkgs is actually a
     function:
-    
-        { # The system (e.g., `i686-linux') for which to build the packages.
-          system ? builtins.currentSystem
-          ...
-        }: ...
+
+    ```nix
+    { # The system (e.g., `i686-linux') for which to build the packages.
+      system ? builtins.currentSystem
+      ...
+    }: ...
+    ```
     
     So if you call this Nix expression (e.g., when you do `nix-env -i
     pkgname`), the function will be called automatically using the

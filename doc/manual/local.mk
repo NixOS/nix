@@ -29,5 +29,6 @@ install: $(docdir)/manual/index.html
 
 $(docdir)/manual/index.html: $(MANUAL_SRCS)
 	$(trace-gen) mdbook build doc/manual -d $(docdir)/manual
+	@cp doc/manual/highlight.pack.js $(docdir)/manual/highlight.js
 
 endif

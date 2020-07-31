@@ -8,25 +8,27 @@ packages are imported and called with the appropriate arguments. Here
 are some fragments of `all-packages.nix`, with annotations of what
 they mean:
 
-    ...
-    
-    rec { ①
-    
-      hello = import ../applications/misc/hello/ex-1 ② { ③
-        inherit fetchurl stdenv perl;
-      };
-    
-      perl = import ../development/interpreters/perl { ④
-        inherit fetchurl stdenv;
-      };
-    
-      fetchurl = import ../build-support/fetchurl {
-        inherit stdenv; ...
-      };
-    
-      stdenv = ...;
-    
-    }
+```nix
+...
+
+rec { ①
+
+  hello = import ../applications/misc/hello/ex-1 ② { ③
+    inherit fetchurl stdenv perl;
+  };
+
+  perl = import ../development/interpreters/perl { ④
+    inherit fetchurl stdenv;
+  };
+
+  fetchurl = import ../build-support/fetchurl {
+    inherit stdenv; ...
+  };
+
+  stdenv = ...;
+
+}
+```
 
 1.  This file defines a set of attributes, all of which are concrete
     derivations (i.e., not functions). In fact, we define a *mutually
@@ -64,11 +66,15 @@ they mean:
     > calls a function, filling in any missing arguments by passing the
     > corresponding attribute from the Nixpkgs set, like this:
     > 
-    >     hello = callPackage ../applications/misc/hello/ex-1 { };
+    > ```nix
+    > hello = callPackage ../applications/misc/hello/ex-1 { };
+    > ```
     > 
     > If necessary, you can set or override arguments:
     > 
-    >     hello = callPackage ../applications/misc/hello/ex-1 { stdenv = myStdenv; };
+    > ```nix
+    > hello = callPackage ../applications/misc/hello/ex-1 { stdenv = myStdenv; };
+    > ```
 
 4.  Likewise, we have to instantiate Perl, `fetchurl`, and the standard
     environment.

@@ -31,8 +31,10 @@ automatically added to your list of “subscribed” channels when you
 install Nix. If this is not the case for some reason, you can add it
 as follows:
 
-    $ nix-channel --add https://nixos.org/channels/nixpkgs-unstable
-    $ nix-channel --update
+```console
+$ nix-channel --add https://nixos.org/channels/nixpkgs-unstable
+$ nix-channel --update
+```
 
 > **Note**
 > 
@@ -44,14 +46,16 @@ as follows:
 
 You can view the set of available packages in Nixpkgs:
 
-    $ nix-env -qa
-    aterm-2.2
-    bash-3.0
-    binutils-2.15
-    bison-1.875d
-    blackdown-1.4.2
-    bzip2-1.0.2
-    …
+```console
+$ nix-env -qa
+aterm-2.2
+bash-3.0
+binutils-2.15
+bison-1.875d
+blackdown-1.4.2
+bzip2-1.0.2
+…
+```
 
 The flag `-q` specifies a query operation, and `-a` means that you want
 to show the “available” (i.e., installable) packages, as opposed to the
@@ -59,31 +63,39 @@ installed packages. If you downloaded Nixpkgs yourself, or if you
 checked it out from GitHub, then you need to pass the path to your
 Nixpkgs tree using the `-f` flag:
 
-    $ nix-env -qaf /path/to/nixpkgs
+```console
+$ nix-env -qaf /path/to/nixpkgs
+```
 
 where */path/to/nixpkgs* is where you’ve unpacked or checked out
 Nixpkgs.
 
 You can select specific packages by name:
 
-    $ nix-env -qa firefox
-    firefox-34.0.5
-    firefox-with-plugins-34.0.5
+```console
+$ nix-env -qa firefox
+firefox-34.0.5
+firefox-with-plugins-34.0.5
+```
 
 and using regular expressions:
 
-    $ nix-env -qa 'firefox.*'
+```console
+$ nix-env -qa 'firefox.*'
+```
 
 It is also possible to see the *status* of available packages, i.e.,
 whether they are installed into the user environment and/or present in
 the system:
 
-    $ nix-env -qas
-    …
-    -PS bash-3.0
-    --S binutils-2.15
-    IPS bison-1.875d
-    …
+```console
+$ nix-env -qas
+…
+-PS bash-3.0
+--S binutils-2.15
+IPS bison-1.875d
+…
+```
 
 The first character (`I`) indicates whether the package is installed in
 your current user environment. The second (`P`) indicates whether it is
@@ -96,7 +108,9 @@ Nix knows that it can fetch a pre-built package from somewhere
 
 You can install a package using `nix-env -i`. For instance,
 
-    $ nix-env -i subversion
+```console
+$ nix-env -i subversion
+```
 
 will install the package called `subversion` (which is, of course, the
 [Subversion version management system](http://subversion.tigris.org/)).
@@ -121,12 +135,16 @@ will install the package called `subversion` (which is, of course, the
 
 Naturally, packages can also be uninstalled:
 
-    $ nix-env -e subversion
+```console
+$ nix-env -e subversion
+```
 
 Upgrading to a new version is just as easy. If you have a new release of
 Nix Packages, you can do:
 
-    $ nix-env -u subversion
+```console
+$ nix-env -u subversion
+```
 
 This will *only* upgrade Subversion if there is a “newer” version in the
 new set of Nix expressions, as defined by some pretty arbitrary rules
@@ -137,14 +155,18 @@ whatever version is in the Nix expressions, use `-i` instead of `-u`;
 
 You can also upgrade all packages for which there are newer versions:
 
-    $ nix-env -u
+```console
+$ nix-env -u
+```
 
 Sometimes it’s useful to be able to ask what `nix-env` would do, without
 actually doing it. For instance, to find out what packages would be
 upgraded by `nix-env -u`, you can do
 
-    $ nix-env -u --dry-run
-    (dry run; not doing anything)
-    upgrading `libxslt-1.1.0' to `libxslt-1.1.10'
-    upgrading `graphviz-1.10' to `graphviz-1.12'
-    upgrading `coreutils-5.0' to `coreutils-5.2.1'
+```console
+$ nix-env -u --dry-run
+(dry run; not doing anything)
+upgrading `libxslt-1.1.0' to `libxslt-1.1.10'
+upgrading `graphviz-1.10' to `graphviz-1.12'
+upgrading `coreutils-5.0' to `coreutils-5.2.1'
+```

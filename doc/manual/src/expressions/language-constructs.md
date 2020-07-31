@@ -5,10 +5,12 @@
 Recursive sets are just normal sets, but the attributes can refer to
 each other. For example,
 
-    rec {
-      x = y;
-      y = 123;
-    }.x
+```nix
+rec {
+  x = y;
+  y = 123;
+}.x
+```
 
 evaluates to `123`. Note that without `rec` the binding `x = y;` would
 refer to the variable `y` in the surrounding scope, if one exists, and
@@ -19,10 +21,12 @@ recursive set, they are.
 Recursive sets of course introduce the danger of infinite recursion. For
 example, the expression
 
-    rec {
-      x = y;
-      y = x;
-    }.x
+```nix
+rec {
+  x = y;
+  y = x;
+}.x
+```
 
 will crash with an `infinite recursion encountered` error message.
 
@@ -31,10 +35,12 @@ will crash with an `infinite recursion encountered` error message.
 A let-expression allows you to define local variables for an expression.
 For instance,
 
-    let
-      x = "foo";
-      y = "bar";
-    in x + y
+```nix
+let
+  x = "foo";
+  y = "bar";
+in x + y
+```
 
 evaluates to `"foobar"`.
 
@@ -45,38 +51,42 @@ copy variables from the surrounding lexical scope (e.g., when you want
 to propagate attributes). This can be shortened using the `inherit`
 keyword. For instance,
 
-    let x = 123; in
-    { inherit x;
-      y = 456;
-    }
+```nix
+let x = 123; in
+{ inherit x;
+  y = 456;
+}
+```
 
 is equivalent to
 
-    let x = 123; in
-    { x = x;
-      y = 456;
-    }
+```nix
+let x = 123; in
+{ x = x;
+  y = 456;
+}
+```
 
 and both evaluate to `{ x = 123; y = 456; }`. (Note that this works
 because `x` is added to the lexical scope by the `let` construct.) It is
 also possible to inherit attributes from another set. For instance, in
 this fragment from `all-packages.nix`,
 
-``` 
-  graphviz = (import ../tools/graphics/graphviz) {
-    inherit fetchurl stdenv libpng libjpeg expat x11 yacc;
-    inherit (xlibs) libXaw;
-  };
+```nix
+graphviz = (import ../tools/graphics/graphviz) {
+  inherit fetchurl stdenv libpng libjpeg expat x11 yacc;
+  inherit (xlibs) libXaw;
+};
 
-  xlibs = {
-    libX11 = ...;
-    libXaw = ...;
-    ...
-  }
-
-  libpng = ...;
-  libjpg = ...;
+xlibs = {
+  libX11 = ...;
+  libXaw = ...;
   ...
+}
+
+libpng = ...;
+libjpg = ...;
+...
 ```
 
 the set used in the function call to the function defined in
@@ -86,17 +96,21 @@ surrounding scope (`fetchurl` ... `yacc`), but also inherits `libXaw`
 
 Summarizing the fragment
 
-    ...
-    inherit x y z;
-    inherit (src-set) a b c;
-    ...
+```nix
+...
+inherit x y z;
+inherit (src-set) a b c;
+...
+```
 
 is equivalent to
 
-    ...
-    x = x; y = y; z = z;
-    a = src-set.a; b = src-set.b; c = src-set.c;
-    ...
+```nix
+...
+x = x; y = y; z = z;
+a = src-set.a; b = src-set.b; c = src-set.c;
+...
+```
 
 when used while defining local variables in a let-expression or while
 defining a set.
@@ -105,7 +119,9 @@ defining a set.
 
 Functions have the following form:
 
-    pattern: body
+```nix
+pattern: body
+```
 
 The pattern specifies what the argument of the function must look like,
 and binds variables in the body to (parts of) the argument. There are
@@ -114,42 +130,51 @@ three kinds of patterns:
   - If a pattern is a single identifier, then the function matches any
     argument. Example:
     
-        let negate = x: !x;
-            concat = x: y: x + y;
-        in if negate true then concat "foo" "bar" else ""
+    ```nix
+    let negate = x: !x;
+        concat = x: y: x + y;
+    in if negate true then concat "foo" "bar" else ""
+    ```
     
     Note that `concat` is a function that takes one argument and returns
     a function that takes another argument. This allows partial
     parameterisation (i.e., only filling some of the arguments of a
     function); e.g.,
     
-        map (concat "foo") [ "bar" "bla" "abc" ]
+    ```nix
+    map (concat "foo") [ "bar" "bla" "abc" ]
+    ```
     
-    evaluates to `[ "foobar" "foobla"
-            "fooabc" ]`.
+    evaluates to `[ "foobar" "foobla" "fooabc" ]`.
 
   - A *set pattern* of the form `{ name1, name2, …, nameN }` matches a
     set containing the listed attributes, and binds the values of those
     attributes to variables in the function body. For example, the
     function
     
-        { x, y, z }: z + y + x
+    ```nix
+    { x, y, z }: z + y + x
+    ```
     
     can only be called with a set containing exactly the attributes `x`,
     `y` and `z`. No other attributes are allowed. If you want to allow
     additional arguments, you can use an ellipsis (`...`):
     
-        { x, y, z, ... }: z + y + x
+    ```nix
+    { x, y, z, ... }: z + y + x
+    ```
     
     This works on any set that contains at least the three named
     attributes.
     
-    It is possible to provide *default values* for attributes, in which
-    case they are allowed to be missing. A default value is specified by
-    writing `name ?
-            e`, where *e* is an arbitrary expression. For example,
+    It is possible to provide *default values* for attributes, in
+    which case they are allowed to be missing. A default value is
+    specified by writing `name ?  e`, where *e* is an arbitrary
+    expression. For example,
     
-        { x, y ? "foo", z ? "bar" }: z + y + x
+    ```nix
+    { x, y ? "foo", z ? "bar" }: z + y + x
+    ```
     
     specifies a function that only requires an attribute named `x`, but
     optionally accepts `y` and `z`.
@@ -157,14 +182,14 @@ three kinds of patterns:
   - An `@`-pattern provides a means of referring to the whole value
     being matched:
     
-    ``` 
-     args@{ x, y, z, ... }: z + y + x + args.a
+    ```nix
+    args@{ x, y, z, ... }: z + y + x + args.a
     ```
     
     but can also be written as:
     
-    ``` 
-     { x, y, z, ... } @ args: z + y + x + args.a
+    ```nix
+    { x, y, z, ... } @ args: z + y + x + args.a
     ```
     
     Here `args` is bound to the entire argument, which is further
@@ -182,24 +207,30 @@ three kinds of patterns:
     > 
     > For instance
     > 
-    >     let
-    >       function = args@{ a ? 23, ... }: args;
-    >     in
-    >      function {}
+    > ```nix
+    > let
+    >   function = args@{ a ? 23, ... }: args;
+    > in
+    >   function {}
+    > ````
     > 
     > will evaluate to an empty attribute set.
 
 Note that functions do not have names. If you want to give them a name,
 you can bind them to an attribute, e.g.,
 
-    let concat = { x, y }: x + y;
-    in concat { x = "foo"; y = "bar"; }
+```nix
+let concat = { x, y }: x + y;
+in concat { x = "foo"; y = "bar"; }
+```
 
 ## Conditionals
 
 Conditionals look like this:
 
-    if e1 then e2 else e3
+```nix
+if e1 then e2 else e3
+```
 
 where *e1* is an expression that should evaluate to a Boolean value
 (`true` or `false`).
@@ -209,7 +240,9 @@ where *e1* is an expression that should evaluate to a Boolean value
 Assertions are generally used to check that certain requirements on or
 between features and dependencies hold. They look like this:
 
-    assert e1; e2
+```nix
+assert e1; e2
+```
 
 where *e1* is an expression that should evaluate to a Boolean value. If
 it evaluates to `true`, *e2* is returned; otherwise expression
@@ -218,29 +251,31 @@ evaluation is aborted and a backtrace is printed.
 Here is a Nix expression for the Subversion package that shows how
 assertions can be used:.
 
-    { localServer ? false
-    , httpServer ? false
-    , sslSupport ? false
-    , pythonBindings ? false
-    , javaSwigBindings ? false
-    , javahlBindings ? false
-    , stdenv, fetchurl
-    , openssl ? null, httpd ? null, db4 ? null, expat, swig ? null, j2sdk ? null
-    }:
-    
-    assert localServer -> db4 != null; ①
-    assert httpServer -> httpd != null && httpd.expat == expat; ②
-    assert sslSupport -> openssl != null && (httpServer -> httpd.openssl == openssl); ③
-    assert pythonBindings -> swig != null && swig.pythonSupport;
-    assert javaSwigBindings -> swig != null && swig.javaSupport;
-    assert javahlBindings -> j2sdk != null;
-    
-    stdenv.mkDerivation {
-      name = "subversion-1.1.1";
-      ...
-      openssl = if sslSupport then openssl else null; ④
-      ...
-    }
+```nix
+{ localServer ? false
+, httpServer ? false
+, sslSupport ? false
+, pythonBindings ? false
+, javaSwigBindings ? false
+, javahlBindings ? false
+, stdenv, fetchurl
+, openssl ? null, httpd ? null, db4 ? null, expat, swig ? null, j2sdk ? null
+}:
+
+assert localServer -> db4 != null; ①
+assert httpServer -> httpd != null && httpd.expat == expat; ②
+assert sslSupport -> openssl != null && (httpServer -> httpd.openssl == openssl); ③
+assert pythonBindings -> swig != null && swig.pythonSupport;
+assert javaSwigBindings -> swig != null && swig.javaSupport;
+assert javahlBindings -> j2sdk != null;
+
+stdenv.mkDerivation {
+  name = "subversion-1.1.1";
+  ...
+  openssl = if sslSupport then openssl else null; ④
+  ...
+}
+```
 
 The points of interest are:
 
@@ -273,19 +308,25 @@ The points of interest are:
 
 A *with-expression*,
 
-    with e1; e2
+```nix
+with e1; e2
+```
 
 introduces the set *e1* into the lexical scope of the expression *e2*.
 For instance,
 
-    let as = { x = "foo"; y = "bar"; };
-    in with as; x + y
+```nix
+let as = { x = "foo"; y = "bar"; };
+in with as; x + y
+```
 
 evaluates to `"foobar"` since the `with` adds the `x` and `y` attributes
 of `as` to the lexical scope in the expression `x + y`. The most common
 use of `with` is in conjunction with the `import` function. E.g.,
 
-    with (import ./definitions.nix); ...
+```nix
+with (import ./definitions.nix); ...
+```
 
 makes all attributes defined in the file `definitions.nix` available as
 if they were defined locally in a `let`-expression.
@@ -293,14 +334,17 @@ if they were defined locally in a `let`-expression.
 The bindings introduced by `with` do not shadow bindings introduced by
 other means, e.g.
 
-    let a = 3; in with { a = 1; }; let a = 4; in with { a = 2; }; ...
+```nix
+let a = 3; in with { a = 1; }; let a = 4; in with { a = 2; }; ...
+```
 
 establishes the same scope as
 
-    let a = 1; in let a = 2; in let a = 3; in let a = 4; in ...
+```nix
+let a = 1; in let a = 2; in let a = 3; in let a = 4; in ...
+```
 
 ## Comments
 
 Comments can be single-line, started with a `#` character, or
-inline/multi-line, enclosed within `/*
-... */`.
+inline/multi-line, enclosed within `/* ... */`.

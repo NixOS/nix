@@ -3,12 +3,14 @@
 Recall that the [build script for GNU Hello](build-script.md) looked
 something like this:
 
-    PATH=$perl/bin:$PATH
-    tar xvfz $src
-    cd hello-*
-    ./configure --prefix=$out
-    make
-    make install
+```bash
+PATH=$perl/bin:$PATH
+tar xvfz $src
+cd hello-*
+./configure --prefix=$out
+make
+make install
+```
 
 The builders for almost all Unix packages look like this — set up some
 environment variables, unpack the sources, configure, build, and
@@ -16,11 +18,13 @@ install. For this reason the standard environment provides some Bash
 functions that automate the build process. Here is what a builder using
 the generic build facilities looks like:
 
-    buildInputs="$perl" ①
-    
-    source $stdenv/setup ②
-    
-    genericBuild ③
+```bash
+buildInputs="$perl" ①
+
+source $stdenv/setup ②
+
+genericBuild ③
+```
 
 Here is what each line means:
 
@@ -45,15 +49,17 @@ Here is what each line means:
 Discerning readers will note that the `buildInputs` could just as well
 have been set in the Nix expression, like this:
 
-``` 
+```nix
   buildInputs = [ perl ];
 ```
 
 The `perl` attribute can then be removed, and the builder becomes even
 shorter:
 
-    source $stdenv/setup
-    genericBuild
+```bash
+source $stdenv/setup
+genericBuild
+```
 
 In fact, `mkDerivation` provides a default builder that looks exactly
 like that, so it is actually possible to omit the builder for Hello

@@ -27,4 +27,6 @@ generations that were active at that point in time).
 To delete from the Nix store everything that is not used by the current
 generations of each profile, do
 
-    $ nix-collect-garbage -d
+```console
+$ nix-collect-garbage -d
+```

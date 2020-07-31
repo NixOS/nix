@@ -3,15 +3,17 @@
 Here is the builder referenced from Hello's Nix expression (stored in
 `pkgs/applications/misc/hello/ex-1/builder.sh`):
 
-    source $stdenv/setup ①
-    
-    PATH=$perl/bin:$PATH ②
-    
-    tar xvfz $src ③
-    cd hello-*
-    ./configure --prefix=$out ④
-    make ⑤
-    make install
+```bash
+source $stdenv/setup ①
+
+PATH=$perl/bin:$PATH ②
+
+tar xvfz $src ③
+cd hello-*
+./configure --prefix=$out ④
+make ⑤
+make install
+```
 
 The builder can actually be made a lot shorter by using the *generic
 builder* functions provided by `stdenv`, but here we write out the build

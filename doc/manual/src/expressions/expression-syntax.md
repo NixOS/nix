@@ -2,17 +2,19 @@
 
 Here is a Nix expression for GNU Hello:
 
-    { stdenv, fetchurl, perl }: ①
-    
-    stdenv.mkDerivation { ②
-      name = "hello-2.1.1"; ③
-      builder = ./builder.sh; ④
-      src = fetchurl { ⑤
-        url = "ftp://ftp.nluug.nl/pub/gnu/hello/hello-2.1.1.tar.gz";
-        sha256 = "1md7jsfd8pa45z73bz1kszpp01yw6x5ljkjk2hx7wl800any6465";
-      };
-      inherit perl; ⑥
-    }
+```nix
+{ stdenv, fetchurl, perl }: ①
+
+stdenv.mkDerivation { ②
+  name = "hello-2.1.1"; ③
+  builder = ./builder.sh; ④
+  src = fetchurl { ⑤
+    url = "ftp://ftp.nluug.nl/pub/gnu/hello/hello-2.1.1.tar.gz";
+    sha256 = "1md7jsfd8pa45z73bz1kszpp01yw6x5ljkjk2hx7wl800any6465";
+  };
+  inherit perl; ⑥
+}
+```
 
 This file is actually already in the Nix Packages collection in
 `pkgs/applications/misc/hello/ex-1/default.nix`. It is customary to
@@ -31,31 +33,27 @@ elements (referenced from the figure by number):
     etc. `fetchurl` is a function that downloads files. `perl` is the
     Perl interpreter.
     
-    Nix functions generally have the form `{ x, y, ...,
-                    z }: e` where `x`, `y`, etc. are the names of the expected
-    arguments, and where *e* is the body of the function. So here, the
-    entire remainder of the file is the body of the function; when given
-    the required arguments, the body should describe how to build an
-    instance of the Hello package.
+    Nix functions generally have the form `{ x, y, ..., z }: e` where
+    `x`, `y`, etc. are the names of the expected arguments, and where
+    *e* is the body of the function. So here, the entire remainder of
+    the file is the body of the function; when given the required
+    arguments, the body should describe how to build an instance of
+    the Hello package.
 
 2.  So we have to build a package. Building something from other stuff
     is called a *derivation* in Nix (as opposed to sources, which are
     built by humans instead of computers). We perform a derivation by
-    calling `stdenv.mkDerivation`. `mkDerivation` is a function provided
-    by `stdenv` that builds a package from a set of *attributes*. A set
-    is just a list of key/value pairs where each key is a string and
-    each value is an arbitrary Nix expression. They take the general
-    form `{
-                    name1 =
-                    expr1; ...
-                    nameN =
-                    exprN; }`.
+    calling `stdenv.mkDerivation`. `mkDerivation` is a function
+    provided by `stdenv` that builds a package from a set of
+    *attributes*. A set is just a list of key/value pairs where each
+    key is a string and each value is an arbitrary Nix
+    expression. They take the general form `{ name1 = expr1; ...
+    nameN = exprN; }`.
 
-3.  The attribute `name` specifies the symbolic name and version of the
-    package. Nix doesn't really care about these things, but they are
-    used by for instance `nix-env
-                    -q` to show a “human-readable” name for packages. This attribute is
-    required by `mkDerivation`.
+3.  The attribute `name` specifies the symbolic name and version of
+    the package. Nix doesn't really care about these things, but they
+    are used by for instance `nix-env -q` to show a “human-readable”
+    name for packages. This attribute is required by `mkDerivation`.
 
 4.  The attribute `builder` specifies the builder. This attribute can
     sometimes be omitted, in which case `mkDerivation` will fill in a
@@ -83,8 +81,10 @@ elements (referenced from the figure by number):
     `perl` function argument to the builder. All attributes in the set
     are actually passed as environment variables to the builder, so
     declaring an attribute
-    
-        perl = perl;
+
+    ```nix
+    perl = perl;
+    ```
     
     will do the trick: it binds an attribute `perl` to the function
     argument which also happens to be called `perl`. However, it looks a

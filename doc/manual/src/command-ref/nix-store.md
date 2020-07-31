@@ -47,13 +47,15 @@ have an effect.
     The `--indirect` flag causes a uniquely named symlink to *path* to
     be stored in `/nix/var/nix/gcroots/auto/`. For instance,
 
-        $ nix-store --add-root /home/eelco/bla/result --indirect -r ...
+    ```console
+    $ nix-store --add-root /home/eelco/bla/result --indirect -r ...
 
-        $ ls -l /nix/var/nix/gcroots/auto
-        lrwxrwxrwx    1 ... 2005-03-13 21:10 dn54lcypm8f8... -> /home/eelco/bla/result
+    $ ls -l /nix/var/nix/gcroots/auto
+    lrwxrwxrwx    1 ... 2005-03-13 21:10 dn54lcypm8f8... -> /home/eelco/bla/result
 
-        $ ls -l /home/eelco/bla/result
-        lrwxrwxrwx    1 ... 2005-03-13 21:10 /home/eelco/bla/result -> /nix/store/1r11343n6qd4...-f-spot-0.0.10
+    $ ls -l /home/eelco/bla/result
+    lrwxrwxrwx    1 ... 2005-03-13 21:10 /home/eelco/bla/result -> /nix/store/1r11343n6qd4...-f-spot-0.0.10
+    ```
 
     Thus, when `/home/eelco/bla/result` is removed, the GC root in the
     `auto` directory becomes a dangling symlink and will be ignored by
@@ -157,14 +159,18 @@ or.
 This operation is typically used to build store derivations produced by
 [`nix-instantiate`](nix-instantiate.md):
 
-    $ nix-store -r $(nix-instantiate ./test.nix)
-    /nix/store/31axcgrlbfsxzmfff1gyj1bf62hvkby2-aterm-2.3.1
+```console
+$ nix-store -r $(nix-instantiate ./test.nix)
+/nix/store/31axcgrlbfsxzmfff1gyj1bf62hvkby2-aterm-2.3.1
+```
 
 This is essentially what [`nix-build`](nix-build.md) does.
 
 To test whether a previously-built derivation is deterministic:
 
-    $ nix-build '<nixpkgs>' -A hello --check -K
+```console
+$ nix-build '<nixpkgs>' -A hello --check -K
+```
 
 # Operation `--serve`
 
@@ -190,9 +196,11 @@ The following flags are available:
 To turn a host into a build server, the `authorized_keys` file can be
 used to provide build access to a given SSH public key:
 
-    $ cat <<EOF >>/root/.ssh/authorized_keys
-    command="nice -n20 nix-store --serve --write" ssh-rsa AAAAB3NzaC1yc2EAAAA...
-    EOF
+```console
+$ cat <<EOF >>/root/.ssh/authorized_keys
+command="nice -n20 nix-store --serve --write" ssh-rsa AAAAB3NzaC1yc2EAAAA...
+EOF
+```
 
 # Operation `--gc`
 
@@ -245,14 +253,18 @@ number of bytes that would be freed.
 
 To delete all unreachable paths, just do:
 
-    $ nix-store --gc
-    deleting `/nix/store/kq82idx6g0nyzsp2s14gfsc38npai7lf-cairo-1.0.4.tar.gz.drv'
-    ...
-    8825586 bytes freed (8.42 MiB)
+```console
+$ nix-store --gc
+deleting `/nix/store/kq82idx6g0nyzsp2s14gfsc38npai7lf-cairo-1.0.4.tar.gz.drv'
+...
+8825586 bytes freed (8.42 MiB)
+```
 
 To delete at least 100 MiBs of unreachable paths:
 
-    $ nix-store --gc --max-freed $((100 * 1024 * 1024))
+```console
+$ nix-store --gc --max-freed $((100 * 1024 * 1024))
+```
 
 # Operation `--delete`
 
@@ -274,9 +286,11 @@ paths in the store that refer to it (i.e., depend on it).
 
 ## Example
 
-    $ nix-store --delete /nix/store/zq0h41l75vlb4z45kzgjjmsjxvcv1qk7-mesa-6.4
-    0 bytes freed (0.00 MiB)
-    error: cannot delete path `/nix/store/zq0h41l75vlb4z45kzgjjmsjxvcv1qk7-mesa-6.4' since it is still alive
+```console
+$ nix-store --delete /nix/store/zq0h41l75vlb4z45kzgjjmsjxvcv1qk7-mesa-6.4
+0 bytes freed (0.00 MiB)
+error: cannot delete path `/nix/store/zq0h41l75vlb4z45kzgjjmsjxvcv1qk7-mesa-6.4' since it is still alive
+```
 
 # Operation `--query`
 
@@ -407,18 +421,22 @@ symlink.
 Print the closure (runtime dependencies) of the `svn` program in the
 current user environment:
 
-    $ nix-store -qR $(which svn)
-    /nix/store/5mbglq5ldqld8sj57273aljwkfvj22mc-subversion-1.1.4
-    /nix/store/9lz9yc6zgmc0vlqmn2ipcpkjlmbi51vv-glibc-2.3.4
-    ...
+```console
+$ nix-store -qR $(which svn)
+/nix/store/5mbglq5ldqld8sj57273aljwkfvj22mc-subversion-1.1.4
+/nix/store/9lz9yc6zgmc0vlqmn2ipcpkjlmbi51vv-glibc-2.3.4
+...
+```
 
 Print the build-time dependencies of `svn`:
 
-    $ nix-store -qR $(nix-store -qd $(which svn))
-    /nix/store/02iizgn86m42q905rddvg4ja975bk2i4-grep-2.5.1.tar.bz2.drv
-    /nix/store/07a2bzxmzwz5hp58nf03pahrv2ygwgs3-gcc-wrapper.sh
-    /nix/store/0ma7c9wsbaxahwwl04gbw3fcd806ski4-glibc-2.3.4.drv
-    ... lots of other paths ...
+```console
+$ nix-store -qR $(nix-store -qd $(which svn))
+/nix/store/02iizgn86m42q905rddvg4ja975bk2i4-grep-2.5.1.tar.bz2.drv
+/nix/store/07a2bzxmzwz5hp58nf03pahrv2ygwgs3-gcc-wrapper.sh
+/nix/store/0ma7c9wsbaxahwwl04gbw3fcd806ski4-glibc-2.3.4.drv
+... lots of other paths ...
+```
 
 The difference with the previous example is that we ask the closure of
 the derivation (`-qd`), not the closure of the output path that contains
@@ -426,29 +444,35 @@ the derivation (`-qd`), not the closure of the output path that contains
 
 Show the build-time dependencies as a tree:
 
-    $ nix-store -q --tree $(nix-store -qd $(which svn))
-    /nix/store/7i5082kfb6yjbqdbiwdhhza0am2xvh6c-subversion-1.1.4.drv
-    +---/nix/store/d8afh10z72n8l1cr5w42366abiblgn54-builder.sh
-    +---/nix/store/fmzxmpjx2lh849ph0l36snfj9zdibw67-bash-3.0.drv
-    |   +---/nix/store/570hmhmx3v57605cqg9yfvvyh0nnb8k8-bash
-    |   +---/nix/store/p3srsbd8dx44v2pg6nbnszab5mcwx03v-builder.sh
-    ...
+```console
+$ nix-store -q --tree $(nix-store -qd $(which svn))
+/nix/store/7i5082kfb6yjbqdbiwdhhza0am2xvh6c-subversion-1.1.4.drv
++---/nix/store/d8afh10z72n8l1cr5w42366abiblgn54-builder.sh
++---/nix/store/fmzxmpjx2lh849ph0l36snfj9zdibw67-bash-3.0.drv
+|   +---/nix/store/570hmhmx3v57605cqg9yfvvyh0nnb8k8-bash
+|   +---/nix/store/p3srsbd8dx44v2pg6nbnszab5mcwx03v-builder.sh
+...
+```
 
 Show all paths that depend on the same OpenSSL library as `svn`:
 
-    $ nix-store -q --referrers $(nix-store -q --binding openssl $(nix-store -qd $(which svn)))
-    /nix/store/23ny9l9wixx21632y2wi4p585qhva1q8-sylpheed-1.0.0
-    /nix/store/5mbglq5ldqld8sj57273aljwkfvj22mc-subversion-1.1.4
-    /nix/store/dpmvp969yhdqs7lm2r1a3gng7pyq6vy4-subversion-1.1.3
-    /nix/store/l51240xqsgg8a7yrbqdx1rfzyv6l26fx-lynx-2.8.5
+```console
+$ nix-store -q --referrers $(nix-store -q --binding openssl $(nix-store -qd $(which svn)))
+/nix/store/23ny9l9wixx21632y2wi4p585qhva1q8-sylpheed-1.0.0
+/nix/store/5mbglq5ldqld8sj57273aljwkfvj22mc-subversion-1.1.4
+/nix/store/dpmvp969yhdqs7lm2r1a3gng7pyq6vy4-subversion-1.1.3
+/nix/store/l51240xqsgg8a7yrbqdx1rfzyv6l26fx-lynx-2.8.5
+```
 
 Show all paths that directly or indirectly depend on the Glibc (C
 library) used by `svn`:
 
-    $ nix-store -q --referrers-closure $(ldd $(which svn) | grep /libc.so | awk '{print $3}')
-    /nix/store/034a6h4vpz9kds5r6kzb9lhh81mscw43-libgnomeprintui-2.8.2
-    /nix/store/15l3yi0d45prm7a82pcrknxdh6nzmxza-gawk-3.1.4
-    ...
+```console
+$ nix-store -q --referrers-closure $(ldd $(which svn) | grep /libc.so | awk '{print $3}')
+/nix/store/034a6h4vpz9kds5r6kzb9lhh81mscw43-libgnomeprintui-2.8.2
+/nix/store/15l3yi0d45prm7a82pcrknxdh6nzmxza-gawk-3.1.4
+...
+```
 
 Note that `ldd` is a command that prints out the dynamic libraries used
 by an ELF executable.
@@ -456,16 +480,20 @@ by an ELF executable.
 Make a picture of the runtime dependency graph of the current user
 environment:
 
-    $ nix-store -q --graph ~/.nix-profile | dot -Tps > graph.ps
-    $ gv graph.ps
+```console
+$ nix-store -q --graph ~/.nix-profile | dot -Tps > graph.ps
+$ gv graph.ps
+```
 
 Show every garbage collector root that points to a store path that
 depends on `svn`:
 
-    $ nix-store -q --roots $(which svn)
-    /nix/var/nix/profiles/default-81-link
-    /nix/var/nix/profiles/default-82-link
-    /nix/var/nix/profiles/per-user/eelco/profile-97-link
+```console
+$ nix-store -q --roots $(which svn)
+/nix/var/nix/profiles/default-81-link
+/nix/var/nix/profiles/default-82-link
+/nix/var/nix/profiles/per-user/eelco/profile-97-link
+```
 
 # Operation `--add`
 
@@ -480,8 +508,10 @@ prints the resulting paths in the Nix store on standard output.
 
 ## Example
 
-    $ nix-store --add ./foo.c
-    /nix/store/m7lrha58ph6rcnv109yzx1nk1cj7k7zf-foo.c
+```console
+$ nix-store --add ./foo.c
+/nix/store/m7lrha58ph6rcnv109yzx1nk1cj7k7zf-foo.c
+```
 
 # Operation `--add-fixed`
 
@@ -505,8 +535,10 @@ This operation has the following options:
 
 ## Example
 
-    $ nix-store --add-fixed sha256 ./hello-2.10.tar.gz
-    /nix/store/3x7dwzq014bblazs7kq20p9hyzz0qh8g-hello-2.10.tar.gz
+```console
+$ nix-store --add-fixed sha256 ./hello-2.10.tar.gz
+/nix/store/3x7dwzq014bblazs7kq20p9hyzz0qh8g-hello-2.10.tar.gz
+```
 
 # Operation `--verify`
 
@@ -554,7 +586,9 @@ path has changed, and 1 otherwise.
 
 To verify the integrity of the `svn` command and all its dependencies:
 
-    $ nix-store --verify-path $(nix-store -qR $(which svn))
+```console
+$ nix-store --verify-path $(nix-store -qR $(which svn))
+```
 
 # Operation `--repair-path`
 
@@ -578,14 +612,16 @@ substitutes are available, then repair is not possible.
 
 ## Example
 
-    $ nix-store --verify-path /nix/store/dj7a81wsm1ijwwpkks3725661h3263p5-glibc-2.13
-    path `/nix/store/dj7a81wsm1ijwwpkks3725661h3263p5-glibc-2.13' was modified!
-      expected hash `2db57715ae90b7e31ff1f2ecb8c12ec1cc43da920efcbe3b22763f36a1861588',
-      got `481c5aa5483ebc97c20457bb8bca24deea56550d3985cda0027f67fe54b808e4'
+```console
+$ nix-store --verify-path /nix/store/dj7a81wsm1ijwwpkks3725661h3263p5-glibc-2.13
+path `/nix/store/dj7a81wsm1ijwwpkks3725661h3263p5-glibc-2.13' was modified!
+  expected hash `2db57715ae90b7e31ff1f2ecb8c12ec1cc43da920efcbe3b22763f36a1861588',
+  got `481c5aa5483ebc97c20457bb8bca24deea56550d3985cda0027f67fe54b808e4'
 
-    $ nix-store --repair-path /nix/store/dj7a81wsm1ijwwpkks3725661h3263p5-glibc-2.13
-    fetching path `/nix/store/d7a81wsm1ijwwpkks3725661h3263p5-glibc-2.13'...
-    …
+$ nix-store --repair-path /nix/store/dj7a81wsm1ijwwpkks3725661h3263p5-glibc-2.13
+fetching path `/nix/store/d7a81wsm1ijwwpkks3725661h3263p5-glibc-2.13'...
+…
+```
 
 # Operation `--dump`
 
@@ -651,11 +687,15 @@ a store path references other store paths that are missing in the target
 Nix store, the import will fail. To copy a whole closure, do something
 like:
 
-    $ nix-store --export $(nix-store -qR paths) > out
+```console
+$ nix-store --export $(nix-store -qR paths) > out
+```
 
 To import the whole closure again, run:
 
-    $ nix-store --import < out
+```console
+$ nix-store --import < out
+```
 
 # Operation `--import`
 
@@ -695,11 +735,13 @@ Use `-vv` or `-vvv` to get some progress indication.
 
 ## Example
 
-    $ nix-store --optimise
-    hashing files in `/nix/store/qhqx7l2f1kmwihc9bnxs7rc159hsxnf3-gcc-4.1.1'
-    ...
-    541838819 bytes (516.74 MiB) freed by hard-linking 54143 files;
-    there are 114486 files with equal contents out of 215894 files in total
+```console
+$ nix-store --optimise
+hashing files in `/nix/store/qhqx7l2f1kmwihc9bnxs7rc159hsxnf3-gcc-4.1.1'
+...
+541838819 bytes (516.74 MiB) freed by hard-linking 54143 files;
+there are 114486 files with equal contents out of 215894 files in total
+```
 
 # Operation `--read-log`
 
@@ -721,13 +763,15 @@ substitute, then the log is unavailable.
 
 ## Example
 
-    $ nix-store -l $(which ktorrent)
-    building /nix/store/dhc73pvzpnzxhdgpimsd9sw39di66ph1-ktorrent-2.2.1
-    unpacking sources
-    unpacking source archive /nix/store/p8n1jpqs27mgkjw07pb5269717nzf5f8-ktorrent-2.2.1.tar.gz
-    ktorrent-2.2.1/
-    ktorrent-2.2.1/NEWS
-    ...
+```console
+$ nix-store -l $(which ktorrent)
+building /nix/store/dhc73pvzpnzxhdgpimsd9sw39di66ph1-ktorrent-2.2.1
+unpacking sources
+unpacking source archive /nix/store/p8n1jpqs27mgkjw07pb5269717nzf5f8-ktorrent-2.2.1.tar.gz
+ktorrent-2.2.1/
+ktorrent-2.2.1/NEWS
+...
+```
 
 # Operation `--dump-db`
 
@@ -773,12 +817,14 @@ of the builder are placed in the variable `_args`.
 
 ## Example
 
-    $ nix-store --print-env $(nix-instantiate '<nixpkgs>' -A firefox)
-    …
-    export src; src='/nix/store/plpj7qrwcz94z2psh6fchsi7s8yihc7k-firefox-12.0.source.tar.bz2'
-    export stdenv; stdenv='/nix/store/7c8asx3yfrg5dg1gzhzyq2236zfgibnn-stdenv'
-    export system; system='x86_64-linux'
-    export _args; _args='-e /nix/store/9krlzvny65gdc8s7kpb6lkx8cd02c25c-default-builder.sh'
+```console
+$ nix-store --print-env $(nix-instantiate '<nixpkgs>' -A firefox)
+…
+export src; src='/nix/store/plpj7qrwcz94z2psh6fchsi7s8yihc7k-firefox-12.0.source.tar.bz2'
+export stdenv; stdenv='/nix/store/7c8asx3yfrg5dg1gzhzyq2236zfgibnn-stdenv'
+export system; system='x86_64-linux'
+export _args; _args='-e /nix/store/9krlzvny65gdc8s7kpb6lkx8cd02c25c-default-builder.sh'
+```
 
 # Operation `--generate-binary-cache-key`
 

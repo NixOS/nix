@@ -54,9 +54,11 @@ Most Nix commands interpret the following environment variables:
     Note that if you’re symlinking the Nix store so that you can put it
     on another file system than the root file system, on Linux you’re
     better off using `bind` mount points, e.g.,
-    
-        $ mkdir /nix
-        $ mount -o bind /mnt/otherdisk/nix /nix
+
+    ```console
+    $ mkdir /nix
+    $ mount -o bind /mnt/otherdisk/nix /nix
+    ```
     
     Consult the mount 8 manual page for details.
 

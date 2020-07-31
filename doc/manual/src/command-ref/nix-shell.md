@@ -39,10 +39,12 @@ after `$stdenv/setup` has been sourced. Since this hook is not executed
 by regular Nix builds, it allows you to perform initialisation specific
 to `nix-shell`. For example, the derivation attribute
 
-    shellHook =
-      ''
-        echo "Hello shell"
-      '';
+```nix
+shellHook =
+  ''
+    echo "Hello shell"
+  '';
+```
 
 will cause `nix-shell` to print `Hello shell`.
 
@@ -108,46 +110,58 @@ The following common options are supported:
 To build the dependencies of the package Pan, and start an interactive
 shell in which to build it:
 
-    $ nix-shell '<nixpkgs>' -A pan
-    [nix-shell]$ unpackPhase
-    [nix-shell]$ cd pan-*
-    [nix-shell]$ configurePhase
-    [nix-shell]$ buildPhase
-    [nix-shell]$ ./pan/gui/pan
+```shell
+$ nix-shell '<nixpkgs>' -A pan
+[nix-shell]$ unpackPhase
+[nix-shell]$ cd pan-*
+[nix-shell]$ configurePhase
+[nix-shell]$ buildPhase
+[nix-shell]$ ./pan/gui/pan
+```
 
 To clear the environment first, and do some additional automatic
 initialisation of the interactive shell:
 
-    $ nix-shell '<nixpkgs>' -A pan --pure \
-        --command 'export NIX_DEBUG=1; export NIX_CORES=8; return'
+```shell
+$ nix-shell '<nixpkgs>' -A pan --pure \
+    --command 'export NIX_DEBUG=1; export NIX_CORES=8; return'
+```
 
 Nix expressions can also be given on the command line using the `-E` and
 `-p` flags. For instance, the following starts a shell containing the
 packages `sqlite` and `libX11`:
 
-    $ nix-shell -E 'with import <nixpkgs> { }; runCommand "dummy" { buildInputs = [ sqlite xorg.libX11 ]; } ""'
+```shell
+$ nix-shell -E 'with import <nixpkgs> { }; runCommand "dummy" { buildInputs = [ sqlite xorg.libX11 ]; } ""'
+```
 
 A shorter way to do the same is:
 
-    $ nix-shell -p sqlite xorg.libX11
-    [nix-shell]$ echo $NIX_LDFLAGS
-    … -L/nix/store/j1zg5v…-sqlite-3.8.0.2/lib -L/nix/store/0gmcz9…-libX11-1.6.1/lib …
+```shell
+$ nix-shell -p sqlite xorg.libX11
+[nix-shell]$ echo $NIX_LDFLAGS
+… -L/nix/store/j1zg5v…-sqlite-3.8.0.2/lib -L/nix/store/0gmcz9…-libX11-1.6.1/lib …
+```
 
 Note that `-p` accepts multiple full nix expressions that are valid in
 the `buildInputs = [ ... ]` shown above, not only package names. So the
 following is also legal:
 
-    $ nix-shell -p sqlite 'git.override { withManual = false; }'
+```shell
+$ nix-shell -p sqlite 'git.override { withManual = false; }'
+```
 
 The `-p` flag looks up Nixpkgs in the Nix search path. You can override
 it by passing `-I` or setting `NIX_PATH`. For example, the following
 gives you a shell containing the Pan package from a specific revision of
 Nixpkgs:
 
-    $ nix-shell -p pan -I nixpkgs=https://github.com/NixOS/nixpkgs/archive/8a3eea054838b55aca962c3fbde9c83c102b8bf2.tar.gz
+```shell
+$ nix-shell -p pan -I nixpkgs=https://github.com/NixOS/nixpkgs/archive/8a3eea054838b55aca962c3fbde9c83c102b8bf2.tar.gz
 
-    [nix-shell:~]$ pan --version
-    Pan 0.139
+[nix-shell:~]$ pan --version
+Pan 0.139
+```
 
 # Use as a `#!`-interpreter
 
@@ -155,8 +169,10 @@ You can use `nix-shell` as a script interpreter to allow scripts written
 in arbitrary languages to obtain their own dependencies via Nix. This is
 done by starting the script with the following lines:
 
-    #! /usr/bin/env nix-shell
-    #! nix-shell -i real-interpreter -p packages
+```bash
+#! /usr/bin/env nix-shell
+#! nix-shell -i real-interpreter -p packages
+```
 
 where *real-interpreter* is the “real” script interpreter that will be
 invoked by `nix-shell` after it has obtained the dependencies and
@@ -170,39 +186,45 @@ because many operating systems only allow one argument in `#!` lines.
 For example, here is a Python script that depends on Python and the
 `prettytable` package:
 
-    #! /usr/bin/env nix-shell
-    #! nix-shell -i python -p python pythonPackages.prettytable
+```python
+#! /usr/bin/env nix-shell
+#! nix-shell -i python -p python pythonPackages.prettytable
 
-    import prettytable
+import prettytable
 
-    # Print a simple table.
-    t = prettytable.PrettyTable(["N", "N^2"])
-    for n in range(1, 10): t.add_row([n, n * n])
-    print t
+# Print a simple table.
+t = prettytable.PrettyTable(["N", "N^2"])
+for n in range(1, 10): t.add_row([n, n * n])
+print t
+```
 
 Similarly, the following is a Perl script that specifies that it
 requires Perl and the `HTML::TokeParser::Simple` and `LWP` packages:
 
-    #! /usr/bin/env nix-shell
-    #! nix-shell -i perl -p perl perlPackages.HTMLTokeParserSimple perlPackages.LWP
+```perl
+#! /usr/bin/env nix-shell
+#! nix-shell -i perl -p perl perlPackages.HTMLTokeParserSimple perlPackages.LWP
 
-    use HTML::TokeParser::Simple;
+use HTML::TokeParser::Simple;
 
-    # Fetch nixos.org and print all hrefs.
-    my $p = HTML::TokeParser::Simple->new(url => 'http://nixos.org/');
+# Fetch nixos.org and print all hrefs.
+my $p = HTML::TokeParser::Simple->new(url => 'http://nixos.org/');
 
-    while (my $token = $p->get_tag("a")) {
-        my $href = $token->get_attr("href");
-        print "$href\n" if $href;
-    }
+while (my $token = $p->get_tag("a")) {
+    my $href = $token->get_attr("href");
+    print "$href\n" if $href;
+}
+```
 
 Sometimes you need to pass a simple Nix expression to customize a
 package like Terraform:
 
-    #! /usr/bin/env nix-shell
-    #! nix-shell -i bash -p "terraform.withPlugins (plugins: [ plugins.openstack ])"
+```bash
+#! /usr/bin/env nix-shell
+#! nix-shell -i bash -p "terraform.withPlugins (plugins: [ plugins.openstack ])"
 
-    terraform apply
+terraform apply
+```
 
 > **Note**
 >
@@ -213,20 +235,22 @@ Finally, using the merging of multiple nix-shell shebangs the following
 Haskell script uses a specific branch of Nixpkgs/NixOS (the 18.03 stable
 branch):
 
-    #! /usr/bin/env nix-shell
-    #! nix-shell -i runghc -p "haskellPackages.ghcWithPackages (ps: [ps.HTTP ps.tagsoup])"
-    #! nix-shell -I nixpkgs=https://github.com/NixOS/nixpkgs/archive/nixos-18.03.tar.gz
+```haskell
+#! /usr/bin/env nix-shell
+#! nix-shell -i runghc -p "haskellPackages.ghcWithPackages (ps: [ps.HTTP ps.tagsoup])"
+#! nix-shell -I nixpkgs=https://github.com/NixOS/nixpkgs/archive/nixos-18.03.tar.gz
 
-    import Network.HTTP
-    import Text.HTML.TagSoup
+import Network.HTTP
+import Text.HTML.TagSoup
 
-    -- Fetch nixos.org and print all hrefs.
-    main = do
-      resp <- Network.HTTP.simpleHTTP (getRequest "http://nixos.org/")
-      body <- getResponseBody resp
-      let tags = filter (isTagOpenName "a") $ parseTags body
-      let tags' = map (fromAttrib "href") tags
-      mapM_ putStrLn $ filter (/= "") tags'
+-- Fetch nixos.org and print all hrefs.
+main = do
+  resp <- Network.HTTP.simpleHTTP (getRequest "http://nixos.org/")
+  body <- getResponseBody resp
+  let tags = filter (isTagOpenName "a") $ parseTags body
+  let tags' = map (fromAttrib "href") tags
+  mapM_ putStrLn $ filter (/= "") tags'
+```
 
 If you want to be even more precise, you can specify a specific revision
 of Nixpkgs:
@@ -237,12 +261,16 @@ The examples above all used `-p` to get dependencies from Nixpkgs. You
 can also use a Nix expression to build your own dependencies. For
 example, the Python example could have been written as:
 
-    #! /usr/bin/env nix-shell
-    #! nix-shell deps.nix -i python
+```python
+#! /usr/bin/env nix-shell
+#! nix-shell deps.nix -i python
+```
 
 where the file `deps.nix` in the same directory as the `#!`-script
 contains:
 
-    with import <nixpkgs> {};
+```nix
+with import <nixpkgs> {};
 
-    runCommand "dummy" { buildInputs = [ python pythonPackages.prettytable ]; } ""
+runCommand "dummy" { buildInputs = [ python pythonPackages.prettytable ]; } ""
+```

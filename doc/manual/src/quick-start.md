@@ -6,7 +6,9 @@ to subsequent chapters.
 
 1. Install single-user Nix by running the following:
 
-        $ bash <(curl -L https://nixos.org/nix/install)
+   ```console
+   $ bash <(curl -L https://nixos.org/nix/install)
+   ```
 
    This will install Nix in `/nix`. The install script will create
    `/nix` using `sudo`, so make sure you have sufficient rights.  (For
@@ -16,52 +18,66 @@ to subsequent chapters.
 1. See what installable packages are currently available in the
    channel:
 
-        $ nix-env -qa
-        docbook-xml-4.3
-        docbook-xml-4.5
-        firefox-33.0.2
-        hello-2.9
-        libxslt-1.1.28
-        …
+   ```console
+   $ nix-env -qa
+   docbook-xml-4.3
+   docbook-xml-4.5
+   firefox-33.0.2
+   hello-2.9
+   libxslt-1.1.28
+   …
+   ```
 
 1. Install some packages from the channel:
 
-        $ nix-env -i hello
+   ```console
+   $ nix-env -i hello
+   ```
 
    This should download pre-built packages; it should not build them
    locally (if it does, something went wrong).
 
 1. Test that they work:
 
-        $ which hello
-        /home/eelco/.nix-profile/bin/hello
-        $ hello
-        Hello, world!
+   ```console
+   $ which hello
+   /home/eelco/.nix-profile/bin/hello
+   $ hello
+   Hello, world!
+   ```
 
 1. Uninstall a package:
 
-        $ nix-env -e hello
+   ```console
+   $ nix-env -e hello
+   ```
 
 1. You can also test a package without installing it:
 
-        $ nix-shell -p hello
+   ```console
+   $ nix-shell -p hello
+   ```
 
    This builds or downloads GNU Hello and its dependencies, then drops
    you into a Bash shell where the `hello` command is present, all
    without affecting your normal environment:
 
-        [nix-shell:~]$ hello
-        Hello, world!
+   ```console
+   [nix-shell:~]$ hello
+   Hello, world!
 
-        [nix-shell:~]$ exit
+   [nix-shell:~]$ exit
 
-        $ hello
-        hello: command not found
+   $ hello
+   hello: command not found
+   ```
 
 1. To keep up-to-date with the channel, do:
 
-        $ nix-channel --update nixpkgs
-        $ nix-env -u '*'
+   ```console
+   $ nix-channel --update nixpkgs
+   $ nix-env -u '*'
+   ```
 
    The latter command will upgrade each installed package for which
    there is a “newer” version (as determined by comparing the version
@@ -70,10 +86,14 @@ to subsequent chapters.
 1. If you're unhappy with the result of a `nix-env` action (e.g., an
    upgraded package turned out not to work properly), you can go back:
 
-        $ nix-env --rollback
+   ```console
+   $ nix-env --rollback
+   ```
 
 1. You should periodically run the Nix garbage collector to get rid of
    unused packages, since uninstalls or upgrades don't actually delete
    them:
 
-        $ nix-collect-garbage -d
+   ```console
+   $ nix-collect-garbage -d
+   ```

@@ -75,21 +75,27 @@ And since packages aren’t overwritten, the old versions are still
 there after an upgrade.  This means that you can _roll back_ to the
 old version:
 
-    $ nix-env --upgrade some-packages
-    $ nix-env --rollback
+```console
+$ nix-env --upgrade some-packages
+$ nix-env --rollback
+```
 
 ## Garbage collection
 
 When you uninstall a package like this…
 
-    $ nix-env --uninstall firefox
+```console
+$ nix-env --uninstall firefox
+```
 
 the package isn’t deleted from the system right away (after all, you
 might want to do a rollback, or it might be in the profiles of other
 users).  Instead, unused packages can be deleted safely by running the
 _garbage collector_:
 
-    $ nix-collect-garbage
+```console
+$ nix-collect-garbage
+```
 
 This deletes all packages that aren’t in use by any user profile or by
 a currently running program.
@@ -115,7 +121,9 @@ each other in the Nix store.
 Nix expressions generally describe how to build a package from
 source, so an installation action like
 
-    $ nix-env --install firefox
+```console
+$ nix-env --install firefox
+```
 
 _could_ cause quite a bit of build activity, as not only Firefox but
 also all its dependencies (all the way up to the C library and the
@@ -149,16 +157,20 @@ For example, the following command gets all dependencies of the
 Pan newsreader, as described by [its
 Nix expression](https://github.com/NixOS/nixpkgs/blob/master/pkgs/applications/networking/newsreaders/pan/default.nix):
 
-    $ nix-shell '<nixpkgs>' -A pan
+```console
+$ nix-shell '<nixpkgs>' -A pan
+```
 
 You’re then dropped into a shell where you can edit, build and test
 the package:
 
-    [nix-shell]$ tar xf $src
-    [nix-shell]$ cd pan-*
-    [nix-shell]$ ./configure
-    [nix-shell]$ make
-    [nix-shell]$ ./pan/gui/pan
+```console
+[nix-shell]$ tar xf $src
+[nix-shell]$ cd pan-*
+[nix-shell]$ ./configure
+[nix-shell]$ make
+[nix-shell]$ ./pan/gui/pan
+```
 
 ## Portability
 

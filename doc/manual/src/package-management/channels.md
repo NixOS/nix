@@ -15,7 +15,9 @@ To see the list of official NixOS channels, visit
 
 You can “subscribe” to a channel using `nix-channel --add`, e.g.,
 
-    $ nix-channel --add https://nixos.org/channels/nixpkgs-unstable
+```console
+$ nix-channel --add https://nixos.org/channels/nixpkgs-unstable
+```
 
 subscribes you to a channel that always contains that latest version of
 the Nix Packages collection. (Subscribing really just means that the URL
@@ -24,11 +26,15 @@ calls to `nix-channel
 --update`.) You can “unsubscribe” using `nix-channel
 --remove`:
 
-    $ nix-channel --remove nixpkgs
+```console
+$ nix-channel --remove nixpkgs
+```
 
 To obtain the latest Nix expressions available in a channel, do
 
-    $ nix-channel --update
+```console
+$ nix-channel --update
+```
 
 This downloads and unpacks the Nix expressions in every channel
 (downloaded from `url/nixexprs.tar.bz2`). It also makes the union of
@@ -36,7 +42,9 @@ each channel’s Nix expressions available by default to `nix-env`
 operations (via the symlink `~/.nix-defexpr/channels`). Consequently,
 you can then say
 
-    $ nix-env -u
+```console
+$ nix-env -u
+```
 
 to upgrade all packages in your profile to the latest versions available
 in the subscribed channels.

@@ -51,20 +51,24 @@ The list of subscribed channels is stored in `~/.nix-channels`.
 
 To subscribe to the Nixpkgs channel and install the GNU Hello package:
 
-    $ nix-channel --add https://nixos.org/channels/nixpkgs-unstable
-    $ nix-channel --update
-    $ nix-env -iA nixpkgs.hello
+```console
+$ nix-channel --add https://nixos.org/channels/nixpkgs-unstable
+$ nix-channel --update
+$ nix-env -iA nixpkgs.hello
+```
 
 You can revert channel updates using `--rollback`:
 
-    $ nix-instantiate --eval -E '(import <nixpkgs> {}).lib.version'
-    "14.04.527.0e935f1"
+```console
+$ nix-instantiate --eval -E '(import <nixpkgs> {}).lib.version'
+"14.04.527.0e935f1"
 
-    $ nix-channel --rollback
-    switching from generation 483 to 482
+$ nix-channel --rollback
+switching from generation 483 to 482
 
-    $ nix-instantiate --eval -E '(import <nixpkgs> {}).lib.version'
-    "14.04.526.dbadfad"
+$ nix-instantiate --eval -E '(import <nixpkgs> {}).lib.version'
+"14.04.526.dbadfad"
+```
 
 # Files
 

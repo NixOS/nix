@@ -70,11 +70,11 @@ The following settings are currently available:
     Note that trusted users are always allowed to connect.
 
   - `auto-optimise-store`  
-    If set to `true`, Nix automatically detects files in the store that
-    have identical contents, and replaces them with hard links to a
-    single copy. This saves disk space. If set to `false` (the default),
-    you can still run `nix-store
-                    --optimise` to get rid of duplicate files.
+    If set to `true`, Nix automatically detects files in the store
+    that have identical contents, and replaces them with hard links to
+    a single copy. This saves disk space. If set to `false` (the
+    default), you can still run `nix-store --optimise` to get rid of
+    duplicate files.
 
   - `builders`  
     A list of machines on which to perform builds.
@@ -214,11 +214,13 @@ The following settings are currently available:
     they have disappeared from their original URI. For example, given
     the default mirror `http://tarballs.nixos.org/`, when building the
     derivation
-    
-        builtins.fetchurl {
-          url = "https://example.org/foo-1.2.3.tar.xz";
-          sha256 = "2c26b46b68ffc68ff99b453c1d30413413422d706483bfa0f98a5e886266e7ae";
-        }
+
+    ```nix
+    builtins.fetchurl {
+      url = "https://example.org/foo-1.2.3.tar.xz";
+      sha256 = "2c26b46b68ffc68ff99b453c1d30413413422d706483bfa0f98a5e886266e7ae";
+    }
+    ```
     
     Nix will attempt to download this file from
     `http://tarballs.nixos.org/sha256/2c26b46b68ffc68ff99b453c1d30413413422d706483bfa0f98a5e886266e7ae`
@@ -233,8 +235,7 @@ The following settings are currently available:
     If set to `true` (the default), Nix will write the build log of a
     derivation (i.e. the standard output and error of its builder) to
     the directory `/nix/var/log/nix/drvs`. The build log can be
-    retrieved using the command `nix-store -l
-                    path`.
+    retrieved using the command `nix-store -l path`.
 
   - `keep-derivations`  
     If `true` (default), the garbage collector will keep the derivations
@@ -504,10 +505,9 @@ The following settings are currently available:
   - `secret-key-files`  
     A whitespace-separated list of files containing secret (private)
     keys. These are used to sign locally-built paths. They can be
-    generated using `nix-store
-                    --generate-binary-cache-key`. The corresponding public key can be
-    distributed to other users, who can add it to `trusted-public-keys`
-    in their `nix.conf`.
+    generated using `nix-store --generate-binary-cache-key`. The
+    corresponding public key can be distributed to other users, who
+    can add it to `trusted-public-keys` in their `nix.conf`.
 
   - `show-trace`  
     Causes Nix to print out a stack trace in case of Nix expression
@@ -601,18 +601,17 @@ The following settings are currently available:
 
   - `trusted-public-keys`  
     A whitespace-separated list of public keys. When paths are copied
-    from another Nix store (such as a binary cache), they must be signed
-    with one of these keys. For example:
+    from another Nix store (such as a binary cache), they must be
+    signed with one of these keys. For example:
     `cache.nixos.org-1:6NCHdD59X431o0gWypbMrAURkbJ16ZPMQFGspcDShjY=
-                    hydra.nixos.org-1:CNHJZBh9K4tP3EKF6FkkgeVYsS3ohTl+oS0Qa8bezVs=`.
+    hydra.nixos.org-1:CNHJZBh9K4tP3EKF6FkkgeVYsS3ohTl+oS0Qa8bezVs=`.
 
   - `trusted-substituters`  
     A list of URLs of substituters, separated by whitespace. These are
     not used by default, but can be enabled by users of the Nix daemon
-    by specifying `--option
-                    substituters urls` on the command line. Unprivileged users are only
-    allowed to pass a subset of the URLs listed in `substituters` and
-    `trusted-substituters`.
+    by specifying `--option substituters urls` on the command
+    line. Unprivileged users are only allowed to pass a subset of the
+    URLs listed in `substituters` and `trusted-substituters`.
 
   - `trusted-users`  
     A list of names of users (separated by whitespace) that have

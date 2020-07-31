@@ -3,8 +3,8 @@
 If you are using Linux or macOS versions up to 10.14 (Mojave), the
 easiest way to install Nix is to run the following command:
 
-``` 
-  $ sh <(curl -L https://nixos.org/nix/install)
+```console
+$ sh <(curl -L https://nixos.org/nix/install)
 ```
 
 If you're using macOS 10.15 (Catalina) or newer, consult [the macOS
@@ -18,8 +18,8 @@ installation is highly recommended.
 
 To explicitly select a single-user installation on your system:
 
-``` 
-  sh <(curl -L https://nixos.org/nix/install) --no-daemon
+```console
+$ sh <(curl -L https://nixos.org/nix/install) --no-daemon
 ```
 
 This will perform a single-user installation of Nix, meaning that `/nix`
@@ -28,8 +28,10 @@ account, *not* as root. The script will invoke `sudo` to create `/nix`
 if it doesn’t already exist. If you don’t have `sudo`, you should
 manually create `/nix` first as root, e.g.:
 
-    $ mkdir /nix
-    $ chown alice /nix
+```console
+$ mkdir /nix
+$ chown alice /nix
+```
 
 The install script will modify the first writable file from amongst
 `.bash_profile`, `.bash_login` and `.profile` to source
@@ -39,7 +41,9 @@ the install script to disable this behaviour.
 
 You can uninstall Nix simply by running:
 
-    $ rm -rf /nix
+```console
+$ rm -rf /nix
+```
 
 # Multi User Installation
 
@@ -53,7 +57,9 @@ service for the Nix daemon.
 You can instruct the installer to perform a multi-user installation on
 your system:
 
-    sh <(curl -L https://nixos.org/nix/install) --daemon
+```console
+$ sh <(curl -L https://nixos.org/nix/install) --daemon
+```
 
 The multi-user installation of Nix will create build users between the
 user IDs 30001 and 30032, and a group with the group ID 30000. You
@@ -72,18 +78,20 @@ extension. The installer will also create `/etc/profile.d/nix.sh`.
 
 You can uninstall Nix with the following commands:
 
-    sudo rm -rf /etc/profile/nix.sh /etc/nix /nix ~root/.nix-profile ~root/.nix-defexpr ~root/.nix-channels ~/.nix-profile ~/.nix-defexpr ~/.nix-channels
-    
-    # If you are on Linux with systemd, you will need to run:
-    sudo systemctl stop nix-daemon.socket
-    sudo systemctl stop nix-daemon.service
-    sudo systemctl disable nix-daemon.socket
-    sudo systemctl disable nix-daemon.service
-    sudo systemctl daemon-reload
-    
-    # If you are on macOS, you will need to run:
-    sudo launchctl unload /Library/LaunchDaemons/org.nixos.nix-daemon.plist
-    sudo rm /Library/LaunchDaemons/org.nixos.nix-daemon.plist
+```console
+sudo rm -rf /etc/profile/nix.sh /etc/nix /nix ~root/.nix-profile ~root/.nix-defexpr ~root/.nix-channels ~/.nix-profile ~/.nix-defexpr ~/.nix-channels
+
+# If you are on Linux with systemd, you will need to run:
+sudo systemctl stop nix-daemon.socket
+sudo systemctl stop nix-daemon.service
+sudo systemctl disable nix-daemon.socket
+sudo systemctl disable nix-daemon.service
+sudo systemctl daemon-reload
+
+# If you are on macOS, you will need to run:
+sudo launchctl unload /Library/LaunchDaemons/org.nixos.nix-daemon.plist
+sudo rm /Library/LaunchDaemons/org.nixos.nix-daemon.plist
+```
 
 There may also be references to Nix in `/etc/profile`, `/etc/bashrc`,
 and `/etc/zshrc` which you may remove.
@@ -110,7 +118,9 @@ chip](https://www.apple.com/euro/mac/shared/docs/Apple_T2_Security_Chip_Overview
 your drive will still be encrypted at rest (in which case "unencrypted"
 is a bit of a misnomer). To use this approach, just install Nix with:
 
-    $ sh <(curl -L https://nixos.org/nix/install) --darwin-use-unencrypted-nix-store-volume
+```console
+$ sh <(curl -L https://nixos.org/nix/install) --darwin-use-unencrypted-nix-store-volume
+```
 
 If you don't like the sound of this, you'll want to weigh the other
 approaches and tradeoffs detailed in this section.
@@ -184,7 +194,9 @@ there are a few things to weigh:
 If you are comfortable navigating these tradeoffs, you can encrypt the
 volume with something along the lines of:
 
-    alice$ diskutil apfs enableFileVault /nix -user disk
+```console
+alice$ diskutil apfs enableFileVault /nix -user disk
+```
 
 ## Symlink the Nix store to a custom location
 
@@ -221,11 +233,15 @@ as a helpful reference if you run into trouble.
     `apfs.util` to trigger creation (not deletion) of new entries
     without a reboot:
     
-        alice$ /System/Library/Filesystems/apfs.fs/Contents/Resources/apfs.util -B
+    ```console
+    alice$ /System/Library/Filesystems/apfs.fs/Contents/Resources/apfs.util -B
+    ```
 
 3.  Create the new APFS volume with diskutil:
     
-        alice$ sudo diskutil apfs addVolume diskX APFS 'Nix Store' -mountpoint /nix
+    ```console
+    alice$ sudo diskutil apfs addVolume diskX APFS 'Nix Store' -mountpoint /nix
+    ```
 
 4.  Using `vifs`, add the new mount to `/etc/fstab`. If it doesn't
     already have other entries, it should look something like:
@@ -248,8 +264,8 @@ since 1.11.16, at `https://releases.nixos.org/nix/nix-version/install`.
 These install scripts can be used the same as the main NixOS.org
 installation script:
 
-``` 
-  sh <(curl -L https://nixos.org/nix/install)
+```console
+$ sh <(curl -L https://nixos.org/nix/install)
 ```
 
 In the same directory of the install script are sha256 sums, and gpg
@@ -263,10 +279,12 @@ dependencies. (This is what the install script at
 it somewhere (e.g. in `/tmp`), and then run the script named `install`
 inside the binary tarball:
 
-    alice$ cd /tmp
-    alice$ tar xfj nix-1.8-x86_64-darwin.tar.bz2
-    alice$ cd nix-1.8-x86_64-darwin
-    alice$ ./install
+```console
+alice$ cd /tmp
+alice$ tar xfj nix-1.8-x86_64-darwin.tar.bz2
+alice$ cd nix-1.8-x86_64-darwin
+alice$ ./install
+```
 
 If you need to edit the multi-user installation script to use different
 group ID or a different user ID range, modify the variables set in the

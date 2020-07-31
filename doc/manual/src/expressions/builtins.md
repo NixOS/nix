@@ -51,7 +51,9 @@ For instance, `derivation` is also available as `builtins.derivation`.
     You can use `builtins` to test for the availability of features in
     the Nix installation, e.g.,
     
-        if builtins ? getEnv then builtins.getEnv "PATH" else ""
+    ```nix
+    if builtins ? getEnv then builtins.getEnv "PATH" else ""
+    ```
     
     This allows a Nix expression to fall back gracefully on older Nix
     installations that don’t have the desired built-in function.
@@ -114,9 +116,11 @@ For instance, `derivation` is also available as `builtins.derivation`.
     function is to obtain external Nix expression dependencies, such as
     a particular version of Nixpkgs, e.g.
     
-        with import (fetchTarball https://github.com/NixOS/nixpkgs/archive/nixos-14.12.tar.gz) {};
-        
-        stdenv.mkDerivation { … }
+    ```nix
+    with import (fetchTarball https://github.com/NixOS/nixpkgs/archive/nixos-14.12.tar.gz) {};
+
+    stdenv.mkDerivation { … }
+    ```
     
     The fetched tarball is cached for a certain amount of time (1 hour
     by default) in `~/.cache/nix/tarballs/`. You can change the cache
@@ -124,19 +128,21 @@ For instance, `derivation` is also available as `builtins.derivation`.
     of seconds` or in the Nix configuration file with this option: ` 
     number of seconds to cache `.
     
-    Note that when obtaining the hash with ` nix-prefetch-url
-                     ` the option `--unpack` is required.
+    Note that when obtaining the hash with ` nix-prefetch-url ` the
+    option `--unpack` is required.
     
     This function can also verify the contents against a hash. In that
     case, the function takes a set instead of a URL. The set requires
     the attribute `url` and the attribute `sha256`, e.g.
     
-        with import (fetchTarball {
-          url = "https://github.com/NixOS/nixpkgs/archive/nixos-14.12.tar.gz";
-          sha256 = "1jppksrfvbk5ypiqdz4cddxdl8z6zyzdb2srq8fcffr327ld5jj2";
-        }) {};
-        
-        stdenv.mkDerivation { … }
+    ```nix
+    with import (fetchTarball {
+      url = "https://github.com/NixOS/nixpkgs/archive/nixos-14.12.tar.gz";
+      sha256 = "1jppksrfvbk5ypiqdz4cddxdl8z6zyzdb2srq8fcffr327ld5jj2";
+    }) {};
+
+    stdenv.mkDerivation { … }
+    ```
     
     This function is not available if [restricted evaluation
     mode](../command-ref/conf-file.md) is enabled.
@@ -172,18 +178,22 @@ For instance, `derivation` is also available as `builtins.derivation`.
     
       - To fetch a private repository over SSH:
         
-            builtins.fetchGit {
-              url = "git@github.com:my-secret/repository.git";
-              ref = "master";
-              rev = "adab8b916a45068c044658c4158d81878f9ed1c3";
-            }
+        ```nix
+        builtins.fetchGit {
+          url = "git@github.com:my-secret/repository.git";
+          ref = "master";
+          rev = "adab8b916a45068c044658c4158d81878f9ed1c3";
+        }
+        ```
     
       - To fetch an arbitrary reference:
         
-            builtins.fetchGit {
-              url = "https://github.com/NixOS/nix.git";
-              ref = "refs/heads/0.5-release";
-            }
+        ```nix
+        builtins.fetchGit {
+          url = "https://github.com/NixOS/nix.git";
+          ref = "refs/heads/0.5-release";
+        }
+        ```
     
       - If the revision you're looking for is in the default branch of
         the git repository you don't strictly need to specify the branch
@@ -193,11 +203,13 @@ For instance, `derivation` is also available as `builtins.derivation`.
         branch for the non-default branch you will need to specify the
         the `ref` attribute as well.
         
-            builtins.fetchGit {
-              url = "https://github.com/nixos/nix.git";
-              rev = "841fcbd04755c7a2865c51c1e2d3b045976b7452";
-              ref = "1.11-maintenance";
-            }
+        ```nix
+        builtins.fetchGit {
+          url = "https://github.com/nixos/nix.git";
+          rev = "841fcbd04755c7a2865c51c1e2d3b045976b7452";
+          ref = "1.11-maintenance";
+        }
+        ```
         
         > **Note**
         > 
@@ -211,24 +223,30 @@ For instance, `derivation` is also available as `builtins.derivation`.
       - If the revision you're looking for is in the default branch of
         the git repository you may omit the `ref` attribute.
         
-            builtins.fetchGit {
-              url = "https://github.com/nixos/nix.git";
-              rev = "841fcbd04755c7a2865c51c1e2d3b045976b7452";
-            }
+        ```nix
+        builtins.fetchGit {
+          url = "https://github.com/nixos/nix.git";
+          rev = "841fcbd04755c7a2865c51c1e2d3b045976b7452";
+        }
+        ```
     
       - To fetch a specific tag:
         
-            builtins.fetchGit {
-              url = "https://github.com/nixos/nix.git";
-              ref = "refs/tags/1.9";
-            }
+        ```nix
+        builtins.fetchGit {
+          url = "https://github.com/nixos/nix.git";
+          ref = "refs/tags/1.9";
+        }
+        ```
     
       - To fetch the latest version of a remote branch:
         
-            builtins.fetchGit {
-              url = "ssh://git@github.com/nixos/nix.git";
-              ref = "master";
-            }
+        ```nix
+        builtins.fetchGit {
+          url = "ssh://git@github.com/nixos/nix.git";
+          ref = "master";
+        }
+        ```
         
         > **Note**
         > 
@@ -248,10 +266,12 @@ For instance, `derivation` is also available as `builtins.derivation`.
     filtering certain files. For instance, suppose that you want to use
     the directory `source-dir` as an input to a Nix expression, e.g.
     
-        stdenv.mkDerivation {
-          ...
-          src = ./source-dir;
-        }
+    ```nix
+    stdenv.mkDerivation {
+      ...
+      src = ./source-dir;
+    }
+    ```
     
     However, if `source-dir` is a Subversion working copy, then all
     those annoying `.svn` subdirectories will also be copied to the
@@ -259,10 +279,10 @@ For instance, `derivation` is also available as `builtins.derivation`.
     causing lots of spurious rebuilds. With `filterSource` you can
     filter out the `.svn` directories:
     
-    ``` 
-      src = builtins.filterSource
-        (path: type: type != "directory" || baseNameOf path != ".svn")
-        ./source-dir;
+    ```nix
+    src = builtins.filterSource
+      (path: type: type != "directory" || baseNameOf path != ".svn")
+      ./source-dir;
     ```
     
     Thus, the first argument *e1* must be a predicate function that is
@@ -279,10 +299,10 @@ For instance, `derivation` is also available as `builtins.derivation`.
 
   - `builtins.foldl’` *op* *nul* *list*  
     Reduce a list by applying a binary operator, from left to right,
-    e.g. `foldl’ op nul [x0 x1 x2 ...] = op (op
-                    (op nul x0) x1) x2) ...`. The operator is applied strictly, i.e.,
-    its arguments are evaluated first. For example, `foldl’ (x: y: x +
-    y) 0 [1 2 3]` evaluates to 6.
+    e.g. `foldl’ op nul [x0 x1 x2 ...] = op (op (op nul x0) x1) x2)
+    ...`. The operator is applied strictly, i.e., its arguments are
+    evaluated first. For example, `foldl’ (x: y: x + y) 0 [1 2 3]`
+    evaluates to 6.
 
   - `builtins.functionArgs` *f*  
     Return a set containing the names of the formal arguments expected
@@ -298,16 +318,19 @@ For instance, `derivation` is also available as `builtins.derivation`.
   - `builtins.fromJSON` *e*  
     Convert a JSON string to a Nix value. For example,
     
-        builtins.fromJSON ''{"x": [1, 2, 3], "y": null}''
+    ```nix
+    builtins.fromJSON ''{"x": [1, 2, 3], "y": null}''
+    ```
     
-    returns the value `{ x = [ 1 2 3 ]; y = null;
-                    }`.
+    returns the value `{ x = [ 1 2 3 ]; y = null; }`.
 
   - `builtins.genList` *generator* *length*  
     Generate list of size *length*, with each element *i* equal to the
     value returned by *generator* `i`. For example,
     
-        builtins.genList (x: x * x) 5
+    ```nix
+    builtins.genList (x: x * x) 5
+    ```
     
     returns the list `[ 0 1 4 9 16 ]`.
 
@@ -369,26 +392,34 @@ For instance, `derivation` is also available as `builtins.derivation`.
     variables that are in scope at the call site. For instance, if you
     have a calling expression
     
-        rec {
-          x = 123;
-          y = import ./foo.nix;
-        }
+    ```nix
+    rec {
+      x = 123;
+      y = import ./foo.nix;
+    }
+    ```
     
     then the following `foo.nix` will give an error:
     
-        x + 456
+    ```nix
+    x + 456
+    ```
     
     since `x` is not in scope in `foo.nix`. If you want `x` to be
     available in `foo.nix`, you should pass it as a function argument:
     
-        rec {
-          x = 123;
-          y = import ./foo.nix x;
-        }
+    ```nix
+    rec {
+      x = 123;
+      y = import ./foo.nix x;
+    }
+    ```
     
     and
     
-        x: x + 456
+    ```nix
+    x: x + 456
+    ```
     
     (The function argument doesn’t have to be called `x` in `foo.nix`;
     any name would work.)
@@ -442,23 +473,28 @@ For instance, `derivation` is also available as `builtins.derivation`.
     string-valued attribute `name` specifying the name of the attribute,
     and an attribute `value` specifying its value. Example:
     
-        builtins.listToAttrs
-          [ { name = "foo"; value = 123; }
-            { name = "bar"; value = 456; }
-          ]
+    ```nix
+    builtins.listToAttrs
+      [ { name = "foo"; value = 123; }
+        { name = "bar"; value = 456; }
+      ]
+    ```
     
     evaluates to
     
-        { foo = 123; bar = 456; }
+    ```nix
+    { foo = 123; bar = 456; }
+    ```
 
   - `map` *f* *list*; `builtins.map` *f* *list*  
     Apply the function *f* to each element in the list *list*. For
     example,
     
-        map (x: "foo" + x) [ "bar" "bla" "abc" ]
+    ```nix
+    map (x: "foo" + x) [ "bar" "bla" "abc" ]
+    ```
     
-    evaluates to `[ "foobar" "foobla" "fooabc"
-                    ]`.
+    evaluates to `[ "foobar" "foobla" "fooabc" ]`.
 
   - `builtins.match` *regex* *str*  
     Returns a list if the [extended POSIX regular
@@ -466,19 +502,27 @@ For instance, `derivation` is also available as `builtins.derivation`.
     *regex* matches *str* precisely, otherwise returns `null`. Each item
     in the list is a regex group.
     
-        builtins.match "ab" "abc"
+    ```nix
+    builtins.match "ab" "abc"
+    ```
     
     Evaluates to `null`.
     
-        builtins.match "abc" "abc"
+    ```nix
+    builtins.match "abc" "abc"
+    ```
     
     Evaluates to `[ ]`.
     
-        builtins.match "a(b)(c)" "abc"
+    ```nix
+    builtins.match "a(b)(c)" "abc"
+    ```
     
     Evaluates to `[ "b" "c" ]`.
     
-        builtins.match "[[:space:]]+([[:upper:]]+)[[:space:]]+" "  FOO   "
+    ```nix
+    builtins.match "[[:space:]]+([[:upper:]]+)[[:space:]]+" "  FOO   "
+    ```
     
     Evaluates to `[ "foo" ]`.
 
@@ -534,11 +578,12 @@ For instance, `derivation` is also available as `builtins.derivation`.
   - `builtins.readDir` *path*  
     Return the contents of the directory *path* as a set mapping
     directory entries to the corresponding file type. For instance, if
-    directory `A` contains a regular file `B` and another directory `C`,
-    then `builtins.readDir
-                    ./A` will return the set
+    directory `A` contains a regular file `B` and another directory
+    `C`, then `builtins.readDir ./A` will return the set
     
-        { B = "regular"; C = "directory"; }
+    ```nix
+    { B = "regular"; C = "directory"; }
+    ```
     
     The possible values for the file type are `"regular"`,
     `"directory"`, `"symlink"` and `"unknown"`.
@@ -550,7 +595,9 @@ For instance, `derivation` is also available as `builtins.derivation`.
     Remove the attributes listed in *list* from *set*. The attributes
     don’t have to exist in *set*. For instance,
     
-        removeAttrs { x = 1; y = 2; z = 3; } [ "a" "x" "z" ]
+    ```nix
+    removeAttrs { x = 1; y = 2; z = 3; } [ "a" "x" "z" ]
+    ```
     
     evaluates to `{ y = 2; }`.
 
@@ -558,7 +605,9 @@ For instance, `derivation` is also available as `builtins.derivation`.
     Given string *s*, replace every occurrence of the strings in *from*
     with the corresponding string in *to*. For example,
     
-        builtins.replaceStrings ["oo" "a"] ["a" "i"] "foobar"
+    ```nix
+    builtins.replaceStrings ["oo" "a"] ["a" "i"] "foobar"
+    ```
     
     evaluates to `"fabir"`.
 
@@ -572,10 +621,11 @@ For instance, `derivation` is also available as `builtins.derivation`.
     if the first element is less than the second, and `false` otherwise.
     For example,
     
-        builtins.sort builtins.lessThan [ 483 249 526 147 42 77 ]
+    ```nix
+    builtins.sort builtins.lessThan [ 483 249 526 147 42 77 ]
+    ```
     
-    produces the list `[ 42 77 147 249 483 526
-                    ]`.
+    produces the list `[ 42 77 147 249 483 526 ]`.
     
     This is a stable sort: it preserves the relative order of elements
     deemed equal by the comparator.
@@ -587,19 +637,27 @@ For instance, `derivation` is also available as `builtins.derivation`.
     *regex* matches of *str*. Each item in the lists of matched
     sequences is a regex group.
     
-        builtins.split "(a)b" "abc"
+    ```nix
+    builtins.split "(a)b" "abc"
+    ```
     
     Evaluates to `[ "" [ "a" ] "c" ]`.
     
-        builtins.split "([ac])" "abc"
+    ```nix
+    builtins.split "([ac])" "abc"
+    ```
     
     Evaluates to `[ "" [ "a" ] "b" [ "c" ] "" ]`.
     
-        builtins.split "(a)|(c)" "abc"
+    ```nix
+    builtins.split "(a)|(c)" "abc"
+    ```
     
     Evaluates to `[ "" [ "a" null ] "b" [ null "c" ] "" ]`.
     
-        builtins.split "([[:upper:]]+)" "  FOO   "
+    ```nix
+    builtins.split "([[:upper:]]+)" "  FOO   "
+    ```
     
     Evaluates to `[ " " [ "FOO" ] " " ]`.
 
@@ -623,7 +681,9 @@ For instance, `derivation` is also available as `builtins.derivation`.
     substring up to the end of the string is returned. *start* must be
     non-negative. For example,
     
-        builtins.substring 0 3 "nixos"
+    ```nix
+    builtins.substring 0 3 "nixos"
+    ```
     
     evaluates to `"nix"`.
 
@@ -645,45 +705,47 @@ For instance, `derivation` is also available as `builtins.derivation`.
     “inline”. For instance, the following Nix expression combines the
     [Nix expression for GNU Hello](expression-syntax.md) and its
     [build script](build-script.md) into one file:
-    
-        { stdenv, fetchurl, perl }:
-        
-        stdenv.mkDerivation {
-          name = "hello-2.1.1";
-        
-          builder = builtins.toFile "builder.sh" "
-            source $stdenv/setup
-        
-            PATH=$perl/bin:$PATH
-        
-            tar xvfz $src
-            cd hello-*
-            ./configure --prefix=$out
-            make
-            make install
-          ";
-        
-          src = fetchurl {
-            url = "http://ftp.nluug.nl/pub/gnu/hello/hello-2.1.1.tar.gz";
-            sha256 = "1md7jsfd8pa45z73bz1kszpp01yw6x5ljkjk2hx7wl800any6465";
-          };
-          inherit perl;
-        }
+
+    ```nix
+    { stdenv, fetchurl, perl }:
+
+    stdenv.mkDerivation {
+      name = "hello-2.1.1";
+
+      builder = builtins.toFile "builder.sh" "
+        source $stdenv/setup
+
+        PATH=$perl/bin:$PATH
+
+        tar xvfz $src
+        cd hello-*
+        ./configure --prefix=$out
+        make
+        make install
+      ";
+
+      src = fetchurl {
+        url = "http://ftp.nluug.nl/pub/gnu/hello/hello-2.1.1.tar.gz";
+        sha256 = "1md7jsfd8pa45z73bz1kszpp01yw6x5ljkjk2hx7wl800any6465";
+      };
+      inherit perl;
+    }
+    ```
     
     It is even possible for one file to refer to another, e.g.,
     
-    ``` 
-      builder = let
-        configFile = builtins.toFile "foo.conf" "
-          # This is some dummy configuration file.
-          ...
-        ";
-      in builtins.toFile "builder.sh" "
-        source $stdenv/setup
+    ```nix
+    builder = let
+      configFile = builtins.toFile "foo.conf" "
+        # This is some dummy configuration file.
         ...
-        cp ${configFile} $out/etc/foo.conf
       ";
-    ```
+    in builtins.toFile "builder.sh" "
+      source $stdenv/setup
+      ...
+      cp ${configFile} $out/etc/foo.conf
+    ";
+  ```
     
     Note that `${configFile}` is an
     [antiquotation](language-values.md), so the result of the
@@ -694,10 +756,12 @@ For instance, `derivation` is also available as `builtins.derivation`.
     It is however *not* allowed to have files mutually referring to each
     other, like so:
     
-        let
-          foo = builtins.toFile "foo" "...${bar}...";
-          bar = builtins.toFile "bar" "...${foo}...";
-        in foo
+    ```nix
+    let
+      foo = builtins.toFile "foo" "...${bar}...";
+      bar = builtins.toFile "bar" "...${foo}...";
+    in foo
+    ```
     
     This is not allowed because it would cause a cyclic dependency in
     the computation of the cryptographic hashes for `foo` and `bar`.
@@ -744,40 +808,42 @@ For instance, `derivation` is also available as `builtins.derivation`.
     
     Here is an example where this is the case:
     
-        { stdenv, fetchurl, libxslt, jira, uberwiki }:
-        
-        stdenv.mkDerivation (rec {
-          name = "web-server";
-        
-          buildInputs = [ libxslt ];
-        
-          builder = builtins.toFile "builder.sh" "
-            source $stdenv/setup
-            mkdir $out
-            echo "$servlets" | xsltproc ${stylesheet} - > $out/server-conf.xml ① 
-          ";
-        
-          stylesheet = builtins.toFile "stylesheet.xsl" ② 
-           "<?xml version='1.0' encoding='UTF-8'?>
-            <xsl:stylesheet xmlns:xsl='http://www.w3.org/1999/XSL/Transform' version='1.0'>
-              <xsl:template match='/'>
-                <Configure>
-                  <xsl:for-each select='/expr/list/attrs'>
-                    <Call name='addWebApplication'>
-                      <Arg><xsl:value-of select=\"attr[@name = 'path']/string/@value\" /></Arg>
-                      <Arg><xsl:value-of select=\"attr[@name = 'war']/path/@value\" /></Arg>
-                    </Call>
-                  </xsl:for-each>
-                </Configure>
-              </xsl:template>
-            </xsl:stylesheet>
-          ";
-        
-          servlets = builtins.toXML [ ③ 
-            { path = "/bugtracker"; war = jira + "/lib/atlassian-jira.war"; }
-            { path = "/wiki"; war = uberwiki + "/uberwiki.war"; }
-          ];
-        })
+    ```nix
+    { stdenv, fetchurl, libxslt, jira, uberwiki }:
+
+    stdenv.mkDerivation (rec {
+      name = "web-server";
+
+      buildInputs = [ libxslt ];
+
+      builder = builtins.toFile "builder.sh" "
+        source $stdenv/setup
+        mkdir $out
+        echo "$servlets" | xsltproc ${stylesheet} - > $out/server-conf.xml ① 
+      ";
+
+      stylesheet = builtins.toFile "stylesheet.xsl" ② 
+       "<?xml version='1.0' encoding='UTF-8'?>
+        <xsl:stylesheet xmlns:xsl='http://www.w3.org/1999/XSL/Transform' version='1.0'>
+          <xsl:template match='/'>
+            <Configure>
+              <xsl:for-each select='/expr/list/attrs'>
+                <Call name='addWebApplication'>
+                  <Arg><xsl:value-of select=\"attr[@name = 'path']/string/@value\" /></Arg>
+                  <Arg><xsl:value-of select=\"attr[@name = 'war']/path/@value\" /></Arg>
+                </Call>
+              </xsl:for-each>
+            </Configure>
+          </xsl:template>
+        </xsl:stylesheet>
+      ";
+
+      servlets = builtins.toXML [ ③ 
+        { path = "/bugtracker"; war = jira + "/lib/atlassian-jira.war"; }
+        { path = "/wiki"; war = uberwiki + "/uberwiki.war"; }
+      ];
+    })
+    ```
     
     The builder is supposed to generate the configuration file for a
     [Jetty servlet container](http://jetty.mortbay.org/). A servlet
@@ -796,27 +862,29 @@ For instance, `derivation` is also available as `builtins.derivation`.
     configuration file for the Jetty server. The XML representation
     produced at point ③ by `toXML` is as follows:
     
-        <?xml version='1.0' encoding='utf-8'?>
-        <expr>
-          <list>
-            <attrs>
-              <attr name="path">
-                <string value="/bugtracker" />
-              </attr>
-              <attr name="war">
-                <path value="/nix/store/d1jh9pasa7k2...-jira/lib/atlassian-jira.war" />
-              </attr>
-            </attrs>
-            <attrs>
-              <attr name="path">
-                <string value="/wiki" />
-              </attr>
-              <attr name="war">
-                <path value="/nix/store/y6423b1yi4sx...-uberwiki/uberwiki.war" />
-              </attr>
-            </attrs>
-          </list>
-        </expr>
+    ```xml
+    <?xml version='1.0' encoding='utf-8'?>
+    <expr>
+      <list>
+        <attrs>
+          <attr name="path">
+            <string value="/bugtracker" />
+          </attr>
+          <attr name="war">
+            <path value="/nix/store/d1jh9pasa7k2...-jira/lib/atlassian-jira.war" />
+          </attr>
+        </attrs>
+        <attrs>
+          <attr name="path">
+            <string value="/wiki" />
+          </attr>
+          <attr name="war">
+            <path value="/nix/store/y6423b1yi4sx...-uberwiki/uberwiki.war" />
+          </attr>
+        </attrs>
+      </list>
+    </expr>
+    ```
     
     Note that we used the `toFile` built-in to write the builder and
     the stylesheet “inline” in the Nix expression. The path of the
@@ -830,13 +898,13 @@ For instance, `derivation` is also available as `builtins.derivation`.
 
   - `builtins.tryEval` *e*  
     Try to shallowly evaluate *e*. Return a set containing the
-    attributes `success` (`true` if *e* evaluated successfully, `false`
-    if an error was thrown) and `value`, equalling *e* if successful and
-    `false` otherwise. Note that this doesn't evaluate *e* deeply, so
-    ` let e = { x = throw ""; }; in (builtins.tryEval e).success
-                     ` will be `true`. Using ` builtins.deepSeq
-                     ` one can get the expected result: `let e = { x = throw "";
-                    }; in (builtins.tryEval (builtins.deepSeq e e)).success` will be
+    attributes `success` (`true` if *e* evaluated successfully,
+    `false` if an error was thrown) and `value`, equalling *e* if
+    successful and `false` otherwise. Note that this doesn't evaluate
+    *e* deeply, so ` let e = { x = throw ""; }; in (builtins.tryEval
+    e).success ` will be `true`. Using ` builtins.deepSeq ` one can
+    get the expected result: `let e = { x = throw ""; }; in
+    (builtins.tryEval (builtins.deepSeq e e)).success` will be
     `false`.
 
   - `builtins.typeOf` *e*  

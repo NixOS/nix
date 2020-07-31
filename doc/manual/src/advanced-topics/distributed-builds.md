@@ -11,12 +11,16 @@ To forward a build to a remote machine, it’s required that the remote
 machine is accessible via SSH and that it has Nix installed. You can
 test whether connecting to the remote Nix instance works, e.g.
 
-    $ nix ping-store --store ssh://mac
+```console
+$ nix ping-store --store ssh://mac
+```
 
 will try to connect to the machine named `mac`. It is possible to
 specify an SSH identity file as part of the remote store URI, e.g.
 
-    $ nix ping-store --store ssh://mac?ssh-key=/home/alice/my-key
+```console
+$ nix ping-store --store ssh://mac?ssh-key=/home/alice/my-key
+```
 
 Since builds should be non-interactive, the key should not have a
 passphrase. Alternatively, you can load identities ahead of time into
@@ -24,8 +28,10 @@ passphrase. Alternatively, you can load identities ahead of time into
 
 If you get the error
 
-    bash: nix-store: command not found
-    error: cannot connect to 'mac'
+```console
+bash: nix-store: command not found
+error: cannot connect to 'mac'
+```
 
 then you need to ensure that the `PATH` of non-interactive login shells
 contains Nix.
@@ -43,21 +49,23 @@ the Nix configuration file. The former is convenient for testing. For
 example, the following command allows you to build a derivation for
 `x86_64-darwin` on a Linux machine:
 
-    $ uname
-    Linux
+```console
+$ uname
+Linux
     
-    $ nix build \
-      '(with import <nixpkgs> { system = "x86_64-darwin"; }; runCommand "foo" {} "uname > $out")' \
-      --builders 'ssh://mac x86_64-darwin'
-    [1/0/1 built, 0.0 MiB DL] building foo on ssh://mac
-    
-    $ cat ./result
-    Darwin
+$ nix build \
+  '(with import <nixpkgs> { system = "x86_64-darwin"; }; runCommand "foo" {} "uname > $out")' \
+  --builders 'ssh://mac x86_64-darwin'
+[1/0/1 built, 0.0 MiB DL] building foo on ssh://mac
+
+$ cat ./result
+Darwin
+```
 
 It is possible to specify multiple builders separated by a semicolon or
 a newline, e.g.
 
-``` 
+```console
   --builders 'ssh://mac x86_64-darwin ; ssh://beastie x86_64-freebsd'
 ```
 
@@ -91,8 +99,10 @@ default, set it to `-`.
     the `requiredSystemFeatures` attribute, then Nix will only perform
     the derivation on a machine that has the specified features. For
     instance, the attribute
-    
-        requiredSystemFeatures = [ "kvm" ];
+
+    ```nix
+    requiredSystemFeatures = [ "kvm" ];
+    ```
     
     will cause the build to be performed on a machine that has the `kvm`
     feature.
@@ -111,11 +121,15 @@ For example, the machine specification
 specifies several machines that can perform `i686-linux` builds.
 However, `poochie` will only do builds that have the attribute
 
-    requiredSystemFeatures = [ "benchmark" ];
+```nix
+requiredSystemFeatures = [ "benchmark" ];
+```
 
 or
 
-    requiredSystemFeatures = [ "benchmark" "kvm" ];
+```nix
+requiredSystemFeatures = [ "benchmark" "kvm" ];
+```
 
 `itchy` cannot do builds that require `kvm`, but `scratchy` does support
 such builds. For regular builds, `itchy` will be preferred over

@@ -22,7 +22,9 @@ store looks like:
 
 Of course, you wouldn’t want to type
 
-    $ /nix/store/dpmvp969yhdq...-subversion-1.1.3/bin/svn
+```console
+$ /nix/store/dpmvp969yhdq...-subversion-1.1.3/bin/svn
+```
 
 every time you want to run Subversion. Of course we could set up the
 `PATH` environment variable to include the `bin` directory of every
@@ -36,7 +38,9 @@ environment `/nix/store/0c1p5z4kda11...-user-env` contains a symlink to
 just Subversion 1.1.2 (arrows in the figure indicate symlinks). This
 would be what we would obtain if we had done
 
-    $ nix-env -i subversion
+```console
+$ nix-env -i subversion
+```
 
 on a set of Nix expressions that contained Subversion 1.1.2.
 
@@ -49,7 +53,9 @@ since every time you perform a `nix-env` operation, a new user
 environment is generated based on the current one. For instance,
 generation 43 was created from generation 42 when we did
 
-    $ nix-env -i subversion firefox
+```console
+$ nix-env -i subversion firefox
+```
 
 on a set of Nix expressions that contained Firefox and a new version of
 Subversion.
@@ -57,11 +63,13 @@ Subversion.
 Generations are grouped together into *profiles* so that different users
 don’t interfere with each other if they don’t want to. For example:
 
-    $ ls -l /nix/var/nix/profiles/
-    ...
-    lrwxrwxrwx  1 eelco ... default-42-link -> /nix/store/0c1p5z4kda11...-user-env
-    lrwxrwxrwx  1 eelco ... default-43-link -> /nix/store/3aw2pdyx2jfc...-user-env
-    lrwxrwxrwx  1 eelco ... default -> default-43-link
+```console
+$ ls -l /nix/var/nix/profiles/
+...
+lrwxrwxrwx  1 eelco ... default-42-link -> /nix/store/0c1p5z4kda11...-user-env
+lrwxrwxrwx  1 eelco ... default-43-link -> /nix/store/3aw2pdyx2jfc...-user-env
+lrwxrwxrwx  1 eelco ... default -> default-43-link
+```
 
 This shows a profile called `default`. The file `default` itself is
 actually a symlink that points to the current generation. When we do a
@@ -75,18 +83,24 @@ store.)
 
 If you find that you want to undo a `nix-env` operation, you can just do
 
-    $ nix-env --rollback
+```console
+$ nix-env --rollback
+```
 
 which will just make the current generation link point at the previous
 link. E.g., `default` would be made to point at `default-42-link`. You
 can also switch to a specific generation:
 
-    $ nix-env --switch-generation 43
+```console
+$ nix-env --switch-generation 43
+```
 
 which in this example would roll forward to generation 43 again. You can
 also see all available generations:
 
-    $ nix-env --list-generations
+```console
+$ nix-env --list-generations
+```
 
 You generally wouldn’t have `/nix/var/nix/profiles/some-profile/bin` in
 your `PATH`. Rather, there is a symlink `~/.nix-profile` that points to
@@ -96,9 +110,11 @@ initialisation script `/nix/etc/profile.d/nix.sh` does). This makes it
 easier to switch to a different profile. You can do that using the
 command `nix-env --switch-profile`:
 
-    $ nix-env --switch-profile /nix/var/nix/profiles/my-profile
-    
-    $ nix-env --switch-profile /nix/var/nix/profiles/default
+```console
+$ nix-env --switch-profile /nix/var/nix/profiles/my-profile
+
+$ nix-env --switch-profile /nix/var/nix/profiles/default
+```
 
 These commands switch to the `my-profile` and default profile,
 respectively. If the profile doesn’t exist, it will be created
@@ -110,6 +126,8 @@ All `nix-env` operations work on the profile pointed to by
 `~/.nix-profile`, but you can override this using the `--profile` option
 (abbreviation `-p`):
 
-    $ nix-env -p /nix/var/nix/profiles/other-profile -i subversion
+```console
+$ nix-env -p /nix/var/nix/profiles/other-profile -i subversion
+```
 
 This will *not* change the `~/.nix-profile` symlink.

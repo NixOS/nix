@@ -57,23 +57,34 @@ the attributes of which specify the inputs of the build.
     and it doesn’t need the documentation at build time. Thus, the
     library package could specify:
     
-        outputs = [ "lib" "headers" "doc" ];
+    ```nix
+    outputs = [ "lib" "headers" "doc" ];
+    ```
     
     This will cause Nix to pass environment variables `lib`, `headers`
     and `doc` to the builder containing the intended store paths of each
     output. The builder would typically do something like
     
-        ./configure --libdir=$lib/lib --includedir=$headers/include --docdir=$doc/share/doc
+    ```bash
+    ./configure \
+      --libdir=$lib/lib \
+      --includedir=$headers/include \
+      --docdir=$doc/share/doc
+    ```
     
     for an Autoconf-style package. You can refer to each output of a
     derivation by selecting it as an attribute, e.g.
     
-        buildInputs = [ pkg.lib pkg.headers ];
+    ```nix
+    buildInputs = [ pkg.lib pkg.headers ];
+    ```
     
     The first element of `outputs` determines the *default output*.
     Thus, you could also write
     
-        buildInputs = [ pkg pkg.headers ];
+    ```nix
+    buildInputs = [ pkg pkg.headers ];
+    ```
     
     since `pkg` is equivalent to `pkg.lib`.
 

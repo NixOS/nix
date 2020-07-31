@@ -6,18 +6,20 @@ yet. The best way to test the package is by using the command
 `nix-build`, which builds a Nix expression and creates a symlink named
 `result` in the current directory:
 
-    $ nix-build -A hello
-    building path `/nix/store/632d2b22514d...-hello-2.1.1'
-    hello-2.1.1/
-    hello-2.1.1/intl/
-    hello-2.1.1/intl/ChangeLog
-    ...
-    
-    $ ls -l result
-    lrwxrwxrwx ... 2006-09-29 10:43 result -> /nix/store/632d2b22514d...-hello-2.1.1
-    
-    $ ./result/bin/hello
-    Hello, world!
+```console
+$ nix-build -A hello
+building path `/nix/store/632d2b22514d...-hello-2.1.1'
+hello-2.1.1/
+hello-2.1.1/intl/
+hello-2.1.1/intl/ChangeLog
+...
+
+$ ls -l result
+lrwxrwxrwx ... 2006-09-29 10:43 result -> /nix/store/632d2b22514d...-hello-2.1.1
+
+$ ./result/bin/hello
+Hello, world!
+```
 
 The `-A` option selects the `hello` attribute. This is faster than
 using the symbolic package name specified by the `name` attribute
@@ -50,8 +52,10 @@ simultaneously, and they try to build the same derivation, the first Nix
 instance that gets there will perform the build, while the others block
 (or perform other derivations if available) until the build finishes:
 
-    $ nix-build -A hello
-    waiting for lock on `/nix/store/0h5b7hp8d4hqfrw8igvx97x1xawrjnac-hello-2.1.1x'
+```console
+$ nix-build -A hello
+waiting for lock on `/nix/store/0h5b7hp8d4hqfrw8igvx97x1xawrjnac-hello-2.1.1x'
+```
 
 So it is always safe to run multiple instances of Nix in parallel (which
 isn’t the case with, say, `make`).

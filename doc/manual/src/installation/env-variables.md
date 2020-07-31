@@ -10,7 +10,9 @@ environment variables is to include the file
 `prefix/etc/profile.d/nix.sh` in your `~/.profile` (or similar), like
 this:
 
-    source prefix/etc/profile.d/nix.sh
+```bash
+source prefix/etc/profile.d/nix.sh
+```
 
 # `NIX_SSL_CERT_FILE`
 
@@ -23,13 +25,17 @@ and use its own certificate bundle.
 
 Set the environment variable and install Nix
 
-    $ export NIX_SSL_CERT_FILE=/etc/ssl/my-certificate-bundle.crt
-    $ sh <(curl -L https://nixos.org/nix/install)
+```console
+$ export NIX_SSL_CERT_FILE=/etc/ssl/my-certificate-bundle.crt
+$ sh <(curl -L https://nixos.org/nix/install)
+```
 
 In the shell profile and rc files (for example, `/etc/bashrc`,
 `/etc/zshrc`), add the following line:
 
-    export NIX_SSL_CERT_FILE=/etc/ssl/my-certificate-bundle.crt
+```bash
+export NIX_SSL_CERT_FILE=/etc/ssl/my-certificate-bundle.crt
+```
 
 > **Note**
 > 
@@ -41,8 +47,10 @@ In the shell profile and rc files (for example, `/etc/bashrc`,
 On macOS you must specify the environment variable for the Nix daemon
 service, then restart it:
 
-    $ sudo launchctl setenv NIX_SSL_CERT_FILE /etc/ssl/my-certificate-bundle.crt
-    $ sudo launchctl kickstart -k system/org.nixos.nix-daemon
+```console
+$ sudo launchctl setenv NIX_SSL_CERT_FILE /etc/ssl/my-certificate-bundle.crt
+$ sudo launchctl kickstart -k system/org.nixos.nix-daemon
+```
 
 ## Proxy Environment Variables
 

@@ -8,16 +8,22 @@ usually uses to fetch pre-built binaries from <https://cache.nixos.org>.
 The daemon that handles binary cache requests via HTTP, `nix-serve`, is
 not part of the Nix distribution, but you can install it from Nixpkgs:
 
-    $ nix-env -i nix-serve
+```console
+$ nix-env -i nix-serve
+```
 
 You can then start the server, listening for HTTP connections on
 whatever port you like:
 
-    $ nix-serve -p 8080
+```console
+$ nix-serve -p 8080
+```
 
 To check whether it works, try the following on the client:
 
-    $ curl http://avalon:8080/nix-cache-info
+```console
+$ curl http://avalon:8080/nix-cache-info
+```
 
 which should print something like:
 
@@ -28,7 +34,9 @@ which should print something like:
 On the client side, you can tell Nix to use your binary cache using
 `--option extra-binary-caches`, e.g.:
 
-    $ nix-env -i firefox --option extra-binary-caches http://avalon:8080/
+```console
+$ nix-env -i firefox --option extra-binary-caches http://avalon:8080/
+```
 
 The option `extra-binary-caches` tells Nix to use this binary cache in
 addition to your default caches, such as <https://cache.nixos.org>.

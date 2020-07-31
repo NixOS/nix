@@ -5,7 +5,9 @@ are symlinks in the directory `prefix/nix/var/nix/gcroots`. For
 instance, the following command makes the path
 `/nix/store/d718ef...-foo` a root of the collector:
 
-    $ ln -s /nix/store/d718ef...-foo /nix/var/nix/gcroots/bar
+```console
+$ ln -s /nix/store/d718ef...-foo /nix/var/nix/gcroots/bar
+```
 
 That is, after this command, the garbage collector will not remove
 `/nix/store/d718ef...-foo` or any of its dependencies.

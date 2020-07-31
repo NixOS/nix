@@ -5,7 +5,9 @@ Nix store via SSH. For example, the following installs Firefox,
 automatically fetching any store paths in Firefox’s closure if they are
 available on the server `avalon`:
 
-    $ nix-env -i firefox --substituters ssh://alice@avalon
+```console
+$ nix-env -i firefox --substituters ssh://alice@avalon
+```
 
 This works similar to the binary cache substituter that Nix usually
 uses, only using SSH instead of HTTP: if a store path `P` is needed, Nix
@@ -22,11 +24,17 @@ building from source.
 You can also copy the closure of some store path, without installing it
 into your profile, e.g.
 
-    $ nix-store -r /nix/store/m85bxg…-firefox-34.0.5 --substituters ssh://alice@avalon
+```console
+$ nix-store -r /nix/store/m85bxg…-firefox-34.0.5 --substituters
+ssh://alice@avalon
+```
 
 This is essentially equivalent to doing
 
-    $ nix-copy-closure --from alice@avalon /nix/store/m85bxg…-firefox-34.0.5
+```console
+$ nix-copy-closure --from alice@avalon
+/nix/store/m85bxg…-firefox-34.0.5
+```
 
 You can use SSH’s *forced command* feature to set up a restricted user
 account for SSH substituter access, allowing read-only access to the
@@ -45,8 +53,10 @@ to `sshd_config` to restrict the user `nix-ssh`:
 On NixOS, you can accomplish the same by adding the following to your
 `configuration.nix`:
 
-    nix.sshServe.enable = true;
-    nix.sshServe.keys = [ "ssh-dss AAAAB3NzaC1k... bob@example.org" ];
+```nix
+nix.sshServe.enable = true;
+nix.sshServe.keys = [ "ssh-dss AAAAB3NzaC1k... bob@example.org" ];
+```
 
 where the latter line lists the public keys of users that are allowed to
 connect.

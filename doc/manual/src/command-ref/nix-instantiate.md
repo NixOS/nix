@@ -85,61 +85,77 @@ standard input.
 Instantiating store derivations from a Nix expression, and building them
 using `nix-store`:
 
-    $ nix-instantiate test.nix (instantiate)
-    /nix/store/cigxbmvy6dzix98dxxh9b6shg7ar5bvs-perl-BerkeleyDB-0.26.drv
+```console
+$ nix-instantiate test.nix (instantiate)
+/nix/store/cigxbmvy6dzix98dxxh9b6shg7ar5bvs-perl-BerkeleyDB-0.26.drv
 
-    $ nix-store -r $(nix-instantiate test.nix) (build)
-    ...
-    /nix/store/qhqk4n8ci095g3sdp93x7rgwyh9rdvgk-perl-BerkeleyDB-0.26 (output path)
+$ nix-store -r $(nix-instantiate test.nix) (build)
+...
+/nix/store/qhqk4n8ci095g3sdp93x7rgwyh9rdvgk-perl-BerkeleyDB-0.26 (output path)
 
-    $ ls -l /nix/store/qhqk4n8ci095g3sdp93x7rgwyh9rdvgk-perl-BerkeleyDB-0.26
-    dr-xr-xr-x    2 eelco    users        4096 1970-01-01 01:00 lib
-    ...
+$ ls -l /nix/store/qhqk4n8ci095g3sdp93x7rgwyh9rdvgk-perl-BerkeleyDB-0.26
+dr-xr-xr-x    2 eelco    users        4096 1970-01-01 01:00 lib
+...
+```
 
 You can also give a Nix expression on the command line:
 
-    $ nix-instantiate -E 'with import <nixpkgs> { }; hello'
-    /nix/store/j8s4zyv75a724q38cb0r87rlczaiag4y-hello-2.8.drv
+```console
+$ nix-instantiate -E 'with import <nixpkgs> { }; hello'
+/nix/store/j8s4zyv75a724q38cb0r87rlczaiag4y-hello-2.8.drv
+```
 
 This is equivalent to:
 
-    $ nix-instantiate '<nixpkgs>' -A hello
+```console
+$ nix-instantiate '<nixpkgs>' -A hello
+```
 
 Parsing and evaluating Nix expressions:
 
-    $ nix-instantiate --parse -E '1 + 2'
-    1 + 2
+```console
+$ nix-instantiate --parse -E '1 + 2'
+1 + 2
+```
 
-    $ nix-instantiate --eval -E '1 + 2'
-    3
+```console
+$ nix-instantiate --eval -E '1 + 2'
+3
+```
 
-    $ nix-instantiate --eval --xml -E '1 + 2'
-    <?xml version='1.0' encoding='utf-8'?>
-    <expr>
-      <int value="3" />
-    </expr>
+```console
+$ nix-instantiate --eval --xml -E '1 + 2'
+<?xml version='1.0' encoding='utf-8'?>
+<expr>
+  <int value="3" />
+</expr>
+```
 
 The difference between non-strict and strict evaluation:
 
-    $ nix-instantiate --eval --xml -E 'rec { x = "foo"; y = x; }'
-    ...
-      <attr name="x">
-        <string value="foo" />
-      </attr>
-      <attr name="y">
-        <unevaluated />
-      </attr>
-    ...
+```console
+$ nix-instantiate --eval --xml -E 'rec { x = "foo"; y = x; }'
+...
+  <attr name="x">
+    <string value="foo" />
+  </attr>
+  <attr name="y">
+    <unevaluated />
+  </attr>
+...
+```
 
 Note that `y` is left unevaluated (the XML representation doesn’t
 attempt to show non-normal forms).
 
-    $ nix-instantiate --eval --xml --strict -E 'rec { x = "foo"; y = x; }'
-    ...
-      <attr name="x">
-        <string value="foo" />
-      </attr>
-      <attr name="y">
-        <string value="foo" />
-      </attr>
-    ...
+```console
+$ nix-instantiate --eval --xml --strict -E 'rec { x = "foo"; y = x; }'
+...
+  <attr name="x">
+    <string value="foo" />
+  </attr>
+  <attr name="y">
+    <string value="foo" />
+  </attr>
+...
+```

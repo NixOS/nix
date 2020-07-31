@@ -51,25 +51,27 @@ cache's documentation.
 
 Your bucket will need the following bucket policy:
 
-    {
-        "Id": "DirectReads",
-        "Version": "2012-10-17",
-        "Statement": [
-            {
-                "Sid": "AllowDirectReads",
-                "Action": [
-                    "s3:GetObject",
-                    "s3:GetBucketLocation"
-                ],
-                "Effect": "Allow",
-                "Resource": [
-                    "arn:aws:s3:::example-nix-cache",
-                    "arn:aws:s3:::example-nix-cache/*"
-                ],
-                "Principal": "*"
-            }
-        ]
-    }
+```json
+{
+    "Id": "DirectReads",
+    "Version": "2012-10-17",
+    "Statement": [
+        {
+            "Sid": "AllowDirectReads",
+            "Action": [
+                "s3:GetObject",
+                "s3:GetBucketLocation"
+            ],
+            "Effect": "Allow",
+            "Resource": [
+                "arn:aws:s3:::example-nix-cache",
+                "arn:aws:s3:::example-nix-cache/*"
+            ],
+            "Principal": "*"
+        }
+    ]
+}
+```
 
 ## Authenticated Reads to your S3 binary cache
 
@@ -101,35 +103,43 @@ for authenticating requests to Amazon S3.
 
 Your account will need the following IAM policy to upload to the cache:
 
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
     {
-      "Version": "2012-10-17",
-      "Statement": [
-        {
-          "Sid": "UploadToCache",
-          "Effect": "Allow",
-          "Action": [
-            "s3:AbortMultipartUpload",
-            "s3:GetBucketLocation",
-            "s3:GetObject",
-            "s3:ListBucket",
-            "s3:ListBucketMultipartUploads",
-            "s3:ListMultipartUploadParts",
-            "s3:PutObject"
-          ],
-          "Resource": [
-            "arn:aws:s3:::example-nix-cache",
-            "arn:aws:s3:::example-nix-cache/*"
-          ]
-        }
+      "Sid": "UploadToCache",
+      "Effect": "Allow",
+      "Action": [
+        "s3:AbortMultipartUpload",
+        "s3:GetBucketLocation",
+        "s3:GetObject",
+        "s3:ListBucket",
+        "s3:ListBucketMultipartUploads",
+        "s3:ListMultipartUploadParts",
+        "s3:PutObject"
+      ],
+      "Resource": [
+        "arn:aws:s3:::example-nix-cache",
+        "arn:aws:s3:::example-nix-cache/*"
       ]
     }
+  ]
+}
+```
 
 ## Examples
 
 To upload with a specific credential profile for Amazon S3:
 
-    nix copy --to 's3://example-nix-cache?profile=cache-upload&region=eu-west-2' nixpkgs.hello
+```console
+$ nix copy nixpkgs.hello \
+  --to 's3://example-nix-cache?profile=cache-upload&region=eu-west-2'
+```
 
 To upload to an S3-compatible binary cache:
 
-    nix copy --to 's3://example-nix-cache?profile=cache-upload&scheme=https&endpoint=minio.example.com' nixpkgs.hello
+```console
+$ nix copy nixpkgs.hello --to \
+  's3://example-nix-cache?profile=cache-upload&scheme=https&endpoint=minio.example.com'
+```

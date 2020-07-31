@@ -467,6 +467,7 @@
               configureFlags+=" --prefix=$prefix"
               PKG_CONFIG_PATH=$prefix/lib/pkgconfig:$PKG_CONFIG_PATH
               PATH=$prefix/bin:$PATH
+              export MANPATH=/home/eelco/Dev/nix/inst/share/man:$MANPATH
               unset PYTHONPATH
             '';
         });
