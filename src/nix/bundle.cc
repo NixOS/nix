@@ -48,6 +48,8 @@ struct CmdBundle : InstallableCommand
         };
     }
 
+    Category category() override { return catSecondary; }
+
     Strings getDefaultFlakeAttrPaths() override
     {
         Strings res{"defaultApp." + settings.thisSystem.get()};
