@@ -218,7 +218,7 @@ struct MercurialInputScheme : InputScheme
         });
 
         if (auto res = getCache()->lookup(store, mutableAttrs)) {
-                    auto rev2 = Hash::parseAny(getStrAttr(res->first, "rev"), htSHA1);
+            auto rev2 = Hash::parseAny(getStrAttr(res->first, "rev"), htSHA1);
             if (!input.getRev() || input.getRev() == rev2) {
                 input.attrs.insert_or_assign("rev", rev2.gitRev());
                 return makeResult(res->first, std::move(res->second));

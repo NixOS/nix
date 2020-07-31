@@ -113,8 +113,8 @@ typedef list<ValidPathInfo> ValidPathInfos;
 struct SubstitutablePathInfo : PathReferences<StorePath>
 {
     std::optional<StorePath> deriver;
-    unsigned long long downloadSize; /* 0 = unknown or inapplicable */
-    unsigned long long narSize; /* 0 = unknown */
+    uint64_t downloadSize; /* 0 = unknown or inapplicable */
+    uint64_t narSize; /* 0 = unknown */
 };
 
 typedef std::map<StorePath, SubstitutablePathInfo> SubstitutablePathInfos;

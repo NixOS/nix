@@ -116,7 +116,7 @@ Hash hashFile(HashType ht, const Path & path);
 
 /* Compute the hash of the given path.  The hash is defined as
    (essentially) hashString(ht, dumpPath(path)). */
-typedef std::pair<Hash, unsigned long long> HashResult;
+typedef std::pair<Hash, uint64_t> HashResult;
 HashResult hashPath(HashType ht, const Path & path,
     PathFilter & filter = defaultPathFilter);
 
@@ -146,7 +146,7 @@ class HashSink : public BufferedSink, public AbstractHashSink
 private:
     HashType ht;
     Ctx * ctx;
-    unsigned long long bytes;
+    uint64_t bytes;
 
 public:
     HashSink(HashType ht);

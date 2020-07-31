@@ -106,6 +106,6 @@ void emitTreeAttrs(
     EvalState & state,
     const fetchers::Tree & tree,
     const fetchers::Input & input,
-    Value & v);
+    Value & v, bool emptyRevFallback = false);
 
 }

@@ -111,6 +111,7 @@ struct CmdRegistryPin : virtual Args, EvalCommand
         fetchers::Attrs extraAttrs;
         if (ref.subdir != "") extraAttrs["dir"] = ref.subdir;
         userRegistry->add(ref.input, resolved, extraAttrs);
+        userRegistry->write(fetchers::getUserRegistryPath());
     }
 };
 

@@ -111,10 +111,12 @@ void Store::computeFSClosure(const StorePath & startPath,
 std::optional<StorePathDescriptor> getDerivationCA(const BasicDerivation & drv)
 {
     auto out = drv.outputs.find("out");
-    if (out != drv.outputs.end() && out->second.hash) {
+    if (out == drv.outputs.end())
+        return std::nullopt;
+    if (auto dof = std::get_if<DerivationOutputFixed>(&out->second.output)) {
         return StorePathDescriptor {
-            .name = std::string { out->second.path.name() },
-            .info = FixedOutputInfo { *out->second.hash, {} },
+            .name =  drv.name,
+            .info = FixedOutputInfo { dof->hash, {} },
         };
     }
     return std::nullopt;
@@ -122,7 +124,7 @@ std::optional<StorePathDescriptor> getDerivationCA(const BasicDerivation & drv)
 
 void Store::queryMissing(const std::vector<StorePathWithOutputs> & targets,
     StorePathSet & willBuild_, StorePathSet & willSubstitute_, StorePathSet & unknown_,
-    unsigned long long & downloadSize_, unsigned long long & narSize_)
+    uint64_t & downloadSize_, uint64_t & narSize_)
 {
     Activity act(*logger, lvlDebug, actUnknown, "querying info about missing paths");
 
@@ -134,8 +136,8 @@ void Store::queryMissing(const std::vector<StorePathWithOutputs> & targets,
     {
         std::unordered_set<std::string> done;
         StorePathSet & unknown, & willSubstitute, & willBuild;
-        unsigned long long & downloadSize;
-        unsigned long long & narSize;
+        uint64_t & downloadSize;
+        uint64_t & narSize;
     };
 
     struct DrvState
@@ -212,10 +214,12 @@ void Store::queryMissing(const std::vector<StorePathWithOutputs> & targets,
             ParsedDerivation parsedDrv(StorePath(path.path), *drv);
 
             PathSet invalid;
-            for (auto & j : drv->outputs)
+            for (auto & j : drv->outputs) {
+                auto storePath = j.second.path(*this, drv->name);
                 if (wantOutput(j.first, path.outputs)
-                    && !isValidPath(j.second.path))
-                    invalid.insert(printStorePath(j.second.path));
+                    && !isValidPath(storePath))
+                    invalid.insert(printStorePath(storePath));
+            }
             if (invalid.empty()) return;
 
             if (settings.useSubstitutes && parsedDrv.substitutesAllowed()) {

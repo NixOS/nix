@@ -344,13 +344,10 @@ struct S3BinaryCacheStoreImpl : public S3BinaryCacheStore
             std::chrono::duration_cast<std::chrono::milliseconds>(now2 - now1)
                 .count();
 
-        auto size = istream->tellg();
-
-        printInfo("uploaded 's3://%s/%s' (%d bytes) in %d ms",
-            bucketName, path, size, duration);
+        printInfo("uploaded 's3://%s/%s' in %d ms",
+            bucketName, path, duration);
 
         stats.putTimeMs += duration;
-        stats.putBytes += size;
         stats.put++;
     }
 

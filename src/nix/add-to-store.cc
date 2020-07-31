@@ -53,18 +53,11 @@ struct CmdAddToStore : MixDryRun, StoreCommand
 
         auto narHash = hashString(htSHA256, *sink.s);
 
-        Hash hash { htSHA256 }; // throwaway def to appease C++
-        switch (ingestionMethod) {
-        case FileIngestionMethod::Recursive: {
-            hash = narHash;
-            break;
-        }
-        case FileIngestionMethod::Flat: {
+        Hash hash = narHash;
+        if (ingestionMethod == FileIngestionMethod::Flat) {
             HashSink hsink(htSHA256);
             readFile(path, hsink);
             hash = hsink.finish().first;
-            break;
-        }
         }
 
         ValidPathInfo info {

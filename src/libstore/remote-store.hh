@@ -95,7 +95,7 @@ public:
 
     void queryMissing(const std::vector<StorePathWithOutputs> & targets,
         StorePathSet & willBuild, StorePathSet & willSubstitute, StorePathSet & unknown,
-        unsigned long long & downloadSize, unsigned long long & narSize) override;
+        uint64_t & downloadSize, uint64_t & narSize) override;
 
     void connect() override;
 
