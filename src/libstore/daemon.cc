@@ -86,7 +86,7 @@ struct TunnelLogger : public Logger
     }
 
     /* startWork() means that we're starting an operation for which we
-      want to send out stderr to the client. */
+       want to send out stderr to the client. */
     void startWork()
     {
         auto state(state_.lock());
@@ -289,7 +289,7 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
         logger->startWork();
         auto hash = store->queryPathInfo(path)->narHash;
         logger->stopWork();
-        to << hash.to_string(Base16, false);
+        to << hash->to_string(Base16, false);
         break;
     }
 
@@ -451,7 +451,7 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
     case wopBuildDerivation: {
         auto drvPath = store->parseStorePath(readString(from));
         BasicDerivation drv;
-        readDerivation(from, *store, drv);
+        readDerivation(from, *store, drv, Derivation::nameFromPath(drvPath));
         BuildMode buildMode = (BuildMode) readInt(from);
         logger->startWork();
         if (!trusted)
@@ -579,7 +579,7 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
         auto path = store->parseStorePath(readString(from));
         logger->startWork();
         SubstitutablePathInfos infos;
-        store->querySubstitutablePathInfos({path}, infos);
+        store->querySubstitutablePathInfos({{path, std::nullopt}}, infos);
         logger->stopWork();
         auto i = infos.find(path);
         if (i == infos.end())
@@ -595,10 +595,16 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
     }
 
     case wopQuerySubstitutablePathInfos: {
-        auto paths = readStorePaths<StorePathSet>(*store, from);
-        logger->startWork();
         SubstitutablePathInfos infos;
-        store->querySubstitutablePathInfos(paths, infos);
+        StorePathCAMap pathsMap = {};
+        if (GET_PROTOCOL_MINOR(clientVersion) < 22) {
+            auto paths = readStorePaths<StorePathSet>(*store, from);
+            for (auto & path : paths)
+                pathsMap.emplace(path, std::nullopt);
+        } else
+            pathsMap = readStorePathCAMap(*store, from);
+        logger->startWork();
+        store->querySubstitutablePathInfos(pathsMap, infos);
         logger->stopWork();
         to << infos.size();
         for (auto & i : infos) {
@@ -632,7 +638,7 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
             if (GET_PROTOCOL_MINOR(clientVersion) >= 17)
                 to << 1;
             to << (info->deriver ? store->printStorePath(*info->deriver) : "")
-               << info->narHash.to_string(Base16, false);
+               << info->narHash->to_string(Base16, false);
             writeStorePaths(*store, to, info->references);
             to << info->registrationTime << info->narSize;
             if (GET_PROTOCOL_MINOR(clientVersion) >= 16) {
@@ -703,24 +709,84 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
         if (!trusted)
             info.ultimate = false;
 
-        std::unique_ptr<Source> source;
-        if (GET_PROTOCOL_MINOR(clientVersion) >= 21)
-            source = std::make_unique<TunnelSource>(from, to);
-        else {
-            StringSink saved;
-            TeeSource tee { from, saved };
-            ParseSink ether;
-            parseDump(ether, tee);
-            source = std::make_unique<StringSource>(std::move(*saved.s));
+        if (GET_PROTOCOL_MINOR(clientVersion) >= 23) {
+
+            struct FramedSource : Source
+            {
+                Source & from;
+                bool eof = false;
+                std::vector<unsigned char> pending;
+                size_t pos = 0;
+
+                FramedSource(Source & from) : from(from)
+                { }
+
+                ~FramedSource()
+                {
+                    if (!eof) {
+                        while (true) {
+                            auto n = readInt(from);
+                            if (!n) break;
+                            std::vector<unsigned char> data(n);
+                            from(data.data(), n);
+                        }
+                    }
+                }
+
+                size_t read(unsigned char * data, size_t len) override
+                {
+                    if (eof) throw EndOfFile("reached end of FramedSource");
+
+                    if (pos >= pending.size()) {
+                        size_t len = readInt(from);
+                        if (!len) {
+                            eof = true;
+                            return 0;
+                        }
+                        pending = std::vector<unsigned char>(len);
+                        pos = 0;
+                        from(pending.data(), len);
+                    }
+
+                    auto n = std::min(len, pending.size() - pos);
+                    memcpy(data, pending.data() + pos, n);
+                    pos += n;
+                    return n;
+                }
+            };
+
+            logger->startWork();
+
+            {
+                FramedSource source(from);
+                store->addToStore(info, source, (RepairFlag) repair,
+                    dontCheckSigs ? NoCheckSigs : CheckSigs);
+            }
+
+            logger->stopWork();
         }
 
-        logger->startWork();
+        else {
+            std::unique_ptr<Source> source;
+            if (GET_PROTOCOL_MINOR(clientVersion) >= 21)
+                source = std::make_unique<TunnelSource>(from, to);
+            else {
+                StringSink saved;
+                TeeSource tee { from, saved };
+                ParseSink ether;
+                parseDump(ether, tee);
+                source = std::make_unique<StringSource>(std::move(*saved.s));
+            }
 
-        // FIXME: race if addToStore doesn't read source?
-        store->addToStore(info, *source, (RepairFlag) repair,
-            dontCheckSigs ? NoCheckSigs : CheckSigs);
+            logger->startWork();
 
-        logger->stopWork();
+            // FIXME: race if addToStore doesn't read source?
+            store->addToStore(info, *source, (RepairFlag) repair,
+                dontCheckSigs ? NoCheckSigs : CheckSigs);
+
+            logger->stopWork();
+        }
+
         break;
     }
 
@@ -730,7 +796,7 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
             targets.push_back(store->parsePathWithOutputs(s));
         logger->startWork();
         StorePathSet willBuild, willSubstitute, unknown;
-        unsigned long long downloadSize, narSize;
+        uint64_t downloadSize, narSize;
         store->queryMissing(targets, willBuild, willSubstitute, unknown, downloadSize, narSize);
         logger->stopWork();
         writeStorePaths(*store, to, willBuild);

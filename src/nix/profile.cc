@@ -133,7 +133,7 @@ struct ProfileManifest
         info.references = std::move(references);
         info.narHash = narHash;
         info.narSize = sink.s->size();
-        info.ca = FixedOutputHash { .method = FileIngestionMethod::Recursive, .hash = info.narHash };
+        info.ca = FixedOutputHash { .method = FileIngestionMethod::Recursive, .hash = *info.narHash };
 
         auto source = StringSource { *sink.s };
         store->addToStore(info, source);

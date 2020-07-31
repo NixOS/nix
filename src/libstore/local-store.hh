@@ -29,8 +29,8 @@ struct Derivation;
 struct OptimiseStats
 {
     unsigned long filesLinked = 0;
-    unsigned long long bytesFreed = 0;
-    unsigned long long blocksFreed = 0;
+    uint64_t bytesFreed = 0;
+    uint64_t blocksFreed = 0;
 };
 
 
@@ -139,7 +139,7 @@ public:
 
     StorePathSet querySubstitutablePaths(const StorePathSet & paths) override;
 
-    void querySubstitutablePathInfos(const StorePathSet & paths,
+    void querySubstitutablePathInfos(const StorePathCAMap & paths,
         SubstitutablePathInfos & infos) override;
 
     void addToStore(const ValidPathInfo & info, Source & source,
