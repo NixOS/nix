@@ -579,7 +579,7 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
         auto path = store->parseStorePath(readString(from));
         logger->startWork();
         SubstitutablePathInfos infos;
-        store->querySubstitutablePathInfos({path}, infos);
+        store->querySubstitutablePathInfos({{path, std::nullopt}}, infos);
         logger->stopWork();
         auto i = infos.find(path);
         if (i == infos.end())
@@ -595,10 +595,16 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
     }
 
     case wopQuerySubstitutablePathInfos: {
-        auto paths = readStorePaths<StorePathSet>(*store, from);
-        logger->startWork();
         SubstitutablePathInfos infos;
-        store->querySubstitutablePathInfos(paths, infos);
+        StorePathCAMap pathsMap = {};
+        if (GET_PROTOCOL_MINOR(clientVersion) < 22) {
+            auto paths = readStorePaths<StorePathSet>(*store, from);
+            for (auto & path : paths)
+                pathsMap.emplace(path, std::nullopt);
+        } else
+            pathsMap = readStorePathCAMap(*store, from);
+        logger->startWork();
+        store->querySubstitutablePathInfos(pathsMap, infos);
         logger->stopWork();
         to << infos.size();
         for (auto & i : infos) {
@@ -790,7 +796,7 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
             targets.push_back(store->parsePathWithOutputs(s));
         logger->startWork();
         StorePathSet willBuild, willSubstitute, unknown;
-        unsigned long long downloadSize, narSize;
+        uint64_t downloadSize, narSize;
         store->queryMissing(targets, willBuild, willSubstitute, unknown, downloadSize, narSize);
         logger->stopWork();
         writeStorePaths(*store, to, willBuild);
