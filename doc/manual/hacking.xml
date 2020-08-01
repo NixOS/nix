@@ -4,18 +4,37 @@
 
 <title>Hacking</title>
 
-<para>This section provides some notes on how to hack on Nix.  To get
+<para>This section provides some notes on how to hack on Nix. To get
 the latest version of Nix from GitHub:
 <screen>
-$ git clone git://github.com/NixOS/nix.git
+$ git clone https://github.com/NixOS/nix.git
 $ cd nix
 </screen>
 </para>
 
-<para>To build it and its dependencies:
+<para>To build Nix for the current operating system/architecture use
+
 <screen>
-$ nix-build release.nix -A build.x86_64-linux
+$ nix-build
 </screen>
+
+or if you have a flakes-enabled nix:
+
+<screen>
+$ nix build
+</screen>
+
+This will build <literal>defaultPackage</literal> attribute defined in the <literal>flake.nix</literal> file.
+
+To build for other platforms add one of the following suffixes to it: aarch64-linux,
+i686-linux, x86_64-darwin, x86_64-linux.
+
+i.e.
+
+<screen>
+nix-build -A defaultPackage.x86_64-linux
+</screen>
+
 </para>
 
 <para>To build all dependencies and start a shell in which all
@@ -27,13 +46,27 @@ $ nix-shell
 To build Nix itself in this shell:
 <screen>
 [nix-shell]$ ./bootstrap.sh
-[nix-shell]$ configurePhase
-[nix-shell]$ make
+[nix-shell]$ ./configure $configureFlags
+[nix-shell]$ make -j $NIX_BUILD_CORES
 </screen>
 To install it in <literal>$(pwd)/inst</literal> and test it:
 <screen>
 [nix-shell]$ make install
 [nix-shell]$ make installcheck
+[nix-shell]$ ./inst/bin/nix --version
+nix (Nix) 2.4
+</screen>
+
+If you have a flakes-enabled nix you can replace:
+
+<screen>
+$ nix-shell
+</screen>
+
+by:
+
+<screen>
+$ nix develop
 </screen>
 
 </para>

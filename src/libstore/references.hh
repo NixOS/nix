@@ -5,8 +5,7 @@
 
 namespace nix {
 
-PathSet scanForReferences(const Path & path, const PathSet & refs,
-    HashResult & hash);
+std::pair<PathSet, HashResult> scanForReferences(const Path & path, const PathSet & refs);
 
 struct RewritingSink : Sink
 {

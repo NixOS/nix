@@ -58,20 +58,6 @@ void builtinFetchurl(const BasicDerivation & drv, const std::string & netrcData)
         }
     };
 
-    /* Try the hashed mirrors first. */
-    if (getAttr("outputHashMode") == "flat")
-        for (auto hashedMirror : settings.hashedMirrors.get())
-            try {
-                if (!hasSuffix(hashedMirror, "/")) hashedMirror += '/';
-                auto ht = parseHashTypeOpt(getAttr("outputHashAlgo"));
-                auto h = Hash(getAttr("outputHash"), ht);
-                fetch(hashedMirror + printHashType(*h.type) + "/" + h.to_string(Base16, false));
-                return;
-            } catch (Error & e) {
-                debug(e.what());
-            }
-
-    /* Otherwise try the specified URL. */
     fetch(mainUrl);
 }
 

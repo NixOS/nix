@@ -32,7 +32,7 @@ MakeError(InvalidPath, Error);
 MakeError(Unsupported, Error);
 MakeError(SubstituteGone, Error);
 MakeError(SubstituterDisabled, Error);
-MakeError(NotInStore, Error);
+MakeError(BadStorePath, Error);
 
 
 class FSAccessor;
@@ -86,7 +86,7 @@ struct GCOptions
     StorePathSet pathsToDelete;
 
     /* Stop after at least `maxFreed' bytes have been freed. */
-    unsigned long long maxFreed{std::numeric_limits<unsigned long long>::max()};
+    uint64_t maxFreed{std::numeric_limits<uint64_t>::max()};
 };
 
 
@@ -98,7 +98,7 @@ struct GCResults
 
     /* For `gcReturnDead', `gcDeleteDead' and `gcDeleteSpecific', the
        number of bytes that would be or was freed. */
-    unsigned long long bytesFreed = 0;
+    uint64_t bytesFreed = 0;
 };
 
 
@@ -230,9 +230,9 @@ public:
        the Nix store. */
     bool isStorePath(std::string_view path) const;
 
-    /* Chop off the parts after the top-level store name, e.g.,
-       /nix/store/abcd-foo/bar => /nix/store/abcd-foo. */
-    Path toStorePath(const Path & path) const;
+    /* Split a path like /nix/store/<hash>-<name>/<bla> into
+       /nix/store/<hash>-<name> and /<bla>. */
+    std::pair<StorePath, Path> toStorePath(const Path & path) const;
 
     /* Follow symlinks until we end up with a path in the Nix store. */
     Path followLinksToStore(std::string_view path) const;
@@ -256,7 +256,11 @@ public:
         bool hasSelfReference = false) const;
 
     StorePath makeTextPath(std::string_view name, const Hash & hash,
-        const StorePathSet & references) const;
+        const StorePathSet & references = {}) const;
+
+    StorePath makeFixedOutputPathFromCA(std::string_view name, ContentAddress ca,
+        const StorePathSet & references = {},
+        bool hasSelfReference = false) const;
 
     /* This is the preparatory part of addToStore(); it computes the
        store path to which srcPath is to be copied.  Returns the store
@@ -297,12 +301,15 @@ public:
         SubstituteFlag maybeSubstitute = NoSubstitute);
 
     /* Query the set of all valid paths. Note that for some store
-       backends, the name part of store paths may be omitted
-       (i.e. you'll get /nix/store/<hash> rather than
+       backends, the name part of store paths may be replaced by 'x'
+       (i.e. you'll get /nix/store/<hash>-x rather than
        /nix/store/<hash>-<name>). Use queryPathInfo() to obtain the
-       full store path. */
+       full store path. FIXME: should return a set of
+       std::variant<StorePath, HashPart> to get rid of this hack. */
     virtual StorePathSet queryAllValidPaths()
     { unsupported("queryAllValidPaths"); }
+
+    constexpr static const char * MissingName = "x";
 
     /* Query information about a valid path. It is permitted to omit
        the name part of the store path. */
@@ -331,8 +338,11 @@ public:
     virtual StorePathSet queryValidDerivers(const StorePath & path) { return {}; };
 
     /* Query the outputs of the derivation denoted by `path'. */
-    virtual StorePathSet queryDerivationOutputs(const StorePath & path)
-    { unsupported("queryDerivationOutputs"); }
+    virtual StorePathSet queryDerivationOutputs(const StorePath & path);
+
+    /* Query the mapping outputName=>outputPath for the given derivation */
+    virtual OutputPathMap queryDerivationOutputMap(const StorePath & path)
+    { unsupported("queryDerivationOutputMap"); }
 
     /* Query the full store path given the hash part of a valid store
        path, or empty if the path doesn't exist. */
@@ -342,15 +352,15 @@ public:
     virtual StorePathSet querySubstitutablePaths(const StorePathSet & paths) { return {}; };
 
     /* Query substitute info (i.e. references, derivers and download
-       sizes) of a set of paths.  If a path does not have substitute
-       info, it's omitted from the resulting ‘infos’ map. */
-    virtual void querySubstitutablePathInfos(const StorePathSet & paths,
+       sizes) of a map of paths to their optional ca values. If a path
+       does not have substitute info, it's omitted from the resulting
+       ‘infos’ map. */
+    virtual void querySubstitutablePathInfos(const StorePathCAMap & paths,
         SubstitutablePathInfos & infos) { return; };
 
     /* Import a path into the store. */
     virtual void addToStore(const ValidPathInfo & info, Source & narSource,
-        RepairFlag repair = NoRepair, CheckSigsFlag checkSigs = CheckSigs,
-        std::shared_ptr<FSAccessor> accessor = 0) = 0;
+        RepairFlag repair = NoRepair, CheckSigsFlag checkSigs = CheckSigs) = 0;
 
     /* Copy the contents of a path to the store and register the
        validity the resulting path.  The resulting path is returned.
@@ -360,8 +370,15 @@ public:
         FileIngestionMethod method = FileIngestionMethod::Recursive, HashType hashAlgo = htSHA256,
         PathFilter & filter = defaultPathFilter, RepairFlag repair = NoRepair) = 0;
 
+    /* Copy the contents of a path to the store and register the
+       validity the resulting path, using a constant amount of
+       memory. */
+    ValidPathInfo addToStoreSlow(std::string_view name, const Path & srcPath,
+        FileIngestionMethod method = FileIngestionMethod::Recursive, HashType hashAlgo = htSHA256,
+        std::optional<Hash> expectedCAHash = {});
+
     // FIXME: remove?
-    virtual StorePath addToStoreFromDump(const string & dump, const string & name,
+    virtual StorePath addToStoreFromDump(Source & dump, const string & name,
         FileIngestionMethod method = FileIngestionMethod::Recursive, HashType hashAlgo = htSHA256, RepairFlag repair = NoRepair)
     {
         throw Error("addToStoreFromDump() is not supported by this store");
@@ -510,7 +527,7 @@ public:
        that will be substituted. */
     virtual void queryMissing(const std::vector<StorePathWithOutputs> & targets,
         StorePathSet & willBuild, StorePathSet & willSubstitute, StorePathSet & unknown,
-        unsigned long long & downloadSize, unsigned long long & narSize);
+        uint64_t & downloadSize, uint64_t & narSize);
 
     /* Sort a set of paths topologically under the references
        relation.  If p refers to q, then p precedes q in this list. */
@@ -526,8 +543,7 @@ public:
        the Nix store. Optionally, the contents of the NARs are
        preloaded into the specified FS accessor to speed up subsequent
        access. */
-    StorePaths importPaths(Source & source, std::shared_ptr<FSAccessor> accessor,
-        CheckSigsFlag checkSigs = CheckSigs);
+    StorePaths importPaths(Source & source, CheckSigsFlag checkSigs = CheckSigs);
 
     struct Stats
     {
@@ -641,11 +657,13 @@ void copyStorePath(ref<Store> srcStore, ref<Store> dstStore,
 
 
 /* Copy store paths from one store to another. The paths may be copied
-   in parallel. They are copied in a topologically sorted order
-   (i.e. if A is a reference of B, then A is copied before B), but
-   the set of store paths is not automatically closed; use
-   copyClosure() for that. */
-void copyPaths(ref<Store> srcStore, ref<Store> dstStore, const StorePathSet & storePaths,
+   in parallel. They are copied in a topologically sorted order (i.e.
+   if A is a reference of B, then A is copied before B), but the set
+   of store paths is not automatically closed; use copyClosure() for
+   that. Returns a map of what each path was copied to the dstStore
+   as. */
+std::map<StorePath, StorePath> copyPaths(ref<Store> srcStore, ref<Store> dstStore,
+    const StorePathSet & storePaths,
     RepairFlag repair = NoRepair,
     CheckSigsFlag checkSigs = CheckSigs,
     SubstituteFlag substitute = NoSubstitute);
@@ -743,5 +761,7 @@ std::optional<ValidPathInfo> decodeValidPathInfo(
 
 /* Split URI into protocol+hierarchy part and its parameter set. */
 std::pair<std::string, Store::Params> splitUriAndParams(const std::string & uri);
+
+std::optional<ContentAddress> getDerivationCA(const BasicDerivation & drv);
 
 }

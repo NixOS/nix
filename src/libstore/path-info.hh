@@ -26,9 +26,9 @@ struct PathReferences
     std::set<Ref> references;
     bool hasSelfReference = false;
 
-	/* Functions to view references + hasSelfReference as one set, mainly for
-	   compatibility's sake. */
-	StorePathSet referencesPossiblyToSelf(const Ref & self) const;
+    /* Functions to view references + hasSelfReference as one set, mainly for
+       compatibility's sake. */
+    StorePathSet referencesPossiblyToSelf(const Ref & self) const;
     void insertReferencePossiblyToSelf(const Ref & self, Ref && ref);
     void setReferencesPossiblyToSelf(const Ref & self, std::set<Ref> && refs);
 };
@@ -65,7 +65,8 @@ struct ValidPathInfo : PathReferences<StorePath>
 {
     StorePath path;
     std::optional<StorePath> deriver;
-    Hash narHash;
+    // TODO document this
+    std::optional<Hash> narHash;
     time_t registrationTime = 0;
     uint64_t narSize = 0; // 0 = unknown
     uint64_t id; // internal use only
@@ -116,9 +117,9 @@ struct ValidPathInfo : PathReferences<StorePath>
     /* Return true iff the path is verifiably content-addressed. */
     bool isContentAddressed(const Store & store) const;
 
-	/* Functions to view references + hasSelfReference as one set, mainly for
-	   compatibility's sake. */
-	StorePathSet referencesPossiblyToSelf() const;
+    /* Functions to view references + hasSelfReference as one set, mainly for
+       compatibility's sake. */
+    StorePathSet referencesPossiblyToSelf() const;
     void insertReferencePossiblyToSelf(StorePath && ref);
     void setReferencesPossiblyToSelf(StorePathSet && refs);
 
@@ -148,8 +149,8 @@ typedef list<ValidPathInfo> ValidPathInfos;
 struct SubstitutablePathInfo : PathReferences<StorePath>
 {
     std::optional<StorePath> deriver;
-    unsigned long long downloadSize; /* 0 = unknown or inapplicable */
-    unsigned long long narSize; /* 0 = unknown */
+    uint64_t downloadSize; /* 0 = unknown or inapplicable */
+    uint64_t narSize; /* 0 = unknown */
 };
 
 typedef std::map<StorePath, SubstitutablePathInfo> SubstitutablePathInfos;
