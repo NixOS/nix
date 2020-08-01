@@ -42,9 +42,9 @@ struct Hash
        is not present, then the hash type must be specified in the
        string. */
     static Hash parseAny(std::string_view s, std::optional<HashType> type);
-    // hash type must be part of string
+    /* hash type must be part of string */
     static Hash parseAnyPrefixed(std::string_view s);
-    // prefix parsed separately; non SRI hash
+    /* prefix parsed separately; non SRI hash */
     static Hash parseNonSRIUnprefixed(std::string_view s, HashType type);
 
     static Hash parseSRI(std::string_view original);
