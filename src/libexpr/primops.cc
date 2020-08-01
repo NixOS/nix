@@ -1211,7 +1211,7 @@ static void prim_path(EvalState & state, const Pos & pos, Value * * args, Value 
     string name;
     Value * filterFun = nullptr;
     auto method = FileIngestionMethod::Recursive;
-    Hash expectedHash(htSHA256);
+    std::optional<Hash> expectedHash;
 
     for (auto & attr : *args[0]->attrs) {
         const string & n(attr.name);

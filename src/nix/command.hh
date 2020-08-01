@@ -5,6 +5,7 @@
 #include "common-eval-args.hh"
 #include "path.hh"
 #include "flake/lockfile.hh"
+#include "store-api.hh"
 
 #include <optional>
 
@@ -185,7 +186,7 @@ static RegisterCommand registerCommand(const std::string & name)
 }
 
 Buildables build(ref<Store> store, Realise mode,
-    std::vector<std::shared_ptr<Installable>> installables);
+    std::vector<std::shared_ptr<Installable>> installables, BuildMode bMode = bmNormal);
 
 std::set<StorePath> toStorePaths(ref<Store> store,
     Realise mode, OperateOn operateOn,
