@@ -3,7 +3,7 @@
 namespace nix {
 
 std::string FixedOutputHash::printMethodAlgo() const {
-    return makeFileIngestionPrefix(method) + printHashType(*hash.type);
+    return makeFileIngestionPrefix(method) + printHashType(hash.type);
 }
 
 std::string makeFileIngestionPrefix(const FileIngestionMethod m) {
@@ -46,7 +46,7 @@ ContentAddress parseContentAddress(std::string_view rawCa) {
         if (prefix == "text") {
             auto hashTypeAndHash = rawCa.substr(prefixSeparator+1, string::npos);
             Hash hash = Hash(string(hashTypeAndHash));
-            if (*hash.type != htSHA256) {
+            if (hash.type != htSHA256) {
                 throw Error("parseContentAddress: the text hash should have type SHA256");
             }
             return TextHash { hash };

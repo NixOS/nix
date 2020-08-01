@@ -26,8 +26,8 @@ const int nixSchemaVersion = 10;
 struct OptimiseStats
 {
     unsigned long filesLinked = 0;
-    unsigned long long bytesFreed = 0;
-    unsigned long long blocksFreed = 0;
+    uint64_t bytesFreed = 0;
+    uint64_t blocksFreed = 0;
 };
 
 
@@ -136,7 +136,7 @@ public:
 
     StorePathSet querySubstitutablePaths(const StorePathSet & paths) override;
 
-    void querySubstitutablePathInfos(const StorePathSet & paths,
+    void querySubstitutablePathInfos(const StorePathCAMap & paths,
         SubstitutablePathInfos & infos) override;
 
     void addToStore(const ValidPathInfo & info, Source & source,
@@ -150,7 +150,7 @@ public:
        in `dump', which is either a NAR serialisation (if recursive ==
        true) or simply the contents of a regular file (if recursive ==
        false). */
-    StorePath addToStoreFromDump(const string & dump, const string & name,
+    StorePath addToStoreFromDump(Source & dump, const string & name,
         FileIngestionMethod method = FileIngestionMethod::Recursive, HashType hashAlgo = htSHA256, RepairFlag repair = NoRepair) override;
 
     StorePath addTextToStore(const string & name, const string & s,

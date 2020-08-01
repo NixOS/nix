@@ -35,7 +35,7 @@ fi
 # Determine if we could use the multi-user installer or not
 if [ "$(uname -s)" = "Darwin" ]; then
     echo "Note: a multi-user installation is possible. See https://nixos.org/nix/manual/#sect-multi-user-installation" >&2
-elif [ "$(uname -s)" = "Linux" ] && [ -e /run/systemd/system ]; then
+elif [ "$(uname -s)" = "Linux" ]; then
     echo "Note: a multi-user installation is possible. See https://nixos.org/nix/manual/#sect-multi-user-installation" >&2
 fi
 
@@ -122,7 +122,7 @@ if [ "$(uname -s)" = "Darwin" ]; then
 fi
 
 if [ "$INSTALL_MODE" = "daemon" ]; then
-    printf '\e[1;31mSwitching to the Daemon-based Installer\e[0m\n'
+    printf '\e[1;31mSwitching to the Multi-user Installer\e[0m\n'
     exec "$self/install-multi-user"
     exit 0
 fi
@@ -207,7 +207,7 @@ if [ -z "$NIX_INSTALLER_NO_MODIFY_PROFILE" ]; then
         if [ -w "$fn" ]; then
             if ! grep -q "$p" "$fn"; then
                 echo "modifying $fn..." >&2
-                echo "if [ -e $p ]; then . $p; fi # added by Nix installer" >> "$fn"
+                echo -e "\nif [ -e $p ]; then . $p; fi # added by Nix installer" >> "$fn"
             fi
             added=1
             break
@@ -218,7 +218,7 @@ if [ -z "$NIX_INSTALLER_NO_MODIFY_PROFILE" ]; then
         if [ -w "$fn" ]; then
             if ! grep -q "$p" "$fn"; then
                 echo "modifying $fn..." >&2
-                echo "if [ -e $p ]; then . $p; fi # added by Nix installer" >> "$fn"
+                echo -e "\nif [ -e $p ]; then . $p; fi # added by Nix installer" >> "$fn"
             fi
             added=1
             break

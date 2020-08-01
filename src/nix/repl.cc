@@ -490,7 +490,7 @@ bool NixRepl::processLine(string line)
                 auto drv = state->store->readDerivation(drvPath);
                 std::cout << std::endl << "this derivation produced the following outputs:" << std::endl;
                 for (auto & i : drv.outputs)
-                    std::cout << fmt("  %s -> %s\n", i.first, state->store->printStorePath(i.second.path));
+                    std::cout << fmt("  %s -> %s\n", i.first, state->store->printStorePath(i.second.path(*state->store, drv.name)));
             }
         } else if (command == ":i") {
             runProgram(settings.nixBinDir + "/nix-env", Strings{"-i", drvPathRaw});
@@ -764,7 +764,11 @@ struct CmdRepl : StoreCommand, MixEvalArgs
 
     CmdRepl()
     {
-        expectArgs("files", &files);
+        expectArgs({
+            .label = "files",
+            .handler = {&files},
+            .completer = completePath
+        });
     }
 
     std::string description() override
@@ -784,6 +788,7 @@ struct CmdRepl : StoreCommand, MixEvalArgs
 
     void run(ref<Store> store) override
     {
+        evalSettings.pureEval = false;
         auto repl = std::make_unique<NixRepl>(searchPath, openStore());
         repl->autoArgs = getAutoArgs(*repl->state);
         repl->mainLoop(files);

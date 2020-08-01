@@ -1,8 +1,11 @@
 # Test Nix's remote build feature.
 
-{ nixpkgs, system, nix }:
+{ nixpkgs, system, overlay }:
 
-with import (nixpkgs + "/nixos/lib/testing.nix") { inherit system; };
+with import (nixpkgs + "/nixos/lib/testing.nix") {
+  inherit system;
+  extraConfigurations = [ { nixpkgs.overlays = [ overlay ]; } ];
+};
 
 makeTest (
 
@@ -13,7 +16,6 @@ let
     { config, pkgs, ... }:
     { services.openssh.enable = true;
       virtualisation.writableStore = true;
-      nix.package = nix;
       nix.useSandbox = true;
     };
 
@@ -59,7 +61,6 @@ in
             ];
           virtualisation.writableStore = true;
           virtualisation.pathsInNixDB = [ config.system.build.extraUtils ];
-          nix.package = nix;
           nix.binaryCaches = lib.mkForce [ ];
           programs.ssh.extraConfig = "ConnectTimeout 30";
         };

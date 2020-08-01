@@ -189,7 +189,7 @@ struct TeeSource : Source
     size_t read(unsigned char * data, size_t len)
     {
         size_t n = orig.read(data, len);
-        sink(data, len);
+        sink(data, n);
         return n;
     }
 };
@@ -256,6 +256,19 @@ struct LambdaSource : Source
     }
 };
 
+/* Chain two sources together so after the first is exhausted, the second is
+   used */
+struct ChainSource : Source
+{
+    Source & source1, & source2;
+    bool useSecond = false;
+    ChainSource(Source & s1, Source & s2)
+        : source1(s1), source2(s2)
+    { }
+
+    size_t read(unsigned char * data, size_t len) override;
+};
+
 
 /* Convert a function that feeds data into a Sink into a Source. The
    Source executes the function as a coroutine. */
@@ -299,14 +312,14 @@ T readNum(Source & source)
     source(buf, sizeof(buf));
 
     uint64_t n =
-        ((unsigned long long) buf[0]) |
-        ((unsigned long long) buf[1] << 8) |
-        ((unsigned long long) buf[2] << 16) |
-        ((unsigned long long) buf[3] << 24) |
-        ((unsigned long long) buf[4] << 32) |
-        ((unsigned long long) buf[5] << 40) |
-        ((unsigned long long) buf[6] << 48) |
-        ((unsigned long long) buf[7] << 56);
+        ((uint64_t) buf[0]) |
+        ((uint64_t) buf[1] << 8) |
+        ((uint64_t) buf[2] << 16) |
+        ((uint64_t) buf[3] << 24) |
+        ((uint64_t) buf[4] << 32) |
+        ((uint64_t) buf[5] << 40) |
+        ((uint64_t) buf[6] << 48) |
+        ((uint64_t) buf[7] << 56);
 
     if (n > std::numeric_limits<T>::max())
         throw SerialisationError("serialised integer %d is too large for type '%s'", n, typeid(T).name());
