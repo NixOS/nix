@@ -85,7 +85,7 @@ struct GCOptions
     StorePathSet pathsToDelete;
 
     /* Stop after at least `maxFreed' bytes have been freed. */
-    unsigned long long maxFreed{std::numeric_limits<unsigned long long>::max()};
+    uint64_t maxFreed{std::numeric_limits<uint64_t>::max()};
 };
 
 
@@ -97,7 +97,7 @@ struct GCResults
 
     /* For `gcReturnDead', `gcDeleteDead' and `gcDeleteSpecific', the
        number of bytes that would be or was freed. */
-    unsigned long long bytesFreed = 0;
+    uint64_t bytesFreed = 0;
 };
 
 
@@ -105,8 +105,8 @@ struct SubstitutablePathInfo
 {
     std::optional<StorePath> deriver;
     StorePathSet references;
-    unsigned long long downloadSize; /* 0 = unknown or inapplicable */
-    unsigned long long narSize; /* 0 = unknown */
+    uint64_t downloadSize; /* 0 = unknown or inapplicable */
+    uint64_t narSize; /* 0 = unknown */
 };
 
 typedef std::map<StorePath, SubstitutablePathInfo> SubstitutablePathInfos;
@@ -115,7 +115,8 @@ struct ValidPathInfo
 {
     StorePath path;
     std::optional<StorePath> deriver;
-    Hash narHash;
+    // TODO document this
+    std::optional<Hash> narHash;
     StorePathSet references;
     time_t registrationTime = 0;
     uint64_t narSize = 0; // 0 = unknown
@@ -343,7 +344,11 @@ public:
         bool hasSelfReference = false) const;
 
     StorePath makeTextPath(std::string_view name, const Hash & hash,
-        const StorePathSet & references) const;
+        const StorePathSet & references = {}) const;
+
+    StorePath makeFixedOutputPathFromCA(std::string_view name, ContentAddress ca,
+        const StorePathSet & references = {},
+        bool hasSelfReference = false) const;
 
     /* This is the preparatory part of addToStore(); it computes the
        store path to which srcPath is to be copied.  Returns the store
@@ -435,9 +440,10 @@ public:
     virtual StorePathSet querySubstitutablePaths(const StorePathSet & paths) { return {}; };
 
     /* Query substitute info (i.e. references, derivers and download
-       sizes) of a set of paths.  If a path does not have substitute
-       info, it's omitted from the resulting ‘infos’ map. */
-    virtual void querySubstitutablePathInfos(const StorePathSet & paths,
+       sizes) of a map of paths to their optional ca values. If a path
+       does not have substitute info, it's omitted from the resulting
+       ‘infos’ map. */
+    virtual void querySubstitutablePathInfos(const StorePathCAMap & paths,
         SubstitutablePathInfos & infos) { return; };
 
     /* Import a path into the store. */
@@ -450,7 +456,7 @@ public:
        libutil/archive.hh). */
     virtual StorePath addToStore(const string & name, const Path & srcPath,
         FileIngestionMethod method = FileIngestionMethod::Recursive, HashType hashAlgo = htSHA256,
-        PathFilter & filter = defaultPathFilter, RepairFlag repair = NoRepair) = 0;
+        PathFilter & filter = defaultPathFilter, RepairFlag repair = NoRepair);
 
     /* Copy the contents of a path to the store and register the
        validity the resulting path, using a constant amount of
@@ -459,6 +465,10 @@ public:
         FileIngestionMethod method = FileIngestionMethod::Recursive, HashType hashAlgo = htSHA256,
         std::optional<Hash> expectedCAHash = {});
 
+    /* Like addToStore(), but the contents of the path are contained
+       in `dump', which is either a NAR serialisation (if recursive ==
+       true) or simply the contents of a regular file (if recursive ==
+       false). */
     // FIXME: remove?
     virtual StorePath addToStoreFromDump(Source & dump, const string & name,
         FileIngestionMethod method = FileIngestionMethod::Recursive, HashType hashAlgo = htSHA256, RepairFlag repair = NoRepair)
@@ -609,7 +619,7 @@ public:
        that will be substituted. */
     virtual void queryMissing(const std::vector<StorePathWithOutputs> & targets,
         StorePathSet & willBuild, StorePathSet & willSubstitute, StorePathSet & unknown,
-        unsigned long long & downloadSize, unsigned long long & narSize);
+        uint64_t & downloadSize, uint64_t & narSize);
 
     /* Sort a set of paths topologically under the references
        relation.  If p refers to q, then p precedes q in this list. */
@@ -743,11 +753,13 @@ void copyStorePath(ref<Store> srcStore, ref<Store> dstStore,
 
 
 /* Copy store paths from one store to another. The paths may be copied
-   in parallel. They are copied in a topologically sorted order
-   (i.e. if A is a reference of B, then A is copied before B), but
-   the set of store paths is not automatically closed; use
-   copyClosure() for that. */
-void copyPaths(ref<Store> srcStore, ref<Store> dstStore, const StorePathSet & storePaths,
+   in parallel. They are copied in a topologically sorted order (i.e.
+   if A is a reference of B, then A is copied before B), but the set
+   of store paths is not automatically closed; use copyClosure() for
+   that. Returns a map of what each path was copied to the dstStore
+   as. */
+std::map<StorePath, StorePath> copyPaths(ref<Store> srcStore, ref<Store> dstStore,
+    const StorePathSet & storePaths,
     RepairFlag repair = NoRepair,
     CheckSigsFlag checkSigs = CheckSigs,
     SubstituteFlag substitute = NoSubstitute);
@@ -845,5 +857,7 @@ std::optional<ValidPathInfo> decodeValidPathInfo(
 
 /* Split URI into protocol+hierarchy part and its parameter set. */
 std::pair<std::string, Store::Params> splitUriAndParams(const std::string & uri);
+
+std::optional<ContentAddress> getDerivationCA(const BasicDerivation & drv);
 
 }

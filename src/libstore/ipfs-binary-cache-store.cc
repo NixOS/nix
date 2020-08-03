@@ -104,6 +104,8 @@ nlohmann::json IPFSBinaryCacheStore::getIpfsDag(std::string objectPath)
     return json;
 }
 
+// Given a ipns path, checks if it corresponds to a DNSLink path, and in
+// case returns the domain
 std::optional<string> IPFSBinaryCacheStore::isDNSLinkPath(std::string path)
 {
     if (path.find("/ipns/") != 0)
@@ -134,6 +136,7 @@ bool IPFSBinaryCacheStore::ipfsObjectExists(const std::string ipfsPath)
     }
 }
 
+// Resolve the IPNS name to an IPFS object
 std::string IPFSBinaryCacheStore::resolveIPNSName(std::string ipnsPath) {
     debug("Resolving IPFS object of '%s', this could take a while.", ipnsPath);
     auto uri = daemonUri + "/api/v0/name/resolve?arg=" + getFileTransfer()->urlEncode(ipnsPath);
@@ -339,7 +342,7 @@ void IPFSBinaryCacheStore::getIpfsObject(const std::string & ipfsPath,
 void IPFSBinaryCacheStore::writeNarInfo(ref<NarInfo> narInfo)
 {
     auto json = nlohmann::json::object();
-    json["narHash"] = narInfo->narHash.to_string(Base32, true);
+    json["narHash"] = narInfo->narHash->to_string(Base32, true);
     json["narSize"] = narInfo->narSize;
 
     auto narMap = getIpfsDag(getIpfsPath())["nar"];
@@ -371,7 +374,7 @@ void IPFSBinaryCacheStore::writeNarInfo(ref<NarInfo> narInfo)
     }
 
     if (narInfo->fileHash)
-        json["downloadHash"] = narInfo->fileHash.to_string(Base32, true);
+        json["downloadHash"] = narInfo->fileHash->to_string(Base32, true);
 
     json["downloadSize"] = narInfo->fileSize;
     json["compression"] = narInfo->compression;
@@ -572,7 +575,7 @@ StorePath IPFSBinaryCacheStore::addToStore(const string & name, const Path & src
        method for very large paths, but `copyPath' is mainly used for
        small files. */
     StringSink sink;
-    Hash h;
+    Hash h { htSHA256 }; // dummy initial value
     if (method == FileIngestionMethod::Recursive) {
         dumpPath(srcPath, sink, filter);
         h = hashString(hashAlgo, *sink.s);

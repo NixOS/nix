@@ -5,7 +5,7 @@
 namespace nix {
 
 std::string FixedOutputHash::printMethodAlgo() const {
-    return makeFileIngestionPrefix(method) + printHashType(*hash.type);
+    return makeFileIngestionPrefix(method) + printHashType(hash.type);
 }
 
 std::string makeFileIngestionPrefix(const FileIngestionMethod m) {
@@ -48,7 +48,7 @@ ContentAddress parseContentAddress(std::string_view rawCa) {
         if (prefix == "text") {
             auto hashTypeAndHash = rawCa.substr(prefixSeparator+1, string::npos);
             Hash hash = Hash(string(hashTypeAndHash));
-            if (*hash.type != htSHA256) {
+            if (hash.type != htSHA256) {
                 throw Error("parseContentAddress: the text hash should have type SHA256");
             }
             return TextHash { hash };
@@ -96,7 +96,7 @@ void to_json(nlohmann::json& j, const ContentAddress & ca) {
             return nlohmann::json {
                 { "type", "fixed" },
                 { "method", foh.method == FileIngestionMethod::Flat ? "flat" : "recursive" },
-                { "algo", printHashType(*foh.hash.type) },
+                { "algo", printHashType(foh.hash.type) },
                 { "hash", foh.hash.to_string(Base32, false) },
             };
         }
@@ -133,10 +133,13 @@ void to_json(nlohmann::json& j, const std::optional<ContentAddress> & c) {
 }
 
 void from_json(const nlohmann::json& j, std::optional<ContentAddress> & c) {
-    if (j.is_null())
+    if (j.is_null()) {
         c = std::nullopt;
-    else
-        c = j.get<ContentAddress>();
+    } else {
+        // Dummy value to set tag bit.
+        c = TextHash { .hash = Hash { htSHA256 } };
+        from_json(j, *c);
+    }
 }
 
 Hash getContentAddressHash(const ContentAddress & ca)

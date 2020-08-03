@@ -500,7 +500,7 @@ struct LocalStore::GCState
     StorePathSet alive;
     bool gcKeepOutputs;
     bool gcKeepDerivations;
-    unsigned long long bytesInvalidated;
+    uint64_t bytesInvalidated;
     bool moveToTrash = true;
     bool shouldDelete;
     GCState(const GCOptions & options, GCResults & results)
@@ -518,7 +518,7 @@ bool LocalStore::isActiveTempFile(const GCState & state,
 
 void LocalStore::deleteGarbage(GCState & state, const Path & path)
 {
-    unsigned long long bytesFreed;
+    uint64_t bytesFreed;
     deletePath(path, bytesFreed);
     state.results.bytesFreed += bytesFreed;
 }
@@ -528,7 +528,7 @@ void LocalStore::deletePathRecursive(GCState & state, const Path & path)
 {
     checkInterrupt();
 
-    unsigned long long size = 0;
+    uint64_t size = 0;
 
     auto storePath = maybeParseStorePath(path);
     if (storePath && isValidPath(*storePath)) {
@@ -687,7 +687,7 @@ void LocalStore::removeUnusedLinks(const GCState & state)
     AutoCloseDir dir(opendir(linksDir.c_str()));
     if (!dir) throw SysError("opening directory '%1%'", linksDir);
 
-    long long actualSize = 0, unsharedSize = 0;
+    int64_t actualSize = 0, unsharedSize = 0;
 
     struct dirent * dirent;
     while (errno = 0, dirent = readdir(dir.get())) {
@@ -717,10 +717,10 @@ void LocalStore::removeUnusedLinks(const GCState & state)
     struct stat st;
     if (stat(linksDir.c_str(), &st) == -1)
         throw SysError("statting '%1%'", linksDir);
-    long long overhead = st.st_blocks * 512ULL;
+    auto overhead = st.st_blocks * 512ULL;
 
-    printInfo(format("note: currently hard linking saves %.2f MiB")
-        % ((unsharedSize - actualSize - overhead) / (1024.0 * 1024.0)));
+    printInfo("note: currently hard linking saves %.2f MiB",
+        ((unsharedSize - actualSize - overhead) / (1024.0 * 1024.0)));
 }
 
 
