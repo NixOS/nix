@@ -153,6 +153,8 @@ void BinaryCacheStore::addToStore(const ValidPathInfo & info, Source & narSource
 
     auto [fdTemp, fnTemp] = createTempFile();
 
+    AutoDelete autoDelete(fnTemp);
+
     auto now1 = std::chrono::steady_clock::now();
 
     /* Read the NAR simultaneously into a CompressionSink+FileSink (to
