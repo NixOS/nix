@@ -456,7 +456,7 @@ public:
        libutil/archive.hh). */
     virtual StorePath addToStore(const string & name, const Path & srcPath,
         FileIngestionMethod method = FileIngestionMethod::Recursive, HashType hashAlgo = htSHA256,
-        PathFilter & filter = defaultPathFilter, RepairFlag repair = NoRepair) = 0;
+        PathFilter & filter = defaultPathFilter, RepairFlag repair = NoRepair);
 
     /* Copy the contents of a path to the store and register the
        validity the resulting path, using a constant amount of
@@ -465,6 +465,10 @@ public:
         FileIngestionMethod method = FileIngestionMethod::Recursive, HashType hashAlgo = htSHA256,
         std::optional<Hash> expectedCAHash = {});
 
+    /* Like addToStore(), but the contents of the path are contained
+       in `dump', which is either a NAR serialisation (if recursive ==
+       true) or simply the contents of a regular file (if recursive ==
+       false). */
     // FIXME: remove?
     virtual StorePath addToStoreFromDump(Source & dump, const string & name,
         FileIngestionMethod method = FileIngestionMethod::Recursive, HashType hashAlgo = htSHA256, RepairFlag repair = NoRepair)
