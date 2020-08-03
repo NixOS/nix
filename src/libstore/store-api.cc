@@ -1061,7 +1061,7 @@ StoreType getStoreType(const std::string & uri, const std::string & stateDir)
 {
     if (uri == "daemon") {
         return tDaemon;
-    } else if (uri == "local" || hasPrefix(uri, "/")) {
+    } else if (uri == "local" || hasPrefix(uri, "/") || hasPrefix(uri, "./")) {
         return tLocal;
     } else if (uri == "" || uri == "auto") {
         if (access(stateDir.c_str(), R_OK | W_OK) == 0)
@@ -1085,8 +1085,11 @@ static RegisterStoreImplementation regStore([](
             return std::shared_ptr<Store>(std::make_shared<UDSRemoteStore>(params));
         case tLocal: {
             Store::Params params2 = params;
-            if (hasPrefix(uri, "/"))
+            if (hasPrefix(uri, "/")) {
                 params2["root"] = uri;
+            } else if (hasPrefix(uri, "./")) {
+                params2["root"] = absPath(uri);
+            }
             return std::shared_ptr<Store>(std::make_shared<LocalStore>(params2));
         }
         default:
