@@ -1,3 +1,4 @@
+#include "eval.hh"
 #include "command.hh"
 #include "common-args.hh"
 #include "shared.hh"
@@ -8,6 +9,7 @@ using namespace nix;
 struct CmdBuild : InstallablesCommand, MixDryRun, MixProfile
 {
     Path outLink = "result";
+    BuildMode buildMode = bmNormal;
 
     CmdBuild()
     {
@@ -17,12 +19,19 @@ struct CmdBuild : InstallablesCommand, MixDryRun, MixProfile
             .description = "path of the symlink to the build result",
             .labels = {"path"},
             .handler = {&outLink},
+            .completer = completePath
         });
 
         addFlag({
             .longName = "no-link",
             .description = "do not create a symlink to the build result",
             .handler = {&outLink, Path("")},
+        });
+
+        addFlag({
+            .longName = "rebuild",
+            .description = "rebuild an already built package and compare the result to the existing store paths",
+            .handler = {&buildMode, bmCheck},
         });
     }
 
@@ -44,14 +53,14 @@ struct CmdBuild : InstallablesCommand, MixDryRun, MixProfile
             },
             Example{
                 "To make a profile point at GNU Hello:",
-                "nix build --profile /tmp/profile nixpkgs.hello"
+                "nix build --profile /tmp/profile nixpkgs#hello"
             },
         };
     }
 
     void run(ref<Store> store) override
     {
-        auto buildables = build(store, dryRun ? DryRun : Build, installables);
+        auto buildables = build(store, dryRun ? Realise::Nothing : Realise::Outputs, installables, buildMode);
 
         if (dryRun) return;
 

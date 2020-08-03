@@ -262,11 +262,13 @@ void LocalStore::findTempRoots(FDs & fds, Roots & tempRoots, bool censor)
 void LocalStore::findRoots(const Path & path, unsigned char type, Roots & roots)
 {
     auto foundRoot = [&](const Path & path, const Path & target) {
-        auto storePath = maybeParseStorePath(toStorePath(target));
-        if (storePath && isValidPath(*storePath))
-            roots[std::move(*storePath)].emplace(path);
-        else
-            printInfo("skipping invalid root from '%1%' to '%2%'", path, target);
+        try {
+            auto storePath = toStorePath(target).first;
+            if (isValidPath(storePath))
+                roots[std::move(storePath)].emplace(path);
+            else
+                printInfo("skipping invalid root from '%1%' to '%2%'", path, target);
+        } catch (BadStorePath &) { }
     };
 
     try {
@@ -472,15 +474,15 @@ void LocalStore::findRuntimeRoots(Roots & roots, bool censor)
 
     for (auto & [target, links] : unchecked) {
         if (!isInStore(target)) continue;
-        Path pathS = toStorePath(target);
-        if (!isStorePath(pathS)) continue;
-        auto path = parseStorePath(pathS);
-        if (!isValidPath(path)) continue;
-        debug("got additional root '%1%'", pathS);
-        if (censor)
-            roots[path].insert(censored);
-        else
-            roots[path].insert(links.begin(), links.end());
+        try {
+            auto path = toStorePath(target).first;
+            if (!isValidPath(path)) continue;
+            debug("got additional root '%1%'", printStorePath(path));
+            if (censor)
+                roots[path].insert(censored);
+            else
+                roots[path].insert(links.begin(), links.end());
+        } catch (BadStorePath &) { }
     }
 }
 
@@ -498,7 +500,7 @@ struct LocalStore::GCState
     StorePathSet alive;
     bool gcKeepOutputs;
     bool gcKeepDerivations;
-    unsigned long long bytesInvalidated;
+    uint64_t bytesInvalidated;
     bool moveToTrash = true;
     bool shouldDelete;
     GCState(const GCOptions & options, GCResults & results)
@@ -516,7 +518,7 @@ bool LocalStore::isActiveTempFile(const GCState & state,
 
 void LocalStore::deleteGarbage(GCState & state, const Path & path)
 {
-    unsigned long long bytesFreed;
+    uint64_t bytesFreed;
     deletePath(path, bytesFreed);
     state.results.bytesFreed += bytesFreed;
 }
@@ -526,7 +528,7 @@ void LocalStore::deletePathRecursive(GCState & state, const Path & path)
 {
     checkInterrupt();
 
-    unsigned long long size = 0;
+    uint64_t size = 0;
 
     auto storePath = maybeParseStorePath(path);
     if (storePath && isValidPath(*storePath)) {
@@ -685,7 +687,7 @@ void LocalStore::removeUnusedLinks(const GCState & state)
     AutoCloseDir dir(opendir(linksDir.c_str()));
     if (!dir) throw SysError("opening directory '%1%'", linksDir);
 
-    long long actualSize = 0, unsharedSize = 0;
+    int64_t actualSize = 0, unsharedSize = 0;
 
     struct dirent * dirent;
     while (errno = 0, dirent = readdir(dir.get())) {
@@ -715,10 +717,10 @@ void LocalStore::removeUnusedLinks(const GCState & state)
     struct stat st;
     if (stat(linksDir.c_str(), &st) == -1)
         throw SysError("statting '%1%'", linksDir);
-    long long overhead = st.st_blocks * 512ULL;
+    auto overhead = st.st_blocks * 512ULL;
 
-    printInfo(format("note: currently hard linking saves %.2f MiB")
-        % ((unsharedSize - actualSize - overhead) / (1024.0 * 1024.0)));
+    printInfo("note: currently hard linking saves %.2f MiB",
+        ((unsharedSize - actualSize - overhead) / (1024.0 * 1024.0)));
 }
 
 

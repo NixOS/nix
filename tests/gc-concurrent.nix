@@ -1,5 +1,7 @@
 with import ./config.nix;
 
+{ lockFifo ? null }:
+
 rec {
 
   input1 = mkDerivation {
@@ -16,6 +18,7 @@ rec {
     name = "gc-concurrent";
     builder = ./gc-concurrent.builder.sh;
     inherit input1 input2;
+    inherit lockFifo;
   };
 
   test2 = mkDerivation {

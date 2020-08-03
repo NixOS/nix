@@ -1,17 +1,9 @@
 #pragma once
 
-// TODO many of thes eare not needed.
 #include "path.hh"
 #include "hash.hh"
 #include "content-address.hh"
-#include "serialise.hh"
-#include "crypto.hh"
-#include "lru-cache.hh"
-#include "sync.hh"
-#include "globals.hh"
-#include "config.hh"
 
-#include <limits>
 #include <string>
 #include <optional>
 
@@ -20,11 +12,24 @@ namespace nix {
 
 class Store;
 
+
+struct SubstitutablePathInfo
+{
+    std::optional<StorePath> deriver;
+    StorePathSet references;
+    uint64_t downloadSize; /* 0 = unknown or inapplicable */
+    uint64_t narSize; /* 0 = unknown */
+};
+
+typedef std::map<StorePath, SubstitutablePathInfo> SubstitutablePathInfos;
+
+
 struct ValidPathInfo
 {
     StorePath path;
     std::optional<StorePath> deriver;
-    Hash narHash;
+    // TODO document this
+    std::optional<Hash> narHash;
     StorePathSet references;
     time_t registrationTime = 0;
     uint64_t narSize = 0; // 0 = unknown
@@ -75,6 +80,12 @@ struct ValidPathInfo
     /* Return true iff the path is verifiably content-addressed. */
     bool isContentAddressed(const Store & store) const;
 
+    /* Functions to view references + hasSelfReference as one set, mainly for
+       compatibility's sake. */
+    StorePathSet referencesPossiblyToSelf() const;
+    void insertReferencePossiblyToSelf(StorePath && ref);
+    void setReferencesPossiblyToSelf(StorePathSet && refs);
+
     static const size_t maxSigs = std::numeric_limits<size_t>::max();
 
     /* Return the number of signatures on this .narinfo that were
@@ -96,4 +107,5 @@ struct ValidPathInfo
 };
 
 typedef list<ValidPathInfo> ValidPathInfos;
+
 }

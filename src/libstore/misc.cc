@@ -108,9 +108,19 @@ void Store::computeFSClosure(const StorePath & startPath,
 }
 
 
+std::optional<ContentAddress> getDerivationCA(const BasicDerivation & drv)
+{
+    auto out = drv.outputs.find("out");
+    if (out != drv.outputs.end()) {
+        if (auto v = std::get_if<DerivationOutputFixed>(&out->second.output))
+            return v->hash;
+    }
+    return std::nullopt;
+}
+
 void Store::queryMissing(const std::vector<StorePathWithOutputs> & targets,
     StorePathSet & willBuild_, StorePathSet & willSubstitute_, StorePathSet & unknown_,
-    unsigned long long & downloadSize_, unsigned long long & narSize_)
+    uint64_t & downloadSize_, uint64_t & narSize_)
 {
     Activity act(*logger, lvlDebug, actUnknown, "querying info about missing paths");
 
@@ -122,8 +132,8 @@ void Store::queryMissing(const std::vector<StorePathWithOutputs> & targets,
     {
         std::unordered_set<std::string> done;
         StorePathSet & unknown, & willSubstitute, & willBuild;
-        unsigned long long & downloadSize;
-        unsigned long long & narSize;
+        uint64_t & downloadSize;
+        uint64_t & narSize;
     };
 
     struct DrvState
@@ -157,7 +167,7 @@ void Store::queryMissing(const std::vector<StorePathWithOutputs> & targets,
         auto outPath = parseStorePath(outPathS);
 
         SubstitutablePathInfos infos;
-        querySubstitutablePathInfos({outPath}, infos);
+        querySubstitutablePathInfos({{outPath, getDerivationCA(*drv)}}, infos);
 
         if (infos.empty()) {
             drvState_->lock()->done = true;
@@ -198,8 +208,8 @@ void Store::queryMissing(const std::vector<StorePathWithOutputs> & targets,
             PathSet invalid;
             for (auto & j : drv->outputs)
                 if (wantOutput(j.first, path.outputs)
-                    && !isValidPath(j.second.path))
-                    invalid.insert(printStorePath(j.second.path));
+                    && !isValidPath(j.second.path(*this, drv->name)))
+                    invalid.insert(printStorePath(j.second.path(*this, drv->name)));
             if (invalid.empty()) return;
 
             if (settings.useSubstitutes && parsedDrv.substitutesAllowed()) {
@@ -214,7 +224,7 @@ void Store::queryMissing(const std::vector<StorePathWithOutputs> & targets,
             if (isValidPath(path.path)) return;
 
             SubstitutablePathInfos infos;
-            querySubstitutablePathInfos({path.path}, infos);
+            querySubstitutablePathInfos({{path.path, std::nullopt}}, infos);
 
             if (infos.empty()) {
                 auto state(state_.lock());
