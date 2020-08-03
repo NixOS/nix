@@ -64,7 +64,6 @@ struct CmdHash : Command
             else
                 hashSink = std::make_unique<HashSink>(ht);
 
-            Hash h;
             switch (mode) {
             case FileIngestionMethod::Flat: {
                 readFile(path, *hashSink);
@@ -79,7 +78,7 @@ struct CmdHash : Command
                 break;
             }
 
-            h = hashSink->finish().first;
+            auto h = hashSink->finish().first;
 
             if (truncate && h.hashSize > 20) h = compressHash(h, 20);
             logger->stdout(h.to_string(base, base == SRI));
@@ -117,7 +116,7 @@ struct CmdToBase : Command
     void run() override
     {
         for (auto s : args)
-            logger->stdout(Hash(s, ht).to_string(base, base == SRI));
+            logger->stdout(Hash::parseAny(s, ht).to_string(base, base == SRI));
     }
 };
 

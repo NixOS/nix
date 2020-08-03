@@ -335,9 +335,6 @@ public:
         "setuid/setgid bits or with file capabilities."};
 #endif
 
-    Setting<Strings> hashedMirrors{this, {"http://tarballs.nixos.org/"}, "hashed-mirrors",
-        "A list of servers used by builtins.fetchurl to fetch files by hash."};
-
     Setting<uint64_t> minFree{this, 0, "min-free",
         "Automatically run the garbage collector when free disk space drops below the specified amount."};
 
@@ -352,6 +349,10 @@ public:
 
     Setting<std::string> githubAccessToken{this, "", "github-access-token",
         "GitHub access token to get access to GitHub data through the GitHub API for github:<..> flakes."};
+
+    Setting<bool> allowExperimentalFeatures{this, true, "allow-experimental-features",
+        "Whether the use of experimental features other than those listed in "
+        "the option 'experimental-features' gives a warning rather than fatal error."};
 
     Setting<Strings> experimentalFeatures{this, {}, "experimental-features",
         "Experimental Nix features to enable."};

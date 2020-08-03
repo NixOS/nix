@@ -106,7 +106,7 @@ std::string BinaryCacheStore::narInfoFileFor(const StorePath & storePath)
 
 void BinaryCacheStore::writeNarInfo(ref<NarInfo> narInfo)
 {
-    auto narInfoFile = narInfoFileFor(narInfo->path);
+    auto narInfoFile = narInfoFileFor(bakeCaIfNeeded(narInfo->path));
 
     upsertFile(narInfoFile, narInfo->to_string(*this), "text/x-nix-narinfo");
 
@@ -178,7 +178,7 @@ void BinaryCacheStore::addToStore(const ValidPathInfo & info, Source & narSource
     auto [fileHash, fileSize] = fileHashSink.finish();
     narInfo->fileHash = fileHash;
     narInfo->fileSize = fileSize;
-    narInfo->url = "nar/" + narInfo->fileHash.to_string(Base32, false) + ".nar"
+    narInfo->url = "nar/" + narInfo->fileHash->to_string(Base32, false) + ".nar"
         + (compression == "xz" ? ".xz" :
            compression == "bzip2" ? ".bz2" :
            compression == "br" ? ".br" :
@@ -194,8 +194,7 @@ void BinaryCacheStore::addToStore(const ValidPathInfo & info, Source & narSource
        reads, but typically they'll already be cached. */
     for (auto & ref : info.references)
         try {
-            if (ref != info.path)
-                queryPathInfo(ref);
+            queryPathInfo(ref);
         } catch (InvalidPath &) {
             throw Error("cannot add '%s' to the binary cache because the reference '%s' is not valid",
                 printStorePath(info.path), printStorePath(ref));
@@ -297,15 +296,15 @@ void BinaryCacheStore::addToStore(const ValidPathInfo & info, Source & narSource
     stats.narInfoWrite++;
 }
 
-bool BinaryCacheStore::isValidPathUncached(const StorePath & storePath)
+bool BinaryCacheStore::isValidPathUncached(StorePathOrDesc storePath)
 {
     // FIXME: this only checks whether a .narinfo with a matching hash
     // part exists. So ‘f4kb...-foo’ matches ‘f4kb...-bar’, even
     // though they shouldn't. Not easily fixed.
-    return fileExists(narInfoFileFor(storePath));
+    return fileExists(narInfoFileFor(bakeCaIfNeeded(storePath)));
 }
 
-void BinaryCacheStore::narFromPath(const StorePath & storePath, Sink & sink)
+void BinaryCacheStore::narFromPath(StorePathOrDesc storePath, Sink & sink)
 {
     auto info = queryPathInfo(storePath).cast<const NarInfo>();
 
@@ -331,16 +330,17 @@ void BinaryCacheStore::narFromPath(const StorePath & storePath, Sink & sink)
     stats.narReadBytes += narSize;
 }
 
-void BinaryCacheStore::queryPathInfoUncached(const StorePath & storePath,
+void BinaryCacheStore::queryPathInfoUncached(StorePathOrDesc storePath,
     Callback<std::shared_ptr<const ValidPathInfo>> callback) noexcept
 {
     auto uri = getUri();
-    auto storePathS = printStorePath(storePath);
+    auto actualStorePath = bakeCaIfNeeded(storePath);
+    auto storePathS = printStorePath(actualStorePath);
     auto act = std::make_shared<Activity>(*logger, lvlTalkative, actQueryPathInfo,
         fmt("querying info about '%s' on '%s'", storePathS, uri), Logger::Fields{storePathS, uri});
     PushActivity pact(act->id);
 
-    auto narInfoFile = narInfoFileFor(storePath);
+    auto narInfoFile = narInfoFileFor(actualStorePath);
 
     auto callbackPtr = std::make_shared<decltype(callback)>(std::move(callback));
 
@@ -372,7 +372,7 @@ StorePath BinaryCacheStore::addToStore(const string & name, const Path & srcPath
        method for very large paths, but `copyPath' is mainly used for
        small files. */
     StringSink sink;
-    Hash h;
+    std::optional<Hash> h;
     switch (method) {
     case FileIngestionMethod::Recursive:
         dumpPath(srcPath, sink, filter);
@@ -388,7 +388,13 @@ StorePath BinaryCacheStore::addToStore(const string & name, const Path & srcPath
         throw Error("cannot add to binary cache store using the git file ingestion method");
     }
 
-    ValidPathInfo info(makeFixedOutputPath(method, h, name));
+    ValidPathInfo info(makeFixedOutputPath(name, FixedOutputInfo {
+        {
+            .method = method,
+            .hash = *h,
+        },
+        {},
+    }));
 
     auto source = StringSource { *sink.s };
     addToStore(info, source, repair, CheckSigs);

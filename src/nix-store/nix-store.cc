@@ -208,7 +208,13 @@ static void opPrintFixedPath(Strings opFlags, Strings opArgs)
     string hash = *i++;
     string name = *i++;
 
-    cout << fmt("%s\n", store->printStorePath(store->makeFixedOutputPath(method, Hash(hash, hashAlgo), name)));
+    cout << fmt("%s\n", store->printStorePath(store->makeFixedOutputPath(name, FixedOutputInfo {
+        {
+            .method = method,
+            .hash = Hash::parseAny(hash, hashAlgo),
+        },
+        {},
+    })));
 }
 
 
@@ -245,7 +251,7 @@ static void printTree(const StorePath & path,
        closure(B).  That is, if derivation A is an (possibly indirect)
        input of B, then A is printed first.  This has the effect of
        flattening the tree, preventing deeply nested structures.  */
-    auto sorted = store->topoSortPaths(info->references);
+    auto sorted = store->topoSortPaths(info->referencesPossiblyToSelf());
     reverse(sorted.begin(), sorted.end());
 
     for (const auto &[n, i] : enumerate(sorted)) {
@@ -328,7 +334,7 @@ static void opQuery(Strings opFlags, Strings opArgs)
                 for (auto & j : ps) {
                     if (query == qRequisites) store->computeFSClosure(j, paths, false, includeOutputs);
                     else if (query == qReferences) {
-                        for (auto & p : store->queryPathInfo(j)->references)
+                        for (auto & p : store->queryPathInfo(j)->referencesPossiblyToSelf())
                             paths.insert(p);
                     }
                     else if (query == qReferrers) {
@@ -349,7 +355,8 @@ static void opQuery(Strings opFlags, Strings opArgs)
 
         case qDeriver:
             for (auto & i : opArgs) {
-                auto info = store->queryPathInfo(store->followLinksToStorePath(i));
+                auto path = store->followLinksToStorePath(i);
+                auto info = store->queryPathInfo(path);
                 cout << fmt("%s\n", info->deriver ? store->printStorePath(*info->deriver) : "unknown-deriver");
             }
             break;
@@ -372,8 +379,8 @@ static void opQuery(Strings opFlags, Strings opArgs)
                 for (auto & j : maybeUseOutputs(store->followLinksToStorePath(i), useOutput, forceRealise)) {
                     auto info = store->queryPathInfo(j);
                     if (query == qHash) {
-                        assert(info->narHash.type == htSHA256);
-                        cout << fmt("%s\n", info->narHash.to_string(Base32, true));
+                        assert(info->narHash && info->narHash->type == htSHA256);
+                        cout << fmt("%s\n", info->narHash->to_string(Base32, true));
                     } else if (query == qSize)
                         cout << fmt("%d\n", info->narSize);
                 }
@@ -725,7 +732,7 @@ static void opVerifyPath(Strings opFlags, Strings opArgs)
         auto path = store->followLinksToStorePath(i);
         printMsg(lvlTalkative, "checking path '%s'...", store->printStorePath(path));
         auto info = store->queryPathInfo(path);
-        HashSink sink(*info->narHash.type);
+        HashSink sink(info->narHash->type);
         store->narFromPath(path, sink);
         auto current = sink.finish();
         if (current.first != info->narHash) {
@@ -734,7 +741,7 @@ static void opVerifyPath(Strings opFlags, Strings opArgs)
                 .hint = hintfmt(
                     "path '%s' was modified! expected hash '%s', got '%s'",
                     store->printStorePath(path),
-                    info->narHash.to_string(Base32, true),
+                    info->narHash->to_string(Base32, true),
                     current.first.to_string(Base32, true))
             });
             status = 1;
@@ -859,12 +866,14 @@ static void opServe(Strings opFlags, Strings opArgs)
                         auto info = store->queryPathInfo(i);
                         out << store->printStorePath(info->path)
                             << (info->deriver ? store->printStorePath(*info->deriver) : "");
-                        writeStorePaths(*store, out, info->references);
+                        writeStorePaths(*store, out, info->referencesPossiblyToSelf());
                         // !!! Maybe we want compression?
                         out << info->narSize // downloadSize
                             << info->narSize;
                         if (GET_PROTOCOL_MINOR(clientVersion) >= 4)
-                            out << (info->narHash ? info->narHash.to_string(Base32, true) : "") << renderContentAddress(info->ca) << info->sigs;
+                            out << (info->narHash ? info->narHash->to_string(Base32, true) : "")
+                                << renderContentAddress(info->ca)
+                                << info->sigs;
                     } catch (InvalidPath &) {
                     }
                 }
@@ -872,9 +881,11 @@ static void opServe(Strings opFlags, Strings opArgs)
                 break;
             }
 
-            case cmdDumpStorePath:
-                store->narFromPath(store->parseStorePath(readString(in)), out);
+            case cmdDumpStorePath: {
+                auto path = store->parseStorePath(readString(in));
+                store->narFromPath(path, out);
                 break;
+            }
 
             case cmdImportPaths: {
                 if (!writeAllowed) throw Error("importing paths is not allowed");
@@ -948,8 +959,8 @@ static void opServe(Strings opFlags, Strings opArgs)
                 auto deriver = readString(in);
                 if (deriver != "")
                     info.deriver = store->parseStorePath(deriver);
-                info.narHash = Hash(readString(in), htSHA256);
-                info.references = readStorePaths<StorePathSet>(*store, in);
+                info.narHash = Hash::parseAny(readString(in), htSHA256);
+                info.setReferencesPossiblyToSelf(readStorePaths<StorePathSet>(*store, in));
                 in >> info.registrationTime >> info.narSize >> info.ultimate;
                 info.sigs = readStrings<StringSet>(in);
                 info.ca = parseContentAddressOpt(readString(in));

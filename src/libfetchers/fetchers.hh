@@ -6,6 +6,7 @@
 #include "tree-info.hh"
 #include "attrs.hh"
 #include "url.hh"
+#include "content-address.hh"
 
 #include <memory>
 

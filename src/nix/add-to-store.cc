@@ -25,6 +25,13 @@ struct CmdAddToStore : MixDryRun, StoreCommand
         });
 
         addFlag({
+            .longName = "flat",
+            .shortName = 0,
+            .description = "add flat file to the Nix store",
+            .handler = {&ingestionMethod, FileIngestionMethod::Flat},
+        });
+
+        addFlag({
             .longName = "git",
             .shortName = 0,
             .description = "treat path as a git object",
@@ -54,14 +61,17 @@ struct CmdAddToStore : MixDryRun, StoreCommand
 
         auto narHash = hashString(htSHA256, *sink.s);
 
-        Hash hash;
+        Hash hash { htSHA256 }; // throwaway def to appease C++
         switch (ingestionMethod) {
         case FileIngestionMethod::Recursive: {
             hash = narHash;
             break;
         }
         case FileIngestionMethod::Flat: {
-            abort(); // not yet supported above
+            HashSink hsink(htSHA256);
+            readFile(path, hsink);
+            hash = hsink.finish().first;
+            break;
         }
         case FileIngestionMethod::Git: {
             hash = dumpGitHash(htSHA1, path);
@@ -69,13 +79,21 @@ struct CmdAddToStore : MixDryRun, StoreCommand
         }
         }
 
-        ValidPathInfo info(store->makeFixedOutputPath(ingestionMethod, hash, *namePart));
+        ValidPathInfo info {
+            *store,
+            StorePathDescriptor {
+                .name = *namePart,
+                .info = FixedOutputInfo {
+                    {
+                        .method = std::move(ingestionMethod),
+                        .hash = std::move(hash),
+                    },
+                    {},
+                },
+            },
+        };
         info.narHash = narHash;
         info.narSize = sink.s->size();
-        info.ca = std::optional { FixedOutputHash {
-            .method = ingestionMethod,
-            .hash = hash,
-        } };
 
         if (!dryRun) {
             auto source = StringSource { *sink.s };

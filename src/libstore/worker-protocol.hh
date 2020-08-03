@@ -70,6 +70,10 @@ template<class T> T readStorePaths(const Store & store, Source & from);
 
 void writeStorePaths(const Store & store, Sink & out, const StorePathSet & paths);
 
+std::set<StorePathDescriptor> readStorePathDescriptorSet(const Store & store, Source & from);
+
+void writeStorePathDescriptorSet(const Store & store, Sink & out, const std::set<StorePathDescriptor> & paths);
+
 void writeOutputPathMap(const Store & store, Sink & out, const OutputPathMap & paths);
 
 }

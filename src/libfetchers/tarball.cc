@@ -67,13 +67,21 @@ DownloadFileResult downloadFile(
         StringSink sink;
         dumpString(*res.data, sink);
         auto hash = hashString(htSHA256, *res.data);
-        ValidPathInfo info(store->makeFixedOutputPath(FileIngestionMethod::Flat, hash, name));
+        ValidPathInfo info {
+            *store,
+            StorePathDescriptor {
+                .name = name,
+                .info = FixedOutputInfo {
+                    {
+                        .method = FileIngestionMethod::Flat,
+                        .hash = hash,
+                    },
+                    {},
+                },
+            },
+        };
         info.narHash = hashString(htSHA256, *sink.s);
         info.narSize = sink.s->size();
-        info.ca = FixedOutputHash {
-            .method = FileIngestionMethod::Flat,
-            .hash = hash,
-        };
         auto source = StringSource { *sink.s };
         store->addToStore(info, source, NoRepair, NoCheckSigs);
         storePath = std::move(info.path);
@@ -242,15 +250,13 @@ struct TarballInputScheme : InputScheme
 
         auto hash = input->url.query.find("hash");
         if (hash != input->url.query.end()) {
-            // FIXME: require SRI hash.
-            input->hash = Hash(hash->second);
+            input->hash = Hash::parseSRI(hash->second);
             input->url.query.erase(hash);
         }
 
         auto narHash = input->url.query.find("narHash");
         if (narHash != input->url.query.end()) {
-            // FIXME: require SRI hash.
-            input->narHash = Hash(narHash->second);
+            input->narHash = Hash::parseSRI(narHash->second);
             input->url.query.erase(narHash);
         }
 

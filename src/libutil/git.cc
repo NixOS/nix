@@ -206,7 +206,7 @@ static GitMode dumpGitInternal(HashType ht, const Path & path, Sink & sink, Path
                 if (result.first == GitMode::Directory)
                     name += "/";
 
-                entries[name] = result;
+                entries.insert_or_assign(name, result);
             }
         perm = dumpGitTree(entries, sink);
     } else throw Error("file '%1%' has an unsupported type", path);

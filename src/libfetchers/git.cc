@@ -29,6 +29,7 @@ struct GitInput : Input
     std::optional<std::string> ref;
     std::optional<Hash> rev;
     std::optional<Hash> treeHash;
+    FileIngestionMethod ingestionMethod = FileIngestionMethod::Recursive;
     bool shallow = false;
     bool submodules = false;
 
@@ -45,6 +46,7 @@ struct GitInput : Input
             && url == other2->url
             && rev == other2->rev
             && treeHash == other2->treeHash
+            && ingestionMethod == other2->ingestionMethod
             && ref == other2->ref;
     }
 
@@ -65,6 +67,7 @@ struct GitInput : Input
         if (treeHash) url2.query.insert_or_assign("treeHash", treeHash->gitRev());
         if (ref) url2.query.insert_or_assign("ref", *ref);
         if (shallow) url2.query.insert_or_assign("shallow", "1");
+        if (ingestionMethod == FileIngestionMethod::Git) url2.query.insert_or_assign("gitIngestion", "1");
         return url2;
     }
 
@@ -82,6 +85,8 @@ struct GitInput : Input
             attrs.emplace("shallow", true);
         if (submodules)
             attrs.emplace("submodules", true);
+        if (ingestionMethod == FileIngestionMethod::Git)
+            attrs.emplace("gitIngestion", true);
         return attrs;
     }
 
@@ -104,13 +109,21 @@ struct GitInput : Input
         assert(!rev || rev->type == htSHA1);
         assert(!treeHash || treeHash->type == htSHA1);
 
-        auto ingestionMethod = treeHash ? FileIngestionMethod::Git : FileIngestionMethod::Recursive;
+        if (submodules) {
+            if (treeHash)
+                throw Error("Cannot fetch specific tree hashes if there are submodules");
+            warn("Nix's computed git tree hash will be different when submodules are converted to regular directories");
+        }
 
-        std::optional<ContentAddress> ca;
+        std::optional<StorePathDescriptor> ca;
         if (treeHash)
-            ca = FixedOutputHash {
-                .method = ingestionMethod,
-                .hash = *treeHash,
+            ca = StorePathDescriptor {
+                .name = name,
+                .info = FixedOutputInfo {
+                    ingestionMethod,
+                    *treeHash,
+                    {},
+                },
             };
 
         // try to substitute
@@ -144,7 +157,7 @@ struct GitInput : Input
             });
             if (input->treeHash)
                 attrs.insert_or_assign("treeHash", input->treeHash->gitRev());
-            else
+            if (input->rev)
                 attrs.insert_or_assign("rev", input->rev->gitRev());
             return attrs;
         };
@@ -266,15 +279,15 @@ struct GitInput : Input
 
         if (isLocal) {
 
-            if (!input->rev && !input->treeHash)
-                input->rev = Hash(chomp(runProgram("git", true, { "-C", actualUrl, "rev-parse", *input->ref })), htSHA1);
+            if (!input->rev)
+                input->rev = Hash::parseAny(chomp(runProgram("git", true, { "-C", actualUrl, "rev-parse", *input->ref })), htSHA1);
 
             repoDir = actualUrl;
 
         } else {
 
             if (auto res = getCache()->lookup(store, mutableAttrs)) {
-                auto rev2 = Hash(getStrAttr(res->first, "rev"), htSHA1);
+                auto rev2 = Hash::parseAny(getStrAttr(res->first, "rev"), htSHA1);
                 if (!input->rev || rev == rev2) {
                     input->rev = rev2;
                     return makeResult(res->first, std::move(res->second));
@@ -282,7 +295,7 @@ struct GitInput : Input
             }
 
             if (auto res = getCache()->lookup(store, mutableAttrs)) {
-                auto treeHash2 = Hash(getStrAttr(res->first, "treeHash"), htSHA1);
+                auto treeHash2 = Hash::parseNonSRIUnprefixed(getStrAttr(res->first, "treeHash"), htSHA1);
                 if (!input->treeHash || treeHash == treeHash2) {
                     input->treeHash = treeHash2;
                     return makeResult(res->first, std::move(res->second));
@@ -351,8 +364,8 @@ struct GitInput : Input
                 utimes(localRefFile.c_str(), times);
             }
 
-            if (!input->rev && !input->treeHash)
-                input->rev = Hash(chomp(readFile(localRefFile)), htSHA1);
+            if (!input->rev)
+                input->rev = Hash::parseAny(chomp(readFile(localRefFile)), htSHA1);
         }
 
         if (input->treeHash) {
@@ -382,9 +395,6 @@ struct GitInput : Input
         AutoDelete delTmpDir(tmpDir, true);
         PathFilter filter = defaultPathFilter;
 
-        if (submodules && treeHash)
-            throw Error("Cannot combine tree hashes with git submodules");
-
         if (submodules) {
             Path tmpGitDir = createTempDir();
             AutoDelete delTmpGitDir(tmpGitDir, true);
@@ -413,15 +423,26 @@ struct GitInput : Input
             unpackTarfile(*source, tmpDir);
         }
 
-        auto storePath = store->addToStore(name, tmpDir, ingestionMethod, ingestionMethod == FileIngestionMethod::Git ? htSHA1 : htSHA256, filter);
+        auto hashAlgo = ingestionMethod == FileIngestionMethod::Git ? htSHA1 : htSHA256;
+        auto storePath = store->addToStore(name, tmpDir, ingestionMethod, hashAlgo, filter);
 
         // verify treeHash is what we actually obtained in the nix store
-        if (input->treeHash) {
-            auto path = store->toRealPath(store->printStorePath(storePath));
-            auto gotHash = dumpGitHash(htSHA1, path);
-            if (gotHash != input->treeHash)
-                throw Error("Git hash mismatch in input '%s' (%s), expected '%s', got '%s'",
-                    to_string(), path, input->treeHash->gitRev(), gotHash.gitRev());
+        if (ingestionMethod == FileIngestionMethod::Git) {
+            auto gotHash = dumpGitHash(htSHA1, tmpDir);
+            if (input->treeHash) {
+                if (gotHash != input->treeHash)
+                    throw Error("Git hash mismatch in input '%s' (%s), expected '%s', got '%s'",
+                        to_string(), store->printStorePath(storePath), input->treeHash->gitRev(), gotHash.gitRev());
+            } else {
+                ca = StorePathDescriptor {
+                    .name = name,
+                    .info = FixedOutputInfo {
+                        ingestionMethod,
+                        gotHash,
+                        {},
+                    },
+                };
+            }
         }
 
         Attrs infoAttrs({});
@@ -492,7 +513,7 @@ struct GitInputScheme : InputScheme
         if (maybeGetStrAttr(attrs, "type") != "git") return {};
 
         for (auto & [name, value] : attrs)
-            if (name != "type" && name != "url" && name != "ref" && name != "rev" && name != "shallow" && name != "submodules" && name != "treeHash")
+            if (name != "type" && name != "url" && name != "ref" && name != "rev" && name != "shallow" && name != "submodules" && name != "treeHash" && name != "gitIngestion")
                 throw Error("unsupported Git input attribute '%s'", name);
 
         auto input = std::make_unique<GitInput>(parseURL(getStrAttr(attrs, "url")));
@@ -502,14 +523,17 @@ struct GitInputScheme : InputScheme
             input->ref = *ref;
         }
         if (auto rev = maybeGetStrAttr(attrs, "rev"))
-            input->rev = Hash(*rev, htSHA1);
+            input->rev = Hash::parseAny(*rev, htSHA1);
 
         if (auto treeHash = maybeGetStrAttr(attrs, "treeHash"))
-            input->treeHash = Hash(*treeHash, htSHA1);
+            input->treeHash = Hash::parseNonSRIUnprefixed(*treeHash, htSHA1);
 
         input->shallow = maybeGetBoolAttr(attrs, "shallow").value_or(false);
 
         input->submodules = maybeGetBoolAttr(attrs, "submodules").value_or(false);
+
+        if (maybeGetBoolAttr(attrs, "gitIngestion").value_or((bool) input->treeHash))
+            input->ingestionMethod = FileIngestionMethod::Git;
 
         return input;
     }

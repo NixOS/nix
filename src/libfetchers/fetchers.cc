@@ -36,8 +36,7 @@ std::unique_ptr<Input> inputFromAttrs(const Attrs & attrs)
         auto res = inputScheme->inputFromAttrs(attrs2);
         if (res) {
             if (auto narHash = maybeGetStrAttr(attrs, "narHash"))
-                // FIXME: require SRI hash.
-                res->narHash = newHashAllowEmpty(*narHash, {});
+                res->narHash = Hash::parseSRI(*narHash);
             return res;
         }
     }
@@ -60,12 +59,19 @@ std::pair<Tree, std::shared_ptr<const Input>> Input::fetchTree(ref<Store> store)
     if (tree.actualPath == "")
         tree.actualPath = store->toRealPath(tree.storePath);
 
+
     if (!tree.info.narHash)
-        tree.info.narHash = store->queryPathInfo(tree.storePath /*, tree.info.ca */)->narHash;
+    {
+        auto pathOrCa = tree.info.ca
+            ? StorePathOrDesc {*tree.info.ca}
+            : StorePathOrDesc {tree.storePath};
+        tree.info.narHash = store->queryPathInfo(pathOrCa)->narHash;
+    }
+
 
     if (!tree.info.narHash) {
         HashSink hashSink(htSHA256);
-        dumpPath(tree.actualPath, hashSink);
+        store->narFromPath(tree.storePath, hashSink);
         tree.info.narHash = hashSink.finish().first;
     }
 
@@ -82,10 +88,18 @@ std::pair<Tree, std::shared_ptr<const Input>> Input::fetchTree(ref<Store> store)
 std::optional<StorePath> trySubstitute(ref<Store> store, FileIngestionMethod ingestionMethod,
     Hash hash, std::string_view name)
 {
-    auto substitutablePath = store->makeFixedOutputPath(ingestionMethod, hash, name);
+    auto ca = StorePathDescriptor {
+        .name = std::string { name },
+        .info = FixedOutputInfo {
+            ingestionMethod,
+            hash,
+            {}
+        },
+    };
+    auto substitutablePath = store->makeFixedOutputPathFromCA(ca);
 
     try {
-        store->ensurePath(substitutablePath);
+        store->ensurePath(ca);
 
         debug("using substituted path '%s'", store->printStorePath(substitutablePath));
 

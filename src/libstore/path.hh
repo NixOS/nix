@@ -1,6 +1,7 @@
 #pragma once
 
-#include "content-address.hh"
+#include <string_view>
+
 #include "types.hh"
 
 namespace nix {

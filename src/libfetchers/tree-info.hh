@@ -2,6 +2,7 @@
 
 #include "path.hh"
 #include "hash.hh"
+#include "content-address.hh"
 
 #include <nlohmann/json_fwd.hpp>
 
@@ -11,9 +12,9 @@ namespace nix::fetchers {
 
 struct TreeInfo
 {
-    Hash narHash;
+    std::optional<Hash> narHash;
 
-    std::optional<ContentAddress> ca;
+    std::optional<StorePathDescriptor> ca;
 
     std::optional<uint64_t> revCount;
     std::optional<time_t> lastModified;

@@ -69,6 +69,10 @@ if [[ -n $(type -p git) ]]; then
     nix-store --delete $path
     path2=$(nix eval --raw "(builtins.fetchTree { type = \"git\"; url = file:///no-such-repo; treeHash = \"$treeHash\"; }).outPath" --substituters file://$cacheDir --option substitute true)
     [ $path2 = $path ]
+
+    # HEAD should be the same path as tree
+    path3=$(nix eval --raw "(builtins.fetchTree { type = \"git\"; url = file://$repo; ref = \"HEAD\"; gitIngestion = true; }).outPath")
+    [ $path3 = $path ]
 else
     echo "Git not installed; skipping Git tests"
 fi

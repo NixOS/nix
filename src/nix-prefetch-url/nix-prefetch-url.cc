@@ -154,12 +154,18 @@ static int _main(int argc, char * * argv)
         /* If an expected hash is given, the file may already exist in
            the store. */
         std::optional<Hash> expectedHash;
-        Hash hash;
+        Hash hash(ht);
         std::optional<StorePath> storePath;
         if (args.size() == 2) {
-            expectedHash = Hash(args[1], ht);
-            const auto recursive = unpack ? FileIngestionMethod::Recursive : FileIngestionMethod::Flat;
-            storePath = store->makeFixedOutputPath(recursive, *expectedHash, name);
+            expectedHash = Hash::parseAny(args[1], ht);
+            const auto method = unpack ? FileIngestionMethod::Recursive : FileIngestionMethod::Flat;
+            storePath = store->makeFixedOutputPath(name, FixedOutputInfo {
+                {
+                    .method = method,
+                    .hash = *expectedHash,
+                },
+                {},
+            });
             if (store->isValidPath(*storePath))
                 hash = *expectedHash;
             else

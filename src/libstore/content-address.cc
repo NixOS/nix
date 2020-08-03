@@ -1,10 +1,13 @@
+#include "args.hh"
 #include "content-address.hh"
+#include "parser.hh"
 
 namespace nix {
 
 std::string FixedOutputHash::printMethodAlgo() const {
-    return makeFileIngestionPrefix(method) + printHashType(*hash.type);
+    return makeFileIngestionPrefix(method) + printHashType(hash.type);
 }
+
 
 std::string makeFileIngestionPrefix(const FileIngestionMethod m) {
     switch (m) {
@@ -18,67 +21,66 @@ std::string makeFileIngestionPrefix(const FileIngestionMethod m) {
     abort();
 }
 
-std::string makeFixedOutputCA(FileIngestionMethod method, const Hash & hash)
-{
-    return "fixed:"
-        + makeFileIngestionPrefix(method)
-        + hash.to_string(Base32, true);
-}
-
-// FIXME Put this somewhere?
-template<class... Ts> struct overloaded : Ts... { using Ts::operator()...; };
-template<class... Ts> overloaded(Ts...) -> overloaded<Ts...>;
 
 std::string renderContentAddress(ContentAddress ca) {
     return std::visit(overloaded {
         [](TextHash th) {
-            return "text:" + th.hash.to_string(Base32, true);
+            return "text:"
+                + th.hash.to_string(Base32, true);
         },
         [](FixedOutputHash fsh) {
-            return makeFixedOutputCA(fsh.method, fsh.hash);
+            return "fixed:"
+                + makeFileIngestionPrefix(fsh.method)
+                + fsh.hash.to_string(Base32, true);
         }
     }, ca);
 }
 
+static HashType parseHashType_(std::string_view & rest) {
+    auto hashTypeRaw = splitPrefixTo(rest, ':');
+    if (!hashTypeRaw)
+        throw UsageError("hash must be in form \"<algo>:<hash>\", but found: %s", rest);
+    return parseHashType(*hashTypeRaw);
+};
+
+static FileIngestionMethod parseFileIngestionMethod_(std::string_view & rest) {
+    if (splitPrefix(rest, "r:"))
+        return FileIngestionMethod::Recursive;
+    else if (splitPrefix(rest, "git:"))
+        return FileIngestionMethod::Git;
+    return FileIngestionMethod::Flat;
+}
+
 ContentAddress parseContentAddress(std::string_view rawCa) {
-    auto prefixSeparator = rawCa.find(':');
-    if (prefixSeparator != string::npos) {
-        auto prefix = string(rawCa, 0, prefixSeparator);
-        if (prefix == "text") {
-            auto hashTypeAndHash = rawCa.substr(prefixSeparator+1, string::npos);
-            Hash hash = Hash(string(hashTypeAndHash));
-            if (*hash.type != htSHA256) {
-                throw Error("parseContentAddress: the text hash should have type SHA256");
-            }
-            return TextHash { hash };
-        } else if (prefix == "fixed") {
-            // This has to be an inverse of makeFixedOutputCA
-            auto methodAndHash = rawCa.substr(prefixSeparator+1, string::npos);
-            if (methodAndHash.substr(0, 2) == "r:") {
-                std::string_view hashRaw = methodAndHash.substr(2, string::npos);
-                return FixedOutputHash {
-                    .method = FileIngestionMethod::Recursive,
-                    .hash = Hash(string(hashRaw)),
-                };
-            } else if (methodAndHash.substr(0, 4) == "git:") {
-                std::string_view hashRaw = methodAndHash.substr(4, string::npos);
-                return FixedOutputHash {
-                    .method = FileIngestionMethod::Git,
-                    .hash = Hash(string(hashRaw)),
-                };
-            } else {
-                std::string_view hashRaw = methodAndHash;
-                return FixedOutputHash {
-                    .method = FileIngestionMethod::Flat,
-                    .hash = Hash(string(hashRaw)),
-                };
-            }
-        } else {
-            throw Error("parseContentAddress: format not recognized; has to be text or fixed");
-        }
-    } else {
-        throw Error("Not a content address because it lacks an appropriate prefix");
+    auto rest = rawCa;
+
+    std::string_view prefix;
+    {
+        auto optPrefix = splitPrefixTo(rest, ':');
+        if (!optPrefix)
+            throw UsageError("not a path-info content address because it is not in the form \"<prefix>:<rest>\": %s", rawCa);
+        prefix = *optPrefix;
     }
+
+    // Switch on prefix
+    if (prefix == "text") {
+        // No parsing of the method, "text" only support flat.
+        HashType hashType = parseHashType_(rest);
+        if (hashType != htSHA256)
+            throw Error("text content address hash should use %s, but instead uses %s",
+                printHashType(htSHA256), printHashType(hashType));
+        return TextHash {
+            .hash = Hash::parseNonSRIUnprefixed(rest, std::move(hashType)),
+        };
+    } else if (prefix == "fixed") {
+        auto method = parseFileIngestionMethod_(rest);
+        HashType hashType = parseHashType_(rest);
+        return FixedOutputHash {
+            .method = method,
+            .hash = Hash::parseNonSRIUnprefixed(rest, std::move(hashType)),
+        };
+    } else
+        throw UsageError("path-info content address prefix \"%s\" is unrecognized. Recogonized prefixes are \"text\", \"fixed\", or \"ipfs\"", prefix);
 };
 
 std::optional<ContentAddress> parseContentAddressOpt(std::string_view rawCaOpt) {
@@ -89,6 +91,120 @@ std::string renderContentAddress(std::optional<ContentAddress> ca) {
     return ca ? renderContentAddress(*ca) : "";
 }
 
+
+// FIXME Deduplicate with store-api.cc path computation
+std::string renderStorePathDescriptor(StorePathDescriptor ca)
+{
+    std::string result = ca.name;
+
+    auto dumpRefs = [&](auto references, bool hasSelfReference) {
+        result += "refs:";
+        result += std::to_string(references.size());
+        for (auto & i : references) {
+            result += ":";
+            result += i.to_string();
+        }
+        if (hasSelfReference) result += ":self";
+    };
+
+    std::visit(overloaded {
+        [&](TextInfo th) {
+            result += "text:";
+            dumpRefs(th.references, false);
+            result += ":" + renderContentAddress(ContentAddress {TextHash {
+                .hash = th.hash,
+            }});
+        },
+        [&](FixedOutputInfo fsh) {
+            result += "fixed:";
+            dumpRefs(fsh.references.references, fsh.references.hasSelfReference);
+            result += ":" + renderContentAddress(ContentAddress {FixedOutputHash {
+                .method = fsh.method,
+                .hash = fsh.hash
+            }});
+        },
+    }, ca.info);
+
+    return result;
+}
+
+
+StorePathDescriptor parseStorePathDescriptor(std::string_view rawCa)
+{
+    auto rest = rawCa;
+
+    std::string_view name;
+    std::string_view tag;
+    {
+        auto optName = splitPrefixTo(rest, ':');
+        auto optTag = splitPrefixTo(rest, ':');
+        if (!(optTag && optName))
+            throw UsageError("not a content address because it is not in the form \"<name>:<tag>:<rest>\": %s", rawCa);
+        tag = *optTag;
+        name = *optName;
+    }
+
+    auto parseRefs = [&]() -> PathReferences<StorePath> {
+        if (!splitPrefix(rest, "refs,"))
+            throw Error("Invalid CA \"%s\", \"%s\" should begin with \"refs:\"", rawCa, rest);
+        PathReferences<StorePath> ret;
+        size_t numReferences = 0;
+        {
+            auto countRaw = splitPrefixTo(rest, ':');
+            if (!countRaw)
+                throw UsageError("Invalid count");
+            numReferences = std::stoi(std::string { *countRaw });
+        }
+        for (size_t i = 0; i < numReferences; i++) {
+            auto s = splitPrefixTo(rest, ':');
+            if (!s)
+                throw UsageError("Missing reference no. %d", i);
+            ret.references.insert(StorePath(*s));
+        }
+        if (splitPrefix(rest, "self:"))
+            ret.hasSelfReference = true;
+        return ret;
+    };
+
+    // Dummy value
+    ContentAddressWithReferences info = TextInfo { Hash(htSHA256), {} };
+
+    // Switch on tag
+    if (tag == "text") {
+        auto refs = parseRefs();
+        if (refs.hasSelfReference)
+            throw UsageError("Text content addresses cannot have self references");
+        auto hashType = parseHashType_(rest);
+        if (hashType != htSHA256)
+            throw Error("Text content address hash should use %s, but instead uses %s",
+                printHashType(htSHA256), printHashType(hashType));
+        info = TextInfo {
+            {
+                .hash = Hash::parseNonSRIUnprefixed(rest, std::move(hashType)),
+            },
+            refs.references,
+        };
+    } else if (tag == "fixed") {
+        auto refs = parseRefs();
+        auto method = parseFileIngestionMethod_(rest);
+        auto hashType = parseHashType_(rest);
+        info = FixedOutputInfo {
+            {
+                .method = method,
+                .hash = Hash::parseNonSRIUnprefixed(rest, std::move(hashType)),
+            },
+            refs,
+        };
+    } else
+        throw UsageError("content address tag \"%s\" is unrecognized. Recogonized tages are \"text\", \"fixed\", or \"ipfs\"", tag);
+
+    return StorePathDescriptor {
+        .name = std::string { name },
+        .info = info,
+    };
+}
+
+
 Hash getContentAddressHash(const ContentAddress & ca)
 {
     return std::visit(overloaded {
@@ -97,7 +213,7 @@ Hash getContentAddressHash(const ContentAddress & ca)
         },
         [](FixedOutputHash fsh) {
             return fsh.hash;
-        }
+        },
     }, ca);
 }
 

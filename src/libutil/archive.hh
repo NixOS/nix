@@ -50,14 +50,6 @@ void dumpPath(const Path & path, Sink & sink,
 
 void dumpString(const std::string & s, Sink & sink);
 
-struct TeeParseSink : ParseSink
-{
-    StringSink saved;
-    TeeSource source;
-
-    TeeParseSink(Source & source) : source(source, saved) { }
-};
-
 void parseDump(ParseSink & sink, Source & source);
 
 void restorePath(const Path & path, Source & source);

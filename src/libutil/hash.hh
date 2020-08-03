@@ -25,31 +25,33 @@ enum Base : int { Base64, Base32, Base16, SRI };
 
 struct Hash
 {
-    static const unsigned int maxHashSize = 64;
-    unsigned int hashSize = 0;
-    unsigned char hash[maxHashSize] = {};
+    constexpr static size_t maxHashSize = 64;
+    size_t hashSize = 0;
+    uint8_t hash[maxHashSize] = {};
 
-    std::optional<HashType> type = {};
-
-    /* Create an unset hash object. */
-    Hash() { };
+    HashType type;
 
     /* Create a zero-filled hash object. */
-    Hash(HashType type) : type(type) { init(); };
+    Hash(HashType type);
 
     /* Initialize the hash from a string representation, in the format
        "[<type>:]<base16|base32|base64>" or "<type>-<base64>" (a
        Subresource Integrity hash expression). If the 'type' argument
        is not present, then the hash type must be specified in the
        string. */
-    Hash(std::string_view s, std::optional<HashType> type);
-    // type must be provided
-    Hash(std::string_view s, HashType type);
+    static Hash parseAny(std::string_view s, std::optional<HashType> type);
     // hash type must be part of string
-    Hash(std::string_view s);
+    static Hash parseAnyPrefixed(std::string_view s);
+    // prefix parsed separately; non SRI hash
+    static Hash parseNonSRIUnprefixed(std::string_view s, HashType type);
 
-    void init();
+    static Hash parseSRI(std::string_view original);
 
+private:
+    // type must be provided, s must not include <type> prefix
+    Hash(std::string_view s, HashType type, bool isSRI);
+
+public:
     /* Check whether a hash is set. */
     operator bool () const { return (bool) type; }
 
@@ -105,7 +107,7 @@ Hash newHashAllowEmpty(std::string hashStr, std::optional<HashType> ht);
 string printHash16or32(const Hash & hash);
 
 /* Compute the hash of the given string. */
-Hash hashString(HashType ht, const string & s);
+Hash hashString(HashType ht, std::string_view s);
 
 /* Compute the hash of the given file. */
 Hash hashFile(HashType ht, const Path & path);
@@ -124,9 +126,9 @@ HashResult hashGit(HashType ht, const Path & path,
 Hash compressHash(const Hash & hash, unsigned int newSize);
 
 /* Parse a string representing a hash type. */
-HashType parseHashType(const string & s);
+HashType parseHashType(std::string_view s);
 /* Will return nothing on parse error */
-std::optional<HashType> parseHashTypeOpt(const string & s);
+std::optional<HashType> parseHashTypeOpt(std::string_view s);
 
 /* And the reverse. */
 string printHashType(HashType ht);

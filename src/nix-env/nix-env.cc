@@ -703,7 +703,8 @@ static void opSet(Globals & globals, Strings opFlags, Strings opArgs)
         printMissing(globals.state->store,
             {{globals.state->store->parseStorePath(drv.queryOutPath())}});
         if (globals.dryRun) return;
-        globals.state->store->ensurePath(globals.state->store->parseStorePath(drv.queryOutPath()));
+        auto path = globals.state->store->parseStorePath(drv.queryOutPath());
+        globals.state->store->ensurePath(path);
     }
 
     debug(format("switching to new user environment"));

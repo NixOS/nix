@@ -33,7 +33,8 @@ void Store::computeFSClosure(const StorePathSet & startPaths,
             state->pending++;
         }
 
-        queryPathInfo(parseStorePath(path), {[&, pathS(path)](std::future<ref<const ValidPathInfo>> fut) {
+        auto p = parseStorePath(path);
+        queryPathInfo(p, {[&, pathS(path)](std::future<ref<const ValidPathInfo>> fut) {
             // FIXME: calls to isValidPath() should be async
 
             try {
@@ -61,8 +62,7 @@ void Store::computeFSClosure(const StorePathSet & startPaths,
                 } else {
 
                     for (auto & ref : info->references)
-                        if (ref != path)
-                            enqueue(printStorePath(ref));
+                        enqueue(printStorePath(ref));
 
                     if (includeOutputs && path.isDerivation())
                         for (auto & i : queryDerivationOutputs(path))
@@ -107,6 +107,18 @@ void Store::computeFSClosure(const StorePath & startPath,
     computeFSClosure(paths, paths_, flipDirection, includeOutputs, includeDerivers);
 }
 
+
+std::optional<StorePathDescriptor> getDerivationCA(const BasicDerivation & drv)
+{
+    auto out = drv.outputs.find("out");
+    if (out != drv.outputs.end() && out->second.hash) {
+        return StorePathDescriptor {
+            .name = std::string { out->second.path.name() },
+            .info = FixedOutputInfo { *out->second.hash, {} },
+        };
+    }
+    return std::nullopt;
+}
 
 void Store::queryMissing(const std::vector<StorePathWithOutputs> & targets,
     StorePathSet & willBuild_, StorePathSet & willSubstitute_, StorePathSet & unknown_,
@@ -157,7 +169,11 @@ void Store::queryMissing(const std::vector<StorePathWithOutputs> & targets,
         auto outPath = parseStorePath(outPathS);
 
         SubstitutablePathInfos infos;
-        querySubstitutablePathInfos({outPath}, infos);
+        auto caOpt = getDerivationCA(*drv);
+        if (caOpt)
+            querySubstitutablePathInfos({}, { *std::move(caOpt) }, infos);
+        else
+            querySubstitutablePathInfos({outPath}, {}, infos);
 
         if (infos.empty()) {
             drvState_->lock()->done = true;
@@ -214,7 +230,7 @@ void Store::queryMissing(const std::vector<StorePathWithOutputs> & targets,
             if (isValidPath(path.path)) return;
 
             SubstitutablePathInfos infos;
-            querySubstitutablePathInfos({path.path}, infos);
+            querySubstitutablePathInfos({path.path}, {}, infos);
 
             if (infos.empty()) {
                 auto state(state_.lock());
@@ -268,7 +284,7 @@ StorePaths Store::topoSortPaths(const StorePathSet & paths)
         for (auto & i : references)
             /* Don't traverse into paths that don't exist.  That can
                happen due to substitutes for non-existent paths. */
-            if (i != path && paths.count(i))
+            if (paths.count(i))
                 dfsVisit(i, &path);
 
         sorted.push_back(path);
