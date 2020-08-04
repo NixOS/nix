@@ -437,7 +437,7 @@ ref<eval_cache::EvalCache> openEvalCache(
     std::shared_ptr<flake::LockedFlake> lockedFlake,
     bool useEvalCache)
 {
-	auto fingerprint = lockedFlake->getFingerprint();
+    auto fingerprint = lockedFlake->getFingerprint();
     return make_ref<nix::eval_cache::EvalCache>(
         useEvalCache && evalSettings.pureEval
             ? std::optional { std::cref(fingerprint) }
