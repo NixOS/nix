@@ -31,7 +31,6 @@ template<> StorePathSet readStorePaths(const Store & store, Source & from)
     return paths;
 }
 
-
 void writeStorePaths(const Store & store, Sink & out, const StorePathSet & paths)
 {
     out << paths.size();
@@ -39,11 +38,6 @@ void writeStorePaths(const Store & store, Sink & out, const StorePathSet & paths
         out << store.printStorePath(i);
 }
 
-StorePath read(const Store & store, Source & from, Proxy<StorePath> _)
-{
-	auto path = readString(from);
-	return store.parseStorePath(path);
-}
 
 StorePathCAMap readStorePathCAMap(const Store & store, Source & from)
 {
@@ -63,10 +57,17 @@ void writeStorePathCAMap(const Store & store, Sink & out, const StorePathCAMap &
     }
 }
 
+
+StorePath read(const Store & store, Source & from, Proxy<StorePath> _)
+{
+    auto path = readString(from);
+    return store.parseStorePath(path);
+}
+
 void write(const Store & store, Sink & out, const StorePath & storePath)
 {
-	auto path = store.printStorePath(storePath);
-	out << path;
+    auto path = store.printStorePath(storePath);
+    out << path;
 }
 
 
