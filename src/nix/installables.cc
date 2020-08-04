@@ -645,7 +645,7 @@ std::shared_ptr<Installable> SourceExprCommand::parseInstallable(
 }
 
 Buildables build(ref<Store> store, Realise mode,
-    std::vector<std::shared_ptr<Installable>> installables)
+    std::vector<std::shared_ptr<Installable>> installables, BuildMode bMode)
 {
     if (mode == Realise::Nothing)
         settings.readOnlyMode = true;
@@ -671,7 +671,7 @@ Buildables build(ref<Store> store, Realise mode,
     if (mode == Realise::Nothing)
         printMissing(store, pathsToBuild, lvlError);
     else if (mode == Realise::Outputs)
-        store->buildPaths(pathsToBuild);
+        store->buildPaths(pathsToBuild, bMode);
 
     return buildables;
 }

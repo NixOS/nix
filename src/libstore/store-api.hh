@@ -10,6 +10,7 @@
 #include "globals.hh"
 #include "config.hh"
 #include "derivations.hh"
+#include "path-info.hh"
 
 #include <atomic>
 #include <limits>
@@ -99,95 +100,6 @@ struct GCResults
        number of bytes that would be or was freed. */
     uint64_t bytesFreed = 0;
 };
-
-
-struct SubstitutablePathInfo
-{
-    std::optional<StorePath> deriver;
-    StorePathSet references;
-    uint64_t downloadSize; /* 0 = unknown or inapplicable */
-    uint64_t narSize; /* 0 = unknown */
-};
-
-typedef std::map<StorePath, SubstitutablePathInfo> SubstitutablePathInfos;
-
-struct ValidPathInfo
-{
-    StorePath path;
-    std::optional<StorePath> deriver;
-    // TODO document this
-    std::optional<Hash> narHash;
-    StorePathSet references;
-    time_t registrationTime = 0;
-    uint64_t narSize = 0; // 0 = unknown
-    uint64_t id; // internal use only
-
-    /* Whether the path is ultimately trusted, that is, it's a
-       derivation output that was built locally. */
-    bool ultimate = false;
-
-    StringSet sigs; // note: not necessarily verified
-
-    /* If non-empty, an assertion that the path is content-addressed,
-       i.e., that the store path is computed from a cryptographic hash
-       of the contents of the path, plus some other bits of data like
-       the "name" part of the path. Such a path doesn't need
-       signatures, since we don't have to trust anybody's claim that
-       the path is the output of a particular derivation. (In the
-       extensional store model, we have to trust that the *contents*
-       of an output path of a derivation were actually produced by
-       that derivation. In the intensional model, we have to trust
-       that a particular output path was produced by a derivation; the
-       path then implies the contents.)
-
-       Ideally, the content-addressability assertion would just be a Boolean,
-       and the store path would be computed from the name component, ‘narHash’
-       and ‘references’. However, we support many types of content addresses.
-    */
-    std::optional<ContentAddress> ca;
-
-    bool operator == (const ValidPathInfo & i) const
-    {
-        return
-            path == i.path
-            && narHash == i.narHash
-            && references == i.references;
-    }
-
-    /* Return a fingerprint of the store path to be used in binary
-       cache signatures. It contains the store path, the base-32
-       SHA-256 hash of the NAR serialisation of the path, the size of
-       the NAR, and the sorted references. The size field is strictly
-       speaking superfluous, but might prevent endless/excessive data
-       attacks. */
-    std::string fingerprint(const Store & store) const;
-
-    void sign(const Store & store, const SecretKey & secretKey);
-
-    /* Return true iff the path is verifiably content-addressed. */
-    bool isContentAddressed(const Store & store) const;
-
-    static const size_t maxSigs = std::numeric_limits<size_t>::max();
-
-    /* Return the number of signatures on this .narinfo that were
-       produced by one of the specified keys, or maxSigs if the path
-       is content-addressed. */
-    size_t checkSignatures(const Store & store, const PublicKeys & publicKeys) const;
-
-    /* Verify a single signature. */
-    bool checkSignature(const Store & store, const PublicKeys & publicKeys, const std::string & sig) const;
-
-    Strings shortRefs() const;
-
-    ValidPathInfo(const ValidPathInfo & other) = default;
-
-    ValidPathInfo(StorePath && path) : path(std::move(path)) { };
-    ValidPathInfo(const StorePath & path) : path(path) { };
-
-    virtual ~ValidPathInfo() { }
-};
-
-typedef list<ValidPathInfo> ValidPathInfos;
 
 
 enum BuildMode { bmNormal, bmRepair, bmCheck };
@@ -456,7 +368,7 @@ public:
        libutil/archive.hh). */
     virtual StorePath addToStore(const string & name, const Path & srcPath,
         FileIngestionMethod method = FileIngestionMethod::Recursive, HashType hashAlgo = htSHA256,
-        PathFilter & filter = defaultPathFilter, RepairFlag repair = NoRepair) = 0;
+        PathFilter & filter = defaultPathFilter, RepairFlag repair = NoRepair);
 
     /* Copy the contents of a path to the store and register the
        validity the resulting path, using a constant amount of
@@ -465,6 +377,10 @@ public:
         FileIngestionMethod method = FileIngestionMethod::Recursive, HashType hashAlgo = htSHA256,
         std::optional<Hash> expectedCAHash = {});
 
+    /* Like addToStore(), but the contents of the path are contained
+       in `dump', which is either a NAR serialisation (if recursive ==
+       true) or simply the contents of a regular file (if recursive ==
+       false). */
     // FIXME: remove?
     virtual StorePath addToStoreFromDump(Source & dump, const string & name,
         FileIngestionMethod method = FileIngestionMethod::Recursive, HashType hashAlgo = htSHA256, RepairFlag repair = NoRepair)
