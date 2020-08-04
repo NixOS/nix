@@ -126,6 +126,4 @@ StorePathCAMap readStorePathCAMap(const Store & store, Source & from);
 
 void writeStorePathCAMap(const Store & store, Sink & out, const StorePathCAMap & paths);
 
-void writeOutputPathMap(const Store & store, Sink & out, const OutputPathMap & paths);
-
 }
