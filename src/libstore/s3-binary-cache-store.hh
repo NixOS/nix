@@ -19,6 +19,7 @@ public:
     struct Stats
     {
         std::atomic<uint64_t> put{0};
+        std::atomic<uint64_t> putBytes{0};
         std::atomic<uint64_t> putTimeMs{0};
         std::atomic<uint64_t> get{0};
         std::atomic<uint64_t> getBytes{0};
