@@ -23,14 +23,6 @@
 namespace nix {
 
 
-void write(const Store & store, Sink & out, const StorePathSet & paths)
-{
-    out << paths.size();
-    for (auto & i : paths)
-        out << store.printStorePath(i);
-}
-
-
 std::string read(const Store & store, Source & from, Proxy<std::string> _)
 {
     return readString(from);
