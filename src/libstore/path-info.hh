@@ -1,17 +1,9 @@
 #pragma once
 
-// TODO many of thes eare not needed.
 #include "path.hh"
 #include "hash.hh"
 #include "content-address.hh"
-#include "serialise.hh"
-#include "crypto.hh"
-#include "lru-cache.hh"
-#include "sync.hh"
-#include "globals.hh"
-#include "config.hh"
 
-#include <limits>
 #include <string>
 #include <optional>
 
