@@ -657,8 +657,7 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
 
                     if (i->name == state.sStructuredAttrs) continue;
 
-                    auto & placeholder = (*jsonObject)[key];
-                    printValueAsJSON(state, true, *i->value, placeholder, context);
+                    (*jsonObject)[key] = printValueAsJSON(state, true, *i->value, context);
 
                     if (i->name == state.sBuilder)
                         drv.builder = state.forceString(*i->value, context, posDrvName);

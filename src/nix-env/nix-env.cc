@@ -872,7 +872,6 @@ static void queryJSON(Globals & globals, vector<DrvInfo> & elems)
         nlohmann::json metaObj = pkgObj["meta"];
         StringSet metaNames = i.queryMetaNames();
         for (auto & j : metaNames) {
-            auto & placeholder = metaObj[j];
             Value * v = i.queryMeta(j);
             if (!v) {
                 logError({
@@ -880,10 +879,10 @@ static void queryJSON(Globals & globals, vector<DrvInfo> & elems)
                     .hint = hintfmt("derivation '%s' has invalid meta attribute '%s'",
                         i.queryName(), j)
                 });
-                placeholder = nullptr;
+                metaObj[j] = nullptr;
             } else {
                 PathSet context;
-                printValueAsJSON(*globals.state, true, *v, placeholder, context);
+                metaObj[j] = printValueAsJSON(*globals.state, true, *v, context);
             }
         }
     }

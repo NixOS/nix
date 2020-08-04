@@ -83,9 +83,7 @@ struct CmdEval : MixJSON, InstallableCommand
             stopProgressBar();
             std::cout << state->coerceToString(noPos, *v, context);
         } else if (json) {
-            nlohmann::json jsonOut;
-            printValueAsJSON(*state, true, *v, jsonOut, context);
-            std::cout << jsonOut;
+            printValueAsJSON(*state, true, *v, std::cout, context);
         } else {
             state->forceValueDeep(*v);
             logger->stdout("%s", *v);
