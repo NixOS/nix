@@ -913,17 +913,17 @@ string showPaths(const PathSet & paths)
 
 StorePathSet ValidPathInfo::referencesPossiblyToSelf() const
 {
-	return PathReferences<StorePath>::referencesPossiblyToSelf(path);
+    return PathReferences<StorePath>::referencesPossiblyToSelf(path);
 }
 
 void ValidPathInfo::insertReferencePossiblyToSelf(StorePath && ref)
 {
-	return PathReferences<StorePath>::insertReferencePossiblyToSelf(path, std::move(ref));
+    return PathReferences<StorePath>::insertReferencePossiblyToSelf(path, std::move(ref));
 }
 
 void ValidPathInfo::setReferencesPossiblyToSelf(StorePathSet && refs)
 {
-	return PathReferences<StorePath>::setReferencesPossiblyToSelf(path, std::move(refs));
+    return PathReferences<StorePath>::setReferencesPossiblyToSelf(path, std::move(refs));
 }
 
 std::string ValidPathInfo::fingerprint(const Store & store) const
