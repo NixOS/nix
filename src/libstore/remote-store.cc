@@ -60,14 +60,12 @@ void writeStorePathCAMap(const Store & store, Sink & out, const StorePathCAMap &
 
 StorePath read(const Store & store, Source & from, Proxy<StorePath> _)
 {
-    auto path = readString(from);
-    return store.parseStorePath(path);
+    return store.parseStorePath(readString(from));
 }
 
 void write(const Store & store, Sink & out, const StorePath & storePath)
 {
-    auto path = store.printStorePath(storePath);
-    out << path;
+    out << store.printStorePath(storePath);
 }
 
 
