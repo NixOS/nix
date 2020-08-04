@@ -66,33 +66,50 @@ typedef enum {
 class Store;
 struct Source;
 
-template<class T> T readStorePaths(const Store & store, Source & from);
-
-void writeStorePaths(const Store & store, Sink & out, const StorePathSet & paths);
-
 /* To guide overloading */
 template<typename T>
 struct Proxy {};
 
 template<typename T>
-std::map<std::string, T> read(const Store & store, Source & from, Proxy<std::map<std::string, T>> _)
+std::set<T> read(const Store & store, Source & from, Proxy<std::set<T>> _)
 {
-    std::map<string, T> resMap;
-    auto size = (size_t)readInt(from);
+    std::set<T> resSet;
+    auto size = readNum<size_t>(from);
     while (size--) {
-        auto thisKey = readString(from);
-        resMap.insert_or_assign(std::move(thisKey), read(store, from, Proxy<T> {}));
+        resSet.insert(read(store, from, Proxy<T> {}));
+    }
+    return resSet;
+}
+
+template<typename T>
+void write(const Store & store, Sink & out, const std::set<T> & resSet)
+{
+    out << resSet.size();
+    for (auto & key : resSet) {
+        write(store, out, key);
+    }
+}
+
+template<typename K, typename V>
+std::map<K, V> read(const Store & store, Source & from, Proxy<std::map<K, V>> _)
+{
+    std::map<K, V> resMap;
+    auto size = readNum<size_t>(from);
+    while (size--) {
+        resMap.insert_or_assign(
+            read(store, from, Proxy<K> {}),
+            read(store, from, Proxy<V> {}));
     }
     return resMap;
 }
 
-template<typename T>
-void write(const Store & store, Sink & out, const std::map<string, T> & resMap)
+template<typename K, typename V>
+void write(const Store & store, Sink & out, const std::map<K, V> & resMap)
 {
     out << resMap.size();
-    for (auto & i : resMap) {
-        out << i.first;
-        write(store, out, i.second);
+    for (auto & [key, value] : resMap) {
+        write(store, out, key);
+        write(store, out, value);
     }
 }
 
@@ -106,26 +123,28 @@ std::optional<T> read(const Store & store, Source & from, Proxy<std::optional<T>
     case 1:
         return read(store, from, Proxy<T> {});
     default:
-        throw Error("got an invalid tag bit for std::optional: %#04x", tag);
+        throw Error("got an invalid tag bit for std::optional: %#04x", (size_t)tag);
     }
 }
 
 template<typename T>
 void write(const Store & store, Sink & out, const std::optional<T> & optVal)
 {
-    out << (optVal ? 1 : 0);
+    out << (uint64_t) (optVal ? 1 : 0);
     if (optVal)
         write(store, out, *optVal);
 }
+
+std::string read(const Store & store, Source & from, Proxy<std::string> _);
+
+void write(const Store & store, Sink & out, const std::string & str);
 
 StorePath read(const Store & store, Source & from, Proxy<StorePath> _);
 
 void write(const Store & store, Sink & out, const StorePath & storePath);
 
-StorePathCAMap readStorePathCAMap(const Store & store, Source & from);
+ContentAddress read(const Store & store, Source & from, Proxy<ContentAddress> _);
 
-void writeStorePathCAMap(const Store & store, Sink & out, const StorePathCAMap & paths);
-
-void writeOutputPathMap(const Store & store, Sink & out, const OutputPathMap & paths);
+void write(const Store & store, Sink & out, const ContentAddress & ca);
 
 }

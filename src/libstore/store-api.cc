@@ -362,14 +362,14 @@ bool Store::PathInfoCacheValue::isKnownNow()
 }
 
 OutputPathMap Store::queryDerivationOutputMapAssumeTotal(const StorePath & path) {
-	auto resp = queryDerivationOutputMap(path);
-	OutputPathMap result;
-	for (auto & [outName, optOutPath] : resp) {
-		if (!optOutPath)
-			throw Error("output '%s' has no store path mapped to it", outName);
-		result.insert_or_assign(outName, *optOutPath);
-	}
-	return result;
+    auto resp = queryDerivationOutputMap(path);
+    OutputPathMap result;
+    for (auto & [outName, optOutPath] : resp) {
+        if (!optOutPath)
+            throw Error("output '%s' has no store path mapped to it", outName);
+        result.insert_or_assign(outName, *optOutPath);
+    }
+    return result;
 }
 
 StorePathSet Store::queryDerivationOutputs(const StorePath & path)

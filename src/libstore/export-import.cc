@@ -45,7 +45,7 @@ void Store::exportPath(const StorePath & path, Sink & sink)
     teeSink
         << exportMagic
         << printStorePath(path);
-    writeStorePaths(*this, teeSink, info->references);
+    write(*this, teeSink, info->references);
     teeSink
         << (info->deriver ? printStorePath(*info->deriver) : "")
         << 0;
@@ -73,7 +73,7 @@ StorePaths Store::importPaths(Source & source, CheckSigsFlag checkSigs)
 
         //Activity act(*logger, lvlInfo, format("importing path '%s'") % info.path);
 
-        info.references = readStorePaths<StorePathSet>(*this, source);
+        info.references = read(*this, source, Proxy<StorePathSet> {});
 
         auto deriver = readString(source);
         if (deriver != "")

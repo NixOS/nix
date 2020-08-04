@@ -477,7 +477,7 @@ Source & readDerivation(Source & in, const Store & store, BasicDerivation & drv,
         drv.outputs.emplace(std::move(name), std::move(output));
     }
 
-    drv.inputSrcs = readStorePaths<StorePathSet>(store, in);
+    drv.inputSrcs = read(store, in, Proxy<StorePathSet> {});
     in >> drv.platform >> drv.builder;
     drv.args = readStrings<Strings>(in);
 
@@ -505,7 +505,7 @@ void writeDerivation(Sink & out, const Store & store, const BasicDerivation & dr
             out << "" << "";
         }
     }
-    writeStorePaths(store, out, drv.inputSrcs);
+    write(store, out, drv.inputSrcs);
     out << drv.platform << drv.builder << drv.args;
     out << drv.env.size();
     for (auto & i : drv.env)
