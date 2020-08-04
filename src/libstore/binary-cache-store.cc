@@ -283,7 +283,7 @@ void BinaryCacheStore::addToStore(const ValidPathInfo & info, Source & narSource
     if (repair || !fileExists(narInfo->url)) {
         stats.narWrite++;
         upsertFile(narInfo->url,
-            std::make_shared<std::fstream>(fnTemp, std::ios_base::in),
+            std::make_shared<std::fstream>(fnTemp, std::ios_base::in | std::ios_base::binary),
             "application/x-nix-nar");
     } else
         stats.narWriteAverted++;
