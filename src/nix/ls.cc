@@ -1,9 +1,10 @@
+#include <nlohmann/json.hpp>
+
 #include "command.hh"
 #include "store-api.hh"
 #include "fs-accessor.hh"
 #include "nar-accessor.hh"
 #include "common-args.hh"
-#include "json.hh"
 
 using namespace nix;
 
@@ -74,8 +75,9 @@ struct MixLs : virtual Args, MixJSON
         if (path == "/") path = "";
 
         if (json) {
-            JSONPlaceholder jsonRoot(std::cout);
+            nlohmann::json jsonRoot;
             listNar(jsonRoot, accessor, path, recursive);
+            std::cout << jsonRoot;
         } else
             listText(accessor);
     }

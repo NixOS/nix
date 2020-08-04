@@ -10,7 +10,6 @@
 #include "filetransfer.hh"
 #include "finally.hh"
 #include "compression.hh"
-#include "json.hh"
 #include "nar-info.hh"
 #include "parsed-derivations.hh"
 #include "machines.hh"
@@ -27,6 +26,7 @@
 #include <regex>
 #include <queue>
 #include <climits>
+#include <iomanip>
 
 #include <sys/time.h>
 #include <sys/wait.h>
@@ -2620,16 +2620,14 @@ void DerivationGoal::writeStructuredAttrs()
     auto e = json.find("exportReferencesGraph");
     if (e != json.end() && e->is_object()) {
         for (auto i = e->begin(); i != e->end(); ++i) {
-            std::ostringstream str;
+            auto & jsonRoot = json[i.key()];
             {
-                JSONPlaceholder jsonRoot(str, true);
                 StorePathSet storePaths;
                 for (auto & p : *i)
                     storePaths.insert(worker.store.parseStorePath(p.get<std::string>()));
                 worker.store.pathInfoToJSON(jsonRoot,
                     exportReferences(storePaths), false, true);
             }
-            json[i.key()] = nlohmann::json::parse(str.str()); // urgh
         }
     }
 

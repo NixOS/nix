@@ -1,5 +1,7 @@
 #pragma once
 
+#include <nlohmann/json.hpp>
+
 #include "symbol-table.hh"
 
 #if HAVE_BOEHMGC
@@ -39,7 +41,6 @@ class Symbol;
 struct Pos;
 class EvalState;
 class XMLWriter;
-class JSONPlaceholder;
 
 
 typedef int64_t NixInt;
@@ -74,7 +75,7 @@ class ExternalValueBase
 
     /* Print the value as JSON. Defaults to unconvertable, i.e. throws an error */
     virtual void printValueAsJSON(EvalState & state, bool strict,
-        JSONPlaceholder & out, PathSet & context) const;
+        nlohmann::json & out, PathSet & context) const;
 
     /* Print the value as XML. Defaults to unevaluated */
     virtual void printValueAsXML(EvalState & state, bool strict, bool location,

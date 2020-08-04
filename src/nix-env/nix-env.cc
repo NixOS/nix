@@ -10,7 +10,6 @@
 #include "store-api.hh"
 #include "user-env.hh"
 #include "util.hh"
-#include "json.hh"
 #include "value-to-json.hh"
 #include "xml-writer.hh"
 #include "../nix/legacy.hh"
@@ -24,6 +23,9 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <unistd.h>
+
+#include <nlohmann/json.hpp>
+
 
 using namespace nix;
 using std::cout;
@@ -857,20 +859,20 @@ static VersionDiff compareVersionAgainstSet(
 
 static void queryJSON(Globals & globals, vector<DrvInfo> & elems)
 {
-    JSONObject topObj(cout, true);
+    nlohmann::json topObj;
     for (auto & i : elems) {
-        JSONObject pkgObj = topObj.object(i.attrPath);
+        nlohmann::json pkgObj = topObj[i.attrPath];
 
         auto drvName = DrvName(i.queryName());
-        pkgObj.attr("name", drvName.fullName);
-        pkgObj.attr("pname", drvName.name);
-        pkgObj.attr("version", drvName.version);
-        pkgObj.attr("system", i.querySystem());
+        pkgObj["name"] = drvName.fullName;
+        pkgObj["pname"] = drvName.name;
+        pkgObj["version"] = drvName.version;
+        pkgObj["system"] = i.querySystem();
 
-        JSONObject metaObj = pkgObj.object("meta");
+        nlohmann::json metaObj = pkgObj["meta"];
         StringSet metaNames = i.queryMetaNames();
         for (auto & j : metaNames) {
-            auto placeholder = metaObj.placeholder(j);
+            auto & placeholder = metaObj[j];
             Value * v = i.queryMeta(j);
             if (!v) {
                 logError({
@@ -878,13 +880,14 @@ static void queryJSON(Globals & globals, vector<DrvInfo> & elems)
                     .hint = hintfmt("derivation '%s' has invalid meta attribute '%s'",
                         i.queryName(), j)
                 });
-                placeholder.write(nullptr);
+                placeholder = nullptr;
             } else {
                 PathSet context;
                 printValueAsJSON(*globals.state, true, *v, placeholder, context);
             }
         }
     }
+    std::cout << topObj;
 }
 
 

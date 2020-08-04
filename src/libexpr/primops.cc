@@ -7,7 +7,6 @@
 #include "names.hh"
 #include "store-api.hh"
 #include "util.hh"
-#include "json.hh"
 #include "value-to-json.hh"
 #include "value-to-xml.hh"
 #include "primops.hh"
@@ -15,6 +14,7 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <unistd.h>
+#include <nlohmann/json.hpp>
 
 #include <algorithm>
 #include <cstring>
@@ -566,10 +566,10 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
 
     /* Check whether attributes should be passed as a JSON file. */
     std::ostringstream jsonBuf;
-    std::unique_ptr<JSONObject> jsonObject;
+    std::unique_ptr<nlohmann::json> jsonObject;
     attr = args[0]->attrs->find(state.sStructuredAttrs);
     if (attr != args[0]->attrs->end() && state.forceBool(*attr->value, pos))
-        jsonObject = std::make_unique<JSONObject>(jsonBuf);
+        jsonObject = std::make_unique<nlohmann::json>();
 
     /* Check whether null attributes should be ignored. */
     bool ignoreNulls = false;
@@ -657,7 +657,7 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
 
                     if (i->name == state.sStructuredAttrs) continue;
 
-                    auto placeholder(jsonObject->placeholder(key));
+                    auto & placeholder = (*jsonObject)[key];
                     printValueAsJSON(state, true, *i->value, placeholder, context);
 
                     if (i->name == state.sBuilder)
@@ -702,8 +702,9 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
     }
 
     if (jsonObject) {
-        jsonObject.reset();
+        jsonBuf << *jsonObject;
         drv.env.emplace("__json", jsonBuf.str());
+        jsonObject.reset();
     }
 
     /* Everything in the context of the strings in the derivation

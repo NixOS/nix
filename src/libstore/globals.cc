@@ -160,7 +160,7 @@ template<> std::string BaseSetting<SandboxMode>::to_string() const
     else abort();
 }
 
-template<> void BaseSetting<SandboxMode>::toJSON(JSONPlaceholder & out)
+template<> void BaseSetting<SandboxMode>::toJSON(nlohmann::json & out)
 {
     AbstractSetting::toJSON(out);
 }

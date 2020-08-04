@@ -5,13 +5,15 @@
 #include "names.hh"
 #include "get-drvs.hh"
 #include "common-args.hh"
-#include "json.hh"
 #include "shared.hh"
 #include "eval-cache.hh"
 #include "attr-path.hh"
 
 #include <regex>
 #include <fstream>
+
+#include <nlohmann/json.hpp>
+
 
 using namespace nix;
 
@@ -92,7 +94,7 @@ struct CmdSearch : InstallableCommand, MixJSON
 
         auto state = getEvalState();
 
-        auto jsonOut = json ? std::make_unique<JSONObject>(std::cout) : nullptr;
+        auto jsonOut = json ? std::optional<nlohmann::json>() : nullptr;
 
         uint64_t results = 0;
 
@@ -141,10 +143,10 @@ struct CmdSearch : InstallableCommand, MixJSON
                     if (found == res.size()) {
                         results++;
                         if (json) {
-                            auto jsonElem = jsonOut->object(attrPath2);
-                            jsonElem.attr("pname", name.name);
-                            jsonElem.attr("version", name.version);
-                            jsonElem.attr("description", description);
+                            auto jsonElem = (*jsonOut)[attrPath2];
+                            jsonElem["pname"] = name.name;
+                            jsonElem["version"] = name.version;
+                            jsonElem["description"] = description;
                         } else {
                             auto name2 = hilite(name.name, nameMatch, "\e[0;2m");
                             if (results > 1) logger->stdout("");
@@ -182,6 +184,9 @@ struct CmdSearch : InstallableCommand, MixJSON
 
         if (!json && !results)
             throw Error("no results for the given search term(s)!");
+
+        if (jsonOut)
+            std::cout << *jsonOut;
     }
 };
 

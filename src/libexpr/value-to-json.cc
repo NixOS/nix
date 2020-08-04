@@ -1,16 +1,16 @@
 #include "value-to-json.hh"
-#include "json.hh"
 #include "eval-inline.hh"
 #include "util.hh"
 
 #include <cstdlib>
 #include <iomanip>
+#include <nlohmann/json.hpp>
 
 
 namespace nix {
 
 void printValueAsJSON(EvalState & state, bool strict,
-    Value & v, JSONPlaceholder & out, PathSet & context)
+    Value & v, nlohmann::json & out, PathSet & context)
 {
     checkInterrupt();
 
@@ -19,41 +19,41 @@ void printValueAsJSON(EvalState & state, bool strict,
     switch (v.type) {
 
         case tInt:
-            out.write(v.integer);
+            out = v.integer;
             break;
 
         case tBool:
-            out.write(v.boolean);
+            out = v.boolean;
             break;
 
         case tString:
             copyContext(v, context);
-            out.write(v.string.s);
+            out = v.string.s;
             break;
 
         case tPath:
-            out.write(state.copyPathToStore(context, v.path));
+            out = state.copyPathToStore(context, v.path);
             break;
 
         case tNull:
-            out.write(nullptr);
+            out = nullptr;
             break;
 
         case tAttrs: {
             auto maybeString = state.tryAttrsToString(noPos, v, context, false, false);
             if (maybeString) {
-                out.write(*maybeString);
+                out = *maybeString;
                 break;
             }
             auto i = v.attrs->find(state.sOutPath);
             if (i == v.attrs->end()) {
-                auto obj(out.object());
+                out = nlohmann::json::object();
                 StringSet names;
                 for (auto & j : *v.attrs)
                     names.insert(j.name);
                 for (auto & j : names) {
                     Attr & a(*v.attrs->find(state.symbols.create(j)));
-                    auto placeholder(obj.placeholder(j));
+                    auto & placeholder = out[j];
                     printValueAsJSON(state, strict, *a.value, placeholder, context);
                 }
             } else
@@ -62,10 +62,10 @@ void printValueAsJSON(EvalState & state, bool strict,
         }
 
         case tList1: case tList2: case tListN: {
-            auto list(out.list());
             for (unsigned int n = 0; n < v.listSize(); ++n) {
-                auto placeholder(list.placeholder());
+                auto placeholder = nlohmann::json::array();
                 printValueAsJSON(state, strict, *v.listElems()[n], placeholder, context);
+                out.push_back(placeholder);
             }
             break;
         }
@@ -75,7 +75,7 @@ void printValueAsJSON(EvalState & state, bool strict,
             break;
 
         case tFloat:
-            out.write(v.fpoint);
+            out = v.fpoint;
             break;
 
         default:
@@ -86,12 +86,13 @@ void printValueAsJSON(EvalState & state, bool strict,
 void printValueAsJSON(EvalState & state, bool strict,
     Value & v, std::ostream & str, PathSet & context)
 {
-    JSONPlaceholder out(str);
+    nlohmann::json out;
     printValueAsJSON(state, strict, v, out, context);
+    str << out;
 }
 
 void ExternalValueBase::printValueAsJSON(EvalState & state, bool strict,
-    JSONPlaceholder & out, PathSet & context) const
+    nlohmann::json & out, PathSet & context) const
 {
     throw TypeError("cannot convert %1% to JSON", showType());
 }
