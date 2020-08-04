@@ -1868,11 +1868,11 @@ HookReply DerivationGoal::tryBuildHook()
 
     /* Tell the hook all the inputs that have to be copied to the
        remote system. */
-    writeStorePaths(worker.store, hook->sink, inputPaths);
+    write(worker.store, hook->sink, inputPaths);
 
     /* Tell the hooks the missing outputs that have to be copied back
        from the remote system. */
-    writeStorePaths(worker.store, hook->sink, missingPaths);
+    write(worker.store, hook->sink, missingPaths);
 
     hook->sink = FdSink();
     hook->toHook.writeSide = -1;
@@ -2760,8 +2760,12 @@ struct RestrictedStore : public LocalFSStore
     void queryReferrers(const StorePath & path, StorePathSet & referrers) override
     { }
 
-    OutputPathMap queryDerivationOutputMap(const StorePath & path) override
-    { throw Error("queryDerivationOutputMap"); }
+    std::map<std::string, std::optional<StorePath>> queryDerivationOutputMap(const StorePath & path) override
+    {
+        if (!goal.isAllowed(path))
+            throw InvalidPath("cannot query output map for unknown path '%s' in recursive Nix", printStorePath(path));
+        return next->queryDerivationOutputMap(path);
+    }
 
     std::optional<StorePath> queryPathFromHashPart(const std::string & hashPart) override
     { throw Error("queryPathFromHashPart"); }
@@ -4977,7 +4981,7 @@ void Worker::waitForInput()
         std::vector<unsigned char> buffer(4096);
         for (auto & k : fds2) {
             if (pollStatus.at(fdToPollStatus.at(k)).revents) {
-                ssize_t rd = read(k, buffer.data(), buffer.size());
+                ssize_t rd = ::read(k, buffer.data(), buffer.size());
                 // FIXME: is there a cleaner way to handle pt close
                 // than EIO? Is this even standard?
                 if (rd == 0 || (rd == -1 && errno == EIO)) {

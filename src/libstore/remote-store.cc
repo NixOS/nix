@@ -23,65 +23,46 @@
 namespace nix {
 
 
-template<> StorePathSet readStorePaths(const Store & store, Source & from)
-{
-    StorePathSet paths;
-    for (auto & i : readStrings<Strings>(from))
-        paths.insert(store.parseStorePath(i));
-    return paths;
-}
-
-
-void writeStorePaths(const Store & store, Sink & out, const StorePathSet & paths)
+void write(const Store & store, Sink & out, const StorePathSet & paths)
 {
     out << paths.size();
     for (auto & i : paths)
         out << store.printStorePath(i);
 }
 
-std::set<StorePathDescriptor> readStorePathDescriptorSet(const Store & store, Source & from)
+
+std::string read(const Store & store, Source & from, Proxy<std::string> _)
 {
-    std::set<StorePathDescriptor> paths;
-    // TODO
-    // auto count = readNum<size_t>(from);
-    // while (count--)
-    //     paths.insert_or_assign(store.parseStorePath(readString(from)), parseContentAddressOpt(readString(from)));
-    return paths;
+    return readString(from);
 }
 
-void writeStorePathDescriptorSet(const Store & store, Sink & out, const std::set<StorePathDescriptor> & paths)
+void write(const Store & store, Sink & out, const std::string & str)
 {
-    // TODO
-    //out << paths.size();
-    //for (auto & i : paths) {
-    //    out << store.printStorePath(i.first);
-    //    out << renderContentAddress(i.second);
-    //}
+    out << str;
 }
 
-std::map<string, StorePath> readOutputPathMap(const Store & store, Source & from)
+
+StorePath read(const Store & store, Source & from, Proxy<StorePath> _)
 {
-    std::map<string, StorePath> pathMap;
-    auto rawInput = readStrings<Strings>(from);
-    if (rawInput.size() % 2)
-        throw Error("got an odd number of elements from the daemon when trying to read a output path map");
-    auto curInput = rawInput.begin();
-    while (curInput != rawInput.end()) {
-        auto thisKey = *curInput++;
-        auto thisValue = *curInput++;
-        pathMap.emplace(thisKey, store.parseStorePath(thisValue));
-    }
-    return pathMap;
+    return store.parseStorePath(readString(from));
 }
 
-void writeOutputPathMap(const Store & store, Sink & out, const std::map<string, StorePath> & pathMap)
+void write(const Store & store, Sink & out, const StorePath & storePath)
 {
-    out << 2*pathMap.size();
-    for (auto & i : pathMap) {
-        out << i.first;
-        out << store.printStorePath(i.second);
-    }
+    out << store.printStorePath(storePath);
 }
+
+
+StorePathDescriptor read(const Store & store, Source & from, Proxy<StorePathDescriptor> _)
+{
+    return parseStorePathDescriptor(readString(from));
+}
+
+void write(const Store & store, Sink & out, const StorePathDescriptor & ca)
+{
+    out << renderStorePathDescriptor(ca);
+}
+
 
 /* TODO: Separate these store impls into different files, give them better names */
 RemoteStore::RemoteStore(const Params & params)
@@ -317,9 +298,9 @@ StorePathSet RemoteStore::queryValidPaths(const StorePathSet & paths, Substitute
         return res;
     } else {
         conn->to << wopQueryValidPaths;
-        writeStorePaths(*this, conn->to, paths);
+        write(*this, conn->to, paths);
         conn.processStderr();
-        return readStorePaths<StorePathSet>(*this, conn->from);
+        return read(*this, conn->from, Proxy<StorePathSet> {});
     }
 }
 
@@ -329,7 +310,7 @@ StorePathSet RemoteStore::queryAllValidPaths()
     auto conn(getConnection());
     conn->to << wopQueryAllValidPaths;
     conn.processStderr();
-    return readStorePaths<StorePathSet>(*this, conn->from);
+    return read(*this, conn->from, Proxy<StorePathSet> {});
 }
 
 
@@ -346,9 +327,9 @@ StorePathSet RemoteStore::querySubstitutablePaths(const StorePathSet & paths)
         return res;
     } else {
         conn->to << wopQuerySubstitutablePaths;
-        writeStorePaths(*this, conn->to, paths);
+        write(*this, conn->to, paths);
         conn.processStderr();
-        return readStorePaths<StorePathSet>(*this, conn->from);
+        return read(*this, conn->from, Proxy<StorePathSet> {});
     }
 }
 
@@ -376,7 +357,7 @@ void RemoteStore::querySubstitutablePathInfos(const StorePathSet & paths, const 
             auto deriver = readString(conn->from);
             if (deriver != "")
                 info.deriver = parseStorePath(deriver);
-            info.setReferencesPossiblyToSelf(path, readStorePaths<StorePathSet>(*this, conn->from));
+            info.setReferencesPossiblyToSelf(path, read(*this, conn->from, Proxy<StorePathSet> {}));
             info.downloadSize = readLongLong(conn->from);
             info.narSize = readLongLong(conn->from);
             infos.insert_or_assign(path, std::move(info));
@@ -386,10 +367,10 @@ void RemoteStore::querySubstitutablePathInfos(const StorePathSet & paths, const 
 
         conn->to << wopQuerySubstitutablePathInfos;
         if (GET_PROTOCOL_MINOR(conn->daemonVersion) < 22) {
-            writeStorePaths(*this, conn->to, combine());
+            write(*this, conn->to, combine());
         } else {
-            writeStorePaths(*this, conn->to, paths);
-            writeStorePathDescriptorSet(*this, conn->to, caPaths);
+            write(*this, conn->to, paths);
+            write(*this, conn->to, caPaths);
         }
         conn.processStderr();
         size_t count = readNum<size_t>(conn->from);
@@ -399,7 +380,7 @@ void RemoteStore::querySubstitutablePathInfos(const StorePathSet & paths, const 
             auto deriver = readString(conn->from);
             if (deriver != "")
                 info.deriver = parseStorePath(deriver);
-            info.setReferencesPossiblyToSelf(path, readStorePaths<StorePathSet>(*this, conn->from));
+            info.setReferencesPossiblyToSelf(path, read(*this, conn->from, Proxy<StorePathSet> {}));
             info.downloadSize = readLongLong(conn->from);
             info.narSize = readLongLong(conn->from);
         }
@@ -433,7 +414,7 @@ void RemoteStore::queryPathInfoUncached(StorePathOrDesc pathOrDesc,
             auto deriver = readString(conn->from);
             if (deriver != "") info->deriver = parseStorePath(deriver);
             info->narHash = Hash::parseAny(readString(conn->from), htSHA256);
-            info->setReferencesPossiblyToSelf(readStorePaths<StorePathSet>(*this, conn->from));
+            info->setReferencesPossiblyToSelf(read(*this, conn->from, Proxy<StorePathSet> {}));
             conn->from >> info->registrationTime >> info->narSize;
             if (GET_PROTOCOL_MINOR(conn->daemonVersion) >= 16) {
                 conn->from >> info->ultimate;
@@ -452,7 +433,7 @@ void RemoteStore::queryReferrers(const StorePath & path,
     auto conn(getConnection());
     conn->to << wopQueryReferrers << printStorePath(path);
     conn.processStderr();
-    for (auto & i : readStorePaths<StorePathSet>(*this, conn->from))
+    for (auto & i : read(*this, conn->from, Proxy<StorePathSet> {}))
         referrers.insert(i);
 }
 
@@ -462,7 +443,7 @@ StorePathSet RemoteStore::queryValidDerivers(const StorePath & path)
     auto conn(getConnection());
     conn->to << wopQueryValidDerivers << printStorePath(path);
     conn.processStderr();
-    return readStorePaths<StorePathSet>(*this, conn->from);
+    return read(*this, conn->from, Proxy<StorePathSet> {});
 }
 
 
@@ -474,16 +455,16 @@ StorePathSet RemoteStore::queryDerivationOutputs(const StorePath & path)
     }
     conn->to << wopQueryDerivationOutputs << printStorePath(path);
     conn.processStderr();
-    return readStorePaths<StorePathSet>(*this, conn->from);
+    return read(*this, conn->from, Proxy<StorePathSet> {});
 }
 
 
-OutputPathMap RemoteStore::queryDerivationOutputMap(const StorePath & path)
+std::map<std::string, std::optional<StorePath>> RemoteStore::queryDerivationOutputMap(const StorePath & path)
 {
     auto conn(getConnection());
     conn->to << wopQueryDerivationOutputMap << printStorePath(path);
     conn.processStderr();
-    return readOutputPathMap(*this, conn->from);
+    return read(*this, conn->from, Proxy<std::map<std::string, std::optional<StorePath>>> {});
 
 }
 
@@ -513,7 +494,7 @@ void RemoteStore::addToStore(const ValidPathInfo & info, Source & source,
             sink
                 << exportMagic
                 << printStorePath(info.path);
-            writeStorePaths(*this, sink, info.referencesPossiblyToSelf());
+            write(*this, sink, info.referencesPossiblyToSelf());
             sink
                 << (info.deriver ? printStorePath(*info.deriver) : "")
                 << 0 // == no legacy signature
@@ -523,7 +504,7 @@ void RemoteStore::addToStore(const ValidPathInfo & info, Source & source,
 
         conn.processStderr(0, source2.get());
 
-        auto importedPaths = readStorePaths<StorePathSet>(*this, conn->from);
+        auto importedPaths = read(*this, conn->from, Proxy<StorePathSet> {});
         assert(importedPaths.empty() == 0); // doesn't include possible self reference
     }
 
@@ -532,7 +513,7 @@ void RemoteStore::addToStore(const ValidPathInfo & info, Source & source,
                  << printStorePath(info.path)
                  << (info.deriver ? printStorePath(*info.deriver) : "")
                  << info.narHash->to_string(Base16, false);
-        writeStorePaths(*this, conn->to, info.referencesPossiblyToSelf());
+        write(*this, conn->to, info.referencesPossiblyToSelf());
         conn->to << info.registrationTime << info.narSize
                  << info.ultimate << info.sigs << renderContentAddress(info.ca)
                  << repair << !checkSigs;
@@ -665,7 +646,7 @@ StorePath RemoteStore::addTextToStore(const string & name, const string & s,
 
     auto conn(getConnection());
     conn->to << wopAddTextToStore << name << s;
-    writeStorePaths(*this, conn->to, references);
+    write(*this, conn->to, references);
 
     conn.processStderr();
     return parseStorePath(readString(conn->from));
@@ -768,7 +749,7 @@ void RemoteStore::collectGarbage(const GCOptions & options, GCResults & results)
 
     conn->to
         << wopCollectGarbage << options.action;
-    writeStorePaths(*this, conn->to, options.pathsToDelete);
+    write(*this, conn->to, options.pathsToDelete);
     conn->to << options.ignoreLiveness
         << options.maxFreed
         /* removed options */
@@ -830,9 +811,9 @@ void RemoteStore::queryMissing(const std::vector<StorePathWithOutputs> & targets
             ss.push_back(p.to_string(*this));
         conn->to << ss;
         conn.processStderr();
-        willBuild = readStorePaths<StorePathSet>(*this, conn->from);
-        willSubstitute = readStorePaths<StorePathSet>(*this, conn->from);
-        unknown = readStorePaths<StorePathSet>(*this, conn->from);
+        willBuild = read(*this, conn->from, Proxy<StorePathSet> {});
+        willSubstitute = read(*this, conn->from, Proxy<StorePathSet> {});
+        unknown = read(*this, conn->from, Proxy<StorePathSet> {});
         conn->from >> downloadSize >> narSize;
         return;
     }

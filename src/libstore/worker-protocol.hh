@@ -66,14 +66,85 @@ typedef enum {
 class Store;
 struct Source;
 
-template<class T> T readStorePaths(const Store & store, Source & from);
+/* To guide overloading */
+template<typename T>
+struct Proxy {};
 
-void writeStorePaths(const Store & store, Sink & out, const StorePathSet & paths);
+template<typename T>
+std::set<T> read(const Store & store, Source & from, Proxy<std::set<T>> _)
+{
+    std::set<T> resSet;
+    auto size = readNum<size_t>(from);
+    while (size--) {
+        resSet.insert(read(store, from, Proxy<T> {}));
+    }
+    return resSet;
+}
 
-std::set<StorePathDescriptor> readStorePathDescriptorSet(const Store & store, Source & from);
+template<typename T>
+void write(const Store & store, Sink & out, const std::set<T> & resSet)
+{
+    out << resSet.size();
+    for (auto & key : resSet) {
+        write(store, out, key);
+    }
+}
 
-void writeStorePathDescriptorSet(const Store & store, Sink & out, const std::set<StorePathDescriptor> & paths);
+template<typename K, typename V>
+std::map<K, V> read(const Store & store, Source & from, Proxy<std::map<K, V>> _)
+{
+    std::map<K, V> resMap;
+    auto size = readNum<size_t>(from);
+    while (size--) {
+        resMap.insert_or_assign(
+            read(store, from, Proxy<K> {}),
+            read(store, from, Proxy<V> {}));
+    }
+    return resMap;
+}
 
-void writeOutputPathMap(const Store & store, Sink & out, const OutputPathMap & paths);
+template<typename K, typename V>
+void write(const Store & store, Sink & out, const std::map<K, V> & resMap)
+{
+    out << resMap.size();
+    for (auto & [key, value] : resMap) {
+        write(store, out, key);
+        write(store, out, value);
+    }
+}
+
+template<typename T>
+std::optional<T> read(const Store & store, Source & from, Proxy<std::optional<T>> _)
+{
+    auto tag = readNum<uint8_t>(from);
+    switch (tag) {
+    case 0:
+        return std::nullopt;
+    case 1:
+        return read(store, from, Proxy<T> {});
+    default:
+        throw Error("got an invalid tag bit for std::optional: %#04x", (size_t)tag);
+    }
+}
+
+template<typename T>
+void write(const Store & store, Sink & out, const std::optional<T> & optVal)
+{
+    out << (uint64_t) (optVal ? 1 : 0);
+    if (optVal)
+        write(store, out, *optVal);
+}
+
+std::string read(const Store & store, Source & from, Proxy<std::string> _);
+
+void write(const Store & store, Sink & out, const std::string & str);
+
+StorePath read(const Store & store, Source & from, Proxy<StorePath> _);
+
+void write(const Store & store, Sink & out, const StorePath & storePath);
+
+StorePathDescriptor read(const Store & store, Source & from, Proxy<StorePathDescriptor> _);
+
+void write(const Store & store, Sink & out, const StorePathDescriptor & ca);
 
 }
