@@ -239,6 +239,20 @@ StorePath Store::computeStorePathForText(const string & name, const string & s,
 }
 
 
+StorePath Store::addToStore(const string & name, const Path & _srcPath,
+    FileIngestionMethod method, HashType hashAlgo, PathFilter & filter, RepairFlag repair)
+{
+    Path srcPath(absPath(_srcPath));
+    auto source = sinkToSource([&](Sink & sink) {
+        if (method == FileIngestionMethod::Recursive)
+            dumpPath(srcPath, sink, filter);
+        else
+            readFile(srcPath, sink);
+    });
+    return addToStoreFromDump(*source, name, method, hashAlgo, repair);
+}
+
+
 /*
 The aim of this function is to compute in one pass the correct ValidPathInfo for
 the files that we are trying to add to the store. To accomplish that in one

@@ -1,17 +1,9 @@
 #pragma once
 
-// TODO many of thes eare not needed.
 #include "path.hh"
 #include "hash.hh"
 #include "content-address.hh"
-#include "serialise.hh"
-#include "crypto.hh"
-#include "lru-cache.hh"
-#include "sync.hh"
-#include "globals.hh"
-#include "config.hh"
 
-#include <limits>
 #include <string>
 #include <optional>
 
@@ -60,6 +52,16 @@ void PathReferences<Ref>::setReferencesPossiblyToSelf(const Ref & self, std::set
 
     references = refs;
 }
+
+
+struct SubstitutablePathInfo : PathReferences<StorePath>
+{
+    std::optional<StorePath> deriver;
+    uint64_t downloadSize; /* 0 = unknown or inapplicable */
+    uint64_t narSize; /* 0 = unknown */
+};
+
+typedef std::map<StorePath, SubstitutablePathInfo> SubstitutablePathInfos;
 
 struct ValidPathInfo : PathReferences<StorePath>
 {
@@ -145,13 +147,4 @@ struct ValidPathInfo : PathReferences<StorePath>
 
 typedef list<ValidPathInfo> ValidPathInfos;
 
-
-struct SubstitutablePathInfo : PathReferences<StorePath>
-{
-    std::optional<StorePath> deriver;
-    uint64_t downloadSize; /* 0 = unknown or inapplicable */
-    uint64_t narSize; /* 0 = unknown */
-};
-
-typedef std::map<StorePath, SubstitutablePathInfo> SubstitutablePathInfos;
 }

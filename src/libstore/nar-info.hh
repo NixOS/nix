@@ -2,7 +2,7 @@
 
 #include "types.hh"
 #include "hash.hh"
-#include "path-info.hh"
+#include "store-api.hh"
 
 namespace nix {
 
