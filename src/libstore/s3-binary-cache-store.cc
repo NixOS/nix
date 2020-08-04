@@ -267,6 +267,10 @@ struct S3BinaryCacheStoreImpl : public S3BinaryCacheStore
         const std::string & mimeType,
         const std::string & contentEncoding)
     {
+        istream->seekg(0, istream->end);
+        auto size = istream->tellg();
+        istream->seekg(0, istream->beg);
+
         auto maxThreads = std::thread::hardware_concurrency();
 
         static std::shared_ptr<Aws::Utils::Threading::PooledThreadExecutor>
@@ -344,10 +348,11 @@ struct S3BinaryCacheStoreImpl : public S3BinaryCacheStore
             std::chrono::duration_cast<std::chrono::milliseconds>(now2 - now1)
                 .count();
 
-        printInfo("uploaded 's3://%s/%s' in %d ms",
-            bucketName, path, duration);
+        printInfo("uploaded 's3://%s/%s' (%d bytes) in %d ms",
+            bucketName, path, size, duration);
 
         stats.putTimeMs += duration;
+        stats.putBytes += std::max(size, (decltype(size)) 0);
         stats.put++;
     }
 

@@ -1049,20 +1049,6 @@ void LocalStore::addToStore(const ValidPathInfo & info, Source & source,
 }
 
 
-StorePath LocalStore::addToStore(const string & name, const Path & _srcPath,
-    FileIngestionMethod method, HashType hashAlgo, PathFilter & filter, RepairFlag repair)
-{
-    Path srcPath(absPath(_srcPath));
-    auto source = sinkToSource([&](Sink & sink) {
-        if (method == FileIngestionMethod::Recursive)
-            dumpPath(srcPath, sink, filter);
-        else
-            readFile(srcPath, sink);
-    });
-    return addToStoreFromDump(*source, name, method, hashAlgo, repair);
-}
-
-
 StorePath LocalStore::addToStoreFromDump(Source & source0, const string & name,
     FileIngestionMethod method, HashType hashAlgo, RepairFlag repair)
 {
