@@ -169,6 +169,7 @@ void BinaryCacheStore::addToStore(const ValidPathInfo & info, Source & narSource
     TeeSource teeSource(narSource, *compressionSink);
     narAccessor = makeNarAccessor(teeSource);
     compressionSink->finish();
+    fileSink.flush();
     }
 
     auto now2 = std::chrono::steady_clock::now();
