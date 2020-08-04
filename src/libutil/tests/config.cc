@@ -154,10 +154,8 @@ namespace nix {
         std::stringstream out;
         {
             // FIXME maybe use SAX streaming API
-            nlohmann::json obj;
             Config config;
-            config.toJSON(obj);
-            out << obj;
+            out << config.toJSON();
         }
 
         ASSERT_EQ(out.str(), "{}");
@@ -173,8 +171,7 @@ namespace nix {
             Setting<std::string> setting{&config, "", "name-of-the-setting", "description"};
             setting.assign("value");
 
-            config.toJSON(obj);
-            out << obj;
+            out << config.toJSON();
         }
         ASSERT_EQ(out.str(), R"#({"name-of-the-setting":{"description":"description","value":"value"}})#");
     }

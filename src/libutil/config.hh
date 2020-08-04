@@ -96,7 +96,7 @@ public:
      * Outputs all settings to JSON
      * - out: JSON Object to write the configuration to
      */
-    virtual void toJSON(nlohmann::json & out) = 0;
+    virtual nlohmann::json toJSON() = 0;
 
     /**
      * Converts settings to `Args` to be used on the command line interface
@@ -166,7 +166,11 @@ public:
 
     void resetOverriden() override;
 
-    void toJSON(nlohmann::json & out) override;
+    std::map<std::string, nlohmann::json> toJSONMap();
+
+    nlohmann::json toJSON() override {
+        return toJSON();
+    }
 
     void convertToArgs(Args & args, const std::string & category) override;
 };
@@ -205,7 +209,7 @@ protected:
 
     virtual std::string to_string() const = 0;
 
-    virtual void toJSON(nlohmann::json & out);
+    virtual nlohmann::json toJSON();
 
     virtual void convertToArg(Args & args, const std::string & category);
 
@@ -250,7 +254,7 @@ public:
 
     void convertToArg(Args & args, const std::string & category) override;
 
-    void toJSON(nlohmann::json & out) override;
+    nlohmann::json toJSON() override;
 };
 
 template<typename T>
@@ -318,7 +322,7 @@ struct GlobalConfig : public AbstractConfig
 
     void resetOverriden() override;
 
-    void toJSON(nlohmann::json & out) override;
+    nlohmann::json toJSON() override;
 
     void convertToArgs(Args & args, const std::string & category) override;
 

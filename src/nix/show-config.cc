@@ -21,9 +21,7 @@ struct CmdShowConfig : Command, MixJSON
     {
         if (json) {
             // FIXME: use appropriate JSON types (bool, ints, etc).
-            nlohmann::json jsonObj;
-            globalConfig.toJSON(jsonObj);
-            std::cout << jsonObj;
+            std::cout << globalConfig.toJSON();
         } else {
             std::map<std::string, Config::SettingInfo> settings;
             globalConfig.getSettings(settings);
