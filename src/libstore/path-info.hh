@@ -20,6 +20,16 @@ namespace nix {
 
 class Store;
 
+
+struct SubstitutablePathInfo : PathReferences<StorePath>
+{
+    std::optional<StorePath> deriver;
+    uint64_t downloadSize; /* 0 = unknown or inapplicable */
+    uint64_t narSize; /* 0 = unknown */
+};
+
+typedef std::map<StorePath, SubstitutablePathInfo> SubstitutablePathInfos;
+
 struct ValidPathInfo : PathReferences<StorePath>
 {
     StorePath path;
@@ -109,13 +119,4 @@ struct ValidPathInfo : PathReferences<StorePath>
 
 typedef list<ValidPathInfo> ValidPathInfos;
 
-
-struct SubstitutablePathInfo : PathReferences<StorePath>
-{
-    std::optional<StorePath> deriver;
-    uint64_t downloadSize; /* 0 = unknown or inapplicable */
-    uint64_t narSize; /* 0 = unknown */
-};
-
-typedef std::map<StorePath, SubstitutablePathInfo> SubstitutablePathInfos;
 }
