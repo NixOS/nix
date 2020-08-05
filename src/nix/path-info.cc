@@ -61,7 +61,7 @@ struct CmdPathInfo : StorePathsCommand, MixJSON
         };
     }
 
-    void printSize(unsigned long long value)
+    void printSize(uint64_t value)
     {
         if (!humanReadable) {
             std::cout << fmt("\t%11d", value);
