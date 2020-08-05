@@ -36,7 +36,11 @@ private:
 
 struct EvalCommand : virtual StoreCommand, MixEvalArgs
 {
+    bool startReplOnEvalErrors = false;
+
     ref<EvalState> getEvalState();
+
+    EvalCommand();
 
     std::shared_ptr<EvalState> evalState;
 };
@@ -250,5 +254,9 @@ void printClosureDiff(
     const StorePath & beforePath,
     const StorePath & afterPath,
     std::string_view indent);
+
+void runRepl(
+    ref<EvalState> evalState,
+    const std::map<std::string, Value *> & extraEnv);
 
 }

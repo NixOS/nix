@@ -41,7 +41,7 @@ namespace nix {
 struct NixRepl : gc
 {
     string curDir;
-    std::unique_ptr<EvalState> state;
+    ref<EvalState> state;
     Bindings * autoArgs;
 
     Strings loadedFiles;
@@ -54,7 +54,7 @@ struct NixRepl : gc
 
     const Path historyFile;
 
-    NixRepl(const Strings & searchPath, nix::ref<Store> store);
+    NixRepl(ref<EvalState> state);
     ~NixRepl();
     void mainLoop(const std::vector<std::string> & files);
     StringSet completePrefix(string prefix);
@@ -65,13 +65,13 @@ struct NixRepl : gc
     void initEnv();
     void reloadFiles();
     void addAttrsToScope(Value & attrs);
-    void addVarToScope(const Symbol & name, Value & v);
+    void addVarToScope(const Symbol & name, Value * v);
     Expr * parseString(string s);
     void evalString(string s, Value & v);
 
     typedef set<Value *> ValuesSeen;
-    std::ostream &  printValue(std::ostream & str, Value & v, unsigned int maxDepth);
-    std::ostream &  printValue(std::ostream & str, Value & v, unsigned int maxDepth, ValuesSeen & seen);
+    std::ostream & printValue(std::ostream & str, Value & v, unsigned int maxDepth);
+    std::ostream & printValue(std::ostream & str, Value & v, unsigned int maxDepth, ValuesSeen & seen);
 };
 
 
@@ -84,8 +84,8 @@ string removeWhitespace(string s)
 }
 
 
-NixRepl::NixRepl(const Strings & searchPath, nix::ref<Store> store)
-    : state(std::make_unique<EvalState>(searchPath, store))
+NixRepl::NixRepl(ref<EvalState> state)
+    : state(state)
     , staticEnv(false, &state->staticBaseEnv)
     , historyFile(getDataDir() + "/nix/repl-history")
 {
@@ -176,11 +176,13 @@ void NixRepl::mainLoop(const std::vector<std::string> & files)
     string error = ANSI_RED "error:" ANSI_NORMAL " ";
     std::cout << "Welcome to Nix version " << nixVersion << ". Type :? for help." << std::endl << std::endl;
 
-    for (auto & i : files)
-        loadedFiles.push_back(i);
+    if (!files.empty()) {
+        for (auto & i : files)
+            loadedFiles.push_back(i);
 
-    reloadFiles();
-    if (!loadedFiles.empty()) std::cout << std::endl;
+        reloadFiles();
+        if (!loadedFiles.empty()) std::cout << std::endl;
+    }
 
     // Allow nix-repl specific settings in .inputrc
     rl_readline_name = "nix-repl";
@@ -516,10 +518,10 @@ bool NixRepl::processLine(string line)
             isVarName(name = removeWhitespace(string(line, 0, p))))
         {
             Expr * e = parseString(string(line, p + 1));
-            Value & v(*state->allocValue());
-            v.type = tThunk;
-            v.thunk.env = env;
-            v.thunk.expr = e;
+            auto v = state->allocValue();
+            v->type = tThunk;
+            v->thunk.env = env;
+            v->thunk.expr = e;
             addVarToScope(state->symbols.create(name), v);
         } else {
             Value v;
@@ -577,17 +579,17 @@ void NixRepl::addAttrsToScope(Value & attrs)
 {
     state->forceAttrs(attrs);
     for (auto & i : *attrs.attrs)
-        addVarToScope(i.name, *i.value);
+        addVarToScope(i.name, i.value);
     std::cout << format("Added %1% variables.") % attrs.attrs->size() << std::endl;
 }
 
 
-void NixRepl::addVarToScope(const Symbol & name, Value & v)
+void NixRepl::addVarToScope(const Symbol & name, Value * v)
 {
     if (displ >= envSize)
         throw Error("environment full; cannot add more variables");
     staticEnv.vars[name] = displ;
-    env->values[displ++] = &v;
+    env->values[displ++] = v;
     varNames.insert((string) name);
 }
 
@@ -754,6 +756,26 @@ std::ostream & NixRepl::printValue(std::ostream & str, Value & v, unsigned int m
     return str;
 }
 
+void runRepl(
+    ref<EvalState> evalState,
+    const std::map<std::string, Value *> & extraEnv)
+{
+    auto repl = std::make_unique<NixRepl>(evalState);
+
+    repl->initEnv();
+
+    std::set<std::string> names;
+
+    for (auto & [name, value] : extraEnv) {
+        names.insert(ANSI_BOLD + name + ANSI_NORMAL);
+        repl->addVarToScope(repl->state->symbols.create(name), value);
+    }
+
+    printError("The following extra variables are in scope: %s\n", concatStringsSep(", ", names));
+
+    repl->mainLoop({});
+}
+
 struct CmdRepl : StoreCommand, MixEvalArgs
 {
     std::vector<std::string> files;
@@ -775,17 +797,20 @@ struct CmdRepl : StoreCommand, MixEvalArgs
     Examples examples() override
     {
         return {
-          Example{
-            "Display all special commands within the REPL:",
-              "nix repl\n  nix-repl> :?"
-          }
+            {
+                "Display all special commands within the REPL:",
+                "nix repl\n  nix-repl> :?"
+            }
         };
     }
 
     void run(ref<Store> store) override
     {
         evalSettings.pureEval = false;
-        auto repl = std::make_unique<NixRepl>(searchPath, openStore());
+
+        auto evalState = make_ref<EvalState>(searchPath, store);
+
+        auto repl = std::make_unique<NixRepl>(evalState);
         repl->autoArgs = getAutoArgs(*repl->state);
         repl->mainLoop(files);
     }
