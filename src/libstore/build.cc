@@ -3722,18 +3722,18 @@ void DerivationGoal::registerOutputs()
         std::optional<ContentAddress> ca;
 
         if (! std::holds_alternative<DerivationOutputInputAddressed>(i.second.output)) {
-            DerivationOutputFloating outputHash;
+            DerivationOutputCAFloating outputHash;
             std::visit(overloaded {
                 [&](DerivationOutputInputAddressed doi) {
                     assert(false); // Enclosing `if` handles this case in other branch
                 },
-                [&](DerivationOutputFixed dof) {
-                    outputHash = DerivationOutputFloating {
+                [&](DerivationOutputCAFixed dof) {
+                    outputHash = DerivationOutputCAFloating {
                         .method = dof.hash.method,
                         .hashType = dof.hash.hash.type,
                     };
                 },
-                [&](DerivationOutputFloating dof) {
+                [&](DerivationOutputCAFloating dof) {
                     outputHash = dof;
                 },
             }, i.second.output);
@@ -3758,7 +3758,7 @@ void DerivationGoal::registerOutputs()
             // true if either floating CA, or incorrect fixed hash.
             bool needsMove = true;
 
-            if (auto p = std::get_if<DerivationOutputFixed>(& i.second.output)) {
+            if (auto p = std::get_if<DerivationOutputCAFixed>(& i.second.output)) {
               Hash & h = p->hash.hash;
               if (h != h2) {
 
