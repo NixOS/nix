@@ -74,6 +74,7 @@ public:
         sSystem, sOverrides, sOutputs, sOutputName, sIgnoreNulls,
         sFile, sLine, sColumn, sFunctor, sToString,
         sRight, sWrong, sStructuredAttrs, sBuilder, sArgs,
+        sContentAddressed,
         sOutputHash, sOutputHashAlgo, sOutputHashMode,
         sRecurseForDerivations,
         sDescription, sSelf, sEpsilon;
