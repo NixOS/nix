@@ -289,7 +289,7 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
         logger->startWork();
         auto hash = store->queryPathInfo(path)->narHash;
         logger->stopWork();
-        to << hash->to_string(Base16, false);
+        to << hash.to_string(Base16, false);
         break;
     }
 
@@ -638,7 +638,7 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
             if (GET_PROTOCOL_MINOR(clientVersion) >= 17)
                 to << 1;
             to << (info->deriver ? store->printStorePath(*info->deriver) : "")
-               << info->narHash->to_string(Base16, false);
+               << info->narHash.to_string(Base16, false);
             writeStorePaths(*store, to, info->references);
             to << info->registrationTime << info->narSize;
             if (GET_PROTOCOL_MINOR(clientVersion) >= 16) {

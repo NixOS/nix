@@ -29,7 +29,7 @@ struct ValidPathInfo
     StorePath path;
     std::optional<StorePath> deriver;
     // TODO document this
-    std::optional<Hash> narHash;
+    Hash narHash;
     StorePathSet references;
     time_t registrationTime = 0;
     uint64_t narSize = 0; // 0 = unknown
@@ -100,8 +100,8 @@ struct ValidPathInfo
 
     ValidPathInfo(const ValidPathInfo & other) = default;
 
-    ValidPathInfo(StorePath && path) : path(std::move(path)) { };
-    ValidPathInfo(const StorePath & path) : path(path) { };
+    ValidPathInfo(StorePath && path) : path(std::move(path)), narHash(Hash(htSHA256)) { };
+    ValidPathInfo(const StorePath & path) : path(path), narHash(Hash(htSHA256)) { };
 
     virtual ~ValidPathInfo() { }
 };
