@@ -327,7 +327,7 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
         logger->startWork();
         auto outputs = store->queryDerivationOutputMap(path);
         logger->stopWork();
-        write(*store, to, outputs);
+        nix::worker_proto::write(*store, to, outputs);
         break;
     }
 

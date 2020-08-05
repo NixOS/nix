@@ -78,6 +78,19 @@ struct Phantom {};
 namespace worker_proto {
 /* FIXME maybe move more stuff inside here */
 
+StorePath read(const Store & store, Source & from, Phantom<StorePath> _);
+void write(const Store & store, Sink & out, const StorePath & storePath);
+
+template<typename T>
+std::map<std::string, T> read(const Store & store, Source & from, Phantom<std::map<std::string, T>> _);
+template<typename T>
+void write(const Store & store, Sink & out, const std::map<string, T> & resMap);
+template<typename T>
+std::optional<T> read(const Store & store, Source & from, Phantom<std::optional<T>> _);
+template<typename T>
+void write(const Store & store, Sink & out, const std::optional<T> & optVal);
+
+
 template<typename T>
 std::map<std::string, T> read(const Store & store, Source & from, Phantom<std::map<std::string, T>> _)
 {
@@ -122,9 +135,6 @@ void write(const Store & store, Sink & out, const std::optional<T> & optVal)
         nix::worker_proto::write(store, out, *optVal);
 }
 
-StorePath read(const Store & store, Source & from, Phantom<StorePath> _);
-
-void write(const Store & store, Sink & out, const StorePath & storePath);
 
 }
 
