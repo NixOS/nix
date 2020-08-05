@@ -1,6 +1,5 @@
 #include "config.hh"
 #include "args.hh"
-#include "json.hh"
 
 namespace nix {
 
@@ -131,15 +130,16 @@ void Config::resetOverriden()
         s.second.setting->overriden = false;
 }
 
-void Config::toJSON(JSONObject & out)
+std::map<std::string, nlohmann::json> Config::toJSONMap()
 {
-    for (auto & s : _settings)
-        if (!s.second.isAlias) {
-            JSONObject out2(out.object(s.first));
-            out2.attr("description", s.second.setting->description);
-            JSONPlaceholder out3(out2.placeholder("value"));
-            s.second.setting->toJSON(out3);
+    std::map<std::string, nlohmann::json> out;
+    for (auto & [name, entry] : _settings)
+        if (!entry.isAlias) {
+            auto & out2 = out[name];
+            out2["description"] = entry.setting->description;
+            out2["value"] = entry.setting->toJSON();
         }
+    return out;
 }
 
 void Config::convertToArgs(Args & args, const std::string & category)
@@ -162,9 +162,9 @@ void AbstractSetting::setDefault(const std::string & str)
     if (!overriden) set(str);
 }
 
-void AbstractSetting::toJSON(JSONPlaceholder & out)
+nlohmann::json AbstractSetting::toJSON()
 {
-    out.write(to_string());
+    return to_string();
 }
 
 void AbstractSetting::convertToArg(Args & args, const std::string & category)
@@ -172,9 +172,9 @@ void AbstractSetting::convertToArg(Args & args, const std::string & category)
 }
 
 template<typename T>
-void BaseSetting<T>::toJSON(JSONPlaceholder & out)
+nlohmann::json BaseSetting<T>::toJSON()
 {
-    out.write(value);
+    return value;
 }
 
 template<typename T>
@@ -255,11 +255,12 @@ template<> std::string BaseSetting<Strings>::to_string() const
     return concatStringsSep(" ", value);
 }
 
-template<> void BaseSetting<Strings>::toJSON(JSONPlaceholder & out)
+template<> nlohmann::json BaseSetting<Strings>::toJSON()
 {
-    JSONList list(out.list());
+    nlohmann::json out;
     for (auto & s : value)
-        list.elem(s);
+        out.push_back(s);
+    return out;
 }
 
 template<> void BaseSetting<StringSet>::set(const std::string & str)
@@ -272,11 +273,12 @@ template<> std::string BaseSetting<StringSet>::to_string() const
     return concatStringsSep(" ", value);
 }
 
-template<> void BaseSetting<StringSet>::toJSON(JSONPlaceholder & out)
+template<> nlohmann::json BaseSetting<StringSet>::toJSON()
 {
-    JSONList list(out.list());
+    nlohmann::json out;
     for (auto & s : value)
-        list.elem(s);
+        out.push_back(s);
+    return out;
 }
 
 template class BaseSetting<int>;
@@ -323,10 +325,14 @@ void GlobalConfig::resetOverriden()
         config->resetOverriden();
 }
 
-void GlobalConfig::toJSON(JSONObject & out)
+nlohmann::json GlobalConfig::toJSON()
 {
-    for (auto & config : *configRegistrations)
-        config->toJSON(out);
+    std::map<std::string, nlohmann::json> out;
+    for (auto & config : *configRegistrations) { 
+        auto entries = config->toJSONMap();
+        out.insert(entries.begin(), entries.end());
+    }
+    return out;
 }
 
 void GlobalConfig::convertToArgs(Args & args, const std::string & category)

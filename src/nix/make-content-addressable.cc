@@ -1,8 +1,9 @@
+#include <nlohmann/json.hpp>
+
 #include "command.hh"
 #include "store-api.hh"
 #include "references.hh"
 #include "common-args.hh"
-#include "json.hh"
 
 using namespace nix;
 
@@ -42,8 +43,8 @@ struct CmdMakeContentAddressable : StorePathsCommand, MixJSON
 
         std::map<StorePath, StorePath> remappings;
 
-        auto jsonRoot = json ? std::make_unique<JSONObject>(std::cout) : nullptr;
-        auto jsonRewrites = json ? std::make_unique<JSONObject>(jsonRoot->object("rewrites")) : nullptr;
+        auto jsonRoot = json ? std::optional<nlohmann::json>() : nullptr;
+        auto jsonRewrites = json ? &(*jsonRoot)["rewrites"] : nullptr;
 
         for (auto & path : paths) {
             auto pathS = store->printStorePath(path);
@@ -99,7 +100,7 @@ struct CmdMakeContentAddressable : StorePathsCommand, MixJSON
             store->addToStore(info, *source);
 
             if (json)
-                jsonRewrites->attr(store->printStorePath(path), store->printStorePath(info.path));
+                (*jsonRewrites)[store->printStorePath(path)] = store->printStorePath(info.path);
 
             remappings.insert_or_assign(std::move(path), std::move(info.path));
         }

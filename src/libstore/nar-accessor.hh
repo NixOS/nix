@@ -1,6 +1,7 @@
 #pragma once
 
 #include <functional>
+#include <nlohmann/json.hpp>
 
 #include "fs-accessor.hh"
 
@@ -24,11 +25,9 @@ ref<FSAccessor> makeLazyNarAccessor(
     const std::string & listing,
     GetNarBytes getNarBytes);
 
-class JSONPlaceholder;
-
 /* Write a JSON representation of the contents of a NAR (except file
    contents). */
-void listNar(JSONPlaceholder & res, ref<FSAccessor> accessor,
+void listNar(nlohmann::json & res, ref<FSAccessor> accessor,
     const Path & path, bool recurse);
 
 }

@@ -1,11 +1,14 @@
 // FIXME: integrate this with nix path-info?
 
+#include <iomanip>
+#include <nlohmann/json.hpp>
+
 #include "command.hh"
 #include "common-args.hh"
 #include "store-api.hh"
 #include "archive.hh"
-#include "json.hh"
 #include "derivations.hh"
+
 
 using namespace nix;
 
@@ -54,63 +57,59 @@ struct CmdShowDerivation : InstallablesCommand
             drvPaths = std::move(closure);
         }
 
-        {
-
-        JSONObject jsonRoot(std::cout, true);
+        nlohmann::json jsonRoot;
 
         for (auto & drvPath : drvPaths) {
             if (!drvPath.isDerivation()) continue;
 
-            auto drvObj(jsonRoot.object(store->printStorePath(drvPath)));
+            auto & drvObj = jsonRoot[store->printStorePath(drvPath)];
 
             auto drv = store->readDerivation(drvPath);
 
             {
-                auto outputsObj(drvObj.object("outputs"));
+                auto & outputsObj= drvObj["outputs"];
                 for (auto & output : drv.outputs) {
-                    auto outputObj(outputsObj.object(output.first));
-                    outputObj.attr("path", store->printStorePath(output.second.path(*store, drv.name)));
+                    auto & outputObj = outputsObj[output.first];
+                    outputObj["path"] = store->printStorePath(output.second.path(*store, drv.name));
                     if (auto hash = std::get_if<DerivationOutputFixed>(&output.second.output)) {
-                        outputObj.attr("hashAlgo", hash->hash.printMethodAlgo());
-                        outputObj.attr("hash", hash->hash.hash.to_string(Base16, false));
+                        outputObj["hashAlgo"] = hash->hash.printMethodAlgo();
+                        outputObj["hash"] = hash->hash.hash.to_string(Base16, false);
                     }
                 }
             }
 
             {
-                auto inputsList(drvObj.list("inputSrcs"));
+                auto & inputsList = drvObj["inputSrcs"];
                 for (auto & input : drv.inputSrcs)
-                    inputsList.elem(store->printStorePath(input));
+                    inputsList.push_back(store->printStorePath(input));
             }
 
             {
-                auto inputDrvsObj(drvObj.object("inputDrvs"));
+                auto & inputDrvsObj = drvObj["inputDrvs"];
                 for (auto & input : drv.inputDrvs) {
-                    auto inputList(inputDrvsObj.list(store->printStorePath(input.first)));
+                    auto & inputList = inputDrvsObj[store->printStorePath(input.first)];
                     for (auto & outputId : input.second)
-                        inputList.elem(outputId);
+                        inputList.push_back(outputId);
                 }
             }
 
-            drvObj.attr("platform", drv.platform);
-            drvObj.attr("builder", drv.builder);
+            drvObj["platform"] = drv.platform;
+            drvObj["builder"] = drv.builder;
 
             {
-                auto argsList(drvObj.list("args"));
+                auto & argsList = drvObj["args"];
                 for (auto & arg : drv.args)
-                    argsList.elem(arg);
+                    argsList.push_back(arg);
             }
 
             {
-                auto envObj(drvObj.object("env"));
+                auto & envObj= drvObj["env"];
                 for (auto & var : drv.env)
-                    envObj.attr(var.first, var.second);
+                    envObj[var.first] = var.second;
             }
         }
 
-        }
-
-        std::cout << "\n";
+        std::cout << std::setw(4) << jsonRoot << std::endl;
     }
 };
 

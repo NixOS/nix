@@ -9,7 +9,6 @@
 #include "remote-fs-accessor.hh"
 #include "nar-info-disk-cache.hh"
 #include "nar-accessor.hh"
-#include "json.hh"
 #include "thread-pool.hh"
 
 #include <chrono>
@@ -210,13 +209,14 @@ void BinaryCacheStore::addToStore(const ValidPathInfo & info, Source & narSource
         std::ostringstream jsonOut;
 
         {
-            JSONObject jsonRoot(jsonOut);
-            jsonRoot.attr("version", 1);
+            auto jsonRoot = nlohmann::json::object();
+            jsonRoot["version"] = 1;
 
             {
-                auto res = jsonRoot.placeholder("root");
+                auto & res = jsonRoot["root"];
                 listNar(res, ref<FSAccessor>(narAccessor), "", true);
             }
+            jsonOut << jsonRoot;
         }
 
         upsertFile(std::string(info.path.to_string()) + ".ls", jsonOut.str(), "application/json");

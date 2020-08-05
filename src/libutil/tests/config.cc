@@ -1,4 +1,3 @@
-#include "json.hh"
 #include "config.hh"
 #include "args.hh"
 
@@ -153,10 +152,10 @@ namespace nix {
 
     TEST(Config, toJSONOnEmptyConfig) {
         std::stringstream out;
-        { // Scoped to force the destructor of JSONObject to write the final `}`
-            JSONObject obj(out);
+        {
+            // FIXME maybe use SAX streaming API
             Config config;
-            config.toJSON(obj);
+            out << config.toJSON();
         }
 
         ASSERT_EQ(out.str(), "{}");
@@ -164,15 +163,15 @@ namespace nix {
 
     TEST(Config, toJSONOnNonEmptyConfig) {
         std::stringstream out;
-        { // Scoped to force the destructor of JSONObject to write the final `}`
-            JSONObject obj(out);
-
+        {
+            // FIXME maybe use SAX streaming API
+            nlohmann::json obj;
             Config config;
             std::map<std::string, Config::SettingInfo> settings;
             Setting<std::string> setting{&config, "", "name-of-the-setting", "description"};
             setting.assign("value");
 
-            config.toJSON(obj);
+            out << config.toJSON();
         }
         ASSERT_EQ(out.str(), R"#({"name-of-the-setting":{"description":"description","value":"value"}})#");
     }

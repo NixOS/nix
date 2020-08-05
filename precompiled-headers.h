@@ -39,6 +39,8 @@
 
 #include <boost/format.hpp>
 
+#include <nlohmann/json.hpp>
+
 #include <dirent.h>
 #include <errno.h>
 #include <fcntl.h>

@@ -1,10 +1,11 @@
 #include "remote-fs-accessor.hh"
 #include "nar-accessor.hh"
-#include "json.hh"
 
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
+
+#include <nlohmann/json.hpp>
 
 namespace nix {
 
@@ -29,14 +30,16 @@ void RemoteFSAccessor::addToCache(std::string_view hashPart, const std::string &
 
     if (cacheDir != "") {
         try {
-            std::ostringstream str;
-            JSONPlaceholder jsonRoot(str);
+            nlohmann::json jsonRoot;
             listNar(jsonRoot, narAccessor, "", true);
+
+            std::ostringstream str;
+            str << jsonRoot;
+
             writeFile(makeCacheFile(hashPart, "ls"), str.str());
 
             /* FIXME: do this asynchronously. */
             writeFile(makeCacheFile(hashPart, "nar"), nar);
-
         } catch (...) {
             ignoreException();
         }

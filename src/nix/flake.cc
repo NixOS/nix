@@ -10,7 +10,6 @@
 #include "attr-path.hh"
 #include "fetchers.hh"
 #include "registry.hh"
-#include "json.hh"
 #include "eval-cache.hh"
 
 #include <nlohmann/json.hpp>
@@ -742,40 +741,43 @@ struct CmdFlakeArchive : FlakeCommand, MixJSON, MixDryRun
     {
         auto flake = lockFlake();
 
-        auto jsonRoot = json ? std::optional<JSONObject>(std::cout) : std::nullopt;
+        auto jsonRoot = json ? std::optional<nlohmann::json>() : std::nullopt;
 
         StorePathSet sources;
 
         sources.insert(flake.flake.sourceInfo->storePath);
         if (jsonRoot)
-            jsonRoot->attr("path", store->printStorePath(flake.flake.sourceInfo->storePath));
+            (*jsonRoot)["path"] = store->printStorePath(flake.flake.sourceInfo->storePath);
 
         // FIXME: use graph output, handle cycles.
-        std::function<void(const Node & node, std::optional<JSONObject> & jsonObj)> traverse;
-        traverse = [&](const Node & node, std::optional<JSONObject> & jsonObj)
+        std::function<void(const Node & node, nlohmann::json * jsonObj)> traverse;
+        traverse = [&](const Node & node, nlohmann::json * jsonObj)
         {
-            auto jsonObj2 = jsonObj ? jsonObj->object("inputs") : std::optional<JSONObject>();
+            auto jsonObj2 = jsonObj ? &(*jsonObj)["inputs"] : nullptr;
             for (auto & [inputName, input] : node.inputs) {
                 if (auto inputNode = std::get_if<0>(&input)) {
-                    auto jsonObj3 = jsonObj2 ? jsonObj2->object(inputName) : std::optional<JSONObject>();
+                    auto jsonObj3 = jsonObj2 ? &(*jsonObj2)[inputName] : nullptr;
                     auto storePath =
                         dryRun
                         ? (*inputNode)->lockedRef.input.computeStorePath(*store)
                         : (*inputNode)->lockedRef.input.fetch(store).first.storePath;
                     if (jsonObj3)
-                        jsonObj3->attr("path", store->printStorePath(storePath));
+                        (*jsonObj3)["path"] = store->printStorePath(storePath);
                     sources.insert(std::move(storePath));
                     traverse(**inputNode, jsonObj3);
                 }
             }
         };
 
-        traverse(*flake.lockFile.root, jsonRoot);
+        traverse(*flake.lockFile.root, jsonRoot ? &*jsonRoot : nullptr);
 
         if (!dryRun && !dstUri.empty()) {
             ref<Store> dstStore = dstUri.empty() ? openStore() : openStore(dstUri);
             copyPaths(store, dstStore, sources);
         }
+
+        if (jsonRoot)
+            std::cout << *jsonRoot;
     }
 };
 

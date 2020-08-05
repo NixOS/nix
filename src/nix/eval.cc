@@ -1,11 +1,13 @@
+#include <nlohmann/json.hpp>
+
 #include "command.hh"
 #include "common-args.hh"
 #include "shared.hh"
 #include "store-api.hh"
 #include "eval.hh"
-#include "json.hh"
 #include "value-to-json.hh"
 #include "progress-bar.hh"
+
 
 using namespace nix;
 
@@ -81,8 +83,7 @@ struct CmdEval : MixJSON, InstallableCommand
             stopProgressBar();
             std::cout << state->coerceToString(noPos, *v, context);
         } else if (json) {
-            JSONPlaceholder jsonOut(std::cout);
-            printValueAsJSON(*state, true, *v, jsonOut, context);
+            printValueAsJSON(*state, true, *v, std::cout, context);
         } else {
             state->forceValueDeep(*v);
             logger->stdout("%s", *v);

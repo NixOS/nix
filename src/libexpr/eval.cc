@@ -6,7 +6,6 @@
 #include "globals.hh"
 #include "eval-inline.hh"
 #include "filetransfer.hh"
-#include "json.hh"
 #include "function-trace.hh"
 
 #include <algorithm>
@@ -17,6 +16,7 @@
 #include <sys/resource.h>
 #include <iostream>
 #include <fstream>
+#include <nlohmann/json.hpp>
 
 #include <sys/resource.h>
 
@@ -1878,98 +1878,102 @@ void EvalState::printStats()
         std::fstream fs;
         if (outPath != "-")
             fs.open(outPath, std::fstream::out);
-        JSONObject topObj(outPath == "-" ? std::cerr : fs, true);
-        topObj.attr("cpuTime",cpuTime);
+        nlohmann::json topObj;
+        topObj["cpuTime"] = cpuTime;
         {
-            auto envs = topObj.object("envs");
-            envs.attr("number", nrEnvs);
-            envs.attr("elements", nrValuesInEnvs);
-            envs.attr("bytes", bEnvs);
+            auto & envs = topObj["envs"];
+            envs["number"] = nrEnvs;
+            envs["elements"] = nrValuesInEnvs;
+            envs["bytes"] = bEnvs;
         }
         {
-            auto lists = topObj.object("list");
-            lists.attr("elements", nrListElems);
-            lists.attr("bytes", bLists);
-            lists.attr("concats", nrListConcats);
+            auto & lists = topObj["list"];
+            lists["elements"] = nrListElems;
+            lists["bytes"] = bLists;
+            lists["concats"] = nrListConcats;
         }
         {
-            auto values = topObj.object("values");
-            values.attr("number", nrValues);
-            values.attr("bytes", bValues);
+            auto & values = topObj["values"];
+            values["number"] = nrValues;
+            values["bytes"] = bValues;
         }
         {
-            auto syms = topObj.object("symbols");
-            syms.attr("number", symbols.size());
-            syms.attr("bytes", symbols.totalSize());
+            auto & syms = topObj["symbols"];
+            syms["number"] = symbols.size();
+            syms["bytes"] = symbols.totalSize();
         }
         {
-            auto sets = topObj.object("sets");
-            sets.attr("number", nrAttrsets);
-            sets.attr("bytes", bAttrsets);
-            sets.attr("elements", nrAttrsInAttrsets);
+            auto & sets = topObj["sets"];
+            sets["number"] = nrAttrsets;
+            sets["bytes"] = bAttrsets;
+            sets["elements"] = nrAttrsInAttrsets;
         }
         {
-            auto sizes = topObj.object("sizes");
-            sizes.attr("Env", sizeof(Env));
-            sizes.attr("Value", sizeof(Value));
-            sizes.attr("Bindings", sizeof(Bindings));
-            sizes.attr("Attr", sizeof(Attr));
+            auto & sizes = topObj["sizes"];
+            sizes["Env"] = sizeof(Env);
+            sizes["Value"] = sizeof(Value);
+            sizes["Bindings"] = sizeof(Bindings);
+            sizes["Attr"] = sizeof(Attr);
         }
-        topObj.attr("nrOpUpdates", nrOpUpdates);
-        topObj.attr("nrOpUpdateValuesCopied", nrOpUpdateValuesCopied);
-        topObj.attr("nrThunks", nrThunks);
-        topObj.attr("nrAvoided", nrAvoided);
-        topObj.attr("nrLookups", nrLookups);
-        topObj.attr("nrPrimOpCalls", nrPrimOpCalls);
-        topObj.attr("nrFunctionCalls", nrFunctionCalls);
+        topObj["nrOpUpdates"] = nrOpUpdates;
+        topObj["nrOpUpdateValuesCopied"] = nrOpUpdateValuesCopied;
+        topObj["nrThunks"] = nrThunks;
+        topObj["nrAvoided"] = nrAvoided;
+        topObj["nrLookups"] = nrLookups;
+        topObj["nrPrimOpCalls"] = nrPrimOpCalls;
+        topObj["nrFunctionCalls"] = nrFunctionCalls;
 #if HAVE_BOEHMGC
         {
-            auto gc = topObj.object("gc");
-            gc.attr("heapSize", heapSize);
-            gc.attr("totalBytes", totalBytes);
+            auto & gc = topObj["gc"];
+            gc["heapSize"] = heapSize;
+            gc["totalBytes"] = totalBytes;
         }
 #endif
 
         if (countCalls) {
             {
-                auto obj = topObj.object("primops");
+                auto & obj = topObj["primops"] = nlohmann::json::object();
                 for (auto & i : primOpCalls)
-                    obj.attr(i.first, i.second);
+                    obj[i.first] = i.second;
             }
             {
-                auto list = topObj.list("functions");
+                auto & list = topObj["functions"] = nlohmann::json::array();
                 for (auto & i : functionCalls) {
-                    auto obj = list.object();
+                    nlohmann::json obj;
                     if (i.first->name.set())
-                        obj.attr("name", (const string &) i.first->name);
+                        obj["name"] = (const string &) i.first->name;
                     else
-                        obj.attr("name", nullptr);
+                        obj["name"] = nullptr;
                     if (i.first->pos) {
-                        obj.attr("file", (const string &) i.first->pos.file);
-                        obj.attr("line", i.first->pos.line);
-                        obj.attr("column", i.first->pos.column);
+                        obj["file"] = (const string &) i.first->pos.file;
+                        obj["line"] = i.first->pos.line;
+                        obj["column"] = i.first->pos.column;
                     }
-                    obj.attr("count", i.second);
+                    obj["count"] = i.second;
                 }
+                list.push_back(list);
             }
             {
-                auto list = topObj.list("attributes");
+                auto & list = topObj["attributes"] = nlohmann::json::array();
                 for (auto & i : attrSelects) {
-                    auto obj = list.object();
+                    nlohmann::json obj;
                     if (i.first) {
-                        obj.attr("file", (const string &) i.first.file);
-                        obj.attr("line", i.first.line);
-                        obj.attr("column", i.first.column);
+                        obj["file"] = (const string &) i.first.file;
+                        obj["line"] = i.first.line;
+                        obj["column"] = i.first.column;
                     }
-                    obj.attr("count", i.second);
+                    obj["count"] = i.second;
+                    list.push_back(obj);
                 }
             }
         }
 
         if (getEnv("NIX_SHOW_SYMBOLS").value_or("0") != "0") {
-            auto list = topObj.list("symbols");
-            symbols.dump([&](const std::string & s) { list.elem(s); });
+            auto & list = topObj["symbols"];
+            symbols.dump([&](const std::string & s) { list.push_back(s); });
         }
+
+        (outPath == "-" ? std::cerr : fs) << topObj;
     }
 }
 

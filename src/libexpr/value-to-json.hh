@@ -8,10 +8,8 @@
 
 namespace nix {
 
-class JSONPlaceholder;
-
-void printValueAsJSON(EvalState & state, bool strict,
-    Value & v, JSONPlaceholder & out, PathSet & context);
+nlohmann::json printValueAsJSON(EvalState & state, bool strict,
+    Value & v, PathSet & context);
 
 void printValueAsJSON(EvalState & state, bool strict,
     Value & v, std::ostream & str, PathSet & context);

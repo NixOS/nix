@@ -38,7 +38,6 @@ MakeError(BadStorePath, Error);
 class FSAccessor;
 class NarInfoDiskCache;
 class Store;
-class JSONPlaceholder;
 
 
 enum CheckSigsFlag : bool { NoCheckSigs = false, CheckSigs = true };
@@ -475,7 +474,7 @@ public:
        variable elements such as the registration time are
        included. If ‘showClosureSize’ is true, the closure size of
        each path is included. */
-    void pathInfoToJSON(JSONPlaceholder & jsonOut, const StorePathSet & storePaths,
+    void pathInfoToJSON(nlohmann::json & jsonOut, const StorePathSet & storePaths,
         bool includeImpureInfo, bool showClosureSize,
         Base hashBase = Base32,
         AllowInvalidFlag allowInvalid = DisallowInvalid);
