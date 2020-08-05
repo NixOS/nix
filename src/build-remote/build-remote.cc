@@ -103,7 +103,7 @@ static int _main(int argc, char * * argv)
             drvPath = store->parseStorePath(readString(source));
             auto requiredFeatures = readStrings<std::set<std::string>>(source);
 
-             auto canBuildLocally = amWilling
+            auto canBuildLocally = amWilling
                  &&  (  neededSystem == settings.thisSystem
                      || settings.extraPlatforms.get().count(neededSystem) > 0)
                  &&  allSupportedLocally(requiredFeatures);
@@ -170,7 +170,38 @@ static int _main(int argc, char * * argv)
                     if (rightType && !canBuildLocally)
                         std::cerr << "# postpone\n";
                     else
+                    {
+                        // build the hint template.
+                        string hintstring =  "required (system, features): (%s, %s)";
+                        hintstring += "\n%s available machines:";
+                        hintstring += "\n(systems, maxjobs, supportedFeatures, mandatoryFeatures)";
+
+                        for (unsigned int i = 0; i < machines.size(); ++i) {
+                          hintstring += "\n(%s, %s, %s, %s)";
+                        }
+
+                        // add the template values.
+                        auto hint = hintformat(hintstring);
+                        hint
+                          % neededSystem
+                          % concatStringsSep<StringSet>(", ", requiredFeatures)
+                          % machines.size();
+
+                        for (auto & m : machines) {
+                          hint % concatStringsSep<vector<string>>(", ", m.systemTypes)
+                            % m.maxJobs
+                            % concatStringsSep<StringSet>(", ", m.supportedFeatures)
+                            % concatStringsSep<StringSet>(", ", m.mandatoryFeatures);
+                        }
+
+                        logError({
+                              .name = "Remote build",
+                              .description = "Failed to find a machine for remote build!",
+                              .hint = hint
+                        });
+
                         std::cerr << "# decline\n";
+                    }
                     break;
                 }
 
