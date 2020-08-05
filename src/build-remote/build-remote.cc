@@ -181,9 +181,15 @@ static int _main(int argc, char * * argv)
                         }
 
                         // add the template values.
+                        string drvstr;
+                        if (drvPath.has_value())
+                            drvstr = drvPath->to_string();
+                        else
+                            drvstr = "<unknown>";
+
                         auto hint = hintformat(hintstring);
                         hint
-                          % drvPath->to_string()
+                          % drvstr
                           % neededSystem
                           % concatStringsSep<StringSet>(", ", requiredFeatures)
                           % machines.size();
