@@ -65,7 +65,7 @@ typedef std::map<StorePath, StringSet> DerivationInputs;
 typedef std::map<string, string> StringPairs;
 
 enum struct DerivationType : uint8_t {
-    Regular,
+    InputAddressed,
     CAFixed,
     CAFloating,
 };
