@@ -698,7 +698,7 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
         auto deriver = readString(from);
         if (deriver != "")
             info.deriver = store->parseStorePath(deriver);
-        info.narHash = Hash(readString(from), htSHA256);
+        info.narHash = Hash::parseAny(readString(from), htSHA256);
         info.references = readStorePaths<StorePathSet>(*store, from);
         from >> info.registrationTime >> info.narSize >> info.ultimate;
         info.sigs = readStrings<StringSet>(from);

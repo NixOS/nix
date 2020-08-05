@@ -200,9 +200,12 @@ std::string Input::getType() const
 
 std::optional<Hash> Input::getNarHash() const
 {
-    if (auto s = maybeGetStrAttr(attrs, "narHash"))
-        // FIXME: require SRI hash.
-        return newHashAllowEmpty(*s, htSHA256);
+    if (auto s = maybeGetStrAttr(attrs, "narHash")) {
+        auto hash = s->empty() ? Hash(htSHA256) : Hash::parseSRI(*s);
+        if (hash.type != htSHA256)
+            throw UsageError("narHash must use SHA-256");
+        return hash;
+    }
     return {};
 }
 
@@ -216,7 +219,7 @@ std::optional<std::string> Input::getRef() const
 std::optional<Hash> Input::getRev() const
 {
     if (auto s = maybeGetStrAttr(attrs, "rev"))
-        return Hash(*s, htSHA1);
+        return Hash::parseAny(*s, htSHA1);
     return {};
 }
 

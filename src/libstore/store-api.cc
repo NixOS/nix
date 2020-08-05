@@ -876,7 +876,7 @@ std::optional<ValidPathInfo> decodeValidPathInfo(const Store & store, std::istre
     if (hashGiven) {
         string s;
         getline(str, s);
-        info.narHash = Hash(s, htSHA256);
+        info.narHash = Hash::parseAny(s, htSHA256);
         getline(str, s);
         if (!string2Int(s, info.narSize)) throw Error("number expected");
     }

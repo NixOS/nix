@@ -127,7 +127,7 @@ static DerivationOutput parseDerivationOutput(const Store & store, std::istrings
             .output = DerivationOutputFixed {
                 .hash = FixedOutputHash {
                     .method = std::move(method),
-                    .hash = Hash(hash, hashType),
+                    .hash = Hash::parseNonSRIUnprefixed(hash, hashType),
                 },
             }
         };
@@ -435,7 +435,7 @@ static DerivationOutput readDerivationOutput(Source & in, const Store & store)
             .output = DerivationOutputFixed {
                 .hash = FixedOutputHash {
                     .method = std::move(method),
-                    .hash = Hash(hash, hashType),
+                    .hash = Hash::parseNonSRIUnprefixed(hash, hashType),
                 },
             }
         };
