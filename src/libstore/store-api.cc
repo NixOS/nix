@@ -9,6 +9,7 @@
 #include "url.hh"
 #include "references.hh"
 #include "archive.hh"
+#include "git.hh"
 
 #include <future>
 
@@ -217,17 +218,17 @@ StorePath Store::makeTextPath(std::string_view name, const TextInfo & info) cons
 }
 
 
-StorePath Store::makeFixedOutputPathFromCA(const StorePathDescriptor & info) const
+StorePath Store::makeFixedOutputPathFromCA(const StorePathDescriptor & desc) const
 {
     // New template
     return std::visit(overloaded {
         [&](TextInfo ti) {
-            return makeTextPath(info.name, ti);
+            return makeTextPath(desc.name, ti);
         },
         [&](FixedOutputInfo foi) {
-            return makeFixedOutputPath(info.name, foi);
+            return makeFixedOutputPath(desc.name, foi);
         }
-    }, info.info);
+    }, desc.info);
 }
 
 
@@ -271,22 +272,107 @@ StorePath Store::computeStorePathForText(const string & name, const string & s,
 }
 
 
+StorePath Store::addToStore(const string & name, const Path & _srcPath,
+    FileIngestionMethod method, HashType hashAlgo, PathFilter & filter, RepairFlag repair)
+{
+    Path srcPath(absPath(_srcPath));
+    auto source = sinkToSource([&](Sink & sink) {
+        switch (method) {
+        case FileIngestionMethod::Recursive: {
+            dumpPath(srcPath, sink, filter);
+            break;
+        }
+        case FileIngestionMethod::Git: {
+            // recursively add to store if path is a directory
+            struct stat st;
+            if (lstat(srcPath.c_str(), &st))
+                throw SysError("getting attributes of path '%1%'", srcPath);
+            if (S_ISDIR(st.st_mode))
+                for (auto & i : readDirectory(srcPath))
+                    addToStore("git", srcPath + "/" + i.name, method, hashAlgo, filter, repair);
+
+            dumpGit(hashAlgo, srcPath, sink, filter);
+            break;
+        }
+        case FileIngestionMethod::Flat: {
+            readFile(srcPath, sink);
+            break;
+        }
+        }
+    });
+    return addToStoreFromDump(*source, name, method, hashAlgo, repair);
+}
+
+
+/*
+The aim of this function is to compute in one pass the correct ValidPathInfo for
+the files that we are trying to add to the store. To accomplish that in one
+pass, given the different kind of inputs that we can take (normal nar archives,
+nar archives with non SHA-256 hashes, and flat files), we set up a net of sinks
+and aliases. Also, since the dataflow is obfuscated by this, we include here a
+graphviz diagram:
+
+digraph graphname {
+    node [shape=box]
+    fileSource -> narSink
+    narSink [style=dashed]
+    narSink -> unsualHashTee [style = dashed, label = "Recursive && !SHA-256"]
+    narSink -> narHashSink [style = dashed, label = "else"]
+    unsualHashTee -> narHashSink
+    unsualHashTee -> caHashSink
+    fileSource -> parseSink
+    parseSink [style=dashed]
+    parseSink-> fileSink [style = dashed, label = "Flat"]
+    parseSink -> blank [style = dashed, label = "Recursive"]
+    fileSink -> caHashSink
+}
+*/
 ValidPathInfo Store::addToStoreSlow(std::string_view name, const Path & srcPath,
     FileIngestionMethod method, HashType hashAlgo,
     std::optional<Hash> expectedCAHash)
 {
-    /* FIXME: inefficient: we're reading/hashing 'tmpFile' three
-       times. */
+    HashSink narHashSink { htSHA256 };
+    HashSink caHashSink { hashAlgo };
 
-    auto [narHash, narSize] = hashPath(htSHA256, srcPath);
+    /* Note that fileSink and unusualHashTee must be mutually exclusive, since
+       they both write to caHashSink. Note that that requisite is currently true
+       because the former is only used in the flat case. */
+    RetrieveRegularNARSink fileSink { caHashSink };
+    TeeSink unusualHashTee { narHashSink, caHashSink };
 
-    auto hash = method == FileIngestionMethod::Recursive
-        ? hashAlgo == htSHA256
-          ? narHash
-          : hashPath(hashAlgo, srcPath).first
+    auto & narSink = method == FileIngestionMethod::Recursive && hashAlgo != htSHA256
+        ? static_cast<Sink &>(unusualHashTee)
+        : narHashSink;
+
+    /* Functionally, this means that fileSource will yield the content of
+       srcPath. The fact that we use scratchpadSink as a temporary buffer here
+       is an implementation detail. */
+    auto fileSource = sinkToSource([&](Sink & scratchpadSink) {
+        dumpPath(srcPath, scratchpadSink);
+    });
+
+    /* tapped provides the same data as fileSource, but we also write all the
+       information to narSink. */
+    TeeSource tapped { *fileSource, narSink };
+
+    ParseSink blank;
+    auto & parseSink = method == FileIngestionMethod::Flat
+        ? fileSink
+        : blank;
+
+    /* The information that flows from tapped (besides being replicated in
+       narSink), is now put in parseSink. */
+    parseDump(parseSink, tapped);
+
+    /* We extract the result of the computation from the sink by calling
+       finish. */
+    auto [narHash, narSize] = narHashSink.finish();
+
+    auto hash = method == FileIngestionMethod::Recursive && hashAlgo == htSHA256
+        ? narHash
         : method == FileIngestionMethod::Git
         ? hashGit(hashAlgo, srcPath).first
-        : hashFile(hashAlgo, srcPath);
+        : caHashSink.finish().first;
 
     if (expectedCAHash && expectedCAHash != hash)
         throw Error("hash mismatch for '%s'", srcPath);
@@ -308,8 +394,8 @@ ValidPathInfo Store::addToStoreSlow(std::string_view name, const Path & srcPath,
     info.narSize = narSize;
 
     if (!isValidPath(info.path)) {
-        auto source = sinkToSource([&](Sink & sink) {
-            dumpPath(srcPath, sink);
+        auto source = sinkToSource([&](Sink & scratchpadSink) {
+            dumpPath(srcPath, scratchpadSink);
         });
         addToStore(info, *source);
     }
@@ -339,9 +425,20 @@ bool Store::PathInfoCacheValue::isKnownNow()
     return std::chrono::steady_clock::now() < time_point + ttl;
 }
 
+OutputPathMap Store::queryDerivationOutputMapAssumeTotal(const StorePath & path) {
+    auto resp = queryDerivationOutputMap(path);
+    OutputPathMap result;
+    for (auto & [outName, optOutPath] : resp) {
+        if (!optOutPath)
+            throw Error("output '%s' has no store path mapped to it", outName);
+        result.insert_or_assign(outName, *optOutPath);
+    }
+    return result;
+}
+
 StorePathSet Store::queryDerivationOutputs(const StorePath & path)
 {
-    auto outputMap = this->queryDerivationOutputMap(path);
+    auto outputMap = this->queryDerivationOutputMapAssumeTotal(path);
     StorePathSet outputPaths;
     for (auto & i: outputMap) {
         outputPaths.emplace(std::move(i.second));
@@ -768,9 +865,9 @@ std::map<StorePath, StorePath> copyPaths(ref<Store> srcStore, ref<Store> dstStor
 {
     auto valid = dstStore->queryValidPaths(storePaths, substitute);
 
-    PathSet missing;
+    StorePathSet missing;
     for (auto & path : storePaths)
-        if (!valid.count(path)) missing.insert(srcStore->printStorePath(path));
+        if (!valid.count(path)) missing.insert(path);
 
     std::map<StorePath, StorePath> pathsMap;
     for (auto & path : storePaths)
@@ -791,12 +888,10 @@ std::map<StorePath, StorePath> copyPaths(ref<Store> srcStore, ref<Store> dstStor
 
     ThreadPool pool;
 
-    processGraph<Path>(pool,
-        PathSet(missing.begin(), missing.end()),
+    processGraph<StorePath>(pool,
+        StorePathSet(missing.begin(), missing.end()),
 
-        [&](const Path & storePathS) {
-            auto storePath = srcStore->parseStorePath(storePathS);
-
+        [&](const StorePath & storePath) {
             auto info = srcStore->queryPathInfo(storePath);
             auto storePathForDst = storePath;
             if (info->ca && info->references.empty() && !info->hasSelfReference) {
@@ -808,22 +903,21 @@ std::map<StorePath, StorePath> copyPaths(ref<Store> srcStore, ref<Store> dstStor
             }
             pathsMap.insert_or_assign(storePath, storePathForDst);
 
-            if (dstStore->isValidPath(storePathForDst)) {
+            if (dstStore->isValidPath(storePath)) {
                 nrDone++;
                 showProgress();
-                return PathSet();
+                return StorePathSet();
             }
 
             bytesExpected += info->narSize;
             act.setExpected(actCopyPath, bytesExpected);
 
-            return srcStore->printStorePathSet(info->references);
+            return info->references;
         },
 
-        [&](const Path & storePathS) {
+        [&](const StorePath & storePath) {
             checkInterrupt();
 
-            auto storePath = srcStore->parseStorePath(storePathS);
             auto info = srcStore->queryPathInfo(storePath);
 
             auto storePathForDst = storePath;
@@ -845,7 +939,7 @@ std::map<StorePath, StorePath> copyPaths(ref<Store> srcStore, ref<Store> dstStor
                     nrFailed++;
                     if (!settings.keepGoing)
                         throw e;
-                    logger->log(lvlError, fmt("could not copy %s: %s", storePathS, e.what()));
+                    logger->log(lvlError, fmt("could not copy %s: %s", dstStore->printStorePath(storePath), e.what()));
                     showProgress();
                     return;
                 }
@@ -1074,12 +1168,20 @@ ref<Store> openStore(const std::string & uri_,
     throw Error("don't know how to open Nix store '%s'", uri);
 }
 
+static bool isNonUriPath(const std::string & spec) {
+    return
+        // is not a URL
+        spec.find("://") == std::string::npos
+        // Has at least one path separator, and so isn't a single word that
+        // might be special like "auto"
+        && spec.find("/") != std::string::npos;
+}
 
 StoreType getStoreType(const std::string & uri, const std::string & stateDir)
 {
     if (uri == "daemon") {
         return tDaemon;
-    } else if (uri == "local" || hasPrefix(uri, "/") || hasPrefix(uri, "./")) {
+    } else if (uri == "local" || isNonUriPath(uri)) {
         return tLocal;
     } else if (uri == "" || uri == "auto") {
         if (access(stateDir.c_str(), R_OK | W_OK) == 0)
@@ -1103,9 +1205,7 @@ static RegisterStoreImplementation regStore([](
             return std::shared_ptr<Store>(std::make_shared<UDSRemoteStore>(params));
         case tLocal: {
             Store::Params params2 = params;
-            if (hasPrefix(uri, "/")) {
-                params2["root"] = uri;
-            } else if (hasPrefix(uri, "./")) {
+            if (isNonUriPath(uri)) {
                 params2["root"] = absPath(uri);
             }
             return std::shared_ptr<Store>(std::make_shared<LocalStore>(params2));

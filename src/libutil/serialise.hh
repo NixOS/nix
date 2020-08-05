@@ -314,14 +314,14 @@ T readNum(Source & source)
     source(buf, sizeof(buf));
 
     uint64_t n =
-        ((unsigned long long) buf[0]) |
-        ((unsigned long long) buf[1] << 8) |
-        ((unsigned long long) buf[2] << 16) |
-        ((unsigned long long) buf[3] << 24) |
-        ((unsigned long long) buf[4] << 32) |
-        ((unsigned long long) buf[5] << 40) |
-        ((unsigned long long) buf[6] << 48) |
-        ((unsigned long long) buf[7] << 56);
+        ((uint64_t) buf[0]) |
+        ((uint64_t) buf[1] << 8) |
+        ((uint64_t) buf[2] << 16) |
+        ((uint64_t) buf[3] << 24) |
+        ((uint64_t) buf[4] << 32) |
+        ((uint64_t) buf[5] << 40) |
+        ((uint64_t) buf[6] << 48) |
+        ((uint64_t) buf[7] << 56);
 
     if (n > std::numeric_limits<T>::max())
         throw SerialisationError("serialised integer %d is too large for type '%s'", n, typeid(T).name());

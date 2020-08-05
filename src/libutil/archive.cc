@@ -150,17 +150,17 @@ static void skipGeneric(Source & source)
 
 static void parseContents(ParseSink & sink, Source & source, const Path & path)
 {
-    unsigned long long size = readLongLong(source);
+    uint64_t size = readLongLong(source);
 
     sink.preallocateContents(size);
 
-    unsigned long long left = size;
+    uint64_t left = size;
     std::vector<unsigned char> buf(65536);
 
     while (left) {
         checkInterrupt();
         auto n = buf.size();
-        if ((unsigned long long)n > left) n = left;
+        if ((uint64_t)n > left) n = left;
         source(buf.data(), n);
         sink.receiveContents(buf.data(), n);
         left -= n;

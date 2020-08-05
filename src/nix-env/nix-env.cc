@@ -381,7 +381,8 @@ static void queryInstSources(EvalState & state,
 
                 if (path.isDerivation()) {
                     elem.setDrvPath(state.store->printStorePath(path));
-                    elem.setOutPath(state.store->printStorePath(state.store->derivationFromPath(path).findOutput("out")));
+                    auto outputs = state.store->queryDerivationOutputMapAssumeTotal(path);
+                    elem.setOutPath(state.store->printStorePath(outputs.at("out")));
                     if (name.size() >= drvExtension.size() &&
                         string(name, name.size() - drvExtension.size()) == drvExtension)
                         name = string(name, 0, name.size() - drvExtension.size());
@@ -1209,18 +1210,17 @@ static void opSwitchProfile(Globals & globals, Strings opFlags, Strings opArgs)
 }
 
 
-static const int prevGen = -2;
+static constexpr GenerationNumber prevGen = std::numeric_limits<GenerationNumber>::max();
 
 
-static void switchGeneration(Globals & globals, int dstGen)
+static void switchGeneration(Globals & globals, GenerationNumber dstGen)
 {
     PathLocks lock;
     lockProfile(lock, globals.profile);
 
-    int curGen;
-    Generations gens = findGenerations(globals.profile, curGen);
+    auto [gens, curGen] = findGenerations(globals.profile);
 
-    Generation dst;
+    std::optional<Generation> dst;
     for (auto & i : gens)
         if ((dstGen == prevGen && i.number < curGen) ||
             (dstGen >= 0 && i.number == dstGen))
@@ -1228,18 +1228,16 @@ static void switchGeneration(Globals & globals, int dstGen)
 
     if (!dst) {
         if (dstGen == prevGen)
-            throw Error("no generation older than the current (%1%) exists",
-                curGen);
+            throw Error("no generation older than the current (%1%) exists", curGen.value_or(0));
         else
             throw Error("generation %1% does not exist", dstGen);
     }
 
-    printInfo(format("switching from generation %1% to %2%")
-        % curGen % dst.number);
+    printInfo("switching from generation %1% to %2%", curGen.value_or(0), dst->number);
 
     if (globals.dryRun) return;
 
-    switchLink(globals.profile, dst.path);
+    switchLink(globals.profile, dst->path);
 }
 
 
@@ -1250,7 +1248,7 @@ static void opSwitchGeneration(Globals & globals, Strings opFlags, Strings opArg
     if (opArgs.size() != 1)
         throw UsageError("exactly one argument expected");
 
-    int dstGen;
+    GenerationNumber dstGen;
     if (!string2Int(opArgs.front(), dstGen))
         throw UsageError("expected a generation number");
 
@@ -1279,8 +1277,7 @@ static void opListGenerations(Globals & globals, Strings opFlags, Strings opArgs
     PathLocks lock;
     lockProfile(lock, globals.profile);
 
-    int curGen;
-    Generations gens = findGenerations(globals.profile, curGen);
+    auto [gens, curGen] = findGenerations(globals.profile);
 
     RunPager pager;
 
@@ -1309,14 +1306,14 @@ static void opDeleteGenerations(Globals & globals, Strings opFlags, Strings opAr
         if(opArgs.front().size() < 2)
             throw Error("invalid number of generations ‘%1%’", opArgs.front());
         string str_max = string(opArgs.front(), 1, opArgs.front().size());
-        int max;
+        GenerationNumber max;
         if (!string2Int(str_max, max) || max == 0)
             throw Error("invalid number of generations to keep ‘%1%’", opArgs.front());
         deleteGenerationsGreaterThan(globals.profile, max, globals.dryRun);
     } else {
-        std::set<unsigned int> gens;
+        std::set<GenerationNumber> gens;
         for (auto & i : opArgs) {
-            unsigned int n;
+            GenerationNumber n;
             if (!string2Int(i, n))
                 throw UsageError("invalid generation number '%1%'", i);
             gens.insert(n);

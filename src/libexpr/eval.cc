@@ -199,6 +199,18 @@ string showType(const Value & v)
 }
 
 
+bool Value::isTrivial() const
+{
+    return
+        type != tApp
+        && type != tPrimOpApp
+        && (type != tThunk
+            || (dynamic_cast<ExprAttrs *>(thunk.expr)
+                && ((ExprAttrs *) thunk.expr)->dynamicAttrs.empty())
+            || dynamic_cast<ExprLambda *>(thunk.expr));
+}
+
+
 #if HAVE_BOEHMGC
 /* Called when the Boehm GC runs out of memory. */
 static void * oomHandler(size_t requested)
@@ -333,10 +345,14 @@ EvalState::EvalState(const Strings & _searchPath, ref<Store> store)
     , sStructuredAttrs(symbols.create("__structuredAttrs"))
     , sBuilder(symbols.create("builder"))
     , sArgs(symbols.create("args"))
+    , sContentAddressed(symbols.create("__contentAddressed"))
     , sOutputHash(symbols.create("outputHash"))
     , sOutputHashAlgo(symbols.create("outputHashAlgo"))
     , sOutputHashMode(symbols.create("outputHashMode"))
     , sRecurseForDerivations(symbols.create("recurseForDerivations"))
+    , sDescription(symbols.create("description"))
+    , sSelf(symbols.create("self"))
+    , sEpsilon(symbols.create(""))
     , repair(NoRepair)
     , store(store)
     , baseEnv(allocEnv(128))
@@ -782,7 +798,7 @@ Value * ExprPath::maybeThunk(EvalState & state, Env & env)
 }
 
 
-void EvalState::evalFile(const Path & path_, Value & v)
+void EvalState::evalFile(const Path & path_, Value & v, bool mustBeTrivial)
 {
     auto path = checkSourcePath(path_);
 
@@ -811,6 +827,11 @@ void EvalState::evalFile(const Path & path_, Value & v)
     fileParseCache[path2] = e;
 
     try {
+        // Enforce that 'flake.nix' is a direct attrset, not a
+        // computation.
+        if (mustBeTrivial &&
+            !(dynamic_cast<ExprAttrs *>(e)))
+            throw Error("file '%s' must be an attribute set", path);
         eval(e, v);
     } catch (Error & e) {
         addErrorTrace(e, "while evaluating the file '%1%':", path2);
@@ -1236,10 +1257,10 @@ void EvalState::callFunction(Value & fun, Value & arg, Value & v, const Pos & po
         try {
             lambda.body->eval(*this, env2, v);
         } catch (Error & e) {
-            addErrorTrace(e, lambda.pos, "while evaluating %s", 
-              (lambda.name.set() 
-                  ? "'" + (string) lambda.name + "'" 
-                  : "anonymous lambdaction"));
+            addErrorTrace(e, lambda.pos, "while evaluating %s",
+              (lambda.name.set()
+                  ? "'" + (string) lambda.name + "'"
+                  : "anonymous lambda"));
             addErrorTrace(e, pos, "from call site%s", "");
             throw;
         }
@@ -1586,11 +1607,34 @@ string EvalState::forceString(Value & v, const Pos & pos)
 }
 
 
+/* Decode a context string ‘!<name>!<path>’ into a pair <path,
+   name>. */
+std::pair<string, string> decodeContext(std::string_view s)
+{
+    if (s.at(0) == '!') {
+        size_t index = s.find("!", 1);
+        return {std::string(s.substr(index + 1)), std::string(s.substr(1, index - 1))};
+    } else
+        return {s.at(0) == '/' ? std::string(s) : std::string(s.substr(1)), ""};
+}
+
+
 void copyContext(const Value & v, PathSet & context)
 {
     if (v.string.context)
         for (const char * * p = v.string.context; *p; ++p)
             context.insert(*p);
+}
+
+
+std::vector<std::pair<Path, std::string>> Value::getContext()
+{
+    std::vector<std::pair<Path, std::string>> res;
+    assert(type == tString);
+    if (string.context)
+        for (const char * * p = string.context; *p; ++p)
+            res.push_back(decodeContext(*p));
+    return res;
 }
 
 
