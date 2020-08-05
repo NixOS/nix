@@ -33,7 +33,7 @@ bool derivationIsCA(DerivationType dt) {
     };
     // Since enums can have non-variant values, but making a `default:` would
     // disable exhaustiveness warnings.
-    abort();
+    assert(false);
 }
 
 bool derivationIsFixed(DerivationType dt) {
@@ -42,7 +42,7 @@ bool derivationIsFixed(DerivationType dt) {
     case DerivationType::CAFixed: return true;
     case DerivationType::CAFloating: return false;
     };
-    abort();
+    assert(false);
 }
 
 bool derivationIsImpure(DerivationType dt) {
@@ -51,7 +51,7 @@ bool derivationIsImpure(DerivationType dt) {
     case DerivationType::CAFixed: return true;
     case DerivationType::CAFloating: return false;
     };
-    abort();
+    assert(false);
 }
 
 
@@ -159,7 +159,7 @@ static DerivationOutput parseDerivationOutput(const Store & store, std::istrings
                   .output = DerivationOutputCAFixed {
                       .hash = FixedOutputHash {
                           .method = std::move(method),
-                          .hash = Hash(hash, hashType),
+                          .hash = Hash::parseNonSRIUnprefixed(hash, hashType),
                       },
                   }
                }
@@ -556,7 +556,7 @@ static DerivationOutput readDerivationOutput(Source & in, const Store & store)
                   .output = DerivationOutputCAFixed {
                       .hash = FixedOutputHash {
                           .method = std::move(method),
-                          .hash = Hash(hash, hashType),
+                          .hash = Hash::parseNonSRIUnprefixed(hash, hashType),
                       },
                   }
                }

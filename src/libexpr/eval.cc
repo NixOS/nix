@@ -1257,10 +1257,10 @@ void EvalState::callFunction(Value & fun, Value & arg, Value & v, const Pos & po
         try {
             lambda.body->eval(*this, env2, v);
         } catch (Error & e) {
-            addErrorTrace(e, lambda.pos, "while evaluating %s", 
-              (lambda.name.set() 
-                  ? "'" + (string) lambda.name + "'" 
-                  : "anonymous lambdaction"));
+            addErrorTrace(e, lambda.pos, "while evaluating %s",
+              (lambda.name.set()
+                  ? "'" + (string) lambda.name + "'"
+                  : "anonymous lambda"));
             addErrorTrace(e, pos, "from call site%s", "");
             throw;
         }

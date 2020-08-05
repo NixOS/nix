@@ -14,6 +14,7 @@ namespace nix {
 
 /* Abstract syntax of derivations. */
 
+/* The traditional non-fixed-output derivation type. */
 struct DerivationOutputInputAddressed
 {
     /* Will need to become `std::optional<StorePath>` once input-addressed
@@ -21,11 +22,16 @@ struct DerivationOutputInputAddressed
     StorePath path;
 };
 
+/* Fixed-output derivations, whose output paths are content addressed
+   according to that fixed output. */
 struct DerivationOutputCAFixed
 {
     FixedOutputHash hash; /* hash used for expected hash computation */
 };
 
+/* Floating-output derivations, whose output paths are content addressed, but
+   not fixed, and so are dynamically calculated from whatever the output ends
+   up being. */
 struct DerivationOutputCAFloating
 {
     /* information used for expected hash computation */

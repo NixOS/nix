@@ -34,21 +34,31 @@ struct Hash
     HashType type;
 
     /* Create a zero-filled hash object. */
-    Hash(HashType type) : type(type) { init(); };
+    Hash(HashType type);
 
-    /* Initialize the hash from a string representation, in the format
+    /* Parse the hash from a string representation in the format
        "[<type>:]<base16|base32|base64>" or "<type>-<base64>" (a
        Subresource Integrity hash expression). If the 'type' argument
        is not present, then the hash type must be specified in the
        string. */
-    Hash(std::string_view s, std::optional<HashType> type);
-    // type must be provided
-    Hash(std::string_view s, HashType type);
-    // hash type must be part of string
-    Hash(std::string_view s);
+    static Hash parseAny(std::string_view s, std::optional<HashType> type);
 
-    void init();
+    /* Parse a hash from a string representation like the above, except the
+       type prefix is mandatory is there is no separate arguement. */
+    static Hash parseAnyPrefixed(std::string_view s);
 
+    /* Parse a plain hash that musst not have any prefix indicating the type.
+       The type is passed in to disambiguate. */
+    static Hash parseNonSRIUnprefixed(std::string_view s, HashType type);
+
+    static Hash parseSRI(std::string_view original);
+
+private:
+    /* The type must be provided, the string view must not include <type>
+       prefix. `isSRI` helps disambigate the various base-* encodings. */
+    Hash(std::string_view s, HashType type, bool isSRI);
+
+public:
     /* Check whether a hash is set. */
     operator bool () const { return (bool) type; }
 
@@ -111,7 +121,7 @@ Hash hashFile(HashType ht, const Path & path);
 
 /* Compute the hash of the given path.  The hash is defined as
    (essentially) hashString(ht, dumpPath(path)). */
-typedef std::pair<Hash, unsigned long long> HashResult;
+typedef std::pair<Hash, uint64_t> HashResult;
 HashResult hashPath(HashType ht, const Path & path,
     PathFilter & filter = defaultPathFilter);
 
@@ -141,7 +151,7 @@ class HashSink : public BufferedSink, public AbstractHashSink
 private:
     HashType ht;
     Ctx * ctx;
-    unsigned long long bytes;
+    uint64_t bytes;
 
 public:
     HashSink(HashType ht);

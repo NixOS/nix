@@ -79,14 +79,14 @@ struct NarAccessor : public FSAccessor
             parents.top()->isExecutable = true;
         }
 
-        void preallocateContents(unsigned long long size) override
+        void preallocateContents(uint64_t size) override
         {
             assert(size <= std::numeric_limits<uint64_t>::max());
             parents.top()->size = (uint64_t) size;
             parents.top()->start = pos;
         }
 
-        void receiveContents(unsigned char * data, unsigned int len) override
+        void receiveContents(unsigned char * data, size_t len) override
         { }
 
         void createSymlink(const Path & path, const string & target) override
