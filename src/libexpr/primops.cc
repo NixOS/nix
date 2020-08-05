@@ -647,7 +647,7 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
 
             /* The `args' attribute is special: it supplies the
                command-line arguments to the builder. */
-            if (i->name == state.sArgs) {
+            else if (i->name == state.sArgs) {
                 state.forceList(*i->value, pos);
                 for (unsigned int n = 0; n < i->value->listSize(); ++n) {
                     string s = state.coerceToString(posDrvName, *i->value->listElems()[n], context, true);
