@@ -4,6 +4,7 @@
 #include "local-store.hh"
 #include "store-api.hh"
 #include "thread-pool.hh"
+#include "topo-sort.hh"
 
 
 namespace nix {
@@ -113,7 +114,7 @@ std::optional<StorePathDescriptor> getDerivationCA(const BasicDerivation & drv)
     auto out = drv.outputs.find("out");
     if (out == drv.outputs.end())
         return std::nullopt;
-    if (auto dof = std::get_if<DerivationOutputFixed>(&out->second.output)) {
+    if (auto dof = std::get_if<DerivationOutputCAFixed>(&out->second.output)) {
         return StorePathDescriptor {
             .name =  drv.name,
             .info = FixedOutputInfo { dof->hash, {} },
@@ -266,41 +267,21 @@ void Store::queryMissing(const std::vector<StorePathWithOutputs> & targets,
 
 StorePaths Store::topoSortPaths(const StorePathSet & paths)
 {
-    StorePaths sorted;
-    StorePathSet visited, parents;
-
-    std::function<void(const StorePath & path, const StorePath * parent)> dfsVisit;
-
-    dfsVisit = [&](const StorePath & path, const StorePath * parent) {
-        if (parents.count(path))
-            throw BuildError("cycle detected in the references of '%s' from '%s'",
-                printStorePath(path), printStorePath(*parent));
-
-        if (!visited.insert(path).second) return;
-        parents.insert(path);
-
-        StorePathSet references;
-        try {
-            references = queryPathInfo(path)->references;
-        } catch (InvalidPath &) {
-        }
-
-        for (auto & i : references)
-            /* Don't traverse into paths that don't exist.  That can
-               happen due to substitutes for non-existent paths. */
-            if (paths.count(i))
-                dfsVisit(i, &path);
-
-        sorted.push_back(path);
-        parents.erase(path);
-    };
-
-    for (auto & i : paths)
-        dfsVisit(i, nullptr);
-
-    std::reverse(sorted.begin(), sorted.end());
-
-    return sorted;
+    return topoSort(paths,
+        {[&](const StorePath & path) {
+            StorePathSet references;
+            try {
+                references = queryPathInfo(path)->references;
+            } catch (InvalidPath &) {
+            }
+            return references;
+        }},
+        {[&](const StorePath & path, const StorePath & parent) {
+            return BuildError(
+                "cycle detected in the references of '%s' from '%s'",
+                printStorePath(path),
+                printStorePath(parent));
+        }});
 }
 
 

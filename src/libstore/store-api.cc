@@ -214,17 +214,17 @@ StorePath Store::makeTextPath(std::string_view name, const TextInfo & info) cons
 }
 
 
-StorePath Store::makeFixedOutputPathFromCA(const StorePathDescriptor & info) const
+StorePath Store::makeFixedOutputPathFromCA(const StorePathDescriptor & desc) const
 {
     // New template
     return std::visit(overloaded {
         [&](TextInfo ti) {
-            return makeTextPath(info.name, ti);
+            return makeTextPath(desc.name, ti);
         },
         [&](FixedOutputInfo foi) {
-            return makeFixedOutputPath(info.name, foi);
+            return makeFixedOutputPath(desc.name, foi);
         }
-    }, info.info);
+    }, desc.info);
 }
 
 

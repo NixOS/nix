@@ -215,8 +215,8 @@ std::optional<Hash> Input::getNarHash() const
     if (auto s = maybeGetStrAttr(attrs, "narHash")) {
         auto hash = s->empty() ? Hash(htSHA256) : Hash::parseSRI(*s);
         if (hash.type != htSHA256)
-            throw UsageError("narHash must be specified with SRI notation");
-        return newHashAllowEmpty(*s, htSHA256);
+            throw UsageError("narHash must use SHA-256");
+        return hash;
     }
     return {};
 }
