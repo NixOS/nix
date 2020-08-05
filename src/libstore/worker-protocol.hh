@@ -74,6 +74,10 @@ void writeStorePaths(const Store & store, Sink & out, const StorePathSet & paths
 template<typename T>
 struct Phantom {};
 
+
+namespace worker_proto {
+/* FIXME maybe move more stuff inside here */
+
 template<typename T>
 std::map<std::string, T> read(const Store & store, Source & from, Phantom<std::map<std::string, T>> _)
 {
@@ -81,7 +85,7 @@ std::map<std::string, T> read(const Store & store, Source & from, Phantom<std::m
     auto size = (size_t)readInt(from);
     while (size--) {
         auto thisKey = readString(from);
-        resMap.insert_or_assign(std::move(thisKey), read(store, from, Phantom<T> {}));
+        resMap.insert_or_assign(std::move(thisKey), nix::worker_proto::read(store, from, Phantom<T> {}));
     }
     return resMap;
 }
@@ -92,7 +96,7 @@ void write(const Store & store, Sink & out, const std::map<string, T> & resMap)
     out << resMap.size();
     for (auto & i : resMap) {
         out << i.first;
-        write(store, out, i.second);
+        nix::worker_proto::write(store, out, i.second);
     }
 }
 
@@ -104,7 +108,7 @@ std::optional<T> read(const Store & store, Source & from, Phantom<std::optional<
     case 0:
         return std::nullopt;
     case 1:
-        return read(store, from, Phantom<T> {});
+        return nix::worker_proto::read(store, from, Phantom<T> {});
     default:
         throw Error("got an invalid tag bit for std::optional: %#04x", tag);
     }
@@ -115,12 +119,15 @@ void write(const Store & store, Sink & out, const std::optional<T> & optVal)
 {
     out << (optVal ? 1 : 0);
     if (optVal)
-        write(store, out, *optVal);
+        nix::worker_proto::write(store, out, *optVal);
 }
 
 StorePath read(const Store & store, Source & from, Phantom<StorePath> _);
 
 void write(const Store & store, Sink & out, const StorePath & storePath);
+
+}
+
 
 StorePathCAMap readStorePathCAMap(const Store & store, Source & from);
 
