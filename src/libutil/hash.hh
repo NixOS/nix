@@ -105,6 +105,8 @@ public:
         assert(type == htSHA1);
         return std::string(to_string(Base16, false), 0, 7);
     }
+
+    static Hash dummy;
 };
 
 /* Helper that defaults empty hashes to the 0 hash. */

@@ -100,8 +100,8 @@ struct ValidPathInfo
 
     ValidPathInfo(const ValidPathInfo & other) = default;
 
-    ValidPathInfo(StorePath && path) : path(std::move(path)), narHash(Hash(htSHA256)) { };
-    ValidPathInfo(const StorePath & path) : path(path), narHash(Hash(htSHA256)) { };
+    ValidPathInfo(StorePath && path) : path(std::move(path)), narHash(Hash::dummy) { };
+    ValidPathInfo(const StorePath & path) : path(path), narHash(Hash::dummy) { };
 
     virtual ~ValidPathInfo() { }
 };
