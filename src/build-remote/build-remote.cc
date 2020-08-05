@@ -172,7 +172,7 @@ static int _main(int argc, char * * argv)
                     else
                     {
                         // build the hint template.
-                        string hintstring =  "required (system, features): (%s, %s)";
+                        string hintstring =  "derivation: %s\nrequired (system, features): (%s, %s)";
                         hintstring += "\n%s available machines:";
                         hintstring += "\n(systems, maxjobs, supportedFeatures, mandatoryFeatures)";
 
@@ -183,6 +183,7 @@ static int _main(int argc, char * * argv)
                         // add the template values.
                         auto hint = hintformat(hintstring);
                         hint
+                          % drvPath->to_string()
                           % neededSystem
                           % concatStringsSep<StringSet>(", ", requiredFeatures)
                           % machines.size();
