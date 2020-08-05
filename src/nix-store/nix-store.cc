@@ -77,7 +77,7 @@ static PathSet realisePath(StorePathWithOutputs path, bool build = true)
             if (i == drv.outputs.end())
                 throw Error("derivation '%s' does not have an output named '%s'",
                     store2->printStorePath(path.path), j);
-            auto outPath = store2->printStorePath(i->second.path);
+            auto outPath = store2->printStorePath(i->second.path(*store, drv.name));
             if (store2) {
                 if (gcRoot == "")
                     printGCWarning();
@@ -130,7 +130,7 @@ static void opRealise(Strings opFlags, Strings opArgs)
     for (auto & i : opArgs)
         paths.push_back(store->followLinksToStorePathWithOutputs(i));
 
-    unsigned long long downloadSize, narSize;
+    uint64_t downloadSize, narSize;
     StorePathSet willBuild, willSubstitute, unknown;
     store->queryMissing(paths, willBuild, willSubstitute, unknown, downloadSize, narSize);
 
@@ -208,7 +208,7 @@ static void opPrintFixedPath(Strings opFlags, Strings opArgs)
     string hash = *i++;
     string name = *i++;
 
-    cout << fmt("%s\n", store->printStorePath(store->makeFixedOutputPath(recursive, Hash(hash, hashAlgo), name)));
+    cout << fmt("%s\n", store->printStorePath(store->makeFixedOutputPath(recursive, Hash::parseAny(hash, hashAlgo), name)));
 }
 
 
@@ -219,7 +219,7 @@ static StorePathSet maybeUseOutputs(const StorePath & storePath, bool useOutput,
         auto drv = store->derivationFromPath(storePath);
         StorePathSet outputs;
         for (auto & i : drv.outputs)
-            outputs.insert(i.second.path);
+            outputs.insert(i.second.path(*store, drv.name));
         return outputs;
     }
     else return {storePath};
@@ -313,7 +313,7 @@ static void opQuery(Strings opFlags, Strings opArgs)
                 if (forceRealise) realisePath({i2});
                 Derivation drv = store->derivationFromPath(i2);
                 for (auto & j : drv.outputs)
-                    cout << fmt("%1%\n", store->printStorePath(j.second.path));
+                    cout << fmt("%1%\n", store->printStorePath(j.second.path(*store, drv.name)));
             }
             break;
         }
@@ -372,8 +372,8 @@ static void opQuery(Strings opFlags, Strings opArgs)
                 for (auto & j : maybeUseOutputs(store->followLinksToStorePath(i), useOutput, forceRealise)) {
                     auto info = store->queryPathInfo(j);
                     if (query == qHash) {
-                        assert(info->narHash.type == htSHA256);
-                        cout << fmt("%s\n", info->narHash.to_string(Base32, true));
+                        assert(info->narHash && info->narHash->type == htSHA256);
+                        cout << fmt("%s\n", info->narHash->to_string(Base32, true));
                     } else if (query == qSize)
                         cout << fmt("%d\n", info->narSize);
                 }
@@ -572,10 +572,8 @@ static void opGC(Strings opFlags, Strings opArgs)
         if (*i == "--print-roots") printRoots = true;
         else if (*i == "--print-live") options.action = GCOptions::gcReturnLive;
         else if (*i == "--print-dead") options.action = GCOptions::gcReturnDead;
-        else if (*i == "--max-freed") {
-            long long maxFreed = getIntArg<long long>(*i, i, opFlags.end(), true);
-            options.maxFreed = maxFreed >= 0 ? maxFreed : 0;
-        }
+        else if (*i == "--max-freed")
+            options.maxFreed = std::max(getIntArg<int64_t>(*i, i, opFlags.end(), true), (int64_t) 0);
         else throw UsageError("bad sub-operation '%1%' in GC", *i);
 
     if (!opArgs.empty()) throw UsageError("no arguments expected");
@@ -725,7 +723,7 @@ static void opVerifyPath(Strings opFlags, Strings opArgs)
         auto path = store->followLinksToStorePath(i);
         printMsg(lvlTalkative, "checking path '%s'...", store->printStorePath(path));
         auto info = store->queryPathInfo(path);
-        HashSink sink(*info->narHash.type);
+        HashSink sink(info->narHash->type);
         store->narFromPath(path, sink);
         auto current = sink.finish();
         if (current.first != info->narHash) {
@@ -734,7 +732,7 @@ static void opVerifyPath(Strings opFlags, Strings opArgs)
                 .hint = hintfmt(
                     "path '%s' was modified! expected hash '%s', got '%s'",
                     store->printStorePath(path),
-                    info->narHash.to_string(Base32, true),
+                    info->narHash->to_string(Base32, true),
                     current.first.to_string(Base32, true))
             });
             status = 1;
@@ -831,7 +829,7 @@ static void opServe(Strings opFlags, Strings opArgs)
                     for (auto & path : paths)
                         if (!path.isDerivation())
                             paths2.push_back({path});
-                    unsigned long long downloadSize, narSize;
+                    uint64_t downloadSize, narSize;
                     StorePathSet willBuild, willSubstitute, unknown;
                     store->queryMissing(paths2,
                         willBuild, willSubstitute, unknown, downloadSize, narSize);
@@ -864,7 +862,9 @@ static void opServe(Strings opFlags, Strings opArgs)
                         out << info->narSize // downloadSize
                             << info->narSize;
                         if (GET_PROTOCOL_MINOR(clientVersion) >= 4)
-                            out << (info->narHash ? info->narHash.to_string(Base32, true) : "") << renderContentAddress(info->ca) << info->sigs;
+                            out << (info->narHash ? info->narHash->to_string(Base32, true) : "")
+                                << renderContentAddress(info->ca)
+                                << info->sigs;
                     } catch (InvalidPath &) {
                     }
                 }
@@ -914,9 +914,9 @@ static void opServe(Strings opFlags, Strings opArgs)
 
                 if (!writeAllowed) throw Error("building paths is not allowed");
 
-                auto drvPath = store->parseStorePath(readString(in)); // informational only
+                auto drvPath = store->parseStorePath(readString(in));
                 BasicDerivation drv;
-                readDerivation(in, *store, drv);
+                readDerivation(in, *store, drv, Derivation::nameFromPath(drvPath));
 
                 getBuildSettings();
 
@@ -948,7 +948,7 @@ static void opServe(Strings opFlags, Strings opArgs)
                 auto deriver = readString(in);
                 if (deriver != "")
                     info.deriver = store->parseStorePath(deriver);
-                info.narHash = Hash(readString(in), htSHA256);
+                info.narHash = Hash::parseAny(readString(in), htSHA256);
                 info.references = readStorePaths<StorePathSet>(*store, in);
                 in >> info.registrationTime >> info.narSize >> info.ultimate;
                 info.sigs = readStrings<StringSet>(in);

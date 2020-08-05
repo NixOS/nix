@@ -107,7 +107,7 @@ struct CmdToBase : Command
     void run() override
     {
         for (auto s : args)
-            logger->stdout(Hash(s, ht).to_string(base, base == SRI));
+            logger->stdout(Hash::parseAny(s, ht).to_string(base, base == SRI));
     }
 };
 

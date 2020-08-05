@@ -276,7 +276,7 @@ std::vector<std::pair<std::shared_ptr<eval_cache::AttrCursor>, std::string>>
 Installable::getCursors(EvalState & state, bool useEvalCache)
 {
     auto evalCache =
-        std::make_shared<nix::eval_cache::EvalCache>(false, Hash(), state,
+        std::make_shared<nix::eval_cache::EvalCache>(std::nullopt, state,
             [&]() { return toValue(state).first; });
     return {{evalCache->getRoot(), ""}};
 }
@@ -304,8 +304,9 @@ struct InstallableStorePath : Installable
     {
         if (storePath.isDerivation()) {
             std::map<std::string, StorePath> outputs;
-            for (auto & [name, output] : store->readDerivation(storePath).outputs)
-                outputs.emplace(name, output.path);
+            auto drv = store->readDerivation(storePath);
+            for (auto & [name, output] : drv.outputs)
+                outputs.emplace(name, output.path(*store, drv.name));
             return {
                 BuildableFromDrv {
                     .drvPath = storePath,
@@ -422,9 +423,11 @@ ref<eval_cache::EvalCache> openEvalCache(
     std::shared_ptr<flake::LockedFlake> lockedFlake,
     bool useEvalCache)
 {
-    return ref(std::make_shared<nix::eval_cache::EvalCache>(
-        useEvalCache && evalSettings.pureEval,
-        lockedFlake->getFingerprint(),
+    auto fingerprint = lockedFlake->getFingerprint();
+    return make_ref<nix::eval_cache::EvalCache>(
+        useEvalCache && evalSettings.pureEval
+            ? std::optional { std::cref(fingerprint) }
+            : std::nullopt,
         state,
         [&state, lockedFlake]()
         {
@@ -442,7 +445,7 @@ ref<eval_cache::EvalCache> openEvalCache(
             assert(aOutputs);
 
             return aOutputs->value;
-        }));
+        });
 }
 
 static std::string showAttrPaths(const std::vector<std::string> & paths)
@@ -628,7 +631,7 @@ std::shared_ptr<Installable> SourceExprCommand::parseInstallable(
 }
 
 Buildables build(ref<Store> store, Realise mode,
-    std::vector<std::shared_ptr<Installable>> installables)
+    std::vector<std::shared_ptr<Installable>> installables, BuildMode bMode)
 {
     if (mode == Realise::Nothing)
         settings.readOnlyMode = true;
@@ -657,7 +660,7 @@ Buildables build(ref<Store> store, Realise mode,
     if (mode == Realise::Nothing)
         printMissing(store, pathsToBuild, lvlError);
     else if (mode == Realise::Outputs)
-        store->buildPaths(pathsToBuild);
+        store->buildPaths(pathsToBuild, bMode);
 
     return buildables;
 }

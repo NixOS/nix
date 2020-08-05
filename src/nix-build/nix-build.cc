@@ -174,7 +174,7 @@ static void _main(int argc, char * * argv)
         else if (*arg == "--run-env") // obsolete
             runEnv = true;
 
-        else if (*arg == "--command" || *arg == "--run") {
+        else if (runEnv && (*arg == "--command" || *arg == "--run")) {
             if (*arg == "--run")
                 interactive = false;
             envCommand = getArg(*arg, arg, end) + "\nexit";
@@ -192,7 +192,7 @@ static void _main(int argc, char * * argv)
         else if (*arg == "--pure") pure = true;
         else if (*arg == "--impure") pure = false;
 
-        else if (*arg == "--packages" || *arg == "-p")
+        else if (runEnv && (*arg == "--packages" || *arg == "-p"))
             packages = true;
 
         else if (inShebang && *arg == "-i") {
@@ -325,7 +325,7 @@ static void _main(int argc, char * * argv)
     auto buildPaths = [&](const std::vector<StorePathWithOutputs> & paths) {
         /* Note: we do this even when !printMissing to efficiently
            fetch binary cache data. */
-        unsigned long long downloadSize, narSize;
+        uint64_t downloadSize, narSize;
         StorePathSet willBuild, willSubstitute, unknown;
         store->queryMissing(paths,
             willBuild, willSubstitute, unknown, downloadSize, narSize);

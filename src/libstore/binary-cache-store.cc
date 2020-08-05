@@ -153,6 +153,8 @@ void BinaryCacheStore::addToStore(const ValidPathInfo & info, Source & narSource
 
     auto [fdTemp, fnTemp] = createTempFile();
 
+    AutoDelete autoDelete(fnTemp);
+
     auto now1 = std::chrono::steady_clock::now();
 
     /* Read the NAR simultaneously into a CompressionSink+FileSink (to
@@ -167,6 +169,7 @@ void BinaryCacheStore::addToStore(const ValidPathInfo & info, Source & narSource
     TeeSource teeSource(narSource, *compressionSink);
     narAccessor = makeNarAccessor(teeSource);
     compressionSink->finish();
+    fileSink.flush();
     }
 
     auto now2 = std::chrono::steady_clock::now();
@@ -178,7 +181,7 @@ void BinaryCacheStore::addToStore(const ValidPathInfo & info, Source & narSource
     auto [fileHash, fileSize] = fileHashSink.finish();
     narInfo->fileHash = fileHash;
     narInfo->fileSize = fileSize;
-    narInfo->url = "nar/" + narInfo->fileHash.to_string(Base32, false) + ".nar"
+    narInfo->url = "nar/" + narInfo->fileHash->to_string(Base32, false) + ".nar"
         + (compression == "xz" ? ".xz" :
            compression == "bzip2" ? ".bz2" :
            compression == "br" ? ".br" :
@@ -280,7 +283,7 @@ void BinaryCacheStore::addToStore(const ValidPathInfo & info, Source & narSource
     if (repair || !fileExists(narInfo->url)) {
         stats.narWrite++;
         upsertFile(narInfo->url,
-            std::make_shared<std::fstream>(fnTemp, std::ios_base::in),
+            std::make_shared<std::fstream>(fnTemp, std::ios_base::in | std::ios_base::binary),
             "application/x-nix-nar");
     } else
         stats.narWriteAverted++;
@@ -372,7 +375,7 @@ StorePath BinaryCacheStore::addToStore(const string & name, const Path & srcPath
        method for very large paths, but `copyPath' is mainly used for
        small files. */
     StringSink sink;
-    Hash h;
+    std::optional<Hash> h;
     if (method == FileIngestionMethod::Recursive) {
         dumpPath(srcPath, sink, filter);
         h = hashString(hashAlgo, *sink.s);
@@ -382,7 +385,7 @@ StorePath BinaryCacheStore::addToStore(const string & name, const Path & srcPath
         h = hashString(hashAlgo, s);
     }
 
-    ValidPathInfo info(makeFixedOutputPath(method, h, name));
+    ValidPathInfo info(makeFixedOutputPath(method, *h, name));
 
     auto source = StringSource { *sink.s };
     addToStore(info, source, repair, CheckSigs);

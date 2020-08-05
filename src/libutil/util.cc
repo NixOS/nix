@@ -374,7 +374,7 @@ void writeLine(int fd, string s)
 }
 
 
-static void _deletePath(int parentfd, const Path & path, unsigned long long & bytesFreed)
+static void _deletePath(int parentfd, const Path & path, uint64_t & bytesFreed)
 {
     checkInterrupt();
 
@@ -414,7 +414,7 @@ static void _deletePath(int parentfd, const Path & path, unsigned long long & by
     }
 }
 
-static void _deletePath(const Path & path, unsigned long long & bytesFreed)
+static void _deletePath(const Path & path, uint64_t & bytesFreed)
 {
     Path dir = dirOf(path);
     if (dir == "")
@@ -435,12 +435,12 @@ static void _deletePath(const Path & path, unsigned long long & bytesFreed)
 
 void deletePath(const Path & path)
 {
-    unsigned long long dummy;
+    uint64_t dummy;
     deletePath(path, dummy);
 }
 
 
-void deletePath(const Path & path, unsigned long long & bytesFreed)
+void deletePath(const Path & path, uint64_t & bytesFreed)
 {
     //Activity act(*logger, lvlDebug, format("recursively deleting path '%1%'") % path);
     bytesFreed = 0;
@@ -494,6 +494,7 @@ std::pair<AutoCloseFD, Path> createTempFile(const Path & prefix)
 {
     Path tmpl(getEnv("TMPDIR").value_or("/tmp") + "/" + prefix + ".XXXXXX");
     // Strictly speaking, this is UB, but who cares...
+    // FIXME: use O_TMPFILE.
     AutoCloseFD fd(mkstemp((char *) tmpl.c_str()));
     if (!fd)
         throw SysError("creating temporary file '%s'", tmpl);
@@ -1449,7 +1450,7 @@ string base64Decode(std::string_view s)
 
         char digit = decode[(unsigned char) c];
         if (digit == -1)
-            throw Error("invalid character in Base64 string");
+            throw Error("invalid character in Base64 string: '%c'", c);
 
         bits += 6;
         d = d << 6 | digit;
@@ -1581,7 +1582,7 @@ AutoCloseFD createUnixDomainSocket(const Path & path, mode_t mode)
 
     struct sockaddr_un addr;
     addr.sun_family = AF_UNIX;
-    if (path.size() >= sizeof(addr.sun_path))
+    if (path.size() + 1 >= sizeof(addr.sun_path))
         throw Error("socket path '%1%' is too long", path);
     strcpy(addr.sun_path, path.c_str());
 
