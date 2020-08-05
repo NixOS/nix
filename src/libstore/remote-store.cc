@@ -397,7 +397,7 @@ void RemoteStore::queryPathInfoUncached(const StorePath & path,
             info = std::make_shared<ValidPathInfo>(StorePath(path));
             auto deriver = readString(conn->from);
             if (deriver != "") info->deriver = parseStorePath(deriver);
-            info->narHash = Hash(readString(conn->from), htSHA256);
+            info->narHash = Hash::parseAny(readString(conn->from), htSHA256);
             info->references = read(*this, conn->from, Proxy<StorePathSet> {});
             conn->from >> info->registrationTime >> info->narSize;
             if (GET_PROTOCOL_MINOR(conn->daemonVersion) >= 16) {

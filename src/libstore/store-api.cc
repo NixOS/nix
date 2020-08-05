@@ -193,10 +193,6 @@ StorePath Store::makeFixedOutputPath(
     }
 }
 
-// FIXME Put this somewhere?
-template<class... Ts> struct overloaded : Ts... { using Ts::operator()...; };
-template<class... Ts> overloaded(Ts...) -> overloaded<Ts...>;
-
 StorePath Store::makeFixedOutputPathFromCA(std::string_view name, ContentAddress ca,
     const StorePathSet & references, bool hasSelfReference) const
 {
@@ -887,7 +883,7 @@ std::optional<ValidPathInfo> decodeValidPathInfo(const Store & store, std::istre
     if (hashGiven) {
         string s;
         getline(str, s);
-        info.narHash = Hash(s, htSHA256);
+        info.narHash = Hash::parseAny(s, htSHA256);
         getline(str, s);
         if (!string2Int(s, info.narSize)) throw Error("number expected");
     }
