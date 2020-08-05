@@ -774,7 +774,7 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
         auto outPath = state.store->makeFixedOutputPath(ingestionMethod, h, drvName);
         if (!jsonObject) drv.env["out"] = state.store->printStorePath(outPath);
         drv.outputs.insert_or_assign("out", DerivationOutput {
-                .output = DerivationOutputFixed {
+                .output = DerivationOutputCAFixed {
                     .hash = FixedOutputHash {
                         .method = ingestionMethod,
                         .hash = std::move(h),
@@ -800,7 +800,9 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
                 });
         }
 
-        Hash h = hashDerivationModulo(*state.store, Derivation(drv), true);
+        // Regular, non-CA derivation should always return a single hash and not
+        // hash per output.
+        Hash h = std::get<0>(hashDerivationModulo(*state.store, Derivation(drv), true));
 
         for (auto & i : outputs) {
             auto outPath = state.store->makeOutputPath(i, h, drvName);

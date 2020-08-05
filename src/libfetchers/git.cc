@@ -121,7 +121,7 @@ struct GitInputScheme : InputScheme
             args.push_back(*ref);
         }
 
-        if (input.getRev()) throw Error("cloning a specific revision is not implemented");
+        if (input.getRev()) throw UnimplementedError("cloning a specific revision is not implemented");
 
         args.push_back(destDir);
 

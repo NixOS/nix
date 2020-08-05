@@ -193,10 +193,6 @@ StorePath Store::makeFixedOutputPath(
     }
 }
 
-// FIXME Put this somewhere?
-template<class... Ts> struct overloaded : Ts... { using Ts::operator()...; };
-template<class... Ts> overloaded(Ts...) -> overloaded<Ts...>;
-
 StorePath Store::makeFixedOutputPathFromCA(std::string_view name, ContentAddress ca,
     const StorePathSet & references, bool hasSelfReference) const
 {
