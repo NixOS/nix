@@ -655,7 +655,7 @@ void LocalStore::queryPathInfoUncached(const StorePath & path,
             info->id = useQueryPathInfo.getInt(0);
 
             try {
-                info->narHash = Hash(useQueryPathInfo.getStr(1));
+                info->narHash = Hash::parseAnyPrefixed(useQueryPathInfo.getStr(1));
             } catch (BadHash & e) {
                 throw Error("in valid-path entry for '%s': %s", printStorePath(path), e.what());
             }
