@@ -63,7 +63,7 @@ void builtinFetchurl(const BasicDerivation & drv, const std::string & netrcData)
     auto & output = drv.outputs.begin()->second;
 
     /* Try the hashed mirrors first. */
-    if (auto hash = std::get_if<DerivationOutputFixed>(&output.output)) {
+    if (auto hash = std::get_if<DerivationOutputCAFixed>(&output.output)) {
         if (hash->hash.method == FileIngestionMethod::Flat) {
             for (auto hashedMirror : settings.hashedMirrors.get()) {
                 try {

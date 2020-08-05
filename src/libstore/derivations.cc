@@ -13,12 +13,12 @@ std::optional<StorePath> DerivationOutput::pathOpt(const Store & store, std::str
         [](DerivationOutputInputAddressed doi) -> std::optional<StorePath> {
             return { doi.path };
         },
-        [&](DerivationOutputFixed dof) -> std::optional<StorePath> {
+        [&](DerivationOutputCAFixed dof) -> std::optional<StorePath> {
             return {
                 store.makeFixedOutputPath(dof.hash.method, dof.hash.hash, drvName)
             };
         },
-        [](DerivationOutputFloating dof) -> std::optional<StorePath> {
+        [](DerivationOutputCAFloating dof) -> std::optional<StorePath> {
             return std::nullopt;
         },
     }, output);
@@ -27,7 +27,7 @@ std::optional<StorePath> DerivationOutput::pathOpt(const Store & store, std::str
 
 bool derivationIsCA(DerivationType dt) {
     switch (dt) {
-    case DerivationType::Regular: return false;
+    case DerivationType::InputAddressed: return false;
     case DerivationType::CAFixed: return true;
     case DerivationType::CAFloating: return true;
     };
@@ -38,7 +38,7 @@ bool derivationIsCA(DerivationType dt) {
 
 bool derivationIsFixed(DerivationType dt) {
     switch (dt) {
-    case DerivationType::Regular: return false;
+    case DerivationType::InputAddressed: return false;
     case DerivationType::CAFixed: return true;
     case DerivationType::CAFloating: return false;
     };
@@ -47,7 +47,7 @@ bool derivationIsFixed(DerivationType dt) {
 
 bool derivationIsImpure(DerivationType dt) {
     switch (dt) {
-    case DerivationType::Regular: return false;
+    case DerivationType::InputAddressed: return false;
     case DerivationType::CAFixed: return true;
     case DerivationType::CAFloating: return false;
     };
@@ -156,7 +156,7 @@ static DerivationOutput parseDerivationOutput(const Store & store, std::istrings
 
         return hash != ""
             ? DerivationOutput {
-                  .output = DerivationOutputFixed {
+                  .output = DerivationOutputCAFixed {
                       .hash = FixedOutputHash {
                           .method = std::move(method),
                           .hash = Hash(hash, hashType),
@@ -165,7 +165,7 @@ static DerivationOutput parseDerivationOutput(const Store & store, std::istrings
                }
             : (settings.requireExperimentalFeature("ca-derivations"),
               DerivationOutput {
-                  .output =  DerivationOutputFloating {
+                  .output =  DerivationOutputCAFloating {
                       .method = std::move(method),
                       .hashType = std::move(hashType),
                   },
@@ -322,11 +322,11 @@ string Derivation::unparse(const Store & store, bool maskOutputs,
                 s += ','; printUnquotedString(s, "");
                 s += ','; printUnquotedString(s, "");
             },
-            [&](DerivationOutputFixed dof) {
+            [&](DerivationOutputCAFixed dof) {
                 s += ','; printUnquotedString(s, dof.hash.printMethodAlgo());
                 s += ','; printUnquotedString(s, dof.hash.hash.to_string(Base16, false));
             },
-            [&](DerivationOutputFloating dof) {
+            [&](DerivationOutputCAFloating dof) {
                 s += ','; printUnquotedString(s, makeFileIngestionPrefix(dof.method) + printHashType(dof.hashType));
                 s += ','; printUnquotedString(s, "");
             },
@@ -391,10 +391,10 @@ DerivationType BasicDerivation::type() const
             [&](DerivationOutputInputAddressed _) {
                inputAddressedOutputs.insert(i.first);
             },
-            [&](DerivationOutputFixed _) {
+            [&](DerivationOutputCAFixed _) {
                 fixedCAOutputs.insert(i.first);
             },
-            [&](DerivationOutputFloating dof) {
+            [&](DerivationOutputCAFloating dof) {
                 floatingCAOutputs.insert(i.first);
                 if (!floatingHashType) {
                     floatingHashType = dof.hashType;
@@ -409,7 +409,7 @@ DerivationType BasicDerivation::type() const
     if (inputAddressedOutputs.empty() && fixedCAOutputs.empty() && floatingCAOutputs.empty()) {
         throw Error("Must have at least one output");
     } else if (! inputAddressedOutputs.empty() && fixedCAOutputs.empty() && floatingCAOutputs.empty()) {
-        return DerivationType::Regular;
+        return DerivationType::InputAddressed;
     } else if (inputAddressedOutputs.empty() && ! fixedCAOutputs.empty() && floatingCAOutputs.empty()) {
         if (fixedCAOutputs.size() > 1)
             // FIXME: Experimental feature?
@@ -475,7 +475,7 @@ DrvHashModulo hashDerivationModulo(Store & store, const Derivation & drv, bool m
     case DerivationType::CAFixed: {
         std::map<std::string, Hash> outputHashes;
         for (const auto & i : drv.outputs) {
-            auto & dof = std::get<DerivationOutputFixed>(i.second.output);
+            auto & dof = std::get<DerivationOutputCAFixed>(i.second.output);
             auto hash = hashString(htSHA256, "fixed:out:"
                 + dof.hash.printMethodAlgo() + ":"
                 + dof.hash.hash.to_string(Base16, false) + ":"
@@ -484,7 +484,7 @@ DrvHashModulo hashDerivationModulo(Store & store, const Derivation & drv, bool m
         }
         return outputHashes;
     }
-    case DerivationType::Regular:
+    case DerivationType::InputAddressed:
         break;
     }
 
@@ -553,7 +553,7 @@ static DerivationOutput readDerivationOutput(Source & in, const Store & store)
         auto hashType = parseHashType(hashAlgo);
         return hash != ""
             ? DerivationOutput {
-                  .output = DerivationOutputFixed {
+                  .output = DerivationOutputCAFixed {
                       .hash = FixedOutputHash {
                           .method = std::move(method),
                           .hash = Hash(hash, hashType),
@@ -562,7 +562,7 @@ static DerivationOutput readDerivationOutput(Source & in, const Store & store)
                }
             : (settings.requireExperimentalFeature("ca-derivations"),
               DerivationOutput {
-                  .output = DerivationOutputFloating {
+                  .output = DerivationOutputCAFloating {
                       .method = std::move(method),
                       .hashType = std::move(hashType),
                   },
@@ -630,11 +630,11 @@ void writeDerivation(Sink & out, const Store & store, const BasicDerivation & dr
             [&](DerivationOutputInputAddressed doi) {
                 out << "" << "";
             },
-            [&](DerivationOutputFixed dof) {
+            [&](DerivationOutputCAFixed dof) {
                 out << dof.hash.printMethodAlgo()
                     << dof.hash.hash.to_string(Base16, false);
             },
-            [&](DerivationOutputFloating dof) {
+            [&](DerivationOutputCAFloating dof) {
                 out << (makeFileIngestionPrefix(dof.method) + printHashType(dof.hashType))
                     << "";
             },

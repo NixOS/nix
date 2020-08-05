@@ -573,11 +573,11 @@ void LocalStore::checkDerivationOutputs(const StorePath & drvPath, const Derivat
                         printStorePath(drvPath), printStorePath(doia.path), printStorePath(recomputed));
                 envHasRightPath(doia.path, i.first);
             },
-            [&](DerivationOutputFixed dof) {
+            [&](DerivationOutputCAFixed dof) {
                 StorePath path = makeFixedOutputPath(dof.hash.method, dof.hash.hash, drvName);
                 envHasRightPath(path, i.first);
             },
-            [&](DerivationOutputFloating _) {
+            [&](DerivationOutputCAFloating _) {
                 throw UnimplementedError("Floating CA output derivations are not yet implemented");
             },
         }, i.second.output);

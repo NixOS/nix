@@ -74,11 +74,11 @@ struct CmdShowDerivation : InstallablesCommand
                     std::visit(overloaded {
                         [&](DerivationOutputInputAddressed doi) {
                         },
-                        [&](DerivationOutputFixed dof) {
+                        [&](DerivationOutputCAFixed dof) {
                             outputObj.attr("hashAlgo", dof.hash.printMethodAlgo());
                             outputObj.attr("hash", dof.hash.hash.to_string(Base16, false));
                         },
-                        [&](DerivationOutputFloating dof) {
+                        [&](DerivationOutputCAFloating dof) {
                             outputObj.attr("hashAlgo", makeFileIngestionPrefix(dof.method) + printHashType(dof.hashType));
                         },
                     }, output.second.output);
