@@ -372,7 +372,7 @@ static void opQuery(Strings opFlags, Strings opArgs)
                 for (auto & j : maybeUseOutputs(store->followLinksToStorePath(i), useOutput, forceRealise)) {
                     auto info = store->queryPathInfo(j);
                     if (query == qHash) {
-                        assert(info->narHash && info->narHash.type == htSHA256);
+                        assert(info->narHash.type == htSHA256);
                         cout << fmt("%s\n", info->narHash.to_string(Base32, true));
                     } else if (query == qSize)
                         cout << fmt("%d\n", info->narSize);
@@ -862,7 +862,7 @@ static void opServe(Strings opFlags, Strings opArgs)
                         out << info->narSize // downloadSize
                             << info->narSize;
                         if (GET_PROTOCOL_MINOR(clientVersion) >= 4)
-                            out << (info->narHash ? info->narHash.to_string(Base32, true) : "")
+                            out << info->narHash.to_string(Base32, true)
                                 << renderContentAddress(info->ca)
                                 << info->sigs;
                     } catch (InvalidPath &) {

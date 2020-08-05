@@ -920,7 +920,7 @@ void LocalStore::registerValidPaths(const ValidPathInfos & infos)
         StorePathSet paths;
 
         for (auto & i : infos) {
-            assert(i.narHash && i.narHash.type == htSHA256);
+            assert(i.narHash.type == htSHA256);
             if (isValidPath_(*state, i.path))
                 updatePathInfo(*state, i);
             else
@@ -984,9 +984,6 @@ const PublicKeys & LocalStore::getPublicKeys()
 void LocalStore::addToStore(const ValidPathInfo & info, Source & source,
     RepairFlag repair, CheckSigsFlag checkSigs)
 {
-    if (!info.narHash)
-        throw Error("cannot add path '%s' because it lacks a hash", printStorePath(info.path));
-
     if (requireSigs && checkSigs && !info.checkSignatures(*this, getPublicKeys()))
         throw Error("cannot add path '%s' because it lacks a valid signature", printStorePath(info.path));
 

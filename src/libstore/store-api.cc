@@ -725,20 +725,6 @@ void copyStorePath(ref<Store> srcStore, ref<Store> dstStore,
         info = info2;
     }
 
-    if (!info->narHash) {
-        StringSink sink;
-        srcStore->narFromPath({storePath}, sink);
-        auto info2 = make_ref<ValidPathInfo>(*info);
-        info2->narHash = hashString(htSHA256, *sink.s);
-        if (!info->narSize) info2->narSize = sink.s->size();
-        if (info->ultimate) info2->ultimate = false;
-        info = info2;
-
-        StringSource source(*sink.s);
-        dstStore->addToStore(*info, source, repair, checkSigs);
-        return;
-    }
-
     if (info->ultimate) {
         auto info2 = make_ref<ValidPathInfo>(*info);
         info2->ultimate = false;
@@ -910,8 +896,8 @@ string showPaths(const PathSet & paths)
 
 std::string ValidPathInfo::fingerprint(const Store & store) const
 {
-    if (narSize == 0 || !narHash)
-        throw Error("cannot calculate fingerprint of path '%s' because its size/hash is not known",
+    if (narSize == 0)
+        throw Error("cannot calculate fingerprint of path '%s' because its size is not known",
             store.printStorePath(path));
     return
         "1;" + store.printStorePath(path) + ";"

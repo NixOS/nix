@@ -143,7 +143,7 @@ struct FileSource : FdSource
 void BinaryCacheStore::addToStore(const ValidPathInfo & info, Source & narSource,
     RepairFlag repair, CheckSigsFlag checkSigs)
 {
-    assert(info.narHash && info.narSize);
+    assert(info.narSize);
 
     if (!repair && isValidPath(info.path)) {
         // FIXME: copyNAR -> null sink
