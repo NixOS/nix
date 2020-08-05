@@ -58,7 +58,7 @@ void writeStorePathCAMap(const Store & store, Sink & out, const StorePathCAMap &
 }
 
 
-StorePath read(const Store & store, Source & from, Proxy<StorePath> _)
+StorePath read(const Store & store, Source & from, Phantom<StorePath> _)
 {
     return store.parseStorePath(readString(from));
 }
@@ -461,7 +461,7 @@ std::map<std::string, std::optional<StorePath>> RemoteStore::queryDerivationOutp
     auto conn(getConnection());
     conn->to << wopQueryDerivationOutputMap << printStorePath(path);
     conn.processStderr();
-    return read(*this, conn->from, Proxy<std::map<std::string, std::optional<StorePath>>> {});
+    return read(*this, conn->from, Phantom<std::map<std::string, std::optional<StorePath>>> {});
 
 }
 
