@@ -573,12 +573,12 @@ void LocalStore::checkDerivationOutputs(const StorePath & drvPath, const Derivat
                         printStorePath(drvPath), printStorePath(doia.path), printStorePath(recomputed));
                 envHasRightPath(doia.path, i.first);
             },
-            [&](DerivationOutputFixed dof) {
+            [&](DerivationOutputCAFixed dof) {
                 StorePath path = makeFixedOutputPath(dof.hash.method, dof.hash.hash, drvName);
                 envHasRightPath(path, i.first);
             },
-            [&](DerivationOutputFloating _) {
-                throw UnimplementedError("Floating CA output derivations are not yet implemented");
+            [&](DerivationOutputCAFloating _) {
+                throw UnimplementedError("floating CA output derivations are not yet implemented");
             },
         }, i.second.output);
     }
@@ -655,7 +655,7 @@ void LocalStore::queryPathInfoUncached(const StorePath & path,
             info->id = useQueryPathInfo.getInt(0);
 
             try {
-                info->narHash = Hash(useQueryPathInfo.getStr(1));
+                info->narHash = Hash::parseAnyPrefixed(useQueryPathInfo.getStr(1));
             } catch (BadHash & e) {
                 throw Error("in valid-path entry for '%s': %s", printStorePath(path), e.what());
             }
@@ -854,20 +854,32 @@ StorePathSet LocalStore::querySubstitutablePaths(const StorePathSet & paths)
 }
 
 
-void LocalStore::querySubstitutablePathInfos(const StorePathSet & paths,
-    SubstitutablePathInfos & infos)
+void LocalStore::querySubstitutablePathInfos(const StorePathCAMap & paths, SubstitutablePathInfos & infos)
 {
     if (!settings.useSubstitutes) return;
     for (auto & sub : getDefaultSubstituters()) {
-        if (sub->storeDir != storeDir) continue;
         for (auto & path : paths) {
-            if (infos.count(path)) continue;
-            debug("checking substituter '%s' for path '%s'", sub->getUri(), printStorePath(path));
+            auto subPath(path.first);
+
+            // recompute store path so that we can use a different store root
+            if (path.second) {
+                subPath = makeFixedOutputPathFromCA(path.first.name(), *path.second);
+                if (sub->storeDir == storeDir)
+                    assert(subPath == path.first);
+                if (subPath != path.first)
+                    debug("replaced path '%s' with '%s' for substituter '%s'", printStorePath(path.first), sub->printStorePath(subPath), sub->getUri());
+            } else if (sub->storeDir != storeDir) continue;
+
+            debug("checking substituter '%s' for path '%s'", sub->getUri(), sub->printStorePath(subPath));
             try {
-                auto info = sub->queryPathInfo(path);
+                auto info = sub->queryPathInfo(subPath);
+
+                if (sub->storeDir != storeDir && !(info->isContentAddressed(*sub) && info->references.empty()))
+                    continue;
+
                 auto narInfo = std::dynamic_pointer_cast<const NarInfo>(
                     std::shared_ptr<const ValidPathInfo>(info));
-                infos.insert_or_assign(path, SubstitutablePathInfo{
+                infos.insert_or_assign(path.first, SubstitutablePathInfo{
                     info->deriver,
                     info->references,
                     narInfo ? narInfo->fileSize : 0,
@@ -1038,20 +1050,6 @@ void LocalStore::addToStore(const ValidPathInfo & info, Source & source,
 
         outputLock.setDeletion(true);
     }
-}
-
-
-StorePath LocalStore::addToStore(const string & name, const Path & _srcPath,
-    FileIngestionMethod method, HashType hashAlgo, PathFilter & filter, RepairFlag repair)
-{
-    Path srcPath(absPath(_srcPath));
-    auto source = sinkToSource([&](Sink & sink) {
-        if (method == FileIngestionMethod::Recursive)
-            dumpPath(srcPath, sink, filter);
-        else
-            readFile(srcPath, sink);
-    });
-    return addToStoreFromDump(*source, name, method, hashAlgo, repair);
 }
 
 

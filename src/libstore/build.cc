@@ -297,7 +297,7 @@ public:
     GoalPtr makeDerivationGoal(const StorePath & drvPath, const StringSet & wantedOutputs, BuildMode buildMode = bmNormal);
     std::shared_ptr<DerivationGoal> makeBasicDerivationGoal(const StorePath & drvPath,
         const BasicDerivation & drv, BuildMode buildMode = bmNormal);
-    GoalPtr makeSubstitutionGoal(const StorePath & storePath, RepairFlag repair = NoRepair);
+    GoalPtr makeSubstitutionGoal(const StorePath & storePath, RepairFlag repair = NoRepair, std::optional<ContentAddress> ca = std::nullopt);
 
     /* Remove a dead goal. */
     void removeGoal(GoalPtr goal);
@@ -1195,7 +1195,7 @@ void DerivationGoal::haveDerivation()
 
     parsedDrv = std::make_unique<ParsedDerivation>(drvPath, *drv);
 
-    if (parsedDrv->contentAddressed()) {
+    if (drv->type() == DerivationType::CAFloating) {
         settings.requireExperimentalFeature("ca-derivations");
         throw UnimplementedError("ca-derivations isn't implemented yet");
     }
@@ -1206,7 +1206,7 @@ void DerivationGoal::haveDerivation()
        them. */
     if (settings.useSubstitutes && parsedDrv->substitutesAllowed())
         for (auto & i : invalidOutputs)
-            addWaitee(worker.makeSubstitutionGoal(i, buildMode == bmRepair ? Repair : NoRepair));
+            addWaitee(worker.makeSubstitutionGoal(i, buildMode == bmRepair ? Repair : NoRepair, getDerivationCA(*drv)));
 
     if (waitees.empty()) /* to prevent hang (no wake-up event) */
         outputsSubstituted();
@@ -1646,13 +1646,13 @@ void DerivationGoal::buildDone()
                So instead, check if the disk is (nearly) full now.  If
                so, we don't mark this build as a permanent failure. */
 #if HAVE_STATVFS
-            unsigned long long required = 8ULL * 1024 * 1024; // FIXME: make configurable
+            uint64_t required = 8ULL * 1024 * 1024; // FIXME: make configurable
             struct statvfs st;
             if (statvfs(worker.store.realStoreDir.c_str(), &st) == 0 &&
-                (unsigned long long) st.f_bavail * st.f_bsize < required)
+                (uint64_t) st.f_bavail * st.f_bsize < required)
                 diskFull = true;
             if (statvfs(tmpDir.c_str(), &st) == 0 &&
-                (unsigned long long) st.f_bavail * st.f_bsize < required)
+                (uint64_t) st.f_bavail * st.f_bsize < required)
                 diskFull = true;
 #endif
 
@@ -2851,7 +2851,7 @@ struct RestrictedStore : public LocalFSStore
 
     void queryMissing(const std::vector<StorePathWithOutputs> & targets,
         StorePathSet & willBuild, StorePathSet & willSubstitute, StorePathSet & unknown,
-        unsigned long long & downloadSize, unsigned long long & narSize) override
+        uint64_t & downloadSize, uint64_t & narSize) override
     {
         /* This is slightly impure since it leaks information to the
            client about what paths will be built/substituted or are
@@ -3722,18 +3722,18 @@ void DerivationGoal::registerOutputs()
         std::optional<ContentAddress> ca;
 
         if (! std::holds_alternative<DerivationOutputInputAddressed>(i.second.first.output)) {
-            DerivationOutputFloating outputHash;
+            DerivationOutputCAFloating outputHash;
             std::visit(overloaded {
                 [&](DerivationOutputInputAddressed doi) {
                     assert(false); // Enclosing `if` handles this case in other branch
                 },
-                [&](DerivationOutputFixed dof) {
-                    outputHash = DerivationOutputFloating {
+                [&](DerivationOutputCAFixed dof) {
+                    outputHash = DerivationOutputCAFloating {
                         .method = dof.hash.method,
                         .hashType = dof.hash.hash.type,
                     };
                 },
-                [&](DerivationOutputFloating dof) {
+                [&](DerivationOutputCAFloating dof) {
                     outputHash = dof;
                 },
             }, i.second.first.output);
@@ -3758,7 +3758,7 @@ void DerivationGoal::registerOutputs()
             // true if either floating CA, or incorrect fixed hash.
             bool needsMove = true;
 
-            if (auto p = std::get_if<DerivationOutputFixed>(& i.second.first.output)) {
+            if (auto p = std::get_if<DerivationOutputCAFixed>(& i.second.first.output)) {
               Hash & h = p->hash.hash;
               if (h != h2) {
 
@@ -4300,6 +4300,10 @@ private:
     /* The store path that should be realised through a substitute. */
     StorePath storePath;
 
+    /* The path the substituter refers to the path as. This will be
+     * different when the stores have different names. */
+    std::optional<StorePath> subPath;
+
     /* The remaining substituters. */
     std::list<ref<Store>> subs;
 
@@ -4333,8 +4337,11 @@ private:
     typedef void (SubstitutionGoal::*GoalState)();
     GoalState state;
 
+    /* Content address for recomputing store path */
+    std::optional<ContentAddress> ca;
+
 public:
-    SubstitutionGoal(const StorePath & storePath, Worker & worker, RepairFlag repair = NoRepair);
+    SubstitutionGoal(const StorePath & storePath, Worker & worker, RepairFlag repair = NoRepair, std::optional<ContentAddress> ca = std::nullopt);
     ~SubstitutionGoal();
 
     void timedOut(Error && ex) override { abort(); };
@@ -4364,10 +4371,11 @@ public:
 };
 
 
-SubstitutionGoal::SubstitutionGoal(const StorePath & storePath, Worker & worker, RepairFlag repair)
+SubstitutionGoal::SubstitutionGoal(const StorePath & storePath, Worker & worker, RepairFlag repair, std::optional<ContentAddress> ca)
     : Goal(worker)
     , storePath(storePath)
     , repair(repair)
+    , ca(ca)
 {
     state = &SubstitutionGoal::init;
     name = fmt("substitution of '%s'", worker.store.printStorePath(this->storePath));
@@ -4442,14 +4450,18 @@ void SubstitutionGoal::tryNext()
     sub = subs.front();
     subs.pop_front();
 
-    if (sub->storeDir != worker.store.storeDir) {
+    if (ca) {
+        subPath = sub->makeFixedOutputPathFromCA(storePath.name(), *ca);
+        if (sub->storeDir == worker.store.storeDir)
+            assert(subPath == storePath);
+    } else if (sub->storeDir != worker.store.storeDir) {
         tryNext();
         return;
     }
 
     try {
         // FIXME: make async
-        info = sub->queryPathInfo(storePath);
+        info = sub->queryPathInfo(subPath ? *subPath : storePath);
     } catch (InvalidPath &) {
         tryNext();
         return;
@@ -4466,6 +4478,19 @@ void SubstitutionGoal::tryNext()
             return;
         }
         throw;
+    }
+
+    if (info->path != storePath) {
+        if (info->isContentAddressed(*sub) && info->references.empty()) {
+            auto info2 = std::make_shared<ValidPathInfo>(*info);
+            info2->path = storePath;
+            info = info2;
+        } else {
+            printError("asked '%s' for '%s' but got '%s'",
+                sub->getUri(), worker.store.printStorePath(storePath), sub->printStorePath(info->path));
+            tryNext();
+            return;
+        }
     }
 
     /* Update the total expected download size. */
@@ -4557,7 +4582,7 @@ void SubstitutionGoal::tryToRun()
             PushActivity pact(act.id);
 
             copyStorePath(ref<Store>(sub), ref<Store>(worker.store.shared_from_this()),
-                storePath, repair, sub->isTrusted ? NoCheckSigs : CheckSigs);
+                subPath ? *subPath : storePath, repair, sub->isTrusted ? NoCheckSigs : CheckSigs);
 
             promise.set_value();
         } catch (...) {
@@ -4690,11 +4715,11 @@ std::shared_ptr<DerivationGoal> Worker::makeBasicDerivationGoal(const StorePath 
 }
 
 
-GoalPtr Worker::makeSubstitutionGoal(const StorePath & path, RepairFlag repair)
+GoalPtr Worker::makeSubstitutionGoal(const StorePath & path, RepairFlag repair, std::optional<ContentAddress> ca)
 {
     GoalPtr goal = substitutionGoals[path].lock(); // FIXME
     if (!goal) {
-        goal = std::make_shared<SubstitutionGoal>(path, *this, repair);
+        goal = std::make_shared<SubstitutionGoal>(path, *this, repair, ca);
         substitutionGoals.insert_or_assign(path, goal);
         wakeUp(goal);
     }
@@ -5062,7 +5087,7 @@ void Worker::markContentsGood(const StorePath & path)
 static void primeCache(Store & store, const std::vector<StorePathWithOutputs> & paths)
 {
     StorePathSet willBuild, willSubstitute, unknown;
-    unsigned long long downloadSize, narSize;
+    uint64_t downloadSize, narSize;
     store.queryMissing(paths, willBuild, willSubstitute, unknown, downloadSize, narSize);
 
     if (!willBuild.empty() && 0 == settings.maxBuildJobs && getMachines().empty())

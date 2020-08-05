@@ -224,7 +224,7 @@ SV * hashString(char * algo, int base32, char * s)
 SV * convertHash(char * algo, char * s, int toBase32)
     PPCODE:
         try {
-            Hash h(s, parseHashType(algo));
+            auto h = Hash::parseAny(s, parseHashType(algo));
             string s = h.to_string(toBase32 ? Base32 : Base16, false);
             XPUSHs(sv_2mortal(newSVpv(s.c_str(), 0)));
         } catch (Error & e) {
@@ -285,7 +285,7 @@ SV * addToStore(char * srcPath, int recursive, char * algo)
 SV * makeFixedOutputPath(int recursive, char * algo, char * hash, char * name)
     PPCODE:
         try {
-            Hash h(hash, parseHashType(algo));
+            auto h = Hash::parseAny(hash, parseHashType(algo));
             auto method = recursive ? FileIngestionMethod::Recursive : FileIngestionMethod::Flat;
             auto path = store()->makeFixedOutputPath(method, h, name);
             XPUSHs(sv_2mortal(newSVpv(store()->printStorePath(path).c_str(), 0)));

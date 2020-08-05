@@ -125,7 +125,7 @@ void writeLine(int fd, string s);
    second variant returns the number of bytes and blocks freed. */
 void deletePath(const Path & path);
 
-void deletePath(const Path & path, unsigned long long & bytesFreed);
+void deletePath(const Path & path, uint64_t & bytesFreed);
 
 std::string getUserName();
 

@@ -14,6 +14,7 @@ namespace nix {
 
 /* Abstract syntax of derivations. */
 
+/* The traditional non-fixed-output derivation type. */
 struct DerivationOutputInputAddressed
 {
     /* Will need to become `std::optional<StorePath>` once input-addressed
@@ -21,12 +22,17 @@ struct DerivationOutputInputAddressed
     StorePath path;
 };
 
-struct DerivationOutputFixed
+/* Fixed-output derivations, whose output paths are content addressed
+   according to that fixed output. */
+struct DerivationOutputCAFixed
 {
     FixedOutputHash hash; /* hash used for expected hash computation */
 };
 
-struct DerivationOutputFloating
+/* Floating-output derivations, whose output paths are content addressed, but
+   not fixed, and so are dynamically calculated from whatever the output ends
+   up being. */
+struct DerivationOutputCAFloating
 {
     /* information used for expected hash computation */
     FileIngestionMethod method;
@@ -37,8 +43,8 @@ struct DerivationOutput
 {
     std::variant<
         DerivationOutputInputAddressed,
-        DerivationOutputFixed,
-        DerivationOutputFloating
+        DerivationOutputCAFixed,
+        DerivationOutputCAFloating
     > output;
     std::optional<HashType> hashAlgoOpt(const Store & store) const;
     /* Note, when you use this function you should make sure that you're passing
@@ -71,7 +77,7 @@ typedef std::map<StorePath, StringSet> DerivationInputs;
 typedef std::map<string, string> StringPairs;
 
 enum struct DerivationType : uint8_t {
-    Regular,
+    InputAddressed,
     CAFixed,
     CAFloating,
 };

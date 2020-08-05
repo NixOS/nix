@@ -29,7 +29,7 @@ struct GitArchiveInputScheme : InputScheme
         if (path.size() == 2) {
         } else if (path.size() == 3) {
             if (std::regex_match(path[2], revRegex))
-                rev = Hash(path[2], htSHA1);
+                rev = Hash::parseAny(path[2], htSHA1);
             else if (std::regex_match(path[2], refRegex))
                 ref = path[2];
             else
@@ -41,7 +41,7 @@ struct GitArchiveInputScheme : InputScheme
             if (name == "rev") {
                 if (rev)
                     throw BadURL("URL '%s' contains multiple commit hashes", url.url);
-                rev = Hash(value, htSHA1);
+                rev = Hash::parseAny(value, htSHA1);
             }
             else if (name == "ref") {
                 if (!std::regex_match(value, refRegex))
@@ -191,7 +191,7 @@ struct GitHubInputScheme : GitArchiveInputScheme
             readFile(
                 store->toRealPath(
                     downloadFile(store, url, "source", false).storePath)));
-        auto rev = Hash(std::string { json["sha"] }, htSHA1);
+        auto rev = Hash::parseAny(std::string { json["sha"] }, htSHA1);
         debug("HEAD revision for '%s' is %s", url, rev.gitRev());
         return rev;
     }
@@ -235,7 +235,7 @@ struct GitLabInputScheme : GitArchiveInputScheme
             readFile(
                 store->toRealPath(
                     downloadFile(store, url, "source", false).storePath)));
-        auto rev = Hash(std::string(json[0]["id"]), htSHA1);
+        auto rev = Hash::parseAny(std::string(json[0]["id"]), htSHA1);
         debug("HEAD revision for '%s' is %s", url, rev.gitRev());
         return rev;
     }
