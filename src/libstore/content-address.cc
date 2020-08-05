@@ -44,14 +44,14 @@ ContentAddress parseContentAddress(std::string_view rawCa) {
     {
         auto optPrefix = splitPrefixTo(rest, ':');
         if (!optPrefix)
-            throw UsageError("not a content address because it is not in the form \"<prefix>:<rest>\": %s", rawCa);
+            throw UsageError("not a content address because it is not in the form '<prefix>:<rest>': %s", rawCa);
         prefix = *optPrefix;
     }
 
     auto parseHashType_ = [&](){
         auto hashTypeRaw = splitPrefixTo(rest, ':');
         if (!hashTypeRaw)
-            throw UsageError("content address hash must be in form \"<algo>:<hash>\", but found: %s", rawCa);
+            throw UsageError("content address hash must be in form '<algo>:<hash>', but found: %s", rawCa);
         HashType hashType = parseHashType(*hashTypeRaw);
         return std::move(hashType);
     };
@@ -77,7 +77,7 @@ ContentAddress parseContentAddress(std::string_view rawCa) {
             .hash = Hash::parseNonSRIUnprefixed(rest, std::move(hashType)),
         };
     } else
-        throw UsageError("content address prefix \"%s\" is unrecognized. Recogonized prefixes are \"text\" or \"fixed\"", prefix);
+        throw UsageError("content address prefix '%s' is unrecognized. Recogonized prefixes are 'text' or 'fixed'", prefix);
 };
 
 std::optional<ContentAddress> parseContentAddressOpt(std::string_view rawCaOpt) {
