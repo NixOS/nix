@@ -308,16 +308,15 @@ struct InstallableStorePath : Installable
             for (auto & [name, output] : drv.outputs)
                 outputs.emplace(name, output.path(*store, drv.name));
             return {
-                Buildable {
+                BuildableFromDrv {
                     .drvPath = storePath,
                     .outputs = std::move(outputs)
                 }
             };
         } else {
             return {
-                Buildable {
-                    .drvPath = {},
-                    .outputs = {{"out", storePath}}
+                BuildableOpaque {
+                    .path = storePath,
                 }
             };
         }
@@ -333,33 +332,20 @@ Buildables InstallableValue::toBuildables()
 {
     Buildables res;
 
-    StorePathSet drvPaths;
+    std::map<StorePath, OutputPathMap> drvsToOutputs;
 
+    // Group by derivation, helps with .all in particular
     for (auto & drv : toDerivations()) {
-        Buildable b{.drvPath = drv.drvPath};
-        drvPaths.insert(drv.drvPath);
-
         auto outputName = drv.outputName;
         if (outputName == "")
-            throw Error("derivation '%s' lacks an 'outputName' attribute", state->store->printStorePath(*b.drvPath));
-
-        b.outputs.emplace(outputName, drv.outPath);
-
-        res.push_back(std::move(b));
+            throw Error("derivation '%s' lacks an 'outputName' attribute", state->store->printStorePath(drv.drvPath));
+        drvsToOutputs[drv.drvPath].insert_or_assign(outputName, drv.outPath);
     }
 
-    // Hack to recognize .all: if all drvs have the same drvPath,
-    // merge the buildables.
-    if (drvPaths.size() == 1) {
-        Buildable b{.drvPath = *drvPaths.begin()};
-        for (auto & b2 : res)
-            for (auto & output : b2.outputs)
-                b.outputs.insert_or_assign(output.first, output.second);
-        Buildables bs;
-        bs.push_back(std::move(b));
-        return bs;
-    } else
-        return res;
+    for (auto & i : drvsToOutputs)
+        res.push_back(BuildableFromDrv { i.first, i.second });
+
+    return res;
 }
 
 struct InstallableAttrPath : InstallableValue
@@ -656,14 +642,17 @@ Buildables build(ref<Store> store, Realise mode,
 
     for (auto & i : installables) {
         for (auto & b : i->toBuildables()) {
-            if (b.drvPath) {
-                StringSet outputNames;
-                for (auto & output : b.outputs)
-                    outputNames.insert(output.first);
-                pathsToBuild.push_back({*b.drvPath, outputNames});
-            } else
-                for (auto & output : b.outputs)
-                    pathsToBuild.push_back({output.second});
+            std::visit(overloaded {
+                [&](BuildableOpaque bo) {
+                    pathsToBuild.push_back({bo.path});
+                },
+                [&](BuildableFromDrv bfd) {
+                    StringSet outputNames;
+                    for (auto & output : bfd.outputs)
+                        outputNames.insert(output.first);
+                    pathsToBuild.push_back({bfd.drvPath, outputNames});
+                },
+            }, b);
             buildables.push_back(std::move(b));
         }
     }
@@ -684,16 +673,23 @@ StorePathSet toStorePaths(ref<Store> store,
 
     if (operateOn == OperateOn::Output) {
         for (auto & b : build(store, mode, installables))
-            for (auto & output : b.outputs)
-                outPaths.insert(output.second);
+            std::visit(overloaded {
+                [&](BuildableOpaque bo) {
+                    outPaths.insert(bo.path);
+                },
+                [&](BuildableFromDrv bfd) {
+                    for (auto & output : bfd.outputs)
+                        outPaths.insert(output.second);
+                },
+            }, b);
     } else {
         if (mode == Realise::Nothing)
             settings.readOnlyMode = true;
 
         for (auto & i : installables)
             for (auto & b : i->toBuildables())
-                if (b.drvPath)
-                    outPaths.insert(*b.drvPath);
+                if (auto bfd = std::get_if<BuildableFromDrv>(&b))
+                    outPaths.insert(bfd->drvPath);
     }
 
     return outPaths;
@@ -717,20 +713,21 @@ StorePathSet toDerivations(ref<Store> store,
     StorePathSet drvPaths;
 
     for (auto & i : installables)
-        for (auto & b : i->toBuildables()) {
-            if (!b.drvPath) {
-                if (!useDeriver)
-                    throw Error("argument '%s' did not evaluate to a derivation", i->what());
-                for (auto & output : b.outputs) {
-                    auto derivers = store->queryValidDerivers(output.second);
+        for (auto & b : i->toBuildables())
+            std::visit(overloaded {
+                [&](BuildableOpaque bo) {
+                    if (!useDeriver)
+                        throw Error("argument '%s' did not evaluate to a derivation", i->what());
+                    auto derivers = store->queryValidDerivers(bo.path);
                     if (derivers.empty())
                         throw Error("'%s' does not have a known deriver", i->what());
                     // FIXME: use all derivers?
                     drvPaths.insert(*derivers.begin());
-                }
-            } else
-                drvPaths.insert(*b.drvPath);
-        }
+                },
+                [&](BuildableFromDrv bfd) {
+                    drvPaths.insert(bfd.drvPath);
+                },
+            }, b);
 
     return drvPaths;
 }
