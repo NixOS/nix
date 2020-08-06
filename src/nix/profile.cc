@@ -455,7 +455,7 @@ struct CmdProfile : virtual MultiCommand, virtual Command
     void run() override
     {
         if (!command)
-            throw UsageError("'nix profile' requires a sub-command.");
+            command = std::pair("info", make_ref<CmdProfileInfo>());
         command->second->prepare();
         command->second->run();
     }
