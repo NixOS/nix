@@ -965,7 +965,7 @@ struct CmdFlake : virtual MultiCommand, virtual Command
     void run() override
     {
         if (!command)
-            throw UsageError("'nix flake' requires a sub-command.");
+            command = std::pair("info", make_ref<CmdFlakeInfo>());
         settings.requireExperimentalFeature("flakes");
         command->second->prepare();
         command->second->run();
