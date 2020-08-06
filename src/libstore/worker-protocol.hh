@@ -136,7 +136,6 @@ void write(const Store & store, Sink & out, const std::map<K, V> & resMap)
 {
     out << resMap.size();
     for (auto & i : resMap) {
-        // out << i.first;
         write(store, out, i.first);
         write(store, out, i.second);
     }
@@ -150,7 +149,6 @@ std::optional<T> read(const Store & store, Source & from, Phantom<std::optional<
     case 0:
         return std::nullopt;
     case 1:
-        // return nix::worker_proto::read(store, from, Phantom<T> {});
         return read(store, from, Phantom<T> {});
     default:
         throw Error("got an invalid tag bit for std::optional: %#04x", (size_t)tag);
