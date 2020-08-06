@@ -107,7 +107,7 @@ struct LegacySSHStore : public Store
             auto deriver = readString(conn->from);
             if (deriver != "")
                 info->deriver = parseStorePath(deriver);
-            info->references = nix::worker_proto::read(*this, conn->from, Phantom<StorePathSet> {});
+            info->references = WorkerProto<StorePathSet>::read(*this, conn->from);
             readLongLong(conn->from); // download size
             info->narSize = readLongLong(conn->from);
 
@@ -139,7 +139,7 @@ struct LegacySSHStore : public Store
                 << printStorePath(info.path)
                 << (info.deriver ? printStorePath(*info.deriver) : "")
                 << info.narHash->to_string(Base16, false);
-            nix::worker_proto::write(*this, conn->to, info.references);
+            WorkerProto<StorePathSet>::write(*this, conn->to, info.references);
             conn->to
                 << info.registrationTime
                 << info.narSize
@@ -168,7 +168,7 @@ struct LegacySSHStore : public Store
             conn->to
                 << exportMagic
                 << printStorePath(info.path);
-            nix::worker_proto::write(*this, conn->to, info.references);
+            WorkerProto<StorePathSet>::write(*this, conn->to, info.references);
             conn->to
                 << (info.deriver ? printStorePath(*info.deriver) : "")
                 << 0
@@ -251,10 +251,10 @@ struct LegacySSHStore : public Store
         conn->to
             << cmdQueryClosure
             << includeOutputs;
-        nix::worker_proto::write(*this, conn->to, paths);
+        WorkerProto<StorePathSet>::write(*this, conn->to, paths);
         conn->to.flush();
 
-        for (auto & i : nix::worker_proto::read(*this, conn->from, Phantom<StorePathSet> {}))
+        for (auto & i : WorkerProto<StorePathSet>::read(*this, conn->from))
             out.insert(i);
     }
 
@@ -267,10 +267,10 @@ struct LegacySSHStore : public Store
             << cmdQueryValidPaths
             << false // lock
             << maybeSubstitute;
-        nix::worker_proto::write(*this, conn->to, paths);
+        WorkerProto<StorePathSet>::write(*this, conn->to, paths);
         conn->to.flush();
 
-        return nix::worker_proto::read(*this, conn->from, Phantom<StorePathSet> {});
+        return WorkerProto<StorePathSet>::read(*this, conn->from);
     }
 
     void connect() override

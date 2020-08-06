@@ -66,105 +66,102 @@ typedef enum {
 class Store;
 struct Source;
 
-/* To guide overloading */
 template<typename T>
-struct Phantom {};
+struct WorkerProto {
+    static T read(const Store & store, Source & from);
+    static void write(const Store & store, Sink & out, const T & t);
+};
 
+template<>
+struct WorkerProto<std::string> {
+    static std::string read(const Store & store, Source & from);
+    static void write(const Store & store, Sink & out, const std::string & t);
+};
 
-namespace worker_proto {
-/* FIXME maybe move more stuff inside here */
+template<>
+struct WorkerProto<StorePath> {
+    static StorePath read(const Store & store, Source & from);
+    static void write(const Store & store, Sink & out, const StorePath & t);
+};
 
-std::string read(const Store & store, Source & from, Phantom<std::string> _);
-void write(const Store & store, Sink & out, const std::string & str);
-
-StorePath read(const Store & store, Source & from, Phantom<StorePath> _);
-void write(const Store & store, Sink & out, const StorePath & storePath);
-
-ContentAddress read(const Store & store, Source & from, Phantom<ContentAddress> _);
-void write(const Store & store, Sink & out, const ContentAddress & ca);
+template<>
+struct WorkerProto<ContentAddress> {
+    static ContentAddress read(const Store & store, Source & from);
+    static void write(const Store & store, Sink & out, const ContentAddress & t);
+};
 
 template<typename T>
-std::set<T> read(const Store & store, Source & from, Phantom<std::set<T>> _);
-template<typename T>
-void write(const Store & store, Sink & out, const std::set<T> & resSet);
+struct WorkerProto<std::set<T>> {
+
+    static std::set<T> read(const Store & store, Source & from)
+    {
+        std::set<T> resSet;
+        auto size = readNum<size_t>(from);
+        while (size--) {
+            resSet.insert(WorkerProto<T>::read(store, from));
+        }
+        return resSet;
+    }
+
+    static void write(const Store & store, Sink & out, const std::set<T> & resSet)
+    {
+        out << resSet.size();
+        for (auto & key : resSet) {
+            WorkerProto<T>::write(store, out, key);
+        }
+    }
+
+};
 
 template<typename K, typename V>
-std::map<K, V> read(const Store & store, Source & from, Phantom<std::map<K, V>> _);
-template<typename K, typename V>
-void write(const Store & store, Sink & out, const std::map<K, V> & resMap);
+struct WorkerProto<std::map<K, V>> {
 
-template<typename T>
-std::optional<T> read(const Store & store, Source & from, Phantom<std::optional<T>> _);
-template<typename T>
-void write(const Store & store, Sink & out, const std::optional<T> & optVal);
-
-template<typename T>
-std::set<T> read(const Store & store, Source & from, Phantom<std::set<T>> _)
-{
-    std::set<T> resSet;
-    auto size = readNum<size_t>(from);
-    while (size--) {
-        resSet.insert(read(store, from, Phantom<T> {}));
+    static std::map<K, V> read(const Store & store, Source & from)
+    {
+        std::map<K, V> resMap;
+        auto size = readNum<size_t>(from);
+        while (size--) {
+            resMap.insert_or_assign(
+                WorkerProto<K>::read(store, from),
+                WorkerProto<V>::read(store, from));
+        }
+        return resMap;
     }
-    return resSet;
-}
+
+    static void write(const Store & store, Sink & out, const std::map<K, V> & resMap)
+    {
+        out << resMap.size();
+        for (auto & i : resMap) {
+            WorkerProto<K>::write(store, out, i.first);
+            WorkerProto<V>::write(store, out, i.second);
+        }
+    }
+
+};
 
 template<typename T>
-void write(const Store & store, Sink & out, const std::set<T> & resSet)
-{
-    out << resSet.size();
-    for (auto & key : resSet) {
-        write(store, out, key);
+struct WorkerProto<std::optional<T>> {
+
+    static std::optional<T> read(const Store & store, Source & from)
+    {
+        auto tag = readNum<uint8_t>(from);
+        switch (tag) {
+        case 0:
+            return std::nullopt;
+        case 1:
+            return WorkerProto<T>::read(store, from);
+        default:
+            throw Error("got an invalid tag bit for std::optional: %#04x", (size_t)tag);
+        }
     }
-}
 
-template<typename K, typename V>
-std::map<K, V> read(const Store & store, Source & from, Phantom<std::map<K, V>> _)
-{
-    std::map<K, V> resMap;
-    auto size = readNum<size_t>(from);
-    while (size--) {
-        resMap.insert_or_assign(
-            read(store, from, Phantom<K> {}),
-            read(store, from, Phantom<V> {}));
+    static void write(const Store & store, Sink & out, const std::optional<T> & optVal)
+    {
+        out << (uint64_t) (optVal ? 1 : 0);
+        if (optVal)
+            WorkerProto<T>::write(store, out, *optVal);
     }
-    return resMap;
-}
 
-template<typename K, typename V>
-void write(const Store & store, Sink & out, const std::map<K, V> & resMap)
-{
-    out << resMap.size();
-    for (auto & i : resMap) {
-        write(store, out, i.first);
-        write(store, out, i.second);
-    }
-}
-
-template<typename T>
-std::optional<T> read(const Store & store, Source & from, Phantom<std::optional<T>> _)
-{
-    auto tag = readNum<uint8_t>(from);
-    switch (tag) {
-    case 0:
-        return std::nullopt;
-    case 1:
-        return read(store, from, Phantom<T> {});
-    default:
-        throw Error("got an invalid tag bit for std::optional: %#04x", (size_t)tag);
-    }
-}
-
-template<typename T>
-void write(const Store & store, Sink & out, const std::optional<T> & optVal)
-{
-    out << (uint64_t) (optVal ? 1 : 0);
-    if (optVal)
-        nix::worker_proto::write(store, out, *optVal);
-}
-
-
-}
-
+};
 
 }

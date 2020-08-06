@@ -1864,11 +1864,11 @@ HookReply DerivationGoal::tryBuildHook()
 
     /* Tell the hook all the inputs that have to be copied to the
        remote system. */
-    nix::worker_proto::write(worker.store, hook->sink, inputPaths);
+    WorkerProto<StorePathSet>::write(worker.store, hook->sink, inputPaths);
 
     /* Tell the hooks the missing outputs that have to be copied back
        from the remote system. */
-    nix::worker_proto::write(worker.store, hook->sink, missingPaths);
+    WorkerProto<StorePathSet>::write(worker.store, hook->sink, missingPaths);
 
     hook->sink = FdSink();
     hook->toHook.writeSide = -1;
