@@ -121,9 +121,9 @@ struct WorkerProto<std::map<K, V>> {
         std::map<K, V> resMap;
         auto size = readNum<size_t>(from);
         while (size--) {
-            resMap.insert_or_assign(
-                WorkerProto<K>::read(store, from),
-                WorkerProto<V>::read(store, from));
+            auto k = WorkerProto<K>::read(store, from);
+            auto v = WorkerProto<V>::read(store, from);
+            resMap.insert_or_assign(std::move(k), std::move(v));
         }
         return resMap;
     }
