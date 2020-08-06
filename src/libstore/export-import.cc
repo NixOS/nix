@@ -45,7 +45,7 @@ void Store::exportPath(const StorePath & path, Sink & sink)
     teeSink
         << exportMagic
         << printStorePath(path);
-    write(*this, teeSink, info->references);
+    nix::worker_proto::write(*this, teeSink, info->references);
     teeSink
         << (info->deriver ? printStorePath(*info->deriver) : "")
         << 0;
@@ -73,7 +73,7 @@ StorePaths Store::importPaths(Source & source, CheckSigsFlag checkSigs)
 
         //Activity act(*logger, lvlInfo, format("importing path '%s'") % info.path);
 
-        info.references = read(*this, source, Proxy<StorePathSet> {});
+        info.references = nix::worker_proto::read(*this, source, Phantom<StorePathSet> {});
 
         auto deriver = readString(source);
         if (deriver != "")

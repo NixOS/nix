@@ -68,15 +68,43 @@ struct Source;
 
 /* To guide overloading */
 template<typename T>
-struct Proxy {};
+struct Phantom {};
+
+
+namespace worker_proto {
+/* FIXME maybe move more stuff inside here */
+
+std::string read(const Store & store, Source & from, Phantom<std::string> _);
+void write(const Store & store, Sink & out, const std::string & str);
+
+StorePath read(const Store & store, Source & from, Phantom<StorePath> _);
+void write(const Store & store, Sink & out, const StorePath & storePath);
+
+ContentAddress read(const Store & store, Source & from, Phantom<ContentAddress> _);
+void write(const Store & store, Sink & out, const ContentAddress & ca);
 
 template<typename T>
-std::set<T> read(const Store & store, Source & from, Proxy<std::set<T>> _)
+std::set<T> read(const Store & store, Source & from, Phantom<std::set<T>> _);
+template<typename T>
+void write(const Store & store, Sink & out, const std::set<T> & resSet);
+
+template<typename K, typename V>
+std::map<K, V> read(const Store & store, Source & from, Phantom<std::map<K, V>> _);
+template<typename K, typename V>
+void write(const Store & store, Sink & out, const std::map<K, V> & resMap);
+
+template<typename T>
+std::optional<T> read(const Store & store, Source & from, Phantom<std::optional<T>> _);
+template<typename T>
+void write(const Store & store, Sink & out, const std::optional<T> & optVal);
+
+template<typename T>
+std::set<T> read(const Store & store, Source & from, Phantom<std::set<T>> _)
 {
     std::set<T> resSet;
     auto size = readNum<size_t>(from);
     while (size--) {
-        resSet.insert(read(store, from, Proxy<T> {}));
+        resSet.insert(read(store, from, Phantom<T> {}));
     }
     return resSet;
 }
@@ -91,14 +119,14 @@ void write(const Store & store, Sink & out, const std::set<T> & resSet)
 }
 
 template<typename K, typename V>
-std::map<K, V> read(const Store & store, Source & from, Proxy<std::map<K, V>> _)
+std::map<K, V> read(const Store & store, Source & from, Phantom<std::map<K, V>> _)
 {
     std::map<K, V> resMap;
     auto size = readNum<size_t>(from);
     while (size--) {
         resMap.insert_or_assign(
-            read(store, from, Proxy<K> {}),
-            read(store, from, Proxy<V> {}));
+            read(store, from, Phantom<K> {}),
+            read(store, from, Phantom<V> {}));
     }
     return resMap;
 }
@@ -107,21 +135,23 @@ template<typename K, typename V>
 void write(const Store & store, Sink & out, const std::map<K, V> & resMap)
 {
     out << resMap.size();
-    for (auto & [key, value] : resMap) {
-        write(store, out, key);
-        write(store, out, value);
+    for (auto & i : resMap) {
+        // out << i.first;
+        write(store, out, i.first);
+        write(store, out, i.second);
     }
 }
 
 template<typename T>
-std::optional<T> read(const Store & store, Source & from, Proxy<std::optional<T>> _)
+std::optional<T> read(const Store & store, Source & from, Phantom<std::optional<T>> _)
 {
     auto tag = readNum<uint8_t>(from);
     switch (tag) {
     case 0:
         return std::nullopt;
     case 1:
-        return read(store, from, Proxy<T> {});
+        // return nix::worker_proto::read(store, from, Phantom<T> {});
+        return read(store, from, Phantom<T> {});
     default:
         throw Error("got an invalid tag bit for std::optional: %#04x", (size_t)tag);
     }
@@ -132,19 +162,11 @@ void write(const Store & store, Sink & out, const std::optional<T> & optVal)
 {
     out << (uint64_t) (optVal ? 1 : 0);
     if (optVal)
-        write(store, out, *optVal);
+        nix::worker_proto::write(store, out, *optVal);
 }
 
-std::string read(const Store & store, Source & from, Proxy<std::string> _);
 
-void write(const Store & store, Sink & out, const std::string & str);
+}
 
-StorePath read(const Store & store, Source & from, Proxy<StorePath> _);
-
-void write(const Store & store, Sink & out, const StorePath & storePath);
-
-ContentAddress read(const Store & store, Source & from, Proxy<ContentAddress> _);
-
-void write(const Store & store, Sink & out, const ContentAddress & ca);
 
 }
