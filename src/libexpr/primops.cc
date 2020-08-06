@@ -583,6 +583,7 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
 
     PathSet context;
 
+    bool contentAddressed = false;
     std::optional<std::string> outputHash;
     std::string outputHashAlgo;
     auto ingestionMethod = FileIngestionMethod::Flat;
@@ -639,9 +640,14 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
                 if (i->value->type == tNull) continue;
             }
 
+            if (i->name == state.sContentAddressed) {
+                settings.requireExperimentalFeature("ca-derivations");
+                contentAddressed = state.forceBool(*i->value, pos);
+            }
+
             /* The `args' attribute is special: it supplies the
                command-line arguments to the builder. */
-            if (i->name == state.sArgs) {
+            else if (i->name == state.sArgs) {
                 state.forceList(*i->value, pos);
                 for (unsigned int n = 0; n < i->value->listSize(); ++n) {
                     string s = state.coerceToString(posDrvName, *i->value->listElems()[n], context, true);
@@ -694,7 +700,7 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
             }
 
         } catch (Error & e) {
-            e.addTrace(posDrvName, 
+            e.addTrace(posDrvName,
                 "while evaluating the attribute '%1%' of the derivation '%2%'",
                 key, drvName);
             throw;
@@ -761,7 +767,10 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
         });
 
     if (outputHash) {
-        /* Handle fixed-output derivations. */
+        /* Handle fixed-output derivations.
+
+           Ignore `__contentAddressed` because fixed output derivations are
+           already content addressed. */
         if (outputs.size() != 1 || *(outputs.begin()) != "out")
             throw Error({
                 .hint = hintfmt("multiple outputs are not supported in fixed-output derivations"),
@@ -774,13 +783,26 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
         auto outPath = state.store->makeFixedOutputPath(ingestionMethod, h, drvName);
         if (!jsonObject) drv.env["out"] = state.store->printStorePath(outPath);
         drv.outputs.insert_or_assign("out", DerivationOutput {
-                .output = DerivationOutputFixed {
+                .output = DerivationOutputCAFixed {
                     .hash = FixedOutputHash {
                         .method = ingestionMethod,
                         .hash = std::move(h),
                     },
                 },
         });
+    }
+
+    else if (contentAddressed) {
+        HashType ht = parseHashType(outputHashAlgo);
+        for (auto & i : outputs) {
+            if (!jsonObject) drv.env[i] = hashPlaceholder(i);
+            drv.outputs.insert_or_assign(i, DerivationOutput {
+                .output = DerivationOutputCAFloating {
+                    .method = ingestionMethod,
+                    .hashType = std::move(ht),
+                },
+            });
+        }
     }
 
     else {
@@ -800,7 +822,9 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
                 });
         }
 
-        Hash h = hashDerivationModulo(*state.store, Derivation(drv), true);
+        // Regular, non-CA derivation should always return a single hash and not
+        // hash per output.
+        Hash h = std::get<0>(hashDerivationModulo(*state.store, Derivation(drv), true));
 
         for (auto & i : outputs) {
             auto outPath = state.store->makeOutputPath(i, h, drvName);
