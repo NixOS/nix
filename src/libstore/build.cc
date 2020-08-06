@@ -3864,8 +3864,10 @@ void DerivationGoal::registerOutputs()
             worker.markContentsGood(worker.store.parseStorePath(path));
         }
 
-        ValidPathInfo info(worker.store.parseStorePath(path));
-        info.narHash = hash.first;
+        ValidPathInfo info {
+            worker.store.parseStorePath(path),
+            hash.first,
+        };
         info.narSize = hash.second;
         info.references = std::move(references);
         info.deriver = drvPath;

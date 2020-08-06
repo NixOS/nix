@@ -69,17 +69,18 @@ StorePaths Store::importPaths(Source & source, CheckSigsFlag checkSigs)
         if (magic != exportMagic)
             throw Error("Nix archive cannot be imported; wrong format");
 
-        ValidPathInfo info(parseStorePath(readString(source)));
+        auto path = parseStorePath(readString(source));
 
         //Activity act(*logger, lvlInfo, format("importing path '%s'") % info.path);
 
-        info.references = readStorePaths<StorePathSet>(*this, source);
-
+        auto references = readStorePaths<StorePathSet>(*this, source);
         auto deriver = readString(source);
+        auto narHash = hashString(htSHA256, *saved.s);
+
+        ValidPathInfo info { path, narHash };
         if (deriver != "")
             info.deriver = parseStorePath(deriver);
-
-        info.narHash = hashString(htSHA256, *saved.s);
+        info.references = references;
         info.narSize = saved.s->size();
 
         // Ignore optional legacy signature.

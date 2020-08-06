@@ -4,7 +4,6 @@
 #include "hash.hh"
 #include "content-address.hh"
 #include "serialise.hh"
-#include "crypto.hh"
 #include "lru-cache.hh"
 #include "sync.hh"
 #include "globals.hh"
@@ -761,7 +760,7 @@ string showPaths(const PathSet & paths);
 std::optional<ValidPathInfo> decodeValidPathInfo(
     const Store & store,
     std::istream & str,
-    bool hashGiven = false);
+    std::optional<HashResult> hashGiven = std::nullopt);
 
 /* Split URI into protocol+hierarchy part and its parameter set. */
 std::pair<std::string, Store::Params> splitUriAndParams(const std::string & uri);

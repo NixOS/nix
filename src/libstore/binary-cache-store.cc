@@ -385,7 +385,10 @@ StorePath BinaryCacheStore::addToStore(const string & name, const Path & srcPath
         h = hashString(hashAlgo, s);
     }
 
-    ValidPathInfo info(makeFixedOutputPath(method, *h, name));
+    ValidPathInfo info {
+        makeFixedOutputPath(method, *h, name),
+        Hash::dummy, // Will be fixed in addToStore, which recomputes nar hash
+    };
 
     auto source = StringSource { *sink.s };
     addToStore(info, source, repair, CheckSigs);
@@ -396,7 +399,10 @@ StorePath BinaryCacheStore::addToStore(const string & name, const Path & srcPath
 StorePath BinaryCacheStore::addTextToStore(const string & name, const string & s,
     const StorePathSet & references, RepairFlag repair)
 {
-    ValidPathInfo info(computeStorePathForText(name, s, references));
+    ValidPathInfo info {
+        computeStorePathForText(name, s, references),
+        Hash::dummy, // Will be fixed in addToStore, which recomputes nar hash
+    };
     info.references = references;
 
     if (repair || !isValidPath(info.path)) {

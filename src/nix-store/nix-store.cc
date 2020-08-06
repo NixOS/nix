@@ -495,7 +495,10 @@ static void registerValidity(bool reregister, bool hashGiven, bool canonicalise)
     ValidPathInfos infos;
 
     while (1) {
-        auto info = decodeValidPathInfo(*store, cin, hashGiven);
+        // We use a dummy value because we'll set it below. FIXME be correct by
+        // construction and avoid dummy value.
+        auto hashResultOpt = !hashGiven ? std::optional<HashResult> { {Hash::dummy, -1} } : std::nullopt;
+        auto info = decodeValidPathInfo(*store, cin, hashResultOpt);
         if (!info) break;
         if (!store->isValidPath(info->path) || reregister) {
             /* !!! races */
@@ -944,11 +947,13 @@ static void opServe(Strings opFlags, Strings opArgs)
                 if (!writeAllowed) throw Error("importing paths is not allowed");
 
                 auto path = readString(in);
-                ValidPathInfo info(store->parseStorePath(path));
                 auto deriver = readString(in);
+                ValidPathInfo info {
+                    store->parseStorePath(path),
+                    Hash::parseAny(readString(in), htSHA256),
+                };
                 if (deriver != "")
                     info.deriver = store->parseStorePath(deriver);
-                info.narHash = Hash::parseAny(readString(in), htSHA256);
                 info.references = readStorePaths<StorePathSet>(*store, in);
                 in >> info.registrationTime >> info.narSize >> info.ultimate;
                 info.sigs = readStrings<StringSet>(in);

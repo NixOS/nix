@@ -694,11 +694,12 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
 
     case wopAddToStoreNar: {
         bool repair, dontCheckSigs;
-        ValidPathInfo info(store->parseStorePath(readString(from)));
+        auto path = store->parseStorePath(readString(from));
         auto deriver = readString(from);
+        auto narHash = Hash::parseAny(readString(from), htSHA256);
+        ValidPathInfo info { path, narHash };
         if (deriver != "")
             info.deriver = store->parseStorePath(deriver);
-        info.narHash = Hash::parseAny(readString(from), htSHA256);
         info.references = readStorePaths<StorePathSet>(*store, from);
         from >> info.registrationTime >> info.narSize >> info.ultimate;
         info.sigs = readStrings<StringSet>(from);

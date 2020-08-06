@@ -419,10 +419,10 @@ void RemoteStore::queryPathInfoUncached(const StorePath & path,
                 bool valid; conn->from >> valid;
                 if (!valid) throw InvalidPath("path '%s' is not valid", printStorePath(path));
             }
-            info = std::make_shared<ValidPathInfo>(StorePath(path));
             auto deriver = readString(conn->from);
+            auto narHash = Hash::parseAny(readString(conn->from), htSHA256);
+            info = std::make_shared<ValidPathInfo>(path, narHash);
             if (deriver != "") info->deriver = parseStorePath(deriver);
-            info->narHash = Hash::parseAny(readString(conn->from), htSHA256);
             info->references = readStorePaths<StorePathSet>(*this, conn->from);
             conn->from >> info->registrationTime >> info->narSize;
             if (GET_PROTOCOL_MINOR(conn->daemonVersion) >= 16) {

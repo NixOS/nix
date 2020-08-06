@@ -189,13 +189,14 @@ public:
                 return {oInvalid, 0};
 
             auto namePart = queryNAR.getStr(1);
-            auto narInfo = make_ref<NarInfo>(StorePath(hashPart + "-" + namePart));
+            auto narInfo = make_ref<NarInfo>(
+                StorePath(hashPart + "-" + namePart),
+                Hash::parseAnyPrefixed(queryNAR.getStr(6)));
             narInfo->url = queryNAR.getStr(2);
             narInfo->compression = queryNAR.getStr(3);
             if (!queryNAR.isNull(4))
                 narInfo->fileHash = Hash::parseAnyPrefixed(queryNAR.getStr(4));
             narInfo->fileSize = queryNAR.getInt(5);
-            narInfo->narHash = Hash::parseAnyPrefixed(queryNAR.getStr(6));
             narInfo->narSize = queryNAR.getInt(7);
             for (auto & r : tokenizeString<Strings>(queryNAR.getStr(8), " "))
                 narInfo->references.insert(StorePath(r));
