@@ -71,7 +71,7 @@ if [[ -n $(type -p git) ]]; then
     [ $path2 = $path ]
 
     # HEAD should be the same path as tree
-    path3=$(nix eval --raw --expr "(builtins.fetchTree { type = \"git\"; url = file://$repo; ref = \"HEAD\"; gitIngestion = true; }).outPath")
+    path3=$(nix eval --impure --raw --expr "(builtins.fetchTree { type = \"git\"; url = file://$repo; ref = \"HEAD\"; gitIngestion = true; }).outPath")
     [ $path3 = $path ]
 else
     echo "Git not installed; skipping Git tests"

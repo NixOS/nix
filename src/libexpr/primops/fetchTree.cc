@@ -28,10 +28,15 @@ void emitTreeAttrs(
 
     // FIXME: support arbitrary input attributes.
 
-    auto narHash = input.getNarHash();
-    assert(narHash);
-    mkString(*state.allocAttr(v, state.symbols.create("narHash")),
-        narHash->to_string(SRI, true));
+    if (auto narHash = input.getNarHash()) {
+        mkString(*state.allocAttr(v, state.symbols.create("narHash")),
+            narHash->to_string(SRI, true));
+    } else if (auto treeHash = input.getTreeHash()) {
+        mkString(*state.allocAttr(v, state.symbols.create("treeHash")),
+            treeHash->to_string(SRI, true));
+    } else
+        /* Must have either tree hash or NAR hash */
+        assert(false);
 
     if (auto rev = input.getRev()) {
         mkString(*state.allocAttr(v, state.symbols.create("rev")), rev->gitRev());

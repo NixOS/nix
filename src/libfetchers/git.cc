@@ -440,6 +440,12 @@ struct GitInputScheme : InputScheme
         PathFilter filter = defaultPathFilter;
 
         if (submodules) {
+            if (input.getTreeHash())
+                throw Error("Cannot fetch specific tree hashes if there are submodules");
+            warn("Nix's computed git tree hash will be different when submodules are converted to regular directories");
+        }
+
+        if (submodules) {
             Path tmpGitDir = createTempDir();
             AutoDelete delTmpGitDir(tmpGitDir, true);
 
