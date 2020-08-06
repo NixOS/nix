@@ -67,7 +67,7 @@ struct PathInputScheme : InputScheme
 
     bool hasAllInfo(const Input & input) override
     {
-        return true;
+        return (bool) input.getNarHash();
     }
 
     std::optional<Path> getSourcePath(const Input & input) override

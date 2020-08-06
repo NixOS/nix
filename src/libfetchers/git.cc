@@ -94,9 +94,14 @@ struct GitInputScheme : InputScheme
     {
         bool maybeDirty = !input.getRef();
         bool shallow = maybeGetBoolAttr(input.attrs, "shallow").value_or(false);
-        return
+        bool submodules = maybeGetBoolAttr(input.attrs, "submodules").value_or(false);
+        /* FIXME just requiring tree hash is necessary for substitutions to
+           work for now, but breaks eval purity. Need a better solution before
+           upstreaming. */
+        return (input.getTreeHash() && !submodules) || (
             maybeGetIntAttr(input.attrs, "lastModified")
-            && (shallow || maybeDirty || maybeGetIntAttr(input.attrs, "revCount"));
+            && (shallow || maybeDirty || maybeGetIntAttr(input.attrs, "revCount"))
+            && input.getNarHash());
     }
 
     /* FIXME no overriding the tree hash / flake registry support for tree

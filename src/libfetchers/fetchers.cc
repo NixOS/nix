@@ -84,7 +84,7 @@ Attrs Input::toAttrs() const
 
 bool Input::hasAllInfo() const
 {
-    return getNarHash() && scheme && scheme->hasAllInfo(*this);
+    return scheme && scheme->hasAllInfo(*this);
 }
 
 bool Input::operator ==(const Input & other) const

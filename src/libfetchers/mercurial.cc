@@ -71,7 +71,8 @@ struct MercurialInputScheme : InputScheme
     {
         // FIXME: ugly, need to distinguish between dirty and clean
         // default trees.
-        return input.getRef() == "default" || maybeGetIntAttr(input.attrs, "revCount");
+        return input.getNarHash()
+            && (input.getRef() == "default" || maybeGetIntAttr(input.attrs, "revCount"));
     }
 
     Input applyOverrides(

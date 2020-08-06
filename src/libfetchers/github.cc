@@ -106,7 +106,7 @@ struct GitArchiveInputScheme : InputScheme
 
     bool hasAllInfo(const Input & input) override
     {
-        return input.getRev() && maybeGetIntAttr(input.attrs, "lastModified");
+        return input.getNarHash() && input.getRev() && maybeGetIntAttr(input.attrs, "lastModified");
     }
 
     Input applyOverrides(
