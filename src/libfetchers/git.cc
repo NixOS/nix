@@ -208,8 +208,9 @@ struct GitInputScheme : InputScheme
             -> std::pair<Tree, Input>
         {
             assert(input.getRev() || input.getTreeHash());
-            assert(!input.getRev() || _input.getRev() == input.getRev());
-            assert(!input.getTreeHash() || _input.getTreeHash() == input.getTreeHash());
+            /* If was originally set, that original value must be preserved. */
+            assert(!_input.getRev() || _input.getRev() == input.getRev());
+            assert(!_input.getTreeHash() || _input.getTreeHash() == input.getTreeHash());
             if (!shallow)
                 input.attrs.insert_or_assign("revCount", getIntAttr(infoAttrs, "revCount"));
             input.attrs.insert_or_assign("lastModified", getIntAttr(infoAttrs, "lastModified"));
