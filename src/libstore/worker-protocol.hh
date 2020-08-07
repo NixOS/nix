@@ -66,85 +66,102 @@ typedef enum {
 class Store;
 struct Source;
 
-/* To guide overloading */
 template<typename T>
-struct Proxy {};
+struct WorkerProto {
+    static T read(const Store & store, Source & from);
+    static void write(const Store & store, Sink & out, const T & t);
+};
+
+template<>
+struct WorkerProto<std::string> {
+    static std::string read(const Store & store, Source & from);
+    static void write(const Store & store, Sink & out, const std::string & t);
+};
+
+template<>
+struct WorkerProto<StorePath> {
+    static StorePath read(const Store & store, Source & from);
+    static void write(const Store & store, Sink & out, const StorePath & t);
+};
+
+template<>
+struct WorkerProto<StorePathDescriptor> {
+    static StorePathDescriptor read(const Store & store, Source & from);
+    static void write(const Store & store, Sink & out, const StorePathDescriptor & t);
+};
 
 template<typename T>
-std::set<T> read(const Store & store, Source & from, Proxy<std::set<T>> _)
-{
-    std::set<T> resSet;
-    auto size = readNum<size_t>(from);
-    while (size--) {
-        resSet.insert(read(store, from, Proxy<T> {}));
-    }
-    return resSet;
-}
+struct WorkerProto<std::set<T>> {
 
-template<typename T>
-void write(const Store & store, Sink & out, const std::set<T> & resSet)
-{
-    out << resSet.size();
-    for (auto & key : resSet) {
-        write(store, out, key);
+    static std::set<T> read(const Store & store, Source & from)
+    {
+        std::set<T> resSet;
+        auto size = readNum<size_t>(from);
+        while (size--) {
+            resSet.insert(WorkerProto<T>::read(store, from));
+        }
+        return resSet;
     }
-}
+
+    static void write(const Store & store, Sink & out, const std::set<T> & resSet)
+    {
+        out << resSet.size();
+        for (auto & key : resSet) {
+            WorkerProto<T>::write(store, out, key);
+        }
+    }
+
+};
 
 template<typename K, typename V>
-std::map<K, V> read(const Store & store, Source & from, Proxy<std::map<K, V>> _)
-{
-    std::map<K, V> resMap;
-    auto size = readNum<size_t>(from);
-    while (size--) {
-        resMap.insert_or_assign(
-            read(store, from, Proxy<K> {}),
-            read(store, from, Proxy<V> {}));
-    }
-    return resMap;
-}
+struct WorkerProto<std::map<K, V>> {
 
-template<typename K, typename V>
-void write(const Store & store, Sink & out, const std::map<K, V> & resMap)
-{
-    out << resMap.size();
-    for (auto & [key, value] : resMap) {
-        write(store, out, key);
-        write(store, out, value);
+    static std::map<K, V> read(const Store & store, Source & from)
+    {
+        std::map<K, V> resMap;
+        auto size = readNum<size_t>(from);
+        while (size--) {
+            auto k = WorkerProto<K>::read(store, from);
+            auto v = WorkerProto<V>::read(store, from);
+            resMap.insert_or_assign(std::move(k), std::move(v));
+        }
+        return resMap;
     }
-}
+
+    static void write(const Store & store, Sink & out, const std::map<K, V> & resMap)
+    {
+        out << resMap.size();
+        for (auto & i : resMap) {
+            WorkerProto<K>::write(store, out, i.first);
+            WorkerProto<V>::write(store, out, i.second);
+        }
+    }
+
+};
 
 template<typename T>
-std::optional<T> read(const Store & store, Source & from, Proxy<std::optional<T>> _)
-{
-    auto tag = readNum<uint8_t>(from);
-    switch (tag) {
-    case 0:
-        return std::nullopt;
-    case 1:
-        return read(store, from, Proxy<T> {});
-    default:
-        throw Error("got an invalid tag bit for std::optional: %#04x", (size_t)tag);
+struct WorkerProto<std::optional<T>> {
+
+    static std::optional<T> read(const Store & store, Source & from)
+    {
+        auto tag = readNum<uint8_t>(from);
+        switch (tag) {
+        case 0:
+            return std::nullopt;
+        case 1:
+            return WorkerProto<T>::read(store, from);
+        default:
+            throw Error("got an invalid tag bit for std::optional: %#04x", (size_t)tag);
+        }
     }
-}
 
-template<typename T>
-void write(const Store & store, Sink & out, const std::optional<T> & optVal)
-{
-    out << (uint64_t) (optVal ? 1 : 0);
-    if (optVal)
-        write(store, out, *optVal);
-}
+    static void write(const Store & store, Sink & out, const std::optional<T> & optVal)
+    {
+        out << (uint64_t) (optVal ? 1 : 0);
+        if (optVal)
+            WorkerProto<T>::write(store, out, *optVal);
+    }
 
-std::string read(const Store & store, Source & from, Proxy<std::string> _);
-
-void write(const Store & store, Sink & out, const std::string & str);
-
-StorePath read(const Store & store, Source & from, Proxy<StorePath> _);
-
-void write(const Store & store, Sink & out, const StorePath & storePath);
-
-StorePathDescriptor read(const Store & store, Source & from, Proxy<StorePathDescriptor> _);
-
-void write(const Store & store, Sink & out, const StorePathDescriptor & ca);
+};
 
 }

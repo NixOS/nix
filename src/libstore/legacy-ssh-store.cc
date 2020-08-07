@@ -107,7 +107,7 @@ struct LegacySSHStore : public Store
             auto deriver = readString(conn->from);
             if (deriver != "")
                 info->deriver = parseStorePath(deriver);
-            info->setReferencesPossiblyToSelf(read(*this, conn->from, Proxy<StorePathSet> {}));
+            info->setReferencesPossiblyToSelf(WorkerProto<StorePathSet>::read(*this, conn->from));
             readLongLong(conn->from); // download size
             info->narSize = readLongLong(conn->from);
 
@@ -139,7 +139,7 @@ struct LegacySSHStore : public Store
                 << printStorePath(info.path)
                 << (info.deriver ? printStorePath(*info.deriver) : "")
                 << info.narHash->to_string(Base16, false);
-            write(*this, conn->to, info.referencesPossiblyToSelf());
+            WorkerProto<StorePathSet>::write(*this, conn->to, info.referencesPossiblyToSelf());
             conn->to
                 << info.registrationTime
                 << info.narSize
@@ -168,7 +168,7 @@ struct LegacySSHStore : public Store
             conn->to
                 << exportMagic
                 << printStorePath(info.path);
-            write(*this, conn->to, info.referencesPossiblyToSelf());
+            WorkerProto<StorePathSet>::write(*this, conn->to, info.referencesPossiblyToSelf());
             conn->to
                 << (info.deriver ? printStorePath(*info.deriver) : "")
                 << 0
@@ -252,10 +252,10 @@ struct LegacySSHStore : public Store
         conn->to
             << cmdQueryClosure
             << includeOutputs;
-        write(*this, conn->to, paths);
+        WorkerProto<StorePathSet>::write(*this, conn->to, paths);
         conn->to.flush();
 
-        for (auto & i : read(*this, conn->from, Proxy<StorePathSet> {}))
+        for (auto & i : WorkerProto<StorePathSet>::read(*this, conn->from))
             out.insert(i);
     }
 
@@ -268,10 +268,10 @@ struct LegacySSHStore : public Store
             << cmdQueryValidPaths
             << false // lock
             << maybeSubstitute;
-        write(*this, conn->to, paths);
+        WorkerProto<StorePathSet>::write(*this, conn->to, paths);
         conn->to.flush();
 
-        return read(*this, conn->from, Proxy<StorePathSet> {});
+        return WorkerProto<StorePathSet>::read(*this, conn->from);
     }
 
     void connect() override

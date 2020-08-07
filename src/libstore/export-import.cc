@@ -45,7 +45,7 @@ void Store::exportPath(const StorePath & path, Sink & sink)
     teeSink
         << exportMagic
         << printStorePath(path);
-    write(*this, teeSink, info->referencesPossiblyToSelf());
+    WorkerProto<StorePathSet>::write(*this, teeSink, info->referencesPossiblyToSelf());
     teeSink
         << (info->deriver ? printStorePath(*info->deriver) : "")
         << 0;
@@ -73,7 +73,7 @@ StorePaths Store::importPaths(Source & source, CheckSigsFlag checkSigs)
 
         //Activity act(*logger, lvlInfo, format("importing path '%s'") % info.path);
 
-        info.setReferencesPossiblyToSelf(read(*this, source, Proxy<StorePathSet> {}));
+        info.setReferencesPossiblyToSelf(WorkerProto<StorePathSet>::read(*this, source));
 
         auto deriver = readString(source);
         if (deriver != "")

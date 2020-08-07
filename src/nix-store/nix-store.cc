@@ -822,7 +822,7 @@ static void opServe(Strings opFlags, Strings opArgs)
             case cmdQueryValidPaths: {
                 bool lock = readInt(in);
                 bool substitute = readInt(in);
-                auto paths = read(*store, in, Proxy<StorePathSet> {});
+                auto paths = WorkerProto<StorePathSet>::read(*store, in);
                 if (lock && writeAllowed)
                     for (auto & path : paths)
                         store->addTempRoot(path);
@@ -852,19 +852,19 @@ static void opServe(Strings opFlags, Strings opArgs)
                         }
                 }
 
-                write(*store, out, store->queryValidPaths(paths));
+                WorkerProto<StorePathSet>::write(*store, out, store->queryValidPaths(paths));
                 break;
             }
 
             case cmdQueryPathInfos: {
-                auto paths = read(*store, in, Proxy<StorePathSet> {});
+                auto paths = WorkerProto<StorePathSet>::read(*store, in);
                 // !!! Maybe we want a queryPathInfos?
                 for (auto & i : paths) {
                     try {
                         auto info = store->queryPathInfo(i);
                         out << store->printStorePath(info->path)
                             << (info->deriver ? store->printStorePath(*info->deriver) : "");
-                        write(*store, out, info->referencesPossiblyToSelf());
+                        WorkerProto<StorePathSet>::write(*store, out, info->referencesPossiblyToSelf());
                         // !!! Maybe we want compression?
                         out << info->narSize // downloadSize
                             << info->narSize;
@@ -894,7 +894,7 @@ static void opServe(Strings opFlags, Strings opArgs)
 
             case cmdExportPaths: {
                 readInt(in); // obsolete
-                store->exportPaths(read(*store, in, Proxy<StorePathSet> {}), out);
+                store->exportPaths(WorkerProto<StorePathSet>::read(*store, in), out);
                 break;
             }
 
@@ -943,9 +943,9 @@ static void opServe(Strings opFlags, Strings opArgs)
             case cmdQueryClosure: {
                 bool includeOutputs = readInt(in);
                 StorePathSet closure;
-                store->computeFSClosure(read(*store, in, Proxy<StorePathSet> {}),
+                store->computeFSClosure(WorkerProto<StorePathSet>::read(*store, in),
                     closure, false, includeOutputs);
-                write(*store, out, closure);
+                WorkerProto<StorePathSet>::write(*store, out, closure);
                 break;
             }
 
@@ -958,7 +958,7 @@ static void opServe(Strings opFlags, Strings opArgs)
                 if (deriver != "")
                     info.deriver = store->parseStorePath(deriver);
                 info.narHash = Hash::parseAny(readString(in), htSHA256);
-                info.setReferencesPossiblyToSelf(read(*store, in, Proxy<StorePathSet> {}));
+                info.setReferencesPossiblyToSelf(WorkerProto<StorePathSet>::read(*store, in));
                 in >> info.registrationTime >> info.narSize >> info.ultimate;
                 info.sigs = readStrings<StringSet>(in);
                 info.ca = parseContentAddressOpt(readString(in));
