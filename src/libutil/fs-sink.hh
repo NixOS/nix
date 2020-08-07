@@ -15,8 +15,8 @@ struct ParseSink
     virtual void createRegularFile(const Path & path) { };
     virtual void createExecutableFile(const Path & path) { };
     virtual void isExecutable() { };
-    virtual void preallocateContents(unsigned long long size) { };
-    virtual void receiveContents(unsigned char * data, unsigned int len) { };
+    virtual void preallocateContents(uint64_t size) { };
+    virtual void receiveContents(unsigned char * data, size_t len) { };
 
     virtual void createSymlink(const Path & path, const string & target) { };
 
@@ -59,7 +59,7 @@ struct RestoreSink : ParseSink
             throw SysError("fchmod");
     }
 
-    void preallocateContents(unsigned long long len)
+    void preallocateContents(uint64_t len)
     {
 #if HAVE_POSIX_FALLOCATE
         if (len) {
@@ -74,7 +74,7 @@ struct RestoreSink : ParseSink
 #endif
     }
 
-    void receiveContents(unsigned char * data, unsigned int len)
+    void receiveContents(unsigned char * data, size_t len)
     {
         writeFull(fd.get(), data, len);
     }

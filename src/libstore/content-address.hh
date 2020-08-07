@@ -135,6 +135,12 @@ struct StorePathDescriptor {
     std::string name;
     ContentAddressWithReferences info;
 
+    bool operator == (const StorePathDescriptor & other) const
+    {
+        return name == other.name;
+        // FIXME second field
+    }
+
     bool operator < (const StorePathDescriptor & other) const
     {
         return name < other.name;

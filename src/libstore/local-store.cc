@@ -545,11 +545,8 @@ void LocalStore::checkDerivationOutputs(const StorePath & drvPath, const Derivat
     std::string drvName(drvPath.name());
     drvName = string(drvName, 0, drvName.size() - drvExtension.size());
 
-    auto check = [&](const StorePath & expected, const StorePath & actual, const std::string & varName)
+    auto envHasRightPath = [&](const StorePath & actual, const std::string & varName)
     {
-        if (actual != expected)
-            throw Error("derivation '%s' has incorrect output '%s', should be '%s'",
-                printStorePath(drvPath), printStorePath(actual), printStorePath(expected));
         auto j = drv.env.find(varName);
         if (j == drv.env.end() || parseStorePath(j->second) != actual)
             throw Error("derivation '%s' has incorrect environment variable '%s', should be '%s'",
@@ -557,23 +554,34 @@ void LocalStore::checkDerivationOutputs(const StorePath & drvPath, const Derivat
     };
 
 
-    if (drv.isFixedOutput()) {
-        DerivationOutputs::const_iterator out = drv.outputs.find("out");
-        if (out == drv.outputs.end())
-            throw Error("derivation '%s' does not have an output named 'out'", printStorePath(drvPath));
+    // Don't need the answer, but do this anyways to assert is proper
+    // combination. The code below is more general and naturally allows
+    // combinations that are currently prohibited.
+    drv.type();
 
-        check(
-            makeFixedOutputPath(drvName, FixedOutputInfo {
-                *out->second.hash,
-                {},
-            }),
-            out->second.path, "out");
-    }
-
-    else {
-        Hash h = hashDerivationModulo(*this, drv, true);
-        for (auto & i : drv.outputs)
-            check(makeOutputPath(i.first, h, drvName), i.second.path, i.first);
+    std::optional<Hash> h;
+    for (auto & i : drv.outputs) {
+        std::visit(overloaded {
+            [&](DerivationOutputInputAddressed doia) {
+                if (!h) {
+                    // somewhat expensive so we do lazily
+                    auto temp = hashDerivationModulo(*this, drv, true);
+                    h = std::get<Hash>(temp);
+                }
+                StorePath recomputed = makeOutputPath(i.first, *h, drvName);
+                if (doia.path != recomputed)
+                    throw Error("derivation '%s' has incorrect output '%s', should be '%s'",
+                        printStorePath(drvPath), printStorePath(doia.path), printStorePath(recomputed));
+                envHasRightPath(doia.path, i.first);
+            },
+            [&](DerivationOutputCAFixed dof) {
+                StorePath path = makeFixedOutputPath(drvName, { dof.hash, {} });
+                envHasRightPath(path, i.first);
+            },
+            [&](DerivationOutputCAFloating _) {
+                throw UnimplementedError("floating CA output derivations are not yet implemented");
+            },
+        }, i.second.output);
     }
 }
 
@@ -595,7 +603,7 @@ uint64_t LocalStore::addValidPath(State & state,
         (concatStringsSep(" ", info.sigs), !info.sigs.empty())
         (renderContentAddress(info.ca), (bool) info.ca)
         .exec();
-    uint64_t id = sqlite3_last_insert_rowid(state.db);
+    uint64_t id = state.db.getLastInsertedRowId();
 
     /* If this is a derivation, then store the derivation outputs in
        the database.  This is useful for the garbage collector: it can
@@ -615,7 +623,7 @@ uint64_t LocalStore::addValidPath(State & state,
             state.stmtAddDerivationOutput.use()
                 (id)
                 (i.first)
-                (printStorePath(i.second.path))
+                (printStorePath(i.second.path(*this, drv.name)))
                 .exec();
         }
     }
@@ -779,17 +787,21 @@ StorePathSet LocalStore::queryValidDerivers(const StorePath & path)
 }
 
 
-OutputPathMap LocalStore::queryDerivationOutputMap(const StorePath & path)
+std::map<std::string, std::optional<StorePath>> LocalStore::queryDerivationOutputMap(const StorePath & path)
 {
-    return retrySQLite<OutputPathMap>([&]() {
+    std::map<std::string, std::optional<StorePath>> outputs;
+    BasicDerivation drv = readDerivation(path);
+    for (auto & [outName, _] : drv.outputs) {
+        outputs.insert_or_assign(outName, std::nullopt);
+    }
+    return retrySQLite<std::map<std::string, std::optional<StorePath>>>([&]() {
         auto state(_state.lock());
 
         auto useQueryDerivationOutputs(state->stmtQueryDerivationOutputs.use()
             (queryValidPathId(*state, path)));
 
-        OutputPathMap outputs;
         while (useQueryDerivationOutputs.next())
-            outputs.emplace(
+            outputs.insert_or_assign(
                 useQueryDerivationOutputs.getStr(0),
                 parseStorePath(useQueryDerivationOutputs.getStr(1))
             );
@@ -1057,38 +1069,6 @@ void LocalStore::addToStore(const ValidPathInfo & info, Source & source,
 }
 
 
-StorePath LocalStore::addToStore(const string & name, const Path & _srcPath,
-    FileIngestionMethod method, HashType hashAlgo, PathFilter & filter, RepairFlag repair)
-{
-    Path srcPath(absPath(_srcPath));
-    auto source = sinkToSource([&](Sink & sink) {
-        switch (method) {
-        case FileIngestionMethod::Recursive: {
-            dumpPath(srcPath, sink, filter);
-            break;
-        }
-        case FileIngestionMethod::Git: {
-            // recursively add to store if path is a directory
-            struct stat st;
-            if (lstat(srcPath.c_str(), &st))
-                throw SysError("getting attributes of path '%1%'", srcPath);
-            if (S_ISDIR(st.st_mode))
-                for (auto & i : readDirectory(srcPath))
-                    addToStore("git", srcPath + "/" + i.name, method, hashAlgo, filter, repair);
-
-            dumpGit(hashAlgo, srcPath, sink, filter);
-            break;
-        }
-        case FileIngestionMethod::Flat: {
-            readFile(srcPath, sink);
-            break;
-        }
-        }
-    });
-    return addToStoreFromDump(*source, name, method, hashAlgo, repair);
-}
-
-
 StorePath LocalStore::addToStoreFromDump(Source & source0, const string & name,
     FileIngestionMethod method, HashType hashAlgo, RepairFlag repair)
 {
@@ -1111,7 +1091,7 @@ StorePath LocalStore::addToStoreFromDump(Source & source0, const string & name,
        or the original source is empty */
     while (dump.size() < settings.narBufferSize) {
         auto oldSize = dump.size();
-        constexpr size_t chunkSize = 1024;
+        constexpr size_t chunkSize = 65536;
         auto want = std::min(chunkSize, settings.narBufferSize - oldSize);
         dump.resize(oldSize + want);
         auto got = 0;

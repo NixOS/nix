@@ -3,6 +3,7 @@
 #include "store-api.hh"
 #include "fetchers.hh"
 #include "filetransfer.hh"
+#include "registry.hh"
 
 #include <ctime>
 #include <iomanip>
@@ -12,39 +13,79 @@ namespace nix {
 void emitTreeAttrs(
     EvalState & state,
     const fetchers::Tree & tree,
-    std::shared_ptr<const fetchers::Input> input,
-    Value & v)
+    const fetchers::Input & input,
+    Value & v,
+    bool emptyRevFallback)
 {
+    assert(input.isImmutable());
+
     state.mkAttrs(v, 8);
 
-    auto storePath = state.store->printStorePath(tree.storePath);
+    auto storePath = state.store->printStorePath(
+        state.store->makeFixedOutputPathFromCA(tree.storePath));
 
     mkString(*state.allocAttr(v, state.sOutPath), storePath, PathSet({storePath}));
 
-    assert(tree.info.narHash);
-    mkString(*state.allocAttr(v, state.symbols.create("narHash")),
-        tree.info.narHash->to_string(SRI, true));
+    // FIXME: support arbitrary input attributes.
 
-    if (input->getRev()) {
-        mkString(*state.allocAttr(v, state.symbols.create("rev")), input->getRev()->gitRev());
-        mkString(*state.allocAttr(v, state.symbols.create("shortRev")), input->getRev()->gitShortRev());
+    if (auto narHash = input.getNarHash()) {
+        mkString(*state.allocAttr(v, state.symbols.create("narHash")),
+            narHash->to_string(SRI, true));
+    } else if (auto treeHash = input.getTreeHash()) {
+        mkString(*state.allocAttr(v, state.symbols.create("treeHash")),
+            treeHash->to_string(SRI, true));
+    } else
+        /* Must have either tree hash or NAR hash */
+        assert(false);
+
+    if (auto rev = input.getRev()) {
+        mkString(*state.allocAttr(v, state.symbols.create("rev")), rev->gitRev());
+        mkString(*state.allocAttr(v, state.symbols.create("shortRev")), rev->gitShortRev());
+    } else if (emptyRevFallback) {
+        // Backwards compat for `builtins.fetchGit`: dirty repos return an empty sha1 as rev
+        auto emptyHash = Hash(htSHA1);
+        mkString(*state.allocAttr(v, state.symbols.create("rev")), emptyHash.gitRev());
+        mkString(*state.allocAttr(v, state.symbols.create("shortRev")), emptyHash.gitRev());
     }
 
-    if (tree.info.revCount)
-        mkInt(*state.allocAttr(v, state.symbols.create("revCount")), *tree.info.revCount);
+    if (input.getType() == "git")
+        mkBool(*state.allocAttr(v, state.symbols.create("submodules")), maybeGetBoolAttr(input.attrs, "submodules").value_or(false));
 
-    if (tree.info.lastModified)
-        mkString(*state.allocAttr(v, state.symbols.create("lastModified")),
-            fmt("%s", std::put_time(std::gmtime(&*tree.info.lastModified), "%Y%m%d%H%M%S")));
+    if (auto revCount = input.getRevCount())
+        mkInt(*state.allocAttr(v, state.symbols.create("revCount")), *revCount);
+    else if (emptyRevFallback)
+        mkInt(*state.allocAttr(v, state.symbols.create("revCount")), 0);
+
+    if (auto lastModified = input.getLastModified()) {
+        mkInt(*state.allocAttr(v, state.symbols.create("lastModified")), *lastModified);
+        mkString(*state.allocAttr(v, state.symbols.create("lastModifiedDate")),
+            fmt("%s", std::put_time(std::gmtime(&*lastModified), "%Y%m%d%H%M%S")));
+    }
 
     v.attrs->sort();
 }
 
-static void prim_fetchTree(EvalState & state, const Pos & pos, Value * * args, Value & v)
+std::string fixURI(std::string uri, EvalState &state)
 {
-    settings.requireExperimentalFeature("flakes");
+    state.checkURI(uri);
+    return uri.find("://") != std::string::npos ? uri : "file://" + uri;
+}
 
-    std::shared_ptr<const fetchers::Input> input;
+void addURI(EvalState &state, fetchers::Attrs &attrs, Symbol name, std::string v)
+{
+    string n(name);
+    attrs.emplace(name, n == "url" ? fixURI(v, state) : v);
+}
+
+static void fetchTree(
+    EvalState &state,
+    const Pos &pos,
+    Value **args,
+    Value &v,
+    const std::optional<std::string> type,
+    bool emptyRevFallback = false
+) {
+    fetchers::Input input;
     PathSet context;
 
     state.forceValue(*args[0]);
@@ -56,14 +97,26 @@ static void prim_fetchTree(EvalState & state, const Pos & pos, Value * * args, V
 
         for (auto & attr : *args[0]->attrs) {
             state.forceValue(*attr.value);
-            if (attr.value->type == tString)
-                attrs.emplace(attr.name, attr.value->string.s);
+            if (attr.value->type == tPath || attr.value->type == tString)
+                addURI(
+                    state,
+                    attrs,
+                    attr.name,
+                    state.coerceToString(*attr.pos, *attr.value, context, false, false)
+                );
+            else if (attr.value->type == tString)
+                addURI(state, attrs, attr.name, attr.value->string.s);
             else if (attr.value->type == tBool)
-                attrs.emplace(attr.name, attr.value->boolean);
+                attrs.emplace(attr.name, fetchers::Explicit<bool>{attr.value->boolean});
+            else if (attr.value->type == tInt)
+                attrs.emplace(attr.name, attr.value->integer);
             else
-                throw TypeError("fetchTree argument '%s' is %s while a string or Boolean is expected",
+                throw TypeError("fetchTree argument '%s' is %s while a string, Boolean or integer is expected",
                     attr.name, showType(*attr.value));
         }
+
+        if (type)
+            attrs.emplace("type", type.value());
 
         if (!attrs.count("type"))
             throw Error({
@@ -71,20 +124,38 @@ static void prim_fetchTree(EvalState & state, const Pos & pos, Value * * args, V
                 .errPos = pos
             });
 
-        input = fetchers::inputFromAttrs(attrs);
-    } else
-        input = fetchers::inputFromURL(state.coerceToString(pos, *args[0], context, false, false));
+        input = fetchers::Input::fromAttrs(std::move(attrs));
+    } else {
+        auto url = fixURI(state.coerceToString(pos, *args[0], context, false, false), state);
 
-    if (evalSettings.pureEval && !input->isImmutable())
-        throw Error("in pure evaluation mode, 'fetchTree' requires an immutable input");
+        if (type == "git") {
+            fetchers::Attrs attrs;
+            attrs.emplace("type", "git");
+            attrs.emplace("url", url);
+            input = fetchers::Input::fromAttrs(std::move(attrs));
+        } else {
+            input = fetchers::Input::fromURL(url);
+        }
+    }
 
-    // FIXME: use fetchOrSubstituteTree
-    auto [tree, input2] = input->fetchTree(state.store);
+    if (!evalSettings.pureEval && !input.isDirect())
+        input = lookupInRegistries(state.store, input).first;
+
+    if (evalSettings.pureEval && !input.isImmutable())
+        throw Error("in pure evaluation mode, 'fetchTree' requires an immutable input, at %s", pos);
+
+    auto [tree, input2] = input.fetch(state.store);
 
     if (state.allowedPaths)
         state.allowedPaths->insert(tree.actualPath);
 
-    emitTreeAttrs(state, tree, input2, v);
+    emitTreeAttrs(state, tree, input2, v, emptyRevFallback);
+}
+
+static void prim_fetchTree(EvalState & state, const Pos & pos, Value * * args, Value & v)
+{
+    settings.requireExperimentalFeature("flakes");
+    fetchTree(state, pos, args, v, std::nullopt);
 }
 
 static RegisterPrimOp r("fetchTree", 1, prim_fetchTree);
@@ -150,10 +221,10 @@ static void fetch(EvalState & state, const Pos & pos, Value * * args, Value & v,
 
     auto storePath =
         unpack
-        ? fetchers::downloadTarball(state.store, *url, name, (bool) expectedHash).storePath
+        ? fetchers::downloadTarball(state.store, *url, name, (bool) expectedHash).first.storePath
         : fetchers::downloadFile(state.store, *url, name, (bool) expectedHash).storePath;
 
-    auto path = state.store->toRealPath(storePath);
+    auto path = state.store->toRealPath(state.store->makeFixedOutputPathFromCA(storePath));
 
     if (expectedHash) {
         auto hash = unpack
@@ -180,7 +251,13 @@ static void prim_fetchTarball(EvalState & state, const Pos & pos, Value * * args
     fetch(state, pos, args, v, "fetchTarball", true, "source");
 }
 
+static void prim_fetchGit(EvalState &state, const Pos &pos, Value **args, Value &v)
+{
+    fetchTree(state, pos, args, v, "git", true);
+}
+
 static RegisterPrimOp r2("__fetchurl", 1, prim_fetchurl);
 static RegisterPrimOp r3("fetchTarball", 1, prim_fetchTarball);
+static RegisterPrimOp r4("fetchGit", 1, prim_fetchGit);
 
 }

@@ -4,6 +4,8 @@
 #include "util.hh"
 #include "eval.hh"
 #include "fetchers.hh"
+#include "registry.hh"
+#include "flake/flakeref.hh"
 #include "store-api.hh"
 
 namespace nix {
@@ -31,6 +33,27 @@ MixEvalArgs::MixEvalArgs()
         .labels = {"path"},
         .handler = {[&](std::string s) { searchPath.push_back(s); }}
     });
+
+    addFlag({
+        .longName = "impure",
+        .description = "allow access to mutable paths and repositories",
+        .handler = {[&]() {
+            evalSettings.pureEval = false;
+        }},
+    });
+
+    addFlag({
+        .longName = "override-flake",
+        .description = "override a flake registry value",
+        .labels = {"original-ref", "resolved-ref"},
+        .handler = {[&](std::string _from, std::string _to) {
+            auto from = parseFlakeRef(_from, absPath("."));
+            auto to = parseFlakeRef(_to, absPath("."));
+            fetchers::Attrs extraAttrs;
+            if (to.subdir != "") extraAttrs["dir"] = to.subdir;
+            fetchers::overrideRegistry(from.input, to.input, extraAttrs);
+        }}
+    });
 }
 
 Bindings * MixEvalArgs::getAutoArgs(EvalState & state)
@@ -52,8 +75,9 @@ Path lookupFileArg(EvalState & state, string s)
 {
     if (isUri(s)) {
         return state.store->toRealPath(
-            fetchers::downloadTarball(
-                state.store, resolveUri(s), "source", false).storePath);
+            state.store->makeFixedOutputPathFromCA(
+                fetchers::downloadTarball(
+                    state.store, resolveUri(s), "source", false).first.storePath));
     } else if (s.size() > 2 && s.at(0) == '<' && s.at(s.size() - 1) == '>') {
         Path p = s.substr(1, s.size() - 2);
         return state.findFile(p);

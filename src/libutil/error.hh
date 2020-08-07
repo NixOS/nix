@@ -191,6 +191,8 @@ public:
     }
 
 MakeError(Error, BaseError);
+MakeError(UsageError, Error);
+MakeError(UnimplementedError, Error);
 
 class SysError : public Error
 {

@@ -310,7 +310,10 @@ SV * derivationFromPath(char * drvPath)
 
             HV * outputs = newHV();
             for (auto & i : drv.outputs)
-                hv_store(outputs, i.first.c_str(), i.first.size(), newSVpv(store()->printStorePath(i.second.path).c_str(), 0), 0);
+                hv_store(
+                    outputs, i.first.c_str(), i.first.size(),
+                    newSVpv(store()->printStorePath(i.second.path(*store(), drv.name)).c_str(), 0),
+                    0);
             hv_stores(hash, "outputs", newRV((SV *) outputs));
 
             AV * inputDrvs = newAV();

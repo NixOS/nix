@@ -47,7 +47,7 @@ void printMissing(
 
 void printMissing(ref<Store> store, const StorePathSet & willBuild,
     const StorePathSet & willSubstitute, const StorePathSet & unknown,
-    unsigned long long downloadSize, unsigned long long narSize, Verbosity lvl = lvlInfo);
+    uint64_t downloadSize, uint64_t narSize, Verbosity lvl = lvlInfo);
 
 string getArg(const string & opt,
     Strings::iterator & i, const Strings::iterator & end);
@@ -110,7 +110,7 @@ extern volatile ::sig_atomic_t blockInt;
 
 /* GC helpers. */
 
-string showBytes(unsigned long long bytes);
+string showBytes(uint64_t bytes);
 
 struct GCResults;
 

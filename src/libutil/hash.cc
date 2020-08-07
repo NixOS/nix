@@ -8,7 +8,7 @@
 #include "hash.hh"
 #include "archive.hh"
 #include "git.hh"
-#include "parser.hh"
+#include "split.hh"
 #include "util.hh"
 
 #include <sys/types.h>
@@ -16,6 +16,7 @@
 #include <fcntl.h>
 
 namespace nix {
+
 
 static size_t regularHashSize(HashType type) {
     switch (type) {
@@ -26,6 +27,10 @@ static size_t regularHashSize(HashType type) {
     }
     abort();
 }
+
+
+std::set<std::string> hashTypes = { "md5", "sha1", "sha256", "sha512" };
+
 
 Hash::Hash(HashType type) : type(type)
 {
@@ -173,7 +178,7 @@ Hash Hash::parseAnyPrefixed(std::string_view original)
     // Either the string or user must provide the type, if they both do they
     // must agree.
     if (!optParsedType)
-        throw BadHash("hash '%s' does not include a type.", rest);
+        throw BadHash("hash '%s' does not include a type", rest);
 
     return Hash(rest, *optParsedType, isSRI);
 }

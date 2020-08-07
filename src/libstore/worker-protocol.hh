@@ -6,7 +6,7 @@ namespace nix {
 #define WORKER_MAGIC_1 0x6e697863
 #define WORKER_MAGIC_2 0x6478696f
 
-#define PROTOCOL_VERSION 0x116
+#define PROTOCOL_VERSION 0x117
 #define GET_PROTOCOL_MAJOR(x) ((x) & 0xff00)
 #define GET_PROTOCOL_MINOR(x) ((x) & 0x00ff)
 
@@ -66,14 +66,102 @@ typedef enum {
 class Store;
 struct Source;
 
-template<class T> T readStorePaths(const Store & store, Source & from);
+template<typename T>
+struct WorkerProto {
+    static T read(const Store & store, Source & from);
+    static void write(const Store & store, Sink & out, const T & t);
+};
 
-void writeStorePaths(const Store & store, Sink & out, const StorePathSet & paths);
+template<>
+struct WorkerProto<std::string> {
+    static std::string read(const Store & store, Source & from);
+    static void write(const Store & store, Sink & out, const std::string & t);
+};
 
-std::set<StorePathDescriptor> readStorePathDescriptorSet(const Store & store, Source & from);
+template<>
+struct WorkerProto<StorePath> {
+    static StorePath read(const Store & store, Source & from);
+    static void write(const Store & store, Sink & out, const StorePath & t);
+};
 
-void writeStorePathDescriptorSet(const Store & store, Sink & out, const std::set<StorePathDescriptor> & paths);
+template<>
+struct WorkerProto<StorePathDescriptor> {
+    static StorePathDescriptor read(const Store & store, Source & from);
+    static void write(const Store & store, Sink & out, const StorePathDescriptor & t);
+};
 
-void writeOutputPathMap(const Store & store, Sink & out, const OutputPathMap & paths);
+template<typename T>
+struct WorkerProto<std::set<T>> {
+
+    static std::set<T> read(const Store & store, Source & from)
+    {
+        std::set<T> resSet;
+        auto size = readNum<size_t>(from);
+        while (size--) {
+            resSet.insert(WorkerProto<T>::read(store, from));
+        }
+        return resSet;
+    }
+
+    static void write(const Store & store, Sink & out, const std::set<T> & resSet)
+    {
+        out << resSet.size();
+        for (auto & key : resSet) {
+            WorkerProto<T>::write(store, out, key);
+        }
+    }
+
+};
+
+template<typename K, typename V>
+struct WorkerProto<std::map<K, V>> {
+
+    static std::map<K, V> read(const Store & store, Source & from)
+    {
+        std::map<K, V> resMap;
+        auto size = readNum<size_t>(from);
+        while (size--) {
+            auto k = WorkerProto<K>::read(store, from);
+            auto v = WorkerProto<V>::read(store, from);
+            resMap.insert_or_assign(std::move(k), std::move(v));
+        }
+        return resMap;
+    }
+
+    static void write(const Store & store, Sink & out, const std::map<K, V> & resMap)
+    {
+        out << resMap.size();
+        for (auto & i : resMap) {
+            WorkerProto<K>::write(store, out, i.first);
+            WorkerProto<V>::write(store, out, i.second);
+        }
+    }
+
+};
+
+template<typename T>
+struct WorkerProto<std::optional<T>> {
+
+    static std::optional<T> read(const Store & store, Source & from)
+    {
+        auto tag = readNum<uint8_t>(from);
+        switch (tag) {
+        case 0:
+            return std::nullopt;
+        case 1:
+            return WorkerProto<T>::read(store, from);
+        default:
+            throw Error("got an invalid tag bit for std::optional: %#04x", (size_t)tag);
+        }
+    }
+
+    static void write(const Store & store, Sink & out, const std::optional<T> & optVal)
+    {
+        out << (uint64_t) (optVal ? 1 : 0);
+        if (optVal)
+            WorkerProto<T>::write(store, out, *optVal);
+    }
+
+};
 
 }

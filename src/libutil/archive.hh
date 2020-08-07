@@ -50,6 +50,31 @@ void dumpPath(const Path & path, Sink & sink,
 
 void dumpString(const std::string & s, Sink & sink);
 
+/* If the NAR archive contains a single file at top-level, then save
+   the contents of the file to `s'.  Otherwise barf. */
+struct RetrieveRegularNARSink : ParseSink
+{
+    bool regular = true;
+    Sink & sink;
+
+    RetrieveRegularNARSink(Sink & sink) : sink(sink) { }
+
+    void createDirectory(const Path & path)
+    {
+        regular = false;
+    }
+
+    void receiveContents(unsigned char * data, size_t len)
+    {
+        sink(data, len);
+    }
+
+    void createSymlink(const Path & path, const string & target)
+    {
+        regular = false;
+    }
+};
+
 void parseDump(ParseSink & sink, Source & source);
 
 void restorePath(const Path & path, Source & source);

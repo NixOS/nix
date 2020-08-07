@@ -51,18 +51,19 @@ struct CacheImpl : Cache
         ref<Store> store,
         const Attrs & inAttrs,
         const Attrs & infoAttrs,
-        const StorePath & storePath,
+        const StorePathDescriptor & storePathDesc,
         bool immutable) override
     {
         _state.lock()->add.use()
             (attrsToJson(inAttrs).dump())
             (attrsToJson(infoAttrs).dump())
-            (store->printStorePath(storePath))
+            // FIXME should use JSON for store path descriptor
+            (renderStorePathDescriptor(storePathDesc))
             (immutable)
             (time(0)).exec();
     }
 
-    std::optional<std::pair<Attrs, StorePath>> lookup(
+    std::optional<std::pair<Attrs, StorePathDescriptor>> lookup(
         ref<Store> store,
         const Attrs & inAttrs) override
     {
@@ -90,9 +91,10 @@ struct CacheImpl : Cache
         }
 
         auto infoJson = stmt.getStr(0);
-        auto storePath = store->parseStorePath(stmt.getStr(1));
+        auto storePathDesc = parseStorePathDescriptor(stmt.getStr(1));
         auto immutable = stmt.getInt(2) != 0;
         auto timestamp = stmt.getInt(3);
+        auto storePath = store->makeFixedOutputPathFromCA(storePathDesc);
 
         store->addTempRoot(storePath);
         if (!store->isValidPath(storePath)) {
@@ -107,7 +109,7 @@ struct CacheImpl : Cache
         return Result {
             .expired = !immutable && (settings.tarballTtl.get() == 0 || timestamp + settings.tarballTtl < time(0)),
             .infoAttrs = jsonToAttrs(nlohmann::json::parse(infoJson)),
-            .storePath = std::move(storePath)
+            .storePath = std::move(storePathDesc)
         };
     }
 };

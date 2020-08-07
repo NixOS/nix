@@ -369,6 +369,9 @@ public:
 
     Setting<size_t> narBufferSize{this, 32 * 1024 * 1024, "nar-buffer-size",
         "Maximum size of NARs before spilling them to disk."};
+
+    Setting<std::string> flakeRegistry{this, "https://github.com/NixOS/flake-registry/raw/master/flake-registry.json", "flake-registry",
+        "Path or URI of the global flake registry."};
 };
 
 

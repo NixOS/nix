@@ -7,7 +7,6 @@
 #include "legacy.hh"
 #include "shared.hh"
 #include "store-api.hh"
-#include "progress-bar.hh"
 #include "filetransfer.hh"
 #include "finally.hh"
 #include "loggers.hh"
@@ -69,7 +68,7 @@ struct NixArgs : virtual MultiCommand, virtual MixCommonArgs
         addFlag({
             .longName = "help",
             .description = "show usage information",
-            .handler = {[&]() { showHelpAndExit(); }},
+            .handler = {[&]() { if (!completions) showHelpAndExit(); }},
         });
 
         addFlag({
@@ -97,7 +96,7 @@ struct NixArgs : virtual MultiCommand, virtual MixCommonArgs
         addFlag({
             .longName = "version",
             .description = "show version information",
-            .handler = {[&]() { printVersion(programName); }},
+            .handler = {[&]() { if (!completions) printVersion(programName); }},
         });
 
         addFlag({
@@ -165,6 +164,7 @@ void mainWrapped(int argc, char * * argv)
 
     verbosity = lvlWarn;
     settings.verboseBuild = false;
+    evalSettings.pureEval = true;
 
     setLogFormat("bar");
 
@@ -172,7 +172,22 @@ void mainWrapped(int argc, char * * argv)
 
     NixArgs args;
 
-    args.parseCmdline(argvToStrings(argc, argv));
+    Finally printCompletions([&]()
+    {
+        if (completions) {
+            std::cout << (pathCompletions ? "filenames\n" : "no-filenames\n");
+            for (auto & s : *completions)
+                std::cout << s << "\n";
+        }
+    });
+
+    try {
+        args.parseCmdline(argvToStrings(argc, argv));
+    } catch (UsageError &) {
+        if (!completions) throw;
+    }
+
+    if (completions) return;
 
     initPlugins();
 

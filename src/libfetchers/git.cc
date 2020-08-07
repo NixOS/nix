@@ -23,131 +23,171 @@ static bool isNotDotGitDirectory(const Path & path)
     return not std::regex_match(path, gitDirRegex);
 }
 
-struct GitInput : Input
+struct GitInputScheme : InputScheme
 {
-    ParsedURL url;
-    std::optional<std::string> ref;
-    std::optional<Hash> rev;
-    std::optional<Hash> treeHash;
-    FileIngestionMethod ingestionMethod = FileIngestionMethod::Recursive;
-    bool shallow = false;
-    bool submodules = false;
-
-    GitInput(const ParsedURL & url) : url(url)
-    { }
-
-    std::string type() const override { return "git"; }
-
-    bool operator ==(const Input & other) const override
+    std::optional<Input> inputFromURL(const ParsedURL & url) override
     {
-        auto other2 = dynamic_cast<const GitInput *>(&other);
-        return
-            other2
-            && url == other2->url
-            && rev == other2->rev
-            && treeHash == other2->treeHash
-            && ingestionMethod == other2->ingestionMethod
-            && ref == other2->ref;
-    }
+        if (url.scheme != "git" &&
+            url.scheme != "git+http" &&
+            url.scheme != "git+https" &&
+            url.scheme != "git+ssh" &&
+            url.scheme != "git+file") return {};
 
-    bool isImmutable() const override
-    {
-        return (bool) rev || treeHash || narHash;
-    }
+        auto url2(url);
+        if (hasPrefix(url2.scheme, "git+")) url2.scheme = std::string(url2.scheme, 4);
+        url2.query.clear();
 
-    std::optional<std::string> getRef() const override { return ref; }
-
-    std::optional<Hash> getRev() const override { return rev; }
-
-    ParsedURL toURL() const override
-    {
-        ParsedURL url2(url);
-        if (url2.scheme != "git") url2.scheme = "git+" + url2.scheme;
-        if (rev) url2.query.insert_or_assign("rev", rev->gitRev());
-        if (treeHash) url2.query.insert_or_assign("treeHash", treeHash->gitRev());
-        if (ref) url2.query.insert_or_assign("ref", *ref);
-        if (shallow) url2.query.insert_or_assign("shallow", "1");
-        if (ingestionMethod == FileIngestionMethod::Git) url2.query.insert_or_assign("gitIngestion", "1");
-        return url2;
-    }
-
-    Attrs toAttrsInternal() const override
-    {
         Attrs attrs;
-        attrs.emplace("url", url.to_string());
-        if (ref)
-            attrs.emplace("ref", *ref);
-        if (rev)
-            attrs.emplace("rev", rev->gitRev());
-        if (treeHash)
-            attrs.emplace("treeHash", treeHash->gitRev());
-        if (shallow)
-            attrs.emplace("shallow", true);
-        if (submodules)
-            attrs.emplace("submodules", true);
-        if (ingestionMethod == FileIngestionMethod::Git)
-            attrs.emplace("gitIngestion", true);
-        return attrs;
+        attrs.emplace("type", "git");
+
+        for (auto &[name, value] : url.query) {
+            if (name == "rev" || name == "ref" || name == "treehash" || name == "gitIngestion")
+                attrs.emplace(name, value);
+            else if (name == "shallow")
+                attrs.emplace(name, Explicit<bool> { value == "1" });
+            else
+                url2.query.emplace(name, value);
+        }
+
+        attrs.emplace("url", url2.to_string());
+
+        return inputFromAttrs(attrs);
     }
 
-    std::pair<bool, std::string> getActualUrl() const
+    std::optional<Input> inputFromAttrs(const Attrs & attrs) override
+    {
+        if (maybeGetStrAttr(attrs, "type") != "git") return {};
+
+        for (auto & [name, value] : attrs)
+            if (name != "type" && name != "url" && name != "ref" && name != "rev" && name != "shallow" && name != "submodules" && name != "gitIngestion" && name != "treeHash" && name != "lastModified" && name != "revCount" && name != "narHash")
+                throw Error("unsupported Git input attribute '%s'", name);
+
+        parseURL(getStrAttr(attrs, "url"));
+        maybeGetBoolAttr(attrs, "shallow");
+        maybeGetBoolAttr(attrs, "submodules");
+
+        if (auto ref = maybeGetStrAttr(attrs, "ref")) {
+            if (std::regex_search(*ref, badGitRefRegex))
+                throw BadURL("invalid Git branch/tag name '%s'", *ref);
+        }
+
+        Input input;
+        input.attrs = attrs;
+        return input;
+    }
+
+    ParsedURL toURL(const Input & input) override
+    {
+        auto url = parseURL(getStrAttr(input.attrs, "url"));
+        if (url.scheme != "git") url.scheme = "git+" + url.scheme;
+        if (auto rev = input.getRev()) url.query.insert_or_assign("rev", rev->gitRev());
+        if (auto treeHash = input.getTreeHash()) url.query.insert_or_assign("treeHash", treeHash->gitRev());
+        if (maybeGetBoolAttr(input.attrs, "gitIngestion").value_or((bool) input.getTreeHash()))
+            url.query.insert_or_assign("shallow", "1");
+        if (auto ref = input.getRef()) url.query.insert_or_assign("ref", *ref);
+        if (maybeGetBoolAttr(input.attrs, "shallow").value_or(false))
+            url.query.insert_or_assign("shallow", "1");
+        return url;
+    }
+
+    bool hasAllInfo(const Input & input) override
+    {
+        bool maybeDirty = !input.getRef();
+        bool shallow = maybeGetBoolAttr(input.attrs, "shallow").value_or(false);
+        bool submodules = maybeGetBoolAttr(input.attrs, "submodules").value_or(false);
+        /* FIXME just requiring tree hash is necessary for substitutions to
+           work for now, but breaks eval purity. Need a better solution before
+           upstreaming. */
+        return (input.getTreeHash() && !submodules) || (
+            maybeGetIntAttr(input.attrs, "lastModified")
+            && (shallow || maybeDirty || maybeGetIntAttr(input.attrs, "revCount"))
+            && input.getNarHash());
+    }
+
+    /* FIXME no overriding the tree hash / flake registry support for tree
+       hashes, for now. */
+    Input applyOverrides(
+        const Input & input,
+        std::optional<std::string> ref,
+        std::optional<Hash> rev) override
+    {
+        auto res(input);
+        if (rev) res.attrs.insert_or_assign("rev", rev->gitRev());
+        if (ref) res.attrs.insert_or_assign("ref", *ref);
+        if (!res.getRef() && res.getRev())
+            throw Error("Git input '%s' has a commit hash but no branch/tag name", res.to_string());
+        return res;
+    }
+
+    void clone(const Input & input, const Path & destDir) override
+    {
+        auto [isLocal, actualUrl] = getActualUrl(input);
+
+        Strings args = {"clone"};
+
+        args.push_back(actualUrl);
+
+        if (auto ref = input.getRef()) {
+            args.push_back("--branch");
+            args.push_back(*ref);
+        }
+
+        if (input.getRev()) throw UnimplementedError("cloning a specific revision is not implemented");
+
+        args.push_back(destDir);
+
+        runProgram("git", true, args);
+    }
+
+    std::optional<Path> getSourcePath(const Input & input) override
+    {
+        auto url = parseURL(getStrAttr(input.attrs, "url"));
+        if (url.scheme == "file" && !input.getRef() && !input.getRev() && !input.getTreeHash())
+            return url.path;
+        return {};
+    }
+
+    void markChangedFile(const Input & input, std::string_view file, std::optional<std::string> commitMsg) override
+    {
+        auto sourcePath = getSourcePath(input);
+        assert(sourcePath);
+
+        runProgram("git", true,
+            { "-C", *sourcePath, "add", "--force", "--intent-to-add", "--", std::string(file) });
+
+        if (commitMsg)
+            runProgram("git", true,
+                { "-C", *sourcePath, "commit", std::string(file), "-m", *commitMsg });
+    }
+
+    std::pair<bool, std::string> getActualUrl(const Input & input) const
     {
         // Don't clone file:// URIs (but otherwise treat them the
         // same as remote URIs, i.e. don't use the working tree or
         // HEAD).
         static bool forceHttp = getEnv("_NIX_FORCE_HTTP") == "1"; // for testing
+        auto url = parseURL(getStrAttr(input.attrs, "url"));
         bool isLocal = url.scheme == "file" && !forceHttp;
         return {isLocal, isLocal ? url.path : url.base};
     }
 
-    std::pair<Tree, std::shared_ptr<const Input>> fetchTreeInternal(nix::ref<Store> store) const override
+    std::pair<Tree, Input> fetch(ref<Store> store, const Input & _input) override
     {
         auto name = "source";
 
-        auto input = std::make_shared<GitInput>(*this);
+        Input input(_input);
 
-        assert(!rev || rev->type == htSHA1);
-        assert(!treeHash || treeHash->type == htSHA1);
-
-        if (submodules) {
-            if (treeHash)
-                throw Error("Cannot fetch specific tree hashes if there are submodules");
-            warn("Nix's computed git tree hash will be different when submodules are converted to regular directories");
-        }
-
-        std::optional<StorePathDescriptor> ca;
-        if (treeHash)
-            ca = StorePathDescriptor {
-                .name = name,
-                .info = FixedOutputInfo {
-                    ingestionMethod,
-                    *treeHash,
-                    {},
-                },
-            };
-
-        // try to substitute
-        if (settings.useSubstitutes && treeHash && !submodules) {
-            auto storePath = fetchers::trySubstitute(store, ingestionMethod, *treeHash, name);
-            if (storePath) {
-                return {
-                    Tree {
-                        .actualPath = store->toRealPath(*storePath),
-                        .storePath = std::move(*storePath),
-                        .info = TreeInfo {
-                            .ca = ca,
-                            .revCount = std::nullopt,
-                            .lastModified = 0,
-                        },
-                    },
-                    input
-                };
-            }
-        }
+        bool shallow = maybeGetBoolAttr(input.attrs, "shallow").value_or(false);
+        bool submodules = maybeGetBoolAttr(input.attrs, "submodules").value_or(false);
 
         std::string cacheType = "git";
         if (shallow) cacheType += "-shallow";
         if (submodules) cacheType += "-submodules";
+
+        auto ingestionMethod =
+            maybeGetBoolAttr(input.attrs, "gitIngestion").value_or((bool) input.getTreeHash())
+            ? FileIngestionMethod::Git
+            : FileIngestionMethod::Recursive;
 
         auto getImmutableAttrs = [&]()
         {
@@ -155,44 +195,45 @@ struct GitInput : Input
                 {"type", cacheType},
                 {"name", name},
             });
-            if (input->treeHash)
-                attrs.insert_or_assign("treeHash", input->treeHash->gitRev());
-            if (input->rev)
-                attrs.insert_or_assign("rev", input->rev->gitRev());
+            if (input.getTreeHash())
+                attrs.insert_or_assign("treeHash", input.getTreeHash()->gitRev());
+            if (input.getRev())
+                attrs.insert_or_assign("rev", input.getRev()->gitRev());
+            if (maybeGetBoolAttr(input.attrs, "gitIngestion").value_or((bool) input.getTreeHash()))
+                attrs.insert_or_assign("gi", true);
             return attrs;
         };
 
-        auto makeResult = [&](const Attrs & infoAttrs, StorePath && storePath)
-            -> std::pair<Tree, std::shared_ptr<const Input>>
+        auto makeResult = [&](const Attrs & infoAttrs, StorePathDescriptor && storePathDesc)
+            -> std::pair<Tree, Input>
         {
-            assert(input->rev || input->treeHash);
-            assert(!rev || rev == input->rev);
-            assert(!treeHash || treeHash == input->treeHash);
+            assert(input.getRev() || input.getTreeHash());
+            /* If was originally set, that original value must be preserved. */
+            assert(!_input.getRev() || _input.getRev() == input.getRev());
+            assert(!_input.getTreeHash() || _input.getTreeHash() == input.getTreeHash());
+            if (!shallow)
+                input.attrs.insert_or_assign("revCount", getIntAttr(infoAttrs, "revCount"));
+            input.attrs.insert_or_assign("lastModified", getIntAttr(infoAttrs, "lastModified"));
             return {
                 Tree {
-                    .actualPath = store->toRealPath(storePath),
-                    .storePath = std::move(storePath),
-                    .info = TreeInfo {
-                        .ca = ca,
-                        .revCount = shallow ? std::nullopt : std::optional(getIntAttr(infoAttrs, "revCount")),
-                        .lastModified = getIntAttr(infoAttrs, "lastModified"),
-                    },
+                    store->toRealPath(store->makeFixedOutputPathFromCA(storePathDesc)),
+                    std::move(storePathDesc),
                 },
                 input
             };
         };
 
-        if (rev) {
+        if (input.getRev()) {
             if (auto res = getCache()->lookup(store, getImmutableAttrs()))
                 return makeResult(res->first, std::move(res->second));
         }
 
-        auto [isLocal, actualUrl_] = getActualUrl();
+        auto [isLocal, actualUrl_] = getActualUrl(input);
         auto actualUrl = actualUrl_; // work around clang bug
 
         // If this is a local directory and no ref or revision is
         // given, then allow the use of an unclean working tree.
-        if (!input->ref && !input->rev && !input->treeHash && isLocal) {
+        if (!input.getRef() && !input.getRev() && !input.getTreeHash() && isLocal) {
             bool clean = false;
 
             /* Check whether this repo has any commits. There are
@@ -250,37 +291,42 @@ struct GitInput : Input
                 };
 
                 auto storePath = store->addToStore("source", actualUrl, ingestionMethod, htSHA256, filter);
+                // FIXME: just have Store::addToStore return a StorePathDescriptor, as
+                // it has the underlying information.
+                auto storePathDesc = store->queryPathInfo(storePath)->fullStorePathDescriptorOpt().value();
 
-                auto tree = Tree {
-                    .actualPath = store->printStorePath(storePath),
-                    .storePath = std::move(storePath),
-                    .info = TreeInfo {
-                        .ca = ca,
-                        // FIXME: maybe we should use the timestamp of the last
-                        // modified dirty file?
-                        .lastModified = haveCommits ? std::stoull(runProgram("git", true, { "-C", actualUrl, "log", "-1", "--format=%ct", "HEAD" })) : 0,
-                    }
+                // FIXME: maybe we should use the timestamp of the last
+                // modified dirty file?
+                input.attrs.insert_or_assign(
+                    "lastModified",
+                    haveCommits ? std::stoull(runProgram("git", true, { "-C", actualUrl, "log", "-1", "--format=%ct", "HEAD" })) : 0);
+
+                return {
+                    Tree {
+                        store->printStorePath(storePath),
+                        std::move(storePathDesc),
+                    },
+                    input
                 };
-
-                return {std::move(tree), input};
             }
         }
 
-        if (!input->ref) input->ref = isLocal ? readHead(actualUrl) : "master";
+        if (!input.getRef()) input.attrs.insert_or_assign("ref", isLocal ? readHead(actualUrl) : "master");
 
         Attrs mutableAttrs({
             {"type", cacheType},
             {"name", name},
             {"url", actualUrl},
-            {"ref", *input->ref},
+            {"ref", *input.getRef()},
         });
 
         Path repoDir;
 
         if (isLocal) {
 
-            if (!input->rev)
-                input->rev = Hash::parseAny(chomp(runProgram("git", true, { "-C", actualUrl, "rev-parse", *input->ref })), htSHA1);
+            if (!input.getRev() && !input.getTreeHash())
+                input.attrs.insert_or_assign("rev",
+                    Hash::parseAny(chomp(runProgram("git", true, { "-C", actualUrl, "rev-parse", *input.getRef() })), htSHA1).gitRev());
 
             repoDir = actualUrl;
 
@@ -288,16 +334,14 @@ struct GitInput : Input
 
             if (auto res = getCache()->lookup(store, mutableAttrs)) {
                 auto rev2 = Hash::parseAny(getStrAttr(res->first, "rev"), htSHA1);
-                if (!input->rev || rev == rev2) {
-                    input->rev = rev2;
+                if (!input.getRev() || input.getRev() == rev2) {
+                    input.attrs.insert_or_assign("rev", rev2.gitRev());
                     return makeResult(res->first, std::move(res->second));
                 }
-            }
 
-            if (auto res = getCache()->lookup(store, mutableAttrs)) {
                 auto treeHash2 = Hash::parseNonSRIUnprefixed(getStrAttr(res->first, "treeHash"), htSHA1);
-                if (!input->treeHash || treeHash == treeHash2) {
-                    input->treeHash = treeHash2;
+                if (!input.getTreeHash() || input.getTreeHash() == treeHash2) {
+                    input.attrs.insert_or_assign("treeHash", rev2.gitRev());
                     return makeResult(res->first, std::move(res->second));
                 }
             }
@@ -311,18 +355,18 @@ struct GitInput : Input
             }
 
             Path localRefFile =
-                input->ref->compare(0, 5, "refs/") == 0
-                ? cacheDir + "/" + *input->ref
-                : cacheDir + "/refs/heads/" + *input->ref;
+                input.getRef()->compare(0, 5, "refs/") == 0
+                ? cacheDir + "/" + *input.getRef()
+                : cacheDir + "/refs/heads/" + *input.getRef();
 
             bool doFetch;
             time_t now = time(0);
 
             /* If a rev or treeHash is specified, we need to fetch if
                it's not in the repo. */
-            if (input->rev || input->treeHash) {
+            if (input.getRev() || input.getTreeHash()) {
                 try {
-                    auto gitHash = input->treeHash ? input->treeHash : input->rev;
+                    auto gitHash = input.getTreeHash() ? input.getTreeHash() : input.getRev();
                     runProgram("git", true, { "-C", repoDir, "cat-file", "-e", gitHash->gitRev() });
                     doFetch = false;
                 } catch (ExecError & e) {
@@ -346,9 +390,10 @@ struct GitInput : Input
                 // FIXME: git stderr messes up our progress indicator, so
                 // we're using --quiet for now. Should process its stderr.
                 try {
-                    auto fetchRef = input->ref->compare(0, 5, "refs/") == 0
-                        ? *input->ref
-                        : "refs/heads/" + *input->ref;
+                    auto ref = input.getRef();
+                    auto fetchRef = ref->compare(0, 5, "refs/") == 0
+                        ? *ref
+                        : "refs/heads/" + *ref;
                     runProgram("git", true, { "-C", repoDir, "fetch", "--quiet", "--force", "--", actualUrl, fmt("%s:%s", fetchRef, fetchRef) });
                 } catch (Error & e) {
                     if (!pathExists(localRefFile)) throw;
@@ -364,14 +409,14 @@ struct GitInput : Input
                 utimes(localRefFile.c_str(), times);
             }
 
-            if (!input->rev)
-                input->rev = Hash::parseAny(chomp(readFile(localRefFile)), htSHA1);
+            if (!input.getRev() && !input.getTreeHash())
+                input.attrs.insert_or_assign("rev", Hash::parseAny(chomp(readFile(localRefFile)), htSHA1).gitRev());
         }
 
-        if (input->treeHash) {
-            auto type = chomp(runProgram("git", true, { "-C", repoDir, "cat-file", "-t", input->treeHash->gitRev() }));
+        if (input.getTreeHash()) {
+            auto type = chomp(runProgram("git", true, { "-C", repoDir, "cat-file", "-t", input.getTreeHash()->gitRev() }));
             if (type != "tree")
-                throw Error("Need a tree object, found '%s' object in %s", type, input->treeHash->gitRev());
+                throw Error("Need a tree object, found '%s' object in %s", type, input.getTreeHash()->gitRev());
         }
 
         bool isShallow = chomp(runProgram("git", true, { "-C", repoDir, "rev-parse", "--is-shallow-repository" })) == "true";
@@ -381,10 +426,10 @@ struct GitInput : Input
 
         // FIXME: check whether rev is an ancestor of ref.
 
-        if (input->rev)
-            printTalkative("using revision %s of repo '%s'", input->rev->gitRev(), actualUrl);
-        else if (input->treeHash)
-            printTalkative("using tree %s of repo '%s'", input->treeHash->gitRev(), actualUrl);
+        if (input.getRev())
+            printTalkative("using revision %s of repo '%s'", input.getRev()->gitRev(), actualUrl);
+        else if (input.getTreeHash())
+            printTalkative("using tree %s of repo '%s'", input.getTreeHash()->gitRev(), actualUrl);
 
         /* Now that we know the ref, check again whether we have it in
            the store. */
@@ -394,6 +439,12 @@ struct GitInput : Input
         Path tmpDir = createTempDir();
         AutoDelete delTmpDir(tmpDir, true);
         PathFilter filter = defaultPathFilter;
+
+        if (submodules) {
+            if (input.getTreeHash())
+                throw Error("Cannot fetch specific tree hashes if there are submodules");
+            warn("Nix's computed git tree hash will be different when submodules are converted to regular directories");
+        }
 
         if (submodules) {
             Path tmpGitDir = createTempDir();
@@ -406,7 +457,7 @@ struct GitInput : Input
             runProgram("git", true, { "-C", tmpDir, "fetch", "--quiet", "--force",
                                       "--update-head-ok", "--", repoDir, "refs/*:refs/*" });
 
-            runProgram("git", true, { "-C", tmpDir, "checkout", "--quiet", input->treeHash ? input->treeHash->gitRev() : input->rev->gitRev() });
+            runProgram("git", true, { "-C", tmpDir, "checkout", "--quiet", input.getTreeHash() ? input.getTreeHash()->gitRev() : input.getRev()->gitRev() });
             runProgram("git", true, { "-C", tmpDir, "remote", "add", "origin", actualUrl });
             runProgram("git", true, { "-C", tmpDir, "submodule", "--quiet", "update", "--init", "--recursive" });
 
@@ -415,7 +466,7 @@ struct GitInput : Input
             // FIXME: should pipe this, or find some better way to extract a
             // revision.
             auto source = sinkToSource([&](Sink & sink) {
-                RunOptions gitOptions("git", { "-C", repoDir, "archive", input->treeHash ? input->treeHash->gitRev() : input->rev->gitRev() });
+                RunOptions gitOptions("git", { "-C", repoDir, "archive", input.getTreeHash() ? input.getTreeHash()->gitRev() : input.getRev()->gitRev() });
                 gitOptions.standardOut = &sink;
                 runProgram2(gitOptions);
             });
@@ -423,119 +474,51 @@ struct GitInput : Input
             unpackTarfile(*source, tmpDir);
         }
 
-        auto hashAlgo = ingestionMethod == FileIngestionMethod::Git ? htSHA1 : htSHA256;
-        auto storePath = store->addToStore(name, tmpDir, ingestionMethod, hashAlgo, filter);
+        auto storePath = store->addToStore(name, tmpDir, ingestionMethod, ingestionMethod == FileIngestionMethod::Git ? htSHA1 : htSHA256, filter);
+        // FIXME: just have Store::addToStore return a StorePathDescriptor, as
+        // it has the underlying information.
+        auto storePathDesc = store->queryPathInfo(storePath)->fullStorePathDescriptorOpt().value();
 
         // verify treeHash is what we actually obtained in the nix store
-        if (ingestionMethod == FileIngestionMethod::Git) {
-            auto gotHash = dumpGitHash(htSHA1, tmpDir);
-            if (input->treeHash) {
-                if (gotHash != input->treeHash)
-                    throw Error("Git hash mismatch in input '%s' (%s), expected '%s', got '%s'",
-                        to_string(), store->printStorePath(storePath), input->treeHash->gitRev(), gotHash.gitRev());
-            } else {
-                ca = StorePathDescriptor {
-                    .name = name,
-                    .info = FixedOutputInfo {
-                        ingestionMethod,
-                        gotHash,
-                        {},
-                    },
-                };
-            }
+        if (input.getTreeHash()) {
+            auto path = store->toRealPath(store->printStorePath(storePath));
+            auto gotHash = dumpGitHash(htSHA1, path);
+            if (gotHash != input.getTreeHash())
+                throw Error("Git hash mismatch in input '%s' (%s), expected '%s', got '%s'",
+                    input.to_string(), path, input.getTreeHash()->gitRev(), gotHash.gitRev());
         }
 
         Attrs infoAttrs({});
-        if (input->treeHash) {
-            infoAttrs.insert_or_assign("treeHash", input->treeHash->gitRev());
+        if (input.getTreeHash()) {
+            infoAttrs.insert_or_assign("treeHash", input.getTreeHash()->gitRev());
             infoAttrs.insert_or_assign("revCount", 0);
             infoAttrs.insert_or_assign("lastModified", 0);
         } else {
-            auto lastModified = std::stoull(runProgram("git", true, { "-C", repoDir, "log", "-1", "--format=%ct", input->rev->gitRev() }));
+            auto lastModified = std::stoull(runProgram("git", true, { "-C", repoDir, "log", "-1", "--format=%ct", input.getRev()->gitRev() }));
+            infoAttrs.insert_or_assign("rev", input.getRev()->gitRev());
             infoAttrs.insert_or_assign("lastModified", lastModified);
-            infoAttrs.insert_or_assign("rev", input->rev->gitRev());
 
             if (!shallow)
                 infoAttrs.insert_or_assign("revCount",
-                    std::stoull(runProgram("git", true, { "-C", repoDir, "rev-list", "--count", input->rev->gitRev() })));
+                    std::stoull(runProgram("git", true, { "-C", repoDir, "rev-list", "--count", input.getRev()->gitRev() })));
         }
 
-        if (!this->rev && !this->treeHash)
+        if (!_input.getRev() && !_input.getTreeHash())
             getCache()->add(
                 store,
                 mutableAttrs,
                 infoAttrs,
-                storePath,
+                storePathDesc,
                 false);
 
         getCache()->add(
             store,
             getImmutableAttrs(),
             infoAttrs,
-            storePath,
+            storePathDesc,
             true);
 
-        return makeResult(infoAttrs, std::move(storePath));
-    }
-};
-
-struct GitInputScheme : InputScheme
-{
-    std::unique_ptr<Input> inputFromURL(const ParsedURL & url) override
-    {
-        if (url.scheme != "git" &&
-            url.scheme != "git+http" &&
-            url.scheme != "git+https" &&
-            url.scheme != "git+ssh" &&
-            url.scheme != "git+file") return nullptr;
-
-        auto url2(url);
-        if (hasPrefix(url2.scheme, "git+")) url2.scheme = std::string(url2.scheme, 4);
-        url2.query.clear();
-
-        Attrs attrs;
-        attrs.emplace("type", "git");
-
-        for (auto &[name, value] : url.query) {
-            if (name == "rev" || name == "ref" || name == "treeHash")
-                attrs.emplace(name, value);
-            else
-                url2.query.emplace(name, value);
-        }
-
-        attrs.emplace("url", url2.to_string());
-
-        return inputFromAttrs(attrs);
-    }
-
-    std::unique_ptr<Input> inputFromAttrs(const Attrs & attrs) override
-    {
-        if (maybeGetStrAttr(attrs, "type") != "git") return {};
-
-        for (auto & [name, value] : attrs)
-            if (name != "type" && name != "url" && name != "ref" && name != "rev" && name != "shallow" && name != "submodules" && name != "treeHash" && name != "gitIngestion")
-                throw Error("unsupported Git input attribute '%s'", name);
-
-        auto input = std::make_unique<GitInput>(parseURL(getStrAttr(attrs, "url")));
-        if (auto ref = maybeGetStrAttr(attrs, "ref")) {
-            if (std::regex_search(*ref, badGitRefRegex))
-                throw BadURL("invalid Git branch/tag name '%s'", *ref);
-            input->ref = *ref;
-        }
-        if (auto rev = maybeGetStrAttr(attrs, "rev"))
-            input->rev = Hash::parseAny(*rev, htSHA1);
-
-        if (auto treeHash = maybeGetStrAttr(attrs, "treeHash"))
-            input->treeHash = Hash::parseNonSRIUnprefixed(*treeHash, htSHA1);
-
-        input->shallow = maybeGetBoolAttr(attrs, "shallow").value_or(false);
-
-        input->submodules = maybeGetBoolAttr(attrs, "submodules").value_or(false);
-
-        if (maybeGetBoolAttr(attrs, "gitIngestion").value_or((bool) input->treeHash))
-            input->ingestionMethod = FileIngestionMethod::Git;
-
-        return input;
+        return makeResult(infoAttrs, std::move(storePathDesc));
     }
 };
 

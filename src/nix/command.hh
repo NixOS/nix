@@ -4,11 +4,18 @@
 #include "args.hh"
 #include "common-eval-args.hh"
 #include "path.hh"
-#include "eval.hh"
+#include "flake/lockfile.hh"
+#include "store-api.hh"
+
+#include <optional>
 
 namespace nix {
 
 extern std::string programPath;
+
+class EvalState;
+struct Pos;
+class Store;
 
 static constexpr Command::Category catSecondary = 100;
 static constexpr Command::Category catUtility = 101;
@@ -27,28 +34,64 @@ private:
     std::shared_ptr<Store> _store;
 };
 
-struct SourceExprCommand : virtual StoreCommand, MixEvalArgs
+struct EvalCommand : virtual StoreCommand, MixEvalArgs
 {
-    Path file;
+    ref<EvalState> getEvalState();
+
+    std::shared_ptr<EvalState> evalState;
+};
+
+struct MixFlakeOptions : virtual Args, EvalCommand
+{
+    flake::LockFlags lockFlags;
+
+    MixFlakeOptions();
+
+    virtual std::optional<FlakeRef> getFlakeRefForCompletion()
+    { return {}; }
+};
+
+/* How to handle derivations in commands that operate on store paths. */
+enum class OperateOn {
+    /* Operate on the output path. */
+    Output,
+    /* Operate on the .drv path. */
+    Derivation
+};
+
+struct SourceExprCommand : virtual Args, MixFlakeOptions
+{
+    std::optional<Path> file;
+    std::optional<std::string> expr;
+
+    // FIXME: move this; not all commands (e.g. 'nix run') use it.
+    OperateOn operateOn = OperateOn::Output;
 
     SourceExprCommand();
 
-    /* Return a value representing the Nix expression from which we
-       are installing. This is either the file specified by ‘--file’,
-       or an attribute set constructed from $NIX_PATH, e.g. ‘{ nixpkgs
-       = import ...; bla = import ...; }’. */
-    Value * getSourceExpr(EvalState & state);
+    std::vector<std::shared_ptr<Installable>> parseInstallables(
+        ref<Store> store, std::vector<std::string> ss);
 
-    ref<EvalState> getEvalState();
+    std::shared_ptr<Installable> parseInstallable(
+        ref<Store> store, const std::string & installable);
 
-private:
+    virtual Strings getDefaultFlakeAttrPaths();
 
-    std::shared_ptr<EvalState> evalState;
+    virtual Strings getDefaultFlakeAttrPathPrefixes();
 
-    RootValue vSourceExpr;
+    void completeInstallable(std::string_view prefix);
 };
 
-enum RealiseMode { Build, NoBuild, DryRun };
+enum class Realise {
+    /* Build the derivation. Postcondition: the
+       derivation outputs exist. */
+    Outputs,
+    /* Don't build the derivation. Postcondition: the store derivation
+       exists. */
+    Derivation,
+    /* Evaluate in dry-run mode. Postcondition: nothing. */
+    Nothing
+};
 
 /* A command that operates on a list of "installables", which can be
    store paths, attribute paths, Nix expressions, etc. */
@@ -56,14 +99,13 @@ struct InstallablesCommand : virtual Args, SourceExprCommand
 {
     std::vector<std::shared_ptr<Installable>> installables;
 
-    InstallablesCommand()
-    {
-        expectArgs("installables", &_installables);
-    }
+    InstallablesCommand();
 
     void prepare() override;
 
     virtual bool useDefaultInstallables() { return true; }
+
+    std::optional<FlakeRef> getFlakeRefForCompletion() override;
 
 private:
 
@@ -75,16 +117,18 @@ struct InstallableCommand : virtual Args, SourceExprCommand
 {
     std::shared_ptr<Installable> installable;
 
-    InstallableCommand()
-    {
-        expectArg("installable", &_installable);
-    }
+    InstallableCommand();
 
     void prepare() override;
 
+    std::optional<FlakeRef> getFlakeRefForCompletion() override
+    {
+        return parseFlakeRef(_installable, absPath("."));
+    }
+
 private:
 
-    std::string _installable;
+    std::string _installable{"."};
 };
 
 /* A command that operates on zero or more store paths. */
@@ -97,7 +141,7 @@ private:
 
 protected:
 
-    RealiseMode realiseMode = NoBuild;
+    Realise realiseMode = Realise::Derivation;
 
 public:
 
@@ -141,17 +185,15 @@ static RegisterCommand registerCommand(const std::string & name)
     return RegisterCommand(name, [](){ return make_ref<T>(); });
 }
 
-std::shared_ptr<Installable> parseInstallable(
-    SourceExprCommand & cmd, ref<Store> store, const std::string & installable,
-    bool useDefaultInstallables);
+Buildables build(ref<Store> store, Realise mode,
+    std::vector<std::shared_ptr<Installable>> installables, BuildMode bMode = bmNormal);
 
-Buildables build(ref<Store> store, RealiseMode mode,
+std::set<StorePath> toStorePaths(ref<Store> store,
+    Realise mode, OperateOn operateOn,
     std::vector<std::shared_ptr<Installable>> installables);
 
-std::set<StorePath> toStorePaths(ref<Store> store, RealiseMode mode,
-    std::vector<std::shared_ptr<Installable>> installables);
-
-StorePath toStorePath(ref<Store> store, RealiseMode mode,
+StorePath toStorePath(ref<Store> store,
+    Realise mode, OperateOn operateOn,
     std::shared_ptr<Installable> installable);
 
 std::set<StorePath> toDerivations(ref<Store> store,
@@ -193,5 +235,20 @@ struct MixEnvironment : virtual Args {
     /* Modify global environ based on ignoreEnvironment, keep, and unset. It's expected that exec will be called before this class goes out of scope, otherwise environ will become invalid. */
     void setEnviron();
 };
+
+void completeFlakeRef(ref<Store> store, std::string_view prefix);
+
+void completeFlakeRefWithFragment(
+    ref<EvalState> evalState,
+    flake::LockFlags lockFlags,
+    Strings attrPathPrefixes,
+    const Strings & defaultFlakeAttrPaths,
+    std::string_view prefix);
+
+void printClosureDiff(
+    ref<Store> store,
+    const StorePath & beforePath,
+    const StorePath & afterPath,
+    std::string_view indent);
 
 }

@@ -3,65 +3,86 @@
 
 namespace nix::fetchers {
 
-struct PathInput : Input
+struct PathInputScheme : InputScheme
 {
-    Path path;
-
-    /* Allow the user to pass in "fake" tree info attributes. This is
-       useful for making a pinned tree work the same as the repository
-       from which is exported
-       (e.g. path:/nix/store/...-source?lastModified=1585388205&rev=b0c285...). */
-    std::optional<Hash> rev;
-    std::optional<uint64_t> revCount;
-    std::optional<time_t> lastModified;
-
-    std::string type() const override { return "path"; }
-
-    std::optional<Hash> getRev() const override { return rev; }
-
-    bool operator ==(const Input & other) const override
+    std::optional<Input> inputFromURL(const ParsedURL & url) override
     {
-        auto other2 = dynamic_cast<const PathInput *>(&other);
-        return
-            other2
-            && path == other2->path
-            && rev == other2->rev
-            && revCount == other2->revCount
-            && lastModified == other2->lastModified;
+        if (url.scheme != "path") return {};
+
+        if (url.authority && *url.authority != "")
+            throw Error("path URL '%s' should not have an authority ('%s')", url.url, *url.authority);
+
+        Input input;
+        input.attrs.insert_or_assign("type", "path");
+        input.attrs.insert_or_assign("path", url.path);
+
+        for (auto & [name, value] : url.query)
+            if (name == "rev" || name == "narHash")
+                input.attrs.insert_or_assign(name, value);
+            else if (name == "revCount" || name == "lastModified") {
+                uint64_t n;
+                if (!string2Int(value, n))
+                    throw Error("path URL '%s' has invalid parameter '%s'", url.to_string(), name);
+                input.attrs.insert_or_assign(name, n);
+            }
+            else
+                throw Error("path URL '%s' has unsupported parameter '%s'", url.to_string(), name);
+
+        return input;
     }
 
-    bool isImmutable() const override
+    std::optional<Input> inputFromAttrs(const Attrs & attrs) override
     {
-        return (bool) narHash;
+        if (maybeGetStrAttr(attrs, "type") != "path") return {};
+
+        getStrAttr(attrs, "path");
+
+        for (auto & [name, value] : attrs)
+            /* Allow the user to pass in "fake" tree info
+               attributes. This is useful for making a pinned tree
+               work the same as the repository from which is exported
+               (e.g. path:/nix/store/...-source?lastModified=1585388205&rev=b0c285...). */
+            if (name == "type" || name == "rev" || name == "revCount" || name == "lastModified" || name == "narHash" || name == "path")
+                // checked in Input::fromAttrs
+                ;
+            else
+                throw Error("unsupported path input attribute '%s'", name);
+
+        Input input;
+        input.attrs = attrs;
+        return input;
     }
 
-    ParsedURL toURL() const override
+    ParsedURL toURL(const Input & input) override
     {
-        auto query = attrsToQuery(toAttrsInternal());
+        auto query = attrsToQuery(input.attrs);
         query.erase("path");
+        query.erase("type");
         return ParsedURL {
             .scheme = "path",
-            .path = path,
+            .path = getStrAttr(input.attrs, "path"),
             .query = query,
         };
     }
 
-    Attrs toAttrsInternal() const override
+    bool hasAllInfo(const Input & input) override
     {
-        Attrs attrs;
-        attrs.emplace("path", path);
-        if (rev)
-            attrs.emplace("rev", rev->gitRev());
-        if (revCount)
-            attrs.emplace("revCount", *revCount);
-        if (lastModified)
-            attrs.emplace("lastModified", *lastModified);
-        return attrs;
+        return (bool) input.getNarHash();
     }
 
-    std::pair<Tree, std::shared_ptr<const Input>> fetchTreeInternal(nix::ref<Store> store) const override
+    std::optional<Path> getSourcePath(const Input & input) override
     {
-        auto input = std::make_shared<PathInput>(*this);
+        return getStrAttr(input.attrs, "path");
+    }
+
+    void markChangedFile(const Input & input, std::string_view file, std::optional<std::string> commitMsg) override
+    {
+        // nothing to do
+    }
+
+    std::pair<Tree, Input> fetch(ref<Store> store, const Input & input) override
+    {
+        auto path = getStrAttr(input.attrs, "path");
 
         // FIXME: check whether access to 'path' is allowed.
 
@@ -70,76 +91,22 @@ struct PathInput : Input
         if (storePath)
             store->addTempRoot(*storePath);
 
-        if (!storePath || storePath->name() != "source" || !store->isValidPath(*storePath))
+        if (!storePath || storePath->name() != "source" || !store->isValidPath(*storePath)) {
             // FIXME: try to substitute storePath.
             storePath = store->addToStore("source", path);
+        }
 
-        return
-            {
-                Tree {
-                    .actualPath = store->toRealPath(*storePath),
-                    .storePath = std::move(*storePath),
-                    .info = TreeInfo {
-                        .revCount = revCount,
-                        .lastModified = lastModified
-                    }
-                },
-                input
-            };
-    }
+        // FIXME: just have Store::addToStore return a StorePathDescriptor, as
+        // it has the underlying information.
+        auto storePathDesc = store->queryPathInfo(*storePath)->fullStorePathDescriptorOpt().value();
 
-};
-
-struct PathInputScheme : InputScheme
-{
-    std::unique_ptr<Input> inputFromURL(const ParsedURL & url) override
-    {
-        if (url.scheme != "path") return nullptr;
-
-        auto input = std::make_unique<PathInput>();
-        input->path = url.path;
-
-        for (auto & [name, value] : url.query)
-            if (name == "rev")
-                input->rev = Hash::parseAny(value, htSHA1);
-            else if (name == "revCount") {
-                uint64_t revCount;
-                if (!string2Int(value, revCount))
-                    throw Error("path URL '%s' has invalid parameter '%s'", url.to_string(), name);
-                input->revCount = revCount;
-            }
-            else if (name == "lastModified") {
-                time_t lastModified;
-                if (!string2Int(value, lastModified))
-                    throw Error("path URL '%s' has invalid parameter '%s'", url.to_string(), name);
-                input->lastModified = lastModified;
-            }
-            else
-                throw Error("path URL '%s' has unsupported parameter '%s'", url.to_string(), name);
-
-        return input;
-    }
-
-    std::unique_ptr<Input> inputFromAttrs(const Attrs & attrs) override
-    {
-        if (maybeGetStrAttr(attrs, "type") != "path") return {};
-
-        auto input = std::make_unique<PathInput>();
-        input->path = getStrAttr(attrs, "path");
-
-        for (auto & [name, value] : attrs)
-            if (name == "rev")
-                input->rev = Hash::parseAny(getStrAttr(attrs, "rev"), htSHA1);
-            else if (name == "revCount")
-                input->revCount = getIntAttr(attrs, "revCount");
-            else if (name == "lastModified")
-                input->lastModified = getIntAttr(attrs, "lastModified");
-            else if (name == "type" || name == "path")
-                ;
-            else
-                throw Error("unsupported path input attribute '%s'", name);
-
-        return input;
+        return {
+            Tree {
+                store->toRealPath(store->makeFixedOutputPathFromCA(storePathDesc)),
+                std::move(storePathDesc),
+            },
+            input
+        };
     }
 };
 

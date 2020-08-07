@@ -18,6 +18,8 @@ const int sha1HashSize = 20;
 const int sha256HashSize = 32;
 const int sha512HashSize = 64;
 
+extern std::set<std::string> hashTypes;
+
 extern const string base32Chars;
 
 enum Base : int { Base64, Base32, Base16, SRI };
@@ -34,21 +36,26 @@ struct Hash
     /* Create a zero-filled hash object. */
     Hash(HashType type);
 
-    /* Initialize the hash from a string representation, in the format
+    /* Parse the hash from a string representation in the format
        "[<type>:]<base16|base32|base64>" or "<type>-<base64>" (a
        Subresource Integrity hash expression). If the 'type' argument
        is not present, then the hash type must be specified in the
        string. */
     static Hash parseAny(std::string_view s, std::optional<HashType> type);
-    // hash type must be part of string
+
+    /* Parse a hash from a string representation like the above, except the
+       type prefix is mandatory is there is no separate arguement. */
     static Hash parseAnyPrefixed(std::string_view s);
-    // prefix parsed separately; non SRI hash
+
+    /* Parse a plain hash that musst not have any prefix indicating the type.
+       The type is passed in to disambiguate. */
     static Hash parseNonSRIUnprefixed(std::string_view s, HashType type);
 
     static Hash parseSRI(std::string_view original);
 
 private:
-    // type must be provided, s must not include <type> prefix
+    /* The type must be provided, the string view must not include <type>
+       prefix. `isSRI` helps disambigate the various base-* encodings. */
     Hash(std::string_view s, HashType type, bool isSRI);
 
 public:
@@ -114,7 +121,7 @@ Hash hashFile(HashType ht, const Path & path);
 
 /* Compute the hash of the given path.  The hash is defined as
    (essentially) hashString(ht, dumpPath(path)). */
-typedef std::pair<Hash, unsigned long long> HashResult;
+typedef std::pair<Hash, uint64_t> HashResult;
 HashResult hashPath(HashType ht, const Path & path,
     PathFilter & filter = defaultPathFilter);
 
@@ -127,6 +134,7 @@ Hash compressHash(const Hash & hash, unsigned int newSize);
 
 /* Parse a string representing a hash type. */
 HashType parseHashType(std::string_view s);
+
 /* Will return nothing on parse error */
 std::optional<HashType> parseHashTypeOpt(std::string_view s);
 
@@ -146,7 +154,7 @@ class HashSink : public BufferedSink, public AbstractHashSink
 private:
     HashType ht;
     Ctx * ctx;
-    unsigned long long bytes;
+    uint64_t bytes;
 
 public:
     HashSink(HashType ht);

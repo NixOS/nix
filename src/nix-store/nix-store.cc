@@ -77,7 +77,7 @@ static PathSet realisePath(StorePathWithOutputs path, bool build = true)
             if (i == drv.outputs.end())
                 throw Error("derivation '%s' does not have an output named '%s'",
                     store2->printStorePath(path.path), j);
-            auto outPath = store2->printStorePath(i->second.path);
+            auto outPath = store2->printStorePath(i->second.path(*store, drv.name));
             if (store2) {
                 if (gcRoot == "")
                     printGCWarning();
@@ -130,7 +130,7 @@ static void opRealise(Strings opFlags, Strings opArgs)
     for (auto & i : opArgs)
         paths.push_back(store->followLinksToStorePathWithOutputs(i));
 
-    unsigned long long downloadSize, narSize;
+    uint64_t downloadSize, narSize;
     StorePathSet willBuild, willSubstitute, unknown;
     store->queryMissing(paths, willBuild, willSubstitute, unknown, downloadSize, narSize);
 
@@ -225,7 +225,7 @@ static StorePathSet maybeUseOutputs(const StorePath & storePath, bool useOutput,
         auto drv = store->derivationFromPath(storePath);
         StorePathSet outputs;
         for (auto & i : drv.outputs)
-            outputs.insert(i.second.path);
+            outputs.insert(i.second.path(*store, drv.name));
         return outputs;
     }
     else return {storePath};
@@ -319,7 +319,7 @@ static void opQuery(Strings opFlags, Strings opArgs)
                 if (forceRealise) realisePath({i2});
                 Derivation drv = store->derivationFromPath(i2);
                 for (auto & j : drv.outputs)
-                    cout << fmt("%1%\n", store->printStorePath(j.second.path));
+                    cout << fmt("%1%\n", store->printStorePath(j.second.path(*store, drv.name)));
             }
             break;
         }
@@ -579,10 +579,8 @@ static void opGC(Strings opFlags, Strings opArgs)
         if (*i == "--print-roots") printRoots = true;
         else if (*i == "--print-live") options.action = GCOptions::gcReturnLive;
         else if (*i == "--print-dead") options.action = GCOptions::gcReturnDead;
-        else if (*i == "--max-freed") {
-            long long maxFreed = getIntArg<long long>(*i, i, opFlags.end(), true);
-            options.maxFreed = maxFreed >= 0 ? maxFreed : 0;
-        }
+        else if (*i == "--max-freed")
+            options.maxFreed = std::max(getIntArg<int64_t>(*i, i, opFlags.end(), true), (int64_t) 0);
         else throw UsageError("bad sub-operation '%1%' in GC", *i);
 
     if (!opArgs.empty()) throw UsageError("no arguments expected");
@@ -824,7 +822,7 @@ static void opServe(Strings opFlags, Strings opArgs)
             case cmdQueryValidPaths: {
                 bool lock = readInt(in);
                 bool substitute = readInt(in);
-                auto paths = readStorePaths<StorePathSet>(*store, in);
+                auto paths = WorkerProto<StorePathSet>::read(*store, in);
                 if (lock && writeAllowed)
                     for (auto & path : paths)
                         store->addTempRoot(path);
@@ -838,7 +836,7 @@ static void opServe(Strings opFlags, Strings opArgs)
                     for (auto & path : paths)
                         if (!path.isDerivation())
                             paths2.push_back({path});
-                    unsigned long long downloadSize, narSize;
+                    uint64_t downloadSize, narSize;
                     StorePathSet willBuild, willSubstitute, unknown;
                     store->queryMissing(paths2,
                         willBuild, willSubstitute, unknown, downloadSize, narSize);
@@ -854,19 +852,19 @@ static void opServe(Strings opFlags, Strings opArgs)
                         }
                 }
 
-                writeStorePaths(*store, out, store->queryValidPaths(paths));
+                WorkerProto<StorePathSet>::write(*store, out, store->queryValidPaths(paths));
                 break;
             }
 
             case cmdQueryPathInfos: {
-                auto paths = readStorePaths<StorePathSet>(*store, in);
+                auto paths = WorkerProto<StorePathSet>::read(*store, in);
                 // !!! Maybe we want a queryPathInfos?
                 for (auto & i : paths) {
                     try {
                         auto info = store->queryPathInfo(i);
                         out << store->printStorePath(info->path)
                             << (info->deriver ? store->printStorePath(*info->deriver) : "");
-                        writeStorePaths(*store, out, info->referencesPossiblyToSelf());
+                        WorkerProto<StorePathSet>::write(*store, out, info->referencesPossiblyToSelf());
                         // !!! Maybe we want compression?
                         out << info->narSize // downloadSize
                             << info->narSize;
@@ -896,7 +894,7 @@ static void opServe(Strings opFlags, Strings opArgs)
 
             case cmdExportPaths: {
                 readInt(in); // obsolete
-                store->exportPaths(readStorePaths<StorePathSet>(*store, in), out);
+                store->exportPaths(WorkerProto<StorePathSet>::read(*store, in), out);
                 break;
             }
 
@@ -925,9 +923,9 @@ static void opServe(Strings opFlags, Strings opArgs)
 
                 if (!writeAllowed) throw Error("building paths is not allowed");
 
-                auto drvPath = store->parseStorePath(readString(in)); // informational only
+                auto drvPath = store->parseStorePath(readString(in));
                 BasicDerivation drv;
-                readDerivation(in, *store, drv);
+                readDerivation(in, *store, drv, Derivation::nameFromPath(drvPath));
 
                 getBuildSettings();
 
@@ -945,9 +943,9 @@ static void opServe(Strings opFlags, Strings opArgs)
             case cmdQueryClosure: {
                 bool includeOutputs = readInt(in);
                 StorePathSet closure;
-                store->computeFSClosure(readStorePaths<StorePathSet>(*store, in),
+                store->computeFSClosure(WorkerProto<StorePathSet>::read(*store, in),
                     closure, false, includeOutputs);
-                writeStorePaths(*store, out, closure);
+                WorkerProto<StorePathSet>::write(*store, out, closure);
                 break;
             }
 
@@ -960,7 +958,7 @@ static void opServe(Strings opFlags, Strings opArgs)
                 if (deriver != "")
                     info.deriver = store->parseStorePath(deriver);
                 info.narHash = Hash::parseAny(readString(in), htSHA256);
-                info.setReferencesPossiblyToSelf(readStorePaths<StorePathSet>(*store, in));
+                info.setReferencesPossiblyToSelf(WorkerProto<StorePathSet>::read(*store, in));
                 in >> info.registrationTime >> info.narSize >> info.ultimate;
                 info.sigs = readStrings<StringSet>(in);
                 info.ca = parseContentAddressOpt(readString(in));

@@ -12,30 +12,24 @@
 namespace nix {
 
 
-static bool cmpGensByNumber(const Generation & a, const Generation & b)
-{
-    return a.number < b.number;
-}
-
-
 /* Parse a generation name of the format
    `<profilename>-<number>-link'. */
-static int parseName(const string & profileName, const string & name)
+static std::optional<GenerationNumber> parseName(const string & profileName, const string & name)
 {
-    if (string(name, 0, profileName.size() + 1) != profileName + "-") return -1;
+    if (string(name, 0, profileName.size() + 1) != profileName + "-") return {};
     string s = string(name, profileName.size() + 1);
     string::size_type p = s.find("-link");
-    if (p == string::npos) return -1;
-    int n;
+    if (p == string::npos) return {};
+    unsigned int n;
     if (string2Int(string(s, 0, p), n) && n >= 0)
         return n;
     else
-        return -1;
+        return {};
 }
 
 
 
-Generations findGenerations(Path profile, int & curGen)
+std::pair<Generations, std::optional<GenerationNumber>> findGenerations(Path profile)
 {
     Generations gens;
 
@@ -43,30 +37,34 @@ Generations findGenerations(Path profile, int & curGen)
     auto profileName = std::string(baseNameOf(profile));
 
     for (auto & i : readDirectory(profileDir)) {
-        int n;
-        if ((n = parseName(profileName, i.name)) != -1) {
-            Generation gen;
-            gen.path = profileDir + "/" + i.name;
-            gen.number = n;
+        if (auto n = parseName(profileName, i.name)) {
+            auto path = profileDir + "/" + i.name;
             struct stat st;
-            if (lstat(gen.path.c_str(), &st) != 0)
-                throw SysError("statting '%1%'", gen.path);
-            gen.creationTime = st.st_mtime;
-            gens.push_back(gen);
+            if (lstat(path.c_str(), &st) != 0)
+                throw SysError("statting '%1%'", path);
+            gens.push_back({
+                .number = *n,
+                .path = path,
+                .creationTime = st.st_mtime
+            });
         }
     }
 
-    gens.sort(cmpGensByNumber);
+    gens.sort([](const Generation & a, const Generation & b)
+    {
+        return a.number < b.number;
+    });
 
-    curGen = pathExists(profile)
+    return {
+        gens,
+        pathExists(profile)
         ? parseName(profileName, readLink(profile))
-        : -1;
-
-    return gens;
+        : std::nullopt
+    };
 }
 
 
-static void makeName(const Path & profile, unsigned int num,
+static void makeName(const Path & profile, GenerationNumber num,
     Path & outLink)
 {
     Path prefix = (format("%1%-%2%") % profile % num).str();
@@ -78,10 +76,9 @@ Path createGeneration(ref<LocalFSStore> store, Path profile, Path outPath)
 {
     /* The new generation number should be higher than old the
        previous ones. */
-    int dummy;
-    Generations gens = findGenerations(profile, dummy);
+    auto [gens, dummy] = findGenerations(profile);
 
-    unsigned int num;
+    GenerationNumber num;
     if (gens.size() > 0) {
         Generation last = gens.back();
 
@@ -121,7 +118,7 @@ static void removeFile(const Path & path)
 }
 
 
-void deleteGeneration(const Path & profile, unsigned int gen)
+void deleteGeneration(const Path & profile, GenerationNumber gen)
 {
     Path generation;
     makeName(profile, gen, generation);
@@ -129,7 +126,7 @@ void deleteGeneration(const Path & profile, unsigned int gen)
 }
 
 
-static void deleteGeneration2(const Path & profile, unsigned int gen, bool dryRun)
+static void deleteGeneration2(const Path & profile, GenerationNumber gen, bool dryRun)
 {
     if (dryRun)
         printInfo(format("would remove generation %1%") % gen);
@@ -140,31 +137,29 @@ static void deleteGeneration2(const Path & profile, unsigned int gen, bool dryRu
 }
 
 
-void deleteGenerations(const Path & profile, const std::set<unsigned int> & gensToDelete, bool dryRun)
+void deleteGenerations(const Path & profile, const std::set<GenerationNumber> & gensToDelete, bool dryRun)
 {
     PathLocks lock;
     lockProfile(lock, profile);
 
-    int curGen;
-    Generations gens = findGenerations(profile, curGen);
+    auto [gens, curGen] = findGenerations(profile);
 
-    if (gensToDelete.find(curGen) != gensToDelete.end())
+    if (gensToDelete.count(*curGen))
         throw Error("cannot delete current generation of profile %1%'", profile);
 
     for (auto & i : gens) {
-        if (gensToDelete.find(i.number) == gensToDelete.end()) continue;
+        if (!gensToDelete.count(i.number)) continue;
         deleteGeneration2(profile, i.number, dryRun);
     }
 }
 
-void deleteGenerationsGreaterThan(const Path & profile, int max, bool dryRun)
+void deleteGenerationsGreaterThan(const Path & profile, GenerationNumber max, bool dryRun)
 {
     PathLocks lock;
     lockProfile(lock, profile);
 
-    int curGen;
     bool fromCurGen = false;
-    Generations gens = findGenerations(profile, curGen);
+    auto [gens, curGen] = findGenerations(profile);
     for (auto i = gens.rbegin(); i != gens.rend(); ++i) {
         if (i->number == curGen) {
             fromCurGen = true;
@@ -186,8 +181,7 @@ void deleteOldGenerations(const Path & profile, bool dryRun)
     PathLocks lock;
     lockProfile(lock, profile);
 
-    int curGen;
-    Generations gens = findGenerations(profile, curGen);
+    auto [gens, curGen] = findGenerations(profile);
 
     for (auto & i : gens)
         if (i.number != curGen)
@@ -200,8 +194,7 @@ void deleteGenerationsOlderThan(const Path & profile, time_t t, bool dryRun)
     PathLocks lock;
     lockProfile(lock, profile);
 
-    int curGen;
-    Generations gens = findGenerations(profile, curGen);
+    auto [gens, curGen] = findGenerations(profile);
 
     bool canDelete = false;
     for (auto i = gens.rbegin(); i != gens.rend(); ++i)

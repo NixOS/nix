@@ -86,7 +86,7 @@ struct GCOptions
     StorePathSet pathsToDelete;
 
     /* Stop after at least `maxFreed' bytes have been freed. */
-    unsigned long long maxFreed{std::numeric_limits<unsigned long long>::max()};
+    uint64_t maxFreed{std::numeric_limits<uint64_t>::max()};
 };
 
 
@@ -98,7 +98,7 @@ struct GCResults
 
     /* For `gcReturnDead', `gcDeleteDead' and `gcDeleteSpecific', the
        number of bytes that would be or was freed. */
-    unsigned long long bytesFreed = 0;
+    uint64_t bytesFreed = 0;
 };
 
 
@@ -342,9 +342,15 @@ public:
     /* Query the outputs of the derivation denoted by `path'. */
     virtual StorePathSet queryDerivationOutputs(const StorePath & path);
 
-    /* Query the mapping outputName=>outputPath for the given derivation */
-    virtual OutputPathMap queryDerivationOutputMap(const StorePath & path)
+    /* Query the mapping outputName => outputPath for the given derivation. All
+       outputs are mentioned so ones mising the mapping are mapped to
+       `std::nullopt`.  */
+    virtual std::map<std::string, std::optional<StorePath>> queryDerivationOutputMap(const StorePath & path)
     { unsupported("queryDerivationOutputMap"); }
+
+    /* Query the mapping outputName=>outputPath for the given derivation.
+       Assume every output has a mapping and throw an exception otherwise. */
+    OutputPathMap queryDerivationOutputMapAssumeTotal(const StorePath & path);
 
     /* Query the full store path given the hash part of a valid store
        path, or empty if the path doesn't exist. */
@@ -371,7 +377,7 @@ public:
        libutil/archive.hh). */
     virtual StorePath addToStore(const string & name, const Path & srcPath,
         FileIngestionMethod method = FileIngestionMethod::Recursive, HashType hashAlgo = htSHA256,
-        PathFilter & filter = defaultPathFilter, RepairFlag repair = NoRepair) = 0;
+        PathFilter & filter = defaultPathFilter, RepairFlag repair = NoRepair);
 
     /* Copy the contents of a path to the store and register the
        validity the resulting path, using a constant amount of
@@ -380,6 +386,10 @@ public:
         FileIngestionMethod method = FileIngestionMethod::Recursive, HashType hashAlgo = htSHA256,
         std::optional<Hash> expectedCAHash = {});
 
+    /* Like addToStore(), but the contents of the path are contained
+       in `dump', which is either a NAR serialisation (if recursive ==
+       true) or simply the contents of a regular file (if recursive ==
+       false). */
     // FIXME: remove?
     virtual StorePath addToStoreFromDump(Source & dump, const string & name,
         FileIngestionMethod method = FileIngestionMethod::Recursive, HashType hashAlgo = htSHA256, RepairFlag repair = NoRepair)
@@ -530,7 +540,7 @@ public:
        that will be substituted. */
     virtual void queryMissing(const std::vector<StorePathWithOutputs> & targets,
         StorePathSet & willBuild, StorePathSet & willSubstitute, StorePathSet & unknown,
-        unsigned long long & downloadSize, unsigned long long & narSize);
+        uint64_t & downloadSize, uint64_t & narSize);
 
     /* Sort a set of paths topologically under the references
        relation.  If p refers to q, then p precedes q in this list. */

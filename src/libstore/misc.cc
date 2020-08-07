@@ -4,6 +4,7 @@
 #include "local-store.hh"
 #include "store-api.hh"
 #include "thread-pool.hh"
+#include "topo-sort.hh"
 
 
 namespace nix {
@@ -111,10 +112,12 @@ void Store::computeFSClosure(const StorePath & startPath,
 std::optional<StorePathDescriptor> getDerivationCA(const BasicDerivation & drv)
 {
     auto out = drv.outputs.find("out");
-    if (out != drv.outputs.end() && out->second.hash) {
+    if (out == drv.outputs.end())
+        return std::nullopt;
+    if (auto dof = std::get_if<DerivationOutputCAFixed>(&out->second.output)) {
         return StorePathDescriptor {
-            .name = std::string { out->second.path.name() },
-            .info = FixedOutputInfo { *out->second.hash, {} },
+            .name =  drv.name,
+            .info = FixedOutputInfo { dof->hash, {} },
         };
     }
     return std::nullopt;
@@ -122,7 +125,7 @@ std::optional<StorePathDescriptor> getDerivationCA(const BasicDerivation & drv)
 
 void Store::queryMissing(const std::vector<StorePathWithOutputs> & targets,
     StorePathSet & willBuild_, StorePathSet & willSubstitute_, StorePathSet & unknown_,
-    unsigned long long & downloadSize_, unsigned long long & narSize_)
+    uint64_t & downloadSize_, uint64_t & narSize_)
 {
     Activity act(*logger, lvlDebug, actUnknown, "querying info about missing paths");
 
@@ -134,8 +137,8 @@ void Store::queryMissing(const std::vector<StorePathWithOutputs> & targets,
     {
         std::unordered_set<std::string> done;
         StorePathSet & unknown, & willSubstitute, & willBuild;
-        unsigned long long & downloadSize;
-        unsigned long long & narSize;
+        uint64_t & downloadSize;
+        uint64_t & narSize;
     };
 
     struct DrvState
@@ -212,10 +215,12 @@ void Store::queryMissing(const std::vector<StorePathWithOutputs> & targets,
             ParsedDerivation parsedDrv(StorePath(path.path), *drv);
 
             PathSet invalid;
-            for (auto & j : drv->outputs)
+            for (auto & j : drv->outputs) {
+                auto storePath = j.second.path(*this, drv->name);
                 if (wantOutput(j.first, path.outputs)
-                    && !isValidPath(j.second.path))
-                    invalid.insert(printStorePath(j.second.path));
+                    && !isValidPath(storePath))
+                    invalid.insert(printStorePath(storePath));
+            }
             if (invalid.empty()) return;
 
             if (settings.useSubstitutes && parsedDrv.substitutesAllowed()) {
@@ -262,41 +267,21 @@ void Store::queryMissing(const std::vector<StorePathWithOutputs> & targets,
 
 StorePaths Store::topoSortPaths(const StorePathSet & paths)
 {
-    StorePaths sorted;
-    StorePathSet visited, parents;
-
-    std::function<void(const StorePath & path, const StorePath * parent)> dfsVisit;
-
-    dfsVisit = [&](const StorePath & path, const StorePath * parent) {
-        if (parents.count(path))
-            throw BuildError("cycle detected in the references of '%s' from '%s'",
-                printStorePath(path), printStorePath(*parent));
-
-        if (!visited.insert(path).second) return;
-        parents.insert(path);
-
-        StorePathSet references;
-        try {
-            references = queryPathInfo(path)->references;
-        } catch (InvalidPath &) {
-        }
-
-        for (auto & i : references)
-            /* Don't traverse into paths that don't exist.  That can
-               happen due to substitutes for non-existent paths. */
-            if (paths.count(i))
-                dfsVisit(i, &path);
-
-        sorted.push_back(path);
-        parents.erase(path);
-    };
-
-    for (auto & i : paths)
-        dfsVisit(i, nullptr);
-
-    std::reverse(sorted.begin(), sorted.end());
-
-    return sorted;
+    return topoSort(paths,
+        {[&](const StorePath & path) {
+            StorePathSet references;
+            try {
+                references = queryPathInfo(path)->references;
+            } catch (InvalidPath &) {
+            }
+            return references;
+        }},
+        {[&](const StorePath & path, const StorePath & parent) {
+            return BuildError(
+                "cycle detected in the references of '%s' from '%s'",
+                printStorePath(path),
+                printStorePath(parent));
+        }});
 }
 
 

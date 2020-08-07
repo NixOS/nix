@@ -3,7 +3,6 @@
 #include "types.hh"
 #include "hash.hh"
 #include "path.hh"
-#include "tree-info.hh"
 #include "attrs.hh"
 #include "url.hh"
 #include "content-address.hh"
@@ -14,77 +13,108 @@ namespace nix { class Store; }
 
 namespace nix::fetchers {
 
-struct Input;
-
 struct Tree
 {
     Path actualPath;
-    StorePath storePath;
-    TreeInfo info;
+    StorePathDescriptor storePath;
+    Tree(Path && actualPath, StorePathDescriptor && storePath)
+        : actualPath(actualPath), storePath(std::move(storePath))
+    {}
 };
 
-struct Input : std::enable_shared_from_this<Input>
+struct InputScheme;
+
+struct Input
 {
-    std::optional<Hash> narHash; // FIXME: implement
+    friend class InputScheme;
 
-    virtual std::string type() const = 0;
+    std::shared_ptr<InputScheme> scheme; // note: can be null
+    Attrs attrs;
+    bool immutable = false;
+    bool direct = true;
 
-    virtual ~Input() { }
+public:
+    static Input fromURL(const std::string & url);
 
-    virtual bool operator ==(const Input & other) const { return false; }
+    static Input fromURL(const ParsedURL & url);
 
-    /* Check whether this is a "direct" input, that is, not
-       one that goes through a registry. */
-    virtual bool isDirect() const { return true; }
+    static Input fromAttrs(Attrs && attrs);
 
-    /* Check whether this is an "immutable" input, that is,
-       one that contains a commit hash or content hash. */
-    virtual bool isImmutable() const { return (bool) narHash; }
+    ParsedURL toURL() const;
 
-    virtual bool contains(const Input & other) const { return false; }
-
-    virtual std::optional<std::string> getRef() const { return {}; }
-
-    virtual std::optional<Hash> getRev() const { return {}; }
-
-    virtual ParsedURL toURL() const = 0;
-
-    std::string to_string() const
-    {
-        return toURL().to_string();
-    }
+    std::string to_string() const;
 
     Attrs toAttrs() const;
 
-    std::pair<Tree, std::shared_ptr<const Input>> fetchTree(ref<Store> store) const;
+    /* Check whether this is a "direct" input, that is, not
+       one that goes through a registry. */
+    bool isDirect() const { return direct; }
 
-private:
+    /* Check whether this is an "immutable" input, that is,
+       one that contains a commit hash or content hash. */
+    bool isImmutable() const { return immutable; }
 
-    virtual std::pair<Tree, std::shared_ptr<const Input>> fetchTreeInternal(ref<Store> store) const = 0;
+    bool hasAllInfo() const;
 
-    virtual Attrs toAttrsInternal() const = 0;
+    bool operator ==(const Input & other) const;
+
+    bool contains(const Input & other) const;
+
+    std::pair<Tree, Input> fetch(ref<Store> store) const;
+
+    Input applyOverrides(
+        std::optional<std::string> ref,
+        std::optional<Hash> rev) const;
+
+    void clone(const Path & destDir) const;
+
+    std::optional<Path> getSourcePath() const;
+
+    void markChangedFile(
+        std::string_view file,
+        std::optional<std::string> commitMsg) const;
+
+    StorePathDescriptor computeStorePath(Store & store) const;
+
+    // Convience functions for common attributes.
+    std::string getType() const;
+    std::optional<Hash> getNarHash() const;
+    std::optional<std::string> getRef() const;
+    std::optional<Hash> getRev() const;
+    std::optional<Hash> getTreeHash() const;
+    std::optional<uint64_t> getRevCount() const;
+    std::optional<time_t> getLastModified() const;
 };
 
 struct InputScheme
 {
-    virtual ~InputScheme() { }
+    virtual std::optional<Input> inputFromURL(const ParsedURL & url) = 0;
 
-    virtual std::unique_ptr<Input> inputFromURL(const ParsedURL & url) = 0;
+    virtual std::optional<Input> inputFromAttrs(const Attrs & attrs) = 0;
 
-    virtual std::unique_ptr<Input> inputFromAttrs(const Attrs & attrs) = 0;
+    virtual ParsedURL toURL(const Input & input);
+
+    virtual bool hasAllInfo(const Input & input) = 0;
+
+    virtual Input applyOverrides(
+        const Input & input,
+        std::optional<std::string> ref,
+        std::optional<Hash> rev);
+
+    virtual void clone(const Input & input, const Path & destDir);
+
+    virtual std::optional<Path> getSourcePath(const Input & input);
+
+    virtual void markChangedFile(const Input & input, std::string_view file, std::optional<std::string> commitMsg);
+
+    virtual std::pair<Tree, Input> fetch(ref<Store> store, const Input & input) = 0;
 };
 
-std::unique_ptr<Input> inputFromURL(const ParsedURL & url);
-
-std::unique_ptr<Input> inputFromURL(const std::string & url);
-
-std::unique_ptr<Input> inputFromAttrs(const Attrs & attrs);
-
-void registerInputScheme(std::unique_ptr<InputScheme> && fetcher);
+void registerInputScheme(std::shared_ptr<InputScheme> && fetcher);
 
 struct DownloadFileResult
 {
-    StorePath storePath;
+    StorePathDescriptor storePath;
     std::string etag;
     std::string effectiveUrl;
 };
@@ -95,7 +125,7 @@ DownloadFileResult downloadFile(
     const std::string & name,
     bool immutable);
 
-Tree downloadTarball(
+std::pair<Tree, time_t> downloadTarball(
     ref<Store> store,
     const std::string & url,
     const std::string & name,
