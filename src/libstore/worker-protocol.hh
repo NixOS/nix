@@ -90,6 +90,13 @@ std::optional<T> read(const Store & store, Source & from, Phantom<std::optional<
 template<typename T>
 void write(const Store & store, Sink & out, const std::optional<T> & optVal);
 
+/* Specialization which uses and empty string for the empty case, taking
+   advantage of the fact StorePaths always serialize to a non-empty string.
+   This is done primarily for backwards compatability, so that StorePath <=
+   std::optional<StorePath>, where <= is the compatability partial order.
+ */
+template<>
+void write(const Store & store, Sink & out, const std::optional<StorePath> & optVal);
 
 template<typename T>
 std::map<std::string, T> read(const Store & store, Source & from, Phantom<std::map<std::string, T>> _)
