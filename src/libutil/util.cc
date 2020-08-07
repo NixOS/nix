@@ -494,6 +494,7 @@ std::pair<AutoCloseFD, Path> createTempFile(const Path & prefix)
 {
     Path tmpl(getEnv("TMPDIR").value_or("/tmp") + "/" + prefix + ".XXXXXX");
     // Strictly speaking, this is UB, but who cares...
+    // FIXME: use O_TMPFILE.
     AutoCloseFD fd(mkstemp((char *) tmpl.c_str()));
     if (!fd)
         throw SysError("creating temporary file '%s'", tmpl);
@@ -1449,7 +1450,7 @@ string base64Decode(std::string_view s)
 
         char digit = decode[(unsigned char) c];
         if (digit == -1)
-            throw Error("invalid character in Base64 string");
+            throw Error("invalid character in Base64 string: '%c'", c);
 
         bits += 6;
         d = d << 6 | digit;

@@ -130,20 +130,25 @@ void MixProfile::updateProfile(const Buildables & buildables)
 {
     if (!profile) return;
 
-    std::optional<StorePath> result;
+    std::vector<StorePath> result;
 
     for (auto & buildable : buildables) {
-        for (auto & output : buildable.outputs) {
-            if (result)
-                throw Error("'--profile' requires that the arguments produce a single store path, but there are multiple");
-            result = output.second;
-        }
+        std::visit(overloaded {
+            [&](BuildableOpaque bo) {
+                result.push_back(bo.path);
+            },
+            [&](BuildableFromDrv bfd) {
+                for (auto & output : bfd.outputs) {
+                    result.push_back(output.second);
+                }
+            },
+        }, buildable);
     }
 
-    if (!result)
-        throw Error("'--profile' requires that the arguments produce a single store path, but there are none");
+    if (result.size() != 1)
+        throw Error("'--profile' requires that the arguments produce a single store path, but there are %d", result.size());
 
-    updateProfile(*result);
+    updateProfile(result[0]);
 }
 
 MixDefaultProfile::MixDefaultProfile()

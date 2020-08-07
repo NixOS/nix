@@ -522,7 +522,7 @@ void IPFSBinaryCacheStore::queryPathInfoUncached(const StorePath & storePath,
     json = getIpfsDag("/ipfs/" + narObjectHash);
 
     NarInfo narInfo { storePath };
-    narInfo.narHash = Hash((std::string) json["narHash"]);
+    narInfo.narHash = Hash::parseAnyPrefixed((std::string) json["narHash"]);
     narInfo.narSize = json["narSize"];
 
     for (auto & ref : json["references"].items())
@@ -551,7 +551,7 @@ void IPFSBinaryCacheStore::queryPathInfoUncached(const StorePath & storePath,
         narInfo.url = "ipfs://" + json["ipfsCid"]["/"].get<std::string>();
 
     if (json.find("downloadHash") != json.end())
-        narInfo.fileHash = Hash((std::string) json["downloadHash"]);
+        narInfo.fileHash = Hash::parseAnyPrefixed((std::string) json["downloadHash"]);
 
     if (json.find("downloadSize") != json.end())
         narInfo.fileSize = json["downloadSize"];

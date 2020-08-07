@@ -209,7 +209,7 @@ struct MercurialInputScheme : InputScheme
         });
 
         if (auto res = getCache()->lookup(store, mutableAttrs)) {
-            auto rev2 = Hash(getStrAttr(res->first, "rev"), htSHA1);
+            auto rev2 = Hash::parseAny(getStrAttr(res->first, "rev"), htSHA1);
             if (!input.getRev() || input.getRev() == rev2) {
                 input.attrs.insert_or_assign("rev", rev2.gitRev());
                 return makeResult(res->first, std::move(res->second));
@@ -252,7 +252,7 @@ struct MercurialInputScheme : InputScheme
             runProgram("hg", true, { "log", "-R", cacheDir, "-r", revOrRef, "--template", "{node} {rev} {branch}" }));
         assert(tokens.size() == 3);
 
-        input.attrs.insert_or_assign("rev", Hash(tokens[0], htSHA1).gitRev());
+        input.attrs.insert_or_assign("rev", Hash::parseAny(tokens[0], htSHA1).gitRev());
         auto revCount = std::stoull(tokens[1]);
         input.attrs.insert_or_assign("ref", tokens[2]);
 
