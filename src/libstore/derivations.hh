@@ -27,6 +27,7 @@ struct DerivationOutputInputAddressed
 struct DerivationOutputCAFixed
 {
     FixedOutputHash hash; /* hash used for expected hash computation */
+    StorePath path(const Store & store, std::string_view drvName, std::string_view outputName) const;
 };
 
 /* Floating-output derivations, whose output paths are content addressed, but
@@ -48,12 +49,6 @@ struct DerivationOutput
     > output;
     std::optional<HashType> hashAlgoOpt(const Store & store) const;
     std::optional<StorePath> pathOpt(const Store & store, std::string_view drvName) const;
-    /* DEPRECATED: Remove after CA drvs are fully implemented */
-    StorePath path(const Store & store, std::string_view drvName) const {
-        auto p = pathOpt(store, drvName);
-        if (!p) throw UnimplementedError("floating content-addressed derivations are not yet implemented");
-        return *p;
-    }
 };
 
 typedef std::map<string, DerivationOutput> DerivationOutputs;
@@ -101,9 +96,6 @@ struct BasicDerivation
     /* Return true iff this is a fixed-output derivation. */
     DerivationType type() const;
 
-    /* Return the output paths of a derivation. */
-    StorePathSet outputPaths(const Store & store) const;
-
     /* Return the output names of a derivation. */
     StringSet outputNames() const;
 
@@ -135,6 +127,8 @@ Derivation readDerivation(const Store & store, const Path & drvPath, std::string
 
 // FIXME: remove
 bool isDerivation(const string & fileName);
+
+std::string outputPathName(std::string_view drvName, std::string_view outputName);
 
 // known CA drv's output hashes, current just for fixed-output derivations
 // whose output hashes are always known since they are fixed up-front.
@@ -184,5 +178,7 @@ Source & readDerivation(Source & in, const Store & store, BasicDerivation & drv,
 void writeDerivation(Sink & out, const Store & store, const BasicDerivation & drv);
 
 std::string hashPlaceholder(const std::string & outputName);
+
+StorePath downstreamPlaceholder(const Store & store, const StorePath & drvPath, std::string_view outputName);
 
 }

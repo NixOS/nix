@@ -488,10 +488,10 @@ bool NixRepl::processLine(string line)
                but doing it in a child makes it easier to recover from
                problems / SIGINT. */
             if (runProgram(settings.nixBinDir + "/nix", Strings{"build", "--no-link", drvPath}) == 0) {
-                auto drv = readDerivation(*state->store, drvPath, Derivation::nameFromPath(state->store->parseStorePath(drvPath)));
+                auto outputs = state->store->queryDerivationOutputMapAssumeTotal(state->store->parseStorePath(drvPath));
                 std::cout << std::endl << "this derivation produced the following outputs:" << std::endl;
-                for (auto & i : drv.outputs)
-                    std::cout << fmt("  %s -> %s\n", i.first, state->store->printStorePath(i.second.path(*state->store, drv.name)));
+                for (auto & i : outputs)
+                    std::cout << fmt("  %s -> %s\n", i.first, state->store->printStorePath(i.second));
             }
         } else if (command == ":i") {
             runProgram(settings.nixBinDir + "/nix-env", Strings{"-i", drvPath});

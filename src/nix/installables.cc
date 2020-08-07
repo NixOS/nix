@@ -302,10 +302,10 @@ struct InstallableStorePath : Installable
     Buildables toBuildables() override
     {
         if (storePath.isDerivation()) {
-            std::map<std::string, StorePath> outputs;
+            std::map<std::string, std::optional<StorePath>> outputs;
             auto drv = store->readDerivation(storePath);
             for (auto & [name, output] : drv.outputs)
-                outputs.emplace(name, output.path(*store, drv.name));
+                outputs.emplace(name, output.pathOpt(*store, drv.name));
             return {
                 BuildableFromDrv {
                     .drvPath = storePath,
@@ -331,7 +331,7 @@ Buildables InstallableValue::toBuildables()
 {
     Buildables res;
 
-    std::map<StorePath, OutputPathMap> drvsToOutputs;
+    std::map<StorePath, std::map<std::string, std::optional<StorePath>>> drvsToOutputs;
 
     // Group by derivation, helps with .all in particular
     for (auto & drv : toDerivations()) {
@@ -674,8 +674,11 @@ StorePathSet toStorePaths(ref<Store> store,
                     outPaths.insert(bo.path);
                 },
                 [&](BuildableFromDrv bfd) {
-                    for (auto & output : bfd.outputs)
-                        outPaths.insert(output.second);
+                    for (auto & output : bfd.outputs) {
+                        if (!output.second)
+                            throw Error("Cannot operate on output of unbuilt CA drv");
+                        outPaths.insert(*output.second);
+                    }
                 },
             }, b);
     } else {

@@ -22,6 +22,12 @@ struct Sink
     }
 };
 
+/* Just throws away data. */
+struct NullSink : Sink
+{
+    void operator () (const unsigned char * data, size_t len) override
+    { }
+};
 
 /* A buffered abstract sink. */
 struct BufferedSink : virtual Sink

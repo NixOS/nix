@@ -244,10 +244,12 @@ public:
     StorePathWithOutputs followLinksToStorePathWithOutputs(std::string_view path) const;
 
     /* Constructs a unique store path name. */
-    StorePath makeStorePath(const string & type,
+    StorePath makeStorePath(std::string_view type,
+        std::string_view hash, std::string_view name) const;
+    StorePath makeStorePath(std::string_view type,
         const Hash & hash, std::string_view name) const;
 
-    StorePath makeOutputPath(const string & id,
+    StorePath makeOutputPath(std::string_view id,
         const Hash & hash, std::string_view name) const;
 
     StorePath makeFixedOutputPath(FileIngestionMethod method,

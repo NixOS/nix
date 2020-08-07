@@ -74,7 +74,7 @@ void write(const Store & store, Sink & out, const StorePath & storePath)
 template<>
 std::optional<StorePath> read(const Store & store, Source & from, Phantom<std::optional<StorePath>> _)
 {
-	auto s = readString(from);
+    auto s = readString(from);
     return s == "" ? std::optional<StorePath> {} : store.parseStorePath(s);
 }
 

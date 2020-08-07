@@ -69,12 +69,12 @@ struct CmdShowDerivation : InstallablesCommand
                 auto outputsObj(drvObj.object("outputs"));
                 for (auto & output : drv.outputs) {
                     auto outputObj(outputsObj.object(output.first));
-                    outputObj.attr("path", store->printStorePath(output.second.path(*store, drv.name)));
-
                     std::visit(overloaded {
                         [&](DerivationOutputInputAddressed doi) {
+                            outputObj.attr("path", store->printStorePath(doi.path));
                         },
                         [&](DerivationOutputCAFixed dof) {
+                            outputObj.attr("path", store->printStorePath(dof.path(*store, drv.name, output.first)));
                             outputObj.attr("hashAlgo", dof.hash.printMethodAlgo());
                             outputObj.attr("hash", dof.hash.hash.to_string(Base16, false));
                         },
