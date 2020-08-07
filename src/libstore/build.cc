@@ -4910,8 +4910,17 @@ void Worker::run(const Goals & _topGoals)
             waitForInput();
         else {
             if (awake.empty() && 0 == settings.maxBuildJobs)
-                throw Error("unable to start any build; either increase '--max-jobs' "
-                            "or enable remote builds");
+            {
+                if (getMachines().empty())
+                   throw Error("unable to start any build; either increase '--max-jobs' "
+                            "or enable remote builds."
+                            "\nhttps://nixos.org/nix/manual/#chap-distributed-builds");
+                else
+                   throw Error("unable to start any build; remote machines may not have "
+                            "all required system features."
+                            "\nhttps://nixos.org/nix/manual/#chap-distributed-builds");
+
+            }
             assert(!awake.empty());
         }
     }

@@ -32,6 +32,7 @@ void WorkerProto<std::string>::write(const Store & store, Sink & out, const std:
     out << str;
 }
 
+
 StorePath WorkerProto<StorePath>::read(const Store & store, Source & from)
 {
     return store.parseStorePath(readString(from));
@@ -50,6 +51,18 @@ StorePathDescriptor WorkerProto<StorePathDescriptor>::read(const Store & store, 
 void WorkerProto<StorePathDescriptor>::write(const Store & store, Sink & out, const StorePathDescriptor & ca)
 {
     out << renderStorePathDescriptor(ca);
+}
+
+
+std::optional<StorePath> WorkerProto<std::optional<StorePath>>::read(const Store & store, Source & from)
+{
+	auto s = readString(from);
+    return s == "" ? std::optional<StorePath> {} : store.parseStorePath(s);
+}
+
+void WorkerProto<std::optional<StorePath>>::write(const Store & store, Sink & out, const std::optional<StorePath> & storePathOpt)
+{
+    out << (storePathOpt ? store.printStorePath(*storePathOpt) : "");
 }
 
 
