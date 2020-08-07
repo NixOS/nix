@@ -33,12 +33,17 @@ extern "C" {
 #include "command.hh"
 #include "finally.hh"
 
+#if HAVE_BOEHMGC
 #define GC_INCLUDE_NEW
 #include <gc/gc_cpp.h>
+#endif
 
 namespace nix {
 
-struct NixRepl : gc
+struct NixRepl
+    #if HAVE_BOEHMGC
+    : gc
+    #endif
 {
     string curDir;
     std::unique_ptr<EvalState> state;

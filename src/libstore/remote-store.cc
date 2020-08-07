@@ -32,6 +32,7 @@ void WorkerProto<std::string>::write(const Store & store, Sink & out, const std:
     out << str;
 }
 
+
 StorePath WorkerProto<StorePath>::read(const Store & store, Source & from)
 {
     return store.parseStorePath(readString(from));
@@ -42,6 +43,7 @@ void WorkerProto<StorePath>::write(const Store & store, Sink & out, const StoreP
     out << store.printStorePath(storePath);
 }
 
+
 ContentAddress WorkerProto<ContentAddress>::read(const Store & store, Source & from)
 {
     return parseContentAddress(readString(from));
@@ -50,6 +52,29 @@ ContentAddress WorkerProto<ContentAddress>::read(const Store & store, Source & f
 void WorkerProto<ContentAddress>::write(const Store & store, Sink & out, const ContentAddress & ca)
 {
     out << renderContentAddress(ca);
+}
+
+
+std::optional<StorePath> WorkerProto<std::optional<StorePath>>::read(const Store & store, Source & from)
+{
+	auto s = readString(from);
+    return s == "" ? std::optional<StorePath> {} : store.parseStorePath(s);
+}
+
+void WorkerProto<std::optional<StorePath>>::write(const Store & store, Sink & out, const std::optional<StorePath> & storePathOpt)
+{
+    out << (storePathOpt ? store.printStorePath(*storePathOpt) : "");
+}
+
+
+std::optional<ContentAddress> WorkerProto<std::optional<ContentAddress>>::read(const Store & store, Source & from)
+{
+    return parseContentAddressOpt(readString(from));
+}
+
+void WorkerProto<std::optional<ContentAddress>>::write(const Store & store, Sink & out, const std::optional<ContentAddress> & caOpt)
+{
+    out << (caOpt ? renderContentAddress(*caOpt) : "");
 }
 
 

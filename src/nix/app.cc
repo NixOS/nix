@@ -8,7 +8,7 @@ namespace nix {
 
 App Installable::toApp(EvalState & state)
 {
-    auto [cursor, attrPath] = getCursor(state, true);
+    auto [cursor, attrPath] = getCursor(state);
 
     auto type = cursor->getAttr("type")->getString();
 
