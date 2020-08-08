@@ -4,6 +4,7 @@
 #include "local-store.hh"
 #include "util.hh"
 #include "archive.hh"
+#include "git.hh"
 #include "affinity.hh"
 #include "builtins.hh"
 #include "builtins/buildenv.hh"
@@ -3989,16 +3990,25 @@ void DerivationGoal::registerOutputs()
             rewriteOutput();
             /* FIXME optimize and deduplicate with addToStore */
             std::string oldHashPart { scratchPath.hashPart() };
-            HashModuloSink caSink { outputHash.hashType, oldHashPart };
+            Hash got { outputHash.hashType }; // Dummy value
             switch (outputHash.method) {
-            case FileIngestionMethod::Recursive:
+            case FileIngestionMethod::Recursive: {
+                HashModuloSink caSink { outputHash.hashType, oldHashPart };
                 dumpPath(actualPath, caSink);
-                break;
-            case FileIngestionMethod::Flat:
-                readFile(actualPath, caSink);
+                got = caSink.finish().first;
                 break;
             }
-            auto got = caSink.finish().first;
+            case FileIngestionMethod::Flat: {
+                HashModuloSink caSink { outputHash.hashType, oldHashPart };
+                readFile(actualPath, caSink);
+                got = caSink.finish().first;
+                break;
+            }
+            case FileIngestionMethod::Git: {
+                got = dumpGitHash(outputHash.hashType, (Path) tmpDir + "/tmp");
+                break;
+            }
+            }
             HashModuloSink narSink { htSHA256, oldHashPart };
             dumpPath(actualPath, narSink);
             auto narHashAndSize = narSink.finish();
