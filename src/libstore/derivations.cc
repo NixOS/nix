@@ -453,18 +453,8 @@ std::variant<DerivationT<Hash, NoPath>, CaOutputHashes> derivationModuloOrOutput
     const DerivationT<InputDrvPath, NoPath> & drv,
     const std::string & drvName)
 {
-    /* Return a fixed hash for fixed-output derivations. */
-    if (drv.isFixedOutput()) {
-        std::map<std::string, Hash> outputHashes;
-        for (const auto & i : drv.outputs) {
-            const Hash h = hashString(htSHA256, "fixed:out:"
-                + i.second.hash->printMethodAlgo() + ":"
-                + i.second.hash->hash.to_string(Base16, false) + ":"
-                + printStorePath(store, i.second.path));
-            outputHashes.insert_or_assign(std::string(i.first), std::move(h));
-        }
-        return outputHashes;
-    }
+    /* We should never bother normalizing inputs for a fixed-ouput derivation */
+    assert(!drv.isFixedOutput());
 
     /* For other derivations, replace the inputs paths with recursive
        calls to this function. */
