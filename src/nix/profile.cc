@@ -184,11 +184,12 @@ struct CmdProfileInstall : InstallablesCommand, MixDefaultProfile
                     auto & element(manifest.elements[i]);
                     if (element.source
                         && !element.source->originalRef.input.isImmutable()
-                        && element.source->originalRef == installable2->flakeRef)
+                        && element.source->originalRef == installable2->flakeRef
+                        && element.source->attrPath == attrPath)
                     {
                         alreadyInstalled = true;
 
-                        printInfo("found '%s' in profile, replacing", installable2->flakeRef);
+                        printInfo("found '%s' in profile, replacing", installable2->what());
 
                         element.storePaths = {drv.outPath}; // FIXME
                         element.source = ProfileElementSource {
