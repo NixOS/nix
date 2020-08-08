@@ -318,10 +318,8 @@ string DerivationT<InputDrvPath, OutputPath>::unparse(const Store & store) const
     first = true;
     for (auto & i : this->env) {
         if (first) first = false; else s += ',';
-        auto o = this->outputs.find(i.first);
         s += '('; printString(s, i.first);
-        // TODO use proper placeholders
-        s += ','; printString(s, o != this->outputs.end() ? "" : i.second);
+        s += ','; printString(s, i.second);
         s += ')';
     }
 
@@ -485,27 +483,28 @@ DerivationT<InputDrvPath, StorePath> bakeDerivationPaths(
     drvFinal.builder = drv.builder;
     drvFinal.args = drv.args;
     drvFinal.env = drv.env;
-    const auto drvOrPseudo = derivationModuloOrOutput(store, drv, drvName);
-    if (const DerivationT<Hash, NoPath> *pval = std::get_if<0>(&drvOrPseudo)) {
-        Hash hash = hashDerivation(store, *pval);
+    if (drv.isFixedOutput()) {
+        // CA derivation's output hashes
+        for (auto & [ outName, output ] : drv.outputs) {
+            assert(output.hash);
+            auto & foh = *output.hash;
+            auto outPath =
+                store.makeFixedOutputPath(foh.method, foh.hash, drvName);
+            drvFinal.outputs.insert_or_assign(outName, DerivationOutput {
+                .path = std::move(outPath),
+                .hash = foh,
+            });
+        }
+    } else {
+        // Regular non-CA derivation, replace derivation
+        Hash hash = hashDerivation(store, derivationModulo(store, drv));
         for (const auto i : drv.outputs) {
             auto outPath = store.makeOutputPath(i.first, hash, drvName);
             drvFinal.outputs.insert_or_assign(i.first, DerivationOutput {
                 .path = std::move(outPath),
-                .hash = std::optional<FixedOutputHash> {},
+                .hash = std::nullopt,
             });
         }
-    } else if (std::get_if<1>(&drvOrPseudo)) {
-        DerivationOutputsT<NoPath>::const_iterator out = drv.outputs.find("out");
-        if (out == drv.outputs.end())
-            throw Error("derivation does not have an output named 'out'");
-        auto & output = out->second;
-        assert(output.hash);
-        auto outPath = store.makeFixedOutputPath(output.hash->method, output.hash->hash, drvName);
-        drvFinal.outputs.insert_or_assign("out", DerivationOutput {
-            .path = std::move(outPath),
-            .hash = std::optional { output.hash },
-        });
     }
     return drvFinal;
 }
@@ -526,6 +525,11 @@ DerivationT<InputDrvPath, NoPath> stripDerivationPaths(
             .path = NoPath {},
             .hash = i.second.hash,
         });
+        if (drvInitial.env.count(i.first)) {
+            auto & envOutPath = drvInitial.env.at(i.first);
+            if (envOutPath == store.printStorePath(i.second.path))
+                envOutPath = "";
+        }
     }
     return drvInitial;
 }
