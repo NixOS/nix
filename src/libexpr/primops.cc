@@ -450,7 +450,7 @@ void prim_unsafeGetLambdaPos(EvalState & state, const Pos & pos, Value * * args,
     /* ensure the argument is a function */
     state.forceValue(*args[0], pos);
     if (args[0]->type != tLambda) {
-        throwTypeError(pos, "value is %1% while a lambda was expected", *args[0]);
+        throwTypeError(pos, "%2%: value is %1% while a lambda was expected", *args[0]);
     }
 
     state.mkPos(v, &args[0]->lambda.fun->pos);
