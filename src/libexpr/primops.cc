@@ -444,6 +444,17 @@ static void prim_genericClosure(EvalState & state, const Pos & pos, Value * * ar
         v.listElems()[n++] = i;
 }
 
+/* Return position information of the given lambda. */
+void prim_unsafeGetLambdaPos(EvalState & state, const Pos & pos, Value * * args, Value & v)
+{
+    /* ensure the argument is a function */
+    state.forceValue(*args[0], pos);
+    if (args[0]->type != tLambda) {
+        throwTypeError(pos, "value is %1% while a lambda was expected", *args[0]);
+    }
+
+    state.mkPos(v, &args[0]->lambda.fun->pos);
+}
 
 static void prim_abort(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
@@ -2314,6 +2325,7 @@ void EvalState::createBaseEnv()
     addPrimOp("__isBool", 1, prim_isBool);
     addPrimOp("__isPath", 1, prim_isPath);
     addPrimOp("__genericClosure", 1, prim_genericClosure);
+    addPrimOp("__unsafeGetLambdaPos", 1, prim_unsafeGetLambdaPos);
     addPrimOp("abort", 1, prim_abort);
     addPrimOp("__addErrorContext", 2, prim_addErrorContext);
     addPrimOp("__tryEval", 1, prim_tryEval);
