@@ -788,8 +788,8 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
     if (!jsonObject) {
         for (const auto & i : drvFinal.outputs) {
             if (!jsonObject) drvFinal.env.insert_or_assign(
-            	i.first,
-            	state.store->printStorePath(i.second.path));
+                i.first,
+                state.store->printStorePath(i.second.path));
         }
     }
 
@@ -803,9 +803,9 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
        case we don't actually write store derivations, so we can't
        read them later. */
     {
-        const std::variant<DerivationT<Hash, StorePath>, std::string> drvOrPseudo =
-            derivationModuloOrOutput(*state.store, drvFinal);
-        auto hash = hashDerivationOrPseudo(*state.store, std::move(drvOrPseudo));
+        auto hash = hashDerivationOrPseudo(
+            *state.store,
+            derivationModuloOrOutput(*state.store, drvFinal));
         drvHashes.insert_or_assign(drvPath, std::move(hash));
     }
     state.mkAttrs(v, 1 + drvFinal.outputs.size());

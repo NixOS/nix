@@ -562,10 +562,12 @@ void LocalStore::checkDerivationOutputs(const StorePath & drvPath, const Derivat
             throw Error("derivation '%s' does not have an output named 'out'", printStorePath(drvPath));
     }
 
-    auto drvOracle = bakeDerivationPaths(*this, stripDerivationPaths(*this, drv), drvName);
+    else {
+        auto drvOracle = bakeDerivationPaths(*this, stripDerivationPaths(*this, drv), drvName);
 
-    for (auto & i : drv.outputs)
-        check(drvOracle.outputs.find(i.first)->second.path, i.second.path, i.first);
+        for (auto & i : drv.outputs)
+            check(drvOracle.outputs.find(i.first)->second.path, i.second.path, i.first);
+    }
 }
 
 
