@@ -761,6 +761,7 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
             .nixCode = NixCode { .errPos = posDrvName }
         });
 
+    std::optional<Hash> outputHashParsed;
     if (outputHash) {
         /* Set "out" output with hash algo and hash for fixed-output derivations. */
         if (outputs.size() != 1 || *(outputs.begin()) != "out")
@@ -769,15 +770,20 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
                 .nixCode = NixCode { .errPos = posDrvName }
             });
 
-        std::optional<HashType> ht = parseHashTypeOpt(outputHashAlgo);
-        Hash h = newHashAllowEmpty(*outputHash, ht);
+        auto ht = parseHashTypeOpt(outputHashAlgo);
+        outputHashParsed = newHashAllowEmpty(*outputHash, ht);
+    }
 
-        drv.outputs.insert_or_assign("out", DerivationOutputT<NoPath> {
+    for (auto & outName : outputs) {
+        if (!jsonObject) drv.env[outName] = "";
+        drv.outputs.insert_or_assign(outName, DerivationOutputT<NoPath> {
             .path = NoPath {},
-            .hash = FixedOutputHash {
-                .method = ingestionMethod,
-                .hash = std::move(h),
-            },
+            .hash = !outputHashParsed
+                ? std::optional<FixedOutputHash> {}
+                : FixedOutputHash {
+                    .method = ingestionMethod,
+                    .hash = *outputHashParsed,
+                },
         });
     }
 

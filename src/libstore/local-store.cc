@@ -550,9 +550,13 @@ void LocalStore::checkDerivationOutputs(const StorePath & drvPath, const Derivat
             throw Error("derivation '%s' has incorrect output '%s', should be '%s'",
                 printStorePath(drvPath), printStorePath(actual), printStorePath(expected));
         auto j = drv.env.find(varName);
-        if (j == drv.env.end() || parseStorePath(j->second) != actual)
-            throw Error("derivation '%s' has incorrect environment variable '%s', should be '%s'",
-                printStorePath(drvPath), varName, printStorePath(actual));
+        auto actualS = printStorePath(actual);
+        if (j == drv.env.end())
+            throw Error("derivation '%s' has missing environment variable '%s', should be '%s'",
+                printStorePath(drvPath), varName, actualS);
+        if (j->second != actualS)
+            throw Error("derivation '%s' has incorrect environment variable '%s', should be '%s' but is '%s'",
+                printStorePath(drvPath), varName, actualS, j->second);
     };
 
 
