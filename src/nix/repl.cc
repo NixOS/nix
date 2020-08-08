@@ -33,12 +33,17 @@ extern "C" {
 #include "command.hh"
 #include "finally.hh"
 
+#if HAVE_BOEHMGC
 #define GC_INCLUDE_NEW
 #include <gc/gc_cpp.h>
+#endif
 
 namespace nix {
 
-struct NixRepl : gc
+struct NixRepl
+    #if HAVE_BOEHMGC
+    : gc
+    #endif
 {
     string curDir;
     std::unique_ptr<EvalState> state;
@@ -211,12 +216,12 @@ void NixRepl::mainLoop(const std::vector<std::string> & files)
                 // input without clearing the input so far.
                 continue;
             } else {
-              printMsg(lvlError, error + "%1%%2%", (settings.showTrace ? e.prefix() : ""), e.msg());
+              printMsg(lvlError, e.msg());
             }
         } catch (Error & e) {
-            printMsg(lvlError, error + "%1%%2%", (settings.showTrace ? e.prefix() : ""), e.msg());
+          printMsg(lvlError, e.msg());
         } catch (Interrupted & e) {
-            printMsg(lvlError, error + "%1%%2%", (settings.showTrace ? e.prefix() : ""), e.msg());
+          printMsg(lvlError, e.msg());
         }
 
         // We handled the current input fully, so we should clear it
@@ -483,10 +488,10 @@ bool NixRepl::processLine(string line)
                but doing it in a child makes it easier to recover from
                problems / SIGINT. */
             if (runProgram(settings.nixBinDir + "/nix", Strings{"build", "--no-link", drvPath}) == 0) {
-                auto drv = readDerivation(*state->store, drvPath);
+                auto drv = readDerivation(*state->store, drvPath, Derivation::nameFromPath(state->store->parseStorePath(drvPath)));
                 std::cout << std::endl << "this derivation produced the following outputs:" << std::endl;
                 for (auto & i : drv.outputs)
-                    std::cout << fmt("  %s -> %s\n", i.first, state->store->printStorePath(i.second.path));
+                    std::cout << fmt("  %s -> %s\n", i.first, state->store->printStorePath(i.second.path(*state->store, drv.name)));
             }
         } else if (command == ":i") {
             runProgram(settings.nixBinDir + "/nix-env", Strings{"-i", drvPath});
@@ -760,7 +765,11 @@ struct CmdRepl : StoreCommand, MixEvalArgs
 
     CmdRepl()
     {
-        expectArgs("files", &files);
+        expectArgs({
+            .label = "files",
+            .handler = {&files},
+            .completer = completePath
+        });
     }
 
     std::string description() override
@@ -780,6 +789,7 @@ struct CmdRepl : StoreCommand, MixEvalArgs
 
     void run(ref<Store> store) override
     {
+        evalSettings.pureEval = false;
         auto repl = std::make_unique<NixRepl>(searchPath, openStore());
         repl->autoArgs = getAutoArgs(*repl->state);
         repl->mainLoop(files);

@@ -282,7 +282,7 @@ void LocalStore::optimiseStore(OptimiseStats & stats)
     }
 }
 
-static string showBytes(unsigned long long bytes)
+static string showBytes(uint64_t bytes)
 {
     return (format("%.2f MiB") % (bytes / (1024.0 * 1024.0))).str();
 }

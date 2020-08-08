@@ -18,7 +18,7 @@ struct CmdLog : InstallableCommand
         return {
             Example{
                 "To get the build log of GNU Hello:",
-                "nix log nixpkgs.hello"
+                "nix log nixpkgs#hello"
             },
             Example{
                 "To get the build log of a specific path:",
@@ -26,7 +26,7 @@ struct CmdLog : InstallableCommand
             },
             Example{
                 "To get a build log from a specific binary cache:",
-                "nix log --store https://cache.nixos.org nixpkgs.hello"
+                "nix log --store https://cache.nixos.org nixpkgs#hello"
             },
         };
     }
@@ -45,11 +45,14 @@ struct CmdLog : InstallableCommand
 
         RunPager pager;
         for (auto & sub : subs) {
-            auto log = b.drvPath ? sub->getBuildLog(*b.drvPath) : nullptr;
-            for (auto & output : b.outputs) {
-                if (log) break;
-                log = sub->getBuildLog(output.second);
-            }
+            auto log = std::visit(overloaded {
+                [&](BuildableOpaque bo) {
+                    return sub->getBuildLog(bo.path);
+                },
+                [&](BuildableFromDrv bfd) {
+                    return sub->getBuildLog(bfd.drvPath);
+                },
+            }, b);
             if (!log) continue;
             stopProgressBar();
             printInfo("got build log for '%s' from '%s'", installable->what(), sub->getUri());

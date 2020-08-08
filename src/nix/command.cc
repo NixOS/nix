@@ -63,7 +63,7 @@ void StorePathsCommand::run(ref<Store> store)
     }
 
     else {
-        for (auto & p : toStorePaths(store, realiseMode, installables))
+        for (auto & p : toStorePaths(store, realiseMode, operateOn, installables))
             storePaths.push_back(p);
 
         if (recursive) {
@@ -80,7 +80,7 @@ void StorePathsCommand::run(ref<Store> store)
 
 void StorePathCommand::run(ref<Store> store)
 {
-    auto storePaths = toStorePaths(store, NoBuild, installables);
+    auto storePaths = toStorePaths(store, Realise::Nothing, operateOn, installables);
 
     if (storePaths.size() != 1)
         throw UsageError("this command requires exactly one store path");
@@ -108,6 +108,7 @@ MixProfile::MixProfile()
         .description = "profile to update",
         .labels = {"path"},
         .handler = {&profile},
+        .completer = completePath
     });
 }
 
@@ -127,20 +128,25 @@ void MixProfile::updateProfile(const Buildables & buildables)
 {
     if (!profile) return;
 
-    std::optional<StorePath> result;
+    std::vector<StorePath> result;
 
     for (auto & buildable : buildables) {
-        for (auto & output : buildable.outputs) {
-            if (result)
-                throw Error("'--profile' requires that the arguments produce a single store path, but there are multiple");
-            result = output.second;
-        }
+        std::visit(overloaded {
+            [&](BuildableOpaque bo) {
+                result.push_back(bo.path);
+            },
+            [&](BuildableFromDrv bfd) {
+                for (auto & output : bfd.outputs) {
+                    result.push_back(output.second);
+                }
+            },
+        }, buildable);
     }
 
-    if (!result)
-        throw Error("'--profile' requires that the arguments produce a single store path, but there are none");
+    if (result.size() != 1)
+        throw Error("'--profile' requires that the arguments produce a single store path, but there are %d", result.size());
 
-    updateProfile(*result);
+    updateProfile(result[0]);
 }
 
 MixDefaultProfile::MixDefaultProfile()

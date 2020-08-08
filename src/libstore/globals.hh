@@ -196,10 +196,6 @@ public:
     /* Whether to lock the Nix client and worker to the same CPU. */
     bool lockCPU;
 
-    /* Whether to show a stack trace if Nix evaluation fails. */
-    Setting<bool> showTrace{this, false, "show-trace",
-        "Whether to show a stack trace on evaluation errors."};
-
     Setting<SandboxMode> sandboxMode{this,
         #if __linux__
           smEnabled
@@ -339,9 +335,6 @@ public:
         "setuid/setgid bits or with file capabilities."};
 #endif
 
-    Setting<Strings> hashedMirrors{this, {"http://tarballs.nixos.org/"}, "hashed-mirrors",
-        "A list of servers used by builtins.fetchurl to fetch files by hash."};
-
     Setting<uint64_t> minFree{this, 0, "min-free",
         "Automatically run the garbage collector when free disk space drops below the specified amount."};
 
@@ -369,6 +362,12 @@ public:
 
     Setting<bool> warnDirty{this, true, "warn-dirty",
         "Whether to warn about dirty Git/Mercurial trees."};
+
+    Setting<size_t> narBufferSize{this, 32 * 1024 * 1024, "nar-buffer-size",
+        "Maximum size of NARs before spilling them to disk."};
+
+    Setting<std::string> flakeRegistry{this, "https://github.com/NixOS/flake-registry/raw/master/flake-registry.json", "flake-registry",
+        "Path or URI of the global flake registry."};
 };
 
 
