@@ -139,18 +139,14 @@ static StringSet parseStrings(std::istream & str, bool arePaths)
 }
 
 
-static DerivationOutput parseDerivationOutput(const Store & store, std::istringstream & str)
+static DerivationOutput parseDerivationOutput(const Store & store,
+    StorePath path, std::string_view hashAlgo, std::string_view hash)
 {
-    expect(str, ","); auto path = store.parseStorePath(parsePath(str));
-    expect(str, ","); auto hashAlgo = parseString(str);
-    expect(str, ","); const auto hash = parseString(str);
-    expect(str, ")");
-
     if (hashAlgo != "") {
         auto method = FileIngestionMethod::Flat;
         if (string(hashAlgo, 0, 2) == "r:") {
             method = FileIngestionMethod::Recursive;
-            hashAlgo = string(hashAlgo, 2);
+            hashAlgo = hashAlgo.substr(2);
         }
         const HashType hashType = parseHashType(hashAlgo);
 
@@ -176,6 +172,16 @@ static DerivationOutput parseDerivationOutput(const Store & store, std::istrings
                 .path = std::move(path),
             }
         };
+}
+
+static DerivationOutput parseDerivationOutput(const Store & store, std::istringstream & str)
+{
+    expect(str, ","); auto path = store.parseStorePath(parsePath(str));
+    expect(str, ","); const auto hashAlgo = parseString(str);
+    expect(str, ","); const auto hash = parseString(str);
+    expect(str, ")");
+
+    return parseDerivationOutput(store, std::move(path), hashAlgo, hash);
 }
 
 
@@ -541,38 +547,10 @@ StorePathSet BasicDerivation::outputPaths(const Store & store) const
 static DerivationOutput readDerivationOutput(Source & in, const Store & store)
 {
     auto path = store.parseStorePath(readString(in));
-    auto hashAlgo = readString(in);
-    auto hash = readString(in);
+    const auto hashAlgo = readString(in);
+    const auto hash = readString(in);
 
-    if (hashAlgo != "") {
-        auto method = FileIngestionMethod::Flat;
-        if (string(hashAlgo, 0, 2) == "r:") {
-            method = FileIngestionMethod::Recursive;
-            hashAlgo = string(hashAlgo, 2);
-        }
-        auto hashType = parseHashType(hashAlgo);
-        return hash != ""
-            ? DerivationOutput {
-                  .output = DerivationOutputCAFixed {
-                      .hash = FixedOutputHash {
-                          .method = std::move(method),
-                          .hash = Hash::parseNonSRIUnprefixed(hash, hashType),
-                      },
-                  }
-               }
-            : (settings.requireExperimentalFeature("ca-derivations"),
-              DerivationOutput {
-                  .output = DerivationOutputCAFloating {
-                      .method = std::move(method),
-                      .hashType = std::move(hashType),
-                  },
-              });
-    } else
-        return DerivationOutput {
-            .output = DerivationOutputInputAddressed {
-                .path = std::move(path),
-            }
-        };
+    return parseDerivationOutput(store, std::move(path), hashAlgo, hash);
 }
 
 StringSet BasicDerivation::outputNames() const
