@@ -127,15 +127,20 @@ static string parseString(std::istream & str)
     return res;
 }
 
-static void validatePath(std::string_view s) {
+static void validatePath(std::string_view s, Phantom<StorePath> _) {
     if (s.size() == 0 || s[0] != '/')
         throw FormatError("bad path '%1%' in derivation", s);
+}
+
+static void validatePath(std::string_view s, Phantom<NoPath> _) {
+    if (s != "")
+        throw FormatError("path '%1%' in unresolved derivation should be empty string", s);
 }
 
 static Path parsePath(std::istream & str)
 {
     auto s = parseString(str);
-    validatePath(s);
+    validatePath(s, Phantom<StorePath> {});
     return s;
 }
 
@@ -163,7 +168,8 @@ static StringSet parseStrings(std::istream & str, bool arePaths)
 }
 
 
-static DerivationOutput parseDerivationOutput(const Store & store,
+template<typename OutPath>
+static DerivationOutputT<OutPath> parseDerivationOutput(const Store & store,
     std::string_view pathS, std::string_view hashAlgo, std::string_view hash)
 {
     if (hashAlgo != "") {
@@ -174,8 +180,8 @@ static DerivationOutput parseDerivationOutput(const Store & store,
         }
         const auto hashType = parseHashType(hashAlgo);
         if (hash != "") {
-            validatePath(pathS);
-            return DerivationOutput {
+            validatePath(pathS, Phantom<OutPath> {});
+            return DerivationOutputT<OutPath> {
                 .output = DerivationOutputCAFixed {
                     .hash = FixedOutputHash {
                         .method = std::move(method),
@@ -186,7 +192,7 @@ static DerivationOutput parseDerivationOutput(const Store & store,
         } else {
             settings.requireExperimentalFeature("ca-derivations");
             assert(pathS == "");
-            return DerivationOutput {
+            return DerivationOutputT<OutPath> {
                 .output = DerivationOutputCAFloating {
                     .method = std::move(method),
                     .hashType = std::move(hashType),
@@ -194,10 +200,10 @@ static DerivationOutput parseDerivationOutput(const Store & store,
             };
         }
     } else {
-        validatePath(pathS);
-        return DerivationOutput {
-            .output = DerivationOutputInputAddressed {
-                .path = store.parseStorePath(pathS),
+        validatePath(pathS, Phantom<OutPath> {});
+        return DerivationOutputT<OutPath> {
+            .output = DerivationOutputInputAddressedT<OutPath> {
+                .path = parseStorePath(store, pathS, Phantom<OutPath> {}),
             }
         };
     }
@@ -210,7 +216,7 @@ static DerivationOutput parseDerivationOutput(const Store & store, std::istrings
     expect(str, ","); const auto hash = parseString(str);
     expect(str, ")");
 
-    return parseDerivationOutput(store, pathS, hashAlgo, hash);
+    return parseDerivationOutput<StorePath>(store, pathS, hashAlgo, hash);
 }
 
 
@@ -311,6 +317,9 @@ static void printUnquotedStrings(string & res, ForwardIterator i, ForwardIterato
     res += ']';
 }
 
+template<typename T>
+struct Phantom;
+
 static string printStorePath(const Store & store, const StorePath & path) {
     return store.printStorePath(path);
 }
@@ -319,12 +328,29 @@ static string printStorePath(const Store & store, const NoPath & _path) {
     return "";
 }
 
+static StorePath parseStorePath(const Store & store, std::string_view path, Phantom<StorePath>) {
+    return store.parseStorePath(path);
+}
+
+static NoPath parseStorePath(const Store & store, std::string_view path, Phantom<NoPath>) {
+    assert(path == "");
+    return NoPath {};
+}
+
 static string printStoreDrvPath(const Store & store, const StorePath & path) {
     return store.printStorePath(path);
 }
 
 static string printStoreDrvPath(const Store & store, const Hash & hash) {
     return hash.to_string(Base16, false);
+}
+
+static StorePath parseStoreDrvPath(const Store & store, std::string_view path, Phantom<StorePath>) {
+    return store.parseStorePath(path);
+}
+
+static Hash parseStoreDrvPath(const Store & store, std::string_view hash, Phantom<Hash>) {
+    return Hash::parseNonSRIUnprefixed(hash, htSHA256);
 }
 
 template<typename InputDrvPath, typename OutputPath>
@@ -648,13 +674,14 @@ bool wantOutput(const string & output, const std::set<string> & wanted)
 }
 
 
-static DerivationOutput readDerivationOutput(Source & in, const Store & store)
+template<typename OutPath>
+static DerivationOutputT<OutPath> readDerivationOutput(Source & in, const Store & store)
 {
     const auto pathS = readString(in);
     const auto hashAlgo = readString(in);
     const auto hash = readString(in);
 
-    return parseDerivationOutput(store, pathS, hashAlgo, hash);
+    return parseDerivationOutput<OutPath>(store, pathS, hashAlgo, hash);
 }
 
 template<typename Path>
@@ -677,15 +704,14 @@ std::string_view BasicDerivationT<Path>::nameFromPath(const StorePath & drvPath)
 }
 
 
-Source & readDerivation(Source & in, const Store & store, BasicDerivation & drv, std::string_view name)
+template<typename OutPath>
+Source & readBasicDerivation(Source & in, const Store & store, BasicDerivationT<OutPath> & drv, std::optional<std::string_view> optName)
 {
-    drv.name = name;
-
     drv.outputs.clear();
     auto nr = readNum<size_t>(in);
     for (size_t n = 0; n < nr; n++) {
         auto name = readString(in);
-        auto output = readDerivationOutput(in, store);
+        auto output = readDerivationOutput<OutPath>(in, store);
         drv.outputs.emplace(std::move(name), std::move(output));
     }
 
@@ -700,18 +726,39 @@ Source & readDerivation(Source & in, const Store & store, BasicDerivation & drv,
         drv.env[key] = value;
     }
 
+    if (optName)
+        drv.name = *optName;
+    else
+        drv.name = readString(in);
+
     return in;
 }
 
+template<typename InputDrvPath, typename OutPath>
+Source & readDerivation(Source & in, const Store & store, DerivationT<InputDrvPath, OutPath> & drv)
+{
+    readBasicDerivation(in, store, (DerivationT<InputDrvPath, OutPath> &) drv, std::nullopt);
+    auto nr = readNum<size_t>(in);
+    for (size_t n = 0; n < nr; n++) {
+        auto key = parseStoreDrvPath(store, readString(in), Phantom<InputDrvPath> {});
+        auto & wanted = drv.inputDrvs[key];
+        auto kr = readNum<size_t>(in);
+        for (size_t k = 0; k < kr; k++) 
+            wanted.insert(readString(in));
+    }
 
-void writeDerivation(Sink & out, const Store & store, const BasicDerivation & drv)
+    return in;
+}
+
+template<typename OutPath>
+void writeBasicDerivation(Sink & out, const Store & store, const BasicDerivationT<OutPath> & drv, bool includeName)
 {
     out << drv.outputs.size();
     for (auto & i : drv.outputs) {
         out << i.first;
         std::visit(overloaded {
-            [&](DerivationOutputInputAddressed doi) {
-                out << store.printStorePath(doi.path)
+            [&](DerivationOutputInputAddressedT<OutPath> doi) {
+                out << printStorePath(store, doi.path)
                     << ""
                     << "";
             },
@@ -732,8 +779,20 @@ void writeDerivation(Sink & out, const Store & store, const BasicDerivation & dr
     out << drv.env.size();
     for (auto & i : drv.env)
         out << i.first << i.second;
+    if (includeName)
+        out << drv.name;
 }
 
+template<typename InputDrvPath, typename OutPath>
+void writeDerivation(Sink & out, const Store & store, const DerivationT<InputDrvPath, OutPath> & drv)
+{
+    writeBasicDerivation(out, store, (const BasicDerivationT<OutPath> &) drv, true);
+    out << drv.inputDrvs.size();
+    for (auto & i : drv.inputDrvs) {
+        out << printStoreDrvPath(store, i.first);
+        out << i.second;
+    }
+}
 
 std::string hashPlaceholder(const std::string & outputName)
 {
@@ -817,5 +876,45 @@ template
 DerivationT<Hash, NoPath> stripDerivationPaths(
     Store & store,
     const DerivationT<Hash, StorePath> & drv);
+
+template
+Source & readBasicDerivation(Source & in, const Store & store,
+    BasicDerivationT<StorePath> & drv, std::optional<std::string_view> optName);
+
+template
+Source & readBasicDerivation(Source & in, const Store & store,
+    BasicDerivationT<NoPath> & drv, std::optional<std::string_view> optName);
+
+template
+void writeBasicDerivation(Sink & out, const Store & store,
+    const BasicDerivationT<StorePath> & drv, bool includeName);
+
+template
+void writeBasicDerivation(Sink & out, const Store & store,
+    const BasicDerivationT<NoPath> & drv, bool includeName);
+
+template
+Source & readDerivation(Source & in, const Store & store, DerivationT<StorePath, StorePath> & drv);
+
+template
+Source & readDerivation(Source & in, const Store & store, DerivationT<StorePath, NoPath> & drv);
+
+template
+Source & readDerivation(Source & in, const Store & store, DerivationT<Hash, StorePath> & drv);
+
+template
+Source & readDerivation(Source & in, const Store & store, DerivationT<Hash, NoPath> & drv);
+
+template
+void writeDerivation(Sink & out, const Store & store, const DerivationT<StorePath, StorePath> & drv);
+
+template
+void writeDerivation(Sink & out, const Store & store, const DerivationT<StorePath, NoPath> & drv);
+
+template
+void writeDerivation(Sink & out, const Store & store, const DerivationT<Hash, StorePath> & drv);
+
+template
+void writeDerivation(Sink & out, const Store & store, const DerivationT<Hash, NoPath> & drv);
 
 }

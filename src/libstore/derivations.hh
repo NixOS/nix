@@ -226,8 +226,19 @@ bool wantOutput(const string & output, const std::set<string> & wanted);
 struct Source;
 struct Sink;
 
-Source & readDerivation(Source & in, const Store & store, BasicDerivation & drv, std::string_view name);
-void writeDerivation(Sink & out, const Store & store, const BasicDerivation & drv);
+template<typename OutPath>
+Source & readBasicDerivation(Source & in, const Store & store,
+    BasicDerivationT<OutPath> & drv, std::optional<std::string_view> optName);
+
+template<typename InputDrvPath, typename OutPath>
+Source & readDerivation(Source & in, const Store & store, DerivationT<InputDrvPath, OutPath> & drv);
+
+template<typename OutPath>
+void writeBasicDerivation(Sink & out, const Store & store, const BasicDerivationT<OutPath> & drv,
+    bool includeName = false);
+
+template<typename InputDrvPath, typename OutPath>
+void writeDerivation(Sink & out, const Store & store, const DerivationT<InputDrvPath, OutPath> & drv);
 
 std::string hashPlaceholder(const std::string & outputName);
 

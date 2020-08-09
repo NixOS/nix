@@ -210,7 +210,7 @@ struct LegacySSHStore : public Store
         conn->to
             << cmdBuildDerivation
             << printStorePath(drvPath);
-        writeDerivation(conn->to, *this, drv);
+        writeBasicDerivation(conn->to, *this, drv);
         conn->to
             << settings.maxSilentTime
             << settings.buildTimeout;

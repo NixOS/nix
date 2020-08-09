@@ -694,7 +694,7 @@ BuildResult RemoteStore::buildDerivation(const StorePath & drvPath, const BasicD
 {
     auto conn(getConnection());
     conn->to << wopBuildDerivation << printStorePath(drvPath);
-    writeDerivation(conn->to, *this, drv);
+    writeBasicDerivation(conn->to, *this, drv);
     conn->to << buildMode;
     conn.processStderr();
     BuildResult res;
