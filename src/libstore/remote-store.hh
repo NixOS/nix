@@ -74,6 +74,9 @@ public:
     BuildResult buildDerivation(const StorePath & drvPath, const BasicDerivation & drv,
         BuildMode buildMode) override;
 
+    BuildResult buildDerivation(const DerivationT<Hash, NoPath> & drv,
+        BuildMode buildMode) override;
+
     void ensurePath(const StorePath & path) override;
 
     void addTempRoot(const StorePath & path) override;

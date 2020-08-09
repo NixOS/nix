@@ -18,6 +18,7 @@ typedef enum {
     cmdBuildPaths = 6,
     cmdQueryClosure = 7,
     cmdBuildDerivation = 8,
+    cmdBuildDerivationTrustless = 10,
     cmdAddToStoreNar = 9,
 } ServeCommand;
 

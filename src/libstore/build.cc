@@ -2993,6 +2993,9 @@ struct RestrictedStore : public LocalFSStore
     BuildResult buildDerivation(const StorePath & drvPath, const BasicDerivation & drv,
         BuildMode buildMode = bmNormal) override
     { unsupported("buildDerivation"); }
+    BuildResult buildDerivation(const DerivationT<Hash, NoPath> & drv,
+        BuildMode buildMode = bmNormal) override
+    { unsupported("buildDerivation"); }
 
     void addTempRoot(const StorePath & path) override
     { }
@@ -5491,6 +5494,16 @@ void LocalStore::buildPaths(const std::vector<StorePathWithOutputs> & drvPaths, 
         if (ex) logError(ex->info());
         throw Error(worker.exitStatus(), "build of %s failed", showPaths(failed));
     }
+}
+
+BuildResult LocalStore::buildDerivation(const DerivationT<Hash, NoPath> & drv, BuildMode buildMode)
+{
+    DerivationT<Hash, StorePath> drvFinal = bakeDerivationPaths(*this, drv);
+    auto drvHash = hashDerivation(*this, drvFinal);
+    /* Not the drvPath the client has, but any unique identifer will do and
+       this construction should prevent colisions */
+    auto drvPath = makeTextPath(drvFinal.name, drvHash);
+    return buildDerivation(drvPath, (const BasicDerivation &) drvFinal, buildMode);
 }
 
 BuildResult LocalStore::buildDerivation(const StorePath & drvPath, const BasicDerivation & drv,

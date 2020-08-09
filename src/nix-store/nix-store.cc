@@ -937,6 +937,26 @@ static void opServe(Strings opFlags, Strings opArgs)
                 break;
             }
 
+            case cmdBuildDerivationTrustless: { /* Used by hydra-queue-runner. */
+
+                if (!writeAllowed) throw Error("building paths is not allowed");
+
+                DerivationT<Hash, NoPath> drv;
+                readDerivation(in, *store, drv);
+
+                getBuildSettings();
+
+                MonitorFdHup monitor(in.fd);
+                auto status = store->buildDerivation(drv);
+
+                out << status.status << status.errorMsg;
+
+                if (GET_PROTOCOL_MINOR(clientVersion) >= 3)
+                    out << status.timesBuilt << status.isNonDeterministic << status.startTime << status.stopTime;
+
+                break;
+            }
+
             case cmdQueryClosure: {
                 bool includeOutputs = readInt(in);
                 StorePathSet closure;

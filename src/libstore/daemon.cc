@@ -462,6 +462,17 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
         break;
     }
 
+    case wopBuildDerivationTrustless: {
+        DerivationT<Hash, NoPath> drv;
+        readDerivation(from, *store, drv);
+        BuildMode buildMode = (BuildMode) readInt(from);
+        logger->startWork();
+        auto res = store->buildDerivation(drv, buildMode);
+        logger->stopWork();
+        to << res.status << res.errorMsg;
+        break;
+    }
+
     case wopEnsurePath: {
         auto path = store->parseStorePath(readString(from));
         logger->startWork();

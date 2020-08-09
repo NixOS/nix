@@ -93,6 +93,9 @@ public:
     BuildResult buildDerivation(const StorePath & drvPath, const BasicDerivation & drv,
         BuildMode buildMode) override
     { unsupported("buildDerivation"); }
+    BuildResult buildDerivation(const DerivationT<Hash, NoPath> & drv,
+        BuildMode buildMode) override
+    { unsupported("buildDerivation"); }
 
     void ensurePath(const StorePath & path) override
     { unsupported("ensurePath"); }

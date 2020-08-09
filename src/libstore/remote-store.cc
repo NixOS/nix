@@ -689,6 +689,22 @@ void RemoteStore::buildPaths(const std::vector<StorePathWithOutputs> & drvPaths,
 }
 
 
+BuildResult RemoteStore::buildDerivation(const DerivationT<Hash, NoPath> & drv,
+    BuildMode buildMode)
+{
+    auto conn(getConnection());
+    conn->to << wopBuildDerivation;
+    writeDerivation(conn->to, *this, drv);
+    conn->to << buildMode;
+    conn.processStderr();
+    BuildResult res;
+    unsigned int status;
+    conn->from >> status >> res.errorMsg;
+    res.status = (BuildResult::Status) status;
+    return res;
+}
+
+
 BuildResult RemoteStore::buildDerivation(const StorePath & drvPath, const BasicDerivation & drv,
     BuildMode buildMode)
 {

@@ -285,7 +285,9 @@ connected:
         auto drv = store->readDerivation(*drvPath);
         drv.inputSrcs = store->parseStorePathSet(inputs);
 
-        auto result = sshStore->buildDerivation(*drvPath, drv);
+        // FIXME: Fallback on old version for old daemon
+        auto result = sshStore->buildDerivation(derivationModulo(*store, stripDerivationPaths(*store, drv)));
+        //auto result = sshStore->buildDerivation(*drvPath, drv);
 
         if (!result.success())
             throw Error("build of '%s' on '%s' failed: %s", store->printStorePath(*drvPath), storeUri, result.errorMsg);

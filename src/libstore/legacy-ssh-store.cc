@@ -202,6 +202,33 @@ struct LegacySSHStore : public Store
         const StorePathSet & references, RepairFlag repair) override
     { unsupported("addTextToStore"); }
 
+    BuildResult buildDerivation(const DerivationT<Hash, NoPath> & drv,
+        BuildMode buildMode = bmNormal) override
+    {
+        auto conn(connections->get());
+
+        conn->to
+            << cmdBuildDerivationTrustless;
+        writeDerivation(conn->to, *this, drv);
+        conn->to
+            << settings.maxSilentTime
+            << settings.buildTimeout
+            << settings.maxLogSize
+            << settings.buildRepeat
+            << settings.enforceDeterminism;
+
+        conn->to.flush();
+
+        BuildResult status;
+        status.status = (BuildResult::Status) readInt(conn->from);
+        conn->from >> status.errorMsg;
+
+        if (GET_PROTOCOL_MINOR(conn->remoteVersion) >= 3)
+            conn->from >> status.timesBuilt >> status.isNonDeterministic >> status.startTime >> status.stopTime;
+
+        return status;
+    }
+
     BuildResult buildDerivation(const StorePath & drvPath, const BasicDerivation & drv,
         BuildMode buildMode) override
     {

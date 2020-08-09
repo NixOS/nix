@@ -45,6 +45,7 @@ typedef enum {
     wopOptimiseStore = 34,
     wopVerifyStore = 35,
     wopBuildDerivation = 36,
+    wopBuildDerivationTrustless = 42,
     wopAddSignatures = 37,
     wopNarFromPath = 38,
     wopAddToStoreNar = 39,

@@ -421,6 +421,13 @@ public:
        informational purposes. */
     virtual BuildResult buildDerivation(const StorePath & drvPath, const BasicDerivation & drv,
         BuildMode buildMode = bmNormal) = 0;
+    /* Safer version of the above, the input derivation derviations are used to
+       calculate the output paths from scratch. The hashes are not themselves
+       verified, but this is fine. While spoofing them changes the resulting
+       output path, finding spoofed values to result in a given output hash is
+       difficult. */
+    virtual BuildResult buildDerivation(const DerivationT<Hash, NoPath> & drv,
+        BuildMode buildMode = bmNormal) = 0;
 
     /* Ensure that a path is valid.  If it is not currently valid, it
        may be made valid by running a substitute (if defined for the
