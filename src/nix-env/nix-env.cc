@@ -381,7 +381,7 @@ static void queryInstSources(EvalState & state,
 
                 if (path.isDerivation()) {
                     elem.setDrvPath(state.store->printStorePath(path));
-                    auto outputs = state.store->queryDerivationOutputMap(path);
+                    auto outputs = state.store->queryDerivationOutputMapAssumeTotal(path);
                     elem.setOutPath(state.store->printStorePath(outputs.at("out")));
                     if (name.size() >= drvExtension.size() &&
                         string(name, name.size() - drvExtension.size()) == drvExtension)

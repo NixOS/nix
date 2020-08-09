@@ -487,50 +487,56 @@ static void _main(int argc, char * * argv)
 
         std::vector<StorePathWithOutputs> pathsToBuild;
 
-        std::map<Path, Path> drvPrefixes;
-        std::map<Path, Path> resultSymlinks;
-        std::vector<Path> outPaths;
+        std::map<StorePath, std::pair<size_t, StringSet>> drvMap;
 
         for (auto & drvInfo : drvs) {
-            auto drvPath = drvInfo.queryDrvPath();
-            auto outPath = drvInfo.queryOutPath();
+            auto drvPath = store->parseStorePath(drvInfo.queryDrvPath());
 
             auto outputName = drvInfo.queryOutputName();
             if (outputName == "")
-                throw Error("derivation '%s' lacks an 'outputName' attribute", drvPath);
+                throw Error("derivation '%s' lacks an 'outputName' attribute", store->printStorePath(drvPath));
 
-            pathsToBuild.push_back({store->parseStorePath(drvPath), {outputName}});
+            pathsToBuild.push_back({drvPath, {outputName}});
 
-            std::string drvPrefix;
-            auto i = drvPrefixes.find(drvPath);
-            if (i != drvPrefixes.end())
-                drvPrefix = i->second;
+            auto i = drvMap.find(drvPath);
+            if (i != drvMap.end())
+                i->second.second.insert(outputName);
             else {
-                drvPrefix = outLink;
-                if (drvPrefixes.size())
-                    drvPrefix += fmt("-%d", drvPrefixes.size() + 1);
-                drvPrefixes[drvPath] = drvPrefix;
+                drvMap[drvPath] = {drvMap.size(), {outputName}};
             }
-
-            std::string symlink = drvPrefix;
-            if (outputName != "out") symlink += "-" + outputName;
-
-            resultSymlinks[symlink] = outPath;
-            outPaths.push_back(outPath);
         }
 
         buildPaths(pathsToBuild);
 
         if (dryRun) return;
 
-        for (auto & symlink : resultSymlinks)
-            if (auto store2 = store.dynamic_pointer_cast<LocalFSStore>())
-                store2->addPermRoot(store->parseStorePath(symlink.second), absPath(symlink.first), true);
+        std::vector<StorePath> outPaths;
+
+        for (auto & [drvPath, info] : drvMap) {
+            auto & [counter, wantedOutputs] = info;
+            std::string drvPrefix = outLink;
+            if (counter)
+                drvPrefix += fmt("-%d", counter + 1);
+
+            auto builtOutputs = store->queryDerivationOutputMapAssumeTotal(drvPath);
+
+            for (auto & outputName : wantedOutputs) {
+                auto outputPath = builtOutputs.at(outputName);
+
+                if (auto store2 = store.dynamic_pointer_cast<LocalFSStore>()) {
+                    std::string symlink = drvPrefix;
+                    if (outputName != "out") symlink += "-" + outputName;
+                    store2->addPermRoot(outputPath, absPath(symlink), true);
+                }
+
+                outPaths.push_back(outputPath);
+            }
+        }
 
         logger->stop();
 
         for (auto & path : outPaths)
-            std::cout << path << '\n';
+            std::cout << store->printStorePath(path) << '\n';
     }
 }
 

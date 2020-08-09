@@ -44,16 +44,6 @@ void EvalState::realiseContext(const PathSet & context)
             throw InvalidPathError(store->printStorePath(ctx));
         if (!outputName.empty() && ctx.isDerivation()) {
             drvs.push_back(StorePathWithOutputs{ctx, {outputName}});
-
-            /* Add the output of this derivation to the allowed
-               paths. */
-            if (allowedPaths) {
-                auto drv = store->derivationFromPath(ctx);
-                DerivationOutputs::iterator i = drv.outputs.find(outputName);
-                if (i == drv.outputs.end())
-                    throw Error("derivation '%s' does not have an output named '%s'", ctxS, outputName);
-                allowedPaths->insert(store->printStorePath(i->second.path(*store, drv.name)));
-            }
         }
     }
 
@@ -69,8 +59,38 @@ void EvalState::realiseContext(const PathSet & context)
     store->queryMissing(drvs, willBuild, willSubstitute, unknown, downloadSize, narSize);
 
     store->buildPaths(drvs);
+
+    /* Add the output of this derivations to the allowed
+       paths. */
+    if (allowedPaths) {
+        for (auto & [drvPath, outputs] : drvs) {
+            auto outputPaths = store->queryDerivationOutputMapAssumeTotal(drvPath);
+            for (auto & outputName : outputs) {
+                if (outputPaths.count(outputName) == 0)
+                    throw Error("derivation '%s' does not have an output named '%s'",
+                            store->printStorePath(drvPath), outputName);
+                allowedPaths->insert(store->printStorePath(outputPaths.at(outputName)));
+            }
+        }
+    }
 }
 
+static void mkOutputString(EvalState & state, Value & v,
+    const StorePath & drvPath, const BasicDerivation & drv,
+    std::pair<string, DerivationOutput> o)
+{
+    auto optOutputPath = o.second.pathOpt(*state.store, drv.name);
+    mkString(
+        *state.allocAttr(v, state.symbols.create(o.first)),
+        state.store->printStorePath(optOutputPath
+            ? *optOutputPath
+            /* Downstream we would substitute this for an actual path once
+               we build the floating CA derivation */
+            /* FIXME: we need to depend on the basic derivation, not
+               derivation */
+            : downstreamPlaceholder(*state.store, drvPath, o.first)),
+        {"!" + o.first + "!" + state.store->printStorePath(drvPath)});
+}
 
 /* Load and evaluate an expression from path specified by the
    argument. */
@@ -114,8 +134,7 @@ static void prim_scopedImport(EvalState & state, const Pos & pos, Value * * args
         unsigned int outputs_index = 0;
 
         for (const auto & o : drv.outputs) {
-            v2 = state.allocAttr(w, state.symbols.create(o.first));
-            mkString(*v2, state.store->printStorePath(o.second.path(*state.store, drv.name)), {"!" + o.first + "!" + path});
+            mkOutputString(state, w, storePath, drv, o);
             outputsVal->listElems()[outputs_index] = state.allocValue();
             mkString(*(outputsVal->listElems()[outputs_index++]), o.first);
         }
@@ -769,7 +788,7 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
     auto hashTypeOpt = parseHashTypeOpt(outputHashAlgo);
     std::optional<Hash> outputHashParsed;
     if (outputHash) {
-		/* Ensure proper single "out" and parse output hash */
+        /* Ensure proper single "out" and parse output hash */
         if (outputs.size() != 1 || *(outputs.begin()) != "out")
             throw Error({
                 .hint = hintfmt("multiple outputs are not supported in fixed-output derivations"),
@@ -784,10 +803,10 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
         drv.outputs.insert_or_assign(outName, outputHashParsed
             ? DerivationOutputT<NoPath> {
                 .output = DerivationOutputCAFixed {
-                	.hash = FixedOutputHash {
-                	    .method = ingestionMethod,
-                	    .hash = *outputHashParsed,
-                	},
+                    .hash = FixedOutputHash {
+                        .method = ingestionMethod,
+                        .hash = *outputHashParsed,
+                    },
                 },
               }
             : contentAddressed
@@ -810,11 +829,11 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
 
     if (!jsonObject) {
         for (const auto & i : drvFinal.outputs) {
-        	auto pathOpt = i.second.pathOpt(*state.store, drv.name);
-        	if (pathOpt)
-            	drvFinal.env.insert_or_assign(
-            	    i.first,
-            	    state.store->printStorePath(*pathOpt));
+            auto pathOpt = i.second.pathOpt(*state.store, drv.name);
+            if (pathOpt)
+                drvFinal.env.insert_or_assign(
+                    i.first,
+                    state.store->printStorePath(*pathOpt));
         }
     }
 
@@ -826,8 +845,11 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
 
     /* Optimisation, but required in read-only mode! because in that
        case we don't actually write store derivations, so we can't
-       read them later. */
-    {
+       read them later.
+
+       However, we don't bother doing this for floating CA derivations because
+       their "hash modulo" is indeterminate until built. */
+    if (drv.type() != DerivationType::CAFloating) {
         auto hash = hashDerivationOrPseudo(
             *state.store,
             derivationModuloOrOutput(*state.store, drvFinal));
@@ -835,10 +857,8 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
     }
     state.mkAttrs(v, 1 + drvFinal.outputs.size());
     mkString(*state.allocAttr(v, state.sDrvPath), drvPathS, {"=" + drvPathS});
-    for (auto & i : drvFinal.outputs) {
-        mkString(*state.allocAttr(v, state.symbols.create(i.first)),
-            state.store->printStorePath(i.second.path(*state.store, drv.name)), {"!" + i.first + "!" + drvPathS});
-    }
+    for (auto & i : drvFinal.outputs)
+        mkOutputString(state, v, drvPath, drvFinal, i);
     v.attrs->sort();
 }
 
