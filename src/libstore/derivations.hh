@@ -187,14 +187,10 @@ DerivationT<Hash, OutPath> derivationModulo(
 
 /* Reduce a derivation down to a resolved normal form if it is regular, or
    hashes per output if it is fixed output. */
-template<typename InputDrvPath>
-std::variant<DerivationT<Hash, StorePath>, CaOutputHashes> derivationModuloOrOutput(
+template<typename InputDrvPath, typename OutPath>
+std::variant<DerivationT<Hash, OutPath>, CaOutputHashes> derivationModuloOrOutput(
     Store & store,
-    const DerivationT<InputDrvPath, StorePath> & drv);
-template<typename InputDrvPath>
-std::variant<DerivationT<Hash, NoPath>, CaOutputHashes> derivationModuloOrOutput(
-    Store & store,
-    const DerivationT<InputDrvPath, NoPath> & drv);
+    const DerivationT<InputDrvPath, OutPath> & drv);
 
 typedef std::variant<
     Hash, // regular DRV normalized hash

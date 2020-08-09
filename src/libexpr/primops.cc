@@ -852,7 +852,7 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
     if (drv.type() != DerivationType::CAFloating) {
         auto hash = hashDerivationOrPseudo(
             *state.store,
-            derivationModuloOrOutput(*state.store, drvFinal));
+            derivationModuloOrOutput(*state.store, drv));
         drvHashes.insert_or_assign(drvPath, std::move(hash));
     }
     state.mkAttrs(v, 1 + drvFinal.outputs.size());

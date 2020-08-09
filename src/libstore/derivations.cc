@@ -550,10 +550,10 @@ DerivationT<Hash, OutPath> derivationModulo(
     return drv;
 }
 
-template<typename InputDrvPath>
-std::variant<DerivationT<Hash, StorePath>, CaOutputHashes> derivationModuloOrOutput(
+template<typename InputDrvPath, typename OutPath>
+std::variant<DerivationT<Hash, OutPath>, CaOutputHashes> derivationModuloOrOutput(
     Store & store,
-    const DerivationT<InputDrvPath, StorePath> & drv)
+    const DerivationT<InputDrvPath, OutPath> & drv)
 {
     /* Return a fixed hash for fixed-output derivations. */
     switch (drv.type()) {
@@ -574,20 +574,6 @@ std::variant<DerivationT<Hash, StorePath>, CaOutputHashes> derivationModuloOrOut
     case DerivationType::InputAddressed:
         break;
     }
-
-    /* For other derivations, replace the inputs paths with recursive
-       calls to this function. */
-    return derivationModulo(store, drv);
-}
-
-template<typename InputDrvPath>
-std::variant<DerivationT<Hash, NoPath>, CaOutputHashes> derivationModuloOrOutput(
-    Store & store,
-    const DerivationT<InputDrvPath, NoPath> & drv,
-    const std::string & drvName)
-{
-    /* We should only bother normalizing inputs for an input-addressed derivation */
-    assert(drv.type() == DerivationType::InputAddressed);
 
     /* For other derivations, replace the inputs paths with recursive
        calls to this function. */
@@ -860,13 +846,11 @@ std::variant<DerivationT<Hash, StorePath>, CaOutputHashes> derivationModuloOrOut
 template
 std::variant<DerivationT<Hash, NoPath>, CaOutputHashes> derivationModuloOrOutput(
     Store & store,
-    const DerivationT<StorePath, NoPath> & drv,
-    const std::string & drvName);
+    const DerivationT<StorePath, NoPath> & drv);
 template
 std::variant<DerivationT<Hash, NoPath>, CaOutputHashes> derivationModuloOrOutput(
     Store & store,
-    const DerivationT<Hash, NoPath> & drv,
-    const std::string & drvName);
+    const DerivationT<Hash, NoPath> & drv);
 
 template
 DrvHashModulo hashDerivationOrPseudo(
