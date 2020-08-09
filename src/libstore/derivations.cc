@@ -579,7 +579,9 @@ DerivationT<InputDrvPath, StorePath> bakeDerivationPaths(
     drvFinal.inputDrvs = drv.inputDrvs;
 
     std::optional<Hash> h;
-    for (auto & [ outputName, output] : drv.outputs) {
+    for (auto & [_outputName, output] : drv.outputs) {
+        // Work around Clang 7 bug with destructuring and lambda capture.
+        auto & outputName = _outputName;
         drvFinal.outputs.insert_or_assign(outputName, std::visit(overloaded {
             [&](DerivationOutputInputAddressedT<NoPath> doia) {
                 if (!h) {
