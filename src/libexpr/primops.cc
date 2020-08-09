@@ -828,12 +828,13 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
     Derivation drvFinal = bakeDerivationPaths(*state.store, drv);
 
     if (!jsonObject) {
-        for (const auto & i : drvFinal.outputs) {
-            auto pathOpt = i.second.pathOpt(*state.store, drv.name);
-            if (pathOpt)
-                drvFinal.env.insert_or_assign(
-                    i.first,
-                    state.store->printStorePath(*pathOpt));
+        for (auto & [outputName, output] : drvFinal.outputs) {
+            auto pathOpt = output.pathOpt(*state.store, drv.name);
+            drvFinal.env.insert_or_assign(
+                outputName,
+                pathOpt
+                    ? state.store->printStorePath(*pathOpt)
+                    : hashPlaceholder(outputName));
         }
     }
 
