@@ -12,10 +12,18 @@ using namespace nix;
 struct CmdEval : MixJSON, InstallableCommand
 {
     bool raw = false;
+    std::optional<std::string> apply;
 
     CmdEval()
     {
         mkFlag(0, "raw", "print strings unquoted", &raw);
+
+        addFlag({
+            .longName = "apply",
+            .description = "apply a function to each argument",
+            .labels = {"expr"},
+            .handler = {&apply},
+        });
     }
 
     std::string description() override
@@ -26,21 +34,25 @@ struct CmdEval : MixJSON, InstallableCommand
     Examples examples() override
     {
         return {
-            Example{
+            {
                 "To evaluate a Nix expression given on the command line:",
-                "nix eval '(1 + 2)'"
+                "nix eval --expr '1 + 2'"
             },
-            Example{
+            {
                 "To evaluate a Nix expression from a file or URI:",
-                "nix eval -f channel:nixos-17.09 hello.name"
+                "nix eval -f ./my-nixpkgs hello.name"
             },
-            Example{
+            {
                 "To get the current version of Nixpkgs:",
-                "nix eval --raw nixpkgs.lib.version"
+                "nix eval --raw nixpkgs#lib.version"
             },
-            Example{
+            {
                 "To print the store path of the Hello package:",
-                "nix eval --raw nixpkgs.hello"
+                "nix eval --raw nixpkgs#hello"
+            },
+            {
+                "To get a list of checks in the 'nix' flake:",
+                "nix eval nix#checks.x86_64-linux --apply builtins.attrNames"
             },
         };
     }
@@ -56,6 +68,14 @@ struct CmdEval : MixJSON, InstallableCommand
 
         auto v = installable->toValue(*state).first;
         PathSet context;
+
+        if (apply) {
+            auto vApply = state->allocValue();
+            state->eval(state->parseExprFromString(*apply, absPath(".")), *vApply);
+            auto vRes = state->allocValue();
+            state->callFunction(*vApply, *v, *vRes, noPos);
+            v = vRes;
+        }
 
         if (raw) {
             stopProgressBar();

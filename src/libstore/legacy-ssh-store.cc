@@ -113,7 +113,7 @@ struct LegacySSHStore : public Store
 
             if (GET_PROTOCOL_MINOR(conn->remoteVersion) >= 4) {
                 auto s = readString(conn->from);
-                info->narHash = s.empty() ? Hash() : Hash(s);
+                info->narHash = s.empty() ? std::optional<Hash>{} : Hash::parseAnyPrefixed(s);
                 info->ca = parseContentAddressOpt(readString(conn->from));
                 info->sigs = readStrings<StringSet>(conn->from);
             }
@@ -126,8 +126,7 @@ struct LegacySSHStore : public Store
     }
 
     void addToStore(const ValidPathInfo & info, Source & source,
-        RepairFlag repair, CheckSigsFlag checkSigs,
-        std::shared_ptr<FSAccessor> accessor) override
+        RepairFlag repair, CheckSigsFlag checkSigs) override
     {
         debug("adding path '%s' to remote host '%s'", printStorePath(info.path), host);
 
@@ -139,7 +138,7 @@ struct LegacySSHStore : public Store
                 << cmdAddToStoreNar
                 << printStorePath(info.path)
                 << (info.deriver ? printStorePath(*info.deriver) : "")
-                << info.narHash.to_string(Base16, false);
+                << info.narHash->to_string(Base16, false);
             writeStorePaths(*this, conn->to, info.references);
             conn->to
                 << info.registrationTime

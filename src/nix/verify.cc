@@ -77,26 +77,29 @@ struct CmdVerify : StorePathsCommand
             try {
                 checkInterrupt();
 
-                Activity act2(*logger, lvlInfo, actUnknown, fmt("checking '%s'", storePath));
-
                 MaintainCount<std::atomic<size_t>> mcActive(active);
                 update();
 
                 auto info = store->queryPathInfo(store->parseStorePath(storePath));
 
+                // Note: info->path can be different from storePath
+                // for binary cache stores when using --all (since we
+                // can't enumerate names efficiently).
+                Activity act2(*logger, lvlInfo, actUnknown, fmt("checking '%s'", store->printStorePath(info->path)));
+
                 if (!noContents) {
 
                     std::unique_ptr<AbstractHashSink> hashSink;
                     if (!info->ca)
-                        hashSink = std::make_unique<HashSink>(*info->narHash.type);
+                        hashSink = std::make_unique<HashSink>(info->narHash->type);
                     else
-                        hashSink = std::make_unique<HashModuloSink>(*info->narHash.type, std::string(info->path.hashPart()));
+                        hashSink = std::make_unique<HashModuloSink>(info->narHash->type, std::string(info->path.hashPart()));
 
                     store->narFromPath(info->path, *hashSink);
 
                     auto hash = hashSink->finish();
 
-                    if (hash.first != info->narHash) {
+                    if (hash.first != *info->narHash) {
                         corrupted++;
                         act2.result(resCorruptedPath, store->printStorePath(info->path));
                         logError({
@@ -104,7 +107,7 @@ struct CmdVerify : StorePathsCommand
                             .hint = hintfmt(
                                 "path '%s' was modified! expected hash '%s', got '%s'",
                                 store->printStorePath(info->path),
-                                info->narHash.to_string(Base32, true),
+                                info->narHash->to_string(Base32, true),
                                 hash.first.to_string(Base32, true))
                         });
                     }

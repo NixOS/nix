@@ -68,22 +68,22 @@ BuildEnvironment readEnvironment(const Path & path)
 
         std::smatch match;
 
-        if (std::regex_search(pos, file.cend(), match, declareRegex)) {
+        if (std::regex_search(pos, file.cend(), match, declareRegex, std::regex_constants::match_continuous)) {
             pos = match[0].second;
             exported.insert(match[1]);
         }
 
-        else if (std::regex_search(pos, file.cend(), match, varRegex)) {
+        else if (std::regex_search(pos, file.cend(), match, varRegex, std::regex_constants::match_continuous)) {
             pos = match[0].second;
             res.env.insert({match[1], Var { .exported = exported.count(match[1]) > 0, .value = match[2] }});
         }
 
-        else if (std::regex_search(pos, file.cend(), match, assocArrayRegex)) {
+        else if (std::regex_search(pos, file.cend(), match, assocArrayRegex, std::regex_constants::match_continuous)) {
             pos = match[0].second;
             res.env.insert({match[1], Var { .associative = true, .value = match[2] }});
         }
 
-        else if (std::regex_search(pos, file.cend(), match, functionRegex)) {
+        else if (std::regex_search(pos, file.cend(), match, functionRegex, std::regex_constants::match_continuous)) {
             res.bashFunctions = std::string(pos, file.cend());
             break;
         }
@@ -137,18 +137,21 @@ StorePath getDerivationEnvironment(ref<Store> store, const StorePath & drvPath)
     drvName += "-env";
     for (auto & output : drv.outputs)
         drv.env.erase(output.first);
+    drv.outputs = {{"out", {
+        .output = DerivationOutputInputAddressedT<NoPath> { .path = NoPath {} }}
+    }};
     drv.env["out"] = "";
+    drv.env["_outputs_saved"] = drv.env["outputs"];
     drv.env["outputs"] = "out";
     drv.inputSrcs.insert(std::move(getEnvShPath));
     drv.outputs.insert_or_assign("out", DerivationOutputT<NoPath> {});
-    Derivation drvFinal = bakeDerivationPaths(*store, drv, drvName);
-    drv.env.insert_or_assign("out", store->printStorePath(drvFinal.outputs.at("out").path));
+    Derivation drvFinal = bakeDerivationPaths(*store, drv);
     auto shellDrvPath2 = writeDerivation(store, drvFinal, drvName);
 
     /* Build the derivation. */
     store->buildPaths({{shellDrvPath2}});
 
-    return drvFinal.outputs.at("out").path;
+    return std::get<DerivationOutputInputAddressed>(drvFinal.outputs.at("out").output).path;
 }
 
 struct Common : InstallableCommand, MixProfile
@@ -203,6 +206,11 @@ struct Common : InstallableCommand, MixProfile
             out << fmt("export %s=\"$NIX_BUILD_TOP\"\n", i);
 
         out << "eval \"$shellHook\"\n";
+    }
+
+    Strings getDefaultFlakeAttrPaths() override
+    {
+        return {"devShell." + settings.thisSystem.get(), "defaultPackage." + settings.thisSystem.get()};
     }
 
     StorePath getShellOutPath(ref<Store> store)
@@ -263,11 +271,15 @@ struct CmdDevelop : Common, MixEnvironment
         return {
             Example{
                 "To get the build environment of GNU hello:",
-                "nix develop nixpkgs.hello"
+                "nix develop nixpkgs#hello"
+            },
+            Example{
+                "To get the build environment of the default package of flake in the current directory:",
+                "nix develop"
             },
             Example{
                 "To store the build environment in a profile:",
-                "nix develop --profile /tmp/my-shell nixpkgs.hello"
+                "nix develop --profile /tmp/my-shell nixpkgs#hello"
             },
             Example{
                 "To use a build environment previously recorded in a profile:",
@@ -298,11 +310,27 @@ struct CmdDevelop : Common, MixEnvironment
 
         stopProgressBar();
 
-        auto shell = getEnv("SHELL").value_or("bash");
-
         setEnviron();
         // prevent garbage collection until shell exits
         setenv("NIX_GCROOT", gcroot.data(), 1);
+
+        Path shell = "bash";
+
+        try {
+            auto state = getEvalState();
+
+            auto bashInstallable = std::make_shared<InstallableFlake>(
+                state,
+                std::move(installable->nixpkgsFlakeRef()),
+                Strings{"bashInteractive"},
+                Strings{"legacyPackages." + settings.thisSystem.get() + "."},
+                lockFlags);
+
+            shell = state->store->printStorePath(
+                toStorePath(state->store, Realise::Outputs, OperateOn::Output, bashInstallable)) + "/bin/bash";
+        } catch (Error &) {
+            ignoreException();
+        }
 
         auto args = Strings{std::string(baseNameOf(shell)), "--rcfile", rcFilePath};
 
@@ -327,7 +355,7 @@ struct CmdPrintDevEnv : Common
         return {
             Example{
                 "To apply the build environment of GNU hello to the current shell:",
-                ". <(nix print-dev-env nixpkgs.hello)"
+                ". <(nix print-dev-env nixpkgs#hello)"
             },
         };
     }

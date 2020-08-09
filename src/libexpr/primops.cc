@@ -30,18 +30,6 @@ namespace nix {
  *************************************************************/
 
 
-/* Decode a context string ‘!<name>!<path>’ into a pair <path,
-   name>. */
-std::pair<string, string> decodeContext(const string & s)
-{
-    if (s.at(0) == '!') {
-        size_t index = s.find("!", 1);
-        return std::pair<string, string>(string(s, index + 1), string(s, 1, index - 1));
-    } else
-        return std::pair<string, string>(s.at(0) == '/' ? s : string(s, 1), "");
-}
-
-
 InvalidPathError::InvalidPathError(const Path & path) :
     EvalError("path '%s' is not valid", path), path(path) {}
 
@@ -64,7 +52,7 @@ void EvalState::realiseContext(const PathSet & context)
                 DerivationOutputs::iterator i = drv.outputs.find(outputName);
                 if (i == drv.outputs.end())
                     throw Error("derivation '%s' does not have an output named '%s'", ctxS, outputName);
-                allowedPaths->insert(store->printStorePath(i->second.path));
+                allowedPaths->insert(store->printStorePath(i->second.path(*store, drv.name)));
             }
         }
     }
@@ -77,7 +65,7 @@ void EvalState::realiseContext(const PathSet & context)
 
     /* For performance, prefetch all substitute info. */
     StorePathSet willBuild, willSubstitute, unknown;
-    unsigned long long downloadSize, narSize;
+    uint64_t downloadSize, narSize;
     store->queryMissing(drvs, willBuild, willSubstitute, unknown, downloadSize, narSize);
 
     store->buildPaths(drvs);
@@ -96,15 +84,24 @@ static void prim_scopedImport(EvalState & state, const Pos & pos, Value * * args
     } catch (InvalidPathError & e) {
         throw EvalError({
             .hint = hintfmt("cannot import '%1%', since path '%2%' is not valid", path, e.path),
-            .nixCode = NixCode { .errPos = pos }
+            .errPos = pos
         });
     }
 
     Path realPath = state.checkSourcePath(state.toRealPath(path, context));
 
     // FIXME
-    if (state.store->isStorePath(path) && state.store->isValidPath(state.store->parseStorePath(path)) && isDerivation(path)) {
-        Derivation drv = readDerivation(*state.store, realPath);
+    auto isValidDerivationInStore = [&]() -> std::optional<StorePath> {
+        if (!state.store->isStorePath(path))
+            return std::nullopt;
+        auto storePath = state.store->parseStorePath(path);
+        if (!(state.store->isValidPath(storePath) && isDerivation(path)))
+            return std::nullopt;
+        return storePath;
+    };
+    if (auto optStorePath = isValidDerivationInStore()) {
+        auto storePath = *optStorePath;
+        Derivation drv = readDerivation(*state.store, realPath, Derivation::nameFromPath(storePath));
         Value & w = *state.allocValue();
         state.mkAttrs(w, 3 + drv.outputs.size());
         Value * v2 = state.allocAttr(w, state.sDrvPath);
@@ -118,7 +115,7 @@ static void prim_scopedImport(EvalState & state, const Pos & pos, Value * * args
 
         for (const auto & o : drv.outputs) {
             v2 = state.allocAttr(w, state.symbols.create(o.first));
-            mkString(*v2, state.store->printStorePath(o.second.path), {"!" + o.first + "!" + path});
+            mkString(*v2, state.store->printStorePath(o.second.path(*state.store, drv.name)), {"!" + o.first + "!" + path});
             outputsVal->listElems()[outputs_index] = state.allocValue();
             mkString(*(outputsVal->listElems()[outputs_index++]), o.first);
         }
@@ -177,7 +174,7 @@ void prim_importNative(EvalState & state, const Pos & pos, Value * * args, Value
             .hint = hintfmt(
                 "cannot import '%1%', since path '%2%' is not valid",
                 path, e.path),
-            .nixCode = NixCode { .errPos = pos }
+            .errPos = pos
         });
     }
 
@@ -215,7 +212,7 @@ void prim_exec(EvalState & state, const Pos & pos, Value * * args, Value & v)
     if (count == 0) {
         throw EvalError({
             .hint = hintfmt("at least one argument to 'exec' required"),
-            .nixCode = NixCode { .errPos = pos }
+            .errPos = pos
         });
     }
     PathSet context;
@@ -230,7 +227,7 @@ void prim_exec(EvalState & state, const Pos & pos, Value * * args, Value & v)
         throw EvalError({
             .hint = hintfmt("cannot execute '%1%', since path '%2%' is not valid",
                 program, e.path),
-            .nixCode = NixCode { .errPos = pos }
+            .errPos = pos
         });
     }
 
@@ -239,13 +236,13 @@ void prim_exec(EvalState & state, const Pos & pos, Value * * args, Value & v)
     try {
         parsed = state.parseExprFromString(output, pos.file);
     } catch (Error & e) {
-        e.addPrefix(fmt("While parsing the output from '%1%', at %2%\n", program, pos));
+        e.addTrace(pos, "While parsing the output from '%1%'", program);
         throw;
     }
     try {
         state.eval(parsed, v);
     } catch (Error & e) {
-        e.addPrefix(fmt("While evaluating the output from '%1%', at %2%\n", program, pos));
+        e.addTrace(pos, "While evaluating the output from '%1%'", program);
         throw;
     }
 }
@@ -385,7 +382,7 @@ static void prim_genericClosure(EvalState & state, const Pos & pos, Value * * ar
     if (startSet == args[0]->attrs->end())
         throw EvalError({
             .hint = hintfmt("attribute 'startSet' required"),
-            .nixCode = NixCode { .errPos = pos }
+            .errPos = pos
         });
     state.forceList(*startSet->value, pos);
 
@@ -399,7 +396,7 @@ static void prim_genericClosure(EvalState & state, const Pos & pos, Value * * ar
     if (op == args[0]->attrs->end())
         throw EvalError({
             .hint = hintfmt("attribute 'operator' required"),
-            .nixCode = NixCode { .errPos = pos }
+            .errPos = pos
         });
     state.forceValue(*op->value, pos);
 
@@ -421,7 +418,7 @@ static void prim_genericClosure(EvalState & state, const Pos & pos, Value * * ar
         if (key == e->attrs->end())
             throw EvalError({
                 .hint = hintfmt("attribute 'key' required"),
-                .nixCode = NixCode { .errPos = pos }
+                .errPos = pos
             });
         state.forceValue(*key->value, pos);
 
@@ -471,7 +468,7 @@ static void prim_addErrorContext(EvalState & state, const Pos & pos, Value * * a
         v = *args[1];
     } catch (Error & e) {
         PathSet context;
-        e.addPrefix(format("%1%\n") % state.coerceToString(pos, *args[0], context));
+        e.addTrace(std::nullopt, state.coerceToString(pos, *args[0], context));
         throw;
     }
 }
@@ -556,14 +553,14 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
     if (attr == args[0]->attrs->end())
         throw EvalError({
             .hint = hintfmt("required attribute 'name' missing"),
-            .nixCode = NixCode { .errPos = pos }
+            .errPos = pos
         });
     string drvName;
     Pos & posDrvName(*attr->pos);
     try {
         drvName = state.forceStringNoCtx(*attr->value, pos);
     } catch (Error & e) {
-        e.addPrefix(fmt("while evaluating the derivation attribute 'name' at %1%:\n", posDrvName));
+        e.addTrace(posDrvName, "while evaluating the derivation attribute 'name'");
         throw;
     }
 
@@ -582,9 +579,11 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
 
     /* Build the derivation expression by processing the attributes. */
     DerivationT<StorePath, NoPath> drv;
+    drv.name = drvName;
 
     PathSet context;
 
+    bool contentAddressed = false;
     std::optional<std::string> outputHash;
     std::string outputHashAlgo;
     auto ingestionMethod = FileIngestionMethod::Flat;
@@ -603,7 +602,7 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
             else
                 throw EvalError({
                     .hint = hintfmt("invalid value '%s' for 'outputHashMode' attribute", s),
-                    .nixCode = NixCode { .errPos = posDrvName }
+                    .errPos = posDrvName
                 });
         };
 
@@ -613,7 +612,7 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
                 if (outputs.find(j) != outputs.end())
                     throw EvalError({
                         .hint = hintfmt("duplicate derivation output '%1%'", j),
-                        .nixCode = NixCode { .errPos = posDrvName }
+                        .errPos = posDrvName
                     });
                 /* !!! Check whether j is a valid attribute
                    name. */
@@ -623,14 +622,14 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
                 if (j == "drv")
                     throw EvalError({
                         .hint = hintfmt("invalid derivation output name 'drv'" ),
-                        .nixCode = NixCode { .errPos = posDrvName }
+                        .errPos = posDrvName
                     });
                 outputs.insert(j);
             }
             if (outputs.empty())
                 throw EvalError({
                     .hint = hintfmt("derivation cannot have an empty set of outputs"),
-                    .nixCode = NixCode { .errPos = posDrvName }
+                    .errPos = posDrvName
                 });
         };
 
@@ -641,9 +640,14 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
                 if (i->value->type == tNull) continue;
             }
 
+            if (i->name == state.sContentAddressed) {
+                settings.requireExperimentalFeature("ca-derivations");
+                contentAddressed = state.forceBool(*i->value, pos);
+            }
+
             /* The `args' attribute is special: it supplies the
                command-line arguments to the builder. */
-            if (i->name == state.sArgs) {
+            else if (i->name == state.sArgs) {
                 state.forceList(*i->value, pos);
                 for (unsigned int n = 0; n < i->value->listSize(); ++n) {
                     string s = state.coerceToString(posDrvName, *i->value->listElems()[n], context, true);
@@ -696,8 +700,9 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
             }
 
         } catch (Error & e) {
-            e.addPrefix(format("while evaluating the attribute '%1%' of the derivation '%2%' at %3%:\n")
-                % key % drvName % posDrvName);
+            e.addTrace(posDrvName,
+                "while evaluating the attribute '%1%' of the derivation '%2%'",
+                key, drvName);
             throw;
         }
     }
@@ -745,57 +750,71 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
     if (drv.builder == "")
         throw EvalError({
             .hint = hintfmt("required attribute 'builder' missing"),
-            .nixCode = NixCode { .errPos = posDrvName }
+            .errPos = posDrvName
         });
 
     if (drv.platform == "")
         throw EvalError({
             .hint = hintfmt("required attribute 'system' missing"),
-            .nixCode = NixCode { .errPos = posDrvName }
+            .errPos = posDrvName
         });
 
     /* Check whether the derivation name is valid. */
     if (isDerivation(drvName))
         throw EvalError({
             .hint = hintfmt("derivation names are not allowed to end in '%s'", drvExtension),
-            .nixCode = NixCode { .errPos = posDrvName }
+            .errPos = posDrvName
         });
 
+    auto hashTypeOpt = parseHashTypeOpt(outputHashAlgo);
     std::optional<Hash> outputHashParsed;
     if (outputHash) {
-        /* Set "out" output with hash algo and hash for fixed-output derivations. */
+		/* Ensure proper single "out" and parse output hash */
         if (outputs.size() != 1 || *(outputs.begin()) != "out")
             throw Error({
                 .hint = hintfmt("multiple outputs are not supported in fixed-output derivations"),
-                .nixCode = NixCode { .errPos = posDrvName }
+                .errPos = posDrvName
             });
 
-        auto ht = parseHashTypeOpt(outputHashAlgo);
-        outputHashParsed = newHashAllowEmpty(*outputHash, ht);
+        outputHashParsed = newHashAllowEmpty(*outputHash, hashTypeOpt);
     }
 
     for (auto & outName : outputs) {
         if (!jsonObject) drv.env[outName] = "";
-        drv.outputs.insert_or_assign(outName, DerivationOutputT<NoPath> {
-            .path = NoPath {},
-            .hash = !outputHashParsed
-                ? std::optional<FixedOutputHash> {}
-                : FixedOutputHash {
-                    .method = ingestionMethod,
-                    .hash = *outputHashParsed,
+        drv.outputs.insert_or_assign(outName, outputHashParsed
+            ? DerivationOutputT<NoPath> {
+                .output = DerivationOutputCAFixed {
+                	.hash = FixedOutputHash {
+                	    .method = ingestionMethod,
+                	    .hash = *outputHashParsed,
+                	},
                 },
-        });
+              }
+            : contentAddressed
+            ? DerivationOutputT<NoPath> {
+                .output = DerivationOutputCAFloating {
+                    .method = ingestionMethod,
+                    .hashType = *hashTypeOpt,
+                },
+              }
+            : DerivationOutputT<NoPath> {
+                .output = DerivationOutputInputAddressedT<NoPath> {
+                    .path = NoPath {},
+                },
+              });
     }
 
     /* Compute the final derivation, which additionally contains the outputs
        paths created from the hash of the initial one. */
-    Derivation drvFinal = bakeDerivationPaths(*state.store, drv, drvName);
+    Derivation drvFinal = bakeDerivationPaths(*state.store, drv);
 
     if (!jsonObject) {
         for (const auto & i : drvFinal.outputs) {
-            if (!jsonObject) drvFinal.env.insert_or_assign(
-                i.first,
-                state.store->printStorePath(i.second.path));
+        	auto pathOpt = i.second.pathOpt(*state.store, drv.name);
+        	if (pathOpt)
+            	drvFinal.env.insert_or_assign(
+            	    i.first,
+            	    state.store->printStorePath(*pathOpt));
         }
     }
 
@@ -818,7 +837,7 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
     mkString(*state.allocAttr(v, state.sDrvPath), drvPathS, {"=" + drvPathS});
     for (auto & i : drvFinal.outputs) {
         mkString(*state.allocAttr(v, state.symbols.create(i.first)),
-            state.store->printStorePath(i.second.path), {"!" + i.first + "!" + drvPathS});
+            state.store->printStorePath(i.second.path(*state.store, drv.name)), {"!" + i.first + "!" + drvPathS});
     }
     v.attrs->sort();
 }
@@ -870,12 +889,12 @@ static void prim_storePath(EvalState & state, const Pos & pos, Value * * args, V
     if (!state.store->isInStore(path))
         throw EvalError({
             .hint = hintfmt("path '%1%' is not in the Nix store", path),
-            .nixCode = NixCode { .errPos = pos }
+            .errPos = pos
         });
-    Path path2 = state.store->toStorePath(path);
+    auto path2 = state.store->toStorePath(path).first;
     if (!settings.readOnlyMode)
-        state.store->ensurePath(state.store->parseStorePath(path2));
-    context.insert(path2);
+        state.store->ensurePath(path2);
+    context.insert(state.store->printStorePath(path2));
     mkString(v, path, context);
 }
 
@@ -891,7 +910,7 @@ static void prim_pathExists(EvalState & state, const Pos & pos, Value * * args, 
             .hint = hintfmt(
                 "cannot check the existence of '%1%', since path '%2%' is not valid",
                 path, e.path),
-            .nixCode = NixCode { .errPos = pos }
+            .errPos = pos
         });
     }
 
@@ -937,7 +956,7 @@ static void prim_readFile(EvalState & state, const Pos & pos, Value * * args, Va
     } catch (InvalidPathError & e) {
         throw EvalError({
             .hint = hintfmt("cannot read '%1%', since path '%2%' is not valid", path, e.path),
-            .nixCode = NixCode { .errPos = pos }
+            .errPos = pos
         });
     }
     string s = readFile(state.checkSourcePath(state.toRealPath(path, context)));
@@ -968,7 +987,7 @@ static void prim_findFile(EvalState & state, const Pos & pos, Value * * args, Va
         if (i == v2.attrs->end())
             throw EvalError({
                 .hint = hintfmt("attribute 'path' missing"),
-                .nixCode = NixCode { .errPos = pos }
+                .errPos = pos
             });
 
         PathSet context;
@@ -979,7 +998,7 @@ static void prim_findFile(EvalState & state, const Pos & pos, Value * * args, Va
         } catch (InvalidPathError & e) {
             throw EvalError({
                 .hint = hintfmt("cannot find '%1%', since path '%2%' is not valid", path, e.path),
-                .nixCode = NixCode { .errPos = pos }
+                .errPos = pos
             });
         }
 
@@ -999,7 +1018,7 @@ static void prim_hashFile(EvalState & state, const Pos & pos, Value * * args, Va
     if (!ht)
       throw Error({
           .hint = hintfmt("unknown hash type '%1%'", type),
-          .nixCode = NixCode { .errPos = pos }
+          .errPos = pos
       });
 
     PathSet context; // discarded
@@ -1018,7 +1037,7 @@ static void prim_readDir(EvalState & state, const Pos & pos, Value * * args, Val
     } catch (InvalidPathError & e) {
         throw EvalError({
             .hint = hintfmt("cannot read '%1%', since path '%2%' is not valid", path, e.path),
-            .nixCode = NixCode { .errPos = pos }
+            .errPos = pos
         });
     }
 
@@ -1094,7 +1113,7 @@ static void prim_toFile(EvalState & state, const Pos & pos, Value * * args, Valu
                     "in 'toFile': the file named '%1%' must not contain a reference "
                     "to a derivation but contains (%2%)",
                     name, path),
-                .nixCode = NixCode { .errPos = pos }
+                .errPos = pos
             });
         refs.insert(state.store->parseStorePath(path));
     }
@@ -1112,7 +1131,7 @@ static void prim_toFile(EvalState & state, const Pos & pos, Value * * args, Valu
 
 
 static void addPath(EvalState & state, const Pos & pos, const string & name, const Path & path_,
-    Value * filterFun, FileIngestionMethod method, const Hash & expectedHash, Value & v)
+    Value * filterFun, FileIngestionMethod method, const std::optional<Hash> expectedHash, Value & v)
 {
     const auto path = evalSettings.pureEval && expectedHash ?
         path_ :
@@ -1143,7 +1162,7 @@ static void addPath(EvalState & state, const Pos & pos, const string & name, con
 
     std::optional<StorePath> expectedStorePath;
     if (expectedHash)
-        expectedStorePath = state.store->makeFixedOutputPath(method, expectedHash, name);
+        expectedStorePath = state.store->makeFixedOutputPath(method, *expectedHash, name);
     Path dstPath;
     if (!expectedHash || !state.store->isValidPath(*expectedStorePath)) {
         dstPath = state.store->printStorePath(settings.readOnlyMode
@@ -1165,7 +1184,7 @@ static void prim_filterSource(EvalState & state, const Pos & pos, Value * * args
     if (!context.empty())
         throw EvalError({
             .hint = hintfmt("string '%1%' cannot refer to other paths", path),
-            .nixCode = NixCode { .errPos = pos }
+            .errPos = pos
         });
 
     state.forceValue(*args[0], pos);
@@ -1174,10 +1193,10 @@ static void prim_filterSource(EvalState & state, const Pos & pos, Value * * args
             .hint = hintfmt(
                 "first argument in call to 'filterSource' is not a function but %1%",
                 showType(*args[0])),
-            .nixCode = NixCode { .errPos = pos }
+            .errPos = pos
         });
 
-    addPath(state, pos, std::string(baseNameOf(path)), path, args[0], FileIngestionMethod::Recursive, Hash(), v);
+    addPath(state, pos, std::string(baseNameOf(path)), path, args[0], FileIngestionMethod::Recursive, std::nullopt, v);
 }
 
 static void prim_path(EvalState & state, const Pos & pos, Value * * args, Value & v)
@@ -1187,7 +1206,7 @@ static void prim_path(EvalState & state, const Pos & pos, Value * * args, Value 
     string name;
     Value * filterFun = nullptr;
     auto method = FileIngestionMethod::Recursive;
-    Hash expectedHash;
+    std::optional<Hash> expectedHash;
 
     for (auto & attr : *args[0]->attrs) {
         const string & n(attr.name);
@@ -1197,7 +1216,7 @@ static void prim_path(EvalState & state, const Pos & pos, Value * * args, Value 
             if (!context.empty())
                 throw EvalError({
                     .hint = hintfmt("string '%1%' cannot refer to other paths", path),
-                    .nixCode = NixCode { .errPos = *attr.pos }
+                    .errPos = *attr.pos
                 });
         } else if (attr.name == state.sName)
             name = state.forceStringNoCtx(*attr.value, *attr.pos);
@@ -1211,13 +1230,13 @@ static void prim_path(EvalState & state, const Pos & pos, Value * * args, Value 
         else
             throw EvalError({
                 .hint = hintfmt("unsupported argument '%1%' to 'addPath'", attr.name),
-                .nixCode = NixCode { .errPos = *attr.pos }
+                .errPos = *attr.pos
             });
     }
     if (path.empty())
         throw EvalError({
             .hint = hintfmt("'path' required"),
-            .nixCode = NixCode { .errPos = pos }
+            .errPos = pos
         });
     if (name.empty())
         name = baseNameOf(path);
@@ -1278,7 +1297,7 @@ void prim_getAttr(EvalState & state, const Pos & pos, Value * * args, Value & v)
     if (i == args[1]->attrs->end())
         throw EvalError({
             .hint = hintfmt("attribute '%1%' missing", attr),
-            .nixCode = NixCode { .errPos = pos }
+            .errPos = pos
         });
     // !!! add to stack trace?
     if (state.countCalls && i->pos) state.attrSelects[*i->pos]++;
@@ -1361,7 +1380,7 @@ static void prim_listToAttrs(EvalState & state, const Pos & pos, Value * * args,
         if (j == v2.attrs->end())
             throw TypeError({
                 .hint = hintfmt("'name' attribute missing in a call to 'listToAttrs'"),
-                .nixCode = NixCode { .errPos = pos }
+                .errPos = pos
             });
         string name = state.forceStringNoCtx(*j->value, pos);
 
@@ -1371,7 +1390,7 @@ static void prim_listToAttrs(EvalState & state, const Pos & pos, Value * * args,
             if (j2 == v2.attrs->end())
                 throw TypeError({
                     .hint = hintfmt("'value' attribute missing in a call to 'listToAttrs'"),
-                    .nixCode = NixCode { .errPos = pos }
+                    .errPos = pos
                 });
             v.attrs->push_back(Attr(sym, j2->value, j2->pos));
         }
@@ -1447,7 +1466,7 @@ static void prim_functionArgs(EvalState & state, const Pos & pos, Value * * args
     if (args[0]->type != tLambda)
         throw TypeError({
             .hint = hintfmt("'functionArgs' requires a function"),
-            .nixCode = NixCode { .errPos = pos }
+            .errPos = pos
         });
 
     if (!args[0]->lambda.fun->matchAttrs) {
@@ -1503,7 +1522,7 @@ static void elemAt(EvalState & state, const Pos & pos, Value & list, int n, Valu
     if (n < 0 || (unsigned int) n >= list.listSize())
         throw Error({
             .hint = hintfmt("list index %1% is out of bounds", n),
-            .nixCode = NixCode { .errPos = pos }
+            .errPos = pos
         });
     state.forceValue(*list.listElems()[n], pos);
     v = *list.listElems()[n];
@@ -1533,7 +1552,7 @@ static void prim_tail(EvalState & state, const Pos & pos, Value * * args, Value 
     if (args[0]->listSize() == 0)
         throw Error({
             .hint = hintfmt("'tail' called on an empty list"),
-            .nixCode = NixCode { .errPos = pos }
+            .errPos = pos
         });
 
     state.mkList(v, args[0]->listSize() - 1);
@@ -1678,7 +1697,7 @@ static void prim_genList(EvalState & state, const Pos & pos, Value * * args, Val
     if (len < 0)
         throw EvalError({
             .hint = hintfmt("cannot create list of size %1%", len),
-            .nixCode = NixCode { .errPos = pos }
+            .errPos = pos
         });
 
     state.mkList(v, len);
@@ -1840,7 +1859,7 @@ static void prim_div(EvalState & state, const Pos & pos, Value * * args, Value &
     if (f2 == 0)
         throw EvalError({
             .hint = hintfmt("division by zero"),
-            .nixCode = NixCode { .errPos = pos }
+            .errPos = pos
         });
 
     if (args[0]->type == tFloat || args[1]->type == tFloat) {
@@ -1852,7 +1871,7 @@ static void prim_div(EvalState & state, const Pos & pos, Value * * args, Value &
         if (i1 == std::numeric_limits<NixInt>::min() && i2 == -1)
             throw EvalError({
                 .hint = hintfmt("overflow in integer division"),
-                .nixCode = NixCode { .errPos = pos }
+                .errPos = pos
             });
 
         mkInt(v, i1 / i2);
@@ -1913,7 +1932,7 @@ static void prim_substring(EvalState & state, const Pos & pos, Value * * args, V
     if (start < 0)
         throw EvalError({
             .hint = hintfmt("negative start position in 'substring'"),
-            .nixCode = NixCode { .errPos = pos }
+            .errPos = pos
         });
 
     mkString(v, (unsigned int) start >= s.size() ? "" : string(s, start, len), context);
@@ -1936,7 +1955,7 @@ static void prim_hashString(EvalState & state, const Pos & pos, Value * * args, 
     if (!ht)
         throw Error({
             .hint = hintfmt("unknown hash type '%1%'", type),
-            .nixCode = NixCode { .errPos = pos }
+            .errPos = pos
         });
 
     PathSet context; // discarded
@@ -1982,12 +2001,12 @@ void prim_match(EvalState & state, const Pos & pos, Value * * args, Value & v)
             // limit is _GLIBCXX_REGEX_STATE_LIMIT for libstdc++
             throw EvalError({
                 .hint = hintfmt("memory limit exceeded by regular expression '%s'", re),
-                .nixCode = NixCode { .errPos = pos }
+                .errPos = pos
             });
         } else {
             throw EvalError({
                 .hint = hintfmt("invalid regular expression '%s'", re),
-                .nixCode = NixCode { .errPos = pos }
+                .errPos = pos
             });
         }
     }
@@ -2055,12 +2074,12 @@ static void prim_split(EvalState & state, const Pos & pos, Value * * args, Value
             // limit is _GLIBCXX_REGEX_STATE_LIMIT for libstdc++
             throw EvalError({
                 .hint = hintfmt("memory limit exceeded by regular expression '%s'", re),
-                .nixCode = NixCode { .errPos = pos }
+                .errPos = pos
             });
         } else {
             throw EvalError({
                 .hint = hintfmt("invalid regular expression '%s'", re),
-                .nixCode = NixCode { .errPos = pos }
+                .errPos = pos
             });
         }
     }
@@ -2094,7 +2113,7 @@ static void prim_replaceStrings(EvalState & state, const Pos & pos, Value * * ar
     if (args[0]->listSize() != args[1]->listSize())
         throw EvalError({
             .hint = hintfmt("'from' and 'to' arguments to 'replaceStrings' have different lengths"),
-            .nixCode = NixCode { .errPos = pos }
+            .errPos = pos
         });
 
     vector<string> from;

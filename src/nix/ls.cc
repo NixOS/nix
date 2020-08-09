@@ -85,7 +85,11 @@ struct CmdLsStore : StoreCommand, MixLs
 {
     CmdLsStore()
     {
-        expectArg("path", &path);
+        expectArgs({
+            .label = "path",
+            .handler = {&path},
+            .completer = completePath
+        });
     }
 
     Examples examples() override
@@ -117,7 +121,11 @@ struct CmdLsNar : Command, MixLs
 
     CmdLsNar()
     {
-        expectArg("nar", &narPath);
+        expectArgs({
+            .label = "nar",
+            .handler = {&narPath},
+            .completer = completePath
+        });
         expectArg("path", &path);
     }
 

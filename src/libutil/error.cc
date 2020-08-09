@@ -7,14 +7,11 @@
 
 namespace nix {
 
-
 const std::string nativeSystem = SYSTEM;
 
-// addPrefix is used for show-trace.  Strings added with addPrefix
-// will print ahead of the error itself.
-BaseError & BaseError::addPrefix(const FormatOrString & fs)
+BaseError & BaseError::addTrace(std::optional<ErrPos> e, hintformat hint)
 {
-    prefix_ = fs.s + prefix_;
+    err.traces.push_front(Trace { .pos = e, .hint = hint});
     return *this;
 }
 
@@ -28,7 +25,7 @@ const string& BaseError::calcWhat() const
         err.name = sname();
 
         std::ostringstream oss;
-        oss << err;
+        showErrorInfo(oss, err, false);
         what_ = oss.str();
 
         return *what_;
@@ -56,28 +53,114 @@ string showErrPos(const ErrPos &errPos)
     }
 }
 
-// if nixCode contains lines of code, print them to the ostream, indicating the error column.
-void printCodeLines(std::ostream &out, const string &prefix, const NixCode &nixCode)
+std::optional<LinesOfCode> getCodeLines(const ErrPos &errPos)
+{
+    if (errPos.line <= 0)
+        return std::nullopt;
+
+    if (errPos.origin == foFile) {
+        LinesOfCode loc;
+        try {
+            AutoCloseFD fd = open(errPos.file.c_str(), O_RDONLY | O_CLOEXEC);
+            if (!fd) {
+                logError(SysError("opening file '%1%'", errPos.file).info());
+                return std::nullopt;
+            }
+            else
+            {
+                // count the newlines.
+                int count = 0;
+                string line;
+                int pl = errPos.line - 1;
+                do
+                {
+                    line = readLine(fd.get());
+                    ++count;
+                    if (count < pl)
+                    {
+                        ;
+                    }
+                    else if (count == pl) {
+                        loc.prevLineOfCode = line;
+                    } else if (count == pl + 1) {
+                        loc.errLineOfCode = line;
+                    } else if (count == pl + 2) {
+                        loc.nextLineOfCode = line;
+                        break;
+                    }
+                } while (true);
+                return loc;
+            }
+        }
+        catch (EndOfFile &eof) {
+            if (loc.errLineOfCode.has_value())
+                return loc;
+            else
+                return std::nullopt;
+        }
+        catch (std::exception &e) {
+            printError("error reading nix file: %s\n%s", errPos.file, e.what());
+            return std::nullopt;
+        }
+    } else {
+        std::istringstream iss(errPos.file);
+        // count the newlines.
+        int count = 0;
+        string line;
+        int pl = errPos.line - 1;
+
+        LinesOfCode loc;
+
+        do
+        {
+            std::getline(iss, line);
+            ++count;
+            if (count < pl)
+            {
+                ;
+            }
+            else if (count == pl) {
+                loc.prevLineOfCode = line;
+            } else if (count == pl + 1) {
+                loc.errLineOfCode = line;
+            } else if (count == pl + 2) {
+                loc.nextLineOfCode = line;
+                break;
+            }
+
+            if (!iss.good())
+                break;
+        } while (true);
+
+        return loc;
+    }
+}
+
+// print lines of code to the ostream, indicating the error column.
+void printCodeLines(std::ostream &out,
+    const string &prefix,
+    const ErrPos &errPos,
+    const LinesOfCode &loc)
 {
     // previous line of code.
-    if (nixCode.prevLineOfCode.has_value()) {
+    if (loc.prevLineOfCode.has_value()) {
         out << std::endl
             << fmt("%1% %|2$5d|| %3%",
-                prefix,
-                (nixCode.errPos.line - 1),
-                *nixCode.prevLineOfCode);
+            prefix,
+            (errPos.line - 1),
+            *loc.prevLineOfCode);
     }
 
-    if (nixCode.errLineOfCode.has_value()) {
+    if (loc.errLineOfCode.has_value()) {
         // line of code containing the error.
         out << std::endl
             << fmt("%1% %|2$5d|| %3%",
-                prefix,
-                (nixCode.errPos.line),
-                *nixCode.errLineOfCode);
+            prefix,
+            (errPos.line),
+            *loc.errLineOfCode);
         // error arrows for the column range.
-        if (nixCode.errPos.column > 0) {
-            int start = nixCode.errPos.column;
+        if (errPos.column > 0) {
+            int start = errPos.column;
             std::string spaces;
             for (int i = 0; i < start; ++i) {
                 spaces.append(" ");
@@ -87,23 +170,49 @@ void printCodeLines(std::ostream &out, const string &prefix, const NixCode &nixC
 
             out << std::endl
                 << fmt("%1%      |%2%" ANSI_RED "%3%" ANSI_NORMAL,
-                    prefix,
-                    spaces,
-                    arrows);
+                prefix,
+                spaces,
+                arrows);
         }
     }
 
     // next line of code.
-    if (nixCode.nextLineOfCode.has_value()) {
+    if (loc.nextLineOfCode.has_value()) {
         out << std::endl
             << fmt("%1% %|2$5d|| %3%",
-                prefix,
-                (nixCode.errPos.line + 1),
-                *nixCode.nextLineOfCode);
+            prefix,
+            (errPos.line + 1),
+            *loc.nextLineOfCode);
     }
 }
 
-std::ostream& operator<<(std::ostream &out, const ErrorInfo &einfo)
+void printAtPos(const string &prefix, const ErrPos &pos, std::ostream &out)
+{
+    if (pos)
+    {
+        switch (pos.origin) {
+            case foFile: {
+                out << prefix << ANSI_BLUE << "at: " << ANSI_YELLOW << showErrPos(pos) <<
+                    ANSI_BLUE << " in file: " << ANSI_NORMAL << pos.file;
+                break;
+            }
+            case foString: {
+                out << prefix << ANSI_BLUE << "at: " << ANSI_YELLOW << showErrPos(pos) <<
+                    ANSI_BLUE << " from string" << ANSI_NORMAL;
+                break;
+            }
+            case foStdin: {
+                out << prefix << ANSI_BLUE << "at: " << ANSI_YELLOW << showErrPos(pos) <<
+                    ANSI_BLUE << " from stdin" << ANSI_NORMAL;
+                break;
+            }
+            default:
+                throw Error("invalid FileOrigin in errPos");
+        }
+    }
+}
+
+std::ostream& showErrorInfo(std::ostream &out, const ErrorInfo &einfo, bool showTrace)
 {
     auto errwidth = std::max<size_t>(getWindowSize().second, 20);
     string prefix = "";
@@ -158,8 +267,12 @@ std::ostream& operator<<(std::ostream &out, const ErrorInfo &einfo)
         }
     }
 
-    auto ndl = prefix.length() + levelString.length() + 3 + einfo.name.length() + einfo.programName.value_or("").length();
-    auto dashwidth = ndl > (errwidth - 3) ? 3 : errwidth - ndl;
+    auto ndl = prefix.length()
+        + filterANSIEscapes(levelString, true).length()
+        + 7
+        + einfo.name.length()
+        + einfo.programName.value_or("").length();
+    auto dashwidth = std::max<int>(errwidth - ndl, 3);
 
     std::string dashes(dashwidth, '-');
 
@@ -179,16 +292,9 @@ std::ostream& operator<<(std::ostream &out, const ErrorInfo &einfo)
             einfo.programName.value_or(""));
 
     bool nl = false;  // intersperse newline between sections.
-    if (einfo.nixCode.has_value()) {
-        if (einfo.nixCode->errPos.file != "") {
-            // filename, line, column.
-            out << std::endl << fmt("%1%in file: " ANSI_BLUE "%2% %3%" ANSI_NORMAL,
-                prefix,
-                einfo.nixCode->errPos.file,
-                showErrPos(einfo.nixCode->errPos));
-        } else {
-            out << std::endl << fmt("%1%from command line argument", prefix);
-        }
+    if (einfo.errPos.has_value() && (*einfo.errPos)) {
+        out << prefix << std::endl;
+        printAtPos(prefix, *einfo.errPos, out);
         nl = true;
     }
 
@@ -200,12 +306,16 @@ std::ostream& operator<<(std::ostream &out, const ErrorInfo &einfo)
         nl = true;
     }
 
-    // lines of code.
-    if (einfo.nixCode.has_value() && einfo.nixCode->errLineOfCode.has_value()) {
-        if (nl)
-            out << std::endl << prefix;
-        printCodeLines(out, prefix, *einfo.nixCode);
-        nl = true;
+    if (einfo.errPos.has_value() && (*einfo.errPos)) {
+        auto loc = getCodeLines(*einfo.errPos);
+
+        // lines of code.
+        if (loc.has_value()) {
+            if (nl)
+                out << std::endl << prefix;
+            printCodeLines(out, prefix, *einfo.errPos, *loc);
+            nl = true;
+        }
     }
 
     // hint
@@ -214,6 +324,54 @@ std::ostream& operator<<(std::ostream &out, const ErrorInfo &einfo)
             out << std::endl << prefix;
         out << std::endl << prefix << *einfo.hint;
         nl = true;
+    }
+
+    // traces
+    if (showTrace && !einfo.traces.empty())
+    {
+        const string tracetitle(" show-trace ");
+
+        int fill = errwidth - tracetitle.length();
+        int lw = 0;
+        int rw = 0;
+        const int min_dashes = 3;
+        if (fill > min_dashes * 2) {
+            if (fill % 2 != 0) {
+                lw = fill / 2;
+                rw = lw + 1;
+            }
+            else
+            {
+                lw = rw = fill / 2;
+            }
+        }
+        else
+            lw = rw = min_dashes;
+
+        if (nl)
+            out << std::endl << prefix;
+
+        out << ANSI_BLUE << std::string(lw, '-') << tracetitle << std::string(rw, '-') << ANSI_NORMAL;
+
+        for (auto iter = einfo.traces.rbegin(); iter != einfo.traces.rend(); ++iter)
+        {
+            out << std::endl << prefix;
+            out << ANSI_BLUE << "trace: " << ANSI_NORMAL << iter->hint.str();
+
+            if (iter->pos.has_value() && (*iter->pos)) {
+                auto pos = iter->pos.value();
+                out << std::endl << prefix;
+                printAtPos(prefix, pos, out);
+
+                auto loc = getCodeLines(pos);
+                if (loc.has_value())
+                {
+                    out << std::endl << prefix;
+                    printCodeLines(out, prefix, pos, *loc);
+                    out << std::endl << prefix;
+                }
+            }
+        }
     }
 
     return out;

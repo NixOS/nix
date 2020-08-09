@@ -23,6 +23,7 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <sys/wait.h>
+#include <sys/time.h>
 #include <sys/un.h>
 #include <unistd.h>
 
@@ -79,7 +80,7 @@ void replaceEnv(std::map<std::string, std::string> newEnv)
 }
 
 
-Path absPath(Path path, std::optional<Path> dir)
+Path absPath(Path path, std::optional<Path> dir, bool resolveSymlinks)
 {
     if (path[0] != '/') {
         if (!dir) {
@@ -100,7 +101,7 @@ Path absPath(Path path, std::optional<Path> dir)
         }
         path = *dir + "/" + path;
     }
-    return canonPath(path);
+    return canonPath(path, resolveSymlinks);
 }
 
 
@@ -345,7 +346,6 @@ void writeFile(const Path & path, Source & source, mode_t mode)
     }
 }
 
-
 string readLine(int fd)
 {
     string s;
@@ -374,7 +374,7 @@ void writeLine(int fd, string s)
 }
 
 
-static void _deletePath(int parentfd, const Path & path, unsigned long long & bytesFreed)
+static void _deletePath(int parentfd, const Path & path, uint64_t & bytesFreed)
 {
     checkInterrupt();
 
@@ -414,7 +414,7 @@ static void _deletePath(int parentfd, const Path & path, unsigned long long & by
     }
 }
 
-static void _deletePath(const Path & path, unsigned long long & bytesFreed)
+static void _deletePath(const Path & path, uint64_t & bytesFreed)
 {
     Path dir = dirOf(path);
     if (dir == "")
@@ -435,12 +435,12 @@ static void _deletePath(const Path & path, unsigned long long & bytesFreed)
 
 void deletePath(const Path & path)
 {
-    unsigned long long dummy;
+    uint64_t dummy;
     deletePath(path, dummy);
 }
 
 
-void deletePath(const Path & path, unsigned long long & bytesFreed)
+void deletePath(const Path & path, uint64_t & bytesFreed)
 {
     //Activity act(*logger, lvlDebug, format("recursively deleting path '%1%'") % path);
     bytesFreed = 0;
@@ -494,6 +494,7 @@ std::pair<AutoCloseFD, Path> createTempFile(const Path & prefix)
 {
     Path tmpl(getEnv("TMPDIR").value_or("/tmp") + "/" + prefix + ".XXXXXX");
     // Strictly speaking, this is UB, but who cares...
+    // FIXME: use O_TMPFILE.
     AutoCloseFD fd(mkstemp((char *) tmpl.c_str()));
     if (!fd)
         throw SysError("creating temporary file '%s'", tmpl);
@@ -581,20 +582,31 @@ Paths createDirs(const Path & path)
 }
 
 
-void createSymlink(const Path & target, const Path & link)
+void createSymlink(const Path & target, const Path & link,
+    std::optional<time_t> mtime)
 {
     if (symlink(target.c_str(), link.c_str()))
         throw SysError("creating symlink from '%1%' to '%2%'", link, target);
+    if (mtime) {
+        struct timeval times[2];
+        times[0].tv_sec = *mtime;
+        times[0].tv_usec = 0;
+        times[1].tv_sec = *mtime;
+        times[1].tv_usec = 0;
+        if (lutimes(link.c_str(), times))
+            throw SysError("setting time of symlink '%s'", link);
+    }
 }
 
 
-void replaceSymlink(const Path & target, const Path & link)
+void replaceSymlink(const Path & target, const Path & link,
+    std::optional<time_t> mtime)
 {
     for (unsigned int n = 0; true; n++) {
         Path tmp = canonPath(fmt("%s/.%d_%s", dirOf(link), n, baseNameOf(link)));
 
         try {
-            createSymlink(target, tmp);
+            createSymlink(target, tmp, mtime);
         } catch (SysError & e) {
             if (e.errNo == EEXIST) continue;
             throw;
@@ -1006,12 +1018,14 @@ std::vector<char *> stringsToCharPtrs(const Strings & ss)
     return res;
 }
 
-
+// Output = "standard out" output stream
 string runProgram(Path program, bool searchPath, const Strings & args,
     const std::optional<std::string> & input)
 {
     RunOptions opts(program, args);
     opts.searchPath = searchPath;
+    // This allows you to refer to a program with a pathname relative to the
+    // PATH variable.
     opts.input = input;
 
     auto res = runProgram(opts);
@@ -1022,6 +1036,7 @@ string runProgram(Path program, bool searchPath, const Strings & args,
     return res.second;
 }
 
+// Output = error code + "standard out" output stream
 std::pair<int, std::string> runProgram(const RunOptions & options_)
 {
     RunOptions options(options_);
@@ -1094,6 +1109,8 @@ void runProgram2(const RunOptions & options)
 
         if (options.searchPath)
             execvp(options.program.c_str(), stringsToCharPtrs(args_).data());
+            // This allows you to refer to a program with a pathname relative
+            // to the PATH variable.
         else
             execv(options.program.c_str(), stringsToCharPtrs(args_).data());
 
@@ -1433,7 +1450,7 @@ string base64Decode(std::string_view s)
 
         char digit = decode[(unsigned char) c];
         if (digit == -1)
-            throw Error("invalid character in Base64 string");
+            throw Error("invalid character in Base64 string: '%c'", c);
 
         bits += 6;
         d = d << 6 | digit;
@@ -1565,7 +1582,7 @@ AutoCloseFD createUnixDomainSocket(const Path & path, mode_t mode)
 
     struct sockaddr_un addr;
     addr.sun_family = AF_UNIX;
-    if (path.size() >= sizeof(addr.sun_path))
+    if (path.size() + 1 >= sizeof(addr.sun_path))
         throw Error("socket path '%1%' is too long", path);
     strcpy(addr.sun_path, path.c_str());
 
