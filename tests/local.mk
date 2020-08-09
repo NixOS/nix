@@ -32,7 +32,8 @@ nix_tests = \
   post-hook.sh \
   function-trace.sh \
   recursive.sh \
-  flakes.sh
+  flakes.sh \
+  content-addressed.sh
   # parallel.sh
 
 install-tests += $(foreach x, $(nix_tests), tests/$(x))

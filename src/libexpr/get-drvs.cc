@@ -39,7 +39,9 @@ DrvInfo::DrvInfo(EvalState & state, ref<Store> store, const std::string & drvPat
     if (i == drv.outputs.end())
         throw Error("derivation '%s' does not have output '%s'", store->printStorePath(drvPath), outputName);
 
-    outPath = store->printStorePath(i->second.path(*store, drv.name));
+    auto optStorePath = i->second.pathOpt(*store, drv.name);
+    if (optStorePath)
+        outPath = store->printStorePath(*optStorePath);
 }
 
 
@@ -77,12 +79,15 @@ string DrvInfo::queryDrvPath() const
 
 string DrvInfo::queryOutPath() const
 {
-    if (outPath == "" && attrs) {
+    if (!outPath && attrs) {
         Bindings::iterator i = attrs->find(state->sOutPath);
         PathSet context;
-        outPath = i != attrs->end() ? state->coerceToPath(*i->pos, *i->value, context) : "";
+        if (i != attrs->end())
+            outPath = state->coerceToPath(*i->pos, *i->value, context);
     }
-    return outPath;
+    if (!outPath)
+        throw UnimplementedError("CA derivations are not yet supported");
+    return *outPath;
 }
 
 

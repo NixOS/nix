@@ -65,6 +65,7 @@ static PathSet realisePath(StorePathWithOutputs path, bool build = true)
 
     if (path.path.isDerivation()) {
         if (build) store->buildPaths({path});
+        auto outputPaths = store->queryDerivationOutputMapAssumeTotal(path.path);
         Derivation drv = store->derivationFromPath(path.path);
         rootNr++;
 
@@ -77,7 +78,8 @@ static PathSet realisePath(StorePathWithOutputs path, bool build = true)
             if (i == drv.outputs.end())
                 throw Error("derivation '%s' does not have an output named '%s'",
                     store2->printStorePath(path.path), j);
-            auto outPath = store2->printStorePath(i->second.path(*store, drv.name));
+            auto outPath = outputPaths.at(i->first);
+            auto retPath = store->printStorePath(outPath);
             if (store2) {
                 if (gcRoot == "")
                     printGCWarning();
@@ -85,10 +87,10 @@ static PathSet realisePath(StorePathWithOutputs path, bool build = true)
                     Path rootName = gcRoot;
                     if (rootNr > 1) rootName += "-" + std::to_string(rootNr);
                     if (i->first != "out") rootName += "-" + i->first;
-                    outPath = store2->addPermRoot(store->parseStorePath(outPath), rootName, indirectRoot);
+                    retPath = store2->addPermRoot(outPath, rootName, indirectRoot);
                 }
             }
-            outputs.insert(outPath);
+            outputs.insert(retPath);
         }
         return outputs;
     }
@@ -218,8 +220,14 @@ static StorePathSet maybeUseOutputs(const StorePath & storePath, bool useOutput,
     if (useOutput && storePath.isDerivation()) {
         auto drv = store->derivationFromPath(storePath);
         StorePathSet outputs;
-        for (auto & i : drv.outputs)
-            outputs.insert(i.second.path(*store, drv.name));
+        if (forceRealise)
+            return store->queryDerivationOutputs(storePath);
+        for (auto & i : drv.outputs) {
+            auto optPath = i.second.pathOpt(*store, drv.name);
+            if (!optPath)
+                throw UsageError("Cannot use output path of floating content-addressed derivation until we know what it is (e.g. by building it)");
+            outputs.insert(*optPath);
+        }
         return outputs;
     }
     else return {storePath};
@@ -309,11 +317,9 @@ static void opQuery(Strings opFlags, Strings opArgs)
 
         case qOutputs: {
             for (auto & i : opArgs) {
-                auto i2 = store->followLinksToStorePath(i);
-                if (forceRealise) realisePath({i2});
-                Derivation drv = store->derivationFromPath(i2);
-                for (auto & j : drv.outputs)
-                    cout << fmt("%1%\n", store->printStorePath(j.second.path(*store, drv.name)));
+                auto outputs = maybeUseOutputs(store->followLinksToStorePath(i), true, forceRealise);
+                for (auto & outputPath : outputs)
+                    cout << fmt("%1%\n", store->printStorePath(outputPath));
             }
             break;
         }
