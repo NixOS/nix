@@ -605,6 +605,7 @@ DerivationT<InputDrvPath, StorePath> bakeDerivationPaths(
     drvFinal.builder = drv.builder;
     drvFinal.args = drv.args;
     drvFinal.env = drv.env;
+    drvFinal.name = drv.name;
 
     std::optional<Hash> h;
     for (auto & [ outputName, output] : drv.outputs) {
@@ -643,6 +644,7 @@ DerivationT<InputDrvPath, NoPath> stripDerivationPaths(
     drvInitial.builder = drv.builder;
     drvInitial.args = drv.args;
     drvInitial.env = drv.env;
+    drvInitial.name = drv.name;
     for (const auto & [outputName, output] : drv.outputs) {
         drvInitial.outputs.insert_or_assign(outputName, std::visit(overloaded {
             [&](DerivationOutputInputAddressed _) {
