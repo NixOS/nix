@@ -119,9 +119,10 @@ StorePath getDerivationEnvironment(ref<Store> store, const StorePath & drvPath)
     drv.args = {store->printStorePath(getEnvShPath)};
 
     /* Copy original but remove derivation checks. */
-    drv.env = drvOriginal.env;
-    drv.platform = drvOriginal.platform;
     drv.inputSrcs = drvOriginal.inputSrcs;
+    drv.platform = drvOriginal.platform;
+    drv.builder = drvOriginal.builder;
+    drv.env = drvOriginal.env;
     drv.inputDrvs = drvOriginal.inputDrvs;
 
     drv.env.erase("allowedReferences");
@@ -131,27 +132,32 @@ StorePath getDerivationEnvironment(ref<Store> store, const StorePath & drvPath)
 
     /* Rehash and write the derivation. FIXME: would be nice to use
        'buildDerivation', but that's privileged. */
-    auto drvName = std::string(drvPath.name());
-    assert(hasSuffix(drvName, ".drv"));
-    drvName.resize(drvName.size() - 4);
-    drvName += "-env";
-    for (auto & output : drv.outputs)
+    drv.name = drvOriginal.name + "-env";
+
+    for (auto & output : drvOriginal.outputs)
         drv.env.erase(output.first);
     drv.outputs = {{"out", {
         .output = DerivationOutputInputAddressedT<NoPath> { .path = NoPath {} }}
     }};
+
     drv.env["out"] = "";
     drv.env["_outputs_saved"] = drv.env["outputs"];
     drv.env["outputs"] = "out";
+
     drv.inputSrcs.insert(std::move(getEnvShPath));
-    drv.outputs.insert_or_assign("out", DerivationOutputT<NoPath> {});
+
     Derivation drvFinal = bakeDerivationPaths(*store, drv);
-    auto shellDrvPath2 = writeDerivation(store, drvFinal, drvName);
+    auto output = std::get<DerivationOutputInputAddressed>(drvFinal.outputs.at("out").output);
+    drvFinal.env.at("out") = store->printStorePath(output.path);
+
+    auto shellDrvPath2 = writeDerivation(store, drvFinal, drv.name);
 
     /* Build the derivation. */
     store->buildPaths({{shellDrvPath2}});
 
-    return std::get<DerivationOutputInputAddressed>(drvFinal.outputs.at("out").output).path;
+    assert(store->isValidPath(output.path));
+
+    return output.path;
 }
 
 struct Common : InstallableCommand, MixProfile

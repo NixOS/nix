@@ -185,10 +185,10 @@ DerivationT<Hash, OutPath> derivationModulo(
     Store & store,
     const DerivationT<Hash, OutPath> & drv);
 
-/* Reduce a derivation down to a resolved normal form if it is regular, or
-   hashes per output if it is fixed output. */
+/* If the derivation is fixed output, transform its (fixed) output hashes into
+   a form useful by derivation or modulo. */
 template<typename InputDrvPath, typename OutPath>
-std::variant<DerivationT<Hash, OutPath>, CaOutputHashes> derivationModuloOrOutput(
+std::optional<CaOutputHashes> outputHashesForModuloIfFixed(
     Store & store,
     const DerivationT<InputDrvPath, OutPath> & drv);
 
@@ -197,17 +197,11 @@ typedef std::variant<
     CaOutputHashes
 > DrvHashModulo;
 
-/// Turn the output of derivationModuloOrOutput into a plain hash.
-template<typename OutPath>
-DrvHashModulo hashDerivationOrPseudo(
-    Store & store,
-    typename std::variant<DerivationT<Hash, OutPath>, CaOutputHashes> drvOrPseudo);
-
-/* Hash a resolved normal form derivation. */
-template<typename OutPath>
+/* Hash a derivation. */
+template<typename InputDrvPath, typename OutPath>
 Hash hashDerivation(
     Store & store,
-    const DerivationT<Hash, OutPath> & drv);
+    const DerivationT<InputDrvPath, OutPath> & drv);
 
 /* Compute a "baked" derivation, made from the which additionally contains the
    outputs paths created from the hash of the initial one. */
