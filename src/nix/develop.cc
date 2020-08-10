@@ -150,7 +150,7 @@ StorePath getDerivationEnvironment(ref<Store> store, const StorePath & drvPath)
     auto output = std::get<DerivationOutputInputAddressed>(drvFinal.outputs.at("out").output);
     drvFinal.env.at("out") = store->printStorePath(output.path);
 
-    auto shellDrvPath2 = writeDerivation(store, drvFinal, drv.name);
+    auto shellDrvPath2 = writeDerivation(store, drvFinal);
 
     /* Build the derivation. */
     store->buildPaths({{shellDrvPath2}});
