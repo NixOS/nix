@@ -219,7 +219,7 @@ void BinaryCacheStore::addToStore(const ValidPathInfo & info, Source & narSource
             }
         }
 
-        upsertFile(std::string(info.path.to_string()) + ".ls", jsonOut.str(), "application/json");
+        upsertFile(std::string(info.path.hashPart()) + ".ls", jsonOut.str(), "application/json");
     }
 
     /* Optionally maintain an index of DWARF debug info files
