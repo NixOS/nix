@@ -1547,6 +1547,7 @@ void DerivationGoal::tryToBuild()
        omitted, but that would be less efficient.)  Note that since we
        now hold the locks on the output paths, no other process can
        build this derivation, so no further checks are necessary. */
+    checkPathValidity();
     bool allValid = true;
     for (auto & [_, status] : initialOutputs) {
         if (!status.wanted) continue;
