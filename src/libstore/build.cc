@@ -1389,9 +1389,10 @@ void DerivationGoal::repairClosure()
     std::map<StorePath, StorePath> outputsToDrv;
     for (auto & i : inputClosure)
         if (i.isDerivation()) {
-            auto depOutputs = worker.store.queryDerivationOutputMapAssumeTotal(i);
+            auto depOutputs = worker.store.queryDerivationOutputMap(i);
             for (auto & j : depOutputs)
-                outputsToDrv.insert_or_assign(j.second, i);
+                if (j.second)
+                    outputsToDrv.insert_or_assign(*j.second, i);
         }
 
     /* Check each path (slow!). */
@@ -1459,11 +1460,16 @@ void DerivationGoal::inputsRealised()
                `i' as input paths.  Only add the closures of output paths
                that are specified as inputs. */
             assert(worker.store.isValidPath(drvPath));
-            auto outputs = worker.store.queryDerivationOutputMapAssumeTotal(depDrvPath);
+            auto outputs = worker.store.queryDerivationOutputMap(depDrvPath);
             for (auto & j : wantedDepOutputs) {
-                if (outputs.count(j) > 0)
-                    worker.store.computeFSClosure(outputs.at(j), inputPaths);
-                else
+                if (outputs.count(j) > 0) {
+                    auto optRealizedInput = outputs.at(j);
+                    if (!optRealizedInput)
+                        throw Error(
+                            "derivation '%s' requires output '%s' from input derivation '%s', which is supposedly realized already, yet we still don't know what path corresponds to that output.",
+                            worker.store.printStorePath(drvPath), j, worker.store.printStorePath(drvPath));
+                    worker.store.computeFSClosure(*optRealizedInput, inputPaths);
+                } else
                     throw Error(
                         "derivation '%s' requires non-existent output '%s' from input derivation '%s'",
                         worker.store.printStorePath(drvPath), j, worker.store.printStorePath(drvPath));
