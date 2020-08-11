@@ -1334,11 +1334,10 @@ void DerivationGoal::outputsSubstitutionTried()
     gaveUpOnSubstitution();
 }
 
+/* At least one of the output paths could not be
+   produced using a substitute.  So we have to build instead. */
 void DerivationGoal::gaveUpOnSubstitution()
 {
-    /* At least one of the output paths could not be
-       produced using a substitute.  So we have to build instead. */
-
     /* Make sure checkPathValidity() from now on checks all
        outputs. */
     wantedOutputs.clear();
