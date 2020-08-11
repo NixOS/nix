@@ -2370,9 +2370,11 @@ void DerivationGoal::startBuilder()
            (typically the dependencies of /bin/sh).  Throw them
            out. */
         for (auto & i : drv->outputs) {
-            /* If the name isn't known a priori (i.e. floating content-addressed
-               derivation), the temporary location we use should be fresh and
-               never in the sandbox in the first place. */
+            /* If the name isn't known a priori (i.e. floating
+               content-addressed derivation), the temporary location we use
+               should be fresh.  Freshness means it is impossible that the path
+               is already in the sandbox, so we don't need to worry about
+               removing it.  */
             auto optPath = i.second.pathOpt(worker.store, drv->name);
             if (optPath)
                 dirsInChroot.erase(worker.store.printStorePath(*optPath));
