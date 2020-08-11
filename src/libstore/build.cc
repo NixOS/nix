@@ -3800,7 +3800,9 @@ void DerivationGoal::registerOutputs()
        that are most definitely already installed, we just store their final
        name so we can also use it in rewrites. */
     StringSet outputsToSort;
-    std::map<std::string, std::variant<StorePath, StorePathSet>> outputReferences;
+    struct AlreadyRegistered { StorePath path; };
+    struct PerhapsNeedToRegister { StorePathSet refs; };
+    std::map<std::string, std::variant<AlreadyRegistered, PerhapsNeedToRegister>> outputReferencesIfUnregistered;
     std::map<std::string, struct stat> outputStats;
     for (auto & [outputName, _] : drv->outputs) {
         auto actualPath = toRealPathChroot(worker.store.printStorePath(scratchOutputs.at(outputName)));
@@ -3814,7 +3816,9 @@ void DerivationGoal::registerOutputs()
         initialInfo.wanted = buildMode == bmCheck
             || !(initialInfo.known && initialInfo.known->isValid());
         if (!initialInfo.wanted) {
-            outputReferences.insert_or_assign(outputName, initialInfo.known->path);
+            outputReferencesIfUnregistered.insert_or_assign(
+                outputName,
+                AlreadyRegistered { .path = initialInfo.known->path });
             continue;
         }
 
@@ -3851,28 +3855,29 @@ void DerivationGoal::registerOutputs()
         auto references = worker.store.parseStorePathSet(
             scanForReferences(blank, actualPath, worker.store.printStorePathSet(referenceablePaths)));
 
-        outputReferences.insert_or_assign(outputName, references);
+        outputReferencesIfUnregistered.insert_or_assign(
+            outputName,
+            PerhapsNeedToRegister { .refs = references });
         outputStats.insert_or_assign(outputName, std::move(st));
     }
 
     auto sortedOutputNames = topoSort(outputsToSort,
         {[&](const std::string & name) {
-            auto x = outputReferences.at(name);
             return std::visit(overloaded {
                 /* Since we'll use the already installed versions of these, we
                    can treat them as leaves and ignore any references they
                    have. */
-                [&](StorePath _) { return StringSet {}; },
-                [&](StorePathSet refs) {
+                [&](AlreadyRegistered _) { return StringSet {}; },
+                [&](PerhapsNeedToRegister refs) {
                     StringSet referencedOutputs;
                     /* FIXME build inverted map up front so no quadratic waste here */
-                    for (auto & r : refs)
+                    for (auto & r : refs.refs)
                         for (auto & [o, p] : scratchOutputs)
                             if (r == p)
                                 referencedOutputs.insert(o);
                     return referencedOutputs;
                 },
-            }, x);
+            }, outputReferencesIfUnregistered.at(name));
         }},
         {[&](const std::string & path, const std::string & parent) {
             // TODO with more -vvvv also show the temporary paths for manual inspection.
@@ -3900,14 +3905,14 @@ void DerivationGoal::registerOutputs()
 
         bool rewritten = false;
         std::optional<StorePathSet> referencesOpt = std::visit(overloaded {
-            [&](StorePath skippedFinalPath) -> std::optional<StorePathSet> {
-                finish(skippedFinalPath);
+            [&](AlreadyRegistered skippedFinalPath) -> std::optional<StorePathSet> {
+                finish(skippedFinalPath.path);
                 return std::nullopt;
             },
-            [&](StorePathSet references) -> std::optional<StorePathSet> {
-                return references;
+            [&](PerhapsNeedToRegister r) -> std::optional<StorePathSet> {
+                return r.refs;
             },
-        }, outputReferences.at(outputName));
+        }, outputReferencesIfUnregistered.at(outputName));
 
         if (!referencesOpt)
             continue;
