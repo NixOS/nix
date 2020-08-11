@@ -201,7 +201,7 @@ static int _main(int argc, char * * argv)
                             % concatStringsSep<StringSet>(", ", m.mandatoryFeatures);
                         }
 
-                        logError({
+                        logErrorInfo(lvlInfo, {
                               .name = "Remote build",
                               .description = "Failed to find a machine for remote build!",
                               .hint = hint
