@@ -827,15 +827,6 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
        paths created from the hash of the initial one. */
     Derivation drvFinal = bakeDerivationPaths(*state.store, drv);
 
-    for (auto & [outputName, output] : drvFinal.outputs) {
-        auto pathOpt = output.pathOpt(*state.store, drv.name);
-        drvFinal.env.insert_or_assign(
-            outputName,
-            pathOpt
-                ? state.store->printStorePath(*pathOpt)
-                : hashPlaceholder(outputName));
-    }
-
     /* Write the resulting term into the Nix store directory. */
     auto drvPath = writeDerivation(state.store, drvFinal, state.repair);
     auto drvPathS = state.store->printStorePath(drvPath);

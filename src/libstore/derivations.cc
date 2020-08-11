@@ -582,6 +582,15 @@ DerivationT<InputDrvPath, StorePath> bakeDerivationPaths(
         }, output.output));
     }
 
+    for (auto & [outputName, output] : drvFinal.outputs) {
+        auto pathOpt = output.pathOpt(store, drvFinal.name);
+        drvFinal.env.insert_or_assign(
+            outputName,
+            pathOpt
+                ? store.printStorePath(*pathOpt)
+                : hashPlaceholder(outputName));
+    }
+
     return drvFinal;
 }
 
