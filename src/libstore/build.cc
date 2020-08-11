@@ -876,7 +876,7 @@ private:
          ends up being. (Note that fixed outputs derivations that produce the
          "wrong" output still install that data under its true content-address.)
      */
-    std::map<std::string, StorePath> finalOutputs;
+    OutputPathMap finalOutputs;
 
     BuildMode buildMode;
 
@@ -1055,7 +1055,7 @@ private:
     StorePath makeFallbackPath(const StorePath & path);
     /* Make a path to another based on the output name alone, if one doesn't
        want to use a random path for CA builds. */
-    StorePath makeFallbackPath(std::string_view path);
+    StorePath makeFallbackPath(std::string_view outputName);
 
     void repairClosure();
 
@@ -1336,7 +1336,7 @@ void DerivationGoal::outputsSubstitutionTried()
 
 void DerivationGoal::gaveUpOnSubstitution()
 {
-    /* Otherwise, at least one of the output paths could not be
+    /* At least one of the output paths could not be
        produced using a substitute.  So we have to build instead. */
 
     /* Make sure checkPathValidity() from now on checks all
@@ -2371,7 +2371,7 @@ void DerivationGoal::startBuilder()
            (typically the dependencies of /bin/sh).  Throw them
            out. */
         for (auto & i : drv->outputs) {
-            /* If the name isn't known a prior (i.e. floating content-addressed
+            /* If the name isn't known a priori (i.e. floating content-addressed
                derivation), the temporary location we use should be fresh and
                never in the sandbox in the first place. */
             auto optPath = i.second.pathOpt(worker.store, drv->name);
@@ -3887,7 +3887,7 @@ void DerivationGoal::registerOutputs()
     for (auto & outputName : sortedOutputNames) {
         auto output = drv->outputs.at(outputName);
         auto & scratchPath = scratchOutputs.at(outputName);
-        auto actualPath = toRealPathChroot(worker.store.printStorePath(scratchOutputs.at(outputName)));
+        auto actualPath = toRealPathChroot(worker.store.printStorePath(scratchPath));
 
         auto finish = [&](StorePath finalStorePath) {
             /* Store the final path */
