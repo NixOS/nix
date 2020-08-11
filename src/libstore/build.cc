@@ -4086,7 +4086,7 @@ void DerivationGoal::registerOutputs()
             } else if (buildMode == bmCheck) {
                 /* Path already exists, and we want to compare, so we leave out
                    new path in place. */
-            } else if (finalDestPath == finalDestPath && worker.store.isValidPath(newInfo.path)) {
+            } else if (worker.store.isValidPath(newInfo.path)) {
                 /* Path already exists because CA path produced by something
                    else. No moving needed. */
                 assert(newInfo.ca);
