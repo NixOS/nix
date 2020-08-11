@@ -192,7 +192,7 @@ static DerivationOutput parseDerivationOutput(const Store & store,
 
 static DerivationOutput parseDerivationOutput(const Store & store, std::istringstream & str)
 {
-    expect(str, ","); const auto pathS = parsePath(str);
+    expect(str, ","); const auto pathS = parseString(str);
     expect(str, ","); const auto hashAlgo = parseString(str);
     expect(str, ","); const auto hash = parseString(str);
     expect(str, ")");
