@@ -202,6 +202,24 @@ struct LegacySSHStore : public Store
         const StorePathSet & references, RepairFlag repair) override
     { unsupported("addTextToStore"); }
 
+private:
+
+    void putBuildSettings(Connection & conn)
+    {
+        conn.to
+            << settings.maxSilentTime
+            << settings.buildTimeout;
+        if (GET_PROTOCOL_MINOR(conn.remoteVersion) >= 2)
+            conn.to
+                << settings.maxLogSize;
+        if (GET_PROTOCOL_MINOR(conn.remoteVersion) >= 3)
+            conn.to
+                << settings.buildRepeat
+                << settings.enforceDeterminism;
+    }
+
+public:
+
     BuildResult buildDerivation(const StorePath & drvPath, const BasicDerivation & drv,
         BuildMode buildMode) override
     {
@@ -211,16 +229,8 @@ struct LegacySSHStore : public Store
             << cmdBuildDerivation
             << printStorePath(drvPath);
         writeDerivation(conn->to, *this, drv);
-        conn->to
-            << settings.maxSilentTime
-            << settings.buildTimeout;
-        if (GET_PROTOCOL_MINOR(conn->remoteVersion) >= 2)
-            conn->to
-                << settings.maxLogSize;
-        if (GET_PROTOCOL_MINOR(conn->remoteVersion) >= 3)
-            conn->to
-                << settings.buildRepeat
-                << settings.enforceDeterminism;
+
+        putBuildSettings(*conn);
 
         conn->to.flush();
 
@@ -232,6 +242,29 @@ struct LegacySSHStore : public Store
             conn->from >> status.timesBuilt >> status.isNonDeterministic >> status.startTime >> status.stopTime;
 
         return status;
+    }
+
+    void buildPaths(const std::vector<StorePathWithOutputs> & drvPaths, BuildMode buildMode) override
+    {
+        auto conn(connections->get());
+
+        conn->to << cmdBuildPaths;
+        Strings ss;
+        for (auto & p : drvPaths)
+            ss.push_back(p.to_string(*this));
+        conn->to << ss;
+
+        putBuildSettings(*conn);
+
+        conn->to.flush();
+
+        BuildResult result;
+        result.status = (BuildResult::Status) readInt(conn->from);
+
+        if (!result.success()) {
+            conn->from >> result.errorMsg;
+            throw Error(result.status, result.errorMsg);
+        }
     }
 
     void ensurePath(const StorePath & path) override
