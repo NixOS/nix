@@ -23,6 +23,7 @@ let
     shell = busybox;
     name = "build-remote-input-2";
     buildCommand = "echo BAR > $out";
+    requiredSystemFeatures = ["bar"];
   };
 
 in
@@ -34,6 +35,6 @@ in
       ''
         read x < ${input1}
         read y < ${input2}
-        echo $x$y > $out
+        echo "$x $y" > $out
       '';
   }

@@ -1475,7 +1475,7 @@ void DerivationGoal::tryToBuild()
     /* Don't do a remote build if the derivation has the attribute
        `preferLocalBuild' set.  Also, check and repair modes are only
        supported for local builds. */
-    bool buildLocally = buildMode != bmNormal || parsedDrv->willBuildLocally();
+    bool buildLocally = buildMode != bmNormal || parsedDrv->willBuildLocally(worker.store);
 
     /* Is the build hook willing to accept this job? */
     if (!buildLocally) {
@@ -1964,13 +1964,13 @@ void linkOrCopy(const Path & from, const Path & to)
 void DerivationGoal::startBuilder()
 {
     /* Right platform? */
-    if (!parsedDrv->canBuildLocally())
+    if (!parsedDrv->canBuildLocally(worker.store))
         throw Error("a '%s' with features {%s} is required to build '%s', but I am a '%s' with features {%s}",
             drv->platform,
             concatStringsSep(", ", parsedDrv->getRequiredSystemFeatures()),
             worker.store.printStorePath(drvPath),
             settings.thisSystem,
-            concatStringsSep<StringSet>(", ", settings.systemFeatures));
+            concatStringsSep<StringSet>(", ", worker.store.systemFeatures));
 
     if (drv->isBuiltin())
         preloadNSS();
@@ -3179,7 +3179,7 @@ void DerivationGoal::runChild()
                 createDirs(chrootRootDir + "/dev/shm");
                 createDirs(chrootRootDir + "/dev/pts");
                 ss.push_back("/dev/full");
-                if (settings.systemFeatures.get().count("kvm") && pathExists("/dev/kvm"))
+                if (worker.store.systemFeatures.get().count("kvm") && pathExists("/dev/kvm"))
                     ss.push_back("/dev/kvm");
                 ss.push_back("/dev/null");
                 ss.push_back("/dev/random");
