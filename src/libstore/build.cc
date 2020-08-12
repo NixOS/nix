@@ -3973,42 +3973,7 @@ void DerivationGoal::registerOutputs()
             return res;
         };
 
-        ValidPathInfo newInfo = [&]() {if (auto outputP = std::get_if<DerivationOutputInputAddressed>(&output.output)) {
-            /* input-addressed case */
-            auto requiredFinalPath = outputP->path;
-            /* Preemtively add rewrite rule for final hash, as that is
-               what the NAR hash will use rather than normalized-self references */
-            if (scratchPath != requiredFinalPath)
-                outputRewrites.insert_or_assign(
-                    std::string { scratchPath.hashPart() },
-                    std::string { requiredFinalPath.hashPart() });
-            rewriteOutput();
-            auto narHashAndSize = hashPath(htSHA256, actualPath);
-            ValidPathInfo newInfo0 { requiredFinalPath };
-            newInfo0.narHash = narHashAndSize.first;
-            newInfo0.narSize = narHashAndSize.second;
-            auto refs = rewriteRefs();
-            newInfo0.references = refs.second;
-            if (refs.first)
-                newInfo0.references.insert(newInfo0.path);
-            return newInfo0;
-        } else {
-            /* content-addressed case */
-            DerivationOutputCAFloating outputHash = std::visit(overloaded {
-                [&](DerivationOutputInputAddressed doi) -> DerivationOutputCAFloating {
-                    // Enclosing `if` handles this case in other branch
-                    throw Error("ought to unreachable, handled in other branch");
-                },
-                [&](DerivationOutputCAFixed dof) {
-                    return DerivationOutputCAFloating {
-                        .method = dof.hash.method,
-                        .hashType = dof.hash.hash.type,
-                    };
-                },
-                [&](DerivationOutputCAFloating dof) {
-                   return dof;
-                },
-            }, output.output);
+        auto newInfoFromCA = [&](const DerivationOutputCAFloating outputHash) -> ValidPathInfo {
             auto & st = outputStats.at(outputName);
             if (outputHash.method == FileIngestionMethod::Flat) {
                 /* The output path should be a regular file without execute permission. */
@@ -4055,9 +4020,41 @@ void DerivationGoal::registerOutputs()
                 newInfo0.narSize = narHashAndSize.second;
             }
 
-            /* Check wanted hash if output is fixed */
-            if (auto p = std::get_if<DerivationOutputCAFixed>(&output.output)) {
-                Hash & wanted = p->hash.hash;
+            assert(newInfo0.ca);
+            return newInfo0;
+        };
+
+        ValidPathInfo newInfo = std::visit(overloaded {
+            [&](DerivationOutputInputAddressed output) {
+                /* input-addressed case */
+                auto requiredFinalPath = output.path;
+                /* Preemtively add rewrite rule for final hash, as that is
+                   what the NAR hash will use rather than normalized-self references */
+                if (scratchPath != requiredFinalPath)
+                    outputRewrites.insert_or_assign(
+                        std::string { scratchPath.hashPart() },
+                        std::string { requiredFinalPath.hashPart() });
+                rewriteOutput();
+                auto narHashAndSize = hashPath(htSHA256, actualPath);
+                ValidPathInfo newInfo0 { requiredFinalPath };
+                newInfo0.narHash = narHashAndSize.first;
+                newInfo0.narSize = narHashAndSize.second;
+                auto refs = rewriteRefs();
+                newInfo0.references = refs.second;
+                if (refs.first)
+                    newInfo0.references.insert(newInfo0.path);
+                return newInfo0;
+            },
+            [&](DerivationOutputCAFixed dof) {
+                auto newInfo0 = newInfoFromCA(DerivationOutputCAFloating {
+                    .method = dof.hash.method,
+                    .hashType = dof.hash.hash.type,
+                });
+
+                /* Check wanted hash */
+                Hash & wanted = dof.hash.hash;
+                assert(newInfo0.ca);
+                auto got = getContentAddressHash(*newInfo0.ca);
                 if (wanted != got) {
                     /* Throw an error after registering the path as
                        valid. */
@@ -4068,11 +4065,12 @@ void DerivationGoal::registerOutputs()
                             wanted.to_string(SRI, true),
                             got.to_string(SRI, true)));
                 }
-            }
-
-            assert(newInfo0.ca);
-            return newInfo0;
-        }}();
+                return newInfo0;
+            },
+            [&](DerivationOutputCAFloating dof) {
+                return newInfoFromCA(dof);
+            },
+        }, output.output);
 
         /* Calculate where we'll move the output files. In the checking case we
            will leave leave them where they are, for now, rather than move to
