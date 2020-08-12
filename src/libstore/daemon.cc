@@ -817,8 +817,7 @@ void processConnection(
     FdSink & to,
     TrustedFlag trusted,
     RecursiveFlag recursive,
-    const std::string & userName,
-    uid_t userId)
+    std::function<void(Store &)> authHook)
 {
     auto monitor = !recursive ? std::make_unique<MonitorFdHup>(from.fd) : nullptr;
 
@@ -859,15 +858,7 @@ void processConnection(
 
         /* If we can't accept clientVersion, then throw an error
            *here* (not above). */
-
-#if 0
-        /* Prevent users from doing something very dangerous. */
-        if (geteuid() == 0 &&
-            querySetting("build-users-group", "") == "")
-            throw Error("if you run 'nix-daemon' as root, then you MUST set 'build-users-group'!");
-#endif
-
-        store->createUser(userName, userId);
+        authHook(*store);
 
         tunnelLogger->stopWork();
         to.flush();

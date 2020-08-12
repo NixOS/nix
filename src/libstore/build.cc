@@ -2920,7 +2920,8 @@ void DerivationGoal::startDaemon()
                 FdSink to(remote.get());
                 try {
                     daemon::processConnection(store, from, to,
-                        daemon::NotTrusted, daemon::Recursive, "nobody", 65535);
+                        daemon::NotTrusted, daemon::Recursive,
+                        [&](Store & store) { store.createUser("nobody", 65535); });
                     debug("terminated daemon connection");
                 } catch (SysError &) {
                     ignoreException();
