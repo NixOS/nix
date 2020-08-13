@@ -1021,11 +1021,7 @@ void LocalStore::addToStore(const ValidPathInfo & info, Source & source,
             else
                 hashSink = std::make_unique<HashModuloSink>(htSHA256, std::string(info.path.hashPart()));
 
-            LambdaSource wrapperSource([&](unsigned char * data, size_t len) -> size_t {
-                size_t n = source.read(data, len);
-                (*hashSink)(data, n);
-                return n;
-            });
+            TeeSource wrapperSource { source, *hashSink };
 
             restorePath(realPath, wrapperSource);
 
