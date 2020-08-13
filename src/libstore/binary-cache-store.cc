@@ -312,14 +312,10 @@ void BinaryCacheStore::narFromPath(const StorePath & storePath, Sink & sink)
 {
     auto info = queryPathInfo(storePath).cast<const NarInfo>();
 
-    uint64_t narSize = 0;
+    LengthSink narSize;
+    TeeSink tee { sink, narSize };
 
-    LambdaSink wrapperSink([&](const unsigned char * data, size_t len) {
-        sink(data, len);
-        narSize += len;
-    });
-
-    auto decompressor = makeDecompressionSink(info->compression, wrapperSink);
+    auto decompressor = makeDecompressionSink(info->compression, tee);
 
     try {
         getFile(info->url, *decompressor);
@@ -331,7 +327,7 @@ void BinaryCacheStore::narFromPath(const StorePath & storePath, Sink & sink)
 
     stats.narRead++;
     //stats.narReadCompressedBytes += nar->size(); // FIXME
-    stats.narReadBytes += narSize;
+    stats.narReadBytes += narSize.length;
 }
 
 void BinaryCacheStore::queryPathInfoUncached(const StorePath & storePath,
