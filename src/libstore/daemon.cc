@@ -688,7 +688,7 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
         auto path = store->parseStorePath(readString(from));
         logger->startWork();
         logger->stopWork();
-        dumpPath(store->toRealPath(path)), to);
+        dumpPath(store->toRealPath(path), to);
         break;
     }
 
