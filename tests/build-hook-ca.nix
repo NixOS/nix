@@ -18,6 +18,7 @@ let
     shell = busybox;
     name = "build-remote-input-1";
     buildCommand = "echo FOO > $out";
+    requiredSystemFeatures = ["foo"];
     outputHash = "sha256-FePFYIlMuycIXPZbWi7LGEiMmZSX9FMbaQenWBzm1Sc=";
   };
 
@@ -25,6 +26,7 @@ let
     shell = busybox;
     name = "build-remote-input-2";
     buildCommand = "echo BAR > $out";
+    requiredSystemFeatures = ["bar"];
     outputHash = "sha256-XArauVH91AVwP9hBBQNlkX9ccuPpSYx9o0zeIHb6e+Q=";
   };
 
@@ -35,6 +37,7 @@ let
       read x < ${input2}
       echo $x BAZ > $out
     '';
+    requiredSystemFeatures = ["baz"];
     outputHash = "sha256-daKAcPp/+BYMQsVi/YYMlCKoNAxCNDsaivwSHgQqD2s=";
   };
 
@@ -43,10 +46,11 @@ in
   mkDerivation {
     shell = busybox;
     name = "build-remote";
-    buildCommand = ''
-      read x < ${input1}
-      read y < ${input3}
-      echo "$x $y" > $out
-    '';
+    buildCommand =
+      ''
+        read x < ${input1}
+        read y < ${input3}
+        echo "$x $y" > $out
+      '';
     outputHash = "sha256-5SxbkUw6xe2l9TE1uwCvTtTDysD1vhRor38OtDF0LqQ=";
   }

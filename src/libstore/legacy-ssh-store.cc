@@ -93,6 +93,9 @@ struct LegacySSHStore : public Store
         try {
             auto conn(connections->get());
 
+            /* No longer support missing NAR hash */
+            assert(GET_PROTOCOL_MINOR(conn->remoteVersion) >= 4);
+
             debug("querying remote host '%s' for info on '%s'", host, printStorePath(path));
 
             conn->to << cmdQueryPathInfos << PathSet{printStorePath(path)};
@@ -100,8 +103,10 @@ struct LegacySSHStore : public Store
 
             auto p = readString(conn->from);
             if (p.empty()) return callback(nullptr);
-            auto info = std::make_shared<ValidPathInfo>(parseStorePath(p));
-            assert(path == info->path);
+            auto path2 = parseStorePath(p);
+            assert(path == path2);
+            /* Hash will be set below. FIXME construct ValidPathInfo at end. */
+            auto info = std::make_shared<ValidPathInfo>(path, Hash::dummy);
 
             PathSet references;
             auto deriver = readString(conn->from);
@@ -111,12 +116,14 @@ struct LegacySSHStore : public Store
             readLongLong(conn->from); // download size
             info->narSize = readLongLong(conn->from);
 
-            if (GET_PROTOCOL_MINOR(conn->remoteVersion) >= 4) {
+            {
                 auto s = readString(conn->from);
-                info->narHash = s.empty() ? std::optional<Hash>{} : Hash::parseAnyPrefixed(s);
-                info->ca = parseContentAddressOpt(readString(conn->from));
-                info->sigs = readStrings<StringSet>(conn->from);
+                if (s == "")
+                    throw Error("NAR hash is now mandatory");
+                info->narHash = Hash::parseAnyPrefixed(s);
             }
+            info->ca = parseContentAddressOpt(readString(conn->from));
+            info->sigs = readStrings<StringSet>(conn->from);
 
             auto s = readString(conn->from);
             assert(s == "");
@@ -138,7 +145,7 @@ struct LegacySSHStore : public Store
                 << cmdAddToStoreNar
                 << printStorePath(info.path)
                 << (info.deriver ? printStorePath(*info.deriver) : "")
-                << info.narHash->to_string(Base16, false);
+                << info.narHash.to_string(Base16, false);
             writeStorePaths(*this, conn->to, info.references);
             conn->to
                 << info.registrationTime

@@ -14,7 +14,8 @@ nix_tests = \
   placeholders.sh nix-shell.sh \
   linux-sandbox.sh \
   build-dry.sh \
-  build-remote.sh \
+  build-remote-input-addressed.sh \
+  build-remote-content-addressed-fixed.sh \
   build-remote-trustless-should-pass-1.sh \
   build-remote-trustless-should-pass-2.sh \
   build-remote-trustless-should-pass-3.sh \

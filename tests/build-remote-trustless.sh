@@ -4,10 +4,8 @@ if ! [[ $busybox =~ busybox ]]; then exit; fi
 unset NIX_STORE_DIR
 unset NIX_STATE_DIR
 
-# Note: ssh://localhost bypasses ssh, directly invoking nix-store as a
-# child process. This allows us to test LegacySSHStore::buildDerivation().
-# ssh-ng://... likewise allows us to test RemoteStore::buildDerivation().
-
+# Note: ssh{-ng}://localhost bypasses ssh. See tests/build-remote.sh for
+# more details.
 nix build -L -v -f $file -o $TEST_ROOT/result --max-jobs 0 \
   --arg busybox $busybox \
   --store $TEST_ROOT/local \
