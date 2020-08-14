@@ -67,8 +67,10 @@ DownloadFileResult downloadFile(
         StringSink sink;
         dumpString(*res.data, sink);
         auto hash = hashString(htSHA256, *res.data);
-        ValidPathInfo info(store->makeFixedOutputPath(FileIngestionMethod::Flat, hash, name));
-        info.narHash = hashString(htSHA256, *sink.s);
+        ValidPathInfo info {
+            store->makeFixedOutputPath(FileIngestionMethod::Flat, hash, name),
+            hashString(htSHA256, *sink.s),
+        };
         info.narSize = sink.s->size();
         info.ca = FixedOutputHash {
             .method = FileIngestionMethod::Flat,

@@ -1,5 +1,6 @@
 #pragma once
 
+#include "crypto.hh"
 #include "path.hh"
 #include "hash.hh"
 #include "content-address.hh"
@@ -29,7 +30,7 @@ struct ValidPathInfo
     StorePath path;
     std::optional<StorePath> deriver;
     // TODO document this
-    std::optional<Hash> narHash;
+    Hash narHash;
     StorePathSet references;
     time_t registrationTime = 0;
     uint64_t narSize = 0; // 0 = unknown
@@ -100,8 +101,8 @@ struct ValidPathInfo
 
     ValidPathInfo(const ValidPathInfo & other) = default;
 
-    ValidPathInfo(StorePath && path) : path(std::move(path)) { };
-    ValidPathInfo(const StorePath & path) : path(path) { };
+    ValidPathInfo(StorePath && path, Hash narHash) : path(std::move(path)), narHash(narHash) { };
+    ValidPathInfo(const StorePath & path, Hash narHash) : path(path), narHash(narHash) { };
 
     virtual ~ValidPathInfo() { }
 };
