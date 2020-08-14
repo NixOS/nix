@@ -1235,12 +1235,9 @@ void DerivationGoal::haveDerivation()
 
     retrySubstitution = false;
 
-    /* Temporarily root output paths that are known a priori building */
-    for (auto & i : drv->outputs) {
-        auto optOutputPath = i.second.pathOpt(worker.store, drv->name);
-        if (optOutputPath)
-            worker.store.addTempRoot(*optOutputPath);
-    }
+    for (auto & i : drv->outputsAndOptPaths(worker.store))
+        if (i.second.second)
+            worker.store.addTempRoot(*i.second.second);
 
     /* Check what outputs paths are not already valid. */
     checkPathValidity();
@@ -1524,11 +1521,9 @@ void DerivationGoal::tryToBuild()
     PathSet lockFiles;
     /* FIXME: Should lock something like the drv itself so we don't build same
        CA drv concurrently */
-    for (auto & i : drv->outputs) {
-        auto optPath = i.second.pathOpt(worker.store, drv->name);
-        if (optPath)
-            lockFiles.insert(worker.store.Store::toRealPath(*optPath));
-    }
+    for (auto & i : drv->outputsAndOptPaths(worker.store))
+        if (i.second.second)
+            lockFiles.insert(worker.store.Store::toRealPath(*i.second.second));
 
     if (!outputLocks.lockPaths(lockFiles, "", false)) {
         if (!actLock)
@@ -1575,7 +1570,7 @@ void DerivationGoal::tryToBuild()
     /* Don't do a remote build if the derivation has the attribute
        `preferLocalBuild' set.  Also, check and repair modes are only
        supported for local builds. */
-    bool buildLocally = buildMode != bmNormal || parsedDrv->willBuildLocally();
+    bool buildLocally = buildMode != bmNormal || parsedDrv->willBuildLocally(worker.store);
 
     if (!buildLocally) {
         switch (tryBuildHook()) {
@@ -2031,15 +2026,14 @@ StorePathSet DerivationGoal::exportReferences(const StorePathSet & storePaths)
     for (auto & j : paths2) {
         if (j.isDerivation()) {
             Derivation drv = worker.store.derivationFromPath(j);
-            for (auto & k : drv.outputs) {
-                auto optPath = k.second.pathOpt(worker.store, drv.name);
-                if (!optPath)
+            for (auto & k : drv.outputsAndOptPaths(worker.store)) {
+                if (!k.second.second)
                     /* FIXME: I am confused why we are calling
                        `computeFSClosure` on the output path, rather than
                        derivation itself. That doesn't seem right to me, so I
                        won't try to implemented this for CA derivations. */
                     throw UnimplementedError("export references including CA derivations (themselves) is not yet implemented");
-                worker.store.computeFSClosure(*optPath, paths);
+                worker.store.computeFSClosure(*k.second.second, paths);
             }
         }
     }
@@ -2084,13 +2078,13 @@ void linkOrCopy(const Path & from, const Path & to)
 void DerivationGoal::startBuilder()
 {
     /* Right platform? */
-    if (!parsedDrv->canBuildLocally())
+    if (!parsedDrv->canBuildLocally(worker.store))
         throw Error("a '%s' with features {%s} is required to build '%s', but I am a '%s' with features {%s}",
             drv->platform,
             concatStringsSep(", ", parsedDrv->getRequiredSystemFeatures()),
             worker.store.printStorePath(drvPath),
             settings.thisSystem,
-            concatStringsSep<StringSet>(", ", settings.systemFeatures));
+            concatStringsSep<StringSet>(", ", worker.store.systemFeatures));
 
     if (drv->isBuiltin())
         preloadNSS();
@@ -2376,15 +2370,14 @@ void DerivationGoal::startBuilder()
            rebuilding a path that is in settings.dirsInChroot
            (typically the dependencies of /bin/sh).  Throw them
            out. */
-        for (auto & i : drv->outputs) {
+        for (auto & i : drv->outputsAndOptPaths(worker.store)) {
             /* If the name isn't known a priori (i.e. floating
                content-addressed derivation), the temporary location we use
                should be fresh.  Freshness means it is impossible that the path
                is already in the sandbox, so we don't need to worry about
                removing it.  */
-            auto optPath = i.second.pathOpt(worker.store, drv->name);
-            if (optPath)
-                dirsInChroot.erase(worker.store.printStorePath(*optPath));
+            if (i.second.second)
+                dirsInChroot.erase(worker.store.printStorePath(*i.second.second));
         }
 
 #elif __APPLE__
@@ -3088,7 +3081,8 @@ void DerivationGoal::startDaemon()
                 FdSink to(remote.get());
                 try {
                     daemon::processConnection(store, from, to,
-                        daemon::NotTrusted, daemon::Recursive, "nobody", 65535);
+                        daemon::NotTrusted, daemon::Recursive,
+                        [&](Store & store) { store.createUser("nobody", 65535); });
                     debug("terminated daemon connection");
                 } catch (SysError &) {
                     ignoreException();
@@ -3347,7 +3341,7 @@ void DerivationGoal::runChild()
                 createDirs(chrootRootDir + "/dev/shm");
                 createDirs(chrootRootDir + "/dev/pts");
                 ss.push_back("/dev/full");
-                if (settings.systemFeatures.get().count("kvm") && pathExists("/dev/kvm"))
+                if (worker.store.systemFeatures.get().count("kvm") && pathExists("/dev/kvm"))
                     ss.push_back("/dev/kvm");
                 ss.push_back("/dev/null");
                 ss.push_back("/dev/random");
@@ -3767,9 +3761,8 @@ void DerivationGoal::registerOutputs()
      */
     if (hook) {
         bool allValid = true;
-        for (auto & i : drv->outputs) {
-            auto optStorePath = i.second.pathOpt(worker.store, drv->name);
-            if (!optStorePath || !worker.store.isValidPath(*optStorePath))
+        for (auto & i : drv->outputsAndOptPaths(worker.store)) {
+            if (!i.second.second || !worker.store.isValidPath(*i.second.second))
                 allValid = false;
         }
         if (allValid) return;
@@ -3997,6 +3990,9 @@ void DerivationGoal::registerOutputs()
             }
             auto got = caSink.finish().first;
             auto refs = rewriteRefs();
+            HashModuloSink narSink { htSHA256, oldHashPart };
+            dumpPath(actualPath, narSink);
+            auto narHashAndSize = narSink.finish();
             ValidPathInfo newInfo0 {
                 worker.store.makeFixedOutputPath(
                     outputHash.method,
@@ -4004,7 +4000,9 @@ void DerivationGoal::registerOutputs()
                     outputPathName(drv->name, outputName),
                     refs.second,
                     refs.first),
+                narHashAndSize.first,
             };
+            newInfo0.narSize = narHashAndSize.second;
             newInfo0.ca = FixedOutputHash {
                 .method = outputHash.method,
                 .hash = got,
@@ -4012,13 +4010,6 @@ void DerivationGoal::registerOutputs()
             newInfo0.references = refs.second;
             if (refs.first)
                 newInfo0.references.insert(newInfo0.path);
-            {
-                HashModuloSink narSink { htSHA256, oldHashPart };
-                dumpPath(actualPath, narSink);
-                auto narHashAndSize = narSink.finish();
-                newInfo0.narHash = narHashAndSize.first;
-                newInfo0.narSize = narHashAndSize.second;
-            }
 
             assert(newInfo0.ca);
             return newInfo0;
@@ -4036,8 +4027,7 @@ void DerivationGoal::registerOutputs()
                         std::string { requiredFinalPath.hashPart() });
                 rewriteOutput();
                 auto narHashAndSize = hashPath(htSHA256, actualPath);
-                ValidPathInfo newInfo0 { requiredFinalPath };
-                newInfo0.narHash = narHashAndSize.first;
+                ValidPathInfo newInfo0 { requiredFinalPath, narHashAndSize.first };
                 newInfo0.narSize = narHashAndSize.second;
                 auto refs = rewriteRefs();
                 newInfo0.references = refs.second;
@@ -4081,7 +4071,7 @@ void DerivationGoal::registerOutputs()
            floating CA derivations and hash-mismatching fixed-output
            derivations. */
         PathLocks dynamicOutputLock;
-        auto optFixedPath = output.pathOpt(worker.store, drv->name);
+        auto optFixedPath = output.pathOpt(worker.store, drv->name, outputName);
         if (!optFixedPath ||
             worker.store.printStorePath(*optFixedPath) != finalDestPath)
         {
@@ -4563,7 +4553,7 @@ std::map<std::string, std::optional<StorePath>> DerivationGoal::queryDerivationO
     if (drv->type() != DerivationType::CAFloating) {
         std::map<std::string, std::optional<StorePath>> res;
         for (auto & [name, output] : drv->outputs)
-            res.insert_or_assign(name, output.pathOpt(worker.store, drv->name));
+            res.insert_or_assign(name, output.pathOpt(worker.store, drv->name, name));
         return res;
     } else {
         return worker.store.queryDerivationOutputMap(drvPath);
@@ -4574,8 +4564,8 @@ OutputPathMap DerivationGoal::queryDerivationOutputMapAssumeTotal()
 {
     if (drv->type() != DerivationType::CAFloating) {
         OutputPathMap res;
-        for (auto & [name, output] : drv->outputs)
-            res.insert_or_assign(name, *output.pathOpt(worker.store, drv->name));
+        for (auto & [name, output] : drv->outputsAndOptPaths(worker.store))
+            res.insert_or_assign(name, *output.second);
         return res;
     } else {
         return worker.store.queryDerivationOutputMapAssumeTotal(drvPath);
@@ -5427,7 +5417,7 @@ bool Worker::pathContentsGood(const StorePath & path)
     if (!pathExists(store.printStorePath(path)))
         res = false;
     else {
-        HashResult current = hashPath(info->narHash->type, store.printStorePath(path));
+        HashResult current = hashPath(info->narHash.type, store.printStorePath(path));
         Hash nullHash(htSHA256);
         res = info->narHash == nullHash || info->narHash == current.first;
     }
