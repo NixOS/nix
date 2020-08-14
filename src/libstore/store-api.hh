@@ -163,6 +163,10 @@ public:
 
     Setting<bool> wantMassQuery{this, false, "want-mass-query", "whether this substituter can be queried efficiently for path validity"};
 
+    Setting<StringSet> systemFeatures{this, settings.systemFeatures,
+        "system-features",
+        "Optional features that the system this store builds on implements (like \"kvm\")."};
+
 protected:
 
     struct PathInfoCacheValue {
