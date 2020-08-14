@@ -47,6 +47,9 @@ struct DerivationOutput
         DerivationOutputCAFloating
     > output;
     std::optional<HashType> hashAlgoOpt(const Store & store) const;
+    /* Note, when you use this function you should make sure that you're passing
+       the right derivation name. When in doubt, you should use the safer
+       interface provided by BasicDerivation::outputsAndPaths */
     std::optional<StorePath> pathOpt(const Store & store, std::string_view drvName) const;
     /* DEPRECATED: Remove after CA drvs are fully implemented */
     StorePath path(const Store & store, std::string_view drvName) const {
@@ -57,6 +60,15 @@ struct DerivationOutput
 };
 
 typedef std::map<string, DerivationOutput> DerivationOutputs;
+
+/* These are analogues to the previous DerivationOutputs data type, but they
+   also contains, for each output, the (optional) store path in which it would
+   be written. To calculate values of these types, see the corresponding
+   functions in BasicDerivation */
+typedef std::map<string, std::pair<DerivationOutput, StorePath>>
+  DerivationOutputsAndPaths;
+typedef std::map<string, std::pair<DerivationOutput, std::optional<StorePath>>>
+  DerivationOutputsAndOptPaths;
 
 /* For inputs that are sub-derivations, we specify exactly which
    output IDs we are interested in. */
@@ -106,6 +118,13 @@ struct BasicDerivation
 
     /* Return the output names of a derivation. */
     StringSet outputNames() const;
+
+    /* Calculates the maps that contains all the DerivationOutputs, but
+       augmented with knowledge of the Store paths they would be written into.
+       The first one of these functions will be removed when the CA work is
+       completed */
+    DerivationOutputsAndPaths outputsAndPaths(const Store & store) const;
+    DerivationOutputsAndOptPaths outputsAndOptPaths(const Store & store) const;
 
     static std::string_view nameFromPath(const StorePath & storePath);
 };

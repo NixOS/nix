@@ -618,11 +618,11 @@ uint64_t LocalStore::addValidPath(State & state,
            registration above is undone. */
         if (checkOutputs) checkDerivationOutputs(info.path, drv);
 
-        for (auto & i : drv.outputs) {
+        for (auto & i : drv.outputsAndPaths(*this)) {
             state.stmtAddDerivationOutput.use()
                 (id)
                 (i.first)
-                (printStorePath(i.second.path(*this, drv.name)))
+                (printStorePath(i.second.second))
                 .exec();
         }
     }
