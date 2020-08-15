@@ -88,19 +88,6 @@ void StorePathCommand::run(ref<Store> store)
     run(store, *storePaths.begin());
 }
 
-Strings editorFor(const Pos & pos)
-{
-    auto editor = getEnv("EDITOR").value_or("cat");
-    auto args = tokenizeString<Strings>(editor);
-    if (pos.line > 0 && (
-        editor.find("emacs") != std::string::npos ||
-        editor.find("nano") != std::string::npos ||
-        editor.find("vim") != std::string::npos))
-        args.push_back(fmt("+%d", pos.line));
-    args.push_back(pos.file);
-    return args;
-}
-
 MixProfile::MixProfile()
 {
     addFlag({

@@ -1,5 +1,8 @@
 #include "config.hh"
 #include "primops.hh"
+#include "repl.hh"
+
+#include <iostream>
 
 using namespace nix;
 
@@ -22,3 +25,10 @@ static void prim_anotherNull (EvalState & state, const Pos & pos, Value ** args,
 }
 
 static RegisterPrimOp rp("anotherNull", 0, prim_anotherNull);
+
+static void myGreet (string name, string arg)
+{
+    std::cout << arg << " " << name << "!\n";
+}
+
+static RegisterReplCmd rc(vector<string>{"greet", "mySecondGreet"}, "aaaaa", myGreet, "ph");

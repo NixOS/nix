@@ -144,6 +144,10 @@ std::vector<Path> getConfigDirs();
 /* Return $XDG_DATA_HOME or $HOME/.local/share. */
 Path getDataDir();
 
+/* Helper function to generate args that invoke $EDITOR on
+   filename:lineno. */
+Strings editorFor(const Path & file, unsigned int line);
+
 /* Create a directory and all its parents, if necessary.  Returns the
    list of created directories, in order of creation. */
 Paths createDirs(const Path & path);

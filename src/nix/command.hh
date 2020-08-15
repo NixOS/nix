@@ -200,10 +200,6 @@ std::set<StorePath> toDerivations(ref<Store> store,
     std::vector<std::shared_ptr<Installable>> installables,
     bool useDeriver = false);
 
-/* Helper function to generate args that invoke $EDITOR on
-   filename:lineno. */
-Strings editorFor(const Pos & pos);
-
 struct MixProfile : virtual StoreCommand
 {
     std::optional<Path> profile;

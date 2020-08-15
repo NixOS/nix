@@ -558,6 +558,18 @@ Path getDataDir()
     return dataDir ? *dataDir : getHome() + "/.local/share";
 }
 
+Strings editorFor(const Path & file, unsigned int line)
+{
+    auto editor = getEnv("EDITOR").value_or("cat");
+    auto args = tokenizeString<Strings>(editor);
+    if (line > 0 && (
+        editor.find("emacs") != std::string::npos ||
+        editor.find("nano") != std::string::npos ||
+        editor.find("vim") != std::string::npos))
+        args.push_back(fmt("+%d", line));
+    args.push_back(file);
+    return args;
+}
 
 Paths createDirs(const Path & path)
 {

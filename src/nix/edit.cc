@@ -43,7 +43,7 @@ struct CmdEdit : InstallableCommand
 
         stopProgressBar();
 
-        auto args = editorFor(pos);
+        auto args = editorFor(pos.file, pos.line);
 
         restoreSignals();
         execvp(args.front().c_str(), stringsToCharPtrs(args).data());
