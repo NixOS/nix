@@ -14,7 +14,8 @@ nix_tests = \
   placeholders.sh nix-shell.sh \
   linux-sandbox.sh \
   build-dry.sh \
-  build-remote.sh \
+  build-remote-input-addressed.sh \
+  build-remote-content-addressed-fixed.sh \
   nar-access.sh \
   structured-attrs.sh \
   fetchGit.sh \
