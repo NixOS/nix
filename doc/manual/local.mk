@@ -4,7 +4,7 @@ MANUAL_SRCS := $(call rwildcard, $(d)/src, *.md)
 
 # Generate man pages.
 man-pages := $(foreach n, \
-  nix-env.1 nix-build.1 nix-shell.1 nix-store.1 nix-instantiate.1 \
+  nix-env.1 nix-build.1 nix-shell.1 nix-store.1 nix-instantiate.1 nix.1 \
   nix-collect-garbage.1 \
   nix-prefetch-url.1 nix-channel.1 \
   nix-hash.1 nix-copy-closure.1 \
@@ -23,6 +23,12 @@ $(d)/%.8: $(d)/src/command-ref/%.md
 
 $(d)/nix.conf.5: $(d)/src/command-ref/conf-file.md
 	$(trace-gen) lowdown -sT man $^ -o $@
+
+$(d)/src/command-ref/nix.md: $(d)/nix.json $(d)/generate-manpage.jq
+	jq -r -f doc/manual/generate-manpage.jq $< > $@
+
+$(d)/nix.json: $(bindir)/nix
+	$(trace-gen) $(bindir)/nix dump-args > $@
 
 # Generate the HTML manual.
 install: $(docdir)/manual/index.html

@@ -25,6 +25,8 @@ perl/Makefile.config
 /doc/manual/*.1
 /doc/manual/*.5
 /doc/manual/*.8
+/doc/manual/nix.json
+/doc/manual/src/command-ref/nix.md
 
 # /scripts/
 /scripts/nix-profile.sh

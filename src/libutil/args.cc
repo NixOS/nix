@@ -238,6 +238,7 @@ nlohmann::json Args::toJSON()
     }
 
     auto res = nlohmann::json::object();
+    res["description"] = description();
     res["flags"] = std::move(flags);
     res["args"] = std::move(args);
     return res;
@@ -371,7 +372,7 @@ MultiCommand::MultiCommand(const Commands & commands)
     : commands(commands)
 {
     expectArgs({
-        .label = "command",
+        .label = "subcommand",
         .optional = true,
         .handler = {[=](std::string s) {
             assert(!command);
