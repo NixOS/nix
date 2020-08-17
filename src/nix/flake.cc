@@ -572,7 +572,7 @@ struct CmdFlakeInitCommon : virtual Args, EvalCommand
             Strings{templateName == "" ? "defaultTemplate" : templateName},
             Strings(attrsPathPrefixes), lockFlags);
 
-        auto [cursor, attrPath] = installable.getCursor(*evalState, true);
+        auto [cursor, attrPath] = installable.getCursor(*evalState);
 
         auto templateDir = cursor->getAttr("path")->getString();
 
@@ -782,7 +782,6 @@ struct CmdFlakeArchive : FlakeCommand, MixJSON, MixDryRun
 struct CmdFlakeShow : FlakeCommand
 {
     bool showLegacy = false;
-    bool useEvalCache = true;
 
     CmdFlakeShow()
     {
@@ -790,12 +789,6 @@ struct CmdFlakeShow : FlakeCommand
             .longName = "legacy",
             .description = "show the contents of the 'legacyPackages' output",
             .handler = {&showLegacy, true}
-        });
-
-        addFlag({
-            .longName = "no-eval-cache",
-            .description = "do not use the flake evaluation cache",
-            .handler = {[&]() { useEvalCache = false; }}
         });
     }
 
@@ -934,7 +927,7 @@ struct CmdFlakeShow : FlakeCommand
             }
         };
 
-        auto cache = openEvalCache(*state, flake, useEvalCache);
+        auto cache = openEvalCache(*state, flake);
 
         visit(*cache->getRoot(), {}, fmt(ANSI_BOLD "%s" ANSI_NORMAL, flake->flake.lockedRef), "");
     }

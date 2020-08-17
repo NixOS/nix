@@ -206,6 +206,26 @@ The following settings are currently available:
     robustness in case of system crashes, but reduces performance. The
     default is `true`.
 
+  - `hashed-mirrors`  
+    A list of web servers used by `builtins.fetchurl` to obtain files by
+    hash. The default is `http://tarballs.nixos.org/`. Given a hash type
+    *ht* and a base-16 hash *h*, Nix will try to download the file from
+    *hashed-mirror*/*ht*/*h*. This allows files to be downloaded even if
+    they have disappeared from their original URI. For example, given
+    the default mirror `http://tarballs.nixos.org/`, when building the
+    derivation
+
+    ```nix
+    builtins.fetchurl {
+      url = "https://example.org/foo-1.2.3.tar.xz";
+      sha256 = "2c26b46b68ffc68ff99b453c1d30413413422d706483bfa0f98a5e886266e7ae";
+    }
+    ```
+    
+    Nix will attempt to download this file from
+    `http://tarballs.nixos.org/sha256/2c26b46b68ffc68ff99b453c1d30413413422d706483bfa0f98a5e886266e7ae`
+    first. If it is not available there, if will try the original URI.
+
   - `http-connections`  
     The maximum number of parallel TCP connections used to fetch files
     from binary caches and by other downloads. It defaults to 25. 0

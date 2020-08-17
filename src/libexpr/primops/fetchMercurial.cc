@@ -31,7 +31,7 @@ static void prim_fetchMercurial(EvalState & state, const Pos & pos, Value * * ar
                 // be both a revision or a branch/tag name.
                 auto value = state.forceStringNoCtx(*attr.value, *attr.pos);
                 if (std::regex_match(value, revRegex))
-                    rev = Hash(value, htSHA1);
+                    rev = Hash::parseAny(value, htSHA1);
                 else
                     ref = value;
             }

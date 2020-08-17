@@ -405,7 +405,7 @@ Value & AttrCursor::forceValue()
     return v;
 }
 
-std::shared_ptr<AttrCursor> AttrCursor::maybeGetAttr(Symbol name)
+std::shared_ptr<AttrCursor> AttrCursor::maybeGetAttr(Symbol name, bool forceErrors)
 {
     if (root->db) {
         if (!cachedValue)
@@ -422,9 +422,12 @@ std::shared_ptr<AttrCursor> AttrCursor::maybeGetAttr(Symbol name)
                 if (attr) {
                     if (std::get_if<missing_t>(&attr->second))
                         return nullptr;
-                    else if (std::get_if<failed_t>(&attr->second))
-                        throw EvalError("cached failure of attribute '%s'", getAttrPathStr(name));
-                    else
+                    else if (std::get_if<failed_t>(&attr->second)) {
+                        if (forceErrors)
+                            debug("reevaluating failed cached attribute '%s'");
+                        else
+                            throw CachedEvalError("cached failure of attribute '%s'", getAttrPathStr(name));
+                    } else
                         return std::make_shared<AttrCursor>(root,
                             std::make_pair(shared_from_this(), name), nullptr, std::move(attr));
                 }
@@ -469,9 +472,9 @@ std::shared_ptr<AttrCursor> AttrCursor::maybeGetAttr(std::string_view name)
     return maybeGetAttr(root->state.symbols.create(name));
 }
 
-std::shared_ptr<AttrCursor> AttrCursor::getAttr(Symbol name)
+std::shared_ptr<AttrCursor> AttrCursor::getAttr(Symbol name, bool forceErrors)
 {
-    auto p = maybeGetAttr(name);
+    auto p = maybeGetAttr(name, forceErrors);
     if (!p)
         throw Error("attribute '%s' does not exist", getAttrPathStr(name));
     return p;
@@ -600,7 +603,7 @@ bool AttrCursor::isDerivation()
 
 StorePath AttrCursor::forceDerivation()
 {
-    auto aDrvPath = getAttr(root->state.sDrvPath);
+    auto aDrvPath = getAttr(root->state.sDrvPath, true);
     auto drvPath = root->state.store->parseStorePath(aDrvPath->getString());
     if (!root->state.store->isValidPath(drvPath) && !settings.readOnlyMode) {
         /* The eval cache contains 'drvPath', but the actual path has
