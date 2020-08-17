@@ -4,6 +4,8 @@
 #include <map>
 #include <memory>
 
+#include <nlohmann/json_fwd.hpp>
+
 #include "util.hh"
 
 namespace nix {
@@ -203,6 +205,8 @@ public:
         });
     }
 
+    virtual nlohmann::json toJSON();
+
     friend class MultiCommand;
 };
 
@@ -234,6 +238,8 @@ struct Command : virtual Args
     virtual Category category() { return catDefault; }
 
     void printHelp(const string & programName, std::ostream & out) override;
+
+    nlohmann::json toJSON() override;
 };
 
 typedef std::map<std::string, std::function<ref<Command>()>> Commands;
@@ -259,6 +265,8 @@ public:
     bool processFlag(Strings::iterator & pos, Strings::iterator end) override;
 
     bool processArgs(const Strings & args, bool finish) override;
+
+    nlohmann::json toJSON() override;
 };
 
 Strings argvToStrings(int argc, char * * argv);

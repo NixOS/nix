@@ -17,6 +17,8 @@
 #include <netdb.h>
 #include <netinet/in.h>
 
+#include <nlohmann/json.hpp>
+
 extern std::string chrootHelperName;
 
 void chrootHelper(int argc, char * * argv);
@@ -171,6 +173,11 @@ void mainWrapped(int argc, char * * argv)
     Finally f([] { logger->stop(); });
 
     NixArgs args;
+
+    if (argc == 2 && std::string(argv[1]) == "dump-args") {
+        std::cout << args.toJSON().dump() << "\n";
+        return;
+    }
 
     Finally printCompletions([&]()
     {
