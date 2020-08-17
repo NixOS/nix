@@ -26,7 +26,7 @@ static void prim_anotherNull (EvalState & state, const Pos & pos, Value ** args,
 
 static RegisterPrimOp rp("anotherNull", 0, prim_anotherNull);
 
-static void myGreet (string name, string arg)
+static void myGreet (NixRepl & repl, string name, string arg)
 {
     std::cout << arg << " " << name << "!\n";
 }

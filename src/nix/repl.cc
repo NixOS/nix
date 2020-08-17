@@ -13,7 +13,7 @@ extern "C" {
 
 namespace nix {
 
-static int replListPossibleCallback(NixRepl & repl, char *s, char ***avp) {
+static int listPossibleCallback(NixRepl & repl, char *s, char ***avp) {
   auto possible = repl.completePrefix(s);
 
   if (possible.size() > (INT_MAX / sizeof(char*)))
@@ -75,7 +75,7 @@ static char * completionCallback(NixRepl & repl, char * s, int *match) {
   return nullptr;
 }
 
-void replMainLoop(NixRepl & repl, const std::vector<std::string> & files)
+static void replMainLoop(NixRepl & repl, const std::vector<std::string> & files)
 {
     string error = ANSI_RED "error:" ANSI_NORMAL " ";
     std::cout << "Welcome to Nix version " << nixVersion << ". Type :? for help." << std::endl << std::endl;
@@ -96,7 +96,7 @@ void replMainLoop(NixRepl & repl, const std::vector<std::string> & files)
         return completionCallback(repl, s, match);
     }));
     rl_set_list_possib_func(cify([&repl](char *s, char ***avp) {
-            return replListPossibleCallback(repl, s, avp);
+            return listPossibleCallback(repl, s, avp);
         }));
 
     std::string input;

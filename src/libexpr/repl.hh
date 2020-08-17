@@ -57,7 +57,7 @@ struct NixRepl
     std::ostream &  printValue(std::ostream & str, Value & v, unsigned int maxDepth, ValuesSeen & seen);
 };
 
-using ReplCmdFun = std::function<void (string name, string arg)>;
+using ReplCmdFun = std::function<void (NixRepl & repl, string name, string arg)>;
 
 /**
  * A registry for extending the REPL commands list.

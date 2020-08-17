@@ -368,7 +368,7 @@ bool NixRepl::processLine(string line)
             if (std::any_of(cmd.names.begin(), cmd.names.end(),
                 [&](auto name){ return name == command.substr(1); })) {
                 // chop off the `:`
-                cmd.cmd(command.substr(1), arg);
+                cmd.cmd(*this, command.substr(1), arg);
                 return true;
             }
         }
