@@ -15,10 +15,8 @@ nix_tests = \
   linux-sandbox.sh \
   build-dry.sh \
   build-remote-input-addressed.sh \
-  build-remote-content-addressed-fixed.sh \
   build-remote-trustless-should-pass-1.sh \
   build-remote-trustless-should-pass-2.sh \
-  build-remote-trustless-should-pass-3.sh \
   build-remote-trustless-should-fail-0.sh \
   nar-access.sh \
   structured-attrs.sh \
@@ -30,7 +28,6 @@ nix_tests = \
   shell.sh \
   brotli.sh \
   pure-eval.sh \
-  check.sh \
   plugins.sh \
   search.sh \
   nix-copy-ssh.sh \
@@ -39,7 +36,10 @@ nix_tests = \
   recursive.sh \
   flakes.sh
   # parallel.sh
+  # build-remote-content-addressed-fixed.sh \
+  # build-remote-trustless-should-pass-3.sh \
   # build-remote-trustless-should-pass-0.sh # problem with legacy ssh-store only
+  # check.sh \
 
 install-tests += $(foreach x, $(nix_tests), tests/$(x))
 
