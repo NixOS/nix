@@ -37,9 +37,9 @@ nix_tests = \
   recursive.sh \
   flakes.sh
   # parallel.sh
-  # build-remote-content-addressed-fixed.sh \
-  # build-remote-trustless-should-pass-3.sh \
+  # build-remote-content-addressed-fixed.sh # problem with fixed output derivations
   # build-remote-trustless-should-pass-0.sh # problem with legacy ssh-store only
+  # build-remote-trustless-should-pass-3.sh # problem with fixed output derivations
 
 install-tests += $(foreach x, $(nix_tests), tests/$(x))
 
