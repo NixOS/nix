@@ -1171,6 +1171,8 @@ void EvalState::callPrimOp(Value & fun, Value & arg, Value & v, const Pos & pos)
     }
 }
 
+std::function<void(const Error & error, const std::map<std::string, Value *> & env)> debuggerHook;
+
 void EvalState::callFunction(Value & fun, Value & arg, Value & v, const Pos & pos)
 {
     auto trace = evalSettings.traceFunctionCalls ? std::make_unique<FunctionCallTrace>(pos) : nullptr;
@@ -1198,8 +1200,15 @@ void EvalState::callFunction(Value & fun, Value & arg, Value & v, const Pos & po
       }
     }
 
-    if (fun.type != tLambda)
-        throwTypeError(pos, "attempt to call something which is not a function but %1%", fun);
+    if (fun.type != tLambda) {
+        auto error = TypeError({
+            .hint = hintfmt("attempt to call something which is not a function but %1%", showType(fun)),
+            .errPos = pos
+        });
+        if (debuggerHook)
+            debuggerHook(error, {{"fun", &fun}, {"arg", &arg}});
+        throw error;
+    }
 
     ExprLambda & lambda(*fun.lambda.fun);
 
