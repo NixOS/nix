@@ -2111,12 +2111,18 @@ static void prim_concatStringSep(EvalState & state, const Pos & pos, Value * * a
     state.forceList(*args[1], pos);
 
     string res;
-    res.reserve((args[1]->listSize() + 32) * sep.size());
+    res.reserve((args[1]->listSize() + 32) * sep.size()); // guess
     bool first = true;
 
     for (unsigned int n = 0; n < args[1]->listSize(); ++n) {
         if (first) first = false; else res += sep;
-        res += state.coerceToString(pos, *args[1]->listElems()[n], context);
+        string s = state.coerceToString(pos, *args[1]->listElems()[n], context);
+        // Exponential growth for amortised overall linear append.
+        if (res.capacity() < res.size() + s.length()) {
+            size_t add = std::max(s.length(), (size_t) (0.5 * res.capacity()));
+            res.reserve(res.capacity() + add);
+        }
+        res += s;
     }
 
     mkString(v, res, context);
