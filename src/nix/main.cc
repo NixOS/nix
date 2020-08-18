@@ -142,6 +142,11 @@ struct NixArgs : virtual MultiCommand, virtual MixCommonArgs
         printHelp(programName, std::cout);
         throw Exit();
     }
+
+    std::string description() override
+    {
+        return "a tool for reproducible and declarative configuration management";
+    }
 };
 
 void mainWrapped(int argc, char * * argv)
