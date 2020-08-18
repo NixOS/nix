@@ -247,6 +247,9 @@ static int _main(int argc, char * * argv)
 connected:
         close(5);
 
+        assert(sshStore);
+        auto sshStore2 = ref<Store>(sshStore);
+
         std::cerr << "# accept\n" << storeUri << "\n";
 
         auto inputs = readStrings<PathSet>(source);
@@ -269,18 +272,23 @@ connected:
 
         {
             Activity act(*logger, lvlTalkative, actUnknown, fmt("copying dependencies to '%s'", storeUri));
-            copyPaths(store, ref<Store>(sshStore), store->parseStorePathSet(inputs), NoRepair, NoCheckSigs, substitute);
+            copyPaths(store, sshStore2, store->parseStorePathSet(inputs), NoRepair, NoCheckSigs, substitute);
         }
 
         uploadLock = -1;
 
-        auto drv = store->readDerivation(*drvPath);
-        drv.inputSrcs = store->parseStorePathSet(inputs);
+        BasicDerivation drv = store->readDerivation(*drvPath);
 
-        auto result = sshStore->buildDerivation(*drvPath, drv);
+        if (sshStore2->isTrusting || derivationIsCA(drv.type())) {
+            drv.inputSrcs = store->parseStorePathSet(inputs);
+            auto result = sshStore2->buildDerivation(*drvPath, drv);
+            if (!result.success())
+                throw Error("build of '%s' on '%s' failed: %s", store->printStorePath(*drvPath), storeUri, result.errorMsg);
+        } else {
+            copyPaths(store, sshStore2, {*drvPath}, NoRepair, NoCheckSigs, substitute);
+            sshStore2->buildPaths({{*drvPath}});
+        }
 
-        if (!result.success())
-            throw Error("build of '%s' on '%s' failed: %s", store->printStorePath(*drvPath), storeUri, result.errorMsg);
 
         StorePathSet missing;
         for (auto & path : outputs)
@@ -290,7 +298,7 @@ connected:
             Activity act(*logger, lvlTalkative, actUnknown, fmt("copying outputs from '%s'", storeUri));
             for (auto & i : missing)
                 store->locksHeld.insert(store->printStorePath(i)); /* FIXME: ugly */
-            copyPaths(ref<Store>(sshStore), store, missing, NoRepair, NoCheckSigs, NoSubstitute);
+            copyPaths(sshStore2, store, missing, NoRepair, NoCheckSigs, NoSubstitute);
         }
 
         return 0;

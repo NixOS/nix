@@ -157,7 +157,9 @@ public:
 
     const Setting<int> pathInfoCacheSize{this, 65536, "path-info-cache-size", "size of the in-memory store path information cache"};
 
-    const Setting<bool> isTrusted{this, false, "trusted", "whether paths from this store can be used as substitutes even when they lack trusted signatures"};
+    const Setting<bool> isTrusted{this, false, "trusted", "whether paths from this store can be used as substitutes even when they lack trusted signatures. Compare \"trusting\""};
+
+    Setting<bool> isTrusting{this, true, "trusting", "whether (we think) paths can be added to this store even when they lack trusted signatures. Compare \"trusted\""};
 
     Setting<int> priority{this, 0, "priority", "priority of this substituter (lower value means higher priority)"};
 

@@ -840,7 +840,23 @@ std::map<StorePath, StorePath> copyPaths(ref<Store> srcStore, ref<Store> dstStor
                 MaintainCount<decltype(nrRunning)> mc(nrRunning);
                 showProgress();
                 try {
-                    copyStorePath(srcStore, dstStore, storePath, repair, checkSigs);
+                    if (dstStore->isTrusting || info->ca) {
+                        copyStorePath(srcStore, dstStore, storePath, repair, checkSigs);
+                    } else if (info->deriver && dstStore->storeDir == srcStore->storeDir) {
+                        auto drvPath = *info->deriver;
+                        auto outputMap = srcStore->queryDerivationOutputMap(drvPath);
+                        auto p = std::find_if(outputMap.begin(), outputMap.end(), [&](auto & i) {
+                            return i.second == storePath;
+                        });
+                        // drv file is always CA
+                        copyStorePath(srcStore, dstStore, drvPath, repair, checkSigs);
+                        dstStore->buildPaths({{
+                            drvPath,
+                            p != outputMap.end() ? StringSet { p->first } : StringSet {},
+                        }});
+                    } else {
+                        dstStore->ensurePath(storePath);
+                    }
                 } catch (Error &e) {
                     nrFailed++;
                     if (!settings.keepGoing)
