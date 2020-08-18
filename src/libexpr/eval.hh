@@ -74,6 +74,7 @@ public:
         sSystem, sOverrides, sOutputs, sOutputName, sIgnoreNulls,
         sFile, sLine, sColumn, sFunctor, sToString,
         sRight, sWrong, sStructuredAttrs, sBuilder, sArgs,
+        sContentAddressed,
         sOutputHash, sOutputHashAlgo, sOutputHashMode,
         sRecurseForDerivations,
         sDescription, sSelf, sEpsilon;
@@ -374,6 +375,9 @@ struct EvalSettings : Config
 
     Setting<bool> traceFunctionCalls{this, false, "trace-function-calls",
         "Emit log messages for each function entry and exit at the 'vomit' log level (-vvvv)."};
+
+    Setting<bool> useEvalCache{this, true, "eval-cache",
+        "Whether to use the flake evaluation cache."};
 };
 
 extern EvalSettings evalSettings;
