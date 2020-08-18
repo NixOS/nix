@@ -13,13 +13,15 @@ DerivationT<InputDrvPath, OutputPath>::DerivationT(const BasicDerivationT<Output
 { }
 
 template<>
-std::optional<StorePath> DerivationOutputT<NoPath>::pathOpt(const Store & store, std::string_view drvName) const
+std::optional<StorePath> DerivationOutputT<NoPath>::pathOpt(const Store & store,
+    std::string_view drvName, std::string_view outputName) const
 {
     return std::nullopt;
 }
 
 template<>
-std::optional<StorePath> DerivationOutput::pathOpt(const Store & store, std::string_view drvName) const
+std::optional<StorePath> DerivationOutput::pathOpt(const Store & store,
+    std::string_view drvName, std::string_view outputName) const
 {
     return std::visit(overloaded {
         [](DerivationOutputInputAddressed doi) -> std::optional<StorePath> {
@@ -27,8 +29,7 @@ std::optional<StorePath> DerivationOutput::pathOpt(const Store & store, std::str
         },
         [&](DerivationOutputCAFixed dof) -> std::optional<StorePath> {
             return {
-                // FIXME if we intend to support multiple CA outputs.
-                dof.path(store, drvName, "out")
+                dof.path(store, drvName, outputName)
             };
         },
         [](DerivationOutputCAFloating dof) -> std::optional<StorePath> {
@@ -583,7 +584,7 @@ DerivationT<InputDrvPath, StorePath> bakeDerivationPaths(
     }
 
     for (auto & [outputName, output] : drvFinal.outputs) {
-        auto pathOpt = output.pathOpt(store, drvFinal.name);
+        auto pathOpt = output.pathOpt(store, drvFinal.name, outputName);
         drvFinal.env.insert_or_assign(
             outputName,
             pathOpt
@@ -626,7 +627,7 @@ DerivationT<InputDrvPath, NoPath> stripDerivationPaths(
         }, output.output));
         if (drvInitial.env.count(outputName)) {
             auto & envOutPath = drvInitial.env.at(outputName);
-            auto optPath = output.pathOpt(store, drv.name);
+            auto optPath = output.pathOpt(store, drv.name, outputName);
             if (optPath && envOutPath == store.printStorePath(*optPath))
                 envOutPath = "";
         }
@@ -666,6 +667,17 @@ StringSet BasicDerivationT<Path>::outputNames() const
     return names;
 }
 
+template<typename Path>
+DerivationOutputsAndOptPathsT<Path> BasicDerivationT<Path>::outputsAndOptPaths(const Store & store) const {
+    DerivationOutputsAndOptPathsT<Path> outsAndOptPaths;
+    for (auto output : outputs)
+        outsAndOptPaths.insert(std::make_pair(
+            output.first,
+            std::make_pair(output.second, output.second.pathOpt(store, name, output.first))
+            )
+        );
+    return outsAndOptPaths;
+}
 
 template<typename Path>
 std::string_view BasicDerivationT<Path>::nameFromPath(const StorePath & drvPath) {

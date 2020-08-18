@@ -38,8 +38,9 @@ DrvInfo::DrvInfo(EvalState & state, ref<Store> store, const std::string & drvPat
     auto i = drv.outputs.find(outputName);
     if (i == drv.outputs.end())
         throw Error("derivation '%s' does not have output '%s'", store->printStorePath(drvPath), outputName);
+    auto & [outputName, output] = *i;
 
-    auto optStorePath = i->second.pathOpt(*store, drv.name);
+    auto optStorePath = output.pathOpt(*store, drv.name, outputName);
     if (optStorePath)
         outPath = store->printStorePath(*optStorePath);
 }

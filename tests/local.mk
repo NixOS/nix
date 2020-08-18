@@ -1,5 +1,5 @@
 nix_tests = \
-  init.sh hash.sh lang.sh add.sh simple.sh dependencies.sh \
+  hash.sh lang.sh add.sh simple.sh dependencies.sh \
   config.sh \
   gc.sh \
   gc-concurrent.sh \
