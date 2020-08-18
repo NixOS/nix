@@ -355,16 +355,25 @@ template<class C> C tokenizeString(std::string_view s, const string & separators
 
 
 /* Concatenate the given strings with a separator between the
-   elements. */
+   elements. The elements must be assignable to `std::string`. */
 template<class C>
-string concatStringsSep(const string & sep, const C & ss)
+string concatStringsSep(const string & sep, const C & elems)
 {
-    string s;
-    for (auto & i : ss) {
-        if (s.size() != 0) s += sep;
-        s += i;
+    // Avoid quadratic append by pre-reserving final size.
+    size_t total_size = 0;
+    for (auto & e : elems) {
+        if (total_size != 0) total_size += sep.size(); // match condition below
+        string elem_str = e;
+        total_size += elem_str.size();
     }
-    return s;
+    string res;
+    res.reserve(total_size);
+    for (auto & e : elems) {
+        if (res.size() != 0) res += sep;
+        string elem_str = e;
+        res += elem_str;
+    }
+    return res;
 }
 
 
