@@ -27,8 +27,15 @@ $(d)/nix.conf.5: $(d)/src/command-ref/conf-file.md
 $(d)/src/command-ref/nix.md: $(d)/nix.json $(d)/generate-manpage.jq
 	jq -r -f doc/manual/generate-manpage.jq $< > $@
 
+$(d)/src/command-ref/conf-file.md: $(d)/conf-file.json $(d)/generate-options.jq $(d)/src/command-ref/conf-file-prefix.md
+	cat doc/manual/src/command-ref/conf-file-prefix.md > $@
+	jq -r -f doc/manual/generate-options.jq $< >> $@
+
 $(d)/nix.json: $(bindir)/nix
 	$(trace-gen) $(bindir)/nix dump-args > $@
+
+$(d)/conf-file.json: $(bindir)/nix
+	$(trace-gen) env -i NIX_CONF_DIR=/dummy HOME=/dummy $(bindir)/nix show-config --json --experimental-features nix-command > $@
 
 # Generate the HTML manual.
 install: $(docdir)/manual/index.html

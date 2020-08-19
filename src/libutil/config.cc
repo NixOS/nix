@@ -149,11 +149,48 @@ void Config::convertToArgs(Args & args, const std::string & category)
             s.second.setting->convertToArg(args, category);
 }
 
+static std::string stripIndentation(std::string_view s)
+{
+    size_t minIndent = 10000;
+    size_t curIndent = 0;
+    bool atStartOfLine = true;
+
+    for (auto & c : s) {
+        if (atStartOfLine && c == ' ')
+            curIndent++;
+        else if (c == '\n') {
+            if (atStartOfLine)
+                minIndent = std::max(minIndent, curIndent);
+            curIndent = 0;
+            atStartOfLine = true;
+        } else {
+            if (atStartOfLine) {
+                minIndent = std::min(minIndent, curIndent);
+                atStartOfLine = false;
+            }
+        }
+    }
+
+    std::string res;
+
+    size_t pos = 0;
+    while (pos < s.size()) {
+        auto eol = s.find('\n', pos);
+        if (eol == s.npos) eol = s.size();
+        if (eol - pos > minIndent)
+            res.append(s.substr(pos + minIndent, eol - pos - minIndent));
+        res.push_back('\n');
+        pos = eol + 1;
+    }
+
+    return res;
+}
+
 AbstractSetting::AbstractSetting(
     const std::string & name,
     const std::string & description,
     const std::set<std::string> & aliases)
-    : name(name), description(description), aliases(aliases)
+    : name(name), description(stripIndentation(description)), aliases(aliases)
 {
 }
 
