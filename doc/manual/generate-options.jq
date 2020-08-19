@@ -1,5 +1,5 @@
 . | to_entries | sort_by(.key) | map(
-  "  - `" + .key + "`  \n"
+  "  - `" + .key + "`  \n\n"
   + (.value.description | split("\n") | map("    " + . + "\n") | join("")) + "\n\n"
   + "    **Default**: " + (
       if .value.value == "" or .value.value == []
