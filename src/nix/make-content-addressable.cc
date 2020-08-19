@@ -85,8 +85,8 @@ struct CmdMakeContentAddressable : StorePathsCommand, MixJSON
                         std::move(refs),
                     },
                 },
+                narHash,
             };
-            info.narHash = narHash;
             info.narSize = sink.s->size();
 
             if (!json)

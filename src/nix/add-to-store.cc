@@ -72,8 +72,8 @@ struct CmdAddToStore : MixDryRun, StoreCommand
                     {},
                 },
             },
+            narHash,
         };
-        info.narHash = narHash;
         info.narSize = sink.s->size();
 
         if (!dryRun) {

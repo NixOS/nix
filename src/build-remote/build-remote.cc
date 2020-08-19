@@ -38,9 +38,9 @@ static AutoCloseFD openSlotLock(const Machine & m, uint64_t slot)
     return openLockFile(fmt("%s/%s-%d", currentLoad, escapeUri(m.storeUri), slot), true);
 }
 
-static bool allSupportedLocally(const std::set<std::string>& requiredFeatures) {
+static bool allSupportedLocally(Store & store, const std::set<std::string>& requiredFeatures) {
     for (auto & feature : requiredFeatures)
-        if (!settings.systemFeatures.get().count(feature)) return false;
+        if (!store.systemFeatures.get().count(feature)) return false;
     return true;
 }
 
@@ -106,7 +106,7 @@ static int _main(int argc, char * * argv)
             auto canBuildLocally = amWilling
                  &&  (  neededSystem == settings.thisSystem
                      || settings.extraPlatforms.get().count(neededSystem) > 0)
-                 &&  allSupportedLocally(requiredFeatures);
+                 &&  allSupportedLocally(*store, requiredFeatures);
 
             /* Error ignored here, will be caught later */
             mkdir(currentLoad.c_str(), 0777);
@@ -201,7 +201,7 @@ static int _main(int argc, char * * argv)
                             % concatStringsSep<StringSet>(", ", m.mandatoryFeatures);
                         }
 
-                        logError({
+                        logErrorInfo(lvlInfo, {
                               .name = "Remote build",
                               .description = "Failed to find a machine for remote build!",
                               .hint = hint
@@ -224,15 +224,7 @@ static int _main(int argc, char * * argv)
 
                     Activity act(*logger, lvlTalkative, actUnknown, fmt("connecting to '%s'", bestMachine->storeUri));
 
-                    Store::Params storeParams;
-                    if (hasPrefix(bestMachine->storeUri, "ssh://")) {
-                        storeParams["max-connections"] = "1";
-                        storeParams["log-fd"] = "4";
-                        if (bestMachine->sshKey != "")
-                            storeParams["ssh-key"] = bestMachine->sshKey;
-                    }
-
-                    sshStore = openStore(bestMachine->storeUri, storeParams);
+                    sshStore = bestMachine->openStore();
                     sshStore->connect();
                     storeUri = bestMachine->storeUri;
 

@@ -227,7 +227,7 @@ static void fetch(EvalState & state, const Pos & pos, Value * * args, Value & v,
             : hashFile(htSHA256, path);
         if (hash != *expectedHash)
             throw Error((unsigned int) 102, "hash mismatch in file downloaded from '%s':\n  wanted: %s\n  got:    %s",
-                *url, expectedHash->to_string(Base32, true), hash->to_string(Base32, true));
+                *url, expectedHash->to_string(Base32, true), hash.to_string(Base32, true));
     }
 
     if (state.allowedPaths)

@@ -412,10 +412,10 @@ void RemoteStore::queryPathInfoUncached(StorePathOrDesc pathOrDesc,
                 bool valid; conn->from >> valid;
                 if (!valid) throw InvalidPath("path '%s' is not valid", printStorePath(path));
             }
-            info = std::make_shared<ValidPathInfo>(StorePath(path));
             auto deriver = readString(conn->from);
+            auto narHash = Hash::parseAny(readString(conn->from), htSHA256);
+            info = std::make_shared<ValidPathInfo>(path, narHash);
             if (deriver != "") info->deriver = parseStorePath(deriver);
-            info->narHash = Hash::parseAny(readString(conn->from), htSHA256);
             info->setReferencesPossiblyToSelf(WorkerProto<StorePathSet>::read(*this, conn->from));
             conn->from >> info->registrationTime >> info->narSize;
             if (GET_PROTOCOL_MINOR(conn->daemonVersion) >= 16) {
@@ -513,7 +513,7 @@ void RemoteStore::addToStore(const ValidPathInfo & info, Source & source,
         conn->to << wopAddToStoreNar
                  << printStorePath(info.path)
                  << (info.deriver ? printStorePath(*info.deriver) : "")
-                 << info.narHash->to_string(Base16, false);
+                 << info.narHash.to_string(Base16, false);
         WorkerProto<StorePathSet>::write(*this, conn->to, info.referencesPossiblyToSelf());
         conn->to << info.registrationTime << info.narSize
                  << info.ultimate << info.sigs << renderContentAddress(info.ca)

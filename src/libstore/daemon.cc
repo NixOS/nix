@@ -289,7 +289,7 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
         logger->startWork();
         auto hash = store->queryPathInfo(path)->narHash;
         logger->stopWork();
-        to << hash->to_string(Base16, false);
+        to << hash.to_string(Base16, false);
         break;
     }
 
@@ -454,8 +454,46 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
         readDerivation(from, *store, drv, Derivation::nameFromPath(drvPath));
         BuildMode buildMode = (BuildMode) readInt(from);
         logger->startWork();
-        if (!trusted)
-            throw Error("you are not privileged to build derivations");
+
+        /* Content-addressed derivations are trustless because their output paths
+           are verified by their content alone, so any derivation is free to
+           try to produce such a path.
+
+           Input-addressed derivation output paths, however, are calculated
+           from the derivation closure that produced them---even knowing the
+           root derivation is not enough. That the output data actually came
+           from those derivations is fundamentally unverifiable, but the daemon
+           trusts itself on that matter. The question instead is whether the
+           submitted plan has rights to the output paths it wants to fill, and
+           at least the derivation closure proves that.
+
+           It would have been nice if input-address algorithm merely depended
+           on the build time closure, rather than depending on the derivation
+           closure. That would mean input-addressed paths used at build time
+           would just be trusted and not need their own evidence. This is in
+           fact fine as the same guarantees would hold *inductively*: either
+           the remote builder has those paths and already trusts them, or it
+           needs to build them too and thus their evidence must be provided in
+           turn.  The advantage of this variant algorithm is that the evidence
+           for input-addressed paths which the remote builder already has
+           doesn't need to be sent again.
+
+           That said, now that we have floating CA derivations, it is better
+           that people just migrate to those which also solve this problem, and
+           others. It's the same migration difficulty with strictly more
+           benefit.
+
+           Lastly, do note that when we parse fixed-output content-addressed
+           derivations, we throw out the precomputed output paths and just
+           store the hashes, so there aren't two competing sources of truth an
+           attacker could exploit. */
+        if (drv.type() == DerivationType::InputAddressed && !trusted)
+            throw Error("you are not privileged to build input-addressed derivations");
+
+        /* Make sure that the non-input-addressed derivations that got this far
+           are in fact content-addressed if we don't trust them. */
+        assert(derivationIsCA(drv.type()) || trusted);
+
         auto res = store->buildDerivation(drvPath, drv, buildMode);
         logger->stopWork();
         to << res.status << res.errorMsg;
@@ -635,7 +673,7 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
             if (GET_PROTOCOL_MINOR(clientVersion) >= 17)
                 to << 1;
             to << (info->deriver ? store->printStorePath(*info->deriver) : "")
-               << info->narHash->to_string(Base16, false);
+               << info->narHash.to_string(Base16, false);
             WorkerProto<StorePathSet>::write(*store, to, info->referencesPossiblyToSelf());
             to << info->registrationTime << info->narSize;
             if (GET_PROTOCOL_MINOR(clientVersion) >= 16) {
@@ -685,17 +723,18 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
         auto path = store->parseStorePath(readString(from));
         logger->startWork();
         logger->stopWork();
-        dumpPath(store->printStorePath(path), to);
+        dumpPath(store->toRealPath(path), to);
         break;
     }
 
     case wopAddToStoreNar: {
         bool repair, dontCheckSigs;
-        ValidPathInfo info(store->parseStorePath(readString(from)));
+        auto path = store->parseStorePath(readString(from));
         auto deriver = readString(from);
+        auto narHash = Hash::parseAny(readString(from), htSHA256);
+        ValidPathInfo info { path, narHash };
         if (deriver != "")
             info.deriver = store->parseStorePath(deriver);
-        info.narHash = Hash::parseAny(readString(from), htSHA256);
         info.setReferencesPossiblyToSelf(WorkerProto<StorePathSet>::read(*store, from));
         from >> info.registrationTime >> info.narSize >> info.ultimate;
         info.sigs = readStrings<StringSet>(from);
@@ -814,8 +853,7 @@ void processConnection(
     FdSink & to,
     TrustedFlag trusted,
     RecursiveFlag recursive,
-    const std::string & userName,
-    uid_t userId)
+    std::function<void(Store &)> authHook)
 {
     auto monitor = !recursive ? std::make_unique<MonitorFdHup>(from.fd) : nullptr;
 
@@ -856,15 +894,7 @@ void processConnection(
 
         /* If we can't accept clientVersion, then throw an error
            *here* (not above). */
-
-#if 0
-        /* Prevent users from doing something very dangerous. */
-        if (geteuid() == 0 &&
-            querySetting("build-users-group", "") == "")
-            throw Error("if you run 'nix-daemon' as root, then you MUST set 'build-users-group'!");
-#endif
-
-        store->createUser(userName, userId);
+        authHook(*store);
 
         tunnelLogger->stopWork();
         to.flush();

@@ -4,7 +4,6 @@
 #include "hash.hh"
 #include "content-address.hh"
 #include "serialise.hh"
-#include "crypto.hh"
 #include "lru-cache.hh"
 #include "sync.hh"
 #include "globals.hh"
@@ -169,6 +168,10 @@ public:
     Setting<int> priority{this, 0, "priority", "priority of this substituter (lower value means higher priority)"};
 
     Setting<bool> wantMassQuery{this, false, "want-mass-query", "whether this substituter can be queried efficiently for path validity"};
+
+    Setting<StringSet> systemFeatures{this, settings.systemFeatures,
+        "system-features",
+        "Optional features that the system this store builds on implements (like \"kvm\")."};
 
 protected:
 
@@ -772,7 +775,7 @@ string showPaths(const PathSet & paths);
 std::optional<ValidPathInfo> decodeValidPathInfo(
     const Store & store,
     std::istream & str,
-    bool hashGiven = false);
+    std::optional<HashResult> hashGiven = std::nullopt);
 
 /* Split URI into protocol+hierarchy part and its parameter set. */
 std::pair<std::string, Store::Params> splitUriAndParams(const std::string & uri);

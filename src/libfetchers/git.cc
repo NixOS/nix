@@ -275,7 +275,7 @@ struct GitInputScheme : InputScheme
                 // modified dirty file?
                 input.attrs.insert_or_assign(
                     "lastModified",
-                    haveCommits ? std::stoull(runProgram("git", true, { "-C", actualUrl, "log", "-1", "--format=%ct", "HEAD" })) : 0);
+                    haveCommits ? std::stoull(runProgram("git", true, { "-C", actualUrl, "log", "-1", "--format=%ct", "--no-show-signature", "HEAD" })) : 0);
 
                 return {
                     Tree {
@@ -433,7 +433,7 @@ struct GitInputScheme : InputScheme
         // it has the underlying information.
         auto storePathDesc = store->queryPathInfo(storePath)->fullStorePathDescriptorOpt().value();
 
-        auto lastModified = std::stoull(runProgram("git", true, { "-C", repoDir, "log", "-1", "--format=%ct", input.getRev()->gitRev() }));
+        auto lastModified = std::stoull(runProgram("git", true, { "-C", repoDir, "log", "-1", "--format=%ct", "--no-show-signature", input.getRev()->gitRev() }));
 
         Attrs infoAttrs({
             {"rev", input.getRev()->gitRev()},

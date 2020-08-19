@@ -1,6 +1,7 @@
 #include "machines.hh"
 #include "util.hh"
 #include "globals.hh"
+#include "store-api.hh"
 
 #include <algorithm>
 
@@ -46,6 +47,29 @@ bool Machine::mandatoryMet(const std::set<string> & features) const {
         [&](const string & feature) {
             return features.count(feature);
         });
+}
+
+ref<Store> Machine::openStore() const {
+    Store::Params storeParams;
+    if (hasPrefix(storeUri, "ssh://")) {
+        storeParams["max-connections"] = "1";
+        storeParams["log-fd"] = "4";
+        if (sshKey != "")
+            storeParams["ssh-key"] = sshKey;
+    }
+    {
+        auto & fs = storeParams["system-features"];
+        auto append = [&](auto feats) {
+            for (auto & f : feats) {
+                if (fs.size() > 0) fs += ' ';
+                fs += f;
+            }
+        };
+        append(supportedFeatures);
+        append(mandatoryFeatures);
+    }
+
+    return nix::openStore(storeUri, storeParams);
 }
 
 void parseMachines(const std::string & s, Machines & machines)

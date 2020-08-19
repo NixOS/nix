@@ -136,14 +136,14 @@ struct ProfileManifest
                 FixedOutputInfo {
                     {
                         .method = FileIngestionMethod::Recursive,
-                        .hash = *info.narHash,
+                        .hash = narHash,
                     },
                     { references },
                 },
             },
+            narHash,
         };
         info.references = std::move(references);
-        info.narHash = narHash;
         info.narSize = sink.s->size();
 
         auto source = StringSource { *sink.s };

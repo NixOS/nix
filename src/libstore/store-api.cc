@@ -352,8 +352,8 @@ ValidPathInfo Store::addToStoreSlow(std::string_view name, const Path & srcPath,
                 {},
             },
         },
+        narHash,
     };
-    info.narHash = narHash;
     info.narSize = narSize;
 
     if (!isValidPath(info.path)) {
@@ -607,7 +607,7 @@ string Store::makeValidityRegistration(const StorePathSet & paths,
         auto info = queryPathInfo(i);
 
         if (showHash) {
-            s += info->narHash->to_string(Base16, false) + "\n";
+            s += info->narHash.to_string(Base16, false) + "\n";
             s += (format("%1%\n") % info->narSize).str();
         }
 
@@ -639,7 +639,7 @@ void Store::pathInfoToJSON(JSONPlaceholder & jsonOut, const StorePathSet & store
             auto info = queryPathInfo(storePath);
 
             jsonPath
-                .attr("narHash", info->narHash->to_string(hashBase, true))
+                .attr("narHash", info->narHash.to_string(hashBase, true))
                 .attr("narSize", info->narSize);
 
             {
@@ -771,35 +771,13 @@ void copyStorePath(ref<Store> srcStore, ref<Store> dstStore,
         // }
         if (info->references.empty()) {
             auto info2 = make_ref<ValidPathInfo>(*info);
-            ValidPathInfo dstInfoCA { *dstStore, StorePathDescriptor { ca } };
+            ValidPathInfo dstInfoCA { *dstStore, StorePathDescriptor { ca }, info->narHash };
             if (dstStore->storeDir == srcStore->storeDir)
                 assert(info2->path == info2->path);
             info2->path = std::move(dstInfoCA.path);
             info2->ca = std::move(dstInfoCA.ca);
             info = info2;
         }
-    }
-
-    if (!info->narHash) {
-        StringSink sink;
-        srcStore->narFromPath(storePath, sink);
-        auto info2 = make_ref<ValidPathInfo>(*info);
-
-        std::unique_ptr<AbstractHashSink> hashSink;
-        if (!info->ca || !info->hasSelfReference)
-            hashSink = std::make_unique<HashSink>(htSHA256);
-        else
-            hashSink = std::make_unique<HashModuloSink>(htSHA256, std::string(info->path.hashPart()));
-        (*hashSink)((unsigned char *) sink.s->data(), sink.s->size());
-        info2->narHash = hashSink->finish().first;
-
-        if (!info->narSize) info2->narSize = sink.s->size();
-        if (info->ultimate) info2->ultimate = false;
-        info = info2;
-
-        StringSource source(*sink.s);
-        dstStore->addToStore(*info, source, repair, checkSigs);
-        return;
     }
 
     if (info->ultimate) {
@@ -809,12 +787,12 @@ void copyStorePath(ref<Store> srcStore, ref<Store> dstStore,
     }
 
     auto source = sinkToSource([&](Sink & sink) {
-        LambdaSink wrapperSink([&](const unsigned char * data, size_t len) {
-            sink(data, len);
+        LambdaSink progressSink([&](const unsigned char * data, size_t len) {
             total += len;
             act.progress(total, info->narSize);
         });
-        srcStore->narFromPath(storePath, wrapperSink);
+        TeeSink tee { sink, progressSink };
+        srcStore->narFromPath(storePath, tee);
     }, [&]() {
            throw EndOfFile("NAR for '%s' fetched from '%s' is incomplete", srcStore->printStorePath(actualStorePath), srcStore->getUri());
     });
@@ -926,19 +904,22 @@ void copyClosure(ref<Store> srcStore, ref<Store> dstStore,
 }
 
 
-std::optional<ValidPathInfo> decodeValidPathInfo(const Store & store, std::istream & str, bool hashGiven)
+std::optional<ValidPathInfo> decodeValidPathInfo(const Store & store, std::istream & str, std::optional<HashResult> hashGiven)
 {
     std::string path;
     getline(str, path);
     if (str.eof()) { return {}; }
-    ValidPathInfo info(store.parseStorePath(path));
-    if (hashGiven) {
+    if (!hashGiven) {
         string s;
         getline(str, s);
-        info.narHash = Hash::parseAny(s, htSHA256);
+        auto narHash = Hash::parseAny(s, htSHA256);
         getline(str, s);
-        if (!string2Int(s, info.narSize)) throw Error("number expected");
+        uint64_t narSize;
+        if (!string2Int(s, narSize)) throw Error("number expected");
+        hashGiven = { narHash, narSize };
     }
+    ValidPathInfo info(store.parseStorePath(path), hashGiven->first);
+    info.narSize = hashGiven->second;
     std::string deriver;
     getline(str, deriver);
     if (deriver != "") info.deriver = store.parseStorePath(deriver);
@@ -987,12 +968,12 @@ void ValidPathInfo::setReferencesPossiblyToSelf(StorePathSet && refs)
 
 std::string ValidPathInfo::fingerprint(const Store & store) const
 {
-    if (narSize == 0 || !narHash)
-        throw Error("cannot calculate fingerprint of path '%s' because its size/hash is not known",
+    if (narSize == 0)
+        throw Error("cannot calculate fingerprint of path '%s' because its size is not known",
             store.printStorePath(path));
     return
         "1;" + store.printStorePath(path) + ";"
-        + narHash->to_string(Base32, true) + ";"
+        + narHash.to_string(Base32, true) + ";"
         + std::to_string(narSize) + ";"
         + concatStringsSep(",", store.printStorePathSet(referencesPossiblyToSelf()));
 }
@@ -1073,8 +1054,10 @@ Strings ValidPathInfo::shortRefs() const
 
 ValidPathInfo::ValidPathInfo(
     const Store & store,
-    StorePathDescriptor && info)
+    StorePathDescriptor && info,
+    Hash narHash)
       : path(store.makeFixedOutputPathFromCA(info))
+      , narHash(narHash)
 {
     std::visit(overloaded {
         [this](TextInfo ti) {

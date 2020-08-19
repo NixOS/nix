@@ -132,7 +132,7 @@ std::pair<Tree, Input> Input::fetch(ref<Store> store) const
     if (tree.actualPath == "")
         tree.actualPath = store->toRealPath(store->makeFixedOutputPathFromCA(tree.storePath));
 
-    auto narHash = store->queryPathInfo(tree.storePath)->narHash.value();
+    auto narHash = store->queryPathInfo(tree.storePath)->narHash;
     input.attrs.insert_or_assign("narHash", narHash.to_string(SRI, true));
 
     if (auto prevNarHash = getNarHash()) {

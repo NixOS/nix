@@ -227,6 +227,17 @@ struct SizedSource : Source
     }
 };
 
+/* A sink that that just counts the number of bytes given to it */
+struct LengthSink : Sink
+{
+    uint64_t length = 0;
+
+    virtual void operator () (const unsigned char * _, size_t len)
+    {
+        length += len;
+    }
+};
+
 /* Convert a function into a sink. */
 struct LambdaSink : Sink
 {
