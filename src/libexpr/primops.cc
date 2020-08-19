@@ -113,9 +113,9 @@ static void prim_scopedImport(EvalState & state, const Pos & pos, Value * * args
         state.mkList(*outputsVal, drv.outputs.size());
         unsigned int outputs_index = 0;
 
-        for (const auto & o : drv.outputs) {
+        for (const auto & o : drv.outputsAndPaths(*state.store)) {
             v2 = state.allocAttr(w, state.symbols.create(o.first));
-            mkString(*v2, state.store->printStorePath(o.second.path(*state.store, drv.name)), {"!" + o.first + "!" + path});
+            mkString(*v2, state.store->printStorePath(o.second.second), {"!" + o.first + "!" + path});
             outputsVal->listElems()[outputs_index] = state.allocValue();
             mkString(*(outputsVal->listElems()[outputs_index++]), o.first);
         }
@@ -781,7 +781,7 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
         Hash h = newHashAllowEmpty(*outputHash, ht);
 
         auto outPath = state.store->makeFixedOutputPath(ingestionMethod, h, drvName);
-        if (!jsonObject) drv.env["out"] = state.store->printStorePath(outPath);
+        drv.env["out"] = state.store->printStorePath(outPath);
         drv.outputs.insert_or_assign("out", DerivationOutput {
                 .output = DerivationOutputCAFixed {
                     .hash = FixedOutputHash {
@@ -795,7 +795,7 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
     else if (contentAddressed) {
         HashType ht = parseHashType(outputHashAlgo);
         for (auto & i : outputs) {
-            if (!jsonObject) drv.env[i] = hashPlaceholder(i);
+            drv.env[i] = hashPlaceholder(i);
             drv.outputs.insert_or_assign(i, DerivationOutput {
                 .output = DerivationOutputCAFloating {
                     .method = ingestionMethod,
@@ -813,7 +813,7 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
            that changes in the set of output names do get reflected in
            the hash. */
         for (auto & i : outputs) {
-            if (!jsonObject) drv.env[i] = "";
+            drv.env[i] = "";
             drv.outputs.insert_or_assign(i,
                 DerivationOutput {
                     .output = DerivationOutputInputAddressed {
@@ -828,7 +828,7 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
 
         for (auto & i : outputs) {
             auto outPath = state.store->makeOutputPath(i, h, drvName);
-            if (!jsonObject) drv.env[i] = state.store->printStorePath(outPath);
+            drv.env[i] = state.store->printStorePath(outPath);
             drv.outputs.insert_or_assign(i,
                 DerivationOutput {
                     .output = DerivationOutputInputAddressed {
@@ -839,7 +839,7 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
     }
 
     /* Write the resulting term into the Nix store directory. */
-    auto drvPath = writeDerivation(state.store, drv, drvName, state.repair);
+    auto drvPath = writeDerivation(state.store, drv, state.repair);
     auto drvPathS = state.store->printStorePath(drvPath);
 
     printMsg(lvlChatty, "instantiated '%1%' -> '%2%'", drvName, drvPathS);
@@ -852,9 +852,9 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
 
     state.mkAttrs(v, 1 + drv.outputs.size());
     mkString(*state.allocAttr(v, state.sDrvPath), drvPathS, {"=" + drvPathS});
-    for (auto & i : drv.outputs) {
+    for (auto & i : drv.outputsAndPaths(*state.store)) {
         mkString(*state.allocAttr(v, state.symbols.create(i.first)),
-            state.store->printStorePath(i.second.path(*state.store, drv.name)), {"!" + i.first + "!" + drvPathS});
+            state.store->printStorePath(i.second.second), {"!" + i.first + "!" + drvPathS});
     }
     v.attrs->sort();
 }
