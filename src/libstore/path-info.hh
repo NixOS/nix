@@ -4,6 +4,7 @@
 #include "path.hh"
 #include "hash.hh"
 #include "content-address.hh"
+#include "these.hh"
 
 #include <string>
 #include <optional>
