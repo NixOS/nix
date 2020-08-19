@@ -33,7 +33,7 @@ $(d)/nix.json: $(bindir)/nix
 # Generate the HTML manual.
 install: $(docdir)/manual/index.html
 
-$(docdir)/manual/index.html: $(MANUAL_SRCS)
+$(docdir)/manual/index.html: $(MANUAL_SRCS) $(d)/book.toml $(d)/custom.css
 	$(trace-gen) mdbook build doc/manual -d $(docdir)/manual
 	@cp doc/manual/highlight.pack.js $(docdir)/manual/highlight.js
 
