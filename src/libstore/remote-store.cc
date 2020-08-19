@@ -86,7 +86,16 @@ RemoteStore::RemoteStore(const Params & params)
     : Store(params)
     , connections(make_ref<Pool<Connection>>(
             std::max(1, (int) maxConnections),
-            [this]() { return openConnectionWrapper(); },
+            [this]() {
+                auto conn = openConnectionWrapper();
+                try {
+                    initConnection(*conn);
+                } catch (...) {
+                    failed = true;
+                    throw;
+                }
+                return conn;
+            },
             [this](const ref<Connection> & r) {
                 return
                     r->to.good()
@@ -168,8 +177,6 @@ ref<RemoteStore::Connection> UDSRemoteStore::openConnection()
     conn->to.fd = conn->fd.get();
 
     conn->startTime = std::chrono::steady_clock::now();
-
-    initConnection(*conn);
 
     return conn;
 }

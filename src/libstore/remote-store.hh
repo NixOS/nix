@@ -102,8 +102,6 @@ public:
 
     void flushBadConnections();
 
-protected:
-
     struct Connection
     {
         AutoCloseFD fd;
@@ -118,6 +116,8 @@ protected:
     };
 
     ref<Connection> openConnectionWrapper();
+
+protected:
 
     virtual ref<Connection> openConnection() = 0;
 

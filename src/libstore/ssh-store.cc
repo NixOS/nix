@@ -89,7 +89,6 @@ ref<RemoteStore::Connection> SSHStore::openConnection()
         + (remoteStore.get() == "" ? "" : " --store " + shellEscape(remoteStore.get())));
     conn->to = FdSink(conn->sshConn->in.get());
     conn->from = FdSource(conn->sshConn->out.get());
-    initConnection(*conn);
     return conn;
 }
 
