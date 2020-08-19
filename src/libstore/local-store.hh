@@ -29,8 +29,8 @@ struct Derivation;
 struct OptimiseStats
 {
     unsigned long filesLinked = 0;
-    unsigned long long bytesFreed = 0;
-    unsigned long long blocksFreed = 0;
+    uint64_t bytesFreed = 0;
+    uint64_t blocksFreed = 0;
 };
 
 
@@ -139,22 +139,14 @@ public:
 
     StorePathSet querySubstitutablePaths(const StorePathSet & paths) override;
 
-    void querySubstitutablePathInfos(const StorePathSet & paths,
+    void querySubstitutablePathInfos(const StorePathCAMap & paths,
         SubstitutablePathInfos & infos) override;
 
     void addToStore(const ValidPathInfo & info, Source & source,
         RepairFlag repair, CheckSigsFlag checkSigs) override;
 
-    StorePath addToStore(const string & name, const Path & srcPath,
-        FileIngestionMethod method, HashType hashAlgo,
-        PathFilter & filter, RepairFlag repair) override;
-
-    /* Like addToStore(), but the contents of the path are contained
-       in `dump', which is either a NAR serialisation (if recursive ==
-       true) or simply the contents of a regular file (if recursive ==
-       false). */
-    StorePath addToStoreFromDump(const string & dump, const string & name,
-        FileIngestionMethod method = FileIngestionMethod::Recursive, HashType hashAlgo = htSHA256, RepairFlag repair = NoRepair) override;
+    StorePath addToStoreFromDump(Source & dump, const string & name,
+        FileIngestionMethod method, HashType hashAlgo, RepairFlag repair) override;
 
     StorePath addTextToStore(const string & name, const string & s,
         const StorePathSet & references, RepairFlag repair) override;

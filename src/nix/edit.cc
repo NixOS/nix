@@ -45,6 +45,7 @@ struct CmdEdit : InstallableCommand
 
         auto args = editorFor(pos);
 
+        restoreSignals();
         execvp(args.front().c_str(), stringsToCharPtrs(args).data());
 
         std::string command;

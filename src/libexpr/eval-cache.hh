@@ -4,9 +4,12 @@
 #include "hash.hh"
 #include "eval.hh"
 
+#include <functional>
 #include <variant>
 
 namespace nix::eval_cache {
+
+MakeError(CachedEvalError, EvalError);
 
 class AttrDb;
 class AttrCursor;
@@ -26,8 +29,7 @@ class EvalCache : public std::enable_shared_from_this<EvalCache>
 public:
 
     EvalCache(
-        bool useCache,
-        const Hash & fingerprint,
+        std::optional<std::reference_wrapper<const Hash>> useCache,
         EvalState & state,
         RootLoader rootLoader);
 
@@ -92,11 +94,11 @@ public:
 
     std::string getAttrPathStr(Symbol name) const;
 
-    std::shared_ptr<AttrCursor> maybeGetAttr(Symbol name);
+    std::shared_ptr<AttrCursor> maybeGetAttr(Symbol name, bool forceErrors = false);
 
     std::shared_ptr<AttrCursor> maybeGetAttr(std::string_view name);
 
-    std::shared_ptr<AttrCursor> getAttr(Symbol name);
+    std::shared_ptr<AttrCursor> getAttr(Symbol name, bool forceErrors = false);
 
     std::shared_ptr<AttrCursor> getAttr(std::string_view name);
 

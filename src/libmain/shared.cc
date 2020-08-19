@@ -36,7 +36,7 @@ void printGCWarning()
 
 void printMissing(ref<Store> store, const std::vector<StorePathWithOutputs> & paths, Verbosity lvl)
 {
-    unsigned long long downloadSize, narSize;
+    uint64_t downloadSize, narSize;
     StorePathSet willBuild, willSubstitute, unknown;
     store->queryMissing(paths, willBuild, willSubstitute, unknown, downloadSize, narSize);
     printMissing(store, willBuild, willSubstitute, unknown, downloadSize, narSize, lvl);
@@ -45,7 +45,7 @@ void printMissing(ref<Store> store, const std::vector<StorePathWithOutputs> & pa
 
 void printMissing(ref<Store> store, const StorePathSet & willBuild,
     const StorePathSet & willSubstitute, const StorePathSet & unknown,
-    unsigned long long downloadSize, unsigned long long narSize, Verbosity lvl)
+    uint64_t downloadSize, uint64_t narSize, Verbosity lvl)
 {
     if (!willBuild.empty()) {
         if (willBuild.size() == 1)
@@ -384,7 +384,7 @@ RunPager::~RunPager()
 }
 
 
-string showBytes(unsigned long long bytes)
+string showBytes(uint64_t bytes)
 {
     return (format("%.2f MiB") % (bytes / (1024.0 * 1024.0))).str();
 }

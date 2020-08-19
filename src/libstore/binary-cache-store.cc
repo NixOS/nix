@@ -143,7 +143,7 @@ struct FileSource : FdSource
 void BinaryCacheStore::addToStore(const ValidPathInfo & info, Source & narSource,
     RepairFlag repair, CheckSigsFlag checkSigs)
 {
-    assert(info.narHash && info.narSize);
+    assert(info.narSize);
 
     if (!repair && isValidPath(info.path)) {
         // FIXME: copyNAR -> null sink
@@ -152,6 +152,8 @@ void BinaryCacheStore::addToStore(const ValidPathInfo & info, Source & narSource
     }
 
     auto [fdTemp, fnTemp] = createTempFile();
+
+    AutoDelete autoDelete(fnTemp);
 
     auto now1 = std::chrono::steady_clock::now();
 
@@ -167,6 +169,7 @@ void BinaryCacheStore::addToStore(const ValidPathInfo & info, Source & narSource
     TeeSource teeSource(narSource, *compressionSink);
     narAccessor = makeNarAccessor(teeSource);
     compressionSink->finish();
+    fileSink.flush();
     }
 
     auto now2 = std::chrono::steady_clock::now();
@@ -178,7 +181,7 @@ void BinaryCacheStore::addToStore(const ValidPathInfo & info, Source & narSource
     auto [fileHash, fileSize] = fileHashSink.finish();
     narInfo->fileHash = fileHash;
     narInfo->fileSize = fileSize;
-    narInfo->url = "nar/" + narInfo->fileHash.to_string(Base32, false) + ".nar"
+    narInfo->url = "nar/" + narInfo->fileHash->to_string(Base32, false) + ".nar"
         + (compression == "xz" ? ".xz" :
            compression == "bzip2" ? ".bz2" :
            compression == "br" ? ".br" :
@@ -216,7 +219,7 @@ void BinaryCacheStore::addToStore(const ValidPathInfo & info, Source & narSource
             }
         }
 
-        upsertFile(std::string(info.path.to_string()) + ".ls", jsonOut.str(), "application/json");
+        upsertFile(std::string(info.path.hashPart()) + ".ls", jsonOut.str(), "application/json");
     }
 
     /* Optionally maintain an index of DWARF debug info files
@@ -280,7 +283,7 @@ void BinaryCacheStore::addToStore(const ValidPathInfo & info, Source & narSource
     if (repair || !fileExists(narInfo->url)) {
         stats.narWrite++;
         upsertFile(narInfo->url,
-            std::make_shared<std::fstream>(fnTemp, std::ios_base::in),
+            std::make_shared<std::fstream>(fnTemp, std::ios_base::in | std::ios_base::binary),
             "application/x-nix-nar");
     } else
         stats.narWriteAverted++;
@@ -309,14 +312,10 @@ void BinaryCacheStore::narFromPath(const StorePath & storePath, Sink & sink)
 {
     auto info = queryPathInfo(storePath).cast<const NarInfo>();
 
-    uint64_t narSize = 0;
+    LengthSink narSize;
+    TeeSink tee { sink, narSize };
 
-    LambdaSink wrapperSink([&](const unsigned char * data, size_t len) {
-        sink(data, len);
-        narSize += len;
-    });
-
-    auto decompressor = makeDecompressionSink(info->compression, wrapperSink);
+    auto decompressor = makeDecompressionSink(info->compression, tee);
 
     try {
         getFile(info->url, *decompressor);
@@ -328,7 +327,7 @@ void BinaryCacheStore::narFromPath(const StorePath & storePath, Sink & sink)
 
     stats.narRead++;
     //stats.narReadCompressedBytes += nar->size(); // FIXME
-    stats.narReadBytes += narSize;
+    stats.narReadBytes += narSize.length;
 }
 
 void BinaryCacheStore::queryPathInfoUncached(const StorePath & storePath,
@@ -372,7 +371,7 @@ StorePath BinaryCacheStore::addToStore(const string & name, const Path & srcPath
        method for very large paths, but `copyPath' is mainly used for
        small files. */
     StringSink sink;
-    Hash h;
+    std::optional<Hash> h;
     if (method == FileIngestionMethod::Recursive) {
         dumpPath(srcPath, sink, filter);
         h = hashString(hashAlgo, *sink.s);
@@ -382,7 +381,10 @@ StorePath BinaryCacheStore::addToStore(const string & name, const Path & srcPath
         h = hashString(hashAlgo, s);
     }
 
-    ValidPathInfo info(makeFixedOutputPath(method, h, name));
+    ValidPathInfo info {
+        makeFixedOutputPath(method, *h, name),
+        Hash::dummy, // Will be fixed in addToStore, which recomputes nar hash
+    };
 
     auto source = StringSource { *sink.s };
     addToStore(info, source, repair, CheckSigs);
@@ -393,7 +395,10 @@ StorePath BinaryCacheStore::addToStore(const string & name, const Path & srcPath
 StorePath BinaryCacheStore::addTextToStore(const string & name, const string & s,
     const StorePathSet & references, RepairFlag repair)
 {
-    ValidPathInfo info(computeStorePathForText(name, s, references));
+    ValidPathInfo info {
+        computeStorePathForText(name, s, references),
+        Hash::dummy, // Will be fixed in addToStore, which recomputes nar hash
+    };
     info.references = references;
 
     if (repair || !isValidPath(info.path)) {

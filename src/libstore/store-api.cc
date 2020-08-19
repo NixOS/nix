@@ -193,6 +193,19 @@ StorePath Store::makeFixedOutputPath(
     }
 }
 
+StorePath Store::makeFixedOutputPathFromCA(std::string_view name, ContentAddress ca,
+    const StorePathSet & references, bool hasSelfReference) const
+{
+    // New template
+    return std::visit(overloaded {
+        [&](TextHash th) {
+            return makeTextPath(name, th.hash, references);
+        },
+        [&](FixedOutputHash fsh) {
+            return makeFixedOutputPath(fsh.method, fsh.hash, name, references, hasSelfReference);
+        }
+    }, ca);
+}
 
 StorePath Store::makeTextPath(std::string_view name, const Hash & hash,
     const StorePathSet & references) const
@@ -222,32 +235,101 @@ StorePath Store::computeStorePathForText(const string & name, const string & s,
 }
 
 
+StorePath Store::addToStore(const string & name, const Path & _srcPath,
+    FileIngestionMethod method, HashType hashAlgo, PathFilter & filter, RepairFlag repair)
+{
+    Path srcPath(absPath(_srcPath));
+    auto source = sinkToSource([&](Sink & sink) {
+        if (method == FileIngestionMethod::Recursive)
+            dumpPath(srcPath, sink, filter);
+        else
+            readFile(srcPath, sink);
+    });
+    return addToStoreFromDump(*source, name, method, hashAlgo, repair);
+}
+
+
+/*
+The aim of this function is to compute in one pass the correct ValidPathInfo for
+the files that we are trying to add to the store. To accomplish that in one
+pass, given the different kind of inputs that we can take (normal nar archives,
+nar archives with non SHA-256 hashes, and flat files), we set up a net of sinks
+and aliases. Also, since the dataflow is obfuscated by this, we include here a
+graphviz diagram:
+
+digraph graphname {
+    node [shape=box]
+    fileSource -> narSink
+    narSink [style=dashed]
+    narSink -> unsualHashTee [style = dashed, label = "Recursive && !SHA-256"]
+    narSink -> narHashSink [style = dashed, label = "else"]
+    unsualHashTee -> narHashSink
+    unsualHashTee -> caHashSink
+    fileSource -> parseSink
+    parseSink [style=dashed]
+    parseSink-> fileSink [style = dashed, label = "Flat"]
+    parseSink -> blank [style = dashed, label = "Recursive"]
+    fileSink -> caHashSink
+}
+*/
 ValidPathInfo Store::addToStoreSlow(std::string_view name, const Path & srcPath,
     FileIngestionMethod method, HashType hashAlgo,
     std::optional<Hash> expectedCAHash)
 {
-    /* FIXME: inefficient: we're reading/hashing 'tmpFile' three
-       times. */
+    HashSink narHashSink { htSHA256 };
+    HashSink caHashSink { hashAlgo };
 
-    auto [narHash, narSize] = hashPath(htSHA256, srcPath);
+    /* Note that fileSink and unusualHashTee must be mutually exclusive, since
+       they both write to caHashSink. Note that that requisite is currently true
+       because the former is only used in the flat case. */
+    RetrieveRegularNARSink fileSink { caHashSink };
+    TeeSink unusualHashTee { narHashSink, caHashSink };
 
-    auto hash = method == FileIngestionMethod::Recursive
-        ? hashAlgo == htSHA256
-          ? narHash
-          : hashPath(hashAlgo, srcPath).first
-        : hashFile(hashAlgo, srcPath);
+    auto & narSink = method == FileIngestionMethod::Recursive && hashAlgo != htSHA256
+        ? static_cast<Sink &>(unusualHashTee)
+        : narHashSink;
+
+    /* Functionally, this means that fileSource will yield the content of
+       srcPath. The fact that we use scratchpadSink as a temporary buffer here
+       is an implementation detail. */
+    auto fileSource = sinkToSource([&](Sink & scratchpadSink) {
+        dumpPath(srcPath, scratchpadSink);
+    });
+
+    /* tapped provides the same data as fileSource, but we also write all the
+       information to narSink. */
+    TeeSource tapped { *fileSource, narSink };
+
+    ParseSink blank;
+    auto & parseSink = method == FileIngestionMethod::Flat
+        ? fileSink
+        : blank;
+
+    /* The information that flows from tapped (besides being replicated in
+       narSink), is now put in parseSink. */
+    parseDump(parseSink, tapped);
+
+    /* We extract the result of the computation from the sink by calling
+       finish. */
+    auto [narHash, narSize] = narHashSink.finish();
+
+    auto hash = method == FileIngestionMethod::Recursive && hashAlgo == htSHA256
+        ? narHash
+        : caHashSink.finish().first;
 
     if (expectedCAHash && expectedCAHash != hash)
         throw Error("hash mismatch for '%s'", srcPath);
 
-    ValidPathInfo info(makeFixedOutputPath(method, hash, name));
-    info.narHash = narHash;
+    ValidPathInfo info {
+        makeFixedOutputPath(method, hash, name),
+        narHash,
+    };
     info.narSize = narSize;
     info.ca = FixedOutputHash { .method = method, .hash = hash };
 
     if (!isValidPath(info.path)) {
-        auto source = sinkToSource([&](Sink & sink) {
-            dumpPath(srcPath, sink);
+        auto source = sinkToSource([&](Sink & scratchpadSink) {
+            dumpPath(srcPath, scratchpadSink);
         });
         addToStore(info, *source);
     }
@@ -560,7 +642,7 @@ void Store::pathInfoToJSON(JSONPlaceholder & jsonOut, const StorePathSet & store
                     if (!narInfo->url.empty())
                         jsonPath.attr("url", narInfo->url);
                     if (narInfo->fileHash)
-                        jsonPath.attr("downloadHash", narInfo->fileHash.to_string(hashBase, true));
+                        jsonPath.attr("downloadHash", narInfo->fileHash->to_string(hashBase, true));
                     if (narInfo->fileSize)
                         jsonPath.attr("downloadSize", narInfo->fileSize);
                     if (showClosureSize)
@@ -636,18 +718,13 @@ void copyStorePath(ref<Store> srcStore, ref<Store> dstStore,
 
     uint64_t total = 0;
 
-    if (!info->narHash) {
-        StringSink sink;
-        srcStore->narFromPath({storePath}, sink);
+    // recompute store path on the chance dstStore does it differently
+    if (info->ca && info->references.empty()) {
         auto info2 = make_ref<ValidPathInfo>(*info);
-        info2->narHash = hashString(htSHA256, *sink.s);
-        if (!info->narSize) info2->narSize = sink.s->size();
-        if (info->ultimate) info2->ultimate = false;
+        info2->path = dstStore->makeFixedOutputPathFromCA(info->path.name(), *info->ca);
+        if (dstStore->storeDir == srcStore->storeDir)
+            assert(info->path == info2->path);
         info = info2;
-
-        StringSource source(*sink.s);
-        dstStore->addToStore(*info, source, repair, checkSigs);
-        return;
     }
 
     if (info->ultimate) {
@@ -657,12 +734,12 @@ void copyStorePath(ref<Store> srcStore, ref<Store> dstStore,
     }
 
     auto source = sinkToSource([&](Sink & sink) {
-        LambdaSink wrapperSink([&](const unsigned char * data, size_t len) {
-            sink(data, len);
+        LambdaSink progressSink([&](const unsigned char * data, size_t len) {
             total += len;
             act.progress(total, info->narSize);
         });
-        srcStore->narFromPath(storePath, wrapperSink);
+        TeeSink tee { sink, progressSink };
+        srcStore->narFromPath(storePath, tee);
     }, [&]() {
            throw EndOfFile("NAR for '%s' fetched from '%s' is incomplete", srcStore->printStorePath(storePath), srcStore->getUri());
     });
@@ -671,16 +748,20 @@ void copyStorePath(ref<Store> srcStore, ref<Store> dstStore,
 }
 
 
-void copyPaths(ref<Store> srcStore, ref<Store> dstStore, const StorePathSet & storePaths,
+std::map<StorePath, StorePath> copyPaths(ref<Store> srcStore, ref<Store> dstStore, const StorePathSet & storePaths,
     RepairFlag repair, CheckSigsFlag checkSigs, SubstituteFlag substitute)
 {
     auto valid = dstStore->queryValidPaths(storePaths, substitute);
 
-    PathSet missing;
+    StorePathSet missing;
     for (auto & path : storePaths)
-        if (!valid.count(path)) missing.insert(srcStore->printStorePath(path));
+        if (!valid.count(path)) missing.insert(path);
 
-    if (missing.empty()) return;
+    std::map<StorePath, StorePath> pathsMap;
+    for (auto & path : storePaths)
+        pathsMap.insert_or_assign(path, path);
+
+    if (missing.empty()) return pathsMap;
 
     Activity act(*logger, lvlInfo, actCopyPaths, fmt("copying %d paths", missing.size()));
 
@@ -695,30 +776,49 @@ void copyPaths(ref<Store> srcStore, ref<Store> dstStore, const StorePathSet & st
 
     ThreadPool pool;
 
-    processGraph<Path>(pool,
-        PathSet(missing.begin(), missing.end()),
+    processGraph<StorePath>(pool,
+        StorePathSet(missing.begin(), missing.end()),
 
-        [&](const Path & storePath) {
-            if (dstStore->isValidPath(dstStore->parseStorePath(storePath))) {
+        [&](const StorePath & storePath) {
+            auto info = srcStore->queryPathInfo(storePath);
+            auto storePathForDst = storePath;
+            if (info->ca && info->references.empty()) {
+                storePathForDst = dstStore->makeFixedOutputPathFromCA(storePath.name(), *info->ca);
+                if (dstStore->storeDir == srcStore->storeDir)
+                    assert(storePathForDst == storePath);
+                if (storePathForDst != storePath)
+                    debug("replaced path '%s' to '%s' for substituter '%s'", srcStore->printStorePath(storePath), dstStore->printStorePath(storePathForDst), dstStore->getUri());
+            }
+            pathsMap.insert_or_assign(storePath, storePathForDst);
+
+            if (dstStore->isValidPath(storePath)) {
                 nrDone++;
                 showProgress();
-                return PathSet();
+                return StorePathSet();
             }
-
-            auto info = srcStore->queryPathInfo(srcStore->parseStorePath(storePath));
 
             bytesExpected += info->narSize;
             act.setExpected(actCopyPath, bytesExpected);
 
-            return srcStore->printStorePathSet(info->references);
+            return info->references;
         },
 
-        [&](const Path & storePathS) {
+        [&](const StorePath & storePath) {
             checkInterrupt();
 
-            auto storePath = dstStore->parseStorePath(storePathS);
+            auto info = srcStore->queryPathInfo(storePath);
 
-            if (!dstStore->isValidPath(storePath)) {
+            auto storePathForDst = storePath;
+            if (info->ca && info->references.empty()) {
+                storePathForDst = dstStore->makeFixedOutputPathFromCA(storePath.name(), *info->ca);
+                if (dstStore->storeDir == srcStore->storeDir)
+                    assert(storePathForDst == storePath);
+                if (storePathForDst != storePath)
+                    debug("replaced path '%s' to '%s' for substituter '%s'", srcStore->printStorePath(storePath), dstStore->printStorePath(storePathForDst), dstStore->getUri());
+            }
+            pathsMap.insert_or_assign(storePath, storePathForDst);
+
+            if (!dstStore->isValidPath(storePathForDst)) {
                 MaintainCount<decltype(nrRunning)> mc(nrRunning);
                 showProgress();
                 try {
@@ -727,7 +827,7 @@ void copyPaths(ref<Store> srcStore, ref<Store> dstStore, const StorePathSet & st
                     nrFailed++;
                     if (!settings.keepGoing)
                         throw e;
-                    logger->log(lvlError, fmt("could not copy %s: %s", storePathS, e.what()));
+                    logger->log(lvlError, fmt("could not copy %s: %s", dstStore->printStorePath(storePath), e.what()));
                     showProgress();
                     return;
                 }
@@ -736,6 +836,8 @@ void copyPaths(ref<Store> srcStore, ref<Store> dstStore, const StorePathSet & st
             nrDone++;
             showProgress();
         });
+
+    return pathsMap;
 }
 
 
@@ -749,19 +851,22 @@ void copyClosure(ref<Store> srcStore, ref<Store> dstStore,
 }
 
 
-std::optional<ValidPathInfo> decodeValidPathInfo(const Store & store, std::istream & str, bool hashGiven)
+std::optional<ValidPathInfo> decodeValidPathInfo(const Store & store, std::istream & str, std::optional<HashResult> hashGiven)
 {
     std::string path;
     getline(str, path);
     if (str.eof()) { return {}; }
-    ValidPathInfo info(store.parseStorePath(path));
-    if (hashGiven) {
+    if (!hashGiven) {
         string s;
         getline(str, s);
-        info.narHash = Hash(s, htSHA256);
+        auto narHash = Hash::parseAny(s, htSHA256);
         getline(str, s);
-        if (!string2Int(s, info.narSize)) throw Error("number expected");
+        uint64_t narSize;
+        if (!string2Int(s, narSize)) throw Error("number expected");
+        hashGiven = { narHash, narSize };
     }
+    ValidPathInfo info(store.parseStorePath(path), hashGiven->first);
+    info.narSize = hashGiven->second;
     std::string deriver;
     getline(str, deriver);
     if (deriver != "") info.deriver = store.parseStorePath(deriver);
@@ -796,8 +901,8 @@ string showPaths(const PathSet & paths)
 
 std::string ValidPathInfo::fingerprint(const Store & store) const
 {
-    if (narSize == 0 || !narHash)
-        throw Error("cannot calculate fingerprint of path '%s' because its size/hash is not known",
+    if (narSize == 0)
+        throw Error("cannot calculate fingerprint of path '%s' because its size is not known",
             store.printStorePath(path));
     return
         "1;" + store.printStorePath(path) + ";"
@@ -811,10 +916,6 @@ void ValidPathInfo::sign(const Store & store, const SecretKey & secretKey)
 {
     sigs.insert(secretKey.signDetached(fingerprint(store)));
 }
-
-// FIXME Put this somewhere?
-template<class... Ts> struct overloaded : Ts... { using Ts::operator()...; };
-template<class... Ts> overloaded(Ts...) -> overloaded<Ts...>;
 
 bool ValidPathInfo::isContentAddressed(const Store & store) const
 {

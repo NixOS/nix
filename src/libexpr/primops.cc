@@ -52,7 +52,7 @@ void EvalState::realiseContext(const PathSet & context)
                 DerivationOutputs::iterator i = drv.outputs.find(outputName);
                 if (i == drv.outputs.end())
                     throw Error("derivation '%s' does not have an output named '%s'", ctxS, outputName);
-                allowedPaths->insert(store->printStorePath(i->second.path));
+                allowedPaths->insert(store->printStorePath(i->second.path(*store, drv.name)));
             }
         }
     }
@@ -65,7 +65,7 @@ void EvalState::realiseContext(const PathSet & context)
 
     /* For performance, prefetch all substitute info. */
     StorePathSet willBuild, willSubstitute, unknown;
-    unsigned long long downloadSize, narSize;
+    uint64_t downloadSize, narSize;
     store->queryMissing(drvs, willBuild, willSubstitute, unknown, downloadSize, narSize);
 
     store->buildPaths(drvs);
@@ -91,8 +91,17 @@ static void prim_scopedImport(EvalState & state, const Pos & pos, Value * * args
     Path realPath = state.checkSourcePath(state.toRealPath(path, context));
 
     // FIXME
-    if (state.store->isStorePath(path) && state.store->isValidPath(state.store->parseStorePath(path)) && isDerivation(path)) {
-        Derivation drv = readDerivation(*state.store, realPath);
+    auto isValidDerivationInStore = [&]() -> std::optional<StorePath> {
+        if (!state.store->isStorePath(path))
+            return std::nullopt;
+        auto storePath = state.store->parseStorePath(path);
+        if (!(state.store->isValidPath(storePath) && isDerivation(path)))
+            return std::nullopt;
+        return storePath;
+    };
+    if (auto optStorePath = isValidDerivationInStore()) {
+        auto storePath = *optStorePath;
+        Derivation drv = readDerivation(*state.store, realPath, Derivation::nameFromPath(storePath));
         Value & w = *state.allocValue();
         state.mkAttrs(w, 3 + drv.outputs.size());
         Value * v2 = state.allocAttr(w, state.sDrvPath);
@@ -104,9 +113,9 @@ static void prim_scopedImport(EvalState & state, const Pos & pos, Value * * args
         state.mkList(*outputsVal, drv.outputs.size());
         unsigned int outputs_index = 0;
 
-        for (const auto & o : drv.outputs) {
+        for (const auto & o : drv.outputsAndPaths(*state.store)) {
             v2 = state.allocAttr(w, state.symbols.create(o.first));
-            mkString(*v2, state.store->printStorePath(o.second.path), {"!" + o.first + "!" + path});
+            mkString(*v2, state.store->printStorePath(o.second.second), {"!" + o.first + "!" + path});
             outputsVal->listElems()[outputs_index] = state.allocValue();
             mkString(*(outputsVal->listElems()[outputs_index++]), o.first);
         }
@@ -570,9 +579,11 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
 
     /* Build the derivation expression by processing the attributes. */
     Derivation drv;
+    drv.name = drvName;
 
     PathSet context;
 
+    bool contentAddressed = false;
     std::optional<std::string> outputHash;
     std::string outputHashAlgo;
     auto ingestionMethod = FileIngestionMethod::Flat;
@@ -629,9 +640,14 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
                 if (i->value->type == tNull) continue;
             }
 
+            if (i->name == state.sContentAddressed) {
+                settings.requireExperimentalFeature("ca-derivations");
+                contentAddressed = state.forceBool(*i->value, pos);
+            }
+
             /* The `args' attribute is special: it supplies the
                command-line arguments to the builder. */
-            if (i->name == state.sArgs) {
+            else if (i->name == state.sArgs) {
                 state.forceList(*i->value, pos);
                 for (unsigned int n = 0; n < i->value->listSize(); ++n) {
                     string s = state.coerceToString(posDrvName, *i->value->listElems()[n], context, true);
@@ -684,7 +700,7 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
             }
 
         } catch (Error & e) {
-            e.addTrace(posDrvName, 
+            e.addTrace(posDrvName,
                 "while evaluating the attribute '%1%' of the derivation '%2%'",
                 key, drvName);
             throw;
@@ -751,7 +767,10 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
         });
 
     if (outputHash) {
-        /* Handle fixed-output derivations. */
+        /* Handle fixed-output derivations.
+
+           Ignore `__contentAddressed` because fixed output derivations are
+           already content addressed. */
         if (outputs.size() != 1 || *(outputs.begin()) != "out")
             throw Error({
                 .hint = hintfmt("multiple outputs are not supported in fixed-output derivations"),
@@ -762,14 +781,28 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
         Hash h = newHashAllowEmpty(*outputHash, ht);
 
         auto outPath = state.store->makeFixedOutputPath(ingestionMethod, h, drvName);
-        if (!jsonObject) drv.env["out"] = state.store->printStorePath(outPath);
+        drv.env["out"] = state.store->printStorePath(outPath);
         drv.outputs.insert_or_assign("out", DerivationOutput {
-            .path = std::move(outPath),
-            .hash = FixedOutputHash {
-                .method = ingestionMethod,
-                .hash = std::move(h),
-            },
+                .output = DerivationOutputCAFixed {
+                    .hash = FixedOutputHash {
+                        .method = ingestionMethod,
+                        .hash = std::move(h),
+                    },
+                },
         });
+    }
+
+    else if (contentAddressed) {
+        HashType ht = parseHashType(outputHashAlgo);
+        for (auto & i : outputs) {
+            drv.env[i] = hashPlaceholder(i);
+            drv.outputs.insert_or_assign(i, DerivationOutput {
+                .output = DerivationOutputCAFloating {
+                    .method = ingestionMethod,
+                    .hashType = std::move(ht),
+                },
+            });
+        }
     }
 
     else {
@@ -780,29 +813,33 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
            that changes in the set of output names do get reflected in
            the hash. */
         for (auto & i : outputs) {
-            if (!jsonObject) drv.env[i] = "";
+            drv.env[i] = "";
             drv.outputs.insert_or_assign(i,
                 DerivationOutput {
-                    .path = StorePath::dummy,
-                    .hash = std::optional<FixedOutputHash> {},
+                    .output = DerivationOutputInputAddressed {
+                        .path = StorePath::dummy,
+                    },
                 });
         }
 
-        Hash h = hashDerivationModulo(*state.store, Derivation(drv), true);
+        // Regular, non-CA derivation should always return a single hash and not
+        // hash per output.
+        Hash h = std::get<0>(hashDerivationModulo(*state.store, Derivation(drv), true));
 
         for (auto & i : outputs) {
             auto outPath = state.store->makeOutputPath(i, h, drvName);
-            if (!jsonObject) drv.env[i] = state.store->printStorePath(outPath);
+            drv.env[i] = state.store->printStorePath(outPath);
             drv.outputs.insert_or_assign(i,
                 DerivationOutput {
-                    .path = std::move(outPath),
-                    .hash = std::optional<FixedOutputHash>(),
+                    .output = DerivationOutputInputAddressed {
+                        .path = std::move(outPath),
+                    },
                 });
         }
     }
 
     /* Write the resulting term into the Nix store directory. */
-    auto drvPath = writeDerivation(state.store, drv, drvName, state.repair);
+    auto drvPath = writeDerivation(state.store, drv, state.repair);
     auto drvPathS = state.store->printStorePath(drvPath);
 
     printMsg(lvlChatty, "instantiated '%1%' -> '%2%'", drvName, drvPathS);
@@ -815,9 +852,9 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
 
     state.mkAttrs(v, 1 + drv.outputs.size());
     mkString(*state.allocAttr(v, state.sDrvPath), drvPathS, {"=" + drvPathS});
-    for (auto & i : drv.outputs) {
+    for (auto & i : drv.outputsAndPaths(*state.store)) {
         mkString(*state.allocAttr(v, state.symbols.create(i.first)),
-            state.store->printStorePath(i.second.path), {"!" + i.first + "!" + drvPathS});
+            state.store->printStorePath(i.second.second), {"!" + i.first + "!" + drvPathS});
     }
     v.attrs->sort();
 }
@@ -1111,7 +1148,7 @@ static void prim_toFile(EvalState & state, const Pos & pos, Value * * args, Valu
 
 
 static void addPath(EvalState & state, const Pos & pos, const string & name, const Path & path_,
-    Value * filterFun, FileIngestionMethod method, const Hash & expectedHash, Value & v)
+    Value * filterFun, FileIngestionMethod method, const std::optional<Hash> expectedHash, Value & v)
 {
     const auto path = evalSettings.pureEval && expectedHash ?
         path_ :
@@ -1142,7 +1179,7 @@ static void addPath(EvalState & state, const Pos & pos, const string & name, con
 
     std::optional<StorePath> expectedStorePath;
     if (expectedHash)
-        expectedStorePath = state.store->makeFixedOutputPath(method, expectedHash, name);
+        expectedStorePath = state.store->makeFixedOutputPath(method, *expectedHash, name);
     Path dstPath;
     if (!expectedHash || !state.store->isValidPath(*expectedStorePath)) {
         dstPath = state.store->printStorePath(settings.readOnlyMode
@@ -1176,7 +1213,7 @@ static void prim_filterSource(EvalState & state, const Pos & pos, Value * * args
             .errPos = pos
         });
 
-    addPath(state, pos, std::string(baseNameOf(path)), path, args[0], FileIngestionMethod::Recursive, Hash(), v);
+    addPath(state, pos, std::string(baseNameOf(path)), path, args[0], FileIngestionMethod::Recursive, std::nullopt, v);
 }
 
 static void prim_path(EvalState & state, const Pos & pos, Value * * args, Value & v)
@@ -1186,7 +1223,7 @@ static void prim_path(EvalState & state, const Pos & pos, Value * * args, Value 
     string name;
     Value * filterFun = nullptr;
     auto method = FileIngestionMethod::Recursive;
-    Hash expectedHash;
+    std::optional<Hash> expectedHash;
 
     for (auto & attr : *args[0]->attrs) {
         const string & n(attr.name);

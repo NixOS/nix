@@ -9,6 +9,7 @@ using namespace nix;
 struct CmdBuild : InstallablesCommand, MixDryRun, MixProfile
 {
     Path outLink = "result";
+    BuildMode buildMode = bmNormal;
 
     CmdBuild()
     {
@@ -25,6 +26,12 @@ struct CmdBuild : InstallablesCommand, MixDryRun, MixProfile
             .longName = "no-link",
             .description = "do not create a symlink to the build result",
             .handler = {&outLink, Path("")},
+        });
+
+        addFlag({
+            .longName = "rebuild",
+            .description = "rebuild an already built package and compare the result to the existing store paths",
+            .handler = {&buildMode, bmCheck},
         });
     }
 
@@ -53,21 +60,28 @@ struct CmdBuild : InstallablesCommand, MixDryRun, MixProfile
 
     void run(ref<Store> store) override
     {
-        auto buildables = build(store, dryRun ? Realise::Nothing : Realise::Outputs, installables);
+        auto buildables = build(store, dryRun ? Realise::Nothing : Realise::Outputs, installables, buildMode);
 
         if (dryRun) return;
 
-        if (outLink != "") {
-            for (size_t i = 0; i < buildables.size(); ++i) {
-                for (auto & output : buildables[i].outputs)
-                    if (auto store2 = store.dynamic_pointer_cast<LocalFSStore>()) {
-                        std::string symlink = outLink;
-                        if (i) symlink += fmt("-%d", i);
-                        if (output.first != "out") symlink += fmt("-%s", output.first);
-                        store2->addPermRoot(output.second, absPath(symlink), true);
-                    }
-            }
-        }
+        if (outLink != "")
+            if (auto store2 = store.dynamic_pointer_cast<LocalFSStore>())
+                for (size_t i = 0; i < buildables.size(); ++i)
+                    std::visit(overloaded {
+                        [&](BuildableOpaque bo) {
+                            std::string symlink = outLink;
+                            if (i) symlink += fmt("-%d", i);
+                            store2->addPermRoot(bo.path, absPath(symlink), true);
+                        },
+                        [&](BuildableFromDrv bfd) {
+                            for (auto & output : bfd.outputs) {
+                                std::string symlink = outLink;
+                                if (i) symlink += fmt("-%d", i);
+                                if (output.first != "out") symlink += fmt("-%s", output.first);
+                                store2->addPermRoot(output.second, absPath(symlink), true);
+                            }
+                        },
+                    }, buildables[i]);
 
         updateProfile(buildables);
     }

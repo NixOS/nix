@@ -68,22 +68,22 @@ BuildEnvironment readEnvironment(const Path & path)
 
         std::smatch match;
 
-        if (std::regex_search(pos, file.cend(), match, declareRegex)) {
+        if (std::regex_search(pos, file.cend(), match, declareRegex, std::regex_constants::match_continuous)) {
             pos = match[0].second;
             exported.insert(match[1]);
         }
 
-        else if (std::regex_search(pos, file.cend(), match, varRegex)) {
+        else if (std::regex_search(pos, file.cend(), match, varRegex, std::regex_constants::match_continuous)) {
             pos = match[0].second;
             res.env.insert({match[1], Var { .exported = exported.count(match[1]) > 0, .value = match[2] }});
         }
 
-        else if (std::regex_search(pos, file.cend(), match, assocArrayRegex)) {
+        else if (std::regex_search(pos, file.cend(), match, assocArrayRegex, std::regex_constants::match_continuous)) {
             pos = match[0].second;
             res.env.insert({match[1], Var { .associative = true, .value = match[2] }});
         }
 
-        else if (std::regex_search(pos, file.cend(), match, functionRegex)) {
+        else if (std::regex_search(pos, file.cend(), match, functionRegex, std::regex_constants::match_continuous)) {
             res.bashFunctions = std::string(pos, file.cend());
             break;
         }
@@ -124,22 +124,21 @@ StorePath getDerivationEnvironment(ref<Store> store, const StorePath & drvPath)
 
     /* Rehash and write the derivation. FIXME: would be nice to use
        'buildDerivation', but that's privileged. */
-    auto drvName = std::string(drvPath.name());
-    assert(hasSuffix(drvName, ".drv"));
-    drvName.resize(drvName.size() - 4);
-    drvName += "-env";
+    drv.name += "-env";
     for (auto & output : drv.outputs)
         drv.env.erase(output.first);
-    drv.outputs = {{"out", DerivationOutput { .path = StorePath::dummy }}};
+    drv.outputs = {{"out", DerivationOutput { .output = DerivationOutputInputAddressed { .path = StorePath::dummy }}}};
     drv.env["out"] = "";
     drv.env["_outputs_saved"] = drv.env["outputs"];
     drv.env["outputs"] = "out";
     drv.inputSrcs.insert(std::move(getEnvShPath));
-    Hash h = hashDerivationModulo(*store, drv, true);
-    auto shellOutPath = store->makeOutputPath("out", h, drvName);
-    drv.outputs.insert_or_assign("out", DerivationOutput { .path = shellOutPath });
+    Hash h = std::get<0>(hashDerivationModulo(*store, drv, true));
+    auto shellOutPath = store->makeOutputPath("out", h, drv.name);
+    drv.outputs.insert_or_assign("out", DerivationOutput { .output = DerivationOutputInputAddressed {
+                .path = shellOutPath
+            } });
     drv.env["out"] = store->printStorePath(shellOutPath);
-    auto shellDrvPath2 = writeDerivation(store, drv, drvName);
+    auto shellDrvPath2 = writeDerivation(store, drv);
 
     /* Build the derivation. */
     store->buildPaths({{shellDrvPath2}});
