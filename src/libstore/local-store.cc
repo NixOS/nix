@@ -789,7 +789,7 @@ StorePathSet LocalStore::queryValidDerivers(const StorePath & path)
 }
 
 
-std::map<std::string, std::optional<StorePath>> LocalStore::queryDerivationOutputMap(const StorePath & path)
+std::map<std::string, std::optional<StorePath>> LocalStore::queryPartialDerivationOutputMap(const StorePath & path)
 {
     std::map<std::string, std::optional<StorePath>> outputs;
     BasicDerivation drv = readDerivation(path);

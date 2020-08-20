@@ -2759,11 +2759,11 @@ struct RestrictedStore : public LocalFSStore
     void queryReferrers(const StorePath & path, StorePathSet & referrers) override
     { }
 
-    std::map<std::string, std::optional<StorePath>> queryDerivationOutputMap(const StorePath & path) override
+    std::map<std::string, std::optional<StorePath>> queryPartialDerivationOutputMap(const StorePath & path) override
     {
         if (!goal.isAllowed(path))
             throw InvalidPath("cannot query output map for unknown path '%s' in recursive Nix", printStorePath(path));
-        return next->queryDerivationOutputMap(path);
+        return next->queryPartialDerivationOutputMap(path);
     }
 
     std::optional<StorePath> queryPathFromHashPart(const std::string & hashPart) override

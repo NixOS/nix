@@ -461,7 +461,7 @@ StorePathSet RemoteStore::queryDerivationOutputs(const StorePath & path)
 }
 
 
-std::map<std::string, std::optional<StorePath>> RemoteStore::queryDerivationOutputMap(const StorePath & path)
+std::map<std::string, std::optional<StorePath>> RemoteStore::queryPartialDerivationOutputMap(const StorePath & path)
 {
     auto conn(getConnection());
     conn->to << wopQueryDerivationOutputMap << printStorePath(path);
