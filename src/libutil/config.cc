@@ -139,6 +139,7 @@ nlohmann::json Config::toJSON()
         if (!s.second.isAlias) {
             auto obj = nlohmann::json::object();
             obj.emplace("description", s.second.setting->description);
+            obj.emplace("aliases", s.second.setting->aliases);
             obj.emplace("value", s.second.setting->toJSON());
             res.emplace(s.first, obj);
         }
