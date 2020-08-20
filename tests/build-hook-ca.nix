@@ -30,6 +30,17 @@ let
     outputHash = "sha256-XArauVH91AVwP9hBBQNlkX9ccuPpSYx9o0zeIHb6e+Q=";
   };
 
+  input3 = mkDerivation {
+    shell = busybox;
+    name = "build-remote-input-3";
+    buildCommand = ''
+      read x < ${input2}
+      echo $x BAZ > $out
+    '';
+    requiredSystemFeatures = ["baz"];
+    outputHash = "sha256-daKAcPp/+BYMQsVi/YYMlCKoNAxCNDsaivwSHgQqD2s=";
+  };
+
 in
 
   mkDerivation {
@@ -38,8 +49,8 @@ in
     buildCommand =
       ''
         read x < ${input1}
-        read y < ${input2}
+        read y < ${input3}
         echo "$x $y" > $out
       '';
-    outputHash = "sha256-3YGhlOfbGUm9hiPn2teXXTT8M1NEpDFvfXkxMaJRld0=";
+    outputHash = "sha256-5SxbkUw6xe2l9TE1uwCvTtTDysD1vhRor38OtDF0LqQ=";
   }

@@ -20,7 +20,7 @@ struct BuildableOpaque {
 
 struct BuildableFromDrv {
     StorePath drvPath;
-    std::map<std::string, StorePath> outputs;
+    std::map<std::string, std::optional<StorePath>> outputs;
 };
 
 typedef std::variant<
@@ -82,7 +82,7 @@ struct InstallableValue : Installable
     struct DerivationInfo
     {
         StorePath drvPath;
-        StorePath outPath;
+        std::optional<StorePath> outPath;
         std::string outputName;
     };
 

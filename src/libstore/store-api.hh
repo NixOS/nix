@@ -157,7 +157,9 @@ public:
 
     const Setting<int> pathInfoCacheSize{this, 65536, "path-info-cache-size", "size of the in-memory store path information cache"};
 
-    const Setting<bool> isTrusted{this, false, "trusted", "whether paths from this store can be used as substitutes even when they lack trusted signatures"};
+    const Setting<bool> isTrusted{this, false, "trusted", "whether paths from this store can be used as substitutes even when they lack trusted signatures. Compare \"trusting\""};
+
+    Setting<bool> isTrusting{this, true, "trusting", "whether (we think) paths can be added to this store even when they lack trusted signatures. Compare \"trusted\""};
 
     Setting<int> priority{this, 0, "priority", "priority of this substituter (lower value means higher priority)"};
 
@@ -247,10 +249,12 @@ public:
     StorePathWithOutputs followLinksToStorePathWithOutputs(std::string_view path) const;
 
     /* Constructs a unique store path name. */
-    StorePath makeStorePath(const string & type,
+    StorePath makeStorePath(std::string_view type,
+        std::string_view hash, std::string_view name) const;
+    StorePath makeStorePath(std::string_view type,
         const Hash & hash, std::string_view name) const;
 
-    StorePath makeOutputPath(const string & id,
+    StorePath makeOutputPath(std::string_view id,
         const Hash & hash, std::string_view name) const;
 
     StorePath makeFixedOutputPath(FileIngestionMethod method,
@@ -343,9 +347,15 @@ public:
     /* Query the outputs of the derivation denoted by `path'. */
     virtual StorePathSet queryDerivationOutputs(const StorePath & path);
 
-    /* Query the mapping outputName=>outputPath for the given derivation */
-    virtual OutputPathMap queryDerivationOutputMap(const StorePath & path)
+    /* Query the mapping outputName => outputPath for the given derivation. All
+       outputs are mentioned so ones mising the mapping are mapped to
+       `std::nullopt`.  */
+    virtual std::map<std::string, std::optional<StorePath>> queryDerivationOutputMap(const StorePath & path)
     { unsupported("queryDerivationOutputMap"); }
+
+    /* Query the mapping outputName=>outputPath for the given derivation.
+       Assume every output has a mapping and throw an exception otherwise. */
+    OutputPathMap queryDerivationOutputMapAssumeTotal(const StorePath & path);
 
     /* Query the full store path given the hash part of a valid store
        path, or empty if the path doesn't exist. */

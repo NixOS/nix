@@ -268,6 +268,7 @@ static int _main(int argc, char * * argv)
 {
     {
         auto stdio = false;
+        std::optional<TrustedFlag> isTrustedOpt;
 
         parseCmdLine(argc, argv, [&](Strings::iterator & arg, const Strings::iterator & end) {
             if (*arg == "--daemon")
@@ -278,14 +279,26 @@ static int _main(int argc, char * * argv)
                 printVersion("nix-daemon");
             else if (*arg == "--stdio")
                 stdio = true;
-            else return false;
+            else if (*arg == "--trust") {
+                settings.requireExperimentalFeature("nix-testing");
+                isTrustedOpt = Trusted;
+            } else if (*arg == "--no-trust") {
+                settings.requireExperimentalFeature("nix-testing");
+                isTrustedOpt = NotTrusted;
+            } else return false;
             return true;
         });
 
         initPlugins();
 
+        auto ensureNoTrustedFlag = [&]() {
+            if (isTrustedOpt)
+                throw Error("--trust and --no-trust flags are only for use with --stdio when this nix-daemon process is not proxying another");
+        };
+
         if (stdio) {
             if (getStoreType() == tDaemon) {
+                ensureNoTrustedFlag();
                 //  Forward on this connection to the real daemon
                 auto socketPath = settings.nixDaemonSocketFile;
                 auto s = socket(PF_UNIX, SOCK_STREAM, 0);
@@ -335,9 +348,11 @@ static int _main(int argc, char * * argv)
                 /* Auth hook is empty because in this mode we blindly trust the
                    standard streams. Limitting access to thoses is explicitly
                    not `nix-daemon`'s responsibility. */
-                processConnection(openUncachedStore(), from, to, Trusted, NotRecursive, [&](Store & _){});
+                auto isTrusted = isTrustedOpt.value_or(Trusted);
+                processConnection(openUncachedStore(), from, to, isTrusted, NotRecursive, [&](Store & _){});
             }
         } else {
+            ensureNoTrustedFlag();
             daemonLoop(argv);
         }
 

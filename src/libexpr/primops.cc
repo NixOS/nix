@@ -44,16 +44,6 @@ void EvalState::realiseContext(const PathSet & context)
             throw InvalidPathError(store->printStorePath(ctx));
         if (!outputName.empty() && ctx.isDerivation()) {
             drvs.push_back(StorePathWithOutputs{ctx, {outputName}});
-
-            /* Add the output of this derivation to the allowed
-               paths. */
-            if (allowedPaths) {
-                auto drv = store->derivationFromPath(ctx);
-                DerivationOutputs::iterator i = drv.outputs.find(outputName);
-                if (i == drv.outputs.end())
-                    throw Error("derivation '%s' does not have an output named '%s'", ctxS, outputName);
-                allowedPaths->insert(store->printStorePath(i->second.path(*store, drv.name)));
-            }
         }
     }
 
@@ -69,8 +59,38 @@ void EvalState::realiseContext(const PathSet & context)
     store->queryMissing(drvs, willBuild, willSubstitute, unknown, downloadSize, narSize);
 
     store->buildPaths(drvs);
+
+    /* Add the output of this derivations to the allowed
+       paths. */
+    if (allowedPaths) {
+        for (auto & [drvPath, outputs] : drvs) {
+            auto outputPaths = store->queryDerivationOutputMapAssumeTotal(drvPath);
+            for (auto & outputName : outputs) {
+                if (outputPaths.count(outputName) == 0)
+                    throw Error("derivation '%s' does not have an output named '%s'",
+                            store->printStorePath(drvPath), outputName);
+                allowedPaths->insert(store->printStorePath(outputPaths.at(outputName)));
+            }
+        }
+    }
 }
 
+static void mkOutputString(EvalState & state, Value & v,
+    const StorePath & drvPath, const BasicDerivation & drv,
+    std::pair<string, DerivationOutput> o)
+{
+    auto optOutputPath = o.second.pathOpt(*state.store, drv.name, o.first);
+    mkString(
+        *state.allocAttr(v, state.symbols.create(o.first)),
+        state.store->printStorePath(optOutputPath
+            ? *optOutputPath
+            /* Downstream we would substitute this for an actual path once
+               we build the floating CA derivation */
+            /* FIXME: we need to depend on the basic derivation, not
+               derivation */
+            : downstreamPlaceholder(*state.store, drvPath, o.first)),
+        {"!" + o.first + "!" + state.store->printStorePath(drvPath)});
+}
 
 /* Load and evaluate an expression from path specified by the
    argument. */
@@ -101,7 +121,7 @@ static void prim_scopedImport(EvalState & state, const Pos & pos, Value * * args
     };
     if (auto optStorePath = isValidDerivationInStore()) {
         auto storePath = *optStorePath;
-        Derivation drv = readDerivation(*state.store, realPath, Derivation::nameFromPath(storePath));
+        Derivation drv = state.store->readDerivation(storePath);
         Value & w = *state.allocValue();
         state.mkAttrs(w, 3 + drv.outputs.size());
         Value * v2 = state.allocAttr(w, state.sDrvPath);
@@ -113,9 +133,8 @@ static void prim_scopedImport(EvalState & state, const Pos & pos, Value * * args
         state.mkList(*outputsVal, drv.outputs.size());
         unsigned int outputs_index = 0;
 
-        for (const auto & o : drv.outputsAndPaths(*state.store)) {
-            v2 = state.allocAttr(w, state.symbols.create(o.first));
-            mkString(*v2, state.store->printStorePath(o.second.second), {"!" + o.first + "!" + path});
+        for (const auto & o : drv.outputs) {
+            mkOutputString(state, w, storePath, drv, o);
             outputsVal->listElems()[outputs_index] = state.allocValue();
             mkString(*(outputsVal->listElems()[outputs_index++]), o.first);
         }
@@ -578,7 +597,7 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
         ignoreNulls = state.forceBool(*attr->value, pos);
 
     /* Build the derivation expression by processing the attributes. */
-    Derivation drv;
+    DerivationT<StorePath, NoPath> drv;
     drv.name = drvName;
 
     PathSet context;
@@ -766,96 +785,71 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
             .errPos = posDrvName
         });
 
+    auto hashTypeOpt = parseHashTypeOpt(outputHashAlgo);
+    std::optional<Hash> outputHashParsed;
     if (outputHash) {
-        /* Handle fixed-output derivations.
-
-           Ignore `__contentAddressed` because fixed output derivations are
-           already content addressed. */
+        /* Ensure proper single "out" and parse output hash */
         if (outputs.size() != 1 || *(outputs.begin()) != "out")
             throw Error({
                 .hint = hintfmt("multiple outputs are not supported in fixed-output derivations"),
                 .errPos = posDrvName
             });
 
-        std::optional<HashType> ht = parseHashTypeOpt(outputHashAlgo);
-        Hash h = newHashAllowEmpty(*outputHash, ht);
+        outputHashParsed = newHashAllowEmpty(*outputHash, hashTypeOpt);
+    }
 
-        auto outPath = state.store->makeFixedOutputPath(ingestionMethod, h, drvName);
-        drv.env["out"] = state.store->printStorePath(outPath);
-        drv.outputs.insert_or_assign("out", DerivationOutput {
+    for (auto & outName : outputs) {
+        if (!jsonObject) drv.env[outName] = "";
+        drv.outputs.insert_or_assign(outName, outputHashParsed
+            ? DerivationOutputT<NoPath> {
                 .output = DerivationOutputCAFixed {
                     .hash = FixedOutputHash {
                         .method = ingestionMethod,
-                        .hash = std::move(h),
+                        .hash = *outputHashParsed,
                     },
                 },
-        });
-    }
-
-    else if (contentAddressed) {
-        HashType ht = parseHashType(outputHashAlgo);
-        for (auto & i : outputs) {
-            drv.env[i] = hashPlaceholder(i);
-            drv.outputs.insert_or_assign(i, DerivationOutput {
+              }
+            : contentAddressed
+            ? DerivationOutputT<NoPath> {
                 .output = DerivationOutputCAFloating {
                     .method = ingestionMethod,
-                    .hashType = std::move(ht),
+                    .hashType = *hashTypeOpt,
                 },
-            });
-        }
+              }
+            : DerivationOutputT<NoPath> {
+                .output = DerivationOutputInputAddressedT<NoPath> {
+                    .path = NoPath {},
+                },
+              });
     }
 
-    else {
-        /* Compute a hash over the "masked" store derivation, which is
-           the final one except that in the list of outputs, the
-           output paths are empty strings, and the corresponding
-           environment variables have an empty value.  This ensures
-           that changes in the set of output names do get reflected in
-           the hash. */
-        for (auto & i : outputs) {
-            drv.env[i] = "";
-            drv.outputs.insert_or_assign(i,
-                DerivationOutput {
-                    .output = DerivationOutputInputAddressed {
-                        .path = StorePath::dummy,
-                    },
-                });
-        }
-
-        // Regular, non-CA derivation should always return a single hash and not
-        // hash per output.
-        Hash h = std::get<0>(hashDerivationModulo(*state.store, Derivation(drv), true));
-
-        for (auto & i : outputs) {
-            auto outPath = state.store->makeOutputPath(i, h, drvName);
-            drv.env[i] = state.store->printStorePath(outPath);
-            drv.outputs.insert_or_assign(i,
-                DerivationOutput {
-                    .output = DerivationOutputInputAddressed {
-                        .path = std::move(outPath),
-                    },
-                });
-        }
-    }
+    /* Compute the final derivation, which additionally contains the outputs
+       paths created from the hash of the initial one. */
+    Derivation drvFinal = bakeDerivationPaths(*state.store, drv);
 
     /* Write the resulting term into the Nix store directory. */
-    auto drvPath = writeDerivation(state.store, drv, state.repair);
+    auto drvPath = writeDerivation(state.store, drvFinal, state.repair);
     auto drvPathS = state.store->printStorePath(drvPath);
 
     printMsg(lvlChatty, "instantiated '%1%' -> '%2%'", drvName, drvPathS);
 
     /* Optimisation, but required in read-only mode! because in that
        case we don't actually write store derivations, so we can't
-       read them later. */
-    drvHashes.insert_or_assign(drvPath,
-        hashDerivationModulo(*state.store, Derivation(drv), false));
+       read them later.
 
-    state.mkAttrs(v, 1 + drv.outputs.size());
-    mkString(*state.allocAttr(v, state.sDrvPath), drvPathS, {"=" + drvPathS});
-    for (auto & i : drv.outputsAndPaths(*state.store)) {
-        mkString(*state.allocAttr(v, state.symbols.create(i.first)),
-            state.store->printStorePath(i.second.second), {"!" + i.first + "!" + drvPathS});
+       However, we don't bother doing this for floating CA derivations because
+       their "hash modulo" is indeterminate until built. */
+    if (drv.type() != DerivationType::CAFloating) {
+        std::optional maybeOutputHashes = outputHashesForModuloIfFixed(*state.store, drvFinal);
+        auto hashes = maybeOutputHashes
+            ? DrvHashModulo { *maybeOutputHashes }
+            : hashDerivation(*state.store, drvFinal);
+        drvHashes.insert_or_assign(drvPath, std::move(hashes));
     }
+    state.mkAttrs(v, 1 + drvFinal.outputs.size());
+    mkString(*state.allocAttr(v, state.sDrvPath), drvPathS, {"=" + drvPathS});
+    for (auto & i : drvFinal.outputs)
+        mkOutputString(state, v, drvPath, drvFinal, i);
     v.attrs->sort();
 }
 

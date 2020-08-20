@@ -2,6 +2,21 @@ with import ./config.nix;
 
 rec {
 
+  # Want to ensure that "out" doesn't get a suffix on it's path.
+  nameCheck = mkDerivation {
+    name = "multiple-outputs-a";
+    outputs = [ "out" "dev" ];
+    builder = builtins.toFile "builder.sh"
+      ''
+        mkdir $first $second
+        test -z $all
+        echo "first" > $first/file
+        echo "second" > $second/file
+        ln -s $first $second/link
+      '';
+    helloString = "Hello, world!";
+  };
+
   a = mkDerivation {
     name = "multiple-outputs-a";
     outputs = [ "first" "second" ];

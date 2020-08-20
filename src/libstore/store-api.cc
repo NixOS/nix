@@ -1,11 +1,11 @@
 #include "crypto.hh"
+#include "fs-accessor.hh"
 #include "globals.hh"
 #include "store-api.hh"
 #include "util.hh"
 #include "nar-info-disk-cache.hh"
 #include "thread-pool.hh"
 #include "json.hh"
-#include "derivations.hh"
 #include "url.hh"
 #include "archive.hh"
 
@@ -140,21 +140,28 @@ StorePathWithOutputs Store::followLinksToStorePathWithOutputs(std::string_view p
 */
 
 
-StorePath Store::makeStorePath(const string & type,
-    const Hash & hash, std::string_view name) const
+StorePath Store::makeStorePath(std::string_view type,
+    std::string_view hash, std::string_view name) const
 {
     /* e.g., "source:sha256:1abc...:/nix/store:foo.tar.gz" */
-    string s = type + ":" + hash.to_string(Base16, true) + ":" + storeDir + ":" + std::string(name);
+    string s = std::string { type } + ":" + std::string { hash }
+        + ":" + storeDir + ":" + std::string { name };
     auto h = compressHash(hashString(htSHA256, s), 20);
     return StorePath(h, name);
 }
 
 
-StorePath Store::makeOutputPath(const string & id,
+StorePath Store::makeStorePath(std::string_view type,
     const Hash & hash, std::string_view name) const
 {
-    return makeStorePath("output:" + id, hash,
-        std::string(name) + (id == "out" ? "" : "-" + id));
+    return makeStorePath(type, hash.to_string(Base16, true), name);
+}
+
+
+StorePath Store::makeOutputPath(std::string_view id,
+    const Hash & hash, std::string_view name) const
+{
+    return makeStorePath("output:" + std::string { id }, hash, outputPathName(name, id));
 }
 
 
@@ -359,9 +366,20 @@ bool Store::PathInfoCacheValue::isKnownNow()
     return std::chrono::steady_clock::now() < time_point + ttl;
 }
 
+OutputPathMap Store::queryDerivationOutputMapAssumeTotal(const StorePath & path) {
+    auto resp = queryDerivationOutputMap(path);
+    OutputPathMap result;
+    for (auto & [outName, optOutPath] : resp) {
+        if (!optOutPath)
+            throw Error("output '%s' has no store path mapped to it", outName);
+        result.insert_or_assign(outName, *optOutPath);
+    }
+    return result;
+}
+
 StorePathSet Store::queryDerivationOutputs(const StorePath & path)
 {
-    auto outputMap = this->queryDerivationOutputMap(path);
+    auto outputMap = this->queryDerivationOutputMapAssumeTotal(path);
     StorePathSet outputPaths;
     for (auto & i: outputMap) {
         outputPaths.emplace(std::move(i.second));
@@ -822,7 +840,23 @@ std::map<StorePath, StorePath> copyPaths(ref<Store> srcStore, ref<Store> dstStor
                 MaintainCount<decltype(nrRunning)> mc(nrRunning);
                 showProgress();
                 try {
-                    copyStorePath(srcStore, dstStore, storePath, repair, checkSigs);
+                    if (dstStore->isTrusting || info->ca) {
+                        copyStorePath(srcStore, dstStore, storePath, repair, checkSigs);
+                    } else if (info->deriver && dstStore->storeDir == srcStore->storeDir) {
+                        auto drvPath = *info->deriver;
+                        auto outputMap = srcStore->queryDerivationOutputMap(drvPath);
+                        auto p = std::find_if(outputMap.begin(), outputMap.end(), [&](auto & i) {
+                            return i.second == storePath;
+                        });
+                        // drv file is always CA
+                        copyStorePath(srcStore, dstStore, drvPath, repair, checkSigs);
+                        dstStore->buildPaths({{
+                            drvPath,
+                            p != outputMap.end() ? StringSet { p->first } : StringSet {},
+                        }});
+                    } else {
+                        dstStore->ensurePath(storePath);
+                    }
                 } catch (Error &e) {
                     nrFailed++;
                     if (!settings.keepGoing)
@@ -969,6 +1003,26 @@ Strings ValidPathInfo::shortRefs() const
     for (auto & r : references)
         refs.push_back(std::string(r.to_string()));
     return refs;
+}
+
+
+Derivation Store::derivationFromPath(const StorePath & drvPath)
+{
+    ensurePath(drvPath);
+    return readDerivation(drvPath);
+}
+
+
+Derivation Store::readDerivation(const StorePath & drvPath)
+{
+    auto accessor = getFSAccessor();
+    try {
+        return parseDerivation(*this,
+            accessor->readFile(printStorePath(drvPath)),
+            Derivation::nameFromPath(drvPath));
+    } catch (FormatError & e) {
+        throw Error("error parsing derivation '%s': %s", printStorePath(drvPath), e.msg());
+    }
 }
 
 

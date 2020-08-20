@@ -23,9 +23,6 @@ namespace nix {
 const int nixSchemaVersion = 10;
 
 
-struct Derivation;
-
-
 struct OptimiseStats
 {
     unsigned long filesLinked = 0;
@@ -133,7 +130,7 @@ public:
 
     StorePathSet queryValidDerivers(const StorePath & path) override;
 
-    OutputPathMap queryDerivationOutputMap(const StorePath & path) override;
+    std::map<std::string, std::optional<StorePath>> queryDerivationOutputMap(const StorePath & path) override;
 
     std::optional<StorePath> queryPathFromHashPart(const std::string & hashPart) override;
 
@@ -281,6 +278,12 @@ private:
     /* Add signatures to a ValidPathInfo using the secret keys
        specified by the ‘secret-key-files’ option. */
     void signPathInfo(ValidPathInfo & info);
+
+    /* Add a mapping from the deriver of the path info (if specified) to its
+     * out path
+     */
+    void linkDeriverToPath(const StorePath & deriver, const string & outputName, const StorePath & output);
+    void linkDeriverToPath(State & state, uint64_t deriver, const string & outputName, const StorePath & output);
 
     Path getRealStoreDir() override { return realStoreDir; }
 

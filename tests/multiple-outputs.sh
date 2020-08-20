@@ -4,6 +4,12 @@ clearStore
 
 rm -f $TEST_ROOT/result*
 
+# Test whether the output names match our expectations
+outPath=$(nix-instantiate multiple-outputs.nix --eval -A nameCheck.out.outPath)
+[ "$(echo "$outPath" | sed -E 's_^".*/[^-/]*-([^/]*)"$_\1_')" = "multiple-outputs-a" ]
+outPath=$(nix-instantiate multiple-outputs.nix --eval -A nameCheck.dev.outPath)
+[ "$(echo "$outPath" | sed -E 's_^".*/[^-/]*-([^/]*)"$_\1_')" = "multiple-outputs-a-dev" ]
+
 # Test whether read-only evaluation works when referring to the
 # ‘drvPath’ attribute.
 echo "evaluating c..."

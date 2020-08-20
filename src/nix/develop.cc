@@ -106,17 +106,25 @@ const static std::string getEnvSh =
    environment to a file and exits. */
 StorePath getDerivationEnvironment(ref<Store> store, const StorePath & drvPath)
 {
-    auto drv = store->derivationFromPath(drvPath);
+    auto drvOriginal = store->derivationFromPath(drvPath);
 
-    auto builder = baseNameOf(drv.builder);
+    auto builder = baseNameOf(drvOriginal.builder);
     if (builder != "bash")
         throw Error("'nix develop' only works on derivations that use 'bash' as their builder");
 
     auto getEnvShPath = store->addTextToStore("get-env.sh", getEnvSh, {});
 
+    DerivationT<StorePath, NoPath> drv;
+
     drv.args = {store->printStorePath(getEnvShPath)};
 
-    /* Remove derivation checks. */
+    /* Copy original but remove derivation checks. */
+    drv.inputSrcs = drvOriginal.inputSrcs;
+    drv.platform = drvOriginal.platform;
+    drv.builder = drvOriginal.builder;
+    drv.env = drvOriginal.env;
+    drv.inputDrvs = drvOriginal.inputDrvs;
+
     drv.env.erase("allowedReferences");
     drv.env.erase("allowedRequisites");
     drv.env.erase("disallowedReferences");
@@ -124,28 +132,31 @@ StorePath getDerivationEnvironment(ref<Store> store, const StorePath & drvPath)
 
     /* Rehash and write the derivation. FIXME: would be nice to use
        'buildDerivation', but that's privileged. */
-    drv.name += "-env";
-    for (auto & output : drv.outputs)
+    drv.name = drvOriginal.name + "-env";
+
+    for (auto & output : drvOriginal.outputs)
         drv.env.erase(output.first);
-    drv.outputs = {{"out", DerivationOutput { .output = DerivationOutputInputAddressed { .path = StorePath::dummy }}}};
+    drv.outputs = {{"out", {
+        .output = DerivationOutputInputAddressedT<NoPath> { .path = NoPath {} }}
+    }};
+
     drv.env["out"] = "";
     drv.env["_outputs_saved"] = drv.env["outputs"];
     drv.env["outputs"] = "out";
+
     drv.inputSrcs.insert(std::move(getEnvShPath));
-    Hash h = std::get<0>(hashDerivationModulo(*store, drv, true));
-    auto shellOutPath = store->makeOutputPath("out", h, drv.name);
-    drv.outputs.insert_or_assign("out", DerivationOutput { .output = DerivationOutputInputAddressed {
-                .path = shellOutPath
-            } });
-    drv.env["out"] = store->printStorePath(shellOutPath);
-    auto shellDrvPath2 = writeDerivation(store, drv);
+
+    Derivation drvFinal = bakeDerivationPaths(*store, drv);
+    auto output = std::get<DerivationOutputInputAddressed>(drvFinal.outputs.at("out").output);
+
+    auto shellDrvPath2 = writeDerivation(store, drvFinal);
 
     /* Build the derivation. */
     store->buildPaths({{shellDrvPath2}});
 
-    assert(store->isValidPath(shellOutPath));
+    assert(store->isValidPath(output.path));
 
-    return shellOutPath;
+    return output.path;
 }
 
 struct Common : InstallableCommand, MixProfile

@@ -91,6 +91,10 @@ public:
        (e.g. "sha256:"). */
     std::string to_string(Base base, bool includeType) const;
 
+    Hash clone() const {
+        return *this;
+    }
+
     std::string gitRev() const
     {
         assert(type == htSHA1);
