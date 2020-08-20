@@ -291,7 +291,7 @@ static int _main(int argc, char * * argv)
                 int from = conn->from.fd;
                 int to = conn->to.fd;
 
-                auto nfds = std::max(from, to) + 1;
+                auto nfds = std::max(from, STDIN_FILENO) + 1;
                 while (true) {
                     fd_set fds;
                     FD_ZERO(&fds);
