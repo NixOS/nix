@@ -30,8 +30,6 @@ struct PrimOp
     PrimOpFun fun;
     size_t arity;
     Symbol name;
-    PrimOp(PrimOpFun fun, size_t arity, Symbol name)
-        : fun(fun), arity(arity), name(name) { }
 };
 
 

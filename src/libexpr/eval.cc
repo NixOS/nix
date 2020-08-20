@@ -509,7 +509,7 @@ Value * EvalState::addPrimOp(const string & name,
     if (arity == 0) {
         auto vPrimOp = allocValue();
         vPrimOp->type = tPrimOp;
-        vPrimOp->primOp = new PrimOp(primOp, 1, sym);
+        vPrimOp->primOp = new PrimOp { .fun = primOp, .arity = 1, .name = sym };
         Value v;
         mkApp(v, *vPrimOp, *vPrimOp);
         return addConstant(name, v);
@@ -517,7 +517,7 @@ Value * EvalState::addPrimOp(const string & name,
 
     Value * v = allocValue();
     v->type = tPrimOp;
-    v->primOp = new PrimOp(primOp, arity, sym);
+    v->primOp = new PrimOp { .fun = primOp, .arity = arity, .name = sym };
     staticBaseEnv.vars[symbols.create(name)] = baseEnvDispl;
     baseEnv.values[baseEnvDispl++] = v;
     baseEnv.values[0]->attrs->push_back(Attr(sym, v));
