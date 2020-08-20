@@ -346,12 +346,12 @@ public:
     /* Query the mapping outputName => outputPath for the given derivation. All
        outputs are mentioned so ones mising the mapping are mapped to
        `std::nullopt`.  */
-    virtual std::map<std::string, std::optional<StorePath>> queryDerivationOutputMap(const StorePath & path)
-    { unsupported("queryDerivationOutputMap"); }
+    virtual std::map<std::string, std::optional<StorePath>> queryPartialDerivationOutputMap(const StorePath & path)
+    { unsupported("queryPartialDerivationOutputMap"); }
 
     /* Query the mapping outputName=>outputPath for the given derivation.
        Assume every output has a mapping and throw an exception otherwise. */
-    OutputPathMap queryDerivationOutputMapAssumeTotal(const StorePath & path);
+    OutputPathMap queryDerivationOutputMap(const StorePath & path);
 
     /* Query the full store path given the hash part of a valid store
        path, or empty if the path doesn't exist. */
