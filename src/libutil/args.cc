@@ -359,12 +359,14 @@ nlohmann::json Command::toJSON()
     for (auto & example : examples()) {
         auto ex = nlohmann::json::object();
         ex["description"] = example.description;
-        ex["command"] = example.command;
+        ex["command"] = chomp(stripIndentation(example.command));
         exs.push_back(std::move(ex));
     }
 
     auto res = Args::toJSON();
     res["examples"] = std::move(exs);
+    auto s = doc();
+    if (s != "") res.emplace("doc", stripIndentation(s));
     return res;
 }
 

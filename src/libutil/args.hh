@@ -22,6 +22,7 @@ public:
 
     virtual void printHelp(const string & programName, std::ostream & out);
 
+    /* Return a short one-line description of the command. */
     virtual std::string description() { return ""; }
 
 protected:
@@ -220,6 +221,9 @@ struct Command : virtual Args
 
     virtual void prepare() { };
     virtual void run() = 0;
+
+    /* Return documentation about this command, in Markdown format. */
+    virtual std::string doc() { return ""; }
 
     struct Example
     {

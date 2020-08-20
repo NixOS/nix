@@ -12,7 +12,7 @@ def show_flags:
   ;
 
 def show_synopsis:
-  "`" + .command + "` " + (.args | map("*" + .label + "*" + (if has("arity") then "" else "..." end)) | join(" ")) + "\n\n"
+  "`" + .command + "` [*flags*...] " + (.args | map("*" + .label + "*" + (if has("arity") then "" else "..." end)) | join(" ")) + "\n\n"
   ;
 
 def show_command:
@@ -21,6 +21,10 @@ def show_command:
   + "`" + .command + "` - " + .def.description + "\n\n"
   + .section + " Synopsis\n\n"
   + ({"command": .command, "args": .def.args} | show_synopsis)
+  + (if .def | has("doc")
+     then .section + " Description\n\n" + .def.doc + "\n\n"
+     else ""
+     end)
   + (if (.def.flags | length) > 0 then
       .section + " Flags\n\n"
       + (.def | show_flags)

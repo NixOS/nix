@@ -782,7 +782,7 @@ struct CmdRepl : StoreCommand, MixEvalArgs
         return {
           Example{
             "Display all special commands within the REPL:",
-              "nix repl\n  nix-repl> :?"
+            "nix repl\nnix-repl> :?"
           }
         };
     }
