@@ -117,7 +117,16 @@ for my $fn (glob "$tmpDir/*") {
     my $dstKey = "$releaseDir/" . $name;
     unless (defined $releasesBucket->head_key($dstKey)) {
         print STDERR "uploading $fn to s3://$releasesBucketName/$dstKey...\n";
-        $releasesBucket->add_key_filename($dstKey, $fn)
+
+        my $configuration = ();
+        $configuration->{content_type} = "application/octet-stream";
+
+        if ($fn =~ /.sha256|.asc|install/) {
+            # Text files
+            $configuration->{content_type} = "text/plain";
+        }
+
+        $releasesBucket->add_key_filename($dstKey, $fn, $configuration)
             or die $releasesBucket->err . ": " . $releasesBucket->errstr;
     }
 }
