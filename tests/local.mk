@@ -14,7 +14,7 @@ nix_tests = \
   placeholders.sh nix-shell.sh \
   linux-sandbox.sh \
   build-dry.sh \
-  build-remote.sh \
+  build-remote-input-addressed.sh \
   nar-access.sh \
   structured-attrs.sh \
   fetchGit.sh \
@@ -35,6 +35,7 @@ nix_tests = \
   flakes.sh \
   content-addressed.sh
   # parallel.sh
+  # build-remote-content-addressed-fixed.sh \
 
 install-tests += $(foreach x, $(nix_tests), tests/$(x))
 
