@@ -74,7 +74,7 @@ struct CmdBuild : InstallablesCommand, MixDryRun, MixProfile
                             store2->addPermRoot(bo.path, absPath(symlink), true);
                         },
                         [&](BuildableFromDrv bfd) {
-                            auto builtOutputs = store->queryDerivationOutputMapAssumeTotal(bfd.drvPath);
+                            auto builtOutputs = store->queryDerivationOutputMap(bfd.drvPath);
                             for (auto & output : builtOutputs) {
                                 std::string symlink = outLink;
                                 if (i) symlink += fmt("-%d", i);

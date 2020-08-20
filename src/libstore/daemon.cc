@@ -325,7 +325,7 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
     case wopQueryDerivationOutputMap: {
         auto path = store->parseStorePath(readString(from));
         logger->startWork();
-        auto outputs = store->queryDerivationOutputMap(path);
+        auto outputs = store->queryPartialDerivationOutputMap(path);
         logger->stopWork();
         worker_proto::write(*store, to, outputs);
         break;

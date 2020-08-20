@@ -64,7 +64,7 @@ void EvalState::realiseContext(const PathSet & context)
        paths. */
     if (allowedPaths) {
         for (auto & [drvPath, outputs] : drvs) {
-            auto outputPaths = store->queryDerivationOutputMapAssumeTotal(drvPath);
+            auto outputPaths = store->queryDerivationOutputMap(drvPath);
             for (auto & outputName : outputs) {
                 if (outputPaths.count(outputName) == 0)
                     throw Error("derivation '%s' does not have an output named '%s'",

@@ -65,7 +65,7 @@ static PathSet realisePath(StorePathWithOutputs path, bool build = true)
 
     if (path.path.isDerivation()) {
         if (build) store->buildPaths({path});
-        auto outputPaths = store->queryDerivationOutputMapAssumeTotal(path.path);
+        auto outputPaths = store->queryDerivationOutputMap(path.path);
         Derivation drv = store->derivationFromPath(path.path);
         rootNr++;
 

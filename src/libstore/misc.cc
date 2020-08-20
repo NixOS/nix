@@ -207,7 +207,7 @@ void Store::queryMissing(const std::vector<StorePathWithOutputs> & targets,
             /* true for regular derivations, and CA derivations for which we
                have a trust mapping for all wanted outputs. */
             auto knownOutputPaths = true;
-            for (auto & [outputName, pathOpt] : queryDerivationOutputMap(path.path)) {
+            for (auto & [outputName, pathOpt] : queryPartialDerivationOutputMap(path.path)) {
                 if (!pathOpt) {
                     knownOutputPaths = false;
                     break;

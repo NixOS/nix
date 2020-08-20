@@ -518,7 +518,7 @@ static void _main(int argc, char * * argv)
             if (counter)
                 drvPrefix += fmt("-%d", counter + 1);
 
-            auto builtOutputs = store->queryDerivationOutputMapAssumeTotal(drvPath);
+            auto builtOutputs = store->queryDerivationOutputMap(drvPath);
 
             for (auto & outputName : wantedOutputs) {
                 auto outputPath = builtOutputs.at(outputName);

@@ -1041,8 +1041,8 @@ private:
     /* Wrappers around the corresponding Store methods that first consult the
        derivation.  This is currently needed because when there is no drv file
        there also is no DB entry. */
-    std::map<std::string, std::optional<StorePath>> queryDerivationOutputMap();
-    OutputPathMap queryDerivationOutputMapAssumeTotal();
+    std::map<std::string, std::optional<StorePath>> queryPartialDerivationOutputMap();
+    OutputPathMap queryDerivationOutputMap();
 
     /* Return the set of (in)valid paths. */
     void checkPathValidity();
@@ -1367,7 +1367,7 @@ void DerivationGoal::repairClosure()
        that produced those outputs. */
 
     /* Get the output closure. */
-    auto outputs = queryDerivationOutputMapAssumeTotal();
+    auto outputs = queryDerivationOutputMap();
     StorePathSet outputClosure;
     for (auto & i : outputs) {
         if (!wantOutput(i.first, wantedOutputs)) continue;
@@ -1386,7 +1386,7 @@ void DerivationGoal::repairClosure()
     std::map<StorePath, StorePath> outputsToDrv;
     for (auto & i : inputClosure)
         if (i.isDerivation()) {
-            auto depOutputs = worker.store.queryDerivationOutputMap(i);
+            auto depOutputs = worker.store.queryPartialDerivationOutputMap(i);
             for (auto & j : depOutputs)
                 if (j.second)
                     outputsToDrv.insert_or_assign(*j.second, i);
@@ -1457,7 +1457,7 @@ void DerivationGoal::inputsRealised()
                `i' as input paths.  Only add the closures of output paths
                that are specified as inputs. */
             assert(worker.store.isValidPath(drvPath));
-            auto outputs = worker.store.queryDerivationOutputMap(depDrvPath);
+            auto outputs = worker.store.queryPartialDerivationOutputMap(depDrvPath);
             for (auto & j : wantedDepOutputs) {
                 if (outputs.count(j) > 0) {
                     auto optRealizedInput = outputs.at(j);
@@ -2912,11 +2912,11 @@ struct RestrictedStore : public LocalFSStore
     void queryReferrers(const StorePath & path, StorePathSet & referrers) override
     { }
 
-    std::map<std::string, std::optional<StorePath>> queryDerivationOutputMap(const StorePath & path) override
+    std::map<std::string, std::optional<StorePath>> queryPartialDerivationOutputMap(const StorePath & path) override
     {
         if (!goal.isAllowed(path))
             throw InvalidPath("cannot query output map for unknown path '%s' in recursive Nix", printStorePath(path));
-        return next->queryDerivationOutputMap(path);
+        return next->queryPartialDerivationOutputMap(path);
     }
 
     std::optional<StorePath> queryPathFromHashPart(const std::string & hashPart) override
@@ -2979,7 +2979,7 @@ struct RestrictedStore : public LocalFSStore
 
         for (auto & path : paths) {
             if (!path.path.isDerivation()) continue;
-            auto outputs = next->queryDerivationOutputMapAssumeTotal(path.path);
+            auto outputs = next->queryDerivationOutputMap(path.path);
             for (auto & output : outputs)
                 if (wantOutput(output.first, path.outputs))
                     newPaths.insert(output.second);
@@ -4548,7 +4548,7 @@ void DerivationGoal::flushLine()
 }
 
 
-std::map<std::string, std::optional<StorePath>> DerivationGoal::queryDerivationOutputMap()
+std::map<std::string, std::optional<StorePath>> DerivationGoal::queryPartialDerivationOutputMap()
 {
     if (drv->type() != DerivationType::CAFloating) {
         std::map<std::string, std::optional<StorePath>> res;
@@ -4556,11 +4556,11 @@ std::map<std::string, std::optional<StorePath>> DerivationGoal::queryDerivationO
             res.insert_or_assign(name, output.pathOpt(worker.store, drv->name, name));
         return res;
     } else {
-        return worker.store.queryDerivationOutputMap(drvPath);
+        return worker.store.queryPartialDerivationOutputMap(drvPath);
     }
 }
 
-OutputPathMap DerivationGoal::queryDerivationOutputMapAssumeTotal()
+OutputPathMap DerivationGoal::queryDerivationOutputMap()
 {
     if (drv->type() != DerivationType::CAFloating) {
         OutputPathMap res;
@@ -4568,7 +4568,7 @@ OutputPathMap DerivationGoal::queryDerivationOutputMapAssumeTotal()
             res.insert_or_assign(name, *output.second);
         return res;
     } else {
-        return worker.store.queryDerivationOutputMapAssumeTotal(drvPath);
+        return worker.store.queryDerivationOutputMap(drvPath);
     }
 }
 
@@ -4576,7 +4576,7 @@ OutputPathMap DerivationGoal::queryDerivationOutputMapAssumeTotal()
 void DerivationGoal::checkPathValidity()
 {
     bool checkHash = buildMode == bmRepair;
-    for (auto & i : queryDerivationOutputMap()) {
+    for (auto & i : queryPartialDerivationOutputMap()) {
         InitialOutputStatus status {
             .wanted = wantOutput(i.first, wantedOutputs),
         };
