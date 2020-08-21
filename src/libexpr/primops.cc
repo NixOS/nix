@@ -82,13 +82,13 @@ static void mkOutputString(EvalState & state, Value & v,
     auto optOutputPath = o.second.pathOpt(*state.store, drv.name, o.first);
     mkString(
         *state.allocAttr(v, state.symbols.create(o.first)),
-        state.store->printStorePath(optOutputPath
-            ? *optOutputPath
+        optOutputPath
+            ? state.store->printStorePath(*optOutputPath)
             /* Downstream we would substitute this for an actual path once
                we build the floating CA derivation */
             /* FIXME: we need to depend on the basic derivation, not
                derivation */
-            : downstreamPlaceholder(*state.store, drvPath, o.first)),
+            : downstreamPlaceholder(*state.store, drvPath, o.first),
         {"!" + o.first + "!" + state.store->printStorePath(drvPath)});
 }
 

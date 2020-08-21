@@ -664,14 +664,12 @@ std::string hashPlaceholder(const std::string & outputName)
     return "/" + hashString(htSHA256, "nix-output:" + outputName).to_string(Base32, false);
 }
 
-StorePath downstreamPlaceholder(const Store & store, const StorePath & drvPath, std::string_view outputName)
+std::string downstreamPlaceholder(const Store & store, const StorePath & drvPath, std::string_view outputName)
 {
     auto drvNameWithExtension = drvPath.name();
     auto drvName = drvNameWithExtension.substr(0, drvNameWithExtension.size() - 4);
-    return store.makeStorePath(
-        "downstream-placeholder:" + std::string { drvPath.name() } + ":" + std::string { outputName },
-        "compressed:" + std::string { drvPath.hashPart() },
-        outputPathName(drvName, outputName));
+    auto clearText = "nix-upstream-output:" + std::string { drvPath.hashPart() } + ":" + outputPathName(drvName, outputName);
+    return "/" + hashString(htSHA256, clearText).to_string(Base32, false);
 }
 
 }
