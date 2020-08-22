@@ -984,6 +984,8 @@ private:
     void tryLocalBuild();
     void buildDone();
 
+    void resolvedFinished();
+
     /* Is the build hook willing to perform the build? */
     HookReply tryBuildHook();
 
@@ -1451,8 +1453,39 @@ void DerivationGoal::inputsRealised()
     /* Determine the full set of input paths. */
 
     /* First, the input derivations. */
-    if (useDerivation)
-        for (auto & [depDrvPath, wantedDepOutputs] : dynamic_cast<Derivation *>(drv.get())->inputDrvs) {
+    if (useDerivation) {
+        auto & fullDrv = *dynamic_cast<Derivation *>(drv.get());
+
+        if (!fullDrv.inputDrvs.empty() && fullDrv.type() == DerivationType::CAFloating) {
+            /* We are be able to resolve this derivation based on the
+               now-known results of dependencies. If so, we become a stub goal
+               aliasing that resolved derivation goal */
+            Derivation drvResolved { fullDrv.resolve(worker.store) };
+
+            auto pathResolved = writeDerivation(worker.store, drvResolved);
+            /* Add to memotable to speed up downstream goal's queries with the
+               original derivation. */
+            drvPathResolutions.lock()->insert_or_assign(drvPath, pathResolved);
+
+            auto msg = fmt("Resolved derivation: '%s' -> '%s'",
+                worker.store.printStorePath(drvPath),
+                worker.store.printStorePath(pathResolved));
+            act = std::make_unique<Activity>(*logger, lvlInfo, actBuildWaiting, msg,
+                Logger::Fields {
+                       worker.store.printStorePath(drvPath),
+                       worker.store.printStorePath(pathResolved),
+                   });
+
+            auto resolvedGoal = worker.makeDerivationGoal(
+                pathResolved, wantedOutputs,
+                buildMode == bmRepair ? bmRepair : bmNormal);
+            addWaitee(resolvedGoal);
+
+            state = &DerivationGoal::resolvedFinished;
+            return;
+        }
+
+        for (auto & [depDrvPath, wantedDepOutputs] : fullDrv.inputDrvs) {
             /* Add the relevant output closures of the input derivation
                `i' as input paths.  Only add the closures of output paths
                that are specified as inputs. */
@@ -1472,6 +1505,7 @@ void DerivationGoal::inputsRealised()
                         worker.store.printStorePath(drvPath), j, worker.store.printStorePath(drvPath));
             }
         }
+    }
 
     /* Second, the input sources. */
     worker.store.computeFSClosure(drv->inputSrcs, inputPaths);
@@ -1893,6 +1927,9 @@ void DerivationGoal::buildDone()
     done(BuildResult::Built);
 }
 
+void DerivationGoal::resolvedFinished() {
+    done(BuildResult::Built);
+}
 
 HookReply DerivationGoal::tryBuildHook()
 {
@@ -2065,7 +2102,7 @@ void linkOrCopy(const Path & from, const Path & to)
            file (e.g. 32000 of ext3), which is quite possible after a
            'nix-store --optimise'. FIXME: actually, why don't we just
            bind-mount in this case?
-           
+
            It can also fail with EPERM in BeegFS v7 and earlier versions
            which don't allow hard-links to other directories */
         if (errno != EMLINK && errno != EPERM)
@@ -4248,10 +4285,14 @@ void DerivationGoal::registerOutputs()
     {
         ValidPathInfos infos2;
         for (auto & [outputName, newInfo] : infos) {
-            /* FIXME: we will want to track this mapping in the DB whether or
-               not we have a drv file. */
             if (useDerivation)
                 worker.store.linkDeriverToPath(drvPath, outputName, newInfo.path);
+            else {
+                /* Once a floating CA derivations reaches this point, it must
+                   already be resolved, drvPath the basic derivation path, and
+                   a file existsing at that path for sake of the DB's foreign key. */
+                assert(drv->type() != DerivationType::CAFloating);
+            }
             infos2.push_back(newInfo);
         }
         worker.store.registerValidPaths(infos2);

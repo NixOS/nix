@@ -803,12 +803,35 @@ StorePathSet LocalStore::queryValidDerivers(const StorePath & path)
 }
 
 
-std::map<std::string, std::optional<StorePath>> LocalStore::queryPartialDerivationOutputMap(const StorePath & path)
+std::map<std::string, std::optional<StorePath>> LocalStore::queryPartialDerivationOutputMap(const StorePath & path_)
 {
+    auto path = path_;
     std::map<std::string, std::optional<StorePath>> outputs;
-    BasicDerivation drv = readDerivation(path);
+    Derivation drv = readDerivation(path);
     for (auto & [outName, _] : drv.outputs) {
         outputs.insert_or_assign(outName, std::nullopt);
+    }
+    bool haveCached = false;
+    {
+        auto resolutions = drvPathResolutions.lock();
+        auto resolvedPathOptIter = resolutions->find(path);
+        if (resolvedPathOptIter != resolutions->end()) {
+            auto & [_, resolvedPathOpt] = *resolvedPathOptIter;
+            if (resolvedPathOpt)
+                path = *resolvedPathOpt;
+            haveCached = true;
+        }
+    }
+    /* can't just use else-if instead of `!haveCached` because we need to unlock
+       `drvPathResolutions` before it is locked in `Derivation::resolve`. */
+    if (!haveCached && drv.type() == DerivationType::CAFloating) {
+        /* Resolve drv and use that path instead. */
+        auto pathResolved = writeDerivation(*this, drv.resolve(*this));
+        /* Store in memo table. */
+        /* FIXME: memo logic should not be local-store specific, should have
+           wrapper-method instead. */
+        drvPathResolutions.lock()->insert_or_assign(path, pathResolved);
+        path = std::move(pathResolved);
     }
     return retrySQLite<std::map<std::string, std::optional<StorePath>>>([&]() {
         auto state(_state.lock());

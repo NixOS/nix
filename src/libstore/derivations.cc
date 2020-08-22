@@ -672,4 +672,57 @@ std::string downstreamPlaceholder(const Store & store, const StorePath & drvPath
     return "/" + hashString(htSHA256, clearText).to_string(Base32, false);
 }
 
+
+// N.B. Outputs are left unchanged
+static void rewriteDerivation(Store & store, BasicDerivation & drv, const StringMap & rewrites) {
+
+    debug("Rewriting the derivation");
+
+    for (auto &rewrite: rewrites) {
+        debug("rewriting %s as %s", rewrite.first, rewrite.second);
+    }
+
+    drv.builder = rewriteStrings(drv.builder, rewrites);
+    for (auto & arg: drv.args) {
+        arg = rewriteStrings(arg, rewrites);
+    }
+
+    StringPairs newEnv;
+    for (auto & envVar: drv.env) {
+        auto envName = rewriteStrings(envVar.first, rewrites);
+        auto envValue = rewriteStrings(envVar.second, rewrites);
+        newEnv.emplace(envName, envValue);
+    }
+    drv.env = newEnv;
+}
+
+
+Sync<DrvPathResolutions> drvPathResolutions;
+
+BasicDerivation Derivation::resolve(Store & store) {
+    BasicDerivation resolved { *this };
+
+    // Input paths that we'll want to rewrite in the derivation
+    StringMap inputRewrites;
+
+    for (auto & input : inputDrvs) {
+        auto inputDrvOutputs = store.queryPartialDerivationOutputMap(input.first);
+        StringSet newOutputNames;
+        for (auto & outputName : input.second) {
+            auto actualPathOpt = inputDrvOutputs.at(outputName);
+            if (!actualPathOpt)
+                throw Error("input drv '%s' wasn't yet built", store.printStorePath(input.first));
+            auto actualPath = *actualPathOpt;
+            inputRewrites.emplace(
+                downstreamPlaceholder(store, input.first, outputName),
+                store.printStorePath(actualPath));
+            resolved.inputSrcs.insert(std::move(actualPath));
+        }
+    }
+
+    rewriteDerivation(store, resolved, inputRewrites);
+
+    return resolved;
+}
+
 }
