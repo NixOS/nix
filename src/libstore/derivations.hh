@@ -100,7 +100,7 @@ struct BasicDerivation
     StringPairs env;
     std::string name;
 
-    BasicDerivation() { }
+    BasicDerivation() = default;
     virtual ~BasicDerivation() { };
 
     bool isBuiltin() const;
@@ -127,7 +127,8 @@ struct Derivation : BasicDerivation
     std::string unparse(const Store & store, bool maskOutputs,
         std::map<std::string, StringSet> * actualInputs = nullptr) const;
 
-    Derivation() { }
+    Derivation() = default;
+    Derivation(BasicDerivation && bd) : BasicDerivation(std::move(bd)) { }
 };
 
 
