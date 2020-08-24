@@ -32,15 +32,22 @@ $(d)/src/command-ref/conf-file.md: $(d)/conf-file.json $(d)/generate-options.jq 
 	jq -r -f doc/manual/generate-options.jq $< >> $@
 
 $(d)/nix.json: $(bindir)/nix
-	$(trace-gen) $(bindir)/nix dump-args > $@
+	$(trace-gen) $(bindir)/nix __dump-args > $@
 
 $(d)/conf-file.json: $(bindir)/nix
 	$(trace-gen) env -i NIX_CONF_DIR=/dummy HOME=/dummy $(bindir)/nix show-config --json --experimental-features nix-command > $@
 
+$(d)/src/expressions/builtins.md: $(d)/builtins.json $(d)/generate-builtins.jq $(d)/src/expressions/builtins-prefix.md
+	cat doc/manual/src/expressions/builtins-prefix.md > $@
+	jq -r -f doc/manual/generate-builtins.jq $< >> $@
+
+$(d)/builtins.json: $(bindir)/nix
+	$(trace-gen) $(bindir)/nix __dump-builtins > $@
+
 # Generate the HTML manual.
 install: $(docdir)/manual/index.html
 
-$(docdir)/manual/index.html: $(MANUAL_SRCS) $(d)/book.toml $(d)/custom.css
+$(docdir)/manual/index.html: $(MANUAL_SRCS) $(d)/book.toml $(d)/custom.css $(d)/src/command-ref/nix.md $(d)/src/command-ref/conf-file.md $(d)/src/expressions/builtins.md
 	$(trace-gen) mdbook build doc/manual -d $(docdir)/manual
 	@cp doc/manual/highlight.pack.js $(docdir)/manual/highlight.js
 
