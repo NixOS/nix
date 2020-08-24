@@ -30,6 +30,8 @@ struct PrimOp
     PrimOpFun fun;
     size_t arity;
     Symbol name;
+    std::vector<std::string> args;
+    const char * doc = nullptr;
 };
 
 
@@ -239,6 +241,8 @@ private:
 
     Value * addPrimOp(const string & name,
         size_t arity, PrimOpFun primOp);
+
+    Value * addPrimOp(PrimOp && primOp);
 
 public:
 

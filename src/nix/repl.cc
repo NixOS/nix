@@ -416,7 +416,8 @@ bool NixRepl::processLine(string line)
              << "  :r            Reload all files\n"
              << "  :s <expr>     Build dependencies of derivation, then start nix-shell\n"
              << "  :t <expr>     Describe result of evaluation\n"
-             << "  :u <expr>     Build derivation, then start nix-shell\n";
+             << "  :u <expr>     Build derivation, then start nix-shell\n"
+             << "  :doc <expr>   Show documentation of a builtin function\n";
     }
 
     else if (command == ":a" || command == ":add") {
@@ -508,6 +509,24 @@ bool NixRepl::processLine(string line)
 
     else if (command == ":q" || command == ":quit")
         return false;
+
+    else if (command == ":doc") {
+        Value v;
+        evalString(arg, v);
+        if (v.type == tPrimOp || v.type == tPrimOpApp) {
+            auto v2 = &v;
+            while (v2->type == tPrimOpApp)
+                v2 = v2->primOpApp.left;
+            if (v2->primOp->doc) {
+                // FIXME: format markdown.
+                if (!v2->primOp->args.empty())
+                    std::cout << fmt("Arguments: %s\n\n", concatStringsSep(" ", v2->primOp->args));
+                std::cout << trim(stripIndentation(v2->primOp->doc)) << "\n";
+            } else
+                throw Error("builtin function '%s' does not have documentation", v2->primOp->name);
+        } else
+            throw Error("value does not have documentation");
+    }
 
     else if (command != "")
         throw Error("unknown command '%1%'", command);

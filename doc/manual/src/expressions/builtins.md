@@ -9,9 +9,6 @@ scope. Instead, you can access them through the `builtins` built-in
 value, which is a set that contains all built-in functions and values.
 For instance, `derivation` is also available as `builtins.derivation`.
 
-  - `abort` *s*; `builtins.abort` *s*  
-    Abort Nix expression evaluation, print error message *s*.
-
   - `builtins.add` *e1* *e2*  
     Return the sum of the numbers *e1* and *e2*.
 

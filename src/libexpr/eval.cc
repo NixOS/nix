@@ -525,6 +525,34 @@ Value * EvalState::addPrimOp(const string & name,
 }
 
 
+Value * EvalState::addPrimOp(PrimOp && primOp)
+{
+    /* Hack to make constants lazy: turn them into a application of
+       the primop to a dummy value. */
+    if (primOp.arity == 0) {
+        primOp.arity = 1;
+        auto vPrimOp = allocValue();
+        vPrimOp->type = tPrimOp;
+        vPrimOp->primOp = new PrimOp(std::move(primOp));
+        Value v;
+        mkApp(v, *vPrimOp, *vPrimOp);
+        return addConstant(primOp.name, v);
+    }
+
+    Symbol envName = primOp.name;
+    if (hasPrefix(primOp.name, "__"))
+        primOp.name = symbols.create(std::string(primOp.name, 2));
+
+    Value * v = allocValue();
+    v->type = tPrimOp;
+    v->primOp = new PrimOp(std::move(primOp));
+    staticBaseEnv.vars[envName] = baseEnvDispl;
+    baseEnv.values[baseEnvDispl++] = v;
+    baseEnv.values[0]->attrs->push_back(Attr(primOp.name, v));
+    return v;
+}
+
+
 Value & EvalState::getBuiltin(const string & name)
 {
     return *baseEnv.values[0]->attrs->find(symbols.create(name))->value;

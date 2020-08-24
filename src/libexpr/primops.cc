@@ -445,12 +445,19 @@ static void prim_genericClosure(EvalState & state, const Pos & pos, Value * * ar
 }
 
 
-static void prim_abort(EvalState & state, const Pos & pos, Value * * args, Value & v)
-{
-    PathSet context;
-    string s = state.coerceToString(pos, *args[0], context);
-    throw Abort("evaluation aborted with the following error message: '%1%'", s);
-}
+static RegisterPrimOp primop_abort({
+    .name = "abort",
+    .args = {"s"},
+    .doc = R"(
+      Abort Nix expression evaluation and print the error message *s*.
+    )",
+    .fun = [](EvalState & state, const Pos & pos, Value * * args, Value & v)
+    {
+        PathSet context;
+        string s = state.coerceToString(pos, *args[0], context);
+        throw Abort("evaluation aborted with the following error message: '%1%'", s);
+    }
+});
 
 
 static void prim_throw(EvalState & state, const Pos & pos, Value * * args, Value & v)
@@ -2238,7 +2245,20 @@ RegisterPrimOp::RegisterPrimOp(std::string name, size_t arity, PrimOpFun fun,
     std::optional<std::string> requiredFeature)
 {
     if (!primOps) primOps = new PrimOps;
-    primOps->push_back({name, arity, fun, requiredFeature});
+    primOps->push_back({
+        .name = name,
+        .args = {},
+        .arity = arity,
+        .requiredFeature = std::move(requiredFeature),
+        .fun = fun
+    });
+}
+
+
+RegisterPrimOp::RegisterPrimOp(Info && info)
+{
+    if (!primOps) primOps = new PrimOps;
+    primOps->push_back(std::move(info));
 }
 
 
@@ -2314,7 +2334,6 @@ void EvalState::createBaseEnv()
     addPrimOp("__isBool", 1, prim_isBool);
     addPrimOp("__isPath", 1, prim_isPath);
     addPrimOp("__genericClosure", 1, prim_genericClosure);
-    addPrimOp("abort", 1, prim_abort);
     addPrimOp("__addErrorContext", 2, prim_addErrorContext);
     addPrimOp("__tryEval", 1, prim_tryEval);
     addPrimOp("__getEnv", 1, prim_getEnv);
@@ -2431,7 +2450,13 @@ void EvalState::createBaseEnv()
     if (RegisterPrimOp::primOps)
         for (auto & primOp : *RegisterPrimOp::primOps)
             if (!primOp.requiredFeature || settings.isExperimentalFeatureEnabled(*primOp.requiredFeature))
-                addPrimOp(primOp.name, primOp.arity, primOp.primOp);
+                addPrimOp({
+                    .fun = primOp.fun,
+                    .arity = std::max(primOp.args.size(), primOp.arity),
+                    .name = symbols.create(primOp.name),
+                    .args = std::move(primOp.args),
+                    .doc = primOp.doc,
+                });
 
     /* Now that we've added all primops, sort the `builtins' set,
        because attribute lookups expect it to be sorted. */
