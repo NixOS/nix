@@ -259,7 +259,7 @@ public:
         "Secret keys with which to sign local builds."};
 
     Setting<unsigned int> tarballTtl{this, 60 * 60, "tarball-ttl",
-        "How long downloaded files are considered up-to-date."};
+        "How long downloaded files are considered up-to-date (in seconds)."};
 
     Setting<bool> requireSigs{this, true, "require-sigs",
         "Whether to check that any non-content-addressed path added to the "
