@@ -381,10 +381,14 @@ EvalState::EvalState(const Strings & _searchPath, ref<Store> store)
             auto path = r.second;
 
             if (store->isInStore(r.second)) {
-                StorePathSet closure;
-                store->computeFSClosure(store->toStorePath(r.second).first, closure);
-                for (auto & path : closure)
-                    allowedPaths->insert(store->printStorePath(path));
+                try {
+                    StorePathSet closure;
+                    store->computeFSClosure(store->toStorePath(r.second).first, closure);
+                    for (auto & path : closure)
+                        allowedPaths->insert(store->printStorePath(path));
+                } catch (InvalidPath &) {
+                    allowedPaths->insert(r.second);
+                }
             } else
                 allowedPaths->insert(r.second);
         }
