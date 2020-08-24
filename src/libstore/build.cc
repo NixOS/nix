@@ -3850,7 +3850,7 @@ void DerivationGoal::registerOutputs()
            something like that. */
         canonicalisePathMetaData(actualPath, buildUser ? buildUser->getUID() : -1, inodesSeen);
 
-        debug("scanning for references for output %1 in temp location '%1%'", outputName, actualPath);
+        debug("scanning for references for output '%s' in temp location '%s'", outputName, actualPath);
 
         /* Pass blank Sink as we are not ready to hash data at this stage. */
         NullSink blank;
