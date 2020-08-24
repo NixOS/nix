@@ -32,6 +32,7 @@ extern "C" {
 #include "globals.hh"
 #include "command.hh"
 #include "finally.hh"
+#include "markdown.hh"
 
 #if HAVE_BOEHMGC
 #define GC_INCLUDE_NEW
@@ -518,10 +519,16 @@ bool NixRepl::processLine(string line)
             while (v2->type == tPrimOpApp)
                 v2 = v2->primOpApp.left;
             if (v2->primOp->doc) {
-                // FIXME: format markdown.
-                if (!v2->primOp->args.empty())
-                    std::cout << fmt("Arguments: %s\n\n", concatStringsSep(" ", v2->primOp->args));
-                std::cout << trim(stripIndentation(v2->primOp->doc)) << "\n";
+                auto args = v2->primOp->args;
+                for (auto & arg : args)
+                    arg = "*" + arg + "*";
+
+                auto markdown =
+                    "**Synopsis:** `builtins." + (std::string) v2->primOp->name + "` "
+                    + concatStringsSep(" ", args) + "\n\n"
+                    + trim(stripIndentation(v2->primOp->doc));
+
+                std::cout << renderMarkdownToTerminal(markdown);
             } else
                 throw Error("builtin function '%s' does not have documentation", v2->primOp->name);
         } else
