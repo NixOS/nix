@@ -16,7 +16,7 @@ nix_SOURCES := \
   $(wildcard src/nix-store/*.cc) \
 
 # -fpermissive is needed by lowdown.
-nix_CXXFLAGS += -I src/libutil -I src/libstore -I src/libfetchers -I src/libexpr -I src/libmain -fpermissive
+nix_CXXFLAGS += -I src/libutil -I src/libstore -I src/libfetchers -I src/libexpr -I src/libmain
 
 nix_LIBS = libexpr libmain libfetchers libstore libutil
 

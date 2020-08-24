@@ -2,8 +2,9 @@
   description = "The purely functional package manager";
 
   inputs.nixpkgs.url = "nixpkgs/nixos-20.03-small";
+  inputs.lowdown-src = { url = "github:edolstra/lowdown/no-structs-in-anonymous-unions"; flake = false; };
 
-  outputs = { self, nixpkgs }:
+  outputs = { self, nixpkgs, lowdown-src }:
 
     let
 
@@ -188,10 +189,14 @@
         lowdown = with final; stdenv.mkDerivation {
           name = "lowdown-0.7.1";
 
+          /*
           src = fetchurl {
             url = https://kristaps.bsd.lv/lowdown/snapshots/lowdown-0.7.1.tar.gz;
             hash = "sha512-1daoAQfYD0LdhK6aFhrSQvadjc5GsSPBZw0fJDb+BEHYMBLjqiUl2A7H8N+l0W4YfGKqbsPYSrCy4vct+7U6FQ==";
           };
+          */
+
+          src = lowdown-src;
 
           outputs = [ "out" "dev" ];
 
