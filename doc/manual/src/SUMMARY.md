@@ -38,6 +38,7 @@
     - [Operators](expressions/language-operators.md)
     - [Derivations](expressions/derivations.md)
       - [Advanced Attributes](expressions/advanced-attributes.md)
+    - [Built-in Constants](expressions/builtin-constants.md)
     - [Built-in Functions](expressions/builtins.md)
 - [Advanced Topics](advanced-topics/advanced-topics.md)
   - [Remote Builds](advanced-topics/distributed-builds.md)
