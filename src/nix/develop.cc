@@ -138,7 +138,7 @@ StorePath getDerivationEnvironment(ref<Store> store, const StorePath & drvPath)
                 .path = shellOutPath
             } });
     drv.env["out"] = store->printStorePath(shellOutPath);
-    auto shellDrvPath2 = writeDerivation(store, drv);
+    auto shellDrvPath2 = writeDerivation(*store, drv);
 
     /* Build the derivation. */
     store->buildPaths({{shellDrvPath2}});
