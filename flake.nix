@@ -73,9 +73,6 @@
             openssl pkgconfig sqlite
             libarchive
             boost
-            (if lib.versionAtLeast lib.version "20.03pre"
-             then nlohmann_json
-             else nlohmann_json.override { multipleHeaders = true; })
             nlohmann_json
 
             # Tests
@@ -171,6 +168,7 @@
                 pkgconfig
                 pkgs.perl
                 boost
+                nlohmann_json
               ]
               ++ lib.optional (stdenv.isLinux || stdenv.isDarwin) libsodium;
 
