@@ -1053,7 +1053,7 @@ static RegisterPrimOp primop_toPath({
     .name = "__toPath",
     .args = {"s"},
     .doc = R"(
-      DEPRECATED. Use `/. + "/path"` to convert a string into an absolute
+      **DEPRECATED.** Use `/. + "/path"` to convert a string into an absolute
       path. For relative paths, use `./. + "/path"`.
     )",
     .fun = prim_toPath,
@@ -1090,6 +1090,23 @@ static void prim_storePath(EvalState & state, const Pos & pos, Value * * args, V
     mkString(v, path, context);
 }
 
+static RegisterPrimOp primop_storePath({
+    .name = "__storePath",
+    .args = {"path"},
+    .doc = R"(
+      This function allows you to define a dependency on an already
+      existing store path. For example, the derivation attribute `src
+      = builtins.storePath /nix/store/f1d18v1y…-source` causes the
+      derivation to depend on the specified path, which must exist or
+      be substitutable. Note that this differs from a plain path
+      (e.g. `src = /nix/store/f1d18v1y…-source`) in that the latter
+      causes the path to be *copied* again to the Nix store, resulting
+      in a new path (e.g. `/nix/store/ld01dnzc…-source-source`).
+
+      This function is not available in pure evaluation mode.
+    )",
+    .fun = prim_storePath,
+});
 
 static void prim_pathExists(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
@@ -2022,9 +2039,6 @@ static RegisterPrimOp primop_listToAttrs({
     .fun = prim_listToAttrs,
 });
 
-/* Return the right-biased intersection of two sets as1 and as2,
-   i.e. a set that contains every attribute from as2 that is also a
-   member of as1. */
 static void prim_intersectAttrs(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
     state.forceAttrs(*args[0], pos);
@@ -2049,13 +2063,6 @@ static RegisterPrimOp primop_intersectAttrs({
     .fun = prim_intersectAttrs,
 });
 
-/* Collect each attribute named `attr' from a list of attribute sets.
-   Sets that don't contain the named attribute are ignored.
-
-   Example:
-     catAttrs "a" [{a = 1;} {b = 0;} {a = 2;}]
-     => [1 2]
-*/
 static void prim_catAttrs(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
     Symbol attrName = state.symbols.create(state.forceStringNoCtx(*args[0], pos));
@@ -2077,19 +2084,23 @@ static void prim_catAttrs(EvalState & state, const Pos & pos, Value * * args, Va
         v.listElems()[n] = res[n];
 }
 
-/* Return a set containing the names of the formal arguments expected
-   by the function `f'.  The value of each attribute is a Boolean
-   denoting whether the corresponding argument has a default value.  For instance,
+static RegisterPrimOp primop_catAttrs({
+    .name = "__catAttrs",
+    .args = {"attr", "list"},
+    .doc = R"(
+      Collect each attribute named *attr* from a list of attribute
+      sets.  Attrsets that don't contain the named attribute are
+      ignored. For example,
 
-      functionArgs ({ x, y ? 123}: ...)
-   => { x = false; y = true; }
+      ```nix
+      builtins.catAttrs "a" [{a = 1;} {b = 0;} {a = 2;}]
+      ```
 
-   "Formal argument" here refers to the attributes pattern-matched by
-   the function.  Plain lambdas are not included, e.g.
+      evaluates to `[1 2]`.
+    )",
+    .fun = prim_catAttrs,
+});
 
-      functionArgs (x: ...)
-   => { }
-*/
 static void prim_functionArgs(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
     state.forceValue(*args[0], pos);
@@ -2131,7 +2142,7 @@ static RegisterPrimOp primop_functionArgs({
     .fun = prim_functionArgs,
 });
 
-/* Apply a function to every element of an attribute set. */
+/*  */
 static void prim_mapAttrs(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
     state.forceAttrs(*args[1], pos);
@@ -2146,6 +2157,21 @@ static void prim_mapAttrs(EvalState & state, const Pos & pos, Value * * args, Va
         mkApp(*state.allocAttr(v, i.name), *vFun2, *i.value);
     }
 }
+
+static RegisterPrimOp primop_mapAttrs({
+    .name = "__mapAttrs",
+    .args = {"f", "attrset"},
+    .doc = R"(
+      Apply function *f* to every element of *attrset*. For example,
+
+      ```nix
+      builtins.mapAttrs (name: value: value * 10) { a = 1; b = 2; }
+      ```
+
+      evaluates to `{ a = 10; b = 20; }`.
+    )",
+    .fun = prim_mapAttrs,
+});
 
 
 /*************************************************************
@@ -2582,9 +2608,29 @@ static void prim_partition(EvalState & state, const Pos & pos, Value * * args, V
     v.attrs->sort();
 }
 
+static RegisterPrimOp primop_partition({
+    .name = "__partition",
+    .args = {"pred", "list"},
+    .doc = R"(
+      Given a predicate function *pred*, this function returns an
+      attrset containing a list named `right`, containing the elements
+      in *list* for which *pred* returned `true`, and a list named
+      `wrong`, containing the elements for which it returned
+      `false`. For example,
 
-/* concatMap = f: list: concatLists (map f list); */
-/* C++-version is to avoid allocating `mkApp', call `f' eagerly */
+      ```nix
+      builtins.partition (x: x > 10) [1 23 9 3 42]
+      ```
+
+      evaluates to
+
+      ```nix
+      { right = [ 23 42 ]; wrong = [ 1 9 3 ]; }
+      ```
+    )",
+    .fun = prim_partition,
+});
+
 static void prim_concatMap(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
     state.forceFunction(*args[0], pos);
@@ -2610,6 +2656,16 @@ static void prim_concatMap(EvalState & state, const Pos & pos, Value * * args, V
         pos += l;
     }
 }
+
+static RegisterPrimOp primop_concatMap({
+    .name = "__concatMap",
+    .args = {"f", "list"},
+    .doc = R"(
+      This function is equivalent to `builtins.concatLists (map f list)`
+      but is more efficient.
+    )",
+    .fun = prim_concatMap,
+});
 
 
 /*************************************************************
@@ -3361,17 +3417,10 @@ void EvalState::createBaseEnv()
     addPrimOp("__addErrorContext", 2, prim_addErrorContext);
 
     // Paths
-    addPrimOp("__storePath", 1, prim_storePath);
     addPrimOp("__findFile", 2, prim_findFile);
 
     // Sets
     addPrimOp("__unsafeGetAttrPos", 2, prim_unsafeGetAttrPos);
-    addPrimOp("__catAttrs", 2, prim_catAttrs);
-    addPrimOp("__mapAttrs", 2, prim_mapAttrs);
-
-    // Lists
-    addPrimOp("__partition", 2, prim_partition);
-    addPrimOp("__concatMap", 2, prim_concatMap);
 
     // Derivations
     addPrimOp("derivationStrict", 1, prim_derivationStrict);
