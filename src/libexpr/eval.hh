@@ -248,6 +248,17 @@ public:
 
     Value & getBuiltin(const string & name);
 
+    struct Doc
+    {
+        Pos pos;
+        std::optional<Symbol> name;
+        size_t arity;
+        std::vector<std::string> args;
+        const char * doc;
+    };
+
+    std::optional<Doc> getDoc(Value & v);
+
 private:
 
     inline Value * lookupVar(Env * env, const ExprVar & var, bool noEval);

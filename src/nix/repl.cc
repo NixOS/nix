@@ -514,23 +514,22 @@ bool NixRepl::processLine(string line)
     else if (command == ":doc") {
         Value v;
         evalString(arg, v);
-        if (v.type == tPrimOp || v.type == tPrimOpApp) {
-            auto v2 = &v;
-            while (v2->type == tPrimOpApp)
-                v2 = v2->primOpApp.left;
-            if (v2->primOp->doc) {
-                auto args = v2->primOp->args;
+        if (auto doc = state->getDoc(v)) {
+            std::string markdown;
+
+            if (!doc->args.empty() && doc->name) {
+                auto args = doc->args;
                 for (auto & arg : args)
                     arg = "*" + arg + "*";
 
-                auto markdown =
-                    "**Synopsis:** `builtins." + (std::string) v2->primOp->name + "` "
-                    + concatStringsSep(" ", args) + "\n\n"
-                    + trim(stripIndentation(v2->primOp->doc));
+                markdown +=
+                    "**Synopsis:** `builtins." + (std::string) (*doc->name) + "` "
+                    + concatStringsSep(" ", args) + "\n\n";
+            }
 
-                std::cout << renderMarkdownToTerminal(markdown);
-            } else
-                throw Error("builtin function '%s' does not have documentation", v2->primOp->name);
+            markdown += trim(stripIndentation(doc->doc));
+
+            std::cout << renderMarkdownToTerminal(markdown);
         } else
             throw Error("value does not have documentation");
     }

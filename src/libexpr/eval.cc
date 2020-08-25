@@ -563,6 +563,25 @@ Value & EvalState::getBuiltin(const string & name)
 }
 
 
+std::optional<EvalState::Doc> EvalState::getDoc(Value & v)
+{
+    if (v.type == tPrimOp || v.type == tPrimOpApp) {
+        auto v2 = &v;
+        while (v2->type == tPrimOpApp)
+            v2 = v2->primOpApp.left;
+        if (v2->primOp->doc)
+            return Doc {
+                .pos = noPos,
+                .name = v2->primOp->name,
+                .arity = v2->primOp->arity,
+                .args = v2->primOp->args,
+                .doc = v2->primOp->doc,
+            };
+    }
+    return {};
+}
+
+
 /* Every "format" object (even temporary) takes up a few hundred bytes
    of stack space, which is a real killer in the recursive
    evaluator.  So here are some helper functions for throwing
