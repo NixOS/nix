@@ -142,6 +142,7 @@ static int _main(int argc, char * * argv)
                             }
                         }
                         if (!free) {
+                            debug("skipping '%s': no slots free", m.storeUri);
                             continue;
                         }
                         bool best = false;
@@ -162,7 +163,15 @@ static int _main(int argc, char * * argv)
                             bestLoad = load;
                             bestSlotLock = std::move(free);
                             bestMachine = &m;
+                        } else {
+                            debug("skipping '%s': there is a better machine", m.storeUri);
                         }
+                    } else {
+                            debug("skipping '%s': does not meet all condiditions\n - enabled = %s\n - system: type is matching = %s / required %s / got %s\n - features: all supported = %s / mandatory supported = %s / required %s / got %s", m.storeUri,
+                                m.enabled,
+                                std::find(m.systemTypes.begin(), m.systemTypes.end(), neededSystem) != m.systemTypes.end(), neededSystem, join(m.systemTypes, ","),
+                                m.allSupported(requiredFeatures), m.mandatoryMet(requiredFeatures), "", ""
+                            );
                     }
                 }
 

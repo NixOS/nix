@@ -1499,6 +1499,7 @@ void DerivationGoal::tryToBuild()
                 return;
             case rpDecline:
                 /* We should do it ourselves. */
+                debug("skip remote build...");
                 break;
         }
     }
@@ -1797,7 +1798,10 @@ void DerivationGoal::buildDone()
 
 HookReply DerivationGoal::tryBuildHook()
 {
-    if (!worker.tryBuildHook || !useDerivation) return rpDecline;
+    if (!worker.tryBuildHook || !useDerivation) {
+        debug("ignore build hook for '%s'...", worker.store.printStorePath(drvPath));
+        return rpDecline;
+    }
 
     if (!worker.hook)
         worker.hook = std::make_unique<HookInstance>();
