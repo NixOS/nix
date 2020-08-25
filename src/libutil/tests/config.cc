@@ -1,9 +1,9 @@
-#include "json.hh"
 #include "config.hh"
 #include "args.hh"
 
 #include <sstream>
 #include <gtest/gtest.h>
+#include <nlohmann/json.hpp>
 
 namespace nix {
 
