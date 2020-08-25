@@ -44,6 +44,10 @@ libstore_CXXFLAGS += \
  -DNIX_MAN_DIR=\"$(mandir)\" \
  -DLSOF=\"$(lsof)\"
 
+ifeq (CYGWIN,$(findstring CYGWIN,$(OS)))
+	GLOBAL_CXXFLAGS += -Wa,-mbig-obj
+endif
+
 ifneq ($(sandbox_shell),)
 libstore_CXXFLAGS += -DSANDBOX_SHELL="\"$(sandbox_shell)\""
 endif
