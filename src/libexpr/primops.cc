@@ -74,10 +74,10 @@ void EvalState::realiseContext(const PathSet & context)
 
 /* Load and evaluate an expression from path specified by the
    argument. */
-static void prim_scopedImport(EvalState & state, const Pos & pos, Value * * args, Value & v)
+static void import(EvalState & state, const Pos & pos, Value & vPath, Value * vScope, Value & v)
 {
     PathSet context;
-    Path path = state.coerceToPath(pos, *args[1], context);
+    Path path = state.coerceToPath(pos, vPath, context);
 
     try {
         state.realiseContext(context);
@@ -99,6 +99,7 @@ static void prim_scopedImport(EvalState & state, const Pos & pos, Value * * args
             return std::nullopt;
         return storePath;
     };
+
     if (auto optStorePath = isValidDerivationInStore()) {
         auto storePath = *optStorePath;
         Derivation drv = readDerivation(*state.store, realPath, Derivation::nameFromPath(storePath));
@@ -133,17 +134,18 @@ static void prim_scopedImport(EvalState & state, const Pos & pos, Value * * args
         mkApp(v, **fun, w);
         state.forceAttrs(v, pos);
     } else {
-        state.forceAttrs(*args[0]);
-        if (args[0]->attrs->empty())
+        if (!vScope)
             state.evalFile(realPath, v);
         else {
-            Env * env = &state.allocEnv(args[0]->attrs->size());
+            state.forceAttrs(*vScope);
+
+            Env * env = &state.allocEnv(vScope->attrs->size());
             env->up = &state.baseEnv;
 
             StaticEnv staticEnv(false, &state.staticBaseEnv);
 
             unsigned int displ = 0;
-            for (auto & attr : *args[0]->attrs) {
+            for (auto & attr : *vScope->attrs) {
                 staticEnv.vars[attr.name] = displ;
                 env->values[displ++] = attr.value;
             }
@@ -155,6 +157,77 @@ static void prim_scopedImport(EvalState & state, const Pos & pos, Value * * args
         }
     }
 }
+
+static RegisterPrimOp primop_scopedImport(RegisterPrimOp::Info {
+    .name = "scopedImport",
+    .arity = 2,
+    .fun = [](EvalState & state, const Pos & pos, Value * * args, Value & v)
+    {
+        import(state, pos, *args[1], args[0], v);
+    }
+});
+
+static RegisterPrimOp primop_import({
+    .name = "import",
+    .args = {"path"},
+    .doc = R"(
+      Load, parse and return the Nix expression in the file *path*. If
+      *path* is a directory, the file ` default.nix ` in that directory
+      is loaded. Evaluation aborts if the file doesn’t exist or contains
+      an incorrect Nix expression. `import` implements Nix’s module
+      system: you can put any Nix expression (such as a set or a
+      function) in a separate file, and use it from Nix expressions in
+      other files.
+
+      > **Note**
+      >
+      > Unlike some languages, `import` is a regular function in Nix.
+      > Paths using the angle bracket syntax (e.g., `import` *\<foo\>*)
+      > are [normal path values](language-values.md).
+
+      A Nix expression loaded by `import` must not contain any *free
+      variables* (identifiers that are not defined in the Nix expression
+      itself and are not built-in). Therefore, it cannot refer to
+      variables that are in scope at the call site. For instance, if you
+      have a calling expression
+
+      ```nix
+      rec {
+        x = 123;
+        y = import ./foo.nix;
+      }
+      ```
+
+      then the following `foo.nix` will give an error:
+
+      ```nix
+      x + 456
+      ```
+
+      since `x` is not in scope in `foo.nix`. If you want `x` to be
+      available in `foo.nix`, you should pass it as a function argument:
+
+      ```nix
+      rec {
+        x = 123;
+        y = import ./foo.nix x;
+      }
+      ```
+
+      and
+
+      ```nix
+      x: x + 456
+      ```
+
+      (The function argument doesn’t have to be called `x` in `foo.nix`;
+      any name would work.)
+    )",
+    .fun = [](EvalState & state, const Pos & pos, Value * * args, Value & v)
+    {
+        import(state, pos, *args[0], nullptr, v);
+    }
+});
 
 /* Want reasonable symbol names, so extern C */
 /* !!! Should we pass the Pos or the file name too? */
@@ -3429,12 +3502,6 @@ void EvalState::createBaseEnv()
     addConstant("__langVersion", v);
 
     // Miscellaneous
-    auto vScopedImport = addPrimOp("scopedImport", 2, prim_scopedImport);
-    Value * v2 = allocValue();
-    mkAttrs(*v2, 0);
-    mkApp(v, *vScopedImport, *v2);
-    forceValue(v);
-    addConstant("import", v);
     if (evalSettings.enableNativeCode) {
         addPrimOp("__importNative", 2, prim_importNative);
         addPrimOp("__exec", 1, prim_exec);
@@ -3444,7 +3511,7 @@ void EvalState::createBaseEnv()
     mkList(v, searchPath.size());
     int n = 0;
     for (auto & i : searchPath) {
-        v2 = v.listElems()[n++] = allocValue();
+        auto v2 = v.listElems()[n++] = allocValue();
         mkAttrs(*v2, 2);
         mkString(*allocAttr(*v2, symbols.create("path")), i.second);
         mkString(*allocAttr(*v2, symbols.create("prefix")), i.first);
