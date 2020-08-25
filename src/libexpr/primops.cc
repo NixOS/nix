@@ -156,7 +156,6 @@ static void prim_scopedImport(EvalState & state, const Pos & pos, Value * * args
     }
 }
 
-
 /* Want reasonable symbol names, so extern C */
 /* !!! Should we pass the Pos or the file name too? */
 extern "C" typedef void (*ValueInitializer)(EvalState & state, Value & v);
@@ -518,6 +517,11 @@ static void prim_genericClosure(EvalState & state, const Pos & pos, Value * * ar
         v.listElems()[n++] = i;
 }
 
+static RegisterPrimOp primop_genericClosure(RegisterPrimOp::Info {
+    .name = "__genericClosure",
+    .arity = 1,
+    .fun = prim_genericClosure,
+});
 
 static RegisterPrimOp primop_abort({
     .name = "abort",
@@ -563,6 +567,11 @@ static void prim_addErrorContext(EvalState & state, const Pos & pos, Value * * a
     }
 }
 
+static RegisterPrimOp primop_addErrorContext(RegisterPrimOp::Info {
+    .name = "__addErrorContext",
+    .arity = 2,
+    .fun = prim_addErrorContext,
+});
 
 /* Try evaluating the argument. Success => {success=true; value=something;},
  * else => {success=false; value=false;} */
@@ -1011,6 +1020,11 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
     v.attrs->sort();
 }
 
+static RegisterPrimOp primop_derivationStrict(RegisterPrimOp::Info {
+    .name = "derivationStrict",
+    .arity = 1,
+    .fun = prim_derivationStrict,
+});
 
 /* Return a placeholder string for the specified output that will be
    substituted by the corresponding output path at build time. For
@@ -1255,6 +1269,12 @@ static void prim_findFile(EvalState & state, const Pos & pos, Value * * args, Va
 
     mkPath(v, state.checkSourcePath(state.findFile(searchPath, path, pos)).c_str());
 }
+
+static RegisterPrimOp primop_findFile(RegisterPrimOp::Info {
+    .name = "__findFile",
+    .arity = 2,
+    .fun = prim_findFile,
+});
 
 /* Return the cryptographic hash of a file in base-16. */
 static void prim_hashFile(EvalState & state, const Pos & pos, Value * * args, Value & v)
@@ -1900,6 +1920,12 @@ static void prim_unsafeGetAttrPos(EvalState & state, const Pos & pos, Value * * 
     else
         state.mkPos(v, i->pos);
 }
+
+static RegisterPrimOp primop_unsafeGetAttrPos(RegisterPrimOp::Info {
+    .name = "__unsafeGetAttrPos",
+    .arity = 2,
+    .fun = prim_unsafeGetAttrPos,
+});
 
 /* Dynamic version of the `?' operator. */
 static void prim_hasAttr(EvalState & state, const Pos & pos, Value * * args, Value & v)
@@ -3413,17 +3439,6 @@ void EvalState::createBaseEnv()
         addPrimOp("__importNative", 2, prim_importNative);
         addPrimOp("__exec", 1, prim_exec);
     }
-    addPrimOp("__genericClosure", 1, prim_genericClosure);
-    addPrimOp("__addErrorContext", 2, prim_addErrorContext);
-
-    // Paths
-    addPrimOp("__findFile", 2, prim_findFile);
-
-    // Sets
-    addPrimOp("__unsafeGetAttrPos", 2, prim_unsafeGetAttrPos);
-
-    // Derivations
-    addPrimOp("derivationStrict", 1, prim_derivationStrict);
 
     /* Add a value containing the current Nix expression search path. */
     mkList(v, searchPath.size());
