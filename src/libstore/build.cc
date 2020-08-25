@@ -3784,7 +3784,7 @@ void DerivationGoal::registerOutputs()
             if (needsMove) {
                 Path actualDest = worker.store.Store::toRealPath(dest);
 
-                if (worker.store.isValidPath(dest))
+                if (worker.store.isValidPath(dest) || buildMode == bmCheck)
                     std::rethrow_exception(delayedException);
 
                 if (actualPath != actualDest) {
