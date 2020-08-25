@@ -1015,7 +1015,7 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
         Hash h = newHashAllowEmpty(*outputHash, ht);
 
         auto outPath = state.store->makeFixedOutputPath(ingestionMethod, h, drvName);
-        if (!jsonObject) drv.env["out"] = state.store->printStorePath(outPath);
+        drv.env["out"] = state.store->printStorePath(outPath);
         drv.outputs.insert_or_assign("out", DerivationOutput {
                 .output = DerivationOutputCAFixed {
                     .hash = FixedOutputHash {
@@ -1029,7 +1029,7 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
     else if (contentAddressed) {
         HashType ht = parseHashType(outputHashAlgo);
         for (auto & i : outputs) {
-            if (!jsonObject) drv.env[i] = hashPlaceholder(i);
+            drv.env[i] = hashPlaceholder(i);
             drv.outputs.insert_or_assign(i, DerivationOutput {
                 .output = DerivationOutputCAFloating {
                     .method = ingestionMethod,
@@ -1047,7 +1047,7 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
            that changes in the set of output names do get reflected in
            the hash. */
         for (auto & i : outputs) {
-            if (!jsonObject) drv.env[i] = "";
+            drv.env[i] = "";
             drv.outputs.insert_or_assign(i,
                 DerivationOutput {
                     .output = DerivationOutputInputAddressed {
@@ -1062,7 +1062,7 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
 
         for (auto & i : outputs) {
             auto outPath = state.store->makeOutputPath(i, h, drvName);
-            if (!jsonObject) drv.env[i] = state.store->printStorePath(outPath);
+            drv.env[i] = state.store->printStorePath(outPath);
             drv.outputs.insert_or_assign(i,
                 DerivationOutput {
                     .output = DerivationOutputInputAddressed {
@@ -1073,7 +1073,7 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
     }
 
     /* Write the resulting term into the Nix store directory. */
-    auto drvPath = writeDerivation(state.store, drv, state.repair);
+    auto drvPath = writeDerivation(*state.store, drv, state.repair);
     auto drvPathS = state.store->printStorePath(drvPath);
 
     printMsg(lvlChatty, "instantiated '%1%' -> '%2%'", drvName, drvPathS);

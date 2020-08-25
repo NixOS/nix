@@ -785,17 +785,21 @@ StorePathSet LocalStore::queryValidDerivers(const StorePath & path)
 }
 
 
-OutputPathMap LocalStore::queryDerivationOutputMap(const StorePath & path)
+std::map<std::string, std::optional<StorePath>> LocalStore::queryPartialDerivationOutputMap(const StorePath & path)
 {
-    return retrySQLite<OutputPathMap>([&]() {
+    std::map<std::string, std::optional<StorePath>> outputs;
+    BasicDerivation drv = readDerivation(path);
+    for (auto & [outName, _] : drv.outputs) {
+        outputs.insert_or_assign(outName, std::nullopt);
+    }
+    return retrySQLite<std::map<std::string, std::optional<StorePath>>>([&]() {
         auto state(_state.lock());
 
         auto useQueryDerivationOutputs(state->stmtQueryDerivationOutputs.use()
             (queryValidPathId(*state, path)));
 
-        OutputPathMap outputs;
         while (useQueryDerivationOutputs.next())
-            outputs.emplace(
+            outputs.insert_or_assign(
                 useQueryDerivationOutputs.getStr(0),
                 parseStorePath(useQueryDerivationOutputs.getStr(1))
             );
