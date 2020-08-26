@@ -19,6 +19,14 @@ typedef list<string> Strings;
 typedef set<string> StringSet;
 typedef std::map<string, string> StringMap;
 
+enum class LogFormat {
+  raw,
+  rawWithLogs,
+  internalJson,
+  bar,
+  barWithLogs,
+};
+
 /* Paths are just strings. */
 
 typedef string Path;

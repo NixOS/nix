@@ -173,7 +173,7 @@ void mainWrapped(int argc, char * * argv)
     settings.verboseBuild = false;
     evalSettings.pureEval = true;
 
-    setLogFormat("bar");
+    createDefaultLogger();
 
     Finally f([] { logger->stop(); });
 

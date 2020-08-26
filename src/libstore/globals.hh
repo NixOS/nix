@@ -892,6 +892,9 @@ public:
     Setting<Strings> experimentalFeatures{this, {}, "experimental-features",
         "Experimental Nix features to enable."};
 
+    Setting<LogFormat> logFormat{this, LogFormat::bar, "log-format",
+        "Default build output logging format; \"raw\", \"raw-with-logs\", \"internal-json\", \"bar\" or \"bar-with-logs\"."};
+
     bool isExperimentalFeatureEnabled(const std::string & name);
 
     void requireExperimentalFeature(const std::string & name);

@@ -3,6 +3,7 @@
 #include "archive.hh"
 #include "args.hh"
 #include "abstract-setting-to-json.hh"
+#include "loggers.hh"
 
 #include <algorithm>
 #include <map>
@@ -200,6 +201,52 @@ template<> void BaseSetting<SandboxMode>::convertToArg(Args & args, const std::s
         .description = "Enable sandboxing, but allow builds to disable it.",
         .category = category,
         .handler = {[=]() { override(smRelaxed); }}
+    });
+}
+
+template<> void BaseSetting<LogFormat>::set(const std::string & str, bool append)
+{
+    if (str == "raw")
+        value = LogFormat::raw;
+    else if (str == "raw-with-logs")
+        value = LogFormat::rawWithLogs;
+    else if (str == "internal-json")
+        value = LogFormat::internalJson;
+    else if (str == "bar")
+        value = LogFormat::bar;
+    else if (str == "bar-with-logs")
+        value = LogFormat::barWithLogs;
+    else throw UsageError("option '%s' has an invalid value '%s'", name, str);
+
+    createDefaultLogger();
+}
+
+template<> bool BaseSetting<LogFormat>::isAppendable()
+{
+    return false;
+}
+
+template<> std::string BaseSetting<LogFormat>::to_string() const
+{
+    if (value == LogFormat::raw) return "raw";
+    else if (value == LogFormat::rawWithLogs) return "raw-with-logs";
+    else if (value == LogFormat::internalJson) return "internal-json";
+    else if (value == LogFormat::bar) return "bar";
+    else if (value == LogFormat::barWithLogs) return "bar-with-logs";
+    else abort();
+}
+
+template<> void BaseSetting<LogFormat>::convertToArg(Args & args, const std::string & category)
+{
+    args.addFlag({
+        .longName = name,
+        .description = "format of log output; `raw`, `raw-with-logs`, `internal-json`, `bar`, "
+                        "or `bar-with-logs`",
+        .category = category,
+        .labels = {"format"},
+        .handler = {[&](std::string format) {
+            settings.logFormat.set(format);
+        }}
     });
 }
 
