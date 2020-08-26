@@ -987,9 +987,10 @@ const PublicKeys & LocalStore::getPublicKeys()
 }
 
 
-void LocalStore::addToStore(const ValidPathInfo & info, Source & source,
+void LocalStore::addToStore(const ValidPathInfo & info_, Source & source,
     RepairFlag repair, CheckSigsFlag checkSigs)
 {
+    ValidPathInfo info { info_ };
     if (requireSigs && checkSigs && !info.checkSignatures(*this, getPublicKeys()))
         throw Error("cannot add path '%s' because it lacks a valid signature", printStorePath(info.path));
 
@@ -1030,13 +1031,23 @@ void LocalStore::addToStore(const ValidPathInfo & info, Source & source,
 
             auto hashResult = hashSink->finish();
 
-            if (hashResult.first != info.narHash())
-                throw Error("hash mismatch importing path '%s';\n  wanted: %s\n  got:    %s",
-                    printStorePath(info.path), info.narHash().to_string(Base32, true), hashResult.first.to_string(Base32, true));
+            if (std::optional optWanted = *info.viewHashResultConst()) {
+                HashResult & wanted = *optWanted;
+                if (hashResult.first != wanted.first)
+                    throw Error("hash mismatch importing path '%s';\n  wanted: %s\n  got:    %s",
+                        printStorePath(info.path),
+                        wanted.first.to_string(Base32, true),
+                        hashResult.first.to_string(Base32, true));
 
-            if (hashResult.second != info.narSize())
-                throw Error("size mismatch importing path '%s';\n  wanted: %s\n  got:   %s",
-                    printStorePath(info.path), info.narSize(), hashResult.second);
+                if (hashResult.second != wanted.second)
+                    throw Error("size mismatch importing path '%s';\n  wanted: %s\n  got:   %s",
+                        printStorePath(info.path), wanted.second, hashResult.second);
+            } else {
+                /* Might as well store the nar hash/ize we just calculated for
+                   an extra method to verify the data in adition to the CA
+                   hash. */
+                info.viewHashResult() = hashResult;
+            }
 
             autoGC();
 

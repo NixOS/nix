@@ -105,28 +105,51 @@ struct LegacySSHStore : public Store
             if (p.empty()) return callback(nullptr);
             auto path2 = parseStorePath(p);
             assert(path == path2);
-            /* Hash will be set below. FIXME construct ValidPathInfo at end. */
-            auto info = std::make_shared<ValidPathInfo>(path, This<HashResult> { { Hash::dummy, 0 } });
 
-            PathSet references;
-            auto deriver = readString(conn->from);
-            if (deriver != "")
-                info->deriver = parseStorePath(deriver);
-            info->references = readStorePaths<StorePathSet>(*this, conn->from);
+            std::optional<StorePath> deriver;
+            {
+                auto deriverS = readString(conn->from);
+                if (deriverS != "")
+                    deriver = parseStorePath(deriverS);
+            }
+            StorePathSet references = readStorePaths<StorePathSet>(*this, conn->from);
             readLongLong(conn->from); // download size
 
-            auto narHashResult = *info->viewHashResult();
-            assert(narHashResult);
-            narHashResult->second = readLongLong(conn->from);
-
+            std::optional<HashResult> optNarHashResult;
             {
-                auto s = readString(conn->from);
-                if (s == "")
-                    throw Error("NAR hash is now mandatory");
-                narHashResult->first = Hash::parseAnyPrefixed(s);
+                uint64_t rawNarSize = readLongLong(conn->from);
+                std::string rawNarHash = readString(conn->from);
+                if (rawNarHash == "") {
+                    assert(rawNarSize == 0);
+                    // No nar size/hash given
+                } else {
+                    auto h = Hash::parseAnyPrefixed(rawNarHash);
+                    assert(h.type == htSHA256);
+                    optNarHashResult = { h, rawNarSize };
+                }
             }
-            info->viewCA() = parseContentAddressOpt(readString(conn->from));
+            auto optCA = parseContentAddressOpt(readString(conn->from));
+
+            ContentAddresses cas =
+                optNarHashResult && optCA ? ContentAddresses {
+                    std::pair<HashResult, ContentAddress> {
+                        *std::move(optNarHashResult),
+                        *std::move(optCA)
+                    }
+                }
+                : optNarHashResult ? ContentAddresses {
+                    This<HashResult> { *std::move(optNarHashResult) }
+                }
+                : optCA ? ContentAddresses {
+                    That<ContentAddress> { *std::move(optCA) }
+                }
+                : throw Error("One of NAR hash+size + content address must be given");
+
+            auto info = std::make_shared<ValidPathInfo>(path, std::move(cas));
+
             info->sigs = readStrings<StringSet>(conn->from);
+            info->deriver = deriver;
+            info->references = references;
 
             auto s = readString(conn->from);
             assert(s == "");
