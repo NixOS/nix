@@ -2416,6 +2416,10 @@ void EvalState::createBaseEnv()
     evalFile(path, v);
     addConstant("derivation", v);
 
+    path = canonPath(settings.nixDataDir + "/nix/corepkgs/module.nix", true);
+    evalFile(path, v);
+    addConstant("module", v);
+
     /* Add a value containing the current Nix expression search path. */
     mkList(v, searchPath.size());
     int n = 0;
