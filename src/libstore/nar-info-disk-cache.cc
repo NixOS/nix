@@ -238,7 +238,7 @@ public:
                     (concatStringsSep(" ", info->shortRefs()))
                     (info->deriver ? std::string(info->deriver->to_string()) : "", (bool) info->deriver)
                     (concatStringsSep(" ", info->sigs))
-                    (renderContentAddress(**info->viewCAConst()))
+                    (renderContentAddress(*info->viewCAConst()))
                     (time(0)).exec();
 
             } else {
