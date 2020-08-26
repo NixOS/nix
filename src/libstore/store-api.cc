@@ -322,10 +322,11 @@ ValidPathInfo Store::addToStoreSlow(std::string_view name, const Path & srcPath,
 
     ValidPathInfo info {
         makeFixedOutputPath(method, hash, name),
-        narHash,
+        std::pair<HashResult, ContentAddress> {
+            { narHash, narSize },
+            { FixedOutputHash { .method = method, .hash = hash } },
+        }
     };
-    info.narSize = narSize;
-    info.ca = FixedOutputHash { .method = method, .hash = hash };
 
     if (!isValidPath(info.path)) {
         auto source = sinkToSource([&](Sink & scratchpadSink) {
@@ -567,8 +568,8 @@ string Store::makeValidityRegistration(const StorePathSet & paths,
         auto info = queryPathInfo(i);
 
         if (showHash) {
-            s += info->narHash.to_string(Base16, false) + "\n";
-            s += (format("%1%\n") % info->narSize).str();
+            s += info->narHash().to_string(Base16, false) + "\n";
+            s += (format("%1%\n") % info->narSize()).str();
         }
 
         auto deriver = showDerivers && info->deriver ? printStorePath(*info->deriver) : "";
@@ -599,8 +600,8 @@ void Store::pathInfoToJSON(JSONPlaceholder & jsonOut, const StorePathSet & store
             auto info = queryPathInfo(storePath);
 
             jsonPath
-                .attr("narHash", info->narHash.to_string(hashBase, true))
-                .attr("narSize", info->narSize);
+                .attr("narHash", info->narHash().to_string(hashBase, true))
+                .attr("narSize", info->narSize());
 
             {
                 auto jsonRefs = jsonPath.list("references");
@@ -608,8 +609,9 @@ void Store::pathInfoToJSON(JSONPlaceholder & jsonOut, const StorePathSet & store
                     jsonRefs.elem(printStorePath(ref));
             }
 
-            if (info->ca)
-                jsonPath.attr("ca", renderContentAddress(info->ca));
+            std::optional<ContentAddress> ca = *viewSecondConst(info->cas);
+            if (ca)
+                jsonPath.attr("ca", renderContentAddress(*ca));
 
             std::pair<uint64_t, uint64_t> closureSizes;
 
@@ -664,7 +666,7 @@ std::pair<uint64_t, uint64_t> Store::getClosureSize(const StorePath & storePath)
     computeFSClosure(storePath, closure, false, false);
     for (auto & p : closure) {
         auto info = queryPathInfo(p);
-        totalNarSize += info->narSize;
+        totalNarSize += info->narSize();
         auto narInfo = std::dynamic_pointer_cast<const NarInfo>(
             std::shared_ptr<const ValidPathInfo>(info));
         if (narInfo)
@@ -719,9 +721,10 @@ void copyStorePath(ref<Store> srcStore, ref<Store> dstStore,
     uint64_t total = 0;
 
     // recompute store path on the chance dstStore does it differently
-    if (info->ca && info->references.empty()) {
+    std::optional<ContentAddress> ca = *viewSecondConst(info->cas);
+    if (ca && info->references.empty()) {
         auto info2 = make_ref<ValidPathInfo>(*info);
-        info2->path = dstStore->makeFixedOutputPathFromCA(info->path.name(), *info->ca);
+        info2->path = dstStore->makeFixedOutputPathFromCA(info->path.name(), *ca);
         if (dstStore->storeDir == srcStore->storeDir)
             assert(info->path == info2->path);
         info = info2;
@@ -736,7 +739,7 @@ void copyStorePath(ref<Store> srcStore, ref<Store> dstStore,
     auto source = sinkToSource([&](Sink & sink) {
         LambdaSink progressSink([&](const unsigned char * data, size_t len) {
             total += len;
-            act.progress(total, info->narSize);
+            act.progress(total, info->narSize());
         });
         TeeSink tee { sink, progressSink };
         srcStore->narFromPath(storePath, tee);
@@ -782,8 +785,8 @@ std::map<StorePath, StorePath> copyPaths(ref<Store> srcStore, ref<Store> dstStor
         [&](const StorePath & storePath) {
             auto info = srcStore->queryPathInfo(storePath);
             auto storePathForDst = storePath;
-            if (info->ca && info->references.empty()) {
-                storePathForDst = dstStore->makeFixedOutputPathFromCA(storePath.name(), *info->ca);
+            if (info->optCa() && info->references.empty()) {
+                storePathForDst = dstStore->makeFixedOutputPathFromCA(storePath.name(), *info->optCa());
                 if (dstStore->storeDir == srcStore->storeDir)
                     assert(storePathForDst == storePath);
                 if (storePathForDst != storePath)
@@ -797,7 +800,7 @@ std::map<StorePath, StorePath> copyPaths(ref<Store> srcStore, ref<Store> dstStor
                 return StorePathSet();
             }
 
-            bytesExpected += info->narSize;
+            bytesExpected += info->narSize();
             act.setExpected(actCopyPath, bytesExpected);
 
             return info->references;
@@ -809,8 +812,8 @@ std::map<StorePath, StorePath> copyPaths(ref<Store> srcStore, ref<Store> dstStor
             auto info = srcStore->queryPathInfo(storePath);
 
             auto storePathForDst = storePath;
-            if (info->ca && info->references.empty()) {
-                storePathForDst = dstStore->makeFixedOutputPathFromCA(storePath.name(), *info->ca);
+            if (info->optCa() && info->references.empty()) {
+                storePathForDst = dstStore->makeFixedOutputPathFromCA(storePath.name(), *info->optCa());
                 if (dstStore->storeDir == srcStore->storeDir)
                     assert(storePathForDst == storePath);
                 if (storePathForDst != storePath)
@@ -865,8 +868,7 @@ std::optional<ValidPathInfo> decodeValidPathInfo(const Store & store, std::istre
         if (!string2Int(s, narSize)) throw Error("number expected");
         hashGiven = { narHash, narSize };
     }
-    ValidPathInfo info(store.parseStorePath(path), hashGiven->first);
-    info.narSize = hashGiven->second;
+    ValidPathInfo info(store.parseStorePath(path), This<HashResult> { *hashGiven });
     std::string deriver;
     getline(str, deriver);
     if (deriver != "") info.deriver = store.parseStorePath(deriver);
@@ -901,13 +903,13 @@ string showPaths(const PathSet & paths)
 
 std::string ValidPathInfo::fingerprint(const Store & store) const
 {
-    if (narSize == 0)
+    if (narSize() == 0)
         throw Error("cannot calculate fingerprint of path '%s' because its size is not known",
             store.printStorePath(path));
     return
         "1;" + store.printStorePath(path) + ";"
-        + narHash.to_string(Base32, true) + ";"
-        + std::to_string(narSize) + ";"
+        + narHash().to_string(Base32, true) + ";"
+        + std::to_string(narSize()) + ";"
         + concatStringsSep(",", store.printStorePathSet(references));
 }
 
@@ -919,7 +921,7 @@ void ValidPathInfo::sign(const Store & store, const SecretKey & secretKey)
 
 bool ValidPathInfo::isContentAddressed(const Store & store) const
 {
-    if (! ca) return false;
+    if (! optCa()) return false;
 
     auto caPath = std::visit(overloaded {
         [&](TextHash th) {
@@ -934,7 +936,7 @@ bool ValidPathInfo::isContentAddressed(const Store & store) const
             }
             return store.makeFixedOutputPath(fsh.method, fsh.hash, path.name(), refs, hasSelfReference);
         }
-    }, *ca);
+    }, *optCa());
 
     bool res = caPath == path;
 

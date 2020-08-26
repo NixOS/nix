@@ -5,7 +5,9 @@
 namespace nix {
 
 NarInfo::NarInfo(const Store & store, const std::string & s, const std::string & whence)
-    : ValidPathInfo(StorePath(StorePath::dummy), Hash(Hash::dummy)) // FIXME: hack
+    : ValidPathInfo(
+        StorePath(StorePath::dummy),
+        This<HashResult> { { Hash(Hash::dummy), 0 } }) // FIXME: hack
 {
     auto corrupt = [&]() {
         return Error("NAR info file '%1%' is corrupt", whence);
@@ -49,11 +51,17 @@ NarInfo::NarInfo(const Store & store, const std::string & s, const std::string &
             if (!string2Int(value, fileSize)) throw corrupt();
         }
         else if (name == "NarHash") {
-            narHash = parseHashField(value);
+            viewFirst(cas).modify([&](std::optional<HashResult> hr) {
+                hr->first = parseHashField(value);
+                return std::optional<HashResult> { hr };
+            });
             haveNarHash = true;
         }
         else if (name == "NarSize") {
-            if (!string2Int(value, narSize)) throw corrupt();
+            viewFirst(cas).modify([&](std::optional<HashResult> hr) {
+                if (!string2Int(value, hr->second)) throw corrupt();
+                return std::optional<HashResult> { hr };
+            });
         }
         else if (name == "References") {
             auto refs = tokenizeString<Strings>(value, " ");
@@ -70,9 +78,9 @@ NarInfo::NarInfo(const Store & store, const std::string & s, const std::string &
         else if (name == "Sig")
             sigs.insert(value);
         else if (name == "CA") {
-            if (ca) throw corrupt();
+            if (optCa()) throw corrupt();
             // FIXME: allow blank ca or require skipping field?
-            ca = parseContentAddressOpt(value);
+            viewSecond(cas) = parseContentAddressOpt(value);
         }
 
         pos = eol + 1;
@@ -80,7 +88,7 @@ NarInfo::NarInfo(const Store & store, const std::string & s, const std::string &
 
     if (compression == "") compression = "bzip2";
 
-    if (!havePath || !haveNarHash || url.empty() || narSize == 0) throw corrupt();
+    if (!havePath || !haveNarHash || url.empty() || narSize() == 0) throw corrupt();
 }
 
 std::string NarInfo::to_string(const Store & store) const
@@ -93,9 +101,9 @@ std::string NarInfo::to_string(const Store & store) const
     assert(fileHash && fileHash->type == htSHA256);
     res += "FileHash: " + fileHash->to_string(Base32, true) + "\n";
     res += "FileSize: " + std::to_string(fileSize) + "\n";
-    assert(narHash.type == htSHA256);
-    res += "NarHash: " + narHash.to_string(Base32, true) + "\n";
-    res += "NarSize: " + std::to_string(narSize) + "\n";
+    assert(narHash().type == htSHA256);
+    res += "NarHash: " + narHash().to_string(Base32, true) + "\n";
+    res += "NarSize: " + std::to_string(narSize()) + "\n";
 
     res += "References: " + concatStringsSep(" ", shortRefs()) + "\n";
 
@@ -108,8 +116,8 @@ std::string NarInfo::to_string(const Store & store) const
     for (auto sig : sigs)
         res += "Sig: " + sig + "\n";
 
-    if (ca)
-        res += "CA: " + renderContentAddress(*ca) + "\n";
+    if (optCa())
+        res += "CA: " + renderContentAddress(*optCa()) + "\n";
 
     return res;
 }

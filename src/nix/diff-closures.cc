@@ -73,8 +73,11 @@ void printClosureDiff(
         {
             uint64_t sum = 0;
             for (auto & [_, paths] : versions)
-                for (auto & [path, _] : paths)
-                    sum += store->queryPathInfo(path)->narSize;
+                for (auto & [path, _] : paths) {
+                    auto narHashResult = *viewFirstConst(store->queryPathInfo(path)->cas);
+                    auto narSize = narHashResult ? narHashResult->second : 0;
+                    sum += narSize;
+                }
             return sum;
         };
 

@@ -79,15 +79,13 @@ struct CmdMakeContentAddressable : StorePathsCommand, MixJSON
 
             ValidPathInfo info {
                 store->makeFixedOutputPath(FileIngestionMethod::Recursive, narHash, path.name(), references, hasSelfReference),
-                narHash,
+                ContentAddresses { std::pair {
+                    std::pair { narHash, sink.s->size() },
+                    (ContentAddress) FixedOutputHash { .method = FileIngestionMethod::Recursive, .hash = narHash }
+                }},
             };
             info.references = std::move(references);
             if (hasSelfReference) info.references.insert(info.path);
-            info.narSize = sink.s->size();
-            info.ca = FixedOutputHash {
-                .method = FileIngestionMethod::Recursive,
-                .hash = info.narHash,
-            };
 
             if (!json)
                 printInfo("rewrote '%s' to '%s'", pathS, store->printStorePath(info.path));

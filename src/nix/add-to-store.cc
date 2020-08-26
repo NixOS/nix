@@ -2,6 +2,7 @@
 #include "common-args.hh"
 #include "store-api.hh"
 #include "archive.hh"
+#include "these.hh"
 
 using namespace nix;
 
@@ -62,13 +63,11 @@ struct CmdAddToStore : MixDryRun, StoreCommand
 
         ValidPathInfo info {
             store->makeFixedOutputPath(ingestionMethod, hash, *namePart),
-            narHash,
+            ContentAddresses { std::pair {
+                std::pair { narHash, sink.s->size() },
+                (ContentAddress) FixedOutputHash { .method = ingestionMethod, .hash = hash },
+            }},
         };
-        info.narSize = sink.s->size();
-        info.ca = std::optional { FixedOutputHash {
-            .method = ingestionMethod,
-            .hash = hash,
-        } };
 
         if (!dryRun) {
             auto source = StringSource { *sink.s };

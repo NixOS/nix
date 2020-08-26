@@ -588,19 +588,19 @@ void LocalStore::checkDerivationOutputs(const StorePath & drvPath, const Derivat
 uint64_t LocalStore::addValidPath(State & state,
     const ValidPathInfo & info, bool checkOutputs)
 {
-    if (info.ca.has_value() && !info.isContentAddressed(*this))
+    if (*viewSecondConst(info.cas) && !info.isContentAddressed(*this))
         throw Error("cannot add path '%s' to the Nix store because it claims to be content-addressed but isn't",
             printStorePath(info.path));
 
     state.stmtRegisterValidPath.use()
         (printStorePath(info.path))
-        (info.narHash.to_string(Base16, true))
+        (info.narHash().to_string(Base16, true))
         (info.registrationTime == 0 ? time(0) : info.registrationTime)
         (info.deriver ? printStorePath(*info.deriver) : "", (bool) info.deriver)
-        (info.narSize, info.narSize != 0)
+        (info.narSize(), info.narSize() != 0)
         (info.ultimate ? 1 : 0, info.ultimate)
         (concatStringsSep(" ", info.sigs), !info.sigs.empty())
-        (renderContentAddress(info.ca), (bool) info.ca)
+        (renderContentAddress(info.optCa()), (bool) info.optCa())
         .exec();
     uint64_t id = state.db.getLastInsertedRowId();
 
@@ -659,7 +659,7 @@ void LocalStore::queryPathInfoUncached(const StorePath & path,
                 throw Error("invalid-path entry for '%s': %s", printStorePath(path), e.what());
             }
 
-            auto info = std::make_shared<ValidPathInfo>(path, narHash);
+            auto info = std::make_shared<ValidPathInfo>(path, This<HashResult> { { narHash, 0 } });
 
             info->id = id;
 
@@ -669,7 +669,10 @@ void LocalStore::queryPathInfoUncached(const StorePath & path,
             if (s) info->deriver = parseStorePath(s);
 
             /* Note that narSize = NULL yields 0. */
-            info->narSize = useQueryPathInfo.getInt(4);
+            viewFirst(info->cas).modify([&](std::optional<HashResult> hr) {
+                hr->second = useQueryPathInfo.getInt(4);
+                return std::optional<HashResult> { hr };
+            });
 
             info->ultimate = useQueryPathInfo.getInt(5) == 1;
 
@@ -677,7 +680,7 @@ void LocalStore::queryPathInfoUncached(const StorePath & path,
             if (s) info->sigs = tokenizeString<StringSet>(s, " ");
 
             s = (const char *) sqlite3_column_text(state->stmtQueryPathInfo, 7);
-            if (s) info->ca = parseContentAddressOpt(s);
+            if (s) viewSecond(info->cas) = parseContentAddressOpt(s);
 
             /* Get the references. */
             auto useQueryReferences(state->stmtQueryReferences.use()(info->id));
@@ -696,11 +699,11 @@ void LocalStore::queryPathInfoUncached(const StorePath & path,
 void LocalStore::updatePathInfo(State & state, const ValidPathInfo & info)
 {
     state.stmtUpdatePathInfo.use()
-        (info.narSize, info.narSize != 0)
-        (info.narHash.to_string(Base16, true))
+        (info.narSize(), info.narSize() != 0)
+        (info.narHash().to_string(Base16, true))
         (info.ultimate ? 1 : 0, info.ultimate)
         (concatStringsSep(" ", info.sigs), !info.sigs.empty())
-        (renderContentAddress(info.ca), (bool) info.ca)
+        (renderContentAddress(info.optCa()), (bool) info.optCa())
         (printStorePath(info.path))
         .exec();
 }
@@ -886,7 +889,7 @@ void LocalStore::querySubstitutablePathInfos(const StorePathCAMap & paths, Subst
                     info->deriver,
                     info->references,
                     narInfo ? narInfo->fileSize : 0,
-                    info->narSize});
+                    info->narSize()});
             } catch (InvalidPath &) {
             } catch (SubstituterDisabled &) {
             } catch (Error & e) {
@@ -923,7 +926,7 @@ void LocalStore::registerValidPaths(const ValidPathInfos & infos)
         StorePathSet paths;
 
         for (auto & i : infos) {
-            assert(i.narHash.type == htSHA256);
+            assert(i.narHash().type == htSHA256);
             if (isValidPath_(*state, i.path))
                 updatePathInfo(*state, i);
             else
@@ -1010,13 +1013,13 @@ void LocalStore::addToStore(const ValidPathInfo & info, Source & source,
 
             // text hashing has long been allowed to have non-self-references because it is used for drv files.
             bool refersToSelf = info.references.count(info.path) > 0;
-            if (info.ca.has_value() && !info.references.empty() && !(std::holds_alternative<TextHash>(*info.ca) && !refersToSelf))
+            if (info.optCa().has_value() && !info.references.empty() && !(std::holds_alternative<TextHash>(*info.optCa()) && !refersToSelf))
                 settings.requireExperimentalFeature("ca-references");
 
             /* While restoring the path from the NAR, compute the hash
                of the NAR. */
             std::unique_ptr<AbstractHashSink> hashSink;
-            if (!info.ca.has_value() || !info.references.count(info.path))
+            if (!info.optCa().has_value() || !info.references.count(info.path))
                 hashSink = std::make_unique<HashSink>(htSHA256);
             else
                 hashSink = std::make_unique<HashModuloSink>(htSHA256, std::string(info.path.hashPart()));
@@ -1027,13 +1030,13 @@ void LocalStore::addToStore(const ValidPathInfo & info, Source & source,
 
             auto hashResult = hashSink->finish();
 
-            if (hashResult.first != info.narHash)
+            if (hashResult.first != info.narHash())
                 throw Error("hash mismatch importing path '%s';\n  wanted: %s\n  got:    %s",
-                    printStorePath(info.path), info.narHash.to_string(Base32, true), hashResult.first.to_string(Base32, true));
+                    printStorePath(info.path), info.narHash().to_string(Base32, true), hashResult.first.to_string(Base32, true));
 
-            if (hashResult.second != info.narSize)
+            if (hashResult.second != info.narSize())
                 throw Error("size mismatch importing path '%s';\n  wanted: %s\n  got:   %s",
-                    printStorePath(info.path), info.narSize, hashResult.second);
+                    printStorePath(info.path), info.narSize(), hashResult.second);
 
             autoGC();
 
@@ -1151,9 +1154,13 @@ StorePath LocalStore::addToStoreFromDump(Source & source0, const string & name,
 
             optimisePath(realPath);
 
-            ValidPathInfo info { dstPath, narHash.first };
-            info.narSize = narHash.second;
-            info.ca = FixedOutputHash { .method = method, .hash = hash };
+            ValidPathInfo info {
+                dstPath,
+                std::pair<HashResult, ContentAddress> {
+                    narHash,
+                    FixedOutputHash { .method = method, .hash = hash },
+                },
+            };
             registerValidPath(info);
         }
 
@@ -1194,10 +1201,14 @@ StorePath LocalStore::addTextToStore(const string & name, const string & s,
 
             optimisePath(realPath);
 
-            ValidPathInfo info { dstPath, narHash };
-            info.narSize = sink.s->size();
+            ValidPathInfo info {
+                dstPath,
+                std::pair<HashResult, ContentAddress> {
+                    { narHash, sink.s->size() },
+                    TextHash { .hash = hash },
+                },
+            };
             info.references = references;
-            info.ca = TextHash { .hash = hash };
             registerValidPath(info);
         }
 
@@ -1308,19 +1319,19 @@ bool LocalStore::verifyStore(bool checkContents, RepairFlag repair)
                 printMsg(lvlTalkative, "checking contents of '%s'", printStorePath(i));
 
                 std::unique_ptr<AbstractHashSink> hashSink;
-                if (!info->ca || !info->references.count(info->path))
-                    hashSink = std::make_unique<HashSink>(info->narHash.type);
+                if (!info->optCa() || !info->references.count(info->path))
+                    hashSink = std::make_unique<HashSink>(info->narHash().type);
                 else
-                    hashSink = std::make_unique<HashModuloSink>(info->narHash.type, std::string(info->path.hashPart()));
+                    hashSink = std::make_unique<HashModuloSink>(info->narHash().type, std::string(info->path.hashPart()));
 
                 dumpPath(Store::toRealPath(i), *hashSink);
                 auto current = hashSink->finish();
 
-                if (info->narHash != nullHash && info->narHash != current.first) {
+                if (info->narHash() != nullHash && info->narHash() != current.first) {
                     logError({
                         .name = "Invalid hash - path modified",
                         .hint = hintfmt("path '%s' was modified! expected hash '%s', got '%s'",
-                        printStorePath(i), info->narHash.to_string(Base32, true), current.first.to_string(Base32, true))
+                        printStorePath(i), info->narHash().to_string(Base32, true), current.first.to_string(Base32, true))
                     });
                     if (repair) repairPath(i); else errors = true;
                 } else {
@@ -1328,16 +1339,22 @@ bool LocalStore::verifyStore(bool checkContents, RepairFlag repair)
                     bool update = false;
 
                     /* Fill in missing hashes. */
-                    if (info->narHash == nullHash) {
+                    if (info->narHash() == nullHash) {
                         printInfo("fixing missing hash on '%s'", printStorePath(i));
-                        info->narHash = current.first;
+                        viewFirst(info->cas).modify([&](std::optional<HashResult> hr) {
+                            hr->first = current.first;
+                            return std::optional<HashResult> { hr };
+                        });
                         update = true;
                     }
 
                     /* Fill in missing narSize fields (from old stores). */
-                    if (info->narSize == 0) {
+                    if (info->narSize() == 0) {
                         printInfo("updating size field on '%s' to %s", printStorePath(i), current.second);
-                        info->narSize = current.second;
+                        viewFirst(info->cas).modify([&](std::optional<HashResult> hr) {
+                            hr->second = current.second;
+                            return std::optional<HashResult> { hr };
+                        });
                         update = true;
                     }
 

@@ -421,14 +421,19 @@ void RemoteStore::queryPathInfoUncached(const StorePath & path,
             }
             auto deriver = readString(conn->from);
             auto narHash = Hash::parseAny(readString(conn->from), htSHA256);
-            info = std::make_shared<ValidPathInfo>(path, narHash);
+            info = std::make_shared<ValidPathInfo>(path, This<HashResult> { { narHash, 0 } });
             if (deriver != "") info->deriver = parseStorePath(deriver);
             info->references = readStorePaths<StorePathSet>(*this, conn->from);
-            conn->from >> info->registrationTime >> info->narSize;
+            conn->from >> info->registrationTime;
+            {
+                auto tempNarSize = readInt(conn->from);
+                auto tempHashResult = **viewFirst(info->cas);
+                viewFirst(info->cas) = { tempHashResult.first, tempNarSize };
+            }
             if (GET_PROTOCOL_MINOR(conn->daemonVersion) >= 16) {
                 conn->from >> info->ultimate;
                 info->sigs = readStrings<StringSet>(conn->from);
-                info->ca = parseContentAddressOpt(readString(conn->from));
+                viewSecond(info->cas) = parseContentAddressOpt(readString(conn->from));
             }
         }
         callback(std::move(info));
@@ -521,10 +526,10 @@ void RemoteStore::addToStore(const ValidPathInfo & info, Source & source,
         conn->to << wopAddToStoreNar
                  << printStorePath(info.path)
                  << (info.deriver ? printStorePath(*info.deriver) : "")
-                 << info.narHash.to_string(Base16, false);
+                 << info.narHash().to_string(Base16, false);
         writeStorePaths(*this, conn->to, info.references);
-        conn->to << info.registrationTime << info.narSize
-                 << info.ultimate << info.sigs << renderContentAddress(info.ca)
+        conn->to << info.registrationTime << info.narSize()
+                 << info.ultimate << info.sigs << renderContentAddress(info.optCa())
                  << repair << !checkSigs;
 
         if (GET_PROTOCOL_MINOR(conn->daemonVersion) >= 23) {

@@ -131,11 +131,12 @@ struct ProfileManifest
 
         ValidPathInfo info {
             store->makeFixedOutputPath(FileIngestionMethod::Recursive, narHash, "profile", references),
-            narHash,
+            ContentAddresses { std::pair {
+                std::pair { narHash, sink.s->size() },
+                FixedOutputHash { .method = FileIngestionMethod::Recursive, .hash = narHash },
+            }},
         };
         info.references = std::move(references);
-        info.narSize = sink.s->size();
-        info.ca = FixedOutputHash { .method = FileIngestionMethod::Recursive, .hash = info.narHash };
 
         auto source = StringSource { *sink.s };
         store->addToStore(info, source);

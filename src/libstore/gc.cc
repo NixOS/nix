@@ -536,7 +536,7 @@ void LocalStore::deletePathRecursive(GCState & state, const Path & path)
         queryReferrers(*storePath, referrers);
         for (auto & i : referrers)
             if (printStorePath(i) != path) deletePathRecursive(state, printStorePath(i));
-        size = queryPathInfo(*storePath)->narSize;
+        size = queryPathInfo(*storePath)->narSize();
         invalidatePathChecked(*storePath);
     }
 

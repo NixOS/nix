@@ -25,17 +25,16 @@ struct SubstitutablePathInfo
 
 typedef std::map<StorePath, SubstitutablePathInfo> SubstitutablePathInfos;
 
+typedef These<HashResult, ContentAddress> ContentAddresses;
 
 struct ValidPathInfo
 {
     StorePath path;
     std::optional<StorePath> deriver;
     // TODO document this
-    These<Hash, ContentAddress> hashOrContentAddress;
-    Hash narHash;
+    ContentAddresses cas;
     StorePathSet references;
     time_t registrationTime = 0;
-    uint64_t narSize = 0; // 0 = unknown
     uint64_t id; // internal use only
 
     /* Whether the path is ultimately trusted, that is, it's a
@@ -60,13 +59,12 @@ struct ValidPathInfo
        and the store path would be computed from the name component, ‘narHash’
        and ‘references’. However, we support many types of content addresses.
     */
-    std::optional<ContentAddress> ca;
 
     bool operator == (const ValidPathInfo & i) const
     {
         return
             path == i.path
-            && narHash == i.narHash
+            && cas == i.cas
             && references == i.references;
     }
 
@@ -77,6 +75,21 @@ struct ValidPathInfo
        speaking superfluous, but might prevent endless/excessive data
        attacks. */
     std::string fingerprint(const Store & store) const;
+
+    Hash narHash() const {
+        auto narHashResult = *viewFirstConst(cas);
+        assert(narHashResult);
+        return narHashResult->first;
+    }
+
+    uint64_t narSize() const {
+        auto narHashResult = *viewFirstConst(cas);
+        return narHashResult ? narHashResult->second : 0;
+    }
+
+    std::optional<ContentAddress> optCa() const {
+        return *viewSecondConst(cas);
+    }
 
     void sign(const Store & store, const SecretKey & secretKey);
 
@@ -103,10 +116,10 @@ struct ValidPathInfo
 
     ValidPathInfo(const ValidPathInfo & other) = default;
 
-    ValidPathInfo(StorePath && path, Hash narHash)
-        : path(std::move(path)), hashOrContentAddress(narHash), narHash(narHash) { };
-    ValidPathInfo(const StorePath & path, Hash narHash)
-        : path(path), hashOrContentAddress(narHash), narHash(narHash) { };
+    ValidPathInfo(StorePath && path, ContentAddresses cas)
+        : path(std::move(path)), cas(cas) { };
+    ValidPathInfo(const StorePath & path, ContentAddresses cas)
+        : path(path), cas(cas) { };
 
     virtual ~ValidPathInfo() { }
 };

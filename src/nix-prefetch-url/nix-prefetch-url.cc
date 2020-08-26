@@ -205,8 +205,9 @@ static int _main(int argc, char * * argv)
 
             auto info = store->addToStoreSlow(name, tmpFile, method, ht, expectedHash);
             storePath = info.path;
-            assert(info.ca);
-            hash = getContentAddressHash(*info.ca);
+            auto ca = *viewSecondConst(info.cas);
+            assert(ca);
+            hash = getContentAddressHash(*ca);
         }
 
         stopProgressBar();

@@ -106,7 +106,7 @@ struct LegacySSHStore : public Store
             auto path2 = parseStorePath(p);
             assert(path == path2);
             /* Hash will be set below. FIXME construct ValidPathInfo at end. */
-            auto info = std::make_shared<ValidPathInfo>(path, Hash::dummy);
+            auto info = std::make_shared<ValidPathInfo>(path, This<HashResult> { { Hash::dummy, 0 } });
 
             PathSet references;
             auto deriver = readString(conn->from);
@@ -114,15 +114,18 @@ struct LegacySSHStore : public Store
                 info->deriver = parseStorePath(deriver);
             info->references = readStorePaths<StorePathSet>(*this, conn->from);
             readLongLong(conn->from); // download size
-            info->narSize = readLongLong(conn->from);
+
+            auto narHashResult = *viewFirst(info->cas);
+            assert(narHashResult);
+            narHashResult->second = readLongLong(conn->from);
 
             {
                 auto s = readString(conn->from);
                 if (s == "")
                     throw Error("NAR hash is now mandatory");
-                info->narHash = Hash::parseAnyPrefixed(s);
+                narHashResult->first = Hash::parseAnyPrefixed(s);
             }
-            info->ca = parseContentAddressOpt(readString(conn->from));
+            viewSecond(info->cas) = parseContentAddressOpt(readString(conn->from));
             info->sigs = readStrings<StringSet>(conn->from);
 
             auto s = readString(conn->from);
@@ -145,14 +148,14 @@ struct LegacySSHStore : public Store
                 << cmdAddToStoreNar
                 << printStorePath(info.path)
                 << (info.deriver ? printStorePath(*info.deriver) : "")
-                << info.narHash.to_string(Base16, false);
+                << (*viewFirstConst(info.cas))->first.to_string(Base16, false);
             writeStorePaths(*this, conn->to, info.references);
             conn->to
                 << info.registrationTime
-                << info.narSize
+                << info.narSize()
                 << info.ultimate
                 << info.sigs
-                << renderContentAddress(info.ca);
+                << renderContentAddress(*viewSecondConst(info.cas));
             try {
                 copyNAR(source, conn->to);
             } catch (...) {

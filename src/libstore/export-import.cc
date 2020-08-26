@@ -38,9 +38,12 @@ void Store::exportPath(const StorePath & path, Sink & sink)
        filesystem corruption from spreading to other machines.
        Don't complain if the stored hash is zero (unknown). */
     Hash hash = hashSink.currentHash().first;
-    if (hash != info->narHash && info->narHash != Hash(info->narHash.type))
+    auto narHashResult = *viewFirstConst(info->cas);
+    assert(narHashResult);
+    auto narHash = narHashResult->first;
+    if (hash != narHash && narHash != Hash(narHash.type))
         throw Error("hash of path '%s' has changed from '%s' to '%s'!",
-            printStorePath(path), info->narHash.to_string(Base32, true), hash.to_string(Base32, true));
+            printStorePath(path), narHash.to_string(Base32, true), hash.to_string(Base32, true));
 
     teeSink
         << exportMagic
@@ -77,11 +80,13 @@ StorePaths Store::importPaths(Source & source, CheckSigsFlag checkSigs)
         auto deriver = readString(source);
         auto narHash = hashString(htSHA256, *saved.s);
 
-        ValidPathInfo info { path, narHash };
+        ValidPathInfo info {
+            path,
+            ContentAddresses { This<HashResult> { std::pair { narHash, saved.s->size() } } },
+        };
         if (deriver != "")
             info.deriver = parseStorePath(deriver);
         info.references = references;
-        info.narSize = saved.s->size();
 
         // Ignore optional legacy signature.
         if (readInt(source) == 1)

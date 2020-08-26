@@ -191,20 +191,20 @@ public:
             auto namePart = queryNAR.getStr(1);
             auto narInfo = make_ref<NarInfo>(
                 StorePath(hashPart + "-" + namePart),
-                Hash::parseAnyPrefixed(queryNAR.getStr(6)));
+                This<HashResult> { { Hash::parseAnyPrefixed(queryNAR.getStr(6)), queryNAR.getInt(7) } }
+                );
             narInfo->url = queryNAR.getStr(2);
             narInfo->compression = queryNAR.getStr(3);
             if (!queryNAR.isNull(4))
                 narInfo->fileHash = Hash::parseAnyPrefixed(queryNAR.getStr(4));
             narInfo->fileSize = queryNAR.getInt(5);
-            narInfo->narSize = queryNAR.getInt(7);
             for (auto & r : tokenizeString<Strings>(queryNAR.getStr(8), " "))
                 narInfo->references.insert(StorePath(r));
             if (!queryNAR.isNull(9))
                 narInfo->deriver = StorePath(queryNAR.getStr(9));
             for (auto & sig : tokenizeString<Strings>(queryNAR.getStr(10), " "))
                 narInfo->sigs.insert(sig);
-            narInfo->ca = parseContentAddressOpt(queryNAR.getStr(11));
+            viewSecond(narInfo->cas) = parseContentAddressOpt(queryNAR.getStr(11));
 
             return {oValid, narInfo};
         });
@@ -233,12 +233,12 @@ public:
                     (narInfo ? narInfo->compression : "", narInfo != 0)
                     (narInfo && narInfo->fileHash ? narInfo->fileHash->to_string(Base32, true) : "", narInfo && narInfo->fileHash)
                     (narInfo ? narInfo->fileSize : 0, narInfo != 0 && narInfo->fileSize)
-                    (info->narHash.to_string(Base32, true))
-                    (info->narSize)
+                    ((*viewFirstConst(info->cas))->first.to_string(Base32, true))
+                    ((*viewFirstConst(info->cas))->second)
                     (concatStringsSep(" ", info->shortRefs()))
                     (info->deriver ? std::string(info->deriver->to_string()) : "", (bool) info->deriver)
                     (concatStringsSep(" ", info->sigs))
-                    (renderContentAddress(info->ca))
+                    (renderContentAddress(**viewSecondConst(info->cas)))
                     (time(0)).exec();
 
             } else {

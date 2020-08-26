@@ -3820,7 +3820,7 @@ void DerivationGoal::registerOutputs()
         if (buildMode == bmCheck) {
             if (!worker.store.isValidPath(worker.store.parseStorePath(path))) continue;
             ValidPathInfo info(*worker.store.queryPathInfo(worker.store.parseStorePath(path)));
-            if (hash.first != info.narHash) {
+            if (hash.first != info.narHash()) {
                 worker.checkMismatch = true;
                 if (settings.runDiffHook || settings.keepFailed) {
                     Path dst = worker.store.toRealPath(path + checkSuffix);
@@ -3867,18 +3867,17 @@ void DerivationGoal::registerOutputs()
 
         ValidPathInfo info {
             worker.store.parseStorePath(path),
-            hash.first,
+            This<HashResult> { hash },
         };
-        info.narSize = hash.second;
         info.references = std::move(references);
         info.deriver = drvPath;
         info.ultimate = true;
-        info.ca = ca;
+        viewSecond(info.cas).add(ca);
         worker.store.signPathInfo(info);
 
         if (!info.references.empty()) {
             // FIXME don't we have an experimental feature for fixed output with references?
-            info.ca = {};
+            viewSecond(info.cas) = std::nullopt;
         }
 
         infos.emplace(i.first, std::move(info));
@@ -3998,12 +3997,12 @@ void DerivationGoal::checkOutputs(const std::map<Path, ValidPathInfo> & outputs)
 
                 auto i = outputsByPath.find(worker.store.printStorePath(path));
                 if (i != outputsByPath.end()) {
-                    closureSize += i->second.narSize;
+                    closureSize += i->second.narSize();
                     for (auto & ref : i->second.references)
                         pathsLeft.push(ref);
                 } else {
                     auto info = worker.store.queryPathInfo(path);
-                    closureSize += info->narSize;
+                    closureSize += info->narSize();
                     for (auto & ref : info->references)
                         pathsLeft.push(ref);
                 }
@@ -4014,9 +4013,9 @@ void DerivationGoal::checkOutputs(const std::map<Path, ValidPathInfo> & outputs)
 
         auto applyChecks = [&](const Checks & checks)
         {
-            if (checks.maxSize && info.narSize > *checks.maxSize)
+            if (checks.maxSize && info.narSize() > *checks.maxSize)
                 throw BuildError("path '%s' is too large at %d bytes; limit is %d bytes",
-                    worker.store.printStorePath(info.path), info.narSize, *checks.maxSize);
+                    worker.store.printStorePath(info.path), info.narSize(), *checks.maxSize);
 
             if (checks.maxClosureSize) {
                 uint64_t closureSize = getClosure(info.path).second;
@@ -4499,7 +4498,7 @@ void SubstitutionGoal::tryNext()
     /* Update the total expected download size. */
     auto narInfo = std::dynamic_pointer_cast<const NarInfo>(info);
 
-    maintainExpectedNar = std::make_unique<MaintainCount<uint64_t>>(worker.expectedNarSize, info->narSize);
+    maintainExpectedNar = std::make_unique<MaintainCount<uint64_t>>(worker.expectedNarSize, info->narSize());
 
     maintainExpectedDownload =
         narInfo && narInfo->fileSize
@@ -5073,9 +5072,10 @@ bool Worker::pathContentsGood(const StorePath & path)
     if (!pathExists(store.printStorePath(path)))
         res = false;
     else {
-        HashResult current = hashPath(info->narHash.type, store.printStorePath(path));
+        Hash narHash = (*viewFirstConst(info->cas))->first;
+        HashResult current = hashPath(narHash.type, store.printStorePath(path));
         Hash nullHash(htSHA256);
-        res = info->narHash == nullHash || info->narHash == current.first;
+        res = narHash == nullHash || narHash == current.first;
     }
     pathContentsGoodCache.insert_or_assign(path, res);
     if (!res)

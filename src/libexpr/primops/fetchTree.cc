@@ -207,8 +207,11 @@ static void fetch(EvalState & state, const Pos & pos, Value * * args, Value & v,
     auto path = state.store->toRealPath(storePath);
 
     if (expectedHash) {
+        auto narHashResult = *viewFirstConst(state.store->queryPathInfo(storePath)->cas);
+        assert(narHashResult);
+        auto narHash = narHashResult->first;
         auto hash = unpack
-            ? state.store->queryPathInfo(storePath)->narHash
+            ? narHash
             : hashFile(htSHA256, path);
         if (hash != *expectedHash)
             throw Error((unsigned int) 102, "hash mismatch in file downloaded from '%s':\n  wanted: %s\n  got:    %s",
