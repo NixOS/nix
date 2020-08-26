@@ -91,6 +91,22 @@ struct ValidPathInfo
         return *viewSecondConst(cas);
     }
 
+    ViewFirstConst<HashResult, ContentAddress> viewHashResultConst() const {
+        return viewFirstConst(cas);
+    }
+
+    ViewFirst<HashResult, ContentAddress> viewHashResult() {
+        return viewFirst(cas);
+    }
+
+    ViewSecondConst<HashResult, ContentAddress> viewCAConst() const {
+        return viewSecondConst(cas);
+    }
+
+    ViewSecond<HashResult, ContentAddress> viewCA() {
+        return viewSecond(cas);
+    }
+
     void sign(const Store & store, const SecretKey & secretKey);
 
     /* Return true iff the path is verifiably content-addressed. */
