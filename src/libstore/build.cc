@@ -3872,12 +3872,12 @@ void DerivationGoal::registerOutputs()
         info.references = std::move(references);
         info.deriver = drvPath;
         info.ultimate = true;
-        viewSecond(info.cas).add(ca);
+        info.viewCA().add(ca);
         worker.store.signPathInfo(info);
 
         if (!info.references.empty()) {
             // FIXME don't we have an experimental feature for fixed output with references?
-            viewSecond(info.cas) = std::nullopt;
+            info.viewCA() = std::nullopt;
         }
 
         infos.emplace(i.first, std::move(info));
@@ -5072,7 +5072,7 @@ bool Worker::pathContentsGood(const StorePath & path)
     if (!pathExists(store.printStorePath(path)))
         res = false;
     else {
-        Hash narHash = (*viewFirstConst(info->cas))->first;
+        Hash narHash = (*info->viewHashResultConst())->first;
         HashResult current = hashPath(narHash.type, store.printStorePath(path));
         Hash nullHash(htSHA256);
         res = narHash == nullHash || narHash == current.first;

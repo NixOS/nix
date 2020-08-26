@@ -74,7 +74,7 @@ void printClosureDiff(
             uint64_t sum = 0;
             for (auto & [_, paths] : versions)
                 for (auto & [path, _] : paths) {
-                    auto narHashResult = *viewFirstConst(store->queryPathInfo(path)->cas);
+                    auto narHashResult = *store->queryPathInfo(path)->viewHashResultConst();
                     auto narSize = narHashResult ? narHashResult->second : 0;
                     sum += narSize;
                 }

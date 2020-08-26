@@ -51,14 +51,14 @@ NarInfo::NarInfo(const Store & store, const std::string & s, const std::string &
             if (!string2Int(value, fileSize)) throw corrupt();
         }
         else if (name == "NarHash") {
-            viewFirst(cas).modify([&](std::optional<HashResult> hr) {
+            viewHashResult().modify([&](std::optional<HashResult> hr) {
                 hr->first = parseHashField(value);
                 return std::optional<HashResult> { hr };
             });
             haveNarHash = true;
         }
         else if (name == "NarSize") {
-            viewFirst(cas).modify([&](std::optional<HashResult> hr) {
+            viewHashResult().modify([&](std::optional<HashResult> hr) {
                 if (!string2Int(value, hr->second)) throw corrupt();
                 return std::optional<HashResult> { hr };
             });
@@ -80,7 +80,7 @@ NarInfo::NarInfo(const Store & store, const std::string & s, const std::string &
         else if (name == "CA") {
             if (optCa()) throw corrupt();
             // FIXME: allow blank ca or require skipping field?
-            viewSecond(cas) = parseContentAddressOpt(value);
+            viewCA() = parseContentAddressOpt(value);
         }
 
         pos = eol + 1;

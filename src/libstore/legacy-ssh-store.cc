@@ -115,7 +115,7 @@ struct LegacySSHStore : public Store
             info->references = readStorePaths<StorePathSet>(*this, conn->from);
             readLongLong(conn->from); // download size
 
-            auto narHashResult = *viewFirst(info->cas);
+            auto narHashResult = *info->viewHashResult();
             assert(narHashResult);
             narHashResult->second = readLongLong(conn->from);
 
@@ -125,7 +125,7 @@ struct LegacySSHStore : public Store
                     throw Error("NAR hash is now mandatory");
                 narHashResult->first = Hash::parseAnyPrefixed(s);
             }
-            viewSecond(info->cas) = parseContentAddressOpt(readString(conn->from));
+            info->viewCA() = parseContentAddressOpt(readString(conn->from));
             info->sigs = readStrings<StringSet>(conn->from);
 
             auto s = readString(conn->from);
@@ -148,14 +148,14 @@ struct LegacySSHStore : public Store
                 << cmdAddToStoreNar
                 << printStorePath(info.path)
                 << (info.deriver ? printStorePath(*info.deriver) : "")
-                << (*viewFirstConst(info.cas))->first.to_string(Base16, false);
+                << (*info.viewHashResultConst())->first.to_string(Base16, false);
             writeStorePaths(*this, conn->to, info.references);
             conn->to
                 << info.registrationTime
                 << info.narSize()
                 << info.ultimate
                 << info.sigs
-                << renderContentAddress(*viewSecondConst(info.cas));
+                << renderContentAddress(*info.viewCAConst());
             try {
                 copyNAR(source, conn->to);
             } catch (...) {

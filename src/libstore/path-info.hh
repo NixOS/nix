@@ -77,13 +77,13 @@ struct ValidPathInfo
     std::string fingerprint(const Store & store) const;
 
     Hash narHash() const {
-        auto narHashResult = *viewFirstConst(cas);
+        auto narHashResult = *viewHashResultConst();
         assert(narHashResult);
         return narHashResult->first;
     }
 
     uint64_t narSize() const {
-        auto narHashResult = *viewFirstConst(cas);
+        auto narHashResult = *viewHashResultConst();
         return narHashResult ? narHashResult->second : 0;
     }
 

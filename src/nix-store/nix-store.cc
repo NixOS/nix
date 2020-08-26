@@ -371,7 +371,7 @@ static void opQuery(Strings opFlags, Strings opArgs)
             for (auto & i : opArgs) {
                 for (auto & j : maybeUseOutputs(store->followLinksToStorePath(i), useOutput, forceRealise)) {
                     auto info = store->queryPathInfo(j);
-                    auto narHashResultOpt = *viewFirstConst(info->cas);
+                    auto narHashResultOpt = *info->viewHashResultConst();
                     assert(narHashResultOpt);
                     auto & [narHash, narSize] = *narHashResultOpt;
                     if (query == qHash) {
@@ -728,7 +728,7 @@ static void opVerifyPath(Strings opFlags, Strings opArgs)
         auto path = store->followLinksToStorePath(i);
         printMsg(lvlTalkative, "checking path '%s'...", store->printStorePath(path));
         auto info = store->queryPathInfo(path);
-        auto narHashResult = *viewFirstConst(info->cas);
+        auto narHashResult = *info->viewHashResultConst();
         assert(narHashResult);
         auto narHash = narHashResult->first;
         HashSink sink(narHash.type);
@@ -866,14 +866,14 @@ static void opServe(Strings opFlags, Strings opArgs)
                         out << store->printStorePath(info->path)
                             << (info->deriver ? store->printStorePath(*info->deriver) : "");
                         writeStorePaths(*store, out, info->references);
-                        auto narHashResult = *viewFirstConst(info->cas);
+                        auto narHashResult = *info->viewHashResultConst();
                         auto narSize = narHashResult ? narHashResult->second : 0;
                         // !!! Maybe we want compression?
                         out << narSize // downloadSize
                             << narSize;
                         if (GET_PROTOCOL_MINOR(clientVersion) >= 4) {
-                            auto narHashResult = *viewFirstConst(info->cas);
-                            auto ca = *viewSecondConst(info->cas);
+                            auto narHashResult = *info->viewHashResultConst();
+                            auto ca = *info->viewCAConst();
                             assert(ca);
                             out << (narHashResult ? narHashResult->first.to_string(Base32, true) : "")
                                 << renderContentAddress(*ca)
@@ -966,11 +966,11 @@ static void opServe(Strings opFlags, Strings opArgs)
                 if (deriver != "")
                     info.deriver = store->parseStorePath(deriver);
                 info.references = readStorePaths<StorePathSet>(*store, in);
-                auto narHashResult = *viewFirstConst(info.cas);
+                auto narHashResult = *info.viewHashResultConst();
                 auto narSize = narHashResult ? narHashResult->second : 0;
                 in >> info.registrationTime >> narSize >> info.ultimate;
                 info.sigs = readStrings<StringSet>(in);
-                viewSecond(info.cas).add(parseContentAddressOpt(readString(in)));
+                info.viewCA().add(parseContentAddressOpt(readString(in)));
 
                 if (narSize == 0)
                     throw Error("narInfo is too old and missing the narSize field");

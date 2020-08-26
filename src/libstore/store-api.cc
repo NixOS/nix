@@ -609,7 +609,7 @@ void Store::pathInfoToJSON(JSONPlaceholder & jsonOut, const StorePathSet & store
                     jsonRefs.elem(printStorePath(ref));
             }
 
-            std::optional<ContentAddress> ca = *viewSecondConst(info->cas);
+            std::optional<ContentAddress> ca = *info->viewCAConst();
             if (ca)
                 jsonPath.attr("ca", renderContentAddress(*ca));
 
@@ -721,7 +721,7 @@ void copyStorePath(ref<Store> srcStore, ref<Store> dstStore,
     uint64_t total = 0;
 
     // recompute store path on the chance dstStore does it differently
-    std::optional<ContentAddress> ca = *viewSecondConst(info->cas);
+    std::optional<ContentAddress> ca = *info->viewCAConst();
     if (ca && info->references.empty()) {
         auto info2 = make_ref<ValidPathInfo>(*info);
         info2->path = dstStore->makeFixedOutputPathFromCA(info->path.name(), *ca);

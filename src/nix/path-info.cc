@@ -106,7 +106,7 @@ struct CmdPathInfo : StorePathsCommand, MixJSON
                     std::cout << std::string(std::max(0, (int) pathLen - (int) storePathS.size()), ' ');
 
                 if (showSize) {
-                    auto narHashResult = *viewFirstConst(info->cas);
+                    auto narHashResult = *info->viewHashResultConst();
                     auto narSize = narHashResult ? narHashResult->second : 0;
                     printSize(narSize);
                 }
@@ -118,7 +118,7 @@ struct CmdPathInfo : StorePathsCommand, MixJSON
                     std::cout << '\t';
                     Strings ss;
                     if (info->ultimate) ss.push_back("ultimate");
-                    auto ca = *viewSecondConst(info->cas);
+                    auto ca = *info->viewCAConst();
                     if (ca) ss.push_back("ca:" + renderContentAddress(*ca));
                     for (auto & sig : info->sigs) ss.push_back(sig);
                     std::cout << concatStringsSep(" ", ss);

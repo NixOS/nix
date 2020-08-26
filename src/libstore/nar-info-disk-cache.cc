@@ -204,7 +204,7 @@ public:
                 narInfo->deriver = StorePath(queryNAR.getStr(9));
             for (auto & sig : tokenizeString<Strings>(queryNAR.getStr(10), " "))
                 narInfo->sigs.insert(sig);
-            viewSecond(narInfo->cas) = parseContentAddressOpt(queryNAR.getStr(11));
+            narInfo->viewCA() = parseContentAddressOpt(queryNAR.getStr(11));
 
             return {oValid, narInfo};
         });
@@ -233,12 +233,12 @@ public:
                     (narInfo ? narInfo->compression : "", narInfo != 0)
                     (narInfo && narInfo->fileHash ? narInfo->fileHash->to_string(Base32, true) : "", narInfo && narInfo->fileHash)
                     (narInfo ? narInfo->fileSize : 0, narInfo != 0 && narInfo->fileSize)
-                    ((*viewFirstConst(info->cas))->first.to_string(Base32, true))
-                    ((*viewFirstConst(info->cas))->second)
+                    ((*info->viewHashResultConst())->first.to_string(Base32, true))
+                    ((*info->viewHashResultConst())->second)
                     (concatStringsSep(" ", info->shortRefs()))
                     (info->deriver ? std::string(info->deriver->to_string()) : "", (bool) info->deriver)
                     (concatStringsSep(" ", info->sigs))
-                    (renderContentAddress(**viewSecondConst(info->cas)))
+                    (renderContentAddress(**info->viewCAConst()))
                     (time(0)).exec();
 
             } else {

@@ -38,7 +38,7 @@ void Store::exportPath(const StorePath & path, Sink & sink)
        filesystem corruption from spreading to other machines.
        Don't complain if the stored hash is zero (unknown). */
     Hash hash = hashSink.currentHash().first;
-    auto narHashResult = *viewFirstConst(info->cas);
+    auto narHashResult = *info->viewHashResultConst();
     assert(narHashResult);
     auto narHash = narHashResult->first;
     if (hash != narHash && narHash != Hash(narHash.type))

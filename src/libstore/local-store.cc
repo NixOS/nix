@@ -588,7 +588,7 @@ void LocalStore::checkDerivationOutputs(const StorePath & drvPath, const Derivat
 uint64_t LocalStore::addValidPath(State & state,
     const ValidPathInfo & info, bool checkOutputs)
 {
-    if (*viewSecondConst(info.cas) && !info.isContentAddressed(*this))
+    if (*info.viewCAConst() && !info.isContentAddressed(*this))
         throw Error("cannot add path '%s' to the Nix store because it claims to be content-addressed but isn't",
             printStorePath(info.path));
 
@@ -669,7 +669,7 @@ void LocalStore::queryPathInfoUncached(const StorePath & path,
             if (s) info->deriver = parseStorePath(s);
 
             /* Note that narSize = NULL yields 0. */
-            viewFirst(info->cas).modify([&](std::optional<HashResult> hr) {
+            info->viewHashResult().modify([&](std::optional<HashResult> hr) {
                 hr->second = useQueryPathInfo.getInt(4);
                 return std::optional<HashResult> { hr };
             });
@@ -680,7 +680,7 @@ void LocalStore::queryPathInfoUncached(const StorePath & path,
             if (s) info->sigs = tokenizeString<StringSet>(s, " ");
 
             s = (const char *) sqlite3_column_text(state->stmtQueryPathInfo, 7);
-            if (s) viewSecond(info->cas) = parseContentAddressOpt(s);
+            if (s) info->viewCA() = parseContentAddressOpt(s);
 
             /* Get the references. */
             auto useQueryReferences(state->stmtQueryReferences.use()(info->id));
@@ -1341,7 +1341,7 @@ bool LocalStore::verifyStore(bool checkContents, RepairFlag repair)
                     /* Fill in missing hashes. */
                     if (info->narHash() == nullHash) {
                         printInfo("fixing missing hash on '%s'", printStorePath(i));
-                        viewFirst(info->cas).modify([&](std::optional<HashResult> hr) {
+                        info->viewHashResult().modify([&](std::optional<HashResult> hr) {
                             hr->first = current.first;
                             return std::optional<HashResult> { hr };
                         });
@@ -1351,7 +1351,7 @@ bool LocalStore::verifyStore(bool checkContents, RepairFlag repair)
                     /* Fill in missing narSize fields (from old stores). */
                     if (info->narSize() == 0) {
                         printInfo("updating size field on '%s' to %s", printStorePath(i), current.second);
-                        viewFirst(info->cas).modify([&](std::optional<HashResult> hr) {
+                        info->viewHashResult().modify([&](std::optional<HashResult> hr) {
                             hr->second = current.second;
                             return std::optional<HashResult> { hr };
                         });

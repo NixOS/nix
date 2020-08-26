@@ -427,13 +427,13 @@ void RemoteStore::queryPathInfoUncached(const StorePath & path,
             conn->from >> info->registrationTime;
             {
                 auto tempNarSize = readInt(conn->from);
-                auto tempHashResult = **viewFirst(info->cas);
-                viewFirst(info->cas) = { tempHashResult.first, tempNarSize };
+                auto tempHashResult = **info->viewHashResult();
+                info->viewHashResult() = { tempHashResult.first, tempNarSize };
             }
             if (GET_PROTOCOL_MINOR(conn->daemonVersion) >= 16) {
                 conn->from >> info->ultimate;
                 info->sigs = readStrings<StringSet>(conn->from);
-                viewSecond(info->cas) = parseContentAddressOpt(readString(conn->from));
+                info->viewCA() = parseContentAddressOpt(readString(conn->from));
             }
         }
         callback(std::move(info));

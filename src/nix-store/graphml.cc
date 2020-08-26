@@ -34,7 +34,7 @@ static string makeEdge(std::string_view src, std::string_view dst)
 
 static string makeNode(const ValidPathInfo & info)
 {
-    auto narHashResult = *viewFirstConst(info.cas);
+    auto narHashResult = *info.viewHashResultConst();
     assert(narHashResult);
     auto narSize = narHashResult->second;
     return fmt(

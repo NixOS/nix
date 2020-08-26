@@ -205,7 +205,7 @@ static int _main(int argc, char * * argv)
 
             auto info = store->addToStoreSlow(name, tmpFile, method, ht, expectedHash);
             storePath = info.path;
-            auto ca = *viewSecondConst(info.cas);
+            auto ca = *info.viewCAConst();
             assert(ca);
             hash = getContentAddressHash(*ca);
         }

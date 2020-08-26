@@ -207,7 +207,7 @@ static void fetch(EvalState & state, const Pos & pos, Value * * args, Value & v,
     auto path = state.store->toRealPath(storePath);
 
     if (expectedHash) {
-        auto narHashResult = *viewFirstConst(state.store->queryPathInfo(storePath)->cas);
+        auto narHashResult = *state.store->queryPathInfo(storePath)->viewHashResultConst();
         assert(narHashResult);
         auto narHash = narHashResult->first;
         auto hash = unpack

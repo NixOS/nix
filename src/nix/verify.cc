@@ -90,8 +90,8 @@ struct CmdVerify : StorePathsCommand
                 if (!noContents) {
 
                     std::unique_ptr<AbstractHashSink> hashSink;
-                    auto narHashResult = *viewFirstConst(info->cas);
-                    auto ca = *viewSecondConst(info->cas);
+                    auto narHashResult = *info->viewHashResultConst();
+                    auto ca = *info->viewCAConst();
                     if (!ca)
                         hashSink = std::make_unique<HashSink>(narHashResult->first.type);
                     else

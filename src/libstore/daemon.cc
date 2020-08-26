@@ -287,7 +287,7 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
     case wopQueryPathHash: {
         auto path = store->parseStorePath(readString(from));
         logger->startWork();
-        auto narHashResult = *viewFirstConst(store->queryPathInfo(path)->cas);
+        auto narHashResult = *store->queryPathInfo(path)->viewHashResultConst();
         assert(narHashResult);
         auto narHash = narHashResult->first;
         logger->stopWork();
@@ -677,7 +677,7 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
         if (info) {
             if (GET_PROTOCOL_MINOR(clientVersion) >= 17)
                 to << 1;
-            auto narHashResult = *viewFirstConst(info->cas);
+            auto narHashResult = *info->viewHashResultConst();
             assert(narHashResult);
             auto narHash = narHashResult->first;
             auto narSize = narHashResult->second;
@@ -688,7 +688,7 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
             if (GET_PROTOCOL_MINOR(clientVersion) >= 16) {
                 to << info->ultimate
                    << info->sigs
-                   << renderContentAddress(*viewSecondConst(info->cas));
+                   << renderContentAddress(*info->viewCAConst());
             }
         } else {
             assert(GET_PROTOCOL_MINOR(clientVersion) >= 17);
@@ -748,12 +748,12 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
         from >> info.registrationTime;
         {
             auto tempNarSize = readInt(from);
-            auto tempHashResult = **viewFirst(info.cas);
-            viewFirst(info.cas) = { tempHashResult.first, tempNarSize };
+            auto tempHashResult = **info.viewHashResult();
+            info.viewHashResult() = { tempHashResult.first, tempNarSize };
         }
         from >> info.ultimate;
         info.sigs = readStrings<StringSet>(from);
-        viewSecond(info.cas).add(parseContentAddressOpt(readString(from)));
+        info.viewCA().add(parseContentAddressOpt(readString(from)));
         from >> repair >> dontCheckSigs;
         if (!trusted && dontCheckSigs)
             dontCheckSigs = false;
