@@ -67,7 +67,7 @@ struct Source
 };
 
 
-/* A buffered abstract source. Warning: a BufferedSink should not be
+/* A buffered abstract source. Warning: a BufferedSource should not be
    used from multiple threads concurrently. */
 struct BufferedSource : Source
 {
