@@ -873,10 +873,9 @@ static void opServe(Strings opFlags, Strings opArgs)
                             << narSize;
                         if (GET_PROTOCOL_MINOR(clientVersion) >= 4) {
                             auto narHashResult = *info->viewHashResultConst();
-                            auto ca = *info->viewCAConst();
-                            assert(ca);
+                            auto optCA = *info->viewCAConst();
                             out << (narHashResult ? narHashResult->first.to_string(Base32, true) : "")
-                                << renderContentAddress(*ca)
+                                << renderContentAddress(optCA)
                                 << info->sigs;
                         }
                     } catch (InvalidPath &) {
@@ -959,16 +958,24 @@ static void opServe(Strings opFlags, Strings opArgs)
 
                 auto path = readString(in);
                 auto deriver = readString(in);
+                auto narHash = Hash::parseAny(readString(in), htSHA256);
+                auto references = readStorePaths<StorePathSet>(*store, in);
+                time_t registrationTime;
+                uint64_t narSize;
+                in >> registrationTime >> narSize;
+
+                if (narSize == 0)
+                    throw Error("narInfo is too old and missing the narSize field");
+
                 ValidPathInfo info {
                     store->parseStorePath(path),
-                    This<HashResult> { std::pair { Hash::parseAny(readString(in), htSHA256), 0 } },
+                    This<HashResult> { std::pair { std::move(narHash), narSize } },
                 };
                 if (deriver != "")
                     info.deriver = store->parseStorePath(deriver);
-                info.references = readStorePaths<StorePathSet>(*store, in);
-                auto narHashResult = *info.viewHashResultConst();
-                auto narSize = narHashResult ? narHashResult->second : 0;
-                in >> info.registrationTime >> narSize >> info.ultimate;
+                info.references = std::move(references);
+                info.registrationTime = registrationTime;
+                in >> info.ultimate;
                 info.sigs = readStrings<StringSet>(in);
                 info.viewCA().add(parseContentAddressOpt(readString(in)));
 

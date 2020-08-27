@@ -91,7 +91,7 @@ struct CmdBundle : InstallableCommand
         mkString(*evalState->allocAttr(*arg, evalState->symbols.create("system")), settings.thisSystem.get());
 
         arg->attrs->sort();
- 
+
         auto vRes = evalState->allocValue();
         evalState->callFunction(*bundler.toValue(*evalState).first, *arg, *vRes, noPos);
 

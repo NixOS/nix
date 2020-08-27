@@ -1951,7 +1951,7 @@ void linkOrCopy(const Path & from, const Path & to)
            file (e.g. 32000 of ext3), which is quite possible after a
            'nix-store --optimise'. FIXME: actually, why don't we just
            bind-mount in this case?
-           
+
            It can also fail with EPERM in BeegFS v7 and earlier versions
            which don't allow hard-links to other directories */
         if (errno != EMLINK && errno != EPERM)
@@ -3820,7 +3820,8 @@ void DerivationGoal::registerOutputs()
         if (buildMode == bmCheck) {
             if (!worker.store.isValidPath(worker.store.parseStorePath(path))) continue;
             ValidPathInfo info(*worker.store.queryPathInfo(worker.store.parseStorePath(path)));
-            if (hash.first != info.narHash()) {
+            assert(info.optNarHash()); // Always calculate nar hash for new builds.
+            if (hash.first != *info.optNarHash()) {
                 worker.checkMismatch = true;
                 if (settings.runDiffHook || settings.keepFailed) {
                     Path dst = worker.store.toRealPath(path + checkSuffix);
@@ -3995,16 +3996,20 @@ void DerivationGoal::checkOutputs(const std::map<Path, ValidPathInfo> & outputs)
                 pathsLeft.pop();
                 if (!pathsDone.insert(path).second) continue;
 
+                auto accumPath = [&](const ValidPathInfo & info) {
+                    std::optional optNarSize = info.optNarSize();
+                    assert(optNarSize); // Always require NAR size for path in local store;
+                    closureSize += *optNarSize;
+                    for (auto & ref : info.references)
+                        pathsLeft.push(ref);
+                };
+
                 auto i = outputsByPath.find(worker.store.printStorePath(path));
                 if (i != outputsByPath.end()) {
-                    closureSize += i->second.narSize();
-                    for (auto & ref : i->second.references)
-                        pathsLeft.push(ref);
+                    accumPath(i->second);
                 } else {
                     auto info = worker.store.queryPathInfo(path);
-                    closureSize += info->narSize();
-                    for (auto & ref : info->references)
-                        pathsLeft.push(ref);
+                    accumPath(*info);
                 }
             }
 
@@ -4013,9 +4018,12 @@ void DerivationGoal::checkOutputs(const std::map<Path, ValidPathInfo> & outputs)
 
         auto applyChecks = [&](const Checks & checks)
         {
-            if (checks.maxSize && info.narSize() > *checks.maxSize)
+            std::optional optNarSize = info.optNarSize();
+            assert(optNarSize); // Always require NAR size for path in local store;
+            auto narSize = *optNarSize;
+            if (checks.maxSize && narSize > *checks.maxSize)
                 throw BuildError("path '%s' is too large at %d bytes; limit is %d bytes",
-                    worker.store.printStorePath(info.path), info.narSize(), *checks.maxSize);
+                    worker.store.printStorePath(info.path), narSize, *checks.maxSize);
 
             if (checks.maxClosureSize) {
                 uint64_t closureSize = getClosure(info.path).second;
@@ -4498,7 +4506,11 @@ void SubstitutionGoal::tryNext()
     /* Update the total expected download size. */
     auto narInfo = std::dynamic_pointer_cast<const NarInfo>(info);
 
-    maintainExpectedNar = std::make_unique<MaintainCount<uint64_t>>(worker.expectedNarSize, info->narSize());
+    auto narSizeOpt = info->optNarSize();
+    maintainExpectedNar =
+        narSizeOpt
+        ? std::make_unique<MaintainCount<uint64_t>>(worker.expectedNarSize, *narSizeOpt)
+        : nullptr;
 
     maintainExpectedDownload =
         narInfo && narInfo->fileSize

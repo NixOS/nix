@@ -143,7 +143,8 @@ struct FileSource : FdSource
 void BinaryCacheStore::addToStore(const ValidPathInfo & info, Source & narSource,
     RepairFlag repair, CheckSigsFlag checkSigs)
 {
-    assert(info.narSize());
+    assert(info.optNarSize());
+    auto narSize = *info.optNarSize();
 
     if (!repair && isValidPath(info.path)) {
         // FIXME: copyNAR -> null sink
@@ -187,8 +188,8 @@ void BinaryCacheStore::addToStore(const ValidPathInfo & info, Source & narSource
 
     auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(now2 - now1).count();
     printMsg(lvlTalkative, "copying path '%1%' (%2% bytes, compressed %3$.1f%% in %4% ms) to binary cache",
-        printStorePath(narInfo->path), info.narSize(),
-        ((1.0 - (double) fileSize / info.narSize()) * 100.0),
+        printStorePath(narInfo->path), narSize,
+        ((1.0 - (double) fileSize / narSize) * 100.0),
         duration);
 
     /* Verify that all references are valid. This may do some .narinfo
@@ -286,7 +287,7 @@ void BinaryCacheStore::addToStore(const ValidPathInfo & info, Source & narSource
     } else
         stats.narWriteAverted++;
 
-    stats.narWriteBytes += info.narSize();
+    stats.narWriteBytes += narSize;
     stats.narWriteCompressedBytes += fileSize;
     stats.narWriteCompressionTimeMs += duration;
 

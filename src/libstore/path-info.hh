@@ -76,18 +76,17 @@ struct ValidPathInfo
        attacks. */
     std::string fingerprint(const Store & store) const;
 
-    Hash narHash() const {
+    std::optional<Hash> optNarHash() const {
         auto narHashResult = *viewHashResultConst();
-        assert(narHashResult);
-        return narHashResult->first;
+        return !narHashResult ? std::optional<Hash> {} : narHashResult->first;
     }
 
-    uint64_t narSize() const {
+    std::optional<uint64_t> optNarSize() const {
         auto narHashResult = *viewHashResultConst();
-        return narHashResult ? narHashResult->second : 0;
+        return !narHashResult ? std::optional<uint64_t> {} : narHashResult->second;
     }
 
-    std::optional<ContentAddress> optCa() const {
+    std::optional<ContentAddress> optCA() const {
         return *viewSecondConst(cas);
     }
 

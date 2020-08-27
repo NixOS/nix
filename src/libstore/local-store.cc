@@ -588,19 +588,24 @@ void LocalStore::checkDerivationOutputs(const StorePath & drvPath, const Derivat
 uint64_t LocalStore::addValidPath(State & state,
     const ValidPathInfo & info, bool checkOutputs)
 {
-    if (*info.viewCAConst() && !info.isContentAddressed(*this))
+    if (info.optCA() && !info.isContentAddressed(*this))
         throw Error("cannot add path '%s' to the Nix store because it claims to be content-addressed but isn't",
             printStorePath(info.path));
 
+    auto optNarHashSize = *info.viewHashResultConst();
+    if (!optNarHashSize)
+        throw Error("NAR hash and size are required for paths in the local store");
+    auto & [narHash, narSize] = *optNarHashSize;
+
     state.stmtRegisterValidPath.use()
         (printStorePath(info.path))
-        (info.narHash().to_string(Base16, true))
+        (narHash.to_string(Base16, true))
         (info.registrationTime == 0 ? time(0) : info.registrationTime)
         (info.deriver ? printStorePath(*info.deriver) : "", (bool) info.deriver)
-        (info.narSize(), info.narSize() != 0)
+        (narSize)
         (info.ultimate ? 1 : 0, info.ultimate)
         (concatStringsSep(" ", info.sigs), !info.sigs.empty())
-        (renderContentAddress(info.optCa()), (bool) info.optCa())
+        (renderContentAddress(info.optCA()), (bool) info.optCA())
         .exec();
     uint64_t id = state.db.getLastInsertedRowId();
 
@@ -698,12 +703,17 @@ void LocalStore::queryPathInfoUncached(const StorePath & path,
 /* Update path info in the database. */
 void LocalStore::updatePathInfo(State & state, const ValidPathInfo & info)
 {
+    auto optNarHashSize = *info.viewHashResultConst();
+    if (!optNarHashSize)
+        throw Error("NAR hash and size are required for paths in the local store");
+    auto & [narHash, narSize] = *optNarHashSize;
+
     state.stmtUpdatePathInfo.use()
-        (info.narSize(), info.narSize() != 0)
-        (info.narHash().to_string(Base16, true))
+        (narSize)
+        (narHash.to_string(Base16, true))
         (info.ultimate ? 1 : 0, info.ultimate)
         (concatStringsSep(" ", info.sigs), !info.sigs.empty())
-        (renderContentAddress(info.optCa()), (bool) info.optCa())
+        (renderContentAddress(info.optCA()), (bool) info.optCA())
         (printStorePath(info.path))
         .exec();
 }
@@ -885,11 +895,12 @@ void LocalStore::querySubstitutablePathInfos(const StorePathCAMap & paths, Subst
 
                 auto narInfo = std::dynamic_pointer_cast<const NarInfo>(
                     std::shared_ptr<const ValidPathInfo>(info));
+                assert(info->optNarSize());
                 infos.insert_or_assign(path.first, SubstitutablePathInfo{
                     info->deriver,
                     info->references,
                     narInfo ? narInfo->fileSize : 0,
-                    info->narSize()});
+                    *info->optNarSize()});
             } catch (InvalidPath &) {
             } catch (SubstituterDisabled &) {
             } catch (Error & e) {
@@ -926,7 +937,8 @@ void LocalStore::registerValidPaths(const ValidPathInfos & infos)
         StorePathSet paths;
 
         for (auto & i : infos) {
-            assert(i.narHash().type == htSHA256);
+            assert(i.optNarHash());
+            assert(i.optNarHash()->type == htSHA256);
             if (isValidPath_(*state, i.path))
                 updatePathInfo(*state, i);
             else
@@ -1014,13 +1026,13 @@ void LocalStore::addToStore(const ValidPathInfo & info_, Source & source,
 
             // text hashing has long been allowed to have non-self-references because it is used for drv files.
             bool refersToSelf = info.references.count(info.path) > 0;
-            if (info.optCa().has_value() && !info.references.empty() && !(std::holds_alternative<TextHash>(*info.optCa()) && !refersToSelf))
+            if (info.optCA().has_value() && !info.references.empty() && !(std::holds_alternative<TextHash>(*info.optCA()) && !refersToSelf))
                 settings.requireExperimentalFeature("ca-references");
 
             /* While restoring the path from the NAR, compute the hash
                of the NAR. */
             std::unique_ptr<AbstractHashSink> hashSink;
-            if (!info.optCa().has_value() || !info.references.count(info.path))
+            if (!info.optCA().has_value() || !info.references.count(info.path))
                 hashSink = std::make_unique<HashSink>(htSHA256);
             else
                 hashSink = std::make_unique<HashModuloSink>(htSHA256, std::string(info.path.hashPart()));
@@ -1320,8 +1332,6 @@ bool LocalStore::verifyStore(bool checkContents, RepairFlag repair)
 
         printInfo("checking store hashes...");
 
-        Hash nullHash(htSHA256);
-
         for (auto & i : validPaths) {
             try {
                 auto info = std::const_pointer_cast<ValidPathInfo>(std::shared_ptr<const ValidPathInfo>(queryPathInfo(i)));
@@ -1330,50 +1340,36 @@ bool LocalStore::verifyStore(bool checkContents, RepairFlag repair)
                 printMsg(lvlTalkative, "checking contents of '%s'", printStorePath(i));
 
                 std::unique_ptr<AbstractHashSink> hashSink;
-                if (!info->optCa() || !info->references.count(info->path))
-                    hashSink = std::make_unique<HashSink>(info->narHash().type);
+                if (!info->optCA() || !info->references.count(info->path))
+                    hashSink = std::make_unique<HashSink>(htSHA256);
                 else
-                    hashSink = std::make_unique<HashModuloSink>(info->narHash().type, std::string(info->path.hashPart()));
+                    hashSink = std::make_unique<HashModuloSink>(htSHA256, std::string(info->path.hashPart()));
 
                 dumpPath(Store::toRealPath(i), *hashSink);
                 auto current = hashSink->finish();
 
-                if (info->narHash() != nullHash && info->narHash() != current.first) {
-                    logError({
-                        .name = "Invalid hash - path modified",
-                        .hint = hintfmt("path '%s' was modified! expected hash '%s', got '%s'",
-                        printStorePath(i), info->narHash().to_string(Base32, true), current.first.to_string(Base32, true))
-                    });
-                    if (repair) repairPath(i); else errors = true;
+                if (std::optional optNarHashSize = *info->viewHashResultConst()) {
+                    auto & wanted = *optNarHashSize;
+                    if (wanted != current) {
+                        auto & [wantedNarHash, wantedNarSize] = wanted;
+                        auto & [currentNarHash, currentNarSize] = current;
+                        logError({
+                            .name = "Invalid hash or size - path modified",
+                            .hint = hintfmt("path '%s' was modified! expected hash '%s' and size '%d', got hash '%s' and size '%d'",
+                                printStorePath(i),
+                                wantedNarHash.to_string(Base32, true), wantedNarSize,
+                                currentNarHash.to_string(Base32, true), currentNarSize),
+                        });
+                        if (repair) repairPath(i); else errors = true;
+                    }
                 } else {
+                    /* Fill in missing hash and size. */
+                    printInfo("fixing missing hash and size fields for '%s': hash is '%s', size is '%s'",
+                        printStorePath(i), current.first.to_string(Base32, true), current.second);
+                    info->viewHashResult() = current;
 
-                    bool update = false;
-
-                    /* Fill in missing hashes. */
-                    if (info->narHash() == nullHash) {
-                        printInfo("fixing missing hash on '%s'", printStorePath(i));
-                        info->viewHashResult().modify([&](std::optional<HashResult> hr) {
-                            hr->first = current.first;
-                            return std::optional<HashResult> { hr };
-                        });
-                        update = true;
-                    }
-
-                    /* Fill in missing narSize fields (from old stores). */
-                    if (info->narSize() == 0) {
-                        printInfo("updating size field on '%s' to %s", printStorePath(i), current.second);
-                        info->viewHashResult().modify([&](std::optional<HashResult> hr) {
-                            hr->second = current.second;
-                            return std::optional<HashResult> { hr };
-                        });
-                        update = true;
-                    }
-
-                    if (update) {
-                        auto state(_state.lock());
-                        updatePathInfo(*state, *info);
-                    }
-
+                    auto state(_state.lock());
+                    updatePathInfo(*state, *info);
                 }
 
             } catch (Error & e) {

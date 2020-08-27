@@ -23,6 +23,7 @@ NarInfo::NarInfo(const Store & store, const std::string & s, const std::string &
 
     bool havePath = false;
     bool haveNarHash = false;
+    bool haveNarSize = false;
 
     size_t pos = 0;
     while (pos < s.size()) {
@@ -62,6 +63,7 @@ NarInfo::NarInfo(const Store & store, const std::string & s, const std::string &
                 if (!string2Int(value, hr->second)) throw corrupt();
                 return std::optional<HashResult> { hr };
             });
+            haveNarSize = true;
         }
         else if (name == "References") {
             auto refs = tokenizeString<Strings>(value, " ");
@@ -78,7 +80,7 @@ NarInfo::NarInfo(const Store & store, const std::string & s, const std::string &
         else if (name == "Sig")
             sigs.insert(value);
         else if (name == "CA") {
-            if (optCa()) throw corrupt();
+            if (optCA()) throw corrupt();
             // FIXME: allow blank ca or require skipping field?
             viewCA() = parseContentAddressOpt(value);
         }
@@ -88,7 +90,7 @@ NarInfo::NarInfo(const Store & store, const std::string & s, const std::string &
 
     if (compression == "") compression = "bzip2";
 
-    if (!havePath || !haveNarHash || url.empty() || narSize() == 0) throw corrupt();
+    if (!havePath || !haveNarHash || url.empty() || !haveNarSize) throw corrupt();
 }
 
 std::string NarInfo::to_string(const Store & store) const
@@ -101,9 +103,11 @@ std::string NarInfo::to_string(const Store & store) const
     assert(fileHash && fileHash->type == htSHA256);
     res += "FileHash: " + fileHash->to_string(Base32, true) + "\n";
     res += "FileSize: " + std::to_string(fileSize) + "\n";
-    assert(narHash().type == htSHA256);
-    res += "NarHash: " + narHash().to_string(Base32, true) + "\n";
-    res += "NarSize: " + std::to_string(narSize()) + "\n";
+    assert(optNarHash());
+    assert(optNarSize());
+    assert(optNarHash()->type == htSHA256);
+    res += "NarHash: " + optNarHash()->to_string(Base32, true) + "\n";
+    res += "NarSize: " + std::to_string(*optNarSize()) + "\n";
 
     res += "References: " + concatStringsSep(" ", shortRefs()) + "\n";
 
@@ -116,8 +120,8 @@ std::string NarInfo::to_string(const Store & store) const
     for (auto sig : sigs)
         res += "Sig: " + sig + "\n";
 
-    if (optCa())
-        res += "CA: " + renderContentAddress(*optCa()) + "\n";
+    if (optCA())
+        res += "CA: " + renderContentAddress(*optCA()) + "\n";
 
     return res;
 }

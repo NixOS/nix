@@ -205,7 +205,7 @@ bool Args::processArgs(const Strings & args, bool finish)
     return res;
 }
 
-static void hashTypeCompleter(size_t index, std::string_view prefix) 
+static void hashTypeCompleter(size_t index, std::string_view prefix)
 {
     for (auto & type : hashTypes)
         if (hasPrefix(type, prefix))

@@ -523,13 +523,17 @@ void RemoteStore::addToStore(const ValidPathInfo & info, Source & source,
     }
 
     else {
+        std::optional optNarHashSize = *info.viewHashResultConst();
+        if (!optNarHashSize)
+            throw Error("The NAR hash and size must be known up front to add data to a remote store");
+        auto & [narHash, narSize] = *optNarHashSize;
         conn->to << wopAddToStoreNar
                  << printStorePath(info.path)
                  << (info.deriver ? printStorePath(*info.deriver) : "")
-                 << info.narHash().to_string(Base16, false);
+                 << narHash.to_string(Base16, false);
         writeStorePaths(*this, conn->to, info.references);
-        conn->to << info.registrationTime << info.narSize()
-                 << info.ultimate << info.sigs << renderContentAddress(info.optCa())
+        conn->to << info.registrationTime << narSize
+                 << info.ultimate << info.sigs << renderContentAddress(info.optCA())
                  << repair << !checkSigs;
 
         if (GET_PROTOCOL_MINOR(conn->daemonVersion) >= 23) {

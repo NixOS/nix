@@ -166,16 +166,19 @@ struct LegacySSHStore : public Store
         auto conn(connections->get());
 
         if (GET_PROTOCOL_MINOR(conn->remoteVersion) >= 5) {
-
+            auto optNarHashSize = *info.viewHashResultConst();
+            if (!optNarHashSize)
+                throw Error("The nar size must be known up front to add data to an ssh:// store");
+            auto & [narHash, narSize] = *optNarHashSize;
             conn->to
                 << cmdAddToStoreNar
                 << printStorePath(info.path)
                 << (info.deriver ? printStorePath(*info.deriver) : "")
-                << (*info.viewHashResultConst())->first.to_string(Base16, false);
+                << narHash.to_string(Base16, false);
             writeStorePaths(*this, conn->to, info.references);
             conn->to
                 << info.registrationTime
-                << info.narSize()
+                << narSize
                 << info.ultimate
                 << info.sigs
                 << renderContentAddress(*info.viewCAConst());
