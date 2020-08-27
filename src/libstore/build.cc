@@ -4654,7 +4654,8 @@ void SubstitutionGoal::finished()
         worker.doneDownloadSize += fileSize;
     }
 
-    worker.doneNarSize += maintainExpectedNar->delta;
+    if (maintainExpectedNar)
+        worker.doneNarSize += maintainExpectedNar->delta;
     maintainExpectedNar.reset();
 
     worker.updateProgress();
