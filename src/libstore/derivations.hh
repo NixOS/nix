@@ -146,11 +146,11 @@ class Store;
 enum RepairFlag : bool { NoRepair = false, Repair = true };
 
 /* Write a derivation to the Nix store, and return its path. */
-StorePath writeDerivation(ref<Store> store,
+StorePath writeDerivation(Store & store,
     const Derivation & drv, RepairFlag repair = NoRepair);
 
 /* Read a derivation from a file. */
-Derivation readDerivation(const Store & store, const Path & drvPath, std::string_view name);
+Derivation parseDerivation(const Store & store, std::string && s, std::string_view name);
 
 // FIXME: remove
 bool isDerivation(const string & fileName);
