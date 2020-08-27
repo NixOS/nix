@@ -57,13 +57,15 @@ of Firefox, Nix will first check if the path is available on the
 server <literal>avalon</literal> or another binary caches. If not, it
 will fall back to building from source.</para>
 
-<para>You can also tell Nix to always use your binary cache by adding
+<para>You can also tell Nix to always use your binary cache, if using Nixos by setting the `nix.extraOptions` in `configuration`, otherwise by adding
 a line to the <filename linkend="sec-conf-file">nix.conf</filename>
 configuration file like this:
 
 <programlisting>
 binary-caches = http://avalon:8080/ https://cache.nixos.org/
 </programlisting>
+         
+<para>More information is also available here: https://nixos.wiki/wiki/Binary_Cache</para>
 
 </para>
 
