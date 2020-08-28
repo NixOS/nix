@@ -421,6 +421,8 @@
         stdenv.mkDerivation {
           name = "nix";
 
+          outputs = [ "out" "dev" "doc" ];
+
           buildInputs = buildDeps ++ propagatedDeps ++ perlDeps;
 
           inherit configureFlags;
@@ -428,15 +430,6 @@
           enableParallelBuilding = true;
 
           installFlags = "sysconfdir=$(out)/etc";
-
-          shellHook =
-            ''
-              export prefix=$(pwd)/inst
-              configureFlags+=" --prefix=$prefix"
-              PKG_CONFIG_PATH=$prefix/lib/pkgconfig:$PKG_CONFIG_PATH
-              PATH=$prefix/bin:$PATH
-              unset PYTHONPATH
-            '';
         });
 
   };
