@@ -9,10 +9,13 @@ testDerivation () {
     local derivationPath=$1
     local commonArgs=("--experimental-features" "ca-derivations" "./content-addressed.nix" "-A" "$derivationPath" "--no-out-link")
     local out1=$(nix-build "${commonArgs[@]}" --arg seed 1)
-    local out2=$(nix-build "${commonArgs[@]}" --arg seed 2)
+    local out2=$(nix-build "${commonArgs[@]}" --arg seed 2 "${extraArgs[@]}")
     test $out1 == $out2
 }
 
 testDerivation root
+# The seed only changes the root derivation, and not it's output, so the
+# dependent derivations should only need to be built once.
+extaArgs=(-j0)
 testDerivation dependent
 testDerivation transitivelyDependent
