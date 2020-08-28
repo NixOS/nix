@@ -68,7 +68,7 @@ bool BasicDerivation::isBuiltin() const
 }
 
 
-StorePath writeDerivation(ref<Store> store,
+StorePath writeDerivation(Store & store,
     const Derivation & drv, RepairFlag repair)
 {
     auto references = drv.inputSrcs;
@@ -78,10 +78,10 @@ StorePath writeDerivation(ref<Store> store,
        (that can be missing (of course) and should not necessarily be
        held during a garbage collection). */
     auto suffix = std::string(drv.name) + drvExtension;
-    auto contents = drv.unparse(*store, false);
+    auto contents = drv.unparse(store, false);
     return settings.readOnlyMode
-        ? store->computeStorePathForText(suffix, contents, references)
-        : store->addTextToStore(suffix, contents, references, repair);
+        ? store.computeStorePathForText(suffix, contents, references)
+        : store.addTextToStore(suffix, contents, references, repair);
 }
 
 
@@ -200,7 +200,7 @@ static DerivationOutput parseDerivationOutput(const Store & store, std::istrings
 }
 
 
-static Derivation parseDerivation(const Store & store, std::string && s, std::string_view name)
+Derivation parseDerivation(const Store & store, std::string && s, std::string_view name)
 {
     Derivation drv;
     drv.name = name;
@@ -245,34 +245,6 @@ static Derivation parseDerivation(const Store & store, std::string && s, std::st
 
     expect(str, ")");
     return drv;
-}
-
-
-Derivation readDerivation(const Store & store, const Path & drvPath, std::string_view name)
-{
-    try {
-        return parseDerivation(store, readFile(drvPath), name);
-    } catch (FormatError & e) {
-        throw Error("error parsing derivation '%1%': %2%", drvPath, e.msg());
-    }
-}
-
-
-Derivation Store::derivationFromPath(const StorePath & drvPath)
-{
-    ensurePath(drvPath);
-    return readDerivation(drvPath);
-}
-
-
-Derivation Store::readDerivation(const StorePath & drvPath)
-{
-    auto accessor = getFSAccessor();
-    try {
-        return parseDerivation(*this, accessor->readFile(printStorePath(drvPath)), Derivation::nameFromPath(drvPath));
-    } catch (FormatError & e) {
-        throw Error("error parsing derivation '%s': %s", printStorePath(drvPath), e.msg());
-    }
 }
 
 

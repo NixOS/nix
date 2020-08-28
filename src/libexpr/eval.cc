@@ -1299,12 +1299,23 @@ void EvalState::autoCallFunction(Bindings & args, Value & fun, Value & res)
     Value * actualArgs = allocValue();
     mkAttrs(*actualArgs, fun.lambda.fun->formals->formals.size());
 
-    for (auto & i : fun.lambda.fun->formals->formals) {
-        Bindings::iterator j = args.find(i.name);
-        if (j != args.end())
-            actualArgs->attrs->push_back(*j);
-        else if (!i.def)
-            throwTypeError("cannot auto-call a function that has an argument without a default value ('%1%')", i.name);
+    if (fun.lambda.fun->formals->ellipsis) {
+        // If the formals have an ellipsis (eg the function accepts extra args) pass
+        // all available automatic arguments (which includes arguments specified on
+        // the command line via --arg/--argstr)
+        for (auto& v : args) {
+            actualArgs->attrs->push_back(v);
+        }
+    } else {
+        // Otherwise, only pass the arguments that the function accepts
+        for (auto & i : fun.lambda.fun->formals->formals) {
+            Bindings::iterator j = args.find(i.name);
+            if (j != args.end()) {
+                actualArgs->attrs->push_back(*j);
+            } else if (!i.def) {
+                throwTypeError("cannot auto-call a function that has an argument without a default value ('%1%')", i.name);
+            }
+        }
     }
 
     actualArgs->attrs->sort();

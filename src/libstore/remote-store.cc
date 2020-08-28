@@ -284,9 +284,9 @@ struct ConnectionHandle
 
     RemoteStore::Connection * operator -> () { return &*handle; }
 
-    void processStderr(Sink * sink = 0, Source * source = 0)
+    void processStderr(Sink * sink = 0, Source * source = 0, bool flush = true)
     {
-        auto ex = handle->processStderr(sink, source);
+        auto ex = handle->processStderr(sink, source, flush);
         if (ex) {
             daemonException = true;
             std::rethrow_exception(ex);
@@ -535,6 +535,8 @@ void RemoteStore::addToStore(const ValidPathInfo & info, Source & source,
 
         if (GET_PROTOCOL_MINOR(conn->daemonVersion) >= 23) {
 
+            conn->to.flush();
+
             std::exception_ptr ex;
 
             struct FramedSink : BufferedSink
@@ -574,7 +576,7 @@ void RemoteStore::addToStore(const ValidPathInfo & info, Source & source,
             std::thread stderrThread([&]()
             {
                 try {
-                    conn.processStderr();
+                    conn.processStderr(nullptr, nullptr, false);
                 } catch (...) {
                     ex = std::current_exception();
                 }
@@ -884,9 +886,10 @@ static Logger::Fields readFields(Source & from)
 }
 
 
-std::exception_ptr RemoteStore::Connection::processStderr(Sink * sink, Source * source)
+std::exception_ptr RemoteStore::Connection::processStderr(Sink * sink, Source * source, bool flush)
 {
-    to.flush();
+    if (flush)
+        to.flush();
 
     while (true) {
 
