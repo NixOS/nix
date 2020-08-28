@@ -264,6 +264,7 @@ struct Common : InstallableCommand, MixProfile
 struct CmdDevelop : Common, MixEnvironment
 {
     std::vector<std::string> command;
+    std::optional<std::string> phase;
 
     CmdDevelop()
     {
@@ -276,6 +277,43 @@ struct CmdDevelop : Common, MixEnvironment
                 if (ss.empty()) throw UsageError("--command requires at least one argument");
                 command = ss;
             }}
+        });
+
+        addFlag({
+            .longName = "phase",
+            .description = "phase to run (e.g. `build` or `configure`)",
+            .labels = {"phase-name"},
+            .handler = {&phase},
+        });
+
+        addFlag({
+            .longName = "configure",
+            .description = "run the configure phase",
+            .handler = {&phase, {"configure"}},
+        });
+
+        addFlag({
+            .longName = "build",
+            .description = "run the build phase",
+            .handler = {&phase, {"build"}},
+        });
+
+        addFlag({
+            .longName = "check",
+            .description = "run the check phase",
+            .handler = {&phase, {"check"}},
+        });
+
+        addFlag({
+            .longName = "install",
+            .description = "run the install phase",
+            .handler = {&phase, {"install"}},
+        });
+
+        addFlag({
+            .longName = "installcheck",
+            .description = "run the installcheck phase",
+            .handler = {&phase, {"installCheck"}},
         });
     }
 
@@ -314,9 +352,22 @@ struct CmdDevelop : Common, MixEnvironment
 
         auto script = makeRcScript(buildEnvironment);
 
-        script +=  fmt("rm -f '%s'\n", rcFilePath);
+        if (verbosity >= lvlDebug)
+            script += "set -x\n";
 
-        if (!command.empty()) {
+        script += fmt("rm -f '%s'\n", rcFilePath);
+
+        if (phase) {
+            if (!command.empty())
+                throw UsageError("you cannot use both '--command' and '--phase'");
+            // FIXME: foundMakefile is set by buildPhase, need to get
+            // rid of that.
+            script += fmt("foundMakefile=1\n");
+            script += fmt("runHook %1%Phase\n", *phase);
+            script += fmt("exit 0\n", *phase);
+        }
+
+        else if (!command.empty()) {
             std::vector<std::string> args;
             for (auto s : command)
                 args.push_back(shellEscape(s));
