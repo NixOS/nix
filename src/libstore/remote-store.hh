@@ -114,7 +114,7 @@ protected:
 
         virtual ~Connection();
 
-        std::exception_ptr processStderr(Sink * sink = 0, Source * source = 0);
+        std::exception_ptr processStderr(Sink * sink = 0, Source * source = 0, bool flush = true);
     };
 
     ref<Connection> openConnectionWrapper();

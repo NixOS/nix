@@ -121,7 +121,7 @@ static void prim_scopedImport(EvalState & state, const Pos & pos, Value * * args
     };
     if (auto optStorePath = isValidDerivationInStore()) {
         auto storePath = *optStorePath;
-        Derivation drv = readDerivation(*state.store, realPath, Derivation::nameFromPath(storePath));
+        Derivation drv = state.store->readDerivation(storePath);
         Value & w = *state.allocValue();
         state.mkAttrs(w, 3 + drv.outputs.size());
         Value * v2 = state.allocAttr(w, state.sDrvPath);

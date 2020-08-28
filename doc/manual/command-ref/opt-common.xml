@@ -106,7 +106,14 @@
     </varlistentry>
 
     <varlistentry><term>internal-json</term>
-    <listitem><para>Outputs the logs in a structured manner. NOTE: the json schema is not guarantees to be stable between releases.</para></listitem>
+     <listitem>
+      <para>Outputs the logs in a structured manner.</para>
+      <warning>
+       <para>
+        While the schema itself is relatively stable, the format of the error-messages (namely of the <literal>msg</literal>-field) can change between several releases.
+       </para>
+      </warning>
+     </listitem>
     </varlistentry>
 
     <varlistentry><term>bar</term>
