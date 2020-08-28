@@ -1477,8 +1477,7 @@ void DerivationGoal::inputsRealised()
                    });
 
             auto resolvedGoal = worker.makeDerivationGoal(
-                pathResolved, wantedOutputs,
-                buildMode == bmRepair ? bmRepair : bmNormal);
+                pathResolved, wantedOutputs, buildMode);
             addWaitee(resolvedGoal);
 
             state = &DerivationGoal::resolvedFinished;
