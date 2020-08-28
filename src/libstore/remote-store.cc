@@ -8,6 +8,7 @@
 #include "derivations.hh"
 #include "pool.hh"
 #include "finally.hh"
+#include "logging.hh"
 
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -30,12 +31,59 @@ template<> StorePathSet readStorePaths(const Store & store, Source & from)
     return paths;
 }
 
-
 void writeStorePaths(const Store & store, Sink & out, const StorePathSet & paths)
 {
     out << paths.size();
     for (auto & i : paths)
         out << store.printStorePath(i);
+}
+
+
+StorePathCAMap readStorePathCAMap(const Store & store, Source & from)
+{
+    StorePathCAMap paths;
+    auto count = readNum<size_t>(from);
+    while (count--)
+        paths.insert_or_assign(store.parseStorePath(readString(from)), parseContentAddressOpt(readString(from)));
+    return paths;
+}
+
+void writeStorePathCAMap(const Store & store, Sink & out, const StorePathCAMap & paths)
+{
+    out << paths.size();
+    for (auto & i : paths) {
+        out << store.printStorePath(i.first);
+        out << renderContentAddress(i.second);
+    }
+}
+
+
+namespace worker_proto {
+
+StorePath read(const Store & store, Source & from, Phantom<StorePath> _)
+{
+    return store.parseStorePath(readString(from));
+}
+
+void write(const Store & store, Sink & out, const StorePath & storePath)
+{
+    out << store.printStorePath(storePath);
+}
+
+
+template<>
+std::optional<StorePath> read(const Store & store, Source & from, Phantom<std::optional<StorePath>> _)
+{
+    auto s = readString(from);
+    return s == "" ? std::optional<StorePath> {} : store.parseStorePath(s);
+}
+
+template<>
+void write(const Store & store, Sink & out, const std::optional<StorePath> & storePathOpt)
+{
+    out << (storePathOpt ? store.printStorePath(*storePathOpt) : "");
+}
+
 }
 
 
@@ -197,7 +245,7 @@ void RemoteStore::setOptions(Connection & conn)
         overrides.erase(settings.maxSilentTime.name);
         overrides.erase(settings.buildCores.name);
         overrides.erase(settings.useSubstitutes.name);
-        overrides.erase(settings.showTrace.name);
+        overrides.erase(loggerSettings.showTrace.name);
         conn.to << overrides.size();
         for (auto & i : overrides)
             conn.to << i.first << i.second.value;
@@ -236,9 +284,9 @@ struct ConnectionHandle
 
     RemoteStore::Connection * operator -> () { return &*handle; }
 
-    void processStderr(Sink * sink = 0, Source * source = 0)
+    void processStderr(Sink * sink = 0, Source * source = 0, bool flush = true)
     {
-        auto ex = handle->processStderr(sink, source);
+        auto ex = handle->processStderr(sink, source, flush);
         if (ex) {
             daemonException = true;
             std::rethrow_exception(ex);
@@ -308,18 +356,17 @@ StorePathSet RemoteStore::querySubstitutablePaths(const StorePathSet & paths)
 }
 
 
-void RemoteStore::querySubstitutablePathInfos(const StorePathSet & paths,
-    SubstitutablePathInfos & infos)
+void RemoteStore::querySubstitutablePathInfos(const StorePathCAMap & pathsMap, SubstitutablePathInfos & infos)
 {
-    if (paths.empty()) return;
+    if (pathsMap.empty()) return;
 
     auto conn(getConnection());
 
     if (GET_PROTOCOL_MINOR(conn->daemonVersion) < 12) {
 
-        for (auto & i : paths) {
+        for (auto & i : pathsMap) {
             SubstitutablePathInfo info;
-            conn->to << wopQuerySubstitutablePathInfo << printStorePath(i);
+            conn->to << wopQuerySubstitutablePathInfo << printStorePath(i.first);
             conn.processStderr();
             unsigned int reply = readInt(conn->from);
             if (reply == 0) continue;
@@ -329,13 +376,19 @@ void RemoteStore::querySubstitutablePathInfos(const StorePathSet & paths,
             info.references = readStorePaths<StorePathSet>(*this, conn->from);
             info.downloadSize = readLongLong(conn->from);
             info.narSize = readLongLong(conn->from);
-            infos.insert_or_assign(i, std::move(info));
+            infos.insert_or_assign(i.first, std::move(info));
         }
 
     } else {
 
         conn->to << wopQuerySubstitutablePathInfos;
-        writeStorePaths(*this, conn->to, paths);
+        if (GET_PROTOCOL_MINOR(conn->daemonVersion) < 22) {
+            StorePathSet paths;
+            for (auto & path : pathsMap)
+                paths.insert(path.first);
+            writeStorePaths(*this, conn->to, paths);
+        } else
+            writeStorePathCAMap(*this, conn->to, pathsMap);
         conn.processStderr();
         size_t count = readNum<size_t>(conn->from);
         for (size_t n = 0; n < count; n++) {
@@ -372,10 +425,10 @@ void RemoteStore::queryPathInfoUncached(const StorePath & path,
                 bool valid; conn->from >> valid;
                 if (!valid) throw InvalidPath("path '%s' is not valid", printStorePath(path));
             }
-            info = std::make_shared<ValidPathInfo>(StorePath(path));
             auto deriver = readString(conn->from);
+            auto narHash = Hash::parseAny(readString(conn->from), htSHA256);
+            info = std::make_shared<ValidPathInfo>(path, narHash);
             if (deriver != "") info->deriver = parseStorePath(deriver);
-            info->narHash = Hash(readString(conn->from), htSHA256);
             info->references = readStorePaths<StorePathSet>(*this, conn->from);
             conn->from >> info->registrationTime >> info->narSize;
             if (GET_PROTOCOL_MINOR(conn->daemonVersion) >= 16) {
@@ -412,11 +465,23 @@ StorePathSet RemoteStore::queryValidDerivers(const StorePath & path)
 StorePathSet RemoteStore::queryDerivationOutputs(const StorePath & path)
 {
     auto conn(getConnection());
+    if (GET_PROTOCOL_MINOR(conn->daemonVersion) >= 0x16) {
+        return Store::queryDerivationOutputs(path);
+    }
     conn->to << wopQueryDerivationOutputs << printStorePath(path);
     conn.processStderr();
     return readStorePaths<StorePathSet>(*this, conn->from);
 }
 
+
+std::map<std::string, std::optional<StorePath>> RemoteStore::queryPartialDerivationOutputMap(const StorePath & path)
+{
+    auto conn(getConnection());
+    conn->to << wopQueryDerivationOutputMap << printStorePath(path);
+    conn.processStderr();
+    return worker_proto::read(*this, conn->from, Phantom<std::map<std::string, std::optional<StorePath>>> {});
+
+}
 
 std::optional<StorePath> RemoteStore::queryPathFromHashPart(const std::string & hashPart)
 {
@@ -430,7 +495,7 @@ std::optional<StorePath> RemoteStore::queryPathFromHashPart(const std::string & 
 
 
 void RemoteStore::addToStore(const ValidPathInfo & info, Source & source,
-    RepairFlag repair, CheckSigsFlag checkSigs, std::shared_ptr<FSAccessor> accessor)
+    RepairFlag repair, CheckSigsFlag checkSigs)
 {
     auto conn(getConnection());
 
@@ -467,9 +532,86 @@ void RemoteStore::addToStore(const ValidPathInfo & info, Source & source,
         conn->to << info.registrationTime << info.narSize
                  << info.ultimate << info.sigs << renderContentAddress(info.ca)
                  << repair << !checkSigs;
-        bool tunnel = GET_PROTOCOL_MINOR(conn->daemonVersion) >= 21;
-        if (!tunnel) copyNAR(source, conn->to);
-        conn.processStderr(0, tunnel ? &source : nullptr);
+
+        if (GET_PROTOCOL_MINOR(conn->daemonVersion) >= 23) {
+
+            conn->to.flush();
+
+            std::exception_ptr ex;
+
+            struct FramedSink : BufferedSink
+            {
+                ConnectionHandle & conn;
+                std::exception_ptr & ex;
+
+                FramedSink(ConnectionHandle & conn, std::exception_ptr & ex) : conn(conn), ex(ex)
+                { }
+
+                ~FramedSink()
+                {
+                    try {
+                        conn->to << 0;
+                        conn->to.flush();
+                    } catch (...) {
+                        ignoreException();
+                    }
+                }
+
+                void write(const unsigned char * data, size_t len) override
+                {
+                    /* Don't send more data if the remote has
+                       encountered an error. */
+                    if (ex) {
+                        auto ex2 = ex;
+                        ex = nullptr;
+                        std::rethrow_exception(ex2);
+                    }
+                    conn->to << len;
+                    conn->to(data, len);
+                };
+            };
+
+            /* Handle log messages / exceptions from the remote on a
+               separate thread. */
+            std::thread stderrThread([&]()
+            {
+                try {
+                    conn.processStderr(nullptr, nullptr, false);
+                } catch (...) {
+                    ex = std::current_exception();
+                }
+            });
+
+            Finally joinStderrThread([&]()
+            {
+                if (stderrThread.joinable()) {
+                    stderrThread.join();
+                    if (ex) {
+                        try {
+                            std::rethrow_exception(ex);
+                        } catch (...) {
+                            ignoreException();
+                        }
+                    }
+                }
+            });
+
+            {
+                FramedSink sink(conn, ex);
+                copyNAR(source, sink);
+                sink.flush();
+            }
+
+            stderrThread.join();
+            if (ex)
+                std::rethrow_exception(ex);
+
+        } else if (GET_PROTOCOL_MINOR(conn->daemonVersion) >= 21) {
+            conn.processStderr(0, &source);
+        } else {
+            copyNAR(source, conn->to);
+            conn.processStderr(0, nullptr);
+        }
     }
 }
 
@@ -671,7 +813,7 @@ void RemoteStore::addSignatures(const StorePath & storePath, const StringSet & s
 
 void RemoteStore::queryMissing(const std::vector<StorePathWithOutputs> & targets,
     StorePathSet & willBuild, StorePathSet & willSubstitute, StorePathSet & unknown,
-    unsigned long long & downloadSize, unsigned long long & narSize)
+    uint64_t & downloadSize, uint64_t & narSize)
 {
     {
         auto conn(getConnection());
@@ -744,9 +886,10 @@ static Logger::Fields readFields(Source & from)
 }
 
 
-std::exception_ptr RemoteStore::Connection::processStderr(Sink * sink, Source * source)
+std::exception_ptr RemoteStore::Connection::processStderr(Sink * sink, Source * source, bool flush)
 {
-    to.flush();
+    if (flush)
+        to.flush();
 
     while (true) {
 

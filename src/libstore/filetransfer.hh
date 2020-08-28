@@ -103,10 +103,12 @@ class FileTransferError : public Error
 {
 public:
     FileTransfer::Error error;
+    std::shared_ptr<string> response; // intentionally optional
+
     template<typename... Args>
-    FileTransferError(FileTransfer::Error error, const Args & ... args)
-        : Error(args...), error(error)
-    { }
+    FileTransferError(FileTransfer::Error error, std::shared_ptr<string> response, const Args & ... args);
+
+    virtual const char* sname() const override { return "FileTransferError"; }
 };
 
 bool isUri(const string & s);

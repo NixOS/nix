@@ -1,12 +1,13 @@
 #include "loggers.hh"
 #include "progress-bar.hh"
+#include "util.hh"
 
 namespace nix {
 
 LogFormat defaultLogFormat = LogFormat::raw;
 
 LogFormat parseLogFormat(const std::string & logFormatStr) {
-    if (logFormatStr == "raw")
+    if (logFormatStr == "raw" || getEnv("NIX_GET_COMPLETIONS"))
         return LogFormat::raw;
     else if (logFormatStr == "raw-with-logs")
         return LogFormat::rawWithLogs;
@@ -26,7 +27,7 @@ Logger * makeDefaultLogger() {
     case LogFormat::rawWithLogs:
         return makeSimpleLogger(true);
     case LogFormat::internalJson:
-        return makeJSONLogger(*makeSimpleLogger());
+        return makeJSONLogger(*makeSimpleLogger(true));
     case LogFormat::bar:
         return makeProgressBar();
     case LogFormat::barWithLogs:

@@ -24,6 +24,7 @@ let pkgs = rec {
     VAR_FROM_NIX = "bar";
     TEST_inNixShell = if inNixShell then "true" else "false";
     inherit stdenv;
+    outputs = ["dev" "out"];
   };
 
   # Used by nix-shell -p

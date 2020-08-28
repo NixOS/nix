@@ -31,7 +31,11 @@ struct CmdHash : Command
             .labels({"modulus"})
             .dest(&modulus);
         #endif
-        expectArgs("paths", &paths);
+        expectArgs({
+            .label = "paths",
+            .handler = {&paths},
+            .completer = completePath
+        });
     }
 
     std::string description() override
@@ -103,7 +107,7 @@ struct CmdToBase : Command
     void run() override
     {
         for (auto s : args)
-            logger->stdout(Hash(s, ht).to_string(base, base == SRI));
+            logger->stdout(Hash::parseAny(s, ht).to_string(base, base == SRI));
     }
 };
 

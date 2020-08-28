@@ -166,6 +166,13 @@ struct Value
     {
         return type == tList1 ? 1 : type == tList2 ? 2 : bigList.size;
     }
+
+    /* Check whether forcing this value requires a trivial amount of
+       computation. In particular, function applications are
+       non-trivial. */
+    bool isTrivial() const;
+
+    std::vector<std::pair<Path, std::string>> getContext();
 };
 
 

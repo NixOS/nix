@@ -1,11 +1,16 @@
 #include "logging.hh"
 #include "util.hh"
+#include "config.hh"
 
 #include <atomic>
 #include <nlohmann/json.hpp>
 #include <iostream>
 
 namespace nix {
+
+LoggerSettings loggerSettings;
+
+static GlobalConfig::Register r1(&loggerSettings);
 
 static thread_local ActivityId curActivity = 0;
 
@@ -72,7 +77,7 @@ public:
     void logEI(const ErrorInfo & ei) override
     {
         std::stringstream oss;
-        oss << ei;
+        showErrorInfo(oss, ei, loggerSettings.showTrace.get());
 
         log(ei.level, oss.str());
     }
@@ -173,12 +178,39 @@ struct JSONLogger : Logger {
     void logEI(const ErrorInfo & ei) override
     {
         std::ostringstream oss;
-        oss << ei;
+        showErrorInfo(oss, ei, loggerSettings.showTrace.get());
 
         nlohmann::json json;
         json["action"] = "msg";
         json["level"] = ei.level;
         json["msg"] = oss.str();
+        json["raw_msg"] = ei.hint->str();
+
+        if (ei.errPos.has_value() && (*ei.errPos)) {
+            json["line"] = ei.errPos->line;
+            json["column"] = ei.errPos->column;
+            json["file"] = ei.errPos->file;
+        } else {
+            json["line"] = nullptr;
+            json["column"] = nullptr;
+            json["file"] = nullptr;
+        }
+
+        if (loggerSettings.showTrace.get() && !ei.traces.empty()) {
+            nlohmann::json traces = nlohmann::json::array();
+            for (auto iter = ei.traces.rbegin(); iter != ei.traces.rend(); ++iter) {
+                nlohmann::json stackFrame;
+                stackFrame["raw_msg"] = iter->hint.str();
+                if (iter->pos.has_value() && (*iter->pos)) {
+                    stackFrame["line"] = iter->pos->line;
+                    stackFrame["column"] = iter->pos->column;
+                    stackFrame["file"] = iter->pos->file;
+                }
+                traces.push_back(stackFrame);
+            }
+
+            json["trace"] = traces;
+        }
 
         write(json);
     }

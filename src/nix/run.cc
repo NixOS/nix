@@ -84,30 +84,29 @@ struct CmdShell : InstallablesCommand, RunCommon, MixEnvironment
     {
         return {
             Example{
-                "To start a shell providing GNU Hello from NixOS 17.03:",
-                "nix shell -f channel:nixos-17.03 hello"
+                "To start a shell providing GNU Hello from NixOS 20.03:",
+                "nix shell nixpkgs/nixos-20.03#hello"
             },
             Example{
                 "To start a shell providing youtube-dl from your 'nixpkgs' channel:",
-                "nix shell nixpkgs.youtube-dl"
+                "nix shell nixpkgs#youtube-dl"
             },
             Example{
                 "To run GNU Hello:",
-                "nix shell nixpkgs.hello -c hello --greeting 'Hi everybody!'"
+                "nix shell nixpkgs#hello -c hello --greeting 'Hi everybody!'"
             },
             Example{
                 "To run GNU Hello in a chroot store:",
-                "nix shell --store ~/my-nix nixpkgs.hello -c hello"
+                "nix shell --store ~/my-nix nixpkgs#hello -c hello"
             },
         };
     }
 
     void run(ref<Store> store) override
     {
-        auto outPaths = toStorePaths(store, Build, installables);
+        auto outPaths = toStorePaths(store, Realise::Outputs, OperateOn::Output, installables);
 
         auto accessor = store->getFSAccessor();
-
 
         std::unordered_set<StorePath> done;
         std::queue<StorePath> todo;
@@ -142,6 +141,67 @@ struct CmdShell : InstallablesCommand, RunCommon, MixEnvironment
 };
 
 static auto r1 = registerCommand<CmdShell>("shell");
+
+struct CmdRun : InstallableCommand, RunCommon
+{
+    std::vector<std::string> args;
+
+    CmdRun()
+    {
+        expectArgs({
+            .label = "args",
+            .handler = {&args},
+            .completer = completePath
+        });
+    }
+
+    std::string description() override
+    {
+        return "run a Nix application";
+    }
+
+    Examples examples() override
+    {
+        return {
+            Example{
+                "To run Blender:",
+                "nix run blender-bin"
+            },
+        };
+    }
+
+    Strings getDefaultFlakeAttrPaths() override
+    {
+        Strings res{"defaultApp." + settings.thisSystem.get()};
+        for (auto & s : SourceExprCommand::getDefaultFlakeAttrPaths())
+            res.push_back(s);
+        return res;
+    }
+
+    Strings getDefaultFlakeAttrPathPrefixes() override
+    {
+        Strings res{"apps." + settings.thisSystem.get() + ".", "packages"};
+        for (auto & s : SourceExprCommand::getDefaultFlakeAttrPathPrefixes())
+            res.push_back(s);
+        return res;
+    }
+
+    void run(ref<Store> store) override
+    {
+        auto state = getEvalState();
+
+        auto app = installable->toApp(*state);
+
+        state->store->buildPaths(app.context);
+
+        Strings allArgs{app.program};
+        for (auto & i : args) allArgs.push_back(i);
+
+        runProgram(store, app.program, allArgs);
+    }
+};
+
+static auto r2 = registerCommand<CmdRun>("run");
 
 void chrootHelper(int argc, char * * argv)
 {

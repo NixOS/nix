@@ -131,7 +131,7 @@ public:
         auto state(state_.lock());
 
         std::stringstream oss;
-        oss << ei;
+        showErrorInfo(oss, ei, loggerSettings.showTrace.get());
 
         log(*state, ei.level, oss.str());
     }
@@ -362,7 +362,7 @@ public:
         auto width = getWindowSize().second;
         if (width <= 0) width = std::numeric_limits<decltype(width)>::max();
 
-        writeToStderr("\r" + filterANSIEscapes(line, false, width) + "\e[K");
+        writeToStderr("\r" + filterANSIEscapes(line, false, width) + ANSI_NORMAL + "\e[K");
     }
 
     std::string getStatus(State & state)

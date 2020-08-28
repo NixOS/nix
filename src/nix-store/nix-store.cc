@@ -77,7 +77,7 @@ static PathSet realisePath(StorePathWithOutputs path, bool build = true)
             if (i == drv.outputs.end())
                 throw Error("derivation '%s' does not have an output named '%s'",
                     store2->printStorePath(path.path), j);
-            auto outPath = store2->printStorePath(i->second.path);
+            auto outPath = store2->printStorePath(i->second.path(*store, drv.name));
             if (store2) {
                 if (gcRoot == "")
                     printGCWarning();
@@ -130,7 +130,7 @@ static void opRealise(Strings opFlags, Strings opArgs)
     for (auto & i : opArgs)
         paths.push_back(store->followLinksToStorePathWithOutputs(i));
 
-    unsigned long long downloadSize, narSize;
+    uint64_t downloadSize, narSize;
     StorePathSet willBuild, willSubstitute, unknown;
     store->queryMissing(paths, willBuild, willSubstitute, unknown, downloadSize, narSize);
 
@@ -174,10 +174,10 @@ static void opAdd(Strings opFlags, Strings opArgs)
    store. */
 static void opAddFixed(Strings opFlags, Strings opArgs)
 {
-    auto recursive = FileIngestionMethod::Flat;
+    auto method = FileIngestionMethod::Flat;
 
     for (auto & i : opFlags)
-        if (i == "--recursive") recursive = FileIngestionMethod::Recursive;
+        if (i == "--recursive") method = FileIngestionMethod::Recursive;
         else throw UsageError("unknown flag '%1%'", i);
 
     if (opArgs.empty())
@@ -187,7 +187,7 @@ static void opAddFixed(Strings opFlags, Strings opArgs)
     opArgs.pop_front();
 
     for (auto & i : opArgs)
-        cout << fmt("%s\n", store->printStorePath(store->addToStore(std::string(baseNameOf(i)), i, recursive, hashAlgo)));
+        std::cout << fmt("%s\n", store->printStorePath(store->addToStoreSlow(baseNameOf(i), i, method, hashAlgo).path));
 }
 
 
@@ -208,7 +208,7 @@ static void opPrintFixedPath(Strings opFlags, Strings opArgs)
     string hash = *i++;
     string name = *i++;
 
-    cout << fmt("%s\n", store->printStorePath(store->makeFixedOutputPath(recursive, Hash(hash, hashAlgo), name)));
+    cout << fmt("%s\n", store->printStorePath(store->makeFixedOutputPath(recursive, Hash::parseAny(hash, hashAlgo), name)));
 }
 
 
@@ -218,8 +218,8 @@ static StorePathSet maybeUseOutputs(const StorePath & storePath, bool useOutput,
     if (useOutput && storePath.isDerivation()) {
         auto drv = store->derivationFromPath(storePath);
         StorePathSet outputs;
-        for (auto & i : drv.outputs)
-            outputs.insert(i.second.path);
+        for (auto & i : drv.outputsAndPaths(*store))
+            outputs.insert(i.second.second);
         return outputs;
     }
     else return {storePath};
@@ -312,8 +312,8 @@ static void opQuery(Strings opFlags, Strings opArgs)
                 auto i2 = store->followLinksToStorePath(i);
                 if (forceRealise) realisePath({i2});
                 Derivation drv = store->derivationFromPath(i2);
-                for (auto & j : drv.outputs)
-                    cout << fmt("%1%\n", store->printStorePath(j.second.path));
+                for (auto & j : drv.outputsAndPaths(*store))
+                    cout << fmt("%1%\n", store->printStorePath(j.second.second));
             }
             break;
         }
@@ -495,7 +495,10 @@ static void registerValidity(bool reregister, bool hashGiven, bool canonicalise)
     ValidPathInfos infos;
 
     while (1) {
-        auto info = decodeValidPathInfo(*store, cin, hashGiven);
+        // We use a dummy value because we'll set it below. FIXME be correct by
+        // construction and avoid dummy value.
+        auto hashResultOpt = !hashGiven ? std::optional<HashResult> { {Hash::dummy, -1} } : std::nullopt;
+        auto info = decodeValidPathInfo(*store, cin, hashResultOpt);
         if (!info) break;
         if (!store->isValidPath(info->path) || reregister) {
             /* !!! races */
@@ -572,10 +575,8 @@ static void opGC(Strings opFlags, Strings opArgs)
         if (*i == "--print-roots") printRoots = true;
         else if (*i == "--print-live") options.action = GCOptions::gcReturnLive;
         else if (*i == "--print-dead") options.action = GCOptions::gcReturnDead;
-        else if (*i == "--max-freed") {
-            long long maxFreed = getIntArg<long long>(*i, i, opFlags.end(), true);
-            options.maxFreed = maxFreed >= 0 ? maxFreed : 0;
-        }
+        else if (*i == "--max-freed")
+            options.maxFreed = std::max(getIntArg<int64_t>(*i, i, opFlags.end(), true), (int64_t) 0);
         else throw UsageError("bad sub-operation '%1%' in GC", *i);
 
     if (!opArgs.empty()) throw UsageError("no arguments expected");
@@ -671,7 +672,7 @@ static void opImport(Strings opFlags, Strings opArgs)
     if (!opArgs.empty()) throw UsageError("no arguments expected");
 
     FdSource source(STDIN_FILENO);
-    auto paths = store->importPaths(source, nullptr, NoCheckSigs);
+    auto paths = store->importPaths(source, NoCheckSigs);
 
     for (auto & i : paths)
         cout << fmt("%s\n", store->printStorePath(i)) << std::flush;
@@ -725,7 +726,7 @@ static void opVerifyPath(Strings opFlags, Strings opArgs)
         auto path = store->followLinksToStorePath(i);
         printMsg(lvlTalkative, "checking path '%s'...", store->printStorePath(path));
         auto info = store->queryPathInfo(path);
-        HashSink sink(*info->narHash.type);
+        HashSink sink(info->narHash.type);
         store->narFromPath(path, sink);
         auto current = sink.finish();
         if (current.first != info->narHash) {
@@ -831,7 +832,7 @@ static void opServe(Strings opFlags, Strings opArgs)
                     for (auto & path : paths)
                         if (!path.isDerivation())
                             paths2.push_back({path});
-                    unsigned long long downloadSize, narSize;
+                    uint64_t downloadSize, narSize;
                     StorePathSet willBuild, willSubstitute, unknown;
                     store->queryMissing(paths2,
                         willBuild, willSubstitute, unknown, downloadSize, narSize);
@@ -864,7 +865,9 @@ static void opServe(Strings opFlags, Strings opArgs)
                         out << info->narSize // downloadSize
                             << info->narSize;
                         if (GET_PROTOCOL_MINOR(clientVersion) >= 4)
-                            out << (info->narHash ? info->narHash.to_string(Base32, true) : "") << renderContentAddress(info->ca) << info->sigs;
+                            out << info->narHash.to_string(Base32, true)
+                                << renderContentAddress(info->ca)
+                                << info->sigs;
                     } catch (InvalidPath &) {
                     }
                 }
@@ -878,7 +881,7 @@ static void opServe(Strings opFlags, Strings opArgs)
 
             case cmdImportPaths: {
                 if (!writeAllowed) throw Error("importing paths is not allowed");
-                store->importPaths(in, nullptr, NoCheckSigs); // FIXME: should we skip sig checking?
+                store->importPaths(in, NoCheckSigs); // FIXME: should we skip sig checking?
                 out << 1; // indicate success
                 break;
             }
@@ -914,9 +917,9 @@ static void opServe(Strings opFlags, Strings opArgs)
 
                 if (!writeAllowed) throw Error("building paths is not allowed");
 
-                auto drvPath = store->parseStorePath(readString(in)); // informational only
+                auto drvPath = store->parseStorePath(readString(in));
                 BasicDerivation drv;
-                readDerivation(in, *store, drv);
+                readDerivation(in, *store, drv, Derivation::nameFromPath(drvPath));
 
                 getBuildSettings();
 
@@ -944,11 +947,13 @@ static void opServe(Strings opFlags, Strings opArgs)
                 if (!writeAllowed) throw Error("importing paths is not allowed");
 
                 auto path = readString(in);
-                ValidPathInfo info(store->parseStorePath(path));
                 auto deriver = readString(in);
+                ValidPathInfo info {
+                    store->parseStorePath(path),
+                    Hash::parseAny(readString(in), htSHA256),
+                };
                 if (deriver != "")
                     info.deriver = store->parseStorePath(deriver);
-                info.narHash = Hash(readString(in), htSHA256);
                 info.references = readStorePaths<StorePathSet>(*store, in);
                 in >> info.registrationTime >> info.narSize >> info.ultimate;
                 info.sigs = readStrings<StringSet>(in);

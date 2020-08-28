@@ -93,6 +93,9 @@ struct LegacySSHStore : public Store
         try {
             auto conn(connections->get());
 
+            /* No longer support missing NAR hash */
+            assert(GET_PROTOCOL_MINOR(conn->remoteVersion) >= 4);
+
             debug("querying remote host '%s' for info on '%s'", host, printStorePath(path));
 
             conn->to << cmdQueryPathInfos << PathSet{printStorePath(path)};
@@ -100,8 +103,10 @@ struct LegacySSHStore : public Store
 
             auto p = readString(conn->from);
             if (p.empty()) return callback(nullptr);
-            auto info = std::make_shared<ValidPathInfo>(parseStorePath(p));
-            assert(path == info->path);
+            auto path2 = parseStorePath(p);
+            assert(path == path2);
+            /* Hash will be set below. FIXME construct ValidPathInfo at end. */
+            auto info = std::make_shared<ValidPathInfo>(path, Hash::dummy);
 
             PathSet references;
             auto deriver = readString(conn->from);
@@ -111,12 +116,14 @@ struct LegacySSHStore : public Store
             readLongLong(conn->from); // download size
             info->narSize = readLongLong(conn->from);
 
-            if (GET_PROTOCOL_MINOR(conn->remoteVersion) >= 4) {
+            {
                 auto s = readString(conn->from);
-                info->narHash = s.empty() ? Hash() : Hash(s);
-                info->ca = parseContentAddressOpt(readString(conn->from));
-                info->sigs = readStrings<StringSet>(conn->from);
+                if (s == "")
+                    throw Error("NAR hash is now mandatory");
+                info->narHash = Hash::parseAnyPrefixed(s);
             }
+            info->ca = parseContentAddressOpt(readString(conn->from));
+            info->sigs = readStrings<StringSet>(conn->from);
 
             auto s = readString(conn->from);
             assert(s == "");
@@ -126,8 +133,7 @@ struct LegacySSHStore : public Store
     }
 
     void addToStore(const ValidPathInfo & info, Source & source,
-        RepairFlag repair, CheckSigsFlag checkSigs,
-        std::shared_ptr<FSAccessor> accessor) override
+        RepairFlag repair, CheckSigsFlag checkSigs) override
     {
         debug("adding path '%s' to remote host '%s'", printStorePath(info.path), host);
 
@@ -203,6 +209,24 @@ struct LegacySSHStore : public Store
         const StorePathSet & references, RepairFlag repair) override
     { unsupported("addTextToStore"); }
 
+private:
+
+    void putBuildSettings(Connection & conn)
+    {
+        conn.to
+            << settings.maxSilentTime
+            << settings.buildTimeout;
+        if (GET_PROTOCOL_MINOR(conn.remoteVersion) >= 2)
+            conn.to
+                << settings.maxLogSize;
+        if (GET_PROTOCOL_MINOR(conn.remoteVersion) >= 3)
+            conn.to
+                << settings.buildRepeat
+                << settings.enforceDeterminism;
+    }
+
+public:
+
     BuildResult buildDerivation(const StorePath & drvPath, const BasicDerivation & drv,
         BuildMode buildMode) override
     {
@@ -212,16 +236,8 @@ struct LegacySSHStore : public Store
             << cmdBuildDerivation
             << printStorePath(drvPath);
         writeDerivation(conn->to, *this, drv);
-        conn->to
-            << settings.maxSilentTime
-            << settings.buildTimeout;
-        if (GET_PROTOCOL_MINOR(conn->remoteVersion) >= 2)
-            conn->to
-                << settings.maxLogSize;
-        if (GET_PROTOCOL_MINOR(conn->remoteVersion) >= 3)
-            conn->to
-                << settings.buildRepeat
-                << settings.enforceDeterminism;
+
+        putBuildSettings(*conn);
 
         conn->to.flush();
 
@@ -233,6 +249,29 @@ struct LegacySSHStore : public Store
             conn->from >> status.timesBuilt >> status.isNonDeterministic >> status.startTime >> status.stopTime;
 
         return status;
+    }
+
+    void buildPaths(const std::vector<StorePathWithOutputs> & drvPaths, BuildMode buildMode) override
+    {
+        auto conn(connections->get());
+
+        conn->to << cmdBuildPaths;
+        Strings ss;
+        for (auto & p : drvPaths)
+            ss.push_back(p.to_string(*this));
+        conn->to << ss;
+
+        putBuildSettings(*conn);
+
+        conn->to.flush();
+
+        BuildResult result;
+        result.status = (BuildResult::Status) readInt(conn->from);
+
+        if (!result.success()) {
+            conn->from >> result.errorMsg;
+            throw Error(result.status, result.errorMsg);
+        }
     }
 
     void ensurePath(const StorePath & path) override

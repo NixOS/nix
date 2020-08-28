@@ -78,15 +78,15 @@ struct TunnelLogger : public Logger
         if (ei.level > verbosity) return;
 
         std::stringstream oss;
-        oss << ei;
+        showErrorInfo(oss, ei, false);
 
         StringSink buf;
-        buf << STDERR_NEXT << oss.str() << "\n"; // (fs.s + "\n");
+        buf << STDERR_NEXT << oss.str();
         enqueueMsg(*buf.s);
     }
 
     /* startWork() means that we're starting an operation for which we
-      want to send out stderr to the client. */
+       want to send out stderr to the client. */
     void startWork()
     {
         auto state(state_.lock());
@@ -170,31 +170,6 @@ struct TunnelSource : BufferedSource
         size_t n = readString(data, len, from);
         if (n == 0) throw EndOfFile("unexpected end-of-file");
         return n;
-    }
-};
-
-/* If the NAR archive contains a single file at top-level, then save
-   the contents of the file to `s'.  Otherwise barf. */
-struct RetrieveRegularNARSink : ParseSink
-{
-    bool regular;
-    string s;
-
-    RetrieveRegularNARSink() : regular(true) { }
-
-    void createDirectory(const Path & path)
-    {
-        regular = false;
-    }
-
-    void receiveContents(unsigned char * data, unsigned int len)
-    {
-        s.append((const char *) data, len);
-    }
-
-    void createSymlink(const Path & path, const string & target)
-    {
-        regular = false;
     }
 };
 
@@ -347,6 +322,15 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
         break;
     }
 
+    case wopQueryDerivationOutputMap: {
+        auto path = store->parseStorePath(readString(from));
+        logger->startWork();
+        auto outputs = store->queryPartialDerivationOutputMap(path);
+        logger->stopWork();
+        worker_proto::write(*store, to, outputs);
+        break;
+    }
+
     case wopQueryDeriver: {
         auto path = store->parseStorePath(readString(from));
         logger->startWork();
@@ -366,42 +350,44 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
     }
 
     case wopAddToStore: {
-        std::string s, baseName;
+        HashType hashAlgo;
+        std::string baseName;
         FileIngestionMethod method;
         {
-            bool fixed; uint8_t recursive;
-            from >> baseName >> fixed /* obsolete */ >> recursive >> s;
+            bool fixed;
+            uint8_t recursive;
+            std::string hashAlgoRaw;
+            from >> baseName >> fixed /* obsolete */ >> recursive >> hashAlgoRaw;
             if (recursive > (uint8_t) FileIngestionMethod::Recursive)
                 throw Error("unsupported FileIngestionMethod with value of %i; you may need to upgrade nix-daemon", recursive);
             method = FileIngestionMethod { recursive };
             /* Compatibility hack. */
             if (!fixed) {
-                s = "sha256";
+                hashAlgoRaw = "sha256";
                 method = FileIngestionMethod::Recursive;
             }
+            hashAlgo = parseHashType(hashAlgoRaw);
         }
-        HashType hashAlgo = parseHashType(s);
 
-        TeeSource savedNAR(from);
-        RetrieveRegularNARSink savedRegular;
+        StringSink saved;
+        TeeSource savedNARSource(from, saved);
+        RetrieveRegularNARSink savedRegular { saved };
 
         if (method == FileIngestionMethod::Recursive) {
             /* Get the entire NAR dump from the client and save it to
                a string so that we can pass it to
                addToStoreFromDump(). */
             ParseSink sink; /* null sink; just parse the NAR */
-            parseDump(sink, savedNAR);
+            parseDump(sink, savedNARSource);
         } else
             parseDump(savedRegular, from);
 
         logger->startWork();
         if (!savedRegular.regular) throw Error("regular file expected");
 
-        auto path = store->addToStoreFromDump(
-            method == FileIngestionMethod::Recursive ? *savedNAR.data : savedRegular.s,
-            baseName,
-            method,
-            hashAlgo);
+        // FIXME: try to stream directly from `from`.
+        StringSource dumpSource { *saved.s };
+        auto path = store->addToStoreFromDump(dumpSource, baseName, method, hashAlgo);
         logger->stopWork();
 
         to << store->printStorePath(path);
@@ -433,7 +419,7 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
     case wopImportPaths: {
         logger->startWork();
         TunnelSource source(from, to);
-        auto paths = store->importPaths(source, nullptr,
+        auto paths = store->importPaths(source,
             trusted ? NoCheckSigs : CheckSigs);
         logger->stopWork();
         Strings paths2;
@@ -465,11 +451,49 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
     case wopBuildDerivation: {
         auto drvPath = store->parseStorePath(readString(from));
         BasicDerivation drv;
-        readDerivation(from, *store, drv);
+        readDerivation(from, *store, drv, Derivation::nameFromPath(drvPath));
         BuildMode buildMode = (BuildMode) readInt(from);
         logger->startWork();
-        if (!trusted)
-            throw Error("you are not privileged to build derivations");
+
+        /* Content-addressed derivations are trustless because their output paths
+           are verified by their content alone, so any derivation is free to
+           try to produce such a path.
+
+           Input-addressed derivation output paths, however, are calculated
+           from the derivation closure that produced them---even knowing the
+           root derivation is not enough. That the output data actually came
+           from those derivations is fundamentally unverifiable, but the daemon
+           trusts itself on that matter. The question instead is whether the
+           submitted plan has rights to the output paths it wants to fill, and
+           at least the derivation closure proves that.
+
+           It would have been nice if input-address algorithm merely depended
+           on the build time closure, rather than depending on the derivation
+           closure. That would mean input-addressed paths used at build time
+           would just be trusted and not need their own evidence. This is in
+           fact fine as the same guarantees would hold *inductively*: either
+           the remote builder has those paths and already trusts them, or it
+           needs to build them too and thus their evidence must be provided in
+           turn.  The advantage of this variant algorithm is that the evidence
+           for input-addressed paths which the remote builder already has
+           doesn't need to be sent again.
+
+           That said, now that we have floating CA derivations, it is better
+           that people just migrate to those which also solve this problem, and
+           others. It's the same migration difficulty with strictly more
+           benefit.
+
+           Lastly, do note that when we parse fixed-output content-addressed
+           derivations, we throw out the precomputed output paths and just
+           store the hashes, so there aren't two competing sources of truth an
+           attacker could exploit. */
+        if (drv.type() == DerivationType::InputAddressed && !trusted)
+            throw Error("you are not privileged to build input-addressed derivations");
+
+        /* Make sure that the non-input-addressed derivations that got this far
+           are in fact content-addressed if we don't trust them. */
+        assert(derivationIsCA(drv.type()) || trusted);
+
         auto res = store->buildDerivation(drvPath, drv, buildMode);
         logger->stopWork();
         to << res.status << res.errorMsg;
@@ -593,7 +617,7 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
         auto path = store->parseStorePath(readString(from));
         logger->startWork();
         SubstitutablePathInfos infos;
-        store->querySubstitutablePathInfos({path}, infos);
+        store->querySubstitutablePathInfos({{path, std::nullopt}}, infos);
         logger->stopWork();
         auto i = infos.find(path);
         if (i == infos.end())
@@ -609,10 +633,16 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
     }
 
     case wopQuerySubstitutablePathInfos: {
-        auto paths = readStorePaths<StorePathSet>(*store, from);
-        logger->startWork();
         SubstitutablePathInfos infos;
-        store->querySubstitutablePathInfos(paths, infos);
+        StorePathCAMap pathsMap = {};
+        if (GET_PROTOCOL_MINOR(clientVersion) < 22) {
+            auto paths = readStorePaths<StorePathSet>(*store, from);
+            for (auto & path : paths)
+                pathsMap.emplace(path, std::nullopt);
+        } else
+            pathsMap = readStorePathCAMap(*store, from);
+        logger->startWork();
+        store->querySubstitutablePathInfos(pathsMap, infos);
         logger->stopWork();
         to << infos.size();
         for (auto & i : infos) {
@@ -696,17 +726,18 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
         auto path = store->parseStorePath(readString(from));
         logger->startWork();
         logger->stopWork();
-        dumpPath(store->printStorePath(path), to);
+        dumpPath(store->toRealPath(path), to);
         break;
     }
 
     case wopAddToStoreNar: {
         bool repair, dontCheckSigs;
-        ValidPathInfo info(store->parseStorePath(readString(from)));
+        auto path = store->parseStorePath(readString(from));
         auto deriver = readString(from);
+        auto narHash = Hash::parseAny(readString(from), htSHA256);
+        ValidPathInfo info { path, narHash };
         if (deriver != "")
             info.deriver = store->parseStorePath(deriver);
-        info.narHash = Hash(readString(from), htSHA256);
         info.references = readStorePaths<StorePathSet>(*store, from);
         from >> info.registrationTime >> info.narSize >> info.ultimate;
         info.sigs = readStrings<StringSet>(from);
@@ -717,24 +748,84 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
         if (!trusted)
             info.ultimate = false;
 
-        std::string saved;
-        std::unique_ptr<Source> source;
-        if (GET_PROTOCOL_MINOR(clientVersion) >= 21)
-            source = std::make_unique<TunnelSource>(from, to);
-        else {
-            TeeSink tee(from);
-            parseDump(tee, tee.source);
-            saved = std::move(*tee.source.data);
-            source = std::make_unique<StringSource>(saved);
+        if (GET_PROTOCOL_MINOR(clientVersion) >= 23) {
+
+            struct FramedSource : Source
+            {
+                Source & from;
+                bool eof = false;
+                std::vector<unsigned char> pending;
+                size_t pos = 0;
+
+                FramedSource(Source & from) : from(from)
+                { }
+
+                ~FramedSource()
+                {
+                    if (!eof) {
+                        while (true) {
+                            auto n = readInt(from);
+                            if (!n) break;
+                            std::vector<unsigned char> data(n);
+                            from(data.data(), n);
+                        }
+                    }
+                }
+
+                size_t read(unsigned char * data, size_t len) override
+                {
+                    if (eof) throw EndOfFile("reached end of FramedSource");
+
+                    if (pos >= pending.size()) {
+                        size_t len = readInt(from);
+                        if (!len) {
+                            eof = true;
+                            return 0;
+                        }
+                        pending = std::vector<unsigned char>(len);
+                        pos = 0;
+                        from(pending.data(), len);
+                    }
+
+                    auto n = std::min(len, pending.size() - pos);
+                    memcpy(data, pending.data() + pos, n);
+                    pos += n;
+                    return n;
+                }
+            };
+
+            logger->startWork();
+
+            {
+                FramedSource source(from);
+                store->addToStore(info, source, (RepairFlag) repair,
+                    dontCheckSigs ? NoCheckSigs : CheckSigs);
+            }
+
+            logger->stopWork();
         }
 
-        logger->startWork();
+        else {
+            std::unique_ptr<Source> source;
+            if (GET_PROTOCOL_MINOR(clientVersion) >= 21)
+                source = std::make_unique<TunnelSource>(from, to);
+            else {
+                StringSink saved;
+                TeeSource tee { from, saved };
+                ParseSink ether;
+                parseDump(ether, tee);
+                source = std::make_unique<StringSource>(std::move(*saved.s));
+            }
 
-        // FIXME: race if addToStore doesn't read source?
-        store->addToStore(info, *source, (RepairFlag) repair,
-            dontCheckSigs ? NoCheckSigs : CheckSigs, nullptr);
+            logger->startWork();
 
-        logger->stopWork();
+            // FIXME: race if addToStore doesn't read source?
+            store->addToStore(info, *source, (RepairFlag) repair,
+                dontCheckSigs ? NoCheckSigs : CheckSigs);
+
+            logger->stopWork();
+        }
+
         break;
     }
 
@@ -744,7 +835,7 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
             targets.push_back(store->parsePathWithOutputs(s));
         logger->startWork();
         StorePathSet willBuild, willSubstitute, unknown;
-        unsigned long long downloadSize, narSize;
+        uint64_t downloadSize, narSize;
         store->queryMissing(targets, willBuild, willSubstitute, unknown, downloadSize, narSize);
         logger->stopWork();
         writeStorePaths(*store, to, willBuild);
@@ -765,8 +856,7 @@ void processConnection(
     FdSink & to,
     TrustedFlag trusted,
     RecursiveFlag recursive,
-    const std::string & userName,
-    uid_t userId)
+    std::function<void(Store &)> authHook)
 {
     auto monitor = !recursive ? std::make_unique<MonitorFdHup>(from.fd) : nullptr;
 
@@ -807,15 +897,7 @@ void processConnection(
 
         /* If we can't accept clientVersion, then throw an error
            *here* (not above). */
-
-#if 0
-        /* Prevent users from doing something very dangerous. */
-        if (geteuid() == 0 &&
-            querySetting("build-users-group", "") == "")
-            throw Error("if you run 'nix-daemon' as root, then you MUST set 'build-users-group'!");
-#endif
-
-        store->createUser(userName, userId);
+        authHook(*store);
 
         tunnelLogger->stopWork();
         to.flush();
