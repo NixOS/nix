@@ -320,7 +320,21 @@ void BinaryCacheStore::narFromPath(const StorePath & storePath, Sink & sink)
     try {
         getFile(info->url, *decompressor);
     } catch (NoSuchBinaryCacheFile & e) {
-        throw SubstituteGone(e.info());
+        // Nar may be missing because new narinfo is available
+        {
+            auto state_(state.lock());
+            state_->pathInfoCache.erase(std::string(info->path.hashPart()));
+        }
+        diskCache = getNarInfoDiskCache();
+        diskCache->deleteNarInfo(std::string(info->path.hashPart()));
+
+        auto info = queryPathInfo(storePath).cast<const NarInfo>();
+
+        try {
+            getFile(info->url, *decompressor);
+        } catch (NoSuchBinaryCacheFile & e) {
+            throw SubstituteGone(e.info());
+        }
     }
 
     decompressor->finish();

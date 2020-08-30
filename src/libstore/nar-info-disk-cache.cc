@@ -165,6 +165,22 @@ public:
         });
     }
 
+    
+
+    void deleteNarInfo(const std::string & hashPart) override
+    {
+        return retrySQLite<void>(
+            [&]() -> void {
+            auto state(_state.lock());
+            SQLiteStmt(state->db,
+                    "delete from NARs where hashPart = ?")
+                    .use()
+                    (hashPart)
+                    .exec();
+        });
+    }
+
+
     std::pair<Outcome, std::shared_ptr<NarInfo>> lookupNarInfo(
         const std::string & uri, const std::string & hashPart) override
     {
