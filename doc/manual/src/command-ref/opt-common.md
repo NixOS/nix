@@ -52,9 +52,14 @@ Most Nix commands accept the following command-line options:
         This is the raw format, as outputted by nix-build.
     
       - internal-json  
-        Outputs the logs in a structured manner. NOTE: the json schema
-        is not guarantees to be stable between releases.
-    
+        Outputs the logs in a structured manner.
+
+        > **Warning**
+        >
+        > While the schema itself is relatively stable, the format of
+        > the error-messages (namely of the `msg`-field) can change
+        > between releases.
+
       - bar  
         Only display a progress bar during the builds.
     

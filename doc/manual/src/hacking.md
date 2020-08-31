@@ -14,7 +14,7 @@ To build Nix for the current operating system/architecture use
 $ nix-build
 ```
 
-or if you have a flakes-enabled nix:
+or if you have a flake-enabled nix:
 
 ```console
 $ nix build
@@ -50,6 +50,12 @@ To install it in `$(pwd)/inst` and test it:
 [nix-shell]$ make installcheck
 [nix-shell]$ ./inst/bin/nix --version
 nix (Nix) 2.4
+```
+
+To run a functional test:
+
+```console
+make tests/test-name-should-auto-complete.sh.test
 ```
 
 If you have a flakes-enabled Nix you can replace:
