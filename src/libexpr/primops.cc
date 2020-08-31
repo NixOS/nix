@@ -11,6 +11,7 @@
 #include "value-to-json.hh"
 #include "value-to-xml.hh"
 #include "primops.hh"
+#include "repl.hh"
 
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -529,6 +530,16 @@ static void prim_trace(EvalState & state, const Pos & pos, Value * * args, Value
         printError("trace: %1%", *args[0]);
     state.forceValue(*args[1], pos);
     v = *args[1];
+}
+
+/* Enter nix-repl, then return the first expression.*/
+static void prim_breakpoint(EvalState & state, const Pos & pos, Value * * args, Value & v)
+{
+    auto repl = std::make_unique<NixRepl>(state);
+    std::vector<std::string> files;
+    repl->mainLoop(files);
+    state.forceValue(*args[0], pos);
+    v = *args[0];
 }
 
 
@@ -2325,6 +2336,7 @@ void EvalState::createBaseEnv()
 
     // Debugging
     addPrimOp("__trace", 2, prim_trace);
+    addPrimOp("__breakpoint", 1, prim_breakpoint);
 
     // Paths
     addPrimOp("__toPath", 1, prim_toPath);
