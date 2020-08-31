@@ -51,7 +51,7 @@ public:
 
     StorePathSet queryDerivationOutputs(const StorePath & path) override;
 
-    OutputPathMap queryDerivationOutputMap(const StorePath & path) override;
+    std::map<std::string, std::optional<StorePath>> queryPartialDerivationOutputMap(const StorePath & path) override;
     std::optional<StorePath> queryPathFromHashPart(const std::string & hashPart) override;
 
     StorePathSet querySubstitutablePaths(const StorePathSet & paths) override;
@@ -114,7 +114,7 @@ protected:
 
         virtual ~Connection();
 
-        std::exception_ptr processStderr(Sink * sink = 0, Source * source = 0);
+        std::exception_ptr processStderr(Sink * sink = 0, Source * source = 0, bool flush = true);
     };
 
     ref<Connection> openConnectionWrapper();

@@ -136,6 +136,8 @@ std::string Hash::to_string(Base base, bool includeType) const
     return s;
 }
 
+Hash Hash::dummy(htSHA256);
+
 Hash Hash::parseSRI(std::string_view original) {
     auto rest = original;
 

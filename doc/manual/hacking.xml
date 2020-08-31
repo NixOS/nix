@@ -57,6 +57,12 @@ To install it in <literal>$(pwd)/inst</literal> and test it:
 nix (Nix) 2.4
 </screen>
 
+To run a functional test:
+          
+<screen>
+make tests/test-name-should-auto-complete.sh.test
+</screen>
+
 If you have a flakes-enabled nix you can replace:
 
 <screen>
