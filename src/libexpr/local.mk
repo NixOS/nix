@@ -15,7 +15,7 @@ libexpr_CXXFLAGS += -I src/libutil -I src/libstore -I src/libfetchers -I src/lib
 
 libexpr_LIBS = libutil libstore libfetchers
 
-libexpr_LDFLAGS =
+libexpr_LDFLAGS =  $(EDITLINE_LIBS)
 ifneq ($(OS), FreeBSD)
  libexpr_LDFLAGS += -ldl
 endif
