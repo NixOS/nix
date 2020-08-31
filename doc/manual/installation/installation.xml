@@ -15,6 +15,7 @@
 <xi:include href="installing-source.xml" />
 <xi:include href="nix-security.xml" />
 <xi:include href="env-variables.xml" />
+<xi:include href="uninstalling-nix.xml" />
 
 <!-- TODO: should be updated
 <section><title>Upgrading Nix through Nix</title>
