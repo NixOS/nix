@@ -430,6 +430,12 @@
           enableParallelBuilding = true;
 
           installFlags = "sysconfdir=$(out)/etc";
+
+          shellHook =
+            ''
+              PATH=$prefix/bin:$PATH
+              unset PYTHONPATH
+            '';
         });
 
   };
