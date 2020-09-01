@@ -381,10 +381,14 @@ EvalState::EvalState(const Strings & _searchPath, ref<Store> store)
             auto path = r.second;
 
             if (store->isInStore(r.second)) {
-                StorePathSet closure;
-                store->computeFSClosure(store->toStorePath(r.second).first, closure);
-                for (auto & path : closure)
-                    allowedPaths->insert(store->printStorePath(path));
+                try {
+                    StorePathSet closure;
+                    store->computeFSClosure(store->toStorePath(r.second).first, closure);
+                    for (auto & path : closure)
+                        allowedPaths->insert(store->printStorePath(path));
+                } catch (InvalidPath &) {
+                    allowedPaths->insert(r.second);
+                }
             } else
                 allowedPaths->insert(r.second);
         }
@@ -509,7 +513,7 @@ Value * EvalState::addPrimOp(const string & name,
     if (arity == 0) {
         auto vPrimOp = allocValue();
         vPrimOp->type = tPrimOp;
-        vPrimOp->primOp = new PrimOp(primOp, 1, sym);
+        vPrimOp->primOp = new PrimOp { .fun = primOp, .arity = 1, .name = sym };
         Value v;
         mkApp(v, *vPrimOp, *vPrimOp);
         return addConstant(name, v);
@@ -517,7 +521,7 @@ Value * EvalState::addPrimOp(const string & name,
 
     Value * v = allocValue();
     v->type = tPrimOp;
-    v->primOp = new PrimOp(primOp, arity, sym);
+    v->primOp = new PrimOp { .fun = primOp, .arity = arity, .name = sym };
     staticBaseEnv.vars[symbols.create(name)] = baseEnvDispl;
     baseEnv.values[baseEnvDispl++] = v;
     baseEnv.values[0]->attrs->push_back(Attr(sym, v));
@@ -525,9 +529,56 @@ Value * EvalState::addPrimOp(const string & name,
 }
 
 
+Value * EvalState::addPrimOp(PrimOp && primOp)
+{
+    /* Hack to make constants lazy: turn them into a application of
+       the primop to a dummy value. */
+    if (primOp.arity == 0) {
+        primOp.arity = 1;
+        auto vPrimOp = allocValue();
+        vPrimOp->type = tPrimOp;
+        vPrimOp->primOp = new PrimOp(std::move(primOp));
+        Value v;
+        mkApp(v, *vPrimOp, *vPrimOp);
+        return addConstant(primOp.name, v);
+    }
+
+    Symbol envName = primOp.name;
+    if (hasPrefix(primOp.name, "__"))
+        primOp.name = symbols.create(std::string(primOp.name, 2));
+
+    Value * v = allocValue();
+    v->type = tPrimOp;
+    v->primOp = new PrimOp(std::move(primOp));
+    staticBaseEnv.vars[envName] = baseEnvDispl;
+    baseEnv.values[baseEnvDispl++] = v;
+    baseEnv.values[0]->attrs->push_back(Attr(primOp.name, v));
+    return v;
+}
+
+
 Value & EvalState::getBuiltin(const string & name)
 {
     return *baseEnv.values[0]->attrs->find(symbols.create(name))->value;
+}
+
+
+std::optional<EvalState::Doc> EvalState::getDoc(Value & v)
+{
+    if (v.type == tPrimOp || v.type == tPrimOpApp) {
+        auto v2 = &v;
+        while (v2->type == tPrimOpApp)
+            v2 = v2->primOpApp.left;
+        if (v2->primOp->doc)
+            return Doc {
+                .pos = noPos,
+                .name = v2->primOp->name,
+                .arity = v2->primOp->arity,
+                .args = v2->primOp->args,
+                .doc = v2->primOp->doc,
+            };
+    }
+    return {};
 }
 
 

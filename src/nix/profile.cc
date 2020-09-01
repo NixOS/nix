@@ -441,7 +441,7 @@ struct CmdProfileDiffClosures : virtual StoreCommand, MixDefaultProfile
     }
 };
 
-struct CmdProfile : virtual MultiCommand, virtual Command
+struct CmdProfile : NixMultiCommand
 {
     CmdProfile()
         : MultiCommand({
@@ -464,11 +464,6 @@ struct CmdProfile : virtual MultiCommand, virtual Command
             throw UsageError("'nix profile' requires a sub-command.");
         command->second->prepare();
         command->second->run();
-    }
-
-    void printHelp(const string & programName, std::ostream & out) override
-    {
-        MultiCommand::printHelp(programName, out);
     }
 };
 

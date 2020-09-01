@@ -28,9 +28,6 @@ nix-channel --update
 
 # Do a query.
 nix-env -qa \* --meta --xml --out-path > $TEST_ROOT/meta.xml
-if [ "$xmllint" != false ]; then
-    $xmllint --noout $TEST_ROOT/meta.xml || fail "malformed XML"
-fi
 grep -q 'meta.*description.*Random test package' $TEST_ROOT/meta.xml
 grep -q 'item.*attrPath="foo".*name="dependencies-top"' $TEST_ROOT/meta.xml
 
@@ -47,9 +44,6 @@ nix-channel --update
 
 # Do a query.
 nix-env -qa \* --meta --xml --out-path > $TEST_ROOT/meta.xml
-if [ "$xmllint" != false ]; then
-    $xmllint --noout $TEST_ROOT/meta.xml || fail "malformed XML"
-fi
 grep -q 'meta.*description.*Random test package' $TEST_ROOT/meta.xml
 grep -q 'item.*attrPath="foo".*name="dependencies-top"' $TEST_ROOT/meta.xml
 

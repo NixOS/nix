@@ -1,9 +1,9 @@
-#include "json.hh"
 #include "config.hh"
 #include "args.hh"
 
 #include <sstream>
 #include <gtest/gtest.h>
+#include <nlohmann/json.hpp>
 
 namespace nix {
 
@@ -33,7 +33,7 @@ namespace nix {
         const auto iter = settings.find("name-of-the-setting");
         ASSERT_NE(iter, settings.end());
         ASSERT_EQ(iter->second.value, "");
-        ASSERT_EQ(iter->second.description, "description");
+        ASSERT_EQ(iter->second.description, "description\n");
     }
 
     TEST(Config, getDefinedOverridenSettingNotSet) {
@@ -59,7 +59,7 @@ namespace nix {
         const auto iter = settings.find("name-of-the-setting");
         ASSERT_NE(iter, settings.end());
         ASSERT_EQ(iter->second.value, "value");
-        ASSERT_EQ(iter->second.description, "description");
+        ASSERT_EQ(iter->second.description, "description\n");
     }
 
     TEST(Config, getDefinedSettingSet2) {
@@ -73,7 +73,7 @@ namespace nix {
         const auto e = settings.find("name-of-the-setting");
         ASSERT_NE(e, settings.end());
         ASSERT_EQ(e->second.value, "value");
-        ASSERT_EQ(e->second.description, "description");
+        ASSERT_EQ(e->second.description, "description\n");
     }
 
     TEST(Config, addSetting) {
@@ -152,29 +152,16 @@ namespace nix {
     }
 
     TEST(Config, toJSONOnEmptyConfig) {
-        std::stringstream out;
-        { // Scoped to force the destructor of JSONObject to write the final `}`
-            JSONObject obj(out);
-            Config config;
-            config.toJSON(obj);
-        }
-
-        ASSERT_EQ(out.str(), "{}");
+        ASSERT_EQ(Config().toJSON().dump(), "{}");
     }
 
     TEST(Config, toJSONOnNonEmptyConfig) {
-        std::stringstream out;
-        { // Scoped to force the destructor of JSONObject to write the final `}`
-            JSONObject obj(out);
+        Config config;
+        std::map<std::string, Config::SettingInfo> settings;
+        Setting<std::string> setting{&config, "", "name-of-the-setting", "description"};
+        setting.assign("value");
 
-            Config config;
-            std::map<std::string, Config::SettingInfo> settings;
-            Setting<std::string> setting{&config, "", "name-of-the-setting", "description"};
-            setting.assign("value");
-
-            config.toJSON(obj);
-        }
-        ASSERT_EQ(out.str(), R"#({"name-of-the-setting":{"description":"description","value":"value"}})#");
+        ASSERT_EQ(config.toJSON().dump(), R"#({"name-of-the-setting":{"aliases":[],"description":"description\n","value":"value"}})#");
     }
 
     TEST(Config, setSettingAlias) {
