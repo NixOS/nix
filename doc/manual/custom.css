@@ -1,0 +1,7 @@
+h1:not(:first-of-type) {
+    margin-top: 1.3em;
+}
+
+h2 {
+    margin-top: 1em;
+}

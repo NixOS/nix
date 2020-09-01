@@ -1,6 +1,7 @@
 #include "config.hh"
 #include "args.hh"
-#include "json.hh"
+
+#include <nlohmann/json.hpp>
 
 namespace nix {
 
@@ -131,15 +132,18 @@ void Config::resetOverriden()
         s.second.setting->overriden = false;
 }
 
-void Config::toJSON(JSONObject & out)
+nlohmann::json Config::toJSON()
 {
+    auto res = nlohmann::json::object();
     for (auto & s : _settings)
         if (!s.second.isAlias) {
-            JSONObject out2(out.object(s.first));
-            out2.attr("description", s.second.setting->description);
-            JSONPlaceholder out3(out2.placeholder("value"));
-            s.second.setting->toJSON(out3);
+            auto obj = nlohmann::json::object();
+            obj.emplace("description", s.second.setting->description);
+            obj.emplace("aliases", s.second.setting->aliases);
+            obj.emplace("value", s.second.setting->toJSON());
+            res.emplace(s.first, obj);
         }
+    return res;
 }
 
 void Config::convertToArgs(Args & args, const std::string & category)
@@ -153,7 +157,7 @@ AbstractSetting::AbstractSetting(
     const std::string & name,
     const std::string & description,
     const std::set<std::string> & aliases)
-    : name(name), description(description), aliases(aliases)
+    : name(name), description(stripIndentation(description)), aliases(aliases)
 {
 }
 
@@ -162,9 +166,9 @@ void AbstractSetting::setDefault(const std::string & str)
     if (!overriden) set(str);
 }
 
-void AbstractSetting::toJSON(JSONPlaceholder & out)
+nlohmann::json AbstractSetting::toJSON()
 {
-    out.write(to_string());
+    return to_string();
 }
 
 void AbstractSetting::convertToArg(Args & args, const std::string & category)
@@ -172,9 +176,9 @@ void AbstractSetting::convertToArg(Args & args, const std::string & category)
 }
 
 template<typename T>
-void BaseSetting<T>::toJSON(JSONPlaceholder & out)
+nlohmann::json BaseSetting<T>::toJSON()
 {
-    out.write(value);
+    return value;
 }
 
 template<typename T>
@@ -255,11 +259,9 @@ template<> std::string BaseSetting<Strings>::to_string() const
     return concatStringsSep(" ", value);
 }
 
-template<> void BaseSetting<Strings>::toJSON(JSONPlaceholder & out)
+template<> nlohmann::json BaseSetting<Strings>::toJSON()
 {
-    JSONList list(out.list());
-    for (auto & s : value)
-        list.elem(s);
+    return value;
 }
 
 template<> void BaseSetting<StringSet>::set(const std::string & str)
@@ -272,11 +274,9 @@ template<> std::string BaseSetting<StringSet>::to_string() const
     return concatStringsSep(" ", value);
 }
 
-template<> void BaseSetting<StringSet>::toJSON(JSONPlaceholder & out)
+template<> nlohmann::json BaseSetting<StringSet>::toJSON()
 {
-    JSONList list(out.list());
-    for (auto & s : value)
-        list.elem(s);
+    return value;
 }
 
 template class BaseSetting<int>;
@@ -323,10 +323,12 @@ void GlobalConfig::resetOverriden()
         config->resetOverriden();
 }
 
-void GlobalConfig::toJSON(JSONObject & out)
+nlohmann::json GlobalConfig::toJSON()
 {
+    auto res = nlohmann::json::object();
     for (auto & config : *configRegistrations)
-        config->toJSON(out);
+        res.update(config->toJSON());
+    return res;
 }
 
 void GlobalConfig::convertToArgs(Args & args, const std::string & category)
