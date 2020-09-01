@@ -454,6 +454,8 @@
 
           shellHook =
             ''
+              PATH=$prefix/bin:$PATH
+              unset PYTHONPATH
               export MANPATH=$out/share/man:$MANPATH
             '';
         });
