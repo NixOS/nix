@@ -3507,8 +3507,7 @@ void EvalState::createBaseEnv()
         addPrimOp("__exec", 1, prim_exec);
     }
 
-    path = canonPath(settings.nixDataDir + "/nix/corepkgs/module.nix", true);
-    evalFile(path, v);
+    evalFile(canonPath(settings.nixDataDir + "/nix/corepkgs/module.nix", true), v);
     addConstant("module", v);
 
     /* Add a value containing the current Nix expression search path. */
