@@ -55,11 +55,17 @@ struct CmdListOptions : InstallableCommand
             auto aValue = aFinal->value->attrs->get(option->name);
             assert(aValue);
 
-            std::ostringstream str;
-            JSONPlaceholder jsonOut(str);
-            PathSet context;
-            printValueAsJSON(*state, true, *aValue->value, jsonOut, context);
-            logger->stdout("  " ANSI_BOLD "Value:" ANSI_NORMAL " %s", str.str());
+            try {
+                std::ostringstream str;
+                JSONPlaceholder jsonOut(str);
+                PathSet context;
+                printValueAsJSON(*state, true, *aValue->value, jsonOut, context);
+                logger->stdout("  " ANSI_BOLD "Value:" ANSI_NORMAL " %s", str.str());
+            } catch (EvalError &) {
+                // FIXME: should ignore "no default" errors, print
+                // other errors.
+                logger->stdout("  " ANSI_BOLD "Value:" ANSI_NORMAL " " ANSI_ITALIC "none" ANSI_NORMAL);
+            }
         }
     }
 };
