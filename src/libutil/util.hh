@@ -464,6 +464,12 @@ string base64Encode(std::string_view s);
 string base64Decode(std::string_view s);
 
 
+/* Remove common leading whitespace from the lines in the string
+   's'. For example, if every line is indented by at least 3 spaces,
+   then we remove 3 spaces from the start of every line. */
+std::string stripIndentation(std::string_view s);
+
+
 /* Get a value for the specified key from an associate container. */
 template <class T>
 std::optional<typename T::mapped_type> get(const T & map, const typename T::key_type & key)

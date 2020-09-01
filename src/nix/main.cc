@@ -17,6 +17,8 @@
 #include <netdb.h>
 #include <netinet/in.h>
 
+#include <nlohmann/json.hpp>
+
 extern std::string chrootHelperName;
 
 void chrootHelper(int argc, char * * argv);
@@ -140,6 +142,11 @@ struct NixArgs : virtual MultiCommand, virtual MixCommonArgs
         printHelp(programName, std::cout);
         throw Exit();
     }
+
+    std::string description() override
+    {
+        return "a tool for reproducible and declarative configuration management";
+    }
 };
 
 void mainWrapped(int argc, char * * argv)
@@ -171,6 +178,29 @@ void mainWrapped(int argc, char * * argv)
     Finally f([] { logger->stop(); });
 
     NixArgs args;
+
+    if (argc == 2 && std::string(argv[1]) == "__dump-args") {
+        std::cout << args.toJSON().dump() << "\n";
+        return;
+    }
+
+    if (argc == 2 && std::string(argv[1]) == "__dump-builtins") {
+        EvalState state({}, openStore("dummy://"));
+        auto res = nlohmann::json::object();
+        auto builtins = state.baseEnv.values[0]->attrs;
+        for (auto & builtin : *builtins) {
+            auto b = nlohmann::json::object();
+            if (builtin.value->type != tPrimOp) continue;
+            auto primOp = builtin.value->primOp;
+            if (!primOp->doc) continue;
+            b["arity"] = primOp->arity;
+            b["args"] = primOp->args;
+            b["doc"] = trim(stripIndentation(primOp->doc));
+            res[(std::string) builtin.name] = std::move(b);
+        }
+        std::cout << res.dump() << "\n";
+        return;
+    }
 
     Finally printCompletions([&]()
     {

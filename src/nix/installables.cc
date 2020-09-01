@@ -76,7 +76,7 @@ MixFlakeOptions::MixFlakeOptions()
 
     addFlag({
         .longName = "override-input",
-        .description = "override a specific flake input (e.g. 'dwarffs/nixpkgs')",
+        .description = "override a specific flake input (e.g. `dwarffs/nixpkgs`)",
         .labels = {"input-path", "flake-url"},
         .handler = {[&](std::string inputPath, std::string flakeRef) {
             lockFlags.inputOverrides.insert_or_assign(
@@ -116,7 +116,7 @@ SourceExprCommand::SourceExprCommand()
     addFlag({
         .longName = "file",
         .shortName = 'f',
-        .description = "evaluate FILE rather than the default",
+        .description = "evaluate *file* rather than the default",
         .labels = {"file"},
         .handler = {&file},
         .completer = completePath
@@ -124,7 +124,7 @@ SourceExprCommand::SourceExprCommand()
 
     addFlag({
         .longName ="expr",
-        .description = "evaluate attributes from EXPR",
+        .description = "evaluate attributes from *expr*",
         .labels = {"expr"},
         .handler = {&expr}
     });
