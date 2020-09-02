@@ -1,0 +1,33 @@
+if [ -n "$HOME" ] && [ -n "$USER" ]
+
+    # Set up the per-user profile.
+    # This part should be kept in sync with nixpkgs:nixos/modules/programs/shell.nix
+
+    set -l NIX_LINK $HOME/.nix-profile
+
+    # Set up environment.
+    # This part should be kept in sync with nixpkgs:nixos/modules/programs/environment.nix
+    set -gx NIX_PROFILES "@localstatedir@/nix/profiles/default $HOME/.nix-profile"
+
+    # Set $NIX_SSL_CERT_FILE so that Nixpkgs applications like curl work.
+    if [ -e /etc/ssl/certs/ca-certificates.crt ] # NixOS, Ubuntu, Debian, Gentoo, Arch
+        set -gx NIX_SSL_CERT_FILE /etc/ssl/certs/ca-certificates.crt
+    else if [ -e /etc/ssl/ca-bundle.pem ] # openSUSE Tumbleweed
+        set -gx NIX_SSL_CERT_FILE /etc/ssl/ca-bundle.pem
+    else if [ -e /etc/ssl/certs/ca-bundle.crt ] # Old NixOS
+        set -gx NIX_SSL_CERT_FILE /etc/ssl/certs/ca-bundle.crt
+    else if [ -e /etc/pki/tls/certs/ca-bundle.crt ] # Fedora, CentOS
+        set -gx NIX_SSL_CERT_FILE /etc/pki/tls/certs/ca-bundle.crt
+    else if [ -e "$NIX_LINK/etc/ssl/certs/ca-bundle.crt" ] # fall back to cacert in Nix profile
+        set -gx NIX_SSL_CERT_FILE "$NIX_LINK/etc/ssl/certs/ca-bundle.crt"
+    else if [ -e "$NIX_LINK/etc/ca-bundle.crt" ] # old cacert in Nix profile
+        set -gx NIX_SSL_CERT_FILE "$NIX_LINK/etc/ca-bundle.crt"
+    end
+
+    if [ -n "$MANPATH" ]; then
+        set -gx --prepend MANPATH "$NIX_LINK/share/man"
+    end
+
+    set -gx --prepend PATH "$NIX_LINK/bin"
+    set -e NIX_LINK
+end

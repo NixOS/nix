@@ -247,3 +247,42 @@ variables are set, either log in again, or type
 in your shell.
 EOF
 fi
+
+added=
+p=$HOME/.nix-profile/etc/profile.d/nix.fish
+if [ -z "$NIX_INSTALLER_NO_MODIFY_PROFILE" ] && [ -f "$HOME/.config/fish/fish.config"]; then
+    # Make the fish shell source nix.fish during login.
+    for i in fish.config; do
+        fn="$HOME/.config/fish/$i"
+        if [ -w "$fn" ]; then
+            if ! grep -q "$p" "$fn"; then
+                echo "modifying $fn..." >&2
+                echo -e "\n[ -e $p ] && . $p # added by Nix installer" >> "$fn"
+            fi
+            added=1
+            break
+        fi
+    done
+fi
+
+if [ -z "$added" ]; then
+    cat >&2 <<EOF
+
+Installation finished!  To ensure that the necessary environment
+variables are set, please add the line
+
+  . $p
+
+to your shell configuration file (~/.config/fish/fish.config).
+EOF
+else
+    cat >&2 <<EOF
+
+Installation finished!  To ensure that the necessary environment
+variables are set, either log in again, or type
+
+  . $p
+
+in your shell.
+EOF
+fi
