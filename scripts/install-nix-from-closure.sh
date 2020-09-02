@@ -198,32 +198,58 @@ if [ -z "$NIX_INSTALLER_NO_CHANNEL_ADD" ]; then
     fi
 fi
 
+function is_current_shell_a_login_one() {
+    shopt -q login_shell
+}
+
+function try_add_profile_to_file() {
+    # Returns "true" if added to the file, "false" otherwise
+    profile="$1"
+    file="$2"
+    if [ -w "$file" ]; then
+        if ! grep -q "$profile" "$file"; then
+            echo "modifying $file..." >&2
+            echo -e "\nif [ -e $profile ]; then . $profile; fi # added by Nix installer" >> "$file"
+        fi
+        return
+    fi
+    false
+}
+
+function try_add_profile_to_first_file_found() {
+    # Returns "true" if a file was modified, "false" otherwise
+    profile="$1"
+    files="$2"
+    for i in "${files[@]}"; do
+        is_profile_added=$(try_add_profile_to_file "$profile" "$HOME/$i")
+        if is_profile_added; then
+            return
+        fi
+    done
+    false
+}
+
 added=
 p=$HOME/.nix-profile/etc/profile.d/nix.sh
+
+if is_current_shell_a_login_one; then
+    bash_files=(.bash_profile .bashrc .bash_login .profile)
+else
+    echo 'Current shell not a logging shell, will try to modified bashrc first...'
+    bash_files=(.bashrc .bash_profile .bash_login .profile)
+fi
+
 if [ -z "$NIX_INSTALLER_NO_MODIFY_PROFILE" ]; then
     # Make the shell source nix.sh during login.
-    for i in .bash_profile .bash_login .profile; do
-        fn="$HOME/$i"
-        if [ -w "$fn" ]; then
-            if ! grep -q "$p" "$fn"; then
-                echo "modifying $fn..." >&2
-                echo -e "\nif [ -e $p ]; then . $p; fi # added by Nix installer" >> "$fn"
-            fi
-            added=1
-            break
-        fi
-    done
-    for i in .zshenv .zshrc; do
-        fn="$HOME/$i"
-        if [ -w "$fn" ]; then
-            if ! grep -q "$p" "$fn"; then
-                echo "modifying $fn..." >&2
-                echo -e "\nif [ -e $p ]; then . $p; fi # added by Nix installer" >> "$fn"
-            fi
-            added=1
-            break
-        fi
-    done
+    added_bash=$(try_add_profile_to_first_file_found "$p" "$bash_files")
+    if "$added_bash"; then
+        added=1
+    fi
+    zsh_files=(.zshenv .zshrc)
+    added_zsh=$(try_add_profile_to_first_file_found "$p" "$zsh_files")
+    if "$added_zsh"; then
+        added=1
+    fi
 fi
 
 if [ -z "$added" ]; then
@@ -234,7 +260,7 @@ variables are set, please add the line
 
   . $p
 
-to your shell profile (e.g. ~/.profile).
+to your shell profile/rc (e.g. ~/.profile).
 EOF
 else
     cat >&2 <<EOF
