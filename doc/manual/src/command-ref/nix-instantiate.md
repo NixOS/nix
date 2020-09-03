@@ -12,7 +12,6 @@ Title: nix-instantiate
   [`--arg` *name* *value*]
   [{`--attr`| `-A`} *attrPath*]
   [`--add-root` *path*]
-  [`--indirect`]
   [`--expr` | `-E`]
   *files…*
 
@@ -32,8 +31,8 @@ standard input.
 
 # Options
 
-  - `--add-root` *path*; `--indirect`  
-    See the [corresponding options](nix-store.md) in `nix-store`.
+  - `--add-root` *path*  
+    See the [corresponding option](nix-store.md) in `nix-store`.
 
   - `--parse`  
     Just parse the input files, and print their abstract syntax trees on

@@ -8,6 +8,8 @@
 
 namespace nix {
 
+class StorePath;
+
 
 typedef unsigned int GenerationNumber;
 
@@ -28,7 +30,7 @@ std::pair<Generations, std::optional<GenerationNumber>> findGenerations(Path pro
 
 class LocalFSStore;
 
-Path createGeneration(ref<LocalFSStore> store, Path profile, Path outPath);
+Path createGeneration(ref<LocalFSStore> store, Path profile, StorePath outPath);
 
 void deleteGeneration(const Path & profile, GenerationNumber gen);
 

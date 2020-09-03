@@ -9,7 +9,6 @@ Title: nix-store
 `nix-store` *operation* [*options…*] [*arguments…*]
   [`--option` *name* *value*]
   [`--add-root` *path*]
-  [`--indirect`]
 
 # Description
 
@@ -28,27 +27,12 @@ have an effect.
   - `--add-root` *path*  
     Causes the result of a realisation (`--realise` and
     `--force-realise`) to be registered as a root of the garbage
-    collector. The root is stored in *path*, which must be inside a
-    directory that is scanned for roots by the garbage collector
-    (i.e., typically in a subdirectory of `/nix/var/nix/gcroots/`)
-    *unless* the `--indirect` flag is used.
-
-    If there are multiple results, then multiple symlinks will be
-    created by sequentially numbering symlinks beyond the first one
-    (e.g., `foo`, `foo-2`, `foo-3`, and so on).
-
-  - `--indirect`  
-    In conjunction with `--add-root`, this option allows roots to be
-    stored *outside* of the GC roots directory. This is useful for
-    commands such as `nix-build` that place a symlink to the build
-    result in the current directory; such a build result should not be
-    garbage-collected unless the symlink is removed.
-
-    The `--indirect` flag causes a uniquely named symlink to *path* to
-    be stored in `/nix/var/nix/gcroots/auto/`. For instance,
+    collector. *path* will be created as a symlink to the resulting
+    store path. In addition, a uniquely named symlink to *path* will
+    be created in `/nix/var/nix/gcroots/auto/`. For instance,
 
     ```console
-    $ nix-store --add-root /home/eelco/bla/result --indirect -r ...
+    $ nix-store --add-root /home/eelco/bla/result -r ...
 
     $ ls -l /nix/var/nix/gcroots/auto
     lrwxrwxrwx    1 ... 2005-03-13 21:10 dn54lcypm8f8... -> /home/eelco/bla/result
@@ -63,11 +47,13 @@ have an effect.
 
     > **Warning**
     >
-    > Note that it is not possible to move or rename indirect GC roots,
-    > since the symlink in the `auto` directory will still point to the
-    > old location.
+    > Note that it is not possible to move or rename GC roots, since
+    > the symlink in the `auto` directory will still point to the old
+    > location.
 
-<!-- end list -->
+    If there are multiple results, then multiple symlinks will be
+    created by sequentially numbering symlinks beyond the first one
+    (e.g., `foo`, `foo-2`, `foo-3`, and so on).
 
 # Operation `--realise`
 

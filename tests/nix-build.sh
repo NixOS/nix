@@ -24,5 +24,5 @@ outPath2=$(nix-build $(nix-instantiate dependencies.nix) --no-out-link)
 outPath2=$(nix-build $(nix-instantiate dependencies.nix)!out --no-out-link)
 [[ $outPath = $outPath2 ]]
 
-outPath2=$(nix-store -r $(nix-instantiate --indirect --add-root $TEST_ROOT/indirect dependencies.nix)!out)
+outPath2=$(nix-store -r $(nix-instantiate --add-root $TEST_ROOT/indirect dependencies.nix)!out)
 [[ $outPath = $outPath2 ]]
