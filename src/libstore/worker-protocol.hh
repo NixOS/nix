@@ -6,7 +6,7 @@ namespace nix {
 #define WORKER_MAGIC_1 0x6e697863
 #define WORKER_MAGIC_2 0x6478696f
 
-#define PROTOCOL_VERSION 0x117
+#define PROTOCOL_VERSION 0x118
 #define GET_PROTOCOL_MAJOR(x) ((x) & 0xff00)
 #define GET_PROTOCOL_MINOR(x) ((x) & 0x00ff)
 
@@ -72,23 +72,16 @@ struct WorkerProto {
     static void write(const Store & store, Sink & out, const T & t);
 };
 
-template<>
-struct WorkerProto<std::string> {
-    static std::string read(const Store & store, Source & from);
-    static void write(const Store & store, Sink & out, const std::string & t);
-};
+#define MAKE_WORKER_PROTO(T) \
+    template<> \
+    struct WorkerProto< T > { \
+        static T read(const Store & store, Source & from); \
+        static void write(const Store & store, Sink & out, const T & t); \
+    }
 
-template<>
-struct WorkerProto<StorePath> {
-    static StorePath read(const Store & store, Source & from);
-    static void write(const Store & store, Sink & out, const StorePath & t);
-};
-
-template<>
-struct WorkerProto<StorePathDescriptor> {
-    static StorePathDescriptor read(const Store & store, Source & from);
-    static void write(const Store & store, Sink & out, const StorePathDescriptor & t);
-};
+MAKE_WORKER_PROTO(std::string);
+MAKE_WORKER_PROTO(StorePath);
+MAKE_WORKER_PROTO(StorePathDescriptor);
 
 template<typename T>
 struct WorkerProto<std::set<T>> {
@@ -163,5 +156,14 @@ struct WorkerProto<std::optional<T>> {
     }
 
 };
+
+/* Specialization which uses and empty string for the empty case, taking
+   advantage of the fact these types always serialize to non-empty strings.
+   This is done primarily for backwards compatability, so that T <=
+   std::optional<T>, where <= is the compatability partial order, T is one of
+   the types below.
+ */
+MAKE_WORKER_PROTO(std::optional<StorePath>);
+MAKE_WORKER_PROTO(std::optional<ContentAddress>);
 
 }

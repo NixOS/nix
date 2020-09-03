@@ -1,10 +1,11 @@
 #include "globals.hh"
 #include "nar-info.hh"
+#include "store-api.hh"
 
 namespace nix {
 
 NarInfo::NarInfo(const Store & store, const std::string & s, const std::string & whence)
-    : ValidPathInfo(StorePath(StorePath::dummy)) // FIXME: hack
+    : ValidPathInfo(StorePath(StorePath::dummy), Hash(Hash::dummy)) // FIXME: hack
 {
     auto corrupt = [&]() {
         return Error("NAR info file '%1%' is corrupt", whence);
@@ -19,6 +20,7 @@ NarInfo::NarInfo(const Store & store, const std::string & s, const std::string &
     };
 
     bool havePath = false;
+    bool haveNarHash = false;
 
     size_t pos = 0;
     while (pos < s.size()) {
@@ -46,8 +48,10 @@ NarInfo::NarInfo(const Store & store, const std::string & s, const std::string &
         else if (name == "FileSize") {
             if (!string2Int(value, fileSize)) throw corrupt();
         }
-        else if (name == "NarHash")
+        else if (name == "NarHash") {
             narHash = parseHashField(value);
+            haveNarHash = true;
+        }
         else if (name == "NarSize") {
             if (!string2Int(value, narSize)) throw corrupt();
         }
@@ -76,7 +80,7 @@ NarInfo::NarInfo(const Store & store, const std::string & s, const std::string &
 
     if (compression == "") compression = "bzip2";
 
-    if (!havePath || url.empty() || narSize == 0 || !narHash) throw corrupt();
+    if (!havePath || !haveNarHash || url.empty() || narSize == 0) throw corrupt();
 }
 
 std::string NarInfo::to_string(const Store & store) const
@@ -89,8 +93,8 @@ std::string NarInfo::to_string(const Store & store) const
     assert(fileHash && fileHash->type == htSHA256);
     res += "FileHash: " + fileHash->to_string(Base32, true) + "\n";
     res += "FileSize: " + std::to_string(fileSize) + "\n";
-    assert(narHash && narHash->type == htSHA256);
-    res += "NarHash: " + narHash->to_string(Base32, true) + "\n";
+    assert(narHash.type == htSHA256);
+    res += "NarHash: " + narHash.to_string(Base32, true) + "\n";
     res += "NarSize: " + std::to_string(narSize) + "\n";
 
     res += "References: " + concatStringsSep(" ", shortRefs()) + "\n";

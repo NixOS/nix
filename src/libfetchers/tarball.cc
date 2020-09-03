@@ -77,8 +77,11 @@ DownloadFileResult downloadFile(
                 {},
             },
         };
-        ValidPathInfo info { *store, StorePathDescriptor { *storePath } };
-        info.narHash = hashString(htSHA256, *sink.s);
+        ValidPathInfo info {
+            *store,
+            StorePathDescriptor { *storePath },
+            hashString(htSHA256, *sink.s),
+        };
         info.narSize = sink.s->size();
         auto source = StringSource { *sink.s };
         store->addToStore(info, source, NoRepair, NoCheckSigs);

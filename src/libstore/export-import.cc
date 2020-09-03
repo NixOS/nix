@@ -38,9 +38,9 @@ void Store::exportPath(const StorePath & path, Sink & sink)
        filesystem corruption from spreading to other machines.
        Don't complain if the stored hash is zero (unknown). */
     Hash hash = hashSink.currentHash().first;
-    if (hash != info->narHash && info->narHash != Hash(info->narHash->type))
+    if (hash != info->narHash && info->narHash != Hash(info->narHash.type))
         throw Error("hash of path '%s' has changed from '%s' to '%s'!",
-            printStorePath(path), info->narHash->to_string(Base32, true), hash.to_string(Base32, true));
+            printStorePath(path), info->narHash.to_string(Base32, true), hash.to_string(Base32, true));
 
     teeSink
         << exportMagic
@@ -69,17 +69,18 @@ StorePaths Store::importPaths(Source & source, CheckSigsFlag checkSigs)
         if (magic != exportMagic)
             throw Error("Nix archive cannot be imported; wrong format");
 
-        ValidPathInfo info(parseStorePath(readString(source)));
+        auto path = parseStorePath(readString(source));
 
         //Activity act(*logger, lvlInfo, format("importing path '%s'") % info.path);
 
-        info.setReferencesPossiblyToSelf(WorkerProto<StorePathSet>::read(*this, source));
-
+        auto references = WorkerProto<StorePathSet>::read(*this, source);
         auto deriver = readString(source);
+        auto narHash = hashString(htSHA256, *saved.s);
+
+        ValidPathInfo info { path, narHash };
         if (deriver != "")
             info.deriver = parseStorePath(deriver);
-
-        info.narHash = hashString(htSHA256, *saved.s);
+        info.setReferencesPossiblyToSelf(std::move(references));
         info.narSize = saved.s->size();
 
         // Ignore optional legacy signature.

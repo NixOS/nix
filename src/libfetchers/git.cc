@@ -299,7 +299,7 @@ struct GitInputScheme : InputScheme
                 // modified dirty file?
                 input.attrs.insert_or_assign(
                     "lastModified",
-                    haveCommits ? std::stoull(runProgram("git", true, { "-C", actualUrl, "log", "-1", "--format=%ct", "HEAD" })) : 0);
+                    haveCommits ? std::stoull(runProgram("git", true, { "-C", actualUrl, "log", "-1", "--format=%ct", "--no-show-signature", "HEAD" })) : 0);
 
                 return {
                     Tree {
@@ -494,7 +494,7 @@ struct GitInputScheme : InputScheme
             infoAttrs.insert_or_assign("revCount", 0);
             infoAttrs.insert_or_assign("lastModified", 0);
         } else {
-            auto lastModified = std::stoull(runProgram("git", true, { "-C", repoDir, "log", "-1", "--format=%ct", input.getRev()->gitRev() }));
+            auto lastModified = std::stoull(runProgram("git", true, { "-C", repoDir, "log", "-1", "--format=%ct", "--no-show-signature", input.getRev()->gitRev() }));
             infoAttrs.insert_or_assign("rev", input.getRev()->gitRev());
             infoAttrs.insert_or_assign("lastModified", lastModified);
 
