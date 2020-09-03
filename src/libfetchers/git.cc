@@ -83,7 +83,7 @@ struct GitInputScheme : InputScheme
         if (auto rev = input.getRev()) url.query.insert_or_assign("rev", rev->gitRev());
         if (auto treeHash = input.getTreeHash()) url.query.insert_or_assign("treeHash", treeHash->gitRev());
         if (maybeGetBoolAttr(input.attrs, "gitIngestion").value_or((bool) input.getTreeHash()))
-            url.query.insert_or_assign("shallow", "1");
+            url.query.insert_or_assign("gitIngestion", "1");
         if (auto ref = input.getRef()) url.query.insert_or_assign("ref", *ref);
         if (maybeGetBoolAttr(input.attrs, "shallow").value_or(false))
             url.query.insert_or_assign("shallow", "1");
