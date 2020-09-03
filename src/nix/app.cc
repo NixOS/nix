@@ -28,19 +28,30 @@ App Installable::toApp(EvalState & state)
         };
     }
 
-    else if (type == "derivation") {
-        auto drvPath = cursor->forceDerivation();
-        auto outPath = cursor->getAttr(state.sOutPath)->getString();
-        auto outputName = cursor->getAttr(state.sOutputName)->getString();
-        auto name = cursor->getAttr(state.sName)->getString();
+    auto getDerivation = [&](std::shared_ptr<eval_cache::AttrCursor> attr)
+    {
+        auto drvPath = attr->forceDerivation();
+        auto outPath = attr->getAttr(state.sOutPath)->getString();
+        auto outputName = attr->getAttr(state.sOutputName)->getString();
+        auto name = attr->getAttr(state.sName)->getString();
         return App {
             .context = { { drvPath, {outputName} } },
             .program = outPath + "/bin/" + DrvName(name).name,
         };
+    };
+
+    if (type == "derivation")
+        return getDerivation(cursor);
+
+    if (type == "module") {
+        // FIXME: define an 'app' option.
+        auto aDerivation = cursor->findAlongAttrPath(
+            {state.symbols.create("final"), state.symbols.create("derivation")});
+        if (aDerivation)
+            return getDerivation(aDerivation);
     }
 
-    else
-        throw Error("attribute '%s' has unsupported type '%s'", attrPath, type);
+    throw Error("attribute '%s' has unsupported type '%s'", attrPath, type);
 }
 
 }

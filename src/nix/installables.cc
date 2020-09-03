@@ -149,7 +149,8 @@ Strings SourceExprCommand::getDefaultFlakeAttrPathPrefixes()
         "packages." + settings.thisSystem.get() + ".",
         // As a temporary hack until Nixpkgs is properly converted
         // to provide a clean 'packages' set, look in 'legacyPackages'.
-        "legacyPackages." + settings.thisSystem.get() + "."
+        "legacyPackages." + settings.thisSystem.get() + ".",
+        "modules.",
     };
 }
 
@@ -464,21 +465,36 @@ std::tuple<std::string, FlakeRef, InstallableValue::DerivationInfo> InstallableF
     auto root = cache->getRoot();
 
     for (auto & attrPath : getActualAttrPaths()) {
+
+        auto getDerivation = [&](std::shared_ptr<eval_cache::AttrCursor> attr) -> std::tuple<std::string, FlakeRef, InstallableValue::DerivationInfo>
+        {
+            auto drvPath = attr->forceDerivation();
+
+            auto drvInfo = DerivationInfo{
+                std::move(drvPath),
+                state->store->parseStorePath(attr->getAttr(state->sOutPath)->getString()),
+                attr->getAttr(state->sOutputName)->getString()
+            };
+
+            return {attrPath, lockedFlake->flake.lockedRef, std::move(drvInfo)};
+        };
+
         auto attr = root->findAlongAttrPath(parseAttrPath(*state, attrPath));
         if (!attr) continue;
 
-        if (!attr->isDerivation())
-            throw Error("flake output attribute '%s' is not a derivation", attrPath);
+        auto aType = attr->maybeGetAttr(state->sType);
 
-        auto drvPath = attr->forceDerivation();
+        if (aType && aType->getString() == "derivation")
+            return getDerivation(attr);
 
-        auto drvInfo = DerivationInfo{
-            std::move(drvPath),
-            state->store->parseStorePath(attr->getAttr(state->sOutPath)->getString()),
-            attr->getAttr(state->sOutputName)->getString()
-        };
+        else if (aType && aType->getString() == "module") {
+            if (auto aDerivation = attr->findAlongAttrPath(
+                    {state->symbols.create("final"), state->symbols.create("derivation")}))
+                if (aDerivation)
+                    return getDerivation(aDerivation);
+        }
 
-        return {attrPath, lockedFlake->flake.lockedRef, std::move(drvInfo)};
+        throw Error("flake output attribute '%s' is not a derivation", attrPath);
     }
 
     throw Error("flake '%s' does not provide attribute %s",
