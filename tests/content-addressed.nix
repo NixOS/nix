@@ -6,7 +6,7 @@ with import ./config.nix;
 # but the output will always be the same
 rec {
   rootLegacy = mkDerivation {
-    name = "simple-content-addressed";
+    name = "simple-input-addressed";
     buildCommand = ''
       set -x
       echo "Building a legacy derivation"
