@@ -85,8 +85,7 @@ void LocalStore::addIndirectRoot(const Path & path)
 }
 
 
-Path LocalFSStore::addPermRoot(const StorePath & storePath,
-    const Path & _gcRoot, bool indirect, bool allowOutsideRootsDir)
+Path LocalFSStore::addPermRoot(const StorePath & storePath, const Path & _gcRoot)
 {
     Path gcRoot(canonPath(_gcRoot));
 
@@ -95,31 +94,12 @@ Path LocalFSStore::addPermRoot(const StorePath & storePath,
                 "creating a garbage collector root (%1%) in the Nix store is forbidden "
                 "(are you running nix-build inside the store?)", gcRoot);
 
-    if (indirect) {
-        /* Don't clobber the link if it already exists and doesn't
-           point to the Nix store. */
-        if (pathExists(gcRoot) && (!isLink(gcRoot) || !isInStore(readLink(gcRoot))))
-            throw Error("cannot create symlink '%1%'; already exists", gcRoot);
-        makeSymlink(gcRoot, printStorePath(storePath));
-        addIndirectRoot(gcRoot);
-    }
-
-    else {
-        if (!allowOutsideRootsDir) {
-            Path rootsDir = canonPath((format("%1%/%2%") % stateDir % gcRootsDir).str());
-
-            if (string(gcRoot, 0, rootsDir.size() + 1) != rootsDir + "/")
-                throw Error(
-                    "path '%1%' is not a valid garbage collector root; "
-                    "it's not in the directory '%2%'",
-                    gcRoot, rootsDir);
-        }
-
-        if (baseNameOf(gcRoot) == std::string(storePath.to_string()))
-            writeFile(gcRoot, "");
-        else
-            makeSymlink(gcRoot, printStorePath(storePath));
-    }
+    /* Don't clobber the link if it already exists and doesn't
+       point to the Nix store. */
+    if (pathExists(gcRoot) && (!isLink(gcRoot) || !isInStore(readLink(gcRoot))))
+        throw Error("cannot create symlink '%1%'; already exists", gcRoot);
+    makeSymlink(gcRoot, printStorePath(storePath));
+    addIndirectRoot(gcRoot);
 
     /* Check that the root can be found by the garbage collector.
        !!! This can be very slow on machines that have many roots.

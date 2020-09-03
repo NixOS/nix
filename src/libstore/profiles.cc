@@ -105,7 +105,7 @@ Path createGeneration(ref<LocalFSStore> store, Path profile, StorePath outPath)
        user environment etc. we've just built. */
     Path generation;
     makeName(profile, num + 1, generation);
-    store->addPermRoot(outPath, generation, true);
+    store->addPermRoot(outPath, generation);
 
     return generation;
 }
