@@ -30,8 +30,8 @@ struct PrimOp
     PrimOpFun fun;
     size_t arity;
     Symbol name;
-    PrimOp(PrimOpFun fun, size_t arity, Symbol name)
-        : fun(fun), arity(arity), name(name) { }
+    std::vector<std::string> args;
+    const char * doc = nullptr;
 };
 
 
@@ -242,9 +242,22 @@ private:
     Value * addPrimOp(const string & name,
         size_t arity, PrimOpFun primOp);
 
+    Value * addPrimOp(PrimOp && primOp);
+
 public:
 
     Value & getBuiltin(const string & name);
+
+    struct Doc
+    {
+        Pos pos;
+        std::optional<Symbol> name;
+        size_t arity;
+        std::vector<std::string> args;
+        const char * doc;
+    };
+
+    std::optional<Doc> getDoc(Value & v);
 
 private:
 
@@ -357,24 +370,57 @@ struct EvalSettings : Config
     Setting<bool> enableNativeCode{this, false, "allow-unsafe-native-code-during-evaluation",
         "Whether builtin functions that allow executing native code should be enabled."};
 
-    Setting<Strings> nixPath{this, getDefaultNixPath(), "nix-path",
-        "List of directories to be searched for <...> file references."};
+    Setting<Strings> nixPath{
+        this, getDefaultNixPath(), "nix-path",
+        "List of directories to be searched for `<...>` file references."};
 
-    Setting<bool> restrictEval{this, false, "restrict-eval",
-        "Whether to restrict file system access to paths in $NIX_PATH, "
-        "and network access to the URI prefixes listed in 'allowed-uris'."};
+    Setting<bool> restrictEval{
+        this, false, "restrict-eval",
+        R"(
+          If set to `true`, the Nix evaluator will not allow access to any
+          files outside of the Nix search path (as set via the `NIX_PATH`
+          environment variable or the `-I` option), or to URIs outside of
+          `allowed-uri`. The default is `false`.
+        )"};
 
     Setting<bool> pureEval{this, false, "pure-eval",
         "Whether to restrict file system and network access to files specified by cryptographic hash."};
 
-    Setting<bool> enableImportFromDerivation{this, true, "allow-import-from-derivation",
-        "Whether the evaluator allows importing the result of a derivation."};
+    Setting<bool> enableImportFromDerivation{
+        this, true, "allow-import-from-derivation",
+        R"(
+          By default, Nix allows you to `import` from a derivation, allowing
+          building at evaluation time. With this option set to false, Nix will
+          throw an error when evaluating an expression that uses this feature,
+          allowing users to ensure their evaluation will not require any
+          builds to take place.
+        )"};
 
     Setting<Strings> allowedUris{this, {}, "allowed-uris",
-        "Prefixes of URIs that builtin functions such as fetchurl and fetchGit are allowed to fetch."};
+        R"(
+          A list of URI prefixes to which access is allowed in restricted
+          evaluation mode. For example, when set to
+          `https://github.com/NixOS`, builtin functions such as `fetchGit` are
+          allowed to access `https://github.com/NixOS/patchelf.git`.
+        )"};
 
     Setting<bool> traceFunctionCalls{this, false, "trace-function-calls",
-        "Emit log messages for each function entry and exit at the 'vomit' log level (-vvvv)."};
+        R"(
+          If set to `true`, the Nix evaluator will trace every function call.
+          Nix will print a log message at the "vomit" level for every function
+          entrance and function exit.
+
+              function-trace entered undefined position at 1565795816999559622
+              function-trace exited undefined position at 1565795816999581277
+              function-trace entered /nix/store/.../example.nix:226:41 at 1565795253249935150
+              function-trace exited /nix/store/.../example.nix:226:41 at 1565795253249941684
+
+          The `undefined position` means the function call is a builtin.
+
+          Use the `contrib/stack-collapse.py` script distributed with the Nix
+          source code to convert the trace logs in to a format suitable for
+          `flamegraph.pl`.
+        )"};
 
     Setting<bool> useEvalCache{this, true, "eval-cache",
         "Whether to use the flake evaluation cache."};

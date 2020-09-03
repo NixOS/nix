@@ -526,7 +526,7 @@ static void _main(int argc, char * * argv)
                 if (auto store2 = store.dynamic_pointer_cast<LocalFSStore>()) {
                     std::string symlink = drvPrefix;
                     if (outputName != "out") symlink += "-" + outputName;
-                    store2->addPermRoot(outputPath, absPath(symlink), true);
+                    store2->addPermRoot(outputPath, absPath(symlink));
                 }
 
                 outPaths.push_back(outputPath);

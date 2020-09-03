@@ -85,7 +85,7 @@ protected:
         checkEnabled();
 
         try {
-            FileTransferRequest request(cacheUri + "/" + path);
+            FileTransferRequest request(makeRequest(path));
             request.head = true;
             getFileTransfer()->download(request);
             return true;
@@ -103,7 +103,7 @@ protected:
         std::shared_ptr<std::basic_iostream<char>> istream,
         const std::string & mimeType) override
     {
-        auto req = FileTransferRequest(cacheUri + "/" + path);
+        auto req = makeRequest(path);
         req.data = std::make_shared<string>(StreamToSourceAdapter(istream).drain());
         req.mimeType = mimeType;
         try {
@@ -115,8 +115,11 @@ protected:
 
     FileTransferRequest makeRequest(const std::string & path)
     {
-        FileTransferRequest request(cacheUri + "/" + path);
-        return request;
+        return FileTransferRequest(
+            hasPrefix(path, "https://") || hasPrefix(path, "http://") || hasPrefix(path, "file://")
+            ? path
+            : cacheUri + "/" + path);
+
     }
 
     void getFile(const std::string & path, Sink & sink) override

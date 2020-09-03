@@ -20,7 +20,6 @@ using namespace nix;
 
 static Path gcRoot;
 static int rootNr = 0;
-static bool indirectRoot = false;
 
 
 enum OutputKind { okPlain, okXML, okJSON };
@@ -71,11 +70,11 @@ void processExpr(EvalState & state, const Strings & attrPaths,
                 if (gcRoot == "")
                     printGCWarning();
                 else {
-                    Path rootName = indirectRoot ? absPath(gcRoot) : gcRoot;
+                    Path rootName = absPath(gcRoot);
                     if (++rootNr > 1) rootName += "-" + std::to_string(rootNr);
                     auto store2 = state.store.dynamic_pointer_cast<LocalFSStore>();
                     if (store2)
-                        drvPath = store2->addPermRoot(store2->parseStorePath(drvPath), rootName, indirectRoot);
+                        drvPath = store2->addPermRoot(store2->parseStorePath(drvPath), rootName);
                 }
                 std::cout << fmt("%s%s\n", drvPath, (outputName != "out" ? "!" + outputName : ""));
             }
@@ -127,7 +126,7 @@ static int _main(int argc, char * * argv)
             else if (*arg == "--add-root")
                 gcRoot = getArg(*arg, arg, end);
             else if (*arg == "--indirect")
-                indirectRoot = true;
+                ;
             else if (*arg == "--xml")
                 outputKind = okXML;
             else if (*arg == "--json")

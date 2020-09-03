@@ -391,7 +391,8 @@ Value & AttrCursor::forceValue()
 
     if (root->db && (!cachedValue || std::get_if<placeholder_t>(&cachedValue->second))) {
         if (v.type == tString)
-            cachedValue = {root->db->setString(getKey(), v.string.s, v.string.context), v.string.s};
+            cachedValue = {root->db->setString(getKey(), v.string.s, v.string.context),
+                           string_t{v.string.s, {}}};
         else if (v.type == tPath)
             cachedValue = {root->db->setString(getKey(), v.path), v.path};
         else if (v.type == tBool)
