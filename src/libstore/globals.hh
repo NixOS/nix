@@ -293,10 +293,6 @@ public:
     Setting<unsigned int> pollInterval{this, 5, "build-poll-interval",
         "How often (in seconds) to poll for locks."};
 
-    Setting<bool> checkRootReachability{this, false, "gc-check-reachability",
-        "Whether to check if new GC roots can in fact be found by the "
-        "garbage collector."};
-
     Setting<bool> gcKeepOutputs{
         this, false, "keep-outputs",
         R"(

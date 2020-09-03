@@ -134,7 +134,7 @@ void MixProfile::updateProfile(const StorePath & storePath)
     switchLink(profile2,
         createGeneration(
             ref<LocalFSStore>(store),
-            profile2, store->printStorePath(storePath)));
+            profile2, storePath));
 }
 
 void MixProfile::updateProfile(const Buildables & buildables)

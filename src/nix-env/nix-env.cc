@@ -708,7 +708,9 @@ static void opSet(Globals & globals, Strings opFlags, Strings opArgs)
     }
 
     debug(format("switching to new user environment"));
-    Path generation = createGeneration(ref<LocalFSStore>(store2), globals.profile, drv.queryOutPath());
+    Path generation = createGeneration(
+        ref<LocalFSStore>(store2), globals.profile,
+        store2->parseStorePath(drv.queryOutPath()));
     switchLink(globals.profile, generation);
 }
 

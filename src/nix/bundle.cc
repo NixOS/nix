@@ -122,7 +122,7 @@ struct CmdBundle : InstallableCommand
         if (!outLink)
             outLink = baseNameOf(app.program);
 
-        store.dynamic_pointer_cast<LocalFSStore>()->addPermRoot(outPath, absPath(*outLink), true);
+        store.dynamic_pointer_cast<LocalFSStore>()->addPermRoot(outPath, absPath(*outLink));
     }
 };
 

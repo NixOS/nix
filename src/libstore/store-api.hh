@@ -651,8 +651,7 @@ public:
     ref<FSAccessor> getFSAccessor() override;
 
     /* Register a permanent GC root. */
-    Path addPermRoot(const StorePath & storePath,
-        const Path & gcRoot, bool indirect, bool allowOutsideRootsDir = false);
+    Path addPermRoot(const StorePath & storePath, const Path & gcRoot);
 
     virtual Path getRealStoreDir() { return storeDir; }
 
