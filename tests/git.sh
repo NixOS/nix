@@ -70,7 +70,10 @@ if [[ -n $(type -p git) ]]; then
     path2=$(nix eval --raw --expr "(builtins.fetchTree { type = \"git\"; url = file:///no-such-repo; treeHash = \"$treeHash\"; }).outPath" --substituters file://$cacheDir --option substitute true)
     [ $path2 = $path ]
 
-    # HEAD should be the same path as tree
+    # HEAD should be the same path and tree hash as tree
+    nix eval --impure --expr "(builtins.fetchTree { type = \"git\"; url = file://$repo; ref = \"HEAD\"; gitIngestion = true; })"
+    treeHash2=$(nix eval --impure --raw --expr "(builtins.fetchTree { type = \"git\"; url = file://$repo; ref = \"HEAD\"; gitIngestion = true; }).treeHash")
+    [ $treeHash = $treeHash2 ]
     path3=$(nix eval --impure --raw --expr "(builtins.fetchTree { type = \"git\"; url = file://$repo; ref = \"HEAD\"; gitIngestion = true; }).outPath")
     [ $path3 = $path ]
 else

@@ -19,7 +19,7 @@ void emitTreeAttrs(
 {
     assert(input.isImmutable());
 
-    state.mkAttrs(v, 8);
+    state.mkAttrs(v, 10);
 
     auto storePath = state.store->printStorePath(
         state.store->makeFixedOutputPathFromCA(tree.storePath));
@@ -46,6 +46,11 @@ void emitTreeAttrs(
         auto emptyHash = Hash(htSHA1);
         mkString(*state.allocAttr(v, state.symbols.create("rev")), emptyHash.gitRev());
         mkString(*state.allocAttr(v, state.symbols.create("shortRev")), emptyHash.gitRev());
+    }
+
+    if (auto treeHash = input.getTreeHash()) {
+        mkString(*state.allocAttr(v, state.symbols.create("treeHash")), treeHash->gitRev());
+        mkString(*state.allocAttr(v, state.symbols.create("shortTreeHash")), treeHash->gitShortRev());
     }
 
     if (input.getType() == "git")
