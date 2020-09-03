@@ -101,22 +101,6 @@ Path LocalFSStore::addPermRoot(const StorePath & storePath, const Path & _gcRoot
     makeSymlink(gcRoot, printStorePath(storePath));
     addIndirectRoot(gcRoot);
 
-    /* Check that the root can be found by the garbage collector.
-       !!! This can be very slow on machines that have many roots.
-       Instead of reading all the roots, it would be more efficient to
-       check if the root is in a directory in or linked from the
-       gcroots directory. */
-    if (settings.checkRootReachability) {
-        auto roots = findRoots(false);
-        if (roots[storePath].count(gcRoot) == 0)
-            logWarning({
-                .name = "GC root",
-                .hint = hintfmt("warning: '%1%' is not in a directory where the garbage collector looks for roots; "
-                    "therefore, '%2%' might be removed by the garbage collector",
-                    gcRoot, printStorePath(storePath))
-            });
-    }
-
     /* Grab the global GC root, causing us to block while a GC is in
        progress.  This prevents the set of permanent roots from
        increasing while a GC is in progress. */
