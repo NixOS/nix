@@ -34,7 +34,6 @@ typedef void (* Operation) (Strings opFlags, Strings opArgs);
 
 static Path gcRoot;
 static int rootNr = 0;
-static bool indirectRoot = false;
 static bool noOutput = false;
 static std::shared_ptr<Store> store;
 
@@ -85,7 +84,7 @@ static PathSet realisePath(StorePathWithOutputs path, bool build = true)
                     Path rootName = gcRoot;
                     if (rootNr > 1) rootName += "-" + std::to_string(rootNr);
                     if (i->first != "out") rootName += "-" + i->first;
-                    outPath = store2->addPermRoot(store->parseStorePath(outPath), rootName, indirectRoot);
+                    outPath = store2->addPermRoot(store->parseStorePath(outPath), rootName, true);
                 }
             }
             outputs.insert(outPath);
@@ -104,7 +103,7 @@ static PathSet realisePath(StorePathWithOutputs path, bool build = true)
                 Path rootName = gcRoot;
                 rootNr++;
                 if (rootNr > 1) rootName += "-" + std::to_string(rootNr);
-                return {store2->addPermRoot(path.path, rootName, indirectRoot)};
+                return {store2->addPermRoot(path.path, rootName, true)};
             }
         }
         return {store->printStorePath(path.path)};
@@ -1085,7 +1084,7 @@ static int _main(int argc, char * * argv)
             else if (*arg == "--add-root")
                 gcRoot = absPath(getArg(*arg, arg, end));
             else if (*arg == "--indirect")
-                indirectRoot = true;
+                ;
             else if (*arg == "--no-output")
                 noOutput = true;
             else if (*arg != "" && arg->at(0) == '-') {
