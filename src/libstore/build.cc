@@ -1266,7 +1266,7 @@ void DerivationGoal::haveDerivation()
         for (auto & [_, status] : initialOutputs) {
             if (!status.wanted) continue;
             if (!status.known) {
-                warn("Do not know how to query for unknown floating CA drv output yet");
+                warn("do not know how to query for unknown floating content-addressed derivation output yet");
                 /* Nothing to wait for; tail call */
                 return DerivationGoal::gaveUpOnSubstitution();
             }
@@ -1463,7 +1463,7 @@ void DerivationGoal::inputsRealised()
                     auto optRealizedInput = outputs.at(j);
                     if (!optRealizedInput)
                         throw Error(
-                            "derivation '%s' requires output '%s' from input derivation '%s', which is supposedly realized already, yet we still don't know what path corresponds to that output.",
+                            "derivation '%s' requires output '%s' from input derivation '%s', which is supposedly realized already, yet we still don't know what path corresponds to that output",
                             worker.store.printStorePath(drvPath), j, worker.store.printStorePath(drvPath));
                     worker.store.computeFSClosure(*optRealizedInput, inputPaths);
                 } else
@@ -2032,7 +2032,7 @@ StorePathSet DerivationGoal::exportReferences(const StorePathSet & storePaths)
                        `computeFSClosure` on the output path, rather than
                        derivation itself. That doesn't seem right to me, so I
                        won't try to implemented this for CA derivations. */
-                    throw UnimplementedError("export references including CA derivations (themselves) is not yet implemented");
+                    throw UnimplementedError("exportReferences on CA derivations is not yet implemented");
                 worker.store.computeFSClosure(*k.second.second, paths);
             }
         }
@@ -2175,7 +2175,7 @@ void DerivationGoal::startBuilder()
            differ. */
         if (fixedFinalPath == scratchPath) continue;
 
-        /* Ensure scratch scratch path is ours to use */
+        /* Ensure scratch path is ours to use. */
         deletePath(worker.store.printStorePath(scratchPath));
 
         /* Rewrite and unrewrite paths */
