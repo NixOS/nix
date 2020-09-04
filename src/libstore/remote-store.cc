@@ -31,13 +31,13 @@ template<> StorePathSet readStorePaths(const Store & store, Source & from)
     return paths;
 }
 
-
 void writeStorePaths(const Store & store, Sink & out, const StorePathSet & paths)
 {
     out << paths.size();
     for (auto & i : paths)
         out << store.printStorePath(i);
 }
+
 
 StorePathCAMap readStorePathCAMap(const Store & store, Source & from)
 {
@@ -57,29 +57,35 @@ void writeStorePathCAMap(const Store & store, Sink & out, const StorePathCAMap &
     }
 }
 
-std::map<string, StorePath> readOutputPathMap(const Store & store, Source & from)
+
+namespace worker_proto {
+
+StorePath read(const Store & store, Source & from, Phantom<StorePath> _)
 {
-    std::map<string, StorePath> pathMap;
-    auto rawInput = readStrings<Strings>(from);
-    if (rawInput.size() % 2)
-        throw Error("got an odd number of elements from the daemon when trying to read a output path map");
-    auto curInput = rawInput.begin();
-    while (curInput != rawInput.end()) {
-        auto thisKey = *curInput++;
-        auto thisValue = *curInput++;
-        pathMap.emplace(thisKey, store.parseStorePath(thisValue));
-    }
-    return pathMap;
+    return store.parseStorePath(readString(from));
 }
 
-void writeOutputPathMap(const Store & store, Sink & out, const std::map<string, StorePath> & pathMap)
+void write(const Store & store, Sink & out, const StorePath & storePath)
 {
-    out << 2*pathMap.size();
-    for (auto & i : pathMap) {
-        out << i.first;
-        out << store.printStorePath(i.second);
-    }
+    out << store.printStorePath(storePath);
 }
+
+
+template<>
+std::optional<StorePath> read(const Store & store, Source & from, Phantom<std::optional<StorePath>> _)
+{
+    auto s = readString(from);
+    return s == "" ? std::optional<StorePath> {} : store.parseStorePath(s);
+}
+
+template<>
+void write(const Store & store, Sink & out, const std::optional<StorePath> & storePathOpt)
+{
+    out << (storePathOpt ? store.printStorePath(*storePathOpt) : "");
+}
+
+}
+
 
 /* TODO: Separate these store impls into different files, give them better names */
 RemoteStore::RemoteStore(const Params & params)
@@ -278,9 +284,9 @@ struct ConnectionHandle
 
     RemoteStore::Connection * operator -> () { return &*handle; }
 
-    void processStderr(Sink * sink = 0, Source * source = 0)
+    void processStderr(Sink * sink = 0, Source * source = 0, bool flush = true)
     {
-        auto ex = handle->processStderr(sink, source);
+        auto ex = handle->processStderr(sink, source, flush);
         if (ex) {
             daemonException = true;
             std::rethrow_exception(ex);
@@ -419,10 +425,10 @@ void RemoteStore::queryPathInfoUncached(const StorePath & path,
                 bool valid; conn->from >> valid;
                 if (!valid) throw InvalidPath("path '%s' is not valid", printStorePath(path));
             }
-            info = std::make_shared<ValidPathInfo>(StorePath(path));
             auto deriver = readString(conn->from);
+            auto narHash = Hash::parseAny(readString(conn->from), htSHA256);
+            info = std::make_shared<ValidPathInfo>(path, narHash);
             if (deriver != "") info->deriver = parseStorePath(deriver);
-            info->narHash = Hash::parseAny(readString(conn->from), htSHA256);
             info->references = readStorePaths<StorePathSet>(*this, conn->from);
             conn->from >> info->registrationTime >> info->narSize;
             if (GET_PROTOCOL_MINOR(conn->daemonVersion) >= 16) {
@@ -468,12 +474,12 @@ StorePathSet RemoteStore::queryDerivationOutputs(const StorePath & path)
 }
 
 
-OutputPathMap RemoteStore::queryDerivationOutputMap(const StorePath & path)
+std::map<std::string, std::optional<StorePath>> RemoteStore::queryPartialDerivationOutputMap(const StorePath & path)
 {
     auto conn(getConnection());
     conn->to << wopQueryDerivationOutputMap << printStorePath(path);
     conn.processStderr();
-    return readOutputPathMap(*this, conn->from);
+    return worker_proto::read(*this, conn->from, Phantom<std::map<std::string, std::optional<StorePath>>> {});
 
 }
 
@@ -521,13 +527,15 @@ void RemoteStore::addToStore(const ValidPathInfo & info, Source & source,
         conn->to << wopAddToStoreNar
                  << printStorePath(info.path)
                  << (info.deriver ? printStorePath(*info.deriver) : "")
-                 << info.narHash->to_string(Base16, false);
+                 << info.narHash.to_string(Base16, false);
         writeStorePaths(*this, conn->to, info.references);
         conn->to << info.registrationTime << info.narSize
                  << info.ultimate << info.sigs << renderContentAddress(info.ca)
                  << repair << !checkSigs;
 
         if (GET_PROTOCOL_MINOR(conn->daemonVersion) >= 23) {
+
+            conn->to.flush();
 
             std::exception_ptr ex;
 
@@ -568,7 +576,7 @@ void RemoteStore::addToStore(const ValidPathInfo & info, Source & source,
             std::thread stderrThread([&]()
             {
                 try {
-                    conn.processStderr();
+                    conn.processStderr(nullptr, nullptr, false);
                 } catch (...) {
                     ex = std::current_exception();
                 }
@@ -878,9 +886,10 @@ static Logger::Fields readFields(Source & from)
 }
 
 
-std::exception_ptr RemoteStore::Connection::processStderr(Sink * sink, Source * source)
+std::exception_ptr RemoteStore::Connection::processStderr(Sink * sink, Source * source, bool flush)
 {
-    to.flush();
+    if (flush)
+        to.flush();
 
     while (true) {
 

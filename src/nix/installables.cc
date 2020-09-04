@@ -76,7 +76,7 @@ MixFlakeOptions::MixFlakeOptions()
 
     addFlag({
         .longName = "override-input",
-        .description = "override a specific flake input (e.g. 'dwarffs/nixpkgs')",
+        .description = "override a specific flake input (e.g. `dwarffs/nixpkgs`)",
         .labels = {"input-path", "flake-url"},
         .handler = {[&](std::string inputPath, std::string flakeRef) {
             lockFlags.inputOverrides.insert_or_assign(
@@ -116,7 +116,7 @@ SourceExprCommand::SourceExprCommand()
     addFlag({
         .longName = "file",
         .shortName = 'f',
-        .description = "evaluate FILE rather than the default",
+        .description = "evaluate *file* rather than the default",
         .labels = {"file"},
         .handler = {&file},
         .completer = completePath
@@ -124,7 +124,7 @@ SourceExprCommand::SourceExprCommand()
 
     addFlag({
         .longName ="expr",
-        .description = "evaluate attributes from EXPR",
+        .description = "evaluate attributes from *expr*",
         .labels = {"expr"},
         .handler = {&expr}
     });
@@ -183,8 +183,7 @@ void completeFlakeRefWithFragment(
             auto flakeRef = parseFlakeRef(flakeRefS, absPath("."));
 
             auto evalCache = openEvalCache(*evalState,
-                std::make_shared<flake::LockedFlake>(lockFlake(*evalState, flakeRef, lockFlags)),
-                true);
+                std::make_shared<flake::LockedFlake>(lockFlake(*evalState, flakeRef, lockFlags)));
 
             auto root = evalCache->getRoot();
 
@@ -273,7 +272,7 @@ Buildable Installable::toBuildable()
 }
 
 std::vector<std::pair<std::shared_ptr<eval_cache::AttrCursor>, std::string>>
-Installable::getCursors(EvalState & state, bool useEvalCache)
+Installable::getCursors(EvalState & state)
 {
     auto evalCache =
         std::make_shared<nix::eval_cache::EvalCache>(std::nullopt, state,
@@ -282,9 +281,9 @@ Installable::getCursors(EvalState & state, bool useEvalCache)
 }
 
 std::pair<std::shared_ptr<eval_cache::AttrCursor>, std::string>
-Installable::getCursor(EvalState & state, bool useEvalCache)
+Installable::getCursor(EvalState & state)
 {
-    auto cursors = getCursors(state, useEvalCache);
+    auto cursors = getCursors(state);
     if (cursors.empty())
         throw Error("cannot find flake attribute '%s'", what());
     return cursors[0];
@@ -305,8 +304,8 @@ struct InstallableStorePath : Installable
         if (storePath.isDerivation()) {
             std::map<std::string, StorePath> outputs;
             auto drv = store->readDerivation(storePath);
-            for (auto & [name, output] : drv.outputs)
-                outputs.emplace(name, output.path(*store, drv.name));
+            for (auto & i : drv.outputsAndPaths(*store))
+                outputs.emplace(i.first, i.second.second);
             return {
                 BuildableFromDrv {
                     .drvPath = storePath,
@@ -420,12 +419,11 @@ Value * InstallableFlake::getFlakeOutputs(EvalState & state, const flake::Locked
 
 ref<eval_cache::EvalCache> openEvalCache(
     EvalState & state,
-    std::shared_ptr<flake::LockedFlake> lockedFlake,
-    bool useEvalCache)
+    std::shared_ptr<flake::LockedFlake> lockedFlake)
 {
     auto fingerprint = lockedFlake->getFingerprint();
     return make_ref<nix::eval_cache::EvalCache>(
-        useEvalCache && evalSettings.pureEval
+        evalSettings.useEvalCache && evalSettings.pureEval
             ? std::optional { std::cref(fingerprint) }
             : std::nullopt,
         state,
@@ -460,10 +458,9 @@ static std::string showAttrPaths(const std::vector<std::string> & paths)
 
 std::tuple<std::string, FlakeRef, InstallableValue::DerivationInfo> InstallableFlake::toDerivation()
 {
-
     auto lockedFlake = getLockedFlake();
 
-    auto cache = openEvalCache(*state, lockedFlake, true);
+    auto cache = openEvalCache(*state, lockedFlake);
     auto root = cache->getRoot();
 
     for (auto & attrPath : getActualAttrPaths()) {
@@ -517,11 +514,10 @@ std::pair<Value *, Pos> InstallableFlake::toValue(EvalState & state)
 }
 
 std::vector<std::pair<std::shared_ptr<eval_cache::AttrCursor>, std::string>>
-InstallableFlake::getCursors(EvalState & state, bool useEvalCache)
+InstallableFlake::getCursors(EvalState & state)
 {
     auto evalCache = openEvalCache(state,
-        std::make_shared<flake::LockedFlake>(lockFlake(state, flakeRef, lockFlags)),
-        useEvalCache);
+        std::make_shared<flake::LockedFlake>(lockFlake(state, flakeRef, lockFlags)));
 
     auto root = evalCache->getRoot();
 

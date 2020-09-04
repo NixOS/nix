@@ -71,14 +71,14 @@ struct CmdBuild : InstallablesCommand, MixDryRun, MixProfile
                         [&](BuildableOpaque bo) {
                             std::string symlink = outLink;
                             if (i) symlink += fmt("-%d", i);
-                            store2->addPermRoot(bo.path, absPath(symlink), true);
+                            store2->addPermRoot(bo.path, absPath(symlink));
                         },
                         [&](BuildableFromDrv bfd) {
                             for (auto & output : bfd.outputs) {
                                 std::string symlink = outLink;
                                 if (i) symlink += fmt("-%d", i);
                                 if (output.first != "out") symlink += fmt("-%s", output.first);
-                                store2->addPermRoot(output.second, absPath(symlink), true);
+                                store2->addPermRoot(output.second, absPath(symlink));
                             }
                         },
                     }, buildables[i]);

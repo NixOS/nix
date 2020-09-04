@@ -2,7 +2,8 @@
 #include "common-args.hh"
 #include "shared.hh"
 #include "store-api.hh"
-#include "json.hh"
+
+#include <nlohmann/json.hpp>
 
 using namespace nix;
 
@@ -19,8 +20,7 @@ struct CmdShowConfig : Command, MixJSON
     {
         if (json) {
             // FIXME: use appropriate JSON types (bool, ints, etc).
-            JSONObject jsonObj(std::cout);
-            globalConfig.toJSON(jsonObj);
+            logger->stdout_("%s", globalConfig.toJSON().dump());
         } else {
             std::map<std::string, Config::SettingInfo> settings;
             globalConfig.getSettings(settings);

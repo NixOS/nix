@@ -182,11 +182,21 @@ struct GitHubInputScheme : GitArchiveInputScheme
 {
     std::string type() override { return "github"; }
 
+    void addAccessToken(std::string & url) const
+    {
+        std::string accessToken = settings.githubAccessToken.get();
+        if (accessToken != "")
+            url += "?access_token=" + accessToken;
+    }
+
     Hash getRevFromRef(nix::ref<Store> store, const Input & input) const override
     {
         auto host_url = maybeGetStrAttr(input.attrs, "url").value_or("github.com");
         auto url = fmt("https://api.%s/repos/%s/%s/commits/%s", // FIXME: check
             host_url, getStrAttr(input.attrs, "owner"), getStrAttr(input.attrs, "repo"), *input.getRef());
+
+        addAccessToken(url);
+
         auto json = nlohmann::json::parse(
             readFile(
                 store->toRealPath(
@@ -205,9 +215,7 @@ struct GitHubInputScheme : GitArchiveInputScheme
             host_url, getStrAttr(input.attrs, "owner"), getStrAttr(input.attrs, "repo"),
             input.getRev()->to_string(Base16, false));
 
-        std::string accessToken = settings.githubAccessToken.get();
-        if (accessToken != "")
-            url += "?access_token=" + accessToken;
+        addAccessToken(url);
 
         return url;
     }

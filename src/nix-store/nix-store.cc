@@ -34,7 +34,6 @@ typedef void (* Operation) (Strings opFlags, Strings opArgs);
 
 static Path gcRoot;
 static int rootNr = 0;
-static bool indirectRoot = false;
 static bool noOutput = false;
 static std::shared_ptr<Store> store;
 
@@ -85,7 +84,7 @@ static PathSet realisePath(StorePathWithOutputs path, bool build = true)
                     Path rootName = gcRoot;
                     if (rootNr > 1) rootName += "-" + std::to_string(rootNr);
                     if (i->first != "out") rootName += "-" + i->first;
-                    outPath = store2->addPermRoot(store->parseStorePath(outPath), rootName, indirectRoot);
+                    outPath = store2->addPermRoot(store->parseStorePath(outPath), rootName);
                 }
             }
             outputs.insert(outPath);
@@ -104,7 +103,7 @@ static PathSet realisePath(StorePathWithOutputs path, bool build = true)
                 Path rootName = gcRoot;
                 rootNr++;
                 if (rootNr > 1) rootName += "-" + std::to_string(rootNr);
-                return {store2->addPermRoot(path.path, rootName, indirectRoot)};
+                return {store2->addPermRoot(path.path, rootName)};
             }
         }
         return {store->printStorePath(path.path)};
@@ -218,8 +217,8 @@ static StorePathSet maybeUseOutputs(const StorePath & storePath, bool useOutput,
     if (useOutput && storePath.isDerivation()) {
         auto drv = store->derivationFromPath(storePath);
         StorePathSet outputs;
-        for (auto & i : drv.outputs)
-            outputs.insert(i.second.path(*store, drv.name));
+        for (auto & i : drv.outputsAndPaths(*store))
+            outputs.insert(i.second.second);
         return outputs;
     }
     else return {storePath};
@@ -312,8 +311,8 @@ static void opQuery(Strings opFlags, Strings opArgs)
                 auto i2 = store->followLinksToStorePath(i);
                 if (forceRealise) realisePath({i2});
                 Derivation drv = store->derivationFromPath(i2);
-                for (auto & j : drv.outputs)
-                    cout << fmt("%1%\n", store->printStorePath(j.second.path(*store, drv.name)));
+                for (auto & j : drv.outputsAndPaths(*store))
+                    cout << fmt("%1%\n", store->printStorePath(j.second.second));
             }
             break;
         }
@@ -372,8 +371,8 @@ static void opQuery(Strings opFlags, Strings opArgs)
                 for (auto & j : maybeUseOutputs(store->followLinksToStorePath(i), useOutput, forceRealise)) {
                     auto info = store->queryPathInfo(j);
                     if (query == qHash) {
-                        assert(info->narHash && info->narHash->type == htSHA256);
-                        cout << fmt("%s\n", info->narHash->to_string(Base32, true));
+                        assert(info->narHash.type == htSHA256);
+                        cout << fmt("%s\n", info->narHash.to_string(Base32, true));
                     } else if (query == qSize)
                         cout << fmt("%d\n", info->narSize);
                 }
@@ -495,7 +494,10 @@ static void registerValidity(bool reregister, bool hashGiven, bool canonicalise)
     ValidPathInfos infos;
 
     while (1) {
-        auto info = decodeValidPathInfo(*store, cin, hashGiven);
+        // We use a dummy value because we'll set it below. FIXME be correct by
+        // construction and avoid dummy value.
+        auto hashResultOpt = !hashGiven ? std::optional<HashResult> { {Hash::dummy, -1} } : std::nullopt;
+        auto info = decodeValidPathInfo(*store, cin, hashResultOpt);
         if (!info) break;
         if (!store->isValidPath(info->path) || reregister) {
             /* !!! races */
@@ -723,7 +725,7 @@ static void opVerifyPath(Strings opFlags, Strings opArgs)
         auto path = store->followLinksToStorePath(i);
         printMsg(lvlTalkative, "checking path '%s'...", store->printStorePath(path));
         auto info = store->queryPathInfo(path);
-        HashSink sink(info->narHash->type);
+        HashSink sink(info->narHash.type);
         store->narFromPath(path, sink);
         auto current = sink.finish();
         if (current.first != info->narHash) {
@@ -732,7 +734,7 @@ static void opVerifyPath(Strings opFlags, Strings opArgs)
                 .hint = hintfmt(
                     "path '%s' was modified! expected hash '%s', got '%s'",
                     store->printStorePath(path),
-                    info->narHash->to_string(Base32, true),
+                    info->narHash.to_string(Base32, true),
                     current.first.to_string(Base32, true))
             });
             status = 1;
@@ -862,7 +864,7 @@ static void opServe(Strings opFlags, Strings opArgs)
                         out << info->narSize // downloadSize
                             << info->narSize;
                         if (GET_PROTOCOL_MINOR(clientVersion) >= 4)
-                            out << (info->narHash ? info->narHash->to_string(Base32, true) : "")
+                            out << info->narHash.to_string(Base32, true)
                                 << renderContentAddress(info->ca)
                                 << info->sigs;
                     } catch (InvalidPath &) {
@@ -944,11 +946,13 @@ static void opServe(Strings opFlags, Strings opArgs)
                 if (!writeAllowed) throw Error("importing paths is not allowed");
 
                 auto path = readString(in);
-                ValidPathInfo info(store->parseStorePath(path));
                 auto deriver = readString(in);
+                ValidPathInfo info {
+                    store->parseStorePath(path),
+                    Hash::parseAny(readString(in), htSHA256),
+                };
                 if (deriver != "")
                     info.deriver = store->parseStorePath(deriver);
-                info.narHash = Hash::parseAny(readString(in), htSHA256);
                 info.references = readStorePaths<StorePathSet>(*store, in);
                 in >> info.registrationTime >> info.narSize >> info.ultimate;
                 info.sigs = readStrings<StringSet>(in);
@@ -1080,7 +1084,7 @@ static int _main(int argc, char * * argv)
             else if (*arg == "--add-root")
                 gcRoot = absPath(getArg(*arg, arg, end));
             else if (*arg == "--indirect")
-                indirectRoot = true;
+                ;
             else if (*arg == "--no-output")
                 noOutput = true;
             else if (*arg != "" && arg->at(0) == '-') {

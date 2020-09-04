@@ -2,8 +2,9 @@
   description = "The purely functional package manager";
 
   inputs.nixpkgs.url = "nixpkgs/nixos-20.03-small";
+  inputs.lowdown-src = { url = "github:edolstra/lowdown/no-structs-in-anonymous-unions"; flake = false; };
 
-  outputs = { self, nixpkgs }:
+  outputs = { self, nixpkgs, lowdown-src }:
 
     let
 
@@ -65,10 +66,8 @@
           [
             buildPackages.bison
             buildPackages.flex
-            buildPackages.libxml2
-            buildPackages.libxslt
-            buildPackages.docbook5
-            buildPackages.docbook_xsl_ns
+            buildPackages.lowdown
+            buildPackages.mdbook
             buildPackages.autoconf-archive
             buildPackages.autoreconfHook
             buildPackages.pkgconfig
@@ -85,10 +84,8 @@
             openssl sqlite
             libarchive
             boost
-            (if lib.versionAtLeast lib.version "20.03pre"
-             then nlohmann_json
-             else nlohmann_json.override { multipleHeaders = true; })
             nlohmann_json
+            lowdown
             gmock
           ]
           ++ lib.optionals stdenv.isLinux [libseccomp utillinuxMinimal]
@@ -183,6 +180,7 @@
                 xz
                 pkgs.perl
                 boost
+                nlohmann_json
               ]
               ++ lib.optional (stdenv.isLinux || stdenv.isDarwin) libsodium;
 
@@ -196,6 +194,30 @@
             postUnpack = "sourceRoot=$sourceRoot/perl";
           };
 
+        };
+
+        lowdown = with final; stdenv.mkDerivation {
+          name = "lowdown-0.7.1";
+
+          /*
+          src = fetchurl {
+            url = https://kristaps.bsd.lv/lowdown/snapshots/lowdown-0.7.1.tar.gz;
+            hash = "sha512-1daoAQfYD0LdhK6aFhrSQvadjc5GsSPBZw0fJDb+BEHYMBLjqiUl2A7H8N+l0W4YfGKqbsPYSrCy4vct+7U6FQ==";
+          };
+          */
+
+          src = lowdown-src;
+
+          outputs = [ "out" "dev" ];
+
+          nativeBuildInputs = [ which ];
+
+          configurePhase =
+            ''
+              ./configure \
+                PREFIX=${placeholder "dev"} \
+                BINDIR=${placeholder "out"}/bin
+            '';
         };
 
       };
@@ -472,6 +494,8 @@
         stdenv.mkDerivation {
           name = "nix";
 
+          outputs = [ "out" "dev" "doc" ];
+
           nativeBuildInputs = nativeBuildDeps;
           buildInputs = buildDeps ++ propagatedDeps ++ awsDeps ++ perlDeps;
 
@@ -483,11 +507,9 @@
 
           shellHook =
             ''
-              export prefix=$(pwd)/inst
-              configureFlags+=" --prefix=$prefix"
-              PKG_CONFIG_PATH=$prefix/lib/pkgconfig:$PKG_CONFIG_PATH
               PATH=$prefix/bin:$PATH
               unset PYTHONPATH
+              export MANPATH=$out/share/man:$MANPATH
             '';
         });
 

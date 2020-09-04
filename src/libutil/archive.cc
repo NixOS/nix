@@ -366,11 +366,7 @@ void copyNAR(Source & source, Sink & sink)
 
     ParseSink parseSink; /* null sink; just parse the NAR */
 
-    LambdaSource wrapper([&](unsigned char * data, size_t len) {
-        auto n = source.read(data, len);
-        sink(data, n);
-        return n;
-    });
+    TeeSource wrapper { source, sink };
 
     parseDump(parseSink, wrapper);
 }

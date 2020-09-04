@@ -115,7 +115,7 @@ struct CmdRegistryPin : virtual Args, EvalCommand
     }
 };
 
-struct CmdRegistry : virtual MultiCommand, virtual Command
+struct CmdRegistry : virtual NixMultiCommand
 {
     CmdRegistry()
         : MultiCommand({
@@ -140,11 +140,6 @@ struct CmdRegistry : virtual MultiCommand, virtual Command
             throw UsageError("'nix registry' requires a sub-command.");
         command->second->prepare();
         command->second->run();
-    }
-
-    void printHelp(const string & programName, std::ostream & out) override
-    {
-        MultiCommand::printHelp(programName, out);
     }
 };
 

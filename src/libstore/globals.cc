@@ -10,6 +10,9 @@
 #include <sys/utsname.h>
 #include <unordered_set>
 
+#include <nlohmann/json.hpp>
+
+
 namespace nix {
 
 
@@ -160,9 +163,9 @@ template<> std::string BaseSetting<SandboxMode>::to_string() const
     else abort();
 }
 
-template<> void BaseSetting<SandboxMode>::toJSON(JSONPlaceholder & out)
+template<> nlohmann::json BaseSetting<SandboxMode>::toJSON()
 {
-    AbstractSetting::toJSON(out);
+    return AbstractSetting::toJSON();
 }
 
 template<> void BaseSetting<SandboxMode>::convertToArg(Args & args, const std::string & category)

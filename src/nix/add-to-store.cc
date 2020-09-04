@@ -36,6 +36,14 @@ struct CmdAddToStore : MixDryRun, StoreCommand
         return "add a path to the Nix store";
     }
 
+    std::string doc() override
+    {
+        return R"(
+          Copy the file or directory *path* to the Nix store, and
+          print the resulting store path on standard output.
+        )";
+    }
+
     Examples examples() override
     {
         return {
@@ -60,8 +68,10 @@ struct CmdAddToStore : MixDryRun, StoreCommand
             hash = hsink.finish().first;
         }
 
-        ValidPathInfo info(store->makeFixedOutputPath(ingestionMethod, hash, *namePart));
-        info.narHash = narHash;
+        ValidPathInfo info {
+            store->makeFixedOutputPath(ingestionMethod, hash, *namePart),
+            narHash,
+        };
         info.narSize = sink.s->size();
         info.ca = std::optional { FixedOutputHash {
             .method = ingestionMethod,

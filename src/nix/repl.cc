@@ -32,6 +32,7 @@ extern "C" {
 #include "globals.hh"
 #include "command.hh"
 #include "finally.hh"
+#include "markdown.hh"
 
 #if HAVE_BOEHMGC
 #define GC_INCLUDE_NEW
@@ -64,7 +65,7 @@ struct NixRepl
     void mainLoop(const std::vector<std::string> & files);
     StringSet completePrefix(string prefix);
     bool getLine(string & input, const std::string &prompt);
-    Path getDerivationPath(Value & v);
+    StorePath getDerivationPath(Value & v);
     bool processLine(string line);
     void loadFile(const Path & path);
     void initEnv();
@@ -375,13 +376,16 @@ bool isVarName(const string & s)
 }
 
 
-Path NixRepl::getDerivationPath(Value & v) {
+StorePath NixRepl::getDerivationPath(Value & v) {
     auto drvInfo = getDerivation(*state, v, false);
     if (!drvInfo)
         throw Error("expression does not evaluate to a derivation, so I can't build it");
-    Path drvPath = drvInfo->queryDrvPath();
-    if (drvPath == "" || !state->store->isValidPath(state->store->parseStorePath(drvPath)))
-        throw Error("expression did not evaluate to a valid derivation");
+    Path drvPathRaw = drvInfo->queryDrvPath();
+    if (drvPathRaw == "")
+        throw Error("expression did not evaluate to a valid derivation (no drv path)");
+    StorePath drvPath = state->store->parseStorePath(drvPathRaw);
+    if (!state->store->isValidPath(drvPath))
+        throw Error("expression did not evaluate to a valid derivation (invalid drv path)");
     return drvPath;
 }
 
@@ -416,7 +420,8 @@ bool NixRepl::processLine(string line)
              << "  :r            Reload all files\n"
              << "  :s <expr>     Build dependencies of derivation, then start nix-shell\n"
              << "  :t <expr>     Describe result of evaluation\n"
-             << "  :u <expr>     Build derivation, then start nix-shell\n";
+             << "  :u <expr>     Build derivation, then start nix-shell\n"
+             << "  :doc <expr>   Show documentation of a builtin function\n";
     }
 
     else if (command == ":a" || command == ":add") {
@@ -474,29 +479,30 @@ bool NixRepl::processLine(string line)
         evalString("drv: (import <nixpkgs> {}).runCommand \"shell\" { buildInputs = [ drv ]; } \"\"", f);
         state->callFunction(f, v, result, Pos());
 
-        Path drvPath = getDerivationPath(result);
-        runProgram(settings.nixBinDir + "/nix-shell", Strings{drvPath});
+        StorePath drvPath = getDerivationPath(result);
+        runProgram(settings.nixBinDir + "/nix-shell", Strings{state->store->printStorePath(drvPath)});
     }
 
     else if (command == ":b" || command == ":i" || command == ":s") {
         Value v;
         evalString(arg, v);
-        Path drvPath = getDerivationPath(v);
+        StorePath drvPath = getDerivationPath(v);
+        Path drvPathRaw = state->store->printStorePath(drvPath);
 
         if (command == ":b") {
             /* We could do the build in this process using buildPaths(),
                but doing it in a child makes it easier to recover from
                problems / SIGINT. */
-            if (runProgram(settings.nixBinDir + "/nix", Strings{"build", "--no-link", drvPath}) == 0) {
-                auto drv = readDerivation(*state->store, drvPath, Derivation::nameFromPath(state->store->parseStorePath(drvPath)));
+            if (runProgram(settings.nixBinDir + "/nix", Strings{"build", "--no-link", drvPathRaw}) == 0) {
+                auto drv = state->store->readDerivation(drvPath);
                 std::cout << std::endl << "this derivation produced the following outputs:" << std::endl;
-                for (auto & i : drv.outputs)
-                    std::cout << fmt("  %s -> %s\n", i.first, state->store->printStorePath(i.second.path(*state->store, drv.name)));
+                for (auto & i : drv.outputsAndPaths(*state->store))
+                    std::cout << fmt("  %s -> %s\n", i.first, state->store->printStorePath(i.second.second));
             }
         } else if (command == ":i") {
-            runProgram(settings.nixBinDir + "/nix-env", Strings{"-i", drvPath});
+            runProgram(settings.nixBinDir + "/nix-env", Strings{"-i", drvPathRaw});
         } else {
-            runProgram(settings.nixBinDir + "/nix-shell", Strings{drvPath});
+            runProgram(settings.nixBinDir + "/nix-shell", Strings{drvPathRaw});
         }
     }
 
@@ -508,6 +514,29 @@ bool NixRepl::processLine(string line)
 
     else if (command == ":q" || command == ":quit")
         return false;
+
+    else if (command == ":doc") {
+        Value v;
+        evalString(arg, v);
+        if (auto doc = state->getDoc(v)) {
+            std::string markdown;
+
+            if (!doc->args.empty() && doc->name) {
+                auto args = doc->args;
+                for (auto & arg : args)
+                    arg = "*" + arg + "*";
+
+                markdown +=
+                    "**Synopsis:** `builtins." + (std::string) (*doc->name) + "` "
+                    + concatStringsSep(" ", args) + "\n\n";
+            }
+
+            markdown += trim(stripIndentation(doc->doc));
+
+            std::cout << renderMarkdownToTerminal(markdown);
+        } else
+            throw Error("value does not have documentation");
+    }
 
     else if (command != "")
         throw Error("unknown command '%1%'", command);
@@ -782,7 +811,7 @@ struct CmdRepl : StoreCommand, MixEvalArgs
         return {
           Example{
             "Display all special commands within the REPL:",
-              "nix repl\n  nix-repl> :?"
+            "nix repl\nnix-repl> :?"
           }
         };
     }

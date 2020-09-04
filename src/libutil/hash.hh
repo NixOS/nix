@@ -59,9 +59,6 @@ private:
     Hash(std::string_view s, HashType type, bool isSRI);
 
 public:
-    /* Check whether a hash is set. */
-    operator bool () const { return (bool) type; }
-
     /* Check whether two hash are equal. */
     bool operator == (const Hash & h2) const;
 
@@ -105,6 +102,8 @@ public:
         assert(type == htSHA1);
         return std::string(to_string(Base16, false), 0, 7);
     }
+
+    static Hash dummy;
 };
 
 /* Helper that defaults empty hashes to the 0 hash. */

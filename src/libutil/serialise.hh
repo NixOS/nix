@@ -23,7 +23,8 @@ struct Sink
 };
 
 
-/* A buffered abstract sink. */
+/* A buffered abstract sink. Warning: a BufferedSink should not be
+   used from multiple threads concurrently. */
 struct BufferedSink : virtual Sink
 {
     size_t bufSize, bufPos;
@@ -66,7 +67,8 @@ struct Source
 };
 
 
-/* A buffered abstract source. */
+/* A buffered abstract source. Warning: a BufferedSource should not be
+   used from multiple threads concurrently. */
 struct BufferedSource : Source
 {
     size_t bufSize, bufPosIn, bufPosOut;
@@ -222,6 +224,17 @@ struct SizedSource : Source
             sum += n;
         }
         return sum;
+    }
+};
+
+/* A sink that that just counts the number of bytes given to it */
+struct LengthSink : Sink
+{
+    uint64_t length = 0;
+
+    virtual void operator () (const unsigned char * _, size_t len)
+    {
+        length += len;
     }
 };
 
