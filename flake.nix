@@ -69,6 +69,7 @@
             buildPackages.libxslt
             buildPackages.docbook5
             buildPackages.docbook_xsl_ns
+            buildPackages.autoconf-archive
             buildPackages.autoreconfHook
             buildPackages.pkgconfig
 
@@ -79,18 +80,9 @@
           ];
 
         buildDeps =
-          [ bison
-            flex
-            libxml2
-            libxslt
-            docbook5
-            docbook_xsl_ns
-            autoconf-archive
-            autoreconfHook
-
-            curl
+          [ curl
             bzip2 xz brotli zlib editline
-            openssl pkgconfig sqlite
+            openssl sqlite
             libarchive
             boost
             (if lib.versionAtLeast lib.version "20.03pre"
@@ -178,14 +170,17 @@
 
             src = self;
 
+            nativeBuildInputs =
+              [ buildPackages.autoconf-archive
+                buildPackages.autoreconfHook
+                buildPackages.pkgconfig
+              ];
+
             buildInputs =
-              [ autoconf-archive
-                autoreconfHook
-                nix
+              [ nix
                 curl
                 bzip2
                 xz
-                pkgconfig
                 pkgs.perl
                 boost
               ]
