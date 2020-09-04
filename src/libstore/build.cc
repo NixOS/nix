@@ -718,7 +718,7 @@ typedef enum {rpAccept, rpDecline, rpPostpone} HookReply;
 
 class SubstitutionGoal;
 
-struct KnownInitialOutputStatus {
+struct InitialOutputStatus {
     StorePath path;
     /* The output optional indicates whether it's already valid; i.e. exists
        and is registered. If we're repairing, inner bool indicates whether the
@@ -731,9 +731,9 @@ struct KnownInitialOutputStatus {
     }
 };
 
-struct InitialOutputStatus {
+struct InitialOutput {
     bool wanted;
-    std::optional<KnownInitialOutputStatus> known;
+    std::optional<InitialOutputStatus> known;
 };
 
 class DerivationGoal : public Goal
@@ -770,7 +770,7 @@ private:
        immediate input paths). */
     StorePathSet inputPaths;
 
-    std::map<std::string, InitialOutputStatus> initialOutputs;
+    std::map<std::string, InitialOutput> initialOutputs;
 
     /* User selected for running the builder. */
     std::unique_ptr<UserLock> buildUser;
@@ -1052,11 +1052,14 @@ private:
     /* Forcibly kill the child process, if any. */
     void killChild();
 
-    /* Map a path to another (reproducably) so we can avoid overwriting outputs
+    /* Create alternative path calculated from but distinct from the
+       input, so we can avoid overwriting outputs (or other store paths)
        that already exist. */
     StorePath makeFallbackPath(const StorePath & path);
-    /* Make a path to another based on the output name alone, if one doesn't
-       want to use a random path for CA builds. */
+    /* Make a path to another based on the output name along with the
+       derivation hash. */
+    /* FIXME add option to randomize, so we can audit whether our
+       rewrites caught everything */
     StorePath makeFallbackPath(std::string_view outputName);
 
     void repairClosure();
@@ -1268,7 +1271,7 @@ void DerivationGoal::haveDerivation()
         for (auto & [_, status] : initialOutputs) {
             if (!status.wanted) continue;
             if (!status.known) {
-                warn("Do not know how to query for unknown floating CA drv output yet");
+                warn("do not know how to query for unknown floating content-addressed derivation output yet");
                 /* Nothing to wait for; tail call */
                 return DerivationGoal::gaveUpOnSubstitution();
             }
@@ -1497,7 +1500,7 @@ void DerivationGoal::inputsRealised()
                     auto optRealizedInput = outputs.at(j);
                     if (!optRealizedInput)
                         throw Error(
-                            "derivation '%s' requires output '%s' from input derivation '%s', which is supposedly realized already, yet we still don't know what path corresponds to that output.",
+                            "derivation '%s' requires output '%s' from input derivation '%s', which is supposedly realized already, yet we still don't know what path corresponds to that output",
                             worker.store.printStorePath(drvPath), j, worker.store.printStorePath(drvPath));
                     worker.store.computeFSClosure(*optRealizedInput, inputPaths);
                 } else
@@ -2070,7 +2073,7 @@ StorePathSet DerivationGoal::exportReferences(const StorePathSet & storePaths)
                        `computeFSClosure` on the output path, rather than
                        derivation itself. That doesn't seem right to me, so I
                        won't try to implemented this for CA derivations. */
-                    throw UnimplementedError("export references including CA derivations (themselves) is not yet implemented");
+                    throw UnimplementedError("exportReferences on CA derivations is not yet implemented");
                 worker.store.computeFSClosure(*k.second.second, paths);
             }
         }
@@ -2179,8 +2182,6 @@ void DerivationGoal::startBuilder()
            with the actual hashes. */
         auto scratchPath =
             !status.known
-                /* FIXME add option to randomize, so we can audit whether our
-                 * rewrites caught everything */
                 ? makeFallbackPath(outputName)
             : !needsHashRewrite()
                 /* Can always use original path in sandbox */
@@ -2213,7 +2214,7 @@ void DerivationGoal::startBuilder()
            differ. */
         if (fixedFinalPath == scratchPath) continue;
 
-        /* Ensure scratch scratch path is ours to use */
+        /* Ensure scratch path is ours to use. */
         deletePath(worker.store.printStorePath(scratchPath));
 
         /* Rewrite and unrewrite paths */
@@ -4139,8 +4140,13 @@ void DerivationGoal::registerOutputs()
                     if (lstat(actualPath.c_str(), &st))
                         throw SysError("getting attributes of path '%1%'", actualPath);
                     mode |= 0200;
-                    if (chmod(actualPath.c_str(), mode) == -1)
-                        throw SysError("changing mode of '%1%' to %2$o", actualPath, mode);
+                    /* Try to change the perms, but only if the file isn't a
+                       symlink as symlinks permissions are mostly ignored and
+                       calling `chmod` on it will just forward the call to the
+                       target of the link. */
+                    if (!S_ISLNK(st.st_mode))
+                        if (chmod(actualPath.c_str(), mode) == -1)
+                            throw SysError("changing mode of '%1%' to %2$o", actualPath, mode);
                 }
                 if (rename(
                         actualPath.c_str(),
@@ -4619,19 +4625,19 @@ void DerivationGoal::checkPathValidity()
 {
     bool checkHash = buildMode == bmRepair;
     for (auto & i : queryPartialDerivationOutputMap()) {
-        InitialOutputStatus status {
+        InitialOutput info {
             .wanted = wantOutput(i.first, wantedOutputs),
         };
         if (i.second) {
             auto outputPath = *i.second;
-            status.known = {
+            info.known = {
                 .path = outputPath,
                 .valid = !worker.store.isValidPath(outputPath)
                     ? std::optional<bool> {}
                     : !checkHash || worker.pathContentsGood(outputPath),
             };
         }
-        initialOutputs.insert_or_assign(i.first, status);
+        initialOutputs.insert_or_assign(i.first, info);
     }
 }
 

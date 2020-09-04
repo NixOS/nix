@@ -13,17 +13,17 @@ rec {
       mkdir -p $out
       echo "Hello World" > $out/hello
     '';
-    __contentAddressed = true;
-    outputHashMode = "recursive";
-    outputHashAlgo = "sha256";
   };
   rootCA = mkDerivation {
     name = "dependent";
+    outputs = [ "out" "dev" ];
     buildCommand = ''
       echo "building a CA derivation"
       echo "The seed is ${toString seed}"
       mkdir -p $out
       echo ${rootLegacy}/hello > $out/dep
+      # test symlink at root
+      ln -s $out $dev
     '';
     __contentAddressed = true;
     outputHashMode = "recursive";

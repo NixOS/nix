@@ -279,9 +279,8 @@ private:
        specified by the ‘secret-key-files’ option. */
     void signPathInfo(ValidPathInfo & info);
 
-    /* Add a mapping from the deriver of the path info (if specified) to its
-     * out path
-     */
+    /* Register the store path 'output' as the output named 'outputName' of
+       derivation 'deriver'. */
     void linkDeriverToPath(const StorePath & deriver, const string & outputName, const StorePath & output);
     void linkDeriverToPath(State & state, uint64_t deriver, const string & outputName, const StorePath & output);
 

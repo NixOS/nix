@@ -150,8 +150,9 @@ void MixProfile::updateProfile(const Buildables & buildables)
             },
             [&](BuildableFromDrv bfd) {
                 for (auto & output : bfd.outputs) {
-                    if (!output.second)
-                        throw Error("output path should be known because we just tried to build it");
+                    /* Output path should be known because we just tried to
+                       build it. */
+                    assert(!output.second);
                     result.push_back(*output.second);
                 }
             },

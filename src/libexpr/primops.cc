@@ -75,6 +75,18 @@ void EvalState::realiseContext(const PathSet & context)
     }
 }
 
+/* Add and attribute to the given attribute map from the output name to
+   the output path, or a placeholder.
+
+   Where possible the path is used, but for floating CA derivations we
+   may not know it. For sake of determinism we always assume we don't
+   and instead put in a place holder. In either case, however, the
+   string context will contain the drv path and output name, so
+   downstream derivations will have the proper dependency, and in
+   addition, before building, the placeholder will be rewritten to be
+   the actual path.
+
+   The 'drv' and 'drvPath' outputs must correspond. */
 static void mkOutputString(EvalState & state, Value & v,
     const StorePath & drvPath, const BasicDerivation & drv,
     std::pair<string, DerivationOutput> o)
