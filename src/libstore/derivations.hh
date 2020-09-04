@@ -146,7 +146,9 @@ enum RepairFlag : bool { NoRepair = false, Repair = true };
 
 /* Write a derivation to the Nix store, and return its path. */
 StorePath writeDerivation(Store & store,
-    const Derivation & drv, RepairFlag repair = NoRepair);
+    const Derivation & drv,
+    RepairFlag repair = NoRepair,
+    bool readOnly = false);
 
 /* Read a derivation from a file. */
 Derivation parseDerivation(const Store & store, std::string && s, std::string_view name);

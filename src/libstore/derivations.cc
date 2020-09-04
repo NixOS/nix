@@ -69,7 +69,7 @@ bool BasicDerivation::isBuiltin() const
 
 
 StorePath writeDerivation(Store & store,
-    const Derivation & drv, RepairFlag repair)
+    const Derivation & drv, RepairFlag repair, bool readOnly)
 {
     auto references = drv.inputSrcs;
     for (auto & i : drv.inputDrvs)
@@ -79,7 +79,7 @@ StorePath writeDerivation(Store & store,
        held during a garbage collection). */
     auto suffix = std::string(drv.name) + drvExtension;
     auto contents = drv.unparse(store, false);
-    return settings.readOnlyMode
+    return readOnly || settings.readOnlyMode
         ? store.computeStorePathForText(suffix, contents, references)
         : store.addTextToStore(suffix, contents, references, repair);
 }

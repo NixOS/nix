@@ -728,7 +728,7 @@ uint64_t LocalStore::queryValidPathId(State & state, const StorePath & path)
 {
     auto use(state.stmtQueryPathInfo.use()(printStorePath(path)));
     if (!use.next())
-        throw Error("path '%s' is not valid", printStorePath(path));
+        throw InvalidPath("path '%s' is not valid", printStorePath(path));
     return use.getInt(0);
 }
 
@@ -831,7 +831,8 @@ std::map<std::string, std::optional<StorePath>> LocalStore::queryPartialDerivati
             /* If we cannot resolve the derivation, we cannot have any path
                assigned so we return the map of all std::nullopts. */
             return outputs;
-        auto pathResolved = writeDerivation(*this, *std::move(attempt));
+        /* Just compute store path */
+        auto pathResolved = writeDerivation(*this, *std::move(attempt), NoRepair, true);
         /* Store in memo table. */
         /* FIXME: memo logic should not be local-store specific, should have
            wrapper-method instead. */
@@ -841,8 +842,19 @@ std::map<std::string, std::optional<StorePath>> LocalStore::queryPartialDerivati
     return retrySQLite<std::map<std::string, std::optional<StorePath>>>([&]() {
         auto state(_state.lock());
 
-        auto useQueryDerivationOutputs(state->stmtQueryDerivationOutputs.use()
-            (queryValidPathId(*state, path)));
+        uint64_t drvId;
+        try {
+            drvId = queryValidPathId(*state, path);
+        } catch (InvalidPath &) {
+            /* FIXME? if the derivation doesn't exist, we cannot have a mapping
+               for it. */
+            return outputs;
+        }
+
+        auto useQueryDerivationOutputs {
+            state->stmtQueryDerivationOutputs.use()
+            (drvId)
+        };
 
         while (useQueryDerivationOutputs.next())
             outputs.insert_or_assign(
